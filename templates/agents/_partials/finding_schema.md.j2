@@ -1,0 +1,93 @@
+## Finding Schema
+
+{% set _v = config.reviewers.verbosity | default("standard") %}
+{% set _kind = reviewer_kind | default("") %}
+Common envelope (every finding):
+
+- `severity`: `"P0"` | `"P1"`{% if _v != "terse" %} | `"P2"`{% endif %}{% if _v == "full" %} | `"P3"`{% endif %}
+- `file`: relative path
+- `line`: 1-indexed line, or `0` for whole-file
+- `summary`: ≤ 80 chars; what is wrong
+- `suggestion`: ≤ 200 chars; concrete fix
+{% if _v != "terse" %}
+- `reasoning`: 4-step Observe→Trace→Infer→Conclude (P0/P1 only)
+{% endif %}
+{% if _v == "full" %}
+- `rationale`: 1-2 sentences; why this severity rather than one notch lower
+{% endif %}
+{% if _kind == "security" %}
+- `category`: `"secrets"` | `"injection"` | `"auth"` | `"permissions"` | `"dependency"` | `"prompt-injection"`
+- `evidence`: the offending code excerpt (≤ 200 chars)
+{% elif _kind == "performance" %}
+- `expected_impact`: quantified when possible (e.g. `"50% fewer allocs"`, `"O(n²)→O(n)"`)
+{% elif _kind == "concurrency" %}
+- `race_kind`: `"data-race"` | `"deadlock"` | `"isr-blocking"` | `"dropped-future"` | `"ordering"`
+- `evidence`: the offending code excerpt (≤ 200 chars)
+{% elif _kind == "ux" %}
+- `wcag_ref`: e.g. `"WCAG 2.1 SC 2.4.7"` when an a11y criterion is implicated
+{% endif %}
+
+### Worked example
+
+{% if _kind == "security" %}
+```json
+{
+  "severity": "P0",
+  "file": "src/auth/login.py",
+  "line": 42,
+  "category": "secrets",
+  "summary": "OAuth client secret embedded in source",
+  "evidence": "CLIENT_SECRET = \"sk-prod-abc123\"",
+  "suggestion": "Move to env var; rotate the leaked value before merge.",
+  {% if _v != "terse" %}"reasoning": "Observe: hardcoded literal at line 42. Trace: imported by api/server.py and shipped to clients. Infer: any read of the bundle leaks the prod secret. Conclude: P0 — secret is live and rotation is mandatory.",{% endif %}
+}
+```
+{% elif _kind == "performance" %}
+```json
+{
+  "severity": "P1",
+  "file": "src/index/build.py",
+  "line": 88,
+  "summary": "O(n²) lookup inside hot indexing loop",
+  "expected_impact": "100× speedup on 10k-doc corpus",
+  "suggestion": "Hoist `for d in docs: x in d` to a precomputed set before the loop.",
+  {% if _v != "terse" %}"reasoning": "Observe: nested `in list` at line 88. Trace: called once per document in build_index. Infer: scales as len(docs)². Conclude: P1 — measurable on the existing 10k corpus.",{% endif %}
+}
+```
+{% elif _kind == "concurrency" %}
+```json
+{
+  "severity": "P0",
+  "file": "src/cache/store.py",
+  "line": 17,
+  "race_kind": "data-race",
+  "summary": "Shared dict mutated without lock from worker pool",
+  "evidence": "self._cache[key] = value  # called from N workers",
+  "suggestion": "Wrap with self._lock or switch to threadsafe TTLCache.",
+  {% if _v != "terse" %}"reasoning": "Observe: bare dict assignment at line 17. Trace: workers in submit() touch _cache concurrently. Infer: dict resize during write corrupts state. Conclude: P0 — undefined behaviour under load.",{% endif %}
+}
+```
+{% elif _kind == "ux" %}
+```json
+{
+  "severity": "P1",
+  "file": "src/ui/Modal.tsx",
+  "line": 24,
+  "summary": "Modal is not keyboard-dismissible",
+  "wcag_ref": "WCAG 2.1 SC 2.1.1",
+  "suggestion": "Add Escape handler; trap focus inside the modal while open.",
+  {% if _v != "terse" %}"reasoning": "Observe: no keyDown handler. Trace: mounted on /settings. Infer: keyboard-only users get stuck. Conclude: P1 — blocks an accessibility audit.",{% endif %}
+}
+```
+{% else %}
+```json
+{
+  "severity": "P1",
+  "file": "src/parser.py",
+  "line": 42,
+  "summary": "Off-by-one in chunk boundary",
+  "suggestion": "Replace `range(n)` with `range(n+1)` to include the final byte.",
+  {% if _v != "terse" %}"reasoning": "Observe: range(n) at line 42. Trace: consumes buffer in encode(). Infer: last byte dropped on len % chunk == 0. Conclude: P1 — silent data loss on aligned inputs.",{% endif %}
+}
+```
+{% endif %}

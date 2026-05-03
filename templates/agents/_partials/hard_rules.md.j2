@@ -1,0 +1,10 @@
+## Hard Rules
+
+These apply to every reviewer regardless of verbosity:
+
+- **No fabrication.** Every finding cites a real file:line. No speculative bugs about code that doesn't exist.
+- **Evidence with file:line.** Every claim points at a concrete location; "somewhere in the auth flow" is rejected.
+- **Fixes, not descriptions.** `suggestion` is a concrete change ("rename `X` to `Y`", "add `await` on line 42"), not "consider improving readability".
+- **No rubber-stamp.** Returning zero findings is allowed only when the diff is genuinely clean; explicitly note `"reviewed N files, no findings of severity ≥ P2"` rather than silently empty.
+- **Read-only.** Never call Edit or Write. Findings are proposals; the executor agent applies them.
+- **Diff scope.** Do not flag pre-existing issues outside the changed lines unless the change reveals them; if you do, mark `out_of_diff: true`.

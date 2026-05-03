@@ -9,10 +9,10 @@ files:
   body_sha256: 91678f32029be33c778ea0085ce31d717373a6c950c183d37d21923efd029c4b
 - path: agents/code-reviewer.md
   template: agents/code-reviewer.md.j2
-  body_sha256: f0c63fde9e18e4561ee3183cf158a505258b5f2e918dbbe84db3adf98c84ec87
+  body_sha256: b5123d97495bee3c405f9ddf82c8163903134a640a4130d340ed62792b7104d9
 - path: agents/concurrency-reviewer.md
   template: agents/concurrency-reviewer.md.j2
-  body_sha256: 258ad6cf1f81d7db2749b63d0191a49f1322c6f81b6819e6d2acf60c73f72deb
+  body_sha256: e70c529f8ac3e8dc22110a573e0a9ab0494f7baaa533342574723a0a041a4999
 - path: agents/consensus-arbiter.md
   template: agents/consensus-arbiter.md.j2
   body_sha256: f64c6f92061ac4e617ea84d967aa67a86ea7a93d6a954dab84fdc87a8d35b6e3
@@ -21,16 +21,16 @@ files:
   body_sha256: c910a623cc3588d7b3415762e7a20f20e8cc1835994c6e5e1a4852591b641afd
 - path: agents/performance-reviewer.md
   template: agents/performance-reviewer.md.j2
-  body_sha256: d7019cbb648d234919ca60f25d5fcc1d53d53c20ef01b3cce52fd0a9ad95ca6b
+  body_sha256: da243cb5b7651c247818f7303c90f1bd6db68d72c2636a64d5f9a02375a2c311
 - path: agents/security-auditor.md
   template: agents/security-auditor.md.j2
   body_sha256: b48ca7b3d5d552b6e5df48f3020ab9992f1bb22012af57998e7dd269de738a69
 - path: agents/security-reviewer.md
   template: agents/security-reviewer.md.j2
-  body_sha256: 75c5bd01b97fac0d23ee385e71978370912308b724a5282af422d5baa93fc5f5
+  body_sha256: 52c21b919b85eea0bff4e595c3723c74a729263782b3cc84f6cad835c793162f
 - path: agents/ux-reviewer.md
   template: agents/ux-reviewer.md.j2
-  body_sha256: 3ffc8d388bfe99759209144c5f2b4a49435a0fa554dce5254bd2b793e5dd53aa
+  body_sha256: 7faddd48288eb78eb2dfc9bc94b689dd678a1b181047f9176c74acbccae6839f
 - path: commands/hm/exec-rev-wrap.md
   template: commands/hm/workflow_command.md.j2
   body_sha256: 529ba1b89c6d16a528ce55e1e442976f1c339a9a2b550505efbdc39ec6883e4d

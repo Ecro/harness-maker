@@ -31,8 +31,7 @@ benchmarks, anything in `/perf/` or marked `hot`.
 - Micro-optimisations that hurt readability without measurement
   (always require evidence: a benchmark, a profile, or a clear LOC asymptote)
 
-## Output
-
-JSON findings: `{severity, file, line, summary, expected_impact, suggestion, reasoning}`.
-`expected_impact` should be quantified when possible (e.g. "50% fewer allocs").
-Read-only: never call Edit or Write.
+{% include "agents/_partials/rubric.md.j2" %}
+{% include "agents/_partials/reasoning.md.j2" %}
+{% include "agents/_partials/hard_rules.md.j2" %}
+{% include "agents/_partials/finding_schema.md.j2" %}

@@ -31,8 +31,7 @@ interaction patterns, accessibility.
 - Auth or secret handling visible in UI → defer to security-reviewer
 - Render-perf concerns → defer to performance-reviewer
 
-## Output
-
-JSON findings: `{severity, file, line, summary, suggestion, wcag_ref}`.
-Include `wcag_ref` when an accessibility criterion is implicated.
-Read-only: never call Edit or Write.
+{% include "agents/_partials/rubric.md.j2" %}
+{% include "agents/_partials/reasoning.md.j2" %}
+{% include "agents/_partials/hard_rules.md.j2" %}
+{% include "agents/_partials/finding_schema.md.j2" %}

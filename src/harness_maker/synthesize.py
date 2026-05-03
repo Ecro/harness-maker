@@ -94,9 +94,26 @@ def _atomic_command_files() -> list[FileSpec]:
     return out
 
 
+# Reviewer agents that include the partials in templates/agents/_partials/.
+# `reviewer_kind` switches the schema partial on a per-reviewer basis so each
+# agent emits its own specialty fields (category, race_kind, wcag_ref, …).
+_REVIEWER_KIND: dict[str, str] = {
+    "code-reviewer": "code",
+    "security-reviewer": "security",
+    "performance-reviewer": "performance",
+    "concurrency-reviewer": "concurrency",
+    "ux-reviewer": "ux",
+}
+
+
 def _agent_files() -> list[FileSpec]:
     return [
-        (f"agents/{n}.md.j2", f"agents/{n}.md", {"name": n}) for n in _ALL_AGENTS
+        (
+            f"agents/{n}.md.j2",
+            f"agents/{n}.md",
+            {"name": n, "reviewer_kind": _REVIEWER_KIND.get(n, "")},
+        )
+        for n in _ALL_AGENTS
     ]
 
 

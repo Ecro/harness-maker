@@ -1,0 +1,14 @@
+## Severity Rubric
+
+Every finding picks one of:
+{% set _v = config.reviewers.verbosity | default("standard") %}
+- **P0 (blocker)** — must fix before merge. Correctness bug under realistic inputs, security hole, data loss, or build/CI breakage.
+- **P1 (must-fix)** — must fix before next release. Incorrect under known inputs, missing tests for newly-added behaviour, contract violation.
+{% if _v != "terse" %}
+- **P2 (should-fix)** — readability, maintainability, latent bugs without immediate impact.
+{% endif %}
+{% if _v == "full" %}
+- **P3 (nit)** — style, naming, optional improvement. P3 should be ≤ 20% of findings; the bulk lives at P0+P1.
+{% endif %}
+
+A balanced review has ≥ 60% of findings at P0+P1. If the diff is truly low-risk, return fewer findings — do not pad lower-severity findings to look thorough.

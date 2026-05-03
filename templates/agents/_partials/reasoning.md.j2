@@ -1,0 +1,13 @@
+{% set _v = config.reviewers.verbosity | default("standard") %}
+{% if _v != "terse" %}
+## Reasoning Template
+
+For every P0/P1 finding, the `reasoning` field walks the four steps below in order. Skip the field for P2/P3.
+
+1. **Observe** — what code or state did you read? Cite file:line.
+2. **Trace** — what runtime path does the change touch? What runs first, what mutates, what can fail?
+3. **Infer** — what input or sequence triggers the failure mode?
+4. **Conclude** — what is the finding, in one sentence?
+
+Reasoning is not a narrative — it is evidence. Each step is one or two sentences. If you cannot complete all four, the finding is not yet ready.
+{% endif %}

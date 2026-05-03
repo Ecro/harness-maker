@@ -32,7 +32,7 @@ respective domains and stay out of generalist territory.
 - UI / a11y → defer to ux-reviewer
 - Race conditions / threading → defer to concurrency-reviewer
 
-## Output
-
-JSON findings: `{severity, file, line, summary, suggestion, reasoning}`.
-Read-only: never call Edit or Write.
+{% include "agents/_partials/rubric.md.j2" %}
+{% include "agents/_partials/reasoning.md.j2" %}
+{% include "agents/_partials/hard_rules.md.j2" %}
+{% include "agents/_partials/finding_schema.md.j2" %}
