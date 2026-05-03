@@ -25,6 +25,7 @@ def test_empty_project_low_score(tmp_path: Path) -> None:
 def test_rich_project_high_score(tmp_path: Path) -> None:
     (tmp_path / "CLAUDE.md").write_text("# claude md\n")
     (tmp_path / "README.md").write_text("# readme\n")
+    (tmp_path / "pyproject.toml").write_text("[project]\nname = 'x'\n")  # stack marker
     tests = tmp_path / "tests"
     tests.mkdir()
     (tests / "test_x.py").write_text("def test_one():\n    assert True\n")
@@ -69,10 +70,12 @@ def test_security_unknown_default(tmp_path: Path) -> None:
 
 
 def test_ceremony_penalty_applied(tmp_path: Path) -> None:
-    # Create many files inside .claude to trigger ceremony penalty
+    # Create user-added .md files (no content_hash) to trigger ceremony penalty.
+    # Side threshold is 10; 20 files should produce a non-zero penalty.
     claude_dir = tmp_path / ".claude"
     claude_dir.mkdir()
-    for i in range(60):
-        (claude_dir / f"f{i}.txt").write_text("x")
+    for i in range(20):
+        (claude_dir / f"user-agent-{i}.md").write_text(f"# Agent {i}\nsome content\n")
     res = compute_health(tmp_path, Preset.SIDE)
     assert res["ceremony_penalty"] > 0
+    assert res["user_md_files"] == 20
