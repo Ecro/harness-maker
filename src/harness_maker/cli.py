@@ -57,9 +57,7 @@ def make(
         conflicts = reconcile(target_dotclaude, bp)
         from harness_maker.models import ReconcileDecision
 
-        keep_paths = {
-            c.path for c in conflicts if c.decision == ReconcileDecision.KEEP
-        }
+        keep_paths = {c.path for c in conflicts if c.decision == ReconcileDecision.KEEP}
         new_files = [f for f in bp.files if f.path not in keep_paths]
         bp = bp.model_copy(update={"files": new_files})
     freeze = DEFAULT_FREEZE_TIME if os.environ.get("HARNESS_MAKER_FREEZE") else None

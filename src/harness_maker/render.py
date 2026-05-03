@@ -188,7 +188,11 @@ def _render_json_file(
 ) -> Path:
     """settings.json — JSON body wrapped in YAML provenance frontmatter."""
     return _render_settings_json(
-        fe, env, target_dir, dry_run=dry_run, freeze_time=freeze_time,
+        fe,
+        env,
+        target_dir,
+        dry_run=dry_run,
+        freeze_time=freeze_time,
     )
 
 
@@ -257,15 +261,27 @@ def render(
     for fe in blueprint.files:
         if _is_hooks_json(fe):
             out = _render_pure_json(
-                fe, env, target_dir, dry_run=dry_run, freeze_time=freeze_time,
+                fe,
+                env,
+                target_dir,
+                dry_run=dry_run,
+                freeze_time=freeze_time,
             )
         elif _is_settings_json(fe):
             out = _render_json_file(
-                fe, env, target_dir, dry_run=dry_run, freeze_time=freeze_time,
+                fe,
+                env,
+                target_dir,
+                dry_run=dry_run,
+                freeze_time=freeze_time,
             )
         else:
             out = _render_text_file(
-                fe, env, target_dir, dry_run=dry_run, freeze_time=freeze_time,
+                fe,
+                env,
+                target_dir,
+                dry_run=dry_run,
+                freeze_time=freeze_time,
             )
         written.append(out)
     return written

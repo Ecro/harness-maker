@@ -12,7 +12,7 @@ from harness_maker.secscan.dependency_cves import scan
 def _write_uv_lock(path: Path) -> Path:
     p = path / "uv.lock"
     p.write_text(
-        '''
+        """
 version = 1
 
 [[package]]
@@ -22,7 +22,7 @@ version = "2.32.0"
 [[package]]
 name = "urllib3"
 version = "1.26.0"
-''',
+""",
         encoding="utf-8",
     )
     return p

@@ -71,7 +71,8 @@ def test_render_md_files_have_frontmatter(tmp_path: Path) -> None:
     assert md_files
     for md in md_files:
         head = md.read_text(encoding="utf-8").splitlines()[:1]
-        assert head and head[0] == "---", f"{md} missing frontmatter"
+        assert head, f"{md} is empty"
+        assert head[0] == "---", f"{md} missing frontmatter"
 
 
 def test_render_settings_json_has_provenance(tmp_path: Path) -> None:

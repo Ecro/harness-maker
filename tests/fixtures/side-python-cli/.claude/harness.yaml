@@ -4,7 +4,7 @@ harness_maker_version: 0.1.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: harness-yaml/Side.yaml.j2
 provenance: official
-content_hash: b872cc0a4a61ef1ef6f721ce288d661790ddb4d26cd0c3682a3c62006e5d211e
+content_hash: bd94a49ccbdd8120c5bec5164f85fdb85afe149c327d0cd03dd809b18995c083
 ---
 preset: Side
 locale: ko
@@ -17,3 +17,12 @@ workflows:
     - execute
     - review
     - wrapup
+
+worktree:
+  scope: [execute]
+  branch_prefix: hm-
+security:
+  on_finding:
+    high: warn
+    medium: log
+  gates: []

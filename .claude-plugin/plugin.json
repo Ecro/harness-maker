@@ -5,5 +5,13 @@
   "author": {
     "name": "noel"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "homepage": "https://github.com/noel/harness-maker",
+  "repository": "https://github.com/noel/harness-maker",
+  "keywords": [
+    "claude-code",
+    "harness",
+    "autoloop",
+    "anti-rot"
+  ]
 }

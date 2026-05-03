@@ -6,10 +6,10 @@ source_template: agents/autoloop-coder.md.j2
 provenance: official
 name: autoloop-coder
 description: Implementation agent for autoloop iterations — bounded scope, write-tool-only,
-  no open-ended exploration
-tools: Read, Write, Edit, Grep, Glob, Bash
+  no open-ended exploration; worktree-bounded writes
+tools: Read, Grep, Glob, Write, Edit, Bash
 model: opus
-content_hash: e3b1728db8a9b29a087d8f61f6b4b60902f97d0c1fe2274abfabbc854fad4695
+content_hash: 91678f32029be33c778ea0085ce31d717373a6c950c183d37d21923efd029c4b
 ---
 
 # autoloop-coder
@@ -17,6 +17,17 @@ content_hash: e3b1728db8a9b29a087d8f61f6b4b60902f97d0c1fe2274abfabbc854fad4695
 The implementation agent that runs inside an autoloop iteration. Bounded
 scope, explicit transformation list, write-tool-only by design (per the
 "CODER bounded scope for large rewrites" learning).
+
+## Permissions policy
+
+Allow:
+- Read(*), Grep(*), Glob(*)
+- Write(.worktrees/**), Edit(.worktrees/**)
+- Bash(uv run:*), Bash(pytest:*), Bash(npm test:*), Bash(cargo test:*)
+
+Deny:
+- Write(/etc/**), Write(~/.ssh/**), Write(~/.aws/**)
+- Bash(curl * | sh), Bash(eval *), Bash(rm -rf /:*)
 
 ## Triggers
 

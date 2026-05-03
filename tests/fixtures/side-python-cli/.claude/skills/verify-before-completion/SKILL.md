@@ -1,0 +1,141 @@
+---
+generated_by: harness-maker
+harness_maker_version: 0.1.0
+generated_at: '2026-01-01T00:00:00+00:00'
+source_template: skills/verify-before-completion/SKILL.md.j2
+provenance: official
+name: verify-before-completion
+description: Pre-wrapup gate enforcing 6 checks before any /hm:wrapup or autoloop
+  iteration close. Failure on any check blocks completion and surfaces the failing
+  check name + remediation hint.
+content_hash: d546e51675eec4d25c963eaedb0bc9253e4cee883500137956e6bdb2c3fb807b
+---
+
+# verify-before-completion
+
+Mandatory gate that runs immediately before `/hm:wrapup` OR before an
+autoloop iteration is considered closed. All 6 checks must pass; the first
+failure short-circuits the gate and blocks completion.
+
+## When to Invoke
+
+- `/hm:wrapup` automatically calls this skill before commit
+- `/hm:loop` calls this skill at the end of each iteration before marking
+  the feature `completed`
+- Manual: `/hm:verify` (the atomic stage) explicitly invokes the gate
+
+## The 6 Checks
+
+Each check returns exit code 0 on pass, non-zero on fail. The orchestrator
+collects all 6 results, but failure on any one blocks completion.
+
+### 1. PLAN/SPEC 충족 (PLAN/SPEC fulfillment)
+
+Verify a PLAN exists for the current task and all its task items are marked
+complete. Drift gate: SPEC frontmatter `status: approved` or `evolving`.
+
+```bash
+test -d work-docs && grep -rq "PLAN-" work-docs/ || exit 1
+# All `- [ ]` items in current PLAN must be `- [x]`:
+grep -E "^- \[ \]" work-docs/**/PLAN-*.md && exit 1 || exit 0
+```
+
+### 2. 회귀 게이트 (Regression / smoke gate)
+
+The repo's smoke verify script must pass for the current phase. For
+harness-maker itself this is `bash .claude-verify.sh phase_<N>`; user
+projects substitute their own smoke command via `harness.yaml.verify.cmd`.
+
+```bash
+bash .claude-verify.sh phase_${CURRENT_PHASE} || exit 1
+```
+
+### 3. Health 점수 -5 이내 (Health score within -5 of baseline)
+
+Compute the Health 6-dim composite via `harness_maker.readiness.compute_health`
+and compare against the last recorded baseline (in
+`.claude/observability/metrics.jsonl`). Drop > 5 points blocks completion.
+
+```bash
+python -c "
+from pathlib import Path
+from harness_maker.readiness import compute_health
+from harness_maker.models import Preset
+score = compute_health(Path('.'), Preset.SIDE)['composite']
+import json, sys
+metrics = Path('.claude/observability/metrics.jsonl')
+baseline = 0
+if metrics.exists():
+    for line in metrics.read_text().splitlines():
+        rec = json.loads(line)
+        if 'health' in rec:
+            baseline = rec['health']
+sys.exit(0 if score >= baseline - 5 else 1)
+"
+```
+
+### 4. Anti-rot pending defer 또는 처리 (Anti-rot pending resolved)
+
+No unresolved anti-rot proposals may be pending. Either accept, reject, or
+explicitly defer (writing a defer marker) before completion.
+
+```bash
+test ! -f .claude/observability/refresh/pending.jsonl || \
+  grep -q '"action":"defer"' .claude/observability/refresh/pending.jsonl || exit 1
+```
+
+### 5. 보안 high finding 0건 (Zero high-severity security findings)
+
+The 5 security gates (secrets, permissions, hook injection, dependency CVEs,
+prompt injection) must report zero `severity: high` findings.
+
+```bash
+findings=.claude/observability/security/findings.jsonl
+if [ -f "$findings" ]; then
+  count=$(grep -c '"severity":"high"' "$findings" || true)
+  [ "$count" -eq 0 ] || exit 1
+fi
+```
+
+### 6. Worktree merge 가능 (Worktree merge-safe)
+
+When worktree isolation is enabled, the active worktree must merge cleanly
+into the parent branch. No conflict markers, no whitespace errors.
+
+```bash
+git diff --check || exit 1
+# Optional: dry-run merge to detect conflicts before /hm:wrapup commits.
+git merge-tree $(git merge-base HEAD main) HEAD main | grep -q "<<<<<<<" && exit 1
+exit 0
+```
+
+## Failure Behavior
+
+- First failing check halts the gate immediately
+- Output: `BLOCKED: check <N> (<name>) — <stderr tail>`
+- Remediation hint per check (PLAN unclosed → list incomplete tasks; smoke
+  fail → re-run failing test; Health drop → show 6-dim breakdown; pending
+  refresh → suggest `/hm:refresh`; security high → list findings; merge
+  conflict → show conflicting paths)
+
+## Implementation
+
+This skill is a thin orchestrator that runs the 6 checks in order, collects
+exit codes, and emits a structured report. Per-check logic lives in the
+referenced Python modules + bash snippets above. No retries — checks are
+deterministic; flakiness is a defect to fix in the check, not retry around.
+
+## Output
+
+```json
+{
+  "passed": [1, 2, 4, 5, 6],
+  "failed": [3],
+  "blocking": true,
+  "first_failure": "Health 점수 -5 이내",
+  "remediation": "Health dropped from 78 to 71 (delta -7). See dashboard."
+}
+```
+
+When `blocking: true`, the calling command (`/hm:wrapup` or autoloop iter)
+must abort completion.

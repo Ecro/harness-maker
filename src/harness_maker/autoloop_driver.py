@@ -69,8 +69,8 @@ def _default_executor(feature: str, iter_idx: int) -> bool:  # noqa: ARG001
 
 
 _CONVERGENCE_PREDICATES: dict[str, Callable[[AutoloopState], bool]] = {
-    "all-features-completed": lambda s: bool(s.features) and all(
-        f in s.completed for f in s.features
+    "all-features-completed": lambda s: (
+        bool(s.features) and all(f in s.completed for f in s.features)
     ),
     "any-feature-completed": lambda s: any(f in s.completed for f in s.features),
     "min-2-features": lambda s: len(s.completed) >= 2,

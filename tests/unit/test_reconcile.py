@@ -10,9 +10,7 @@ from harness_maker.reconcile import backup, compute_body_hash, parse_frontmatter
 
 def _bp(rel_paths: list[str]) -> Blueprint:
     return Blueprint(
-        files=[
-            FileEntry(path=Path(rp), template="x.j2") for rp in rel_paths
-        ],
+        files=[FileEntry(path=Path(rp), template="x.j2") for rp in rel_paths],
     )
 
 
@@ -49,7 +47,9 @@ def test_reconcile_hash_match_returns_replace(tmp_path: Path) -> None:
 def test_reconcile_hash_mismatch_returns_keep(tmp_path: Path) -> None:
     target = tmp_path / "a.md"
     body = "# user has edited this\n"
-    fm = "---\ncontent_hash: 0000000000000000000000000000000000000000000000000000000000000000\n---\n"
+    fm = (
+        "---\ncontent_hash: 0000000000000000000000000000000000000000000000000000000000000000\n---\n"
+    )
     target.write_text(fm + body, encoding="utf-8")
     bp = _bp(["a.md"])
     conflicts = reconcile(tmp_path, bp)

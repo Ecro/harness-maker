@@ -313,14 +313,10 @@ def test_reconcile_preserves_user_edits() -> None:
         assert "content_hash mismatch" in cp.stderr, (
             f"unexpected failure mode: rc={cp.returncode} stderr={cp.stderr}"
         )
-        assert "dev.md" in cp.stderr, (
-            f"verify error did not name dev.md: stderr={cp.stderr}"
-        )
+        assert "dev.md" in cp.stderr, f"verify error did not name dev.md: stderr={cp.stderr}"
 
     after = target_file.read_text(encoding="utf-8")
-    assert sentinel in after, (
-        "user-edited dev.md was overwritten — reconcile KEEP decision missed"
-    )
+    assert sentinel in after, "user-edited dev.md was overwritten — reconcile KEEP decision missed"
 
 
 if __name__ == "__main__":

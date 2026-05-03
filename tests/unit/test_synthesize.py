@@ -76,9 +76,7 @@ def test_synthesize_atomic_command_count() -> None:
     p = _profile()
     a = interview(p, autoloop_mode=True)
     bp = synthesize(p, a)
-    atomic_paths = [
-        str(f.path) for f in bp.files if str(f.path).startswith("commands/hm/")
-    ]
+    atomic_paths = [str(f.path) for f in bp.files if str(f.path).startswith("commands/hm/")]
     # Side: 7 atomic + 1 workflow (dev) + 3 fixed (loop, monitor, refresh) = 11
     assert len(atomic_paths) == 11
 

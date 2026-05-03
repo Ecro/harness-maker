@@ -35,9 +35,7 @@ def _client_returning(payload: object, status: int = 200) -> httpx.Client:
 
 def test_crawl_returns_vulnerabilities() -> None:
     client = _client_returning(SAMPLE_OSV_RESPONSE)
-    specs = [
-        {"package": {"name": "requests", "ecosystem": "PyPI"}, "version": "2.0.0"}
-    ]
+    specs = [{"package": {"name": "requests", "ecosystem": "PyPI"}, "version": "2.0.0"}]
     items = osv_dev.crawl(packages=specs, client=client)
 
     assert len(items) == 1
@@ -71,7 +69,7 @@ def test_crawl_handles_http_error() -> None:
 def test_parse_uv_lock_extracts_packages(tmp_path: Path) -> None:
     lock = tmp_path / "uv.lock"
     lock.write_text(
-        '''
+        """
 version = 1
 
 [[package]]
@@ -84,7 +82,7 @@ version = "2.7.1"
 
 [[package]]
 name = "incomplete"
-'''.strip()
+""".strip()
     )
     specs = osv_dev.parse_uv_lock(lock)
     names = {s["package"]["name"] for s in specs}

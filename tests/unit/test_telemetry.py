@@ -47,7 +47,8 @@ def test_creates_parent_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> 
 
 
 def test_malformed_stdin_does_not_crash(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.chdir(tmp_path)
     rc = _run_main_with_stdin(monkeypatch, "not json {{{")
@@ -58,7 +59,8 @@ def test_malformed_stdin_does_not_crash(
 
 
 def test_empty_stdin_writes_default_entry(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.chdir(tmp_path)
     rc = _run_main_with_stdin(monkeypatch, "")

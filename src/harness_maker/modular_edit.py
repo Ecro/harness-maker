@@ -33,8 +33,7 @@ def _parse_component(component: str) -> tuple[str, str]:
     kind, sep, name = component.partition(":")
     if not sep or not name:
         msg = (
-            f"Invalid component spec {component!r}; expected 'kind:name' "
-            f"(e.g. 'reviewer:security')"
+            f"Invalid component spec {component!r}; expected 'kind:name' (e.g. 'reviewer:security')"
         )
         raise ModularEditError(msg)
     if kind not in ALLOWED_KINDS:
@@ -77,6 +76,7 @@ def _write_harness_yaml(
 ) -> None:
     """Atomic-write harness.yaml; refresh content_hash so reconciler treats us as canonical."""
     import hashlib
+
     hy = target_dir / "harness.yaml"
     body_yaml = yaml.safe_dump(
         config,

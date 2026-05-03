@@ -605,7 +605,7 @@ final_acceptance() {
 
   # R1 Locale-first
   log "R1 Locale-first"
-  uv run python -c "from harness_maker.i18n import resolve_locale, t; from harness_maker.models import Locale; assert t('q1_choose_language', Locale.KO)" \
+  uv run python -c "from harness_maker.i18n import resolve_locale, t; from harness_maker.models import Locale; assert t('q1_choose_language', Locale.KO, lang='ko')" \
     || fail "R1: i18n broken"
 
   # R2 Anti-rot

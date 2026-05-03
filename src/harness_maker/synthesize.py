@@ -192,10 +192,7 @@ _PRODUCTION_AGENTS: list[str] = [
 PRODUCTION_FILES: list[FileSpec] = [
     *SIDE_FILES,
     # 7 extra skills
-    *[
-        (f"skills/{n}/SKILL.md.j2", f"skills/{n}/SKILL.md", {"name": n})
-        for n in _PRODUCTION_SKILLS
-    ],
+    *[(f"skills/{n}/SKILL.md.j2", f"skills/{n}/SKILL.md", {"name": n}) for n in _PRODUCTION_SKILLS],
     # 8 extra agents
     *[(f"agents/{n}.md.j2", f"agents/{n}.md", {"name": n}) for n in _PRODUCTION_AGENTS],
 ]

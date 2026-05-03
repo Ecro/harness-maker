@@ -15,12 +15,7 @@ def _write_with_provenance(
 ) -> str:
     body_bytes = body.encode("utf-8")
     h = compute_body_hash(body_bytes)
-    fm = (
-        "---\n"
-        f"content_hash: {h}\n"
-        f"source_template: {source_template}\n"
-        "---\n"
-    )
+    fm = f"---\ncontent_hash: {h}\nsource_template: {source_template}\n---\n"
     path.write_text(fm + body, encoding="utf-8")
     return h
 

@@ -46,7 +46,9 @@ def _setup_minimal_project(target: Path, *, preset: str = "Side") -> None:
 
 
 def test_format_with_mock_data(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     _setup_minimal_project(tmp_path)
     payload = {"workspace": {"current_dir": str(tmp_path)}}
@@ -59,7 +61,9 @@ def test_format_with_mock_data(
 
 
 def test_no_claude_dir_graceful_fallback(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     payload = {"workspace": {"current_dir": str(tmp_path)}}
     monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(payload)))
@@ -72,7 +76,9 @@ def test_no_claude_dir_graceful_fallback(
 
 
 def test_production_preset_detected(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     _setup_minimal_project(tmp_path, preset="Production")
     payload = {"workspace": {"current_dir": str(tmp_path)}}
@@ -84,7 +90,9 @@ def test_production_preset_detected(
 
 
 def test_malformed_stdin_falls_back_to_cwd(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr("sys.stdin", io.StringIO("garbage{{{"))

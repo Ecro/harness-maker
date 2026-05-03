@@ -74,8 +74,7 @@ def verify(target_dir: Path) -> list[str]:
         actual = compute_body_hash(body)
         if actual != declared:
             errors.append(
-                f"{rel}: content_hash mismatch "
-                f"(declared {declared[:8]}, actual {actual[:8]})",
+                f"{rel}: content_hash mismatch (declared {declared[:8]}, actual {actual[:8]})",
             )
 
     return errors

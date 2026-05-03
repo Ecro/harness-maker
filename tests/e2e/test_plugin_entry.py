@@ -78,21 +78,16 @@ def test_plugin_entry_make_writes_harness_yaml() -> None:
         check=False,
     )
     assert cp.returncode == 0, (
-        f"plugin-entry make failed: rc={cp.returncode}\n"
-        f"stdout={cp.stdout}\nstderr={cp.stderr}"
+        f"plugin-entry make failed: rc={cp.returncode}\nstdout={cp.stdout}\nstderr={cp.stderr}"
     )
 
     harness_yaml = PLUGIN_SANDBOX / ".claude" / "harness.yaml"
-    assert harness_yaml.is_file(), (
-        f"missing harness.yaml after plugin-entry make: {harness_yaml}"
-    )
+    assert harness_yaml.is_file(), f"missing harness.yaml after plugin-entry make: {harness_yaml}"
 
     # Sanity: the plugin entry must produce the same minimum file count as the
     # regular CLI entry (≥25 per phase_11_apply gate).
     file_count = sum(1 for _ in (PLUGIN_SANDBOX / ".claude").rglob("*") if _.is_file())
-    assert file_count >= 25, (
-        f"plugin-entry make produced {file_count} files, expected ≥25"
-    )
+    assert file_count >= 25, f"plugin-entry make produced {file_count} files, expected ≥25"
 
 
 if __name__ == "__main__":

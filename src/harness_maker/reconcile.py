@@ -38,11 +38,7 @@ def parse_frontmatter(path: Path) -> tuple[dict[str, object] | None, bytes]:
 
 def compute_body_hash(body_bytes: bytes) -> str:
     """Same normalization as Renderer."""
-    text = (
-        body_bytes.decode("utf-8", errors="replace")
-        .replace("\r\n", "\n")
-        .replace("\r", "\n")
-    )
+    text = body_bytes.decode("utf-8", errors="replace").replace("\r\n", "\n").replace("\r", "\n")
     if not text.endswith("\n"):
         text += "\n"
     while text.endswith("\n\n"):

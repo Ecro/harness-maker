@@ -50,10 +50,7 @@ def test_crawl_returns_empty_list_on_http_error() -> None:
 
 
 def test_crawl_caps_at_max_items() -> None:
-    many = "".join(
-        f'<a href="/news/post-{i}"><h2>Post {i}</h2></a>'
-        for i in range(50)
-    )
+    many = "".join(f'<a href="/news/post-{i}"><h2>Post {i}</h2></a>' for i in range(50))
     html = f"<html><body>{many}</body></html>"
     client = _client_returning(html)
     items = anthropic_blog.crawl(client=client)
