@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.1.0
+harness_maker_version: 0.2.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/atomic_command.md.j2
 provenance: official
-content_hash: fb743fc5e2dbb7ba96c19ce07bb55f8c94b83e1229d24c9a39aeafcae615c270
+content_hash: e36e78a4f839f3a9709a58b6d2a3ae32cb28e004e893cc034407d950a4866f0c
 ---
 # Stage: wrapup
 
@@ -41,10 +41,9 @@ next session benefits, run the final review pass, sync TODOs and commit.
 4. **Failure-driven proposal** — when a failure entry crosses the threshold
    (count ≥ 3), log a skill/agent proposal to `.claude/memory/pending-proposals.md`.
 5. **TODO sync** — mark task complete, move to weekly archive.
-6. **RAG reindex** — run the project's janitor to update the vector index.
-7. **Commit** — single commit summarising the work unit, body explains
+6. **Commit** — single commit summarising the work unit, body explains
    the "why".
-8. (Optional) push.
+7. (Optional) push.
 
 ## Outputs
 

@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.1.0
+harness_maker_version: 0.2.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: 6fc321392ef94c1c7a5f1562c5ffa014529c269911c2f61b2d7f99812c6f232d
+content_hash: b8eb519c47111969e5470d68d0cb74a63dbea472a667dd0e977b831cb86d50f9
 ---
 # /hm:exec-rev-wrap-ver
 
@@ -304,10 +304,9 @@ next session benefits, run the final review pass, sync TODOs and commit.
 4. **Failure-driven proposal** — when a failure entry crosses the threshold
    (count ≥ 3), log a skill/agent proposal to `.claude/memory/pending-proposals.md`.
 5. **TODO sync** — mark task complete, move to weekly archive.
-6. **RAG reindex** — run the project's janitor to update the vector index.
-7. **Commit** — single commit summarising the work unit, body explains
+6. **Commit** — single commit summarising the work unit, body explains
    the "why".
-8. (Optional) push.
+7. (Optional) push.
 
 ## Outputs
 
