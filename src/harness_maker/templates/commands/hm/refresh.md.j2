@@ -26,17 +26,24 @@
    - Shipped domain samples at `templates/agents/_standards/*.md.j2`
    Default threshold is 90 days since `last_reviewed_at`. Missing dates count
    as stale.
-3. **Score** every `CrawlItem` against project keywords (extracted from
+3. **Version-drift check** via `harness_maker.relevance.detect_version_drift`:
+   compare `.claude/harness.yaml`'s stamped `harness_maker_version` against
+   the running package's `__version__`. Surface any mismatch as an upgrade
+   suggestion (`/plugin update` + `/harness-maker:make`).
+4. **Score** every `CrawlItem` against project keywords (extracted from
    `CLAUDE.md` + `README.md`) and compute the next adaptive threshold from
    prior accept/reject history.
-4. **Filter** items whose score ≥ threshold; write them — together with the
-   stale-asset list from step 2 — to
+5. **Filter** items whose score ≥ threshold; write them — together with the
+   stale-asset list and any version drift — to
    `.claude/observability/refresh/proposed-<YYYY-MM-DD>.md`.
-5. **AskUserQuestion** for each proposal: `accept` / `reject` / `defer`.
+6. **AskUserQuestion** for each proposal: `accept` / `reject` / `defer`.
    - For stale assets, `accept` updates the `last_reviewed_at` date only
      (body remains the user's responsibility); `reject` and `defer` produce
      no file changes.
    - For crawl items, `accept` patches the relevant `.claude/` asset.
+   - For version drift, `accept` is a NO-OP at this step — the user runs
+     `/harness-maker:make` themselves to apply the upgrade (preserves the
+     manual-confirm guarantee for re-rendering).
    Decisions append to `.claude/observability/refresh/decisions.jsonl`.
 
 **Hard rule:** the agent NEVER bypasses the AskUserQuestion step. Auto-apply
@@ -49,7 +56,12 @@ of refresh proposals is forbidden.
 from datetime import UTC, datetime
 from pathlib import Path
 from harness_maker.crawler import anthropic_blog, github_releases, arxiv, osv_dev, write_raw
-from harness_maker.relevance import build_proposal_lines, detect_stale_assets
+from harness_maker.relevance import (
+    build_drift_lines,
+    build_proposal_lines,
+    detect_stale_assets,
+    detect_version_drift,
+)
 
 # Step 1 — crawl 4 sources.
 items = []
@@ -63,17 +75,23 @@ write_raw(items, project_dir='.')
 project = Path('.')
 stale = detect_stale_assets(project)
 
-# Steps 3-4 — proposed-<date>.md gathers both crawl results and stale assets.
+# Step 3 — version-drift check (harness.yaml stamp vs running package).
+drift = detect_version_drift(project)
+
+# Steps 4-5 — proposed-<date>.md gathers crawl + stale + drift.
 out_dir = project / '.claude' / 'observability' / 'refresh'
 out_dir.mkdir(parents=True, exist_ok=True)
 today = datetime.now(tz=UTC).date().isoformat()
 out_path = out_dir / f'proposed-{today}.md'
-lines = [f'# proposed-{today}', '', f'## Stale assets ({len(stale)})', '']
+lines = [f'# proposed-{today}', '']
+lines += [f'## Version drift ({1 if drift else 0})', '']
+lines += build_drift_lines(drift) or ['(none)']
+lines += ['', f'## Stale assets ({len(stale)})', '']
 lines += build_proposal_lines(stale, project) or ['(none)']
 lines += ['', f'## Crawl items ({len(items)})', '',
           f'(score + filter via harness_maker.relevance — interactive walk follows)']
 out_path.write_text('\n'.join(lines) + '\n', encoding='utf-8')
-print(f'crawled {len(items)} items; {len(stale)} stale assets; wrote {out_path}')
+print(f'crawled {len(items)} items; {len(stale)} stale; drift={bool(drift)}; wrote {out_path}')
 "
 ```
 

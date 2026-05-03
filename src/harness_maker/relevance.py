@@ -12,6 +12,12 @@ annotation that domain packs and reviewer partials carry, and reports those
 older than a configurable threshold. ``/hm:refresh`` consumes the result via
 ``build_proposal_lines`` to prompt the user (or write proposed-<date>.md under
 autoloop). Accepted proposals are applied through ``update_last_reviewed_at``.
+
+Version-drift detection (``detect_version_drift``) compares the
+``harness_maker_version`` stamped in the project's ``harness.yaml`` frontmatter
+against the running package's ``__version__``. ``/hm:refresh`` includes any
+drift in the proposed-<date>.md so the user knows when to re-run
+``/harness-maker:make``.
 """
 
 from __future__ import annotations
@@ -21,6 +27,9 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from importlib import resources
 from pathlib import Path
+from typing import Literal
+
+import yaml
 
 from harness_maker.io_utils import atomic_write
 from harness_maker.models import CrawlItem
@@ -294,6 +303,108 @@ def update_last_reviewed_at(path: Path, new_date: date | None = None) -> date:
     )
     atomic_write(path, new_text)
     return new_date
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Version-drift detection (/hm:refresh anti-rot, Layer 1 option B)
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class VersionDrift:
+    """Mismatch between a project's stamped harness_maker_version and the
+    currently-installed harness-maker package. Direction is from the project's
+    perspective: ``upgrade`` = newer package available, ``downgrade`` = package
+    is older than what stamped the project (rare, usually a rollback).
+    """
+
+    installed: str  # the version stamped in harness.yaml frontmatter
+    current: str  # the running package's __version__
+    direction: Literal["upgrade", "downgrade"]
+
+
+def detect_version_drift(project_dir: Path) -> VersionDrift | None:
+    """Return drift info or None when no drift / harness.yaml unreadable.
+
+    Reads ``<project_dir>/.claude/harness.yaml`` frontmatter for
+    ``harness_maker_version`` and compares against the running package's
+    ``__version__``. Missing file, missing frontmatter, missing key, or
+    matching versions all return None — the caller treats None as "no
+    drift to surface".
+    """
+    from harness_maker import __version__
+
+    harness_yaml = project_dir / ".claude" / "harness.yaml"
+    if not harness_yaml.exists():
+        return None
+    try:
+        text = harness_yaml.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    if not text.startswith("---\n"):
+        return None
+    end = text.find("\n---\n", 4)
+    if end == -1:
+        return None
+    try:
+        fm = yaml.safe_load(text[4:end])
+    except yaml.YAMLError:
+        return None
+    if not isinstance(fm, dict):
+        return None
+    installed = fm.get("harness_maker_version")
+    if not isinstance(installed, str) or not installed:
+        return None
+    if installed == __version__:
+        return None
+    direction = _drift_direction(installed, __version__)
+    return VersionDrift(installed=installed, current=__version__, direction=direction)
+
+
+def _drift_direction(installed: str, current: str) -> Literal["upgrade", "downgrade"]:
+    """Compare two versions; semver-aware with lexical fallback for unparseable.
+
+    Returns ``upgrade`` when the running package is newer than what's stamped
+    in the project (typical case after harness-maker is bumped). Returns
+    ``downgrade`` otherwise. Equal versions are filtered before this is called.
+    """
+    pa = _parse_semver(installed)
+    pb = _parse_semver(current)
+    if pa is not None and pb is not None:
+        return "upgrade" if pa < pb else "downgrade"
+    # Fallback: lexical comparison. Coarse but deterministic for non-semver
+    # tags (e.g. dev / rc suffixes that we don't ship today).
+    return "upgrade" if installed < current else "downgrade"
+
+
+def _parse_semver(v: str) -> tuple[int, int, int] | None:
+    parts = v.split(".")
+    if len(parts) != 3:
+        return None
+    try:
+        return (int(parts[0]), int(parts[1]), int(parts[2]))
+    except ValueError:
+        return None
+
+
+def build_drift_lines(drift: VersionDrift | None) -> list[str]:
+    """Format a VersionDrift as bullet lines for proposed-<date>.md.
+
+    Returns an empty list when drift is None so callers can unconditionally
+    extend their proposal-line list.
+    """
+    if drift is None:
+        return []
+    arrow = "↑" if drift.direction == "upgrade" else "↓"
+    suggestion = (
+        "Run `/plugin update harness-maker@harness-maker-local` then `/harness-maker:make`."
+        if drift.direction == "upgrade"
+        else "Re-render with `/harness-maker:make` to align stamps with the current package."
+    )
+    return [
+        f"- harness-maker: `{drift.installed}` {arrow} `{drift.current}` ({drift.direction})",
+        f"  - {suggestion}",
+    ]
 
 
 def build_proposal_lines(
