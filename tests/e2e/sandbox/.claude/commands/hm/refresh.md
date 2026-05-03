@@ -4,12 +4,13 @@ harness_maker_version: 0.1.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/refresh.md.j2
 provenance: official
-content_hash: 5bb4ff81abb54ef83c3c48bbb7e585f5371f6bc6c15a21e57cd0967732f2dbf3
+content_hash: 0c2c33d6f3e6e637477d0ddcd930ff054b70a9c837e9545c4cabf34898978f62
 ---
 # /hm:refresh
 
 > Anti-rot refresh — re-validate the harness against the latest patterns from
-> 4 sources, then **manually confirm** every proposed change. Never applies
+> 4 sources **and** flag stale internal assets (reviewer partials, domain
+> packs), then **manually confirm** every proposed change. Never applies
 > automatically.
 
 ## Usage
@@ -26,17 +27,25 @@ content_hash: 5bb4ff81abb54ef83c3c48bbb7e585f5371f6bc6c15a21e57cd0967732f2dbf3
 
 1. **Crawl** all 4 sources (Anthropic blog, GitHub releases, arxiv,
    OSV.dev). Failures degrade gracefully — partial results still proceed.
-2. **Score** every `CrawlItem` against project keywords (extracted from
+2. **Stale-asset scan** via `harness_maker.relevance.detect_stale_assets`:
+   - User-authored domain packs at `.claude/agents/_standards/*.md`
+   - Reviewer partials at the harness-maker package's
+     `templates/agents/_partials/*.md.j2`
+   - Shipped domain samples at `templates/agents/_standards/*.md.j2`
+   Default threshold is 90 days since `last_reviewed_at`. Missing dates count
+   as stale.
+3. **Score** every `CrawlItem` against project keywords (extracted from
    `CLAUDE.md` + `README.md`) and compute the next adaptive threshold from
    prior accept/reject history.
-3. **Filter** items whose score ≥ threshold; write them to
+4. **Filter** items whose score ≥ threshold; write them — together with the
+   stale-asset list from step 2 — to
    `.claude/observability/refresh/proposed-<YYYY-MM-DD>.md`.
-4. **AskUserQuestion** for each proposal: `accept` / `reject` / `defer`.
-   Decisions are appended to
-   `.claude/observability/refresh/decisions.jsonl` so the next run's
-   adaptive threshold reflects the user's preferences.
-5. On `accept`, patch the relevant `.claude/` asset and stage the commit.
-   `reject` and `defer` produce no file changes.
+5. **AskUserQuestion** for each proposal: `accept` / `reject` / `defer`.
+   - For stale assets, `accept` updates the `last_reviewed_at` date only
+     (body remains the user's responsibility); `reject` and `defer` produce
+     no file changes.
+   - For crawl items, `accept` patches the relevant `.claude/` asset.
+   Decisions append to `.claude/observability/refresh/decisions.jsonl`.
 
 **Hard rule:** the agent NEVER bypasses the AskUserQuestion step. Auto-apply
 of refresh proposals is forbidden.
@@ -66,6 +75,7 @@ proposal interactively via **AskUserQuestion** — accept / reject / defer.
 ## Autoloop behavior
 
 When invoked under `autoloop` (no human in the loop), proceed only through
-step 3 (write `proposed-<date>.md`) and stop. Step 4 still requires
+step 4 (write `proposed-<date>.md` containing both stale-asset and
+crawl-item proposals) and stop. Step 5 still requires
 **AskUserQuestion** in interactive mode; autoloop must not synthesize a
 default answer.

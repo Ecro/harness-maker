@@ -9,7 +9,7 @@ description: Reviews changes for race conditions, deadlocks, ISR safety, and asy
   correctness
 tools: Read, Grep, Glob
 model: sonnet
-content_hash: 3d01e81cd87443841a1c56b2d2a20887ae9c48c4d1591752a368c1a7afcd92d2
+content_hash: 29f5f14f6bf297fd480c06c545b2c25481cc5e6b2aded59cb1312059815f22d7
 ---
 
 # concurrency-reviewer
@@ -37,6 +37,7 @@ async runtime, or a background worker.
 - Auth / secrets → defer to security-reviewer
 - Hot-path micro-perf → defer to performance-reviewer
 
+<!-- harness-maker partial: rubric (last_reviewed_at: 2026-05-03) -->
 ## Severity Rubric
 
 Every finding picks one of:
@@ -50,6 +51,7 @@ Every finding picks one of:
 
 A balanced review has ≥ 60% of findings at P0+P1. If the diff is truly low-risk, return fewer findings — do not pad lower-severity findings to look thorough.
 
+<!-- harness-maker partial: reasoning (last_reviewed_at: 2026-05-03) -->
 
 
 ## Reasoning Template
@@ -64,6 +66,7 @@ For every P0/P1 finding, the `reasoning` field walks the four steps below in ord
 Reasoning is not a narrative — it is evidence. Each step is one or two sentences. If you cannot complete all four, the finding is not yet ready.
 
 
+<!-- harness-maker partial: hard_rules (last_reviewed_at: 2026-05-03) -->
 ## Hard Rules
 
 These apply to every reviewer regardless of verbosity:
@@ -76,6 +79,7 @@ These apply to every reviewer regardless of verbosity:
 - **Diff scope.** Do not flag pre-existing issues outside the changed lines unless the change reveals them; if you do, mark `out_of_diff: true`.
 
 
+<!-- harness-maker partial: finding_schema (last_reviewed_at: 2026-05-03) -->
 ## Finding Schema
 
 
