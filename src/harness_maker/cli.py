@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 
 import typer
 
 from harness_maker.add_domain import AddDomainError, add_domain, validate_domain_name
 from harness_maker.block_merge import MergeReport
-from harness_maker.interview import interview
+from harness_maker.interview import answers_from_harness_yaml, interview
 from harness_maker.modular_edit import ModularEditError
 from harness_maker.modular_edit import add as modular_add
 from harness_maker.modular_edit import remove as modular_remove
@@ -62,10 +63,35 @@ def make(
             "non-shipped names. Shipped samples: python."
         ),
     ),
+    reinterview: bool = typer.Option(
+        False,
+        "--reinterview",
+        help=(
+            "Force the interactive interview even when an existing "
+            ".claude/harness.yaml is present. Default: silently reuse prior "
+            "answers on re-render."
+        ),
+    ),
 ) -> None:
     """Generate or refine the project harness at TARGET/.claude/."""
     p = profile(target)
-    a = interview(p, autoloop_mode=autoloop)
+    # Re-render path: silently reuse prior interview answers from harness.yaml
+    # so locale / dev_mode / custom workflows / reviewer-enablement survive
+    # without re-prompting. --reinterview forces fresh prompts; --autoloop
+    # only kicks in for first-time installs (no harness.yaml yet).
+    existing_yaml = target / ".claude" / "harness.yaml"
+    reused = None if reinterview else answers_from_harness_yaml(existing_yaml)
+    if reused is not None:
+        a = reused
+        typer.echo(f"reusing settings from {existing_yaml.relative_to(target)}")
+    else:
+        # Fresh install + non-tty stdin (e.g., invoked via Claude Code slash
+        # command, where AskUserQuestion isn't piped through) → auto-flip to
+        # autoloop defaults instead of hanging on the interactive prompt.
+        effective_autoloop = autoloop or (not sys.stdin.isatty())
+        if effective_autoloop and not autoloop:
+            typer.echo("non-tty stdin detected; using --autoloop defaults")
+        a = interview(p, autoloop_mode=effective_autoloop)
     if add_domain_name is not None:
         try:
             validate_domain_name(add_domain_name)

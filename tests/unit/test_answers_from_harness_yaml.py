@@ -1,0 +1,160 @@
+"""Tests for answers_from_harness_yaml — silent reuse on re-render."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+from harness_maker.interview import answers_from_harness_yaml
+from harness_maker.models import AtomicStage, DevMode, Preset
+
+
+def _write_yaml(tmp_path: Path, body: str) -> Path:
+    target = tmp_path / "harness.yaml"
+    target.write_text(
+        "---\ngenerated_by: harness-maker\n---\n" + body,
+        encoding="utf-8",
+    )
+    return target
+
+
+def test_returns_none_when_file_missing(tmp_path: Path) -> None:
+    assert answers_from_harness_yaml(tmp_path / "nope.yaml") is None
+
+
+def test_returns_none_when_yaml_invalid(tmp_path: Path) -> None:
+    target = tmp_path / "harness.yaml"
+    target.write_text("---\n  bad:\nindent\n---\n: : :\n", encoding="utf-8")
+    assert answers_from_harness_yaml(target) is None
+
+
+def test_preserves_locale_and_dev_mode(tmp_path: Path) -> None:
+    target = _write_yaml(
+        tmp_path,
+        "preset: Side\nlocale: ko\ndev_mode: task-driven\n"
+        "default_workflow: exec-rev-wrap\ncaching: agent-aware\n"
+        "workflows:\n  exec-rev-wrap:\n    - execute\n    - review\n    - wrapup\n",
+    )
+    answers = answers_from_harness_yaml(target)
+    assert answers is not None
+    assert answers.locale == "ko"
+    assert answers.dev_mode == DevMode.TASK_DRIVEN
+    assert answers.preset == Preset.SIDE
+    assert answers.default_workflow == "exec-rev-wrap"
+    assert answers.fused_workflows["exec-rev-wrap"] == [
+        AtomicStage.EXECUTE,
+        AtomicStage.REVIEW,
+        AtomicStage.WRAPUP,
+    ]
+
+
+def test_preserves_review_knobs(tmp_path: Path) -> None:
+    target = _write_yaml(
+        tmp_path,
+        "preset: Side\nlocale: en\ndev_mode: task-driven\n"
+        "default_workflow: exec-rev-wrap\n"
+        "workflows:\n  exec-rev-wrap:\n    - execute\n    - review\n    - wrapup\n"
+        "reviewers:\n"
+        "  consensus: cross-check\n"
+        "  auto_fix: false\n"
+        "  grade_threshold: B\n"
+        "  max_review_rounds: 5\n"
+        "  installed: []\n"
+        "  enabled:\n    - code-reviewer\n    - security-reviewer\n",
+    )
+    answers = answers_from_harness_yaml(target)
+    assert answers is not None
+    assert answers.consensus == "cross-check"
+    assert answers.auto_fix is False
+    assert answers.grade_threshold == "B"
+    assert answers.max_review_rounds == 5
+    assert "code-reviewer" in answers.reviewers["enabled"]
+    assert "security-reviewer" in answers.reviewers["enabled"]
+
+
+def test_legacy_yaml_without_review_knobs_uses_defaults(tmp_path: Path) -> None:
+    """harness.yaml from harness-maker < 0.3.0 lacks auto_fix/grade_threshold/
+    max_review_rounds; reuse must fill these from InterviewAnswers defaults
+    rather than crashing.
+    """
+    target = _write_yaml(
+        tmp_path,
+        "preset: Side\nlocale: en\ndev_mode: task-driven\n"
+        "default_workflow: exec-rev-wrap\n"
+        "workflows:\n  exec-rev-wrap:\n    - execute\n    - review\n",
+    )
+    answers = answers_from_harness_yaml(target)
+    assert answers is not None
+    assert answers.auto_fix is True
+    assert answers.grade_threshold == "A"
+    assert answers.max_review_rounds == 3
+
+
+def test_unknown_preset_returns_none(tmp_path: Path) -> None:
+    """Schema drift on `preset` is fatal — caller falls back to interview."""
+    target = _write_yaml(tmp_path, "preset: Experimental\n")
+    assert answers_from_harness_yaml(target) is None
+
+
+def test_invalid_workflow_stages_skipped(tmp_path: Path) -> None:
+    """Unknown stage names in a workflow are dropped, not propagated."""
+    target = _write_yaml(
+        tmp_path,
+        "preset: Side\nlocale: en\ndev_mode: task-driven\n"
+        "default_workflow: exec-rev-wrap\n"
+        "workflows:\n  exec-rev-wrap:\n    - execute\n    - imaginary\n    - wrapup\n",
+    )
+    answers = answers_from_harness_yaml(target)
+    assert answers is not None
+    assert answers.fused_workflows["exec-rev-wrap"] == [
+        AtomicStage.EXECUTE,
+        AtomicStage.WRAPUP,
+    ]
+
+
+def test_default_workflow_falls_back_when_missing_from_workflows(tmp_path: Path) -> None:
+    """If `default_workflow` names a key not present in `workflows`, fall
+    back to the first workflow rather than failing model validation.
+    """
+    target = _write_yaml(
+        tmp_path,
+        "preset: Side\nlocale: en\ndev_mode: task-driven\n"
+        "default_workflow: imaginary\n"
+        "workflows:\n  exec-rev-wrap:\n    - execute\n    - review\n    - wrapup\n",
+    )
+    answers = answers_from_harness_yaml(target)
+    assert answers is not None
+    assert answers.default_workflow == "exec-rev-wrap"
+
+
+def test_handles_missing_workflows_block(tmp_path: Path) -> None:
+    target = _write_yaml(tmp_path, "preset: Side\nlocale: en\ndev_mode: task-driven\n")
+    answers = answers_from_harness_yaml(target)
+    assert answers is not None
+    # Falls back to preset starter set; default_workflow must exist among them.
+    assert answers.default_workflow in answers.fused_workflows
+
+
+def test_preserves_project_domains(tmp_path: Path) -> None:
+    target = _write_yaml(
+        tmp_path,
+        "preset: Side\nlocale: en\ndev_mode: task-driven\n"
+        "default_workflow: exec-rev-wrap\n"
+        "workflows:\n  exec-rev-wrap:\n    - execute\n    - review\n    - wrapup\n"
+        "project:\n  domains: [python, tauri]\n",
+    )
+    answers = answers_from_harness_yaml(target)
+    assert answers is not None
+    assert answers.domains == ["python", "tauri"]
+
+
+def test_no_frontmatter_still_parses(tmp_path: Path) -> None:
+    target = tmp_path / "harness.yaml"
+    target.write_text(
+        "preset: Side\nlocale: ko\ndev_mode: task-driven\n"
+        "default_workflow: exec-rev-wrap\n"
+        "workflows:\n  exec-rev-wrap:\n    - execute\n    - review\n    - wrapup\n",
+        encoding="utf-8",
+    )
+    answers = answers_from_harness_yaml(target)
+    assert answers is not None
+    assert answers.locale == "ko"

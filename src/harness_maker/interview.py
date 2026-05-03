@@ -16,7 +16,10 @@ inline flags on the workflow command (documented in workflow_command.md.j2).
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
+
+import yaml
 
 from harness_maker.models import (
     AtomicStage,
@@ -370,6 +373,149 @@ def _build_answers(
         caching=caching or "agent-aware",
         **_preset_extras(preset),
     )
+
+
+def answers_from_harness_yaml(yaml_path: Path) -> InterviewAnswers | None:
+    """Reconstruct InterviewAnswers from a previously-rendered harness.yaml.
+
+    Used by ``/harness-maker:make`` to silently reuse a project's prior
+    choices on re-render — preserving locale, dev_mode, custom workflows,
+    enabled reviewers/skills, and the v0.3.0+ review-stage knobs (auto_fix /
+    grade_threshold / max_review_rounds) without re-prompting the user.
+
+    Returns None when the file is missing, the YAML is malformed, or the
+    `preset` field is unparseable. The caller falls back to interactive
+    interview (or `--autoloop` defaults) in that case. Schema gaps (missing
+    keys from older renders) are filled with `_build_answers` defaults so
+    upgrade paths from older harness-maker versions are non-fatal.
+    """
+    if not yaml_path.exists():
+        return None
+    try:
+        text = yaml_path.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    if text.startswith("---\n"):
+        end = text.find("\n---\n", 4)
+        if end != -1:
+            text = text[end + 5 :]
+    try:
+        data = yaml.safe_load(text)
+    except yaml.YAMLError:
+        return None
+    if not isinstance(data, dict):
+        return None
+    try:
+        preset = Preset(data.get("preset", "Side"))
+    except ValueError:
+        return None
+    try:
+        dev_mode = DevMode(data.get("dev_mode", "task-driven"))
+    except ValueError:
+        dev_mode = DevMode.SPEC_DRIVEN if preset == Preset.PRODUCTION else DevMode.TASK_DRIVEN
+
+    fused_workflows = _parse_workflows(data.get("workflows"), preset)
+    default_workflow = _string_or(data.get("default_workflow"), next(iter(fused_workflows)))
+    if default_workflow not in fused_workflows:
+        default_workflow = next(iter(fused_workflows))
+
+    base = _build_answers(
+        locale=_string_or(data.get("locale"), "en"),
+        preset=preset,
+        dev_mode=dev_mode,
+        fused_workflows=fused_workflows,
+        default_workflow=default_workflow,
+        consensus=_string_or(_dig(data, "reviewers", "consensus"), None),
+        caching=_string_or(data.get("caching"), None),
+    )
+
+    # Overlay user-tuned reviewer/skill enablement.
+    reviewers_data = data.get("reviewers")
+    if not isinstance(reviewers_data, dict):
+        reviewers_data = {}
+    skills_data = data.get("skills")
+    if not isinstance(skills_data, dict):
+        skills_data = {}
+    reviewers_enabled = _list_of_strings(reviewers_data.get("enabled")) or base.reviewers["enabled"]
+    skills_enabled = _list_of_strings(skills_data.get("enabled")) or base.skills["enabled"]
+
+    # Overlay v0.3.0+ review-stage knobs when present; older harness.yaml falls
+    # back to the InterviewAnswers field defaults.
+    auto_fix = reviewers_data.get("auto_fix")
+    grade_threshold = reviewers_data.get("grade_threshold")
+    max_review_rounds = reviewers_data.get("max_review_rounds")
+
+    domains = _list_of_strings(_dig(data, "project", "domains")) or list(base.domains)
+
+    update: dict[str, Any] = {
+        "domains": domains,
+        "reviewers": {
+            "installed": list(base.reviewers["installed"]),
+            "enabled": reviewers_enabled,
+        },
+        "skills": {
+            "installed": list(base.skills["installed"]),
+            "enabled": skills_enabled,
+        },
+    }
+    if isinstance(auto_fix, bool):
+        update["auto_fix"] = auto_fix
+    if isinstance(grade_threshold, str) and grade_threshold:
+        update["grade_threshold"] = grade_threshold
+    if isinstance(max_review_rounds, int):
+        update["max_review_rounds"] = max_review_rounds
+
+    return base.model_copy(update=update)
+
+
+def _parse_workflows(
+    workflows: object,
+    preset: Preset,
+) -> dict[str, list[AtomicStage]]:
+    """Parse the YAML ``workflows`` block into the typed shape.
+
+    Falls back to the preset's starter set when the block is missing or
+    every entry rejects validation.
+    """
+    fallback = dict(_SIDE_STARTER if preset == Preset.SIDE else _PRODUCTION_STARTER)
+    if not isinstance(workflows, dict) or not workflows:
+        return fallback
+    out: dict[str, list[AtomicStage]] = {}
+    for name, raw_stages in workflows.items():
+        if not isinstance(name, str) or not isinstance(raw_stages, list):
+            continue
+        stages: list[AtomicStage] = []
+        for s in raw_stages:
+            if not isinstance(s, str):
+                continue
+            try:
+                stages.append(AtomicStage(s))
+            except ValueError:
+                continue
+        if stages:
+            out[name] = stages
+    return out or fallback
+
+
+def _string_or(value: object, fallback: str | None) -> str:
+    if isinstance(value, str) and value:
+        return value
+    return fallback or ""
+
+
+def _list_of_strings(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [v for v in value if isinstance(v, str)]
+
+
+def _dig(data: dict[str, Any], *keys: str) -> object:
+    cur: object = data
+    for k in keys:
+        if not isinstance(cur, dict) or k not in cur:
+            return None
+        cur = cur[k]
+    return cur
 
 
 def _preset_extras(preset: Preset) -> dict[str, Any]:
