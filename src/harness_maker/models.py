@@ -230,6 +230,7 @@ class InterviewAnswers(BaseModel):
     locale: str = "en"
     preset: Preset = Preset.SIDE
     dev_mode: DevMode = DevMode.SPEC_DRIVEN
+    domains: list[str] = Field(default_factory=list)
     # Map of user-named workflow → ordered atomic stages. Names are typically
     # auto-derived via STAGE_ABBREV (e.g. `exec-rev-wrap`) but user can override.
     fused_workflows: dict[str, list[AtomicStage]] = Field(

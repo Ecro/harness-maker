@@ -9,7 +9,7 @@ description: Reviews code changes for correctness, readability, maintainability,
   basic security/performance hygiene
 tools: Read, Grep, Glob
 model: sonnet
-content_hash: b5123d97495bee3c405f9ddf82c8163903134a640a4130d340ed62792b7104d9
+content_hash: 6a7136c7c42b6ea9e279487bbdb43dc376c19be7e84c06b955c96cdff39996b2
 ---
 
 # code-reviewer
@@ -76,6 +76,7 @@ These apply to every reviewer regardless of verbosity:
 - **No rubber-stamp.** Returning zero findings is allowed only when the diff is genuinely clean; explicitly note `"reviewed N files, no findings of severity ≥ P2"` rather than silently empty.
 - **Read-only.** Never call Edit or Write. Findings are proposals; the executor agent applies them.
 - **Diff scope.** Do not flag pre-existing issues outside the changed lines unless the change reveals them; if you do, mark `out_of_diff: true`.
+
 
 ## Finding Schema
 

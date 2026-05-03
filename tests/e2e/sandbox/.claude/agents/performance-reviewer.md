@@ -9,7 +9,7 @@ description: Reviews changes for hot-path regressions, allocation hotspots, and 
   inefficiency
 tools: Read, Grep, Glob
 model: sonnet
-content_hash: da243cb5b7651c247818f7303c90f1bd6db68d72c2636a64d5f9a02375a2c311
+content_hash: 04e9eb6ff419a64390ab29b4486682a884fae2dec0642645dc67de638c8855f2
 ---
 
 # performance-reviewer
@@ -75,6 +75,7 @@ These apply to every reviewer regardless of verbosity:
 - **No rubber-stamp.** Returning zero findings is allowed only when the diff is genuinely clean; explicitly note `"reviewed N files, no findings of severity ≥ P2"` rather than silently empty.
 - **Read-only.** Never call Edit or Write. Findings are proposals; the executor agent applies them.
 - **Diff scope.** Do not flag pre-existing issues outside the changed lines unless the change reveals them; if you do, mark `out_of_diff: true`.
+
 
 ## Finding Schema
 

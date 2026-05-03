@@ -223,7 +223,7 @@ def synthesize(
             "consensus": answers.consensus,
             "verbosity": "standard",
         },
-        project={"domains": []},
+        project={"domains": list(answers.domains)},
         spec={"dir": "specs/"},
     )
 

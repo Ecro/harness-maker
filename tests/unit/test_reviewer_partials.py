@@ -34,7 +34,10 @@ def _render_reviewer(name: str, verbosity: str) -> str:
     return tpl.render(
         name=name,
         reviewer_kind=KINDS[name],
-        config={"reviewers": {"verbosity": verbosity}},
+        config={
+            "reviewers": {"verbosity": verbosity},
+            "project": {"domains": []},
+        },
     )
 
 
@@ -94,3 +97,41 @@ def test_code_reviewer_has_no_specialty_fields() -> None:
     assert "race_kind" not in body
     assert "wcag_ref" not in body
     assert "expected_impact" not in body
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Domain pack inlining via {% for d in config.project.domains %}
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def _render_with_domains(name: str, domains: list[str]) -> str:
+    env = _make_env()
+    tpl = env.get_template(f"agents/{name}.md.j2")
+    return tpl.render(
+        name=name,
+        reviewer_kind=KINDS[name],
+        config={
+            "reviewers": {"verbosity": "standard"},
+            "project": {"domains": domains},
+        },
+    )
+
+
+@pytest.mark.parametrize("name", REVIEWERS)
+def test_python_pack_inlined_when_enabled(name: str) -> None:
+    body = _render_with_domains(name, ["python"])
+    assert "## python standards" in body
+    assert "Atomic file writes only" in body
+
+
+@pytest.mark.parametrize("name", REVIEWERS)
+def test_no_domain_pack_when_domains_empty(name: str) -> None:
+    body = _render_with_domains(name, [])
+    assert "## python standards" not in body
+
+
+@pytest.mark.parametrize("name", REVIEWERS)
+def test_unknown_domain_silently_skipped(name: str) -> None:
+    """ignore missing — unshipped domain renders nothing without erroring."""
+    body = _render_with_domains(name, ["does-not-exist"])
+    assert "does-not-exist" not in body

@@ -8,7 +8,7 @@ name: ux-reviewer
 description: Reviews UI changes for accessibility, consistency, and interaction quality
 tools: Read, Grep, Glob
 model: sonnet
-content_hash: 7faddd48288eb78eb2dfc9bc94b689dd678a1b181047f9176c74acbccae6839f
+content_hash: 9897d788ce208ecd2b255348a77564af5c45913abacd7f3a73f52199e7173cb8
 ---
 
 # ux-reviewer
@@ -74,6 +74,7 @@ These apply to every reviewer regardless of verbosity:
 - **No rubber-stamp.** Returning zero findings is allowed only when the diff is genuinely clean; explicitly note `"reviewed N files, no findings of severity ≥ P2"` rather than silently empty.
 - **Read-only.** Never call Edit or Write. Findings are proposals; the executor agent applies them.
 - **Diff scope.** Do not flag pre-existing issues outside the changed lines unless the change reveals them; if you do, mark `out_of_diff: true`.
+
 
 ## Finding Schema
 

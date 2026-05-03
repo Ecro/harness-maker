@@ -9,7 +9,7 @@ description: Reviews changes for secrets exposure, injection, auth flaws, and un
   permission grants
 tools: Read, Grep, Glob
 model: sonnet
-content_hash: 52c21b919b85eea0bff4e595c3723c74a729263782b3cc84f6cad835c793162f
+content_hash: a667bfd2fd653f10316a0f16fd37aa33eacd3efcc64122d8478664c7c7f32ddd
 ---
 
 # security-reviewer
@@ -75,6 +75,7 @@ These apply to every reviewer regardless of verbosity:
 - **No rubber-stamp.** Returning zero findings is allowed only when the diff is genuinely clean; explicitly note `"reviewed N files, no findings of severity ≥ P2"` rather than silently empty.
 - **Read-only.** Never call Edit or Write. Findings are proposals; the executor agent applies them.
 - **Diff scope.** Do not flag pre-existing issues outside the changed lines unless the change reveals them; if you do, mark `out_of_diff: true`.
+
 
 ## Finding Schema
 

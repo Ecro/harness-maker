@@ -33,4 +33,7 @@ async runtime, or a background worker.
 {% include "agents/_partials/rubric.md.j2" %}
 {% include "agents/_partials/reasoning.md.j2" %}
 {% include "agents/_partials/hard_rules.md.j2" %}
+{% for d in config.project.domains %}
+{% include "agents/_standards/" + d + ".md.j2" ignore missing %}
+{% endfor %}
 {% include "agents/_partials/finding_schema.md.j2" %}

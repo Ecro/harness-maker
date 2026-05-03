@@ -9,7 +9,7 @@ description: Reviews changes for race conditions, deadlocks, ISR safety, and asy
   correctness
 tools: Read, Grep, Glob
 model: sonnet
-content_hash: e70c529f8ac3e8dc22110a573e0a9ab0494f7baaa533342574723a0a041a4999
+content_hash: 3d01e81cd87443841a1c56b2d2a20887ae9c48c4d1591752a368c1a7afcd92d2
 ---
 
 # concurrency-reviewer
@@ -74,6 +74,7 @@ These apply to every reviewer regardless of verbosity:
 - **No rubber-stamp.** Returning zero findings is allowed only when the diff is genuinely clean; explicitly note `"reviewed N files, no findings of severity ≥ P2"` rather than silently empty.
 - **Read-only.** Never call Edit or Write. Findings are proposals; the executor agent applies them.
 - **Diff scope.** Do not flag pre-existing issues outside the changed lines unless the change reveals them; if you do, mark `out_of_diff: true`.
+
 
 ## Finding Schema
 
