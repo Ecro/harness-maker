@@ -4,7 +4,7 @@ harness_maker_version: 0.2.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: skills/relevance-filter/SKILL.md.j2
 provenance: official
-content_hash: 5a0ac2ecf85d330b41090e3d21a475747951944a62f9b638ef3beb3ab1dfa90c
+content_hash: d846b301f6964ce782b6bf5dc91e5a994a74ea902a0ccf1ff22d4b13c61dd5df
 ---
 # relevance-filter
 
@@ -47,3 +47,7 @@ by `/hm:refresh` for explicit accept / reject / defer choice.
 - `WINDOW = 20` recent decisions; `MIN_SAMPLES = 5` before adapting
 - accept_rate > 0.8 → relax (lower threshold, more items pass)
 - accept_rate < 0.5 → tighten (raise threshold, fewer items pass)
+
+<!-- @hm:user:extensions -->
+<!-- Project-specific relevance signals or threshold overrides. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extensions -->

@@ -9,7 +9,7 @@ description: Workflow executor with worktree-bounded write permissions — only 
   to .worktrees/, never to repo root
 tools: Read, Grep, Glob, Write, Edit, Bash
 model: sonnet
-content_hash: c910a623cc3588d7b3415762e7a20f20e8cc1835994c6e5e1a4852591b641afd
+content_hash: adec9393962c1bdeba94c2cae226c2a9787a126169f6b115272248637d4413a2
 ---
 
 # executor
@@ -55,3 +55,7 @@ Deny:
 
 Per-phase status: `{phase, files_changed, verify_outcome, worktree_path, merge_safe}`.
 On `merge_safe == false`: include the conflict summary and stop.
+
+<!-- @hm:user:extensions -->
+<!-- Project-specific executor rules (mandatory verify commands, forbidden file paths, etc.). Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extensions -->

@@ -8,7 +8,7 @@ name: context-linter
 description: Lint generated CLAUDE.md / agent / skill / workflow files for verbose-context
   bloat against per-preset line thresholds. Use before /hm:execute or /hm:wrapup to
   keep the agent context lean.
-content_hash: 012827c4f0267b47cba5123ba3df775a79c2259ce96f6cd2ab2728552e0b3bfd
+content_hash: 5a390fa895e3c898ad6909b451995688eed8c7fbb4a3577e3d842fd7ad62c65b
 ---
 
 # context-linter
@@ -50,3 +50,7 @@ for w in warnings:
 ## Output
 
 A flat list of warning strings. Empty list = file is within budget.
+
+<!-- @hm:user:extensions -->
+<!-- Project-specific lint thresholds or asset-type overrides. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extensions -->

@@ -51,6 +51,10 @@ be measured and stalled work can be diagnosed.
 - An independent reader can predict the file diff per phase
 - Each exit criterion is checkable (script, test, manual checklist)
 - Risks are concrete, not platitudes ("might break things")
+
+<!-- @hm:user:extra-quality-checks -->
+<!-- Project-specific quality bar items. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extra-quality-checks -->
 {% if project_name %}
 
 ## Project Context
@@ -60,3 +64,7 @@ be measured and stalled work can be diagnosed.
 {% if feature %}
 - Feature: `{{ feature }}`
 {% endif %}
+
+<!-- @hm:user:extensions -->
+<!-- Free-form project-specific additions to the plan stage. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extensions -->

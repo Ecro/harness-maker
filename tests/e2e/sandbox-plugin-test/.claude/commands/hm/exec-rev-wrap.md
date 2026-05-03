@@ -4,7 +4,7 @@ harness_maker_version: 0.2.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: f71d6358ceca9b7c954d2c88960bd0c61a96f718c7f5b894204ad6d6370181cb
+content_hash: 87c77be6e78ff07d6080a016cd37fdb387805c9d235a34fd4a6bea33e8ae4b01
 ---
 # /hm:exec-rev-wrap
 
@@ -62,7 +62,15 @@ each phase exits only when its verification command is green.
 - No skipped/xfail tests added without justification
 - Diff matches PLAN scope; surprises are documented
 
+<!-- @hm:user:extra-quality-checks -->
+<!-- Project-specific quality bar items. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extra-quality-checks -->
 
+
+
+<!-- @hm:user:extensions -->
+<!-- Free-form project-specific additions to the execute stage. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extensions -->
 
 
 ## Stage: review
@@ -333,7 +341,15 @@ next session benefits, run the final review pass, sync TODOs and commit.
 - Failure entries deduplicate (count++ rather than new section for repeats)
 - Commit message captures intent, not just diff summary
 
+<!-- @hm:user:extra-quality-checks -->
+<!-- Project-specific wrapup checklist items. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extra-quality-checks -->
 
+
+
+<!-- @hm:user:extensions -->
+<!-- Free-form project-specific additions to the wrapup stage. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extensions -->
 
 
 ---

@@ -9,7 +9,7 @@ description: Reviews changes for hot-path regressions, allocation hotspots, and 
   inefficiency
 tools: Read, Grep, Glob
 model: sonnet
-content_hash: 8fd23cdfc20b026d6056078d91a6a74daa77e56861ad1c06022be5d7e33f16be
+content_hash: f0daad64359358396e1d7d66192dcb3d8cda6c7720b64b39736cfffce6e75894
 ---
 
 # performance-reviewer
@@ -114,3 +114,9 @@ Common envelope (every finding):
   "reasoning": "Observe: nested `in list` at line 88. Trace: called once per document in build_index. Infer: scales as len(docs)². Conclude: P1 — measurable on the existing 10k corpus.",
 }
 ```
+
+
+
+<!-- @hm:user:extensions -->
+<!-- Project-specific performance rules / hot-path inventory. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extensions -->

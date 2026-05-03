@@ -4,7 +4,7 @@ harness_maker_version: 0.2.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/refresh.md.j2
 provenance: official
-content_hash: 2f03e04613c564e2d38b31b43ef6fe9650f5cffbe557176d86e33c42fdb4db60
+content_hash: 92c5ed0e7ef7ab476e424b30f166853bbb90e3af17963e111695621f56e9b0c9
 ---
 # /hm:refresh
 
@@ -100,3 +100,7 @@ step 4 (write `proposed-<date>.md` containing both stale-asset and
 crawl-item proposals) and stop. Step 5 still requires
 **AskUserQuestion** in interactive mode; autoloop must not synthesize a
 default answer.
+
+<!-- @hm:user:extensions -->
+<!-- Project-specific refresh sources or custom proposal handlers. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extensions -->

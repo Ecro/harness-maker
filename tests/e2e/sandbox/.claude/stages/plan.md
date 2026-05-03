@@ -4,7 +4,7 @@ harness_maker_version: 0.2.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: stages/plan.md.j2
 provenance: official
-content_hash: abe19607ac7e31b3c817b09eae451d7302667b99abcb2b88d624276b9c467881
+content_hash: 659713aba285e81690cc0e8e74bbe31cbc47220e5fdbd8d0cea70b72d8141352
 ---
 # Stage: plan
 
@@ -57,3 +57,13 @@ be measured and stalled work can be diagnosed.
 - An independent reader can predict the file diff per phase
 - Each exit criterion is checkable (script, test, manual checklist)
 - Risks are concrete, not platitudes ("might break things")
+
+<!-- @hm:user:extra-quality-checks -->
+<!-- Project-specific quality bar items. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extra-quality-checks -->
+
+
+
+<!-- @hm:user:extensions -->
+<!-- Free-form project-specific additions to the plan stage. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extensions -->

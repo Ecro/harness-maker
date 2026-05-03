@@ -8,7 +8,7 @@ name: consensus-arbiter
 description: Aggregates findings from multiple reviewer agents and resolves disagreements
 tools: Read, Grep, Glob
 model: sonnet
-content_hash: f64c6f92061ac4e617ea84d967aa67a86ea7a93d6a954dab84fdc87a8d35b6e3
+content_hash: 3423679e133284691ba76eff6638e630c3d6e32a6f3ff436e2be0b3246c6e13e
 ---
 
 # consensus-arbiter
@@ -44,3 +44,7 @@ consensus mode (`single` / `cross-check` / `k-of-n`).
 JSON list of findings with consensus metadata:
 `{severity, file, line, category, summary, suggestion, agreement: {count, total, dissent}}`.
 Read-only: never call Edit or Write.
+
+<!-- @hm:user:extensions -->
+<!-- Project-specific consensus rules (which categories to weigh higher, etc.). Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extensions -->

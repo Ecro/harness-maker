@@ -4,7 +4,7 @@ harness_maker_version: 0.2.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: claude-md/Side.ko.md.j2
 provenance: official
-content_hash: dba240734cf1d9a81c99b7613e222ebdfa5386872e72b1106ace2af1032dc03c
+content_hash: dc174fe33af6fe92c490732e242abcb7fdb4ed9e94dd932a22dc8a32ef91b1bf
 ---
 # CLAUDE.md — Production preset
 
@@ -21,3 +21,11 @@ content_hash: dba240734cf1d9a81c99b7613e222ebdfa5386872e72b1106ace2af1032dc03c
 ## 메모리
 
 per-repo memory 활성화 여부는 `harness.yaml` 참조.
+
+<!-- @hm:user:project-rules -->
+<!-- 프로젝트 고유 규칙 (코딩 스타일, 도메인 용어, 에이전트 호출 관례 등). harness-maker 업데이트 시 보존. -->
+<!-- @hm:/user:project-rules -->
+
+<!-- @hm:user:extensions -->
+<!-- Free-form CLAUDE.md additions. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extensions -->

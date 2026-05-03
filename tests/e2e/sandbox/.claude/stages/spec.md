@@ -4,7 +4,7 @@ harness_maker_version: 0.2.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: stages/spec.md.j2
 provenance: official
-content_hash: 31c988a718c1c941b0e218ba36db8a0c7e6e831e744d13c9505fb8edd9d1d9cc
+content_hash: 77c4f694f67373003199b20a4219eda29d27a97c661467fd7182360b38196979
 ---
 # Stage: spec
 
@@ -58,3 +58,13 @@ has something concrete to write tests against.
 - A test author can write tests directly from the criteria without guessing
 - Criteria are not implementation details — they describe behaviour
 - Non-goals prevent scope creep in `plan` and `execute`
+
+<!-- @hm:user:extra-quality-checks -->
+<!-- Project-specific quality bar items. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extra-quality-checks -->
+
+
+
+<!-- @hm:user:extensions -->
+<!-- Free-form project-specific additions to the spec stage. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extensions -->

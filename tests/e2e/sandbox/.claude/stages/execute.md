@@ -4,7 +4,7 @@ harness_maker_version: 0.2.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: stages/execute.md.j2
 provenance: official
-content_hash: c28c5fdb500ced20194473813831a430df31153a9f4f168aa5f4564ae5601ee2
+content_hash: 372550c3f45f9216fd49299729d73270f7afa88fa409def9780eda2272604099
 ---
 # Stage: execute
 
@@ -54,3 +54,13 @@ each phase exits only when its verification command is green.
 - All phase-D checks green
 - No skipped/xfail tests added without justification
 - Diff matches PLAN scope; surprises are documented
+
+<!-- @hm:user:extra-quality-checks -->
+<!-- Project-specific quality bar items. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extra-quality-checks -->
+
+
+
+<!-- @hm:user:extensions -->
+<!-- Free-form project-specific additions to the execute stage. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extensions -->

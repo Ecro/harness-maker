@@ -4,7 +4,7 @@ harness_maker_version: 0.2.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: skills/research-crawler/SKILL.md.j2
 provenance: official
-content_hash: 5dc19e51679b005ea03ef53e9bde9248c94669c073ae88e4f5860e2c4b624edf
+content_hash: f33179104793a2c77bcecfa21b9fa25116f568255598220ab61ceaf4f6a50f6d
 ---
 # research-crawler
 
@@ -41,3 +41,7 @@ Downstream the `relevance-filter` skill scores each item.
 A `raw-<date>.jsonl` snapshot of `CrawlItem` records. Never auto-applies
 changes — only writes raw data; the `/hm:refresh` command is responsible for
 the AskUserQuestion confirmation flow.
+
+<!-- @hm:user:extensions -->
+<!-- Project-specific crawler sources (additional RSS feeds, repos to track, etc.). Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extensions -->

@@ -9,7 +9,7 @@ description: Deep security audit of changed code (secrets, permissions, hook inj
   CVEs, prompt injection)
 tools: Read, Grep, Glob, Bash
 model: sonnet
-content_hash: b48ca7b3d5d552b6e5df48f3020ab9992f1bb22012af57998e7dd269de738a69
+content_hash: 8834c91a2a44989d6252d882d859d08107fbb2a627c25c40f10fb4ce63992c1a
 ---
 
 # security-auditor
@@ -32,3 +32,7 @@ Performs deep security audits on changed code paths.
 ## Output
 
 JSON: `{findings: [{severity, category, file, line, evidence, fix}], summary}`
+
+<!-- @hm:user:extensions -->
+<!-- Project-specific audit rules (additional CVE feeds, custom secret patterns, etc.). Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extensions -->

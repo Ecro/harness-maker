@@ -4,7 +4,7 @@ harness_maker_version: 0.2.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: stages/wrapup.md.j2
 provenance: official
-content_hash: e36e78a4f839f3a9709a58b6d2a3ae32cb28e004e893cc034407d950a4866f0c
+content_hash: 6074e6325c03448d8ee515a2e74d6296a44edd41bd17dcf0ee138c5398ef79ac
 ---
 # Stage: wrapup
 
@@ -57,3 +57,13 @@ next session benefits, run the final review pass, sync TODOs and commit.
 - Wiki entries are searchable (good tags) — `rg -F "[tags:keyword]"` works
 - Failure entries deduplicate (count++ rather than new section for repeats)
 - Commit message captures intent, not just diff summary
+
+<!-- @hm:user:extra-quality-checks -->
+<!-- Project-specific wrapup checklist items. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extra-quality-checks -->
+
+
+
+<!-- @hm:user:extensions -->
+<!-- Free-form project-specific additions to the wrapup stage. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extensions -->

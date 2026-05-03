@@ -4,7 +4,7 @@ harness_maker_version: 0.2.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: 5c9e5515a9ba24e8e0041740c88dfe2b9e23003a257c88430b8c979aefd75adf
+content_hash: d9cb44507f0b492d6931c3ae04b4035ecf21ab7059fdfa35bfd3cab74717c898
 ---
 # /hm:exec-rev
 
@@ -62,7 +62,15 @@ each phase exits only when its verification command is green.
 - No skipped/xfail tests added without justification
 - Diff matches PLAN scope; surprises are documented
 
+<!-- @hm:user:extra-quality-checks -->
+<!-- Project-specific quality bar items. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extra-quality-checks -->
 
+
+
+<!-- @hm:user:extensions -->
+<!-- Free-form project-specific additions to the execute stage. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extensions -->
 
 
 ## Stage: review

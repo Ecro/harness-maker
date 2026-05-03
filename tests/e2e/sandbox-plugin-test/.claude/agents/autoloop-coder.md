@@ -9,7 +9,7 @@ description: Implementation agent for autoloop iterations — bounded scope, wri
   no open-ended exploration; worktree-bounded writes
 tools: Read, Grep, Glob, Write, Edit, Bash
 model: opus
-content_hash: 91678f32029be33c778ea0085ce31d717373a6c950c183d37d21923efd029c4b
+content_hash: 2cecd74dae60e11989a7ed2af7973636a169186495f374168f3054fc92ba2a2e
 ---
 
 # autoloop-coder
@@ -56,3 +56,7 @@ Deny:
 A short status report per transformation: file path, change summary,
 verify outcome. On failure: full diagnostic (failed command, stderr tail,
 suggested next iteration goal).
+
+<!-- @hm:user:extensions -->
+<!-- Project-specific autoloop-coder rules (forbidden libraries, mandatory checks, etc.). Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extensions -->

@@ -48,6 +48,10 @@ each phase exits only when its verification command is green.
 - All phase-D checks green
 - No skipped/xfail tests added without justification
 - Diff matches PLAN scope; surprises are documented
+
+<!-- @hm:user:extra-quality-checks -->
+<!-- Project-specific quality bar items. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extra-quality-checks -->
 {% if project_name %}
 
 ## Project Context
@@ -57,3 +61,7 @@ each phase exits only when its verification command is green.
 {% if feature %}
 - Feature: `{{ feature }}`
 {% endif %}
+
+<!-- @hm:user:extensions -->
+<!-- Free-form project-specific additions to the execute stage. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extensions -->

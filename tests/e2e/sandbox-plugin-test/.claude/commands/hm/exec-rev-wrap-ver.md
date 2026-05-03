@@ -4,7 +4,7 @@ harness_maker_version: 0.2.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: 828cd3b36320a53c7a746e9d36a54f2fc3f4e7fa44aef2d520b8d666d475d151
+content_hash: 6f8adba44e2aa2a64312e0930bc89df92f7953de8de2e91d3e571adb10ff4776
 ---
 # /hm:exec-rev-wrap-ver
 
@@ -62,7 +62,15 @@ each phase exits only when its verification command is green.
 - No skipped/xfail tests added without justification
 - Diff matches PLAN scope; surprises are documented
 
+<!-- @hm:user:extra-quality-checks -->
+<!-- Project-specific quality bar items. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extra-quality-checks -->
 
+
+
+<!-- @hm:user:extensions -->
+<!-- Free-form project-specific additions to the execute stage. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extensions -->
 
 
 ## Stage: review
@@ -333,7 +341,15 @@ next session benefits, run the final review pass, sync TODOs and commit.
 - Failure entries deduplicate (count++ rather than new section for repeats)
 - Commit message captures intent, not just diff summary
 
+<!-- @hm:user:extra-quality-checks -->
+<!-- Project-specific wrapup checklist items. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extra-quality-checks -->
 
+
+
+<!-- @hm:user:extensions -->
+<!-- Free-form project-specific additions to the wrapup stage. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extensions -->
 
 
 ## Stage: verify
@@ -395,7 +411,15 @@ machine-checkable stop sign before `wrapup`.
 - The gate is non-negotiable; bypassing requires explicit user override
 - A failed check produces actionable evidence, not just a red line
 
+<!-- @hm:user:extra-quality-checks -->
+<!-- Project-specific verify checklist items. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extra-quality-checks -->
 
+
+
+<!-- @hm:user:extensions -->
+<!-- Free-form project-specific additions to the verify stage. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extensions -->
 
 
 ---

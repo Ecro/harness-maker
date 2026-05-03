@@ -4,7 +4,7 @@ harness_maker_version: 0.2.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: skills/conditional-router/SKILL.md.j2
 provenance: official
-content_hash: 66a51ea054727fbeacfa9e8dcee2129c119a16bb4ecff7c56c82ddafd8399954
+content_hash: 90f824d451daeebb50bf10d5e7bf8abd586fb32ce20e0a965c1d3d0722fb3e83
 ---
 ---
 name: conditional-router
@@ -57,3 +57,7 @@ Pure function, no IO, no side effects — easy to unit-test.
 
 A list of reviewer agent names, e.g. `["code-reviewer", "security-reviewer"]`,
 to be passed to the orchestrator that fans out the review work.
+
+<!-- @hm:user:extensions -->
+<!-- Project-specific routing rules (additional path patterns → reviewers). Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extensions -->

@@ -54,6 +54,10 @@ machine-checkable stop sign before `wrapup`.
 
 - The gate is non-negotiable; bypassing requires explicit user override
 - A failed check produces actionable evidence, not just a red line
+
+<!-- @hm:user:extra-quality-checks -->
+<!-- Project-specific verify checklist items. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extra-quality-checks -->
 {% if project_name %}
 
 ## Project Context
@@ -63,3 +67,7 @@ machine-checkable stop sign before `wrapup`.
 {% if feature %}
 - Feature: `{{ feature }}`
 {% endif %}
+
+<!-- @hm:user:extensions -->
+<!-- Free-form project-specific additions to the verify stage. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extensions -->

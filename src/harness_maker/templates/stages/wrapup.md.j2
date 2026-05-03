@@ -51,6 +51,10 @@ next session benefits, run the final review pass, sync TODOs and commit.
 - Wiki entries are searchable (good tags) — `rg -F "[tags:keyword]"` works
 - Failure entries deduplicate (count++ rather than new section for repeats)
 - Commit message captures intent, not just diff summary
+
+<!-- @hm:user:extra-quality-checks -->
+<!-- Project-specific wrapup checklist items. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extra-quality-checks -->
 {% if project_name %}
 
 ## Project Context
@@ -60,3 +64,7 @@ next session benefits, run the final review pass, sync TODOs and commit.
 {% if feature %}
 - Feature: `{{ feature }}`
 {% endif %}
+
+<!-- @hm:user:extensions -->
+<!-- Free-form project-specific additions to the wrapup stage. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extensions -->

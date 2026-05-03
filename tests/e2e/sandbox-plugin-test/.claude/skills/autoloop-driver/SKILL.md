@@ -11,7 +11,7 @@ description: Orchestration guide for /hm:loop. Covers prompt-driven driver respo
   + convergence predicate), and the safety rails (3-fail halt, time cap, iter cap,
   ping every 5 iters). The /hm:loop command file owns the per-step procedure; this
   skill explains the rationale + invariants Claude must hold.
-content_hash: 2dac75393a5388a4f3b9efff3fffa3512020f44223a44d67a397f07ed66edbd8
+content_hash: c5f7629031c2f99cbfb27d59d1a94e6d3ab370d3a20c4b7748c53df75b7b5869
 ---
 
 # autoloop-driver
@@ -150,3 +150,7 @@ command, stop — that is a bug in the prompt, not your environment.
   workflow delegates to it)
 - Loop-spec schema: see "Structured loop-spec" above
 - Persisted loop-specs: `.claude/loop-specs/<slug>.yaml`
+
+<!-- @hm:user:extensions -->
+<!-- Project-specific autoloop rules (custom convergence predicates, env constraints, etc.). Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extensions -->

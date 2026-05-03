@@ -52,6 +52,10 @@ has something concrete to write tests against.
 - A test author can write tests directly from the criteria without guessing
 - Criteria are not implementation details — they describe behaviour
 - Non-goals prevent scope creep in `plan` and `execute`
+
+<!-- @hm:user:extra-quality-checks -->
+<!-- Project-specific quality bar items. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extra-quality-checks -->
 {% if project_name %}
 
 ## Project Context
@@ -61,3 +65,7 @@ has something concrete to write tests against.
 {% if feature %}
 - Feature: `{{ feature }}`
 {% endif %}
+
+<!-- @hm:user:extensions -->
+<!-- Free-form project-specific additions to the spec stage. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extensions -->

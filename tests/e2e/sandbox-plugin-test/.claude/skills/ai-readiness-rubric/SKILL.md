@@ -8,7 +8,7 @@ name: ai-readiness-rubric
 description: Compute the Health 6-dimension composite score (docs, tests, CI, observability,
   security, governance) for a project. Use when /hm:monitor renders the dashboard
   or /hm:verify needs a baseline comparison. Calls harness_maker.readiness.compute_health.
-content_hash: 7eec86c19e719bff04ce713408dc9821d77f5f2b2d9987cd72740d8a327558c1
+content_hash: bcbcec6cf3c24ac12ccf6363e4ca275c4063707dd156f3214048a4118c289df3
 ---
 
 # ai-readiness-rubric
@@ -72,3 +72,7 @@ This skill reports the drop; it does not patch.
 
 A dict matching `compute_health(...)` return shape. Consumers
 (dashboard, verify gate) format it for their context.
+
+<!-- @hm:user:extensions -->
+<!-- Project-specific dimension weights or extra signals. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extensions -->

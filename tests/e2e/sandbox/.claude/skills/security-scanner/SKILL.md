@@ -9,7 +9,7 @@ name: security-scanner
 description: 5-gate security scan (secrets · permissions · hook injection · CVEs ·
   prompt injection)
 tools: Read, Grep, Glob, Bash
-content_hash: b4528add877b87599a4b7db6133082294b8287a8a45f6f2a0cc6f4b5a54d6f3d
+content_hash: 5d866a1d4fbfd0f47431318f79159a5727582f8de222dca65748f649c882cd7b
 ---
 
 # security-scanner
@@ -55,3 +55,7 @@ if high and cfg["security"]["on_finding"]["high"] == "block":
 Aggregated `list[Finding]` (returned) plus persisted JSONL at
 `.claude/observability/security/findings-<date>.jsonl` (one finding per line).
 Each finding has `{severity, category, file, line, evidence, fix}`.
+
+<!-- @hm:user:extensions -->
+<!-- Project-specific scanner rules (custom secret patterns, allowlist entries, etc.). Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extensions -->

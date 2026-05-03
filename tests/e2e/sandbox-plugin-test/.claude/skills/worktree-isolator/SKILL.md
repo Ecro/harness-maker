@@ -8,7 +8,7 @@ name: worktree-isolator
 description: Isolate /hm:execute changes inside a disposable git worktree. Read harness.yaml.worktree.scope
   to decide whether to engage; on success merge back and clean up; on failure preserve
   the worktree for inspection.
-content_hash: 0300f88647ac2860735d8f7affc2159607803b9c50acc131eead099a74f60870
+content_hash: 5301cc02a594968ca7861982eddfd2448d7a9eff084f390f5e2b4b2a7ae693c5
 ---
 
 # worktree-isolator
@@ -79,3 +79,7 @@ worktree:
   scope: [execute]            # which /hm:<stage> commands trigger isolation
   branch_prefix: hm-          # reserved for Phase 9 (currently informational)
 ```
+
+<!-- @hm:user:extensions -->
+<!-- Project-specific worktree rules (extra cleanup commands, branch naming, etc.). Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extensions -->

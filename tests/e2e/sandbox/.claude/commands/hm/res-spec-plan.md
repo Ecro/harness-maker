@@ -4,7 +4,7 @@ harness_maker_version: 0.2.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: 37e4ea9174ea3cdaf1e3a799e3925791b99aa5aff29a8f23049536dd3fd6a63d
+content_hash: e1fb24696d62950748efa3959d977e3d0173e7bf0fdc0617a5e07f2e1321c813
 ---
 # /hm:res-spec-plan
 
@@ -65,7 +65,15 @@ art, library docs, and architectural constraints so that downstream stages
 - Recommendation is grounded in evidence, not authority
 - Open questions are explicit, not hidden as assumptions
 
+<!-- @hm:user:extra-quality-checks -->
+<!-- Project-specific quality bar items. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extra-quality-checks -->
 
+
+
+<!-- @hm:user:extensions -->
+<!-- Free-form project-specific additions to the research stage. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extensions -->
 
 
 ## Stage: spec
@@ -125,7 +133,15 @@ has something concrete to write tests against.
 - Criteria are not implementation details — they describe behaviour
 - Non-goals prevent scope creep in `plan` and `execute`
 
+<!-- @hm:user:extra-quality-checks -->
+<!-- Project-specific quality bar items. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extra-quality-checks -->
 
+
+
+<!-- @hm:user:extensions -->
+<!-- Free-form project-specific additions to the spec stage. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extensions -->
 
 
 ## Stage: plan
@@ -184,7 +200,15 @@ be measured and stalled work can be diagnosed.
 - Each exit criterion is checkable (script, test, manual checklist)
 - Risks are concrete, not platitudes ("might break things")
 
+<!-- @hm:user:extra-quality-checks -->
+<!-- Project-specific quality bar items. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extra-quality-checks -->
 
+
+
+<!-- @hm:user:extensions -->
+<!-- Free-form project-specific additions to the plan stage. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extensions -->
 
 
 ---

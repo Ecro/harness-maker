@@ -8,7 +8,7 @@ name: ux-reviewer
 description: Reviews UI changes for accessibility, consistency, and interaction quality
 tools: Read, Grep, Glob
 model: sonnet
-content_hash: 49244932e2fb3f36505512a340c98d746867e718a649521b5b958c770824820a
+content_hash: db7f1929425a16ccd8381e392f3b8f058e3305114c0e32c6e03ca4bdcd843113
 ---
 
 # ux-reviewer
@@ -113,3 +113,9 @@ Common envelope (every finding):
   "reasoning": "Observe: no keyDown handler. Trace: mounted on /settings. Infer: keyboard-only users get stuck. Conclude: P1 — blocks an accessibility audit.",
 }
 ```
+
+
+
+<!-- @hm:user:extensions -->
+<!-- Project-specific UX rules / a11y baselines / design-system guardrails. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extensions -->

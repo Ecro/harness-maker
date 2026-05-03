@@ -9,7 +9,7 @@ description: Reviews code changes for correctness, readability, maintainability,
   basic security/performance hygiene
 tools: Read, Grep, Glob
 model: sonnet
-content_hash: bc99f73fcb3b021f5a9804e7475585db812052ddc8a05c4dcc4c8bb6e86c9262
+content_hash: de6193cb5fc102cd0695809bb4f3643cf412520f3c49b5316662ac979c1b93e6
 ---
 
 # code-reviewer
@@ -112,3 +112,9 @@ Common envelope (every finding):
   "reasoning": "Observe: range(n) at line 42. Trace: consumes buffer in encode(). Infer: last byte dropped on len % chunk == 0. Conclude: P1 — silent data loss on aligned inputs.",
 }
 ```
+
+
+
+<!-- @hm:user:extensions -->
+<!-- Project-specific reviewer rules / hard rules / domain heuristics. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extensions -->

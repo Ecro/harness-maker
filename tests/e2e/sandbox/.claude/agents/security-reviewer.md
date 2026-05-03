@@ -9,7 +9,7 @@ description: Reviews changes for secrets exposure, injection, auth flaws, and un
   permission grants
 tools: Read, Grep, Glob
 model: sonnet
-content_hash: 8163c067962e4b03114728273d86b67a39c96e78563c47e2efaf70ad504bd6d3
+content_hash: f44f1732f9d201ea3b2755316c2cbbb138d04ed8c43ad01077fc5522d159eae3
 ---
 
 # security-reviewer
@@ -116,3 +116,9 @@ Common envelope (every finding):
   "reasoning": "Observe: hardcoded literal at line 42. Trace: imported by api/server.py and shipped to clients. Infer: any read of the bundle leaks the prod secret. Conclude: P0 — secret is live and rotation is mandatory.",
 }
 ```
+
+
+
+<!-- @hm:user:extensions -->
+<!-- Project-specific security rules / threat-model entries / known sensitive paths. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extensions -->

@@ -9,7 +9,7 @@ description: Reviews changes for race conditions, deadlocks, ISR safety, and asy
   correctness
 tools: Read, Grep, Glob
 model: sonnet
-content_hash: 05402ad8b7e9c72e3e97e7a12167a76d53d665883604eb9bf16bc19c22b95d9e
+content_hash: a3c1b7279591f4e6080057c0934b810e7f47f987a8d0ca416a40c9cd3d8f809f
 ---
 
 # concurrency-reviewer
@@ -115,3 +115,9 @@ Common envelope (every finding):
   "reasoning": "Observe: bare dict assignment at line 17. Trace: workers in submit() touch _cache concurrently. Infer: dict resize during write corrupts state. Conclude: P0 — undefined behaviour under load.",
 }
 ```
+
+
+
+<!-- @hm:user:extensions -->
+<!-- Project-specific concurrency rules / known race patterns. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extensions -->

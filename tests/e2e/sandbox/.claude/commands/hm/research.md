@@ -4,7 +4,7 @@ harness_maker_version: 0.2.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/atomic_command.md.j2
 provenance: official
-content_hash: 60596fc0a7dd270bb3f7a328ac0de373cef377f5bb2464c6527f356d91015169
+content_hash: 245c7c2cd0dc3c487593d0bc17d1b78fc0ecd2b6a0430af43afb65213bc0d257
 ---
 # Stage: research
 
@@ -57,3 +57,13 @@ art, library docs, and architectural constraints so that downstream stages
 - No "I don't know" surprises in later stages on points covered here
 - Recommendation is grounded in evidence, not authority
 - Open questions are explicit, not hidden as assumptions
+
+<!-- @hm:user:extra-quality-checks -->
+<!-- Project-specific quality bar items. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extra-quality-checks -->
+
+
+
+<!-- @hm:user:extensions -->
+<!-- Free-form project-specific additions to the research stage. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extensions -->

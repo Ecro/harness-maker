@@ -8,7 +8,7 @@ name: agent-quality-rubric
 description: Score an agent .md file as Platinum/Gold/Silver/Bronze. Use when /hm:monitor
   drills into agent quality or when a Bronze-tier agent should be auto-registered
   as an anti-rot patch candidate. Calls harness_maker.agent_quality.score_agent.
-content_hash: 1666f4aca4f150fd3ee449162cee70752e684517eda5046dbcf6e2af78453270
+content_hash: 7141e6ba8f13e9c96d51d591333d195a52d5e61fa27d826424225fd78fbc5849
 ---
 
 # agent-quality-rubric
@@ -86,3 +86,7 @@ proposes a refresh patch (always with manual confirm — never auto-apply).
 
 The `score_agent(...)` dict, plus a side-effect when Bronze: the
 auto-registered candidate line. Consumers (dashboard, refresh) read both.
+
+<!-- @hm:user:extensions -->
+<!-- Project-specific scoring overrides or rubric extensions. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extensions -->

@@ -4,7 +4,7 @@ harness_maker_version: 0.2.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/loop.md.j2
 provenance: official
-content_hash: 787838c1ebd4dbdbda3a6c2e03ccd33bcd4da95832290a85bdab18a6e35739fd
+content_hash: 491d3a6254edbdddbdb5a18fd77159180a0500b12671c04c49c78d54cacddd15
 ---
 # /hm:loop
 
@@ -225,3 +225,7 @@ NOT silently keep retrying. Report the blocker and halt.
   workflow delegates to it)
 - Loop-spec schema: see step 3.f above
 - Persisted loop-specs: `.claude/loop-specs/<slug>.yaml`
+
+<!-- @hm:user:extensions -->
+<!-- Project-specific autoloop overrides (custom safety rails, additional convergence predicates, etc.). Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extensions -->

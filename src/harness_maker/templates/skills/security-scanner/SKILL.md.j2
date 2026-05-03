@@ -48,3 +48,7 @@ if high and cfg["security"]["on_finding"]["high"] == "block":
 Aggregated `list[Finding]` (returned) plus persisted JSONL at
 `.claude/observability/security/findings-<date>.jsonl` (one finding per line).
 Each finding has `{severity, category, file, line, evidence, fix}`.
+
+<!-- @hm:user:extensions -->
+<!-- Project-specific scanner rules (custom secret patterns, allowlist entries, etc.). Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extensions -->

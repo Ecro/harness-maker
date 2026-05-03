@@ -8,7 +8,7 @@ name: verify-before-completion
 description: Pre-wrapup gate enforcing 6 checks before any /hm:wrapup or autoloop
   iteration close. Failure on any check blocks completion and surfaces the failing
   check name + remediation hint.
-content_hash: d546e51675eec4d25c963eaedb0bc9253e4cee883500137956e6bdb2c3fb807b
+content_hash: d089104de340e2620a731942d01087c9e647401c8333c423ee6764f39cdc8560
 ---
 
 # verify-before-completion
@@ -139,3 +139,7 @@ deterministic; flakiness is a defect to fix in the check, not retry around.
 
 When `blocking: true`, the calling command (`/hm:wrapup` or autoloop iter)
 must abort completion.
+
+<!-- @hm:user:extensions -->
+<!-- Project-specific verify checks beyond the 6 baseline. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extensions -->

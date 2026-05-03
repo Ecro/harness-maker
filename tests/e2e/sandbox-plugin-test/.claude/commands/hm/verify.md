@@ -4,7 +4,7 @@ harness_maker_version: 0.2.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/atomic_command.md.j2
 provenance: official
-content_hash: 5c832499ec7086d4dc59da9180c1dc7a0a1affa8155a3206299bb89b17ec3441
+content_hash: a84a42a8869d10de5d1ea6ad9a201e5b8ad2c73d099058e9ccbe7feb7fb0f194
 ---
 # Stage: verify
 
@@ -60,3 +60,13 @@ machine-checkable stop sign before `wrapup`.
 
 - The gate is non-negotiable; bypassing requires explicit user override
 - A failed check produces actionable evidence, not just a red line
+
+<!-- @hm:user:extra-quality-checks -->
+<!-- Project-specific verify checklist items. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extra-quality-checks -->
+
+
+
+<!-- @hm:user:extensions -->
+<!-- Free-form project-specific additions to the verify stage. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extensions -->
