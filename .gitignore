@@ -1,0 +1,34 @@
+# Autoloop runtime state
+.claude-progress.json
+.claude-progress.json.tmp
+
+# Worktrees (v1.4)
+.worktrees/
+
+# Observability outputs (per-project, generated)
+.claude/observability/metrics.jsonl
+.claude/observability/refresh/raw-*.jsonl
+.claude/observability/refresh/proposed-*.md
+.claude/observability/security/findings-*.jsonl
+
+# Backups
+.claude/.backup-*/
+
+# Cache
+~/.cache/harness-maker/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Local env
+.env
+.env.local
