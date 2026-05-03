@@ -55,7 +55,7 @@ files:
   body_sha256: 659713aba285e81690cc0e8e74bbe31cbc47220e5fdbd8d0cea70b72d8141352
 - path: commands/hm/refresh.md
   template: commands/hm/refresh.md.j2
-  body_sha256: 92c5ed0e7ef7ab476e424b30f166853bbb90e3af17963e111695621f56e9b0c9
+  body_sha256: 91e1e9a305d206a91a3588db8fd6d8e540bcdd2f6213a5ec670b60cc28b8f1ea
 - path: commands/hm/research.md
   template: commands/hm/atomic_command.md.j2
   body_sha256: 245c7c2cd0dc3c487593d0bc17d1b78fc0ecd2b6a0430af43afb65213bc0d257
