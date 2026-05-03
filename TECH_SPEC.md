@@ -1,13 +1,13 @@
 # TECH_SPEC: harness-maker
 
-> **상태:** v2.1 (autoloop dry-run 분석 fixes 반영) · **작성:** 2026-05-03 · **언어:** 한국어 (Korean)
+> **상태:** v2.2 (Phase 2/7 split + env precheck + invariant gate) · **작성:** 2026-05-03 · **언어:** 한국어 (Korean)
 > Claude Code 플러그인 — 어떤 프로젝트든 `/harness-maker:make` 한 번에 맞춤 하네스(.claude/) 자동 생성·갱신. autoloop 으로 자율 빌드 가능한 형식.
 
 ## 0. Loop Configuration
 
 ```json
 {
-  "phases": 10,
+  "phases": 12,
   "max_iterations_per_phase": 5,
   "max_global_iterations": 100,
   "verify_command": "bash .claude-verify.sh",
@@ -565,6 +565,13 @@ class ConflictItem(BaseModel):
 
 #### Tasks
 
+- **Task 1.0: 환경 precheck (fail fast)**
+  - Do: 빌드 환경 검증 — (a) `command -v uv` (uv 설치 확인, 없으면 설치 안내 출력 후 STOP), (b) `python3 --version` 가 3.12+ (없으면 STOP), (c) `command -v git` 및 `git rev-parse --git-dir` (현재 repo 가 git-init 되어있는지 — 이미 됐어야 함), (d) `mkdir -p ~/.cache/harness-maker && touch ~/.cache/harness-maker/.write-test && rm ~/.cache/harness-maker/.write-test` (캐시 디렉토리 쓰기 가능). 모든 체크 통과 시 진행, 하나라도 실패 시 명확한 에러 메시지 + STOP.
+  - Files: `.claude-verify.sh` 의 `phase_1_env` 만 호출 (별도 신규 파일 X — verify script 가 환경 검증 담당)
+  - Done when: `bash .claude-verify.sh phase_1_env` 가 exit 0
+  - Verify: `bash .claude-verify.sh phase_1_env`
+  - Commit: (no commit — verify-only task, env 가 OK 면 다음 task 로 진행)
+
 - **Task 1.1: uv 프로젝트 초기화**
   - Do: `uv init --package` 실행 후 pyproject.toml 설정 — name="harness-maker", version="0.1.0", python ">=3.12", license="MIT", deps=[jinja2>=3, pyyaml>=6, pydantic>=2, anthropic, httpx, feedparser, typer, rich], dev=[pytest>=8, pytest-asyncio, ruff, mypy]. ruff config (E,F,W,I,N,UP,B,A,C4,RET,SIM,PT 룰셋). mypy strict.
   - Files: `pyproject.toml`, `uv.lock`, `src/harness_maker/__init__.py` (with `__version__ = "0.1.0"`)
@@ -602,25 +609,26 @@ class ConflictItem(BaseModel):
 
 **Phase 1 Exit Criteria:**
 ```bash
-uv sync \
+bash .claude-verify.sh phase_1_env \
+  && uv sync \
   && uv run python -c "from harness_maker import __version__; assert __version__ == '0.1.0'" \
   && jq -r .name .claude-plugin/plugin.json | grep -q '^harness-maker$' \
   && test -f commands/make.md \
   && uv run pytest tests/unit/test_i18n.py -v \
   && uv run ruff check src/ \
   && uv run mypy --strict src/ \
-  && test -f README.md && test -f LICENSE && test -f .github/workflows/ci.yml
+  && test -f README.md && test -f LICENSE && test -f .github/workflows/ci.yml \
+  && bash .claude-verify.sh phase_1_invariants
 ```
 
 ---
 
-### Phase 2: Profiler + Interviewer + Synthesizer + Renderer + Reconciler + 4 Fixtures
+### Phase 2: Foundations — Pydantic Models + Profiler + Interviewer
 
-**Objective:** `/harness-maker:make` 의 핵심 파이프라인 동작. 4 fixture 에 적용해 expected blueprint 일치.
+**Objective:** Pipeline (Phase 3) 의 빌딩블록 확보. 모델·시그널 추출·인터뷰 모두 단위테스트 통과.
 
 **Research targets (autoloop Stage 1 자동 fetch):**
 - Pydantic v2 patterns: https://docs.pydantic.dev/latest/
-- Jinja2 templating: https://jinja.palletsprojects.com/en/3.1.x/
 - AskUserQuestion tool spec (Claude Code SDK): https://code.claude.com/docs/en/sub-agents
 
 #### Tasks
@@ -635,60 +643,81 @@ uv sync \
 - **Task 2.2: Profiler 구현**
   - Do: `src/harness_maker/profile.py` — `profile(project_dir: Path) -> ProjectProfile`. 시그널: (a) stack — package.json/pyproject.toml/Cargo.toml/CMakeLists.txt/go.mod 존재 검사, (b) scale — 파일 개수 < 50 small / 50-500 medium / >500 large, (c) lifecycle — git commit 빈도 (last 30 days commits), (d) existing_dotclaude — `.claude/` 존재 여부, (e) spec_only — `TECH_SPEC.md` 존재 + 코드 파일 0개 시 true, (f) vault_member — `.claude/obsidian.json` 존재. mock 시그널로 unit test.
   - Files: `src/harness_maker/profile.py`, `tests/unit/test_profile.py`
-  - Done when: 4 fixture 디렉토리에서 profile 호출 시 expected ProjectProfile 반환
+  - Done when: 4 fixture stub 디렉토리 (Phase 3 에서 본격 작성) 에서 profile 호출 시 expected ProjectProfile 반환
   - Verify: `bash .claude-verify.sh phase_2_profile`
   - Commit: `feat(phase2): implement Profiler with multi-stack detection`
 
 - **Task 2.3: Interviewer 구현**
-  - Do: `src/harness_maker/interview.py` — `interview(profile: ProjectProfile, autoloop_mode: bool = False) -> dict[str, Any]`. autoloop_mode=True 시 모든 default 자동 채택 (AskUserQuestion 호출 X). interactive 모드 시 preset 추천 + 10 차원 질문: workflow names, default_workflow, reviewers, consensus, caching, models, autoloop, memory, anti_rot, worktree, security, context_lint. ko/en 메시지 카탈로그 활용.
+  - Do: `src/harness_maker/interview.py` — `interview(profile: ProjectProfile, autoloop_mode: bool = False) -> dict[str, Any]`. autoloop_mode=True 시 모든 default 자동 채택 (AskUserQuestion 호출 X). interactive 모드 시 preset 추천 + 10+ 차원 질문: workflow names, default_workflow, reviewers, consensus, caching, models, autoloop, memory, anti_rot, worktree, security, context_lint. ko/en 메시지 카탈로그 활용.
   - Files: `src/harness_maker/interview.py`, `tests/unit/test_interview.py`
   - Done when: autoloop_mode 테스트가 모든 dimension 에 대한 default 답 채택 확인. interactive mode 는 mocked input 으로 테스트.
   - Verify: `bash .claude-verify.sh phase_2_interview`
   - Commit: `feat(phase2): implement Interviewer with autoloop + interactive modes`
 
-- **Task 2.4: Synthesizer 구현**
+**Phase 2 Exit Criteria:**
+```bash
+uv run pytest tests/unit/test_models.py tests/unit/test_profile.py tests/unit/test_interview.py -v \
+  && uv run ruff check src/harness_maker/{models,profile,interview}.py \
+  && uv run mypy --strict src/harness_maker/{models,profile,interview}.py \
+  && uv run python -c "from harness_maker.models import HarnessConfig, Blueprint, ProjectProfile, FileEntry, ConflictItem; from harness_maker.profile import profile; from harness_maker.interview import interview" \
+  && bash .claude-verify.sh phase_2_invariants
+```
+
+---
+
+### Phase 3: Synthesis Pipeline — Synthesizer + Renderer + Reconciler + Verifier + 4 Fixtures + CLI
+
+**Objective:** `/harness-maker:make` 의 핵심 파이프라인 end-to-end 동작. 4 fixture 에 적용해 expected blueprint 일치 + file count assertion.
+
+**Research targets (autoloop Stage 1 자동 fetch):**
+- Jinja2 templating: https://jinja.palletsprojects.com/en/3.1.x/
+- (Phase 2 산출물 이미 사용 가능 — Pydantic models, profile, interview)
+
+#### Tasks
+
+- **Task 3.1: Synthesizer 구현**
   - Do: `src/harness_maker/synthesize.py` — `synthesize(profile: ProjectProfile, answers: dict) -> Blueprint`. preset+answers 를 deterministic 매핑해 Blueprint(HarnessConfig + list[FileEntry]) 생성. Side preset → 25-30 파일, Production → 35-45 파일. Side 와 Production 의 정확한 파일 리스트는 본 spec Section 2 의 templates/ 트리에서 도출 (모든 .j2 파일이 → 사용자 .claude/ 의 어떤 경로로 갈지 매핑).
   - Files: `src/harness_maker/synthesize.py`, `tests/unit/test_synthesize.py`
   - Done when: Side preset blueprint 가 25-30 파일, Production 35-45 파일 포함, 모든 FileEntry 가 valid template 경로 보유
-  - Verify: `bash .claude-verify.sh phase_2_synthesize`
-  - Commit: `feat(phase2): implement Synthesizer (preset + answers → Blueprint)`
+  - Verify: `bash .claude-verify.sh phase_3_synthesize`
+  - Commit: `feat(phase3): implement Synthesizer (preset + answers → Blueprint)`
 
-- **Task 2.5: Renderer 구현 (provenance frontmatter 포함, deterministic 모드)**
-  - Do: `src/harness_maker/render.py` — `render(blueprint: Blueprint, target_dir: Path, *, dry_run: bool = False, freeze_time: datetime | None = None)`. Jinja2 환경 셋업 (`templates/` 가 search path). 각 FileEntry 마다 (a) 템플릿 렌더, (b) provenance frontmatter (generated_by, harness_maker_version, generated_at = freeze_time or now(), source_template, content_hash sha256 of body **excluding frontmatter**, provenance="official") 부착, (c) target_dir 에 **atomic write** (`tempfile.NamedTemporaryFile(dir=target_dir.parent, delete=False)` → `os.rename`). dry_run=True 시 디스크 변경 0, 변경 목록만 반환. **freeze_time 인자 = 테스트 결정성 보장 (snapshot 비교에 필수)**.
+- **Task 3.2: Renderer 구현 (provenance frontmatter 포함, deterministic 모드)**
+  - Do: `src/harness_maker/render.py` — `render(blueprint: Blueprint, target_dir: Path, *, dry_run: bool = False, freeze_time: datetime | None = None)`. Jinja2 환경 셋업 (`templates/` 가 search path). 각 FileEntry 마다 (a) 템플릿 렌더, (b) provenance frontmatter (generated_by, harness_maker_version, generated_at = freeze_time or now(), source_template, content_hash sha256 of body **excluding frontmatter**, provenance="official") 부착, (c) target_dir 에 **atomic write** (CLAUDE.md 의 atomic_write helper 사용 — tempfile + os.replace). dry_run=True 시 디스크 변경 0, 변경 목록만 반환. **freeze_time 인자 = 테스트 결정성 보장 (snapshot 비교에 필수)**.
   - Files: `src/harness_maker/render.py`, `tests/unit/test_render.py`
-  - Done when: 빈 fixture 디렉토리에서 Side blueprint 렌더 → 25-30 파일 모두 frontmatter 포함, content_hash 가 실제 hash 와 일치
-  - Verify: `bash .claude-verify.sh phase_2_render`
-  - Commit: `feat(phase2): implement Renderer with Jinja2 + provenance frontmatter`
+  - Done when: 빈 fixture 디렉토리에서 Side blueprint 렌더 → 25-30 파일 모두 frontmatter 포함, content_hash 가 실제 hash 와 일치, freeze_time 동일 시 byte-identical
+  - Verify: `bash .claude-verify.sh phase_3_render`
+  - Commit: `feat(phase3): implement Renderer with Jinja2 + provenance + deterministic freeze_time`
 
-- **Task 2.6: Reconciler 구현 (Brownfield)**
+- **Task 3.3: Reconciler 구현 (Brownfield)**
   - Do: `src/harness_maker/reconcile.py` — `reconcile(existing_dir: Path, blueprint: Blueprint) -> list[ConflictItem]`. 기존 .claude/ 인덱싱. 각 신규 FileEntry 와 비교. 충돌 분류: (a) frontmatter 있고 hash 일치 → 우리 것, overwrite 안전 (decision=REPLACE 자동), (b) frontmatter 없음 또는 hash 불일치 → 사용자/타 출처 (decision=KEEP 디폴트, autoloop 환경 자동), (c) 신규 only → ADD. backup 함수 — `.claude/.backup-<ISO>/`.
   - Files: `src/harness_maker/reconcile.py`, `tests/unit/test_reconcile.py`
   - Done when: brownfield fixture (시드된 기존 .claude/) 에서 reconcile → 충돌 N건 분류 정확. backup 디렉토리 생성 확인.
-  - Verify: `bash .claude-verify.sh phase_2_reconcile`
-  - Commit: `feat(phase2): implement Reconciler with frontmatter-based conflict resolution`
+  - Verify: `bash .claude-verify.sh phase_3_reconcile`
+  - Commit: `feat(phase3): implement Reconciler with frontmatter-based conflict resolution`
 
-- **Task 2.7: Verifier 구현 (smoke)**
+- **Task 3.4: Verifier 구현 (smoke)**
   - Do: `src/harness_maker/verify.py` — `verify(target_dir: Path) -> list[str]` (errors). 검사: harness.yaml YAML lint, hooks/hooks.json JSON parse, 모든 .md 파일에 provenance frontmatter 존재, settings.json permissions schema valid.
   - Files: `src/harness_maker/verify.py`, `tests/unit/test_verify.py`
   - Done when: valid blueprint 렌더 결과에서 errors == [], 의도적 손상 시 errors 검출
-  - Verify: `bash .claude-verify.sh phase_2_verifier`
-  - Commit: `feat(phase2): implement Verifier with yaml/json/frontmatter checks`
+  - Verify: `bash .claude-verify.sh phase_3_verifier`
+  - Commit: `feat(phase3): implement Verifier with yaml/json/frontmatter checks`
 
-- **Task 2.8: 4 Fixture + Snapshot Test (deterministic)**
+- **Task 3.5: 4 Fixture + Snapshot Test (deterministic)**
   - Do: `tests/fixtures/{side-python-cli, side-tauri-app, prod-tauri-app, prod-firmware}/` 디렉토리 생성. 각 fixture 에 시드 파일 (pyproject.toml or package.json 등 Profiler 가 stack 감지 가능하게). `tests/snapshot/<fixture>.expected.yaml` — 각 fixture 에 대한 expected Blueprint (preset, 파일 리스트 + 각 파일의 content_hash, harness.yaml 내용). `tests/unit/test_synthesize_snapshot.py` — 4 fixture profile → synthesize → render(target=tmp, freeze_time=datetime(2026,1,1,0,0,0,tzinfo=UTC)) → snapshot 비교. **timestamp 는 freeze_time 으로 고정 → frontmatter content 결정적 → snapshot 안정**. Render 결과 파일 개수도 단언 (Side: 25-30, Production: 35-45 fixture 별 expected 값 사용).
   - Files: `tests/fixtures/*/`, `tests/snapshot/*.expected.yaml`, `tests/unit/test_synthesize_snapshot.py`
   - Done when: 4 fixture 모두 snapshot 일치, 각 fixture 의 file count 가 expected range 안
-  - Verify: `bash .claude-verify.sh phase_2_fixtures`
-  - Commit: `test(phase2): add 4 fixtures with deterministic snapshot tests`
+  - Verify: `bash .claude-verify.sh phase_3_fixtures`
+  - Commit: `test(phase3): add 4 fixtures with deterministic snapshot tests`
 
-- **Task 2.9: CLI integration — `make` 명령 동작**
-  - Do: `src/harness_maker/cli.py` 의 `make` 함수 완성. 흐름: profile → (autoloop_mode True 일 시 default) interview → synthesize → (existing_dotclaude 시) reconcile → render. `uv run python -m harness_maker.cli make <fixture-dir> --autoloop` 명령으로 4 fixture 모두 정상 적용.
+- **Task 3.6: CLI integration — `make` 명령 동작**
+  - Do: `src/harness_maker/cli.py` 의 `make` 함수 완성. 흐름: profile → (autoloop_mode True 일 시 default) interview → synthesize → (existing_dotclaude 시) reconcile → render → verify. `uv run python -m harness_maker.cli make <fixture-dir> --autoloop` 명령으로 4 fixture 모두 정상 적용.
   - Files: `src/harness_maker/cli.py` (확장)
-  - Done when: 4 fixture 모두 CLI 호출 → .claude/ 생성 → verify pass
-  - Verify: `bash .claude-verify.sh phase_2_cli_make`
-  - Commit: `feat(phase2): wire CLI make command end-to-end`
+  - Done when: 4 fixture 모두 CLI 호출 → .claude/ 생성 → verify pass + file count expected range
+  - Verify: `bash .claude-verify.sh phase_3_cli_make`
+  - Commit: `feat(phase3): wire CLI make command end-to-end`
 
-**Phase 2 Exit Criteria:**
+**Phase 3 Exit Criteria:**
 ```bash
 uv run pytest tests/unit/ -v \
   && uv run ruff check src/ \
@@ -702,12 +731,13 @@ uv run pytest tests/unit/ -v \
          side-*)  [[ $count -ge 25 && $count -le 32 ]] || { echo "$fix: expected 25-30, got $count"; exit 1; } ;;
          prod-*)  [[ $count -ge 35 && $count -le 47 ]] || { echo "$fix: expected 35-45, got $count"; exit 1; } ;;
        esac
-     done
+     done \
+  && bash .claude-verify.sh phase_3_invariants
 ```
 
 ---
 
-### Phase 3: Monitoring 3 Metrics (효율 + Health + fresh)
+### Phase 4: Monitoring 3 Metrics (효율 + Health + fresh)
 
 **Objective:** 사용자 하네스에 statusline·dashboard·telemetry 자산 렌더되어 3 지표 실시간 표시. Health 6-dim + Agent quality drill-down 계산 동작.
 
@@ -771,7 +801,7 @@ uv run pytest tests/unit/ -v \
 
 ---
 
-### Phase 4: Anti-rot Pipeline (4-source crawl + adaptive threshold + manual confirm)
+### Phase 5: Anti-rot Pipeline (4-source crawl + adaptive threshold + manual confirm)
 
 **Objective:** `/hm:refresh` 명령이 사용자 하네스에 렌더되어 주 1회 자동 + 수동 호출. 4 source 크롤 → adaptive filter → propose UI. **항상 manual confirm.**
 
@@ -857,7 +887,7 @@ uv run pytest tests/unit/crawler/ tests/unit/test_relevance.py -v \
 
 ---
 
-### Phase 5: Workflow Engine + Conditional Router + Modular Installer
+### Phase 6: Workflow Engine + Conditional Router + Modular Installer
 
 **Objective:** atomic stage 7개 + 사용자 명명 fused workflow 가 사용자 하네스에 렌더. Conditional Router 가 변경 영역 따라 reviewer 선택. `--add` / `--remove` 모듈식 설치 동작.
 
@@ -931,7 +961,7 @@ uv run pytest tests/unit/test_workflow_fuse.py tests/unit/test_conditional_route
 
 ---
 
-### Phase 6: Autoloop driver + Verify-before-completion gate
+### Phase 7: Autoloop driver + Verify-before-completion gate
 
 **Objective:** `/hm:loop` 명령이 사용자 하네스에 렌더되어 자율 반복 동작. `/hm:verify` 가 wrapup 직전 자동 호출되는 gate skill 동작.
 
@@ -991,93 +1021,112 @@ uv run pytest tests/unit/test_autoloop_driver.py -v \
 
 ---
 
-### Phase 7: Worktree Isolation + 5 Security Gates
+### Phase 8: Worktree Isolation + harness.yaml schema 확장
 
-**Objective:** `/hm:execute` 가 자동 git worktree 안에서 동작. 5 security gate 모두 검출 가능 (sandbox 시드된 vulnerability 사용).
+**Objective:** `/hm:execute` 가 자동 git worktree 안에서 동작. harness.yaml 에 worktree·security 섹션 추가 (security 게이트 자체는 Phase 9).
 
 **Research targets (autoloop Stage 1 자동 fetch):**
 - git worktree CLI: https://git-scm.com/docs/git-worktree
-- gitleaks 패턴 카탈로그 (regex 참고용): https://github.com/gitleaks/gitleaks
-- OSV.dev API query format: https://google.github.io/osv.dev/api/
-- CVE-2025-59536 (skill poisoning): https://arxiv.org/abs/2604.03081
-- OWASP LLM prompt injection: https://owasp.org/www-project-top-10-for-large-language-model-applications/
 - Archon worktree 패턴 참고: https://github.com/coleam00/Archon
-- ECC AgentShield 보안 스캐폴딩 패턴: https://github.com/affaan-m/everything-claude-code
 
 #### Tasks
 
-- **Task 7.1: Worktree 라이프사이클**
-  - Do: `src/harness_maker/worktree.py` — `create(workflow: str, base_dir: Path) -> Path` (`.worktrees/<workflow>-<ts>/` 생성), `cleanup(wt_path: Path, on_success: bool)`, `merge(wt_path: Path, strategy: str)`. git worktree CLI 호출. .gitignore 자동 추가 검증.
+- **Task 8.1: Worktree 라이프사이클**
+  - Do: `src/harness_maker/worktree.py` — `create(workflow: str, base_dir: Path) -> Path` (`.worktrees/<workflow>-<ts>/` 생성), `cleanup(wt_path: Path, on_success: bool)`, `merge(wt_path: Path, strategy: str)`, `cleanup_all(force: bool)` (autoloop blocker 시 호출). git worktree CLI 호출. .gitignore 자동 추가 검증.
   - Files: `src/harness_maker/worktree.py`, `tests/unit/test_worktree.py`
-  - Done when: temp git repo 에서 worktree 생성·cleanup·merge 동작 확인
-  - Verify: `bash .claude-verify.sh phase_7_worktree`
-  - Commit: `feat(phase7): implement git worktree lifecycle`
+  - Done when: temp git repo 에서 worktree 생성·cleanup·merge·cleanup_all 동작 확인
+  - Verify: `bash .claude-verify.sh phase_8_worktree`
+  - Commit: `feat(phase8): implement git worktree lifecycle`
 
-- **Task 7.2: worktree-isolator skill 템플릿**
+- **Task 8.2: worktree-isolator skill 템플릿**
   - Do: `templates/skills/worktree-isolator/SKILL.md.j2` — `/hm:execute` 호출 시 자동 worktree 생성, 변경 격리, 성공 시 cleanup 절차. harness.yaml.worktree 설정 참조.
   - Files: `templates/skills/worktree-isolator/SKILL.md.j2`
   - Done when: 렌더된 SKILL.md 가 4-step 흐름 명시
-  - Verify: `bash .claude-verify.sh phase_7_worktree_skill`
-  - Commit: `feat(phase7): add worktree-isolator skill template`
+  - Verify: `bash .claude-verify.sh phase_8_worktree_skill`
+  - Commit: `feat(phase8): add worktree-isolator skill template`
 
-- **Task 7.3: Security gate — secrets**
-  - Do: `src/harness_maker/secscan/secrets.py` — `scan(target_dir: Path) -> list[Finding]`. regex 패턴: AWS_ACCESS_KEY, GitHub PAT, Anthropic API key, .env 누출, generic high-entropy strings. severity: high.
-  - Files: `src/harness_maker/secscan/secrets.py`, `tests/unit/test_secrets_scan.py`
-  - Done when: seeded 가짜 secret 들을 detect, 빈 디렉토리는 0 finding
-  - Verify: `bash .claude-verify.sh phase_7_secrets`
-  - Commit: `feat(phase7): implement secrets scanner`
-
-- **Task 7.4: Security gate — permissions**
-  - Do: `src/harness_maker/secscan/permissions.py` — `scan(settings_json: Path) -> list[Finding]`. settings.json 의 `permissions.allow` 안의 과확장 패턴 검출 (`Bash(*)`, `Write(/**)` 등). severity: high (catch-all) / medium (broad path).
-  - Files: `src/harness_maker/secscan/permissions.py`, `tests/unit/test_permissions_scan.py`
-  - Done when: catch-all 검출, 정상 narrow 패턴은 finding 0
-  - Verify: `bash .claude-verify.sh phase_7_permissions`
-  - Commit: `feat(phase7): implement permissions scanner`
-
-- **Task 7.5: Security gate — hook injection**
-  - Do: `src/harness_maker/secscan/hook_injection.py` — `scan(hooks_json: Path) -> list[Finding]`. 위험 패턴 list: `rm -rf`, `curl <url> | sh`, `eval`, `wget ... | bash`. AST 또는 regex.
-  - Files: `src/harness_maker/secscan/hook_injection.py`, `tests/unit/test_hook_injection.py`
-  - Done when: seeded 위험 hook 검출, 정상 hook 0 finding
-  - Verify: `bash .claude-verify.sh phase_7_hook_injection`
-  - Commit: `feat(phase7): implement hook injection scanner`
-
-- **Task 7.6: Security gate — dependency CVEs**
-  - Do: `src/harness_maker/secscan/dependency_cves.py` — `scan(target_dir: Path) -> list[Finding]`. package-lock.json/Cargo.lock/requirements.txt/uv.lock 파싱 → package list → osv_dev.query_cve(). severity: high (CVSS ≥ 7) / medium (4-6.9) / low (<4).
-  - Files: `src/harness_maker/secscan/dependency_cves.py`, `tests/unit/test_cve_scan.py`
-  - Done when: mock OSV 응답으로 Vulnerability list, severity 분류 정확
-  - Verify: `bash .claude-verify.sh phase_7_cve`
-  - Commit: `feat(phase7): implement dependency CVE scanner`
-
-- **Task 7.7: Security gate — prompt injection**
-  - Do: `src/harness_maker/secscan/prompt_injection.py` — `scan(text: str) -> list[Finding]`. hidden instruction 패턴 (zero-width chars, base64 instructions, "ignore previous", "system:" injection). severity: high.
-  - Files: `src/harness_maker/secscan/prompt_injection.py`, `tests/unit/test_prompt_injection.py`
-  - Done when: seeded 가짜 injection 검출, 정상 텍스트 0 finding
-  - Verify: `bash .claude-verify.sh phase_7_prompt_injection`
-  - Commit: `feat(phase7): implement prompt injection scanner`
-
-- **Task 7.8: Security scanner orchestrator + skill + agent**
-  - Do: `src/harness_maker/security_scanner.py` — `scan_all(target_dir: Path, harness_config: dict) -> list[Finding]`. 5 gate 호출 → findings → `.claude/observability/security/findings-<date>.jsonl` 저장. on_finding 정책 적용 (high=block/warn/allow). `templates/skills/security-scanner/SKILL.md.j2`, `templates/agents/security-auditor.md.j2`.
-  - Files: `src/harness_maker/security_scanner.py`, `templates/skills/security-scanner/SKILL.md.j2`, `templates/agents/security-auditor.md.j2`, `tests/unit/test_security_scanner.py`
-  - Done when: 5 seeded vulnerability 모두 검출, findings.jsonl 생성, security-auditor agent 렌더 정상
-  - Verify: `bash .claude-verify.sh phase_7_orchestrator`
-  - Commit: `feat(phase7): wire security scanner orchestrator + skill + auditor agent`
-
-- **Task 7.9: harness.yaml schema 확장 (worktree + security)**
-  - Do: `templates/harness-yaml/{Side,Production}.yaml.j2` 에 `worktree:` 와 `security:` 섹션 추가. Side: worktree.scope=[execute], security.on_finding.high=warn. Production: scope=[execute, plan], on_finding.high=block.
-  - Files: `templates/harness-yaml/{Side,Production}.yaml.j2`
+- **Task 8.3: harness.yaml schema 확장 (worktree + security 섹션)**
+  - Do: `templates/harness-yaml/{Side,Production}.yaml.j2` 에 `worktree:` 와 `security:` 섹션 추가 (security 의 실제 검사 로직은 Phase 9). Side: worktree.scope=[execute], security.on_finding.high=warn. Production: scope=[execute, plan], on_finding.high=block. Pydantic HarnessConfig 모델도 worktree·security 키 검증 확장.
+  - Files: `templates/harness-yaml/{Side,Production}.yaml.j2`, `src/harness_maker/models.py` (확장)
   - Done when: 렌더된 harness.yaml 이 Pydantic HarnessConfig validation 통과
-  - Verify: `bash .claude-verify.sh phase_7_yaml_schema`
-  - Commit: `feat(phase7): extend harness.yaml schema with worktree + security`
+  - Verify: `bash .claude-verify.sh phase_8_yaml_schema`
+  - Commit: `feat(phase8): extend harness.yaml schema with worktree + security`
 
-**Phase 7 Exit Criteria:**
+**Phase 8 Exit Criteria:**
 ```bash
-uv run pytest tests/unit/test_worktree.py tests/unit/test_secrets_scan.py tests/unit/test_permissions_scan.py tests/unit/test_hook_injection.py tests/unit/test_cve_scan.py tests/unit/test_prompt_injection.py tests/unit/test_security_scanner.py -v \
-  && bash .claude-verify.sh phase_7_seeded_vulns
+uv run pytest tests/unit/test_worktree.py -v \
+  && bash .claude-verify.sh phase_8_worktree_skill \
+  && bash .claude-verify.sh phase_8_yaml_schema \
+  && bash .claude-verify.sh phase_8_invariants
 ```
 
 ---
 
-### Phase 8: Context Lint + Privilege Separation + Provenance Frontmatter
+### Phase 9: 5 Security Gates (secrets · permissions · hook injection · CVE · prompt injection)
+
+**Objective:** 5 security gate 모두 검출 가능. orchestrator 가 5 gate 통합 호출. security-auditor agent 추가.
+
+**Research targets (autoloop Stage 1 자동 fetch):**
+- gitleaks 패턴 카탈로그 (regex 참고용): https://github.com/gitleaks/gitleaks
+- OSV.dev API query format: https://google.github.io/osv.dev/api/
+- CVE-2025-59536 (skill poisoning): https://arxiv.org/abs/2604.03081
+- OWASP LLM prompt injection: https://owasp.org/www-project-top-10-for-large-language-model-applications/
+- ECC AgentShield 보안 스캐폴딩 패턴: https://github.com/affaan-m/everything-claude-code
+
+#### Tasks
+
+- **Task 9.1: Security gate — secrets**
+  - Do: `src/harness_maker/secscan/secrets.py` — `scan(target_dir: Path) -> list[Finding]`. regex 패턴: AWS_ACCESS_KEY, GitHub PAT, Anthropic API key, .env 누출, generic high-entropy strings. severity: high.
+  - Files: `src/harness_maker/secscan/secrets.py`, `tests/unit/test_secrets_scan.py`
+  - Done when: seeded 가짜 secret 들을 detect, 빈 디렉토리는 0 finding
+  - Verify: `bash .claude-verify.sh phase_9_secrets`
+  - Commit: `feat(phase9): implement secrets scanner`
+
+- **Task 9.2: Security gate — permissions**
+  - Do: `src/harness_maker/secscan/permissions.py` — `scan(settings_json: Path) -> list[Finding]`. settings.json 의 `permissions.allow` 안의 과확장 패턴 검출 (`Bash(*)`, `Write(/**)` 등). severity: high (catch-all) / medium (broad path).
+  - Files: `src/harness_maker/secscan/permissions.py`, `tests/unit/test_permissions_scan.py`
+  - Done when: catch-all 검출, 정상 narrow 패턴은 finding 0
+  - Verify: `bash .claude-verify.sh phase_9_permissions`
+  - Commit: `feat(phase9): implement permissions scanner`
+
+- **Task 9.3: Security gate — hook injection**
+  - Do: `src/harness_maker/secscan/hook_injection.py` — `scan(hooks_json: Path) -> list[Finding]`. 위험 패턴 list: `rm -rf`, `curl <url> | sh`, `eval`, `wget ... | bash`. AST 또는 regex.
+  - Files: `src/harness_maker/secscan/hook_injection.py`, `tests/unit/test_hook_injection.py`
+  - Done when: seeded 위험 hook 검출, 정상 hook 0 finding
+  - Verify: `bash .claude-verify.sh phase_9_hook_injection`
+  - Commit: `feat(phase9): implement hook injection scanner`
+
+- **Task 9.4: Security gate — dependency CVEs**
+  - Do: `src/harness_maker/secscan/dependency_cves.py` — `scan(target_dir: Path) -> list[Finding]`. package-lock.json/Cargo.lock/requirements.txt/uv.lock 파싱 → package list → osv_dev.query_cve(). severity: high (CVSS ≥ 7) / medium (4-6.9) / low (<4).
+  - Files: `src/harness_maker/secscan/dependency_cves.py`, `tests/unit/test_cve_scan.py`
+  - Done when: mock OSV 응답으로 Vulnerability list, severity 분류 정확
+  - Verify: `bash .claude-verify.sh phase_9_cve`
+  - Commit: `feat(phase9): implement dependency CVE scanner`
+
+- **Task 9.5: Security gate — prompt injection**
+  - Do: `src/harness_maker/secscan/prompt_injection.py` — `scan(text: str) -> list[Finding]`. hidden instruction 패턴 (zero-width chars, base64 instructions, "ignore previous", "system:" injection). severity: high.
+  - Files: `src/harness_maker/secscan/prompt_injection.py`, `tests/unit/test_prompt_injection.py`
+  - Done when: seeded 가짜 injection 검출, 정상 텍스트 0 finding
+  - Verify: `bash .claude-verify.sh phase_9_prompt_injection`
+  - Commit: `feat(phase9): implement prompt injection scanner`
+
+- **Task 9.6: Security scanner orchestrator + skill + agent**
+  - Do: `src/harness_maker/security_scanner.py` — `scan_all(target_dir: Path, harness_config: dict) -> list[Finding]`. 5 gate 호출 → findings → `.claude/observability/security/findings-<date>.jsonl` 저장. on_finding 정책 적용 (high=block/warn/allow). `templates/skills/security-scanner/SKILL.md.j2`, `templates/agents/security-auditor.md.j2`.
+  - Files: `src/harness_maker/security_scanner.py`, `templates/skills/security-scanner/SKILL.md.j2`, `templates/agents/security-auditor.md.j2`, `tests/unit/test_security_scanner.py`
+  - Done when: 5 seeded vulnerability 모두 검출, findings.jsonl 생성, security-auditor agent 렌더 정상
+  - Verify: `bash .claude-verify.sh phase_9_orchestrator`
+  - Commit: `feat(phase9): wire security scanner orchestrator + skill + auditor agent`
+
+**Phase 9 Exit Criteria:**
+```bash
+uv run pytest tests/unit/test_secrets_scan.py tests/unit/test_permissions_scan.py tests/unit/test_hook_injection.py tests/unit/test_cve_scan.py tests/unit/test_prompt_injection.py tests/unit/test_security_scanner.py -v \
+  && bash .claude-verify.sh phase_9_seeded_vulns \
+  && bash .claude-verify.sh phase_9_invariants
+```
+
+---
+
+### Phase 10: Context Lint + Privilege Separation + Provenance Frontmatter
 
 **Objective:** Renderer 에 context lint 통합 (verbose 차단). Reviewer agent 의 settings.json permissions 권한 분리. 모든 generated 파일 provenance frontmatter (Phase 2 에서 부분 구현 → 여기서 검증·refresh hash 비교).
 
@@ -1157,7 +1206,7 @@ print('reviewer permission separation OK')
 
 ---
 
-### Phase 9: Dogfood — sandbox 적용
+### Phase 11: Dogfood — sandbox 적용
 
 **Objective:** harness-maker 자체를 1개 sandbox 프로젝트에 적용해 모든 R1-R6 + 모든 메커니즘 동작 검증. Python CLI entry + Claude Code 플러그인 entry 둘 다 검증.
 
@@ -1227,7 +1276,7 @@ uv run pytest tests/e2e/ -v \
 
 ---
 
-### Phase 10: Polish (README + Docs + Final Cleanup)
+### Phase 12: Polish (README + Docs + Final Cleanup)
 
 **Objective:** 외부 공개 가능한 상태. README 완성, CONTRIBUTING, 최종 lint/type/test 0 error.
 
@@ -1422,7 +1471,8 @@ bash .claude-verify.sh all
 - **v1.5**: Agent quality drill-down (Health 의 sub-rubric)
 - **v1.6**: Context lint + Privilege separation + Provenance frontmatter (arxiv 2602.11988 / 2603.13424 / 2604.03081)
 - **v2.0**: autoloop-ready 형식 — Section 0-6 구조, 10 phase, 모든 R/M/A 가 Section 4 task 또는 Section 5 verify 에 명시 매핑
-- **v2.1** (본 spec): autoloop dry-run 분석 결과 10 fix 적용 — (C1) Renderer freeze_time 인자, (C2) Phase 9 plugin entry subprocess 검증 task 추가, (C3) Phase 4 Anthropic URL 명시 (HTML scrape, RSS 없음), (I1) SubAgent permissions 공식 schema research note, (I2) vault autoloop 절대경로 → docs/reference/autoloop-pattern.md 자족적 reference, (I3) atomic write 패턴 CLAUDE.md, (I4) LLM mock pytest fixture 패턴 CLAUDE.md, (I5) worktree cleanup on autoloop failure CLAUDE.md, (M1) Phase 9 "Research targets: None" 명시, (M2) Phase 2 file count assertion verify 추가
+- **v2.1**: autoloop dry-run 분석 10 fix — (C1) Renderer freeze_time, (C2) plugin entry subprocess task, (C3) Anthropic URL 명시, (I1) SubAgent permissions schema research, (I2) vault path 의존 제거, (I3-I5) atomic write/LLM mock/worktree cleanup CLAUDE.md, (M1-M2) Phase 9 marker + file count assertion
+- **v2.2** (본 spec): 2차 dry-run 분석 expanded fix set — (a) **Phase 2 split** (9 tasks → Phase 2 Foundations 3 + Phase 3 Pipeline 6) — autoloop 자체 권고. (b) **Phase 7 split** (9 tasks → Phase 8 Worktree 3 + Phase 9 Security 6) — 동일 패턴. (c) **Task 1.0 env precheck** (uv/python3.12+/git/cache write — fail fast). (d) **Cross-phase invariant gate** — 매 phase Exit Criteria 에 `phase_<N>_invariants` 호출 (생성 .claude/ 자산 frontmatter 검증). (e) Total phases: 10 → **12**. (f) verify script 전면 개정 — 12 phase 함수, env check, invariants helper. (g) max_global_iterations 100 유지 (12×5=60 worst, 충분 마진).
 
 ---
 
