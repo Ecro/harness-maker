@@ -159,6 +159,111 @@ def normalize_for_snapshot(text: str) -> str:
 - shell=True 금지 (security_scanner 의 hook injection 검사가 자기 코드도 잡으면 안 됨)
 - 외부 명령 실패 시 graceful fallback (예: GitHub API rate limit → empty result + 경고 로그)
 
+## 무언가를 고치거나 개선하기 전에 — 필수 체크리스트
+
+> **이 섹션은 다음 fix/feature 시작 전에 반드시 읽고 통과시킬 것.**
+> 0.1.0 → 0.3.5 patch 5번을 거치며 같은 패턴의 실수가 반복됨. 매번
+> 회귀 테스트가 잡아주는 게 아니라 **구현 전에 8개 체크포인트를
+> 통과**해야 다음에 같은 함정 안 밟음.
+
+각 체크포인트는 "현실에서 한 번 깨졌던 사례 + 그래서 다음엔 어떻게
+미리 잡을지" 형태. 새 PR 의 description 에 **각 항목 OK/N-A 표기 권장**.
+
+### 1. 사용자 상태 보존 계약을 먼저 그려라
+사용자 디스크에 쓸 때마다 묻는다: **"이 write 가 사용자가 손댄 무엇을
+지울 수 있나?"** 답이 "있다" 면 보존 정책 설계 필수.
+- 0.3.0: block-merge marker (`@hm:user:*` 안의 사용자 추가가 템플릿
+  업그레이드를 견디게)
+- 0.3.1: `settings.json` shallow merge (Claude Code 가 쓴 `enabledPlugins`
+  보존)
+- 0.3.2: `answers_from_harness_yaml` (재렌더 시 인터뷰 답변 silent 재사용)
+- 0.3.4–0.3.5: `statusLine` keep/overwrite/combine 정책
+
+패턴: **policy flag (default = preserve user) + slash 명령에서
+`AskUserQuestion` 으로 의도 묻기**.
+
+### 2. 외부 소비자의 파서 정합성 확인
+우리가 렌더하는 파일은 우리가 아니라 **다른 도구가 읽음**. 그 도구의
+parser 가 받아들이는 형식을 따라야 함.
+- `settings.json` → Claude Code 가 pure JSON 으로 기대 (YAML frontmatter
+  prefix 박으면 statusLine/permissions 무시됨, 0.3.1 fix)
+- `hooks/hooks.json` → jq-parseable pure JSON
+- `lib/*.sh` → bash 가 `---` 를 명령으로 해석, frontmatter 금지
+  (`_render_pure_text`)
+
+새 파일 종류 추가 시: 그 파일을 누가 읽는지 + 그 reader 가 frontmatter
+허용하는지 먼저 확인. 안 되면 `_is_pure_text` / `_is_hooks_json` 같은
+디스패치 분기 추가.
+
+### 3. 설정 precedence 의식
+Claude Code 는 `~/.claude/settings.json` (user) → `<project>/.claude/settings.json`
+(project) → `<project>/.claude/settings.local.json` 순으로 우선 적용. **하위
+레벨에 키를 쓰면 상위가 가려짐**.
+- 0.3.5: 사용자 global `statusLine` 이 있는데 project-level 에 우리 statusLine
+  쓰면 silent shadowing — `_read_global_status_line()` 으로 미리 검사
+- 같은 패턴: `permissions`, `env` 도 project 가 user-global 을 가림
+
+새 키 쓰기 전에 상위 레벨에 같은 키 있는지 확인. 있으면 keep / combine /
+overwrite 분기 줄지 결정.
+
+### 4. CLI 와 slash 명령의 책임 분리
+- **CLI** (`harness_maker.cli`) = flag-driven, no stdin/AskUserQuestion.
+  테스트 가능, CI 안전, 슬래시 명령에서 호출 가능
+- **Slash 명령** (`commands/*.md`, `templates/commands/hm/*.md.j2`) = 사용자
+  intent 수집 (`AskUserQuestion`) → CLI 에 적절한 flag 조합으로 dispatch
+
+CLI 에 `input()` / `AskUserQuestion` 박지 말 것 — 슬래시 명령 컨텍스트에는
+stdin 이 안 통해 hang. 0.3.2 의 non-tty fallback 도 같은 원리.
+
+### 5. 자동-업그레이드 vs 보존 분기 (fingerprint 기반)
+사용자 파일에 박힌 값을 만질 때: **이게 우리가 박은 거냐 사용자가 박은
+거냐** 를 fingerprint 로 판정.
+- 0.3.4: `_HARNESS_SHIPPED_STATUSLINE_COMMANDS` set 으로 "ours" 판정 →
+  자동 업그레이드 (broken v0.3.0 default → wrapper)
+- 0.3.5: 단, **explicit policy 가 있으면 자동-업그레이드 무시 + policy 우선**
+
+같은 fingerprint 패턴이 필요할 만한 곳: 사용자 hooks.json, 사용자 추가
+agent/skill 파일. 그 위치에 우리 출력 박을 때 fingerprint set 만들어두면
+나중에 업그레이드 깔끔.
+
+### 6. 양방향 매퍼 (write 한 건 read 도 가능해야)
+디스크에 persist 하는 모든 포맷은 **reverse mapper** 가 있어야 추후
+재사용 가능.
+- `synthesize.py` → `harness.yaml` 쓰기
+- `interview.answers_from_harness_yaml` → `harness.yaml` 읽어서 InterviewAnswers
+  복원 (0.3.2)
+- `render.py` → frontmatter 에 `content_hash`
+- `reconcile.py` → 같은 hash 로 KEEP/REPLACE 결정
+
+새 persist 포맷 도입 시 "이걸 다음 번에 누가 읽을까?" 답이 있어야 함.
+Schema gap (옛 버전 파일에 새 키 없음) 은 default fallback 으로 처리.
+
+### 7. 테스트 결정성 + 환경 격리
+사용자 환경 (HOME, env vars, 시계) 을 읽는 코드는 **테스트에서 격리** 필수.
+안 그러면 개발자 머신 의존 + CI 비결정적.
+- `freeze_time` (0.1.x): `generated_at` 결정적
+- `Path.home()` mocking (0.3.5): test 가 개발자의 `~/.claude/settings.json`
+  에 의존하지 않게
+- `regenerate.py` 도 HOME pin: snapshot 결정성
+- LLM mock: `mock_anthropic_client` fixture
+- 외부 API: `INTEGRATION=1` 가드
+
+새 코드가 환경 변수 / HOME / 외부 API / 시계 읽으면 **autouse fixture 또는
+명시 monkeypatch** 추가가 PR 의 일부.
+
+### 8. Integration 경계 한 줄 테스트
+unit test 다 통과해도 **integration 경계** (CLI 실행, 외부 도구 호출,
+파일 시스템 효과) 가 깨질 수 있음.
+- 0.3.0 의 broken statusLine: `harness_maker.statusline` 모듈 import 는
+  통과했지만 `uv run` 으로 다른 cwd 에서 실행은 실패. unit 으론 못 잡음.
+- 0.3.4 fix: bash wrapper + 실제 `bash run-statusline.sh` 실행해서 출력
+  확인 e2e
+
+새 사용자-경계 코드 (CLI 명령, 슬래시 명령, hook) 는 **bash 또는
+subprocess 로 실제 실행하는 e2e 한 케이스** 라도 추가.
+
+---
+
 ## 사용자 voice
 - 직접적 (no preamble, no flattery)
 - 우려 먼저, 동의 나중
