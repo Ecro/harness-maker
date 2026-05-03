@@ -19,7 +19,9 @@ user_part=""
 if [ -x ".claude/lib/user-statusline.sh" ] || [ -f ".claude/lib/user-statusline.sh" ]; then
     user_part=$(printf '%s' "$stdin_data" | bash .claude/lib/user-statusline.sh 2>/dev/null || true)
 fi
-harness_part=$(printf '%s' "$stdin_data" | bash .claude/lib/run-statusline.sh 2>/dev/null || true)
+harness_raw=$(printf '%s' "$stdin_data" | bash .claude/lib/run-statusline.sh 2>/dev/null || true)
+# Drop the project-name segment — user's script already shows it.
+harness_part="${harness_raw#* | }"
 
 if [ -n "$user_part" ] && [ -n "$harness_part" ]; then
     echo "$user_part | $harness_part"
