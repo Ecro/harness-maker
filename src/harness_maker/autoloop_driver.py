@@ -19,7 +19,6 @@ import logging
 import re
 import time
 from collections.abc import Callable
-from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -69,7 +68,7 @@ def _default_executor(feature: str, iter_idx: int) -> bool:  # noqa: ARG001
     return True
 
 
-_CONVERGENCE_PREDICATES: dict[str, callable] = {
+_CONVERGENCE_PREDICATES: dict[str, Callable[[AutoloopState], bool]] = {
     "all-features-completed": lambda s: bool(s.features) and all(
         f in s.completed for f in s.features
     ),

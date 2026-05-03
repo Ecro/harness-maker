@@ -75,7 +75,7 @@ files:
   body_sha256: fb743fc5e2dbb7ba96c19ce07bb55f8c94b83e1229d24c9a39aeafcae615c270
 - path: harness.yaml
   template: harness-yaml/Side.yaml.j2
-  body_sha256: aefbd8d72dd026d4e16b1e0ab482e8d91f6c9d917977e0e7bec0643c6fd9bb37
+  body_sha256: 25ba36ecf4992030ce4c38ae6d12834a56c7b272c7346ee83154ac7234b46d8d
 - path: hooks/hooks.json
   template: hooks/hooks.json.j2
   body_sha256: 7615fc94ad6de4897252a4841802ea975263d0eac1312ca941a5e4c524b0ef2a
@@ -117,7 +117,7 @@ files:
   body_sha256: d546e51675eec4d25c963eaedb0bc9253e4cee883500137956e6bdb2c3fb807b
 - path: skills/worktree-isolator/SKILL.md
   template: skills/worktree-isolator/SKILL.md.j2
-  body_sha256: a209f510b4383190c77630dc2908ffbeceb6bbab57f85c0178f90a8c43c0bc5e
+  body_sha256: 0300f88647ac2860735d8f7affc2159607803b9c50acc131eead099a74f60870
 - path: stages/execute.md
   template: stages/execute.md.j2
   body_sha256: c28c5fdb500ced20194473813831a430df31153a9f4f168aa5f4564ae5601ee2

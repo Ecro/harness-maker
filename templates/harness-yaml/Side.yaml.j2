@@ -7,3 +7,11 @@ workflows:
   {{ name }}:
 {% for s in stages %}    - {{ s }}
 {% endfor %}{% endfor %}
+worktree:
+  scope: [execute]
+  branch_prefix: hm-
+security:
+  on_finding:
+    high: warn
+    medium: log
+  gates: []

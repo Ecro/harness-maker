@@ -12,3 +12,11 @@ reviewers:
   list:
 {% for r in config.reviewers.list %}    - {{ r }}
 {% endfor %}
+worktree:
+  scope: [execute, plan]
+  branch_prefix: hm-
+security:
+  on_finding:
+    high: block
+    medium: log
+  gates: []
