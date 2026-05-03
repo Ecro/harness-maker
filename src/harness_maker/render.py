@@ -104,42 +104,72 @@ def _render_settings_json(
     target_dir: Path,
     *,
     dry_run: bool,
-    freeze_time: datetime | None,
+    freeze_time: datetime | None,  # noqa: ARG001 — kept for dispatch signature parity
 ) -> Path:
-    """Render JSON template, embed _provenance with content_hash, prepend YAML frontmatter.
+    """Render settings.json as pure JSON, shallow-merging with any existing on disk.
 
-    Output layout:
-      ---
-      <YAML frontmatter>
-      ---
-      <JSON body>
+    Claude Code expects ``settings.json`` to be parseable as plain JSON, so we
+    cannot prepend YAML frontmatter (it'd break the file). We also need to
+    coexist with Claude Code-managed top-level keys like ``enabledPlugins`` —
+    written when the user runs ``/plugin install`` — so we shallow-merge:
+      * existing top-level keys NOT in our template are preserved
+      * keys present in both — our template's value wins (it's the source of
+        truth for permissions/statusLine/preset)
 
-    The leading `---` satisfies the cross-phase frontmatter invariant.
-    The verifier strips the frontmatter before json.loads.
+    Legacy settings.json files from harness-maker ≤ 0.3.0 carry a YAML
+    frontmatter prefix; we strip it before parsing for back-compat.
+
+    v1 limitation — the merge is **shallow**: nested customizations under a
+    key our template owns (e.g. user-added entries in ``permissions.allow``)
+    are lost on re-render. Workaround: keep custom permissions in
+    ``.claude/settings.local.json`` (Claude Code merges that automatically).
+    Deep-merge with list-union semantics is on the v1.5 roadmap.
     """
     template = env.get_template(fe.template)
     rendered = template.render(**fe.context)
     try:
-        data: dict[str, Any] = json.loads(rendered)
+        new_data: dict[str, Any] = json.loads(rendered)
     except json.JSONDecodeError as e:
         msg = f"Template {fe.template} rendered invalid JSON for {fe.path}: {e}"
         raise ValueError(msg) from e
-    if not isinstance(data, dict):
-        msg = f"Template {fe.template} must render a JSON object (got {type(data).__name__})"
+    if not isinstance(new_data, dict):
+        msg = f"Template {fe.template} must render a JSON object (got {type(new_data).__name__})"
         raise ValueError(msg)
-    prov = _build_provenance(fe, freeze_time)
-    # Provenance lives in YAML frontmatter only — keeping it out of the JSON body
-    # makes reconciler hash recomputation stable across re-renders.
-    body_bytes = _format_settings_json(data)
+    out = target_dir / fe.path
+    merged = _shallow_merge_existing_json(out, new_data)
+    body_bytes = _format_settings_json(merged)
     body_hash = hashlib.sha256(body_bytes).hexdigest()
     fe.body_sha256 = body_hash
-    prov["content_hash"] = body_hash
-    fm_str = _format_frontmatter(prov)
-    final_bytes = fm_str.encode("utf-8") + body_bytes
-    out = target_dir / fe.path
     if not dry_run:
-        atomic_write(out, final_bytes)
+        atomic_write(out, body_bytes)
     return out
+
+
+def _shallow_merge_existing_json(out: Path, new_data: dict[str, Any]) -> dict[str, Any]:
+    """Merge top-level keys: existing's unique keys + new_data (template wins).
+
+    Returns ``new_data`` unchanged when ``out`` is missing, unreadable, or
+    contains corrupt JSON — failures fall through silently because losing
+    user keys is preferable to crashing the entire render.
+    """
+    if not out.exists():
+        return new_data
+    try:
+        text = out.read_text(encoding="utf-8")
+    except OSError:
+        return new_data
+    # Legacy back-compat: strip YAML frontmatter if a pre-0.4.0 render left one.
+    if text.startswith("---\n"):
+        end = text.find("\n---\n", 4)
+        if end != -1:
+            text = text[end + 5 :]
+    try:
+        existing = json.loads(text)
+    except json.JSONDecodeError:
+        return new_data
+    if not isinstance(existing, dict):
+        return new_data
+    return {**existing, **new_data}
 
 
 def _is_settings_json(fe: FileEntry) -> bool:

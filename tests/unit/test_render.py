@@ -75,11 +75,11 @@ def test_render_md_files_have_frontmatter(tmp_path: Path) -> None:
         assert head[0] == "---", f"{md} missing frontmatter"
 
 
-def test_render_settings_json_has_provenance(tmp_path: Path) -> None:
+def test_render_settings_json_is_pure_json(tmp_path: Path) -> None:
+    """settings.json is co-owned with Claude Code (which expects pure JSON), so
+    we cannot prepend YAML frontmatter the way other rendered files do.
+    """
     import json
-
-    from harness_maker.reconcile import parse_frontmatter
-    from harness_maker.verify import _read_json_body
 
     p = _profile()
     a = interview(p, autoloop_mode=True)
@@ -87,15 +87,79 @@ def test_render_settings_json_has_provenance(tmp_path: Path) -> None:
     render(bp, tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
     settings_path = tmp_path / "settings.json"
     assert settings_path.exists()
-    # Provenance now lives ONLY in the YAML frontmatter (not duplicated in JSON body)
-    # so reconciler hash verification matches across renders.
-    fm, _body = parse_frontmatter(settings_path)
-    assert fm is not None
-    assert fm["generated_by"] == "harness-maker"
-    assert "content_hash" in fm
-    # JSON body itself contains only the user-facing config, no _provenance leak.
-    data = json.loads(_read_json_body(settings_path))
-    assert "_provenance" not in data
+    raw = settings_path.read_text(encoding="utf-8")
+    assert not raw.startswith("---\n"), "settings.json must be pure JSON, no frontmatter"
+    data = json.loads(raw)
+    assert "permissions" in data
+    assert "statusLine" in data
+    assert data["statusLine"]["type"] == "command"
+
+
+def test_render_settings_json_shallow_merges_existing(tmp_path: Path) -> None:
+    """When Claude Code already wrote settings.json with `enabledPlugins`, the
+    re-render must preserve that key while adding our own.
+    """
+    import json
+
+    settings_path = tmp_path / "settings.json"
+    settings_path.write_text(
+        json.dumps({"enabledPlugins": {"foo@bar": True}, "permissions": {"allow": ["custom"]}}),
+        encoding="utf-8",
+    )
+    p = _profile()
+    a = interview(p, autoloop_mode=True)
+    bp = synthesize(p, a)
+    render(bp, tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
+    data = json.loads(settings_path.read_text(encoding="utf-8"))
+    # User's enabledPlugins survived (template doesn't define this key).
+    assert data["enabledPlugins"] == {"foo@bar": True}
+    # Template's permissions won (template owns this key).
+    assert data["permissions"]["allow"] != ["custom"]
+    assert "Read" in data["permissions"]["allow"]
+    # Template's statusLine landed.
+    assert data["statusLine"]["type"] == "command"
+
+
+def test_render_settings_json_falls_back_when_existing_corrupt(tmp_path: Path) -> None:
+    """Malformed JSON on disk → render writes pure template content (no crash).
+
+    The user's corrupt file is overwritten because we can't merge against
+    invalid JSON. Less catastrophic than crashing the whole render.
+    """
+    import json
+
+    settings_path = tmp_path / "settings.json"
+    settings_path.write_text("{ this is not valid JSON ::: ", encoding="utf-8")
+    p = _profile()
+    a = interview(p, autoloop_mode=True)
+    bp = synthesize(p, a)
+    render(bp, tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
+    data = json.loads(settings_path.read_text(encoding="utf-8"))
+    assert "statusLine" in data
+    assert "permissions" in data
+
+
+def test_render_settings_json_strips_legacy_frontmatter(tmp_path: Path) -> None:
+    """Pre-0.4.0 settings.json output had a YAML frontmatter prefix. The new
+    render must read past it when shallow-merging (back-compat).
+    """
+    import json
+
+    settings_path = tmp_path / "settings.json"
+    settings_path.write_text(
+        "---\ngenerated_by: harness-maker\ncontent_hash: deadbeef\n---\n"
+        + json.dumps({"enabledPlugins": {"x@y": True}}),
+        encoding="utf-8",
+    )
+    p = _profile()
+    a = interview(p, autoloop_mode=True)
+    bp = synthesize(p, a)
+    render(bp, tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
+    raw = settings_path.read_text(encoding="utf-8")
+    assert not raw.startswith("---\n")
+    data = json.loads(raw)
+    assert data["enabledPlugins"] == {"x@y": True}
+    assert "statusLine" in data
 
 
 def test_render_populates_body_sha256(tmp_path: Path) -> None:

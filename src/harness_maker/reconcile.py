@@ -64,6 +64,18 @@ def reconcile(existing_dir: Path, blueprint: Blueprint) -> list[ConflictItem]:
                 ConflictItem(path=fe.path, decision=ReconcileDecision.BOTH, reason="new-only"),
             )
             continue
+        # settings.json is system-managed JSON co-owned with Claude Code (which
+        # writes `enabledPlugins`). Render handles shallow merge internally;
+        # always REPLACE here so the file isn't filtered out by the KEEP path.
+        if fe.path.name == "settings.json":
+            conflicts.append(
+                ConflictItem(
+                    path=fe.path,
+                    decision=ReconcileDecision.REPLACE,
+                    reason="json-shallow-merge",
+                ),
+            )
+            continue
         fm, body = parse_frontmatter(existing_path)
         if fm is None or "content_hash" not in fm:
             conflicts.append(
