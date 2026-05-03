@@ -1,6 +1,6 @@
 preset: Production
 dev_mode: task-driven
-file_count: 47
+file_count: 48
 files:
 - path: ../CLAUDE.md
   template: claude-md/Side.ko.md.j2
@@ -80,6 +80,9 @@ files:
 - path: hooks/hooks.json
   template: hooks/hooks.json.j2
   body_sha256: 37862c3828f497ea25a24e7d6d8742ab8b57eba94eccf44409f47ccbad9c1ec6
+- path: lib/run-statusline.sh
+  template: lib/run-statusline.sh.j2
+  body_sha256: dcede54bca7246726ffc581dc27037d417f78313a6bb6719f97759994fa0917d
 - path: memory/failures.md
   template: memory/failures.ko.md.j2
   body_sha256: 3abe4997a48ceb0b67f5c42eaad5ba5b24d13251385d7a5d8d41fcc7886ac572
@@ -91,7 +94,7 @@ files:
   body_sha256: 840901a2c3618f8a314e1a8d797ebb80e14f709e21c21f092a74c3a952237c83
 - path: settings.json
   template: settings/Production.json.j2
-  body_sha256: e148e51e9bd91696d5a174a91606725c01511ee8be7cc6635b3e538600549759
+  body_sha256: ef1372138297d8f75f47fa0889c5d3bc1f305b504089053c7518a9d897b199e8
 - path: skills/agent-quality-rubric/SKILL.md
   template: skills/agent-quality-rubric/SKILL.md.j2
   body_sha256: 7141e6ba8f13e9c96d51d591333d195a52d5e61fa27d826424225fd78fbc5849

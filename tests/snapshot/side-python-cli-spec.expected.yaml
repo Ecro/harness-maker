@@ -1,6 +1,6 @@
 preset: Side
 dev_mode: spec-driven
-file_count: 46
+file_count: 47
 files:
 - path: ../CLAUDE.md
   template: claude-md/Side.ko.md.j2
@@ -77,6 +77,9 @@ files:
 - path: hooks/hooks.json
   template: hooks/hooks.json.j2
   body_sha256: 472e1652d67973140ad77ee3a641cc9f7e7bb268c7e3244a49e1276d4be4f33d
+- path: lib/run-statusline.sh
+  template: lib/run-statusline.sh.j2
+  body_sha256: dcede54bca7246726ffc581dc27037d417f78313a6bb6719f97759994fa0917d
 - path: memory/failures.md
   template: memory/failures.ko.md.j2
   body_sha256: c8c41d8fd473350a246e6861675a55e14390bd269018f08f3b82e72b95635772
@@ -88,7 +91,7 @@ files:
   body_sha256: 350c75e906be2d12108aa57c7ff7102f7e70b7f42bbc1305abd49b65fbd1ffba
 - path: settings.json
   template: settings/Side.json.j2
-  body_sha256: 6ab7da21df8aec9213c43098eaedfc3f1b845bf29d67375780ba670cedb40bd6
+  body_sha256: ada57ffd64b0f047fe723457c8891a6c6af590a8ac6aef2ce2abccc4e671a536
 - path: skills/agent-quality-rubric/SKILL.md
   template: skills/agent-quality-rubric/SKILL.md.j2
   body_sha256: 7141e6ba8f13e9c96d51d591333d195a52d5e61fa27d826424225fd78fbc5849
