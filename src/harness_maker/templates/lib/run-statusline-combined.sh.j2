@@ -10,11 +10,16 @@
 
 set -uo pipefail
 
+# Read stdin once so both scripts receive the full JSON payload.
+# Without this, the first script (user-statusline.sh) consumes stdin and
+# the harness script gets nothing, causing cwd fallback to the plugin dir.
+stdin_data=$(cat)
+
 user_part=""
 if [ -x ".claude/lib/user-statusline.sh" ] || [ -f ".claude/lib/user-statusline.sh" ]; then
-    user_part=$(bash .claude/lib/user-statusline.sh 2>/dev/null || true)
+    user_part=$(printf '%s' "$stdin_data" | bash .claude/lib/user-statusline.sh 2>/dev/null || true)
 fi
-harness_part=$(bash .claude/lib/run-statusline.sh 2>/dev/null || true)
+harness_part=$(printf '%s' "$stdin_data" | bash .claude/lib/run-statusline.sh 2>/dev/null || true)
 
 if [ -n "$user_part" ] && [ -n "$harness_part" ]; then
     echo "$user_part | $harness_part"
