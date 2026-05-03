@@ -70,7 +70,8 @@ def test_harness_config_defaults() -> None:
     assert cfg.locale == Locale.KO
     assert cfg.preset == Preset.SIDE
     assert cfg.default_workflow == "dev"
-    assert cfg.workflows == []
+    assert "dev" in cfg.workflows
+    assert AtomicStage.EXECUTE in cfg.workflows["dev"]
     assert cfg.execution == {}
     assert cfg.caching == "agent-aware"
 
@@ -79,7 +80,7 @@ def test_harness_config_round_trip_json() -> None:
     cfg = HarnessConfig(
         locale=Locale.EN,
         preset=Preset.PRODUCTION,
-        workflows=[WorkflowDef(name="dev", stages=[AtomicStage.EXECUTE])],
+        workflows={"dev": [AtomicStage.EXECUTE]},
         execution={"default": "step"},
     )
     raw_json = cfg.model_dump_json()
@@ -126,11 +127,11 @@ def test_workflow_def_starts_with_digit_raises() -> None:
 def test_blueprint_with_file_entry() -> None:
     bp = Blueprint(
         config=HarnessConfig(),
-        files=[FileEntry(path=Path("/tmp/x.md"), sha256="abc")],
+        files=[FileEntry(path=Path("/tmp/x.md"), template="t.md.j2")],
     )
     assert len(bp.files) == 1
     assert bp.files[0].path == Path("/tmp/x.md")
-    assert bp.files[0].sha256 == "abc"
+    assert bp.files[0].template == "t.md.j2"
 
 
 def test_blueprint_default_empty() -> None:
@@ -140,10 +141,11 @@ def test_blueprint_default_empty() -> None:
 
 
 def test_file_entry_defaults() -> None:
-    fe = FileEntry(path=Path("a.md"))
-    assert fe.sha256 == ""
-    assert fe.rendered_from is None
-    assert fe.provenance == {}
+    fe = FileEntry(path=Path("a.md"), template="a.md.j2")
+    assert fe.template == "a.md.j2"
+    assert fe.context == {}
+    assert fe.frontmatter == {}
+    assert fe.body_sha256 is None
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -195,13 +197,15 @@ def test_interview_answers_defaults() -> None:
 
 def test_conflict_item_with_decision() -> None:
     ci = ConflictItem(
-        existing_path=Path("/tmp/old"),
-        new_path=Path("/tmp/new"),
+        path=Path("/tmp/x"),
         decision=ReconcileDecision.KEEP,
+        reason="hash-mismatch-user-modified",
     )
     assert ci.decision == ReconcileDecision.KEEP
+    assert ci.reason == "hash-mismatch-user-modified"
 
 
 def test_conflict_item_decision_none_default() -> None:
-    ci = ConflictItem(existing_path=Path("/tmp/old"), new_path=Path("/tmp/new"))
+    ci = ConflictItem(path=Path("/tmp/x"))
     assert ci.decision is None
+    assert ci.reason is None

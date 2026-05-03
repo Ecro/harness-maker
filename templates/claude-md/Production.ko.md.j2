@@ -1,0 +1,19 @@
+# CLAUDE.md — {{ preset }} preset
+
+> Phase 3 stub. Phase 6에서 locale별 + preset별로 본문이 채워집니다.
+
+## 워크플로우
+
+기본: `/hm:{{ config.default_workflow }}` — atomic stage들을 묶은 워크플로우.
+
+## 리뷰어
+
+consensus: `{{ config.reviewers.consensus }}` — Phase 9에서 보안 게이트 추가.
+
+## 캐싱
+
+`{{ config.caching }}` — agent별 prompt cache + session cache.
+
+## 자동 루프 / 워크트리
+
+autoloop / worktree 활성화 여부는 `harness.yaml` 참조.

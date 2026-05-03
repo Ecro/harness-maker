@@ -1,0 +1,9 @@
+preset: {{ config.preset }}
+locale: {{ config.locale }}
+default_workflow: {{ config.default_workflow }}
+caching: {{ config.caching }}
+workflows:
+{% for name, stages in config.workflows.items() %}
+  {{ name }}:
+{% for s in stages %}    - {{ s }}
+{% endfor %}{% endfor %}

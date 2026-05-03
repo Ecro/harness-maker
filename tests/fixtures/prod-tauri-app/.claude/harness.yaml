@@ -1,0 +1,27 @@
+---
+generated_by: harness-maker
+harness_maker_version: 0.1.0
+generated_at: '2026-01-01T00:00:00+00:00'
+source_template: harness-yaml/Side.yaml.j2
+provenance: official
+content_hash: 88b65b0af1df413e42e41ae6c2da662a0c82734f461816b5f876f58a72c12fde
+---
+preset: Production
+locale: ko
+default_workflow: dev
+caching: session+agent
+workflows:
+
+  dev:
+    - research
+    - plan
+    - execute
+    - review
+    - wrapup
+
+  ship:
+    - research
+    - plan
+    - execute
+    - review
+    - wrapup

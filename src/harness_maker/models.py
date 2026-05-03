@@ -83,14 +83,15 @@ class WorkflowDef(BaseModel):
 
 
 class FileEntry(BaseModel):
-    """One file to render or already rendered (path + provenance metadata)."""
+    """One file to render (template + context + frontmatter); body_sha256 populated post-render."""
 
     model_config = ConfigDict(arbitrary_types_allowed=True, strict=True, extra="forbid")
 
     path: Path
-    sha256: str = ""
-    rendered_from: str | None = None
-    provenance: dict[str, Any] = Field(default_factory=dict)
+    template: str
+    context: dict[str, Any] = Field(default_factory=dict)
+    frontmatter: dict[str, Any] = Field(default_factory=dict)
+    body_sha256: str | None = None  # populated post-render
 
 
 class ConflictItem(BaseModel):
@@ -98,9 +99,9 @@ class ConflictItem(BaseModel):
 
     model_config = ConfigDict(arbitrary_types_allowed=True, strict=True, extra="forbid")
 
-    existing_path: Path
-    new_path: Path
+    path: Path
     decision: ReconcileDecision | None = None
+    reason: str | None = None
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -115,7 +116,17 @@ class HarnessConfig(BaseModel):
 
     locale: Locale = Locale.KO
     preset: Preset = Preset.SIDE
-    workflows: list[WorkflowDef] = Field(default_factory=list)
+    workflows: dict[str, list[AtomicStage]] = Field(
+        default_factory=lambda: {
+            "dev": [
+                AtomicStage.RESEARCH,
+                AtomicStage.PLAN,
+                AtomicStage.EXECUTE,
+                AtomicStage.REVIEW,
+                AtomicStage.WRAPUP,
+            ],
+        },
+    )
     default_workflow: str = "dev"
     execution: dict[str, Any] = Field(default_factory=dict)
     reviewers: dict[str, Any] = Field(default_factory=dict)

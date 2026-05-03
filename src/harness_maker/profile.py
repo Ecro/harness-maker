@@ -76,7 +76,7 @@ def profile(project_dir: Path) -> ProjectProfile:
 
 
 def _count_tracked_files(project_dir: Path) -> int:
-    """Use ``git ls-files`` if a repo, otherwise os.walk excluding IGNORE_DIRS."""
+    """Count tracked files via git ls-files if non-zero; otherwise os.walk excluding IGNORE_DIRS."""
     if (project_dir / ".git").exists():
         try:
             result = subprocess.run(
@@ -90,7 +90,11 @@ def _count_tracked_files(project_dir: Path) -> int:
         except (subprocess.SubprocessError, FileNotFoundError):
             pass
         else:
-            return len(result.stdout.splitlines())
+            tracked = len(result.stdout.splitlines())
+            if tracked > 0:
+                return tracked
+            # git ls-files returned 0 → either fixture inside a parent repo with no
+            # tracked files in this subtree, or empty repo. Fall through to os.walk.
     count = 0
     for root, dirs, files in os.walk(project_dir):  # noqa: B007
         dirs[:] = [d for d in dirs if d not in IGNORE_DIRS]

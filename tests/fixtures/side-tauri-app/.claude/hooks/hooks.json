@@ -1,0 +1,17 @@
+---
+generated_by: harness-maker
+harness_maker_version: 0.1.0
+generated_at: '2026-01-01T00:00:00+00:00'
+source_template: hooks/hooks.json.j2
+provenance: official
+content_hash: f8c09c09fe7af1eab956fa1760c96311856afef8fe7abfdec3ee2bce006fab63
+---
+{
+  "hooks": {
+    "PostToolUse": [],
+    "PreToolUse": [],
+    "SessionStart": [],
+    "Stop": []
+  },
+  "preset": "Side"
+}
