@@ -2,20 +2,15 @@
 
 from __future__ import annotations
 
-from enum import Enum
 from pathlib import Path
 from typing import cast
 
 import yaml
 
 from harness_maker.i18n_messages import MESSAGES
+from harness_maker.models import Locale  # re-export for backward compat
 
-
-class Locale(str, Enum):  # noqa: UP042  # form fixed by amendment §C; Phase 2 moves to models.py
-    """Supported user-facing locales. Phase 2 will re-export from models.py."""
-
-    KO = "ko"
-    EN = "en"
+__all__ = ["Locale", "resolve_locale", "t"]
 
 
 def resolve_locale(project_dir: Path) -> Locale | None:
