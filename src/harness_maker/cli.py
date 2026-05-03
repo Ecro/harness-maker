@@ -11,6 +11,7 @@ import typer
 from harness_maker.add_domain import AddDomainError, add_domain, validate_domain_name
 from harness_maker.block_merge import MergeReport
 from harness_maker.interview import answers_from_harness_yaml, interview
+from harness_maker.models import InterviewAnswers
 from harness_maker.modular_edit import ModularEditError
 from harness_maker.modular_edit import add as modular_add
 from harness_maker.modular_edit import remove as modular_remove
@@ -72,6 +73,23 @@ def make(
             "answers on re-render."
         ),
     ),
+    preset_override: str | None = typer.Option(
+        None,
+        "--preset",
+        help="Override preset for this run: 'Side' or 'Production'. Reuses "
+        "all other answers from harness.yaml when present.",
+    ),
+    locale_override: str | None = typer.Option(
+        None,
+        "--locale",
+        help="Override locale tag (e.g., 'ko', 'en', 'ja'). Free-text; "
+        "unknown locales fall back to English at runtime.",
+    ),
+    dev_mode_override: str | None = typer.Option(
+        None,
+        "--dev-mode",
+        help="Override dev_mode: 'spec-driven' or 'task-driven'.",
+    ),
 ) -> None:
     """Generate or refine the project harness at TARGET/.claude/."""
     p = profile(target)
@@ -92,6 +110,12 @@ def make(
         if effective_autoloop and not autoloop:
             typer.echo("non-tty stdin detected; using --autoloop defaults")
         a = interview(p, autoloop_mode=effective_autoloop)
+    a = _apply_dimension_overrides(
+        a,
+        preset_override=preset_override,
+        locale_override=locale_override,
+        dev_mode_override=dev_mode_override,
+    )
     if add_domain_name is not None:
         try:
             validate_domain_name(add_domain_name)
@@ -159,6 +183,57 @@ def make(
         typer.echo(f"--add-domain stub created: {stub}")
 
     typer.echo(f"harness applied to {target_dotclaude} ({len(bp.files)} files)")
+
+
+def _apply_dimension_overrides(
+    answers: InterviewAnswers,
+    *,
+    preset_override: str | None,
+    locale_override: str | None,
+    dev_mode_override: str | None,
+) -> InterviewAnswers:
+    """Apply per-dimension CLI overrides (preset/locale/dev_mode) on top of
+    the answers (whether reused or freshly interviewed).
+
+    Switching ``preset`` also re-derives the preset-coupled extras
+    (``models`` / ``autoloop`` / ``memory`` / ``anti_rot`` / ``worktree`` /
+    ``security`` / ``context_lint`` / default reviewer & skill enablement)
+    so a Side→Production flip actually unlocks Production-only behaviour
+    rather than leaving stale Side defaults around.
+    """
+    from harness_maker.interview import _build_answers
+    from harness_maker.models import DevMode, Preset
+
+    update: dict[str, object] = {}
+    if locale_override:
+        update["locale"] = locale_override
+    if dev_mode_override:
+        try:
+            update["dev_mode"] = DevMode(dev_mode_override)
+        except ValueError as e:
+            typer.echo(f"--dev-mode invalid: {dev_mode_override}", err=True)
+            raise typer.Exit(code=1) from e
+    if preset_override:
+        try:
+            new_preset = Preset(preset_override)
+        except ValueError as e:
+            typer.echo(f"--preset invalid: {preset_override}", err=True)
+            raise typer.Exit(code=1) from e
+        if new_preset != answers.preset:
+            # Rebuild from scratch so preset-derived extras are correct, then
+            # re-overlay the answers we want to carry across (workflows,
+            # locale, etc.).
+            rebuilt = _build_answers(
+                locale=answers.locale,
+                preset=new_preset,
+                dev_mode=answers.dev_mode,
+                fused_workflows=answers.fused_workflows,
+                default_workflow=answers.default_workflow,
+                consensus=answers.consensus,
+                caching=answers.caching,
+            )
+            return rebuilt.model_copy(update=update)
+    return answers.model_copy(update=update) if update else answers
 
 
 def _emit_reconcile_report(
