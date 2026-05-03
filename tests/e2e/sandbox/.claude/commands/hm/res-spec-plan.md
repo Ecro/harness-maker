@@ -4,7 +4,7 @@ harness_maker_version: 0.3.5
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: e1fb24696d62950748efa3959d977e3d0173e7bf0fdc0617a5e07f2e1321c813
+content_hash: 7f05b9c2ec2cf044cb28ea4ddf1c430a7fc83e5b38524c26ba44d830ec2d44df
 ---
 # /hm:res-spec-plan
 
@@ -119,7 +119,7 @@ has something concrete to write tests against.
 
 ## Outputs
 
-- `SPEC-{slug}.md` with frontmatter:
+- `specs/SPEC-{slug}.md` with frontmatter:
   - `type: spec`
   - `status: draft | approved`
   - `task_slug:`, `created:`, `tags:`
@@ -187,7 +187,7 @@ be measured and stalled work can be diagnosed.
 
 ## Outputs
 
-- `PLAN-{slug}.md` with frontmatter:
+- `work-docs/PLAN-{slug}.md` with frontmatter:
   - `type: plan`, `task_slug:`, `created:`, `tags:`
   - `spec: "[[SPEC-{slug}]]"` (when SPEC exists)
 - Numbered phase list with scope + exit criterion + risk for each

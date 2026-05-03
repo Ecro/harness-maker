@@ -60,7 +60,7 @@ disable auto-fix for this run only (config default unchanged).
 4. Tag each finding:
    - **consensus-passed** — survives the consensus rule (auto-fix candidate)
    - **manual-only** — single source / disagreement on severity (NEVER auto-fixed)
-5. Write `REVIEW-{topic}-{date}.md` with:
+5. Write `{{ config.work_docs.dir }}REVIEW-{topic}-{date}.md` with:
    - All findings ordered by severity
    - Disagreements between reviewers (with reasoning)
    - Recommended actions

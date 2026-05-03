@@ -4,7 +4,7 @@ harness_maker_version: 0.3.5
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: stages/plan.md.j2
 provenance: official
-content_hash: 659713aba285e81690cc0e8e74bbe31cbc47220e5fdbd8d0cea70b72d8141352
+content_hash: ade6f25cd31ea71907b81df4882ffeaefc6602ec3a85705915c1b1f9db8d85ec
 ---
 # Stage: plan
 
@@ -45,7 +45,7 @@ be measured and stalled work can be diagnosed.
 
 ## Outputs
 
-- `PLAN-{slug}.md` with frontmatter:
+- `work-docs/PLAN-{slug}.md` with frontmatter:
   - `type: plan`, `task_slug:`, `created:`, `tags:`
   - `spec: "[[SPEC-{slug}]]"` (when SPEC exists)
 - Numbered phase list with scope + exit criterion + risk for each

@@ -27,9 +27,10 @@ Verify a PLAN exists for the current task and all its task items are marked
 complete. Drift gate: SPEC frontmatter `status: approved` or `evolving`.
 
 ```bash
-test -d work-docs && grep -rq "PLAN-" work-docs/ || exit 1
+work_docs="{{ config.work_docs.dir }}"
+test -d "$work_docs" && grep -rq "PLAN-" "$work_docs" || exit 1
 # All `- [ ]` items in current PLAN must be `- [x]`:
-grep -E "^- \[ \]" work-docs/**/PLAN-*.md && exit 1 || exit 0
+grep -E "^- \[ \]" "${work_docs}"**/PLAN-*.md && exit 1 || exit 0
 ```
 
 ### 2. 회귀 게이트 (Regression / smoke gate)

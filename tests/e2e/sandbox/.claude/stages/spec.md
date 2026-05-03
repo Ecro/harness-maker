@@ -4,7 +4,7 @@ harness_maker_version: 0.3.5
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: stages/spec.md.j2
 provenance: official
-content_hash: 77c4f694f67373003199b20a4219eda29d27a97c661467fd7182360b38196979
+content_hash: be9047f3ecbf7397d631e4e515a1247facf267073fa16477b24875f9d3f66300
 ---
 # Stage: spec
 
@@ -45,7 +45,7 @@ has something concrete to write tests against.
 
 ## Outputs
 
-- `SPEC-{slug}.md` with frontmatter:
+- `specs/SPEC-{slug}.md` with frontmatter:
   - `type: spec`
   - `status: draft | approved`
   - `task_slug:`, `created:`, `tags:`

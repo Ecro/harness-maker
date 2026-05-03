@@ -4,7 +4,7 @@ harness_maker_version: 0.3.5
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: harness-yaml/Production.yaml.j2
 provenance: official
-content_hash: 0854b05c6178d2800b9cd7bdd53d2a5e3558867ff325fa6e99a0daf93fa9ef89
+content_hash: 29193dd6ac07e58bdb670ffb0e6345341bd076cf1a89fea0a04510aac04e5d35
 ---
 preset: Production
 locale: en
@@ -15,6 +15,8 @@ project:
   domains: []
 spec:
   dir: specs/
+work_docs:
+  dir: work-docs/
 workflows:
 
   exec-rev:

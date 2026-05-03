@@ -8,7 +8,7 @@ name: verify-before-completion
 description: Pre-wrapup gate enforcing 6 checks before any /hm:wrapup or autoloop
   iteration close. Failure on any check blocks completion and surfaces the failing
   check name + remediation hint.
-content_hash: d089104de340e2620a731942d01087c9e647401c8333c423ee6764f39cdc8560
+content_hash: df89c5fb7ae62ed917ced284efc3629d4a194f3314ccd369ecada65c103cae45
 ---
 
 # verify-before-completion
@@ -35,9 +35,10 @@ Verify a PLAN exists for the current task and all its task items are marked
 complete. Drift gate: SPEC frontmatter `status: approved` or `evolving`.
 
 ```bash
-test -d work-docs && grep -rq "PLAN-" work-docs/ || exit 1
+work_docs="work-docs/"
+test -d "$work_docs" && grep -rq "PLAN-" "$work_docs" || exit 1
 # All `- [ ]` items in current PLAN must be `- [x]`:
-grep -E "^- \[ \]" work-docs/**/PLAN-*.md && exit 1 || exit 0
+grep -E "^- \[ \]" "${work_docs}"**/PLAN-*.md && exit 1 || exit 0
 ```
 
 ### 2. 회귀 게이트 (Regression / smoke gate)

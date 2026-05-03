@@ -4,7 +4,7 @@ harness_maker_version: 0.3.5
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: d9cb44507f0b492d6931c3ae04b4035ecf21ab7059fdfa35bfd3cab74717c898
+content_hash: f720963349ca26d13176561ac3da35b4c8eca31d861ae10bbe83809a21170e80
 ---
 # /hm:exec-rev
 
@@ -31,8 +31,8 @@ each phase exits only when its verification command is green.
 
 ## Inputs
 
-- PLAN-{slug}.md
-- SPEC-{slug}.md (when present) — drives test authoring
+- `work-docs/PLAN-{slug}.md`
+- `specs/SPEC-{slug}.md` (when present) — drives test authoring
 - Codebase, tests, build/CI scripts
 
 ## Procedure
@@ -137,7 +137,7 @@ disable auto-fix for this run only (config default unchanged).
 4. Tag each finding:
    - **consensus-passed** — survives the consensus rule (auto-fix candidate)
    - **manual-only** — single source / disagreement on severity (NEVER auto-fixed)
-5. Write `REVIEW-{topic}-{date}.md` with:
+5. Write `work-docs/REVIEW-{topic}-{date}.md` with:
    - All findings ordered by severity
    - Disagreements between reviewers (with reasoning)
    - Recommended actions

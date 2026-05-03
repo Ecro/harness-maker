@@ -37,6 +37,10 @@ def fuse(
 
         env = _make_env()
 
+    from harness_maker.models import HarnessConfig
+
+    default_config = HarnessConfig().model_dump(mode="json")
+
     parts: list[str] = [f"# /hm:{workflow_name}\n"]
     for stage in stages:
         tpl = env.get_template(f"stages/{stage.value}.md.j2")
@@ -45,6 +49,7 @@ def fuse(
             stage=stage.value,
             project_name="",
             feature="",
+            config=default_config,
         )
         parts.append(f"\n## Stage: {stage.value}\n\n{body}")
     return "\n".join(parts)

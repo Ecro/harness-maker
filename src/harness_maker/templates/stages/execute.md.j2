@@ -18,8 +18,8 @@ each phase exits only when its verification command is green.
 
 ## Inputs
 
-- PLAN-{slug}.md
-- SPEC-{slug}.md (when present) — drives test authoring
+- `{{ config.work_docs.dir }}PLAN-{slug}.md`
+- `{{ config.spec.dir }}SPEC-{slug}.md` (when present) — drives test authoring
 - Codebase, tests, build/CI scripts
 
 ## Procedure

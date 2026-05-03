@@ -4,7 +4,7 @@ harness_maker_version: 0.3.5
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: stages/review.md.j2
 provenance: official
-content_hash: 54ace34a50682063666f4c971505d0374f0bd92b3c11e32bfa6a9f374d43847b
+content_hash: ad5ac291290394cf46306e21e26e8cccc770878bb9a0785bc366d75db419dcec
 ---
 # Stage: review
 
@@ -66,7 +66,7 @@ disable auto-fix for this run only (config default unchanged).
 4. Tag each finding:
    - **consensus-passed** — survives the consensus rule (auto-fix candidate)
    - **manual-only** — single source / disagreement on severity (NEVER auto-fixed)
-5. Write `REVIEW-{topic}-{date}.md` with:
+5. Write `work-docs/REVIEW-{topic}-{date}.md` with:
    - All findings ordered by severity
    - Disagreements between reviewers (with reasoning)
    - Recommended actions

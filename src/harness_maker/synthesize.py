@@ -73,9 +73,11 @@ def _atomic_command_files() -> list[FileSpec]:
     """Generate one /hm:<stage> command per atomic stage, with rendered body."""
     out: list[FileSpec] = []
     # Lazy import: avoid jinja env construction at module import time
+    from harness_maker.models import HarnessConfig
     from harness_maker.render import _make_env
 
     env = _make_env()
+    default_config = HarnessConfig().model_dump(mode="json")
     for s in _ATOMIC_STAGES:
         tpl = env.get_template(f"stages/{s}.md.j2")
         body = tpl.render(
@@ -83,6 +85,7 @@ def _atomic_command_files() -> list[FileSpec]:
             stage=s,
             project_name="",
             feature="",
+            config=default_config,
         )
         out.append(
             (
@@ -135,14 +138,10 @@ def _base_files(preset: Preset) -> list[FileSpec]:
     CLAUDE.md (which currently share a Side/Production split per locale).
     """
     yaml_template = (
-        "harness-yaml/Side.yaml.j2"
-        if preset == Preset.SIDE
-        else "harness-yaml/Production.yaml.j2"
+        "harness-yaml/Side.yaml.j2" if preset == Preset.SIDE else "harness-yaml/Production.yaml.j2"
     )
     settings_template = (
-        "settings/Side.json.j2"
-        if preset == Preset.SIDE
-        else "settings/Production.json.j2"
+        "settings/Side.json.j2" if preset == Preset.SIDE else "settings/Production.json.j2"
     )
     return [
         (yaml_template, "harness.yaml", {}),
@@ -229,6 +228,7 @@ def synthesize(
         },
         project={"domains": list(answers.domains)},
         spec={"dir": "specs/"},
+        work_docs={"dir": "work-docs/"},
     )
 
     config_dump = config.model_dump(mode="json")

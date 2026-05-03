@@ -212,6 +212,7 @@ class HarnessConfig(BaseModel):
     context_lint: dict[str, Any] = Field(default_factory=dict)
     project: dict[str, Any] = Field(default_factory=lambda: {"domains": []})
     spec: dict[str, Any] = Field(default_factory=lambda: {"dir": "specs/"})
+    work_docs: dict[str, Any] = Field(default_factory=lambda: {"dir": "work-docs/"})
 
 
 class Blueprint(BaseModel):

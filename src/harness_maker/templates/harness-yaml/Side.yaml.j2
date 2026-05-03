@@ -7,6 +7,8 @@ project:
   domains: [{{ config.project.domains | join(", ") }}]
 spec:
   dir: {{ config.spec.dir }}
+work_docs:
+  dir: {{ config.work_docs.dir }}
 workflows:
 {% for name, stages in config.workflows.items() %}
   {{ name }}:

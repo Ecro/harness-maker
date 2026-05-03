@@ -4,7 +4,7 @@ harness_maker_version: 0.3.5
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/atomic_command.md.j2
 provenance: official
-content_hash: 372550c3f45f9216fd49299729d73270f7afa88fa409def9780eda2272604099
+content_hash: 47371e76150b5566a590fc2d3d6d801a2c63fb05a3354aeea15be2934ef04f09
 ---
 # Stage: execute
 
@@ -24,8 +24,8 @@ each phase exits only when its verification command is green.
 
 ## Inputs
 
-- PLAN-{slug}.md
-- SPEC-{slug}.md (when present) — drives test authoring
+- `work-docs/PLAN-{slug}.md`
+- `specs/SPEC-{slug}.md` (when present) — drives test authoring
 - Codebase, tests, build/CI scripts
 
 ## Procedure

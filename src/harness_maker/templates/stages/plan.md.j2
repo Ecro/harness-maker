@@ -20,7 +20,7 @@ be measured and stalled work can be diagnosed.
 ## Inputs
 
 - SPEC (if available) or research notes + user requirements
-- Existing TECH_SPEC.md, ADRs, prior PLANs in `work-docs/`
+- Existing TECH_SPEC.md, ADRs, prior PLANs in `{{ config.work_docs.dir }}`
 - Codebase structure (modules, conventions, test layout)
 
 ## Procedure
@@ -39,7 +39,7 @@ be measured and stalled work can be diagnosed.
 
 ## Outputs
 
-- `PLAN-{slug}.md` with frontmatter:
+- `{{ config.work_docs.dir }}PLAN-{slug}.md` with frontmatter:
   - `type: plan`, `task_slug:`, `created:`, `tags:`
   - `spec: "[[SPEC-{slug}]]"` (when SPEC exists)
 - Numbered phase list with scope + exit criterion + risk for each
