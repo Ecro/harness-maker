@@ -56,6 +56,38 @@ Use `AskUserQuestion` to gather:
 Then dispatch with `--preset / --locale / --dev-mode --autoloop` so the CLI
 skips its own interview but uses the answers you collected.
 
+### 3.5. Detect custom statusLine and ask policy (re-render only)
+
+Before dispatching, peek at `.claude/settings.json` (if it exists) and look
+at `statusLine.command`:
+
+- Empty / missing → CLI installs harness-maker's wrapper. No question.
+- `uv run python -m harness_maker.statusline` (the broken v0.3.0 default)
+  or `bash .claude/lib/run-statusline.sh` (current simple wrapper) → CLI
+  auto-upgrades silently. No question.
+- `bash .claude/lib/run-statusline-combined.sh` (combined wrapper from a
+  prior "combine" choice) → preserve as-is. No question.
+- Anything else → user has a **custom statusLine**. Use `AskUserQuestion`:
+
+  > "Custom statusLine detected: `<command>`. What should happen?"
+  >
+  > - **Keep mine** — preserve my custom statusLine, don't install harness-maker's.
+  > - **Combine** — render a wrapper that runs both my command and harness-maker's metrics, joining outputs with ` | `.
+  > - **Use harness-maker** — overwrite my custom one with harness-maker's wrapper.
+
+Map the answer to a flag and append it to the dispatch invocation:
+
+| Answer            | Flag                                  |
+|-------------------|---------------------------------------|
+| Keep mine         | `--statusline-policy keep`            |
+| Combine           | `--statusline-policy combine`         |
+| Use harness-maker | `--statusline-policy overwrite`       |
+
+The `combine` policy creates `.claude/lib/user-statusline.sh` (one-shot,
+holds your original command — edit freely; harness-maker won't touch it
+again) and `.claude/lib/run-statusline-combined.sh` (the wrapper that
+joins outputs).
+
 ### 4. Dispatch — pick the right CLI invocation
 
 Branch on the chosen intent. Use `$plugin_dir` from step 1.

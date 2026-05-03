@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# harness-maker statusline wrapper — combined variant.
+#
+# Runs the user's prior statusLine command (preserved as user-statusline.sh)
+# alongside the harness-maker metrics line and joins both outputs with " | ".
+# Rendered when the user picked the "combine" policy at /harness-maker:make
+# time. Update behaviour: this file is always replaced on re-render so
+# upgrades to the join logic land; user-statusline.sh is preserved
+# (KEEP-on-reconcile) so user edits there survive.
+
+set -uo pipefail
+
+user_part=""
+if [ -x ".claude/lib/user-statusline.sh" ] || [ -f ".claude/lib/user-statusline.sh" ]; then
+    user_part=$(bash .claude/lib/user-statusline.sh 2>/dev/null || true)
+fi
+harness_part=$(bash .claude/lib/run-statusline.sh 2>/dev/null || true)
+
+if [ -n "$user_part" ] && [ -n "$harness_part" ]; then
+    echo "$user_part | $harness_part"
+elif [ -n "$user_part" ]; then
+    echo "$user_part"
+else
+    echo "$harness_part"
+fi

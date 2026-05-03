@@ -13,7 +13,7 @@
   },
   "preset": "Production",
   "statusLine": {
-    "command": "uv run python -m harness_maker.statusline",
+    "command": "bash .claude/lib/run-statusline.sh",
     "type": "command"
   }
 }

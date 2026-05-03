@@ -159,6 +159,7 @@ def _base_files(preset: Preset) -> list[FileSpec]:
         *_agent_files(),
         ("hooks/hooks.json.j2", "hooks/hooks.json", {}),
         ("observability/dashboard.ko.md.j2", "observability/dashboard.md", {}),
+        ("lib/run-statusline.sh.j2", "lib/run-statusline.sh", {}),
     ]
 
 

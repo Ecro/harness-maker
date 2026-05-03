@@ -139,6 +139,93 @@ def test_render_settings_json_falls_back_when_existing_corrupt(tmp_path: Path) -
     assert "permissions" in data
 
 
+def test_render_settings_json_preserves_user_status_line(tmp_path: Path) -> None:
+    """User's custom statusLine survives a re-render — we add what's missing,
+    we do not overwrite a user-curated command.
+    """
+    import json
+
+    settings_path = tmp_path / "settings.json"
+    user_status = {"type": "command", "command": "echo my-custom-statusline"}
+    settings_path.write_text(
+        json.dumps({"statusLine": user_status, "enabledPlugins": {"x@y": True}}),
+        encoding="utf-8",
+    )
+    p = _profile()
+    a = interview(p, autoloop_mode=True)
+    bp = synthesize(p, a)
+    render(bp, tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
+    data = json.loads(settings_path.read_text(encoding="utf-8"))
+    assert data["statusLine"] == user_status
+    # Other template keys still land.
+    assert "permissions" in data
+    assert data["enabledPlugins"] == {"x@y": True}
+
+
+def test_render_settings_json_overwrite_policy_replaces_user(tmp_path: Path) -> None:
+    """statusline_policy='overwrite' → user's custom statusLine replaced by template's."""
+    import json
+
+    settings_path = tmp_path / "settings.json"
+    settings_path.write_text(
+        json.dumps(
+            {"statusLine": {"type": "command", "command": "echo custom"}},
+        ),
+        encoding="utf-8",
+    )
+    p = _profile()
+    a = interview(p, autoloop_mode=True)
+    bp = synthesize(p, a)
+    render(bp, tmp_path, freeze_time=DEFAULT_FREEZE_TIME, statusline_policy="overwrite")
+    data = json.loads(settings_path.read_text(encoding="utf-8"))
+    assert data["statusLine"]["command"] == "bash .claude/lib/run-statusline.sh"
+
+
+def test_render_settings_json_combine_policy_points_to_combined_wrapper(tmp_path: Path) -> None:
+    """statusline_policy='combine' → settings.json points to combined wrapper."""
+    import json
+
+    settings_path = tmp_path / "settings.json"
+    settings_path.write_text(
+        json.dumps(
+            {"statusLine": {"type": "command", "command": "echo custom"}},
+        ),
+        encoding="utf-8",
+    )
+    p = _profile()
+    a = interview(p, autoloop_mode=True)
+    bp = synthesize(p, a)
+    render(bp, tmp_path, freeze_time=DEFAULT_FREEZE_TIME, statusline_policy="combine")
+    data = json.loads(settings_path.read_text(encoding="utf-8"))
+    assert data["statusLine"]["command"] == "bash .claude/lib/run-statusline-combined.sh"
+
+
+def test_render_settings_json_upgrades_outdated_status_line(tmp_path: Path) -> None:
+    """v0.3.0–0.3.3 shipped a broken statusLine command; users stuck on it
+    get auto-upgraded to the current wrapper-based command on next make.
+    """
+    import json
+
+    settings_path = tmp_path / "settings.json"
+    settings_path.write_text(
+        json.dumps(
+            {
+                "statusLine": {
+                    "type": "command",
+                    "command": "uv run python -m harness_maker.statusline",
+                },
+            },
+        ),
+        encoding="utf-8",
+    )
+    p = _profile()
+    a = interview(p, autoloop_mode=True)
+    bp = synthesize(p, a)
+    render(bp, tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
+    data = json.loads(settings_path.read_text(encoding="utf-8"))
+    assert data["statusLine"]["command"] == "bash .claude/lib/run-statusline.sh"
+
+
 def test_render_settings_json_strips_legacy_frontmatter(tmp_path: Path) -> None:
     """Pre-0.4.0 settings.json output had a YAML frontmatter prefix. The new
     render must read past it when shallow-merging (back-compat).

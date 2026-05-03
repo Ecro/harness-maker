@@ -11,7 +11,7 @@ import typer
 from harness_maker.add_domain import AddDomainError, add_domain, validate_domain_name
 from harness_maker.block_merge import MergeReport
 from harness_maker.interview import answers_from_harness_yaml, interview
-from harness_maker.models import InterviewAnswers
+from harness_maker.models import Blueprint, FileEntry, InterviewAnswers
 from harness_maker.modular_edit import ModularEditError
 from harness_maker.modular_edit import add as modular_add
 from harness_maker.modular_edit import remove as modular_remove
@@ -90,6 +90,17 @@ def make(
         "--dev-mode",
         help="Override dev_mode: 'spec-driven' or 'task-driven'.",
     ),
+    statusline_policy: str | None = typer.Option(
+        None,
+        "--statusline-policy",
+        help=(
+            "How to handle an existing custom statusLine in settings.json: "
+            "'keep' (preserve user, install nothing), 'overwrite' (replace "
+            "with harness-maker's), or 'combine' (render a wrapper that "
+            "joins user output + harness-maker output). Default: preserve "
+            "user-custom statusLines silently; auto-upgrade harness-shipped ones."
+        ),
+    ),
 ) -> None:
     """Generate or refine the project harness at TARGET/.claude/."""
     p = profile(target)
@@ -126,6 +137,7 @@ def make(
             a.domains.append(add_domain_name)
     bp = synthesize(p, a)
     target_dotclaude = target / ".claude"
+    bp = _apply_statusline_policy(bp, target_dotclaude, statusline_policy)
     merge_paths: set[Path] = set()
     keep_count = 0
     if target_dotclaude.exists() and any(target_dotclaude.iterdir()):
@@ -146,6 +158,7 @@ def make(
         freeze_time=freeze,
         merge_paths=merge_paths,
         merge_reports=merge_reports,
+        statusline_policy=statusline_policy,
     )
     _emit_reconcile_report(keep_count, merge_reports)
     errors = verify(target_dotclaude)
@@ -183,6 +196,81 @@ def make(
         typer.echo(f"--add-domain stub created: {stub}")
 
     typer.echo(f"harness applied to {target_dotclaude} ({len(bp.files)} files)")
+
+
+_VALID_STATUSLINE_POLICIES: frozenset[str] = frozenset({"keep", "overwrite", "combine"})
+
+
+def _apply_statusline_policy(
+    blueprint: Blueprint,
+    target_dotclaude: Path,
+    policy: str | None,
+) -> Blueprint:
+    """Append combined-wrapper FileEntries to the blueprint when policy=combine.
+
+    Reads the user's prior statusLine command from ``settings.json`` so the
+    one-shot ``user-statusline.sh`` captures it. ``keep`` / ``overwrite`` /
+    None require no extra files — they're handled by the merge logic at
+    settings.json render time.
+    """
+    if policy is None:
+        return blueprint
+    if policy not in _VALID_STATUSLINE_POLICIES:
+        typer.echo(
+            f"--statusline-policy invalid: {policy} (expected: keep | overwrite | combine)",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+    if policy != "combine":
+        return blueprint
+    user_cmd = _read_existing_statusline_command(target_dotclaude / "settings.json")
+    if user_cmd is None:
+        typer.echo(
+            "--statusline-policy=combine: no existing custom statusLine to combine; "
+            "falling back to overwrite.",
+            err=True,
+        )
+        return blueprint
+    extra = [
+        FileEntry(
+            path=Path("lib/user-statusline.sh"),
+            template="lib/user-statusline.sh.j2",
+            context={"user_statusline_command": user_cmd},
+        ),
+        FileEntry(
+            path=Path("lib/run-statusline-combined.sh"),
+            template="lib/run-statusline-combined.sh.j2",
+            context={},
+        ),
+    ]
+    return blueprint.model_copy(update={"files": [*blueprint.files, *extra]})
+
+
+def _read_existing_statusline_command(settings_path: Path) -> str | None:
+    """Best-effort extract of ``statusLine.command`` from existing settings.json."""
+    if not settings_path.exists():
+        return None
+    try:
+        text = settings_path.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    if text.startswith("---\n"):
+        end = text.find("\n---\n", 4)
+        if end != -1:
+            text = text[end + 5 :]
+    import json as _json
+
+    try:
+        data = _json.loads(text)
+    except _json.JSONDecodeError:
+        return None
+    if not isinstance(data, dict):
+        return None
+    sl = data.get("statusLine")
+    if not isinstance(sl, dict):
+        return None
+    cmd = sl.get("command")
+    return cmd if isinstance(cmd, str) and cmd else None
 
 
 def _apply_dimension_overrides(

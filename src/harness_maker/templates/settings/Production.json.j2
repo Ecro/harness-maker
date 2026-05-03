@@ -3,6 +3,6 @@
     "allow": ["Read", "Bash(uv:*)", "Bash(pytest:*)", "Bash(git:*)"],
     "deny": ["Bash(rm:*)", "Bash(curl:*)"]
   },
-  "statusLine": {"type": "command", "command": "uv run python -m harness_maker.statusline"},
+  "statusLine": {"type": "command", "command": "bash .claude/lib/run-statusline.sh"},
   "preset": "{{ preset }}"
 }
