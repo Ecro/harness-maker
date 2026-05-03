@@ -32,8 +32,10 @@ DEV_MODES: tuple[tuple[str, DevMode], ...] = (
 def regen_one(fixture_name: str, mode_label: str, mode: DevMode) -> None:
     fix_dir = Path("tests/fixtures") / fixture_name
     p = profile(fix_dir)
-    a = interview(p, autoloop_mode=True)
-    a.dev_mode = mode  # explicit cross — overrides preset's recommendation
+    # model_copy keeps validators in play and matches the convention used in
+    # cli.py / tests; direct attribute mutation works today but would skip any
+    # future @model_validator on InterviewAnswers.
+    a = interview(p, autoloop_mode=True).model_copy(update={"dev_mode": mode})
     bp = synthesize(p, a)
     target = fix_dir / f".claude.regen-tmp-{mode_label}"
     target.mkdir(exist_ok=True)

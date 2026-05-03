@@ -30,8 +30,10 @@ from harness_maker import __version__
 from harness_maker.io_utils import atomic_write
 from harness_maker.models import Blueprint, FileEntry
 
-# Module constants
-TEMPLATE_DIR = Path(__file__).resolve().parent.parent.parent / "templates"
+# Module constants — templates ship inside the harness_maker package so they're
+# present in both editable installs (src/harness_maker/templates/) and wheel
+# installs (importable as package data).
+TEMPLATE_DIR = Path(__file__).resolve().parent / "templates"
 DEFAULT_FREEZE_TIME = datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC)
 
 

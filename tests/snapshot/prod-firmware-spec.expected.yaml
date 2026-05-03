@@ -10,10 +10,10 @@ files:
   body_sha256: 91678f32029be33c778ea0085ce31d717373a6c950c183d37d21923efd029c4b
 - path: agents/code-reviewer.md
   template: agents/code-reviewer.md.j2
-  body_sha256: 0ef414c8141200fb55a94e21aabfc9c66dd48694bddbc2d6b382596c482b01a1
+  body_sha256: bc99f73fcb3b021f5a9804e7475585db812052ddc8a05c4dcc4c8bb6e86c9262
 - path: agents/concurrency-reviewer.md
   template: agents/concurrency-reviewer.md.j2
-  body_sha256: 29f5f14f6bf297fd480c06c545b2c25481cc5e6b2aded59cb1312059815f22d7
+  body_sha256: 05402ad8b7e9c72e3e97e7a12167a76d53d665883604eb9bf16bc19c22b95d9e
 - path: agents/consensus-arbiter.md
   template: agents/consensus-arbiter.md.j2
   body_sha256: f64c6f92061ac4e617ea84d967aa67a86ea7a93d6a954dab84fdc87a8d35b6e3
@@ -22,16 +22,16 @@ files:
   body_sha256: c910a623cc3588d7b3415762e7a20f20e8cc1835994c6e5e1a4852591b641afd
 - path: agents/performance-reviewer.md
   template: agents/performance-reviewer.md.j2
-  body_sha256: 6ba8b54a3d0b61a2c37174e55c37627d799082cb0c1ac22f48d478f702737b0b
+  body_sha256: 8fd23cdfc20b026d6056078d91a6a74daa77e56861ad1c06022be5d7e33f16be
 - path: agents/security-auditor.md
   template: agents/security-auditor.md.j2
   body_sha256: b48ca7b3d5d552b6e5df48f3020ab9992f1bb22012af57998e7dd269de738a69
 - path: agents/security-reviewer.md
   template: agents/security-reviewer.md.j2
-  body_sha256: d5e965614e1a847197f4e34e6542ed7e768f2ef9020f37154f8ddb53aa896a22
+  body_sha256: 8163c067962e4b03114728273d86b67a39c96e78563c47e2efaf70ad504bd6d3
 - path: agents/ux-reviewer.md
   template: agents/ux-reviewer.md.j2
-  body_sha256: 2b3b9ff9b7605ffdae2be750664e130e0bc05ff5274b63d9b951236407be2239
+  body_sha256: 49244932e2fb3f36505512a340c98d746867e718a649521b5b958c770824820a
 - path: commands/hm/exec-rev-wrap-ver.md
   template: commands/hm/workflow_command.md.j2
   body_sha256: 944a13c0edda00aa607572e5df85b9325c943616306fe2e73a0afeb52097e4c6
@@ -55,7 +55,7 @@ files:
   body_sha256: abe19607ac7e31b3c817b09eae451d7302667b99abcb2b88d624276b9c467881
 - path: commands/hm/refresh.md
   template: commands/hm/refresh.md.j2
-  body_sha256: 0c2c33d6f3e6e637477d0ddcd930ff054b70a9c837e9545c4cabf34898978f62
+  body_sha256: 2f03e04613c564e2d38b31b43ef6fe9650f5cffbe557176d86e33c42fdb4db60
 - path: commands/hm/res-spec-plan.md
   template: commands/hm/workflow_command.md.j2
   body_sha256: 8660b0cc2d6d440f3f85616ad954c54cdd6f4bdcfaa1b603f955bc8f03d66e23

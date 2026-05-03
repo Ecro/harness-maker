@@ -8,18 +8,21 @@ plug in an LLM-driven scorer.
 The adaptive-threshold algorithm follows ``phase_5_amendments.md §E``.
 
 Stale-asset detection (``detect_stale_assets``) reads the ``last_reviewed_at``
-HTML comment that domain packs and reviewer partials carry, and reports those
-older than a configurable threshold. ``/hm:refresh`` consumes the result to
-prompt the user (or write proposed-<date>.md under autoloop).
+annotation that domain packs and reviewer partials carry, and reports those
+older than a configurable threshold. ``/hm:refresh`` consumes the result via
+``build_proposal_lines`` to prompt the user (or write proposed-<date>.md under
+autoloop). Accepted proposals are applied through ``update_last_reviewed_at``.
 """
 
 from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import UTC, date, datetime
+from importlib import resources
 from pathlib import Path
 
+from harness_maker.io_utils import atomic_write
 from harness_maker.models import CrawlItem
 
 DEFAULT_THRESHOLD = 0.7
@@ -103,16 +106,18 @@ class StaleAsset:
 
     path: Path
     asset_kind: str  # "domain-pack" | "partial"
+    source: str  # "user" | "shipped" — distinguishes mutator target
     last_reviewed_at: date | None
     days_since_review: int  # threshold_days + 1 when last_reviewed_at is None
     threshold_days: int
 
 
 def parse_last_reviewed_at(text: str) -> date | None:
-    """Extract the ``last_reviewed_at`` date from a partial / domain-pack body.
+    """Extract the ``last_reviewed_at`` date.
 
-    Tolerant of either YAML frontmatter or HTML-comment annotations — both
-    forms are used in the templates.
+    Tolerant of YAML frontmatter, HTML comments, or Jinja comments — the regex
+    matches the bare ``last_reviewed_at: YYYY-MM-DD`` substring regardless of
+    enclosing syntax.
     """
     match = _LAST_REVIEWED_RE.search(text)
     if match is None:
@@ -123,10 +128,33 @@ def parse_last_reviewed_at(text: str) -> date | None:
         return None
 
 
+def resolve_template_dir() -> Path:
+    """Locate harness-maker's templates/ directory at runtime.
+
+    Templates ship inside the harness_maker package (``src/harness_maker/
+    templates/``), so a single resolver handles both editable installs and
+    wheel installs. ``importlib.resources`` returns a Traversable that
+    ``as_file`` materialises to a real path — necessary for Jinja's
+    ``FileSystemLoader`` and for ``Path.glob``.
+    """
+    try:
+        traversable = resources.files("harness_maker").joinpath("templates")
+        with resources.as_file(traversable) as tdir:
+            if tdir.is_dir():
+                return Path(tdir)
+    except (ModuleNotFoundError, FileNotFoundError):
+        pass
+    # Editable-install fallback — same directory ``Path(__file__).parent`` would
+    # find, kept here as a defensive secondary in case the package metadata
+    # lookup fails for an unusual install layout.
+    return Path(__file__).resolve().parent / "templates"
+
+
 def _scan_dir(
     root: Path,
     glob: str,
     asset_kind: str,
+    source: str,
     *,
     now: date,
     threshold_days: int,
@@ -148,6 +176,7 @@ def _scan_dir(
                 StaleAsset(
                     path=asset,
                     asset_kind=asset_kind,
+                    source=source,
                     last_reviewed_at=None,
                     days_since_review=threshold_days + 1,
                     threshold_days=threshold_days,
@@ -160,6 +189,7 @@ def _scan_dir(
                 StaleAsset(
                     path=asset,
                     asset_kind=asset_kind,
+                    source=source,
                     last_reviewed_at=last,
                     days_since_review=delta,
                     threshold_days=threshold_days,
@@ -178,22 +208,21 @@ def detect_stale_assets(
     """Return stale partials + domain packs from project + harness-maker templates.
 
     ``project_dir`` is the user project root; user-authored domain packs at
-    ``<project_dir>/.claude/agents/_standards/*.md`` are scanned. Shipped
-    partials live under ``template_dir`` (defaults to harness-maker's own
-    ``templates/`` directory) — these typically only go stale during package
-    upgrade, but surfacing them lets ``/hm:refresh`` prompt for explicit
-    review when 90+ days have passed.
+    ``<project_dir>/.claude/agents/_standards/*.md`` are scanned and tagged
+    ``source="user"``. Shipped partials and samples live under
+    ``template_dir`` (resolved via :func:`resolve_template_dir` when omitted)
+    and are tagged ``source="shipped"`` so an accept handler can route the
+    update to the correct location.
     """
     if isinstance(now, datetime):
         today = now.date()
     elif isinstance(now, date):
         today = now
     else:
-        today = datetime.now().date()  # noqa: DTZ005 — date-only comparisons
+        today = datetime.now(tz=UTC).date()
 
     if template_dir is None:
-        # Resolve harness-maker's own templates/ relative to this module.
-        template_dir = Path(__file__).resolve().parent.parent.parent / "templates"
+        template_dir = resolve_template_dir()
 
     stale: list[StaleAsset] = []
     stale.extend(
@@ -201,6 +230,7 @@ def detect_stale_assets(
             project_dir / ".claude" / "agents" / "_standards",
             "*.md",
             "domain-pack",
+            "user",
             now=today,
             threshold_days=threshold_days,
         ),
@@ -210,6 +240,7 @@ def detect_stale_assets(
             template_dir / "agents" / "_partials",
             "*.md.j2",
             "partial",
+            "shipped",
             now=today,
             threshold_days=threshold_days,
         ),
@@ -219,8 +250,73 @@ def detect_stale_assets(
             template_dir / "agents" / "_standards",
             "*.md.j2",
             "domain-pack",
+            "shipped",
             now=today,
             threshold_days=threshold_days,
         ),
     )
     return stale
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Mutator + proposal formatting (Phase 5 — /hm:refresh accept handler)
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+class StaleAssetUpdateError(RuntimeError):
+    """Raised when ``update_last_reviewed_at`` cannot rewrite the asset."""
+
+
+def update_last_reviewed_at(path: Path, new_date: date | None = None) -> date:
+    """Rewrite the asset's ``last_reviewed_at`` to ``new_date`` atomically.
+
+    Accept handler for stale-asset proposals — only the date is touched; body
+    is the user's responsibility. Raises if no annotation exists (the asset
+    needs a one-time hand-edit before it can be tracked).
+    """
+    if new_date is None:
+        new_date = datetime.now(tz=UTC).date()
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as e:
+        msg = f"cannot read {path}: {e}"
+        raise StaleAssetUpdateError(msg) from e
+    if _LAST_REVIEWED_RE.search(text) is None:
+        msg = (
+            f"{path} has no last_reviewed_at annotation; add one "
+            "(YAML frontmatter or HTML comment) before /hm:refresh can track it"
+        )
+        raise StaleAssetUpdateError(msg)
+    new_text = _LAST_REVIEWED_RE.sub(
+        f"last_reviewed_at: {new_date.isoformat()}",
+        text,
+        count=1,
+    )
+    atomic_write(path, new_text)
+    return new_date
+
+
+def build_proposal_lines(
+    stale: list[StaleAsset],
+    project_dir: Path,
+) -> list[str]:
+    """Format each StaleAsset for inclusion in proposed-<date>.md.
+
+    Paths are reported relative to ``project_dir`` when possible so the
+    output is portable across machines.
+    """
+    lines: list[str] = []
+    for asset in stale:
+        try:
+            rel = asset.path.relative_to(project_dir)
+            shown = str(rel)
+        except ValueError:
+            shown = str(asset.path)
+        when = asset.last_reviewed_at.isoformat() if asset.last_reviewed_at else "(never)"
+        lines.append(
+            f"- [{asset.source}/{asset.asset_kind}] {shown} — "
+            f"last_reviewed_at: {when}, "
+            f"{asset.days_since_review} days since review "
+            f"(threshold {asset.threshold_days})",
+        )
+    return lines

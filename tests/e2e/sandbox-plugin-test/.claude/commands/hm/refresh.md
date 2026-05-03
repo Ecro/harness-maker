@@ -4,7 +4,7 @@ harness_maker_version: 0.1.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/refresh.md.j2
 provenance: official
-content_hash: 0c2c33d6f3e6e637477d0ddcd930ff054b70a9c837e9545c4cabf34898978f62
+content_hash: 2f03e04613c564e2d38b31b43ef6fe9650f5cffbe557176d86e33c42fdb4db60
 ---
 # /hm:refresh
 
@@ -54,23 +54,44 @@ of refresh proposals is forbidden.
 
 ```bash
 !uv run python -c "
+from datetime import UTC, datetime
 from pathlib import Path
 from harness_maker.crawler import anthropic_blog, github_releases, arxiv, osv_dev, write_raw
+from harness_maker.relevance import build_proposal_lines, detect_stale_assets
 
+# Step 1 — crawl 4 sources.
 items = []
 items += anthropic_blog.crawl()
 items += github_releases.crawl()
 items += arxiv.crawl()
 items += osv_dev.crawl(packages=osv_dev.parse_uv_lock(Path('uv.lock')))
-
 write_raw(items, project_dir='.')
-print(f'crawled {len(items)} items')
+
+# Step 2 — stale-asset scan (partials + domain packs).
+project = Path('.')
+stale = detect_stale_assets(project)
+
+# Steps 3-4 — proposed-<date>.md gathers both crawl results and stale assets.
+out_dir = project / '.claude' / 'observability' / 'refresh'
+out_dir.mkdir(parents=True, exist_ok=True)
+today = datetime.now(tz=UTC).date().isoformat()
+out_path = out_dir / f'proposed-{today}.md'
+lines = [f'# proposed-{today}', '', f'## Stale assets ({len(stale)})', '']
+lines += build_proposal_lines(stale, project) or ['(none)']
+lines += ['', f'## Crawl items ({len(items)})', '',
+          f'(score + filter via harness_maker.relevance — interactive walk follows)']
+out_path.write_text('\n'.join(lines) + '\n', encoding='utf-8')
+print(f'crawled {len(items)} items; {len(stale)} stale assets; wrote {out_path}')
 "
 ```
 
-Then load the JSONL, score with `harness_maker.relevance.score_item`, filter
-with `filter_items(items, adaptive_threshold(history))`, and walk each
-proposal interactively via **AskUserQuestion** — accept / reject / defer.
+Then for each line in `proposed-<date>.md` invoke **AskUserQuestion** —
+`accept` / `reject` / `defer`. On `accept`:
+- For a stale asset: call `harness_maker.relevance.update_last_reviewed_at(path)`
+  to refresh the date in place (body stays the user's responsibility).
+- For a crawl item: score with `harness_maker.relevance.score_item`, filter
+  via `filter_items(items, adaptive_threshold(history))`, and patch the
+  relevant `.claude/` asset.
 
 ## Autoloop behavior
 

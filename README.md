@@ -4,12 +4,11 @@ A Claude Code plugin that **generates and refines a project-tailored `.claude/` 
 
 ## Requirements
 
-- **Python 3.12+ and `uv`** are required in your project's environment, even if your project's primary toolchain is Rust, Node, Go, or anything non-Python. This is because the rendered harness wires hooks (e.g. `permission_gate`, `spec_gate`, `telemetry`) that execute via `uv run python -m harness_maker.gates.<name>` at PreToolUse/PostToolUse boundaries.
-  - Easiest: install [`uv`](https://docs.astral.sh/uv/) once, then `uv tool install harness-maker` (or add as a dev dep via `uv sync`) so the `harness_maker` Python package resolves on every Claude Code invocation.
-  - You can disable hooks selectively: `dev_mode: task-driven` in `harness.yaml` skips `spec_gate`; commenting out an entry in `.claude/hooks/hooks.json` skips that hook. The harness still works without any hook installed.
-  - A self-contained binary distribution that removes the Python+uv requirement is on the roadmap; until then, treat harness-maker as a Python dev dep of your project.
-- **Claude Code CLI** (any recent version with plugin + hook support).
-- **Git** (worktree isolation in Production preset uses `git worktree add`).
+- **Python 3.12+ and [`uv`](https://docs.astral.sh/uv/)** must be available wherever Claude Code runs against your project, even if the project's primary toolchain is Rust, Node, Go, or any non-Python language. The rendered harness installs hooks (`permission_gate`, optionally `spec_gate`, plus `telemetry`) that invoke `uv run python -m harness_maker.gates.<name>` at PreToolUse/PostToolUse boundaries; without `uv` + the `harness_maker` package on the path those hooks are silent no-ops.
+  - **Today (pre-PyPI):** clone this repo and install editable into your project: `uv pip install -e /path/to/harness-maker`. Then load the plugin with `claude --plugin-dir /path/to/harness-maker`. PyPI publish is on the open-question list; until it lands, editable from a clone is the only supported install.
+  - **Disabling hooks selectively:** set `dev_mode: task-driven` in `.claude/harness.yaml` to skip `spec_gate`; remove an entry from `.claude/hooks/hooks.json` to skip any hook. The base harness keeps working with no hooks installed.
+- **Claude Code CLI** with plugin + hook support.
+- **Git** — every worktree-enabled preset (default for both `Side` and `Production`; opt out via `worktree.scope: []` in `harness.yaml`) uses `git worktree add` for `/hm:execute`.
 
 ## Quick Start
 

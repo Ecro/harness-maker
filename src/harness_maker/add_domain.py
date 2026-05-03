@@ -45,10 +45,15 @@ def _today_iso() -> str:
 
 
 def _render_skeleton(name: str, today: str) -> str:
-    """Render `_template.md.j2` with the domain name + today's date filled in."""
+    """Render `_template.md.j2` with the domain name + today's date filled in.
+
+    ``include_metadata=True`` switches on the HTML-comment annotation in the
+    skeleton so the rendered user-side ``.md`` carries a ``last_reviewed_at``
+    that ``detect_stale_assets`` can later parse.
+    """
     env = _make_env()
     tpl = env.get_template("agents/_standards/_template.md.j2")
-    return tpl.render(domain_name=name, today=today)
+    return tpl.render(domain_name=name, today=today, include_metadata=True)
 
 
 def _read_yaml(path: Path) -> dict[str, object]:

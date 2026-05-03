@@ -245,16 +245,16 @@ phase_4_agent_quality() {
 }
 
 phase_4_dashboard() {
-  require_file templates/observability/dashboard.ko.md.j2
-  require_file templates/observability/dashboard.en.md.j2
-  require_file templates/commands/hm/monitor.md.j2
+  require_file src/harness_maker/templates/observability/dashboard.ko.md.j2
+  require_file src/harness_maker/templates/observability/dashboard.en.md.j2
+  require_file src/harness_maker/templates/commands/hm/monitor.md.j2
   ok "phase_4_dashboard"
 }
 
 phase_4_hooks_settings() {
-  require_file templates/hooks/hooks.json.j2
-  require_file templates/settings/Side.json.j2
-  require_file templates/settings/Production.json.j2
+  require_file src/harness_maker/templates/hooks/hooks.json.j2
+  require_file src/harness_maker/templates/settings/Side.json.j2
+  require_file src/harness_maker/templates/settings/Production.json.j2
   ok "phase_4_hooks_settings"
 }
 
@@ -283,12 +283,12 @@ phase_5_github()         { uv run pytest tests/unit/crawler/test_github_releases
 phase_5_arxiv()          { uv run pytest tests/unit/crawler/test_arxiv.py -q           || fail "arxiv crawler";     ok "phase_5_arxiv"; }
 phase_5_osv()            { uv run pytest tests/unit/crawler/test_osv_dev.py -q         || fail "osv crawler";       ok "phase_5_osv"; }
 phase_5_relevance()      { uv run pytest tests/unit/test_relevance.py -q               || fail "relevance";         ok "phase_5_relevance"; }
-phase_5_skill_template() { require_file templates/skills/research-crawler/SKILL.md.j2; ok "phase_5_skill_template"; }
-phase_5_filter_template(){ require_file templates/skills/relevance-filter/SKILL.md.j2; ok "phase_5_filter_template"; }
+phase_5_skill_template() { require_file src/harness_maker/templates/skills/research-crawler/SKILL.md.j2; ok "phase_5_skill_template"; }
+phase_5_filter_template(){ require_file src/harness_maker/templates/skills/relevance-filter/SKILL.md.j2; ok "phase_5_filter_template"; }
 
 phase_5_refresh_template() {
-  require_file templates/commands/hm/refresh.md.j2
-  grep -q "AskUserQuestion" templates/commands/hm/refresh.md.j2 \
+  require_file src/harness_maker/templates/commands/hm/refresh.md.j2
+  grep -q "AskUserQuestion" src/harness_maker/templates/commands/hm/refresh.md.j2 \
     || fail "refresh.md.j2 missing AskUserQuestion (manual confirm 필수)"
   ok "phase_5_refresh_template"
 }
@@ -314,7 +314,7 @@ phase_5() {
 
 phase_6_stages() {
   for s in research spec plan execute review wrapup verify; do
-    require_file "templates/stages/$s.md.j2"
+    require_file "src/harness_maker/templates/stages/$s.md.j2"
   done
   ok "phase_6_stages"
 }
@@ -364,26 +364,26 @@ phase_6() {
 # ──────────────────────────────────────────────────────────────────────
 
 phase_7_driver()         { uv run pytest tests/unit/test_autoloop_driver.py -q || fail "autoloop driver"; ok "phase_7_driver"; }
-phase_7_loop_template()  { require_file templates/commands/hm/loop.md.j2; ok "phase_7_loop_template"; }
+phase_7_loop_template()  { require_file src/harness_maker/templates/commands/hm/loop.md.j2; ok "phase_7_loop_template"; }
 
 phase_7_autoloop_assets() {
-  require_file templates/agents/autoloop-coder.md.j2
-  require_file templates/skills/autoloop-driver/SKILL.md.j2
+  require_file src/harness_maker/templates/agents/autoloop-coder.md.j2
+  require_file src/harness_maker/templates/skills/autoloop-driver/SKILL.md.j2
   ok "phase_7_autoloop_assets"
 }
 
 phase_7_verify_gate() {
-  require_file templates/skills/verify-before-completion/SKILL.md.j2
+  require_file src/harness_maker/templates/skills/verify-before-completion/SKILL.md.j2
   for k in "PLAN/SPEC" "smoke" "Health" "pending" "security" "Worktree"; do
-    grep -E "$k" templates/skills/verify-before-completion/SKILL.md.j2 >/dev/null \
+    grep -E "$k" src/harness_maker/templates/skills/verify-before-completion/SKILL.md.j2 >/dev/null \
       || fail "verify-before-completion missing check: $k"
   done
   ok "phase_7_verify_gate"
 }
 
 phase_7_health_skills() {
-  require_file templates/skills/ai-readiness-rubric/SKILL.md.j2
-  require_file templates/skills/agent-quality-rubric/SKILL.md.j2
+  require_file src/harness_maker/templates/skills/ai-readiness-rubric/SKILL.md.j2
+  require_file src/harness_maker/templates/skills/agent-quality-rubric/SKILL.md.j2
   ok "phase_7_health_skills"
 }
 
@@ -407,13 +407,13 @@ phase_7() {
 # ──────────────────────────────────────────────────────────────────────
 
 phase_8_worktree()       { uv run pytest tests/unit/test_worktree.py -q || fail "worktree"; ok "phase_8_worktree"; }
-phase_8_worktree_skill() { require_file templates/skills/worktree-isolator/SKILL.md.j2; ok "phase_8_worktree_skill"; }
+phase_8_worktree_skill() { require_file src/harness_maker/templates/skills/worktree-isolator/SKILL.md.j2; ok "phase_8_worktree_skill"; }
 
 phase_8_yaml_schema() {
   for p in Side Production; do
-    require_file "templates/harness-yaml/$p.yaml.j2"
-    grep -q "worktree:" "templates/harness-yaml/$p.yaml.j2" || fail "$p missing worktree section"
-    grep -q "security:" "templates/harness-yaml/$p.yaml.j2" || fail "$p missing security section"
+    require_file "src/harness_maker/templates/harness-yaml/$p.yaml.j2"
+    grep -q "worktree:" "src/harness_maker/templates/harness-yaml/$p.yaml.j2" || fail "$p missing worktree section"
+    grep -q "security:" "src/harness_maker/templates/harness-yaml/$p.yaml.j2" || fail "$p missing security section"
   done
   ok "phase_8_yaml_schema"
 }
@@ -438,8 +438,8 @@ phase_9_prompt_injection() { uv run pytest tests/unit/test_prompt_injection.py -
 
 phase_9_orchestrator() {
   uv run pytest tests/unit/test_security_scanner.py -q || fail "security scanner"
-  require_file templates/skills/security-scanner/SKILL.md.j2
-  require_file templates/agents/security-auditor.md.j2
+  require_file src/harness_maker/templates/skills/security-scanner/SKILL.md.j2
+  require_file src/harness_maker/templates/agents/security-auditor.md.j2
   ok "phase_9_orchestrator"
 }
 
@@ -466,20 +466,20 @@ phase_9() {
 
 phase_10_context_lint()      { uv run pytest tests/unit/test_context_lint.py -q || fail "context lint"; ok "phase_10_context_lint"; }
 phase_10_render_lint()       { uv run pytest tests/unit/test_render.py -q -k "lint" || true; ok "phase_10_render_lint"; }
-phase_10_lint_skill()        { require_file templates/skills/context-linter/SKILL.md.j2; ok "phase_10_lint_skill"; }
+phase_10_lint_skill()        { require_file src/harness_maker/templates/skills/context-linter/SKILL.md.j2; ok "phase_10_lint_skill"; }
 
 phase_10_reviewer_perms() {
   for a in code-reviewer security-reviewer security-auditor performance-reviewer ux-reviewer concurrency-reviewer; do
-    require_file "templates/agents/$a.md.j2"
-    grep -E "Write|deny|Read.*Grep" "templates/agents/$a.md.j2" >/dev/null \
+    require_file "src/harness_maker/templates/agents/$a.md.j2"
+    grep -E "Write|deny|Read.*Grep" "src/harness_maker/templates/agents/$a.md.j2" >/dev/null \
       || fail "$a missing read-only permission constraint"
   done
   ok "phase_10_reviewer_perms"
 }
 
 phase_10_executor_perms() {
-  require_file templates/agents/executor.md.j2
-  grep -q ".worktrees" templates/agents/executor.md.j2 \
+  require_file src/harness_maker/templates/agents/executor.md.j2
+  grep -q ".worktrees" src/harness_maker/templates/agents/executor.md.j2 \
     || fail "executor missing .worktrees scope"
   ok "phase_10_executor_perms"
 }
@@ -612,7 +612,7 @@ final_acceptance() {
   log "R2 Anti-rot"
   uv run python -c "from harness_maker.crawler import anthropic_blog, github_releases, arxiv, osv_dev; from harness_maker.relevance import score" \
     || fail "R2: anti-rot modules missing"
-  grep -q "AskUserQuestion" templates/commands/hm/refresh.md.j2 || fail "R2: refresh missing manual confirm"
+  grep -q "AskUserQuestion" src/harness_maker/templates/commands/hm/refresh.md.j2 || fail "R2: refresh missing manual confirm"
 
   # R3 Monitoring
   log "R3 Monitoring"
@@ -622,20 +622,20 @@ final_acceptance() {
   # R4 Workflow
   log "R4 Workflow"
   for s in research spec plan execute review wrapup verify; do
-    require_file "templates/stages/$s.md.j2"
+    require_file "src/harness_maker/templates/stages/$s.md.j2"
   done
   uv run python -c "from harness_maker.workflow_fuse import fuse" || fail "R4: fuse missing"
 
   # R5 Autoloop
   log "R5 Autoloop"
   uv run python -c "from harness_maker.autoloop_driver import run" || fail "R5: autoloop driver missing"
-  require_file templates/commands/hm/loop.md.j2
+  require_file src/harness_maker/templates/commands/hm/loop.md.j2
 
   # R6 Per-project preset
   log "R6 Preset"
   for p in Side Production; do
-    require_file "templates/harness-yaml/$p.yaml.j2"
-    require_file "templates/settings/$p.json.j2"
+    require_file "src/harness_maker/templates/harness-yaml/$p.yaml.j2"
+    require_file "src/harness_maker/templates/settings/$p.json.j2"
   done
 
   # M1-M13 메커니즘
@@ -652,14 +652,14 @@ from harness_maker import (
   log "Skills (10) 존재"
   for sk in verify-before-completion conditional-router ai-readiness-rubric agent-quality-rubric \
             research-crawler relevance-filter autoloop-driver worktree-isolator security-scanner context-linter; do
-    require_file "templates/skills/$sk/SKILL.md.j2"
+    require_file "src/harness_maker/templates/skills/$sk/SKILL.md.j2"
   done
 
   # Agents 9
   log "Agents (9) 존재"
   for ag in code-reviewer security-reviewer security-auditor performance-reviewer ux-reviewer \
             concurrency-reviewer consensus-arbiter autoloop-coder executor; do
-    require_file "templates/agents/$ag.md.j2"
+    require_file "src/harness_maker/templates/agents/$ag.md.j2"
   done
 
   # Sandbox final dogfood

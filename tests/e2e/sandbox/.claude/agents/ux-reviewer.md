@@ -8,7 +8,7 @@ name: ux-reviewer
 description: Reviews UI changes for accessibility, consistency, and interaction quality
 tools: Read, Grep, Glob
 model: sonnet
-content_hash: 2b3b9ff9b7605ffdae2be750664e130e0bc05ff5274b63d9b951236407be2239
+content_hash: 49244932e2fb3f36505512a340c98d746867e718a649521b5b958c770824820a
 ---
 
 # ux-reviewer
@@ -37,7 +37,7 @@ interaction patterns, accessibility.
 - Auth or secret handling visible in UI → defer to security-reviewer
 - Render-perf concerns → defer to performance-reviewer
 
-<!-- harness-maker partial: rubric (last_reviewed_at: 2026-05-03) -->
+
 ## Severity Rubric
 
 Every finding picks one of:
@@ -51,7 +51,7 @@ Every finding picks one of:
 
 A balanced review has ≥ 60% of findings at P0+P1. If the diff is truly low-risk, return fewer findings — do not pad lower-severity findings to look thorough.
 
-<!-- harness-maker partial: reasoning (last_reviewed_at: 2026-05-03) -->
+
 
 
 ## Reasoning Template
@@ -66,7 +66,7 @@ For every P0/P1 finding, the `reasoning` field walks the four steps below in ord
 Reasoning is not a narrative — it is evidence. Each step is one or two sentences. If you cannot complete all four, the finding is not yet ready.
 
 
-<!-- harness-maker partial: hard_rules (last_reviewed_at: 2026-05-03) -->
+
 ## Hard Rules
 
 These apply to every reviewer regardless of verbosity:
@@ -79,7 +79,7 @@ These apply to every reviewer regardless of verbosity:
 - **Diff scope.** Do not flag pre-existing issues outside the changed lines unless the change reveals them; if you do, mark `out_of_diff: true`.
 
 
-<!-- harness-maker partial: finding_schema (last_reviewed_at: 2026-05-03) -->
+
 ## Finding Schema
 
 

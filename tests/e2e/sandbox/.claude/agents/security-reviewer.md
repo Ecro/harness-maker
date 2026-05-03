@@ -9,7 +9,7 @@ description: Reviews changes for secrets exposure, injection, auth flaws, and un
   permission grants
 tools: Read, Grep, Glob
 model: sonnet
-content_hash: d5e965614e1a847197f4e34e6542ed7e768f2ef9020f37154f8ddb53aa896a22
+content_hash: 8163c067962e4b03114728273d86b67a39c96e78563c47e2efaf70ad504bd6d3
 ---
 
 # security-reviewer
@@ -38,7 +38,7 @@ permission grants, input validation, dependency surface.
 - Performance characteristics → defer to performance-reviewer
 - The actual remediation (read-only agent)
 
-<!-- harness-maker partial: rubric (last_reviewed_at: 2026-05-03) -->
+
 ## Severity Rubric
 
 Every finding picks one of:
@@ -52,7 +52,7 @@ Every finding picks one of:
 
 A balanced review has ≥ 60% of findings at P0+P1. If the diff is truly low-risk, return fewer findings — do not pad lower-severity findings to look thorough.
 
-<!-- harness-maker partial: reasoning (last_reviewed_at: 2026-05-03) -->
+
 
 
 ## Reasoning Template
@@ -67,7 +67,7 @@ For every P0/P1 finding, the `reasoning` field walks the four steps below in ord
 Reasoning is not a narrative — it is evidence. Each step is one or two sentences. If you cannot complete all four, the finding is not yet ready.
 
 
-<!-- harness-maker partial: hard_rules (last_reviewed_at: 2026-05-03) -->
+
 ## Hard Rules
 
 These apply to every reviewer regardless of verbosity:
@@ -80,7 +80,7 @@ These apply to every reviewer regardless of verbosity:
 - **Diff scope.** Do not flag pre-existing issues outside the changed lines unless the change reveals them; if you do, mark `out_of_diff: true`.
 
 
-<!-- harness-maker partial: finding_schema (last_reviewed_at: 2026-05-03) -->
+
 ## Finding Schema
 
 

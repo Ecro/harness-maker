@@ -1,5 +1,7 @@
+{# harness-maker domain pack skeleton — rendered standalone via add_domain with include_metadata=True so the HTML comment carries last_reviewed_at into the user-side .md #}
+{% if include_metadata|default(false) %}
 <!-- harness-maker domain pack: {{ domain_name }} (last_reviewed_at: {{ today }}) -->
-
+{% endif %}
 ## {{ domain_name }} standards
 
 > This pack is **user-authored**. harness-maker only ships the empty skeleton

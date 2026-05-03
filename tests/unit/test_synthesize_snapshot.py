@@ -2,7 +2,10 @@
 
 Parametrized over preset × dev_mode (4 fixtures × 2 modes = 8 cases) so that a
 regression in either axis fails its own test rather than being swallowed by a
-single combined snapshot.
+single combined snapshot. A 9th sanity case asserts the two dev_modes for the
+same fixture actually produce different output — guarding against a bug where
+synthesize ignores ``answers.dev_mode`` and both regenerate.py + the snapshot
+test silently agree on identical files.
 """
 
 from __future__ import annotations
@@ -41,8 +44,7 @@ def test_snapshot_matches(
     )
     expected = yaml.safe_load(snap_path.read_text())
     p = profile(fix_dir)
-    a = interview(p, autoloop_mode=True)
-    a.dev_mode = mode
+    a = interview(p, autoloop_mode=True).model_copy(update={"dev_mode": mode})
     bp = synthesize(p, a)
     render(bp, tmp_path, dry_run=False, freeze_time=DEFAULT_FREEZE_TIME)
     assert bp.config.preset.value == expected["preset"]
@@ -56,3 +58,19 @@ def test_snapshot_matches(
         key=lambda x: x["path"],
     )
     assert actual == expected["files"]
+
+
+@pytest.mark.parametrize("fixture", _FIXTURES)
+def test_dev_mode_axis_actually_differentiates(fixture: str) -> None:
+    """task-driven and spec-driven for the same fixture must produce different files.
+
+    Catches the regression class where ``answers.dev_mode`` is plumbed through
+    types but ignored at synthesis — both snapshots would be identical and all
+    parametrized tests above would still pass.
+    """
+    snap_dir = Path(__file__).parent.parent / "snapshot"
+    task = yaml.safe_load((snap_dir / f"{fixture}-task.expected.yaml").read_text())
+    spec = yaml.safe_load((snap_dir / f"{fixture}-spec.expected.yaml").read_text())
+    assert task["files"] != spec["files"], (
+        f"{fixture}: task-driven and spec-driven produced identical outputs"
+    )
