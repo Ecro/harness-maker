@@ -4,22 +4,60 @@ harness_maker_version: 0.1.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: dd2b2264de7ba195d68b17bf1d8ce63be7ed656abaf100c2524b6043f5a5d596
+content_hash: 1ec78475aa928dc0dc1ffcdd35c66f3f67bc5b678b6c67a63df6196d47638929
 ---
 # /hm:quick
 
-> Workflow command — composes atomic stages defined in `harness.yaml`.
 
-## Usage
+## Stage: execute
 
-```
-/hm:quick <task description>
-```
+# Stage: execute
 
-## Arguments
+> Atomic stage. Implement the plan with continuous verification.
 
-`$ARGUMENTS` — task description.
+> Invoked as part of the **quick** workflow.
 
-## Behavior
 
-`harness.yaml` 의 `workflows.quick` 시퀀스를 순서대로 실행.
+## Purpose
+
+Apply the PLAN's phases to the codebase. Default mode is TDD: tests are
+written from acceptance criteria first, the implementation follows, and
+each phase exits only when its verification command is green.
+
+## When to Run
+
+- After `plan` (or after `research` for trivial changes that skip plan)
+- Whenever there is concrete work to land
+
+## Inputs
+
+- PLAN-{slug}.md
+- SPEC-{slug}.md (when present) — drives test authoring
+- Codebase, tests, build/CI scripts
+
+## Procedure
+
+1. Confirm preconditions:
+   - Working tree clean (or changes are intentional WIP)
+   - PLAN's exit criteria for prior phases are met
+2. For each PLAN phase, run the 5-phase TDD machine:
+   - **Phase A** — Author tests from SPEC criteria (RED expected)
+   - **Phase A.5** — Test-quality gate (criteria coverage, no false-positives)
+   - **Phase B** — Run tests; confirm RED for the right reasons
+   - **Phase C** — Implement to GREEN. No untested code paths.
+   - **Phase D** — Post-GREEN verification: ruff, mypy, full pytest, manual smoke
+3. Commit at phase boundaries with a message that maps to the PLAN phase.
+4. If a phase blocks: stop, document the blocker, escalate to the user
+   rather than thrash. Do not silently change scope.
+
+## Outputs
+
+- Code + tests committed to git
+- Updated PLAN with phase status (in-progress / done / blocked)
+- Optional SESSION-{slug}-{date}.md when `--session` is set
+
+## Quality Bar
+
+- All phase-D checks green
+- No skipped/xfail tests added without justification
+- Diff matches PLAN scope; surprises are documented

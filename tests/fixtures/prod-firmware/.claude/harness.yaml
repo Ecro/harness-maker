@@ -4,7 +4,7 @@ harness_maker_version: 0.1.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: harness-yaml/Side.yaml.j2
 provenance: official
-content_hash: 88b65b0af1df413e42e41ae6c2da662a0c82734f461816b5f876f58a72c12fde
+content_hash: aefbd8d72dd026d4e16b1e0ab482e8d91f6c9d917977e0e7bec0643c6fd9bb37
 ---
 preset: Production
 locale: ko
@@ -13,15 +13,22 @@ caching: session+agent
 workflows:
 
   dev:
-    - research
     - plan
     - execute
     - review
     - wrapup
 
-  ship:
+  quick:
+    - execute
+
+  careful:
     - research
+    - spec
     - plan
     - execute
     - review
     - wrapup
+    - verify
+
+  audit:
+    - review

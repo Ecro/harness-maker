@@ -4,22 +4,56 @@ harness_maker_version: 0.1.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/atomic_command.md.j2
 provenance: official
-content_hash: 151313cc4b04ff9fbf866fd08829c062a11551b0835aa42dce2303bc1a818d3c
+content_hash: abe19607ac7e31b3c817b09eae451d7302667b99abcb2b88d624276b9c467881
 ---
-# /hm:plan
+# Stage: plan
 
-> Atomic stage command — runs only the `plan` stage.
+> Atomic stage. Implementation planning with phase decomposition.
 
-## Usage
 
-```
-/hm:plan <task description>
-```
+## Purpose
 
-## Arguments
+Convert acceptance criteria into a concrete sequence of implementation
+phases. Each phase has a verifiable exit criterion so that progress can
+be measured and stalled work can be diagnosed.
 
-`$ARGUMENTS` — task description (kebab-case slug auto-generated).
+## When to Run
 
-## Behavior
+- After `spec` (or after `research` when `spec` is skipped)
+- Before `execute` for any change touching more than 2-3 files or
+  introducing new architectural elements
 
-Phase 5에서 stage runner 본문 채워집니다.
+## Inputs
+
+- SPEC (if available) or research notes + user requirements
+- Existing TECH_SPEC.md, ADRs, prior PLANs in `work-docs/`
+- Codebase structure (modules, conventions, test layout)
+
+## Procedure
+
+1. Restate the goal in one sentence. If it changed during research, note that.
+2. Identify architectural touchpoints: which modules change, which contracts
+   shift, what new files appear.
+3. Decompose into phases. Each phase MUST have:
+   - A clear scope (what's in)
+   - An exit criterion (a command or check that proves the phase is done)
+   - An estimate of risk (low / medium / high)
+4. Order phases by dependency. Earlier phases unblock later ones.
+5. Identify rollback points — checkpoints from which work can resume on
+   failure without redoing prior phases.
+6. Call out risks and unknowns. For each, list the mitigation.
+
+## Outputs
+
+- `PLAN-{slug}.md` with frontmatter:
+  - `type: plan`, `task_slug:`, `created:`, `tags:`
+  - `spec: "[[SPEC-{slug}]]"` (when SPEC exists)
+- Numbered phase list with scope + exit criterion + risk for each
+- Risk register with mitigations
+- Rollback strategy
+
+## Quality Bar
+
+- An independent reader can predict the file diff per phase
+- Each exit criterion is checkable (script, test, manual checklist)
+- Risks are concrete, not platitudes ("might break things")

@@ -1,11 +1,14 @@
 """Synthesizer — map preset+answers to deterministic Blueprint with FileEntry list.
 
-Per amendment §D, the synthesizer uses two hardcoded mappings:
-- SIDE_FILES → Side preset (~27 files, must land in 25-30 range)
-- PRODUCTION_FILES → Production preset (~45 files, must land in 35-45 range)
+Per amendment §D, the synthesizer uses two hardcoded skeletons:
+- SIDE_FILES → Side preset (~24 files + 1 workflow = 25 files)
+- PRODUCTION_FILES → Production preset (~24 + 4 workflow + 7 skill + 8 agent = 43 files)
 
-The mapping is intentionally explicit (no logic-driven file selection in Phase 3)
-so that the snapshot tests are stable. Phase 6/7 will add dynamic selection.
+Phase 6 (this file): workflow command rendering is now DYNAMIC. Workflow command
+FileEntries are generated from HarnessConfig.workflows at synthesis time, with
+each entry's `fused_body` Jinja context computed via `workflow_fuse.fuse(...)`.
+The static SIDE_FILES / PRODUCTION_FILES skeletons no longer encode workflow
+names; the workflow loop in `synthesize()` appends them dynamically.
 """
 
 from __future__ import annotations
@@ -23,6 +26,7 @@ from harness_maker.models import (
     Preset,
     ProjectProfile,
 )
+from harness_maker.workflow_fuse import fuse
 
 # Each tuple: (template path under templates/, output path under .claude/, context supplement)
 FileSpec = tuple[str, str, dict[str, Any]]
@@ -37,17 +41,74 @@ _ATOMIC_STAGES: list[str] = [
     "verify",
 ]
 
+# Default stage sequence assigned to each workflow when the interview doesn't
+# specialise it. Matches the architecture's "dev" recommendation.
+_DEFAULT_WORKFLOW_STAGES: list[AtomicStage] = [
+    AtomicStage.RESEARCH,
+    AtomicStage.PLAN,
+    AtomicStage.EXECUTE,
+    AtomicStage.REVIEW,
+    AtomicStage.WRAPUP,
+]
+
+# Preset-seeded workflow stage recipes (per architecture preset comparison).
+_WORKFLOW_RECIPES: dict[str, list[AtomicStage]] = {
+    "dev": [
+        AtomicStage.PLAN,
+        AtomicStage.EXECUTE,
+        AtomicStage.REVIEW,
+        AtomicStage.WRAPUP,
+    ],
+    "quick": [AtomicStage.EXECUTE],
+    "careful": list(AtomicStage),
+    "audit": [AtomicStage.REVIEW],
+    "ship": [AtomicStage.EXECUTE, AtomicStage.REVIEW, AtomicStage.WRAPUP],
+}
+
+
+def _stages_for_workflow(name: str) -> list[AtomicStage]:
+    return _WORKFLOW_RECIPES.get(name, _DEFAULT_WORKFLOW_STAGES)
+
 
 def _stage_files() -> list[FileSpec]:
-    return [(f"stages/{s}.md.j2", f"stages/{s}.md", {"stage": s}) for s in _ATOMIC_STAGES]
-
-
-def _atomic_command_files() -> list[FileSpec]:
     return [
-        ("commands/hm/atomic_command.md.j2", f"commands/hm/{s}.md", {"stage": s})
+        (
+            f"stages/{s}.md.j2",
+            f"stages/{s}.md",
+            {"stage": s, "workflow_context": "", "project_name": "", "feature": ""},
+        )
         for s in _ATOMIC_STAGES
     ]
 
+
+def _atomic_command_files() -> list[FileSpec]:
+    """Generate one /hm:<stage> command per atomic stage, with rendered body."""
+    out: list[FileSpec] = []
+    # Lazy import: avoid jinja env construction at module import time
+    from harness_maker.render import _make_env
+
+    env = _make_env()
+    for s in _ATOMIC_STAGES:
+        tpl = env.get_template(f"stages/{s}.md.j2")
+        body = tpl.render(
+            workflow_context="",
+            stage=s,
+            project_name="",
+            feature="",
+        )
+        out.append(
+            (
+                "commands/hm/atomic_command.md.j2",
+                f"commands/hm/{s}.md",
+                {"stage": s, "stage_body": body},
+            ),
+        )
+    return out
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Side skeleton (workflow commands appended dynamically in synthesize())
+# ──────────────────────────────────────────────────────────────────────────────
 
 SIDE_FILES: list[FileSpec] = [
     # 1 — harness.yaml
@@ -63,26 +124,24 @@ SIDE_FILES: list[FileSpec] = [
     *_stage_files(),
     # 13-19 — atomic commands (7)
     *_atomic_command_files(),
-    # 20 — single workflow command
-    ("commands/hm/workflow_command.md.j2", "commands/hm/dev.md", {"workflow_name": "dev"}),
-    # 21-23 — fixed commands
+    # 20-22 — fixed commands
     ("commands/hm/loop.md.j2", "commands/hm/loop.md", {}),
     ("commands/hm/monitor.md.j2", "commands/hm/monitor.md", {}),
     ("commands/hm/refresh.md.j2", "commands/hm/refresh.md", {}),
-    # 24 — Side gets one skill
+    # 23 — Side gets one skill
     (
         "skills/verify-before-completion/SKILL.md.j2",
         "skills/verify-before-completion/SKILL.md",
         {"name": "verify-before-completion"},
     ),
-    # 25 — Side gets one agent
+    # 24 — Side gets one agent
     ("agents/code-reviewer.md.j2", "agents/code-reviewer.md", {"name": "code-reviewer"}),
-    # 26 — hooks
+    # 25 — hooks
     ("hooks/hooks.json.j2", "hooks/hooks.json", {}),
-    # 27 — observability dashboard
+    # 26 — observability dashboard
     ("observability/dashboard.ko.md.j2", "observability/dashboard.md", {}),
 ]
-# Side total = 27 (in 25-30 range)
+# Side base = 26; +1 workflow (dev) → 27 files (in 25-30 range)
 
 
 _PRODUCTION_SKILLS: list[str] = [
@@ -109,14 +168,6 @@ _PRODUCTION_AGENTS: list[str] = [
 
 PRODUCTION_FILES: list[FileSpec] = [
     *SIDE_FILES,
-    # 3 extra workflow commands
-    ("commands/hm/workflow_command.md.j2", "commands/hm/quick.md", {"workflow_name": "quick"}),
-    (
-        "commands/hm/workflow_command.md.j2",
-        "commands/hm/careful.md",
-        {"workflow_name": "careful"},
-    ),
-    ("commands/hm/workflow_command.md.j2", "commands/hm/audit.md", {"workflow_name": "audit"}),
     # 7 extra skills
     *[
         (f"skills/{n}/SKILL.md.j2", f"skills/{n}/SKILL.md", {"name": n})
@@ -125,7 +176,26 @@ PRODUCTION_FILES: list[FileSpec] = [
     # 8 extra agents
     *[(f"agents/{n}.md.j2", f"agents/{n}.md", {"name": n}) for n in _PRODUCTION_AGENTS],
 ]
-# Production total = 27 + 3 + 7 + 8 = 45 (in 35-45 range)
+# Production base = 26 + 7 + 8 = 41; +4 workflows (dev/quick/careful/audit) → 45
+
+
+def _workflow_command_files(
+    workflow_names: list[str],
+    workflows: dict[str, list[AtomicStage]],
+) -> list[FileSpec]:
+    """Build a FileSpec per workflow with the fused body in context."""
+    out: list[FileSpec] = []
+    for name in workflow_names:
+        stages = workflows.get(name, _stages_for_workflow(name))
+        body = fuse(stages, name)
+        out.append(
+            (
+                "commands/hm/workflow_command.md.j2",
+                f"commands/hm/{name}.md",
+                {"workflow_name": name, "fused_body": body},
+            ),
+        )
+    return out
 
 
 def synthesize(
@@ -136,22 +206,24 @@ def synthesize(
     """Map preset+answers to a deterministic Blueprint.
 
     If `preset` not given, derives from answers: 'single' consensus → Side, else Production.
-    Phase 3 hardcodes locale=KO; Phase 6 will read from answers.
+    Workflow command FileEntries are generated dynamically from
+    answers.workflow_names (per Phase 6 amendment §B).
     """
     if preset is None:
         preset = Preset.SIDE if answers.consensus == "single" else Preset.PRODUCTION
 
-    file_specs = SIDE_FILES if preset == Preset.SIDE else PRODUCTION_FILES
+    base_specs = SIDE_FILES if preset == Preset.SIDE else PRODUCTION_FILES
 
-    # Workflow dict: derive from answers.workflow_names; for now use a fixed stage list.
-    default_stages = [
-        AtomicStage.RESEARCH,
-        AtomicStage.PLAN,
-        AtomicStage.EXECUTE,
-        AtomicStage.REVIEW,
-        AtomicStage.WRAPUP,
+    # Resolve per-workflow stage list from the preset recipe.
+    workflows: dict[str, list[AtomicStage]] = {
+        name: _stages_for_workflow(name) for name in answers.workflow_names
+    }
+
+    # Append dynamic workflow command FileSpecs to the static base.
+    file_specs: list[FileSpec] = [
+        *base_specs,
+        *_workflow_command_files(answers.workflow_names, workflows),
     ]
-    workflows: dict[str, list[AtomicStage]] = dict.fromkeys(answers.workflow_names, default_stages)
 
     config = HarnessConfig(
         locale=Locale.KO,

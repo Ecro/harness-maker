@@ -29,7 +29,8 @@ def test_synthesize_side_returns_blueprint() -> None:
     bp = synthesize(p, a)
     assert isinstance(bp, Blueprint)
     assert bp.config.preset == Preset.SIDE
-    assert len(bp.files) == len(SIDE_FILES)
+    # Phase 6: workflow commands are dynamic, so total = static base + N workflows
+    assert len(bp.files) == len(SIDE_FILES) + len(a.workflow_names)
     for f in bp.files:
         assert isinstance(f, FileEntry)
         assert f.template
@@ -42,7 +43,7 @@ def test_synthesize_production_via_explicit_preset() -> None:
     a = interview(p, autoloop_mode=True)
     bp = synthesize(p, a, preset=Preset.PRODUCTION)
     assert bp.config.preset == Preset.PRODUCTION
-    assert len(bp.files) == len(PRODUCTION_FILES)
+    assert len(bp.files) == len(PRODUCTION_FILES) + len(a.workflow_names)
 
 
 def test_synthesize_auto_derives_production_from_consensus() -> None:

@@ -33,6 +33,7 @@ verify_frontmatter_invariants() {
     if [[ -d "$fix/.claude" ]]; then
       missing=$(find "$fix/.claude" -type f \( -name "*.md" -o -name "*.json" \) \
         -not -path "*/.backup-*/*" \
+        -not -path "*/hooks/hooks.json" \
         -not -path "*/observability/refresh/*" \
         -not -path "*/observability/security/*" \
         -not -path "*/observability/metrics.jsonl" \

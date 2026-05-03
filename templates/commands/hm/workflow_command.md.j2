@@ -1,17 +1,1 @@
-# /hm:{{ workflow_name }}
-
-> Workflow command — composes atomic stages defined in `harness.yaml`.
-
-## Usage
-
-```
-/hm:{{ workflow_name }} <task description>
-```
-
-## Arguments
-
-`$ARGUMENTS` — task description.
-
-## Behavior
-
-`harness.yaml` 의 `workflows.{{ workflow_name }}` 시퀀스를 순서대로 실행.
+{{ fused_body | default('# /hm:' + workflow_name) }}

@@ -62,8 +62,9 @@ def test_interview_recommends_production_for_large_scale() -> None:
 
 
 def test_interview_interactive_mocked_input(monkeypatch: pytest.MonkeyPatch) -> None:
-    # Empty input ⇒ accept defaults across the 3 prompted dimensions.
-    inputs: Iterator[str] = iter(["", "", ""])
+    # Empty input ⇒ accept defaults across the 4 prompted dimensions
+    # (default_workflow, consensus, caching, workflow_names).
+    inputs: Iterator[str] = iter(["", "", "", ""])
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
     result = interview(_profile(), autoloop_mode=False)
     assert isinstance(result, InterviewAnswers)
@@ -72,9 +73,36 @@ def test_interview_interactive_mocked_input(monkeypatch: pytest.MonkeyPatch) -> 
 
 
 def test_interview_interactive_override(monkeypatch: pytest.MonkeyPatch) -> None:
-    # Production profile has workflow_names=['dev', 'ship']; override default_workflow to 'ship'.
-    inputs: Iterator[str] = iter(["ship", "", ""])
+    # Production preset has workflow_names=['dev','quick','careful','audit']; override
+    # default_workflow to 'careful'.
+    inputs: Iterator[str] = iter(["careful", "", "", ""])
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
     result = interview(_profile(scale="medium", lifecycle="active"), autoloop_mode=False)
-    assert result.default_workflow == "ship"
+    assert result.default_workflow == "careful"
     assert result.consensus == "cross-check"
+
+
+def test_interview_workflow_naming_rename(monkeypatch: pytest.MonkeyPatch) -> None:
+    """User-typed workflow_names override the preset seed list."""
+    # default_workflow, consensus, caching, workflow_names
+    inputs: Iterator[str] = iter(["", "", "", "feature-flow,bugfix"])
+    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
+    result = interview(_profile(), autoloop_mode=False)
+    assert result.workflow_names == ["feature-flow", "bugfix"]
+    # default_workflow no longer in list → coerced to first new name
+    assert result.default_workflow == "feature-flow"
+
+
+def test_interview_workflow_naming_rejects_reserved(monkeypatch: pytest.MonkeyPatch) -> None:
+    """User cannot pick a reserved name for a workflow."""
+    inputs: Iterator[str] = iter(["", "", "", "review,plan"])
+    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
+    with pytest.raises(ValueError, match="reserved"):
+        interview(_profile(), autoloop_mode=False)
+
+
+def test_interview_autoloop_mode_validates_seeds() -> None:
+    """Autoloop preset seeds (dev/quick/careful/audit/ship) pass the validator."""
+    # Production seeds include 'audit' which is in RESERVED but EXEMPT as a preset seed.
+    result = interview(_profile(scale="medium", lifecycle="active"), autoloop_mode=True)
+    assert "audit" in result.workflow_names

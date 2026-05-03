@@ -4,22 +4,53 @@ harness_maker_version: 0.1.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/atomic_command.md.j2
 provenance: official
-content_hash: a6c2e37e938a1a38d7f471ef21a2a218c9c6b2ff81a6cb16ed7b1e373b72ca84
+content_hash: c28c5fdb500ced20194473813831a430df31153a9f4f168aa5f4564ae5601ee2
 ---
-# /hm:execute
+# Stage: execute
 
-> Atomic stage command — runs only the `execute` stage.
+> Atomic stage. Implement the plan with continuous verification.
 
-## Usage
 
-```
-/hm:execute <task description>
-```
+## Purpose
 
-## Arguments
+Apply the PLAN's phases to the codebase. Default mode is TDD: tests are
+written from acceptance criteria first, the implementation follows, and
+each phase exits only when its verification command is green.
 
-`$ARGUMENTS` — task description (kebab-case slug auto-generated).
+## When to Run
 
-## Behavior
+- After `plan` (or after `research` for trivial changes that skip plan)
+- Whenever there is concrete work to land
 
-Phase 5에서 stage runner 본문 채워집니다.
+## Inputs
+
+- PLAN-{slug}.md
+- SPEC-{slug}.md (when present) — drives test authoring
+- Codebase, tests, build/CI scripts
+
+## Procedure
+
+1. Confirm preconditions:
+   - Working tree clean (or changes are intentional WIP)
+   - PLAN's exit criteria for prior phases are met
+2. For each PLAN phase, run the 5-phase TDD machine:
+   - **Phase A** — Author tests from SPEC criteria (RED expected)
+   - **Phase A.5** — Test-quality gate (criteria coverage, no false-positives)
+   - **Phase B** — Run tests; confirm RED for the right reasons
+   - **Phase C** — Implement to GREEN. No untested code paths.
+   - **Phase D** — Post-GREEN verification: ruff, mypy, full pytest, manual smoke
+3. Commit at phase boundaries with a message that maps to the PLAN phase.
+4. If a phase blocks: stop, document the blocker, escalate to the user
+   rather than thrash. Do not silently change scope.
+
+## Outputs
+
+- Code + tests committed to git
+- Updated PLAN with phase status (in-progress / done / blocked)
+- Optional SESSION-{slug}-{date}.md when `--session` is set
+
+## Quality Bar
+
+- All phase-D checks green
+- No skipped/xfail tests added without justification
+- Diff matches PLAN scope; surprises are documented

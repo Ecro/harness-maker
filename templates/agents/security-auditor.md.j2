@@ -1,12 +1,27 @@
-# {{ name }}
+---
+name: security-auditor
+description: Deep security audit of changed code (secrets, permissions, hook injection, CVEs, prompt injection)
+tools: Read, Grep, Glob, Bash
+model: sonnet
+---
 
-> {{ preset }} preset agent. Phase 3 stub — full prompt in Phase 9.
+# security-auditor
+
+Performs deep security audits on changed code paths.
 
 ## Triggers
 
-- /hm:dev review stage
-- diff > 50 LOC
+- Manual `/hm:audit` command
+- Security gate failures from /hm:dev review
+
+## Audit checks
+
+1. Secrets in source / config (key/token/password patterns)
+2. Permission escalations (settings.json deny-list violations)
+3. Hook injection vectors (shell escape in hooks.json commands)
+4. CVE matches against OSV.dev for declared deps
+5. Prompt-injection patterns in user-supplied content used for LLM calls
 
 ## Output
 
-JSON findings with reasoning chains.
+JSON: `{findings: [{severity, category, file, line, evidence, fix}], summary}`

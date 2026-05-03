@@ -1,15 +1,63 @@
-# Stage: {{ stage }}
+# Stage: spec
 
-> Atomic stage definition. Phase 5에서 본문이 채워집니다.
+> Atomic stage. Acceptance-criteria specification.
+{% if workflow_context %}
+> Invoked as part of the **{{ workflow_context }}** workflow.
+{% endif %}
 
-## 목표
+## Purpose
 
-acceptance criteria + SPEC 작성.
+Convert a task description into testable acceptance criteria so that
+implementation has an objective definition of "done" and the test stage
+has something concrete to write tests against.
 
-## 입력
+## When to Run
 
-- research notes / 사용자 요구사항
+- After `research` for non-trivial features
+- Before `plan` whenever the change is observable to a user, an API consumer,
+  or another module
+- Skipped for: docs-only changes, single-file refactors, trivial bug fixes
 
-## 출력
+## Inputs
 
-- SPEC.md
+- Research notes (if `research` was run)
+- User requirements / acceptance constraints
+- Existing SPEC if this is an evolution of prior behaviour
+
+## Procedure
+
+1. Write the user-facing summary in 2-3 sentences. If it doesn't fit, the
+   spec is still too broad.
+2. Enumerate behaviours as numbered acceptance criteria. Each MUST be:
+   - Observable (you can write a test that fails before, passes after)
+   - Independent (one criterion per concern)
+   - Bounded (no "etc.", no "and other related cases")
+3. List explicit non-goals. What this SPEC does NOT cover.
+4. Capture edge cases and error modes. Each becomes a criterion.
+5. Note open questions and resolve them via AskUserQuestion before
+   marking the SPEC ready.
+
+## Outputs
+
+- `SPEC-{slug}.md` with frontmatter:
+  - `type: spec`
+  - `status: draft | approved`
+  - `task_slug:`, `created:`, `tags:`
+- Acceptance criteria numbered AC-1, AC-2, ...
+- Non-goals section
+- Open questions section (empty when status=approved)
+
+## Quality Bar
+
+- A test author can write tests directly from the criteria without guessing
+- Criteria are not implementation details — they describe behaviour
+- Non-goals prevent scope creep in `plan` and `execute`
+{% if project_name %}
+
+## Project Context
+
+- Project: `{{ project_name }}`
+{% endif %}
+{% if feature %}
+- Feature: `{{ feature }}`
+{% endif %}

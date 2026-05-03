@@ -8,23 +8,17 @@ Determinism contract (per amendment §C):
 - content_hash: sha256 of the normalized body bytes; injected into frontmatter.
 - freeze_time: when set, generated_at is fixed (used in tests + CI).
 
-hooks.json (Phase 4) special-case:
+hooks.json (Phase 4 F1 amendment §E):
 - Claude Code hooks.json must be pure JSON (jq-parseable) — no YAML frontmatter prefix.
-- The phase_4 verify gate runs `jq . hooks.json`; the cross-phase invariant gate also
-  expects every `.json` file in `.claude/` to start with `---`.  These are mutually
-  exclusive in raw JSON, so we resolve it by writing the real file as a sibling
-  with a non-`.json` extension (`.hooks-config`) and exposing `hooks.json` as a
-  symlink. `find -type f` skips the symlink, the sibling has no `.json`/`.md`
-  extension, and `jq` follows the symlink to read pure JSON. Provenance lives in
-  a sidecar `.hooks-provenance.md` so the audit trail survives.
+- The cross-phase frontmatter invariant gate explicitly excludes `*/hooks/hooks.json`,
+  so we render hooks.json as pure JSON via `_render_pure_json` (no symlink, no sidecar).
+- Provenance is sacrificed for hooks.json (acceptable since it's small + reproducible).
 """
 
 from __future__ import annotations
 
-import contextlib
 import hashlib
 import json
-import os
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -152,20 +146,18 @@ def _is_hooks_json(fe: FileEntry) -> bool:
     return str(fe.path).endswith("hooks.json")
 
 
-def _render_hooks_json(
+def _render_pure_json(
     fe: FileEntry,
     env: Environment,
     target_dir: Path,
     *,
     dry_run: bool,
-    freeze_time: datetime | None,
+    freeze_time: datetime | None,  # noqa: ARG001 — kept for dispatch signature parity
 ) -> Path:
-    """hooks.json — pure JSON via symlink, provenance in sidecar.
+    """Render pure JSON (no frontmatter prefix) — used for hooks.json (jq-parseable).
 
-    Layout:
-      .claude/hooks/.hooks-config        (real file, pure JSON, no .json ext)
-      .claude/hooks/.hooks-provenance.md (sidecar with frontmatter; satisfies audit)
-      .claude/hooks/hooks.json           (symlink → .hooks-config)
+    Provenance is intentionally omitted; hooks.json is small and reproducible from
+    the template. The frontmatter invariant gate explicitly excludes hooks.json.
     """
     template = env.get_template(fe.template)
     rendered = template.render(**fe.context)
@@ -180,42 +172,8 @@ def _render_hooks_json(
     body_bytes = _format_settings_json(data)
     body_hash = hashlib.sha256(body_bytes).hexdigest()
     fe.body_sha256 = body_hash
-
     out = target_dir / fe.path
-    real_path = out.parent / ".hooks-config"
-    prov_path = out.parent / ".hooks-provenance.md"
-
-    if dry_run:
-        return out
-
-    real_path.parent.mkdir(parents=True, exist_ok=True)
-    atomic_write(real_path, body_bytes)
-
-    # Write provenance sidecar (markdown) — captures the audit trail.
-    prov = _build_provenance(fe, freeze_time)
-    prov["content_hash"] = body_hash
-    prov["target"] = str(out.name)
-    sidecar_body = (
-        f"# Provenance for `{out.name}`\n\n"
-        f"This sidecar exists because `hooks.json` must be pure JSON for `jq`.\n"
-        f"The real content lives at `.hooks-config` (symlinked).\n"
-    )
-    sidecar_bytes = _normalize_body(sidecar_body)
-    sidecar_hash = hashlib.sha256(sidecar_bytes).hexdigest()
-    prov["sidecar_hash"] = sidecar_hash
-    final_sidecar = _format_frontmatter(prov).encode("utf-8") + sidecar_bytes
-    atomic_write(prov_path, final_sidecar)
-
-    # Replace symlink (or stale file) at hooks.json → .hooks-config
-    if out.is_symlink() or out.exists():
-        with contextlib.suppress(OSError):
-            out.unlink()
-    try:
-        os.symlink(".hooks-config", out)
-    except OSError:
-        # Fallback: write pure JSON directly. This will trip the invariant on
-        # systems without symlink support (Windows w/o Developer Mode), but
-        # keeps the file readable. Document the limitation.
+    if not dry_run:
         atomic_write(out, body_bytes)
     return out
 
@@ -234,6 +192,26 @@ def _render_json_file(
     )
 
 
+def _split_template_frontmatter(rendered: str) -> tuple[dict[str, Any], str]:
+    """If rendered text starts with YAML frontmatter (---...---), split and parse it.
+
+    Returns (template_frontmatter_dict, body_without_frontmatter). When no
+    frontmatter is present returns ({}, rendered) unchanged.
+    """
+    if not rendered.startswith("---\n"):
+        return {}, rendered
+    end = rendered.find("\n---\n", 4)
+    if end == -1:
+        return {}, rendered
+    try:
+        parsed = yaml.safe_load(rendered[4:end])
+    except yaml.YAMLError:
+        return {}, rendered
+    if not isinstance(parsed, dict):
+        return {}, rendered
+    return parsed, rendered[end + 5 :]
+
+
 def _render_text_file(
     fe: FileEntry,
     env: Environment,
@@ -243,11 +221,18 @@ def _render_text_file(
     freeze_time: datetime | None,
 ) -> Path:
     template = env.get_template(fe.template)
-    rendered_body = template.render(**fe.context)
-    body_bytes = _normalize_body(rendered_body)
+    rendered = template.render(**fe.context)
+    # If template authored its own frontmatter (e.g. SubAgent name/description/tools/model),
+    # merge it into the single provenance frontmatter so Claude Code's loaders see one block.
+    template_fm, body_text = _split_template_frontmatter(rendered)
+    body_bytes = _normalize_body(body_text)
     body_hash = hashlib.sha256(body_bytes).hexdigest()
     fe.body_sha256 = body_hash
     fm = _build_provenance(fe, freeze_time)
+    # Template-supplied keys take precedence for display fields (name/description/tools/model);
+    # provenance fields stay authoritative.
+    for k, v in template_fm.items():
+        fm.setdefault(k, v)
     fm["content_hash"] = body_hash
     final_bytes = _format_frontmatter(fm).encode("utf-8") + body_bytes
     out = target_dir / fe.path
@@ -271,7 +256,7 @@ def render(
     written: list[Path] = []
     for fe in blueprint.files:
         if _is_hooks_json(fe):
-            out = _render_hooks_json(
+            out = _render_pure_json(
                 fe, env, target_dir, dry_run=dry_run, freeze_time=freeze_time,
             )
         elif _is_settings_json(fe):

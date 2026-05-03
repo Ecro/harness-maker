@@ -1,1 +1,19 @@
-.hooks-config
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "uv run python -m harness_maker.telemetry",
+            "type": "command"
+          }
+        ],
+        "matcher": "*"
+      }
+    ],
+    "PreToolUse": [],
+    "SessionStart": [],
+    "Stop": []
+  },
+  "preset": "Side"
+}

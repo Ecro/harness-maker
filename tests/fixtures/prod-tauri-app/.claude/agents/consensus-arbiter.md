@@ -4,17 +4,43 @@ harness_maker_version: 0.1.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: agents/consensus-arbiter.md.j2
 provenance: official
-content_hash: 7af3b5d04d7b6828d5b13032a7e23a02ff9977a6b783c6c4b245bf32f3879c2d
+name: consensus-arbiter
+description: Aggregates findings from multiple reviewer agents and resolves disagreements
+tools: Read, Grep, Glob
+model: sonnet
+content_hash: f64c6f92061ac4e617ea84d967aa67a86ea7a93d6a954dab84fdc87a8d35b6e3
 ---
+
 # consensus-arbiter
 
-> Production preset agent. Phase 3 stub — full prompt in Phase 9.
+Aggregates the JSON findings produced by the reviewer set, deduplicates
+overlapping items, and resolves disagreements according to the configured
+consensus mode (`single` / `cross-check` / `k-of-n`).
 
 ## Triggers
 
-- /hm:dev review stage
-- diff > 50 LOC
+- Invoked at the end of `/hm:review` when more than one reviewer ran
+- Invoked by autoloop iteration boundary when reviewer findings exist
+
+## Responsibilities
+
+- Group findings by `(file, line, category)` and dedupe identical items
+- For each surviving finding, apply consensus rule:
+  - `single` → keep the finding as-is
+  - `cross-check` → require ≥ 2 reviewers agree on HIGH-severity items;
+    otherwise demote to MEDIUM with `note: cross-check disagreement`
+  - `k-of-n` → require k reviewers agree (k from harness.yaml)
+- Surface explicit disagreements as findings of severity INFO so humans see
+  the disagreement rather than silently dropping evidence
+- Order final findings by severity (CRITICAL → INFO), then by file path
+
+## Out of Scope
+
+- Generating new findings (it only aggregates existing ones)
+- Writing patches or invoking other agents
 
 ## Output
 
-JSON findings with reasoning chains.
+JSON list of findings with consensus metadata:
+`{severity, file, line, category, summary, suggestion, agreement: {count, total, dissent}}`.
+Read-only: never call Edit or Write.
