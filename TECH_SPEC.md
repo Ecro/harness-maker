@@ -1,6 +1,6 @@
 # TECH_SPEC: harness-maker
 
-> **상태:** v2.0 (autoloop-ready) · **작성:** 2026-05-03 · **언어:** 한국어 (Korean)
+> **상태:** v2.1 (autoloop dry-run 분석 fixes 반영) · **작성:** 2026-05-03 · **언어:** 한국어 (Korean)
 > Claude Code 플러그인 — 어떤 프로젝트든 `/harness-maker:make` 한 번에 맞춤 하네스(.claude/) 자동 생성·갱신. autoloop 으로 자율 빌드 가능한 형식.
 
 ## 0. Loop Configuration
@@ -653,8 +653,8 @@ uv sync \
   - Verify: `bash .claude-verify.sh phase_2_synthesize`
   - Commit: `feat(phase2): implement Synthesizer (preset + answers → Blueprint)`
 
-- **Task 2.5: Renderer 구현 (provenance frontmatter 포함)**
-  - Do: `src/harness_maker/render.py` — `render(blueprint: Blueprint, target_dir: Path, dry_run: bool = False)`. Jinja2 환경 셋업 (`templates/` 가 search path). 각 FileEntry 마다 (a) 템플릿 렌더, (b) provenance frontmatter (generated_by, harness_maker_version, generated_at, source_template, content_hash sha256, provenance="official") 부착, (c) target_dir 에 Write tool 식 atomic write. dry_run=True 시 디스크 변경 0, 변경 목록만 반환.
+- **Task 2.5: Renderer 구현 (provenance frontmatter 포함, deterministic 모드)**
+  - Do: `src/harness_maker/render.py` — `render(blueprint: Blueprint, target_dir: Path, *, dry_run: bool = False, freeze_time: datetime | None = None)`. Jinja2 환경 셋업 (`templates/` 가 search path). 각 FileEntry 마다 (a) 템플릿 렌더, (b) provenance frontmatter (generated_by, harness_maker_version, generated_at = freeze_time or now(), source_template, content_hash sha256 of body **excluding frontmatter**, provenance="official") 부착, (c) target_dir 에 **atomic write** (`tempfile.NamedTemporaryFile(dir=target_dir.parent, delete=False)` → `os.rename`). dry_run=True 시 디스크 변경 0, 변경 목록만 반환. **freeze_time 인자 = 테스트 결정성 보장 (snapshot 비교에 필수)**.
   - Files: `src/harness_maker/render.py`, `tests/unit/test_render.py`
   - Done when: 빈 fixture 디렉토리에서 Side blueprint 렌더 → 25-30 파일 모두 frontmatter 포함, content_hash 가 실제 hash 와 일치
   - Verify: `bash .claude-verify.sh phase_2_render`
@@ -674,12 +674,12 @@ uv sync \
   - Verify: `bash .claude-verify.sh phase_2_verifier`
   - Commit: `feat(phase2): implement Verifier with yaml/json/frontmatter checks`
 
-- **Task 2.8: 4 Fixture + Snapshot Test**
-  - Do: `tests/fixtures/{side-python-cli, side-tauri-app, prod-tauri-app, prod-firmware}/` 디렉토리 생성. 각 fixture 에 시드 파일 (pyproject.toml or package.json 등 Profiler 가 stack 감지 가능하게). `tests/snapshot/<fixture>.expected.yaml` — 각 fixture 에 대한 expected Blueprint (preset, 파일 리스트, harness.yaml 내용). `tests/unit/test_synthesize_snapshot.py` — 4 fixture profile → synthesize → snapshot 비교.
+- **Task 2.8: 4 Fixture + Snapshot Test (deterministic)**
+  - Do: `tests/fixtures/{side-python-cli, side-tauri-app, prod-tauri-app, prod-firmware}/` 디렉토리 생성. 각 fixture 에 시드 파일 (pyproject.toml or package.json 등 Profiler 가 stack 감지 가능하게). `tests/snapshot/<fixture>.expected.yaml` — 각 fixture 에 대한 expected Blueprint (preset, 파일 리스트 + 각 파일의 content_hash, harness.yaml 내용). `tests/unit/test_synthesize_snapshot.py` — 4 fixture profile → synthesize → render(target=tmp, freeze_time=datetime(2026,1,1,0,0,0,tzinfo=UTC)) → snapshot 비교. **timestamp 는 freeze_time 으로 고정 → frontmatter content 결정적 → snapshot 안정**. Render 결과 파일 개수도 단언 (Side: 25-30, Production: 35-45 fixture 별 expected 값 사용).
   - Files: `tests/fixtures/*/`, `tests/snapshot/*.expected.yaml`, `tests/unit/test_synthesize_snapshot.py`
-  - Done when: 4 fixture 모두 snapshot 일치
+  - Done when: 4 fixture 모두 snapshot 일치, 각 fixture 의 file count 가 expected range 안
   - Verify: `bash .claude-verify.sh phase_2_fixtures`
-  - Commit: `test(phase2): add 4 fixtures with snapshot tests`
+  - Commit: `test(phase2): add 4 fixtures with deterministic snapshot tests`
 
 - **Task 2.9: CLI integration — `make` 명령 동작**
   - Do: `src/harness_maker/cli.py` 의 `make` 함수 완성. 흐름: profile → (autoloop_mode True 일 시 default) interview → synthesize → (existing_dotclaude 시) reconcile → render. `uv run python -m harness_maker.cli make <fixture-dir> --autoloop` 명령으로 4 fixture 모두 정상 적용.
@@ -694,8 +694,14 @@ uv run pytest tests/unit/ -v \
   && uv run ruff check src/ \
   && uv run mypy --strict src/ \
   && for fix in side-python-cli side-tauri-app prod-tauri-app prod-firmware; do
+       rm -rf tests/fixtures/$fix/.claude
        uv run python -m harness_maker.cli make tests/fixtures/$fix --autoloop || exit 1
        test -f tests/fixtures/$fix/.claude/harness.yaml || exit 1
+       count=$(find tests/fixtures/$fix/.claude -type f | wc -l)
+       case "$fix" in
+         side-*)  [[ $count -ge 25 && $count -le 32 ]] || { echo "$fix: expected 25-30, got $count"; exit 1; } ;;
+         prod-*)  [[ $count -ge 35 && $count -le 47 ]] || { echo "$fix: expected 35-45, got $count"; exit 1; } ;;
+       esac
      done
 ```
 
@@ -774,14 +780,16 @@ uv run pytest tests/unit/ -v \
 - GitHub REST API releases endpoint: https://docs.github.com/en/rest/releases/releases
 - GitHub API rate limits (unauthenticated 60/h): https://docs.github.com/en/rest/overview/rate-limits-for-the-rest-api
 - OSV.dev API: https://google.github.io/osv.dev/api/
-- Anthropic blog/changelog RSS feed URL discovery
+- Anthropic news index page (HTML scrape — RSS 없음): https://www.anthropic.com/news
+- Claude Code release notes: https://github.com/anthropics/claude-code/releases
 - feedparser library: https://feedparser.readthedocs.io/en/latest/
 - httpx async client: https://www.python-httpx.org/
 
 #### Tasks
 
-- **Task 4.1: Crawler — Anthropic blog/changelog (RSS)**
-  - Do: `src/harness_maker/crawler/anthropic_blog.py` — `fetch_recent(since: datetime) -> list[CrawlItem]`. feedparser 로 anthropic.com/news/rss 파싱. CrawlItem(title, url, published, summary). 캐시: `~/.cache/harness-maker/anthropic-blog.json` (12h TTL).
+- **Task 4.1: Crawler — Anthropic blog/changelog (HTML scrape)**
+  - Do: `src/harness_maker/crawler/anthropic_blog.py` — `fetch_recent(since: datetime) -> list[CrawlItem]`. **Anthropic 는 공식 RSS 없음.** httpx 로 `https://www.anthropic.com/news` HTML 가져와 BeautifulSoup4 (의존성 추가) 또는 정규식으로 article 카드 파싱 → CrawlItem(title, url, published, summary). 캐시: `~/.cache/harness-maker/anthropic-blog.json` (12h TTL). 실패 시 graceful skip + 경고 로그.
+  - Files: `src/harness_maker/crawler/anthropic_blog.py`, `tests/unit/crawler/test_anthropic_blog.py`, `pyproject.toml` (beautifulsoup4 추가)
   - Files: `src/harness_maker/crawler/anthropic_blog.py`, `tests/unit/crawler/test_anthropic_blog.py`
   - Done when: mock RSS feed 으로 호출 시 CrawlItem list 반환, 캐시 hit 시 네트워크 호출 X
   - Verify: `bash .claude-verify.sh phase_4_anthropic`
@@ -889,7 +897,7 @@ uv run pytest tests/unit/crawler/ tests/unit/test_relevance.py -v \
   - Commit: `feat(phase5): implement Conditional Router`
 
 - **Task 5.5: conditional-router skill 템플릿 + agents**
-  - Do: `templates/skills/conditional-router/SKILL.md.j2`. 9 agent template: `templates/agents/{code,security,performance,ux,concurrency}-reviewer.md.j2`, `consensus-arbiter.md.j2`, `autoloop-coder.md.j2`, `executor.md.j2`. 각 agent .md 에 frontmatter (name, description, permissions) — 권한 분리는 placeholder (Phase 8 에서 강화). security-auditor 는 Phase 7 에서 추가.
+  - Do: `templates/skills/conditional-router/SKILL.md.j2`. 9 agent template: `templates/agents/{code,security,performance,ux,concurrency}-reviewer.md.j2`, `consensus-arbiter.md.j2`, `autoloop-coder.md.j2`, `executor.md.j2`. 각 agent .md 에 frontmatter (name, description, permissions) — **Claude Code SubAgent permissions 의 정확한 frontmatter 스키마는 research target URL 의 doc 따라 확정 (allow/deny 필드명·구조 검증 필수)**. 권한 분리는 placeholder (Phase 8 에서 강화). security-auditor 는 Phase 7 에서 추가.
   - Files: `templates/skills/conditional-router/SKILL.md.j2`, `templates/agents/*.md.j2` (8개)
   - Done when: Production fixture 적용 시 .claude/agents/ 에 8 agent 생성
   - Verify: `bash .claude-verify.sh phase_5_agents`
@@ -928,7 +936,7 @@ uv run pytest tests/unit/test_workflow_fuse.py tests/unit/test_conditional_route
 **Objective:** `/hm:loop` 명령이 사용자 하네스에 렌더되어 자율 반복 동작. `/hm:verify` 가 wrapup 직전 자동 호출되는 gate skill 동작.
 
 **Research targets (autoloop Stage 1 자동 fetch):**
-- vault `/autoloop` 명령 패턴 참고 (동일 구조): /mnt/c/Users/euncheol.ro/Documents/obsidian-vault/.claude/commands/autoloop.md
+- 본 repo 의 autoloop 패턴 reference (자족적, vault 의존 X): docs/reference/autoloop-pattern.md
 - AHE — Agentic Harness Engineering: https://arxiv.org/abs/2604.25850
 - Inside the Scaffold (5 loop primitives): https://arxiv.org/abs/2604.03515
 - superpowers verify-before-completion 패턴: https://github.com/obra/superpowers
@@ -1103,8 +1111,8 @@ uv run pytest tests/unit/test_worktree.py tests/unit/test_secrets_scan.py tests/
   - Verify: `bash .claude-verify.sh phase_8_lint_skill`
   - Commit: `feat(phase8): add context-linter skill template`
 
-- **Task 8.4: 권한 분리 — Reviewer agents settings.json**
-  - Do: `templates/agents/{code,security,security-auditor,performance,ux,concurrency}-reviewer.md.j2` 의 frontmatter 에 `permissions: {allow: [Read(*), Grep(*), Bash(git diff:*), Bash(git log:*)], deny: [Write(*), Edit(*), Bash(rm:*), Bash(curl:*), Bash(npm install:*), Bash(eval:*)]}`. 6 reviewer 일관 적용.
+- **Task 8.4: 권한 분리 — Reviewer agents permissions**
+  - Do: `templates/agents/{code,security,security-auditor,performance,ux,concurrency}-reviewer.md.j2` 의 frontmatter 에 read-only permissions. **반드시 Claude Code SubAgent 공식 spec (https://code.claude.com/docs/en/sub-agents + https://code.claude.com/docs/en/settings) 의 정확한 schema 확인 후 적용** — 만약 SubAgent frontmatter 가 `tools: [Read, Grep]` 식 allowlist 만 지원하고 deny list 미지원이면, allowlist 만으로 read-only 강제 (Write/Edit/Bash exec 도구 자체 제외). 6 reviewer 일관 적용.
   - Files: `templates/agents/{code,security,security-auditor,performance,ux,concurrency}-reviewer.md.j2`
   - Done when: 렌더된 agent .md 의 frontmatter 에 deny 리스트 존재
   - Verify: `bash .claude-verify.sh phase_8_reviewer_perms`
@@ -1151,7 +1159,9 @@ print('reviewer permission separation OK')
 
 ### Phase 9: Dogfood — sandbox 적용
 
-**Objective:** harness-maker 자체를 1개 sandbox 프로젝트에 적용해 모든 R1-R6 + 모든 메커니즘 동작 검증.
+**Objective:** harness-maker 자체를 1개 sandbox 프로젝트에 적용해 모든 R1-R6 + 모든 메커니즘 동작 검증. Python CLI entry + Claude Code 플러그인 entry 둘 다 검증.
+
+**Research targets:** None — Phase 9 는 integration test only. 외부 doc fetch 불필요.
 
 #### Tasks
 
@@ -1197,14 +1207,22 @@ print('reviewer permission separation OK')
   - Verify: `bash .claude-verify.sh phase_9_reconcile`
   - Commit: `test(phase9): verify Brownfield reconcile preserves user edits`
 
+- **Task 9.7: Plugin entry 검증 (Claude Code 호출)**
+  - Do: subprocess 로 `claude --plugin-dir /home/noel/harness-maker -p "/harness-maker:make tests/e2e/sandbox-plugin-test --autoloop"` 실행 (또는 `--dangerously-skip-permissions` 필요 시). Claude Code 가 본 플러그인 로드 → /harness-maker:make 명령 라우팅 → `python -m harness_maker.cli make` 호출 → sandbox-plugin-test/.claude/ 생성 검증. **Python CLI entry 와 Plugin entry 둘 다 동일 결과** 보장.
+  - Files: `tests/e2e/test_plugin_entry.py`, `tests/e2e/sandbox-plugin-test/`
+  - Done when: subprocess exit 0, sandbox-plugin-test/.claude/harness.yaml 존재, Python CLI 결과와 file count·content 일치 (timestamp 무시)
+  - Verify: `bash .claude-verify.sh phase_9_plugin_entry`
+  - Commit: `test(phase9): verify Claude Code plugin entry matches CLI entry`
+
 **Phase 9 Exit Criteria:**
 ```bash
-uv run pytest tests/e2e/test_dogfood_sandbox.py -v \
+uv run pytest tests/e2e/ -v \
   && test -f tests/e2e/sandbox/.claude/harness.yaml \
   && test -f tests/e2e/sandbox/.claude/commands/hm/loop.md \
   && test -f tests/e2e/sandbox/.claude/commands/hm/monitor.md \
   && test -f tests/e2e/sandbox/.claude/commands/hm/refresh.md \
-  && test -f tests/e2e/sandbox/.claude/observability/dashboard.md
+  && test -f tests/e2e/sandbox/.claude/observability/dashboard.md \
+  && test -f tests/e2e/sandbox-plugin-test/.claude/harness.yaml  # plugin entry path
 ```
 
 ---
@@ -1403,7 +1421,8 @@ bash .claude-verify.sh all
 - **v1.4**: Worktree 격리 + 5 Security Gates (Archon/ECC 영향)
 - **v1.5**: Agent quality drill-down (Health 의 sub-rubric)
 - **v1.6**: Context lint + Privilege separation + Provenance frontmatter (arxiv 2602.11988 / 2603.13424 / 2604.03081)
-- **v2.0** (본 spec): autoloop-ready 형식 — Section 0-6 구조, 10 phase, 모든 R/M/A 가 Section 4 task 또는 Section 5 verify 에 명시 매핑
+- **v2.0**: autoloop-ready 형식 — Section 0-6 구조, 10 phase, 모든 R/M/A 가 Section 4 task 또는 Section 5 verify 에 명시 매핑
+- **v2.1** (본 spec): autoloop dry-run 분석 결과 10 fix 적용 — (C1) Renderer freeze_time 인자, (C2) Phase 9 plugin entry subprocess 검증 task 추가, (C3) Phase 4 Anthropic URL 명시 (HTML scrape, RSS 없음), (I1) SubAgent permissions 공식 schema research note, (I2) vault autoloop 절대경로 → docs/reference/autoloop-pattern.md 자족적 reference, (I3) atomic write 패턴 CLAUDE.md, (I4) LLM mock pytest fixture 패턴 CLAUDE.md, (I5) worktree cleanup on autoloop failure CLAUDE.md, (M1) Phase 9 "Research targets: None" 명시, (M2) Phase 2 file count assertion verify 추가
 
 ---
 

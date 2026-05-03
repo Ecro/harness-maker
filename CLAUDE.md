@@ -80,8 +80,84 @@
 ## Autoloop 빌드 중 모호함 발생 시
 1. TECH_SPEC.md Section 4 의 phase task 우선
 2. 본 CLAUDE.md 우선
-3. vault `/autoloop` 명령 의 autonomous decision protocol (DD#8) 따름 — log 후 진행
+3. `docs/reference/autoloop-pattern.md` 의 autonomous decision protocol (DD#8) 따름 — log 후 진행
 4. **AskUserQuestion 호출 금지**
+
+## 구현 패턴 (CODER 가 따라야 할 코드 관례)
+
+### Atomic file write (디스크 corrupt 방지)
+모든 파일 write 는 atomic 패턴 강제:
+```python
+import os, tempfile
+from pathlib import Path
+
+def atomic_write(path: Path, content: str) -> None:
+    """tempfile + os.rename — 인터럽트 시 corrupt 0."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(
+        dir=str(path.parent),
+        prefix=f".{path.name}.",
+        suffix=".tmp",
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(content)
+        os.replace(tmp, path)  # atomic on POSIX + Windows
+    except Exception:
+        Path(tmp).unlink(missing_ok=True)
+        raise
+```
+plain `open(path, "w")` 사용 금지 (단, 명백히 임시 디렉토리 안에서만 OK).
+
+### LLM mock 패턴 (테스트 결정성)
+사용자 정책: 실제 호출은 Claude Code subscription 통해 가능하지만, **단위 테스트는 mock 우선** (속도·결정성).
+
+```python
+# tests/unit/conftest.py
+import pytest
+from anthropic.types import Message, TextBlock, Usage
+
+@pytest.fixture
+def mock_anthropic_client(monkeypatch):
+    """Claude SDK 호출을 deterministic mock 으로 대체."""
+    class _MockClient:
+        def __init__(self, *_a, **_kw): ...
+        @property
+        def messages(self):
+            return self
+        def create(self, *_a, **_kw):
+            return Message(
+                id="msg_test",
+                type="message",
+                role="assistant",
+                model="claude-opus-4-7",
+                content=[TextBlock(type="text", text='{"applicability_score": 0.85, "risk": "low"}')],
+                stop_reason="end_turn",
+                stop_sequence=None,
+                usage=Usage(input_tokens=10, output_tokens=20),
+            )
+    monkeypatch.setattr("anthropic.Anthropic", _MockClient)
+    return _MockClient
+```
+Integration test 는 `tests/integration/` 에 두고 `pytest.mark.skipif(not os.getenv("INTEGRATION"))` 가드.
+
+### Worktree cleanup 정책
+- 정상 종료: `harness.yaml.worktree.cleanup` 따름 (default `on_success`)
+- **autoloop iter / phase blocker 발생 시 강제 cleanup**: `worktree.cleanup_all(force=True)` 호출 → halt 전 모든 `.worktrees/*` 제거 (디스크 누적 방지). 단, `--debug-worktree` 플래그 시 보존.
+- weekly cleanup hook: `/hm:refresh` 와 동시 실행되는 별도 함수가 24h 이상 stale worktree 청소.
+
+### Snapshot test 결정성
+Renderer 의 `freeze_time` 인자 적극 활용. snapshot 비교 시 `generated_at` 필드 마스크:
+```python
+def normalize_for_snapshot(text: str) -> str:
+    """frontmatter 의 generated_at 만 마스크 (다른 필드는 결정적)."""
+    return re.sub(r'^generated_at:.*$', 'generated_at: <FROZEN>', text, flags=re.M)
+```
+
+### 외부 명령 호출
+- `subprocess.run(..., check=True, capture_output=True, text=True, timeout=N)` — timeout 필수
+- shell=True 금지 (security_scanner 의 hook injection 검사가 자기 코드도 잡으면 안 됨)
+- 외부 명령 실패 시 graceful fallback (예: GitHub API rate limit → empty result + 경고 로그)
 
 ## 사용자 voice
 - 직접적 (no preamble, no flattery)

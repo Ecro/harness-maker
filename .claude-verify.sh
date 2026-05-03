@@ -118,6 +118,11 @@ phase_2_cli_make() {
     uv run python -m harness_maker.cli make "tests/fixtures/$fix" --autoloop \
       || fail "cli make failed for $fix"
     require_file "tests/fixtures/$fix/.claude/harness.yaml"
+    count=$(find "tests/fixtures/$fix/.claude" -type f | wc -l)
+    case "$fix" in
+      side-*)  [[ $count -ge 25 && $count -le 32 ]] || fail "$fix: expected 25-30 files, got $count" ;;
+      prod-*)  [[ $count -ge 35 && $count -le 47 ]] || fail "$fix: expected 35-45 files, got $count" ;;
+    esac
   done
   ok "phase_2_cli_make"
 }
@@ -473,6 +478,13 @@ phase_9_reconcile() {
   ok "phase_9_reconcile"
 }
 
+phase_9_plugin_entry() {
+  require_file tests/e2e/test_plugin_entry.py
+  uv run pytest tests/e2e/test_plugin_entry.py -q || fail "plugin entry test"
+  require_file tests/e2e/sandbox-plugin-test/.claude/harness.yaml
+  ok "phase_9_plugin_entry"
+}
+
 phase_9() {
   phase_9_sandbox_init
   phase_9_apply
@@ -480,6 +492,7 @@ phase_9() {
   phase_9_security
   phase_9_metrics
   phase_9_reconcile
+  phase_9_plugin_entry
   ok "Phase 9 Exit Criteria"
 }
 
