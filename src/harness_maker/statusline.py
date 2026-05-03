@@ -1,9 +1,10 @@
 """Statusline — `python -m harness_maker.statusline` (per amendments §C/§D/§E/§I).
 
 Reads JSON from stdin (Claude Code statusLine spec). Writes one-line summary to stdout:
-    <project> | <preset> | 🪙<eff>% | 🎯<health> | 🔄<fresh>d
+    <project> | <preset> | eff:<eff>% | hlth:<health> | age:<fresh>d
 
-NEVER crash on missing files (eff=0, fresh=999, health=0).
+Values show '-' when the underlying data file is absent (no data yet).
+NEVER crash on missing files.
 """
 
 from __future__ import annotations
@@ -53,7 +54,6 @@ def _read_preset(claude_dir: Path) -> Preset:
         text = yml.read_text(encoding="utf-8")
     except OSError:
         return Preset.SIDE
-    # Strip leading YAML frontmatter doc separator if multi-doc
     docs: list[Any] = []
     try:
         docs = list(yaml.safe_load_all(text))
@@ -68,15 +68,15 @@ def _read_preset(claude_dir: Path) -> Preset:
     return Preset.SIDE
 
 
-def _compute_eff(claude_dir: Path, window: int = 20) -> int:
-    """cache_hit_pct from last N entries of metrics.jsonl. 0 if absent."""
+def _compute_eff(claude_dir: Path, window: int = 20) -> int | None:
+    """cache_hit_pct from last N entries of metrics.jsonl. None if absent."""
     metrics = claude_dir / "observability" / "metrics.jsonl"
     try:
         lines = metrics.read_text(encoding="utf-8").splitlines()
     except OSError:
-        return 0
+        return None
     if not lines:
-        return 0
+        return None
     total = 0
     cached = 0
     for line in lines[-window:]:
@@ -93,18 +93,18 @@ def _compute_eff(claude_dir: Path, window: int = 20) -> int:
         total += in_tok + cache_tok
         cached += cache_tok
     if total == 0:
-        return 0
+        return None
     return round(100 * cached / total)
 
 
-def _compute_fresh(claude_dir: Path) -> int:
-    """Days since newest mtime of refresh/raw-*.jsonl. 999 if absent."""
+def _compute_fresh(claude_dir: Path) -> int | None:
+    """Days since newest mtime of refresh/raw-*.jsonl. None if absent."""
     refresh_dir = claude_dir / "observability" / "refresh"
     if not refresh_dir.is_dir():
-        return 999
+        return None
     files = list(refresh_dir.glob("raw-*.jsonl"))
     if not files:
-        return 999
+        return None
     newest = max(f.stat().st_mtime for f in files)
     return int((time.time() - newest) // 86400)
 
@@ -116,9 +116,13 @@ def _safe_compute_health(project_dir: Path, preset: Preset) -> int:
         return 0
 
 
-def format_line(project: str, preset: Preset, eff: int, health: int, fresh: int) -> str:
+def format_line(
+    project: str, preset: Preset, eff: int | None, health: int, fresh: int | None
+) -> str:
     """Build the one-line statusline output."""
-    return f"{project} | {preset.value} | 🪙{eff}% | 🎯{health} | 🔄{fresh}d"
+    eff_str = f"eff:{eff}%" if eff is not None else "eff:-"
+    fresh_str = f"age:{fresh}d" if fresh is not None else "age:-"
+    return f"{project} | {preset.value} | {eff_str} | hlth:{health} | {fresh_str}"
 
 
 def main() -> int:

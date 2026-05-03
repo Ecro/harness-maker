@@ -3,7 +3,7 @@
 Tests are grouped by `-k <keyword>`:
 - ``commands``  — generated command files exist + parseable + worktree skill smoke
 - ``security``  — security_scanner.scan_all detects seeded vulns
-- ``metrics``   — statusline renders 🪙·🎯·🔄 from seeded metrics.jsonl
+- ``metrics``   — statusline renders eff/hlth/age from seeded metrics.jsonl
 - ``reconcile`` — second `make` run preserves user-modified files (KEEP decision)
 """
 
@@ -245,7 +245,7 @@ def _seed_metrics(claude_dir: Path) -> None:
 
 
 def test_metrics_statusline_format() -> None:
-    """statusline must emit `<project> | <preset> | 🪙N% | 🎯N | 🔄Nd` shape."""
+    """statusline must emit `<project> | <preset> | eff:N% | hlth:N | age:(Nd|-)` shape."""
     import re
 
     _ensure_sandbox_applied()
@@ -264,7 +264,7 @@ def test_metrics_statusline_format() -> None:
     )
     assert cp.returncode == 0, f"statusline exit={cp.returncode} stderr={cp.stderr}"
     # Tolerant: regex match anywhere in stdout (subprocess may inject preamble).
-    pattern = re.compile(r".+ \| .+ \| 🪙\d+% \| 🎯\d+ \| 🔄\d+d")
+    pattern = re.compile(r".+ \| .+ \| eff:\d+% \| hlth:\d+ \| age:(\d+d|-)")
     assert pattern.search(cp.stdout), f"statusline format mismatch: {cp.stdout!r}"
 
 

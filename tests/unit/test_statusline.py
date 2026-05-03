@@ -14,7 +14,7 @@ import pytest
 from harness_maker import statusline
 
 LINE_RE = re.compile(
-    r"^[^|]+ \| (Side|Production) \| 🪙\d+% \| 🎯\d+ \| 🔄\d+d$",
+    r"^[^|]+ \| (Side|Production) \| eff:(\d+%|-) \| hlth:\d+ \| age:(\d+d|-)$",
 )
 
 
@@ -71,8 +71,8 @@ def test_no_claude_dir_graceful_fallback(
     assert rc == 0
     out = capsys.readouterr().out.strip()
     assert LINE_RE.match(out), f"Unexpected fallback: {out!r}"
-    assert "🪙0%" in out
-    assert "🔄999d" in out
+    assert "eff:-" in out
+    assert "age:-" in out
 
 
 def test_production_preset_detected(
@@ -118,12 +118,21 @@ def test_subprocess_entry_point(tmp_path: Path) -> None:
     assert LINE_RE.match(out), f"Unexpected output: {out!r}"
 
 
-def test_format_line_helper() -> None:
+def test_format_line_with_data() -> None:
     from harness_maker.models import Preset
 
     line = statusline.format_line("myproj", Preset.SIDE, 42, 80, 3)
     assert LINE_RE.match(line)
     assert "myproj" in line
-    assert "🪙42%" in line
-    assert "🎯80" in line
-    assert "🔄3d" in line
+    assert "eff:42%" in line
+    assert "hlth:80" in line
+    assert "age:3d" in line
+
+
+def test_format_line_no_data() -> None:
+    from harness_maker.models import Preset
+
+    line = statusline.format_line("myproj", Preset.SIDE, None, 0, None)
+    assert LINE_RE.match(line)
+    assert "eff:-" in line
+    assert "age:-" in line
