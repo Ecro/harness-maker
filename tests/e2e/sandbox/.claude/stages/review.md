@@ -4,7 +4,7 @@ harness_maker_version: 0.1.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: stages/review.md.j2
 provenance: official
-content_hash: 284cb78ea4f4c943f798818bb49879ef66c6821331ba4cdd337416ab23b76c24
+content_hash: 23f61aae29a3607e1e2b4c55b57177cc21aefc07ad0ab324e15e94755e3de85e
 ---
 # Stage: review
 
@@ -35,8 +35,11 @@ conditionally-routed) and walk the code paths that the change touches.
 ## Procedure
 
 1. Determine reviewer set:
-   - `routing: always-all` → invoke every reviewer in `reviewers.list`
+   - Start from `harness.yaml`'s `reviewers.enabled`
+   - `routing: always-all` → invoke every enabled reviewer
    - `routing: conditional` → use Conditional Router on the changed files
+   - Add any extras passed via `--with-reviewers=<csv>` on the workflow command
+     (must be present in `reviewers.installed`)
 2. For each reviewer:
    - Read the diff with full context (use Read on changed files end-to-end,
      not just the patch)

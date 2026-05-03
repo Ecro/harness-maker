@@ -1,14 +1,13 @@
 """Synthesizer — map preset+answers to deterministic Blueprint with FileEntry list.
 
-Per amendment §D, the synthesizer uses two hardcoded skeletons:
-- SIDE_FILES → Side preset (~24 files + 1 workflow = 25 files)
-- PRODUCTION_FILES → Production preset (~24 + 4 workflow + 7 skill + 8 agent = 43 files)
+Per the new architecture every preset installs the FULL skill + agent inventory.
+The harness.yaml `reviewers.enabled` and `skills.enabled` lists govern default
+activation; users opt into more reviewers per-task via inline command flags.
 
-Phase 6 (this file): workflow command rendering is now DYNAMIC. Workflow command
-FileEntries are generated from HarnessConfig.workflows at synthesis time, with
-each entry's `fused_body` Jinja context computed via `workflow_fuse.fuse(...)`.
-The static SIDE_FILES / PRODUCTION_FILES skeletons no longer encode workflow
-names; the workflow loop in `synthesize()` appends them dynamically.
+Workflow command FileEntries are generated dynamically from
+`answers.fused_workflows` (a typed `dict[name, list[AtomicStage]]`). The
+`workflow_fuse.fuse(...)` helper produces the per-workflow body that the
+`workflow_command.md.j2` template wraps.
 """
 
 from __future__ import annotations
@@ -31,43 +30,33 @@ from harness_maker.workflow_fuse import fuse
 # Each tuple: (template path under templates/, output path under .claude/, context supplement)
 FileSpec = tuple[str, str, dict[str, Any]]
 
-_ATOMIC_STAGES: list[str] = [
-    "research",
-    "spec",
-    "plan",
-    "execute",
-    "review",
-    "wrapup",
-    "verify",
+_ATOMIC_STAGES: list[str] = [s.value for s in AtomicStage]
+
+# Every preset installs the full reviewer/skill inventory; activation is data,
+# not file presence.
+_ALL_AGENTS: list[str] = [
+    "autoloop-coder",
+    "code-reviewer",
+    "concurrency-reviewer",
+    "consensus-arbiter",
+    "executor",
+    "performance-reviewer",
+    "security-auditor",
+    "security-reviewer",
+    "ux-reviewer",
 ]
-
-# Default stage sequence assigned to each workflow when the interview doesn't
-# specialise it. Matches the architecture's "dev" recommendation.
-_DEFAULT_WORKFLOW_STAGES: list[AtomicStage] = [
-    AtomicStage.RESEARCH,
-    AtomicStage.PLAN,
-    AtomicStage.EXECUTE,
-    AtomicStage.REVIEW,
-    AtomicStage.WRAPUP,
+_ALL_SKILLS: list[str] = [
+    "agent-quality-rubric",
+    "ai-readiness-rubric",
+    "autoloop-driver",
+    "conditional-router",
+    "context-linter",
+    "relevance-filter",
+    "research-crawler",
+    "security-scanner",
+    "verify-before-completion",
+    "worktree-isolator",
 ]
-
-# Preset-seeded workflow stage recipes (per architecture preset comparison).
-_WORKFLOW_RECIPES: dict[str, list[AtomicStage]] = {
-    "dev": [
-        AtomicStage.PLAN,
-        AtomicStage.EXECUTE,
-        AtomicStage.REVIEW,
-        AtomicStage.WRAPUP,
-    ],
-    "quick": [AtomicStage.EXECUTE],
-    "careful": list(AtomicStage),
-    "audit": [AtomicStage.REVIEW],
-    "ship": [AtomicStage.EXECUTE, AtomicStage.REVIEW, AtomicStage.WRAPUP],
-}
-
-
-def _stages_for_workflow(name: str) -> list[AtomicStage]:
-    return _WORKFLOW_RECIPES.get(name, _DEFAULT_WORKFLOW_STAGES)
 
 
 def _stage_files() -> list[FileSpec]:
@@ -106,107 +95,69 @@ def _atomic_command_files() -> list[FileSpec]:
     return out
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Side skeleton (workflow commands appended dynamically in synthesize())
-# ──────────────────────────────────────────────────────────────────────────────
-
-SIDE_FILES: list[FileSpec] = [
-    # 1 — harness.yaml
-    ("harness-yaml/Side.yaml.j2", "harness.yaml", {}),
-    # 2 — settings.json
-    ("settings/Side.json.j2", "settings.json", {}),
-    # 3 — CLAUDE.md (project root)
-    ("claude-md/Side.ko.md.j2", "../CLAUDE.md", {}),
-    # 4-5 — memory
-    ("memory/failures.ko.md.j2", "memory/failures.md", {}),
-    ("memory/wiki.ko.md.j2", "memory/wiki.md", {}),
-    # 6-12 — stages (7)
-    *_stage_files(),
-    # 13-19 — atomic commands (7)
-    *_atomic_command_files(),
-    # 20-22 — fixed commands
-    ("commands/hm/loop.md.j2", "commands/hm/loop.md", {}),
-    ("commands/hm/monitor.md.j2", "commands/hm/monitor.md", {}),
-    ("commands/hm/refresh.md.j2", "commands/hm/refresh.md", {}),
-    # 23 — Side gets one skill
-    (
-        "skills/verify-before-completion/SKILL.md.j2",
-        "skills/verify-before-completion/SKILL.md",
-        {"name": "verify-before-completion"},
-    ),
-    # 24 — autoloop-driver skill (required by /hm:loop on every preset)
-    (
-        "skills/autoloop-driver/SKILL.md.j2",
-        "skills/autoloop-driver/SKILL.md",
-        {"name": "autoloop-driver"},
-    ),
-    # 25 — autoloop-coder agent (Side also exposes /hm:loop, so needs the worker)
-    (
-        "agents/autoloop-coder.md.j2",
-        "agents/autoloop-coder.md",
-        {"name": "autoloop-coder"},
-    ),
-    # 26 — ai-readiness-rubric (Health 6-dim — used by /hm:monitor on every preset)
-    (
-        "skills/ai-readiness-rubric/SKILL.md.j2",
-        "skills/ai-readiness-rubric/SKILL.md",
-        {"name": "ai-readiness-rubric"},
-    ),
-    # 27 — agent-quality-rubric (Bronze auto-flag — used by /hm:monitor everywhere)
-    (
-        "skills/agent-quality-rubric/SKILL.md.j2",
-        "skills/agent-quality-rubric/SKILL.md",
-        {"name": "agent-quality-rubric"},
-    ),
-    # 28 — Side gets one reviewer agent
-    ("agents/code-reviewer.md.j2", "agents/code-reviewer.md", {"name": "code-reviewer"}),
-    # 25 — hooks
-    ("hooks/hooks.json.j2", "hooks/hooks.json", {}),
-    # 26 — observability dashboard
-    ("observability/dashboard.ko.md.j2", "observability/dashboard.md", {}),
-]
-# Side base = 26; +1 workflow (dev) → 27 files (in 25-30 range)
+def _agent_files() -> list[FileSpec]:
+    return [
+        (f"agents/{n}.md.j2", f"agents/{n}.md", {"name": n}) for n in _ALL_AGENTS
+    ]
 
 
-_PRODUCTION_SKILLS: list[str] = [
-    "conditional-router",
-    # ai-readiness-rubric + agent-quality-rubric are now in SIDE_FILES.
-    "relevance-filter",
-    "worktree-isolator",
-    "security-scanner",
-    "context-linter",
-]
-
-_PRODUCTION_AGENTS: list[str] = [
-    "security-reviewer",
-    "security-auditor",
-    "performance-reviewer",
-    "ux-reviewer",
-    "concurrency-reviewer",
-    "consensus-arbiter",
-    # autoloop-coder is now in SIDE_FILES (every preset exposes /hm:loop).
-    "executor",
-]
+def _skill_files() -> list[FileSpec]:
+    return [
+        (
+            f"skills/{n}/SKILL.md.j2",
+            f"skills/{n}/SKILL.md",
+            {"name": n},
+        )
+        for n in _ALL_SKILLS
+    ]
 
 
-PRODUCTION_FILES: list[FileSpec] = [
-    *SIDE_FILES,
-    # 7 extra skills
-    *[(f"skills/{n}/SKILL.md.j2", f"skills/{n}/SKILL.md", {"name": n}) for n in _PRODUCTION_SKILLS],
-    # 8 extra agents
-    *[(f"agents/{n}.md.j2", f"agents/{n}.md", {"name": n}) for n in _PRODUCTION_AGENTS],
-]
-# Production base = 26 + 7 + 8 = 41; +4 workflows (dev/quick/careful/audit) → 45
+def _base_files(preset: Preset) -> list[FileSpec]:
+    """Shared base: stages + atomic commands + all agents/skills + fixed assets.
+
+    The only preset-dependent files are harness.yaml, settings.json, and
+    CLAUDE.md (which currently share a Side/Production split per locale).
+    """
+    yaml_template = (
+        "harness-yaml/Side.yaml.j2"
+        if preset == Preset.SIDE
+        else "harness-yaml/Production.yaml.j2"
+    )
+    settings_template = (
+        "settings/Side.json.j2"
+        if preset == Preset.SIDE
+        else "settings/Production.json.j2"
+    )
+    return [
+        (yaml_template, "harness.yaml", {}),
+        (settings_template, "settings.json", {}),
+        ("claude-md/Side.ko.md.j2", "../CLAUDE.md", {}),
+        ("memory/failures.ko.md.j2", "memory/failures.md", {}),
+        ("memory/wiki.ko.md.j2", "memory/wiki.md", {}),
+        *_stage_files(),
+        *_atomic_command_files(),
+        ("commands/hm/loop.md.j2", "commands/hm/loop.md", {}),
+        ("commands/hm/monitor.md.j2", "commands/hm/monitor.md", {}),
+        ("commands/hm/refresh.md.j2", "commands/hm/refresh.md", {}),
+        *_skill_files(),
+        *_agent_files(),
+        ("hooks/hooks.json.j2", "hooks/hooks.json", {}),
+        ("observability/dashboard.ko.md.j2", "observability/dashboard.md", {}),
+    ]
+
+
+# Public skeletons retained for backwards-compat counts in tests; both presets
+# now install the full inventory.
+SIDE_FILES: list[FileSpec] = _base_files(Preset.SIDE)
+PRODUCTION_FILES: list[FileSpec] = _base_files(Preset.PRODUCTION)
 
 
 def _workflow_command_files(
-    workflow_names: list[str],
-    workflows: dict[str, list[AtomicStage]],
+    fused_workflows: dict[str, list[AtomicStage]],
 ) -> list[FileSpec]:
     """Build a FileSpec per workflow with the fused body in context."""
     out: list[FileSpec] = []
-    for name in workflow_names:
-        stages = workflows.get(name, _stages_for_workflow(name))
+    for name, stages in fused_workflows.items():
         body = fuse(stages, name)
         out.append(
             (
@@ -225,30 +176,21 @@ def synthesize(
 ) -> Blueprint:
     """Map preset+answers to a deterministic Blueprint.
 
-    If `preset` not given, derives from answers: 'single' consensus → Side, else Production.
-    Workflow command FileEntries are generated dynamically from
-    answers.workflow_names (per Phase 6 amendment §B).
+    `preset` argument is honored if given; otherwise `answers.preset` wins.
+    Workflow command FileEntries are generated from `answers.fused_workflows`.
     """
-    if preset is None:
-        preset = Preset.SIDE if answers.consensus == "single" else Preset.PRODUCTION
+    effective_preset = preset or answers.preset
+    base_specs = _base_files(effective_preset)
 
-    base_specs = SIDE_FILES if preset == Preset.SIDE else PRODUCTION_FILES
-
-    # Resolve per-workflow stage list from the preset recipe.
-    workflows: dict[str, list[AtomicStage]] = {
-        name: _stages_for_workflow(name) for name in answers.workflow_names
-    }
-
-    # Append dynamic workflow command FileSpecs to the static base.
     file_specs: list[FileSpec] = [
         *base_specs,
-        *_workflow_command_files(answers.workflow_names, workflows),
+        *_workflow_command_files(answers.fused_workflows),
     ]
 
     config = HarnessConfig(
         locale=Locale.KO,
-        preset=preset,
-        workflows=workflows,
+        preset=effective_preset,
+        workflows=dict(answers.fused_workflows),
         default_workflow=answers.default_workflow,
         caching=answers.caching,
         autoloop=answers.autoloop,
@@ -258,19 +200,29 @@ def synthesize(
         security=answers.security,
         context_lint=answers.context_lint,
         models=answers.models,
-        reviewers={"list": answers.reviewers, "consensus": answers.consensus},
+        reviewers={
+            "installed": answers.reviewers.get("installed", []),
+            "enabled": answers.reviewers.get("enabled", []),
+            "consensus": answers.consensus,
+        },
     )
 
-    # Build a context payload that's stable across runs.
     config_dump = config.model_dump(mode="json")
+    # Skills inventory + enabled list aren't part of HarnessConfig today, but
+    # templates need them; expose via per-file context.
+    skills_dump = {
+        "installed": answers.skills.get("installed", []),
+        "enabled": answers.skills.get("enabled", []),
+    }
     files = [
         FileEntry(
             path=Path(out_path),
             template=tpl,
             context={
                 **ctx,
-                "preset": preset.value,
+                "preset": effective_preset.value,
                 "config": config_dump,
+                "skills": skills_dump,
                 "stack": profile.stack,
                 "scale": profile.scale,
                 "lifecycle": profile.lifecycle,

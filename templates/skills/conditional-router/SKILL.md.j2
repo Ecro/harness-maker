@@ -28,7 +28,8 @@ Path-substring match (case-insensitive). A single file may match multiple rules.
 | `thread`, `isr`, `worker`, `async`     | concurrency-reviewer   |
 | (always)                               | code-reviewer          |
 
-If `routing != 'conditional'`, every reviewer in `reviewers.list` runs.
+If `routing != 'conditional'`, every reviewer in `reviewers.enabled` runs
+(plus any extras passed via `--with-reviewers=<csv>` on the workflow command).
 
 ## Selection Constraints
 

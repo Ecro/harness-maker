@@ -29,8 +29,11 @@ conditionally-routed) and walk the code paths that the change touches.
 ## Procedure
 
 1. Determine reviewer set:
-   - `routing: always-all` → invoke every reviewer in `reviewers.list`
+   - Start from `harness.yaml`'s `reviewers.enabled`
+   - `routing: always-all` → invoke every enabled reviewer
    - `routing: conditional` → use Conditional Router on the changed files
+   - Add any extras passed via `--with-reviewers=<csv>` on the workflow command
+     (must be present in `reviewers.installed`)
 2. For each reviewer:
    - Read the diff with full context (use Read on changed files end-to-end,
      not just the patch)

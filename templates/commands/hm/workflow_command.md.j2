@@ -1,1 +1,22 @@
 {{ fused_body | default('# /hm:' + workflow_name) }}
+
+---
+
+## Inline overrides
+
+Extra reviewers/skills can be activated for one invocation by passing flags:
+
+    /hm:{{ workflow_name }} <task description> --with-reviewers=security-reviewer,performance-reviewer
+    /hm:{{ workflow_name }} <task description> --with-skills=context-linter
+
+Recognised flags parsed from `$ARGUMENTS`:
+
+- `--with-reviewers=<csv>` — additionally activate these reviewers (must be in
+  `harness.yaml`'s `reviewers.installed` list).
+- `--with-skills=<csv>` — additionally activate these skills (must be in
+  `harness.yaml`'s `skills.installed` list).
+
+Flags are additive to the harness defaults (`reviewers.enabled` /
+`skills.enabled`) and apply only to this run. Unknown identifiers are warned
+and ignored. The flags themselves are stripped from `$ARGUMENTS` before the
+fused stages read the user's task description.

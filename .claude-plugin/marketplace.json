@@ -1,0 +1,7 @@
+{
+  "name": "harness-maker-local",
+  "owner": { "name": "noel" },
+  "plugins": [
+    { "name": "harness-maker", "source": "./" }
+  ]
+}

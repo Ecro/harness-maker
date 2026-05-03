@@ -15,12 +15,14 @@ def _profile(scale: str = "small", lifecycle: str = "experiment") -> ProjectProf
     )
 
 
+def test_side_and_production_install_full_inventory() -> None:
+    """Both presets install the same skill+agent inventory; counts match."""
+    assert len(SIDE_FILES) == len(PRODUCTION_FILES)
+
+
 def test_side_file_count_in_range() -> None:
-    assert 25 <= len(SIDE_FILES) <= 30
-
-
-def test_production_file_count_in_range() -> None:
-    assert 35 <= len(PRODUCTION_FILES) <= 45
+    # 17 atomic+stages+fixed + 9 agents + 10 skills + harness/settings/CLAUDE/memory/hooks/dashboard
+    assert 40 <= len(SIDE_FILES) <= 50
 
 
 def test_synthesize_side_returns_blueprint() -> None:
@@ -29,8 +31,8 @@ def test_synthesize_side_returns_blueprint() -> None:
     bp = synthesize(p, a)
     assert isinstance(bp, Blueprint)
     assert bp.config.preset == Preset.SIDE
-    # Phase 6: workflow commands are dynamic, so total = static base + N workflows
-    assert len(bp.files) == len(SIDE_FILES) + len(a.workflow_names)
+    # Total = static base + N fused workflow command files
+    assert len(bp.files) == len(SIDE_FILES) + len(a.fused_workflows)
     for f in bp.files:
         assert isinstance(f, FileEntry)
         assert f.template
@@ -43,15 +45,14 @@ def test_synthesize_production_via_explicit_preset() -> None:
     a = interview(p, autoloop_mode=True)
     bp = synthesize(p, a, preset=Preset.PRODUCTION)
     assert bp.config.preset == Preset.PRODUCTION
-    assert len(bp.files) == len(PRODUCTION_FILES) + len(a.workflow_names)
+    assert len(bp.files) == len(PRODUCTION_FILES) + len(a.fused_workflows)
 
 
-def test_synthesize_auto_derives_production_from_consensus() -> None:
+def test_synthesize_uses_answers_preset_when_unset() -> None:
     p = _profile(scale="medium", lifecycle="active")
     a = interview(p, autoloop_mode=True)
-    # autoloop on a medium/active profile selects 'cross-check' → Production
     bp = synthesize(p, a)
-    assert bp.config.preset == Preset.PRODUCTION
+    assert bp.config.preset == a.preset == Preset.PRODUCTION
 
 
 def test_synthesize_deterministic_across_runs() -> None:
@@ -72,13 +73,14 @@ def test_synthesize_includes_harness_yaml_and_settings_json() -> None:
     assert "settings.json" in paths
 
 
-def test_synthesize_atomic_command_count() -> None:
+def test_synthesize_fused_workflow_command_count() -> None:
+    """Side starter set has 3 fused workflows + 7 atomic + 3 fixed = 13 commands/hm/."""
     p = _profile()
     a = interview(p, autoloop_mode=True)
     bp = synthesize(p, a)
-    atomic_paths = [str(f.path) for f in bp.files if str(f.path).startswith("commands/hm/")]
-    # Side: 7 atomic + 1 workflow (dev) + 3 fixed (loop, monitor, refresh) = 11
-    assert len(atomic_paths) == 11
+    cmd_paths = [str(f.path) for f in bp.files if str(f.path).startswith("commands/hm/")]
+    expected = 7 + 3 + len(a.fused_workflows)  # atomic + (loop/monitor/refresh) + fused
+    assert len(cmd_paths) == expected
 
 
 def test_synthesize_context_carries_preset() -> None:
@@ -87,3 +89,14 @@ def test_synthesize_context_carries_preset() -> None:
     bp = synthesize(p, a)
     for f in bp.files:
         assert f.context["preset"] == bp.config.preset.value
+
+
+def test_synthesize_emits_skills_context() -> None:
+    """Per-file context exposes skills installed/enabled for templates."""
+    p = _profile()
+    a = interview(p, autoloop_mode=True)
+    bp = synthesize(p, a)
+    for f in bp.files:
+        assert "skills" in f.context
+        assert "installed" in f.context["skills"]
+        assert "enabled" in f.context["skills"]

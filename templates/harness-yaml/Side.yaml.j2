@@ -7,6 +7,19 @@ workflows:
   {{ name }}:
 {% for s in stages %}    - {{ s }}
 {% endfor %}{% endfor %}
+reviewers:
+  consensus: {{ config.reviewers.consensus }}
+  installed:
+{% for r in config.reviewers.installed %}    - {{ r }}
+{% endfor %}  enabled:
+{% for r in config.reviewers.enabled %}    - {{ r }}
+{% endfor %}
+skills:
+  installed:
+{% for s in skills.installed %}    - {{ s }}
+{% endfor %}  enabled:
+{% for s in skills.enabled %}    - {{ s }}
+{% endfor %}
 worktree:
   scope: [execute]
   branch_prefix: hm-

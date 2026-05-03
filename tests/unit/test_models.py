@@ -182,9 +182,11 @@ def test_project_profile_custom() -> None:
 
 def test_interview_answers_defaults() -> None:
     ans = InterviewAnswers()
-    assert ans.workflow_names == ["dev"]
-    assert ans.default_workflow == "dev"
-    assert ans.reviewers == []
+    assert ans.preset.value == "Side"
+    assert "exec-rev-wrap" in ans.fused_workflows
+    assert ans.default_workflow == "exec-rev-wrap"
+    assert ans.reviewers == {"installed": [], "enabled": []}
+    assert ans.skills == {"installed": [], "enabled": []}
     assert ans.consensus == "single"
     assert ans.caching == "agent-aware"
 

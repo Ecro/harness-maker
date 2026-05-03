@@ -9,8 +9,16 @@ workflows:
 {% endfor %}{% endfor %}
 reviewers:
   consensus: {{ config.reviewers.consensus }}
-  list:
-{% for r in config.reviewers.list %}    - {{ r }}
+  installed:
+{% for r in config.reviewers.installed %}    - {{ r }}
+{% endfor %}  enabled:
+{% for r in config.reviewers.enabled %}    - {{ r }}
+{% endfor %}
+skills:
+  installed:
+{% for s in skills.installed %}    - {{ s }}
+{% endfor %}  enabled:
+{% for s in skills.enabled %}    - {{ s }}
 {% endfor %}
 worktree:
   scope: [execute, plan]

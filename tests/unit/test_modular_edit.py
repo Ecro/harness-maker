@@ -47,8 +47,8 @@ def test_add_reviewer_idempotent(tmp_path: Path) -> None:
         end = text.find("\n---\n", 4)
         text = text[end + 5 :]
     config = yaml.safe_load(text)
-    rev_list = config["reviewers"]["list"]
-    assert rev_list.count("security-reviewer") == 1
+    enabled = config["reviewers"]["enabled"]
+    assert enabled.count("security-reviewer") == 1
 
 
 def test_add_invalid_component_raises(tmp_path: Path) -> None:
@@ -87,4 +87,4 @@ def test_add_updates_harness_yaml(tmp_path: Path) -> None:
         end = text.find("\n---\n", 4)
         text = text[end + 5 :]
     config = yaml.safe_load(text)
-    assert "security-reviewer" in config["reviewers"]["list"]
+    assert "security-reviewer" in config["reviewers"]["enabled"]

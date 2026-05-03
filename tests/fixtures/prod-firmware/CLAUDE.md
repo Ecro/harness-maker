@@ -4,7 +4,7 @@ harness_maker_version: 0.1.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: claude-md/Side.ko.md.j2
 provenance: official
-content_hash: 826f853e66340943e9b458eb2facd2ca9bda0447df4973e05eeb59940dc6a355
+content_hash: dba240734cf1d9a81c99b7613e222ebdfa5386872e72b1106ace2af1032dc03c
 ---
 # CLAUDE.md — Production preset
 
@@ -12,11 +12,11 @@ content_hash: 826f853e66340943e9b458eb2facd2ca9bda0447df4973e05eeb59940dc6a355
 
 ## 워크플로우
 
-기본: `/hm:dev` — atomic stage들을 묶은 워크플로우.
+기본: `/hm:exec-rev-wrap-ver` — atomic stage들을 묶은 워크플로우.
 
 ## 캐싱
 
-`session+agent` — Phase 6에서 prompt cache 전략 문서화.
+`agent-aware` — Phase 6에서 prompt cache 전략 문서화.
 
 ## 메모리
 

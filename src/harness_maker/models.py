@@ -47,6 +47,29 @@ class AtomicStage(str, Enum):  # noqa: UP042
     VERIFY = "verify"
 
 
+# Slash-command-friendly abbreviations used to derive transparent fused workflow
+# names like `exec-rev-wrap`. Joined with `-` so each stage stays visible.
+STAGE_ABBREV: dict[AtomicStage, str] = {
+    AtomicStage.RESEARCH: "res",
+    AtomicStage.SPEC: "spec",
+    AtomicStage.PLAN: "plan",
+    AtomicStage.EXECUTE: "exec",
+    AtomicStage.REVIEW: "rev",
+    AtomicStage.WRAPUP: "wrap",
+    AtomicStage.VERIFY: "ver",
+}
+
+
+def auto_workflow_name(stages: list[AtomicStage]) -> str:
+    """Build a transparent slash-friendly name from stage abbreviations."""
+    return "-".join(STAGE_ABBREV[s] for s in stages)
+
+
+def _empty_install_enabled() -> dict[str, list[str]]:
+    """Default factory: typed empty {installed: [], enabled: []}."""
+    return {"installed": [], "enabled": []}
+
+
 class ReconcileDecision(str, Enum):  # noqa: UP042
     """Brownfield reconcile decision per conflicting file."""
 
@@ -183,9 +206,28 @@ class InterviewAnswers(BaseModel):
 
     model_config = ConfigDict(strict=True, extra="forbid")
 
-    workflow_names: list[str] = Field(default_factory=lambda: ["dev"])
-    default_workflow: str = "dev"
-    reviewers: list[str] = Field(default_factory=list)
+    preset: Preset = Preset.SIDE
+    # Map of user-named workflow → ordered atomic stages. Names are typically
+    # auto-derived via STAGE_ABBREV (e.g. `exec-rev-wrap`) but user can override.
+    fused_workflows: dict[str, list[AtomicStage]] = Field(
+        default_factory=lambda: {
+            "exec-rev-wrap": [
+                AtomicStage.EXECUTE,
+                AtomicStage.REVIEW,
+                AtomicStage.WRAPUP,
+            ],
+        },
+    )
+    default_workflow: str = "exec-rev-wrap"
+    # All reviewers/skills are installed regardless of preset; `enabled` lists
+    # govern which ones the harness activates by default. Per-task override is
+    # via inline flags on the workflow command (e.g. --with-reviewers=...).
+    reviewers: dict[str, list[str]] = Field(
+        default_factory=_empty_install_enabled,
+    )
+    skills: dict[str, list[str]] = Field(
+        default_factory=_empty_install_enabled,
+    )
     consensus: str = "single"  # 'single' | 'cross-check' | 'k-of-n'
     caching: str = "agent-aware"
     models: dict[str, Any] = Field(default_factory=dict)
@@ -197,11 +239,11 @@ class InterviewAnswers(BaseModel):
     context_lint: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")
-    def _default_workflow_in_names(self) -> InterviewAnswers:
-        if self.default_workflow not in self.workflow_names:
+    def _default_workflow_in_fused(self) -> InterviewAnswers:
+        if self.default_workflow not in self.fused_workflows:
             msg = (
                 f"default_workflow={self.default_workflow!r} not in "
-                f"workflow_names={self.workflow_names}"
+                f"fused_workflows={sorted(self.fused_workflows)}"
             )
             raise ValueError(msg)
         return self

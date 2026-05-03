@@ -4,7 +4,7 @@ harness_maker_version: 0.1.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: skills/conditional-router/SKILL.md.j2
 provenance: official
-content_hash: 6d9efd8820c20841575f0da107401f7083f8a9a21d98c7b563a3e8a510bf7f59
+content_hash: 66a51ea054727fbeacfa9e8dcee2129c119a16bb4ecff7c56c82ddafd8399954
 ---
 ---
 name: conditional-router
@@ -36,7 +36,8 @@ Path-substring match (case-insensitive). A single file may match multiple rules.
 | `thread`, `isr`, `worker`, `async`     | concurrency-reviewer   |
 | (always)                               | code-reviewer          |
 
-If `routing != 'conditional'`, every reviewer in `reviewers.list` runs.
+If `routing != 'conditional'`, every reviewer in `reviewers.enabled` runs
+(plus any extras passed via `--with-reviewers=<csv>` on the workflow command).
 
 ## Selection Constraints
 

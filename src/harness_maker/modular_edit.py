@@ -137,19 +137,25 @@ def add(component: str, target_dir: Path) -> Path:
     fm, config = _read_harness_yaml(target_dir)
 
     if kind == "reviewer":
-        # Append `<name>-reviewer` to reviewers.list (idempotent).
+        # Activate `<name>-reviewer` in reviewers.enabled (idempotent). The
+        # agent file is always installed; --add only flips activation.
         reviewer_full = f"{name}-reviewer" if not name.endswith("-reviewer") else name
         reviewers = config.setdefault("reviewers", {})
-        rev_list = reviewers.setdefault("list", [])
-        if reviewer_full not in rev_list:
-            rev_list.append(reviewer_full)
+        enabled = reviewers.setdefault("enabled", [])
+        if reviewer_full not in enabled:
+            enabled.append(reviewer_full)
         template = f"agents/{reviewer_full}.md.j2"
         out = Path("agents") / f"{reviewer_full}.md"
         rendered = _render_single_component(template, out, reviewer_full, target_dir, config)
     else:  # skill
-        skills = config.setdefault("skills", [])
-        if name not in skills:
-            skills.append(name)
+        skills = config.setdefault("skills", {})
+        if isinstance(skills, list):
+            # legacy shape — coerce to the new {installed, enabled} dict
+            skills = {"installed": list(skills), "enabled": list(skills)}
+            config["skills"] = skills
+        skills_enabled = skills.setdefault("enabled", [])
+        if name not in skills_enabled:
+            skills_enabled.append(name)
         template = f"skills/{name}/SKILL.md.j2"
         out = Path("skills") / name / "SKILL.md"
         rendered = _render_single_component(template, out, name, target_dir, config)
@@ -175,14 +181,18 @@ def remove(component: str, target_dir: Path) -> Path:
     if kind == "reviewer":
         reviewer_full = f"{name}-reviewer" if not name.endswith("-reviewer") else name
         reviewers = config.setdefault("reviewers", {})
-        rev_list = reviewers.setdefault("list", [])
-        if reviewer_full in rev_list:
-            rev_list.remove(reviewer_full)
+        enabled = reviewers.setdefault("enabled", [])
+        if reviewer_full in enabled:
+            enabled.remove(reviewer_full)
         out = target_dir / "agents" / f"{reviewer_full}.md"
     else:  # skill
-        skills = config.setdefault("skills", [])
-        if name in skills:
-            skills.remove(name)
+        skills = config.setdefault("skills", {})
+        if isinstance(skills, list):
+            skills = {"installed": list(skills), "enabled": list(skills)}
+            config["skills"] = skills
+        skills_enabled = skills.setdefault("enabled", [])
+        if name in skills_enabled:
+            skills_enabled.remove(name)
         out = target_dir / "skills" / name / "SKILL.md"
 
     if out.exists():
