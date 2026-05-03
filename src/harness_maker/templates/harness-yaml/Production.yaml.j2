@@ -15,6 +15,9 @@ workflows:
 reviewers:
   consensus: {{ config.reviewers.consensus }}
   verbosity: {{ config.reviewers.verbosity }}
+  auto_fix: {{ config.reviewers.auto_fix | lower }}
+  grade_threshold: {{ config.reviewers.grade_threshold }}
+  max_review_rounds: {{ config.reviewers.max_review_rounds }}
   installed:
 {% for r in config.reviewers.installed %}    - {{ r }}
 {% endfor %}  enabled:

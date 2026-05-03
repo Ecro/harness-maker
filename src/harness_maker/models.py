@@ -253,6 +253,12 @@ class InterviewAnswers(BaseModel):
         default_factory=_empty_install_enabled,
     )
     consensus: str = "single"  # 'single' | 'cross-check' | 'k-of-n'
+    # Review-stage grade gate — see templates/stages/review.md.j2. Runtime
+    # override via `--no-auto-fix` on the workflow command is prompt-driven
+    # (no code path here).
+    auto_fix: bool = True
+    grade_threshold: str = "A"  # 'A' | 'B' | 'C'
+    max_review_rounds: int = 3
     caching: str = "agent-aware"
     models: dict[str, Any] = Field(default_factory=dict)
     autoloop: dict[str, Any] = Field(default_factory=dict)

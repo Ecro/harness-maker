@@ -4,7 +4,7 @@ harness_maker_version: 0.1.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: 8660b0cc2d6d440f3f85616ad954c54cdd6f4bdcfaa1b603f955bc8f03d66e23
+content_hash: 37e4ea9174ea3cdaf1e3a799e3925791b99aa5aff29a8f23049536dd3fd6a63d
 ---
 # /hm:res-spec-plan
 
@@ -202,6 +202,9 @@ Recognised flags parsed from `$ARGUMENTS`:
   `harness.yaml`'s `reviewers.installed` list).
 - `--with-skills=<csv>` — additionally activate these skills (must be in
   `harness.yaml`'s `skills.installed` list).
+- `--no-auto-fix` — disable the review stage's auto-fix loop for this run
+  (config default in `harness.yaml`'s `reviewers.auto_fix` is unchanged).
+  Findings are still reported; no edits are applied.
 
 Flags are additive to the harness defaults (`reviewers.enabled` /
 `skills.enabled`) and apply only to this run. Unknown identifiers are warned

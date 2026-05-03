@@ -15,6 +15,9 @@ Recognised flags parsed from `$ARGUMENTS`:
   `harness.yaml`'s `reviewers.installed` list).
 - `--with-skills=<csv>` — additionally activate these skills (must be in
   `harness.yaml`'s `skills.installed` list).
+- `--no-auto-fix` — disable the review stage's auto-fix loop for this run
+  (config default in `harness.yaml`'s `reviewers.auto_fix` is unchanged).
+  Findings are still reported; no edits are applied.
 
 Flags are additive to the harness defaults (`reviewers.enabled` /
 `skills.enabled`) and apply only to this run. Unknown identifiers are warned
