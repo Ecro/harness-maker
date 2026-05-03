@@ -22,6 +22,10 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 
+# Python build / venv
+.venv/
+*.egg-info/
+
 # Editor
 .vscode/
 .idea/
