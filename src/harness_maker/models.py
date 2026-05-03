@@ -118,6 +118,19 @@ class CrawlItem(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+class Finding(BaseModel):
+    """One security finding from any of the 5 security gates."""
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    severity: str  # "high" | "medium" | "low"
+    category: str  # "secrets" | "permissions" | "hook_injection" | "cve" | "prompt_injection"
+    file: str = ""
+    line: int = 0
+    evidence: str = ""
+    fix: str = ""
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Composite models
 # ──────────────────────────────────────────────────────────────────────────────

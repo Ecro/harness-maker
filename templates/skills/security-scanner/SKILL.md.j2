@@ -1,15 +1,50 @@
-# {{ name }}
+---
+type: skill
+name: {{ name | default('security-scanner') }}
+description: 5-gate security scan (secrets · permissions · hook injection · CVEs · prompt injection)
+tools: Read, Grep, Glob, Bash
+---
 
-> Phase 3 stub. Full prompt in Phase 6/9.
+# {{ name | default('security-scanner') }}
+
+Orchestrator that runs all 5 security gates against a target project tree and
+persists findings to `.claude/observability/security/findings-<YYYY-MM-DD>.jsonl`.
 
 ## Triggers
 
-- specific keyword match per skill type
+- `/hm:audit` invocation
+- Pre-commit hook on changed `.claude/` assets
+- Autoloop TESTER stage when security gate is configured
 
-## Behavior
+## The 5 Gates
 
-Phase 6/9에서 skill 본문이 채워집니다.
+1. **Secrets** — regex patterns for AWS keys, GitHub PATs, Anthropic API keys,
+   `.env`-style password/secret/token assignments. Severity: high.
+2. **Permissions** — flags catch-all entries (`Bash(*)`, `Write(*)`) and overly
+   broad path patterns in `permissions.allow`. Severity: high (catch-all) /
+   medium (broad path).
+3. **Hook injection** — scans hook commands for `rm -rf`, `curl ... | sh`,
+   `wget ... | bash`, `eval`, reverse-shell `nc`. Severity: high.
+4. **CVEs** — parses `uv.lock` (or `pyproject.toml`) and queries OSV.dev for
+   each package. CVSS ≥ 7 → high; 4-6.9 → medium; < 4 → low.
+5. **Prompt injection** — looks for zero-width / bidi control chars,
+   "ignore previous", "system:" role override, base64 blocks. Severity:
+   high (clear) / medium (soft signal).
+
+## Invocation (Python)
+
+```python
+from pathlib import Path
+from harness_maker.security_scanner import scan_all
+
+findings = scan_all(Path("./target-project"), harness_config=cfg)
+high = [f for f in findings if f.severity == "high"]
+if high and cfg["security"]["on_finding"]["high"] == "block":
+    raise SystemExit("security gate blocked: high-severity findings present")
+```
 
 ## Output
 
-structured findings or actions.
+Aggregated `list[Finding]` (returned) plus persisted JSONL at
+`.claude/observability/security/findings-<date>.jsonl` (one finding per line).
+Each finding has `{severity, category, file, line, evidence, fix}`.

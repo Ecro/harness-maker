@@ -7,7 +7,7 @@ from pathlib import Path
 
 import yaml
 
-from harness_maker.reconcile import parse_frontmatter
+from harness_maker.reconcile import compute_body_hash, parse_frontmatter
 
 
 def _read_json_body(path: Path) -> str:
@@ -57,12 +57,25 @@ def verify(target_dir: Path) -> list[str]:
     if project_claude.exists():
         scan_paths.append(project_claude)
     for md in scan_paths:
-        fm, _ = parse_frontmatter(md)
+        fm, body = parse_frontmatter(md)
+        try:
+            rel = md.relative_to(target_dir)
+        except ValueError:
+            rel = md
         if fm is None or "content_hash" not in fm:
-            try:
-                rel = md.relative_to(target_dir)
-            except ValueError:
-                rel = md
             errors.append(f"{rel}: missing provenance frontmatter")
+            continue
+        # Hash-validity check (Phase 6 carry-over): declared content_hash must
+        # match the actual body hash. Catches manual edits / tampering.
+        declared = fm.get("content_hash")
+        if not isinstance(declared, str):
+            errors.append(f"{rel}: content_hash is not a string")
+            continue
+        actual = compute_body_hash(body)
+        if actual != declared:
+            errors.append(
+                f"{rel}: content_hash mismatch "
+                f"(declared {declared[:8]}, actual {actual[:8]})",
+            )
 
     return errors

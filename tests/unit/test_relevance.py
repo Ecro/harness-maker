@@ -15,7 +15,6 @@ from harness_maker.relevance import (
     score_item,
 )
 
-
 # ─── adaptive_threshold ───────────────────────────────────────────────────────
 
 

@@ -111,7 +111,7 @@ files:
   body_sha256: 5a0ac2ecf85d330b41090e3d21a475747951944a62f9b638ef3beb3ab1dfa90c
 - path: skills/security-scanner/SKILL.md
   template: skills/security-scanner/SKILL.md.j2
-  body_sha256: 9970ab74a48c61512b02019138786a590f7182fd4052f61022d01ef2d79b0148
+  body_sha256: b4528add877b87599a4b7db6133082294b8287a8a45f6f2a0cc6f4b5a54d6f3d
 - path: skills/verify-before-completion/SKILL.md
   template: skills/verify-before-completion/SKILL.md.j2
   body_sha256: d546e51675eec4d25c963eaedb0bc9253e4cee883500137956e6bdb2c3fb807b
