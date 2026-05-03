@@ -1,6 +1,14 @@
 ---
+generated_by: harness-maker
+harness_maker_version: 0.1.0
+generated_at: '2026-01-01T00:00:00+00:00'
+source_template: skills/ai-readiness-rubric/SKILL.md.j2
+provenance: official
 name: ai-readiness-rubric
-description: Compute the Health 6-dimension composite score (docs, tests, CI, observability, security, governance) for a project. Use when /hm:monitor renders the dashboard or /hm:verify needs a baseline comparison. Calls harness_maker.readiness.compute_health.
+description: Compute the Health 6-dimension composite score (docs, tests, CI, observability,
+  security, governance) for a project. Use when /hm:monitor renders the dashboard
+  or /hm:verify needs a baseline comparison. Calls harness_maker.readiness.compute_health.
+content_hash: 7eec86c19e719bff04ce713408dc9821d77f5f2b2d9987cd72740d8a327558c1
 ---
 
 # ai-readiness-rubric

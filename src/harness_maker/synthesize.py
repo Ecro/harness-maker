@@ -134,7 +134,31 @@ SIDE_FILES: list[FileSpec] = [
         "skills/verify-before-completion/SKILL.md",
         {"name": "verify-before-completion"},
     ),
-    # 24 — Side gets one agent
+    # 24 — autoloop-driver skill (required by /hm:loop on every preset)
+    (
+        "skills/autoloop-driver/SKILL.md.j2",
+        "skills/autoloop-driver/SKILL.md",
+        {"name": "autoloop-driver"},
+    ),
+    # 25 — autoloop-coder agent (Side also exposes /hm:loop, so needs the worker)
+    (
+        "agents/autoloop-coder.md.j2",
+        "agents/autoloop-coder.md",
+        {"name": "autoloop-coder"},
+    ),
+    # 26 — ai-readiness-rubric (Health 6-dim — used by /hm:monitor on every preset)
+    (
+        "skills/ai-readiness-rubric/SKILL.md.j2",
+        "skills/ai-readiness-rubric/SKILL.md",
+        {"name": "ai-readiness-rubric"},
+    ),
+    # 27 — agent-quality-rubric (Bronze auto-flag — used by /hm:monitor everywhere)
+    (
+        "skills/agent-quality-rubric/SKILL.md.j2",
+        "skills/agent-quality-rubric/SKILL.md",
+        {"name": "agent-quality-rubric"},
+    ),
+    # 28 — Side gets one reviewer agent
     ("agents/code-reviewer.md.j2", "agents/code-reviewer.md", {"name": "code-reviewer"}),
     # 25 — hooks
     ("hooks/hooks.json.j2", "hooks/hooks.json", {}),
@@ -146,8 +170,7 @@ SIDE_FILES: list[FileSpec] = [
 
 _PRODUCTION_SKILLS: list[str] = [
     "conditional-router",
-    "ai-readiness-rubric",
-    "agent-quality-rubric",
+    # ai-readiness-rubric + agent-quality-rubric are now in SIDE_FILES.
     "relevance-filter",
     "worktree-isolator",
     "security-scanner",
@@ -161,7 +184,7 @@ _PRODUCTION_AGENTS: list[str] = [
     "ux-reviewer",
     "concurrency-reviewer",
     "consensus-arbiter",
-    "autoloop-coder",
+    # autoloop-coder is now in SIDE_FILES (every preset exposes /hm:loop).
     "executor",
 ]
 

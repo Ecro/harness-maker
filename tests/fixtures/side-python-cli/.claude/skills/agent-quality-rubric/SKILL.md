@@ -1,6 +1,14 @@
 ---
+generated_by: harness-maker
+harness_maker_version: 0.1.0
+generated_at: '2026-01-01T00:00:00+00:00'
+source_template: skills/agent-quality-rubric/SKILL.md.j2
+provenance: official
 name: agent-quality-rubric
-description: Score an agent .md file as Platinum/Gold/Silver/Bronze. Use when /hm:monitor drills into agent quality or when a Bronze-tier agent should be auto-registered as an anti-rot patch candidate. Calls harness_maker.agent_quality.score_agent.
+description: Score an agent .md file as Platinum/Gold/Silver/Bronze. Use when /hm:monitor
+  drills into agent quality or when a Bronze-tier agent should be auto-registered
+  as an anti-rot patch candidate. Calls harness_maker.agent_quality.score_agent.
+content_hash: 1666f4aca4f150fd3ee449162cee70752e684517eda5046dbcf6e2af78453270
 ---
 
 # agent-quality-rubric

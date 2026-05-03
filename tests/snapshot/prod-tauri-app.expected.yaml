@@ -1,5 +1,5 @@
 preset: Production
-file_count: 45
+file_count: 46
 files:
 - path: ../CLAUDE.md
   template: claude-md/Side.ko.md.j2
@@ -45,7 +45,7 @@ files:
   body_sha256: c28c5fdb500ced20194473813831a430df31153a9f4f168aa5f4564ae5601ee2
 - path: commands/hm/loop.md
   template: commands/hm/loop.md.j2
-  body_sha256: b8bcecaa054a4d85d2c30a6e499011273e55758d7f3f485eea995a2f97dbe5f5
+  body_sha256: a0f9931faa984dc7a1fabc1906810f33dc036c7a7560c15639103a613e94fd00
 - path: commands/hm/monitor.md
   template: commands/hm/monitor.md.j2
   body_sha256: c12b4fbff532ceed89daa1cc759668411af7b5b3d7abedef624682ad69aded5a
@@ -93,10 +93,13 @@ files:
   body_sha256: 36c7e00f3bed5f3c5cb1d98e205032b8ab1d2a74b1a0cae64b43a9d4c216b779
 - path: skills/agent-quality-rubric/SKILL.md
   template: skills/agent-quality-rubric/SKILL.md.j2
-  body_sha256: 2ab9268cce5131005239761b28af044742601c917fa11e9a20da3d9a461649b9
+  body_sha256: 1666f4aca4f150fd3ee449162cee70752e684517eda5046dbcf6e2af78453270
 - path: skills/ai-readiness-rubric/SKILL.md
   template: skills/ai-readiness-rubric/SKILL.md.j2
-  body_sha256: 9ac3363a1c90526474a0835914c3e0d2dba5f018d4c385038b40380097bb01a4
+  body_sha256: 7eec86c19e719bff04ce713408dc9821d77f5f2b2d9987cd72740d8a327558c1
+- path: skills/autoloop-driver/SKILL.md
+  template: skills/autoloop-driver/SKILL.md.j2
+  body_sha256: 4605f90a75813ddb786478f49ff7c8b8bba2fab94d4274b2d102dad70af86e22
 - path: skills/conditional-router/SKILL.md
   template: skills/conditional-router/SKILL.md.j2
   body_sha256: 6d9efd8820c20841575f0da107401f7083f8a9a21d98c7b563a3e8a510bf7f59
@@ -111,7 +114,7 @@ files:
   body_sha256: 9970ab74a48c61512b02019138786a590f7182fd4052f61022d01ef2d79b0148
 - path: skills/verify-before-completion/SKILL.md
   template: skills/verify-before-completion/SKILL.md.j2
-  body_sha256: a7dfd626f84ca188497af09c0753410cc4ff3c776088edd80af63a5acf263d9c
+  body_sha256: d546e51675eec4d25c963eaedb0bc9253e4cee883500137956e6bdb2c3fb807b
 - path: skills/worktree-isolator/SKILL.md
   template: skills/worktree-isolator/SKILL.md.j2
   body_sha256: a209f510b4383190c77630dc2908ffbeceb6bbab57f85c0178f90a8c43c0bc5e
