@@ -104,6 +104,20 @@ class ConflictItem(BaseModel):
     reason: str | None = None
 
 
+class CrawlItem(BaseModel):
+    """One refreshed item from a crawler source (Anthropic blog, GitHub releases, arxiv, OSV)."""
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    source: str  # "anthropic_blog" | "github_releases" | "arxiv" | "osv_dev"
+    item_id: str  # URL or unique id
+    title: str
+    summary: str = ""
+    published: str | None = None  # ISO date
+    score: float = 0.0  # relevance score [0,1]
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Composite models
 # ──────────────────────────────────────────────────────────────────────────────

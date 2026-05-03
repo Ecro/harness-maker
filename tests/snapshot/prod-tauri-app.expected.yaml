@@ -57,7 +57,7 @@ files:
   body_sha256: dd2b2264de7ba195d68b17bf1d8ce63be7ed656abaf100c2524b6043f5a5d596
 - path: commands/hm/refresh.md
   template: commands/hm/refresh.md.j2
-  body_sha256: 5ff60e9ab8269f4d825fb4f11c4fd879e9e0425e58c2e34debe53925aab3f7ec
+  body_sha256: 5bb4ff81abb54ef83c3c48bbb7e585f5371f6bc6c15a21e57cd0967732f2dbf3
 - path: commands/hm/research.md
   template: commands/hm/atomic_command.md.j2
   body_sha256: ee26b410ecec73bb8de51e09edeb1bd55d66279c2e26dd4abb0738e50191a453
@@ -105,7 +105,7 @@ files:
   body_sha256: 587bba008a1b78b45430428a98b71bd05c153f67449a80ee2da9409def7aa80f
 - path: skills/relevance-filter/SKILL.md
   template: skills/relevance-filter/SKILL.md.j2
-  body_sha256: a8cfba563f13cb07bd017213c3965df563571c842dbec43f251371258e8cc8c3
+  body_sha256: 5a0ac2ecf85d330b41090e3d21a475747951944a62f9b638ef3beb3ab1dfa90c
 - path: skills/security-scanner/SKILL.md
   template: skills/security-scanner/SKILL.md.j2
   body_sha256: 9970ab74a48c61512b02019138786a590f7182fd4052f61022d01ef2d79b0148
