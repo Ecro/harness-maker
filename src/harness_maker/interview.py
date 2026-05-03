@@ -1,13 +1,13 @@
 """Interview the user (or accept defaults) to derive InterviewAnswers from a profile.
 
-New flow (replaces v0.1 single-question prompt):
+Question order:
 
-    1. Confirm preset (Side / Production) — recommended based on profile.
-    2. Show 7 atomic stages + recommended starter set of fused workflows.
-       User accepts the starter set or defines custom (loop, comma-separated
-       stage numbers, optional name override).
-    3. Pick default workflow (the one /hm:<name> the user runs most).
-    4. consensus + caching (preset defaults shown).
+    1. locale (free-text, default ``en``; ``en``/``ko`` ship with built-in i18n).
+    2. preset (Side / Production) — recommended based on profile.
+    3. dev_mode (spec-driven / task-driven) — independent of preset; default
+       per preset (Side→task-driven, Production→spec-driven). Any cross OK.
+    4. fused workflows + default workflow.
+    5. consensus + caching (preset defaults shown).
 
 Skills and agents are always installed in full; the `enabled` lists in the
 returned answers govern default activation. Users can override per-task with
@@ -20,12 +20,17 @@ from typing import Any
 
 from harness_maker.models import (
     AtomicStage,
+    DevMode,
     InterviewAnswers,
     Preset,
     ProjectProfile,
     auto_workflow_name,
 )
 from harness_maker.validators import validate_workflow_name
+
+# Locales we ship i18n catalogs for; users can type any tag (free text).
+_BUILTIN_LOCALES: tuple[str, ...] = ("en", "ko")
+_DEFAULT_LOCALE = "en"
 
 # Stages displayed 1-indexed in the interview.
 _STAGES: list[AtomicStage] = list(AtomicStage)
@@ -120,7 +125,9 @@ def interview(
     recommended = _recommend_preset(profile)
     if autoloop_mode:
         return _build_answers(
+            locale=_DEFAULT_LOCALE,
             preset=recommended,
+            dev_mode=_recommend_dev_mode(recommended),
             fused_workflows=_starter_for(recommended),
             default_workflow=_default_for(recommended),
         )
@@ -129,17 +136,65 @@ def interview(
         f"\nDetected: stack={profile.stack}, scale={profile.scale}, "
         f"lifecycle={profile.lifecycle}",
     )
+    locale = _ask_locale()
     preset = _ask_preset(recommended)
+    dev_mode = _ask_dev_mode(preset)
     fused, default_name = _ask_fused_workflows(preset)
     consensus = _ask_with_default("consensus", _consensus_for(preset))
     caching = _ask_with_default("caching", "agent-aware")
     return _build_answers(
+        locale=locale,
         preset=preset,
+        dev_mode=dev_mode,
         fused_workflows=fused,
         default_workflow=default_name,
         consensus=consensus,
         caching=caching,
     )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Locale (first question)
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def _ask_locale() -> str:
+    """Free-text locale tag; en/ko shipped, others accepted with en fallback."""
+    builtins_label = "/".join(_BUILTIN_LOCALES)
+    raw = _input_or_empty(
+        f"Interface language [{builtins_label} or any tag] ({_DEFAULT_LOCALE}): ",
+    )
+    cleaned = raw.strip()
+    return cleaned or _DEFAULT_LOCALE
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Dev mode (independent axis; recommended per preset, any cross allowed)
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def _recommend_dev_mode(preset: Preset) -> DevMode:
+    """Side defaults to task-driven (lighter), Production defaults to spec-driven."""
+    return DevMode.TASK_DRIVEN if preset == Preset.SIDE else DevMode.SPEC_DRIVEN
+
+
+def _ask_dev_mode(preset: Preset) -> DevMode:
+    recommended = _recommend_dev_mode(preset)
+    other = (
+        DevMode.SPEC_DRIVEN
+        if recommended == DevMode.TASK_DRIVEN
+        else DevMode.TASK_DRIVEN
+    )
+    label = f"dev_mode [{recommended.value} / {other.value}]"
+    raw = _input_or_empty(f"{label} ({recommended.value}): ")
+    cleaned = raw.strip().lower()
+    if not cleaned:
+        return recommended
+    if cleaned.startswith(("s", "spec")):
+        return DevMode.SPEC_DRIVEN
+    if cleaned.startswith(("t", "task")):
+        return DevMode.TASK_DRIVEN
+    return recommended
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -288,7 +343,9 @@ def _ask_with_default(label: str, default: str) -> str:
 
 def _build_answers(
     *,
+    locale: str,
     preset: Preset,
+    dev_mode: DevMode,
     fused_workflows: dict[str, list[AtomicStage]],
     default_workflow: str,
     consensus: str | None = None,
@@ -296,7 +353,9 @@ def _build_answers(
 ) -> InterviewAnswers:
     is_side = preset == Preset.SIDE
     return InterviewAnswers(
+        locale=locale,
         preset=preset,
+        dev_mode=dev_mode,
         fused_workflows=fused_workflows,
         default_workflow=default_workflow,
         reviewers={

@@ -14,7 +14,12 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 class Locale(str, Enum):  # noqa: UP042
-    """Supported user-facing locales."""
+    """Built-in locales with first-class i18n catalogs.
+
+    The ``HarnessConfig.locale`` field is a free-text ``str`` (any tag accepted),
+    so users can request locales we don't yet ship messages for. ``i18n.t()``
+    silently falls back to English for unknown locales.
+    """
 
     KO = "ko"
     EN = "en"
@@ -25,6 +30,17 @@ class Preset(str, Enum):  # noqa: UP042
 
     SIDE = "Side"
     PRODUCTION = "Production"
+
+
+class DevMode(str, Enum):  # noqa: UP042
+    """Development methodology — independent of preset depth.
+
+    spec-driven enforces SPEC + tests via spec-gate hook; task-driven omits the
+    spec-gate hook entirely. Any preset×dev_mode cross is allowed.
+    """
+
+    SPEC_DRIVEN = "spec-driven"
+    TASK_DRIVEN = "task-driven"
 
 
 class ModelTier(str, Enum):  # noqa: UP042
@@ -164,8 +180,11 @@ class HarnessConfig(BaseModel):
 
     model_config = ConfigDict(strict=True, extra="forbid")
 
-    locale: Locale = Locale.KO
+    # Free-text locale tag. en/ko ship with built-in i18n catalogs; unknown
+    # tags fall back to English in i18n.t().
+    locale: str = "en"
     preset: Preset = Preset.SIDE
+    dev_mode: DevMode = DevMode.SPEC_DRIVEN
     workflows: dict[str, list[AtomicStage]] = Field(
         default_factory=lambda: {
             "dev": [
@@ -190,6 +209,8 @@ class HarnessConfig(BaseModel):
     worktree: dict[str, Any] = Field(default_factory=dict)
     security: dict[str, Any] = Field(default_factory=dict)
     context_lint: dict[str, Any] = Field(default_factory=dict)
+    project: dict[str, Any] = Field(default_factory=lambda: {"domains": []})
+    spec: dict[str, Any] = Field(default_factory=lambda: {"dir": "specs/"})
 
 
 class Blueprint(BaseModel):
@@ -206,7 +227,9 @@ class InterviewAnswers(BaseModel):
 
     model_config = ConfigDict(strict=True, extra="forbid")
 
+    locale: str = "en"
     preset: Preset = Preset.SIDE
+    dev_mode: DevMode = DevMode.SPEC_DRIVEN
     # Map of user-named workflow → ordered atomic stages. Names are typically
     # auto-derived via STAGE_ABBREV (e.g. `exec-rev-wrap`) but user can override.
     fused_workflows: dict[str, list[AtomicStage]] = Field(

@@ -7,7 +7,13 @@ from collections.abc import Iterator
 import pytest
 
 from harness_maker.interview import interview
-from harness_maker.models import AtomicStage, InterviewAnswers, Preset, ProjectProfile
+from harness_maker.models import (
+    AtomicStage,
+    DevMode,
+    InterviewAnswers,
+    Preset,
+    ProjectProfile,
+)
 
 
 def _profile(scale: str = "small", lifecycle: str = "experiment") -> ProjectProfile:
@@ -24,6 +30,7 @@ def _profile(scale: str = "small", lifecycle: str = "experiment") -> ProjectProf
 def test_interview_autoloop_returns_typed_answers() -> None:
     result = interview(_profile(), autoloop_mode=True)
     assert isinstance(result, InterviewAnswers)
+    assert result.locale == "en"
     assert result.preset == Preset.SIDE
     # Side starter set: exec-rev, exec-rev-wrap, plan-exec-rev-wrap
     assert "exec-rev" in result.fused_workflows
@@ -40,6 +47,17 @@ def test_interview_autoloop_returns_typed_answers() -> None:
     assert result.context_lint is not None
     assert "installed" in result.reviewers
     assert "enabled" in result.reviewers
+
+
+def test_interview_autoloop_recommends_task_driven_for_side() -> None:
+    """Side preset gets task-driven by default — lighter, no SPEC enforcement."""
+    result = interview(_profile(), autoloop_mode=True)
+    assert result.dev_mode == DevMode.TASK_DRIVEN
+
+
+def test_interview_autoloop_recommends_spec_driven_for_production() -> None:
+    result = interview(_profile(scale="medium", lifecycle="active"), autoloop_mode=True)
+    assert result.dev_mode == DevMode.SPEC_DRIVEN
 
 
 def test_interview_recommends_side_for_experiment_small() -> None:
@@ -80,18 +98,53 @@ def test_interview_installs_all_reviewers_and_skills() -> None:
 
 
 def test_interview_interactive_accepts_recommended(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Empty answers ⇒ accept recommended preset + starter set + defaults."""
-    # preset, use-recommended?, default workflow, consensus, caching
-    inputs: Iterator[str] = iter(["", "", "", "", ""])
+    """Empty answers ⇒ accept recommended locale/preset/dev_mode/starter/defaults."""
+    # locale, preset, dev_mode, use-recommended?, default workflow, consensus, caching
+    inputs: Iterator[str] = iter(["", "", "", "", "", "", ""])
+    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
+    result = interview(_profile(), autoloop_mode=False)
+    assert result.locale == "en"
+    assert result.preset == Preset.SIDE
+    assert result.dev_mode == DevMode.TASK_DRIVEN  # Side default
+    assert result.default_workflow == "exec-rev-wrap"
+
+
+def test_interview_locale_first_question_accepts_arbitrary_tag(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Locale is the first prompt; user types ``ja`` and it passes through."""
+    inputs: Iterator[str] = iter(["ja", "", "", "", "", "", ""])
+    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
+    result = interview(_profile(), autoloop_mode=False)
+    assert result.locale == "ja"
+
+
+def test_interview_dev_mode_explicit_override_to_spec_driven(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Side+spec-driven cross is allowed (independent of preset)."""
+    # locale, preset, dev_mode=spec, use-rec?, default, consensus, caching
+    inputs: Iterator[str] = iter(["", "", "spec", "", "", "", ""])
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
     result = interview(_profile(), autoloop_mode=False)
     assert result.preset == Preset.SIDE
-    assert result.default_workflow == "exec-rev-wrap"
+    assert result.dev_mode == DevMode.SPEC_DRIVEN
+
+
+def test_interview_dev_mode_explicit_override_to_task_on_production(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Production+task-driven cross is allowed."""
+    inputs: Iterator[str] = iter(["", "Production", "task", "", "", "", ""])
+    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
+    result = interview(_profile(), autoloop_mode=False)
+    assert result.preset == Preset.PRODUCTION
+    assert result.dev_mode == DevMode.TASK_DRIVEN
 
 
 def test_interview_interactive_overrides_default(monkeypatch: pytest.MonkeyPatch) -> None:
     """User picks a different default workflow from the starter set."""
-    inputs: Iterator[str] = iter(["", "", "exec-rev", "", ""])
+    inputs: Iterator[str] = iter(["", "", "", "", "exec-rev", "", ""])
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
     result = interview(_profile(), autoloop_mode=False)
     assert result.default_workflow == "exec-rev"
@@ -99,9 +152,10 @@ def test_interview_interactive_overrides_default(monkeypatch: pytest.MonkeyPatch
 
 def test_interview_interactive_custom_workflows(monkeypatch: pytest.MonkeyPatch) -> None:
     """User declines recommended set and defines a custom workflow."""
-    # preset, use-rec?, stages-#1, name-#1, stages-#2 (done), default, consensus, caching
+    # locale, preset, dev_mode, use-rec?, stages-#1, name-#1, stages-#2 (done),
+    # default, consensus, caching
     inputs: Iterator[str] = iter(
-        ["", "n", "4,5", "", "done", "", "", ""],
+        ["", "", "", "n", "4,5", "", "done", "", "", ""],
     )
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
     result = interview(_profile(), autoloop_mode=False)
@@ -116,7 +170,7 @@ def test_interview_interactive_custom_named_override(
 ) -> None:
     """User overrides the auto-generated workflow name."""
     inputs: Iterator[str] = iter(
-        ["", "n", "4,5,6", "ship", "done", "", "", ""],
+        ["", "", "", "n", "4,5,6", "ship", "done", "", "", ""],
     )
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
     result = interview(_profile(), autoloop_mode=False)
@@ -130,7 +184,7 @@ def test_interview_interactive_custom_named_override(
 
 def test_interview_preset_override_to_production(monkeypatch: pytest.MonkeyPatch) -> None:
     """User on a small-experiment profile picks Production explicitly."""
-    inputs: Iterator[str] = iter(["Production", "", "", "", ""])
+    inputs: Iterator[str] = iter(["", "Production", "", "", "", "", ""])
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
     result = interview(_profile(), autoloop_mode=False)
     assert result.preset == Preset.PRODUCTION
@@ -141,10 +195,10 @@ def test_interview_custom_workflow_rejects_reserved(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Cannot name a custom workflow with a reserved word; user re-prompted."""
-    # preset, use-rec?, stages-#1, name=plan (reserved → re-prompt),
+    # locale, preset, dev_mode, use-rec?, stages-#1, name=plan (reserved → re-prompt),
     # stages-#1 again (3,4), name (auto), done, default, consensus, caching
     inputs: Iterator[str] = iter(
-        ["", "n", "4,5", "plan", "3,4", "", "done", "", "", ""],
+        ["", "", "", "n", "4,5", "plan", "3,4", "", "done", "", "", ""],
     )
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
     result = interview(_profile(), autoloop_mode=False)

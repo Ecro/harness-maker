@@ -21,7 +21,6 @@ from harness_maker.models import (
     FileEntry,
     HarnessConfig,
     InterviewAnswers,
-    Locale,
     Preset,
     ProjectProfile,
 )
@@ -188,8 +187,9 @@ def synthesize(
     ]
 
     config = HarnessConfig(
-        locale=Locale.KO,
+        locale=answers.locale,
         preset=effective_preset,
+        dev_mode=answers.dev_mode,
         workflows=dict(answers.fused_workflows),
         default_workflow=answers.default_workflow,
         caching=answers.caching,
@@ -204,7 +204,10 @@ def synthesize(
             "installed": answers.reviewers.get("installed", []),
             "enabled": answers.reviewers.get("enabled", []),
             "consensus": answers.consensus,
+            "verbosity": "standard",
         },
+        project={"domains": []},
+        spec={"dir": "specs/"},
     )
 
     config_dump = config.model_dump(mode="json")

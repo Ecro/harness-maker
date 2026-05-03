@@ -1,4 +1,4 @@
-"""Locale resolution and message lookup for user-facing strings."""
+"""Locale resolution and message lookup; English baseline with silent fallback."""
 
 from __future__ import annotations
 
@@ -10,38 +10,46 @@ import yaml
 from harness_maker.i18n_messages import MESSAGES
 from harness_maker.models import Locale  # re-export for backward compat
 
-__all__ = ["Locale", "resolve_locale", "t"]
+__all__ = ["DEFAULT_LOCALE", "Locale", "resolve_locale", "t"]
+
+DEFAULT_LOCALE = "en"
 
 
-def resolve_locale(project_dir: Path) -> Locale | None:
-    """Read ``.claude/harness.yaml`` locale; return None if unset/missing/invalid."""
+def resolve_locale(project_dir: Path) -> str:
+    """Read ``.claude/harness.yaml`` locale tag; return English by default.
+
+    Returns the raw string from yaml — any tag is accepted so user can request
+    locales we don't yet have messages for. ``t()`` handles silent fallback.
+    """
     yaml_path = project_dir / ".claude" / "harness.yaml"
     try:
         text = yaml_path.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
-        return None
+        return DEFAULT_LOCALE
     try:
         raw = yaml.safe_load(text)
     except yaml.YAMLError:
-        return None
+        return DEFAULT_LOCALE
     if not isinstance(raw, dict):
-        return None
+        return DEFAULT_LOCALE
     data = cast(dict[str, object], raw)
     locale_str = data.get("locale")
-    if not isinstance(locale_str, str):
-        return None
-    try:
-        return Locale(locale_str)
-    except ValueError:
-        return None
+    if not isinstance(locale_str, str) or not locale_str:
+        return DEFAULT_LOCALE
+    return locale_str
 
 
-def t(key: str, locale: Locale, **variables: object) -> str:
-    """Look up ``key`` for ``locale`` and substitute ``variables`` via str.format."""
-    catalog = MESSAGES.get(locale.value)
-    if catalog is None:
-        raise KeyError(f"unknown locale: {locale!r}")
-    template = catalog.get(key)
+def t(key: str, locale: str | Locale, **variables: object) -> str:
+    """Look up ``key`` for ``locale``; silent fallback to English.
+
+    Why fallback in two stages: an unknown locale tag falls back to the English
+    catalog wholesale; a known locale that simply lacks a key falls back per-key
+    so partial translations don't crash the harness.
+    """
+    locale_str = locale.value if isinstance(locale, Locale) else locale
+    catalog = MESSAGES.get(locale_str) or MESSAGES[DEFAULT_LOCALE]
+    template = catalog.get(key) or MESSAGES[DEFAULT_LOCALE].get(key)
     if template is None:
-        raise KeyError(f"missing message key {key!r} for locale {locale.value!r}")
-    return template.format(**variables) if variables else template.format()
+        msg = f"missing message key {key!r}"
+        raise KeyError(msg)
+    return template.format(**variables) if variables else template

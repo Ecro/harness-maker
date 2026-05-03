@@ -1,7 +1,12 @@
 preset: {{ config.preset }}
 locale: {{ config.locale }}
+dev_mode: {{ config.dev_mode }}
 default_workflow: {{ config.default_workflow }}
 caching: {{ config.caching }}
+project:
+  domains: [{{ config.project.domains | join(", ") }}]
+spec:
+  dir: {{ config.spec.dir }}
 workflows:
 {% for name, stages in config.workflows.items() %}
   {{ name }}:
@@ -9,6 +14,7 @@ workflows:
 {% endfor %}{% endfor %}
 reviewers:
   consensus: {{ config.reviewers.consensus }}
+  verbosity: {{ config.reviewers.verbosity }}
   installed:
 {% for r in config.reviewers.installed %}    - {{ r }}
 {% endfor %}  enabled:
@@ -27,4 +33,5 @@ security:
   on_finding:
     high: warn
     medium: log
-  gates: []
+  gates:
+    spec_gate: warn

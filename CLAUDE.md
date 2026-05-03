@@ -6,7 +6,7 @@
 - **이름**: harness-maker (Claude Code 플러그인)
 - **단일 메타 명령**: `/harness-maker:make` (audit/add/remove/promote 플래그)
 - **사용자 명령은 `/hm:` prefix** — `.claude/commands/hm/<name>.md` → `/hm:<name>`
-- **언어**: Korean-first (locale=ko 디폴트), English 지원
+- **언어**: English-default (locale=en 디폴트). interview 첫 질문이 locale (free-text). 한국어 등 다른 locale 도 입력 가능, unknown locale 은 en 으로 silent fallback
 
 ## 기술 결정 (변경 금지)
 
@@ -41,7 +41,7 @@
 - 함수 docstring: WHY only (WHAT 은 코드가 말함)
 - 주석 최소 — non-obvious 만
 - 변수명은 영어. 사용자 출력은 locale 따름.
-- 에러 메시지: locale=ko 일 때 한국어 (system error 는 영어 그대로 + 한국어 요약)
+- 에러 메시지: locale 따라 분기 (en/ko 빌트인, 그 외 en fallback). system error 는 영어 그대로 + 현재 locale 요약
 
 ## 테스트 정책
 - 모든 LLM 호출은 **subscription 통해 실제 호출 가능** (Anthropic API 결제 X — Claude Code 환경)

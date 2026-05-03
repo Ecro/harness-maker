@@ -11,6 +11,7 @@ from harness_maker.models import (
     AtomicStage,
     Blueprint,
     ConflictItem,
+    DevMode,
     FileEntry,
     HarnessConfig,
     InterviewAnswers,
@@ -31,6 +32,12 @@ def test_locale_members() -> None:
     assert Locale.KO.value == "ko"
     assert Locale.EN.value == "en"
     assert {m.value for m in Locale} == {"ko", "en"}
+
+
+def test_dev_mode_members() -> None:
+    assert DevMode.SPEC_DRIVEN.value == "spec-driven"
+    assert DevMode.TASK_DRIVEN.value == "task-driven"
+    assert {m.value for m in DevMode} == {"spec-driven", "task-driven"}
 
 
 def test_preset_members() -> None:
@@ -66,19 +73,29 @@ def test_reconcile_decision_members() -> None:
 
 def test_harness_config_defaults() -> None:
     cfg = HarnessConfig()
-    assert cfg.locale == Locale.KO
+    assert cfg.locale == "en"
     assert cfg.preset == Preset.SIDE
+    assert cfg.dev_mode == DevMode.SPEC_DRIVEN
     assert cfg.default_workflow == "dev"
     assert "dev" in cfg.workflows
     assert AtomicStage.EXECUTE in cfg.workflows["dev"]
     assert cfg.execution == {}
     assert cfg.caching == "agent-aware"
+    assert cfg.project == {"domains": []}
+    assert cfg.spec == {"dir": "specs/"}
+
+
+def test_harness_config_accepts_arbitrary_locale_tag() -> None:
+    """Free-text locale: ``ja`` is accepted even though we ship no ja catalog."""
+    cfg = HarnessConfig(locale="ja")
+    assert cfg.locale == "ja"
 
 
 def test_harness_config_round_trip_json() -> None:
     cfg = HarnessConfig(
-        locale=Locale.EN,
+        locale="en",
         preset=Preset.PRODUCTION,
+        dev_mode=DevMode.TASK_DRIVEN,
         workflows={"dev": [AtomicStage.EXECUTE]},
         execution={"default": "step"},
     )
@@ -182,7 +199,9 @@ def test_project_profile_custom() -> None:
 
 def test_interview_answers_defaults() -> None:
     ans = InterviewAnswers()
+    assert ans.locale == "en"
     assert ans.preset.value == "Side"
+    assert ans.dev_mode == DevMode.SPEC_DRIVEN
     assert "exec-rev-wrap" in ans.fused_workflows
     assert ans.default_workflow == "exec-rev-wrap"
     assert ans.reviewers == {"installed": [], "enabled": []}

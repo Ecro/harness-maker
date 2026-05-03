@@ -4,12 +4,17 @@ harness_maker_version: 0.1.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: harness-yaml/Production.yaml.j2
 provenance: official
-content_hash: 5af5c4b501d20851dd2397f783b45d0f58e73d2800507a1715f4d1ff0de313ba
+content_hash: f010817d6b4c6667961bb695824da5b0e0e60c702e3f34a61bedc5b0b38585ad
 ---
 preset: Production
-locale: ko
+locale: en
+dev_mode: spec-driven
 default_workflow: exec-rev-wrap-ver
 caching: agent-aware
+project:
+  domains: []
+spec:
+  dir: specs/
 workflows:
 
   exec-rev:
@@ -34,6 +39,7 @@ workflows:
 
 reviewers:
   consensus: cross-check
+  verbosity: standard
   installed:
     - code-reviewer
     - security-reviewer
@@ -82,4 +88,5 @@ security:
   on_finding:
     high: block
     medium: log
-  gates: []
+  gates:
+    spec_gate: block
