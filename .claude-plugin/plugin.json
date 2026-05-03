@@ -1,6 +1,6 @@
 {
   "name": "harness-maker",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "프로젝트 맞춤 Claude Code 하네스 자동 생성 + anti-rot + 모니터링 / Project-tailored Claude Code harness generator with anti-rot and monitoring",
   "author": {
     "name": "noel"
