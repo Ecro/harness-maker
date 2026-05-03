@@ -53,8 +53,11 @@
 ## Git 정책
 - 커밋 메시지: `<type>: <short subject>` 또는 autoloop 자동 형식 `autoloop(harness-maker): phase N - <name>`
 - type: `feat | fix | chore | ci | test | docs | refactor`
-- **No remote** (local commits only). push 금지.
-- 모든 phase 완료 시 자동 commit (autoloop wrapup stage)
+- **Remote**: `git@github.com-personal:Ecro/harness-maker.git` (private). push 허용 — backup 용도.
+  - 사용자가 명시적으로 요청해야 push (자동 push 금지).
+  - public 공개 시점·조건은 별도 결정 (현재는 private 유지).
+- 로컬 author: `Ecro <e839638@gmail.com>` (project-scoped git config).
+- 모든 phase 완료 시 자동 commit (autoloop wrapup stage). push 는 별도.
 
 ## 보안 / 권한 (v1.6)
 - Reviewer agent (code, security, perf, ux, concurrency) — `permissions.allow: [Read(*), Grep(*), Bash(git diff:*), Bash(git log:*)]`, `deny: [Write(*), Edit(*), Bash(rm:*), Bash(curl:*), Bash(npm:*)]`
