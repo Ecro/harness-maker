@@ -1,8 +1,15 @@
 {
   "hooks": {
-    "SessionStart": [],
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {"type": "command", "command": "uv run python -m harness_maker.telemetry"}
+        ]
+      }
+    ],
     "PreToolUse": [],
-    "PostToolUse": [],
+    "SessionStart": [],
     "Stop": []
   },
   "preset": "{{ preset }}"

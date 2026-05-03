@@ -1,7 +1,8 @@
 {
   "permissions": {
-    "allow": ["Read", "Bash(uv:*)", "Bash(pytest:*)", "Bash(ruff:*)", "Bash(mypy:*)"],
-    "deny": ["Bash(rm:-rf:*)", "Bash(curl:*|sh)"]
+    "allow": ["Read", "Bash(uv:*)", "Bash(pytest:*)", "Bash(git:*)"],
+    "deny": ["Bash(rm:*)", "Bash(curl:*)"]
   },
+  "statusLine": {"type": "command", "command": "uv run python -m harness_maker.statusline"},
   "preset": "{{ preset }}"
 }

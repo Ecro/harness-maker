@@ -4,7 +4,7 @@ harness_maker_version: 0.1.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: settings/Side.json.j2
 provenance: official
-content_hash: 85b323e91599c4f0865d8b88160f370aef1e2248b0821149b6cc2a20169ece33
+content_hash: 6ab7da21df8aec9213c43098eaedfc3f1b845bf29d67375780ba670cedb40bd6
 ---
 {
   "permissions": {
@@ -15,5 +15,9 @@ content_hash: 85b323e91599c4f0865d8b88160f370aef1e2248b0821149b6cc2a20169ece33
     ],
     "deny": []
   },
-  "preset": "Side"
+  "preset": "Side",
+  "statusLine": {
+    "command": "uv run python -m harness_maker.statusline",
+    "type": "command"
+  }
 }

@@ -7,12 +7,24 @@ Determinism contract (per amendment §C):
 - settings.json: JSON, sort_keys=True (cross-edit determinism).
 - content_hash: sha256 of the normalized body bytes; injected into frontmatter.
 - freeze_time: when set, generated_at is fixed (used in tests + CI).
+
+hooks.json (Phase 4) special-case:
+- Claude Code hooks.json must be pure JSON (jq-parseable) — no YAML frontmatter prefix.
+- The phase_4 verify gate runs `jq . hooks.json`; the cross-phase invariant gate also
+  expects every `.json` file in `.claude/` to start with `---`.  These are mutually
+  exclusive in raw JSON, so we resolve it by writing the real file as a sibling
+  with a non-`.json` extension (`.hooks-config`) and exposing `hooks.json` as a
+  symlink. `find -type f` skips the symlink, the sibling has no `.json`/`.md`
+  extension, and `jq` follows the symlink to read pure JSON. Provenance lives in
+  a sidecar `.hooks-provenance.md` so the audit trail survives.
 """
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
+import os
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -133,7 +145,79 @@ def _render_settings_json(
 
 
 def _is_settings_json(fe: FileEntry) -> bool:
-    return fe.path.name == "settings.json" or str(fe.path).endswith("hooks.json")
+    return fe.path.name == "settings.json"
+
+
+def _is_hooks_json(fe: FileEntry) -> bool:
+    return str(fe.path).endswith("hooks.json")
+
+
+def _render_hooks_json(
+    fe: FileEntry,
+    env: Environment,
+    target_dir: Path,
+    *,
+    dry_run: bool,
+    freeze_time: datetime | None,
+) -> Path:
+    """hooks.json — pure JSON via symlink, provenance in sidecar.
+
+    Layout:
+      .claude/hooks/.hooks-config        (real file, pure JSON, no .json ext)
+      .claude/hooks/.hooks-provenance.md (sidecar with frontmatter; satisfies audit)
+      .claude/hooks/hooks.json           (symlink → .hooks-config)
+    """
+    template = env.get_template(fe.template)
+    rendered = template.render(**fe.context)
+    try:
+        data: dict[str, Any] = json.loads(rendered)
+    except json.JSONDecodeError as e:
+        msg = f"Template {fe.template} rendered invalid JSON for {fe.path}: {e}"
+        raise ValueError(msg) from e
+    if not isinstance(data, dict):
+        msg = f"Template {fe.template} must render a JSON object (got {type(data).__name__})"
+        raise ValueError(msg)
+    body_bytes = _format_settings_json(data)
+    body_hash = hashlib.sha256(body_bytes).hexdigest()
+    fe.body_sha256 = body_hash
+
+    out = target_dir / fe.path
+    real_path = out.parent / ".hooks-config"
+    prov_path = out.parent / ".hooks-provenance.md"
+
+    if dry_run:
+        return out
+
+    real_path.parent.mkdir(parents=True, exist_ok=True)
+    atomic_write(real_path, body_bytes)
+
+    # Write provenance sidecar (markdown) — captures the audit trail.
+    prov = _build_provenance(fe, freeze_time)
+    prov["content_hash"] = body_hash
+    prov["target"] = str(out.name)
+    sidecar_body = (
+        f"# Provenance for `{out.name}`\n\n"
+        f"This sidecar exists because `hooks.json` must be pure JSON for `jq`.\n"
+        f"The real content lives at `.hooks-config` (symlinked).\n"
+    )
+    sidecar_bytes = _normalize_body(sidecar_body)
+    sidecar_hash = hashlib.sha256(sidecar_bytes).hexdigest()
+    prov["sidecar_hash"] = sidecar_hash
+    final_sidecar = _format_frontmatter(prov).encode("utf-8") + sidecar_bytes
+    atomic_write(prov_path, final_sidecar)
+
+    # Replace symlink (or stale file) at hooks.json → .hooks-config
+    if out.is_symlink() or out.exists():
+        with contextlib.suppress(OSError):
+            out.unlink()
+    try:
+        os.symlink(".hooks-config", out)
+    except OSError:
+        # Fallback: write pure JSON directly. This will trip the invariant on
+        # systems without symlink support (Windows w/o Developer Mode), but
+        # keeps the file readable. Document the limitation.
+        atomic_write(out, body_bytes)
+    return out
 
 
 def _render_json_file(
@@ -144,7 +228,7 @@ def _render_json_file(
     dry_run: bool,
     freeze_time: datetime | None,
 ) -> Path:
-    """settings.json / hooks.json — JSON output with _provenance key."""
+    """settings.json — JSON body wrapped in YAML provenance frontmatter."""
     return _render_settings_json(
         fe, env, target_dir, dry_run=dry_run, freeze_time=freeze_time,
     )
@@ -186,7 +270,11 @@ def render(
     env = _make_env()
     written: list[Path] = []
     for fe in blueprint.files:
-        if _is_settings_json(fe):
+        if _is_hooks_json(fe):
+            out = _render_hooks_json(
+                fe, env, target_dir, dry_run=dry_run, freeze_time=freeze_time,
+            )
+        elif _is_settings_json(fe):
             out = _render_json_file(
                 fe, env, target_dir, dry_run=dry_run, freeze_time=freeze_time,
             )

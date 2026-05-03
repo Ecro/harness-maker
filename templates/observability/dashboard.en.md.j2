@@ -1,11 +1,11 @@
 # Dashboard — {{ preset | default('Side') }} preset
 
-**프로젝트:** {{ project_name | default('unknown') }}
+**Project:** {{ project_name | default('unknown') }}
 **Preset:** {{ preset | default('Side') }}
 
-## 효율
+## Efficiency
 - Cache hit: {{ cache_hit | default(0) }}%
-- 누적 토큰: {{ total_tokens | default(0) }}
+- Cumulative tokens: {{ total_tokens | default(0) }}
 
 ## Health (6-dim)
 {% for dim, score in (health_dims | default({})).items() -%}
@@ -19,4 +19,4 @@
 
 ## Refresh
 
-`/hm:monitor` 로 갱신.
+Run `/hm:monitor` to refresh.

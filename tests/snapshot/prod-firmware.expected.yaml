@@ -48,7 +48,7 @@ files:
   body_sha256: b8bcecaa054a4d85d2c30a6e499011273e55758d7f3f485eea995a2f97dbe5f5
 - path: commands/hm/monitor.md
   template: commands/hm/monitor.md.j2
-  body_sha256: c5c3aacaa66fa7def15bd773a03740e356824c9aed45978b1cdc92be63cc3492
+  body_sha256: c12b4fbff532ceed89daa1cc759668411af7b5b3d7abedef624682ad69aded5a
 - path: commands/hm/plan.md
   template: commands/hm/atomic_command.md.j2
   body_sha256: 151313cc4b04ff9fbf866fd08829c062a11551b0835aa42dce2303bc1a818d3c
@@ -78,7 +78,7 @@ files:
   body_sha256: 88b65b0af1df413e42e41ae6c2da662a0c82734f461816b5f876f58a72c12fde
 - path: hooks/hooks.json
   template: hooks/hooks.json.j2
-  body_sha256: 33285bf63603625f79a0257aaf229c630c19f24003c07e7c587b18d77b91261b
+  body_sha256: 7615fc94ad6de4897252a4841802ea975263d0eac1312ca941a5e4c524b0ef2a
 - path: memory/failures.md
   template: memory/failures.ko.md.j2
   body_sha256: 3abe4997a48ceb0b67f5c42eaad5ba5b24d13251385d7a5d8d41fcc7886ac572
@@ -87,10 +87,10 @@ files:
   body_sha256: eec6072b37c26b9d19bcb0219135939a06e15adb3ecb7dde4bc4b57009654aed
 - path: observability/dashboard.md
   template: observability/dashboard.ko.md.j2
-  body_sha256: 8f6b402fa6af954c524c533890e468009fdb58190799f330f16b6e82d1a8b0e7
+  body_sha256: e91c9f91ac2839e263dde946c6cea440b5f99c71349b76c4125891eea1fe3cfc
 - path: settings.json
   template: settings/Side.json.j2
-  body_sha256: 53eb3829f33a79e2608ad80da371a0a475362d4746fe528144d4b321644aadff
+  body_sha256: 36c7e00f3bed5f3c5cb1d98e205032b8ab1d2a74b1a0cae64b43a9d4c216b779
 - path: skills/agent-quality-rubric/SKILL.md
   template: skills/agent-quality-rubric/SKILL.md.j2
   body_sha256: 2ab9268cce5131005239761b28af044742601c917fa11e9a20da3d9a461649b9

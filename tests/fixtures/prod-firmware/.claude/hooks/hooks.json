@@ -1,17 +1,1 @@
----
-generated_by: harness-maker
-harness_maker_version: 0.1.0
-generated_at: '2026-01-01T00:00:00+00:00'
-source_template: hooks/hooks.json.j2
-provenance: official
-content_hash: 33285bf63603625f79a0257aaf229c630c19f24003c07e7c587b18d77b91261b
----
-{
-  "hooks": {
-    "PostToolUse": [],
-    "PreToolUse": [],
-    "SessionStart": [],
-    "Stop": []
-  },
-  "preset": "Production"
-}
+.hooks-config

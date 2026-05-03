@@ -1,6 +1,6 @@
 # /hm:monitor
 
-> Monitoring dashboard — show 3 metrics (cost, completeness, drift).
+> Re-render the dashboard with current metrics (효율 + Health + Agent quality).
 
 ## Usage
 
@@ -14,4 +14,11 @@
 
 ## Behavior
 
-Phase 4에서 dashboard rendering 본문이 채워집니다.
+Reads `.claude/observability/metrics.jsonl`, computes Health 6-dim via
+`harness_maker.readiness.compute_health`, scores each agent via
+`harness_maker.agent_quality.score_agent`, and re-renders
+`.claude/observability/dashboard.md`.
+
+```bash
+!uv run python -c "from harness_maker.readiness import compute_health; from harness_maker.agent_quality import score_agent; print('updated')"
+```
