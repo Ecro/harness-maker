@@ -42,7 +42,7 @@ files:
   body_sha256: c28c5fdb500ced20194473813831a430df31153a9f4f168aa5f4564ae5601ee2
 - path: commands/hm/loop.md
   template: commands/hm/loop.md.j2
-  body_sha256: a0f9931faa984dc7a1fabc1906810f33dc036c7a7560c15639103a613e94fd00
+  body_sha256: 787838c1ebd4dbdbda3a6c2e03ccd33bcd4da95832290a85bdab18a6e35739fd
 - path: commands/hm/monitor.md
   template: commands/hm/monitor.md.j2
   body_sha256: c12b4fbff532ceed89daa1cc759668411af7b5b3d7abedef624682ad69aded5a
@@ -96,7 +96,7 @@ files:
   body_sha256: 7eec86c19e719bff04ce713408dc9821d77f5f2b2d9987cd72740d8a327558c1
 - path: skills/autoloop-driver/SKILL.md
   template: skills/autoloop-driver/SKILL.md.j2
-  body_sha256: 4605f90a75813ddb786478f49ff7c8b8bba2fab94d4274b2d102dad70af86e22
+  body_sha256: 2dac75393a5388a4f3b9efff3fffa3512020f44223a44d67a397f07ed66edbd8
 - path: skills/conditional-router/SKILL.md
   template: skills/conditional-router/SKILL.md.j2
   body_sha256: 66a51ea054727fbeacfa9e8dcee2129c119a16bb4ecff7c56c82ddafd8399954
