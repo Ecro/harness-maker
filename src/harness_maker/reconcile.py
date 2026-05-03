@@ -1,10 +1,13 @@
-"""Reconciler (Task 3.3) — decide KEEP/REPLACE/BOTH per file in brownfield projects.
+"""Reconciler (Task 3.3) — decide per-file action in brownfield projects.
 
-Decision matrix (per amendment §F):
-- new-only (no existing file)              → BOTH
-- existing has no frontmatter / no hash    → KEEP (user file, do not touch)
-- existing hash matches our recompute      → REPLACE (it's our previous output, safe to overwrite)
-- existing hash mismatches our recompute   → KEEP (user has modified our file)
+Decision matrix:
+- new-only (no existing file)                                → BOTH
+- existing has no frontmatter / no hash                      → KEEP (user file)
+- existing hash matches our recompute                        → REPLACE (safe overwrite)
+- existing hash mismatches AND both OLD/NEW have markers     → MERGE_BLOCK (3-way)
+- existing hash mismatches otherwise                         → KEEP (legacy fallback)
+
+Block-marker spec: docs/reference/block-merge-spec.md
 """
 
 from __future__ import annotations
@@ -16,7 +19,12 @@ from pathlib import Path
 
 import yaml
 
+from harness_maker.block_merge import ParseError, has_markers, parse_segments
 from harness_maker.models import Blueprint, ConflictItem, ReconcileDecision
+
+# Templates ship inside the package; reconcile peeks at the source to know
+# whether a fresh render will produce markers without re-rendering.
+_TEMPLATE_DIR = Path(__file__).resolve().parent / "templates"
 
 
 def parse_frontmatter(path: Path) -> tuple[dict[str, object] | None, bytes]:
@@ -77,14 +85,36 @@ def reconcile(existing_dir: Path, blueprint: Blueprint) -> list[ConflictItem]:
                 ),
             )
         else:
+            decision, reason = _decide_user_modified(fe.template, body)
             conflicts.append(
-                ConflictItem(
-                    path=fe.path,
-                    decision=ReconcileDecision.KEEP,
-                    reason="hash-mismatch-user-modified",
-                ),
+                ConflictItem(path=fe.path, decision=decision, reason=reason),
             )
     return conflicts
+
+
+def _decide_user_modified(template_name: str, old_body: bytes) -> tuple[ReconcileDecision, str]:
+    """User edited the file. Pick MERGE_BLOCK if both sides have markers,
+    else fall back to KEEP (preserves legacy behaviour for marker-less files).
+    """
+    template_path = _TEMPLATE_DIR / template_name
+    try:
+        template_src = template_path.read_text(encoding="utf-8")
+    except OSError:
+        return ReconcileDecision.KEEP, "hash-mismatch-template-unreadable"
+    try:
+        old_text = old_body.decode("utf-8")
+    except UnicodeDecodeError:
+        return ReconcileDecision.KEEP, "hash-mismatch-binary-old"
+    if has_markers(template_src) and has_markers(old_text):
+        # Validate OLD parses cleanly. A user who broke marker syntax (typo,
+        # deleted close, etc.) should NOT silently lose their edits via
+        # REPLACE-on-parse-failure; KEEP the malformed file and surface why.
+        try:
+            parse_segments(old_text)
+        except ParseError:
+            return ReconcileDecision.KEEP, "hash-mismatch-malformed-markers"
+        return ReconcileDecision.MERGE_BLOCK, "hash-mismatch-mergeable"
+    return ReconcileDecision.KEEP, "hash-mismatch-user-modified"
 
 
 def backup(existing_dir: Path) -> Path:

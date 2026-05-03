@@ -4,7 +4,7 @@ harness_maker_version: 0.2.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: 4641f19d1a93315ecc6c5b8ef434c5b80b6a07f27915688e7a3b5948b1680127
+content_hash: 5c9e5515a9ba24e8e0041740c88dfe2b9e23003a257c88430b8c979aefd75adf
 ---
 # /hm:exec-rev
 
@@ -134,6 +134,10 @@ disable auto-fix for this run only (config default unchanged).
    - Disagreements between reviewers (with reasoning)
    - Recommended actions
 
+<!-- @hm:user:procedure-extras -->
+<!-- Project-specific Round 1 steps (extra reviewers, custom heuristics, etc.). Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:procedure-extras -->
+
 ## Grade Computation (after every round)
 
 Count consensus-passed findings by severity:
@@ -262,7 +266,15 @@ human_review_needed: {true|false}
 - Auto-fix never silently overwrites a build break; failed fixes are reverted
   and logged
 
+<!-- @hm:user:extra-quality-checks -->
+<!-- Project-specific quality bar items (additional invariants, domain rules). Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extra-quality-checks -->
 
+
+
+<!-- @hm:user:extensions -->
+<!-- Free-form project-specific additions to the review stage. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extensions -->
 
 
 ---

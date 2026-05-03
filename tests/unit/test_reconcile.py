@@ -44,17 +44,77 @@ def test_reconcile_hash_match_returns_replace(tmp_path: Path) -> None:
     assert conflicts[0].reason == "hash-match-ours"
 
 
-def test_reconcile_hash_mismatch_returns_keep(tmp_path: Path) -> None:
+def test_reconcile_hash_mismatch_no_markers_returns_keep(tmp_path: Path) -> None:
+    """User edited a marker-less file → KEEP (legacy fallback)."""
     target = tmp_path / "a.md"
     body = "# user has edited this\n"
     fm = (
         "---\ncontent_hash: 0000000000000000000000000000000000000000000000000000000000000000\n---\n"
     )
     target.write_text(fm + body, encoding="utf-8")
-    bp = _bp(["a.md"])
+    # Use a real marker-less template so reconcile can read it; the hash
+    # mismatch is what we exercise here, not template-unreadable.
+    bp = Blueprint(files=[FileEntry(path=Path("a.md"), template="stages/research.md.j2")])
     conflicts = reconcile(tmp_path, bp)
     assert conflicts[0].decision == ReconcileDecision.KEEP
     assert conflicts[0].reason == "hash-mismatch-user-modified"
+
+
+def test_reconcile_hash_mismatch_template_unreadable_returns_keep(tmp_path: Path) -> None:
+    """Missing template → graceful KEEP with diagnostic reason."""
+    target = tmp_path / "a.md"
+    body = "# edited\n"
+    fm = (
+        "---\ncontent_hash: 0000000000000000000000000000000000000000000000000000000000000000\n---\n"
+    )
+    target.write_text(fm + body, encoding="utf-8")
+    bp = _bp(["a.md"])  # template="x.j2" doesn't exist
+    conflicts = reconcile(tmp_path, bp)
+    assert conflicts[0].decision == ReconcileDecision.KEEP
+    assert conflicts[0].reason == "hash-mismatch-template-unreadable"
+
+
+def test_reconcile_hash_mismatch_both_have_markers_returns_merge_block(tmp_path: Path) -> None:
+    """User edited a marker-bearing file whose template still has markers
+    → MERGE_BLOCK so user blocks survive the upgrade.
+    """
+    target = tmp_path / "review.md"
+    # OLD body has a user block — simulates a previously-rendered review.md.
+    body = (
+        "# Stage: review\n"
+        "<!-- @hm:user:notes -->\n"
+        "my custom step\n"
+        "<!-- @hm:/user:notes -->\n"
+    )
+    fm = (
+        "---\ncontent_hash: 0000000000000000000000000000000000000000000000000000000000000000\n---\n"
+    )
+    target.write_text(fm + body, encoding="utf-8")
+    bp = Blueprint(files=[FileEntry(path=Path("review.md"), template="stages/review.md.j2")])
+    conflicts = reconcile(tmp_path, bp)
+    assert conflicts[0].decision == ReconcileDecision.MERGE_BLOCK
+    assert conflicts[0].reason == "hash-mismatch-mergeable"
+
+
+def test_reconcile_malformed_markers_falls_back_to_keep(tmp_path: Path) -> None:
+    """User broke marker syntax (e.g., deleted the close tag) → KEEP not
+    MERGE_BLOCK. Reason: silent loss of user edits is unacceptable; surface
+    the diagnostic so the user can fix their markup.
+    """
+    target = tmp_path / "review.md"
+    body = (
+        "# Stage: review\n"
+        "<!-- @hm:user:notes -->\n"
+        "user content but close tag is missing\n"
+    )
+    fm = (
+        "---\ncontent_hash: 0000000000000000000000000000000000000000000000000000000000000000\n---\n"
+    )
+    target.write_text(fm + body, encoding="utf-8")
+    bp = Blueprint(files=[FileEntry(path=Path("review.md"), template="stages/review.md.j2")])
+    conflicts = reconcile(tmp_path, bp)
+    assert conflicts[0].decision == ReconcileDecision.KEEP
+    assert conflicts[0].reason == "hash-mismatch-malformed-markers"
 
 
 def test_parse_frontmatter_no_marker(tmp_path: Path) -> None:

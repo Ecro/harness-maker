@@ -4,7 +4,7 @@ harness_maker_version: 0.2.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/atomic_command.md.j2
 provenance: official
-content_hash: 06aca922ca1b1dd7a0f0584de56683253d8ed396d6a139df5a2cf2558e1df02c
+content_hash: 54ace34a50682063666f4c971505d0374f0bd92b3c11e32bfa6a9f374d43847b
 ---
 # Stage: review
 
@@ -70,6 +70,10 @@ disable auto-fix for this run only (config default unchanged).
    - All findings ordered by severity
    - Disagreements between reviewers (with reasoning)
    - Recommended actions
+
+<!-- @hm:user:procedure-extras -->
+<!-- Project-specific Round 1 steps (extra reviewers, custom heuristics, etc.). Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:procedure-extras -->
 
 ## Grade Computation (after every round)
 
@@ -198,3 +202,13 @@ human_review_needed: {true|false}
   triggers the rollback criterion
 - Auto-fix never silently overwrites a build break; failed fixes are reverted
   and logged
+
+<!-- @hm:user:extra-quality-checks -->
+<!-- Project-specific quality bar items (additional invariants, domain rules). Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extra-quality-checks -->
+
+
+
+<!-- @hm:user:extensions -->
+<!-- Free-form project-specific additions to the review stage. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extensions -->

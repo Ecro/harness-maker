@@ -92,6 +92,7 @@ class ReconcileDecision(str, Enum):  # noqa: UP042
     KEEP = "keep"
     REPLACE = "replace"
     BOTH = "both"
+    MERGE_BLOCK = "merge_block"  # block-marker-aware 3-way merge (user blocks preserved)
 
 
 # ──────────────────────────────────────────────────────────────────────────────

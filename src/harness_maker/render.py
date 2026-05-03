@@ -27,6 +27,8 @@ import yaml
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 from harness_maker import __version__
+from harness_maker.block_merge import MergeReport
+from harness_maker.block_merge import merge as block_merge
 from harness_maker.io_utils import atomic_write
 from harness_maker.models import Blueprint, FileEntry
 
@@ -225,12 +227,19 @@ def _render_text_file(
     *,
     dry_run: bool,
     freeze_time: datetime | None,
+    merge_reports: dict[Path, MergeReport] | None = None,
 ) -> Path:
     template = env.get_template(fe.template)
     rendered = template.render(**fe.context)
     # If template authored its own frontmatter (e.g. SubAgent name/description/tools/model),
     # merge it into the single provenance frontmatter so Claude Code's loaders see one block.
     template_fm, body_text = _split_template_frontmatter(rendered)
+    out = target_dir / fe.path
+    # Block-merge: caller signals "this file is mergeable" by passing a
+    # non-None merge_reports dict. We splice OLD user blocks into NEW before
+    # hashing. Parse failures fall through to plain REPLACE.
+    if merge_reports is not None and out.exists():
+        body_text = _try_block_merge(out, body_text, fe.path, merge_reports)
     body_bytes = _normalize_body(body_text)
     body_hash = hashlib.sha256(body_bytes).hexdigest()
     fe.body_sha256 = body_hash
@@ -241,10 +250,45 @@ def _render_text_file(
         fm.setdefault(k, v)
     fm["content_hash"] = body_hash
     final_bytes = _format_frontmatter(fm).encode("utf-8") + body_bytes
-    out = target_dir / fe.path
     if not dry_run:
         atomic_write(out, final_bytes)
     return out
+
+
+def _try_block_merge(
+    out: Path,
+    new_body: str,
+    rel_path: Path,
+    merge_reports: dict[Path, MergeReport],
+) -> str:
+    """Read OLD body (sans frontmatter) at ``out`` and merge with ``new_body``.
+
+    On any parse failure, log nothing and return ``new_body`` unchanged — the
+    caller already vetted mergeability via reconcile, so a parse failure here
+    is a rare race (file edited mid-make). Falling through to plain REPLACE
+    is the safe behaviour.
+    """
+    try:
+        existing = out.read_text(encoding="utf-8")
+    except OSError:
+        return new_body
+    _, old_body = _split_existing_frontmatter(existing)
+    try:
+        merged, report = block_merge(old_body, new_body)
+    except Exception:  # noqa: BLE001 — fall back to REPLACE on any merge failure
+        return new_body
+    merge_reports[rel_path] = report
+    return merged
+
+
+def _split_existing_frontmatter(text: str) -> tuple[str, str]:
+    """Strip a leading ``---\\n…\\n---\\n`` block; return (frontmatter, body)."""
+    if not text.startswith("---\n"):
+        return "", text
+    end = text.find("\n---\n", 4)
+    if end == -1:
+        return "", text
+    return text[: end + 5], text[end + 5 :]
 
 
 def render(
@@ -253,13 +297,24 @@ def render(
     *,
     dry_run: bool = False,
     freeze_time: datetime | None = None,
+    merge_paths: set[Path] | None = None,
+    merge_reports: dict[Path, MergeReport] | None = None,
 ) -> list[Path]:
     """Render blueprint to target_dir.
+
+    ``merge_paths`` — when non-empty, files at those (relative) paths receive
+    block-marker-aware merge: NEW template structure with OLD ``user:<id>``
+    block contents preserved. Spec: docs/reference/block-merge-spec.md.
+
+    ``merge_reports`` — optional out-dict. When provided, each successfully
+    merged path is recorded with its ``MergeReport`` so the CLI can display
+    what was preserved/seeded/orphaned.
 
     Returns list of paths written (or would-write paths if dry_run).
     """
     env = _make_env()
     written: list[Path] = []
+    paths_to_merge = merge_paths or set()
     for fe in blueprint.files:
         if _is_hooks_json(fe):
             out = _render_pure_json(
@@ -278,12 +333,18 @@ def render(
                 freeze_time=freeze_time,
             )
         else:
+            # Only mergeable text files plumb the merge_reports map; JSON
+            # files don't support markers in v1.
+            file_merge_reports = (
+                merge_reports if merge_reports is not None and fe.path in paths_to_merge else None
+            )
             out = _render_text_file(
                 fe,
                 env,
                 target_dir,
                 dry_run=dry_run,
                 freeze_time=freeze_time,
+                merge_reports=file_merge_reports,
             )
         written.append(out)
     return written

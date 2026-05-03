@@ -106,3 +106,61 @@ def test_render_populates_body_sha256(tmp_path: Path) -> None:
     for f in bp.files:
         assert f.body_sha256
         assert len(f.body_sha256) == 64  # sha256 hex
+
+
+def test_render_with_merge_paths_preserves_user_blocks(tmp_path: Path) -> None:
+    """Round-trip: render → user edits a user:<id> block → re-render with
+    merge_paths → user content survives, hash reflects merged body.
+    """
+    from harness_maker.block_merge import MergeReport
+
+    p = _profile()
+    a = interview(p, autoloop_mode=True)
+    bp = synthesize(p, a)
+    render(bp, tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
+
+    review_path = tmp_path / "stages" / "review.md"
+    text = review_path.read_text(encoding="utf-8")
+    edited = text.replace(
+        "<!-- Free-form project-specific additions to the review stage. "
+        "Preserved across harness-maker upgrades. -->",
+        "## Project rule\n\nAlways check telemetry impact for hot-path changes.",
+    )
+    review_path.write_text(edited, encoding="utf-8")
+
+    bp2 = synthesize(p, a)
+    merge_paths = {Path("stages/review.md")}
+    merge_reports: dict[Path, MergeReport] = {}
+    render(
+        bp2,
+        tmp_path,
+        freeze_time=DEFAULT_FREEZE_TIME,
+        merge_paths=merge_paths,
+        merge_reports=merge_reports,
+    )
+
+    final = review_path.read_text(encoding="utf-8")
+    assert "Always check telemetry impact" in final
+    assert Path("stages/review.md") in merge_reports
+    report = merge_reports[Path("stages/review.md")]
+    assert "extensions" in report.user_blocks_preserved
+
+
+def test_render_without_merge_paths_overwrites(tmp_path: Path) -> None:
+    """Sanity: when merge_paths is empty, render performs plain REPLACE.
+    User edits in user blocks would be lost — by design (caller didn't ask
+    for merge).
+    """
+    p = _profile()
+    a = interview(p, autoloop_mode=True)
+    bp = synthesize(p, a)
+    render(bp, tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
+
+    review_path = tmp_path / "stages" / "review.md"
+    review_path.write_text("# user wrote this\n", encoding="utf-8")
+
+    bp2 = synthesize(p, a)
+    render(bp2, tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
+    final = review_path.read_text(encoding="utf-8")
+    assert "# user wrote this" not in final
+    assert "Stage: review" in final

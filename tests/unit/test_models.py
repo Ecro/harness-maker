@@ -63,7 +63,7 @@ def test_atomic_stage_members() -> None:
 
 
 def test_reconcile_decision_members() -> None:
-    assert {m.value for m in ReconcileDecision} == {"keep", "replace", "both"}
+    assert {m.value for m in ReconcileDecision} == {"keep", "replace", "both", "merge_block"}
 
 
 # ──────────────────────────────────────────────────────────────────────────────

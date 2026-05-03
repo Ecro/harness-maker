@@ -65,6 +65,10 @@ disable auto-fix for this run only (config default unchanged).
    - Disagreements between reviewers (with reasoning)
    - Recommended actions
 
+<!-- @hm:user:procedure-extras -->
+<!-- Project-specific Round 1 steps (extra reviewers, custom heuristics, etc.). Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:procedure-extras -->
+
 ## Grade Computation (after every round)
 
 Count consensus-passed findings by severity:
@@ -192,6 +196,10 @@ human_review_needed: {true|false}
   triggers the rollback criterion
 - Auto-fix never silently overwrites a build break; failed fixes are reverted
   and logged
+
+<!-- @hm:user:extra-quality-checks -->
+<!-- Project-specific quality bar items (additional invariants, domain rules). Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extra-quality-checks -->
 {% if project_name %}
 
 ## Project Context
@@ -201,3 +209,7 @@ human_review_needed: {true|false}
 {% if feature %}
 - Feature: `{{ feature }}`
 {% endif %}
+
+<!-- @hm:user:extensions -->
+<!-- Free-form project-specific additions to the review stage. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extensions -->

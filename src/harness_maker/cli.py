@@ -8,6 +8,7 @@ from pathlib import Path
 import typer
 
 from harness_maker.add_domain import AddDomainError, add_domain, validate_domain_name
+from harness_maker.block_merge import MergeReport
 from harness_maker.interview import interview
 from harness_maker.modular_edit import ModularEditError
 from harness_maker.modular_edit import add as modular_add
@@ -75,16 +76,28 @@ def make(
             a.domains.append(add_domain_name)
     bp = synthesize(p, a)
     target_dotclaude = target / ".claude"
+    merge_paths: set[Path] = set()
+    keep_count = 0
     if target_dotclaude.exists() and any(target_dotclaude.iterdir()):
         backup(target_dotclaude)
         conflicts = reconcile(target_dotclaude, bp)
         from harness_maker.models import ReconcileDecision
 
         keep_paths = {c.path for c in conflicts if c.decision == ReconcileDecision.KEEP}
+        merge_paths = {c.path for c in conflicts if c.decision == ReconcileDecision.MERGE_BLOCK}
+        keep_count = len(keep_paths)
         new_files = [f for f in bp.files if f.path not in keep_paths]
         bp = bp.model_copy(update={"files": new_files})
     freeze = DEFAULT_FREEZE_TIME if os.environ.get("HARNESS_MAKER_FREEZE") else None
-    render(bp, target_dotclaude, freeze_time=freeze)
+    merge_reports: dict[Path, MergeReport] = {}
+    render(
+        bp,
+        target_dotclaude,
+        freeze_time=freeze,
+        merge_paths=merge_paths,
+        merge_reports=merge_reports,
+    )
+    _emit_reconcile_report(keep_count, merge_reports)
     errors = verify(target_dotclaude)
     if errors:
         for err in errors:
@@ -120,6 +133,37 @@ def make(
         typer.echo(f"--add-domain stub created: {stub}")
 
     typer.echo(f"harness applied to {target_dotclaude} ({len(bp.files)} files)")
+
+
+def _emit_reconcile_report(
+    keep_count: int,
+    merge_reports: dict[Path, MergeReport],
+) -> None:
+    """Surface what reconcile decided so the user knows their edits' fate."""
+    if keep_count:
+        typer.echo(
+            f"  KEEP: {keep_count} file(s) preserved as-is "
+            f"(no markers — won't receive new template content)",
+        )
+    for path, report in merge_reports.items():
+        bits: list[str] = []
+        if report.user_blocks_preserved:
+            bits.append(
+                f"preserved {len(report.user_blocks_preserved)} user block(s): "
+                f"{', '.join(report.user_blocks_preserved)}",
+            )
+        if report.user_blocks_seeded:
+            bits.append(
+                f"seeded {len(report.user_blocks_seeded)} new block(s): "
+                f"{', '.join(report.user_blocks_seeded)}",
+            )
+        if report.user_blocks_orphaned:
+            bits.append(
+                f"⚠ orphaned {len(report.user_blocks_orphaned)} block(s): "
+                f"{', '.join(report.user_blocks_orphaned)}",
+            )
+        if bits:
+            typer.echo(f"  MERGE_BLOCK: {path} — {'; '.join(bits)}")
 
 
 @app.command(hidden=True)
