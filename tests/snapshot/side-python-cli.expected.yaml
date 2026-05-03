@@ -6,7 +6,7 @@ files:
   body_sha256: cb1938c763d6d918ffe5226d0c7e69b267af8c5f89426b732b3046ae22097f3f
 - path: agents/autoloop-coder.md
   template: agents/autoloop-coder.md.j2
-  body_sha256: e3b1728db8a9b29a087d8f61f6b4b60902f97d0c1fe2274abfabbc854fad4695
+  body_sha256: 91678f32029be33c778ea0085ce31d717373a6c950c183d37d21923efd029c4b
 - path: agents/code-reviewer.md
   template: agents/code-reviewer.md.j2
   body_sha256: f0c63fde9e18e4561ee3183cf158a505258b5f2e918dbbe84db3adf98c84ec87

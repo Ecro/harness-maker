@@ -1,0 +1,86 @@
+"""Tests for context_lint (Phase 10 Task 8.1)."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+from harness_maker.context_lint import THRESHOLDS, lint
+from harness_maker.models import Preset
+
+
+def _write(path: Path, body: str, with_fm: bool = False) -> Path:
+    if with_fm:
+        path.write_text("---\nname: x\n---\n" + body, encoding="utf-8")
+    else:
+        path.write_text(body, encoding="utf-8")
+    return path
+
+
+def test_under_threshold_returns_no_warnings(tmp_path: Path) -> None:
+    body = "\n".join(["line"] * 10) + "\n"
+    f = _write(tmp_path / "CLAUDE.md", body)
+    assert lint(f, "CLAUDE.md", Preset.SIDE) == []
+
+
+def test_at_threshold_returns_no_warnings(tmp_path: Path) -> None:
+    limit = THRESHOLDS[("agent", Preset.SIDE.value)]
+    body = "\n".join(["line"] * limit) + "\n"
+    f = _write(tmp_path / "agent.md", body)
+    assert lint(f, "agent", Preset.SIDE) == []
+
+
+def test_over_threshold_returns_warning(tmp_path: Path) -> None:
+    limit = THRESHOLDS[("skill", Preset.SIDE.value)]
+    body = "\n".join(["line"] * (limit + 25)) + "\n"
+    f = _write(tmp_path / "SKILL.md", body)
+    warnings = lint(f, "skill", Preset.SIDE)
+    assert len(warnings) == 1
+    assert "skill" in warnings[0]
+    assert "Side" in warnings[0]
+    assert "trim" in warnings[0]
+
+
+def test_frontmatter_excluded_from_count(tmp_path: Path) -> None:
+    # 50 frontmatter lines + 5 body lines should be well under skill/Side (50)
+    fm_block = "---\n" + "\n".join([f"k{i}: v" for i in range(50)]) + "\n---\n"
+    body = "\n".join(["line"] * 5) + "\n"
+    f = tmp_path / "SKILL.md"
+    f.write_text(fm_block + body, encoding="utf-8")
+    assert lint(f, "skill", Preset.SIDE) == []
+
+
+def test_production_thresholds_are_higher(tmp_path: Path) -> None:
+    # 250-line agent: over Side(100), under Production(200)? actually under(250 > 200) → still over.
+    # Use 150: over Side(100), under Production(200) ✓
+    body = "\n".join(["line"] * 150) + "\n"
+    f = _write(tmp_path / "agent.md", body)
+    assert len(lint(f, "agent", Preset.SIDE)) == 1
+    assert lint(f, "agent", Preset.PRODUCTION) == []
+
+
+def test_workflow_threshold(tmp_path: Path) -> None:
+    body = "\n".join(["line"] * 350) + "\n"
+    f = _write(tmp_path / "execute.md", body)
+    assert len(lint(f, "workflow", Preset.SIDE)) == 1
+    assert lint(f, "workflow", Preset.PRODUCTION) == []
+
+
+def test_other_asset_type_no_limit(tmp_path: Path) -> None:
+    body = "\n".join(["line"] * 10000) + "\n"
+    f = _write(tmp_path / "data.json", body)
+    assert lint(f, "other", Preset.SIDE) == []
+
+
+def test_unknown_asset_type_no_limit(tmp_path: Path) -> None:
+    body = "\n".join(["line"] * 10000) + "\n"
+    f = _write(tmp_path / "x.md", body)
+    assert lint(f, "totally-unknown", Preset.SIDE) == []
+
+
+def test_warning_message_includes_path_and_excess(tmp_path: Path) -> None:
+    body = "\n".join(["line"] * 80) + "\n"
+    f = _write(tmp_path / "S.md", body)
+    warnings = lint(f, "skill", Preset.SIDE)
+    assert str(f) in warnings[0]
+    assert "80" in warnings[0]
+    assert "50" in warnings[0]

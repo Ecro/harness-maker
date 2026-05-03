@@ -1,6 +1,14 @@
 ---
+generated_by: harness-maker
+harness_maker_version: 0.1.0
+generated_at: '2026-01-01T00:00:00+00:00'
+source_template: skills/context-linter/SKILL.md.j2
+provenance: official
 name: context-linter
-description: Lint generated CLAUDE.md / agent / skill / workflow files for verbose-context bloat against per-preset line thresholds. Use before /hm:execute or /hm:wrapup to keep the agent context lean.
+description: Lint generated CLAUDE.md / agent / skill / workflow files for verbose-context
+  bloat against per-preset line thresholds. Use before /hm:execute or /hm:wrapup to
+  keep the agent context lean.
+content_hash: 012827c4f0267b47cba5123ba3df775a79c2259ce96f6cd2ab2728552e0b3bfd
 ---
 
 # context-linter

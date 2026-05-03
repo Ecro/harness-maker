@@ -6,7 +6,7 @@ files:
   body_sha256: 826f853e66340943e9b458eb2facd2ca9bda0447df4973e05eeb59940dc6a355
 - path: agents/autoloop-coder.md
   template: agents/autoloop-coder.md.j2
-  body_sha256: e3b1728db8a9b29a087d8f61f6b4b60902f97d0c1fe2274abfabbc854fad4695
+  body_sha256: 91678f32029be33c778ea0085ce31d717373a6c950c183d37d21923efd029c4b
 - path: agents/code-reviewer.md
   template: agents/code-reviewer.md.j2
   body_sha256: f0c63fde9e18e4561ee3183cf158a505258b5f2e918dbbe84db3adf98c84ec87
@@ -18,7 +18,7 @@ files:
   body_sha256: f64c6f92061ac4e617ea84d967aa67a86ea7a93d6a954dab84fdc87a8d35b6e3
 - path: agents/executor.md
   template: agents/executor.md.j2
-  body_sha256: 807f93976ac052365caae46ff63130646801da6844b10432c6e015af9113a4e6
+  body_sha256: c910a623cc3588d7b3415762e7a20f20e8cc1835994c6e5e1a4852591b641afd
 - path: agents/performance-reviewer.md
   template: agents/performance-reviewer.md.j2
   body_sha256: d7019cbb648d234919ca60f25d5fcc1d53d53c20ef01b3cce52fd0a9ad95ca6b
@@ -105,7 +105,7 @@ files:
   body_sha256: 6d9efd8820c20841575f0da107401f7083f8a9a21d98c7b563a3e8a510bf7f59
 - path: skills/context-linter/SKILL.md
   template: skills/context-linter/SKILL.md.j2
-  body_sha256: 587bba008a1b78b45430428a98b71bd05c153f67449a80ee2da9409def7aa80f
+  body_sha256: 012827c4f0267b47cba5123ba3df775a79c2259ce96f6cd2ab2728552e0b3bfd
 - path: skills/relevance-filter/SKILL.md
   template: skills/relevance-filter/SKILL.md.j2
   body_sha256: 5a0ac2ecf85d330b41090e3d21a475747951944a62f9b638ef3beb3ab1dfa90c
