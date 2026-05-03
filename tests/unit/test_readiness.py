@@ -65,7 +65,7 @@ def test_observability_dimension(tmp_path: Path) -> None:
 
 def test_security_unknown_default(tmp_path: Path) -> None:
     res = compute_health(tmp_path, Preset.SIDE)
-    assert res["dimensions"]["security"] == 70
+    assert res["dimensions"]["security"] == 50
 
 
 def test_ceremony_penalty_applied(tmp_path: Path) -> None:

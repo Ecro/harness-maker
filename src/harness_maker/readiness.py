@@ -72,7 +72,7 @@ def _score_observability(project_dir: Path) -> int:
 def _score_security(project_dir: Path) -> int:
     findings_dir = project_dir / ".claude" / "observability" / "security"
     if not findings_dir.is_dir():
-        return 70  # unknown
+        return 50  # not scanned yet — neutral, not assumed safe
     high = 0
     for f in findings_dir.glob("findings-*.jsonl"):
         try:
