@@ -1,4 +1,5 @@
 preset: Production
+dev_mode: spec-driven
 file_count: 47
 files:
 - path: ../CLAUDE.md

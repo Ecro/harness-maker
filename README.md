@@ -2,6 +2,15 @@
 
 A Claude Code plugin that **generates and refines a project-tailored `.claude/` harness** — commands, skills, agents, hooks, and observability — tuned to your stack, scale, and lifecycle. It does not run your project code; it builds the runtime that does. Anti-rot keeps the harness fresh against the moving Claude Code ecosystem; worktree isolation and 5 security gates keep it safe; built-in monitoring (효율 / Health / fresh) keeps it honest.
 
+## Requirements
+
+- **Python 3.12+ and `uv`** are required in your project's environment, even if your project's primary toolchain is Rust, Node, Go, or anything non-Python. This is because the rendered harness wires hooks (e.g. `permission_gate`, `spec_gate`, `telemetry`) that execute via `uv run python -m harness_maker.gates.<name>` at PreToolUse/PostToolUse boundaries.
+  - Easiest: install [`uv`](https://docs.astral.sh/uv/) once, then `uv tool install harness-maker` (or add as a dev dep via `uv sync`) so the `harness_maker` Python package resolves on every Claude Code invocation.
+  - You can disable hooks selectively: `dev_mode: task-driven` in `harness.yaml` skips `spec_gate`; commenting out an entry in `.claude/hooks/hooks.json` skips that hook. The harness still works without any hook installed.
+  - A self-contained binary distribution that removes the Python+uv requirement is on the roadmap; until then, treat harness-maker as a Python dev dep of your project.
+- **Claude Code CLI** (any recent version with plugin + hook support).
+- **Git** (worktree isolation in Production preset uses `git worktree add`).
+
 ## Quick Start
 
 ```bash

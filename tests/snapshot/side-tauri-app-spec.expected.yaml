@@ -1,4 +1,5 @@
 preset: Side
+dev_mode: spec-driven
 file_count: 46
 files:
 - path: ../CLAUDE.md
@@ -72,10 +73,10 @@ files:
   body_sha256: fb743fc5e2dbb7ba96c19ce07bb55f8c94b83e1229d24c9a39aeafcae615c270
 - path: harness.yaml
   template: harness-yaml/Side.yaml.j2
-  body_sha256: 88749f70c6ab7f478d29d9af071b1b44c7ea0a4a0c77c71bc8e0f227439a63c5
+  body_sha256: b1c033e4e2d16fa796d2d4773a47754ca28adaa003c841be01dfe8d82b57a585
 - path: hooks/hooks.json
   template: hooks/hooks.json.j2
-  body_sha256: ec0cd093531db27ebb06a45d876fbb7baf71a3c41cef49a496dd40af3b23e283
+  body_sha256: 472e1652d67973140ad77ee3a641cc9f7e7bb268c7e3244a49e1276d4be4f33d
 - path: memory/failures.md
   template: memory/failures.ko.md.j2
   body_sha256: c8c41d8fd473350a246e6861675a55e14390bd269018f08f3b82e72b95635772
