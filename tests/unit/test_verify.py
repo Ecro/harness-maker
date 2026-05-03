@@ -42,8 +42,23 @@ def test_verify_broken_settings_json_fails(tmp_path: Path) -> None:
     assert any("settings.json JSON error" in e for e in errors)
 
 
-def test_verify_md_missing_frontmatter_fails(tmp_path: Path) -> None:
+def test_verify_md_no_frontmatter_is_skipped(tmp_path: Path) -> None:
+    """User-owned .md files (no provenance frontmatter) must not produce errors."""
     (tmp_path / "harness.yaml").write_text("preset: Side\n", encoding="utf-8")
     (tmp_path / "no_fm.md").write_text("plain markdown\n", encoding="utf-8")
     errors = verify(tmp_path)
-    assert any("missing provenance frontmatter" in e for e in errors)
+    assert not any("no_fm.md" in e for e in errors), f"user-owned file was flagged: {errors}"
+
+
+def test_verify_md_content_hash_mismatch_fails(tmp_path: Path) -> None:
+    """Harness-generated .md (has content_hash) with wrong hash must error."""
+    (tmp_path / "harness.yaml").write_text("preset: Side\n", encoding="utf-8")
+    bad = (
+        "---\ngenerated_by: harness-maker\ncontent_hash: deadbeef\n---\n"
+        "actual body that hashes differently\n"
+    )
+    (tmp_path / "bad_hash.md").write_text(bad, encoding="utf-8")
+    errors = verify(tmp_path)
+    assert any("content_hash mismatch" in e for e in errors), (
+        f"expected mismatch error, got: {errors}"
+    )

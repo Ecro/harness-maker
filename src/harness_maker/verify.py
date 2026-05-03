@@ -51,7 +51,10 @@ def verify(target_dir: Path) -> list[str]:
         except json.JSONDecodeError as e:
             errors.append(f"hooks/hooks.json JSON error: {e}")
 
-    # 4. Every .md file has frontmatter with content_hash (incl. project-root CLAUDE.md)
+    # 4. .md files with harness-maker provenance frontmatter must have a valid
+    #    content_hash. Files without frontmatter (or without content_hash) are
+    #    user-owned and are skipped — treating them as errors would break
+    #    projects that have pre-existing .claude/ files.
     scan_paths = list(target_dir.rglob("*.md"))
     project_claude = target_dir.parent / "CLAUDE.md"
     if project_claude.exists():
@@ -63,10 +66,8 @@ def verify(target_dir: Path) -> list[str]:
         except ValueError:
             rel = md
         if fm is None or "content_hash" not in fm:
-            errors.append(f"{rel}: missing provenance frontmatter")
+            # No provenance frontmatter → user-owned file, skip
             continue
-        # Hash-validity check (Phase 6 carry-over): declared content_hash must
-        # match the actual body hash. Catches manual edits / tampering.
         declared = fm.get("content_hash")
         if not isinstance(declared, str):
             errors.append(f"{rel}: content_hash is not a string")
