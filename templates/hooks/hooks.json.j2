@@ -8,7 +8,14 @@
         ]
       }
     ],
-    "PreToolUse": [],
+    "PreToolUse": [{% if config.dev_mode == "spec-driven" %}
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {"type": "command", "command": "uv run python -m harness_maker.gates.spec_gate"}
+        ]
+      }{% endif %}
+    ],
     "SessionStart": [],
     "Stop": []
   },
