@@ -75,7 +75,7 @@ files:
   body_sha256: 88749f70c6ab7f478d29d9af071b1b44c7ea0a4a0c77c71bc8e0f227439a63c5
 - path: hooks/hooks.json
   template: hooks/hooks.json.j2
-  body_sha256: 3234c864dd8396fd2c9aef4bfbbf7e5992a41c8beb47446b9a7bb51e15d6c384
+  body_sha256: ec0cd093531db27ebb06a45d876fbb7baf71a3c41cef49a496dd40af3b23e283
 - path: memory/failures.md
   template: memory/failures.ko.md.j2
   body_sha256: c8c41d8fd473350a246e6861675a55e14390bd269018f08f3b82e72b95635772
