@@ -36,3 +36,10 @@ __pycache__/
 # Local env
 .env
 .env.local
+
+# Phase 11 dogfood sandboxes get git init'd at test time; don't track inner repos
+tests/e2e/sandbox/.git/
+tests/e2e/sandbox-plugin-test/.git/
+tests/e2e/sandbox/.worktrees/
+tests/e2e/sandbox/.backup-*/
+tests/e2e/sandbox-plugin-test/.backup-*/

@@ -1,0 +1,71 @@
+---
+generated_by: harness-maker
+harness_maker_version: 0.1.0
+generated_at: '2026-01-01T00:00:00+00:00'
+source_template: commands/hm/refresh.md.j2
+provenance: official
+content_hash: 5bb4ff81abb54ef83c3c48bbb7e585f5371f6bc6c15a21e57cd0967732f2dbf3
+---
+# /hm:refresh
+
+> Anti-rot refresh — re-validate the harness against the latest patterns from
+> 4 sources, then **manually confirm** every proposed change. Never applies
+> automatically.
+
+## Usage
+
+```
+/hm:refresh
+```
+
+## Arguments
+
+(none)
+
+## Flow
+
+1. **Crawl** all 4 sources (Anthropic blog, GitHub releases, arxiv,
+   OSV.dev). Failures degrade gracefully — partial results still proceed.
+2. **Score** every `CrawlItem` against project keywords (extracted from
+   `CLAUDE.md` + `README.md`) and compute the next adaptive threshold from
+   prior accept/reject history.
+3. **Filter** items whose score ≥ threshold; write them to
+   `.claude/observability/refresh/proposed-<YYYY-MM-DD>.md`.
+4. **AskUserQuestion** for each proposal: `accept` / `reject` / `defer`.
+   Decisions are appended to
+   `.claude/observability/refresh/decisions.jsonl` so the next run's
+   adaptive threshold reflects the user's preferences.
+5. On `accept`, patch the relevant `.claude/` asset and stage the commit.
+   `reject` and `defer` produce no file changes.
+
+**Hard rule:** the agent NEVER bypasses the AskUserQuestion step. Auto-apply
+of refresh proposals is forbidden.
+
+## Run
+
+```bash
+!uv run python -c "
+from pathlib import Path
+from harness_maker.crawler import anthropic_blog, github_releases, arxiv, osv_dev, write_raw
+
+items = []
+items += anthropic_blog.crawl()
+items += github_releases.crawl()
+items += arxiv.crawl()
+items += osv_dev.crawl(packages=osv_dev.parse_uv_lock(Path('uv.lock')))
+
+write_raw(items, project_dir='.')
+print(f'crawled {len(items)} items')
+"
+```
+
+Then load the JSONL, score with `harness_maker.relevance.score_item`, filter
+with `filter_items(items, adaptive_threshold(history))`, and walk each
+proposal interactively via **AskUserQuestion** — accept / reject / defer.
+
+## Autoloop behavior
+
+When invoked under `autoloop` (no human in the loop), proceed only through
+step 3 (write `proposed-<date>.md`) and stop. Step 4 still requires
+**AskUserQuestion** in interactive mode; autoloop must not synthesize a
+default answer.
