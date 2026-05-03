@@ -11,9 +11,5 @@
       "Bash(curl:*)"
     ]
   },
-  "preset": "Production",
-  "statusLine": {
-    "command": "bash .claude/lib/run-statusline.sh",
-    "type": "command"
-  }
+  "preset": "Production"
 }

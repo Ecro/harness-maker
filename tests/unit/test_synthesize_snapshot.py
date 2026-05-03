@@ -28,6 +28,18 @@ _MODES: tuple[tuple[str, DevMode], ...] = (
 )
 
 
+@pytest.fixture(autouse=True)
+def _isolate_home(
+    tmp_path_factory: pytest.TempPathFactory,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Pin Path.home() to an empty tmp dir so snapshot output stays stable
+    regardless of the developer's personal ~/.claude/settings.json.
+    """
+    fake_home = tmp_path_factory.mktemp("hm-home")
+    monkeypatch.setattr(Path, "home", lambda: fake_home)
+
+
 @pytest.mark.parametrize(
     ("fixture", "mode_label", "mode"),
     [(f, label, mode) for f in _FIXTURES for label, mode in _MODES],

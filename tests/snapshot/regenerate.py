@@ -11,8 +11,11 @@ Run from harness-maker repo root:
 
 from __future__ import annotations
 
+import os
 import shutil
+import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 import yaml
 
@@ -58,7 +61,14 @@ def regen_one(fixture_name: str, mode_label: str, mode: DevMode) -> None:
 
 
 if __name__ == "__main__":
-    for fixture in FIXTURES:
-        for label, mode in DEV_MODES:
-            regen_one(fixture, label, mode)
-            print(f"Regenerated {fixture}-{label}")
+    # Pin HOME to an empty tmp dir so render's global-statusLine probe
+    # (~/.claude/settings.json) returns nothing — snapshots must be stable
+    # across developer environments regardless of personal Claude Code
+    # settings.
+    with tempfile.TemporaryDirectory() as fake_home:
+        os.environ["HOME"] = fake_home
+        with patch.object(Path, "home", lambda: Path(fake_home)):
+            for fixture in FIXTURES:
+                for label, mode in DEV_MODES:
+                    regen_one(fixture, label, mode)
+                    print(f"Regenerated {fixture}-{label}")

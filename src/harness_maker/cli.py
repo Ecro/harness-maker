@@ -247,11 +247,29 @@ def _apply_statusline_policy(
 
 
 def _read_existing_statusline_command(settings_path: Path) -> str | None:
-    """Best-effort extract of ``statusLine.command`` from existing settings.json."""
-    if not settings_path.exists():
+    """Best-effort extract of ``statusLine.command``.
+
+    Project-level ``settings.json`` wins (Claude Code's precedence: project
+    overrides user-global). When the project file has no statusLine, fall
+    back to ``~/.claude/settings.json`` because writing a project-level
+    statusLine would silently shadow the user's global one — we want the
+    same keep/combine/overwrite question asked in that case too.
+    """
+    cmd = _read_statusline_from(settings_path)
+    if cmd is not None:
+        return cmd
+    return _read_statusline_from(Path.home() / ".claude" / "settings.json")
+
+
+def _read_statusline_from(path: Path) -> str | None:
+    """Extract ``statusLine.command`` from a single settings.json (project or
+    user-global). Returns None when the file is missing, malformed, or has
+    no statusLine.
+    """
+    if not path.exists():
         return None
     try:
-        text = settings_path.read_text(encoding="utf-8")
+        text = path.read_text(encoding="utf-8")
     except OSError:
         return None
     if text.startswith("---\n"):

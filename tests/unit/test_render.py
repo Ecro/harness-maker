@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from harness_maker.interview import interview
 from harness_maker.models import Blueprint, ProjectProfile
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
@@ -12,6 +14,21 @@ from harness_maker.synthesize import synthesize
 
 def _profile() -> ProjectProfile:
     return ProjectProfile(stack=["python"], scale="small", lifecycle="experiment")
+
+
+@pytest.fixture(autouse=True)
+def _isolate_home(
+    tmp_path_factory: pytest.TempPathFactory,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Pin Path.home() to an empty tmp dir for every test in this module.
+
+    settings.json render now consults ``~/.claude/settings.json`` for a
+    global statusLine; running the suite against the developer's actual
+    home would couple test outcomes to whatever statusLine they have set.
+    """
+    fake_home = tmp_path_factory.mktemp("hm-home")
+    monkeypatch.setattr(Path, "home", lambda: fake_home)
 
 
 def test_render_empty_blueprint(tmp_path: Path) -> None:
@@ -179,6 +196,141 @@ def test_render_settings_json_overwrite_policy_replaces_user(tmp_path: Path) -> 
     render(bp, tmp_path, freeze_time=DEFAULT_FREEZE_TIME, statusline_policy="overwrite")
     data = json.loads(settings_path.read_text(encoding="utf-8"))
     assert data["statusLine"]["command"] == "bash .claude/lib/run-statusline.sh"
+
+
+def test_render_settings_json_keep_drops_statusline_when_only_global(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Project has no statusLine but the user-global one would be shadowed
+    if we write any. Default policy must drop statusLine entirely so the
+    global keeps winning via Claude Code's settings precedence.
+    """
+    import json
+
+    # Fake home pointing into tmp_path so the global lookup hits a real file
+    # we control.
+    fake_home = tmp_path / "home"
+    (fake_home / ".claude").mkdir(parents=True)
+    (fake_home / ".claude" / "settings.json").write_text(
+        json.dumps(
+            {"statusLine": {"type": "command", "command": "/path/to/user-global.sh"}},
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(Path, "home", lambda: fake_home)
+
+    settings_path = tmp_path / "settings.json"
+    settings_path.write_text(json.dumps({"enabledPlugins": {"x@y": True}}), encoding="utf-8")
+    p = _profile()
+    a = interview(p, autoloop_mode=True)
+    bp = synthesize(p, a)
+    render(bp, tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
+    data = json.loads(settings_path.read_text(encoding="utf-8"))
+    # Project statusLine omitted — global stays active by precedence.
+    assert "statusLine" not in data
+    assert data["enabledPlugins"] == {"x@y": True}
+
+
+def test_render_settings_json_keep_drops_when_project_is_harness_shipped_and_global_custom(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Project already on our wrapper + user has global custom → policy=keep
+    must drop the project statusLine so global wins (regression: previously
+    the harness-shipped branch ignored policy and silently re-installed).
+    """
+    import json
+
+    fake_home = tmp_path / "home"
+    (fake_home / ".claude").mkdir(parents=True)
+    (fake_home / ".claude" / "settings.json").write_text(
+        json.dumps(
+            {"statusLine": {"type": "command", "command": "/path/to/user-global.sh"}},
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(Path, "home", lambda: fake_home)
+
+    settings_path = tmp_path / "settings.json"
+    settings_path.write_text(
+        json.dumps(
+            {"statusLine": {"type": "command", "command": "bash .claude/lib/run-statusline.sh"}},
+        ),
+        encoding="utf-8",
+    )
+    p = _profile()
+    a = interview(p, autoloop_mode=True)
+    bp = synthesize(p, a)
+    render(bp, tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
+    data = json.loads(settings_path.read_text(encoding="utf-8"))
+    # statusLine dropped — global wins via Claude Code precedence.
+    assert "statusLine" not in data
+
+
+def test_render_settings_json_combine_overrides_harness_shipped(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Explicit combine policy must replace a harness-shipped project value
+    with the combined wrapper, even though the auto-upgrade default would
+    otherwise leave the simple wrapper in place.
+    """
+    import json
+
+    fake_home = tmp_path / "home"
+    (fake_home / ".claude").mkdir(parents=True)
+    (fake_home / ".claude" / "settings.json").write_text(
+        json.dumps(
+            {"statusLine": {"type": "command", "command": "/path/to/user-global.sh"}},
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(Path, "home", lambda: fake_home)
+
+    settings_path = tmp_path / "settings.json"
+    settings_path.write_text(
+        json.dumps(
+            {"statusLine": {"type": "command", "command": "bash .claude/lib/run-statusline.sh"}},
+        ),
+        encoding="utf-8",
+    )
+    p = _profile()
+    a = interview(p, autoloop_mode=True)
+    bp = synthesize(p, a)
+    render(bp, tmp_path, freeze_time=DEFAULT_FREEZE_TIME, statusline_policy="combine")
+    data = json.loads(settings_path.read_text(encoding="utf-8"))
+    assert data["statusLine"]["command"] == "bash .claude/lib/run-statusline-combined.sh"
+
+
+def test_render_settings_json_combine_with_only_global_status_line(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Combine policy when only the global statusLine exists must still
+    install the combined wrapper so the global command + harness metrics
+    join.
+    """
+    import json
+
+    fake_home = tmp_path / "home"
+    (fake_home / ".claude").mkdir(parents=True)
+    (fake_home / ".claude" / "settings.json").write_text(
+        json.dumps(
+            {"statusLine": {"type": "command", "command": "/path/to/user-global.sh"}},
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(Path, "home", lambda: fake_home)
+
+    settings_path = tmp_path / "settings.json"
+    settings_path.write_text("{}", encoding="utf-8")
+    p = _profile()
+    a = interview(p, autoloop_mode=True)
+    bp = synthesize(p, a)
+    render(bp, tmp_path, freeze_time=DEFAULT_FREEZE_TIME, statusline_policy="combine")
+    data = json.loads(settings_path.read_text(encoding="utf-8"))
+    assert data["statusLine"]["command"] == "bash .claude/lib/run-statusline-combined.sh"
 
 
 def test_render_settings_json_combine_policy_points_to_combined_wrapper(tmp_path: Path) -> None:

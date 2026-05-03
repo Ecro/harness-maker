@@ -164,66 +164,126 @@ _HARNESS_SHIPPED_STATUSLINE_COMMANDS: frozenset[str] = frozenset(
 _COMBINED_STATUSLINE_COMMAND = "bash .claude/lib/run-statusline-combined.sh"
 
 
+def _decide_status_line(
+    *,
+    existing_sl: dict[str, Any] | None,
+    global_sl: dict[str, Any] | None,
+    template_sl: dict[str, Any] | None,
+    policy: str | None,
+) -> dict[str, Any] | None:
+    """Pick the statusLine block to write into project settings.json.
+
+    ``None`` return means "drop the statusLine key entirely" so Claude Code's
+    settings precedence keeps the user-global one active.
+
+    Decision matrix (rows: project state · global state):
+
+    - empty            · empty  → install template (None/keep, overwrite, combine→combined)
+    - empty            · custom → drop (None/keep) | install template (overwrite) | combined
+    - harness-shipped  · empty  → auto-upgrade (None/keep, overwrite) | combined
+    - harness-shipped  · custom → drop (None/keep) | auto-upgrade (overwrite) | combined
+    - custom           · (any)  → preserve project (None/keep) | template (overwrite) | combined
+
+    Explicit policy always wins over the auto-upgrade default. Combined wrapper
+    is intentionally NOT in ``_HARNESS_SHIPPED_STATUSLINE_COMMANDS`` so a prior
+    "combine" choice is preserved across re-renders rather than auto-upgraded
+    away from.
+    """
+    if policy == "combine":
+        return {"type": "command", "command": _COMBINED_STATUSLINE_COMMAND}
+    if policy == "overwrite":
+        return template_sl
+
+    cmd = ""
+    if existing_sl is not None:
+        raw = existing_sl.get("command")
+        cmd = raw if isinstance(raw, str) else ""
+    project_is_harness_shipped = cmd in _HARNESS_SHIPPED_STATUSLINE_COMMANDS
+
+    # Custom project statusLine → preserve verbatim.
+    if existing_sl is not None and not project_is_harness_shipped:
+        return existing_sl
+    # Harness-shipped project + no global → silent auto-upgrade.
+    if project_is_harness_shipped and global_sl is None:
+        return template_sl
+    # Empty project + no global → fresh install.
+    if existing_sl is None and global_sl is None:
+        return template_sl
+    # Otherwise (no project sl OR project is harness-shipped, with a global
+    # present) → drop ours so Claude Code precedence keeps the global active.
+    return None
+
+
+def _read_global_status_line() -> dict[str, Any] | None:
+    """Read ``~/.claude/settings.json``'s ``statusLine`` block, if any.
+
+    Project-level settings shadow user-global, so writing a project statusLine
+    would silently override what the user already has globally. Reading the
+    global block lets the merge keep it visible (or capture it for combine).
+    Returns None on any failure — the merge falls through to its no-global
+    branch.
+    """
+    path = Path.home() / ".claude" / "settings.json"
+    if not path.exists():
+        return None
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    if text.startswith("---\n"):
+        end = text.find("\n---\n", 4)
+        if end != -1:
+            text = text[end + 5 :]
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(data, dict):
+        return None
+    sl = data.get("statusLine")
+    return sl if isinstance(sl, dict) else None
+
+
 def _shallow_merge_existing_json(
     out: Path,
     new_data: dict[str, Any],
     statusline_policy: str | None = None,
 ) -> dict[str, Any]:
     """Merge top-level keys: existing's unique keys + new_data (template wins),
-    with a per-key carve-out for ``statusLine``.
-
-    Returns ``new_data`` unchanged when ``out`` is missing, unreadable, or
-    contains corrupt JSON — failures fall through silently because losing
-    user keys is preferable to crashing the entire render.
-
-    statusLine policy decides what happens when the existing settings.json
-    has a custom ``statusLine`` (one we didn't ship):
-
-    | policy       | custom existing → kept? | combined wrapper installed? |
-    | None/default | yes (preserve)          | no                           |
-    | keep         | yes (preserve)          | no                           |
-    | overwrite    | no (template wins)      | no                           |
-    | combine      | no (replaced by wrapper)| yes — points settings.json to combined wrapper |
-
-    Harness-maker-shipped statusLines (matching ``_HARNESS_SHIPPED_STATUSLINE_COMMANDS``)
-    are always auto-upgraded to the current template regardless of policy —
-    rescues users stuck on the v0.3.0 broken default.
+    with statusLine routed through ``_decide_status_line`` so user-global
+    isn't silently shadowed and explicit policy always wins.
     """
-    if not out.exists():
-        return new_data
-    try:
-        text = out.read_text(encoding="utf-8")
-    except OSError:
-        return new_data
-    # Legacy back-compat: strip YAML frontmatter if a pre-0.4.0 render left one.
-    if text.startswith("---\n"):
-        end = text.find("\n---\n", 4)
-        if end != -1:
-            text = text[end + 5 :]
-    try:
-        existing = json.loads(text)
-    except json.JSONDecodeError:
-        return new_data
-    if not isinstance(existing, dict):
-        return new_data
+    existing: dict[str, Any] = {}
+    if out.exists():
+        try:
+            text = out.read_text(encoding="utf-8")
+        except OSError:
+            text = ""
+        # Legacy back-compat: strip YAML frontmatter from pre-0.4.0 renders.
+        if text.startswith("---\n"):
+            end = text.find("\n---\n", 4)
+            if end != -1:
+                text = text[end + 5 :]
+        if text:
+            try:
+                parsed = json.loads(text)
+            except json.JSONDecodeError:
+                parsed = None
+            if isinstance(parsed, dict):
+                existing = parsed
     merged: dict[str, Any] = {**existing, **new_data}
-    existing_sl = existing.get("statusLine")
-    if isinstance(existing_sl, dict):
-        cmd = existing_sl.get("command") if isinstance(existing_sl.get("command"), str) else ""
-        is_harness_shipped = cmd in _HARNESS_SHIPPED_STATUSLINE_COMMANDS
-        if is_harness_shipped:
-            # Always upgrade to current template, ignoring policy.
-            pass
-        elif statusline_policy == "combine":
-            merged["statusLine"] = {
-                "type": "command",
-                "command": _COMBINED_STATUSLINE_COMMAND,
-            }
-        elif statusline_policy == "overwrite":
-            pass  # template wins (current shallow merge already did this)
-        else:
-            # None / "keep" / unknown → preserve user
-            merged["statusLine"] = existing_sl
+    raw_existing_sl = existing.get("statusLine")
+    raw_template_sl = new_data.get("statusLine")
+    decided = _decide_status_line(
+        existing_sl=raw_existing_sl if isinstance(raw_existing_sl, dict) else None,
+        global_sl=_read_global_status_line(),
+        template_sl=raw_template_sl if isinstance(raw_template_sl, dict) else None,
+        policy=statusline_policy,
+    )
+    if decided is None:
+        merged.pop("statusLine", None)
+    else:
+        merged["statusLine"] = decided
     return merged
 
 
