@@ -2,6 +2,18 @@
 
 > 이 파일은 Claude / autoloop CODER agent 가 본 프로젝트에서 작업할 때 따라야 하는 규칙·관례 모음. **모든 결정은 사용자가 사전에 lock-in 했음.** autoloop 빌드 중에는 AskUserQuestion 호출 금지 — 모호하면 본 문서 + TECH_SPEC.md 우선.
 
+## LLM 활용 원칙 (최우선)
+
+harness-maker 는 Claude Code 의 플러그인으로, **LLM 판단력을 최대한 활용하여 품질을 극대화**한다.
+
+- **규칙 기반 대신 LLM 판단**: 패턴 매칭·키워드 필터로 해결할 수 있는 것도, LLM 이 더 정확하게 판단할 수 있으면 LLM 에 위임
+- **모호함 감지**: 답변이 충분히 actionable 한지 판정은 LLM 이 직접 수행 (regex 로 vague 판정 금지)
+- **질문 생성**: 인터뷰 follow-up 질문은 LLM 이 컨텍스트를 읽고 동적으로 생성 (고정 스크립트 금지)
+- **추출·요약**: 소스 문서에서 목적·불변조건·우선순위 등을 뽑는 작업은 LLM 이 전체 문서를 읽고 추출
+- **수렴 판단**: stopping criteria 만족 여부는 LLM 이 현재 상태를 읽고 판단
+
+템플릿(`.j2`)이 생성하는 슬래시 명령 안에서 Claude 가 직접 판단·추출·생성하도록 프롬프트를 설계할 것. Python 레이어는 타입 계약·저장·안전 레일만 담당.
+
 ## 프로젝트 정체성
 - **이름**: harness-maker (Claude Code 플러그인)
 - **단일 메타 명령**: `/harness-maker:make` (audit/add/remove/promote 플래그)

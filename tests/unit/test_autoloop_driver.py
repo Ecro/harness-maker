@@ -5,13 +5,19 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from harness_maker.autoloop_driver import (
     AutoloopState,
     Feature,
+    ImprovementContext,
+    LoopContext,
+    LoopMode,
     LoopSpec,
+    detect_mode,
     is_loop_consumable,
     parse_goal,
+    parse_loop_context,
     parse_loop_spec,
     run,
 )
@@ -108,15 +114,23 @@ def test_success_path_with_mock_executor_converges() -> None:
 
 
 def test_failure_then_success_resets_streak() -> None:
-    """One failure followed by success should NOT trip the 3-failure halt."""
+    """One failure followed by success should NOT trip the 3-failure halt.
+
+    Feature 'a' fails once (iter 1) then succeeds (iter 2); b and c succeed
+    on first try (iters 3–4). Exactly 4 executor calls → iterator safe with
+    max_iter=10 (cap check fires before convergence check at loop top, so
+    max_iter must be > number of executor calls, not equal).
+    """
     call_results = iter([False, True, True, True])
 
     def varied(feature: Feature, iter_idx: int) -> bool:  # noqa: ARG001
         return next(call_results)
 
-    state = run("a;b;c;d", max_iter=10, executor=varied)
-    assert state.failed_streak >= 1 or state.converged
-    assert "a" in state.completed
+    state = run("a;b;c", max_iter=10, executor=varied)
+    assert state.converged is True
+    assert state.completed == ["a", "b", "c"]
+    assert state.failed_streak == 0
+    assert state.iter == 4
 
 
 def test_convergence_expression_can_short_circuit() -> None:
@@ -146,7 +160,7 @@ def test_state_is_pydantic_model() -> None:
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-def test_run_with_loopspec_uses_features_and_acceptance(tmp_path: Path) -> None:
+def test_run_with_loopspec_uses_features_and_acceptance() -> None:
     """`run(spec=...)` consumes structured features with AC."""
     spec = LoopSpec(
         objective="ship auth flow",
@@ -232,6 +246,18 @@ def test_is_loop_consumable_rejects_feature_without_name() -> None:
     assert is_loop_consumable(yaml_text) is False
 
 
+def test_is_loop_consumable_strips_provenance_frontmatter() -> None:
+    """Renderer-wrapped specs (with --- frontmatter) are still consumable."""
+    wrapped = "---\ngenerated_by: harness-maker\n---\nobjective: x\nfeatures:\n  - name: foo\n"
+    assert is_loop_consumable(wrapped) is True
+
+
+def test_is_loop_consumable_frontmatter_improve_mode() -> None:
+    """Frontmatter-wrapped improve-mode spec is consumable."""
+    wrapped = "---\ngenerated_by: harness-maker\n---\nmode: improve\nobjective: improve auth\n"
+    assert is_loop_consumable(wrapped) is True
+
+
 def test_spec_convergence_overridden_by_argument() -> None:
     """Explicit convergence= argument wins over spec.convergence."""
     spec = LoopSpec(
@@ -251,3 +277,233 @@ def test_spec_convergence_overridden_by_argument() -> None:
     )
     assert state.converged is True
     assert len(state.completed) == 1
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# LoopMode + detect_mode
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def test_detect_mode_returns_feature_by_default() -> None:
+    assert detect_mode("implement login flow") == LoopMode.FEATURE
+    assert detect_mode("add logout endpoint") == LoopMode.FEATURE
+    assert detect_mode("build user profile page") == LoopMode.FEATURE
+
+
+def test_detect_mode_returns_improve_on_keywords() -> None:
+    assert detect_mode("improve code quality") == LoopMode.IMPROVE
+    assert detect_mode("refactor auth module") == LoopMode.IMPROVE
+    assert detect_mode("clean up this service") == LoopMode.IMPROVE
+    assert detect_mode("optimize database queries") == LoopMode.IMPROVE
+    assert detect_mode("코드 품질 개선") == LoopMode.IMPROVE
+    assert detect_mode("리팩토링 필요") == LoopMode.IMPROVE
+
+
+def test_detect_mode_case_insensitive() -> None:
+    assert detect_mode("IMPROVE the API") == LoopMode.IMPROVE
+    assert detect_mode("Refactor this module") == LoopMode.IMPROVE
+
+
+def test_detect_mode_empty_goal_returns_feature() -> None:
+    assert detect_mode("") == LoopMode.FEATURE
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# ImprovementContext + LoopContext
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def _make_context() -> ImprovementContext:
+    return ImprovementContext(
+        purpose="JWT auth handler. Called by API gateway on every request.",
+        invariants=["RS256 algorithm only", "/auth/token signature stable"],
+        priority="safety > performance > readability",
+        test_reliability="e2e: 12 scenarios, unit: 78% coverage. Missing token-expiry cases.",
+        stopping_criteria="0 critical/high issues, ≤2 medium, all e2e passing",
+    )
+
+
+def test_improvement_context_fields() -> None:
+    ctx = _make_context()
+    assert ctx.purpose.startswith("JWT")
+    assert len(ctx.invariants) == 2
+    assert ctx.notes == []
+
+
+def test_improvement_context_notes_field() -> None:
+    ctx = ImprovementContext(
+        purpose="x",
+        invariants=[],
+        priority="readability > safety > performance",
+        test_reliability="low",
+        stopping_criteria="no critical issues",
+        notes=["Redis out of scope", "rate limiting is gateway's job"],
+    )
+    assert len(ctx.notes) == 2
+
+
+def test_loop_context_round_trip(tmp_path: Path) -> None:
+    ctx_path = tmp_path / "auth-service.yaml"
+    ctx_path.write_text(
+        "slug: auth-service\n"
+        "source: TECH_SPEC.md\n"
+        "created_at: '2026-05-04'\n"
+        "updated_at: '2026-05-04'\n"
+        "context:\n"
+        "  purpose: JWT auth handler\n"
+        "  invariants:\n"
+        "    - RS256 only\n"
+        "  priority: safety > performance > readability\n"
+        "  test_reliability: medium\n"
+        "  stopping_criteria: no critical issues\n"
+        "  notes: []\n",
+        encoding="utf-8",
+    )
+    lc = parse_loop_context(ctx_path)
+    assert lc.slug == "auth-service"
+    assert lc.source == "TECH_SPEC.md"
+    assert lc.context.purpose == "JWT auth handler"
+    assert lc.context.invariants == ["RS256 only"]
+
+
+def test_parse_loop_context_strips_frontmatter(tmp_path: Path) -> None:
+    ctx_path = tmp_path / "ctx.yaml"
+    ctx_path.write_text(
+        "---\ngenerated_by: harness-maker\n---\n"
+        "slug: foo\n"
+        "source: ''\n"
+        "created_at: '2026-05-04'\n"
+        "updated_at: '2026-05-04'\n"
+        "context:\n"
+        "  purpose: does stuff\n"
+        "  invariants: []\n"
+        "  priority: readability\n"
+        "  test_reliability: low\n"
+        "  stopping_criteria: none\n"
+        "  notes: []\n",
+        encoding="utf-8",
+    )
+    lc = parse_loop_context(ctx_path)
+    assert lc.slug == "foo"
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# LoopSpec with mode / context / context_ref
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def test_loopspec_features_optional() -> None:
+    """LoopSpec without features field is valid (improve mode)."""
+    spec = LoopSpec(objective="improve auth module", mode=LoopMode.IMPROVE)
+    assert spec.features == []
+    assert spec.mode == LoopMode.IMPROVE
+    # improve mode overrides the class-level default convergence
+    assert spec.convergence == "stopping-criteria"
+
+
+def test_loopspec_improve_explicit_convergence_not_overridden() -> None:
+    """Explicitly set convergence on improve mode is preserved."""
+    spec = LoopSpec(
+        objective="improve auth",
+        mode=LoopMode.IMPROVE,
+        convergence="first-iter",
+    )
+    assert spec.convergence == "first-iter"
+
+
+def test_loopspec_feature_mode_convergence_default_unchanged() -> None:
+    """feature mode still defaults to all-features-completed."""
+    spec = LoopSpec(objective="build foo", features=[Feature(name="a")])
+    assert spec.convergence == "all-features-completed"
+
+
+def test_loopspec_with_inline_context() -> None:
+    ctx = _make_context()
+    spec = LoopSpec(
+        objective="improve auth",
+        mode=LoopMode.IMPROVE,
+        target="src/auth/",
+        context=ctx,
+    )
+    assert spec.context is not None
+    assert spec.context.purpose.startswith("JWT")
+    assert spec.target == "src/auth/"
+
+
+def test_loopspec_with_context_ref() -> None:
+    spec = LoopSpec(
+        objective="improve auth",
+        mode=LoopMode.IMPROVE,
+        context_ref="work-docs/loop-context/auth-service.yaml",
+    )
+    assert spec.context_ref == "work-docs/loop-context/auth-service.yaml"
+    assert spec.context is None
+
+
+def test_parse_loop_spec_improve_mode(tmp_path: Path) -> None:
+    """Improve-mode loop-spec parses correctly with context block."""
+    spec_path = tmp_path / "improve-auth.yaml"
+    spec_path.write_text(
+        "mode: improve\n"
+        "objective: improve auth module quality\n"
+        "target: src/auth/\n"
+        "convergence: stopping-criteria\n"
+        "features: []\n"
+        "context_ref: work-docs/loop-context/auth-service.yaml\n",
+        encoding="utf-8",
+    )
+    spec = parse_loop_spec(spec_path)
+    assert spec.mode == LoopMode.IMPROVE
+    assert spec.target == "src/auth/"
+    assert spec.convergence == "stopping-criteria"
+    assert spec.context_ref == "work-docs/loop-context/auth-service.yaml"
+
+
+def test_is_loop_consumable_improve_mode_empty_features() -> None:
+    """improve mode with no features list is still consumable."""
+    yaml_text = "mode: improve\nobjective: improve auth\ntarget: src/auth/\n"
+    assert is_loop_consumable(yaml_text) is True
+
+
+def test_is_loop_consumable_feature_mode_still_requires_features() -> None:
+    """feature mode (default) without features is not consumable."""
+    yaml_text = "objective: build foo\n"
+    assert is_loop_consumable(yaml_text) is False
+
+
+def test_parse_loop_spec_rejects_invalid_mode(tmp_path: Path) -> None:
+    """Invalid mode value raises ValidationError, not a silent default."""
+    spec_path = tmp_path / "bad-mode.yaml"
+    spec_path.write_text(
+        "objective: x\nmode: invalid_value\nfeatures:\n  - name: a\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValidationError):
+        parse_loop_spec(spec_path)
+
+
+def test_run_improve_spec_empty_features_exits_immediately() -> None:
+    """Improve-mode spec with no features exits with no_remaining_features, not converged."""
+    spec = LoopSpec(objective="improve auth module", mode=LoopMode.IMPROVE)
+    assert spec.features == []
+    state = run(spec=spec, max_iter=5)
+    assert state.converged is False
+    assert state.stop_reason == "no_remaining_features"
+    assert state.iter == 0
+
+
+def test_stopping_criteria_predicate_registered() -> None:
+    """stopping-criteria is a valid predicate name — no unknown-predicate warning."""
+    spec = LoopSpec(
+        objective="improve auth",
+        mode=LoopMode.IMPROVE,
+        convergence="stopping-criteria",
+        features=[Feature(name="cycle-1")],
+    )
+
+    def succeed(feature: Feature, iter_idx: int) -> bool:  # noqa: ARG001
+        return True
+
+    state = run(spec=spec, max_iter=5, executor=succeed)
+    assert state.converged is True
+    assert "cycle-1" in state.completed
