@@ -4,7 +4,7 @@ harness_maker_version: 0.3.5
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/ai-readiness.md.j2
 provenance: official
-content_hash: e5e4853145a67f1f381e2e6f89700f160c1b9f7eb0336b87761f799b3cabdcae
+content_hash: ee09d17fa2aa742ec4b5ea19ea6db907c8072d7bbbf08a7a5c2565b43dad64c4
 ---
 # /hm:ai-readiness
 
@@ -39,7 +39,7 @@ content_hash: e5e4853145a67f1f381e2e6f89700f160c1b9f7eb0336b87761f799b3cabdcae
 ## Run
 
 ```bash
-!uv run python -m harness_maker.cli ai-readiness . $ARGUMENTS
+!uv run --with /home/noel/harness-maker python -m harness_maker.cli ai-readiness . $ARGUMENTS
 ```
 
 ## Improving against the report

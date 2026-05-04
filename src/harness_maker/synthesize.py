@@ -29,6 +29,10 @@ from harness_maker.workflow_fuse import fuse
 # Each tuple: (template path under templates/, output path under .claude/, context supplement)
 FileSpec = tuple[str, str, dict[str, Any]]
 
+# Computed once — points to the directory containing pyproject.toml.
+# Works both from the source repo and from the plugin cache.
+_HARNESS_MAKER_PKG_ROOT = str(Path(__file__).parent.parent.parent)
+
 _ATOMIC_STAGES: list[str] = [s.value for s in AtomicStage]
 
 # Every preset installs the full reviewer/skill inventory; activation is data,
@@ -265,6 +269,7 @@ def synthesize(
                 "stack": profile.stack,
                 "scale": profile.scale,
                 "lifecycle": profile.lifecycle,
+                "harness_maker_src_path": _HARNESS_MAKER_PKG_ROOT,
             },
             frontmatter={},
         )

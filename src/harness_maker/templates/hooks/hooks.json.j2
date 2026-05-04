@@ -4,7 +4,7 @@
       {
         "matcher": "*",
         "hooks": [
-          {"type": "command", "command": "uv run python -m harness_maker.telemetry"}
+          {"type": "command", "command": "uv run --with {{ harness_maker_src_path }} python -m harness_maker.telemetry"}
         ]
       }
     ],
@@ -12,13 +12,13 @@
       {
         "matcher": "Bash",
         "hooks": [
-          {"type": "command", "command": "uv run python -m harness_maker.gates.permission_gate"}
+          {"type": "command", "command": "uv run --with {{ harness_maker_src_path }} python -m harness_maker.gates.permission_gate"}
         ]
       }{% if config.dev_mode == "spec-driven" %},
       {
         "matcher": "Write|Edit",
         "hooks": [
-          {"type": "command", "command": "uv run python -m harness_maker.gates.spec_gate"}
+          {"type": "command", "command": "uv run --with {{ harness_maker_src_path }} python -m harness_maker.gates.spec_gate"}
         ]
       }{% endif %}
     ],

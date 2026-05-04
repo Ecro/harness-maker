@@ -136,8 +136,7 @@ def interview(
         )
 
     print(
-        f"\nDetected: stack={profile.stack}, scale={profile.scale}, "
-        f"lifecycle={profile.lifecycle}",
+        f"\nDetected: stack={profile.stack}, scale={profile.scale}, lifecycle={profile.lifecycle}",
     )
     locale = _ask_locale()
     preset = _ask_preset(recommended)
@@ -183,11 +182,7 @@ def _recommend_dev_mode(preset: Preset) -> DevMode:
 
 def _ask_dev_mode(preset: Preset) -> DevMode:
     recommended = _recommend_dev_mode(preset)
-    other = (
-        DevMode.SPEC_DRIVEN
-        if recommended == DevMode.TASK_DRIVEN
-        else DevMode.TASK_DRIVEN
-    )
+    other = DevMode.SPEC_DRIVEN if recommended == DevMode.TASK_DRIVEN else DevMode.TASK_DRIVEN
     label = f"dev_mode [{recommended.value} / {other.value}]"
     raw = _input_or_empty(f"{label} ({recommended.value}): ")
     cleaned = raw.strip().lower()
@@ -260,11 +255,7 @@ def _ask_fused_workflows(
         print(f"  /hm:{name}  ({nums}) → {joined}")
 
     use_default = _input_or_empty("Use recommended? [Y/n]: ").strip().lower()
-    chosen = (
-        starter
-        if use_default in ("", "y", "yes")
-        else (_ask_custom_workflows() or starter)
-    )
+    chosen = starter if use_default in ("", "y", "yes") else (_ask_custom_workflows() or starter)
 
     default_seed = _default_for(preset) if chosen is starter else next(iter(chosen))
     default_name = _ask_with_default("default workflow", default_seed)

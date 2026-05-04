@@ -14,8 +14,6 @@ def _profile() -> ProjectProfile:
     return ProjectProfile(stack=["python"], scale="small", lifecycle="experiment")
 
 
-
-
 def test_render_empty_blueprint(tmp_path: Path) -> None:
     bp = Blueprint()
     written = render(bp, tmp_path, freeze_time=DEFAULT_FREEZE_TIME)

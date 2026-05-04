@@ -5,28 +5,23 @@ description: Pre-wrapup gate enforcing 6 checks before any /hm:wrapup or autoloo
 
 # verify-before-completion
 
-Mandatory gate that runs immediately before `/hm:wrapup` OR before an
+Mandatory gate that runs immediately before `/hm:wrapup` or before an
 autoloop iteration is considered closed. All 6 checks must pass; the first
 failure short-circuits the gate and blocks completion.
 
 ## When to Invoke
 
-- `/hm:wrapup` automatically calls this skill before commit
-- `/hm:loop` calls this skill at the end of each iteration before marking
-  the feature `completed`
-- Manual: `/hm:verify` (the atomic stage) explicitly invokes the gate
+- `/hm:wrapup` — automatically before commit
+- `/hm:loop` — at the end of each iteration
+- Manual: `/hm:verify`
 
 ## The 6 Checks
 
-Each check returns exit code 0 on pass, non-zero on fail. The orchestrator
-collects all 6 results, but failure on any one blocks completion.
+### 1. PLAN/SPEC fulfillment — LLM-judged (hard fail)
 
-### 1. PLAN/SPEC 충족 (PLAN/SPEC fulfillment) — LLM-judged
-
-LLM reads the PLAN body + the diff and rules each PLAN item `fulfilled` or
-not, with cited evidence (file:line refs). Ticked checkboxes alone do NOT
-pass — the diff must contain matching code/test/doc changes. Drift gate:
-SPEC frontmatter `status: approved` or `evolving`.
+LLM reads the PLAN body + diff and rules each item `fulfilled` or not with
+cited evidence. Ticked checkboxes alone do NOT pass — the diff must contain
+matching code/test/doc changes.
 
 ```bash
 work_docs="{{ config.work_docs.dir }}"
@@ -36,7 +31,8 @@ test -n "$plan" || exit 1
 diff_file=$(mktemp)
 trap 'rm -f "$diff_file"' EXIT
 git diff HEAD~1 HEAD > "$diff_file" 2>/dev/null || git diff > "$diff_file"
-PLAN="$plan" DIFF_FILE="$diff_file" uv run python -c "
+PLAN="$plan" DIFF_FILE="$diff_file" \
+  uv run --with {{ harness_maker_src_path }} python -c "
 import os, sys
 from pathlib import Path
 from harness_maker.llm_judge import AnthropicJudgeClient
@@ -45,8 +41,7 @@ diff_text = Path(os.environ['DIFF_FILE']).read_text(encoding='utf-8', errors='re
 try:
     result = verify_plan(Path(os.environ['PLAN']), diff_text, client=AnthropicJudgeClient())
 except PlanVerifyError as e:
-    print(f'BLOCKED: PLAN verify error — {e}', file=sys.stderr)
-    sys.exit(1)
+    print(f'BLOCKED: PLAN verify error — {e}', file=sys.stderr); sys.exit(1)
 if not result.overall_pass:
     for it in (i for i in result.items if not i.fulfilled):
         print(f'BLOCKED: {it.text} — {it.reason}', file=sys.stderr)
@@ -54,58 +49,39 @@ if not result.overall_pass:
 "
 ```
 
-The check is **hard-fail**: any LLM transport error or any unfulfilled PLAN
-item blocks completion. Falling back to a checkbox grep would defeat the
-gate's purpose.
-
-### 2. 회귀 게이트 (Regression / smoke gate)
-
-The repo's smoke verify script must pass for the current phase. For
-harness-maker itself this is `bash .claude-verify.sh phase_<N>`; user
-projects substitute their own smoke command via `harness.yaml.verify.cmd`.
+### 2. Regression / smoke gate
 
 ```bash
 bash .claude-verify.sh phase_${CURRENT_PHASE} || exit 1
 ```
 
-### 3. Health 점수 -5 이내 (Health score within -5 of baseline)
-
-Compute the Health 6-dim composite via `harness_maker.readiness.compute_health`
-and compare against the last recorded baseline (in
-`.claude/observability/metrics.jsonl`). Drop > 5 points blocks completion.
+### 3. Health score within −5 of baseline
 
 ```bash
-python -c "
+uv run --with {{ harness_maker_src_path }} python -c "
 from pathlib import Path
 from harness_maker.readiness import compute_health
 from harness_maker.models import Preset
-score = compute_health(Path('.'), Preset.SIDE)['composite']
 import json, sys
+score = compute_health(Path('.'), Preset.SIDE)['composite']
 metrics = Path('.claude/observability/metrics.jsonl')
 baseline = 0
 if metrics.exists():
     for line in metrics.read_text().splitlines():
         rec = json.loads(line)
-        if 'health' in rec:
-            baseline = rec['health']
+        if 'health' in rec: baseline = rec['health']
 sys.exit(0 if score >= baseline - 5 else 1)
 "
 ```
 
-### 4. Anti-rot pending defer 또는 처리 (Anti-rot pending resolved)
-
-No unresolved anti-rot proposals may be pending. Either accept, reject, or
-explicitly defer (writing a defer marker) before completion.
+### 4. Anti-rot pending resolved
 
 ```bash
 test ! -f .claude/observability/refresh/pending.jsonl || \
   grep -q '"action":"defer"' .claude/observability/refresh/pending.jsonl || exit 1
 ```
 
-### 5. 보안 high finding 0건 (Zero high-severity security findings)
-
-The 5 security gates (secrets, permissions, hook injection, dependency CVEs,
-prompt injection) must report zero `severity: high` findings.
+### 5. Zero high-severity security findings
 
 ```bash
 findings=.claude/observability/security/findings.jsonl
@@ -115,48 +91,21 @@ if [ -f "$findings" ]; then
 fi
 ```
 
-### 6. Worktree merge 가능 (Worktree merge-safe)
-
-When worktree isolation is enabled, the active worktree must merge cleanly
-into the parent branch. No conflict markers, no whitespace errors.
+### 6. Worktree merge-safe
 
 ```bash
 git diff --check || exit 1
-# Optional: dry-run merge to detect conflicts before /hm:wrapup commits.
 git merge-tree $(git merge-base HEAD main) HEAD main | grep -q "<<<<<<<" && exit 1
 exit 0
 ```
 
 ## Failure Behavior
 
-- First failing check halts the gate immediately
-- Output: `BLOCKED: check <N> (<name>) — <stderr tail>`
-- Remediation hint per check (PLAN unclosed → list incomplete tasks; smoke
-  fail → re-run failing test; Health drop → show 6-dim breakdown; pending
-  refresh → suggest `/hm:refresh`; security high → list findings; merge
-  conflict → show conflicting paths)
-
-## Implementation
-
-This skill is a thin orchestrator that runs the 6 checks in order, collects
-exit codes, and emits a structured report. Per-check logic lives in the
-referenced Python modules + bash snippets above. No retries — checks are
-deterministic; flakiness is a defect to fix in the check, not retry around.
-
-## Output
-
-```json
-{
-  "passed": [1, 2, 4, 5, 6],
-  "failed": [3],
-  "blocking": true,
-  "first_failure": "Health 점수 -5 이내",
-  "remediation": "Health dropped from 78 to 71 (delta -7). See dashboard."
-}
-```
-
-When `blocking: true`, the calling command (`/hm:wrapup` or autoloop iter)
-must abort completion.
+First failing check halts the gate. Output: `BLOCKED: check <N> (<name>) — <stderr tail>`.
+When blocked, the calling command must abort. Remediation hints:
+PLAN unclosed → list incomplete tasks; smoke fail → re-run failing test;
+Health drop → show 6-dim breakdown; pending refresh → `/hm:refresh`;
+security high → list findings; merge conflict → show conflicting paths.
 
 <!-- @hm:user:extensions -->
 <!-- Project-specific verify checks beyond the 6 baseline. Preserved across harness-maker upgrades. -->

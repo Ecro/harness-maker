@@ -106,8 +106,7 @@ def render_dashboard_markdown(plan: ImprovementPlan, project_name: str) -> str:
         "|-------|------:|------------------|",
         f"| readiness | {plan.layer_scores['readiness']} | "
         "Deterministic structural signals (CLAUDE.md, hooks, tests, CI, …) |",
-        f"| llm_judge | {plan.layer_scores['llm_judge']} | "
-        "LLM-judged content quality vs rubrics |",
+        f"| llm_judge | {plan.layer_scores['llm_judge']} | LLM-judged content quality vs rubrics |",
         f"| cache | {plan.layer_scores['cache']} | "
         "Prompt-cache hit rate + failure-mode diagnosis |",
         "",

@@ -466,8 +466,7 @@ def _dim_guardrails(project_dir: Path) -> DimensionScore:
     sec_action = (
         None
         if high_count == 0
-        else f"Resolve {high_count} high-severity finding(s) "
-        "under .claude/observability/security/"
+        else f"Resolve {high_count} high-severity finding(s) under .claude/observability/security/"
     )
     signals.append(
         _signal(

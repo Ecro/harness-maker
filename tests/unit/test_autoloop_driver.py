@@ -200,12 +200,7 @@ def test_parse_loop_spec_strips_provenance_frontmatter(tmp_path: Path) -> None:
     """Renderer-wrapped loop-spec.yaml (with `---` provenance) parses cleanly."""
     spec_path = tmp_path / "wrapped.yaml"
     spec_path.write_text(
-        "---\n"
-        "generated_by: test\n"
-        "---\n"
-        "objective: x\n"
-        "features:\n"
-        "  - name: a\n",
+        "---\ngenerated_by: test\n---\nobjective: x\nfeatures:\n  - name: a\n",
         encoding="utf-8",
     )
     spec = parse_loop_spec(spec_path)
@@ -223,11 +218,7 @@ def test_is_loop_consumable_rejects_markdown() -> None:
 
 
 def test_is_loop_consumable_accepts_well_formed_yaml() -> None:
-    yaml_text = (
-        "objective: x\n"
-        "features:\n"
-        "  - name: foo\n"
-    )
+    yaml_text = "objective: x\nfeatures:\n  - name: foo\n"
     assert is_loop_consumable(yaml_text) is True
 
 

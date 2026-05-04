@@ -173,12 +173,7 @@ def test_detect_drift_ignores_unknown_recorded_id() -> None:
 
 
 def test_merge_preserves_user_block_content() -> None:
-    old = (
-        "header\n"
-        "<!-- @hm:user:notes -->\n"
-        "my custom step\n"
-        "<!-- @hm:/user:notes -->\n"
-    )
+    old = "header\n<!-- @hm:user:notes -->\nmy custom step\n<!-- @hm:/user:notes -->\n"
     new = (
         "header v2\n"  # template structure changed
         "<!-- @hm:user:notes -->\n"
@@ -196,12 +191,7 @@ def test_merge_preserves_user_block_content() -> None:
 
 def test_merge_seeds_new_user_block_when_old_missing() -> None:
     old = "header\n"  # no markers in OLD
-    new = (
-        "header\n"
-        "<!-- @hm:user:notes -->\n"
-        "(seed)\n"
-        "<!-- @hm:/user:notes -->\n"
-    )
+    new = "header\n<!-- @hm:user:notes -->\n(seed)\n<!-- @hm:/user:notes -->\n"
     merged, report = merge(old, new)
     assert "(seed)" in merged
     assert report.user_blocks_seeded == ["notes"]
@@ -209,12 +199,7 @@ def test_merge_seeds_new_user_block_when_old_missing() -> None:
 
 
 def test_merge_orphans_old_user_block_absent_from_new() -> None:
-    old = (
-        "header\n"
-        "<!-- @hm:user:legacy -->\n"
-        "important user content\n"
-        "<!-- @hm:/user:legacy -->\n"
-    )
+    old = "header\n<!-- @hm:user:legacy -->\nimportant user content\n<!-- @hm:/user:legacy -->\n"
     new = "header v2\n"  # no user blocks
     merged, report = merge(old, new)
     assert "important user content" in merged
@@ -224,12 +209,7 @@ def test_merge_orphans_old_user_block_absent_from_new() -> None:
 
 
 def test_merge_replaces_template_content_outside_markers() -> None:
-    old = (
-        "old template body\n"
-        "<!-- @hm:user:notes -->\n"
-        "user note\n"
-        "<!-- @hm:/user:notes -->\n"
-    )
+    old = "old template body\n<!-- @hm:user:notes -->\nuser note\n<!-- @hm:/user:notes -->\n"
     new = (
         "new template body with grade gate\n"
         "<!-- @hm:user:notes -->\n"
@@ -246,12 +226,7 @@ def test_merge_idempotent_when_no_user_edits() -> None:
     """If OLD has user block with seed content and NEW has the same seed,
     merging produces the same file (modulo whitespace).
     """
-    text = (
-        "header\n"
-        "<!-- @hm:user:notes -->\n"
-        "(seed)\n"
-        "<!-- @hm:/user:notes -->\n"
-    )
+    text = "header\n<!-- @hm:user:notes -->\n(seed)\n<!-- @hm:/user:notes -->\n"
     merged, report = merge(text, text)
     assert merged == text
     assert report.user_blocks_preserved == ["notes"]

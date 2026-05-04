@@ -73,7 +73,7 @@ Three design commitments shape every decision below:
         │      ◀── M3 atomic stages                           │
         │    <user-named>.md  ◀── M3 fused workflows          │
         │    loop.md          ◀── M7 autoloop driver          │
-        │    monitor.md       ◀── M5 dashboard                │
+        │    ai-readiness.md  ◀── M5 scored readiness report   │
         │    refresh.md       ◀── M4 anti-rot, manual confirm │
         │  skills/  (10)      ◀── including verify-before,    │
         │                          conditional-router,        │

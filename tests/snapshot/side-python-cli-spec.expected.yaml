@@ -34,7 +34,7 @@ files:
   body_sha256: db7f1929425a16ccd8381e392f3b8f058e3305114c0e32c6e03ca4bdcd843113
 - path: commands/hm/ai-readiness.md
   template: commands/hm/ai-readiness.md.j2
-  body_sha256: e5e4853145a67f1f381e2e6f89700f160c1b9f7eb0336b87761f799b3cabdcae
+  body_sha256: ee09d17fa2aa742ec4b5ea19ea6db907c8072d7bbbf08a7a5c2565b43dad64c4
 - path: commands/hm/exec-rev-wrap.md
   template: commands/hm/workflow_command.md.j2
   body_sha256: 4f5d1eb92c811efc99e24af9f4dcac5f3d48dea85bbb05dcfb705d2962154219
@@ -76,7 +76,7 @@ files:
   body_sha256: 9e91c1be4ee465bcace02e0561d96e0b5ab7d3d6c19d61932723524f7eef1f55
 - path: hooks/hooks.json
   template: hooks/hooks.json.j2
-  body_sha256: 472e1652d67973140ad77ee3a641cc9f7e7bb268c7e3244a49e1276d4be4f33d
+  body_sha256: fd9fc1e87ca021df68389ac5476835fc59ba38a4eb1f632879e09fe5af8f7b2b
 - path: memory/failures.md
   template: memory/failures.ko.md.j2
   body_sha256: c8c41d8fd473350a246e6861675a55e14390bd269018f08f3b82e72b95635772
@@ -127,7 +127,7 @@ files:
   body_sha256: 5d866a1d4fbfd0f47431318f79159a5727582f8de222dca65748f649c882cd7b
 - path: skills/verify-before-completion/SKILL.md
   template: skills/verify-before-completion/SKILL.md.j2
-  body_sha256: 350fb4d6f0b6bd350de60f5e04ba9a3fa2fa88d97f2418ab04e2c1567ae98fbf
+  body_sha256: c28985a37c6edbd99c91da68511cee45c15ff491baa597596b37c452479c56fd
 - path: skills/worktree-isolator/SKILL.md
   template: skills/worktree-isolator/SKILL.md.j2
   body_sha256: 5301cc02a594968ca7861982eddfd2448d7a9eff084f390f5e2b4b2a7ae693c5

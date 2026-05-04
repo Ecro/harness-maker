@@ -51,9 +51,7 @@ def test_snapshot_matches(
     tmp_path: Path,
 ) -> None:
     fix_dir = Path(__file__).parent.parent / "fixtures" / fixture
-    snap_path = (
-        Path(__file__).parent.parent / "snapshot" / f"{fixture}-{mode_label}.expected.yaml"
-    )
+    snap_path = Path(__file__).parent.parent / "snapshot" / f"{fixture}-{mode_label}.expected.yaml"
     expected = yaml.safe_load(snap_path.read_text())
     p = profile(fix_dir)
     a = interview(p, autoloop_mode=True).model_copy(update={"dev_mode": mode})

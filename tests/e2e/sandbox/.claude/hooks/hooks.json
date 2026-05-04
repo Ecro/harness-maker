@@ -4,7 +4,7 @@
       {
         "hooks": [
           {
-            "command": "uv run python -m harness_maker.telemetry",
+            "command": "uv run --with /home/noel/harness-maker python -m harness_maker.telemetry",
             "type": "command"
           }
         ],

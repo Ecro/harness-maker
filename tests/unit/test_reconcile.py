@@ -80,12 +80,7 @@ def test_reconcile_hash_mismatch_both_have_markers_returns_merge_block(tmp_path:
     """
     target = tmp_path / "review.md"
     # OLD body has a user block — simulates a previously-rendered review.md.
-    body = (
-        "# Stage: review\n"
-        "<!-- @hm:user:notes -->\n"
-        "my custom step\n"
-        "<!-- @hm:/user:notes -->\n"
-    )
+    body = "# Stage: review\n<!-- @hm:user:notes -->\nmy custom step\n<!-- @hm:/user:notes -->\n"
     fm = (
         "---\ncontent_hash: 0000000000000000000000000000000000000000000000000000000000000000\n---\n"
     )
@@ -102,11 +97,7 @@ def test_reconcile_malformed_markers_falls_back_to_keep(tmp_path: Path) -> None:
     the diagnostic so the user can fix their markup.
     """
     target = tmp_path / "review.md"
-    body = (
-        "# Stage: review\n"
-        "<!-- @hm:user:notes -->\n"
-        "user content but close tag is missing\n"
-    )
+    body = "# Stage: review\n<!-- @hm:user:notes -->\nuser content but close tag is missing\n"
     fm = (
         "---\ncontent_hash: 0000000000000000000000000000000000000000000000000000000000000000\n---\n"
     )

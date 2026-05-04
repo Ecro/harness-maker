@@ -1,6 +1,6 @@
 # harness-maker
 
-A Claude Code plugin that **generates and refines a project-tailored `.claude/` harness** — commands, skills, agents, hooks, and observability — tuned to your stack, scale, and lifecycle. It does not run your project code; it builds the runtime that does. Anti-rot keeps the harness fresh against the moving Claude Code ecosystem; worktree isolation and 5 security gates keep it safe; built-in monitoring (효율 / Health / fresh) keeps it honest.
+A Claude Code plugin that **generates and refines a project-tailored `.claude/` harness** — commands, skills, agents, hooks, and observability — tuned to your stack, scale, and lifecycle. It does not run your project code; it builds the runtime that does. Anti-rot keeps the harness fresh against the moving Claude Code ecosystem; worktree isolation and 5 security gates keep it safe; `/hm:ai-readiness` gives a scored, ranked action plan for improving AI-pair quality.
 
 ## Requirements
 
@@ -28,7 +28,7 @@ A single command takes you from zero to a fully-rendered `.claude/` directory wi
 After install, the rendered harness exposes its own commands under `/hm:*`:
 
 - `/hm:loop "<goal>"` — autoloop driver (token-unbounded, time/iter-bounded)
-- `/hm:monitor` — open the dashboard
+- `/hm:ai-readiness` — scored 3-layer readiness report + ranked action plan
 - `/hm:refresh` — anti-rot crawl + manual confirm
 - `/hm:research` · `/hm:spec` · `/hm:plan` · `/hm:execute` · `/hm:review` · `/hm:wrapup` · `/hm:verify` — atomic stages
 - Plus user-named workflows fused from those stages (e.g. `/hm:dev`, `/hm:careful`)
@@ -37,7 +37,7 @@ After install, the rendered harness exposes its own commands under `/hm:*`:
 
 - **Single command, no subcommand sprawl** — `/harness-maker:make` is the only entry point. Everything else is a flag.
 - **Two presets, ten+ override dimensions** — pick `Side` (1 reviewer, lean) or `Production` (5 reviewers, verify-required); then tune workflow naming, models, autoloop, anti-rot, worktree, security, context-lint, memory, caching.
-- **Three live metrics** — 효율 (cache hit %), Health (0-100 across 6 dimensions + Agent quality drill-down), fresh (days since refresh). All telemetry stays local.
+- **AI-readiness scoring** — `/hm:ai-readiness` runs a 3-layer composite: deterministic structural checks (70%), LLM rubric evaluation (25%), prompt-cache diagnostics (5%). Outputs a 0-100 score with P0/P1/P2 ranked actions and updates `.claude/observability/dashboard.md`. All telemetry stays local.
 - **Anti-rot pipeline** — weekly crawl across 4 sources (Anthropic blog/changelog, GitHub releases, arxiv cs.SE/CL/CR, OSV.dev), LLM-scored with adaptive threshold, **always manual-confirmed** via `AskUserQuestion`. No silent overwrites.
 - **Worktree isolation** — every `/hm:execute` (and optionally `/hm:plan`) runs in a fresh `git worktree` under `.claude/.worktrees/`. Successful runs cleanup; failures preserve evidence.
 - **5 security gates** — secrets (regex + entropy), permissions (`settings.json` over-grant), hook injection (`hooks.json` AST scan), dependency CVEs (OSV.dev), prompt injection (hidden-instruction detection + privilege separation between reviewer and executor agents).
@@ -51,7 +51,7 @@ Other Claude Code harnesses pick a niche; harness-maker is the **meta-tool** tha
 | Project | Scope | What harness-maker adds |
 |---|---|---|
 | **ohmyclaudecode** | Curated commands/agents (skills bundle) | Project-tailored synthesis (preset + 10+ override dims), brownfield reconcile, provenance, anti-rot pipeline |
-| **superpowers** | Powerful sub-agents and workflows | Single-command entry, monitoring (3 metrics), worktree isolation by default, privilege-separated reviewer/executor |
+| **superpowers** | Powerful sub-agents and workflows | Single-command entry, ai-readiness scoring, worktree isolation by default, privilege-separated reviewer/executor |
 | **Archon** | Knowledge-base + RAG-backed planning | Stack/scale/lifecycle profiler, atomic+fused workflow engine, conditional reviewer routing, 5 security gates |
 
 harness-maker treats the `.claude/` directory itself as the artifact and gives it a lifecycle: profile → interview → synthesize → render → reconcile → verify → refresh.

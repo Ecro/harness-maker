@@ -29,7 +29,7 @@ harness-maker/
 │   ├── relevance.py          # M4: LLM scoring + adaptive threshold
 │   └── i18n.py               # locale-first messaging
 ├── templates/                # Jinja2 templates (the harness's payload)
-│   ├── commands/hm/          # /hm:<stage> + /hm:loop / monitor / refresh
+│   ├── commands/hm/          # /hm:<stage> + /hm:loop / ai-readiness / refresh
 │   ├── skills/<name>/SKILL.md.j2
 │   ├── agents/<name>.md.j2
 │   ├── stages/<stage>.md.j2  # atomic stage fragments for workflow fusion
