@@ -22,6 +22,7 @@ drift in the proposed-<date>.md so the user knows when to re-run
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
@@ -32,6 +33,7 @@ from typing import Literal
 import yaml
 
 from harness_maker.io_utils import atomic_write
+from harness_maker.llm_judge import JudgeClient
 from harness_maker.models import CrawlItem
 
 DEFAULT_THRESHOLD = 0.7
@@ -68,11 +70,10 @@ def adaptive_threshold(history: list[bool]) -> float:
     return DEFAULT_THRESHOLD
 
 
-def score_item(item: CrawlItem, project_keywords: list[str]) -> float:
-    """Return a relevance score in ``[0, 1]`` from keyword overlap.
+def _keyword_score(item: CrawlItem, project_keywords: list[str]) -> float:
+    """Fallback: keyword-overlap heuristic when the LLM scorer is unreachable.
 
-    Score = (unique project keywords matched) / (total unique project keywords).
-    Returns 0.0 when ``project_keywords`` is empty.
+    Score = (unique project keywords matched in title+summary) / (total keywords).
     """
     if not project_keywords:
         return 0.0
@@ -81,10 +82,94 @@ def score_item(item: CrawlItem, project_keywords: list[str]) -> float:
     keyword_set = {k.lower().strip() for k in project_keywords if k.strip()}
     if not keyword_set:
         return 0.0
-    # Token-set membership only — substring fallback caused false positives
-    # (e.g. keyword "ai" matching "maintain"/"detail"). Word-boundary safe.
     matched = sum(1 for kw in keyword_set if kw in haystack_tokens)
     return matched / len(keyword_set)
+
+
+_PROJECT_CTX_CHAR_CAP = 2000  # per file
+
+
+def extract_project_context(project_dir: Path) -> str:
+    """Build the relevance scorer's system-prompt context from project docs.
+
+    Reads CLAUDE.md and README.md, capped at ``_PROJECT_CTX_CHAR_CAP`` chars
+    each. Returns an empty string when neither exists; the LLM scorer treats
+    that as "no signal" and defers to the keyword fallback.
+    """
+    parts: list[str] = []
+    for name in ("CLAUDE.md", "README.md"):
+        p = project_dir / name
+        if not p.is_file():
+            continue
+        try:
+            text = p.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        snippet = text[:_PROJECT_CTX_CHAR_CAP]
+        parts.append(f"--- {name} ---\n{snippet}")
+    return "\n\n".join(parts)
+
+
+def _build_relevance_system_prompt(project_context: str) -> str:
+    return (
+        "You score the relevance of a crawled research item to a specific "
+        "project. Return JSON ONLY in the exact shape:\n"
+        '  {"score": <float 0..1>, "rationale": "<one sentence>"}\n\n'
+        "Higher score = more directly applicable to this project's tech "
+        "stack, current work, or stated principles. Lower score = generic "
+        "or unrelated.\n\n"
+        f"Project context:\n{project_context}\n"
+    )
+
+
+def _parse_relevance_response(raw: str) -> tuple[float | None, str]:
+    body = raw.strip()
+    if body.startswith("```"):
+        nl = body.find("\n")
+        if nl != -1:
+            body = body[nl + 1 :]
+        if body.endswith("```"):
+            body = body[:-3]
+    try:
+        data = json.loads(body)
+    except (json.JSONDecodeError, ValueError):
+        return None, "non-JSON LLM response"
+    if not isinstance(data, dict):
+        return None, "LLM response not an object"
+    raw_score = data.get("score")
+    rationale = data.get("rationale", "") if isinstance(data.get("rationale"), str) else ""
+    if not isinstance(raw_score, int | float):
+        return None, "missing score"
+    return max(0.0, min(1.0, float(raw_score))), rationale
+
+
+def score_item(
+    item: CrawlItem,
+    project_keywords: list[str] | None = None,
+    *,
+    project_context: str | None = None,
+    client: JudgeClient | None = None,
+    model: str = "claude-sonnet-4-6",
+) -> float:
+    """LLM-judged relevance with keyword-overlap fallback.
+
+    When ``client`` and ``project_context`` are provided, the LLM scores the
+    item against the project's CLAUDE.md / README.md. Any LLM failure
+    (non-JSON, network, missing API key) falls back to the keyword scorer
+    using ``project_keywords`` — the call site never crashes.
+    """
+    if client is not None and project_context:
+        try:
+            system = _build_relevance_system_prompt(project_context)
+            user = f"Title: {item.title}\nSummary: {item.summary}\nSource: {item.source}"
+            raw = client.judge(system, user, model)
+        except Exception:  # noqa: BLE001 — LLM transport failures degrade gracefully
+            raw = None
+        if raw is not None:
+            score, _rationale = _parse_relevance_response(raw)
+            if score is not None:
+                return score
+    return _keyword_score(item, project_keywords or [])
 
 
 def filter_items(items: list[CrawlItem], threshold: float) -> list[CrawlItem]:
@@ -92,10 +177,22 @@ def filter_items(items: list[CrawlItem], threshold: float) -> list[CrawlItem]:
     return [item for item in items if item.score >= threshold]
 
 
-# Backwards-compat alias used by .claude-verify.sh final_acceptance step.
-def score(item: CrawlItem, project_keywords: list[str]) -> float:
-    """Public alias for :func:`score_item` (used by external acceptance gate)."""
-    return score_item(item, project_keywords)
+def score(
+    item: CrawlItem,
+    project_keywords: list[str] | None = None,
+    *,
+    project_context: str | None = None,
+    client: JudgeClient | None = None,
+    model: str = "claude-sonnet-4-6",
+) -> float:
+    """Public alias for :func:`score_item` — kept for the verify-script entrypoint."""
+    return score_item(
+        item,
+        project_keywords,
+        project_context=project_context,
+        client=client,
+        model=model,
+    )
 
 
 # ──────────────────────────────────────────────────────────────────────────────

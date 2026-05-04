@@ -55,7 +55,7 @@ files:
   body_sha256: ade6f25cd31ea71907b81df4882ffeaefc6602ec3a85705915c1b1f9db8d85ec
 - path: commands/hm/refresh.md
   template: commands/hm/refresh.md.j2
-  body_sha256: 91e1e9a305d206a91a3588db8fd6d8e540bcdd2f6213a5ec670b60cc28b8f1ea
+  body_sha256: cacc4b385a8702eeafea7ede9fcab2018a8107cfbbc3efce88d9153e4186c32f
 - path: commands/hm/res-spec-plan.md
   template: commands/hm/workflow_command.md.j2
   body_sha256: 7f05b9c2ec2cf044cb28ea4ddf1c430a7fc83e5b38524c26ba44d830ec2d44df
@@ -106,7 +106,7 @@ files:
   body_sha256: ccca560d99dc320945f8c31c92e5c69ecbcf2d615bc145496ae9583698b7c11d
 - path: skills/agent-quality-rubric/SKILL.md
   template: skills/agent-quality-rubric/SKILL.md.j2
-  body_sha256: 049ddd30a4566abcc3ca1efac0a7723b463bae3bf778d1b2fa561b950524d910
+  body_sha256: 5a863f9da9e424ebe5389194556fc3b917b9764bf5ad36f24ee1b86c14aeab1c
 - path: skills/ai-readiness-rubric/SKILL.md
   template: skills/ai-readiness-rubric/SKILL.md.j2
   body_sha256: 041e8b0bce3a0e1dc2176dec3e3ca5cf84e79be9a2ccaf0be7327556f4320e5d
@@ -130,7 +130,7 @@ files:
   body_sha256: 5d866a1d4fbfd0f47431318f79159a5727582f8de222dca65748f649c882cd7b
 - path: skills/verify-before-completion/SKILL.md
   template: skills/verify-before-completion/SKILL.md.j2
-  body_sha256: df89c5fb7ae62ed917ced284efc3629d4a194f3314ccd369ecada65c103cae45
+  body_sha256: 350fb4d6f0b6bd350de60f5e04ba9a3fa2fa88d97f2418ab04e2c1567ae98fbf
 - path: skills/worktree-isolator/SKILL.md
   template: skills/worktree-isolator/SKILL.md.j2
   body_sha256: 5301cc02a594968ca7861982eddfd2448d7a9eff084f390f5e2b4b2a7ae693c5

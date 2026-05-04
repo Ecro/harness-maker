@@ -4,7 +4,7 @@ harness_maker_version: 0.3.5
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/refresh.md.j2
 provenance: official
-content_hash: 91e1e9a305d206a91a3588db8fd6d8e540bcdd2f6213a5ec670b60cc28b8f1ea
+content_hash: cacc4b385a8702eeafea7ede9fcab2018a8107cfbbc3efce88d9153e4186c32f
 ---
 # /hm:refresh
 
@@ -107,9 +107,12 @@ Then for each line in `proposed-<date>.md` invoke **AskUserQuestion** —
 `accept` / `reject` / `defer`. On `accept`:
 - For a stale asset: call `harness_maker.relevance.update_last_reviewed_at(path)`
   to refresh the date in place (body stays the user's responsibility).
-- For a crawl item: score with `harness_maker.relevance.score_item`, filter
-  via `filter_items(items, adaptive_threshold(history))`, and patch the
-  relevant `.claude/` asset.
+- For a crawl item: score with `harness_maker.relevance.score_item` —
+  the LLM scorer reads the project's CLAUDE.md/README via
+  `extract_project_context(project_dir)` and judges relevance against this
+  specific project (falls back to keyword overlap on LLM error). Then
+  filter via `filter_items(items, adaptive_threshold(history))` and patch
+  the relevant `.claude/` asset.
 
 ## Autoloop behavior
 

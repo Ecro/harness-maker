@@ -14,12 +14,13 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from harness_maker.llm_judge import AnthropicJudgeClient, JudgeClient
 from harness_maker.models import Finding
 from harness_maker.secscan import (
     scan_dependency_cves,
     scan_hook_injection,
     scan_permissions,
-    scan_prompt_injection,
+    scan_prompt_injection_llm,
     scan_secrets,
 )
 
@@ -50,11 +51,28 @@ def _on_finding_policy(harness_config: dict[str, Any] | None) -> str:
     return "warn"
 
 
+def _build_pi_client() -> JudgeClient | None:
+    """Best-effort Anthropic client for the prompt-injection LLM second pass."""
+    try:
+        return AnthropicJudgeClient()
+    except Exception:  # noqa: BLE001 — falling back to regex-only is fine
+        return None
+
+
 def scan_all(
     target_dir: Path,
     harness_config: dict[str, Any] | None = None,
+    *,
+    pi_client: JudgeClient | None = None,
 ) -> list[Finding]:
-    """Run all 5 security gates against ``target_dir``; persist + return findings."""
+    """Run all 5 security gates against ``target_dir``; persist + return findings.
+
+    The prompt-injection gate runs both regex and an LLM second pass (via
+    ``scan_prompt_injection_llm``). On any LLM transport error the gate
+    silently falls back to regex-only — the security scanner must never
+    raise, since blocking edits on a flaky network call is worse than a
+    one-off missed polymorphic injection.
+    """
     findings: list[Finding] = []
 
     findings.extend(scan_secrets(target_dir))
@@ -71,7 +89,9 @@ def scan_all(
 
     findings.extend(scan_dependency_cves(target_dir))
 
-    # Prompt-injection scan: walk markdown files in target_dir for hidden patterns.
+    # Prompt-injection scan: walk markdown files for hidden patterns + LLM.
+    if pi_client is None:
+        pi_client = _build_pi_client()
     pi_text_sources: list[Path] = []
     for ext in ("*.md", "*.txt"):
         pi_text_sources.extend(target_dir.rglob(ext))
@@ -82,12 +102,16 @@ def scan_all(
             text = src.read_text(encoding="utf-8", errors="replace")
         except OSError:
             continue
-        for f in scan_prompt_injection(text):
+        per_file = (
+            scan_prompt_injection_llm(text, client=pi_client)
+            if pi_client is not None
+            else scan_prompt_injection_regex_only(text)
+        )
+        for f in per_file:
             try:
                 rel = str(src.relative_to(target_dir))
             except ValueError:
                 rel = str(src)
-            # Re-bind the file field (per-source).
             findings.append(
                 Finding(
                     severity=f.severity,
@@ -102,9 +126,13 @@ def scan_all(
     _persist(findings, target_dir)
 
     policy = _on_finding_policy(harness_config)
-    # Policy is informational at this layer — we always return findings.
-    # The caller (CLI / autoloop driver) inspects the policy to decide whether
-    # a non-empty high-severity list aborts the run.
-    _ = policy
+    _ = policy  # informational; callers decide blocking on high findings.
 
     return findings
+
+
+def scan_prompt_injection_regex_only(text: str) -> list[Finding]:
+    """Regex-only fallback (mirrors the legacy ``scan`` import path)."""
+    from harness_maker.secscan.prompt_injection import scan as _regex_scan
+
+    return _regex_scan(text)

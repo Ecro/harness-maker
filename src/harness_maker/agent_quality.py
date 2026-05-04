@@ -1,15 +1,25 @@
-"""Agent quality scoring (Platinum/Gold/Silver/Bronze) per amendment §G."""
+"""Agent prompt quality scoring → Platinum/Gold/Silver/Bronze tier.
+
+Hybrid score: static structural checks (line count, frontmatter, bullets)
+combined with an optional Layer-2 LLM judgment against the shipped
+``agent_prompt.yaml`` rubric. When a ``JudgeClient`` and ``rubric_dir`` are
+provided, the LLM half lifts the score above the structural floor; on any
+LLM failure we degrade to the static score with a logged warning.
+
+Tier thresholds are preserved: composite ≥90 Platinum, ≥80 Gold, ≥70 Silver,
+else Bronze (which auto-flags an agent for /hm:refresh anti-rot review).
+"""
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any
 
+from harness_maker.llm_judge import JudgeClient, judge_file
+from harness_maker.rubric_loader import load_rubric_file
 
-class LLMJudge(Protocol):
-    """Optional LLM-based agent prompt evaluator (0-100)."""
-
-    def judge(self, prompt: str) -> int: ...
+_LOG = logging.getLogger(__name__)
 
 
 def _static_score(agent_md: Path) -> int:
@@ -27,7 +37,6 @@ def _static_score(agent_md: Path) -> int:
     elif 50 <= line_count < 100 or 500 < line_count <= 700:
         score += 20
     if text.startswith("---"):
-        # Look for closing frontmatter delimiter
         rest = text[4:]
         if "\n---" in rest:
             score += 30
@@ -46,33 +55,51 @@ def _tier(composite: int) -> str:
     return "Bronze"
 
 
-def score_agent(agent_md: Path, judge: LLMJudge | None = None) -> dict[str, Any]:
-    """Score an agent .md file across (a) static structure, (b) LLM judge, (c) Monte Carlo.
+def score_agent(
+    agent_md: Path,
+    *,
+    rubric_dir: Path | None = None,
+    client: JudgeClient | None = None,
+    model: str = "claude-sonnet-4-6",
+) -> dict[str, Any]:
+    """Score one agent prompt and emit a tier.
 
-    Returns dict with composite + tier (Platinum >=90 / Gold >=80 / Silver >=70 / Bronze else).
+    Args:
+        agent_md: Path to ``.claude/agents/<name>.md``.
+        rubric_dir: When provided alongside ``client``, points at the
+            ``.claude/rubrics/`` directory; the ``agent_prompt.yaml`` rubric
+            inside drives the LLM judgment.
+        client: Optional LLM client (``JudgeClient`` Protocol). When omitted,
+            the LLM half is skipped and the score reflects structural signals
+            only.
+        model: Anthropic model id passed through to the judge.
+
+    Returns:
+        ``{"static": int, "llm": int|None, "composite": int, "tier": str}``.
     """
     static = _static_score(agent_md)
     llm: int | None = None
-    if judge is not None:
-        try:
-            llm = int(judge.judge(agent_md.read_text(encoding="utf-8")))
-        except OSError:
-            llm = 0
-    monte_carlo = 100  # placeholder (Phase 4)
-    if llm is None:
-        weights = {"static": 1.0, "llm": 0.0, "consistency": 0.0}
-    else:
-        weights = {"static": 0.4, "llm": 0.3, "consistency": 0.3}
-    composite_f = (
-        static * weights["static"]
-        + (llm or 0) * weights["llm"]
-        + monte_carlo * weights["consistency"]
-    )
-    composite = int(composite_f)
+
+    if client is not None and rubric_dir is not None:
+        rubric_path = rubric_dir / "agent_prompt.yaml"
+        rubric = load_rubric_file(rubric_path)
+        if rubric is None:
+            _LOG.warning("agent_quality: rubric not found at %s; static-only score", rubric_path)
+        else:
+            try:
+                result = judge_file(agent_md, rubric, client=client, model=model)
+            except Exception as e:  # noqa: BLE001 — LLM transport degrades gracefully
+                _LOG.warning("agent_quality: LLM judge failed (%s); static-only score", e)
+                result = None
+            if result is not None and result.error is None:
+                llm = result.score
+            elif result is not None and result.error:
+                _LOG.warning("agent_quality: LLM judge reported %s", result.error)
+
+    composite = static if llm is None else (static + llm) // 2
     return {
         "static": static,
         "llm": llm,
-        "monte_carlo": monte_carlo,
         "composite": composite,
         "tier": _tier(composite),
     }

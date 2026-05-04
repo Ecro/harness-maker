@@ -10,6 +10,7 @@ from harness_maker.secscan.dependency_cves import scan as scan_dependency_cves
 from harness_maker.secscan.hook_injection import scan as scan_hook_injection
 from harness_maker.secscan.permissions import scan as scan_permissions
 from harness_maker.secscan.prompt_injection import scan as scan_prompt_injection
+from harness_maker.secscan.prompt_injection import scan_with_llm as scan_prompt_injection_llm
 from harness_maker.secscan.secrets import scan as scan_secrets
 
 __all__ = [
@@ -18,5 +19,6 @@ __all__ = [
     "scan_hook_injection",
     "scan_permissions",
     "scan_prompt_injection",
+    "scan_prompt_injection_llm",
     "scan_secrets",
 ]

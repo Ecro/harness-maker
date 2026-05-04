@@ -8,7 +8,7 @@ name: verify-before-completion
 description: Pre-wrapup gate enforcing 6 checks before any /hm:wrapup or autoloop
   iteration close. Failure on any check blocks completion and surfaces the failing
   check name + remediation hint.
-content_hash: df89c5fb7ae62ed917ced284efc3629d4a194f3314ccd369ecada65c103cae45
+content_hash: 350fb4d6f0b6bd350de60f5e04ba9a3fa2fa88d97f2418ab04e2c1567ae98fbf
 ---
 
 # verify-before-completion
@@ -29,17 +29,42 @@ failure short-circuits the gate and blocks completion.
 Each check returns exit code 0 on pass, non-zero on fail. The orchestrator
 collects all 6 results, but failure on any one blocks completion.
 
-### 1. PLAN/SPEC 충족 (PLAN/SPEC fulfillment)
+### 1. PLAN/SPEC 충족 (PLAN/SPEC fulfillment) — LLM-judged
 
-Verify a PLAN exists for the current task and all its task items are marked
-complete. Drift gate: SPEC frontmatter `status: approved` or `evolving`.
+LLM reads the PLAN body + the diff and rules each PLAN item `fulfilled` or
+not, with cited evidence (file:line refs). Ticked checkboxes alone do NOT
+pass — the diff must contain matching code/test/doc changes. Drift gate:
+SPEC frontmatter `status: approved` or `evolving`.
 
 ```bash
 work_docs="work-docs/"
 test -d "$work_docs" && grep -rq "PLAN-" "$work_docs" || exit 1
-# All `- [ ]` items in current PLAN must be `- [x]`:
-grep -E "^- \[ \]" "${work_docs}"**/PLAN-*.md && exit 1 || exit 0
+plan=$(ls "$work_docs"/PLAN-*.md 2>/dev/null | head -1)
+test -n "$plan" || exit 1
+diff_file=$(mktemp)
+trap 'rm -f "$diff_file"' EXIT
+git diff HEAD~1 HEAD > "$diff_file" 2>/dev/null || git diff > "$diff_file"
+PLAN="$plan" DIFF_FILE="$diff_file" uv run python -c "
+import os, sys
+from pathlib import Path
+from harness_maker.llm_judge import AnthropicJudgeClient
+from harness_maker.plan_verify import PlanVerifyError, verify_plan
+diff_text = Path(os.environ['DIFF_FILE']).read_text(encoding='utf-8', errors='replace')
+try:
+    result = verify_plan(Path(os.environ['PLAN']), diff_text, client=AnthropicJudgeClient())
+except PlanVerifyError as e:
+    print(f'BLOCKED: PLAN verify error — {e}', file=sys.stderr)
+    sys.exit(1)
+if not result.overall_pass:
+    for it in (i for i in result.items if not i.fulfilled):
+        print(f'BLOCKED: {it.text} — {it.reason}', file=sys.stderr)
+    sys.exit(1)
+"
 ```
+
+The check is **hard-fail**: any LLM transport error or any unfulfilled PLAN
+item blocks completion. Falling back to a checkbox grep would defeat the
+gate's purpose.
 
 ### 2. 회귀 게이트 (Regression / smoke gate)
 

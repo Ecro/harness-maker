@@ -4,20 +4,21 @@ Per architecture M6, when `harness.yaml.reviewers.routing == 'conditional'`,
 the router maps changed-file path patterns to reviewer specialities so a
 small change touches only the relevant reviewers (cheaper, faster).
 
-Routing rules (path-substring match, case-insensitive):
-- `.env`, `/auth/`, `/secret`            → security-reviewer
-- `/perf/`, `benchmark`, `hot`           → performance-reviewer
-- `.tsx`, `.jsx`, `/ui/`                 → ux-reviewer
-- `thread`, `isr`, `worker`, `async`     → concurrency-reviewer
-- (always)                               → code-reviewer
+Two paths:
+- ``route_reviewers`` (path-rule based) — fast, deterministic, no LLM.
+- ``route_with_llm`` (diff-aware) — reads the actual diff and picks
+  reviewers by semantic intent. Catches cases the path rules miss
+  (e.g., a ``.py`` file that introduces concurrency primitives).
 
-When `routing == 'always-all'` (or anything other than 'conditional'),
-the function returns the preset reviewer list unchanged.
+The LLM router falls back to the rule-based router on any transport error.
 """
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
+
+from harness_maker.llm_judge import JudgeClient
 
 # Routing rule table — order is irrelevant since `selected` is a set.
 _RULES: list[tuple[tuple[str, ...], str]] = [
@@ -26,6 +27,8 @@ _RULES: list[tuple[tuple[str, ...], str]] = [
     ((".tsx", ".jsx", "/ui/"), "ux-reviewer"),
     (("thread", "isr", "worker", "async"), "concurrency-reviewer"),
 ]
+
+_DIFF_CHAR_CAP = 16_000  # cost guard for the LLM router
 
 
 def route_reviewers(
@@ -60,3 +63,95 @@ def route_reviewers(
     # honour the user's choice (don't invoke a reviewer the preset omits).
     filtered = [r for r in preset_reviewers if r in selected]
     return filtered or ["code-reviewer"]
+
+
+# ── LLM-powered router ─────────────────────────────────────────────────────
+
+
+_LLM_SYSTEM_PROMPT = """You route reviewer agents based on a git diff.
+
+Given the changed files + diff, pick which reviewers from the available
+list should run. Always include `code-reviewer`. Add specialists when the
+diff actually warrants them — not by file extension alone, but by what the
+code does:
+
+- security-reviewer: auth flows, secrets, permissions, deserialization,
+  command injection vectors, crypto, input validation at trust boundaries.
+- performance-reviewer: hot loops, N+1 patterns, allocation in inner
+  loops, sync I/O on hot paths, caching changes.
+- ux-reviewer: user-visible UI changes, copy, accessibility.
+- concurrency-reviewer: threads, locks, async/await, ISRs, workers,
+  shared mutable state, race conditions.
+
+Output JSON ONLY:
+{"reviewers": ["code-reviewer", ...]}
+
+Only include reviewers that appear in the available list. Empty
+specialist set is fine if the diff is plain — `code-reviewer` alone is
+the floor."""
+
+
+def _strip_markdown_fence(text: str) -> str:
+    stripped = text.strip()
+    if stripped.startswith("```"):
+        nl = stripped.find("\n")
+        if nl != -1:
+            stripped = stripped[nl + 1 :]
+        if stripped.endswith("```"):
+            stripped = stripped[:-3]
+    return stripped.strip()
+
+
+def _parse_router_response(raw: str, allowed: set[str]) -> list[str] | None:
+    body = _strip_markdown_fence(raw)
+    try:
+        data = json.loads(body)
+    except (json.JSONDecodeError, ValueError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    raw_list = data.get("reviewers")
+    if not isinstance(raw_list, list):
+        return None
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in raw_list:
+        if isinstance(item, str) and item in allowed and item not in seen:
+            out.append(item)
+            seen.add(item)
+    if not out:
+        return None
+    if "code-reviewer" not in seen and "code-reviewer" in allowed:
+        out.insert(0, "code-reviewer")
+    return out
+
+
+def route_with_llm(
+    changed_files: list[Path],
+    preset_reviewers: list[str],
+    diff_text: str,
+    *,
+    client: JudgeClient,
+    model: str = "claude-sonnet-4-6",
+) -> list[str]:
+    """LLM-routed reviewer selection with rule-based fallback.
+
+    On any LLM transport error or unparseable response we delegate to
+    ``route_reviewers(..., routing='conditional')`` so /hm:review never
+    breaks because the API blinked.
+    """
+    allowed = set(preset_reviewers)
+    user = (
+        f"Available reviewers: {', '.join(preset_reviewers)}\n\n"
+        f"Changed files:\n  " + "\n  ".join(str(f) for f in changed_files) + "\n\n"
+        f"--- BEGIN DIFF ---\n{diff_text[:_DIFF_CHAR_CAP]}\n--- END DIFF ---"
+    )
+    try:
+        raw = client.judge(_LLM_SYSTEM_PROMPT, user, model)
+    except Exception:  # noqa: BLE001 — degrade to rules
+        return route_reviewers(changed_files, preset_reviewers, routing="conditional")
+    parsed = _parse_router_response(raw, allowed)
+    if parsed is None:
+        return route_reviewers(changed_files, preset_reviewers, routing="conditional")
+    # Preserve preset ordering — LLM's order may differ.
+    return [r for r in preset_reviewers if r in set(parsed)]
