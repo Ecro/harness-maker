@@ -31,7 +31,9 @@ After install, the rendered harness exposes its own commands under `/hm:*`:
 - `/hm:ai-readiness` — scored 3-layer readiness report + ranked action plan
 - `/hm:refresh` — anti-rot crawl + manual confirm
 - `/hm:research` · `/hm:spec` · `/hm:plan` · `/hm:execute` · `/hm:review` · `/hm:wrapup` · `/hm:verify` — atomic stages
-- Plus user-named workflows fused from those stages (e.g. `/hm:dev`, `/hm:careful`)
+- Fused workflows (stage combos, renameable at install):
+  - **Side defaults:** `/hm:exec-rev` · `/hm:exec-rev-wrap` _(default)_ · `/hm:plan-exec-rev-wrap`
+  - **Production defaults:** `/hm:exec-rev-wrap-ver` _(default)_ · `/hm:exec-rev-wrap` · `/hm:exec-rev` · `/hm:res-spec-plan`
 
 ## Features
 
