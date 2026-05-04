@@ -1,58 +1,30 @@
 # /hm:refresh
 
 > Anti-rot refresh — re-validate the harness against the latest patterns from
-> 4 sources **and** flag stale internal assets (reviewer partials, domain
-> packs), then **manually confirm** every proposed change. Never applies
-> automatically.
-
-## Usage
-
-```
-/hm:refresh
-```
-
-## Arguments
-
-(none)
+> 4 sources **and** flag stale internal assets, then **manually confirm** every
+> proposed change. Never applies automatically.
 
 ## Flow
 
-1. **Crawl** all 4 sources (Anthropic blog, GitHub releases, arxiv,
-   OSV.dev). Failures degrade gracefully — partial results still proceed.
-2. **Stale-asset scan** via `harness_maker.relevance.detect_stale_assets`:
-   - User-authored domain packs at `.claude/agents/_standards/*.md`
-   - Reviewer partials at the harness-maker package's
-     `templates/agents/_partials/*.md.j2`
-   - Shipped domain samples at `templates/agents/_standards/*.md.j2`
-   Default threshold is 90 days since `last_reviewed_at`. Missing dates count
-   as stale.
-3. **Version-drift check** via `harness_maker.relevance.detect_version_drift`:
-   compare `.claude/harness.yaml`'s stamped `harness_maker_version` against
-   the running package's `__version__`. Surface any mismatch as an upgrade
-   suggestion (`/plugin update` + `/harness-maker:make`).
-4. **Score** every `CrawlItem` against project keywords (extracted from
-   `CLAUDE.md` + `README.md`) and compute the next adaptive threshold from
-   prior accept/reject history.
-5. **Filter** items whose score ≥ threshold; write them — together with the
-   stale-asset list and any version drift — to
+1. **Crawl** 4 sources (Anthropic blog, GitHub releases, arxiv, OSV.dev).
+   Failures degrade gracefully — partial results still proceed.
+2. **Stale-asset scan** — user domain packs in `.claude/agents/_standards/*.md`
+   and reviewer partials. Default threshold: 90 days since `last_reviewed_at`.
+3. **Version-drift check** — compare `.claude/harness.yaml` stamp vs current
+   package `__version__`.
+4. **Relevance filter** — you (Claude) read the crawled items and judge which
+   ones are relevant to THIS project based on CLAUDE.md + README context.
+   Use your own judgment; do not call an external API.
+5. **Write proposal** — filtered items + stale + drift →
    `.claude/observability/refresh/proposed-<YYYY-MM-DD>.md`.
 6. **AskUserQuestion** for each proposal: `accept` / `reject` / `defer`.
-   - For stale assets, `accept` updates the `last_reviewed_at` date only
-     (body remains the user's responsibility); `reject` and `defer` produce
-     no file changes.
-   - For crawl items, `accept` patches the relevant `.claude/` asset.
-   - For version drift, `accept` is a NO-OP at this step — the user runs
-     `/harness-maker:make` themselves to apply the upgrade (preserves the
-     manual-confirm guarantee for re-rendering).
-   Decisions append to `.claude/observability/refresh/decisions.jsonl`.
 
-**Hard rule:** the agent NEVER bypasses the AskUserQuestion step. Auto-apply
-of refresh proposals is forbidden.
+**Hard rule:** never bypass AskUserQuestion. Auto-apply is forbidden.
 
 ## Run
 
 ```bash
-!uv run python -c "
+!uv run --with {{ harness_maker_src_path }} python -c "
 from datetime import UTC, datetime
 from pathlib import Path
 from harness_maker.crawler import anthropic_blog, github_releases, arxiv, osv_dev, write_raw
@@ -62,23 +34,15 @@ from harness_maker.relevance import (
     detect_stale_assets,
     detect_version_drift,
 )
-
-# Step 1 — crawl 4 sources.
 items = []
 items += anthropic_blog.crawl()
 items += github_releases.crawl()
 items += arxiv.crawl()
 items += osv_dev.crawl(packages=osv_dev.parse_uv_lock(Path('uv.lock')))
 write_raw(items, project_dir='.')
-
-# Step 2 — stale-asset scan (partials + domain packs).
 project = Path('.')
 stale = detect_stale_assets(project)
-
-# Step 3 — version-drift check (harness.yaml stamp vs running package).
 drift = detect_version_drift(project)
-
-# Steps 4-5 — proposed-<date>.md gathers crawl + stale + drift.
 out_dir = project / '.claude' / 'observability' / 'refresh'
 out_dir.mkdir(parents=True, exist_ok=True)
 today = datetime.now(tz=UTC).date().isoformat()
@@ -89,30 +53,30 @@ lines += build_drift_lines(drift) or ['(none)']
 lines += ['', f'## Stale assets ({len(stale)})', '']
 lines += build_proposal_lines(stale, project) or ['(none)']
 lines += ['', f'## Crawl items ({len(items)})', '',
-          f'(score + filter via harness_maker.relevance — interactive walk follows)']
+          '(relevance scored inline by Claude — see Step 4)']
 out_path.write_text('\n'.join(lines) + '\n', encoding='utf-8')
 print(f'crawled {len(items)} items; {len(stale)} stale; drift={bool(drift)}; wrote {out_path}')
 "
 ```
 
-Then for each line in `proposed-<date>.md` invoke **AskUserQuestion** —
+Read the crawled items from `.claude/observability/refresh/raw-<date>.jsonl`.
+For each item, judge relevance to this project using what you know from
+CLAUDE.md and README.md — no API call needed. Apply the adaptive threshold
+from prior decisions in `decisions.jsonl` (default 0.7; use keyword overlap
+as a tiebreaker for borderline items).
+
+Then for each item in `proposed-<date>.md` use AskUserQuestion —
 `accept` / `reject` / `defer`. On `accept`:
-- For a stale asset: call `harness_maker.relevance.update_last_reviewed_at(path)`
-  to refresh the date in place (body stays the user's responsibility).
-- For a crawl item: score with `harness_maker.relevance.score_item` —
-  the LLM scorer reads the project's CLAUDE.md/README via
-  `extract_project_context(project_dir)` and judges relevance against this
-  specific project (falls back to keyword overlap on LLM error). Then
-  filter via `filter_items(items, adaptive_threshold(history))` and patch
-  the relevant `.claude/` asset.
+- Stale asset: run `update_last_reviewed_at(path)` via subprocess.
+- Crawl item: patch the relevant `.claude/` asset.
+- Version drift: no-op here; user runs `/harness-maker:make` themselves.
+
+Append decisions to `.claude/observability/refresh/decisions.jsonl`.
 
 ## Autoloop behavior
 
-When invoked under `autoloop` (no human in the loop), proceed only through
-step 4 (write `proposed-<date>.md` containing both stale-asset and
-crawl-item proposals) and stop. Step 5 still requires
-**AskUserQuestion** in interactive mode; autoloop must not synthesize a
-default answer.
+Stop after writing `proposed-<date>.md`. The AskUserQuestion step requires
+interactive mode; autoloop must not synthesize a default answer.
 
 <!-- @hm:user:extensions -->
 <!-- Project-specific refresh sources or custom proposal handlers. Preserved across harness-maker upgrades. -->
