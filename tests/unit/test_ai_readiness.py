@@ -9,9 +9,11 @@ from typing import Any
 import pytest
 
 from harness_maker.ai_readiness import (
+    finalize_from_verdicts_json,
     render_dashboard_markdown,
     render_terminal_summary,
     run_ai_readiness,
+    run_ai_readiness_structural,
 )
 from harness_maker.llm_judge import JudgeClient
 from harness_maker.models import Preset
@@ -112,10 +114,10 @@ rubrics:
     assert plan.layer_scores["llm_judge"] == 50
 
 
-def test_run_handles_anthropic_init_failure(
+def test_run_handles_anthropic_client_unavailable(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """If AnthropicJudgeClient() raises (no API key, etc.), skip Layer 2 silently."""
+    """If AnthropicJudgeClient raises (no API key), Layer 2 is skipped silently."""
     _seed_minimal_project(tmp_path)
     rubrics_dir = tmp_path / ".claude" / "rubrics"
     rubrics_dir.mkdir(parents=True)
@@ -225,6 +227,77 @@ def test_dashboard_markdown_handles_pipe_in_text() -> None:
     md = render_dashboard_markdown(plan, "x")
     # Body of suggestion appears with escaped pipes (rendered string contains `\|`)
     assert "rm \\| xargs" in md
+
+
+# ── structural + finalize path ─────────────────────────────────────────────
+
+
+def test_run_ai_readiness_structural_returns_json_serializable(tmp_path: Path) -> None:
+    """run_ai_readiness_structural output is dict with 'readiness' and 'cache' keys."""
+    import json
+
+    result = run_ai_readiness_structural(tmp_path, preset=Preset.SIDE)
+    assert "readiness" in result
+    assert "cache" in result
+    assert "preset" in result
+    # Must be JSON-serializable (no pydantic objects)
+    json.dumps(result)  # raises if not serializable
+
+
+def test_finalize_from_verdicts_json_round_trip(tmp_path: Path) -> None:
+    """finalize_from_verdicts_json reconstructs a plan from JSON files."""
+    import json
+
+    scores = run_ai_readiness_structural(tmp_path, preset=Preset.SIDE)
+    scores_path = tmp_path / "scores.json"
+    scores_path.write_text(json.dumps(scores), encoding="utf-8")
+
+    # Claude provides these verdicts (one passing, one failing)
+    verdicts = [
+        {
+            "file": str(tmp_path / "CLAUDE.md"),
+            "dimension": "context_quality",
+            "verdicts": [
+                {
+                    "rubric_id": "has_overview",
+                    "severity": "P0",
+                    "passed": True,
+                    "evidence": "Overview section found at line 1",
+                    "suggestion": None,
+                },
+                {
+                    "rubric_id": "has_examples",
+                    "severity": "P1",
+                    "passed": False,
+                    "evidence": "No examples section found",
+                    "suggestion": "Add a ## Examples section",
+                },
+            ],
+        }
+    ]
+    verdicts_path = tmp_path / "verdicts.json"
+    verdicts_path.write_text(json.dumps(verdicts), encoding="utf-8")
+
+    plan = finalize_from_verdicts_json(scores_path, verdicts_path)
+    # L2 ran → score is not the neutral 50
+    assert plan.layer_scores["llm_judge"] != 50
+    # The failing rubric item appears as an action
+    action_sources = [a.source for a in plan.actions]
+    assert any("has_examples" in s for s in action_sources)
+
+
+def test_finalize_from_verdicts_json_empty_verdicts(tmp_path: Path) -> None:
+    """Empty verdicts list → L2 neutral (50)."""
+    import json
+
+    scores = run_ai_readiness_structural(tmp_path, preset=Preset.SIDE)
+    scores_path = tmp_path / "scores.json"
+    scores_path.write_text(json.dumps(scores), encoding="utf-8")
+    verdicts_path = tmp_path / "verdicts.json"
+    verdicts_path.write_text("[]", encoding="utf-8")
+
+    plan = finalize_from_verdicts_json(scores_path, verdicts_path)
+    assert plan.layer_scores["llm_judge"] == 50
 
 
 def test_dashboard_markdown_no_actions_message() -> None:

@@ -1,6 +1,6 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.4.4
+harness_maker_version: 0.4.5
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: skills/verify-before-completion/SKILL.md.j2
 provenance: official
@@ -8,14 +8,13 @@ name: verify-before-completion
 description: Pre-wrapup gate enforcing 6 checks before any /hm:wrapup or autoloop
   iteration close. Failure on any check blocks completion and surfaces the failing
   check name + remediation hint.
-content_hash: c28985a37c6edbd99c91da68511cee45c15ff491baa597596b37c452479c56fd
+content_hash: 8dccc7f30515f8e9680960b302ee80661bd859f2e3fa32394825909de725d53a
 ---
 
 # verify-before-completion
 
-Mandatory gate that runs immediately before `/hm:wrapup` or before an
-autoloop iteration is considered closed. All 6 checks must pass; the first
-failure short-circuits the gate and blocks completion.
+Mandatory gate before `/hm:wrapup` or autoloop iteration close.
+All 6 checks must pass; the first failure short-circuits and blocks.
 
 ## When to Invoke
 
@@ -25,37 +24,26 @@ failure short-circuits the gate and blocks completion.
 
 ## The 6 Checks
 
-### 1. PLAN/SPEC fulfillment — LLM-judged (hard fail)
+### 1. PLAN/SPEC fulfillment — you verify (hard fail)
 
-LLM reads the PLAN body + diff and rules each item `fulfilled` or not with
-cited evidence. Ticked checkboxes alone do NOT pass — the diff must contain
-matching code/test/doc changes.
+You are the judge for this check. Do NOT delegate to a subprocess.
 
 ```bash
 work_docs="work-docs/"
-test -d "$work_docs" && grep -rq "PLAN-" "$work_docs" || exit 1
+test -d "$work_docs" || { echo "BLOCKED: check 1 — work_docs dir missing"; exit 1; }
 plan=$(ls "$work_docs"/PLAN-*.md 2>/dev/null | head -1)
-test -n "$plan" || exit 1
-diff_file=$(mktemp)
-trap 'rm -f "$diff_file"' EXIT
-git diff HEAD~1 HEAD > "$diff_file" 2>/dev/null || git diff > "$diff_file"
-PLAN="$plan" DIFF_FILE="$diff_file" \
-  uv run --with /home/noel/harness-maker python -c "
-import os, sys
-from pathlib import Path
-from harness_maker.llm_judge import AnthropicJudgeClient
-from harness_maker.plan_verify import PlanVerifyError, verify_plan
-diff_text = Path(os.environ['DIFF_FILE']).read_text(encoding='utf-8', errors='replace')
-try:
-    result = verify_plan(Path(os.environ['PLAN']), diff_text, client=AnthropicJudgeClient())
-except PlanVerifyError as e:
-    print(f'BLOCKED: PLAN verify error — {e}', file=sys.stderr); sys.exit(1)
-if not result.overall_pass:
-    for it in (i for i in result.items if not i.fulfilled):
-        print(f'BLOCKED: {it.text} — {it.reason}', file=sys.stderr)
-    sys.exit(1)
-"
+test -n "$plan" || { echo "BLOCKED: check 1 — no PLAN-*.md found"; exit 1; }
+echo "PLAN=$plan"
+!git diff HEAD~1 HEAD 2>/dev/null || git diff
 ```
+
+Read the PLAN file printed above (`$plan`). Read the git diff output.
+For each numbered item, task, or acceptance criterion in the PLAN:
+- The diff must contain matching code/test/doc changes (ticked checkbox alone does NOT pass)
+
+If any item is absent from the diff, output exactly:
+`BLOCKED: check 1 (PLAN-fulfillment) — <item text> not found in diff`
+then stop (do not proceed to check 2).
 
 ### 2. Regression / smoke gate
 
@@ -68,10 +56,11 @@ bash .claude-verify.sh phase_${CURRENT_PHASE} || exit 1
 ```bash
 uv run --with /home/noel/harness-maker python -c "
 from pathlib import Path
-from harness_maker.readiness import compute_health
+from harness_maker.readiness import compute_readiness
 from harness_maker.models import Preset
 import json, sys
-score = compute_health(Path('.'), Preset.SIDE)['composite']
+result = compute_readiness(Path('.'), Preset.SIDE)
+score = result.composite
 metrics = Path('.claude/observability/metrics.jsonl')
 baseline = 0
 if metrics.exists():
@@ -109,7 +98,8 @@ exit 0
 
 ## Failure Behavior
 
-First failing check halts the gate. Output: `BLOCKED: check <N> (<name>) — <stderr tail>`.
+First failing check halts the gate.
+Output: `BLOCKED: check <N> (<name>) — <reason>`.
 When blocked, the calling command must abort. Remediation hints:
 PLAN unclosed → list incomplete tasks; smoke fail → re-run failing test;
 Health drop → show 6-dim breakdown; pending refresh → `/hm:refresh`;

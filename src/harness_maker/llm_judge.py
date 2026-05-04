@@ -60,11 +60,11 @@ class JudgeClient(Protocol):
 
 
 class AnthropicJudgeClient:
-    """Production ``JudgeClient`` backed by ``anthropic.Anthropic``.
+    """``JudgeClient`` backed by ``anthropic.Anthropic`` (requires ``ANTHROPIC_API_KEY``).
 
-    The system prompt (rubric) is wrapped with ``cache_control`` so judging
-    multiple files against the same rubric pays the prefix cost only once
-    every TTL (5 min default). User prompt (file body) is uncached.
+    Not used inside Claude Code subscription — Layer 2 evaluation runs
+    prompt-natively (the executing Claude agent reads rubrics and evaluates
+    files inline; results are fed to ``ai-readiness-finalize``).
     """
 
     def __init__(self, *, api_key: str | None = None) -> None:
@@ -200,6 +200,11 @@ def _parse_response(raw: str, rubric: RubricFile) -> tuple[list[RubricVerdict], 
 
 
 # ── score calculation ──────────────────────────────────────────────────────
+
+
+def compute_score_from_verdicts(verdicts: list[RubricVerdict]) -> int:
+    """Severity-weighted pass rate — public entry point for the finalize path."""
+    return _weighted_score(verdicts)
 
 
 def _weighted_score(verdicts: list[RubricVerdict]) -> int:

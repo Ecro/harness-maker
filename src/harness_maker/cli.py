@@ -301,17 +301,22 @@ def ai_readiness_cmd(
     skip_llm: bool = typer.Option(
         False,
         "--skip-llm",
-        help="Skip Layer 2 (LLM judge). Useful for offline / CI runs.",
+        help="Skip Layer 2 (LLM judge). Use with --json-output to feed Claude-native L2.",
     ),
     model: str = typer.Option(
         "claude-sonnet-4-6",
         "--model",
-        help="Anthropic model to use for the judge.",
+        help="Model hint for cache diagnostics threshold calculation.",
     ),
     update_dashboard: bool = typer.Option(
         True,
         "--update-dashboard/--no-update-dashboard",
         help="Write the rendered plan to .claude/observability/dashboard.md.",
+    ),
+    json_output: Path | None = typer.Option(
+        None,
+        "--json-output",
+        help="Write L1+L3 structural scores as JSON to this path (implies --skip-llm).",
     ),
 ) -> None:
     """Compute ai-readiness composite + ranked improvement actions."""
@@ -319,16 +324,73 @@ def ai_readiness_cmd(
         render_dashboard_markdown,
         render_terminal_summary,
         run_ai_readiness,
+        run_ai_readiness_structural,
     )
     from harness_maker.io_utils import atomic_write
 
     target = target.resolve()
     preset = _read_preset(target / ".claude" / "harness.yaml") or Preset.SIDE
+
+    if json_output is not None:
+        # Structural-only mode: write L1+L3 as JSON for Claude-native L2 finalize.
+        import json
+
+        scores = run_ai_readiness_structural(target, preset=preset, model=model)
+        json_output.parent.mkdir(parents=True, exist_ok=True)
+        json_output.write_text(json.dumps(scores, indent=2), encoding="utf-8")
+        typer.echo(f"Structural scores written to {json_output}")
+        # Also print L1+L3 partial summary (L2=50 neutral placeholder).
+        from harness_maker.improvement import build_improvement_plan
+        from harness_maker.readiness import ReadinessResult
+        from harness_maker.cache_diagnostics import CacheDiagnosis
+        readiness = ReadinessResult.model_validate(scores["readiness"])
+        cache = CacheDiagnosis.model_validate(scores["cache"])
+        plan = build_improvement_plan(readiness, [], cache)
+        typer.echo(render_terminal_summary(plan))
+        typer.echo("(Layer 2 pending — run ai-readiness-finalize after Claude evaluates rubrics)")
+        return
+
     plan = run_ai_readiness(target, preset=preset, skip_llm=skip_llm, model=model)
     typer.echo(render_terminal_summary(plan))
     if update_dashboard:
         dashboard = target / ".claude" / "observability" / "dashboard.md"
         body = render_dashboard_markdown(plan, target.name)
+        atomic_write(dashboard, body)
+        typer.echo(f"\nDashboard updated: {dashboard}")
+
+
+@app.command("ai-readiness-finalize")
+def ai_readiness_finalize_cmd(
+    scores_json: Path = typer.Option(
+        ...,
+        "--scores-json",
+        help="Path to L1+L3 scores JSON written by ai-readiness --json-output.",
+    ),
+    verdicts_json: Path = typer.Option(
+        ...,
+        "--verdicts-json",
+        help="Path to Claude-provided L2 verdicts JSON.",
+    ),
+    update_dashboard: bool = typer.Option(
+        True,
+        "--update-dashboard/--no-update-dashboard",
+        help="Write the rendered plan to .claude/observability/dashboard.md.",
+    ),
+) -> None:
+    """Combine pre-computed L1+L3 scores with Claude-provided L2 verdicts."""
+    from harness_maker.ai_readiness import (
+        finalize_from_verdicts_json,
+        render_dashboard_markdown,
+        render_terminal_summary,
+    )
+    from harness_maker.io_utils import atomic_write
+
+    plan = finalize_from_verdicts_json(scores_json, verdicts_json)
+    typer.echo(render_terminal_summary(plan))
+    if update_dashboard:
+        # Dashboard lives beside the scores JSON (inside .claude/observability/).
+        dashboard = scores_json.parent / "dashboard.md"
+        body = render_dashboard_markdown(plan, scores_json.parent.parent.parent.name)
         atomic_write(dashboard, body)
         typer.echo(f"\nDashboard updated: {dashboard}")
 

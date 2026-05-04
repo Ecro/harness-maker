@@ -1,54 +1,63 @@
 # /hm:ai-readiness
 
-> Compute the ai-readiness composite (Layer 1 deterministic + Layer 2 LLM-judged
-> + Layer 3 cache diagnostics) and surface ranked improvement actions.
+3-layer AI readiness audit. You run this command in three steps.
 
-## Usage
-
-```
-/hm:ai-readiness                    # full scan (default — calls Anthropic)
-/hm:ai-readiness --skip-llm         # offline mode, no API call
-/hm:ai-readiness --no-update-dashboard
-```
-
-## What it produces
-
-- **Composite score** (0-100) blending the three layers.
-- **Per-layer breakdown** — readiness 70%, llm_judge 25%, cache 5%.
-- **Top actions** — sorted P0 → P1 → P2, each with target file, evidence,
-  and a concrete suggestion.
-- **Dashboard** — re-renders `.claude/observability/dashboard.md` with the
-  full action table.
-
-## Layers
-
-| Layer | Source | What it checks |
-|-------|--------|----------------|
-| 1 readiness | `harness_maker.readiness.compute_readiness` | 7 deterministic dimensions: context quality, guardrails, verification, workflow clarity, memory continuity, observability setup, governance. Evidence-anchored signals (file presence + structural correctness). |
-| 2 llm_judge | `harness_maker.llm_judge.judge_target` | LLM rubrics under `.claude/rubrics/*.yaml`. Each rubric is a list of pass/fail checks the model evaluates against the target file (CLAUDE.md, agents, skills, commands). |
-| 3 cache | `harness_maker.cache_diagnostics.diagnose_cache` | Cache hit rate from `.claude/observability/metrics.jsonl` plus failure-mode classification: `miss_min_threshold`, `miss_invalidation`, `miss_ttl`. |
-
-## Run
+## Step 1 — structural analysis (Layer 1 + Layer 3)
 
 ```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.cli ai-readiness . $ARGUMENTS
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.cli ai-readiness . \
+  --skip-llm --json-output .claude/observability/.l1l3.tmp.json
 ```
 
-## Improving against the report
+## Step 2 — LLM evaluation (Layer 2, you evaluate inline)
 
-Each action has a `priority` (P0/P1/P2), a `target` (file or area), and a
-`suggestion`. Walk the list top-down — fixing the highest-priority items
-first delivers the biggest score improvement per unit of effort.
+Read each `.claude/rubrics/*.yaml`. If the directory is absent or empty, write `[]` to `.claude/observability/.l2.tmp.json` and skip to Step 3.
 
-For Layer 2 (LLM judge) actions, the suggestion is **tailored to the
-specific file** (not generic) — the model read the file and proposed a fix
-keyed to its actual content.
+Each rubric file structure:
+```yaml
+dimension: <name>
+target: <path or glob>    # relative to project root, e.g. CLAUDE.md or .claude/agents/*.md
+rubrics:
+  - id: <id>
+    description: <check description>
+    severity: P0 | P1 | P2
+    action: <suggestion when fails>
+```
 
-For Layer 3 (cache) actions, the remediation explains *why* the cache rate
-is low — common causes are prefix below the model's minimum write
-threshold (1024 tokens for Sonnet/Opus, 4096 for Haiku), prefix
-invalidation (tools or system prompt changing mid-session), or TTL expiry
-(>5 min between turns at default TTL).
+For each rubric file:
+1. Expand `target` as a glob under the project root (zero matches → skip)
+2. For each matching file: read its content, evaluate each criterion
+3. Produce one verdict per rubric item
+
+Write your verdicts to `.claude/observability/.l2.tmp.json`:
+```json
+[
+  {
+    "file": "<absolute path>",
+    "dimension": "<dimension>",
+    "verdicts": [
+      {
+        "rubric_id": "<id>",
+        "severity": "<P0|P1|P2>",
+        "passed": true,
+        "evidence": "<direct quote or line reference>",
+        "suggestion": null
+      }
+    ]
+  }
+]
+```
+
+`suggestion` is `null` when `passed` is `true`; provide a concrete, file-specific fix when `passed` is `false`.
+
+## Step 3 — finalize + write dashboard
+
+```bash
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.cli ai-readiness-finalize \
+  --scores-json .claude/observability/.l1l3.tmp.json \
+  --verdicts-json .claude/observability/.l2.tmp.json
+!rm -f .claude/observability/.l1l3.tmp.json .claude/observability/.l2.tmp.json
+```
 
 <!-- @hm:user:extensions -->
 <!-- Project-specific ai-readiness extensions (custom panels, additional layers). Preserved across harness-maker upgrades. -->

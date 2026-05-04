@@ -2,39 +2,49 @@
 
 Public API:
 - ``run_ai_readiness(project_dir, preset, ...)`` — full pipeline returning
-  ``ImprovementPlan``. Layer 2 (LLM) runs by default against rubrics shipped
-  under ``.claude/rubrics/``; skip with ``skip_llm=True`` for offline runs.
+  ``ImprovementPlan``. In Claude Code context, call with ``skip_llm=True``
+  and let the executing Claude agent evaluate rubrics inline; then feed
+  results to ``finalize_from_verdicts_json``.
+- ``run_ai_readiness_structural(project_dir, preset, ...)`` — L1+L3 only,
+  returns a JSON-serializable dict suitable for ``--json-output`` flag.
+- ``finalize_from_verdicts_json(scores_path, verdicts_path)`` — reconstruct
+  a full plan from pre-computed structural scores + Claude-provided L2
+  verdicts (used by the ``ai-readiness-finalize`` CLI subcommand).
 - ``render_terminal_summary(plan)`` — concise text for CLI output.
 - ``render_dashboard_markdown(plan, project_name)`` — dashboard.md content.
 """
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
+from typing import Any
 
-from harness_maker.cache_diagnostics import diagnose_cache
+from harness_maker.cache_diagnostics import CacheDiagnosis, diagnose_cache
 from harness_maker.improvement import ActionItem, ImprovementPlan, build_improvement_plan
 from harness_maker.llm_judge import (
     AnthropicJudgeClient,
     JudgeClient,
     JudgeResult,
+    RubricVerdict,
+    compute_score_from_verdicts,
     judge_target,
 )
 from harness_maker.models import Preset
-from harness_maker.readiness import compute_readiness
+from harness_maker.readiness import ReadinessResult, compute_readiness
 from harness_maker.rubric_loader import load_rubrics
 
 
 def _build_judge_client() -> JudgeClient | None:
-    """Best-effort construction of an Anthropic-backed judge.
+    """Best-effort Anthropic SDK client (requires ANTHROPIC_API_KEY).
 
-    Returns None when the SDK can't initialize (missing API key, network
-    unreachable on import, etc.) — the orchestrator falls back to skipping
-    Layer 2 silently rather than failing the whole readiness check.
+    In Claude Code subscription contexts Layer 2 runs prompt-natively
+    (the executing Claude agent evaluates rubrics inline). This fallback
+    is kept for non-interactive / CI environments that do have an API key.
     """
     try:
         return AnthropicJudgeClient()
-    except Exception:  # noqa: BLE001 — optional dependency at runtime
+    except Exception:  # noqa: BLE001 — missing API key etc.
         return None
 
 
@@ -59,6 +69,67 @@ def run_ai_readiness(
             if client is not None:
                 for rf in rubrics.values():
                     judge_results.extend(judge_target(project_dir, rf, client=client, model=model))
+
+    return build_improvement_plan(readiness, judge_results, cache)
+
+
+def run_ai_readiness_structural(
+    project_dir: Path,
+    *,
+    preset: Preset,
+    model: str = "claude-sonnet-4-6",
+) -> dict[str, Any]:
+    """Run L1+L3 only and return a JSON-serializable dict.
+
+    The dict is written by ``--json-output`` so that ``ai-readiness-finalize``
+    can reconstruct a full plan after Claude provides L2 verdicts inline.
+    """
+    readiness = compute_readiness(project_dir, preset)
+    metrics = project_dir / ".claude" / "observability" / "metrics.jsonl"
+    cache = diagnose_cache(metrics, model=model)
+    return {
+        "readiness": readiness.model_dump(),
+        "cache": cache.model_dump(),
+        "preset": preset.value,
+    }
+
+
+def finalize_from_verdicts_json(
+    scores_path: Path,
+    verdicts_path: Path,
+) -> ImprovementPlan:
+    """Reconstruct a full ImprovementPlan from pre-computed L1+L3 + Claude L2 verdicts.
+
+    ``verdicts_path`` must contain a JSON array of objects in the form:
+    ``[{"file": "...", "dimension": "...", "verdicts": [{...RubricVerdict fields...}]}]``
+
+    The ``score`` field is computed from the verdicts; ``error`` defaults to null.
+    """
+    scores = json.loads(scores_path.read_text(encoding="utf-8"))
+    readiness = ReadinessResult.model_validate(scores["readiness"])
+    cache = CacheDiagnosis.model_validate(scores["cache"])
+
+    raw_verdicts = json.loads(verdicts_path.read_text(encoding="utf-8"))
+    judge_results: list[JudgeResult] = []
+    if isinstance(raw_verdicts, list):
+        for entry in raw_verdicts:
+            if not isinstance(entry, dict):
+                continue
+            verdicts = [
+                RubricVerdict.model_validate(v)
+                for v in entry.get("verdicts", [])
+                if isinstance(v, dict)
+            ]
+            score = compute_score_from_verdicts(verdicts) if verdicts else 50
+            judge_results.append(
+                JudgeResult(
+                    file=str(entry.get("file", "")),
+                    dimension=str(entry.get("dimension", "")),
+                    score=score,
+                    verdicts=verdicts,
+                    error=entry.get("error"),
+                )
+            )
 
     return build_improvement_plan(readiness, judge_results, cache)
 

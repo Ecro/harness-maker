@@ -23,23 +23,26 @@ when both run, static alone when the LLM is unreachable.
 | ≥ 70 | Silver | Watch |
 | < 70 | Bronze | Auto-register anti-rot patch candidate |
 
-## Implementation
+## How to invoke
 
-```python
+You are the LLM judge. Read the agent file and evaluate it against
+`.claude/rubrics/agent_prompt.yaml`. Call the static scorer via subprocess,
+then merge the two scores:
+
+```bash
+!uv run --with {{ harness_maker_src_path }} python -c "
 from pathlib import Path
 from harness_maker.agent_quality import score_agent
-from harness_maker.llm_judge import AnthropicJudgeClient
-
-result = score_agent(
-    Path(".claude/agents/code-reviewer.md"),
-    rubric_dir=Path(".claude/rubrics"),
-    client=AnthropicJudgeClient(),
-)
-# {"static": 70, "llm": 85, "composite": 77, "tier": "Silver"}
+result = score_agent(Path('.claude/agents/code-reviewer.md'), rubric_dir=Path('.claude/rubrics'), client=None)
+print(result)
+"
 ```
 
-`client=None` (or unreachable LLM) → static-only scoring with a logged
-warning; the function never raises.
+Then evaluate the same agent file against each rubric criterion in
+`.claude/rubrics/agent_prompt.yaml` yourself. Compute:
+- `llm_score` = severity-weighted pass rate (P0=3, P1=2, P2=1)
+- `composite` = (static_score + llm_score) // 2
+- `tier` = Platinum ≥90 / Gold ≥80 / Silver ≥70 / Bronze <70
 
 ## Static signals
 

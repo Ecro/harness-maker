@@ -104,7 +104,7 @@ def _extract_layer2_actions(judge_results: Iterable[JudgeResult]) -> list[Action
                     target=jr.file,
                     summary=f"LLM judge could not evaluate {jr.file}",
                     detail=jr.error,
-                    suggestion="Re-run /hm:ai-readiness, or check Anthropic API access.",
+                    suggestion="Re-run /hm:ai-readiness to retry the LLM evaluation.",
                     source=f"layer2:error@{jr.file}",
                 )
             )

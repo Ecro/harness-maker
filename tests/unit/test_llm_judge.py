@@ -304,7 +304,7 @@ def test_judge_client_protocol_satisfied_by_fake() -> None:
     assert callable(getattr(fake, "judge", None))
 
 
-# ── Anthropic client construction (smoke, no network) ──────────────────────
+# ── client construction (smoke, no network) ───────────────────────────────
 
 
 def test_anthropic_judge_client_lazy_imports(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -321,3 +321,16 @@ def test_anthropic_judge_client_lazy_imports(monkeypatch: pytest.MonkeyPatch) ->
     client = llm_judge.AnthropicJudgeClient(api_key="test-key")
     assert isinstance(client, llm_judge.AnthropicJudgeClient)
     assert captured["init_kwargs"] == {"api_key": "test-key"}
+
+
+def test_compute_score_from_verdicts_exported() -> None:
+    """compute_score_from_verdicts is a public alias for _weighted_score."""
+    from harness_maker.llm_judge import RubricVerdict, compute_score_from_verdicts
+
+    verdicts = [
+        RubricVerdict(rubric_id="r1", severity="P0", passed=True, evidence="ok", suggestion=None),
+        RubricVerdict(rubric_id="r2", severity="P0", passed=False, evidence="x", suggestion="fix"),
+    ]
+    score = compute_score_from_verdicts(verdicts)
+    # 1 of 2 P0-weight items passed → 50%
+    assert score == 50
