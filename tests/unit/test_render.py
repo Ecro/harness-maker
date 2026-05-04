@@ -116,6 +116,31 @@ def test_render_settings_json_shallow_merges_existing(tmp_path: Path) -> None:
     assert "Read" in data["permissions"]["allow"]
 
 
+def test_render_settings_json_evicts_stale_harness_keys(tmp_path: Path) -> None:
+    """statusLine written by harness-maker 0.3.x must be removed on re-render once
+    the template no longer emits it — simple shallow-merge would leave it forever.
+    """
+    import json
+
+    settings_path = tmp_path / "settings.json"
+    settings_path.write_text(
+        json.dumps(
+            {
+                "statusLine": {"command": "bash .claude/lib/run-statusline-combined.sh", "type": "command"},
+                "enabledPlugins": {"foo@bar": True},
+            }
+        ),
+        encoding="utf-8",
+    )
+    p = _profile()
+    a = interview(p, autoloop_mode=True)
+    bp = synthesize(p, a)
+    render(bp, tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
+    data = json.loads(settings_path.read_text(encoding="utf-8"))
+    assert "statusLine" not in data, "stale statusLine must be evicted by re-render"
+    assert data["enabledPlugins"] == {"foo@bar": True}
+
+
 def test_render_settings_json_falls_back_when_existing_corrupt(tmp_path: Path) -> None:
     """Malformed JSON on disk → render writes pure template content (no crash).
 
