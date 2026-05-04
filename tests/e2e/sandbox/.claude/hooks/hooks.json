@@ -11,7 +11,26 @@
         "matcher": "*"
       }
     ],
-    "PreToolUse": [],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "uv run --with /home/noel/harness-maker python -m harness_maker.gates.permission_gate",
+            "type": "command"
+          }
+        ],
+        "matcher": "Bash"
+      },
+      {
+        "hooks": [
+          {
+            "command": "uv run --with /home/noel/harness-maker python -m harness_maker.gates.spec_gate",
+            "type": "command"
+          }
+        ],
+        "matcher": "Write|Edit"
+      }
+    ],
     "SessionStart": [],
     "Stop": []
   },

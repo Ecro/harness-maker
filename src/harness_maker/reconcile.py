@@ -76,6 +76,17 @@ def reconcile(existing_dir: Path, blueprint: Blueprint) -> list[ConflictItem]:
                 ),
             )
             continue
+        # hooks.json is pure JSON (no frontmatter). Always REPLACE so template
+        # updates (e.g., new hook commands) propagate on re-render.
+        if fe.path == Path("hooks/hooks.json"):
+            conflicts.append(
+                ConflictItem(
+                    path=fe.path,
+                    decision=ReconcileDecision.REPLACE,
+                    reason="pure-json-no-frontmatter",
+                ),
+            )
+            continue
         # Generated wrappers under `.claude/lib/*.sh` carry no provenance
         # frontmatter (interpreters reject YAML preambles). Always REPLACE so
         # template updates land.

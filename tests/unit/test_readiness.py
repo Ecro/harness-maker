@@ -125,12 +125,17 @@ def test_guardrails_with_full_setup(tmp_path: Path) -> None:
     (claude / "hooks" / "hooks.json").write_text(
         json.dumps(
             {
-                "PreToolUse": [
-                    {"matcher": "Bash", "hooks": [{"type": "command", "command": "echo"}]}
-                ],
-                "PostToolUse": [
-                    {"matcher": "*", "hooks": [{"type": "command", "command": "telemetry"}]}
-                ],
+                "hooks": {
+                    "PreToolUse": [
+                        {"matcher": "Bash", "hooks": [{"type": "command", "command": "echo"}]}
+                    ],
+                    "PostToolUse": [
+                        {"matcher": "*", "hooks": [{"type": "command", "command": "telemetry"}]}
+                    ],
+                    "SessionStart": [],
+                    "Stop": [],
+                },
+                "preset": "Side",
             }
         )
     )

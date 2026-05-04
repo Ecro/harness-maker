@@ -4,7 +4,6 @@ harness_maker_version: 0.3.5
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: memory/failures.ko.md.j2
 provenance: official
-content_hash: 3abe4997a48ceb0b67f5c42eaad5ba5b24d13251385d7a5d8d41fcc7886ac572
 ---
 # Failures Log — Production preset
 

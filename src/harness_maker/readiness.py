@@ -389,7 +389,12 @@ def _dim_guardrails(project_dir: Path) -> DimensionScore:
     hooks_data = _read_json_with_optional_frontmatter(hooks_path) if hooks_path.exists() else None
     hook_count = 0
     if isinstance(hooks_data, dict):
-        for events in hooks_data.values():
+        # Rendered format: {"hooks": {"PostToolUse": [...]}, "preset": "..."}
+        # Legacy flat format: {"PostToolUse": [...]}
+        hook_section = hooks_data.get("hooks")
+        if not isinstance(hook_section, dict):
+            hook_section = hooks_data
+        for events in hook_section.values():
             if isinstance(events, list):
                 for h in events:
                     if isinstance(h, dict) and h.get("hooks"):
@@ -668,13 +673,15 @@ def _dim_memory_continuity(project_dir: Path) -> DimensionScore:
             for line in body.splitlines()
             if line.strip() and not line.lstrip().startswith("<!--")
         ]
-        has_real_lessons = len(non_empty_lines) > 10
+        has_real_lessons = len(non_empty_lines) > 5 or any(
+            line.startswith("## ") for line in non_empty_lines
+        )
     signals.append(
         _signal(
             "failures_md_has_content",
             has_real_lessons,
             30,
-            "failures.md contains accumulated lessons (>10 lines)"
+            "failures.md contains accumulated lessons"
             if has_real_lessons
             else "failures.md is empty or stub",
             None if has_real_lessons else "Append real failure lessons after each incident",

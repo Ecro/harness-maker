@@ -301,7 +301,10 @@ def _render_text_file(
     # provenance fields stay authoritative.
     for k, v in template_fm.items():
         fm.setdefault(k, v)
-    fm["content_hash"] = body_hash
+    # Memory files are user-append targets (wrapup writes to them freely).
+    # Injecting content_hash would cause verify to fail after any wrapup write.
+    if not str(fe.path).startswith("memory/"):
+        fm["content_hash"] = body_hash
     final_bytes = _format_frontmatter(fm).encode("utf-8") + body_bytes
     if not dry_run:
         atomic_write(out, final_bytes)
