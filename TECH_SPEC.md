@@ -48,7 +48,6 @@
 - [ ] `/harness-maker:make` 가 빈 디렉토리에서 10분 내 완전한 하네스 생성
 - [ ] `/harness-maker:make` 가 기존 .claude/ 풍부한 디렉토리에서 충돌 reconcile + ADD-only 적용
 - [ ] 생성된 `/hm:dev`, `/hm:loop`, `/hm:monitor`, `/hm:refresh` 모두 정상 동작
-- [ ] statusline 에 효율·Health·fresh 3 지표 실시간 표시
 - [ ] `/hm:refresh` 가 4 source 크롤 → 패치 제안 → 사용자 confirm
 - [ ] `/hm:execute` 가 worktree 격리 안에서 동작
 - [ ] `/hm:verify` 가 5종 보안 게이트 검출 (sandbox 시드 vulnerability)
@@ -120,7 +119,6 @@ harness-maker/
 │       ├── verify.py                    # smoke (yaml lint, hooks parse, frontmatter)
 │       ├── modular_edit.py              # --add / --remove
 │       ├── workflow_fuse.py             # atomic stages → fused workflow command
-│       ├── statusline.py                # `python -m harness_maker.statusline`
 │       ├── telemetry.py                 # post-tool-use hook
 │       ├── context_lint.py              # 길이 + 중요도 lint
 │       ├── provenance.py                # frontmatter 부착·검증
@@ -335,7 +333,7 @@ harness-maker/
         ┌─────────────────────────────────────────────────────┐
         │  <project>/.claude/  (생성된 하네스 = 모든 런타임)      │
         │  ├── harness.yaml       (single source of truth)     │
-        │  ├── settings.json      (statusLine, permissions)    │
+        │  ├── settings.json      (permissions)                │
         │  ├── commands/                                        │
         │  │   └── hm/                                          │
         │  │       ├── research.md ┐                            │
@@ -353,8 +351,7 @@ harness-maker/
         │  │       └── refresh.md    → /hm:refresh (anti-rot)   │
         │  ├── skills/  (10 skills)                             │
         │  ├── agents/  (9 agents)                              │
-        │  ├── hooks/hooks.json (statusline + telemetry)        │
-        │  ├── lib/  (statusline.py wrapper)                    │
+        │  ├── hooks/hooks.json (telemetry)                     │
         │  ├── .worktrees/  (gitignored)                        │
         │  └── observability/                                    │
         │      ├── dashboard.md                                 │
@@ -421,7 +418,7 @@ class HarnessConfig(BaseModel):
     execution: dict  # { default: "step" | "autoloop" }
     reviewers: dict  # { list, consensus, routing }
     caching: str  # aggressive | conservative | adaptive | off
-    hooks: dict  # { statusline-monitor, telemetry-collector }
+    hooks: dict  # { telemetry-collector }
     memory: dict  # { files: [failures.md, wiki.md] }
     autoloop: dict  # { allowed, default_time_h, default_max_iter }
     anti_rot: dict  # { threshold, auto_apply, schedule }
@@ -480,9 +477,9 @@ class ConflictItem(BaseModel):
 3. Propose: `/hm:refresh` 가 AskUserQuestion (accept/reject/defer). **항상 manual confirm.**
 
 **(M5) Monitoring 3 metrics (Phase 3)**
-- 효율 (cache hit %) — 매 turn, statusline 🪙
+- 효율 (cache hit %) — 매 turn, `/hm:ai-readiness` 리포트 🪙
 - Health (0-100) — 6-dim (docs/tests/CI/obs/security/governance) + Agent quality drill-down (Platinum/Gold/Silver/Bronze) + ceremony penalty
-- fresh (days since refresh) — statusline 🔄
+- fresh (days since refresh) — 🔄
 - Telemetry 100% 로컬 (`metrics.jsonl` 외부 전송 0)
 
 **(M6) Conditional Router (Phase 5)**
@@ -542,7 +539,7 @@ class ConflictItem(BaseModel):
 | Memory | failures.md + wiki.md | failures.md + wiki.md |
 | Anti-rot threshold | adaptive (0.7) | adaptive (0.7) |
 | Anti-rot auto_apply | false | false |
-| Hooks | statusline + telemetry | statusline + telemetry |
+| Hooks | telemetry | telemetry |
 | Verify-before-completion | optional | required |
 | Worktree scope | [execute] | [execute, plan] |
 | Security on_finding.high | warn | block |
@@ -739,23 +736,15 @@ uv run pytest tests/unit/ -v \
 
 ### Phase 4: Monitoring 3 Metrics (효율 + Health + fresh)
 
-**Objective:** 사용자 하네스에 statusline·dashboard·telemetry 자산 렌더되어 3 지표 실시간 표시. Health 6-dim + Agent quality drill-down 계산 동작.
+**Objective:** 사용자 하네스에 dashboard·telemetry 자산 렌더되어 3 지표 `/hm:ai-readiness` 리포트에 표시. Health 6-dim + Agent quality drill-down 계산 동작.
 
 **Research targets (autoloop Stage 1 자동 fetch):**
-- Claude Code statusline JSON input format: https://code.claude.com/docs/en/statusline
 - Claude Code hooks (PostToolUse, format): https://code.claude.com/docs/en/hooks
-- Claude Code session data fields available to statusline scripts (stdin JSON schema)
+- Claude Code session data fields available to hook scripts (stdin JSON schema)
 
 #### Tasks
 
-- **Task 3.1: statusline 구현**
-  - Do: `src/harness_maker/statusline.py` — `python -m harness_maker.statusline` 실행 시 stdin 으로 Claude Code 세션 데이터 받아 stdout 으로 statusline 출력. 형식: `<project> | <preset> | 🪙<eff>% | 🎯<health> | 🔄<fresh>d`. 데이터 source: `.claude/observability/metrics.jsonl` 의 마지막 N 항목 + harness.yaml 의 preset.
-  - Files: `src/harness_maker/statusline.py`, `tests/unit/test_statusline.py`
-  - Done when: mock metrics.jsonl 로 호출 시 expected 문자열 출력
-  - Verify: `bash .claude-verify.sh phase_3_statusline`
-  - Commit: `feat(phase3): implement statusline with 3 metrics`
-
-- **Task 3.2: telemetry hook 구현**
+- **Task 3.1: telemetry hook 구현**
   - Do: `src/harness_maker/telemetry.py` — `python -m harness_maker.telemetry` 가 PostToolUse hook 으로 호출됨. stdin 으로 hook input 받아 metrics.jsonl 에 turn 단위 기록 (input_tokens, output_tokens, cache_read, cost).
   - Files: `src/harness_maker/telemetry.py`, `tests/unit/test_telemetry.py`
   - Done when: mock hook input 으로 호출 → metrics.jsonl 에 줄 추가 검증
@@ -783,10 +772,10 @@ uv run pytest tests/unit/ -v \
   - Verify: `bash .claude-verify.sh phase_3_dashboard`
   - Commit: `feat(phase3): add dashboard template + /hm:monitor command`
 
-- **Task 3.6: hooks.json + settings.json 템플릿**
-  - Do: `templates/hooks/hooks.json.j2` — PostToolUse 에 telemetry hook, statusLine 에 statusline 호출. `templates/settings/{Side,Production}.json.j2` — statusLine + permissions allow list (read-only 기본 + 권한 분리는 Phase 8 에서 강화).
+- **Task 3.5: hooks.json + settings.json 템플릿**
+  - Do: `templates/hooks/hooks.json.j2` — PostToolUse 에 telemetry hook. `templates/settings/{Side,Production}.json.j2` — permissions allow list (read-only 기본 + 권한 분리는 Phase 8 에서 강화).
   - Files: `templates/hooks/hooks.json.j2`, `templates/settings/{Side,Production}.json.j2`
-  - Done when: 렌더된 hooks.json 이 jq 통과, settings.json 이 statusLine 가리킴
+  - Done when: 렌더된 hooks.json 이 jq 통과, settings.json 에 permissions 존재
   - Verify: `bash .claude-verify.sh phase_3_hooks_settings`
   - Commit: `feat(phase3): add hooks.json + settings.json templates`
 
@@ -795,8 +784,7 @@ uv run pytest tests/unit/ -v \
 uv run pytest tests/unit/ -v \
   && uv run python -m harness_maker.cli make tests/fixtures/side-python-cli --autoloop \
   && jq . tests/fixtures/side-python-cli/.claude/hooks/hooks.json > /dev/null \
-  && test -f tests/fixtures/side-python-cli/.claude/observability/dashboard.md \
-  && uv run python -m harness_maker.statusline < tests/data/mock-session.json | grep -E '🪙[0-9]+ \| 🎯[0-9]+ \| 🔄[0-9]+d'
+  && test -f tests/fixtures/side-python-cli/.claude/observability/dashboard.md
 ```
 
 ---
@@ -1243,9 +1231,9 @@ print('reviewer permission separation OK')
   - Commit: `test(phase9): verify all 5 security gates detect seeded vulns`
 
 - **Task 9.5: 3 지표 출력 검증**
-  - Do: sandbox 에서 mock metrics.jsonl 시딩 후 `python -m harness_maker.statusline` 호출 → expected 형식 출력. `/hm:monitor` 호출 → dashboard.md 갱신, 3 metric 모두 표시.
+  - Do: sandbox 에서 mock metrics.jsonl 시딩 후 `/hm:monitor` 호출 → dashboard.md 갱신, 3 metric 모두 표시.
   - Files: `tests/e2e/test_dogfood_sandbox.py` (확장)
-  - Done when: statusline 출력에 🪙·🎯·🔄 모두 존재, dashboard.md 에 Health 6-dim + Agent quality 섹션 존재
+  - Done when: dashboard.md 에 Health 6-dim + Agent quality 섹션 존재, 🪙·🎯·🔄 모두 존재
   - Verify: `bash .claude-verify.sh phase_9_metrics`
   - Commit: `test(phase9): verify 3 metrics displayed correctly`
 
@@ -1340,7 +1328,7 @@ uv run ruff check src/ tests/ \
 
 - [ ] **R1 Locale-first**: 빈 sandbox 에서 `cli make --interactive` 호출 시 Q1 (한국어/English) 가 첫 질문. `.claude/harness.yaml` 에 locale 키 저장.
 - [ ] **R2 Anti-rot**: 4 source crawler 모두 호출 가능. relevance filter adaptive threshold 동작. `/hm:refresh` 가 propose 까지 진행 후 manual confirm 대기 (자동 적용 절대 X).
-- [ ] **R3 Monitoring**: statusline 에 🪙효율% · 🎯Health · 🔄fresh d 모두 표시. dashboard.md 에 Health 6-dim + Agent quality drill-down (Platinum/Gold/Silver/Bronze) 섹션 포함. metrics.jsonl 외부 전송 0.
+- [ ] **R3 Monitoring**: `/hm:ai-readiness` 리포트에 🪙효율% · 🎯Health · 🔄fresh d 모두 표시. dashboard.md 에 Health 6-dim + Agent quality drill-down (Platinum/Gold/Silver/Bronze) 섹션 포함. metrics.jsonl 외부 전송 0.
 - [ ] **R4 Workflow**: 7 atomic stage (`/hm:research` ... `/hm:verify`) 자동 노출. 사용자 명명 fused workflow N개 (`/hm:dev`, `/hm:careful`) 단일 명령으로 호출 가능. atomic vs fused 둘 다 동작.
 - [ ] **R5 Autoloop**: `/hm:loop "<goal>"` 호출 시 driver 가 token 무제한, 8h/30iter 디폴트로 자율 반복. dry-run 모드 동작. iter 5 ping, 3-fail stop.
 - [ ] **R6 Per-project preset**: 2 preset (Side/Production) 인터뷰 → 10+ 차원 override → harness.yaml 에 저장. 4 fixture 모두 expected blueprint 일치.
@@ -1366,7 +1354,7 @@ uv run ruff check src/ tests/ \
 - [ ] Skills (10): verify-before-completion, conditional-router, ai-readiness-rubric, agent-quality-rubric, research-crawler, relevance-filter, autoloop-driver, worktree-isolator, security-scanner, context-linter
 - [ ] Agents (9): code-reviewer, security-reviewer, security-auditor, performance-reviewer, ux-reviewer, concurrency-reviewer, consensus-arbiter, autoloop-coder, executor
 - [ ] Commands (10+): /hm:research, spec, plan, execute, review, wrapup, verify (atomic 7개) + /hm:loop, /hm:monitor, /hm:refresh (메타 3개) + N user workflows
-- [ ] Hooks: hooks.json 에 statusLine + telemetry-collector
+- [ ] Hooks: hooks.json 에 telemetry-collector
 - [ ] Templates: harness-yaml/{Side,Production} + claude-md × {ko,en} × 2 preset + memory × {failures,wiki} × {ko,en} + settings × 2 preset + dashboard × {ko,en}
 
 ### Verification Script (`.claude-verify.sh`)
@@ -1386,7 +1374,7 @@ bash .claude-verify.sh all
 
 - **ADR-1: Python only (Bash 사용 금지)**
   - Context: 초기 spec 은 Bash + Python 혼용
-  - Decision: Python 단일 — Bash 제거. statusline 도 `python -m harness_maker.statusline` 호출.
+  - Decision: Python 단일 — Bash 제거.
   - Rationale: 일관성, type checking, test framework 통합. WSL2 환경 안정성.
 
 - **ADR-2: 단일 메타-툴 명령**
@@ -1441,7 +1429,7 @@ bash .claude-verify.sh all
 | K1 | arxiv 크롤이 noise → 잘못된 패치 | high | adaptive threshold + 항상 manual confirm |
 | K2 | autoloop runaway | high | iter cap + time cap + 3 fail stop + iter 5 ping |
 | K3 | Template 자체가 stale → 자기-순환 | med | refresh 대상에 self template 포함 |
-| K4 | 모니터링이 압도적 | med | statusline 3 지표 fixed, dashboard on-demand |
+| K4 | 모니터링이 압도적 | med | ai-readiness 3 지표 고정, dashboard on-demand |
 | K5 | i18n 비대칭 | med | template diff 비대칭 시 빌드 fail (CI 게이트) |
 | K6 | hiloop skill 이름 충돌 | low | `harness-maker:` namespace 명시 |
 | K7 | 22 프로젝트 한꺼번에 적용 → 회귀 폭발 | high | dry-run 강제 첫 회 / per-project apply / backup 보존 |
@@ -1508,7 +1496,7 @@ bash .claude-verify.sh all
 **경쟁/참고 framework:**
 - hiloop: ai-readiness-rubric (Health), failures.md/wiki.md memory, autoloop-coder agent
 - Synthesis (Rajiv Pant, 2026-04): `.agents/` 컨벤션 (현재 미채택, Open Question)
-- claude-statusline-enhanced: cache hit 표시
+- claude-statusline-enhanced: cache hit 표시 (statusLine 기능 — harness-maker 는 제거, ai-readiness 로 대체)
 - obra/superpowers: verify-before-completion 게이트, 멀티-호스트 매니페스트
 - wshobson/agents: Conditional Routing + agent별 model tier + 3-layer eval (agent quality)
 - davila7/claude-code-templates: Modular installer 패턴

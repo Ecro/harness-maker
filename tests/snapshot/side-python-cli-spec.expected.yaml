@@ -34,7 +34,7 @@ files:
   body_sha256: db7f1929425a16ccd8381e392f3b8f058e3305114c0e32c6e03ca4bdcd843113
 - path: commands/hm/ai-readiness.md
   template: commands/hm/ai-readiness.md.j2
-  body_sha256: 410aead48870bac2b6ff1d53784daabdf741217873c1bf10b97f7af0bdd7b8cd
+  body_sha256: 50723b24320945863213ad4c16d6dc155dbdf0102f0f65c6b0e10d3d2bc5b077
 - path: commands/hm/exec-rev-wrap.md
   template: commands/hm/workflow_command.md.j2
   body_sha256: 4f5d1eb92c811efc99e24af9f4dcac5f3d48dea85bbb05dcfb705d2962154219

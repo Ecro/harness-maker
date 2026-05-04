@@ -312,6 +312,19 @@ def test_dashboard_markdown_no_actions_message() -> None:
     assert "(none — project looks healthy)" in md
 
 
+def test_finalize_from_verdicts_json_malformed_scores_raises(tmp_path: Path) -> None:
+    """Malformed scores JSON raises ValueError, not a raw KeyError/JSONDecodeError."""
+    import json
+
+    scores_path = tmp_path / "scores.json"
+    scores_path.write_text('{"not_readiness": {}}', encoding="utf-8")
+    verdicts_path = tmp_path / "verdicts.json"
+    verdicts_path.write_text("[]", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="scores JSON"):
+        finalize_from_verdicts_json(scores_path, verdicts_path)
+
+
 def test_judge_client_protocol_satisfied_by_fake() -> None:
     fake: JudgeClient = _FakeJudgeClient()
     assert callable(getattr(fake, "judge", None))

@@ -7,6 +7,19 @@ Asks the user what they want to do before invoking the CLI.
 
 You (Claude) act as the orchestrator. Follow these steps:
 
+### 0. CI / test mode detection
+
+If the prompt text contains `--ci`, extract inline params and skip all
+`AskUserQuestion` calls. Parse `preset=`, `locale=`, `dev_mode=` from the
+prompt; use defaults `Side` / `en` / `task` for any that are absent.
+Skip sections 2 and 3 entirely and jump directly to section 4 (Dispatch →
+Fresh install or Update, depending on whether `.claude/harness.yaml` exists).
+
+Example invocation:
+```
+/harness-maker:make --ci preset=Side locale=en dev_mode=task
+```
+
 ### 1. Detect state
 
 Resolve the plugin install path and check whether the project already has
@@ -55,50 +68,6 @@ Use `AskUserQuestion` to gather:
 
 Then dispatch with `--preset / --locale / --dev-mode --autoloop` so the CLI
 skips its own interview but uses the answers you collected.
-
-### 3.5. Detect custom statusLine and ask policy
-
-Before dispatching, look at `statusLine.command` in:
-
-1. `.claude/settings.json` (project-level — wins by Claude Code precedence)
-2. `~/.claude/settings.json` (user-global — shadowed if we write to project)
-
-Outcomes:
-
-- Both empty / missing → CLI installs harness-maker's wrapper. No question.
-- Project-level matches `uv run python -m harness_maker.statusline` (broken
-  v0.3.0 default) or `bash .claude/lib/run-statusline.sh` (current simple
-  wrapper) → CLI auto-upgrades silently. No question.
-- Project-level matches `bash .claude/lib/run-statusline-combined.sh`
-  (combined wrapper from a prior "combine" choice) → preserve as-is. No
-  question.
-- Project-level is custom OR project-level is empty but global is custom
-  → user has a statusLine that would be **shadowed** if we write one. Use
-  `AskUserQuestion`:
-
-  > "Custom statusLine detected: `<command>`. What should happen?"
-  >
-  > - **Keep mine** — preserve my custom statusLine, don't install harness-maker's.
-  > - **Combine** — render a wrapper that runs both my command and harness-maker's metrics, joining outputs with ` | `.
-  > - **Use harness-maker** — overwrite my custom one with harness-maker's wrapper.
-
-Map the answer to a flag and append it to the dispatch invocation:
-
-| Answer            | Flag                                  |
-|-------------------|---------------------------------------|
-| Keep mine         | `--statusline-policy keep`            |
-| Combine           | `--statusline-policy combine`         |
-| Use harness-maker | `--statusline-policy overwrite`       |
-
-The `combine` policy creates `.claude/lib/user-statusline.sh` (one-shot,
-holds your original command — edit freely; harness-maker won't touch it
-again) and `.claude/lib/run-statusline-combined.sh` (the wrapper that
-joins outputs). When the source command came from the user-global
-settings, that's what gets captured.
-
-The `keep` policy on a global-only statusLine drops the statusLine key
-from the project's `settings.json` entirely so Claude Code falls back to
-the global one — your existing statusline stays untouched.
 
 ### 4. Dispatch — pick the right CLI invocation
 

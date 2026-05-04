@@ -116,30 +116,6 @@ def test_render_settings_json_shallow_merges_existing(tmp_path: Path) -> None:
     assert "Read" in data["permissions"]["allow"]
 
 
-def test_render_settings_json_evicts_stale_harness_keys(tmp_path: Path) -> None:
-    """statusLine written by harness-maker 0.3.x must be removed on re-render once
-    the template no longer emits it — simple shallow-merge would leave it forever.
-    """
-    import json
-
-    settings_path = tmp_path / "settings.json"
-    settings_path.write_text(
-        json.dumps(
-            {
-                "statusLine": {"command": "bash .claude/lib/run-statusline-combined.sh", "type": "command"},
-                "enabledPlugins": {"foo@bar": True},
-            }
-        ),
-        encoding="utf-8",
-    )
-    p = _profile()
-    a = interview(p, autoloop_mode=True)
-    bp = synthesize(p, a)
-    render(bp, tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
-    data = json.loads(settings_path.read_text(encoding="utf-8"))
-    assert "statusLine" not in data, "stale statusLine must be evicted by re-render"
-    assert data["enabledPlugins"] == {"foo@bar": True}
-
 
 def test_render_settings_json_falls_back_when_existing_corrupt(tmp_path: Path) -> None:
     """Malformed JSON on disk → render writes pure template content (no crash).
@@ -205,6 +181,31 @@ def test_render_with_merge_paths_preserves_user_blocks(tmp_path: Path) -> None:
     assert Path("stages/review.md") in merge_reports
     report = merge_reports[Path("stages/review.md")]
     assert "extensions" in report.user_blocks_preserved
+
+
+def test_render_settings_json_evicts_stale_harness_keys(tmp_path: Path) -> None:
+    """Keys harness-maker used to write (e.g. statusLine) are evicted on re-render
+    even if they're still present in the existing settings.json.
+    """
+    import json
+
+    settings_path = tmp_path / "settings.json"
+    settings_path.write_text(
+        json.dumps({
+            "statusLine": "some old status line value",
+            "enabledPlugins": {"user-plugin": True},
+        }),
+        encoding="utf-8",
+    )
+    p = _profile()
+    a = interview(p, autoloop_mode=True)
+    bp = synthesize(p, a)
+    render(bp, tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
+    data = json.loads(settings_path.read_text(encoding="utf-8"))
+    # statusLine was owned by harness-maker in <=0.3.x — must be evicted.
+    assert "statusLine" not in data
+    # User-owned key survives.
+    assert data["enabledPlugins"] == {"user-plugin": True}
 
 
 def test_render_without_merge_paths_overwrites(tmp_path: Path) -> None:

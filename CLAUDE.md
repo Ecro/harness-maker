@@ -180,8 +180,6 @@ def normalize_for_snapshot(text: str) -> str:
 - 0.3.1: `settings.json` shallow merge (Claude Code 가 쓴 `enabledPlugins`
   보존)
 - 0.3.2: `answers_from_harness_yaml` (재렌더 시 인터뷰 답변 silent 재사용)
-- 0.3.4–0.3.5: `statusLine` keep/overwrite/combine 정책
-
 패턴: **policy flag (default = preserve user) + slash 명령에서
 `AskUserQuestion` 으로 의도 묻기**.
 
@@ -189,7 +187,7 @@ def normalize_for_snapshot(text: str) -> str:
 우리가 렌더하는 파일은 우리가 아니라 **다른 도구가 읽음**. 그 도구의
 parser 가 받아들이는 형식을 따라야 함.
 - `settings.json` → Claude Code 가 pure JSON 으로 기대 (YAML frontmatter
-  prefix 박으면 statusLine/permissions 무시됨, 0.3.1 fix)
+  prefix 박으면 permissions 무시됨, 0.3.1 fix)
 - `hooks/hooks.json` → jq-parseable pure JSON
 - `lib/*.sh` → bash 가 `---` 를 명령으로 해석, frontmatter 금지
   (`_render_pure_text`)
@@ -202,8 +200,6 @@ parser 가 받아들이는 형식을 따라야 함.
 Claude Code 는 `~/.claude/settings.json` (user) → `<project>/.claude/settings.json`
 (project) → `<project>/.claude/settings.local.json` 순으로 우선 적용. **하위
 레벨에 키를 쓰면 상위가 가려짐**.
-- 0.3.5: 사용자 global `statusLine` 이 있는데 project-level 에 우리 statusLine
-  쓰면 silent shadowing — `_read_global_status_line()` 으로 미리 검사
 - 같은 패턴: `permissions`, `env` 도 project 가 user-global 을 가림
 
 새 키 쓰기 전에 상위 레벨에 같은 키 있는지 확인. 있으면 keep / combine /
@@ -221,9 +217,9 @@ stdin 이 안 통해 hang. 0.3.2 의 non-tty fallback 도 같은 원리.
 ### 5. 자동-업그레이드 vs 보존 분기 (fingerprint 기반)
 사용자 파일에 박힌 값을 만질 때: **이게 우리가 박은 거냐 사용자가 박은
 거냐** 를 fingerprint 로 판정.
-- 0.3.4: `_HARNESS_SHIPPED_STATUSLINE_COMMANDS` set 으로 "ours" 판정 →
-  자동 업그레이드 (broken v0.3.0 default → wrapper)
-- 0.3.5: 단, **explicit policy 가 있으면 자동-업그레이드 무시 + policy 우선**
+- `content_hash` 비교: frontmatter hash 가 일치하면 "ours" → 자동 업그레이드.
+  다르면 "theirs" → KEEP.
+- explicit policy 가 있으면 자동-업그레이드 무시 + policy 우선.
 
 같은 fingerprint 패턴이 필요할 만한 곳: 사용자 hooks.json, 사용자 추가
 agent/skill 파일. 그 위치에 우리 출력 박을 때 fingerprint set 만들어두면
@@ -257,10 +253,9 @@ Schema gap (옛 버전 파일에 새 키 없음) 은 default fallback 으로 처
 ### 8. Integration 경계 한 줄 테스트
 unit test 다 통과해도 **integration 경계** (CLI 실행, 외부 도구 호출,
 파일 시스템 효과) 가 깨질 수 있음.
-- 0.3.0 의 broken statusLine: `harness_maker.statusline` 모듈 import 는
-  통과했지만 `uv run` 으로 다른 cwd 에서 실행은 실패. unit 으론 못 잡음.
-- 0.3.4 fix: bash wrapper + 실제 `bash run-statusline.sh` 실행해서 출력
-  확인 e2e
+- 예: 모듈 import 는 통과해도 `uv run` 으로 다른 cwd 에서 실행하면 실패.
+  unit 으론 못 잡음 → `tests/e2e/test_plugin_live.py` 로 실제 claude 바이너리
+  호출해서 검증.
 
 새 사용자-경계 코드 (CLI 명령, 슬래시 명령, hook) 는 **bash 또는
 subprocess 로 실제 실행하는 e2e 한 케이스** 라도 추가.

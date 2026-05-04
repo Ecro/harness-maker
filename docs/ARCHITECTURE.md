@@ -67,7 +67,7 @@ Three design commitments shape every decision below:
         │  Generated harness (the runtime)                    │
         │  ──────────────────                                 │
         │  harness.yaml          ◀── single source of truth   │
-        │  settings.json         ◀── statusLine, permissions  │
+        │  settings.json         ◀── permissions               │
         │  commands/hm/                                       │
         │    research|spec|plan|execute|review|wrapup|verify  │
         │      ◀── M3 atomic stages                           │
@@ -81,7 +81,7 @@ Three design commitments shape every decision below:
         │                          worktree-isolator, ...     │
         │  agents/  (9)       ◀── M12 reviewer/executor       │
         │                          privilege separation       │
-        │  hooks/hooks.json   ◀── statusline + telemetry      │
+        │  hooks/hooks.json   ◀── telemetry                    │
         │  .worktrees/        ◀── M9 git worktree isolation   │
         │  observability/                                     │
         │    dashboard.md                                     │
@@ -147,11 +147,11 @@ This means harness-maker stays current without ever silently changing the user's
 
 ### M5 — Monitoring (3 Metrics)
 
-All three render into the status line via `statusline.py`:
+Three metrics are computed and surfaced in the `/hm:ai-readiness` report:
 
-- **효율** — cache hit % per turn, surfaced with the 🪙 emoji. Computed from telemetry hook output.
+- **효율** — cache hit % per turn. Computed from telemetry hook output.
 - **Health** — 0-100 score across 6 dimensions: docs, tests, CI, observability, security, governance. Implemented in `readiness.py`. Drills down into `agent_quality.py`, which assigns each agent a Platinum/Gold/Silver/Bronze rating against a fixed rubric. A "ceremony penalty" deducts points when an agent has high-process / low-output behavior.
-- **fresh** — days since the last `/hm:refresh` accepted at least one proposal, surfaced with 🔄.
+- **fresh** — days since the last `/hm:refresh` accepted at least one proposal.
 
 All telemetry stays local — `metrics.jsonl` is never transmitted.
 

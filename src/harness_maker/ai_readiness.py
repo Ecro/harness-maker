@@ -105,11 +105,19 @@ def finalize_from_verdicts_json(
 
     The ``score`` field is computed from the verdicts; ``error`` defaults to null.
     """
-    scores = json.loads(scores_path.read_text(encoding="utf-8"))
-    readiness = ReadinessResult.model_validate(scores["readiness"])
-    cache = CacheDiagnosis.model_validate(scores["cache"])
+    try:
+        scores = json.loads(scores_path.read_text(encoding="utf-8"))
+        readiness = ReadinessResult.model_validate(scores["readiness"])
+        cache = CacheDiagnosis.model_validate(scores["cache"])
+    except (json.JSONDecodeError, KeyError, Exception) as e:
+        msg = f"Could not parse scores JSON at {scores_path}: {e}"
+        raise ValueError(msg) from e
 
-    raw_verdicts = json.loads(verdicts_path.read_text(encoding="utf-8"))
+    try:
+        raw_verdicts = json.loads(verdicts_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        msg = f"Could not parse verdicts JSON at {verdicts_path}: {e}"
+        raise ValueError(msg) from e
     judge_results: list[JudgeResult] = []
     if isinstance(raw_verdicts, list):
         for entry in raw_verdicts:

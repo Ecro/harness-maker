@@ -361,6 +361,10 @@ def ai_readiness_cmd(
 
 @app.command("ai-readiness-finalize")
 def ai_readiness_finalize_cmd(
+    target: Path = typer.Argument(  # noqa: B008
+        default_factory=Path.cwd,
+        help="Project root (the directory containing .claude/).  Defaults to cwd.",
+    ),
     scores_json: Path = typer.Option(
         ...,
         "--scores-json",
@@ -388,9 +392,9 @@ def ai_readiness_finalize_cmd(
     plan = finalize_from_verdicts_json(scores_json, verdicts_json)
     typer.echo(render_terminal_summary(plan))
     if update_dashboard:
-        # Dashboard lives beside the scores JSON (inside .claude/observability/).
-        dashboard = scores_json.parent / "dashboard.md"
-        body = render_dashboard_markdown(plan, scores_json.parent.parent.parent.name)
+        target = target.resolve()
+        dashboard = target / ".claude" / "observability" / "dashboard.md"
+        body = render_dashboard_markdown(plan, target.name)
         atomic_write(dashboard, body)
         typer.echo(f"\nDashboard updated: {dashboard}")
 

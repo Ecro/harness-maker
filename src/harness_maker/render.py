@@ -141,16 +141,15 @@ def _render_settings_json(
     return out
 
 
-# Keys harness-maker has ever written to settings.json.  When a key was
-# removed from the template (e.g. statusLine in 0.3.6) it must be actively
-# dropped on the next render — simple {**existing, **new_data} would leave it
-# behind forever.
+# Keys harness-maker has ever written to settings.json.  When a key is
+# removed from the template it must be actively dropped on the next render —
+# simple {**existing, **new_data} would leave it behind forever.
+# NOTE: "env" is intentionally absent — users may set their own env vars.
 _SETTINGS_KEYS_OWNED_BY_HARNESS: frozenset[str] = frozenset(
     {
-        "statusLine",   # shipped 0.3.x, removed 0.3.6
+        "statusLine",  # written by <=0.3.x; template no longer emits it
         "preset",
         "permissions",
-        "env",
     }
 )
 
@@ -162,7 +161,7 @@ def _shallow_merge_existing_json(
     """Merge top-level keys: existing's unique keys + new_data (template wins).
 
     Previously-owned harness-maker keys absent from new_data are removed so
-    stale keys (e.g. statusLine) don't linger after a template drops them.
+    stale keys don't linger after a template drops them.
     """
     existing: dict[str, Any] = {}
     if out.exists():

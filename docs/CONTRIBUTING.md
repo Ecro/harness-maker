@@ -24,7 +24,6 @@ harness-maker/
 │   ├── provenance.py         # M13: frontmatter (hash, generated_by, ...)
 │   ├── readiness.py          # M5: Health (0-100, 6 dimensions)
 │   ├── agent_quality.py      # M5: Platinum/Gold/Silver/Bronze rubric
-│   ├── statusline.py         # M5: 효율/Health/fresh status line
 │   ├── crawler/              # M4: 4-source anti-rot crawl
 │   ├── relevance.py          # M4: LLM scoring + adaptive threshold
 │   └── i18n.py               # locale-first messaging
@@ -35,7 +34,7 @@ harness-maker/
 │   ├── stages/<stage>.md.j2  # atomic stage fragments for workflow fusion
 │   ├── harness-yaml/<Preset>.yaml.j2
 │   ├── settings/<Preset>.json.j2
-│   └── hooks/                # statusline + telemetry hooks
+│   └── hooks/                # telemetry hooks
 ├── commands/make.md          # /harness-maker:make plugin entry
 ├── tests/
 │   ├── unit/                 # per-module pytest
@@ -99,7 +98,7 @@ Presets live in two paired templates:
 
 ```
 templates/harness-yaml/<Preset>.yaml.j2   # the harness.yaml schema instance
-templates/settings/<Preset>.json.j2        # the settings.json (statusLine, permissions, hooks)
+templates/settings/<Preset>.json.j2        # the settings.json (permissions, hooks)
 ```
 
 Steps:
