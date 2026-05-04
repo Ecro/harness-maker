@@ -21,6 +21,19 @@ each phase exits only when its verification command is green.
 - `{{ config.work_docs.dir }}PLAN-{slug}.md`
 - `{{ config.spec.dir }}SPEC-{slug}.md` (when present) — drives test authoring
 - Codebase, tests, build/CI scripts
+- Memory tiers — see loading order below
+
+## Session Context Loading
+
+Before starting, load memory in tier order:
+
+1. **Hot tier** — Read `.claude/memory/session/<today's date>.md` in full if it
+   exists. If a `checkpoint:compaction` entry is present, this session was
+   interrupted mid-stage — check `.claude-progress.json` for partial state.
+2. **Warm tier** — Skim `.claude/memory/failures.md` (first 60 lines) for
+   patterns relevant to the task. Targeted: `rg -F "[fail:" .claude/memory/failures.md`
+3. **Warm tier** — Skim `.claude/memory/wiki.md` (first 40 lines) for
+   conventions that apply to the implementation area.
 
 ## Procedure
 

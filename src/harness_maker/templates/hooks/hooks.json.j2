@@ -22,6 +22,30 @@
         ]
       }{% endif %}
     ],
+    "PreCompact": [
+      {
+        "matcher": "auto",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run --with {{ harness_maker_src_path }} python -m harness_maker.hooks.flush_session",
+            "timeout": 30,
+            "statusMessage": "Snapshotting autoloop progress..."
+          }
+        ]
+      },
+      {
+        "matcher": "manual",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run --with {{ harness_maker_src_path }} python -m harness_maker.hooks.flush_session",
+            "timeout": 30,
+            "statusMessage": "Snapshotting autoloop progress..."
+          }
+        ]
+      }
+    ],
     "SessionStart": [],
     "Stop": []
   },

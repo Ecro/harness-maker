@@ -22,14 +22,25 @@ art, library docs, and architectural constraints so that downstream stages
 
 - User question, task description, or feature request (`$ARGUMENTS`)
 - Codebase context (relevant files, prior PLANs, prior REVIEWs)
-- Existing wiki + failure-log entries (`.claude/memory/`)
+- Memory tiers: session log (hot), failures + wiki (warm) — see loading order below
+
+## Session Context Loading
+
+Before starting, load memory in tier order (stops at first miss per tier):
+
+1. **Hot tier** — Read `.claude/memory/session/<today's date>.md` in full if it
+   exists. Compaction checkpoint entries reveal where the prior session ended.
+2. **Warm tier** — Skim `.claude/memory/failures.md` (first 60 lines).
+   Search for relevant entries: `rg -F "[fail:" .claude/memory/failures.md`
+3. **Warm tier** — Skim `.claude/memory/wiki.md` (first 60 lines).
+   Search for relevant entries: `rg -F "[wiki:" .claude/memory/wiki.md`
 
 ## Procedure
 
 1. Identify the scope. State explicitly what is in/out of scope.
-2. Search prior art:
-   - Repo memory: `rg -F "[tags:keyword]" .claude/memory/wiki.md`
-   - Repo failures: `rg -F "[tags:keyword]" .claude/memory/failures.md`
+2. Search prior art (using loaded memory above as starting point):
+   - Targeted grep: `rg -F "[wiki:<keyword>]" .claude/memory/wiki.md`
+   - Targeted grep: `rg -F "[fail:<keyword>]" .claude/memory/failures.md`
    - Codebase patterns via Grep/Glob
 3. Fetch external documentation when a library/framework/API is involved.
    Prefer official docs over training data — versions drift.

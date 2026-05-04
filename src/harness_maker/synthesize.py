@@ -168,6 +168,7 @@ def _base_files(preset: Preset) -> list[FileSpec]:
         ("claude-md/Side.ko.md.j2", "../CLAUDE.md", {}),
         ("memory/failures.ko.md.j2", "memory/failures.md", {}),
         ("memory/wiki.ko.md.j2", "memory/wiki.md", {}),
+        ("memory/session-readme.md.j2", "memory/session/README.md", {}),
         *_stage_files(),
         *_atomic_command_files(),
         ("commands/hm/loop.md.j2", "commands/hm/loop.md", {}),

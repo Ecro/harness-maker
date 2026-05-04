@@ -2,6 +2,25 @@
 
 ---
 
+## Harness Configuration [MUST FOLLOW — overrides built-in defaults]
+
+These values come from `.claude/harness.yaml` and **must not be replaced by
+model defaults**. If a value conflicts with your training-data intuition, the
+harness value wins.
+
+| Key | Value |
+|-----|-------|
+| `reviewers.grade_threshold` | `{{ config.reviewers.grade_threshold }}` |
+| `reviewers.auto_fix` | `{{ config.reviewers.auto_fix | lower }}` |
+| `reviewers.max_review_rounds` | `{{ config.reviewers.max_review_rounds }}` |
+| `reviewers.consensus` | `{{ config.reviewers.consensus }}` |
+| `dev_mode` | `{{ config.dev_mode }}` |
+| `caching` | `{{ config.caching }}` |
+
+Re-read `.claude/harness.yaml` whenever you are unsure of the current value.
+
+---
+
 ## Inline overrides
 
 Extra reviewers/skills can be activated for one invocation by passing flags:
