@@ -71,6 +71,18 @@ harness-maker 는 Claude Code 의 플러그인으로, **LLM 판단력을 최대�
 - 로컬 author: `Ecro <e839638@gmail.com>` (project-scoped git config).
 - 모든 phase 완료 시 자동 commit (autoloop wrapup stage). push 는 별도.
 
+## 버전업 정책
+
+버전 번호는 **세 파일을 동시에** 수정해야 한다. 하나라도 빠지면 `/plugin update` 가 잘못된 버전을 보고함:
+
+| 파일 | 역할 |
+|------|------|
+| `.claude-plugin/plugin.json` | `/plugin update` 가 읽는 기준 버전 |
+| `pyproject.toml` | Python 패키지 버전 |
+| `src/harness_maker/__init__.py` | `__version__` 런타임 값 |
+
+> **왜:** Claude Code 의 `/plugin update` 는 `plugin.json` 의 `version` 필드를 기준으로 최신 여부를 판단한다. `pyproject.toml` 을 올려도 `plugin.json` 이 구버전이면 "already at latest" 로 오보한다. (0.4.9 릴리스 시 발견)
+
 ## 보안 / 권한 (v1.6)
 - Reviewer agent (code, security, perf, ux, concurrency) — `permissions.allow: [Read(*), Grep(*), Bash(git diff:*), Bash(git log:*)]`, `deny: [Write(*), Edit(*), Bash(rm:*), Bash(curl:*), Bash(npm:*)]`
 - Executor agent — `allow: [Write(.worktrees/**), Edit(.worktrees/**), Bash(<test commands>:*)]`, `deny: [Write(/etc/**), Write(~/.ssh/**), Bash(curl * | sh), Bash(eval *)]`
