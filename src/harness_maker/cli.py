@@ -313,7 +313,7 @@ def ai_readiness_cmd(
         "--update-dashboard/--no-update-dashboard",
         help="Write the rendered plan to .claude/observability/dashboard.md.",
     ),
-    json_output: Path | None = typer.Option(
+    json_output: Path | None = typer.Option(  # noqa: B008
         None,
         "--json-output",
         help="Write L1+L3 structural scores as JSON to this path (implies --skip-llm).",
@@ -340,9 +340,10 @@ def ai_readiness_cmd(
         json_output.write_text(json.dumps(scores, indent=2), encoding="utf-8")
         typer.echo(f"Structural scores written to {json_output}")
         # Also print L1+L3 partial summary (L2=50 neutral placeholder).
+        from harness_maker.cache_diagnostics import CacheDiagnosis
         from harness_maker.improvement import build_improvement_plan
         from harness_maker.readiness import ReadinessResult
-        from harness_maker.cache_diagnostics import CacheDiagnosis
+
         readiness = ReadinessResult.model_validate(scores["readiness"])
         cache = CacheDiagnosis.model_validate(scores["cache"])
         plan = build_improvement_plan(readiness, [], cache)
@@ -365,12 +366,12 @@ def ai_readiness_finalize_cmd(
         default_factory=Path.cwd,
         help="Project root (the directory containing .claude/).  Defaults to cwd.",
     ),
-    scores_json: Path = typer.Option(
+    scores_json: Path = typer.Option(  # noqa: B008
         ...,
         "--scores-json",
         help="Path to L1+L3 scores JSON written by ai-readiness --json-output.",
     ),
-    verdicts_json: Path = typer.Option(
+    verdicts_json: Path = typer.Option(  # noqa: B008
         ...,
         "--verdicts-json",
         help="Path to Claude-provided L2 verdicts JSON.",
