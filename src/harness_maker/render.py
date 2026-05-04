@@ -105,7 +105,6 @@ def _render_settings_json(
     *,
     dry_run: bool,
     freeze_time: datetime | None,  # noqa: ARG001 — kept for dispatch signature parity
-    statusline_policy: str | None = None,
 ) -> Path:
     """Render settings.json as pure JSON, shallow-merging with any existing on disk.
 
@@ -115,16 +114,12 @@ def _render_settings_json(
     written when the user runs ``/plugin install`` — so we shallow-merge:
       * existing top-level keys NOT in our template are preserved
       * keys present in both — our template's value wins (it's the source of
-        truth for permissions/statusLine/preset)
-
-    Legacy settings.json files from harness-maker ≤ 0.3.0 carry a YAML
-    frontmatter prefix; we strip it before parsing for back-compat.
+        truth for permissions/preset)
 
     v1 limitation — the merge is **shallow**: nested customizations under a
     key our template owns (e.g. user-added entries in ``permissions.allow``)
     are lost on re-render. Workaround: keep custom permissions in
     ``.claude/settings.local.json`` (Claude Code merges that automatically).
-    Deep-merge with list-union semantics is on the v1.5 roadmap.
     """
     template = env.get_template(fe.template)
     rendered = template.render(**fe.context)
@@ -137,7 +132,7 @@ def _render_settings_json(
         msg = f"Template {fe.template} must render a JSON object (got {type(new_data).__name__})"
         raise ValueError(msg)
     out = target_dir / fe.path
-    merged = _shallow_merge_existing_json(out, new_data, statusline_policy=statusline_policy)
+    merged = _shallow_merge_existing_json(out, new_data)
     body_bytes = _format_settings_json(merged)
     body_hash = hashlib.sha256(body_bytes).hexdigest()
     fe.body_sha256 = body_hash
@@ -146,124 +141,17 @@ def _render_settings_json(
     return out
 
 
-# Known harness-maker-shipped statusLine commands. Existing settings.json
-# entries that match one of these were installed by a prior harness-maker
-# render and are safe to upgrade in place. Anything else is treated as a user
-# customization and preserved verbatim.
-_HARNESS_SHIPPED_STATUSLINE_COMMANDS: frozenset[str] = frozenset(
-    {
-        # v0.3.0–0.3.3 — broken from project cwd because harness_maker isn't
-        # importable; auto-upgrade these to the wrapper-based 0.3.4+ command.
-        "uv run python -m harness_maker.statusline",
-        # v0.3.4+ wrapper — current; matching value means already up to date.
-        "bash .claude/lib/run-statusline.sh",
-    },
-)
-
-
-_COMBINED_STATUSLINE_COMMAND = "bash .claude/lib/run-statusline-combined.sh"
-
-
-def _decide_status_line(
-    *,
-    existing_sl: dict[str, Any] | None,
-    global_sl: dict[str, Any] | None,
-    template_sl: dict[str, Any] | None,
-    policy: str | None,
-) -> dict[str, Any] | None:
-    """Pick the statusLine block to write into project settings.json.
-
-    ``None`` return means "drop the statusLine key entirely" so Claude Code's
-    settings precedence keeps the user-global one active.
-
-    Decision matrix (rows: project state · global state):
-
-    - empty            · empty  → install template (None/keep, overwrite, combine→combined)
-    - empty            · custom → drop (None/keep) | install template (overwrite) | combined
-    - harness-shipped  · empty  → auto-upgrade (None/keep, overwrite) | combined
-    - harness-shipped  · custom → drop (None/keep) | auto-upgrade (overwrite) | combined
-    - custom           · (any)  → preserve project (None/keep) | template (overwrite) | combined
-
-    Explicit policy always wins over the auto-upgrade default. Combined wrapper
-    is intentionally NOT in ``_HARNESS_SHIPPED_STATUSLINE_COMMANDS`` so a prior
-    "combine" choice is preserved across re-renders rather than auto-upgraded
-    away from.
-    """
-    if policy == "combine":
-        return {"type": "command", "command": _COMBINED_STATUSLINE_COMMAND}
-    if policy == "overwrite":
-        return template_sl
-
-    cmd = ""
-    if existing_sl is not None:
-        raw = existing_sl.get("command")
-        cmd = raw if isinstance(raw, str) else ""
-    project_is_harness_shipped = cmd in _HARNESS_SHIPPED_STATUSLINE_COMMANDS
-
-    # Custom project statusLine → preserve verbatim.
-    if existing_sl is not None and not project_is_harness_shipped:
-        return existing_sl
-    # Harness-shipped project + no global → silent auto-upgrade.
-    if project_is_harness_shipped and global_sl is None:
-        return template_sl
-    # Empty project + no global → fresh install.
-    if existing_sl is None and global_sl is None:
-        return template_sl
-    # Otherwise (no project sl OR project is harness-shipped, with a global
-    # present) → drop ours so Claude Code precedence keeps the global active.
-    return None
-
-
-def _read_global_status_line() -> dict[str, Any] | None:
-    """Read ``~/.claude/settings.json``'s ``statusLine`` block, if any.
-
-    Project-level settings shadow user-global, so writing a project statusLine
-    would silently override what the user already has globally. Reading the
-    global block lets the merge keep it visible (or capture it for combine).
-    Returns None on any failure — the merge falls through to its no-global
-    branch.
-    """
-    path = Path.home() / ".claude" / "settings.json"
-    if not path.exists():
-        return None
-    try:
-        text = path.read_text(encoding="utf-8")
-    except OSError:
-        return None
-    if text.startswith("---\n"):
-        end = text.find("\n---\n", 4)
-        if end != -1:
-            text = text[end + 5 :]
-    try:
-        data = json.loads(text)
-    except json.JSONDecodeError:
-        return None
-    if not isinstance(data, dict):
-        return None
-    sl = data.get("statusLine")
-    return sl if isinstance(sl, dict) else None
-
-
 def _shallow_merge_existing_json(
     out: Path,
     new_data: dict[str, Any],
-    statusline_policy: str | None = None,
 ) -> dict[str, Any]:
-    """Merge top-level keys: existing's unique keys + new_data (template wins),
-    with statusLine routed through ``_decide_status_line`` so user-global
-    isn't silently shadowed and explicit policy always wins.
-    """
+    """Merge top-level keys: existing's unique keys + new_data (template wins)."""
     existing: dict[str, Any] = {}
     if out.exists():
         try:
             text = out.read_text(encoding="utf-8")
         except OSError:
             text = ""
-        # Legacy back-compat: strip YAML frontmatter from pre-0.4.0 renders.
-        if text.startswith("---\n"):
-            end = text.find("\n---\n", 4)
-            if end != -1:
-                text = text[end + 5 :]
         if text:
             try:
                 parsed = json.loads(text)
@@ -271,20 +159,7 @@ def _shallow_merge_existing_json(
                 parsed = None
             if isinstance(parsed, dict):
                 existing = parsed
-    merged: dict[str, Any] = {**existing, **new_data}
-    raw_existing_sl = existing.get("statusLine")
-    raw_template_sl = new_data.get("statusLine")
-    decided = _decide_status_line(
-        existing_sl=raw_existing_sl if isinstance(raw_existing_sl, dict) else None,
-        global_sl=_read_global_status_line(),
-        template_sl=raw_template_sl if isinstance(raw_template_sl, dict) else None,
-        policy=statusline_policy,
-    )
-    if decided is None:
-        merged.pop("statusLine", None)
-    else:
-        merged["statusLine"] = decided
-    return merged
+    return {**existing, **new_data}
 
 
 def _is_settings_json(fe: FileEntry) -> bool:
@@ -367,7 +242,6 @@ def _render_json_file(
     *,
     dry_run: bool,
     freeze_time: datetime | None,
-    statusline_policy: str | None = None,
 ) -> Path:
     """settings.json — JSON body wrapped in YAML provenance frontmatter."""
     return _render_settings_json(
@@ -376,7 +250,6 @@ def _render_json_file(
         target_dir,
         dry_run=dry_run,
         freeze_time=freeze_time,
-        statusline_policy=statusline_policy,
     )
 
 
@@ -479,7 +352,6 @@ def render(
     freeze_time: datetime | None = None,
     merge_paths: set[Path] | None = None,
     merge_reports: dict[Path, MergeReport] | None = None,
-    statusline_policy: str | None = None,
 ) -> list[Path]:
     """Render blueprint to target_dir.
 
@@ -512,7 +384,6 @@ def render(
                 target_dir,
                 dry_run=dry_run,
                 freeze_time=freeze_time,
-                statusline_policy=statusline_policy,
             )
         elif _is_pure_text(fe):
             out = _render_pure_text(

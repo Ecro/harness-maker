@@ -1,0 +1,51 @@
+---
+generated_by: harness-maker
+harness_maker_version: 0.3.5
+generated_at: '2026-01-01T00:00:00+00:00'
+source_template: rubrics/skill.yaml.j2
+provenance: official
+content_hash: 9cc468bab52bad6f3b85b2bfb4374eeaa2bc4bc3571a30582dd7f42ce9979f64
+---
+dimension: workflow_clarity
+target: .claude/skills/*/SKILL.md
+rubrics:
+  - id: trigger_conditions_explicit
+    description: >
+      Does the skill's frontmatter 'description' specify clear trigger
+      conditions (when Claude should invoke it)? Vague descriptions cause
+      the skill to be ignored or wrongly invoked.
+    severity: P0
+    action: >
+      Make the 'description' field state explicit triggers, e.g.,
+      'Use when X happens or user requests Y'.
+  - id: progressive_disclosure
+    description: >
+      Is the skill scoped to load on demand rather than being auto-imported
+      into every CLAUDE.md context? Skills should follow progressive disclosure.
+    severity: P1
+    action: >
+      Confirm SKILL.md is referenced via the skills system, not inlined
+      into CLAUDE.md.
+  - id: implementation_referenced
+    description: >
+      Does the skill clearly point to its implementation (Python module,
+      CLI command, bash snippet)? Pure prose skills with no concrete entry
+      point are dead weight.
+    severity: P1
+    action: >
+      Add an 'Implementation' or 'Run' section linking the actual code or
+      command that runs the skill.
+  - id: input_output_specified
+    description: >
+      Are the skill's inputs (what it reads / requires) and outputs
+      (what it produces / writes) documented?
+    severity: P2
+    action: >
+      Document expected inputs and the shape of the output the skill returns.
+  - id: under_fifty_lines_side
+    description: >
+      Is the SKILL.md within the per-preset line cap (Side ≤ 50, Production
+      ≤ 150)? Bloated skills crowd out the prompts that need attention.
+    severity: P1
+    action: >
+      Trim SKILL.md or split into multiple skills.

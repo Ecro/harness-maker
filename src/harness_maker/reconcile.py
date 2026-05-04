@@ -77,20 +77,9 @@ def reconcile(existing_dir: Path, blueprint: Blueprint) -> list[ConflictItem]:
             )
             continue
         # Generated wrappers under `.claude/lib/*.sh` carry no provenance
-        # frontmatter (interpreters reject YAML preambles). Most are always
-        # REPLACE so template updates land. The one carve-out: user-statusline.sh
-        # is a captured-once user file — KEEP it forever after first render so
-        # subsequent edits survive.
+        # frontmatter (interpreters reject YAML preambles). Always REPLACE so
+        # template updates land.
         if str(fe.path).endswith(".sh"):
-            if fe.path.name == "user-statusline.sh":
-                conflicts.append(
-                    ConflictItem(
-                        path=fe.path,
-                        decision=ReconcileDecision.KEEP,
-                        reason="user-owned-statusline",
-                    ),
-                )
-                continue
             conflicts.append(
                 ConflictItem(
                     path=fe.path,

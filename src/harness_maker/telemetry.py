@@ -22,6 +22,7 @@ def _build_entry(data: dict[str, Any]) -> dict[str, Any]:
         "input_tokens": usage.get("input_tokens", 0),
         "output_tokens": usage.get("output_tokens", 0),
         "cache_read_tokens": usage.get("cache_read_input_tokens", 0),
+        "cache_creation_tokens": usage.get("cache_creation_input_tokens", 0),
         "tool_name": data.get("tool_name"),
     }
 

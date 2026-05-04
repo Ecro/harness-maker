@@ -61,10 +61,9 @@ def regen_one(fixture_name: str, mode_label: str, mode: DevMode) -> None:
 
 
 if __name__ == "__main__":
-    # Pin HOME to an empty tmp dir so render's global-statusLine probe
-    # (~/.claude/settings.json) returns nothing — snapshots must be stable
-    # across developer environments regardless of personal Claude Code
-    # settings.
+    # Pin HOME to an empty tmp dir so any environment-dependent helper
+    # (e.g., user-global config probes) returns deterministic results,
+    # keeping snapshots stable across developer machines.
     with tempfile.TemporaryDirectory() as fake_home:
         os.environ["HOME"] = fake_home
         with patch.object(Path, "home", lambda: Path(fake_home)):

@@ -131,6 +131,21 @@ def _skill_files() -> list[FileSpec]:
     ]
 
 
+_ALL_RUBRICS: list[str] = ["claude_md", "agent_prompt", "skill", "workflow"]
+
+
+def _rubric_files() -> list[FileSpec]:
+    """Layer-2 rubric YAML data files for the LLM judge."""
+    return [
+        (
+            f"rubrics/{n}.yaml.j2",
+            f"rubrics/{n}.yaml",
+            {"name": n},
+        )
+        for n in _ALL_RUBRICS
+    ]
+
+
 def _base_files(preset: Preset) -> list[FileSpec]:
     """Shared base: stages + atomic commands + all agents/skills + fixed assets.
 
@@ -152,13 +167,13 @@ def _base_files(preset: Preset) -> list[FileSpec]:
         *_stage_files(),
         *_atomic_command_files(),
         ("commands/hm/loop.md.j2", "commands/hm/loop.md", {}),
-        ("commands/hm/monitor.md.j2", "commands/hm/monitor.md", {}),
+        ("commands/hm/ai-readiness.md.j2", "commands/hm/ai-readiness.md", {}),
         ("commands/hm/refresh.md.j2", "commands/hm/refresh.md", {}),
         *_skill_files(),
         *_agent_files(),
+        *_rubric_files(),
         ("hooks/hooks.json.j2", "hooks/hooks.json", {}),
-        ("observability/dashboard.ko.md.j2", "observability/dashboard.md", {}),
-        ("lib/run-statusline.sh.j2", "lib/run-statusline.sh", {}),
+        ("observability/dashboard.md.j2", "observability/dashboard.md", {}),
     ]
 
 

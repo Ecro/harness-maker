@@ -1,6 +1,6 @@
 preset: Side
 dev_mode: spec-driven
-file_count: 47
+file_count: 50
 files:
 - path: ../CLAUDE.md
   template: claude-md/Side.ko.md.j2
@@ -32,6 +32,9 @@ files:
 - path: agents/ux-reviewer.md
   template: agents/ux-reviewer.md.j2
   body_sha256: db7f1929425a16ccd8381e392f3b8f058e3305114c0e32c6e03ca4bdcd843113
+- path: commands/hm/ai-readiness.md
+  template: commands/hm/ai-readiness.md.j2
+  body_sha256: e5e4853145a67f1f381e2e6f89700f160c1b9f7eb0336b87761f799b3cabdcae
 - path: commands/hm/exec-rev-wrap.md
   template: commands/hm/workflow_command.md.j2
   body_sha256: 4f5d1eb92c811efc99e24af9f4dcac5f3d48dea85bbb05dcfb705d2962154219
@@ -44,9 +47,6 @@ files:
 - path: commands/hm/loop.md
   template: commands/hm/loop.md.j2
   body_sha256: 491d3a6254edbdddbdb5a18fd77159180a0500b12671c04c49c78d54cacddd15
-- path: commands/hm/monitor.md
-  template: commands/hm/monitor.md.j2
-  body_sha256: acf6cec6265ef4739cb6b8e240da2f4917d01030f70d86988f490684c0451e04
 - path: commands/hm/plan-exec-rev-wrap.md
   template: commands/hm/workflow_command.md.j2
   body_sha256: d0621ae683fd417d22076e36aa59c93b8e575ebb92e99c0dcbd3b71e413d00b0
@@ -77,9 +77,6 @@ files:
 - path: hooks/hooks.json
   template: hooks/hooks.json.j2
   body_sha256: 472e1652d67973140ad77ee3a641cc9f7e7bb268c7e3244a49e1276d4be4f33d
-- path: lib/run-statusline.sh
-  template: lib/run-statusline.sh.j2
-  body_sha256: dcede54bca7246726ffc581dc27037d417f78313a6bb6719f97759994fa0917d
 - path: memory/failures.md
   template: memory/failures.ko.md.j2
   body_sha256: c8c41d8fd473350a246e6861675a55e14390bd269018f08f3b82e72b95635772
@@ -87,17 +84,29 @@ files:
   template: memory/wiki.ko.md.j2
   body_sha256: 0f1985c7d28600a44925ee01551968bce3d1ed8e1e685b430814959c943b3597
 - path: observability/dashboard.md
-  template: observability/dashboard.ko.md.j2
-  body_sha256: 350c75e906be2d12108aa57c7ff7102f7e70b7f42bbc1305abd49b65fbd1ffba
+  template: observability/dashboard.md.j2
+  body_sha256: eee6c910e0302f8cb0391482ec61c9f9dd3a4b59a38bddb5c5274fc39cb58608
+- path: rubrics/agent_prompt.yaml
+  template: rubrics/agent_prompt.yaml.j2
+  body_sha256: e31a0322210a7f5f4a07b190a5e65f9cc22da783c57a8878d7644cbda3547eb6
+- path: rubrics/claude_md.yaml
+  template: rubrics/claude_md.yaml.j2
+  body_sha256: 3c5e35fb0ab1ccf6bf90f5e8152b5743c868d7f92f35361fa549bbea7607105b
+- path: rubrics/skill.yaml
+  template: rubrics/skill.yaml.j2
+  body_sha256: 9cc468bab52bad6f3b85b2bfb4374eeaa2bc4bc3571a30582dd7f42ce9979f64
+- path: rubrics/workflow.yaml
+  template: rubrics/workflow.yaml.j2
+  body_sha256: bd46a9af3e1a0912ef132227b7b509bbc3c1a14758c9fb620dd1392f2059899f
 - path: settings.json
   template: settings/Side.json.j2
-  body_sha256: ada57ffd64b0f047fe723457c8891a6c6af590a8ac6aef2ce2abccc4e671a536
+  body_sha256: 85b323e91599c4f0865d8b88160f370aef1e2248b0821149b6cc2a20169ece33
 - path: skills/agent-quality-rubric/SKILL.md
   template: skills/agent-quality-rubric/SKILL.md.j2
-  body_sha256: 7141e6ba8f13e9c96d51d591333d195a52d5e61fa27d826424225fd78fbc5849
+  body_sha256: 049ddd30a4566abcc3ca1efac0a7723b463bae3bf778d1b2fa561b950524d910
 - path: skills/ai-readiness-rubric/SKILL.md
   template: skills/ai-readiness-rubric/SKILL.md.j2
-  body_sha256: bcbcec6cf3c24ac12ccf6363e4ca275c4063707dd156f3214048a4118c289df3
+  body_sha256: 041e8b0bce3a0e1dc2176dec3e3ca5cf84e79be9a2ccaf0be7327556f4320e5d
 - path: skills/autoloop-driver/SKILL.md
   template: skills/autoloop-driver/SKILL.md.j2
   body_sha256: c5f7629031c2f99cbfb27d59d1a94e6d3ab370d3a20c4b7748c53df75b7b5869

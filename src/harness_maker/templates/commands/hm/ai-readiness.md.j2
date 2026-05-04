@@ -1,0 +1,55 @@
+# /hm:ai-readiness
+
+> Compute the ai-readiness composite (Layer 1 deterministic + Layer 2 LLM-judged
+> + Layer 3 cache diagnostics) and surface ranked improvement actions.
+
+## Usage
+
+```
+/hm:ai-readiness                    # full scan (default — calls Anthropic)
+/hm:ai-readiness --skip-llm         # offline mode, no API call
+/hm:ai-readiness --no-update-dashboard
+```
+
+## What it produces
+
+- **Composite score** (0-100) blending the three layers.
+- **Per-layer breakdown** — readiness 70%, llm_judge 25%, cache 5%.
+- **Top actions** — sorted P0 → P1 → P2, each with target file, evidence,
+  and a concrete suggestion.
+- **Dashboard** — re-renders `.claude/observability/dashboard.md` with the
+  full action table.
+
+## Layers
+
+| Layer | Source | What it checks |
+|-------|--------|----------------|
+| 1 readiness | `harness_maker.readiness.compute_readiness` | 7 deterministic dimensions: context quality, guardrails, verification, workflow clarity, memory continuity, observability setup, governance. Evidence-anchored signals (file presence + structural correctness). |
+| 2 llm_judge | `harness_maker.llm_judge.judge_target` | LLM rubrics under `.claude/rubrics/*.yaml`. Each rubric is a list of pass/fail checks the model evaluates against the target file (CLAUDE.md, agents, skills, commands). |
+| 3 cache | `harness_maker.cache_diagnostics.diagnose_cache` | Cache hit rate from `.claude/observability/metrics.jsonl` plus failure-mode classification: `miss_min_threshold`, `miss_invalidation`, `miss_ttl`. |
+
+## Run
+
+```bash
+!uv run python -m harness_maker.cli ai-readiness . $ARGUMENTS
+```
+
+## Improving against the report
+
+Each action has a `priority` (P0/P1/P2), a `target` (file or area), and a
+`suggestion`. Walk the list top-down — fixing the highest-priority items
+first delivers the biggest score improvement per unit of effort.
+
+For Layer 2 (LLM judge) actions, the suggestion is **tailored to the
+specific file** (not generic) — the model read the file and proposed a fix
+keyed to its actual content.
+
+For Layer 3 (cache) actions, the remediation explains *why* the cache rate
+is low — common causes are prefix below the model's minimum write
+threshold (1024 tokens for Sonnet/Opus, 4096 for Haiku), prefix
+invalidation (tools or system prompt changing mid-session), or TTL expiry
+(>5 min between turns at default TTL).
+
+<!-- @hm:user:extensions -->
+<!-- Project-specific ai-readiness extensions (custom panels, additional layers). Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extensions -->

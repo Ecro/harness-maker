@@ -3,7 +3,7 @@
 Tests are grouped by `-k <keyword>`:
 - ``commands``  — generated command files exist + parseable + worktree skill smoke
 - ``security``  — security_scanner.scan_all detects seeded vulns
-- ``metrics``   — statusline renders eff/hlth/age from seeded metrics.jsonl
+- ``metrics``   — observability dir + metrics.jsonl seeding helpers
 - ``reconcile`` — second `make` run preserves user-modified files (KEEP decision)
 """
 
@@ -33,7 +33,7 @@ REQUIRED_COMMANDS = [
     "verify",
     "dev",
     "loop",
-    "monitor",
+    "ai-readiness",
     "refresh",
 ]
 
@@ -212,60 +212,6 @@ def test_security_scan_detects_seeded_vulns(tmp_path: Path) -> None:
     assert "secrets" in categories, f"missing 'secrets' finding: {categories}"
     assert "permissions" in categories, f"missing 'permissions' finding: {categories}"
     assert "hook_injection" in categories, f"missing 'hook_injection' finding: {categories}"
-
-
-# ──────────────────────────────────────────────────────────────────────
-# metrics group
-# ──────────────────────────────────────────────────────────────────────
-
-
-def _seed_metrics(claude_dir: Path) -> None:
-    """Write a few entries to observability/metrics.jsonl with non-zero cache stats."""
-    obs = claude_dir / "observability"
-    obs.mkdir(parents=True, exist_ok=True)
-    metrics = obs / "metrics.jsonl"
-    entries = [
-        {
-            "ts": "2026-05-01T00:00:00+00:00",
-            "input_tokens": 1000,
-            "cache_read_tokens": 4000,
-            "cache_read_input_tokens": 4000,
-        },
-        {
-            "ts": "2026-05-02T00:00:00+00:00",
-            "input_tokens": 2000,
-            "cache_read_tokens": 8000,
-            "cache_read_input_tokens": 8000,
-        },
-    ]
-    metrics.write_text(
-        "\n".join(json.dumps(e) for e in entries) + "\n",
-        encoding="utf-8",
-    )
-
-
-def test_metrics_statusline_format() -> None:
-    """statusline must emit `<project> | <preset> | eff:N% | hlth:N | age:(Nd|-)` shape."""
-    import re
-
-    _ensure_sandbox_applied()
-    _seed_metrics(CLAUDE)
-
-    payload = json.dumps({"workspace": {"current_dir": str(SANDBOX)}})
-    # Run from REPO_ROOT so `uv run` finds the installed harness_maker package.
-    # statusline resolves project dir from the JSON payload, not from cwd.
-    cp = subprocess.run(  # noqa: S603
-        ["uv", "run", "python", "-m", "harness_maker.statusline"],
-        input=payload,
-        capture_output=True,
-        text=True,
-        cwd=REPO_ROOT,
-        check=False,
-    )
-    assert cp.returncode == 0, f"statusline exit={cp.returncode} stderr={cp.stderr}"
-    # Tolerant: regex match anywhere in stdout (subprocess may inject preamble).
-    pattern = re.compile(r".+ \| .+ \| eff:\d+% \| hlth:\d+ \| age:(\d+d|-)")
-    assert pattern.search(cp.stdout), f"statusline format mismatch: {cp.stdout!r}"
 
 
 # ──────────────────────────────────────────────────────────────────────

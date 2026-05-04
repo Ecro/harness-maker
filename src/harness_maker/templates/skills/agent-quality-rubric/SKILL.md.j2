@@ -1,6 +1,6 @@
 ---
 name: agent-quality-rubric
-description: Score an agent .md file as Platinum/Gold/Silver/Bronze. Use when /hm:monitor drills into agent quality or when a Bronze-tier agent should be auto-registered as an anti-rot patch candidate. Calls harness_maker.agent_quality.score_agent.
+description: Score an agent .md file as Platinum/Gold/Silver/Bronze. Use when /hm:ai-readiness drills into agent quality or when a Bronze-tier agent should be auto-registered as an anti-rot patch candidate. Calls harness_maker.agent_quality.score_agent.
 ---
 
 # agent-quality-rubric
@@ -12,7 +12,7 @@ review.
 
 ## When to Invoke
 
-- `/hm:monitor` agent-quality drill-down panel
+- `/hm:ai-readiness` agent-quality drill-down panel
 - After modifying any `agents/*.md` file (CI hook can run this skill)
 - Periodic anti-rot sweep to detect prompt rot
 

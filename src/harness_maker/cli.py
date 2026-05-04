@@ -11,7 +11,7 @@ import typer
 from harness_maker.add_domain import AddDomainError, add_domain, validate_domain_name
 from harness_maker.block_merge import MergeReport
 from harness_maker.interview import answers_from_harness_yaml, interview
-from harness_maker.models import Blueprint, FileEntry, InterviewAnswers
+from harness_maker.models import InterviewAnswers, Preset
 from harness_maker.modular_edit import ModularEditError
 from harness_maker.modular_edit import add as modular_add
 from harness_maker.modular_edit import remove as modular_remove
@@ -90,17 +90,6 @@ def make(
         "--dev-mode",
         help="Override dev_mode: 'spec-driven' or 'task-driven'.",
     ),
-    statusline_policy: str | None = typer.Option(
-        None,
-        "--statusline-policy",
-        help=(
-            "How to handle an existing custom statusLine in settings.json: "
-            "'keep' (preserve user, install nothing), 'overwrite' (replace "
-            "with harness-maker's), or 'combine' (render a wrapper that "
-            "joins user output + harness-maker output). Default: preserve "
-            "user-custom statusLines silently; auto-upgrade harness-shipped ones."
-        ),
-    ),
 ) -> None:
     """Generate or refine the project harness at TARGET/.claude/."""
     p = profile(target)
@@ -137,7 +126,6 @@ def make(
             a.domains.append(add_domain_name)
     bp = synthesize(p, a)
     target_dotclaude = target / ".claude"
-    bp = _apply_statusline_policy(bp, target_dotclaude, statusline_policy)
     merge_paths: set[Path] = set()
     keep_count = 0
     if target_dotclaude.exists() and any(target_dotclaude.iterdir()):
@@ -158,7 +146,6 @@ def make(
         freeze_time=freeze,
         merge_paths=merge_paths,
         merge_reports=merge_reports,
-        statusline_policy=statusline_policy,
     )
     _emit_reconcile_report(keep_count, merge_reports)
     errors = verify(target_dotclaude)
@@ -196,99 +183,28 @@ def make(
         typer.echo(f"--add-domain stub created: {stub}")
 
     typer.echo(f"harness applied to {target_dotclaude} ({len(bp.files)} files)")
+    _emit_post_make_readiness(target, a.preset)
 
 
-_VALID_STATUSLINE_POLICIES: frozenset[str] = frozenset({"keep", "overwrite", "combine"})
+def _emit_post_make_readiness(target: Path, preset: Preset) -> None:
+    """Run the cheap (skip_llm) ai-readiness scan and surface the top actions.
 
-
-def _apply_statusline_policy(
-    blueprint: Blueprint,
-    target_dotclaude: Path,
-    policy: str | None,
-) -> Blueprint:
-    """Append combined-wrapper FileEntries to the blueprint when policy=combine.
-
-    Reads the user's prior statusLine command from ``settings.json`` so the
-    one-shot ``user-statusline.sh`` captures it. ``keep`` / ``overwrite`` /
-    None require no extra files — they're handled by the merge logic at
-    settings.json render time.
+    Wrapped in a broad except so a diagnostic failure never breaks ``make``.
     """
-    if policy is None:
-        return blueprint
-    if policy not in _VALID_STATUSLINE_POLICIES:
-        typer.echo(
-            f"--statusline-policy invalid: {policy} (expected: keep | overwrite | combine)",
-            err=True,
-        )
-        raise typer.Exit(code=1)
-    if policy != "combine":
-        return blueprint
-    user_cmd = _read_existing_statusline_command(target_dotclaude / "settings.json")
-    if user_cmd is None:
-        typer.echo(
-            "--statusline-policy=combine: no existing custom statusLine to combine; "
-            "falling back to overwrite.",
-            err=True,
-        )
-        return blueprint
-    extra = [
-        FileEntry(
-            path=Path("lib/user-statusline.sh"),
-            template="lib/user-statusline.sh.j2",
-            context={"user_statusline_command": user_cmd},
-        ),
-        FileEntry(
-            path=Path("lib/run-statusline-combined.sh"),
-            template="lib/run-statusline-combined.sh.j2",
-            context={},
-        ),
-    ]
-    return blueprint.model_copy(update={"files": [*blueprint.files, *extra]})
-
-
-def _read_existing_statusline_command(settings_path: Path) -> str | None:
-    """Best-effort extract of ``statusLine.command``.
-
-    Project-level ``settings.json`` wins (Claude Code's precedence: project
-    overrides user-global). When the project file has no statusLine, fall
-    back to ``~/.claude/settings.json`` because writing a project-level
-    statusLine would silently shadow the user's global one — we want the
-    same keep/combine/overwrite question asked in that case too.
-    """
-    cmd = _read_statusline_from(settings_path)
-    if cmd is not None:
-        return cmd
-    return _read_statusline_from(Path.home() / ".claude" / "settings.json")
-
-
-def _read_statusline_from(path: Path) -> str | None:
-    """Extract ``statusLine.command`` from a single settings.json (project or
-    user-global). Returns None when the file is missing, malformed, or has
-    no statusLine.
-    """
-    if not path.exists():
-        return None
     try:
-        text = path.read_text(encoding="utf-8")
-    except OSError:
-        return None
-    if text.startswith("---\n"):
-        end = text.find("\n---\n", 4)
-        if end != -1:
-            text = text[end + 5 :]
-    import json as _json
+        from harness_maker.ai_readiness import render_terminal_summary, run_ai_readiness
 
-    try:
-        data = _json.loads(text)
-    except _json.JSONDecodeError:
-        return None
-    if not isinstance(data, dict):
-        return None
-    sl = data.get("statusLine")
-    if not isinstance(sl, dict):
-        return None
-    cmd = sl.get("command")
-    return cmd if isinstance(cmd, str) and cmd else None
+        plan = run_ai_readiness(target, preset=preset, skip_llm=True)
+    except Exception as e:  # noqa: BLE001 — diagnostic, never fail the make
+        typer.echo(f"\n(ai-readiness scan skipped: {type(e).__name__}: {e})")
+        return
+    typer.echo("\n" + "─" * 64)
+    typer.echo("Initial AI-readiness scan (LLM judge skipped — see hint below)")
+    typer.echo("─" * 64)
+    typer.echo(render_terminal_summary(plan, max_actions=5))
+    typer.echo("\nNext steps:")
+    typer.echo("  • Run /hm:ai-readiness for the full LLM-judged scan + dashboard.")
+    typer.echo("  • Walk the action list above; fix P0 items first.")
 
 
 def _apply_dimension_overrides(
@@ -371,6 +287,72 @@ def _emit_reconcile_report(
             )
         if bits:
             typer.echo(f"  MERGE_BLOCK: {path} — {'; '.join(bits)}")
+
+
+_AI_READINESS_TARGET = typer.Argument(
+    Path("."),
+    help="Project root (the directory containing .claude/).",
+)
+
+
+@app.command("ai-readiness")
+def ai_readiness_cmd(
+    target: Path = _AI_READINESS_TARGET,
+    skip_llm: bool = typer.Option(
+        False,
+        "--skip-llm",
+        help="Skip Layer 2 (LLM judge). Useful for offline / CI runs.",
+    ),
+    model: str = typer.Option(
+        "claude-sonnet-4-6",
+        "--model",
+        help="Anthropic model to use for the judge.",
+    ),
+    update_dashboard: bool = typer.Option(
+        True,
+        "--update-dashboard/--no-update-dashboard",
+        help="Write the rendered plan to .claude/observability/dashboard.md.",
+    ),
+) -> None:
+    """Compute ai-readiness composite + ranked improvement actions."""
+    from harness_maker.ai_readiness import (
+        render_dashboard_markdown,
+        render_terminal_summary,
+        run_ai_readiness,
+    )
+    from harness_maker.io_utils import atomic_write
+
+    target = target.resolve()
+    preset = _read_preset(target / ".claude" / "harness.yaml") or Preset.SIDE
+    plan = run_ai_readiness(target, preset=preset, skip_llm=skip_llm, model=model)
+    typer.echo(render_terminal_summary(plan))
+    if update_dashboard:
+        dashboard = target / ".claude" / "observability" / "dashboard.md"
+        body = render_dashboard_markdown(plan, target.name)
+        atomic_write(dashboard, body)
+        typer.echo(f"\nDashboard updated: {dashboard}")
+
+
+def _read_preset(harness_yaml: Path) -> Preset | None:
+    """Best-effort preset extraction; returns None on any failure."""
+    if not harness_yaml.is_file():
+        return None
+    import yaml as _yaml
+
+    try:
+        text = harness_yaml.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    try:
+        for doc in _yaml.safe_load_all(text):
+            if isinstance(doc, dict) and "preset" in doc:
+                try:
+                    return Preset(doc["preset"])
+                except (ValueError, TypeError):
+                    return None
+    except _yaml.YAMLError:
+        return None
+    return None
 
 
 @app.command(hidden=True)

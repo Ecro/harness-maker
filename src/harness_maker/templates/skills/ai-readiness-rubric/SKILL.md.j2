@@ -1,69 +1,47 @@
 ---
 name: ai-readiness-rubric
-description: Compute the Health 6-dimension composite score (docs, tests, CI, observability, security, governance) for a project. Use when /hm:monitor renders the dashboard or /hm:verify needs a baseline comparison. Calls harness_maker.readiness.compute_health.
+description: 3-layer rubric scoring AI-readiness — Layer 1 deterministic structural signals, Layer 2 LLM-judged content quality vs rubric YAMLs, Layer 3 prompt-cache failure-mode classification. Invoke via /hm:ai-readiness.
 ---
 
 # ai-readiness-rubric
 
-The Health 6-dim scoring rubric. Maps repo signals to a 0-100 composite
-score with per-dimension drill-down. Side preset uses 5 dims (governance
-= 0 weight); Production uses all 6 with rebalanced weights.
+Composite ai-readiness rubric. Three layers, distinct evidence types,
+folded into a single 0-100 score plus a ranked list of actionable items.
 
 ## When to Invoke
 
-- `/hm:monitor` rendering the observability dashboard
-- `/hm:verify` Check 3 (Health 점수 -5 이내) baseline comparison
-- Anti-rot freshness gauge cross-checking against repo health
+- `/hm:ai-readiness` — full scan (terminal summary + dashboard.md update)
+- `/hm:verify` — Layer 1 composite as the baseline-comparison gate
 
-## The 6 Dimensions
+## Layers
 
-| Dim | Side weight | Prod weight | Signal source |
-|---|---|---|---|
-| docs | 0.20 | 0.15 | CLAUDE.md, README.md, docs/adr/*.md |
-| tests | 0.30 | 0.25 | tests/ dir, coverage report |
-| ci | 0.20 | 0.15 | .github/workflows/*.yml jobs |
-| observability | 0.15 | 0.15 | .claude/observability/dashboard.md, metrics.jsonl |
-| security | 0.15 | 0.20 | findings.jsonl, settings.json permissions deny list |
-| governance | 0.00 | 0.10 | CHANGELOG.md, CONTRIBUTING.md, ADR count |
+| Layer | Module | What it checks |
+|---|---|---|
+| 1 readiness | `harness_maker.readiness` | 7 deterministic dimensions: context_quality, guardrails, verification, workflow_clarity, memory_continuity, observability_setup, governance. Each dim decomposes into yes/no signals with weighted contribution. |
+| 2 llm_judge | `harness_maker.llm_judge` | Rubric YAMLs at `.claude/rubrics/*.yaml`. LLM evaluates each rubric pass/fail with evidence + tailored suggestion. P0/P1/P2 severity weights (3/2/1) drive per-file score. System prompt cached. |
+| 3 cache | `harness_maker.cache_diagnostics` | `metrics.jsonl` analysis. Classifies miss reasons: `min_threshold` (prefix < cache-write min), `invalidation` (prefix mutated), `ttl` (>5min gap), `first` (expected). |
 
-## Implementation
+## Composite
 
-```python
-from pathlib import Path
-from harness_maker.readiness import compute_health
-from harness_maker.models import Preset
-
-result = compute_health(Path("."), Preset.PRODUCTION)
-# {
-#   "composite": 78,
-#   "dimensions": {
-#     "docs": 90, "tests": 75, "ci": 80,
-#     "observability": 60, "security": 85, "governance": 70
-#   },
-#   "preset": "Production"
-# }
+```
+final = 0.70 * readiness  +  0.25 * llm_judge_avg  +  0.05 * cache
 ```
 
-The function is pure (no IO beyond reading the project dir), deterministic,
-and safe to call from the statusline tick.
+## Entry point
 
-## Scoring Conventions
+```python
+from harness_maker.ai_readiness import run_ai_readiness
+plan = run_ai_readiness(Path("."), preset=Preset.SIDE)
+```
 
-- Each dim is 0-100 internally; weights sum to 1.0 → composite is 0-100
-- Missing signal = dim score 0 (don't crash)
-- New project (no CI yet) starts low; that's the point — Health is a
-  pressure gauge, not a moral judgment
+Returns `ImprovementPlan` with `composite_score`, `layer_scores`, and a
+priority-sorted `actions` list. Each `ActionItem` has priority, dimension,
+target file/area, summary, detail (evidence), and suggestion (how to fix).
 
-## Bronze-Tier Auto-Refresh
+## Extension
 
-When the composite drops to Bronze (≤ 60), the agent-quality-rubric
-sibling skill auto-registers an anti-rot patch candidate (see that skill).
-This skill reports the drop; it does not patch.
-
-## Output
-
-A dict matching `compute_health(...)` return shape. Consumers
-(dashboard, verify gate) format it for their context.
+Drop additional rubric YAMLs into `.claude/rubrics/`; they're picked up
+automatically. Shipped rubrics are preserved across upgrades.
 
 <!-- @hm:user:extensions -->
 <!-- Project-specific dimension weights or extra signals. Preserved across harness-maker upgrades. -->

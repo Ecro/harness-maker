@@ -220,12 +220,6 @@ phase_3() {
 # Phase 4: Monitoring 3 Metrics
 # ──────────────────────────────────────────────────────────────────────
 
-phase_4_statusline() {
-  require_file src/harness_maker/statusline.py
-  uv run pytest tests/unit/test_statusline.py -q || fail "statusline tests"
-  ok "phase_4_statusline"
-}
-
 phase_4_telemetry() {
   require_file src/harness_maker/telemetry.py
   uv run pytest tests/unit/test_telemetry.py -q || fail "telemetry tests"
@@ -259,7 +253,6 @@ phase_4_hooks_settings() {
 }
 
 phase_4() {
-  phase_4_statusline
   phase_4_telemetry
   phase_4_health
   phase_4_agent_quality
@@ -616,7 +609,7 @@ final_acceptance() {
 
   # R3 Monitoring
   log "R3 Monitoring"
-  uv run python -c "from harness_maker.statusline import format_line; from harness_maker.readiness import compute_health; from harness_maker.agent_quality import score_agent" \
+  uv run python -c "from harness_maker.readiness import compute_readiness; from harness_maker.cache_diagnostics import diagnose_cache; from harness_maker.agent_quality import score_agent" \
     || fail "R3: monitoring modules missing"
 
   # R4 Workflow
