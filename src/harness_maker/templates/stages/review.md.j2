@@ -21,6 +21,9 @@ until the grade passes the threshold or `max_review_rounds` is exhausted.
   - New public APIs are added
 - Skipped for: docs-only, single-file fixes, config-only — unless overridden
 
+> **When invoked as part of a fused workflow** (see preamble), the skip
+> conditions above do NOT apply — always run.
+
 ## Inputs
 
 - The diff under review (`git diff` since the prior reviewed commit)

@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.4.7
+harness_maker_version: 0.4.8
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: stages/review.md.j2
 provenance: official
-content_hash: ad5ac291290394cf46306e21e26e8cccc770878bb9a0785bc366d75db419dcec
+content_hash: 7a5bf6280b35f42e0b000f9d60446d12bd039ca6e142e1581be674924ca55eb0
 ---
 # Stage: review
 
@@ -26,6 +26,9 @@ until the grade passes the threshold or `max_review_rounds` is exhausted.
   - Architectural surface (interfaces, contracts) changed
   - New public APIs are added
 - Skipped for: docs-only, single-file fixes, config-only — unless overridden
+
+> **When invoked as part of a fused workflow** (see preamble), the skip
+> conditions above do NOT apply — always run.
 
 ## Inputs
 

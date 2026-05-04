@@ -257,8 +257,12 @@ Each iteration:
 2. **Pick next feature**: first in spec order not in `completed`
 3. **Increment `iter`**
 4. **Invoke workflow**: pass feature name + AC + objective to the configured
-   fused workflow (`/hm:<workflow>`). Read the workflow command file under
-   `.claude/commands/hm/<workflow>.md` and follow its fused stages inline.
+   fused workflow. Read the workflow command file under
+   `.claude/commands/hm/<workflow>.md` and execute **every stage it defines,
+   in order, without skipping any** — individual stage "When to Run" skip
+   conditions apply only to standalone invocation, not when driven by the
+   loop. The loop's decision to call this workflow is itself the authority
+   to run all its stages.
 5. **Update state**:
    - Success → mark completed in `TodoWrite`, append to `completed`,
      reset `failed_streak = 0`

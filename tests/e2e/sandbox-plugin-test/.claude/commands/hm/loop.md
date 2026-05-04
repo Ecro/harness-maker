@@ -1,231 +1,358 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.4.7
+harness_maker_version: 0.4.8
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/loop.md.j2
 provenance: official
-content_hash: 491d3a6254edbdddbdb5a18fd77159180a0500b12671c04c49c78d54cacddd15
+content_hash: 1860e507554c82164d47b6a4cb9e3fd2be8a52dc7a2c3c052a9c03880ae8db04
 ---
 # /hm:loop
 
-> Run a bounded autoloop: parse goal/spec → iterate the configured fused
-> workflow against each feature → halt on convergence, time cap, iter cap, or
-> 3 consecutive failures.
+> Start a bounded autoloop. Claude conducts a coverage-driven adaptive
+> interview to establish full context, then iterates the configured workflow
+> until the stopping criteria are met or a safety cap fires.
 
 This command is **prompt-driven**. You (Claude) act as the autoloop driver:
-parse the input, track state, invoke the per-iteration workflow, and enforce
-the safety rails. Do NOT try to import any Python module — `harness_maker.*`
-exists only in the harness-maker development repository, not in the projects
-this command runs in.
+parse input, detect mode, run the adaptive interview, track state, invoke
+the per-iteration workflow, and enforce safety rails. Do NOT try to import
+any Python module — `harness_maker.*` exists only in the harness-maker
+development repository, not in the projects this command runs in.
 
 ## Usage
 
 ```
 /hm:loop <goal>
-/hm:loop --spec <path> [--time 8h] [--max-iter 30] [--workflow exec-rev-wrap] [--convergence <predicate>] [--dry-run]
+/hm:loop --spec <path> [--mode feature|improve] [--target <path>]
+         [--time 8h] [--max-iter 30] [--workflow exec-rev-wrap]
+         [--convergence <predicate>] [--dry-run]
 ```
-
-`<goal>` and `--spec <path>` are mutually exclusive input forms. If both are
-present, `--spec` wins.
 
 ## Arguments
 
 `$ARGUMENTS` is parsed positionally + by flag:
 
-- `<goal>` — free-form target description (legacy form). Split into a feature
-  list on `;`, newline, or `·`. Period and comma stay inside features so
-  `v1.2.3`, `https://api.x.com/v1`, and `3.14` survive intact.
-- `--spec <path>` — path to a structured loop-spec YAML or any document the
-  conditioning step should consume (e.g. `TECH_SPEC.md`, a previously written
-  `.claude/loop-specs/<slug>.yaml`).
-- `--time <Nh>` — max wall-clock duration (default `8h`). Halt with
-  `stop_reason=time_cap` when exceeded.
-- `--max-iter <N>` — max iterations (default `30`). Halt with
-  `stop_reason=max_iter` when reached.
-- `--workflow <name>` — fused workflow command each iteration body invokes
+- `<goal>` — free-form target description. Split into features on `;`,
+  newline, or `·`. Period and comma stay inside features.
+- `--spec <path>` — path to a loop-spec YAML or any document (e.g.
+  `TECH_SPEC.md`, `.claude/loop-specs/<slug>.yaml`). Wins over `<goal>`.
+- `--mode feature|improve` — explicit mode override. When omitted, mode is
+  auto-detected from goal keywords.
+- `--target <path>` — scope for `improve` mode (file, directory, or module
+  name). Defaults to the entire project if omitted.
+- `--time <Nh>` — max wall-clock duration (default `8h`).
+- `--max-iter <N>` — max iterations (default `30`).
+- `--workflow <name>` — fused workflow each `feature`-mode iteration invokes
   (default `exec-rev-wrap`). Must exist in `.claude/commands/hm/`.
 - `--convergence <predicate>` — overrides the spec's predicate. Allowed:
   `all-features-completed` (default), `any-feature-completed`,
-  `min-2-features`, `min-5-features`, `first-iter`. Anything else: warn and
-  fall back to default.
+  `min-2-features`, `min-5-features`, `first-iter`, `stopping-criteria`.
 - `--dry-run` — single iteration; mark all features completed without
-  invoking the workflow. Confirms parsing + state setup.
+  invoking the workflow.
+
+---
 
 ## Procedure
 
 ### 1. Parse `$ARGUMENTS`
 
-Extract `--spec`, `--time`, `--max-iter`, `--workflow`, `--convergence`,
-`--dry-run`. The remaining tokens form the free-form `<goal>`.
+Extract all flags. Remaining tokens form the free-form `<goal>`.
 
-If neither `<goal>` nor `--spec` is present, halt with an error: tell the
-user the command needs at least one input shape.
+If neither `<goal>` nor `--spec` is present, halt with an error.
 
-### 2. Resolve input → loop spec
-
-Branch on what the user provided:
-
-- **No `--spec`, only `<goal>`** — split `<goal>` on `;`, `\n`, or `·`. Each
-  fragment becomes a feature with empty acceptance criteria. Skip to step 4.
-- **`--spec <path>` and the file is loop-consumable YAML** — read it and use
-  it directly. Skip to step 4. A file is loop-consumable when it parses as
-  YAML mapping with at least: `objective` (string), `features` (non-empty
-  list), and every feature having a `name`. (Provenance frontmatter `---\n...
-  \n---\n` at the top is stripped before checking.)
-- **`--spec <path>` exists but is NOT loop-consumable** — markdown like
-  `TECH_SPEC.md`, prose, half-written YAML, etc. Run the conditioning
-  interview (step 3) to produce a loop-spec from it.
-
-### 3. Conditioning interview (when spec is non-conformant)
-
-Goal: turn the user's input document into a reusable loop-spec. Use
-`AskUserQuestion` for every elicitation — never invent answers.
-
-**a. Show context.** Read the spec file. Quote roughly the first 30 lines
-   so the user can see you understood it. If the file is huge (>2000 lines),
-   read in chunks and summarise structure (top-level headings, section
-   counts) — do not paste the whole thing.
-
-**b. Objective.** Propose a single sentence drawn from the document (e.g.
-   the README intro, the spec's first paragraph). Use `AskUserQuestion` to
-   confirm or override.
-
-**c. Features.** Propose a feature list extracted from the document
-   (top-level headings, numbered roadmap items, "TODO" markers, definition-
-   of-done checklists). Use `AskUserQuestion` with these options:
-     - "Accept proposed list (N items)" — show the list inline
-     - "Edit interactively" — drop into per-feature confirm/edit
-     - "Type from scratch" — clear list, user dictates
-
-   For huge specs (e.g. multi-thousand-line documents), do NOT propose
-   hundreds of features. Cap the proposal at the **single coherent slice**
-   most likely to fit one autoloop run (typically 3–10 features matching
-   one phase, milestone, or roadmap section). Tell the user which slice
-   you picked and why.
-
-**d. Per-feature acceptance criteria.** For each feature, ask via
-   `AskUserQuestion` whether to:
-     - Accept auto-extracted ACs (when the source document has bullet
-       points / DoD items under that feature)
-     - Type ACs from scratch
-     - Leave AC empty (exploratory features only)
-
-   For a long feature list, batch this — present 3–5 features per
-   `AskUserQuestion` call rather than one at a time.
-
-**e. Convergence.** Use `AskUserQuestion`:
-     - `all-features-completed` (recommended default)
-     - `any-feature-completed` (stop after first success)
-     - `min-2-features`
-     - `min-5-features`
-     - `first-iter` (one-shot)
-
-**f. Persist.** Write the resulting loop-spec to
-   `.claude/loop-specs/<slug>.yaml`. `<slug>` is derived from the input
-   file's stem in lowercase-kebab-case (e.g. `TECH_SPEC.md` →
-   `tech-spec`). If the target already exists, ask via `AskUserQuestion`
-   whether to overwrite, append a numeric suffix, or abort. The YAML
-   schema:
-
-   ```yaml
-   objective: <one-sentence purpose>
-   convergence: all-features-completed
-   features:
-     - name: <short identifier>
-       acceptance_criteria:
-         - <observable check>
-         - <observable check>
-     - name: <next feature>
-       acceptance_criteria: []
-   ```
-
-**g. Confirm.** Show the saved path + a one-line summary
-   (`<N> features, convergence=<predicate>, objective="..."`) and use
-   `AskUserQuestion` to get final go-ahead before step 4.
-
-### 4. Run the autoloop
-
-You are the driver. Track state in your working memory + via `TodoWrite`:
-
-- Create one task per feature in `TodoWrite`. The task subject is the
-  feature name; the description holds its acceptance criteria.
-- Note the start timestamp (use `Bash` `date +%s` once at the beginning).
-- Maintain three counters in your narrative: `iter` (starts at 0),
-  `failed_streak` (starts at 0), `completed` (list of feature names).
-
-Loop body:
-
-1. **Cap checks (always before doing work):**
-    - If `iter >= max_iter` → halt with `stop_reason="max_iter (N) reached"`.
-    - If elapsed seconds (current `date +%s` − start) ≥ `time_h * 3600` →
-      halt with `stop_reason="time_cap (Nh) reached"`.
-    - If `failed_streak >= 3` → halt with `stop_reason="3 consecutive failures"`.
-2. **Convergence check:**
-    - Evaluate the chosen predicate against the current state:
-      - `all-features-completed` — every feature is in `completed`
-      - `any-feature-completed` — at least one feature is in `completed`
-      - `min-N-features` — `len(completed) >= N`
-      - `first-iter` — `iter >= 1`
-    - If True → halt with `converged=True`, `stop_reason="converged"`.
-3. **Pick next feature:** the first feature (in spec order) not in `completed`.
-   If none remain but convergence didn't trigger, halt with
-   `stop_reason="no_remaining_features"`.
-4. **Increment `iter`.** Every 5th iteration log a ping line
-   (`autoloop ping: iter=<N> feature=<name>`) so the user can see progress.
-5. **Invoke the workflow.** Pass the feature's name + acceptance criteria
-   to the configured fused workflow command:
-    - In a normal Claude Code session, invoke `/hm:<workflow>` directly
-      (e.g. via the `SlashCommand` tool when available) with a payload
-      structured as: feature name, AC list, and the loop's overall
-      objective for context.
-    - If `--dry-run` is set, skip this step and treat the iteration as a
-      success without doing any work.
-6. **Update state:**
-    - Workflow succeeded (the workflow's own `verify`/`wrapup` checks
-      passed) → mark the feature task `completed` in `TodoWrite`, append to
-      `completed` list, reset `failed_streak = 0`.
-    - Workflow failed → `failed_streak += 1`. Do NOT mark the feature as
-      completed. Log a brief failure note (what failed, what you tried).
-
-Repeat from step 1.
-
-### 5. Report
-
-When the loop halts (any reason), emit a brief summary block:
+### 2. Detect mode
 
 ```
-loop done — converged=<bool> iter=<N>/<max_iter>
-  objective: <objective or "(inline goal)">
-  completed: <count>/<total>  [<feature names...>]
+explicit --mode flag present?
+  → use it
+
+else if --spec points to an existing loop-spec (mode: improve)?
+  → improve
+
+else if goal/spec text contains improve-signal keywords?
+  (improve, refactor, quality, clean, optimize, 코드 품질, 리팩토링, 개선, cleanup, code review)
+  → improve
+
+else
+  → feature (default)
+```
+
+### 3. Resolve input → loop spec
+
+Branch on input shape:
+
+**A. `--spec <path>` and the file is a conformant loop-spec YAML**
+A file is conformant when it parses as a YAML mapping containing `objective`
+and either non-empty `features` (feature mode) or `mode: improve`. Strip
+provenance frontmatter (`---\n...\n---\n`) before checking.
+→ Load it directly. Proceed to step 4.
+
+**B. No `--spec`, only `<goal>`, mode = feature**
+Split `<goal>` on `;`, `\n`, or `·` into features with empty AC.
+→ Proceed to step 4 with the feature list pre-populated. The interview
+  still runs to collect the five context dimensions; it does not re-ask
+  for the feature list.
+
+**C. `--spec <path>` exists but is NOT conformant, OR any improve-mode input**
+→ Run the adaptive interview (step 4) to build the spec from scratch.
+
+### 4. Adaptive interview — establish full context
+
+**Goal**: start the loop with zero ambiguity. Use LLM judgment throughout —
+not keyword matching or pattern rules.
+
+#### 4-0. Derive slug (before reading any context file)
+
+Compute the slug now — it is needed to find an existing context file in 4-A.
+
+Derivation priority:
+1. `--spec` file's stem in lowercase-kebab-case (e.g. `TECH_SPEC.md` → `tech-spec`)
+2. `--target` path's last two components joined by `-` (e.g. `src/auth/` →
+   `src-auth`, `src/auth/handler.py` → `auth-handler`)
+3. First 4 words of the goal in lowercase-kebab-case
+
+In all cases, sanitize to ASCII: transliterate or drop non-ASCII characters,
+replace spaces and special characters with `-`, collapse multiple `-` into
+one, strip leading/trailing `-`. If the result is empty after sanitization
+(e.g., a pure Korean goal with no ASCII), fall back to
+`loop-<first-8-chars-of-uuid4>`.
+
+#### 4-A. Read and extract (LLM-driven)
+
+Read all available source material:
+- The `--spec` file (if provided), in full
+- Existing `work-docs/loop-context/<slug>.yaml` (if present — reuse answers
+  from prior runs; the slug from 4-0 tells you which file to look for)
+- For improve mode: read the `--target` files/directory structure
+
+Then, for each of the **five required context dimensions**, use your full
+comprehension to extract an answer if the source material clearly states it:
+
+| Dimension | What counts as "clearly stated" |
+|-----------|--------------------------------|
+| **purpose** | An explicit description of what the code/system does and who calls it |
+| **invariants** | Explicit "must not change", "breaking change", API contracts, protocol specs |
+| **priority** | An explicit ranking among performance / readability / safety |
+| **test_reliability** | Explicit test coverage data, CI setup, or a description of test scenarios |
+| **stopping_criteria** | An explicit Definition of Done, exit criteria, or quality bar |
+
+If the source only hints at a dimension (vague, implicit, partial) — mark it
+as **unresolved** and ask. Do not invent answers.
+
+#### 4-B. Interview for missing dimensions
+
+For each unresolved dimension, ask via `AskUserQuestion`. Present what you
+found in the source (if anything) and ask the user to confirm or complete it.
+
+Ask dimensions in this order:
+1. purpose
+2. invariants
+3. priority
+4. test_reliability
+5. stopping_criteria
+
+Batch up to two related dimensions per `AskUserQuestion` call when they are
+short (e.g., priority + test_reliability). Never batch stopping_criteria with
+others — it deserves its own focused question.
+
+#### 4-C. Ambiguity resolution (LLM judgment)
+
+After receiving each answer, evaluate whether it is **actionable**:
+
+- **Actionable**: specific enough that a future Claude reading only this
+  context file could make correct implementation decisions without asking again
+- **Not actionable**: vague scope ("make it better"), unresolved conflict
+  ("both speed and safety"), missing metric ("good coverage"), unconstrained
+  qualifier ("important things")
+
+If not actionable, generate a targeted follow-up question (LLM-generated,
+not a fixed script) and ask via `AskUserQuestion`. Continue until actionable.
+
+There is no maximum question count. The loop does not start until all five
+dimensions are actionable.
+
+#### 4-D. For feature mode: extract feature list
+
+After context is established, if mode = feature and features are not yet
+defined:
+
+- If input was a `--spec` file: propose features extracted from it (headings,
+  roadmap items, TODO markers, DoD checklists). Cap proposal at one coherent
+  slice of 3–10 features. Ask via `AskUserQuestion` to accept / edit / retype.
+- If input was a free-form `<goal>`: use the already-split feature list.
+  Ask via `AskUserQuestion` to add AC for each feature (batch 3–5 per call).
+
+For `improve` mode: features list stays empty. The iteration cycle is the
+"feature".
+
+#### 4-E. Convergence
+
+Ask via `AskUserQuestion` only if the stopping_criteria answer didn't make
+the convergence predicate obvious:
+
+- `feature` mode: translate stopping_criteria into one of the named
+  predicates (`all-features-completed`, `any-feature-completed`,
+  `min-N-features`, `stopping-criteria`).
+- `improve` mode: always `stopping-criteria` (LLM evaluates each iteration).
+
+#### 4-F. Persist context
+
+Save to `work-docs/loop-context/<slug>.yaml` using the slug derived in
+step 4-0.
+
+If the file already exists, merge: keep existing answers for dimensions that
+haven't changed, update dimensions where the user gave new answers, append
+new notes.
+
+```yaml
+slug: <slug>
+source: <spec path or "(inline goal)">
+created_at: <ISO date>
+updated_at: <ISO date>
+context:
+  purpose: <actionable answer>
+  invariants:
+    - <item>
+  priority: <ranked>
+  test_reliability: <actionable answer>
+  stopping_criteria: <actionable answer>
+  notes:
+    - <any additional clarifications from follow-ups>
+```
+
+Save the loop-spec to `.claude/loop-specs/<slug>.yaml`:
+
+```yaml
+mode: <feature|improve>
+objective: <one-sentence derived from purpose>
+target: <--target value or "">
+convergence: <predicate>
+context_ref: work-docs/loop-context/<slug>.yaml
+features:
+  - name: <feature name>
+    acceptance_criteria:
+      - <observable check>
+```
+
+Show the user: saved paths + one-line summary, then ask `AskUserQuestion`
+for final go-ahead before starting the loop.
+
+---
+
+### 5. Run the autoloop
+
+You are the driver. Track state via `TodoWrite` and your working memory.
+
+- Create one task per feature in `TodoWrite` (feature mode) or one task
+  named `improve-cycle` (improve mode). Task description holds AC or
+  stopping_criteria.
+- Note the start timestamp: `Bash` → `date +%s`.
+- Maintain counters: `iter` (0), `failed_streak` (0), `completed` (list).
+
+#### Safety rails (always on, never skip)
+
+1. `iter >= max_iter` → halt `stop_reason="max_iter (N) reached"`
+2. `elapsed >= time_h * 3600` → halt `stop_reason="time_cap (Nh) reached"`
+3. `failed_streak >= 3` → halt `stop_reason="3 consecutive failures"`
+4. Same feature retried ≥ 3 times → halt and report blocker
+5. Ping every 5 iterations: `autoloop ping: iter=<N> target=<name>`
+6. Convergence check **before** each iteration body
+
+#### 5-A. Feature mode loop body
+
+Each iteration:
+
+1. **Cap + convergence checks** (see safety rails)
+2. **Pick next feature**: first in spec order not in `completed`
+3. **Increment `iter`**
+4. **Invoke workflow**: pass feature name + AC + objective to the configured
+   fused workflow. Read the workflow command file under
+   `.claude/commands/hm/<workflow>.md` and execute **every stage it defines,
+   in order, without skipping any** — individual stage "When to Run" skip
+   conditions apply only to standalone invocation, not when driven by the
+   loop. The loop's decision to call this workflow is itself the authority
+   to run all its stages.
+5. **Update state**:
+   - Success → mark completed in `TodoWrite`, append to `completed`,
+     reset `failed_streak = 0`
+   - Failure → `failed_streak += 1`, log what failed
+
+Convergence check: evaluate predicate against `completed` list.
+
+#### 5-B. Improve mode loop body
+
+Each iteration is one full review → fix → test → review cycle:
+
+1. **Cap checks** (see safety rails)
+2. **Increment `iter`**
+3. **Read target** — read all files in `--target` scope. If scope is large
+   (>500 lines total), read in passes: first by structure (headings, class/
+   function signatures), then full content of flagged areas.
+4. **Review** — using the context (purpose, invariants, priority) as the
+   review lens, identify all issues. Classify each:
+   - `critical`: breaks invariants or correctness
+   - `high`: trade-off that contradicts the stated priority (e.g., sacrifices
+     a higher-ranked property for a lower-ranked one — optimizing performance
+     at the expense of safety when priority is `safety > performance`)
+   - `medium`: actionable quality concern that doesn't contradict the priority
+   - `low`: minor style, non-blocking
+   Output a ranked issue list.
+5. **Evaluate stopping criteria** (LLM judgment) — read the
+   `stopping_criteria` from context and judge: does the current codebase
+   satisfy it given the issue list? If yes → `converged = True`, skip fix.
+6. **Fix** — address all critical + high issues. Address medium issues if
+   iter budget allows (estimate: ≤ max_iter/3 iters remaining). Never make
+   changes that would cause context invariants to be violated.
+7. **Run tests** — use whatever test command is appropriate for the project
+   (check for `Makefile`, `pyproject.toml`, `package.json` test scripts).
+   If no test infrastructure is found, consult the `test_reliability` context
+   dimension: if it confirms no tests exist, skip this step and note it in
+   the re-review; otherwise flag the absence of tests as a medium issue.
+   Record: passed / failed / skipped counts.
+8. **Re-review** — brief re-read of changed files. Confirm fixes landed,
+   no regressions introduced.
+9. **Update state**:
+   - `converged = True` (from step 5) → mark `improve-cycle` completed in
+     `TodoWrite`, `completed = ["improve-cycle"]`, `stop_reason = "converged"`
+   - `converged = False` → continue loop. **What counts as failure** in
+     improve mode is test failure only (step 7): tests passing but
+     stopping_criteria not yet met is NOT a failure — it means progress
+     is being made. `failed_streak += 1` only when tests fail; reset to 0
+     when tests pass.
+
+---
+
+### 6. Report
+
+When the loop halts (any reason):
+
+```
+loop done — converged=<bool> iter=<N>/<max_iter>  mode=<mode>
+  objective: <objective>
+  target: <target or "(all features)">
+  completed: <count>/<total>  [<names...>]
   stop_reason: <reason>
-  spec: <spec path or "(inline goal)">
+  spec: <spec path>
+  context: work-docs/loop-context/<slug>.yaml
 ```
 
-For non-converged halts, also list:
-- which feature was being worked on when the loop stopped
-- the last failure reason (if `failed_streak > 0`)
-- a one-line suggestion for the user (e.g. "raise --max-iter", "narrow the
-  failing feature's AC", "split feature X into 2")
+For non-converged halts, also emit:
+- In-flight feature/cycle when stopped
+- Last failure reason (if `failed_streak > 0`)
+- One concrete suggestion (raise `--max-iter`, narrow stopping_criteria,
+  split a failing feature, etc.)
 
-## Safety Rails (always on, never skip)
-
-- **3 consecutive failures** → halt with `stop_reason="3 consecutive failures"`
-- **`max_iter` cap** → halt
-- **`time_h` cap** → halt
-- **Ping every 5 iterations** → INFO-level log
-- **Convergence check** before each iteration — early exit when satisfied
-
-If the loop appears to be stuck on a single feature for >3 iterations, do
-NOT silently keep retrying. Report the blocker and halt.
+For `improve` mode convergence, emit a brief quality summary:
+- Issues found in final review (by severity count)
+- Test result from last cycle
+- Which stopping_criteria items are satisfied
 
 ## Reference
 
-- Skill: `autoloop-driver` (orchestration guide + safety-rail rationale)
-- Agent: `autoloop-coder` (per-iteration implementation worker, when the
-  workflow delegates to it)
-- Loop-spec schema: see step 3.f above
-- Persisted loop-specs: `.claude/loop-specs/<slug>.yaml`
+- Skill: `autoloop-driver` (orchestration rationale + safety-rail invariants)
+- Agent: `autoloop-coder` (per-iteration implementation worker)
+- Loop-spec schema: `.claude/loop-specs/<slug>.yaml`
+- Context store: `work-docs/loop-context/<slug>.yaml`
 
 <!-- @hm:user:extensions -->
-<!-- Project-specific autoloop overrides (custom safety rails, additional convergence predicates, etc.). Preserved across harness-maker upgrades. -->
+<!-- Project-specific autoloop overrides (custom safety rails, convergence predicates, etc.). Preserved across harness-maker upgrades. -->
 <!-- @hm:/user:extensions -->

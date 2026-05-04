@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.4.7
+harness_maker_version: 0.4.8
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/atomic_command.md.j2
 provenance: official
-content_hash: 6074e6325c03448d8ee515a2e74d6296a44edd41bd17dcf0ee138c5398ef79ac
+content_hash: 7d28c2297b6a7ed85318b5fc25f181b6fb8c0536a3f4f6a7fe8273913a19bead
 ---
 # Stage: wrapup
 
@@ -22,6 +22,9 @@ next session benefits, run the final review pass, sync TODOs and commit.
 - Before pushing to a shared branch
 - Whenever a logical work unit completes (feature flag flipped, ticket
   closed, demo-ready)
+
+> **When invoked as part of a fused workflow** (see preamble), always run —
+> do not skip based on the conditions above.
 
 ## Inputs
 

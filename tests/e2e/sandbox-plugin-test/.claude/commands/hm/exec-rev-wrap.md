@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.4.7
+harness_maker_version: 0.4.8
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: 4f5d1eb92c811efc99e24af9f4dcac5f3d48dea85bbb05dcfb705d2962154219
+content_hash: 483bd2bf33b323e881921dbc4d0d3288d8a0e646c7fb10f39a7f2fcdd6695a06
 ---
 # /hm:exec-rev-wrap
 
@@ -97,6 +97,9 @@ until the grade passes the threshold or `max_review_rounds` is exhausted.
   - Architectural surface (interfaces, contracts) changed
   - New public APIs are added
 - Skipped for: docs-only, single-file fixes, config-only — unless overridden
+
+> **When invoked as part of a fused workflow** (see preamble), the skip
+> conditions above do NOT apply — always run.
 
 ## Inputs
 
@@ -305,6 +308,9 @@ next session benefits, run the final review pass, sync TODOs and commit.
 - Before pushing to a shared branch
 - Whenever a logical work unit completes (feature flag flipped, ticket
   closed, demo-ready)
+
+> **When invoked as part of a fused workflow** (see preamble), always run —
+> do not skip based on the conditions above.
 
 ## Inputs
 

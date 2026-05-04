@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.4.7
+harness_maker_version: 0.4.8
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: f720963349ca26d13176561ac3da35b4c8eca31d861ae10bbe83809a21170e80
+content_hash: 08e0268484269d85df14ae375b49b37f365d555d94404ac24b5ae0c87b2d981a
 ---
 # /hm:exec-rev
 
@@ -97,6 +97,9 @@ until the grade passes the threshold or `max_review_rounds` is exhausted.
   - Architectural surface (interfaces, contracts) changed
   - New public APIs are added
 - Skipped for: docs-only, single-file fixes, config-only — unless overridden
+
+> **When invoked as part of a fused workflow** (see preamble), the skip
+> conditions above do NOT apply — always run.
 
 ## Inputs
 
