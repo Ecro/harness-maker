@@ -191,6 +191,27 @@ def _is_hooks_json(fe: FileEntry) -> bool:
     return str(fe.path).endswith("hooks.json")
 
 
+def _is_cursor_mdc(fe: FileEntry) -> bool:
+    """Cursor rules — ``.cursor/rules/*.mdc``. Plain markdown + Cursor frontmatter
+    (``description``, ``globs``, ``alwaysApply``). 우리 ``content_hash`` 등 메타는
+    Phase 1 A1.frontmatter 검증 결과 따라 추후 sidecar 분리 가능 — 현재는 jinja
+    template 이 frontmatter 자체를 만들어내므로 ``_render_pure_text`` 로 처리.
+    """
+    return str(fe.path).startswith(".cursor/rules/") and fe.path.suffix == ".mdc"
+
+
+def _is_cursor_command(fe: FileEntry) -> bool:
+    """Cursor slash commands — ``.cursor/commands/*.md``. Plain markdown, no
+    frontmatter (Cursor command 는 frontmatter 안 가짐).
+    """
+    return str(fe.path).startswith(".cursor/commands/") and fe.path.suffix == ".md"
+
+
+def _is_cursor_mcp_json(fe: FileEntry) -> bool:
+    """Cursor MCP config — ``.cursor/mcp.json`` (pure JSON, no frontmatter)."""
+    return str(fe.path) == ".cursor/mcp.json"
+
+
 def _render_pure_text(
     fe: FileEntry,
     env: Environment,
@@ -201,10 +222,19 @@ def _render_pure_text(
 ) -> Path:
     """Render template body verbatim, no provenance frontmatter.
 
-    Used for files whose interpreter rejects a YAML preamble — currently
-    ``.sh`` wrappers under ``.claude/lib/``. Provenance is sacrificed
-    because the wrapper is small, reproducible from the template, and
-    re-rendered every time the user runs ``/harness-maker:make``.
+    Used for files whose external consumer rejects a YAML preamble:
+
+    - ``.sh`` wrappers under ``.claude/lib/`` — bash interprets ``---`` as
+      a command
+    - ``.cursor/rules/*.mdc`` — Cursor frontmatter parser may strict-reject
+      our ``content_hash`` / ``generated_by`` keys (Phase 1 A1.frontmatter
+      검증 결과에 따라 sidecar 메타 분리 가능)
+    - ``.cursor/commands/*.md`` — Cursor slash commands are plain markdown
+
+    Provenance is sacrificed because these files are small, reproducible
+    from the template, and re-rendered every time the user runs
+    ``/harness-maker:make``. Reconcile of ``.cursor/`` 자산은 Phase 2.4 에서
+    별도 정책 (sidecar 또는 항상 REPLACE).
     """
     template = env.get_template(fe.template)
     rendered = template.render(**fe.context)
@@ -232,10 +262,16 @@ def _render_pure_json(
     dry_run: bool,
     freeze_time: datetime | None,  # noqa: ARG001 — kept for dispatch signature parity
 ) -> Path:
-    """Render pure JSON (no frontmatter prefix) — used for hooks.json (jq-parseable).
+    """Render pure JSON (no frontmatter prefix).
 
-    Provenance is intentionally omitted; hooks.json is small and reproducible from
-    the template. The frontmatter invariant gate explicitly excludes hooks.json.
+    Used for files whose external consumer expects pure JSON:
+
+    - ``.claude/hooks/hooks.json`` — jq-parseable, Claude Code spec
+    - ``.cursor/mcp.json`` — Cursor MCP config
+
+    Provenance is intentionally omitted; both are small, reproducible from the
+    template, and re-rendered every time. Frontmatter invariant gate explicitly
+    excludes them.
     """
     template = env.get_template(fe.template)
     rendered = template.render(**fe.context)
@@ -393,7 +429,7 @@ def render(
     written: list[Path] = []
     paths_to_merge = merge_paths or set()
     for fe in blueprint.files:
-        if _is_hooks_json(fe):
+        if _is_hooks_json(fe) or _is_cursor_mcp_json(fe):
             out = _render_pure_json(
                 fe,
                 env,
@@ -409,7 +445,7 @@ def render(
                 dry_run=dry_run,
                 freeze_time=freeze_time,
             )
-        elif _is_pure_text(fe):
+        elif _is_pure_text(fe) or _is_cursor_mdc(fe) or _is_cursor_command(fe):
             out = _render_pure_text(
                 fe,
                 env,

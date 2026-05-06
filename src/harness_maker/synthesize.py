@@ -23,6 +23,7 @@ from harness_maker.models import (
     InterviewAnswers,
     Preset,
     ProjectProfile,
+    Target,
 )
 from harness_maker.workflow_fuse import fuse
 
@@ -206,6 +207,34 @@ def _workflow_command_files(
     return out
 
 
+def _cursor_target_files() -> list[FileSpec]:
+    """Cursor target 전용 자산 — ``targets`` 에 cursor 포함 시에만 추가.
+
+    Single source 원칙 (PLAN-cursor-target-support.md § Targets 정책): agents /
+    skills / hooks 는 ``.claude/`` 한 곳에서 양쪽 IDE 공유 (Cursor 가 native 로
+    읽음). 본 함수는 Cursor 전용 자산만:
+
+    - ``.cursor/rules/harness.mdc`` — Cursor IDE-rules (alwaysApply: true,
+      CLAUDE.md 의 Cursor-flavored 변형)
+    - ``.cursor/mcp.json`` — Cursor MCP 서버 정의 (pure JSON)
+
+    ``.cursor/commands/hm-*.md`` 별도 렌더는 Phase 1 A4.command-discover 검증
+    결과에 따라 추가 — 현재는 single source ``.claude/commands/`` 가정.
+    """
+    return [
+        (
+            "cursor/rules/harness.mdc.j2",
+            ".cursor/rules/harness.mdc",
+            {},
+        ),
+        (
+            "cursor/mcp.json.j2",
+            ".cursor/mcp.json",
+            {},
+        ),
+    ]
+
+
 def synthesize(
     profile: ProjectProfile,
     answers: InterviewAnswers,
@@ -224,8 +253,12 @@ def synthesize(
         *_workflow_command_files(answers.fused_workflows),
     ]
 
+    if Target.CURSOR in answers.targets:
+        file_specs.extend(_cursor_target_files())
+
     config = HarnessConfig(
         locale=answers.locale,
+        targets=list(answers.targets),
         preset=effective_preset,
         dev_mode=answers.dev_mode,
         workflows=dict(answers.fused_workflows),

@@ -211,7 +211,7 @@ def _ask_targets() -> list[Target]:
         try:
             out.append(Target(s))
         except ValueError:
-            print(f"  warning: unknown target {s!r} — skipped")
+            logger.warning("unknown target %r — skipped", s)
     return out or [Target.CLAUDE_CODE]
 
 

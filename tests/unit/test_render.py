@@ -227,3 +227,70 @@ def test_render_without_merge_paths_overwrites(tmp_path: Path) -> None:
     final = review_path.read_text(encoding="utf-8")
     assert "# user wrote this" not in final
     assert "Stage: review" in final
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Cursor target — Phase 2.2/2.3
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def test_render_cursor_target_emits_mdc_and_mcp_json(tmp_path: Path) -> None:
+    """targets=[cursor] full pipeline: .cursor/rules/harness.mdc 와
+    .cursor/mcp.json 디스크 생성, 내용 검증.
+    """
+    from harness_maker.models import Target
+
+    p = ProjectProfile(stack=["python"], scale="small", lifecycle="experiment")
+    a = interview(p, autoloop_mode=True).model_copy(update={"targets": [Target.CURSOR]})
+    bp = synthesize(p, a)
+    render(bp, tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
+
+    mdc = tmp_path / ".cursor" / "rules" / "harness.mdc"
+    mcp = tmp_path / ".cursor" / "mcp.json"
+    assert mdc.exists()
+    assert mcp.exists()
+
+    # mdc: Cursor frontmatter 존재 + alwaysApply: true
+    mdc_text = mdc.read_text(encoding="utf-8")
+    assert mdc_text.startswith("---\n")
+    assert "alwaysApply: true" in mdc_text
+    assert "description:" in mdc_text
+
+    # mcp.json: pure JSON, frontmatter 없음
+    import json as _json
+
+    mcp_text = mcp.read_text(encoding="utf-8")
+    assert not mcp_text.startswith("---")
+    parsed = _json.loads(mcp_text)
+    assert isinstance(parsed, dict)
+    assert "mcpServers" in parsed
+
+
+def test_render_cursor_mdc_lacks_our_provenance_frontmatter(tmp_path: Path) -> None:
+    """Cursor .mdc 는 _render_pure_text 로 처리되어 우리 ``generated_by``,
+    ``content_hash``, ``source_template`` 메타가 박히지 않음 (Cursor strict-reject
+    회피, Phase 1 A1.frontmatter 결과에 따라 sidecar 메타 분리는 Phase 2.4+).
+    """
+    from harness_maker.models import Target
+
+    p = ProjectProfile(stack=["python"], scale="small", lifecycle="experiment")
+    a = interview(p, autoloop_mode=True).model_copy(update={"targets": [Target.CURSOR]})
+    bp = synthesize(p, a)
+    render(bp, tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
+
+    mdc_text = (tmp_path / ".cursor" / "rules" / "harness.mdc").read_text(encoding="utf-8")
+    assert "generated_by:" not in mdc_text
+    assert "content_hash:" not in mdc_text
+    assert "source_template:" not in mdc_text
+    assert "harness_maker_version:" not in mdc_text
+
+
+def test_render_claude_only_target_omits_cursor_directory(tmp_path: Path) -> None:
+    """targets=[claude-code] (default): .cursor/ 디렉토리 자체가 만들어지지 않음."""
+    p = ProjectProfile(stack=["python"], scale="small", lifecycle="experiment")
+    a = interview(p, autoloop_mode=True)  # default [claude-code]
+    bp = synthesize(p, a)
+    render(bp, tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
+
+    cursor_dir = tmp_path / ".cursor"
+    assert not cursor_dir.exists()

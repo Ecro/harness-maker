@@ -212,9 +212,10 @@ class HarnessConfig(BaseModel):
     # Free-text locale tag. en/ko ship with built-in i18n catalogs; unknown
     # tags fall back to English in i18n.t().
     locale: str = "en"
-    # IDE target multi-select. 새 인터뷰는 명시 multi-select 강제 (interview.py).
-    # 옛 yaml load 시 _targets_schema_gap_fallback validator 가 [claude-code]
-    # 로 fallback + 경고 로그. 빈 list 직접 입력은 min_length=1 이 거부.
+    # IDE target multi-select. 새 인터뷰는 multi-select 답변을 받음 (빈 입력은
+    # default [claude-code] 선택). 옛 yaml load 시 yaml-aware loader
+    # (interview._parse_targets) 가 [claude-code] fallback + 경고 로그 — 옛
+    # yaml 으로부터의 추론 금지. 빈 list 직접 입력은 min_length=1 이 거부.
     targets: list[Target] = Field(
         default_factory=lambda: [Target.CLAUDE_CODE],
         min_length=1,

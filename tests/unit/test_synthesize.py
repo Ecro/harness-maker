@@ -100,3 +100,62 @@ def test_synthesize_emits_skills_context() -> None:
         assert "skills" in f.context
         assert "installed" in f.context["skills"]
         assert "enabled" in f.context["skills"]
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Cursor target — Phase 2.2/2.3
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def test_synthesize_no_cursor_target_omits_cursor_files() -> None:
+    """targets=[claude-code]: regression 0 — `.cursor/` 자산 안 나옴."""
+    from harness_maker.models import Target
+
+    p = _profile()
+    a = interview(p, autoloop_mode=True)
+    assert a.targets == [Target.CLAUDE_CODE]  # autoloop default
+    bp = synthesize(p, a)
+    paths = {str(f.path) for f in bp.files}
+    assert not any(p.startswith(".cursor/") for p in paths)
+
+
+def test_synthesize_cursor_target_includes_cursor_files() -> None:
+    """targets=[cursor]: `.cursor/rules/harness.mdc` + `.cursor/mcp.json` 추가."""
+    from harness_maker.models import Target
+
+    p = _profile()
+    a = interview(p, autoloop_mode=True).model_copy(update={"targets": [Target.CURSOR]})
+    bp = synthesize(p, a)
+    paths = {str(f.path) for f in bp.files}
+    assert ".cursor/rules/harness.mdc" in paths
+    assert ".cursor/mcp.json" in paths
+
+
+def test_synthesize_both_targets_include_claude_and_cursor_files() -> None:
+    """targets=[claude-code, cursor]: 모든 공유 자산 + Cursor 전용 자산."""
+    from harness_maker.models import Target
+
+    p = _profile()
+    a = interview(p, autoloop_mode=True).model_copy(
+        update={"targets": [Target.CLAUDE_CODE, Target.CURSOR]},
+    )
+    bp = synthesize(p, a)
+    paths = {str(f.path) for f in bp.files}
+    # 공유 자산 (.claude/) — single source
+    assert "harness.yaml" in paths
+    assert "settings.json" in paths
+    # Cursor 전용
+    assert ".cursor/rules/harness.mdc" in paths
+    assert ".cursor/mcp.json" in paths
+
+
+def test_synthesize_targets_propagates_to_harness_config() -> None:
+    """`answers.targets` 가 `config.targets` 로 박혀 yaml 에 출력됨."""
+    from harness_maker.models import Target
+
+    p = _profile()
+    a = interview(p, autoloop_mode=True).model_copy(
+        update={"targets": [Target.CLAUDE_CODE, Target.CURSOR]},
+    )
+    bp = synthesize(p, a)
+    assert bp.config.targets == [Target.CLAUDE_CODE, Target.CURSOR]
