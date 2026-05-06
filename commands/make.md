@@ -53,6 +53,11 @@ Then use `AskUserQuestion` with these options:
   defaults (security gates, worktree scope, default reviewer set).
 - **Switch locale** — change the `locale` tag (en/ko/ja/...).
 - **Switch dev_mode** — spec-driven ↔ task-driven.
+- **Switch IDE targets** — pick `claude-code`, `cursor`, or both.
+  Adding `cursor` renders `.cursor/rules/harness.mdc` + `.cursor/mcp.json`
+  alongside the shared `.claude/` assets so the harness drives Cursor
+  IDE 2.4+ natively. Removing leaves prior `.cursor/` files in place
+  (delete manually if undesired).
 - **Add a component** — install one extra reviewer / skill / domain pack.
 - **Remove a component** — uninstall one reviewer / skill.
 - **Full reconfigure** — re-run the entire interview (only works in a real
@@ -101,6 +106,17 @@ templates while preserving user `@hm:user:*` blocks via reconcile.
 ```bash
 !uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" --dev-mode spec-driven
 ```
+
+#### Switch IDE targets
+
+```bash
+!uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" --targets claude-code,cursor
+```
+
+(or `--targets cursor` for Cursor-only, `--targets claude-code` to drop
+back to Claude-Code-only.) Adding `cursor` renders `.cursor/rules/harness.mdc`
++ `.cursor/mcp.json`. Dropping `cursor` does **not** delete previously
+rendered `.cursor/` files — remove them manually if you want a clean slate.
 
 #### Add / remove a component
 

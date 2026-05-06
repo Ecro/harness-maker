@@ -1,4 +1,4 @@
-"""Tests for CLI per-dimension override flags (--preset / --locale / --dev-mode)."""
+"""Tests for CLI per-dimension override flags (--preset / --locale / --dev-mode / --targets)."""
 
 from __future__ import annotations
 
@@ -34,6 +34,7 @@ def test_no_overrides_returns_input_unchanged() -> None:
         preset_override=None,
         locale_override=None,
         dev_mode_override=None,
+        targets_override=None,
     )
     assert out is a  # short-circuit when nothing to apply
 
@@ -45,6 +46,7 @@ def test_locale_override_sets_locale() -> None:
         preset_override=None,
         locale_override="ko",
         dev_mode_override=None,
+        targets_override=None,
     )
     assert out.locale == "ko"
     assert out.preset == Preset.SIDE  # untouched
@@ -57,6 +59,7 @@ def test_dev_mode_override_sets_dev_mode() -> None:
         preset_override=None,
         locale_override=None,
         dev_mode_override="spec-driven",
+        targets_override=None,
     )
     assert out.dev_mode == DevMode.SPEC_DRIVEN
 
@@ -69,6 +72,7 @@ def test_dev_mode_override_invalid_aborts() -> None:
             preset_override=None,
             locale_override=None,
             dev_mode_override="bogus",
+            targets_override=None,
         )
 
 
@@ -81,6 +85,7 @@ def test_preset_override_rederives_extras() -> None:
         preset_override="Production",
         locale_override=None,
         dev_mode_override=None,
+        targets_override=None,
     )
     assert out.preset == Preset.PRODUCTION
     assert out.anti_rot.get("enabled") is True
@@ -100,6 +105,7 @@ def test_preset_override_invalid_aborts() -> None:
             preset_override="Experimental",
             locale_override=None,
             dev_mode_override=None,
+            targets_override=None,
         )
 
 
@@ -111,6 +117,7 @@ def test_preset_override_same_preset_is_noop() -> None:
         preset_override="Side",
         locale_override=None,
         dev_mode_override=None,
+        targets_override=None,
     )
     assert out.preset == Preset.SIDE
     # Internals (anti_rot etc.) carry through untouched
@@ -124,7 +131,98 @@ def test_combined_overrides_apply_all() -> None:
         preset_override="Production",
         locale_override="ko",
         dev_mode_override="spec-driven",
+        targets_override="claude-code,cursor",
     )
     assert out.preset == Preset.PRODUCTION
     assert out.locale == "ko"
     assert out.dev_mode == DevMode.SPEC_DRIVEN
+    assert out.targets == [Target.CLAUDE_CODE, Target.CURSOR]
+
+
+def test_targets_override_single_cursor() -> None:
+    a = _baseline_side()
+    assert a.targets == [Target.CLAUDE_CODE]
+    out = _apply_dimension_overrides(
+        a,
+        preset_override=None,
+        locale_override=None,
+        dev_mode_override=None,
+        targets_override="cursor",
+    )
+    assert out.targets == [Target.CURSOR]
+
+
+def test_targets_override_both_preserves_order() -> None:
+    a = _baseline_side()
+    out = _apply_dimension_overrides(
+        a,
+        preset_override=None,
+        locale_override=None,
+        dev_mode_override=None,
+        targets_override="cursor,claude-code",
+    )
+    # input order preserved
+    assert out.targets == [Target.CURSOR, Target.CLAUDE_CODE]
+
+
+def test_targets_override_dedupes() -> None:
+    a = _baseline_side()
+    out = _apply_dimension_overrides(
+        a,
+        preset_override=None,
+        locale_override=None,
+        dev_mode_override=None,
+        targets_override="cursor,cursor,claude-code",
+    )
+    assert out.targets == [Target.CURSOR, Target.CLAUDE_CODE]
+
+
+def test_targets_override_whitespace_tolerant() -> None:
+    a = _baseline_side()
+    out = _apply_dimension_overrides(
+        a,
+        preset_override=None,
+        locale_override=None,
+        dev_mode_override=None,
+        targets_override=" claude-code , cursor ",
+    )
+    assert out.targets == [Target.CLAUDE_CODE, Target.CURSOR]
+
+
+def test_targets_override_invalid_aborts() -> None:
+    a = _baseline_side()
+    with pytest.raises(typer.Exit):
+        _apply_dimension_overrides(
+            a,
+            preset_override=None,
+            locale_override=None,
+            dev_mode_override=None,
+            targets_override="vscode",
+        )
+
+
+def test_targets_override_empty_aborts() -> None:
+    """`--targets ,,` (only commas/whitespace) must reject — min_length=1."""
+    a = _baseline_side()
+    with pytest.raises(typer.Exit):
+        _apply_dimension_overrides(
+            a,
+            preset_override=None,
+            locale_override=None,
+            dev_mode_override=None,
+            targets_override=" , , ",
+        )
+
+
+def test_targets_override_with_preset_switch() -> None:
+    """Targets carry through a preset rebuild (override applied on top of rebuild)."""
+    a = _baseline_side()
+    out = _apply_dimension_overrides(
+        a,
+        preset_override="Production",
+        locale_override=None,
+        dev_mode_override=None,
+        targets_override="claude-code,cursor",
+    )
+    assert out.preset == Preset.PRODUCTION
+    assert out.targets == [Target.CLAUDE_CODE, Target.CURSOR]

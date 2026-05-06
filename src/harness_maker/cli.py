@@ -90,6 +90,14 @@ def make(
         "--dev-mode",
         help="Override dev_mode: 'spec-driven' or 'task-driven'.",
     ),
+    targets_override: str | None = typer.Option(
+        None,
+        "--targets",
+        help="Override IDE targets (comma-separated): 'claude-code', "
+        "'cursor', or 'claude-code,cursor'. Re-renders cursor assets when "
+        "'cursor' is added; leaves them in place (and unreferenced) when "
+        "removed — delete .cursor/ manually if undesired.",
+    ),
 ) -> None:
     """Generate or refine the project harness at TARGET/.claude/."""
     p = profile(target)
@@ -115,6 +123,7 @@ def make(
         preset_override=preset_override,
         locale_override=locale_override,
         dev_mode_override=dev_mode_override,
+        targets_override=targets_override,
     )
     if add_domain_name is not None:
         try:
@@ -238,9 +247,10 @@ def _apply_dimension_overrides(
     preset_override: str | None,
     locale_override: str | None,
     dev_mode_override: str | None,
+    targets_override: str | None,
 ) -> InterviewAnswers:
-    """Apply per-dimension CLI overrides (preset/locale/dev_mode) on top of
-    the answers (whether reused or freshly interviewed).
+    """Apply per-dimension CLI overrides (preset/locale/dev_mode/targets) on
+    top of the answers (whether reused or freshly interviewed).
 
     Switching ``preset`` also re-derives the preset-coupled extras
     (``models`` / ``autoloop`` / ``memory`` / ``anti_rot`` / ``worktree`` /
@@ -249,7 +259,7 @@ def _apply_dimension_overrides(
     rather than leaving stale Side defaults around.
     """
     from harness_maker.interview import _build_answers
-    from harness_maker.models import DevMode, Preset
+    from harness_maker.models import DevMode, Preset, Target
 
     update: dict[str, object] = {}
     if locale_override:
@@ -260,6 +270,28 @@ def _apply_dimension_overrides(
         except ValueError as e:
             typer.echo(f"--dev-mode invalid: {dev_mode_override}", err=True)
             raise typer.Exit(code=1) from e
+    if targets_override:
+        raw = [t.strip() for t in targets_override.split(",") if t.strip()]
+        if not raw:
+            typer.echo("--targets must specify at least one target", err=True)
+            raise typer.Exit(code=1)
+        try:
+            parsed = [Target(t) for t in raw]
+        except ValueError as e:
+            valid = ", ".join(t.value for t in Target)
+            typer.echo(
+                f"--targets invalid: {targets_override!r} (valid: {valid})",
+                err=True,
+            )
+            raise typer.Exit(code=1) from e
+        # de-dup while preserving order
+        seen: set[Target] = set()
+        deduped: list[Target] = []
+        for t in parsed:
+            if t not in seen:
+                seen.add(t)
+                deduped.append(t)
+        update["targets"] = deduped
     if preset_override:
         try:
             new_preset = Preset(preset_override)
@@ -269,7 +301,8 @@ def _apply_dimension_overrides(
         if new_preset != answers.preset:
             # Rebuild from scratch so preset-derived extras are correct, then
             # re-overlay the answers we want to carry across (workflows,
-            # locale, etc.).
+            # locale, etc.). targets_override (if any) is applied via the
+            # `update` overlay below.
             rebuilt = _build_answers(
                 locale=answers.locale,
                 targets=list(answers.targets),
