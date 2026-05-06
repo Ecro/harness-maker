@@ -268,3 +268,31 @@ def test_targets_empty_list_yaml_falls_back_with_warning(
     assert answers is not None
     assert answers.targets == [Target.CLAUDE_CODE]
     assert any("targets" in rec.message for rec in caplog.records)
+
+
+def test_phase1_fixture_yaml_falls_back_with_warning(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """B11 — Phase 1 manual checklist fixture
+    (`tests/cursor-compat/fixture/.claude/harness.yaml`) 이 옛 yaml format
+    (targets 키 부재) 임을 검증 + answers_from_harness_yaml 이 [claude-code]
+    fallback + 경고 로그 emit. PLAN-cursor-target-impl.md §2.6 의 B11 자동화
+    acceptance 를 직접 만족시키는 test (Phase 1 fixture 를 production code 가
+    실제로 처리할 수 있는지 회귀 방지).
+    """
+    fixture = (
+        Path(__file__).resolve().parents[2]
+        / "tests"
+        / "cursor-compat"
+        / "fixture"
+        / ".claude"
+        / "harness.yaml"
+    )
+    assert fixture.exists(), "Phase 1 fixture missing — broken test setup"
+
+    with caplog.at_level(logging.WARNING, logger="harness_maker.interview"):
+        answers = answers_from_harness_yaml(fixture)
+
+    assert answers is not None
+    assert answers.targets == [Target.CLAUDE_CODE]
+    assert any("targets" in rec.message and "falling back" in rec.message for rec in caplog.records)

@@ -178,9 +178,11 @@ Manual 검증 (사용자가 IDE 에서 직접 — `tests/cursor-compat/MANUAL_CH
 9. 결과를 `tests/cursor-compat/RESULTS.md` 에 PASS/FAIL + 스크린샷/로그로 기록
 
 **Acceptance**
-- A1–A4 manual 검증 결과 `tests/cursor-compat/RESULTS.md` 에 기록
-- B11 + B13 fixture 작성 (자동화 검증 자체는 Phase 2 implementation 후로 deferred — Phase 2 acceptance 에 포함)
-- A1–A4 모두 PASS (또는 PARTIAL with onboarding 가이드 처리 가능) 시 Phase 2 진입
+- A1–A4 manual 검증 결과 `tests/cursor-compat/RESULTS.md` 에 기록 (사용자 IDE 검증 진행 중 — 진입은 보류 가능)
+- ✅ B11 자동화 검증 완료 — Phase 2.6 의 `test_phase1_fixture_yaml_falls_back_with_warning`
+  (Phase 1 fixture 가 production code 에 의해 정확히 처리됨이 회귀 방지)
+- ✅ B13 자동화 검증 완료 — Phase 2.4 의 cursor reconcile/backup 5 tests
+- A1–A4 모두 PASS (또는 PARTIAL with onboarding 가이드 처리 가능) 시 Phase 2 진입 (A1–A4 PASS 가정으로 Phase 2.0–2.6 implementation 진행 중 — A1–A4 검증은 1차 release 전 dogfooding 시점에 수행)
 - A1–A4 일부 FAIL 시 plan §3 "Fail 시 영향" 행 적용 → 본 PLAN 갱신 후 재 review
 
 ---

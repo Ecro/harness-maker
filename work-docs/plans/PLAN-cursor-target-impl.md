@@ -136,27 +136,52 @@ Phase 1 fixture + manual checklist 작성 완료, 검증은 사용자 IDE 에서
 ### Phase 2.5 — harness-maker 자체 dual plugin manifest
 
 **Files**:
-- `.cursor-plugin/plugin.json` (신규) — `.claude-plugin/plugin.json` schema 거의 동일. 컴포넌트 path: `commands: "./commands"`, `agents: "./agents"`, `skills: "./skills"`, `hooks: "./hooks/hooks.json"`, `mcpServers: "./mcp.json"` (모두 `.claude-plugin` 과 같은 디렉토리 가리킴)
-- `tests/unit/test_version_sync.py` (신규) — 4 파일 version 일치 검증 (`.claude-plugin/plugin.json`, `.cursor-plugin/plugin.json`, `pyproject.toml`, `__init__.py`)
-- `scripts/bump_version.py` (선택) — 4 파일 동시 bump helper
+- `.cursor-plugin/plugin.json` (신규) — `.claude-plugin/plugin.json` 거의 동일.
+  description 에 dual-IDE 명시 + keywords 에 `cursor` 추가. `commands`
+  path 를 explicit 로 박음 (`"./commands"`) — Cursor docs "explicit >
+  implicit" 권고 (auto-discovery 결과는 동일하나 spec 변경 시 break 회피).
+  현재 plugin 은 `/harness-maker:make` 명령 하나만 노출; agents/skills 는
+  사용자 하네스의 렌더 결과로 들어가고 plugin 자체에는 포함 안 됨.
+- `tests/unit/test_version_sync.py` (신규) — 4-way version 일치 + manifest
+  metadata 일치 + Cursor explicit commands path 검증 (8 tests).
 
 **Acceptance**:
-- 두 manifest version 일치
-- 컴포넌트 path 가 같은 디렉토리 가리킴 (single source)
-- `test_version_sync` PASS
+- ✅ 두 manifest version 일치 (`test_*_versions_match`,
+  `test_all_four_version_sources_agree`)
+- ✅ Cursor 의 commands path explicit (`test_cursor_plugin_explicit_commands_path`,
+  `test_cursor_plugin_commands_path_resolves_to_existing_directory`)
+- ✅ Required metadata 일치 (name, author, license, repository, homepage) —
+  `test_two_manifests_share_required_metadata`
+- ✅ Cursor 키워드 포함 — `test_cursor_plugin_manifest_has_cursor_keyword`
+
+**의식적 omit (1차 release scope 외)**:
+- `scripts/bump_version.py` (선택, 4-파일 동시 bump helper) — manual bump +
+  `test_version_sync` 회귀 검증으로 충분. 미래 release 시 cycle 빈도가
+  높아지면 도입.
 
 ---
 
 ### Phase 2.6 — B11 / B13 자동화 검증
 
 **Files**:
-- `tests/integration/test_targets_fallback.py` (신규) — `tests/cursor-compat/fixture/.claude/harness.yaml` 로 render → `[claude-code]` fallback + 경고 로그 확인 (B11)
-- `tests/integration/test_reconcile_cursor.py` — Phase 2.4 의 일부, B13
+- `tests/unit/test_answers_from_harness_yaml.py` 에 `test_phase1_fixture_yaml_falls_back_with_warning` 추가
+  — Phase 1 fixture 직접 사용 (B11). integration 디렉토리 미존재로 unit 통합.
+- `tests/unit/test_reconcile.py` — Phase 2.4 에 추가된 cursor reconcile 섹션
+  + backup 의 `.cursor/` 처리 (B13).
 
 **Acceptance**:
-- B11 PASS: 옛 yaml 로 render → 경고 로그 + targets default
-- B13 PASS: `.cursor/` 도 reconcile / backup 범위 포함
-- `PLAN-cursor-target-support.md` §5 Phase 1 acceptance 의 deferred 부분 closed (해당 plan 갱신 필요)
+- ✅ B11 PASS — Phase 1 fixture (`tests/cursor-compat/fixture/.claude/harness.yaml`)
+  를 production code (`answers_from_harness_yaml`) 가 read 시 `[claude-code]`
+  fallback + `falling back` 경고 로그 emit. Phase 1 fixture 가 dead asset 가
+  아니라 회귀 방지 자산으로 자동화에 통합됨.
+- ✅ B13 PASS — Phase 2.4 의 5 cursor reconcile/backup tests:
+  `test_reconcile_cursor_first_render_returns_both`,
+  `test_reconcile_cursor_mdc_keeps_after_render`,
+  `test_backup_includes_cursor_directory`,
+  `test_backup_after_full_render_preserves_cursor_user_modifications`,
+  `test_backup_creates_dir` (Phase 2.4 layout).
+- ✅ `PLAN-cursor-target-support.md` §5 Phase 1 acceptance 의 deferred 부분
+  closed (parent plan 의 Phase 1 acceptance 표시 갱신 필요).
 
 ---
 
