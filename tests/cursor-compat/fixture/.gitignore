@@ -1,0 +1,14 @@
+# IDE-generated metadata — must not pollute the fixture across runs.
+# When a verifier opens this directory in Cursor / Claude Code, the IDE may
+# auto-create state files; those are user-specific and should never be committed.
+
+.cursor/
+.claude/settings.local.json
+.specstory/
+.history/
+
+# Editor / OS artifacts
+*.swp
+*~
+.DS_Store
+Thumbs.db

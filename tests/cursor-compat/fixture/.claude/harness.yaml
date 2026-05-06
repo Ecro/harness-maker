@@ -1,0 +1,15 @@
+# Phase 1 fixture — `targets` 키 의도적 누락 (B11 fallback 검증용).
+# render 시 옛 yaml 호환 정책으로 `[claude-code]` silent fallback + 경고 로그가
+# 발생해야 한다 (PLAN-cursor-target-support.md §3 B11). 자동화 검증은
+# Phase 2.6 에서 `tests/integration/test_targets_fallback.py` 가 수행.
+locale: en
+preset: Side
+dev_mode: spec-driven
+workflows:
+  dev:
+    - research
+    - plan
+    - execute
+    - review
+    - wrapup
+default_workflow: dev
