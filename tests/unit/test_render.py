@@ -235,18 +235,22 @@ def test_render_without_merge_paths_overwrites(tmp_path: Path) -> None:
 
 
 def test_render_cursor_target_emits_mdc_and_mcp_json(tmp_path: Path) -> None:
-    """targets=[cursor] full pipeline: .cursor/rules/harness.mdc 와
-    .cursor/mcp.json 디스크 생성, 내용 검증.
+    """targets=[cursor] full pipeline mirrors real CLI: target_dir 는 ``.claude/``,
+    ``.cursor/`` 자산은 그 sibling 으로 resolve.
     """
     from harness_maker.models import Target
+
+    project_root = tmp_path
+    target_dir = project_root / ".claude"
+    target_dir.mkdir()
 
     p = ProjectProfile(stack=["python"], scale="small", lifecycle="experiment")
     a = interview(p, autoloop_mode=True).model_copy(update={"targets": [Target.CURSOR]})
     bp = synthesize(p, a)
-    render(bp, tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
+    render(bp, target_dir, freeze_time=DEFAULT_FREEZE_TIME)
 
-    mdc = tmp_path / ".cursor" / "rules" / "harness.mdc"
-    mcp = tmp_path / ".cursor" / "mcp.json"
+    mdc = project_root / ".cursor" / "rules" / "harness.mdc"
+    mcp = project_root / ".cursor" / "mcp.json"
     assert mdc.exists()
     assert mcp.exists()
 
@@ -273,12 +277,16 @@ def test_render_cursor_mdc_lacks_our_provenance_frontmatter(tmp_path: Path) -> N
     """
     from harness_maker.models import Target
 
+    project_root = tmp_path
+    target_dir = project_root / ".claude"
+    target_dir.mkdir()
+
     p = ProjectProfile(stack=["python"], scale="small", lifecycle="experiment")
     a = interview(p, autoloop_mode=True).model_copy(update={"targets": [Target.CURSOR]})
     bp = synthesize(p, a)
-    render(bp, tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
+    render(bp, target_dir, freeze_time=DEFAULT_FREEZE_TIME)
 
-    mdc_text = (tmp_path / ".cursor" / "rules" / "harness.mdc").read_text(encoding="utf-8")
+    mdc_text = (project_root / ".cursor" / "rules" / "harness.mdc").read_text(encoding="utf-8")
     assert "generated_by:" not in mdc_text
     assert "content_hash:" not in mdc_text
     assert "source_template:" not in mdc_text
@@ -287,10 +295,14 @@ def test_render_cursor_mdc_lacks_our_provenance_frontmatter(tmp_path: Path) -> N
 
 def test_render_claude_only_target_omits_cursor_directory(tmp_path: Path) -> None:
     """targets=[claude-code] (default): .cursor/ 디렉토리 자체가 만들어지지 않음."""
+    project_root = tmp_path
+    target_dir = project_root / ".claude"
+    target_dir.mkdir()
+
     p = ProjectProfile(stack=["python"], scale="small", lifecycle="experiment")
     a = interview(p, autoloop_mode=True)  # default [claude-code]
     bp = synthesize(p, a)
-    render(bp, tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
+    render(bp, target_dir, freeze_time=DEFAULT_FREEZE_TIME)
 
-    cursor_dir = tmp_path / ".cursor"
+    cursor_dir = project_root / ".cursor"
     assert not cursor_dir.exists()

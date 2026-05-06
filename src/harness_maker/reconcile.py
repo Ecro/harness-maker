@@ -21,6 +21,7 @@ import yaml
 
 from harness_maker.block_merge import ParseError, has_markers, parse_segments
 from harness_maker.models import Blueprint, ConflictItem, ReconcileDecision
+from harness_maker.render import resolve_output_path
 
 # Templates ship inside the package; reconcile peeks at the source to know
 # whether a fresh render will produce markers without re-rendering.
@@ -58,7 +59,7 @@ def reconcile(existing_dir: Path, blueprint: Blueprint) -> list[ConflictItem]:
     """Apply decision matrix per FileEntry vs existing file."""
     conflicts: list[ConflictItem] = []
     for fe in blueprint.files:
-        existing_path = existing_dir / fe.path
+        existing_path = resolve_output_path(existing_dir, fe.path)
         if not existing_path.exists():
             conflicts.append(
                 ConflictItem(path=fe.path, decision=ReconcileDecision.BOTH, reason="new-only"),
@@ -153,7 +154,14 @@ def _decide_user_modified(template_name: str, old_body: bytes) -> tuple[Reconcil
 
 
 def backup(existing_dir: Path) -> Path:
-    """Snapshot existing .claude/ to .backup-<ISO>/. Microsecond + counter avoids collision."""
+    """Snapshot existing harness state (``.claude/`` + ``.cursor/``) to
+    ``.backup-<ISO>/``. Microsecond + counter avoids collision.
+
+    Backup layout (Phase 2.4+): backup directory mirrors the project root,
+    holding both ``.claude/`` and ``.cursor/`` subtrees so cursor-target
+    assets are also restorable. Pre-Phase-2.4 backups have a flat layout
+    (``.backup-<ISO>/<files>``); manual restore needed in that case.
+    """
     iso = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
     candidate = existing_dir.parent / f".backup-{iso}"
     n = 0
@@ -161,5 +169,8 @@ def backup(existing_dir: Path) -> Path:
         n += 1
         candidate = existing_dir.parent / f".backup-{iso}-{n}"
     if existing_dir.exists():
-        shutil.copytree(existing_dir, candidate)
+        shutil.copytree(existing_dir, candidate / existing_dir.name)
+    cursor_dir = existing_dir.parent / ".cursor"
+    if cursor_dir.exists():
+        shutil.copytree(cursor_dir, candidate / ".cursor")
     return candidate

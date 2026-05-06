@@ -125,13 +125,32 @@ def test_parse_frontmatter_valid(tmp_path: Path) -> None:
 
 
 def test_backup_creates_dir(tmp_path: Path) -> None:
+    """Phase 2.4 backup layout: backup mirrors project root, holding
+    ``.claude/`` + ``.cursor/`` subtrees. Pre-2.4 callers did `bdir / 'f.txt'`;
+    new layout is `bdir / '.claude' / 'f.txt'`.
+    """
     src = tmp_path / ".claude"
     src.mkdir()
     (src / "f.txt").write_text("hi\n")
     bdir = backup(src)
     assert bdir.exists()
-    assert (bdir / "f.txt").read_text() == "hi\n"
+    assert (bdir / ".claude" / "f.txt").read_text() == "hi\n"
     assert bdir.name.startswith(".backup-")
+
+
+def test_backup_includes_cursor_directory(tmp_path: Path) -> None:
+    """Cursor target 자산 (`.cursor/`) 도 backup 안에 포함되어 restore 가능."""
+    claude_dir = tmp_path / ".claude"
+    claude_dir.mkdir()
+    (claude_dir / "f.txt").write_text("claude\n")
+    cursor_dir = tmp_path / ".cursor"
+    (cursor_dir / "rules").mkdir(parents=True)
+    (cursor_dir / "rules" / "harness.mdc").write_text("---\nalwaysApply: true\n---\n# x\n")
+
+    bdir = backup(claude_dir)
+
+    assert (bdir / ".claude" / "f.txt").read_text() == "claude\n"
+    assert (bdir / ".cursor" / "rules" / "harness.mdc").read_text().startswith("---\n")
 
 
 def test_backup_missing_dir_returns_path(tmp_path: Path) -> None:
@@ -139,3 +158,91 @@ def test_backup_missing_dir_returns_path(tmp_path: Path) -> None:
     bdir = backup(src)
     # backup_dir is computed but not created when src is missing
     assert bdir.name.startswith(".backup-")
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Cursor target reconcile — Phase 2.4
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def test_reconcile_cursor_first_render_returns_both(tmp_path: Path) -> None:
+    """첫 render — existing 없음 → BOTH (render + symlink). cursor 자산도 동일."""
+    from harness_maker.interview import interview
+    from harness_maker.models import ProjectProfile, Target
+    from harness_maker.synthesize import synthesize
+
+    p = ProjectProfile(stack=["python"], scale="small", lifecycle="experiment")
+    a = interview(p, autoloop_mode=True).model_copy(update={"targets": [Target.CURSOR]})
+    bp = synthesize(p, a)
+
+    project_root = tmp_path
+    target_dir = project_root / ".claude"
+    target_dir.mkdir()
+
+    conflicts = reconcile(target_dir, bp)
+    cursor_decisions = {
+        str(c.path): c.decision for c in conflicts if str(c.path).startswith(".cursor/")
+    }
+    assert cursor_decisions == {
+        ".cursor/rules/harness.mdc": ReconcileDecision.BOTH,
+        ".cursor/mcp.json": ReconcileDecision.BOTH,
+    }
+
+
+def test_reconcile_cursor_mdc_keeps_after_render(tmp_path: Path) -> None:
+    """첫 render 후 두 번째 reconcile: existing mdc 가 우리 content_hash 없음
+    (Cursor strict-reject 회피) → 'no-frontmatter' rule 자동 적용 → KEEP.
+
+    Trade-off: 사용자 수정 자동 보존 ✅, 우리 template 업데이트는 사용자가
+    수동 delete + re-render 필요. Phase 2.4+ 에서 sidecar 메타 도입 시 변경
+    가능.
+    """
+    from harness_maker.interview import interview
+    from harness_maker.models import ProjectProfile, Target
+    from harness_maker.render import DEFAULT_FREEZE_TIME, render
+    from harness_maker.synthesize import synthesize
+
+    p = ProjectProfile(stack=["python"], scale="small", lifecycle="experiment")
+    a = interview(p, autoloop_mode=True).model_copy(update={"targets": [Target.CURSOR]})
+
+    project_root = tmp_path
+    target_dir = project_root / ".claude"
+    target_dir.mkdir()
+
+    # 첫 render
+    bp = synthesize(p, a)
+    render(bp, target_dir, freeze_time=DEFAULT_FREEZE_TIME)
+
+    # 두 번째 reconcile
+    bp2 = synthesize(p, a)
+    conflicts = reconcile(target_dir, bp2)
+    mdc_conflicts = [c for c in conflicts if str(c.path) == ".cursor/rules/harness.mdc"]
+    assert len(mdc_conflicts) == 1
+    assert mdc_conflicts[0].decision == ReconcileDecision.KEEP
+    assert mdc_conflicts[0].reason == "no-frontmatter"
+
+
+def test_backup_after_full_render_preserves_cursor_user_modifications(tmp_path: Path) -> None:
+    """B13 — backup() 가 .cursor/ 의 사용자 수정도 보존."""
+    from harness_maker.interview import interview
+    from harness_maker.models import ProjectProfile, Target
+    from harness_maker.render import DEFAULT_FREEZE_TIME, render
+    from harness_maker.synthesize import synthesize
+
+    p = ProjectProfile(stack=["python"], scale="small", lifecycle="experiment")
+    a = interview(p, autoloop_mode=True).model_copy(update={"targets": [Target.CURSOR]})
+
+    project_root = tmp_path
+    target_dir = project_root / ".claude"
+    target_dir.mkdir()
+
+    bp = synthesize(p, a)
+    render(bp, target_dir, freeze_time=DEFAULT_FREEZE_TIME)
+
+    # 사용자 수정 시뮬레이션 (cursor mdc)
+    mdc = project_root / ".cursor" / "rules" / "harness.mdc"
+    mdc.write_text("# user override\n", encoding="utf-8")
+
+    bdir = backup(target_dir)
+    backup_mdc = bdir / ".cursor" / "rules" / "harness.mdc"
+    assert backup_mdc.read_text(encoding="utf-8") == "# user override\n"

@@ -131,7 +131,7 @@ def _render_settings_json(
     if not isinstance(new_data, dict):
         msg = f"Template {fe.template} must render a JSON object (got {type(new_data).__name__})"
         raise ValueError(msg)
-    out = target_dir / fe.path
+    out = resolve_output_path(target_dir, fe.path)
     merged = _shallow_merge_existing_json(out, new_data)
     body_bytes = _format_settings_json(merged)
     body_hash = hashlib.sha256(body_bytes).hexdigest()
@@ -191,6 +191,22 @@ def _is_hooks_json(fe: FileEntry) -> bool:
     return str(fe.path).endswith("hooks.json")
 
 
+def resolve_output_path(target_dir: Path, fe_path: Path) -> Path:
+    """Resolve where a FileEntry should be written/read.
+
+    `target_dir` 는 보통 `<project>/.claude` (CLI dispatch). 그러나 cursor
+    target 자산 (`.cursor/rules/*.mdc`, `.cursor/commands/*.md`,
+    `.cursor/mcp.json`) 은 `.claude/` 의 sibling 이라 `target_dir` 안에 박지
+    못함 → `target_dir.parent` 기준으로 resolve.
+
+    그 외 자산은 기존대로 ``target_dir / fe_path``. reconcile.py 도 동일
+    helper 사용 — 같은 path 에 read/write/backup 이 일관.
+    """
+    if str(fe_path).startswith(".cursor/"):
+        return target_dir.parent / fe_path
+    return target_dir / fe_path
+
+
 def _is_cursor_mdc(fe: FileEntry) -> bool:
     """Cursor rules — ``.cursor/rules/*.mdc``. Plain markdown + Cursor frontmatter
     (``description``, ``globs``, ``alwaysApply``). 우리 ``content_hash`` 등 메타는
@@ -241,7 +257,7 @@ def _render_pure_text(
     body_bytes = _normalize_body(rendered)
     body_hash = hashlib.sha256(body_bytes).hexdigest()
     fe.body_sha256 = body_hash
-    out = target_dir / fe.path
+    out = resolve_output_path(target_dir, fe.path)
     if not dry_run:
         atomic_write(out, body_bytes)
     return out
@@ -286,7 +302,7 @@ def _render_pure_json(
     body_bytes = _format_settings_json(data)
     body_hash = hashlib.sha256(body_bytes).hexdigest()
     fe.body_sha256 = body_hash
-    out = target_dir / fe.path
+    out = resolve_output_path(target_dir, fe.path)
     if not dry_run:
         atomic_write(out, body_bytes)
     return out
@@ -344,7 +360,7 @@ def _render_text_file(
     # If template authored its own frontmatter (e.g. SubAgent name/description/tools/model),
     # merge it into the single provenance frontmatter so Claude Code's loaders see one block.
     template_fm, body_text = _split_template_frontmatter(rendered)
-    out = target_dir / fe.path
+    out = resolve_output_path(target_dir, fe.path)
     # Block-merge: caller signals "this file is mergeable" by passing a
     # non-None merge_reports dict. We splice OLD user blocks into NEW before
     # hashing. Parse failures fall through to plain REPLACE.

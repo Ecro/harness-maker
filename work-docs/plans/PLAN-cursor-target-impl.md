@@ -101,15 +101,35 @@ Phase 1 fixture + manual checklist 작성 완료, 검증은 사용자 IDE 에서
 ### Phase 2.4 — Reconcile 확장
 
 **Files**:
-- `src/harness_maker/reconcile.py` — `.cursor/` 디렉토리도 enumerate (기존 `.claude/` 만 처리)
-- `src/harness_maker/reconcile.py` — `.mdc` 파일은 frontmatter 가지므로 기존 hash 패턴 적용 가능 → KEEP/REPLACE/MERGE_BLOCK 정상 작동
-- `src/harness_maker/reconcile.py` — `backup()` 가 `.cursor/` 도 포함 (디렉토리 리스트 확장)
-- `tests/integration/test_reconcile_cursor.py` (신규) — `.cursor/` enumerate, backup, KEEP/REPLACE 결정 (B13)
+- `src/harness_maker/render.py` — `resolve_output_path(target_dir, fe_path)` helper 신규
+  (구현 중 발견된 critical bug fix: CLI 가 target_dir = `.claude/` 로 호출하는데
+  cursor 자산은 그 sibling 위치라 기존 `target_dir / fe.path` 가 `.claude/.cursor/...`
+  로 잘못된 경로 만듦)
+- `src/harness_maker/render.py` — 4 callers 갱신 (`out = target_dir / fe.path` →
+  `out = resolve_output_path(target_dir, fe.path)`)
+- `src/harness_maker/reconcile.py` — `resolve_output_path` import 후 동일 helper 사용
+  (`existing_path = resolve_output_path(existing_dir, fe.path)`)
+- `src/harness_maker/reconcile.py` — `backup()` layout 변경: backup directory 가
+  project root 의 mirror (`<bdir>/.claude/<files>` + `<bdir>/.cursor/<files>`).
+  Pre-2.4 layout (flat `<bdir>/<files>`) 은 manual restore 필요 — README 명시.
+- `tests/unit/test_reconcile.py` — cursor section 추가 (3 tests: first-render-BOTH /
+  second-render-KEEP / backup-cursor-modifications) + backup test 갱신 (`bdir / '.claude' / 'f.txt'`).
+  integration 디렉토리 미존재로 unit 으로 통합.
+- `tests/unit/test_render.py` — cursor test 3개 갱신 (`target_dir = tmp_path` →
+  `target_dir = tmp_path / '.claude'` 의 실제 CLI 패턴)
 
 **Acceptance**:
-- 옛 `.claude/` + 신규 `.cursor/` reconcile 시 두 디렉토리 모두 backup
-- `.mdc` hash mismatch 시 KEEP (사용자 추가 보존)
-- B13 자동화 테스트 PASS — Phase 1 acceptance 의 deferred 항목 closed
+- ✅ 옛 `.claude/` + 신규 `.cursor/` reconcile 시 두 디렉토리 모두 backup
+  (`test_backup_includes_cursor_directory`, `test_backup_after_full_render_preserves_cursor_user_modifications`)
+- ✅ `.mdc` 가 우리 `content_hash` 메타 박지 않으므로 (Cursor strict-reject 회피)
+  reconcile 의 'no-frontmatter' rule 자동 KEEP. 사용자 수정 보존 ✅; 우리
+  template update 는 사용자가 수동 delete + re-render 필요 — README 명시 +
+  Phase 2.4+ 에 sidecar 메타 (`.hm-meta.yaml`) 도입 시 변경 가능
+  (`test_reconcile_cursor_mdc_keeps_after_render`)
+- ✅ B13 자동화 테스트 PASS — Phase 1 acceptance 의 deferred 항목 closed
+  (`test_reconcile_cursor_first_render_returns_both`)
+- ✅ Path resolution critical bug fix (CLI 가 `.claude/` 를 target_dir 로 호출 시
+  cursor 자산이 정확한 경로에 박힘)
 
 ---
 
