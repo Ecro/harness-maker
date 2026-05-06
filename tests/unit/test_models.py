@@ -20,6 +20,7 @@ from harness_maker.models import (
     Preset,
     ProjectProfile,
     ReconcileDecision,
+    Target,
     WorkflowDef,
 )
 
@@ -48,6 +49,12 @@ def test_preset_members() -> None:
 
 def test_model_tier_members() -> None:
     assert {m.value for m in ModelTier} == {"opus", "sonnet", "haiku"}
+
+
+def test_target_members() -> None:
+    assert Target.CLAUDE_CODE.value == "claude-code"
+    assert Target.CURSOR.value == "cursor"
+    assert {m.value for m in Target} == {"claude-code", "cursor"}
 
 
 def test_atomic_stage_members() -> None:
@@ -107,6 +114,54 @@ def test_harness_config_round_trip_json() -> None:
 def test_harness_config_extra_forbidden() -> None:
     with pytest.raises(ValidationError):
         HarnessConfig.model_validate({"unknown_field": 1})
+
+
+def test_harness_config_targets_default() -> None:
+    """Default = [claude-code] (옛 yaml fallback 보호용 default factory)."""
+    cfg = HarnessConfig()
+    assert cfg.targets == [Target.CLAUDE_CODE]
+
+
+def test_harness_config_targets_multi_select() -> None:
+    cfg = HarnessConfig(targets=[Target.CLAUDE_CODE, Target.CURSOR])
+    assert cfg.targets == [Target.CLAUDE_CODE, Target.CURSOR]
+
+
+def test_harness_config_targets_cursor_only() -> None:
+    cfg = HarnessConfig(targets=[Target.CURSOR])
+    assert cfg.targets == [Target.CURSOR]
+
+
+def test_harness_config_targets_empty_raises() -> None:
+    """빈 list 는 min_length=1 으로 거부 — 인터뷰가 명시 multi-select 강제."""
+    with pytest.raises(ValidationError):
+        HarnessConfig(targets=[])
+
+
+def test_harness_config_targets_invalid_value_raises() -> None:
+    with pytest.raises(ValidationError):
+        HarnessConfig.model_validate({"targets": ["not-a-real-target"]})
+
+
+def test_harness_config_recommended_model_default() -> None:
+    """CLAUDE.md § Targets 정책: Cursor user 도 Anthropic 모델 권장."""
+    cfg = HarnessConfig()
+    assert cfg.recommended_model == "claude-opus-4-7"
+
+
+def test_harness_config_recommended_model_override() -> None:
+    cfg = HarnessConfig(recommended_model="claude-sonnet-4-6")
+    assert cfg.recommended_model == "claude-sonnet-4-6"
+
+
+def test_harness_config_targets_schema_gap_fallback() -> None:
+    """옛 yaml (``targets`` 키 없음) load 시 default_factory 가 [claude-code] 보호.
+
+    Warning log 는 yaml-aware loader (interview.py / synthesize.py) 책임 —
+    Phase 2.1 이후. 본 test 는 model 단의 default 박힘만 확인.
+    """
+    cfg = HarnessConfig.model_validate({"locale": "en"})
+    assert cfg.targets == [Target.CLAUDE_CODE]
 
 
 # ──────────────────────────────────────────────────────────────────────────────

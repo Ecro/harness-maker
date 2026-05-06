@@ -42,9 +42,9 @@ Phase 1 fixture + manual checklist 작성 완료, 검증은 사용자 IDE 에서
 
 **Acceptance**:
 - `HarnessConfig(targets=[Target.CLAUDE_CODE])`, `[Target.CURSOR]`, `[Target.CLAUDE_CODE, Target.CURSOR]` 모두 valid
-- `HarnessConfig(targets=[])` ValidationError
-- 옛 yaml fixture (`tests/cursor-compat/fixture/.claude/harness.yaml`) load → `[Target.CLAUDE_CODE]` + 경고 로그
-- 단위 테스트 green
+- `HarnessConfig(targets=[])` ValidationError (`min_length=1`)
+- 옛 yaml fixture (`tests/cursor-compat/fixture/.claude/harness.yaml`) load → `default_factory` 가 `[Target.CLAUDE_CODE]` 박음. **경고 로그는 Phase 2.1 의 yaml-aware loader 책임으로 이전** — model 단은 default_factory 만으로 처리 (Pydantic `mode="before"` validator 가 default 호출에서도 fire 하는 동작 회피, 구현 중 발견)
+- 단위 테스트 green (회귀 0)
 
 ---
 
@@ -59,6 +59,7 @@ Phase 1 fixture + manual checklist 작성 완료, 검증은 사용자 IDE 에서
 - 인터뷰 순서: `locale → targets → preset → dev_mode → workflow → consensus → caching`
 - 빈 targets 답변 시 재질문 (또는 default 거부)
 - 옛 yaml + 재 인터뷰 시 targets 답변 silent 재사용 (B12)
+- `answers_from_harness_yaml` 또는 yaml loader wrapper 가 옛 yaml (`targets` 키 부재) 검출 시 `[claude-code]` fallback **+ 경고 로그** (Phase 2.0 에서 이전된 책임)
 
 ---
 

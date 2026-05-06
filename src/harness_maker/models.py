@@ -51,6 +51,19 @@ class ModelTier(str, Enum):  # noqa: UP042
     HAIKU = "haiku"
 
 
+class Target(str, Enum):  # noqa: UP042
+    """IDE target — which IDE(s) the rendered harness must work in.
+
+    Drives whether ``.cursor/rules/``, ``.cursor/commands/``, ``.cursor/mcp.json``
+    are rendered alongside the shared ``.claude/`` assets. preset/dev_mode 와
+    직교; 인터뷰에서 명시 multi-select 강제. 옛 yaml fallback 은
+    ``HarnessConfig._targets_schema_gap_fallback`` validator 가 처리.
+    """
+
+    CLAUDE_CODE = "claude-code"
+    CURSOR = "cursor"
+
+
 class AtomicStage(str, Enum):  # noqa: UP042
     """Seven atomic stages composable into named workflows."""
 
@@ -199,6 +212,17 @@ class HarnessConfig(BaseModel):
     # Free-text locale tag. en/ko ship with built-in i18n catalogs; unknown
     # tags fall back to English in i18n.t().
     locale: str = "en"
+    # IDE target multi-select. 새 인터뷰는 명시 multi-select 강제 (interview.py).
+    # 옛 yaml load 시 _targets_schema_gap_fallback validator 가 [claude-code]
+    # 로 fallback + 경고 로그. 빈 list 직접 입력은 min_length=1 이 거부.
+    targets: list[Target] = Field(
+        default_factory=lambda: [Target.CLAUDE_CODE],
+        min_length=1,
+    )
+    # Cursor 사용자에게 권장 모델 — agent frontmatter `model` 에 박힘. user
+    # override 자유. prompt 자체는 model-agnostic 재작성 안 함
+    # (CLAUDE.md § Targets 정책).
+    recommended_model: str = "claude-opus-4-7"
     preset: Preset = Preset.SIDE
     dev_mode: DevMode = DevMode.SPEC_DRIVEN
     workflows: dict[str, list[AtomicStage]] = Field(
