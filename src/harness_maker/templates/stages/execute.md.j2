@@ -37,6 +37,54 @@ Before starting, load memory in tier order:
 
 ## Procedure
 
+### 0. Worktree isolation (deterministic — do NOT rely on skill auto-discovery)
+
+Before any code edits, engage isolation if `harness.yaml.worktree.scope`
+includes `execute`. The `worktree-isolator` skill is documentation only —
+its trigger-based dispatch is probabilistic in Cursor IDE and can silently
+skip, leaving safety-critical edits on the main branch. **Invoke the
+worktree CLI directly** so isolation is deterministic across both IDEs.
+
+Run the create command:
+
+```bash
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree create execute "$(pwd)"
+```
+
+Read the **single line** the command prints — that is the contract for
+the rest of this stage. Two cases:
+
+- **Absolute path** like `/path/to/project/.worktrees/execute-20260506T1830Z`
+  → isolation engaged. **Treat that exact string as `<WT>` for the rest
+  of this stage.** You (Claude) MUST substitute the literal absolute
+  path everywhere `<WT>` appears below — **do NOT use a shell variable**:
+  each `!` block is a fresh subshell, so any `worktree_path=...`
+  assignment is lost between blocks.
+  - Every Read/Write/Edit call uses absolute paths starting with `<WT>/`.
+  - Tests / lints / type checks: `!cd <WT> && <cmd>`.
+- **Empty output** → `worktree.scope` does not include `execute`. No
+  isolation; operate in `cwd`. Skip the finalize step at the end.
+
+### Stage exit (after the TDD machine below completes)
+
+Pick **exactly one** finalize command based on the outcome. Substitute
+`<WT>` with the literal absolute path you read in step 0.
+
+```bash
+# All phases GREEN + verification clean — squash-merge the branch back + cleanup:
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree finalize <WT> success
+```
+
+```bash
+# Stage halted on a blocker — preserve the worktree for inspection:
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree finalize <WT> fail
+```
+
+If step 0 printed empty (no isolation engaged), skip both — there is
+nothing to finalize.
+
+### TDD machine (the actual stage work)
+
 1. Confirm preconditions:
    - Working tree clean (or changes are intentional WIP)
    - PLAN's exit criteria for prior phases are met

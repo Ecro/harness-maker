@@ -308,6 +308,116 @@ def test_render_claude_only_target_omits_cursor_directory(tmp_path: Path) -> Non
     assert not cursor_dir.exists()
 
 
+def test_render_cursor_hooks_json_camelcase_with_path_wrap(tmp_path: Path) -> None:
+    """Cursor IDE 가 .claude/hooks/hooks.json 을 안 읽으므로 cursor target 일 때
+    .cursor/hooks.json 을 별도 렌더 (PLAN-cursor-rootcause.md R1.A).
+
+    필수 보장:
+    - `version: 1` (Cursor 스키마)
+    - 이벤트 키 camelCase: preToolUse / postToolUse / preCompact (PascalCase X)
+    - 각 command 가 PATH wrap 으로 시작 — Cursor spawn shell 의 PATH 미보장 방어
+    - frontmatter 없음 (pure JSON)
+    """
+    from harness_maker.models import Target
+
+    project_root = tmp_path
+    target_dir = project_root / ".claude"
+    target_dir.mkdir()
+
+    p = ProjectProfile(stack=["python"], scale="small", lifecycle="experiment")
+    a = interview(p, autoloop_mode=True).model_copy(update={"targets": [Target.CURSOR]})
+    bp = synthesize(p, a)
+    render(bp, target_dir, freeze_time=DEFAULT_FREEZE_TIME)
+
+    cursor_hooks = project_root / ".cursor" / "hooks.json"
+    assert cursor_hooks.exists()
+
+    text = cursor_hooks.read_text(encoding="utf-8")
+    # pure JSON — no provenance frontmatter
+    assert not text.startswith("---")
+    import json as _json
+
+    parsed = _json.loads(text)
+    assert parsed["version"] == 1
+
+    hooks = parsed["hooks"]
+    assert "preToolUse" in hooks
+    assert "postToolUse" in hooks
+    assert "preCompact" in hooks
+    # PascalCase must NOT appear — silent ignore in Cursor would produce no fire
+    assert "PreToolUse" not in hooks
+    assert "PostToolUse" not in hooks
+    assert "PreCompact" not in hooks
+
+    # Every hook command must defensively prepend the user-local PATH so
+    # `uv` resolves even when Cursor spawns the subprocess from a shell
+    # without ~/.local/bin in PATH.
+    all_commands = [
+        h["command"]
+        for event_hooks in hooks.values()
+        for h in event_hooks
+    ]
+    assert all_commands  # at least one
+    for cmd in all_commands:
+        assert cmd.startswith('PATH="$HOME/.local/bin:$PATH"'), cmd
+
+
+def test_render_cursor_hooks_json_omits_spec_gate_when_task_driven(
+    tmp_path: Path,
+) -> None:
+    """dev_mode=task-driven 이면 .cursor/hooks.json 의 preToolUse 에는 spec_gate
+    가 포함되지 않음 (.claude/hooks/hooks.json 과 동일 규칙)."""
+    from harness_maker.models import DevMode, Target
+
+    project_root = tmp_path
+    target_dir = project_root / ".claude"
+    target_dir.mkdir()
+
+    p = ProjectProfile(stack=["python"], scale="small", lifecycle="experiment")
+    a = interview(p, autoloop_mode=True).model_copy(
+        update={"targets": [Target.CURSOR], "dev_mode": DevMode.TASK_DRIVEN},
+    )
+    bp = synthesize(p, a)
+    render(bp, target_dir, freeze_time=DEFAULT_FREEZE_TIME)
+
+    text = (project_root / ".cursor" / "hooks.json").read_text(encoding="utf-8")
+    assert "spec_gate" not in text
+    assert "permission_gate" in text  # always-on
+
+
+def test_render_cursor_hooks_json_includes_spec_gate_when_spec_driven(
+    tmp_path: Path,
+) -> None:
+    """Symmetric to the task-driven test: dev_mode=spec-driven includes the
+    Write|Edit spec_gate matcher in the cursor preToolUse list. Both gates
+    receive the PATH wrap from the template."""
+    import json as _json
+
+    from harness_maker.models import DevMode, Target
+
+    project_root = tmp_path
+    target_dir = project_root / ".claude"
+    target_dir.mkdir()
+
+    p = ProjectProfile(stack=["python"], scale="small", lifecycle="experiment")
+    a = interview(p, autoloop_mode=True).model_copy(
+        update={"targets": [Target.CURSOR], "dev_mode": DevMode.SPEC_DRIVEN},
+    )
+    bp = synthesize(p, a)
+    render(bp, target_dir, freeze_time=DEFAULT_FREEZE_TIME)
+
+    parsed = _json.loads(
+        (project_root / ".cursor" / "hooks.json").read_text(encoding="utf-8"),
+    )
+    pre_tool_use = parsed["hooks"]["preToolUse"]
+    assert len(pre_tool_use) == 2  # Bash + Write|Edit
+    matchers = {h["matcher"] for h in pre_tool_use}
+    assert matchers == {"Bash", "Write|Edit"}
+    spec_gate_hook = next(h for h in pre_tool_use if h["matcher"] == "Write|Edit")
+    assert "spec_gate" in spec_gate_hook["command"]
+    assert spec_gate_hook["command"].startswith('PATH="$HOME/.local/bin:$PATH"')
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Cursor target snapshot determinism — Phase 2.7
 # ──────────────────────────────────────────────────────────────────────────────

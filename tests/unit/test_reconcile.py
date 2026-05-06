@@ -185,17 +185,18 @@ def test_reconcile_cursor_first_render_returns_both(tmp_path: Path) -> None:
     }
     assert cursor_decisions == {
         ".cursor/rules/harness.mdc": ReconcileDecision.BOTH,
+        ".cursor/hooks.json": ReconcileDecision.BOTH,
         ".cursor/mcp.json": ReconcileDecision.BOTH,
     }
 
 
 def test_reconcile_cursor_mdc_keeps_after_render(tmp_path: Path) -> None:
-    """첫 render 후 두 번째 reconcile: existing mdc 가 우리 content_hash 없음
-    (Cursor strict-reject 회피) → 'no-frontmatter' rule 자동 적용 → KEEP.
+    """첫 render 후 두 번째 reconcile: existing mdc 가 Cursor frontmatter
+    (description/globs/alwaysApply) 만 있고 우리 generated_by/content_hash
+    없음 (Cursor strict-reject 회피) → KEEP.
 
     Trade-off: 사용자 수정 자동 보존 ✅, 우리 template 업데이트는 사용자가
-    수동 delete + re-render 필요. Phase 2.4+ 에서 sidecar 메타 도입 시 변경
-    가능.
+    수동 delete + re-render 필요. sidecar 메타 도입 시 변경 가능.
     """
     from harness_maker.interview import interview
     from harness_maker.models import ProjectProfile, Target
@@ -219,7 +220,109 @@ def test_reconcile_cursor_mdc_keeps_after_render(tmp_path: Path) -> None:
     mdc_conflicts = [c for c in conflicts if str(c.path) == ".cursor/rules/harness.mdc"]
     assert len(mdc_conflicts) == 1
     assert mdc_conflicts[0].decision == ReconcileDecision.KEEP
-    assert mdc_conflicts[0].reason == "no-frontmatter"
+    # Cursor frontmatter (description/globs/alwaysApply) is present; absence
+    # of generated_by routes through the new "frontmatter-no-hash-not-ours"
+    # branch so user mdc edits are preserved.
+    assert mdc_conflicts[0].reason == "frontmatter-no-hash-not-ours"
+
+
+def test_reconcile_legacy_ours_no_hash_returns_replace(tmp_path: Path) -> None:
+    """Legacy ours: pre-content_hash version (e.g. v0.4.7 memory templates)
+    has generated_by but no content_hash → REPLACE so version bumps land.
+
+    Real-world reproducer: ~/kairos memory/wiki.md stuck on v0.4.7 with
+    'Side preset' header even after upgrading the harness to Production.
+    """
+    from harness_maker.models import Blueprint, FileEntry
+
+    target = tmp_path / ".claude"
+    target.mkdir()
+    (target / "memory").mkdir()
+    (target / "memory" / "wiki.md").write_text(
+        "---\n"
+        "generated_by: harness-maker\n"
+        "harness_maker_version: 0.4.7\n"
+        "source_template: memory/wiki.ko.md.j2\n"
+        "---\n"
+        "# Wiki — Side preset\n"
+        "(아직 기록된 항목 없음)\n",
+        encoding="utf-8",
+    )
+    bp = Blueprint(
+        files=[
+            FileEntry(
+                path=Path("memory/wiki.md"),
+                template="memory/wiki.ko.md.j2",
+                context={},
+                frontmatter={},
+            ),
+        ],
+    )
+    conflicts = reconcile(target, bp)
+    assert len(conflicts) == 1
+    assert conflicts[0].decision == ReconcileDecision.REPLACE
+    assert conflicts[0].reason == "legacy-no-hash-but-ours"
+
+
+def test_reconcile_cursor_hooks_json_always_replaces(tmp_path: Path) -> None:
+    """`.cursor/hooks.json` is pure JSON (no frontmatter possible — Cursor's
+    parser is strict). Always REPLACE so template updates land, mirroring
+    `.claude/hooks/hooks.json` policy. User edits are overwritten by design.
+    """
+    from harness_maker.models import Blueprint, FileEntry
+
+    target = tmp_path / ".claude"
+    target.mkdir()
+    cursor_dir = tmp_path / ".cursor"
+    cursor_dir.mkdir()
+    (cursor_dir / "hooks.json").write_text(
+        '{"version": 1, "hooks": {"preToolUse": [{"command": "user-edit"}]}}\n',
+        encoding="utf-8",
+    )
+    bp = Blueprint(
+        files=[
+            FileEntry(
+                path=Path(".cursor/hooks.json"),
+                template="cursor/hooks.json.j2",
+                context={},
+                frontmatter={},
+            ),
+        ],
+    )
+    conflicts = reconcile(target, bp)
+    assert len(conflicts) == 1
+    assert conflicts[0].decision == ReconcileDecision.REPLACE
+    assert conflicts[0].reason == "pure-json-no-frontmatter"
+
+
+def test_reconcile_user_frontmatter_no_hash_returns_keep(tmp_path: Path) -> None:
+    """User-authored file with arbitrary frontmatter (no generated_by) →
+    KEEP. Mirror of the .cursor/rules/*.mdc case but for an arbitrary
+    user file: never silently overwrite something we didn't generate.
+    """
+    from harness_maker.models import Blueprint, FileEntry
+
+    target = tmp_path / ".claude"
+    target.mkdir()
+    (target / "agents").mkdir()
+    (target / "agents" / "user-agent.md").write_text(
+        "---\nname: user-agent\nfoo: bar\n---\n# my agent\n",
+        encoding="utf-8",
+    )
+    bp = Blueprint(
+        files=[
+            FileEntry(
+                path=Path("agents/user-agent.md"),
+                template="agents/code-reviewer.md.j2",  # any template
+                context={},
+                frontmatter={},
+            ),
+        ],
+    )
+    conflicts = reconcile(target, bp)
+    assert len(conflicts) == 1
+    assert conflicts[0].decision == ReconcileDecision.KEEP
+    assert conflicts[0].reason == "frontmatter-no-hash-not-ours"
 
 
 def test_backup_after_full_render_preserves_cursor_user_modifications(tmp_path: Path) -> None:

@@ -20,8 +20,11 @@ Conventions
 from __future__ import annotations
 
 import subprocess
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
+
+import yaml
 
 WORKTREE_DIR_NAME = ".worktrees"
 _TS_FMT = "%Y%m%dT%H%MZ"
@@ -69,14 +72,36 @@ def create(workflow: str, base_dir: Path) -> Path:
     Returns
     -------
     Path to the newly created worktree.
+
+    Notes
+    -----
+    Timestamps are minute-precision so two ``create()`` calls within the same
+    minute (realistic for autoloop / fused workflows) would collide on branch
+    name. We retry with ``-1``, ``-2``, ... suffixes up to 100 times before
+    giving up; collisions clear once the minute rolls over.
     """
     base = base_dir.resolve()
-    name = f"{workflow}-{_timestamp()}"
-    wt_path = base / WORKTREE_DIR_NAME / name
-    wt_path.parent.mkdir(parents=True, exist_ok=True)
-    # Create a new branch tracking the current HEAD inside the worktree.
-    _run(["git", "worktree", "add", "-b", name, str(wt_path)], cwd=base)
-    return wt_path
+    base_name = f"{workflow}-{_timestamp()}"
+    (base / WORKTREE_DIR_NAME).mkdir(parents=True, exist_ok=True)
+    last_err: RuntimeError | None = None
+    for attempt in range(100):
+        name = base_name if attempt == 0 else f"{base_name}-{attempt}"
+        wt_path = base / WORKTREE_DIR_NAME / name
+        if wt_path.exists():
+            continue
+        try:
+            _run(["git", "worktree", "add", "-b", name, str(wt_path)], cwd=base)
+        except RuntimeError as e:
+            # Likely "branch already exists" or "path already exists" — retry
+            # with the next suffix. Capture for final failure if all suffixes
+            # also collide (extremely unlikely; >100 calls in one minute).
+            last_err = e
+            continue
+        return wt_path
+    raise RuntimeError(
+        f"git worktree add failed after 100 retries with prefix {base_name!r}; "
+        f"last error: {last_err}",
+    )
 
 
 def cleanup(wt_path: Path, on_success: bool) -> None:
@@ -166,3 +191,110 @@ def cleanup_all(base_dir: Path, force: bool = False) -> int:
             # the autoloop blocker recovery path.
             continue
     return removed
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# CLI entry — invoked by slash commands as `python -m harness_maker.worktree`
+# so /hm:execute can engage isolation deterministically (PLAN-cursor-rootcause
+# R2: stop relying on Cursor skill auto-discovery for safety-critical ops).
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def _scope_includes(harness_yaml: Path, stage: str) -> bool:
+    """Read harness.yaml; return True iff worktree.scope includes the stage."""
+    try:
+        text = harness_yaml.read_text(encoding="utf-8")
+    except OSError:
+        return False
+    try:
+        for doc in yaml.safe_load_all(text):
+            if not isinstance(doc, dict):
+                continue
+            wt = doc.get("worktree")
+            if not isinstance(wt, dict):
+                continue
+            scope = wt.get("scope")
+            if isinstance(scope, list) and stage in scope:
+                return True
+    except yaml.YAMLError:
+        return False
+    return False
+
+
+def _cli_create(args: list[str]) -> int:
+    """`python -m harness_maker.worktree create <stage> <base_dir>` — print path or skip.
+
+    Empty stdout (with exit 0) signals "scope check off, run in place" — the
+    slash command treats an empty `worktree_path` as "no isolation needed".
+    """
+    if len(args) != 2:
+        print("usage: create <stage> <base_dir>", file=sys.stderr)
+        return 2
+    stage, base_str = args
+    base = Path(base_str).resolve()
+    yaml_path = base / ".claude" / "harness.yaml"
+    if not _scope_includes(yaml_path, stage):
+        print("")
+        return 0
+    wt_path = create(stage, base)
+    print(str(wt_path))
+    return 0
+
+
+def _cli_finalize(args: list[str]) -> int:
+    """`python -m harness_maker.worktree finalize <wt_path> <success|fail> [strategy]`.
+
+    On success: merge back (default strategy: squash) + cleanup with --force.
+    On fail: skip merge; cleanup non-force (preserves dirty worktree for inspection).
+    Missing `<wt_path>` is a no-op exit 0 — slash commands wire `finalize`
+    unconditionally, and an empty worktree_path means scope check was off.
+
+    Both merge and cleanup failures are caught and surfaced via stderr +
+    return 1 so we never crash with a bare traceback (e.g., a locked file
+    on Windows blocking ``git worktree remove --force``). The slash command
+    treats exit 1 as "finalize had an issue, evidence preserved" rather
+    than letting the harness break.
+    """
+    if len(args) < 2 or len(args) > 3:
+        print("usage: finalize <wt_path> <success|fail> [strategy]", file=sys.stderr)
+        return 2
+    wt_str, status = args[0], args[1]
+    strategy = args[2] if len(args) == 3 else "squash"
+    if status not in {"success", "fail"}:
+        print("status must be 'success' or 'fail'", file=sys.stderr)
+        return 2
+    wt = Path(wt_str)
+    if not wt.is_dir():
+        return 0
+    on_success = status == "success"
+    if on_success:
+        try:
+            merge(wt, strategy=strategy)
+        except RuntimeError as e:
+            print(f"merge failed, preserving worktree: {e}", file=sys.stderr)
+            return 1
+    try:
+        cleanup(wt, on_success=on_success)
+    except RuntimeError as e:
+        print(f"cleanup failed, worktree preserved at {wt}: {e}", file=sys.stderr)
+        return 1
+    return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Dispatch worktree subcommand from argv."""
+    args = list(sys.argv[1:] if argv is None else argv)
+    if not args:
+        print("usage: python -m harness_maker.worktree <create|finalize> [...]", file=sys.stderr)
+        return 2
+    sub, rest = args[0], args[1:]
+    if sub == "create":
+        return _cli_create(rest)
+    if sub == "finalize":
+        return _cli_finalize(rest)
+    print(f"unknown subcommand: {sub}", file=sys.stderr)
+    return 2
+
+
+if __name__ == "__main__":  # pragma: no cover — exercised via subprocess
+    sys.exit(main())

@@ -2,7 +2,11 @@
 
 Decision matrix:
 - new-only (no existing file)                                → BOTH
-- existing has no frontmatter / no hash                      → KEEP (user file)
+- existing has no frontmatter at all                         → KEEP (user file)
+- existing has frontmatter but no content_hash AND
+  generated_by == "harness-maker"                            → REPLACE (legacy ours,
+                                                                pre-content_hash era)
+- existing has frontmatter but no content_hash, not ours     → KEEP (user file w/ fm)
 - existing hash matches our recompute                        → REPLACE (safe overwrite)
 - existing hash mismatches AND both OLD/NEW have markers     → MERGE_BLOCK (3-way)
 - existing hash mismatches otherwise                         → KEEP (legacy fallback)
@@ -78,8 +82,11 @@ def reconcile(existing_dir: Path, blueprint: Blueprint) -> list[ConflictItem]:
             )
             continue
         # hooks.json is pure JSON (no frontmatter). Always REPLACE so template
-        # updates (e.g., new hook commands) propagate on re-render.
-        if fe.path == Path("hooks/hooks.json"):
+        # updates (e.g., new hook commands) propagate on re-render. Same rule
+        # for the Cursor hooks file at .cursor/hooks.json — Cursor reads only
+        # this path (PLAN-cursor-rootcause.md R1.A) and its parser is strict
+        # about JSON-only.
+        if fe.path == Path("hooks/hooks.json") or fe.path == Path(".cursor/hooks.json"):
             conflicts.append(
                 ConflictItem(
                     path=fe.path,
@@ -101,7 +108,7 @@ def reconcile(existing_dir: Path, blueprint: Blueprint) -> list[ConflictItem]:
             )
             continue
         fm, body = parse_frontmatter(existing_path)
-        if fm is None or "content_hash" not in fm:
+        if fm is None:
             conflicts.append(
                 ConflictItem(
                     path=fe.path,
@@ -109,6 +116,29 @@ def reconcile(existing_dir: Path, blueprint: Blueprint) -> list[ConflictItem]:
                     reason="no-frontmatter",
                 ),
             )
+            continue
+        if "content_hash" not in fm:
+            # Legacy ours: pre-content_hash era (e.g. v0.4.7 memory templates)
+            # left a `generated_by` marker but no hash. Without backfill these
+            # files KEEP forever despite the user never editing them. Detect
+            # via the generated_by stamp; backup() (called by the CLI before
+            # render) preserves the legacy file under .backup-<ts>/.
+            if fm.get("generated_by") == "harness-maker":
+                conflicts.append(
+                    ConflictItem(
+                        path=fe.path,
+                        decision=ReconcileDecision.REPLACE,
+                        reason="legacy-no-hash-but-ours",
+                    ),
+                )
+            else:
+                conflicts.append(
+                    ConflictItem(
+                        path=fe.path,
+                        decision=ReconcileDecision.KEEP,
+                        reason="frontmatter-no-hash-not-ours",
+                    ),
+                )
             continue
         existing_hash = fm.get("content_hash")
         recomputed = compute_body_hash(body)

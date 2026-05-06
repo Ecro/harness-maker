@@ -69,3 +69,49 @@ def test_empty_stdin_writes_default_entry(
     assert metrics.is_file()
     entry = json.loads(metrics.read_text().strip())
     assert entry["input_tokens"] == 0
+
+
+def test_cwd_falls_back_to_claude_project_dir_env(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """When stdin lacks workspace.current_dir / cwd, CLAUDE_PROJECT_DIR
+    env var (Cursor compat alias) wins over `os.getcwd()`. Without this,
+    Cursor-spawned hooks may write to the wrong directory."""
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_path))
+    monkeypatch.delenv("CURSOR_PROJECT_DIR", raising=False)
+    monkeypatch.chdir("/")  # ensure cwd is NOT tmp_path
+    rc = _run_main_with_stdin(monkeypatch, "{}")
+    assert rc == 0
+    assert (tmp_path / ".claude" / "observability" / "metrics.jsonl").is_file()
+
+
+def test_cwd_falls_back_to_cursor_project_dir_env(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """CURSOR_PROJECT_DIR is the native Cursor env var; used when the
+    stdin payload doesn't carry the cwd hint."""
+    monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
+    monkeypatch.setenv("CURSOR_PROJECT_DIR", str(tmp_path))
+    monkeypatch.chdir("/")
+    rc = _run_main_with_stdin(monkeypatch, "{}")
+    assert rc == 0
+    assert (tmp_path / ".claude" / "observability" / "metrics.jsonl").is_file()
+
+
+def test_empty_env_vars_fall_through_to_getcwd(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`CLAUDE_PROJECT_DIR=""` (empty string) is falsy → falls through to
+    next fallback rather than writing to `/.claude/...`. Critical for
+    not corrupting filesystem root when an env var is set but empty."""
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", "")
+    monkeypatch.setenv("CURSOR_PROJECT_DIR", "")
+    monkeypatch.chdir(tmp_path)
+    rc = _run_main_with_stdin(monkeypatch, "{}")
+    assert rc == 0
+    # Should land in tmp_path (via os.getcwd), NOT at root
+    assert (tmp_path / ".claude" / "observability" / "metrics.jsonl").is_file()
+    assert not Path("/.claude").exists()

@@ -92,6 +92,9 @@ def _atomic_command_files() -> list[FileSpec]:
             project_name="",
             feature="",
             config=default_config,
+            # stages/execute.md.j2 calls `python -m harness_maker.worktree`
+            # via this absolute path baked into the rendered slash command.
+            harness_maker_src_path=_HARNESS_MAKER_PKG_ROOT,
         )
         out.append(
             (
@@ -210,21 +213,29 @@ def _workflow_command_files(
 def _cursor_target_files() -> list[FileSpec]:
     """Cursor target 전용 자산 — ``targets`` 에 cursor 포함 시에만 추가.
 
-    Single source 원칙 (PLAN-cursor-target-support.md § Targets 정책): agents /
-    skills / hooks 는 ``.claude/`` 한 곳에서 양쪽 IDE 공유 (Cursor 가 native 로
-    읽음). 본 함수는 Cursor 전용 자산만:
+    **Hooks 정정 (PLAN-cursor-rootcause.md R1.A/B/C/D)**: Cursor IDE 는
+    ``.claude/hooks/hooks.json`` 을 안 읽음. 2.4 changelog 의 "Claude Code
+    hooks 호환" 은 CLI 한정. IDE 는 ``.cursor/hooks.json`` 만 봄. 또 schema 가
+    camelCase (``preToolUse`` 등) — PascalCase 는 silent ignore. 따라서 cursor
+    target 일 때는 **별도 렌더**:
 
-    - ``.cursor/rules/harness.mdc`` — Cursor IDE-rules (alwaysApply: true,
-      CLAUDE.md 의 Cursor-flavored 변형)
+    - ``.cursor/rules/harness.mdc`` — Cursor IDE-rules (alwaysApply: true)
+    - ``.cursor/hooks.json`` — Cursor camelCase hooks + PATH wrap (R1.D 방어)
     - ``.cursor/mcp.json`` — Cursor MCP 서버 정의 (pure JSON)
 
-    ``.cursor/commands/hm-*.md`` 별도 렌더는 Phase 1 A4.command-discover 검증
-    결과에 따라 추가 — 현재는 single source ``.claude/commands/`` 가정.
+    Agents / skills 는 여전히 single-source ``.claude/`` (Cursor 2.4+ 가
+    ``.claude/skills/`` / ``.claude/agents/`` 를 native 호환 — Cursor docs
+    공식 명시).
     """
     return [
         (
             "cursor/rules/harness.mdc.j2",
             ".cursor/rules/harness.mdc",
+            {},
+        ),
+        (
+            "cursor/hooks.json.j2",
+            ".cursor/hooks.json",
             {},
         ),
         (

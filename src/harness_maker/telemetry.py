@@ -43,7 +43,19 @@ def main() -> int:
             data = {}
     raw_workspace = data.get("workspace")
     workspace: dict[str, Any] = raw_workspace if isinstance(raw_workspace, dict) else {}
-    cwd_str = workspace.get("current_dir") or data.get("cwd") or os.getcwd()
+    # Resolve project root in priority order:
+    #   1. stdin payload (Claude Code: workspace.current_dir; Cursor: cwd)
+    #   2. env vars Cursor exposes for hook scripts (CURSOR_PROJECT_DIR is
+    #      Cursor-native; CLAUDE_PROJECT_DIR is the compat alias)
+    #   3. cwd of the spawning process — last resort, may be wrong if the
+    #      IDE spawns the hook from $HOME or "/"
+    cwd_str = (
+        workspace.get("current_dir")
+        or data.get("cwd")
+        or os.environ.get("CLAUDE_PROJECT_DIR")
+        or os.environ.get("CURSOR_PROJECT_DIR")
+        or os.getcwd()
+    )
     cwd = Path(cwd_str)
     metrics_path = cwd / ".claude" / "observability" / "metrics.jsonl"
     try:
