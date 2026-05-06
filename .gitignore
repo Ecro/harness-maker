@@ -15,6 +15,11 @@
 # Backups
 .claude/.backup-*/
 
+# ScheduleWakeup runtime lock (Claude Code internal — not source-of-truth)
+.claude/scheduled_tasks.lock
+tests/e2e/sandbox/.claude/.backup-*/
+tests/e2e/sandbox-plugin-test/.claude/.backup-*/
+
 # Cache
 ~/.cache/harness-maker/
 __pycache__/

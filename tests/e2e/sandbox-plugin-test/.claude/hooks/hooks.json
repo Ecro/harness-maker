@@ -11,6 +11,30 @@
         "matcher": "*"
       }
     ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "command": "uv run --with /home/noel/harness-maker python -m harness_maker.hooks.flush_session",
+            "statusMessage": "Snapshotting autoloop progress...",
+            "timeout": 30,
+            "type": "command"
+          }
+        ],
+        "matcher": "auto"
+      },
+      {
+        "hooks": [
+          {
+            "command": "uv run --with /home/noel/harness-maker python -m harness_maker.hooks.flush_session",
+            "statusMessage": "Snapshotting autoloop progress...",
+            "timeout": 30,
+            "type": "command"
+          }
+        ],
+        "matcher": "manual"
+      }
+    ],
     "PreToolUse": [
       {
         "hooks": [

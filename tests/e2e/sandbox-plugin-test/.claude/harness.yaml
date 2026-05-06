@@ -1,13 +1,15 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.4.8
+harness_maker_version: 0.5.3
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: harness-yaml/Production.yaml.j2
 provenance: official
-content_hash: 29193dd6ac07e58bdb670ffb0e6345341bd076cf1a89fea0a04510aac04e5d35
+content_hash: fd5fd145497c9fe75fd1aa9014e6d45e3babe43880aa423f61e62f055743e82c
 ---
 preset: Production
 locale: en
+targets: [claude-code]
+recommended_model: claude-opus-4-7
 dev_mode: spec-driven
 default_workflow: exec-rev-wrap-ver
 caching: agent-aware
@@ -17,6 +19,8 @@ spec:
   dir: specs/
 work_docs:
   dir: work-docs/
+ref_folders:
+
 workflows:
 
   exec-rev:
@@ -74,6 +78,7 @@ skills:
     - security-scanner
     - context-linter
     - research-crawler
+    - refdocs-search
   enabled:
     - verify-before-completion
     - autoloop-driver

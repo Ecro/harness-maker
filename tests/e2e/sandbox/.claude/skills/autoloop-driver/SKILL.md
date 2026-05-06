@@ -1,156 +1,110 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.4.6
+harness_maker_version: 0.5.3
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: skills/autoloop-driver/SKILL.md.j2
 provenance: official
 name: autoloop-driver
-description: Orchestration guide for /hm:loop. Covers prompt-driven driver responsibilities
-  (state via TodoWrite, executor via SlashCommand on the configured fused workflow),
-  spec-conditioning interview, loop-spec.yaml schema (objective + features-with-AC
-  + convergence predicate), and the safety rails (3-fail halt, time cap, iter cap,
-  ping every 5 iters). The /hm:loop command file owns the per-step procedure; this
-  skill explains the rationale + invariants Claude must hold.
-content_hash: c5f7629031c2f99cbfb27d59d1a94e6d3ab370d3a20c4b7748c53df75b7b5869
+description: Orchestration guide for /hm:loop. Covers two modes (feature and improve),
+  coverage-driven adaptive interview rationale, LoopContext schema (work-docs/loop-context/),
+  improve-mode loop body invariants, and safety rails. The /hm:loop command file owns
+  the per-step procedure; this skill explains WHY and the invariants Claude must hold.
+content_hash: ea4baec8c2fc849c60e628fd6460c5a068b778ef57bb46fab366c5df7adc0f6e
 ---
 
 # autoloop-driver
 
-`/hm:loop` is **prompt-driven**. Claude itself plays the role of the
-autoloop driver: parse input → maybe condition the spec → iterate the
-configured fused workflow against each feature → enforce safety rails →
-report. There is no Python module to import at runtime; the orchestration
-lives entirely in `commands/hm/loop.md` and this skill.
+`/hm:loop` is **prompt-driven and LLM-maximised**. Claude plays the role of
+the autoloop driver. No Python module is imported at runtime.
 
-## When to Invoke
+## Two Modes
 
-- User runs `/hm:loop "<goal>"` (free-form mode) or
-  `/hm:loop --spec <path>` (structured mode, with a conditioning interview
-  when the spec isn't loop-consumable).
-- An orchestrator wants to retry a stalled phase under iteration discipline.
+**`feature` mode (default)**: implement discrete features one per iteration.
+Executor = configured fused workflow. Convergence = named predicate.
 
-## Two Input Shapes
+**`improve` mode**: continuous quality improvement — review → fix → test →
+review — until LLM judges stopping criteria met. No feature list.
 
-### Free-form goal
+Mode detection order: explicit `--mode` flag → spec `mode` field → keyword
+scan of goal (`improve`, `refactor`, `quality`, `clean`, `cleanup`,
+`optimize`, `코드 품질`, `리팩토링`, `개선`, `code review`) → default `feature`.
 
-```
-/hm:loop "implement login; add logout; wire reset"
-```
+## Coverage-Driven Adaptive Interview
 
-Split on `;`, newline, or `·`. Period and comma stay inside features so
-version numbers, URLs, and decimals survive. Each fragment becomes a
-feature with empty acceptance criteria.
+**Invariant**: zero ambiguity before the first iteration. The interview is
+not a fixed script — it is a coverage problem solved by LLM judgment.
 
-### Structured loop-spec
+Five required dimensions (every loop, every mode):
 
-```
-/hm:loop --spec .claude/loop-specs/auth.yaml
-```
+| Dimension | Actionable = |
+|-----------|-------------|
+| **purpose** | Caller identity + data flow clear |
+| **invariants** | Specific interfaces/protocols named |
+| **priority** | Explicit 1-2-3 ranking with tiebreaker |
+| **test_reliability** | Coverage % or scenario count + known gaps |
+| **stopping_criteria** | Measurable bar (issue counts, test results) |
 
-YAML schema:
+**Extraction first**: Claude reads all source material and extracts answers
+with LLM comprehension before asking anything. Only missing or ambiguous
+dimensions trigger `AskUserQuestion`.
 
-```yaml
-objective: <one-sentence purpose>
-convergence: all-features-completed   # or any-feature-completed, min-2-features, min-5-features, first-iter
-features:
-  - name: <short identifier>
-    acceptance_criteria:
-      - <observable check>
-      - <observable check>
-  - name: <next feature>
-    acceptance_criteria: []           # exploratory features may have no AC
-```
+**Ambiguity judgment**: after each answer, Claude evaluates actionability
+via LLM — not regex. A future Claude reading only the context file must
+be able to make correct decisions without asking again. If not, generate
+a targeted follow-up. No question cap.
 
-Provenance frontmatter at the top (`---\n...\n---\n`) is stripped before
-parsing.
+## Context Persistence
 
-## Conditioning interview (the value-add)
+`work-docs/loop-context/<slug>.yaml` — survives across multiple loop runs.
+Merge on re-run: keep unchanged answers, update new ones, append notes.
 
-When `--spec <path>` points to a non-conformant document (markdown like
-`TECH_SPEC.md`, prose, half-written YAML), the loop command runs a
-multi-step `AskUserQuestion` interview to elicit:
+`.claude/loop-specs/<slug>.yaml` — generated per run, references context
+via `context_ref`.
 
-1. Objective (one sentence)
-2. Feature list — proposed from the document, then user-confirmed/edited
-3. Per-feature acceptance criteria
-4. Convergence predicate
+## Improve Mode — Invariants
 
-The result is persisted to `.claude/loop-specs/<slug>.yaml`. Subsequent
-runs against the same spec skip the interview.
+Each iteration: read target → review (classify critical/high/medium/low)
+→ evaluate stopping_criteria (LLM) → fix if not converged → run tests
+→ re-review. The stopping_criteria judgment decides convergence, not a
+rule-based predicate.
 
-**For huge inputs** (multi-thousand-line specs), do NOT propose hundreds of
-features. Pick the single coherent slice (one phase, one milestone, one
-roadmap section) most likely to fit one autoloop run, and tell the user
-which slice you picked and why. The user can re-run for other slices later.
+Hard invariants:
+- Never make changes that would cause context invariants to be violated
+- Evaluate stopping_criteria **before** fixing (converge early when met)
+- Detect test command from project structure (Makefile, pyproject.toml…)
 
 ## Safety Rails (always on, never skip)
 
-1. **3 consecutive failures** → halt with
-   `stop_reason="3 consecutive failures"`. Diagnose, do not thrash.
-2. **`max_iter` cap** → halt with `stop_reason="max_iter (N) reached"`.
-3. **`time_h` cap** → halt with `stop_reason="time_cap (Nh) reached"`.
-4. **Ping every 5 iterations** → log
-   `autoloop ping: iter=<N> feature=<name>` so the user can see progress.
-5. **Convergence check** before each iteration — early exit when satisfied.
-6. **Stuck-on-one-feature guard** — if the same feature has been retried
-   ≥3 iterations, halt and report the blocker rather than silently looping.
+1. `iter >= max_iter` → halt
+2. `elapsed >= time_h × 3600` → halt
+3. `failed_streak >= 3` → halt
+4. *(feature mode only)* Same feature retried ≥ 3 times → halt and report
+   blocker. Not applicable in improve mode (no feature list).
+5. Ping every 5 iterations
+6. Convergence check **before** each iteration body
 
-## State Tracking
+## LLM-Maximised Design Principle
 
-Use `TodoWrite` for the feature list (one task per feature; the description
-holds AC). Maintain `iter`, `failed_streak`, and `completed` in your
-narrative. Get the start timestamp once via `Bash` (`date +%s`) and check
-elapsed before each iteration.
-
-## Per-Iteration Workflow Invocation
-
-The configured fused workflow (`--workflow exec-rev-wrap` by default) is
-invoked once per iteration with the feature's name + AC + the loop's
-overall objective for context. In a Claude Code session, use the
-`SlashCommand` tool when available (`/hm:<workflow>`); otherwise read the
-workflow command file under `.claude/commands/hm/<workflow>.md` and follow
-its fused stages inline.
-
-The workflow's own `verify`/`wrapup` checks decide success vs failure. The
-loop driver does NOT add its own correctness checks — it only counts
-outcomes.
-
-## Output
-
-When the loop halts (any reason), emit:
-
-```
-loop done — converged=<bool> iter=<N>/<max_iter>
-  objective: <objective or "(inline goal)">
-  completed: <count>/<total>  [<feature names...>]
-  stop_reason: <reason>
-  spec: <spec path or "(inline goal)">
-```
-
-For non-converged halts, also list the in-flight feature, the last failure
-reason, and one concrete suggestion (raise `--max-iter`, narrow the failing
-feature's AC, split feature X into 2, etc.).
+Every judgment benefiting from language understanding is delegated to Claude:
+ambiguity detection, follow-up question generation, answer extraction from
+source documents, stopping criteria evaluation, issue classification.
+Python types enforce schema and enable unit tests — they contain no
+business logic.
 
 ## Dev-time Python API (NOT for runtime use)
 
-The harness-maker development repository ships a Python package
-`harness_maker.autoloop_driver` with `Feature`, `LoopSpec`, `AutoloopState`,
-`parse_goal`, `parse_loop_spec`, `is_loop_consumable`, and `run`. These
-exist for **harness-maker's own unit tests** so the driver semantics
-(splitter behaviour, convergence predicates, safety rails) are pinned by
-deterministic Python tests. They are NOT installed into the projects this
-plugin runs in, and `/hm:loop` MUST NOT try to import them. If you find
-yourself writing `from harness_maker import ...` while executing this
-command, stop — that is a bug in the prompt, not your environment.
+`harness_maker.autoloop_driver`: `LoopMode`, `ImprovementContext`,
+`LoopContext`, `Feature`, `LoopSpec`, `AutoloopState`, `detect_mode`,
+`parse_goal`, `parse_loop_spec`, `parse_loop_context`, `is_loop_consumable`,
+`run`. Exists for harness-maker unit tests only. `/hm:loop` must not import.
 
 ## Reference
 
-- Command: `commands/hm/loop.md` (the per-step procedure Claude executes)
-- Agent: `autoloop-coder` (per-iteration implementation worker, when the
-  workflow delegates to it)
-- Loop-spec schema: see "Structured loop-spec" above
-- Persisted loop-specs: `.claude/loop-specs/<slug>.yaml`
+- Command: `commands/hm/loop.md` (full per-step procedure)
+- Agent: `autoloop-coder` (per-iteration implementation worker)
+- Context: `work-docs/loop-context/<slug>.yaml`
+- Spec: `.claude/loop-specs/<slug>.yaml`
 
 <!-- @hm:user:extensions -->
-<!-- Project-specific autoloop rules (custom convergence predicates, env constraints, etc.). Preserved across harness-maker upgrades. -->
+<!-- Project-specific autoloop rules. Preserved across upgrades. -->
 <!-- @hm:/user:extensions -->

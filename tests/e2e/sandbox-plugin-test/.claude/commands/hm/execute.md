@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.4.8
+harness_maker_version: 0.5.3
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/atomic_command.md.j2
 provenance: official
-content_hash: 47371e76150b5566a590fc2d3d6d801a2c63fb05a3354aeea15be2934ef04f09
+content_hash: c62a3b080fe5dcb91b8f39430a1dc4c5b1b194b2ac5c21ac19ec3558065d2ca0
 ---
 # Stage: execute
 
@@ -27,8 +27,69 @@ each phase exits only when its verification command is green.
 - `work-docs/PLAN-{slug}.md`
 - `specs/SPEC-{slug}.md` (when present) — drives test authoring
 - Codebase, tests, build/CI scripts
+- Memory tiers — see loading order below
+
+## Session Context Loading
+
+Before starting, load memory in tier order:
+
+1. **Hot tier** — Read `.claude/memory/session/<today's date>.md` in full if it
+   exists. If a `checkpoint:compaction` entry is present, this session was
+   interrupted mid-stage — check `.claude-progress.json` for partial state.
+2. **Warm tier** — Skim `.claude/memory/failures.md` (first 60 lines) for
+   patterns relevant to the task. Targeted: `rg -F "[fail:" .claude/memory/failures.md`
+3. **Warm tier** — Skim `.claude/memory/wiki.md` (first 40 lines) for
+   conventions that apply to the implementation area.
 
 ## Procedure
+
+### 0. Worktree isolation (deterministic — do NOT rely on skill auto-discovery)
+
+Before any code edits, engage isolation if `harness.yaml.worktree.scope`
+includes `execute`. The `worktree-isolator` skill is documentation only —
+its trigger-based dispatch is probabilistic in Cursor IDE and can silently
+skip, leaving safety-critical edits on the main branch. **Invoke the
+worktree CLI directly** so isolation is deterministic across both IDEs.
+
+Run the create command:
+
+```bash
+!uv run --with /home/noel/harness-maker python -m harness_maker.worktree create execute "$(pwd)"
+```
+
+Read the **single line** the command prints — that is the contract for
+the rest of this stage. Two cases:
+
+- **Absolute path** like `/path/to/project/.worktrees/execute-20260506T1830Z`
+  → isolation engaged. **Treat that exact string as `<WT>` for the rest
+  of this stage.** You (Claude) MUST substitute the literal absolute
+  path everywhere `<WT>` appears below — **do NOT use a shell variable**:
+  each `!` block is a fresh subshell, so any `worktree_path=...`
+  assignment is lost between blocks.
+  - Every Read/Write/Edit call uses absolute paths starting with `<WT>/`.
+  - Tests / lints / type checks: `!cd <WT> && <cmd>`.
+- **Empty output** → `worktree.scope` does not include `execute`. No
+  isolation; operate in `cwd`. Skip the finalize step at the end.
+
+### Stage exit (after the TDD machine below completes)
+
+Pick **exactly one** finalize command based on the outcome. Substitute
+`<WT>` with the literal absolute path you read in step 0.
+
+```bash
+# All phases GREEN + verification clean — squash-merge the branch back + cleanup:
+!uv run --with /home/noel/harness-maker python -m harness_maker.worktree finalize <WT> success
+```
+
+```bash
+# Stage halted on a blocker — preserve the worktree for inspection:
+!uv run --with /home/noel/harness-maker python -m harness_maker.worktree finalize <WT> fail
+```
+
+If step 0 printed empty (no isolation engaged), skip both — there is
+nothing to finalize.
+
+### TDD machine (the actual stage work)
 
 1. Confirm preconditions:
    - Working tree clean (or changes are intentional WIP)

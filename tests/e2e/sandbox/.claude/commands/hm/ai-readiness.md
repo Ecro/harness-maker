@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.4.6
+harness_maker_version: 0.5.3
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/ai-readiness.md.j2
 provenance: official
-content_hash: 410aead48870bac2b6ff1d53784daabdf741217873c1bf10b97f7af0bdd7b8cd
+content_hash: 50723b24320945863213ad4c16d6dc155dbdf0102f0f65c6b0e10d3d2bc5b077
 ---
 # /hm:ai-readiness
 
@@ -20,7 +20,7 @@ content_hash: 410aead48870bac2b6ff1d53784daabdf741217873c1bf10b97f7af0bdd7b8cd
 ## Step 2 — LLM evaluation (Layer 2, you evaluate inline)
 
 Read each `.claude/rubrics/*.yaml`. If the directory is absent or empty, write `[]` to
-`.claude/observability/.l2.tmp.json` and skip to Step 3.
+`.claude/observability/.l2.tmp.json` then proceed to Step 3.
 
 Rubric file structure:
 ```yaml
@@ -67,11 +67,11 @@ Write verdicts to `.claude/observability/.l2.tmp.json`:
 Classify every action from Step 3 into two buckets:
 
 **🤖 AI-fixable** — config, docs, file structure (you can apply these now):
-signals: `claude_md_*`, `readme_present`, `agent_frontmatter_*`, `permissions_*`,
-`deny_*`, `hooks_*`, `fused_workflow_*`, `commands_*`, `harness_*`, `memory_*`,
-`observability_*`, `dashboard_md_*`, `wiki_md_present`, `failures_md_present`,
-`adr_present`, `contributing_present`, any rubric verdict that only requires
-writing or editing a documentation/config file.
+signals: `claude_md_*`, `readme_present`, `agent_frontmatter_*`, `agents_within_limit`,
+`side_governance_skipped`, `permissions_*`, `deny_*`, `hooks_*`, `fused_workflow_*`,
+`commands_*`, `harness_*`, `memory_*`, `observability_*`, `dashboard_md_*`,
+`wiki_md_present`, `failures_md_present`, `adr_present`, `contributing_present`,
+any rubric verdict that only requires writing or editing a documentation/config file.
 
 **👤 Human-required** — code, CI, actual usage, security review (you explain what to do):
 signals: `stack_detected`, `tests_present`, `ci_workflow_*`, `metrics_*`,

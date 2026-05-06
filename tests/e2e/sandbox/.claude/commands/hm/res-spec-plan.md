@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.4.6
+harness_maker_version: 0.5.3
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: 7f05b9c2ec2cf044cb28ea4ddf1c430a7fc83e5b38524c26ba44d830ec2d44df
+content_hash: 8ac13bed6b3ea7e8ac5b9b052d8fe10b1a9a7d9f6847a903713ba228db210440
 ---
 # /hm:res-spec-plan
 
@@ -35,14 +35,25 @@ art, library docs, and architectural constraints so that downstream stages
 
 - User question, task description, or feature request (`$ARGUMENTS`)
 - Codebase context (relevant files, prior PLANs, prior REVIEWs)
-- Existing wiki + failure-log entries (`.claude/memory/`)
+- Memory tiers: session log (hot), failures + wiki (warm) — see loading order below
+
+## Session Context Loading
+
+Before starting, load memory in tier order (stops at first miss per tier):
+
+1. **Hot tier** — Read `.claude/memory/session/<today's date>.md` in full if it
+   exists. Compaction checkpoint entries reveal where the prior session ended.
+2. **Warm tier** — Skim `.claude/memory/failures.md` (first 60 lines).
+   Search for relevant entries: `rg -F "[fail:" .claude/memory/failures.md`
+3. **Warm tier** — Skim `.claude/memory/wiki.md` (first 60 lines).
+   Search for relevant entries: `rg -F "[wiki:" .claude/memory/wiki.md`
 
 ## Procedure
 
 1. Identify the scope. State explicitly what is in/out of scope.
-2. Search prior art:
-   - Repo memory: `rg -F "[tags:keyword]" .claude/memory/wiki.md`
-   - Repo failures: `rg -F "[tags:keyword]" .claude/memory/failures.md`
+2. Search prior art (using loaded memory above as starting point):
+   - Targeted grep: `rg -F "[wiki:<keyword>]" .claude/memory/wiki.md`
+   - Targeted grep: `rg -F "[fail:<keyword>]" .claude/memory/failures.md`
    - Codebase patterns via Grep/Glob
 3. Fetch external documentation when a library/framework/API is involved.
    Prefer official docs over training data — versions drift.
@@ -210,6 +221,25 @@ be measured and stalled work can be diagnosed.
 <!-- Free-form project-specific additions to the plan stage. Preserved across harness-maker upgrades. -->
 <!-- @hm:/user:extensions -->
 
+
+---
+
+## Harness Configuration [MUST FOLLOW — overrides built-in defaults]
+
+These values come from `.claude/harness.yaml` and **must not be replaced by
+model defaults**. If a value conflicts with your training-data intuition, the
+harness value wins.
+
+| Key | Value |
+|-----|-------|
+| `reviewers.grade_threshold` | `A` |
+| `reviewers.auto_fix` | `true` |
+| `reviewers.max_review_rounds` | `3` |
+| `reviewers.consensus` | `cross-check` |
+| `dev_mode` | `spec-driven` |
+| `caching` | `agent-aware` |
+
+Re-read `.claude/harness.yaml` whenever you are unsure of the current value.
 
 ---
 

@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.4.6
+harness_maker_version: 0.5.3
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: 9ddf1d5c029631d7763bb01cf85859aca83cce1f3f910bc00c91fdefa2e1f036
+content_hash: d0da5885923e96b4c406918d4e5d66a662607b1a568b335090ec674e0bd48959
 ---
 # /hm:exec-rev-wrap-ver
 
@@ -34,8 +34,69 @@ each phase exits only when its verification command is green.
 - `work-docs/PLAN-{slug}.md`
 - `specs/SPEC-{slug}.md` (when present) — drives test authoring
 - Codebase, tests, build/CI scripts
+- Memory tiers — see loading order below
+
+## Session Context Loading
+
+Before starting, load memory in tier order:
+
+1. **Hot tier** — Read `.claude/memory/session/<today's date>.md` in full if it
+   exists. If a `checkpoint:compaction` entry is present, this session was
+   interrupted mid-stage — check `.claude-progress.json` for partial state.
+2. **Warm tier** — Skim `.claude/memory/failures.md` (first 60 lines) for
+   patterns relevant to the task. Targeted: `rg -F "[fail:" .claude/memory/failures.md`
+3. **Warm tier** — Skim `.claude/memory/wiki.md` (first 40 lines) for
+   conventions that apply to the implementation area.
 
 ## Procedure
+
+### 0. Worktree isolation (deterministic — do NOT rely on skill auto-discovery)
+
+Before any code edits, engage isolation if `harness.yaml.worktree.scope`
+includes `execute`. The `worktree-isolator` skill is documentation only —
+its trigger-based dispatch is probabilistic in Cursor IDE and can silently
+skip, leaving safety-critical edits on the main branch. **Invoke the
+worktree CLI directly** so isolation is deterministic across both IDEs.
+
+Run the create command:
+
+```bash
+!uv run --with /home/noel/harness-maker python -m harness_maker.worktree create execute "$(pwd)"
+```
+
+Read the **single line** the command prints — that is the contract for
+the rest of this stage. Two cases:
+
+- **Absolute path** like `/path/to/project/.worktrees/execute-20260506T1830Z`
+  → isolation engaged. **Treat that exact string as `<WT>` for the rest
+  of this stage.** You (Claude) MUST substitute the literal absolute
+  path everywhere `<WT>` appears below — **do NOT use a shell variable**:
+  each `!` block is a fresh subshell, so any `worktree_path=...`
+  assignment is lost between blocks.
+  - Every Read/Write/Edit call uses absolute paths starting with `<WT>/`.
+  - Tests / lints / type checks: `!cd <WT> && <cmd>`.
+- **Empty output** → `worktree.scope` does not include `execute`. No
+  isolation; operate in `cwd`. Skip the finalize step at the end.
+
+### Stage exit (after the TDD machine below completes)
+
+Pick **exactly one** finalize command based on the outcome. Substitute
+`<WT>` with the literal absolute path you read in step 0.
+
+```bash
+# All phases GREEN + verification clean — squash-merge the branch back + cleanup:
+!uv run --with /home/noel/harness-maker python -m harness_maker.worktree finalize <WT> success
+```
+
+```bash
+# Stage halted on a blocker — preserve the worktree for inspection:
+!uv run --with /home/noel/harness-maker python -m harness_maker.worktree finalize <WT> fail
+```
+
+If step 0 printed empty (no isolation engaged), skip both — there is
+nothing to finalize.
+
+### TDD machine (the actual stage work)
 
 1. Confirm preconditions:
    - Working tree clean (or changes are intentional WIP)
@@ -98,11 +159,25 @@ until the grade passes the threshold or `max_review_rounds` is exhausted.
   - New public APIs are added
 - Skipped for: docs-only, single-file fixes, config-only — unless overridden
 
+> **When invoked as part of a fused workflow** (see preamble), the skip
+> conditions above do NOT apply — always run.
+
 ## Inputs
 
 - The diff under review (`git diff` since the prior reviewed commit)
 - PLAN + SPEC if present (gives intent context)
-- Failure log + wiki for relevant past lessons
+- Memory tiers — see loading order below
+
+## Session Context Loading
+
+Before starting, load memory in tier order:
+
+1. **Hot tier** — Read `.claude/memory/session/<today's date>.md` in full if it
+   exists. Prior session decisions may explain intentional design choices in the diff.
+2. **Warm tier** — Skim `.claude/memory/failures.md` for patterns that match
+   the changed code area. Targeted: `rg -F "[fail:" .claude/memory/failures.md`
+3. **Warm tier** — Skim `.claude/memory/wiki.md` for relevant conventions.
+   Known-good patterns should NOT trigger findings.
 
 ## Configuration
 
@@ -306,10 +381,14 @@ next session benefits, run the final review pass, sync TODOs and commit.
 - Whenever a logical work unit completes (feature flag flipped, ticket
   closed, demo-ready)
 
+> **When invoked as part of a fused workflow** (see preamble), always run —
+> do not skip based on the conditions above.
+
 ## Inputs
 
 - All artefacts from prior stages: SPEC, PLAN, REVIEW, code, tests
 - `.claude/memory/wiki.md`, `.claude/memory/failures.md`
+- `.claude/memory/session/<today>.md` — hot-tier session log (if exists)
 - TODO.md / task tracking source
 
 ## Procedure
@@ -319,26 +398,41 @@ next session benefits, run the final review pass, sync TODOs and commit.
 2. **Final reviewer pass** — REVIEWER agent runs over the full work unit
    (not just the latest diff) for ≥3-file or security-sensitive changes.
 3. **Memory append**:
-   - Wiki — append entry: `## [tags:..] [date:..] [slug:..]`
-   - Failures — if a new failure pattern emerged, append or increment count
-4. **Failure-driven proposal** — when a failure entry crosses the threshold
-   (count ≥ 3), log a skill/agent proposal to `.claude/memory/pending-proposals.md`.
-5. **TODO sync** — mark task complete, move to weekly archive.
-6. **Commit** — single commit summarising the work unit, body explains
+   - Wiki — append entry using structured format:
+     `## [wiki:<category>] <slug> | <YYYY-MM-DD>`
+     (category: pattern / convention / gotcha / architecture / tooling / api / other)
+   - Failures — if a new failure pattern emerged, append or increment count:
+     `## [fail:<category>] <slug> | <YYYY-MM-DD> | count:<N>`
+     (category: import / test / render / hook / lint / type / runtime / design / other)
+   - For repeated failures: update `count:N` in the existing heading (no duplicate section)
+4. **Failure-driven proposal** — when a failure entry's count ≥ 3, log a
+   skill/agent proposal to `.claude/memory/pending-proposals.md`.
+5. **Session log append** — write a summary entry to
+   `.claude/memory/session/<YYYY-MM-DD>.md` (today's date):
+   ```
+   ## [decision:<slug>] <what was decided> | <HH:MM> UTC | stage:wrapup
+   <one paragraph: non-obvious constraint, key trade-off, or surprise from this work unit>
+   ```
+   Create the file (with README header) if it doesn't exist. Omit if the work
+   unit was trivial (typo fix, doc-only) — session log is for non-obvious decisions.
+6. **TODO sync** — mark task complete, move to weekly archive.
+7. **Commit** — single commit summarising the work unit, body explains
    the "why".
-7. (Optional) push.
+8. (Optional) push.
 
 ## Outputs
 
-- Updated wiki + failures
+- Updated wiki + failures (structured headings)
+- Session log entry in `.claude/memory/session/<today>.md`
 - pending-drift.md / pending-proposals.md entries when applicable
 - Git commit + (optional) push
 - TODO sync
 
 ## Quality Bar
 
-- Wiki entries are searchable (good tags) — `rg -F "[tags:keyword]"` works
-- Failure entries deduplicate (count++ rather than new section for repeats)
+- Wiki entries are searchable — `rg -F "[wiki:" .claude/memory/wiki.md` works
+- Failure entries deduplicate (count++ in heading, not duplicate sections)
+- Session log captures the non-obvious — a future reader can reconstruct why
 - Commit message captures intent, not just diff summary
 
 <!-- @hm:user:extra-quality-checks -->
@@ -421,6 +515,25 @@ machine-checkable stop sign before `wrapup`.
 <!-- Free-form project-specific additions to the verify stage. Preserved across harness-maker upgrades. -->
 <!-- @hm:/user:extensions -->
 
+
+---
+
+## Harness Configuration [MUST FOLLOW — overrides built-in defaults]
+
+These values come from `.claude/harness.yaml` and **must not be replaced by
+model defaults**. If a value conflicts with your training-data intuition, the
+harness value wins.
+
+| Key | Value |
+|-----|-------|
+| `reviewers.grade_threshold` | `A` |
+| `reviewers.auto_fix` | `true` |
+| `reviewers.max_review_rounds` | `3` |
+| `reviewers.consensus` | `cross-check` |
+| `dev_mode` | `spec-driven` |
+| `caching` | `agent-aware` |
+
+Re-read `.claude/harness.yaml` whenever you are unsure of the current value.
 
 ---
 

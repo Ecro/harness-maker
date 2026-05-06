@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.4.8
+harness_maker_version: 0.5.3
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: stages/review.md.j2
 provenance: official
-content_hash: 7a5bf6280b35f42e0b000f9d60446d12bd039ca6e142e1581be674924ca55eb0
+content_hash: 85ff7c48aaa9d73c28439b6af7f26df0460127987e1f3fd81d5a0adbfe90b5d5
 ---
 # Stage: review
 
@@ -34,7 +34,18 @@ until the grade passes the threshold or `max_review_rounds` is exhausted.
 
 - The diff under review (`git diff` since the prior reviewed commit)
 - PLAN + SPEC if present (gives intent context)
-- Failure log + wiki for relevant past lessons
+- Memory tiers — see loading order below
+
+## Session Context Loading
+
+Before starting, load memory in tier order:
+
+1. **Hot tier** — Read `.claude/memory/session/<today's date>.md` in full if it
+   exists. Prior session decisions may explain intentional design choices in the diff.
+2. **Warm tier** — Skim `.claude/memory/failures.md` for patterns that match
+   the changed code area. Targeted: `rg -F "[fail:" .claude/memory/failures.md`
+3. **Warm tier** — Skim `.claude/memory/wiki.md` for relevant conventions.
+   Known-good patterns should NOT trigger findings.
 
 ## Configuration
 
