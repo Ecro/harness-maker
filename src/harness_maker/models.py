@@ -171,6 +171,21 @@ class Finding(BaseModel):
     fix: str = ""
 
 
+class RefFolder(BaseModel):
+    """User-registered reference document folder for skill-driven search.
+
+    Path is stored as free-text str (not Path) so harness.yaml stays portable
+    across machines — relative paths like ``../shared-architecture`` survive
+    git commits. Existence/glob validation is performed at registration time
+    in interview.py, not here.
+    """
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    path: str
+    glob: str = "**/*.{md,txt,pdf}"
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Composite models
 # ──────────────────────────────────────────────────────────────────────────────
@@ -213,6 +228,7 @@ class HarnessConfig(BaseModel):
     project: dict[str, Any] = Field(default_factory=lambda: {"domains": []})
     spec: dict[str, Any] = Field(default_factory=lambda: {"dir": "specs/"})
     work_docs: dict[str, Any] = Field(default_factory=lambda: {"dir": "work-docs/"})
+    ref_folders: list[RefFolder] = Field(default_factory=list)
 
 
 class Blueprint(BaseModel):
@@ -233,6 +249,7 @@ class InterviewAnswers(BaseModel):
     preset: Preset = Preset.SIDE
     dev_mode: DevMode = DevMode.SPEC_DRIVEN
     domains: list[str] = Field(default_factory=list)
+    ref_folders: list[RefFolder] = Field(default_factory=list)
     # Map of user-named workflow → ordered atomic stages. Names are typically
     # auto-derived via STAGE_ABBREV (e.g. `exec-rev-wrap`) but user can override.
     fused_workflows: dict[str, list[AtomicStage]] = Field(

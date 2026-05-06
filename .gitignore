@@ -10,6 +10,7 @@
 .claude/observability/refresh/raw-*.jsonl
 .claude/observability/refresh/proposed-*.md
 .claude/observability/security/findings-*.jsonl
+.claude/observability/docs_index.yaml
 
 # Backups
 .claude/.backup-*/

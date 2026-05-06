@@ -27,6 +27,7 @@ from harness_maker.models import (
     InterviewAnswers,
     Preset,
     ProjectProfile,
+    RefFolder,
     auto_workflow_name,
 )
 from harness_maker.validators import validate_workflow_name
@@ -101,6 +102,7 @@ _ALL_SKILLS: list[str] = [
     "security-scanner",
     "context-linter",
     "research-crawler",
+    "refdocs-search",
 ]
 
 _SIDE_ENABLED_REVIEWERS: list[str] = ["code-reviewer"]
@@ -109,6 +111,7 @@ _SIDE_ENABLED_SKILLS: list[str] = [
     "autoloop-driver",
     "ai-readiness-rubric",
     "agent-quality-rubric",
+    "refdocs-search",
 ]
 _PROD_ENABLED_REVIEWERS: list[str] = [
     "code-reviewer",
@@ -144,6 +147,7 @@ def interview(
     fused, default_name = _ask_fused_workflows(preset)
     consensus = _ask_with_default("consensus", _consensus_for(preset))
     caching = _ask_with_default("caching", "agent-aware")
+    ref_folders = _ask_ref_folders()
     return _build_answers(
         locale=locale,
         preset=preset,
@@ -152,6 +156,7 @@ def interview(
         default_workflow=default_name,
         consensus=consensus,
         caching=caching,
+        ref_folders=ref_folders,
     )
 
 
@@ -300,6 +305,40 @@ def _ask_custom_workflows() -> dict[str, list[AtomicStage]] | None:
         custom[name] = stages
 
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Reference document folders (multi)
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def _ask_ref_folders() -> list[RefFolder]:
+    """Multi-line input — each line is a folder path with optional ';glob'.
+
+    Empty input ends the loop (skip). Non-existent paths only warn — the path
+    may resolve on a different machine where the harness ships, so we still
+    register. DOCX files inside the folder are unsupported by the search
+    skill (announced upfront, enforced at index time).
+    """
+    print("\nReference document folders (skill-driven search will index these).")
+    print("  Format: '<path>' or '<path> ; <glob>'.  One per line.")
+    print("  Default glob: **/*.{md,txt,pdf}.  DOCX is unsupported (convert first).")
+    print("  Blank line to skip / finish.")
+    out: list[RefFolder] = []
+    while True:
+        idx = len(out) + 1
+        line = _input_or_empty(f"  ref_folder #{idx}: ").strip()
+        if not line:
+            return out
+        path_part, _, glob_part = line.partition(";")
+        path_part = path_part.strip()
+        glob = glob_part.strip() or "**/*.{md,txt,pdf}"
+        if not path_part:
+            print("  empty path; skip.")
+            continue
+        if not Path(path_part).expanduser().exists():
+            print(f"  warn: path {path_part!r} not found on this machine (registering anyway).")
+        out.append(RefFolder(path=path_part, glob=glob))
+
+
 def _parse_stage_numbers(line: str) -> list[AtomicStage]:
     out: list[AtomicStage] = []
     for tok in line.split(","):
@@ -344,6 +383,7 @@ def _build_answers(
     default_workflow: str,
     consensus: str | None = None,
     caching: str | None = None,
+    ref_folders: list[RefFolder] | None = None,
 ) -> InterviewAnswers:
     is_side = preset == Preset.SIDE
     return InterviewAnswers(
@@ -352,6 +392,7 @@ def _build_answers(
         dev_mode=dev_mode,
         fused_workflows=fused_workflows,
         default_workflow=default_workflow,
+        ref_folders=list(ref_folders) if ref_folders else [],
         reviewers={
             "installed": list(_ALL_REVIEWERS),
             "enabled": list(_SIDE_ENABLED_REVIEWERS if is_side else _PROD_ENABLED_REVIEWERS),
@@ -437,9 +478,11 @@ def answers_from_harness_yaml(yaml_path: Path) -> InterviewAnswers | None:
     max_review_rounds = reviewers_data.get("max_review_rounds")
 
     domains = _list_of_strings(_dig(data, "project", "domains")) or list(base.domains)
+    ref_folders = _parse_ref_folders(data.get("ref_folders"))
 
     update: dict[str, Any] = {
         "domains": domains,
+        "ref_folders": ref_folders,
         "reviewers": {
             "installed": list(base.reviewers["installed"]),
             "enabled": reviewers_enabled,
@@ -486,6 +529,27 @@ def _parse_workflows(
         if stages:
             out[name] = stages
     return out or fallback
+
+
+def _parse_ref_folders(value: object) -> list[RefFolder]:
+    """Reverse-map harness.yaml ``ref_folders:`` block to typed RefFolder list.
+
+    Tolerant of malformed entries — silently drops items missing ``path``.
+    Empty/missing block returns ``[]`` (caller falls back to base default).
+    """
+    if not isinstance(value, list):
+        return []
+    out: list[RefFolder] = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        path = item.get("path")
+        if not isinstance(path, str) or not path:
+            continue
+        glob_val = item.get("glob")
+        glob = glob_val if isinstance(glob_val, str) and glob_val else "**/*.{md,txt,pdf}"
+        out.append(RefFolder(path=path, glob=glob))
+    return out
 
 
 def _string_or(value: object, fallback: str | None) -> str:

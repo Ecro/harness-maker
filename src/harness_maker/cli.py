@@ -11,7 +11,7 @@ import typer
 from harness_maker.add_domain import AddDomainError, add_domain, validate_domain_name
 from harness_maker.block_merge import MergeReport
 from harness_maker.interview import answers_from_harness_yaml, interview
-from harness_maker.models import InterviewAnswers, Preset
+from harness_maker.models import InterviewAnswers, Preset, RefFolder
 from harness_maker.modular_edit import ModularEditError
 from harness_maker.modular_edit import add as modular_add
 from harness_maker.modular_edit import remove as modular_remove
@@ -184,6 +184,31 @@ def make(
 
     typer.echo(f"harness applied to {target_dotclaude} ({len(bp.files)} files)")
     _emit_post_make_readiness(target, a.preset)
+    _emit_refdocs_index_build(target, a.ref_folders)
+
+
+def _emit_refdocs_index_build(target: Path, ref_folders: list[RefFolder]) -> None:
+    """Build docs_index.yaml so the refdocs-search skill has metadata to triage with.
+
+    No-op when no ref_folders were registered. Failures are swallowed with a
+    user-visible note — the index can always be rebuilt via
+    ``python -m harness_maker.refdocs_index build``.
+    """
+    if not ref_folders:
+        return
+    try:
+        from harness_maker.refdocs_index import build as build_refdocs_index
+
+        result = build_refdocs_index(target, ref_folders)
+    except Exception as e:  # noqa: BLE001 — diagnostic, never fail the make
+        typer.echo(f"\n(refdocs index skipped: {type(e).__name__}: {e})")
+        return
+    typer.echo(
+        f"\nref_folders index: {result.entry_count} entries → "
+        f"{result.index_path.relative_to(target)}",
+    )
+    for w in result.warnings:
+        typer.echo(f"  warn: {w}")
 
 
 def _emit_post_make_readiness(target: Path, preset: Preset) -> None:

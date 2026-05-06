@@ -99,21 +99,23 @@ def test_interview_installs_all_reviewers_and_skills() -> None:
 
 def test_interview_interactive_accepts_recommended(monkeypatch: pytest.MonkeyPatch) -> None:
     """Empty answers ⇒ accept recommended locale/preset/dev_mode/starter/defaults."""
-    # locale, preset, dev_mode, use-recommended?, default workflow, consensus, caching
-    inputs: Iterator[str] = iter(["", "", "", "", "", "", ""])
+    # locale, preset, dev_mode, use-recommended?, default workflow, consensus,
+    # caching, ref_folders (blank = skip)
+    inputs: Iterator[str] = iter(["", "", "", "", "", "", "", ""])
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
     result = interview(_profile(), autoloop_mode=False)
     assert result.locale == "en"
     assert result.preset == Preset.SIDE
     assert result.dev_mode == DevMode.TASK_DRIVEN  # Side default
     assert result.default_workflow == "exec-rev-wrap"
+    assert result.ref_folders == []
 
 
 def test_interview_locale_first_question_accepts_arbitrary_tag(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Locale is the first prompt; user types ``ja`` and it passes through."""
-    inputs: Iterator[str] = iter(["ja", "", "", "", "", "", ""])
+    inputs: Iterator[str] = iter(["ja", "", "", "", "", "", "", ""])
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
     result = interview(_profile(), autoloop_mode=False)
     assert result.locale == "ja"
@@ -123,8 +125,8 @@ def test_interview_dev_mode_explicit_override_to_spec_driven(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Side+spec-driven cross is allowed (independent of preset)."""
-    # locale, preset, dev_mode=spec, use-rec?, default, consensus, caching
-    inputs: Iterator[str] = iter(["", "", "spec", "", "", "", ""])
+    # locale, preset, dev_mode=spec, use-rec?, default, consensus, caching, ref_folders
+    inputs: Iterator[str] = iter(["", "", "spec", "", "", "", "", ""])
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
     result = interview(_profile(), autoloop_mode=False)
     assert result.preset == Preset.SIDE
@@ -135,7 +137,7 @@ def test_interview_dev_mode_explicit_override_to_task_on_production(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Production+task-driven cross is allowed."""
-    inputs: Iterator[str] = iter(["", "Production", "task", "", "", "", ""])
+    inputs: Iterator[str] = iter(["", "Production", "task", "", "", "", "", ""])
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
     result = interview(_profile(), autoloop_mode=False)
     assert result.preset == Preset.PRODUCTION
@@ -144,7 +146,7 @@ def test_interview_dev_mode_explicit_override_to_task_on_production(
 
 def test_interview_interactive_overrides_default(monkeypatch: pytest.MonkeyPatch) -> None:
     """User picks a different default workflow from the starter set."""
-    inputs: Iterator[str] = iter(["", "", "", "", "exec-rev", "", ""])
+    inputs: Iterator[str] = iter(["", "", "", "", "exec-rev", "", "", ""])
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
     result = interview(_profile(), autoloop_mode=False)
     assert result.default_workflow == "exec-rev"
@@ -153,9 +155,9 @@ def test_interview_interactive_overrides_default(monkeypatch: pytest.MonkeyPatch
 def test_interview_interactive_custom_workflows(monkeypatch: pytest.MonkeyPatch) -> None:
     """User declines recommended set and defines a custom workflow."""
     # locale, preset, dev_mode, use-rec?, stages-#1, name-#1, stages-#2 (done),
-    # default, consensus, caching
+    # default, consensus, caching, ref_folders
     inputs: Iterator[str] = iter(
-        ["", "", "", "n", "4,5", "", "done", "", "", ""],
+        ["", "", "", "n", "4,5", "", "done", "", "", "", ""],
     )
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
     result = interview(_profile(), autoloop_mode=False)
@@ -170,7 +172,7 @@ def test_interview_interactive_custom_named_override(
 ) -> None:
     """User overrides the auto-generated workflow name."""
     inputs: Iterator[str] = iter(
-        ["", "", "", "n", "4,5,6", "ship", "done", "", "", ""],
+        ["", "", "", "n", "4,5,6", "ship", "done", "", "", "", ""],
     )
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
     result = interview(_profile(), autoloop_mode=False)
@@ -184,7 +186,7 @@ def test_interview_interactive_custom_named_override(
 
 def test_interview_preset_override_to_production(monkeypatch: pytest.MonkeyPatch) -> None:
     """User on a small-experiment profile picks Production explicitly."""
-    inputs: Iterator[str] = iter(["", "Production", "", "", "", "", ""])
+    inputs: Iterator[str] = iter(["", "Production", "", "", "", "", "", ""])
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
     result = interview(_profile(), autoloop_mode=False)
     assert result.preset == Preset.PRODUCTION
@@ -196,12 +198,35 @@ def test_interview_custom_workflow_rejects_reserved(
 ) -> None:
     """Cannot name a custom workflow with a reserved word; user re-prompted."""
     # locale, preset, dev_mode, use-rec?, stages-#1, name=plan (reserved → re-prompt),
-    # stages-#1 again (3,4), name (auto), done, default, consensus, caching
+    # stages-#1 again (3,4), name (auto), done, default, consensus, caching, ref_folders
     inputs: Iterator[str] = iter(
-        ["", "", "", "n", "4,5", "plan", "3,4", "", "done", "", "", ""],
+        ["", "", "", "n", "4,5", "plan", "3,4", "", "done", "", "", "", ""],
     )
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
     result = interview(_profile(), autoloop_mode=False)
     # The reserved-name attempt was rejected; only the second valid entry remains.
     assert "plan" not in result.fused_workflows
     assert "plan-exec" in result.fused_workflows
+
+
+def test_interview_ref_folders_multiple_with_glob_override(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """User registers two folders, one with a custom glob."""
+    # locale .. caching, ref_folder #1 (path only), ref_folder #2 (path;glob), blank=stop
+    inputs: Iterator[str] = iter(
+        ["", "", "", "", "", "", "", "./docs", "../shared ; **/*.md", ""],
+    )
+    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
+    result = interview(_profile(), autoloop_mode=False)
+    assert len(result.ref_folders) == 2
+    assert result.ref_folders[0].path == "./docs"
+    assert result.ref_folders[0].glob == "**/*.{md,txt,pdf}"
+    assert result.ref_folders[1].path == "../shared"
+    assert result.ref_folders[1].glob == "**/*.md"
+
+
+def test_interview_autoloop_skips_ref_folders() -> None:
+    """Autoloop mode never prompts; ref_folders defaults to []."""
+    result = interview(_profile(), autoloop_mode=True)
+    assert result.ref_folders == []

@@ -11,7 +11,6 @@ from harness_maker.autoloop_driver import (
     AutoloopState,
     Feature,
     ImprovementContext,
-    LoopContext,
     LoopMode,
     LoopSpec,
     detect_mode,

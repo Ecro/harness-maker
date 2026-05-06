@@ -163,19 +163,21 @@ _SPLIT_RE = re.compile(r"[;\n·]+")
 
 # Keywords that signal the user wants a continuous-improvement loop rather than
 # a feature-implementation loop. Matched case-insensitively against the goal.
-_IMPROVE_KEYWORDS: frozenset[str] = frozenset({
-    "improve",
-    "refactor",
-    "quality",
-    "clean",
-    "optimize",
-    "review loop",
-    "코드 품질",
-    "리팩토링",
-    "개선",
-    "cleanup",
-    "code review",
-})
+_IMPROVE_KEYWORDS: frozenset[str] = frozenset(
+    {
+        "improve",
+        "refactor",
+        "quality",
+        "clean",
+        "optimize",
+        "review loop",
+        "코드 품질",
+        "리팩토링",
+        "개선",
+        "cleanup",
+        "code review",
+    }
+)
 
 
 def detect_mode(goal: str) -> LoopMode:
@@ -209,7 +211,7 @@ def _strip_frontmatter(raw: str) -> str:
     if raw.startswith("---\n"):
         end = raw.find("\n---\n", 4)
         if end != -1:
-            return raw[end + 5:]
+            return raw[end + 5 :]
     return raw
 
 

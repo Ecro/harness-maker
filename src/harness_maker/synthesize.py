@@ -54,6 +54,7 @@ _ALL_SKILLS: list[str] = [
     "autoloop-driver",
     "conditional-router",
     "context-linter",
+    "refdocs-search",
     "relevance-filter",
     "research-crawler",
     "security-scanner",
@@ -249,6 +250,7 @@ def synthesize(
         project={"domains": list(answers.domains)},
         spec={"dir": "specs/"},
         work_docs={"dir": "work-docs/"},
+        ref_folders=list(answers.ref_folders),
     )
 
     config_dump = config.model_dump(mode="json")

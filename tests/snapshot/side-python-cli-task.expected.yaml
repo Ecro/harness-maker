@@ -1,6 +1,6 @@
 preset: Side
 dev_mode: task-driven
-file_count: 51
+file_count: 52
 files:
 - path: ../CLAUDE.md
   template: claude-md/Side.ko.md.j2
@@ -73,7 +73,7 @@ files:
   body_sha256: 71ae5a91b8b078f50e25f08038d65dd4ff583dbbfd0cdc54111961296fac6514
 - path: harness.yaml
   template: harness-yaml/Side.yaml.j2
-  body_sha256: 89664ce01c200a7b86d3ffdcca315c7c544ef3f0203a7f1ee9b1d681d0cf012b
+  body_sha256: f53ee95d1ad1a5678c2511ae7190ed0918dbe2a0e79c3a4e62f1803df9375a86
 - path: hooks/hooks.json
   template: hooks/hooks.json.j2
   body_sha256: dabc1e54b5cd49200c732d0b0b4168c0540692dcd3780129a28aff1ab05c725a
@@ -119,6 +119,9 @@ files:
 - path: skills/context-linter/SKILL.md
   template: skills/context-linter/SKILL.md.j2
   body_sha256: 5a390fa895e3c898ad6909b451995688eed8c7fbb4a3577e3d842fd7ad62c65b
+- path: skills/refdocs-search/SKILL.md
+  template: skills/refdocs-search/SKILL.md.j2
+  body_sha256: fa1e04737038d31b4277566804accff7aad010641534d41a69e898c68d452073
 - path: skills/relevance-filter/SKILL.md
   template: skills/relevance-filter/SKILL.md.j2
   body_sha256: 4020e7dfd7a241e031f5e50552ae169b8a585f9054f97f760328456caa5fabaf

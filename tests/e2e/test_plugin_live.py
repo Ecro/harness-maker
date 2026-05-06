@@ -71,7 +71,7 @@ def _run_make(
 # ---------------------------------------------------------------------------
 
 
-@pytest.fixture()
+@pytest.fixture
 def fresh_project(tmp_path: Path) -> Path:
     """Minimal Python project with a git repo — matches the fresh-install path."""
     proj = tmp_path / "myproject"

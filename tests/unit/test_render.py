@@ -116,7 +116,6 @@ def test_render_settings_json_shallow_merges_existing(tmp_path: Path) -> None:
     assert "Read" in data["permissions"]["allow"]
 
 
-
 def test_render_settings_json_falls_back_when_existing_corrupt(tmp_path: Path) -> None:
     """Malformed JSON on disk → render writes pure template content (no crash).
 
@@ -191,10 +190,12 @@ def test_render_settings_json_evicts_stale_harness_keys(tmp_path: Path) -> None:
 
     settings_path = tmp_path / "settings.json"
     settings_path.write_text(
-        json.dumps({
-            "statusLine": "some old status line value",
-            "enabledPlugins": {"user-plugin": True},
-        }),
+        json.dumps(
+            {
+                "statusLine": "some old status line value",
+                "enabledPlugins": {"user-plugin": True},
+            }
+        ),
         encoding="utf-8",
     )
     p = _profile()

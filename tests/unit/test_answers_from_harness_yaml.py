@@ -158,3 +158,36 @@ def test_no_frontmatter_still_parses(tmp_path: Path) -> None:
     answers = answers_from_harness_yaml(target)
     assert answers is not None
     assert answers.locale == "ko"
+
+
+def test_round_trip_ref_folders(tmp_path: Path) -> None:
+    """ref_folders survives interview → synthesize → render → reverse map.
+
+    Required by CLAUDE.md checkpoint 6 — every format we persist needs a
+    working reverse mapper, otherwise upgrades silently lose user state.
+    """
+    from harness_maker.interview import interview
+    from harness_maker.models import RefFolder
+    from harness_maker.profile import profile
+    from harness_maker.render import render
+    from harness_maker.synthesize import synthesize
+
+    p = profile(tmp_path)
+    a = interview(p, autoloop_mode=True).model_copy(
+        update={
+            "ref_folders": [
+                RefFolder(path="./docs"),
+                RefFolder(path="../shared", glob="**/*.md"),
+            ],
+        },
+    )
+    bp = synthesize(p, a)
+    target = tmp_path / ".claude"
+    render(bp, target, dry_run=False)
+    reused = answers_from_harness_yaml(target / "harness.yaml")
+    assert reused is not None
+    assert len(reused.ref_folders) == 2
+    assert reused.ref_folders[0].path == "./docs"
+    assert reused.ref_folders[0].glob == "**/*.{md,txt,pdf}"
+    assert reused.ref_folders[1].path == "../shared"
+    assert reused.ref_folders[1].glob == "**/*.md"

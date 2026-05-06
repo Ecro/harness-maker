@@ -9,6 +9,10 @@ spec:
   dir: {{ config.spec.dir }}
 work_docs:
   dir: {{ config.work_docs.dir }}
+ref_folders:
+{% for f in config.ref_folders %}  - path: {{ f.path | tojson }}
+    glob: {{ f.glob | tojson }}
+{% endfor %}
 workflows:
 {% for name, stages in config.workflows.items() %}
   {{ name }}:
