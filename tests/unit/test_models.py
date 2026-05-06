@@ -255,6 +255,7 @@ def test_project_profile_custom() -> None:
 def test_interview_answers_defaults() -> None:
     ans = InterviewAnswers()
     assert ans.locale == "en"
+    assert ans.targets == [Target.CLAUDE_CODE]
     assert ans.preset.value == "Side"
     assert ans.dev_mode == DevMode.SPEC_DRIVEN
     assert "exec-rev-wrap" in ans.fused_workflows
@@ -263,6 +264,16 @@ def test_interview_answers_defaults() -> None:
     assert ans.skills == {"installed": [], "enabled": []}
     assert ans.consensus == "single"
     assert ans.caching == "agent-aware"
+
+
+def test_interview_answers_targets_multi_select() -> None:
+    ans = InterviewAnswers(targets=[Target.CLAUDE_CODE, Target.CURSOR])
+    assert ans.targets == [Target.CLAUDE_CODE, Target.CURSOR]
+
+
+def test_interview_answers_targets_empty_raises() -> None:
+    with pytest.raises(ValidationError):
+        InterviewAnswers(targets=[])
 
 
 # ──────────────────────────────────────────────────────────────────────────────

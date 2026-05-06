@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
+import pytest
+
 from harness_maker.interview import answers_from_harness_yaml
-from harness_maker.models import AtomicStage, DevMode, Preset
+from harness_maker.models import AtomicStage, DevMode, Preset, Target
 
 
 def _write_yaml(tmp_path: Path, body: str) -> Path:
@@ -191,3 +194,58 @@ def test_round_trip_ref_folders(tmp_path: Path) -> None:
     assert reused.ref_folders[0].glob == "**/*.{md,txt,pdf}"
     assert reused.ref_folders[1].path == "../shared"
     assert reused.ref_folders[1].glob == "**/*.md"
+
+
+def test_targets_present_in_yaml_parsed(tmp_path: Path) -> None:
+    """yaml 의 targets 키가 valid list 면 그대로 파싱."""
+    target = _write_yaml(
+        tmp_path,
+        "preset: Side\nlocale: en\ndev_mode: task-driven\n"
+        "default_workflow: exec-rev-wrap\n"
+        "workflows:\n  exec-rev-wrap:\n    - execute\n    - review\n    - wrapup\n"
+        "targets:\n  - claude-code\n  - cursor\n",
+    )
+    answers = answers_from_harness_yaml(target)
+    assert answers is not None
+    assert answers.targets == [Target.CLAUDE_CODE, Target.CURSOR]
+
+
+def test_targets_missing_falls_back_with_warning(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """옛 yaml (targets 키 부재) → [claude-code] fallback + 경고 로그.
+
+    Phase 2.0 의 model 단 책임이 Phase 2.1 yaml-aware loader (_parse_targets)
+    로 이전됐음을 검증.
+    """
+    target = _write_yaml(
+        tmp_path,
+        "preset: Side\nlocale: en\ndev_mode: task-driven\n"
+        "default_workflow: exec-rev-wrap\n"
+        "workflows:\n  exec-rev-wrap:\n    - execute\n    - review\n    - wrapup\n",
+    )
+    with caplog.at_level(logging.WARNING, logger="harness_maker.interview"):
+        answers = answers_from_harness_yaml(target)
+    assert answers is not None
+    assert answers.targets == [Target.CLAUDE_CODE]
+    assert any("targets" in rec.message and "falling back" in rec.message for rec in caplog.records)
+
+
+def test_targets_invalid_values_filtered_with_warning(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """yaml targets list 에 알 수 없는 값만 있으면 [claude-code] fallback + 경고."""
+    target = _write_yaml(
+        tmp_path,
+        "preset: Side\nlocale: en\ndev_mode: task-driven\n"
+        "default_workflow: exec-rev-wrap\n"
+        "workflows:\n  exec-rev-wrap:\n    - execute\n    - review\n    - wrapup\n"
+        "targets:\n  - vscode-fork\n  - 12345\n",
+    )
+    with caplog.at_level(logging.WARNING, logger="harness_maker.interview"):
+        answers = answers_from_harness_yaml(target)
+    assert answers is not None
+    assert answers.targets == [Target.CLAUDE_CODE]
+    assert any("targets" in rec.message for rec in caplog.records)

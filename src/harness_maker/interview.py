@@ -16,6 +16,7 @@ inline flags on the workflow command (documented in workflow_command.md.j2).
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -28,9 +29,12 @@ from harness_maker.models import (
     Preset,
     ProjectProfile,
     RefFolder,
+    Target,
     auto_workflow_name,
 )
 from harness_maker.validators import validate_workflow_name
+
+logger = logging.getLogger(__name__)
 
 # Locales we ship i18n catalogs for; users can type any tag (free text).
 _BUILTIN_LOCALES: tuple[str, ...] = ("en", "ko")
@@ -132,6 +136,7 @@ def interview(
     if autoloop_mode:
         return _build_answers(
             locale=_DEFAULT_LOCALE,
+            targets=[Target.CLAUDE_CODE],
             preset=recommended,
             dev_mode=_recommend_dev_mode(recommended),
             fused_workflows=_starter_for(recommended),
@@ -142,6 +147,7 @@ def interview(
         f"\nDetected: stack={profile.stack}, scale={profile.scale}, lifecycle={profile.lifecycle}",
     )
     locale = _ask_locale()
+    targets = _ask_targets()
     preset = _ask_preset(recommended)
     dev_mode = _ask_dev_mode(preset)
     fused, default_name = _ask_fused_workflows(preset)
@@ -150,6 +156,7 @@ def interview(
     ref_folders = _ask_ref_folders()
     return _build_answers(
         locale=locale,
+        targets=targets,
         preset=preset,
         dev_mode=dev_mode,
         fused_workflows=fused,
@@ -173,6 +180,39 @@ def _ask_locale() -> str:
     )
     cleaned = raw.strip()
     return cleaned or _DEFAULT_LOCALE
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Targets (multi-select; preset/dev_mode 와 직교한 IDE 타깃 축)
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def _ask_targets() -> list[Target]:
+    """IDE target multi-select. comma-separated; 빈 입력은 default [claude-code].
+
+    PLAN-cursor-target-support.md § Targets 정책: single source 원칙으로
+    ``.claude/agents/``, ``.claude/skills/``, ``.claude/hooks/`` 는 양쪽 IDE 가
+    공유; cursor target 추가 시 ``.cursor/rules/``, ``.cursor/commands/``,
+    ``.cursor/mcp.json`` 도 렌더.
+    """
+    options = ", ".join(t.value for t in Target)
+    default = Target.CLAUDE_CODE.value
+    raw = _input_or_empty(
+        f"IDE targets [{options}] — comma-separated for multi-select ({default}): ",
+    )
+    cleaned = raw.strip().lower()
+    if not cleaned:
+        return [Target.CLAUDE_CODE]
+    out: list[Target] = []
+    for token in cleaned.split(","):
+        s = token.strip()
+        if not s:
+            continue
+        try:
+            out.append(Target(s))
+        except ValueError:
+            print(f"  warning: unknown target {s!r} — skipped")
+    return out or [Target.CLAUDE_CODE]
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -377,6 +417,7 @@ def _ask_with_default(label: str, default: str) -> str:
 def _build_answers(
     *,
     locale: str,
+    targets: list[Target],
     preset: Preset,
     dev_mode: DevMode,
     fused_workflows: dict[str, list[AtomicStage]],
@@ -388,6 +429,7 @@ def _build_answers(
     is_side = preset == Preset.SIDE
     return InterviewAnswers(
         locale=locale,
+        targets=list(targets),
         preset=preset,
         dev_mode=dev_mode,
         fused_workflows=fused_workflows,
@@ -451,8 +493,11 @@ def answers_from_harness_yaml(yaml_path: Path) -> InterviewAnswers | None:
     if default_workflow not in fused_workflows:
         default_workflow = next(iter(fused_workflows))
 
+    targets = _parse_targets(data.get("targets"))
+
     base = _build_answers(
         locale=_string_or(data.get("locale"), "en"),
+        targets=targets,
         preset=preset,
         dev_mode=dev_mode,
         fused_workflows=fused_workflows,
@@ -500,6 +545,37 @@ def answers_from_harness_yaml(yaml_path: Path) -> InterviewAnswers | None:
         update["max_review_rounds"] = max_review_rounds
 
     return base.model_copy(update=update)
+
+
+def _parse_targets(raw: object) -> list[Target]:
+    """yaml ``targets`` 키 파싱. 부재/잘못된 형식 시 [claude-code] fallback +
+    경고 로그 (Phase 2.0 의 model 단 책임 이전 — yaml-aware loader 가 처리).
+    """
+    if raw is None:
+        logger.warning(
+            "harness.yaml has no `targets` key — falling back to [claude-code]. "
+            "Re-run interview to opt into Cursor support.",
+        )
+        return [Target.CLAUDE_CODE]
+    if not isinstance(raw, list):
+        logger.warning(
+            "harness.yaml `targets` is not a list — falling back to [claude-code].",
+        )
+        return [Target.CLAUDE_CODE]
+    out: list[Target] = []
+    for item in raw:
+        if not isinstance(item, str):
+            continue
+        try:
+            out.append(Target(item))
+        except ValueError:
+            continue
+    if not out:
+        logger.warning(
+            "harness.yaml `targets` had no valid entries — falling back to [claude-code].",
+        )
+        return [Target.CLAUDE_CODE]
+    return out
 
 
 def _parse_workflows(

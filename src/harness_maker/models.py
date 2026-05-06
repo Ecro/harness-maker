@@ -270,6 +270,12 @@ class InterviewAnswers(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
 
     locale: str = "en"
+    # IDE target multi-select (preset/dev_mode 와 직교). 빈 list 거부 (min_length=1).
+    # 인터뷰 default 는 [claude-code]; cursor 는 명시 multi-select.
+    targets: list[Target] = Field(
+        default_factory=lambda: [Target.CLAUDE_CODE],
+        min_length=1,
+    )
     preset: Preset = Preset.SIDE
     dev_mode: DevMode = DevMode.SPEC_DRIVEN
     domains: list[str] = Field(default_factory=list)

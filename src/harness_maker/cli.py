@@ -272,6 +272,7 @@ def _apply_dimension_overrides(
             # locale, etc.).
             rebuilt = _build_answers(
                 locale=answers.locale,
+                targets=list(answers.targets),
                 preset=new_preset,
                 dev_mode=answers.dev_mode,
                 fused_workflows=answers.fused_workflows,

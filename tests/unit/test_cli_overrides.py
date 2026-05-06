@@ -7,12 +7,13 @@ import typer
 
 from harness_maker.cli import _apply_dimension_overrides
 from harness_maker.interview import _build_answers
-from harness_maker.models import AtomicStage, DevMode, Preset
+from harness_maker.models import AtomicStage, DevMode, Preset, Target
 
 
 def _baseline_side() -> object:
     return _build_answers(
         locale="en",
+        targets=[Target.CLAUDE_CODE],
         preset=Preset.SIDE,
         dev_mode=DevMode.TASK_DRIVEN,
         fused_workflows={
