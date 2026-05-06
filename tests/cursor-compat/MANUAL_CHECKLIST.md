@@ -200,3 +200,55 @@ claude --version
 - **A1–A4 모두 PASS**: `PLAN-cursor-target-support.md` Phase 2 (myplan) 진입
 - **일부 FAIL**: PLAN §3 "Fail 시 영향" 행 적용 → 본 PLAN 갱신 후 재 review
 - **PARTIAL** (자연어 fallback 으로만 작동): Phase 2 에서 onboarding 가이드 추가로 처리. PASS 로 분류.
+
+---
+
+## Phase 2.8 — Production hook 작동 검증
+
+> 위 A1–A4 manual checklist 와 별도. **Phase 1 fixture 의 simple echo hook**
+> 이 fire 되더라도 production 은 `uv run --with <pkg> python -m
+> harness_maker.gates.X` 패턴으로 호출 — 이 production-style command 가 Cursor
+> IDE 환경에서 실제 작동하는지 검증.
+
+### 절차 (Cursor IDE)
+
+1. **실제 프로젝트** (또는 이 repo) 의 `.claude/` 가 비어있는 디렉토리에서:
+   ```bash
+   /harness-maker:make
+   ```
+   인터뷰에서 `targets=[claude-code, cursor]` 또는 `[cursor]` 선택.
+2. 렌더된 `.claude/hooks/hooks.json` 확인 — `PreToolUse` matcher 와 command:
+   ```bash
+   jq '.hooks.PreToolUse' .claude/hooks/hooks.json
+   ```
+   command 가 `uv run --with /path/to/harness-maker python -m harness_maker.gates.permission_gate` 형식이어야.
+3. Cursor IDE 에서 도구 사용 (예: 파일 편집) 시도:
+   - **Claude Code 회귀**: 기준선으로 동작 확인 — Claude Code 에서 hook fire +
+     `permission_gate` 실행 + exit 0 또는 stderr 메시지 보임
+   - **Cursor 검증**: 같은 도구 사용 → hook fire 확인
+4. 검증 항목:
+   - **`Phase2.8.fire`**: Cursor 가 `PreToolUse` matcher 의 command 를 trigger 하는가?
+   - **`Phase2.8.uv-resolves`**: `uv run --with <path>` 의 path resolution 이
+     Cursor 환경에서 작동하는가? (`harness_maker_src_path` jinja 변수 → render
+     시 절대 경로 박힘)
+   - **`Phase2.8.module-loads`**: `python -m harness_maker.gates.permission_gate`
+     가 ImportError / ModuleNotFoundError 없이 실행되는가?
+   - **`Phase2.8.exit-clean`**: hook command 가 exit 0 또는 graceful exit 2 (블록)
+     로 종료하는가? Stack trace 없음.
+
+### 기록 (RESULTS.md)
+
+위 4 항목별 PASS/FAIL 을 RESULTS.md 의 Phase 2.8 row 에 채움. FAIL 시
+사유와 stderr 캡처를 비고에 기록.
+
+### Fail 시 분기
+
+- `Phase2.8.fire` FAIL → Cursor 의 hook event 매핑 (camelCase vs PascalCase)
+  재검증 + `.cursor/hooks.json` 별도 렌더 + 스키마 변환 layer 도입
+- `Phase2.8.uv-resolves` FAIL → harness-maker 가 `uv` 의존성 명시 또는
+  Cursor 환경에서의 PATH 전파 가이드 필요
+- `Phase2.8.module-loads` FAIL → harness-maker 가 dev dep 으로 사용자 프로젝트
+  에 등록되어 있는지 확인 (`pyproject.toml` 의 dependency-groups.dev) +
+  installation 가이드 갱신
+- `Phase2.8.exit-clean` FAIL → `harness_maker.gates.X` 의 graceful exit
+  policy 검토 + uncaught exception 의 user-facing message 개선

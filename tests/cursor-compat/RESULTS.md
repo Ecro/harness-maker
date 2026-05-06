@@ -74,3 +74,18 @@
 - 본 검증은 manual. CI 자동화는 불가 (사용자가 Cursor IDE 사용, CLI 사용 X).
 - 회귀 방지는 (a) 본 fixture + manual checklist 를 release 마다 1회 재실행, (b) unit + snapshot test 로 디스크 산출물 (frontmatter, parser 정합성, render 결정성) 을 CI 에서 잡음.
 - `.gitignore` 가 IDE 자동 생성 파일 (`.cursor/`, `.claude/settings.local.json` 등) 을 가려주므로 fixture 는 검증 사이에 깨끗 유지.
+
+---
+
+## Phase 2.8 — Production hook 작동 검증
+
+> Phase 2.4 의 reconcile 매트릭스 대신 production-style hook command
+> (`uv run --with <pkg> python -m harness_maker.gates.X`) 가 Cursor IDE 에서
+> 실제로 작동하는지 검증. 절차: `MANUAL_CHECKLIST.md` 의 Phase 2.8 섹션.
+
+| 가정 | 검증 항목 | Cursor 결과 | Claude Code 결과 | 비고 |
+|------|-----------|-------------|------------------|------|
+| **Phase 2.8** | hook fire on PreToolUse (`Phase2.8.fire`) | TBD | TBD | matcher: 우리 production hooks.json 의 PreToolUse |
+| **Phase 2.8** | `uv run --with <path>` resolves (`Phase2.8.uv-resolves`) | TBD | TBD | jinja `harness_maker_src_path` 가 정확한 absolute path 인지 |
+| **Phase 2.8** | `python -m harness_maker.gates.X` 모듈 로드 (`Phase2.8.module-loads`) | TBD | TBD | dev dep 또는 plugin install 필요 여부 |
+| **Phase 2.8** | hook command exit-clean (`Phase2.8.exit-clean`) | TBD | TBD | graceful exit 0 / 2 (block); stack trace 부재 |

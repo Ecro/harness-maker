@@ -126,6 +126,14 @@ Phase 1 fixture + manual checklist 작성 완료, 검증은 사용자 IDE 에서
   template update 는 사용자가 수동 delete + re-render 필요 — README 명시 +
   Phase 2.4+ 에 sidecar 메타 (`.hm-meta.yaml`) 도입 시 변경 가능
   (`test_reconcile_cursor_mdc_keeps_after_render`)
+- ⚠️ **Reconcile KEEP rule 의 일반 trade-off**: hash-가진 자산 (`harness.yaml`,
+  `CLAUDE.md`, agents/skills/commands) 도 옛 hash != 새 hash 시 KEEP rule 적용.
+  template 갱신 (예: Phase 2.7 의 `targets`/`recommended_model` 키 추가) 이
+  자동 propagation 안 됨 — 사용자가 수정 안 했어도 옛 yaml 그대로 보존.
+  Workaround: 사용자가 `harness.yaml` 수동 delete + `/harness-maker:make`
+  재실행 (또는 직접 yaml 편집). 1차 release 는 README/onboarding 가이드에
+  명시. Phase 2.4+ 의 sidecar 메타 도입 또는 yaml 의 special-case
+  (settings.json 같이 always-REPLACE) 로 향후 개선 가능.
 - ✅ B13 자동화 테스트 PASS — Phase 1 acceptance 의 deferred 항목 closed
   (`test_reconcile_cursor_first_render_returns_both`)
 - ✅ Path resolution critical bug fix (CLI 가 `.claude/` 를 target_dir 로 호출 시
@@ -185,29 +193,54 @@ Phase 1 fixture + manual checklist 작성 완료, 검증은 사용자 IDE 에서
 
 ---
 
-### Phase 2.7 — Snapshot tests
+### Phase 2.7 — Snapshot tests + critical bug fix
 
 **Files**:
-- `tests/snapshots/cursor_target/` (신규) — `targets=[cursor]` render 결과 snapshot
-- `tests/snapshots/both_target/` (신규) — `targets=[claude-code, cursor]` render 결과 snapshot
-- `tests/integration/test_render_snapshots.py` 확장 — Cursor target 케이스 추가 (`freeze_time` + `normalize_for_snapshot`)
-- `tests/unit/test_render_determinism.py` — 같은 input 으로 두 번 render 시 byte-identical
+- `src/harness_maker/templates/harness-yaml/Side.yaml.j2` +
+  `Production.yaml.j2`: **critical bug fix** — `targets` 와
+  `recommended_model` 키가 yaml output 에 박지 않던 누락 (Phase 2.0/2.1 의
+  buf 가 Phase 2.7 진행 중 발견). 사용자가 cursor 선택해도 yaml 에 박지
+  않으면 next render 시 옛 yaml 으로 인식되어 silent fallback
+  `[claude-code]`. fix 후 yaml 에 `targets: [claude-code, cursor]` +
+  `recommended_model: claude-opus-4-7` 명시.
+- `tests/snapshot/*.expected.yaml` × 8: 모두 regenerate.py 로 갱신
+  (file_count 동일, body_sha256 만 변화 — yaml template 의 새 키 추가 반영).
+- `tests/unit/test_render.py`: cursor target snapshot section 추가 (3 tests):
+  - `test_render_cursor_target_byte_identical_across_runs`
+  - `test_render_both_targets_byte_identical_across_runs`
+  - `test_render_cursor_target_writes_targets_to_harness_yaml`
 
 **Acceptance**:
-- 모든 snapshot 결정성 (`generated_at` 마스크 외 모든 필드 frozen)
-- regression 0 (`targets=[claude-code]` snapshot 이 기존과 동일)
+- ✅ snapshot 결정성 — `freeze_time=DEFAULT_FREEZE_TIME` 으로 두 번 render 시
+  byte-identical (cursor only / both targets 모두).
+- ✅ regression 0 — 기존 8 snapshot 들의 file_count 동일, body_sha256 만
+  template 변경에 따라 갱신 (path / template / file_count 변화 없음).
+- ✅ harness.yaml 의 `targets` / `recommended_model` 키가 실제 박힘 — re-render
+  시 옛 yaml fallback 회피, 사용자 선택 보존
+  (`test_render_cursor_target_writes_targets_to_harness_yaml`).
+- ✅ End-to-end round-trip 보장 — `synthesize → render → answers_from_harness_yaml`
+  이 `targets` 를 정확히 복원 (CLAUDE.md 체크리스트 #6, 양방향 매퍼)
+  (`test_round_trip_targets_via_render_and_reverse`,
+   `test_round_trip_cursor_only_targets`).
 
 ---
 
 ### Phase 2.8 — Production hook 작동 검증 (manual)
 
 **Files**:
-- `tests/cursor-compat/MANUAL_CHECKLIST.md` 의 Phase 2 검증 step 추가 — production-style hook command (`uv run --with ... python -m harness_maker.gates.spec_gate`) 가 Cursor IDE 에서 실제 작동
-- `tests/cursor-compat/RESULTS.md` 의 메타 표에 "Phase 2 production hook" 행 추가
+- ✅ `tests/cursor-compat/MANUAL_CHECKLIST.md` 끝에 "Phase 2.8 — Production
+  hook 작동 검증" 섹션 추가. 4 검증 항목 (`Phase2.8.fire`, `.uv-resolves`,
+  `.module-loads`, `.exit-clean`) + 각 항목별 fail-시-분기 명시 (스키마 변환
+  layer / uv 의존성 명시 / dev dep 등록 / graceful exit 정책).
+- ✅ `tests/cursor-compat/RESULTS.md` 끝에 Phase 2.8 결과 표 추가
+  (4 rows × `Cursor 결과` / `Claude Code 결과`).
 
 **Acceptance**:
-- production hook command 가 Cursor IDE 에서 fire + 정상 종료 확인 (manual)
-- 결과 RESULTS.md 에 기록
+- Production hook command (`uv run --with <path> python -m
+  harness_maker.gates.X`) 가 Cursor IDE 에서 fire + module 로드 + clean exit
+  되는지 manual 검증 절차 정의 (1차 release 의 dogfooding 시점에 사용자가
+  실 IDE 에서 따라가서 RESULTS.md row 채움).
+- Phase 1 acceptance 의 A1–A4 와 함께 dogfooding manual 검증으로 통합.
 
 ---
 

@@ -306,3 +306,80 @@ def test_render_claude_only_target_omits_cursor_directory(tmp_path: Path) -> Non
 
     cursor_dir = project_root / ".cursor"
     assert not cursor_dir.exists()
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Cursor target snapshot determinism — Phase 2.7
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def _collect(root: Path) -> dict[Path, bytes]:
+    return {p.relative_to(root): p.read_bytes() for p in root.rglob("*") if p.is_file()}
+
+
+def test_render_cursor_target_byte_identical_across_runs(tmp_path: Path) -> None:
+    """Phase 2.7: targets=[cursor] 두 번 render → byte-identical (frozen time)."""
+    from harness_maker.models import Target
+
+    p = ProjectProfile(stack=["python"], scale="small", lifecycle="experiment")
+    a = interview(p, autoloop_mode=True).model_copy(update={"targets": [Target.CURSOR]})
+
+    def _run(root: Path) -> dict[Path, bytes]:
+        target = root / ".claude"
+        target.mkdir()
+        bp = synthesize(p, a)
+        render(bp, target, freeze_time=DEFAULT_FREEZE_TIME)
+        return _collect(root)
+
+    r1 = tmp_path / "r1"
+    r1.mkdir()
+    r2 = tmp_path / "r2"
+    r2.mkdir()
+    assert _run(r1) == _run(r2)
+
+
+def test_render_both_targets_byte_identical_across_runs(tmp_path: Path) -> None:
+    """Phase 2.7: targets=[claude-code, cursor] 두 번 render → byte-identical."""
+    from harness_maker.models import Target
+
+    p = ProjectProfile(stack=["python"], scale="small", lifecycle="experiment")
+    a = interview(p, autoloop_mode=True).model_copy(
+        update={"targets": [Target.CLAUDE_CODE, Target.CURSOR]},
+    )
+
+    def _run(root: Path) -> dict[Path, bytes]:
+        target = root / ".claude"
+        target.mkdir()
+        bp = synthesize(p, a)
+        render(bp, target, freeze_time=DEFAULT_FREEZE_TIME)
+        return _collect(root)
+
+    r1 = tmp_path / "r1"
+    r1.mkdir()
+    r2 = tmp_path / "r2"
+    r2.mkdir()
+    assert _run(r1) == _run(r2)
+
+
+def test_render_cursor_target_writes_targets_to_harness_yaml(tmp_path: Path) -> None:
+    """Phase 2.7 bug fix: targets / recommended_model 키가 harness.yaml 에
+    실제로 박힘 — 그렇지 않으면 re-render 시 옛 yaml 으로 잘못 인식되어
+    silent fallback (`[claude-code]`) 으로 cursor 선택 손실. Phase 2.0/2.1 의
+    누락이 Phase 2.7 진행 중 발견되어 fix.
+    """
+    from harness_maker.models import Target
+
+    project_root = tmp_path
+    target = project_root / ".claude"
+    target.mkdir()
+
+    p = ProjectProfile(stack=["python"], scale="small", lifecycle="experiment")
+    a = interview(p, autoloop_mode=True).model_copy(
+        update={"targets": [Target.CLAUDE_CODE, Target.CURSOR]},
+    )
+    bp = synthesize(p, a)
+    render(bp, target, freeze_time=DEFAULT_FREEZE_TIME)
+
+    yaml_text = (target / "harness.yaml").read_text(encoding="utf-8")
+    assert "targets: [claude-code, cursor]" in yaml_text
+    assert "recommended_model: claude-opus-4-7" in yaml_text
