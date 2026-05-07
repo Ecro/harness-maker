@@ -155,11 +155,30 @@ def _rubric_files() -> list[FileSpec]:
     ]
 
 
-def _base_files(preset: Preset) -> list[FileSpec]:
+# Locales that ship with first-party prose templates. Anything else falls back
+# to the English copy silently — matches `i18n.t()` fallback behavior in
+# `models.Locale` so users get readable assets regardless of free-text tag.
+_TEMPLATE_LOCALES: frozenset[str] = frozenset({"en", "ko"})
+
+
+def _localized(stem: str, locale: str) -> str:
+    """Pick `<stem>.<locale>.md.j2`, falling back to `.en` for unknown locales.
+
+    Why: `harness.yaml.locale` is free-text (`models.HarnessConfig.locale`).
+    Built-in catalogs only cover en/ko. Without this fallback an unknown
+    locale (or a placeholder default) would resolve to a missing template
+    file and the renderer would crash mid-blueprint.
+    """
+    suffix = locale if locale in _TEMPLATE_LOCALES else "en"
+    return f"{stem}.{suffix}.md.j2"
+
+
+def _base_files(preset: Preset, locale: str = "en") -> list[FileSpec]:
     """Shared base: stages + atomic commands + all agents/skills + fixed assets.
 
-    The only preset-dependent files are harness.yaml, settings.json, and
-    CLAUDE.md (which currently share a Side/Production split per locale).
+    Preset gates the structural variants (harness.yaml / settings.json /
+    CLAUDE.md). Locale gates the prose-only templates (CLAUDE.md +
+    memory/{failures,wiki}). Unknown locales silently fall back to en.
     """
     yaml_template = (
         "harness-yaml/Side.yaml.j2" if preset == Preset.SIDE else "harness-yaml/Production.yaml.j2"
@@ -167,12 +186,13 @@ def _base_files(preset: Preset) -> list[FileSpec]:
     settings_template = (
         "settings/Side.json.j2" if preset == Preset.SIDE else "settings/Production.json.j2"
     )
+    claude_md_stem = "claude-md/Side" if preset == Preset.SIDE else "claude-md/Production"
     return [
         (yaml_template, "harness.yaml", {}),
         (settings_template, "settings.json", {}),
-        ("claude-md/Side.ko.md.j2", "../CLAUDE.md", {}),
-        ("memory/failures.ko.md.j2", "memory/failures.md", {}),
-        ("memory/wiki.ko.md.j2", "memory/wiki.md", {}),
+        (_localized(claude_md_stem, locale), "../CLAUDE.md", {}),
+        (_localized("memory/failures", locale), "memory/failures.md", {}),
+        (_localized("memory/wiki", locale), "memory/wiki.md", {}),
         ("memory/session-readme.md.j2", "memory/session/README.md", {}),
         *_stage_files(),
         *_atomic_command_files(),
@@ -188,7 +208,8 @@ def _base_files(preset: Preset) -> list[FileSpec]:
 
 
 # Public skeletons retained for backwards-compat counts in tests; both presets
-# now install the full inventory.
+# now install the full inventory. These default to en — locale-specific
+# fan-out is exercised through synthesize() at request time.
 SIDE_FILES: list[FileSpec] = _base_files(Preset.SIDE)
 PRODUCTION_FILES: list[FileSpec] = _base_files(Preset.PRODUCTION)
 
@@ -257,7 +278,7 @@ def synthesize(
     Workflow command FileEntries are generated from `answers.fused_workflows`.
     """
     effective_preset = preset or answers.preset
-    base_specs = _base_files(effective_preset)
+    base_specs = _base_files(effective_preset, answers.locale)
 
     file_specs: list[FileSpec] = [
         *base_specs,

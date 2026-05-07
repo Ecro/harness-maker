@@ -1,29 +1,33 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.5.5
+harness_maker_version: 0.5.7
 generated_at: '2026-01-01T00:00:00+00:00'
-source_template: claude-md/Side.ko.md.j2
+source_template: claude-md/Production.en.md.j2
 provenance: official
-content_hash: dc174fe33af6fe92c490732e242abcb7fdb4ed9e94dd932a22dc8a32ef91b1bf
+content_hash: 7432d856351787fc797ac14173bc8d3b453b96c1af44c1e70d917e23546d90e0
 ---
 # CLAUDE.md — Production preset
 
-> Phase 3 stub. Phase 6에서 locale별 + preset별로 본문이 채워집니다.
+> Phase 3 stub. Phase 6 fills in the locale × preset content.
 
-## 워크플로우
+## Workflow
 
-기본: `/hm:exec-rev-wrap-ver` — atomic stage들을 묶은 워크플로우.
+Default: `/hm:exec-rev-wrap-ver` — a fused workflow that chains atomic stages.
 
-## 캐싱
+## Reviewers
 
-`agent-aware` — Phase 6에서 prompt cache 전략 문서화.
+consensus: `cross-check` — Phase 9 adds the security gate.
 
-## 메모리
+## Caching
 
-per-repo memory 활성화 여부는 `harness.yaml` 참조.
+`agent-aware` — per-agent prompt cache + session cache.
+
+## Autoloop / Worktree
+
+autoloop / worktree toggles live in `harness.yaml`.
 
 <!-- @hm:user:project-rules -->
-<!-- 프로젝트 고유 규칙 (코딩 스타일, 도메인 용어, 에이전트 호출 관례 등). harness-maker 업데이트 시 보존. -->
+<!-- Project-specific rules (coding style, domain terms, agent invocation conventions). Preserved across harness-maker upgrades. -->
 <!-- @hm:/user:project-rules -->
 
 <!-- @hm:user:extensions -->

@@ -2,9 +2,17 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from harness_maker.interview import interview
 from harness_maker.models import Blueprint, FileEntry, Preset, ProjectProfile
-from harness_maker.synthesize import PRODUCTION_FILES, SIDE_FILES, synthesize
+from harness_maker.synthesize import (
+    PRODUCTION_FILES,
+    SIDE_FILES,
+    _base_files,
+    _localized,
+    synthesize,
+)
 
 
 def _profile(scale: str = "small", lifecycle: str = "experiment") -> ProjectProfile:
@@ -159,3 +167,76 @@ def test_synthesize_targets_propagates_to_harness_config() -> None:
     )
     bp = synthesize(p, a)
     assert bp.config.targets == [Target.CLAUDE_CODE, Target.CURSOR]
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Locale routing — _localized() helper + _base_files() locale fan-out
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def test_localized_returns_en_for_english_locale() -> None:
+    assert _localized("claude-md/Side", "en") == "claude-md/Side.en.md.j2"
+
+
+def test_localized_returns_ko_for_korean_locale() -> None:
+    assert _localized("claude-md/Side", "ko") == "claude-md/Side.ko.md.j2"
+
+
+def test_localized_falls_back_to_en_for_unknown_locale() -> None:
+    """Free-text locales (any tag) silently route to en — matches i18n.t() behavior."""
+    assert _localized("memory/wiki", "ja") == "memory/wiki.en.md.j2"
+    assert _localized("memory/wiki", "fr-CA") == "memory/wiki.en.md.j2"
+    assert _localized("memory/wiki", "") == "memory/wiki.en.md.j2"
+
+
+def test_base_files_default_locale_is_en() -> None:
+    specs = _base_files(Preset.SIDE)
+    templates = {t for t, _, _ in specs}
+    assert "claude-md/Side.en.md.j2" in templates
+    assert "memory/failures.en.md.j2" in templates
+    assert "memory/wiki.en.md.j2" in templates
+
+
+def test_base_files_routes_to_ko_when_requested() -> None:
+    specs = _base_files(Preset.SIDE, "ko")
+    templates = {t for t, _, _ in specs}
+    assert "claude-md/Side.ko.md.j2" in templates
+    assert "memory/failures.ko.md.j2" in templates
+    assert "memory/wiki.ko.md.j2" in templates
+
+
+def test_base_files_unknown_locale_falls_back_to_en() -> None:
+    specs = _base_files(Preset.PRODUCTION, "fr")
+    templates = {t for t, _, _ in specs}
+    assert "claude-md/Production.en.md.j2" in templates
+    assert "memory/failures.en.md.j2" in templates
+
+
+def test_synthesize_with_en_locale_picks_en_templates() -> None:
+    p = _profile()
+    a = interview(p, autoloop_mode=True).model_copy(update={"locale": "en"})
+    bp = synthesize(p, a)
+    # locate the CLAUDE.md FileEntry — its `template` field tells us what was picked
+    claude_md = next(f for f in bp.files if str(f.path) == "../CLAUDE.md")
+    assert claude_md.template == "claude-md/Side.en.md.j2"
+
+
+def test_synthesize_with_ko_locale_picks_ko_templates() -> None:
+    p = _profile()
+    a = interview(p, autoloop_mode=True).model_copy(update={"locale": "ko"})
+    bp = synthesize(p, a)
+    claude_md = next(f for f in bp.files if str(f.path) == "../CLAUDE.md")
+    assert claude_md.template == "claude-md/Side.ko.md.j2"
+
+
+def test_localized_template_files_exist_on_disk() -> None:
+    """Each path that `_localized()` can return must point at a real template file.
+
+    Guards against silent breakage when someone removes a template without
+    updating the locale routing.
+    """
+    template_dir = Path(__file__).resolve().parents[2] / "src" / "harness_maker" / "templates"
+    for stem in ("claude-md/Side", "claude-md/Production", "memory/failures", "memory/wiki"):
+        for locale in ("en", "ko"):
+            path = template_dir / _localized(stem, locale)
+            assert path.is_file(), f"missing template: {path}"

@@ -1,22 +1,14 @@
----
-generated_by: harness-maker
-harness_maker_version: 0.5.7
-generated_at: '2026-01-01T00:00:00+00:00'
-source_template: claude-md/Side.en.md.j2
-provenance: official
-content_hash: 89714642c2d3a511b544f62c990c97856c7d59cf452299854e818e9daf4b1055
----
-# CLAUDE.md — Side preset
+# CLAUDE.md — {{ preset }} preset
 
 > Phase 3 stub. Phase 6 fills in the locale × preset content.
 
 ## Workflow
 
-Default: `/hm:exec-rev-wrap` — a fused workflow that chains atomic stages.
+Default: `/hm:{{ config.default_workflow }}` — a fused workflow that chains atomic stages.
 
 ## Caching
 
-`agent-aware` — Phase 6 documents the prompt cache strategy.
+`{{ config.caching }}` — Phase 6 documents the prompt cache strategy.
 
 ## Memory
 

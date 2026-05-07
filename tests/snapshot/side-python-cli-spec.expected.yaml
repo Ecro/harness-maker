@@ -3,8 +3,8 @@ dev_mode: spec-driven
 file_count: 52
 files:
 - path: ../CLAUDE.md
-  template: claude-md/Side.ko.md.j2
-  body_sha256: 89691bac123e588498b71ce76b7543eb88488459f1e71516368dcff428dea3d3
+  template: claude-md/Side.en.md.j2
+  body_sha256: 89714642c2d3a511b544f62c990c97856c7d59cf452299854e818e9daf4b1055
 - path: agents/autoloop-coder.md
   template: agents/autoloop-coder.md.j2
   body_sha256: 2cecd74dae60e11989a7ed2af7973636a169186495f374168f3054fc92ba2a2e
@@ -78,14 +78,14 @@ files:
   template: hooks/hooks.json.j2
   body_sha256: 3342fa848eedc2fd3e185b5d096b96d79a1e38ce75352a5521daded4a26d6941
 - path: memory/failures.md
-  template: memory/failures.ko.md.j2
-  body_sha256: e2a61ec8f575a19a1240f5928e48a0bb854f0a36817cf72876ff04069e9add37
+  template: memory/failures.en.md.j2
+  body_sha256: 87d014117a5c313258f506bf993bd1b56241281b849e9c92a253406cc88452ad
 - path: memory/session/README.md
   template: memory/session-readme.md.j2
   body_sha256: 4363ed627b31f0b3ffaa92d8b20f070f8c96039cd59056aea6133760d3d5dd4b
 - path: memory/wiki.md
-  template: memory/wiki.ko.md.j2
-  body_sha256: b6878b767f5a8b3fa842b5fb9959d7193164fb7de026d8b79bf5eadf6569d891
+  template: memory/wiki.en.md.j2
+  body_sha256: 8ff345004c8148e7ad80d90f8141e3b4998db47b11d9ec5db5345e6f396338f2
 - path: observability/dashboard.md
   template: observability/dashboard.md.j2
   body_sha256: eee6c910e0302f8cb0391482ec61c9f9dd3a4b59a38bddb5c5274fc39cb58608
