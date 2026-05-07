@@ -1,7 +1,22 @@
-"""PostToolUse telemetry hook — appends one JSONL line to .claude/observability/metrics.jsonl.
+"""Hybrid telemetry hook — adapts to both Claude Code and Cursor IDE.
 
 Per amendment §H. Hook input arrives via stdin as JSON; output is "ok" on stdout.
-Must NEVER crash Claude Code: malformed input → empty entry, exit 0.
+Must NEVER crash Claude Code or Cursor: malformed input → empty entry, exit 0.
+
+Event shapes (PLAN-cursor-rootcause.md follow-up):
+
+- **post_tool_use** (Claude Code PostToolUse): payload has `tool_name` + `usage`.
+  We extract token counts for cache-diagnostic Layer 3.
+- **stop** (Cursor stop): payload has `status` / `loop_count` / `duration_ms` but
+  NO `usage` (Cursor does not surface tokens in any hook event — confirmed by
+  Cursor team in <https://forum.cursor.com/t/cursordiskkv-table-records-always-show-0-for-tokencount/155984>).
+  We capture per-turn signals; cache_diagnostics filters these out so they
+  don't pollute hit-rate calculation.
+- **unknown**: minimal entry (timestamp + event hint) — never silently skip.
+
+Each entry carries an `event` field so downstream readers can filter cleanly.
+Older entries (pre-0.5.4) lacked this field; cache_diagnostics treats absent
+`event` as `post_tool_use` for backward compatibility.
 """
 
 from __future__ import annotations
@@ -14,17 +29,45 @@ from pathlib import Path
 from typing import Any
 
 
+def _detect_event(data: dict[str, Any]) -> str:
+    """Classify payload shape into a known event type.
+
+    Order matters: tool_name is the strongest signal (post_tool_use carries
+    it on both IDEs). status/loop_count are unique to Cursor's stop event.
+    Anything else (e.g. session_start with no useful fields) → unknown.
+    """
+    if "tool_name" in data:
+        return "post_tool_use"
+    if "status" in data or "loop_count" in data or "duration_ms" in data:
+        return "stop"
+    return "unknown"
+
+
 def _build_entry(data: dict[str, Any]) -> dict[str, Any]:
-    raw_usage = data.get("usage")
-    usage: dict[str, Any] = raw_usage if isinstance(raw_usage, dict) else {}
-    return {
+    """Adapt the stdin payload to a JSONL entry tagged by event type."""
+    event = _detect_event(data)
+    entry: dict[str, Any] = {
         "timestamp": datetime.now(UTC).isoformat(),
-        "input_tokens": usage.get("input_tokens", 0),
-        "output_tokens": usage.get("output_tokens", 0),
-        "cache_read_tokens": usage.get("cache_read_input_tokens", 0),
-        "cache_creation_tokens": usage.get("cache_creation_input_tokens", 0),
-        "tool_name": data.get("tool_name"),
+        "event": event,
     }
+    if event == "post_tool_use":
+        raw_usage = data.get("usage")
+        usage: dict[str, Any] = raw_usage if isinstance(raw_usage, dict) else {}
+        entry["tool_name"] = data.get("tool_name")
+        entry["input_tokens"] = usage.get("input_tokens", 0)
+        entry["output_tokens"] = usage.get("output_tokens", 0)
+        entry["cache_read_tokens"] = usage.get("cache_read_input_tokens", 0)
+        entry["cache_creation_tokens"] = usage.get("cache_creation_input_tokens", 0)
+    elif event == "stop":
+        # Cursor stop fires once per agent turn — meaningful per-turn signal
+        # even though tokens aren't available. status/loop_count/duration_ms
+        # power custom dashboards; conversation_id allows cross-session join.
+        entry["status"] = data.get("status")
+        entry["loop_count"] = data.get("loop_count")
+        entry["duration_ms"] = data.get("duration_ms")
+        entry["model"] = data.get("model")
+        entry["conversation_id"] = data.get("conversation_id")
+    return entry
 
 
 def main() -> int:

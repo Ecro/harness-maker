@@ -186,21 +186,37 @@ def diagnose_cache(
             "Check file permissions on .claude/observability/metrics.jsonl",
         )
 
+    # Walk backwards from the tail, collecting the last `window`
+    # post_tool_use entries even when the file is dominated by Cursor `stop`
+    # entries (those carry no tokens — see telemetry.py docstring). Treat
+    # entries lacking the `event` tag as post_tool_use for backward compat
+    # with pre-0.5.4 metrics files.
     entries: list[dict[str, Any]] = []
-    for line in lines[-window:]:
+    for line in reversed(lines):
         if not line.strip():
             continue
         try:
             parsed = json.loads(line)
         except (json.JSONDecodeError, ValueError):
             continue
-        if isinstance(parsed, dict):
-            entries.append(parsed)
+        if not isinstance(parsed, dict):
+            continue
+        event = parsed.get("event", "post_tool_use")
+        if event != "post_tool_use":
+            continue
+        entries.append(parsed)
+        if len(entries) >= window:
+            break
+    entries.reverse()  # restore chronological order for TTL gap calculation
 
     if not entries:
         return _no_data(
-            "metrics.jsonl exists but contains no parseable entries.",
-            "Use Claude Code for a few turns to accumulate telemetry.",
+            "metrics.jsonl exists but contains no token-bearing entries — "
+            "if running in Cursor IDE, this is expected (Cursor does not "
+            "surface token usage to hooks). Run from Claude Code for "
+            "cache-diagnostic data.",
+            "For Cursor users: cost data lives in cursor.com/settings → Usage. "
+            "For Claude Code: use it for a few turns to accumulate telemetry.",
         )
 
     threshold = _threshold_for_model(model)

@@ -304,3 +304,86 @@ def test_diagnose_counters_contain_all_classes(tmp_path: Path) -> None:
     res = diagnose_cache(p)
     assert res.counters["hit"] == 1
     assert res.counters["miss_first"] == 1
+
+
+# ── 0.5.4 hybrid telemetry: filter `event != post_tool_use` entries ─────────
+
+
+def test_diagnose_filters_cursor_stop_entries(tmp_path: Path) -> None:
+    """Cursor stop entries (event=stop, no token fields) must NOT pollute
+    the cache classification — they would all bucket as miss_min_threshold
+    (input_tokens=0 < threshold) and drag hit-rate to 0%."""
+    p = tmp_path / "metrics.jsonl"
+    _write_metrics(
+        p,
+        [
+            # 5 real tool calls, all hits
+            *(
+                {
+                    "timestamp": _ts(i * 30),
+                    "event": "post_tool_use",
+                    "tool_name": "Read",
+                    "input_tokens": 200,
+                    "cache_read_tokens": 5000,
+                }
+                for i in range(5)
+            ),
+            # 20 Cursor stop entries interspersed — must be ignored
+            *(
+                {
+                    "timestamp": _ts(150 + i),
+                    "event": "stop",
+                    "status": "completed",
+                    "loop_count": i,
+                }
+                for i in range(20)
+            ),
+        ],
+    )
+    res = diagnose_cache(p)
+    assert res.sample_size == 5  # only post_tool_use entries counted
+    assert res.hit_rate == 100  # not diluted by stop entries
+
+
+def test_diagnose_returns_no_data_when_only_stop_entries(tmp_path: Path) -> None:
+    """Pure Cursor session (only stop events, no token data) → no_data
+    diagnosis with Cursor-specific guidance, not silent miss bucket."""
+    p = tmp_path / "metrics.jsonl"
+    _write_metrics(
+        p,
+        [
+            {
+                "timestamp": _ts(i * 30),
+                "event": "stop",
+                "status": "completed",
+                "loop_count": i,
+            }
+            for i in range(10)
+        ],
+    )
+    res = diagnose_cache(p)
+    assert res.sample_size == 0
+    assert res.primary_failure == "no_data"
+    assert "cursor" in res.evidence.lower()
+
+
+def test_diagnose_treats_untagged_entries_as_post_tool_use(tmp_path: Path) -> None:
+    """Pre-0.5.4 metrics files lack the `event` field. Backward compat:
+    treat untagged entries as post_tool_use (their original purpose)."""
+    p = tmp_path / "metrics.jsonl"
+    _write_metrics(
+        p,
+        [
+            {
+                "timestamp": _ts(i * 30),
+                # NO event field — pre-0.5.4 schema
+                "tool_name": "Read",
+                "input_tokens": 200,
+                "cache_read_tokens": 5000,
+            }
+            for i in range(5)
+        ],
+    )
+    res = diagnose_cache(p)
+    assert res.sample_size == 5
+    assert res.hit_rate == 100
