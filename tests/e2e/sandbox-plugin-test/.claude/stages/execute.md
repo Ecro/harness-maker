@@ -4,7 +4,7 @@ harness_maker_version: 0.5.7
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: stages/execute.md.j2
 provenance: official
-content_hash: 32bb9393e22f76b37db598de8c3e44d9cec84c006ef6a7745e791177b7550e66
+content_hash: 946307effd2dace0012d2bf5b33f65d13dace61d07aface80a5aa311d91c1ebd
 ---
 # Stage: execute
 
@@ -105,13 +105,14 @@ nothing to finalize.
    - **Phase B** — Run tests; confirm RED for the right reasons
    - **Phase C** — Implement to GREEN. No untested code paths.
    - **Phase D** — Post-GREEN verification: ruff, mypy, full pytest, manual smoke
-3. Commit at phase boundaries with a message that maps to the PLAN phase.
+3. When a PLAN phase completes GREEN, verify the exit criterion passes. Leave
+   changes **unstaged or staged — do NOT commit**. Wrapup owns the commit.
 4. If a phase blocks: stop, document the blocker, escalate to the user
    rather than thrash. Do not silently change scope.
 
 ## Outputs
 
-- Code + tests committed to git
+- Code + tests **staged but not committed** (commit happens in wrapup)
 - Updated PLAN with phase status (in-progress / done / blocked)
 - Optional SESSION-{slug}-{date}.md when `--session` is set
 

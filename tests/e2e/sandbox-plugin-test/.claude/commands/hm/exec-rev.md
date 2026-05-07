@@ -4,7 +4,7 @@ harness_maker_version: 0.5.7
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: c0758b0a74d5f5521da711aafe71089980f16806ff455bead588fb1a184b97aa
+content_hash: 4771e92019bdd8572502e8748265dff79a498d41d88e7393e6e3255c6b6d00e1
 ---
 # /hm:exec-rev
 
@@ -112,13 +112,14 @@ nothing to finalize.
    - **Phase B** — Run tests; confirm RED for the right reasons
    - **Phase C** — Implement to GREEN. No untested code paths.
    - **Phase D** — Post-GREEN verification: ruff, mypy, full pytest, manual smoke
-3. Commit at phase boundaries with a message that maps to the PLAN phase.
+3. When a PLAN phase completes GREEN, verify the exit criterion passes. Leave
+   changes **unstaged or staged — do NOT commit**. Wrapup owns the commit.
 4. If a phase blocks: stop, document the blocker, escalate to the user
    rather than thrash. Do not silently change scope.
 
 ## Outputs
 
-- Code + tests committed to git
+- Code + tests **staged but not committed** (commit happens in wrapup)
 - Updated PLAN with phase status (in-progress / done / blocked)
 - Optional SESSION-{slug}-{date}.md when `--session` is set
 

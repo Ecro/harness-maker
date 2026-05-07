@@ -5,7 +5,7 @@ generated_at: '2026-01-01T00:00:00+00:00'
 source_template: memory/failures.en.md.j2
 provenance: official
 ---
-# Failures Log — Production preset
+# Failures Log — Side preset
 
 > Repeated mistakes / pitfalls in this project. The wrapup stage appends entries automatically.
 >

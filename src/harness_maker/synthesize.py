@@ -45,6 +45,7 @@ _ALL_AGENTS: list[str] = [
     "consensus-arbiter",
     "executor",
     "performance-reviewer",
+    "plan-validator",
     "security-auditor",
     "security-reviewer",
     "ux-reviewer",

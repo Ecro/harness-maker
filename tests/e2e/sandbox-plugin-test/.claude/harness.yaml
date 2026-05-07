@@ -4,7 +4,7 @@ harness_maker_version: 0.5.7
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: harness-yaml/Production.yaml.j2
 provenance: official
-content_hash: fd5fd145497c9fe75fd1aa9014e6d45e3babe43880aa423f61e62f055743e82c
+content_hash: 31919e2c48ff2b8b3f8ec2d9f131dc8fffde9873bf8e4424d4d843319b64dfcc
 ---
 preset: Production
 locale: en
@@ -90,6 +90,7 @@ skills:
     - security-scanner
     - context-linter
     - research-crawler
+    - refdocs-search
 
 worktree:
   scope: [execute, plan]

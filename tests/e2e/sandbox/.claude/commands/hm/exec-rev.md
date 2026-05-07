@@ -4,7 +4,7 @@ harness_maker_version: 0.5.7
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: c0758b0a74d5f5521da711aafe71089980f16806ff455bead588fb1a184b97aa
+content_hash: b3c9ce5193aa16c960cc83ba5e88ac52034a7badcb58c4f97ab125ea973363ff
 ---
 # /hm:exec-rev
 
@@ -112,13 +112,14 @@ nothing to finalize.
    - **Phase B** — Run tests; confirm RED for the right reasons
    - **Phase C** — Implement to GREEN. No untested code paths.
    - **Phase D** — Post-GREEN verification: ruff, mypy, full pytest, manual smoke
-3. Commit at phase boundaries with a message that maps to the PLAN phase.
+3. When a PLAN phase completes GREEN, verify the exit criterion passes. Leave
+   changes **unstaged or staged — do NOT commit**. Wrapup owns the commit.
 4. If a phase blocks: stop, document the blocker, escalate to the user
    rather than thrash. Do not silently change scope.
 
 ## Outputs
 
-- Code + tests committed to git
+- Code + tests **staged but not committed** (commit happens in wrapup)
 - Updated PLAN with phase status (in-progress / done / blocked)
 - Optional SESSION-{slug}-{date}.md when `--session` is set
 
@@ -379,7 +380,7 @@ harness value wins.
 | `reviewers.auto_fix` | `true` |
 | `reviewers.max_review_rounds` | `3` |
 | `reviewers.consensus` | `cross-check` |
-| `dev_mode` | `spec-driven` |
+| `dev_mode` | `task-driven` |
 | `caching` | `agent-aware` |
 
 Re-read `.claude/harness.yaml` whenever you are unsure of the current value.
@@ -407,3 +408,5 @@ Flags are additive to the harness defaults (`reviewers.enabled` /
 `skills.enabled`) and apply only to this run. Unknown identifiers are warned
 and ignored. The flags themselves are stripped from `$ARGUMENTS` before the
 fused stages read the user's task description.
+
+<!-- USER EDIT: phase11 reconcile sentinel -->

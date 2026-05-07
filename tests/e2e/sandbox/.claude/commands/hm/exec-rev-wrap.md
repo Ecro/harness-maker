@@ -4,7 +4,7 @@ harness_maker_version: 0.5.7
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: 7cbc77fa40cd553004d5010592e5cd25623607029c2622f3d08e2063face13d3
+content_hash: e28aec09728ec151cfc05f477531aec85d85346add86bb8202b96afa143f4d96
 ---
 # /hm:exec-rev-wrap
 
@@ -112,13 +112,14 @@ nothing to finalize.
    - **Phase B** — Run tests; confirm RED for the right reasons
    - **Phase C** — Implement to GREEN. No untested code paths.
    - **Phase D** — Post-GREEN verification: ruff, mypy, full pytest, manual smoke
-3. Commit at phase boundaries with a message that maps to the PLAN phase.
+3. When a PLAN phase completes GREEN, verify the exit criterion passes. Leave
+   changes **unstaged or staged — do NOT commit**. Wrapup owns the commit.
 4. If a phase blocks: stop, document the blocker, escalate to the user
    rather than thrash. Do not silently change scope.
 
 ## Outputs
 
-- Code + tests committed to git
+- Code + tests **staged but not committed** (commit happens in wrapup)
 - Updated PLAN with phase status (in-progress / done / blocked)
 - Optional SESSION-{slug}-{date}.md when `--session` is set
 
@@ -465,7 +466,7 @@ harness value wins.
 | `reviewers.auto_fix` | `true` |
 | `reviewers.max_review_rounds` | `3` |
 | `reviewers.consensus` | `cross-check` |
-| `dev_mode` | `spec-driven` |
+| `dev_mode` | `task-driven` |
 | `caching` | `agent-aware` |
 
 Re-read `.claude/harness.yaml` whenever you are unsure of the current value.

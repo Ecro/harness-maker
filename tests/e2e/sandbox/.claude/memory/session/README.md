@@ -5,7 +5,7 @@ generated_at: '2026-01-01T00:00:00+00:00'
 source_template: memory/session-readme.md.j2
 provenance: official
 ---
-# Session Logs — Production preset
+# Session Logs — Side preset
 
 > 이 디렉토리는 autoloop 세션 로그를 날짜별로 보관합니다.
 > `flush_session` PreCompact hook 과 wrapup 스테이지가 자동 생성합니다.
