@@ -54,11 +54,36 @@ This seed is what the interview refines. Investigate code unknowns with Read/Gre
 ### Step 2 — SPEC inheritance check (when SPEC exists)
 
 If `{{ config.spec.dir }}SPEC-{slug}.md` exists:
-1. Read it fully.
-2. For each SPEC category already filled (Intent, Outcomes, In-Scope Scenarios, Non-Goals, Constraints, Verification): **do NOT re-ask** in the interview. Reference it as `✅ {category}: {summary} (from SPEC)` in the round preamble's "지금까지 확정된 것" / "decisions locked in" block.
-3. Phase 0 remaining scope becomes the **how** questions (architecture / phasing / risk / trade-offs), not the **what** questions.
 
-### Step 3 — Interview loop (unlimited rounds, user-controlled exit)
+1. **Read it fully**, including frontmatter `status:` and the `## ❓ Open Questions` section.
+2. Branch on SPEC completeness:
+
+   **Case A — `status: approved` AND `## ❓ Open Questions` is empty:**
+   The user has already gone through `/hm:spec`'s 6-category interview, and every question was locked. Plan **SKIPS the deep interview**. Run only Step 3.0 (the brief lock-in confirmation below), then proceed to Step 4.
+
+   **Case B — `status: draft` (open questions remain):**
+   Plan inherits the resolved categories but **MUST** engage interview on the remaining ambiguities:
+   - For each SPEC category already filled (Intent, Outcomes, In-Scope Scenarios, Non-Goals, Constraints, Verification): **do NOT re-ask**. Reference as `✅ {category}: {summary} (from SPEC)` in the round preamble's "decisions locked in" block.
+   - For each entry in `## ❓ Open Questions`: open as a Phase 0 round.
+   - Phase 0 remaining scope = (a) SPEC open questions, then (b) the **how** questions (architecture / phasing / risk / trade-offs).
+
+   **Case C — no SPEC file:**
+   Run the full Step 3 interview from scratch.
+
+#### Step 3.0 — Brief lock-in confirmation (Case A only)
+
+When SPEC is fully approved, the only remaining `/hm:plan` question is: **"Given this SPEC, are you ready for phase decomposition, or is there a how-question (architecture / phasing / library choice) you want to lock down first?"** Surface this as ONE `AskUserQuestion` with options:
+
+- **"Proceed to phase decomposition"** — skip Step 3 entirely, jump to Step 4.
+- **"One architectural decision first: {topic}"** — engage Step 3 for that single round only.
+- **"Several architecture questions"** — engage full Step 3.
+- **"Other"** — user free-form.
+
+This single confirmation prevents the "I just answered every SPEC question — why is plan asking again?" foot-shooting.
+
+### Step 3 — Interview loop (skipped in Case A; unlimited rounds otherwise)
+
+> **If Step 2 set Case A and Step 3.0 returned "Proceed to phase decomposition": SKIP this entire step.** Jump to Step 4.
 
 **Language rule (important):**
 - **Live interview UI** → conduct in `{{ config.locale }}` (en→English, ko→Korean, ja→Japanese, others→English fallback). Round preamble, "decisions so far", open ambiguity explanations, AskUserQuestion prompts and option labels — all in `{{ config.locale }}`.

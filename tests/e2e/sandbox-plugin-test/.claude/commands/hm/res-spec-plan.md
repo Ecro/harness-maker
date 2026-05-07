@@ -4,7 +4,7 @@ harness_maker_version: 0.5.7
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: 231b6b1a70c3830b3c796b08be907e6c30cd113da707c76d28d6999febee021f
+content_hash: d22b4dab3f28b38c26794925b358aed742a992743679a1c7caf392febd4c5c6d
 ---
 # /hm:res-spec-plan
 
@@ -195,58 +195,189 @@ If the user opts for "dig deeper" — re-enter Phase 1 with narrowed scope (one 
 
 # Stage: spec
 
-> Atomic stage. Acceptance-criteria specification.
+> Atomic stage. Acceptance-criteria specification via 6-category interview. Owns **what / why / verification**. `plan` owns **how / risk / phasing**.
 
 > Invoked as part of the **res-spec-plan** workflow.
 
 
+## Communication Protocol
+
+- Be direct. No flattery, no preamble.
+- Force observable acceptance — vague criteria ("works correctly") are rejected.
+- Force the test framework choice in Constraints — `/hm:execute` Phase A writes tests against it; deferring this just kicks the can.
+- Lead with concerns: if a SPEC criterion is implementation detail in disguise, say so.
+
 ## Purpose
 
-Convert a task description into testable acceptance criteria so that
-implementation has an objective definition of "done" and the test stage
-has something concrete to write tests against.
+Convert a task description into testable acceptance criteria so that:
+- `/hm:plan` can decompose into phases that each map back to a SPEC scenario.
+- `/hm:execute` Phase A can author tests **directly from the SPEC**, not from planner intent.
+- `/hm:wrapup` Drift gate can compare actual diff against SPEC scope.
+
+The deep interview here is shorter than `/hm:plan`'s — SPEC concerns are **what** and **how to verify**, not **how to build**. Architecture decisions belong to `plan`.
 
 ## When to Run
 
-- After `research` for non-trivial features
-- Before `plan` whenever the change is observable to a user, an API consumer,
-  or another module
-- Skipped for: docs-only changes, single-file refactors, trivial bug fixes
+- After `research` for non-trivial features.
+- Before `plan` whenever the change is observable to a user, an API consumer, or another module.
+- Skip via Step 0 heuristic for trivial changes.
 
 ## Inputs
 
-- Research notes (if `research` was run)
-- User requirements / acceptance constraints
-- Existing SPEC if this is an evolution of prior behaviour
+- Research notes at `work-docs/RESEARCH-{slug}.md` (when `/hm:research` ran).
+- User requirements / acceptance constraints.
+- Existing SPEC at `specs/SPEC-{slug}.md` if this is an evolution.
+- Project memory (`.claude/memory/wiki.md`, `failures.md`).
 
 ## Procedure
 
-1. Write the user-facing summary in 2-3 sentences. If it doesn't fit, the
-   spec is still too broad.
-2. Enumerate behaviours as numbered acceptance criteria. Each MUST be:
-   - Observable (you can write a test that fails before, passes after)
-   - Independent (one criterion per concern)
-   - Bounded (no "etc.", no "and other related cases")
-3. List explicit non-goals. What this SPEC does NOT cover.
-4. Capture edge cases and error modes. Each becomes a criterion.
-5. Note open questions and resolve them via AskUserQuestion before
-   marking the SPEC ready.
+### Step 0 — Skip heuristic (ALL 4 criteria + title-obvious)
+
+Skip the SPEC interview ONLY when:
+
+| Criterion | Skip condition |
+|-----------|----------------|
+| **Scope** | Single file OR config-only (typo, env var, README copy) |
+| **Acceptance** | Obvious from the title — no scenarios beyond happy path |
+| **Contracts** | No API / IPC / DB schema / file format change |
+| **Risk** | Reversible in <1h with no user-facing impact |
+
+When skipped: write a minimal SPEC (Intent + 1 happy-path scenario in G-W-T form + Verification = "manual smoke") and continue. Do NOT ask permission to skip — proceed and log rationale in the SPEC's `## Refinement Decisions` section.
+
+### Step 1 — Knowledge retrieval
+
+Search prior work to ground the interview (token budget ≤3k):
+
+```bash
+# Prior SPECs on related topics
+Grep "<key terms>" --glob "specs/SPEC-*.md"
+# Prior PLANs (for scope reference)
+Grep "<key terms>" --glob "work-docs/PLAN-*.md"
+# Repo memory
+[ -f .claude/memory/failures.md ] && rg "<key terms>" .claude/memory/failures.md
+[ -f .claude/memory/wiki.md ] && rg "<key terms>" .claude/memory/wiki.md
+# When research ran, read its cache
+[ -f work-docs/RESEARCH-{slug}.md ] && Read work-docs/RESEARCH-{slug}.md
+```
+
+Surface relevant prior-SPEC snippets at the top of the interview so the user can see what's been specified before.
+
+### Step 2 — Interview (default ON)
+
+Same UX rules as `/hm:plan`:
+- **Live UI** in `en` (en→English, ko→Korean, others→English fallback).
+- **SPEC document on disk** always English. Translate user's free-form answers when archiving.
+- Use `AskUserQuestion`. **Batch independent questions** per round (independence test: would Q2's options change based on Q1's answer? if yes → separate rounds).
+- Always include **"Other — let me describe"**.
+- From Round 2 onward, include **"SPEC is sufficiently clear — end interview"** on one foundational question per round.
+- Visualization OPTIONAL — prose / bullets preferred, ASCII for topology, Mermaid only in the final document (never in live terminal).
+
+#### 2.1 Six interview categories (in this order)
+
+Skip a category when sufficiently answered by prior research, prior SPEC, or earlier rounds. Batch multiple independent questions per round when possible.
+
+1. **Intent (Why)** — motivation, business / technical trigger. Often answered by `/hm:research`; confirm if so.
+2. **Outcomes (What success looks like)** — observable end-state. Force the user to state "done" in observable terms, not implementation details.
+3. **In-Scope Scenarios** — generate 2-4 scenarios in **Given-When-Then** form covering normal / edge / failure paths. This is mandatory format; reject prose like "the system handles errors" — restate as G-W-T.
+4. **Non-Goals** — explicit out-of-scope list. Prevents scope creep in `plan`.
+5. **Constraints** — HW, SW, security, performance, compatibility, **and test framework** (mandatory — pick `pytest` / `gtest` / `vitest` / `bats` / etc; `/hm:execute` Phase A uses this to write tests).
+6. **Verification Criteria** — per-scenario, how we'll prove it: unit / integration / manual. Each scenario MUST map to at least one verification mode.
+
+#### 2.2 Promotion rule
+
+SPEC's substantive decisions (e.g., "what counts as done for Scenario 2?", "fail-closed vs fail-open?") feed `/hm:plan`'s ADRs downstream — they live in the SPEC's `## ❓ Open Questions` section with the resolution. **SPEC does NOT have its own ADR section.** Promotion to ADR happens in `plan`.
+
+#### 2.3 Round preamble
+
+```
+## SPEC Interview Round {N}
+
+**Decisions locked in so far:**
+- ✅ Intent: {summary}
+- ✅ Outcomes: {summary}
+- ✅ Scenario S1, S2 confirmed
+
+**This round's category:** {Non-Goals / Constraints / Verification}
+**Why it matters:** {one-sentence cost of getting this wrong}
+```
+
+### Step 3 — Write SPEC document
+
+Write to `specs/SPEC-{slug}.md`.
+
+**Required frontmatter:**
+
+```yaml
+---
+type: spec
+task_slug: {slug}
+status: draft   # → approved when interview ends with no open questions
+created: {YYYY-MM-DD}
+tags: [{project}, spec, {tech-stack}, {2-5 domain tags}]
+test_framework: {pytest | gtest | vitest | bats | …}   # MANDATORY
+research_doc: "[[RESEARCH-{slug}]]"   # OR omit when no research artifact
+summary: "{≤100 char one-line: what this SPEC is for}"
+---
+```
+
+**Required sections (in this order):**
+
+1. **🎯 Intent** — 2-3 sentences: trigger + business/technical motivation.
+2. **🌅 Outcomes** — observable end-state. What the user / API consumer can do that they cannot do today.
+3. **📋 In-Scope Scenarios** — numbered S1, S2, … each in **Given-When-Then** form:
+   ```markdown
+   ### S1: {short title}
+   **Given** {initial state}
+   **When** {triggering action}
+   **Then** {observable result}
+   **And** {additional observable}   ← optional
+   ```
+4. **🚫 Non-Goals** — bullet list of explicit out-of-scope items.
+5. **⚠️ Constraints** — table:
+   | Constraint | Value | Rationale |
+   |---|---|---|
+   | Test framework | `{name}` | {why this one} |
+   | Performance | `{budget}` | {source of bound} |
+   | Security | `{requirement}` | {threat model} |
+   | Compatibility | `{version range}` | {ecosystem} |
+6. **✅ Verification Criteria** — per-scenario:
+   | Scenario | Verification mode | Test name / manual step |
+   |---|---|---|
+   | S1 | unit | `test_s1_happy_path` |
+   | S2 | integration | `test_s2_with_db` |
+   | S3 | manual | "open settings, click X, confirm Y" |
+7. **❓ Open Questions** — items the user could not resolve in interview. These feed `/hm:plan`'s ADRs. Empty list = SPEC ready for plan.
+8. **🔍 Refinement Decisions** — 1-line per round summarizing what was locked in (or "skipped — task is trivial: {reason}").
+
+### Step 4 — Verify write
+
+After writing, Read the file back and assert:
+- Starts with `---` frontmatter.
+- `test_framework:` field is non-empty.
+- ≥1 scenario in G-W-T form.
+- Verification table covers every scenario.
+
+If verification fails, retry write **once**. If still failing, surface error + path and stop.
+
+### Step 5 — Status update
+
+If `## ❓ Open Questions` is empty: update frontmatter `status: approved`. Otherwise `status: draft`.
+
+The user can resume by editing the SPEC directly or re-running `/hm:spec {slug}` (interview will read the existing SPEC and re-engage on draft items).
 
 ## Outputs
 
-- `specs/SPEC-{slug}.md` with frontmatter:
-  - `type: spec`
-  - `status: draft | approved`
-  - `task_slug:`, `created:`, `tags:`
-- Acceptance criteria numbered AC-1, AC-2, ...
-- Non-goals section
-- Open questions section (empty when status=approved)
+- `specs/SPEC-{slug}.md` — frontmatter + 8 sections above.
+- Status: `draft` (open questions remain) or `approved` (ready for `/hm:plan`).
 
 ## Quality Bar
 
-- A test author can write tests directly from the criteria without guessing
-- Criteria are not implementation details — they describe behaviour
-- Non-goals prevent scope creep in `plan` and `execute`
+- A test author can write tests directly from `## ✅ Verification Criteria` without guessing.
+- No criterion is implementation detail in disguise — descriptions are about behavior.
+- Non-goals prevent scope creep in `plan` and `execute`.
+- Test framework is named — `pytest` not "Python testing".
+- Every scenario in `## 📋 In-Scope Scenarios` is in G-W-T form (no prose-form scenarios).
+- Open Questions are explicit handoffs to `plan`, not silent assumptions.
 
 <!-- @hm:user:extra-quality-checks -->
 <!-- Project-specific quality bar items. Preserved across harness-maker upgrades. -->
@@ -317,11 +448,36 @@ This seed is what the interview refines. Investigate code unknowns with Read/Gre
 ### Step 2 — SPEC inheritance check (when SPEC exists)
 
 If `specs/SPEC-{slug}.md` exists:
-1. Read it fully.
-2. For each SPEC category already filled (Intent, Outcomes, In-Scope Scenarios, Non-Goals, Constraints, Verification): **do NOT re-ask** in the interview. Reference it as `✅ {category}: {summary} (from SPEC)` in the round preamble's "지금까지 확정된 것" / "decisions locked in" block.
-3. Phase 0 remaining scope becomes the **how** questions (architecture / phasing / risk / trade-offs), not the **what** questions.
 
-### Step 3 — Interview loop (unlimited rounds, user-controlled exit)
+1. **Read it fully**, including frontmatter `status:` and the `## ❓ Open Questions` section.
+2. Branch on SPEC completeness:
+
+   **Case A — `status: approved` AND `## ❓ Open Questions` is empty:**
+   The user has already gone through `/hm:spec`'s 6-category interview, and every question was locked. Plan **SKIPS the deep interview**. Run only Step 3.0 (the brief lock-in confirmation below), then proceed to Step 4.
+
+   **Case B — `status: draft` (open questions remain):**
+   Plan inherits the resolved categories but **MUST** engage interview on the remaining ambiguities:
+   - For each SPEC category already filled (Intent, Outcomes, In-Scope Scenarios, Non-Goals, Constraints, Verification): **do NOT re-ask**. Reference as `✅ {category}: {summary} (from SPEC)` in the round preamble's "decisions locked in" block.
+   - For each entry in `## ❓ Open Questions`: open as a Phase 0 round.
+   - Phase 0 remaining scope = (a) SPEC open questions, then (b) the **how** questions (architecture / phasing / risk / trade-offs).
+
+   **Case C — no SPEC file:**
+   Run the full Step 3 interview from scratch.
+
+#### Step 3.0 — Brief lock-in confirmation (Case A only)
+
+When SPEC is fully approved, the only remaining `/hm:plan` question is: **"Given this SPEC, are you ready for phase decomposition, or is there a how-question (architecture / phasing / library choice) you want to lock down first?"** Surface this as ONE `AskUserQuestion` with options:
+
+- **"Proceed to phase decomposition"** — skip Step 3 entirely, jump to Step 4.
+- **"One architectural decision first: {topic}"** — engage Step 3 for that single round only.
+- **"Several architecture questions"** — engage full Step 3.
+- **"Other"** — user free-form.
+
+This single confirmation prevents the "I just answered every SPEC question — why is plan asking again?" foot-shooting.
+
+### Step 3 — Interview loop (skipped in Case A; unlimited rounds otherwise)
+
+> **If Step 2 set Case A and Step 3.0 returned "Proceed to phase decomposition": SKIP this entire step.** Jump to Step 4.
 
 **Language rule (important):**
 - **Live interview UI** → conduct in `en` (en→English, ko→Korean, ja→Japanese, others→English fallback). Round preamble, "decisions so far", open ambiguity explanations, AskUserQuestion prompts and option labels — all in `en`.
