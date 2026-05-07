@@ -1,6 +1,6 @@
 preset: Side
 dev_mode: task-driven
-file_count: 53
+file_count: 54
 files:
 - path: ../CLAUDE.md
   template: claude-md/Side.en.md.j2
@@ -32,6 +32,9 @@ files:
 - path: agents/security-reviewer.md
   template: agents/security-reviewer.md.j2
   body_sha256: f44f1732f9d201ea3b2755316c2cbbb138d04ed8c43ad01077fc5522d159eae3
+- path: agents/test-reviewer.md
+  template: agents/test-reviewer.md.j2
+  body_sha256: ee3dd5cb0fa2f67ecd4d469dd45eee21da93cac89a2e5e42fdb263eaf3a3555a
 - path: agents/ux-reviewer.md
   template: agents/ux-reviewer.md.j2
   body_sha256: db7f1929425a16ccd8381e392f3b8f058e3305114c0e32c6e03ca4bdcd843113
@@ -40,19 +43,19 @@ files:
   body_sha256: 50723b24320945863213ad4c16d6dc155dbdf0102f0f65c6b0e10d3d2bc5b077
 - path: commands/hm/exec-rev-wrap.md
   template: commands/hm/workflow_command.md.j2
-  body_sha256: c2bb991d9c83968eecbebd6e83d00f76748faeacd96c99565f69920e19272800
+  body_sha256: 6a53264fbe2715c763124892e6b5243dfa6bbb6d6116354f40a9810982dfdcbf
 - path: commands/hm/exec-rev.md
   template: commands/hm/workflow_command.md.j2
-  body_sha256: b5652415b970a3fe3e8c132a284a5c2df0bcad7ec2167fdfb1cbdbff309e552a
+  body_sha256: 4a4a478132e8828865abce3ef0951a9d53a1dcf682198318192c7d14086588b0
 - path: commands/hm/execute.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: 946307effd2dace0012d2bf5b33f65d13dace61d07aface80a5aa311d91c1ebd
+  body_sha256: 66b7856406b1da1374ac0097fa76c8dfb2145d10bebe68023e346d0426898070
 - path: commands/hm/loop.md
   template: commands/hm/loop.md.j2
   body_sha256: 823430184b01ac445850d6ef8ca52d44454456961ff88f08503ddf5023cee465
 - path: commands/hm/plan-exec-rev-wrap.md
   template: commands/hm/workflow_command.md.j2
-  body_sha256: f09ceb6d399ec189aee38a1b1d7c1ae9663daf0d734c5cebbe97d36243220b7d
+  body_sha256: 34117e69d5bdbe291ffd490a545484340ff4ec4827945f82fc1499370c541227
 - path: commands/hm/plan.md
   template: commands/hm/atomic_command.md.j2
   body_sha256: 22579b376aff6b18b6857041c42f1b02f40a24ffe920a2de4e88b46f9f65a929
@@ -142,7 +145,7 @@ files:
   body_sha256: 5301cc02a594968ca7861982eddfd2448d7a9eff084f390f5e2b4b2a7ae693c5
 - path: stages/execute.md
   template: stages/execute.md.j2
-  body_sha256: 946307effd2dace0012d2bf5b33f65d13dace61d07aface80a5aa311d91c1ebd
+  body_sha256: 66b7856406b1da1374ac0097fa76c8dfb2145d10bebe68023e346d0426898070
 - path: stages/plan.md
   template: stages/plan.md.j2
   body_sha256: 22579b376aff6b18b6857041c42f1b02f40a24ffe920a2de4e88b46f9f65a929

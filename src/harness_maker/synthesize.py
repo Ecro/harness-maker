@@ -48,6 +48,7 @@ _ALL_AGENTS: list[str] = [
     "plan-validator",
     "security-auditor",
     "security-reviewer",
+    "test-reviewer",
     "ux-reviewer",
 ]
 _ALL_SKILLS: list[str] = [

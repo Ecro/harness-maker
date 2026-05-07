@@ -1,6 +1,6 @@
 preset: Production
 dev_mode: task-driven
-file_count: 54
+file_count: 55
 files:
 - path: ../CLAUDE.md
   template: claude-md/Production.en.md.j2
@@ -32,6 +32,9 @@ files:
 - path: agents/security-reviewer.md
   template: agents/security-reviewer.md.j2
   body_sha256: f44f1732f9d201ea3b2755316c2cbbb138d04ed8c43ad01077fc5522d159eae3
+- path: agents/test-reviewer.md
+  template: agents/test-reviewer.md.j2
+  body_sha256: ee3dd5cb0fa2f67ecd4d469dd45eee21da93cac89a2e5e42fdb263eaf3a3555a
 - path: agents/ux-reviewer.md
   template: agents/ux-reviewer.md.j2
   body_sha256: db7f1929425a16ccd8381e392f3b8f058e3305114c0e32c6e03ca4bdcd843113
@@ -40,16 +43,16 @@ files:
   body_sha256: 50723b24320945863213ad4c16d6dc155dbdf0102f0f65c6b0e10d3d2bc5b077
 - path: commands/hm/exec-rev-wrap-ver.md
   template: commands/hm/workflow_command.md.j2
-  body_sha256: 171bea3b0f65eed814be688a35a837198ac36d50531e550316bb8e52cf6723cc
+  body_sha256: b72add028482d8330adaeca2cbb74db60b7a324b2b2e570c0e2ebd2f200b9635
 - path: commands/hm/exec-rev-wrap.md
   template: commands/hm/workflow_command.md.j2
-  body_sha256: e28aec09728ec151cfc05f477531aec85d85346add86bb8202b96afa143f4d96
+  body_sha256: 256a60df7858f1f5d4a0088fd04e27c3f803128d37c26b6cb36f99026f1a309b
 - path: commands/hm/exec-rev.md
   template: commands/hm/workflow_command.md.j2
-  body_sha256: b3c9ce5193aa16c960cc83ba5e88ac52034a7badcb58c4f97ab125ea973363ff
+  body_sha256: 376860d41e11f2504e4e38141aed9a1d0ea1be9dfb72fd2b481c6349a0f66aa2
 - path: commands/hm/execute.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: 946307effd2dace0012d2bf5b33f65d13dace61d07aface80a5aa311d91c1ebd
+  body_sha256: 66b7856406b1da1374ac0097fa76c8dfb2145d10bebe68023e346d0426898070
 - path: commands/hm/loop.md
   template: commands/hm/loop.md.j2
   body_sha256: 9e9f00d25aa19a3d8e2e5ea5b44f4504b77b57603f03a11f5936b25e93c735f0
@@ -145,7 +148,7 @@ files:
   body_sha256: 5301cc02a594968ca7861982eddfd2448d7a9eff084f390f5e2b4b2a7ae693c5
 - path: stages/execute.md
   template: stages/execute.md.j2
-  body_sha256: 946307effd2dace0012d2bf5b33f65d13dace61d07aface80a5aa311d91c1ebd
+  body_sha256: 66b7856406b1da1374ac0097fa76c8dfb2145d10bebe68023e346d0426898070
 - path: stages/plan.md
   template: stages/plan.md.j2
   body_sha256: 22579b376aff6b18b6857041c42f1b02f40a24ffe920a2de4e88b46f9f65a929
