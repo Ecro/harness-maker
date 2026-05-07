@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.5.3
+harness_maker_version: 0.5.4
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: c0bf184d5dc98f2d5b68705299c71ad5ecb4b9a1fb82c08c6613f8164f4bb0a4
+content_hash: 7cbc77fa40cd553004d5010592e5cd25623607029c2622f3d08e2063face13d3
 ---
 # /hm:exec-rev-wrap
 
@@ -57,6 +57,11 @@ includes `execute`. The `worktree-isolator` skill is documentation only —
 its trigger-based dispatch is probabilistic in Cursor IDE and can silently
 skip, leaving safety-critical edits on the main branch. **Invoke the
 worktree CLI directly** so isolation is deterministic across both IDEs.
+
+**Idempotent under `/hm:loop`**: when this stage runs as part of a loop
+iteration, the loop has already engaged a per-loop worktree at step 5.
+The `worktree create` CLI detects we're already inside `.worktrees/<name>/`
+and returns that path — no nested worktrees, just reuse.
 
 Run the create command:
 

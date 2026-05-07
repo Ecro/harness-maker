@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.5.3
+harness_maker_version: 0.5.4
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/loop.md.j2
 provenance: official
-content_hash: 1860e507554c82164d47b6a4cb9e3fd2be8a52dc7a2c3c052a9c03880ae8db04
+content_hash: 9e9f00d25aa19a3d8e2e5ea5b44f4504b77b57603f03a11f5936b25e93c735f0
 ---
 # /hm:loop
 
@@ -23,9 +23,15 @@ development repository, not in the projects this command runs in.
 ```
 /hm:loop <goal>
 /hm:loop --spec <path> [--mode feature|improve] [--target <path>]
-         [--time 8h] [--max-iter 30] [--workflow exec-rev-wrap]
+         [--time 8h] [--max-iter 30] [--per-iter-workflow exec-rev]
          [--convergence <predicate>] [--dry-run]
 ```
+
+> **Breaking from pre-0.5.5**: per-iter workflow defaults to `exec-rev`
+> (was `exec-rev-wrap*`). Wrapup runs **once** at loop close instead of
+> per iter. The whole loop runs inside one `.worktrees/execute-<ts>/`
+> worktree (improve and feature mode both). To restore the old per-iter
+> wrap behavior pass `--per-iter-workflow exec-rev-wrap` explicitly.
 
 ## Arguments
 
@@ -41,8 +47,11 @@ development repository, not in the projects this command runs in.
   name). Defaults to the entire project if omitted.
 - `--time <Nh>` — max wall-clock duration (default `8h`).
 - `--max-iter <N>` — max iterations (default `30`).
-- `--workflow <name>` — fused workflow each `feature`-mode iteration invokes
-  (default `exec-rev-wrap`). Must exist in `.claude/commands/hm/`.
+- `--per-iter-workflow <name>` (alias `--workflow`) — fused workflow each
+  iter invokes. Default: `exec-rev` (execute + review only — wrapup is
+  deferred to loop close to avoid commit-per-iter). Recommended overrides:
+  `plan-exec-rev` for big features needing per-iter planning. Must exist
+  in `.claude/commands/hm/`.
 - `--convergence <predicate>` — overrides the spec's predicate. Allowed:
   `all-features-completed` (default), `any-feature-completed`,
   `min-2-features`, `min-5-features`, `first-iter`, `stopping-criteria`.
@@ -238,7 +247,41 @@ for final go-ahead before starting the loop.
 
 ---
 
-### 5. Run the autoloop
+### 5. Engage worktree (loop top — once, before any iter)
+
+If `harness.yaml.worktree.scope` includes `execute`, create one worktree
+that wraps the **entire loop**. Per-loop (not per-iter) — improve and
+feature mode both default to one squash-merge at convergence. Per-iter
+worktree would explode commit count.
+
+```bash
+!uv run --with /home/noel/harness-maker python -m harness_maker.worktree create execute "$(pwd)"
+```
+
+Read the **single line** the command prints. Two cases:
+
+- **Absolute path** like `/path/to/repo/.worktrees/execute-20260507T0010Z`
+  → isolation engaged. **Treat that exact string as `<WT>` for every
+  subsequent operation in this loop**: every Read/Write/Edit call, every
+  `cd` for tests/lints, every workflow-command invocation. Do NOT use a
+  shell variable — each `!` block is a fresh subshell.
+- **Empty output** → `worktree.scope` does not include `execute`. No
+  isolation; operate in `cwd`. Skip the finalize step at the end.
+
+Per-iter standalone `/hm:execute` (e.g. inside an invoked workflow's
+execute stage) calls `worktree create` again — its idempotency check
+detects we're already inside `.worktrees/<name>/` and returns the
+existing path. No nested worktrees.
+
+**Enforcement layer**: `worktree_gate` (a PreToolUse hook installed by
+`/harness-maker:make`) blocks Write/Edit/MultiEdit calls whose target is
+outside `<WT>` while a loop is active. This is technical insurance for
+the prompt-driven `<WT>` substitution; LLM drift across long contexts
+gets caught instead of silently corrupting main. **Bash-driven writes
+(`>`, `sed -i`, `python -c "open(...)"`) are NOT gated** — for shell
+ops always `cd <WT>` first so the cwd stays inside isolation.
+
+### 6. Run the autoloop — UNIFIED iteration body
 
 You are the driver. Track state via `TodoWrite` and your working memory.
 
@@ -257,71 +300,111 @@ You are the driver. Track state via `TodoWrite` and your working memory.
 5. Ping every 5 iterations: `autoloop ping: iter=<N> target=<name>`
 6. Convergence check **before** each iteration body
 
-#### 5-A. Feature mode loop body
+#### Per-iter workflow selection
 
-Each iteration:
+Each iter invokes one fused workflow command:
 
-1. **Cap + convergence checks** (see safety rails)
-2. **Pick next feature**: first in spec order not in `completed`
-3. **Increment `iter`**
-4. **Invoke workflow**: pass feature name + AC + objective to the configured
-   fused workflow. Read the workflow command file under
-   `.claude/commands/hm/<workflow>.md` and execute **every stage it defines,
-   in order, without skipping any** — individual stage "When to Run" skip
-   conditions apply only to standalone invocation, not when driven by the
-   loop. The loop's decision to call this workflow is itself the authority
-   to run all its stages.
+- **Default**: `exec-rev` (execute + review). Wrapup is **deferred to
+  loop close** (step 7) — running wrapup per iter would commit + merge
+  on every iter, defeating the per-loop worktree.
+- **`--per-iter-workflow plan-exec-rev`**: include plan stage per iter.
+  Recommended for big features where each iter needs fresh planning.
+- **`--per-iter-workflow <other>`**: explicit override. The configured
+  default workflow (`exec-rev-wrap-ver`) is used only if the
+  user explicitly passes `--per-iter-workflow exec-rev-wrap-ver`
+  — otherwise prefer the leaner `exec-rev`.
+
+Choose once at loop start, store as `WORKFLOW`.
+
+#### Workflow file validation (before iter 1)
+
+The chosen `WORKFLOW` must exist as `.claude/commands/hm/<WORKFLOW>.md`.
+The default `exec-rev` is rendered only if `exec-rev` is in the harness's
+`fused_workflows` map — custom harnesses may have stripped it. If the
+file is missing, **halt** with this user-facing error:
+
+```
+loop halted — per-iter workflow '<WORKFLOW>' not found at
+.claude/commands/hm/<WORKFLOW>.md.
+
+Either:
+  • re-run with --per-iter-workflow <one of exec-rev, exec-rev-wrap, exec-rev-wrap-ver, res-spec-plan>
+  • or re-render the harness with `exec-rev` in fused_workflows
+    (run /harness-maker:make → "Update")
+```
+
+Do NOT silently fall back to a different workflow — that masks
+intent and could iterate over the wrong stages.
+
+#### Iteration body (same for feature and improve mode)
+
+For each iter (until convergence or any safety rail fires):
+
+1. **Cap + convergence checks** (safety rails above)
+2. **Pick work unit** (mode-specific):
+   - **feature**: next uncompleted feature from spec; no remaining → mark
+     converged and exit loop.
+   - **improve**: read target → review → identify issues → evaluate
+     stopping_criteria. No issues OR criteria met → mark converged and
+     exit loop.
+3. **Increment `iter`**.
+4. **Invoke per-iter workflow**: read
+   `.claude/commands/hm/<WORKFLOW>.md` and execute **every stage it
+   defines, in order, without skipping any**. Operate inside `<WT>`:
+   substitute the absolute worktree path for every Read/Write/Edit call;
+   tests / lints / type checks run via `cd <WT> && <cmd>`. Stage "When
+   to Run" skip conditions apply only to standalone invocation, not
+   under loop dispatch.
 5. **Update state**:
-   - Success → mark completed in `TodoWrite`, append to `completed`,
-     reset `failed_streak = 0`
-   - Failure → `failed_streak += 1`, log what failed
+   - Workflow returned success (review verdict ≥ grade_threshold and
+     tests pass) → mark completed, append to `completed`, reset
+     `failed_streak = 0`.
+   - Workflow returned failure → `failed_streak += 1`, log what failed.
+     For improve mode, "failure" means **tests failed** — tests passing
+     but stopping_criteria not yet met is NOT a failure (progress is
+     being made).
 
-Convergence check: evaluate predicate against `completed` list.
+### 7. Loop close — UNIFIED
 
-#### 5-B. Improve mode loop body
+When the loop halts (convergence, safety rail, or hard error):
 
-Each iteration is one full review → fix → test → review cycle:
+1. **Run wrapup ONCE**: read `.claude/commands/hm/wrapup.md` and execute
+   the wrapup stage (commits, SESSION-md if `--session`, memory append
+   to `wiki.md` / `failures.md`). Operate inside `<WT>` if engaged.
 
-1. **Cap checks** (see safety rails)
-2. **Increment `iter`**
-3. **Read target** — read all files in `--target` scope. If scope is large
-   (>500 lines total), read in passes: first by structure (headings, class/
-   function signatures), then full content of flagged areas.
-4. **Review** — using the context (purpose, invariants, priority) as the
-   review lens, identify all issues. Classify each:
-   - `critical`: breaks invariants or correctness
-   - `high`: trade-off that contradicts the stated priority (e.g., sacrifices
-     a higher-ranked property for a lower-ranked one — optimizing performance
-     at the expense of safety when priority is `safety > performance`)
-   - `medium`: actionable quality concern that doesn't contradict the priority
-   - `low`: minor style, non-blocking
-   Output a ranked issue list.
-5. **Evaluate stopping criteria** (LLM judgment) — read the
-   `stopping_criteria` from context and judge: does the current codebase
-   satisfy it given the issue list? If yes → `converged = True`, skip fix.
-6. **Fix** — address all critical + high issues. Address medium issues if
-   iter budget allows (estimate: ≤ max_iter/3 iters remaining). Never make
-   changes that would cause context invariants to be violated.
-7. **Run tests** — use whatever test command is appropriate for the project
-   (check for `Makefile`, `pyproject.toml`, `package.json` test scripts).
-   If no test infrastructure is found, consult the `test_reliability` context
-   dimension: if it confirms no tests exist, skip this step and note it in
-   the re-review; otherwise flag the absence of tests as a medium issue.
-   Record: passed / failed / skipped counts.
-8. **Re-review** — brief re-read of changed files. Confirm fixes landed,
-   no regressions introduced.
-9. **Update state**:
-   - `converged = True` (from step 5) → mark `improve-cycle` completed in
-     `TodoWrite`, `completed = ["improve-cycle"]`, `stop_reason = "converged"`
-   - `converged = False` → continue loop. **What counts as failure** in
-     improve mode is test failure only (step 7): tests passing but
-     stopping_criteria not yet met is NOT a failure — it means progress
-     is being made. `failed_streak += 1` only when tests fail; reset to 0
-     when tests pass.
+2. **Decide finalize status — explicit rule, not judgment**:
+
+   | Halt reason | Finalize status | Why |
+   |---|---|---|
+   | `converged = True` | `success` | clean stopping criteria met |
+   | `iter >= max_iter` | `fail` | budget exhausted without convergence |
+   | `elapsed >= time_h * 3600` | `fail` | time cap fired |
+   | `failed_streak >= 3` | `fail` | repeated failures, evidence valuable |
+   | Hard error (uncaught) | `fail` | preserve for debug |
+
+   Do NOT classify max-iter or time-cap halts as "partial success" — the
+   user explicitly bounded the run; un-merged worktree is more useful
+   than a half-baked squash that contaminates main.
+
+3. **Finalize worktree** (only if engaged in step 5):
+
+   ```bash
+   !uv run --with /home/noel/harness-maker python -m harness_maker.worktree finalize <WT> <STATUS>
+   ```
+
+   On `success`: `worktree.merge` does a squash-merge into the loop's
+   parent branch and then `cleanup --force` removes `<WT>`. **If squash
+   conflicts** (e.g. main has concurrent edits to `.claude/memory/wiki.md`
+   from another session), the merge step exits 1; finalize leaves `<WT>`
+   in place. Treat this as a fail-equivalent: emit the conflicting file
+   list in step 4 and instruct the user to resolve manually with
+   `cd <WT> && git status && git merge --abort` or similar.
+
+4. **Emit final report** (next section).
 
 ---
 
-### 6. Report
+### 8. Report
 
 When the loop halts (any reason):
 

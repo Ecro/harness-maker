@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.5.3
+harness_maker_version: 0.5.4
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: stages/execute.md.j2
 provenance: official
-content_hash: c62a3b080fe5dcb91b8f39430a1dc4c5b1b194b2ac5c21ac19ec3558065d2ca0
+content_hash: 32bb9393e22f76b37db598de8c3e44d9cec84c006ef6a7745e791177b7550e66
 ---
 # Stage: execute
 
@@ -50,6 +50,11 @@ includes `execute`. The `worktree-isolator` skill is documentation only —
 its trigger-based dispatch is probabilistic in Cursor IDE and can silently
 skip, leaving safety-critical edits on the main branch. **Invoke the
 worktree CLI directly** so isolation is deterministic across both IDEs.
+
+**Idempotent under `/hm:loop`**: when this stage runs as part of a loop
+iteration, the loop has already engaged a per-loop worktree at step 5.
+The `worktree create` CLI detects we're already inside `.worktrees/<name>/`
+and returns that path — no nested worktrees, just reuse.
 
 Run the create command:
 
