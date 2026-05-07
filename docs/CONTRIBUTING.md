@@ -34,13 +34,17 @@ harness-maker/
 │   ├── stages/<stage>.md.j2  # atomic stage fragments for workflow fusion
 │   ├── harness-yaml/<Preset>.yaml.j2
 │   ├── settings/<Preset>.json.j2
+│   ├── cursor/               # M14: Cursor-only assets (rules/*.mdc, mcp.json)
 │   └── hooks/                # telemetry hooks
 ├── commands/make.md          # /harness-maker:make plugin entry
+├── .claude-plugin/plugin.json  # Claude Code marketplace manifest
+├── .cursor-plugin/plugin.json  # Cursor Marketplace manifest
 ├── tests/
 │   ├── unit/                 # per-module pytest
 │   ├── fixtures/             # 4 reference projects (side-python-cli, side-tauri-app, prod-tauri-app, prod-firmware)
 │   ├── snapshot/             # golden Blueprint YAMLs + regenerate.py
-│   └── e2e/                  # dogfood + plugin entry
+│   ├── e2e/                  # dogfood + plugin entry
+│   └── cursor-compat/        # M14: manual checklist + results grid for Cursor IDE verification
 ├── docs/                     # this folder
 ├── TECH_SPEC.md              # source of truth for design decisions
 └── .claude-verify.sh         # autoloop-callable phase exit-criteria checker
@@ -76,7 +80,7 @@ Steps:
    ```
 
 3. **Wire it into the synthesizer.** Open `src/harness_maker/synthesize.py` and add a `FileEntry` for the new skill in the appropriate preset path. Reference the template path; pass the context the template needs.
-4. **Add to `final_acceptance` in `.claude-verify.sh`.** The "Skills (10) 존재" loop enumerates required templates. Increment the count and add your skill name.
+4. **Add to `final_acceptance` in `.claude-verify.sh`.** The "Skills (11) 존재" loop enumerates required templates. Increment the count and add your skill name.
 5. **Write a test.** Add a unit test under `tests/unit/` that renders the template against a `Blueprint` fixture and asserts the output starts with `---` and contains expected markers.
 6. **Regenerate snapshots if the Blueprint shape changed.**
 
@@ -91,6 +95,17 @@ Same pattern as skills, with two differences:
 1. Path: `templates/agents/<name>.md.j2` (single file, no folder).
 2. **Privilege separation matters (M12).** Reviewer-style agents must declare `permissions.deny: [Write, Edit, Bash exec]` in their frontmatter; executor-style agents get `permissions.allow: [Write(.worktrees/**)]`. The `phase_10_reviewer_perms` and `phase_10_executor_perms` checks in `.claude-verify.sh` will fail if you mix these up. See `templates/agents/code-reviewer.md.j2` (reviewer pattern) and `templates/agents/executor.md.j2` (executor pattern) as references.
 3. Update the "Agents (9) 존재" loop in `.claude-verify.sh`'s `final_acceptance`.
+
+## Adding Cursor target support to a new template
+
+If your new skill, agent, or command needs a Cursor-specific variant:
+
+1. **Check if single-source is enough.** For most templates, Cursor 2.4+ reads `.claude/agents/` and `.claude/skills/` natively — no extra file needed.
+2. **Only add a Cursor-specific file if the content must differ** (e.g., a rules file at `.cursor/rules/`).
+3. **Use `_render_cursor_mdc()` dispatch in `render.py`** when the output is a `.mdc` file. This limits frontmatter to `description`, `globs`, and `alwaysApply` — Cursor rejects unknown keys. Do **not** include `content_hash` in the frontmatter; use a sidecar `.hm-meta.yaml` if hash-tracking is needed.
+4. **Use `_render_pure_text()` dispatch** for `.json` files like `.cursor/mcp.json` — no frontmatter allowed.
+5. **Gate the render** with `if cursor in config.targets` in `synthesize.py`.
+6. **Add a manual checklist row** in `tests/cursor-compat/MANUAL_CHECKLIST.md` for the new asset.
 
 ## Adding a New Preset
 
@@ -171,7 +186,8 @@ Before opening a PR:
 - [ ] If you added/changed a Blueprint field: snapshots regenerated (`uv run python tests/snapshot/regenerate.py`) and reviewed in the diff
 - [ ] If you added a skill/agent/preset: enumerated in `.claude-verify.sh final_acceptance`
 - [ ] If you added a template: starts with `---` frontmatter (provenance invariant)
-- [ ] `TECH_SPEC.md` updated if the change touches a Section 3 mechanism (M1-M13) or Section 5 acceptance criteria
+- [ ] `TECH_SPEC.md` updated if the change touches a Section 3 mechanism (M1-M14) or Section 5 acceptance criteria
+- [ ] If bumping the version: all **4 files** updated in the same commit: `.claude-plugin/plugin.json`, `.cursor-plugin/plugin.json`, `pyproject.toml`, `src/harness_maker/__init__.py`
 - [ ] Commit message follows `<type>(phase<N>): <description>` (e.g. `feat(phase4): add anti-rot adaptive threshold`)
 
 ## Reporting Issues

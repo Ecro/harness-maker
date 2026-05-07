@@ -3,6 +3,8 @@
 > 본 문서는 vault `/autoloop` 명령 (`/mnt/c/Users/euncheol.ro/Documents/obsidian-vault/.claude/commands/autoloop.md`) 에서 발췌·정리한 핵심 패턴.
 > Phase 6 의 `/hm:loop` (사용자 하네스용 autoloop) 구현 시 참고. cross-filesystem 의존 제거 + 자족적 reference.
 
+*Last reviewed against code: 2026-05-07 (0.5.x). `/hm:loop` 는 `feature` 와 `improve` 두 mode 를 지원하며, per-loop 단일 worktree 를 사용 (0.5.5+). wrapup 은 iter 마다가 아니라 loop close 시 1회만.*
+
 ## Per-Phase 5-Stage Pipeline
 
 각 phase 는 다음 5 stage 를 순차 진행:

@@ -1,112 +1,352 @@
 # harness-maker
 
-A plugin for **Claude Code and Cursor IDE** that **generates and refines a project-tailored `.claude/` harness** — commands, skills, agents, hooks, and observability — tuned to your stack, scale, and lifecycle. It does not run your project code; it builds the runtime that does. Anti-rot keeps the harness fresh against the moving Claude Code / Cursor ecosystem; worktree isolation and 5 security gates keep it safe; `/hm:ai-readiness` gives a scored, ranked action plan for improving AI-pair quality.
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org)
+[![Claude Code plugin](https://img.shields.io/badge/Claude_Code-plugin-orange)](https://code.claude.com)
+[![Cursor 2.4+](https://img.shields.io/badge/Cursor-2.4%2B-black)](https://cursor.com)
+[![Built with uv](https://img.shields.io/badge/built_with-uv-261230.svg)](https://docs.astral.sh/uv/)
 
-Single-source `.claude/` (agents / skills / hooks / commands) works in both IDEs; opt into the `cursor` target during the interview to additionally render `.cursor/rules/harness.mdc` and `.cursor/mcp.json`.
+> A meta-plugin for **Claude Code + Cursor IDE** that builds a project-tailored `.claude/` harness — agents, skills, hooks, observability — and keeps it fresh against the moving Claude/Cursor ecosystem.
 
-## Requirements
+One command. Interview-driven. Dual-IDE. Anti-rot built in.
 
-- **Python 3.12+ and [`uv`](https://docs.astral.sh/uv/)** must be available wherever Claude Code runs against your project, even if the project's primary toolchain is Rust, Node, Go, or any non-Python language. The rendered harness installs hooks (`permission_gate`, optionally `spec_gate`, plus `telemetry`) that invoke `uv run python -m harness_maker.gates.<name>` at PreToolUse/PostToolUse boundaries; without `uv` + the `harness_maker` package on the path those hooks are silent no-ops.
-  - **Today (pre-PyPI):** clone this repo and install editable into your project: `uv pip install -e /path/to/harness-maker`. Then load the plugin with `claude --plugin-dir /path/to/harness-maker`. PyPI publish is on the open-question list; until it lands, editable from a clone is the only supported install.
-  - **Disabling hooks selectively:** set `dev_mode: task-driven` in `.claude/harness.yaml` to skip `spec_gate`; remove an entry from `.claude/hooks/hooks.json` to skip any hook. The base harness keeps working with no hooks installed.
-- **Claude Code CLI** (with plugin + hook support) **and/or Cursor IDE 2.4+** — Cursor reads `.claude/agents/`, `.claude/skills/`, and Claude Code-format hooks natively (subagents + skills support shipped in Cursor 2.4). Opt into Cursor-specific assets (`.cursor/rules/`, `.cursor/mcp.json`) via the `targets` interview question.
-- **Git** — every worktree-enabled preset (default for both `Side` and `Production`; opt out via `worktree.scope: []` in `harness.yaml`) uses `git worktree add` for `/hm:execute`.
+[Why](#why-harness-maker) ·
+[Quickstart](#quickstart) ·
+[Features](#features) ·
+[How it works](#how-it-works) ·
+[Slash commands](#slash-commands-the-harness-exposes) ·
+[Comparison](#how-it-compares) ·
+[Configuration](#configuration) ·
+[Cursor target](#cursor-target) ·
+[FAQ](#faq) ·
+[Roadmap](#roadmap)
 
-## Quick Start
+---
+
+## Why harness-maker?
+
+Every project that uses Claude Code or Cursor needs a `.claude/` directory — commands, agents, skills, hooks, observability. Rolling it by hand is fast on day 1 and painful by day 90: best practices shift, new hook events ship, reviewer prompts rot, and nothing tells you.
+
+harness-maker treats the `.claude/` directory as a **versioned artifact** with a lifecycle:
+
+```
+profile → interview → synthesize → render → reconcile → /hm:* runtime → /hm:refresh (weekly)
+```
+
+The same single-source `.claude/` drives both Claude Code and Cursor IDE 2.4+ natively. Anti-rot crawlers watch 4 sources (Anthropic blog, GitHub releases, arxiv cs.SE/CL/CR, OSV.dev) and always ask before touching anything.
+
+---
+
+## Table of Contents
+
+- [Why harness-maker?](#why-harness-maker)
+- [Quickstart](#quickstart)
+- [Requirements](#requirements)
+- [Features](#features)
+- [How it works](#how-it-works)
+- [Slash commands the harness exposes](#slash-commands-the-harness-exposes)
+- [How it compares](#how-it-compares)
+- [Configuration](#configuration)
+- [Cursor target](#cursor-target)
+- [Reconcile rules](#reconcile-rules-re-rendering-an-existing-harness)
+- [Observability](#observability)
+- [Marketplace](#marketplace)
+- [FAQ](#faq)
+- [Roadmap](#roadmap)
+- [Development](#development)
+- [Contributing](#contributing)
+- [License](#license)
+
+---
+
+## Quickstart
 
 ```bash
-uv sync
-claude --plugin-dir .
+# 1. Clone and install (pre-PyPI — editable from clone)
+git clone git@github.com:Ecro/harness-maker.git
+uv pip install -e ./harness-maker
+
+# 2. Load the plugin in your project
+cd your-project
+claude --plugin-dir /path/to/harness-maker
+
+# 3. Generate the harness
 /harness-maker:make
 ```
 
-A single command takes you from zero to a fully-rendered `.claude/` directory with workflow stages, reviewer agents, anti-rot pipeline, and a status line wired up. The interview asks for IDE `targets` — choose `claude-code`, `cursor`, or both (comma-separated). Single-source assets work in either IDE; Cursor-specific files are rendered only if `cursor` is selected.
+The interview asks for your preset (`Side` or `Production`), locale, dev mode, and target IDEs. A fully-rendered `.claude/` directory is ready in one turn.
 
 Re-run with flags to evolve the harness:
 
-- `/harness-maker:make --audit` — score the existing `.claude/` against the rubric
-- `/harness-maker:make --add NAME` — graft on a single skill/agent/command
-- `/harness-maker:make --remove NAME` — surgically remove one component
-- `/harness-maker:make --promote NAME` — move an ad-hoc artifact into the harness
+```bash
+/harness-maker:make --audit          # score the existing .claude/ against the rubric
+/harness-maker:make --add NAME       # graft on a single skill/agent/command
+/harness-maker:make --remove NAME    # surgically remove one component
+/harness-maker:make --promote NAME   # move an ad-hoc artifact into the harness
+```
 
-After install, the rendered harness exposes its own commands under `/hm:*`:
+---
 
-- `/hm:loop "<goal>"` — autoloop driver (token-unbounded, time/iter-bounded)
-- `/hm:ai-readiness` — scored 3-layer readiness report + ranked action plan
-- `/hm:refresh` — anti-rot crawl + manual confirm
-- `/hm:research` · `/hm:spec` · `/hm:plan` · `/hm:execute` · `/hm:review` · `/hm:wrapup` · `/hm:verify` — atomic stages
-- Fused workflows (stage combos, renameable at install):
-  - **Side defaults:** `/hm:exec-rev` · `/hm:exec-rev-wrap` _(default)_ · `/hm:plan-exec-rev-wrap`
-  - **Production defaults:** `/hm:exec-rev-wrap-ver` _(default)_ · `/hm:exec-rev-wrap` · `/hm:exec-rev` · `/hm:res-spec-plan`
+## Requirements
+
+| Dependency | Notes |
+|---|---|
+| **Python 3.12+** and **[`uv`](https://docs.astral.sh/uv/)** | Required wherever Claude Code runs against your project — even if your project's primary language is Rust, Node, or Go. Hooks invoke `uv run python -m harness_maker.gates.*`; without `uv` they are silent no-ops. |
+| **Claude Code CLI** (plugin + hook support) | Loaded via `claude --plugin-dir /path/to/harness-maker`. |
+| **Cursor IDE 2.4+** | Optional. Reads `.claude/agents/`, `.claude/skills/`, and Claude Code-format hooks natively. Opt in via `targets: [cursor]` at the interview. |
+| **Git** | Required for worktree isolation (every `/hm:execute` and `/hm:loop` run). |
+
+---
 
 ## Features
 
-- **Dual IDE — Claude Code + Cursor** — single-source `.claude/agents/`, `.claude/skills/`, `.claude/commands/`, and `.claude/hooks/hooks.json` drive both IDEs (Cursor 2.4+ reads `.claude/` natively). Opt into the `cursor` target to additionally render `.cursor/rules/harness.mdc` (always-on workflow rules) and `.cursor/mcp.json`. IDE-compatibility verification fixture under `tests/cursor-compat/` (`MANUAL_CHECKLIST.md` + `RESULTS.md`) for release-time regression checks.
-- **Single command, no subcommand sprawl** — `/harness-maker:make` is the only entry point. Everything else is a flag.
-- **Two presets, ten+ override dimensions** — pick `Side` (1 reviewer, lean) or `Production` (5 reviewers, verify-required); then tune workflow naming, models, autoloop, anti-rot, worktree, security, context-lint, memory, caching.
-- **AI-readiness scoring** — `/hm:ai-readiness` runs a 3-layer composite: deterministic structural checks (70%), LLM rubric evaluation (25%), prompt-cache diagnostics (5%). Outputs a 0-100 score with P0/P1/P2 ranked actions and updates `.claude/observability/dashboard.md`. All telemetry stays local.
-- **Anti-rot pipeline** — weekly crawl across 4 sources (Anthropic blog/changelog, GitHub releases, arxiv cs.SE/CL/CR, OSV.dev), LLM-scored with adaptive threshold, **always manual-confirmed** via `AskUserQuestion`. No silent overwrites.
-- **Worktree isolation** — every `/hm:execute` (and optionally `/hm:plan`) runs in a fresh `git worktree` under `.claude/.worktrees/`. Successful runs cleanup; failures preserve evidence.
-- **5 security gates** — secrets (regex + entropy), permissions (`settings.json` over-grant), hook injection (`hooks.json` AST scan), dependency CVEs (OSV.dev), prompt injection (hidden-instruction detection + privilege separation between reviewer and executor agents).
-- **Brownfield-safe** — `Reconciler` indexes existing `.claude/`, hashes via provenance frontmatter, and offers per-conflict keep/replace/both. ADD-only apply with timestamped backups.
-- **Provenance frontmatter** — every generated `.md`/`.json` carries `generated_by`, `harness_maker_version`, `content_hash`, `source_template`, `generated_at`, `provenance`. User edits are detected and never silently overwritten.
+- **Single command, no subcommand sprawl.** `/harness-maker:make` is the only entry point. Everything else is a flag (`--audit`, `--add`, `--remove`, `--promote`). No muscle-memory tax.
 
-## How It Compares
+- **Two presets, ten override dimensions.** `Side` (1 reviewer, lean, fast) and `Production` (5 reviewers, verify-required, secure) cover ~90% of teams. The remaining 10% comes from override dimensions surfaced in the interview: workflow naming, models, autoloop, anti-rot, worktree, security, context-lint, memory, caching.
+
+- **Dual IDE — Claude Code + Cursor, single source.** `.claude/agents/`, `.claude/skills/`, `.claude/commands/hm/`, and `.claude/hooks/hooks.json` are shared. Cursor 2.4+ reads them natively — no duplication. Opt into the `cursor` target to additionally render `.cursor/rules/harness.mdc` and `.cursor/mcp.json`.
+
+- **AI-readiness scoring.** `/hm:ai-readiness` runs a 3-layer composite: deterministic structural checks (70%), LLM rubric evaluation (25%), prompt-cache diagnostics (5%). Outputs a 0-100 score with P0/P1/P2 ranked action items and updates `.claude/observability/dashboard.md`. All telemetry stays local.
+
+- **Anti-rot pipeline.** Weekly crawl across 4 sources: Anthropic blog/changelog, GitHub releases (`anthropics/claude-code`), arxiv (cs.SE / cs.CL / cs.CR), OSV.dev CVEs. Each item is LLM-scored for relevance with an adaptive threshold (starts at 0.7, adapts ±0.05 based on your accept/reject history). **Always manual-confirmed** — there is no `--auto-apply` path.
+
+- **Worktree isolation per run.** Every `/hm:execute` runs in a fresh `git worktree` under `.worktrees/`. `/hm:loop` allocates one worktree for the whole loop, shared across iterations to reduce branch churn. Successful runs clean up; failed runs preserve evidence. Prefix-match cleanup never touches Cursor-managed worktrees in the same directory.
+
+- **5 security gates.** `secrets` (regex + entropy, gitleaks-style), `permissions` (`settings.json` over-grant detection), `hook injection` (`hooks.json` AST scan for `rm -rf`, `curl | sh`, `eval`), `dependency CVEs` (OSV.dev), `prompt injection` (hidden-instruction pattern detection + privilege separation). Findings go to `.claude/observability/security/findings-*.jsonl` — never transmitted.
+
+- **Privilege separation.** Reviewer agents get `permissions.deny: [Write, Edit, Bash exec]`. Executor agents get `permissions.allow: [Write(.worktrees/**)]`. Combined with worktree isolation, this gives defense-in-depth: even a prompt-injected reviewer cannot write to disk; even a compromised executor cannot write outside the active worktree.
+
+- **Brownfield-safe.** `Reconciler` indexes existing `.claude/`, computes hash-based ours/theirs decisions via provenance frontmatter, and offers per-conflict keep/replace/both. Apply is ADD-only with timestamped backups. User edits are never silently overwritten.
+
+- **Autoloop with feature and improve modes.** `/hm:loop` runs token-unbounded, time-and-iteration-bounded loops. `feature` mode drives toward a goal or spec file with a coverage-driven adaptive interview. `improve` mode iterates `exec-rev` against a quality target until a convergence predicate is met.
+
+- **Refdocs search skill.** Register your project's reference folders (architecture docs, API specs, design docs) in `harness.yaml`. The `refdocs-search` skill gives the LLM lossless full-text search across all registered folders — no chunking, no RAG index.
+
+- **SessionStart drift reminder.** A hook fires on every session open and warns if the running harness-maker version differs from the version that rendered the harness — so you notice when a `/plugin update` needs a re-render.
+
+---
+
+## How it works
+
+```mermaid
+flowchart TD
+    A["/harness-maker:make"] --> B["Profile\n(stack, scale, lifecycle)"]
+    B --> C["Interview\n(preset + 10 dims + targets)"]
+    C --> D["Synthesize\n(deterministic Blueprint)"]
+    D --> E["Render\n(Jinja2 + provenance frontmatter)"]
+    E --> F{Brownfield?}
+    F -- No --> G["Write .claude/ directly"]
+    F -- Yes --> H["Reconcile\n(hash-based keep/replace/both)"]
+    H --> G
+    G --> I["Cursor target?\nRender .cursor/ assets too"]
+    I --> J["User runs /hm:* commands"]
+    J --> K["Weekly /hm:refresh\n4-source anti-rot crawl\n→ manual confirm"]
+```
+
+**14 mechanisms** (M1-M14) back every feature. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full breakdown including the privilege-separation model, security gate triggers, and reconcile invariants.
+
+---
+
+## Slash commands the harness exposes
+
+After install, the rendered harness exposes commands under `/hm:*`:
+
+### Atomic stages (always available)
+
+| Command | Purpose |
+|---|---|
+| `/hm:research` | Gather information, best practices, explore options |
+| `/hm:spec` | Write acceptance criteria from research |
+| `/hm:plan` | Decompose spec into phases with exit criteria |
+| `/hm:execute` | Implement with TDD + worktree isolation |
+| `/hm:review` | Multi-reviewer consensus (conditional routing) |
+| `/hm:wrapup` | Clean, document, commit |
+| `/hm:verify` | 6-check gate before completion |
+
+### Fused workflows (preset-generated, user-renameable)
+
+| Preset | Default fused workflows |
+|---|---|
+| **Side** | `/hm:exec-rev` · `/hm:exec-rev-wrap` _(default)_ |
+| **Production** | `/hm:exec-rev-wrap-ver` _(default)_ · `/hm:exec-rev-wrap` · `/hm:exec-rev` · `/hm:res-spec-plan` |
+
+### Utility commands
+
+| Command | Purpose |
+|---|---|
+| `/hm:loop "<goal>"` | Autoloop driver — `feature` or `improve` mode, time/iter-bounded |
+| `/hm:ai-readiness` | 3-layer readiness score + P0/P1/P2 ranked actions |
+| `/hm:refresh` | Anti-rot crawl — manual confirm required |
+
+---
+
+## How it compares
 
 Other Claude Code harnesses pick a niche; harness-maker is the **meta-tool** that builds them.
 
 | Project | Scope | What harness-maker adds |
 |---|---|---|
-| **ohmyclaudecode** | Curated commands/agents (skills bundle) | Project-tailored synthesis (preset + 10+ override dims), brownfield reconcile, provenance, anti-rot pipeline |
-| **superpowers** | Powerful sub-agents and workflows | Single-command entry, ai-readiness scoring, worktree isolation by default, privilege-separated reviewer/executor |
+| **ohmyclaudecode** | Curated commands/agents bundle | Project-tailored synthesis (preset + 10 override dims), brownfield reconcile, provenance frontmatter, anti-rot pipeline |
+| **superpowers** | Powerful sub-agents and workflows | Single-command entry, AI-readiness scoring, worktree isolation by default, privilege-separated reviewer/executor |
 | **Archon** | Knowledge-base + RAG-backed planning | Stack/scale/lifecycle profiler, atomic+fused workflow engine, conditional reviewer routing, 5 security gates |
+| **aider** | Terminal pair programmer, LLM-agnostic | Claude Code / Cursor IDE native; harness output is the runtime (not the session); anti-rot keeps it current |
+| **Hand-rolled `.claude/`** | Full control, zero automation | Drift detection via provenance hash, weekly anti-rot crawl, AI-readiness scoring, worktree isolation — without writing it yourself |
 
 harness-maker treats the `.claude/` directory itself as the artifact and gives it a lifecycle: profile → interview → synthesize → render → reconcile → verify → refresh.
+
+---
+
+## Configuration
+
+The interview writes answers to `.claude/harness.yaml`. Key dimensions:
+
+```yaml
+preset: Production           # Side | Production
+locale: en                   # en | ko | <any — unknown falls back to en>
+dev_mode: spec-driven        # spec-driven | task-driven
+targets:                     # which IDEs to drive
+  - claude-code
+  - cursor
+recommended_model: claude-opus-4-7
+
+reviewers:
+  enabled: [code, security, performance, ux, concurrency]
+  routing: conditional       # conditional | always-all
+
+worktree:
+  scope: [execute, plan]     # which stages run in a fresh worktree
+  cleanup: on_success        # on_success | always | never
+
+anti_rot:
+  enabled: true
+  threshold: 0.7             # adaptive — adjusts ±0.05 based on accept/reject ratio
+
+context_lint:
+  strict: true               # warn on overrun | block
+
+memory:
+  files: [failures.md, wiki.md]
+```
+
+Run `/harness-maker:make` again and choose **Update** (same settings, pick up template improvements) or **Full reconfigure** to change any dimension.
+
+---
 
 ## Cursor target
 
 Run `/harness-maker:make` and pick `targets: [cursor]` or `[claude-code, cursor]` at the interview. The renderer adds:
 
-- `.cursor/rules/harness.mdc` — always-on workflow rules (LLM-first design, agent dispatch, slash commands, security gates, models, memory, anti-rot — Cursor frontmatter `description` / `globs: []` / `alwaysApply: true`)
+- `.cursor/rules/harness.mdc` — always-on workflow rules with Cursor-legal frontmatter (`description` / `globs: []` / `alwaysApply: true`)
 - `.cursor/mcp.json` — Cursor MCP server config (default `{"mcpServers": {}}`, user-tunable)
 
-`.claude/agents/`, `.claude/skills/`, `.claude/commands/`, and `.claude/hooks/hooks.json` are single-source — Cursor 2.4+ reads them natively, so the same files drive both IDEs without duplication.
-
-### Reconcile KEEP rule trade-off (read before re-rendering)
-
-Re-running `/harness-maker:make` against an existing harness uses a hash-driven KEEP rule that protects user edits. Trade-off: when harness-maker bumps a template (e.g. adds a yaml key on a minor release), the existing file's `content_hash` frontmatter no longer matches the new template's hash, so reconcile picks **KEEP** even if you didn't edit the file — the rendered yaml stays on the old template.
-
-To pick up template updates manually after a harness-maker bump:
-
-```bash
-# Force-update the harness manifest after bumping harness-maker version:
-rm .claude/harness.yaml
-/harness-maker:make
-# (the previous file is auto-backed up to .backup-<ISO>/.claude/harness.yaml)
-```
-
-Cursor's `.cursor/rules/*.mdc` follow the same KEEP behavior (no `content_hash` frontmatter, to avoid Cursor's strict-reject of unknown keys). A future phase introduces a sidecar `.hm-meta.yaml` so harness-maker can hash-track Cursor assets without polluting the Cursor frontmatter.
+`.claude/agents/`, `.claude/skills/`, `.claude/commands/`, and `.claude/hooks/hooks.json` are single-source — Cursor 2.4+ reads them natively.
 
 ### Recommended model
 
-`harness.yaml.recommended_model` defaults to `claude-opus-4-7` and propagates to agent frontmatter. Cursor users may override model selection in their IDE, but prompts contain Claude-specific patterns (`<thinking>` blocks, role framing) so quality may degrade on other models. The harness does **not** model-agnostically rewrite prompts — that's a deliberate tradeoff in favor of polish on the recommended model.
+`harness.yaml.recommended_model` defaults to `claude-opus-4-7` and propagates to agent frontmatter. Cursor users may override model selection in their IDE. The harness does **not** rewrite prompts to be model-agnostic — `<thinking>` blocks and Claude-specific patterns are preserved deliberately.
 
 ### Verification
 
-For first-release dogfooding and per-release regression:
+Per-release Cursor compatibility is tracked in `tests/cursor-compat/`:
 
-- `tests/cursor-compat/MANUAL_CHECKLIST.md` — A1–A4 (agent dispatch, hook fire, skill auto-discovery, slash command + Q&A loop) + Phase 2.8 (production hook command runs) covering both IDEs.
-- `tests/cursor-compat/RESULTS.md` — meta + PASS/FAIL/PARTIAL grid you fill while running the checklist.
-- `tests/cursor-compat/fixture/` — minimal `.claude/` for opening directly in either IDE (gitignore protects against IDE-generated metadata pollution).
+- `MANUAL_CHECKLIST.md` — A1–A4 (agent dispatch, hook fire, skill auto-discovery, slash command + Q&A loop) covering both IDEs
+- `RESULTS.md` — PASS/FAIL/PARTIAL grid you fill while running the checklist
+- `fixture/` — minimal `.claude/` for opening directly in either IDE
+
+---
+
+## Reconcile rules (re-rendering an existing harness)
+
+Re-running `/harness-maker:make` on an existing harness uses a hash-driven KEEP rule: if a file's `content_hash` frontmatter matches the new template's hash, it's "ours" — safe to overwrite. If it differs (user-edited), it's "theirs" — kept.
+
+**Trade-off**: when harness-maker bumps a template on a minor release, the existing file's hash no longer matches, so reconcile picks KEEP even if you didn't edit the file.
+
+To pick up template updates after a version bump:
+
+```bash
+rm .claude/harness.yaml
+/harness-maker:make
+# (previous .claude/ is auto-backed up to .backup-<ISO>/)
+```
+
+`.cursor/rules/*.mdc` follow the same KEEP behavior. A future phase introduces a sidecar `.hm-meta.yaml` so harness-maker can hash-track Cursor assets without polluting Cursor frontmatter.
+
+---
+
+## Observability
+
+All observability is 100% local — nothing is transmitted externally.
+
+| File | Contents |
+|---|---|
+| `.claude/observability/dashboard.md` | AI-readiness score, dimension breakdown, ranked action items |
+| `.claude/observability/metrics.jsonl` | Per-turn telemetry (cache hit %, tool calls, durations) |
+| `.claude/observability/refresh/raw-*.jsonl` | Anti-rot crawl evidence (accepted / rejected items) |
+| `.claude/observability/security/findings-*.jsonl` | 5-gate security scan findings |
+
+Run `/hm:ai-readiness` to regenerate the dashboard on demand.
+
+---
 
 ## Marketplace
 
 Both manifests are marketplace-ready:
 
-- `.claude-plugin/plugin.json` — Claude Code marketplace spec: <https://code.claude.com/docs/en/plugin-marketplaces>
-- `.cursor-plugin/plugin.json` — Cursor Marketplace spec: <https://cursor.com/docs/plugins/building>; submit at <https://cursor.com/marketplace/publish>
+- `.claude-plugin/plugin.json` — Claude Code plugin spec
+- `.cursor-plugin/plugin.json` — Cursor Marketplace spec
 
-Listing on either marketplace is pending. Until then, install locally with `claude --plugin-dir .` from the repo root, or open the repo as a folder in Cursor and use it as a workspace plugin.
+Listing on either marketplace is **pending**. Until then, install locally:
+
+```bash
+# Claude Code
+claude --plugin-dir /path/to/harness-maker
+
+# Cursor — open the repo folder directly in Cursor as a workspace plugin
+```
+
+---
+
+## FAQ
+
+**Q: Why Python? My project is Rust / Node / Go.**
+The hooks (`permission_gate`, `worktree_gate`, `telemetry`) call `uv run python -m harness_maker.*` at PreToolUse / PostToolUse boundaries. This doesn't touch your project's toolchain — `uv` and `harness_maker` need to be on the path, but only to run hooks. Your project's build system is untouched.
+
+**Q: Why does it require `uv`?**
+`uv` gives a hermetic, fast Python environment without polluting the system or your project's virtualenv. Hooks run in milliseconds without activating anything.
+
+**Q: Will harness-maker overwrite my hand-edits when I re-render?**
+No. Every generated file carries a `content_hash` in its provenance frontmatter. Re-render compares the new template's hash against the file on disk. If they differ — meaning you edited the file — it keeps yours. See [Reconcile rules](#reconcile-rules-re-rendering-an-existing-harness).
+
+**Q: What's the difference between `Side` and `Production`?**
+`Side` is lean: 1 reviewer (code), verify-before-completion optional, worktree scope `[execute]`. `Production` is thorough: 5 reviewers, verify required, worktree scope `[execute, plan]`, security on high-finding = block. Both share the same anti-rot and caching defaults.
+
+**Q: Does anti-rot ever auto-apply?**
+Never. Every anti-rot item surfaces via `AskUserQuestion` in `/hm:refresh`. There is no `--auto-apply` flag and no plan to add one. The rationale: a wrong patch is worse than a stale harness.
+
+**Q: Can I use only Claude Code? Only Cursor? Both?**
+Yes to all three. `targets` is a multi-select at the interview. Single-source `.claude/` assets work in either IDE; Cursor-only files (`.cursor/rules/`, `.cursor/mcp.json`) render only when `cursor` is in `targets`.
+
+**Q: Do my prompts or telemetry leave my machine?**
+No. `metrics.jsonl`, dashboard, and security findings are written to `.claude/observability/` locally. Anti-rot crawls *read* public sources (Anthropic blog, arxiv, GitHub, OSV.dev) but never uploads anything.
+
+**Q: How do I pick up template improvements after a `/plugin update`?**
+Run `/harness-maker:make` → choose **Update**. For files where your hash matches the old template, the new version is applied. For files you edited (hash mismatch), yours is kept. To force a full refresh, `rm .claude/harness.yaml` and re-run.
+
+**Q: Why doesn't harness-maker rewrite prompts to be model-agnostic?**
+The prompts are tuned for `claude-opus-4-7` — `<thinking>` blocks, role framing, chain-of-thought structure. Rewriting for model-neutrality would degrade quality on the recommended model for hypothetical gains on others. Override `recommended_model` in `harness.yaml` if you want a different model; the prompts remain as-is.
+
+---
+
+## Roadmap
+
+- **PyPI publish** — remove the editable-from-clone requirement.
+- **Claude Code + Cursor Marketplace listings** — submit both plugin manifests.
+- **`.hm-meta.yaml` sidecar for Cursor assets** — enable hash-tracking of `.cursor/rules/*.mdc` without polluting Cursor frontmatter, unblocking auto-upgrade for Cursor-target files.
+- **User-configurable anti-rot repo list** — `harness.yaml.anti_rot.github_repos` to track additional Claude Code ecosystem repos beyond the default.
+- **Demo screencast** — record a first-install + `/hm:loop` session.
+- **`Enterprise` preset** — stricter security gates, mandatory spec-driven dev mode.
+
+---
 
 ## Development
 
@@ -115,11 +355,19 @@ uv sync
 uv run pytest                       # full suite
 uv run ruff check src/ tests/       # lint
 uv run ruff format src/ tests/      # format
-uv run mypy --strict src/           # type
+uv run mypy --strict src/           # type check
 bash .claude-verify.sh all          # phase-by-phase exit criteria + final acceptance
 ```
 
-See [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) for adding skills/agents/presets and [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the 13 mechanisms (M1-M13) behind the system.
+---
+
+## Contributing
+
+See [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) for adding skills/agents/presets, test patterns, and the PR checklist (including the 4-file version bump invariant).
+
+See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the 14 mechanisms (M1-M14) behind the system.
+
+---
 
 ## License
 

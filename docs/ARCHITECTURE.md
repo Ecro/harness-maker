@@ -58,9 +58,10 @@ Three design commitments shape every decision below:
             └─────────────┬───────────────┘
                           │
                           ▼
-            ┌─────────────────────────────────────────┐
-            │  ADD-only apply to <project>/.claude/   │
-            └────────────────────┬────────────────────┘
+            ┌──────────────────────────────────────────────────────┐
+            │  ADD-only apply to <project>/.claude/                │
+            │  (+ .cursor/rules/ + .cursor/mcp.json when M14 active) │
+            └────────────────────┬─────────────────────────────────┘
                                  │
                                  ▼
         ┌────────────────────────────────────────────────────┐
@@ -75,9 +76,9 @@ Three design commitments shape every decision below:
         │    loop.md          ◀── M7 autoloop driver          │
         │    ai-readiness.md  ◀── M5 scored readiness report   │
         │    refresh.md       ◀── M4 anti-rot, manual confirm │
-        │  skills/  (10)      ◀── including verify-before,    │
+        │  skills/  (11)      ◀── including verify-before,    │
         │                          conditional-router,        │
-        │                          context-linter,            │
+        │                          refdocs-search,            │
         │                          worktree-isolator, ...     │
         │  agents/  (9)       ◀── M12 reviewer/executor       │
         │                          privilege separation       │
@@ -99,7 +100,7 @@ Three design commitments shape every decision below:
                   → AskUserQuestion (always manual)
 ```
 
-## 3. The 13 Mechanisms (M1-M13)
+## 3. The 14 Mechanisms (M1-M14)
 
 Every mechanism below maps to a module under `src/harness_maker/` and at least one verification check in `.claude-verify.sh`.
 
@@ -108,7 +109,7 @@ Every mechanism below maps to a module under `src/harness_maker/` and at least o
 The four-stage core. Each stage has a single responsibility and a typed handoff.
 
 - **Profiler** (`profile.py`) inspects the project root for signals: `pyproject.toml`, `package.json`, `Cargo.toml`, `*.overlay`, `.github/workflows/`, presence of `.claude/`, presence of standalone `TECH_SPEC.md`, vault membership. Emits `ProjectProfile`.
-- **Interviewer** (`interview.py`) recommends a preset based on the profile, then runs an interactive interview across 10+ override dimensions: workflow naming, reviewers, models, autoloop, anti-rot, worktree, security, context-lint, memory, caching. Locale-first (Korean and English) via `i18n.py`. Emits `HarnessConfig`.
+- **Interviewer** (`interview.py`) recommends a preset based on the profile, then runs an interactive interview across 10+ override dimensions: workflow naming, reviewers, models, autoloop, anti-rot, worktree, security, context-lint, memory, caching. Also captures `targets` (Claude Code / Cursor) and `recommended_model`. Locale-first; English is the default (`DEFAULT_LOCALE = "en"`) with Korean built-in and unknown locales silently falling back to English, via `i18n.py`. Emits `HarnessConfig`.
 - **Synthesizer** (`synthesize.py`) is **purely deterministic** — given a `HarnessConfig`, it produces the same `Blueprint` (a list of `FileEntry`) every time. No LLM call here; this guarantees reproducibility and snapshot testability.
 - **Renderer** (`render.py`) walks the `Blueprint`, loads each Jinja2 template, injects context, prepends provenance frontmatter (M13), and writes the result.
 
@@ -139,7 +140,7 @@ The Claude Code ecosystem moves weekly. Skills, agents, and best practices that 
 
 Three stages:
 
-1. **Crawl** (weekly): four sources — Anthropic blog/changelog, GitHub releases (superpowers, oh-my-claudecode, Archon, ECC, OpenHarness, wshobson, claude-code-templates), arxiv (cs.SE / cs.CL / cs.CR), OSV.dev. Implemented under `src/harness_maker/crawler/`. Raw output to `observability/refresh/raw-<date>.jsonl`.
+1. **Crawl** (weekly): four sources — Anthropic blog/changelog, GitHub releases (`anthropics/claude-code` by default), arxiv (cs.SE / cs.CL / cs.CR), OSV.dev. Implemented under `src/harness_maker/crawler/`. Raw output to `observability/refresh/raw-<date>.jsonl`.
 2. **Filter** (`relevance.py`): LLM scores each item for project-relevance. Threshold starts at 0.7 and adapts ±0.05 based on the recent accept/reject ratio.
 3. **Propose** (`templates/commands/hm/refresh.md.j2`): `/hm:refresh` opens an `AskUserQuestion` per surviving item — accept, reject, or defer. **Manual confirm is non-negotiable**: there is no `--auto-apply` path.
 
@@ -149,9 +150,11 @@ This means harness-maker stays current without ever silently changing the user's
 
 Three metrics are computed and surfaced in the `/hm:ai-readiness` report:
 
-- **효율** — cache hit % per turn. Computed from telemetry hook output.
+- **효율** — cache hit % per turn. Computed from telemetry hook output (PostToolUse) with a hybrid schema that works across Claude Code and Cursor IDE (0.5.4+).
 - **Health** — 0-100 score across 6 dimensions: docs, tests, CI, observability, security, governance. Implemented in `readiness.py`. Drills down into `agent_quality.py`, which assigns each agent a Platinum/Gold/Silver/Bronze rating against a fixed rubric. A "ceremony penalty" deducts points when an agent has high-process / low-output behavior.
 - **fresh** — days since the last `/hm:refresh` accepted at least one proposal.
+
+A **SessionStart drift reminder** hook (`hooks/sessionstart_drift.py`) fires on every session open and warns if the running harness-maker version differs from the version that rendered the harness — alerting users to re-render after a plugin update (0.5.6+).
 
 All telemetry stays local — `metrics.jsonl` is never transmitted.
 
@@ -169,12 +172,17 @@ Override: set `harness.yaml.reviewers.routing: always-all` to call every reviewe
 
 ### M7 — Autoloop Driver
 
-`/hm:loop "<goal>" [--time 8h] [--max-iter 30] [--workflow X] [--dry-run]` runs an unbounded-token, time-and-iteration-bounded loop. Implemented in `autoloop_driver.py`.
+`/hm:loop "<goal>" [--mode feature|improve] [--time 8h] [--max-iter 30] [--per-iter-workflow X] [--dry-run]` runs an unbounded-token, time-and-iteration-bounded loop. Implemented in `autoloop_driver.py`.
+
+Two modes:
+
+- **feature** (default) — driven by a goal or `--spec` file; coverage-driven adaptive interview extracts features; iterates until all features pass or caps fire.
+- **improve** — driven by a quality target or `--target` path; iterates the `exec-rev` workflow until a convergence predicate is met.
 
 Each iteration:
 
-1. Allocates a fresh worktree (M9).
-2. Runs the chosen workflow (default: `dev`).
+1. Allocates a per-loop worktree at loop start (M9); reuses it for all iterations (0.5.5+).
+2. Runs the chosen per-iteration workflow (default: `exec-rev`). Wrapup runs once at loop close, not per iteration.
 3. Calls `/hm:verify` (M8) before completion.
 4. Cleans up on success; preserves on failure.
 
@@ -195,7 +203,9 @@ Required in the `Production` preset; optional in `Side`.
 
 ### M9 — Worktree Isolation
 
-`worktree.py` integrates `git worktree`. By default `/hm:execute` (and optionally `/hm:plan` in `Production`) runs inside a fresh worktree under `.claude/.worktrees/<workflow>-<timestamp>/`. The LLM may only write inside that worktree — enforced by M12's executor agent permissions.
+`worktree.py` integrates `git worktree`. By default `/hm:execute` (and optionally `/hm:plan` in `Production`) runs inside a fresh worktree under `.worktrees/<workflow>-<timestamp>/` at the project root. The LLM may only write inside that worktree — enforced by M12's executor agent permissions.
+
+`/hm:loop` allocates **one shared worktree per loop run** (not per iteration), reducing branch churn (0.5.5+). Cleanup uses prefix-match (`phase-*`, `autoloop-*`, `execute-*`) so harness-maker never removes worktrees created by Cursor or other tools in the same `.worktrees/` directory.
 
 Successful runs cleanup the worktree after merging back. Failed runs preserve the worktree as evidence.
 
@@ -245,6 +255,23 @@ Three loops depend on this:
 - **`/hm:refresh`** (M4) compares hashes to detect user edits and refuses to silently overwrite.
 - **`phase_<N>_invariants`** check in `.claude-verify.sh` walks every generated file and asserts the first line is `---` — the invariant that makes the other two loops sound.
 
+### M14 — Dual-IDE Rendering (Cursor target) (0.5.0+)
+
+harness-maker renders the same harness for both Claude Code and Cursor IDE. The `targets` field in `HarnessConfig` (values: `claude-code`, `cursor`, or both) drives which files the Renderer emits.
+
+**Single-source assets** (`targets: [claude-code, cursor]` both get these):
+- `.claude/agents/`, `.claude/skills/`, `.claude/commands/hm/`, `.claude/hooks/hooks.json`
+
+Cursor 2.4+ reads `.claude/agents/` and `.claude/skills/` natively, so no duplication is needed for those.
+
+**Cursor-only assets** (emitted only when `cursor` ∈ targets):
+- `.cursor/rules/harness.mdc` — always-on workflow rules rendered via `_render_cursor_mdc()`, which limits frontmatter to keys Cursor accepts (`description`, `globs`, `alwaysApply`). Our `content_hash` metadata is omitted from the frontmatter to avoid strict-reject.
+- `.cursor/mcp.json` — pure JSON (no frontmatter); rendered via `_render_pure_text()`.
+
+**Dual plugin manifest**: `.claude-plugin/plugin.json` for the Claude Code marketplace and `.cursor-plugin/plugin.json` for the Cursor Marketplace. Both manifests must be bumped in sync with `pyproject.toml` and `src/harness_maker/__init__.py` on every version release (4-file invariant).
+
+**Recommended model**: `HarnessConfig.recommended_model` defaults to `claude-opus-4-7` and propagates to agent frontmatter. The harness does **not** rewrite prompts to be model-agnostic — `<thinking>` blocks and Claude-specific patterns are preserved deliberately.
+
 ## 4. Preset Comparison
 
 The two presets bracket the design space. Most projects pick one and tune 1-3 dimensions.
@@ -274,3 +301,4 @@ The two presets share most defaults intentionally — the gap is concentrated in
 - **How to extend:** [`CONTRIBUTING.md`](CONTRIBUTING.md)
 - **What's verified:** [`.claude-verify.sh`](../.claude-verify.sh) — every mechanism above has at least one phase check
 - **Reference patterns:** [`docs/reference/autoloop-pattern.md`](reference/autoloop-pattern.md)
+- **Cursor target details:** [`../README.md#cursor-target`](../README.md) — KEEP rule trade-off, recommended model, manual checklist

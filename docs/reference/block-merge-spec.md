@@ -2,6 +2,8 @@
 
 > 사용자 수정 보존 + 템플릿 업데이트 모두 받는 reconcile 모드. v1 제약: flat blocks, `.md` 파일 only.
 
+*Last reviewed against code: 2026-05-07 (0.5.x). Block-merge markers (`@hm:user:*`) 는 현재 `.md` 파일에서만 동작. `.cursor/rules/*.mdc` 는 frontmatter 제약으로 별도 처리.*
+
 ## Marker 구문
 
 마크다운 HTML comment 로 표현 — 마크다운 렌더에서 보이지 않고, 텍스트 에디터에서만 보임.

@@ -350,3 +350,7 @@ subprocess 로 실제 실행하는 e2e 한 케이스** 라도 추가.
 - 우려 먼저, 동의 나중
 - 동의 시 WHY 설명
 - 새 증거 없이 fold 하지 않음
+
+---
+
+*Cross-refs last verified: 2026-05-07 (0.5.x). TECH_SPEC.md §4 / docs/reference/autoloop-pattern.md DD#8 / tests/cursor-compat/MANUAL_CHECKLIST.md — 모두 유효.*

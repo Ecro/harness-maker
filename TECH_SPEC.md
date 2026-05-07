@@ -349,7 +349,7 @@ harness-maker/
         │  │       ├── loop.md       → /hm:loop                 │
         │  │       ├── monitor.md    → /hm:monitor              │
         │  │       └── refresh.md    → /hm:refresh (anti-rot)   │
-        │  ├── skills/  (10 skills)                             │
+        │  ├── skills/  (11 skills)                             │
         │  ├── agents/  (9 agents)                              │
         │  ├── hooks/hooks.json (telemetry)                     │
         │  ├── .worktrees/  (gitignored)                        │
@@ -455,9 +455,9 @@ class ConflictItem(BaseModel):
 
 **(M1) Profiler → Interviewer → Synthesizer → Renderer pipeline (Phase 2)**
 1. Profiler 가 stack/scale/lifecycle/existing_dotclaude/spec_only 감지
-2. Interviewer 가 preset 추천 + 10+ 차원 override Q (workflow naming, reviewers, models, autoloop, anti-rot, worktree, security, context_lint, memory, caching)
+2. Interviewer 가 preset 추천 + 10+ 차원 override Q (workflow naming, reviewers, models, autoloop, anti-rot, worktree, security, context_lint, memory, caching). 추가 축: `targets` (claude-code / cursor / both), `recommended_model` (default: claude-opus-4-7). Locale 기본값 English (DEFAULT_LOCALE="en"), 한국어 메시지 내장, 미지원 locale → en silent fallback.
 3. Synthesizer 가 deterministic 매핑 → Blueprint
-4. Renderer 가 Jinja2 + provenance frontmatter 부착해 .claude/ 에 출력
+4. Renderer 가 Jinja2 + provenance frontmatter 부착해 .claude/ 에 출력 (M14 활성 시 .cursor/ 추가 출력)
 
 **(M2) Reconciler — Brownfield 충돌 해결 (Phase 5)**
 - 기존 .claude/ 인덱싱 → 신규 blueprint 충돌 후보 N
@@ -472,14 +472,15 @@ class ConflictItem(BaseModel):
 
 **(M4) Anti-rot (Phase 4)**
 3-Stage 파이프라인:
-1. Crawl (주 1회): Anthropic blog/changelog + GitHub releases + arxiv (cs.SE/cs.CL/cs.CR) + reference repos (superpowers, oh-my-claudecode, Archon, ECC, OpenHarness, wshobson, claude-code-templates) + OSV.dev
+1. Crawl (주 1회): Anthropic blog/changelog + GitHub releases (`anthropics/claude-code` 기본값) + arxiv (cs.SE/cs.CL/cs.CR) + OSV.dev
 2. Filter (LLM): adaptive threshold (start 0.7, accept/reject 비율 따라 ±0.05)
 3. Propose: `/hm:refresh` 가 AskUserQuestion (accept/reject/defer). **항상 manual confirm.**
 
 **(M5) Monitoring 3 metrics (Phase 3)**
-- 효율 (cache hit %) — 매 turn, `/hm:ai-readiness` 리포트 🪙
+- 효율 (cache hit %) — 매 turn, `/hm:ai-readiness` 리포트 🪙. PostToolUse telemetry hook 에서 수집 (0.5.4+ hybrid schema: Claude Code + Cursor IDE 공용)
 - Health (0-100) — 6-dim (docs/tests/CI/obs/security/governance) + Agent quality drill-down (Platinum/Gold/Silver/Bronze) + ceremony penalty
 - fresh (days since refresh) — 🔄
+- **SessionStart drift reminder** (0.5.6+): 세션 시작 시 실행 중인 harness-maker 버전과 harness 렌더 당시 버전이 다르면 경고 (sessionstart_drift.py hook)
 - Telemetry 100% 로컬 (`metrics.jsonl` 외부 전송 0)
 
 **(M6) Conditional Router (Phase 5)**
@@ -488,9 +489,11 @@ class ConflictItem(BaseModel):
 - override: `harness.yaml.reviewers.routing: always-all`
 
 **(M7) Autoloop driver (Phase 6)**
-- `/hm:loop "<goal>" [--time 8h] [--max-iter 30] [--workflow X] [--dry-run]`
+- `/hm:loop "<goal>" [--mode feature|improve] [--time 8h] [--max-iter 30] [--per-iter-workflow X] [--dry-run]`
+- **feature mode** (default): goal/spec 기반, coverage-driven adaptive interview → 수렴까지 반복
+- **improve mode** (0.4.7+): quality target / `--target` 경로 기반, exec-rev 반복 후 convergence predicate 충족 시 종료
 - Token 무제한, 시간·iter 만 limit
-- 매 iter 가 자체 worktree (Phase 7 통합)
+- **Per-loop 단일 worktree** (0.5.5+): loop start 시 1개 worktree, 전 iter 공유. per-iter-workflow 기본값 exec-rev (wrapup 은 loop close 시 1회)
 - iter 5회마다 사용자 ping, 3회 연속 실패 → stop
 
 **(M8) Verify-before-completion 게이트 (Phase 6)**
@@ -498,9 +501,10 @@ class ConflictItem(BaseModel):
 - 체크리스트: PLAN/SPEC 충족 / 회귀 게이트 / Health -5 이내 / Anti-rot pending / 보안 high finding 0건 / Worktree merge 가능
 
 **(M9) Worktree 격리 (Phase 7)**
-- `/hm:execute` 시 자동 git worktree 생성 (`.worktrees/<workflow>-<ts>/`)
+- `/hm:execute` 시 자동 git worktree 생성 (`.worktrees/<workflow>-<ts>/` — 프로젝트 루트 기준, `.claude/` 내부 X)
 - LLM 이 worktree 안에서만 파일 수정
 - 성공 시 cleanup, 실패 시 보존
+- prefix-match cleanup (`phase-*`, `autoloop-*`, `execute-*`): Cursor 가 같은 `.worktrees/` 를 공유해도 타 도구 worktree 건드리지 않음
 
 **(M10) 5 Security Gates (Phase 7)**
 | 검사 | 기법 | 트리거 |
@@ -523,6 +527,16 @@ class ConflictItem(BaseModel):
 - 모든 생성 자산 상단 frontmatter (generated_by, harness_maker_version, content_hash, source_template, generated_at, provenance)
 - `/hm:refresh` 가 hash 비교 → 사용자 수정 감지 → silent overwrite 차단
 - Brownfield reconcile 가 frontmatter 로 ours/theirs 판별
+- 버전 번호는 **4개 파일 동시 변경** 필수: `.claude-plugin/plugin.json` · `.cursor-plugin/plugin.json` · `pyproject.toml` · `src/harness_maker/__init__.py`. 누락 시 marketplace 가 이전 버전으로 오보.
+
+**(M14) Dual-IDE Rendering — Cursor target (0.5.0+)**
+- `HarnessConfig.targets: list[Target]` — 사용자가 인터뷰에서 명시 선택 (auto-detect 금지)
+- Single-source `.claude/` 자산 (agents, skills, commands, hooks): Cursor 2.4+ 가 native 로 읽어 양쪽 IDE 공유
+- Cursor-only 자산 (`targets` 에 cursor 포함 시만 렌더):
+  - `.cursor/rules/harness.mdc` — `_render_cursor_mdc()`: Cursor 허용 frontmatter (description/globs/alwaysApply) 만 포함, content_hash 제외
+  - `.cursor/mcp.json` — `_render_pure_text()`: pure JSON, frontmatter 0
+- Dual plugin manifest: `.claude-plugin/plugin.json` (Claude Code marketplace) + `.cursor-plugin/plugin.json` (Cursor Marketplace) — schema 동일, 버전 동기화 필수
+- `recommended_model: claude-opus-4-7` — agent frontmatter 에 전파. 사용자 override 허용. prompt 자체 모델 중립화 X (`<thinking>` 등 Claude-specific 표현 유지).
 
 ### Preset 디폴트 비교
 
@@ -1348,10 +1362,11 @@ uv run ruff check src/ tests/ \
 - [ ] (M11) Context Lint 가 verbose 차단
 - [ ] (M12) Privilege Separation — reviewer settings.json 에 `Write` deny, executor 에 `Write(.worktrees/**)` allow
 - [ ] (M13) Provenance Frontmatter — 모든 generated 파일에 hash + version, refresh 시 사용자 수정 감지
+- [ ] (M14) Dual-IDE Rendering — cursor target 선택 시 `.cursor/rules/harness.mdc` + `.cursor/mcp.json` 렌더, single-source `.claude/` 자산은 양쪽 공유. dual plugin manifest 동기화.
 
 ### 자산 존재 검증
 
-- [ ] Skills (10): verify-before-completion, conditional-router, ai-readiness-rubric, agent-quality-rubric, research-crawler, relevance-filter, autoloop-driver, worktree-isolator, security-scanner, context-linter
+- [ ] Skills (11): verify-before-completion, conditional-router, ai-readiness-rubric, agent-quality-rubric, research-crawler, relevance-filter, autoloop-driver, worktree-isolator, security-scanner, context-linter, refdocs-search
 - [ ] Agents (9): code-reviewer, security-reviewer, security-auditor, performance-reviewer, ux-reviewer, concurrency-reviewer, consensus-arbiter, autoloop-coder, executor
 - [ ] Commands (10+): /hm:research, spec, plan, execute, review, wrapup, verify (atomic 7개) + /hm:loop, /hm:monitor, /hm:refresh (메타 3개) + N user workflows
 - [ ] Hooks: hooks.json 에 telemetry-collector
@@ -1422,6 +1437,21 @@ bash .claude-verify.sh all
   - Decision: Renderer 에 길이 한계 적용 (CLAUDE.md Side 200/Prod 500 등).
   - Rationale: arxiv 2602.11988 — verbose context = -성공률, +20% 비용.
 
+- **ADR-11: Targets 축 — Cursor as native consumer of `.claude/` (0.5.0)**
+  - Context: Cursor IDE 2.4+ 가 `.claude/agents/`, `.claude/skills/` 를 native 로 읽음 확인
+  - Decision: single-source `.claude/` 를 두 IDE 가 공유. Cursor-only 자산 (rules, mcp.json) 만 별도 렌더. auto-detect 금지 — 사용자가 명시 선택.
+  - Rationale: 중복 없이 dual IDE 지원. 사용자 의도 확인 (`.cursor/` 존재 여부로 추론하면 false-positive 발생).
+
+- **ADR-12: recommended_model + no model-agnostic rewrite (0.5.0)**
+  - Context: Cursor 사용자는 모델 자유 선택. harness prompt 에 `<thinking>` 등 Claude-specific 표현 있음.
+  - Decision: `harness.yaml.recommended_model: claude-opus-4-7` 기본값 + agent frontmatter 전파. prompt 자체 재작성 X.
+  - Rationale: prompt 재작성은 품질 하락 위험. 사용자가 다른 모델 쓰는 건 본인 선택 + 결과 책임.
+
+- **ADR-13: 버전 4파일 동시 변경 invariant (0.4.9, cursor target 시 확장)**
+  - Context: 0.4.9 릴리스 시 `pyproject.toml` 만 올리고 plugin.json 방치 → marketplace 가 "already at latest" 오보
+  - Decision: 버전 변경 시 `.claude-plugin/plugin.json` + `.cursor-plugin/plugin.json` + `pyproject.toml` + `src/harness_maker/__init__.py` 4개 동시 변경 필수. PR checklist 항목 + CI 잠재 gate.
+  - Rationale: marketplace 동기화 보장. 누락 시 사용자가 stale plugin 을 최신으로 오해.
+
 ### Risks (K1-K17)
 
 | ID | 위험 | 영향 | 완화 |
@@ -1461,6 +1491,7 @@ bash .claude-verify.sh all
 - **v2.0**: autoloop-ready 형식 — Section 0-6 구조, 10 phase, 모든 R/M/A 가 Section 4 task 또는 Section 5 verify 에 명시 매핑
 - **v2.1**: autoloop dry-run 분석 10 fix — (C1) Renderer freeze_time, (C2) plugin entry subprocess task, (C3) Anthropic URL 명시, (I1) SubAgent permissions schema research, (I2) vault path 의존 제거, (I3-I5) atomic write/LLM mock/worktree cleanup CLAUDE.md, (M1-M2) Phase 9 marker + file count assertion
 - **v2.2** (본 spec): 2차 dry-run 분석 expanded fix set — (a) **Phase 2 split** (9 tasks → Phase 2 Foundations 3 + Phase 3 Pipeline 6) — autoloop 자체 권고. (b) **Phase 7 split** (9 tasks → Phase 8 Worktree 3 + Phase 9 Security 6) — 동일 패턴. (c) **Task 1.0 env precheck** (uv/python3.12+/git/cache write — fail fast). (d) **Cross-phase invariant gate** — 매 phase Exit Criteria 에 `phase_<N>_invariants` 호출 (생성 .claude/ 자산 frontmatter 검증). (e) Total phases: 10 → **12**. (f) verify script 전면 개정 — 12 phase 함수, env check, invariants helper. (g) max_global_iterations 100 유지 (12×5=60 worst, 충분 마진).
+- **v2.3** (0.5.x 현황 반영, 2026-05): (a) M1 targets/recommended_model/locale-en 추가. (b) M4 anti-rot GitHub source 실제값 반영 (anthropics/claude-code 기본). (c) M5 SessionStart drift reminder hook + hybrid telemetry schema. (d) M7 feature/improve mode + per-loop worktree (wrapup 1회). (e) M9 worktree path `.worktrees/` (프로젝트 루트) + prefix-match cleanup. (f) M13 4파일 버전 invariant. (g) **M14 신규** — Dual-IDE Rendering (Cursor target). (h) §5 skills 10→11 (refdocs-search 추가), M14 verify row. (i) ADR-11/12/13 신규.
 
 ---
 
@@ -1488,6 +1519,10 @@ bash .claude-verify.sh all
 | 권한 분리 | reviewer = Read/Grep only, executor = Write(.worktrees/**) only |
 | Provenance frontmatter | 모든 생성 자산에 generated_by + content_hash + source_template |
 | fixture | 합성 검증용 가짜 프로젝트 (Side/Production × Python/Tauri/Firmware) |
+| targets | HarnessConfig 의 IDE 선택 축 — claude-code \| cursor \| 둘 다. 사용자가 인터뷰에서 명시 선택 (auto-detect 금지) |
+| recommended_model | harness.yaml 에 저장되는 권장 모델 ID; agent frontmatter 에 전파 (기본: claude-opus-4-7) |
+| Dual-IDE Rendering (M14) | `.claude/` single-source + Cursor-only 자산 렌더 (M14). Cursor 2.4+ 가 `.claude/` native 읽음 |
+| SessionStart drift reminder | 세션 시작 시 harness-maker 버전 vs 렌더 당시 버전 비교 경고 hook |
 
 ---
 
@@ -1518,3 +1553,7 @@ bash .claude-verify.sh all
 ---
 
 **v2.0 확정** (autoloop-ready). `vault/.claude/commands/autoloop.md` 가 본 spec 의 Section 0-6 을 파싱해 자율 빌드 가능. Phase 0 kickoff 가능.
+
+---
+
+*Document health: Last reconciled against code 2026-05-07 (0.5.x). M14 + ADR-11/12/13 + 0.5.x addenda added in v2.3.*
