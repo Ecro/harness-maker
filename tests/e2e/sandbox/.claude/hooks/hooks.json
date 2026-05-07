@@ -64,7 +64,16 @@
         "matcher": "Write|Edit"
       }
     ],
-    "SessionStart": [],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "command": "uv run --with /home/noel/harness-maker python -m harness_maker.hooks.sessionstart_drift",
+            "type": "command"
+          }
+        ]
+      }
+    ],
     "Stop": []
   },
   "preset": "Production"

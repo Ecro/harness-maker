@@ -76,7 +76,7 @@ files:
   body_sha256: 2d5105c332b762c3a83eb98274a1d53a8939302a198d4fdd7ba7cb5485591b96
 - path: hooks/hooks.json
   template: hooks/hooks.json.j2
-  body_sha256: 47ebccbb46bf56e216dc750865be13770c95d67b70c2199a9166243bb4a50db8
+  body_sha256: 91db5df8d0a3892dae9a729f79501f7b9fee02aeb6509758e7086d0b9a0587d1
 - path: memory/failures.md
   template: memory/failures.en.md.j2
   body_sha256: 87d014117a5c313258f506bf993bd1b56241281b849e9c92a253406cc88452ad
