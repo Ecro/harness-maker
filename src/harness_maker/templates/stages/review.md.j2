@@ -1,102 +1,157 @@
 # Stage: review
 
-> Atomic stage. Multi-perspective review + grade gate + auto-fix loop.
+> Atomic stage. Multi-perspective review with **surface-match + reasoning-alignment** consensus, grade gate, and auto-fix loop.
 {% if workflow_context %}
 > Invoked as part of the **{{ workflow_context }}** workflow.
 {% endif %}
 
+## Communication Protocol
+
+- Be direct. No flattery, no preamble.
+- Surface disagreements between reviewers — never average findings into mush.
+- When applying auto-fix, log every step verbatim so the next round can audit.
+- A reviewer's finding is authoritative *only* when it survives the consensus filter; single-source findings are recorded as `manual-only`, never auto-applied.
+
 ## Purpose
 
-Find defects, design weaknesses, and risk hotspots before they reach
-production. Run the configured reviewer set, compute a grade from the
-findings, and (when auto-fix is enabled) apply suggested fixes and re-review
-until the grade passes the threshold or `max_review_rounds` is exhausted.
+Find defects, design weaknesses, and risk hotspots **before** they reach `wrapup`. Run the configured reviewer set, dedupe findings via surface + reasoning alignment, compute a grade, and (when auto-fix is enabled) apply consensus-passed fixes and re-review until the grade meets threshold or `max_review_rounds` is exhausted.
 
 ## When to Run
 
 - After `execute` whenever:
-  - More than 3 files changed
-  - Security-sensitive code (auth, secrets, perms) changed
-  - Architectural surface (interfaces, contracts) changed
-  - New public APIs are added
-- Skipped for: docs-only, single-file fixes, config-only — unless overridden
+  - More than 3 files changed.
+  - Security-sensitive code (auth, secrets, perms) changed.
+  - Architectural surface (interfaces, contracts) changed.
+  - New public APIs are added.
+- Skipped for: docs-only, single-file fixes, config-only — unless overridden.
 
-> **When invoked as part of a fused workflow** (see preamble), the skip
-> conditions above do NOT apply — always run.
+> When invoked as part of a fused workflow, the skip conditions above do **NOT** apply — always run.
 
 ## Inputs
 
-- The diff under review (`git diff` since the prior reviewed commit)
-- PLAN + SPEC if present (gives intent context)
-- Memory tiers — see loading order below
+- The diff under review (`git diff` since the prior reviewed commit, or full worktree diff when running post-`execute`).
+- PLAN at `{{ config.work_docs.dir }}PLAN-{slug}.md` and SPEC at `{{ config.spec.dir }}SPEC-{slug}.md` (intent / scenarios / ADRs).
+- Memory tiers (loaded below).
 
 ## Session Context Loading
 
-Before starting, load memory in tier order:
-
-1. **Hot tier** — Read `.claude/memory/session/<today's date>.md` in full if it
-   exists. Prior session decisions may explain intentional design choices in the diff.
-2. **Warm tier** — Skim `.claude/memory/failures.md` for patterns that match
-   the changed code area. Targeted: `rg -F "[fail:" .claude/memory/failures.md`
-3. **Warm tier** — Skim `.claude/memory/wiki.md` for relevant conventions.
-   Known-good patterns should NOT trigger findings.
+1. **Hot tier** — Read `.claude/memory/session/<today>.md` if it exists. Prior session decisions may explain intentional design choices in the diff.
+2. **Warm tier** — Skim `.claude/memory/failures.md` for patterns matching the changed code area: `rg -F "[fail:" .claude/memory/failures.md`.
+3. **Warm tier** — Skim `.claude/memory/wiki.md` for relevant conventions. Known-good patterns should NOT trigger findings.
 
 ## Configuration
 
-Defaults from `harness.yaml` `reviewers:`:
+Defaults from `harness.yaml.reviewers:`:
+- `auto_fix` (bool, default `true`) — apply consensus-passed fixes between rounds.
+- `grade_threshold` (`A | B | C`, default `A`) — minimum grade to exit.
+- `max_review_rounds` (int, default `3`) — cap on review iterations.
+- `consensus` — `single` | `cross-check (2/3)` | `k-of-n` (default: cross-check).
+- `routing` — `conditional` | `always-all` (default: conditional).
 
-- `auto_fix` (bool, default `true`) — apply consensus-passed fixes between rounds
-- `grade_threshold` (`A | B | C`, default `A`) — minimum grade needed to exit
-- `max_review_rounds` (int, default `3`) — cap on review iterations
-
-Per-invocation override: pass `--no-auto-fix` on the workflow command to
-disable auto-fix for this run only (config default unchanged).
+Per-invocation overrides (workflow command flags):
+- `--no-auto-fix` — disable auto-fix this run only.
+- `--with-reviewers=<csv>` — add ad-hoc reviewers (must exist in `reviewers.installed`).
 
 ## Procedure — Round 1 (initial review)
 
-1. Determine reviewer set:
-   - Start from `harness.yaml`'s `reviewers.enabled`
-   - `routing: always-all` → invoke every enabled reviewer
-   - `routing: conditional` → use Conditional Router on the changed files
-   - Add any extras passed via `--with-reviewers=<csv>` on the workflow command
-     (must be present in `reviewers.installed`)
-2. For each reviewer:
-   - Read the diff with full context (use Read on changed files end-to-end,
-     not just the patch)
-   - Walk through the runtime path the diff touches — what runs first,
-     what state mutates, what can fail
-   - Emit findings per the Finding Schema partial:
-     `{severity, file, line, summary, suggestion, ...}`
-3. Aggregate via consensus (per `reviewers.consensus`):
-   - `single` — accept reviewer's findings as-is
-   - `cross-check` — require 2/3 agreement on P0/P1 findings
-   - `k-of-n` — configurable threshold
-4. Tag each finding:
-   - **consensus-passed** — survives the consensus rule (auto-fix candidate)
-   - **manual-only** — single source / disagreement on severity (NEVER auto-fixed)
-5. Write `{{ config.work_docs.dir }}REVIEW-{topic}-{date}.md` with:
-   - All findings ordered by severity
-   - Disagreements between reviewers (with reasoning)
-   - Recommended actions
+### Step 1 — Reviewer set selection
+
+- Start from `harness.yaml.reviewers.enabled`.
+- `routing: always-all` → invoke every enabled reviewer in parallel.
+- `routing: conditional` → use Conditional Router (M6) on the changed-file paths to pick the subset.
+- Add any extras from `--with-reviewers=<csv>`.
+
+### Step 2 — Drift gate (PLAN/SPEC vs actual diff)
+
+Before reviewers run, scan the diff against PLAN scope:
+- Files changed that are NOT in any PLAN phase's "scope" → flag as **scope drift**.
+- Files in PLAN phase's scope that have NOT changed → flag as **incomplete phase**.
+
+Drift findings get severity `P1` and surface in the REVIEW report; reviewers still run on the actual diff.
+
+### Step 3 — Parallel reviewer invocation
+
+Run all selected reviewers in a **single message with multiple Task tool uses** for parallel execution. Each reviewer:
+- Reads the diff with full context (use Read on changed files end-to-end, not just the patch).
+- Walks the runtime path the diff touches — what runs first, what state mutates, what can fail.
+- Returns findings per the Finding Schema partial: `{severity, file, line, summary, suggestion, reasoning?, …}`.
+
+### Step 4 — Consensus filter (surface + reasoning alignment)
+
+For each pair of findings from different reviewers, decide if they describe the **same issue** via this 2-step filter:
+
+#### Step 4a — Surface match (candidacy)
+
+Two findings are consensus *candidates* iff they satisfy BOTH:
+1. Same `file` AND `line ± 5` (or both target the same named symbol when line numbers shift).
+2. Same `severity` tier (P0 vs P0; P1 vs P1; do not bridge tiers).
+
+Pairs failing surface match are recorded as **independent** findings — preserve both.
+
+#### Step 4b — Reasoning alignment (verification)
+
+For surface-match candidates, compare the `reasoning` chains (OBSERVE → INFER → CONCLUDE):
+- **CONCLUDE clauses identify the same execution risk?** → **strong consensus** (`[2/N]` or `[N/N]`).
+- **OBSERVE matches but CONCLUDE diverges** (e.g., one says "race condition", other says "null deref") → **weak consensus** (`[2/N weak]`) — keep both, flag for manual judgment.
+- **OBSERVE matches but reasoning is missing on one side** → demote to `manual-only`.
+
+#### Step 4c — Severity resolution (when consensus has differing severities)
+
+| Votes | Applied severity |
+|-------|------------------|
+| All agree | Agreed severity |
+| 2 agree, 1 differs | Majority severity |
+| All differ (one each) | Middle of the scale (P1 over P0/P2) |
+
+#### Step 4d — Tag every finding
+
+| Tag | Condition | Auto-fix eligible? |
+|-----|-----------|--------------------|
+| `consensus-passed` | Survived surface + reasoning alignment with strong consensus | ✅ Yes |
+| `weak-consensus` | Surface match, reasoning diverges | ❌ No (manual) |
+| `manual-only` | Single source, or consensus failed | ❌ No (manual) |
+
+### Step 5 — Write REVIEW report
+
+Write `{{ config.work_docs.dir }}REVIEW-{slug}-{date}.md` with frontmatter + sections:
+
+```yaml
+---
+type: review
+task_slug: {slug}
+status: in-progress  # → APPROVED | CHANGES_REQUESTED on final summary
+created: {YYYY-MM-DD}
+reviewers_invoked: [{names}]
+consensus_method: cross-check
+---
+```
+
+Sections:
+1. **🎯 Round 1 Summary** — grade, fixes pending, manual items.
+2. **🔍 Drift Findings** — from Step 2.
+3. **✅ Consensus Findings** — `consensus-passed`, by severity.
+4. **⚠️ Weak Consensus** — `weak-consensus`, by severity.
+5. **📝 Manual-Only Findings** — `manual-only`, by severity.
+6. **🤝 Disagreements** — when reasoning aligned but severity differed; show all reviewer takes.
 
 <!-- @hm:user:procedure-extras -->
-<!-- Project-specific Round 1 steps (extra reviewers, custom heuristics, etc.). Preserved across harness-maker upgrades. -->
+<!-- Project-specific Round 1 steps (extra reviewers, custom heuristics). Preserved across harness-maker upgrades. -->
 <!-- @hm:/user:procedure-extras -->
 
 ## Grade Computation (after every round)
 
-Count consensus-passed findings by severity:
+Count **`consensus-passed`** findings only by severity:
 
-- `P0_count` = consensus-passed findings with severity P0
-- `P1_count` = consensus-passed findings with severity P1
+- `P0_count` = consensus-passed findings with severity P0.
+- `P1_count` = consensus-passed findings with severity P1.
 
-P2/P3 and manual-only findings do NOT lower the grade.
+P2/P3, weak-consensus, and manual-only findings do NOT lower the grade.
 
 | P0 | P1 | Grade |
 |----|----|-------|
-| 0  | 0  | **A** |
-| 0  | 1–2 | B |
-| 0  | ≥3 | C |
+| 0 | 0 | **A** |
+| 0 | 1–2 | B |
+| 0 | ≥3 | C |
 | 1–2 | * | D |
 | ≥3 | * | F |
 
@@ -104,18 +159,18 @@ Order: A > B > C > D > F. Threshold met iff `grade ≥ grade_threshold`.
 
 ## Grade Gate
 
-After Round 1's report is written:
+After each round's report:
 
 ```
 IF grade ≥ grade_threshold:
-  → STOP. Final report = Round 1 report. Proceed to wrapup.
+  → STOP. Final report = current. Status = APPROVED. Proceed to wrapup.
 
 IF auto_fix disabled (config OR --no-auto-fix):
-  → STOP. Report grade + remaining findings.
+  → STOP. Report grade + remaining findings. Status = CHANGES_REQUESTED.
   → Set human_review_needed=true if grade < threshold.
 
 IF iteration_count ≥ max_review_rounds:
-  → STOP. Report best grade + remaining findings.
+  → STOP. Best grade + remaining. Status = CHANGES_REQUESTED.
   → Set human_review_needed=true.
 
 ELSE:
@@ -124,35 +179,32 @@ ELSE:
 
 ## Auto-Fix Loop (rounds 2..max_review_rounds)
 
-For each iteration:
+Per iteration:
 
-1. **Select fixable findings.** Take only:
-   - Severity P0, P1, or P2 (skip P3 unless current grade is D or F)
-   - Tag = consensus-passed (skip manual-only)
-   - Has a concrete `suggestion` with replacement code (skip vague advice)
+1. **Select fixable findings** — only:
+   - Severity P0, P1, or P2 (skip P3 unless current grade is D or F).
+   - Tag = `consensus-passed`.
+   - Has a concrete `suggestion` with replacement code (skip vague advice).
+
 2. **Apply fixes in priority order** (P0 → P1 → P2):
-   - Read the file at `{file}:{line}`
-   - Verify the current code still matches the finding's `evidence` /
-     `current` snippet (prior fixes may have shifted lines)
-   - Apply the suggested fix via `Edit`
-   - Log: `[Fix #{N}] {severity} {summary} in {file}:{line}`
-   - If the fix's target lines overlap a fix applied this round (same file,
-     line ±5): **skip** and log `skipped — overlap with Fix #{prev}`
-3. **Verify build.** Run the project's standard verification:
-   - Python: `uv run pytest -x`, `uv run ruff check`, `uv run mypy --strict`
-   - Rust: `cargo check`, `cargo test`
-   - Node: `pnpm build`, `pnpm test`
-   - Or invoke `/hm:verify` if the harness has it
-   On failure:
-   - Identify the last fix that touched the failing file
-   - **Revert** that fix (restore original snippet) and log
-     `Fix #{N} reverted — caused build failure`
-   - Continue with remaining fixes (do not abort the round)
-4. **Re-review** (selective). Re-spawn ONLY reviewers whose scope was touched
-   by the applied fixes. Reviewers that approved untouched files are NOT
-   re-run. Multi-instance code-reviewer consensus (when configured) still
-   uses the configured number of instances on the modified files.
-5. **Recompute grade** using the new findings.
+   - Read the file at `{file}:{line}`.
+   - Verify current code still matches the finding's `evidence` snippet (prior fixes may have shifted lines).
+   - Apply the suggested fix via `Edit`.
+   - Log: `[Fix #{N}] {severity} {summary} in {file}:{line}`.
+   - Skip when target lines overlap a fix applied this round (same file, line ±5): log `skipped — overlap with Fix #{prev}`.
+
+3. **Verify build** — run the project's standard verification:
+   - Python: `uv run pytest -x`, `uv run ruff check`, `uv run mypy --strict`.
+   - Rust: `cargo check`, `cargo test`.
+   - Node: `pnpm build`, `pnpm test`.
+   - Or invoke `/hm:verify` if the harness has it.
+
+   On failure: identify the last fix that touched the failing file → **revert** it (restore original snippet) and log `Fix #{N} reverted — caused build failure`. Continue with remaining fixes (do not abort the round).
+
+4. **Re-review (selective)** — re-spawn ONLY reviewers whose scope was touched by applied fixes. Reviewers that approved untouched files are NOT re-run. Multi-instance code-reviewer consensus (when configured) still uses the configured number of instances on modified files.
+
+5. **Recompute grade** using the new findings (Step 4 consensus filter again).
+
 6. **Append iteration record** to the REVIEW report:
 
    ```markdown
@@ -167,8 +219,7 @@ For each iteration:
    Remaining: {count} | New issues introduced: {count}
    ```
 
-7. Return to the Grade Gate with the updated grade and incremented
-   `iteration_count`.
+7. Return to the Grade Gate with the updated grade and incremented `iteration_count`.
 
 ## Final Summary (always)
 
@@ -181,35 +232,30 @@ Append to the REVIEW report:
 |-----------|-------|---------------|-----------|-----|
 | 1 (init)  | {g1}  | —             | {n1}      | —   |
 | 2         | {g2}  | {f2}          | {n2}      | {x2}|
-| ...
 
 Final grade: {final}
 Iterations used: {N} / {max_review_rounds}
+Status: APPROVED | CHANGES_REQUESTED
 human_review_needed: {true|false}
 ```
 
-- Final grade ≥ threshold → status `APPROVED`, ready for wrapup.
-- Final grade < threshold after exhausting rounds → status
-  `CHANGES_REQUESTED`, list remaining issues, set `human_review_needed=true`,
-  proceed to wrapup (autoloop policy — do NOT halt the loop on D/F).
+- `APPROVED` → ready for wrapup.
+- `CHANGES_REQUESTED` (autoloop policy) → list remaining issues, set `human_review_needed=true`, **proceed to wrapup** (do NOT halt the loop on D/F — wrapup will surface the flag).
 
 ## Outputs
 
-- REVIEW document with structured findings, per-iteration records, and final
-  grade summary
-- File modifications applied during the auto-fix loop (when enabled)
-- `human_review_needed` flag when threshold was not reached
+- `{{ config.work_docs.dir }}REVIEW-{slug}-{date}.md` with all findings, per-iteration records, and final grade summary.
+- File modifications applied during auto-fix (when enabled). **Not committed** — wrapup owns the commit.
+- `human_review_needed` flag when threshold not reached.
 
 ## Quality Bar
 
-- P0/P1 findings have evidence (code reference + failure mode)
-- Reviewer **agents** stay read-only (`permissions.deny: [Write, Edit]`); the
-  **stage orchestrator** (Claude running this stage) applies fixes via
-  `Edit`, preserving the reviewer permission boundary
-- A finding category that should have been caught (per category-owner agent)
-  triggers the rollback criterion
-- Auto-fix never silently overwrites a build break; failed fixes are reverted
-  and logged
+- P0/P1 findings have evidence (code reference + failure mode + OBSERVE/INFER/CONCLUDE).
+- Reviewer **agents** stay read-only (`permissions.deny: [Write, Edit]`); the **stage orchestrator** (Claude running this stage) applies fixes via `Edit`, preserving the reviewer permission boundary.
+- A finding category that should have been caught (per category-owner agent) triggers the rollback criterion.
+- Auto-fix never silently overwrites a build break; failed fixes are reverted and logged.
+- No `git commit` invoked from this stage. (Verify: `git log` shows no new commit relative to stage start.)
+- `weak-consensus` items are surfaced separately — never silently merged with strong-consensus findings.
 
 <!-- @hm:user:extra-quality-checks -->
 <!-- Project-specific quality bar items (additional invariants, domain rules). Preserved across harness-maker upgrades. -->
