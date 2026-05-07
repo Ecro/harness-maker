@@ -133,12 +133,16 @@ def cleanup(wt_path: Path, on_success: bool) -> None:
             raise
 
 
-def merge(wt_path: Path, strategy: str = "squash") -> None:
+def merge(wt_path: Path, strategy: str = "squash", commit: bool = True) -> None:
     """Merge the worktree's branch back into the base repo's current branch.
 
     Switches into the base repo and runs `git merge <branch>` with the
     requested strategy. Caller is responsible for choosing when to call this
     (typically: post-success, before cleanup).
+
+    When ``commit=False`` and ``strategy="squash"``, the merge stages changes
+    onto the base branch but does NOT auto-commit — wrapup is expected to
+    create the user-facing commit (with proper message + Co-Authored-By).
     """
     wt = wt_path.resolve()
     base = wt.parent.parent
@@ -147,11 +151,12 @@ def merge(wt_path: Path, strategy: str = "squash") -> None:
     if strategy == "squash":
         args.extend(["--squash", branch])
         _run(args, cwd=base)
-        # `--squash` stages but does not commit; finalize so the merge is durable.
-        _run(
-            ["git", "commit", "-m", f"squash-merge worktree {branch}"],
-            cwd=base,
-        )
+        if commit:
+            # `--squash` stages but does not commit; finalize so the merge is durable.
+            _run(
+                ["git", "commit", "-m", f"squash-merge worktree {branch}"],
+                cwd=base,
+            )
     else:
         args.extend([f"--{strategy}", branch] if strategy != "merge" else [branch])
         _run(args, cwd=base)
@@ -386,9 +391,12 @@ def _detect_existing_worktree(base: Path) -> Path | None:
 
 
 def _cli_finalize(args: list[str]) -> int:
-    """`python -m harness_maker.worktree finalize <wt_path> <success|fail> [strategy]`.
+    """`python -m harness_maker.worktree finalize <wt_path> <success|fail|stage-only> [strategy]`.
 
     On success: merge back (default strategy: squash) + cleanup with --force.
+    On stage-only: merge with --no-commit (changes staged on base branch) +
+        cleanup with --force. Used by `/hm:execute` Step 5 when wrapup will
+        own the user-facing commit (single-commit-owner pattern).
     On fail: skip merge; cleanup non-force (preserves dirty worktree for inspection).
     Missing `<wt_path>` is a no-op exit 0 — slash commands wire `finalize`
     unconditionally, and an empty worktree_path means scope check was off.
@@ -400,22 +408,26 @@ def _cli_finalize(args: list[str]) -> int:
     than letting the harness break.
     """
     if len(args) < 2 or len(args) > 3:
-        print("usage: finalize <wt_path> <success|fail> [strategy]", file=sys.stderr)
+        print(
+            "usage: finalize <wt_path> <success|fail|stage-only> [strategy]",
+            file=sys.stderr,
+        )
         return 2
     wt_str, status = args[0], args[1]
     strategy = args[2] if len(args) == 3 else "squash"
-    if status not in {"success", "fail"}:
-        print("status must be 'success' or 'fail'", file=sys.stderr)
+    if status not in {"success", "fail", "stage-only"}:
+        print("status must be 'success' | 'fail' | 'stage-only'", file=sys.stderr)
         return 2
     wt = Path(wt_str)
     if not wt.is_dir():
         return 0
     # Project root = parent of `.worktrees/<name>` (mirrors cleanup's logic).
     project_root = wt.resolve().parent.parent
-    on_success = status == "success"
+    on_success = status in {"success", "stage-only"}
+    auto_commit = status == "success"  # stage-only leaves the merge uncommitted
     if on_success:
         try:
-            merge(wt, strategy=strategy)
+            merge(wt, strategy=strategy, commit=auto_commit)
         except RuntimeError as e:
             print(f"merge failed, preserving worktree: {e}", file=sys.stderr)
             return 1

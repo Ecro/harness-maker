@@ -4,7 +4,7 @@ harness_maker_version: 0.5.7
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: 105e574972b26e34ec7d0b4d1b76122189d426480b3711475ef8e52a72d18eb3
+content_hash: a3bdbea7e3e7b9660f1d1357043e8c18786ba16db789aa94e2e5b8f016741e7f
 ---
 # /hm:exec-rev
 
@@ -197,8 +197,9 @@ If a PLAN phase blocks (Phase A.5 retry exhausted, Phase D unfixable, or ADR con
 Pick **exactly one** finalize command. Substitute `<WT>` with the literal absolute path from Step 0.
 
 ```bash
-# All phases GREEN + verification clean — squash-merge the branch back + cleanup:
-!uv run --with /home/noel/harness-maker python -m harness_maker.worktree finalize <WT> success
+# All phases GREEN — stage-merge the branch back (NO commit) + cleanup the worktree.
+# /hm:wrapup will create the single user-facing commit (with proper message + Co-Authored-By).
+!uv run --with /home/noel/harness-maker python -m harness_maker.worktree finalize <WT> stage-only
 ```
 
 ```bash
@@ -207,6 +208,12 @@ Pick **exactly one** finalize command. Substitute `<WT>` with the literal absolu
 ```
 
 If Step 0 printed empty (no isolation engaged), skip both — there is nothing to finalize.
+
+**Workflows without wrapup** (e.g., `/hm:exec-rev`): if you exit a fused workflow at this stage without wrapup running afterward, the staged changes remain uncommitted on the base branch. Either run `/hm:wrapup` to commit them, or commit manually:
+
+```bash
+git commit -m "<your message>"
+```
 
 ## Outputs
 

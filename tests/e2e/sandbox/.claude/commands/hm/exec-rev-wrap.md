@@ -4,7 +4,7 @@ harness_maker_version: 0.5.7
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: a451b383377d4bcc4eed7e3a55441c7576e2327598d4c7f75bdb88370b8c8010
+content_hash: 92182b8de38029b6314d1de7c620b670d476773d8ceb514f4c5d896ee881db13
 ---
 # /hm:exec-rev-wrap
 
@@ -197,8 +197,9 @@ If a PLAN phase blocks (Phase A.5 retry exhausted, Phase D unfixable, or ADR con
 Pick **exactly one** finalize command. Substitute `<WT>` with the literal absolute path from Step 0.
 
 ```bash
-# All phases GREEN + verification clean — squash-merge the branch back + cleanup:
-!uv run --with /home/noel/harness-maker python -m harness_maker.worktree finalize <WT> success
+# All phases GREEN — stage-merge the branch back (NO commit) + cleanup the worktree.
+# /hm:wrapup will create the single user-facing commit (with proper message + Co-Authored-By).
+!uv run --with /home/noel/harness-maker python -m harness_maker.worktree finalize <WT> stage-only
 ```
 
 ```bash
@@ -207,6 +208,12 @@ Pick **exactly one** finalize command. Substitute `<WT>` with the literal absolu
 ```
 
 If Step 0 printed empty (no isolation engaged), skip both — there is nothing to finalize.
+
+**Workflows without wrapup** (e.g., `/hm:exec-rev`): if you exit a fused workflow at this stage without wrapup running afterward, the staged changes remain uncommitted on the base branch. Either run `/hm:wrapup` to commit them, or commit manually:
+
+```bash
+git commit -m "<your message>"
+```
 
 ## Outputs
 
@@ -510,76 +517,195 @@ human_review_needed: {true|false}
 
 # Stage: wrapup
 
-> Atomic stage. Final quality gate, memory append, commit.
+> Atomic stage. **Single commit owner**: integrates execute's staged changes + memory + PLAN status updates into ONE user-facing commit with Co-Authored-By: Claude.
 
 > Invoked as part of the **exec-rev-wrap** workflow.
 
 
+## Communication Protocol
+
+- Be direct. No flattery, no preamble.
+- The commit message describes the **why**, not the diff. Future readers (including future-you at 2 a.m.) need intent, not file lists.
+- If a quality gate fails, surface the failure verbatim and STOP — do not paper over with "mostly works" language.
+- Memory entries are written in the user's voice — concise, specific, traceable.
+
 ## Purpose
 
-Close the loop on a unit of work. Capture lessons in repo memory so the
-next session benefits, run the final review pass, sync TODOs and commit.
+Close the loop on a unit of work:
+1. Run the final verification pass (build / tests / lint).
+2. Capture lessons in repo memory so the next session benefits.
+3. Update PLAN status to mark phases done.
+4. Create the **single commit** for this work unit (execute already staged its changes; this stage adds memory + PLAN updates and commits everything).
 
 ## When to Run
 
-- After `review` (when review ran)
-- Before pushing to a shared branch
-- Whenever a logical work unit completes (feature flag flipped, ticket
-  closed, demo-ready)
+- After `review` (when review ran).
+- Before pushing to a shared branch.
+- Whenever a logical work unit completes (feature flag flipped, ticket closed, demo-ready).
 
-> **When invoked as part of a fused workflow** (see preamble), always run —
-> do not skip based on the conditions above.
+> When invoked as part of a fused workflow, always run — do not skip based on the conditions above.
 
 ## Inputs
 
-- All artefacts from prior stages: SPEC, PLAN, REVIEW, code, tests
-- `.claude/memory/wiki.md`, `.claude/memory/failures.md`
-- `.claude/memory/session/<today>.md` — hot-tier session log (if exists)
-- TODO.md / task tracking source
+- All artefacts from prior stages: SPEC, PLAN, REVIEW, code, tests.
+- `.claude/memory/wiki.md`, `.claude/memory/failures.md`, `.claude/memory/session/<today>.md`.
+- The currently-staged changes from `/hm:execute` Step 5 (`stage-only` mode).
+- TODO source if the project tracks tasks in a structured place (optional).
 
 ## Procedure
 
-1. **Drift gate (advisory)** — diff intent (SPEC/PLAN) against actual diff.
-   Log unexpected scope changes to `.claude/memory/pending-drift.md`.
-2. **Final reviewer pass** — REVIEWER agent runs over the full work unit
-   (not just the latest diff) for ≥3-file or security-sensitive changes.
-3. **Memory append**:
-   - Wiki — append entry using structured format:
-     `## [wiki:<category>] <slug> | <YYYY-MM-DD>`
-     (category: pattern / convention / gotcha / architecture / tooling / api / other)
-   - Failures — if a new failure pattern emerged, append or increment count:
-     `## [fail:<category>] <slug> | <YYYY-MM-DD> | count:<N>`
-     (category: import / test / render / hook / lint / type / runtime / design / other)
-   - For repeated failures: update `count:N` in the existing heading (no duplicate section)
-4. **Failure-driven proposal** — when a failure entry's count ≥ 3, log a
-   skill/agent proposal to `.claude/memory/pending-proposals.md`.
-5. **Session log append** — write a summary entry to
-   `.claude/memory/session/<YYYY-MM-DD>.md` (today's date):
-   ```
-   ## [decision:<slug>] <what was decided> | <HH:MM> UTC | stage:wrapup
-   <one paragraph: non-obvious constraint, key trade-off, or surprise from this work unit>
-   ```
-   Create the file (with README header) if it doesn't exist. Omit if the work
-   unit was trivial (typo fix, doc-only) — session log is for non-obvious decisions.
-6. **TODO sync** — mark task complete, move to weekly archive.
-7. **Commit** — single commit summarising the work unit, body explains
-   the "why".
-8. (Optional) push.
+### Step 1 — Pre-flight checks
+
+Before touching anything, verify state:
+
+1. **Working tree state**: there should be staged changes (from execute) OR clean (if execute was skipped). If there are *unstaged* changes that don't trace to execute's worktree merge, surface them — they may be drift.
+2. **Worktree finalize state**: any `.worktrees/execute-*` directories should be cleaned up by execute Step 5 already. If one persists, log a warning — it means execute exited with `fail` or stage-only failed.
+3. **PLAN existence**: `work-docs/PLAN-{slug}.md` exists (skip wrapup with a clear error otherwise).
+
+### Step 2 — Final verification pass
+
+Run the project's full check suite once before committing. Catch regressions wrapup-stage edits could introduce:
+
+```bash
+# Pick the toolchain that matches the project. Examples:
+!uv run pytest -x                      # Python
+!uv run ruff check src/ tests/          # lint
+!uv run mypy --strict src/              # type
+# Rust: cargo test && cargo check
+# Node: pnpm test && pnpm build
+```
+
+If any fail: STOP, surface the failure, do NOT proceed. Reverting an executed-merge is more painful than diagnosing here.
+
+### Step 3 — Drift gate (advisory)
+
+Diff intent (SPEC scenarios + PLAN phase scopes) against the actual staged changes:
+
+- **Files staged but NOT in any PLAN phase scope** → log to `.claude/memory/pending-drift.md`.
+- **Files in PLAN scope but NOT staged** → log incomplete-phase warning to `pending-drift.md`.
+- **SPEC scenarios with no test coverage in the diff** → log missing-coverage warning.
+
+This is advisory; do not block the commit. The next session reads `pending-drift.md` to catch up.
+
+### Step 4 — PLAN status update
+
+Update `work-docs/PLAN-{slug}.md`:
+
+1. **Frontmatter**: `status: planning` → `status: complete`.
+2. **Checkboxes**: replace every `- [ ]` with `- [x]` in the body. At wrapup time the plan's phases are either done or explicitly deferred — the checkbox state should reflect that.
+
+Use a single Edit / Write call (atomic). Verify by reading back: assert `status: complete` is present and zero `- [ ]` remain.
+
+### Step 5 — Memory append
+
+#### 5.1 Wiki
+
+Append (or update) one entry under `.claude/memory/wiki.md`:
+
+```markdown
+## [wiki:<category>] <slug> | <YYYY-MM-DD>
+<one-paragraph summary of the pattern / convention / gotcha learned>
+```
+
+- **category**: `pattern` | `convention` | `gotcha` | `architecture` | `tooling` | `api` | `other`.
+- **slug**: kebab-case, ≤40 chars, derived from the work unit.
+- If a `[wiki:<same-slug>]` entry already exists: replace its body with the updated learning (do NOT duplicate).
+
+#### 5.2 Failures
+
+For each new failure pattern that emerged this work unit, append (or increment count) under `.claude/memory/failures.md`:
+
+```markdown
+## [fail:<category>] <slug> | <YYYY-MM-DD> | count:<N>
+<symptom + cause + fix in one paragraph>
+```
+
+- **category**: `import` | `test` | `render` | `hook` | `lint` | `type` | `runtime` | `design` | `other`.
+- **count**: increment when the same `<category>:<slug>` already exists; do NOT duplicate sections.
+- **Qualifies as failure**: incorrect API usage, wrong syntax, convention misunderstanding, build failures, tool mistakes, workflow violations.
+- **Does NOT qualify**: user preference changes, expected errors, normal debugging cycles, design evolution.
+
+#### 5.3 Failure-driven proposal
+
+When a failure entry's `count >= 3`, write a skill / agent / rule proposal to `.claude/memory/pending-proposals.md`:
+
+```markdown
+## Proposal: {short-title} ({YYYY-MM-DD})
+**Triggered by:** [fail:<category>] <slug> (count: 3)
+**Proposed mechanism:** {new skill | rule update | agent | hook}
+**Rationale:** {why an automated guard would have prevented this 3 times}
+```
+
+The user reviews proposals later and decides whether to ingest into the harness.
+
+#### 5.4 Session log
+
+Append to `.claude/memory/session/<YYYY-MM-DD>.md` (today's date):
+
+```markdown
+## [decision:<slug>] <what was decided> | <HH:MM> UTC | stage:wrapup
+<one paragraph: non-obvious constraint, key trade-off, or surprise from this work unit>
+```
+
+Create the file (with README header) if it doesn't exist. **Omit** when the work unit was trivial (typo fix, doc-only) — session log is for non-obvious decisions.
+
+### Step 6 — Stage memory + PLAN updates
+
+```bash
+!git add .claude/memory/ work-docs/PLAN-{slug}.md work-docs/REVIEW-{slug}-*.md 2>/dev/null
+```
+
+(REVIEW-*.md is optional — only present when `/hm:review` ran.)
+
+### Step 7 — Single commit
+
+Write the commit message: `<type>(<scope>): <subject ≤72 chars>` followed by a body explaining **why**, not **what**. The diff already says what.
+
+```bash
+!git commit -m "$(cat <<'EOF'
+<type>(<scope>): <subject>
+
+<body — explains why this change exists, what trade-off was accepted, and
+which constraint forced the chosen approach. Cite ADR-NNN or Interview-#N
+when the rationale lives in the PLAN.>
+
+Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
+EOF
+)"
+```
+
+**Type** (per CLAUDE.md `<type>(<scope>): <subject>` convention): `feat | fix | chore | ci | test | docs | refactor`.
+
+The commit captures: the staged execute changes + the memory updates + the PLAN status update — **all in one commit**.
+
+### Step 8 — Push (manual; never automatic)
+
+Wrapup does **NOT** auto-push. The user explicitly requests push when ready:
+
+```bash
+# (User runs separately when they want to push)
+!git push
+```
+
+If the user asks to push during wrapup, that is fine — but never push without an explicit request.
 
 ## Outputs
 
-- Updated wiki + failures (structured headings)
-- Session log entry in `.claude/memory/session/<today>.md`
-- pending-drift.md / pending-proposals.md entries when applicable
-- Git commit + (optional) push
-- TODO sync
+- **One** git commit including: implementation diff (from execute), wiki + failures + session log + PLAN status updates.
+- `.claude/memory/pending-drift.md` entries when drift was detected.
+- `.claude/memory/pending-proposals.md` entries when failure count crossed threshold.
+- Updated `.claude/memory/session/<today>.md` for non-trivial work units.
 
 ## Quality Bar
 
-- Wiki entries are searchable — `rg -F "[wiki:" .claude/memory/wiki.md` works
-- Failure entries deduplicate (count++ in heading, not duplicate sections)
-- Session log captures the non-obvious — a future reader can reconstruct why
-- Commit message captures intent, not just diff summary
+- **Exactly one** commit per wrapup invocation. (Verify: `git log` shows one new commit relative to wrapup start.)
+- Commit message subject ≤72 chars; body explains **why**, not what.
+- `Co-Authored-By: Claude` line present.
+- Wiki entries are searchable: `rg -F "[wiki:" .claude/memory/wiki.md` returns the new entry.
+- Failure entries deduplicate by slug (count++ in heading, not duplicate sections).
+- Session log captures non-obvious decisions; trivial work units do NOT add noise.
+- PLAN frontmatter `status: complete` and zero `- [ ]` remain in the body.
+- Final verification pass GREEN before commit.
 
 <!-- @hm:user:extra-quality-checks -->
 <!-- Project-specific wrapup checklist items. Preserved across harness-maker upgrades. -->
