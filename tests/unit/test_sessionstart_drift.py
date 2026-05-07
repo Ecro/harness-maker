@@ -1,0 +1,122 @@
+"""Tests for harness_maker.hooks.sessionstart_drift."""
+
+from __future__ import annotations
+
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+from harness_maker import __version__
+from harness_maker.hooks.sessionstart_drift import _format_message, run
+
+
+def _write_harness_yaml(project_dir: Path, stamped_version: str) -> None:
+    claude = project_dir / ".claude"
+    claude.mkdir(parents=True, exist_ok=True)
+    fm = f"---\nharness_maker_version: {stamped_version}\npreset: Side\n---\npreset: Side\n"
+    (claude / "harness.yaml").write_text(fm, encoding="utf-8")
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# run() — silent paths
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def test_run_silent_when_no_harness_yaml(tmp_path: Path, capsys) -> None:
+    rc = run(cwd=tmp_path)
+    assert rc == 0
+    captured = capsys.readouterr()
+    assert captured.out == ""
+
+
+def test_run_silent_when_versions_match(tmp_path: Path, capsys) -> None:
+    _write_harness_yaml(tmp_path, __version__)
+    rc = run(cwd=tmp_path)
+    assert rc == 0
+    captured = capsys.readouterr()
+    assert captured.out == ""
+
+
+def test_run_silent_when_harness_yaml_has_no_frontmatter(tmp_path: Path, capsys) -> None:
+    claude = tmp_path / ".claude"
+    claude.mkdir()
+    (claude / "harness.yaml").write_text("preset: Side\n", encoding="utf-8")
+    rc = run(cwd=tmp_path)
+    assert rc == 0
+    assert capsys.readouterr().out == ""
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# run() — drift surfaced
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def test_run_emits_additional_context_on_upgrade(tmp_path: Path, capsys) -> None:
+    _write_harness_yaml(tmp_path, "0.0.1")
+    rc = run(cwd=tmp_path)
+    assert rc == 0
+
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["hookSpecificOutput"]["hookEventName"] == "SessionStart"
+    ctx = payload["hookSpecificOutput"]["additionalContext"]
+    assert "[harness-maker]" in ctx
+    assert "0.0.1" in ctx
+    assert __version__ in ctx
+    assert "/harness-maker:make" in ctx
+
+
+def test_run_emits_downgrade_warning(tmp_path: Path, capsys) -> None:
+    _write_harness_yaml(tmp_path, "999.0.0")
+    rc = run(cwd=tmp_path)
+    assert rc == 0
+    ctx = json.loads(capsys.readouterr().out)["hookSpecificOutput"]["additionalContext"]
+    assert "downgrade" in ctx.lower()
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# _format_message
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def test_format_message_upgrade_mentions_make_command() -> None:
+    msg = _format_message("0.4.0", "0.5.5", "upgrade")
+    assert "/harness-maker:make" in msg
+    assert "0.4.0" in msg
+    assert "0.5.5" in msg
+
+
+def test_format_message_downgrade_warns_intent() -> None:
+    msg = _format_message("0.5.5", "0.4.0", "downgrade")
+    assert "downgrade" in msg.lower()
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# CLI entry point — proves module is invokable as `python -m`
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def test_main_as_subprocess_silent_when_no_harness(tmp_path: Path) -> None:
+    result = subprocess.run(
+        [sys.executable, "-m", "harness_maker.hooks.sessionstart_drift"],
+        capture_output=True,
+        text=True,
+        cwd=str(tmp_path),
+        timeout=15,
+    )
+    assert result.returncode == 0
+    assert result.stdout == ""
+
+
+def test_main_as_subprocess_emits_on_drift(tmp_path: Path) -> None:
+    _write_harness_yaml(tmp_path, "0.0.1")
+    result = subprocess.run(
+        [sys.executable, "-m", "harness_maker.hooks.sessionstart_drift"],
+        capture_output=True,
+        text=True,
+        cwd=str(tmp_path),
+        timeout=15,
+    )
+    assert result.returncode == 0
+    payload = json.loads(result.stdout)
+    assert payload["hookSpecificOutput"]["hookEventName"] == "SessionStart"

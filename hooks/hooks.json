@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run --with ${CLAUDE_PLUGIN_ROOT} python -m harness_maker.hooks.sessionstart_drift",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
