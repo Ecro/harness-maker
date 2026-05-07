@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from harness_maker.interview import interview
 from harness_maker.models import Blueprint, ProjectProfile
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
@@ -366,7 +368,14 @@ def test_render_cursor_hooks_json_camelcase_with_path_wrap(tmp_path: Path) -> No
     ]
     assert all_commands  # at least one
     for cmd in all_commands:
-        assert cmd.startswith('PATH="$HOME/.local/bin:$PATH"'), cmd
+        # Round H GRADE-B 6: Cursor hook commands now also propagate
+        # CLAUDE_PROJECT_DIR (falls back to CURSOR_PROJECT_DIR / $PWD)
+        # so the gate's stdin-fallback chain works even when env vars
+        # are stripped or renamed in future Cursor releases.
+        assert cmd.startswith(
+            'CLAUDE_PROJECT_DIR="${CLAUDE_PROJECT_DIR:-${CURSOR_PROJECT_DIR:-$PWD}}" '
+            'PATH="$HOME/.local/bin:$PATH"',
+        ), cmd
 
 
 def test_render_cursor_hooks_json_omits_spec_gate_when_task_driven(
@@ -390,6 +399,42 @@ def test_render_cursor_hooks_json_omits_spec_gate_when_task_driven(
     text = (project_root / ".cursor" / "hooks.json").read_text(encoding="utf-8")
     assert "spec_gate" not in text
     assert "permission_gate" in text  # always-on
+
+
+@pytest.mark.parametrize("dev_mode_label", ["task", "spec"])
+def test_render_hooks_json_valid_in_both_dev_modes(
+    tmp_path: Path, dev_mode_label: str,
+) -> None:
+    """Round H GRADE-B 5: both Claude Code and Cursor hooks templates must
+    render valid JSON in both dev_modes. The Jinja conditional for
+    spec_gate uses inline `{% if %}` glued to commas (`}{% if ... %},`) —
+    fragile under future maintainer reorderings. Lock both renderings via
+    json.loads() validation."""
+    import json as _json
+
+    from harness_maker.models import DevMode, Target
+
+    project_root = tmp_path
+    target_dir = project_root / ".claude"
+    target_dir.mkdir()
+
+    dev_mode = DevMode.SPEC_DRIVEN if dev_mode_label == "spec" else DevMode.TASK_DRIVEN
+    p = ProjectProfile(stack=["python"], scale="small", lifecycle="experiment")
+    a = interview(p, autoloop_mode=True).model_copy(
+        update={"targets": [Target.CLAUDE_CODE, Target.CURSOR], "dev_mode": dev_mode},
+    )
+    bp = synthesize(p, a)
+    render(bp, target_dir, freeze_time=DEFAULT_FREEZE_TIME)
+
+    # Claude Code hooks
+    claude_text = (target_dir / "hooks" / "hooks.json").read_text(encoding="utf-8")
+    claude = _json.loads(claude_text)  # raises on invalid JSON
+    assert "PreToolUse" in claude["hooks"]
+
+    # Cursor hooks
+    cursor_text = (project_root / ".cursor" / "hooks.json").read_text(encoding="utf-8")
+    cursor = _json.loads(cursor_text)  # raises on invalid JSON
+    assert "preToolUse" in cursor["hooks"]
 
 
 def test_render_cursor_hooks_json_includes_spec_gate_when_spec_driven(
@@ -417,12 +462,16 @@ def test_render_cursor_hooks_json_includes_spec_gate_when_spec_driven(
         (project_root / ".cursor" / "hooks.json").read_text(encoding="utf-8"),
     )
     pre_tool_use = parsed["hooks"]["preToolUse"]
-    assert len(pre_tool_use) == 2  # Bash + Write|Edit
+    # Bash + Write|Edit|MultiEdit (worktree_gate) + Write|Edit (spec_gate)
+    assert len(pre_tool_use) == 3
     matchers = {h["matcher"] for h in pre_tool_use}
-    assert matchers == {"Bash", "Write|Edit"}
+    assert matchers == {"Bash", "Write|Edit", "Write|Edit|MultiEdit"}
     spec_gate_hook = next(h for h in pre_tool_use if h["matcher"] == "Write|Edit")
     assert "spec_gate" in spec_gate_hook["command"]
-    assert spec_gate_hook["command"].startswith('PATH="$HOME/.local/bin:$PATH"')
+    assert spec_gate_hook["command"].startswith(
+        'CLAUDE_PROJECT_DIR="${CLAUDE_PROJECT_DIR:-${CURSOR_PROJECT_DIR:-$PWD}}" '
+        'PATH="$HOME/.local/bin:$PATH"',
+    )
 
 
 # ──────────────────────────────────────────────────────────────────────────────

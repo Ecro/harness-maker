@@ -4,21 +4,25 @@
     "preToolUse": [
       {
         "matcher": "Bash",
-        "command": "PATH=\"$HOME/.local/bin:$PATH\" uv run --with {{ harness_maker_src_path }} python -m harness_maker.gates.permission_gate"
+        "command": "CLAUDE_PROJECT_DIR=\"${CLAUDE_PROJECT_DIR:-${CURSOR_PROJECT_DIR:-$PWD}}\" PATH=\"$HOME/.local/bin:$PATH\" uv run --with {{ harness_maker_src_path }} python -m harness_maker.gates.permission_gate"
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "command": "CLAUDE_PROJECT_DIR=\"${CLAUDE_PROJECT_DIR:-${CURSOR_PROJECT_DIR:-$PWD}}\" PATH=\"$HOME/.local/bin:$PATH\" uv run --with {{ harness_maker_src_path }} python -m harness_maker.gates.worktree_gate"
       }{% if config.dev_mode == "spec-driven" %},
       {
         "matcher": "Write|Edit",
-        "command": "PATH=\"$HOME/.local/bin:$PATH\" uv run --with {{ harness_maker_src_path }} python -m harness_maker.gates.spec_gate"
+        "command": "CLAUDE_PROJECT_DIR=\"${CLAUDE_PROJECT_DIR:-${CURSOR_PROJECT_DIR:-$PWD}}\" PATH=\"$HOME/.local/bin:$PATH\" uv run --with {{ harness_maker_src_path }} python -m harness_maker.gates.spec_gate"
       }{% endif %}
     ],
     "stop": [
       {
-        "command": "PATH=\"$HOME/.local/bin:$PATH\" uv run --with {{ harness_maker_src_path }} python -m harness_maker.telemetry"
+        "command": "CLAUDE_PROJECT_DIR=\"${CLAUDE_PROJECT_DIR:-${CURSOR_PROJECT_DIR:-$PWD}}\" PATH=\"$HOME/.local/bin:$PATH\" uv run --with {{ harness_maker_src_path }} python -m harness_maker.telemetry"
       }
     ],
     "preCompact": [
       {
-        "command": "PATH=\"$HOME/.local/bin:$PATH\" uv run --with {{ harness_maker_src_path }} python -m harness_maker.hooks.flush_session",
+        "command": "CLAUDE_PROJECT_DIR=\"${CLAUDE_PROJECT_DIR:-${CURSOR_PROJECT_DIR:-$PWD}}\" PATH=\"$HOME/.local/bin:$PATH\" uv run --with {{ harness_maker_src_path }} python -m harness_maker.hooks.flush_session",
         "timeout": 30
       }
     ]

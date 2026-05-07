@@ -29,6 +29,11 @@ import yaml
 WORKTREE_DIR_NAME = ".worktrees"
 _TS_FMT = "%Y%m%dT%H%MZ"
 
+# Marker file written at the project root when a loop engages a worktree.
+# `harness_maker.gates.worktree_gate` reads it to enforce <WT>-scoped writes
+# (technical fallback for prompt-driven `<WT>` substitution in loop.md.j2).
+_LOOP_MARKER_REL = Path(".claude") / ".hm-loop-active"
+
 
 def _run(args: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
     """Wrap subprocess.run with check=True + capture; uniform error surface."""
@@ -226,19 +231,158 @@ def _cli_create(args: list[str]) -> int:
 
     Empty stdout (with exit 0) signals "scope check off, run in place" — the
     slash command treats an empty `worktree_path` as "no isolation needed".
+
+    Idempotent: if ``base_dir`` (typically `$(pwd)`) is **already inside** a
+    `.worktrees/<name>/` directory, return that worktree path without
+    creating a new one. Lets `/hm:loop` engage worktree once at the top and
+    have nested standalone `/hm:execute` invocations re-detect + reuse it
+    instead of nesting worktrees.
     """
     if len(args) != 2:
         print("usage: create <stage> <base_dir>", file=sys.stderr)
         return 2
     stage, base_str = args
     base = Path(base_str).resolve()
+
+    existing = _detect_existing_worktree(base)
+    if existing is not None:
+        # Already inside a worktree; marker should already be in place from
+        # the parent loop's create. No-op idempotent return.
+        print(str(existing))
+        return 0
+
     yaml_path = base / ".claude" / "harness.yaml"
     if not _scope_includes(yaml_path, stage):
         print("")
         return 0
     wt_path = create(stage, base)
+    _write_loop_marker(base, wt_path)
     print(str(wt_path))
     return 0
+
+
+_LOOP_MARKER_GITIGNORE_LINE = ".claude/.hm-loop-active"
+
+
+def _write_loop_marker(project_root: Path, wt_path: Path) -> None:
+    """Persist active-worktree path so worktree_gate can enforce <WT> scope.
+
+    Overwrites any existing marker (treats prior value as orphaned — finalize
+    is responsible for cleanup; if a previous loop crashed without finalize,
+    this resets state). Atomic write — concurrent readers (the gate hook)
+    must never see a partial line.
+
+    Also ensures ``.claude/.hm-loop-active`` is in the project's ``.gitignore``
+    so a marker leftover from a crashed loop doesn't get committed and break
+    every collaborator's gate against a non-existent worktree path. The
+    append is idempotent (no-op when already present) and creates a new
+    ``.gitignore`` if absent.
+    """
+    from harness_maker.io_utils import atomic_write
+
+    marker = project_root / _LOOP_MARKER_REL
+    atomic_write(marker, str(wt_path) + "\n")
+    _ensure_gitignore_entry(project_root, _LOOP_MARKER_GITIGNORE_LINE)
+
+
+def _ensure_gitignore_entry(project_root: Path, entry: str) -> None:
+    """Append ``entry`` to ``<project_root>/.gitignore`` if not already there.
+
+    Cheap idempotent line-append:
+    - File missing → create with the entry as sole content
+    - File present, entry already (exact line match) → no-op
+    - File present, entry absent → append with leading newline if needed
+
+    Failures are silently swallowed: gitignore hygiene is best-effort, not
+    a hard correctness requirement. The gate still works; users may have
+    a marker to manually clean up if a loop crashes.
+    """
+    gitignore = project_root / ".gitignore"
+    try:
+        if gitignore.is_file():
+            existing = gitignore.read_text(encoding="utf-8")
+            # Match by line — `.claude/.hm-loop-active` (avoid false-match of
+            # a longer line that happens to start with our pattern).
+            for line in existing.splitlines():
+                if line.strip() == entry:
+                    return
+            sep = "" if existing.endswith("\n") else "\n"
+            with gitignore.open("a", encoding="utf-8") as f:
+                f.write(f"{sep}{entry}\n")
+        else:
+            gitignore.write_text(f"{entry}\n", encoding="utf-8")
+    except OSError:
+        # Best-effort; don't fail loop creation over a gitignore write.
+        pass
+
+
+def _clear_loop_marker_if_matches(project_root: Path, wt_path: Path) -> None:
+    """Remove marker only if it points to ``wt_path``.
+
+    Defensive: if a different loop is now active (concurrent run), don't
+    clobber that loop's marker by removing it during this loop's finalize.
+    """
+    marker = project_root / _LOOP_MARKER_REL
+    if not marker.is_file():
+        return
+    try:
+        recorded = marker.read_text(encoding="utf-8").strip()
+    except OSError:
+        return
+    if recorded == str(wt_path):
+        marker.unlink(missing_ok=True)
+
+
+def _detect_existing_worktree(base: Path) -> Path | None:
+    """Idempotent dispatch helper — return the enclosing real git worktree.
+
+    Two signals consulted in priority order:
+
+    1. **Loop marker** (`<base>/.claude/.hm-loop-active`) — strongest signal.
+       Written by `worktree create` when a loop engages and points at the
+       active worktree. Covers the realistic case where /hm:loop runs in
+       the project root and dispatches `/hm:execute` whose §0 calls
+       `worktree create execute "$(pwd)"` *also* from project root — without
+       this, §0 would not see the loop's worktree (cwd is project root, not
+       inside `.worktrees/`) and create a SECOND worktree.
+    2. **Path-based** (rightmost ``.worktrees`` segment of ``base.parts``)
+       — fallback for standalone `/hm:execute` invoked from inside an
+       existing worktree, or any case where the marker is absent. To avoid
+       false positives — a user's home contains ``~/.worktrees`` from
+       another tool, a regular file named ``.worktrees``, a stale dir
+       without a real git checkout — we probe for the worktree's ``.git``
+       entry (file or dir; ``git worktree add`` writes a file pointing
+       at the parent's ``$GIT_DIR/worktrees/<name>``).
+
+    Returns the worktree root Path on confirmed match, else None.
+    """
+    # 1. Marker-based: the active loop's source of truth.
+    marker = base / _LOOP_MARKER_REL
+    if marker.is_file():
+        try:
+            recorded = marker.read_text(encoding="utf-8").strip()
+        except OSError:
+            recorded = ""
+        if recorded:
+            wt = Path(recorded)
+            if wt.is_dir() and (wt / ".git").exists():
+                return wt.resolve()
+        # Marker exists but content is stale/unreadable — fall through to
+        # path-based check rather than failing loud.
+
+    # 2. Path-based: walk right-to-left so nested .worktrees pick innermost.
+    parts = base.parts
+    for i in range(len(parts) - 1, -1, -1):
+        if parts[i] != WORKTREE_DIR_NAME:
+            continue
+        if i + 1 >= len(parts):
+            continue  # at .worktrees itself, no <name> child yet
+        candidate = Path(*parts[: i + 2])
+        if not candidate.is_dir():
+            continue
+        if (candidate / ".git").exists():
+            return candidate
+    return None
 
 
 def _cli_finalize(args: list[str]) -> int:
@@ -266,6 +410,8 @@ def _cli_finalize(args: list[str]) -> int:
     wt = Path(wt_str)
     if not wt.is_dir():
         return 0
+    # Project root = parent of `.worktrees/<name>` (mirrors cleanup's logic).
+    project_root = wt.resolve().parent.parent
     on_success = status == "success"
     if on_success:
         try:
@@ -278,6 +424,12 @@ def _cli_finalize(args: list[str]) -> int:
     except RuntimeError as e:
         print(f"cleanup failed, worktree preserved at {wt}: {e}", file=sys.stderr)
         return 1
+    # Loop is over (success OR failure) → release the marker so
+    # worktree_gate stops blocking main edits. Failure preserves the
+    # `<WT>` directory for inspection, but the user must be free to edit
+    # main again (e.g. cherry-pick from <WT>, discard, retry). Stale
+    # markers from crashed loops are also cleaned up here.
+    _clear_loop_marker_if_matches(project_root, wt.resolve())
     return 0
 
 

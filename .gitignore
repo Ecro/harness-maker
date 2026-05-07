@@ -17,6 +17,11 @@
 
 # ScheduleWakeup runtime lock (Claude Code internal — not source-of-truth)
 .claude/scheduled_tasks.lock
+
+# Active autoloop marker (worktree_gate runtime state — pointing at
+# .worktrees/<name>; ephemeral per-loop, never source-of-truth)
+.claude/.hm-loop-active
+
 tests/e2e/sandbox/.claude/.backup-*/
 tests/e2e/sandbox-plugin-test/.claude/.backup-*/
 

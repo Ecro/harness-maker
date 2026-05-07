@@ -138,7 +138,11 @@ harness-maker 는 **dual plugin** — 두 marketplace 양쪽에 등록 가능:
 
 ## 실행 주의
 - WSL2 NTFS 환경 인지 (vault 경로). Edit 대신 Write 강제 시점 있음.
-- Worktree base_dir 는 `.worktrees/` (.gitignore 자동 추가, Cursor 와 공유)
+- Worktree base_dir 는 `.worktrees/` (Cursor 와 공유). 사용자 프로젝트의
+  `.gitignore` 에 추가는 사용자 책임 — 본 repo 자체는 gitignore 됨.
+- `.claude/.hm-loop-active` 은 자동 gitignore 추가 (worktree.create 시
+  idempotent line-append; H3 round). marker 가 commit 되면 협업자 측에서
+  존재하지 않는 worktree path 로 gate 가 블록 → 강제 footgun.
 - 100% 로컬 telemetry — 외부 전송 금지
 
 ## Autoloop 빌드 중 모호함 발생 시
