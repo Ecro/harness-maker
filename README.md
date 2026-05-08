@@ -93,7 +93,7 @@ Re-run with flags to evolve the harness:
 |---|---|
 | **Python 3.12+** and **[`uv`](https://docs.astral.sh/uv/)** | Required wherever Claude Code runs against your project — even if your project's primary language is Rust, Node, or Go. Hooks invoke `uv run python -m harness_maker.gates.*`; without `uv` they are silent no-ops. |
 | **Claude Code CLI** (plugin + hook support) | Loaded via `claude --plugin-dir /path/to/harness-maker`. |
-| **Cursor IDE 2.4+** (3.2+ recommended) | Optional. Reads `.claude/agents/`, `.claude/skills/`, and `.claude/commands/hm/*.md` natively (verified empirically in 0.6.2 — see `tests/cursor-compat/results-2026-05-08.md`). Hooks render to a separate `.cursor/hooks.json` with Cursor-native schema; both files are emitted when `targets` includes `cursor`. Cursor 3.0+ adds native `/worktree` and `/best-of-n` which coexist safely with harness-maker's prefix-matched cleanup. |
+| **Cursor IDE 2.4+** (3.2+ recommended) | Optional. Reads `.claude/agents/`, `.claude/skills/`, and `.claude/commands/hm/*.md` natively (verified empirically in 0.6.2, re-confirmed 0.7.1 — see `tests/cursor-compat/results-2026-05-08.md`). Hooks render to a separate `.cursor/hooks.json` with Cursor-native schema; both files are emitted when `targets` includes `cursor`. Cursor 3.0+ adds native `/worktree` and `/best-of-n` which coexist safely with harness-maker's prefix-matched cleanup. |
 | **Git** | Required for worktree isolation (every `/hm:execute` and `/hm:loop` run). |
 
 ---
@@ -112,9 +112,9 @@ Re-run with flags to evolve the harness:
 
 - **Worktree isolation per run.** Every `/hm:execute` runs in a fresh `git worktree` under `.worktrees/`. `/hm:loop` allocates one worktree for the whole loop, shared across iterations to reduce branch churn. Successful runs clean up; failed runs preserve evidence. Prefix-match cleanup never touches Cursor-managed worktrees in the same directory.
 
-- **5 security gates.** `secrets` (regex + entropy, gitleaks-style), `permissions` (`settings.json` over-grant detection), `hook injection` (`hooks.json` AST scan for `rm -rf`, `curl | sh`, `eval`), `dependency CVEs` (OSV.dev), `prompt injection` (hidden-instruction pattern detection + privilege separation). Findings go to `.claude/observability/security/findings-*.jsonl` — never transmitted.
+- **7 security gates.** `secrets` (regex + entropy, gitleaks-style), `permissions` (`settings.json` over-grant detection), `hook injection` (`hooks.json` AST scan for `rm -rf`, `curl | sh`, `eval`), `dependency CVEs` (OSV.dev), `hallucination` (AST scan for non-existent imports — pure-filesystem check, no execution of LLM-generated code), `prod-name guard` (cross-tool sequence detection for production-targeting patterns), `prompt injection` (hidden-instruction pattern detection + privilege separation, regex + LLM second pass). Findings go to `.claude/observability/security/findings-*.jsonl` — never transmitted.
 
-- **Privilege separation.** Reviewer agents get `permissions.deny: [Write(*), Edit(*), Bash(rm:*), Bash(curl:*), Bash(npm:*), Bash(eval *), Bash(python:*), Bash(node:*), Bash(sh:*), Bash(bash:*)]` — interpreter denies block subprocess-bypass attempts (0.6.2 hardening). Executor agents get `permissions.allow: [Write(.worktrees/**), Edit(.worktrees/**), Bash(uv run:*), Bash(pytest:*), …]` plus paired Edit/Write denies on system paths (`/etc`, `~/.ssh`, `~/.aws`). Combined with worktree isolation, this gives defense-in-depth: even a prompt-injected reviewer cannot write to disk or shell out via interpreters; even a compromised executor cannot write outside the active worktree or touch system credentials.
+- **Privilege separation.** Reviewer agents get `permissions.deny: [Write(*), Edit(*), Bash(rm:*), Bash(curl:*), Bash(npm:*), Bash(eval *), Bash(python:*), Bash(node:*), Bash(sh:*), Bash(bash:*)]` — interpreter denies block subprocess-bypass attempts (0.6.2 hardening). Executor agents get `permissions.allow: [Write(.worktrees/**), Edit(.worktrees/**), Bash(uv run:*), Bash(pytest:*), …]` plus paired Edit/Write denies on system paths (`/etc`, `~/.ssh`, `~/.aws`). Combined with worktree isolation and the 0.7.1 telemetry tool-input whitelist + secret redaction (ADR-107), this gives defense-in-depth: even a prompt-injected reviewer cannot write to disk or shell out via interpreters; even a compromised executor cannot write outside the active worktree or touch system credentials; even a poisoned `tool_input` payload cannot leak credentials into the metrics log.
 
 - **Brownfield-safe.** `Reconciler` indexes existing `.claude/`, computes hash-based ours/theirs decisions via provenance frontmatter, and offers per-conflict keep/replace/both. Apply is ADD-only with timestamped backups. User edits are never silently overwritten.
 
@@ -123,6 +123,8 @@ Re-run with flags to evolve the harness:
 - **Refdocs search skill.** Register your project's reference folders (architecture docs, API specs, design docs) in `harness.yaml`. The `refdocs-search` skill gives the LLM lossless full-text search across all registered folders — no chunking, no RAG index.
 
 - **SessionStart drift reminder.** A hook fires on every session open and warns if the running harness-maker version differs from the version that rendered the harness — so you notice when a `/plugin update` needs a re-render. The detector compares `harness.yaml.harness_maker_version` against the **latest plugin version cached on disk** (not just the imported `__version__`), so `/hm:refresh` and SessionStart agree even when the slash command runs against a pinned older version (0.6.2).
+
+- **Memory tier with cross-process safety.** `.claude/memory/` holds `episodic/` (per-day JSONL), `semantic.jsonl` (queryable index), `profile.json`, `wiki.md`, and `failures.md`. Concurrent writers from parallel sessions are serialised via a re-entrant POSIX flock — same thread can re-acquire without deadlock, different threads block normally (ADR-106, 0.7.1). Telemetry hooks append atomically via raw `os.write()` on `O_APPEND` (single-syscall, ≤ PIPE_BUF) so concurrent Claude Code + Cursor hooks cannot interleave JSONL lines.
 
 ---
 
@@ -288,7 +290,7 @@ All observability is 100% local — nothing is transmitted externally.
 | File | Contents |
 |---|---|
 | `.claude/observability/dashboard.md` | AI-readiness score, dimension breakdown, ranked action items |
-| `.claude/observability/metrics.jsonl` | Per-turn telemetry (cache hit %, tool calls, durations) |
+| `.claude/observability/metrics-YYYY-MM-DD.jsonl` | Per-turn telemetry (cache hit %, tool calls, durations) — date-rotated daily (ADR-103, 0.7.1). Pre-0.7.1 `metrics.jsonl` is read as the trailing legacy shard. |
 | `.claude/observability/refresh/raw-*.jsonl` | Anti-rot crawl evidence (accepted / rejected items) |
 | `.claude/observability/security/findings-*.jsonl` | 5-gate security scan findings |
 

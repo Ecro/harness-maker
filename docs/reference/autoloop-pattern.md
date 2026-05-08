@@ -1,19 +1,19 @@
 # Autoloop Pattern Reference
 
-> 본 문서는 vault `/autoloop` 명령 (`/mnt/c/Users/euncheol.ro/Documents/obsidian-vault/.claude/commands/autoloop.md`) 에서 발췌·정리한 핵심 패턴.
-> Phase 6 의 `/hm:loop` (사용자 하네스용 autoloop) 구현 시 참고. cross-filesystem 의존 제거 + 자족적 reference.
+> Extracted and condensed from the vault `/autoloop` command (`/mnt/c/Users/euncheol.ro/Documents/obsidian-vault/.claude/commands/autoloop.md`).
+> Reference for implementing `/hm:loop` (user-harness autoloop) in Phase 6. Cross-filesystem dependency removed; self-contained reference.
 
-*Last reviewed against code: 2026-05-07 (0.5.x). `/hm:loop` 는 `feature` 와 `improve` 두 mode 를 지원하며, per-loop 단일 worktree 를 사용 (0.5.5+). wrapup 은 iter 마다가 아니라 loop close 시 1회만.*
+*Last reviewed against code: 2026-05-08 (0.7.1). `/hm:loop` supports `feature` and `improve` modes and uses a per-loop single worktree (0.5.5+); squash-merged at convergence (0.7.1+). Wrapup runs once at loop close, not per iteration.*
 
 ## Per-Phase 5-Stage Pipeline
 
-각 phase 는 다음 5 stage 를 순차 진행:
+Each phase runs the following 5 stages in sequence:
 
 ```
 Phase N
-  Stage 1: Research Detection (URL/marker/unknown-lib 자동 감지)
+  Stage 1: Research Detection (URL/marker/unknown-lib auto-detection)
   Stage 2: Plan Validation (3x parallel, 2/3 consensus, max 2 rounds)
-  Stage 3: Execute (CODER → TESTER 루프, max N retries with error context)
+  Stage 3: Execute (CODER → TESTER loop, max N retries with error context)
   Stage 4: Review (5-8 reviewers, 2/3 consensus, auto-fix P0-P2)
   Stage 5: Wrapup (git commit "autoloop({project}): phase N - {name}")
   ↓
@@ -22,35 +22,35 @@ Phase N+1
 
 ## Document Sharding (DD#3)
 
-각 sub-agent 는 최소 컨텍스트만:
+Each sub-agent receives only the minimum required context:
 
-| Section | Included? | 이유 |
+| Section | Included? | Reason |
 |---|---|---|
-| Section 2 (Technical Constitution) | Always | 코드 스타일·boundaries |
-| Section 3 (Architecture) | Always | 시스템 디자인·data model·APIs |
-| Current Phase block ONLY | Per-phase | 현재 phase task 만 (scope creep 방지) |
-| Research Context | If triggered | Stage 1 결과 |
-| All Other Phases | Never | 미래 phase 누출 차단 |
-| Section 1 (Vision) | Never | 구현 무관 |
-| Section 5 (Final Acceptance) | Final pass only | 마지막 검증에만 |
-| Section 6 (Risks) | Never | orchestrator 만 |
+| Section 2 (Technical Constitution) | Always | Code style and boundaries |
+| Section 3 (Architecture) | Always | System design, data model, APIs |
+| Current Phase block ONLY | Per-phase | Current phase task only (scope creep prevention) |
+| Research Context | If triggered | Stage 1 output |
+| All Other Phases | Never | Block future-phase leakage |
+| Section 1 (Vision) | Never | Not relevant to implementation |
+| Section 5 (Final Acceptance) | Final pass only | Final verification only |
+| Section 6 (Risks) | Never | Orchestrator-only |
 
 ## Context Isolation (DD#4)
 
-- 각 phase 는 별도 sub-agent invocation (fresh context window)
-- State handoff 는 디스크 (`.claude-progress.json`) + git history
-- Sub-agent 는 progress file 읽지 않음 — 구현·검증만
+- Each phase is a separate sub-agent invocation (fresh context window)
+- State handoff is via disk (`.claude-progress.json`) + git history
+- Sub-agents do not read the progress file — they only implement and verify
 
 ## 2/3 Consensus Algorithm (Plan Validation + Code Review)
 
-**Step A — Surface Matching:** 두 finding 이 candidate 인 조건: ≥2 일치 (file, line range ±10, category). transitive closure 로 group.
+**Step A — Surface Matching:** Two findings are candidates when: ≥2 attributes match (file, line range ±10, category). Groups formed via transitive closure.
 
-**Step B — Conclusion Alignment:** group 안에서 CONCLUDE step 비교. 같은 risk/impact 인지 검증.
+**Step B — Conclusion Alignment:** Compare CONCLUDE steps within each group. Verify same risk/impact rating.
 
 **Step C — Consensus Decision:**
 ```
 if agent_count >= 2 AND conclusions_aligned:
-    tier = "strong" if agent_count == 3 else "standard"  # 자동 fix 가능
+    tier = "strong" if agent_count == 3 else "standard"  # eligible for auto-fix
 elif agent_count >= 2 AND NOT aligned:
     tier = "weak"  # manual review, no auto-fix
 else:
@@ -59,29 +59,32 @@ else:
 
 ## Adaptive Reviewer Selection (DD#9)
 
-**항상 spawn (5):**
+**Always spawned (5):**
 - 3x code-reviewer (parallel, OBSERVE→TRACE→INFER→CONCLUDE)
 - 1x performance-reviewer
 - 1x walkthrough-reviewer
 
-**조건부 (0-3):**
-- side-effect-reviewer: public 함수 시그니처 변경 시
-- concurrency-reviewer: async/await/thread/mutex/lock 포함 시
-- test-quality-reviewer: test 파일 수정 시
+**Conditional (0-3):**
+- side-effect-reviewer: when public function signatures change
+- concurrency-reviewer: when async/await/thread/mutex/lock is present
+- test-quality-reviewer: when test files are modified
 
 ## Autonomous Decision Protocol (DD#8)
 
-**모든 결정은 autoloop 안에서 자율** — AskUserQuestion 호출 금지.
+**All decisions inside autoloop are autonomous** — AskUserQuestion calls are forbidden.
+When ambiguous, log the decision and proceed (do not block on user input).
 
-| 상황 | 자율 행동 | 로그 필요? |
+| Situation | Autonomous Action | Log Required? |
 |---|---|---|
-| Hash mismatch on resume | Auto-continue with new spec, 완료 phase 보존 | Yes, human_review_needed=true |
-| Plan NEEDS_REVISION | Validator 의 revised text 자동 적용 | Yes |
+| Hash mismatch on resume | Auto-continue with new spec, preserve completed phases | Yes, human_review_needed=true |
+| Plan NEEDS_REVISION | Auto-apply validator's revised text | Yes |
 | Plan MAJOR_REVISION (round 1) | Auto-revise + re-validate | Yes |
-| Plan MAJOR_REVISION (round 2) | 진행 + human_review_needed=true | Yes |
-| Review grade D/F | 진행, human_review_needed flag | Yes |
-| Phase blocked (max retries) | HALT autoloop, blocker 기록 | Yes |
-| Final verification fails | 보고만, HALT 안 함 | Yes |
+| Plan MAJOR_REVISION (round 2) | Proceed + human_review_needed=true | Yes |
+| Review grade D/F | Proceed, set human_review_needed flag | Yes |
+| Phase blocked (max retries) | HALT autoloop, record blocker | Yes |
+| Final verification fails | Report only, do not HALT | Yes |
+
+*0.7.1: `/hm:review` defaults to consensus filter (surface match + reasoning alignment) with grade gate A/B/C and auto-fix loop bounded by `max_review_rounds`.*
 
 ## State File Schema (`.claude-progress.json`)
 
@@ -123,7 +126,8 @@ else:
 }
 ```
 
-**Atomic write:** `path.tmp` 작성 → `os.rename(tmp, path)`. 인터럽트 시 corrupt 0.
+**Atomic write:** Write to `path.tmp` then `os.rename(tmp, path)`. Zero corruption on interrupt.
+(0.7.1 ADR-103: metrics are rotated daily as `metrics-YYYY-MM-DD.jsonl`; readers use `_metrics_io.iter_recent_entries` rather than reading the state file directly.)
 
 ## Error Handling
 
@@ -133,27 +137,29 @@ else:
 | TECH_SPEC.md absent | ERROR + STOP |
 | Section 0 malformed | ERROR + STOP |
 | Phase parse fail | ERROR + STOP |
-| Verify script absent (TECH_SPEC mode) | TESTER-only fallback, 로그 |
-| CODER outputs PHASE_BLOCKED | 즉시 HALT |
-| Phase fails max retries | HALT 모든 후속 phase |
-| Review grade D/F | 진행, human_review_needed |
-| Hash mismatch on resume | Auto-continue, 로그 |
+| Verify script absent (TECH_SPEC mode) | TESTER-only fallback, log |
+| CODER outputs PHASE_BLOCKED | Immediate HALT |
+| Phase fails max retries | HALT all subsequent phases |
+| Review grade D/F | Proceed, set human_review_needed |
+| Hash mismatch on resume | Auto-continue, log |
 | Global iter cap | HALT |
-| Final verify fails | 보고, HALT 안 함 |
-| Agent malformed JSON | N-1 agent 로 진행 |
+| Final verify fails | Report, do not HALT |
+| Agent malformed JSON | Proceed with N-1 agents |
 
-## 우리 `/hm:loop` 가 모방할 부분
+## What `/hm:loop` Adopts
 
 - **5-stage pipeline** (research → plan-validate → execute → review → wrapup)
-- **Document sharding** — atomic stage 별 prompt fragment + workflow 별 fused prompt
-- **Adaptive reviewer selection** — Conditional Router (Phase 5) 와 통합
+- **Document sharding** — atomic per-stage prompt fragments + per-workflow fused prompts
+- **Adaptive reviewer selection** — integrated with Conditional Router (Phase 5)
 - **Atomic state writes** — `.claude/observability/loop-state.json`
-- **Autonomous decision protocol** — `--dry-run` 외 모든 결정 자율, log 기록
+  (0.7.1 ADR-106: `_locking.exclusive_lock` is thread-re-entrant via `threading.local`, safe inside concurrent autoloop iterations)
+- **Autonomous decision protocol** — all decisions autonomous except `--dry-run`; every decision logged
+  (0.7.1 ADR-108: drift_monitor wraps LLM judge input in XML fences with both open and close tag defanging)
 
-## 차이점 (`/hm:loop` 특유)
+## Differences Specific to `/hm:loop`
 
-- vault autoloop 은 vault 안에서 실행 → repo 타깃. `/hm:loop` 은 user 프로젝트 안에서 실행 → 같은 repo.
-- vault autoloop 은 TECH_SPEC.md 기반. `/hm:loop` 은 사용자 자연어 goal + workflow 기반.
-- vault autoloop 은 phase-based. `/hm:loop` 은 feature-based (parse_goal → feature_list).
-- 권한 분리 적용: `/hm:loop` 의 worker 는 executor agent (write-in-worktree only).
-- 보안 게이트 통합: 매 iter wrapup 직전 verify-before-completion (보안 high finding 0건 체크).
+- The vault autoloop runs inside the vault and targets that repo. `/hm:loop` runs inside the user's project and targets that same repo.
+- The vault autoloop is TECH_SPEC.md-driven. `/hm:loop` is natural-language-goal-driven + workflow-driven.
+- The vault autoloop is phase-based. `/hm:loop` is feature-based (parse_goal → feature_list).
+- Permission separation enforced: `/hm:loop` workers are executor agents (write-in-worktree only).
+- Security gate integrated: verify-before-completion runs immediately before each iter wrapup (zero high-severity security findings required).

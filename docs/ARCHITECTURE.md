@@ -86,9 +86,10 @@ Three design commitments shape every decision below:
         │  .worktrees/        ◀── M9 git worktree isolation   │
         │  observability/                                     │
         │    dashboard.md                                     │
-        │    metrics.jsonl       ◀── 100% local telemetry     │
+        │    metrics-YYYY-MM-DD.jsonl ◀── 100% local         │
+        │       telemetry, daily-rotated (ADR-103, 0.7.1)     │
         │    refresh/raw-*.jsonl ◀── M4 crawl evidence        │
-        │    security/findings-* ◀── M10 5 security gates     │
+        │    security/findings-* ◀── M10 7 security gates     │
         └────────────────────────────────────────────────────┘
                                  │
                                  ▼
@@ -150,7 +151,7 @@ This means harness-maker stays current without ever silently changing the user's
 
 Three metrics are computed and surfaced in the `/hm:ai-readiness` report:
 
-- **효율** — cache hit % per turn. Computed from telemetry hook output (PostToolUse) with a hybrid schema that works across Claude Code and Cursor IDE (0.5.4+).
+- **Efficiency** — cache hit % per turn. Computed from telemetry hook output (PostToolUse) with a hybrid schema that works across Claude Code and Cursor IDE (0.5.4+). 0.7.1 (ADR-103) rotates the on-disk file daily as `metrics-YYYY-MM-DD.jsonl`; readers walk dated shards newest-first via `_metrics_io.iter_recent_entries` and fall back to the legacy `metrics.jsonl` for pre-0.7.1 entries.
 - **Health** — 0-100 score across 6 dimensions: docs, tests, CI, observability, security, governance. Implemented in `readiness.py`. Drills down into `agent_quality.py`, which assigns each agent a Platinum/Gold/Silver/Bronze rating against a fixed rubric. A "ceremony penalty" deducts points when an agent has high-process / low-output behavior.
 - **fresh** — days since the last `/hm:refresh` accepted at least one proposal.
 
@@ -158,7 +159,7 @@ A **SessionStart drift reminder** hook (`hooks/sessionstart_drift.py`) fires on 
 
 The detector (`relevance.detect_version_drift`) compares `harness.yaml.harness_maker_version` (the **stamped** version, formerly named `installed` — renamed in 0.6.2 REVIEW M2 to remove a semantic inversion) against `relevance.latest_installed_version()`, which scans `~/.claude/plugins/cache/harness-maker-local/harness-maker/<v>/` for the highest semver-parseable directory name. **Why scan the cache instead of using the imported `__version__`** (0.6.2 P6): `/hm:refresh` is rendered as a Jinja template that runs with `uv run --with /path/to/<render-time-version>`, pinning its in-process `__version__` to the version that *rendered* the slash command. The SessionStart hook runs against the live plugin so its `__version__` is current. The two import paths therefore see different `__version__` values; calling the same `detect_version_drift` would return different verdicts. Routing both through `latest_installed_version()` (an external truth source) makes them agree. The function is `@functools.cache`-decorated for sub-100ms session-start latency, with a top-K cap (10) on the cache scan to bound worst-case syscalls on long-lived installs.
 
-All telemetry stays local — `metrics.jsonl` is never transmitted.
+All telemetry stays local — `metrics-YYYY-MM-DD.jsonl` is never transmitted. 0.7.1 (ADR-107) added a `tool_input` whitelist for the persisted entries: only `path`, `file_path`, `command`, `target`, `database`, `url`, `query` survive; values are scanned for known-secret prefixes (`sk-`, `ghp_`, `AKIA`, `Bearer …`) and redacted *before* a 256-char cap to ensure a partial-token tail cannot survive truncation. The cwd resolution chain is env-var-first (`CLAUDE_PROJECT_DIR` → `CURSOR_PROJECT_DIR` → typed `workspace.current_dir` → `os.getcwd()`); the bare stdin `cwd` field is intentionally NOT consulted, since prior to 0.7.1 a poisoned PostToolUse payload could redirect metrics writes via that field (ADR-102).
 
 ### M6 — Conditional Router
 
@@ -211,7 +212,7 @@ Required in the `Production` preset; optional in `Side`.
 
 Successful runs cleanup the worktree after merging back. Failed runs preserve the worktree as evidence.
 
-### M10 — 5 Security Gates
+### M10 — 7 Security Gates
 
 Implemented in `security_scanner.py`. Findings are written to `observability/security/findings-<date>.jsonl`.
 
@@ -221,7 +222,9 @@ Implemented in `security_scanner.py`. Findings are written to `observability/sec
 | **permissions** | `settings.json` `allow` over-grant detection | `refresh`, `/harness-maker:make` |
 | **hook injection** | `hooks.json` AST scan for dangerous commands (`rm -rf`, `curl \| sh`, `eval`) | `pre_wrapup`, `refresh` |
 | **dependency CVEs** | OSV.dev lookup against `package-lock.json`, `Cargo.lock`, `requirements.txt` | weekly |
-| **prompt injection** | hidden-instruction pattern detection + reviewer/executor privilege split (M12) | LLM call boundary |
+| **hallucination** (0.7.0+) | AST scan for non-existent imports. 0.7.1 (ADR-105) switched to a pure-filesystem check — `_is_available` walks `sys.path` for `<pkg>/__init__.py` / `<pkg>.py` / `<pkg>/` and never imports the package, so adversarial sys.path entries cannot trigger `__init__.py` side-effects on LLM-generated code. `@functools.lru_cache(maxsize=512)` memoises the lookup; guarded `try/except ImportError` and `except` handler imports are downgraded to P2. | `pre_wrapup` |
+| **prod-name guard** (0.7.0+) | Cross-tool sequence detection: walks recent PostToolUse entries via `_metrics_io.iter_recent_entries` and flags windows of N tool calls whose `tool_input.target` contains production-only patterns (`prod`, `production`, the actual deployed bucket name, etc.). 0.7.1 rewrote the matcher with a `collections.deque(maxlen=window)` sliding window for O(N) scan. | `pre_wrapup` |
+| **prompt injection** | hidden-instruction pattern detection + reviewer/executor privilege split (M12). Regex first pass + LLM second pass via `scan_prompt_injection_llm`. On any LLM transport error the gate degrades to regex-only with a warning. | LLM call boundary |
 
 ### M11 — Context Lint
 
@@ -240,7 +243,7 @@ Reviewer agents and executor agents have **structurally different permissions** 
 
 Frontmatter `permissions:` is also written as prose under `## Permissions policy` in the agent body for human-readable rationale; the structured fields are what the IDE enforces. Combined with M9, this gives a defense-in-depth model: even if a reviewer is prompt-injected into trying to write or shell out via interpreter, the permission system blocks it. Even if an executor is injected into writing outside the worktree, the path scope blocks it.
 
-CLAUDE.md §보안/권한 v1.6 carries the policy authoritatively; templates mirror that policy and CI snapshot tests guard against accidental drift.
+CLAUDE.md §Security/Permissions v1.6 carries the policy authoritatively; templates mirror that policy and CI snapshot tests guard against accidental drift.
 
 ### M13 — Provenance Frontmatter
 
@@ -276,7 +279,7 @@ harness-maker renders the same harness for both Claude Code and Cursor IDE. The 
 - `.claude/hooks/hooks.json` — Claude Code schema: PascalCase event keys (`PreToolUse`, `PostToolUse`, `Stop`, `PreCompact`) + nested `{matcher, hooks:[{type, command}]}` shape.
 - `.cursor/hooks.json` — Cursor-native schema: lowercase camelCase event keys (`preToolUse`, `stop`, `preCompact`) + flat `{matcher, command}` shape + `version: 1`.
 
-**The hooks divergence is by design**, not a bug. The 0.6.2 forensic on the kairos repo (private, harness-maker 0.5.7) traced 4 entries in `metrics.jsonl` — all with `event: "stop"` (lowercase) and Cursor-only `status` / `loop_count` payload fields per `telemetry.py:11` — to the lowercase template, proving Cursor reads its dedicated file with its own schema. Both `templates/cursor/hooks.json.j2` and `templates/hooks/hooks.json.j2` carry Jinja header comments and unit tests (`test_cursor_hooks_uses_lowercase_native_schema`) that fail loudly if a future change attempts to converge them. CLAUDE.md §Plugin 구조 also documents the divergence authoritatively.
+**The hooks divergence is by design**, not a bug. The 0.6.2 forensic on the kairos repo (private, harness-maker 0.5.7) traced 4 entries in `metrics.jsonl` — all with `event: "stop"` (lowercase) and Cursor-only `status` / `loop_count` payload fields per `telemetry.py:11` — to the lowercase template, proving Cursor reads its dedicated file with its own schema. Both `templates/cursor/hooks.json.j2` and `templates/hooks/hooks.json.j2` carry Jinja header comments and unit tests (`test_cursor_hooks_uses_lowercase_native_schema`) that fail loudly if a future change attempts to converge them. CLAUDE.md §Plugin structure also documents the divergence authoritatively.
 
 **Cursor-only assets** (emitted only when `cursor` ∈ targets):
 - `.cursor/rules/harness.mdc` — always-on workflow rules rendered via `_render_cursor_mdc()`, which limits frontmatter to keys Cursor accepts (`description`, `globs`, `alwaysApply`). Our `content_hash` metadata is omitted from the frontmatter to avoid strict-reject. Cap: 200 lines (Side preset context-lint); current rendered output is ~108 lines.

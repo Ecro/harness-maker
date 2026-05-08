@@ -19,7 +19,11 @@ harness-maker/
 │   ├── conditional_router.py # M6: file-area → reviewer routing
 │   ├── autoloop_driver.py    # M7: time/iter-bounded loop
 │   ├── worktree.py           # M9: git worktree isolation
-│   ├── security_scanner.py   # M10: 5 security gates
+│   ├── security_scanner.py   # M10: 7 security gates
+│   ├── _metrics_io.py        # shared reader for metrics-YYYY-MM-DD.jsonl (ADR-103, 0.7.1)
+│   ├── memory/               # episodic / semantic / profile + _locking.py (ADR-106 re-entrant flock)
+│   ├── secscan/              # hallucination + prod_name_guard gate implementations
+│   ├── drift_monitor.py      # SPEC↔current trajectory drift (ADR-108 fenced LLM judge)
 │   ├── context_lint.py       # M11: render-time context lint
 │   ├── provenance.py         # M13: frontmatter (hash, generated_by, ...)
 │   ├── readiness.py          # M5: Health (0-100, 6 dimensions)
@@ -80,7 +84,7 @@ Steps:
    ```
 
 3. **Wire it into the synthesizer.** Open `src/harness_maker/synthesize.py` and add a `FileEntry` for the new skill in the appropriate preset path. Reference the template path; pass the context the template needs.
-4. **Add to `final_acceptance` in `.claude-verify.sh`.** The "Skills (11) 존재" loop enumerates required templates. Increment the count and add your skill name.
+4. **Add to `final_acceptance` in `.claude-verify.sh`.** The "Skills (11) presence" loop enumerates required templates. Increment the count and add your skill name.
 5. **Write a test.** Add a unit test under `tests/unit/` that renders the template against a `Blueprint` fixture and asserts the output starts with `---` and contains expected markers.
 6. **Regenerate snapshots if the Blueprint shape changed.**
 
@@ -97,7 +101,7 @@ Same pattern as skills, with two differences:
    - Reviewer-style agents: `deny` MUST include `Write(*)`, `Edit(*)`, `Bash(rm:*)`, `Bash(curl:*)`, `Bash(npm:*)`, `Bash(eval *)`, plus the interpreter set `Bash(python:*)`, `Bash(node:*)`, `Bash(sh:*)`, `Bash(bash:*)` (the latter four added 0.6.2 to close subprocess-bypass via `python -c "..."`).
    - Executor-style agents: `allow` includes `Write(.worktrees/**)`, `Edit(.worktrees/**)`, plus scoped Bash test commands. `deny` MUST pair `Write` and `Edit` for every system path — `Write(/etc/**)` without `Edit(/etc/**)` is an escalation gap (0.6.2 REVIEW M1).
    - The `phase_10_reviewer_perms` and `phase_10_executor_perms` checks in `.claude-verify.sh` will fail if you mix these up. CI snapshot test `test_render_agents_have_structured_permissions_frontmatter` guards the structural shape. See `templates/agents/code-reviewer.md.j2` (reviewer pattern) and `templates/agents/executor.md.j2` (executor pattern) as references.
-3. Update the "Agents (9) 존재" loop in `.claude-verify.sh`'s `final_acceptance`.
+3. Update the "Agents (9) presence" loop in `.claude-verify.sh`'s `final_acceptance`.
 
 ## Adding Cursor target support to a new template
 
@@ -130,7 +134,7 @@ Steps:
        MY_NEW_PRESET = "MyNewPreset"
    ```
 
-2. **Add the synthesizer mapping.** In `src/harness_maker/synthesize.py`, extend the preset→reviewer/workflow/model mapping. Use `TECH_SPEC.md` Section 3 "Preset 디폴트 비교" as the schema reference for which dimensions a preset must define.
+2. **Add the synthesizer mapping.** In `src/harness_maker/synthesize.py`, extend the preset→reviewer/workflow/model mapping. Use `TECH_SPEC.md` Section 3 "Preset default comparison" as the schema reference for which dimensions a preset must define.
 3. **Render templates.** Create `templates/harness-yaml/MyNewPreset.yaml.j2` and `templates/settings/MyNewPreset.json.j2`. Copy from `Side.yaml.j2` (lean) or `Production.yaml.j2` (full) as starting point.
 4. **Add a fixture.** Create `tests/fixtures/<scenario>-mynewpreset/` with a minimal project shape (pyproject.toml or package.json or Cargo.toml). Add the corresponding `tests/snapshot/<scenario>-mynewpreset.expected.yaml`.
 5. **Update `final_acceptance`.** Add your preset to the `for p in Side Production` loop in `.claude-verify.sh`.

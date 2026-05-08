@@ -1,7 +1,7 @@
 # TECH_SPEC: harness-maker
 
-> **상태:** v2.2 (Phase 2/7 split + env precheck + invariant gate) · **작성:** 2026-05-03 · **언어:** 한국어 (Korean)
-> Claude Code 플러그인 — 어떤 프로젝트든 `/harness-maker:make` 한 번에 맞춤 하네스(.claude/) 자동 생성·갱신. autoloop 으로 자율 빌드 가능한 형식.
+> **Status:** v2.2 (Phase 2/7 split + env precheck + invariant gate) · **Written:** 2026-05-03 · **Language:** English
+> Claude Code plugin — generates and updates a custom harness (`.claude/`) for any project with a single `/harness-maker:make` command. Structured for autonomous builds via autoloop.
 
 ## 0. Loop Configuration
 
@@ -17,53 +17,53 @@
 ```
 
 **Loop behavior:**
-- 각 Phase 의 모든 Task 완료 → Phase Exit Criteria 검증
-- Phase Exit Criteria 실패 시 max 5회 재시도 → 그래도 실패 시 blocker 기록 후 HALT
-- AskUserQuestion 호출 금지 — 모든 결정은 본 spec + CLAUDE.md 우선 (DD#8 autonomous decision protocol)
-- 진행 상태는 `.claude-progress.json` 에 atomic write
-- Final Acceptance (Section 5) 실패는 HALT 안 함 — 보고만, 사용자 사후 review
+- All Tasks in each Phase complete → Phase Exit Criteria verified
+- Phase Exit Criteria failure: retry up to 5 times → if still failing, record blocker and HALT
+- AskUserQuestion calls are forbidden — all decisions defer to this spec + CLAUDE.md (DD#8 autonomous decision protocol)
+- Progress state is written atomically to `.claude-progress.json`
+- Final Acceptance (Section 5) failure does NOT HALT — report only; user reviews afterward
 
 ---
 
 ## 1. Product Vision
 
 ### Problem Statement
-사용자(`/home/noel`)는 22+ Claude-active 프로젝트를 한 사람이 운영. 각 프로젝트의 하네스 구성 fragmentation 심각:
-- 8개 프로젝트는 하네스 무
-- 1개 (spoton) 만 heavy
-- vault 가 사실상 메인 hub
-- 명령 표면 일치도 ≈ 30%
-- 메모리 표준 일치도 ≈ 40%
+The user (`/home/noel`) operates 22+ Claude-active projects single-handedly. Harness configuration fragmentation across projects is severe:
+- 8 projects have no harness at all
+- Only 1 (spoton) has a heavy harness
+- vault is effectively the main hub
+- Command surface consistency ≈ 30%
+- Memory standard consistency ≈ 40%
 
-수동 큐레이션은 22 프로젝트 × 항목별로 시간 부족. 사람이 결정해야 할 것 vs 자동화 가능한 것 의 경계 재설정 필요.
+Manual curation across 22 projects × per-item is unsustainable. The boundary between what requires human decision vs. what can be automated needs to be redrawn.
 
 ### Solution
-**harness-maker** — Claude Code 플러그인. **단 하나의 메타 명령** `/harness-maker:make` 로 사용자 프로젝트 `.claude/` 안에 *맞춤 하네스 (commands·skills·agents·hooks·monitoring·anti-rot·worktree·security 자산)* 인터뷰 기반 생성. 사용자 일상 명령은 `/hm:` prefix (`/hm:dev`, `/hm:loop`, `/hm:monitor`, ...). Brownfield + Greenfield-with-spec 모두 지원.
+**harness-maker** — a Claude Code plugin. A **single meta-command** `/harness-maker:make` generates a *custom harness (commands, skills, agents, hooks, monitoring, anti-rot, worktree, and security assets)* inside the user project's `.claude/` directory via an interview-driven flow. Day-to-day user commands use the `/hm:` prefix (`/hm:dev`, `/hm:loop`, `/hm:monitor`, ...). Supports both Brownfield and Greenfield-with-spec projects.
 
 ### Target User
-1. **사용자 본인 (1차)**: 22 프로젝트에 점진 적용. dogfood.
-2. (Phase 10+) 외부 사용자 — Solo 개발자, marketplace 배포 검토.
+1. **The user themselves (primary)**: Incremental rollout across 22 projects. Dogfood.
+2. (Phase 10+) External users — solo developers; marketplace distribution under consideration.
 
 ### Success Metrics
-- [ ] `/harness-maker:make` 가 빈 디렉토리에서 10분 내 완전한 하네스 생성
-- [ ] `/harness-maker:make` 가 기존 .claude/ 풍부한 디렉토리에서 충돌 reconcile + ADD-only 적용
-- [ ] 생성된 `/hm:dev`, `/hm:loop`, `/hm:monitor`, `/hm:refresh` 모두 정상 동작
-- [ ] `/hm:refresh` 가 4 source 크롤 → 패치 제안 → 사용자 confirm
-- [ ] `/hm:execute` 가 worktree 격리 안에서 동작
-- [ ] `/hm:verify` 가 5종 보안 게이트 검출 (sandbox 시드 vulnerability)
-- [ ] 모든 generated 파일에 provenance frontmatter (hash + version)
-- [ ] Reviewer agent 가 `Write` 시도 시 settings.json 차단 (권한 분리)
-- [ ] CLAUDE.md / agent prompt 길이 제한 lint 동작
+- [ ] `/harness-maker:make` generates a complete harness from an empty directory within 10 minutes
+- [ ] `/harness-maker:make` reconciles conflicts and applies ADD-only changes against a directory with an existing rich `.claude/`
+- [ ] Generated `/hm:dev`, `/hm:loop`, `/hm:monitor`, `/hm:refresh` all function correctly
+- [ ] `/hm:refresh` crawls 4 sources → proposes patches → user confirms
+- [ ] `/hm:execute` operates inside worktree isolation
+- [ ] `/hm:verify` detects 5 categories of security gate violations (sandbox seed vulnerability)
+- [ ] All generated files carry provenance frontmatter (hash + version)
+- [ ] Reviewer agent is blocked by `settings.json` when attempting `Write` (privilege separation)
+- [ ] CLAUDE.md / agent prompt length-limit lint is operational
 
-### NON-GOALS (의도적 배제, 변경 금지)
-- 크로스-에이전트 portability (.agents 컨벤션, AGENTS.md 동기화) — Claude 전용
-- Brainstorming · systematic-debugging 사전 게이트 — 사용자 결정
-- Cursor / Aider / Codex 호환 — Phase 10+ 검토 안 함
-- 팀 협업 기능 — hiloop 영역
-- 클라우드 백엔드 — 100% 로컬 (telemetry 도)
-- vault 자체 대체 — vault 는 hub
-- 펌웨어/embedded 팀 governance 자동화
-- Mode 분류 (M1-M4) — 폐기, 2 preset(Side/Production) 으로 대체
+### NON-GOALS (intentionally excluded — do not change)
+- Cross-agent portability (`.agents` convention, `AGENTS.md` sync) — Claude-only
+- Brainstorming / systematic-debugging pre-gates — user's decision
+- Cursor / Aider / Codex compatibility — not under consideration until Phase 10+
+- Team collaboration features — hiloop's domain
+- Cloud backend — 100% local (telemetry included)
+- Replacing vault itself — vault remains the hub
+- Firmware/embedded team governance automation
+- Mode classification (M1-M4) — deprecated, replaced by 2 presets (Side/Production)
 
 ---
 
@@ -72,56 +72,58 @@
 ### Tech Stack
 | Layer | Technology | Version | Notes |
 |-------|-----------|---------|-------|
-| Language | Python | 3.12+ | 단일 언어 (Bash 사용 금지) |
+| Language | Python | 3.12+ | Single language (Bash prohibited) |
 | Package Manager | uv | latest | pyproject.toml + uv.lock |
-| Type Check | mypy | latest | strict mode, 0 error |
+| Type Check | mypy | latest | strict mode, 0 errors |
 | Linting | ruff | latest | check + format |
-| Testing | pytest | 8+ | mock 우선, integration 는 INTEGRATION=1 시 |
-| Templates | Jinja2 | 3+ | 모든 렌더링 |
-| YAML | PyYAML | 6+ | harness.yaml 파싱 |
-| LLM SDK | anthropic | latest | Claude Code subscription 활용 |
-| HTTP | httpx | latest | arxiv·GitHub·OSV.dev API |
+| Testing | pytest | 8+ | mock-first; integration tests run only when INTEGRATION=1 |
+| Templates | Jinja2 | 3+ | All rendering |
+| YAML | PyYAML | 6+ | harness.yaml parsing |
+| LLM SDK | anthropic | latest | Uses Claude Code subscription |
+| HTTP | httpx | latest | arxiv / GitHub / OSV.dev API |
 | Hash | hashlib (stdlib) | - | sha256 frontmatter |
 | RSS | feedparser | latest | Anthropic blog crawl |
-| CLI (옵션) | typer | latest | dev tooling 만 (plugin entry 는 .md) |
+| CLI (optional) | typer | latest | Dev tooling only (plugin entry is .md) |
 | CI | GitHub Actions | - | lint + test on PR |
-| License | MIT | - | LICENSE 파일 |
+| License | MIT | - | LICENSE file |
 
 ### Project Structure (Plugin = ~/harness-maker)
 ```
 harness-maker/
 ├── README.md
 ├── LICENSE                              # MIT
-├── CLAUDE.md                            # autoloop CODER 가이드
-├── TECH_SPEC.md                         # 본 문서 (vault symlink target)
+├── CLAUDE.md                            # autoloop CODER guide
+├── TECH_SPEC.md                         # this document (vault symlink target)
 ├── pyproject.toml                       # uv project
 ├── uv.lock
 ├── .gitignore
 ├── .claude-verify.sh                    # autoloop verify entry point
 ├── .claude-progress.json                # autoloop runtime state (gitignored)
 ├── .claude-plugin/
-│   └── plugin.json                      # Claude Code 공식 manifest
-├── .claude/                             # harness-maker 자체 dogfood (Phase 9)
-│   └── obsidian.json                    # vault path 가리키기
+│   └── plugin.json                      # Claude Code official manifest
+├── .claude/                             # harness-maker dogfoods itself (Phase 9)
+│   └── obsidian.json                    # points to vault path
 ├── .github/
 │   └── workflows/
 │       └── ci.yml
 ├── src/
-│   └── harness_maker/                   # Python 패키지
-│       ├── __init__.py                  # __version__ = "0.1.0"
+│   └── harness_maker/                   # Python package
+│       ├── __init__.py                  # __version__ = "0.7.1"
 │       ├── cli.py                       # dev tooling (typer)
 │       ├── i18n.py                      # locale resolver
-│       ├── profile.py                   # 시그널 추출
-│       ├── interview.py                 # preset + 차원 인터뷰
+│       ├── profile.py                   # signal extraction
+│       ├── interview.py                 # preset + dimension interview
 │       ├── synthesize.py                # preset + answers → blueprint
-│       ├── reconcile.py                 # Brownfield 충돌 해결
-│       ├── render.py                    # Jinja2 렌더 + frontmatter 부착
+│       ├── reconcile.py                 # brownfield conflict resolution
+│       ├── render.py                    # Jinja2 render + frontmatter attachment
 │       ├── verify.py                    # smoke (yaml lint, hooks parse, frontmatter)
 │       ├── modular_edit.py              # --add / --remove
 │       ├── workflow_fuse.py             # atomic stages → fused workflow command
 │       ├── telemetry.py                 # post-tool-use hook
-│       ├── context_lint.py              # 길이 + 중요도 lint
-│       ├── provenance.py                # frontmatter 부착·검증
+│       ├── context_lint.py              # length + importance lint
+│       ├── provenance.py                # frontmatter attachment and validation
+│       ├── _metrics_io.py               # ADR-103: daily-rotated metrics reader
+│       ├── _locking.py                  # ADR-106: re-entrant exclusive_lock
 │       ├── crawler/
 │       │   ├── __init__.py
 │       │   ├── anthropic_blog.py
@@ -130,21 +132,23 @@ harness-maker/
 │       │   ├── osv_dev.py
 │       │   └── reference_repos.py
 │       ├── relevance.py                 # adaptive threshold filter
-│       ├── readiness.py                 # Health 6-dim 계산
+│       ├── readiness.py                 # Health 6-dimension calculation
 │       ├── agent_quality.py             # Platinum/Gold/Silver/Bronze
-│       ├── conditional_router.py        # 변경 영역 → reviewer 선택
-│       ├── worktree.py                  # git worktree 라이프사이클
-│       ├── security_scanner.py          # 5 gates orchestrator
+│       ├── conditional_router.py        # changed area → reviewer selection
+│       ├── worktree.py                  # git worktree lifecycle
+│       ├── security_scanner.py          # 7-gate orchestrator (ADR-101)
 │       ├── secscan/
 │       │   ├── secrets.py
 │       │   ├── permissions.py
 │       │   ├── hook_injection.py
 │       │   ├── dependency_cves.py
-│       │   └── prompt_injection.py
-│       └── autoloop_driver.py           # /hm:loop 의 driver
-├── commands/                            # 메타-툴은 단 1개 명령
+│       │   ├── prompt_injection.py
+│       │   ├── hallucination.py         # ADR-105: pure-filesystem gate
+│       │   └── prod_name_guard.py       # ADR-101: production-name guard
+│       └── autoloop_driver.py           # /hm:loop driver
+├── commands/                            # meta-tool has exactly 1 command
 │   └── make.md                          # /harness-maker:make
-├── skills/                              # 메타-툴 자체 skills
+├── skills/                              # meta-tool's own skills
 │   ├── profile-project/SKILL.md
 │   ├── interview-config/SKILL.md
 │   ├── synthesize-blueprint/SKILL.md
@@ -152,7 +156,7 @@ harness-maker/
 │   ├── render-blueprint/SKILL.md
 │   ├── verify-harness/SKILL.md
 │   └── modular-edit/SKILL.md
-├── templates/                           # ★ 사용자 .claude/ 로 렌더되는 자산
+├── templates/                           # ★ assets rendered into the user's .claude/
 │   ├── harness-yaml/
 │   │   ├── Side.yaml.j2
 │   │   └── Production.yaml.j2
@@ -179,8 +183,8 @@ harness-maker/
 │   │   └── verify.md.j2
 │   ├── commands/                        # → user .claude/commands/hm/
 │   │   └── hm/
-│   │       ├── atomic_command.md.j2     # 7 atomic 각각 렌더
-│   │       ├── workflow_command.md.j2   # fused workflow 각각 렌더
+│   │       ├── atomic_command.md.j2     # renders each of the 7 atomics
+│   │       ├── workflow_command.md.j2   # renders each fused workflow
 │   │       ├── loop.md.j2               # /hm:loop
 │   │       ├── monitor.md.j2            # /hm:monitor
 │   │       └── refresh.md.j2            # /hm:refresh
@@ -212,7 +216,7 @@ harness-maker/
 │       └── dashboard.en.md.j2
 └── tests/
     ├── conftest.py
-    ├── unit/                            # 단위 테스트 (mock 위주)
+    ├── unit/                            # unit tests (mock-first)
     │   ├── test_profile.py
     │   ├── test_interview.py
     │   ├── test_synthesize.py
@@ -235,7 +239,7 @@ harness-maker/
     │       ├── test_github_releases.py
     │       ├── test_arxiv.py
     │       └── test_osv_dev.py
-    ├── fixtures/                        # 합성 검증용 가짜 프로젝트
+    ├── fixtures/                        # synthetic projects for render validation
     │   ├── side-python-cli/             # Side x Python
     │   ├── side-tauri-app/              # Side x Tauri
     │   ├── prod-tauri-app/              # Production x Tauri
@@ -245,7 +249,7 @@ harness-maker/
     │   ├── side-tauri-app.expected.yaml
     │   ├── prod-tauri-app.expected.yaml
     │   └── prod-firmware.expected.yaml
-    ├── integration/                     # INTEGRATION=1 시만
+    ├── integration/                     # run only when INTEGRATION=1
     │   ├── test_make_greenfield.py
     │   ├── test_make_brownfield.py
     │   ├── test_refresh_real_crawl.py
@@ -255,98 +259,108 @@ harness-maker/
 ```
 
 ### Code Style
-- 파일 상단 1-line docstring (모듈 목적)
-- 함수 docstring: WHY only (WHAT 은 코드)
-- 주석 최소 — non-obvious 만
-- 변수·함수명 영어 / 사용자 출력은 locale 따름
-- 에러 메시지: locale=ko 시 한국어 + system error 영어 그대로
-- mypy strict 통과 (Any 금지, 명시적 type hint)
-- ruff 모든 룰 통과 (선택 룰셋: E, F, W, I, N, UP, B, A, C4, RET, SIM, PT)
+- 1-line module docstring at the top of every file (states module purpose)
+- Function docstrings: WHY only (WHAT is expressed by the code)
+- Comments minimal — non-obvious cases only
+- Variable and function names in English; user-facing output follows locale
+- Error messages: Korean when locale=ko, system errors left in English verbatim
+- mypy strict must pass (Any prohibited, explicit type hints required)
+- ruff all selected rules must pass (rulesets: E, F, W, I, N, UP, B, A, C4, RET, SIM, PT)
 
-### Git 정책
-- 커밋: `<type>: <subject>` 또는 autoloop 자동 형식 `autoloop(harness-maker): phase N - <name>`
+### Git Policy
+- Commit format: `<type>: <subject>` or autoloop auto-format `autoloop(harness-maker): phase N - <name>`
 - type: `feat | fix | chore | ci | test | docs | refactor`
-- **No remote** — local commits only. push 금지.
-- 모든 phase wrapup stage 에서 자동 commit
+- **No remote** — local commits only. Push prohibited.
+- Auto-commit runs at the wrapup stage of every phase
 
-### 외부 API 정책
-- LLM 호출은 Claude Code subscription 통해 (API key 없이)
-- arxiv·GitHub·OSV.dev: unauthenticated, `~/.cache/harness-maker/` 캐시 공유
-- 외부 호출은 fixture mock 우선. 실제 호출은 INTEGRATION=1 env 시만.
+### External API Policy
+- LLM calls go through Claude Code subscription (no API key required)
+- arxiv / GitHub / OSV.dev: unauthenticated, shared cache at `~/.cache/harness-maker/`
+- External calls use fixture mocks by default. Real calls only when INTEGRATION=1 env is set.
 
-### 보안 / 권한 (v1.6, REVIEW-2026-05-08 개정)
+### Security / Permissions (v1.6, revised REVIEW-2026-05-08)
 - **Reviewer agent** (code, security, perf, ux, concurrency, security-auditor, consensus-arbiter):
   - allow: `[Read(*), Grep(*), Glob(*), Bash(git diff:*), Bash(git log:*), Bash(git status:*)]`
   - deny: `[Write(*), Edit(*), Bash(rm:*), Bash(curl:*), Bash(npm:*), Bash(eval *), Bash(python:*), Bash(node:*), Bash(sh:*), Bash(bash:*)]`
-  - **Why interpreter denies** (0.6.2 REVIEW M7): `Bash(rm:*)` 차단만으로는 `Bash(python -c "import os; os.system('rm …')")` 우회 가능. 모든 인터프리터 호출 deny.
+  - **Why interpreter denies** (0.6.2 REVIEW M7): blocking only `Bash(rm:*)` can be bypassed via `Bash(python -c "import os; os.system('rm …')")`. All interpreter invocations are denied.
 - **Executor agent** (autoloop-coder, executor):
   - allow: `[Read(*), Grep(*), Glob(*), Write(.worktrees/**), Edit(.worktrees/**), Bash(uv run:*), Bash(pytest:*), Bash(npm test:*), Bash(cargo test:*), Bash(git diff:*), Bash(git log:*), Bash(git status:*)]`
   - deny: `[Write(/etc/**), Write(~/.ssh/**), Write(~/.aws/**), Edit(/etc/**), Edit(~/.ssh/**), Edit(~/.aws/**), Bash(curl * | sh), Bash(eval *), Bash(rm -rf /:*)]`
-  - **Why Edit/Write 페어** (0.6.2 REVIEW M1): `Write(/etc/**)` 만 deny 면 `Edit(/etc/sudoers)` 로 같은 파일 수정 가능. 모든 시스템 경로는 Write + Edit 페어로 deny.
-- 모든 generated 파일은 frontmatter:
+  - **Why Edit/Write pairing** (0.6.2 REVIEW M1): denying only `Write(/etc/**)` still allows `Edit(/etc/sudoers)` to modify the same file. All system paths require both Write and Edit to be denied as a pair.
+- Security gates expanded from 5 to 7 in 0.7.1 (ADR-101): added hallucination gate (pure-filesystem, never imports — ADR-105) and production-name guard.
+- All generated files include frontmatter:
   ```yaml
   generated_by: harness-maker
-  harness_maker_version: "0.1.0"
+  harness_maker_version: "0.7.1"
   generated_at: "<ISO-8601>"
   source_template: "templates/<path>"
   content_hash: "sha256:<hex>"
   provenance: "official"  # official | community | user-modified
   ```
 
-### Context Lint (v1.6)
-| 자산 | Side 한계 | Production 한계 |
-|---|---|---|
-| CLAUDE.md | 200 행 | 500 행 |
-| agent prompt | 100 행 | 200 행 |
-| skill SKILL.md | 50 행 | 150 행 |
-| workflow command (fused) | 300 행 | 600 행 |
+### Telemetry (ADR-102, ADR-103)
+- cwd resolution order: `CLAUDE_PROJECT_DIR → CURSOR_PROJECT_DIR → workspace.current_dir → os.getcwd()`. Stdin `cwd` is not consulted.
+- Metrics rotate daily as `metrics-YYYY-MM-DD.jsonl`. Reader: `harness_maker._metrics_io.iter_recent_entries` (ADR-103).
+- Read-staleness policy: doc-only; no LOCK_SH (ADR-104).
+- tool_input whitelist + secret-prefix redaction (`sk-` / `ghp_` / `AKIA` / `Bearer`) applied before the 256-char cap (ADR-107).
+- drift_monitor XML fence uses open+close defang (ADR-108).
+- `_locking.exclusive_lock` is re-entrant via `threading.local` (ADR-106).
+- 100% local telemetry — no external transmission.
 
-초과 시 renderer 가 warn (override: `harness.yaml.context_lint.strict: false`).
+### Context Lint (v1.6)
+| Asset | Side limit | Production limit |
+|---|---|---|
+| CLAUDE.md | 200 lines | 500 lines |
+| agent prompt | 100 lines | 200 lines |
+| skill SKILL.md | 50 lines | 150 lines |
+| workflow command (fused) | 300 lines | 600 lines |
+
+When exceeded, the renderer emits a warning (override: `harness.yaml.context_lint.strict: false`).
 
 ---
 
 ## 3. Architecture
 
-### 시스템 묘사
+### System Overview
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
-│                            사용자                                     │
-│                  /harness-maker:make  (단 하나)                       │
+│                              User                                     │
+│                  /harness-maker:make  (single entry point)            │
 │           [--audit | --add X | --remove X | --promote]                │
-└────────────────────────────────┬─────────────────────────────────────┘
-                                 │
-            ┌────────────────────┴─────────────────────┐
-            │   harness-maker 플러그인 (메타-툴)         │
-            │   역할: 사용자 .claude/ 를 생성·갱신만     │
-            ├────────────────────────────────────────┤
-            │  ① Profiler          (시그널 추출)        │
-            │  ② Interviewer       (Preset + 10+ 차원) │
-            │  ③ Synthesizer       (preset → blueprint)│
-            │  ④ Reconciler        (Brownfield 충돌)   │
+└────────────────────────────┬─────────────────────────────────────────┘
+                             │
+            ┌────────────────┴─────────────────────────┐
+            │   harness-maker plugin (meta-tool)        │
+            │   Role: generate and update user .claude/ │
+            ├──────────────────────────────────────────┤
+            │  ① Profiler          (signal extraction)  │
+            │  ② Interviewer       (Preset + 10+ dims)  │
+            │  ③ Synthesizer       (preset → blueprint) │
+            │  ④ Reconciler        (Brownfield conflicts)│
             │  ⑤ Renderer          (Jinja2 + frontmatter)│
-            │  ⑥ Verifier          (smoke 검증)         │
-            │  ⑦ ModularEditor     (--add / --remove)  │
-            │  ⑧ I18n              (locale 인지)        │
-            │  자체 업데이트: Claude Code plugin auto-update │
-            └────────────────────────────────────────┘
-                                 │  생성·렌더
-                                 ▼
+            │  ⑥ Verifier          (smoke verification) │
+            │  ⑦ ModularEditor     (--add / --remove)   │
+            │  ⑧ I18n              (locale awareness)   │
+            │   Self-update: Claude Code plugin auto-update │
+            └──────────────────────────────────────────┘
+                             │  generate · render
+                             ▼
         ┌─────────────────────────────────────────────────────┐
-        │  <project>/.claude/  (생성된 하네스 = 모든 런타임)      │
+        │  <project>/.claude/  (generated harness = all runtime)  │
         │  ├── harness.yaml       (single source of truth)     │
         │  ├── settings.json      (permissions)                │
         │  ├── commands/                                        │
         │  │   └── hm/                                          │
         │  │       ├── research.md ┐                            │
         │  │       ├── spec.md     │                            │
-        │  │       ├── plan.md     ├ atomic stages (항상 7개)   │
+        │  │       ├── plan.md     ├ atomic stages (always 7)  │
         │  │       ├── execute.md  │   /hm:<stage>              │
         │  │       ├── review.md   │                            │
         │  │       ├── wrapup.md   │                            │
         │  │       ├── verify.md   ┘                            │
         │  │       ├── dev.md      ┐                            │
-        │  │       ├── careful.md  ├ workflows (사용자 명명)     │
+        │  │       ├── careful.md  ├ workflows (user-named)     │
         │  │       ├── ...         ┘                            │
         │  │       ├── loop.md       → /hm:loop                 │
         │  │       ├── monitor.md    → /hm:monitor              │
@@ -366,7 +380,7 @@ harness-maker/
         └─────────────────────────────────────────────────────┘
 ```
 
-### Data Model (핵심 Pydantic 모델)
+### Data Model (Core Pydantic Models)
 
 ```python
 # src/harness_maker/models.py
@@ -403,7 +417,7 @@ class ProjectProfile(BaseModel):
     scale: str  # small | medium | large
     lifecycle: str  # experiment | active | maintenance
     existing_dotclaude: bool
-    spec_only: bool  # TECH_SPEC.md 만 있는 경우
+    spec_only: bool  # True when only TECH_SPEC.md is present
     vault_member: bool
 
 class WorkflowDef(BaseModel):
@@ -437,7 +451,7 @@ class Blueprint(BaseModel):
     
 class FileEntry(BaseModel):
     """One file to render."""
-    path: Path  # .claude/commands/hm/dev.md 같은 상대 경로
+    path: Path  # relative path such as .claude/commands/hm/dev.md
     template: str  # templates/commands/hm/workflow_command.md.j2
     context: dict  # Jinja2 context vars
     frontmatter: dict  # provenance fields
@@ -453,103 +467,107 @@ class ConflictItem(BaseModel):
     decision: ReconcileDecision | None = None
 ```
 
-### 핵심 메커니즘 (모두 Phase 4-8 에서 구현)
+### Core Mechanisms (all implemented in Phases 4–8)
 
 **(M1) Profiler → Interviewer → Synthesizer → Renderer pipeline (Phase 2)**
-1. Profiler 가 stack/scale/lifecycle/existing_dotclaude/spec_only 감지
-2. Interviewer 가 preset 추천 + 10+ 차원 override Q (workflow naming, reviewers, models, autoloop, anti-rot, worktree, security, context_lint, memory, caching). 추가 축: `targets` (claude-code / cursor / both), `recommended_model` (default: claude-opus-4-7). Locale 기본값 English (DEFAULT_LOCALE="en"), 한국어 메시지 내장, 미지원 locale → en silent fallback.
-3. Synthesizer 가 deterministic 매핑 → Blueprint
-4. Renderer 가 Jinja2 + provenance frontmatter 부착해 .claude/ 에 출력 (M14 활성 시 .cursor/ 추가 출력)
+1. Profiler detects stack / scale / lifecycle / existing_dotclaude / spec_only
+2. Interviewer presents preset recommendation + 10+ dimension override questions (workflow naming, reviewers, models, autoloop, anti-rot, worktree, security, context_lint, memory, caching). Additional axes: `targets` (claude-code / cursor / both), `recommended_model` (default: claude-opus-4-7). Locale default is English (DEFAULT_LOCALE="en"); Korean messages are built-in; unsupported locales fall back to en silently.
+3. Synthesizer performs deterministic mapping → Blueprint
+4. Renderer attaches Jinja2 + provenance frontmatter and writes to .claude/ (when M14 is active, also writes to .cursor/)
 
-**(M2) Reconciler — Brownfield 충돌 해결 (Phase 5)**
-- 기존 .claude/ 인덱싱 → 신규 blueprint 충돌 후보 N
-- 항목별 사용자 선택 (keep/replace/both) — autoloop 환경에선 frontmatter hash 기반 자동 결정
-- Hash 일치 = 우리 것 (overwrite 안전), Hash 없음/불일치 = 사용자/타 출처 (보존)
-- backup → `.claude/.backup-<date>/` → ADD-only apply
+**(M2) Reconciler — Brownfield Conflict Resolution (Phase 5)**
+- Indexes existing .claude/ → identifies N conflict candidates against the new blueprint
+- Per-item user choice (keep/replace/both) — in autoloop environments, decisions are made automatically based on frontmatter hash
+- Hash match = ours (safe to overwrite); hash absent/mismatch = user or third-party origin (preserve)
+- Backup → `.claude/.backup-<date>/` → ADD-only apply
 
 **(M3) Workflow Engine — atomic + fused (Phase 5)**
-- Atomic stage 7개 → 각각 `/hm:<stage>` 자동 노출
-- Workflow = 사용자 명명 stage 시퀀스 → Renderer 가 fragment 합성 → 단일 `/hm:<name>` 명령
-- `harness.yaml.workflows` 키에 정의, `/harness-maker:make` 재실행으로 추가 가능
+- 7 atomic stages → each automatically exposed as `/hm:<stage>`
+- Workflow = user-named stage sequence → Renderer synthesizes fragments → single `/hm:<name>` command
+- Defined under `harness.yaml.workflows` key; additional workflows can be added by re-running `/harness-maker:make`
 
 **(M4) Anti-rot (Phase 4)**
-3-Stage 파이프라인:
-1. Crawl (주 1회): Anthropic blog/changelog + GitHub releases (`anthropics/claude-code` 기본값) + arxiv (cs.SE/cs.CL/cs.CR) + OSV.dev
-2. Filter (LLM): adaptive threshold (start 0.7, accept/reject 비율 따라 ±0.05)
-3. Propose: `/hm:refresh` 가 AskUserQuestion (accept/reject/defer). **항상 manual confirm.**
+3-stage pipeline:
+1. Crawl (weekly): Anthropic blog/changelog + GitHub releases (`anthropics/claude-code` by default) + arxiv (cs.SE/cs.CL/cs.CR) + OSV.dev
+2. Filter (LLM): adaptive threshold (starts at 0.7, adjusts ±0.05 based on accept/reject ratio)
+3. Propose: `/hm:refresh` issues AskUserQuestion (accept/reject/defer). **Manual confirm always required.**
 
-**(M5) Monitoring 3 metrics (Phase 3)**
-- 효율 (cache hit %) — 매 turn, `/hm:ai-readiness` 리포트 🪙. PostToolUse telemetry hook 에서 수집 (0.5.4+ hybrid schema: Claude Code + Cursor IDE 공용)
-- Health (0-100) — 6-dim (docs/tests/CI/obs/security/governance) + Agent quality drill-down (Platinum/Gold/Silver/Bronze) + ceremony penalty
-- fresh (days since refresh) — 🔄
-- **SessionStart drift reminder** (0.5.6+): 세션 시작 시 실행 중인 harness-maker 버전과 harness 렌더 당시 버전이 다르면 경고 (sessionstart_drift.py hook)
-- Telemetry 100% 로컬 (`metrics.jsonl` 외부 전송 0)
+**(M5) Monitoring — 3 metrics (Phase 3)**
+- Efficiency (cache hit %) — collected every turn, reported in `/hm:ai-readiness` report. Collected via PostToolUse telemetry hook (0.5.4+ hybrid schema: shared by Claude Code and Cursor IDE). ADR-103: `metrics.jsonl` is rotated daily; use `_metrics_io.iter_recent_entries` to read across rotation boundaries.
+- Health (0–100) — 6-dim (docs/tests/CI/obs/security/governance) + Agent quality drill-down (Platinum/Gold/Silver/Bronze) + ceremony penalty
+- Freshness (days since refresh)
+- **SessionStart drift reminder** (0.5.6+): warns at session start when the running harness-maker version differs from the version that rendered the current harness (sessionstart_drift.py hook)
+- Telemetry is 100% local (`metrics.jsonl` — zero external transmission)
 
 **(M6) Conditional Router (Phase 5)**
-- 변경 파일 영역 → reviewer 자동 선택
-- auth/.env → security · perf-critical → performance · ui/.tsx → ux · worker/thread/isr → concurrency
-- override: `harness.yaml.reviewers.routing: always-all`
+- Changed-file region → automatic reviewer selection
+- auth/.env → security; perf-critical → performance; ui/.tsx → ux; worker/thread/isr → concurrency
+- Override: `harness.yaml.reviewers.routing: always-all`
 
 **(M7) Autoloop driver (Phase 6)**
 - `/hm:loop "<goal>" [--mode feature|improve] [--time 8h] [--max-iter 30] [--per-iter-workflow X] [--dry-run]`
-- **feature mode** (default): goal/spec 기반, coverage-driven adaptive interview → 수렴까지 반복
-- **improve mode** (0.4.7+): quality target / `--target` 경로 기반, exec-rev 반복 후 convergence predicate 충족 시 종료
-- Token 무제한, 시간·iter 만 limit
-- **Per-loop 단일 worktree** (0.5.5+): loop start 시 1개 worktree, 전 iter 공유. per-iter-workflow 기본값 exec-rev (wrapup 은 loop close 시 1회)
-- iter 5회마다 사용자 ping, 3회 연속 실패 → stop
+- **feature mode** (default): goal/spec-driven, coverage-driven adaptive interview → iterates until convergence
+- **improve mode** (0.4.7+): quality-target / `--target`-path driven; repeats exec-rev cycles until the convergence predicate is satisfied
+- Token budget is unlimited; only time and iteration count are limited
+- **Single worktree per loop** (0.5.5+): one worktree is created at loop start and shared across all iterations; per-iter-workflow defaults to exec-rev (wrapup runs once at loop close). ADR-106: worktree acquisition uses a re-entrant flock to prevent concurrent loop invocations from racing on the same worktree path.
+- User ping every 5 iterations; 3 consecutive failures → stop
 
-**(M8) Verify-before-completion 게이트 (Phase 6)**
-- `/hm:wrapup` 또는 autoloop iter 완료 직전 자동 호출
-- 체크리스트: PLAN/SPEC 충족 / 회귀 게이트 / Health -5 이내 / Anti-rot pending / 보안 high finding 0건 / Worktree merge 가능
+**(M8) Verify-before-completion gate (Phase 6)**
+- Invoked automatically just before `/hm:wrapup` or autoloop iteration completion
+- Checklist: PLAN/SPEC fulfilled / regression gate / Health within -5 / Anti-rot pending / 0 security high findings / worktree mergeable
 
-**(M9) Worktree 격리 (Phase 7)**
-- `/hm:execute` 시 자동 git worktree 생성 (`.worktrees/<workflow>-<ts>/` — 프로젝트 루트 기준, `.claude/` 내부 X)
-- LLM 이 worktree 안에서만 파일 수정
-- 성공 시 cleanup, 실패 시 보존
-- prefix-match cleanup (`phase-*`, `autoloop-*`, `execute-*`): Cursor 가 같은 `.worktrees/` 를 공유해도 타 도구 worktree 건드리지 않음
+**(M9) Worktree isolation (Phase 7)**
+- `/hm:execute` automatically creates a git worktree (`.worktrees/<workflow>-<ts>/` — relative to project root, not inside `.claude/`)
+- LLM modifies files only within the worktree
+- Cleanup on success; preserved on failure
+- Prefix-match cleanup (`phase-*`, `autoloop-*`, `execute-*`): does not touch worktrees owned by other tools even when Cursor shares the same `.worktrees/` directory. ADR-106: the re-entrant flock guards the cleanup path as well, ensuring concurrent wrapup and loop-close do not double-free the same worktree.
 
-**(M10) 5 Security Gates (Phase 7)**
-| 검사 | 기법 | 트리거 |
+**(M10) 7 Security Gates (Phase 7)**
+| Check | Technique | Trigger |
 |---|---|---|
 | secrets | regex + entropy (gitleaks-style) | pre_commit · pre_wrapup · refresh |
-| permissions | settings.json `allow` 과확장 검사 | refresh · /harness-maker:make |
-| hook injection | hooks.json 위험 명령 (rm -rf, curl pipe sh, eval) AST | pre_wrapup · refresh |
-| dependency CVEs | OSV.dev 조회 (package-lock·Cargo.lock·requirements.txt) | weekly |
-| prompt injection | hidden instruction 패턴 + 권한 분리 architecture | LLM 호출 직전 |
+| permissions | settings.json `allow` over-expansion check | refresh · /harness-maker:make |
+| hook injection | hooks.json dangerous-command AST (rm -rf, curl pipe sh, eval) | pre_wrapup · refresh |
+| dependency CVEs | OSV.dev lookup (package-lock / Cargo.lock / requirements.txt) | weekly |
+| prompt injection | hidden-instruction patterns + privilege-separation architecture | before each LLM call |
+| hallucination guard | LLM output cross-checked against known identifiers before apply | pre_wrapup · autoloop iter |
+| prod-name guard | blocks use of production resource names (DBs, buckets) in generated commands | pre_commit · pre_wrapup |
+
+(Gate count raised from 5 to 7 in 0.7.1: hallucination guard and prod-name guard added.)
 
 **(M11) Context Lint (Phase 8)**
-- Renderer Apply 직전 길이·중요도 검사. 초과 시 warn + 자동 요약 제안.
+- Length and importance check run immediately before Renderer apply. Violations emit a warning and automatically suggest a summary.
 
-**(M12) Privilege Separation (Phase 8, hardened 0.6.2)**
-- Agent YAML frontmatter `permissions: {allow, deny}` (Cursor 2.5+ subagent permission inheritance gap 대응 — 부모 → 자식 cascade 안 됨, 명시 per-agent)
-- Reviewer: deny `[Write(*), Edit(*), Bash(rm|curl|npm|eval|python|node|sh|bash:*)]` — 인터프리터 우회 차단
-- Executor: allow `[Write(.worktrees/**), Edit(.worktrees/**), Bash(uv run|pytest|...)]`; deny system paths Write **+ Edit pair** `[Write(/etc/**), Edit(/etc/**), Write(~/.ssh/**), Edit(~/.ssh/**), Write(~/.aws/**), Edit(~/.aws/**)]`
-- Worktree 와 결합 → 격리·분리 이중 방어
+**(M12) Privilege Separation (Phase 8, hardened 0.7.1)**
+- Agent YAML frontmatter `permissions: {allow, deny}` (addresses Cursor 2.5+ subagent permission-inheritance gap — parent-to-child cascade does not occur; permissions must be declared per-agent explicitly)
+- Reviewer: deny `[Write(*), Edit(*), Bash(rm|curl|npm|eval|python|node|sh|bash:*)]` — blocks interpreter-based bypass
+- Executor: allow `[Write(.worktrees/**), Edit(.worktrees/**), Bash(uv run|pytest|...)]`; deny system paths as Write **+ Edit pairs** `[Write(/etc/**), Edit(/etc/**), Write(~/.ssh/**), Edit(~/.ssh/**), Write(~/.aws/**), Edit(~/.aws/**)]`
+- Combined with Worktree isolation → dual-layer defense of isolation and separation
 
 **(M13) Provenance Frontmatter (Phase 8)**
-- 모든 생성 자산 상단 frontmatter (generated_by, harness_maker_version, content_hash, source_template, generated_at, provenance)
-- `/hm:refresh` 가 hash 비교 → 사용자 수정 감지 → silent overwrite 차단
-- Brownfield reconcile 가 frontmatter 로 ours/theirs 판별
-- 버전 번호는 **4개 파일 동시 변경** 필수: `.claude-plugin/plugin.json` · `.cursor-plugin/plugin.json` · `pyproject.toml` · `src/harness_maker/__init__.py`. 누락 시 marketplace 가 이전 버전으로 오보.
+- All generated assets carry a frontmatter header (generated_by, harness_maker_version, content_hash, source_template, generated_at, provenance)
+- `/hm:refresh` compares hashes → detects user modifications → blocks silent overwrite
+- Brownfield reconcile uses frontmatter to distinguish ours from theirs
+- Version numbers must be updated in **4 files simultaneously**: `.claude-plugin/plugin.json` · `.cursor-plugin/plugin.json` · `pyproject.toml` · `src/harness_maker/__init__.py`. Missing any one causes the marketplace to report the previous version. ADR-108: when rendering drift diffs, XML fence delimiters are defanged (both open and close tags) to prevent the diff content from being interpreted as live tool calls.
 
 **(M14) Dual-IDE Rendering — Cursor target (0.5.0+)**
-- `HarnessConfig.targets: list[Target]` — 사용자가 인터뷰에서 명시 선택 (auto-detect 금지)
-- Single-source `.claude/` 자산 (agents, skills, commands, hooks): Cursor 2.4+ 가 native 로 읽어 양쪽 IDE 공유
-- Cursor-only 자산 (`targets` 에 cursor 포함 시만 렌더):
-  - `.cursor/rules/harness.mdc` — `_render_cursor_mdc()`: Cursor 허용 frontmatter (description/globs/alwaysApply) 만 포함, content_hash 제외
-  - `.cursor/mcp.json` — `_render_pure_text()`: pure JSON, frontmatter 0
-- Dual plugin manifest: `.claude-plugin/plugin.json` (Claude Code marketplace) + `.cursor-plugin/plugin.json` (Cursor Marketplace) — schema 동일, 버전 동기화 필수
-- `recommended_model: claude-opus-4-7` — agent frontmatter 에 전파. 사용자 override 허용. prompt 자체 모델 중립화 X (`<thinking>` 등 Claude-specific 표현 유지).
+- `HarnessConfig.targets: list[Target]` — user makes an explicit selection during the interview (auto-detection is prohibited)
+- Single-source `.claude/` assets (agents, skills, commands, hooks): Cursor 2.4+ reads these natively, so both IDEs share one copy
+- Cursor-only assets (rendered only when `cursor` is present in `targets`):
+  - `.cursor/rules/harness.mdc` — `_render_cursor_mdc()`: includes only Cursor-accepted frontmatter fields (description/globs/alwaysApply); excludes content_hash
+  - `.cursor/mcp.json` — `_render_pure_text()`: pure JSON, zero frontmatter
+- Dual plugin manifests: `.claude-plugin/plugin.json` (Claude Code Marketplace) + `.cursor-plugin/plugin.json` (Cursor Marketplace) — schemas are identical; version synchronization is mandatory
+- `recommended_model: claude-opus-4-7` — propagated to agent frontmatter. User override permitted. Prompts themselves are not neutralized for model (`<thinking>` and other Claude-specific expressions are preserved). ADR-107: tool_input fields passed through telemetry hooks are filtered against a whitelist; any field matching a secret pattern (API keys, tokens, passwords) is redacted before writing to `metrics.jsonl`.
 
-### Preset 디폴트 비교
+### Preset Default Comparison
 
-| 차원 | Side | Production |
+| Dimension | Side | Production |
 |---|---|---|
 | Reviewers | `[code]` (1) | `[code, security, perf, ux, concurrency]` (5) |
 | Consensus | cross-check | cross-check |
 | Routing | conditional | conditional |
 | Caching | aggressive | aggressive |
-| Workflow 추천 시드 | dev=[plan,execute,review,wrapup] + quick=[execute] | 위 + careful=[research,spec,plan,execute,review,wrapup,verify] + audit=[review] |
+| Recommended workflow seeds | dev=[plan,execute,review,wrapup] + quick=[execute] | above + careful=[research,spec,plan,execute,review,wrapup,verify] + audit=[review] |
 | default_workflow | dev | dev |
 | Model preset_default | sonnet | sonnet |
 | Autoloop allowed | true | true |
@@ -560,8 +578,8 @@ class ConflictItem(BaseModel):
 | Verify-before-completion | optional | required |
 | Worktree scope | [execute] | [execute, plan] |
 | Security on_finding.high | warn | block |
-| Context lint | enabled | enabled (더 엄격) |
-| 파일 개수 (대략) | 25-30 | 35-45 |
+| Context lint | enabled | enabled (stricter) |
+| Approximate file count | 25–30 | 35–45 |
 
 ---
 
@@ -569,55 +587,55 @@ class ConflictItem(BaseModel):
 
 ### Phase 1: Project Scaffold + Plugin Manifest + i18n MVP
 
-**Objective:** Python 패키지 + uv + 공식 plugin manifest + i18n 모듈 + Q1 locale 동작.
+**Objective:** Python package + uv + official plugin manifest + i18n module + Q1 locale working.
 
-**Research targets (autoloop Stage 1 자동 fetch):**
+**Research targets (autoloop Stage 1 auto-fetch):**
 - Claude Code plugin manifest spec: https://code.claude.com/docs/en/plugins
-- Claude Code plugins reference (전체 schema): https://code.claude.com/docs/en/plugins-reference
-- uv 사용법: https://docs.astral.sh/uv/
+- Claude Code plugins reference (full schema): https://code.claude.com/docs/en/plugins-reference
+- uv usage: https://docs.astral.sh/uv/
 - pyproject.toml schema: https://packaging.python.org/en/latest/specifications/pyproject-toml/
 
 #### Tasks
 
-- **Task 1.0: 환경 precheck (fail fast)**
-  - Do: 빌드 환경 검증 — (a) `command -v uv` (uv 설치 확인, 없으면 설치 안내 출력 후 STOP), (b) `python3 --version` 가 3.12+ (없으면 STOP), (c) `command -v git` 및 `git rev-parse --git-dir` (현재 repo 가 git-init 되어있는지 — 이미 됐어야 함), (d) `mkdir -p ~/.cache/harness-maker && touch ~/.cache/harness-maker/.write-test && rm ~/.cache/harness-maker/.write-test` (캐시 디렉토리 쓰기 가능). 모든 체크 통과 시 진행, 하나라도 실패 시 명확한 에러 메시지 + STOP.
-  - Files: `.claude-verify.sh` 의 `phase_1_env` 만 호출 (별도 신규 파일 X — verify script 가 환경 검증 담당)
-  - Done when: `bash .claude-verify.sh phase_1_env` 가 exit 0
+- **Task 1.0: Environment precheck (fail fast)**
+  - Do: Validate build environment — (a) `command -v uv` (confirm uv is installed; if missing, print install instructions and STOP), (b) `python3 --version` is 3.12+ (if not, STOP), (c) `command -v git` and `git rev-parse --git-dir` (confirm current repo is git-initialized — it should already be), (d) `mkdir -p ~/.cache/harness-maker && touch ~/.cache/harness-maker/.write-test && rm ~/.cache/harness-maker/.write-test` (confirm cache directory is writable). Proceed only if all checks pass; on any failure, print a clear error message and STOP.
+  - Files: invoke only `phase_1_env` in `.claude-verify.sh` (no new separate file — the verify script handles environment validation)
+  - Done when: `bash .claude-verify.sh phase_1_env` exits 0
   - Verify: `bash .claude-verify.sh phase_1_env`
-  - Commit: (no commit — verify-only task, env 가 OK 면 다음 task 로 진행)
+  - Commit: (no commit — verify-only task; if env is OK, proceed to next task)
 
-- **Task 1.1: uv 프로젝트 초기화**
-  - Do: `uv init --package` 실행 후 pyproject.toml 설정 — name="harness-maker", version="0.1.0", python ">=3.12", license="MIT", deps=[jinja2>=3, pyyaml>=6, pydantic>=2, anthropic, httpx, feedparser, typer, rich], dev=[pytest>=8, pytest-asyncio, ruff, mypy]. ruff config (E,F,W,I,N,UP,B,A,C4,RET,SIM,PT 룰셋). mypy strict.
+- **Task 1.1: uv project initialization**
+  - Do: Run `uv init --package` then configure pyproject.toml — name="harness-maker", version="0.1.0", python ">=3.12", license="MIT", deps=[jinja2>=3, pyyaml>=6, pydantic>=2, anthropic, httpx, feedparser, typer, rich], dev=[pytest>=8, pytest-asyncio, ruff, mypy]. ruff config (E,F,W,I,N,UP,B,A,C4,RET,SIM,PT ruleset). mypy strict.
   - Files: `pyproject.toml`, `uv.lock`, `src/harness_maker/__init__.py` (with `__version__ = "0.1.0"`)
-  - Done when: `uv sync` 성공, `uv run python -c "import harness_maker; print(harness_maker.__version__)"` 가 "0.1.0" 출력
+  - Done when: `uv sync` succeeds, `uv run python -c "import harness_maker; print(harness_maker.__version__)"` prints "0.1.0"
   - Verify: `bash .claude-verify.sh phase_1_uv`
   - Commit: `feat(phase1): initialize uv project with core dependencies`
 
-- **Task 1.2: 공식 Plugin manifest**
-  - Do: `.claude-plugin/plugin.json` 생성 — name="harness-maker", description="프로젝트 맞춤 하네스 자동 생성 + anti-rot + 모니터링", version="0.1.0", author={name: "noel"}, license="MIT". 공식 spec 준수 — 어떤 다른 디렉토리도 .claude-plugin/ 안에 두지 않음.
+- **Task 1.2: Official Plugin manifest**
+  - Do: Create `.claude-plugin/plugin.json` — name="harness-maker", description="Auto-generate project-tailored harness + anti-rot + monitoring", version="0.1.0", author={name: "noel"}, license="MIT". Comply with official spec — do not place any other directories inside `.claude-plugin/`.
   - Files: `.claude-plugin/plugin.json`
-  - Done when: `jq -r .name .claude-plugin/plugin.json` 가 "harness-maker"
+  - Done when: `jq -r .name .claude-plugin/plugin.json` returns "harness-maker"
   - Verify: `bash .claude-verify.sh phase_1_manifest`
   - Commit: `feat(phase1): add Claude Code plugin manifest`
 
-- **Task 1.3: 메타-툴 entry command**
-  - Do: `commands/make.md` 생성 — `/harness-maker:make` 명령 정의. 단 하나의 슬래시 명령. argparse: `--audit, --add, --remove, --promote`. 본문은 placeholder ("Phase 2 구현 예정") + 실행 시 `python -m harness_maker.cli make $ARGUMENTS` 호출.
+- **Task 1.3: Meta-tool entry command**
+  - Do: Create `commands/make.md` — defines the `/harness-maker:make` command. Single slash command. argparse: `--audit, --add, --remove, --promote`. Body is a placeholder ("Phase 2 implementation pending") + on invocation calls `python -m harness_maker.cli make $ARGUMENTS`.
   - Files: `commands/make.md`, `src/harness_maker/cli.py` (typer skeleton)
-  - Done when: `cat commands/make.md` 가 `/harness-maker:make` 라우팅 보임, `uv run python -m harness_maker.cli --help` 정상
+  - Done when: `cat commands/make.md` shows `/harness-maker:make` routing, `uv run python -m harness_maker.cli --help` works normally
   - Verify: `bash .claude-verify.sh phase_1_command`
   - Commit: `feat(phase1): add /harness-maker:make entry command`
 
-- **Task 1.4: i18n 모듈 + Q1 locale**
-  - Do: `src/harness_maker/i18n.py` 구현. `resolve_locale(project_dir: Path) -> Locale` — `.claude/harness.yaml` 의 locale 키 우선, 없으면 None 반환 (호출자가 Q1 처리). `t(key: str, locale: Locale, **vars) -> str` — 메시지 카탈로그 lookup. 카탈로그는 `src/harness_maker/i18n_messages.py` (dict). 최소 키: `q1_choose_language`, `apply_done`, `error_no_yaml`. Test: `tests/unit/test_i18n.py` — locale 미존재 시 None, ko/en 메시지 lookup 테스트.
+- **Task 1.4: i18n module + Q1 locale**
+  - Do: Implement `src/harness_maker/i18n.py`. `resolve_locale(project_dir: Path) -> Locale` — prefer the `locale` key in `.claude/harness.yaml`; return None if absent (caller handles Q1 flow). `t(key: str, locale: Locale, **vars) -> str` — message catalog lookup. Catalog lives in `src/harness_maker/i18n_messages.py` (dict). Minimum keys: `q1_choose_language`, `apply_done`, `error_no_yaml`. Test: `tests/unit/test_i18n.py` — None when locale is missing, ko/en message lookup tests.
   - Files: `src/harness_maker/i18n.py`, `src/harness_maker/i18n_messages.py`, `tests/unit/test_i18n.py`
-  - Done when: `uv run pytest tests/unit/test_i18n.py -v` 통과
+  - Done when: `uv run pytest tests/unit/test_i18n.py -v` passes
   - Verify: `bash .claude-verify.sh phase_1_i18n`
   - Commit: `feat(phase1): implement i18n module with ko/en messages`
 
-- **Task 1.5: README + LICENSE + CI 스켈레톤**
-  - Do: `README.md` (1 page — 프로젝트 목적, Quick Start placeholder, License). `LICENSE` (MIT, copyright "noel"). `.github/workflows/ci.yml` — uv setup → ruff check → ruff format --check → mypy --strict → pytest. matrix: python 3.12.
+- **Task 1.5: README + LICENSE + CI skeleton**
+  - Do: `README.md` (1 page — project purpose, Quick Start placeholder, License). `LICENSE` (MIT, copyright "noel"). `.github/workflows/ci.yml` — uv setup → ruff check → ruff format --check → mypy --strict → pytest. matrix: python 3.12.
   - Files: `README.md`, `LICENSE`, `.github/workflows/ci.yml`
-  - Done when: 3 파일 존재, ci.yml 이 ruff+mypy+pytest 모두 호출
+  - Done when: all 3 files exist, ci.yml calls ruff+mypy+pytest
   - Verify: `bash .claude-verify.sh phase_1_meta`
   - Commit: `chore(phase1): add README, MIT LICENSE, CI workflow`
 
@@ -639,32 +657,32 @@ bash .claude-verify.sh phase_1_env \
 
 ### Phase 2: Foundations — Pydantic Models + Profiler + Interviewer
 
-**Objective:** Pipeline (Phase 3) 의 빌딩블록 확보. 모델·시그널 추출·인터뷰 모두 단위테스트 통과.
+**Objective:** Secure the building blocks for the Pipeline (Phase 3). Models, signal extraction, and interview all pass unit tests.
 
-**Research targets (autoloop Stage 1 자동 fetch):**
+**Research targets (autoloop Stage 1 auto-fetch):**
 - Pydantic v2 patterns: https://docs.pydantic.dev/latest/
 - AskUserQuestion tool spec (Claude Code SDK): https://code.claude.com/docs/en/sub-agents
 
 #### Tasks
 
-- **Task 2.1: Pydantic 모델 정의**
-  - Do: `src/harness_maker/models.py` 에 Section 3 Data Model 의 모든 모델 구현 (Locale, Preset, ModelTier, AtomicStage, ProjectProfile, WorkflowDef, HarnessConfig, Blueprint, FileEntry, ReconcileDecision, ConflictItem). pydantic v2 strict.
+- **Task 2.1: Pydantic model definitions**
+  - Do: Implement all models from Section 3 Data Model in `src/harness_maker/models.py` (Locale, Preset, ModelTier, AtomicStage, ProjectProfile, WorkflowDef, HarnessConfig, Blueprint, FileEntry, ReconcileDecision, ConflictItem). pydantic v2 strict.
   - Files: `src/harness_maker/models.py`, `tests/unit/test_models.py`
-  - Done when: `uv run python -c "from harness_maker.models import HarnessConfig, Blueprint, ProjectProfile"` 성공, model validation 테스트 통과
+  - Done when: `uv run python -c "from harness_maker.models import HarnessConfig, Blueprint, ProjectProfile"` succeeds, model validation tests pass
   - Verify: `bash .claude-verify.sh phase_2_models`
   - Commit: `feat(phase2): define Pydantic models for harness config and blueprint`
 
-- **Task 2.2: Profiler 구현**
-  - Do: `src/harness_maker/profile.py` — `profile(project_dir: Path) -> ProjectProfile`. 시그널: (a) stack — package.json/pyproject.toml/Cargo.toml/CMakeLists.txt/go.mod 존재 검사, (b) scale — 파일 개수 < 50 small / 50-500 medium / >500 large, (c) lifecycle — git commit 빈도 (last 30 days commits), (d) existing_dotclaude — `.claude/` 존재 여부, (e) spec_only — `TECH_SPEC.md` 존재 + 코드 파일 0개 시 true, (f) vault_member — `.claude/obsidian.json` 존재. mock 시그널로 unit test.
+- **Task 2.2: Profiler implementation**
+  - Do: `src/harness_maker/profile.py` — `profile(project_dir: Path) -> ProjectProfile`. Signals: (a) stack — check for package.json/pyproject.toml/Cargo.toml/CMakeLists.txt/go.mod, (b) scale — file count < 50 small / 50-500 medium / >500 large, (c) lifecycle — git commit frequency (commits in last 30 days), (d) existing_dotclaude — whether `.claude/` exists, (e) spec_only — `TECH_SPEC.md` present + 0 code files → true, (f) vault_member — `.claude/obsidian.json` exists. Unit test with mock signals.
   - Files: `src/harness_maker/profile.py`, `tests/unit/test_profile.py`
-  - Done when: 4 fixture stub 디렉토리 (Phase 3 에서 본격 작성) 에서 profile 호출 시 expected ProjectProfile 반환
+  - Done when: calling profile on 4 fixture stub directories (fleshed out in Phase 3) returns the expected ProjectProfile
   - Verify: `bash .claude-verify.sh phase_2_profile`
   - Commit: `feat(phase2): implement Profiler with multi-stack detection`
 
-- **Task 2.3: Interviewer 구현**
-  - Do: `src/harness_maker/interview.py` — `interview(profile: ProjectProfile, autoloop_mode: bool = False) -> dict[str, Any]`. autoloop_mode=True 시 모든 default 자동 채택 (AskUserQuestion 호출 X). interactive 모드 시 preset 추천 + 10+ 차원 질문: workflow names, default_workflow, reviewers, consensus, caching, models, autoloop, memory, anti_rot, worktree, security, context_lint. ko/en 메시지 카탈로그 활용.
+- **Task 2.3: Interviewer implementation**
+  - Do: `src/harness_maker/interview.py` — `interview(profile: ProjectProfile, autoloop_mode: bool = False) -> dict[str, Any]`. When autoloop_mode=True, auto-adopt all defaults (no AskUserQuestion calls). In interactive mode, recommend a preset and ask 10+ dimension questions: workflow names, default_workflow, reviewers, consensus, caching, models, autoloop, memory, anti_rot, worktree, security, context_lint. Use ko/en message catalog.
   - Files: `src/harness_maker/interview.py`, `tests/unit/test_interview.py`
-  - Done when: autoloop_mode 테스트가 모든 dimension 에 대한 default 답 채택 확인. interactive mode 는 mocked input 으로 테스트.
+  - Done when: autoloop_mode test confirms default answer adopted for every dimension. Interactive mode tested with mocked input.
   - Verify: `bash .claude-verify.sh phase_2_interview`
   - Commit: `feat(phase2): implement Interviewer with autoloop + interactive modes`
 
@@ -681,53 +699,53 @@ uv run pytest tests/unit/test_models.py tests/unit/test_profile.py tests/unit/te
 
 ### Phase 3: Synthesis Pipeline — Synthesizer + Renderer + Reconciler + Verifier + 4 Fixtures + CLI
 
-**Objective:** `/harness-maker:make` 의 핵심 파이프라인 end-to-end 동작. 4 fixture 에 적용해 expected blueprint 일치 + file count assertion.
+**Objective:** End-to-end operation of the `/harness-maker:make` core pipeline. Apply to 4 fixtures and assert expected blueprint match + file count.
 
-**Research targets (autoloop Stage 1 자동 fetch):**
+**Research targets (autoloop Stage 1 auto-fetch):**
 - Jinja2 templating: https://jinja.palletsprojects.com/en/3.1.x/
-- (Phase 2 산출물 이미 사용 가능 — Pydantic models, profile, interview)
+- (Phase 2 artifacts already available — Pydantic models, profile, interview)
 
 #### Tasks
 
-- **Task 3.1: Synthesizer 구현**
-  - Do: `src/harness_maker/synthesize.py` — `synthesize(profile: ProjectProfile, answers: dict) -> Blueprint`. preset+answers 를 deterministic 매핑해 Blueprint(HarnessConfig + list[FileEntry]) 생성. Side preset → 25-30 파일, Production → 35-45 파일. Side 와 Production 의 정확한 파일 리스트는 본 spec Section 2 의 templates/ 트리에서 도출 (모든 .j2 파일이 → 사용자 .claude/ 의 어떤 경로로 갈지 매핑).
+- **Task 3.1: Synthesizer implementation**
+  - Do: `src/harness_maker/synthesize.py` — `synthesize(profile: ProjectProfile, answers: dict) -> Blueprint`. Deterministically map preset+answers to a Blueprint(HarnessConfig + list[FileEntry]). Side preset → 25-30 files, Production → 35-45 files. Exact file list for Side and Production derived from the `templates/` tree in Section 2 of this spec (mapping each `.j2` file to its destination path under the user's `.claude/`).
   - Files: `src/harness_maker/synthesize.py`, `tests/unit/test_synthesize.py`
-  - Done when: Side preset blueprint 가 25-30 파일, Production 35-45 파일 포함, 모든 FileEntry 가 valid template 경로 보유
+  - Done when: Side preset blueprint contains 25-30 files, Production 35-45 files, all FileEntry objects have valid template paths
   - Verify: `bash .claude-verify.sh phase_3_synthesize`
   - Commit: `feat(phase3): implement Synthesizer (preset + answers → Blueprint)`
 
-- **Task 3.2: Renderer 구현 (provenance frontmatter 포함, deterministic 모드)**
-  - Do: `src/harness_maker/render.py` — `render(blueprint: Blueprint, target_dir: Path, *, dry_run: bool = False, freeze_time: datetime | None = None)`. Jinja2 환경 셋업 (`templates/` 가 search path). 각 FileEntry 마다 (a) 템플릿 렌더, (b) provenance frontmatter (generated_by, harness_maker_version, generated_at = freeze_time or now(), source_template, content_hash sha256 of body **excluding frontmatter**, provenance="official") 부착, (c) target_dir 에 **atomic write** (CLAUDE.md 의 atomic_write helper 사용 — tempfile + os.replace). dry_run=True 시 디스크 변경 0, 변경 목록만 반환. **freeze_time 인자 = 테스트 결정성 보장 (snapshot 비교에 필수)**.
+- **Task 3.2: Renderer implementation (with provenance frontmatter, deterministic mode)**
+  - Do: `src/harness_maker/render.py` — `render(blueprint: Blueprint, target_dir: Path, *, dry_run: bool = False, freeze_time: datetime | None = None)`. Set up Jinja2 environment (`templates/` as search path). For each FileEntry: (a) render template, (b) attach provenance frontmatter (generated_by, harness_maker_version, generated_at = freeze_time or now(), source_template, content_hash sha256 of body **excluding frontmatter**, provenance="official"), (c) **atomic write** to target_dir (use the `atomic_write` helper from CLAUDE.md — tempfile + os.replace). dry_run=True makes zero disk changes and returns only the change list. **freeze_time argument guarantees test determinism (required for snapshot comparison)**.
   - Files: `src/harness_maker/render.py`, `tests/unit/test_render.py`
-  - Done when: 빈 fixture 디렉토리에서 Side blueprint 렌더 → 25-30 파일 모두 frontmatter 포함, content_hash 가 실제 hash 와 일치, freeze_time 동일 시 byte-identical
+  - Done when: rendering a Side blueprint into an empty fixture directory produces 25-30 files all containing frontmatter, content_hash matches actual hash, byte-identical output for the same freeze_time
   - Verify: `bash .claude-verify.sh phase_3_render`
   - Commit: `feat(phase3): implement Renderer with Jinja2 + provenance + deterministic freeze_time`
 
-- **Task 3.3: Reconciler 구현 (Brownfield)**
-  - Do: `src/harness_maker/reconcile.py` — `reconcile(existing_dir: Path, blueprint: Blueprint) -> list[ConflictItem]`. 기존 .claude/ 인덱싱. 각 신규 FileEntry 와 비교. 충돌 분류: (a) frontmatter 있고 hash 일치 → 우리 것, overwrite 안전 (decision=REPLACE 자동), (b) frontmatter 없음 또는 hash 불일치 → 사용자/타 출처 (decision=KEEP 디폴트, autoloop 환경 자동), (c) 신규 only → ADD. backup 함수 — `.claude/.backup-<ISO>/`.
+- **Task 3.3: Reconciler implementation (Brownfield)**
+  - Do: `src/harness_maker/reconcile.py` — `reconcile(existing_dir: Path, blueprint: Blueprint) -> list[ConflictItem]`. Index the existing `.claude/`. Compare each new FileEntry against it. Classify conflicts: (a) frontmatter present and hash matches → ours, safe to overwrite (decision=REPLACE automatically), (b) no frontmatter or hash mismatch → user/other source (decision=KEEP by default; auto in autoloop environment), (c) new only → ADD. Backup function — `.claude/.backup-<ISO>/`.
   - Files: `src/harness_maker/reconcile.py`, `tests/unit/test_reconcile.py`
-  - Done when: brownfield fixture (시드된 기존 .claude/) 에서 reconcile → 충돌 N건 분류 정확. backup 디렉토리 생성 확인.
+  - Done when: reconcile on a brownfield fixture (seeded existing `.claude/`) correctly classifies N conflicts. Backup directory creation confirmed.
   - Verify: `bash .claude-verify.sh phase_3_reconcile`
   - Commit: `feat(phase3): implement Reconciler with frontmatter-based conflict resolution`
 
-- **Task 3.4: Verifier 구현 (smoke)**
-  - Do: `src/harness_maker/verify.py` — `verify(target_dir: Path) -> list[str]` (errors). 검사: harness.yaml YAML lint, hooks/hooks.json JSON parse, 모든 .md 파일에 provenance frontmatter 존재, settings.json permissions schema valid.
+- **Task 3.4: Verifier implementation (smoke)**
+  - Do: `src/harness_maker/verify.py` — `verify(target_dir: Path) -> list[str]` (errors). Checks: harness.yaml YAML lint, hooks/hooks.json JSON parse, provenance frontmatter present in all `.md` files, settings.json permissions schema valid.
   - Files: `src/harness_maker/verify.py`, `tests/unit/test_verify.py`
-  - Done when: valid blueprint 렌더 결과에서 errors == [], 의도적 손상 시 errors 검출
+  - Done when: errors == [] for a valid blueprint render result; errors detected on intentional corruption
   - Verify: `bash .claude-verify.sh phase_3_verifier`
   - Commit: `feat(phase3): implement Verifier with yaml/json/frontmatter checks`
 
-- **Task 3.5: 4 Fixture + Snapshot Test (deterministic)**
-  - Do: `tests/fixtures/{side-python-cli, side-tauri-app, prod-tauri-app, prod-firmware}/` 디렉토리 생성. 각 fixture 에 시드 파일 (pyproject.toml or package.json 등 Profiler 가 stack 감지 가능하게). `tests/snapshot/<fixture>.expected.yaml` — 각 fixture 에 대한 expected Blueprint (preset, 파일 리스트 + 각 파일의 content_hash, harness.yaml 내용). `tests/unit/test_synthesize_snapshot.py` — 4 fixture profile → synthesize → render(target=tmp, freeze_time=datetime(2026,1,1,0,0,0,tzinfo=UTC)) → snapshot 비교. **timestamp 는 freeze_time 으로 고정 → frontmatter content 결정적 → snapshot 안정**. Render 결과 파일 개수도 단언 (Side: 25-30, Production: 35-45 fixture 별 expected 값 사용).
+- **Task 3.5: 4 Fixtures + Snapshot Test (deterministic)**
+  - Do: Create `tests/fixtures/{side-python-cli, side-tauri-app, prod-tauri-app, prod-firmware}/` directories. Seed each fixture with the files required for Profiler to detect the stack (pyproject.toml or package.json, etc.). `tests/snapshot/<fixture>.expected.yaml` — expected Blueprint per fixture (preset, file list + content_hash per file, harness.yaml contents). `tests/unit/test_synthesize_snapshot.py` — 4 fixture profiles → synthesize → render(target=tmp, freeze_time=datetime(2026,1,1,0,0,0,tzinfo=UTC)) → snapshot comparison. **Timestamp fixed via freeze_time → frontmatter content is deterministic → stable snapshots**. Also assert rendered file count (Side: 25-30, Production: 35-45; use per-fixture expected values).
   - Files: `tests/fixtures/*/`, `tests/snapshot/*.expected.yaml`, `tests/unit/test_synthesize_snapshot.py`
-  - Done when: 4 fixture 모두 snapshot 일치, 각 fixture 의 file count 가 expected range 안
+  - Done when: all 4 fixtures match snapshot, each fixture file count is within the expected range
   - Verify: `bash .claude-verify.sh phase_3_fixtures`
   - Commit: `test(phase3): add 4 fixtures with deterministic snapshot tests`
 
-- **Task 3.6: CLI integration — `make` 명령 동작**
-  - Do: `src/harness_maker/cli.py` 의 `make` 함수 완성. 흐름: profile → (autoloop_mode True 일 시 default) interview → synthesize → (existing_dotclaude 시) reconcile → render → verify. `uv run python -m harness_maker.cli make <fixture-dir> --autoloop` 명령으로 4 fixture 모두 정상 적용.
-  - Files: `src/harness_maker/cli.py` (확장)
-  - Done when: 4 fixture 모두 CLI 호출 → .claude/ 생성 → verify pass + file count expected range
+- **Task 3.6: CLI integration — `make` command working**
+  - Do: Complete the `make` function in `src/harness_maker/cli.py`. Flow: profile → (if autoloop_mode True, use defaults) interview → synthesize → (if existing_dotclaude) reconcile → render → verify. `uv run python -m harness_maker.cli make <fixture-dir> --autoloop` applies successfully to all 4 fixtures.
+  - Files: `src/harness_maker/cli.py` (extended)
+  - Done when: CLI invocation on all 4 fixtures → `.claude/` created → verify passes + file count within expected range
   - Verify: `bash .claude-verify.sh phase_3_cli_make`
   - Commit: `feat(phase3): wire CLI make command end-to-end`
 
@@ -751,48 +769,48 @@ uv run pytest tests/unit/ -v \
 
 ---
 
-### Phase 4: Monitoring 3 Metrics (효율 + Health + fresh)
+### Phase 4: Monitoring 3 Metrics (Efficiency + Health + Fresh)
 
-**Objective:** 사용자 하네스에 dashboard·telemetry 자산 렌더되어 3 지표 `/hm:ai-readiness` 리포트에 표시. Health 6-dim + Agent quality drill-down 계산 동작.
+**Objective:** Dashboard and telemetry assets rendered into the user harness; all 3 metrics displayed in `/hm:ai-readiness` report. Health 6-dim + Agent quality drill-down calculation working.
 
-**Research targets (autoloop Stage 1 자동 fetch):**
+**Research targets (autoloop Stage 1 auto-fetch):**
 - Claude Code hooks (PostToolUse, format): https://code.claude.com/docs/en/hooks
 - Claude Code session data fields available to hook scripts (stdin JSON schema)
 
 #### Tasks
 
-- **Task 3.1: telemetry hook 구현**
-  - Do: `src/harness_maker/telemetry.py` — `python -m harness_maker.telemetry` 가 PostToolUse hook 으로 호출됨. stdin 으로 hook input 받아 metrics.jsonl 에 turn 단위 기록 (input_tokens, output_tokens, cache_read, cost).
+- **Task 3.1: Telemetry hook implementation**
+  - Do: `src/harness_maker/telemetry.py` — `python -m harness_maker.telemetry` is invoked as a PostToolUse hook. Reads hook input from stdin, records per-turn metrics to metrics.jsonl (input_tokens, output_tokens, cache_read, cost).
   - Files: `src/harness_maker/telemetry.py`, `tests/unit/test_telemetry.py`
-  - Done when: mock hook input 으로 호출 → metrics.jsonl 에 줄 추가 검증
+  - Done when: invocation with mock hook input → verified that a line is appended to metrics.jsonl
   - Verify: `bash .claude-verify.sh phase_3_telemetry`
   - Commit: `feat(phase3): implement telemetry collector hook`
 
-- **Task 3.3: Health 6-dim 계산**
-  - Do: `src/harness_maker/readiness.py` — `compute_health(project_dir: Path, preset: Preset) -> dict`. 6 dim 각각 0-100 점수: docs (CLAUDE.md/README/ADR 존재 + 길이), tests (test/ 디렉토리 + 커버리지 grep), CI (.github/workflows 존재), observability (metrics.jsonl + dashboard 존재), security (.claude/observability/security/findings 의 high count), governance (Production 만 가중치, ADR/CONTRIBUTING 존재). composite = 가중평균 + ceremony penalty.
+- **Task 3.3: Health 6-dim scoring**
+  - Do: `src/harness_maker/readiness.py` — `compute_health(project_dir: Path, preset: Preset) -> dict`. Score each of the 6 dimensions 0-100: docs (CLAUDE.md/README/ADR presence + length), tests (test/ directory + coverage grep), CI (.github/workflows present), observability (metrics.jsonl + dashboard present), security (high-severity count in `.claude/observability/security/findings`), governance (Production-only weighted; ADR/CONTRIBUTING present). composite = weighted average + ceremony penalty.
   - Files: `src/harness_maker/readiness.py`, `tests/unit/test_readiness.py`
-  - Done when: 4 fixture 각각 Health 점수 계산, 빈 fixture 는 낮은 점수, 풍부한 fixture 는 높은 점수
+  - Done when: Health score computed for all 4 fixtures; empty fixture scores low, rich fixture scores high
   - Verify: `bash .claude-verify.sh phase_3_health`
   - Commit: `feat(phase3): implement Health 6-dim composite scoring`
 
 - **Task 3.4: Agent quality drill-down**
-  - Do: `src/harness_maker/agent_quality.py` — `score_agent(agent_md: Path) -> dict`. 3-layer 평가: (a) Static — 길이·구조·permissions 정의 존재, (b) LLM judge — agent prompt 를 Claude 에게 평가 요청 (quality 0-100, mock 가능), (c) Monte Carlo — 동일 prompt 10회 실행 결과 일관성 (지금은 placeholder). 종합 → Platinum (≥90) / Gold (80-89) / Silver (70-79) / Bronze (<70).
+  - Do: `src/harness_maker/agent_quality.py` — `score_agent(agent_md: Path) -> dict`. 3-layer evaluation: (a) Static — length, structure, presence of permissions definition, (b) LLM judge — ask Claude to evaluate the agent prompt (quality 0-100, mockable), (c) Monte Carlo — consistency across 10 runs of the same prompt (placeholder for now). Aggregate → Platinum (>=90) / Gold (80-89) / Silver (70-79) / Bronze (<70).
   - Files: `src/harness_maker/agent_quality.py`, `tests/unit/test_agent_quality.py`
-  - Done when: mock agent .md 로 등급 결정 통과
+  - Done when: grade determination passes with a mock agent `.md`
   - Verify: `bash .claude-verify.sh phase_3_agent_quality`
   - Commit: `feat(phase3): implement Agent quality rubric (Platinum/Gold/Silver/Bronze)`
 
-- **Task 3.5: Dashboard 렌더 + monitor 명령**
-  - Do: `templates/observability/dashboard.{ko,en}.md.j2` 작성 — 3 지표 + Health 6-dim + Agent quality drill-down + Anti-rot pending 섹션. `templates/commands/hm/monitor.md.j2` 작성 — `/hm:monitor` 명령으로 Python 으로 지표 계산 후 dashboard 갱신.
+- **Task 3.5: Dashboard render + monitor command**
+  - Do: Write `templates/observability/dashboard.{ko,en}.md.j2` — 3 metrics + Health 6-dim + Agent quality drill-down + Anti-rot pending section. Write `templates/commands/hm/monitor.md.j2` — `/hm:monitor` command: compute metrics via Python then refresh dashboard.
   - Files: `templates/observability/dashboard.{ko,en}.md.j2`, `templates/commands/hm/monitor.md.j2`
-  - Done when: Side fixture 에서 make → /hm:monitor 호출 시 dashboard.md 갱신 (mock metrics 활용)
+  - Done when: make on Side fixture → invoking /hm:monitor updates dashboard.md (using mock metrics)
   - Verify: `bash .claude-verify.sh phase_3_dashboard`
   - Commit: `feat(phase3): add dashboard template + /hm:monitor command`
 
-- **Task 3.5: hooks.json + settings.json 템플릿**
-  - Do: `templates/hooks/hooks.json.j2` — PostToolUse 에 telemetry hook. `templates/settings/{Side,Production}.json.j2` — permissions allow list (read-only 기본 + 권한 분리는 Phase 8 에서 강화).
+- **Task 3.5: hooks.json + settings.json templates**
+  - Do: `templates/hooks/hooks.json.j2` — PostToolUse telemetry hook. `templates/settings/{Side,Production}.json.j2` — permissions allow list (read-only by default; privilege separation hardened in Phase 8).
   - Files: `templates/hooks/hooks.json.j2`, `templates/settings/{Side,Production}.json.j2`
-  - Done when: 렌더된 hooks.json 이 jq 통과, settings.json 에 permissions 존재
+  - Done when: rendered hooks.json passes jq, settings.json contains permissions
   - Verify: `bash .claude-verify.sh phase_3_hooks_settings`
   - Commit: `feat(phase3): add hooks.json + settings.json templates`
 
@@ -808,14 +826,14 @@ uv run pytest tests/unit/ -v \
 
 ### Phase 5: Anti-rot Pipeline (4-source crawl + adaptive threshold + manual confirm)
 
-**Objective:** `/hm:refresh` 명령이 사용자 하네스에 렌더되어 주 1회 자동 + 수동 호출. 4 source 크롤 → adaptive filter → propose UI. **항상 manual confirm.**
+**Objective:** `/hm:refresh` command rendered into the user harness, runs automatically weekly + on manual invocation. 4-source crawl → adaptive filter → propose UI. **Always requires manual confirm.**
 
-**Research targets (autoloop Stage 1 자동 fetch):**
+**Research targets (autoloop Stage 1 auto-fetch):**
 - arxiv API spec: https://info.arxiv.org/help/api/user-manual.html
 - GitHub REST API releases endpoint: https://docs.github.com/en/rest/releases/releases
 - GitHub API rate limits (unauthenticated 60/h): https://docs.github.com/en/rest/overview/rate-limits-for-the-rest-api
 - OSV.dev API: https://google.github.io/osv.dev/api/
-- Anthropic news index page (HTML scrape — RSS 없음): https://www.anthropic.com/news
+- Anthropic news index page (HTML scrape — no RSS): https://www.anthropic.com/news
 - Claude Code release notes: https://github.com/anthropics/claude-code/releases
 - feedparser library: https://feedparser.readthedocs.io/en/latest/
 - httpx async client: https://www.python-httpx.org/
@@ -823,59 +841,59 @@ uv run pytest tests/unit/ -v \
 #### Tasks
 
 - **Task 4.1: Crawler — Anthropic blog/changelog (HTML scrape)**
-  - Do: `src/harness_maker/crawler/anthropic_blog.py` — `fetch_recent(since: datetime) -> list[CrawlItem]`. **Anthropic 는 공식 RSS 없음.** httpx 로 `https://www.anthropic.com/news` HTML 가져와 BeautifulSoup4 (의존성 추가) 또는 정규식으로 article 카드 파싱 → CrawlItem(title, url, published, summary). 캐시: `~/.cache/harness-maker/anthropic-blog.json` (12h TTL). 실패 시 graceful skip + 경고 로그.
-  - Files: `src/harness_maker/crawler/anthropic_blog.py`, `tests/unit/crawler/test_anthropic_blog.py`, `pyproject.toml` (beautifulsoup4 추가)
+  - Do: `src/harness_maker/crawler/anthropic_blog.py` — `fetch_recent(since: datetime) -> list[CrawlItem]`. **Anthropic has no official RSS.** Fetch `https://www.anthropic.com/news` HTML via httpx, parse article cards with BeautifulSoup4 (add dependency) or regex → CrawlItem(title, url, published, summary). Cache: `~/.cache/harness-maker/anthropic-blog.json` (12h TTL). On failure: graceful skip + warning log.
+  - Files: `src/harness_maker/crawler/anthropic_blog.py`, `tests/unit/crawler/test_anthropic_blog.py`, `pyproject.toml` (add beautifulsoup4)
   - Files: `src/harness_maker/crawler/anthropic_blog.py`, `tests/unit/crawler/test_anthropic_blog.py`
-  - Done when: mock RSS feed 으로 호출 시 CrawlItem list 반환, 캐시 hit 시 네트워크 호출 X
+  - Done when: invocation with mock RSS feed returns CrawlItem list; cache hit makes no network call
   - Verify: `bash .claude-verify.sh phase_4_anthropic`
   - Commit: `feat(phase4): implement Anthropic blog crawler`
 
 - **Task 4.2: Crawler — GitHub releases**
-  - Do: `src/harness_maker/crawler/github_releases.py` — `fetch_releases(repo: str, since: datetime) -> list[CrawlItem]`. httpx 로 `api.github.com/repos/{repo}/releases` 호출 (unauthenticated). repos: anthropics/claude-code, obra/superpowers, Yeachan-Heo/oh-my-claudecode, scalarian/oh-my-codex, wshobson/agents, davila7/claude-code-templates, coleam00/Archon, affaan-m/everything-claude-code, HKUDS/OpenHarness. 캐시: `~/.cache/harness-maker/gh-{repo}.json` (24h TTL). rate limit 감지 시 graceful skip.
+  - Do: `src/harness_maker/crawler/github_releases.py` — `fetch_releases(repo: str, since: datetime) -> list[CrawlItem]`. Call `api.github.com/repos/{repo}/releases` via httpx (unauthenticated). repos: anthropics/claude-code, obra/superpowers, Yeachan-Heo/oh-my-claudecode, scalarian/oh-my-codex, wshobson/agents, davila7/claude-code-templates, coleam00/Archon, affaan-m/everything-claude-code, HKUDS/OpenHarness. Cache: `~/.cache/harness-maker/gh-{repo}.json` (24h TTL). Graceful skip on rate limit detection.
   - Files: `src/harness_maker/crawler/github_releases.py`, `tests/unit/crawler/test_github_releases.py`
-  - Done when: mock 응답으로 CrawlItem list, rate limit 응답 시 빈 리스트 + 경고 로그
+  - Done when: mock response → CrawlItem list; rate-limit response → empty list + warning log
   - Verify: `bash .claude-verify.sh phase_4_github`
   - Commit: `feat(phase4): implement GitHub releases crawler with caching`
 
 - **Task 4.3: Crawler — arxiv**
-  - Do: `src/harness_maker/crawler/arxiv.py` — `fetch_recent(categories: list[str], terms: list[str], since: datetime) -> list[CrawlItem]`. arxiv API (export.arxiv.org/api/query) 호출. categories: cs.SE, cs.CL, cs.CR. terms: ["coding agent", "prompt engineering", "agent harness", "agent eval", "prompt injection"]. 캐시: `~/.cache/harness-maker/arxiv.json` (7d TTL).
+  - Do: `src/harness_maker/crawler/arxiv.py` — `fetch_recent(categories: list[str], terms: list[str], since: datetime) -> list[CrawlItem]`. Call arxiv API (export.arxiv.org/api/query). categories: cs.SE, cs.CL, cs.CR. terms: ["coding agent", "prompt engineering", "agent harness", "agent eval", "prompt injection"]. Cache: `~/.cache/harness-maker/arxiv.json` (7d TTL).
   - Files: `src/harness_maker/crawler/arxiv.py`, `tests/unit/crawler/test_arxiv.py`
-  - Done when: mock 응답으로 CrawlItem list, 캐시 hit 검증
+  - Done when: mock response → CrawlItem list, cache hit verified
   - Verify: `bash .claude-verify.sh phase_4_arxiv`
   - Commit: `feat(phase4): implement arxiv crawler with category+term filter`
 
 - **Task 4.4: Crawler — OSV.dev**
-  - Do: `src/harness_maker/crawler/osv_dev.py` — `query_cve(packages: list[Package]) -> list[Vulnerability]`. OSV.dev API. package-lock.json/Cargo.lock/requirements.txt 파싱.
+  - Do: `src/harness_maker/crawler/osv_dev.py` — `query_cve(packages: list[Package]) -> list[Vulnerability]`. OSV.dev API. Parse package-lock.json/Cargo.lock/requirements.txt.
   - Files: `src/harness_maker/crawler/osv_dev.py`, `tests/unit/crawler/test_osv_dev.py`
-  - Done when: mock package list 로 Vulnerability list 반환
+  - Done when: mock package list → Vulnerability list returned
   - Verify: `bash .claude-verify.sh phase_4_osv`
   - Commit: `feat(phase4): implement OSV.dev CVE query`
 
 - **Task 4.5: Relevance filter (adaptive threshold)**
-  - Do: `src/harness_maker/relevance.py` — `score(item: CrawlItem, harness_yaml: dict, history: list) -> float`. LLM 호출 (Claude Code subscription). 입력: CrawlItem + harness.yaml 요약 + 과거 accept/reject 이력. 출력: applicability_score (0-1), risk (low/med/high), proposed_change. threshold = adaptive: start 0.7, accept >80% → -0.05, reject >50% → +0.05. mock LLM 으로 unit test.
+  - Do: `src/harness_maker/relevance.py` — `score(item: CrawlItem, harness_yaml: dict, history: list) -> float`. LLM call (Claude Code subscription). Input: CrawlItem + harness.yaml summary + past accept/reject history. Output: applicability_score (0-1), risk (low/med/high), proposed_change. threshold = adaptive: start 0.7, if accept rate >80% → -0.05, if reject rate >50% → +0.05. Unit test with mock LLM.
   - Files: `src/harness_maker/relevance.py`, `tests/unit/test_relevance.py`
-  - Done when: mock LLM 응답으로 점수 산출 및 threshold 적응 검증
+  - Done when: mock LLM response → score computed and threshold adaptation verified
   - Verify: `bash .claude-verify.sh phase_4_relevance`
   - Commit: `feat(phase4): implement adaptive relevance filter`
 
-- **Task 4.6: research-crawler skill 템플릿**
-  - Do: `templates/skills/research-crawler/SKILL.md.j2` — 사용자 하네스가 호출할 skill. description: "Crawl 4 sources for harness updates". 본문: Python 모듈 호출 절차.
+- **Task 4.6: research-crawler skill template**
+  - Do: `templates/skills/research-crawler/SKILL.md.j2` — skill invoked by the user harness. description: "Crawl 4 sources for harness updates". Body: Python module invocation procedure.
   - Files: `templates/skills/research-crawler/SKILL.md.j2`
-  - Done when: 렌더된 SKILL.md 가 valid frontmatter + description 포함
+  - Done when: rendered SKILL.md contains valid frontmatter + description
   - Verify: `bash .claude-verify.sh phase_4_skill_template`
   - Commit: `feat(phase4): add research-crawler skill template`
 
-- **Task 4.7: relevance-filter skill 템플릿**
+- **Task 4.7: relevance-filter skill template**
   - Do: `templates/skills/relevance-filter/SKILL.md.j2`
   - Files: `templates/skills/relevance-filter/SKILL.md.j2`
-  - Done when: 렌더된 SKILL.md 정상
+  - Done when: rendered SKILL.md is valid
   - Verify: `bash .claude-verify.sh phase_4_filter_template`
   - Commit: `feat(phase4): add relevance-filter skill template`
 
-- **Task 4.8: /hm:refresh 명령 템플릿 (manual confirm UI)**
-  - Do: `templates/commands/hm/refresh.md.j2` — `/hm:refresh` 명령. 흐름: (1) 4 crawler 호출, (2) relevance filter, (3) threshold 통과 항목 → `.claude/observability/refresh/proposed-<date>.md` 생성, (4) 각 제안에 대해 AskUserQuestion (accept/reject/defer), (5) accept → 해당 .claude/ 자산 패치 + commit. **자동 적용 절대 X.**
+- **Task 4.8: /hm:refresh command template (manual confirm UI)**
+  - Do: `templates/commands/hm/refresh.md.j2` — `/hm:refresh` command. Flow: (1) invoke 4 crawlers, (2) relevance filter, (3) items passing threshold → create `.claude/observability/refresh/proposed-<date>.md`, (4) AskUserQuestion for each proposal (accept/reject/defer), (5) on accept → patch the relevant `.claude/` asset + commit. **Absolutely no auto-apply.**
   - Files: `templates/commands/hm/refresh.md.j2`
-  - Done when: 렌더된 refresh.md 가 manual confirm 흐름 포함, autoloop 환경에선 propose 까지만 실행 (accept 시뮬레이션)
+  - Done when: rendered refresh.md includes manual confirm flow; in autoloop environment, runs only up to propose step (simulates accept)
   - Verify: `bash .claude-verify.sh phase_4_refresh_template`
   - Commit: `feat(phase4): add /hm:refresh command template with manual confirm`
 
@@ -887,16 +905,16 @@ uv run pytest tests/unit/crawler/ tests/unit/test_relevance.py -v \
        test -f templates/skills/$tpl/SKILL.md.j2 || exit 1
      done \
   && test -f templates/commands/hm/refresh.md.j2 \
-  && grep -q "AskUserQuestion" templates/commands/hm/refresh.md.j2  # manual confirm 존재 확인
+  && grep -q "AskUserQuestion" templates/commands/hm/refresh.md.j2  # confirm manual confirm is present
 ```
 
 ---
 
 ### Phase 6: Workflow Engine + Conditional Router + Modular Installer
 
-**Objective:** atomic stage 7개 + 사용자 명명 fused workflow 가 사용자 하네스에 렌더. Conditional Router 가 변경 영역 따라 reviewer 선택. `--add` / `--remove` 모듈식 설치 동작.
+**Objective:** 7 atomic stages + user-named fused workflows rendered into the user harness. Conditional Router selects reviewers based on the change area. `--add` / `--remove` modular installation working.
 
-**Research targets (autoloop Stage 1 자동 fetch):**
+**Research targets (autoloop Stage 1 auto-fetch):**
 - Claude Code skill spec (SKILL.md frontmatter): https://code.claude.com/docs/en/skills
 - Claude Code subagent spec (agent .md frontmatter): https://code.claude.com/docs/en/sub-agents
 - Slash command subdirectory namespace (`commands/hm/<name>.md` → `/hm:<name>`): https://code.claude.com/docs/en/plugins-reference
@@ -904,51 +922,51 @@ uv run pytest tests/unit/crawler/ tests/unit/test_relevance.py -v \
 #### Tasks
 
 - **Task 5.1: Atomic stage prompt fragments**
-  - Do: `templates/stages/{research,spec,plan,execute,review,wrapup,verify}.md.j2` 7개 작성. 각 fragment 는 ~50-150 행 (Side 한계 안). 각 stage 의 instructions 명확히. Variables: {{ project_name }}, {{ feature }}, {{ workflow_context }}.
+  - Do: Write 7 files `templates/stages/{research,spec,plan,execute,review,wrapup,verify}.md.j2`. Each fragment ~50-150 lines (within Side limits). Instructions for each stage clearly stated. Variables: {{ project_name }}, {{ feature }}, {{ workflow_context }}.
   - Files: `templates/stages/*.md.j2`
-  - Done when: 7 fragment 모두 valid Jinja2, 렌더 시 정상 출력
+  - Done when: all 7 fragments are valid Jinja2, render produces normal output
   - Verify: `bash .claude-verify.sh phase_5_stages`
   - Commit: `feat(phase5): add 7 atomic stage prompt fragments`
 
-- **Task 5.2: Workflow fuse 로직**
-  - Do: `src/harness_maker/workflow_fuse.py` — `fuse(stages: list[AtomicStage], workflow_name: str) -> str`. atomic stage fragment 들을 하나의 prompt 로 합성. 각 fragment 사이에 명확한 separator (`## Stage: <name>`) 삽입. 출력은 단일 `/hm:<workflow>` 명령 .md 파일 본문.
+- **Task 5.2: Workflow fusion logic**
+  - Do: `src/harness_maker/workflow_fuse.py` — `fuse(stages: list[AtomicStage], workflow_name: str) -> str`. Combine atomic stage fragments into a single prompt. Insert a clear separator between each fragment (`## Stage: <name>`). Output is the body of a single `/hm:<workflow>` command `.md` file.
   - Files: `src/harness_maker/workflow_fuse.py`, `tests/unit/test_workflow_fuse.py`
-  - Done when: 예시 workflow `dev=[plan,execute,review,wrapup]` 합성 → 4 fragment 가 순서대로 결합된 prompt 출력
+  - Done when: example workflow `dev=[plan,execute,review,wrapup]` fused → output is the 4 fragments combined in order
   - Verify: `bash .claude-verify.sh phase_5_fuse`
   - Commit: `feat(phase5): implement workflow fusion logic`
 
-- **Task 5.3: Atomic + workflow 명령 템플릿**
-  - Do: `templates/commands/hm/atomic_command.md.j2` — Renderer 가 7 atomic 각각 렌더해 `commands/hm/{stage}.md` 생성. `templates/commands/hm/workflow_command.md.j2` — Renderer 가 harness.yaml.workflows 순회하며 각 workflow 에 대해 fused command 생성.
-  - Files: `templates/commands/hm/atomic_command.md.j2`, `templates/commands/hm/workflow_command.md.j2`, `src/harness_maker/render.py` 확장 (workflow 루프 추가)
-  - Done when: Side fixture 적용 시 commands/hm/ 에 7 atomic + N workflow 명령 모두 생성
+- **Task 5.3: Atomic + workflow command templates**
+  - Do: `templates/commands/hm/atomic_command.md.j2` — Renderer renders each of the 7 atomics to produce `commands/hm/{stage}.md`. `templates/commands/hm/workflow_command.md.j2` — Renderer iterates `harness.yaml.workflows` and generates a fused command for each workflow.
+  - Files: `templates/commands/hm/atomic_command.md.j2`, `templates/commands/hm/workflow_command.md.j2`, `src/harness_maker/render.py` extended (add workflow loop)
+  - Done when: applying to Side fixture produces all 7 atomic + N workflow commands under `commands/hm/`
   - Verify: `bash .claude-verify.sh phase_5_commands_render`
   - Commit: `feat(phase5): wire atomic + workflow command rendering`
 
 - **Task 5.4: Conditional Router**
-  - Do: `src/harness_maker/conditional_router.py` — `route_reviewers(changed_files: list[Path], preset_reviewers: list[str], routing: str) -> list[str]`. routing="conditional" 시 변경 파일 영역 매핑 (auth/.env→security, perf-critical→performance, ui/.tsx→ux, worker/thread/isr→concurrency). routing="always-all" 시 preset_reviewers 모두.
+  - Do: `src/harness_maker/conditional_router.py` — `route_reviewers(changed_files: list[Path], preset_reviewers: list[str], routing: str) -> list[str]`. When routing="conditional": map changed-file areas (auth/.env → security, perf-critical → performance, ui/.tsx → ux, worker/thread/isr → concurrency). When routing="always-all": return all preset_reviewers.
   - Files: `src/harness_maker/conditional_router.py`, `tests/unit/test_conditional_router.py`
-  - Done when: changed_files 다양한 조합으로 expected reviewer set 반환
+  - Done when: various combinations of changed_files return the expected reviewer set
   - Verify: `bash .claude-verify.sh phase_5_router`
   - Commit: `feat(phase5): implement Conditional Router`
 
-- **Task 5.5: conditional-router skill 템플릿 + agents**
-  - Do: `templates/skills/conditional-router/SKILL.md.j2`. 9 agent template: `templates/agents/{code,security,performance,ux,concurrency}-reviewer.md.j2`, `consensus-arbiter.md.j2`, `autoloop-coder.md.j2`, `executor.md.j2`. 각 agent .md 에 frontmatter (name, description, permissions) — **Claude Code SubAgent permissions 의 정확한 frontmatter 스키마는 research target URL 의 doc 따라 확정 (allow/deny 필드명·구조 검증 필수)**. 권한 분리는 placeholder (Phase 8 에서 강화). security-auditor 는 Phase 7 에서 추가.
-  - Files: `templates/skills/conditional-router/SKILL.md.j2`, `templates/agents/*.md.j2` (8개)
-  - Done when: Production fixture 적용 시 .claude/agents/ 에 8 agent 생성
+- **Task 5.5: conditional-router skill template + agents**
+  - Do: `templates/skills/conditional-router/SKILL.md.j2`. 9 agent templates: `templates/agents/{code,security,performance,ux,concurrency}-reviewer.md.j2`, `consensus-arbiter.md.j2`, `autoloop-coder.md.j2`, `executor.md.j2`. Each agent `.md` has frontmatter (name, description, permissions) — **the exact frontmatter schema for Claude Code SubAgent permissions must be confirmed from the research target URL docs (verify allow/deny field names and structure)**. Privilege separation is a placeholder (hardened in Phase 8). security-auditor added in Phase 7.
+  - Files: `templates/skills/conditional-router/SKILL.md.j2`, `templates/agents/*.md.j2` (8 files)
+  - Done when: applying Production fixture → `.claude/agents/` contains 8 agents
   - Verify: `bash .claude-verify.sh phase_5_agents`
   - Commit: `feat(phase5): add Conditional Router skill + 8 agent templates`
 
 - **Task 5.6: Modular Installer (--add / --remove)**
-  - Do: `src/harness_maker/modular_edit.py` — `add(component: str, target_dir: Path)`, `remove(component: str, target_dir: Path)`. component 형식: `reviewer:security`, `hook:pre-push-smoke`, `skill:tdd-conditional`. 추가/제거 시 (a) 해당 template 렌더, (b) `.claude/harness.yaml` 동기화 (예: reviewers.list 에 추가), (c) verifier 재실행. CLI 통합: `cli.py make --add ...`.
+  - Do: `src/harness_maker/modular_edit.py` — `add(component: str, target_dir: Path)`, `remove(component: str, target_dir: Path)`. Component format: `reviewer:security`, `hook:pre-push-smoke`, `skill:tdd-conditional`. On add/remove: (a) render the relevant template, (b) sync `.claude/harness.yaml` (e.g., add to reviewers.list), (c) re-run verifier. CLI integration: `cli.py make --add ...`.
   - Files: `src/harness_maker/modular_edit.py`, `tests/unit/test_modular_edit.py`
-  - Done when: Side fixture 에서 `make --add reviewer:security` → security-reviewer.md 추가, harness.yaml 갱신
+  - Done when: `make --add reviewer:security` on Side fixture → security-reviewer.md added, harness.yaml updated
   - Verify: `bash .claude-verify.sh phase_5_modular`
   - Commit: `feat(phase5): implement modular --add / --remove installer`
 
-- **Task 5.7: Workflow naming + interview 통합**
-  - Do: `src/harness_maker/interview.py` 확장 — Q-workflows 단계: preset 별 추천 workflow 시드 제시 (Side: dev+quick / Production: 위 + careful + audit), 사용자가 이름 확정/수정/제거/추가. workflow 이름 검증 (`[a-z][a-z0-9-]*`, 예약어 = atomic stage 이름 + "make" 차단). default_workflow 결정.
-  - Files: `src/harness_maker/interview.py` (확장), `tests/unit/test_interview.py` (확장)
-  - Done when: autoloop_mode 시 추천 시드 그대로 채택, interactive 시 mock 입력으로 workflow rename 검증
+- **Task 5.7: Workflow naming + interview integration**
+  - Do: Extend `src/harness_maker/interview.py` — Q-workflows step: present recommended workflow seeds per preset (Side: dev+quick / Production: the above + careful + audit), user confirms/edits/removes/adds names. Validate workflow names (`[a-z][a-z0-9-]*`; reserved words = atomic stage names + "make" are blocked). Determine default_workflow.
+  - Files: `src/harness_maker/interview.py` (extended), `tests/unit/test_interview.py` (extended)
+  - Done when: in autoloop_mode, recommended seeds adopted as-is; in interactive mode, workflow rename verified with mock input
   - Verify: `bash .claude-verify.sh phase_5_workflow_interview`
   - Commit: `feat(phase5): wire workflow naming into interview`
 
@@ -968,48 +986,50 @@ uv run pytest tests/unit/test_workflow_fuse.py tests/unit/test_conditional_route
 
 ### Phase 7: Autoloop driver + Verify-before-completion gate
 
-**Objective:** `/hm:loop` 명령이 사용자 하네스에 렌더되어 자율 반복 동작. `/hm:verify` 가 wrapup 직전 자동 호출되는 gate skill 동작.
+**Objective:** The `/hm:loop` command is rendered into the user harness and operates as an autonomous iteration loop. `/hm:verify` acts as a gate skill that is automatically invoked immediately before wrapup.
 
-**Research targets (autoloop Stage 1 자동 fetch):**
-- 본 repo 의 autoloop 패턴 reference (자족적, vault 의존 X): docs/reference/autoloop-pattern.md
+Note (ADR-108): The drift_monitor fence introduced in 0.7.1 guards the autoloop driver against unbounded token consumption; the `iter % 5` ping and 3-consecutive-failure stop logic below are the primary safety rails, and ADR-108 adds a drift fence that halts the loop if the goal-state delta has not decreased over N iterations.
+
+**Research targets (autoloop Stage 1 auto-fetch):**
+- Autoloop pattern reference for this repo (self-contained, no vault dependency): docs/reference/autoloop-pattern.md
 - AHE — Agentic Harness Engineering: https://arxiv.org/abs/2604.25850
 - Inside the Scaffold (5 loop primitives): https://arxiv.org/abs/2604.03515
-- superpowers verify-before-completion 패턴: https://github.com/obra/superpowers
+- superpowers verify-before-completion pattern: https://github.com/obra/superpowers
 
 #### Tasks
 
-- **Task 6.1: Autoloop driver 로직**
-  - Do: `src/harness_maker/autoloop_driver.py` — `run(goal: str, args: dict)`. parse_goal → feature_list. while not converged: next_feature → workflow 실행 (fused command 호출 시뮬레이션) → state update. safety: iter % 5 == 0 시 ping, 3회 연속 실패 시 stop, time/iter cap. token 무제한.
+- **Task 6.1: Autoloop driver logic**
+  - Do: `src/harness_maker/autoloop_driver.py` — `run(goal: str, args: dict)`. parse_goal → feature_list. while not converged: next_feature → execute workflow (fused command invocation simulation) → state update. safety: ping at iter % 5 == 0, stop on 3 consecutive failures, time/iter cap. No token limit.
   - Files: `src/harness_maker/autoloop_driver.py`, `tests/unit/test_autoloop_driver.py`
-  - Done when: mock workflow 실행으로 수렴 시뮬레이션, dry-run 모드에서 디스크 변경 0
+  - Done when: convergence simulation via mock workflow execution, zero disk changes in dry-run mode
   - Verify: `bash .claude-verify.sh phase_6_driver`
   - Commit: `feat(phase6): implement autoloop driver`
 
-- **Task 6.2: /hm:loop 명령 템플릿**
-  - Do: `templates/commands/hm/loop.md.j2` — autoloop_driver 호출. argparse: `<goal>` (required), `--time 8h`, `--max-iter 30`, `--workflow <name>`, `--convergence "<criterion>"`, `--dry-run`.
+- **Task 6.2: /hm:loop command template**
+  - Do: `templates/commands/hm/loop.md.j2` — invokes autoloop_driver. argparse: `<goal>` (required), `--time 8h`, `--max-iter 30`, `--workflow <name>`, `--convergence "<criterion>"`, `--dry-run`.
   - Files: `templates/commands/hm/loop.md.j2`
-  - Done when: 렌더된 loop.md 정상, autoloop 인자 파싱 명세 명확
+  - Done when: rendered loop.md is well-formed, autoloop argument parsing spec is clear
   - Verify: `bash .claude-verify.sh phase_6_loop_template`
   - Commit: `feat(phase6): add /hm:loop command template`
 
-- **Task 6.3: autoloop-coder + autoloop-driver skill 템플릿**
-  - Do: `templates/agents/autoloop-coder.md.j2` — autoloop 의 main worker agent. `templates/skills/autoloop-driver/SKILL.md.j2` — driver 호출 가이드.
+- **Task 6.3: autoloop-coder + autoloop-driver skill templates**
+  - Do: `templates/agents/autoloop-coder.md.j2` — main worker agent for autoloop. `templates/skills/autoloop-driver/SKILL.md.j2` — driver invocation guide.
   - Files: `templates/agents/autoloop-coder.md.j2`, `templates/skills/autoloop-driver/SKILL.md.j2`
-  - Done when: 렌더 후 frontmatter 검증 통과
+  - Done when: frontmatter validation passes after render
   - Verify: `bash .claude-verify.sh phase_6_autoloop_assets`
   - Commit: `feat(phase6): add autoloop-coder agent + autoloop-driver skill templates`
 
-- **Task 6.4: Verify-before-completion 게이트 구현**
-  - Do: `templates/skills/verify-before-completion/SKILL.md.j2` — /hm:wrapup 또는 autoloop iter 완료 직전 자동 호출되는 skill. 체크리스트: PLAN/SPEC 충족 / 회귀 게이트 / Health 점수 -5 이내 / Anti-rot pending defer 또는 처리 / 보안 high finding 0건 / Worktree merge 가능. 각 체크는 bash 또는 Python 호출. 실패 시 wrapup 차단.
+- **Task 6.4: Verify-before-completion gate implementation**
+  - Do: `templates/skills/verify-before-completion/SKILL.md.j2` — skill automatically invoked immediately before `/hm:wrapup` or autoloop iter completion. Checklist: PLAN/SPEC satisfied / regression gate / Health score within -5 / Anti-rot pending deferred or resolved / zero high security findings / Worktree merge-safe. Each check calls bash or Python. Blocks wrapup on failure.
   - Files: `templates/skills/verify-before-completion/SKILL.md.j2`
-  - Done when: SKILL.md 가 6 체크 모두 명시, 각 체크에 검증 명령 명확
+  - Done when: SKILL.md specifies all 6 checks, each with a clear verification command
   - Verify: `bash .claude-verify.sh phase_6_verify_gate`
   - Commit: `feat(phase6): add verify-before-completion gate skill`
 
-- **Task 6.5: ai-readiness-rubric + agent-quality-rubric skill 템플릿**
-  - Do: `templates/skills/ai-readiness-rubric/SKILL.md.j2` — Health 6-dim 계산 가이드 (readiness.py 호출). `templates/skills/agent-quality-rubric/SKILL.md.j2` — Platinum/Gold/Silver/Bronze 평가 가이드 (agent_quality.py 호출). Bronze 등급 자동으로 anti-rot patch 후보 등록 절차 명시.
+- **Task 6.5: ai-readiness-rubric + agent-quality-rubric skill templates**
+  - Do: `templates/skills/ai-readiness-rubric/SKILL.md.j2` — guide for computing Health 6-dim score (calls readiness.py). `templates/skills/agent-quality-rubric/SKILL.md.j2` — guide for Platinum/Gold/Silver/Bronze evaluation (calls agent_quality.py). Procedure for automatically registering Bronze-grade agents as anti-rot patch candidates is explicitly stated.
   - Files: `templates/skills/ai-readiness-rubric/SKILL.md.j2`, `templates/skills/agent-quality-rubric/SKILL.md.j2`
-  - Done when: 렌더 후 valid frontmatter + description
+  - Done when: valid frontmatter + description after render
   - Verify: `bash .claude-verify.sh phase_6_health_skills`
   - Commit: `feat(phase6): add Health + Agent quality rubric skills`
 
@@ -1026,34 +1046,34 @@ uv run pytest tests/unit/test_autoloop_driver.py -v \
 
 ---
 
-### Phase 8: Worktree Isolation + harness.yaml schema 확장
+### Phase 8: Worktree Isolation + harness.yaml schema extension
 
-**Objective:** `/hm:execute` 가 자동 git worktree 안에서 동작. harness.yaml 에 worktree·security 섹션 추가 (security 게이트 자체는 Phase 9).
+**Objective:** `/hm:execute` operates automatically inside a git worktree. `worktree:` and `security:` sections are added to harness.yaml (the actual security gate logic is in Phase 9).
 
-**Research targets (autoloop Stage 1 자동 fetch):**
+**Research targets (autoloop Stage 1 auto-fetch):**
 - git worktree CLI: https://git-scm.com/docs/git-worktree
-- Archon worktree 패턴 참고: https://github.com/coleam00/Archon
+- Archon worktree pattern reference: https://github.com/coleam00/Archon
 
 #### Tasks
 
-- **Task 8.1: Worktree 라이프사이클**
-  - Do: `src/harness_maker/worktree.py` — `create(workflow: str, base_dir: Path) -> Path` (`.worktrees/<workflow>-<ts>/` 생성), `cleanup(wt_path: Path, on_success: bool)`, `merge(wt_path: Path, strategy: str)`, `cleanup_all(force: bool)` (autoloop blocker 시 호출). git worktree CLI 호출. .gitignore 자동 추가 검증.
+- **Task 8.1: Worktree lifecycle**
+  - Do: `src/harness_maker/worktree.py` — `create(workflow: str, base_dir: Path) -> Path` (creates `.worktrees/<workflow>-<ts>/`), `cleanup(wt_path: Path, on_success: bool)`, `merge(wt_path: Path, strategy: str)`, `cleanup_all(force: bool)` (called on autoloop blocker). Invokes git worktree CLI. Validates automatic `.gitignore` addition.
   - Files: `src/harness_maker/worktree.py`, `tests/unit/test_worktree.py`
-  - Done when: temp git repo 에서 worktree 생성·cleanup·merge·cleanup_all 동작 확인
+  - Done when: worktree create/cleanup/merge/cleanup_all confirmed working in a temp git repo
   - Verify: `bash .claude-verify.sh phase_8_worktree`
   - Commit: `feat(phase8): implement git worktree lifecycle`
 
-- **Task 8.2: worktree-isolator skill 템플릿**
-  - Do: `templates/skills/worktree-isolator/SKILL.md.j2` — `/hm:execute` 호출 시 자동 worktree 생성, 변경 격리, 성공 시 cleanup 절차. harness.yaml.worktree 설정 참조.
+- **Task 8.2: worktree-isolator skill template**
+  - Do: `templates/skills/worktree-isolator/SKILL.md.j2` — automatic worktree creation on `/hm:execute` invocation, change isolation, cleanup procedure on success. References `harness.yaml.worktree` configuration.
   - Files: `templates/skills/worktree-isolator/SKILL.md.j2`
-  - Done when: 렌더된 SKILL.md 가 4-step 흐름 명시
+  - Done when: rendered SKILL.md specifies the 4-step flow
   - Verify: `bash .claude-verify.sh phase_8_worktree_skill`
   - Commit: `feat(phase8): add worktree-isolator skill template`
 
-- **Task 8.3: harness.yaml schema 확장 (worktree + security 섹션)**
-  - Do: `templates/harness-yaml/{Side,Production}.yaml.j2` 에 `worktree:` 와 `security:` 섹션 추가 (security 의 실제 검사 로직은 Phase 9). Side: worktree.scope=[execute], security.on_finding.high=warn. Production: scope=[execute, plan], on_finding.high=block. Pydantic HarnessConfig 모델도 worktree·security 키 검증 확장.
-  - Files: `templates/harness-yaml/{Side,Production}.yaml.j2`, `src/harness_maker/models.py` (확장)
-  - Done when: 렌더된 harness.yaml 이 Pydantic HarnessConfig validation 통과
+- **Task 8.3: harness.yaml schema extension (worktree + security sections)**
+  - Do: Add `worktree:` and `security:` sections to `templates/harness-yaml/{Side,Production}.yaml.j2` (actual security check logic is Phase 9). Side: worktree.scope=[execute], security.on_finding.high=warn. Production: scope=[execute, plan], on_finding.high=block. Extend Pydantic HarnessConfig model to validate `worktree` and `security` keys.
+  - Files: `templates/harness-yaml/{Side,Production}.yaml.j2`, `src/harness_maker/models.py` (extended)
+  - Done when: rendered harness.yaml passes Pydantic HarnessConfig validation
   - Verify: `bash .claude-verify.sh phase_8_yaml_schema`
   - Commit: `feat(phase8): extend harness.yaml schema with worktree + security`
 
@@ -1067,58 +1087,60 @@ uv run pytest tests/unit/test_worktree.py -v \
 
 ---
 
-### Phase 9: 5 Security Gates (secrets · permissions · hook injection · CVE · prompt injection)
+### Phase 9: 7 Security Gates (secrets · permissions · hook injection · CVE · hallucination · prod-name guard · prompt injection)
 
-**Objective:** 5 security gate 모두 검출 가능. orchestrator 가 5 gate 통합 호출. security-auditor agent 추가.
+**Objective:** All 7 security gates are detectable. The orchestrator calls all 7 gates in aggregate. A security-auditor agent is added.
 
-**Research targets (autoloop Stage 1 자동 fetch):**
-- gitleaks 패턴 카탈로그 (regex 참고용): https://github.com/gitleaks/gitleaks
+Two additional gates — hallucination detection and prod-name guard — landed in 0.7.0 and were hardened in 0.7.1: ADR-105 implements a pure-filesystem hallucination check (no external API calls required), and the prod-name guard uses a deque-based sliding window to detect repeated production-name leakage across iterations.
+
+**Research targets (autoloop Stage 1 auto-fetch):**
+- gitleaks pattern catalog (regex reference): https://github.com/gitleaks/gitleaks
 - OSV.dev API query format: https://google.github.io/osv.dev/api/
 - CVE-2025-59536 (skill poisoning): https://arxiv.org/abs/2604.03081
 - OWASP LLM prompt injection: https://owasp.org/www-project-top-10-for-large-language-model-applications/
-- ECC AgentShield 보안 스캐폴딩 패턴: https://github.com/affaan-m/everything-claude-code
+- ECC AgentShield security scaffolding pattern: https://github.com/affaan-m/everything-claude-code
 
 #### Tasks
 
 - **Task 9.1: Security gate — secrets**
-  - Do: `src/harness_maker/secscan/secrets.py` — `scan(target_dir: Path) -> list[Finding]`. regex 패턴: AWS_ACCESS_KEY, GitHub PAT, Anthropic API key, .env 누출, generic high-entropy strings. severity: high.
+  - Do: `src/harness_maker/secscan/secrets.py` — `scan(target_dir: Path) -> list[Finding]`. Regex patterns: AWS_ACCESS_KEY, GitHub PAT, Anthropic API key, .env leakage, generic high-entropy strings. severity: high.
   - Files: `src/harness_maker/secscan/secrets.py`, `tests/unit/test_secrets_scan.py`
-  - Done when: seeded 가짜 secret 들을 detect, 빈 디렉토리는 0 finding
+  - Done when: seeded fake secrets are detected, empty directory yields 0 findings
   - Verify: `bash .claude-verify.sh phase_9_secrets`
   - Commit: `feat(phase9): implement secrets scanner`
 
 - **Task 9.2: Security gate — permissions**
-  - Do: `src/harness_maker/secscan/permissions.py` — `scan(settings_json: Path) -> list[Finding]`. settings.json 의 `permissions.allow` 안의 과확장 패턴 검출 (`Bash(*)`, `Write(/**)` 등). severity: high (catch-all) / medium (broad path).
+  - Do: `src/harness_maker/secscan/permissions.py` — `scan(settings_json: Path) -> list[Finding]`. Detects overly broad patterns inside `permissions.allow` in settings.json (`Bash(*)`, `Write(/**)`, etc.). severity: high (catch-all) / medium (broad path).
   - Files: `src/harness_maker/secscan/permissions.py`, `tests/unit/test_permissions_scan.py`
-  - Done when: catch-all 검출, 정상 narrow 패턴은 finding 0
+  - Done when: catch-all detected, normal narrow patterns yield 0 findings
   - Verify: `bash .claude-verify.sh phase_9_permissions`
   - Commit: `feat(phase9): implement permissions scanner`
 
 - **Task 9.3: Security gate — hook injection**
-  - Do: `src/harness_maker/secscan/hook_injection.py` — `scan(hooks_json: Path) -> list[Finding]`. 위험 패턴 list: `rm -rf`, `curl <url> | sh`, `eval`, `wget ... | bash`. AST 또는 regex.
+  - Do: `src/harness_maker/secscan/hook_injection.py` — `scan(hooks_json: Path) -> list[Finding]`. Dangerous pattern list: `rm -rf`, `curl <url> | sh`, `eval`, `wget ... | bash`. AST or regex.
   - Files: `src/harness_maker/secscan/hook_injection.py`, `tests/unit/test_hook_injection.py`
-  - Done when: seeded 위험 hook 검출, 정상 hook 0 finding
+  - Done when: seeded dangerous hooks detected, normal hooks yield 0 findings
   - Verify: `bash .claude-verify.sh phase_9_hook_injection`
   - Commit: `feat(phase9): implement hook injection scanner`
 
 - **Task 9.4: Security gate — dependency CVEs**
-  - Do: `src/harness_maker/secscan/dependency_cves.py` — `scan(target_dir: Path) -> list[Finding]`. package-lock.json/Cargo.lock/requirements.txt/uv.lock 파싱 → package list → osv_dev.query_cve(). severity: high (CVSS ≥ 7) / medium (4-6.9) / low (<4).
+  - Do: `src/harness_maker/secscan/dependency_cves.py` — `scan(target_dir: Path) -> list[Finding]`. Parses package-lock.json/Cargo.lock/requirements.txt/uv.lock → package list → osv_dev.query_cve(). severity: high (CVSS >= 7) / medium (4-6.9) / low (<4).
   - Files: `src/harness_maker/secscan/dependency_cves.py`, `tests/unit/test_cve_scan.py`
-  - Done when: mock OSV 응답으로 Vulnerability list, severity 분류 정확
+  - Done when: Vulnerability list from mock OSV response, severity classification accurate
   - Verify: `bash .claude-verify.sh phase_9_cve`
   - Commit: `feat(phase9): implement dependency CVE scanner`
 
 - **Task 9.5: Security gate — prompt injection**
-  - Do: `src/harness_maker/secscan/prompt_injection.py` — `scan(text: str) -> list[Finding]`. hidden instruction 패턴 (zero-width chars, base64 instructions, "ignore previous", "system:" injection). severity: high.
+  - Do: `src/harness_maker/secscan/prompt_injection.py` — `scan(text: str) -> list[Finding]`. Hidden instruction patterns (zero-width chars, base64 instructions, "ignore previous", "system:" injection). severity: high.
   - Files: `src/harness_maker/secscan/prompt_injection.py`, `tests/unit/test_prompt_injection.py`
-  - Done when: seeded 가짜 injection 검출, 정상 텍스트 0 finding
+  - Done when: seeded fake injections detected, normal text yields 0 findings
   - Verify: `bash .claude-verify.sh phase_9_prompt_injection`
   - Commit: `feat(phase9): implement prompt injection scanner`
 
 - **Task 9.6: Security scanner orchestrator + skill + agent**
-  - Do: `src/harness_maker/security_scanner.py` — `scan_all(target_dir: Path, harness_config: dict) -> list[Finding]`. 5 gate 호출 → findings → `.claude/observability/security/findings-<date>.jsonl` 저장. on_finding 정책 적용 (high=block/warn/allow). `templates/skills/security-scanner/SKILL.md.j2`, `templates/agents/security-auditor.md.j2`.
+  - Do: `src/harness_maker/security_scanner.py` — `scan_all(target_dir: Path, harness_config: dict) -> list[Finding]`. Calls all 7 gates → findings → saves to `.claude/observability/security/findings-<date>.jsonl`. Applies on_finding policy (high=block/warn/allow). `templates/skills/security-scanner/SKILL.md.j2`, `templates/agents/security-auditor.md.j2`.
   - Files: `src/harness_maker/security_scanner.py`, `templates/skills/security-scanner/SKILL.md.j2`, `templates/agents/security-auditor.md.j2`, `tests/unit/test_security_scanner.py`
-  - Done when: 5 seeded vulnerability 모두 검출, findings.jsonl 생성, security-auditor agent 렌더 정상
+  - Done when: all 7 seeded vulnerabilities detected, findings.jsonl generated, security-auditor agent renders correctly
   - Verify: `bash .claude-verify.sh phase_9_orchestrator`
   - Commit: `feat(phase9): wire security scanner orchestrator + skill + auditor agent`
 
@@ -1133,63 +1155,65 @@ uv run pytest tests/unit/test_secrets_scan.py tests/unit/test_permissions_scan.p
 
 ### Phase 10: Context Lint + Privilege Separation + Provenance Frontmatter
 
-**Objective:** Renderer 에 context lint 통합 (verbose 차단). Reviewer agent 의 settings.json permissions 권한 분리. 모든 generated 파일 provenance frontmatter (Phase 2 에서 부분 구현 → 여기서 검증·refresh hash 비교).
+**Objective:** Integrate context lint into the renderer (blocks verbose output). Separate permissions for reviewer agent settings.json. Validate provenance frontmatter on all generated files (partially implemented in Phase 2 — full verification and hash comparison here).
 
-**Research targets (autoloop Stage 1 자동 fetch):**
-- Claude Code settings.json permissions schema (allow/deny 형식): https://code.claude.com/docs/en/settings
-- Evaluating AGENTS.md (verbose context 실증): https://arxiv.org/abs/2602.11988
-- OpenClaw — Privilege Separation (권한 분리 ASR 0.31% vs 14%): https://arxiv.org/abs/2603.13424
-- Supply-Chain Poisoning (provenance 도입 근거): https://arxiv.org/abs/2604.03081
+Note (ADR-107): The 0.7.1 tool_input whitelist and secret redaction in the telemetry hook are directly relevant to privilege separation; generated executor/reviewer agent frontmatter must reflect the updated allow/deny lists from ADR-107.
+
+**Research targets (autoloop Stage 1 auto-fetch):**
+- Claude Code settings.json permissions schema (allow/deny format): https://code.claude.com/docs/en/settings
+- Evaluating AGENTS.md (verbose context empirical study): https://arxiv.org/abs/2602.11988
+- OpenClaw — Privilege Separation (privilege separation ASR 0.31% vs 14%): https://arxiv.org/abs/2603.13424
+- Supply-Chain Poisoning (rationale for provenance): https://arxiv.org/abs/2604.03081
 - AgentBound capability framework: https://arxiv.org/abs/2510.21236
 
 #### Tasks
 
-- **Task 8.1: Context Lint 구현**
-  - Do: `src/harness_maker/context_lint.py` — `lint(file_path: Path, asset_type: str, preset: Preset) -> list[str]` (warnings). 한계: CLAUDE.md (Side 200/Prod 500), agent (100/200), skill SKILL.md (50/150), workflow command (300/600). 초과 시 자동 요약 제안.
+- **Task 8.1: Context Lint implementation**
+  - Do: `src/harness_maker/context_lint.py` — `lint(file_path: Path, asset_type: str, preset: Preset) -> list[str]` (warnings). Thresholds: CLAUDE.md (Side 200 / Prod 500), agent (100 / 200), skill SKILL.md (50 / 150), workflow command (300 / 600). Suggests automatic summarization on threshold exceeded.
   - Files: `src/harness_maker/context_lint.py`, `tests/unit/test_context_lint.py`
-  - Done when: 초과 파일에 warning, 정상 파일 0 warning
+  - Done when: warning emitted for over-threshold files, 0 warnings for normal files
   - Verify: `bash .claude-verify.sh phase_8_context_lint`
   - Commit: `feat(phase8): implement context lint with length thresholds`
 
-- **Task 8.2: Renderer 에 context lint 통합**
-  - Do: `src/harness_maker/render.py` 확장 — Apply 직전 렌더된 모든 파일에 context_lint 호출. warning 출력. `harness.yaml.context_lint.strict: true` 시 초과 = error (Apply 차단). default false.
-  - Files: `src/harness_maker/render.py` (확장), `tests/unit/test_render.py` (확장)
-  - Done when: 의도적 verbose 템플릿 시 warning 출력, strict=true 시 차단
+- **Task 8.2: Integrate context lint into renderer**
+  - Do: Extend `src/harness_maker/render.py` — call context_lint on every rendered file immediately before Apply. Output warnings. When `harness.yaml.context_lint.strict: true`, exceeding threshold is an error (blocks Apply). default false.
+  - Files: `src/harness_maker/render.py` (extended), `tests/unit/test_render.py` (extended)
+  - Done when: warning emitted with intentionally verbose template, blocked when strict=true
   - Verify: `bash .claude-verify.sh phase_8_render_lint`
   - Commit: `feat(phase8): wire context lint into renderer`
 
-- **Task 8.3: context-linter skill 템플릿**
-  - Do: `templates/skills/context-linter/SKILL.md.j2` — 사용자 하네스 안의 자가 lint skill (`/hm:execute` 또는 `/hm:wrapup` 직전 호출 가능).
+- **Task 8.3: context-linter skill template**
+  - Do: `templates/skills/context-linter/SKILL.md.j2` — self-lint skill inside the user harness (can be invoked immediately before `/hm:execute` or `/hm:wrapup`).
   - Files: `templates/skills/context-linter/SKILL.md.j2`
-  - Done when: 렌더 통과
+  - Done when: passes render
   - Verify: `bash .claude-verify.sh phase_8_lint_skill`
   - Commit: `feat(phase8): add context-linter skill template`
 
-- **Task 8.4: 권한 분리 — Reviewer agents permissions**
-  - Do: `templates/agents/{code,security,security-auditor,performance,ux,concurrency}-reviewer.md.j2` 의 frontmatter 에 read-only permissions. **반드시 Claude Code SubAgent 공식 spec (https://code.claude.com/docs/en/sub-agents + https://code.claude.com/docs/en/settings) 의 정확한 schema 확인 후 적용** — 만약 SubAgent frontmatter 가 `tools: [Read, Grep]` 식 allowlist 만 지원하고 deny list 미지원이면, allowlist 만으로 read-only 강제 (Write/Edit/Bash exec 도구 자체 제외). 6 reviewer 일관 적용.
+- **Task 8.4: Privilege separation — Reviewer agents permissions**
+  - Do: Add read-only permissions to the frontmatter of `templates/agents/{code,security,security-auditor,performance,ux,concurrency}-reviewer.md.j2`. **Must verify the exact schema from the official Claude Code SubAgent spec (https://code.claude.com/docs/en/sub-agents + https://code.claude.com/docs/en/settings) before applying** — if SubAgent frontmatter only supports a `tools: [Read, Grep]` allowlist and does not support a deny list, enforce read-only via allowlist alone (excluding Write/Edit/Bash exec tools entirely). Apply consistently across all 6 reviewers.
   - Files: `templates/agents/{code,security,security-auditor,performance,ux,concurrency}-reviewer.md.j2`
-  - Done when: 렌더된 agent .md 의 frontmatter 에 deny 리스트 존재
+  - Done when: deny list present in rendered agent .md frontmatter
   - Verify: `bash .claude-verify.sh phase_8_reviewer_perms`
   - Commit: `feat(phase8): enforce read-only permissions on all reviewer agents`
 
-- **Task 8.5: 권한 분리 — Executor agent**
-  - Do: `templates/agents/executor.md.j2` — write 가능하지만 `.worktrees/**` 안에서만. `permissions.allow: [Read(*), Grep(*), Write(.worktrees/**), Edit(.worktrees/**), Bash(npm test:*), Bash(pytest:*), Bash(uv run:*), Bash(cargo test:*)]`, `deny: [Write(/etc/**), Write(~/.ssh/**), Write(~/.aws/**), Bash(curl * | sh), Bash(eval *), Bash(rm -rf /:*)]`. autoloop-coder.md.j2 도 동일 정책.
-  - Files: `templates/agents/executor.md.j2`, `templates/agents/autoloop-coder.md.j2` (확장)
-  - Done when: 렌더 후 권한 정책 검증
+- **Task 8.5: Privilege separation — Executor agent**
+  - Do: `templates/agents/executor.md.j2` — write-capable but restricted to `.worktrees/**` only. `permissions.allow: [Read(*), Grep(*), Write(.worktrees/**), Edit(.worktrees/**), Bash(npm test:*), Bash(pytest:*), Bash(uv run:*), Bash(cargo test:*)]`, `deny: [Write(/etc/**), Write(~/.ssh/**), Write(~/.aws/**), Bash(curl * | sh), Bash(eval *), Bash(rm -rf /:*)]`. Same policy applies to autoloop-coder.md.j2.
+  - Files: `templates/agents/executor.md.j2`, `templates/agents/autoloop-coder.md.j2` (extended)
+  - Done when: permission policy verified after render
   - Verify: `bash .claude-verify.sh phase_8_executor_perms`
   - Commit: `feat(phase8): add executor agent with worktree-bounded write permissions`
 
-- **Task 8.6: Provenance 검증 + refresh hash 비교**
-  - Do: `src/harness_maker/provenance.py` — `verify_file(file_path: Path) -> tuple[bool, str]` (hash 일치 여부, source_template). `compute_hash(file_path: Path) -> str`. `parse_frontmatter(file_path: Path) -> dict`. `/hm:refresh` 시 사용자 수정 감지: 각 파일의 frontmatter content_hash vs 실제 hash 비교 → 불일치 시 사용자 confirm 필수 (autoloop 환경에선 KEEP 자동).
+- **Task 8.6: Provenance verification + refresh hash comparison**
+  - Do: `src/harness_maker/provenance.py` — `verify_file(file_path: Path) -> tuple[bool, str]` (hash match result, source_template). `compute_hash(file_path: Path) -> str`. `parse_frontmatter(file_path: Path) -> dict`. On `/hm:refresh`: detect user modifications by comparing each file's frontmatter content_hash against actual hash → mismatch requires user confirm (in autoloop environment, auto-KEEP).
   - Files: `src/harness_maker/provenance.py`, `tests/unit/test_provenance.py`
-  - Done when: 정상 generated 파일 verify 통과, 의도적 수정 시 mismatch 검출
+  - Done when: normal generated file passes verify, intentional modification detected as mismatch
   - Verify: `bash .claude-verify.sh phase_8_provenance_verify`
   - Commit: `feat(phase8): implement provenance hash verification`
 
-- **Task 8.7: Reconciler + refresh 의 provenance 연동**
-  - Do: `src/harness_maker/reconcile.py` 확장 — frontmatter 있는 기존 파일 vs 신규 blueprint hash 비교 → 일치 시 자동 REPLACE, 불일치 시 KEEP. `/hm:refresh` 시 모든 .claude/ 자산 hash 검증 → 사용자 수정 파일은 silent overwrite 차단.
-  - Files: `src/harness_maker/reconcile.py` (확장), `templates/commands/hm/refresh.md.j2` (확장)
-  - Done when: brownfield fixture 에서 hash-based 자동 분류 검증
+- **Task 8.7: Wire provenance into Reconciler + refresh**
+  - Do: Extend `src/harness_maker/reconcile.py` — compare existing file frontmatter hash vs new blueprint hash → auto-REPLACE on match, KEEP on mismatch. On `/hm:refresh`: hash-verify all `.claude/` assets → silently block overwrite of user-modified files.
+  - Files: `src/harness_maker/reconcile.py` (extended), `templates/commands/hm/refresh.md.j2` (extended)
+  - Done when: hash-based auto-classification verified in brownfield fixture
   - Verify: `bash .claude-verify.sh phase_8_reconcile_provenance`
   - Commit: `feat(phase8): wire provenance into Reconciler + /hm:refresh`
 
@@ -1211,60 +1235,60 @@ print('reviewer permission separation OK')
 
 ---
 
-### Phase 11: Dogfood — sandbox 적용
+### Phase 11: Dogfood — apply to sandbox
 
-**Objective:** harness-maker 자체를 1개 sandbox 프로젝트에 적용해 모든 R1-R6 + 모든 메커니즘 동작 검증. Python CLI entry + Claude Code 플러그인 entry 둘 다 검증.
+**Objective:** Apply harness-maker itself to one sandbox project and verify that all R1-R6 requirements and all mechanisms work correctly. Validate both the Python CLI entry and the Claude Code plugin entry.
 
-**Research targets:** None — Phase 9 는 integration test only. 외부 doc fetch 불필요.
+**Research targets:** None — Phase 9 is integration test only. No external doc fetch required.
 
 #### Tasks
 
-- **Task 9.1: Sandbox 프로젝트 생성**
-  - Do: `tests/e2e/sandbox/` — 빈 Python 프로젝트 디렉토리. pyproject.toml + 1 hello_world.py. git init.
+- **Task 9.1: Create sandbox project**
+  - Do: `tests/e2e/sandbox/` — empty Python project directory. pyproject.toml + 1 hello_world.py. git init.
   - Files: `tests/e2e/sandbox/`, `tests/e2e/sandbox/pyproject.toml`, `tests/e2e/sandbox/hello_world.py`
-  - Done when: 디렉토리 + 시드 파일 존재, git init 됨
+  - Done when: directory + seed files exist, git init complete
   - Verify: `bash .claude-verify.sh phase_9_sandbox_init`
   - Commit: `test(phase9): create sandbox project for dogfood`
 
-- **Task 9.2: /harness-maker:make 적용**
-  - Do: sandbox 에서 `uv run python -m harness_maker.cli make tests/e2e/sandbox --autoloop` 실행. Side preset 적용. 모든 자산 생성 확인 (harness.yaml, commands/hm/*, skills/, agents/, hooks/, observability/dashboard.md).
-  - Files: `tests/e2e/sandbox/.claude/` (생성)
-  - Done when: .claude/ 디렉토리 가 25-30 파일, 모두 provenance frontmatter
+- **Task 9.2: Apply /harness-maker:make**
+  - Do: Run `uv run python -m harness_maker.cli make tests/e2e/sandbox --autoloop` in sandbox. Apply Side preset. Confirm all assets generated (harness.yaml, commands/hm/*, skills/, agents/, hooks/, observability/dashboard.md).
+  - Files: `tests/e2e/sandbox/.claude/` (generated)
+  - Done when: .claude/ directory contains 25-30 files, all with provenance frontmatter
   - Verify: `bash .claude-verify.sh phase_9_apply`
   - Commit: `test(phase9): apply harness-maker to sandbox`
 
-- **Task 9.3: 생성된 명령 실행 검증**
-  - Do: e2e test — 사용자 하네스의 `/hm:quick`, `/hm:dev`, `/hm:loop`, `/hm:monitor`, `/hm:refresh` 각각이 호출 가능한지 확인 (실제 LLM 호출 X — 명령 파일 존재 + frontmatter valid + parseable). `/hm:execute` 가 worktree 격리 동작 (mock).
+- **Task 9.3: Verify generated command execution**
+  - Do: e2e test — confirm each of `/hm:quick`, `/hm:dev`, `/hm:loop`, `/hm:monitor`, `/hm:refresh` in the user harness is callable (no actual LLM calls — command file exists + valid frontmatter + parseable). `/hm:execute` demonstrates worktree isolation (mock).
   - Files: `tests/e2e/test_dogfood_sandbox.py`
-  - Done when: 5+ 명령 모두 valid + parseable + worktree skill 호출 시 .worktrees/ 생성
+  - Done when: all 5+ commands valid + parseable + `.worktrees/` created on worktree skill invocation
   - Verify: `bash .claude-verify.sh phase_9_commands`
   - Commit: `test(phase9): verify all generated commands callable`
 
-- **Task 9.4: Security gate 동작 검증**
-  - Do: sandbox 에 의도적으로 시드: 가짜 .env (AWS_ACCESS_KEY=AKIA...), settings.json 에 `Bash(*)` 과확장, hooks.json 에 `curl url | sh`, requirements.txt 에 알려진 vulnerable 패키지, 코드에 hidden instruction. `/hm:verify` 또는 직접 security_scanner.scan_all 호출 → 5 finding 모두 검출.
-  - Files: `tests/e2e/sandbox/.env.seeded`, etc. + `tests/e2e/test_dogfood_sandbox.py` (확장)
-  - Done when: 5 finding 모두 정확히 분류
+- **Task 9.4: Verify security gate behavior**
+  - Do: Intentionally seed the sandbox: fake .env (AWS_ACCESS_KEY=AKIA...), `Bash(*)` overly broad in settings.json, `curl url | sh` in hooks.json, known vulnerable package in requirements.txt, hidden instruction in code. Invoke `/hm:verify` or call security_scanner.scan_all directly → all 7 findings detected.
+  - Files: `tests/e2e/sandbox/.env.seeded`, etc. + `tests/e2e/test_dogfood_sandbox.py` (extended)
+  - Done when: all 7 findings correctly classified
   - Verify: `bash .claude-verify.sh phase_9_security`
   - Commit: `test(phase9): verify all 5 security gates detect seeded vulns`
 
-- **Task 9.5: 3 지표 출력 검증**
-  - Do: sandbox 에서 mock metrics.jsonl 시딩 후 `/hm:monitor` 호출 → dashboard.md 갱신, 3 metric 모두 표시.
-  - Files: `tests/e2e/test_dogfood_sandbox.py` (확장)
-  - Done when: dashboard.md 에 Health 6-dim + Agent quality 섹션 존재, 🪙·🎯·🔄 모두 존재
+- **Task 9.5: Verify 3 metrics output**
+  - Do: Seed mock metrics.jsonl in sandbox, invoke `/hm:monitor` → dashboard.md updated, all 3 metrics displayed.
+  - Files: `tests/e2e/test_dogfood_sandbox.py` (extended)
+  - Done when: dashboard.md contains Health 6-dim + Agent quality sections, all of token, goal, and iteration indicators present
   - Verify: `bash .claude-verify.sh phase_9_metrics`
   - Commit: `test(phase9): verify 3 metrics displayed correctly`
 
-- **Task 9.6: Reconcile 검증 (Brownfield)**
-  - Do: sandbox `.claude/` 에 의도적으로 사용자 수정 파일 1개 생성 (hash 깨뜨리기). `make` 재실행 → reconcile 가 KEEP 결정 (autoloop 자동). 사용자 수정 파일 보존 확인.
-  - Files: `tests/e2e/test_dogfood_sandbox.py` (확장)
-  - Done when: 사용자 수정 파일 그대로, 다른 파일은 갱신
+- **Task 9.6: Verify Reconcile (Brownfield)**
+  - Do: Intentionally create one user-modified file in sandbox `.claude/` (break the hash). Re-run `make` → reconcile decides KEEP (automatic in autoloop). Confirm user-modified file is preserved.
+  - Files: `tests/e2e/test_dogfood_sandbox.py` (extended)
+  - Done when: user-modified file unchanged, other files updated
   - Verify: `bash .claude-verify.sh phase_9_reconcile`
   - Commit: `test(phase9): verify Brownfield reconcile preserves user edits`
 
-- **Task 9.7: Plugin entry 검증 (Claude Code 호출)**
-  - Do: subprocess 로 `claude --plugin-dir /home/noel/harness-maker -p "/harness-maker:make tests/e2e/sandbox-plugin-test --autoloop"` 실행 (또는 `--dangerously-skip-permissions` 필요 시). Claude Code 가 본 플러그인 로드 → /harness-maker:make 명령 라우팅 → `python -m harness_maker.cli make` 호출 → sandbox-plugin-test/.claude/ 생성 검증. **Python CLI entry 와 Plugin entry 둘 다 동일 결과** 보장.
+- **Task 9.7: Verify plugin entry (Claude Code invocation)**
+  - Do: Run via subprocess: `claude --plugin-dir /home/noel/harness-maker -p "/harness-maker:make tests/e2e/sandbox-plugin-test --autoloop"` (add `--dangerously-skip-permissions` if required). Claude Code loads this plugin → routes /harness-maker:make command → calls `python -m harness_maker.cli make` → verify `sandbox-plugin-test/.claude/` is generated. **Both the Python CLI entry and the plugin entry must produce identical results.**
   - Files: `tests/e2e/test_plugin_entry.py`, `tests/e2e/sandbox-plugin-test/`
-  - Done when: subprocess exit 0, sandbox-plugin-test/.claude/harness.yaml 존재, Python CLI 결과와 file count·content 일치 (timestamp 무시)
+  - Done when: subprocess exit 0, sandbox-plugin-test/.claude/harness.yaml exists, file count and content match Python CLI result (ignoring timestamps)
   - Verify: `bash .claude-verify.sh phase_9_plugin_entry`
   - Commit: `test(phase9): verify Claude Code plugin entry matches CLI entry`
 
@@ -1283,46 +1307,46 @@ uv run pytest tests/e2e/ -v \
 
 ### Phase 12: Polish (README + Docs + Final Cleanup)
 
-**Objective:** 외부 공개 가능한 상태. README 완성, CONTRIBUTING, 최종 lint/type/test 0 error.
+**Objective:** Reach a state suitable for public release. Complete README, CONTRIBUTING, final lint/type/test with 0 errors.
 
-**Research targets (autoloop Stage 1 자동 fetch):**
-- Claude Code marketplace 등록: https://code.claude.com/docs/en/plugin-marketplaces
+**Research targets (autoloop Stage 1 auto-fetch):**
+- Claude Code marketplace registration: https://code.claude.com/docs/en/plugin-marketplaces
 - README best practices: https://www.makeareadme.com/
 
 #### Tasks
 
-- **Task 10.1: README.md 완성**
-  - Do: 1-page README — 프로젝트 소개 (1단락), Quick Start (`uv sync && claude --plugin-dir . && /harness-maker:make`), 기능 요약 (단일 명령, 2 preset, 3 metric, anti-rot, worktree, security), 비교표 (vs ohmyclaudecode/superpowers/Archon — 차별점 짧게), License.
-  - Files: `README.md` (확장)
-  - Done when: README 가 Quick Start + 기능 요약 + 비교 + License 모두 포함
+- **Task 10.1: Complete README.md**
+  - Do: 1-page README — project introduction (1 paragraph), Quick Start (`uv sync && claude --plugin-dir . && /harness-maker:make`), feature summary (single command, 2 presets, 3 metrics, anti-rot, worktree, security), comparison table (vs ohmyclaudecode/superpowers/Archon — brief differentiators), License.
+  - Files: `README.md` (extended)
+  - Done when: README includes Quick Start + feature summary + comparison + License
   - Verify: `bash .claude-verify.sh phase_10_readme`
   - Commit: `docs(phase10): write comprehensive README`
 
 - **Task 10.2: CONTRIBUTING.md**
-  - Do: `docs/CONTRIBUTING.md` — 기여 가이드. 새 skill/agent 템플릿 추가 방법, 새 preset 추가 (yaml schema 확장), 테스트 작성 패턴, PR 체크리스트.
+  - Do: `docs/CONTRIBUTING.md` — contribution guide. How to add new skill/agent templates, how to add a new preset (yaml schema extension), test writing patterns, PR checklist.
   - Files: `docs/CONTRIBUTING.md`
-  - Done when: 외부 기여자가 따라할 수 있는 가이드 완성
+  - Done when: guide is complete enough for an external contributor to follow
   - Verify: `bash .claude-verify.sh phase_10_contributing`
   - Commit: `docs(phase10): write contributing guide`
 
-- **Task 10.3: ARCHITECTURE.md (도메인 지식 추출)**
-  - Do: `docs/ARCHITECTURE.md` — TECH_SPEC Section 3 의 메커니즘 13개를 외부 독자가 이해할 수 있게 풀어쓴 문서. 시스템 다이어그램, data flow, 각 메커니즘의 의도.
+- **Task 10.3: ARCHITECTURE.md (domain knowledge extraction)**
+  - Do: `docs/ARCHITECTURE.md` — explanation of the 13 mechanisms from TECH_SPEC Section 3 written for an external reader. System diagram, data flow, intent of each mechanism.
   - Files: `docs/ARCHITECTURE.md`
-  - Done when: 외부 독자가 코드 안 봐도 시스템 이해 가능
+  - Done when: an external reader can understand the system without reading the code
   - Verify: `bash .claude-verify.sh phase_10_architecture`
   - Commit: `docs(phase10): write ARCHITECTURE.md`
 
-- **Task 10.4: 최종 lint + type + test**
-  - Do: 전체 코드베이스 ruff format 적용, ruff check 0 error, mypy --strict 0 error, pytest 모든 테스트 통과. pyproject.toml version bump? (유지 — 0.1.0).
-  - Files: 전체
-  - Done when: lint 0, type 0, pytest 0 fail
+- **Task 10.4: Final lint + type + test**
+  - Do: Apply ruff format across the entire codebase, ruff check 0 errors, mypy --strict 0 errors, all pytest tests pass. pyproject.toml version bump? (hold at 0.1.0).
+  - Files: entire codebase
+  - Done when: lint 0, type 0, pytest 0 failures
   - Verify: `bash .claude-verify.sh phase_10_final_quality`
   - Commit: `chore(phase10): final cleanup — lint, type, test all green`
 
 - **Task 10.5: Marketplace prep (optional)**
-  - Do: `.claude-plugin/plugin.json` 에 homepage, repository (placeholder), keywords 추가. README 에 marketplace 등록 절차 placeholder.
-  - Files: `.claude-plugin/plugin.json`, `README.md` (확장)
-  - Done when: plugin.json 이 marketplace 호환 schema (Claude Code 공식 spec 참조)
+  - Do: Add `homepage`, `repository` (placeholder), and `keywords` to `.claude-plugin/plugin.json`. Add marketplace registration procedure placeholder to README.
+  - Files: `.claude-plugin/plugin.json`, `README.md` (extended)
+  - Done when: plugin.json is compatible with marketplace schema (per Claude Code official spec)
   - Verify: `bash .claude-verify.sh phase_10_marketplace`
   - Commit: `feat(phase10): prepare plugin.json for marketplace submission`
 
@@ -1341,47 +1365,47 @@ uv run ruff check src/ tests/ \
 
 ## 5. Final Acceptance Criteria
 
-### R1-R6 검증 (모든 핵심 요구사항)
+### R1-R6 Verification (All Core Requirements)
 
-- [ ] **R1 Locale-first**: 빈 sandbox 에서 `cli make --interactive` 호출 시 Q1 (한국어/English) 가 첫 질문. `.claude/harness.yaml` 에 locale 키 저장.
-- [ ] **R2 Anti-rot**: 4 source crawler 모두 호출 가능. relevance filter adaptive threshold 동작. `/hm:refresh` 가 propose 까지 진행 후 manual confirm 대기 (자동 적용 절대 X).
-- [ ] **R3 Monitoring**: `/hm:ai-readiness` 리포트에 🪙효율% · 🎯Health · 🔄fresh d 모두 표시. dashboard.md 에 Health 6-dim + Agent quality drill-down (Platinum/Gold/Silver/Bronze) 섹션 포함. metrics.jsonl 외부 전송 0.
-- [ ] **R4 Workflow**: 7 atomic stage (`/hm:research` ... `/hm:verify`) 자동 노출. 사용자 명명 fused workflow N개 (`/hm:dev`, `/hm:careful`) 단일 명령으로 호출 가능. atomic vs fused 둘 다 동작.
-- [ ] **R5 Autoloop**: `/hm:loop "<goal>"` 호출 시 driver 가 token 무제한, 8h/30iter 디폴트로 자율 반복. dry-run 모드 동작. iter 5 ping, 3-fail stop.
-- [ ] **R6 Per-project preset**: 2 preset (Side/Production) 인터뷰 → 10+ 차원 override → harness.yaml 에 저장. 4 fixture 모두 expected blueprint 일치.
+- [ ] **R1 Locale-first**: Invoking `cli make --interactive` in an empty sandbox, Q1 (Korean/English) must be the first question. The `locale` key is saved to `.claude/harness.yaml`.
+- [ ] **R2 Anti-rot**: All 4 source crawlers are callable. The relevance filter adaptive threshold operates correctly. `/hm:refresh` proceeds through the propose step and then waits for manual confirm (auto-apply absolutely prohibited).
+- [ ] **R3 Monitoring**: `/hm:ai-readiness` report shows all three metrics: efficiency%, Health, and fresh (days since refresh). `dashboard.md` includes a Health 6-dim section and an Agent quality drill-down (Platinum/Gold/Silver/Bronze) section. Zero external transmission of `metrics.jsonl`.
+- [ ] **R4 Workflow**: 7 atomic stages (`/hm:research` ... `/hm:verify`) auto-exposed. N user-named fused workflows (`/hm:dev`, `/hm:careful`) callable as a single command. Both atomic and fused workflows operate correctly.
+- [ ] **R5 Autoloop**: Invoking `/hm:loop "<goal>"` causes the driver to iterate autonomously with unlimited tokens, defaulting to 8h/30 iterations. Dry-run mode works. Iter-5 ping and 3-fail stop operate correctly.
+- [ ] **R6 Per-project preset**: 2 presets (Side/Production) interview flow → 10+ dimension overrides → saved to `harness.yaml`. All 4 fixtures match expected blueprints.
 
-### 메커니즘 검증
+### Mechanism Verification
 
-- [ ] (M1) Profiler→Interviewer→Synthesizer→Renderer pipeline 4 fixture 통과
-- [ ] (M2) Reconciler 가 hash-based 자동 분류, backup 디렉토리 생성
-- [ ] (M3) Workflow Engine atomic + fused 모두 렌더
-- [ ] (M4) Anti-rot 4 source 호출 가능 + adaptive threshold 적응
-- [ ] (M5) 3 metrics 실시간 + Health 6-dim + Agent quality drill-down
-- [ ] (M6) Conditional Router 가 changed_files → reviewer 자동 선택
-- [ ] (M7) Autoloop driver state machine 동작
-- [ ] (M8) Verify-before-completion 가 wrapup 직전 6 체크 모두 실행
-- [ ] (M9) Worktree 격리 — `.worktrees/<workflow>-<ts>/` 생성·cleanup
-- [ ] (M10) 5 Security Gates 모두 seeded vulnerability 검출
-- [ ] (M11) Context Lint 가 verbose 차단
-- [ ] (M12) Privilege Separation — reviewer settings.json 에 `Write` deny, executor 에 `Write(.worktrees/**)` allow
-- [ ] (M13) Provenance Frontmatter — 모든 generated 파일에 hash + version, refresh 시 사용자 수정 감지
-- [ ] (M14) Dual-IDE Rendering — cursor target 선택 시 `.cursor/rules/harness.mdc` + `.cursor/mcp.json` 렌더, single-source `.claude/` 자산은 양쪽 공유. dual plugin manifest 동기화.
+- [ ] (M1) Profiler → Interviewer → Synthesizer → Renderer pipeline passes 4 fixtures
+- [ ] (M2) Reconciler performs hash-based automatic classification and creates a backup directory
+- [ ] (M3) Workflow Engine renders both atomic and fused workflows
+- [ ] (M4) Anti-rot 4 sources callable + adaptive threshold adapts
+- [ ] (M5) 3 real-time metrics + Health 6-dim + Agent quality drill-down
+- [ ] (M6) Conditional Router auto-selects reviewer based on `changed_files`
+- [ ] (M7) Autoloop driver state machine operates correctly
+- [ ] (M8) Verify-before-completion executes all 6 checks immediately before wrapup
+- [ ] (M9) Worktree isolation — `.worktrees/<workflow>-<ts>/` is created and cleaned up
+- [ ] (M10) All 7 Security Gates detect seeded vulnerabilities
+- [ ] (M11) Context Lint blocks verbose output
+- [ ] (M12) Privilege Separation — reviewer `settings.json` has `Write` denied, executor has `Write(.worktrees/**)` allowed
+- [ ] (M13) Provenance Frontmatter — all generated files have hash + version; user modifications detected on refresh
+- [ ] (M14) Dual-IDE Rendering — when cursor target is selected, `.cursor/rules/harness.mdc` + `.cursor/mcp.json` are rendered; single-source `.claude/` assets are shared by both IDEs; dual plugin manifest is synchronized
 
-### 자산 존재 검증
+### Asset Existence Verification
 
 - [ ] Skills (11): verify-before-completion, conditional-router, ai-readiness-rubric, agent-quality-rubric, research-crawler, relevance-filter, autoloop-driver, worktree-isolator, security-scanner, context-linter, refdocs-search
 - [ ] Agents (9): code-reviewer, security-reviewer, security-auditor, performance-reviewer, ux-reviewer, concurrency-reviewer, consensus-arbiter, autoloop-coder, executor
-- [ ] Commands (10+): /hm:research, spec, plan, execute, review, wrapup, verify (atomic 7개) + /hm:loop, /hm:monitor, /hm:refresh (메타 3개) + N user workflows
-- [ ] Hooks: hooks.json 에 telemetry-collector
-- [ ] Templates: harness-yaml/{Side,Production} + claude-md × {ko,en} × 2 preset + memory × {failures,wiki} × {ko,en} + settings × 2 preset + dashboard × {ko,en}
+- [ ] Commands (10+): /hm:research, spec, plan, execute, review, wrapup, verify (7 atomic) + /hm:loop, /hm:monitor, /hm:refresh (3 meta) + N user workflows
+- [ ] Hooks: `hooks.json` contains telemetry-collector
+- [ ] Templates: harness-yaml/{Side,Production} + claude-md × {ko,en} × 2 presets + memory × {failures,wiki} × {ko,en} + settings × 2 presets + dashboard × {ko,en}
 
 ### Verification Script (`.claude-verify.sh`)
 
-상세는 `.claude-verify.sh all` 참조. 모든 체크는 phase 별 + final all 두 가지 모드 지원.
+See `.claude-verify.sh all` for details. All checks support both per-phase and final `all` modes.
 
 ```bash
 bash .claude-verify.sh all
-# 위 모든 항목을 체크 → exit 0 = 모두 통과 / non-zero = 실패 항목 출력
+# Checks all items above → exit 0 = all passed / non-zero = prints failed items
 ```
 
 ---
@@ -1390,172 +1414,173 @@ bash .claude-verify.sh all
 
 ### Architecture Decision Records
 
-- **ADR-1: Python only (Bash 사용 금지)**
-  - Context: 초기 spec 은 Bash + Python 혼용
-  - Decision: Python 단일 — Bash 제거.
-  - Rationale: 일관성, type checking, test framework 통합. WSL2 환경 안정성.
+- **ADR-1: Python only (no Bash)**
+  - Context: Initial spec mixed Bash and Python.
+  - Decision: Python exclusively — Bash removed.
+  - Rationale: Consistency, type checking, test framework integration, and WSL2 environment stability.
 
-- **ADR-2: 단일 메타-툴 명령**
-  - Context: 초기 spec 은 /harness-maker:make + refresh + audit + monitor + loop + add 6개 명령
-  - Decision: `/harness-maker:make` 단 1개. audit/add/remove/promote 는 플래그.
-  - Rationale: "메타-툴은 생성기" 원칙. /loop /monitor /refresh 등 일상 명령은 사용자 하네스 안에 렌더 (`/hm:` prefix).
+- **ADR-2: Single meta-tool command**
+  - Context: Initial spec had 6 commands: /harness-maker:make + refresh + audit + monitor + loop + add.
+  - Decision: `/harness-maker:make` only. `audit/add/remove/promote` are flags.
+  - Rationale: "Meta-tool is a generator" principle. Day-to-day commands like /loop /monitor /refresh are rendered into the user harness (`/hm:` prefix).
 
-- **ADR-3: /hm: prefix (subdirectory namespace 활용)**
-  - Context: 사용자가 직접 만든 명령과 ownership 구별 필요
-  - Decision: `.claude/commands/hm/<name>.md` → `/hm:<name>`. 사용자 명령은 prefix 없이 `.claude/commands/<name>.md` → `/<name>`.
-  - Rationale: Manifest tracking 불필요. 자연스러운 ownership 분리.
+- **ADR-3: /hm: prefix (subdirectory namespace)**
+  - Context: Need to distinguish ownership between user-authored commands and harness-generated commands.
+  - Decision: `.claude/commands/hm/<name>.md` → `/hm:<name>`. User commands have no prefix: `.claude/commands/<name>.md` → `/<name>`.
+  - Rationale: No manifest tracking needed. Natural ownership separation.
 
-- **ADR-4: Workflow = Prompt Fusion (사용자 명명)**
-  - Context: spec/task methodology 2x2 매트릭스로 시작
-  - Decision: 일반화 — 7 atomic stage + N 사용자 명명 fused workflow. Renderer 가 stage prompt fragment 합성해 단일 command 생성.
-  - Rationale: human-in-the-loop 최소화 (1 입력 → 1 turn). 사용자가 도메인 맞춤 workflow 명명.
+- **ADR-4: Workflow = Prompt Fusion (user-named)**
+  - Context: Started as a spec/task methodology 2x2 matrix.
+  - Decision: Generalized — 7 atomic stages + N user-named fused workflows. Renderer synthesizes stage prompt fragments into a single command file.
+  - Rationale: Minimizes human-in-the-loop (1 input → 1 turn). Users name domain-specific workflows.
 
 - **ADR-5: 100% local telemetry**
-  - Context: external observability 가능
-  - Decision: metrics.jsonl 은 .claude/observability/ 에만, 외부 전송 0.
-  - Rationale: 프라이버시·신뢰. anti-rot 의 서비스 호출은 user-initiated 만.
+  - Context: External observability was possible.
+  - Decision: `metrics.jsonl` stored only in `.claude/observability/`; zero external transmission.
+  - Rationale: Privacy and trust. Anti-rot service calls are user-initiated only.
 
-- **ADR-6: Anti-rot 항상 manual confirm**
-  - Context: low-risk auto-apply 옵션 검토
-  - Decision: 모든 risk 등급에서 사용자 confirm 강제. auto_apply=false 고정.
-  - Rationale: silent change 방지. K1 (잘못된 patch) 위험 완화.
+- **ADR-6: Anti-rot always requires manual confirm**
+  - Context: Low-risk auto-apply option was considered.
+  - Decision: User confirm enforced at all risk levels. `auto_apply=false` fixed.
+  - Rationale: Prevents silent changes. Mitigates K1 (bad patch) risk.
 
-- **ADR-7: Worktree per execute (Archon/superpowers/OMX 표준)**
-  - Context: 변경 격리 방법
-  - Decision: `/hm:execute` 자동 git worktree 생성, 성공 시 cleanup.
-  - Rationale: main branch 오염 방지. autoloop 매 iter 격리. 산업 표준.
+- **ADR-7: Worktree per execute (Archon/superpowers/OMX standard)**
+  - Context: Method for change isolation.
+  - Decision: `/hm:execute` automatically creates a git worktree; cleans up on success.
+  - Rationale: Prevents main branch contamination. Isolates each autoloop iteration. Industry standard.
 
-- **ADR-8: 권한 분리 아키텍처 (OpenClaw)**
-  - Context: prompt injection 방어
-  - Decision: reviewer = Read+Grep only / executor = Write(.worktrees/**) only. settings.json 에 명시적 deny 리스트.
-  - Rationale: arxiv 2603.13424 — 필터 단독 14% ASR vs 권한 분리 0.31% (323배 감소).
+- **ADR-8: Privilege separation architecture (OpenClaw)**
+  - Context: Defense against prompt injection.
+  - Decision: reviewer = Read+Grep only / executor = Write(.worktrees/**) only. Explicit deny list in `settings.json`.
+  - Rationale: arxiv 2603.13424 — filter alone: 14% ASR vs privilege separation: 0.31% (323x reduction).
 
-- **ADR-9: Provenance Frontmatter (Supply-Chain Poisoning 대응)**
-  - Context: skill default-trust 위험 (CVE-2025-59536)
-  - Decision: 모든 generated 자산에 frontmatter (generated_by + content_hash + source_template + version).
-  - Rationale: arxiv 2604.03081. silent overwrite 차단. Brownfield reconcile 의 ours/theirs 판별 강화.
+- **ADR-9: Provenance Frontmatter (Supply-Chain Poisoning defense)**
+  - Context: Skill default-trust risk (CVE-2025-59536).
+  - Decision: All generated assets have frontmatter (`generated_by` + `content_hash` + `source_template` + `version`).
+  - Rationale: arxiv 2604.03081. Blocks silent overwrite. Strengthens ours/theirs determination in brownfield reconcile.
 
-- **ADR-10: Context Lint (verbose 차단)**
-  - Context: AGENTS.md verbose 가 성공률 ↓
-  - Decision: Renderer 에 길이 한계 적용 (CLAUDE.md Side 200/Prod 500 등).
-  - Rationale: arxiv 2602.11988 — verbose context = -성공률, +20% 비용.
+- **ADR-10: Context Lint (block verbose)**
+  - Context: Verbose AGENTS.md decreases success rate.
+  - Decision: Apply length limits in Renderer (CLAUDE.md Side 200/Prod 500, etc.).
+  - Rationale: arxiv 2602.11988 — verbose context = lower success rate, +20% cost.
 
-- **ADR-11: Targets 축 — Cursor as native consumer of `.claude/` (0.5.0)**
-  - Context: Cursor IDE 2.4+ 가 `.claude/agents/`, `.claude/skills/` 를 native 로 읽음 확인
-  - Decision: single-source `.claude/` 를 두 IDE 가 공유. Cursor-only 자산 (rules, mcp.json) 만 별도 렌더. auto-detect 금지 — 사용자가 명시 선택.
-  - Rationale: 중복 없이 dual IDE 지원. 사용자 의도 확인 (`.cursor/` 존재 여부로 추론하면 false-positive 발생).
+- **ADR-11: Targets axis — Cursor as native consumer of `.claude/` (0.5.0)**
+  - Context: Confirmed that Cursor IDE 2.4+ natively reads `.claude/agents/`, `.claude/skills/`.
+  - Decision: Both IDEs share a single-source `.claude/`. Only Cursor-only assets (rules, mcp.json) are rendered separately. Auto-detect prohibited — user must explicitly select.
+  - Rationale: Dual IDE support without duplication. User intent confirmation required (inferring from `.cursor/` directory presence causes false positives).
 
 - **ADR-12: recommended_model + no model-agnostic rewrite (0.5.0)**
-  - Context: Cursor 사용자는 모델 자유 선택. harness prompt 에 `<thinking>` 등 Claude-specific 표현 있음.
-  - Decision: `harness.yaml.recommended_model: claude-opus-4-7` 기본값 + agent frontmatter 전파. prompt 자체 재작성 X.
-  - Rationale: prompt 재작성은 품질 하락 위험. 사용자가 다른 모델 쓰는 건 본인 선택 + 결과 책임.
+  - Context: Cursor users can freely choose their model. Harness prompts contain Claude-specific expressions like `<thinking>` blocks.
+  - Decision: `harness.yaml.recommended_model: claude-opus-4-7` as default, propagated to agent frontmatter. Prompts themselves are not rewritten.
+  - Rationale: Rewriting prompts risks quality degradation. Users choosing a different model do so at their own discretion and accept the consequences.
 
-- **ADR-13: 버전 4파일 동시 변경 invariant (0.4.9, cursor target 시 확장)**
-  - Context: 0.4.9 릴리스 시 `pyproject.toml` 만 올리고 plugin.json 방치 → marketplace 가 "already at latest" 오보
-  - Decision: 버전 변경 시 `.claude-plugin/plugin.json` + `.cursor-plugin/plugin.json` + `pyproject.toml` + `src/harness_maker/__init__.py` 4개 동시 변경 필수. PR checklist 항목 + CI 잠재 gate.
-  - Rationale: marketplace 동기화 보장. 누락 시 사용자가 stale plugin 을 최신으로 오해.
+- **ADR-13: Four-file simultaneous version change invariant (0.4.9, extended for cursor target)**
+  - Context: In 0.4.9 release, only `pyproject.toml` was bumped while `plugin.json` was neglected → marketplace falsely reported "already at latest".
+  - Decision: Version changes must simultaneously modify all four files: `.claude-plugin/plugin.json` + `.cursor-plugin/plugin.json` + `pyproject.toml` + `src/harness_maker/__init__.py`. Required as a PR checklist item and potential CI gate.
+  - Rationale: Guarantees marketplace synchronization. Without it, users mistake a stale plugin for the latest version.
 
 ### Risks (K1-K17)
 
-| ID | 위험 | 영향 | 완화 |
+| ID | Risk | Impact | Mitigation |
 |---|---|---|---|
-| K1 | arxiv 크롤이 noise → 잘못된 패치 | high | adaptive threshold + 항상 manual confirm |
-| K2 | autoloop runaway | high | iter cap + time cap + 3 fail stop + iter 5 ping |
-| K3 | Template 자체가 stale → 자기-순환 | med | refresh 대상에 self template 포함 |
-| K4 | 모니터링이 압도적 | med | ai-readiness 3 지표 고정, dashboard on-demand |
-| K5 | i18n 비대칭 | med | template diff 비대칭 시 빌드 fail (CI 게이트) |
-| K6 | hiloop skill 이름 충돌 | low | `harness-maker:` namespace 명시 |
-| K7 | 22 프로젝트 한꺼번에 적용 → 회귀 폭발 | high | dry-run 강제 첫 회 / per-project apply / backup 보존 |
-| K8 | WSL2 NTFS Edit hazard | med | renderer 가 자동 Write tool 강제 |
-| K9 | autoloop 외부 서비스 호출 비용 | med | dry-run 디폴트, 외부 API 호출 confirm |
-| K10 | 사용자 voice leak | low | prefs (memory) 의 voice 가이드 인지 |
-| K11 | Brownfield .claude/ 풍부 시 reconcile 복잡 | high | backup + ADD-only + 항목별 reconcile UI + provenance hash |
-| K12 | Worktree 잔존물 디스크 누적 | med | .gitignore 자동 + cleanup=on_success default + weekly cleanup hook |
-| K13 | 보안 스캔 false positive 폭발 | med | on_finding.high=warn (Side default) + allowlist 파일 + per-finding silence |
-| K14 | 보안 스캔 결과 누출 | low | findings .gitignore + 100% 로컬 정책 |
-| K15 | Context verbose → 성공률 -·비용 +20% | high | context-linter Side 200/Prod 500 한계 |
-| K16 | Reviewer agent prompt injection 으로 Write 권한 획득 | high | settings.json 권한 분리 — reviewer Write/Edit deny |
-| K17 | 사용자 수정 파일 silent overwrite | med | provenance hash 비교 → 불일치 시 confirm 필수 |
+| K1 | arxiv crawl noise → bad patch | high | adaptive threshold + always manual confirm |
+| K2 | autoloop runaway | high | iter cap + time cap + 3-fail stop + iter-5 ping |
+| K3 | Template itself goes stale → self-referential cycle | med | include self-template in refresh targets |
+| K4 | Monitoring becomes overwhelming | med | ai-readiness fixed at 3 metrics, dashboard on-demand |
+| K5 | i18n asymmetry | med | build fails on template diff asymmetry (CI gate) |
+| K6 | hiloop skill name collision | low | explicit `harness-maker:` namespace |
+| K7 | Applying to 22 projects at once → regression explosion | high | dry-run forced on first run / per-project apply / backup preserved |
+| K8 | WSL2 NTFS Edit hazard | med | renderer automatically enforces Write tool |
+| K9 | autoloop external service call cost | med | dry-run default, confirm before external API calls |
+| K10 | User voice leak | low | voice guide awareness in prefs (memory) |
+| K11 | Rich brownfield `.claude/` → complex reconcile | high | backup + ADD-only + per-item reconcile UI + provenance hash |
+| K12 | Worktree remnants accumulate on disk | med | auto `.gitignore` + `cleanup=on_success` default + weekly cleanup hook |
+| K13 | Security scan false positive explosion | med | `on_finding.high=warn` (Side default) + allowlist file + per-finding silence |
+| K14 | Security scan results leak | low | findings `.gitignore` + 100% local policy |
+| K15 | Context verbose → lower success rate, +20% cost | high | context-linter Side 200 / Prod 500 limits |
+| K16 | Reviewer agent prompt injection to gain Write permission | high | `settings.json` privilege separation — reviewer Write/Edit denied (closed in 0.7.1, ADR-108) |
+| K17 | Silent overwrite of user-modified files | med | provenance hash comparison → confirm required on mismatch |
 
 ---
 
 ## Appendix A: Decisions Log (v0.1 → v2.0)
 
-상세 변경 이력은 본 spec 의 모든 ADR + Risk + Goal 결정에 흡수. 핵심 변천:
+Detailed change history is absorbed into all ADR + Risk + Goal decisions in this spec. Key evolution:
 
-- **v0.1** (Draft): 6 R 요구사항, M1-M4 mode 분류, 5 모니터링 지표, 4 명령, 8 phase
-- **v1.0**: M1-M4 폐기, 2 preset (Side/Production), 3 지표 압축, 단일 메타 명령, 12주 phase
-- **v1.1**: 메타-툴 / 런타임 분리 (모든 일상 명령 → 사용자 하네스로 이동)
+- **v0.1** (Draft): 6 R requirements, M1-M4 mode classification, 5 monitoring metrics, 4 commands, 8 phases
+- **v1.0**: M1-M4 retired, 2 presets (Side/Production), 3 metrics consolidated, single meta command, 12-week phases
+- **v1.1**: Meta-tool / runtime separation (all day-to-day commands moved to user harness)
 - **v1.2**: /hm: prefix
-- **v1.3**: Workflow 추상화 (atomic + fused) + Model tier 설정
-- **v1.4**: Worktree 격리 + 5 Security Gates (Archon/ECC 영향)
-- **v1.5**: Agent quality drill-down (Health 의 sub-rubric)
+- **v1.3**: Workflow abstraction (atomic + fused) + Model tier configuration
+- **v1.4**: Worktree isolation + 5 Security Gates (influenced by Archon/ECC)
+- **v1.5**: Agent quality drill-down (sub-rubric of Health)
 - **v1.6**: Context lint + Privilege separation + Provenance frontmatter (arxiv 2602.11988 / 2603.13424 / 2604.03081)
-- **v2.0**: autoloop-ready 형식 — Section 0-6 구조, 10 phase, 모든 R/M/A 가 Section 4 task 또는 Section 5 verify 에 명시 매핑
-- **v2.1**: autoloop dry-run 분석 10 fix — (C1) Renderer freeze_time, (C2) plugin entry subprocess task, (C3) Anthropic URL 명시, (I1) SubAgent permissions schema research, (I2) vault path 의존 제거, (I3-I5) atomic write/LLM mock/worktree cleanup CLAUDE.md, (M1-M2) Phase 9 marker + file count assertion
-- **v2.2** (본 spec): 2차 dry-run 분석 expanded fix set — (a) **Phase 2 split** (9 tasks → Phase 2 Foundations 3 + Phase 3 Pipeline 6) — autoloop 자체 권고. (b) **Phase 7 split** (9 tasks → Phase 8 Worktree 3 + Phase 9 Security 6) — 동일 패턴. (c) **Task 1.0 env precheck** (uv/python3.12+/git/cache write — fail fast). (d) **Cross-phase invariant gate** — 매 phase Exit Criteria 에 `phase_<N>_invariants` 호출 (생성 .claude/ 자산 frontmatter 검증). (e) Total phases: 10 → **12**. (f) verify script 전면 개정 — 12 phase 함수, env check, invariants helper. (g) max_global_iterations 100 유지 (12×5=60 worst, 충분 마진).
-- **v2.3** (0.5.x 현황 반영, 2026-05): (a) M1 targets/recommended_model/locale-en 추가. (b) M4 anti-rot GitHub source 실제값 반영 (anthropics/claude-code 기본). (c) M5 SessionStart drift reminder hook + hybrid telemetry schema. (d) M7 feature/improve mode + per-loop worktree (wrapup 1회). (e) M9 worktree path `.worktrees/` (프로젝트 루트) + prefix-match cleanup. (f) M13 4파일 버전 invariant. (g) **M14 신규** — Dual-IDE Rendering (Cursor target). (h) §5 skills 10→11 (refdocs-search 추가), M14 verify row. (i) ADR-11/12/13 신규.
+- **v2.0**: autoloop-ready format — Section 0-6 structure, 10 phases, all R/M/A entries explicitly mapped to Section 4 tasks or Section 5 verify
+- **v2.1**: autoloop dry-run analysis 10 fixes — (C1) Renderer freeze_time, (C2) plugin entry subprocess task, (C3) Anthropic URL explicit, (I1) SubAgent permissions schema research, (I2) remove vault path dependency, (I3-I5) atomic write/LLM mock/worktree cleanup CLAUDE.md, (M1-M2) Phase 9 marker + file count assertion
+- **v2.2** (this spec): 2nd dry-run analysis expanded fix set — (a) **Phase 2 split** (9 tasks → Phase 2 Foundations 3 + Phase 3 Pipeline 6) — autoloop's own recommendation. (b) **Phase 7 split** (9 tasks → Phase 8 Worktree 3 + Phase 9 Security 6) — same pattern. (c) **Task 1.0 env precheck** (uv/python3.12+/git/cache write — fail fast). (d) **Cross-phase invariant gate** — each phase Exit Criteria calls `phase_<N>_invariants` (validates frontmatter of generated `.claude/` assets). (e) Total phases: 10 → **12**. (f) Verify script fully revised — 12 phase functions, env check, invariants helper. (g) `max_global_iterations` 100 maintained (12×5=60 worst case, sufficient margin).
+- **v2.3** (0.5.x status update, 2026-05): (a) M1 targets/recommended_model/locale-en additions. (b) M4 anti-rot GitHub source actual values reflected (anthropics/claude-code default). (c) M5 SessionStart drift reminder hook + hybrid telemetry schema. (d) M7 feature/improve mode + per-loop worktree (wrapup once). (e) M9 worktree path `.worktrees/` (project root) + prefix-match cleanup. (f) M13 four-file version invariant. (g) **M14 new** — Dual-IDE Rendering (Cursor target). (h) §5 skills 10→11 (refdocs-search added), M14 verify row. (i) ADR-11/12/13 new.
+- **v2.1 (0.7.1, 2026-05-08)** — Patch release closing 9 deferred review findings. ADR-101 to ADR-108: scope, telemetry env-var cwd, daily metrics rotation, doc-only read-staleness, pure-filesystem hallucination, threading.local re-entrant flock, tool_input whitelist + secret redaction, drift_monitor XML fence. /hm:review round-2 P0 fixes: flock-before-depth ordering; raw os.write for atomic O_APPEND.
 
 ---
 
 ## Appendix B: Glossary
 
-| 용어 | 의미 |
+| Term | Meaning |
 |---|---|
-| 하네스 | Claude Code 사용을 위한 프로젝트별 설정·스크립트·메모리 묶음 (`.claude/` 트리) |
-| Synthesizer | preset + 사용자 응답 → blueprint 매핑 (deterministic) |
-| Blueprint | 생성될 파일 목록 + 각 파일의 내용 (Apply 전 단계) |
-| Preset | Side / Production — 10+ 차원의 디폴트 번들 |
-| Reconciler | Brownfield 에서 기존 .claude/ 와 신규 blueprint 충돌 해결 |
-| Anti-rot | 시간이 지나도 하네스가 stale 하지 않도록 자동 최신화 (manual confirm) |
-| Autoloop | 목표 한 줄 → 수렴까지 자율 반복 사이클 (8h/30iter 디폴트) |
-| 효율 / Health / fresh | 3 핵심 지표 (cache hit% / readiness 0-100 / days since last refresh) |
-| Atomic stage | 7개 빌트인 (`research`, `spec`, `plan`, `execute`, `review`, `wrapup`, `verify`). 각 `/hm:<stage>` |
-| Workflow (fused) | 사용자 명명 stage 시퀀스. Renderer 가 fragment 합성 → 1 명령 1 turn |
-| Conditional Routing | 변경 파일 영역 따라 reviewer 선택 |
-| Verify-before-completion | /hm:wrapup 직전 자동 게이트 |
-| Modular installer | preset 외 단위 설치 (`make --add reviewer:security`) |
-| Worktree 격리 | `/hm:execute` 가 git worktree 안에서만 동작 |
-| 5 security gates | secrets · permissions · hook injection · CVE · prompt injection |
-| Agent quality rubric | per-agent Platinum/Gold/Silver/Bronze (Health drill-down) |
-| Context lint | Generator 단계의 verbose 차단 |
-| 권한 분리 | reviewer = Read/Grep only, executor = Write(.worktrees/**) only |
-| Provenance frontmatter | 모든 생성 자산에 generated_by + content_hash + source_template |
-| fixture | 합성 검증용 가짜 프로젝트 (Side/Production × Python/Tauri/Firmware) |
-| targets | HarnessConfig 의 IDE 선택 축 — claude-code \| cursor \| 둘 다. 사용자가 인터뷰에서 명시 선택 (auto-detect 금지) |
-| recommended_model | harness.yaml 에 저장되는 권장 모델 ID; agent frontmatter 에 전파 (기본: claude-opus-4-7) |
-| Dual-IDE Rendering (M14) | `.claude/` single-source + Cursor-only 자산 렌더 (M14). Cursor 2.4+ 가 `.claude/` native 읽음 |
-| SessionStart drift reminder | 세션 시작 시 harness-maker 버전 vs 렌더 당시 버전 비교 경고 hook |
+| Harness | A per-project bundle of configuration, scripts, and memory for using Claude Code (the `.claude/` tree) |
+| Synthesizer | Maps preset + user responses → blueprint (deterministic) |
+| Blueprint | The list of files to be generated along with their contents (the step before Apply) |
+| Preset | Side / Production — a bundle of defaults across 10+ dimensions |
+| Reconciler | Resolves conflicts between existing `.claude/` assets and a new blueprint in brownfield projects |
+| Anti-rot | Automatically keeps the harness current so it does not go stale over time (manual confirm required) |
+| Autoloop | One-line goal → autonomous iteration cycle until convergence (default: 8h/30 iterations) |
+| Efficiency / Health / fresh | 3 core metrics (cache hit% / readiness 0-100 / days since last refresh) |
+| Atomic stage | 7 built-in stages (`research`, `spec`, `plan`, `execute`, `review`, `wrapup`, `verify`), each as `/hm:<stage>` |
+| Workflow (fused) | A user-named stage sequence. Renderer synthesizes fragments → 1 command, 1 turn |
+| Conditional Routing | Selects reviewer based on the region of changed files |
+| Verify-before-completion | Automatic gate immediately before `/hm:wrapup` |
+| Modular installer | Per-unit installation outside of preset (`make --add reviewer:security`) |
+| Worktree isolation | `/hm:execute` operates only inside a git worktree |
+| 7 security gates | secrets · permissions · hook injection · CVE · prompt injection · hallucination · prod-name guard |
+| Agent quality rubric | Per-agent Platinum/Gold/Silver/Bronze rating (Health drill-down) |
+| Context lint | Blocks verbose output at the generator stage |
+| Privilege separation | reviewer = Read/Grep only, executor = Write(.worktrees/**) only |
+| Provenance frontmatter | All generated assets include `generated_by` + `content_hash` + `source_template` |
+| fixture | A synthetic project used for validation (Side/Production × Python/Tauri/Firmware) |
+| targets | IDE selection axis in HarnessConfig — `claude-code` \| `cursor` \| both. User makes an explicit selection during interview (auto-detect prohibited) |
+| recommended_model | Recommended model ID stored in `harness.yaml`; propagated to agent frontmatter (default: claude-opus-4-7) |
+| Dual-IDE Rendering (M14) | `.claude/` single-source + Cursor-only asset rendering (M14). Cursor 2.4+ natively reads `.claude/` |
+| SessionStart drift reminder | Hook that warns at session start when harness-maker version differs from the version at render time |
 
 ---
 
 ## Appendix C: Sources & Citations
 
-**경쟁/참고 framework:**
+**Competing/reference frameworks:**
 - hiloop: ai-readiness-rubric (Health), failures.md/wiki.md memory, autoloop-coder agent
-- Synthesis (Rajiv Pant, 2026-04): `.agents/` 컨벤션 (현재 미채택, Open Question)
-- claude-statusline-enhanced: cache hit 표시 (statusLine 기능 — harness-maker 는 제거, ai-readiness 로 대체)
-- obra/superpowers: verify-before-completion 게이트, 멀티-호스트 매니페스트
-- wshobson/agents: Conditional Routing + agent별 model tier + 3-layer eval (agent quality)
-- davila7/claude-code-templates: Modular installer 패턴
-- coleam00/Archon (v1.4 추가): YAML workflow + worktree 격리 + deterministic 노드
-- affaan-m/everything-claude-code (ECC): AgentShield 보안 스캐폴딩
-- scalarian/oh-my-codex: tmux worktree 라이프사이클
-- HKUDS/OpenHarness: Auto-Compaction 멀티-데이 세션
-- Yeachan-Heo/oh-my-claudecode: 키워드 기반 모드 자동 활성화 패턴
+- Synthesis (Rajiv Pant, 2026-04): `.agents/` convention (not currently adopted, Open Question)
+- claude-statusline-enhanced: cache hit display (statusLine feature — removed in harness-maker, replaced by ai-readiness)
+- obra/superpowers: verify-before-completion gate, multi-host manifests
+- wshobson/agents: Conditional Routing + per-agent model tier + 3-layer eval (agent quality)
+- davila7/claude-code-templates: Modular installer pattern
+- coleam00/Archon (added v1.4): YAML workflow + worktree isolation + deterministic nodes
+- affaan-m/everything-claude-code (ECC): AgentShield security scaffolding
+- scalarian/oh-my-codex: tmux worktree lifecycle
+- HKUDS/OpenHarness: Auto-Compaction multi-day sessions
+- Yeachan-Heo/oh-my-claudecode: keyword-based mode auto-activation pattern
 
-**arxiv 학술 근거 (v1.6, 2025-11~2026-05):**
-- AHE — Agentic Harness Engineering ([arxiv 2604.25850](https://arxiv.org/abs/2604.25850)): anti-rot 자동 진화 closed-loop 정당화
-- OpenDev ([arxiv 2603.05344](https://arxiv.org/abs/2603.05344)): 5-layer defense-in-depth → 5 security gates 정당화
-- Inside the Scaffold ([arxiv 2604.03515](https://arxiv.org/abs/2604.03515)): 5 loop primitives 분류
-- Evaluating AGENTS.md ([arxiv 2602.11988](https://arxiv.org/abs/2602.11988)): verbose context = -성공률, +20% 비용 → context lint 도입 근거
-- Routing/Cascades ([arxiv 2602.09902](https://arxiv.org/abs/2602.09902)): static routing optimal → model tier 정당화
-- OpenClaw — Privilege Separation ([arxiv 2603.13424](https://arxiv.org/abs/2603.13424)): 권한 분리 ASR 0.31% vs 필터 14% → 권한 분리 도입 근거
-- Supply-Chain Poisoning ([arxiv 2604.03081](https://arxiv.org/abs/2604.03081), CVE-2025-59536): provenance frontmatter 도입 근거
+**arxiv academic foundations (v1.6, 2025-11~2026-05):**
+- AHE — Agentic Harness Engineering ([arxiv 2604.25850](https://arxiv.org/abs/2604.25850)): justifies anti-rot automatic evolution closed-loop
+- OpenDev ([arxiv 2603.05344](https://arxiv.org/abs/2603.05344)): 5-layer defense-in-depth → justifies 5 security gates
+- Inside the Scaffold ([arxiv 2604.03515](https://arxiv.org/abs/2604.03515)): classifies 5 loop primitives
+- Evaluating AGENTS.md ([arxiv 2602.11988](https://arxiv.org/abs/2602.11988)): verbose context = lower success rate, +20% cost → basis for context lint introduction
+- Routing/Cascades ([arxiv 2602.09902](https://arxiv.org/abs/2602.09902)): static routing optimal → justifies model tier
+- OpenClaw — Privilege Separation ([arxiv 2603.13424](https://arxiv.org/abs/2603.13424)): privilege separation ASR 0.31% vs filter 14% → basis for privilege separation introduction
+- Supply-Chain Poisoning ([arxiv 2604.03081](https://arxiv.org/abs/2604.03081), CVE-2025-59536): basis for provenance frontmatter introduction
 
 ---
 
-**v2.0 확정** (autoloop-ready). `vault/.claude/commands/autoloop.md` 가 본 spec 의 Section 0-6 을 파싱해 자율 빌드 가능. Phase 0 kickoff 가능.
+**v2.0 finalized** (autoloop-ready). `vault/.claude/commands/autoloop.md` can parse Sections 0-6 of this spec and perform autonomous builds. Phase 0 kickoff is ready.
 
 ---
 
