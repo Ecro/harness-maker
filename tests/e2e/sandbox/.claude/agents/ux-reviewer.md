@@ -8,6 +8,8 @@ name: ux-reviewer
 description: Reviews UI changes for accessibility, consistency, and interaction quality
 tools: Read, Grep, Glob
 model: sonnet
+review_scope:
+- ux
 permissions:
   allow:
   - Read(*)

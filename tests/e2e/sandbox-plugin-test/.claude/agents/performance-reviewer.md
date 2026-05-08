@@ -9,6 +9,8 @@ description: Reviews changes for hot-path regressions, allocation hotspots, and 
   inefficiency
 tools: Read, Grep, Glob
 model: sonnet
+review_scope:
+- performance
 permissions:
   allow:
   - Read(*)

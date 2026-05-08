@@ -40,20 +40,22 @@ def scan_tool_call(
     for pattern in PROD_PATTERNS:
         match = pattern.search(args_str)
         if match:
-            findings.append(Finding(
-                severity="P0",
-                category="prod_name_guard",
-                file=str(args.get("path", args.get("file", ""))),
-                line=0,
-                evidence=(
-                    f"Tool '{tool_name}' references production pattern "
-                    f"'{match.group()}' in args: {args_str[:200]}"
-                ),
-                fix=(
-                    "Verify this is not targeting a production resource. "
-                    "Use a test/staging environment."
-                ),
-            ))
+            findings.append(
+                Finding(
+                    severity="P0",
+                    category="prod_name_guard",
+                    file=str(args.get("path", args.get("file", ""))),
+                    line=0,
+                    evidence=(
+                        f"Tool '{tool_name}' references production pattern "
+                        f"'{match.group()}' in args: {args_str[:200]}"
+                    ),
+                    fix=(
+                        "Verify this is not targeting a production resource. "
+                        "Use a test/staging environment."
+                    ),
+                )
+            )
     return findings
 
 
@@ -88,20 +90,22 @@ def scan_sequence(
                 if prev_name == seq_first and current_name == seq_second:
                     has_prod = any(p.search(current_target) for p in PROD_PATTERNS)
                     severity = "P0" if has_prod else "P1"
-                    findings.append(Finding(
-                        severity=severity,
-                        category="prod_name_guard_sequence",
-                        file=current_target,
-                        line=0,
-                        evidence=(
-                            f"Dangerous sequence: {prev_name}({prev_target}) → "
-                            f"{current_name}({current_target}). {description}"
-                        ),
-                        fix=(
-                            "Verify this sequence is intentional and does not "
-                            "target production data."
-                        ),
-                    ))
+                    findings.append(
+                        Finding(
+                            severity=severity,
+                            category="prod_name_guard_sequence",
+                            file=current_target,
+                            line=0,
+                            evidence=(
+                                f"Dangerous sequence: {prev_name}({prev_target}) → "
+                                f"{current_name}({current_target}). {description}"
+                            ),
+                            fix=(
+                                "Verify this sequence is intentional and does not "
+                                "target production data."
+                            ),
+                        )
+                    )
     return findings
 
 

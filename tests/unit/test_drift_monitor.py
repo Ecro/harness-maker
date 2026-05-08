@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
 
 from harness_maker.drift_monitor import (
     DriftMonitor,
@@ -11,7 +10,6 @@ from harness_maker.drift_monitor import (
     cosine_similarity,
     resolve_baseline,
 )
-
 
 # ── cosine_similarity ────────────────────────────────────────────────────
 

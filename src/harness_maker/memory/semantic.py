@@ -8,6 +8,8 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+from harness_maker.memory._locking import exclusive_lock
+
 
 class SemanticStore:
     """Structured knowledge store — summaries, patterns, conventions.
@@ -20,6 +22,7 @@ class SemanticStore:
         self._dir = base_dir / "semantic"
         self._dir.mkdir(parents=True, exist_ok=True)
         self._index_path = self._dir / "index.jsonl"
+        self._lock_path = self._dir / "index.lock"
 
     def write(
         self,
@@ -30,7 +33,13 @@ class SemanticStore:
         keywords: list[str],
         source: str = "",
     ) -> dict[str, Any]:
-        """Write or update a semantic entry. Deduplicates by slug."""
+        """Write or update a semantic entry. Deduplicates by slug.
+
+        Acquires an exclusive POSIX flock around the read-modify-replace
+        block so two concurrent sessions writing different slugs cannot
+        clobber each other (the prior implementation silently lost the
+        second writer's update).
+        """
         entry: dict[str, Any] = {
             "slug": slug,
             "category": category,
@@ -38,10 +47,11 @@ class SemanticStore:
             "keywords": keywords,
             "source": source,
         }
-        existing = self._read_index()
-        updated = [e for e in existing if e.get("slug") != slug]
-        updated.append(entry)
-        self._write_index(updated)
+        with exclusive_lock(self._lock_path):
+            existing = self._read_index()
+            updated = [e for e in existing if e.get("slug") != slug]
+            updated.append(entry)
+            self._write_index(updated)
         return entry
 
     def read_all(self) -> list[dict[str, Any]]:

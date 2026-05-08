@@ -240,6 +240,17 @@ def diagnose_cache(
         event = parsed.get("event", "post_tool_use")
         if event != "post_tool_use":
             continue
+        # 0.7.0 wiring: Cursor postToolUse entries land here too but Cursor
+        # does not surface usage data, so all token fields are 0. Skip them
+        # — they convey tool-call timeline (handled elsewhere) but say
+        # nothing about cache health and would otherwise pollute hit-rate.
+        if (
+            parsed.get("input_tokens", 0) == 0
+            and parsed.get("output_tokens", 0) == 0
+            and parsed.get("cache_read_tokens", 0) == 0
+            and parsed.get("cache_creation_tokens", 0) == 0
+        ):
+            continue
         entries.append(parsed)
         if len(entries) >= window:
             break

@@ -33,8 +33,14 @@ DIFF = """\
 """
 
 EXPECTED_CRITICAL_FINDINGS = [
-    "TOCTOU: read_text() outside the lock fd — another process can modify between flock and read_text",
-    "fcntl not available on Windows — platform portability issue (WSL2 OK but native Windows breaks)",
+    (
+        "TOCTOU: read_text() outside the lock fd — another process "
+        "can modify between flock and read_text"
+    ),
+    (
+        "fcntl not available on Windows — platform portability issue "
+        "(WSL2 OK but native Windows breaks)"
+    ),
 ]
 
 ANCHORING_RISK = """

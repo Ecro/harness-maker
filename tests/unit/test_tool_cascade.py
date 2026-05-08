@@ -3,9 +3,17 @@
 from __future__ import annotations
 
 import json
+import multiprocessing as mp
 from pathlib import Path
 
 from harness_maker.tool_cascade import RecoveryAction, ToolCascade
+
+
+def _cascade_worker(log_path: str, worker_id: int, n: int) -> None:
+    """Top-level worker for multiprocessing.Process."""
+    cascade = ToolCascade(max_retries=10, log_path=Path(log_path))
+    for i in range(n):
+        cascade.on_failure(f"tool-{worker_id}-{i}", f"err-{i}")
 
 
 def test_retry_on_first_failure() -> None:
@@ -103,3 +111,30 @@ def test_independent_tool_tracking() -> None:
     assert action_read == RecoveryAction.RETRY
     action_bash, _ = cascade.on_failure("Bash", "e3")
     assert action_bash == RecoveryAction.ABORT
+
+
+def test_concurrent_append_no_loss(tmp_path: Path) -> None:
+    """4 processes × 50 failures: log must contain exactly 200 entries.
+
+    Validates Phase 12a fix for the read-modify-replace race that previously
+    caused failure log entries to be dropped under concurrent retry storms.
+    """
+    log_path = tmp_path / "cascade.jsonl"
+    n_per_worker = 50
+    n_workers = 4
+    ctx = mp.get_context("spawn")
+    procs = [
+        ctx.Process(target=_cascade_worker, args=(str(log_path), wid, n_per_worker))
+        for wid in range(n_workers)
+    ]
+    for p in procs:
+        p.start()
+    for p in procs:
+        p.join(timeout=30)
+        assert p.exitcode == 0, f"worker exited with {p.exitcode}"
+    lines = log_path.read_text(encoding="utf-8").splitlines()
+    assert len(lines) == n_per_worker * n_workers, (
+        f"expected {n_per_worker * n_workers} entries, got {len(lines)}"
+    )
+    parsed = [json.loads(line) for line in lines if line.strip()]
+    assert len(parsed) == n_per_worker * n_workers

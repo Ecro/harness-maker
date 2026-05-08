@@ -288,15 +288,28 @@ def classify_error(error_msg: str) -> ErrorClass:
     """
     lowered = error_msg.lower()
     syntax_signals = [
-        "syntax", "indent", "parse", "unexpected token",
-        "unterminated", "invalid syntax", "syntaxerror",
+        "syntax",
+        "indent",
+        "parse",
+        "unexpected token",
+        "unterminated",
+        "invalid syntax",
+        "syntaxerror",
     ]
     if any(sig in lowered for sig in syntax_signals):
         return ErrorClass.SYNTAX
     logical_signals = [
-        "logic", "semantic", "wrong result", "incorrect",
-        "assertion", "type error", "typeerror", "attributeerror",
-        "nameerror", "keyerror", "valueerror",
+        "logic",
+        "semantic",
+        "wrong result",
+        "incorrect",
+        "assertion",
+        "type error",
+        "typeerror",
+        "attributeerror",
+        "nameerror",
+        "keyerror",
+        "valueerror",
     ]
     if any(sig in lowered for sig in logical_signals):
         return ErrorClass.LOGICAL

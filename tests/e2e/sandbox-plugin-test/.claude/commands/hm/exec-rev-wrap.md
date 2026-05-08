@@ -4,7 +4,7 @@ harness_maker_version: 0.6.2
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: 95ddad2089b9fd835561eb1a7071cf024084c236d14c9c507fd1391986b30733
+content_hash: a95aaf7eb6a0c210b5e3b59d5ff63aef92f763a0f3bf6ec5678759d86d7fd77f
 ---
 # /hm:exec-rev-wrap
 
@@ -27,7 +27,7 @@ content_hash: 95ddad2089b9fd835561eb1a7071cf024084c236d14c9c507fd1391986b30733
 
 ## Purpose
 
-Apply the PLAN's phases to the codebase. Default mode is **TDD**: tests are written from SPEC's In-Scope Scenarios first, the implementation follows, and each PLAN phase exits only when its exit-criterion command is GREEN.
+Apply the PLAN's phases to the codebase. When `tdd_active`, tests are written from SPEC's In-Scope Scenarios first, the implementation follows, and each PLAN phase exits only when its exit-criterion command is GREEN. Use `test_dep_map.build_test_hints()` to identify which tests are affected by each changed file — run only those tests during Phase D instead of the full suite on every edit.
 
 ## Usage
 
@@ -72,7 +72,7 @@ Engage isolation if `harness.yaml.worktree.scope` includes `execute`. The `workt
 **Idempotent under `/hm:loop`**: when this stage runs as part of a loop iteration, the loop has already engaged a per-loop worktree at step 5. The `worktree create` CLI detects we're already inside `.worktrees/<name>/` and returns that path — no nested worktrees, just reuse.
 
 ```bash
-!uv run --with /home/noel/harness-maker python -m harness_maker.worktree create execute "$(pwd)"
+!uv run --with /home/noel/harness-maker/.worktrees/execute-20260508T0738Z python -m harness_maker.worktree create execute "$(pwd)"
 ```
 
 Read the **single line** the command prints — that is the contract for the rest of this stage. Two cases:
@@ -199,12 +199,12 @@ Pick **exactly one** finalize command. Substitute `<WT>` with the literal absolu
 ```bash
 # All phases GREEN — stage-merge the branch back (NO commit) + cleanup the worktree.
 # /hm:wrapup will create the single user-facing commit (with proper message + Co-Authored-By).
-!uv run --with /home/noel/harness-maker python -m harness_maker.worktree finalize <WT> stage-only
+!uv run --with /home/noel/harness-maker/.worktrees/execute-20260508T0738Z python -m harness_maker.worktree finalize <WT> stage-only
 ```
 
 ```bash
 # Stage halted on a blocker — preserve the worktree for inspection:
-!uv run --with /home/noel/harness-maker python -m harness_maker.worktree finalize <WT> fail
+!uv run --with /home/noel/harness-maker/.worktrees/execute-20260508T0738Z python -m harness_maker.worktree finalize <WT> fail
 ```
 
 If Step 0 printed empty (no isolation engaged), skip both — there is nothing to finalize.
@@ -314,12 +314,44 @@ Before reviewers run, scan the diff against PLAN scope:
 
 Drift findings get severity `P1` and surface in the REVIEW report; reviewers still run on the actual diff.
 
-### Step 3 — Parallel reviewer invocation
+### Step 3 — Parallel reviewer invocation (2-pass redaction)
 
-Run all selected reviewers in a **single message with multiple Task tool uses** for parallel execution. Each reviewer:
-- Reads the diff with full context (use Read on changed files end-to-end, not just the patch).
-- Walks the runtime path the diff touches — what runs first, what state mutates, what can fail.
-- Returns findings per the Finding Schema partial: `{severity, file, line, summary, suggestion, reasoning?, …}`.
+Run reviewers in **two sequential passes** to neutralize metadata anchoring
+(Phase 0 ablation showed +47 percentage-point precision gain on
+anchoring-prone diffs):
+
+#### Pass 1 — rubric-only (metadata redacted)
+
+1. Build `pass1_context` from the diff context with PR title / description /
+   author / commit message redacted. Pipe the JSON context through the
+   harness CLI rather than redacting in prose:
+   ```bash
+   echo '<full_context_json>' | python -m harness_maker.two_pass_review redact
+   ```
+   The CLI returns a JSON object with the same fields but anchoring values
+   replaced by `[REDACTED]`.
+2. Run all selected reviewers in a **single message with multiple Task tool
+   uses** for parallel execution, passing `pass1_context`. Each reviewer:
+   - Reads the diff with full context (use Read on changed files
+     end-to-end, not just the patch).
+   - Walks the runtime path the diff touches — what runs first, what state
+     mutates, what can fail.
+   - Returns findings per the Finding Schema partial:
+     `{severity, file, line, summary, suggestion, reasoning?, …}`.
+
+#### Pass 2 — contextual verdict (full metadata restored)
+
+3. Re-run the same reviewer set with the **full** context (metadata
+   restored) and the Pass 1 findings list. Each reviewer validates each
+   finding against the metadata, drops any that the context proves to be
+   spurious, and adjusts severity if the context changes risk.
+4. Merge the two passes via the harness CLI:
+   ```bash
+   echo '{"pass1": [...], "pass2": [...]}' | python -m harness_maker.two_pass_review merge
+   ```
+   Pass 2 is authoritative — Pass 1 findings absent from Pass 2 are
+   invalidated by context and **dropped** (CP10 contract).
+5. The merged finding list is the input to the consensus filter (Step 4).
 
 ### Step 4 — Consensus filter (surface + reasoning alignment)
 

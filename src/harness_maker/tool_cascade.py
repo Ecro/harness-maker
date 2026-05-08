@@ -7,8 +7,6 @@ logged to JSONL for observability. No chaos test (deferred to 0.8.0).
 from __future__ import annotations
 
 import json
-import os
-import tempfile
 from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
@@ -73,6 +71,13 @@ class ToolCascade:
         return self._failure_counts.get(tool_name, 0)
 
     def _log_failure(self, tool_name: str, error: str, count: int) -> None:
+        """Append a failure entry to the JSONL log.
+
+        Uses POSIX O_APPEND atomicity (single-line write < PIPE_BUF) so
+        concurrent retries from parallel agents do not clobber each other's
+        log entries — replacing an earlier read-modify-replace pattern that
+        silently dropped entries.
+        """
         if self._log_path is None:
             return
         entry = {
@@ -82,18 +87,6 @@ class ToolCascade:
             "failure_count": count,
         }
         self._log_path.parent.mkdir(parents=True, exist_ok=True)
-        fd, tmp = tempfile.mkstemp(
-            dir=str(self._log_path.parent),
-            prefix=f".{self._log_path.name}.",
-            suffix=".tmp",
-        )
-        try:
-            existing = ""
-            if self._log_path.exists():
-                existing = self._log_path.read_text(encoding="utf-8")
-            with os.fdopen(fd, "w", encoding="utf-8") as f:
-                f.write(existing + json.dumps(entry, ensure_ascii=False) + "\n")
-            os.replace(tmp, self._log_path)
-        except Exception:
-            Path(tmp).unlink(missing_ok=True)
-            raise
+        line = json.dumps(entry, ensure_ascii=False) + "\n"
+        with self._log_path.open("a", encoding="utf-8") as f:
+            f.write(line)

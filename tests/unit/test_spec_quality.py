@@ -5,7 +5,6 @@ from __future__ import annotations
 from harness_maker.models import DevMode
 from harness_maker.spec_quality import evaluate_spec
 
-
 STRONG_SPEC = """\
 ## Scope
 In-scope: User authentication feature with OAuth2.

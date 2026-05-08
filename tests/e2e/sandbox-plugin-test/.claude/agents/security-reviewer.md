@@ -9,6 +9,8 @@ description: Reviews changes for secrets exposure, injection, auth flaws, and un
   permission grants
 tools: Read, Grep, Glob
 model: sonnet
+review_scope:
+- security
 permissions:
   allow:
   - Read(*)

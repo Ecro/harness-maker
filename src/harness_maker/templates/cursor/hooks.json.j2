@@ -13,6 +13,12 @@
 
     Do NOT "fix" this to match the Claude PascalCase shape. Cursor will
     stop firing hooks. The dual-render is by design.
+
+    The `postToolUse` hook (added 2026-05-08) mirrors Claude Code's
+    PostToolUse → telemetry wiring. Cursor does NOT surface token usage
+    in any hook event (confirmed by Cursor team), so cost_usd will be
+    null for entries from this hook — but tool_name + timestamp still
+    give a per-call timeline that the prior stop-only render lacked.
 -#}
 {
   "version": 1,
@@ -30,6 +36,12 @@
         "matcher": "Write|Edit",
         "command": "CLAUDE_PROJECT_DIR=\"${CLAUDE_PROJECT_DIR:-${CURSOR_PROJECT_DIR:-$PWD}}\" PATH=\"$HOME/.local/bin:$PATH\" uv run --with {{ harness_maker_src_path }} python -m harness_maker.gates.spec_gate"
       }{% endif %}
+    ],
+    "postToolUse": [
+      {
+        "matcher": "*",
+        "command": "CLAUDE_PROJECT_DIR=\"${CLAUDE_PROJECT_DIR:-${CURSOR_PROJECT_DIR:-$PWD}}\" PATH=\"$HOME/.local/bin:$PATH\" uv run --with {{ harness_maker_src_path }} python -m harness_maker.telemetry"
+      }
     ],
     "stop": [
       {

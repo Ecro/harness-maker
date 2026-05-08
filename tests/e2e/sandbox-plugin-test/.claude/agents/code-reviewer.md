@@ -9,6 +9,8 @@ description: Reviews code changes for correctness, readability, maintainability,
   basic security/performance hygiene
 tools: Read, Grep, Glob
 model: sonnet
+review_scope:
+- code
 permissions:
   allow:
   - Read(*)

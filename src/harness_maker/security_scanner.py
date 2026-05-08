@@ -29,6 +29,52 @@ from harness_maker.secscan import (
     scan_secrets,
 )
 from harness_maker.secscan.hallucination import scan_directory as scan_hallucination
+from harness_maker.secscan.prod_name_guard import scan_sequence as scan_prod_sequence
+
+
+def _load_recent_tool_calls(target_dir: Path, window: int = 50) -> list[dict[str, Any]]:
+    """Read the last ``window`` post_tool_use entries from metrics.jsonl.
+
+    Builds a list shaped for ``prod_name_guard.scan_sequence``: each call has
+    ``tool_name`` + ``args`` (decoded from the truncated ``tool_input`` field
+    that telemetry persists since 0.7.0). Pre-0.7.0 entries lack ``tool_input``
+    and contribute only ``tool_name`` — sequence detection requires both, so
+    those entries are silently skipped (graceful upgrade path).
+    """
+    metrics = target_dir / ".claude" / "observability" / "metrics.jsonl"
+    if not metrics.is_file():
+        return []
+    try:
+        lines = metrics.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return []
+    calls: list[dict[str, Any]] = []
+    for line in reversed(lines):
+        if not line.strip():
+            continue
+        try:
+            parsed = json.loads(line)
+        except (json.JSONDecodeError, ValueError):
+            continue
+        if not isinstance(parsed, dict):
+            continue
+        if parsed.get("event") != "post_tool_use":
+            continue
+        tool_name = parsed.get("tool_name")
+        raw_input = parsed.get("tool_input")
+        if not isinstance(tool_name, str) or not isinstance(raw_input, str):
+            continue
+        try:
+            args = json.loads(raw_input)
+        except (json.JSONDecodeError, ValueError):
+            continue
+        if not isinstance(args, dict):
+            continue
+        calls.append({"tool_name": tool_name, "args": args})
+        if len(calls) >= window:
+            break
+    calls.reverse()
+    return calls
 
 
 def _persist(findings: list[Finding], target_dir: Path) -> Path:
@@ -97,6 +143,12 @@ def scan_all(
 
     # Gate 6: Hallucination — AST-detected non-existent imports
     findings.extend(scan_hallucination(target_dir))
+
+    # Gate 7: Production-name guard — sequence detection over recent tool history.
+    # No-op when metrics.jsonl is empty or all entries pre-date 0.7.0
+    # tool_input persistence (graceful upgrade).
+    tool_calls = _load_recent_tool_calls(target_dir)
+    findings.extend(scan_prod_sequence(tool_calls))
 
     # Prompt-injection scan: walk markdown files for hidden patterns + LLM.
     if pi_client is None:

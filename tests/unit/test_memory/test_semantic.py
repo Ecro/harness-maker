@@ -2,9 +2,22 @@
 
 from __future__ import annotations
 
+import multiprocessing as mp
 from pathlib import Path
 
 from harness_maker.memory.semantic import SemanticStore
+
+
+def _semantic_worker(base_dir: str, worker_id: int, n: int) -> None:
+    """Top-level worker for multiprocessing.Process — distinct slugs per writer."""
+    store = SemanticStore(Path(base_dir))
+    for i in range(n):
+        store.write(
+            slug=f"w{worker_id}-{i}",
+            category="test",
+            summary=f"summary-{worker_id}-{i}",
+            keywords=[f"k{worker_id}"],
+        )
 
 
 def test_write_and_read(tmp_path: Path) -> None:
@@ -55,3 +68,31 @@ def test_search_case_insensitive(tmp_path: Path) -> None:
 def test_empty_store_search(tmp_path: Path) -> None:
     store = SemanticStore(tmp_path)
     assert store.search("anything") == []
+
+
+def test_concurrent_set_no_lost_update(tmp_path: Path) -> None:
+    """4 processes × 25 distinct slugs each: index must contain all 100 entries.
+
+    Validates Phase 12a flock fix for the read-modify-replace lost-update race
+    where two concurrent writers would clobber each other's updates.
+    """
+    n_per_worker = 25
+    n_workers = 4
+    ctx = mp.get_context("spawn")
+    procs = [
+        ctx.Process(target=_semantic_worker, args=(str(tmp_path), wid, n_per_worker))
+        for wid in range(n_workers)
+    ]
+    for p in procs:
+        p.start()
+    for p in procs:
+        p.join(timeout=30)
+        assert p.exitcode == 0, f"worker exited with {p.exitcode}"
+    store = SemanticStore(tmp_path)
+    entries = store.read_all()
+    assert len(entries) == n_per_worker * n_workers, (
+        f"expected {n_per_worker * n_workers} entries, got {len(entries)}"
+    )
+    slugs = {e["slug"] for e in entries}
+    expected = {f"w{wid}-{i}" for wid in range(n_workers) for i in range(n_per_worker)}
+    assert slugs == expected, f"missing: {expected - slugs}"

@@ -98,6 +98,10 @@ def test_build_pass2_conditional_explanation() -> None:
 
 
 def test_merge_passes_pass2_authoritative() -> None:
+    """CP10 fix: Pass 2 is authoritative — Pass 1 findings absent from Pass 2
+    are invalidated by context and DROPPED from the merged result.
+    Earlier behavior re-surfaced them with status=invalidated_by_context,
+    which defeated the design intent when callers forgot to filter."""
     pass1 = [
         {"file": "a.py", "line": 10, "severity": "P0", "summary": "Issue A"},
         {"file": "b.py", "line": 20, "severity": "P1", "summary": "Issue B"},
@@ -106,12 +110,13 @@ def test_merge_passes_pass2_authoritative() -> None:
         {"file": "a.py", "line": 10, "severity": "P1", "summary": "Issue A (adjusted)"},
     ]
     merged = merge_passes(pass1, pass2)
-    retained = [f for f in merged if f.get("pass") == 2]
-    invalidated = [f for f in merged if f.get("status") == "invalidated_by_context"]
-    assert len(retained) == 1
-    assert retained[0]["severity"] == "P1"
-    assert len(invalidated) == 1
-    assert invalidated[0]["file"] == "b.py"
+    assert len(merged) == 1
+    assert merged[0]["severity"] == "P1"
+    assert merged[0]["file"] == "a.py"
+    assert merged[0]["pass"] == 2
+    assert all(f.get("status") != "invalidated_by_context" for f in merged), (
+        "invalidated findings must NOT appear in merged result (CP10)"
+    )
 
 
 def test_merge_passes_empty_pass2_keeps_pass1() -> None:

@@ -9,6 +9,8 @@ description: Reviews changes for race conditions, deadlocks, ISR safety, and asy
   correctness
 tools: Read, Grep, Glob
 model: sonnet
+review_scope:
+- concurrency
 permissions:
   allow:
   - Read(*)

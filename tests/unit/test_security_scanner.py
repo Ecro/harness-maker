@@ -156,3 +156,52 @@ def test_seeded_vulns_all_detected(tmp_path: Path, monkeypatch: Any) -> None:
     expected = {"secrets", "permissions", "hook_injection", "cve", "prompt_injection"}
     missing = expected - by_cat
     assert not missing, f"missing categories: {missing}"
+
+
+def test_prod_name_guard_wired(tmp_path: Path) -> None:
+    """Phase 12b: scan_all reads metrics.jsonl tool history and invokes prod_name_guard.
+
+    Seeds metrics.jsonl with Read(prod.db) → Write(prod.db) sequence; expects
+    a finding with category 'prod_name_guard_sequence'.
+    """
+    target = tmp_path / "target"
+    target.mkdir()
+    (target / ".claude").mkdir()
+
+    metrics_dir = target / ".claude" / "observability"
+    metrics_dir.mkdir(parents=True, exist_ok=True)
+    metrics_path = metrics_dir / "metrics.jsonl"
+
+    entries = [
+        {
+            "timestamp": "2026-05-08T10:00:00+00:00",
+            "event": "post_tool_use",
+            "tool_name": "Read",
+            "tool_input": json.dumps({"path": "/data/prod.db"}),
+            "input_tokens": 100,
+            "output_tokens": 50,
+            "cache_read_tokens": 0,
+            "cache_creation_tokens": 0,
+        },
+        {
+            "timestamp": "2026-05-08T10:00:01+00:00",
+            "event": "post_tool_use",
+            "tool_name": "Write",
+            "tool_input": json.dumps({"path": "/data/prod.db"}),
+            "input_tokens": 100,
+            "output_tokens": 50,
+            "cache_read_tokens": 0,
+            "cache_creation_tokens": 0,
+        },
+    ]
+    with metrics_path.open("a", encoding="utf-8") as f:
+        for entry in entries:
+            f.write(json.dumps(entry) + "\n")
+
+    findings = scan_all(target)
+    seq_findings = [f for f in findings if f.category == "prod_name_guard_sequence"]
+    cats = [f.category for f in findings]
+    assert len(seq_findings) >= 1, f"expected prod_name_guard_sequence finding, got: {cats}"
+    assert seq_findings[0].severity == "P0", (
+        f"expected P0 (prod target), got {seq_findings[0].severity}"
+    )

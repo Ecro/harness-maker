@@ -344,13 +344,13 @@ def test_render_cursor_hooks_json_camelcase_with_path_wrap(tmp_path: Path) -> No
 
     hooks = parsed["hooks"]
     assert "preToolUse" in hooks
-    # PLAN-cursor-rootcause follow-up: Cursor uses `stop` (per-turn) for
-    # telemetry, NOT postToolUse (per-tool). Cursor never sends usage data
-    # to hooks, so per-tool entries would all have tokens=0 and pollute
-    # cache_diagnostics. stop fires once per agent turn with status /
-    # loop_count / duration_ms — meaningful even without tokens.
+    # 0.7.0 wiring fix: postToolUse re-added so Cursor users get a per-tool
+    # timeline (tool_name + timestamp). Tokens are still null in Cursor —
+    # cache_diagnostics filters all-zero post_tool_use entries so they do
+    # NOT pollute hit-rate calc. stop continues to fire per-turn for
+    # status/loop_count/duration_ms signals.
     assert "stop" in hooks
-    assert "postToolUse" not in hooks  # explicitly removed in 0.5.4
+    assert "postToolUse" in hooks
     assert "preCompact" in hooks
     # PascalCase must NOT appear — silent ignore in Cursor would produce no fire
     assert "PreToolUse" not in hooks

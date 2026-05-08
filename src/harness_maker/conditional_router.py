@@ -73,8 +73,7 @@ def scope_aware_consensus(
 
             if is_in_reviewer_scope(reviewer, category):
                 other_scopes_cover = any(
-                    r != reviewer and is_in_reviewer_scope(r, category)
-                    for r in REVIEWER_SCOPES
+                    r != reviewer and is_in_reviewer_scope(r, category) for r in REVIEWER_SCOPES
                 )
                 if not other_scopes_cover:
                     finding["consensus_tag"] = "scope-exempted"

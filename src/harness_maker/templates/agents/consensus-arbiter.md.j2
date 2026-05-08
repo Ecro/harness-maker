@@ -26,6 +26,42 @@ Two findings are consensus *candidates* iff they satisfy BOTH:
 
 Pairs failing surface match are recorded as **independent** findings — preserve both.
 
+### Step 4a-bis — Scope-aware exemption (ADR-005, Phase 5)
+
+Before applying surface match, check **reviewer scope alignment**:
+
+1. Each reviewer agent declares its `review_scope` in frontmatter — values
+   from `{security, performance, code, ux, concurrency, drift}`. The
+   currently configured map lives in
+   `harness.yaml.reviewers.installed[*].review_scope`.
+2. A finding's `category` field maps to one of the same scope values
+   (e.g. `category=secrets|injection|auth → scope=security`;
+   `category=race|deadlock → scope=concurrency`).
+3. **A finding is `scope-exempt` when no other enabled reviewer shares
+   that scope.** Example: only `security-reviewer` carries `scope=security`,
+   so its `secrets` finding has no peer to cross-check against.
+
+Scope-exempt findings:
+
+- **Skip the cross-check requirement.** Their single-reviewer verdict is
+  treated as authoritative for grade computation.
+- Tag them `consensus-passed-by-scope` (distinct from `consensus-passed`
+  which requires K ≥ 2 reviewers agreeing).
+- Auto-fix eligibility is **opt-in** per reviewer's `auto_fix_scoped`
+  flag — default off, since a single voice has higher false-positive risk
+  than multi-source consensus.
+
+This rule was introduced after REVIEW-2026-05-08 found 9 cross-check
+manual-only findings that were objectively bugs but blocked from auto-fix
+because the specialist reviewers had non-overlapping scopes (Pitfall #7).
+The scope-exempt path lets specialist findings reach the grade gate
+without forcing every reviewer to opine on every domain they are not
+qualified for.
+
+Use `harness_maker.conditional_router.scope_aware_consensus(findings,
+reviewer_scopes)` to compute the exemption set; do not reimplement the
+logic in prose here.
+
 ### Step 4b — Reasoning alignment (verification)
 
 For surface-match candidates, compare the 4-step `reasoning` chains (OBSERVE → TRACE → INFER → CONCLUDE — matches `_partials/reasoning.md.j2`):
@@ -47,8 +83,9 @@ For surface-match candidates, compare the 4-step `reasoning` chains (OBSERVE →
 | Tag | Condition | Auto-fix eligible? |
 |-----|-----------|--------------------|
 | `consensus-passed` | Surface match + strong reasoning alignment | ✅ Yes |
+| `consensus-passed-by-scope` | Single source, scope-exempt (Step 4a-bis) | ⚠️ Opt-in (`auto_fix_scoped`) |
 | `weak-consensus` | Surface match, reasoning diverges | ❌ No (manual) |
-| `manual-only` | Single source, or consensus failed | ❌ No (manual) |
+| `manual-only` | Single source, no scope exemption | ❌ No (manual) |
 
 ### Ordering
 

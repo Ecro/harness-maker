@@ -93,6 +93,16 @@ def _build_entry(data: dict[str, Any]) -> dict[str, Any]:
         cost = _estimate_cost(entry, data.get("model", ""))
         if cost is not None:
             entry["cost_usd"] = round(cost, 6)
+        # 0.7.0 wiring: persist a truncated tool_input so prod_name_guard's
+        # scan_sequence can detect Read(prod.db) → Write(prod.db) patterns.
+        # Cap at 2 KiB to bound disk usage and limit secret-leak surface;
+        # full args still flow through gates in real time.
+        raw_input = data.get("tool_input")
+        if isinstance(raw_input, dict):
+            serialized = json.dumps(raw_input, ensure_ascii=False)
+            if len(serialized) > 2048:
+                serialized = serialized[:2048] + "...<truncated>"
+            entry["tool_input"] = serialized
     elif event == "stop":
         # Cursor stop fires once per agent turn — meaningful per-turn signal
         # even though tokens aren't available. status/loop_count/duration_ms

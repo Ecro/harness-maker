@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
-import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -33,7 +31,15 @@ class EpisodicStore:
         payload: dict[str, Any],
         timestamp: datetime | None = None,
     ) -> dict[str, Any]:
-        """Append an event and return it."""
+        """Append an event and return it.
+
+        Uses POSIX O_APPEND atomicity: a single ``write()`` of a JSONL line
+        under PIPE_BUF (4 KiB on Linux) is guaranteed atomic across concurrent
+        appenders, so two sessions writing simultaneously interleave at line
+        boundaries rather than dropping each other's writes. This replaces an
+        earlier read-modify-replace pattern that silently lost concurrent
+        events.
+        """
         ts = timestamp or datetime.now(UTC)
         event: dict[str, Any] = {
             "timestamp": ts.isoformat(),
@@ -44,22 +50,9 @@ class EpisodicStore:
         date_str = ts.strftime("%Y-%m-%d")
         target = self._file_for_date(date_str)
         target.parent.mkdir(parents=True, exist_ok=True)
-        fd, tmp = tempfile.mkstemp(
-            dir=str(target.parent),
-            prefix=f".{target.name}.",
-            suffix=".tmp",
-        )
-        try:
-            line = json.dumps(event, ensure_ascii=False) + "\n"
-            with os.fdopen(fd, "a", encoding="utf-8") as f:
-                existing = ""
-                if target.exists():
-                    existing = target.read_text(encoding="utf-8")
-                f.write(existing + line)
-            os.replace(tmp, target)
-        except Exception:
-            Path(tmp).unlink(missing_ok=True)
-            raise
+        line = json.dumps(event, ensure_ascii=False) + "\n"
+        with target.open("a", encoding="utf-8") as f:
+            f.write(line)
         return event
 
     def read(self, date_str: str) -> list[dict[str, Any]]:

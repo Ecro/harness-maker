@@ -375,19 +375,23 @@ def test_ttl_regression_detected(tmp_path: Path) -> None:
     p = tmp_path / "metrics.jsonl"
     entries = []
     for i in range(10):
-        entries.append({
-            "timestamp": _ts(i * 30),
-            "input_tokens": 200,
-            "cache_read_tokens": 5000,
-            "cache_creation_tokens": 0,
-        })
+        entries.append(
+            {
+                "timestamp": _ts(i * 30),
+                "input_tokens": 200,
+                "cache_read_tokens": 5000,
+                "cache_creation_tokens": 0,
+            }
+        )
     for i in range(10):
-        entries.append({
-            "timestamp": _ts(300 + i * 600),
-            "input_tokens": 200,
-            "cache_read_tokens": 0,
-            "cache_creation_tokens": 5000,
-        })
+        entries.append(
+            {
+                "timestamp": _ts(300 + i * 600),
+                "input_tokens": 200,
+                "cache_read_tokens": 0,
+                "cache_creation_tokens": 5000,
+            }
+        )
     _write_metrics(p, entries)
     res = diagnose_cache(p, window=20)
     assert res.ttl_regression is True
@@ -414,10 +418,18 @@ def test_no_ttl_regression_when_consistent(tmp_path: Path) -> None:
 def test_ttl_regression_needs_minimum_entries(tmp_path: Path) -> None:
     """Fewer than 10 entries should skip regression detection."""
     p = tmp_path / "metrics.jsonl"
-    _write_metrics(p, [
-        {"timestamp": _ts(i * 600), "input_tokens": 200, "cache_read_tokens": 0, "cache_creation_tokens": 5000}
-        for i in range(5)
-    ])
+    _write_metrics(
+        p,
+        [
+            {
+                "timestamp": _ts(i * 600),
+                "input_tokens": 200,
+                "cache_read_tokens": 0,
+                "cache_creation_tokens": 5000,
+            }
+            for i in range(5)
+        ],
+    )
     res = diagnose_cache(p, window=5)
     assert res.ttl_regression is False
 

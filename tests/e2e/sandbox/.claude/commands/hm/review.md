@@ -4,7 +4,7 @@ harness_maker_version: 0.6.2
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/atomic_command.md.j2
 provenance: official
-content_hash: 7e61fe8f58a1f6b8e537ec00790ee16bda6fffc67b55ab7b42206cfc3db5113b
+content_hash: 075bfec6be71d028e0748f60a9548103f38933db15c7e84dbaf6bbdeac20b3cc
 ---
 # Stage: review
 
@@ -75,12 +75,44 @@ Before reviewers run, scan the diff against PLAN scope:
 
 Drift findings get severity `P1` and surface in the REVIEW report; reviewers still run on the actual diff.
 
-### Step 3 — Parallel reviewer invocation
+### Step 3 — Parallel reviewer invocation (2-pass redaction)
 
-Run all selected reviewers in a **single message with multiple Task tool uses** for parallel execution. Each reviewer:
-- Reads the diff with full context (use Read on changed files end-to-end, not just the patch).
-- Walks the runtime path the diff touches — what runs first, what state mutates, what can fail.
-- Returns findings per the Finding Schema partial: `{severity, file, line, summary, suggestion, reasoning?, …}`.
+Run reviewers in **two sequential passes** to neutralize metadata anchoring
+(Phase 0 ablation showed +47 percentage-point precision gain on
+anchoring-prone diffs):
+
+#### Pass 1 — rubric-only (metadata redacted)
+
+1. Build `pass1_context` from the diff context with PR title / description /
+   author / commit message redacted. Pipe the JSON context through the
+   harness CLI rather than redacting in prose:
+   ```bash
+   echo '<full_context_json>' | python -m harness_maker.two_pass_review redact
+   ```
+   The CLI returns a JSON object with the same fields but anchoring values
+   replaced by `[REDACTED]`.
+2. Run all selected reviewers in a **single message with multiple Task tool
+   uses** for parallel execution, passing `pass1_context`. Each reviewer:
+   - Reads the diff with full context (use Read on changed files
+     end-to-end, not just the patch).
+   - Walks the runtime path the diff touches — what runs first, what state
+     mutates, what can fail.
+   - Returns findings per the Finding Schema partial:
+     `{severity, file, line, summary, suggestion, reasoning?, …}`.
+
+#### Pass 2 — contextual verdict (full metadata restored)
+
+3. Re-run the same reviewer set with the **full** context (metadata
+   restored) and the Pass 1 findings list. Each reviewer validates each
+   finding against the metadata, drops any that the context proves to be
+   spurious, and adjusts severity if the context changes risk.
+4. Merge the two passes via the harness CLI:
+   ```bash
+   echo '{"pass1": [...], "pass2": [...]}' | python -m harness_maker.two_pass_review merge
+   ```
+   Pass 2 is authoritative — Pass 1 findings absent from Pass 2 are
+   invalidated by context and **dropped** (CP10 contract).
+5. The merged finding list is the input to the consensus filter (Step 4).
 
 ### Step 4 — Consensus filter (surface + reasoning alignment)
 

@@ -4,7 +4,7 @@ harness_maker_version: 0.6.2
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: stages/spec.md.j2
 provenance: official
-content_hash: 2c6a0e09fa19240ff66a232522037aff9298f36c33b27fe444265bf77fcb0c16
+content_hash: 171322c2b0601a088471593a406012bbf33318be1c9a778a946685828da1e571
 ---
 # Stage: spec
 
@@ -169,6 +169,31 @@ After writing, Read the file back and assert:
 - Verification table covers every scenario.
 
 If verification fails, retry write **once**. If still failing, surface error + path and stop.
+
+### Step 4.5 — Spec quality gate (ADR-006)
+
+Score the freshly-written SPEC against the rubric (5 dimensions, each 0-100):
+completeness, testability, unambiguity, consistency, scope_boundary.
+
+```bash
+jq -n --arg spec "$(cat specs/SPEC-{slug}.md)" \
+      --arg mode "task-driven" \
+      '{spec_text: $spec, dev_mode: $mode}' \
+  | python -m harness_maker.spec_quality eval
+```
+
+Read the returned JSON `{overall, scores, weak_dimensions, blocked, dev_mode}`.
+
+| `dev_mode` | `blocked == true` (overall < 60 OR any dim < 40) | Action |
+|------------|--------------------------------------------------|--------|
+| `spec-driven` | yes | **HALT.** Surface failing dims + concrete improvement bullets ("strengthen acceptance criteria for Scenario 2", "delete vague qualifier 'fast'", "add an out-of-scope section"). Do NOT mark `status: approved`. |
+| `spec-driven` | no | continue to Step 5 |
+| `task-driven` | yes | **WARN only.** Print `⚠️ spec quality below threshold ({overall}/100): {weak_dimensions}` and continue — task-driven mode does not block. |
+| `task-driven` | no | continue silently |
+
+Failure rationale always cites the exact `weak_dimensions` from the CLI
+output. Do not paraphrase — the user will rewrite those specific
+dimensions.
 
 ### Step 5 — Status update
 

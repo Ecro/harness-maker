@@ -22,15 +22,17 @@ from harness_maker.models import Finding
 
 _STDLIB_MODULES: frozenset[str] = frozenset(sys.stdlib_module_names)
 
-_KNOWN_NAMESPACE_PACKAGES: frozenset[str] = frozenset({
-    "google",
-    "azure",
-    "aws_cdk",
-    "zope",
-    "jaraco",
-    "backports",
-    "sphinxcontrib",
-})
+_KNOWN_NAMESPACE_PACKAGES: frozenset[str] = frozenset(
+    {
+        "google",
+        "azure",
+        "aws_cdk",
+        "zope",
+        "jaraco",
+        "backports",
+        "sphinxcontrib",
+    }
+)
 
 
 def _top_level_package(module_name: str) -> str:
@@ -48,11 +50,6 @@ def _is_available(package: str) -> bool:
         return spec is not None
     except (ModuleNotFoundError, ValueError):
         return False
-
-
-def _is_guarded_import(node: ast.AST) -> bool:
-    """Check if an import is inside a try/except block (optional dependency pattern)."""
-    return any(isinstance(n, ast.ExceptHandler) for n in ast.walk(node))
 
 
 def scan_file(file_path: Path) -> list[Finding]:
@@ -101,17 +98,21 @@ def scan_file(file_path: Path) -> list[Finding]:
 
             is_guarded = lineno in guarded_lines
             severity = "P2" if is_guarded else "P0"
-            findings.append(Finding(
-                severity=severity,
-                category="hallucination",
-                file=str(file_path),
-                line=lineno,
-                evidence=f"import of '{pkg}' — package not found in stdlib or installed packages",
-                fix=(
-                    f"Verify '{pkg}' exists. If intentional, add to "
-                    f"project dependencies. If hallucinated, remove the import."
-                ),
-            ))
+            findings.append(
+                Finding(
+                    severity=severity,
+                    category="hallucination",
+                    file=str(file_path),
+                    line=lineno,
+                    evidence=(
+                        f"import of '{pkg}' — package not found in stdlib or installed packages"
+                    ),
+                    fix=(
+                        f"Verify '{pkg}' exists. If intentional, add to "
+                        f"project dependencies. If hallucinated, remove the import."
+                    ),
+                )
+            )
 
     return findings
 

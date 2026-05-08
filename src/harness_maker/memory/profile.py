@@ -8,6 +8,8 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+from harness_maker.memory._locking import exclusive_lock
+
 
 class ProfileStore:
     """Tracks user behavior patterns and preferences across sessions.
@@ -21,6 +23,7 @@ class ProfileStore:
         self._dir = base_dir / "profile"
         self._dir.mkdir(parents=True, exist_ok=True)
         self._store_path = self._dir / "profile.json"
+        self._lock_path = self._dir / "profile.lock"
 
     def get(self, key: str) -> Any:
         """Get the latest value for a profile key."""
@@ -33,16 +36,24 @@ class ProfileStore:
         return entry
 
     def set(self, key: str, value: Any, *, timestamp: str = "") -> None:
-        """Set a profile key. Appends to history if key exists."""
-        data = self._read()
-        existing = data.get(key)
-        if isinstance(existing, dict) and "history" in existing:
-            existing["history"].append({"value": existing["value"], "ts": existing.get("ts", "")})
-            existing["value"] = value
-            existing["ts"] = timestamp
-        else:
-            data[key] = {"value": value, "ts": timestamp, "history": []}
-        self._write(data)
+        """Set a profile key. Appends to history if key exists.
+
+        Wraps the read-modify-write block in an exclusive POSIX flock so
+        concurrent set() calls on different keys do not clobber each other
+        (prior implementation silently lost the second writer's update).
+        """
+        with exclusive_lock(self._lock_path):
+            data = self._read()
+            existing = data.get(key)
+            if isinstance(existing, dict) and "history" in existing:
+                existing["history"].append(
+                    {"value": existing["value"], "ts": existing.get("ts", "")}
+                )
+                existing["value"] = value
+                existing["ts"] = timestamp
+            else:
+                data[key] = {"value": value, "ts": timestamp, "history": []}
+            self._write(data)
 
     def get_all(self) -> dict[str, Any]:
         """Read the entire profile."""

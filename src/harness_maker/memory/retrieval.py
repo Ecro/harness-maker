@@ -41,9 +41,7 @@ class MemoryRetriever:
             for i, evt in enumerate(events):
                 evt_str = str(evt).lower()
                 if q_lower in evt_str:
-                    neighbors = self.episodic.retrieve_neighbors(
-                        episodic_date, i, window=2
-                    )
+                    neighbors = self.episodic.retrieve_neighbors(episodic_date, i, window=2)
                     matching.extend(neighbors)
             seen: set[str] = set()
             deduped: list[dict[str, Any]] = []

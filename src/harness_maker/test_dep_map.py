@@ -108,9 +108,7 @@ def build_test_hints(
             continue
 
         rel_src = (
-            str(src.relative_to(project_root))
-            if src.is_relative_to(project_root)
-            else str(src)
+            str(src.relative_to(project_root)) if src.is_relative_to(project_root) else str(src)
         )
 
         affected: list[Path] = source_to_test_candidates(src, project_root)

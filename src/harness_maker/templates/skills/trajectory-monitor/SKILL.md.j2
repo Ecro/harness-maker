@@ -1,0 +1,60 @@
+---
+type: skill
+name: {{ name | default('trajectory-monitor') }}
+description: Detect drift between current stage output and the original SPEC/PLAN baseline via hybrid cosine pre-filter + LLM precision judgment.
+tools: Read, Bash, Grep
+---
+
+# {{ name | default('trajectory-monitor') }}
+
+Compares current stage output against a baseline (SPEC → PLAN → original prompt,
+multi-layer fallback) and returns a drift score in [0.0, 1.0]. A score > the
+configured threshold (`harness.yaml.drift.threshold`, default 0.7) signals
+trajectory drift and surfaces in the stage's review report.
+
+Implements ADR-010 hybrid drift score: cosine similarity is computed first;
+only when `cos_sim < threshold` does the LLM precision judge run, keeping
+LLM cost low while preserving precision on suspicious cases.
+
+
+## When to invoke
+
+- After `execute` finishes implementing a phase — verify the diff still
+  serves the SPEC's acceptance criteria, not a hallucinated alternative.
+- During `review` consensus when the surface findings disagree on whether
+  the implementation matches intent.
+- On `wrapup` immediately before commit — last-line defense against
+  silent scope creep.
+
+
+## When to skip
+
+- Stage output empty or `< 100` chars (no signal to compare).
+- No baseline available (no SPEC, no PLAN, no captured user prompt) — the
+  monitor would have nothing to anchor against.
+- `harness.yaml.drift.disabled: true` (user explicit opt-out).
+
+
+## How it runs
+
+```bash
+python -m harness_maker.drift_monitor \
+    --baseline-spec specs/SPEC-{{ '{slug}' }}.md \
+    --baseline-plan work-docs/plans/PLAN-{{ '{slug}' }}.md \
+    --baseline-prompt "<original-user-request>" \
+    --current-text "<current-stage-output>"
+```
+
+The CLI prints a JSON object: `{"drift_score": 0.42, "method": "cosine|llm",
+"baseline_source": "spec|plan|prompt", "verdict": "on-track|drift"}`.
+
+
+## Outputs
+
+- Drift score, method (cosine fast path vs. LLM precision), baseline source.
+- Verdict (`on-track` or `drift`). Verdict `drift` should attach to the
+  stage report under "Drift Findings" — ⚠️ severity, link the diverging
+  passage, suggest re-aligning to the SPEC item.
+
+The skill is read-only. Acting on a drift verdict is the orchestrating
+stage's responsibility, not this skill's.

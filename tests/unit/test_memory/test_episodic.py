@@ -2,18 +2,30 @@
 
 from __future__ import annotations
 
+import multiprocessing as mp
 from datetime import UTC, datetime
 from pathlib import Path
 
 from harness_maker.memory.episodic import EpisodicStore
 
 
+def _episodic_worker(base_dir: str, worker_id: int, n: int) -> None:
+    """Top-level worker for multiprocessing.Process — must be picklable."""
+    store = EpisodicStore(Path(base_dir))
+    ts = datetime(2026, 5, 8, 12, 0, 0, tzinfo=UTC)
+    for i in range(n):
+        store.write(
+            session_id=f"w{worker_id}",
+            stage="execute",
+            payload={"worker_id": worker_id, "i": i},
+            timestamp=ts,
+        )
+
+
 def test_write_and_read(tmp_path: Path) -> None:
     store = EpisodicStore(tmp_path)
     ts = datetime(2026, 5, 8, 12, 0, 0, tzinfo=UTC)
-    event = store.write(
-        session_id="s1", stage="execute", payload={"action": "edit"}, timestamp=ts
-    )
+    event = store.write(session_id="s1", stage="execute", payload={"action": "edit"}, timestamp=ts)
     assert event["session_id"] == "s1"
     assert event["stage"] == "execute"
     events = store.read("2026-05-08")
@@ -81,3 +93,35 @@ def test_read_all_across_dates(tmp_path: Path) -> None:
     assert len(all_events) == 2
     assert all_events[0]["day"] == 7
     assert all_events[1]["day"] == 8
+
+
+def test_concurrent_append_no_loss(tmp_path: Path) -> None:
+    """4 processes × 50 writes: file must contain exactly 200 events.
+
+    Validates Phase 12a fix for the read-modify-replace race that previously
+    caused episodic events to be silently dropped under concurrent hook fires.
+    """
+    n_per_worker = 50
+    n_workers = 4
+    ctx = mp.get_context("spawn")
+    procs = [
+        ctx.Process(target=_episodic_worker, args=(str(tmp_path), wid, n_per_worker))
+        for wid in range(n_workers)
+    ]
+    for p in procs:
+        p.start()
+    for p in procs:
+        p.join(timeout=30)
+        assert p.exitcode == 0, f"worker exited with {p.exitcode}"
+    store = EpisodicStore(tmp_path)
+    events = store.read("2026-05-08")
+    assert len(events) == n_per_worker * n_workers, (
+        f"expected {n_per_worker * n_workers} events, got {len(events)}"
+    )
+    by_worker: dict[int, list[int]] = {}
+    for ev in events:
+        by_worker.setdefault(ev["worker_id"], []).append(ev["i"])
+    for wid in range(n_workers):
+        assert sorted(by_worker[wid]) == list(range(n_per_worker)), (
+            f"worker {wid} missing entries: {sorted(by_worker[wid])}"
+        )

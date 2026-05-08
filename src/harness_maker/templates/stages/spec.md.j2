@@ -164,6 +164,31 @@ After writing, Read the file back and assert:
 
 If verification fails, retry write **once**. If still failing, surface error + path and stop.
 
+### Step 4.5 — Spec quality gate (ADR-006)
+
+Score the freshly-written SPEC against the rubric (5 dimensions, each 0-100):
+completeness, testability, unambiguity, consistency, scope_boundary.
+
+```bash
+jq -n --arg spec "$(cat {{ config.spec.dir }}SPEC-{slug}.md)" \
+      --arg mode "{{ config.dev_mode }}" \
+      '{spec_text: $spec, dev_mode: $mode}' \
+  | python -m harness_maker.spec_quality eval
+```
+
+Read the returned JSON `{overall, scores, weak_dimensions, blocked, dev_mode}`.
+
+| `dev_mode` | `blocked == true` (overall < 60 OR any dim < 40) | Action |
+|------------|--------------------------------------------------|--------|
+| `spec-driven` | yes | **HALT.** Surface failing dims + concrete improvement bullets ("strengthen acceptance criteria for Scenario 2", "delete vague qualifier 'fast'", "add an out-of-scope section"). Do NOT mark `status: approved`. |
+| `spec-driven` | no | continue to Step 5 |
+| `task-driven` | yes | **WARN only.** Print `⚠️ spec quality below threshold ({overall}/100): {weak_dimensions}` and continue — task-driven mode does not block. |
+| `task-driven` | no | continue silently |
+
+Failure rationale always cites the exact `weak_dimensions` from the CLI
+output. Do not paraphrase — the user will rewrite those specific
+dimensions.
+
 ### Step 5 — Status update
 
 If `## ❓ Open Questions` is empty: update frontmatter `status: approved`. Otherwise `status: draft`.

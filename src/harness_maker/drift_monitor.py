@@ -156,3 +156,55 @@ class DriftMonitor:
                 f"warn threshold {warn_threshold:.2f}"
             )
         return result
+
+
+def main() -> int:
+    """CLI entry point for `python -m harness_maker.drift_monitor`.
+
+    Reads JSON from stdin with keys baseline_spec_path / baseline_plan_path /
+    baseline_prompt / current_text / threshold (optional), runs the hybrid
+    drift check, and prints a single-line JSON result to stdout. Stage
+    prompts in trajectory-monitor.md.j2 invoke this module rather than
+    re-implementing the logic in prose.
+    """
+    import json
+    import sys
+
+    raw = sys.stdin.read()
+    try:
+        data = json.loads(raw) if raw.strip() else {}
+    except (json.JSONDecodeError, ValueError):
+        sys.stderr.write("drift_monitor: stdin is not valid JSON\n")
+        return 1
+    if not isinstance(data, dict):
+        sys.stderr.write("drift_monitor: stdin must be a JSON object\n")
+        return 1
+    spec_path_str = data.get("baseline_spec_path")
+    plan_path_str = data.get("baseline_plan_path")
+    prompt_text = data.get("baseline_prompt", "") or ""
+    current_text = data.get("current_text", "") or ""
+    threshold_raw = data.get("threshold", 0.7)
+    try:
+        threshold = float(threshold_raw)
+    except (TypeError, ValueError):
+        threshold = 0.7
+    monitor = DriftMonitor(threshold=threshold)
+    result = monitor.check(
+        spec_path=Path(spec_path_str) if isinstance(spec_path_str, str) and spec_path_str else None,
+        plan_path=Path(plan_path_str) if isinstance(plan_path_str, str) and plan_path_str else None,
+        prompt=prompt_text if isinstance(prompt_text, str) else "",
+        current_output=current_text if isinstance(current_text, str) else "",
+    )
+    score = result.get("drift_score", 0.0)
+    if isinstance(score, int | float) and score > threshold:
+        result["verdict"] = "drift"
+    else:
+        result["verdict"] = "on-track"
+    sys.stdout.write(json.dumps(result, ensure_ascii=False) + "\n")
+    return 0
+
+
+if __name__ == "__main__":
+    import sys as _sys
+
+    _sys.exit(main())
