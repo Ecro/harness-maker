@@ -26,7 +26,13 @@ class ProfileStore:
         self._lock_path = self._dir / "profile.lock"
 
     def get(self, key: str) -> Any:
-        """Get the latest value for a profile key."""
+        """Get the latest value for a profile key.
+
+        0.7.1 (ADR-104): reads do NOT acquire the lock. POSIX ``os.replace``
+        guarantees readers see either the old file or the new file in full,
+        never a torn state — but a read concurrent with a write may return
+        the pre-write snapshot.
+        """
         data = self._read()
         entry = data.get(key)
         if entry is None:
@@ -56,7 +62,12 @@ class ProfileStore:
             self._write(data)
 
     def get_all(self) -> dict[str, Any]:
-        """Read the entire profile."""
+        """Read the entire profile.
+
+        0.7.1 (ADR-104): same lock-free read contract as ``get`` — readers
+        see either old or new file fully (``os.replace`` atomicity), never
+        torn. Strict-freshness callers must serialize externally.
+        """
         return self._read()
 
     def _read(self) -> dict[str, Any]:

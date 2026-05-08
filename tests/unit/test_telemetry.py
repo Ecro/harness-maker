@@ -16,6 +16,45 @@ def _run_main_with_stdin(monkeypatch: pytest.MonkeyPatch, stdin: str) -> int:
     return telemetry.main()
 
 
+def _read_today_entries(tmp_path: Path) -> list[dict]:
+    """Read all entries telemetry wrote today (handles 0.7.1 dated filenames)."""
+    obs_dir = tmp_path / ".claude" / "observability"
+    if not obs_dir.is_dir():
+        return []
+    entries = []
+    for f in sorted(obs_dir.glob("metrics-*.jsonl")):
+        for line in f.read_text(encoding="utf-8").splitlines():
+            if line.strip():
+                entries.append(json.loads(line))
+    return entries
+
+
+def _read_today_text(tmp_path: Path) -> str:
+    """Concatenate all today's metric file text — convenience for tests
+    that previously read a single ``metrics.jsonl`` file."""
+    obs_dir = tmp_path / ".claude" / "observability"
+    parts: list[str] = []
+    for f in sorted(obs_dir.glob("metrics-*.jsonl")):
+        parts.append(f.read_text(encoding="utf-8"))
+    return "".join(parts)
+
+
+def _metrics_file(tmp_path: Path) -> Path:
+    """Return the (single) dated metrics file written by telemetry today.
+
+    Tests in this suite produce exactly one entry per ``main()`` invocation,
+    so a single dated file always exists. If multiple files are present
+    (rare — only when the test crosses midnight), returns the most recent.
+    """
+    obs_dir = tmp_path / ".claude" / "observability"
+    files = sorted(obs_dir.glob("metrics-*.jsonl"))
+    if not files:
+        # Fall back to the legacy filename so the FileNotFoundError raised
+        # by callers still pinpoints the missing path.
+        return obs_dir / "metrics.jsonl"
+    return files[-1]
+
+
 def test_appends_jsonl_entry(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     payload = {
         "workspace": {"current_dir": str(tmp_path)},
@@ -28,7 +67,7 @@ def test_appends_jsonl_entry(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
     }
     rc = _run_main_with_stdin(monkeypatch, json.dumps(payload))
     assert rc == 0
-    metrics = tmp_path / ".claude" / "observability" / "metrics.jsonl"
+    metrics = _metrics_file(tmp_path)
     assert metrics.is_file()
     line = metrics.read_text().strip()
     entry = json.loads(line)
@@ -53,7 +92,7 @@ def test_malformed_stdin_does_not_crash(
     monkeypatch.chdir(tmp_path)
     rc = _run_main_with_stdin(monkeypatch, "not json {{{")
     assert rc == 0
-    metrics = tmp_path / ".claude" / "observability" / "metrics.jsonl"
+    metrics = _metrics_file(tmp_path)
     # Even on malformed input, we still write an empty entry
     assert metrics.is_file()
 
@@ -69,7 +108,7 @@ def test_empty_stdin_writes_default_entry(
     monkeypatch.chdir(tmp_path)
     rc = _run_main_with_stdin(monkeypatch, "")
     assert rc == 0
-    metrics = tmp_path / ".claude" / "observability" / "metrics.jsonl"
+    metrics = _metrics_file(tmp_path)
     assert metrics.is_file()
     entry = json.loads(metrics.read_text().strip())
     assert entry["event"] == "unknown"
@@ -89,7 +128,7 @@ def test_cwd_falls_back_to_claude_project_dir_env(
     monkeypatch.chdir("/")  # ensure cwd is NOT tmp_path
     rc = _run_main_with_stdin(monkeypatch, "{}")
     assert rc == 0
-    assert (tmp_path / ".claude" / "observability" / "metrics.jsonl").is_file()
+    assert (_metrics_file(tmp_path)).is_file()
 
 
 def test_cwd_falls_back_to_cursor_project_dir_env(
@@ -103,7 +142,7 @@ def test_cwd_falls_back_to_cursor_project_dir_env(
     monkeypatch.chdir("/")
     rc = _run_main_with_stdin(monkeypatch, "{}")
     assert rc == 0
-    assert (tmp_path / ".claude" / "observability" / "metrics.jsonl").is_file()
+    assert (_metrics_file(tmp_path)).is_file()
 
 
 def test_empty_env_vars_fall_through_to_getcwd(
@@ -119,7 +158,7 @@ def test_empty_env_vars_fall_through_to_getcwd(
     rc = _run_main_with_stdin(monkeypatch, "{}")
     assert rc == 0
     # Should land in tmp_path (via os.getcwd), NOT at root
-    assert (tmp_path / ".claude" / "observability" / "metrics.jsonl").is_file()
+    assert (_metrics_file(tmp_path)).is_file()
     assert not Path("/.claude").exists()
 
 
@@ -137,7 +176,7 @@ def test_post_tool_use_payload_writes_token_entry(
     rc = _run_main_with_stdin(monkeypatch, json.dumps(payload))
     assert rc == 0
     entry = json.loads(
-        (tmp_path / ".claude" / "observability" / "metrics.jsonl").read_text().strip(),
+        (_metrics_file(tmp_path)).read_text().strip(),
     )
     assert entry["event"] == "post_tool_use"
     assert entry["tool_name"] == "Bash"
@@ -166,7 +205,7 @@ def test_cursor_stop_payload_writes_per_turn_entry(
     rc = _run_main_with_stdin(monkeypatch, json.dumps(payload))
     assert rc == 0
     entry = json.loads(
-        (tmp_path / ".claude" / "observability" / "metrics.jsonl").read_text().strip(),
+        (_metrics_file(tmp_path)).read_text().strip(),
     )
     assert entry["event"] == "stop"
     assert entry["status"] == "completed"
@@ -192,7 +231,7 @@ def test_unknown_payload_writes_minimal_entry(
     rc = _run_main_with_stdin(monkeypatch, json.dumps(payload))
     assert rc == 0
     entry = json.loads(
-        (tmp_path / ".claude" / "observability" / "metrics.jsonl").read_text().strip(),
+        (_metrics_file(tmp_path)).read_text().strip(),
     )
     assert entry["event"] == "unknown"
     assert "timestamp" in entry
@@ -212,7 +251,7 @@ def test_entry_has_span_id_and_trace_id(
     }
     _run_main_with_stdin(monkeypatch, json.dumps(payload))
     entry = json.loads(
-        (tmp_path / ".claude" / "observability" / "metrics.jsonl").read_text().strip(),
+        (_metrics_file(tmp_path)).read_text().strip(),
     )
     assert "span_id" in entry
     assert len(entry["span_id"]) == 16
@@ -232,7 +271,7 @@ def test_trace_id_uses_conversation_id_when_available(
     }
     _run_main_with_stdin(monkeypatch, json.dumps(payload))
     entry = json.loads(
-        (tmp_path / ".claude" / "observability" / "metrics.jsonl").read_text().strip(),
+        (_metrics_file(tmp_path)).read_text().strip(),
     )
     assert entry["trace_id"] == "conv-xyz-123"
 
@@ -252,7 +291,7 @@ def test_cost_usd_present_for_post_tool_use(
     }
     _run_main_with_stdin(monkeypatch, json.dumps(payload))
     entry = json.loads(
-        (tmp_path / ".claude" / "observability" / "metrics.jsonl").read_text().strip(),
+        (_metrics_file(tmp_path)).read_text().strip(),
     )
     assert "cost_usd" in entry
     assert entry["cost_usd"] > 0
@@ -267,7 +306,7 @@ def test_cost_usd_absent_for_stop_event(
     payload = {"status": "completed", "duration_ms": 5000}
     _run_main_with_stdin(monkeypatch, json.dumps(payload))
     entry = json.loads(
-        (tmp_path / ".claude" / "observability" / "metrics.jsonl").read_text().strip(),
+        (_metrics_file(tmp_path)).read_text().strip(),
     )
     assert "cost_usd" not in entry
 
@@ -286,3 +325,73 @@ def test_estimate_cost_function() -> None:
     assert abs(cost - 3.0) < 0.01  # $3/MTK input for sonnet
 
     assert _estimate_cost({}, "") is None
+
+
+# 0.7.1 ADR-102: stdin `cwd` field is now ignored entirely (path-traversal fix).
+def test_cwd_precedence_ignores_stdin_cwd(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A poisoned ``{"cwd": "/etc"}`` in stdin must NOT redirect the metrics
+    write target. ADR-102: only env vars + workspace.current_dir + os.getcwd
+    are consulted; the bare stdin `cwd` key is dropped from the chain."""
+    monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
+    monkeypatch.delenv("CURSOR_PROJECT_DIR", raising=False)
+    monkeypatch.chdir(tmp_path)
+    payload = {"cwd": "/etc", "tool_name": "Bash"}  # adversarial cwd
+    rc = _run_main_with_stdin(monkeypatch, json.dumps(payload))
+    assert rc == 0
+    # Telemetry must have written under tmp_path (via os.getcwd), NEVER /etc.
+    assert (_metrics_file(tmp_path)).is_file()
+    assert not Path("/etc/.claude").exists()
+
+
+# 0.7.1 ADR-107: tool_input is whitelist-projected, not raw-truncated.
+def test_tool_input_whitelist_drops_unknown_keys(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Foreign keys in tool_input are dropped on write — defends against
+    schema bloat and incidental secret leaks via unknown fields."""
+    payload = {
+        "workspace": {"current_dir": str(tmp_path)},
+        "tool_name": "Read",
+        "tool_input": {
+            "path": "/data/regular.json",
+            "extra_secret": "sk-ABCDEFGHIJ12345678",  # not in whitelist → dropped
+        },
+        "usage": {"input_tokens": 1, "output_tokens": 1},
+    }
+    rc = _run_main_with_stdin(monkeypatch, json.dumps(payload))
+    assert rc == 0
+    entry = json.loads((_metrics_file(tmp_path)).read_text().strip())
+    persisted = json.loads(entry["tool_input"])
+    assert persisted == {"path": "/data/regular.json"}
+    assert "extra_secret" not in persisted
+
+
+# 0.7.1 ADR-107 secret-pattern redaction.
+def test_tool_input_redacts_known_secret_patterns(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Known-secret regex (sk-/ghp_/AKIA/Bearer) → [REDACTED] before the
+    256-char cap, so a partial-secret tail can never survive truncation."""
+    payload = {
+        "workspace": {"current_dir": str(tmp_path)},
+        "tool_name": "Bash",
+        "tool_input": {
+            "command": (
+                "curl -H 'Authorization: Bearer sk-prod-abc123def456ghi789' https://api.example.com"
+            ),
+        },
+        "usage": {"input_tokens": 1, "output_tokens": 1},
+    }
+    rc = _run_main_with_stdin(monkeypatch, json.dumps(payload))
+    assert rc == 0
+    entry = json.loads((_metrics_file(tmp_path)).read_text().strip())
+    persisted = json.loads(entry["tool_input"])
+    cmd = persisted["command"]
+    # The literal secret bytes must NOT appear in the persisted command.
+    assert "sk-prod-abc" not in cmd
+    assert "[REDACTED]" in cmd

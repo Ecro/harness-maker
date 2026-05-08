@@ -67,7 +67,8 @@ def test_concurrent_set_no_lost_update(tmp_path: Path) -> None:
     for p in procs:
         p.start()
     for p in procs:
-        p.join(timeout=30)
+        p.join(timeout=60)
+        assert not p.is_alive(), "worker timed out"
         assert p.exitcode == 0, f"worker exited with {p.exitcode}"
     store = ProfileStore(tmp_path)
     data = store.get_all()

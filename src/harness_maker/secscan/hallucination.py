@@ -14,7 +14,7 @@ Limitations (intentional):
 from __future__ import annotations
 
 import ast
-import importlib.util
+import functools
 import sys
 from pathlib import Path
 
@@ -39,17 +39,46 @@ def _top_level_package(module_name: str) -> str:
     return module_name.split(".")[0]
 
 
+@functools.lru_cache(maxsize=512)
 def _is_available(package: str) -> bool:
-    """Check if a top-level package is stdlib or installed."""
+    """Check whether ``package`` is stdlib or resolvable on ``sys.path``.
+
+    ADR-105 (0.7.1): replaces ``importlib.util.find_spec(...)`` with a pure
+    filesystem scan. The previous approach invoked the import-machinery
+    finder chain, which on namespace packages or attacker-controlled .pth
+    entries can execute side effects (`__init__.py`, `pkg_resources`
+    plugins) merely to "find" the spec. The hallucination gate scans
+    LLM-generated code; it must never execute it. ``functools.lru_cache``
+    closes Perf PF4 by memoising repeated lookups in the same scan tree.
+
+    Trade-off: false negatives for exotic loaders (egg, zip imports,
+    installed-as-editable namespace packages without a directory). The
+    gate is advisory, so this is acceptable.
+    """
     if package in _STDLIB_MODULES:
         return True
     if package == "__future__":
         return True
-    try:
-        spec = importlib.util.find_spec(package)
-        return spec is not None
-    except (ModuleNotFoundError, ValueError):
-        return False
+    if package in _KNOWN_NAMESPACE_PACKAGES:
+        return True
+    for entry in sys.path:
+        if not entry:
+            continue
+        try:
+            base = Path(entry)
+        except (TypeError, ValueError):
+            continue
+        if not base.is_dir():
+            continue
+        if (base / package / "__init__.py").is_file():
+            return True
+        if (base / f"{package}.py").is_file():
+            return True
+        # Single-file or namespace package without __init__.py — accept
+        # the directory presence to keep the namespace allowlist tight.
+        if (base / package).is_dir():
+            return True
+    return False
 
 
 def scan_file(file_path: Path) -> list[Finding]:
@@ -69,7 +98,15 @@ def scan_file(file_path: Path) -> list[Finding]:
 
     for node in ast.walk(tree):
         if isinstance(node, ast.Try):
-            for try_child in node.body:
+            # 0.7.1 (Code F7): walk both `try` body AND `except` handler
+            # bodies. The except branch typically holds the FALLBACK import
+            # (``except ImportError: import alt_name``); the prior loop only
+            # caught the primary import in `try.body`, leaving the fallback
+            # tagged P0 instead of the intended P2.
+            scopes: list[ast.AST] = list(node.body)
+            for handler in node.handlers:
+                scopes.extend(handler.body)
+            for try_child in scopes:
                 for inner in ast.walk(try_child):
                     if isinstance(inner, (ast.Import, ast.ImportFrom)):
                         guarded_lines.add(inner.lineno)

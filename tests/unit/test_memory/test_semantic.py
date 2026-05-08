@@ -5,6 +5,8 @@ from __future__ import annotations
 import multiprocessing as mp
 from pathlib import Path
 
+import pytest
+
 from harness_maker.memory.semantic import SemanticStore
 
 
@@ -70,6 +72,39 @@ def test_empty_store_search(tmp_path: Path) -> None:
     assert store.search("anything") == []
 
 
+def test_write_many_single_lock_acquisition(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Perf F6 (0.7.1): write_many acquires the lock exactly once for
+    N entries instead of N times via repeated ``write`` calls."""
+    import contextlib
+
+    import harness_maker.memory.semantic as semantic_module
+
+    real_lock = semantic_module.exclusive_lock
+    acquire_count = 0
+
+    @contextlib.contextmanager
+    def counted_lock(path: Path):  # type: ignore[no-untyped-def]
+        nonlocal acquire_count
+        acquire_count += 1
+        with real_lock(path):
+            yield
+
+    monkeypatch.setattr(semantic_module, "exclusive_lock", counted_lock)
+    store = SemanticStore(tmp_path)
+    entries = [
+        {"slug": f"k{i}", "category": "test", "summary": str(i), "keywords": []} for i in range(100)
+    ]
+    written = store.write_many(entries)
+    assert len(written) == 100
+    assert acquire_count == 1, f"expected 1 lock acquire, got {acquire_count}"
+    # All 100 entries must be persisted.
+    all_entries = store.read_all()
+    assert len(all_entries) == 100
+
+
 def test_concurrent_set_no_lost_update(tmp_path: Path) -> None:
     """4 processes × 25 distinct slugs each: index must contain all 100 entries.
 
@@ -86,7 +121,8 @@ def test_concurrent_set_no_lost_update(tmp_path: Path) -> None:
     for p in procs:
         p.start()
     for p in procs:
-        p.join(timeout=30)
+        p.join(timeout=60)
+        assert not p.is_alive(), "worker timed out"
         assert p.exitcode == 0, f"worker exited with {p.exitcode}"
     store = SemanticStore(tmp_path)
     entries = store.read_all()

@@ -1,0 +1,49 @@
+slug: plan-0-7-1-cleanup
+source: work-docs/plans/PLAN-0.7.1-cleanup.md
+created_at: "2026-05-08"
+updated_at: "2026-05-08"
+context:
+  purpose: >
+    harness-maker 0.7.1 patch release. REVIEW-harness-gap-cot-2026-05-2026-05-08
+    + REVIEW-harness-gap-cot-wiring-2026-05-08 이 deferred 처리한 모든 P1+P2 finding
+    을 단일 patch 로 닫는다. 호출자: 0.7.0 이미 push 된 상태에서 carry-over 정리
+    + version bump 만 필요. 사용자 외부 노출 X (private backup remote).
+  invariants:
+    - "parent PLANs (PLAN-harness-gap-cot-2026-05 + PLAN-harness-gap-cot-wiring-2026-05) 의 ADR 모두 상속"
+    - "ADR-101: 스코프 = 모든 deferred (~15 phase)"
+    - "ADR-102: telemetry cwd = CLAUDE_PROJECT_DIR → CURSOR_PROJECT_DIR → workspace.current_dir → os.getcwd; stdin cwd 무시"
+    - "ADR-103: metrics.jsonl rotation = date-based daily files (`metrics-YYYY-MM-DD.jsonl`); reader glob last 7 days; legacy `metrics.jsonl` fallback"
+    - "ADR-104: semantic/profile read-staleness = docstring only (no LOCK_SH; os.replace 의 old-or-new 보장 인정)"
+    - "ADR-105: hallucination find_spec → pure-filesystem (sys.path 순회 + lru_cache)"
+    - "ADR-106: _locking re-entrancy = threading.local depth counter, key=str(lock_path)"
+    - "ADR-107: tool_input = whitelist keys (path/file_path/command/target/database/url/query) + 256-char value cap + known-secret regex redaction"
+    - "ADR-108: drift_monitor fence = Python contract enforce in DriftMonitor.score (XML wrap baseline+current before judge_drift)"
+    - "버전 bump 4 파일 sync (.claude-plugin/plugin.json + .cursor-plugin/plugin.json + pyproject.toml + src/harness_maker/__init__.py) + 2 sandbox harness.yaml stamp refresh"
+    - "CHANGELOG entry 가 각 closed REVIEW finding 을 ID 로 reference"
+    - "신규 public API 추가 X (whitelist constant, write_many helper, max_days arg 등 internal)"
+  priority: "security correctness > performance fixes > docstring contracts > test fixture polish > version bump"
+  test_reliability: >
+    각 phase exit criterion 에 구체적 pytest 명령. 신규 ~12 unit test 추가
+    (test_metrics_io, test_cwd_precedence, test_tool_input_whitelist,
+    test_drift_score_wraps_baseline_in_fence, test_hallucination_no_import_side_effects,
+    test_exclusive_lock_reentrant_no_deadlock, test_guarded_import_in_except_handler,
+    test_scan_sequence_constant_time_per_call, test_tool_input_redacts_known_secret_patterns,
+    test_read_all_max_days_limit, test_write_many_single_lock_acquisition,
+    timeout-extended 4 concurrency tests). mock_anthropic_client fixture 사용.
+    snapshot regen Phase 15 직전 일괄.
+  stopping_criteria: >
+    Success Criteria 8개 항목 전체 통과:
+    (1) 15 phase 모두 land,
+    (2) `uv run pytest` 전체 pass (1034+ 기존 + ~12 신규),
+    (3) `ruff check` + `ruff format --check` clean,
+    (4) `mypy --strict` 0 error,
+    (5) /hm:review 재실행 시 grade A 또는 B (≥ threshold),
+    (6) CHANGELOG entry 가 각 closed REVIEW finding ID reference,
+    (7) version stamps 4 파일 + 2 sandbox harness.yaml 동기화,
+    (8) 새 public API 없음 확인.
+  notes:
+    - "Phase 0 (rotation) → 1 (cwd) → 2 (whitelist) 가 인프라 + 보안 high-impact"
+    - "Phase 3-4 (drift fence, hallucination) 는 prompt-injection / import side-effect 잔여 위험 마감"
+    - "Phase 5-11 internal cleanup; Phase 12-14 docstring/test polish"
+    - "Phase 15 마지막에 version bump + CHANGELOG 일괄 — snapshot regen 도 여기서"
+    - "Loop max_iter 30 / time 8h 충분; 각 phase 작음"

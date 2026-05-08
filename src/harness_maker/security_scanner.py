@@ -19,6 +19,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from harness_maker._metrics_io import iter_recent_entries
 from harness_maker.llm_judge import AnthropicJudgeClient, JudgeClient
 from harness_maker.models import Finding
 from harness_maker.secscan import (
@@ -33,33 +34,18 @@ from harness_maker.secscan.prod_name_guard import scan_sequence as scan_prod_seq
 
 
 def _load_recent_tool_calls(target_dir: Path, window: int = 50) -> list[dict[str, Any]]:
-    """Read the last ``window`` post_tool_use entries from metrics.jsonl.
+    """Read the last ``window`` post_tool_use entries with ``tool_input``.
 
-    Builds a list shaped for ``prod_name_guard.scan_sequence``: each call has
-    ``tool_name`` + ``args`` (decoded from the truncated ``tool_input`` field
-    that telemetry persists since 0.7.0). Pre-0.7.0 entries lack ``tool_input``
-    and contribute only ``tool_name`` — sequence detection requires both, so
-    those entries are silently skipped (graceful upgrade path).
+    Delegates I/O to :func:`harness_maker._metrics_io.iter_recent_entries`,
+    so date-sharded ``metrics-YYYY-MM-DD.jsonl`` files plus the legacy
+    ``metrics.jsonl`` are unified (ADR-103, 0.7.1). Each emitted call has
+    ``tool_name`` + ``args`` (decoded from the truncated ``tool_input``
+    field that telemetry persists since 0.7.0); pre-0.7.0 entries lack
+    ``tool_input`` and are silently skipped.
     """
-    metrics = target_dir / ".claude" / "observability" / "metrics.jsonl"
-    if not metrics.is_file():
-        return []
-    try:
-        lines = metrics.read_text(encoding="utf-8").splitlines()
-    except OSError:
-        return []
+    obs_dir = target_dir / ".claude" / "observability"
     calls: list[dict[str, Any]] = []
-    for line in reversed(lines):
-        if not line.strip():
-            continue
-        try:
-            parsed = json.loads(line)
-        except (json.JSONDecodeError, ValueError):
-            continue
-        if not isinstance(parsed, dict):
-            continue
-        if parsed.get("event") != "post_tool_use":
-            continue
+    for parsed in iter_recent_entries(obs_dir, days=window, event="post_tool_use"):
         tool_name = parsed.get("tool_name")
         raw_input = parsed.get("tool_input")
         if not isinstance(tool_name, str) or not isinstance(raw_input, str):

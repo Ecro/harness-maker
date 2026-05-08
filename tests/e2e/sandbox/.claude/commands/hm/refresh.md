@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.6.2
+harness_maker_version: 0.7.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/refresh.md.j2
 provenance: official
-content_hash: 5bc24a2849705eaa6e63963ccf9311f59bfade58c61b1859cfeb0c35dfc6759a
+content_hash: 61eb8c002a9aca0b7efbadf356752e6273a507770ccbb8c07ce7cc53db2a5f00
 ---
 # /hm:refresh
 
@@ -32,7 +32,7 @@ content_hash: 5bc24a2849705eaa6e63963ccf9311f59bfade58c61b1859cfeb0c35dfc6759a
 ## Run
 
 ```bash
-!uv run --with /home/noel/harness-maker python -c "
+!uv run --with /home/noel/harness-maker/.worktrees/execute-20260508T1017Z python -c "
 from datetime import UTC, datetime
 from pathlib import Path
 from harness_maker.crawler import anthropic_blog, github_releases, arxiv, osv_dev, write_raw

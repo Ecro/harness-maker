@@ -63,29 +63,30 @@ def scan_sequence(
     tool_calls: list[dict[str, Any]],
     window: int = _DEFAULT_WINDOW,
 ) -> list[Finding]:
-    """Detect dangerous tool-call sequences within a sliding window."""
+    """Detect dangerous tool-call sequences within a sliding window.
+
+    0.7.1 (Perf F5): walks the call list once and keeps a fixed-size
+    ``collections.deque`` of the most recent ``window`` calls; per-call
+    cost is O(window) rather than the prior O(n*window) nested-loop scan.
+    Output and severities are unchanged.
+    """
+    from collections import deque
+
     findings: list[Finding] = []
     if len(tool_calls) < 2:
         return findings
 
-    for i in range(len(tool_calls)):
-        current = tool_calls[i]
+    recent: deque[tuple[dict[str, Any], str, str]] = deque(maxlen=window)
+    for current in tool_calls:
         current_name = str(current.get("tool_name", ""))
         current_target = _extract_target(current)
         if not current_target:
+            recent.append((current, current_name, ""))
             continue
 
-        start = max(0, i - window)
-        for j in range(start, i):
-            prev = tool_calls[j]
-            prev_name = str(prev.get("tool_name", ""))
-            prev_target = _extract_target(prev)
-            if not prev_target:
+        for _prev_call, prev_name, prev_target in recent:
+            if not prev_target or prev_target != current_target:
                 continue
-
-            if prev_target != current_target:
-                continue
-
             for seq_first, seq_second, description in DANGEROUS_SEQUENCES:
                 if prev_name == seq_first and current_name == seq_second:
                     has_prod = any(p.search(current_target) for p in PROD_PATTERNS)
@@ -106,6 +107,7 @@ def scan_sequence(
                             ),
                         )
                     )
+        recent.append((current, current_name, current_target))
     return findings
 
 

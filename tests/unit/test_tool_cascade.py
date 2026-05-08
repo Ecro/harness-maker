@@ -130,7 +130,8 @@ def test_concurrent_append_no_loss(tmp_path: Path) -> None:
     for p in procs:
         p.start()
     for p in procs:
-        p.join(timeout=30)
+        p.join(timeout=60)
+        assert not p.is_alive(), "worker timed out"
         assert p.exitcode == 0, f"worker exited with {p.exitcode}"
     lines = log_path.read_text(encoding="utf-8").splitlines()
     assert len(lines) == n_per_worker * n_workers, (

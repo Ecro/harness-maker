@@ -54,12 +54,55 @@ class SemanticStore:
             self._write_index(updated)
         return entry
 
+    def write_many(self, entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Bulk-write multiple entries while holding the lock once.
+
+        0.7.1 (Perf F6): a bulk import of N semantic entries through
+        ``write`` would acquire/release the flock N times — significant
+        syscall overhead on WSL2 where flock latency is 5-10x native
+        Linux. ``write_many`` acquires the lock a single time, applies
+        all dedup-by-slug operations, and writes the index once.
+        Each entry must contain ``slug`` + ``category`` + ``summary`` +
+        ``keywords``; ``source`` defaults to empty string.
+        """
+        if not entries:
+            return []
+        normalized: list[dict[str, Any]] = []
+        for raw in entries:
+            normalized.append(
+                {
+                    "slug": raw["slug"],
+                    "category": raw["category"],
+                    "summary": raw["summary"],
+                    "keywords": raw.get("keywords", []),
+                    "source": raw.get("source", ""),
+                }
+            )
+        with exclusive_lock(self._lock_path):
+            existing = self._read_index()
+            new_slugs = {e["slug"] for e in normalized}
+            kept = [e for e in existing if e.get("slug") not in new_slugs]
+            kept.extend(normalized)
+            self._write_index(kept)
+        return normalized
+
     def read_all(self) -> list[dict[str, Any]]:
-        """Read all semantic entries."""
+        """Read all semantic entries.
+
+        0.7.1 (ADR-104): reads do NOT acquire the lock. POSIX ``os.replace``
+        guarantees readers see either the old file or the new file in full,
+        never a torn mid-write state — but a read concurrent with a write
+        may return the pre-write snapshot. Callers needing strict freshness
+        should serialize against ``write`` externally.
+        """
         return self._read_index()
 
     def search(self, query: str) -> list[dict[str, Any]]:
-        """Search entries by keyword match (case-insensitive substring)."""
+        """Search entries by keyword match (case-insensitive substring).
+
+        0.7.1 (ADR-104): same lock-free read contract as ``read_all`` — see
+        that method's docstring for the staleness guarantee.
+        """
         q = query.lower()
         results: list[dict[str, Any]] = []
         for entry in self._read_index():

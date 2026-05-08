@@ -12,12 +12,13 @@ Returns a CacheDiagnosis with score, primary failure mode, evidence, remediation
 
 from __future__ import annotations
 
-import json
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict
+
+from harness_maker._metrics_io import iter_recent_entries
 
 # Per Anthropic prompt-caching docs: minimum tokens that must accumulate before
 # a cache write happens. Below this, cache_creation_input_tokens silently == 0.
@@ -206,47 +207,31 @@ def diagnose_cache(
     model: str = "sonnet",
     window: int = 50,
 ) -> CacheDiagnosis:
-    """Analyze the last `window` entries of metrics.jsonl to diagnose cache health."""
-    if not metrics_path.is_file():
+    """Analyze the last `window` post_tool_use entries to diagnose cache health.
+
+    ``metrics_path`` retains its 0.6.x signature for backward compat (legacy
+    callers still pass the single ``metrics.jsonl`` path). Internally we
+    delegate to :func:`harness_maker._metrics_io.iter_recent_entries` over
+    the parent directory so date-sharded ``metrics-YYYY-MM-DD.jsonl`` files
+    plus the legacy file are both consulted (ADR-103, 0.7.1).
+    """
+    obs_dir = metrics_path.parent
+    if not obs_dir.is_dir():
         return _no_data(
-            "No metrics.jsonl yet — telemetry hook may not be installed or has not fired.",
+            "No metrics directory yet — telemetry hook may not be installed or has not fired.",
             "Run /hm:make to install the PostToolUse telemetry hook, "
             "then use Claude Code for a few turns.",
         )
 
-    try:
-        lines = metrics_path.read_text(encoding="utf-8").splitlines()
-    except OSError as e:
-        return _no_data(
-            f"Could not read metrics.jsonl: {e}",
-            "Check file permissions on .claude/observability/metrics.jsonl",
-        )
-
-    # Walk backwards from the tail, collecting the last `window`
-    # post_tool_use entries even when the file is dominated by Cursor `stop`
-    # entries (those carry no tokens — see telemetry.py docstring). Treat
-    # entries lacking the `event` tag as post_tool_use for backward compat
-    # with pre-0.5.4 metrics files.
+    # Walk newest-first via the shared reader. It already filters by event,
+    # skips malformed lines, and unifies dated + legacy files.
     entries: list[dict[str, Any]] = []
-    for line in reversed(lines):
-        if not line.strip():
-            continue
-        try:
-            parsed = json.loads(line)
-        except (json.JSONDecodeError, ValueError):
-            continue
-        if not isinstance(parsed, dict):
-            continue
-        event = parsed.get("event", "post_tool_use")
-        if event != "post_tool_use":
-            continue
-        # 0.7.0 wiring: Cursor postToolUse entries land here too but Cursor
-        # does not surface usage data, so all token fields are 0 or null.
-        # Skip them — they convey tool-call timeline (handled elsewhere)
+    for parsed in iter_recent_entries(obs_dir, days=window, event="post_tool_use"):
+        # 0.7.0 wiring: Cursor postToolUse entries also have event="post_tool_use"
+        # but Cursor does not surface usage data, so all token fields are 0 or
+        # null. Skip them — they convey tool-call timeline (handled elsewhere)
         # but say nothing about cache health and would otherwise pollute
-        # hit-rate. Round-2 Code F8: use `or 0` so JSON `null` (which
-        # `parsed.get(field, 0) == 0` evaluates falsely) still triggers the
-        # skip.
+        # hit-rate. ``or 0`` handles JSON null too.
         if (
             (parsed.get("input_tokens") or 0) == 0
             and (parsed.get("output_tokens") or 0) == 0

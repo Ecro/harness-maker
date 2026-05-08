@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.6.2
+harness_maker_version: 0.7.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: 5a93fec5fb24702138d7383da4f0331850ce95312663b2edeb4b144acd7e2d19
+content_hash: 54b45f0fe4e64a31c1b7507d41fd7010e3c0c4db422bcd88a371fff69d0e4634
 ---
 # /hm:exec-rev-wrap-ver
 
@@ -72,7 +72,7 @@ Engage isolation if `harness.yaml.worktree.scope` includes `execute`. The `workt
 **Idempotent under `/hm:loop`**: when this stage runs as part of a loop iteration, the loop has already engaged a per-loop worktree at step 5. The `worktree create` CLI detects we're already inside `.worktrees/<name>/` and returns that path — no nested worktrees, just reuse.
 
 ```bash
-!uv run --with /home/noel/harness-maker python -m harness_maker.worktree create execute "$(pwd)"
+!uv run --with /home/noel/harness-maker/.worktrees/execute-20260508T1017Z python -m harness_maker.worktree create execute "$(pwd)"
 ```
 
 Read the **single line** the command prints — that is the contract for the rest of this stage. Two cases:
@@ -199,12 +199,12 @@ Pick **exactly one** finalize command. Substitute `<WT>` with the literal absolu
 ```bash
 # All phases GREEN — stage-merge the branch back (NO commit) + cleanup the worktree.
 # /hm:wrapup will create the single user-facing commit (with proper message + Co-Authored-By).
-!uv run --with /home/noel/harness-maker python -m harness_maker.worktree finalize <WT> stage-only
+!uv run --with /home/noel/harness-maker/.worktrees/execute-20260508T1017Z python -m harness_maker.worktree finalize <WT> stage-only
 ```
 
 ```bash
 # Stage halted on a blocker — preserve the worktree for inspection:
-!uv run --with /home/noel/harness-maker python -m harness_maker.worktree finalize <WT> fail
+!uv run --with /home/noel/harness-maker/.worktrees/execute-20260508T1017Z python -m harness_maker.worktree finalize <WT> fail
 ```
 
 If Step 0 printed empty (no isolation engaged), skip both — there is nothing to finalize.

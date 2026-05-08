@@ -74,10 +74,19 @@ class EpisodicStore:
                 continue
         return events
 
-    def read_all(self) -> list[dict[str, Any]]:
-        """Read all events across all dates, chronologically."""
+    def read_all(self, max_days: int | None = 30) -> list[dict[str, Any]]:
+        """Read events across recent date files, chronologically.
+
+        0.7.1 (Perf F7): ``max_days`` (default 30) caps the window so a
+        long-lived store does not load every historical day into memory
+        on every call. Pass ``None`` for the pre-0.7.1 unbounded behaviour
+        when a caller genuinely wants the full history.
+        """
+        files = sorted(self._dir.glob("*.jsonl"))
+        if max_days is not None:
+            files = files[-max_days:]
         all_events: list[dict[str, Any]] = []
-        for f in sorted(self._dir.glob("*.jsonl")):
+        for f in files:
             for line in f.read_text(encoding="utf-8").splitlines():
                 if not line.strip():
                     continue

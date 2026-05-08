@@ -95,6 +95,32 @@ def test_read_all_across_dates(tmp_path: Path) -> None:
     assert all_events[1]["day"] == 8
 
 
+def test_read_all_max_days_limit(tmp_path: Path) -> None:
+    """Perf F7 (0.7.1): read_all(max_days=N) caps how many daily files are
+    loaded. Default 30; pass None for unbounded behaviour."""
+    from datetime import UTC, datetime, timedelta
+
+    store = EpisodicStore(tmp_path)
+    base_date = datetime(2026, 5, 8, 12, 0, 0, tzinfo=UTC)
+    for offset in range(60):
+        ts = base_date - timedelta(days=offset)
+        store.write(
+            session_id="s1",
+            stage="execute",
+            payload={"day_offset": offset},
+            timestamp=ts,
+        )
+    # Default is 30 → 30 most-recent files.
+    default = store.read_all()
+    assert len(default) == 30
+    # Explicit cap honours the parameter.
+    capped = store.read_all(max_days=7)
+    assert len(capped) == 7
+    # ``None`` returns the unbounded set.
+    full = store.read_all(max_days=None)
+    assert len(full) == 60
+
+
 def test_concurrent_append_no_loss(tmp_path: Path) -> None:
     """4 processes × 50 writes: file must contain exactly 200 events.
 
@@ -111,7 +137,8 @@ def test_concurrent_append_no_loss(tmp_path: Path) -> None:
     for p in procs:
         p.start()
     for p in procs:
-        p.join(timeout=30)
+        p.join(timeout=60)
+        assert not p.is_alive(), "worker timed out"
         assert p.exitcode == 0, f"worker exited with {p.exitcode}"
     store = EpisodicStore(tmp_path)
     events = store.read("2026-05-08")
