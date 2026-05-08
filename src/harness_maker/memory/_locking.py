@@ -28,7 +28,15 @@ except ImportError:
 
 @contextlib.contextmanager
 def exclusive_lock(lock_path: Path) -> Iterator[None]:
-    """Hold an exclusive POSIX file lock on `lock_path` for the body."""
+    """Hold an exclusive POSIX file lock on `lock_path` for the body.
+
+    Round-2 Sec F6 hardening: the lock fd is opened with ``O_NOFOLLOW``
+    (refuses to follow symlinks — defeats a symlink-redirect attack on
+    the lock path) and mode ``0o600`` (owner-only — does not leak lock
+    state to other local users). The fd uses ``O_WRONLY`` since this
+    helper never reads or writes lock-file bytes; the file is purely a
+    flock anchor.
+    """
     if not _HAS_FCNTL:
         logger.warning(
             "fcntl unavailable on this platform; concurrent writers to %s "
@@ -38,7 +46,8 @@ def exclusive_lock(lock_path: Path) -> Iterator[None]:
         yield
         return
     lock_path.parent.mkdir(parents=True, exist_ok=True)
-    fd = os.open(str(lock_path), os.O_RDWR | os.O_CREAT, 0o644)
+    flags = os.O_WRONLY | os.O_CREAT | os.O_NOFOLLOW
+    fd = os.open(str(lock_path), flags, 0o600)
     try:
         fcntl.flock(fd, fcntl.LOCK_EX)
         yield

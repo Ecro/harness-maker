@@ -9,7 +9,7 @@ name: security-scanner
 description: 5-gate security scan (secrets · permissions · hook injection · CVEs ·
   prompt injection)
 tools: Read, Grep, Glob, Bash
-content_hash: 7737df55b656e3bb25270724f90c60086d72c31bd3a6a05e55d3342d08cf5891
+content_hash: a59eee1aab77b8071893b4bab80f92f6ab84c6d2f48cd54c954a91912ea01af7
 ---
 
 # security-scanner
@@ -54,7 +54,7 @@ Runs all 5 security gates and persists findings to
 ## Run
 
 ```bash
-!uv run --with /home/noel/harness-maker/.worktrees/execute-20260508T0738Z python -m harness_maker.cli security-scan .
+!uv run --with /home/noel/harness-maker python -m harness_maker.cli security-scan .
 ```
 
 Review Gate 5 candidates output by the scanner. For each `medium`-severity

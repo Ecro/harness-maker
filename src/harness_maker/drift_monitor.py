@@ -158,6 +158,25 @@ class DriftMonitor:
         return result
 
 
+def _safe_baseline_path(raw: object, base: Path) -> Path | None:
+    """Resolve ``raw`` against ``base`` and reject paths that escape it.
+
+    Round-2 Sec F2 fix: the CLI accepts JSON-encoded paths that
+    ``DriftMonitor.check`` will read with ``Path.read_text``. Without
+    containment, an attacker-supplied ``{"baseline_spec_path": "/etc/shadow"}``
+    turned the drift monitor into an arbitrary read primitive.
+    """
+    if not isinstance(raw, str) or not raw:
+        return None
+    candidate = (base / raw).resolve() if not Path(raw).is_absolute() else Path(raw).resolve()
+    base_resolved = base.resolve()
+    try:
+        candidate.relative_to(base_resolved)
+    except ValueError:
+        return None
+    return candidate
+
+
 def main() -> int:
     """CLI entry point for `python -m harness_maker.drift_monitor`.
 
@@ -166,8 +185,11 @@ def main() -> int:
     drift check, and prints a single-line JSON result to stdout. Stage
     prompts in trajectory-monitor.md.j2 invoke this module rather than
     re-implementing the logic in prose.
+
+    Baseline paths are confined to the current working directory tree.
     """
     import json
+    import os
     import sys
 
     raw = sys.stdin.read()
@@ -188,10 +210,11 @@ def main() -> int:
         threshold = float(threshold_raw)
     except (TypeError, ValueError):
         threshold = 0.7
+    base = Path(os.getcwd())
     monitor = DriftMonitor(threshold=threshold)
     result = monitor.check(
-        spec_path=Path(spec_path_str) if isinstance(spec_path_str, str) and spec_path_str else None,
-        plan_path=Path(plan_path_str) if isinstance(plan_path_str, str) and plan_path_str else None,
+        spec_path=_safe_baseline_path(spec_path_str, base),
+        plan_path=_safe_baseline_path(plan_path_str, base),
         prompt=prompt_text if isinstance(prompt_text, str) else "",
         current_output=current_text if isinstance(current_text, str) else "",
     )

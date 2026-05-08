@@ -7,6 +7,7 @@ logged to JSONL for observability. No chaos test (deferred to 0.8.0).
 from __future__ import annotations
 
 import json
+import os
 from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
@@ -73,20 +74,29 @@ class ToolCascade:
     def _log_failure(self, tool_name: str, error: str, count: int) -> None:
         """Append a failure entry to the JSONL log.
 
-        Uses POSIX O_APPEND atomicity (single-line write < PIPE_BUF) so
-        concurrent retries from parallel agents do not clobber each other's
-        log entries — replacing an earlier read-modify-replace pattern that
-        silently dropped entries.
+        Uses POSIX ``O_APPEND`` + ``os.write`` so the syscall is atomic
+        when the encoded line ≤ ``PIPE_BUF`` (4 KiB on Linux). Round-2
+        Conc F2: errors with long stack traces can exceed PIPE_BUF; the
+        encoded line is truncated to a safe boundary so the atomicity
+        guarantee holds even on retry storms with verbose errors.
         """
         if self._log_path is None:
             return
+        # Cap the error string so the entire encoded line stays under
+        # PIPE_BUF and the os.write below remains a single atomic syscall.
+        # Tracebacks beyond the cap are truncated; full context lives in
+        # the original tool output, not here.
+        capped_error = error if len(error) <= 1024 else error[:1024] + "...<truncated>"
         entry = {
             "timestamp": datetime.now(UTC).isoformat(),
             "tool_name": tool_name,
-            "error": error,
+            "error": capped_error,
             "failure_count": count,
         }
         self._log_path.parent.mkdir(parents=True, exist_ok=True)
-        line = json.dumps(entry, ensure_ascii=False) + "\n"
-        with self._log_path.open("a", encoding="utf-8") as f:
-            f.write(line)
+        encoded = (json.dumps(entry, ensure_ascii=False) + "\n").encode("utf-8")
+        fd = os.open(str(self._log_path), os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o644)
+        try:
+            os.write(fd, encoded)
+        finally:
+            os.close(fd)

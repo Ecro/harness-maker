@@ -241,14 +241,17 @@ def diagnose_cache(
         if event != "post_tool_use":
             continue
         # 0.7.0 wiring: Cursor postToolUse entries land here too but Cursor
-        # does not surface usage data, so all token fields are 0. Skip them
-        # — they convey tool-call timeline (handled elsewhere) but say
-        # nothing about cache health and would otherwise pollute hit-rate.
+        # does not surface usage data, so all token fields are 0 or null.
+        # Skip them — they convey tool-call timeline (handled elsewhere)
+        # but say nothing about cache health and would otherwise pollute
+        # hit-rate. Round-2 Code F8: use `or 0` so JSON `null` (which
+        # `parsed.get(field, 0) == 0` evaluates falsely) still triggers the
+        # skip.
         if (
-            parsed.get("input_tokens", 0) == 0
-            and parsed.get("output_tokens", 0) == 0
-            and parsed.get("cache_read_tokens", 0) == 0
-            and parsed.get("cache_creation_tokens", 0) == 0
+            (parsed.get("input_tokens") or 0) == 0
+            and (parsed.get("output_tokens") or 0) == 0
+            and (parsed.get("cache_read_tokens") or 0) == 0
+            and (parsed.get("cache_creation_tokens") or 0) == 0
         ):
             continue
         entries.append(parsed)

@@ -4,7 +4,7 @@ harness_maker_version: 0.6.2
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: stages/execute.md.j2
 provenance: official
-content_hash: 060b502152d2bdf73648279df2fd8b95eb8748da8a32b65ceb5f1bd63eee4767
+content_hash: 50a7a1d225d89e7b58bd458536a0f6689511a6b1b1a32c0d72e8abf6a86ae485
 ---
 # Stage: execute
 
@@ -65,7 +65,7 @@ Engage isolation if `harness.yaml.worktree.scope` includes `execute`. The `workt
 **Idempotent under `/hm:loop`**: when this stage runs as part of a loop iteration, the loop has already engaged a per-loop worktree at step 5. The `worktree create` CLI detects we're already inside `.worktrees/<name>/` and returns that path — no nested worktrees, just reuse.
 
 ```bash
-!uv run --with /home/noel/harness-maker/.worktrees/execute-20260508T0738Z python -m harness_maker.worktree create execute "$(pwd)"
+!uv run --with /home/noel/harness-maker python -m harness_maker.worktree create execute "$(pwd)"
 ```
 
 Read the **single line** the command prints — that is the contract for the rest of this stage. Two cases:
@@ -192,12 +192,12 @@ Pick **exactly one** finalize command. Substitute `<WT>` with the literal absolu
 ```bash
 # All phases GREEN — stage-merge the branch back (NO commit) + cleanup the worktree.
 # /hm:wrapup will create the single user-facing commit (with proper message + Co-Authored-By).
-!uv run --with /home/noel/harness-maker/.worktrees/execute-20260508T0738Z python -m harness_maker.worktree finalize <WT> stage-only
+!uv run --with /home/noel/harness-maker python -m harness_maker.worktree finalize <WT> stage-only
 ```
 
 ```bash
 # Stage halted on a blocker — preserve the worktree for inspection:
-!uv run --with /home/noel/harness-maker/.worktrees/execute-20260508T0738Z python -m harness_maker.worktree finalize <WT> fail
+!uv run --with /home/noel/harness-maker python -m harness_maker.worktree finalize <WT> fail
 ```
 
 If Step 0 printed empty (no isolation engaged), skip both — there is nothing to finalize.

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -33,12 +34,12 @@ class EpisodicStore:
     ) -> dict[str, Any]:
         """Append an event and return it.
 
-        Uses POSIX O_APPEND atomicity: a single ``write()`` of a JSONL line
-        under PIPE_BUF (4 KiB on Linux) is guaranteed atomic across concurrent
-        appenders, so two sessions writing simultaneously interleave at line
-        boundaries rather than dropping each other's writes. This replaces an
-        earlier read-modify-replace pattern that silently lost concurrent
-        events.
+        Uses POSIX ``O_APPEND`` + a single ``os.write(fd, bytes)`` so the
+        syscall is atomic when the encoded line ≤ ``PIPE_BUF`` (4 KiB on
+        Linux). Round-2 Conc F1: this bypasses Python's TextIOWrapper
+        buffer, which could otherwise split a ``f.write`` into multiple
+        ``write(2)`` syscalls for larger lines and silently invalidate the
+        atomicity guarantee under concurrent writers.
         """
         ts = timestamp or datetime.now(UTC)
         event: dict[str, Any] = {
@@ -50,9 +51,12 @@ class EpisodicStore:
         date_str = ts.strftime("%Y-%m-%d")
         target = self._file_for_date(date_str)
         target.parent.mkdir(parents=True, exist_ok=True)
-        line = json.dumps(event, ensure_ascii=False) + "\n"
-        with target.open("a", encoding="utf-8") as f:
-            f.write(line)
+        encoded = (json.dumps(event, ensure_ascii=False) + "\n").encode("utf-8")
+        fd = os.open(str(target), os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o644)
+        try:
+            os.write(fd, encoded)
+        finally:
+            os.close(fd)
         return event
 
     def read(self, date_str: str) -> list[dict[str, Any]]:

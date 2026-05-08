@@ -1,0 +1,44 @@
+slug: plan-harness-gap-cot-wiring-2026-05
+source: work-docs/plans/PLAN-harness-gap-cot-wiring-2026-05.md
+created_at: "2026-05-08"
+updated_at: "2026-05-08"
+context:
+  purpose: >
+    harness-maker 0.7.0 release-blocker fixes. REVIEW-harness-gap-cot-2026-05-2026-05-08.md
+    이 적발한 (a) 5 orphaned 모듈 (drift_monitor / two_pass_review / spec_quality /
+    tool_cascade / prod_name_guard — runtime unreachable), (b) 4-instance read-modify-write
+    P0 race (episodic / semantic / profile / tool_cascade), (c) Cursor `.cursor/hooks.json.j2`
+    가 `postToolUse` 블록을 한 번도 렌더한 적 없어서 kairos metrics.jsonl 에 5개 stop event
+    만 누적되고 per-tool-call telemetry 영구 누락 — 이 세 부류를 4 phase 로 닫는다.
+    호출자: 0.7.0 push 직전 자체 정비 (사용자 외부 노출 X).
+  invariants:
+    - "parent PLAN-harness-gap-cot-2026-05 의 ADR-001~010 + invariants 모두 상속"
+    - "외부 추가 의존 금지 (stdlib `fcntl` + 기존 anthropic, httpx 만)"
+    - "기존 wiki.md / failures.md / metrics.jsonl 포맷 미변경 — 신규 entry 만 append"
+    - "race-fix 분리 전략 락: log-shape (episodic, tool_cascade) → 직접 `open(path, 'a')` append-only / index-shape (semantic, profile) → `fcntl.flock(LOCK_EX)` 로 read-modify-write 보호"
+    - "prod_name_guard wiring source = 기존 metrics.jsonl 의 last 50 post_tool_use entry 재사용 (새 schema 도입 X)"
+    - "2-pass review 는 Python 모듈을 `python -m harness_maker.two_pass_review` 로 호출 (review.md.j2 에 logic 재구현 X)"
+    - "Cursor postToolUse 는 token 데이터 없어도 tool-call timeline 용으로 렌더 — null cost_usd 허용"
+    - "Cross-platform race fix: fcntl 미지원 환경 (Windows) 은 try/except ImportError + 경고 로그 + no-op fallback"
+  priority: "reliability(correctness, no data loss) > integration completeness (orphan 해소) > observability (Cursor postToolUse) > 단순성 > cost"
+  test_reliability: >
+    각 phase 별 Exit criterion 에 구체적 pytest 명령. 신규 4 concurrency test (parallel
+    process write-then-read count assertion) 가 race fix 검증 핵심. snapshot test 가
+    review/spec stage prompt + cursor hooks template 변경을 잡아냄. mock_anthropic_client
+    fixture 사용 (LLM 단위 mock). Cursor hooks 변경은 manual 검증 (rendered .cursor/hooks.json
+    의 postToolUse 블록 존재 확인) 추가.
+  stopping_criteria: >
+    Success Criteria 8개 항목 전체 통과:
+    (1) Phase 12a 4 concurrency test pass + Cursor postToolUse 렌더 확인,
+    (2) Phase 12b prod_name_guard wired test pass,
+    (3) Phase 12c 2개 신규 template + 5 reviewer review_scope frontmatter + drift_monitor `__main__` 동작,
+    (4) Phase 12d review.md.j2 / spec.md.j2 wiring + spec_quality bare except logged + merge_passes 버그 fix,
+    (5) `uv run pytest` 전체 pass,
+    (6) `ruff check` + `ruff format --check` clean,
+    (7) `mypy --strict` 0 error,
+    (8) /hm:review 재실행 시 P0 0건.
+  notes:
+    - "REVIEW 의 P2 findings (CP11-CP18) + manual-only 12건은 본 PLAN 의 Non-Goal — 0.7.1 cleanup PLAN 으로 미룸"
+    - "CP8 (hallucination dead `_is_guarded_import`) 만 wrapup commit 에 trivial 3-line delete 로 끼워넣음"
+    - "Phase 12a → 12b → 12c → 12d 순서. 12a 가 race + Cursor 인프라 닫고, 12b-d 가 wiring"
+    - "Snapshot avalanche 위험 (12d 가 review/spec stage prompt 변경) — 12d 종료 후 snapshot --snapshot-update 일괄"

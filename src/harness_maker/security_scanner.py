@@ -117,7 +117,7 @@ def scan_all(
     *,
     pi_client: JudgeClient | None = None,
 ) -> list[Finding]:
-    """Run all 5 security gates against ``target_dir``; persist + return findings.
+    """Run all 7 security gates against ``target_dir``; persist + return findings.
 
     The prompt-injection gate runs both regex and an LLM second pass (via
     ``scan_prompt_injection_llm``). On any LLM transport error the gate
