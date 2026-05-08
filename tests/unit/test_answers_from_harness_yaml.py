@@ -340,3 +340,95 @@ def test_round_trip_cursor_only_targets(tmp_path: Path) -> None:
     reused = answers_from_harness_yaml(target / "harness.yaml")
     assert reused is not None
     assert reused.targets == [Target.CURSOR]
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# REVIEW M5/M8 — mcp_servers validation + drop warnings
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def test_mcp_servers_valid_entry_preserved(tmp_path: Path) -> None:
+    """A well-formed mcp_servers entry survives round-trip parse."""
+    target = _write_yaml(
+        tmp_path,
+        (
+            "preset: Side\nlocale: en\ndev_mode: task-driven\n"
+            "mcp_servers:\n"
+            "  context7:\n"
+            "    command: npx\n"
+            "    args: [-y, '@context7/server']\n"
+            "    env:\n"
+            "      API_KEY: KEY\n"
+        ),
+    )
+    a = answers_from_harness_yaml(target)
+    assert a is not None
+    assert "context7" in a.mcp_servers
+    assert a.mcp_servers["context7"]["command"] == "npx"
+
+
+def test_mcp_servers_missing_command_dropped_with_warning(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """REVIEW M5/M8: entries with missing/non-string command are dropped + warned."""
+    target = _write_yaml(
+        tmp_path,
+        (
+            "preset: Side\n"
+            "mcp_servers:\n"
+            "  bad-no-command: {args: [foo]}\n"
+            "  bad-int-command: {command: 42}\n"
+            "  bad-empty-command: {command: ''}\n"
+            "  good: {command: uvx, args: [valid]}\n"
+        ),
+    )
+    with caplog.at_level(logging.WARNING):
+        a = answers_from_harness_yaml(target)
+    assert a is not None
+    assert list(a.mcp_servers.keys()) == ["good"]
+    assert any("dropped" in r.message and "malformed" in r.message for r in caplog.records)
+
+
+def test_mcp_servers_bad_args_type_dropped(tmp_path: Path) -> None:
+    """args must be list[str] — string-typed args is rejected."""
+    target = _write_yaml(
+        tmp_path,
+        (
+            "preset: Side\n"
+            "mcp_servers:\n"
+            "  bad: {command: npx, args: 'not-a-list'}\n"
+            "  bad-mixed: {command: npx, args: [valid, 42]}\n"
+            "  good: {command: npx, args: [valid]}\n"
+        ),
+    )
+    a = answers_from_harness_yaml(target)
+    assert a is not None
+    assert list(a.mcp_servers.keys()) == ["good"]
+
+
+def test_mcp_servers_bad_env_type_dropped(tmp_path: Path) -> None:
+    """env must be dict[str,str] — non-string values rejected."""
+    target = _write_yaml(
+        tmp_path,
+        (
+            "preset: Side\n"
+            "mcp_servers:\n"
+            "  bad: {command: npx, env: {KEY: 42}}\n"
+            "  good: {command: npx, env: {KEY: 'string-value'}}\n"
+        ),
+    )
+    a = answers_from_harness_yaml(target)
+    assert a is not None
+    assert list(a.mcp_servers.keys()) == ["good"]
+
+
+def test_mcp_servers_args_and_env_optional(tmp_path: Path) -> None:
+    """Bare command-only entry (no args/env) is valid and preserved."""
+    target = _write_yaml(
+        tmp_path,
+        ("preset: Side\nmcp_servers:\n  minimal: {command: simple-bin}\n"),
+    )
+    a = answers_from_harness_yaml(target)
+    assert a is not None
+    assert a.mcp_servers == {"minimal": {"command": "simple-bin"}}

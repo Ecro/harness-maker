@@ -8,7 +8,7 @@ name: relevance-filter
 description: Score crawled anti-rot items against project context using LLM judgment
   + adaptive threshold (start 0.7, ±0.05 by accept/reject ratio). Use after research-crawler
   writes raw-<date>.jsonl, between crawl and AskUserQuestion confirmation in /hm:refresh.
-content_hash: 36ed38425a094cd60979f7c0d6a1d848f4b90d14f24872c3978256b3076789a4
+content_hash: 9e2fd2990fcd9ee100bbdaf080c2cc696889d8ec801963d49de69c75ff7bb12d
 ---
 
 # relevance-filter
@@ -44,7 +44,7 @@ You are the relevance judge — no external API call needed.
 4. Compute the adaptive threshold from prior decisions in `decisions.jsonl`:
 
 ```bash
-!uv run --with /home/noel/harness-maker/.worktrees/execute-20260508T0357Z python -c "
+!uv run --with /home/noel/harness-maker python -c "
 from pathlib import Path
 from harness_maker.relevance import adaptive_threshold, load_decisions
 history = load_decisions(Path('.claude/observability/refresh/decisions.jsonl'))

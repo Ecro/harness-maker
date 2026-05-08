@@ -116,9 +116,9 @@ harness-maker 는 **dual plugin** — 두 marketplace 양쪽에 등록 가능:
 
 > **왜:** Claude Code 의 `/plugin update` 는 `.claude-plugin/plugin.json` 의 `version` 필드를 기준으로 최신 여부를 판단한다. Cursor 도 `.cursor-plugin/plugin.json` 의 `version` 으로 동일 판단. `pyproject.toml` 만 올리고 두 manifest 가 구버전이면 두 marketplace 모두 "already at latest" 로 오보. (0.4.9 릴리스 시 발견; cursor target 도입 시 4 파일로 확장)
 
-## 보안 / 권한 (v1.6)
-- Reviewer agent (code, security, perf, ux, concurrency) — `permissions.allow: [Read(*), Grep(*), Bash(git diff:*), Bash(git log:*)]`, `deny: [Write(*), Edit(*), Bash(rm:*), Bash(curl:*), Bash(npm:*)]`
-- Executor agent — `allow: [Write(.worktrees/**), Edit(.worktrees/**), Bash(<test commands>:*)]`, `deny: [Write(/etc/**), Write(~/.ssh/**), Bash(curl * | sh), Bash(eval *)]`
+## 보안 / 권한 (v1.6, REVIEW-2026-05-08 개정)
+- Reviewer agent (code, security, perf, ux, concurrency) — `permissions.allow: [Read(*), Grep(*), Glob(*), Bash(git diff:*), Bash(git log:*), Bash(git status:*)]`, `deny: [Write(*), Edit(*), Bash(rm:*), Bash(curl:*), Bash(npm:*), Bash(eval *), Bash(python:*), Bash(node:*), Bash(sh:*), Bash(bash:*)]`. **Why 추가 Bash deny**: REVIEW M7 발견 — 단순 rm/curl/npm 차단만으로는 `Bash(python -c "...")` / `Bash(sh -c "...")` 우회 가능. 인터프리터 호출도 모두 deny.
+- Executor agent — `allow: [Read(*), Grep(*), Glob(*), Write(.worktrees/**), Edit(.worktrees/**), Bash(uv run:*), Bash(pytest:*), Bash(npm test:*), Bash(cargo test:*), Bash(git diff:*), Bash(git log:*), Bash(git status:*)]`, `deny: [Write(/etc/**), Write(~/.ssh/**), Write(~/.aws/**), Edit(/etc/**), Edit(~/.ssh/**), Edit(~/.aws/**), Bash(curl * | sh), Bash(eval *), Bash(rm -rf /:*)]`. **Why Edit/Write 페어링**: REVIEW M1 발견 — `Write(/etc/**)` 만 deny 면 `Edit(/etc/sudoers)` 로 동일 파일 수정 가능 (escalation path). 같은 시스템 경로에 대해 Write 와 Edit 은 항상 페어로 deny.
 - 모든 generated 파일은 frontmatter 에 `generated_by + content_hash + source_template + harness_maker_version`
 
 > **Cursor target 의 권한 매핑** (Phase 1 검증 결과 채움):

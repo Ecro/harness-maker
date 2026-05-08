@@ -545,14 +545,50 @@ def answers_from_harness_yaml(yaml_path: Path) -> InterviewAnswers | None:
         update["max_review_rounds"] = max_review_rounds
 
     # MCP servers — user adds these manually to harness.yaml; preserve on re-render.
+    # REVIEW M5/M8 (2026-05-08): validate inner dict shape (command:str, args:list[str],
+    # env:dict[str,str]) and warn when entries are dropped, since the rendered
+    # `.cursor/mcp.json` is executed by Cursor — silent drop on malformed yaml could
+    # mask a typo that leaves the user with no MCP servers wired up.
     mcp_servers = data.get("mcp_servers")
     if isinstance(mcp_servers, dict):
-        # Only accept dict-of-dict shape; other shapes silently dropped (preserves
-        # the InterviewAnswers default {}). Keys must be strings.
         clean: dict[str, dict[str, Any]] = {}
+        dropped: list[str] = []
         for k, v in mcp_servers.items():
-            if isinstance(k, str) and isinstance(v, dict):
-                clean[k] = v
+            if not isinstance(k, str):
+                dropped.append(repr(k))
+                continue
+            if not isinstance(v, dict):
+                dropped.append(k)
+                continue
+            # Per-field shape validation (best-effort; unknown fields pass through
+            # since MCP server spec evolves and we don't want to gate on it).
+            command = v.get("command")
+            args = v.get("args")
+            env = v.get("env")
+            if not isinstance(command, str) or not command:
+                dropped.append(k)
+                continue
+            if args is not None and not (
+                isinstance(args, list) and all(isinstance(a, str) for a in args)
+            ):
+                dropped.append(k)
+                continue
+            if env is not None and not (
+                isinstance(env, dict)
+                and all(isinstance(ek, str) and isinstance(ev, str) for ek, ev in env.items())
+            ):
+                dropped.append(k)
+                continue
+            clean[k] = v
+        if dropped:
+            logger.warning(
+                "harness.yaml mcp_servers: dropped %d malformed entries (%s). "
+                "Each entry must have command:str, args:list[str] (optional), "
+                "env:dict[str,str] (optional). Fix the yaml or those servers will "
+                "not appear in .cursor/mcp.json.",
+                len(dropped),
+                ", ".join(dropped[:5]),
+            )
         if clean:
             update["mcp_servers"] = clean
 

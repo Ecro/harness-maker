@@ -21,16 +21,16 @@ from pathlib import Path
 from harness_maker.relevance import detect_version_drift
 
 
-def _format_message(installed: str, current: str, direction: str) -> str:
+def _format_message(stamped: str, current: str, direction: str) -> str:
     if direction == "upgrade":
         return (
             f"[harness-maker] Harness drift detected: project rendered with "
-            f"{installed}, plugin is at {current}. Run /harness-maker:make to "
+            f"{stamped}, plugin is at {current}. Run /harness-maker:make to "
             f"re-render templates and pick up the latest fixes."
         )
     return (
         f"[harness-maker] Harness drift detected: project rendered with "
-        f"{installed} but plugin is now at {current} (older than stamped). "
+        f"{stamped} but plugin is now at {current} (older than stamped). "
         f"Likely a plugin downgrade — verify intent before running /harness-maker:make."
     )
 
@@ -46,7 +46,7 @@ def run(cwd: Path | None = None) -> int:
     payload = {
         "hookSpecificOutput": {
             "hookEventName": "SessionStart",
-            "additionalContext": _format_message(drift.installed, drift.current, drift.direction),
+            "additionalContext": _format_message(drift.stamped, drift.current, drift.direction),
         }
     }
     sys.stdout.write(json.dumps(payload))

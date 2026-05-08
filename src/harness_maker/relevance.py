@@ -25,6 +25,7 @@ the SessionStart drift hook regardless of which import path called us.
 
 from __future__ import annotations
 
+import functools
 import json
 import re
 from dataclasses import dataclass
@@ -413,43 +414,74 @@ def update_last_reviewed_at(path: Path, new_date: date | None = None) -> date:
 @dataclass(frozen=True)
 class VersionDrift:
     """Mismatch between a project's stamped harness_maker_version and the
-    currently-installed harness-maker package. Direction is from the project's
+    latest-installed harness-maker package. Direction is from the project's
     perspective: ``upgrade`` = newer package available, ``downgrade`` = package
     is older than what stamped the project (rare, usually a rollback).
+
+    Field naming (REVIEW M2, 2026-05-08): ``stamped`` is the version baked
+    into ``harness.yaml`` at last render; ``current`` is the latest plugin
+    cached on disk. Older codebases used ``installed`` for the stamped value,
+    which read as the opposite semantic to most readers.
     """
 
-    installed: str  # the version stamped in harness.yaml frontmatter
-    current: str  # the running package's __version__
+    stamped: str  # the version stamped in harness.yaml frontmatter
+    current: str  # the latest plugin version on disk (or fallback __version__)
     direction: Literal["upgrade", "downgrade"]
 
 
-def _scan_plugin_cache_versions() -> list[str]:
-    """Return all harness-maker versions cached under ``~/.claude/plugins/cache/``.
+_CACHE_TOPK = 10
+"""Cap _scan_plugin_cache_versions to the top-K most recent semver-parseable
+entries to bound worst-case scan cost on long-lived installs where every
+``/plugin update`` adds a directory and Claude Code does not prune them
+(REVIEW M9, 2026-05-08)."""
 
-    The Claude Code plugin cache layout is
-    ``~/.claude/plugins/cache/harness-maker-local/harness-maker/<version>/``.
-    Each subdirectory name is a version string. Missing/unreadable cache
-    returns an empty list (caller falls back to ``__version__``).
+
+def _scan_plugin_cache_versions() -> list[str]:
+    """Return up to ``_CACHE_TOPK`` highest-semver harness-maker versions cached
+    under ``~/.claude/plugins/cache/harness-maker-local/harness-maker/``.
+
+    The Claude Code plugin cache layout is one subdirectory per cached
+    version. Missing/unreadable cache returns an empty list (caller falls
+    back to ``__version__``).
+
+    Why top-K cap (REVIEW M9): Claude Code does not prune the cache on
+    ``/plugin update`` — directories accumulate monotonically. Capping at
+    ``_CACHE_TOPK`` bounds scan cost for long-lived installs while preserving
+    correctness (the caller only needs the maximum, so older entries cannot
+    affect the result).
     """
     cache_root = (
         Path.home() / ".claude" / "plugins" / "cache" / "harness-maker-local" / "harness-maker"
     )
-    if not cache_root.is_dir():
-        return []
     try:
-        return [d.name for d in cache_root.iterdir() if d.is_dir()]
+        if not cache_root.is_dir():
+            return []
+        names = [d.name for d in cache_root.iterdir() if d.is_dir()]
     except OSError:
+        # Symlink loop, permission error, broken filesystem — skip and let
+        # latest_installed_version fall back to __version__.
         return []
+    # Sort by semver descending; unparseable entries float to the end (they're
+    # not in the comparison key but still preserved for caller's filter pass).
+    parsed = [(_parse_semver(n), n) for n in names]
+    parsed.sort(key=lambda x: (x[0] is not None, x[0] or (0, 0, 0)), reverse=True)
+    return [name for _p, name in parsed[:_CACHE_TOPK]]
 
 
+@functools.cache
 def latest_installed_version() -> str:
     """Resolve the latest harness-maker version visible to the running session.
 
     Strategy:
     1. Scan ``~/.claude/plugins/cache/harness-maker-local/harness-maker/`` for
-       version subdirectories.
+       version subdirectories (capped at ``_CACHE_TOPK``).
     2. Pick the highest semver-parseable version.
     3. Fall back to imported ``__version__`` if scan yields nothing.
+
+    Why memoized (REVIEW M3): pure-read deterministic-within-process. Process
+    lifetime for SessionStart hook + /hm:refresh is short enough that cache
+    invalidation is not a concern. Avoids repeat iterdir + stat syscalls when
+    multiple call sites land in the same process.
 
     Why not just use ``__version__``: ``/hm:refresh`` is rendered with a
     pinned ``--with <path>`` clause, so its in-process ``__version__`` is the
@@ -501,30 +533,30 @@ def detect_version_drift(project_dir: Path) -> VersionDrift | None:
         return None
     if not isinstance(fm, dict):
         return None
-    installed = fm.get("harness_maker_version")
-    if not isinstance(installed, str) or not installed:
+    stamped = fm.get("harness_maker_version")
+    if not isinstance(stamped, str) or not stamped:
         return None
     current = latest_installed_version()
-    if installed == current:
+    if stamped == current:
         return None
-    direction = _drift_direction(installed, current)
-    return VersionDrift(installed=installed, current=current, direction=direction)
+    direction = _drift_direction(stamped, current)
+    return VersionDrift(stamped=stamped, current=current, direction=direction)
 
 
-def _drift_direction(installed: str, current: str) -> Literal["upgrade", "downgrade"]:
+def _drift_direction(stamped: str, current: str) -> Literal["upgrade", "downgrade"]:
     """Compare two versions; semver-aware with lexical fallback for unparseable.
 
     Returns ``upgrade`` when the running package is newer than what's stamped
     in the project (typical case after harness-maker is bumped). Returns
     ``downgrade`` otherwise. Equal versions are filtered before this is called.
     """
-    pa = _parse_semver(installed)
+    pa = _parse_semver(stamped)
     pb = _parse_semver(current)
     if pa is not None and pb is not None:
         return "upgrade" if pa < pb else "downgrade"
     # Fallback: lexical comparison. Coarse but deterministic for non-semver
     # tags (e.g. dev / rc suffixes that we don't ship today).
-    return "upgrade" if installed < current else "downgrade"
+    return "upgrade" if stamped < current else "downgrade"
 
 
 def _parse_semver(v: str) -> tuple[int, int, int] | None:
@@ -552,7 +584,7 @@ def build_drift_lines(drift: VersionDrift | None) -> list[str]:
         else "Re-render with `/harness-maker:make` to align stamps with the current package."
     )
     return [
-        f"- harness-maker: `{drift.installed}` {arrow} `{drift.current}` ({drift.direction})",
+        f"- harness-maker: `{drift.stamped}` {arrow} `{drift.current}` ({drift.direction})",
         f"  - {suggestion}",
     ]
 

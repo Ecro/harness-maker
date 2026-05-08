@@ -5,11 +5,22 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from harness_maker.relevance import (
     VersionDrift,
     build_drift_lines,
     detect_version_drift,
+    latest_installed_version,
 )
+
+
+@pytest.fixture(autouse=True)
+def _clear_drift_cache() -> None:
+    """Reset @lru_cache between tests — REVIEW M3 added memoization to
+    latest_installed_version, which would otherwise leak state across cases
+    that mock _scan_plugin_cache_versions with different return values."""
+    latest_installed_version.cache_clear()
 
 
 def _write_harness_yaml(project: Path, stamped_version: str) -> None:
@@ -36,7 +47,7 @@ def test_detect_drift_upgrade_when_running_newer(tmp_path: Path) -> None:
     _write_harness_yaml(tmp_path, "0.2.0")
     with patch("harness_maker.relevance.latest_installed_version", return_value="0.3.0"):
         drift = detect_version_drift(tmp_path)
-    assert drift == VersionDrift(installed="0.2.0", current="0.3.0", direction="upgrade")
+    assert drift == VersionDrift(stamped="0.2.0", current="0.3.0", direction="upgrade")
 
 
 def test_detect_drift_downgrade_when_running_older(tmp_path: Path) -> None:
@@ -60,10 +71,13 @@ def test_detect_drift_falls_back_to_lexical_for_unparseable(tmp_path: Path) -> N
     _write_harness_yaml(tmp_path, "0.2.0-rc1")
     with patch("harness_maker.relevance.latest_installed_version", return_value="0.2.0"):
         drift = detect_version_drift(tmp_path)
-    # "0.2.0-rc1" < "0.2.0" lexically? No — "0" < "-" actually. Let's just
-    # assert a drift was detected; direction is whatever lexical gives.
+    # Lexical: "0.2.0-rc1" vs "0.2.0" — first 5 chars equal, then "-" (0x2D)
+    # vs "" (string ends). Python string comparison: shorter string is "less"
+    # when prefix-equal, so "0.2.0" < "0.2.0-rc1" → stamped > current →
+    # downgrade direction. Pin this exact result so a sign-flip in the
+    # fallback branch is caught (REVIEW M2 surfaced the loose prior assertion).
     assert drift is not None
-    assert drift.direction in {"upgrade", "downgrade"}
+    assert drift.direction == "downgrade"
 
 
 def test_detect_drift_returns_none_when_no_harness_yaml(tmp_path: Path) -> None:
@@ -104,7 +118,7 @@ def test_build_drift_lines_empty_when_none() -> None:
 
 
 def test_build_drift_lines_upgrade_includes_plugin_update_command() -> None:
-    drift = VersionDrift(installed="0.2.0", current="0.3.0", direction="upgrade")
+    drift = VersionDrift(stamped="0.2.0", current="0.3.0", direction="upgrade")
     lines = build_drift_lines(drift)
     body = "\n".join(lines)
     assert "0.2.0" in body
@@ -115,7 +129,7 @@ def test_build_drift_lines_upgrade_includes_plugin_update_command() -> None:
 
 
 def test_build_drift_lines_downgrade_suggests_realign() -> None:
-    drift = VersionDrift(installed="0.4.0", current="0.3.0", direction="downgrade")
+    drift = VersionDrift(stamped="0.4.0", current="0.3.0", direction="downgrade")
     lines = build_drift_lines(drift)
     body = "\n".join(lines)
     assert "↓" in body
@@ -147,7 +161,7 @@ def test_drift_detector_uses_latest_installed_not_imported_version(tmp_path: Pat
     with patch("harness_maker.relevance.latest_installed_version", return_value="0.6.1"):
         drift = detect_version_drift(tmp_path)
     assert drift is not None
-    assert drift.installed == "0.5.7"
+    assert drift.stamped == "0.5.7"
     assert drift.current == "0.6.1"
     assert drift.direction == "upgrade"
 
@@ -182,13 +196,28 @@ def test_latest_installed_version_picks_highest_semver(tmp_path: Path) -> None:
 
 def test_latest_installed_version_skips_unparseable(tmp_path: Path) -> None:
     """Garbage entries in the cache directory are ignored, not parsed."""
-    from harness_maker.relevance import latest_installed_version
-
     with patch(
         "harness_maker.relevance._scan_plugin_cache_versions",
         return_value=["random-text", "0.6.1", "not.a.version", ".tmp"],
     ):
         assert latest_installed_version() == "0.6.1"
+
+
+def test_latest_installed_version_all_unparseable_falls_back(tmp_path: Path) -> None:
+    """When EVERY cache entry fails semver parsing, fall back to __version__.
+
+    REVIEW M6 (2026-05-08): coverage gap — prior tests always included at least
+    one valid entry, leaving the `if not valid: return __version__` branch at
+    relevance.py untested. This test exercises that branch directly.
+    """
+    with (
+        patch(
+            "harness_maker.relevance._scan_plugin_cache_versions",
+            return_value=["random-text", "not.a.version", ".tmp", "garbage"],
+        ),
+        patch("harness_maker.__version__", "0.6.2"),
+    ):
+        assert latest_installed_version() == "0.6.2"
 
 
 def test_session_start_hook_and_refresh_command_agree(tmp_path: Path) -> None:

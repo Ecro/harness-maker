@@ -4,7 +4,7 @@ harness_maker_version: 0.6.2
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/ai-readiness.md.j2
 provenance: official
-content_hash: f0828f9b80501b4bc87bc396dcd6f41b087d620f17a1adb97d964ba5e98b436c
+content_hash: 50723b24320945863213ad4c16d6dc155dbdf0102f0f65c6b0e10d3d2bc5b077
 ---
 # /hm:ai-readiness
 
@@ -13,7 +13,7 @@ content_hash: f0828f9b80501b4bc87bc396dcd6f41b087d620f17a1adb97d964ba5e98b436c
 ## Step 1 — structural analysis (Layer 1 + Layer 3)
 
 ```bash
-!uv run --with /home/noel/harness-maker/.worktrees/execute-20260508T0357Z python -m harness_maker.cli ai-readiness . \
+!uv run --with /home/noel/harness-maker python -m harness_maker.cli ai-readiness . \
   --skip-llm --json-output .claude/observability/.l1l3.tmp.json
 ```
 
@@ -56,7 +56,7 @@ Write verdicts to `.claude/observability/.l2.tmp.json`:
 ## Step 3 — finalize + write dashboard
 
 ```bash
-!uv run --with /home/noel/harness-maker/.worktrees/execute-20260508T0357Z python -m harness_maker.cli ai-readiness-finalize \
+!uv run --with /home/noel/harness-maker python -m harness_maker.cli ai-readiness-finalize \
   --scores-json .claude/observability/.l1l3.tmp.json \
   --verdicts-json .claude/observability/.l2.tmp.json
 !rm -f .claude/observability/.l1l3.tmp.json .claude/observability/.l2.tmp.json
@@ -96,7 +96,7 @@ Then use AskUserQuestion:
 
 After all fixes, re-run structural analysis to confirm score improvement:
 ```bash
-!uv run --with /home/noel/harness-maker/.worktrees/execute-20260508T0357Z python -m harness_maker.cli ai-readiness . --skip-llm
+!uv run --with /home/noel/harness-maker python -m harness_maker.cli ai-readiness . --skip-llm
 ```
 
 **For 👤-required items** — briefly state: what action is needed, why you can't do it,

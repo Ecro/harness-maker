@@ -24,6 +24,10 @@ permissions:
   - Bash(curl:*)
   - Bash(npm:*)
   - Bash(eval *)
+  - Bash(python:*)
+  - Bash(node:*)
+  - Bash(sh:*)
+  - Bash(bash:*)
 content_hash: b60b73e9df3034ccbd094277fb79c24d9024f8baacf164460ebc1f6e981f7b4d
 ---
 
