@@ -10,6 +10,8 @@ model: sonnet
 Specialist reviewer for code that runs in multiple threads, an ISR, an
 async runtime, or a background worker.
 
+{% include "agents/_partials/communication.md.j2" %}
+
 ## Triggers
 
 - Conditional Router match: `thread`, `isr`, `worker`, `async`

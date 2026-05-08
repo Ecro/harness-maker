@@ -1,6 +1,6 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.6.0
+harness_maker_version: 0.6.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: skills/context-linter/SKILL.md.j2
 provenance: official
@@ -8,7 +8,7 @@ name: context-linter
 description: Lint generated CLAUDE.md / agent / skill / workflow files for verbose-context
   bloat against per-preset line thresholds. Use before /hm:execute or /hm:wrapup to
   keep the agent context lean.
-content_hash: 5a390fa895e3c898ad6909b451995688eed8c7fbb4a3577e3d842fd7ad62c65b
+content_hash: 4d881419c548a69a5b2230e3f43d88dcd34852efd47296256b88ee6d5f5cde4f
 ---
 
 # context-linter
@@ -17,6 +17,16 @@ Self-lint skill bundled into the user's harness. Wraps `harness_maker.context_li
 to surface warnings when generated assets exceed the line budgets that protect model
 attention quality.
 
+
+## When to invoke vs skip
+
+**Invoke when:**
+- A render is about to write a CLAUDE.md, agent .md, or skill SKILL.md.
+- Pre-`/hm:execute` or pre-`/hm:wrapup` to catch verbose-context bloat early.
+
+**Skip when:**
+- The file is already under-budget (renderer logs counts; recheck only if size grew).
+- The file is non-prompt content (settings.json, hooks.json, harness.yaml).
 ## When to invoke
 
 - Right before `/hm:execute` (catch bloat before it hits the iteration loop)

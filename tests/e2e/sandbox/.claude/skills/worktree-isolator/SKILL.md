@@ -1,6 +1,6 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.6.0
+harness_maker_version: 0.6.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: skills/worktree-isolator/SKILL.md.j2
 provenance: official
@@ -8,7 +8,7 @@ name: worktree-isolator
 description: Isolate /hm:execute changes inside a disposable git worktree. Read harness.yaml.worktree.scope
   to decide whether to engage; on success merge back and clean up; on failure preserve
   the worktree for inspection.
-content_hash: 5301cc02a594968ca7861982eddfd2448d7a9eff084f390f5e2b4b2a7ae693c5
+content_hash: 6dbec00b68278020063f121ad1522f3517eab68662a28f6ec7baad3f70bc0f21
 ---
 
 # worktree-isolator
@@ -18,6 +18,18 @@ Disposable worktree isolation for `/hm:execute` (and any stage listed in
 primitives so all file mutations land in `.worktrees/<workflow>-<ts>/` rather
 than the live working tree.
 
+
+## When to invoke vs skip
+
+**Invoke when:**
+- `/hm:execute` starts AND `harness.yaml.worktree.scope` includes `execute`.
+- `/hm:plan` starts AND `worktree.scope` includes `plan` (Production preset default).
+- `/hm:loop` allocates the per-loop worktree at iteration start.
+
+**Skip when:**
+- `worktree.scope` does not include the current stage (skill becomes a no-op).
+- Already inside `.worktrees/<name>/` (idempotent — worktree CLI returns the existing path).
+- User passed an explicit `--no-worktree` override (when the harness exposes one).
 ## Triggers
 
 - `/hm:execute` invocation

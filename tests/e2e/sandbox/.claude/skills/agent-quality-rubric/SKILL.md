@@ -1,6 +1,6 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.6.0
+harness_maker_version: 0.6.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: skills/agent-quality-rubric/SKILL.md.j2
 provenance: official
@@ -8,7 +8,7 @@ name: agent-quality-rubric
 description: Tier-rank an agent .md file Platinum/Gold/Silver/Bronze using static
   structural checks combined with the agent_prompt LLM rubric. Bronze tier auto-flags
   for anti-rot review. Calls harness_maker.agent_quality.score_agent.
-content_hash: 6c3fd84f638aa9dbdda5929eed49c7cbefa1d7d45d36afafda7f6d4926188f50
+content_hash: c9c137fde3bfbf550e7ef1427e98c951493d6a60936c47ee0a5a67a203434106
 ---
 
 # agent-quality-rubric
@@ -17,6 +17,17 @@ Hybrid: static structural signals + Layer-2 LLM judgment against
 `.claude/rubrics/agent_prompt.yaml`. Composite = `(static + llm) // 2`
 when both run, static alone when the LLM is unreachable.
 
+
+## When to invoke vs skip
+
+**Invoke when:**
+- `/hm:ai-readiness` is computing per-agent quality scores.
+- A new agent template was added and needs a tier ranking.
+- A regression check after a major agent prompt rewrite.
+
+**Skip when:**
+- The agent in question is already scored Platinum/Gold and unchanged since.
+- The dashboard's last regenerated date is < 7 days ago and no agents changed.
 ## When
 
 - `/hm:ai-readiness` agent drill-down · after any `agents/*.md` edit

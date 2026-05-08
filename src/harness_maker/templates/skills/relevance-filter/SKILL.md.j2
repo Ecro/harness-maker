@@ -1,8 +1,23 @@
+---
+name: relevance-filter
+description: Score crawled anti-rot items against project context using LLM judgment + adaptive threshold (start 0.7, ±0.05 by accept/reject ratio). Use after research-crawler writes raw-<date>.jsonl, between crawl and AskUserQuestion confirmation in /hm:refresh.
+---
+
 # {{ name }}
 
 > Score crawled items against project context using your own judgment, then
 > apply an adaptive threshold to filter the proposal list.
 
+
+## When to invoke vs skip
+
+**Invoke when:**
+- `research-crawler` has just emitted `raw-<date>.jsonl` and the proposal queue needs filtering.
+- `/hm:refresh` is between crawl and user-confirm phases.
+
+**Skip when:**
+- No crawl output exists yet (run `research-crawler` first).
+- Proposals are already pre-filtered (e.g., user manually curated the list).
 ## Triggers
 
 - After `research-crawler` writes `raw-<date>.jsonl`

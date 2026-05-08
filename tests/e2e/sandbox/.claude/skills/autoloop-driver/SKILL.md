@@ -1,6 +1,6 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.6.0
+harness_maker_version: 0.6.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: skills/autoloop-driver/SKILL.md.j2
 provenance: official
@@ -9,7 +9,7 @@ description: Orchestration guide for /hm:loop. Covers two modes (feature and imp
   coverage-driven adaptive interview rationale, LoopContext schema (work-docs/loop-context/),
   improve-mode loop body invariants, and safety rails. The /hm:loop command file owns
   the per-step procedure; this skill explains WHY and the invariants Claude must hold.
-content_hash: ea4baec8c2fc849c60e628fd6460c5a068b778ef57bb46fab366c5df7adc0f6e
+content_hash: 14b85dd71ff9704f1de5ef0e8e3c701ebffed00db83234028c69c9a24dfb751a
 ---
 
 # autoloop-driver
@@ -17,6 +17,16 @@ content_hash: ea4baec8c2fc849c60e628fd6460c5a068b778ef57bb46fab366c5df7adc0f6e
 `/hm:loop` is **prompt-driven and LLM-maximised**. Claude plays the role of
 the autoloop driver. No Python module is imported at runtime.
 
+
+## When to invoke vs skip
+
+**Invoke when:**
+- `/hm:loop "<goal>"` starts and the orchestrator needs the WHY behind feature/improve mode + per-loop worktree invariants.
+- A loop iteration boundary needs to confirm the LoopContext schema rules.
+
+**Skip when:**
+- A single non-loop stage runs (`/hm:execute`, `/hm:review`, etc.) — autoloop-driver is loop-scope.
+- The loop is interrupted mid-iteration (resume logic lives in the command file, not this skill).
 ## Two Modes
 
 **`feature` mode (default)**: implement discrete features one per iteration.

@@ -5,10 +5,21 @@
         "hooks": [
           {
             "command": "uv run --with /home/noel/harness-maker python -m harness_maker.telemetry",
+            "timeout": 5,
             "type": "command"
           }
         ],
         "matcher": "*"
+      },
+      {
+        "hooks": [
+          {
+            "command": "uv run --with /home/noel/harness-maker python -m harness_maker.hooks.post_write_reminder",
+            "timeout": 5,
+            "type": "command"
+          }
+        ],
+        "matcher": "Write|Edit|MultiEdit"
       }
     ],
     "PreCompact": [

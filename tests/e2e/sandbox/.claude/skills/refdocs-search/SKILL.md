@@ -1,16 +1,34 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.6.0
+harness_maker_version: 0.6.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: skills/refdocs-search/SKILL.md.j2
 provenance: official
-content_hash: fa1e04737038d31b4277566804accff7aad010641534d41a69e898c68d452073
+name: refdocs-search
+description: Search registered reference-document folders (architecture docs, API
+  specs, design docs) via lossless full-text search; no chunking, no RAG index. Use
+  during research / spec / plan / execute when the question references documentation
+  outside the source tree, or on direct prompts like "search the design docs for X".
+content_hash: 8366ccb51da372f42f73058c82c7bb75c4d6a66e22f378056599e021c871d533
 ---
+
 # refdocs-search
 
 > Search registered reference document folders without extracting their content
 > — lossy yaml index for triage, *original* files for answers.
 
+
+## When to invoke vs skip
+
+**Invoke when:**
+- The question references material outside `src/` and `tests/` (design docs, spec PDFs, vendor docs).
+- The user asks "what does the spec say about X" or "search the architecture docs for Y".
+- A research / plan / execute stage needs context from `harness.yaml.ref_folders`.
+
+**Skip when:**
+- The answer lives in code (use `Grep` / `Glob` directly).
+- `harness.yaml.ref_folders` is empty (skill has nothing to search).
+- The user explicitly asked to read a specific file (use `Read` directly).
 ## Triggers
 
 - Inside research / spec / plan / execute when the question references

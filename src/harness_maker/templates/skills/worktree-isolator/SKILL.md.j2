@@ -10,6 +10,18 @@ Disposable worktree isolation for `/hm:execute` (and any stage listed in
 primitives so all file mutations land in `.worktrees/<workflow>-<ts>/` rather
 than the live working tree.
 
+
+## When to invoke vs skip
+
+**Invoke when:**
+- `/hm:execute` starts AND `harness.yaml.worktree.scope` includes `execute`.
+- `/hm:plan` starts AND `worktree.scope` includes `plan` (Production preset default).
+- `/hm:loop` allocates the per-loop worktree at iteration start.
+
+**Skip when:**
+- `worktree.scope` does not include the current stage (skill becomes a no-op).
+- Already inside `.worktrees/<name>/` (idempotent — worktree CLI returns the existing path).
+- User passed an explicit `--no-worktree` override (when the harness exposes one).
 ## Triggers
 
 - `/hm:execute` invocation

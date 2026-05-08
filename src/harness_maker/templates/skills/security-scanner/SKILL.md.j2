@@ -10,6 +10,17 @@ tools: Read, Grep, Glob, Bash
 Runs all 5 security gates and persists findings to
 `.claude/observability/security/findings-<YYYY-MM-DD>.jsonl`.
 
+
+## When to invoke vs skip
+
+**Invoke when:**
+- `/hm:audit` runs (full sweep across staged diff).
+- Pre-release before pushing to a shared branch / marketplace.
+- Security-gate failure from `/hm:review` triggers the deeper audit path.
+
+**Skip when:**
+- A clean scan ran less than 24h ago AND no dependency-lock files changed since.
+- The diff is empty (no staged or unstaged changes).
 ## Triggers
 
 - `/hm:audit` invocation

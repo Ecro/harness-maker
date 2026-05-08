@@ -1,43 +1,46 @@
 preset: Side
 dev_mode: task-driven
-file_count: 54
+file_count: 55
 files:
 - path: ../CLAUDE.md
   template: claude-md/Side.en.md.j2
   body_sha256: 89714642c2d3a511b544f62c990c97856c7d59cf452299854e818e9daf4b1055
 - path: agents/autoloop-coder.md
   template: agents/autoloop-coder.md.j2
-  body_sha256: 2cecd74dae60e11989a7ed2af7973636a169186495f374168f3054fc92ba2a2e
+  body_sha256: db9b0af4c0cd2106e4510f2560b7b2bed855f52e4d6bf00ddf3dfcbdb882d5a8
 - path: agents/code-reviewer.md
   template: agents/code-reviewer.md.j2
-  body_sha256: de6193cb5fc102cd0695809bb4f3643cf412520f3c49b5316662ac979c1b93e6
+  body_sha256: 5b9e96a6eddab64b26567e781c48496621d6587e9de0e2e4fd39805ae2b1f26f
 - path: agents/concurrency-reviewer.md
   template: agents/concurrency-reviewer.md.j2
-  body_sha256: a3c1b7279591f4e6080057c0934b810e7f47f987a8d0ca416a40c9cd3d8f809f
+  body_sha256: a462f8374a971624ecbbcc6372205ddcd35e5fae7e888a7d235f8490c3ba61a3
 - path: agents/consensus-arbiter.md
   template: agents/consensus-arbiter.md.j2
-  body_sha256: 3423679e133284691ba76eff6638e630c3d6e32a6f3ff436e2be0b3246c6e13e
+  body_sha256: 536ee6da9329abff60113e0293a6d149b482abd000c038a00dce5fa4525452d4
 - path: agents/executor.md
   template: agents/executor.md.j2
-  body_sha256: adec9393962c1bdeba94c2cae226c2a9787a126169f6b115272248637d4413a2
+  body_sha256: c2086f966bae9e22e9d3672f016dfa392ca6c7bc1960a3c82ade570f16ef743e
 - path: agents/performance-reviewer.md
   template: agents/performance-reviewer.md.j2
-  body_sha256: f0daad64359358396e1d7d66192dcb3d8cda6c7720b64b39736cfffce6e75894
+  body_sha256: d8c2ae1c8655eb80d50ccc40193e3e6056311a22588cbefa2b2e4fba73287a32
 - path: agents/plan-validator.md
   template: agents/plan-validator.md.j2
   body_sha256: cbe6c88807f8ce9a07bf008458aadde89e10c2cdea6797136d3ed73c481fa344
 - path: agents/security-auditor.md
   template: agents/security-auditor.md.j2
-  body_sha256: 8834c91a2a44989d6252d882d859d08107fbb2a627c25c40f10fb4ce63992c1a
+  body_sha256: f3c96393e27b392f1f46019363d6347163f69782f635f7d96fb0f35b6a700fc9
 - path: agents/security-reviewer.md
   template: agents/security-reviewer.md.j2
-  body_sha256: f44f1732f9d201ea3b2755316c2cbbb138d04ed8c43ad01077fc5522d159eae3
+  body_sha256: b60b73e9df3034ccbd094277fb79c24d9024f8baacf164460ebc1f6e981f7b4d
+- path: agents/stuck.md
+  template: agents/stuck.md.j2
+  body_sha256: 3efe31fde69f6b95cc658e33ac07391a6f77b35be4d087bc4946e7ba452c05dd
 - path: agents/test-reviewer.md
   template: agents/test-reviewer.md.j2
   body_sha256: ee3dd5cb0fa2f67ecd4d469dd45eee21da93cac89a2e5e42fdb263eaf3a3555a
 - path: agents/ux-reviewer.md
   template: agents/ux-reviewer.md.j2
-  body_sha256: db7f1929425a16ccd8381e392f3b8f058e3305114c0e32c6e03ca4bdcd843113
+  body_sha256: 3dd53d23395028918fab5ce3817abc028c2b0ae3cff61915bdf787cbf071d5a2
 - path: commands/hm/ai-readiness.md
   template: commands/hm/ai-readiness.md.j2
   body_sha256: 50723b24320945863213ad4c16d6dc155dbdf0102f0f65c6b0e10d3d2bc5b077
@@ -82,7 +85,7 @@ files:
   body_sha256: 2d5105c332b762c3a83eb98274a1d53a8939302a198d4fdd7ba7cb5485591b96
 - path: hooks/hooks.json
   template: hooks/hooks.json.j2
-  body_sha256: 91db5df8d0a3892dae9a729f79501f7b9fee02aeb6509758e7086d0b9a0587d1
+  body_sha256: 520c5c9dd603190f4209034347a2b8f53e0c959a516039df7389b7e595a4aa15
 - path: memory/failures.md
   template: memory/failures.en.md.j2
   body_sha256: 87d014117a5c313258f506bf993bd1b56241281b849e9c92a253406cc88452ad
@@ -112,37 +115,37 @@ files:
   body_sha256: 85b323e91599c4f0865d8b88160f370aef1e2248b0821149b6cc2a20169ece33
 - path: skills/agent-quality-rubric/SKILL.md
   template: skills/agent-quality-rubric/SKILL.md.j2
-  body_sha256: 6c3fd84f638aa9dbdda5929eed49c7cbefa1d7d45d36afafda7f6d4926188f50
+  body_sha256: c9c137fde3bfbf550e7ef1427e98c951493d6a60936c47ee0a5a67a203434106
 - path: skills/ai-readiness-rubric/SKILL.md
   template: skills/ai-readiness-rubric/SKILL.md.j2
-  body_sha256: 041e8b0bce3a0e1dc2176dec3e3ca5cf84e79be9a2ccaf0be7327556f4320e5d
+  body_sha256: a0f452b87ffdd0af62242aa2358fb57e2a269b0047403261a38fa443125b9163
 - path: skills/autoloop-driver/SKILL.md
   template: skills/autoloop-driver/SKILL.md.j2
-  body_sha256: ea4baec8c2fc849c60e628fd6460c5a068b778ef57bb46fab366c5df7adc0f6e
+  body_sha256: 14b85dd71ff9704f1de5ef0e8e3c701ebffed00db83234028c69c9a24dfb751a
 - path: skills/conditional-router/SKILL.md
   template: skills/conditional-router/SKILL.md.j2
-  body_sha256: 90f824d451daeebb50bf10d5e7bf8abd586fb32ce20e0a965c1d3d0722fb3e83
+  body_sha256: 2707a46360c6af3a22901b48a91dfaec259500d267c06f0a3b62a8c8e5d78f6d
 - path: skills/context-linter/SKILL.md
   template: skills/context-linter/SKILL.md.j2
-  body_sha256: 5a390fa895e3c898ad6909b451995688eed8c7fbb4a3577e3d842fd7ad62c65b
+  body_sha256: 4d881419c548a69a5b2230e3f43d88dcd34852efd47296256b88ee6d5f5cde4f
 - path: skills/refdocs-search/SKILL.md
   template: skills/refdocs-search/SKILL.md.j2
-  body_sha256: fa1e04737038d31b4277566804accff7aad010641534d41a69e898c68d452073
+  body_sha256: 8366ccb51da372f42f73058c82c7bb75c4d6a66e22f378056599e021c871d533
 - path: skills/relevance-filter/SKILL.md
   template: skills/relevance-filter/SKILL.md.j2
-  body_sha256: 4020e7dfd7a241e031f5e50552ae169b8a585f9054f97f760328456caa5fabaf
+  body_sha256: 9e2fd2990fcd9ee100bbdaf080c2cc696889d8ec801963d49de69c75ff7bb12d
 - path: skills/research-crawler/SKILL.md
   template: skills/research-crawler/SKILL.md.j2
-  body_sha256: f33179104793a2c77bcecfa21b9fa25116f568255598220ab61ceaf4f6a50f6d
+  body_sha256: ca17023045fbd8f5ef8ad569d25098c062bd31ffaacb89bda428dd1b80eb87bd
 - path: skills/security-scanner/SKILL.md
   template: skills/security-scanner/SKILL.md.j2
-  body_sha256: b7fb6f4cfb7eb873c20e35ddb65cfd09ea405079c2f98619fd96f02ec98fc1c5
+  body_sha256: a59eee1aab77b8071893b4bab80f92f6ab84c6d2f48cd54c954a91912ea01af7
 - path: skills/verify-before-completion/SKILL.md
   template: skills/verify-before-completion/SKILL.md.j2
-  body_sha256: 8dccc7f30515f8e9680960b302ee80661bd859f2e3fa32394825909de725d53a
+  body_sha256: 3e1f44a26a6e41abeefb422e46a42f61febed138ed89b2b3d188caeeefa1c8a9
 - path: skills/worktree-isolator/SKILL.md
   template: skills/worktree-isolator/SKILL.md.j2
-  body_sha256: 5301cc02a594968ca7861982eddfd2448d7a9eff084f390f5e2b4b2a7ae693c5
+  body_sha256: 6dbec00b68278020063f121ad1522f3517eab68662a28f6ec7baad3f70bc0f21
 - path: stages/execute.md
   template: stages/execute.md.j2
   body_sha256: f512d2bced7f668b748aaf4fe94f9f154bcb08b409cd6b8062ab9ecbcb971e6a

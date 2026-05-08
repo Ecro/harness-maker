@@ -10,6 +10,8 @@ model: sonnet
 Specialist reviewer for security-relevant code: auth flows, secret handling,
 permission grants, input validation, dependency surface.
 
+{% include "agents/_partials/communication.md.j2" %}
+
 ## Triggers
 
 - Conditional Router match: `.env`, `/auth/`, `/secret`

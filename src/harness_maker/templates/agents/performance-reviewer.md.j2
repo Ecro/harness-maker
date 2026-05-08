@@ -10,6 +10,8 @@ model: sonnet
 Specialist reviewer for performance-sensitive changes: hot loops, IO paths,
 benchmarks, anything in `/perf/` or marked `hot`.
 
+{% include "agents/_partials/communication.md.j2" %}
+
 ## Triggers
 
 - Conditional Router match: `/perf/`, `benchmark`, `hot`

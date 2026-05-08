@@ -1,6 +1,6 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.6.0
+harness_maker_version: 0.6.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: skills/security-scanner/SKILL.md.j2
 provenance: official
@@ -9,7 +9,7 @@ name: security-scanner
 description: 5-gate security scan (secrets · permissions · hook injection · CVEs ·
   prompt injection)
 tools: Read, Grep, Glob, Bash
-content_hash: b7fb6f4cfb7eb873c20e35ddb65cfd09ea405079c2f98619fd96f02ec98fc1c5
+content_hash: a59eee1aab77b8071893b4bab80f92f6ab84c6d2f48cd54c954a91912ea01af7
 ---
 
 # security-scanner
@@ -17,6 +17,17 @@ content_hash: b7fb6f4cfb7eb873c20e35ddb65cfd09ea405079c2f98619fd96f02ec98fc1c5
 Runs all 5 security gates and persists findings to
 `.claude/observability/security/findings-<YYYY-MM-DD>.jsonl`.
 
+
+## When to invoke vs skip
+
+**Invoke when:**
+- `/hm:audit` runs (full sweep across staged diff).
+- Pre-release before pushing to a shared branch / marketplace.
+- Security-gate failure from `/hm:review` triggers the deeper audit path.
+
+**Skip when:**
+- A clean scan ran less than 24h ago AND no dependency-lock files changed since.
+- The diff is empty (no staged or unstaged changes).
 ## Triggers
 
 - `/hm:audit` invocation

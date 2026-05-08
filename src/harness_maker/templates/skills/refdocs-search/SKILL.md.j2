@@ -1,8 +1,25 @@
+---
+name: refdocs-search
+description: Search registered reference-document folders (architecture docs, API specs, design docs) via lossless full-text search; no chunking, no RAG index. Use during research / spec / plan / execute when the question references documentation outside the source tree, or on direct prompts like "search the design docs for X".
+---
+
 # {{ name }}
 
 > Search registered reference document folders without extracting their content
 > — lossy yaml index for triage, *original* files for answers.
 
+
+## When to invoke vs skip
+
+**Invoke when:**
+- The question references material outside `src/` and `tests/` (design docs, spec PDFs, vendor docs).
+- The user asks "what does the spec say about X" or "search the architecture docs for Y".
+- A research / plan / execute stage needs context from `harness.yaml.ref_folders`.
+
+**Skip when:**
+- The answer lives in code (use `Grep` / `Glob` directly).
+- `harness.yaml.ref_folders` is empty (skill has nothing to search).
+- The user explicitly asked to read a specific file (use `Read` directly).
 ## Triggers
 
 - Inside research / spec / plan / execute when the question references

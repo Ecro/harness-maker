@@ -1,6 +1,6 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.6.0
+harness_maker_version: 0.6.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: skills/ai-readiness-rubric/SKILL.md.j2
 provenance: official
@@ -8,7 +8,7 @@ name: ai-readiness-rubric
 description: 3-layer rubric scoring AI-readiness — Layer 1 deterministic structural
   signals, Layer 2 LLM-judged content quality vs rubric YAMLs, Layer 3 prompt-cache
   failure-mode classification. Invoke via /hm:ai-readiness.
-content_hash: 041e8b0bce3a0e1dc2176dec3e3ca5cf84e79be9a2ccaf0be7327556f4320e5d
+content_hash: a0f452b87ffdd0af62242aa2358fb57e2a269b0047403261a38fa443125b9163
 ---
 
 # ai-readiness-rubric
@@ -16,6 +16,16 @@ content_hash: 041e8b0bce3a0e1dc2176dec3e3ca5cf84e79be9a2ccaf0be7327556f4320e5d
 Composite ai-readiness rubric. Three layers, distinct evidence types,
 folded into a single 0-100 score plus a ranked list of actionable items.
 
+
+## When to invoke vs skip
+
+**Invoke when:**
+- `/hm:ai-readiness` computes the 3-layer composite score.
+- A regression check after a major harness change to confirm Health did not drop.
+
+**Skip when:**
+- A score from less than 1h ago is still valid (no harness changes since).
+- The user only wants Layer 1 (deterministic) — the rubric loader supports a layer-only mode.
 ## When to Invoke
 
 - `/hm:ai-readiness` — full scan (terminal summary + dashboard.md update)

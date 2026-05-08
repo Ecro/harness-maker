@@ -10,6 +10,16 @@ only invokes the relevant reviewers. Reduces token cost + review latency
 without hiding HIGH-severity findings (security-, performance-, ux-, and
 concurrency-relevant paths still trigger their owners).
 
+
+## When to invoke vs skip
+
+**Invoke when:**
+- `/hm:review` runs with `harness.yaml.reviewers.routing: conditional`.
+- A workflow step needs to map changed-file paths to a reviewer subset.
+
+**Skip when:**
+- `routing: always-all` is set (every reviewer fires regardless).
+- The diff is empty (nothing to route).
 ## When to Invoke
 
 - `/hm:review` is running and `harness.yaml.reviewers.routing == 'conditional'`

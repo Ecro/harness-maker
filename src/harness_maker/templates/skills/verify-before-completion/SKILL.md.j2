@@ -8,6 +8,17 @@ description: Pre-wrapup gate enforcing 6 checks before any /hm:wrapup or autoloo
 Mandatory gate before `/hm:wrapup` or autoloop iteration close.
 All 6 checks must pass; the first failure short-circuits and blocks.
 
+
+## When to invoke vs skip
+
+**Invoke when:**
+- Just before `/hm:wrapup` (M8 invariant).
+- At the end of every `/hm:loop` iteration.
+- On demand via `/hm:verify` whenever doubt arises.
+
+**Skip when:**
+- The work unit is trivial (typo / docs-only / config-only — wrapup's pre-flight already covers it).
+- A previous PASS in this same session is still valid (no new commits, no test changes since).
 ## When to Invoke
 
 - `/hm:wrapup` — automatically before commit

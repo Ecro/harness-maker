@@ -1,16 +1,31 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.6.0
+harness_maker_version: 0.6.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: skills/relevance-filter/SKILL.md.j2
 provenance: official
-content_hash: 4020e7dfd7a241e031f5e50552ae169b8a585f9054f97f760328456caa5fabaf
+name: relevance-filter
+description: Score crawled anti-rot items against project context using LLM judgment
+  + adaptive threshold (start 0.7, ±0.05 by accept/reject ratio). Use after research-crawler
+  writes raw-<date>.jsonl, between crawl and AskUserQuestion confirmation in /hm:refresh.
+content_hash: 9e2fd2990fcd9ee100bbdaf080c2cc696889d8ec801963d49de69c75ff7bb12d
 ---
+
 # relevance-filter
 
 > Score crawled items against project context using your own judgment, then
 > apply an adaptive threshold to filter the proposal list.
 
+
+## When to invoke vs skip
+
+**Invoke when:**
+- `research-crawler` has just emitted `raw-<date>.jsonl` and the proposal queue needs filtering.
+- `/hm:refresh` is between crawl and user-confirm phases.
+
+**Skip when:**
+- No crawl output exists yet (run `research-crawler` first).
+- Proposals are already pre-filtered (e.g., user manually curated the list).
 ## Triggers
 
 - After `research-crawler` writes `raw-<date>.jsonl`

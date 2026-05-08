@@ -133,6 +133,57 @@ def cleanup(wt_path: Path, on_success: bool) -> None:
             raise
 
 
+def _capture_pending_in_worktree(wt_path: Path) -> bool:
+    """Auto-commit uncommitted work inside the worktree before merge runs.
+
+    Without this step, ``git merge --squash <branch>`` from the base repo only
+    sees commits on <branch>. If the worktree has staged or unstaged edits that
+    were never committed, ``cleanup(force=True)`` deletes them — silent data loss.
+
+    Returns True when a WIP commit was created, False when the worktree was
+    already clean.
+
+    On commit failure (e.g., pre-commit hook rejection, .git/index.lock
+    contention with a Cursor co-writer), the staged state is rolled back via
+    ``git reset HEAD`` so the worktree is left in a consistent state for retry.
+
+    Known limitation: the status-check + add + commit sequence is not atomic
+    against a concurrent writer (e.g., Cursor IDE editing the same worktree).
+    Cleanup --force may delete a Cursor write that arrived after our status
+    check but before our git add. CLAUDE.md "Worktree 공유" notes the prefix-
+    match cleanup boundary; in practice harness-maker and Cursor own different
+    worktree prefixes, so the actual race surface is small.
+    """
+    wt = wt_path.resolve()
+    status = _run(["git", "status", "--porcelain"], cwd=wt)
+    if not status.stdout.strip():
+        return False
+    branch = wt.name
+    _run(["git", "add", "-A"], cwd=wt)
+    try:
+        _run(
+            [
+                "git",
+                "commit",
+                "-m",
+                f"wip(execute): capture uncommitted work in worktree {branch}",
+                "--no-verify",
+            ],
+            cwd=wt,
+        )
+    except RuntimeError:
+        # Roll back the staging so the next finalize attempt sees the original state.
+        try:
+            _run(["git", "reset", "HEAD"], cwd=wt)
+        except RuntimeError as reset_err:
+            print(
+                f"[finalize] reset rollback also failed: {reset_err}",
+                file=sys.stderr,
+            )
+        raise
+    return True
+
+
 def merge(wt_path: Path, strategy: str = "squash", commit: bool = True) -> None:
     """Merge the worktree's branch back into the base repo's current branch.
 
@@ -425,24 +476,49 @@ def _cli_finalize(args: list[str]) -> int:
     project_root = wt.resolve().parent.parent
     on_success = status in {"success", "stage-only"}
     auto_commit = status == "success"  # stage-only leaves the merge uncommitted
-    if on_success:
-        try:
-            merge(wt, strategy=strategy, commit=auto_commit)
-        except RuntimeError as e:
-            print(f"merge failed, preserving worktree: {e}", file=sys.stderr)
-            return 1
+    rc = 0
     try:
-        cleanup(wt, on_success=on_success)
-    except RuntimeError as e:
-        print(f"cleanup failed, worktree preserved at {wt}: {e}", file=sys.stderr)
-        return 1
-    # Loop is over (success OR failure) → release the marker so
-    # worktree_gate stops blocking main edits. Failure preserves the
-    # `<WT>` directory for inspection, but the user must be free to edit
-    # main again (e.g. cherry-pick from <WT>, discard, retry). Stale
-    # markers from crashed loops are also cleaned up here.
-    _clear_loop_marker_if_matches(project_root, wt.resolve())
-    return 0
+        if on_success:
+            # CRITICAL: capture uncommitted work in the worktree before merge.
+            # Without this, `git merge --squash <branch>` only sees committed work,
+            # and `cleanup(force=True)` then deletes the uncommitted edits silently.
+            # See worktree finalize bug investigation 2026-05-08.
+            try:
+                captured = _capture_pending_in_worktree(wt)
+                if captured:
+                    print(
+                        f"[finalize] captured uncommitted work in {wt.name} as WIP commit",
+                        file=sys.stderr,
+                    )
+            except RuntimeError as e:
+                print(
+                    f"failed to capture uncommitted work in {wt}: {e}; preserving worktree",
+                    file=sys.stderr,
+                )
+                rc = 1
+            if rc == 0:
+                try:
+                    merge(wt, strategy=strategy, commit=auto_commit)
+                except RuntimeError as e:
+                    print(f"merge failed, preserving worktree: {e}", file=sys.stderr)
+                    rc = 1
+        if rc == 0:
+            try:
+                cleanup(wt, on_success=on_success)
+            except RuntimeError as e:
+                print(
+                    f"cleanup failed, worktree preserved at {wt}: {e}",
+                    file=sys.stderr,
+                )
+                rc = 1
+    finally:
+        # ALWAYS release the loop marker, even on early failure paths. Without
+        # this, worktree_gate (PreToolUse) blocks every Write/Edit on main
+        # forever after a merge/cleanup failure — user is silently locked out
+        # with no recovery hint. Move into finally to guarantee release.
+        # See review finding 2026-05-08 P1 (concurrency-reviewer).
+        _clear_loop_marker_if_matches(project_root, wt.resolve())
+    return rc
 
 
 def main(argv: list[str] | None = None) -> int:

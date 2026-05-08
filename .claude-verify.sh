@@ -648,11 +648,11 @@ from harness_maker import (
     require_file "src/harness_maker/templates/skills/$sk/SKILL.md.j2"
   done
 
-  # Agents 11
-  log "Agents (11) 존재"
+  # Agents 12
+  log "Agents (12) 존재"
   for ag in code-reviewer security-reviewer security-auditor performance-reviewer ux-reviewer \
             concurrency-reviewer consensus-arbiter autoloop-coder executor plan-validator \
-            test-reviewer; do
+            stuck test-reviewer; do
     require_file "src/harness_maker/templates/agents/$ag.md.j2"
   done
 

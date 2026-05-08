@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.6.0
+harness_maker_version: 0.6.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: skills/conditional-router/SKILL.md.j2
 provenance: official
-content_hash: 90f824d451daeebb50bf10d5e7bf8abd586fb32ce20e0a965c1d3d0722fb3e83
+content_hash: 2707a46360c6af3a22901b48a91dfaec259500d267c06f0a3b62a8c8e5d78f6d
 ---
 ---
 name: conditional-router
@@ -18,6 +18,16 @@ only invokes the relevant reviewers. Reduces token cost + review latency
 without hiding HIGH-severity findings (security-, performance-, ux-, and
 concurrency-relevant paths still trigger their owners).
 
+
+## When to invoke vs skip
+
+**Invoke when:**
+- `/hm:review` runs with `harness.yaml.reviewers.routing: conditional`.
+- A workflow step needs to map changed-file paths to a reviewer subset.
+
+**Skip when:**
+- `routing: always-all` is set (every reviewer fires regardless).
+- The diff is empty (nothing to route).
 ## When to Invoke
 
 - `/hm:review` is running and `harness.yaml.reviewers.routing == 'conditional'`

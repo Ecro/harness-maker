@@ -1,6 +1,6 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.6.0
+harness_maker_version: 0.6.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: skills/verify-before-completion/SKILL.md.j2
 provenance: official
@@ -8,7 +8,7 @@ name: verify-before-completion
 description: Pre-wrapup gate enforcing 6 checks before any /hm:wrapup or autoloop
   iteration close. Failure on any check blocks completion and surfaces the failing
   check name + remediation hint.
-content_hash: 8dccc7f30515f8e9680960b302ee80661bd859f2e3fa32394825909de725d53a
+content_hash: 3e1f44a26a6e41abeefb422e46a42f61febed138ed89b2b3d188caeeefa1c8a9
 ---
 
 # verify-before-completion
@@ -16,6 +16,17 @@ content_hash: 8dccc7f30515f8e9680960b302ee80661bd859f2e3fa32394825909de725d53a
 Mandatory gate before `/hm:wrapup` or autoloop iteration close.
 All 6 checks must pass; the first failure short-circuits and blocks.
 
+
+## When to invoke vs skip
+
+**Invoke when:**
+- Just before `/hm:wrapup` (M8 invariant).
+- At the end of every `/hm:loop` iteration.
+- On demand via `/hm:verify` whenever doubt arises.
+
+**Skip when:**
+- The work unit is trivial (typo / docs-only / config-only — wrapup's pre-flight already covers it).
+- A previous PASS in this same session is still valid (no new commits, no test changes since).
 ## When to Invoke
 
 - `/hm:wrapup` — automatically before commit

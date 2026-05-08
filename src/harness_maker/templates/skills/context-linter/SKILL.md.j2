@@ -9,6 +9,16 @@ Self-lint skill bundled into the user's harness. Wraps `harness_maker.context_li
 to surface warnings when generated assets exceed the line budgets that protect model
 attention quality.
 
+
+## When to invoke vs skip
+
+**Invoke when:**
+- A render is about to write a CLAUDE.md, agent .md, or skill SKILL.md.
+- Pre-`/hm:execute` or pre-`/hm:wrapup` to catch verbose-context bloat early.
+
+**Skip when:**
+- The file is already under-budget (renderer logs counts; recheck only if size grew).
+- The file is non-prompt content (settings.json, hooks.json, harness.yaml).
 ## When to invoke
 
 - Right before `/hm:execute` (catch bloat before it hits the iteration loop)

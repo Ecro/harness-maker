@@ -9,6 +9,17 @@ Hybrid: static structural signals + Layer-2 LLM judgment against
 `.claude/rubrics/agent_prompt.yaml`. Composite = `(static + llm) // 2`
 when both run, static alone when the LLM is unreachable.
 
+
+## When to invoke vs skip
+
+**Invoke when:**
+- `/hm:ai-readiness` is computing per-agent quality scores.
+- A new agent template was added and needs a tier ranking.
+- A regression check after a major agent prompt rewrite.
+
+**Skip when:**
+- The agent in question is already scored Platinum/Gold and unchanged since.
+- The dashboard's last regenerated date is < 7 days ago and no agents changed.
 ## When
 
 - `/hm:ai-readiness` agent drill-down · after any `agents/*.md` edit

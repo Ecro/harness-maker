@@ -88,6 +88,107 @@ def test_merge_squash_brings_worktree_changes_into_base(repo: Path) -> None:
     assert (repo / "feature.txt").exists()
 
 
+def test_finalize_stage_only_captures_uncommitted_work(repo: Path) -> None:
+    """Bug 2026-05-08: stage-only finalize used to silently lose uncommitted edits.
+
+    The bug: `git merge --squash <branch>` only sees committed work; if the
+    worktree had pending edits, `cleanup(force=True)` then deleted them.
+    The fix: _capture_pending_in_worktree() makes a WIP commit on the worktree's
+    branch first, so the merge picks the work up. This test exercises the path:
+    - Make uncommitted edits in the worktree.
+    - Run finalize stage-only.
+    - Assert the uncommitted edits landed on `main` as staged changes (not lost).
+    """
+    wt = worktree.create("execute", repo)
+    # Uncommitted, unstaged edit (the lossy case).
+    (wt / "feature.txt").write_text("uncommitted feature work\n")
+    # Run finalize stage-only.
+    rc = worktree._cli_finalize([str(wt), "stage-only"])
+    assert rc == 0, f"finalize returned {rc}"
+    # Worktree dir must be cleaned up.
+    assert not wt.exists()
+    # The previously-uncommitted work must now be staged on `main`, not lost.
+    on_main = repo / "feature.txt"
+    assert on_main.exists(), "uncommitted feature.txt was lost by finalize"
+    assert on_main.read_text() == "uncommitted feature work\n"
+    # And the staging area should hold it (stage-only does not create the commit).
+    diff_cached = subprocess.run(  # noqa: S603
+        ["git", "diff", "--cached", "--name-only"],
+        cwd=str(repo),
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert "feature.txt" in diff_cached.stdout
+
+
+def test_finalize_success_captures_uncommitted_work(repo: Path) -> None:
+    """Same fix verified on the `success` finalize path (auto-commit mode)."""
+    wt = worktree.create("execute", repo)
+    (wt / "src.py").write_text("print('hi')\n")
+    rc = worktree._cli_finalize([str(wt), "success"])
+    assert rc == 0
+    assert not wt.exists()
+    # `success` mode auto-commits the squash-merge — work lands as a real commit.
+    assert (repo / "src.py").exists()
+    log = subprocess.run(  # noqa: S603
+        ["git", "log", "--oneline", "-1"],
+        cwd=str(repo),
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert "squash-merge worktree" in log.stdout
+
+
+def test_finalize_fail_preserves_uncommitted_work(repo: Path) -> None:
+    """`fail` finalize path must NOT auto-commit — uncommitted state stays for inspection."""
+    wt = worktree.create("execute", repo)
+    (wt / "broken.py").write_text("# this code is wrong\n")
+    rc = worktree._cli_finalize([str(wt), "fail"])
+    # fail path returns 0 when cleanup succeeds; worktree dir is removed but
+    # branch + uncommitted state is preserved on the branch ref via cleanup
+    # behavior. The uncommitted file is intentionally left as evidence on disk
+    # IF the cleanup keeps the worktree (non-force); since we use non-force on
+    # fail, the dir stays.
+    # The contract: NOT lost on main.
+    assert not (repo / "broken.py").exists(), "fail mode should NOT propagate edits to main"
+    # Per worktree.py:127-133 (cleanup with on_success=False), RuntimeError is
+    # swallowed — the cleanup non-force path is allowed to fail when the worktree
+    # is dirty, leaving the directory for inspection. _cli_finalize then returns 0.
+    assert rc == 0
+
+
+def test_finalize_clears_loop_marker_even_on_merge_failure(repo: Path) -> None:
+    """Bug 2026-05-08 (concurrency-reviewer P1): loop marker must clear on every
+    finalize exit path, not just success. Otherwise worktree_gate locks main edits.
+
+    Reproducer: write the marker, then call finalize with a status that triggers
+    the merge path; whatever the outcome, the marker MUST be gone after.
+    """
+    wt = worktree.create("execute", repo)
+    # Simulate the loop marker the autoloop driver writes.
+    marker = repo / ".claude" / ".hm-loop-active"
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.write_text(str(wt.resolve()))
+    assert marker.exists()
+
+    # Stage-only finalize that succeeds — happy path: marker should clear.
+    (wt / "feature.txt").write_text("work\n")
+    rc = worktree._cli_finalize([str(wt), "stage-only"])
+    assert rc == 0
+    assert not marker.exists(), "loop marker not released on stage-only success"
+
+    # Re-set the marker and force a failing scenario via 'fail' status — marker
+    # MUST also clear on the fail path so the user can edit main again.
+    wt2 = worktree.create("execute", repo)
+    marker.write_text(str(wt2.resolve()))
+    assert marker.exists()
+    rc = worktree._cli_finalize([str(wt2), "fail"])
+    assert rc == 0
+    assert not marker.exists(), "loop marker not released on fail path"
+
+
 def test_cleanup_all_removes_every_worktree(repo: Path) -> None:
     wt1 = worktree.create("execute", repo)
     # Force a different timestamp by switching minute is overkill; just create

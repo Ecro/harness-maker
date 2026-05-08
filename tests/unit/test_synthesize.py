@@ -29,8 +29,8 @@ def test_side_and_production_install_full_inventory() -> None:
 
 
 def test_side_file_count_in_range() -> None:
-    # 17 atomic+stages+fixed + 11 agents + 11 skills + harness/settings/CLAUDE/memory/hooks/dashboard
-    assert 40 <= len(SIDE_FILES) <= 55
+    # 17 atomic+stages+fixed + 12 agents + 11 skills + harness/settings/CLAUDE/memory/etc.
+    assert 40 <= len(SIDE_FILES) <= 60
 
 
 def test_synthesize_side_returns_blueprint() -> None:

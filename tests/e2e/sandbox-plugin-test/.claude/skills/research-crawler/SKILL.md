@@ -1,15 +1,30 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.6.0
+harness_maker_version: 0.6.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: skills/research-crawler/SKILL.md.j2
 provenance: official
-content_hash: f33179104793a2c77bcecfa21b9fa25116f568255598220ab61ceaf4f6a50f6d
+name: research-crawler
+description: Crawl 4 anti-rot sources (Anthropic blog/changelog, GitHub releases including
+  anthropics/claude-code, arxiv cs.SE/CL/CR, OSV.dev CVEs) and write to .claude/observability/refresh/raw-<date>.jsonl.
+  Use during /hm:refresh or when the freshness gauge crosses the staleness threshold.
+content_hash: ca17023045fbd8f5ef8ad569d25098c062bd31ffaacb89bda428dd1b80eb87bd
 ---
+
 # research-crawler
 
 > Crawl 4 sources for harness updates: Anthropic blog, GitHub releases (claude-code + reference repos), arxiv (cs.SE/cs.CL/cs.CR), and OSV.dev CVE feed.
 
+
+## When to invoke vs skip
+
+**Invoke when:**
+- `/hm:refresh` runs (manual or weekly schedule).
+- Anti-rot freshness gauge in `/hm:ai-readiness` crosses the staleness threshold (default 7 days since last refresh).
+
+**Skip when:**
+- A `raw-<date>.jsonl` from less than 24h ago already exists (running again would just bloat the queue).
+- The user is offline / OSV.dev unreachable (skill will silently skip with stderr warning).
 ## Triggers
 
 - `/hm:refresh` invocation (manual or weekly schedule)

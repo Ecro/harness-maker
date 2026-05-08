@@ -8,6 +8,16 @@ description: Orchestration guide for /hm:loop. Covers two modes (feature and imp
 `/hm:loop` is **prompt-driven and LLM-maximised**. Claude plays the role of
 the autoloop driver. No Python module is imported at runtime.
 
+
+## When to invoke vs skip
+
+**Invoke when:**
+- `/hm:loop "<goal>"` starts and the orchestrator needs the WHY behind feature/improve mode + per-loop worktree invariants.
+- A loop iteration boundary needs to confirm the LoopContext schema rules.
+
+**Skip when:**
+- A single non-loop stage runs (`/hm:execute`, `/hm:review`, etc.) — autoloop-driver is loop-scope.
+- The loop is interrupted mid-iteration (resume logic lives in the command file, not this skill).
 ## Two Modes
 
 **`feature` mode (default)**: implement discrete features one per iteration.
