@@ -1,15 +1,11 @@
-"""Context Lint (Phase 10 Task 8.1) — flag verbose CLAUDE.md / agent / skill / workflow files.
+"""Context Lint — flag verbose files and context window overuse.
 
 Per spec, context bloat hurts model attention; we enforce per-asset-type line thresholds
 that vary by Preset (Side: looser; Production: tightest signal-to-noise).
 
-Scope decision (intentional, per Phase 10 Task 8.2):
-This module is a STANDALONE callable. Renderer integration is deferred — the existing
-snapshot tests assume byte-stable output; wiring lint warnings into the render path
-risks destabilising those baselines. Phase 11 dogfood will exercise this module directly
-via the context-linter SKILL or a CLI shim.
+Phase 1 addition: window % hard-cap warning when context usage exceeds 40%.
 
-Lines are counted EXCLUDING YAML frontmatter (the leading `---\n…\n---\n` block) so
+Lines are counted EXCLUDING YAML frontmatter (the leading `---\\n…\\n---\\n` block) so
 that frontmatter bookkeeping (provenance hash, metadata) does not inflate the count.
 """
 
@@ -18,6 +14,14 @@ from __future__ import annotations
 from pathlib import Path
 
 from harness_maker.models import Preset
+
+MODEL_CONTEXT_WINDOWS: dict[str, int] = {
+    "opus": 200_000,
+    "sonnet": 200_000,
+    "haiku": 200_000,
+}
+_DEFAULT_WINDOW = 200_000
+_WINDOW_WARN_THRESHOLD = 0.40
 
 # (asset_type, preset) → max body line count
 THRESHOLDS: dict[tuple[str, str], int] = {
@@ -81,4 +85,47 @@ def lint(file_path: Path, asset_type: str, preset: Preset) -> list[str]:
         f"{file_path}: {asset_type} body has {actual} lines "
         f"(>{limit} threshold for {preset.value} preset; "
         f"trim ~{excess} lines or split into a referenced doc)"
+    ]
+
+
+_MCP_SERVER_WARN_THRESHOLD = 6
+
+
+def lint_mcp_server_count(
+    server_count: int,
+    threshold: int = _MCP_SERVER_WARN_THRESHOLD,
+) -> list[str]:
+    """Warn when the number of MCP servers exceeds the threshold.
+
+    High MCP server counts inflate context with tool descriptors,
+    reducing useful context budget.
+    """
+    if server_count <= threshold:
+        return []
+    return [
+        f"MCP server count ({server_count}) exceeds recommended "
+        f"maximum ({threshold}). Each server adds tool descriptors "
+        f"to the context window. Consider disabling unused servers."
+    ]
+
+
+def lint_window_usage(
+    total_tokens: int,
+    model: str = "sonnet",
+    threshold: float = _WINDOW_WARN_THRESHOLD,
+) -> list[str]:
+    """Warn when context window usage exceeds the threshold (default 40%)."""
+    m = model.lower()
+    window = _DEFAULT_WINDOW
+    for key, val in MODEL_CONTEXT_WINDOWS.items():
+        if key in m:
+            window = val
+            break
+    usage_pct = total_tokens / window if window > 0 else 0.0
+    if usage_pct <= threshold:
+        return []
+    return [
+        f"Context window {usage_pct:.0%} used ({total_tokens:,}/{window:,} tokens) "
+        f"— exceeds {threshold:.0%} threshold. Consider compacting context or "
+        f"splitting into a new session."
     ]

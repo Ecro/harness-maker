@@ -42,6 +42,8 @@ class CacheDiagnosis(BaseModel):
     evidence: str
     remediation: str
     counters: dict[str, int]
+    ttl_regression: bool = False
+    ttl_regression_detail: str = ""
 
 
 def _threshold_for_model(model: str) -> int:
@@ -165,6 +167,40 @@ def _build_evidence(
     return (f"Cache miss reasons: {counters}", "See evidence.")
 
 
+def _detect_ttl_regression(
+    entries: list[dict[str, Any]],
+    threshold: int,
+) -> tuple[bool, str]:
+    """Compare TTL miss rate between first and second half of the window."""
+    if len(entries) < 10:
+        return False, ""
+    mid = len(entries) // 2
+    first_half = entries[:mid]
+    second_half = entries[mid:]
+
+    def _ttl_miss_rate(segment: list[dict[str, Any]]) -> float:
+        if not segment:
+            return 0.0
+        ttl_count = 0
+        prev: dict[str, Any] | None = None
+        for e in segment:
+            kind = _classify_turn(e, prev, threshold)
+            if kind == "miss_ttl":
+                ttl_count += 1
+            prev = e
+        return ttl_count / len(segment)
+
+    rate_early = _ttl_miss_rate(first_half)
+    rate_recent = _ttl_miss_rate(second_half)
+    if rate_recent > rate_early + 0.15 and rate_recent > 0.2:
+        return True, (
+            f"TTL miss rate increased from {rate_early:.0%} (early) to "
+            f"{rate_recent:.0%} (recent) — possible cache TTL regression. "
+            f"Check for increased inter-turn latency or session gaps."
+        )
+    return False, ""
+
+
 def diagnose_cache(
     metrics_path: Path,
     model: str = "sonnet",
@@ -264,6 +300,7 @@ def diagnose_cache(
     evidence, remediation = _build_evidence(
         primary, counters, sample_size, threshold, avg_prefix, model
     )
+    ttl_reg, ttl_detail = _detect_ttl_regression(entries, threshold)
     return CacheDiagnosis(
         hit_rate=hit_rate,
         score=score,
@@ -272,4 +309,6 @@ def diagnose_cache(
         evidence=evidence,
         remediation=remediation,
         counters=counters,
+        ttl_regression=ttl_reg,
+        ttl_regression_detail=ttl_detail,
     )

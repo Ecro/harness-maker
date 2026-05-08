@@ -265,6 +265,57 @@ def is_loop_consumable(text: str) -> bool:
     return all(isinstance(f, dict) and f.get("name") for f in features)
 
 
+class ErrorClass(StrEnum):
+    """LLM error classification for per-class cap enforcement (ADR-009)."""
+
+    SYNTAX = "syntax"
+    LOGICAL = "logical"
+    UNKNOWN = "unknown"
+
+
+ERROR_CLASS_CAPS: dict[ErrorClass, int] = {
+    ErrorClass.SYNTAX: 5,
+    ErrorClass.LOGICAL: 2,
+    ErrorClass.UNKNOWN: 3,
+}
+
+
+def classify_error(error_msg: str) -> ErrorClass:
+    """Classify an LLM error message into an ErrorClass.
+
+    Uses keyword heuristics. Callers may override with LLM-based
+    classification by passing pre-classified ErrorClass directly.
+    """
+    lowered = error_msg.lower()
+    syntax_signals = [
+        "syntax", "indent", "parse", "unexpected token",
+        "unterminated", "invalid syntax", "syntaxerror",
+    ]
+    if any(sig in lowered for sig in syntax_signals):
+        return ErrorClass.SYNTAX
+    logical_signals = [
+        "logic", "semantic", "wrong result", "incorrect",
+        "assertion", "type error", "typeerror", "attributeerror",
+        "nameerror", "keyerror", "valueerror",
+    ]
+    if any(sig in lowered for sig in logical_signals):
+        return ErrorClass.LOGICAL
+    return ErrorClass.UNKNOWN
+
+
+def check_error_cap(
+    error_counts: dict[ErrorClass, int],
+    error_class: ErrorClass,
+) -> bool:
+    """Return True if the error class has NOT exceeded its cap (safe to retry).
+
+    Returns False when the cap is reached — caller should halt.
+    """
+    cap = ERROR_CLASS_CAPS.get(error_class, 3)
+    current = error_counts.get(error_class, 0)
+    return current < cap
+
+
 def _default_executor(feature: Feature, iter_idx: int) -> bool:  # noqa: ARG001
     """Dry-run no-op executor — always succeeds, never touches disk."""
     return True

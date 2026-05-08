@@ -1,10 +1,15 @@
-"""Security scanner orchestrator — invokes 5 gates and persists findings.
+"""Security scanner orchestrator — invokes gates and persists findings.
+
+Gates (7 total):
+1. secrets — hardcoded credentials / API keys
+2. permissions — overly permissive settings.json
+3. hook_injection — shell=True / eval patterns in hooks
+4. dependency_cves — known CVEs in dependencies
+5. prompt_injection — hidden prompt patterns in markdown
+6. hallucination — AST-detected imports of non-existent packages (Phase 2)
+7. prod_name_guard — production environment name/sequence detection (Phase 8)
 
 Returns aggregated findings; persists to ``.claude/observability/security/findings-<date>.jsonl``.
-The ``on_finding.high`` policy in ``harness_config.security`` controls semantics:
-- ``"warn"``  — return findings, log but do not raise.
-- ``"block"`` — return findings; caller should treat non-empty list as a build failure.
-- ``"allow"`` — return findings (caller may ignore).
 """
 
 from __future__ import annotations
@@ -23,6 +28,7 @@ from harness_maker.secscan import (
     scan_prompt_injection_llm,
     scan_secrets,
 )
+from harness_maker.secscan.hallucination import scan_directory as scan_hallucination
 
 
 def _persist(findings: list[Finding], target_dir: Path) -> Path:
@@ -88,6 +94,9 @@ def scan_all(
     findings.extend(scan_hook_injection(hooks))
 
     findings.extend(scan_dependency_cves(target_dir))
+
+    # Gate 6: Hallucination — AST-detected non-existent imports
+    findings.extend(scan_hallucination(target_dir))
 
     # Prompt-injection scan: walk markdown files for hidden patterns + LLM.
     if pi_client is None:

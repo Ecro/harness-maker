@@ -9,10 +9,13 @@ from pydantic import ValidationError
 
 from harness_maker.autoloop_driver import (
     AutoloopState,
+    ErrorClass,
     Feature,
     ImprovementContext,
     LoopMode,
     LoopSpec,
+    check_error_cap,
+    classify_error,
     detect_mode,
     is_loop_consumable,
     parse_goal,
@@ -506,3 +509,66 @@ def test_stopping_criteria_predicate_registered() -> None:
     state = run(spec=spec, max_iter=5, executor=succeed)
     assert state.converged is True
     assert "cycle-1" in state.completed
+
+
+# --- Phase 10: Error-Class LLM Cap tests ---
+
+
+class TestClassifyError:
+    def test_syntax_error_detected(self) -> None:
+        assert classify_error("SyntaxError: unexpected token") == ErrorClass.SYNTAX
+
+    def test_indent_error_detected(self) -> None:
+        assert classify_error("IndentationError at line 5") == ErrorClass.SYNTAX
+
+    def test_parse_error_detected(self) -> None:
+        assert classify_error("Failed to parse JSON") == ErrorClass.SYNTAX
+
+    def test_type_error_detected(self) -> None:
+        assert classify_error("TypeError: int is not callable") == ErrorClass.LOGICAL
+
+    def test_assertion_error_detected(self) -> None:
+        assert classify_error("AssertionError: expected 5 got 3") == ErrorClass.LOGICAL
+
+    def test_name_error_detected(self) -> None:
+        assert classify_error("NameError: name 'foo' is not defined") == ErrorClass.LOGICAL
+
+    def test_unknown_error_fallback(self) -> None:
+        assert classify_error("Something went wrong") == ErrorClass.UNKNOWN
+
+    def test_case_insensitive(self) -> None:
+        assert classify_error("SYNTAXERROR: bad token") == ErrorClass.SYNTAX
+
+
+class TestCheckErrorCap:
+    def test_syntax_under_cap(self) -> None:
+        counts: dict[ErrorClass, int] = {ErrorClass.SYNTAX: 3}
+        assert check_error_cap(counts, ErrorClass.SYNTAX) is True
+
+    def test_syntax_at_cap(self) -> None:
+        counts: dict[ErrorClass, int] = {ErrorClass.SYNTAX: 5}
+        assert check_error_cap(counts, ErrorClass.SYNTAX) is False
+
+    def test_syntax_over_cap(self) -> None:
+        counts: dict[ErrorClass, int] = {ErrorClass.SYNTAX: 7}
+        assert check_error_cap(counts, ErrorClass.SYNTAX) is False
+
+    def test_logical_under_cap(self) -> None:
+        counts: dict[ErrorClass, int] = {ErrorClass.LOGICAL: 1}
+        assert check_error_cap(counts, ErrorClass.LOGICAL) is True
+
+    def test_logical_at_cap(self) -> None:
+        counts: dict[ErrorClass, int] = {ErrorClass.LOGICAL: 2}
+        assert check_error_cap(counts, ErrorClass.LOGICAL) is False
+
+    def test_unknown_under_cap(self) -> None:
+        counts: dict[ErrorClass, int] = {ErrorClass.UNKNOWN: 2}
+        assert check_error_cap(counts, ErrorClass.UNKNOWN) is True
+
+    def test_unknown_at_cap(self) -> None:
+        counts: dict[ErrorClass, int] = {ErrorClass.UNKNOWN: 3}
+        assert check_error_cap(counts, ErrorClass.UNKNOWN) is False
+
+    def test_empty_counts_safe(self) -> None:
+        counts: dict[ErrorClass, int] = {}
+        assert check_error_cap(counts, ErrorClass.SYNTAX) is True

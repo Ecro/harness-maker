@@ -24,9 +24,39 @@ from __future__ import annotations
 import json
 import os
 import sys
+import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+COST_PER_MTK: dict[str, dict[str, float]] = {
+    "opus": {"input": 15.0, "output": 75.0, "cache_read": 1.5, "cache_write": 18.75},
+    "sonnet": {"input": 3.0, "output": 15.0, "cache_read": 0.3, "cache_write": 3.75},
+    "haiku": {"input": 0.25, "output": 1.25, "cache_read": 0.025, "cache_write": 0.3},
+}
+_DEFAULT_COST = COST_PER_MTK["sonnet"]
+
+
+def _estimate_cost(entry: dict[str, Any], model: str = "") -> float | None:
+    """Estimate USD cost from token counts. Returns None if no token data."""
+    inp = entry.get("input_tokens", 0) or 0
+    out = entry.get("output_tokens", 0) or 0
+    cache_read = entry.get("cache_read_tokens", 0) or 0
+    cache_write = entry.get("cache_creation_tokens", 0) or 0
+    if inp == 0 and out == 0 and cache_read == 0 and cache_write == 0:
+        return None
+    m = model.lower()
+    rates = _DEFAULT_COST
+    for key, val in COST_PER_MTK.items():
+        if key in m:
+            rates = val
+            break
+    return (
+        inp * rates["input"]
+        + out * rates["output"]
+        + cache_read * rates["cache_read"]
+        + cache_write * rates["cache_write"]
+    ) / 1_000_000
 
 
 def _detect_event(data: dict[str, Any]) -> str:
@@ -48,6 +78,8 @@ def _build_entry(data: dict[str, Any]) -> dict[str, Any]:
     event = _detect_event(data)
     entry: dict[str, Any] = {
         "timestamp": datetime.now(UTC).isoformat(),
+        "span_id": uuid.uuid4().hex[:16],
+        "trace_id": data.get("conversation_id") or uuid.uuid4().hex,
         "event": event,
     }
     if event == "post_tool_use":
@@ -58,6 +90,9 @@ def _build_entry(data: dict[str, Any]) -> dict[str, Any]:
         entry["output_tokens"] = usage.get("output_tokens", 0)
         entry["cache_read_tokens"] = usage.get("cache_read_input_tokens", 0)
         entry["cache_creation_tokens"] = usage.get("cache_creation_input_tokens", 0)
+        cost = _estimate_cost(entry, data.get("model", ""))
+        if cost is not None:
+            entry["cost_usd"] = round(cost, 6)
     elif event == "stop":
         # Cursor stop fires once per agent turn — meaningful per-turn signal
         # even though tokens aren't available. status/loop_count/duration_ms

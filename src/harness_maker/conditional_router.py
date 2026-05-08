@@ -20,6 +20,79 @@ from pathlib import Path
 
 from harness_maker.llm_judge import JudgeClient
 
+REVIEWER_SCOPES: dict[str, list[str]] = {
+    "code-reviewer": ["code", "design", "correctness"],
+    "security-reviewer": ["security", "auth", "permissions", "secrets", "injection"],
+    "performance-reviewer": ["performance", "latency", "throughput", "allocation"],
+    "ux-reviewer": ["ux", "accessibility", "layout", "copy"],
+    "concurrency-reviewer": ["concurrency", "race", "deadlock", "async", "threading"],
+}
+
+
+def is_in_reviewer_scope(reviewer: str, finding_category: str) -> bool:
+    """Check if a finding's category falls within a reviewer's declared scope."""
+    scope = REVIEWER_SCOPES.get(reviewer, [])
+    if not scope:
+        return False
+    cat_lower = finding_category.lower()
+    return any(s in cat_lower for s in scope)
+
+
+def scope_aware_consensus(
+    findings: list[dict[str, object]],
+) -> list[dict[str, object]]:
+    """Apply scope-aware consensus filter (ADR-005).
+
+    Rules:
+    - If a finding is tagged by 2+ reviewers (standard cross-check): consensus-passed
+    - If a finding is from a single reviewer BUT the finding's category is within
+      that reviewer's declared scope AND no other reviewer's scope covers that
+      category: the finding is scope-exempted (treated as valid, auto-fix eligible)
+    - Otherwise: manual-only
+    """
+    from collections import defaultdict
+
+    by_location: dict[str, list[dict[str, object]]] = defaultdict(list)
+    for f in findings:
+        key = f"{f.get('file', '')}:{f.get('line', 0)}:{f.get('severity', '')}"
+        by_location[key].append(f)
+
+    result: list[dict[str, object]] = []
+    for _key, group in by_location.items():
+        reviewers = {str(f.get("reviewer", "")) for f in group}
+
+        if len(reviewers) >= 2:
+            merged = dict(group[0])
+            merged["consensus_tag"] = "consensus-passed"
+            merged["consensus_count"] = len(reviewers)
+            result.append(merged)
+        elif len(reviewers) == 1:
+            reviewer = next(iter(reviewers))
+            finding = dict(group[0])
+            category = str(finding.get("category", finding.get("summary", "")))
+
+            if is_in_reviewer_scope(reviewer, category):
+                other_scopes_cover = any(
+                    r != reviewer and is_in_reviewer_scope(r, category)
+                    for r in REVIEWER_SCOPES
+                )
+                if not other_scopes_cover:
+                    finding["consensus_tag"] = "scope-exempted"
+                    finding["scope_owner"] = reviewer
+                else:
+                    finding["consensus_tag"] = "manual-only"
+            else:
+                finding["consensus_tag"] = "manual-only"
+            result.append(finding)
+        else:
+            for f in group:
+                merged = dict(f)
+                merged["consensus_tag"] = "manual-only"
+                result.append(merged)
+
+    return result
+
+
 # Routing rule table — order is irrelevant since `selected` is a set.
 _RULES: list[tuple[tuple[str, ...], str]] = [
     ((".env", "/auth/", "/secret"), "security-reviewer"),

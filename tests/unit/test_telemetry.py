@@ -196,3 +196,93 @@ def test_unknown_payload_writes_minimal_entry(
     )
     assert entry["event"] == "unknown"
     assert "timestamp" in entry
+
+
+# ── Phase 1: OTel-compatible fields + cost estimation ─────────────────────
+
+
+def test_entry_has_span_id_and_trace_id(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload = {
+        "workspace": {"current_dir": str(tmp_path)},
+        "tool_name": "Read",
+        "usage": {"input_tokens": 100},
+    }
+    _run_main_with_stdin(monkeypatch, json.dumps(payload))
+    entry = json.loads(
+        (tmp_path / ".claude" / "observability" / "metrics.jsonl").read_text().strip(),
+    )
+    assert "span_id" in entry
+    assert len(entry["span_id"]) == 16
+    assert "trace_id" in entry
+    assert len(entry["trace_id"]) > 0
+
+
+def test_trace_id_uses_conversation_id_when_available(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload = {
+        "workspace": {"current_dir": str(tmp_path)},
+        "tool_name": "Read",
+        "usage": {"input_tokens": 100},
+        "conversation_id": "conv-xyz-123",
+    }
+    _run_main_with_stdin(monkeypatch, json.dumps(payload))
+    entry = json.loads(
+        (tmp_path / ".claude" / "observability" / "metrics.jsonl").read_text().strip(),
+    )
+    assert entry["trace_id"] == "conv-xyz-123"
+
+
+def test_cost_usd_present_for_post_tool_use(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    payload = {
+        "workspace": {"current_dir": str(tmp_path)},
+        "tool_name": "Bash",
+        "usage": {
+            "input_tokens": 1000,
+            "output_tokens": 500,
+            "cache_read_input_tokens": 200,
+        },
+    }
+    _run_main_with_stdin(monkeypatch, json.dumps(payload))
+    entry = json.loads(
+        (tmp_path / ".claude" / "observability" / "metrics.jsonl").read_text().strip(),
+    )
+    assert "cost_usd" in entry
+    assert entry["cost_usd"] > 0
+
+
+def test_cost_usd_absent_for_stop_event(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CURSOR_PROJECT_DIR", str(tmp_path))
+    monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
+    payload = {"status": "completed", "duration_ms": 5000}
+    _run_main_with_stdin(monkeypatch, json.dumps(payload))
+    entry = json.loads(
+        (tmp_path / ".claude" / "observability" / "metrics.jsonl").read_text().strip(),
+    )
+    assert "cost_usd" not in entry
+
+
+def test_estimate_cost_function() -> None:
+    from harness_maker.telemetry import _estimate_cost
+
+    entry = {
+        "input_tokens": 1_000_000,
+        "output_tokens": 0,
+        "cache_read_tokens": 0,
+        "cache_creation_tokens": 0,
+    }
+    cost = _estimate_cost(entry, "sonnet")
+    assert cost is not None
+    assert abs(cost - 3.0) < 0.01  # $3/MTK input for sonnet
+
+    assert _estimate_cost({}, "") is None

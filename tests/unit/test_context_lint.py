@@ -1,10 +1,10 @@
-"""Tests for context_lint (Phase 10 Task 8.1)."""
+"""Tests for context_lint."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from harness_maker.context_lint import THRESHOLDS, lint
+from harness_maker.context_lint import THRESHOLDS, lint, lint_mcp_server_count, lint_window_usage
 from harness_maker.models import Preset
 
 
@@ -84,3 +84,60 @@ def test_warning_message_includes_path_and_excess(tmp_path: Path) -> None:
     assert str(f) in warnings[0]
     assert "80" in warnings[0]
     assert "50" in warnings[0]
+
+
+# ── Phase 1: window % hard-cap ──────────────────────────────────────────
+
+
+def test_lint_window_usage_under_threshold_no_warning() -> None:
+    assert lint_window_usage(50_000, model="sonnet") == []
+
+
+def test_lint_window_usage_over_threshold_warns() -> None:
+    warnings = lint_window_usage(100_000, model="sonnet")
+    assert len(warnings) == 1
+    assert "50%" in warnings[0]
+    assert "40%" in warnings[0]
+
+
+def test_lint_window_usage_at_40_percent_no_warning() -> None:
+    assert lint_window_usage(80_000, model="sonnet") == []
+
+
+def test_lint_window_usage_just_above_40_percent_warns() -> None:
+    warnings = lint_window_usage(80_001, model="sonnet")
+    assert len(warnings) == 1
+
+
+def test_lint_window_usage_custom_threshold() -> None:
+    assert lint_window_usage(120_000, model="sonnet", threshold=0.7) == []
+    warnings = lint_window_usage(150_000, model="sonnet", threshold=0.7)
+    assert len(warnings) == 1
+
+
+# ── Phase 10: MCP server budget warn ─────────────────────────────────────
+
+
+def test_mcp_under_threshold_no_warning() -> None:
+    assert lint_mcp_server_count(3) == []
+
+
+def test_mcp_at_threshold_no_warning() -> None:
+    assert lint_mcp_server_count(6) == []
+
+
+def test_mcp_over_threshold_warns() -> None:
+    warnings = lint_mcp_server_count(7)
+    assert len(warnings) == 1
+    assert "7" in warnings[0]
+    assert "6" in warnings[0]
+
+
+def test_mcp_custom_threshold() -> None:
+    assert lint_mcp_server_count(4, threshold=5) == []
+    warnings = lint_mcp_server_count(6, threshold=5)
+    assert len(warnings) == 1
+
+
+def test_mcp_zero_servers_no_warning() -> None:
+    assert lint_mcp_server_count(0) == []
