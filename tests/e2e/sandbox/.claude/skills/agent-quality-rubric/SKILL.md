@@ -8,7 +8,7 @@ name: agent-quality-rubric
 description: Tier-rank an agent .md file Platinum/Gold/Silver/Bronze using static
   structural checks combined with the agent_prompt LLM rubric. Bronze tier auto-flags
   for anti-rot review. Calls harness_maker.agent_quality.score_agent.
-content_hash: 8405f8f06e2eb7f0e79db5b4a24945caf866e7c45c01e8496982f4721acc4170
+content_hash: c9c137fde3bfbf550e7ef1427e98c951493d6a60936c47ee0a5a67a203434106
 ---
 
 # agent-quality-rubric
@@ -49,7 +49,7 @@ You are the LLM judge. Read the agent file and evaluate it against
 then merge the two scores:
 
 ```bash
-!uv run --with /home/noel/harness-maker/.worktrees/execute-20260508T0357Z python -c "
+!uv run --with /home/noel/harness-maker python -c "
 from pathlib import Path
 from harness_maker.agent_quality import score_agent
 result = score_agent(Path('.claude/agents/code-reviewer.md'), rubric_dir=Path('.claude/rubrics'), client=None)
