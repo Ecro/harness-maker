@@ -227,7 +227,8 @@ def test_cli_create_emits_path_when_scope_includes_stage(repo: Path) -> None:
 
 
 def test_cli_create_idempotent_via_marker_from_project_root(
-    repo: Path, capsys: pytest.CaptureFixture[str],
+    repo: Path,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     """When loop wrote the .hm-loop-active marker, a subsequent `create` from
     project root (NOT from inside .worktrees/) must return the loop's
@@ -256,7 +257,8 @@ def test_cli_create_idempotent_via_marker_from_project_root(
 
 
 def test_cli_create_idempotent_when_already_in_worktree(
-    repo: Path, capsys: pytest.CaptureFixture[str],
+    repo: Path,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     """When base_dir is already inside `.worktrees/<name>/...`, return that
     worktree path without creating a new one. Lets `/hm:loop` engage one
@@ -285,7 +287,8 @@ def test_cli_create_idempotent_when_already_in_worktree(
 
 
 def test_cli_create_idempotent_from_subdir_of_worktree(
-    repo: Path, capsys: pytest.CaptureFixture[str],
+    repo: Path,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     """Idempotency works from arbitrary subdirs of the worktree root —
     `pwd` deep inside the loop's working tree must still resolve back to
@@ -312,7 +315,8 @@ def test_cli_create_idempotent_from_subdir_of_worktree(
 
 
 def test_cli_create_does_not_match_unrelated_dotworktrees_dir(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     """A directory literally named `.worktrees/foo` that ISN'T a real git
     worktree (no `.git` file/dir inside) must NOT short-circuit. Realistic
@@ -331,7 +335,8 @@ def test_cli_create_does_not_match_unrelated_dotworktrees_dir(
 
 
 def test_cli_create_does_not_match_dotworktrees_as_file(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str],
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     """A regular FILE (not dir) named `.worktrees` somewhere in the path
     parts must not trigger idempotency. Edge case but the path-parts
@@ -353,7 +358,8 @@ def test_cli_create_does_not_match_dotworktrees_as_file(
 
 
 def test_cli_create_writes_loop_marker(
-    repo: Path, capsys: pytest.CaptureFixture[str],
+    repo: Path,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     """`worktree create` persists `.claude/.hm-loop-active` containing the
     new worktree path so `worktree_gate` can enforce <WT> scope on
@@ -372,7 +378,8 @@ def test_cli_create_writes_loop_marker(
 
 
 def test_cli_create_appends_marker_to_gitignore(
-    repo: Path, capsys: pytest.CaptureFixture[str],
+    repo: Path,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     """Round H BLOCK 2 fix: marker file must be gitignored. Without this,
     a stale marker from a crashed loop could be committed and break every
@@ -391,7 +398,8 @@ def test_cli_create_appends_marker_to_gitignore(
 
 
 def test_cli_create_idempotent_gitignore_no_duplicate(
-    repo: Path, capsys: pytest.CaptureFixture[str],
+    repo: Path,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     """Two consecutive `worktree create` (e.g. user re-runs /hm:loop) must
     not duplicate the .gitignore line."""
@@ -412,7 +420,8 @@ def test_cli_create_idempotent_gitignore_no_duplicate(
 
 
 def test_cli_create_preserves_existing_gitignore_content(
-    repo: Path, capsys: pytest.CaptureFixture[str],
+    repo: Path,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     """Existing .gitignore content (other patterns) must be preserved when
     we append the marker entry. No clobber, no reordering."""
@@ -449,7 +458,8 @@ def test_cli_create_no_marker_when_scope_off(
 
 
 def test_cli_finalize_success_clears_marker(
-    repo: Path, capsys: pytest.CaptureFixture[str],
+    repo: Path,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     """After successful finalize, marker is removed so worktree_gate stops
     blocking main edits."""
@@ -471,7 +481,8 @@ def test_cli_finalize_success_clears_marker(
 
 
 def test_cli_finalize_fail_also_clears_marker(
-    repo: Path, capsys: pytest.CaptureFixture[str],
+    repo: Path,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     """Failure path still clears the marker — loop is over either way; user
     must be free to edit main again (cherry-pick from <WT>, retry, etc.)."""
@@ -490,7 +501,8 @@ def test_cli_finalize_fail_also_clears_marker(
 
 
 def test_cli_finalize_does_not_clear_marker_for_different_worktree(
-    repo: Path, capsys: pytest.CaptureFixture[str],
+    repo: Path,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     """Concurrent loops: marker points to wt-A; finalize wt-B fires →
     marker for wt-A must NOT be clobbered. Prevents one loop's finalize
@@ -514,7 +526,8 @@ def test_cli_finalize_does_not_clear_marker_for_different_worktree(
 
 
 def test_cli_create_picks_innermost_when_nested_dotworktrees(
-    repo: Path, capsys: pytest.CaptureFixture[str],
+    repo: Path,
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     """Nested `.worktrees/.worktrees/<name>` (pathological but possible)
     must resolve to the INNER worktree, not the outer false match. We walk
@@ -614,7 +627,9 @@ def test_create_collision_within_same_minute_retries_with_suffix(
 
 
 def test_cli_finalize_success_with_cleanup_failure_returns_1(
-    repo: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch,
+    repo: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """When cleanup() raises after a successful merge (e.g. locked file on
     Windows), _cli_finalize must surface via stderr + exit 1, not bare

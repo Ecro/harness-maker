@@ -28,20 +28,20 @@ def _write_harness_yaml(project: Path, stamped_version: str) -> None:
 
 def test_detect_drift_returns_none_when_versions_match(tmp_path: Path) -> None:
     _write_harness_yaml(tmp_path, "0.3.0")
-    with patch("harness_maker.__version__", "0.3.0"):
+    with patch("harness_maker.relevance.latest_installed_version", return_value="0.3.0"):
         assert detect_version_drift(tmp_path) is None
 
 
 def test_detect_drift_upgrade_when_running_newer(tmp_path: Path) -> None:
     _write_harness_yaml(tmp_path, "0.2.0")
-    with patch("harness_maker.__version__", "0.3.0"):
+    with patch("harness_maker.relevance.latest_installed_version", return_value="0.3.0"):
         drift = detect_version_drift(tmp_path)
     assert drift == VersionDrift(installed="0.2.0", current="0.3.0", direction="upgrade")
 
 
 def test_detect_drift_downgrade_when_running_older(tmp_path: Path) -> None:
     _write_harness_yaml(tmp_path, "0.4.0")
-    with patch("harness_maker.__version__", "0.3.0"):
+    with patch("harness_maker.relevance.latest_installed_version", return_value="0.3.0"):
         drift = detect_version_drift(tmp_path)
     assert drift is not None
     assert drift.direction == "downgrade"
@@ -49,7 +49,7 @@ def test_detect_drift_downgrade_when_running_older(tmp_path: Path) -> None:
 
 def test_detect_drift_semver_minor_jump(tmp_path: Path) -> None:
     _write_harness_yaml(tmp_path, "0.2.0")
-    with patch("harness_maker.__version__", "0.10.0"):
+    with patch("harness_maker.relevance.latest_installed_version", return_value="0.10.0"):
         drift = detect_version_drift(tmp_path)
     assert drift is not None
     assert drift.direction == "upgrade"  # 0.2.0 < 0.10.0 by semver, not lexical
@@ -58,7 +58,7 @@ def test_detect_drift_semver_minor_jump(tmp_path: Path) -> None:
 def test_detect_drift_falls_back_to_lexical_for_unparseable(tmp_path: Path) -> None:
     """When either side isn't 3-part numeric semver, fall back to lexical."""
     _write_harness_yaml(tmp_path, "0.2.0-rc1")
-    with patch("harness_maker.__version__", "0.2.0"):
+    with patch("harness_maker.relevance.latest_installed_version", return_value="0.2.0"):
         drift = detect_version_drift(tmp_path)
     # "0.2.0-rc1" < "0.2.0" lexically? No — "0" < "-" actually. Let's just
     # assert a drift was detected; direction is whatever lexical gives.
@@ -123,3 +123,100 @@ def test_build_drift_lines_downgrade_suggests_realign() -> None:
     # Downgrade path doesn't suggest /plugin update — that'd reinstall the
     # newer cached plugin, defeating the rollback.
     assert "/plugin update" not in body
+
+
+def test_drift_detector_uses_latest_installed_not_imported_version(tmp_path: Path) -> None:
+    """0.6.2 P6 alignment: detect_version_drift consults the plugin cache, not
+    the imported __version__.
+
+    Why: ``/hm:refresh`` is rendered with a pinned ``--with <render-time-path>``
+    clause, so its in-process ``__version__`` matches harness.yaml exactly and
+    the old code returned no drift even after a real plugin upgrade. SessionStart
+    hook saw the running plugin's newer ``__version__`` and reported drift.
+    The two paths disagreed. After this fix both call
+    ``latest_installed_version()`` which reads from the plugin cache — single
+    source of truth, both paths see the same verdict.
+    """
+    _write_harness_yaml(tmp_path, "0.5.7")
+
+    # If detect_version_drift ignored the cache and used __version__ directly,
+    # this test would behave differently when run via the pinned-import path
+    # vs the system-import path. By patching latest_installed_version we
+    # demonstrate that's the only knob the function consults — refactoring
+    # callers to inject __version__ directly would break this test.
+    with patch("harness_maker.relevance.latest_installed_version", return_value="0.6.1"):
+        drift = detect_version_drift(tmp_path)
+    assert drift is not None
+    assert drift.installed == "0.5.7"
+    assert drift.current == "0.6.1"
+    assert drift.direction == "upgrade"
+
+
+def test_latest_installed_version_falls_back_to_imported_when_cache_empty(
+    tmp_path: Path,
+) -> None:
+    """When ~/.claude/plugins/cache is empty/unreadable, fall back to __version__.
+
+    Required for environments without Claude Code installed (CI, dev sandboxes).
+    """
+    from harness_maker.relevance import latest_installed_version
+
+    with (
+        patch("harness_maker.relevance._scan_plugin_cache_versions", return_value=[]),
+        patch("harness_maker.__version__", "0.7.7"),
+    ):
+        assert latest_installed_version() == "0.7.7"
+
+
+def test_latest_installed_version_picks_highest_semver(tmp_path: Path) -> None:
+    """Among multiple cached versions, return the highest by semver tuple."""
+    from harness_maker.relevance import latest_installed_version
+
+    with patch(
+        "harness_maker.relevance._scan_plugin_cache_versions",
+        return_value=["0.3.2", "0.6.1", "0.5.7", "0.10.0", "0.6.0"],
+    ):
+        # 0.10.0 > 0.6.1 by semver (not lexical — lexical would say "0.5.7" wins)
+        assert latest_installed_version() == "0.10.0"
+
+
+def test_latest_installed_version_skips_unparseable(tmp_path: Path) -> None:
+    """Garbage entries in the cache directory are ignored, not parsed."""
+    from harness_maker.relevance import latest_installed_version
+
+    with patch(
+        "harness_maker.relevance._scan_plugin_cache_versions",
+        return_value=["random-text", "0.6.1", "not.a.version", ".tmp"],
+    ):
+        assert latest_installed_version() == "0.6.1"
+
+
+def test_session_start_hook_and_refresh_command_agree(tmp_path: Path) -> None:
+    """Q-D resolved: both code paths now call detect_version_drift which uses
+    latest_installed_version → identical verdict.
+
+    The fix is structural (single helper) so this test asserts the code shape:
+    both paths must funnel through detect_version_drift, and detect_version_drift
+    must NOT directly import __version__ for comparison.
+    """
+    import inspect
+
+    from harness_maker.hooks import sessionstart_drift
+    from harness_maker.relevance import detect_version_drift
+
+    # Both should use the same drift fn
+    hook_src = inspect.getsource(sessionstart_drift)
+    assert "detect_version_drift" in hook_src
+
+    # detect_version_drift body must consult latest_installed_version, not __version__
+    drift_src = inspect.getsource(detect_version_drift)
+    assert "latest_installed_version()" in drift_src, (
+        "detect_version_drift must call latest_installed_version() so the "
+        "pinned /hm:refresh path and the system SessionStart path agree."
+    )
+    # And NOT directly import __version__ for the comparison side
+    assert "from harness_maker import __version__" not in drift_src, (
+        "detect_version_drift should not bypass latest_installed_version() — "
+        "doing so reintroduces the divergence between /hm:refresh (pinned) and "
+        "SessionStart (system) reported drift."
+    )

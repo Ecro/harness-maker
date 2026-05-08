@@ -544,6 +544,18 @@ def answers_from_harness_yaml(yaml_path: Path) -> InterviewAnswers | None:
     if isinstance(max_review_rounds, int):
         update["max_review_rounds"] = max_review_rounds
 
+    # MCP servers — user adds these manually to harness.yaml; preserve on re-render.
+    mcp_servers = data.get("mcp_servers")
+    if isinstance(mcp_servers, dict):
+        # Only accept dict-of-dict shape; other shapes silently dropped (preserves
+        # the InterviewAnswers default {}). Keys must be strings.
+        clean: dict[str, dict[str, Any]] = {}
+        for k, v in mcp_servers.items():
+            if isinstance(k, str) and isinstance(v, dict):
+                clean[k] = v
+        if clean:
+            update["mcp_servers"] = clean
+
     return base.model_copy(update=update)
 
 

@@ -1,6 +1,6 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.6.1
+harness_maker_version: 0.6.2
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: agents/ux-reviewer.md.j2
 provenance: official
@@ -8,6 +8,21 @@ name: ux-reviewer
 description: Reviews UI changes for accessibility, consistency, and interaction quality
 tools: Read, Grep, Glob
 model: sonnet
+permissions:
+  allow:
+  - Read(*)
+  - Grep(*)
+  - Glob(*)
+  - Bash(git diff:*)
+  - Bash(git log:*)
+  - Bash(git status:*)
+  deny:
+  - Write(*)
+  - Edit(*)
+  - Bash(rm:*)
+  - Bash(curl:*)
+  - Bash(npm:*)
+  - Bash(eval *)
 content_hash: 3dd53d23395028918fab5ce3817abc028c2b0ae3cff61915bdf787cbf071d5a2
 ---
 

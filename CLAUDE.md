@@ -56,7 +56,7 @@ harness-maker 는 **dual plugin** — 두 marketplace 양쪽에 등록 가능:
 - `skills/<name>/SKILL.md` — Anthropic SKILL.md 표준, 양쪽 공유 (loose md 금지)
 - `agents/<name>.md` — sub-agent 정의, 양쪽 공유
 - `commands/<name>.md` — 슬래시 명령, 양쪽 공유
-- `hooks/hooks.json` — 단일 파일에 정의, 양쪽 공유 (Cursor 2.4+ Claude Code hooks schema 호환 명시; IDE 모드 인식은 Phase 1 검증)
+- `hooks/hooks.json` — **Hook schema diverges by design**: Cursor IDE reads `.cursor/hooks.json` (lowercase camelCase + `version: 1`); Claude Code reads `.claude/hooks/hooks.json` (PascalCase + nested `{hooks:[],matcher:}`). Each IDE owns its own file with its own native schema. Verified empirically via kairos 0.5.7 metrics forensic 2026-05-08 (`tests/cursor-compat/results-2026-05-08.md`). Do NOT collapse to single source — Cursor 2.4+ hooks-compat docs apply to CLI only, IDE reads the dedicated `.cursor/` location.
 - `rules/<name>.mdc` — Cursor 전용 (Claude Code 미사용)
 - `mcp.json` — MCP server 정의, 양쪽 공유
 - `lib/` — 내부 헬퍼

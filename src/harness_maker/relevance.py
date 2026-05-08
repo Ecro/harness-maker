@@ -15,9 +15,12 @@ autoloop). Accepted proposals are applied through ``update_last_reviewed_at``.
 
 Version-drift detection (``detect_version_drift``) compares the
 ``harness_maker_version`` stamped in the project's ``harness.yaml`` frontmatter
-against the running package's ``__version__``. ``/hm:refresh`` includes any
-drift in the proposed-<date>.md so the user knows when to re-run
-``/harness-maker:make``.
+against the **latest installed** harness-maker version (not just the imported
+``__version__``). This alignment matters because ``/hm:refresh`` is rendered as
+a pinned-version template — its ``--with <path>`` clause locks the import to
+the render-time version, which would falsely appear "in sync" with harness.yaml
+even after a plugin upgrade. Scanning the plugin cache makes the result match
+the SessionStart drift hook regardless of which import path called us.
 """
 
 from __future__ import annotations
@@ -420,17 +423,66 @@ class VersionDrift:
     direction: Literal["upgrade", "downgrade"]
 
 
+def _scan_plugin_cache_versions() -> list[str]:
+    """Return all harness-maker versions cached under ``~/.claude/plugins/cache/``.
+
+    The Claude Code plugin cache layout is
+    ``~/.claude/plugins/cache/harness-maker-local/harness-maker/<version>/``.
+    Each subdirectory name is a version string. Missing/unreadable cache
+    returns an empty list (caller falls back to ``__version__``).
+    """
+    cache_root = (
+        Path.home() / ".claude" / "plugins" / "cache" / "harness-maker-local" / "harness-maker"
+    )
+    if not cache_root.is_dir():
+        return []
+    try:
+        return [d.name for d in cache_root.iterdir() if d.is_dir()]
+    except OSError:
+        return []
+
+
+def latest_installed_version() -> str:
+    """Resolve the latest harness-maker version visible to the running session.
+
+    Strategy:
+    1. Scan ``~/.claude/plugins/cache/harness-maker-local/harness-maker/`` for
+       version subdirectories.
+    2. Pick the highest semver-parseable version.
+    3. Fall back to imported ``__version__`` if scan yields nothing.
+
+    Why not just use ``__version__``: ``/hm:refresh`` is rendered with a
+    pinned ``--with <path>`` clause, so its in-process ``__version__`` is the
+    render-time version (not the running plugin). SessionStart hook runs
+    against the active plugin so its ``__version__`` is current. To make both
+    code paths agree, both must consult the same external truth — the cache.
+    """
+    from harness_maker import __version__
+
+    versions = _scan_plugin_cache_versions()
+    if not versions:
+        return __version__
+    parsed = [(_parse_semver(v), v) for v in versions]
+    valid = [(p, raw) for p, raw in parsed if p is not None]
+    if not valid:
+        return __version__
+    # Pick highest by semver tuple (parse_semver returns (major, minor, patch))
+    valid.sort(key=lambda x: x[0], reverse=True)
+    return valid[0][1]
+
+
 def detect_version_drift(project_dir: Path) -> VersionDrift | None:
     """Return drift info or None when no drift / harness.yaml unreadable.
 
     Reads ``<project_dir>/.claude/harness.yaml`` frontmatter for
-    ``harness_maker_version`` and compares against the running package's
-    ``__version__``. Missing file, missing frontmatter, missing key, or
-    matching versions all return None — the caller treats None as "no
-    drift to surface".
-    """
-    from harness_maker import __version__
+    ``harness_maker_version`` and compares against the **latest installed**
+    plugin version (resolved via ``latest_installed_version()``). Missing
+    file, missing frontmatter, missing key, or matching versions all return
+    None — the caller treats None as "no drift to surface".
 
+    Single-source consistency: both ``/hm:refresh`` (pinned) and SessionStart
+    hook (system) call the same function and see the same drift verdict.
+    """
     harness_yaml = project_dir / ".claude" / "harness.yaml"
     if not harness_yaml.exists():
         return None
@@ -452,10 +504,11 @@ def detect_version_drift(project_dir: Path) -> VersionDrift | None:
     installed = fm.get("harness_maker_version")
     if not isinstance(installed, str) or not installed:
         return None
-    if installed == __version__:
+    current = latest_installed_version()
+    if installed == current:
         return None
-    direction = _drift_direction(installed, __version__)
-    return VersionDrift(installed=installed, current=__version__, direction=direction)
+    direction = _drift_direction(installed, current)
+    return VersionDrift(installed=installed, current=current, direction=direction)
 
 
 def _drift_direction(installed: str, current: str) -> Literal["upgrade", "downgrade"]:

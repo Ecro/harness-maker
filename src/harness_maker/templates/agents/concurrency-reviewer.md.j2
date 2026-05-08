@@ -3,6 +3,21 @@ name: concurrency-reviewer
 description: Reviews changes for race conditions, deadlocks, ISR safety, and async correctness
 tools: Read, Grep, Glob
 model: sonnet
+permissions:
+  allow:
+    - "Read(*)"
+    - "Grep(*)"
+    - "Glob(*)"
+    - "Bash(git diff:*)"
+    - "Bash(git log:*)"
+    - "Bash(git status:*)"
+  deny:
+    - "Write(*)"
+    - "Edit(*)"
+    - "Bash(rm:*)"
+    - "Bash(curl:*)"
+    - "Bash(npm:*)"
+    - "Bash(eval *)"
 ---
 
 # concurrency-reviewer

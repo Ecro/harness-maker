@@ -1,6 +1,6 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.6.1
+harness_maker_version: 0.6.2
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: agents/code-reviewer.md.j2
 provenance: official
@@ -9,6 +9,21 @@ description: Reviews code changes for correctness, readability, maintainability,
   basic security/performance hygiene
 tools: Read, Grep, Glob
 model: sonnet
+permissions:
+  allow:
+  - Read(*)
+  - Grep(*)
+  - Glob(*)
+  - Bash(git diff:*)
+  - Bash(git log:*)
+  - Bash(git status:*)
+  deny:
+  - Write(*)
+  - Edit(*)
+  - Bash(rm:*)
+  - Bash(curl:*)
+  - Bash(npm:*)
+  - Bash(eval *)
 content_hash: 5b9e96a6eddab64b26567e781c48496621d6587e9de0e2e4fd39805ae2b1f26f
 ---
 

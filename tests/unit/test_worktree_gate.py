@@ -31,7 +31,8 @@ def _write_marker(project_root: Path, wt_path: Path) -> None:
 
 
 def test_no_marker_means_no_active_loop_so_allow(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_path))
     rc = _run(
@@ -42,7 +43,8 @@ def test_no_marker_means_no_active_loop_so_allow(
 
 
 def test_target_inside_active_worktree_is_allowed(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Active marker + Write to a path INSIDE the worktree → allow."""
     project = tmp_path / "repo"
@@ -59,7 +61,8 @@ def test_target_inside_active_worktree_is_allowed(
 
 
 def test_non_write_tool_is_allowed(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Read / Bash / Grep are not in _GUARDED_TOOLS — pass through."""
     project = tmp_path / "repo"
@@ -77,7 +80,8 @@ def test_non_write_tool_is_allowed(
 
 
 def test_stale_marker_pointing_to_missing_dir_is_treated_as_no_active(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Marker points to a path that no longer exists (e.g. crashed loop) →
     treat as if no marker; don't lock the user out."""
@@ -93,7 +97,8 @@ def test_stale_marker_pointing_to_missing_dir_is_treated_as_no_active(
 
 
 def test_empty_marker_file_treated_as_no_active(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Whitespace-only marker → no active loop."""
     project = tmp_path / "repo"
@@ -118,7 +123,8 @@ def test_malformed_stdin_does_not_crash(
 
 
 def test_missing_tool_input_passes_through(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Active marker but tool_input missing file_path → allow (defensive)."""
     project = tmp_path / "repo"
@@ -185,7 +191,8 @@ def test_edit_to_sibling_worktree_blocked(
 
 
 def test_multiedit_is_guarded(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """MultiEdit is in _GUARDED_TOOLS — same enforcement as Write/Edit."""
     project = tmp_path / "repo"
@@ -205,7 +212,8 @@ def test_multiedit_is_guarded(
 
 
 def test_relative_path_resolved_against_project_root(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Relative file_path → resolved against project root, not cwd of hook
     subprocess. Without this, a hook spawned from $HOME with a relative
@@ -229,7 +237,8 @@ def test_relative_path_resolved_against_project_root(
 
 
 def test_cursor_project_dir_used_when_claude_unset(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Mirror telemetry.py's resolution order: CURSOR_PROJECT_DIR is
     consulted when CLAUDE_PROJECT_DIR is unset."""
@@ -248,7 +257,8 @@ def test_cursor_project_dir_used_when_claude_unset(
 
 
 def test_stdin_workspace_current_dir_wins_over_env(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Round H BLOCK 1 fix: payload.workspace.current_dir takes priority
     over env vars and cwd. Without this, multi-window IDE scenarios where
@@ -277,7 +287,8 @@ def test_stdin_workspace_current_dir_wins_over_env(
 
 
 def test_stdin_cwd_field_used_when_workspace_absent(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Cursor's payload uses ``cwd`` (not nested under workspace). Order:
     workspace.current_dir → cwd → env → os.getcwd()."""
@@ -301,7 +312,8 @@ def test_stdin_cwd_field_used_when_workspace_absent(
 
 
 def test_symlinked_target_outside_wt_is_blocked(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Round H NIT 10: a symlink inside the WT pointing at a main-repo
     file must NOT bypass the gate. _target_path calls Path.resolve() which

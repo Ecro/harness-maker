@@ -361,11 +361,7 @@ def test_render_cursor_hooks_json_camelcase_with_path_wrap(tmp_path: Path) -> No
     # Every hook command must defensively prepend the user-local PATH so
     # `uv` resolves even when Cursor spawns the subprocess from a shell
     # without ~/.local/bin in PATH.
-    all_commands = [
-        h["command"]
-        for event_hooks in hooks.values()
-        for h in event_hooks
-    ]
+    all_commands = [h["command"] for event_hooks in hooks.values() for h in event_hooks]
     assert all_commands  # at least one
     for cmd in all_commands:
         # Round H GRADE-B 6: Cursor hook commands now also propagate
@@ -403,7 +399,8 @@ def test_render_cursor_hooks_json_omits_spec_gate_when_task_driven(
 
 @pytest.mark.parametrize("dev_mode_label", ["task", "spec"])
 def test_render_hooks_json_valid_in_both_dev_modes(
-    tmp_path: Path, dev_mode_label: str,
+    tmp_path: Path,
+    dev_mode_label: str,
 ) -> None:
     """Round H GRADE-B 5: both Claude Code and Cursor hooks templates must
     render valid JSON in both dev_modes. The Jinja conditional for
@@ -549,3 +546,203 @@ def test_render_cursor_target_writes_targets_to_harness_yaml(tmp_path: Path) -> 
     yaml_text = (target / "harness.yaml").read_text(encoding="utf-8")
     assert "targets: [claude-code, cursor]" in yaml_text
     assert "recommended_model: claude-opus-4-7" in yaml_text
+
+
+def test_render_agents_have_structured_permissions_frontmatter(tmp_path: Path) -> None:
+    """0.6.2 P2: agent .md frontmatter MUST carry structured permissions.allow/deny.
+
+    Why: Cursor 2.5+ does not cascade parent agent permissions to spawned subagents.
+    A tool call evaluating to "ask" blocks indefinitely in autoloop. Structured
+    frontmatter permissions let Cursor enforce explicit allow/deny per agent.
+    Claude Code accepts unknown frontmatter fields permissively (verified vs
+    official feature-dev / pr-review-toolkit plugins which use no `permissions`).
+    """
+    p = _profile()
+    a = interview(p, autoloop_mode=True)
+    bp = synthesize(p, a)
+    render(bp, tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
+
+    # Reviewer agents share a common deny set
+    reviewer_names = [
+        "code-reviewer",
+        "security-reviewer",
+        "performance-reviewer",
+        "ux-reviewer",
+        "concurrency-reviewer",
+    ]
+    for name in reviewer_names:
+        agent_path = tmp_path / "agents" / f"{name}.md"
+        assert agent_path.exists(), f"missing rendered agent: {name}"
+        content = agent_path.read_text(encoding="utf-8")
+        assert "permissions:" in content, f"{name}: missing permissions block"
+        assert "allow:" in content, f"{name}: missing allow list"
+        assert "deny:" in content, f"{name}: missing deny list"
+        # Spot-check reviewer-specific values
+        assert "Read(*)" in content, f"{name}: missing Read(*) allow"
+        assert "Write(*)" in content, f"{name}: missing Write(*) deny"
+        assert "Bash(curl:*)" in content, f"{name}: missing curl deny"
+
+    # Executor has wider allow (worktree writes + test commands)
+    executor = (tmp_path / "agents" / "executor.md").read_text(encoding="utf-8")
+    assert "permissions:" in executor
+    assert "Write(.worktrees/**)" in executor
+    assert "Bash(uv run:*)" in executor
+    assert "Bash(eval *)" in executor  # deny side
+
+
+def test_cursor_hooks_uses_lowercase_native_schema(tmp_path: Path) -> None:
+    """0.6.2 P1: .cursor/hooks.json MUST use Cursor-native lowercase schema.
+
+    Why: Cursor IDE reads its own .cursor/hooks.json with lowercase camelCase
+    keys (preToolUse, stop, preCompact) + version: 1 + flat {matcher, command}
+    shape. The Claude Code PascalCase shape would be silently ignored. Verified
+    via kairos 0.5.7 forensic — see tests/cursor-compat/results-2026-05-08.md.
+    """
+    import json
+
+    from harness_maker.models import Target
+
+    project_root = tmp_path
+    target = project_root / ".claude"
+    target.mkdir()
+    p = _profile()
+    a = interview(p, autoloop_mode=True).model_copy(
+        update={"targets": [Target.CLAUDE_CODE, Target.CURSOR]},
+    )
+    bp = synthesize(p, a)
+    render(bp, target, freeze_time=DEFAULT_FREEZE_TIME)
+
+    cursor_hooks_path = project_root / ".cursor" / "hooks.json"
+    assert cursor_hooks_path.exists(), "Cursor hooks file not rendered"
+    cursor_hooks = json.loads(cursor_hooks_path.read_text(encoding="utf-8"))
+
+    # Cursor schema invariants
+    assert cursor_hooks.get("version") == 1, "Cursor hooks must have version: 1"
+    hooks = cursor_hooks.get("hooks", {})
+    # Lowercase event keys are required
+    has_lowercase = any(k in hooks for k in ("preToolUse", "stop", "preCompact"))
+    has_pascalcase = any(k in hooks for k in ("PreToolUse", "Stop", "PreCompact"))
+    assert has_lowercase, "Cursor hooks.json must use lowercase keys (preToolUse/stop/preCompact)"
+    assert not has_pascalcase, (
+        "Cursor hooks.json must NOT use PascalCase keys — those are Claude Code's "
+        "schema. Cursor will silently ignore them. See "
+        "tests/cursor-compat/results-2026-05-08.md."
+    )
+
+    # Claude file must use the opposite schema (PascalCase + nested {hooks:[]})
+    claude_hooks_path = target / "hooks" / "hooks.json"
+    assert claude_hooks_path.exists()
+    claude_hooks = json.loads(claude_hooks_path.read_text(encoding="utf-8"))
+    claude_inner = claude_hooks.get("hooks", {})
+    assert "PreToolUse" in claude_inner or "PostToolUse" in claude_inner, (
+        "Claude hooks.json must use PascalCase event keys"
+    )
+    # Claude shape is nested: {matcher, hooks: [{type, command}]}
+    sample = claude_inner.get("PostToolUse") or claude_inner.get("PreToolUse")
+    assert sample, "Claude hooks must contain at least one matcher entry"
+    assert "hooks" in sample[0], (
+        "Claude hooks must use nested {matcher, hooks:[{type,command}]} shape"
+    )
+
+
+def test_no_cursor_commands_rendered(tmp_path: Path) -> None:
+    """0.6.2 P4: targets:[claude-code,cursor] must NOT render .cursor/commands/.
+
+    Why: Cursor 2.4+ reads .claude/commands/hm/*.md natively (kairos 0.5.7
+    forensic). Mirroring to .cursor/commands/hm-*.md is unnecessary and
+    would just be dead duplication. This test guards against accidental
+    reintroduction of the mirror.
+    """
+    from harness_maker.models import Target
+
+    project_root = tmp_path
+    target = project_root / ".claude"
+    target.mkdir()
+    p = _profile()
+    a = interview(p, autoloop_mode=True).model_copy(
+        update={"targets": [Target.CLAUDE_CODE, Target.CURSOR]},
+    )
+    bp = synthesize(p, a)
+    render(bp, target, freeze_time=DEFAULT_FREEZE_TIME)
+
+    cursor_dir = project_root / ".cursor"
+    assert cursor_dir.exists(), "Cursor target must render .cursor/ directory"
+    cursor_commands = cursor_dir / "commands"
+    assert not cursor_commands.exists(), (
+        f"Unexpected .cursor/commands/ directory found at {cursor_commands}. "
+        "Cursor 2.4+ reads .claude/commands/hm/*.md natively. If this directory "
+        "is needed because of a Cursor regression, also remove this assertion "
+        "and document the regression in tests/cursor-compat/results-*.md."
+    )
+
+    # Claude commands must still exist (the actual single-source location)
+    assert (target / "commands" / "hm").exists(), (
+        "Claude commands must be rendered at .claude/commands/hm/"
+    )
+
+
+def test_cursor_mcp_propagates_servers_from_config(tmp_path: Path) -> None:
+    """0.6.2 P5: .cursor/mcp.json mirrors config.mcp_servers, not hardcoded {}.
+
+    Why: prior template hardcoded `{"mcpServers": {}}`. Users adding MCP servers
+    to harness.yaml.mcp_servers got nothing in Cursor. This test verifies the
+    propagation chain: InterviewAnswers.mcp_servers → HarnessConfig.mcp_servers
+    → Jinja context → .cursor/mcp.json content.
+    """
+    import json
+
+    from harness_maker.models import Target
+
+    project_root = tmp_path
+    target = project_root / ".claude"
+    target.mkdir()
+    p = _profile()
+    base = interview(p, autoloop_mode=True)
+    a = base.model_copy(
+        update={
+            "targets": [Target.CLAUDE_CODE, Target.CURSOR],
+            "mcp_servers": {
+                "context7": {
+                    "command": "npx",
+                    "args": ["-y", "@context7/server"],
+                    "env": {"API_KEY": "${CONTEXT7_KEY}"},
+                },
+                "playwright": {
+                    "command": "uvx",
+                    "args": ["mcp-server-playwright"],
+                },
+            },
+        },
+    )
+    bp = synthesize(p, a)
+    render(bp, target, freeze_time=DEFAULT_FREEZE_TIME)
+
+    cursor_mcp_path = project_root / ".cursor" / "mcp.json"
+    assert cursor_mcp_path.exists()
+    cursor_mcp = json.loads(cursor_mcp_path.read_text(encoding="utf-8"))
+    servers = cursor_mcp.get("mcpServers", {})
+    assert "context7" in servers, "context7 MCP server not propagated to Cursor"
+    assert servers["context7"]["command"] == "npx"
+    assert servers["context7"]["args"] == ["-y", "@context7/server"]
+    assert servers["context7"]["env"]["API_KEY"] == "${CONTEXT7_KEY}"
+    assert "playwright" in servers
+
+
+def test_cursor_mcp_empty_default(tmp_path: Path) -> None:
+    """Empty mcp_servers must render as `{"mcpServers": {}}` (valid Cursor config)."""
+    import json
+
+    from harness_maker.models import Target
+
+    project_root = tmp_path
+    target = project_root / ".claude"
+    target.mkdir()
+    p = _profile()
+    a = interview(p, autoloop_mode=True).model_copy(
+        update={"targets": [Target.CLAUDE_CODE, Target.CURSOR]},
+    )
+    bp = synthesize(p, a)
+    render(bp, target, freeze_time=DEFAULT_FREEZE_TIME)
+
+    cursor_mcp = json.loads((project_root / ".cursor" / "mcp.json").read_text(encoding="utf-8"))
+    assert cursor_mcp == {"mcpServers": {}}

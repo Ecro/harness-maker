@@ -1,3 +1,19 @@
+{#- Cursor-native hooks schema: lowercase camelCase event keys + version: 1 + flat
+    {matcher, command} shape. This is DELIBERATELY DIFFERENT from
+    templates/hooks/hooks.json.j2 (Claude Code: PascalCase + nested {hooks:[]}).
+
+    Each IDE owns its own hooks file with its own schema:
+      - Cursor reads .cursor/hooks.json (this file)
+      - Claude Code reads .claude/hooks/hooks.json (the other file)
+
+    Verified empirically via kairos 0.5.7 forensic on 2026-05-08:
+    metrics.jsonl entries had `event: "stop"` (lowercase) + Cursor-only
+    `status` + `loop_count` payload fields → unambiguous Cursor origin.
+    See tests/cursor-compat/results-2026-05-08.md for full evidence.
+
+    Do NOT "fix" this to match the Claude PascalCase shape. Cursor will
+    stop firing hooks. The dual-render is by design.
+-#}
 {
   "version": 1,
   "hooks": {

@@ -1,3 +1,14 @@
+{#- Claude Code hooks schema: PascalCase event keys + nested
+    {matcher, hooks: [{type, command}]} shape.
+
+    Cursor uses a different schema (lowercase camelCase + version: 1, flat
+    {matcher, command}) rendered to .cursor/hooks.json by
+    templates/cursor/hooks.json.j2. Each IDE reads its own file; the
+    dual-render is intentional, not a bug.
+
+    See tests/cursor-compat/results-2026-05-08.md for the kairos-derived
+    empirical evidence proving Cursor reads .cursor/hooks.json natively.
+-#}
 {
   "hooks": {
     "PostToolUse": [

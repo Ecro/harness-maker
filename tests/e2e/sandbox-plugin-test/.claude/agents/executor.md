@@ -1,6 +1,6 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.6.1
+harness_maker_version: 0.6.2
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: agents/executor.md.j2
 provenance: official
@@ -9,6 +9,27 @@ description: Workflow executor with worktree-bounded write permissions — only 
   to .worktrees/, never to repo root
 tools: Read, Grep, Glob, Write, Edit, Bash
 model: sonnet
+permissions:
+  allow:
+  - Read(*)
+  - Grep(*)
+  - Glob(*)
+  - Write(.worktrees/**)
+  - Edit(.worktrees/**)
+  - Bash(uv run:*)
+  - Bash(pytest:*)
+  - Bash(npm test:*)
+  - Bash(cargo test:*)
+  - Bash(git diff:*)
+  - Bash(git log:*)
+  - Bash(git status:*)
+  deny:
+  - Write(/etc/**)
+  - Write(~/.ssh/**)
+  - Write(~/.aws/**)
+  - Bash(curl * | sh)
+  - Bash(eval *)
+  - Bash(rm -rf /:*)
 content_hash: c2086f966bae9e22e9d3672f016dfa392ca6c7bc1960a3c82ade570f16ef743e
 ---
 

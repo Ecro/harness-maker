@@ -254,6 +254,11 @@ class HarnessConfig(BaseModel):
     spec: dict[str, Any] = Field(default_factory=lambda: {"dir": "specs/"})
     work_docs: dict[str, Any] = Field(default_factory=lambda: {"dir": "work-docs/"})
     ref_folders: list[RefFolder] = Field(default_factory=list)
+    # MCP servers — propagated to .cursor/mcp.json (and future .claude/.mcp.json).
+    # Shape: {"server-name": {"command": "...", "args": [...], "env": {...}}}.
+    # Users add manually to harness.yaml; preserved across re-render via
+    # answers_from_harness_yaml. No interview question yet.
+    mcp_servers: dict[str, dict[str, Any]] = Field(default_factory=dict)
 
 
 class Blueprint(BaseModel):
@@ -310,6 +315,9 @@ class InterviewAnswers(BaseModel):
     grade_threshold: str = "A"  # 'A' | 'B' | 'C'
     max_review_rounds: int = 3
     caching: str = "agent-aware"
+    # MCP servers — user adds to harness.yaml manually (no interview question
+    # yet). Propagated to .cursor/mcp.json on re-render via answers_from_harness_yaml.
+    mcp_servers: dict[str, dict[str, Any]] = Field(default_factory=dict)
     models: dict[str, Any] = Field(default_factory=dict)
     autoloop: dict[str, Any] = Field(default_factory=dict)
     memory: dict[str, Any] = Field(default_factory=dict)

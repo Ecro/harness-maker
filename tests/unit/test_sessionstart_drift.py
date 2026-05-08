@@ -6,9 +6,14 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+from unittest.mock import patch
 
-from harness_maker import __version__
 from harness_maker.hooks.sessionstart_drift import _format_message, run
+
+# Pin both the imported __version__ AND latest_installed_version to a stable
+# value so this test suite is deterministic regardless of what's actually in
+# ~/.claude/plugins/cache/ (0.6.2 P6 alignment surfaced this).
+_TEST_CURRENT = "0.5.5"
 
 
 def _write_harness_yaml(project_dir: Path, stamped_version: str) -> None:
@@ -31,8 +36,9 @@ def test_run_silent_when_no_harness_yaml(tmp_path: Path, capsys) -> None:
 
 
 def test_run_silent_when_versions_match(tmp_path: Path, capsys) -> None:
-    _write_harness_yaml(tmp_path, __version__)
-    rc = run(cwd=tmp_path)
+    _write_harness_yaml(tmp_path, _TEST_CURRENT)
+    with patch("harness_maker.relevance.latest_installed_version", return_value=_TEST_CURRENT):
+        rc = run(cwd=tmp_path)
     assert rc == 0
     captured = capsys.readouterr()
     assert captured.out == ""
@@ -54,7 +60,8 @@ def test_run_silent_when_harness_yaml_has_no_frontmatter(tmp_path: Path, capsys)
 
 def test_run_emits_additional_context_on_upgrade(tmp_path: Path, capsys) -> None:
     _write_harness_yaml(tmp_path, "0.0.1")
-    rc = run(cwd=tmp_path)
+    with patch("harness_maker.relevance.latest_installed_version", return_value=_TEST_CURRENT):
+        rc = run(cwd=tmp_path)
     assert rc == 0
 
     payload = json.loads(capsys.readouterr().out)
@@ -62,13 +69,14 @@ def test_run_emits_additional_context_on_upgrade(tmp_path: Path, capsys) -> None
     ctx = payload["hookSpecificOutput"]["additionalContext"]
     assert "[harness-maker]" in ctx
     assert "0.0.1" in ctx
-    assert __version__ in ctx
+    assert _TEST_CURRENT in ctx
     assert "/harness-maker:make" in ctx
 
 
 def test_run_emits_downgrade_warning(tmp_path: Path, capsys) -> None:
     _write_harness_yaml(tmp_path, "999.0.0")
-    rc = run(cwd=tmp_path)
+    with patch("harness_maker.relevance.latest_installed_version", return_value=_TEST_CURRENT):
+        rc = run(cwd=tmp_path)
     assert rc == 0
     ctx = json.loads(capsys.readouterr().out)["hookSpecificOutput"]["additionalContext"]
     assert "downgrade" in ctx.lower()

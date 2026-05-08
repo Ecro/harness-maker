@@ -124,7 +124,8 @@ def test_empty_env_vars_fall_through_to_getcwd(
 
 
 def test_post_tool_use_payload_writes_token_entry(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Claude Code-style payload (tool_name + usage) is tagged event=post_tool_use
     and carries token counts. This is what cache_diagnostics consumes."""
@@ -147,7 +148,8 @@ def test_post_tool_use_payload_writes_token_entry(
 
 
 def test_cursor_stop_payload_writes_per_turn_entry(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Cursor stop event (status + loop_count + duration_ms, no usage) is
     tagged event=stop and captures per-turn signals. cache_diagnostics
@@ -179,7 +181,8 @@ def test_cursor_stop_payload_writes_per_turn_entry(
 
 
 def test_unknown_payload_writes_minimal_entry(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Payload that's neither post_tool_use nor stop shape (e.g., a future
     Cursor session_start event we don't consume) gets event=unknown but

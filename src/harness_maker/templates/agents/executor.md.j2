@@ -3,6 +3,27 @@ name: executor
 description: Workflow executor with worktree-bounded write permissions — only writes to .worktrees/, never to repo root
 tools: Read, Grep, Glob, Write, Edit, Bash
 model: sonnet
+permissions:
+  allow:
+    - "Read(*)"
+    - "Grep(*)"
+    - "Glob(*)"
+    - "Write(.worktrees/**)"
+    - "Edit(.worktrees/**)"
+    - "Bash(uv run:*)"
+    - "Bash(pytest:*)"
+    - "Bash(npm test:*)"
+    - "Bash(cargo test:*)"
+    - "Bash(git diff:*)"
+    - "Bash(git log:*)"
+    - "Bash(git status:*)"
+  deny:
+    - "Write(/etc/**)"
+    - "Write(~/.ssh/**)"
+    - "Write(~/.aws/**)"
+    - "Bash(curl * | sh)"
+    - "Bash(eval *)"
+    - "Bash(rm -rf /:*)"
 ---
 
 # executor

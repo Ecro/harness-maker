@@ -1,6 +1,6 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.6.1
+harness_maker_version: 0.6.2
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: agents/concurrency-reviewer.md.j2
 provenance: official
@@ -9,6 +9,21 @@ description: Reviews changes for race conditions, deadlocks, ISR safety, and asy
   correctness
 tools: Read, Grep, Glob
 model: sonnet
+permissions:
+  allow:
+  - Read(*)
+  - Grep(*)
+  - Glob(*)
+  - Bash(git diff:*)
+  - Bash(git log:*)
+  - Bash(git status:*)
+  deny:
+  - Write(*)
+  - Edit(*)
+  - Bash(rm:*)
+  - Bash(curl:*)
+  - Bash(npm:*)
+  - Bash(eval *)
 content_hash: a462f8374a971624ecbbcc6372205ddcd35e5fae7e888a7d235f8490c3ba61a3
 ---
 

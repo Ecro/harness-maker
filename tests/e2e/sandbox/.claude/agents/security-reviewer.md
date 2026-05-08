@@ -1,6 +1,6 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.6.1
+harness_maker_version: 0.6.2
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: agents/security-reviewer.md.j2
 provenance: official
@@ -9,6 +9,21 @@ description: Reviews changes for secrets exposure, injection, auth flaws, and un
   permission grants
 tools: Read, Grep, Glob
 model: sonnet
+permissions:
+  allow:
+  - Read(*)
+  - Grep(*)
+  - Glob(*)
+  - Bash(git diff:*)
+  - Bash(git log:*)
+  - Bash(git status:*)
+  deny:
+  - Write(*)
+  - Edit(*)
+  - Bash(rm:*)
+  - Bash(curl:*)
+  - Bash(npm:*)
+  - Bash(eval *)
 content_hash: b60b73e9df3034ccbd094277fb79c24d9024f8baacf164460ebc1f6e981f7b4d
 ---
 

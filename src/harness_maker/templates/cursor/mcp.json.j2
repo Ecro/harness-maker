@@ -1,3 +1,10 @@
+{#- Cursor MCP server config — pure JSON, no frontmatter (Cursor strict-rejects it).
+    Source of truth: harness.yaml.mcp_servers (HarnessConfig.mcp_servers).
+    Shape: {"server-name": {"command": "...", "args": [...], "env": {...}}}.
+    Empty default ({}) is valid and matches a project with no MCP servers.
+    Same source feeds Claude Code's location (.claude/.mcp.json) when that
+    template lands.
+-#}
 {
-  "mcpServers": {}
+  "mcpServers": {{ config.mcp_servers | tojson }}
 }

@@ -1,6 +1,6 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.6.1
+harness_maker_version: 0.6.2
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: skills/security-scanner/SKILL.md.j2
 provenance: official
@@ -9,7 +9,7 @@ name: security-scanner
 description: 5-gate security scan (secrets · permissions · hook injection · CVEs ·
   prompt injection)
 tools: Read, Grep, Glob, Bash
-content_hash: a59eee1aab77b8071893b4bab80f92f6ab84c6d2f48cd54c954a91912ea01af7
+content_hash: f6084ebd2a3f42992968ecab1071688fcd15fe80b28a79aeb21706e30b460f07
 ---
 
 # security-scanner
@@ -54,7 +54,7 @@ Runs all 5 security gates and persists findings to
 ## Run
 
 ```bash
-!uv run --with /home/noel/harness-maker python -m harness_maker.cli security-scan .
+!uv run --with /home/noel/harness-maker/.worktrees/execute-20260508T0357Z python -m harness_maker.cli security-scan .
 ```
 
 Review Gate 5 candidates output by the scanner. For each `medium`-severity

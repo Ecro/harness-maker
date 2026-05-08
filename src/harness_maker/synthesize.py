@@ -319,6 +319,7 @@ def synthesize(
         spec={"dir": "specs/"},
         work_docs={"dir": "work-docs/"},
         ref_folders=list(answers.ref_folders),
+        mcp_servers=dict(answers.mcp_servers),
     )
 
     config_dump = config.model_dump(mode="json")

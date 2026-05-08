@@ -146,7 +146,7 @@ def main() -> int:
         f"If you intended to edit main, finalize the loop first:\n"
         f"  uv run --with <plugin_path> python -m harness_maker.worktree "
         f"finalize {active_wt} <success|fail>\n"
-        f"Note: Bash-driven writes (>, sed -i, python -c \"open(...)\") are "
+        f'Note: Bash-driven writes (>, sed -i, python -c "open(...)") are '
         f"NOT gated. Always cd into the worktree for shell ops."
     )
     print(msg, file=sys.stderr)

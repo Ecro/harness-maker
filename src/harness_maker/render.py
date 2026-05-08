@@ -217,8 +217,16 @@ def _is_cursor_mdc(fe: FileEntry) -> bool:
 
 
 def _is_cursor_command(fe: FileEntry) -> bool:
-    """Cursor slash commands — ``.cursor/commands/*.md``. Plain markdown, no
-    frontmatter (Cursor command 는 frontmatter 안 가짐).
+    """Cursor slash commands — ``.cursor/commands/*.md``.
+
+    **Currently dead code** — no template feeds ``.cursor/commands/`` because
+    Cursor 2.4+ reads ``.claude/commands/hm/*.md`` natively (verified
+    empirically via kairos 0.5.7 forensic on 2026-05-08; see
+    ``tests/cursor-compat/results-2026-05-08.md``). Kept as a reserved
+    dispatch in case a future Cursor release regresses the single-source
+    contract — adding a ``templates/cursor/commands/`` directory would be
+    sufficient to reactivate it. Until that happens, the dispatch evaluates
+    to False on every FileEntry produced by synthesize.
     """
     return str(fe.path).startswith(".cursor/commands/") and fe.path.suffix == ".md"
 
