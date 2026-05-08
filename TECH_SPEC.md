@@ -274,13 +274,15 @@ harness-maker/
 - arxiv·GitHub·OSV.dev: unauthenticated, `~/.cache/harness-maker/` 캐시 공유
 - 외부 호출은 fixture mock 우선. 실제 호출은 INTEGRATION=1 env 시만.
 
-### 보안 / 권한 (v1.6)
+### 보안 / 권한 (v1.6, REVIEW-2026-05-08 개정)
 - **Reviewer agent** (code, security, perf, ux, concurrency, security-auditor, consensus-arbiter):
-  - allow: `[Read(*), Grep(*), Bash(git diff:*), Bash(git log:*)]`
-  - deny: `[Write(*), Edit(*), Bash(rm:*), Bash(curl:*), Bash(npm install:*), Bash(eval:*)]`
+  - allow: `[Read(*), Grep(*), Glob(*), Bash(git diff:*), Bash(git log:*), Bash(git status:*)]`
+  - deny: `[Write(*), Edit(*), Bash(rm:*), Bash(curl:*), Bash(npm:*), Bash(eval *), Bash(python:*), Bash(node:*), Bash(sh:*), Bash(bash:*)]`
+  - **Why interpreter denies** (0.6.2 REVIEW M7): `Bash(rm:*)` 차단만으로는 `Bash(python -c "import os; os.system('rm …')")` 우회 가능. 모든 인터프리터 호출 deny.
 - **Executor agent** (autoloop-coder, executor):
-  - allow: `[Read(*), Grep(*), Write(.worktrees/**), Edit(.worktrees/**), Bash(npm test:*), Bash(pytest:*), Bash(cargo test:*), Bash(uv run:*)]`
-  - deny: `[Write(/etc/**), Write(~/.ssh/**), Write(~/.aws/**), Bash(curl * | sh), Bash(eval *), Bash(rm -rf /:*)]`
+  - allow: `[Read(*), Grep(*), Glob(*), Write(.worktrees/**), Edit(.worktrees/**), Bash(uv run:*), Bash(pytest:*), Bash(npm test:*), Bash(cargo test:*), Bash(git diff:*), Bash(git log:*), Bash(git status:*)]`
+  - deny: `[Write(/etc/**), Write(~/.ssh/**), Write(~/.aws/**), Edit(/etc/**), Edit(~/.ssh/**), Edit(~/.aws/**), Bash(curl * | sh), Bash(eval *), Bash(rm -rf /:*)]`
+  - **Why Edit/Write 페어** (0.6.2 REVIEW M1): `Write(/etc/**)` 만 deny 면 `Edit(/etc/sudoers)` 로 같은 파일 수정 가능. 모든 시스템 경로는 Write + Edit 페어로 deny.
 - 모든 generated 파일은 frontmatter:
   ```yaml
   generated_by: harness-maker
@@ -518,9 +520,10 @@ class ConflictItem(BaseModel):
 **(M11) Context Lint (Phase 8)**
 - Renderer Apply 직전 길이·중요도 검사. 초과 시 warn + 자동 요약 제안.
 
-**(M12) Privilege Separation (Phase 8)**
-- Reviewer agent settings.json `permissions.deny: [Write, Edit, Bash exec]`
-- Executor agent settings.json `permissions.allow: [Write(.worktrees/**)]`
+**(M12) Privilege Separation (Phase 8, hardened 0.6.2)**
+- Agent YAML frontmatter `permissions: {allow, deny}` (Cursor 2.5+ subagent permission inheritance gap 대응 — 부모 → 자식 cascade 안 됨, 명시 per-agent)
+- Reviewer: deny `[Write(*), Edit(*), Bash(rm|curl|npm|eval|python|node|sh|bash:*)]` — 인터프리터 우회 차단
+- Executor: allow `[Write(.worktrees/**), Edit(.worktrees/**), Bash(uv run|pytest|...)]`; deny system paths Write **+ Edit pair** `[Write(/etc/**), Edit(/etc/**), Write(~/.ssh/**), Edit(~/.ssh/**), Write(~/.aws/**), Edit(~/.aws/**)]`
 - Worktree 와 결합 → 격리·분리 이중 방어
 
 **(M13) Provenance Frontmatter (Phase 8)**

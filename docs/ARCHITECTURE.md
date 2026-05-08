@@ -156,6 +156,8 @@ Three metrics are computed and surfaced in the `/hm:ai-readiness` report:
 
 A **SessionStart drift reminder** hook (`hooks/sessionstart_drift.py`) fires on every session open and warns if the running harness-maker version differs from the version that rendered the harness — alerting users to re-render after a plugin update (0.5.6+).
 
+The detector (`relevance.detect_version_drift`) compares `harness.yaml.harness_maker_version` (the **stamped** version, formerly named `installed` — renamed in 0.6.2 REVIEW M2 to remove a semantic inversion) against `relevance.latest_installed_version()`, which scans `~/.claude/plugins/cache/harness-maker-local/harness-maker/<v>/` for the highest semver-parseable directory name. **Why scan the cache instead of using the imported `__version__`** (0.6.2 P6): `/hm:refresh` is rendered as a Jinja template that runs with `uv run --with /path/to/<render-time-version>`, pinning its in-process `__version__` to the version that *rendered* the slash command. The SessionStart hook runs against the live plugin so its `__version__` is current. The two import paths therefore see different `__version__` values; calling the same `detect_version_drift` would return different verdicts. Routing both through `latest_installed_version()` (an external truth source) makes them agree. The function is `@functools.cache`-decorated for sub-100ms session-start latency, with a top-K cap (10) on the cache scan to bound worst-case syscalls on long-lived installs.
+
 All telemetry stays local — `metrics.jsonl` is never transmitted.
 
 ### M6 — Conditional Router
@@ -227,12 +229,18 @@ Implemented in `security_scanner.py`. Findings are written to `observability/sec
 
 ### M12 — Privilege Separation
 
-Reviewer agents and executor agents have **structurally different permissions** in their `settings.json` slot:
+Reviewer agents and executor agents have **structurally different permissions** declared both in their YAML frontmatter (so Cursor 2.5+ enforces per-agent — parent → subagent permission inheritance is broken in Cursor) and in the project's `settings.json`:
 
-- **Reviewer** (`templates/agents/code-reviewer.md.j2`, etc.): `permissions.deny: [Write, Edit, Bash exec]`. Can read and analyze; cannot mutate.
-- **Executor** (`templates/agents/executor.md.j2`, `autoloop-coder.md.j2`): `permissions.allow: [Write(.worktrees/**)]`. Can write only inside the active worktree.
+- **Reviewer** (`templates/agents/code-reviewer.md.j2` and 4 siblings):
+  - `allow: [Read(*), Grep(*), Glob(*), Bash(git diff:*), Bash(git log:*), Bash(git status:*)]` — read-only diff inspection.
+  - `deny: [Write(*), Edit(*), Bash(rm:*), Bash(curl:*), Bash(npm:*), Bash(eval *), Bash(python:*), Bash(node:*), Bash(sh:*), Bash(bash:*)]`. The interpreter denies (added 0.6.2 REVIEW M7) close a bypass where `Bash(rm:*)` deny was insufficient because `Bash(python -c "import os; os.system('rm …')")` was unblocked.
+- **Executor** (`templates/agents/executor.md.j2`):
+  - `allow: [Read(*), Write(.worktrees/**), Edit(.worktrees/**), Bash(uv run:*), Bash(pytest:*), Bash(npm test:*), Bash(cargo test:*), …]` — scoped to the active worktree plus standard test commands.
+  - `deny: [Write(/etc/**), Write(~/.ssh/**), Write(~/.aws/**), Edit(/etc/**), Edit(~/.ssh/**), Edit(~/.aws/**), Bash(curl * | sh), Bash(eval *), Bash(rm -rf /:*)]`. The Edit pairings (added 0.6.2 REVIEW M1) close an escalation path where `Write(/etc/sudoers)` was denied but `Edit(/etc/sudoers)` slipped through. **Invariant: any system path with a `Write` deny must have a matching `Edit` deny.**
 
-Combined with M9, this gives a defense-in-depth model: even if a reviewer is prompt-injected into trying to write, the permission system blocks it. Even if an executor is injected into writing outside the worktree, the path scope blocks it.
+Frontmatter `permissions:` is also written as prose under `## Permissions policy` in the agent body for human-readable rationale; the structured fields are what the IDE enforces. Combined with M9, this gives a defense-in-depth model: even if a reviewer is prompt-injected into trying to write or shell out via interpreter, the permission system blocks it. Even if an executor is injected into writing outside the worktree, the path scope blocks it.
+
+CLAUDE.md §보안/권한 v1.6 carries the policy authoritatively; templates mirror that policy and CI snapshot tests guard against accidental drift.
 
 ### M13 — Provenance Frontmatter
 
@@ -255,22 +263,30 @@ Three loops depend on this:
 - **`/hm:refresh`** (M4) compares hashes to detect user edits and refuses to silently overwrite.
 - **`phase_<N>_invariants`** check in `.claude-verify.sh` walks every generated file and asserts the first line is `---` — the invariant that makes the other two loops sound.
 
-### M14 — Dual-IDE Rendering (Cursor target) (0.5.0+)
+### M14 — Dual-IDE Rendering (Cursor target) (0.5.0+, hardened in 0.6.2)
 
 harness-maker renders the same harness for both Claude Code and Cursor IDE. The `targets` field in `HarnessConfig` (values: `claude-code`, `cursor`, or both) drives which files the Renderer emits.
 
-**Single-source assets** (`targets: [claude-code, cursor]` both get these):
-- `.claude/agents/`, `.claude/skills/`, `.claude/commands/hm/`, `.claude/hooks/hooks.json`
+**Single-source assets** (`targets: [claude-code, cursor]` both get these — Cursor reads them natively):
+- `.claude/agents/<name>.md`
+- `.claude/skills/<name>/SKILL.md`
+- `.claude/commands/hm/<name>.md` (verified empirically against kairos 0.5.7 in 0.6.2 — see `tests/cursor-compat/results-2026-05-08.md`; the previously-reserved `_is_cursor_command` dispatch in `render.py` is now annotated as dead code)
 
-Cursor 2.4+ reads `.claude/agents/` and `.claude/skills/` natively, so no duplication is needed for those.
+**Per-IDE assets** (different content per IDE — both files emitted when `cursor` ∈ targets):
+- `.claude/hooks/hooks.json` — Claude Code schema: PascalCase event keys (`PreToolUse`, `PostToolUse`, `Stop`, `PreCompact`) + nested `{matcher, hooks:[{type, command}]}` shape.
+- `.cursor/hooks.json` — Cursor-native schema: lowercase camelCase event keys (`preToolUse`, `stop`, `preCompact`) + flat `{matcher, command}` shape + `version: 1`.
+
+**The hooks divergence is by design**, not a bug. The 0.6.2 forensic on the kairos repo (private, harness-maker 0.5.7) traced 4 entries in `metrics.jsonl` — all with `event: "stop"` (lowercase) and Cursor-only `status` / `loop_count` payload fields per `telemetry.py:11` — to the lowercase template, proving Cursor reads its dedicated file with its own schema. Both `templates/cursor/hooks.json.j2` and `templates/hooks/hooks.json.j2` carry Jinja header comments and unit tests (`test_cursor_hooks_uses_lowercase_native_schema`) that fail loudly if a future change attempts to converge them. CLAUDE.md §Plugin 구조 also documents the divergence authoritatively.
 
 **Cursor-only assets** (emitted only when `cursor` ∈ targets):
-- `.cursor/rules/harness.mdc` — always-on workflow rules rendered via `_render_cursor_mdc()`, which limits frontmatter to keys Cursor accepts (`description`, `globs`, `alwaysApply`). Our `content_hash` metadata is omitted from the frontmatter to avoid strict-reject.
-- `.cursor/mcp.json` — pure JSON (no frontmatter); rendered via `_render_pure_text()`.
+- `.cursor/rules/harness.mdc` — always-on workflow rules rendered via `_render_cursor_mdc()`, which limits frontmatter to keys Cursor accepts (`description`, `globs`, `alwaysApply`). Our `content_hash` metadata is omitted from the frontmatter to avoid strict-reject. Cap: 200 lines (Side preset context-lint); current rendered output is ~108 lines.
+- `.cursor/mcp.json` — pure JSON (no frontmatter), rendered via `_render_pure_text()`. Populated from `harness.yaml.mcp_servers` propagated through `HarnessConfig.mcp_servers` and the Jinja context (0.6.2 P5). Empty default `{"mcpServers": {}}` is valid; users add servers manually to their yaml. The `interview.answers_from_harness_yaml` reverse mapper preserves user-edited `mcp_servers` across re-renders, with type validation (`command: str` non-empty, `args: list[str]` optional, `env: dict[str, str]` optional) and a warning log when entries are dropped.
 
 **Dual plugin manifest**: `.claude-plugin/plugin.json` for the Claude Code marketplace and `.cursor-plugin/plugin.json` for the Cursor Marketplace. Both manifests must be bumped in sync with `pyproject.toml` and `src/harness_maker/__init__.py` on every version release (4-file invariant).
 
 **Recommended model**: `HarnessConfig.recommended_model` defaults to `claude-opus-4-7` and propagates to agent frontmatter. The harness does **not** rewrite prompts to be model-agnostic — `<thinking>` blocks and Claude-specific patterns are preserved deliberately.
+
+**Minimum supported Cursor**: 2.4 (2026-01-22 — first to bundle subagents, skills, Claude Code hooks compatibility). **Recommended**: 3.2+ (2026-04-24 — agent-first redesign, native `/worktree` and `/best-of-n`). The native worktree commands coexist safely with `/hm:execute` because cleanup is prefix-matched (`phase-*`, `autoloop-*`, `execute-*` reserved for harness-maker).
 
 ## 4. Preset Comparison
 

@@ -93,7 +93,10 @@ Steps:
 Same pattern as skills, with two differences:
 
 1. Path: `templates/agents/<name>.md.j2` (single file, no folder).
-2. **Privilege separation matters (M12).** Reviewer-style agents must declare `permissions.deny: [Write, Edit, Bash exec]` in their frontmatter; executor-style agents get `permissions.allow: [Write(.worktrees/**)]`. The `phase_10_reviewer_perms` and `phase_10_executor_perms` checks in `.claude-verify.sh` will fail if you mix these up. See `templates/agents/code-reviewer.md.j2` (reviewer pattern) and `templates/agents/executor.md.j2` (executor pattern) as references.
+2. **Privilege separation matters (M12).** Both reviewer and executor agents declare structured `permissions: {allow: [...], deny: [...]}` in their YAML frontmatter (so Cursor 2.5+ enforces per-agent — parent → subagent inheritance is broken).
+   - Reviewer-style agents: `deny` MUST include `Write(*)`, `Edit(*)`, `Bash(rm:*)`, `Bash(curl:*)`, `Bash(npm:*)`, `Bash(eval *)`, plus the interpreter set `Bash(python:*)`, `Bash(node:*)`, `Bash(sh:*)`, `Bash(bash:*)` (the latter four added 0.6.2 to close subprocess-bypass via `python -c "..."`).
+   - Executor-style agents: `allow` includes `Write(.worktrees/**)`, `Edit(.worktrees/**)`, plus scoped Bash test commands. `deny` MUST pair `Write` and `Edit` for every system path — `Write(/etc/**)` without `Edit(/etc/**)` is an escalation gap (0.6.2 REVIEW M1).
+   - The `phase_10_reviewer_perms` and `phase_10_executor_perms` checks in `.claude-verify.sh` will fail if you mix these up. CI snapshot test `test_render_agents_have_structured_permissions_frontmatter` guards the structural shape. See `templates/agents/code-reviewer.md.j2` (reviewer pattern) and `templates/agents/executor.md.j2` (executor pattern) as references.
 3. Update the "Agents (9) 존재" loop in `.claude-verify.sh`'s `final_acceptance`.
 
 ## Adding Cursor target support to a new template

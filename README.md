@@ -3,7 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org)
 [![Claude Code plugin](https://img.shields.io/badge/Claude_Code-plugin-orange)](https://code.claude.com)
-[![Cursor 2.4+](https://img.shields.io/badge/Cursor-2.4%2B-black)](https://cursor.com)
+[![Cursor 2.4+ (3.2+ rec)](https://img.shields.io/badge/Cursor-2.4%2B_(3.2%2B_rec)-black)](https://cursor.com)
 [![Built with uv](https://img.shields.io/badge/built_with-uv-261230.svg)](https://docs.astral.sh/uv/)
 
 > A meta-plugin for **Claude Code + Cursor IDE** that builds a project-tailored `.claude/` harness — agents, skills, hooks, observability — and keeps it fresh against the moving Claude/Cursor ecosystem.
@@ -93,7 +93,7 @@ Re-run with flags to evolve the harness:
 |---|---|
 | **Python 3.12+** and **[`uv`](https://docs.astral.sh/uv/)** | Required wherever Claude Code runs against your project — even if your project's primary language is Rust, Node, or Go. Hooks invoke `uv run python -m harness_maker.gates.*`; without `uv` they are silent no-ops. |
 | **Claude Code CLI** (plugin + hook support) | Loaded via `claude --plugin-dir /path/to/harness-maker`. |
-| **Cursor IDE 2.4+** | Optional. Reads `.claude/agents/`, `.claude/skills/`, and Claude Code-format hooks natively. Opt in via `targets: [cursor]` at the interview. |
+| **Cursor IDE 2.4+** (3.2+ recommended) | Optional. Reads `.claude/agents/`, `.claude/skills/`, and `.claude/commands/hm/*.md` natively (verified empirically in 0.6.2 — see `tests/cursor-compat/results-2026-05-08.md`). Hooks render to a separate `.cursor/hooks.json` with Cursor-native schema; both files are emitted when `targets` includes `cursor`. Cursor 3.0+ adds native `/worktree` and `/best-of-n` which coexist safely with harness-maker's prefix-matched cleanup. |
 | **Git** | Required for worktree isolation (every `/hm:execute` and `/hm:loop` run). |
 
 ---
@@ -114,7 +114,7 @@ Re-run with flags to evolve the harness:
 
 - **5 security gates.** `secrets` (regex + entropy, gitleaks-style), `permissions` (`settings.json` over-grant detection), `hook injection` (`hooks.json` AST scan for `rm -rf`, `curl | sh`, `eval`), `dependency CVEs` (OSV.dev), `prompt injection` (hidden-instruction pattern detection + privilege separation). Findings go to `.claude/observability/security/findings-*.jsonl` — never transmitted.
 
-- **Privilege separation.** Reviewer agents get `permissions.deny: [Write, Edit, Bash exec]`. Executor agents get `permissions.allow: [Write(.worktrees/**)]`. Combined with worktree isolation, this gives defense-in-depth: even a prompt-injected reviewer cannot write to disk; even a compromised executor cannot write outside the active worktree.
+- **Privilege separation.** Reviewer agents get `permissions.deny: [Write(*), Edit(*), Bash(rm:*), Bash(curl:*), Bash(npm:*), Bash(eval *), Bash(python:*), Bash(node:*), Bash(sh:*), Bash(bash:*)]` — interpreter denies block subprocess-bypass attempts (0.6.2 hardening). Executor agents get `permissions.allow: [Write(.worktrees/**), Edit(.worktrees/**), Bash(uv run:*), Bash(pytest:*), …]` plus paired Edit/Write denies on system paths (`/etc`, `~/.ssh`, `~/.aws`). Combined with worktree isolation, this gives defense-in-depth: even a prompt-injected reviewer cannot write to disk or shell out via interpreters; even a compromised executor cannot write outside the active worktree or touch system credentials.
 
 - **Brownfield-safe.** `Reconciler` indexes existing `.claude/`, computes hash-based ours/theirs decisions via provenance frontmatter, and offers per-conflict keep/replace/both. Apply is ADD-only with timestamped backups. User edits are never silently overwritten.
 
@@ -122,7 +122,7 @@ Re-run with flags to evolve the harness:
 
 - **Refdocs search skill.** Register your project's reference folders (architecture docs, API specs, design docs) in `harness.yaml`. The `refdocs-search` skill gives the LLM lossless full-text search across all registered folders — no chunking, no RAG index.
 
-- **SessionStart drift reminder.** A hook fires on every session open and warns if the running harness-maker version differs from the version that rendered the harness — so you notice when a `/plugin update` needs a re-render.
+- **SessionStart drift reminder.** A hook fires on every session open and warns if the running harness-maker version differs from the version that rendered the harness — so you notice when a `/plugin update` needs a re-render. The detector compares `harness.yaml.harness_maker_version` against the **latest plugin version cached on disk** (not just the imported `__version__`), so `/hm:refresh` and SessionStart agree even when the slash command runs against a pinned older version (0.6.2).
 
 ---
 
@@ -237,9 +237,10 @@ Run `/harness-maker:make` again and choose **Update** (same settings, pick up te
 Run `/harness-maker:make` and pick `targets: [cursor]` or `[claude-code, cursor]` at the interview. The renderer adds:
 
 - `.cursor/rules/harness.mdc` — always-on workflow rules with Cursor-legal frontmatter (`description` / `globs: []` / `alwaysApply: true`)
-- `.cursor/mcp.json` — Cursor MCP server config (default `{"mcpServers": {}}`, user-tunable)
+- `.cursor/hooks.json` — Cursor-native hooks schema (lowercase camelCase keys, `version: 1`, flat `{matcher, command}`). **Deliberately different from `.claude/hooks/hooks.json`** (PascalCase, nested `{hooks:[…], matcher}`); each IDE reads only its own file. Don't try to collapse them — Cursor will silently stop firing hooks. See `tests/cursor-compat/results-2026-05-08.md` for the kairos 0.5.7 forensic that proved this empirically.
+- `.cursor/mcp.json` — Cursor MCP server config. Populated from `harness.yaml.mcp_servers` (0.6.2+); defaults to `{"mcpServers": {}}` when no servers are configured. Inner shape (`command`, `args`, `env`) is type-validated on parse with a warning log when entries are dropped.
 
-`.claude/agents/`, `.claude/skills/`, `.claude/commands/`, and `.claude/hooks/hooks.json` are single-source — Cursor 2.4+ reads them natively.
+`.claude/agents/`, `.claude/skills/`, and `.claude/commands/hm/` are single-source — Cursor 2.4+ reads them natively (forensic-verified). Hooks are the only asset that requires per-IDE rendering because the schemas diverge by design.
 
 ### Recommended model
 
@@ -251,7 +252,14 @@ Per-release Cursor compatibility is tracked in `tests/cursor-compat/`:
 
 - `MANUAL_CHECKLIST.md` — A1–A4 (agent dispatch, hook fire, skill auto-discovery, slash command + Q&A loop) covering both IDEs
 - `RESULTS.md` — PASS/FAIL/PARTIAL grid you fill while running the checklist
+- `results-2026-05-08.md` — kairos 0.5.7 forensic that resolved Q-A (hooks discovery) and Q-B (commands discovery) without an IDE-driven manual run; future Cursor verifications append a new dated `results-*.md`
 - `fixture/` — minimal `.claude/` for opening directly in either IDE
+
+Automated CI guards the dual-schema invariants regardless of manual fixture runs:
+
+- `test_cursor_hooks_uses_lowercase_native_schema` — fails if `.cursor/hooks.json` accidentally adopts Claude PascalCase
+- `test_no_cursor_commands_rendered` — fails if a future change starts emitting `.cursor/commands/hm-*.md` mirrors (Cursor reads `.claude/commands/` natively)
+- `test_render_agents_have_structured_permissions_frontmatter` — fails if any agent template loses its `permissions.allow/deny` block (Cursor 2.5+ subagent permission inheritance gap)
 
 ---
 
