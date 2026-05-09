@@ -125,6 +125,8 @@ Re-run with flags to evolve the harness:
 
 - **Brownfield-safe.** `Reconciler` indexes existing `.claude/`, computes hash-based ours/theirs decisions via provenance frontmatter, and offers per-conflict keep/replace/both. Apply is ADD-only with timestamped backups. User edits are never silently overwritten.
 
+- **Mechanical pre-checks in review.** Add shell commands to `harness.yaml.reviewers.mechanical_checks` (e.g., `ruff check .`, `uv run pytest tests/unit -x -q`). These run **before** any LLM reviewer — stop-on-first. If a command fails, `/hm:review` emits `## MECHANICAL_BLOCK: <cmd> exit=<N>` and halts immediately: no grade, no auto-fix loop, no wasted reviewer tokens on broken code. The list is preserved across re-renders.
+
 - **Deep interview before every implementation.** `/hm:spec` runs a 6-category interview (Intent → Outcomes → In-Scope Scenarios → Non-Goals → Constraints → Verification) scored for completeness; incomplete categories trigger follow-up questions, not silent gaps. `/hm:plan` runs a 9-category interview (scope → architecture → contract → risk → testing → phasing → dependencies → failure handling → observability) in impact order. Each decision that changes a component boundary, introduces a new contract, or rejects a viable alternative is promoted to a formal **Architecture Decision Record** (ADR) and becomes a binding constraint for `/hm:execute` — not advisory. A `plan-validator` agent gates the plan before it is written to disk: NEEDS_REVISION triggers targeted follow-up rounds; MAJOR_REVISION escalates to the user. The interview ends with a "no deferred decisions" scan — any "Accept?/OK?/Verify?" phrasing is a missed interview round, not a plan checkpoint.
 
 - **Autoloop with adaptive interview and convergence judgment.** `/hm:loop` runs time-and-iteration-bounded loops. Before the first iteration, `autoloop-driver` reads the goal description, extracts already-answered dimensions (purpose / invariants / priority / stopping_criteria / out-of-scope), and asks only what's missing — no fixed question script. A single worktree is shared across all iterations (no per-iteration branch churn). Code writes are delegated to `autoloop-coder` (write-tool-only, bounded scope, no open-ended exploration). Convergence is judged by LLM reading the current state against `stopping_criteria` — not a rule-based checklist — and the loop exits when the predicate is satisfied. Failed iterations preserve the worktree for inspection.
@@ -186,11 +188,13 @@ After install, the rendered harness exposes commands under `/hm:*`:
 | `/hm:spec` | Write acceptance criteria from research |
 | `/hm:plan` | Decompose spec into phases with exit criteria |
 | `/hm:execute` | Implement with TDD + worktree isolation |
-| `/hm:review` | Multi-reviewer consensus (conditional routing) |
+| `/hm:review` | Multi-reviewer consensus (mechanical pre-check → conditional routing) |
 | `/hm:wrapup` | Clean, document, commit |
 | `/hm:verify` | 6-check gate before completion |
 
 ### Fused workflows (preset-generated, user-renameable)
+
+Fused workflows combine atomic stages into a single command. The interview generates a starter set; you can add, remove, or rename them in `harness.yaml`.
 
 | Preset | Default fused workflows |
 |---|---|
@@ -209,7 +213,7 @@ After install, the rendered harness exposes commands under `/hm:*`:
 
 ## How it compares
 
-Other Claude Code harnesses pick a niche; harness-maker is the **meta-tool** that builds them.
+Other Claude Code harnesses pick a niche; harness-maker is the **meta-tool** that builds them — and then keeps them current.
 
 | Project | Scope | What harness-maker adds |
 |---|---|---|
@@ -220,7 +224,7 @@ Other Claude Code harnesses pick a niche; harness-maker is the **meta-tool** tha
 | **ouroboros** | Autonomous self-bootstrapping AI software factory | Project-shaped interview (not one pipeline for all), grade-gated reviews with mechanical pre-checks, anti-rot pipeline, brownfield reconcile, dual-IDE support |
 | **Hand-rolled `.claude/`** | Full control, zero automation | Drift detection via provenance hash, weekly anti-rot crawl, AI-readiness scoring, worktree isolation — without writing it yourself |
 
-harness-maker treats the `.claude/` directory itself as the artifact and gives it a lifecycle: profile → interview → synthesize → render → reconcile → verify → refresh.
+The core difference: harness-maker generates and **owns the lifecycle** of your `.claude/` directory. A static tool gives you a starting point. harness-maker gives you a starting point that knows who it was created for and can be updated without losing your changes.
 
 ---
 
@@ -376,6 +380,9 @@ Shell commands listed under `reviewers.mechanical_checks` in `harness.yaml` run 
 
 **Q: Why doesn't harness-maker rewrite prompts to be model-agnostic?**
 The prompts are tuned for `claude-opus-4-7` — `<thinking>` blocks, role framing, chain-of-thought structure. Rewriting for model-neutrality would degrade quality on the recommended model for hypothetical gains on others. Override `recommended_model` in `harness.yaml` if you want a different model; the prompts remain as-is.
+
+**Q: What are mechanical_checks and when should I use them?**
+`mechanical_checks` is a list of shell commands that run before LLM reviewers in `/hm:review`. Use them for fast, deterministic gates (linting, unit tests) that should block review if broken. They catch structural issues before spending reviewer tokens — a linter failure that takes 2 seconds to catch shouldn't consume a full review round.
 
 ---
 

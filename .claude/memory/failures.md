@@ -1,6 +1,6 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.7.1
+harness_maker_version: 0.7.2
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: memory/failures.ko.md.j2
 provenance: official
@@ -22,6 +22,7 @@ provenance: official
 
 ---
 
+<!-- @hm:user:entries -->
 ## [fail:test] snapshot-regen-inside-worktree | 2026-05-09 | count:1
 Running `tests/snapshot/regenerate.py` inside a git worktree embeds the worktree absolute path in all rendered template outputs (via `synthesize._HARNESS_MAKER_PKG_ROOT = Path(__file__).parent.parent.parent`). The resulting SHA-256 hashes diverge from hashes computed when tests run in the main repo. Fix: always run `regenerate.py` from the main repo root. The session that ran it inside `.worktrees/execute-0924Z/` required a second regeneration from the main branch to produce correct stable hashes.
 
@@ -36,3 +37,5 @@ Running `tests/snapshot/regenerate.py` inside a git worktree embeds the worktree
 
 ## [fail:test] boundary-test-no-sentinel | 2026-05-09 | count:1
 `test_git_as_file_stops_walk` asserted `_find_marker(subdir) is None` but planted no marker above the boundary. The test passed regardless of whether the boundary guard worked, because no marker happened to exist above `tmp_path` in the test environment. Fix: always plant a marker ABOVE the boundary in a `try/finally` block so the test fails if the walk ignores the boundary. Pattern: boundary tests must prove both "find it when it should be found" AND "don't find it when the boundary blocks."
+
+<!-- @hm:/user:entries -->

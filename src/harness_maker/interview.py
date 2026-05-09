@@ -592,8 +592,8 @@ def answers_from_harness_yaml(yaml_path: Path) -> InterviewAnswers | None:
                 len(dropped_mc),
                 ", ".join(dropped_mc[:5]),
             )
-        # Always write through so an explicit `mechanical_checks: []` clears the field.
-        update["mechanical_checks"] = clean_mc
+        if clean_mc:
+            update["mechanical_checks"] = clean_mc
 
     # MCP servers — user adds these manually to harness.yaml; preserve on re-render.
     # REVIEW M5/M8 (2026-05-08): validate inner dict shape (command:str, args:list[str],

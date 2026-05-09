@@ -91,13 +91,13 @@ files:
   body_sha256: 1e484feb03df7d114700f5460fee94ba413fe8b574d07b93109fda3f0d73c6c6
 - path: memory/failures.md
   template: memory/failures.en.md.j2
-  body_sha256: 9e25ef3f2e40bd9238c2528b0ae24af35056942dc27be90bb83ea79bdfe7d673
+  body_sha256: ee112656ee40cc591cb6ecb35b5de85402bf52b252dd53bb1e98538f990816d6
 - path: memory/session/README.md
   template: memory/session-readme.md.j2
   body_sha256: efb0b91163791078123a53675678df7cd84aaa7e1d6c9ec54c88710d8d1a9c3b
 - path: memory/wiki.md
   template: memory/wiki.en.md.j2
-  body_sha256: a80854d492dedb677317020c1c141b1132b8bd65dbe0fbab851a5bc1eaeef449
+  body_sha256: 2fe866beba2b97de1a0c53726a902e265b1613fa1c4441805f4092b8ff269f75
 - path: observability/dashboard.md
   template: observability/dashboard.md.j2
   body_sha256: b4570b96aa7bacf396b079f45d1fe03a91bb0e8e85245b061469bca4d4645efd
