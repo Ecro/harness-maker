@@ -6,9 +6,9 @@
 [![Cursor 2.4+ (3.2+ rec)](https://img.shields.io/badge/Cursor-2.4%2B_(3.2%2B_rec)-black)](https://cursor.com)
 [![Built with uv](https://img.shields.io/badge/built_with-uv-261230.svg)](https://docs.astral.sh/uv/)
 
-> A meta-plugin for **Claude Code + Cursor IDE** that builds a project-tailored `.claude/` harness — agents, skills, hooks, observability — and keeps it fresh against the moving Claude/Cursor ecosystem.
+> **A harness that knows your project — and stays that way.**
 
-One command. Interview-driven. Dual-IDE. Anti-rot built in.
+Interview-born. Grade-gated. Anti-rot by design. Dual-IDE.
 
 [Why](#why-harness-maker) ·
 [Quickstart](#quickstart) ·
@@ -26,15 +26,21 @@ One command. Interview-driven. Dual-IDE. Anti-rot built in.
 
 ## Why harness-maker?
 
-Every project that uses Claude Code or Cursor needs a `.claude/` directory — commands, agents, skills, hooks, observability. Rolling it by hand is fast on day 1 and painful by day 90: best practices shift, new hook events ship, reviewer prompts rot, and nothing tells you.
+Most Claude Code setups start from a generic template and drift from day one. harness-maker takes a different stance — it builds a harness that is **shaped around your project** and **keeps that shape over time**.
 
-harness-maker treats the `.claude/` directory as a **versioned artifact** with a lifecycle:
+Four principles drive every design decision:
 
-```
-profile → interview → synthesize → render → reconcile → /hm:* runtime → /hm:refresh (weekly)
-```
+**1. Personalized — Interview-born, not template-pasted.**
+The profiler reads your stack, scale, and lifecycle. The interview locks in preset, dev mode, target IDEs, and reviewer depth. A `Side` experiment and a `Production` service get structurally different harnesses — different reviewer sets, different workflow stage counts, different security gates. No generic defaults silently shipped.
 
-The same single-source `.claude/` drives both Claude Code and Cursor IDE 2.4+ natively. Anti-rot crawlers watch 4 sources (Anthropic blog, GitHub releases, arxiv cs.SE/CL/CR, OSV.dev) and always ask before touching anything.
+**2. Trusted — Grade-gated, not hope-based.**
+Every `/hm:execute` runs in a fresh git worktree and follows a TDD loop. `/hm:review` doesn't just report findings — it applies consensus-passed fixes and re-reviews until the grade meets the configured threshold (default A). Pre-LLM mechanical checks (lint, tests) gate the review before any reviewer agent spawns. Reviews you trust don't need second-guessing.
+
+**3. Anti-rot — Built-in, not retrofitted.**
+The Claude/Cursor ecosystem moves fast. harness-maker ships a weekly crawl across 4 sources (Anthropic blog, GitHub releases, arxiv cs.SE/CL/CR, OSV.dev), scores each item for relevance, and surfaces only what matters — always manual-confirmed, never auto-applied. The failure-memory system proposes new skills and rules when the same failure recurs 3× across sessions.
+
+**4. Evolving — Refresh cycles, not rewrites.**
+`/harness-maker:make --update` picks up new template improvements without touching your edits (hash-based KEEP/REPLACE per file). The session memory and wiki build up project-specific conventions. Failure proposals turn recurring stumbles into permanent fixes. The harness improves with the project, not against it.
 
 ---
 
@@ -141,6 +147,8 @@ Re-run with flags to evolve the harness:
 
 - **Grade-based auto-fix loop.** `/hm:review` computes a grade (A–F) from `consensus-passed` P0/P1 findings and loops: apply fixes → re-review (selective — only re-spawn reviewers whose scope was touched) → regrade, until grade meets `grade_threshold` (default A) or `max_review_rounds` is exhausted. Failed fixes that break the build are automatically reverted and logged. Weak-consensus and manual-only findings are never auto-applied.
 
+- **Pre-LLM mechanical checks gate.** Add shell commands to `harness.yaml` once and they run at the start of every `/hm:review` — before any reviewer agent spawns. Stop-on-first: the first non-zero exit emits `## MECHANICAL_BLOCK: <cmd> exit=<N>`, halts the review, and exits `CHANGES_REQUESTED`. Lint clean and tests green are enforced mechanically, not by reviewer prompt. `--no-auto-fix` does not skip mechanical checks.
+
 For the complete mechanics behind each feature — all procedures, decision paths, and internal invariants — see [**docs/HOW-IT-WORKS.md**](docs/HOW-IT-WORKS.md).
 
 ---
@@ -186,8 +194,8 @@ After install, the rendered harness exposes commands under `/hm:*`:
 
 | Preset | Default fused workflows |
 |---|---|
-| **Side** | `/hm:exec-rev` · `/hm:exec-rev-wrap` _(default)_ |
-| **Production** | `/hm:exec-rev-wrap-ver` _(default)_ · `/hm:exec-rev-wrap` · `/hm:exec-rev` · `/hm:res-spec-plan` |
+| **Side** | `/hm:plan-exec-rev` · `/hm:exec-rev` · `/hm:exec-rev-wrap` _(default)_ |
+| **Production** | `/hm:exec-rev-wrap-ver` _(default)_ · `/hm:exec-rev-wrap` · `/hm:plan-exec-rev` · `/hm:exec-rev` · `/hm:res-spec-plan` |
 
 ### Utility commands
 
@@ -209,6 +217,7 @@ Other Claude Code harnesses pick a niche; harness-maker is the **meta-tool** tha
 | **superpowers** | Powerful sub-agents and workflows | Single-command entry, AI-readiness scoring, worktree isolation by default, privilege-separated reviewer/executor |
 | **Archon** | Knowledge-base + RAG-backed planning | Stack/scale/lifecycle profiler, atomic+fused workflow engine, conditional reviewer routing, 5 security gates |
 | **aider** | Terminal pair programmer, LLM-agnostic | Claude Code / Cursor IDE native; harness output is the runtime (not the session); anti-rot keeps it current |
+| **ouroboros** | Autonomous self-bootstrapping AI software factory | Project-shaped interview (not one pipeline for all), grade-gated reviews with mechanical pre-checks, anti-rot pipeline, brownfield reconcile, dual-IDE support |
 | **Hand-rolled `.claude/`** | Full control, zero automation | Drift detection via provenance hash, weekly anti-rot crawl, AI-readiness scoring, worktree isolation — without writing it yourself |
 
 harness-maker treats the `.claude/` directory itself as the artifact and gives it a lifecycle: profile → interview → synthesize → render → reconcile → verify → refresh.
@@ -231,6 +240,9 @@ recommended_model: claude-opus-4-7
 reviewers:
   enabled: [code, security, performance, ux, concurrency]
   routing: conditional       # conditional | always-all
+  mechanical_checks:         # pre-LLM stop-on-first gate (optional)
+    - ruff check .
+    - uv run pytest tests/unit -x -q
 
 worktree:
   scope: [execute, plan]     # which stages run in a fresh worktree
@@ -358,6 +370,9 @@ No. `metrics.jsonl`, dashboard, and security findings are written to `.claude/ob
 
 **Q: How do I pick up template improvements after a `/plugin update`?**
 Run `/harness-maker:make` → choose **Update**. For files where your hash matches the old template, the new version is applied. For files you edited (hash mismatch), yours is kept. To force a full refresh, `rm .claude/harness.yaml` and re-run.
+
+**Q: What are `mechanical_checks` and when should I use them?**
+Shell commands listed under `reviewers.mechanical_checks` in `harness.yaml` run at the start of every `/hm:review` — before any LLM reviewer spawns. The first command that exits non-zero emits `## MECHANICAL_BLOCK: <cmd> exit=<N>` and halts review immediately (`CHANGES_REQUESTED`). Use them for fast, deterministic gates (lint, type-check, unit test) that shouldn't waste LLM tokens when the basics are broken. The list is user-managed; harness-maker never populates it automatically. `--no-auto-fix` does not skip mechanical checks — they are a hard gate, not part of the fix loop.
 
 **Q: Why doesn't harness-maker rewrite prompts to be model-agnostic?**
 The prompts are tuned for `claude-opus-4-7` — `<thinking>` blocks, role framing, chain-of-thought structure. Rewriting for model-neutrality would degrade quality on the recommended model for hypothetical gains on others. Override `recommended_model` in `harness.yaml` if you want a different model; the prompts remain as-is.
