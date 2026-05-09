@@ -264,6 +264,49 @@ def test_reconcile_legacy_ours_no_hash_returns_replace(tmp_path: Path) -> None:
     assert conflicts[0].reason == "legacy-no-hash-but-ours"
 
 
+def test_reconcile_legacy_ours_with_markers_returns_merge_block(tmp_path: Path) -> None:
+    """Memory files have no content_hash by design (wrapup appends freely).
+    When BOTH the template and existing body have @hm:user:* markers, use
+    MERGE_BLOCK so accumulated wiki/failure entries survive re-renders.
+    """
+    from harness_maker.models import Blueprint, FileEntry
+
+    target = tmp_path / ".claude"
+    target.mkdir()
+    (target / "memory").mkdir()
+    (target / "memory" / "wiki.md").write_text(
+        "---\n"
+        "generated_by: harness-maker\n"
+        "harness_maker_version: 0.7.2\n"
+        "source_template: memory/wiki.ko.md.j2\n"
+        "provenance: official\n"
+        "---\n"
+        "# Wiki Index — Production preset\n"
+        "\n"
+        "---\n"
+        "\n"
+        "<!-- @hm:user:entries -->\n"
+        "## [wiki:gotcha] some-gotcha | 2026-05-09\n"
+        "User-accumulated entry that must survive re-render.\n"
+        "<!-- @hm:/user:entries -->\n",
+        encoding="utf-8",
+    )
+    bp = Blueprint(
+        files=[
+            FileEntry(
+                path=Path("memory/wiki.md"),
+                template="memory/wiki.ko.md.j2",
+                context={},
+                frontmatter={},
+            ),
+        ],
+    )
+    conflicts = reconcile(target, bp)
+    assert len(conflicts) == 1
+    assert conflicts[0].decision == ReconcileDecision.MERGE_BLOCK
+    assert conflicts[0].reason == "memory-block-merge"
+
+
 def test_reconcile_cursor_hooks_json_always_replaces(tmp_path: Path) -> None:
     """`.cursor/hooks.json` is pure JSON (no frontmatter possible — Cursor's
     parser is strict). Always REPLACE so template updates land, mirroring

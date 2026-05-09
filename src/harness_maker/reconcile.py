@@ -123,14 +123,29 @@ def reconcile(existing_dir: Path, blueprint: Blueprint) -> list[ConflictItem]:
             # files KEEP forever despite the user never editing them. Detect
             # via the generated_by stamp; backup() (called by the CLI before
             # render) preserves the legacy file under .backup-<ts>/.
+            #
+            # Special case: memory/ files intentionally omit content_hash so
+            # wrapup can append freely. Use MERGE_BLOCK when BOTH the template
+            # and the existing body carry @hm:user:* block markers — that
+            # preserves user-accumulated wiki/failure entries across re-renders.
             if fm.get("generated_by") == "harness-maker":
-                conflicts.append(
-                    ConflictItem(
-                        path=fe.path,
-                        decision=ReconcileDecision.REPLACE,
-                        reason="legacy-no-hash-but-ours",
-                    ),
-                )
+                decision, reason = _decide_user_modified(fe.template, body)
+                if decision == ReconcileDecision.MERGE_BLOCK:
+                    conflicts.append(
+                        ConflictItem(
+                            path=fe.path,
+                            decision=ReconcileDecision.MERGE_BLOCK,
+                            reason="memory-block-merge",
+                        ),
+                    )
+                else:
+                    conflicts.append(
+                        ConflictItem(
+                            path=fe.path,
+                            decision=ReconcileDecision.REPLACE,
+                            reason="legacy-no-hash-but-ours",
+                        ),
+                    )
             else:
                 conflicts.append(
                     ConflictItem(
