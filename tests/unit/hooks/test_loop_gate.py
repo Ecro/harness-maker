@@ -82,5 +82,11 @@ class TestFindMarker:
         (tmp_path / ".git").write_text("gitdir: /repo/.git/worktrees/wt1\n")
         subdir = tmp_path / "sub"
         subdir.mkdir()
-        # No marker → should return None, not walk above tmp_path
-        assert _find_marker(subdir) is None
+        # Plant a marker ABOVE the boundary — a walk that ignores .git-as-file
+        # would find this and return non-None, proving the guard is untested.
+        above = tmp_path.parent / ".hm-loop-active"
+        above.touch()
+        try:
+            assert _find_marker(subdir) is None
+        finally:
+            above.unlink(missing_ok=True)
