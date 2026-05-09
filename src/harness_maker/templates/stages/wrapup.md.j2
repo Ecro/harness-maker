@@ -42,7 +42,7 @@ Close the loop on a unit of work:
 Before touching anything, verify state:
 
 1. **Working tree state**: there should be staged changes (from execute) OR clean (if execute was skipped). If there are *unstaged* changes that don't trace to execute's worktree merge, surface them — they may be drift.
-2. **Worktree finalize state**: any `.worktrees/execute-*` directories should be cleaned up by execute Step 5 already. If one persists, log a warning — it means execute exited with `fail` or stage-only failed.
+2. **Worktree finalize state**: any `.worktrees/execute-*` directories should be cleaned up by execute Step 5 (`stage-only`) already. If one persists, log a warning — it means execute exited with `fail` or stage-only failed. **Multi-repo**: when sibling repos are configured, `finalize stage-only` merges all repos' worktrees into their respective main branches; if any sibling's merge failed, the marker file is kept and the directory remains — resolve manually before committing.
 3. **PLAN existence**: `{{ config.work_docs.dir }}PLAN-{slug}.md` exists (skip wrapup with a clear error otherwise).
 
 ### Step 2 — Final verification pass

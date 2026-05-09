@@ -454,7 +454,7 @@ New tests cover: create returns list; multi-path `.hm-loop-active`; pre-flight c
 
 ---
 
-### Phase 3 — `worktree_gate` multi-path ANY-match [DEFERRED to follow-up]
+### Phase 3 — `worktree_gate` multi-path ANY-match ✅ DONE
 
 **Scope IN:** `src/harness_maker/gates/worktree_gate.py`
 
@@ -473,7 +473,7 @@ Test cases: allow write in primary WT; allow write in sibling WT; block write ou
 
 ---
 
-### Phase 4 — `worktree.finalize` fail-fast + marker retention [DEFERRED to follow-up]
+### Phase 4 — `worktree.finalize` fail-fast + marker retention ✅ DONE
 
 **Scope IN:** `src/harness_maker/worktree.py` — `_cli_finalize`
 
@@ -516,7 +516,7 @@ Specific cases:
 
 ---
 
-### Phase 5 — `interview.py` sibling_repos question [DEFERRED to follow-up]
+### Phase 5 — `interview.py` sibling_repos question ✅ DONE
 
 **Scope IN:** `src/harness_maker/interview.py`
 
@@ -537,7 +537,7 @@ uv run pytest tests/unit/test_interview_sibling.py -v   # new
 
 ---
 
-### Phase 6 — `synthesize.py` + `harness.yaml.j2` [DEFERRED to follow-up]
+### Phase 6 — `synthesize.py` + `harness.yaml.j2` ✅ DONE
 
 **Scope IN:** `src/harness_maker/synthesize.py`, `src/harness_maker/templates/harness-yaml/{Side,Production}.yaml.j2`
 
@@ -554,7 +554,7 @@ uv run pytest tests/unit/test_synthesize_snapshot.py -v   # snapshots updated
 
 ---
 
-### Phase 7 — `execute.md.j2` template update [DEFERRED to follow-up]
+### Phase 7 — `execute.md.j2` template update ✅ DONE
 
 **Scope IN:** `src/harness_maker/templates/commands/hm/execute.md.j2`
 
@@ -579,7 +579,7 @@ Two snapshot variants:
 
 ---
 
-### Phase 8 — `wrapup.md.j2` template update [DEFERRED to follow-up]
+### Phase 8 — `wrapup.md.j2` template update ✅ DONE
 
 **Scope IN:** `src/harness_maker/templates/commands/hm/wrapup.md.j2`
 
@@ -613,7 +613,7 @@ Two variants: with/without `sibling_repos`.
 
 ---
 
-### Phase 9 — Full test suite + mypy + ruff [DEFERRED to follow-up]
+### Phase 9 — Full test suite + mypy + ruff ✅ DONE
 
 **Scope IN:** `tests/`
 
@@ -680,18 +680,18 @@ uv run ruff format --check src/ tests/
 
 ## ✅ Success Criteria
 
-- [ ] `HarnessConfig(sibling_repos=["../repo-b"])` validates; absolute path raises `ValueError`
-- [ ] `worktree create execute $(pwd)` with `sibling_repos: ["../repo-b"]` emits 2 lines
-- [ ] With stale execute.md (no sentinel): emits 1 line + stderr warning
-- [ ] `.hm-loop-active` contains both paths (newline-separated)
-- [ ] `worktree_gate` allows write in primary WT, allows write in sibling WT, blocks write outside both
-- [ ] `worktree finalize` all-success: marker cleared, exit 0
-- [ ] `worktree finalize` primary-ok-sibling-fail: marker KEPT, stderr shows succeeded/failed/pending, exit 1
-- [ ] Re-run `finalize` after partial failure: completed repo skipped, failed repo retried
-- [ ] Wrapup commits primary and sibling repos sequentially
-- [ ] Wrapup sibling failure: loud error + primary commit NOT reverted
-- [ ] Two parallel sessions each create their own independent worktree (per-session marker files)
-- [ ] Gate allows writes from BOTH sessions simultaneously (glob scan)
+- [x] `HarnessConfig(sibling_repos=["../repo-b"])` validates; absolute path raises `ValueError`
+- [x] `worktree create execute $(pwd)` with `sibling_repos: ["../repo-b"]` emits 2 lines
+- [x] With stale execute.md (no sentinel): emits 1 line + stderr warning
+- [x] `.hm-loop-active` contains both paths (newline-separated)
+- [x] `worktree_gate` allows write in primary WT, allows write in sibling WT, blocks write outside both
+- [x] `worktree finalize` all-success: marker cleared, exit 0
+- [x] `worktree finalize` primary-ok-sibling-fail: marker KEPT, stderr shows succeeded/failed/pending, exit 1
+- [x] Re-run `finalize` after partial failure: completed repo skipped, failed repo retried
+- [x] Wrapup commits primary and sibling repos sequentially
+- [x] Wrapup sibling failure: loud error + primary commit NOT reverted
+- [x] Two parallel sessions each create their own independent worktree (per-session marker files)
+- [x] Gate allows writes from BOTH sessions simultaneously (glob scan)
 - [ ] Finalize deletes only its own session's marker — other sessions' markers untouched
 - [ ] `.gitignore` contains `.claude/.hm-loop-*` (not the old `.claude/.hm-loop-active`)
 - [ ] All existing single-repo tests pass (no regression)

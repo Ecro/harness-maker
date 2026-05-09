@@ -52,6 +52,30 @@ Per-invocation overrides (workflow command flags):
 - `--no-auto-fix` — disable auto-fix this run only.
 - `--with-reviewers=<csv>` — add ad-hoc reviewers (must exist in `reviewers.installed`).
 
+{% if config.reviewers.get("mechanical_checks") %}
+## Phase 0 — Mechanical Pre-Checks
+
+Run each command in order **before** any LLM reviewer. These are deterministic checks
+(lint, typecheck, unit tests); failures are a hard-block — stop-on-first, no grade
+computation.
+
+```bash
+{% for cmd in config.reviewers.mechanical_checks %}{{ cmd }}
+{% endfor %}```
+
+If a command exits non-zero:
+1. Emit the marker **exactly**:
+   ```
+   ## MECHANICAL_BLOCK: <cmd> exit=<N>
+   ```
+2. Print the command's full stdout/stderr.
+3. **Stop** — do NOT run remaining checks or LLM reviewers.
+4. Status = `CHANGES_REQUESTED` immediately; no grade is assigned.
+
+> `--no-auto-fix` does **not** skip mechanical checks — they guard structural
+> correctness that auto-fix cannot restore.
+
+{% endif %}
 ## Procedure — Round 1 (initial review)
 
 ### Step 1 — Reviewer set selection

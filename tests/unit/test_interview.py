@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import pathlib
 from collections.abc import Iterator
 
 import pytest
 
-from harness_maker.interview import interview
+from harness_maker.interview import answers_from_harness_yaml, interview
 from harness_maker.models import (
     AtomicStage,
     DevMode,
@@ -104,7 +105,7 @@ def test_interview_interactive_accepts_recommended(monkeypatch: pytest.MonkeyPat
     # caching, ref_folders (blank = skip)
     # locale, targets, preset, dev_mode, use-recommended?, default workflow,
     # consensus, caching, ref_folders (blank = skip)
-    inputs: Iterator[str] = iter(["", "", "", "", "", "", "", "", ""])
+    inputs: Iterator[str] = iter(["", "", "", "", "", "", "", "", "", ""])
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
     result = interview(_profile(), autoloop_mode=False)
     assert result.locale == "en"
@@ -119,7 +120,7 @@ def test_interview_locale_first_question_accepts_arbitrary_tag(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Locale is the first prompt; user types ``ja`` and it passes through."""
-    inputs: Iterator[str] = iter(["ja", "", "", "", "", "", "", "", ""])
+    inputs: Iterator[str] = iter(["ja", "", "", "", "", "", "", "", "", ""])
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
     result = interview(_profile(), autoloop_mode=False)
     assert result.locale == "ja"
@@ -130,7 +131,7 @@ def test_interview_dev_mode_explicit_override_to_spec_driven(
 ) -> None:
     """Side+spec-driven cross is allowed (independent of preset)."""
     # locale, targets, preset, dev_mode=spec, use-rec?, default, consensus, caching, ref_folders
-    inputs: Iterator[str] = iter(["", "", "", "spec", "", "", "", "", ""])
+    inputs: Iterator[str] = iter(["", "", "", "spec", "", "", "", "", "", ""])
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
     result = interview(_profile(), autoloop_mode=False)
     assert result.preset == Preset.SIDE
@@ -141,7 +142,7 @@ def test_interview_dev_mode_explicit_override_to_task_on_production(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Production+task-driven cross is allowed."""
-    inputs: Iterator[str] = iter(["", "", "Production", "task", "", "", "", "", ""])
+    inputs: Iterator[str] = iter(["", "", "Production", "task", "", "", "", "", "", ""])
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
     result = interview(_profile(), autoloop_mode=False)
     assert result.preset == Preset.PRODUCTION
@@ -150,7 +151,7 @@ def test_interview_dev_mode_explicit_override_to_task_on_production(
 
 def test_interview_interactive_overrides_default(monkeypatch: pytest.MonkeyPatch) -> None:
     """User picks a different default workflow from the starter set."""
-    inputs: Iterator[str] = iter(["", "", "", "", "", "exec-rev", "", "", ""])
+    inputs: Iterator[str] = iter(["", "", "", "", "", "exec-rev", "", "", "", ""])
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
     result = interview(_profile(), autoloop_mode=False)
     assert result.default_workflow == "exec-rev"
@@ -161,7 +162,7 @@ def test_interview_interactive_custom_workflows(monkeypatch: pytest.MonkeyPatch)
     # locale, targets, preset, dev_mode, use-rec?, stages-#1, name-#1, stages-#2 (done),
     # default, consensus, caching, ref_folders
     inputs: Iterator[str] = iter(
-        ["", "", "", "", "n", "4,5", "", "done", "", "", "", ""],
+        ["", "", "", "", "n", "4,5", "", "done", "", "", "", "", ""],
     )
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
     result = interview(_profile(), autoloop_mode=False)
@@ -176,7 +177,7 @@ def test_interview_interactive_custom_named_override(
 ) -> None:
     """User overrides the auto-generated workflow name."""
     inputs: Iterator[str] = iter(
-        ["", "", "", "", "n", "4,5,6", "ship", "done", "", "", "", ""],
+        ["", "", "", "", "n", "4,5,6", "ship", "done", "", "", "", "", ""],
     )
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
     result = interview(_profile(), autoloop_mode=False)
@@ -190,7 +191,7 @@ def test_interview_interactive_custom_named_override(
 
 def test_interview_preset_override_to_production(monkeypatch: pytest.MonkeyPatch) -> None:
     """User on a small-experiment profile picks Production explicitly."""
-    inputs: Iterator[str] = iter(["", "", "Production", "", "", "", "", "", ""])
+    inputs: Iterator[str] = iter(["", "", "Production", "", "", "", "", "", "", ""])
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
     result = interview(_profile(), autoloop_mode=False)
     assert result.preset == Preset.PRODUCTION
@@ -204,7 +205,7 @@ def test_interview_custom_workflow_rejects_reserved(
     # locale, targets, preset, dev_mode, use-rec?, stages-#1, name=plan (reserved → re-prompt),
     # stages-#1 again (3,4), name (auto), done, default, consensus, caching, ref_folders
     inputs: Iterator[str] = iter(
-        ["", "", "", "", "n", "4,5", "plan", "3,4", "", "done", "", "", "", ""],
+        ["", "", "", "", "n", "4,5", "plan", "3,4", "", "done", "", "", "", "", ""],
     )
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
     result = interview(_profile(), autoloop_mode=False)
@@ -219,7 +220,7 @@ def test_interview_ref_folders_multiple_with_glob_override(
     """User registers two folders, one with a custom glob."""
     # locale, targets .. caching, ref_folder #1 (path only), ref_folder #2 (path;glob), blank=stop
     inputs: Iterator[str] = iter(
-        ["", "", "", "", "", "", "", "", "./docs", "../shared ; **/*.md", ""],
+        ["", "", "", "", "", "", "", "", "./docs", "../shared ; **/*.md", "", ""],
     )
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
     result = interview(_profile(), autoloop_mode=False)
@@ -233,7 +234,7 @@ def test_interview_ref_folders_multiple_with_glob_override(
 def test_interview_targets_multi_select_input(monkeypatch: pytest.MonkeyPatch) -> None:
     """Comma-separated input parses into list[Target]; whitespace tolerated."""
     inputs: Iterator[str] = iter(
-        ["", "claude-code, cursor", "", "", "", "", "", "", ""],
+        ["", "claude-code, cursor", "", "", "", "", "", "", "", ""],
     )
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
     result = interview(_profile(), autoloop_mode=False)
@@ -242,7 +243,7 @@ def test_interview_targets_multi_select_input(monkeypatch: pytest.MonkeyPatch) -
 
 def test_interview_targets_cursor_only_input(monkeypatch: pytest.MonkeyPatch) -> None:
     """User can pick Cursor as the sole target."""
-    inputs: Iterator[str] = iter(["", "cursor", "", "", "", "", "", "", ""])
+    inputs: Iterator[str] = iter(["", "cursor", "", "", "", "", "", "", "", ""])
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
     result = interview(_profile(), autoloop_mode=False)
     assert result.targets == [Target.CURSOR]
@@ -251,7 +252,7 @@ def test_interview_targets_cursor_only_input(monkeypatch: pytest.MonkeyPatch) ->
 def test_interview_targets_unknown_value_skipped(monkeypatch: pytest.MonkeyPatch) -> None:
     """Unknown tokens are skipped; if all unknown, fall back to [claude-code]."""
     inputs: Iterator[str] = iter(
-        ["", "claude-code, vscode-fork", "", "", "", "", "", "", ""],
+        ["", "claude-code, vscode-fork", "", "", "", "", "", "", "", ""],
     )
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
     result = interview(_profile(), autoloop_mode=False)
@@ -262,3 +263,70 @@ def test_interview_autoloop_skips_ref_folders() -> None:
     """Autoloop mode never prompts; ref_folders defaults to []."""
     result = interview(_profile(), autoloop_mode=True)
     assert result.ref_folders == []
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# mechanical_checks — filter + round-trip
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def test_interview_mechanical_checks_filters_empty_strings(
+    tmp_path: pathlib.Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Empty-string entries are stripped; logger.warning is emitted for each."""
+    import logging
+
+    harness_yaml = tmp_path / "harness.yaml"
+    harness_yaml.write_text(
+        "locale: en\n"
+        "preset: Side\n"
+        "reviewers:\n"
+        "  mechanical_checks:\n"
+        "  - 'ruff check .'\n"
+        "  - ''\n"
+        "  - 'uv run pytest tests/unit -x -q'\n"
+    )
+    with caplog.at_level(logging.WARNING, logger="harness_maker.interview"):
+        result = answers_from_harness_yaml(harness_yaml)
+    assert result is not None
+    assert result.mechanical_checks == ["ruff check .", "uv run pytest tests/unit -x -q"]
+    assert any("mechanical_checks" in r.message for r in caplog.records)
+
+
+def test_interview_mechanical_checks_old_yaml_fallback(tmp_path: pathlib.Path) -> None:
+    """harness.yaml without mechanical_checks key → silent empty list."""
+    harness_yaml = tmp_path / "harness.yaml"
+    harness_yaml.write_text("locale: en\npreset: Side\n")
+    result = answers_from_harness_yaml(harness_yaml)
+    assert result is not None
+    assert result.mechanical_checks == []
+
+
+def test_interview_mechanical_checks_scalar_value_warns(
+    tmp_path: pathlib.Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Non-list mechanical_checks (bare string) is ignored with a warning."""
+    import logging
+
+    harness_yaml = tmp_path / "harness.yaml"
+    harness_yaml.write_text(
+        "locale: en\npreset: Side\nreviewers:\n  mechanical_checks: 'ruff check .'\n"
+    )
+    with caplog.at_level(logging.WARNING, logger="harness_maker.interview"):
+        result = answers_from_harness_yaml(harness_yaml)
+    assert result is not None
+    assert result.mechanical_checks == []
+    assert any("mechanical_checks" in r.message for r in caplog.records)
+
+
+def test_interview_mechanical_checks_explicit_empty_list_clears(
+    tmp_path: pathlib.Path,
+) -> None:
+    """Explicit `mechanical_checks: []` writes through (opt-out intent honoured)."""
+    harness_yaml = tmp_path / "harness.yaml"
+    harness_yaml.write_text("locale: en\npreset: Side\nreviewers:\n  mechanical_checks: []\n")
+    result = answers_from_harness_yaml(harness_yaml)
+    assert result is not None
+    assert result.mechanical_checks == []

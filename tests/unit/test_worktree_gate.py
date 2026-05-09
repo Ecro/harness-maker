@@ -311,6 +311,100 @@ def test_stdin_cwd_field_used_when_workspace_absent(
     assert rc == 2
 
 
+def _write_session_marker(project_root: Path, wt_name: str, wt_paths: list[Path]) -> None:
+    """Write a per-session ADR-006 marker (.hm-loop-{wt_name})."""
+    marker = project_root / ".claude" / f".hm-loop-{wt_name}"
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.write_text("\n".join(str(p) for p in wt_paths) + "\n", encoding="utf-8")
+
+
+def test_per_session_marker_write_inside_any_active_wt_allowed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Two parallel sessions (ADR-006 per-session markers); write to session-b's
+    worktree → allowed because it's inside one of the active WTs."""
+    project = tmp_path / "repo"
+    project.mkdir()
+    wt_a = project / ".worktrees" / "execute-session-a"
+    wt_a.mkdir(parents=True)
+    wt_b = project / ".worktrees" / "execute-session-b"
+    wt_b.mkdir(parents=True)
+    _write_session_marker(project, "execute-session-a", [wt_a])
+    _write_session_marker(project, "execute-session-b", [wt_b])
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(project))
+    rc = _run(
+        monkeypatch,
+        {"tool_name": "Write", "tool_input": {"file_path": str(wt_b / "src/foo.py")}},
+    )
+    assert rc == 0
+
+
+def test_multi_session_write_outside_all_wts_blocked(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Two active sessions; write to main repo (outside both WTs) → blocked."""
+    project = tmp_path / "repo"
+    project.mkdir()
+    wt_a = project / ".worktrees" / "execute-session-a"
+    wt_a.mkdir(parents=True)
+    wt_b = project / ".worktrees" / "execute-session-b"
+    wt_b.mkdir(parents=True)
+    _write_session_marker(project, "execute-session-a", [wt_a])
+    _write_session_marker(project, "execute-session-b", [wt_b])
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(project))
+    rc = _run(
+        monkeypatch,
+        {"tool_name": "Write", "tool_input": {"file_path": str(project / "src/foo.py")}},
+    )
+    assert rc == 2
+    err = capsys.readouterr().err
+    assert "blocked" in err
+
+
+def test_sibling_wt_in_session_marker_allowed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Single per-session marker lists primary + sibling WT paths.
+    Write to sibling WT → allowed (multi-repo session, ADR-006)."""
+    project = tmp_path / "repo"
+    project.mkdir()
+    sibling = tmp_path / "sibling-repo"
+    sibling.mkdir()
+    primary_wt = project / ".worktrees" / "execute-ts"
+    primary_wt.mkdir(parents=True)
+    sibling_wt = sibling / ".worktrees" / "execute-ts-sibling"
+    sibling_wt.mkdir(parents=True)
+    _write_session_marker(project, "execute-ts", [primary_wt, sibling_wt])
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(project))
+    rc = _run(
+        monkeypatch,
+        {"tool_name": "Write", "tool_input": {"file_path": str(sibling_wt / "bar.ts")}},
+    )
+    assert rc == 0
+
+
+def test_legacy_hm_loop_active_backward_compat(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Legacy .hm-loop-active filename matches .hm-loop-* glob — backward compat.
+    Allow inside WT, block outside."""
+    project = tmp_path / "repo"
+    project.mkdir()
+    wt = project / ".worktrees" / "execute-x"
+    wt.mkdir(parents=True)
+    _write_marker(project, wt)  # writes .hm-loop-active
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(project))
+    inside = {"tool_name": "Write", "tool_input": {"file_path": str(wt / "x.py")}}
+    outside = {"tool_name": "Write", "tool_input": {"file_path": str(project / "x.py")}}
+    assert _run(monkeypatch, inside) == 0
+    assert _run(monkeypatch, outside) == 2
+
+
 def test_symlinked_target_outside_wt_is_blocked(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

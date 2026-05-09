@@ -135,9 +135,7 @@ def test_read_active_worktrees_multi_path(primary: Path, sibling: Path) -> None:
     assert result[1] in paths
 
 
-def test_read_active_worktrees_parallel_sessions_both_visible(
-    primary: Path, sibling: Path
-) -> None:
+def test_read_active_worktrees_parallel_sessions_both_visible(primary: Path, sibling: Path) -> None:
     """ADR-006: two sessions' per-session marker files → _read_active_worktrees
     returns paths from BOTH files (gate allows writes in either session)."""
     result_a = worktree.create("execute", primary)
@@ -157,6 +155,87 @@ def test_read_active_worktrees_no_marker_returns_empty(primary: Path) -> None:
 # ──────────────────────────────────────────────────────────────────────────────
 # Stale execute.md sentinel detection
 # ──────────────────────────────────────────────────────────────────────────────
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# _cli_finalize — multi-repo fail-fast + marker retention (Phase 4)
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def test_finalize_all_success(primary: Path, sibling: Path) -> None:
+    """All WTs finalize stage-only successfully → marker cleared, rc 0."""
+    result = worktree.create("execute", primary, sibling_dirs=[sibling])
+    primary_wt, sibling_wt = result
+
+    rc = worktree._cli_finalize([str(primary_wt), "stage-only"])
+    assert rc == 0
+
+    marker = primary / ".claude" / f".hm-loop-{primary_wt.name}"
+    assert not marker.is_file(), "marker must be cleared on full success"
+    assert not primary_wt.is_dir(), "primary WT cleaned up"
+    assert not sibling_wt.is_dir(), "sibling WT cleaned up"
+
+
+def test_finalize_primary_ok_sibling_fail(
+    primary: Path,
+    sibling: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Primary merge succeeds; sibling merge fails → rc 1, marker kept, status to stderr."""
+    result = worktree.create("execute", primary, sibling_dirs=[sibling])
+    primary_wt, sibling_wt = result
+
+    original_merge = worktree.merge
+
+    def fail_on_sibling(wt: Path, **kwargs: object) -> None:
+        if wt.is_relative_to(sibling):
+            raise RuntimeError("simulated sibling merge conflict")
+        original_merge(wt, **kwargs)
+
+    monkeypatch.setattr(worktree, "merge", fail_on_sibling)
+
+    rc = worktree._cli_finalize([str(primary_wt), "stage-only"])
+    assert rc == 1
+
+    marker = primary / ".claude" / f".hm-loop-{primary_wt.name}"
+    assert marker.is_file(), "marker must be kept on partial failure (ADR-003)"
+
+    err = capsys.readouterr().err
+    assert "succeeded" in err
+    assert "failed" in err
+
+
+def test_finalize_rerun_after_partial(
+    primary: Path,
+    sibling: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Re-run after partial: primary WT already cleaned → skipped; sibling retried."""
+    result = worktree.create("execute", primary, sibling_dirs=[sibling])
+    primary_wt, sibling_wt = result
+
+    original_merge = worktree.merge
+    calls: list[Path] = []
+
+    def fail_second_call(wt: Path, **kwargs: object) -> None:
+        calls.append(wt)
+        if len(calls) == 2:
+            raise RuntimeError("simulated sibling fail")
+        original_merge(wt, **kwargs)
+
+    monkeypatch.setattr(worktree, "merge", fail_second_call)
+
+    rc1 = worktree._cli_finalize([str(primary_wt), "stage-only"])
+    assert rc1 == 1
+    assert not primary_wt.is_dir(), "primary WT cleaned after its merge+cleanup succeeded"
+    marker = primary / ".claude" / f".hm-loop-{primary_wt.name}"
+    assert marker.is_file()
+
+    monkeypatch.setattr(worktree, "merge", original_merge)
+    rc2 = worktree._cli_finalize([str(primary_wt), "stage-only"])
+    assert rc2 == 0
+    assert not marker.is_file(), "marker cleared after full success on re-run"
 
 
 def test_cli_create_stale_sentinel_emits_warning(
@@ -210,9 +289,7 @@ def test_cli_create_with_sentinel_emits_both_paths(
     # Write execute.md WITH sentinel
     cmd_dir = claude_dir / "commands" / "hm"
     cmd_dir.mkdir(parents=True)
-    (cmd_dir / "execute.md").write_text(
-        "# SIBLING_WORKTREE_PATHS\nsome instructions\n"
-    )
+    (cmd_dir / "execute.md").write_text("# SIBLING_WORKTREE_PATHS\nsome instructions\n")
 
     import io
     import sys

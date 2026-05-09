@@ -276,9 +276,7 @@ class HarnessConfig(BaseModel):
             return v
         for p in v:
             if isinstance(p, str) and (Path(p).is_absolute() or p.startswith("~")):
-                raise ValueError(
-                    f"sibling_repos must contain relative paths; got absolute: {p!r}"
-                )
+                raise ValueError(f"sibling_repos must contain relative paths; got absolute: {p!r}")
         return v
 
 
@@ -336,6 +334,9 @@ class InterviewAnswers(BaseModel):
     grade_threshold: str = "A"  # 'A' | 'B' | 'C'
     max_review_rounds: int = 3
     caching: str = "agent-aware"
+    # Shell commands run as mechanical pre-check in /hm:review before LLM reviewers.
+    # User adds to harness.yaml manually (no interview question). Empty list = feature off.
+    mechanical_checks: list[str] = Field(default_factory=list)
     # MCP servers — user adds to harness.yaml manually (no interview question
     # yet). Propagated to .cursor/mcp.json on re-render via answers_from_harness_yaml.
     mcp_servers: dict[str, dict[str, Any]] = Field(default_factory=dict)
@@ -356,9 +357,7 @@ class InterviewAnswers(BaseModel):
             return v
         for p in v:
             if isinstance(p, str) and (Path(p).is_absolute() or p.startswith("~")):
-                raise ValueError(
-                    f"sibling_repos must contain relative paths; got absolute: {p!r}"
-                )
+                raise ValueError(f"sibling_repos must contain relative paths; got absolute: {p!r}")
         return v
 
     @model_validator(mode="after")

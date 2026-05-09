@@ -57,9 +57,7 @@ def _run(args: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
         )
         raise RuntimeError(msg) from e
     except subprocess.TimeoutExpired as e:
-        raise RuntimeError(
-            f"git command timed out after {_GIT_TIMEOUT}s: {' '.join(args)}"
-        ) from e
+        raise RuntimeError(f"git command timed out after {_GIT_TIMEOUT}s: {' '.join(args)}") from e
 
 
 def _timestamp() -> str:
@@ -103,9 +101,7 @@ def _find_free_name(
         ):
             continue
         return name
-    raise RuntimeError(
-        f"No free branch name found after 100 attempts with prefix {base_name!r}"
-    )
+    raise RuntimeError(f"No free branch name found after 100 attempts with prefix {base_name!r}")
 
 
 def create(
@@ -545,6 +541,23 @@ def _detect_existing_worktree(base: Path) -> Path | None:
     return None
 
 
+def _session_worktrees(project_root: Path, primary_wt_name: str, fallback: Path) -> list[Path]:
+    """Return all WTs for this session from the per-session marker file.
+
+    Falls back to [fallback] when the marker is absent/unreadable (backward
+    compat — single-repo sessions that wrote no marker, or pre-Phase 2 code).
+    """
+    marker = _marker_path(project_root, primary_wt_name)
+    if not marker.is_file():
+        return [fallback]
+    try:
+        text = marker.read_text(encoding="utf-8")
+    except OSError:
+        return [fallback]
+    paths = [Path(ln.strip()) for ln in text.splitlines() if ln.strip()]
+    return paths if paths else [fallback]
+
+
 def _cli_finalize(args: list[str]) -> int:
     """`python -m harness_maker.worktree finalize <wt_path> <success|fail|stage-only> [strategy]`.
 
@@ -553,14 +566,12 @@ def _cli_finalize(args: list[str]) -> int:
         cleanup with --force. Used by `/hm:execute` Step 5 when wrapup will
         own the user-facing commit (single-commit-owner pattern).
     On fail: skip merge; cleanup non-force (preserves dirty worktree for inspection).
-    Missing `<wt_path>` is a no-op exit 0 — slash commands wire `finalize`
-    unconditionally, and an empty worktree_path means scope check was off.
 
-    Both merge and cleanup failures are caught and surfaced via stderr +
-    return 1 so we never crash with a bare traceback (e.g., a locked file
-    on Windows blocking ``git worktree remove --force``). The slash command
-    treats exit 1 as "finalize had an issue, evidence preserved" rather
-    than letting the harness break.
+    Multi-repo (Phase 4, ADR-003/005/006): reads all WTs from the per-session
+    marker file and processes them in order. Fail-fast on first error (success
+    path only): emits per-repo status to stderr and returns 1; marker is kept
+    so the gate continues protecting surviving worktrees. Idempotent re-run:
+    WTs whose directory no longer exists (already cleaned) are skipped.
     """
     if len(args) < 2 or len(args) > 3:
         print(
@@ -574,55 +585,95 @@ def _cli_finalize(args: list[str]) -> int:
         print("status must be 'success' | 'fail' | 'stage-only'", file=sys.stderr)
         return 2
     wt = Path(wt_str)
-    if not wt.is_dir():
-        return 0
     # Project root = parent of `.worktrees/<name>` (mirrors cleanup's logic).
     project_root = wt.resolve().parent.parent
-    on_success = status in {"success", "stage-only"}
-    auto_commit = status == "success"  # stage-only leaves the merge uncommitted
-    rc = 0
-    try:
-        if on_success:
-            # CRITICAL: capture uncommitted work in the worktree before merge.
-            # Without this, `git merge --squash <branch>` only sees committed work,
-            # and `cleanup(force=True)` then deletes the uncommitted edits silently.
-            # See worktree finalize bug investigation 2026-05-08.
+    primary_wt_name = wt.resolve().name
+    auto_commit = status == "success"
+
+    all_wts = _session_worktrees(project_root, primary_wt_name, wt)
+
+    # Nothing to do if all WTs have already been cleaned up (idempotent no-op).
+    if not any(p.is_dir() for p in all_wts):
+        return 0
+
+    if status == "fail":
+        # Fail path: best-effort cleanup of all WTs; marker stays (ADR-003/005).
+        overall_rc = 0
+        for current_wt in all_wts:
+            if not current_wt.is_dir():
+                continue
             try:
-                captured = _capture_pending_in_worktree(wt)
-                if captured:
-                    print(
-                        f"[finalize] captured uncommitted work in {wt.name} as WIP commit",
-                        file=sys.stderr,
-                    )
+                cleanup(current_wt, on_success=False)
             except RuntimeError as e:
                 print(
-                    f"failed to capture uncommitted work in {wt}: {e}; preserving worktree",
+                    f"cleanup failed, worktree preserved at {current_wt}: {e}",
                     file=sys.stderr,
                 )
-                rc = 1
-            if rc == 0:
-                try:
-                    merge(wt, strategy=strategy, commit=auto_commit)
-                except RuntimeError as e:
-                    print(f"merge failed, preserving worktree: {e}", file=sys.stderr)
-                    rc = 1
-        if rc == 0:
+                overall_rc = 1
+        return overall_rc
+
+    # success / stage-only: fail-fast multi-WT merge loop.
+    succeeded: list[Path] = []
+    pending = list(all_wts)
+
+    for current_wt in all_wts:
+        if not current_wt.is_dir():
+            # Already processed in a prior run (idempotent re-run).
+            succeeded.append(current_wt)
+            pending.remove(current_wt)
+            continue
+
+        wt_rc = 0
+        # CRITICAL: capture uncommitted work before merge — see finalize bug 2026-05-08.
+        try:
+            captured = _capture_pending_in_worktree(current_wt)
+            if captured:
+                print(
+                    f"[finalize] captured uncommitted work in {current_wt.name} as WIP commit",
+                    file=sys.stderr,
+                )
+        except RuntimeError as e:
+            print(
+                f"failed to capture uncommitted work in {current_wt}: {e}; preserving worktree",
+                file=sys.stderr,
+            )
+            wt_rc = 1
+
+        if wt_rc == 0:
             try:
-                cleanup(wt, on_success=on_success)
+                merge(current_wt, strategy=strategy, commit=auto_commit)
+            except RuntimeError as e:
+                print(f"merge failed, preserving worktree: {e}", file=sys.stderr)
+                wt_rc = 1
+
+        if wt_rc == 0:
+            try:
+                cleanup(current_wt, on_success=True)
             except RuntimeError as e:
                 print(
-                    f"cleanup failed, worktree preserved at {wt}: {e}",
+                    f"cleanup failed, worktree preserved at {current_wt}: {e}",
                     file=sys.stderr,
                 )
-                rc = 1
-    finally:
-        # Clear only when the user explicitly requested success/stage-only AND
-        # all operations succeeded (rc == 0). On `fail` status the worktree is
-        # intentionally preserved for inspection — marker stays so the gate
-        # continues protecting it. ADR-003/005/006.
-        if status != "fail" and rc == 0:
-            _clear_loop_marker(project_root, wt.resolve().name)
-    return rc
+                wt_rc = 1
+
+        if wt_rc != 0:
+            # Fail-fast: emit per-repo status; keep marker so gate protects all.
+            remaining = [p for p in pending if p != current_wt]
+            print(f"[finalize] succeeded: {[str(s) for s in succeeded]}", file=sys.stderr)
+            print(f"[finalize] failed: [{str(current_wt)}]", file=sys.stderr)
+            print(f"[finalize] pending: {[str(p) for p in remaining]}", file=sys.stderr)
+            print(
+                "[finalize] marker kept — re-run 'worktree finalize <WT> ...' after resolving",
+                file=sys.stderr,
+            )
+            return 1
+
+        succeeded.append(current_wt)
+        pending.remove(current_wt)
+
+    # All WTs processed successfully — clear this session's marker (ADR-006).
+    _clear_loop_marker(project_root, primary_wt_name)
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:

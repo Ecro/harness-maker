@@ -340,3 +340,23 @@ def test_interview_answers_sibling_repos_relative_path_valid() -> None:
 def test_interview_answers_sibling_repos_absolute_rejected() -> None:
     with pytest.raises(ValidationError, match="absolute"):
         InterviewAnswers(sibling_repos=["/abs/path/repo-b"])
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# InterviewAnswers.mechanical_checks
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def test_interview_answers_mechanical_checks_default_empty() -> None:
+    ans = InterviewAnswers()
+    assert ans.mechanical_checks == []
+
+
+def test_interview_answers_mechanical_checks_round_trip_via_synthesize() -> None:
+    from harness_maker.models import ProjectProfile
+    from harness_maker.synthesize import synthesize
+
+    checks = ["ruff check .", "uv run pytest tests/unit -x -q"]
+    ans = InterviewAnswers(mechanical_checks=checks)
+    bp = synthesize(ProjectProfile(), ans)
+    assert bp.config.reviewers["mechanical_checks"] == checks

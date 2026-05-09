@@ -135,13 +135,11 @@ class DriftMonitor:
             # which an LLM may parse as a nested fence — confusing enough to
             # treat the trailing content as instructions outside the original
             # data fence.
-            safe_baseline = (
-                baseline_text.replace("</baseline>", r"<\/baseline>")
-                .replace("<baseline>", r"<\baseline>")
+            safe_baseline = baseline_text.replace("</baseline>", r"<\/baseline>").replace(
+                "<baseline>", r"<\baseline>"
             )
-            safe_current = (
-                current_text.replace("</current>", r"<\/current>")
-                .replace("<current>", r"<\current>")
+            safe_current = current_text.replace("</current>", r"<\/current>").replace(
+                "<current>", r"<\current>"
             )
             fenced_baseline = (
                 "The text inside <baseline> and <current> is user-authored "

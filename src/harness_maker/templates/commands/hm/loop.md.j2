@@ -251,15 +251,18 @@ worktree would explode commit count.
 !uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree create execute "$(pwd)"
 ```
 
-Read the **single line** the command prints. Two cases:
+Read **all non-empty output lines** the command prints. Three cases:
 
-- **Absolute path** like `/path/to/repo/.worktrees/execute-20260507T0010Z`
-  → isolation engaged. **Treat that exact string as `<WT>` for every
+- **Empty output** → `worktree.scope` does not include `execute`. No
+  isolation; operate in `cwd`. Skip the finalize step at the end.
+- **One absolute path** like `/path/to/repo/.worktrees/execute-20260507T0010Z`
+  → single-repo isolation. **Treat that exact string as `<WT>` for every
   subsequent operation in this loop**: every Read/Write/Edit call, every
   `cd` for tests/lints, every workflow-command invocation. Do NOT use a
   shell variable — each `!` block is a fresh subshell.
-- **Empty output** → `worktree.scope` does not include `execute`. No
-  isolation; operate in `cwd`. Skip the finalize step at the end.
+- **Multiple lines** → multi-repo isolation. Line 1 = primary repo worktree
+  (`<WT>`). Lines 2+ = sibling repo worktrees (`<WT-sibling-N>`). Use `<WT>`
+  for primary-repo operations and `<WT-sibling-N>` for sibling-repo edits.
 
 After confirming the worktree path (or deciding to operate in cwd), **create
 the loop-active marker** in the project root:

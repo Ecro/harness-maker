@@ -21,6 +21,9 @@ provenance: official
 
 ---
 
+## [wiki:architecture] multi-repo-worktree-sibling | 2026-05-09
+`sibling_repos` in harness.yaml lists relative paths (no absolute paths — cross-machine portability). `worktree.create` emits one path per line: line 1 = primary WT, lines 2+ = sibling WTs. The loop driver reads all non-empty lines. Gate now globs `.claude/.hm-loop-*` (per-session files) and allows writes in ANY matching WT path. Finalize is fail-fast: first merge failure halts, marker file KEPT so gate stays active for the session; re-running finalize skips already-cleaned WTs via `wt.is_dir()` check. `execute.md.j2` carries a `SIBLING_WORKTREE_PATHS` sentinel comment — absent means stale template, CLI emits primary-only with a stderr warning. Tests live in `test_worktree_multi.py` (worktree) and `test_interview_sibling.py` (interview/round-trip).
+
 ## [wiki:convention] how-it-works-grade-table | 2026-05-09
 `/hm:review` grade table: A=P0:0,P1:0 / B=P0:0,P1:1-2 / C=P0:0,P1≥3 / D=P0:1-2 / F=P0≥3. The field is `grade_threshold` (default A), not `max_grade_threshold`. P2/weak-consensus/manual-only findings do NOT lower the grade — only `consensus-passed` P0/P1 count.
 

@@ -459,10 +459,13 @@ def test_render_cursor_hooks_json_includes_spec_gate_when_spec_driven(
         (project_root / ".cursor" / "hooks.json").read_text(encoding="utf-8"),
     )
     pre_tool_use = parsed["hooks"]["preToolUse"]
-    # Bash + Write|Edit|MultiEdit (worktree_gate) + Write|Edit (spec_gate)
-    assert len(pre_tool_use) == 3
-    matchers = {h["matcher"] for h in pre_tool_use}
-    assert matchers == {"Bash", "Write|Edit", "Write|Edit|MultiEdit"}
+    # Bash×2 (loop_gate + permission_gate) + Write|Edit|MultiEdit (worktree_gate)
+    # + Write|Edit (spec_gate)
+    assert len(pre_tool_use) == 4
+    matchers = [h["matcher"] for h in pre_tool_use]
+    assert matchers.count("Bash") == 2
+    assert "Write|Edit|MultiEdit" in matchers
+    assert "Write|Edit" in matchers
     spec_gate_hook = next(h for h in pre_tool_use if h["matcher"] == "Write|Edit")
     assert "spec_gate" in spec_gate_hook["command"]
     assert spec_gate_hook["command"].startswith(

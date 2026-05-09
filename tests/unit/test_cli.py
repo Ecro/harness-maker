@@ -68,16 +68,18 @@ def test_update_flag_with_harness_yaml(tmp_path: Path) -> None:
     _write_harness_yaml(tmp_path)
     interview_spy = MagicMock(return_value=_minimal_answers())
 
-    with patch("harness_maker.cli.profile", return_value=MagicMock()), \
-         patch("harness_maker.cli.synthesize", return_value=MagicMock(files=[])), \
-         patch("harness_maker.cli.render"), \
-         patch("harness_maker.cli.verify", return_value=[]), \
-         patch("harness_maker.cli.backup"), \
-         patch("harness_maker.cli.reconcile", return_value=[]), \
-         patch("harness_maker.cli._emit_post_make_readiness"), \
-         patch("harness_maker.cli._emit_refdocs_index_build"), \
-         patch("harness_maker.cli.answers_from_harness_yaml", return_value=_minimal_answers()), \
-         patch("harness_maker.cli.interview", interview_spy):
+    with (
+        patch("harness_maker.cli.profile", return_value=MagicMock()),
+        patch("harness_maker.cli.synthesize", return_value=MagicMock(files=[])),
+        patch("harness_maker.cli.render"),
+        patch("harness_maker.cli.verify", return_value=[]),
+        patch("harness_maker.cli.backup"),
+        patch("harness_maker.cli.reconcile", return_value=[]),
+        patch("harness_maker.cli._emit_post_make_readiness"),
+        patch("harness_maker.cli._emit_refdocs_index_build"),
+        patch("harness_maker.cli.answers_from_harness_yaml", return_value=_minimal_answers()),
+        patch("harness_maker.cli.interview", interview_spy),
+    ):
         result = runner.invoke(app, ["make", str(tmp_path), "--update"])
 
     assert result.exit_code == 0, f"exit {result.exit_code}:\n{result.output}"
@@ -112,15 +114,17 @@ def test_update_reinterview_precedence(tmp_path: Path) -> None:
     answers = _minimal_answers()
     interview_spy = MagicMock(return_value=answers)
 
-    with patch("harness_maker.cli.profile", return_value=MagicMock()), \
-         patch("harness_maker.cli.synthesize", return_value=MagicMock(files=[])), \
-         patch("harness_maker.cli.render"), \
-         patch("harness_maker.cli.verify", return_value=[]), \
-         patch("harness_maker.cli.backup"), \
-         patch("harness_maker.cli.reconcile", return_value=[]), \
-         patch("harness_maker.cli._emit_post_make_readiness"), \
-         patch("harness_maker.cli._emit_refdocs_index_build"), \
-         patch("harness_maker.cli.interview", interview_spy):
+    with (
+        patch("harness_maker.cli.profile", return_value=MagicMock()),
+        patch("harness_maker.cli.synthesize", return_value=MagicMock(files=[])),
+        patch("harness_maker.cli.render"),
+        patch("harness_maker.cli.verify", return_value=[]),
+        patch("harness_maker.cli.backup"),
+        patch("harness_maker.cli.reconcile", return_value=[]),
+        patch("harness_maker.cli._emit_post_make_readiness"),
+        patch("harness_maker.cli._emit_refdocs_index_build"),
+        patch("harness_maker.cli.interview", interview_spy),
+    ):
         runner.invoke(app, ["make", str(tmp_path), "--update", "--reinterview"])
 
     interview_spy.assert_called_once()
@@ -139,16 +143,18 @@ def test_no_flag_reuses_harness_yaml(tmp_path: Path) -> None:
     _write_harness_yaml(tmp_path)
     interview_spy = MagicMock(return_value=_minimal_answers())
 
-    with patch("harness_maker.cli.profile", return_value=MagicMock()), \
-         patch("harness_maker.cli.synthesize", return_value=MagicMock(files=[])), \
-         patch("harness_maker.cli.render"), \
-         patch("harness_maker.cli.verify", return_value=[]), \
-         patch("harness_maker.cli.backup"), \
-         patch("harness_maker.cli.reconcile", return_value=[]), \
-         patch("harness_maker.cli._emit_post_make_readiness"), \
-         patch("harness_maker.cli._emit_refdocs_index_build"), \
-         patch("harness_maker.cli.answers_from_harness_yaml", return_value=_minimal_answers()), \
-         patch("harness_maker.cli.interview", interview_spy):
+    with (
+        patch("harness_maker.cli.profile", return_value=MagicMock()),
+        patch("harness_maker.cli.synthesize", return_value=MagicMock(files=[])),
+        patch("harness_maker.cli.render"),
+        patch("harness_maker.cli.verify", return_value=[]),
+        patch("harness_maker.cli.backup"),
+        patch("harness_maker.cli.reconcile", return_value=[]),
+        patch("harness_maker.cli._emit_post_make_readiness"),
+        patch("harness_maker.cli._emit_refdocs_index_build"),
+        patch("harness_maker.cli.answers_from_harness_yaml", return_value=_minimal_answers()),
+        patch("harness_maker.cli.interview", interview_spy),
+    ):
         result = runner.invoke(app, ["make", str(tmp_path)])
 
     assert result.exit_code == 0, f"exit {result.exit_code}:\n{result.output}"

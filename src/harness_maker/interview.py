@@ -154,6 +154,7 @@ def interview(
     consensus = _ask_with_default("consensus", _consensus_for(preset))
     caching = _ask_with_default("caching", "agent-aware")
     ref_folders = _ask_ref_folders()
+    sibling_repos = _ask_sibling_repos()
     return _build_answers(
         locale=locale,
         targets=targets,
@@ -164,6 +165,7 @@ def interview(
         consensus=consensus,
         caching=caching,
         ref_folders=ref_folders,
+        sibling_repos=sibling_repos,
     )
 
 
@@ -379,6 +381,29 @@ def _ask_ref_folders() -> list[RefFolder]:
         out.append(RefFolder(path=path_part, glob=glob))
 
 
+def _ask_sibling_repos() -> list[str]:
+    """Collect sibling repo relative paths — one per line, blank to finish.
+
+    Absolute paths are rejected (cross-machine portability — ADR-001).
+    Missing/non-git paths only warn (portability: the path may resolve
+    on a different machine where the harness ships).
+    """
+    print("\nSibling repos (other repos that form one logical project with this one).")
+    print("  Enter relative paths (e.g. ../repo-b).  One per line.  Blank to skip/finish.")
+    out: list[str] = []
+    while True:
+        idx = len(out) + 1
+        line = _input_or_empty(f"  sibling_repo #{idx}: ").strip()
+        if not line:
+            return out
+        if Path(line).is_absolute():
+            print("  error: absolute paths are not allowed — use a relative path like ../repo-b")
+            continue
+        if not Path(line).exists():
+            print(f"  warn: path {line!r} not found on this machine (registering anyway).")
+        out.append(line)
+
+
 def _parse_stage_numbers(line: str) -> list[AtomicStage]:
     out: list[AtomicStage] = []
     for tok in line.split(","):
@@ -425,6 +450,7 @@ def _build_answers(
     consensus: str | None = None,
     caching: str | None = None,
     ref_folders: list[RefFolder] | None = None,
+    sibling_repos: list[str] | None = None,
 ) -> InterviewAnswers:
     is_side = preset == Preset.SIDE
     return InterviewAnswers(
@@ -435,6 +461,7 @@ def _build_answers(
         fused_workflows=fused_workflows,
         default_workflow=default_workflow,
         ref_folders=list(ref_folders) if ref_folders else [],
+        sibling_repos=list(sibling_repos) if sibling_repos else [],
         reviewers={
             "installed": list(_ALL_REVIEWERS),
             "enabled": list(_SIDE_ENABLED_REVIEWERS if is_side else _PROD_ENABLED_REVIEWERS),
@@ -524,10 +551,12 @@ def answers_from_harness_yaml(yaml_path: Path) -> InterviewAnswers | None:
 
     domains = _list_of_strings(_dig(data, "project", "domains")) or list(base.domains)
     ref_folders = _parse_ref_folders(data.get("ref_folders"))
+    sibling_repos = _list_of_strings(data.get("sibling_repos"))
 
     update: dict[str, Any] = {
         "domains": domains,
         "ref_folders": ref_folders,
+        "sibling_repos": sibling_repos,
         "reviewers": {
             "installed": list(base.reviewers["installed"]),
             "enabled": reviewers_enabled,
@@ -543,6 +572,28 @@ def answers_from_harness_yaml(yaml_path: Path) -> InterviewAnswers | None:
         update["grade_threshold"] = grade_threshold
     if isinstance(max_review_rounds, int):
         update["max_review_rounds"] = max_review_rounds
+
+    # mechanical_checks — user adds shell commands manually; preserve on re-render.
+    # Empty-string entries are filtered with a warning (likely typos in yaml list).
+    # Old harness.yaml without the key → silent empty (valid "feature off" state).
+    raw_mc = reviewers_data.get("mechanical_checks")
+    if raw_mc is not None and not isinstance(raw_mc, list):
+        logger.warning(
+            "harness.yaml reviewers.mechanical_checks: expected a list, got %s — ignored.",
+            type(raw_mc).__name__,
+        )
+    elif isinstance(raw_mc, list):
+        clean_mc: list[str] = [c for c in raw_mc if isinstance(c, str) and c.strip()]
+        dropped_mc = [repr(c) for c in raw_mc if not (isinstance(c, str) and c.strip())]
+        if dropped_mc:
+            logger.warning(
+                "harness.yaml reviewers.mechanical_checks: dropped %d "
+                "empty/non-string entries (%s).",
+                len(dropped_mc),
+                ", ".join(dropped_mc[:5]),
+            )
+        # Always write through so an explicit `mechanical_checks: []` clears the field.
+        update["mechanical_checks"] = clean_mc
 
     # MCP servers — user adds these manually to harness.yaml; preserve on re-render.
     # REVIEW M5/M8 (2026-05-08): validate inner dict shape (command:str, args:list[str],

@@ -314,11 +314,13 @@ def synthesize(
             "auto_fix": answers.auto_fix,
             "grade_threshold": answers.grade_threshold,
             "max_review_rounds": answers.max_review_rounds,
+            "mechanical_checks": list(answers.mechanical_checks),
         },
         project={"domains": list(answers.domains)},
         spec={"dir": "specs/"},
         work_docs={"dir": "work-docs/"},
         ref_folders=list(answers.ref_folders),
+        sibling_repos=list(answers.sibling_repos),
         mcp_servers=dict(answers.mcp_servers),
     )
 

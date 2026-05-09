@@ -41,10 +41,7 @@ def _stop_hook(stdin_text: str) -> int:
 
     response = {
         "decision": "block",
-        "reason": (
-            f"/hm:loop is active ({marker}). "
-            "To exit the loop early: rm .hm-loop-active"
-        ),
+        "reason": (f"/hm:loop is active ({marker}). To exit the loop early: rm .hm-loop-active"),
     }
     print(json.dumps(response))
     return 2
@@ -58,9 +55,7 @@ def _pretooluse(stdin_text: str) -> int:  # noqa: ARG001
     """
     marker = _find_marker()
     if marker is not None:
-        sys.stderr.write(
-            f"[loop-gate] /hm:loop active ({marker}) — do not close this session.\n"
-        )
+        sys.stderr.write(f"[loop-gate] /hm:loop active ({marker}) — do not close this session.\n")
     return 0
 
 

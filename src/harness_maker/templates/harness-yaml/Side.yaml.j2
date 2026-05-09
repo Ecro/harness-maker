@@ -15,6 +15,9 @@ ref_folders:
 {% for f in config.ref_folders %}  - path: {{ f.path | tojson }}
     glob: {{ f.glob | tojson }}
 {% endfor %}
+sibling_repos:
+{% for r in config.sibling_repos %}  - {{ r | tojson }}
+{% endfor %}
 workflows:
 {% for name, stages in config.workflows.items() %}
   {{ name }}:

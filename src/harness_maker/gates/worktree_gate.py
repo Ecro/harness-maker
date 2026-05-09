@@ -7,12 +7,12 @@ and start editing the main repo, defeating per-loop isolation. This gate is
 the technical enforcement layer.
 
 Mechanism:
-- `harness_maker.worktree create` writes `.claude/.hm-loop-active` containing
-  the absolute worktree path when isolation engages.
-- `harness_maker.worktree finalize` removes the marker on matching WT.
-- This gate fires PreToolUse on Write/Edit/MultiEdit; if marker present AND
-  target file is outside the recorded worktree, exit 2 (block) with stderr
-  guidance. If no marker (loop not active), no-op exit 0.
+- `harness_maker.worktree create` writes `.claude/.hm-loop-{wt_name}` (ADR-006
+  per-session file) containing newline-separated absolute worktree paths.
+- `harness_maker.worktree finalize` removes that file on success.
+- This gate fires PreToolUse on Write/Edit/MultiEdit; globs all .hm-loop-* files,
+  unions paths, and blocks if target is outside ALL active worktrees. Exit 2
+  (block) with stderr guidance. If no markers (loop not active), no-op exit 0.
 
 Default-on for both Claude Code and Cursor hook installs (rendered into
 hooks.json.j2 templates). User can disable per-project by deleting the
@@ -61,31 +61,35 @@ def _project_root(payload: dict[str, Any]) -> Path:
     return Path(cwd_str)
 
 
-def _read_active_worktree(project_root: Path) -> Path | None:
-    """Return the active loop's worktree path, or None when no loop is active.
+def _read_active_worktrees(project_root: Path) -> list[Path]:
+    """Return all active loop worktree paths across all parallel sessions.
 
-    Marker is treated as advisory: missing file, unreadable, or pointing at a
-    no-longer-existing path → return None (gate becomes a no-op). Better to
-    miss enforcement than to hard-block the user when state is inconsistent.
-
-    Race window: if the loop's `worktree finalize` runs between this gate's
-    read and the user's actual tool call, the gate may briefly block a write
-    against a worktree that no longer exists. The next tool call sees the
-    cleared marker and allows. Sub-second window; acceptable.
+    Globs .claude/.hm-loop-* (ADR-006 per-session files) — each file may list
+    one or more newline-separated absolute paths (multi-repo session). The
+    legacy .hm-loop-active filename is matched by the glob, preserving backward
+    compatibility. Missing .claude/ dir, unreadable files, or paths that no
+    longer exist are silently filtered; missing enforcement is safer than
+    hard-blocking on inconsistent state.
     """
-    marker = project_root / ".claude" / ".hm-loop-active"
-    if not marker.is_file():
-        return None
-    try:
-        text = marker.read_text(encoding="utf-8").strip()
-    except OSError:
-        return None
-    if not text:
-        return None
-    wt = Path(text)
-    if not wt.is_dir():
-        return None
-    return wt.resolve()
+    claude_dir = project_root / ".claude"
+    if not claude_dir.is_dir():
+        return []
+    active: list[Path] = []
+    for marker in claude_dir.glob(".hm-loop-*"):
+        if not marker.is_file():
+            continue
+        try:
+            text = marker.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        for line in text.splitlines():
+            stripped = line.strip()
+            if not stripped:
+                continue
+            wt = Path(stripped)
+            if wt.is_dir():
+                active.append(wt.resolve())
+    return active
 
 
 def _target_path(payload: dict[str, Any], project_root: Path) -> Path | None:
@@ -122,30 +126,26 @@ def main() -> int:
         return 0
 
     project_root = _project_root(payload)
-    active_wt = _read_active_worktree(project_root)
-    if active_wt is None:
-        # No loop active — pass through unchecked.
+    active_wts = _read_active_worktrees(project_root)
+    if not active_wts:
         return 0
 
     target = _target_path(payload, project_root)
     if target is None:
         return 0  # missing/malformed input → allow (defensive)
 
-    # If target is inside the active worktree, allow. relative_to raises
-    # ValueError when the path is NOT a descendant of active_wt.
-    try:
-        target.relative_to(active_wt)
+    if any(target.is_relative_to(wt) for wt in active_wts):
         return 0
-    except ValueError:
-        pass
 
+    wt_list = ", ".join(str(wt) for wt in active_wts)
+    first_wt = active_wts[0]
     msg = (
-        f"worktree_gate: write to {target} blocked — autoloop is active in "
-        f"{active_wt}.\n"
-        f"All Write/Edit/MultiEdit must target paths under {active_wt}/.\n"
+        f"worktree_gate: write to {target} blocked — autoloop is active.\n"
+        f"Active worktrees: {wt_list}\n"
+        f"All Write/Edit/MultiEdit must target a path under one of the active worktrees.\n"
         f"If you intended to edit main, finalize the loop first:\n"
         f"  uv run --with <plugin_path> python -m harness_maker.worktree "
-        f"finalize {active_wt} <success|fail>\n"
+        f"finalize {first_wt} <success|fail>\n"
         f'Note: Bash-driven writes (>, sed -i, python -c "open(...)") are '
         f"NOT gated. Always cd into the worktree for shell ops."
     )
