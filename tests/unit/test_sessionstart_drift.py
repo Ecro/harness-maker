@@ -99,6 +99,14 @@ def test_format_message_downgrade_warns_intent() -> None:
     assert "downgrade" in msg.lower()
 
 
+def test_message_contains_update_flag() -> None:
+    """Upgrade message mentions `make --update` so users know the fast re-render command."""
+    msg = _format_message("0.4.0", "0.5.5", "upgrade")
+    assert "make --update" in msg, (
+        f"Expected 'make --update' as actionable command in message:\n{msg}"
+    )
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # CLI entry point — proves module is invokable as `python -m`
 # ──────────────────────────────────────────────────────────────────────────────

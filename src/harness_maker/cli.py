@@ -73,6 +73,16 @@ def make(
             "answers on re-render."
         ),
     ),
+    update: bool = typer.Option(
+        False,
+        "--update",
+        help=(
+            "Re-render silently using existing .claude/harness.yaml answers "
+            "(no interview). Errors if .claude/harness.yaml is absent — "
+            "run harness-maker make (without --update) for initial setup. "
+            "--reinterview overrides --update when both are set."
+        ),
+    ),
     preset_override: str | None = typer.Option(
         None,
         "--preset",
@@ -100,12 +110,19 @@ def make(
     ),
 ) -> None:
     """Generate or refine the project harness at TARGET/.claude/."""
+    existing_yaml = target / ".claude" / "harness.yaml"
+    if update and not reinterview and not existing_yaml.is_file():
+        typer.echo(
+            f"No {existing_yaml.relative_to(target)} found — "
+            "run harness-maker make (without --update) for initial setup.",
+            err=True,
+        )
+        raise typer.Exit(code=1)
     p = profile(target)
     # Re-render path: silently reuse prior interview answers from harness.yaml
     # so locale / dev_mode / custom workflows / reviewer-enablement survive
     # without re-prompting. --reinterview forces fresh prompts; --autoloop
     # only kicks in for first-time installs (no harness.yaml yet).
-    existing_yaml = target / ".claude" / "harness.yaml"
     reused = None if reinterview else answers_from_harness_yaml(existing_yaml)
     if reused is not None:
         a = reused

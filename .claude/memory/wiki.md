@@ -26,3 +26,9 @@ provenance: official
 
 ## [wiki:gotcha] docs-grade-table-wrong-3x | 2026-05-09
 When documenting the review grade table, all boundary values were wrong on first attempt: thresholds were offset (A included P1≤2, B included P1≤5, etc). Root cause: grade table was reconstructed from memory instead of reading `review.md` source. Fix: always read the skill source file before documenting grade logic.
+
+## [wiki:architecture] generator-not-runtime-config | 2026-05-09
+harness-maker must stay a generator (Jinja2 pre-render), not a pure plugin that reads harness.yaml at runtime. Three file categories are irreducible: (1) hooks.json — IDE-specific schemas (PascalCase vs lowercase camelCase) consumed pre-LLM, no plugin-system injection hook; (2) settings.json — permission sandbox established before LLM runs, cannot be self-set; (3) CLAUDE.md — technically injectable but would break the `<!-- @hm:user:* -->` block-merge contract and content_hash KEEP/REPLACE/MERGE_BLOCK reconciliation that lets user customizations survive upgrades. Agents/skills/commands could be runtime-configured but the complexity delta is not eliminated since the three infra files still need rendering. See ADR-001 in PLAN-plugin-vs-generator-2026-05.
+
+## [wiki:gotcha] worktree-snapshot-harness-path | 2026-05-09
+`test_synthesize_snapshot.py` compares `body_sha256` of rendered files. The `ai-readiness.md.j2` template embeds `{{ harness_maker_src_path }}` which resolves to `_HARNESS_MAKER_PKG_ROOT = str(Path(__file__).parent.parent.parent)` — an absolute path. When pytest runs from a worktree (`.worktrees/execute-*/`) the path differs from the main repo, producing a different hash. All 8 snapshot tests fail in the worktree but pass on the main repo. Always run snapshot tests from the main repo directory to verify. The pre-existing failures in the worktree are NOT regressions — they disappear on `finalize stage-only` when changes land on the main branch.

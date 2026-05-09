@@ -25,8 +25,9 @@ def _format_message(stamped: str, current: str, direction: str) -> str:
     if direction == "upgrade":
         return (
             f"[harness-maker] Harness drift detected: project rendered with "
-            f"{stamped}, plugin is at {current}. Run /harness-maker:make to "
-            f"re-render templates and pick up the latest fixes."
+            f"{stamped}, plugin is at {current}. "
+            f"Run /hm:make --update for a silent re-render, "
+            f"or /harness-maker:make for a full interactive run."
         )
     return (
         f"[harness-maker] Harness drift detected: project rendered with "
