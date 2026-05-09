@@ -29,10 +29,12 @@ import yaml
 WORKTREE_DIR_NAME = ".worktrees"
 _TS_FMT = "%Y%m%dT%H%MZ"
 
-# Marker file written at the project root when a loop engages a worktree.
-# `harness_maker.gates.worktree_gate` reads it to enforce <WT>-scoped writes
-# (technical fallback for prompt-driven `<WT>` substitution in loop.md.j2).
-_LOOP_MARKER_REL = Path(".claude") / ".hm-loop-active"
+# Per-session marker files: .claude/.hm-loop-{primary-wt-basename}
+# One file per active session — parallel sessions coexist without collision.
+# Gate reads all matching files via glob. Finalize deletes only its own file.
+_LOOP_MARKER_DIR = Path(".claude")
+_LOOP_MARKER_PREFIX = ".hm-loop-"
+_LOOP_MARKER_GITIGNORE_PATTERN = ".claude/.hm-loop-*"
 
 
 def _run(args: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
@@ -64,49 +66,83 @@ def _current_branch(repo: Path) -> str:
     return cp.stdout.strip()
 
 
-def create(workflow: str, base_dir: Path) -> Path:
-    """Create a new git worktree at <base_dir>/.worktrees/<workflow>-<ts>.
+def _branch_exists(repo: Path, name: str) -> bool:
+    """Return True if a branch with this name exists in repo."""
+    cp = _run(["git", "branch", "--list", name], cwd=repo)
+    return bool(cp.stdout.strip())
 
-    Parameters
-    ----------
-    workflow:
-        The workflow name (e.g. "execute", "dev"); used in the directory name.
-    base_dir:
-        Path to the base git repository.
 
-    Returns
-    -------
-    Path to the newly created worktree.
+def _find_free_name(
+    workflow: str,
+    ts: str,
+    primary: Path,
+    sibling_dirs: list[Path],
+    sibling_slugs: list[str],
+) -> str:
+    """Find a base name whose derived branch names are free in ALL repos.
 
-    Notes
-    -----
-    Timestamps are minute-precision so two ``create()`` calls within the same
-    minute (realistic for autoloop / fused workflows) would collide on branch
-    name. We retry with ``-1``, ``-2``, ... suffixes up to 100 times before
-    giving up; collisions clear once the minute rolls over.
+    Primary branch = ``{name}``.
+    Sibling branch  = ``{name}-{slug}``.
+    Checks all repos before committing to any git worktree add.
     """
-    base = base_dir.resolve()
-    base_name = f"{workflow}-{_timestamp()}"
-    (base / WORKTREE_DIR_NAME).mkdir(parents=True, exist_ok=True)
-    last_err: RuntimeError | None = None
+    base_name = f"{workflow}-{ts}"
     for attempt in range(100):
         name = base_name if attempt == 0 else f"{base_name}-{attempt}"
-        wt_path = base / WORKTREE_DIR_NAME / name
-        if wt_path.exists():
+        if _branch_exists(primary, name):
             continue
-        try:
-            _run(["git", "worktree", "add", "-b", name, str(wt_path)], cwd=base)
-        except RuntimeError as e:
-            # Likely "branch already exists" or "path already exists" — retry
-            # with the next suffix. Capture for final failure if all suffixes
-            # also collide (extremely unlikely; >100 calls in one minute).
-            last_err = e
+        if any(
+            _branch_exists(sibling, f"{name}-{slug}")
+            for sibling, slug in zip(sibling_dirs, sibling_slugs, strict=True)
+        ):
             continue
-        return wt_path
+        return name
     raise RuntimeError(
-        f"git worktree add failed after 100 retries with prefix {base_name!r}; "
-        f"last error: {last_err}",
+        f"No free branch name found after 100 attempts with prefix {base_name!r}"
     )
+
+
+def create(
+    workflow: str,
+    base_dir: Path,
+    sibling_dirs: list[Path] | None = None,
+) -> list[Path]:
+    """Create git worktrees for primary and optional sibling repos.
+
+    Returns [primary_wt, *sibling_wts]. Single-repo → list of length 1.
+    Branch names: primary={name}, sibling={name}-{slug} where slug=sibling.name.
+
+    Pre-flights branch-name availability across ALL repos before creating any,
+    so a collision in repo N does not leave repos 0..N-1 with orphan worktrees.
+    """
+    base = base_dir.resolve()
+    siblings = [s.resolve() for s in (sibling_dirs or [])]
+    slugs = [s.name for s in siblings]
+
+    ts = _timestamp()
+    name = _find_free_name(workflow, ts, base, siblings, slugs)
+
+    # Create primary worktree
+    (base / WORKTREE_DIR_NAME).mkdir(parents=True, exist_ok=True)
+    primary_wt = base / WORKTREE_DIR_NAME / name
+    _run(["git", "worktree", "add", "-b", name, str(primary_wt)], cwd=base)
+
+    # Create sibling worktrees
+    sibling_wts: list[Path] = []
+    for sibling, slug in zip(siblings, slugs, strict=True):
+        sib_name = f"{name}-{slug}"
+        (sibling / WORKTREE_DIR_NAME).mkdir(parents=True, exist_ok=True)
+        sib_wt = sibling / WORKTREE_DIR_NAME / sib_name
+        try:
+            _run(["git", "worktree", "add", "-b", sib_name, str(sib_wt)], cwd=sibling)
+        except RuntimeError:
+            # Best-effort: primary is already created, keep it. Sibling failure
+            # is surfaced to caller; finalize handles the orphan state.
+            raise
+        sibling_wts.append(sib_wt)
+
+    all_wts = [primary_wt, *sibling_wts]
+    _write_loop_marker(base, primary_wt.name, all_wts)
+    return all_wts
 
 
 def cleanup(wt_path: Path, on_success: bool) -> None:
@@ -282,6 +318,44 @@ def _scope_includes(harness_yaml: Path, stage: str) -> bool:
     return False
 
 
+_SIBLING_SENTINEL = "SIBLING_WORKTREE_PATHS"
+_EXECUTE_MD_REL = Path(".claude") / "commands" / "hm" / "execute.md"
+
+
+def _load_sibling_dirs(harness_yaml: Path, base: Path) -> list[Path]:
+    """Read sibling_repos from harness.yaml; resolve relative paths against base."""
+    try:
+        text = harness_yaml.read_text(encoding="utf-8")
+    except OSError:
+        return []
+    try:
+        for doc in yaml.safe_load_all(text):
+            if not isinstance(doc, dict):
+                continue
+            raw = doc.get("sibling_repos")
+            if not isinstance(raw, list):
+                continue
+            result: list[Path] = []
+            for rel in raw:
+                if not isinstance(rel, str):
+                    continue
+                resolved = (base / rel).resolve()
+                result.append(resolved)
+            return result
+    except yaml.YAMLError:
+        pass
+    return []
+
+
+def _execute_md_has_sentinel(base: Path) -> bool:
+    """Return True if the rendered execute.md contains the sibling sentinel."""
+    md = base / _EXECUTE_MD_REL
+    try:
+        return _SIBLING_SENTINEL in md.read_text(encoding="utf-8")
+    except OSError:
+        return False
+
+
 def _cli_create(args: list[str]) -> int:
     """`python -m harness_maker.worktree create <stage> <base_dir>` — print path or skip.
 
@@ -311,34 +385,89 @@ def _cli_create(args: list[str]) -> int:
     if not _scope_includes(yaml_path, stage):
         print("")
         return 0
-    wt_path = create(stage, base)
-    _write_loop_marker(base, wt_path)
-    print(str(wt_path))
+
+    # Load sibling_repos from harness.yaml (empty list when field absent)
+    sibling_dirs = _load_sibling_dirs(yaml_path, base)
+
+    wt_paths = create(stage, base, sibling_dirs=sibling_dirs if sibling_dirs else None)
+
+    # Stale execute.md detection: if sibling repos configured but execute.md
+    # lacks the SIBLING_WORKTREE_PATHS sentinel, degrade to primary-only output
+    # so the old prompt doesn't silently drop sibling isolation.
+    if sibling_dirs and not _execute_md_has_sentinel(base):
+        print(
+            "[WARNING] execute.md is stale — run 'make --update' to enable "
+            "sibling worktree support",
+            file=sys.stderr,
+        )
+        # Gate already protects both WTs via .hm-loop-active; only stdout differs.
+        print(str(wt_paths[0]))
+        return 0
+
+    for wt in wt_paths:
+        print(str(wt))
     return 0
 
 
-_LOOP_MARKER_GITIGNORE_LINE = ".claude/.hm-loop-active"
+def _marker_path(project_root: Path, wt_name: str) -> Path:
+    """Return the per-session marker file path for this worktree."""
+    return project_root / _LOOP_MARKER_DIR / f"{_LOOP_MARKER_PREFIX}{wt_name}"
 
 
-def _write_loop_marker(project_root: Path, wt_path: Path) -> None:
-    """Persist active-worktree path so worktree_gate can enforce <WT> scope.
+def _write_loop_marker(project_root: Path, wt_name: str, wt_paths: list[Path]) -> None:
+    """Persist active-worktree paths for this session to a per-session marker file.
 
-    Overwrites any existing marker (treats prior value as orphaned — finalize
-    is responsible for cleanup; if a previous loop crashed without finalize,
-    this resets state). Atomic write — concurrent readers (the gate hook)
-    must never see a partial line.
+    File: ``.claude/.hm-loop-{wt_name}`` — one file per active session so
+    parallel sessions coexist without overwriting each other (ADR-006).
+    Content: newline-separated absolute paths. Single-repo = one line,
+    multi-repo = N lines.
 
-    Also ensures ``.claude/.hm-loop-active`` is in the project's ``.gitignore``
-    so a marker leftover from a crashed loop doesn't get committed and break
-    every collaborator's gate against a non-existent worktree path. The
-    append is idempotent (no-op when already present) and creates a new
-    ``.gitignore`` if absent.
+    Atomic write — concurrent readers (gate hook) must never see partial.
+    Also ensures ``.claude/.hm-loop-*`` is in ``.gitignore``.
     """
     from harness_maker.io_utils import atomic_write
 
-    marker = project_root / _LOOP_MARKER_REL
-    atomic_write(marker, str(wt_path) + "\n")
-    _ensure_gitignore_entry(project_root, _LOOP_MARKER_GITIGNORE_LINE)
+    marker = _marker_path(project_root, wt_name)
+    content = "\n".join(str(p) for p in wt_paths) + "\n"
+    atomic_write(marker, content)
+    _ensure_gitignore_entry(project_root, _LOOP_MARKER_GITIGNORE_PATTERN)
+
+
+def _clear_loop_marker(project_root: Path, wt_name: str) -> None:
+    """Remove only this session's per-session marker file.
+
+    Called when ALL repos for this session finalize successfully. Other
+    parallel sessions' marker files are untouched (ADR-006).
+    """
+    _marker_path(project_root, wt_name).unlink(missing_ok=True)
+
+
+def _read_active_worktrees(project_root: Path) -> list[Path]:
+    """Return all active worktree paths across all sessions.
+
+    Scans all ``.claude/.hm-loop-*`` files (one per parallel session),
+    collects every path listed in them, and filters non-existent entries.
+    Returns empty list when no marker files exist.
+    """
+    marker_dir = project_root / _LOOP_MARKER_DIR
+    paths: list[Path] = []
+    try:
+        marker_files = sorted(marker_dir.glob(f"{_LOOP_MARKER_PREFIX}*"))
+    except OSError:
+        return []
+    for marker in marker_files:
+        try:
+            text = marker.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        for line in text.splitlines():
+            stripped = line.strip()
+            if not stripped:
+                continue
+            p = Path(stripped)
+            if p.exists():
+                paths.append(p)
+    return paths
 
 
 def _ensure_gitignore_entry(project_root: Path, entry: str) -> None:
@@ -372,61 +501,24 @@ def _ensure_gitignore_entry(project_root: Path, entry: str) -> None:
         pass
 
 
-def _clear_loop_marker_if_matches(project_root: Path, wt_path: Path) -> None:
-    """Remove marker only if it points to ``wt_path``.
-
-    Defensive: if a different loop is now active (concurrent run), don't
-    clobber that loop's marker by removing it during this loop's finalize.
-    """
-    marker = project_root / _LOOP_MARKER_REL
-    if not marker.is_file():
-        return
-    try:
-        recorded = marker.read_text(encoding="utf-8").strip()
-    except OSError:
-        return
-    if recorded == str(wt_path):
-        marker.unlink(missing_ok=True)
-
-
 def _detect_existing_worktree(base: Path) -> Path | None:
     """Idempotent dispatch helper — return the enclosing real git worktree.
 
-    Two signals consulted in priority order:
+    Path-based detection only (ADR-006): walk ``base.parts`` right-to-left
+    looking for a ``.worktrees/<name>/`` structure with a ``.git`` entry.
 
-    1. **Loop marker** (`<base>/.claude/.hm-loop-active`) — strongest signal.
-       Written by `worktree create` when a loop engages and points at the
-       active worktree. Covers the realistic case where /hm:loop runs in
-       the project root and dispatches `/hm:execute` whose §0 calls
-       `worktree create execute "$(pwd)"` *also* from project root — without
-       this, §0 would not see the loop's worktree (cwd is project root, not
-       inside `.worktrees/`) and create a SECOND worktree.
-    2. **Path-based** (rightmost ``.worktrees`` segment of ``base.parts``)
-       — fallback for standalone `/hm:execute` invoked from inside an
-       existing worktree, or any case where the marker is absent. To avoid
-       false positives — a user's home contains ``~/.worktrees`` from
-       another tool, a regular file named ``.worktrees``, a stale dir
-       without a real git checkout — we probe for the worktree's ``.git``
-       entry (file or dir; ``git worktree add`` writes a file pointing
-       at the parent's ``$GIT_DIR/worktrees/<name>``).
+    Marker-based detection was removed because it caused parallel sessions to
+    cross-detect each other's worktrees — Session B would find Session A's
+    marker and reuse Session A's worktree instead of creating its own.
+
+    The loop→sub-call idempotency relies on the loop CDing into ``<WT>``
+    before dispatching sub-commands (execute stage §0 convention). When the
+    sub-command runs with ``$(pwd)=<WT>``, path-based detection returns the
+    correct existing worktree without consulting the marker.
 
     Returns the worktree root Path on confirmed match, else None.
     """
-    # 1. Marker-based: the active loop's source of truth.
-    marker = base / _LOOP_MARKER_REL
-    if marker.is_file():
-        try:
-            recorded = marker.read_text(encoding="utf-8").strip()
-        except OSError:
-            recorded = ""
-        if recorded:
-            wt = Path(recorded)
-            if wt.is_dir() and (wt / ".git").exists():
-                return wt.resolve()
-        # Marker exists but content is stale/unreadable — fall through to
-        # path-based check rather than failing loud.
-
-    # 2. Path-based: walk right-to-left so nested .worktrees pick innermost.
+    # Path-based: walk right-to-left so nested .worktrees pick innermost.
     parts = base.parts
     for i in range(len(parts) - 1, -1, -1):
         if parts[i] != WORKTREE_DIR_NAME:
@@ -512,12 +604,12 @@ def _cli_finalize(args: list[str]) -> int:
                 )
                 rc = 1
     finally:
-        # ALWAYS release the loop marker, even on early failure paths. Without
-        # this, worktree_gate (PreToolUse) blocks every Write/Edit on main
-        # forever after a merge/cleanup failure — user is silently locked out
-        # with no recovery hint. Move into finally to guarantee release.
-        # See review finding 2026-05-08 P1 (concurrency-reviewer).
-        _clear_loop_marker_if_matches(project_root, wt.resolve())
+        # Clear only when the user explicitly requested success/stage-only AND
+        # all operations succeeded (rc == 0). On `fail` status the worktree is
+        # intentionally preserved for inspection — marker stays so the gate
+        # continues protecting it. ADR-003/005/006.
+        if status != "fail" and rc == 0:
+            _clear_loop_marker(project_root, wt.resolve().name)
     return rc
 
 

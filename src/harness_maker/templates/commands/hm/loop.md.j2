@@ -15,7 +15,7 @@ development repository, not in the projects this command runs in.
 ```
 /hm:loop <goal>
 /hm:loop --spec <path> [--mode feature|improve] [--target <path>]
-         [--time 8h] [--max-iter 30] [--per-iter-workflow exec-rev]
+         [--time 8h] [--max-iter 50] [--per-iter-workflow exec-rev]
          [--convergence <predicate>] [--dry-run]
 ```
 
@@ -38,7 +38,8 @@ development repository, not in the projects this command runs in.
 - `--target <path>` — scope for `improve` mode (file, directory, or module
   name). Defaults to the entire project if omitted.
 - `--time <Nh>` — max wall-clock duration (default `8h`).
-- `--max-iter <N>` — max iterations (default `30`).
+- `--max-iter <N>` — max iterations (default `50`).
+- `--failed-streak-cap <N>` — max consecutive failures before halting (default `5`). Raise when features are expected to fail multiple times before succeeding.
 - `--per-iter-workflow <name>` (alias `--workflow`) — fused workflow each
   iter invokes. Default: `exec-rev` (execute + review only — wrapup is
   deferred to loop close to avoid commit-per-iter). Recommended overrides:
@@ -260,6 +261,23 @@ Read the **single line** the command prints. Two cases:
 - **Empty output** → `worktree.scope` does not include `execute`. No
   isolation; operate in `cwd`. Skip the finalize step at the end.
 
+After confirming the worktree path (or deciding to operate in cwd), **create
+the loop-active marker** in the project root:
+
+```bash
+!touch .hm-loop-active
+```
+
+This activates the Stop hook guard — the session will not terminate while
+this file exists. The marker is gitignored by the harness worktree setup.
+
+> **Cursor users**: the Claude Code Stop event guard is not available in
+> Cursor IDE. The `.hm-loop-active` marker activates advisory stderr output
+> on each Bash tool call but cannot block session termination. **Do not
+> close the Cursor IDE window manually while the loop is running.** To
+> recover a loop broken by accidental close: `rm .hm-loop-active` then
+> re-run `/hm:loop --spec <spec-path>` with the remaining features.
+
 Per-iter standalone `/hm:execute` (e.g. inside an invoked workflow's
 execute stage) calls `worktree create` again — its idempotency check
 detects we're already inside `.worktrees/<name>/` and returns the
@@ -287,7 +305,7 @@ You are the driver. Track state via `TodoWrite` and your working memory.
 
 1. `iter >= max_iter` → halt `stop_reason="max_iter (N) reached"`
 2. `elapsed >= time_h * 3600` → halt `stop_reason="time_cap (Nh) reached"`
-3. `failed_streak >= 3` → halt `stop_reason="3 consecutive failures"`
+3. `failed_streak >= --failed-streak-cap` (default 5) → halt `stop_reason="N consecutive failures"`
 4. Same feature retried ≥ 3 times → halt and report blocker
 5. Ping every 5 iterations: `autoloop ping: iter=<N> target=<name>`
 6. Convergence check **before** each iteration body
@@ -330,6 +348,11 @@ intent and could iterate over the wrong stages.
 
 #### Iteration body (same for feature and improve mode)
 
+> **Context advisory**: Every 10 iterations (`iter % 10 == 0`) or when you
+> notice the context window is more than 60% full, run `/compact` before
+> starting the next iteration. Long loops lose spec details to compaction;
+> proactively compacting keeps the full specification in context.
+
 For each iter (until convergence or any safety rail fires):
 
 1. **Cap + convergence checks** (safety rails above)
@@ -360,25 +383,32 @@ For each iter (until convergence or any safety rail fires):
 
 When the loop halts (convergence, safety rail, or hard error):
 
-1. **Run wrapup ONCE**: read `.claude/commands/hm/wrapup.md` and execute
+1. **Delete the loop-active marker** — do this **first**, before wrapup, so
+   a wrapup crash never leaves a stale marker that blocks future sessions:
+
+   ```bash
+   !rm -f .hm-loop-active
+   ```
+
+2. **Run wrapup ONCE**: read `.claude/commands/hm/wrapup.md` and execute
    the wrapup stage (commits, SESSION-md if `--session`, memory append
    to `wiki.md` / `failures.md`). Operate inside `<WT>` if engaged.
 
-2. **Decide finalize status — explicit rule, not judgment**:
+3. **Decide finalize status — explicit rule, not judgment**:
 
    | Halt reason | Finalize status | Why |
    |---|---|---|
    | `converged = True` | `success` | clean stopping criteria met |
    | `iter >= max_iter` | `fail` | budget exhausted without convergence |
    | `elapsed >= time_h * 3600` | `fail` | time cap fired |
-   | `failed_streak >= 3` | `fail` | repeated failures, evidence valuable |
+   | `failed_streak >= --failed-streak-cap` | `fail` | repeated failures, evidence valuable |
    | Hard error (uncaught) | `fail` | preserve for debug |
 
    Do NOT classify max-iter or time-cap halts as "partial success" — the
    user explicitly bounded the run; un-merged worktree is more useful
    than a half-baked squash that contaminates main.
 
-3. **Finalize worktree** (only if engaged in step 5):
+4. **Finalize worktree** (only if engaged in step 5):
 
    ```bash
    !uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree finalize <WT> <STATUS>
@@ -389,10 +419,10 @@ When the loop halts (convergence, safety rail, or hard error):
    conflicts** (e.g. main has concurrent edits to `.claude/memory/wiki.md`
    from another session), the merge step exits 1; finalize leaves `<WT>`
    in place. Treat this as a fail-equivalent: emit the conflicting file
-   list in step 4 and instruct the user to resolve manually with
+   list in step 5 and instruct the user to resolve manually with
    `cd <WT> && git status && git merge --abort` or similar.
 
-4. **Emit final report** (next section).
+5. **Emit final report** (next section).
 
 ---
 

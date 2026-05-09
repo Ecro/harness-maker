@@ -39,8 +39,11 @@ def repo(tmp_path: Path) -> Path:
     return r
 
 
-def test_create_returns_path_and_directory_exists(repo: Path) -> None:
-    wt = worktree.create("execute", repo)
+def test_create_returns_list_of_path(repo: Path) -> None:
+    result = worktree.create("execute", repo)
+    assert isinstance(result, list)
+    assert len(result) == 1
+    wt = result[0]
     assert wt.exists()
     assert wt.is_dir()
     assert wt.parent.name == worktree.WORKTREE_DIR_NAME
@@ -48,7 +51,7 @@ def test_create_returns_path_and_directory_exists(repo: Path) -> None:
 
 
 def test_create_generates_unique_branch(repo: Path) -> None:
-    wt = worktree.create("dev", repo)
+    wt = worktree.create("dev", repo)[0]
     cp = subprocess.run(  # noqa: S603
         ["git", "branch", "--list"],
         cwd=str(repo),
@@ -61,7 +64,7 @@ def test_create_generates_unique_branch(repo: Path) -> None:
 
 
 def test_cleanup_on_success_removes_directory(repo: Path) -> None:
-    wt = worktree.create("execute", repo)
+    wt = worktree.create("execute", repo)[0]
     assert wt.exists()
     worktree.cleanup(wt, on_success=True)
     assert not wt.exists()
@@ -69,7 +72,7 @@ def test_cleanup_on_success_removes_directory(repo: Path) -> None:
 
 def test_cleanup_on_failure_preserves_dirty_worktree(repo: Path) -> None:
     """Non-force cleanup must leave a dirty worktree intact for inspection."""
-    wt = worktree.create("execute", repo)
+    wt = worktree.create("execute", repo)[0]
     (wt / "scratch.txt").write_text("uncommitted\n")
     # Should not raise even though cleanup itself fails internally.
     worktree.cleanup(wt, on_success=False)
@@ -78,7 +81,7 @@ def test_cleanup_on_failure_preserves_dirty_worktree(repo: Path) -> None:
 
 
 def test_merge_squash_brings_worktree_changes_into_base(repo: Path) -> None:
-    wt = worktree.create("execute", repo)
+    wt = worktree.create("execute", repo)[0]
     # Make a commit inside the worktree.
     (wt / "feature.txt").write_text("feature\n")
     _git(["add", "."], cwd=wt)
@@ -99,7 +102,7 @@ def test_finalize_stage_only_captures_uncommitted_work(repo: Path) -> None:
     - Run finalize stage-only.
     - Assert the uncommitted edits landed on `main` as staged changes (not lost).
     """
-    wt = worktree.create("execute", repo)
+    wt = worktree.create("execute", repo)[0]
     # Uncommitted, unstaged edit (the lossy case).
     (wt / "feature.txt").write_text("uncommitted feature work\n")
     # Run finalize stage-only.
@@ -124,7 +127,7 @@ def test_finalize_stage_only_captures_uncommitted_work(repo: Path) -> None:
 
 def test_finalize_success_captures_uncommitted_work(repo: Path) -> None:
     """Same fix verified on the `success` finalize path (auto-commit mode)."""
-    wt = worktree.create("execute", repo)
+    wt = worktree.create("execute", repo)[0]
     (wt / "src.py").write_text("print('hi')\n")
     rc = worktree._cli_finalize([str(wt), "success"])
     assert rc == 0
@@ -143,7 +146,7 @@ def test_finalize_success_captures_uncommitted_work(repo: Path) -> None:
 
 def test_finalize_fail_preserves_uncommitted_work(repo: Path) -> None:
     """`fail` finalize path must NOT auto-commit — uncommitted state stays for inspection."""
-    wt = worktree.create("execute", repo)
+    wt = worktree.create("execute", repo)[0]
     (wt / "broken.py").write_text("# this code is wrong\n")
     rc = worktree._cli_finalize([str(wt), "fail"])
     # fail path returns 0 when cleanup succeeds; worktree dir is removed but
@@ -159,38 +162,33 @@ def test_finalize_fail_preserves_uncommitted_work(repo: Path) -> None:
     assert rc == 0
 
 
-def test_finalize_clears_loop_marker_even_on_merge_failure(repo: Path) -> None:
-    """Bug 2026-05-08 (concurrency-reviewer P1): loop marker must clear on every
-    finalize exit path, not just success. Otherwise worktree_gate locks main edits.
+def test_finalize_success_clears_marker_fail_keeps_it(repo: Path) -> None:
+    """ADR-003/006 policy: success → marker deleted (gate releases); fail → marker
+    KEPT (gate continues protecting worktree until user finalizes successfully).
 
-    Reproducer: write the marker, then call finalize with a status that triggers
-    the merge path; whatever the outcome, the marker MUST be gone after.
+    Old policy (pre-ADR-006) cleared marker on every path — that was wrong
+    because a dirty/failed finalize left the worktree alive but unprotected.
     """
-    wt = worktree.create("execute", repo)
-    # Simulate the loop marker the autoloop driver writes.
-    marker = repo / ".claude" / ".hm-loop-active"
-    marker.parent.mkdir(parents=True, exist_ok=True)
-    marker.write_text(str(wt.resolve()))
-    assert marker.exists()
-
-    # Stage-only finalize that succeeds — happy path: marker should clear.
+    # Success path: create() writes .hm-loop-{wt.name}; successful finalize clears it.
+    wt = worktree.create("execute", repo)[0]
+    marker = repo / ".claude" / f".hm-loop-{wt.name}"
+    assert marker.exists(), "create() must write per-session marker"
     (wt / "feature.txt").write_text("work\n")
     rc = worktree._cli_finalize([str(wt), "stage-only"])
     assert rc == 0
-    assert not marker.exists(), "loop marker not released on stage-only success"
+    assert not marker.exists(), "marker must be cleared on stage-only success"
 
-    # Re-set the marker and force a failing scenario via 'fail' status — marker
-    # MUST also clear on the fail path so the user can edit main again.
-    wt2 = worktree.create("execute", repo)
-    marker.write_text(str(wt2.resolve()))
-    assert marker.exists()
+    # Fail path: marker is KEPT so gate continues protecting the surviving worktree.
+    wt2 = worktree.create("execute", repo)[0]
+    marker2 = repo / ".claude" / f".hm-loop-{wt2.name}"
+    assert marker2.exists()
     rc = worktree._cli_finalize([str(wt2), "fail"])
     assert rc == 0
-    assert not marker.exists(), "loop marker not released on fail path"
+    assert marker2.exists(), "marker must be KEPT on fail path (gate still active)"
 
 
 def test_cleanup_all_removes_every_worktree(repo: Path) -> None:
-    wt1 = worktree.create("execute", repo)
+    wt1 = worktree.create("execute", repo)[0]
     # Force a different timestamp by switching minute is overkill; just create
     # a second worktree manually so we exercise the multi-removal path.
     wt2_path = repo / worktree.WORKTREE_DIR_NAME / "execute-manual"
@@ -226,34 +224,36 @@ def test_cli_create_emits_path_when_scope_includes_stage(repo: Path) -> None:
     assert rc == 0
 
 
-def test_cli_create_idempotent_via_marker_from_project_root(
+def test_cli_create_parallel_sessions_get_independent_worktrees(
     repo: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """When loop wrote the .hm-loop-active marker, a subsequent `create` from
-    project root (NOT from inside .worktrees/) must return the loop's
-    worktree, not make a new one. This is the realistic case for /hm:loop:
-    loop creates worktree from project root, dispatches /hm:execute whose
-    §0 also runs worktree create from project root — without marker-based
-    idempotency, §0 creates a second worktree."""
+    """ADR-006: two create() calls from the project root (parallel sessions)
+    must each get an independent worktree — not reuse the first one.
+
+    Loop→sub-call idempotency is handled via path-based detection only
+    (Signal 2): when the loop CDs into <WT> before dispatching sub-commands,
+    the sub-command's pwd IS inside .worktrees/ and path detection returns it.
+    """
     (repo / ".claude").mkdir()
     (repo / ".claude" / "harness.yaml").write_text(
         "preset: Production\nworktree:\n  scope: [execute]\n",
         encoding="utf-8",
     )
-    # Loop's first create
     rc1 = worktree.main(["create", "execute", str(repo)])
-    loop_wt = Path(capsys.readouterr().out.strip())
+    wt1 = Path(capsys.readouterr().out.strip())
     assert rc1 == 0
 
-    # Execute §0's call from same project root → must NOT make a new WT
+    # Second session from project root → separate worktree (not reuse)
     rc2 = worktree.main(["create", "execute", str(repo)])
-    out2 = capsys.readouterr().out.strip()
+    wt2 = Path(capsys.readouterr().out.strip())
     assert rc2 == 0
-    assert out2 == str(loop_wt)
-    # Filesystem confirms only one worktree exists
-    worktrees_dir = repo / worktree.WORKTREE_DIR_NAME
-    assert sum(1 for _ in worktrees_dir.iterdir()) == 1
+    assert wt1 != wt2, "parallel sessions must NOT share a worktree"
+    assert wt1.exists()
+    assert wt2.exists()
+    # Each session has its own marker file
+    assert (repo / ".claude" / f".hm-loop-{wt1.name}").is_file()
+    assert (repo / ".claude" / f".hm-loop-{wt2.name}").is_file()
 
 
 def test_cli_create_idempotent_when_already_in_worktree(
@@ -372,9 +372,10 @@ def test_cli_create_writes_loop_marker(
     rc = worktree.main(["create", "execute", str(repo)])
     wt_path = capsys.readouterr().out.strip()
     assert rc == 0
-    marker = repo / ".claude" / ".hm-loop-active"
-    assert marker.is_file()
-    assert marker.read_text(encoding="utf-8").strip() == wt_path
+    wt_name = Path(wt_path).name
+    marker = repo / ".claude" / f".hm-loop-{wt_name}"
+    assert marker.is_file(), "per-session marker must exist"
+    assert wt_path in marker.read_text(encoding="utf-8")
 
 
 def test_cli_create_appends_marker_to_gitignore(
@@ -394,7 +395,7 @@ def test_cli_create_appends_marker_to_gitignore(
     gitignore = repo / ".gitignore"
     assert gitignore.is_file()
     lines = [line.strip() for line in gitignore.read_text(encoding="utf-8").splitlines()]
-    assert ".claude/.hm-loop-active" in lines
+    assert ".claude/.hm-loop-*" in lines
 
 
 def test_cli_create_idempotent_gitignore_no_duplicate(
@@ -416,7 +417,7 @@ def test_cli_create_idempotent_gitignore_no_duplicate(
     capsys.readouterr()
     gitignore = repo / ".gitignore"
     text = gitignore.read_text(encoding="utf-8")
-    assert text.count(".claude/.hm-loop-active") == 1
+    assert text.count(".claude/.hm-loop-*") == 1
 
 
 def test_cli_create_preserves_existing_gitignore_content(
@@ -440,7 +441,7 @@ def test_cli_create_preserves_existing_gitignore_content(
     assert "# user gitignore" in text
     assert "*.pyc" in text
     assert ".env" in text
-    assert ".claude/.hm-loop-active" in text
+    assert ".claude/.hm-loop-*" in text
 
 
 def test_cli_create_no_marker_when_scope_off(
@@ -454,7 +455,8 @@ def test_cli_create_no_marker_when_scope_off(
         encoding="utf-8",
     )
     worktree.main(["create", "execute", str(repo)])
-    assert not (repo / ".claude" / ".hm-loop-active").exists()
+    # No .hm-loop-* files should exist (scope off → no worktree created)
+    assert list((repo / ".claude").glob(".hm-loop-*")) == []
 
 
 def test_cli_finalize_success_clears_marker(
@@ -473,19 +475,19 @@ def test_cli_finalize_success_clears_marker(
     (wt_path / "new.txt").write_text("ok\n")
     _git(["add", "."], cwd=wt_path)
     _git(["commit", "-m", "x"], cwd=wt_path)
-    marker = repo / ".claude" / ".hm-loop-active"
+    marker = repo / ".claude" / f".hm-loop-{wt_path.name}"
     assert marker.is_file()
     rc = worktree.main(["finalize", str(wt_path), "success"])
     assert rc == 0
     assert not marker.exists()
 
 
-def test_cli_finalize_fail_also_clears_marker(
+def test_cli_finalize_fail_keeps_marker(
     repo: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """Failure path still clears the marker — loop is over either way; user
-    must be free to edit main again (cherry-pick from <WT>, retry, etc.)."""
+    """ADR-003/006: fail path KEEPS the marker — gate continues protecting the
+    worktree until user runs a successful finalize."""
     (repo / ".claude").mkdir()
     (repo / ".claude" / "harness.yaml").write_text(
         "preset: Production\nworktree:\n  scope: [execute]\n",
@@ -493,36 +495,39 @@ def test_cli_finalize_fail_also_clears_marker(
     )
     worktree.main(["create", "execute", str(repo)])
     wt_path = Path(capsys.readouterr().out.strip())
-    marker = repo / ".claude" / ".hm-loop-active"
+    marker = repo / ".claude" / f".hm-loop-{wt_path.name}"
     assert marker.is_file()
     rc = worktree.main(["finalize", str(wt_path), "fail"])
     assert rc == 0
-    assert not marker.exists()
+    assert marker.is_file(), "fail path must KEEP marker (gate stays active)"
 
 
-def test_cli_finalize_does_not_clear_marker_for_different_worktree(
+def test_cli_finalize_does_not_clear_other_session_marker(
     repo: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """Concurrent loops: marker points to wt-A; finalize wt-B fires →
-    marker for wt-A must NOT be clobbered. Prevents one loop's finalize
-    from disabling another concurrent loop's gate."""
+    """ADR-006: per-session markers — finalize wt_b deletes only its own marker,
+    never wt_a's. Parallel sessions each own their own file."""
     (repo / ".claude").mkdir()
     (repo / ".claude" / "harness.yaml").write_text(
         "preset: Production\nworktree:\n  scope: [execute]\n",
         encoding="utf-8",
     )
-    wt_a = worktree.create("execute", repo)
-    wt_b = worktree.create("execute", repo)
-    # Manually pin marker to wt_a (simulate "wt_a loop is the active one")
-    marker = repo / ".claude" / ".hm-loop-active"
-    marker.write_text(str(wt_a) + "\n", encoding="utf-8")
+    wt_a = worktree.create("execute", repo)[0]
+    wt_b = worktree.create("execute", repo)[0]
+    marker_a = repo / ".claude" / f".hm-loop-{wt_a.name}"
+    marker_b = repo / ".claude" / f".hm-loop-{wt_b.name}"
+    assert marker_a.is_file()
+    assert marker_b.is_file()
 
-    # Finalize wt_b → must NOT clear marker
-    rc = worktree.main(["finalize", str(wt_b), "fail"])
+    # Successful finalize of wt_b → deletes marker_b, marker_a untouched
+    (wt_b / "f.txt").write_text("x\n")
+    _git(["add", "."], cwd=wt_b)
+    _git(["commit", "-m", "x"], cwd=wt_b)
+    rc = worktree.main(["finalize", str(wt_b), "success"])
     assert rc == 0
-    assert marker.is_file()
-    assert marker.read_text(encoding="utf-8").strip() == str(wt_a)
+    assert not marker_b.exists(), "finalize must delete its own session's marker"
+    assert marker_a.is_file(), "finalize must NOT touch other session's marker"
 
 
 def test_cli_create_picks_innermost_when_nested_dotworktrees(
@@ -538,7 +543,7 @@ def test_cli_create_picks_innermost_when_nested_dotworktrees(
         encoding="utf-8",
     )
     # Create a real worktree first via the API
-    outer_wt = worktree.create("outer", repo)
+    outer_wt = worktree.create("outer", repo)[0]
     # Manually manufacture a nested .worktrees/inner inside the outer
     # worktree root — synthesizes the pathological structure with a fake
     # .git file so the inner candidate passes the .git probe.
@@ -619,8 +624,8 @@ def test_create_collision_within_same_minute_retries_with_suffix(
     """Two create() calls within the same UTC minute share a base timestamp
     → second call appends `-1` suffix (PLAN-cursor-rootcause finding #3).
     Realistic for autoloop / fused workflows that re-enter execute fast."""
-    wt1 = worktree.create("execute", repo)
-    wt2 = worktree.create("execute", repo)
+    wt1 = worktree.create("execute", repo)[0]
+    wt2 = worktree.create("execute", repo)[0]
     assert wt1 != wt2
     assert wt1.exists()
     assert wt2.exists()
@@ -634,7 +639,7 @@ def test_cli_finalize_success_with_cleanup_failure_returns_1(
     """When cleanup() raises after a successful merge (e.g. locked file on
     Windows), _cli_finalize must surface via stderr + exit 1, not bare
     traceback. Honors the "never block" contract."""
-    wt = worktree.create("execute", repo)
+    wt = worktree.create("execute", repo)[0]
     (wt / "new.txt").write_text("hi\n")
     _git(["add", "."], cwd=wt)
     _git(["commit", "-m", "x"], cwd=wt)
@@ -653,7 +658,7 @@ def test_cli_finalize_success_with_cleanup_failure_returns_1(
 def test_cli_finalize_success_merges_and_cleans(repo: Path) -> None:
     """finalize success → squash merge + cleanup --force. No worktree dir
     remains; the change is on the base branch."""
-    wt = worktree.create("execute", repo)
+    wt = worktree.create("execute", repo)[0]
     (wt / "new.txt").write_text("hi\n")
     _git(["add", "."], cwd=wt)
     _git(["commit", "-m", "add new.txt"], cwd=wt)
@@ -667,7 +672,7 @@ def test_cli_finalize_success_merges_and_cleans(repo: Path) -> None:
 def test_cli_finalize_fail_preserves_worktree(repo: Path) -> None:
     """finalize fail → no merge, cleanup non-force. Dirty worktree stays
     so the user can inspect (parity with cleanup(on_success=False))."""
-    wt = worktree.create("execute", repo)
+    wt = worktree.create("execute", repo)[0]
     (wt / "dirty.txt").write_text("uncommitted\n")  # unstaged change
 
     rc = worktree.main(["finalize", str(wt), "fail"])

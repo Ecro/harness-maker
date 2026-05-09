@@ -78,7 +78,7 @@ Hard invariants:
 
 1. `iter >= max_iter` → halt
 2. `elapsed >= time_h × 3600` → halt
-3. `failed_streak >= 3` → halt
+3. `failed_streak >= N` → halt (default N=5, configurable via `--failed-streak-cap`)
 4. *(feature mode only)* Same feature retried ≥ 3 times → halt and report
    blocker. Not applicable in improve mode (no feature list).
 5. Ping every 5 iterations

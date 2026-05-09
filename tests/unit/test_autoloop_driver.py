@@ -93,11 +93,30 @@ def test_failed_streak_3_halts_loop() -> None:
     def always_fail(feature: Feature, iter_idx: int) -> bool:  # noqa: ARG001
         return False
 
-    state = run("a;b;c;d;e", max_iter=10, executor=always_fail)
+    state = run("a;b;c;d;e", max_iter=10, executor=always_fail, failed_streak_cap=3)
     assert state.failed_streak >= 3
     assert state.converged is False
     assert state.stop_reason == "3 consecutive failures"
     assert state.iter == 3
+
+
+def test_failed_streak_cap_default_5() -> None:
+    """Default failed_streak_cap is 5; loop continues past 3 failures."""
+
+    def always_fail(feature: Feature, iter_idx: int) -> bool:  # noqa: ARG001
+        return False
+
+    state = run("a;b;c;d;e;f;g", max_iter=20, executor=always_fail)
+    assert state.failed_streak >= 5
+    assert "5 consecutive failures" in state.stop_reason
+
+
+def test_max_iter_default_50() -> None:
+    """Default max_iter is 50."""
+    import inspect
+
+    sig = inspect.signature(run)
+    assert sig.parameters["max_iter"].default == 50
 
 
 def test_success_path_with_mock_executor_converges() -> None:

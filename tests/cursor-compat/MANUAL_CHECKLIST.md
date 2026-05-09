@@ -252,3 +252,52 @@ claude --version
   installation 가이드 갱신
 - `Phase2.8.exit-clean` FAIL → `harness_maker.gates.X` 의 graceful exit
   policy 검토 + uncaught exception 의 user-facing message 개선
+
+---
+
+## Phase 2.9 — PreToolUse loop_gate 검증 (Cursor loop longevity)
+
+> `harness_maker.hooks.loop_gate --mode pretooluse` 가 Cursor 의 `preToolUse`
+> Bash hook 으로 fire 되는지, 그리고 `.hm-loop-active` marker 유무에 따라
+> advisory stderr 메시지가 정확히 출력되는지 수동 확인.
+
+### 절차 (Cursor IDE)
+
+1. **실제 프로젝트** 에서 `/harness-maker:make` 로 하네스를 렌더 (targets 에
+   `cursor` 포함).
+2. `.cursor/hooks.json` 에 `preToolUse.Bash` 항목으로 `loop_gate --mode pretooluse`
+   가 포함되어 있는지 확인:
+   ```bash
+   cat .cursor/hooks.json | python -m json.tool | grep loop_gate
+   ```
+   loop_gate 항목 있으면 PASS.
+
+3. **marker 없음** — Cursor IDE 에서 Bash 도구를 실행 (예: `ls`):
+   - **`Phase2.9.no-marker`**: hook 이 fire 되고 stderr 에 `[loop-gate]` 메시지가
+     **없어야** 정상. exit 0.
+
+4. **marker 있음** — 프로젝트 루트에서:
+   ```bash
+   touch .hm-loop-active
+   ```
+   이후 Cursor IDE 에서 Bash 도구 실행:
+   - **`Phase2.9.advisory-msg`**: stderr/output 에
+     `[loop-gate] /hm:loop active` 메시지가 보이는가?
+   - **`Phase2.9.still-exits-0`**: hook 이 exit 0 으로 종료하여 도구 실행이
+     **block 되지 않는가**? (preToolUse exit 2 = tool cancel. 이 hook 은
+     항상 exit 0 이어야 함)
+   - 테스트 후 정리: `rm .hm-loop-active`
+
+### 기록 (RESULTS.md)
+
+`Phase2.9.no-marker`, `Phase2.9.advisory-msg`, `Phase2.9.still-exits-0` 각
+PASS/FAIL 을 RESULTS.md Phase 2.9 row 에 기입.
+
+### Fail 시 분기
+
+- `Phase2.9.no-marker` FAIL (메시지 잘못 출력) → `_find_marker` 로직 오류. cwd
+  탐색 경계 확인.
+- `Phase2.9.advisory-msg` FAIL (메시지 미출력) → Cursor 가 hook stderr 을
+  Output 패널에 표시하지 않을 수 있음. stdout 으로 전환 고려.
+- `Phase2.9.still-exits-0` FAIL (도구 block) → `_pretooluse` 가 exit 0 을
+  반환하는지 코드 재확인. 다른 hook 이 exit 2 를 반환하는 충돌 가능성 배제.

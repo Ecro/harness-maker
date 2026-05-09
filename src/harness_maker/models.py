@@ -6,7 +6,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Enums (string-valued)
@@ -259,6 +259,27 @@ class HarnessConfig(BaseModel):
     # Users add manually to harness.yaml; preserved across re-render via
     # answers_from_harness_yaml. No interview question yet.
     mcp_servers: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    # Sibling repos that are part of the same logical project. Relative paths
+    # only (absolute paths break cross-machine portability — same policy as
+    # RefFolder). Resolved against primary repo root at worktree create time.
+    sibling_repos: list[str] = Field(default_factory=list)
+
+    @field_validator("sibling_repos", mode="before")
+    @classmethod
+    def _reject_absolute_sibling_paths(cls, v: object) -> object:
+        """Relative paths survive cross-machine git clones; absolute paths do not.
+
+        Rejects both /abs/path and ~/home-relative paths — neither survives a
+        clone to a machine with a different directory layout.
+        """
+        if not isinstance(v, list):
+            return v
+        for p in v:
+            if isinstance(p, str) and (Path(p).is_absolute() or p.startswith("~")):
+                raise ValueError(
+                    f"sibling_repos must contain relative paths; got absolute: {p!r}"
+                )
+        return v
 
 
 class Blueprint(BaseModel):
@@ -325,6 +346,20 @@ class InterviewAnswers(BaseModel):
     worktree: dict[str, Any] = Field(default_factory=dict)
     security: dict[str, Any] = Field(default_factory=dict)
     context_lint: dict[str, Any] = Field(default_factory=dict)
+    sibling_repos: list[str] = Field(default_factory=list)
+
+    @field_validator("sibling_repos", mode="before")
+    @classmethod
+    def _reject_absolute_sibling_paths(cls, v: object) -> object:
+        """Relative paths survive cross-machine git clones; absolute paths do not."""
+        if not isinstance(v, list):
+            return v
+        for p in v:
+            if isinstance(p, str) and (Path(p).is_absolute() or p.startswith("~")):
+                raise ValueError(
+                    f"sibling_repos must contain relative paths; got absolute: {p!r}"
+                )
+        return v
 
     @model_validator(mode="after")
     def _default_workflow_in_fused(self) -> InterviewAnswers:

@@ -295,3 +295,48 @@ def test_conflict_item_decision_none_default() -> None:
     ci = ConflictItem(path=Path("/tmp/x"))
     assert ci.decision is None
     assert ci.reason is None
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# sibling_repos — Phase 1 (multi-repo support)
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def test_harness_config_sibling_repos_default_empty() -> None:
+    cfg = HarnessConfig()
+    assert cfg.sibling_repos == []
+
+
+def test_harness_config_sibling_repos_relative_path_valid() -> None:
+    cfg = HarnessConfig(sibling_repos=["../repo-b"])
+    assert cfg.sibling_repos == ["../repo-b"]
+
+
+def test_harness_config_sibling_repos_multiple_valid() -> None:
+    cfg = HarnessConfig(sibling_repos=["../repo-b", "../repo-c"])
+    assert cfg.sibling_repos == ["../repo-b", "../repo-c"]
+
+
+def test_harness_config_sibling_repos_absolute_rejected() -> None:
+    with pytest.raises(ValidationError, match="absolute"):
+        HarnessConfig(sibling_repos=["/abs/path/repo-b"])
+
+
+def test_harness_config_sibling_repos_absolute_tilde_rejected() -> None:
+    with pytest.raises(ValidationError, match="absolute"):
+        HarnessConfig(sibling_repos=["~/projects/repo-b"])
+
+
+def test_interview_answers_sibling_repos_default_empty() -> None:
+    ans = InterviewAnswers()
+    assert ans.sibling_repos == []
+
+
+def test_interview_answers_sibling_repos_relative_path_valid() -> None:
+    ans = InterviewAnswers(sibling_repos=["../repo-b"])
+    assert ans.sibling_repos == ["../repo-b"]
+
+
+def test_interview_answers_sibling_repos_absolute_rejected() -> None:
+    with pytest.raises(ValidationError, match="absolute"):
+        InterviewAnswers(sibling_repos=["/abs/path/repo-b"])

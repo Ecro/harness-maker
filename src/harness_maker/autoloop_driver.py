@@ -25,8 +25,9 @@ Key types:
   target, context_ref, and optional inline ImprovementContext
 - `AutoloopState` — mutable run state returned by `run()`
 
-Safety rails: 3 consecutive failures stop the loop; every 5 iterations emits
-a ping log; time/iter caps stop with `converged=False`.
+Safety rails: consecutive failures stop the loop (default cap 5, configurable
+via failed_streak_cap); every 5 iterations emits a ping log; time/iter caps
+stop with `converged=False`.
 
 The `executor` argument is a callable injected by the caller. Its contract:
 `executor(feature: Feature, iter_idx: int) -> bool` — True on success, False
@@ -387,7 +388,8 @@ def run(  # noqa: PLR0913
     *,
     spec: LoopSpec | None = None,
     time_h: float = 8.0,
-    max_iter: int = 30,
+    max_iter: int = 50,
+    failed_streak_cap: int = 5,
     dry_run: bool = False,
     workflow: str = "exec-rev-wrap",  # noqa: ARG001 — opaque, passed by /hm:loop
     convergence: str | None = None,
@@ -446,8 +448,8 @@ def run(  # noqa: PLR0913
         if elapsed >= time_cap_s:
             state.stop_reason = f"time_cap ({time_h}h) reached"
             break
-        if state.failed_streak >= 3:
-            state.stop_reason = "3 consecutive failures"
+        if state.failed_streak >= failed_streak_cap:
+            state.stop_reason = f"{failed_streak_cap} consecutive failures"
             break
         if _check_convergence(state, effective_convergence):
             state.converged = True

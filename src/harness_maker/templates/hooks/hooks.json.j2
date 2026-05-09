@@ -76,7 +76,17 @@
         ]
       }
     ],
-    "Stop": []
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run --with {{ harness_maker_src_path }} python -m harness_maker.hooks.loop_gate --mode stop-hook",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
   },
   "preset": "{{ preset }}"
 }
