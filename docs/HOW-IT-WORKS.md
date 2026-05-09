@@ -2136,6 +2136,115 @@ WSL2/NTFS 환경에서 Edit 도구가 파일을 corrupt 할 수 있는 알려진
 
 ---
 
+### 11.21 Deep Interview — 추측 대신 대화로 아키텍처를 잠근다
+
+**Before**: 대부분의 AI 워크플로우는 작업 설명만 받고 구현에 들어간다. 모호한 요구사항은 구현 중에 발견되고, 그때 다시 돌아가서 고치는 비용이 발생한다.
+
+**After**: `/hm:spec` 과 `/hm:plan` 은 구현 전에 심층 인터뷰를 시행한다. 질문은 고정 스크립트가 아니라 LLM 이 컨텍스트를 읽어 동적으로 생성한다.
+
+#### /hm:spec 의 6-카테고리 인터뷰
+
+SPEC 인터뷰는 **6개 카테고리를 순서대로** 커버한다:
+
+| 카테고리 | 확인하는 것 |
+|---------|-----------|
+| Intent (의도) | 왜 이 기능이 필요한가, 무엇을 해결하는가 |
+| Outcomes (성과) | 완료 기준, 측정 가능한 지표 |
+| In-Scope Scenarios | "주어진 X일 때, Y하면 Z가 되어야 한다" 형식의 구체적 시나리오 |
+| Non-Goals | 명시적으로 포함하지 않는 것 |
+| Constraints | 기술적·비즈니스적 제약 |
+| Verification | 어떻게 완료를 증명할 것인가 |
+
+6개 카테고리 커버리지와 시나리오 구체성을 **completeness scorer** 가 0-1 점수로 평가한다. 점수 미달 시 부족한 카테고리만 추가 질문한다. 완료된 SPEC 은 `status: approved` 로 마킹되어 이후 `/hm:plan` 이 재질문을 생략한다 (Case A — 중복 인터뷰 없음).
+
+#### /hm:plan 의 9-카테고리 우선순위 인터뷰
+
+PLAN 인터뷰는 "어떻게 만들 것인가"를 결정한다. 질문 카테고리는 **영향도 역순**으로 진행된다:
+
+1. Scope boundaries — 무엇이 포함/제외되는가
+2. Architecture — 컴포넌트 소유권, 패턴 선택
+3. Contract shape — API 서명, DB 스키마, 파일 형식
+4. Risk tolerance — 안전/점진 vs 빠른/대담, 롤백 전략
+5. Testing depth — 단위/통합/수동 범위
+6. Implementation phasing — feature flag, 순서, 의존성
+7. Dependencies — 라이브러리 추가 vs 직접 구현
+8. Failure handling — 재시도, circuit-break, fallback
+9. Observability — 로그 레벨, 메트릭 이름, 알림 임계값
+
+#### ADR 자동 승격 — 5개 기준 중 하나라도 해당하면
+
+인터뷰 답변이 다음 중 하나를 충족하면 해당 결정이 **Architecture Decision Record** 로 자동 승격된다:
+- 컴포넌트 경계/소유권 변경
+- 새로운 계약 (API, IPC, 스키마, 파일 형식, 프로토콜)
+- 합리적인 대안을 명시적으로 기각
+- 이번 태스크를 넘어서는 장기적 영향 (precedent 설정)
+- 미래 유연성 제약 (프레임워크, 라이브러리, 프로토콜 고착)
+
+ADR 에는 `Context / Decision / Consequences / Rejected Alternatives` 가 기록된다. `/hm:execute` 는 이를 **바인딩 제약**으로 취급 — ADR 에 위배되는 구현이 필요하면 blocker 로 에스컬레이션하지 않음.
+
+#### plan-validator 에이전트 게이트
+
+인터뷰 종료 후 PLAN 을 디스크에 쓰기 전에 `plan-validator` 에이전트가 독립적으로 검토:
+- `APPROVED` → 바로 저장
+- `NEEDS_REVISION` → 경고별 1회 추가 인터뷰 후 저장
+- `MAJOR_REVISION` → 추가 인터뷰 → 재검증 1회. 두 번째도 통과 못 하면 사용자에게 에스컬레이션
+
+#### "미결 결정 없음" 규칙
+
+PLAN 저장 전, "Accept?", "OK?", "Verify?", "Should we?" 같은 표현을 스캔한다. 이런 표현이 남아 있으면 **놓친 인터뷰 라운드**를 의미한다 — PLAN 에는 체크리스트가 없고, 모든 판단은 인터뷰 트랜스크립트나 ADR 에 이미 기록된 상태여야 한다.
+
+---
+
+### 11.22 /hm:loop 적응형 인터뷰 + 수렴 루프 — 반복 실행이 목표를 향해 수렴한다
+
+**Before**: "이 코드를 개선해줘" 같은 열린 요청은 한 턴으로 끝나거나, 각 턴이 서로 맥락을 잃고 무관한 방향으로 진행된다.
+
+**After**: `/hm:loop` 는 **time-and-iteration bounded** 루프를 실행한다. 각 반복이 이전 반복의 결과를 읽고, 목표를 향해 수렴하는지 LLM 이 판단한다.
+
+#### 두 가지 모드
+
+| 모드 | 명령 | 목적 |
+|-----|------|-----|
+| **feature** | `/hm:loop feature "설명"` | 목표 또는 SPEC 파일을 향해 점진적 구현 |
+| **improve** | `/hm:loop improve "설명"` | 기존 코드를 반복적으로 개선, 수렴 조건 충족 시 종료 |
+
+#### autoloop-driver 의 5차원 적응형 인터뷰
+
+루프 시작 전 `autoloop-driver` 스킬이 **LLM 이 설명을 읽어 이미 답된 차원을 추출**하고, 부족한 차원만 질문한다:
+
+| 차원 | 내용 |
+|------|------|
+| purpose | 이 루프가 달성해야 하는 것 |
+| invariants | 반복 중 깨뜨리면 안 되는 불변조건 |
+| priority | 어떤 측면이 가장 중요한가 |
+| stopping_criteria | 언제 "충분히 완료됐다"고 보는가 |
+| out_of_scope | 명시적으로 건드리지 않을 것 |
+
+"CSV 파서에 에러 핸들링 추가" 처럼 상세한 설명이면 purpose 는 이미 답된 것으로 처리하고 나머지 차원만 질문한다. **고정 스크립트 없이** LLM 판단으로 필요한 질문만 한다.
+
+#### 단일 워크트리 공유 + autoloop-coder 권한 제한
+
+루프 전체에서 **하나의 워크트리**를 공유한다. 반복마다 새 브랜치를 만들면 체크아웃 오버헤드가 누적되는데, 단일 공유 워크트리는 이를 방지한다.
+
+코드 작성은 `autoloop-coder` 에이전트가 수행:
+- **write-tool-only**: 탐색 없이 지정된 작업만 실행 (open-ended exploration 금지)
+- 워크트리 경계 내 쓰기만 허용
+- CLAUDE.md + TECH_SPEC.md 우선 — 모호하면 자율 결정 후 log, **AskUserQuestion 금지**
+
+#### 수렴 판단은 LLM 이 한다
+
+각 반복 종료 시 `autoloop-driver` 가 `stopping_criteria` 를 현재 코드 상태와 비교해 수렴 여부를 판단한다. 고정 규칙 체크리스트가 아니라 **LLM 이 결과물 전체를 읽고** "이 정도면 목표가 달성됐는가"를 판단한다. 판단이 YES 면 루프를 종료하고 wrapup 으로 진행한다.
+
+#### 시간·반복 횟수 경계 + 증거 보존
+
+무한 루프 방지를 위해:
+- `max_iterations` (기본값: harness.yaml 설정에 따름)
+- `max_duration_minutes` (시간 초과 시 안전 종료)
+
+실패한 반복은 워크트리를 보존(`fail` finalize) 해 사용자가 어느 단계에서 멈췄는지 확인할 수 있다.
+
+---
+
 ### 특장점 요약표
 
 | 특장점 | 해결하는 문제 | 관련 컴포넌트 |
@@ -2160,6 +2269,8 @@ WSL2/NTFS 환경에서 Edit 도구가 파일을 corrupt 할 수 있는 알려진
 | LLM 판단 우선 | regex/규칙의 false positive/negative | 전 시스템 |
 | 원자 파일 쓰기 | 인터럽트 시 파일 corruption | atomic_write 패턴 |
 | 100% 로컬 텔레메트리 | 외부 전송 우려 | PostToolUse hook / metrics.jsonl |
+| Deep Interview (spec/plan) | 추측으로 구현 → 나중에 재작업 | 6-카테고리/9-카테고리 + ADR 승격 + plan-validator |
+| loop 적응형 인터뷰 + 수렴 루프 | 열린 요청이 발산하거나 맥락 유실 | autoloop-driver / autoloop-coder / stopping_criteria |
 
 ---
 
