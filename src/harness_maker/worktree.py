@@ -19,6 +19,7 @@ Conventions
 
 from __future__ import annotations
 
+import contextlib
 import subprocess
 import sys
 from datetime import UTC, datetime
@@ -28,6 +29,7 @@ import yaml
 
 WORKTREE_DIR_NAME = ".worktrees"
 _TS_FMT = "%Y%m%dT%H%MZ"
+_GIT_TIMEOUT = 60  # seconds — prevent hang on SSH prompt or NFS stall
 
 # Per-session marker files: .claude/.hm-loop-{primary-wt-basename}
 # One file per active session — parallel sessions coexist without collision.
@@ -46,6 +48,7 @@ def _run(args: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
             check=True,
             capture_output=True,
             text=True,
+            timeout=_GIT_TIMEOUT,
         )
     except subprocess.CalledProcessError as e:
         msg = (
@@ -53,6 +56,10 @@ def _run(args: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
             f"stderr: {e.stderr.strip() if e.stderr else '<empty>'}"
         )
         raise RuntimeError(msg) from e
+    except subprocess.TimeoutExpired as e:
+        raise RuntimeError(
+            f"git command timed out after {_GIT_TIMEOUT}s: {' '.join(args)}"
+        ) from e
 
 
 def _timestamp() -> str:
@@ -128,17 +135,22 @@ def create(
 
     # Create sibling worktrees
     sibling_wts: list[Path] = []
-    for sibling, slug in zip(siblings, slugs, strict=True):
-        sib_name = f"{name}-{slug}"
-        (sibling / WORKTREE_DIR_NAME).mkdir(parents=True, exist_ok=True)
-        sib_wt = sibling / WORKTREE_DIR_NAME / sib_name
-        try:
+    try:
+        for sibling, slug in zip(siblings, slugs, strict=True):
+            sib_name = f"{name}-{slug}"
+            (sibling / WORKTREE_DIR_NAME).mkdir(parents=True, exist_ok=True)
+            sib_wt = sibling / WORKTREE_DIR_NAME / sib_name
             _run(["git", "worktree", "add", "-b", sib_name, str(sib_wt)], cwd=sibling)
-        except RuntimeError:
-            # Best-effort: primary is already created, keep it. Sibling failure
-            # is surfaced to caller; finalize handles the orphan state.
-            raise
-        sibling_wts.append(sib_wt)
+            sibling_wts.append(sib_wt)
+    except RuntimeError:
+        # Rollback: remove all already-created worktrees (including primary) so no
+        # orphaned git worktrees accumulate without a marker or manual-cleanup path.
+        for created_wt, sib in zip(sibling_wts, siblings[: len(sibling_wts)], strict=False):
+            with contextlib.suppress(RuntimeError):
+                _run(["git", "worktree", "remove", "--force", str(created_wt)], cwd=sib)
+        with contextlib.suppress(RuntimeError):
+            _run(["git", "worktree", "remove", "--force", str(primary_wt)], cwd=base)
+        raise
 
     all_wts = [primary_wt, *sibling_wts]
     _write_loop_marker(base, primary_wt.name, all_wts)

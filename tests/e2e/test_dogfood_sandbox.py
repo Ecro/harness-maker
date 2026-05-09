@@ -140,7 +140,7 @@ def test_commands_worktree_skill_smoke(tmp_path: Path) -> None:
         pytest.skip("git unavailable for worktree smoke test")
 
     try:
-        wt_path = worktree.create("dev", repo)
+        wt_path = worktree.create("dev", repo)[0]
     except RuntimeError as e:
         pytest.skip(f"git worktree create failed: {e}")
 
