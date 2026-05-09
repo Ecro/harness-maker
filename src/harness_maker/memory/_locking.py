@@ -96,10 +96,7 @@ def exclusive_lock(lock_path: Path) -> Iterator[None]:
             yield
         finally:
             _depth_set(key, 0)
-            try:
+            with contextlib.suppress(OSError):
                 fcntl.flock(fd, fcntl.LOCK_UN)
-            except OSError:
-                # Best-effort: closing the fd will release the lock anyway.
-                pass
     finally:
         os.close(fd)

@@ -19,7 +19,8 @@ One command. Interview-driven. Dual-IDE. Anti-rot built in.
 [Configuration](#configuration) ·
 [Cursor target](#cursor-target) ·
 [FAQ](#faq) ·
-[Roadmap](#roadmap)
+[Roadmap](#roadmap) ·
+[Deep dive](docs/HOW-IT-WORKS.md)
 
 ---
 
@@ -125,6 +126,20 @@ Re-run with flags to evolve the harness:
 - **SessionStart drift reminder.** A hook fires on every session open and warns if the running harness-maker version differs from the version that rendered the harness — so you notice when a `/plugin update` needs a re-render. The detector compares `harness.yaml.harness_maker_version` against the **latest plugin version cached on disk** (not just the imported `__version__`), so `/hm:refresh` and SessionStart agree even when the slash command runs against a pinned older version (0.6.2).
 
 - **Memory tier with cross-process safety.** `.claude/memory/` holds `episodic/` (per-day JSONL), `semantic.jsonl` (queryable index), `profile.json`, `wiki.md`, and `failures.md`. Concurrent writers from parallel sessions are serialised via a re-entrant POSIX flock — same thread can re-acquire without deadlock, different threads block normally (ADR-106, 0.7.1). Telemetry hooks append atomically via raw `os.write()` on `O_APPEND` (single-syscall, ≤ PIPE_BUF) so concurrent Claude Code + Cursor hooks cannot interleave JSONL lines.
+
+- **3-tier context loading + compaction recovery.** Every stage opens memory in tier order — Hot (`session/<today>.md`), Warm (`failures.md` + `wiki.md` first 60/40 lines), Cold (git log / PLANs on demand). `PreCompact` hook flushes the session to `session/<today>.md` with a `checkpoint:compaction` marker before Claude compacts context; the next turn detects the marker and resumes from the last in-progress phase without losing progress.
+
+- **2-pass redaction for review precision (+47 pp).** Reviewers run twice: Pass 1 strips PR title, author, and commit message so findings aren't anchored to metadata; Pass 2 restores full context and each reviewer validates or drops their Pass 1 findings. Findings absent from Pass 2 are dropped (CP10 contract). Ablation showed a +47 percentage-point precision gain on anchoring-prone diffs.
+
+- **Self-improving failure memory.** Every stage appends failure patterns (wrong API usage, broken convention, unexpected build failure) to `failures.md` with a count. When any failure slug reaches count ≥ 3, a proposal is automatically appended to `pending-proposals.md` — suggesting a new skill, rule, or hook that would have prevented the recurrence. The user reviews and decides whether to ingest.
+
+- **ADR system as binding execute constraints.** Architecture Decision Records promoted during `/hm:plan` are hard constraints — `/hm:execute` must not violate them. If a PLAN phase conflicts with an ADR, execute surfaces it as a blocker rather than silently proceeding. ADRs capture rejected alternatives and the reasoning, so future sessions don't re-litigate settled decisions.
+
+- **Cache miss classification (4 reasons).** The prompt-cache diagnostic layer reports why a cache miss occurred: `min_threshold` (content too short), `invalidation` (context changed), `ttl` (5-min TTL expired), or `first` (cold start). The 5% weight in the AI-readiness score distinguishes cold-start misses (benign) from structural misses (actionable), so you fix the right thing.
+
+- **Grade-based auto-fix loop.** `/hm:review` computes a grade (A–F) from `consensus-passed` P0/P1 findings and loops: apply fixes → re-review (selective — only re-spawn reviewers whose scope was touched) → regrade, until grade meets `grade_threshold` (default A) or `max_review_rounds` is exhausted. Failed fixes that break the build are automatically reverted and logged. Weak-consensus and manual-only findings are never auto-applied.
+
+For the complete mechanics behind each feature — all procedures, decision paths, and internal invariants — see [**docs/HOW-IT-WORKS.md**](docs/HOW-IT-WORKS.md).
 
 ---
 
