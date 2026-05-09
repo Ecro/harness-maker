@@ -53,6 +53,9 @@
     - 11.20 [100% 로컬 텔레메트리](#1120-100-로컬-텔레메트리)
     - 11.21 [Deep Interview (spec/plan)](#1121-deep-interview--추측-대신-대화로-아키텍처를-잠근다)
     - 11.22 [loop 적응형 인터뷰 + 수렴 루프](#1122-hmloop-적응형-인터뷰--수렴-루프--반복-실행이-목표를-향해-수렴한다)
+    - 11.23 [TDD Phase A.5 테스트 품질 게이트](#1123-tdd-phase-a5-게이트--테스트가-진짜-red-인지-구현-전에-검증한다)
+    - 11.24 [`stuck` 에스컬레이션 에이전트](#1124-stuck-에스컬레이션-에이전트--블로킹이-두-번-반복되면-전용-분석가가-개입한다)
+    - 11.25 [6-checkpoint verify 게이트](#1125-6-checkpoint-verify-게이트--완료를-diff-와-건강-지표로-이중-검증한다)
 
 ---
 
@@ -2268,6 +2271,93 @@ PLAN 저장 전, "Accept?", "OK?", "Verify?", "Should we?" 같은 표현을 스�
 
 ---
 
+### 11.23 TDD Phase A.5 게이트 — 테스트가 진짜 RED 인지 구현 전에 검증한다
+
+**Before**: AI 가 테스트와 구현을 함께 쓰거나, 테스트를 썼어도 항상 통과하는 tautology 테스트를 쓴다. 테스트가 실제로 구현 부재를 잡는지 아무도 확인하지 않는다.
+
+**After**: `/hm:execute` 는 테스트를 구현 전에 작성하고 (Phase A), `test-reviewer` 에이전트가 테스트 파일을 독립 검토한다 (Phase A.5). 구현은 Phase C 에서 시작한다.
+
+#### 8개 금지 패턴 — 하나라도 해당하면 FAIL
+
+`test-reviewer` 에이전트가 아래 패턴을 탐지하면 `FAIL` 판정:
+
+| 패턴 | 예시 | 문제 |
+|-----|-----|-----|
+| Tautology | `assert True`, `assert len(x) >= 0` | 구현과 무관하게 항상 통과 |
+| Stub-only | `pass`, `raise NotImplementedError` | 실질적 검증 없음 |
+| Framework-check-only | `import mymodule; assert True` | 임포트 성공만 검증 |
+| Over-mocking | 테스트 대상 자체를 mock | 실제 코드를 테스트하지 않음 |
+| Scenario-ID 불일치 | `test_s3_foo` 가 Scenario 3 이 아님 | SPEC 추적 불가 |
+| 매직 값 assertion | SPEC 에 없는 상수 비교 | SPEC 와 테스트 분리 |
+| 실패 억제 | `try...except: pass` | 에러를 무시하는 테스트 |
+| private 상태 assertion | `._internal_state == x` | 구현 세부사항에 결합 |
+
+#### passing_tests[] 동결 + RED-correctness
+
+`test-reviewer` 가 `PASS` 판정한 테스트는 `passing_tests[]` 로 기록되어 **이후 재시도에서 재작성 불가** — 이미 검증된 테스트를 수정하면 품질 기준이 무의미해지기 때문이다.
+
+테스트를 수정한 뒤에는 Phase B (RED 게이트) 에서 실제로 FAIL 하는지 확인한다. 우연히 PASS 하면 (false-RED) Phase A 로 돌아가 재작성 — 구현이 없어도 통과하는 테스트는 의미가 없다.
+
+재시도 예산: **2회**. 2회 연속 FAIL 이면 `stuck` 에이전트로 에스컬레이션.
+
+---
+
+### 11.24 `stuck` 에스컬레이션 에이전트 — 블로킹이 두 번 반복되면 전용 분석가가 개입한다
+
+**Before**: 워크플로우가 막히면 사용자가 오류 메시지를 읽고 직접 원인을 찾는다. 여러 시스템(PLAN, SPEC, REVIEW, ADR)에 분산된 정보를 종합해야 한다.
+
+**After**: `stuck` 에이전트가 모든 컨텍스트를 읽어 **단일 구속 제약** (single binding constraint) 을 찾고 2-3개의 구체적 해결 경로를 제안한다. 각 경로는 trade-off 와 관련 ADR 번호를 포함한다.
+
+#### 트리거 조건
+
+| 상황 | 세부 |
+|-----|-----|
+| Phase A.5 재시도 소진 | test-reviewer 2회 연속 FAIL |
+| Phase D 수정 불가 | PLAN 범위 변경 없이는 해결 불가한 실패 |
+| ADR 충돌 | 구현이 ADR 을 위반해야만 진행 가능 |
+| 리뷰 교착 | 3개 리뷰어가 동일 이슈에 상충 CONCLUDE |
+| plan-validator 2차 MAJOR | 두 번의 검증에서 모두 심각한 문제 |
+
+#### 분석 방법
+
+`stuck` 에이전트는 전체 PLAN + SPEC + REVIEW + 최근 3개 리뷰어 출력 + 실패 로그를 읽은 뒤:
+
+1. **증상 vs 근본 제약 분리** — "테스트가 실패한다" 가 아니라 "ADR-002 가 이 API 형식을 금지하는데 SPEC S3 이 그 형식을 요구한다" 같은 근본 제약을 찾는다
+2. **2-3개 해결 경로 제안** — 각각의 trade-off 와 관련 ADR/Interview 번호 포함
+3. **우선 경로 권장** — 현재 결정 맥락과 가장 일관된 경로를 권장
+4. **에스컬레이션 노트 저장** — `.claude/memory/escalations/escalation-{slug}-{date}.md`
+
+`stuck` 은 **읽기 전용 조언자** — 직접 코드를 수정하지 않는다. 결정은 사용자에게 돌아간다.
+
+---
+
+### 11.25 6-checkpoint verify 게이트 — "완료"를 diff 와 건강 지표로 이중 검증한다
+
+**Before**: "테스트가 통과하면 완료"로 간주한다. PLAN 에 쓴 내용이 실제 구현됐는지, 보안 취약점이 없는지, 다른 품질 지표가 후퇴하지 않았는지는 검사하지 않는다.
+
+**After**: `/hm:verify` (= `verify-before-completion` 스킬) 가 6개 체크포인트를 순서대로 실행하고 **첫 번째 실패에서 즉시 블로킹**한다.
+
+#### 6개 체크포인트
+
+| # | 체크 | 판정 방식 | 실패 시 |
+|---|-----|---------|--------|
+| 1 | PLAN 이행 | **LLM 이 diff 와 PLAN 항목을 직접 대조** | 미이행 항목 목록 표시 |
+| 2 | 회귀/스모크 | `.claude-verify.sh` 실행 | 실패 테스트 출력 |
+| 3 | 헬스 점수 -5 이내 | `compute_readiness()` vs 베이스라인 | 6차원 breakdown |
+| 4 | 안티-rot 펜딩 해소 | `pending.jsonl` 미처리 항목 확인 | `/hm:refresh` 실행 안내 |
+| 5 | high-severity 보안 없음 | `findings.jsonl` count 확인 | 발견 목록 표시 |
+| 6 | 워크트리 merge-safe | `git diff --check` + 충돌 마커 확인 | 충돌 경로 표시 |
+
+#### Check 1 이 LLM 판단인 이유
+
+PLAN 이행 여부는 체크박스 체크만으로는 판정할 수 없다. PLAN 의 "CSVParser.parse() 구현" 항목이 실제로 `git diff` 에 있는지, 구현 내용이 PLAN 의 의도와 일치하는지는 **LLM 이 두 문서를 동시에 읽고 판단**한다. subprocess 로 자동 판정하면 PLAN 에 체크만 하고 코드를 안 쓴 경우를 못 잡는다.
+
+#### Check 3 이 단순 테스트 통과와 다른 이유
+
+테스트는 통과해도 AI Readiness composite 점수가 5점 이상 하락할 수 있다. 예를 들어 새 코드가 문서화 비율을 낮추거나, 모듈 결합도를 높이거나, 타입 힌트를 빠뜨리면 테스트는 통과해도 Check 3 에서 잡힌다. 이 체크는 "지금 잘 동작하는가"가 아니라 "코드베이스 전반의 품질이 후퇴하지 않았는가"를 측정한다.
+
+---
+
 ### 특장점 요약표
 
 | 특장점 | 해결하는 문제 | 관련 컴포넌트 |
@@ -2294,6 +2384,9 @@ PLAN 저장 전, "Accept?", "OK?", "Verify?", "Should we?" 같은 표현을 스�
 | 100% 로컬 텔레메트리 | 외부 전송 우려 | PostToolUse hook / metrics.jsonl |
 | Deep Interview (spec/plan) | 추측으로 구현 → 나중에 재작업 | 6-카테고리/9-카테고리 + ADR 승격 + plan-validator |
 | loop 적응형 인터뷰 + 수렴 루프 | 열린 요청이 발산하거나 맥락 유실 | autoloop-driver / autoloop-coder / stopping_criteria |
+| TDD Phase A.5 테스트 품질 게이트 | tautology 테스트가 false-GREEN 을 만들고 구현으로 진행 | test-reviewer / 8-banned-patterns / passing_tests[] freeze |
+| stuck 에스컬레이션 에이전트 | 블로킹 시 원인 파악과 해결 경로 탐색이 사용자 몫 | stuck / escalation-{slug}-{date}.md |
+| 6-checkpoint verify 게이트 | 테스트 통과 ≠ 완료 (PLAN 이행·건강 지표·보안 미확인) | verify-before-completion / Check1 LLM 대조 / Check3 헬스 회귀 |
 
 ---
 
