@@ -2,7 +2,7 @@
 hooks = true
 {% for agent_name, agent_desc in agents.items() %}
 [agents.{{ agent_name }}]
-config_file = ".codex/agents/{{ agent_name }}.toml"
+config_file = "agents/{{ agent_name }}.toml"
 description = {{ agent_desc | tojson }}
 {% endfor %}
 {% if config.mcp_servers -%}
