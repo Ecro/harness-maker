@@ -49,6 +49,16 @@ Before touching anything, verify state:
 
 Run the project's full check suite once before committing. Catch regressions wrapup-stage edits could introduce:
 
+{% if is_codex %}
+```
+# Pick the toolchain that matches the project. Examples:
+Bash("uv run pytest -x")                      # Python
+Bash("uv run ruff check src/ tests/")          # lint
+Bash("uv run mypy --strict src/")              # type
+# Rust: Bash("cargo test && cargo check")
+# Node: Bash("pnpm test && pnpm build")
+```
+{% else %}
 ```bash
 # Pick the toolchain that matches the project. Examples:
 !uv run pytest -x                      # Python
@@ -57,6 +67,7 @@ Run the project's full check suite once before committing. Catch regressions wra
 # Rust: cargo test && cargo check
 # Node: pnpm test && pnpm build
 ```
+{% endif %}
 
 If any fail: STOP, surface the failure, do NOT proceed. Reverting an executed-merge is more painful than diagnosing here.
 

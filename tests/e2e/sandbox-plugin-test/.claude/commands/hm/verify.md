@@ -4,7 +4,7 @@ harness_maker_version: 0.9.3
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/atomic_command.md.j2
 provenance: official
-content_hash: 0d8b5fcd83e26d95888276bfd226a4c705d626d52471c770b3f66bdc041fbe02
+content_hash: a5fcd9509b8d873e124219c255de87e72f47d6198e510ee7ec28af19b26dd6ea
 ---
 # Stage: verify
 
@@ -63,6 +63,7 @@ FAIL when: any scenario lacks coverage AND lacks waiver.
 
 Run the project's full check suite. Pick the toolchain that matches the project:
 
+
 ```bash
 # Python:
 !uv run pytest -q
@@ -71,6 +72,7 @@ Run the project's full check suite. Pick the toolchain that matches the project:
 # Rust: cargo test && cargo check
 # Node: pnpm test && pnpm build
 ```
+
 
 If the harness has its own `.claude-verify.sh phase_<N>` script, prefer it over the generic toolchain commands.
 
@@ -167,6 +169,7 @@ When `--force` is set, append the same record with `"force_override": true, "ove
 3. Repeat for Checks 2-6.
 4. Emit final RESULT line + JSON record.
 5. When `--force` is set with FAILing checks: emit text + JSON record with override flag + reason, then return PASS exit code (let the workflow proceed). Wrapup will surface the override in the commit body footer.
+6. **Stage terminal**: Emit the RESULT line and **STOP**. Do not proceed to `/hm:wrapup` or any other stage without an explicit user command — unless this stage was invoked as part of a fused workflow (e.g., `exec-rev-wrap-ver`), in which case the fused workflow owns the transition.
 
 ## Outputs
 

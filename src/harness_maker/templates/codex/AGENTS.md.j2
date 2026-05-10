@@ -1,24 +1,52 @@
-# AGENTS.md — {{ preset }} preset
+# AGENTS.md — harness-maker workflow guide
 
-> harness-maker {{ config.dev_mode }} mode. Edit the user blocks below to add project-specific rules.
+> **{{ preset }}** preset · {{ config.dev_mode }} mode
+> harness-maker {{ config.harness_maker_version | default('') }} — skills are in `.agents/skills/`.
 
-## Workflow
+## Workflow overview
 
-Default: `@hm-{{ config.default_workflow }}` skill — invokes the fused workflow that chains atomic stages.
+harness-maker provides 7 atomic stages and fused workflows.
+Invoke a stage by mentioning the skill name (e.g. `@hm-execute task-slug`).
 
-Run individual stages: `@hm-research`, `@hm-spec`, `@hm-plan`, `@hm-execute`, `@hm-review`, `@hm-verify`, `@hm-wrapup`.
+### Atomic stages
 
-## Reviewers
+| Skill | Purpose |
+|-------|---------|
+| `@hm-research` | Multi-source fact-gathering; writes RESEARCH doc |
+| `@hm-spec` | Acceptance-criteria specification; writes SPEC doc |
+| `@hm-plan` | Phase decomposition + ADRs; writes PLAN doc |
+| `@hm-execute` | TDD implementation driven by PLAN; no commits |
+| `@hm-review` | Deep code review; grades A–F; writes REVIEW doc |
+| `@hm-verify` | Full check suite: tests + lint + type |
+| `@hm-wrapup` | Final tests, drift gate, single commit |
 
-verbosity: `{{ config.reviewers.verbosity }}` — code, security, performance, concurrency, and UX reviewers available.
+### Autoloop
 
-## Caching
+| Skill | Purpose |
+|-------|---------|
+| `@hm-loop` | Bounded autoloop: interview → iterate workflow → wrapup |
 
-`{{ config.caching }}` — per-agent prompt cache + session cache.
+### Fused workflows (stages chained in one turn)
 
-## Autoloop / Worktree
+| Skill | Chain |
+|-------|-------|
+| `@hm-exec-rev` | execute → review |
+| `@hm-exec-rev-wrap` | execute → review → wrapup |
+| `@hm-exec-rev-wrap-ver` | execute → review → wrapup → verify |
 
-autoloop / worktree toggles live in `.claude/harness.yaml`.
+Default per-iteration workflow: `@hm-{{ config.default_workflow }}`.
+
+## Configuration
+
+- `harness.yaml` — worktree scope, loop settings, reviewer list
+- Worktree isolation: `{{ config.worktree.scope | join(', ') if config.worktree is defined and config.worktree.scope is defined else 'execute' }}`
+- Reviewers: {{ config.reviewers.verbosity | default('standard') }} verbosity
+
+## Quality bar
+
+All stage skills carry their own procedures. Each skill is self-contained —
+you do not need to read AGENTS.md to execute a stage; invoke the stage skill
+directly and follow the embedded procedure.
 
 <!-- @hm:user:project-rules -->
 <!-- Project-specific rules (coding style, domain terms, agent invocation conventions). Preserved across harness-maker upgrades. -->

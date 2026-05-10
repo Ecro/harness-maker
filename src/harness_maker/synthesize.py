@@ -81,9 +81,8 @@ def _stage_files() -> list[FileSpec]:
 def _atomic_command_files() -> list[FileSpec]:
     """Generate one /hm:<stage> command per atomic stage, with rendered body."""
     out: list[FileSpec] = []
-    # Lazy import: avoid jinja env construction at module import time
-    from harness_maker.models import HarnessConfig
-    from harness_maker.render import _make_env
+    from harness_maker.models import HarnessConfig  # local import: avoid cycle
+    from harness_maker.render import _make_env  # local import: avoid cycle
 
     env = _make_env()
     default_config = HarnessConfig().model_dump(mode="json")
@@ -98,6 +97,7 @@ def _atomic_command_files() -> list[FileSpec]:
             # stages/execute.md.j2 calls `python -m harness_maker.worktree`
             # via this absolute path baked into the rendered slash command.
             harness_maker_src_path=_HARNESS_MAKER_PKG_ROOT,
+            is_codex=False,
         )
         out.append(
             (
@@ -360,8 +360,21 @@ def _cursor_target_files() -> list[FileSpec]:
 
 def _codex_target_files(
     fused_workflows: dict[str, list[AtomicStage]],
+    *,
+    config_dump: dict[str, object] | None = None,
 ) -> list[FileSpec]:
     """Codex target-specific assets: config.toml + AGENTS.md + hooks.json + agents + skills."""
+    from harness_maker.render import _make_env  # local import: avoid cycle
+
+    if config_dump is None:
+        from harness_maker.models import HarnessConfig  # local import: avoid cycle
+        config_dump = HarnessConfig().model_dump(mode="json")
+    env = _make_env()
+    loop_body = env.get_template("commands/hm/loop.md.j2").render(
+        harness_maker_src_path=_HARNESS_MAKER_PKG_ROOT,
+        is_codex=True,
+        config=config_dump,
+    )
     return [
         (
             "codex/config.toml.j2",
@@ -380,12 +393,12 @@ def _codex_target_files(
         ),
         *_codex_agent_files(),
         *_codex_skill_files(),
-        *_codex_stage_skills(),
+        *_codex_stage_skills(config_dump=config_dump),
         *_codex_workflow_skills(fused_workflows),
         (
             "codex/loop_skill.md.j2",
             ".agents/skills/hm-loop/SKILL.md",
-            {},
+            {"loop_body": loop_body},
         ),
     ]
 
@@ -398,16 +411,34 @@ def _codex_skill_files() -> list[FileSpec]:
     ]
 
 
-def _codex_stage_skills() -> list[FileSpec]:
-    """Seven stage-trigger SKILL.md files — one per atomic stage."""
-    return [
-        (
-            "codex/stage_skill.md.j2",
-            f".agents/skills/hm-{s}/SKILL.md",
-            {"stage": s},
+def _codex_stage_skills(*, config_dump: dict[str, object] | None = None) -> list[FileSpec]:
+    """Seven stage-trigger SKILL.md files with embedded procedure bodies (is_codex=True)."""
+    from harness_maker.render import _make_env  # local import: avoid cycle
+
+    if config_dump is None:
+        from harness_maker.models import HarnessConfig  # local import: avoid cycle
+        config_dump = HarnessConfig().model_dump(mode="json")
+    env = _make_env()
+    out: list[FileSpec] = []
+    for s in _ATOMIC_STAGES:
+        tpl = env.get_template(f"stages/{s}.md.j2")
+        body = tpl.render(
+            workflow_context="",
+            stage=s,
+            project_name="",
+            feature="",
+            config=config_dump,
+            harness_maker_src_path=_HARNESS_MAKER_PKG_ROOT,
+            is_codex=True,
         )
-        for s in _ATOMIC_STAGES
-    ]
+        out.append(
+            (
+                "codex/stage_skill.md.j2",
+                f".agents/skills/hm-{s}/SKILL.md",
+                {"stage": s, "stage_body": body},
+            )
+        )
+    return out
 
 
 def _codex_workflow_skills(
@@ -437,17 +468,7 @@ def synthesize(
     effective_preset = preset or answers.preset
     base_specs = _base_files(effective_preset, answers.locale)
 
-    file_specs: list[FileSpec] = [
-        *base_specs,
-        *_workflow_command_files(answers.fused_workflows),
-    ]
-
-    if Target.CURSOR in answers.targets:
-        file_specs.extend(_cursor_target_files())
-
-    if Target.CODEX in answers.targets:
-        file_specs.extend(_codex_target_files(answers.fused_workflows))
-
+    # Build config before file_specs so Codex skill rendering gets real user values.
     config = HarnessConfig(
         locale=answers.locale,
         targets=list(answers.targets),
@@ -482,8 +503,19 @@ def synthesize(
         mcp_servers=dict(answers.mcp_servers),
         wrapup_docs=list(answers.wrapup_docs),
     )
-
     config_dump = config.model_dump(mode="json")
+
+    file_specs: list[FileSpec] = [
+        *base_specs,
+        *_workflow_command_files(answers.fused_workflows),
+    ]
+
+    if Target.CURSOR in answers.targets:
+        file_specs.extend(_cursor_target_files())
+
+    if Target.CODEX in answers.targets:
+        file_specs.extend(_codex_target_files(answers.fused_workflows, config_dump=config_dump))
+
     # Skills inventory + enabled list aren't part of HarnessConfig today, but
     # templates need them; expose via per-file context.
     skills_dump = {
@@ -503,6 +535,9 @@ def synthesize(
                 "scale": profile.scale,
                 "lifecycle": profile.lifecycle,
                 "harness_maker_src_path": _HARNESS_MAKER_PKG_ROOT,
+                # is_codex gates Codex-specific branches; always False here since
+                # Codex skill bodies are pre-rendered in _codex_stage_skills().
+                "is_codex": ctx.get("is_codex", False),
             },
             frontmatter={},
         )

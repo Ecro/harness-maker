@@ -4,7 +4,7 @@ harness_maker_version: 0.9.3
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/atomic_command.md.j2
 provenance: official
-content_hash: cbe3f3b8fe59ca71536015c3827976a74a4b66224d83ba2aeeb24cf53230eabe
+content_hash: d92dc565da460e82b037de361e3df60f9549bfb9536812a994a22e4f76be5e34
 ---
 # Stage: plan
 
@@ -92,7 +92,7 @@ This single confirmation prevents the "I just answered every SPEC question — w
 > **If Step 2 set Case A and Step 3.0 returned "Proceed to phase decomposition": SKIP this entire step.** Jump to Step 4.
 
 **Language rule (important):**
-- **Live interview UI** → conduct in `en` (en→English, ko→Korean, ja→Japanese, others→English fallback). Round preamble, "decisions so far", open ambiguity explanations, AskUserQuestion prompts and option labels — all in `en`.
+- **Live interview** → conduct in `en` (en→English, ko→Korean, ja→Japanese, others→English fallback). Round preamble, "decisions so far", open ambiguity explanations, AskUserQuestion prompts and option labels — all in `en`.
 - **PLAN document on disk** → always English. Translate user's free-form answers when archiving in Step 5.
 
 Each round runs Steps A–E.
@@ -329,6 +329,8 @@ After writing, Read the file back and assert:
 - Every phase has all 4 required fields (scope / exit / risk / rollback).
 
 If verification fails, retry write **once**. If still failing, surface the path + error and stop — do NOT proceed to a downstream stage.
+
+**Stage terminal**: On success, output a brief completion summary (PLAN path, interview rounds, ADR count, validator outcome) and **STOP**. Do not invoke any downstream stage (`/hm:execute` or any other) without an explicit user command. This boundary must survive context compaction — the next stage is user-initiated.
 
 ## Outputs
 

@@ -1,4 +1,4 @@
-# /hm:loop
+# {% if is_codex %}@hm-loop{% else %}/hm:loop{% endif %}
 
 > Start a bounded autoloop. Claude conducts a coverage-driven adaptive
 > interview to establish full context, then iterates the configured workflow
@@ -12,12 +12,24 @@ development repository, not in the projects this command runs in.
 
 ## Usage
 
+{% if is_codex %}
+Invoke via `@hm-loop <goal>` or `@hm-loop [options]`.
+
+Parse from the user's natural-language input:
+- Main text → the free-form `<goal>`
+- "spec: <path>" → loop-spec file path
+- "mode: feature" or "mode: improve" → explicit mode
+- "time: Nh" → wall-clock limit
+- "max-iter: N" → iteration cap
+- "workflow: <name>" → per-iter workflow override
+{% else %}
 ```
 /hm:loop <goal>
 /hm:loop --spec <path> [--mode feature|improve] [--target <path>]
          [--time 8h] [--max-iter 50] [--per-iter-workflow exec-rev]
          [--convergence <predicate>] [--dry-run]
 ```
+{% endif %}
 
 > **Breaking from pre-0.5.5**: per-iter workflow defaults to `exec-rev`
 > (was `exec-rev-wrap*`). Wrapup runs **once** at loop close instead of
@@ -25,6 +37,7 @@ development repository, not in the projects this command runs in.
 > worktree (improve and feature mode both). To restore the old per-iter
 > wrap behavior pass `--per-iter-workflow exec-rev-wrap` explicitly.
 
+{% if not is_codex %}
 ## Arguments
 
 `$ARGUMENTS` is parsed positionally + by flag:
@@ -50,14 +63,20 @@ development repository, not in the projects this command runs in.
   `min-2-features`, `min-5-features`, `first-iter`, `stopping-criteria`.
 - `--dry-run` — single iteration; mark all features completed without
   invoking the workflow.
+{% endif %}
 
 ---
 
 ## Procedure
 
-### 1. Parse `$ARGUMENTS`
+### 1. {% if is_codex %}Parse user input{% else %}Parse `$ARGUMENTS`{% endif %}
 
+{% if is_codex %}
+Parse from the user's natural-language input: extract goal text, spec path, mode,
+time limit, iteration cap, and workflow name as described in the Usage section above.
+{% else %}
 Extract all flags. Remaining tokens form the free-form `<goal>`.
+{% endif %}
 
 If neither `<goal>` nor `--spec` is present, halt with an error.
 
@@ -144,7 +163,7 @@ as **unresolved** and ask. Do not invent answers.
 
 Before interviewing for missing dimensions, lock in the loop's quality bar.
 
-Ask via `AskUserQuestion` (single call, two independent questions):
+{% if is_codex %}Ask in your response (two questions){% else %}Ask via `AskUserQuestion` (single call, two independent questions){% endif %}:
 
 **Q1 — Loop intensity:**
 
@@ -192,7 +211,7 @@ own additions; `maximum` includes all `thorough` items plus its own.
 
 #### 4-B. Interview for missing dimensions
 
-For each unresolved dimension, ask via `AskUserQuestion`. Present what you
+For each unresolved dimension, {% if is_codex %}ask in your response{% else %}ask via `AskUserQuestion`{% endif %}. Present what you
 found in the source (if anything) and ask the user to confirm or complete it.
 
 Ask dimensions in this order:
@@ -202,7 +221,7 @@ Ask dimensions in this order:
 4. test_reliability
 5. stopping_criteria
 
-Batch up to two related dimensions per `AskUserQuestion` call when they are
+Batch up to two related dimensions per {% if is_codex %}response question{% else %}`AskUserQuestion` call{% endif %} when they are
 short (e.g., priority + test_reliability). Never batch stopping_criteria with
 others — it deserves its own focused question.
 
@@ -216,7 +235,7 @@ condition that is NOT already in `exit_criteria_checklist`:
 
 1. Propose it as a new `ExitCriterion` (set `cmd` if a shell command can
    check it, otherwise leave `cmd=""`).
-2. Ask via `AskUserQuestion`: "Add to exit checklist? {proposed label}"
+2. {% if is_codex %}Ask in your response{% else %}Ask via `AskUserQuestion`{% endif %}: "Add to exit checklist? {proposed label}"
    Options: **Add (required)** / **Add (warning only)** / **Skip**.
 
 This ensures measurable stopping conditions become first-class checklist
@@ -233,7 +252,7 @@ After receiving each answer, evaluate whether it is **actionable**:
   qualifier ("important things")
 
 If not actionable, generate a targeted follow-up question (LLM-generated,
-not a fixed script) and ask via `AskUserQuestion`. Continue until actionable.
+not a fixed script) and {% if is_codex %}ask in your response{% else %}ask via `AskUserQuestion`{% endif %}. Continue until actionable.
 
 There is no maximum question count. The loop does not start until all five
 dimensions are actionable.
@@ -245,16 +264,16 @@ defined:
 
 - If input was a `--spec` file: propose features extracted from it (headings,
   roadmap items, TODO markers, DoD checklists). Cap proposal at one coherent
-  slice of 3–10 features. Ask via `AskUserQuestion` to accept / edit / retype.
+  slice of 3–10 features. {% if is_codex %}Ask in your response{% else %}Ask via `AskUserQuestion`{% endif %} to accept / edit / retype.
 - If input was a free-form `<goal>`: use the already-split feature list.
-  Ask via `AskUserQuestion` to add AC for each feature (batch 3–5 per call).
+  {% if is_codex %}Ask in your response{% else %}Ask via `AskUserQuestion`{% endif %} to add AC for each feature (batch 3–5 per call).
 
 For `improve` mode: features list stays empty. The iteration cycle is the
 "feature".
 
 #### 4-E. Convergence
 
-Ask via `AskUserQuestion` only if the stopping_criteria answer didn't make
+{% if is_codex %}Ask in your response{% else %}Ask via `AskUserQuestion`{% endif %} only if the stopping_criteria answer didn't make
 the convergence predicate obvious:
 
 - `feature` mode: translate stopping_criteria into one of the named
@@ -296,7 +315,7 @@ Five candidate types (use short label to track across rounds):
 - **PERF**: "What **performance or scale** expectations exist?" → implicit benchmarks
 
 **MUST NOT reuse a type label** from a previous round (track: WRONG/METHOD/STAKEHOLDER/STYLE/PERF used).
-Batch Layer 1 and Layer 2 questions into one `AskUserQuestion` call (max 4).
+{% if is_codex %}Ask Layer 1 and Layer 2 questions in your response (max 4).{% else %}Batch Layer 1 and Layer 2 questions into one `AskUserQuestion` call (max 4).{% endif %}
 
 **Layer 3 — Ambiguity Score (display and gate)**
 
@@ -320,7 +339,7 @@ appended to the Layer 3 display block, then applied.
 → proceed to step 4-F (Persist context).
 
 On **NEEDS**: return to Layer 1 (focus on failing axis); generate new Layer 2
-probes (no repeats). Max **3 rounds**. After 3 NEEDS, offer via `AskUserQuestion`:
+probes (no repeats). Max **3 rounds**. After 3 NEEDS, {% if is_codex %}ask in your response{% else %}offer via `AskUserQuestion`{% endif %}:
 - A: "Proceed — accept current ambiguity and start loop"
 - B: "Refine further — return to Layer 1 with new focus"
 
@@ -379,7 +398,7 @@ features:
       - <observable check>
 ```
 
-Show the user: saved paths + one-line summary, then ask `AskUserQuestion`
+Show the user: saved paths + one-line summary, then {% if is_codex %}ask in your response{% else %}ask `AskUserQuestion`{% endif %}
 for final go-ahead before starting the loop.
 
 ---
@@ -391,9 +410,19 @@ that wraps the **entire loop**. Per-loop (not per-iter) — improve and
 feature mode both default to one squash-merge at convergence. Per-iter
 worktree would explode commit count.
 
+{% if is_codex %}
+```
+Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree create execute $(pwd)")
+```
+
+If the command fails (non-zero exit or git error):
+- Warn the user: "Worktree creation failed — proceeding in-place (no isolation)."
+- Set `<WT>` = the current working directory. Continue.
+{% else %}
 ```bash
 !uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree create execute "$(pwd)"
 ```
+{% endif %}
 
 Read **all non-empty output lines** the command prints. Three cases:
 
@@ -402,8 +431,8 @@ Read **all non-empty output lines** the command prints. Three cases:
 - **One absolute path** like `/path/to/repo/.worktrees/execute-20260507T0010Z`
   → single-repo isolation. **Treat that exact string as `<WT>` for every
   subsequent operation in this loop**: every Read/Write/Edit call, every
-  `cd` for tests/lints, every workflow-command invocation. Do NOT use a
-  shell variable — each `!` block is a fresh subshell.
+  {% if is_codex %}`Bash("cd <WT> && ...")` for tests/lints{% else %}`cd` for tests/lints{% endif %}, every workflow-command invocation. Do NOT use a
+  shell variable{% if not is_codex %} — each `!` block is a fresh subshell{% endif %}.
 - **Multiple lines** → multi-repo isolation. Line 1 = primary repo worktree
   (`<WT>`). Lines 2+ = sibling repo worktrees (`<WT-sibling-N>`). Use `<WT>`
   for primary-repo operations and `<WT-sibling-N>` for sibling-repo edits.
@@ -411,9 +440,15 @@ Read **all non-empty output lines** the command prints. Three cases:
 After confirming the worktree path (or deciding to operate in cwd), **create
 the loop-active marker** in the project root:
 
+{% if is_codex %}
+```
+Bash("touch .hm-loop-active")
+```
+{% else %}
 ```bash
 !touch .hm-loop-active
 ```
+{% endif %}
 
 This activates the Stop hook guard — the session will not terminate while
 this file exists. The marker is gitignored by the harness worktree setup.
@@ -526,9 +561,15 @@ For each iter (until convergence or any safety rail fires):
 
    **Gate 1 — Mechanical** (skip items where `cmd=""`):
    For each `ExitCriterion` where `cmd != ""`, run the command inside `<WT>`:
+{% if is_codex %}
+   ```
+   Bash("cd <WT> && <criterion.cmd>")
+   ```
+{% else %}
    ```bash
    !cd <WT> && <criterion.cmd>
    ```
+{% endif %}
    - Exit 0 → criterion passes.
    - Exit non-0 → criterion fails.
      - `required: true` → Gate 1 fails → stop gate evaluation.
@@ -543,7 +584,7 @@ For each iter (until convergence or any safety rail fires):
    - "Clearly not satisfied" → fails. Reset `criterion_ambiguity_counts[label]` to 0.
    - "Ambiguous" → **deadlock detector**: increment `criterion_ambiguity_counts[label]`.
      Persist the updated map to `runtime.criterion_ambiguity_counts` in the
-     loop-context file. If the count reaches 3, ask via `AskUserQuestion`:
+     loop-context file. If the count reaches 3, {% if is_codex %}ask in your response{% else %}ask via `AskUserQuestion`{% endif %}:
      options **"Continue anyway"** / **"Accept criterion as met"** /
      **"Remove criterion"**. This prevents infinite loops on unresolvable
      qualitative bars.
@@ -618,7 +659,7 @@ When the loop halts (convergence, safety rail, or hard error):
      - Increment `checklist_fail_counts[label]`. Persist to
        `runtime.checklist_fail_counts` in loop-context file.
      - **Escape hatch (ADR-009)**: If `checklist_fail_counts[label] >= 3`,
-       ask via `AskUserQuestion`:
+       {% if is_codex %}ask in your response{% else %}ask via `AskUserQuestion`{% endif %}:
        - **"Override — accept loop as converged despite failing criterion"**
        - **"Abort — mark loop as not converged, exit without wrapup"**
        - **"Remove criterion and accept"** (removes from `exit_criteria_checklist`)
@@ -632,9 +673,15 @@ When the loop halts (convergence, safety rail, or hard error):
    `converged = True` (or after a safety rail fires), so re-entry cycles
    remain under the Stop hook guard:
 
+{% if is_codex %}
+   ```
+   Bash("rm -f .hm-loop-active")
+   ```
+{% else %}
    ```bash
    !rm -f .hm-loop-active
    ```
+{% endif %}
 
 3. **Run wrapup ONCE**: read `.claude/commands/hm/wrapup.md` and execute
    the wrapup stage (commits, SESSION-md if `--session`, memory append
@@ -656,9 +703,15 @@ When the loop halts (convergence, safety rail, or hard error):
 
 5. **Finalize worktree** (only if engaged in step 5):
 
+{% if is_codex %}
+   ```
+   Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree finalize <WT> <STATUS>")
+   ```
+{% else %}
    ```bash
    !uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree finalize <WT> <STATUS>
    ```
+{% endif %}
 
    On `success`: `worktree.merge` does a squash-merge into the loop's
    parent branch and then `cleanup --force` removes `<WT>`. **If squash

@@ -4,7 +4,7 @@ harness_maker_version: 0.9.3
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: stages/spec.md.j2
 provenance: official
-content_hash: 073e002a5fe44e43bc1abe9004c4359dfe3de73b73130e309ae9760088f55ea4
+content_hash: fea62ff883d1da8d211b09beb24be446be251ef67ed0457df1b3d6ccab2aa5cf
 ---
 # Stage: spec
 
@@ -265,6 +265,8 @@ dimensions.
 If `## ❓ Open Questions` is empty: update frontmatter `status: approved`. Otherwise `status: draft`.
 
 The user can resume by editing the SPEC directly or re-running `/hm:spec {slug}` (interview will read the existing SPEC and re-engage on draft items).
+
+**Stage terminal**: On success, output the SPEC path and its status (`draft` / `approved`), then **STOP**. Do not proceed to `/hm:plan` or any other stage without an explicit user command. This boundary must survive context compaction — the next stage is user-initiated.
 
 ## Outputs
 

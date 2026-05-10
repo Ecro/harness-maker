@@ -4,7 +4,7 @@ harness_maker_version: 0.9.3
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: de5781f33434542d7a9c00f297eb3b01878349028bbcf79b784b3bade424fb38
+content_hash: 0653a89d73bb341ded9d2555ffe7ee262c09efcbd90903fde53633047d019843
 ---
 # /hm:res-spec-plan
 
@@ -44,9 +44,11 @@ Research deliberately avoids heavy interaction — it is silent multi-source gat
 
 ## Usage
 
+
 ```
 /hm:research <topic> [--deep] [--slug=<name>]
 ```
+
 
 - `<topic>` — free-form description of what to research.
 - `--deep` — opt into Phase 0 refinement interview (3-5 questions to narrow scope before searching). Use when the topic is vague or over-broad. Default is OFF — research dives in directly.
@@ -55,6 +57,7 @@ Research deliberately avoids heavy interaction — it is silent multi-source gat
 ## Inputs
 
 - User topic (`$ARGUMENTS`).
+
 - Codebase context (relevant files, prior PLANs, prior REVIEWs in `work-docs/`).
 - Memory tiers — see loading order below.
 
@@ -223,6 +226,8 @@ Stop and validate with the user. Surface this prompt:
 ```
 
 If the user opts for "dig deeper" — re-enter Phase 1 with narrowed scope (one approach in focus). Re-write the RESEARCH document; do NOT create a second file.
+
+**Stage terminal**: On success, output the RESEARCH document path and a one-line summary of the recommended direction, then **STOP**. Do not proceed to `/hm:spec`, `/hm:plan`, or any other stage without an explicit user command. This boundary must survive context compaction — the next stage is user-initiated.
 
 ## Outputs
 
@@ -512,6 +517,8 @@ If `## ❓ Open Questions` is empty: update frontmatter `status: approved`. Othe
 
 The user can resume by editing the SPEC directly or re-running `/hm:spec {slug}` (interview will read the existing SPEC and re-engage on draft items).
 
+**Stage terminal**: On success, output the SPEC path and its status (`draft` / `approved`), then **STOP**. Do not proceed to `/hm:plan` or any other stage without an explicit user command. This boundary must survive context compaction — the next stage is user-initiated.
+
 ## Outputs
 
 - `specs/SPEC-{slug}.md` — frontmatter + 8 sections above.
@@ -627,7 +634,7 @@ This single confirmation prevents the "I just answered every SPEC question — w
 > **If Step 2 set Case A and Step 3.0 returned "Proceed to phase decomposition": SKIP this entire step.** Jump to Step 4.
 
 **Language rule (important):**
-- **Live interview UI** → conduct in `en` (en→English, ko→Korean, ja→Japanese, others→English fallback). Round preamble, "decisions so far", open ambiguity explanations, AskUserQuestion prompts and option labels — all in `en`.
+- **Live interview** → conduct in `en` (en→English, ko→Korean, ja→Japanese, others→English fallback). Round preamble, "decisions so far", open ambiguity explanations, AskUserQuestion prompts and option labels — all in `en`.
 - **PLAN document on disk** → always English. Translate user's free-form answers when archiving in Step 5.
 
 Each round runs Steps A–E.
@@ -864,6 +871,8 @@ After writing, Read the file back and assert:
 - Every phase has all 4 required fields (scope / exit / risk / rollback).
 
 If verification fails, retry write **once**. If still failing, surface the path + error and stop — do NOT proceed to a downstream stage.
+
+**Stage terminal**: On success, output a brief completion summary (PLAN path, interview rounds, ADR count, validator outcome) and **STOP**. Do not invoke any downstream stage (`/hm:execute` or any other) without an explicit user command. This boundary must survive context compaction — the next stage is user-initiated.
 
 ## Outputs
 

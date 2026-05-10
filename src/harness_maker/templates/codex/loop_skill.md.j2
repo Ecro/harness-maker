@@ -3,29 +3,7 @@ name: hm-loop
 description: "Start a bounded harness-maker autoloop. Runs a coverage-driven adaptive interview then iterates the configured workflow until stopping criteria are met or a safety cap fires."
 ---
 
-# hm-loop
-
-Start a **bounded autoloop** using the harness-maker workflow engine.
-
-## Usage
-
-```
-$hm-loop <goal>
-$hm-loop --spec <path> [--mode feature|improve] [--target <path>]
-         [--time 8h] [--max-iter 50] [--per-iter-workflow exec-rev]
-```
-
-## Behaviour
-
-1. Detect mode (`feature` or `improve`) from goal keywords or `--mode`.
-2. Run coverage-driven adaptive interview to establish full context.
-3. Iterate the per-iteration workflow (`exec-rev` by default) until:
-   - Convergence predicate is satisfied, OR
-   - `--max-iter` / `--time` safety cap fires.
-4. Run wrapup once at loop close.
-
-Follow the full procedure documented in **AGENTS.md** and the
-`$autoloop-driver` skill.
+{{ loop_body | default('') }}
 
 <!-- @hm:user:extensions -->
 <!-- Project-specific loop configuration. Preserved across upgrades. -->

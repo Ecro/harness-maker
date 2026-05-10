@@ -31,9 +31,18 @@ Research deliberately avoids heavy interaction — it is silent multi-source gat
 
 ## Usage
 
+{% if is_codex %}
+Invoke via `@hm-research <topic> [deep] [slug: <name>]`.
+
+Parse from the user's natural-language input:
+- Main topic text → the research topic
+- "deep" keyword → enable `--deep` refinement interview
+- "slug: <name>" → explicit output slug
+{% else %}
 ```
 /hm:research <topic> [--deep] [--slug=<name>]
 ```
+{% endif %}
 
 - `<topic>` — free-form description of what to research.
 - `--deep` — opt into Phase 0 refinement interview (3-5 questions to narrow scope before searching). Use when the topic is vague or over-broad. Default is OFF — research dives in directly.
@@ -41,7 +50,9 @@ Research deliberately avoids heavy interaction — it is silent multi-source gat
 
 ## Inputs
 
-- User topic (`$ARGUMENTS`).
+{% if is_codex %}- User topic (from your message — parse the research topic from natural language).
+{% else %}- User topic (`$ARGUMENTS`).
+{% endif %}
 - Codebase context (relevant files, prior PLANs, prior REVIEWs in `{{ config.work_docs.dir }}`).
 - Memory tiers — see loading order below.
 
@@ -59,7 +70,7 @@ Before starting, load memory in tier order (stops at first miss per tier):
 
 Vague or over-broad topics produce shallow research. Narrowing the question first is the single highest-leverage step. Skip this phase by default; engage when the topic itself is the unknown.
 
-When `--deep` is set, conduct one `AskUserQuestion` call in `{{ config.locale }}` with 3-5 questions drawn from this rubric:
+When `--deep` is set, {% if is_codex %}ask in your response{% else %}conduct one `AskUserQuestion` call in `{{ config.locale }}`{% endif %} with 3-5 questions drawn from this rubric:
 
 1. **Scope narrowing** — "Is this about {sub-area A} specifically, or the broader {domain}?"
 2. **Constraint surfacing** — "Which constraint actually binds: {HW budget / API compat / team skill / timeline / other}?"
@@ -105,7 +116,7 @@ Five candidate types (use short label to track; also exclude types semantically 
 - **TIME-SCOPE**: "What **time or depth** constraints apply — quick scan vs exhaustive survey?" → scope bounds
 
 **MUST NOT reuse a type label** from Phase 0 rubric or a prior gate round (track: NOT-USEFUL/AVOID/DEPTH/AUDIENCE/TIME-SCOPE used).
-Batch into one `AskUserQuestion` call (max 4).
+{% if is_codex %}Ask all Layer 1+2 questions in your response (max 4).{% else %}Batch into one `AskUserQuestion` call (max 4).{% endif %}
 
 **Layer 3 — Ambiguity Score (display)**
 
@@ -210,6 +221,8 @@ Stop and validate with the user. Surface this prompt:
 ```
 
 If the user opts for "dig deeper" — re-enter Phase 1 with narrowed scope (one approach in focus). Re-write the RESEARCH document; do NOT create a second file.
+
+**Stage terminal**: On success, output the RESEARCH document path and a one-line summary of the recommended direction, then **STOP**. Do not proceed to `/hm:spec`, `/hm:plan`, or any other stage without an explicit user command. This boundary must survive context compaction — the next stage is user-initiated.
 
 ## Outputs
 

@@ -39,6 +39,13 @@ Four-step flow, executed deterministically by the orchestrator:
    isolation costs more than it saves.
 
 2. **If "execute" (or current stage) in scope → call `worktree.create()`.**
+
+   CLI (used by stage skills directly):
+   ```
+   uv run python -m harness_maker.worktree create execute "$(pwd)"
+   ```
+
+   Python API (used by harness-maker internals):
    ```python
    from harness_maker import worktree
    wt = worktree.create(workflow="execute", base_dir=Path.cwd())

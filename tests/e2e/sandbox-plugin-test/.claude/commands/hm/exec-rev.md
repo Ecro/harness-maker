@@ -4,7 +4,7 @@ harness_maker_version: 0.9.3
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: e474762f1842820418bcdb678c560b6981142c381a33d0ccb40ed1199ea75627
+content_hash: 5ce33baf3a40d889e4395d54776cce60432f225616ca4fa7840e871c1d7b9460
 ---
 # /hm:exec-rev
 
@@ -31,17 +31,21 @@ Apply the PLAN's phases to the codebase. When `tdd_active`, tests are written fr
 
 ## Usage
 
+
 ```
 /hm:execute <slug> [--no-tdd]
 ```
 
 - `<slug>` — task identifier matching `work-docs/PLAN-{slug}.md`. Required.
 - `--no-tdd` — skip Phase A (test authoring), Phase A.5 (test-reviewer gate), and Phase B (RED gate). Phase C still loads SPEC reference. Use when:
+
+
   - Pure refactor (no behavior change — existing tests already cover).
   - Docs-only / config-only / typo fix.
   - Emergency fix where SPEC + tests are already present and correct.
 
   All other modes default to TDD. There is no second flag.
+
 
 ## Inputs
 
@@ -73,9 +77,11 @@ Engage isolation if `harness.yaml.worktree.scope` includes `execute`. The `workt
 
 **Idempotent under `/hm:loop`**: when this stage runs as part of a loop iteration, the loop has already engaged a per-loop worktree at step 5. The `worktree create` CLI detects we're already inside `.worktrees/<name>/` and returns that path — no nested worktrees, just reuse.
 
+
 ```bash
 !uv run --with /home/noel/harness-maker python -m harness_maker.worktree create execute "$(pwd)"
 ```
+
 
 Read **all non-empty output lines** — that is the contract for the rest of this stage. Three cases:
 
@@ -97,9 +103,11 @@ Read PLAN fully. Extract:
 - ADRs (binding constraints — must not be violated by implementation).
 - Frontmatter `spec:` and `research_doc:` references.
 
+
 Parse flags from `$ARGUMENTS`:
 - `--no-tdd` → set `tdd_active = false`.
 - Otherwise `tdd_active = true`.
+
 
 ### Step 2 — Resolve SPEC + RESEARCH cache (when frontmatter references them)
 
@@ -154,9 +162,11 @@ Resolution:
 
 Run the test command from SPEC's `## ✅ Verification Criteria` table (or the PLAN phase's exit criterion if SPEC absent):
 
+
 ```bash
 !cd <WT> && <test_command>
 ```
+
 
 Expected result: tests FAIL for the right reasons (missing implementation, not syntax errors / import errors / framework misconfiguration). Verify by reading the failure output. If the test passes by accident → return to Phase A and rewrite (false-RED is a Phase A.5 escape).
 
@@ -172,11 +182,13 @@ Compile / type-check after each edit; do not batch multiple edits before checkin
 
 Run the project's full check suite:
 
+
 ```bash
 !cd <WT> && <lint command>     # e.g., ruff check
 !cd <WT> && <type command>     # e.g., mypy --strict
 !cd <WT> && <test command>     # e.g., pytest tests/ -q
 ```
+
 
 Plus the PLAN phase's exit-criterion command. All must pass. If any fails:
 - Compile / type / lint failure → fix in Phase C (re-edit, re-check); do NOT advance.
@@ -199,6 +211,7 @@ If a PLAN phase blocks (Phase A.5 retry exhausted, Phase D unfixable, or ADR con
 
 Pick **exactly one** finalize command. Substitute `<WT>` with the literal absolute path from Step 0.
 
+
 ```bash
 # All phases GREEN — stage-merge the branch back (NO commit) + cleanup the worktree.
 # /hm:wrapup will create the single user-facing commit (with proper message + Co-Authored-By).
@@ -209,6 +222,7 @@ Pick **exactly one** finalize command. Substitute `<WT>` with the literal absolu
 # Stage halted on a blocker — preserve the worktree for inspection:
 !uv run --with /home/noel/harness-maker python -m harness_maker.worktree finalize <WT> fail
 ```
+
 
 If Step 0 printed empty (no isolation engaged), skip both — there is nothing to finalize.
 

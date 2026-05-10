@@ -8,7 +8,7 @@ name: worktree-isolator
 description: Isolate /hm:execute changes inside a disposable git worktree. Read harness.yaml.worktree.scope
   to decide whether to engage; on success merge back and clean up; on failure preserve
   the worktree for inspection.
-content_hash: 6dbec00b68278020063f121ad1522f3517eab68662a28f6ec7baad3f70bc0f21
+content_hash: f041a9abf2791ee59eaefc867a7f3dbc47d31860282f3ff527bfc2607ccfdec5
 ---
 
 # worktree-isolator
@@ -47,6 +47,13 @@ Four-step flow, executed deterministically by the orchestrator:
    isolation costs more than it saves.
 
 2. **If "execute" (or current stage) in scope → call `worktree.create()`.**
+
+   CLI (used by stage skills directly):
+   ```
+   uv run python -m harness_maker.worktree create execute "$(pwd)"
+   ```
+
+   Python API (used by harness-maker internals):
    ```python
    from harness_maker import worktree
    wt = worktree.create(workflow="execute", base_dir=Path.cwd())

@@ -10,7 +10,7 @@ description: Orchestration guide for /hm:loop. Covers two modes (feature and imp
   loop intensity + exit criteria checklist (4-gate convergence), improve-mode loop
   body invariants, and safety rails. The /hm:loop command file owns the per-step procedure;
   this skill explains WHY and the invariants Claude must hold.
-content_hash: 7d764912ddee54367d06139aeb1072a86775b9db06505a8940a3941bdf54f179
+content_hash: 5294ea09dfbb507e9d0401e67a31cc2105b39e5cfa186fc6c4852d70c65fcb26
 ---
 
 # autoloop-driver
@@ -153,7 +153,7 @@ business logic.
 
 ## Reference
 
-- Command: `commands/hm/loop.md` (full per-step procedure)
+- Command: Claude Code: `commands/hm/loop.md` · Codex: `@hm-loop` skill
 - Agent: `autoloop-coder` (per-iteration implementation worker)
 - Context: `work-docs/loop-context/<slug>.yaml`
 - Spec: `.claude/loop-specs/<slug>.yaml`

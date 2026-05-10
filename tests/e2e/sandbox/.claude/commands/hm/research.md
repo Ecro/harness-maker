@@ -4,7 +4,7 @@ harness_maker_version: 0.9.3
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/atomic_command.md.j2
 provenance: official
-content_hash: 284511ed15a63b37c2f17fd0309f24517f0becfefd23ebe2fb28d6fc9322aacd
+content_hash: af94df4d5985c7757269731dc906450ce9f03fbfcf136c0518479ffb9b95cd44
 ---
 # Stage: research
 
@@ -37,9 +37,11 @@ Research deliberately avoids heavy interaction — it is silent multi-source gat
 
 ## Usage
 
+
 ```
 /hm:research <topic> [--deep] [--slug=<name>]
 ```
+
 
 - `<topic>` — free-form description of what to research.
 - `--deep` — opt into Phase 0 refinement interview (3-5 questions to narrow scope before searching). Use when the topic is vague or over-broad. Default is OFF — research dives in directly.
@@ -48,6 +50,7 @@ Research deliberately avoids heavy interaction — it is silent multi-source gat
 ## Inputs
 
 - User topic (`$ARGUMENTS`).
+
 - Codebase context (relevant files, prior PLANs, prior REVIEWs in `work-docs/`).
 - Memory tiers — see loading order below.
 
@@ -216,6 +219,8 @@ Stop and validate with the user. Surface this prompt:
 ```
 
 If the user opts for "dig deeper" — re-enter Phase 1 with narrowed scope (one approach in focus). Re-write the RESEARCH document; do NOT create a second file.
+
+**Stage terminal**: On success, output the RESEARCH document path and a one-line summary of the recommended direction, then **STOP**. Do not proceed to `/hm:spec`, `/hm:plan`, or any other stage without an explicit user command. This boundary must survive context compaction — the next stage is user-initiated.
 
 ## Outputs
 

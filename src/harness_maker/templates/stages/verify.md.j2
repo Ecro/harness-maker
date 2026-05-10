@@ -28,7 +28,7 @@ Block silent regressions and partial completions. Run a rigid 6-check rubric tha
 /hm:verify [--force] [--reason=<text>]
 ```
 
-- `--force` — proceed even when one or more checks FAIL. **Logged with the override reason.** Use only when the user has consciously chosen to bypass (emergency hotfix, intentional debt). Without `--reason=<text>`, `--force` requires confirmation via AskUserQuestion in `{{ config.locale }}`.
+- `--force` — proceed even when one or more checks FAIL. **Logged with the override reason.** Use only when the user has consciously chosen to bypass (emergency hotfix, intentional debt). Without `--reason=<text>`, `--force` requires confirmation {% if is_codex %}in your response{% else %}via AskUserQuestion in `{{ config.locale }}`{% endif %}.
 - `--reason=<text>` — free-form override rationale. Required for `--force` in non-interactive contexts (autoloop).
 
 ## Inputs
@@ -57,6 +57,16 @@ FAIL when: any scenario lacks coverage AND lacks waiver.
 
 Run the project's full check suite. Pick the toolchain that matches the project:
 
+{% if is_codex %}
+```
+# Python:
+Bash("uv run pytest -q")
+Bash("uv run ruff check src/ tests/")
+Bash("uv run mypy --strict src/")
+# Rust: Bash("cargo test && cargo check")
+# Node: Bash("pnpm test && pnpm build")
+```
+{% else %}
 ```bash
 # Python:
 !uv run pytest -q
@@ -65,6 +75,7 @@ Run the project's full check suite. Pick the toolchain that matches the project:
 # Rust: cargo test && cargo check
 # Node: pnpm test && pnpm build
 ```
+{% endif %}
 
 If the harness has its own `.claude-verify.sh phase_<N>` script, prefer it over the generic toolchain commands.
 
@@ -161,6 +172,7 @@ When `--force` is set, append the same record with `"force_override": true, "ove
 3. Repeat for Checks 2-6.
 4. Emit final RESULT line + JSON record.
 5. When `--force` is set with FAILing checks: emit text + JSON record with override flag + reason, then return PASS exit code (let the workflow proceed). Wrapup will surface the override in the commit body footer.
+6. **Stage terminal**: Emit the RESULT line and **STOP**. Do not proceed to `/hm:wrapup` or any other stage without an explicit user command — unless this stage was invoked as part of a fused workflow (e.g., `exec-rev-wrap-ver`), in which case the fused workflow owns the transition.
 
 ## Outputs
 

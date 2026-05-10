@@ -64,6 +64,7 @@ def fuse(
             # stages/execute.md.j2 invokes `python -m harness_maker.worktree`
             # via this absolute path baked into the rendered slash command.
             harness_maker_src_path=_HARNESS_MAKER_PKG_ROOT,
+            is_codex=False,
         )
         parts.append(f"\n## Stage: {stage.value}\n\n{body}")
     return "\n".join(parts)

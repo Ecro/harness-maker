@@ -4,7 +4,7 @@ harness_maker_version: 0.9.3
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: stages/wrapup.md.j2
 provenance: official
-content_hash: 54f4eb3dacb3cb6a1e0aae6bb778d08aa09bcdb6cdf4bc7efee90ca2cb14033e
+content_hash: 5e25ac7efb5c6794c82ec64958eb6aa69b4afd7955790606b537cc789773250e
 ---
 # Stage: wrapup
 
@@ -55,6 +55,7 @@ Before touching anything, verify state:
 
 Run the project's full check suite once before committing. Catch regressions wrapup-stage edits could introduce:
 
+
 ```bash
 # Pick the toolchain that matches the project. Examples:
 !uv run pytest -x                      # Python
@@ -63,6 +64,7 @@ Run the project's full check suite once before committing. Catch regressions wra
 # Rust: cargo test && cargo check
 # Node: pnpm test && pnpm build
 ```
+
 
 If any fail: STOP, surface the failure, do NOT proceed. Reverting an executed-merge is more painful than diagnosing here.
 

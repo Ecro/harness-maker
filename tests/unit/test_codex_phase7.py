@@ -7,8 +7,11 @@ RED before Phase 7:
 
 GREEN after Phase 7:
 - stage_skill.md.j2 renders valid SKILL.md frontmatter
-- hm-research skill description mentions "harness-maker research stage" and "AGENTS.md"
-- _codex_target_files() includes 11 existing + 7 stage = 18 skill paths
+- hm-research skill description mentions "harness-maker research stage"
+- _codex_target_files() includes 11 existing + 7 stage + 1 loop = 19 skill paths
+
+ADR-001 overrides ADR-008: stage skills now embed procedure bodies directly,
+not via AGENTS.md reference. The AGENTS.md assertion has been removed.
 """
 
 from __future__ import annotations
@@ -69,14 +72,18 @@ def test_stage_skill_has_description_field(stage: str) -> None:
     )
 
 
-def test_stage_skill_research_mentions_harness_maker_and_agents_md() -> None:
-    """hm-research SKILL.md must mention 'harness-maker' and 'AGENTS.md'."""
+def test_stage_skill_research_mentions_harness_maker() -> None:
+    """hm-research SKILL.md must mention 'harness-maker' in description.
+
+    ADR-001 overrides ADR-008: procedures are embedded in the skill body, not
+    delegated via AGENTS.md. The AGENTS.md assertion is intentionally removed.
+    """
     rendered = _render_stage_skill("research")
     assert "harness-maker" in rendered.lower(), (
         "hm-research skill missing 'harness-maker' reference"
     )
-    assert "AGENTS.md" in rendered, (
-        "hm-research skill missing 'AGENTS.md' reference (ADR-008)"
+    assert "research stage" in rendered.lower(), (
+        "hm-research skill description must mention 'research stage'"
     )
 
 

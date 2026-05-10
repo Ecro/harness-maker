@@ -4,7 +4,7 @@ harness_maker_version: 0.9.3
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/loop.md.j2
 provenance: official
-content_hash: 6a6ed14266cba4e94a84d4a17fca5c1f8fe05b8b5723db25d1259b2e12e97069
+content_hash: fbc3a5df1b0c23f919ee33eeb8e59159539a352e9561eab8fe4eb2cce81864ae
 ---
 # /hm:loop
 
@@ -20,6 +20,7 @@ development repository, not in the projects this command runs in.
 
 ## Usage
 
+
 ```
 /hm:loop <goal>
 /hm:loop --spec <path> [--mode feature|improve] [--target <path>]
@@ -27,11 +28,13 @@ development repository, not in the projects this command runs in.
          [--convergence <predicate>] [--dry-run]
 ```
 
+
 > **Breaking from pre-0.5.5**: per-iter workflow defaults to `exec-rev`
 > (was `exec-rev-wrap*`). Wrapup runs **once** at loop close instead of
 > per iter. The whole loop runs inside one `.worktrees/execute-<ts>/`
 > worktree (improve and feature mode both). To restore the old per-iter
 > wrap behavior pass `--per-iter-workflow exec-rev-wrap` explicitly.
+
 
 ## Arguments
 
@@ -59,13 +62,16 @@ development repository, not in the projects this command runs in.
 - `--dry-run` — single iteration; mark all features completed without
   invoking the workflow.
 
+
 ---
 
 ## Procedure
 
 ### 1. Parse `$ARGUMENTS`
 
+
 Extract all flags. Remaining tokens form the free-form `<goal>`.
+
 
 If neither `<goal>` nor `--spec` is present, halt with an error.
 
@@ -399,9 +405,11 @@ that wraps the **entire loop**. Per-loop (not per-iter) — improve and
 feature mode both default to one squash-merge at convergence. Per-iter
 worktree would explode commit count.
 
+
 ```bash
 !uv run --with /home/noel/harness-maker python -m harness_maker.worktree create execute "$(pwd)"
 ```
+
 
 Read **all non-empty output lines** the command prints. Three cases:
 
@@ -419,9 +427,11 @@ Read **all non-empty output lines** the command prints. Three cases:
 After confirming the worktree path (or deciding to operate in cwd), **create
 the loop-active marker** in the project root:
 
+
 ```bash
 !touch .hm-loop-active
 ```
+
 
 This activates the Stop hook guard — the session will not terminate while
 this file exists. The marker is gitignored by the harness worktree setup.
@@ -534,9 +544,11 @@ For each iter (until convergence or any safety rail fires):
 
    **Gate 1 — Mechanical** (skip items where `cmd=""`):
    For each `ExitCriterion` where `cmd != ""`, run the command inside `<WT>`:
+
    ```bash
    !cd <WT> && <criterion.cmd>
    ```
+
    - Exit 0 → criterion passes.
    - Exit non-0 → criterion fails.
      - `required: true` → Gate 1 fails → stop gate evaluation.
@@ -640,9 +652,11 @@ When the loop halts (convergence, safety rail, or hard error):
    `converged = True` (or after a safety rail fires), so re-entry cycles
    remain under the Stop hook guard:
 
+
    ```bash
    !rm -f .hm-loop-active
    ```
+
 
 3. **Run wrapup ONCE**: read `.claude/commands/hm/wrapup.md` and execute
    the wrapup stage (commits, SESSION-md if `--session`, memory append
@@ -664,9 +678,11 @@ When the loop halts (convergence, safety rail, or hard error):
 
 5. **Finalize worktree** (only if engaged in step 5):
 
+
    ```bash
    !uv run --with /home/noel/harness-maker python -m harness_maker.worktree finalize <WT> <STATUS>
    ```
+
 
    On `success`: `worktree.merge` does a squash-merge into the loop's
    parent branch and then `cleanup --force` removes `<WT>`. **If squash
