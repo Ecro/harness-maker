@@ -61,7 +61,7 @@ files:
   body_sha256: 2be1a94db316238100c0d2d15ff5bdf28d41aba05c2aedb2b2c9d816fc8f6be4
 - path: commands/hm/loop.md
   template: commands/hm/loop.md.j2
-  body_sha256: fbc3a5df1b0c23f919ee33eeb8e59159539a352e9561eab8fe4eb2cce81864ae
+  body_sha256: 98a818efe66617db70f28b9816d2bb13f8f9eb3409461dc863e496930ebfd8e8
 - path: commands/hm/make.md
   template: commands/hm/make.md.j2
   body_sha256: 37218410cd9e8d24ca79817a18e408984df2815d5fa3fbd5aad922957f1907e7

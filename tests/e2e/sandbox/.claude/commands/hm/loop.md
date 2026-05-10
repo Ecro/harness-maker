@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.9.3
+harness_maker_version: 0.9.4
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/loop.md.j2
 provenance: official
-content_hash: fbc3a5df1b0c23f919ee33eeb8e59159539a352e9561eab8fe4eb2cce81864ae
+content_hash: 98a818efe66617db70f28b9816d2bb13f8f9eb3409461dc863e496930ebfd8e8
 ---
 # /hm:loop
 
@@ -648,9 +648,20 @@ When the loop halts (convergence, safety rail, or hard error):
 
    This gate fires for **both** feature and improve mode when `converged = True`.
 
-2. **Delete the loop-active marker** — after the checklist gate confirms
-   `converged = True` (or after a safety rail fires), so re-entry cycles
-   remain under the Stop hook guard:
+2. **Delete the loop-active marker only on convergence or explicit override**.
+
+   Keep `.hm-loop-active` on every non-converged halt (max-iter, time cap,
+   failed-streak cap, hard error, or unresolved checklist failure). In those
+   states, report the blocker and ask for an explicit next action while the
+   Stop hook remains active:
+
+   - **Continue** — adjust budget/scope and re-enter the iteration body.
+   - **Abort** — user accepts non-convergence; delete marker and finalize `fail`.
+   - **Override** — user explicitly accepts the current state; delete marker
+     and finalize using the user-approved status.
+
+   After the checklist gate confirms `converged = True`, or after the user
+   explicitly chooses Abort/Override, delete the marker:
 
 
    ```bash
