@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.7.3
+harness_maker_version: 0.7.4
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: stages/execute.md.j2
 provenance: official
-content_hash: 3629b33e2e6e3eac4344feef4de61d6139d6327b7c12b4c181030bd13c04210e
+content_hash: 2c1e4de5e9307e7cbcfe5722cba399cf687000706820338fa9a77c6183b0315c
 ---
 # Stage: execute
 
@@ -67,7 +67,7 @@ Engage isolation if `harness.yaml.worktree.scope` includes `execute`. The `workt
 **Idempotent under `/hm:loop`**: when this stage runs as part of a loop iteration, the loop has already engaged a per-loop worktree at step 5. The `worktree create` CLI detects we're already inside `.worktrees/<name>/` and returns that path — no nested worktrees, just reuse.
 
 ```bash
-!uv run --with /home/noel/harness-maker python -m harness_maker.worktree create execute "$(pwd)"
+!uv run --with /home/noel/harness-maker/.worktrees/execute-20260510T0331Z python -m harness_maker.worktree create execute "$(pwd)"
 ```
 
 Read **all non-empty output lines** — that is the contract for the rest of this stage. Three cases:
@@ -195,12 +195,12 @@ Pick **exactly one** finalize command. Substitute `<WT>` with the literal absolu
 ```bash
 # All phases GREEN — stage-merge the branch back (NO commit) + cleanup the worktree.
 # /hm:wrapup will create the single user-facing commit (with proper message + Co-Authored-By).
-!uv run --with /home/noel/harness-maker python -m harness_maker.worktree finalize <WT> stage-only
+!uv run --with /home/noel/harness-maker/.worktrees/execute-20260510T0331Z python -m harness_maker.worktree finalize <WT> stage-only
 ```
 
 ```bash
 # Stage halted on a blocker — preserve the worktree for inspection:
-!uv run --with /home/noel/harness-maker python -m harness_maker.worktree finalize <WT> fail
+!uv run --with /home/noel/harness-maker/.worktrees/execute-20260510T0331Z python -m harness_maker.worktree finalize <WT> fail
 ```
 
 If Step 0 printed empty (no isolation engaged), skip both — there is nothing to finalize.

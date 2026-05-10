@@ -126,6 +126,23 @@ _PROD_ENABLED_REVIEWERS: list[str] = [
 ]
 _PROD_ENABLED_SKILLS: list[str] = list(_ALL_SKILLS)
 
+_FOCUS_REVIEWERS: dict[str, list[str]] = {
+    "feature": ["code-reviewer", "ux-reviewer"],
+    "bugfix": ["code-reviewer", "test-reviewer"],
+    "security": ["code-reviewer", "security-reviewer", "security-auditor"],
+    "performance": ["code-reviewer", "performance-reviewer"],
+    "refactoring": ["code-reviewer", "concurrency-reviewer"],
+}
+
+
+def _focus_to_additional_reviewers(focus: str, preset: Preset) -> list[str]:
+    """Return reviewers to enable beyond the preset default for a given work focus."""
+    wanted = set(_FOCUS_REVIEWERS.get(focus, []))
+    preset_defaults = set(
+        _SIDE_ENABLED_REVIEWERS if preset == Preset.SIDE else _PROD_ENABLED_REVIEWERS
+    )
+    return sorted(wanted - preset_defaults)
+
 
 def interview(
     profile: ProjectProfile,

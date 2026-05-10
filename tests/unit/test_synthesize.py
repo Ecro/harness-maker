@@ -82,13 +82,41 @@ def test_synthesize_includes_harness_yaml_and_settings_json() -> None:
 
 
 def test_synthesize_fused_workflow_command_count() -> None:
-    """Side starter set has 3 fused workflows + 7 atomic + 3 fixed = 13 commands/hm/."""
+    """Side starter set has 3 fused + 7 atomic + 6 fixed = 16 commands/hm/."""
     p = _profile()
     a = interview(p, autoloop_mode=True)
     bp = synthesize(p, a)
     cmd_paths = [str(f.path) for f in bp.files if str(f.path).startswith("commands/hm/")]
-    expected = 7 + 3 + len(a.fused_workflows)  # atomic + (loop/monitor/refresh) + fused
+    # atomic(7) + fixed(6: loop/ai-readiness/refresh/make/configure/uninstall) + fused
+    expected = 7 + 6 + len(a.fused_workflows)
     assert len(cmd_paths) == expected
+
+
+def test_synthesize_includes_make_command() -> None:
+    """Phase 1: /hm:make command template must be in the generated file list."""
+    p = _profile()
+    a = interview(p, autoloop_mode=True)
+    bp = synthesize(p, a)
+    paths = {str(f.path) for f in bp.files}
+    assert "commands/hm/make.md" in paths
+
+
+def test_synthesize_includes_configure_command() -> None:
+    """Phase 6: /hm:configure command template must be in the generated file list."""
+    p = _profile()
+    a = interview(p, autoloop_mode=True)
+    bp = synthesize(p, a)
+    paths = {str(f.path) for f in bp.files}
+    assert "commands/hm/configure.md" in paths
+
+
+def test_synthesize_includes_uninstall_command() -> None:
+    """Phase 7: /hm:uninstall command template must be in the generated file list."""
+    p = _profile()
+    a = interview(p, autoloop_mode=True)
+    bp = synthesize(p, a)
+    paths = {str(f.path) for f in bp.files}
+    assert "commands/hm/uninstall.md" in paths
 
 
 def test_synthesize_context_carries_preset() -> None:

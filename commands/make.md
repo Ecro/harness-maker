@@ -82,16 +82,96 @@ most common reason existing 0.4.x/0.5.0 users return to this command:
   directly in the prompt also routes here; see section 0.5.)
 - **Audit only** — report status, do not change anything.
 
-### 3. If `STATE=fresh-install` — ask first-time questions
+### 3. If `STATE=fresh-install` — smart defaults + confirm
 
-Use `AskUserQuestion` to gather (in this order):
-- preset (Side / Production)
-- locale (en / ko / free-text)
-- dev_mode (task-driven / spec-driven; Side default = task, Production = spec)
-- targets (claude-code / cursor / claude-code,cursor — multi-select)
+#### 3.1 Run profile scan
 
-Then dispatch with `--preset / --locale / --dev-mode / --targets --autoloop`
-so the CLI skips its own interview but uses the answers you collected.
+```bash
+!uv run --directory "$plugin_dir" python -m harness_maker.cli profile "$(pwd)" --json
+```
+
+Parse the JSON output. Extract: `stack`, `scale`, `lifecycle`, `detected_checks`.
+
+#### 3.2 Compute smart defaults
+
+Based on the profile, derive:
+- **preset**: `Production` if (scale=medium/large OR lifecycle=active), else `Side`
+- **preset reason**: e.g. "stack=Python+FastAPI, scale=medium, lifecycle=active → Production recommended"
+- **reviewer_list**: Side = `[code-reviewer]`; Production = `[code-reviewer, security-reviewer, performance-reviewer, ux-reviewer, concurrency-reviewer]`
+- **detected_checks**: from profile scan (may be empty)
+- **grade_threshold**: `A` if Production, else `B`
+- **locale**: `en` (default)
+- **dev_mode**: `spec-driven` if Production, else `task-driven`
+- **targets**: `claude-code` (default)
+
+#### 3.3 AskUserQuestion: Smart defaults confirm screen
+
+Show a summary of the detected profile and smart defaults. Use `AskUserQuestion`:
+
+> **Project profile detected:**
+> - Stack: {stack}
+> - Scale: {scale} ({file_count} files)
+> - Lifecycle: {lifecycle}
+>
+> **Recommended setup:**
+> - Preset: {preset} — {reason}
+> - Reviewers: {reviewer_list}
+> - Mechanical checks: {detected_checks or "(none detected — add manually later)"}
+> - Grade threshold: {grade_threshold}
+> - Auto-fix: enabled
+>
+> Options:
+> - **Looks right** — install with these settings
+> - **Adjust a few things** — change specific dimensions
+> - **Full setup** — answer all questions (preset, locale, dev_mode, targets, focus, grade, domains, model)
+
+#### 3.4 Branch on confirm response
+
+**"Looks right"** → Jump to Section 3.6 (Preview) with smart defaults.
+
+**"Adjust a few things"** → Use `AskUserQuestion` to ask which dimension(s)
+to change (multi-select: preset, locale, dev_mode, targets, grade_threshold,
+mechanical_checks). For each selected dimension, show an `AskUserQuestion`
+with the current smart default and alternatives. Then jump to Section 3.6.
+
+**"Full setup"** → Ask all dimensions in order:
+
+1. `AskUserQuestion`: **preset** — `Side` or `Production` (show smart default)
+2. `AskUserQuestion`: **locale** — `en`, `ko`, or free-text
+3. `AskUserQuestion`: **dev_mode** — `task-driven` or `spec-driven`
+4. `AskUserQuestion`: **targets** — `claude-code`, `cursor`, or both (multi-select)
+5. `AskUserQuestion`: **review focus** — "What's your primary work on this project?"
+   Options: `feature` (code + UX review), `bugfix` (code + test review),
+   `security` (code + security + auditor), `performance` (code + perf review),
+   `refactoring` (code + concurrency review). Maps to `--focus` flag.
+6. `AskUserQuestion`: **mechanical_checks** — "Pre-review shell commands to
+   run before LLM reviewers." Show detected_checks as suggestion. User can
+   accept, edit, or clear. Semicolon-separated. Maps to `--mechanical-checks`.
+7. `AskUserQuestion`: **grade_threshold** — `A` (strict, zero P0/P1), `B`
+   (moderate, up to 2 P1), or `C` (relaxed). Maps to `--grade-threshold`.
+8. `AskUserQuestion`: **domains + model** — comma-separated domain packs
+   (python, react, tauri, ...) and preferred Claude model (opus/sonnet/haiku).
+   Maps to `--domains` and `--recommended-model`.
+
+#### 3.5 Preview AskUserQuestion
+
+Before dispatch, show a preview:
+
+> **Will install 40+ files under .claude/.** Key capabilities:
+> - {count} slash commands ({workflow_names})
+> - {reviewer_count} reviewers active
+> - {skill_count} skills enabled
+> - Mechanical checks: {checks or "(none)"}
+>
+> Options:
+> - **Proceed** — install now
+> - **Cancel** — abort
+
+If "Cancel": exit without dispatch.
+
+#### 3.6 Dispatch with collected values
+
+Jump to Section 4 → Fresh install branch, passing all collected flags.
 
 ### 4. Dispatch — pick the right CLI invocation
 
@@ -164,17 +244,30 @@ in turn, then dispatch with all collected flags:
    `spec-driven` (spec_gate hook enforced).
 4. `AskUserQuestion`: **targets** — `claude-code`, `cursor`, or both
    (multi-select; `claude-code,cursor` for both).
+5. `AskUserQuestion`: **review focus** — `feature` | `bugfix` | `security` |
+   `performance` | `refactoring`. Maps to `--focus`.
+6. `AskUserQuestion`: **mechanical_checks** — semicolon-separated commands.
+   Show detected_checks from `profile --json` as suggestion. Maps to
+   `--mechanical-checks`.
+7. `AskUserQuestion`: **grade_threshold** — `A` | `B` | `C`. Maps to
+   `--grade-threshold`.
+8. `AskUserQuestion`: **domains + model** — comma-separated domain packs
+   and preferred Claude model. Maps to `--domains` and `--recommended-model`.
 
 Then dispatch with the collected values:
 
 ```bash
 !uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" \
-  --preset "$PRESET" --locale "$LOCALE" --dev-mode "$DEV_MODE" --targets "$TARGETS"
+  --preset "$PRESET" --locale "$LOCALE" --dev-mode "$DEV_MODE" --targets "$TARGETS" \
+  --focus "$FOCUS" --grade-threshold "$GRADE" --domains "$DOMAINS" \
+  --mechanical-checks "$CHECKS" --recommended-model "$MODEL"
 ```
 
-Existing settings outside these four dimensions (workflow naming, reviewer
-enablement, anti-rot config, etc.) are reused from `.claude/harness.yaml`.
-For a deeper reset that re-asks those too, run from a real terminal:
+Omit flags for any dimension the user skipped or left at default.
+
+Existing settings outside these dimensions (workflow naming, anti-rot
+config, etc.) are reused from `.claude/harness.yaml`. For a deeper reset
+that re-asks those too, run from a real terminal:
 `uv run --directory <plugin_dir> python -m harness_maker.cli make <project> --reinterview`.
 
 #### Audit only
@@ -191,18 +284,30 @@ Use Read + Bash; no CLI invocation.
 
 ```bash
 !uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" \
-  --preset "$PRESET" --locale "$LOCALE" --dev-mode "$DEV_MODE" --targets "$TARGETS" --autoloop
+  --preset "$PRESET" --locale "$LOCALE" --dev-mode "$DEV_MODE" --targets "$TARGETS" \
+  --focus "$FOCUS" --grade-threshold "$GRADE" --domains "$DOMAINS" \
+  --mechanical-checks "$CHECKS" --recommended-model "$MODEL" --autoloop
 ```
 
-(Substitute the values collected in step 3. `$TARGETS` is the
-comma-joined multi-select — e.g. `claude-code` or `claude-code,cursor`.)
+Substitute the values collected in step 3. Omit flags the user didn't set
+or left at smart defaults (the CLI applies preset defaults for unset flags).
+`$TARGETS` is the comma-joined multi-select — e.g. `claude-code` or
+`claude-code,cursor`.
 
-### 5. Report
+### 5. Report + Quick start
 
 After dispatch, summarize what changed:
 - Files: how many REPLACE / MERGE_BLOCK / KEEP (the CLI prints this)
 - Whether the chosen intent landed (e.g., "preset is now Production")
 - Backup directory path for recovery
+
+Then show a **quick-start** guide:
+
+> **Harness installed!** Here's what to try first:
+> - Run `/hm:execute <task>` to implement a feature with TDD
+> - Run `/hm:ai-readiness` to see your project's AI-readiness score
+> - Run `/hm:configure` to adjust settings later
+> - Run `/hm:make` after a plugin update for a quick re-render
 
 If something's unclear, prompt the user with `AskUserQuestion` rather than
 guessing.

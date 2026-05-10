@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.7.3
+harness_maker_version: 0.7.4
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/loop.md.j2
 provenance: official
-content_hash: b0924cf34db5cb268a34caf90c8bc5d800565b51881a1d1905fa2cdbb28e163b
+content_hash: 767ce3348d9457ee42633191669b9a8593a03774cb7c5e4fcb0c1bc3e5f03fa5
 ---
 # /hm:loop
 
@@ -338,7 +338,7 @@ feature mode both default to one squash-merge at convergence. Per-iter
 worktree would explode commit count.
 
 ```bash
-!uv run --with /home/noel/harness-maker python -m harness_maker.worktree create execute "$(pwd)"
+!uv run --with /home/noel/harness-maker/.worktrees/execute-20260510T0331Z python -m harness_maker.worktree create execute "$(pwd)"
 ```
 
 Read **all non-empty output lines** the command prints. Three cases:
@@ -603,7 +603,7 @@ When the loop halts (convergence, safety rail, or hard error):
 5. **Finalize worktree** (only if engaged in step 5):
 
    ```bash
-   !uv run --with /home/noel/harness-maker python -m harness_maker.worktree finalize <WT> <STATUS>
+   !uv run --with /home/noel/harness-maker/.worktrees/execute-20260510T0331Z python -m harness_maker.worktree finalize <WT> <STATUS>
    ```
 
    On `success`: `worktree.merge` does a squash-merge into the loop's

@@ -104,3 +104,56 @@ def test_profile_ignores_node_modules(tmp_path: Path) -> None:
     p = profile(tmp_path)
     # node_modules should be ignored → only package.json (1 file) → small
     assert p.scale == "small"
+
+
+# ---------------------------------------------------------------------------
+# Phase 3: mechanical_checks detection
+# ---------------------------------------------------------------------------
+
+
+def test_detect_checks_pyproject_ruff(tmp_path: Path) -> None:
+    """pyproject.toml with [tool.ruff] → detected_checks includes ruff."""
+    (tmp_path / "pyproject.toml").write_text("[tool.ruff]\n")
+    p = profile(tmp_path)
+    assert any("ruff" in c for c in p.detected_checks)
+
+
+def test_detect_checks_pyproject_mypy(tmp_path: Path) -> None:
+    """pyproject.toml mentioning mypy → detected_checks includes mypy."""
+    (tmp_path / "pyproject.toml").write_text("[tool.mypy]\nstrict = true\n")
+    p = profile(tmp_path)
+    assert any("mypy" in c for c in p.detected_checks)
+
+
+def test_detect_checks_pyproject_pytest(tmp_path: Path) -> None:
+    """pyproject.toml with pytest dependency → detected_checks includes pytest."""
+    (tmp_path / "pyproject.toml").write_text('[project]\ndependencies = ["pytest"]\n')
+    p = profile(tmp_path)
+    assert any("pytest" in c for c in p.detected_checks)
+
+
+def test_detect_checks_makefile_targets(tmp_path: Path) -> None:
+    """Makefile with lint:/test: targets → detected_checks includes make lint/test."""
+    (tmp_path / "Makefile").write_text("lint:\n\truff check .\ntest:\n\tpytest\n")
+    p = profile(tmp_path)
+    assert any("make lint" in c for c in p.detected_checks)
+    assert any("make test" in c for c in p.detected_checks)
+
+
+def test_detect_checks_empty_project(tmp_path: Path) -> None:
+    """Project with no pyproject.toml or Makefile → empty detected_checks."""
+    (tmp_path / "README.md").write_text("hello")
+    p = profile(tmp_path)
+    assert p.detected_checks == []
+
+
+def test_detect_checks_cap_at_4(tmp_path: Path) -> None:
+    """detected_checks is capped at 4 to avoid overwhelming."""
+    (tmp_path / "pyproject.toml").write_text(
+        "[tool.ruff]\n[tool.mypy]\n[project]\ndependencies = ['pytest']\n"
+    )
+    (tmp_path / "Makefile").write_text(
+        "lint:\n\truff .\ntest:\n\tpytest\ntypecheck:\n\tmypy .\ncheck:\n\tall\n"
+    )
+    p = profile(tmp_path)
+    assert len(p.detected_checks) <= 4

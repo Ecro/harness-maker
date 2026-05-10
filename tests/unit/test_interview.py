@@ -330,3 +330,60 @@ def test_interview_mechanical_checks_explicit_empty_list_clears(
     result = answers_from_harness_yaml(harness_yaml)
     assert result is not None
     assert result.mechanical_checks == []
+
+
+# ---------------------------------------------------------------------------
+# Phase 2: focus → reviewer mapping tests
+# ---------------------------------------------------------------------------
+
+
+def test_focus_to_additional_reviewers_security_side() -> None:
+    """focus=security on Side preset adds security-reviewer + security-auditor."""
+    from harness_maker.interview import _focus_to_additional_reviewers
+    from harness_maker.models import Preset
+
+    additional = _focus_to_additional_reviewers("security", Preset.SIDE)
+    assert "security-reviewer" in additional
+    assert "security-auditor" in additional
+
+
+def test_focus_to_additional_reviewers_feature_side() -> None:
+    """focus=feature on Side preset adds ux-reviewer (code-reviewer already enabled)."""
+    from harness_maker.interview import _focus_to_additional_reviewers
+    from harness_maker.models import Preset
+
+    additional = _focus_to_additional_reviewers("feature", Preset.SIDE)
+    assert "ux-reviewer" in additional
+    assert "code-reviewer" not in additional  # already in Side defaults
+
+
+def test_focus_to_additional_reviewers_security_production() -> None:
+    """focus=security on Production preset adds security-auditor only.
+
+    security-reviewer is already in Production defaults.
+    """
+    from harness_maker.interview import _focus_to_additional_reviewers
+    from harness_maker.models import Preset
+
+    additional = _focus_to_additional_reviewers("security", Preset.PRODUCTION)
+    assert "security-auditor" in additional
+    assert "security-reviewer" not in additional  # already in Production defaults
+
+
+def test_focus_to_additional_reviewers_unknown_focus() -> None:
+    """Unknown focus value returns empty list (no additional reviewers)."""
+    from harness_maker.interview import _focus_to_additional_reviewers
+    from harness_maker.models import Preset
+
+    additional = _focus_to_additional_reviewers("unknown", Preset.SIDE)
+    assert additional == []
+
+
+def test_focus_to_additional_reviewers_all_values() -> None:
+    """All 5 defined focus values return valid reviewer names."""
+    from harness_maker.interview import _focus_to_additional_reviewers
+    from harness_maker.models import Preset
+
+    for focus in ("feature", "bugfix", "security", "performance", "refactoring"):
+        result = _focus_to_additional_reviewers(focus, Preset.SIDE)
+        assert isinstance(result, list)

@@ -1,0 +1,57 @@
+# /hm:uninstall
+
+> Remove harness-maker generated files from this project.
+
+## Procedure
+
+You (Claude) act as the orchestrator. Present consequences, confirm
+intent, and dispatch the CLI.
+
+### 1. Confirm intent
+
+Use `AskUserQuestion`:
+
+> **Remove harness-maker from this project?**
+>
+> This will delete all harness-maker–generated files (agents, commands,
+> hooks, skills, etc.) from `.claude/`. Files you customized (containing
+> `@hm:user:` markers) will be **skipped** with a warning.
+
+Options:
+- **Remove generated files** — keep `harness.yaml` for future reinstall
+- **Remove everything** — also delete `harness.yaml`
+- **Cancel**
+
+If **Cancel**, stop.
+
+### 2. Preview (dry-run)
+
+```bash
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.cli remove "$(pwd)" --dry-run
+```
+
+Show the user the file list.
+
+### 3. Dispatch
+
+Based on option selected:
+
+```bash
+# Keep harness.yaml
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.cli remove "$(pwd)"
+
+# Remove everything
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.cli remove "$(pwd)" --remove-yaml
+```
+
+### 4. Post-removal
+
+Report:
+- Files removed
+- Files skipped (user blocks)
+- Whether `harness.yaml` was kept or removed
+- "To reinstall: `/harness-maker:make`"
+
+<!-- @hm:user:extensions -->
+<!-- Project-specific /hm:uninstall overrides. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extensions -->

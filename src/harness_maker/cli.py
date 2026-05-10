@@ -11,7 +11,7 @@ import typer
 from harness_maker.add_domain import AddDomainError, add_domain, validate_domain_name
 from harness_maker.block_merge import MergeReport
 from harness_maker.interview import answers_from_harness_yaml, interview
-from harness_maker.models import InterviewAnswers, Preset, RefFolder
+from harness_maker.models import Blueprint, InterviewAnswers, Preset, RefFolder
 from harness_maker.modular_edit import ModularEditError
 from harness_maker.modular_edit import add as modular_add
 from harness_maker.modular_edit import remove as modular_remove
@@ -108,6 +108,36 @@ def make(
         "'cursor' is added; leaves them in place (and unreferenced) when "
         "removed — delete .cursor/ manually if undesired.",
     ),
+    grade_threshold_override: str | None = typer.Option(
+        None,
+        "--grade-threshold",
+        help="Review grade gate: A (strict) | B (moderate) | C (relaxed).",
+    ),
+    domains_override: str | None = typer.Option(
+        None,
+        "--domains",
+        help="Comma-separated domain packs: python, tauri, react, ...",
+    ),
+    mechanical_checks_override: str | None = typer.Option(
+        None,
+        "--mechanical-checks",
+        help="Semicolon-separated pre-review commands.",
+    ),
+    recommended_model_override: str | None = typer.Option(
+        None,
+        "--recommended-model",
+        help="Claude model: opus | sonnet | haiku.",
+    ),
+    focus_override: str | None = typer.Option(
+        None,
+        "--focus",
+        help="Primary work focus: feature|bugfix|security|performance|refactoring.",
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="Print what would be installed; do not write files.",
+    ),
 ) -> None:
     """Generate or refine the project harness at TARGET/.claude/."""
     existing_yaml = target / ".claude" / "harness.yaml"
@@ -141,6 +171,11 @@ def make(
         locale_override=locale_override,
         dev_mode_override=dev_mode_override,
         targets_override=targets_override,
+        grade_threshold_override=grade_threshold_override,
+        domains_override=domains_override,
+        mechanical_checks_override=mechanical_checks_override,
+        recommended_model_override=recommended_model_override,
+        focus_override=focus_override,
     )
     if add_domain_name is not None:
         try:
@@ -152,6 +187,11 @@ def make(
             a.domains.append(add_domain_name)
     bp = synthesize(p, a)
     target_dotclaude = target / ".claude"
+
+    if dry_run:
+        _emit_dry_run_summary(bp, target_dotclaude)
+        raise typer.Exit(0)
+
     merge_paths: set[Path] = set()
     keep_count = 0
     if target_dotclaude.exists() and any(target_dotclaude.iterdir()):
@@ -166,13 +206,14 @@ def make(
         bp = bp.model_copy(update={"files": new_files})
     freeze = DEFAULT_FREEZE_TIME if os.environ.get("HARNESS_MAKER_FREEZE") else None
     merge_reports: dict[Path, MergeReport] = {}
-    render(
+    written = render(
         bp,
         target_dotclaude,
         freeze_time=freeze,
         merge_paths=merge_paths,
         merge_reports=merge_reports,
     )
+    _write_harness_manifest(target_dotclaude, written)
     _emit_reconcile_report(keep_count, merge_reports)
     errors = verify(target_dotclaude)
     if errors:
@@ -209,8 +250,98 @@ def make(
         typer.echo(f"--add-domain stub created: {stub}")
 
     typer.echo(f"harness applied to {target_dotclaude} ({len(bp.files)} files)")
+    _emit_install_summary(a, bp)
     _emit_post_make_readiness(target, a.preset)
     _emit_refdocs_index_build(target, a.ref_folders)
+
+
+def _emit_dry_run_summary(bp: Blueprint, target_dotclaude: Path) -> None:
+    """Print what make() would install without writing any files."""
+    existing = set()
+    if target_dotclaude.exists():
+        for p in target_dotclaude.rglob("*"):
+            if p.is_file():
+                existing.add(p.relative_to(target_dotclaude))
+
+    new_count = 0
+    replace_count = 0
+    for fe in bp.files:
+        if fe.path in existing:
+            replace_count += 1
+        else:
+            new_count += 1
+
+    typer.echo("─" * 50)
+    typer.echo("DRY RUN — no files will be written")
+    typer.echo("─" * 50)
+    typer.echo(f"  NEW:     {new_count}")
+    typer.echo(f"  REPLACE: {replace_count}")
+    typer.echo(f"  Total:   {len(bp.files)} files")
+    typer.echo("─" * 50)
+
+    cmd_files = [str(f.path) for f in bp.files if str(f.path).startswith("commands/hm/")]
+    if cmd_files:
+        typer.echo(f"\nSlash commands ({len(cmd_files)}):")
+        for c in sorted(cmd_files):
+            name = c.replace("commands/hm/", "/hm:").replace(".md", "")
+            typer.echo(f"  {name}")
+
+
+def _emit_install_summary(
+    answers: InterviewAnswers,
+    bp: Blueprint,
+) -> None:
+    """Post-install summary with commands, reviewers, and quick-start."""
+    try:
+        cmd_files = [str(f.path) for f in bp.files if str(f.path).startswith("commands/hm/")]
+        reviewer_enabled = answers.reviewers.get("enabled", [])
+
+        typer.echo("\n" + "─" * 50)
+        typer.echo("Install summary")
+        typer.echo("─" * 50)
+
+        if cmd_files:
+            typer.echo(f"\nSlash commands ({len(cmd_files)}):")
+            for c in sorted(cmd_files):
+                name = c.replace("commands/hm/", "/hm:").replace(".md", "")
+                typer.echo(f"  {name}")
+
+        typer.echo(f"\nReviewers active: {', '.join(reviewer_enabled) or '(none)'}")
+        typer.echo(f"Grade threshold: {answers.grade_threshold}")
+
+        if answers.mechanical_checks:
+            typer.echo(f"Mechanical checks: {'; '.join(answers.mechanical_checks)}")
+
+        typer.echo("\nQuick start:")
+        typer.echo("  /hm:execute <task>       — implement a feature with TDD")
+        typer.echo("  /hm:ai-readiness         — check AI-readiness score")
+        typer.echo("  /hm:configure            — adjust settings later")
+        typer.echo("  /hm:make                 — re-render after plugin update")
+    except Exception:  # noqa: BLE001 — diagnostic, never fail the make
+        pass
+
+
+def _write_harness_manifest(target_dotclaude: Path, written: list[Path]) -> None:
+    """Write .harness-manifest.json listing all rendered file paths.
+
+    Used by Phase 7 (uninstall) to identify frontmatter-less files like
+    settings.json and hooks/hooks.json that lack generated_by markers.
+    """
+    import json
+
+    from harness_maker import __version__
+
+    manifest = {
+        "generated_by": "harness-maker",
+        "version": __version__,
+        "files": sorted(str(p) for p in written),
+    }
+    manifest_path = target_dotclaude / ".harness-manifest.json"
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2) + "\n",
+        encoding="utf-8",
+    )
 
 
 def _emit_refdocs_index_build(target: Path, ref_folders: list[RefFolder]) -> None:
@@ -265,17 +396,24 @@ def _apply_dimension_overrides(
     locale_override: str | None,
     dev_mode_override: str | None,
     targets_override: str | None,
+    grade_threshold_override: str | None = None,
+    domains_override: str | None = None,
+    mechanical_checks_override: str | None = None,
+    recommended_model_override: str | None = None,
+    focus_override: str | None = None,
 ) -> InterviewAnswers:
-    """Apply per-dimension CLI overrides (preset/locale/dev_mode/targets) on
-    top of the answers (whether reused or freshly interviewed).
+    """Apply per-dimension CLI overrides on top of the answers.
+
+    Precedence: CLI flag > harness.yaml > preset default.
 
     Switching ``preset`` also re-derives the preset-coupled extras
     (``models`` / ``autoloop`` / ``memory`` / ``anti_rot`` / ``worktree`` /
     ``security`` / ``context_lint`` / default reviewer & skill enablement)
     so a Side→Production flip actually unlocks Production-only behaviour
-    rather than leaving stale Side defaults around.
+    rather than leaving stale Side defaults around. Extended flags
+    (grade_threshold, domains, etc.) are re-applied AFTER the rebuild.
     """
-    from harness_maker.interview import _build_answers
+    from harness_maker.interview import _build_answers, _focus_to_additional_reviewers
     from harness_maker.models import DevMode, Preset, Target
 
     update: dict[str, object] = {}
@@ -301,7 +439,6 @@ def _apply_dimension_overrides(
                 err=True,
             )
             raise typer.Exit(code=1) from e
-        # de-dup while preserving order
         seen: set[Target] = set()
         deduped: list[Target] = []
         for t in parsed:
@@ -309,6 +446,19 @@ def _apply_dimension_overrides(
                 seen.add(t)
                 deduped.append(t)
         update["targets"] = deduped
+    if grade_threshold_override:
+        update["grade_threshold"] = grade_threshold_override
+    if domains_override:
+        update["domains"] = [d.strip() for d in domains_override.split(",") if d.strip()]
+    if mechanical_checks_override:
+        update["mechanical_checks"] = [
+            c.strip() for c in mechanical_checks_override.split(";") if c.strip()
+        ]
+    if recommended_model_override:
+        new_models = dict(answers.models)
+        new_models["default"] = recommended_model_override
+        update["models"] = new_models
+
     if preset_override:
         try:
             new_preset = Preset(preset_override)
@@ -316,10 +466,6 @@ def _apply_dimension_overrides(
             typer.echo(f"--preset invalid: {preset_override}", err=True)
             raise typer.Exit(code=1) from e
         if new_preset != answers.preset:
-            # Rebuild from scratch so preset-derived extras are correct, then
-            # re-overlay the answers we want to carry across (workflows,
-            # locale, etc.). targets_override (if any) is applied via the
-            # `update` overlay below.
             rebuilt = _build_answers(
                 locale=answers.locale,
                 targets=list(answers.targets),
@@ -330,8 +476,32 @@ def _apply_dimension_overrides(
                 consensus=answers.consensus,
                 caching=answers.caching,
             )
-            return rebuilt.model_copy(update=update)
-    return answers.model_copy(update=update) if update else answers
+            result = rebuilt.model_copy(update=update)
+            if focus_override:
+                additional = _focus_to_additional_reviewers(focus_override, new_preset)
+                if additional:
+                    enabled = list(result.reviewers["enabled"])
+                    for r in additional:
+                        if r not in enabled:
+                            enabled.append(r)
+                    result = result.model_copy(
+                        update={"reviewers": {**result.reviewers, "enabled": enabled}}
+                    )
+            return result
+
+    result = answers.model_copy(update=update) if update else answers
+    if focus_override:
+        effective_preset = Preset(preset_override) if preset_override else answers.preset
+        additional = _focus_to_additional_reviewers(focus_override, effective_preset)
+        if additional:
+            enabled = list(result.reviewers["enabled"])
+            for r in additional:
+                if r not in enabled:
+                    enabled.append(r)
+            result = result.model_copy(
+                update={"reviewers": {**result.reviewers, "enabled": enabled}}
+            )
+    return result
 
 
 def _emit_reconcile_report(
@@ -496,6 +666,126 @@ def _read_preset(harness_yaml: Path) -> Preset | None:
     except _yaml.YAMLError:
         return None
     return None
+
+
+@app.command("remove")
+def remove_cmd(
+    target: Path = typer.Argument(  # noqa: B008
+        default_factory=Path.cwd,
+        help="Project root to remove harness from.",
+    ),
+    remove_yaml: bool = typer.Option(
+        False,
+        "--remove-yaml",
+        help="Also remove harness.yaml (default: keep).",
+    ),
+    dry_run: bool = typer.Option(
+        False,
+        "--dry-run",
+        help="Show what would be removed; do not delete.",
+    ),
+) -> None:
+    """Remove harness-maker generated files from a project."""
+    import json
+
+    target_dotclaude = target / ".claude"
+    manifest_path = target_dotclaude / ".harness-manifest.json"
+
+    if not manifest_path.exists():
+        typer.echo(
+            "No .harness-manifest.json found — cannot determine managed files.",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    file_list: list[str] = manifest.get("files", [])
+
+    removed: list[str] = []
+    skipped: list[str] = []
+
+    for rel in file_list:
+        if rel == "harness.yaml" and not remove_yaml:
+            continue
+
+        fpath = target_dotclaude / rel
+        if not fpath.exists():
+            continue
+
+        if _has_user_block(fpath):
+            skipped.append(rel)
+            continue
+
+        if dry_run:
+            removed.append(rel)
+        else:
+            fpath.unlink()
+            removed.append(rel)
+            _rmdir_if_empty(fpath.parent)
+
+    if not dry_run:
+        manifest_path.unlink(missing_ok=True)
+        _rmdir_if_empty(manifest_path.parent)
+
+    action = "Would remove" if dry_run else "Removed"
+    typer.echo(f"{action} {len(removed)} file(s), skipped {len(skipped)} (user blocks)")
+    if skipped:
+        for s in skipped:
+            typer.echo(f"  skipped (user block): .claude/{s}")
+    if removed and dry_run:
+        for r in removed:
+            typer.echo(f"  {r}")
+
+
+def _has_user_block(fpath: Path) -> bool:
+    """Check if a file contains @hm:user: markers."""
+    try:
+        content = fpath.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return False
+    return "@hm:user:" in content
+
+
+def _rmdir_if_empty(d: Path) -> None:
+    """Remove directory if empty, walking up to .claude/."""
+    try:
+        while d.name and d.name != ".claude":
+            if d.exists() and not any(d.iterdir()):
+                d.rmdir()
+                d = d.parent
+            else:
+                break
+    except OSError:
+        pass
+
+
+@app.command("profile")
+def profile_cmd(
+    target: Path = typer.Argument(  # noqa: B008
+        default_factory=Path.cwd,
+        help="Project root to profile.",
+    ),
+    json_output: bool = typer.Option(
+        False,
+        "--json",
+        help="Output as JSON (one line).",
+    ),
+) -> None:
+    """Inspect project and output detected profile signals."""
+    p = profile(target)
+    if json_output:
+        typer.echo(p.model_dump_json())
+    else:
+        typer.echo(f"stack: {', '.join(p.stack)}")
+        typer.echo(f"scale: {p.scale}")
+        typer.echo(f"lifecycle: {p.lifecycle}")
+        typer.echo(f"existing_dotclaude: {p.existing_dotclaude}")
+        typer.echo(f"spec_only: {p.spec_only}")
+        typer.echo(f"vault_member: {p.vault_member}")
+        if p.detected_checks:
+            typer.echo(f"detected_checks: {', '.join(p.detected_checks)}")
+        else:
+            typer.echo("detected_checks: (none)")
 
 
 @app.command(hidden=True)

@@ -65,6 +65,8 @@ def profile(project_dir: Path) -> ProjectProfile:
     # (f) vault_member
     vault_member = (project_dir / ".claude" / "obsidian.json").exists()
 
+    detected_checks = _detect_mechanical_checks(project_dir)
+
     return ProjectProfile(
         stack=stack,
         scale=scale,
@@ -72,7 +74,36 @@ def profile(project_dir: Path) -> ProjectProfile:
         existing_dotclaude=existing_dotclaude,
         spec_only=spec_only,
         vault_member=vault_member,
+        detected_checks=detected_checks,
     )
+
+
+def _detect_mechanical_checks(project_dir: Path) -> list[str]:
+    """Scan pyproject.toml and Makefile for common check commands."""
+    checks: list[str] = []
+    pyproject = project_dir / "pyproject.toml"
+    if pyproject.exists():
+        try:
+            content = pyproject.read_text(encoding="utf-8")
+        except OSError:
+            content = ""
+        if "[tool.ruff]" in content:
+            checks.append("uv run ruff check .")
+        if "[tool.mypy]" in content or "mypy" in content:
+            checks.append("uv run mypy .")
+        if "pytest" in content:
+            checks.append("uv run pytest --tb=short -q")
+    makefile = project_dir / "Makefile"
+    if makefile.exists():
+        try:
+            content = makefile.read_text(encoding="utf-8")
+        except OSError:
+            content = ""
+        for line in content.splitlines():
+            if line.strip().startswith(("lint:", "check:", "typecheck:", "test:")):
+                target = line.split(":")[0].strip()
+                checks.append(f"make {target}")
+    return checks[:4]
 
 
 def _count_tracked_files(project_dir: Path) -> int:

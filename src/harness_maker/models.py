@@ -124,6 +124,7 @@ class ProjectProfile(BaseModel):
     existing_dotclaude: bool = False
     spec_only: bool = False
     vault_member: bool = False
+    detected_checks: list[str] = Field(default_factory=list)
 
 
 class WorkflowDef(BaseModel):

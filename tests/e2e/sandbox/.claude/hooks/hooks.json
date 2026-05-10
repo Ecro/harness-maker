@@ -4,7 +4,7 @@
       {
         "hooks": [
           {
-            "command": "uv run --with /home/noel/harness-maker python -m harness_maker.telemetry",
+            "command": "uv run --with /home/noel/harness-maker/.worktrees/execute-20260510T0331Z python -m harness_maker.telemetry",
             "timeout": 5,
             "type": "command"
           }
@@ -14,7 +14,7 @@
       {
         "hooks": [
           {
-            "command": "uv run --with /home/noel/harness-maker python -m harness_maker.hooks.post_write_reminder",
+            "command": "uv run --with /home/noel/harness-maker/.worktrees/execute-20260510T0331Z python -m harness_maker.hooks.post_write_reminder",
             "timeout": 5,
             "type": "command"
           }
@@ -26,7 +26,7 @@
       {
         "hooks": [
           {
-            "command": "uv run --with /home/noel/harness-maker python -m harness_maker.hooks.flush_session",
+            "command": "uv run --with /home/noel/harness-maker/.worktrees/execute-20260510T0331Z python -m harness_maker.hooks.flush_session",
             "statusMessage": "Snapshotting autoloop progress...",
             "timeout": 30,
             "type": "command"
@@ -37,7 +37,7 @@
       {
         "hooks": [
           {
-            "command": "uv run --with /home/noel/harness-maker python -m harness_maker.hooks.flush_session",
+            "command": "uv run --with /home/noel/harness-maker/.worktrees/execute-20260510T0331Z python -m harness_maker.hooks.flush_session",
             "statusMessage": "Snapshotting autoloop progress...",
             "timeout": 30,
             "type": "command"
@@ -50,7 +50,7 @@
       {
         "hooks": [
           {
-            "command": "uv run --with /home/noel/harness-maker python -m harness_maker.gates.permission_gate",
+            "command": "uv run --with /home/noel/harness-maker/.worktrees/execute-20260510T0331Z python -m harness_maker.gates.permission_gate",
             "type": "command"
           }
         ],
@@ -59,7 +59,7 @@
       {
         "hooks": [
           {
-            "command": "uv run --with /home/noel/harness-maker python -m harness_maker.gates.worktree_gate",
+            "command": "uv run --with /home/noel/harness-maker/.worktrees/execute-20260510T0331Z python -m harness_maker.gates.worktree_gate",
             "type": "command"
           }
         ],
@@ -70,7 +70,7 @@
       {
         "hooks": [
           {
-            "command": "uv run --with /home/noel/harness-maker python -m harness_maker.hooks.sessionstart_drift",
+            "command": "uv run --with /home/noel/harness-maker/.worktrees/execute-20260510T0331Z python -m harness_maker.hooks.sessionstart_drift",
             "type": "command"
           }
         ]
@@ -80,7 +80,7 @@
       {
         "hooks": [
           {
-            "command": "uv run --with /home/noel/harness-maker python -m harness_maker.hooks.loop_gate --mode stop-hook",
+            "command": "uv run --with /home/noel/harness-maker/.worktrees/execute-20260510T0331Z python -m harness_maker.hooks.loop_gate --mode stop-hook",
             "timeout": 5,
             "type": "command"
           }
