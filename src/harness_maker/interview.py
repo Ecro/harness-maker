@@ -585,6 +585,9 @@ def answers_from_harness_yaml(yaml_path: Path) -> InterviewAnswers | None:
             "enabled": skills_enabled,
         },
     }
+    raw_recommended_model = data.get("recommended_model")
+    if isinstance(raw_recommended_model, str) and raw_recommended_model.strip():
+        update["recommended_model"] = raw_recommended_model.strip()
     if isinstance(auto_fix, bool):
         update["auto_fix"] = auto_fix
     if isinstance(grade_threshold, str) and grade_threshold:

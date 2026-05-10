@@ -304,6 +304,9 @@ class InterviewAnswers(BaseModel):
         default_factory=lambda: [Target.CLAUDE_CODE],
         min_length=1,
     )
+    # Recommended Claude model — written into agent frontmatter `model` field.
+    # Maps to HarnessConfig.recommended_model in synthesize.
+    recommended_model: str = "claude-opus-4-7"
     preset: Preset = Preset.SIDE
     dev_mode: DevMode = DevMode.SPEC_DRIVEN
     domains: list[str] = Field(default_factory=list)

@@ -429,6 +429,7 @@ def synthesize(
     config = HarnessConfig(
         locale=answers.locale,
         targets=list(answers.targets),
+        recommended_model=answers.recommended_model,
         preset=effective_preset,
         dev_mode=answers.dev_mode,
         workflows=dict(answers.fused_workflows),

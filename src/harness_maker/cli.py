@@ -45,10 +45,9 @@ def make(
         "--add",
         help="Add a component (e.g. 'reviewer:security' or 'skill:conditional-router')",
     ),
-    remove: str | None = typer.Option(
-        None,
-        "--remove",
-        help="Remove a component (e.g. 'reviewer:security')",
+    remove: list[str] = typer.Option(  # noqa: B008
+        default=[],
+        help="Remove a component (e.g. 'reviewer:security'). Repeatable.",
     ),
     promote: str | None = typer.Option(  # noqa: ARG001
         None,
@@ -236,13 +235,13 @@ def make(
             typer.echo(f"--add failed: {e}", err=True)
             raise typer.Exit(code=1) from e
         typer.echo(f"--add applied: {rendered}")
-    if remove:
+    for remove_spec in remove:
         try:
-            removed = modular_remove(remove, target_dotclaude)
+            removed_path = modular_remove(remove_spec, target_dotclaude)
         except ModularEditError as e:
             typer.echo(f"--remove failed: {e}", err=True)
             raise typer.Exit(code=1) from e
-        typer.echo(f"--remove applied: {removed}")
+        typer.echo(f"--remove applied: {removed_path}")
 
     if add_domain_name is not None and add_domain_name not in _SHIPPED_DOMAIN_SAMPLES:
         # User-authored pack: render the skeleton at user side so they can fill
@@ -462,9 +461,7 @@ def _apply_dimension_overrides(
             c.strip() for c in mechanical_checks_override.split(";") if c.strip()
         ]
     if recommended_model_override:
-        new_models = dict(answers.models)
-        new_models["default"] = recommended_model_override
-        update["models"] = new_models
+        update["recommended_model"] = recommended_model_override
     if wrapup_docs_override:
         update["wrapup_docs"] = [
             d.strip() for d in wrapup_docs_override.split(";") if d.strip()
