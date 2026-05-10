@@ -1,7 +1,7 @@
 # TECH_SPEC: harness-maker
 
-> **Status:** v2.2 (Phase 2/7 split + env precheck + invariant gate) · **Written:** 2026-05-03 · **Language:** English
-> Claude Code plugin — generates and updates a custom harness (`.claude/`) for any project with a single `/harness-maker:make` command. Structured for autonomous builds via autoloop.
+> **Status:** v2.4 (0.9.3 target + autoloop refresh) · **Written:** 2026-05-03 · **Language:** English
+> Claude Code / Cursor / Codex harness generator — generates and updates project-specific runtime assets with a single `/harness-maker:make` command. Structured for autonomous builds via autoloop.
 
 ## 0. Loop Configuration
 
@@ -38,7 +38,7 @@ The user (`/home/noel`) operates 22+ Claude-active projects single-handedly. Har
 Manual curation across 22 projects × per-item is unsustainable. The boundary between what requires human decision vs. what can be automated needs to be redrawn.
 
 ### Solution
-**harness-maker** — a Claude Code plugin. A **single meta-command** `/harness-maker:make` generates a *custom harness (commands, skills, agents, hooks, monitoring, anti-rot, worktree, and security assets)* inside the user project's `.claude/` directory via an interview-driven flow. Day-to-day user commands use the `/hm:` prefix (`/hm:dev`, `/hm:loop`, `/hm:monitor`, ...). Supports both Brownfield and Greenfield-with-spec projects.
+**harness-maker** — a multi-target harness generator. A **single meta-command** `/harness-maker:make` generates a *custom harness (commands, skills, agents, hooks, monitoring, anti-rot, worktree, and security assets)* via an interview-driven flow. Claude Code uses `.claude/`; Cursor reuses the same `.claude/` assets and receives `.cursor/` glue; Codex receives `AGENTS.md`, `.codex/`, and `.agents/skills/`. Day-to-day commands use the `/hm:` prefix where slash commands are available, and matching skills where Codex discovers skills. Supports both Brownfield and Greenfield-with-spec projects.
 
 ### Target User
 1. **The user themselves (primary)**: Incremental rollout across 22 projects. Dogfood.
@@ -50,15 +50,14 @@ Manual curation across 22 projects × per-item is unsustainable. The boundary be
 - [ ] Generated `/hm:dev`, `/hm:loop`, `/hm:monitor`, `/hm:refresh` all function correctly
 - [ ] `/hm:refresh` crawls 4 sources → proposes patches → user confirms
 - [ ] `/hm:execute` operates inside worktree isolation
-- [ ] `/hm:verify` detects 5 categories of security gate violations (sandbox seed vulnerability)
+- [ ] `/hm:verify` detects 7 categories of security gate violations (sandbox seed vulnerability)
 - [ ] All generated files carry provenance frontmatter (hash + version)
 - [ ] Reviewer agent is blocked by `settings.json` when attempting `Write` (privilege separation)
 - [ ] CLAUDE.md / agent prompt length-limit lint is operational
 
 ### NON-GOALS (intentionally excluded — do not change)
-- Cross-agent portability (`.agents` convention, `AGENTS.md` sync) — Claude-only
 - Brainstorming / systematic-debugging pre-gates — user's decision
-- Cursor / Aider / Codex compatibility — not under consideration until Phase 10+
+- Aider-native rendering — not under consideration until a dedicated target model is designed
 - Team collaboration features — hiloop's domain
 - Cloud backend — 100% local (telemetry included)
 - Replacing vault itself — vault remains the hub
@@ -101,6 +100,10 @@ harness-maker/
 ├── .claude-progress.json                # autoloop runtime state (gitignored)
 ├── .claude-plugin/
 │   └── plugin.json                      # Claude Code official manifest
+├── .cursor-plugin/
+│   └── plugin.json                      # Cursor marketplace manifest
+├── .codex-plugin/
+│   └── plugin.json                      # Codex plugin manifest
 ├── .claude/                             # harness-maker dogfoods itself (Phase 9)
 │   └── obsidian.json                    # points to vault path
 ├── .github/
@@ -108,7 +111,7 @@ harness-maker/
 │       └── ci.yml
 ├── src/
 │   └── harness_maker/                   # Python package
-│       ├── __init__.py                  # __version__ = "0.7.1"
+│       ├── __init__.py                  # __version__ = "0.9.3"
 │       ├── cli.py                       # dev tooling (typer)
 │       ├── i18n.py                      # locale resolver
 │       ├── profile.py                   # signal extraction
@@ -291,7 +294,7 @@ harness-maker/
 - All generated files include frontmatter:
   ```yaml
   generated_by: harness-maker
-  harness_maker_version: "0.7.1"
+  harness_maker_version: "0.9.3"
   generated_at: "<ISO-8601>"
   source_template: "templates/<path>"
   content_hash: "sha256:<hex>"
@@ -548,15 +551,20 @@ class ConflictItem(BaseModel):
 - All generated assets carry a frontmatter header (generated_by, harness_maker_version, content_hash, source_template, generated_at, provenance)
 - `/hm:refresh` compares hashes → detects user modifications → blocks silent overwrite
 - Brownfield reconcile uses frontmatter to distinguish ours from theirs
-- Version numbers must be updated in **4 files simultaneously**: `.claude-plugin/plugin.json` · `.cursor-plugin/plugin.json` · `pyproject.toml` · `src/harness_maker/__init__.py`. Missing any one causes the marketplace to report the previous version. ADR-108: when rendering drift diffs, XML fence delimiters are defanged (both open and close tags) to prevent the diff content from being interpreted as live tool calls.
+- Version numbers must be updated in **5 files simultaneously**: `.claude-plugin/plugin.json` · `.cursor-plugin/plugin.json` · `.codex-plugin/plugin.json` · `pyproject.toml` · `src/harness_maker/__init__.py`. Missing any one causes a runtime or marketplace manifest to report the previous version. ADR-108: when rendering drift diffs, XML fence delimiters are defanged (both open and close tags) to prevent the diff content from being interpreted as live tool calls.
 
-**(M14) Dual-IDE Rendering — Cursor target (0.5.0+)**
+**(M14) Multi-target rendering — Claude Code, Cursor, Codex**
 - `HarnessConfig.targets: list[Target]` — user makes an explicit selection during the interview (auto-detection is prohibited)
-- Single-source `.claude/` assets (agents, skills, commands, hooks): Cursor 2.4+ reads these natively, so both IDEs share one copy
+- Single-source `.claude/` assets (agents, skills, commands): Cursor 2.4+ reads these natively, so Claude Code and Cursor share one copy
 - Cursor-only assets (rendered only when `cursor` is present in `targets`):
   - `.cursor/rules/harness.mdc` — `_render_cursor_mdc()`: includes only Cursor-accepted frontmatter fields (description/globs/alwaysApply); excludes content_hash
   - `.cursor/mcp.json` — `_render_pure_text()`: pure JSON, zero frontmatter
-- Dual plugin manifests: `.claude-plugin/plugin.json` (Claude Code Marketplace) + `.cursor-plugin/plugin.json` (Cursor Marketplace) — schemas are identical; version synchronization is mandatory
+- Codex-only assets (rendered only when `codex` is present in `targets`):
+  - `AGENTS.md` — top-level instructions with HTML metadata and `@hm:user:*` block markers
+  - `.codex/config.toml` and `.codex/agents/*.toml` — pure TOML config and agent registrations
+  - `.codex/hooks.json` — Codex hook schema, including `PermissionRequest` handling
+  - `.agents/skills/*/SKILL.md` — existing skills plus generated stage, workflow, and loop trigger skills
+- Plugin manifests: `.claude-plugin/plugin.json`, `.cursor-plugin/plugin.json`, `.codex-plugin/plugin.json` — version synchronization is mandatory
 - `recommended_model: claude-opus-4-7` — propagated to agent frontmatter. User override permitted. Prompts themselves are not neutralized for model (`<thinking>` and other Claude-specific expressions are preserved). ADR-107: tool_input fields passed through telemetry hooks are filtered against a whitelist; any field matching a secret pattern (API keys, tokens, passwords) is redacted before writing to `metrics.jsonl`.
 
 ### Preset Default Comparison
@@ -1389,7 +1397,7 @@ uv run ruff check src/ tests/ \
 - [ ] (M11) Context Lint blocks verbose output
 - [ ] (M12) Privilege Separation — reviewer `settings.json` has `Write` denied, executor has `Write(.worktrees/**)` allowed
 - [ ] (M13) Provenance Frontmatter — all generated files have hash + version; user modifications detected on refresh
-- [ ] (M14) Dual-IDE Rendering — when cursor target is selected, `.cursor/rules/harness.mdc` + `.cursor/mcp.json` are rendered; single-source `.claude/` assets are shared by both IDEs; dual plugin manifest is synchronized
+- [ ] (M14) Multi-target Rendering — Cursor target renders `.cursor/rules/harness.mdc` + `.cursor/mcp.json`; Codex target renders `AGENTS.md`, `.codex/`, and `.agents/skills/`; plugin manifests stay synchronized
 
 ### Asset Existence Verification
 
@@ -1474,10 +1482,10 @@ bash .claude-verify.sh all
   - Decision: `harness.yaml.recommended_model: claude-opus-4-7` as default, propagated to agent frontmatter. Prompts themselves are not rewritten.
   - Rationale: Rewriting prompts risks quality degradation. Users choosing a different model do so at their own discretion and accept the consequences.
 
-- **ADR-13: Four-file simultaneous version change invariant (0.4.9, extended for cursor target)**
+- **ADR-13: Manifest version synchronization invariant (0.4.9, extended for Cursor and Codex targets)**
   - Context: In 0.4.9 release, only `pyproject.toml` was bumped while `plugin.json` was neglected → marketplace falsely reported "already at latest".
-  - Decision: Version changes must simultaneously modify all four files: `.claude-plugin/plugin.json` + `.cursor-plugin/plugin.json` + `pyproject.toml` + `src/harness_maker/__init__.py`. Required as a PR checklist item and potential CI gate.
-  - Rationale: Guarantees marketplace synchronization. Without it, users mistake a stale plugin for the latest version.
+  - Decision: Version changes must simultaneously modify all runtime manifests plus package metadata: `.claude-plugin/plugin.json` + `.cursor-plugin/plugin.json` + `.codex-plugin/plugin.json` + `pyproject.toml` + `src/harness_maker/__init__.py`. Required as a PR checklist item and CI gate.
+  - Rationale: Guarantees runtime and marketplace synchronization. Without it, users mistake a stale plugin for the latest version.
 
 ### Risks (K1-K17)
 
@@ -1518,7 +1526,8 @@ Detailed change history is absorbed into all ADR + Risk + Goal decisions in this
 - **v2.0**: autoloop-ready format — Section 0-6 structure, 10 phases, all R/M/A entries explicitly mapped to Section 4 tasks or Section 5 verify
 - **v2.1**: autoloop dry-run analysis 10 fixes — (C1) Renderer freeze_time, (C2) plugin entry subprocess task, (C3) Anthropic URL explicit, (I1) SubAgent permissions schema research, (I2) remove vault path dependency, (I3-I5) atomic write/LLM mock/worktree cleanup CLAUDE.md, (M1-M2) Phase 9 marker + file count assertion
 - **v2.2** (this spec): 2nd dry-run analysis expanded fix set — (a) **Phase 2 split** (9 tasks → Phase 2 Foundations 3 + Phase 3 Pipeline 6) — autoloop's own recommendation. (b) **Phase 7 split** (9 tasks → Phase 8 Worktree 3 + Phase 9 Security 6) — same pattern. (c) **Task 1.0 env precheck** (uv/python3.12+/git/cache write — fail fast). (d) **Cross-phase invariant gate** — each phase Exit Criteria calls `phase_<N>_invariants` (validates frontmatter of generated `.claude/` assets). (e) Total phases: 10 → **12**. (f) Verify script fully revised — 12 phase functions, env check, invariants helper. (g) `max_global_iterations` 100 maintained (12×5=60 worst case, sufficient margin).
-- **v2.3** (0.5.x status update, 2026-05): (a) M1 targets/recommended_model/locale-en additions. (b) M4 anti-rot GitHub source actual values reflected (anthropics/claude-code default). (c) M5 SessionStart drift reminder hook + hybrid telemetry schema. (d) M7 feature/improve mode + per-loop worktree (wrapup once). (e) M9 worktree path `.worktrees/` (project root) + prefix-match cleanup. (f) M13 four-file version invariant. (g) **M14 new** — Dual-IDE Rendering (Cursor target). (h) §5 skills 10→11 (refdocs-search added), M14 verify row. (i) ADR-11/12/13 new.
+- **v2.3** (0.5.x status update, 2026-05): (a) M1 targets/recommended_model/locale-en additions. (b) M4 anti-rot GitHub source actual values reflected (anthropics/claude-code default). (c) M5 SessionStart drift reminder hook + hybrid telemetry schema. (d) M7 feature/improve mode + per-loop worktree (wrapup once). (e) M9 worktree path `.worktrees/` (project root) + prefix-match cleanup. (f) M13 pre-Codex manifest version invariant. (g) **M14 new** — Cursor target rendering. (h) §5 skills 10→11 (refdocs-search added), M14 verify row. (i) ADR-11/12/13 new.
+- **v2.4 (0.9.3, 2026-05-10)** — Codex target added as a first-class render target: `AGENTS.md`, `.codex/config.toml`, `.codex/hooks.json`, `.codex/agents/*.toml`, and `.agents/skills/*/SKILL.md`. `/harness-maker:make` supports `ref_folders` and `sibling_repos`; refdocs indexing is built after render, and sibling repositories participate in worktree isolation.
 - **v2.1 (0.7.1, 2026-05-08)** — Patch release closing 9 deferred review findings. ADR-101 to ADR-108: scope, telemetry env-var cwd, daily metrics rotation, doc-only read-staleness, pure-filesystem hallucination, threading.local re-entrant flock, tool_input whitelist + secret redaction, drift_monitor XML fence. /hm:review round-2 P0 fixes: flock-before-depth ordering; raw os.write for atomic O_APPEND.
 
 ---
@@ -1547,9 +1556,9 @@ Detailed change history is absorbed into all ADR + Risk + Goal decisions in this
 | Privilege separation | reviewer = Read/Grep only, executor = Write(.worktrees/**) only |
 | Provenance frontmatter | All generated assets include `generated_by` + `content_hash` + `source_template` |
 | fixture | A synthetic project used for validation (Side/Production × Python/Tauri/Firmware) |
-| targets | IDE selection axis in HarnessConfig — `claude-code` \| `cursor` \| both. User makes an explicit selection during interview (auto-detect prohibited) |
+| targets | Runtime selection axis in HarnessConfig — `claude-code` \| `cursor` \| `codex` \| any combination. User makes an explicit selection during interview (auto-detect prohibited) |
 | recommended_model | Recommended model ID stored in `harness.yaml`; propagated to agent frontmatter (default: claude-opus-4-7) |
-| Dual-IDE Rendering (M14) | `.claude/` single-source + Cursor-only asset rendering (M14). Cursor 2.4+ natively reads `.claude/` |
+| Multi-target Rendering (M14) | `.claude/` for Claude Code and Cursor, `.cursor/` for Cursor glue, `.codex/` + `.agents/skills/` + `AGENTS.md` for Codex |
 | SessionStart drift reminder | Hook that warns at session start when harness-maker version differs from the version at render time |
 
 ---
@@ -1558,7 +1567,7 @@ Detailed change history is absorbed into all ADR + Risk + Goal decisions in this
 
 **Competing/reference frameworks:**
 - hiloop: ai-readiness-rubric (Health), failures.md/wiki.md memory, autoloop-coder agent
-- Synthesis (Rajiv Pant, 2026-04): `.agents/` convention (not currently adopted, Open Question)
+- Synthesis (Rajiv Pant, 2026-04): `.agents/` convention, adopted for Codex skill discovery in 0.9.0
 - claude-statusline-enhanced: cache hit display (statusLine feature — removed in harness-maker, replaced by ai-readiness)
 - obra/superpowers: verify-before-completion gate, multi-host manifests
 - wshobson/agents: Conditional Routing + per-agent model tier + 3-layer eval (agent quality)

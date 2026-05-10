@@ -1,5 +1,60 @@
 # Changelog
 
+## 0.9.3 — 2026-05-10
+
+Patch release after the Codex target rollout.
+
+### Fixed
+- Fixed conditional-router skill frontmatter so YAML descriptions containing
+  colons do not create a double-frontmatter parse failure.
+- Synchronized sandbox renders and snapshot baselines after the 0.9.3 bump.
+
+## 0.9.2 — 2026-05-10
+
+### Fixed
+- Fixed Codex `config_file` rendering so paths do not accidentally include a
+  duplicated `.codex/` segment.
+
+## 0.9.1 — 2026-05-10
+
+### Changed
+- Version synchronization release after 0.9.0.
+
+## 0.9.0 — 2026-05-10
+
+### Added
+- Added OpenAI Codex CLI as a third harness target alongside Claude Code and
+  Cursor.
+- Codex target renders `AGENTS.md`, `.codex/config.toml`,
+  `.codex/hooks.json`, `.codex/agents/*.toml`, and `.agents/skills/*/SKILL.md`
+  from the same preset, workflow, skill, and agent definitions.
+- Added Codex workflow and loop skills so atomic stages, fused workflows, and
+  `/hm:loop` are discoverable through Codex's skill layout.
+- Added Codex agent registration in generated config.
+
+### Changed
+- Generated outputs (`.claude/`, `.codex/`, `.agents/`, and `AGENTS.md`) are
+  treated as render artifacts and ignored in the source repo.
+- Reconcile and render paths now understand Codex-specific pure TOML files and
+  block-merge-aware `AGENTS.md`.
+
+## 0.8.1 — 2026-05-10
+
+### Added
+- Added `ref_folders` and `sibling_repos` to the make interview and CLI flags.
+- `ref_folders` can build a local docs index for the `refdocs-search` skill.
+- `sibling_repos` lets worktree isolation include related repositories in the
+  same logical run.
+
+## 0.8.0 — 2026-05-10
+
+### Added
+- Completed the make UX lifecycle for install, configure, update, add, remove,
+  and promote flows.
+- Added `wrapup_docs`, allowing users to configure documents that `/hm:wrapup`
+  should keep updated after work units.
+- Added the 3-layer deep interview gate for research, spec, plan, and loop.
+
 ## 0.7.1 — 2026-05-08
 
 Patch release closing all P1 + P2 carry-overs from

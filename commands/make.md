@@ -18,7 +18,7 @@ depending on whether `.claude/harness.yaml` exists).
 
 Example invocation:
 ```
-/harness-maker:make --ci preset=Side locale=en dev_mode=task targets=claude-code,cursor
+/harness-maker:make --ci preset=Side locale=en dev_mode=task targets=claude-code,cursor,codex
 ```
 
 ### 0.5. `--reinterview` shortcut
@@ -58,18 +58,19 @@ Read `.claude/harness.yaml` body (skip frontmatter) and surface to the user:
 - count of enabled reviewers/skills
 
 Then use `AskUserQuestion` with these options. **Order matters** — list
-"Switch IDE targets" prominently right after Update, since it's the
+"Switch runtime targets" prominently right after Update, since it's the
 most common reason existing 0.4.x/0.5.0 users return to this command:
 
 - **Update** — re-render with the same settings; pick up new template
   improvements. (recommended after a `/plugin update`. Does **not** ask
-  about Cursor — pick "Switch IDE targets" if you want to opt into Cursor
-  on a previously claude-code-only install.)
-- **Switch IDE targets** — pick `claude-code`, `cursor`, or both.
+  about extra runtimes — pick "Switch runtime targets" if you want to opt into
+  Cursor or Codex on a previously claude-code-only install.)
+- **Switch runtime targets** — pick `claude-code`, `cursor`, `codex`, or any combination.
   Adding `cursor` renders `.cursor/rules/harness.mdc` + `.cursor/mcp.json`
   alongside the shared `.claude/` assets so the harness drives Cursor
-  IDE 2.4+ natively. Removing leaves prior `.cursor/` files in place
-  (delete manually if undesired).
+  IDE 2.4+ natively. Adding `codex` renders `AGENTS.md`, `.codex/`, and
+  `.agents/skills/` assets. Removing a target leaves prior target-specific
+  files in place (delete manually if undesired).
 - **Switch preset** — Side ↔ Production. Re-derives all preset-coupled
   defaults (security gates, worktree scope, default reviewer set).
 - **Switch locale** — change the `locale` tag (en/ko/ja/...).
@@ -144,7 +145,7 @@ alternatives. Then jump to Section 3.6.
 1. `AskUserQuestion`: **preset** — `Side` or `Production` (show smart default)
 2. `AskUserQuestion`: **locale** — `en`, `ko`, or free-text
 3. `AskUserQuestion`: **dev_mode** — `task-driven` or `spec-driven`
-4. `AskUserQuestion`: **targets** — `claude-code`, `cursor`, or both (multi-select)
+4. `AskUserQuestion`: **targets** — `claude-code`, `cursor`, `codex`, or any combination (multi-select)
 5. `AskUserQuestion`: **review focus** — "What's your primary work on this project?"
    Options: `feature` (code + UX review), `bugfix` (code + test review),
    `security` (code + security + auditor), `performance` (code + perf review),
@@ -229,16 +230,18 @@ templates while preserving user `@hm:user:*` blocks via reconcile.
 !uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" --dev-mode spec-driven
 ```
 
-#### Switch IDE targets
+#### Switch runtime targets
 
 ```bash
-!uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" --targets claude-code,cursor
+!uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" --targets claude-code,cursor,codex
 ```
 
-(or `--targets cursor` for Cursor-only, `--targets claude-code` to drop
-back to Claude-Code-only.) Adding `cursor` renders `.cursor/rules/harness.mdc`
-+ `.cursor/mcp.json`. Dropping `cursor` does **not** delete previously
-rendered `.cursor/` files — remove them manually if you want a clean slate.
+(or `--targets cursor` for Cursor-only, `--targets codex` for Codex-only,
+`--targets claude-code` to drop back to Claude-Code-only.) Adding `cursor`
+renders `.cursor/rules/harness.mdc` + `.cursor/mcp.json`; adding `codex`
+renders `AGENTS.md`, `.codex/`, and `.agents/skills/`. Dropping a target
+does **not** delete previously rendered target-specific files — remove them
+manually if you want a clean slate.
 
 #### Add / remove a component
 
@@ -291,8 +294,8 @@ in turn, then dispatch with all collected flags:
 2. `AskUserQuestion`: **locale** — `en`, `ko`, or other free-text tag.
 3. `AskUserQuestion`: **dev_mode** — `task-driven` (no spec gate) or
    `spec-driven` (spec_gate hook enforced).
-4. `AskUserQuestion`: **targets** — `claude-code`, `cursor`, or both
-   (multi-select; `claude-code,cursor` for both).
+4. `AskUserQuestion`: **targets** — `claude-code`, `cursor`, `codex`, or any combination
+   (multi-select; `claude-code,cursor,codex` for all three).
 5. `AskUserQuestion`: **review focus** — `feature` | `bugfix` | `security` |
    `performance` | `refactoring`. Maps to `--focus`.
 6. `AskUserQuestion`: **mechanical_checks** — semicolon-separated commands.
@@ -354,8 +357,8 @@ Use Read + Bash; no CLI invocation.
 
 Substitute the values collected in step 3. Omit flags the user didn't set
 or left at smart defaults (the CLI applies preset defaults for unset flags).
-`$TARGETS` is the comma-joined multi-select — e.g. `claude-code` or
-`claude-code,cursor`.
+`$TARGETS` is the comma-joined multi-select — e.g. `claude-code`,
+`claude-code,cursor`, or `claude-code,cursor,codex`.
 
 ### 5. Report + Quick start
 

@@ -8,7 +8,7 @@
 
 > **A harness that knows your project — and stays that way.**
 
-Interview-born. Grade-gated. Anti-rot by design. Dual-IDE.
+Interview-born. Grade-gated. Anti-rot by design. Multi-target.
 
 [Why](#why-harness-maker) ·
 [Quickstart](#quickstart) ·
@@ -17,7 +17,7 @@ Interview-born. Grade-gated. Anti-rot by design. Dual-IDE.
 [Slash commands](#slash-commands-the-harness-exposes) ·
 [Comparison](#how-it-compares) ·
 [Configuration](#configuration) ·
-[Cursor target](#cursor-target) ·
+[Targets](#targets) ·
 [FAQ](#faq) ·
 [Roadmap](#roadmap) ·
 [Deep dive](docs/HOW-IT-WORKS.md)
@@ -31,13 +31,13 @@ Most Claude Code setups start from a generic template and drift from day one. ha
 Four principles drive every design decision:
 
 **1. Personalized — Interview-born, not template-pasted.**
-The profiler reads your stack, scale, and lifecycle. The interview locks in preset, dev mode, target IDEs, and reviewer depth. A `Side` experiment and a `Production` service get structurally different harnesses — different reviewer sets, different workflow stage counts, different security gates. No generic defaults silently shipped.
+The profiler reads your stack, scale, and lifecycle. The interview locks in preset, dev mode, target runtimes, and reviewer depth. A `Side` experiment and a `Production` service get structurally different harnesses — different reviewer sets, different workflow stage counts, different security gates. No generic defaults silently shipped.
 
 **2. Trusted — Grade-gated, not hope-based.**
 Every `/hm:execute` runs in a fresh git worktree and follows a TDD loop. `/hm:review` doesn't just report findings — it applies consensus-passed fixes and re-reviews until the grade meets the configured threshold (default A). Pre-LLM mechanical checks (lint, tests) gate the review before any reviewer agent spawns. Reviews you trust don't need second-guessing.
 
 **3. Anti-rot — Built-in, not retrofitted.**
-The Claude/Cursor ecosystem moves fast. harness-maker ships a weekly crawl across 4 sources (Anthropic blog, GitHub releases, arxiv cs.SE/CL/CR, OSV.dev), scores each item for relevance, and surfaces only what matters — always manual-confirmed, never auto-applied. The failure-memory system proposes new skills and rules when the same failure recurs 3× across sessions.
+The Claude Code, Cursor, and Codex ecosystem moves fast. harness-maker ships a weekly crawl across 4 sources (Anthropic blog, GitHub releases, arxiv cs.SE/CL/CR, OSV.dev), scores each item for relevance, and surfaces only what matters — always manual-confirmed, never auto-applied. The failure-memory system proposes new skills and rules when the same failure recurs 3× across sessions.
 
 **4. Evolving — Refresh cycles, not rewrites.**
 `/harness-maker:make --update` picks up new template improvements without touching your edits (hash-based KEEP/REPLACE per file). The session memory and wiki build up project-specific conventions. Failure proposals turn recurring stumbles into permanent fixes. The harness improves with the project, not against it.
@@ -54,7 +54,7 @@ The Claude/Cursor ecosystem moves fast. harness-maker ships a weekly crawl acros
 - [Slash commands the harness exposes](#slash-commands-the-harness-exposes)
 - [How it compares](#how-it-compares)
 - [Configuration](#configuration)
-- [Cursor target](#cursor-target)
+- [Targets](#targets)
 - [Reconcile rules](#reconcile-rules-re-rendering-an-existing-harness)
 - [Observability](#observability)
 - [Marketplace](#marketplace)
@@ -81,7 +81,7 @@ claude --plugin-dir /path/to/harness-maker
 /harness-maker:make
 ```
 
-The interview asks for your preset (`Side` or `Production`), locale, dev mode, and target IDEs. A fully-rendered `.claude/` directory is ready in one turn.
+The interview asks for your preset (`Side` or `Production`), locale, dev mode, and target runtime. A fully-rendered harness is ready in one turn.
 
 Re-run with flags to evolve the harness:
 
@@ -101,6 +101,7 @@ Re-run with flags to evolve the harness:
 | **Python 3.12+** and **[`uv`](https://docs.astral.sh/uv/)** | Required wherever Claude Code runs against your project — even if your project's primary language is Rust, Node, or Go. Hooks invoke `uv run python -m harness_maker.gates.*`; without `uv` they are silent no-ops. |
 | **Claude Code CLI** (plugin + hook support) | Loaded via `claude --plugin-dir /path/to/harness-maker`. |
 | **Cursor IDE 2.4+** (3.2+ recommended) | Optional. Reads `.claude/agents/`, `.claude/skills/`, and `.claude/commands/hm/*.md` natively (verified empirically in 0.6.2, re-confirmed 0.7.1 — see `tests/cursor-compat/results-2026-05-08.md`). Hooks render to a separate `.cursor/hooks.json` with Cursor-native schema; both files are emitted when `targets` includes `cursor`. Cursor 3.0+ adds native `/worktree` and `/best-of-n` which coexist safely with harness-maker's prefix-matched cleanup. |
+| **OpenAI Codex CLI** | Optional. When `targets` includes `codex`, harness-maker renders Codex-native `.codex/` config, `AGENTS.md`, and `.agents/skills/` assets from the same workflow definitions. |
 | **Git** | Required for worktree isolation (every `/hm:execute` and `/hm:loop` run). |
 
 ---
@@ -111,13 +112,13 @@ Re-run with flags to evolve the harness:
 
 - **Two presets, ten override dimensions.** `Side` (1 reviewer, lean, fast) and `Production` (5 reviewers, verify-required, secure) cover ~90% of teams. The remaining 10% comes from override dimensions surfaced in the interview: workflow naming, models, autoloop, anti-rot, worktree, security, context-lint, memory, caching.
 
-- **Dual IDE — Claude Code + Cursor, single source.** `.claude/agents/`, `.claude/skills/`, `.claude/commands/hm/`, and `.claude/hooks/hooks.json` are shared. Cursor 2.4+ reads them natively — no duplication. Opt into the `cursor` target to additionally render `.cursor/rules/harness.mdc` and `.cursor/mcp.json`.
+- **Three targets from one harness.** Claude Code gets the native `.claude/` runtime. Cursor reuses `.claude/agents/`, `.claude/skills/`, and `.claude/commands/hm/` while receiving Cursor-specific hooks and rules. Codex receives `AGENTS.md`, `.codex/config.toml`, `.codex/hooks.json`, agent TOML files, and `.agents/skills/` so the same stage and workflow model runs in Codex without hand-porting prompts.
 
 - **AI-readiness scoring.** `/hm:ai-readiness` runs a 3-layer composite: deterministic structural checks (70%), LLM rubric evaluation (25%), prompt-cache diagnostics (5%). Outputs a 0-100 score with P0/P1/P2 ranked action items and updates `.claude/observability/dashboard.md`. All telemetry stays local.
 
 - **Anti-rot pipeline.** Weekly crawl across 4 sources: Anthropic blog/changelog, GitHub releases (`anthropics/claude-code`), arxiv (cs.SE / cs.CL / cs.CR), OSV.dev CVEs. Each item is LLM-scored for relevance with an adaptive threshold (starts at 0.7, adapts ±0.05 based on your accept/reject history). **Always manual-confirmed** — there is no `--auto-apply` path.
 
-- **Worktree isolation per run.** Every `/hm:execute` runs in a fresh `git worktree` under `.worktrees/`. `/hm:loop` allocates one worktree for the whole loop, shared across iterations to reduce branch churn. Successful runs clean up; failed runs preserve evidence. Prefix-match cleanup never touches Cursor-managed worktrees in the same directory.
+- **Worktree isolation per run.** Every `/hm:execute` runs in a fresh `git worktree` under `.worktrees/`. `/hm:loop` allocates one worktree for the whole loop, shared across iterations to reduce branch churn. `sibling_repos` can opt related repos into the same isolation session for split frontend/backend or app/library work. Successful runs clean up; failed runs preserve evidence. Prefix-match cleanup never touches Cursor-managed worktrees in the same directory.
 
 - **7 security gates.** `secrets` (regex + entropy, gitleaks-style), `permissions` (`settings.json` over-grant detection), `hook injection` (`hooks.json` AST scan for `rm -rf`, `curl | sh`, `eval`), `dependency CVEs` (OSV.dev), `hallucination` (AST scan for non-existent imports — pure-filesystem check, no execution of LLM-generated code), `prod-name guard` (cross-tool sequence detection for production-targeting patterns), `prompt injection` (hidden-instruction pattern detection + privilege separation, regex + LLM second pass). Findings go to `.claude/observability/security/findings-*.jsonl` — never transmitted.
 
@@ -129,9 +130,9 @@ Re-run with flags to evolve the harness:
 
 - **Deep interview before every implementation.** `/hm:spec` runs a 6-category interview (Intent → Outcomes → In-Scope Scenarios → Non-Goals → Constraints → Verification) scored for completeness; incomplete categories trigger follow-up questions, not silent gaps. `/hm:plan` runs a 9-category interview (scope → architecture → contract → risk → testing → phasing → dependencies → failure handling → observability) in impact order. Each decision that changes a component boundary, introduces a new contract, or rejects a viable alternative is promoted to a formal **Architecture Decision Record** (ADR) and becomes a binding constraint for `/hm:execute` — not advisory. A `plan-validator` agent gates the plan before it is written to disk: NEEDS_REVISION triggers targeted follow-up rounds; MAJOR_REVISION escalates to the user. The interview ends with a "no deferred decisions" scan — any "Accept?/OK?/Verify?" phrasing is a missed interview round, not a plan checkpoint.
 
-- **Autoloop with adaptive interview and convergence judgment.** `/hm:loop` runs time-and-iteration-bounded loops. Before the first iteration, `autoloop-driver` reads the goal description, extracts already-answered dimensions (purpose / invariants / priority / stopping_criteria / out-of-scope), and asks only what's missing — no fixed question script. A single worktree is shared across all iterations (no per-iteration branch churn). Code writes are delegated to `autoloop-coder` (write-tool-only, bounded scope, no open-ended exploration). Convergence is judged by LLM reading the current state against `stopping_criteria` — not a rule-based checklist — and the loop exits when the predicate is satisfied. Failed iterations preserve the worktree for inspection.
+- **Autoloop with adaptive interview and 4-gate convergence.** `/hm:loop` runs time-and-iteration-bounded loops. Before the first iteration, `autoloop-driver` reads the goal description, extracts already-answered dimensions (purpose / invariants / priority / stopping_criteria), and asks only what's missing — no fixed question script. It locks a loop intensity and explicit exit checklist, then requires mechanical checks, per-criterion LLM judgment, regression comparison, and a two-iteration convergence streak before accepting completion. A single worktree is shared across all iterations, and failed iterations preserve the worktree for inspection.
 
-- **Refdocs search skill.** Register your project's reference folders (architecture docs, API specs, design docs) in `harness.yaml`. The `refdocs-search` skill gives the LLM lossless full-text search across all registered folders — no chunking, no RAG index.
+- **Refdocs search skill.** Register your project's reference folders (architecture docs, API specs, design docs) in `harness.yaml`. `/harness-maker:make` builds a local `docs_index.yaml`, and the `refdocs-search` skill gives the LLM lossless full-text search across registered folders — no chunking, no RAG index.
 
 - **SessionStart drift reminder.** A hook fires on every session open and warns if the running harness-maker version differs from the version that rendered the harness — so you notice when a `/plugin update` needs a re-render. The detector compares `harness.yaml.harness_maker_version` against the **latest plugin version cached on disk** (not just the imported `__version__`), so `/hm:refresh` and SessionStart agree even when the slash command runs against a pinned older version (0.6.2).
 
@@ -167,7 +168,7 @@ flowchart TD
     F -- No --> G["Write .claude/ directly"]
     F -- Yes --> H["Reconcile\n(hash-based keep/replace/both)"]
     H --> G
-    G --> I["Cursor target?\nRender .cursor/ assets too"]
+    G --> I["Extra targets?\nRender .cursor/ and/or .codex/ assets"]
     I --> J["User runs /hm:* commands"]
     J --> K["Weekly /hm:refresh\n4-source anti-rot crawl\n→ manual confirm"]
 ```
@@ -219,9 +220,9 @@ Other Claude Code harnesses pick a niche; harness-maker is the **meta-tool** tha
 |---|---|---|
 | **ohmyclaudecode** | Curated commands/agents bundle | Project-tailored synthesis (preset + 10 override dims), brownfield reconcile, provenance frontmatter, anti-rot pipeline |
 | **superpowers** | Powerful sub-agents and workflows | Single-command entry, AI-readiness scoring, worktree isolation by default, privilege-separated reviewer/executor |
-| **Archon** | Knowledge-base + RAG-backed planning | Stack/scale/lifecycle profiler, atomic+fused workflow engine, conditional reviewer routing, 5 security gates |
-| **aider** | Terminal pair programmer, LLM-agnostic | Claude Code / Cursor IDE native; harness output is the runtime (not the session); anti-rot keeps it current |
-| **ouroboros** | Autonomous self-bootstrapping AI software factory | Project-shaped interview (not one pipeline for all), grade-gated reviews with mechanical pre-checks, anti-rot pipeline, brownfield reconcile, dual-IDE support |
+| **Archon** | Knowledge-base + RAG-backed planning | Stack/scale/lifecycle profiler, atomic+fused workflow engine, conditional reviewer routing, 7 security gates |
+| **aider** | Terminal pair programmer, LLM-agnostic | Claude Code / Cursor / Codex native assets; harness output is the runtime (not the session); anti-rot keeps it current |
+| **ouroboros** | Autonomous self-bootstrapping AI software factory | Project-shaped interview (not one pipeline for all), grade-gated reviews with mechanical pre-checks, anti-rot pipeline, brownfield reconcile, multi-target support |
 | **Hand-rolled `.claude/`** | Full control, zero automation | Drift detection via provenance hash, weekly anti-rot crawl, AI-readiness scoring, worktree isolation — without writing it yourself |
 
 The core difference: harness-maker generates and **owns the lifecycle** of your `.claude/` directory. A static tool gives you a starting point. harness-maker gives you a starting point that knows who it was created for and can be updated without losing your changes.
@@ -236,10 +237,17 @@ The interview writes answers to `.claude/harness.yaml`. Key dimensions:
 preset: Production           # Side | Production
 locale: en                   # en | ko | <any — unknown falls back to en>
 dev_mode: spec-driven        # spec-driven | task-driven
-targets:                     # which IDEs to drive
+targets:                     # which runtimes to drive
   - claude-code
   - cursor
+  - codex
 recommended_model: claude-opus-4-7
+
+ref_folders:
+  - path: ../architecture-docs
+    glob: "**/*.{md,txt,pdf}"
+sibling_repos:
+  - ../backend
 
 reviewers:
   enabled: [code, security, performance, ux, concurrency]
@@ -267,7 +275,11 @@ Run `/harness-maker:make` again and choose **Update** (same settings, pick up te
 
 ---
 
-## Cursor target
+## Targets
+
+`targets` is a multi-select. Choose `claude-code`, `cursor`, `codex`, or any combination. Claude Code is the default; Cursor and Codex add runtime-specific assets while preserving the same preset, workflows, skills, reviewers, and safety model.
+
+### Cursor target
 
 Run `/harness-maker:make` and pick `targets: [cursor]` or `[claude-code, cursor]` at the interview. The renderer adds:
 
@@ -295,6 +307,17 @@ Automated CI guards the dual-schema invariants regardless of manual fixture runs
 - `test_cursor_hooks_uses_lowercase_native_schema` — fails if `.cursor/hooks.json` accidentally adopts Claude PascalCase
 - `test_no_cursor_commands_rendered` — fails if a future change starts emitting `.cursor/commands/hm-*.md` mirrors (Cursor reads `.claude/commands/` natively)
 - `test_render_agents_have_structured_permissions_frontmatter` — fails if any agent template loses its `permissions.allow/deny` block (Cursor 2.5+ subagent permission inheritance gap)
+
+### Codex target
+
+Run `/harness-maker:make` and pick `targets: [codex]` or include `codex` with the other targets. The renderer adds:
+
+- `AGENTS.md` — Codex's top-level project instruction file, rendered without YAML frontmatter so Codex displays clean instructions.
+- `.codex/config.toml` and `.codex/agents/*.toml` — Codex-native configuration and agent registrations.
+- `.codex/hooks.json` — Codex hook wiring, including Codex-specific permission events and file-edit tool matchers.
+- `.agents/skills/*/SKILL.md` — the existing harness skills plus stage, workflow, and loop trigger skills in the layout Codex discovers.
+
+Codex TOML files are rendered as pure TOML, not markdown-with-frontmatter. `AGENTS.md` uses block-merge markers so user additions survive re-renders, while `.codex/*.toml` files are regenerated from the selected target configuration.
 
 ---
 
@@ -325,7 +348,7 @@ All observability is 100% local — nothing is transmitted externally.
 | `.claude/observability/dashboard.md` | AI-readiness score, dimension breakdown, ranked action items |
 | `.claude/observability/metrics-YYYY-MM-DD.jsonl` | Per-turn telemetry (cache hit %, tool calls, durations) — date-rotated daily (ADR-103, 0.7.1). Pre-0.7.1 `metrics.jsonl` is read as the trailing legacy shard. |
 | `.claude/observability/refresh/raw-*.jsonl` | Anti-rot crawl evidence (accepted / rejected items) |
-| `.claude/observability/security/findings-*.jsonl` | 5-gate security scan findings |
+| `.claude/observability/security/findings-*.jsonl` | 7-gate security scan findings |
 
 Run `/hm:ai-readiness` to regenerate the dashboard on demand.
 
@@ -333,18 +356,22 @@ Run `/hm:ai-readiness` to regenerate the dashboard on demand.
 
 ## Marketplace
 
-Both manifests are marketplace-ready:
+Marketplace manifests are present for each runtime:
 
 - `.claude-plugin/plugin.json` — Claude Code plugin spec
 - `.cursor-plugin/plugin.json` — Cursor Marketplace spec
+- `.codex-plugin/plugin.json` — Codex plugin spec
 
-Listing on either marketplace is **pending**. Until then, install locally:
+Listings are **pending**. Until then, install locally:
 
 ```bash
 # Claude Code
 claude --plugin-dir /path/to/harness-maker
 
 # Cursor — open the repo folder directly in Cursor as a workspace plugin
+
+# Codex — render Codex-native assets in your project harness
+/harness-maker:make --targets codex
 ```
 
 ---
@@ -366,8 +393,8 @@ No. Every generated file carries a `content_hash` in its provenance frontmatter.
 **Q: Does anti-rot ever auto-apply?**
 Never. Every anti-rot item surfaces via `AskUserQuestion` in `/hm:refresh`. There is no `--auto-apply` flag and no plan to add one. The rationale: a wrong patch is worse than a stale harness.
 
-**Q: Can I use only Claude Code? Only Cursor? Both?**
-Yes to all three. `targets` is a multi-select at the interview. Single-source `.claude/` assets work in either IDE; Cursor-only files (`.cursor/rules/`, `.cursor/mcp.json`) render only when `cursor` is in `targets`.
+**Q: Can I use only Claude Code? Only Cursor? Only Codex?**
+Yes. `targets` is a multi-select at the interview. Claude Code uses `.claude/`; Cursor reuses most `.claude/` assets and adds `.cursor/`; Codex adds `AGENTS.md`, `.codex/`, and `.agents/skills/`.
 
 **Q: Do my prompts or telemetry leave my machine?**
 No. `metrics.jsonl`, dashboard, and security findings are written to `.claude/observability/` locally. Anti-rot crawls *read* public sources (Anthropic blog, arxiv, GitHub, OSV.dev) but never uploads anything.
@@ -381,15 +408,12 @@ Shell commands listed under `reviewers.mechanical_checks` in `harness.yaml` run 
 **Q: Why doesn't harness-maker rewrite prompts to be model-agnostic?**
 The prompts are tuned for `claude-opus-4-7` — `<thinking>` blocks, role framing, chain-of-thought structure. Rewriting for model-neutrality would degrade quality on the recommended model for hypothetical gains on others. Override `recommended_model` in `harness.yaml` if you want a different model; the prompts remain as-is.
 
-**Q: What are mechanical_checks and when should I use them?**
-`mechanical_checks` is a list of shell commands that run before LLM reviewers in `/hm:review`. Use them for fast, deterministic gates (linting, unit tests) that should block review if broken. They catch structural issues before spending reviewer tokens — a linter failure that takes 2 seconds to catch shouldn't consume a full review round.
-
 ---
 
 ## Roadmap
 
 - **PyPI publish** — remove the editable-from-clone requirement.
-- **Claude Code + Cursor Marketplace listings** — submit both plugin manifests.
+- **Claude Code + Cursor + Codex Marketplace listings** — submit all plugin manifests.
 - **`.hm-meta.yaml` sidecar for Cursor assets** — enable hash-tracking of `.cursor/rules/*.mdc` without polluting Cursor frontmatter, unblocking auto-upgrade for Cursor-target files.
 - **User-configurable anti-rot repo list** — `harness.yaml.anti_rot.github_repos` to track additional Claude Code ecosystem repos beyond the default.
 - **Demo screencast** — record a first-install + `/hm:loop` session.

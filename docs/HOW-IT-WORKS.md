@@ -3,7 +3,7 @@
 # harness-maker: How It Works — Complete Guide
 
 > **Audience**: Developers new to harness-maker, or users who want a deep understanding of internal behavior.
-> **Version**: 0.7.1. Focus is on **procedures, flow, and responsibilities** — not implementation details.
+> **Version**: 0.9.3. Focus is on **procedures, flow, and responsibilities** — not implementation details.
 
 ---
 
@@ -63,7 +63,7 @@
 
 ## 1. What is harness-maker?
 
-harness-maker is a dual plugin that operates in both **Claude Code and Cursor IDE**. Its core role is singular: **structure LLM-based development workflows** so that the same level of quality assurance (review, testing, security scanning) that applied when humans wrote code directly also applies to AI-driven development.
+harness-maker is a multi-target harness generator for **Claude Code, Cursor IDE, and OpenAI Codex CLI**. Its core role is singular: **structure LLM-based development workflows** so that the same level of quality assurance (review, testing, security scanning) that applied when humans wrote code directly also applies to AI-driven development.
 
 ### What it provides
 
@@ -95,7 +95,7 @@ harness-maker is a dual plugin that operates in both **Claude Code and Cursor ID
                           ▼
 ┌──────────────────────────────────────────────────────────────────────┐
 │                  harness.yaml (Single Source of Truth)               │
-│   locale, preset (Side/Production), dev_mode, targets (claude/cursor) │
+│   locale, preset (Side/Production), dev_mode, targets (claude/cursor/codex) │
 │   worktree.scope, max_review_rounds, preferred_model, ...            │
 └──────────┬───────────────────────────────────────┬───────────────────┘
            │                                       │
@@ -837,18 +837,18 @@ The most comprehensive fusion command. Use when safely deploying a new feature e
 
 ## 5. /hm:loop — Automated Iteration Loop
 
-**Purpose**: Progressively improve toward a single goal through multiple iterations. Each loop uses an independent worktree, and safety rails prevent infinite loops.
+**Purpose**: Progressively improve toward a single goal through multiple iterations. Each loop uses one shared worktree, and safety rails prevent infinite loops.
 
 ### Two Modes
 
 | Mode | Usage | Behavior |
 |------|-------|----------|
-| **feature** | `/hm:loop feature <description>` | Incrementally implement a new feature over multiple iterations |
-| **improve** | `/hm:loop improve <description>` | Iteratively improve existing code |
+| **feature** | `/hm:loop --mode feature <description>` | Incrementally implement a new feature over multiple iterations |
+| **improve** | `/hm:loop --mode improve <description>` | Review first, then iteratively improve existing code until exit criteria pass |
 
-### 5-Dimension Required Context
+### Required Context + Loop Intensity
 
-Before starting the loop, the `autoloop-driver` skill collects 5 dimensions:
+Before starting the loop, the `autoloop-driver` skill collects required dimensions and locks the loop intensity:
 
 | Dimension | Content |
 |-----------|---------|
@@ -858,7 +858,7 @@ Before starting the loop, the `autoloop-driver` skill collects 5 dimensions:
 | **test_reliability** | Are tests trustworthy? Are there flaky tests? |
 | **stopping_criteria** | When to judge the loop complete |
 
-**Coverage-based adaptive interview**: LLM reads the user's initial description, extracts already-answered dimensions, and asks questions about **only the missing dimensions**. No fixed script.
+The intensity tier (`quick`, `standard`, `thorough`, or `maximum`) determines which exit checks are required. **Coverage-based adaptive interview**: LLM reads the user's initial description, extracts already-answered dimensions, and asks questions about **only the missing dimensions**. No fixed script.
 
 ### Iteration Cycle
 
@@ -873,8 +873,8 @@ Loop start
    ├─ Set goal for this iteration
    ├─ Run exec-rev (base workflow)
    ├─ Run verify-before-completion skill
-   ├─ Evaluate stopping_criteria
-   └─ If achieved → end loop / If not → next iteration
+   ├─ Run 4-gate convergence check
+   └─ If convergence streak >= 2 → end loop / If not → next iteration
 │
 └─ Run wrapup (exactly once for the entire loop)
 ```
@@ -885,7 +885,9 @@ Loop start
 |------|---------|---------|
 | `max_iter` | 30 | Maximum number of iterations |
 | `max_time` | 8 hours | Maximum execution time |
-| `failed_streak` | 3 | Stop after 3 consecutive failures |
+| `failed_streak` | 5 | Stop after repeated consecutive failures |
+| `same feature retry` | 3 | Stop when feature mode keeps retrying the same feature |
+| `ambiguity count` | 3 | Ask the user when an exit criterion remains ambiguous |
 
 ### Example Loop Scenario Trace (feature mode, 3 iterations)
 
@@ -897,10 +899,11 @@ Loop start
 5. Loop starts, worktree created: .worktrees/autoloop-20260509T0500Z
 6. [Iteration 1] Implement error type classification logic + tests → review → Grade B
 7. verify-before-completion → PASS
-8. stopping_criteria evaluation: "Is error handling fully implemented?" → Partial
+8. 4-gate convergence: mechanical PASS, criterion PARTIAL, regression PASS, streak reset
 9. [Iteration 2] Add error message localization → tests → review → Grade A
-10. stopping_criteria evaluation: "Fully implemented?" → YES
-11. Loop ends, wrapup executed (single commit)
+10. 4-gate convergence: all pass, streak=1
+11. [Iteration 3] Re-check without regression: all pass, streak=2
+12. Loop ends, wrapup executed (single commit)
 ```
 
 ---
@@ -1066,12 +1069,12 @@ See [Section 6.2](#62-hmai-readiness--ai-readiness-analysis) for 3-layer details
 
 ### 7.3 autoloop-driver
 
-**Role**: Explains the WHY of the `/hm:loop` command and defines the method for collecting 5-dimension context.
+**Role**: Explains the WHY of the `/hm:loop` command and defines the method for collecting loop context, intensity, and exit criteria.
 
 **Key contributions**:
 - Define 5 required dimensions (purpose, invariants, priority, test_reliability, stopping_criteria)
 - Coverage-based adaptive interview principle (extract first, ask later)
-- Document safety rails
+- Define the 4-gate convergence model and safety rails
 
 This skill is a **documentation skill** — it does not execute code directly, but provides guidance on how the `/hm:loop` command should behave.
 
@@ -1168,9 +1171,9 @@ osv_dev.crawl(packages=osv_dev.parse_uv_lock("uv.lock"))
 
 ### 7.9 security-scanner
 
-**Role**: Executes a 5-gate security scan and saves findings to JSONL.
+**Role**: Executes a 7-gate security scan and saves findings to JSONL.
 
-**5 gates**:
+**7 gates**:
 
 | Gate | Content | Severity |
 |------|---------|---------|
@@ -1179,6 +1182,8 @@ osv_dev.crawl(packages=osv_dev.parse_uv_lock("uv.lock"))
 | 3. Hook injection | `rm -rf`, `curl \| sh`, `eval`, reverse shell | high |
 | 4. CVEs | OSV.dev-based dependency vulnerabilities (CVSS ≥7 → high) | high/medium/low |
 | 5. Prompt injection | zero-width characters, "ignore previous", base64 blocks | medium/high |
+| 6. Hallucination | non-existent imports detected without executing generated code | medium/high |
+| 7. Prod-name guard | production resource names in dangerous tool-call sequences | high |
 
 For gate 5 (Prompt injection):
 - Regex first-pass filtering, then
@@ -1354,11 +1359,11 @@ Agents are sub-agents with independent contexts. When the main Claude context in
 
 ### 8.8 security-auditor
 
-**Role**: Deep 5-gate security audit. More thorough analysis than `security-reviewer`.
+**Role**: Deep 7-gate security audit. More thorough analysis than `security-reviewer`.
 
-**Difference**: security-reviewer spot-checks only the changed portions of diff. security-auditor conducts a **complete 5-gate audit of the entire codebase**.
+**Difference**: security-reviewer spot-checks only the changed portions of diff. security-auditor conducts a **complete 7-gate audit of the entire codebase**.
 
-**5 gates (same as security-scanner skill)**:
+**7 gates (same as security-scanner skill)**:
 1. Secrets (secrets in source/config)
 2. Permission escalation (settings.json permissions)
 3. Hook injection (dangerous patterns in hooks.json)
@@ -1749,9 +1754,9 @@ A: Enters the automatic fix loop (executor agent fixes P0/P1 findings). If targe
 
 A: It is not invoked automatically on its own. Each stage invokes the stuck agent via `Task()` when it detects a blocking condition. Can also be used manually with something like "we're stuck at X, what's the minimum-regret unblock?"
 
-**Q: How do I know if it's running in Cursor vs Claude Code?**
+**Q: How do I know which runtime target is active?**
 
-A: harness-maker works identically in both. When `targets` includes `cursor`, Cursor-specific assets (`.cursor/rules/*.mdc`, `.cursor/mcp.json`) are additionally rendered. Core logic is shared from a single `.claude/` directory by both IDEs.
+A: `harness.yaml.targets` is the source of truth. Claude Code uses `.claude/`; Cursor adds `.cursor/` assets while reusing most `.claude/` files; Codex adds `AGENTS.md`, `.codex/`, and `.agents/skills/`. The workflow and reviewer model stays shared across targets.
 
 ---
 
@@ -2225,14 +2230,14 @@ Before saving the PLAN, scan for expressions like "Accept?", "OK?", "Verify?", "
 
 **Before**: Open-ended requests like "improve this code" either end in one turn, or each turn loses context and drifts in unrelated directions.
 
-**After**: `/hm:loop` executes a **time-and-iteration bounded** loop. Each iteration reads the results of the previous iteration, and the LLM judges whether progress is converging toward the goal.
+**After**: `/hm:loop` executes a **time-and-iteration bounded** loop. Each iteration reads the results of the previous iteration, then convergence is accepted only after mechanical checks, LLM criterion checks, regression comparison, and a two-iteration streak all pass.
 
 #### Two Modes
 
 | Mode | Command | Purpose |
 |------|---------|---------|
-| **feature** | `/hm:loop feature "description"` | Incrementally implement toward a goal or SPEC file |
-| **improve** | `/hm:loop improve "description"` | Iteratively improve existing code, stop when convergence condition is met |
+| **feature** | `/hm:loop --mode feature "description"` | Incrementally implement toward a goal or SPEC file |
+| **improve** | `/hm:loop --mode improve "description"` | Iteratively improve existing code, stop when exit criteria converge |
 
 #### autoloop-driver's 5-Dimension Adaptive Interview
 
@@ -2257,9 +2262,16 @@ Code writing is performed by the `autoloop-coder` agent:
 - Write access restricted to within worktree boundaries
 - CLAUDE.md + TECH_SPEC.md take priority — make autonomous decisions when ambiguous and log them; **AskUserQuestion is prohibited**
 
-#### Convergence Judgment Is Made by LLM
+#### 4-Gate Convergence
 
-At the end of each iteration, `autoloop-driver` compares `stopping_criteria` against the current code state to judge convergence. Rather than a fixed rule checklist, the **LLM reads the entire output** and judges "has this achieved the goal sufficiently?". If judgment is YES, the loop ends and proceeds to wrapup.
+At the end of each iteration, `autoloop-driver` checks convergence through four gates:
+
+1. **Mechanical**: run each exit criterion command; required failures block convergence.
+2. **LLM individual**: evaluate each criterion label against the current worktree state.
+3. **Regression**: compare current test failures against the previous baseline.
+4. **Streak**: require two consecutive all-pass checks before accepting completion.
+
+The LLM still handles the language-heavy judgment, but it no longer acts as a single unchecked stop signal.
 
 #### Time/Iteration Boundary + Evidence Preservation
 
@@ -2390,4 +2402,4 @@ Even when tests pass, the AI Readiness composite score can drop by 5 or more poi
 
 ---
 
-*This document is current as of harness-maker 0.7.1. Generated via: `/hm:execute how-it-works-docs`*
+*This document is current as of harness-maker 0.9.3. Generated via: `/hm:execute how-it-works-docs`*
