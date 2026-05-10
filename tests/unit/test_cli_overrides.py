@@ -226,3 +226,45 @@ def test_targets_override_with_preset_switch() -> None:
     )
     assert out.preset == Preset.PRODUCTION
     assert out.targets == [Target.CLAUDE_CODE, Target.CURSOR]
+
+
+def test_empty_list_overrides_clear_configurable_lists() -> None:
+    """Configure's clear action passes an empty string; it must clear lists."""
+    a = _baseline_side().model_copy(
+        update={
+            "domains": ["python", "react"],
+            "mechanical_checks": ["ruff check ."],
+            "wrapup_docs": ["CHANGELOG.md"],
+            "sibling_repos": ["../backend"],
+        }
+    )
+    out = _apply_dimension_overrides(
+        a,
+        preset_override=None,
+        locale_override=None,
+        dev_mode_override=None,
+        targets_override=None,
+        domains_override="",
+        mechanical_checks_override="",
+        wrapup_docs_override="",
+        sibling_repos_override="",
+    )
+    assert out.domains == []
+    assert out.mechanical_checks == []
+    assert out.wrapup_docs == []
+    assert out.sibling_repos == []
+
+
+def test_empty_ref_folders_override_clears_ref_folders() -> None:
+    from harness_maker.models import RefFolder
+
+    a = _baseline_side().model_copy(update={"ref_folders": [RefFolder(path="./docs")]})
+    out = _apply_dimension_overrides(
+        a,
+        preset_override=None,
+        locale_override=None,
+        dev_mode_override=None,
+        targets_override=None,
+        ref_folders_override="",
+    )
+    assert out.ref_folders == []

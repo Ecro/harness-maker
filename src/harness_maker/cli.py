@@ -351,10 +351,17 @@ def _write_harness_manifest(target_dotclaude: Path, written: list[Path]) -> None
 
     from harness_maker import __version__
 
+    project_root = target_dotclaude.parent.resolve()
+    files: list[str] = []
+    for path in written:
+        try:
+            files.append(path.resolve().relative_to(project_root).as_posix())
+        except ValueError:
+            files.append(path.as_posix())
     manifest = {
         "generated_by": "harness-maker",
         "version": __version__,
-        "files": sorted(str(p) for p in written),
+        "files": sorted(files),
     }
     manifest_path = target_dotclaude / ".harness-manifest.json"
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
@@ -471,21 +478,21 @@ def _apply_dimension_overrides(
         update["targets"] = deduped
     if grade_threshold_override:
         update["grade_threshold"] = grade_threshold_override
-    if domains_override:
+    if domains_override is not None:
         update["domains"] = [d.strip() for d in domains_override.split(",") if d.strip()]
-    if mechanical_checks_override:
+    if mechanical_checks_override is not None:
         update["mechanical_checks"] = [
             c.strip() for c in mechanical_checks_override.split(";") if c.strip()
         ]
     if recommended_model_override:
         update["recommended_model"] = recommended_model_override
-    if wrapup_docs_override:
+    if wrapup_docs_override is not None:
         update["wrapup_docs"] = [
             d.strip() for d in wrapup_docs_override.split(";") if d.strip()
         ]
-    if ref_folders_override:
+    if ref_folders_override is not None:
         update["ref_folders"] = _parse_ref_folders_flag(ref_folders_override)
-    if sibling_repos_override:
+    if sibling_repos_override is not None:
         update["sibling_repos"] = [
             r.strip() for r in sibling_repos_override.split(";") if r.strip()
         ]
@@ -720,6 +727,65 @@ def _read_preset(harness_yaml: Path) -> Preset | None:
     return None
 
 
+def _read_harness_config(harness_yaml: Path) -> dict[str, object] | None:
+    """Best-effort harness.yaml body extraction for commands that need policy."""
+    if not harness_yaml.is_file():
+        return None
+    import yaml as _yaml
+
+    try:
+        text = harness_yaml.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    try:
+        for doc in _yaml.safe_load_all(text):
+            if isinstance(doc, dict) and "generated_by" not in doc:
+                return doc
+    except _yaml.YAMLError:
+        return None
+    return None
+
+
+@app.command("security-scan")
+def security_scan_cmd(
+    target: Path = typer.Argument(  # noqa: B008
+        default_factory=Path.cwd,
+        help="Project root to scan.",
+    ),
+) -> None:
+    """Run the bundled security scanner and print a compact summary."""
+    from collections import Counter
+
+    from harness_maker.security_scanner import scan_all
+
+    target = target.resolve()
+    harness_config = _read_harness_config(target / ".claude" / "harness.yaml")
+    findings = scan_all(target, harness_config=harness_config)
+    by_severity = Counter(f.severity for f in findings)
+
+    typer.echo(f"Security scan: {len(findings)} finding(s)")
+    if by_severity:
+        bits = [f"{severity}={count}" for severity, count in sorted(by_severity.items())]
+        typer.echo("Severity: " + ", ".join(bits))
+    for finding in findings[:20]:
+        typer.echo(
+            f"  {finding.severity} {finding.category} "
+            f"{finding.file}:{finding.line} — {finding.evidence}",
+        )
+    if len(findings) > 20:
+        typer.echo(f"  ... {len(findings) - 20} more")
+
+    policy = "warn"
+    if isinstance(harness_config, dict):
+        security = harness_config.get("security")
+        if isinstance(security, dict):
+            on_finding = security.get("on_finding")
+            if isinstance(on_finding, dict) and on_finding.get("high") == "block":
+                policy = "block"
+    if policy == "block" and any(f.severity in {"high", "P0"} for f in findings):
+        raise typer.Exit(code=1)
+
+
 @app.command("remove")
 def remove_cmd(
     target: Path = typer.Argument(  # noqa: B008
@@ -755,12 +821,17 @@ def remove_cmd(
 
     removed: list[str] = []
     skipped: list[str] = []
+    project_root = target.resolve()
 
     for rel in file_list:
-        if rel == "harness.yaml" and not remove_yaml:
+        fpath = _resolve_manifest_file(target_dotclaude, rel)
+        if fpath is None:
+            skipped.append(rel)
             continue
 
-        fpath = target_dotclaude / rel
+        if fpath == (target_dotclaude / "harness.yaml").resolve() and not remove_yaml:
+            continue
+
         if not fpath.exists():
             continue
 
@@ -773,7 +844,7 @@ def remove_cmd(
         else:
             fpath.unlink()
             removed.append(rel)
-            _rmdir_if_empty(fpath.parent)
+            _rmdir_if_empty(fpath.parent, stop=project_root)
 
     if not dry_run:
         manifest_path.unlink(missing_ok=True)
@@ -790,18 +861,64 @@ def remove_cmd(
 
 
 def _has_user_block(fpath: Path) -> bool:
-    """Check if a file contains @hm:user: markers."""
+    """Return True only when a user block contains real user content."""
     try:
         content = fpath.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
         return False
-    return "@hm:user:" in content
+    lines = content.splitlines()
+    in_block = False
+    block_has_content = False
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("<!-- @hm:user:"):
+            in_block = True
+            block_has_content = False
+            continue
+        if stripped.startswith("<!-- @hm:/user:"):
+            if block_has_content:
+                return True
+            in_block = False
+            block_has_content = False
+            continue
+        if in_block and stripped and not (stripped.startswith("<!--") and stripped.endswith("-->")):
+            block_has_content = True
+    return False
 
 
-def _rmdir_if_empty(d: Path) -> None:
-    """Remove directory if empty, walking up to .claude/."""
+def _resolve_manifest_file(target_dotclaude: Path, rel: str) -> Path | None:
+    """Resolve old and current manifest entries without escaping the project."""
+    project_root = target_dotclaude.parent.resolve()
+    raw = Path(rel)
+    if raw.is_absolute():
+        candidate = raw
+    elif (
+        (raw.parts and raw.parts[0] in {".claude", ".cursor", ".codex", ".agents"})
+        or (raw.name in {"CLAUDE.md", "AGENTS.md"} and len(raw.parts) == 1)
+    ):
+        candidate = project_root / raw
+    else:
+        # Backward compatibility with pre-0.9.5 manifests whose entries were
+        # relative to .claude, e.g. "commands/hm/execute.md".
+        candidate = target_dotclaude / raw
+    try:
+        resolved = candidate.resolve()
+    except OSError:
+        resolved = candidate.absolute()
+    try:
+        resolved.relative_to(project_root)
+    except ValueError:
+        return None
+    return resolved
+
+
+def _rmdir_if_empty(d: Path, *, stop: Path | None = None) -> None:
+    """Remove empty directories up to the project root or .claude boundary."""
+    stop = stop.resolve() if stop is not None else None
     try:
         while d.name and d.name != ".claude":
+            if stop is not None and d.resolve() == stop:
+                break
             if d.exists() and not any(d.iterdir()):
                 d.rmdir()
                 d = d.parent

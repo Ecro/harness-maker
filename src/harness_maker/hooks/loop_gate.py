@@ -9,15 +9,33 @@ from pathlib import Path
 
 
 def _find_marker(start_dir: Path | None = None) -> Path | None:
-    """Return path to .hm-loop-active if found in start_dir or any ancestor up to git root."""
+    """Return .hm-loop-active from cwd, ancestors, or a harness worktree parent."""
     cwd = start_dir if start_dir is not None else Path.cwd()
     for directory in [cwd, *cwd.parents]:
         candidate = directory / ".hm-loop-active"
         if candidate.exists():
             return candidate
-        if (directory / ".git").exists():
+        git_marker = directory / ".git"
+        if git_marker.exists():
+            if git_marker.is_file():
+                worktree_parent_marker = _worktree_parent_marker(directory)
+                if worktree_parent_marker is not None:
+                    return worktree_parent_marker
             break
     return None
+
+
+def _worktree_parent_marker(directory: Path) -> Path | None:
+    """Find the parent-repo loop marker for harness `.worktrees/<name>` dirs."""
+    parts = directory.parts
+    if ".worktrees" not in parts:
+        return None
+    idx = len(parts) - 1 - parts[::-1].index(".worktrees")
+    if idx == 0:
+        return None
+    project_root = Path(*parts[:idx])
+    candidate = project_root / ".hm-loop-active"
+    return candidate if candidate.exists() else None
 
 
 def _stop_hook(stdin_text: str) -> int:

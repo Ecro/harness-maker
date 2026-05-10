@@ -83,6 +83,23 @@ def test_codex_hooks_json_has_stop_with_flush_session() -> None:
     )
 
 
+def test_codex_hooks_json_has_stop_with_loop_gate() -> None:
+    """Codex Stop event must hard-block active hm-loop sessions."""
+    env = _make_env()
+    tpl = env.get_template("codex/hooks.json.j2")
+    rendered = tpl.render(
+        config=_BASE_CONFIG,
+        preset="Production",
+        harness_maker_src_path=_HARNESS_MAKER_PATH,
+    )
+    parsed = json.loads(rendered)
+    stop_hooks = parsed.get("hooks", {}).get("Stop", [])
+    stop_commands = " ".join(
+        h.get("command", "") for entry in stop_hooks for h in entry.get("hooks", [])
+    )
+    assert "harness_maker.hooks.loop_gate --mode stop-hook" in stop_commands
+
+
 def test_codex_hooks_json_no_worktree_gate() -> None:
     """Codex hooks.json must NOT contain worktree_gate (ADR-005: omitted)."""
     env = _make_env()

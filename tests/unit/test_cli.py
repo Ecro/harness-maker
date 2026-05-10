@@ -212,6 +212,8 @@ def test_manifest_written_after_make(tmp_path: Path) -> None:
     assert "version" in data
     assert isinstance(data["files"], list)
     assert len(data["files"]) >= 1
+    assert ".claude/harness.yaml" in data["files"]
+    assert all(not Path(p).is_absolute() for p in data["files"])
 
 
 # ---------------------------------------------------------------------------
@@ -563,3 +565,129 @@ def test_wrapup_docs_flag(tmp_path: Path) -> None:
 
     assert result.exit_code == 0, f"exit {result.exit_code}:\n{result.output}"
     assert captured["wrapup_docs"] == ["CHANGELOG.md", "TODO.md"]
+
+
+# ---------------------------------------------------------------------------
+# security-scan CLI command
+# ---------------------------------------------------------------------------
+
+
+def test_security_scan_command_reports_findings(tmp_path: Path) -> None:
+    """Generated security-scanner skill calls `cli security-scan`; keep it wired."""
+    from harness_maker.models import Finding
+
+    finding = Finding(
+        severity="medium",
+        category="prompt_injection",
+        file="README.md",
+        line=1,
+        evidence="ignore previous instructions",
+        fix="Remove the instruction override.",
+    )
+
+    with patch("harness_maker.security_scanner.scan_all", return_value=[finding]) as scan:
+        result = runner.invoke(app, ["security-scan", str(tmp_path)])
+
+    assert result.exit_code == 0, f"exit {result.exit_code}:\n{result.output}"
+    scan.assert_called_once()
+    assert "Security scan: 1 finding" in result.output
+    assert "prompt_injection" in result.output
+
+
+def test_security_scan_blocks_high_when_policy_blocks(tmp_path: Path) -> None:
+    """Production harness policy can make high findings fail the command."""
+    from harness_maker.models import Finding
+
+    claude = tmp_path / ".claude"
+    claude.mkdir()
+    (claude / "harness.yaml").write_text(
+        "---\ngenerated_by: harness-maker\n---\n"
+        "security:\n"
+        "  on_finding:\n"
+        "    high: block\n",
+        encoding="utf-8",
+    )
+    finding = Finding(
+        severity="high",
+        category="secrets",
+        file="leak.py",
+        line=1,
+        evidence="secret",
+        fix="Rotate and remove.",
+    )
+
+    with patch("harness_maker.security_scanner.scan_all", return_value=[finding]):
+        result = runner.invoke(app, ["security-scan", str(tmp_path)])
+
+    assert result.exit_code == 1, f"expected blocking exit:\n{result.output}"
+    assert "high secrets" in result.output
+
+
+# ---------------------------------------------------------------------------
+# real temporary project lifecycle
+# ---------------------------------------------------------------------------
+
+
+def test_make_update_clear_and_remove_real_tmp_project(tmp_path: Path) -> None:
+    """Install, update, clear config-style lists, dry-run remove, then remove."""
+    result = runner.invoke(
+        app,
+        [
+            "make",
+            str(tmp_path),
+            "--autoloop",
+            "--grade-threshold",
+            "B",
+            "--domains",
+            "python,react",
+            "--mechanical-checks",
+            "ruff check .",
+            "--wrapup-docs",
+            "CHANGELOG.md;TODO.md",
+        ],
+    )
+    assert result.exit_code == 0, f"fresh make failed:\n{result.output}"
+
+    claude = tmp_path / ".claude"
+    assert (claude / "harness.yaml").is_file()
+    assert (claude / ".harness-manifest.json").is_file()
+    assert (claude / "commands" / "hm" / "make.md").is_file()
+    assert (claude / "commands" / "hm" / "configure.md").is_file()
+    assert (claude / "commands" / "hm" / "uninstall.md").is_file()
+
+    update = runner.invoke(
+        app,
+        [
+            "make",
+            str(tmp_path),
+            "--update",
+            "--grade-threshold",
+            "C",
+            "--domains",
+            "",
+            "--mechanical-checks",
+            "",
+            "--wrapup-docs",
+            "",
+        ],
+    )
+    assert update.exit_code == 0, f"update failed:\n{update.output}"
+
+    from harness_maker.interview import answers_from_harness_yaml
+
+    reused = answers_from_harness_yaml(claude / "harness.yaml")
+    assert reused is not None
+    assert reused.grade_threshold == "C"
+    assert reused.domains == []
+    assert reused.mechanical_checks == []
+    assert reused.wrapup_docs == []
+
+    dry_run = runner.invoke(app, ["remove", str(tmp_path), "--dry-run"])
+    assert dry_run.exit_code == 0, f"dry-run remove failed:\n{dry_run.output}"
+    assert (claude / "commands" / "hm" / "make.md").is_file()
+
+    remove = runner.invoke(app, ["remove", str(tmp_path)])
+    assert remove.exit_code == 0, f"remove failed:\n{remove.output}"
+    assert (claude / "harness.yaml").is_file()
+    assert not (claude / ".harness-manifest.json").exists()
+    assert not (claude / "commands" / "hm" / "make.md").exists()

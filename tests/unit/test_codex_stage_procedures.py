@@ -177,6 +177,13 @@ def test_loop_codex_render_has_worktree_fallback() -> None:
     ), "Codex loop must document worktree fallback path (ADR-005)"
 
 
+def test_loop_codex_render_keeps_marker_on_non_convergence() -> None:
+    """Non-converged Codex loop halts must keep the Stop-hook marker active."""
+    rendered = _render_loop(is_codex=True)
+    assert "Keep `.hm-loop-active` on every non-converged halt" in rendered
+    assert "explicitly chooses Abort/Override" in rendered
+
+
 # ── AskUserQuestion absent in all Codex renders ───────────────────────────────
 
 _ALL_STAGES = ["execute", "research", "spec", "plan", "review", "wrapup", "verify"]

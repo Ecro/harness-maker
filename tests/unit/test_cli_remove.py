@@ -146,6 +146,26 @@ def test_remove_skips_user_block_files(tmp_path: Path) -> None:
     assert "skipped" in result.output.lower() or "user" in result.output.lower()
 
 
+def test_remove_deletes_files_with_empty_user_block_placeholders(tmp_path: Path) -> None:
+    """Generated placeholder markers alone are not user customization."""
+    project = _scaffold_project(tmp_path)
+    claude = project / ".claude"
+    target = claude / "commands" / "hm" / "execute.md"
+    target.write_text(
+        "---\ngenerated_by: harness-maker\n---\n"
+        "execute command\n"
+        "<!-- @hm:user:extensions -->\n"
+        "<!-- Project-specific overrides. Preserved across upgrades. -->\n"
+        "<!-- @hm:/user:extensions -->\n",
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(app, ["remove", str(project)])
+
+    assert result.exit_code == 0, f"exit {result.exit_code}:\n{result.output}"
+    assert not target.exists()
+
+
 # ---------------------------------------------------------------------------
 # remove: --dry-run prints but does not delete
 # ---------------------------------------------------------------------------

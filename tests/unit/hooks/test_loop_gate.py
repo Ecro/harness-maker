@@ -39,6 +39,27 @@ class TestStopHook:
         # stop_hook_active guard must short-circuit even when marker exists
         assert _stop_hook('{"stop_hook_active": true}') == 0
 
+    def test_worktree_parent_marker_blocks_stop(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        project = tmp_path / "repo"
+        worktree = project / ".worktrees" / "execute-20260510T1602Z"
+        subdir = worktree / "sub"
+        subdir.mkdir(parents=True)
+        (project / ".git").mkdir(parents=True)
+        (project / ".hm-loop-active").touch()
+        (worktree / ".git").write_text(
+            f"gitdir: {project}/.git/worktrees/execute-20260510T1602Z\n",
+            encoding="utf-8",
+        )
+        monkeypatch.chdir(subdir)
+
+        result = _stop_hook("")
+        captured = capsys.readouterr()
+
+        assert result == 2
+        assert json.loads(captured.out)["decision"] == "block"
+
 
 class TestPreToolUse:
     def test_no_marker_exits_0(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -78,7 +99,7 @@ class TestFindMarker:
 
     def test_git_as_file_stops_walk(self, tmp_path: Path) -> None:
         # Git worktrees have .git as a regular file, not a directory.
-        # _find_marker must stop at this boundary the same way.
+        # Non-harness worktrees still stop at this boundary.
         (tmp_path / ".git").write_text("gitdir: /repo/.git/worktrees/wt1\n")
         subdir = tmp_path / "sub"
         subdir.mkdir()
@@ -90,3 +111,18 @@ class TestFindMarker:
             assert _find_marker(subdir) is None
         finally:
             above.unlink(missing_ok=True)
+
+    def test_found_in_harness_worktree_parent(self, tmp_path: Path) -> None:
+        project = tmp_path / "repo"
+        worktree = project / ".worktrees" / "execute-20260510T1602Z"
+        subdir = worktree / "sub"
+        subdir.mkdir(parents=True)
+        (project / ".git").mkdir(parents=True)
+        marker = project / ".hm-loop-active"
+        marker.touch()
+        (worktree / ".git").write_text(
+            f"gitdir: {project}/.git/worktrees/execute-20260510T1602Z\n",
+            encoding="utf-8",
+        )
+
+        assert _find_marker(subdir) == marker
