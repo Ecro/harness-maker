@@ -76,7 +76,17 @@
         ]
       }
     ],
-    "Stop": []
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "command": "uv run --with /home/noel/harness-maker python -m harness_maker.hooks.loop_gate --mode stop-hook",
+            "timeout": 5,
+            "type": "command"
+          }
+        ]
+      }
+    ]
   },
   "preset": "Side"
 }

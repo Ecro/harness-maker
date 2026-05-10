@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.7.1
+harness_maker_version: 0.7.3
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: fa49ad526a2b27f2b9262186afdf421bea640b7515e65997c9e191929e3a3369
+content_hash: 67c2cebe91ace28da7ebf7eb0dbc529f5370d38e1b135a9c4f29a0eb870edbc8
 ---
 # /hm:exec-rev-wrap-ver
 
@@ -67,6 +67,8 @@ Before any code edits, load memory in tier order (stops at first miss):
 
 ### Step 0 — Worktree isolation (deterministic — do NOT rely on skill auto-discovery)
 
+<!-- # SIBLING_WORKTREE_PATHS -->
+
 Engage isolation if `harness.yaml.worktree.scope` includes `execute`. The `worktree-isolator` skill is documentation-only — its trigger-based dispatch is probabilistic in Cursor IDE and can silently skip, leaving safety-critical edits on the main branch. **Invoke the worktree CLI directly** so isolation is deterministic across both IDEs.
 
 **Idempotent under `/hm:loop`**: when this stage runs as part of a loop iteration, the loop has already engaged a per-loop worktree at step 5. The `worktree create` CLI detects we're already inside `.worktrees/<name>/` and returns that path — no nested worktrees, just reuse.
@@ -75,12 +77,13 @@ Engage isolation if `harness.yaml.worktree.scope` includes `execute`. The `workt
 !uv run --with /home/noel/harness-maker python -m harness_maker.worktree create execute "$(pwd)"
 ```
 
-Read the **single line** the command prints — that is the contract for the rest of this stage. Two cases:
+Read **all non-empty output lines** — that is the contract for the rest of this stage. Three cases:
 
-- **Absolute path** like `/path/to/project/.worktrees/execute-20260506T1830Z` → isolation engaged. **Treat that exact string as `<WT>` for the rest of this stage.** You (Claude) MUST substitute the literal absolute path everywhere `<WT>` appears below — **do NOT use a shell variable**: each `!` block is a fresh subshell, so `worktree_path=...` assignment is lost between blocks.
+- **Empty output** → `worktree.scope` does not include `execute`. No isolation; operate in `cwd`. Skip the finalize step at end.
+- **One absolute path** like `/path/to/project/.worktrees/execute-20260506T1830Z` → single-repo isolation. **Treat that exact string as `<WT>` for the rest of this stage.** You (Claude) MUST substitute the literal absolute path everywhere `<WT>` appears below — **do NOT use a shell variable**: each `!` block is a fresh subshell.
   - Every Read/Write/Edit call uses absolute paths starting with `<WT>/`.
   - Tests / lints / type checks: `!cd <WT> && <cmd>`.
-- **Empty output** → `worktree.scope` does not include `execute`. No isolation; operate in `cwd`. Skip the finalize step at end.
+- **Multiple lines** → multi-repo isolation. Line 1 = primary repo worktree (`<WT>`). Lines 2+ = sibling repo worktrees (`<WT-sibling-N>`). Use `<WT>` for primary-repo edits and `<WT-sibling-N>` for sibling-repo edits — the per-session gate marker covers all of them.
 
 ### Step 1 — Load PLAN + flag parsing
 
@@ -296,6 +299,7 @@ Defaults from `harness.yaml.reviewers:`:
 Per-invocation overrides (workflow command flags):
 - `--no-auto-fix` — disable auto-fix this run only.
 - `--with-reviewers=<csv>` — add ad-hoc reviewers (must exist in `reviewers.installed`).
+
 
 ## Procedure — Round 1 (initial review)
 
@@ -591,7 +595,7 @@ Close the loop on a unit of work:
 Before touching anything, verify state:
 
 1. **Working tree state**: there should be staged changes (from execute) OR clean (if execute was skipped). If there are *unstaged* changes that don't trace to execute's worktree merge, surface them — they may be drift.
-2. **Worktree finalize state**: any `.worktrees/execute-*` directories should be cleaned up by execute Step 5 already. If one persists, log a warning — it means execute exited with `fail` or stage-only failed.
+2. **Worktree finalize state**: any `.worktrees/execute-*` directories should be cleaned up by execute Step 5 (`stage-only`) already. If one persists, log a warning — it means execute exited with `fail` or stage-only failed. **Multi-repo**: when sibling repos are configured, `finalize stage-only` merges all repos' worktrees into their respective main branches; if any sibling's merge failed, the marker file is kept and the directory remains — resolve manually before committing.
 3. **PLAN existence**: `work-docs/PLAN-{slug}.md` exists (skip wrapup with a clear error otherwise).
 
 ### Step 2 — Final verification pass

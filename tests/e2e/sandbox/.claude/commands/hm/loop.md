@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.7.1
+harness_maker_version: 0.7.3
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/loop.md.j2
 provenance: official
-content_hash: 9e9f00d25aa19a3d8e2e5ea5b44f4504b77b57603f03a11f5936b25e93c735f0
+content_hash: b0924cf34db5cb268a34caf90c8bc5d800565b51881a1d1905fa2cdbb28e163b
 ---
 # /hm:loop
 
@@ -23,7 +23,7 @@ development repository, not in the projects this command runs in.
 ```
 /hm:loop <goal>
 /hm:loop --spec <path> [--mode feature|improve] [--target <path>]
-         [--time 8h] [--max-iter 30] [--per-iter-workflow exec-rev]
+         [--time 8h] [--max-iter 50] [--per-iter-workflow exec-rev]
          [--convergence <predicate>] [--dry-run]
 ```
 
@@ -46,7 +46,8 @@ development repository, not in the projects this command runs in.
 - `--target <path>` — scope for `improve` mode (file, directory, or module
   name). Defaults to the entire project if omitted.
 - `--time <Nh>` — max wall-clock duration (default `8h`).
-- `--max-iter <N>` — max iterations (default `30`).
+- `--max-iter <N>` — max iterations (default `50`).
+- `--failed-streak-cap <N>` — max consecutive failures before halting (default `5`). Raise when features are expected to fail multiple times before succeeding.
 - `--per-iter-workflow <name>` (alias `--workflow`) — fused workflow each
   iter invokes. Default: `exec-rev` (execute + review only — wrapup is
   deferred to loop close to avoid commit-per-iter). Recommended overrides:
@@ -147,6 +148,56 @@ comprehension to extract an answer if the source material clearly states it:
 If the source only hints at a dimension (vague, implicit, partial) — mark it
 as **unresolved** and ask. Do not invent answers.
 
+#### 4-G. Loop intensity + exit criteria (mandatory — runs before 4-B)
+
+Before interviewing for missing dimensions, lock in the loop's quality bar.
+
+Ask via `AskUserQuestion` (single call, two independent questions):
+
+**Q1 — Loop intensity:**
+
+| Option | What it guarantees |
+|--------|--------------------|
+| `quick` | Tests pass + lint clean |
+| `standard` *(recommended)* | + mypy clean, review grade ≥ B |
+| `thorough` | + review grade = A, all AC verified |
+| `maximum` | + security scan clean, no regressions vs baseline |
+
+**Q2 — Additional exit criteria (free-form text or "none"):**
+
+> Any measurable conditions specific to this goal that must be satisfied before the loop can converge? (Examples: "< 100 ms p99 latency", "no CVEs in deps", "all SPEC scenarios green")
+
+After the user answers:
+
+1. Set `loop_intensity` from Q1.
+2. Populate `exit_criteria_checklist` with the intensity-tier defaults below,
+   then append any user-specified Q2 items as `ExitCriterion` entries
+   (set `cmd=""` for qualitative items; adapt `cmd` values to the actual
+   project toolchain — use `uv run pytest` for Python, `cargo test` for Rust,
+   `npm test` for Node.js, etc.):
+
+```yaml
+# quick
+- {label: "all tests pass",  cmd: "pytest -q --tb=short", required: true}
+- {label: "lint clean",      cmd: "ruff check .",         required: true}
+
+# standard adds:
+- {label: "type check clean",  cmd: "mypy --strict .", required: false}
+- {label: "review grade >= B", cmd: "",               required: true}
+
+# thorough replaces "grade >= B" with:
+- {label: "type check clean",              cmd: "mypy --strict .", required: true}
+- {label: "review grade = A",              cmd: "",               required: true}
+- {label: "all acceptance criteria verified", cmd: "",            required: true}
+
+# maximum adds to thorough:
+- {label: "security scan clean",                cmd: "",  required: true}
+- {label: "no regressions vs prior iter baseline", cmd: "", required: true}
+```
+
+Each tier is **cumulative**: `thorough` includes all `standard` items plus its
+own additions; `maximum` includes all `thorough` items plus its own.
+
 #### 4-B. Interview for missing dimensions
 
 For each unresolved dimension, ask via `AskUserQuestion`. Present what you
@@ -162,6 +213,22 @@ Ask dimensions in this order:
 Batch up to two related dimensions per `AskUserQuestion` call when they are
 short (e.g., priority + test_reliability). Never batch stopping_criteria with
 others — it deserves its own focused question.
+
+**4-B post-hook (ADR-008) — runs immediately after stopping_criteria is
+finalized:**
+
+Re-read the finalized `stopping_criteria` text. Using LLM judgment, extract
+every **measurable condition** it contains — items with a specific metric,
+threshold, or command that can be mechanically checked. For each extracted
+condition that is NOT already in `exit_criteria_checklist`:
+
+1. Propose it as a new `ExitCriterion` (set `cmd` if a shell command can
+   check it, otherwise leave `cmd=""`).
+2. Ask via `AskUserQuestion`: "Add to exit checklist? {proposed label}"
+   Options: **Add (required)** / **Add (warning only)** / **Skip**.
+
+This ensures measurable stopping conditions become first-class checklist
+items rather than staying buried in prose.
 
 #### 4-C. Ambiguity resolution (LLM judgment)
 
@@ -224,9 +291,25 @@ context:
   priority: <ranked>
   test_reliability: <actionable answer>
   stopping_criteria: <actionable answer>
+  loop_intensity: <quick|standard|thorough|maximum>
+  exit_criteria_checklist:
+    - label: <criterion description>
+      cmd: <shell command or "">
+      required: <true|false>
   notes:
     - <any additional clarifications from follow-ups>
+runtime:
+  convergence_streak: 0
+  checklist_fail_counts: {}          # {criterion_label: int}
+  criterion_ambiguity_counts: {}     # {criterion_label: int}
+  last_test_result:
+    exit_code: null
+    failing: []
 ```
+
+The `runtime:` block is **ephemeral per-run state** — it is cleared at loop
+start and never merged across runs (unlike `context:`, which persists). After
+any `/compact`, re-read this block and restore the counters before continuing.
 
 Save the loop-spec to `.claude/loop-specs/<slug>.yaml`:
 
@@ -258,15 +341,35 @@ worktree would explode commit count.
 !uv run --with /home/noel/harness-maker python -m harness_maker.worktree create execute "$(pwd)"
 ```
 
-Read the **single line** the command prints. Two cases:
+Read **all non-empty output lines** the command prints. Three cases:
 
-- **Absolute path** like `/path/to/repo/.worktrees/execute-20260507T0010Z`
-  → isolation engaged. **Treat that exact string as `<WT>` for every
+- **Empty output** → `worktree.scope` does not include `execute`. No
+  isolation; operate in `cwd`. Skip the finalize step at the end.
+- **One absolute path** like `/path/to/repo/.worktrees/execute-20260507T0010Z`
+  → single-repo isolation. **Treat that exact string as `<WT>` for every
   subsequent operation in this loop**: every Read/Write/Edit call, every
   `cd` for tests/lints, every workflow-command invocation. Do NOT use a
   shell variable — each `!` block is a fresh subshell.
-- **Empty output** → `worktree.scope` does not include `execute`. No
-  isolation; operate in `cwd`. Skip the finalize step at the end.
+- **Multiple lines** → multi-repo isolation. Line 1 = primary repo worktree
+  (`<WT>`). Lines 2+ = sibling repo worktrees (`<WT-sibling-N>`). Use `<WT>`
+  for primary-repo operations and `<WT-sibling-N>` for sibling-repo edits.
+
+After confirming the worktree path (or deciding to operate in cwd), **create
+the loop-active marker** in the project root:
+
+```bash
+!touch .hm-loop-active
+```
+
+This activates the Stop hook guard — the session will not terminate while
+this file exists. The marker is gitignored by the harness worktree setup.
+
+> **Cursor users**: the Claude Code Stop event guard is not available in
+> Cursor IDE. The `.hm-loop-active` marker activates advisory stderr output
+> on each Bash tool call but cannot block session termination. **Do not
+> close the Cursor IDE window manually while the loop is running.** To
+> recover a loop broken by accidental close: `rm .hm-loop-active` then
+> re-run `/hm:loop --spec <spec-path>` with the remaining features.
 
 Per-iter standalone `/hm:execute` (e.g. inside an invoked workflow's
 execute stage) calls `worktree create` again — its idempotency check
@@ -289,13 +392,21 @@ You are the driver. Track state via `TodoWrite` and your working memory.
   named `improve-cycle` (improve mode). Task description holds AC or
   stopping_criteria.
 - Note the start timestamp: `Bash` → `date +%s`.
-- Maintain counters: `iter` (0), `failed_streak` (0), `completed` (list).
+- Maintain counters: `iter` (0), `failed_streak` (0), `convergence_streak` (0),
+  `completed` (list), `checklist_fail_counts` ({}), `criterion_ambiguity_counts` ({}).
+- **Post-`/compact` recovery**: after any compaction event, reload
+  `convergence_streak`, `checklist_fail_counts`, and `criterion_ambiguity_counts`
+  from `work-docs/loop-context/<slug>.yaml` `runtime:` section (see step 4-F
+  for the persistence schema). If the `runtime:` section is absent, reinitialize
+  all counters to their zero values — this is safe because Gate 3 and Gate 4
+  skip or reset on missing baseline, and the escape hatch merely takes one
+  extra cycle to fire.
 
 #### Safety rails (always on, never skip)
 
 1. `iter >= max_iter` → halt `stop_reason="max_iter (N) reached"`
 2. `elapsed >= time_h * 3600` → halt `stop_reason="time_cap (Nh) reached"`
-3. `failed_streak >= 3` → halt `stop_reason="3 consecutive failures"`
+3. `failed_streak >= --failed-streak-cap` (default 5) → halt `stop_reason="N consecutive failures"`
 4. Same feature retried ≥ 3 times → halt and report blocker
 5. Ping every 5 iterations: `autoloop ping: iter=<N> target=<name>`
 6. Convergence check **before** each iteration body
@@ -338,15 +449,81 @@ intent and could iterate over the wrong stages.
 
 #### Iteration body (same for feature and improve mode)
 
+> **Context advisory**: Every 10 iterations (`iter % 10 == 0`) or when you
+> notice the context window is more than 60% full, run `/compact` before
+> starting the next iteration. Long loops lose spec details to compaction;
+> proactively compacting keeps the full specification in context.
+
 For each iter (until convergence or any safety rail fires):
 
 1. **Cap + convergence checks** (safety rails above)
 2. **Pick work unit** (mode-specific):
-   - **feature**: next uncompleted feature from spec; no remaining → mark
-     converged and exit loop.
-   - **improve**: read target → review → identify issues → evaluate
-     stopping_criteria. No issues OR criteria met → mark converged and
+   - **feature**: next uncompleted feature from spec; no remaining → run
+     the convergence check below, then exit loop.
+   - **improve**: read target → review → identify issues → run the 4-gate
+     convergence check below. All four gates pass → mark converged and
      exit loop.
+
+   **4-gate convergence check (improve mode: every iter; feature mode: when no features remain):**
+
+   Run the four gates in order. ALL must pass (for the current iteration)
+   before incrementing the convergence streak. Any gate failure = iteration
+   is not converged.
+
+   **Gate 1 — Mechanical** (skip items where `cmd=""`):
+   For each `ExitCriterion` where `cmd != ""`, run the command inside `<WT>`:
+   ```bash
+   !cd <WT> && <criterion.cmd>
+   ```
+   - Exit 0 → criterion passes.
+   - Exit non-0 → criterion fails.
+     - `required: true` → Gate 1 fails → stop gate evaluation.
+     - `required: false` → log warning, continue to next criterion.
+
+   **Gate 2 — LLM individual evaluation** (runs regardless of cmd):
+   For each `ExitCriterion` in the checklist, evaluate whether its `label`
+   is satisfied given the current state of `<WT>` (read relevant files,
+   test output, review grade). Evaluate **each criterion independently**
+   — do not aggregate or average. For each:
+   - "Clearly satisfied" → passes. Reset `criterion_ambiguity_counts[label]` to 0.
+   - "Clearly not satisfied" → fails. Reset `criterion_ambiguity_counts[label]` to 0.
+   - "Ambiguous" → **deadlock detector**: increment `criterion_ambiguity_counts[label]`.
+     Persist the updated map to `runtime.criterion_ambiguity_counts` in the
+     loop-context file. If the count reaches 3, ask via `AskUserQuestion`:
+     options **"Continue anyway"** / **"Accept criterion as met"** /
+     **"Remove criterion"**. This prevents infinite loops on unresolvable
+     qualitative bars.
+   - `required: true` AND (fails OR "Ambiguous" with count < 3) → Gate 2 fails.
+   - `required: false` AND fails → log warning only.
+
+   **Gate 3 — Regression check** (skip on iter 1 or when no baseline exists):
+   The baseline is **exit-code + set of failing test names** (not raw output
+   text), stored as `runtime.last_test_result` in `work-docs/loop-context/<slug>.yaml`.
+   After each iteration, update `last_test_result` with the current result.
+
+   Compare current iter result against prior baseline:
+   - No prior baseline (iter 1 or post-compaction with no persisted baseline)
+     → Gate 3 passes unconditionally; save current result as new baseline.
+   - Tests pass now AND prior baseline also showed passing → Gate 3 passes.
+   - Tests pass NOW but prior baseline showed failing → Gate 3 passes (improvement).
+   - Tests FAIL now but prior baseline showed passing → Gate 3 fails (regression).
+     Log which test names flipped from passing to failing.
+   - Tests fail in both → Gate 3 passes (no new regression; Gate 1 catches
+     the failing tests via `cmd`-based criteria).
+
+   **Gate 4 — Streak** (2 consecutive iters):
+   `convergence_streak` is the **single canonical reset site** — do NOT
+   reset it in the "Update state" block (step 6.5):
+   - Gates 1 + 2 + 3 all pass this iter → `convergence_streak += 1`.
+     Persist to `runtime.convergence_streak` in loop-context file.
+   - Any gate fails → `convergence_streak = 0`.
+     Persist the reset.
+   - `convergence_streak >= 2` → mark `converged = True`, exit loop.
+
+   This streak requirement prevents false convergence from single-iter
+   flukes. For `quick` intensity where the checklist is minimal, it still
+   prevents exiting on the very first passing iter.
+
 3. **Increment `iter`**.
 4. **Invoke per-iter workflow**: read
    `.claude/commands/hm/<WORKFLOW>.md` and execute **every stage it
@@ -358,8 +535,12 @@ For each iter (until convergence or any safety rail fires):
 5. **Update state**:
    - Workflow returned success (review verdict ≥ grade_threshold and
      tests pass) → mark completed, append to `completed`, reset
-     `failed_streak = 0`.
+     `failed_streak = 0`. The 4-gate check (above) then decides whether
+     to increment or reset `convergence_streak`.
    - Workflow returned failure → `failed_streak += 1`, log what failed.
+     The 4-gate check runs regardless — Gate 1/2 failure will reset
+     `convergence_streak` via Gate 4. Do NOT independently reset
+     `convergence_streak` here.
      For improve mode, "failure" means **tests failed** — tests passing
      but stopping_criteria not yet met is NOT a failure (progress is
      being made).
@@ -368,25 +549,58 @@ For each iter (until convergence or any safety rail fires):
 
 When the loop halts (convergence, safety rail, or hard error):
 
-1. **Run wrapup ONCE**: read `.claude/commands/hm/wrapup.md` and execute
+1. **Exit criteria checklist gate** (skipped when `converged = False` — safety
+   rail halts skip the gate entirely):
+
+   When `converged = True`, evaluate all items in `exit_criteria_checklist`
+   one final time against the current state of `<WT>`:
+
+   - **`required: false` items** that fail → emit a warning line per item,
+     continue. Do NOT flip `converged` to `False`.
+
+   - **`required: true` items** that fail:
+     - Log the failure with the criterion label + (if `cmd != ""`) the
+       command output.
+     - Increment `checklist_fail_counts[label]`. Persist to
+       `runtime.checklist_fail_counts` in loop-context file.
+     - **Escape hatch (ADR-009)**: If `checklist_fail_counts[label] >= 3`,
+       ask via `AskUserQuestion`:
+       - **"Override — accept loop as converged despite failing criterion"**
+       - **"Abort — mark loop as not converged, exit without wrapup"**
+       - **"Remove criterion and accept"** (removes from `exit_criteria_checklist`)
+       If count < 3, flip `converged = False` and re-enter the iteration
+       body for one more cycle (do NOT increment `failed_streak`; the
+       loop-active marker is still present so the Stop hook remains active).
+
+   This gate fires for **both** feature and improve mode when `converged = True`.
+
+2. **Delete the loop-active marker** — after the checklist gate confirms
+   `converged = True` (or after a safety rail fires), so re-entry cycles
+   remain under the Stop hook guard:
+
+   ```bash
+   !rm -f .hm-loop-active
+   ```
+
+3. **Run wrapup ONCE**: read `.claude/commands/hm/wrapup.md` and execute
    the wrapup stage (commits, SESSION-md if `--session`, memory append
    to `wiki.md` / `failures.md`). Operate inside `<WT>` if engaged.
 
-2. **Decide finalize status — explicit rule, not judgment**:
+4. **Decide finalize status — explicit rule, not judgment**:
 
    | Halt reason | Finalize status | Why |
    |---|---|---|
    | `converged = True` | `success` | clean stopping criteria met |
    | `iter >= max_iter` | `fail` | budget exhausted without convergence |
    | `elapsed >= time_h * 3600` | `fail` | time cap fired |
-   | `failed_streak >= 3` | `fail` | repeated failures, evidence valuable |
+   | `failed_streak >= --failed-streak-cap` | `fail` | repeated failures, evidence valuable |
    | Hard error (uncaught) | `fail` | preserve for debug |
 
    Do NOT classify max-iter or time-cap halts as "partial success" — the
    user explicitly bounded the run; un-merged worktree is more useful
    than a half-baked squash that contaminates main.
 
-3. **Finalize worktree** (only if engaged in step 5):
+5. **Finalize worktree** (only if engaged in step 5):
 
    ```bash
    !uv run --with /home/noel/harness-maker python -m harness_maker.worktree finalize <WT> <STATUS>
@@ -397,10 +611,10 @@ When the loop halts (convergence, safety rail, or hard error):
    conflicts** (e.g. main has concurrent edits to `.claude/memory/wiki.md`
    from another session), the merge step exits 1; finalize leaves `<WT>`
    in place. Treat this as a fail-equivalent: emit the conflicting file
-   list in step 4 and instruct the user to resolve manually with
+   list in step 6 and instruct the user to resolve manually with
    `cd <WT> && git status && git merge --abort` or similar.
 
-4. **Emit final report** (next section).
+6. **Emit final report** (next section).
 
 ---
 

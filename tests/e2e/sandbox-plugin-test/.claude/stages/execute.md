@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.7.1
+harness_maker_version: 0.7.3
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: stages/execute.md.j2
 provenance: official
-content_hash: 50a7a1d225d89e7b58bd458536a0f6689511a6b1b1a32c0d72e8abf6a86ae485
+content_hash: 3629b33e2e6e3eac4344feef4de61d6139d6327b7c12b4c181030bd13c04210e
 ---
 # Stage: execute
 
@@ -60,6 +60,8 @@ Before any code edits, load memory in tier order (stops at first miss):
 
 ### Step 0 — Worktree isolation (deterministic — do NOT rely on skill auto-discovery)
 
+<!-- # SIBLING_WORKTREE_PATHS -->
+
 Engage isolation if `harness.yaml.worktree.scope` includes `execute`. The `worktree-isolator` skill is documentation-only — its trigger-based dispatch is probabilistic in Cursor IDE and can silently skip, leaving safety-critical edits on the main branch. **Invoke the worktree CLI directly** so isolation is deterministic across both IDEs.
 
 **Idempotent under `/hm:loop`**: when this stage runs as part of a loop iteration, the loop has already engaged a per-loop worktree at step 5. The `worktree create` CLI detects we're already inside `.worktrees/<name>/` and returns that path — no nested worktrees, just reuse.
@@ -68,12 +70,13 @@ Engage isolation if `harness.yaml.worktree.scope` includes `execute`. The `workt
 !uv run --with /home/noel/harness-maker python -m harness_maker.worktree create execute "$(pwd)"
 ```
 
-Read the **single line** the command prints — that is the contract for the rest of this stage. Two cases:
+Read **all non-empty output lines** — that is the contract for the rest of this stage. Three cases:
 
-- **Absolute path** like `/path/to/project/.worktrees/execute-20260506T1830Z` → isolation engaged. **Treat that exact string as `<WT>` for the rest of this stage.** You (Claude) MUST substitute the literal absolute path everywhere `<WT>` appears below — **do NOT use a shell variable**: each `!` block is a fresh subshell, so `worktree_path=...` assignment is lost between blocks.
+- **Empty output** → `worktree.scope` does not include `execute`. No isolation; operate in `cwd`. Skip the finalize step at end.
+- **One absolute path** like `/path/to/project/.worktrees/execute-20260506T1830Z` → single-repo isolation. **Treat that exact string as `<WT>` for the rest of this stage.** You (Claude) MUST substitute the literal absolute path everywhere `<WT>` appears below — **do NOT use a shell variable**: each `!` block is a fresh subshell.
   - Every Read/Write/Edit call uses absolute paths starting with `<WT>/`.
   - Tests / lints / type checks: `!cd <WT> && <cmd>`.
-- **Empty output** → `worktree.scope` does not include `execute`. No isolation; operate in `cwd`. Skip the finalize step at end.
+- **Multiple lines** → multi-repo isolation. Line 1 = primary repo worktree (`<WT>`). Lines 2+ = sibling repo worktrees (`<WT-sibling-N>`). Use `<WT>` for primary-repo edits and `<WT-sibling-N>` for sibling-repo edits — the per-session gate marker covers all of them.
 
 ### Step 1 — Load PLAN + flag parsing
 

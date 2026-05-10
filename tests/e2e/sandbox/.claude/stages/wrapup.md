@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.7.1
+harness_maker_version: 0.7.3
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: stages/wrapup.md.j2
 provenance: official
-content_hash: ebb44fdfde5b8b017e2520c022a745545be4c56a494d12a97d13b316119ca5aa
+content_hash: b885c00f707b22051a41c5fc01cac1c32691e1736dd7a105f29d108db4a6b517
 ---
 # Stage: wrapup
 
@@ -48,7 +48,7 @@ Close the loop on a unit of work:
 Before touching anything, verify state:
 
 1. **Working tree state**: there should be staged changes (from execute) OR clean (if execute was skipped). If there are *unstaged* changes that don't trace to execute's worktree merge, surface them — they may be drift.
-2. **Worktree finalize state**: any `.worktrees/execute-*` directories should be cleaned up by execute Step 5 already. If one persists, log a warning — it means execute exited with `fail` or stage-only failed.
+2. **Worktree finalize state**: any `.worktrees/execute-*` directories should be cleaned up by execute Step 5 (`stage-only`) already. If one persists, log a warning — it means execute exited with `fail` or stage-only failed. **Multi-repo**: when sibling repos are configured, `finalize stage-only` merges all repos' worktrees into their respective main branches; if any sibling's merge failed, the marker file is kept and the directory remains — resolve manually before committing.
 3. **PLAN existence**: `work-docs/PLAN-{slug}.md` exists (skip wrapup with a clear error otherwise).
 
 ### Step 2 — Final verification pass

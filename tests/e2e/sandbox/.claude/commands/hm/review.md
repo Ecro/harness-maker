@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.7.1
+harness_maker_version: 0.7.3
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/atomic_command.md.j2
 provenance: official
-content_hash: 075bfec6be71d028e0748f60a9548103f38933db15c7e84dbaf6bbdeac20b3cc
+content_hash: 3b20f1e43ba33a9d9692ba90afd3a58ef3c37b6d1faa6e49e5fa4390eb5d986a
 ---
 # Stage: review
 
@@ -57,6 +57,7 @@ Defaults from `harness.yaml.reviewers:`:
 Per-invocation overrides (workflow command flags):
 - `--no-auto-fix` — disable auto-fix this run only.
 - `--with-reviewers=<csv>` — add ad-hoc reviewers (must exist in `reviewers.installed`).
+
 
 ## Procedure — Round 1 (initial review)
 

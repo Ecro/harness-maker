@@ -17,8 +17,11 @@ Two modes (LoopMode):
 
 Key types:
 - `LoopMode` — FEATURE | IMPROVE
+- `LoopIntensity` — Literal["quick","standard","thorough","maximum"]
+- `ExitCriterion` — one item in the 4-gate exit checklist (label, cmd, required)
 - `ImprovementContext` — five required interview dimensions (purpose,
-  invariants, priority, test_reliability, stopping_criteria) plus notes
+  invariants, priority, test_reliability, stopping_criteria) plus
+  loop_intensity, exit_criteria_checklist, and notes
 - `LoopContext` — persisted context wrapper with slug, source, timestamps
 - `Feature` — one unit of work with name + acceptance_criteria
 - `LoopSpec` — structured loop input: mode, objective, features, convergence,
@@ -46,6 +49,7 @@ import time
 from collections.abc import Callable
 from enum import StrEnum
 from pathlib import Path
+from typing import Literal
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -58,6 +62,23 @@ class LoopMode(StrEnum):
 
     FEATURE = "feature"
     IMPROVE = "improve"
+
+
+LoopIntensity = Literal["quick", "standard", "thorough", "maximum"]
+
+
+class ExitCriterion(BaseModel):
+    """One item in the exit criteria checklist.
+
+    cmd="" means LLM-only gate (Gate 2 only; Gate 1 skipped).
+    required=False means failure is a warning, not a convergence blocker.
+    """
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    label: str
+    cmd: str = ""
+    required: bool = True
 
 
 class ImprovementContext(BaseModel):
@@ -74,6 +95,8 @@ class ImprovementContext(BaseModel):
     priority: str
     test_reliability: str
     stopping_criteria: str
+    loop_intensity: LoopIntensity = "standard"
+    exit_criteria_checklist: list[ExitCriterion] = Field(default_factory=list)
     notes: list[str] = Field(default_factory=list)
 
 

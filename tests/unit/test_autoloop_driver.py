@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+import yaml
 from pydantic import ValidationError
 
 from harness_maker.autoloop_driver import (
@@ -591,3 +592,133 @@ class TestCheckErrorCap:
     def test_empty_counts_safe(self) -> None:
         counts: dict[ErrorClass, int] = {}
         assert check_error_cap(counts, ErrorClass.SYNTAX) is True
+
+
+# --- Phase 11: ExitCriterion + LoopIntensity schema tests (S1-S8) ---
+
+
+def test_s1_exit_criterion_defaults() -> None:
+    """S1: ExitCriterion with only label uses safe defaults (cmd="" required=True)."""
+    from harness_maker.autoloop_driver import ExitCriterion
+
+    ec = ExitCriterion(label="all tests pass")
+    assert ec.label == "all tests pass"
+    assert ec.cmd == ""
+    assert ec.required is True
+
+
+def test_s2_exit_criterion_required_false() -> None:
+    """S2: required=False parses and is preserved in the model."""
+    from harness_maker.autoloop_driver import ExitCriterion
+
+    ec = ExitCriterion(label="no regressions", cmd="pytest -x", required=False)
+    assert ec.required is False
+    assert ec.cmd == "pytest -x"
+
+
+def test_s3_exit_criterion_extra_field_rejected() -> None:
+    """S3: extra="forbid" still active on ExitCriterion."""
+    from harness_maker.autoloop_driver import ExitCriterion
+
+    with pytest.raises(ValidationError):
+        ExitCriterion(label="foo", unknown_key="bar")  # type: ignore[call-arg]
+
+
+def test_s4_loop_intensity_valid_values() -> None:
+    """S4: All four LoopIntensity literals are accepted by ImprovementContext."""
+    from harness_maker.autoloop_driver import ExitCriterion, LoopIntensity
+
+    _ = LoopIntensity  # ensure importable
+
+    for value in ("quick", "standard", "thorough", "maximum"):
+        ctx = ImprovementContext(
+            purpose="p",
+            priority="high",
+            test_reliability="good",
+            stopping_criteria="done when green",
+            loop_intensity=value,  # type: ignore[arg-type]
+        )
+        assert ctx.loop_intensity == value
+
+    _ = ExitCriterion  # side-effect: import check
+
+
+def test_s5_loop_intensity_invalid_rejects() -> None:
+    """S5: Invalid intensity values ("ultra", "THOROUGH") are rejected."""
+    with pytest.raises(ValidationError):
+        ImprovementContext(
+            purpose="p",
+            priority="high",
+            test_reliability="good",
+            stopping_criteria="done",
+            loop_intensity="ultra",  # type: ignore[arg-type]
+        )
+
+    with pytest.raises(ValidationError):
+        ImprovementContext(
+            purpose="p",
+            priority="high",
+            test_reliability="good",
+            stopping_criteria="done",
+            loop_intensity="THOROUGH",  # type: ignore[arg-type]
+        )
+
+
+def test_s6_improvement_context_backward_compat() -> None:
+    """S6: Old YAML without loop_intensity / exit_criteria_checklist parses with defaults."""
+    old_yaml = (
+        "purpose: improve auth\n"
+        "priority: high\n"
+        "test_reliability: unit tests stable\n"
+        "stopping_criteria: all acceptance criteria met\n"
+    )
+    data = yaml.safe_load(old_yaml)
+    ctx = ImprovementContext.model_validate(data)
+    assert ctx.loop_intensity == "standard"
+    assert ctx.exit_criteria_checklist == []
+    assert ctx.notes == []
+    assert ctx.invariants == []
+
+
+def test_s7_improvement_context_full_fields_roundtrip() -> None:
+    """S7: New fields round-trip through model_dump / model_validate."""
+    from harness_maker.autoloop_driver import ExitCriterion
+
+    ec = ExitCriterion(label="tests green", cmd="pytest -q", required=True)
+    ctx = ImprovementContext(
+        purpose="quality improvement",
+        priority="high",
+        test_reliability="stable",
+        stopping_criteria="grade A for 2 iters",
+        loop_intensity="thorough",
+        exit_criteria_checklist=[ec],
+        notes=["focus on auth module"],
+    )
+    dumped = ctx.model_dump()
+    restored = ImprovementContext.model_validate(dumped)
+    assert restored.loop_intensity == "thorough"
+    assert len(restored.exit_criteria_checklist) == 1
+    assert restored.exit_criteria_checklist[0].label == "tests green"
+    assert restored.exit_criteria_checklist[0].cmd == "pytest -q"
+    assert restored.notes == ["focus on auth module"]
+
+
+def test_s8_loop_context_backward_compat(tmp_path: Path) -> None:
+    """S8: LoopContext YAML without new ImprovementContext fields parses with defaults."""
+    old_context_yaml = (
+        "slug: auth-service\n"
+        "source: manual\n"
+        "created_at: '2026-01-01T00:00:00Z'\n"
+        "updated_at: '2026-01-02T00:00:00Z'\n"
+        "context:\n"
+        "  purpose: improve auth module quality\n"
+        "  priority: high\n"
+        "  test_reliability: integration tests stable\n"
+        "  stopping_criteria: no regressions + grade A\n"
+    )
+    ctx_path = tmp_path / "auth-service.yaml"
+    ctx_path.write_text(old_context_yaml, encoding="utf-8")
+    loop_ctx = parse_loop_context(ctx_path)
+    assert loop_ctx.slug == "auth-service"
+    assert loop_ctx.context.loop_intensity == "standard"
+    assert loop_ctx.context.exit_criteria_checklist == []
