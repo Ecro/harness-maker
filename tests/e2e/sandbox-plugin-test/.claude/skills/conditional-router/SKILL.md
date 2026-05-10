@@ -1,14 +1,14 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.9.0
+harness_maker_version: 0.9.3
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: skills/conditional-router/SKILL.md.j2
 provenance: official
-content_hash: 2707a46360c6af3a22901b48a91dfaec259500d267c06f0a3b62a8c8e5d78f6d
----
----
 name: conditional-router
-description: Selects which reviewer agents to invoke based on the changed-file paths in the current diff. Use when /hm:review runs with `routing: conditional` to avoid invoking every reviewer on every change.
+description: Selects which reviewer agents to invoke based on the changed-file paths
+  in the current diff. Use when /hm:review runs with routing=conditional to avoid
+  invoking every reviewer on every change.
+content_hash: 83644120dd2c6fd16289ec749f4f8f57895e2c055b19e540f588cb254c08f726
 ---
 
 # conditional-router

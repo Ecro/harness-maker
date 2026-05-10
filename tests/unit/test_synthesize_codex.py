@@ -49,7 +49,7 @@ def test_synthesize_codex_target_emits_codex_config_toml(tmp_path: Path) -> None
 
 
 def test_synthesize_codex_target_emits_skill_paths(tmp_path: Path) -> None:
-    """synthesize() with codex target must emit 11 + 7 + N workflows + 1 loop .agents/skills/ entries."""
+    """synthesize() with codex target must emit 11 + 7 + N workflows + 1 loop skills."""
     answers = _make_answers(tmp_path, ["codex"])
     bp = synthesize(profile(tmp_path), answers)
     skill_paths = [str(f.path) for f in bp.files if str(f.path).startswith(".agents/skills/")]
