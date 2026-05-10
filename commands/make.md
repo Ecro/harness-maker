@@ -123,7 +123,7 @@ Show a summary of the detected profile and smart defaults. Use `AskUserQuestion`
 > Options:
 > - **Looks right** — install with these settings
 > - **Adjust a few things** — change specific dimensions
-> - **Full setup** — answer all questions (preset, locale, dev_mode, targets, focus, grade, domains, model)
+> - **Full setup** — answer all questions (preset, locale, dev_mode, targets, focus, grade, domains, model, wrapup docs)
 
 #### 3.4 Branch on confirm response
 
@@ -131,8 +131,9 @@ Show a summary of the detected profile and smart defaults. Use `AskUserQuestion`
 
 **"Adjust a few things"** → Use `AskUserQuestion` to ask which dimension(s)
 to change (multi-select: preset, locale, dev_mode, targets, grade_threshold,
-mechanical_checks). For each selected dimension, show an `AskUserQuestion`
-with the current smart default and alternatives. Then jump to Section 3.6.
+mechanical_checks, wrapup_docs). For each selected dimension, show an
+`AskUserQuestion` with the current smart default and alternatives. Then
+jump to Section 3.6.
 
 **"Full setup"** → Ask all dimensions in order:
 
@@ -152,6 +153,10 @@ with the current smart default and alternatives. Then jump to Section 3.6.
 8. `AskUserQuestion`: **domains + model** — comma-separated domain packs
    (python, react, tauri, ...) and preferred Claude model (opus/sonnet/haiku).
    Maps to `--domains` and `--recommended-model`.
+9. `AskUserQuestion`: **wrapup documents** — "Additional documents that
+   `/hm:wrapup` should update after each work unit (e.g. CHANGELOG.md,
+   TODO.md, docs/decisions/index.md)." Semicolon-separated paths relative
+   to project root, or "none". Maps to `--wrapup-docs`.
 
 #### 3.5 Preview AskUserQuestion
 
@@ -253,6 +258,9 @@ in turn, then dispatch with all collected flags:
    `--grade-threshold`.
 8. `AskUserQuestion`: **domains + model** — comma-separated domain packs
    and preferred Claude model. Maps to `--domains` and `--recommended-model`.
+9. `AskUserQuestion`: **wrapup documents** — semicolon-separated paths to
+   docs that `/hm:wrapup` should update (e.g. `CHANGELOG.md;TODO.md`), or
+   "none". Maps to `--wrapup-docs`.
 
 Then dispatch with the collected values:
 
@@ -260,7 +268,7 @@ Then dispatch with the collected values:
 !uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" \
   --preset "$PRESET" --locale "$LOCALE" --dev-mode "$DEV_MODE" --targets "$TARGETS" \
   --focus "$FOCUS" --grade-threshold "$GRADE" --domains "$DOMAINS" \
-  --mechanical-checks "$CHECKS" --recommended-model "$MODEL"
+  --mechanical-checks "$CHECKS" --recommended-model "$MODEL" --wrapup-docs "$WRAPUP_DOCS"
 ```
 
 Omit flags for any dimension the user skipped or left at default.
@@ -286,7 +294,7 @@ Use Read + Bash; no CLI invocation.
 !uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" \
   --preset "$PRESET" --locale "$LOCALE" --dev-mode "$DEV_MODE" --targets "$TARGETS" \
   --focus "$FOCUS" --grade-threshold "$GRADE" --domains "$DOMAINS" \
-  --mechanical-checks "$CHECKS" --recommended-model "$MODEL" --autoloop
+  --mechanical-checks "$CHECKS" --recommended-model "$MODEL" --wrapup-docs "$WRAPUP_DOCS" --autoloop
 ```
 
 Substitute the values collected in step 3. Omit flags the user didn't set

@@ -325,6 +325,7 @@ def synthesize(
         ref_folders=list(answers.ref_folders),
         sibling_repos=list(answers.sibling_repos),
         mcp_servers=dict(answers.mcp_servers),
+        wrapup_docs=list(answers.wrapup_docs),
     )
 
     config_dump = config.model_dump(mode="json")

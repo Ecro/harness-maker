@@ -46,13 +46,13 @@ files:
   body_sha256: 50723b24320945863213ad4c16d6dc155dbdf0102f0f65c6b0e10d3d2bc5b077
 - path: commands/hm/configure.md
   template: commands/hm/configure.md.j2
-  body_sha256: e625f44aa23ef1b69c12eb21999eb21a2c9c5f479b4407bc1b82180e9c986a30
+  body_sha256: 4b41df509190a5c0fcc5cd5bfd0e5b8d96674678cee3fbff7a803da5c198da9f
 - path: commands/hm/exec-rev-wrap-ver.md
   template: commands/hm/workflow_command.md.j2
-  body_sha256: e96f56432ce15d9cc624bb7b4998b7b6cc662c186b267b2fdbe898f72f28a599
+  body_sha256: c68836d566e967dae3683b3bf6ae79a0b9c7d2c2aff8e3d4939024a099b1c218
 - path: commands/hm/exec-rev-wrap.md
   template: commands/hm/workflow_command.md.j2
-  body_sha256: dc6ab299c4d9368bffbb1cef8098b39032e7e255f273ff4d81e4d3092b28632b
+  body_sha256: 6bcab5ce69705dfe07481acbf2330471e34b51bc8253bc09aa8246c2cf10125b
 - path: commands/hm/exec-rev.md
   template: commands/hm/workflow_command.md.j2
   body_sha256: e474762f1842820418bcdb678c560b6981142c381a33d0ccb40ed1199ea75627
@@ -91,10 +91,10 @@ files:
   body_sha256: 0d8b5fcd83e26d95888276bfd226a4c705d626d52471c770b3f66bdc041fbe02
 - path: commands/hm/wrapup.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: b885c00f707b22051a41c5fc01cac1c32691e1736dd7a105f29d108db4a6b517
+  body_sha256: 54f4eb3dacb3cb6a1e0aae6bb778d08aa09bcdb6cdf4bc7efee90ca2cb14033e
 - path: harness.yaml
   template: harness-yaml/Production.yaml.j2
-  body_sha256: 5f0a7e5c42f927ad6c38e8888197522a43b0377ad0235c04b4bebafa3a330f9d
+  body_sha256: a8218fe11ba6be63f51c02ee20807f32da4791e0ec6e98057799cea1718b919a
 - path: hooks/hooks.json
   template: hooks/hooks.json.j2
   body_sha256: 1e484feb03df7d114700f5460fee94ba413fe8b574d07b93109fda3f0d73c6c6
@@ -178,4 +178,4 @@ files:
   body_sha256: 0d8b5fcd83e26d95888276bfd226a4c705d626d52471c770b3f66bdc041fbe02
 - path: stages/wrapup.md
   template: stages/wrapup.md.j2
-  body_sha256: b885c00f707b22051a41c5fc01cac1c32691e1736dd7a105f29d108db4a6b517
+  body_sha256: 54f4eb3dacb3cb6a1e0aae6bb778d08aa09bcdb6cdf4bc7efee90ca2cb14033e

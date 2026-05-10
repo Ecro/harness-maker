@@ -569,11 +569,13 @@ def answers_from_harness_yaml(yaml_path: Path) -> InterviewAnswers | None:
     domains = _list_of_strings(_dig(data, "project", "domains")) or list(base.domains)
     ref_folders = _parse_ref_folders(data.get("ref_folders"))
     sibling_repos = _list_of_strings(data.get("sibling_repos"))
+    wrapup_docs = _list_of_strings(data.get("wrapup_docs"))
 
     update: dict[str, Any] = {
         "domains": domains,
         "ref_folders": ref_folders,
         "sibling_repos": sibling_repos,
+        "wrapup_docs": wrapup_docs,
         "reviewers": {
             "installed": list(base.reviewers["installed"]),
             "enabled": reviewers_enabled,

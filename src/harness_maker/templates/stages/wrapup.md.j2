@@ -121,7 +121,29 @@ When a failure entry's `count >= 3`, write a skill / agent / rule proposal to `.
 
 The user reviews proposals later and decides whether to ingest into the harness.
 
-#### 5.4 Session log
+#### 5.4 Managed documents
+{% if config.wrapup_docs %}
+
+The user configured these additional documents for wrapup to update. For each
+path below, read the file and update it to reflect the work completed in this
+unit. If a file does not exist, create it with appropriate content.
+
+{% for doc in config.wrapup_docs %}- `{{ doc }}`
+{% endfor %}
+
+Update rules:
+- **CHANGELOG.md**: prepend an entry under `## [Unreleased]` (or today's date heading) summarizing the change.
+- **TODO.md / TODO**: check off completed items; remove if done.
+- **ADR-*.md / docs/decisions/**: no auto-edit — just note in the session log if an ADR should be revisited.
+- **Other**: use judgment — append a dated entry or update existing sections as appropriate.
+{% else %}
+
+No additional managed documents configured. To add documents that wrapup
+should update (e.g. CHANGELOG.md, TODO.md), run `/hm:configure` and select
+**Wrapup documents**.
+{% endif %}
+
+#### 5.5 Session log
 
 Append to `.claude/memory/session/<YYYY-MM-DD>.md` (today's date):
 

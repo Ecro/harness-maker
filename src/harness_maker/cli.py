@@ -133,6 +133,11 @@ def make(
         "--focus",
         help="Primary work focus: feature|bugfix|security|performance|refactoring.",
     ),
+    wrapup_docs_override: str | None = typer.Option(
+        None,
+        "--wrapup-docs",
+        help="Semicolon-separated doc paths for wrapup to update (e.g. CHANGELOG.md;TODO.md).",
+    ),
     dry_run: bool = typer.Option(
         False,
         "--dry-run",
@@ -176,6 +181,7 @@ def make(
         mechanical_checks_override=mechanical_checks_override,
         recommended_model_override=recommended_model_override,
         focus_override=focus_override,
+        wrapup_docs_override=wrapup_docs_override,
     )
     if add_domain_name is not None:
         try:
@@ -401,6 +407,7 @@ def _apply_dimension_overrides(
     mechanical_checks_override: str | None = None,
     recommended_model_override: str | None = None,
     focus_override: str | None = None,
+    wrapup_docs_override: str | None = None,
 ) -> InterviewAnswers:
     """Apply per-dimension CLI overrides on top of the answers.
 
@@ -458,6 +465,10 @@ def _apply_dimension_overrides(
         new_models = dict(answers.models)
         new_models["default"] = recommended_model_override
         update["models"] = new_models
+    if wrapup_docs_override:
+        update["wrapup_docs"] = [
+            d.strip() for d in wrapup_docs_override.split(";") if d.strip()
+        ]
 
     if preset_override:
         try:

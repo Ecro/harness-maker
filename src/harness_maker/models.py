@@ -264,6 +264,7 @@ class HarnessConfig(BaseModel):
     # only (absolute paths break cross-machine portability — same policy as
     # RefFolder). Resolved against primary repo root at worktree create time.
     sibling_repos: list[str] = Field(default_factory=list)
+    wrapup_docs: list[str] = Field(default_factory=list)
 
     @field_validator("sibling_repos", mode="before")
     @classmethod
@@ -349,6 +350,10 @@ class InterviewAnswers(BaseModel):
     security: dict[str, Any] = Field(default_factory=dict)
     context_lint: dict[str, Any] = Field(default_factory=dict)
     sibling_repos: list[str] = Field(default_factory=list)
+    # Paths to additional documents that wrapup should update/manage.
+    # User specifies via --wrapup-docs or /hm:configure. Examples:
+    # CHANGELOG.md, TODO.md, docs/ADR-index.md.
+    wrapup_docs: list[str] = Field(default_factory=list)
 
     @field_validator("sibling_repos", mode="before")
     @classmethod

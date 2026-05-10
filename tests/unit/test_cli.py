@@ -516,3 +516,50 @@ def test_partial_override_preserves_unchanged_fields(tmp_path: Path) -> None:
     assert captured_bp["grade_threshold"] == "B"
     assert captured_bp["domains"] == ["python", "react"]
     assert captured_bp["mechanical_checks"] == ["ruff check ."]
+
+
+# ---------------------------------------------------------------------------
+# wrapup_docs CLI flag test
+# ---------------------------------------------------------------------------
+
+
+def test_wrapup_docs_flag(tmp_path: Path) -> None:
+    """--wrapup-docs passes semicolon-separated paths to answers."""
+    _write_harness_yaml(tmp_path)
+    captured: dict[str, object] = {}
+
+    def _capture(p, a, **kw):
+        from harness_maker.models import Blueprint, HarnessConfig
+
+        captured["wrapup_docs"] = list(a.wrapup_docs)
+        return Blueprint(config=HarnessConfig(), files=[])
+
+    with (
+        patch("harness_maker.cli.profile", return_value=MagicMock()),
+        patch("harness_maker.cli.synthesize", side_effect=_capture),
+        patch("harness_maker.cli.render", return_value=[]),
+        patch("harness_maker.cli.verify", return_value=[]),
+        patch("harness_maker.cli.backup"),
+        patch("harness_maker.cli.reconcile", return_value=[]),
+        patch("harness_maker.cli._emit_post_make_readiness"),
+        patch("harness_maker.cli._emit_refdocs_index_build"),
+        patch("harness_maker.cli._emit_install_summary"),
+        patch("harness_maker.cli._write_harness_manifest"),
+        patch(
+            "harness_maker.cli.answers_from_harness_yaml",
+            return_value=_minimal_answers(),
+        ),
+        patch("harness_maker.cli.interview", return_value=_minimal_answers()),
+    ):
+        result = runner.invoke(
+            app,
+            [
+                "make",
+                str(tmp_path),
+                "--wrapup-docs",
+                "CHANGELOG.md;TODO.md",
+            ],
+        )
+
+    assert result.exit_code == 0, f"exit {result.exit_code}:\n{result.output}"
+    assert captured["wrapup_docs"] == ["CHANGELOG.md", "TODO.md"]

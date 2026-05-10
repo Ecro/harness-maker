@@ -18,6 +18,9 @@ ref_folders:
 sibling_repos:
 {% for r in config.sibling_repos %}  - {{ r | tojson }}
 {% endfor %}
+wrapup_docs:
+{% for d in config.wrapup_docs %}  - {{ d | tojson }}
+{% endfor %}
 workflows:
 {% for name, stages in config.workflows.items() %}
   {{ name }}:
