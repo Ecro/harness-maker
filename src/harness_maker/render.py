@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import tomllib
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -194,15 +195,20 @@ def _is_hooks_json(fe: FileEntry) -> bool:
 def resolve_output_path(target_dir: Path, fe_path: Path) -> Path:
     """Resolve where a FileEntry should be written/read.
 
-    `target_dir` 는 보통 `<project>/.claude` (CLI dispatch). 그러나 cursor
-    target 자산 (`.cursor/rules/*.mdc`, `.cursor/commands/*.md`,
-    `.cursor/mcp.json`) 은 `.claude/` 의 sibling 이라 `target_dir` 안에 박지
-    못함 → `target_dir.parent` 기준으로 resolve.
+    `target_dir` 는 보통 `<project>/.claude` (CLI dispatch). `.cursor/`,
+    `.codex/`, `.agents/`, `AGENTS.md` 는 `.claude/` 의 sibling 이라
+    `target_dir.parent` 기준으로 resolve.
 
     그 외 자산은 기존대로 ``target_dir / fe_path``. reconcile.py 도 동일
     helper 사용 — 같은 path 에 read/write/backup 이 일관.
     """
-    if str(fe_path).startswith(".cursor/"):
+    path_str = str(fe_path)
+    if (
+        path_str.startswith(".cursor/")
+        or path_str.startswith(".codex/")
+        or path_str.startswith(".agents/")
+        or path_str == "AGENTS.md"
+    ):
         return target_dir.parent / fe_path
     return target_dir / fe_path
 
@@ -234,6 +240,88 @@ def _is_cursor_command(fe: FileEntry) -> bool:
 def _is_cursor_mcp_json(fe: FileEntry) -> bool:
     """Cursor MCP config — ``.cursor/mcp.json`` (pure JSON, no frontmatter)."""
     return str(fe.path) == ".cursor/mcp.json"
+
+
+def _is_codex_hooks_json(fe: FileEntry) -> bool:
+    """Codex hooks — ``.codex/hooks.json`` (pure JSON, PascalCase Codex schema)."""
+    return str(fe.path) == ".codex/hooks.json"
+
+
+def _is_codex_config_toml(fe: FileEntry) -> bool:
+    """Codex main config — ``.codex/config.toml`` (pure TOML, no frontmatter)."""
+    return str(fe.path) == ".codex/config.toml"
+
+
+def _is_codex_agent_toml(fe: FileEntry) -> bool:
+    """Codex agent definition — ``.codex/agents/<name>.toml`` (pure TOML)."""
+    return str(fe.path).startswith(".codex/agents/") and fe.path.suffix == ".toml"
+
+
+def _is_agents_md(fe: FileEntry) -> bool:
+    """AGENTS.md at project root — pure text with HTML-comment metadata."""
+    return str(fe.path) == "AGENTS.md"
+
+
+def _render_pure_toml(
+    fe: FileEntry,
+    env: Environment,
+    target_dir: Path,
+    *,
+    dry_run: bool,
+    freeze_time: datetime | None,  # noqa: ARG001 — kept for dispatch signature parity
+) -> Path:
+    """Render pure TOML (no frontmatter prefix), validated via tomllib.loads().
+
+    Used for ``.codex/config.toml`` and ``.codex/agents/<name>.toml``.
+    Raises ``ValueError`` (with template name) if the rendered output is not
+    valid TOML — mirrors ``_render_pure_json`` error contract.
+    """
+    template = env.get_template(fe.template)
+    rendered = template.render(**fe.context)
+    try:
+        tomllib.loads(rendered)
+    except tomllib.TOMLDecodeError as e:
+        msg = f"Template {fe.template} rendered invalid TOML for {fe.path}: {e}"
+        raise ValueError(msg) from e
+    body_bytes = _normalize_body(rendered)
+    body_hash = hashlib.sha256(body_bytes).hexdigest()
+    fe.body_sha256 = body_hash
+    out = resolve_output_path(target_dir, fe.path)
+    if not dry_run:
+        atomic_write(out, body_bytes)
+    return out
+
+
+def _render_agents_md(
+    fe: FileEntry,
+    env: Environment,
+    target_dir: Path,
+    *,
+    dry_run: bool,
+    freeze_time: datetime | None,
+) -> Path:
+    """Render AGENTS.md as pure text with a leading HTML-comment metadata line.
+
+    AGENTS.md has no YAML frontmatter (Codex would display it as literal text).
+    Provenance is stored in ``<!-- harness-maker: content_hash=... version=... -->``.
+    Block-merge markers (``<!-- @hm:user:* -->``) work unchanged because Codex
+    ignores HTML comments.
+    """
+    template = env.get_template(fe.template)
+    rendered = template.render(**fe.context)
+    body_bytes = _normalize_body(rendered)
+    body_hash = hashlib.sha256(body_bytes).hexdigest()
+    fe.body_sha256 = body_hash
+    ts = freeze_time.isoformat() if freeze_time else datetime.now(UTC).isoformat()
+    metadata = (
+        f"<!-- harness-maker: content_hash={body_hash}"
+        f" version={__version__} generated_at={ts} -->\n"
+    )
+    final_bytes = metadata.encode("utf-8") + body_bytes
+    out = resolve_output_path(target_dir, fe.path)
+    if not dry_run:
+        atomic_write(out, final_bytes)
+    return out
 
 
 def _render_pure_text(
@@ -453,8 +541,24 @@ def render(
     written: list[Path] = []
     paths_to_merge = merge_paths or set()
     for fe in blueprint.files:
-        if _is_hooks_json(fe) or _is_cursor_mcp_json(fe):
+        if _is_hooks_json(fe) or _is_cursor_mcp_json(fe) or _is_codex_hooks_json(fe):
             out = _render_pure_json(
+                fe,
+                env,
+                target_dir,
+                dry_run=dry_run,
+                freeze_time=freeze_time,
+            )
+        elif _is_codex_config_toml(fe) or _is_codex_agent_toml(fe):
+            out = _render_pure_toml(
+                fe,
+                env,
+                target_dir,
+                dry_run=dry_run,
+                freeze_time=freeze_time,
+            )
+        elif _is_agents_md(fe):
+            out = _render_agents_md(
                 fe,
                 env,
                 target_dir,

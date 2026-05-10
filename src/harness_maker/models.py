@@ -62,6 +62,7 @@ class Target(str, Enum):  # noqa: UP042
 
     CLAUDE_CODE = "claude-code"
     CURSOR = "cursor"
+    CODEX = "codex"
 
 
 class AtomicStage(str, Enum):  # noqa: UP042

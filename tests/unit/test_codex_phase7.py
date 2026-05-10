@@ -1,0 +1,126 @@
+"""Phase 7 tests: Codex skills dual-render + 7 stage skills.
+
+RED before Phase 7:
+- templates/codex/stage_skill.md.j2 does not exist
+- _codex_stage_skills() returns [] (stub)
+- _codex_target_files() lacks .agents/skills/ paths
+
+GREEN after Phase 7:
+- stage_skill.md.j2 renders valid SKILL.md frontmatter
+- hm-research skill description mentions "harness-maker research stage" and "AGENTS.md"
+- _codex_target_files() includes 11 existing + 7 stage = 18 skill paths
+"""
+
+from __future__ import annotations
+
+import pytest
+
+from harness_maker.render import _make_env
+from harness_maker.synthesize import (
+    _ALL_SKILLS,
+    _ATOMIC_STAGES,
+    _codex_stage_skills,
+    _codex_target_files,
+)
+
+_STAGES = _ATOMIC_STAGES  # ["research", "spec", "plan", "execute", "review", "wrapup", "verify"]
+
+
+def _render_stage_skill(stage: str) -> str:
+    env = _make_env()
+    tpl = env.get_template("codex/stage_skill.md.j2")
+    return tpl.render(stage=stage)
+
+
+# ── stage_skill.md.j2 ─────────────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize("stage", _STAGES)
+def test_stage_skill_renders_non_empty(stage: str) -> None:
+    """codex/stage_skill.md.j2 must render non-empty content for each stage."""
+    rendered = _render_stage_skill(stage)
+    assert rendered.strip(), f"Stage skill for {stage!r} rendered empty"
+
+
+@pytest.mark.parametrize("stage", _STAGES)
+def test_stage_skill_has_yaml_frontmatter(stage: str) -> None:
+    """Stage skill SKILL.md must start with YAML frontmatter (---\\n)."""
+    rendered = _render_stage_skill(stage)
+    assert rendered.startswith("---\n"), (
+        f"Stage skill {stage!r} missing YAML frontmatter"
+    )
+
+
+@pytest.mark.parametrize("stage", _STAGES)
+def test_stage_skill_has_name_field(stage: str) -> None:
+    """Stage skill frontmatter must contain name: hm-<stage>."""
+    rendered = _render_stage_skill(stage)
+    assert f"name: hm-{stage}" in rendered, (
+        f"Stage skill {stage!r} missing 'name: hm-{stage}' in frontmatter"
+    )
+
+
+@pytest.mark.parametrize("stage", _STAGES)
+def test_stage_skill_has_description_field(stage: str) -> None:
+    """Stage skill frontmatter must contain a non-empty description."""
+    rendered = _render_stage_skill(stage)
+    assert "description:" in rendered, (
+        f"Stage skill {stage!r} missing 'description:' in frontmatter"
+    )
+
+
+def test_stage_skill_research_mentions_harness_maker_and_agents_md() -> None:
+    """hm-research SKILL.md must mention 'harness-maker' and 'AGENTS.md'."""
+    rendered = _render_stage_skill("research")
+    assert "harness-maker" in rendered.lower(), (
+        "hm-research skill missing 'harness-maker' reference"
+    )
+    assert "AGENTS.md" in rendered, (
+        "hm-research skill missing 'AGENTS.md' reference (ADR-008)"
+    )
+
+
+# ── synthesize: _codex_stage_skills ───────────────────────────────────────────
+
+
+def test_codex_stage_skills_returns_7_entries() -> None:
+    """_codex_stage_skills() must return 7 entries (one per atomic stage)."""
+    specs = _codex_stage_skills()
+    assert len(specs) == 7, f"Expected 7 stage skill specs, got {len(specs)}"
+
+
+def test_codex_stage_skills_output_paths() -> None:
+    """Each stage skill must have output path .agents/skills/hm-<stage>/SKILL.md."""
+    specs = _codex_stage_skills()
+    out_paths = {out for _, out, _ in specs}
+    for stage in _STAGES:
+        assert f".agents/skills/hm-{stage}/SKILL.md" in out_paths, (
+            f"Missing stage skill output path for stage {stage!r}"
+        )
+
+
+# ── synthesize: _codex_target_files includes 11 + 7 = 18 skill paths ─────────
+
+
+def test_codex_target_files_includes_existing_skills() -> None:
+    """_codex_target_files() must include all 11 existing skills at .agents/skills/."""
+    out_paths = {out for _, out, _ in _codex_target_files()}
+    for skill in _ALL_SKILLS:
+        assert f".agents/skills/{skill}/SKILL.md" in out_paths, (
+            f"_codex_target_files missing existing skill {skill!r}"
+        )
+
+
+def test_codex_target_files_includes_stage_skills() -> None:
+    """_codex_target_files() must include all 7 stage skills at .agents/skills/hm-<stage>/."""
+    out_paths = {out for _, out, _ in _codex_target_files()}
+    for stage in _STAGES:
+        assert f".agents/skills/hm-{stage}/SKILL.md" in out_paths, (
+            f"_codex_target_files missing stage skill hm-{stage!r}"
+        )
+
+
+def test_codex_target_files_total_skill_count() -> None:
+    """_codex_target_files() must include 11 + 7 = 18 .agents/skills/ entries."""
+    out_paths = [out for _, out, _ in _codex_target_files() if out.startswith(".agents/skills/")]
+    assert len(out_paths) == 18, f"Expected 18 skill paths, got {len(out_paths)}"

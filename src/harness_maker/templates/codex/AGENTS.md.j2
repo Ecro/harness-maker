@@ -1,0 +1,29 @@
+# AGENTS.md — {{ preset }} preset
+
+> harness-maker {{ config.dev_mode }} mode. Edit the user blocks below to add project-specific rules.
+
+## Workflow
+
+Default: `@hm-{{ config.default_workflow }}` skill — invokes the fused workflow that chains atomic stages.
+
+Run individual stages: `@hm-research`, `@hm-spec`, `@hm-plan`, `@hm-execute`, `@hm-review`, `@hm-verify`, `@hm-wrapup`.
+
+## Reviewers
+
+verbosity: `{{ config.reviewers.verbosity }}` — code, security, performance, concurrency, and UX reviewers available.
+
+## Caching
+
+`{{ config.caching }}` — per-agent prompt cache + session cache.
+
+## Autoloop / Worktree
+
+autoloop / worktree toggles live in `.claude/harness.yaml`.
+
+<!-- @hm:user:project-rules -->
+<!-- Project-specific rules (coding style, domain terms, agent invocation conventions). Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:project-rules -->
+
+<!-- @hm:user:extensions -->
+<!-- Free-form AGENTS.md additions. Preserved across harness-maker upgrades. -->
+<!-- @hm:/user:extensions -->

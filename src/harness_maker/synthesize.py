@@ -132,6 +132,91 @@ def _agent_files() -> list[FileSpec]:
     ]
 
 
+# Codex agent metadata: (description, model_codex). Model maps Claude tier →
+# OpenAI equivalent (o4 for opus, o4-mini for sonnet) as a reasonable default;
+# users can override in .codex/agents/ directly.
+_CODEX_AGENT_META: dict[str, tuple[str, str]] = {
+    "autoloop-coder": (
+        "Implementation agent for autoloop iterations — bounded scope, "
+        "write-tool-only, no open-ended exploration; worktree-bounded writes",
+        "o4",
+    ),
+    "code-reviewer": (
+        "Reviews code changes for correctness, readability, maintainability, "
+        "and basic security/performance hygiene",
+        "o4-mini",
+    ),
+    "concurrency-reviewer": (
+        "Reviews changes for race conditions, deadlocks, ISR safety, and async correctness",
+        "o4-mini",
+    ),
+    "consensus-arbiter": (
+        "Aggregates findings from multiple reviewer agents via surface match + reasoning "
+        "alignment + severity resolution; tags every finding "
+        "consensus-passed | weak-consensus | manual-only",
+        "o4-mini",
+    ),
+    "executor": (
+        "Workflow executor with worktree-bounded write permissions — "
+        "only writes to .worktrees/, never to repo root",
+        "o4-mini",
+    ),
+    "performance-reviewer": (
+        "Reviews changes for hot-path regressions, allocation hotspots, "
+        "and algorithmic inefficiency",
+        "o4-mini",
+    ),
+    "plan-validator": (
+        "Critiques a draft PLAN document for gaps, ambiguities, missing exit criteria, "
+        "and feasibility risks before /hm:execute is invoked. Read-only.",
+        "o4",
+    ),
+    "security-auditor": (
+        "Deep 5-gate security audit (secrets, permissions, hook injection, "
+        "dependency CVEs, prompt injection) — read-only, returns structured findings JSON",
+        "o4-mini",
+    ),
+    "security-reviewer": (
+        "Reviews changes for secrets exposure, injection, auth flaws, "
+        "and unsafe permission grants",
+        "o4-mini",
+    ),
+    "stuck": (
+        "Escalation analyst — invoked when /hm:execute, /hm:review, or /hm:plan blocks. "
+        "Performs root-cause analysis, proposes 2-3 unblock paths, "
+        "and writes a structured escalation note. Read-only.",
+        "o4",
+    ),
+    "test-reviewer": (
+        "Phase A.5 gate for /hm:execute. Critiques RED-stage tests for SPEC alignment, "
+        "banned-pattern violations, and assertion quality before Phase B (RED gate) runs. "
+        "Read-only.",
+        "o4-mini",
+    ),
+    "ux-reviewer": (
+        "Reviews UI changes for accessibility, consistency, and interaction quality",
+        "o4-mini",
+    ),
+}
+
+
+def _codex_agent_files() -> list[FileSpec]:
+    """Codex agent TOML files — one per agent using codex/agent.toml.j2."""
+    return [
+        (
+            "codex/agent.toml.j2",
+            f".codex/agents/{n}.toml",
+            {
+                "name": n,
+                "description": _CODEX_AGENT_META[n][0],
+                "model_codex": _CODEX_AGENT_META[n][1],
+                "reviewer_kind": _REVIEWER_KIND.get(n, ""),
+            },
+        )
+        for n in _ALL_AGENTS
+    ]
+
+
 def _skill_files() -> list[FileSpec]:
     return [
         (
@@ -273,6 +358,50 @@ def _cursor_target_files() -> list[FileSpec]:
     ]
 
 
+def _codex_target_files() -> list[FileSpec]:
+    """Codex target-specific assets: config.toml + AGENTS.md + hooks.json + agents + skills."""
+    return [
+        (
+            "codex/config.toml.j2",
+            ".codex/config.toml",
+            {},
+        ),
+        (
+            "codex/AGENTS.md.j2",
+            "AGENTS.md",
+            {},
+        ),
+        (
+            "codex/hooks.json.j2",
+            ".codex/hooks.json",
+            {},
+        ),
+        *_codex_agent_files(),
+        *_codex_skill_files(),
+        *_codex_stage_skills(),
+    ]
+
+
+def _codex_skill_files() -> list[FileSpec]:
+    """Existing 11 skills dual-rendered to .agents/skills/ for Codex."""
+    return [
+        (f"skills/{n}/SKILL.md.j2", f".agents/skills/{n}/SKILL.md", {"name": n})
+        for n in _ALL_SKILLS
+    ]
+
+
+def _codex_stage_skills() -> list[FileSpec]:
+    """Seven stage-trigger SKILL.md files — one per atomic stage."""
+    return [
+        (
+            "codex/stage_skill.md.j2",
+            f".agents/skills/hm-{s}/SKILL.md",
+            {"stage": s},
+        )
+        for s in _ATOMIC_STAGES
+    ]
+
+
 def synthesize(
     profile: ProjectProfile,
     answers: InterviewAnswers,
@@ -293,6 +422,9 @@ def synthesize(
 
     if Target.CURSOR in answers.targets:
         file_specs.extend(_cursor_target_files())
+
+    if Target.CODEX in answers.targets:
+        file_specs.extend(_codex_target_files())
 
     config = HarnessConfig(
         locale=answers.locale,

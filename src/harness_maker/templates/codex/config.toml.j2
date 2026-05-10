@@ -1,0 +1,16 @@
+[features]
+codex_hooks = true
+{% if config.mcp_servers -%}
+{% for server_name, server_cfg in config.mcp_servers.items() %}
+[mcp_servers."{{ server_name }}"]
+command = {{ server_cfg.command | tojson }}
+{%- if server_cfg.get("args") %}
+args = {{ server_cfg.args | tojson }}
+{%- endif %}
+{%- if server_cfg.get("env") %}
+{%- for env_k, env_v in server_cfg.env.items() %}
+env.{{ env_k }} = {{ env_v | tojson }}
+{%- endfor %}
+{%- endif %}
+{% endfor %}
+{%- endif %}

@@ -25,7 +25,7 @@ harness-maker 는 Claude Code + Cursor 양쪽 IDE 의 플러그인으로, **LLM 
 
 `harness.yaml.targets: list[Target]` — 사용자 하네스가 어느 IDE 에서 작동할지 결정하는 축. preset / dev_mode 와 직교.
 
-- **값**: `claude-code` | `cursor` (multi-select)
+- **값**: `claude-code` | `cursor` | `codex` (multi-select)
 - **인터뷰 정책**: 명시 multi-select 강제. **auto-detect 금지** (`.cursor/` 디렉토리 존재 여부 등으로 추론하지 않음). 사용자 의도 확인 필수.
 - **Default fallback**: 옛 harness.yaml 에 `targets` 키 없을 때만 `[claude-code]` silent fallback + 경고 로그. 신규 인터뷰는 항상 명시 선택.
 - **Single source 원칙**: agents / skills / hooks / MCP 자산은 `.claude/` 한 곳에서 양쪽 IDE 가 공유 (Cursor 가 `.claude/agents/` 를 native 로 읽음, hooks schema 호환 — IDE 모드 인식은 Phase 1 manual 검증 결과 따름).
@@ -47,12 +47,13 @@ harness-maker 는 Claude Code + Cursor 양쪽 IDE 의 플러그인으로, **LLM 
 - **Version 시작**: `0.1.0`
 - **CI**: GitHub Actions (lint + test on PR)
 
-### Plugin 구조 (Claude Code + Cursor 공식 spec)
+### Plugin 구조 (Claude Code + Cursor + Codex 공식 spec)
 
-harness-maker 는 **dual plugin** — 두 marketplace 양쪽에 등록 가능:
+harness-maker 는 **triple plugin** — 세 marketplace 모두에 등록 가능:
 
 - `.claude-plugin/plugin.json` — Claude Code manifest
 - `.cursor-plugin/plugin.json` — Cursor Marketplace manifest (schema 거의 동일)
+- `.codex-plugin/plugin.json` — Codex CLI manifest
 - `skills/<name>/SKILL.md` — Anthropic SKILL.md 표준, 양쪽 공유 (loose md 금지)
 - `agents/<name>.md` — sub-agent 정의, 양쪽 공유
 - `commands/<name>.md` — 슬래시 명령, 양쪽 공유
@@ -77,6 +78,14 @@ harness-maker 는 **dual plugin** — 두 marketplace 양쪽에 등록 가능:
 - `.cursor/rules/<name>.mdc` — Cursor rules (CLAUDE.md 의 .mdc 변환본)
 - `.cursor/commands/hm-<name>.md` — Cursor 위치의 슬래시 명령 (Phase 1 검증 결과 따라 `.claude/commands/` 만으로 가능할 수 있음)
 - `.cursor/mcp.json` — MCP server (Cursor 별도 위치)
+
+**Codex target 추가** (`targets` 에 `codex` 포함 시):
+- `.codex/config.toml` — Codex CLI 전역 설정 (features, mcp_servers)
+- `.codex/hooks.json` — Codex hooks (PascalCase + PermissionRequest 이벤트)
+- `.codex/agents/<name>.toml` — 에이전트 TOML (developer_instructions = agent body)
+- `AGENTS.md` — 프로젝트 루트 instructions (block-merge markers 포함)
+- `.agents/skills/<name>/SKILL.md` — 기존 11개 skill 의 Codex 경로 dual-render
+- `.agents/skills/hm-<stage>/SKILL.md` — 7개 atomic stage 용 stage-trigger skill
 
 **Worktree 공유**: `.worktrees/` 단일 디렉토리. Cursor 의 `/worktree` 자체 관리와 같은 위치. cleanup 은 prefix 매치로 자기 것만 (우리 `phase-*`, `autoloop-*`).
 
@@ -105,16 +114,17 @@ harness-maker 는 **dual plugin** — 두 marketplace 양쪽에 등록 가능:
 
 ## 버전업 정책
 
-버전 번호는 **네 파일을 동시에** 수정해야 한다. 하나라도 빠지면 `/plugin update` 또는 Cursor Marketplace 가 잘못된 버전을 보고함:
+버전 번호는 **다섯 파일을 동시에** 수정해야 한다. 하나라도 빠지면 `/plugin update` 또는 Cursor / Codex Marketplace 가 잘못된 버전을 보고함:
 
 | 파일 | 역할 |
 |------|------|
 | `.claude-plugin/plugin.json` | Claude Code `/plugin update` 가 읽는 기준 버전 |
 | `.cursor-plugin/plugin.json` | Cursor Marketplace 가 읽는 기준 버전 |
+| `.codex-plugin/plugin.json` | Codex CLI 가 읽는 기준 버전 |
 | `pyproject.toml` | Python 패키지 버전 |
 | `src/harness_maker/__init__.py` | `__version__` 런타임 값 |
 
-> **왜:** Claude Code 의 `/plugin update` 는 `.claude-plugin/plugin.json` 의 `version` 필드를 기준으로 최신 여부를 판단한다. Cursor 도 `.cursor-plugin/plugin.json` 의 `version` 으로 동일 판단. `pyproject.toml` 만 올리고 두 manifest 가 구버전이면 두 marketplace 모두 "already at latest" 로 오보. (0.4.9 릴리스 시 발견; cursor target 도입 시 4 파일로 확장)
+> **왜:** Claude Code 의 `/plugin update` 는 `.claude-plugin/plugin.json` 의 `version` 필드를 기준으로 최신 여부를 판단한다. Cursor 도 `.cursor-plugin/plugin.json`, Codex 도 `.codex-plugin/plugin.json` 으로 동일 판단. `pyproject.toml` 만 올리고 세 manifest 가 구버전이면 모두 "already at latest" 로 오보. (0.4.9 릴리스 시 발견; cursor 도입 시 4 파일, codex 도입 시 5 파일로 확장)
 
 ## 보안 / 권한 (v1.6, REVIEW-2026-05-08 개정)
 - Reviewer agent (code, security, perf, ux, concurrency) — `permissions.allow: [Read(*), Grep(*), Glob(*), Bash(git diff:*), Bash(git log:*), Bash(git status:*)]`, `deny: [Write(*), Edit(*), Bash(rm:*), Bash(curl:*), Bash(npm:*), Bash(eval *), Bash(python:*), Bash(node:*), Bash(sh:*), Bash(bash:*)]`. **Why 추가 Bash deny**: REVIEW M7 발견 — 단순 rm/curl/npm 차단만으로는 `Bash(python -c "...")` / `Bash(sh -c "...")` 우회 가능. 인터프리터 호출도 모두 deny.

@@ -1,0 +1,18 @@
+---
+name: hm-{{ stage }}
+description: Invoke the harness-maker {{ stage }} stage procedure documented in AGENTS.md. Use the user's input as the goal or topic for this stage.
+---
+
+# hm-{{ stage }}
+
+Follow the **{{ stage }}** stage procedure documented in **AGENTS.md**.
+Use the user's input as the goal, topic, or slug for this stage.
+
+Invoke when the user asks to run the {{ stage }} stage of the harness-maker workflow,
+or when the task context matches the {{ stage }} stage description.
+
+See AGENTS.md for the full procedure, exit criteria, and quality bar.
+
+<!-- @hm:user:extensions -->
+<!-- Project-specific additions to the hm-{{ stage }} skill. Preserved across upgrades. -->
+<!-- @hm:/user:extensions -->

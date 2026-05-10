@@ -368,6 +368,36 @@ def test_reconcile_user_frontmatter_no_hash_returns_keep(tmp_path: Path) -> None
     assert conflicts[0].reason == "frontmatter-no-hash-not-ours"
 
 
+def test_reconcile_codex_toml_always_replaces(tmp_path: Path) -> None:
+    """`.codex/*.toml` files have no YAML frontmatter (tomllib rejects preambles).
+    Always REPLACE so template updates (model defaults, MCP fields) propagate.
+    """
+    from harness_maker.models import Blueprint, FileEntry
+
+    target = tmp_path / ".claude"
+    target.mkdir()
+    codex_dir = tmp_path / ".codex"
+    codex_dir.mkdir()
+    (codex_dir / "config.toml").write_text(
+        "[features]\ncodex_hooks = true\n",
+        encoding="utf-8",
+    )
+    bp = Blueprint(
+        files=[
+            FileEntry(
+                path=Path(".codex/config.toml"),
+                template="codex/config.toml.j2",
+                context={},
+                frontmatter={},
+            ),
+        ],
+    )
+    conflicts = reconcile(target, bp)
+    assert len(conflicts) == 1
+    assert conflicts[0].decision == ReconcileDecision.REPLACE
+    assert conflicts[0].reason == "pure-toml-no-frontmatter"
+
+
 def test_backup_after_full_render_preserves_cursor_user_modifications(tmp_path: Path) -> None:
     """B13 — backup() 가 .cursor/ 의 사용자 수정도 보존."""
     from harness_maker.interview import interview

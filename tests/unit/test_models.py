@@ -54,7 +54,8 @@ def test_model_tier_members() -> None:
 def test_target_members() -> None:
     assert Target.CLAUDE_CODE.value == "claude-code"
     assert Target.CURSOR.value == "cursor"
-    assert {m.value for m in Target} == {"claude-code", "cursor"}
+    assert Target.CODEX.value == "codex"
+    assert {m.value for m in Target} == {"claude-code", "cursor", "codex"}
 
 
 def test_atomic_stage_members() -> None:
@@ -141,6 +142,23 @@ def test_harness_config_targets_empty_raises() -> None:
 def test_harness_config_targets_invalid_value_raises() -> None:
     with pytest.raises(ValidationError):
         HarnessConfig.model_validate({"targets": ["not-a-real-target"]})
+
+
+def test_harness_config_targets_codex() -> None:
+    cfg = HarnessConfig(targets=[Target.CODEX])
+    assert cfg.targets == [Target.CODEX]
+
+
+def test_harness_config_targets_all_three() -> None:
+    cfg = HarnessConfig(targets=[Target.CLAUDE_CODE, Target.CURSOR, Target.CODEX])
+    assert cfg.targets == [Target.CLAUDE_CODE, Target.CURSOR, Target.CODEX]
+
+
+def test_interview_answers_targets_codex() -> None:
+    from harness_maker.models import InterviewAnswers
+
+    ans = InterviewAnswers(targets=[Target.CODEX])
+    assert ans.targets == [Target.CODEX]
 
 
 def test_harness_config_recommended_model_default() -> None:

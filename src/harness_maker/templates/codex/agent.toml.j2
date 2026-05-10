@@ -1,0 +1,8 @@
+name = "{{ name }}"
+description = "{{ description }}"
+{% if model_codex -%}
+model = "{{ model_codex }}"
+{% endif %}
+developer_instructions = """
+{% include "agents/" + name + "_body.md.j2" -%}
+"""

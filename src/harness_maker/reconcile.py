@@ -81,6 +81,18 @@ def reconcile(existing_dir: Path, blueprint: Blueprint) -> list[ConflictItem]:
                 ),
             )
             continue
+        # AGENTS.md uses HTML-comment metadata (no YAML frontmatter — Codex shows
+        # frontmatter as literal text). MVP: always MERGE_BLOCK so user-edited
+        # <!-- @hm:user:* --> blocks survive re-renders.
+        if fe.path == Path("AGENTS.md"):
+            conflicts.append(
+                ConflictItem(
+                    path=fe.path,
+                    decision=ReconcileDecision.MERGE_BLOCK,
+                    reason="codex-agents-merge",
+                ),
+            )
+            continue
         # hooks.json is pure JSON (no frontmatter). Always REPLACE so template
         # updates (e.g., new hook commands) propagate on re-render. Same rule
         # for the Cursor hooks file at .cursor/hooks.json — Cursor reads only
@@ -92,6 +104,17 @@ def reconcile(existing_dir: Path, blueprint: Blueprint) -> list[ConflictItem]:
                     path=fe.path,
                     decision=ReconcileDecision.REPLACE,
                     reason="pure-json-no-frontmatter",
+                ),
+            )
+            continue
+        # Codex TOML files carry no YAML frontmatter (tomllib would reject it).
+        # Always REPLACE so template updates (new MCP fields, model defaults) land.
+        if str(fe.path).endswith(".toml"):
+            conflicts.append(
+                ConflictItem(
+                    path=fe.path,
+                    decision=ReconcileDecision.REPLACE,
+                    reason="pure-toml-no-frontmatter",
                 ),
             )
             continue
@@ -218,4 +241,10 @@ def backup(existing_dir: Path) -> Path:
     cursor_dir = existing_dir.parent / ".cursor"
     if cursor_dir.exists():
         shutil.copytree(cursor_dir, candidate / ".cursor")
+    codex_dir = existing_dir.parent / ".codex"
+    if codex_dir.exists():
+        shutil.copytree(codex_dir, candidate / ".codex")
+    agents_md = existing_dir.parent / "AGENTS.md"
+    if agents_md.exists():
+        shutil.copy2(agents_md, candidate / "AGENTS.md")
     return candidate

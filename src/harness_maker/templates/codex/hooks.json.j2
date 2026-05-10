@@ -1,0 +1,73 @@
+{#- Codex hooks schema: PascalCase event keys (same as Claude Code) + PermissionRequest
+    (Codex-exclusive, ADR-006) + flush_session wired to Stop (no PreCompact, ADR-004) +
+    worktree_gate omitted (kernel sandbox handles isolation, ADR-005).
+    apply_patch is Codex's file-edit tool; use in matchers alongside Write|Edit.
+-#}
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {"type": "command", "command": "uv run --with {{ harness_maker_src_path }} python -m harness_maker.telemetry", "timeout": 5}
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit|apply_patch",
+        "hooks": [
+          {"type": "command", "command": "uv run --with {{ harness_maker_src_path }} python -m harness_maker.hooks.post_write_reminder", "timeout": 5}
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {"type": "command", "command": "uv run --with {{ harness_maker_src_path }} python -m harness_maker.gates.permission_gate"}
+        ]
+      }{% if config.dev_mode == "spec-driven" %},
+      {
+        "matcher": "apply_patch",
+        "hooks": [
+          {"type": "command", "command": "uv run --with {{ harness_maker_src_path }} python -m harness_maker.gates.spec_gate"}
+        ]
+      }{% endif %}
+    ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {"type": "command", "command": "uv run --with {{ harness_maker_src_path }} python -m harness_maker.gates.permission_gate"}
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {"type": "command", "command": "uv run --with {{ harness_maker_src_path }} python -m harness_maker.hooks.sessionstart_drift"}
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run --with {{ harness_maker_src_path }} python -m harness_maker.hooks.loop_gate --mode stop-hook",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run --with {{ harness_maker_src_path }} python -m harness_maker.hooks.flush_session",
+            "timeout": 30,
+            "statusMessage": "Snapshotting autoloop progress..."
+          }
+        ]
+      }
+    ]
+  },
+  "preset": "{{ preset }}"
+}

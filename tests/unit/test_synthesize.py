@@ -198,6 +198,43 @@ def test_synthesize_targets_propagates_to_harness_config() -> None:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# Codex target — Phase 1 stub + integration
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def test_synthesize_no_codex_target_omits_codex_files() -> None:
+    """targets=[claude-code] (default): .codex/ and .agents/ paths never emitted."""
+    from harness_maker.models import Target
+
+    p = _profile()
+    a = interview(p, autoloop_mode=True)
+    assert a.targets == [Target.CLAUDE_CODE]
+    bp = synthesize(p, a)
+    paths = {str(f.path) for f in bp.files}
+    assert not any(fp.startswith(".codex/") for fp in paths)
+    assert not any(fp.startswith(".agents/") for fp in paths)
+    assert "AGENTS.md" not in paths
+
+
+def test_synthesize_codex_target_files_importable() -> None:
+    """_codex_target_files() is importable and returns a list (stub)."""
+    from harness_maker.synthesize import _codex_target_files
+
+    result = _codex_target_files()
+    assert isinstance(result, list)
+
+
+def test_synthesize_codex_target_propagates_to_config() -> None:
+    """targets=[codex] propagates to blueprint config.targets."""
+    from harness_maker.models import Target
+
+    p = _profile()
+    a = interview(p, autoloop_mode=True).model_copy(update={"targets": [Target.CODEX]})
+    bp = synthesize(p, a)
+    assert bp.config.targets == [Target.CODEX]
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Locale routing — _localized() helper + _base_files() locale fan-out
 # ──────────────────────────────────────────────────────────────────────────────
 

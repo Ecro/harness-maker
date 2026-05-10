@@ -259,6 +259,44 @@ def test_interview_targets_unknown_value_skipped(monkeypatch: pytest.MonkeyPatch
     assert result.targets == [Target.CLAUDE_CODE]
 
 
+def test_interview_targets_codex_input(monkeypatch: pytest.MonkeyPatch) -> None:
+    """User can pick codex as the sole target."""
+    inputs: Iterator[str] = iter(["", "codex", "", "", "", "", "", "", "", ""])
+    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
+    result = interview(_profile(), autoloop_mode=False)
+    assert result.targets == [Target.CODEX]
+
+
+def test_interview_targets_all_three(monkeypatch: pytest.MonkeyPatch) -> None:
+    """All three targets in comma-separated input."""
+    inputs: Iterator[str] = iter(
+        ["", "claude-code, cursor, codex", "", "", "", "", "", "", "", ""],
+    )
+    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
+    result = interview(_profile(), autoloop_mode=False)
+    assert result.targets == [Target.CLAUDE_CODE, Target.CURSOR, Target.CODEX]
+
+
+def test_parse_targets_codex(tmp_path: pathlib.Path) -> None:
+    """answers_from_harness_yaml round-trips targets: [codex]."""
+    harness_yaml = tmp_path / "harness.yaml"
+    harness_yaml.write_text("locale: en\npreset: Side\ntargets:\n  - codex\n")
+    result = answers_from_harness_yaml(harness_yaml)
+    assert result is not None
+    assert result.targets == [Target.CODEX]
+
+
+def test_parse_targets_all_three(tmp_path: pathlib.Path) -> None:
+    """answers_from_harness_yaml round-trips all three targets."""
+    harness_yaml = tmp_path / "harness.yaml"
+    harness_yaml.write_text(
+        "locale: en\npreset: Side\ntargets:\n  - claude-code\n  - cursor\n  - codex\n"
+    )
+    result = answers_from_harness_yaml(harness_yaml)
+    assert result is not None
+    assert result.targets == [Target.CLAUDE_CODE, Target.CURSOR, Target.CODEX]
+
+
 def test_interview_autoloop_skips_ref_folders() -> None:
     """Autoloop mode never prompts; ref_folders defaults to []."""
     result = interview(_profile(), autoloop_mode=True)

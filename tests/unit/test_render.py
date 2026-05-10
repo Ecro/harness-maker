@@ -749,3 +749,219 @@ def test_cursor_mcp_empty_default(tmp_path: Path) -> None:
 
     cursor_mcp = json.loads((project_root / ".cursor" / "mcp.json").read_text(encoding="utf-8"))
     assert cursor_mcp == {"mcpServers": {}}
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Codex target — resolve_output_path routing (Phase 1)
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def test_resolve_output_path_codex_routes_to_parent() -> None:
+    """.codex/ assets route to target_dir.parent (sibling of .claude/)."""
+    from harness_maker.render import resolve_output_path
+
+    target_dir = Path("/project/.claude")
+    assert resolve_output_path(target_dir, Path(".codex/config.toml")) == Path(
+        "/project/.codex/config.toml"
+    )
+    assert resolve_output_path(target_dir, Path(".codex/hooks.json")) == Path(
+        "/project/.codex/hooks.json"
+    )
+    assert resolve_output_path(target_dir, Path(".codex/agents/code-reviewer.toml")) == Path(
+        "/project/.codex/agents/code-reviewer.toml"
+    )
+
+
+def test_resolve_output_path_agents_routes_to_parent() -> None:
+    """.agents/ assets (skills) route to target_dir.parent."""
+    from harness_maker.render import resolve_output_path
+
+    target_dir = Path("/project/.claude")
+    assert resolve_output_path(target_dir, Path(".agents/skills/foo/SKILL.md")) == Path(
+        "/project/.agents/skills/foo/SKILL.md"
+    )
+    assert resolve_output_path(target_dir, Path(".agents/skills/hm-research/SKILL.md")) == Path(
+        "/project/.agents/skills/hm-research/SKILL.md"
+    )
+
+
+def test_resolve_output_path_agents_md_routes_to_parent() -> None:
+    """AGENTS.md at project root routes to target_dir.parent (not .claude/AGENTS.md)."""
+    from harness_maker.render import resolve_output_path
+
+    target_dir = Path("/project/.claude")
+    assert resolve_output_path(target_dir, Path("AGENTS.md")) == Path("/project/AGENTS.md")
+
+
+def test_resolve_output_path_cursor_still_routes_correctly() -> None:
+    """.cursor/ routing unchanged after adding codex support."""
+    from harness_maker.render import resolve_output_path
+
+    target_dir = Path("/project/.claude")
+    assert resolve_output_path(target_dir, Path(".cursor/rules/harness.mdc")) == Path(
+        "/project/.cursor/rules/harness.mdc"
+    )
+
+
+def test_resolve_output_path_claude_unchanged() -> None:
+    """Regular .claude/ assets still route to target_dir."""
+    from harness_maker.render import resolve_output_path
+
+    target_dir = Path("/project/.claude")
+    assert resolve_output_path(target_dir, Path("harness.yaml")) == Path(
+        "/project/.claude/harness.yaml"
+    )
+    assert resolve_output_path(target_dir, Path("agents/code-reviewer.md")) == Path(
+        "/project/.claude/agents/code-reviewer.md"
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Codex render infrastructure — predicates + _render_pure_toml (Phase 2)
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def _fe(path: str) -> Blueprint:
+    """Minimal FileEntry helper for predicate testing."""
+    from harness_maker.models import FileEntry
+
+    return FileEntry(path=Path(path), template="hooks/hooks.json.j2", context={})
+
+
+def test_is_codex_hooks_json_true() -> None:
+    from harness_maker.render import _is_codex_hooks_json
+
+    assert _is_codex_hooks_json(_fe(".codex/hooks.json"))
+
+
+def test_is_codex_hooks_json_false_for_claude_hooks() -> None:
+    from harness_maker.render import _is_codex_hooks_json
+
+    assert not _is_codex_hooks_json(_fe("hooks/hooks.json"))
+
+
+def test_is_codex_config_toml_true() -> None:
+    from harness_maker.render import _is_codex_config_toml
+
+    assert _is_codex_config_toml(_fe(".codex/config.toml"))
+
+
+def test_is_codex_config_toml_false_for_other() -> None:
+    from harness_maker.render import _is_codex_config_toml
+
+    assert not _is_codex_config_toml(_fe("harness.yaml"))
+
+
+def test_is_codex_agent_toml_true() -> None:
+    from harness_maker.render import _is_codex_agent_toml
+
+    assert _is_codex_agent_toml(_fe(".codex/agents/code-reviewer.toml"))
+    assert _is_codex_agent_toml(_fe(".codex/agents/executor.toml"))
+
+
+def test_is_codex_agent_toml_false_for_md_agent() -> None:
+    from harness_maker.render import _is_codex_agent_toml
+
+    assert not _is_codex_agent_toml(_fe("agents/code-reviewer.md"))
+
+
+def test_is_agents_md_true() -> None:
+    from harness_maker.render import _is_agents_md
+
+    assert _is_agents_md(_fe("AGENTS.md"))
+
+
+def test_is_agents_md_false_for_claude_md() -> None:
+    from harness_maker.render import _is_agents_md
+
+    assert not _is_agents_md(_fe("../CLAUDE.md"))
+    assert not _is_agents_md(_fe("CLAUDE.md"))
+
+
+def test_render_pure_toml_invalid_raises_value_error(tmp_path: Path) -> None:
+    """_render_pure_toml() raises ValueError containing template name on parse failure."""
+
+    from harness_maker.render import _render_pure_toml
+
+    # Write a valid Jinja2 template that renders invalid TOML
+    (tmp_path / "bad.toml.j2").write_text("this is not valid toml content\n")
+    from jinja2 import Environment, FileSystemLoader, StrictUndefined
+
+    from harness_maker.models import FileEntry
+
+    env = Environment(
+        loader=FileSystemLoader(str(tmp_path)),
+        undefined=StrictUndefined,
+        keep_trailing_newline=True,
+    )
+    fe = FileEntry(path=Path(".codex/config.toml"), template="bad.toml.j2", context={})
+    with pytest.raises(ValueError, match="bad.toml"):
+        _render_pure_toml(fe, env, tmp_path / ".claude", dry_run=True, freeze_time=None)
+
+
+def test_render_pure_toml_valid_toml_dry_run(tmp_path: Path) -> None:
+    """_render_pure_toml() does not write when dry_run=True."""
+    from harness_maker.render import _render_pure_toml
+
+    (tmp_path / "ok.toml.j2").write_text(
+        '[features]\ncodex_hooks = true\n'
+    )
+    from jinja2 import Environment, FileSystemLoader, StrictUndefined
+
+    from harness_maker.models import FileEntry
+
+    env = Environment(
+        loader=FileSystemLoader(str(tmp_path)),
+        undefined=StrictUndefined,
+        keep_trailing_newline=True,
+    )
+    target_dir = tmp_path / ".claude"
+    target_dir.mkdir()
+    fe = FileEntry(path=Path(".codex/config.toml"), template="ok.toml.j2", context={})
+    out = _render_pure_toml(fe, env, target_dir, dry_run=True, freeze_time=None)
+    assert str(out).endswith(".codex/config.toml")
+    assert not (tmp_path / ".codex" / "config.toml").exists()
+
+
+def test_render_agents_md_dry_run(tmp_path: Path) -> None:
+    """_render_agents_md() renders AGENTS.md as pure text with HTML-comment metadata."""
+    from harness_maker.render import _render_agents_md
+
+    (tmp_path / "agents.md.j2").write_text("# Project Instructions\n\nHello.\n")
+    from jinja2 import Environment, FileSystemLoader, StrictUndefined
+
+    from harness_maker.models import FileEntry
+
+    env = Environment(
+        loader=FileSystemLoader(str(tmp_path)),
+        undefined=StrictUndefined,
+        keep_trailing_newline=True,
+    )
+    target_dir = tmp_path / ".claude"
+    target_dir.mkdir()
+    fe = FileEntry(path=Path("AGENTS.md"), template="agents.md.j2", context={})
+    out = _render_agents_md(fe, env, target_dir, dry_run=True, freeze_time=None)
+    assert out == tmp_path / "AGENTS.md"
+
+
+def test_render_agents_md_writes_html_comment_metadata(tmp_path: Path) -> None:
+    """AGENTS.md written to disk has harness-maker HTML metadata comment."""
+    from harness_maker.render import _render_agents_md
+
+    (tmp_path / "agents.md.j2").write_text("# Project Instructions\n")
+    from jinja2 import Environment, FileSystemLoader, StrictUndefined
+
+    from harness_maker.models import FileEntry
+
+    env = Environment(
+        loader=FileSystemLoader(str(tmp_path)),
+        undefined=StrictUndefined,
+        keep_trailing_newline=True,
+    )
+    target_dir = tmp_path / ".claude"
+    target_dir.mkdir()
+    fe = FileEntry(path=Path("AGENTS.md"), template="agents.md.j2", context={})
+    out = _render_agents_md(fe, env, target_dir, dry_run=False, freeze_time=None)
+    content = out.read_text(encoding="utf-8")
+    assert "<!-- harness-maker:" in content
+    assert "content_hash=" in content

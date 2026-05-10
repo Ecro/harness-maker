@@ -82,7 +82,11 @@ def evaluate(
 
 
 def main() -> int:
-    """Entry point: read PreToolUse JSON from stdin, exit 0 (allow) or 2 (block)."""
+    """Entry point: read hook JSON from stdin.
+
+    PreToolUse (Claude Code/Cursor): exit 0 (allow) or 2 (block).
+    PermissionRequest (Codex): always exit 0; emit JSON hookSpecificOutput to stdout.
+    """
     try:
         text = sys.stdin.read()
         payload: Any = json.loads(text) if text.strip() else {}
@@ -90,10 +94,22 @@ def main() -> int:
         return 0
     if not isinstance(payload, dict):
         return 0
+    hook_event = str(payload.get("hook_event_name") or "")
     tool_name = str(payload.get("tool_name") or "")
     raw_input = payload.get("tool_input")
     tool_input = raw_input if isinstance(raw_input, dict) else {}
     decision = evaluate(tool_name, tool_input, Path.cwd())
+    if hook_event == "PermissionRequest":
+        behavior = "allow" if decision.allow else "deny"
+        print(
+            json.dumps({
+                "hookSpecificOutput": {
+                    "hookEventName": "PermissionRequest",
+                    "decision": {"behavior": behavior},
+                }
+            })
+        )
+        return 0
     if decision.message:
         print(decision.message, file=sys.stderr)
     return 0 if decision.allow else 2
