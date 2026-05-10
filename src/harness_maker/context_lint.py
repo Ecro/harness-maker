@@ -40,13 +40,21 @@ THRESHOLDS: dict[tuple[str, str], int] = {
 
 
 def _strip_frontmatter(text: str) -> str:
-    """Remove leading `---\\n...\\n---\\n` YAML frontmatter block, if present."""
-    if not text.startswith("---\n"):
-        return text
-    end = text.find("\n---\n", 4)
-    if end == -1:
-        return text
-    return text[end + 5 :]
+    """Remove provenance header before counting body lines.
+
+    Handles two formats:
+    - YAML frontmatter ``---\\n...\\n---\\n`` (agents, skills, commands, …)
+    - HTML metadata comment ``<!-- harness-maker: ... -->\\n`` (AGENTS.md)
+    """
+    if text.startswith("---\n"):
+        end = text.find("\n---\n", 4)
+        if end != -1:
+            return text[end + 5 :]
+    if text.startswith("<!-- harness-maker:"):
+        newline = text.find("\n")
+        if newline != -1:
+            return text[newline + 1 :]
+    return text
 
 
 def _count_body_lines(text: str) -> int:

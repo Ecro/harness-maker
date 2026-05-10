@@ -244,6 +244,9 @@ def backup(existing_dir: Path) -> Path:
     codex_dir = existing_dir.parent / ".codex"
     if codex_dir.exists():
         shutil.copytree(codex_dir, candidate / ".codex")
+    agents_skills = existing_dir.parent / ".agents"
+    if agents_skills.exists():
+        shutil.copytree(agents_skills, candidate / ".agents")
     agents_md = existing_dir.parent / "AGENTS.md"
     if agents_md.exists():
         shutil.copy2(agents_md, candidate / "AGENTS.md")

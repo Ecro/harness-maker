@@ -965,3 +965,85 @@ def test_render_agents_md_writes_html_comment_metadata(tmp_path: Path) -> None:
     content = out.read_text(encoding="utf-8")
     assert "<!-- harness-maker:" in content
     assert "content_hash=" in content
+
+
+def test_render_agents_md_block_merge_preserves_user_blocks(tmp_path: Path) -> None:
+    """Re-rendering AGENTS.md with merge_reports preserves @hm:user:* block content."""
+    from pathlib import Path
+
+    from jinja2 import Environment, FileSystemLoader, StrictUndefined
+
+    from harness_maker.models import FileEntry
+    from harness_maker.render import DEFAULT_FREEZE_TIME, _render_agents_md
+
+    template_text = (
+        "# AGENTS.md\n\n"
+        "<!-- @hm:user:rules -->\n"
+        "<!-- Default placeholder. -->\n"
+        "<!-- @hm:/user:rules -->\n"
+    )
+    (tmp_path / "agents.md.j2").write_text(template_text)
+    env = Environment(
+        loader=FileSystemLoader(str(tmp_path)),
+        undefined=StrictUndefined,
+        keep_trailing_newline=True,
+    )
+    target_dir = tmp_path / ".claude"
+    target_dir.mkdir()
+    # Simulate existing AGENTS.md with user's custom rules
+    existing = (
+        "<!-- harness-maker: content_hash=old version=0.8.1 generated_at=2026-01-01 -->\n"
+        "# AGENTS.md\n\n"
+        "<!-- @hm:user:rules -->\n"
+        "Use snake_case always.\n"
+        "<!-- @hm:/user:rules -->\n"
+    )
+    (tmp_path / "AGENTS.md").write_text(existing)
+
+    merge_reports: dict = {}
+    fe = FileEntry(path=Path("AGENTS.md"), template="agents.md.j2", context={})
+    out = _render_agents_md(
+        fe, env, target_dir,
+        dry_run=False,
+        freeze_time=DEFAULT_FREEZE_TIME,
+        merge_reports=merge_reports,
+    )
+    result = out.read_text(encoding="utf-8")
+    # User block preserved
+    assert "Use snake_case always." in result
+    # Default placeholder replaced
+    assert "Default placeholder." not in result
+    # Metadata header still present with new hash
+    assert result.startswith("<!-- harness-maker:")
+    assert "content_hash=" in result
+    # merge reported
+    assert Path("AGENTS.md") in merge_reports
+
+
+def test_render_agents_md_block_merge_fallback_on_missing_file(tmp_path: Path) -> None:
+    """When no existing AGENTS.md, merge_reports provided but no file → fresh render."""
+    from pathlib import Path
+
+    from jinja2 import Environment, FileSystemLoader, StrictUndefined
+
+    from harness_maker.models import FileEntry
+    from harness_maker.render import DEFAULT_FREEZE_TIME, _render_agents_md
+
+    (tmp_path / "agents.md.j2").write_text("# Fresh\n")
+    env = Environment(
+        loader=FileSystemLoader(str(tmp_path)),
+        undefined=StrictUndefined,
+        keep_trailing_newline=True,
+    )
+    target_dir = tmp_path / ".claude"
+    target_dir.mkdir()
+    merge_reports: dict = {}
+    fe = FileEntry(path=Path("AGENTS.md"), template="agents.md.j2", context={})
+    out = _render_agents_md(
+        fe, env, target_dir,
+        dry_run=False,
+        freeze_time=DEFAULT_FREEZE_TIME,
+        merge_reports=merge_reports,
+    )
+    assert out.read_text(encoding="utf-8").startswith("<!-- harness-maker:")
+    assert Path("AGENTS.md") not in merge_reports  # no merge; no existing file

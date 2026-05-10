@@ -141,3 +141,14 @@ def test_mcp_custom_threshold() -> None:
 
 def test_mcp_zero_servers_no_warning() -> None:
     assert lint_mcp_server_count(0) == []
+
+
+def test_agents_md_html_comment_excluded_from_count(tmp_path: Path) -> None:
+    """HTML-comment metadata line must not count toward AGENTS.md body line count."""
+    # 10 body lines + metadata comment — only body lines count
+    body = "\n".join(["line"] * 10) + "\n"
+    metadata = "<!-- harness-maker: content_hash=abc version=0.9.0 generated_at=2026-01-01 -->\n"
+    f = tmp_path / "AGENTS.md"
+    f.write_text(metadata + body, encoding="utf-8")
+    warnings = lint(f, "CLAUDE.md", Preset.SIDE)
+    assert warnings == []

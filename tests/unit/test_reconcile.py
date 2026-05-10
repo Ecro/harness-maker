@@ -368,6 +368,21 @@ def test_reconcile_user_frontmatter_no_hash_returns_keep(tmp_path: Path) -> None
     assert conflicts[0].reason == "frontmatter-no-hash-not-ours"
 
 
+def test_backup_includes_agents_skills_directory(tmp_path: Path) -> None:
+    """`.agents/skills/` Codex dual-render directory must be included in backup."""
+    claude_dir = tmp_path / ".claude"
+    claude_dir.mkdir()
+    (claude_dir / "f.txt").write_text("claude\n")
+    agents_dir = tmp_path / ".agents" / "skills" / "hm-research"
+    agents_dir.mkdir(parents=True)
+    (agents_dir / "SKILL.md").write_text("# research skill\n")
+
+    bdir = backup(claude_dir)
+
+    skill_path = bdir / ".agents" / "skills" / "hm-research" / "SKILL.md"
+    assert skill_path.read_text() == "# research skill\n"
+
+
 def test_reconcile_codex_toml_always_replaces(tmp_path: Path) -> None:
     """`.codex/*.toml` files have no YAML frontmatter (tomllib rejects preambles).
     Always REPLACE so template updates (model defaults, MCP fields) propagate.

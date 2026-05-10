@@ -299,6 +299,7 @@ def _render_agents_md(
     *,
     dry_run: bool,
     freeze_time: datetime | None,
+    merge_reports: dict[Path, MergeReport] | None = None,
 ) -> Path:
     """Render AGENTS.md as pure text with a leading HTML-comment metadata line.
 
@@ -306,10 +307,29 @@ def _render_agents_md(
     Provenance is stored in ``<!-- harness-maker: content_hash=... version=... -->``.
     Block-merge markers (``<!-- @hm:user:* -->``) work unchanged because Codex
     ignores HTML comments.
+
+    When ``merge_reports`` is provided the existing file's user blocks are
+    preserved into the freshly rendered template — same contract as the YAML
+    frontmatter path in ``_render_text_file``.
     """
     template = env.get_template(fe.template)
     rendered = template.render(**fe.context)
-    body_bytes = _normalize_body(rendered)
+    body_text = rendered
+
+    # Block-merge: splice OLD user blocks into fresh template body.
+    if merge_reports is not None:
+        out_path = resolve_output_path(target_dir, fe.path)
+        if out_path.exists():
+            try:
+                existing = out_path.read_text(encoding="utf-8")
+                old_body = _strip_agents_md_metadata(existing)
+                merged, report = block_merge(old_body, rendered)
+                body_text = merged
+                merge_reports[fe.path] = report
+            except Exception:  # noqa: BLE001 — fall back to plain replace
+                pass
+
+    body_bytes = _normalize_body(body_text)
     body_hash = hashlib.sha256(body_bytes).hexdigest()
     fe.body_sha256 = body_hash
     ts = freeze_time.isoformat() if freeze_time else datetime.now(UTC).isoformat()
@@ -516,6 +536,20 @@ def _split_existing_frontmatter(text: str) -> tuple[str, str]:
     return text[: end + 5], text[end + 5 :]
 
 
+def _strip_agents_md_metadata(text: str) -> str:
+    """Strip the leading ``<!-- harness-maker: ... -->\\n`` line from AGENTS.md.
+
+    AGENTS.md uses an HTML-comment first line instead of YAML frontmatter so
+    Codex doesn't display provenance fields as literal text. This function
+    removes that line so block_merge receives only the template body.
+    """
+    if text.startswith("<!-- harness-maker:"):
+        newline = text.find("\n")
+        if newline != -1:
+            return text[newline + 1 :]
+    return text
+
+
 def render(
     blueprint: Blueprint,
     target_dir: Path,
@@ -558,12 +592,18 @@ def render(
                 freeze_time=freeze_time,
             )
         elif _is_agents_md(fe):
+            agents_merge = (
+                merge_reports
+                if merge_reports is not None and fe.path in paths_to_merge
+                else None
+            )
             out = _render_agents_md(
                 fe,
                 env,
                 target_dir,
                 dry_run=dry_run,
                 freeze_time=freeze_time,
+                merge_reports=agents_merge,
             )
         elif _is_settings_json(fe):
             out = _render_json_file(

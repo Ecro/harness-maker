@@ -26,6 +26,20 @@ from harness_maker.secscan.hook_injection import _DANGER_PATTERNS
 
 _TRIGGER_TOOL = "Bash"
 
+# Only Bash commands are checked against danger patterns (ADR-006). Non-Bash
+# tool calls (write_file, apply_patch, …) are allowed because Codex's kernel
+# sandbox (Seatbelt on macOS, Landlock on Linux) enforces filesystem access
+# policy for those; the permission gate is a Bash-specific safety net only.
+# Future work: extend to apply_patch once Codex sandbox compatibility is
+# verified in tests/codex-compat/.
+_KNOWN_HOOK_EVENTS = frozenset({
+    "PreToolUse",
+    "PostToolUse",
+    "PreCompact",
+    "Stop",
+    "PermissionRequest",
+})
+
 
 @dataclass(frozen=True)
 class GateDecision:
@@ -95,6 +109,9 @@ def main() -> int:
     if not isinstance(payload, dict):
         return 0
     hook_event = str(payload.get("hook_event_name") or "")
+    if hook_event and hook_event not in _KNOWN_HOOK_EVENTS:
+        # Unknown event — new Codex version or spoofed field. Safe default: allow.
+        return 0
     tool_name = str(payload.get("tool_name") or "")
     raw_input = payload.get("tool_input")
     tool_input = raw_input if isinstance(raw_input, dict) else {}
