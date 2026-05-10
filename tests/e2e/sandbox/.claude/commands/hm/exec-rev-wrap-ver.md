@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.7.4
+harness_maker_version: 0.8.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: 07ac7db50bef907618d75a7e61d4dd380dde9fb01d07b9b9afaf91be8add5e59
+content_hash: 67c2cebe91ace28da7ebf7eb0dbc529f5370d38e1b135a9c4f29a0eb870edbc8
 ---
 # /hm:exec-rev-wrap-ver
 
@@ -74,7 +74,7 @@ Engage isolation if `harness.yaml.worktree.scope` includes `execute`. The `workt
 **Idempotent under `/hm:loop`**: when this stage runs as part of a loop iteration, the loop has already engaged a per-loop worktree at step 5. The `worktree create` CLI detects we're already inside `.worktrees/<name>/` and returns that path — no nested worktrees, just reuse.
 
 ```bash
-!uv run --with /home/noel/harness-maker/.worktrees/execute-20260510T0331Z python -m harness_maker.worktree create execute "$(pwd)"
+!uv run --with /home/noel/harness-maker python -m harness_maker.worktree create execute "$(pwd)"
 ```
 
 Read **all non-empty output lines** — that is the contract for the rest of this stage. Three cases:
@@ -202,12 +202,12 @@ Pick **exactly one** finalize command. Substitute `<WT>` with the literal absolu
 ```bash
 # All phases GREEN — stage-merge the branch back (NO commit) + cleanup the worktree.
 # /hm:wrapup will create the single user-facing commit (with proper message + Co-Authored-By).
-!uv run --with /home/noel/harness-maker/.worktrees/execute-20260510T0331Z python -m harness_maker.worktree finalize <WT> stage-only
+!uv run --with /home/noel/harness-maker python -m harness_maker.worktree finalize <WT> stage-only
 ```
 
 ```bash
 # Stage halted on a blocker — preserve the worktree for inspection:
-!uv run --with /home/noel/harness-maker/.worktrees/execute-20260510T0331Z python -m harness_maker.worktree finalize <WT> fail
+!uv run --with /home/noel/harness-maker python -m harness_maker.worktree finalize <WT> fail
 ```
 
 If Step 0 printed empty (no isolation engaged), skip both — there is nothing to finalize.

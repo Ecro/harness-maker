@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.7.4
+harness_maker_version: 0.8.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/configure.md.j2
 provenance: official
-content_hash: 21ad759fa8b436b57b8c4fd19fc2b6558a6bbd91c345c08500707ca6b5d6a64f
+content_hash: e625f44aa23ef1b69c12eb21999eb21a2c9c5f479b4407bc1b82180e9c986a30
 ---
 # /hm:configure
 
@@ -49,7 +49,7 @@ value and alternatives. Collect the new values.
 Run the CLI with only the changed flags:
 
 ```bash
-!uv run --with /home/noel/harness-maker/.worktrees/execute-20260510T0331Z python -m harness_maker.cli make "$(pwd)" \
+!uv run --with /home/noel/harness-maker python -m harness_maker.cli make "$(pwd)" \
   --grade-threshold "$GRADE" --domains "$DOMAINS" --mechanical-checks "$CHECKS" \
   --recommended-model "$MODEL" --focus "$FOCUS"
 ```

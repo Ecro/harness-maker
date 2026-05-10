@@ -23,8 +23,8 @@ provenance: official
 ---
 
 <!-- @hm:user:entries -->
-## [fail:test] snapshot-regen-inside-worktree | 2026-05-09 | count:1
-Running `tests/snapshot/regenerate.py` inside a git worktree embeds the worktree absolute path in all rendered template outputs (via `synthesize._HARNESS_MAKER_PKG_ROOT = Path(__file__).parent.parent.parent`). The resulting SHA-256 hashes diverge from hashes computed when tests run in the main repo. Fix: always run `regenerate.py` from the main repo root. The session that ran it inside `.worktrees/execute-0924Z/` required a second regeneration from the main branch to produce correct stable hashes.
+## [fail:test] snapshot-regen-inside-worktree | 2026-05-10 | count:2
+Running `tests/snapshot/regenerate.py` inside a git worktree embeds the worktree absolute path in all rendered template outputs (via `synthesize._HARNESS_MAKER_PKG_ROOT = Path(__file__).parent.parent.parent`). The resulting SHA-256 hashes diverge from hashes computed when tests run in the main repo. Fix: always run `regenerate.py` from the main repo root. This recurred again in the make-ux-gaps loop — the worktree squash-merge left snapshots with worktree-specific hashes, requiring a second regeneration from main.
 
 ## [fail:test] typer-cli-runner-mix-stderr | 2026-05-09 | count:1
 `CliRunner(mix_stderr=True)` raises `TypeError` — typer's `CliRunner.__init__()` does not accept `mix_stderr`. Only `unittest.mock`'s Click-based TestCase variant accepts that kwarg. Fix: remove `mix_stderr=True`; `result.output` in typer's CliRunner already captures both stdout and stderr by default.

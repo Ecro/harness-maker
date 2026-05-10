@@ -1,6 +1,6 @@
 [project]
 name = "harness-maker"
-version = "0.7.4"
+version = "0.8.0"
 description = "Project-tailored Claude Code harness generator. Grade-gated review + auto-fix, multi-reviewer consensus, edit-preserving block-merge upgrades, anti-rot crawlers, worktree isolation, version-drift detection, and a 3-layer ai-readiness rubric with ranked improvement actions."
 readme = "README.md"
 requires-python = ">=3.12"
