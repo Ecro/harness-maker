@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.8.0
+harness_maker_version: 0.8.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: 05c38f1f9b84eb86d300220dab0f73a648afbfce9ed469f4f608a687a57ca4ea
+content_hash: aea466f6f2e05bb884450fd19f04507979850df16e7f433f29fb5302ca43d3a1
 ---
 # /hm:exec-rev-wrap
 
@@ -674,7 +674,15 @@ When a failure entry's `count >= 3`, write a skill / agent / rule proposal to `.
 
 The user reviews proposals later and decides whether to ingest into the harness.
 
-#### 5.4 Session log
+#### 5.4 Managed documents
+
+
+No additional managed documents configured. To add documents that wrapup
+should update (e.g. CHANGELOG.md, TODO.md), run `/hm:configure` and select
+**Wrapup documents**.
+
+
+#### 5.5 Session log
 
 Append to `.claude/memory/session/<YYYY-MM-DD>.md` (today's date):
 

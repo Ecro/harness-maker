@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.8.0
+harness_maker_version: 0.8.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/atomic_command.md.j2
 provenance: official
-content_hash: 13f6d2a7e7402fb84e9fe101c4e0c4ed0e4a1fc44f065b9ea1845215592c9268
+content_hash: 408e884e948608e46ae9f798cf11b7198d4c2231f2f7f4351b291cc26d900ff6
 ---
 # Stage: spec
 
@@ -93,6 +93,71 @@ Skip a category when sufficiently answered by prior research, prior SPEC, or ear
 4. **Non-Goals** — explicit out-of-scope list. Prevents scope creep in `plan`.
 5. **Constraints** — HW, SW, security, performance, compatibility, **and test framework** (mandatory — pick `pytest` / `gtest` / `vitest` / `bats` / etc; `/hm:execute` Phase A uses this to write tests).
 6. **Verification Criteria** — per-scenario, how we'll prove it: unit / integration / manual. Each scenario MUST map to at least one verification mode.
+
+#### 2.5 — 3-Layer Deep Interview Gate
+
+Runs after all 6 categories are complete (or skipped), before closing the
+interview. This gate surfaces requirements the structured categories miss.
+
+**Skip if early exit**: If the user chose "SPEC is sufficiently clear — end interview"
+in any prior §2.1 round, skip §2.5 entirely and proceed to §2.2.
+
+**Layer 1 — GCIC Gap Check**
+
+Map the collected answers to 4 underspecification axes and score each
+(0.0 = absent · 0.5 = partial/vague · 1.0 = clear and actionable):
+
+- **Goals**: Intent + Outcomes clearly define the desired end-state?
+- **Constraints**: Constraints category covers all inviolable boundaries?
+- **Inputs**: Scenarios (Given clauses) + Constraints capture available resources?
+- **Context**: Constraints / Non-Goals capture team / tooling / reviewer environment?
+
+For any axis scoring below 0.7, apply the **CLARITI filter** before asking:
+1. Task Relevance: "Does knowing this axis change the task outcome?" (0–1)
+2. User Answerability: "Can the user realistically answer this now?" (0–1)
+→ Ask only if **both ≥ 0.7**. Otherwise log `"LLM-inferred"` and skip.
+
+**Layer 2 — Implicit Probing**
+
+Read all collected answers. Dynamically generate 1–3 reverse questions from
+the candidate types most relevant to this specific context (apply CLARITI filter
+to each candidate before selecting):
+
+Five candidate types (use short label to track across rounds):
+- **WRONG**: "What would make you say the result is **wrong**?" → implicit rejection criteria
+- **METHOD**: "What assumptions about **how** this will be built?" → implicit method constraints
+- **STAKEHOLDER**: "Who else reviews/uses this output and by what standard?" → implicit stakeholders
+- **STYLE**: "What **format or style** constraints apply?" → style (hardest type to elicit)
+- **PERF**: "What **performance or scale** expectations exist?" → implicit benchmarks
+
+**MUST NOT reuse a type label** from a prior gate round (track: WRONG/METHOD/STAKEHOLDER/STYLE/PERF used).
+Batch Layer 1 and Layer 2 questions into a single `AskUserQuestion` call (max 4).
+
+**Layer 3 — Ambiguity Score (display every round)**
+
+After receiving answers, compute and display:
+
+```
+Ambiguity Score: {X.X}/1.0  (Goal×40% + Constraint×30% + SC×30%)
+  Goals:             {g:.1f}/1.0  ✅ or ⚠️  (threshold 0.8)
+  Constraints:       {c:.1f}/1.0  ✅ or ⚠️
+  Success Criteria:  {sc:.1f}/1.0 ✅ or ⚠️
+  Weighted total:    {g*0.4 + c*0.3 + sc*0.3:.2f}
+  → PASS or NEEDS  (streak: {N}/2)
+```
+
+Inputs/Context gaps resolved in Layer 1 are absorbed into Goals/Constraints
+scores respectively. Score monotonicity rule: score must not decrease from the
+prior round given the same answer set; a drop ≥ 0.1 requires a one-line
+`[score-drop-reason]: ...` note appended to the Layer 3 display, then applied.
+
+**Convergence**: total ≥ 0.8 AND all dims ≥ 0.7, **2 consecutive rounds** → PASS.
+On **NEEDS**: return to Layer 1 (focus on failing axis), new Layer 2 probes (no
+repeats). Max **3 rounds** total. After 3 NEEDS, offer via `AskUserQuestion`:
+- A: "Proceed — accept current ambiguity and move to §2.2"
+- B: "Refine further — return to Layer 1 with new focus"
+
+---
 
 #### 2.2 Promotion rule
 

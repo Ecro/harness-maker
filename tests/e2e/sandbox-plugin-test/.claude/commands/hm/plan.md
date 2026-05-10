@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.7.4
+harness_maker_version: 0.8.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/atomic_command.md.j2
 provenance: official
-content_hash: 22579b376aff6b18b6857041c42f1b02f40a24ffe920a2de4e88b46f9f65a929
+content_hash: cbe3f3b8fe59ca71536015c3827976a74a4b66224d83ba2aeeb24cf53230eabe
 ---
 # Stage: plan
 
@@ -201,7 +201,62 @@ ADR template:
 
 #### Step E — Exit check
 
-Continue to next round UNLESS:
+**Skip gate if early exit**: If the user chose "Plan is sufficiently clear — end interview"
+in Step B this round, skip the gate below and exit the interview immediately.
+
+Otherwise, before declaring the interview complete, run the **3-Layer Deep Interview Gate**:
+
+**Layer 1 — GCIC Gap Check**
+
+Map all collected answers to 4 underspecification axes
+(0.0 = absent · 0.5 = partial · 1.0 = clear):
+
+- **Goals**: Purpose and desired end-state are clearly defined?
+- **Constraints**: Inviolable boundaries (ADRs, scope) are clearly defined?
+- **Inputs**: Available resources and starting state are clearly defined?
+- **Context**: Team / tooling / timeline / reviewer environment is clearly defined?
+
+For any axis < 0.7, apply the **CLARITI filter** before generating a question:
+1. Task Relevance: "Does this axis change implementation decisions?" (0–1)
+2. User Answerability: "Can the user answer this realistically now?" (0–1)
+→ Ask only if both ≥ 0.7. Otherwise log `"LLM-inferred"`.
+
+**Layer 2 — Implicit Probing**
+
+Five candidate types (use short label to track across rounds):
+- **WRONG**: "What would make you say the result is **wrong**?" → implicit rejection criteria
+- **METHOD**: "What assumptions about **how** this will be built?" → implicit method constraints
+- **STAKEHOLDER**: "Who else reviews/uses this and by what standard?" → implicit stakeholders
+- **STYLE**: "What **format or style** constraints apply?" → style requirements
+- **PERF**: "What **performance or scale** expectations?" → implicit benchmarks
+
+**MUST NOT reuse a type label** from a prior gate round (track: WRONG/METHOD/STAKEHOLDER/STYLE/PERF used).
+Batch with any Layer 1 questions into one `AskUserQuestion` call (max 4).
+
+**Layer 3 — Ambiguity Score (display every round)**
+
+```
+Ambiguity Score: {X.X}/1.0  (Goal×40% + Constraint×30% + SC×30%)
+  Goals:             {g:.1f}/1.0  ✅ or ⚠️  (threshold 0.8)
+  Constraints:       {c:.1f}/1.0  ✅ or ⚠️
+  Success Criteria:  {sc:.1f}/1.0 ✅ or ⚠️
+  Weighted total:    {g*0.4 + c*0.3 + sc*0.3:.2f}
+  → PASS or NEEDS  (streak: {N}/2)
+```
+
+Inputs/Context absorbed into Goals/Constraints scores. Score monotonicity rule:
+score must not decrease from the prior round given the same answers; a drop ≥ 0.1
+requires a one-line `[score-drop-reason]: ...` note appended to the Layer 3
+display block, then applied.
+
+**Gate convergence**: total ≥ 0.8 AND all dims ≥ 0.7, **2 consecutive rounds**
+→ PASS → exit check proceeds to the standard exit conditions below.
+On **NEEDS**: generate new Layer 1/2 questions (no repeats). Max **3 rounds**.
+After 3 NEEDS, offer: "Proceed with current answers (some ambiguity accepted)?"
+
+---
+
+After the gate PASSes (or user accepts ambiguity), continue to next round UNLESS:
 - User chose "Plan is sufficiently clear — end interview", OR
 - Zero high/medium-impact ambiguities remain in the internal draft.
 

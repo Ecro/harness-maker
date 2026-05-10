@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.7.4
+harness_maker_version: 0.8.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/loop.md.j2
 provenance: official
-content_hash: 767ce3348d9457ee42633191669b9a8593a03774cb7c5e4fcb0c1bc3e5f03fa5
+content_hash: 6a6ed14266cba4e94a84d4a17fca5c1f8fe05b8b5723db25d1259b2e12e97069
 ---
 # /hm:loop
 
@@ -270,6 +270,68 @@ the convergence predicate obvious:
   `min-N-features`, `stopping-criteria`).
 - `improve` mode: always `stopping-criteria` (LLM evaluates each iteration).
 
+#### 4-H. 3-Layer Deep Interview Gate
+
+Runs after steps 4-B through 4-E complete, before persisting context (4-F).
+This gate surfaces implicit requirements missed by the 5-dimension interview.
+
+**Layer 1 — GCIC Gap Check**
+
+Map the 5 collected dimensions to 4 underspecification axes
+(0.0 = absent · 0.5 = partial · 1.0 = clear):
+
+- **Goals**: `purpose` + `stopping_criteria` clearly define the desired end-state?
+- **Constraints**: `invariants` covers all inviolable boundaries?
+- **Inputs**: `test_reliability` captures available tooling and starting state?
+- **Context**: `priority` + `immediate_task` capture team/environment adequately?
+
+Dimensions already scored 1.0 from the 5-dimension interview are skipped.
+For any axis < 0.7, apply the **CLARITI filter** before asking:
+1. Task Relevance: "Does knowing this axis change loop execution decisions?" (0–1)
+2. User Answerability: "Can the user answer this now?" (0–1)
+→ Ask only if **both ≥ 0.7**. Otherwise log `"LLM-inferred"`.
+
+**Layer 2 — Implicit Probing**
+
+Read all collected context. Dynamically generate 1–3 reverse questions from
+the most contextually relevant candidate types (apply CLARITI filter to each):
+
+Five candidate types (use short label to track across rounds):
+- **WRONG**: "What would make you say the result is **wrong**?" → implicit rejection criteria
+- **METHOD**: "What assumptions about **how** this will be done?" → implicit method constraints
+- **STAKEHOLDER**: "Who else reviews/uses this output and by what standard?" → implicit stakeholders
+- **STYLE**: "What **format or style** constraints apply?" → style (hardest to elicit)
+- **PERF**: "What **performance or scale** expectations exist?" → implicit benchmarks
+
+**MUST NOT reuse a type label** from a previous round (track: WRONG/METHOD/STAKEHOLDER/STYLE/PERF used).
+Batch Layer 1 and Layer 2 questions into one `AskUserQuestion` call (max 4).
+
+**Layer 3 — Ambiguity Score (display and gate)**
+
+After receiving answers, compute and display:
+
+```
+Ambiguity Score: {X.X}/1.0  (Goal×40% + Constraint×30% + SC×30%)
+  Goals:             {g:.1f}/1.0  ✅ or ⚠️  (threshold 0.8)
+  Constraints:       {c:.1f}/1.0  ✅ or ⚠️
+  Success Criteria:  {sc:.1f}/1.0 ✅ or ⚠️
+  Weighted total:    {g*0.4 + c*0.3 + sc*0.3:.2f}
+  → PASS or NEEDS  (streak: {N}/2)
+```
+
+Inputs/Context gaps resolved in Layer 1 are absorbed into Goals/Constraints scores
+respectively. Score monotonicity rule: score must not decrease round-over-round given
+the same answers; a drop ≥ 0.1 requires a one-line `[score-drop-reason]: ...` note
+appended to the Layer 3 display block, then applied.
+
+**Convergence**: total ≥ 0.8 AND all dims ≥ 0.7, **2 consecutive rounds** → PASS
+→ proceed to step 4-F (Persist context).
+
+On **NEEDS**: return to Layer 1 (focus on failing axis); generate new Layer 2
+probes (no repeats). Max **3 rounds**. After 3 NEEDS, offer via `AskUserQuestion`:
+- A: "Proceed — accept current ambiguity and start loop"
+- B: "Refine further — return to Layer 1 with new focus"
+
 #### 4-F. Persist context
 
 Save to `work-docs/loop-context/<slug>.yaml` using the slug derived in
@@ -338,7 +400,7 @@ feature mode both default to one squash-merge at convergence. Per-iter
 worktree would explode commit count.
 
 ```bash
-!uv run --with /home/noel/harness-maker/.worktrees/execute-20260510T0331Z python -m harness_maker.worktree create execute "$(pwd)"
+!uv run --with /home/noel/harness-maker python -m harness_maker.worktree create execute "$(pwd)"
 ```
 
 Read **all non-empty output lines** the command prints. Three cases:
@@ -603,7 +665,7 @@ When the loop halts (convergence, safety rail, or hard error):
 5. **Finalize worktree** (only if engaged in step 5):
 
    ```bash
-   !uv run --with /home/noel/harness-maker/.worktrees/execute-20260510T0331Z python -m harness_maker.worktree finalize <WT> <STATUS>
+   !uv run --with /home/noel/harness-maker python -m harness_maker.worktree finalize <WT> <STATUS>
    ```
 
    On `success`: `worktree.merge` does a squash-merge into the loop's

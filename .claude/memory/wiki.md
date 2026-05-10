@@ -1,6 +1,6 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.7.4
+harness_maker_version: 0.8.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: memory/wiki.en.md.j2
 provenance: official
@@ -54,5 +54,8 @@ The `.hm-loop-active` marker file (placed at git root by `loop.md.j2` step 5, re
 
 ## [wiki:convention] version-bump-4-files | 2026-05-10
 Version bumps must touch 4 files simultaneously: `pyproject.toml`, `src/harness_maker/__init__.py`, `.claude-plugin/plugin.json`, `.cursor-plugin/plugin.json`. Missing any one causes `/plugin update` or Cursor Marketplace to report "already at latest" incorrectly. After bumping, re-render sandboxes and regenerate snapshot baselines since rendered templates embed `harness_maker_version`.
+
+## [wiki:pattern] deep-interview-gate | 2026-05-10
+The 3-Layer Deep Interview Gate is a post-interview quality gate added to spec/plan/research/loop stages. Layer 1 — GCIC Gap Check: map prior answers to 4 axes (Goals / Constraints / Inputs / Context, 0.0/0.5/1.0), apply CLARITI filter (Task Relevance AND User Answerability ≥ 0.7) to uncovered axes below 0.7, log others as "LLM-inferred". Layer 2 — Implicit Probing: 5 stable labeled candidate types (spec/plan/loop: WRONG/METHOD/STAKEHOLDER/STYLE/PERF; research: NOT-USEFUL/AVOID/DEPTH/AUDIENCE/TIME-SCOPE), MUST NOT reuse a type label from prior rounds, batch ≤4 into one `AskUserQuestion`. Layer 3 — Ambiguity Score: `G×40% + C×30% + SC×30%` (research uses OC not SC), 2 consecutive PASS rounds → converge, max 3 NEEDS rounds. Score monotonicity rule: drop ≥ 0.1 requires `[score-drop-reason]: ...` note appended to the display block before applying the drop. Skip guards: gate fires only when the user has NOT already signaled "clear/skip" in the preceding round. Escape hatch at 3 NEEDS: named options (A: proceed / B: refine) rather than prose question.
 
 <!-- @hm:/user:entries -->

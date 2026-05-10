@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.7.4
+harness_maker_version: 0.8.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/atomic_command.md.j2
 provenance: official
-content_hash: b885c00f707b22051a41c5fc01cac1c32691e1736dd7a105f29d108db4a6b517
+content_hash: 54f4eb3dacb3cb6a1e0aae6bb778d08aa09bcdb6cdf4bc7efee90ca2cb14033e
 ---
 # Stage: wrapup
 
@@ -127,7 +127,15 @@ When a failure entry's `count >= 3`, write a skill / agent / rule proposal to `.
 
 The user reviews proposals later and decides whether to ingest into the harness.
 
-#### 5.4 Session log
+#### 5.4 Managed documents
+
+
+No additional managed documents configured. To add documents that wrapup
+should update (e.g. CHANGELOG.md, TODO.md), run `/hm:configure` and select
+**Wrapup documents**.
+
+
+#### 5.5 Session log
 
 Append to `.claude/memory/session/<YYYY-MM-DD>.md` (today's date):
 

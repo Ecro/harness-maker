@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.7.4
+harness_maker_version: 0.8.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/uninstall.md.j2
 provenance: official
-content_hash: 9ed8454bd4537743f9f7a211fef63df3af1b0b967c7de1e6a61b288255b77110
+content_hash: 3b8224b8ec32150fe271a0d39cdcf24273b9cae58072ccbb97536286988f50d7
 ---
 # /hm:uninstall
 
@@ -35,7 +35,7 @@ If **Cancel**, stop.
 ### 2. Preview (dry-run)
 
 ```bash
-!uv run --with /home/noel/harness-maker/.worktrees/execute-20260510T0331Z python -m harness_maker.cli remove "$(pwd)" --dry-run
+!uv run --with /home/noel/harness-maker python -m harness_maker.cli remove "$(pwd)" --dry-run
 ```
 
 Show the user the file list.
@@ -46,10 +46,10 @@ Based on option selected:
 
 ```bash
 # Keep harness.yaml
-!uv run --with /home/noel/harness-maker/.worktrees/execute-20260510T0331Z python -m harness_maker.cli remove "$(pwd)"
+!uv run --with /home/noel/harness-maker python -m harness_maker.cli remove "$(pwd)"
 
 # Remove everything
-!uv run --with /home/noel/harness-maker/.worktrees/execute-20260510T0331Z python -m harness_maker.cli remove "$(pwd)" --remove-yaml
+!uv run --with /home/noel/harness-maker python -m harness_maker.cli remove "$(pwd)" --remove-yaml
 ```
 
 ### 4. Post-removal

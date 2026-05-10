@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.8.0
+harness_maker_version: 0.8.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: harness-yaml/Side.yaml.j2
 provenance: official
-content_hash: 6c8c8016f44a6b7fc1296b7a6eb6ff1e556e6529db9af9a62df5c1a5edca5d16
+content_hash: ace3160453472c520f33fd8633eb478df6ab0765b0bf3071e0e9b2bfdd3ba277
 ---
 preset: Side
 locale: en
@@ -22,6 +22,8 @@ work_docs:
 ref_folders:
 
 sibling_repos:
+
+wrapup_docs:
 
 workflows:
 

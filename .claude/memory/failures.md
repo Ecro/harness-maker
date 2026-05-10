@@ -1,6 +1,6 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.7.4
+harness_maker_version: 0.8.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: memory/failures.en.md.j2
 provenance: official
@@ -23,8 +23,8 @@ provenance: official
 ---
 
 <!-- @hm:user:entries -->
-## [fail:test] snapshot-regen-inside-worktree | 2026-05-10 | count:2
-Running `tests/snapshot/regenerate.py` inside a git worktree embeds the worktree absolute path in all rendered template outputs (via `synthesize._HARNESS_MAKER_PKG_ROOT = Path(__file__).parent.parent.parent`). The resulting SHA-256 hashes diverge from hashes computed when tests run in the main repo. Fix: always run `regenerate.py` from the main repo root. This recurred again in the make-ux-gaps loop — the worktree squash-merge left snapshots with worktree-specific hashes, requiring a second regeneration from main.
+## [fail:test] snapshot-regen-inside-worktree | 2026-05-10 | count:3
+Running `tests/snapshot/regenerate.py` inside a git worktree embeds the worktree absolute path in all rendered template outputs (via `synthesize._HARNESS_MAKER_PKG_ROOT = Path(__file__).parent.parent.parent`). The resulting SHA-256 hashes diverge from hashes computed when tests run in the main repo. Fix: always run `regenerate.py` from the main repo root. This recurred again in the make-ux-gaps loop — the worktree squash-merge left snapshots with worktree-specific hashes. Recurred a third time in deep-interview-llm-delegation: regen ran from main repo BEFORE worktree finalize, so old template sha256s were generated; worktree must be finalized (stage-only) first so new templates are present in main before running regen. Correct sequence: (1) run unit tests from worktree, (2) finalize stage-only, (3) regen from main repo root, (4) full pytest from main.
 
 ## [fail:test] typer-cli-runner-mix-stderr | 2026-05-09 | count:1
 `CliRunner(mix_stderr=True)` raises `TypeError` — typer's `CliRunner.__init__()` does not accept `mix_stderr`. Only `unittest.mock`'s Click-based TestCase variant accepts that kwarg. Fix: remove `mix_stderr=True`; `result.output` in typer's CliRunner already captures both stdout and stderr by default.
@@ -40,5 +40,8 @@ Running `tests/snapshot/regenerate.py` inside a git worktree embeds the worktree
 
 ## [fail:test] class-methods-orphaned-by-partial-edit | 2026-05-10 | count:1
 `TestCheckErrorCap` had 8 methods. The `Edit` tool's `old_string` captured only the first 3 methods (through `test_syntax_over_cap`), leaving the remaining 5 (`test_logical_under_cap`, `test_logical_at_cap`, `test_unknown_under_cap`, `test_unknown_at_cap`, `test_empty_counts_safe`) as un-indented dead defs. After the worktree merge, those 5 methods orphaned as nested function definitions inside the next test function (`test_s8_loop_context_backward_compat`). They compiled fine but were unreachable by pytest. Fix: always read the full class body before writing `old_string`; when editing a class, the `old_string` must include the full class through its last method (or use a marker at the class close). Grep for all `def test_` under a class before committing to the `old_string`.
+
+## [fail:review] abbreviated-diff-causes-reviewer-false-positives | 2026-05-10 | count:1
+When the review prompt for a large diff abbreviates template content with inline placeholders like `[...same 4-axis check, plan-specific dimension labels...]` or `[... Full gate text: 53 lines ...]`, reviewers interpret those placeholders as literal file content (stub/placeholder text in the template). In this case, code-reviewer raised P1 findings against plan.md.j2 for "Layer 1 placeholder stub" and "Full gate text stub" — both false positives. Fix: verify against actual file content with grep before applying single-source findings; drop false positives in the consensus step. Prevention: never abbreviate template body content in the diff context passed to reviewers; if the diff is too large, pass the full file via Read instead of an inline summary.
 
 <!-- @hm:/user:entries -->

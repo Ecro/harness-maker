@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.8.0
+harness_maker_version: 0.8.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: stages/research.md.j2
 provenance: official
-content_hash: 92fcefeb3e219a9d4e2a86efdb40b8aac7c4285bb43fa596bce7b5f2037edec2
+content_hash: 284511ed15a63b37c2f17fd0309f24517f0becfefd23ebe2fb28d6fc9322aacd
 ---
 # Stage: research
 
@@ -74,6 +74,63 @@ When `--deep` is set, conduct one `AskUserQuestion` call in `en` with 3-5 questi
 5. **Prior-art** — "Have you tried an approach that didn't work, so we can avoid it?"
 
 Always include "Skip — proceed with topic as given" as an option. Record interview outcomes under `## Refinement Decisions` in the output document.
+
+### Phase 0.5 — 3-Layer Deep Interview Gate (only when `--deep` is set)
+
+Runs immediately after Phase 0's rubric questions, before Phase 1 gathering.
+Bridges from the rubric's broad-scope answers to research-ready precision.
+
+**Skip if user chose Skip**: If the user chose "Skip — proceed with topic as given"
+in Phase 0, skip Phase 0.5 entirely and proceed directly to Phase 1.
+
+**Layer 1 — GCIC Gap Check**
+
+Map Phase 0 answers to 4 research-scoping axes
+(0.0 = absent · 0.5 = partial · 1.0 = clear):
+
+- **Goals**: Research objective — what decision or output does this research inform?
+- **Constraints**: Binding constraints on the recommended approach (budget, compat, risk tolerance)?
+- **Inputs**: Prior knowledge, rejected approaches, existing code to build on?
+- **Context**: Team skill level, timeline, and who evaluates the research output?
+
+Note: axes already clearly answered by Phase 0 rubric questions are scored 1.0 and
+skipped — do NOT re-ask. Only probe uncovered axes.
+
+For any axis < 0.7 that wasn't covered by the rubric, apply the **CLARITI filter**:
+1. Task Relevance: "Does knowing this axis change which sources to search?" (0–1)
+2. User Answerability: "Can the user answer this now?" (0–1)
+→ Ask only if both ≥ 0.7. Otherwise log `"LLM-inferred"`.
+
+**Layer 2 — Implicit Probing**
+
+Five candidate types (use short label to track; also exclude types semantically covered by Phase 0 rubric questions):
+- **NOT-USEFUL**: "What would make this research **not useful** to you?" → implicit failure criteria
+- **AVOID**: "What direction are you hoping I **won't** recommend?" → implicit bias/constraints
+- **DEPTH**: "What **depth** is needed — proof of concept vs production-grade?" → scope expectations
+- **AUDIENCE**: "Who else will read this research output?" → implicit audience / quality bar
+- **TIME-SCOPE**: "What **time or depth** constraints apply — quick scan vs exhaustive survey?" → scope bounds
+
+**MUST NOT reuse a type label** from Phase 0 rubric or a prior gate round (track: NOT-USEFUL/AVOID/DEPTH/AUDIENCE/TIME-SCOPE used).
+Batch into one `AskUserQuestion` call (max 4).
+
+**Layer 3 — Ambiguity Score (display)**
+
+```
+Research Scope Score: {X.X}/1.0  (Goal×40% + Constraint×30% + OC×30%)
+  Goals (research objective):  {g:.1f}/1.0  ✅ or ⚠️
+  Constraints (approach):      {c:.1f}/1.0  ✅ or ⚠️
+  Output Criteria (usefulness):{oc:.1f}/1.0 ✅ or ⚠️
+  Weighted total: {g*0.4 + c*0.3 + oc*0.3:.2f}
+  → PASS or NEEDS  (streak: {N}/2)
+```
+
+Score monotonicity rule: score must not decrease round-over-round for the same answers;
+a drop ≥ 0.1 requires a one-line `[score-drop-reason]: ...` note appended to the
+Layer 3 display block, then applied.
+
+**Convergence**: total ≥ 0.8 AND all dims ≥ 0.7, **2 consecutive rounds** → PASS.
+On **NEEDS**: new probes only (no repeats). Max **3 rounds**. After 3 NEEDS,
+offer "Proceed with current scope?" and continue to Phase 1 regardless.
 
 ### Phase 1 — Multi-source gathering
 

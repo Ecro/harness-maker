@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.8.0
+harness_maker_version: 0.8.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: 753963cc9fe113f6c63cff52f312d1d07a5aa76a0523f6302284c55b3e7423b1
+content_hash: 5d6930c73c933d973cdbda3b472864d89258479e35eee88f7052bc98c55bf652
 ---
 # /hm:res-spec-plan
 
@@ -81,6 +81,63 @@ When `--deep` is set, conduct one `AskUserQuestion` call in `en` with 3-5 questi
 5. **Prior-art** — "Have you tried an approach that didn't work, so we can avoid it?"
 
 Always include "Skip — proceed with topic as given" as an option. Record interview outcomes under `## Refinement Decisions` in the output document.
+
+### Phase 0.5 — 3-Layer Deep Interview Gate (only when `--deep` is set)
+
+Runs immediately after Phase 0's rubric questions, before Phase 1 gathering.
+Bridges from the rubric's broad-scope answers to research-ready precision.
+
+**Skip if user chose Skip**: If the user chose "Skip — proceed with topic as given"
+in Phase 0, skip Phase 0.5 entirely and proceed directly to Phase 1.
+
+**Layer 1 — GCIC Gap Check**
+
+Map Phase 0 answers to 4 research-scoping axes
+(0.0 = absent · 0.5 = partial · 1.0 = clear):
+
+- **Goals**: Research objective — what decision or output does this research inform?
+- **Constraints**: Binding constraints on the recommended approach (budget, compat, risk tolerance)?
+- **Inputs**: Prior knowledge, rejected approaches, existing code to build on?
+- **Context**: Team skill level, timeline, and who evaluates the research output?
+
+Note: axes already clearly answered by Phase 0 rubric questions are scored 1.0 and
+skipped — do NOT re-ask. Only probe uncovered axes.
+
+For any axis < 0.7 that wasn't covered by the rubric, apply the **CLARITI filter**:
+1. Task Relevance: "Does knowing this axis change which sources to search?" (0–1)
+2. User Answerability: "Can the user answer this now?" (0–1)
+→ Ask only if both ≥ 0.7. Otherwise log `"LLM-inferred"`.
+
+**Layer 2 — Implicit Probing**
+
+Five candidate types (use short label to track; also exclude types semantically covered by Phase 0 rubric questions):
+- **NOT-USEFUL**: "What would make this research **not useful** to you?" → implicit failure criteria
+- **AVOID**: "What direction are you hoping I **won't** recommend?" → implicit bias/constraints
+- **DEPTH**: "What **depth** is needed — proof of concept vs production-grade?" → scope expectations
+- **AUDIENCE**: "Who else will read this research output?" → implicit audience / quality bar
+- **TIME-SCOPE**: "What **time or depth** constraints apply — quick scan vs exhaustive survey?" → scope bounds
+
+**MUST NOT reuse a type label** from Phase 0 rubric or a prior gate round (track: NOT-USEFUL/AVOID/DEPTH/AUDIENCE/TIME-SCOPE used).
+Batch into one `AskUserQuestion` call (max 4).
+
+**Layer 3 — Ambiguity Score (display)**
+
+```
+Research Scope Score: {X.X}/1.0  (Goal×40% + Constraint×30% + OC×30%)
+  Goals (research objective):  {g:.1f}/1.0  ✅ or ⚠️
+  Constraints (approach):      {c:.1f}/1.0  ✅ or ⚠️
+  Output Criteria (usefulness):{oc:.1f}/1.0 ✅ or ⚠️
+  Weighted total: {g*0.4 + c*0.3 + oc*0.3:.2f}
+  → PASS or NEEDS  (streak: {N}/2)
+```
+
+Score monotonicity rule: score must not decrease round-over-round for the same answers;
+a drop ≥ 0.1 requires a one-line `[score-drop-reason]: ...` note appended to the
+Layer 3 display block, then applied.
+
+**Convergence**: total ≥ 0.8 AND all dims ≥ 0.7, **2 consecutive rounds** → PASS.
+On **NEEDS**: new probes only (no repeats). Max **3 rounds**. After 3 NEEDS,
+offer "Proceed with current scope?" and continue to Phase 1 regardless.
 
 ### Phase 1 — Multi-source gathering
 
@@ -282,6 +339,71 @@ Skip a category when sufficiently answered by prior research, prior SPEC, or ear
 4. **Non-Goals** — explicit out-of-scope list. Prevents scope creep in `plan`.
 5. **Constraints** — HW, SW, security, performance, compatibility, **and test framework** (mandatory — pick `pytest` / `gtest` / `vitest` / `bats` / etc; `/hm:execute` Phase A uses this to write tests).
 6. **Verification Criteria** — per-scenario, how we'll prove it: unit / integration / manual. Each scenario MUST map to at least one verification mode.
+
+#### 2.5 — 3-Layer Deep Interview Gate
+
+Runs after all 6 categories are complete (or skipped), before closing the
+interview. This gate surfaces requirements the structured categories miss.
+
+**Skip if early exit**: If the user chose "SPEC is sufficiently clear — end interview"
+in any prior §2.1 round, skip §2.5 entirely and proceed to §2.2.
+
+**Layer 1 — GCIC Gap Check**
+
+Map the collected answers to 4 underspecification axes and score each
+(0.0 = absent · 0.5 = partial/vague · 1.0 = clear and actionable):
+
+- **Goals**: Intent + Outcomes clearly define the desired end-state?
+- **Constraints**: Constraints category covers all inviolable boundaries?
+- **Inputs**: Scenarios (Given clauses) + Constraints capture available resources?
+- **Context**: Constraints / Non-Goals capture team / tooling / reviewer environment?
+
+For any axis scoring below 0.7, apply the **CLARITI filter** before asking:
+1. Task Relevance: "Does knowing this axis change the task outcome?" (0–1)
+2. User Answerability: "Can the user realistically answer this now?" (0–1)
+→ Ask only if **both ≥ 0.7**. Otherwise log `"LLM-inferred"` and skip.
+
+**Layer 2 — Implicit Probing**
+
+Read all collected answers. Dynamically generate 1–3 reverse questions from
+the candidate types most relevant to this specific context (apply CLARITI filter
+to each candidate before selecting):
+
+Five candidate types (use short label to track across rounds):
+- **WRONG**: "What would make you say the result is **wrong**?" → implicit rejection criteria
+- **METHOD**: "What assumptions about **how** this will be built?" → implicit method constraints
+- **STAKEHOLDER**: "Who else reviews/uses this output and by what standard?" → implicit stakeholders
+- **STYLE**: "What **format or style** constraints apply?" → style (hardest type to elicit)
+- **PERF**: "What **performance or scale** expectations exist?" → implicit benchmarks
+
+**MUST NOT reuse a type label** from a prior gate round (track: WRONG/METHOD/STAKEHOLDER/STYLE/PERF used).
+Batch Layer 1 and Layer 2 questions into a single `AskUserQuestion` call (max 4).
+
+**Layer 3 — Ambiguity Score (display every round)**
+
+After receiving answers, compute and display:
+
+```
+Ambiguity Score: {X.X}/1.0  (Goal×40% + Constraint×30% + SC×30%)
+  Goals:             {g:.1f}/1.0  ✅ or ⚠️  (threshold 0.8)
+  Constraints:       {c:.1f}/1.0  ✅ or ⚠️
+  Success Criteria:  {sc:.1f}/1.0 ✅ or ⚠️
+  Weighted total:    {g*0.4 + c*0.3 + sc*0.3:.2f}
+  → PASS or NEEDS  (streak: {N}/2)
+```
+
+Inputs/Context gaps resolved in Layer 1 are absorbed into Goals/Constraints
+scores respectively. Score monotonicity rule: score must not decrease from the
+prior round given the same answer set; a drop ≥ 0.1 requires a one-line
+`[score-drop-reason]: ...` note appended to the Layer 3 display, then applied.
+
+**Convergence**: total ≥ 0.8 AND all dims ≥ 0.7, **2 consecutive rounds** → PASS.
+On **NEEDS**: return to Layer 1 (focus on failing axis), new Layer 2 probes (no
+repeats). Max **3 rounds** total. After 3 NEEDS, offer via `AskUserQuestion`:
+- A: "Proceed — accept current ambiguity and move to §2.2"
+- B: "Refine further — return to Layer 1 with new focus"
+
+---
 
 #### 2.2 Promotion rule
 
@@ -614,7 +736,62 @@ ADR template:
 
 #### Step E — Exit check
 
-Continue to next round UNLESS:
+**Skip gate if early exit**: If the user chose "Plan is sufficiently clear — end interview"
+in Step B this round, skip the gate below and exit the interview immediately.
+
+Otherwise, before declaring the interview complete, run the **3-Layer Deep Interview Gate**:
+
+**Layer 1 — GCIC Gap Check**
+
+Map all collected answers to 4 underspecification axes
+(0.0 = absent · 0.5 = partial · 1.0 = clear):
+
+- **Goals**: Purpose and desired end-state are clearly defined?
+- **Constraints**: Inviolable boundaries (ADRs, scope) are clearly defined?
+- **Inputs**: Available resources and starting state are clearly defined?
+- **Context**: Team / tooling / timeline / reviewer environment is clearly defined?
+
+For any axis < 0.7, apply the **CLARITI filter** before generating a question:
+1. Task Relevance: "Does this axis change implementation decisions?" (0–1)
+2. User Answerability: "Can the user answer this realistically now?" (0–1)
+→ Ask only if both ≥ 0.7. Otherwise log `"LLM-inferred"`.
+
+**Layer 2 — Implicit Probing**
+
+Five candidate types (use short label to track across rounds):
+- **WRONG**: "What would make you say the result is **wrong**?" → implicit rejection criteria
+- **METHOD**: "What assumptions about **how** this will be built?" → implicit method constraints
+- **STAKEHOLDER**: "Who else reviews/uses this and by what standard?" → implicit stakeholders
+- **STYLE**: "What **format or style** constraints apply?" → style requirements
+- **PERF**: "What **performance or scale** expectations?" → implicit benchmarks
+
+**MUST NOT reuse a type label** from a prior gate round (track: WRONG/METHOD/STAKEHOLDER/STYLE/PERF used).
+Batch with any Layer 1 questions into one `AskUserQuestion` call (max 4).
+
+**Layer 3 — Ambiguity Score (display every round)**
+
+```
+Ambiguity Score: {X.X}/1.0  (Goal×40% + Constraint×30% + SC×30%)
+  Goals:             {g:.1f}/1.0  ✅ or ⚠️  (threshold 0.8)
+  Constraints:       {c:.1f}/1.0  ✅ or ⚠️
+  Success Criteria:  {sc:.1f}/1.0 ✅ or ⚠️
+  Weighted total:    {g*0.4 + c*0.3 + sc*0.3:.2f}
+  → PASS or NEEDS  (streak: {N}/2)
+```
+
+Inputs/Context absorbed into Goals/Constraints scores. Score monotonicity rule:
+score must not decrease from the prior round given the same answers; a drop ≥ 0.1
+requires a one-line `[score-drop-reason]: ...` note appended to the Layer 3
+display block, then applied.
+
+**Gate convergence**: total ≥ 0.8 AND all dims ≥ 0.7, **2 consecutive rounds**
+→ PASS → exit check proceeds to the standard exit conditions below.
+On **NEEDS**: generate new Layer 1/2 questions (no repeats). Max **3 rounds**.
+After 3 NEEDS, offer: "Proceed with current answers (some ambiguity accepted)?"
+
+---
+
+After the gate PASSes (or user accepts ambiguity), continue to next round UNLESS:
 - User chose "Plan is sufficiently clear — end interview", OR
 - Zero high/medium-impact ambiguities remain in the internal draft.
 

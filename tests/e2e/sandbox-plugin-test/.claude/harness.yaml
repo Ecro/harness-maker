@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.7.4
+harness_maker_version: 0.8.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: harness-yaml/Production.yaml.j2
 provenance: official
-content_hash: 5f0a7e5c42f927ad6c38e8888197522a43b0377ad0235c04b4bebafa3a330f9d
+content_hash: a8218fe11ba6be63f51c02ee20807f32da4791e0ec6e98057799cea1718b919a
 ---
 preset: Production
 locale: en
@@ -22,6 +22,8 @@ work_docs:
 ref_folders:
 
 sibling_repos:
+
+wrapup_docs:
 
 workflows:
 

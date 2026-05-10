@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.8.0
+harness_maker_version: 0.8.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/configure.md.j2
 provenance: official
-content_hash: e625f44aa23ef1b69c12eb21999eb21a2c9c5f479b4407bc1b82180e9c986a30
+content_hash: 4b41df509190a5c0fcc5cd5bfd0e5b8d96674678cee3fbff7a803da5c198da9f
 ---
 # /hm:configure
 
@@ -24,6 +24,7 @@ Read `.claude/harness.yaml` body (skip frontmatter) and surface:
 - mechanical_checks (if any)
 - domains (if any)
 - recommended_model
+- wrapup_docs (if any)
 
 ### 2. Ask what to change
 
@@ -38,6 +39,7 @@ Options (multi-select):
 - **Domains** — add/remove domain packs
 - **Mechanical checks** — add/edit/clear pre-review commands
 - **Recommended model** — opus / sonnet / haiku
+- **Wrapup documents** — add/edit/clear docs updated during /hm:wrapup (e.g. CHANGELOG.md, TODO.md)
 
 ### 3. Collect changes
 
@@ -51,7 +53,7 @@ Run the CLI with only the changed flags:
 ```bash
 !uv run --with /home/noel/harness-maker python -m harness_maker.cli make "$(pwd)" \
   --grade-threshold "$GRADE" --domains "$DOMAINS" --mechanical-checks "$CHECKS" \
-  --recommended-model "$MODEL" --focus "$FOCUS"
+  --recommended-model "$MODEL" --focus "$FOCUS" --wrapup-docs "$WRAPUP_DOCS"
 ```
 
 Omit flags for dimensions that weren't changed. The CLI preserves

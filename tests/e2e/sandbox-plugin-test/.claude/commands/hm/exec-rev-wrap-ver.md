@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.7.4
+harness_maker_version: 0.8.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: 3d0ada96d1d5122aa1b885066f9ce67b379bf6d0f706dc9531dd0ba58e97d9f8
+content_hash: c68836d566e967dae3683b3bf6ae79a0b9c7d2c2aff8e3d4939024a099b1c218
 ---
 # /hm:exec-rev-wrap-ver
 
@@ -74,7 +74,7 @@ Engage isolation if `harness.yaml.worktree.scope` includes `execute`. The `workt
 **Idempotent under `/hm:loop`**: when this stage runs as part of a loop iteration, the loop has already engaged a per-loop worktree at step 5. The `worktree create` CLI detects we're already inside `.worktrees/<name>/` and returns that path — no nested worktrees, just reuse.
 
 ```bash
-!uv run --with /home/noel/harness-maker/.worktrees/execute-20260510T0331Z python -m harness_maker.worktree create execute "$(pwd)"
+!uv run --with /home/noel/harness-maker python -m harness_maker.worktree create execute "$(pwd)"
 ```
 
 Read **all non-empty output lines** — that is the contract for the rest of this stage. Three cases:
@@ -202,12 +202,12 @@ Pick **exactly one** finalize command. Substitute `<WT>` with the literal absolu
 ```bash
 # All phases GREEN — stage-merge the branch back (NO commit) + cleanup the worktree.
 # /hm:wrapup will create the single user-facing commit (with proper message + Co-Authored-By).
-!uv run --with /home/noel/harness-maker/.worktrees/execute-20260510T0331Z python -m harness_maker.worktree finalize <WT> stage-only
+!uv run --with /home/noel/harness-maker python -m harness_maker.worktree finalize <WT> stage-only
 ```
 
 ```bash
 # Stage halted on a blocker — preserve the worktree for inspection:
-!uv run --with /home/noel/harness-maker/.worktrees/execute-20260510T0331Z python -m harness_maker.worktree finalize <WT> fail
+!uv run --with /home/noel/harness-maker python -m harness_maker.worktree finalize <WT> fail
 ```
 
 If Step 0 printed empty (no isolation engaged), skip both — there is nothing to finalize.
@@ -674,7 +674,15 @@ When a failure entry's `count >= 3`, write a skill / agent / rule proposal to `.
 
 The user reviews proposals later and decides whether to ingest into the harness.
 
-#### 5.4 Session log
+#### 5.4 Managed documents
+
+
+No additional managed documents configured. To add documents that wrapup
+should update (e.g. CHANGELOG.md, TODO.md), run `/hm:configure` and select
+**Wrapup documents**.
+
+
+#### 5.5 Session log
 
 Append to `.claude/memory/session/<YYYY-MM-DD>.md` (today's date):
 
