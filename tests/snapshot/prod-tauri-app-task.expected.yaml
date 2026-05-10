@@ -136,7 +136,7 @@ files:
   body_sha256: 7d764912ddee54367d06139aeb1072a86775b9db06505a8940a3941bdf54f179
 - path: skills/conditional-router/SKILL.md
   template: skills/conditional-router/SKILL.md.j2
-  body_sha256: 2707a46360c6af3a22901b48a91dfaec259500d267c06f0a3b62a8c8e5d78f6d
+  body_sha256: 83644120dd2c6fd16289ec749f4f8f57895e2c055b19e540f588cb254c08f726
 - path: skills/context-linter/SKILL.md
   template: skills/context-linter/SKILL.md.j2
   body_sha256: 4d881419c548a69a5b2230e3f43d88dcd34852efd47296256b88ee6d5f5cde4f
