@@ -55,12 +55,12 @@ def test_codex_config_toml_renders_valid_toml() -> None:
 
 
 def test_codex_config_toml_has_features_section() -> None:
-    """Rendered config.toml must contain [features] with codex_hooks = true."""
+    """Rendered config.toml must contain [features] with hooks = true."""
     env = _make_env()
     tpl = env.get_template("codex/config.toml.j2")
     rendered = tpl.render(config=_BASE_CONFIG)
     parsed = tomllib.loads(rendered)
-    assert parsed.get("features", {}).get("codex_hooks") is True
+    assert parsed.get("features", {}).get("hooks") is True
 
 
 def test_codex_config_toml_mcp_servers_included() -> None:

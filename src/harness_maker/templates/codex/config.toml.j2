@@ -1,5 +1,5 @@
 [features]
-codex_hooks = true
+hooks = true
 {% if config.mcp_servers -%}
 {% for server_name, server_cfg in config.mcp_servers.items() %}
 [mcp_servers."{{ server_name }}"]
