@@ -76,10 +76,14 @@ most common reason existing 0.4.x/0.5.0 users return to this command:
 - **Switch dev_mode** — spec-driven ↔ task-driven.
 - **Add a component** — install one extra reviewer / skill / domain pack.
 - **Remove a component** — uninstall one reviewer / skill.
+- **Manage ref_folders** — add, remove, or clear reference document folders
+  that the `refdocs-search` skill indexes. Ask the user for new folder paths.
+- **Manage sibling_repos** — add, remove, or clear sibling repo relative paths
+  that provide cross-repo context during research and review.
 - **Full reconfigure** — drive a fresh interview here in the slash command
-  (preset → locale → dev_mode → targets) and dispatch with all flags. No
-  TTY required — works in slash-command context. (`--reinterview` typed
-  directly in the prompt also routes here; see section 0.5.)
+  (preset → locale → dev_mode → targets → ref_folders → sibling_repos) and
+  dispatch with all flags. No TTY required — works in slash-command context.
+  (`--reinterview` typed directly in the prompt also routes here; see section 0.5.)
 - **Audit only** — report status, do not change anything.
 
 ### 3. If `STATE=fresh-install` — smart defaults + confirm
@@ -123,7 +127,7 @@ Show a summary of the detected profile and smart defaults. Use `AskUserQuestion`
 > Options:
 > - **Looks right** — install with these settings
 > - **Adjust a few things** — change specific dimensions
-> - **Full setup** — answer all questions (preset, locale, dev_mode, targets, focus, grade, domains, model, wrapup docs)
+> - **Full setup** — answer all questions (preset, locale, dev_mode, targets, focus, grade, domains, model, wrapup docs, ref_folders, sibling_repos)
 
 #### 3.4 Branch on confirm response
 
@@ -131,9 +135,9 @@ Show a summary of the detected profile and smart defaults. Use `AskUserQuestion`
 
 **"Adjust a few things"** → Use `AskUserQuestion` to ask which dimension(s)
 to change (multi-select: preset, locale, dev_mode, targets, grade_threshold,
-mechanical_checks, wrapup_docs). For each selected dimension, show an
-`AskUserQuestion` with the current smart default and alternatives. Then
-jump to Section 3.6.
+mechanical_checks, wrapup_docs, ref_folders, sibling_repos). For each selected
+dimension, show an `AskUserQuestion` with the current smart default and
+alternatives. Then jump to Section 3.6.
 
 **"Full setup"** → Ask all dimensions in order:
 
@@ -157,6 +161,20 @@ jump to Section 3.6.
    `/hm:wrapup` should update after each work unit (e.g. CHANGELOG.md,
    TODO.md, docs/decisions/index.md)." Semicolon-separated paths relative
    to project root, or "none". Maps to `--wrapup-docs`.
+10. `AskUserQuestion`: **ref_folders** — "Reference documentation folders
+   that the `refdocs-search` skill will index for skill-driven search."
+   Show detected sibling dirs (`../docs`, `../specs`, etc.) from `ls ..`
+   as suggestions. Format: `::` separates multiple entries, `;` separates
+   path from glob within an entry (e.g. `../docs::../specs;**/*.pdf`).
+   Default glob: `**/*.{md,txt,pdf}`. DOCX unsupported. "none" to skip.
+   Maps to `--ref-folders`.
+11. `AskUserQuestion`: **sibling_repos** — "Other repositories that form
+   one logical project with this one (e.g. backend + frontend monorepo
+   split). Entering them lets research and review agents cross-reference
+   related code."
+   Suggest sibling dirs visible via `ls ..` that look like git repos.
+   Semicolon-separated relative paths (e.g. `../backend;../mobile`).
+   "none" to skip. Maps to `--sibling-repos`.
 
 #### 3.5 Preview AskUserQuestion
 
@@ -235,6 +253,32 @@ Available reviewers: `code`, `security`, `performance`, `concurrency`, `ux`,
 Available skills: see `.claude/harness.yaml` `skills.installed`. Domain
 packs ship: `python` (others get a user-side stub).
 
+#### Manage ref_folders
+
+Ask the user for the new ref_folders value with `AskUserQuestion` (current
+value shown from harness.yaml), then dispatch:
+
+```bash
+!uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" \
+  --ref-folders "$REF_FOLDERS"
+```
+
+`$REF_FOLDERS` uses `::` between entries and `;` between path and glob within
+an entry (e.g. `../docs::../specs;**/*.pdf`). Pass the empty string to clear.
+
+#### Manage sibling_repos
+
+Ask the user for the new sibling_repos value with `AskUserQuestion` (current
+value shown from harness.yaml), then dispatch:
+
+```bash
+!uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" \
+  --sibling-repos "$SIBLING_REPOS"
+```
+
+`$SIBLING_REPOS` is semicolon-separated relative paths (e.g. `../backend;../mobile`).
+Pass the empty string to clear.
+
 #### Full reconfigure
 
 Drive the interview here in the slash command via `AskUserQuestion` —
@@ -261,6 +305,15 @@ in turn, then dispatch with all collected flags:
 9. `AskUserQuestion`: **wrapup documents** — semicolon-separated paths to
    docs that `/hm:wrapup` should update (e.g. `CHANGELOG.md;TODO.md`), or
    "none". Maps to `--wrapup-docs`.
+10. `AskUserQuestion`: **ref_folders** — reference doc folders for the
+   `refdocs-search` skill. Show sibling git repos visible via `ls ..` as
+   suggestions. `::` separates entries, `;` separates path from glob within
+   an entry (e.g. `../docs::../specs;**/*.pdf`). "none" to skip.
+   Maps to `--ref-folders`.
+11. `AskUserQuestion`: **sibling_repos** — other repos forming one logical
+   project (e.g. `../backend;../mobile`). Show sibling git dirs as
+   suggestions. Semicolon-separated relative paths, or "none".
+   Maps to `--sibling-repos`.
 
 Then dispatch with the collected values:
 
@@ -268,7 +321,8 @@ Then dispatch with the collected values:
 !uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" \
   --preset "$PRESET" --locale "$LOCALE" --dev-mode "$DEV_MODE" --targets "$TARGETS" \
   --focus "$FOCUS" --grade-threshold "$GRADE" --domains "$DOMAINS" \
-  --mechanical-checks "$CHECKS" --recommended-model "$MODEL" --wrapup-docs "$WRAPUP_DOCS"
+  --mechanical-checks "$CHECKS" --recommended-model "$MODEL" --wrapup-docs "$WRAPUP_DOCS" \
+  --ref-folders "$REF_FOLDERS" --sibling-repos "$SIBLING_REPOS"
 ```
 
 Omit flags for any dimension the user skipped or left at default.
@@ -294,7 +348,8 @@ Use Read + Bash; no CLI invocation.
 !uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" \
   --preset "$PRESET" --locale "$LOCALE" --dev-mode "$DEV_MODE" --targets "$TARGETS" \
   --focus "$FOCUS" --grade-threshold "$GRADE" --domains "$DOMAINS" \
-  --mechanical-checks "$CHECKS" --recommended-model "$MODEL" --wrapup-docs "$WRAPUP_DOCS" --autoloop
+  --mechanical-checks "$CHECKS" --recommended-model "$MODEL" --wrapup-docs "$WRAPUP_DOCS" \
+  --ref-folders "$REF_FOLDERS" --sibling-repos "$SIBLING_REPOS" --autoloop
 ```
 
 Substitute the values collected in step 3. Omit flags the user didn't set
@@ -332,8 +387,8 @@ guessing.
   `AskUserQuestion` here. `--reinterview` from a real terminal still
   works for users who want the full interactive interview that re-asks
   every dimension (workflows, reviewer enablement, anti-rot, etc.) —
-  the slash-command Full reconfigure is a slimmer 4-dimension reset
-  (preset / locale / dev_mode / targets).
+  the slash-command Full reconfigure covers preset / locale / dev_mode /
+  targets / ref_folders / sibling_repos (not workflows or reviewer enablement).
 - `--preset / --locale / --dev-mode / --targets` are the in-band override
   flags; prefer these for slash-command-driven reconfiguration since they
   don't need a TTY.

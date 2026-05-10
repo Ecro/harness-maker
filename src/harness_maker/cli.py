@@ -137,6 +137,19 @@ def make(
         "--wrapup-docs",
         help="Semicolon-separated doc paths for wrapup to update (e.g. CHANGELOG.md;TODO.md).",
     ),
+    ref_folders_override: str | None = typer.Option(
+        None,
+        "--ref-folders",
+        help=(
+            "Reference doc folders for refdocs-search. '::'-separated entries, each 'path[;glob]'. "
+            "Example: '../docs::../specs;**/*.pdf'"
+        ),
+    ),
+    sibling_repos_override: str | None = typer.Option(
+        None,
+        "--sibling-repos",
+        help="Semicolon-separated relative paths to sibling repos (e.g. '../backend;../frontend').",
+    ),
     dry_run: bool = typer.Option(
         False,
         "--dry-run",
@@ -181,6 +194,8 @@ def make(
         recommended_model_override=recommended_model_override,
         focus_override=focus_override,
         wrapup_docs_override=wrapup_docs_override,
+        ref_folders_override=ref_folders_override,
+        sibling_repos_override=sibling_repos_override,
     )
     if add_domain_name is not None:
         try:
@@ -407,6 +422,8 @@ def _apply_dimension_overrides(
     recommended_model_override: str | None = None,
     focus_override: str | None = None,
     wrapup_docs_override: str | None = None,
+    ref_folders_override: str | None = None,
+    sibling_repos_override: str | None = None,
 ) -> InterviewAnswers:
     """Apply per-dimension CLI overrides on top of the answers.
 
@@ -466,6 +483,12 @@ def _apply_dimension_overrides(
         update["wrapup_docs"] = [
             d.strip() for d in wrapup_docs_override.split(";") if d.strip()
         ]
+    if ref_folders_override:
+        update["ref_folders"] = _parse_ref_folders_flag(ref_folders_override)
+    if sibling_repos_override:
+        update["sibling_repos"] = [
+            r.strip() for r in sibling_repos_override.split(";") if r.strip()
+        ]
 
     if preset_override:
         try:
@@ -510,6 +533,27 @@ def _apply_dimension_overrides(
                 update={"reviewers": {**result.reviewers, "enabled": enabled}}
             )
     return result
+
+
+def _parse_ref_folders_flag(raw: str) -> list[object]:
+    """Parse --ref-folders value into a list of RefFolder dicts for model_copy.
+
+    Format: '::'-separated entries, each entry is 'path[;glob]'.
+    Example: '../docs::../specs;**/*.pdf'
+    """
+    from harness_maker.models import RefFolder
+
+    out: list[object] = []
+    for entry in raw.split("::"):
+        entry = entry.strip()
+        if not entry:
+            continue
+        path_part, _, glob_part = entry.partition(";")
+        path_part = path_part.strip()
+        glob = glob_part.strip() or "**/*.{md,txt,pdf}"
+        if path_part:
+            out.append(RefFolder(path=path_part, glob=glob))
+    return out
 
 
 def _emit_reconcile_report(
