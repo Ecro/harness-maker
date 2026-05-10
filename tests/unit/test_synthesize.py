@@ -220,7 +220,7 @@ def test_synthesize_codex_target_files_importable() -> None:
     """_codex_target_files() is importable and returns a list (stub)."""
     from harness_maker.synthesize import _codex_target_files
 
-    result = _codex_target_files()
+    result = _codex_target_files({})
     assert isinstance(result, list)
 
 

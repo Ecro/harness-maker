@@ -50,7 +50,7 @@ def test_codex_config_toml_renders_valid_toml() -> None:
     """templates/codex/config.toml.j2 must produce parse-able TOML."""
     env = _make_env()
     tpl = env.get_template("codex/config.toml.j2")
-    rendered = tpl.render(config=_BASE_CONFIG)
+    rendered = tpl.render(config=_BASE_CONFIG, agents={})
     tomllib.loads(rendered)  # raises TOMLDecodeError on invalid TOML
 
 
@@ -58,7 +58,7 @@ def test_codex_config_toml_has_features_section() -> None:
     """Rendered config.toml must contain [features] with hooks = true."""
     env = _make_env()
     tpl = env.get_template("codex/config.toml.j2")
-    rendered = tpl.render(config=_BASE_CONFIG)
+    rendered = tpl.render(config=_BASE_CONFIG, agents={})
     parsed = tomllib.loads(rendered)
     assert parsed.get("features", {}).get("hooks") is True
 
@@ -67,7 +67,7 @@ def test_codex_config_toml_mcp_servers_included() -> None:
     """MCP servers from config.mcp_servers appear in rendered config.toml."""
     env = _make_env()
     tpl = env.get_template("codex/config.toml.j2")
-    rendered = tpl.render(config=_CONFIG_WITH_MCP)
+    rendered = tpl.render(config=_CONFIG_WITH_MCP, agents={})
     parsed = tomllib.loads(rendered)
     assert "my-server" in parsed.get("mcp_servers", {})
 
@@ -76,7 +76,7 @@ def test_codex_config_toml_empty_mcp_servers_no_section() -> None:
     """Empty mcp_servers → no [mcp_servers] table in rendered TOML (no orphan header)."""
     env = _make_env()
     tpl = env.get_template("codex/config.toml.j2")
-    rendered = tpl.render(config=_BASE_CONFIG)
+    rendered = tpl.render(config=_BASE_CONFIG, agents={})
     parsed = tomllib.loads(rendered)
     assert "mcp_servers" not in parsed, (
         "Empty mcp_servers should not render a [mcp_servers] section"
@@ -133,7 +133,7 @@ def test_reconcile_agents_md_both_when_new(tmp_path: Path) -> None:
     AGENTS.md resolves to target_dir.parent (project root), so existing_dir must
     be the .claude/ subdir so the path routing mirrors production use.
     """
-    specs = _codex_target_files()
+    specs = _codex_target_files({})
     agents_md_specs = [(t, o, c) for t, o, c in specs if o == "AGENTS.md"]
     assert agents_md_specs, "_codex_target_files must include AGENTS.md (prerequisite S7)"
     claude_dir = tmp_path / ".claude"
@@ -185,14 +185,14 @@ def test_reconcile_agents_md_merge_block_reason(tmp_path: Path) -> None:
 
 def test_codex_target_files_includes_config_toml() -> None:
     """_codex_target_files() must include .codex/config.toml entry."""
-    specs = _codex_target_files()
+    specs = _codex_target_files({})
     out_paths = [out for _, out, _ in specs]
     assert ".codex/config.toml" in out_paths
 
 
 def test_codex_target_files_includes_agents_md() -> None:
     """_codex_target_files() must include AGENTS.md entry."""
-    specs = _codex_target_files()
+    specs = _codex_target_files({})
     out_paths = [out for _, out, _ in specs]
     assert "AGENTS.md" in out_paths
 
@@ -200,5 +200,5 @@ def test_codex_target_files_includes_agents_md() -> None:
 def test_codex_target_files_template_names_exist() -> None:
     """Templates referenced in _codex_target_files() must be loadable by Jinja2 env."""
     env = _make_env()
-    for tpl_path, _, _ in _codex_target_files():
+    for tpl_path, _, _ in _codex_target_files({}):
         env.get_template(tpl_path)  # raises TemplateNotFound if missing

@@ -1,5 +1,10 @@
 [features]
 hooks = true
+{% for agent_name, agent_desc in agents.items() %}
+[agents.{{ agent_name }}]
+config_file = ".codex/agents/{{ agent_name }}.toml"
+description = {{ agent_desc | tojson }}
+{% endfor %}
 {% if config.mcp_servers -%}
 {% for server_name, server_cfg in config.mcp_servers.items() %}
 [mcp_servers."{{ server_name }}"]

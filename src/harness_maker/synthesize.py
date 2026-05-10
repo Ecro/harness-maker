@@ -358,13 +358,15 @@ def _cursor_target_files() -> list[FileSpec]:
     ]
 
 
-def _codex_target_files() -> list[FileSpec]:
+def _codex_target_files(
+    fused_workflows: dict[str, list[AtomicStage]],
+) -> list[FileSpec]:
     """Codex target-specific assets: config.toml + AGENTS.md + hooks.json + agents + skills."""
     return [
         (
             "codex/config.toml.j2",
             ".codex/config.toml",
-            {},
+            {"agents": {n: meta[0] for n, meta in _CODEX_AGENT_META.items()}},
         ),
         (
             "codex/AGENTS.md.j2",
@@ -379,6 +381,12 @@ def _codex_target_files() -> list[FileSpec]:
         *_codex_agent_files(),
         *_codex_skill_files(),
         *_codex_stage_skills(),
+        *_codex_workflow_skills(fused_workflows),
+        (
+            "codex/loop_skill.md.j2",
+            ".agents/skills/hm-loop/SKILL.md",
+            {},
+        ),
     ]
 
 
@@ -399,6 +407,20 @@ def _codex_stage_skills() -> list[FileSpec]:
             {"stage": s},
         )
         for s in _ATOMIC_STAGES
+    ]
+
+
+def _codex_workflow_skills(
+    fused_workflows: dict[str, list[AtomicStage]],
+) -> list[FileSpec]:
+    """Fused workflow SKILL.md files — one per workflow (e.g. exec-rev, exec-rev-wrap-ver)."""
+    return [
+        (
+            "codex/workflow_skill.md.j2",
+            f".agents/skills/hm-{name}/SKILL.md",
+            {"workflow_name": name, "stages": [s.value for s in stages]},
+        )
+        for name, stages in fused_workflows.items()
     ]
 
 
@@ -424,7 +446,7 @@ def synthesize(
         file_specs.extend(_cursor_target_files())
 
     if Target.CODEX in answers.targets:
-        file_specs.extend(_codex_target_files())
+        file_specs.extend(_codex_target_files(answers.fused_workflows))
 
     config = HarnessConfig(
         locale=answers.locale,

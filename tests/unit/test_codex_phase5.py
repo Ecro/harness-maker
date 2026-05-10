@@ -196,6 +196,6 @@ def test_permission_gate_pretooluse_dangerous_command_regression() -> None:
 
 def test_codex_target_files_includes_hooks_json() -> None:
     """_codex_target_files() must include .codex/hooks.json entry after Phase 5."""
-    specs = _codex_target_files()
+    specs = _codex_target_files({})
     out_paths = [out for _, out, _ in specs]
     assert ".codex/hooks.json" in out_paths

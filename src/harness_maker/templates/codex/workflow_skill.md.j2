@@ -1,0 +1,20 @@
+---
+name: hm-{{ workflow_name }}
+description: "Run the harness-maker {{ workflow_name }} workflow ({{ stages | join(' → ') }}) as documented in AGENTS.md. Use the user's input as the goal or task for this workflow."
+---
+
+# hm-{{ workflow_name }}
+
+Run the **{{ workflow_name }}** fused workflow: {{ stages | join(' → ') }}.
+
+Follow the procedure for each stage as documented in **AGENTS.md**.
+Use the user's input as the goal or task description.
+
+Invoke when the user asks to run the `{{ workflow_name }}` workflow,
+or when the task context calls for chaining {{ stages | join(', ') }}.
+
+See AGENTS.md for the full per-stage procedures, exit criteria, and quality bar.
+
+<!-- @hm:user:extensions -->
+<!-- Project-specific additions to the hm-{{ workflow_name }} skill. Preserved across upgrades. -->
+<!-- @hm:/user:extensions -->

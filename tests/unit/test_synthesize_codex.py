@@ -48,12 +48,16 @@ def test_synthesize_codex_target_emits_codex_config_toml(tmp_path: Path) -> None
     assert ".codex/config.toml" in paths, "Blueprint missing .codex/config.toml"
 
 
-def test_synthesize_codex_target_emits_18_skill_paths(tmp_path: Path) -> None:
-    """synthesize() with codex target must emit 18 .agents/skills/ entries (11 + 7)."""
+def test_synthesize_codex_target_emits_skill_paths(tmp_path: Path) -> None:
+    """synthesize() with codex target must emit 11 + 7 + N workflows + 1 loop .agents/skills/ entries."""
     answers = _make_answers(tmp_path, ["codex"])
     bp = synthesize(profile(tmp_path), answers)
     skill_paths = [str(f.path) for f in bp.files if str(f.path).startswith(".agents/skills/")]
-    assert len(skill_paths) == 18, f"Expected 18 .agents/skills/ entries, got {len(skill_paths)}"
+    n_workflows = len(answers.fused_workflows)
+    expected = 11 + 7 + n_workflows + 1  # existing + stages + workflows + loop
+    assert len(skill_paths) == expected, (
+        f"Expected {expected} .agents/skills/ entries, got {len(skill_paths)}"
+    )
 
 
 def test_synthesize_claude_code_only_no_agents_md(tmp_path: Path) -> None:

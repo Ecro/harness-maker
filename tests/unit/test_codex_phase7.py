@@ -104,7 +104,7 @@ def test_codex_stage_skills_output_paths() -> None:
 
 def test_codex_target_files_includes_existing_skills() -> None:
     """_codex_target_files() must include all 11 existing skills at .agents/skills/."""
-    out_paths = {out for _, out, _ in _codex_target_files()}
+    out_paths = {out for _, out, _ in _codex_target_files({})}
     for skill in _ALL_SKILLS:
         assert f".agents/skills/{skill}/SKILL.md" in out_paths, (
             f"_codex_target_files missing existing skill {skill!r}"
@@ -113,7 +113,7 @@ def test_codex_target_files_includes_existing_skills() -> None:
 
 def test_codex_target_files_includes_stage_skills() -> None:
     """_codex_target_files() must include all 7 stage skills at .agents/skills/hm-<stage>/."""
-    out_paths = {out for _, out, _ in _codex_target_files()}
+    out_paths = {out for _, out, _ in _codex_target_files({})}
     for stage in _STAGES:
         assert f".agents/skills/hm-{stage}/SKILL.md" in out_paths, (
             f"_codex_target_files missing stage skill hm-{stage!r}"
@@ -121,6 +121,6 @@ def test_codex_target_files_includes_stage_skills() -> None:
 
 
 def test_codex_target_files_total_skill_count() -> None:
-    """_codex_target_files() must include 11 + 7 = 18 .agents/skills/ entries."""
-    out_paths = [out for _, out, _ in _codex_target_files() if out.startswith(".agents/skills/")]
-    assert len(out_paths) == 18, f"Expected 18 skill paths, got {len(out_paths)}"
+    """_codex_target_files({}) must include 11 + 7 + 1 (loop) = 19 .agents/skills/ entries."""
+    out_paths = [out for _, out, _ in _codex_target_files({}) if out.startswith(".agents/skills/")]
+    assert len(out_paths) == 19, f"Expected 19 skill paths, got {len(out_paths)}"
