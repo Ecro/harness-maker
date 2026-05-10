@@ -43,34 +43,34 @@ files:
   body_sha256: 3dd53d23395028918fab5ce3817abc028c2b0ae3cff61915bdf787cbf071d5a2
 - path: commands/hm/ai-readiness.md
   template: commands/hm/ai-readiness.md.j2
-  body_sha256: 190714b2b70c5ad387bf3a02ffc4520e0c26c5ed6c14ec779d1472af5688f8a4
+  body_sha256: 50723b24320945863213ad4c16d6dc155dbdf0102f0f65c6b0e10d3d2bc5b077
 - path: commands/hm/configure.md
   template: commands/hm/configure.md.j2
-  body_sha256: 21ad759fa8b436b57b8c4fd19fc2b6558a6bbd91c345c08500707ca6b5d6a64f
+  body_sha256: e625f44aa23ef1b69c12eb21999eb21a2c9c5f479b4407bc1b82180e9c986a30
 - path: commands/hm/exec-rev-wrap-ver.md
   template: commands/hm/workflow_command.md.j2
-  body_sha256: 3d0ada96d1d5122aa1b885066f9ce67b379bf6d0f706dc9531dd0ba58e97d9f8
+  body_sha256: e96f56432ce15d9cc624bb7b4998b7b6cc662c186b267b2fdbe898f72f28a599
 - path: commands/hm/exec-rev-wrap.md
   template: commands/hm/workflow_command.md.j2
-  body_sha256: e5f313ce1e57914df9053b834f295d0e7c6609d9cd7c126262f10874db17e1cd
+  body_sha256: dc6ab299c4d9368bffbb1cef8098b39032e7e255f273ff4d81e4d3092b28632b
 - path: commands/hm/exec-rev.md
   template: commands/hm/workflow_command.md.j2
-  body_sha256: 3c1cee4091ac5ad51c036acd984a5ffdd70483a42783f1067075d4026c26912f
+  body_sha256: e474762f1842820418bcdb678c560b6981142c381a33d0ccb40ed1199ea75627
 - path: commands/hm/execute.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: 2c1e4de5e9307e7cbcfe5722cba399cf687000706820338fa9a77c6183b0315c
+  body_sha256: 3629b33e2e6e3eac4344feef4de61d6139d6327b7c12b4c181030bd13c04210e
 - path: commands/hm/loop.md
   template: commands/hm/loop.md.j2
-  body_sha256: 767ce3348d9457ee42633191669b9a8593a03774cb7c5e4fcb0c1bc3e5f03fa5
+  body_sha256: b0924cf34db5cb268a34caf90c8bc5d800565b51881a1d1905fa2cdbb28e163b
 - path: commands/hm/make.md
   template: commands/hm/make.md.j2
-  body_sha256: 632c11797606a82be021408e7067235139c3bddcad64ecd677989bfdcfae7c90
+  body_sha256: 37218410cd9e8d24ca79817a18e408984df2815d5fa3fbd5aad922957f1907e7
 - path: commands/hm/plan.md
   template: commands/hm/atomic_command.md.j2
   body_sha256: 22579b376aff6b18b6857041c42f1b02f40a24ffe920a2de4e88b46f9f65a929
 - path: commands/hm/refresh.md
   template: commands/hm/refresh.md.j2
-  body_sha256: a62c609503436b12b68f60848495105af38198b699287fa33bc8b96b2e1632bb
+  body_sha256: 5bc24a2849705eaa6e63963ccf9311f59bfade58c61b1859cfeb0c35dfc6759a
 - path: commands/hm/res-spec-plan.md
   template: commands/hm/workflow_command.md.j2
   body_sha256: fe50200d7388fdcdd21cf2a83c97ee594410a73f8eff9a4079d444de806ef9ab
@@ -85,7 +85,7 @@ files:
   body_sha256: 13f6d2a7e7402fb84e9fe101c4e0c4ed0e4a1fc44f065b9ea1845215592c9268
 - path: commands/hm/uninstall.md
   template: commands/hm/uninstall.md.j2
-  body_sha256: 9ed8454bd4537743f9f7a211fef63df3af1b0b967c7de1e6a61b288255b77110
+  body_sha256: 3b8224b8ec32150fe271a0d39cdcf24273b9cae58072ccbb97536286988f50d7
 - path: commands/hm/verify.md
   template: commands/hm/atomic_command.md.j2
   body_sha256: 0d8b5fcd83e26d95888276bfd226a4c705d626d52471c770b3f66bdc041fbe02
@@ -97,7 +97,7 @@ files:
   body_sha256: 5f0a7e5c42f927ad6c38e8888197522a43b0377ad0235c04b4bebafa3a330f9d
 - path: hooks/hooks.json
   template: hooks/hooks.json.j2
-  body_sha256: 8e1236a97f80f07f4ce4ec89ff439d635e17bafc699c95a3f23ab5d79b694a10
+  body_sha256: 1e484feb03df7d114700f5460fee94ba413fe8b574d07b93109fda3f0d73c6c6
 - path: memory/failures.md
   template: memory/failures.en.md.j2
   body_sha256: ee112656ee40cc591cb6ecb35b5de85402bf52b252dd53bb1e98538f990816d6
@@ -127,7 +127,7 @@ files:
   body_sha256: ccca560d99dc320945f8c31c92e5c69ecbcf2d615bc145496ae9583698b7c11d
 - path: skills/agent-quality-rubric/SKILL.md
   template: skills/agent-quality-rubric/SKILL.md.j2
-  body_sha256: 70708af1282d9dba8a8677b5c2b690a08b4ed4bb9adcab18d8181b83bda5f762
+  body_sha256: c9c137fde3bfbf550e7ef1427e98c951493d6a60936c47ee0a5a67a203434106
 - path: skills/ai-readiness-rubric/SKILL.md
   template: skills/ai-readiness-rubric/SKILL.md.j2
   body_sha256: a0f452b87ffdd0af62242aa2358fb57e2a269b0047403261a38fa443125b9163
@@ -145,22 +145,22 @@ files:
   body_sha256: 8366ccb51da372f42f73058c82c7bb75c4d6a66e22f378056599e021c871d533
 - path: skills/relevance-filter/SKILL.md
   template: skills/relevance-filter/SKILL.md.j2
-  body_sha256: d876693bcaac403140bb3b5680a81223257e7fa185a47af9693731a35f122a5d
+  body_sha256: 9e2fd2990fcd9ee100bbdaf080c2cc696889d8ec801963d49de69c75ff7bb12d
 - path: skills/research-crawler/SKILL.md
   template: skills/research-crawler/SKILL.md.j2
   body_sha256: ca17023045fbd8f5ef8ad569d25098c062bd31ffaacb89bda428dd1b80eb87bd
 - path: skills/security-scanner/SKILL.md
   template: skills/security-scanner/SKILL.md.j2
-  body_sha256: 17fed71c22fd67c4d5c54b18fd93e3a3e5d9a1f10fc3127025dd4498e6a577fd
+  body_sha256: a59eee1aab77b8071893b4bab80f92f6ab84c6d2f48cd54c954a91912ea01af7
 - path: skills/verify-before-completion/SKILL.md
   template: skills/verify-before-completion/SKILL.md.j2
-  body_sha256: 3b5af5ee2fee011f09ec839c80d8903da9fdee3fbbab8f5c0816b9fc352edc19
+  body_sha256: 3e1f44a26a6e41abeefb422e46a42f61febed138ed89b2b3d188caeeefa1c8a9
 - path: skills/worktree-isolator/SKILL.md
   template: skills/worktree-isolator/SKILL.md.j2
   body_sha256: 6dbec00b68278020063f121ad1522f3517eab68662a28f6ec7baad3f70bc0f21
 - path: stages/execute.md
   template: stages/execute.md.j2
-  body_sha256: 2c1e4de5e9307e7cbcfe5722cba399cf687000706820338fa9a77c6183b0315c
+  body_sha256: 3629b33e2e6e3eac4344feef4de61d6139d6327b7c12b4c181030bd13c04210e
 - path: stages/plan.md
   template: stages/plan.md.j2
   body_sha256: 22579b376aff6b18b6857041c42f1b02f40a24ffe920a2de4e88b46f9f65a929
