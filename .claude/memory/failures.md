@@ -38,4 +38,7 @@ Running `tests/snapshot/regenerate.py` inside a git worktree embeds the worktree
 ## [fail:test] boundary-test-no-sentinel | 2026-05-09 | count:1
 `test_git_as_file_stops_walk` asserted `_find_marker(subdir) is None` but planted no marker above the boundary. The test passed regardless of whether the boundary guard worked, because no marker happened to exist above `tmp_path` in the test environment. Fix: always plant a marker ABOVE the boundary in a `try/finally` block so the test fails if the walk ignores the boundary. Pattern: boundary tests must prove both "find it when it should be found" AND "don't find it when the boundary blocks."
 
+## [fail:test] class-methods-orphaned-by-partial-edit | 2026-05-10 | count:1
+`TestCheckErrorCap` had 8 methods. The `Edit` tool's `old_string` captured only the first 3 methods (through `test_syntax_over_cap`), leaving the remaining 5 (`test_logical_under_cap`, `test_logical_at_cap`, `test_unknown_under_cap`, `test_unknown_at_cap`, `test_empty_counts_safe`) as un-indented dead defs. After the worktree merge, those 5 methods orphaned as nested function definitions inside the next test function (`test_s8_loop_context_backward_compat`). They compiled fine but were unreachable by pytest. Fix: always read the full class body before writing `old_string`; when editing a class, the `old_string` must include the full class through its last method (or use a marker at the class close). Grep for all `def test_` under a class before committing to the `old_string`.
+
 <!-- @hm:/user:entries -->
