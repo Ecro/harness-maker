@@ -2,6 +2,31 @@
 
 ## Unreleased
 
+## 0.11.0 — 2026-05-11
+
+Adds agentic-depth instructions to the 5 reviewer prompts so reviewers
+investigate with Read / Grep / git log before flagging, and promotes the
+previously-unreleased verifier-surface strip (ADR-008) into the 0.11.0
+release. PLAN
+[`PLAN-llm-code-review-2026`](work-docs/PLAN-llm-code-review-2026.md)
+Phase C completes the multi-phase agentic-review effort.
+
+### Added
+- Each of the 5 reviewer prompt bodies (`code-reviewer`,
+  `security-reviewer`, `performance-reviewer`, `concurrency-reviewer`,
+  `ux-reviewer`) gains a new `## Investigation Steps (agentic depth)`
+  section. The 3 common floor instructions — full-context Read,
+  Grep-to-confirm before flagging, git log for prior intent — appear
+  verbatim in every reviewer; each reviewer additionally carries a
+  domain-specific 4th investigation instruction (trace runtime path /
+  Grep for related sinks / Grep for hot-path callers / Grep for lock
+  acquisitions / Grep for related accessibility patterns).
+- New `tests/structural/test_reviewer_prompts_contain_agentic_depth_clauses.py`
+  enforces the substring contract from PLAN ADR-009 Decision #1 — 5
+  reviewers × 4 verbatim substrings each. Drift in any of the 5 prompt
+  bodies that drops a locked substring fails this structural test at
+  PR-merge time.
+
 ### Removed
 - Stripped the Anthropic-API-dependent surface from the 0.10.0 verifier
   feature: `AnthropicVerifierClient` class, `ModelUnavailableError`
@@ -28,6 +53,8 @@
   algorithm intact. Callers supplying a custom client (in-process Claude
   Code Task, future external service, mock for tests) still get the
   reduce-only invariant + demote validation + fence-escaped prompts.
+  Signature is now `client: VerifierClient` (required) — the previous
+  auto-instantiate-Anthropic default is gone.
 - `agents/code-verifier` definition retained as the role contract;
   description unchanged.
 - Telemetry JSONL schema (15 fields including `verifier_*` counts +
@@ -47,6 +74,12 @@
   `observability_dir` is now containment-checked against
   `project_root.resolve()` via `is_relative_to`; escape attempts raise
   `ValueError` (release-0-10-0 REVIEW O2).
+
+### Internal
+- PLAN-llm-code-review-2026 status: `phase-a-partial-revert-c-replanned`.
+  9 ADRs (ADR-001 through ADR-009) record the design decisions. Phase C
+  acceptance criteria adapted post-ADR-008 — verifier-dependent tests
+  replaced by prompt-only static guards per ADR-009.
 
 ## 0.10.0 — 2026-05-11
 

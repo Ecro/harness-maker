@@ -10,13 +10,13 @@ files:
   body_sha256: db9b0af4c0cd2106e4510f2560b7b2bed855f52e4d6bf00ddf3dfcbdb882d5a8
 - path: agents/code-reviewer.md
   template: agents/code-reviewer.md.j2
-  body_sha256: 5b9e96a6eddab64b26567e781c48496621d6587e9de0e2e4fd39805ae2b1f26f
+  body_sha256: 17abed5de46ae5786b0ef0ffd2ee47a183470b7e5d9482ae52fb3770bc350f17
 - path: agents/code-verifier.md
   template: agents/code-verifier.md.j2
   body_sha256: 213d52611fc85b0e4b3da9a82f7a3555edc9f8e65b2dd4a0f0649817f067d82a
 - path: agents/concurrency-reviewer.md
   template: agents/concurrency-reviewer.md.j2
-  body_sha256: a462f8374a971624ecbbcc6372205ddcd35e5fae7e888a7d235f8490c3ba61a3
+  body_sha256: 3235c5a61f1dba51e28d3f4ee7a3943bdf0fcc0a2b7966b59ef09f07c3ea54e7
 - path: agents/consensus-arbiter.md
   template: agents/consensus-arbiter.md.j2
   body_sha256: f2bb6c7fb5b54d6642d1adeed5cc1a6e3f297b2bec3a042781cc702b284a6f12
@@ -25,7 +25,7 @@ files:
   body_sha256: c2086f966bae9e22e9d3672f016dfa392ca6c7bc1960a3c82ade570f16ef743e
 - path: agents/performance-reviewer.md
   template: agents/performance-reviewer.md.j2
-  body_sha256: d8c2ae1c8655eb80d50ccc40193e3e6056311a22588cbefa2b2e4fba73287a32
+  body_sha256: 5ab179a889e8490e9c529c661a7fd3570e62d402383194b1fc9bc97ae9deef9d
 - path: agents/plan-validator.md
   template: agents/plan-validator.md.j2
   body_sha256: cbe6c88807f8ce9a07bf008458aadde89e10c2cdea6797136d3ed73c481fa344
@@ -34,7 +34,7 @@ files:
   body_sha256: f3c96393e27b392f1f46019363d6347163f69782f635f7d96fb0f35b6a700fc9
 - path: agents/security-reviewer.md
   template: agents/security-reviewer.md.j2
-  body_sha256: b60b73e9df3034ccbd094277fb79c24d9024f8baacf164460ebc1f6e981f7b4d
+  body_sha256: 90f0b49c2203a295bd7ec6d199452d8cb5dd14142c2afcb50f24a1c578cff79b
 - path: agents/stuck.md
   template: agents/stuck.md.j2
   body_sha256: 3efe31fde69f6b95cc658e33ac07391a6f77b35be4d087bc4946e7ba452c05dd
@@ -43,7 +43,7 @@ files:
   body_sha256: ee3dd5cb0fa2f67ecd4d469dd45eee21da93cac89a2e5e42fdb263eaf3a3555a
 - path: agents/ux-reviewer.md
   template: agents/ux-reviewer.md.j2
-  body_sha256: 3dd53d23395028918fab5ce3817abc028c2b0ae3cff61915bdf787cbf071d5a2
+  body_sha256: 227a4b9d9ba42d98cc6229ed4a2f05754b104e2d5667fef40e79488fa175d047
 - path: commands/hm/ai-readiness.md
   template: commands/hm/ai-readiness.md.j2
   body_sha256: 50723b24320945863213ad4c16d6dc155dbdf0102f0f65c6b0e10d3d2bc5b077
