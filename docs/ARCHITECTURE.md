@@ -131,6 +131,8 @@ When `.claude/` already exists, the Renderer doesn't write blindly. The `Reconci
 
 There are exactly **7 atomic stages**: `research`, `spec`, `plan`, `execute`, `review`, `wrapup`, `verify`. Each is a Jinja2 fragment under `templates/stages/<stage>.md.j2` and is **always** exposed as `/hm:<stage>`.
 
+The `research` fragment includes a discovery-lens calibration step so broad trend or roadmap prompts inspect user workflows and adjacent artifacts before narrowing into academic, benchmark, or implementation-only sources.
+
 **Workflows** are user-named sequences of stages. The synthesizer emits a workflow seed per preset (e.g. `dev = [plan, execute, review, wrapup]`). The `workflow_fuse.py` module concatenates the relevant stage fragments into a single command file rendered to `.claude/commands/hm/<workflow>.md`. Re-running `/harness-maker:make` extends `harness.yaml.workflows` and re-fuses.
 
 This decouples "what the workflow does" from "how the user calls it" — the same atomic stages back every workflow.

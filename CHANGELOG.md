@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+- Updated `/hm:research` so broad trend, roadmap, and opportunity research
+  starts with a user-workflow/product discovery lens before papers,
+  benchmarks, or architecture-only sources.
+
 ## 0.9.3 — 2026-05-10
 
 Patch release after the Codex target rollout.

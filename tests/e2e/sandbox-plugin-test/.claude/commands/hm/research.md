@@ -4,7 +4,7 @@ harness_maker_version: 0.9.4
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/atomic_command.md.j2
 provenance: official
-content_hash: af94df4d5985c7757269731dc906450ce9f03fbfcf136c0518479ffb9b95cd44
+content_hash: 5cbae81f1f0487f346a78dbd0c3811d63183a99669236237433560f15f357abd
 ---
 # Stage: research
 
@@ -135,6 +135,28 @@ Layer 3 display block, then applied.
 On **NEEDS**: new probes only (no repeats). Max **3 rounds**. After 3 NEEDS,
 offer "Proceed with current scope?" and continue to Phase 1 regardless.
 
+### Phase 0.75 — Discovery lens calibration
+
+Before Phase 1, choose one or more search lenses. This is mandatory even when
+`--deep` is not set.
+
+1. **User-workflow / product opportunity** — how real users already work, where
+   context lives, which repeated artifacts they maintain, and which adjacent
+   tools they already trust.
+2. **Technical architecture / implementation** — codebase patterns, APIs,
+   libraries, protocols, data models, and integration constraints.
+3. **Research / benchmark / academic** — arXiv papers, evals, leaderboards,
+   benchmarks, and formal methods. Do not use this as the only lens unless the
+   user explicitly asks for papers only.
+4. **Risk / compliance / security** — data boundaries, auth, prompt injection,
+   write permissions, destructive actions, and vendor lock-in.
+
+For broad trend, opportunity, roadmap, "what should we add", "latest", or
+"would users use this" topics, run the **User-workflow / product opportunity**
+lens before arXiv, benchmark, or architecture-only searches. Record the chosen
+lenses under `## 🔍 Refinement Decisions` as "Discovery lens: ..."; if the
+section would otherwise be omitted, include only this short note.
+
 ### Phase 1 — Multi-source gathering
 
 Run these in parallel where the answers are independent. Total token budget ≤8k.
@@ -142,9 +164,20 @@ Run these in parallel where the answers are independent. Total token budget ≤8
 1. **Codebase patterns** — `Grep` / `Glob` for related identifiers, prior implementations, similar features.
 2. **Prior-art search in memory** — already loaded above; pull relevant `[wiki:*]` and `[fail:*]` entries.
 3. **Prior PLANs / REVIEWs** — `Grep` over `work-docs/` for related task slugs.
-4. **Library / framework docs** — when the topic involves a named library (React, FastAPI, Tokio, etc.), use Context7 (or equivalent doc-fetch MCP if available) for **current** docs. Training data drifts; check official docs.
-5. **Web search** — for "best practices YEAR" / "common pitfalls" / "implementation patterns" queries. Skip when an internal answer is already authoritative.
-6. **Refdocs folders** — when project has `ref_folders` configured in `harness.yaml`, the `refdocs-search` skill provides lossless full-text search across registered folders.
+4. **User-workflow / product discovery** — for broad trend, opportunity, roadmap, harness-direction, or user-facing value topics, search how users actually work before searching papers:
+   - User artifacts and context stores: Obsidian, Notion, Google Drive, Slack, Linear, GitHub Issues/PRs, Jira, Sentry, docs, chats, runbooks, and local notes.
+   - Repeated pains: re-explaining context, copy/paste handoff, stale project memory, duplicated planning, brittle eval setup, hidden decisions, and disconnected personal knowledge.
+   - Ecosystem signals: MCP servers, plugin marketplaces, community prototypes, integration requests, issue threads, and migration guides.
+   - Produce a short **Local capability x User artifact** matrix mapping what this harness can do to the artifacts users already maintain.
+5. **Library / framework docs** — when the topic involves a named library (React, FastAPI, Tokio, etc.), use Context7 (or equivalent doc-fetch MCP if available) for **current** docs. Training data drifts; check official docs.
+6. **Web search** — for "best practices YEAR" / "common pitfalls" / "implementation patterns" queries. Skip when an internal answer is already authoritative.
+7. **Refdocs folders** — when project has `ref_folders` configured in `harness.yaml`, the `refdocs-search` skill provides lossless full-text search across registered folders.
+
+**Discovery coverage guard**: If the topic is broad, trend-oriented, roadmap-like,
+or user-facing and the research lacks both (a) at least one user-workflow source
+and (b) a Local capability x User artifact mapping, the research is incomplete.
+arXiv papers, benchmarks, and leaderboards cannot satisfy this guard by
+themselves.
 
 Cite every external source. Track:
 - `libs_fetched` — list of library IDs / doc URLs queried.
@@ -166,7 +199,7 @@ For each surfaced approach, capture:
 
 Then synthesize:
 1. **Problem understanding** — restate the topic with sharper boundaries (in/out of scope).
-2. **Recommended direction** — pick one approach with one-sentence rationale. This is *informational* — `plan` makes the binding decision.
+2. **Recommended direction** — pick one approach with one-sentence rationale, including whether the main impact is user-facing workflow value or internal maintainer value. This is *informational* — `plan` makes the binding decision.
 3. **Open questions** — items that block `plan` from starting. Surface these as the validation prompt at Phase 4.
 4. **Pitfalls** — what others got wrong on this topic.
 
@@ -194,7 +227,7 @@ summary: "{≤100 char one-line: recommended direction}"
 **Required sections (in this order):**
 
 1. **🎯 Recommended Direction** — TL;DR sentence + one-paragraph rationale.
-2. **🔍 Refinement Decisions** — when `--deep` ran, summarize Phase 0 answers; otherwise omit.
+2. **🔍 Refinement Decisions** — when `--deep` ran, summarize Phase 0 answers; when Phase 0.75 selected discovery lenses, record `Discovery lens: ...`; otherwise omit.
 3. **🛠️ Approaches Found** — 2-3 alternatives, each with the analysis table fields above.
 4. **⚠️ Pitfalls** — concrete failure modes others hit on this topic, with citations.
 5. **❓ Open Questions** — items `/hm:plan` will need to lock down via interview.

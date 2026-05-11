@@ -185,7 +185,7 @@ After install, the rendered harness exposes commands under `/hm:*`:
 
 | Command | Purpose |
 |---|---|
-| `/hm:research` | Gather information, best practices, explore options |
+| `/hm:research` | Gather facts, user-workflow signals, best practices, and options |
 | `/hm:spec` | Write acceptance criteria from research |
 | `/hm:plan` | Decompose spec into phases with exit criteria |
 | `/hm:execute` | Implement with TDD + worktree isolation |

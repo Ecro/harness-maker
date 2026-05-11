@@ -173,7 +173,7 @@ Each stage has a **unique responsibility** and receives the output of the previo
 
 ### 3.1 /hm:research — Exploration
 
-**Purpose**: Systematically gather the information needed before implementing a new feature.
+**Purpose**: Systematically gather the information needed before implementing a new feature, choosing a product/user-workflow lens before papers or benchmarks when the topic is broad or opportunity-oriented.
 
 #### Execution Procedure
 
@@ -181,17 +181,29 @@ Each stage has a **unique responsibility** and receives the output of the previo
 
 Branches into two paths based on the presence of the `--deep` flag.
 
-- Without `--deep`: Explore only the codebase + memory + existing PLANs
-- With `--deep`: Additionally explore external sources (library docs, web search, refdocs)
+- Without `--deep`: Start gathering directly, but still calibrate the search lens.
+- With `--deep`: First run the refinement interview and 3-layer deep interview gate.
+
+**Phase 0.75 — Discovery Lens Calibration**
+
+Every research run selects one or more lenses before gathering:
+
+- User-workflow / product opportunity
+- Technical architecture / implementation
+- Research / benchmark / academic
+- Risk / compliance / security
+
+For trend, roadmap, "what should we add", or "would users use this" prompts, the user-workflow/product opportunity lens runs before arXiv, benchmark, or architecture-only searches. The research is incomplete unless it includes user-workflow evidence and a Local capability x User artifact mapping.
 
 **Phase 1 — Information Gathering**
 
-Parallel collection from 4 sources:
+Parallel collection from the relevant sources:
 
 1. **Codebase exploration**: Identify relevant files/modules, confirm existing patterns
 2. **Memory exploration**: Check past failures and lessons in `.claude/memory/wiki.md` and `failures.md`
 3. **Existing PLAN exploration**: Review precedents from similar tasks in `work-docs/PLAN-*.md`
-4. **External sources** (with `--deep`): `refdocs-search` skill + Context7 MCP + web search
+4. **User-workflow/product discovery**: Search real user artifacts, adjacent tools, repeated handoff pains, ecosystem requests, and community prototypes
+5. **External sources**: `refdocs-search` skill + Context7 MCP + web search when current docs or citations matter
 
 The `refdocs-search` skill performs a 2-tier search on the reference document folders (`ref_folders`):
 - Tier 1: Lightweight ripgrep index to narrow down candidate files

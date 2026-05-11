@@ -224,6 +224,26 @@ def test_research_codex_render_no_dollar_arguments() -> None:
     assert "$ARGUMENTS" not in rendered, "Codex research render contains $ARGUMENTS"
 
 
+def test_research_stage_requires_user_workflow_discovery_lens() -> None:
+    """research must calibrate product/user workflow discovery before pure benchmarks."""
+    rendered = _render_stage("research")
+    assert "Discovery lens calibration" in rendered
+    assert "User-workflow / product opportunity" in rendered
+    assert "Local capability x User artifact" in rendered
+    assert "arXiv papers, benchmarks, and leaderboards cannot satisfy this guard" in rendered
+
+
+def test_codex_research_skill_inherits_user_workflow_discovery_lens() -> None:
+    """Codex hm-research skill must inherit the same discovery guard from the template."""
+    specs = _codex_stage_skills()
+    spec = next((s for s in specs if "hm-research" in s[1]), None)
+    assert spec is not None, "No stage skill spec found for hm-research"
+    body = spec[2].get("stage_body", "")
+    assert "Discovery lens calibration" in body
+    assert "run the **User-workflow / product opportunity**" in body
+    assert "Local capability x User artifact" in body
+
+
 # ── Config threading: config_dump flows into stage_body ───────────────────────
 
 

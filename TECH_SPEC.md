@@ -488,6 +488,7 @@ class ConflictItem(BaseModel):
 - 7 atomic stages → each automatically exposed as `/hm:<stage>`
 - Workflow = user-named stage sequence → Renderer synthesizes fragments → single `/hm:<name>` command
 - Defined under `harness.yaml.workflows` key; additional workflows can be added by re-running `/harness-maker:make`
+- `/hm:research` calibrates search lenses before gathering; broad trend and roadmap prompts must run the user-workflow/product opportunity lens before academic, benchmark, or architecture-only searches.
 
 **(M4) Anti-rot (Phase 4)**
 3-stage pipeline:
