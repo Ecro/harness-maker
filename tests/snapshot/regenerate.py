@@ -11,7 +11,9 @@ Run from harness-maker repo root:
 
 from __future__ import annotations
 
+import fnmatch
 import os
+import re
 import shutil
 import tempfile
 from pathlib import Path
@@ -24,6 +26,40 @@ from harness_maker.models import DevMode
 from harness_maker.profile import profile
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
+
+EXCLUSIONS_FILE = Path(__file__).parent / "EXCLUSIONS.md"
+
+
+def load_exclusions(path: Path = EXCLUSIONS_FILE) -> list[str]:
+    """Parse EXCLUSIONS.md into a list of fnmatch globs.
+
+    PLAN-llm-code-review-2026 ADR-005 — paths inside the
+    ``<!-- @hm:exclusion-list -->`` / ``<!-- @hm:/exclusion-list -->`` block
+    are dropped from snapshot comparison so non-deterministic reviewer output
+    paths do not flake.
+    """
+    if not path.is_file():
+        return []
+    raw = path.read_text(encoding="utf-8")
+    match = re.search(
+        r"<!--\s*@hm:exclusion-list\s*-->(.*?)<!--\s*@hm:/exclusion-list\s*-->",
+        raw,
+        flags=re.DOTALL,
+    )
+    if not match:
+        return []
+    globs: list[str] = []
+    for line in match.group(1).splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith(("#", "<!--")):
+            continue
+        globs.append(stripped)
+    return globs
+
+
+def is_excluded(path: str, exclusions: list[str]) -> bool:
+    """True iff ``path`` matches any of the active fnmatch globs."""
+    return any(fnmatch.fnmatch(path, g) for g in exclusions)
 
 FIXTURES = ["side-python-cli", "side-tauri-app", "prod-tauri-app", "prod-firmware"]
 DEV_MODES: tuple[tuple[str, DevMode], ...] = (
@@ -43,14 +79,16 @@ def regen_one(fixture_name: str, mode_label: str, mode: DevMode) -> None:
     target = fix_dir / f".claude.regen-tmp-{mode_label}"
     target.mkdir(exist_ok=True)
     render(bp, target, dry_run=False, freeze_time=DEFAULT_FREEZE_TIME)
+    exclusions = load_exclusions()
+    filtered = [f for f in bp.files if not is_excluded(str(f.path), exclusions)]
     snap = {
         "preset": bp.config.preset.value,
         "dev_mode": bp.config.dev_mode.value,
-        "file_count": len(bp.files),
+        "file_count": len(filtered),
         "files": sorted(
             [
                 {"path": str(f.path), "template": f.template, "body_sha256": f.body_sha256}
-                for f in bp.files
+                for f in filtered
             ],
             key=lambda x: x["path"],
         ),

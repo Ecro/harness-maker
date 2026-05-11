@@ -10,6 +10,7 @@ test silently agree on identical files.
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import pytest
@@ -20,6 +21,9 @@ from harness_maker.models import DevMode
 from harness_maker.profile import profile
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
+
+sys.path.insert(0, str(Path(__file__).parent.parent / "snapshot"))
+from regenerate import is_excluded, load_exclusions  # noqa: E402
 
 _FIXTURES = ("side-python-cli", "side-tauri-app", "prod-tauri-app", "prod-firmware")
 _MODES: tuple[tuple[str, DevMode], ...] = (
@@ -57,13 +61,15 @@ def test_snapshot_matches(
     a = interview(p, autoloop_mode=True).model_copy(update={"dev_mode": mode})
     bp = synthesize(p, a)
     render(bp, tmp_path, dry_run=False, freeze_time=DEFAULT_FREEZE_TIME)
+    exclusions = load_exclusions()
+    filtered = [f for f in bp.files if not is_excluded(str(f.path), exclusions)]
     assert bp.config.preset.value == expected["preset"]
     assert bp.config.dev_mode.value == expected["dev_mode"]
-    assert len(bp.files) == expected["file_count"]
+    assert len(filtered) == expected["file_count"]
     actual = sorted(
         [
             {"path": str(f.path), "template": f.template, "body_sha256": f.body_sha256}
-            for f in bp.files
+            for f in filtered
         ],
         key=lambda x: x["path"],
     )

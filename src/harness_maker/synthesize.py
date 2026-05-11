@@ -41,6 +41,7 @@ _ATOMIC_STAGES: list[str] = [s.value for s in AtomicStage]
 _ALL_AGENTS: list[str] = [
     "autoloop-coder",
     "code-reviewer",
+    "code-verifier",
     "concurrency-reviewer",
     "consensus-arbiter",
     "executor",
@@ -149,6 +150,7 @@ def _agent_files() -> list[FileSpec]:
 _CODEX_AGENT_META: dict[str, str] = {
     "autoloop-coder": "Implementation agent for autoloop iterations — bounded scope, write-tool-only, no open-ended exploration; worktree-bounded writes",  # noqa: E501
     "code-reviewer": "Reviews code changes for correctness, readability, maintainability, and basic security/performance hygiene",  # noqa: E501
+    "code-verifier": "Pass 1.5 reduce-only verifier — KEEP/DROP/DEMOTE Pass 1 findings against the redacted diff. MUST NOT introduce new findings.",  # noqa: E501
     "concurrency-reviewer": "Reviews changes for race conditions, deadlocks, ISR safety, and async correctness",  # noqa: E501
     "consensus-arbiter": "Aggregates findings from multiple reviewer agents via surface match + reasoning alignment + severity resolution; tags every finding consensus-passed | weak-consensus | manual-only",  # noqa: E501
     "executor": "Workflow executor with worktree-bounded write permissions — only writes to .worktrees/, never to repo root",  # noqa: E501

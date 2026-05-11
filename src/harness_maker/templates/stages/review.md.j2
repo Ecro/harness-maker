@@ -140,19 +140,51 @@ anchoring-prone diffs):
    - Returns findings per the Finding Schema partial:
      `{severity, file, line, summary, suggestion, reasoning?, …}`.
 
+#### Pass 1.5 — verifier (reduce-only, redacted context)
+
+3. Pipe the Pass 1 findings + redacted context through the verifier CLI.
+   The verifier role is REDUCE-ONLY (ADR-002 of PLAN-llm-code-review-2026):
+   it MUST NOT introduce new findings — its output is a strict subset of
+   `pass1_findings`, possibly with demoted severity.
+   {% if is_codex %}
+   ```bash
+   Bash("echo '<verifier_input_json>' | python -m harness_maker.two_pass_review verify")
+   ```
+   {% else %}
+   ```bash
+   echo '<verifier_input_json>' | python -m harness_maker.two_pass_review verify
+   ```
+   {% endif %}
+   Verifier input shape:
+   `{pass1_findings: [...], pass1_context: {...redacted...}, fixture_label?: str}`.
+   Verifier output shape:
+   `{kept: [...⊆ pass1_findings], dropped: [{finding, reason}], stats: {input_n, kept_n, dropped_n, demoted_n}}`.
+   If the verifier model is unavailable the CLI emits `stats.fallback="model_unavailable"` and `kept == pass1_findings` (guard for failures.md 2026-05-11).
+4. **The verifier-kept set is the input to Pass 2.** Pass 1 findings that
+   the verifier dropped MUST NOT be re-introduced by Pass 2 — surface
+   them only in the optional drift section of the REVIEW report.
+
 #### Pass 2 — contextual verdict (full metadata restored)
 
-3. Re-run the same reviewer set with the **full** context (metadata
-   restored) and the Pass 1 findings list. Each reviewer validates each
-   finding against the metadata, drops any that the context proves to be
-   spurious, and adjusts severity if the context changes risk.
-4. Merge the two passes via the harness CLI:
+5. Re-run the same reviewer set with the **full** context (metadata
+   restored) and the **verifier-kept** findings list (NOT the raw Pass 1
+   list). Each reviewer validates each kept finding against the metadata,
+   drops any that the context proves spurious, and adjusts severity if
+   context changes risk. Pass 2 MUST NOT re-evaluate verifier-dropped
+   findings — its input is the verifier-kept set only.
+6. Merge the two passes via the harness CLI:
+   {% if is_codex %}
+   ```bash
+   Bash("echo '{\"pass1\": [...], \"pass2\": [...]}' | python -m harness_maker.two_pass_review merge")
+   ```
+   {% else %}
    ```bash
    echo '{"pass1": [...], "pass2": [...]}' | python -m harness_maker.two_pass_review merge
    ```
+   {% endif %}
    Pass 2 is authoritative — Pass 1 findings absent from Pass 2 are
    invalidated by context and **dropped** (CP10 contract).
-5. The merged finding list is the input to the consensus filter (Step 4).
+7. The merged finding list is the input to the consensus filter (Step 4).
 
 ### Step 4 — Consensus filter (surface + reasoning alignment)
 
@@ -319,6 +351,31 @@ human_review_needed: {true|false}
 
 - `APPROVED` → ready for wrapup.
 - `CHANGES_REQUESTED` (autoloop policy) → list remaining issues, set `human_review_needed=true`, **proceed to wrapup** (do NOT halt the loop on D/F — wrapup will surface the flag).
+
+## Telemetry Emit (always, per round)
+
+After each round's REVIEW report write, append one line to
+`.claude/observability/review-{YYYY-MM-DD}.jsonl` via the harness CLI.
+14-field schema (PLAN-llm-code-review-2026 ADR-006); numeric fields default
+to 0, `fixture_label` / `verifier_false_*` / `fallback` are null on real
+runs. Don't interpolate `wall_time_ms` into any other rendered template
+(determinism leakage — see `test_telemetry_no_leak`).
+
+{% if is_codex %}
+```bash
+Bash("echo '<record_json>' | python -m harness_maker.review_telemetry emit")
+```
+{% else %}
+```bash
+echo '<record_json>' | python -m harness_maker.review_telemetry emit
+```
+{% endif %}
+
+Record fields:
+`{ts, slug, round, pass1_n, verifier_kept_n, verifier_dropped_n, verifier_false_drop_n, verifier_false_keep_n, fixture_label, pass2_kept_n, consensus_passed_n, wall_time_ms, build_break_count, auto_fix_reverted_n, fallback}`.
+
+The CLI auto-stamps `ts` when omitted. Schema validation rejects unknown
+fields and negative counts.
 
 ## Outputs
 

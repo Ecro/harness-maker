@@ -1,0 +1,64 @@
+{
+  "fixture_label": "adv-fix-001",
+  "description": "5-finding labeled fixture for verifier behavior tests. 2 real bugs in the diff, 3 spurious findings whose reasoning chain does not hold against the diff alone (anchoring-on-metadata, speculative INFER, or contradicted by the diff itself).",
+  "pass1_context": {
+    "pr_title": "[REDACTED]",
+    "pr_description": "[REDACTED]",
+    "author": "[REDACTED]",
+    "diff": "--- a/src/queue.py\n+++ b/src/queue.py\n@@ -10,4 +10,7 @@\n def enqueue(item, q):\n-    if item is None:\n-        return False\n+    q.append(item)\n     return True\n+\n+def dequeue(q):\n+    return q.pop(0)\n"
+  },
+  "pass1_findings": [
+    {
+      "id": "real-1",
+      "ground_truth": "real",
+      "severity": "P0",
+      "file": "src/queue.py",
+      "line": 11,
+      "summary": "Null check removed allows None enqueue",
+      "suggestion": "Restore the None guard or document the new contract.",
+      "reasoning": "OBSERVE: diff deletes 'if item is None: return False'. INFER: callers that relied on the False signal for None now receive True. CONCLUDE: silent data corruption when None reaches downstream consumers."
+    },
+    {
+      "id": "real-2",
+      "ground_truth": "real",
+      "severity": "P1",
+      "file": "src/queue.py",
+      "line": 15,
+      "summary": "dequeue uses O(n) pop(0) on list",
+      "suggestion": "Use collections.deque or popleft() if the type is deque already.",
+      "reasoning": "OBSERVE: dequeue calls q.pop(0). INFER: list.pop(0) shifts every element. CONCLUDE: enqueue O(1) + dequeue O(n) makes the queue O(n) overall."
+    },
+    {
+      "id": "spurious-anchored",
+      "ground_truth": "spurious",
+      "severity": "P0",
+      "file": "src/queue.py",
+      "line": 1,
+      "summary": "Missing thread-safety primitives",
+      "suggestion": "Wrap operations in a Lock.",
+      "reasoning": "OBSERVE: file is named queue.py. INFER: queues are typically used across threads. CONCLUDE: race condition risk. (Note: the PR description mentioned multi-threading — that field is redacted at this pass, so this finding rests on speculation, not the diff.)"
+    },
+    {
+      "id": "spurious-contradicted",
+      "ground_truth": "spurious",
+      "severity": "P1",
+      "file": "src/queue.py",
+      "line": 11,
+      "summary": "enqueue does not return on early exit",
+      "suggestion": "Add explicit return statement.",
+      "reasoning": "OBSERVE: enqueue lacks an explicit early return. INFER: control may fall through. CONCLUDE: function may return None. (Contradicted by the diff: the function unconditionally returns True at line 12.)"
+    },
+    {
+      "id": "spurious-speculative",
+      "ground_truth": "spurious",
+      "severity": "P2",
+      "file": "src/queue.py",
+      "line": 15,
+      "summary": "dequeue might crash on empty queue",
+      "suggestion": "Add length check.",
+      "reasoning": "OBSERVE: dequeue calls pop(0). INFER: maybe the queue is empty in some callsite. CONCLUDE: IndexError. (INFER step references hypothetical callsites not visible in the diff — speculative.)"
+    }
+  ],
+  "expected_keep_ids": ["real-1", "real-2"],
+  "expected_drop_ids": ["spurious-anchored", "spurious-contradicted", "spurious-speculative"]
+}

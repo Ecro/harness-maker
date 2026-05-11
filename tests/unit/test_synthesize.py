@@ -35,7 +35,7 @@ def test_side_and_production_install_full_inventory() -> None:
 
 
 def test_side_file_count_in_range() -> None:
-    # 17 atomic+stages+fixed + 12 agents + 11 skills + harness/settings/CLAUDE/memory/etc.
+    # 17 atomic+stages+fixed + _ALL_AGENTS + 11 skills + harness/settings/CLAUDE/memory etc.
     assert 40 <= len(SIDE_FILES) <= 60
 
 

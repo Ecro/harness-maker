@@ -1,4 +1,4 @@
-"""Phase 6 tests: Codex agent TOML templates (12 agents via codex/agent.toml.j2).
+"""Phase 6 tests: Codex agent TOML templates (one per agent in _ALL_AGENTS).
 
 RED before Phase 6 implementation:
 - templates/codex/agent.toml.j2 does not yet exist
@@ -8,7 +8,7 @@ RED before Phase 6 implementation:
 GREEN after Phase 6:
 - Each agent renders valid TOML
 - developer_instructions does NOT contain YAML frontmatter (ADR-007 regression guard)
-- All 12 agent paths present in _codex_target_files()
+- All agent paths in _ALL_AGENTS present in _codex_target_files()
 """
 
 from __future__ import annotations
@@ -105,10 +105,12 @@ def test_codex_agent_toml_developer_instructions_has_heading(name: str) -> None:
 # ── synthesize: _codex_agent_files and _codex_target_files ───────────────────
 
 
-def test_codex_agent_files_returns_12_entries() -> None:
-    """_codex_agent_files() must return 12 FileSpec entries (one per agent)."""
+def test_codex_agent_files_returns_one_entry_per_agent() -> None:
+    """_codex_agent_files() must return one FileSpec per agent in _ALL_AGENTS."""
     specs = _codex_agent_files()
-    assert len(specs) == 12, f"Expected 12 agent specs, got {len(specs)}"
+    assert len(specs) == len(_ALL_AGENTS), (
+        f"Expected {len(_ALL_AGENTS)} agent specs, got {len(specs)}"
+    )
 
 
 def test_codex_agent_files_correct_output_paths() -> None:
