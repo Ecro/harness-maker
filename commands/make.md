@@ -81,9 +81,13 @@ most common reason existing 0.4.x/0.5.0 users return to this command:
   that the `refdocs-search` skill indexes. Ask the user for new folder paths.
 - **Manage sibling_repos** — add, remove, or clear sibling repo relative paths
   that provide cross-repo context during research and review.
+- **Manage Second Brain** — enable, disable, or update the Obsidian vault
+  connection. Ask for `vault_path` and `project_id`; dispatches with
+  `--second-brain-vault-path` (pass empty string to disable).
 - **Full reconfigure** — drive a fresh interview here in the slash command
-  (preset → locale → dev_mode → targets → ref_folders → sibling_repos) and
-  dispatch with all flags. No TTY required — works in slash-command context.
+  (preset → locale → dev_mode → targets → ref_folders → sibling_repos →
+  second_brain) and dispatch with all flags. No TTY required — works in
+  slash-command context.
   (`--reinterview` typed directly in the prompt also routes here; see section 0.5.)
 - **Audit only** — report status, do not change anything.
 
@@ -136,7 +140,7 @@ Show a summary of the detected profile and smart defaults. Use `AskUserQuestion`
 
 **"Adjust a few things"** → Use `AskUserQuestion` to ask which dimension(s)
 to change (multi-select: preset, locale, dev_mode, targets, grade_threshold,
-mechanical_checks, wrapup_docs, ref_folders, sibling_repos). For each selected
+mechanical_checks, wrapup_docs, ref_folders, sibling_repos, second_brain). For each selected
 dimension, show an `AskUserQuestion` with the current smart default and
 alternatives. Then jump to Section 3.6.
 
@@ -176,6 +180,12 @@ alternatives. Then jump to Section 3.6.
    Suggest sibling dirs visible via `ls ..` that look like git repos.
    Semicolon-separated relative paths (e.g. `../backend;../mobile`).
    "none" to skip. Maps to `--sibling-repos`.
+12. `AskUserQuestion`: **Second Brain** — "Connect an Obsidian vault for
+   stage-aware memory? Stages read typed notes (decision, preference,
+   failure, reference, project) instead of loading the whole vault."
+   Ask: vault path (absolute or `~`-relative), or "none" to skip.
+   If given: ask project_id (kebab-case, e.g. `my-app`; blank to omit).
+   Maps to `--second-brain-vault-path` and `--second-brain-project-id`.
 
 #### 3.5 Preview AskUserQuestion
 
@@ -317,6 +327,10 @@ in turn, then dispatch with all collected flags:
    project (e.g. `../backend;../mobile`). Show sibling git dirs as
    suggestions. Semicolon-separated relative paths, or "none".
    Maps to `--sibling-repos`.
+12. `AskUserQuestion`: **Second Brain** — "Connect an Obsidian vault for
+   stage-aware memory?" Ask for vault path (absolute or `~`-relative), or
+   "none" to skip. If given: ask project_id (kebab-case, e.g. `my-app`).
+   Maps to `--second-brain-vault-path` and `--second-brain-project-id`.
 
 Then dispatch with the collected values:
 
@@ -325,10 +339,13 @@ Then dispatch with the collected values:
   --preset "$PRESET" --locale "$LOCALE" --dev-mode "$DEV_MODE" --targets "$TARGETS" \
   --focus "$FOCUS" --grade-threshold "$GRADE" --domains "$DOMAINS" \
   --mechanical-checks "$CHECKS" --recommended-model "$MODEL" --wrapup-docs "$WRAPUP_DOCS" \
-  --ref-folders "$REF_FOLDERS" --sibling-repos "$SIBLING_REPOS"
+  --ref-folders "$REF_FOLDERS" --sibling-repos "$SIBLING_REPOS" \
+  --second-brain-vault-path "$SB_VAULT_PATH" --second-brain-project-id "$SB_PROJECT_ID"
 ```
 
-Omit flags for any dimension the user skipped or left at default.
+Omit `--second-brain-vault-path` when the user chose "none"; omit
+`--second-brain-project-id` when the user left it blank. Omit all other
+flags for dimensions the user skipped or left at default.
 
 Existing settings outside these dimensions (workflow naming, anti-rot
 config, etc.) are reused from `.claude/harness.yaml`. For a deeper reset
@@ -345,6 +362,23 @@ Read `.claude/harness.yaml`, render no files, report:
 
 Use Read + Bash; no CLI invocation.
 
+#### Manage Second Brain
+
+Read `.claude/harness.yaml` for current `second_brain` settings (enabled, vault_path,
+project_id). Show them, then ask:
+
+1. `AskUserQuestion`: vault path — current value shown; enter new path, empty to keep,
+   or "none" to disable.
+2. `AskUserQuestion`: project_id — current value shown; enter new value or blank to keep.
+
+```bash
+!uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" \
+  --second-brain-vault-path "$SB_VAULT_PATH" --second-brain-project-id "$SB_PROJECT_ID"
+```
+
+Pass empty string `""` for `--second-brain-vault-path` to disable. Omit
+`--second-brain-project-id` if the user left it unchanged.
+
 #### Fresh install
 
 ```bash
@@ -352,7 +386,9 @@ Use Read + Bash; no CLI invocation.
   --preset "$PRESET" --locale "$LOCALE" --dev-mode "$DEV_MODE" --targets "$TARGETS" \
   --focus "$FOCUS" --grade-threshold "$GRADE" --domains "$DOMAINS" \
   --mechanical-checks "$CHECKS" --recommended-model "$MODEL" --wrapup-docs "$WRAPUP_DOCS" \
-  --ref-folders "$REF_FOLDERS" --sibling-repos "$SIBLING_REPOS" --autoloop
+  --ref-folders "$REF_FOLDERS" --sibling-repos "$SIBLING_REPOS" \
+  --second-brain-vault-path "$SB_VAULT_PATH" --second-brain-project-id "$SB_PROJECT_ID" \
+  --autoloop
 ```
 
 Substitute the values collected in step 3. Omit flags the user didn't set

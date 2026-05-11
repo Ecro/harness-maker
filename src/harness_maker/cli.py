@@ -150,6 +150,19 @@ def make(
         "--sibling-repos",
         help="Semicolon-separated relative paths to sibling repos (e.g. '../backend;../frontend').",
     ),
+    second_brain_vault_path: str | None = typer.Option(
+        None,
+        "--second-brain-vault-path",
+        help=(
+            "Obsidian vault path (absolute or ~-relative) to enable Second Brain. "
+            "Pass empty string '' to disable."
+        ),
+    ),
+    second_brain_project_id: str | None = typer.Option(
+        None,
+        "--second-brain-project-id",
+        help="kebab-case project id for Second Brain namespace isolation.",
+    ),
     dry_run: bool = typer.Option(
         False,
         "--dry-run",
@@ -196,6 +209,8 @@ def make(
         wrapup_docs_override=wrapup_docs_override,
         ref_folders_override=ref_folders_override,
         sibling_repos_override=sibling_repos_override,
+        second_brain_vault_path=second_brain_vault_path,
+        second_brain_project_id=second_brain_project_id,
     )
     if add_domain_name is not None:
         try:
@@ -431,6 +446,8 @@ def _apply_dimension_overrides(
     wrapup_docs_override: str | None = None,
     ref_folders_override: str | None = None,
     sibling_repos_override: str | None = None,
+    second_brain_vault_path: str | None = None,
+    second_brain_project_id: str | None = None,
 ) -> InterviewAnswers:
     """Apply per-dimension CLI overrides on top of the answers.
 
@@ -496,6 +513,28 @@ def _apply_dimension_overrides(
         update["sibling_repos"] = [
             r.strip() for r in sibling_repos_override.split(";") if r.strip()
         ]
+    if second_brain_vault_path is not None:
+        from harness_maker.models import SecondBrainConfig  # noqa: PLC0415
+
+        if second_brain_vault_path == "":
+            update["second_brain"] = SecondBrainConfig()
+        else:
+            existing_id = answers.second_brain.project_id
+            update["second_brain"] = SecondBrainConfig(
+                enabled=True,
+                vault_path=second_brain_vault_path,
+                project_id=second_brain_project_id if second_brain_project_id is not None else existing_id,
+            )
+    elif second_brain_project_id is not None and answers.second_brain.enabled:
+        from harness_maker.models import SecondBrainConfig  # noqa: PLC0415
+
+        existing = answers.second_brain
+        update["second_brain"] = SecondBrainConfig(
+            enabled=existing.enabled,
+            vault_path=existing.vault_path,
+            project_id=second_brain_project_id,
+            folders=list(existing.folders),
+        )
 
     if preset_override:
         try:

@@ -173,6 +173,7 @@ def interview(
     caching = _ask_with_default("caching", "agent-aware")
     ref_folders = _ask_ref_folders()
     sibling_repos = _ask_sibling_repos()
+    second_brain = _ask_second_brain()
     return _build_answers(
         locale=locale,
         targets=targets,
@@ -184,6 +185,7 @@ def interview(
         caching=caching,
         ref_folders=ref_folders,
         sibling_repos=sibling_repos,
+        second_brain=second_brain,
     )
 
 
@@ -422,6 +424,32 @@ def _ask_sibling_repos() -> list[str]:
         out.append(line)
 
 
+def _ask_second_brain() -> SecondBrainConfig:
+    """Ask whether to connect an Obsidian vault as Second Brain.
+
+    Blank vault_path skips (disabled). project_id is required only when
+    writable folders will be configured later — we don't ask for folders here;
+    the user adds them directly to harness.yaml after initial setup.
+    """
+    print("\nObsidian Second Brain (connect a Markdown vault for stage-aware memory).")
+    print("  Vault path: absolute or ~-relative path to the Obsidian vault root.")
+    print("  Leave blank to skip.")
+    vault_raw = _input_or_empty("  vault_path: ").strip()
+    if not vault_raw:
+        return SecondBrainConfig()
+    vault_path = Path(vault_raw).expanduser()
+    if not vault_path.exists():
+        print(f"  warn: vault path {vault_raw!r} not found on this machine (registering anyway).")
+    project_id_raw = _input_or_empty(
+        "  project_id (kebab-case, e.g. my-app — blank to omit): "
+    ).strip()
+    return SecondBrainConfig(
+        enabled=True,
+        vault_path=vault_raw,
+        project_id=project_id_raw,
+    )
+
+
 def _parse_stage_numbers(line: str) -> list[AtomicStage]:
     out: list[AtomicStage] = []
     for tok in line.split(","):
@@ -467,6 +495,7 @@ def _build_answers(
     default_workflow: str,
     consensus: str | None = None,
     caching: str | None = None,
+    second_brain: SecondBrainConfig | None = None,
     ref_folders: list[RefFolder] | None = None,
     sibling_repos: list[str] | None = None,
 ) -> InterviewAnswers:
@@ -480,6 +509,7 @@ def _build_answers(
         default_workflow=default_workflow,
         ref_folders=list(ref_folders) if ref_folders else [],
         sibling_repos=list(sibling_repos) if sibling_repos else [],
+        second_brain=second_brain if second_brain is not None else SecondBrainConfig(),
         reviewers={
             "installed": list(_ALL_REVIEWERS),
             "enabled": list(_SIDE_ENABLED_REVIEWERS if is_side else _PROD_ENABLED_REVIEWERS),
