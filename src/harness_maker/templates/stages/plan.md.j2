@@ -114,6 +114,9 @@ This single confirmation prevents the "I just answered every SPEC question — w
 
 **Language rule (important):**
 - **Live interview** → conduct in `{{ config.locale }}` (en→English, ko→Korean, ja→Japanese, others→English fallback). Round preamble, "decisions so far", open ambiguity explanations, {% if is_codex %}questions asked in response{% else %}AskUserQuestion prompts{% endif %} and option labels — all in `{{ config.locale }}`.
+- Use the configured locale for every live round preamble, decisions-so-far
+  block, ambiguity explanation, question text and option labels, ambiguity
+  score display labels, and validation prompt.
 - **PLAN document on disk** → always English. Translate user's free-form answers when archiving in Step 5.
 
 Each round runs Steps A–E.
@@ -226,6 +229,8 @@ ADR template:
 in Step B this round, skip the gate below and exit the interview immediately.
 
 Otherwise, before declaring the interview complete, run the **3-Layer Deep Interview Gate**:
+Continue using the configured locale for Layer 1/2 question text and option
+labels, ambiguity explanations, score display labels, and validation prompts.
 
 **Layer 1 — GCIC Gap Check**
 

@@ -81,7 +81,7 @@ claude --plugin-dir /path/to/harness-maker
 /harness-maker:make
 ```
 
-The interview asks for your preset (`Side` or `Production`), locale, dev mode, and target runtime. A fully-rendered harness is ready in one turn.
+The interview asks for locale first, then preset (`Side` or `Production`), dev mode, and target runtime. The setup preview explains generated roots, backups, preserved user blocks, target-specific leftovers, review trade-offs, and how to continue advanced Second Brain setup with `/hm:configure`. A fully-rendered harness is ready in one turn.
 
 Re-run with flags to evolve the harness:
 

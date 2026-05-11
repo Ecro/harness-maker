@@ -8,7 +8,7 @@ A **meta-tool**. The Claude Code ecosystem ships a `.claude/` directory inside e
 
 Three design commitments shape every decision below:
 
-1. **Single command.** Users invoke `/harness-maker:make`. Everything else is a flag (`--audit`, `--add`, `--remove`, `--promote`).
+1. **Single command.** Users invoke `/harness-maker:make`. Everything else is a flag (`--audit`, `--add`, `--remove`, `--promote`). Interactive onboarding asks locale first, then keeps live setup prompts in that locale.
 2. **Two presets, deep override.** `Side` (1 reviewer, lean) and `Production` (5 reviewers, verify-required) cover ~90% of cases. The remaining 10% comes from 10+ override dimensions surfaced in the interview.
 3. **Brownfield-safe.** harness-maker never silently overwrites user edits. Provenance frontmatter (M13) and the Reconciler (M2) form a hash-based ours/theirs decision system.
 
@@ -115,7 +115,7 @@ The four-stage core. Each stage has a single responsibility and a typed handoff.
 - **Interviewer** (`interview.py`) recommends a preset based on the profile, then runs an interactive interview across 10+ override dimensions: workflow naming, reviewers, models, autoloop, anti-rot, worktree, security, context-lint, memory, caching. Also captures `targets` (Claude Code / Cursor) and `recommended_model`. Locale-first; English is the default (`DEFAULT_LOCALE = "en"`) with Korean built-in and unknown locales silently falling back to English, via `i18n.py`. Emits `HarnessConfig`.
 - **Synthesizer** (`synthesize.py`) is **purely deterministic** — given a `HarnessConfig`, it produces the same `Blueprint` (a list of `FileEntry`) every time. No LLM call here; this guarantees reproducibility and snapshot testability.
 - **Renderer** (`render.py`) walks the `Blueprint`, loads each Jinja2 template, injects context, prepends provenance frontmatter (M13), and writes the result.
-- **Second Brain** (`second_brain.py`) treats an Obsidian vault as a typed Markdown graph for stage-aware memory. Read/write access is constrained by configured folder allowlists, and writable folders require `second_brain.project_id` in the folder path so several projects can share one vault without writing into the same namespace.
+- **Second Brain** (`second_brain.py`) treats an Obsidian vault as a typed Markdown graph for stage-aware memory. First-install onboarding is read-first; deeper write-capable setup is configured later. Read/write access is constrained by configured folder allowlists, and writable folders require `second_brain.project_id` in the folder path so several projects can share one vault without writing into the same namespace.
 
 The split lets you swap the interview UX (CLI prompt vs `AskUserQuestion`) without touching synthesis, and snapshot-test the synthesizer in isolation.
 

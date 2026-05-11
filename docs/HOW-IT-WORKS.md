@@ -2026,6 +2026,8 @@ PDFs are processed page-by-page with Read multimodal. DOCX is not supported (con
 
 `second_brain` connects a generated harness to an Obsidian-compatible Markdown vault as a typed graph of decisions, preferences, failures, projects, references, and journals. Notes use YAML frontmatter plus tags and `[[links]]`, so stages can retrieve targeted memory instead of loading the whole vault.
 
+First install keeps this setup read-first and points advanced write-capable configuration to `/hm:configure`, where the user can review the allowlist, namespace, and writable-folder trade-offs deliberately.
+
 Writes are intentionally full Markdown writes inside trusted allowlisted folders. To keep several projects from colliding in the same vault, any writable folder requires `second_brain.project_id`, and the writable folder path must include that project id as a path segment, such as `Projects/my-app`. Managed notes also warn when frontmatter omits the project namespace.
 
 ---

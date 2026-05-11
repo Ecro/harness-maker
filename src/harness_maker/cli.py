@@ -523,7 +523,11 @@ def _apply_dimension_overrides(
             update["second_brain"] = SecondBrainConfig(
                 enabled=True,
                 vault_path=second_brain_vault_path,
-                project_id=second_brain_project_id if second_brain_project_id is not None else existing_id,
+                project_id=(
+                    second_brain_project_id
+                    if second_brain_project_id is not None
+                    else existing_id
+                ),
             )
     elif second_brain_project_id is not None and answers.second_brain.enabled:
         from harness_maker.models import SecondBrainConfig  # noqa: PLC0415

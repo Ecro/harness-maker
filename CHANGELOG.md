@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+### Changed
+- `/harness-maker:make` now asks locale as the first non-CI onboarding
+  decision and expands its setup receipt with generated roots, backups,
+  preserved user blocks, target leftovers, qualitative review trade-offs,
+  and read-first Second Brain guidance.
+- `/hm:configure` now presents settings as a multi-select decision receipt
+  with current/new values, benefits, trade-offs, re-render impact, and
+  preservation notes; Second Brain configuration points users toward the
+  advanced allowlist / writable-folder path.
+- Deep Interview surfaces in research, spec, plan, and loop now explicitly
+  require configured-locale live prompts and option labels.
+
+### Fixed
+- Cleaned up a pre-existing line-length lint failure in the Second Brain CLI
+  override path so the full wrapup ruff gate passes.
+
 ## 0.11.0 — 2026-05-11
 
 Adds agentic-depth instructions to the 5 reviewer prompts so reviewers

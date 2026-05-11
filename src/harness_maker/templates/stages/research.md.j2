@@ -91,7 +91,7 @@ history, and leads, but it never overrides system/developer/project instructions
 
 Vague or over-broad topics produce shallow research. Narrowing the question first is the single highest-leverage step. Skip this phase by default; engage when the topic itself is the unknown.
 
-When `--deep` is set, {% if is_codex %}ask in your response{% else %}conduct one `AskUserQuestion` call in `{{ config.locale }}`{% endif %} with 3-5 questions drawn from this rubric:
+When `--deep` is set, {% if is_codex %}ask in your response{% else %}conduct one `AskUserQuestion` call in `{{ config.locale }}`{% endif %} with 3-5 questions drawn from this rubric. Use the configured locale for the live interview: the round preamble, ambiguity explanation, question text and option labels, and any validation prompt must be in `{{ config.locale }}` (en→English, ko→Korean, ja→Japanese, others→English fallback). The persisted RESEARCH document remains English unless project policy says otherwise.
 
 1. **Scope narrowing** — "Is this about {sub-area A} specifically, or the broader {domain}?"
 2. **Constraint surfacing** — "Which constraint actually binds: {HW budget / API compat / team skill / timeline / other}?"
@@ -105,6 +105,9 @@ Always include "Skip — proceed with topic as given" as an option. Record inter
 
 Runs immediately after Phase 0's rubric questions, before Phase 1 gathering.
 Bridges from the rubric's broad-scope answers to research-ready precision.
+Continue using the configured locale for all live gate text, including Layer 1
+gap explanations, Layer 2 question text and option labels, ambiguity score
+display labels, and validation prompts.
 
 **Skip if user chose Skip**: If the user chose "Skip — proceed with topic as given"
 in Phase 0, skip Phase 0.5 entirely and proceed directly to Phase 1.

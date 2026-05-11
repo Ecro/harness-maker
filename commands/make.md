@@ -12,8 +12,8 @@ You (Claude) act as the orchestrator. Follow these steps:
 If the prompt text contains `--ci`, extract inline params and skip all
 `AskUserQuestion` calls. Parse `preset=`, `locale=`, `dev_mode=`,
 `targets=` from the prompt; use defaults `Side` / `en` / `task` /
-`claude-code` for any that are absent. Skip sections 2 and 3 entirely
-and jump directly to section 4 (Dispatch → Fresh install or Update,
+`claude-code` for any that are absent. Skip the live locale question and
+jump directly to section 5 (Dispatch → Fresh install or Update,
 depending on whether `.claude/harness.yaml` exists).
 
 Example invocation:
@@ -27,12 +27,32 @@ If the prompt text contains `--reinterview` (and is not `--ci`), the user
 wants a full interactive reconfigure. **Do not pass `--reinterview` through
 to the CLI** — the CLI's interactive interview reads from stdin, which
 falls back to autoloop defaults in the slash-command context (no TTY).
-Instead, skip the menu in section 2 and jump straight to the **Full
-reconfigure** branch in section 4, which drives `AskUserQuestion` here in
+Instead, skip the menu in section 3 and jump straight to the **Full
+reconfigure** branch in section 5, which drives `AskUserQuestion` here in
 the slash command and dispatches with collected `--preset / --locale /
 --dev-mode / --targets` flags.
 
-### 1. Detect state
+### 1. Choose live locale
+
+Default is `en`, but the first interactive decision must be the user's live
+onboarding language. Ask this before profile detection, preset selection,
+dev_mode, targets, or any setup confirmation. All subsequent live onboarding prose,
+question text, option labels, trade-off explanations, and decision
+summaries must use the selected locale. Persisted generated documents may still
+follow their own template rules; this section controls the live setup
+conversation.
+
+Use `AskUserQuestion`:
+
+- **English (`en`)** — default; best-supported public-plugin baseline.
+- **Korean (`ko`)** — use Korean for the rest of this onboarding flow.
+- **Other locale tag** — accept a free-text BCP-47-style tag; if no localized
+  template exists, explain that runtime generated text may fall back to English.
+
+Store the answer as `$LOCALE` and use it in every later dispatch unless the
+user explicitly changes it.
+
+### 2. Detect state
 
 Resolve the plugin install path and check whether the project already has
 a harness:
@@ -50,7 +70,7 @@ echo "PLUGIN_DIR=$plugin_dir"
 [ -f "$(pwd)/.claude/harness.yaml" ] && echo "STATE=re-render" || echo "STATE=fresh-install"
 ```
 
-### 2. If `STATE=re-render` — show current settings + ask intent
+### 3. If `STATE=re-render` — show current settings + ask intent
 
 Read `.claude/harness.yaml` body (skip frontmatter) and surface to the user:
 - preset, locale, dev_mode, default_workflow
@@ -64,15 +84,19 @@ most common reason existing 0.4.x/0.5.0 users return to this command:
 - **Update** — re-render with the same settings; pick up new template
   improvements. (recommended after a `/plugin update`. Does **not** ask
   about extra runtimes — pick "Switch runtime targets" if you want to opt into
-  Cursor or Codex on a previously claude-code-only install.)
+  Cursor or Codex on a previously claude-code-only install.) Explain that the
+  CLI backs up the current generated harness state under `.backup-<timestamp>`
+  before rendering when existing files are present.
 - **Switch runtime targets** — pick `claude-code`, `cursor`, `codex`, or any combination.
   Adding `cursor` renders `.cursor/rules/harness.mdc` + `.cursor/mcp.json`
   alongside the shared `.claude/` assets so the harness drives Cursor
   IDE 2.4+ natively. Adding `codex` renders `AGENTS.md`, `.codex/`, and
-  `.agents/skills/` assets. Removing a target leaves prior target-specific
-  files in place (delete manually if undesired).
+  `.agents/skills/` assets. Dropping a target does not delete previously
+  rendered target-specific files; it leaves them in place so user edits are not
+  destroyed. Remove them manually or with uninstall if you want a clean slate.
 - **Switch preset** — Side ↔ Production. Re-derives all preset-coupled
-  defaults (security gates, worktree scope, default reviewer set).
+  defaults (security gates, worktree scope, default reviewer set). Trade-off:
+  Production increases review coverage and strictness; Side is lighter.
 - **Switch locale** — change the `locale` tag (en/ko/ja/...).
 - **Switch dev_mode** — spec-driven ↔ task-driven.
 - **Add a component** — install one extra reviewer / skill / domain pack.
@@ -83,17 +107,20 @@ most common reason existing 0.4.x/0.5.0 users return to this command:
   that provide cross-repo context during research and review.
 - **Manage Second Brain** — enable, disable, or update the Obsidian vault
   connection. Ask for `vault_path` and `project_id`; dispatches with
-  `--second-brain-vault-path` (pass empty string to disable).
+  `--second-brain-vault-path` (pass empty string to disable). Explain that
+  first setup is read-first: stages search configured project memory rather
+  than writing arbitrary vault files; deeper writable-folder setup continues in
+  `/hm:configure`.
 - **Full reconfigure** — drive a fresh interview here in the slash command
-  (preset → locale → dev_mode → targets → ref_folders → sibling_repos →
+  (locale → preset → dev_mode → targets → ref_folders → sibling_repos →
   second_brain) and dispatch with all flags. No TTY required — works in
   slash-command context.
   (`--reinterview` typed directly in the prompt also routes here; see section 0.5.)
 - **Audit only** — report status, do not change anything.
 
-### 3. If `STATE=fresh-install` — smart defaults + confirm
+### 4. If `STATE=fresh-install` — smart defaults + confirm
 
-#### 3.1 Run profile scan
+#### 4.1 Run profile scan
 
 ```bash
 !uv run --directory "$plugin_dir" python -m harness_maker.cli profile "$(pwd)" --json
@@ -101,7 +128,7 @@ most common reason existing 0.4.x/0.5.0 users return to this command:
 
 Parse the JSON output. Extract: `stack`, `scale`, `lifecycle`, `detected_checks`.
 
-#### 3.2 Compute smart defaults
+#### 4.2 Compute smart defaults
 
 Based on the profile, derive:
 - **preset**: `Production` if (scale=medium/large OR lifecycle=active), else `Side`
@@ -109,13 +136,14 @@ Based on the profile, derive:
 - **reviewer_list**: Side = `[code-reviewer]`; Production = `[code-reviewer, security-reviewer, performance-reviewer, ux-reviewer, concurrency-reviewer]`
 - **detected_checks**: from profile scan (may be empty)
 - **grade_threshold**: `A` if Production, else `B`
-- **locale**: `en` (default)
+- **locale**: `$LOCALE` from section 1 (`en` when the user accepted the default)
 - **dev_mode**: `spec-driven` if Production, else `task-driven`
 - **targets**: `claude-code` (default)
 
-#### 3.3 AskUserQuestion: Smart defaults confirm screen
+#### 4.3 AskUserQuestion: Smart defaults confirm screen
 
-Show a summary of the detected profile and smart defaults. Use `AskUserQuestion`:
+Show a summary of the detected profile and smart defaults in `$LOCALE`.
+Use `AskUserQuestion`:
 
 > **Project profile detected:**
 > - Stack: {stack}
@@ -128,26 +156,39 @@ Show a summary of the detected profile and smart defaults. Use `AskUserQuestion`
 > - Mechanical checks: {detected_checks or "(none detected — add manually later)"}
 > - Grade threshold: {grade_threshold}
 > - Auto-fix: enabled
+> - Review trade-off: stricter gates, more reviewers, and mechanical checks
+>   increase confidence and may increase review work; this flow explains the
+>   trade-off without predicting exact review time.
+>
+> **Safety receipt preview:**
+> - Generated roots may include `.claude/`, `.cursor/`, `.codex/`,
+>   `.agents/skills/`, and `AGENTS.md`, depending on selected targets.
+> - Existing generated state is backed up under `.backup-<timestamp>` before
+>   re-render when applicable.
+> - User blocks marked `@hm:user:*` are preserved; reconcile may report `KEEP`,
+>   `MERGE_BLOCK`, or `REPLACE`.
 >
 > Options:
 > - **Looks right** — install with these settings
 > - **Adjust a few things** — change specific dimensions
-> - **Full setup** — answer all questions (preset, locale, dev_mode, targets, focus, grade, domains, model, wrapup docs, ref_folders, sibling_repos)
+> - **Full setup** — answer all questions (locale, preset, dev_mode, targets, focus, grade, domains, model, wrapup docs, ref_folders, sibling_repos)
 
-#### 3.4 Branch on confirm response
+#### 4.4 Branch on confirm response
 
-**"Looks right"** → Jump to Section 3.6 (Preview) with smart defaults.
+**"Looks right"** → Jump to Section 4.6 (Preview) with smart defaults.
 
 **"Adjust a few things"** → Use `AskUserQuestion` to ask which dimension(s)
 to change (multi-select: preset, locale, dev_mode, targets, grade_threshold,
 mechanical_checks, wrapup_docs, ref_folders, sibling_repos, second_brain). For each selected
-dimension, show an `AskUserQuestion` with the current smart default and
-alternatives. Then jump to Section 3.6.
+dimension, show an `AskUserQuestion` with the current smart default,
+alternatives, and a one-line trade-off. Then jump to Section 4.6.
 
 **"Full setup"** → Ask all dimensions in order:
 
-1. `AskUserQuestion`: **preset** — `Side` or `Production` (show smart default)
-2. `AskUserQuestion`: **locale** — `en`, `ko`, or free-text
+1. `AskUserQuestion`: **locale confirmation** — keep `$LOCALE` or change it.
+   This must remain first if the user enters Full setup directly.
+2. `AskUserQuestion`: **preset** — `Side` or `Production` (show smart default
+   and trade-off: Side is lighter; Production increases review coverage and strictness)
 3. `AskUserQuestion`: **dev_mode** — `task-driven` or `spec-driven`
 4. `AskUserQuestion`: **targets** — `claude-code`, `cursor`, `codex`, or any combination (multi-select)
 5. `AskUserQuestion`: **review focus** — "What's your primary work on this project?"
@@ -181,21 +222,34 @@ alternatives. Then jump to Section 3.6.
    Semicolon-separated relative paths (e.g. `../backend;../mobile`).
    "none" to skip. Maps to `--sibling-repos`.
 12. `AskUserQuestion`: **Second Brain** — "Connect an Obsidian vault for
-   stage-aware memory? Stages read typed notes (decision, preference,
-   failure, reference, project) instead of loading the whole vault."
+   stage-aware memory? This first setup is read-first: stages read typed notes
+   (decision, preference, failure, reference, project) instead of loading the
+   whole vault or configuring writable folders now."
    Ask: vault path (absolute or `~`-relative), or "none" to skip.
    If given: ask project_id (kebab-case, e.g. `my-app`; blank to omit).
    Maps to `--second-brain-vault-path` and `--second-brain-project-id`.
+   Tell the user that `/hm:configure` can continue with deeper Second Brain
+   setup after install, including write-capable allowlisted folders.
 
-#### 3.5 Preview AskUserQuestion
+#### 4.5 Preview AskUserQuestion
 
 Before dispatch, show a preview:
 
-> **Will install 40+ files under .claude/.** Key capabilities:
+> **Will install/update harness files.** Key capabilities and safety receipt:
 > - {count} slash commands ({workflow_names})
 > - {reviewer_count} reviewers active
 > - {skill_count} skills enabled
 > - Mechanical checks: {checks or "(none)"}
+> - Target roots: `.claude/` always; `.cursor/`, `.codex/`, `.agents/skills/`,
+>   and `AGENTS.md` when those targets are selected.
+> - Backup: existing generated state is copied to `.backup-<timestamp>` before
+>   re-render when applicable.
+> - Preservation: `@hm:user:*` blocks are preserved; reconcile reports `KEEP`,
+>   `MERGE_BLOCK`, or `REPLACE` from the CLI output.
+> - Target removal: dropping a target does not delete old target-specific files.
+> - Review trade-off: more reviewers, stricter grade thresholds, and mechanical
+>   checks increase confidence and can add review work, without predicting exact
+>   review time.
 >
 > Options:
 > - **Proceed** — install now
@@ -203,13 +257,13 @@ Before dispatch, show a preview:
 
 If "Cancel": exit without dispatch.
 
-#### 3.6 Dispatch with collected values
+#### 4.6 Dispatch with collected values
 
-Jump to Section 4 → Fresh install branch, passing all collected flags.
+Jump to Section 5 → Fresh install branch, passing all collected flags.
 
-### 4. Dispatch — pick the right CLI invocation
+### 5. Dispatch — pick the right CLI invocation
 
-Branch on the chosen intent. Use `$plugin_dir` from step 1.
+Branch on the chosen intent. Use `$plugin_dir` from section 2.
 
 #### Update (re-render same settings)
 
@@ -227,6 +281,8 @@ templates while preserving user `@hm:user:*` blocks via reconcile.
 ```
 
 (or `--preset Side` for the reverse). Other dimensions stay as before.
+Explain the trade-off without predicting exact review time: Production usually
+enables broader review and stricter gates; Side is lighter.
 
 #### Switch locale
 
@@ -299,9 +355,10 @@ Drive the interview here in the slash command via `AskUserQuestion` —
 falls back to autoloop defaults in slash context). Ask each dimension
 in turn, then dispatch with all collected flags:
 
-1. `AskUserQuestion`: **preset** — `Side` (1 reviewer, lean) or
+1. `AskUserQuestion`: **locale confirmation** — keep `$LOCALE` from section 1
+   or change it before asking any other setup question.
+2. `AskUserQuestion`: **preset** — `Side` (1 reviewer, lean) or
    `Production` (5 reviewers, verify-required).
-2. `AskUserQuestion`: **locale** — `en`, `ko`, or other free-text tag.
 3. `AskUserQuestion`: **dev_mode** — `task-driven` (no spec gate) or
    `spec-driven` (spec_gate hook enforced).
 4. `AskUserQuestion`: **targets** — `claude-code`, `cursor`, `codex`, or any combination
@@ -365,11 +422,14 @@ Use Read + Bash; no CLI invocation.
 #### Manage Second Brain
 
 Read `.claude/harness.yaml` for current `second_brain` settings (enabled, vault_path,
-project_id). Show them, then ask:
+project_id). Show them, explain this is the advanced path after read-first
+setup, then ask:
 
 1. `AskUserQuestion`: vault path — current value shown; enter new path, empty to keep,
    or "none" to disable.
 2. `AskUserQuestion`: project_id — current value shown; enter new value or blank to keep.
+3. Explain that write-capable folders are constrained by allowlist,
+   Markdown/frontmatter validation, and `project_id` namespace rules.
 
 ```bash
 !uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" \
@@ -391,17 +451,21 @@ Pass empty string `""` for `--second-brain-vault-path` to disable. Omit
   --autoloop
 ```
 
-Substitute the values collected in step 3. Omit flags the user didn't set
+Substitute the values collected in section 4. Omit flags the user didn't set
 or left at smart defaults (the CLI applies preset defaults for unset flags).
 `$TARGETS` is the comma-joined multi-select — e.g. `claude-code`,
 `claude-code,cursor`, or `claude-code,cursor,codex`.
 
-### 5. Report + Quick start
+### 6. Report + Quick start
 
 After dispatch, summarize what changed:
 - Files: how many REPLACE / MERGE_BLOCK / KEEP (the CLI prints this)
 - Whether the chosen intent landed (e.g., "preset is now Production")
 - Backup directory path for recovery
+- What target roots are now active and which previously rendered target files
+  were intentionally left in place
+- For Second Brain: whether it is disabled, read-first, or ready for deeper
+  `/hm:configure` setup
 
 Then show a **quick-start** guide:
 
