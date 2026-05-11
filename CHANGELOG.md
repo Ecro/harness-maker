@@ -2,28 +2,75 @@
 
 ## Unreleased
 
+## 0.10.0 — 2026-05-11
+
+Adds a Pass-1.5 verifier sub-role and built-in JSONL telemetry to the
+`/hm:review` stage, plus the previously-unreleased Second Brain, research
+discovery-lens, and Codex model-omit fixes.
+
 ### Added
-- Added filesystem-backed Obsidian Second Brain configuration and helper
-  commands for typed Markdown notes, including project-scoped write allowlists,
-  frontmatter/tag/link validation, and stage-aware research/plan/review/wrapup
-  guidance.
+- New `code-verifier` agent and `verify_findings()` engine for the Pass-1.5
+  reduce-only verifier in `/hm:review` (PLAN-llm-code-review-2026 ADR-002).
+  Reduce-only invariant — `set(kept ∪ dropped) ⊆ input`; out-of-range LLM
+  indices silently dropped; `_validated_demote_severity` rejects promotion
+  attempts (a malformed verifier response with `new_severity: "P0"` on a
+  P2 finding falls back to one-tier demotion + warning log).
+- New `harness_maker.review_telemetry` module emitting an append-only JSONL
+  row per `/hm:review` invocation at `.claude/observability/review-{date}.jsonl`
+  (ADR-006). 14-field schema (`ts, slug, round, pass1_n, verifier_kept_n,
+  verifier_dropped_n, verifier_false_drop_n, verifier_false_keep_n,
+  fixture_label, pass2_kept_n, consensus_passed_n, wall_time_ms,
+  build_break_count, auto_fix_reverted_n, fallback`). Uses POSIX `O_APPEND` +
+  looped `os.write` (EINTR-resilient); PIPE_BUF (4096) write-time guard plus
+  pydantic `Field(max_length=...)` schema-time guard. Concurrent reviewers
+  sharing `.worktrees/` serialize at the kernel level for writes ≤ PIPE_BUF.
+- New `python -m harness_maker.two_pass_review verify` and
+  `python -m harness_maker.review_telemetry emit` CLI subcommands so stage
+  templates pipe JSON contracts through Python instead of re-implementing
+  them in prose.
+- New `tests/snapshot/EXCLUSIONS.md` mechanism (empty list at ship — Phase C
+  populates) so reviewer-output paths can opt out of snapshot comparison
+  when prompt-only agentic depth lands (ADR-005).
+- New `tests/structural/` test category for assertions that complement
+  snapshot comparison: verifier agent permissions, review-stage wiring,
+  reviewer-output schema on a labeled adversarial fixture,
+  snapshot-exclusion mechanism, and telemetry-leak grep lint.
+- Filesystem-backed Obsidian Second Brain configuration and helper commands
+  for typed Markdown notes — project-scoped write allowlists, frontmatter
+  / tag / link validation, and stage-aware research / plan / review /
+  wrapup guidance.
 
 ### Changed
+- `/hm:review` Step 3 now runs Pass 1 → Pass 1.5 verifier → Pass 2 (the
+  verifier-kept set is the input to Pass 2, not raw Pass 1). Pass 2 prompt
+  body now includes `## Diff` explicitly — the parameter was previously
+  accepted but never interpolated, leaving reviewers with no diff to
+  validate findings against.
+- `_build_verifier_user_prompt` fence-escapes LLM-originated `summary` /
+  `reasoning` fields per the same defense used in `build_pass2_prompt` so
+  a prompt-injected Pass-1 finding cannot break out of its block and leak
+  instructions into the verifier turn.
 - Updated `/hm:research` so broad trend, roadmap, and opportunity research
-  starts with a user-workflow/product discovery lens before papers,
+  starts with a user-workflow / product discovery lens before papers,
   benchmarks, or architecture-only sources.
 
 ### Fixed
-- Omit per-agent `model = ...` line from rendered `.codex/agents/*.toml`. The
-  hardcoded `o4` / `o4-mini` strings were rejected on ChatGPT-tier Codex CLI
-  subscriptions with HTTP 400 `invalid_request_error`, causing
-  reviewer/validator subagents (including `/hm:plan` Step 4 plan-validator) to
-  fail to spawn. With the field omitted Codex inherits the account's
+- Omit per-agent `model = ...` line from rendered `.codex/agents/*.toml`.
+  The hardcoded `o4` / `o4-mini` strings were rejected on ChatGPT-tier Codex
+  CLI subscriptions with HTTP 400 `invalid_request_error`, causing reviewer
+  / validator subagents (including `/hm:plan` Step 4 plan-validator) to fail
+  to spawn. With the field omitted Codex inherits the account's
   `~/.codex/config.toml` profile default automatically. The template's
   `{% if model_codex %}` gate is preserved so a future opt-in
   `codex_agent_models` knob on `HarnessConfig` can re-enable per-agent models
   without touching the template. See ADR-001 in
   `work-docs/PLAN-codex-plan-validator-model-unavailable.md`.
+
+### Internal
+- `_codex_agent_files()` count assertions now derive from `_ALL_AGENTS`
+  length so future agent registrations don't require manual test edits.
+- Tightened the concurrent-writer test: round-trip JSON equality detects
+  byte-tearing, not just missed records.
 
 ## 0.9.3 — 2026-05-10
 
