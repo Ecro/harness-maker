@@ -17,6 +17,7 @@ Read `.claude/harness.yaml` body (skip frontmatter) and surface:
 - domains (if any)
 - recommended_model
 - wrapup_docs (if any)
+- second_brain: enabled, vault_path, project_id (if configured)
 
 ### 2. Ask what to change
 
@@ -32,11 +33,18 @@ Options (multi-select):
 - **Mechanical checks** — add/edit/clear pre-review commands
 - **Recommended model** — opus / sonnet / haiku
 - **Wrapup documents** — add/edit/clear docs updated during /hm:wrapup (e.g. CHANGELOG.md, TODO.md)
+- **Second Brain** — configure Obsidian vault connection (vault_path, project_id)
 
 ### 3. Collect changes
 
 For each selected dimension, show an `AskUserQuestion` with the current
 value and alternatives. Collect the new values.
+
+For **Second Brain**: ask two questions in sequence:
+1. Vault path — show current `second_brain.vault_path` (or "not configured");
+   user enters absolute/`~`-relative path, or "none" to disable.
+2. Project ID — show current `second_brain.project_id`; user enters
+   kebab-case id (e.g. `my-app`), or blank to keep existing.
 
 ### 4. Dispatch
 
@@ -45,12 +53,15 @@ Run the CLI with only the changed flags:
 ```bash
 !uv run --with {{ harness_maker_src_path }} python -m harness_maker.cli make "$(pwd)" \
   --grade-threshold "$GRADE" --domains "$DOMAINS" --mechanical-checks "$CHECKS" \
-  --recommended-model "$MODEL" --focus "$FOCUS" --wrapup-docs "$WRAPUP_DOCS"
+  --recommended-model "$MODEL" --focus "$FOCUS" --wrapup-docs "$WRAPUP_DOCS" \
+  --second-brain-vault-path "$SB_VAULT_PATH" --second-brain-project-id "$SB_PROJECT_ID"
 ```
 
-Omit flags for dimensions that weren't changed. The CLI preserves
-unspecified fields from `.claude/harness.yaml` — only changed dimensions
-are overwritten.
+Omit flags for dimensions that weren't changed. Omit `--second-brain-vault-path`
+when Second Brain wasn't selected; pass empty string `""` to disable it.
+Omit `--second-brain-project-id` when the user left it unchanged.
+The CLI preserves unspecified fields from `.claude/harness.yaml` — only
+changed dimensions are overwritten.
 
 ### 5. Confirm
 

@@ -368,6 +368,37 @@ def test_reconcile_user_frontmatter_no_hash_returns_keep(tmp_path: Path) -> None
     assert conflicts[0].reason == "frontmatter-no-hash-not-ours"
 
 
+def test_reconcile_harness_yaml_always_replaces(tmp_path: Path) -> None:
+    """harness.yaml is always REPLACE regardless of hash or manual edits.
+
+    User-maintained fields (e.g. mechanical_checks) survive because
+    answers_from_harness_yaml reads them back before the render pass.
+    """
+    from harness_maker.models import Blueprint, FileEntry
+
+    target = tmp_path / ".claude"
+    target.mkdir()
+    (target / "harness.yaml").write_text(
+        "---\ncontent_hash: stale-hash\ngenerated_by: harness-maker\n---\n"
+        "preset: Side\nlocale: en\nmechanical_checks:\n  - ruff check .\n",
+        encoding="utf-8",
+    )
+    bp = Blueprint(
+        files=[
+            FileEntry(
+                path=Path("harness.yaml"),
+                template="harness-yaml/Side.yaml.j2",
+                context={},
+                frontmatter={},
+            ),
+        ],
+    )
+    conflicts = reconcile(target, bp)
+    assert len(conflicts) == 1
+    assert conflicts[0].decision == ReconcileDecision.REPLACE
+    assert conflicts[0].reason == "config-always-replace"
+
+
 def test_backup_includes_agents_skills_directory(tmp_path: Path) -> None:
     """`.agents/skills/` Codex dual-render directory must be included in backup."""
     claude_dir = tmp_path / ".claude"

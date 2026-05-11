@@ -2,6 +2,9 @@
 
 Decision matrix:
 - new-only (no existing file)                                → BOTH
+- harness.yaml                                               → REPLACE (always; user
+                                                                fields survive via
+                                                                answers_from_harness_yaml)
 - existing has no frontmatter at all                         → KEEP (user file)
 - existing has frontmatter but no content_hash AND
   generated_by == "harness-maker"                            → REPLACE (legacy ours,
@@ -67,6 +70,19 @@ def reconcile(existing_dir: Path, blueprint: Blueprint) -> list[ConflictItem]:
         if not existing_path.exists():
             conflicts.append(
                 ConflictItem(path=fe.path, decision=ReconcileDecision.BOTH, reason="new-only"),
+            )
+            continue
+        # harness.yaml is the primary config file. Always REPLACE so template
+        # additions (e.g. new second_brain section) propagate on re-render.
+        # User-maintained fields (mechanical_checks, etc.) survive because
+        # answers_from_harness_yaml reads them back before the render pass.
+        if fe.path.name == "harness.yaml":
+            conflicts.append(
+                ConflictItem(
+                    path=fe.path,
+                    decision=ReconcileDecision.REPLACE,
+                    reason="config-always-replace",
+                ),
             )
             continue
         # settings.json is system-managed JSON co-owned with Claude Code (which

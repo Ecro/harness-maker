@@ -49,7 +49,7 @@ files:
   body_sha256: 50723b24320945863213ad4c16d6dc155dbdf0102f0f65c6b0e10d3d2bc5b077
 - path: commands/hm/configure.md
   template: commands/hm/configure.md.j2
-  body_sha256: 4b41df509190a5c0fcc5cd5bfd0e5b8d96674678cee3fbff7a803da5c198da9f
+  body_sha256: a598f2537dd6eef31e32aeeb15c8cdf197a0dc762969415e811a4ccebda057c3
 - path: commands/hm/exec-rev-wrap.md
   template: commands/hm/workflow_command.md.j2
   body_sha256: fb7498971f581ff93859e92f35732cc779c33635a9c1be4225edfc6c515b0fbd
@@ -94,7 +94,7 @@ files:
   body_sha256: 723c07570562b440412fc6b2b8a96d1c15d7116bd7b5ce1fbd7aee3ea05f7de0
 - path: harness.yaml
   template: harness-yaml/Side.yaml.j2
-  body_sha256: b94fe2e7662ac40a59f3e43e37ee534dece2c31ab74a1d3d2d94cc5cbeba7796
+  body_sha256: 49a8abb5b47966b11c90796cc033d78619b64d99b2276cab09556df73775a68e
 - path: hooks/hooks.json
   template: hooks/hooks.json.j2
   body_sha256: c1d2af4f46d4b2021666c37a53d26e6a364b1c8ba1bac1369816df7e78dd5a0d

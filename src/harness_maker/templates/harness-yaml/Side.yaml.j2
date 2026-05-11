@@ -49,6 +49,10 @@ reviewers:
   auto_fix: {{ config.reviewers.auto_fix | lower }}
   grade_threshold: {{ config.reviewers.grade_threshold }}
   max_review_rounds: {{ config.reviewers.max_review_rounds }}
+{% if config.reviewers.mechanical_checks %}
+  mechanical_checks:
+{% for c in config.reviewers.mechanical_checks %}    - {{ c | tojson }}
+{% endfor %}{% endif %}
   installed:
 {% for r in config.reviewers.installed %}    - {{ r }}
 {% endfor %}  enabled:
