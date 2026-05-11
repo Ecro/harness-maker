@@ -4,7 +4,7 @@ harness_maker_version: 0.9.4
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: harness-yaml/Side.yaml.j2
 provenance: official
-content_hash: ace3160453472c520f33fd8633eb478df6ab0765b0bf3071e0e9b2bfdd3ba277
+content_hash: 56167444d920667669f94061c4949e79294e7c5d485b0b291bbb3a4ed3005d2d
 ---
 preset: Side
 locale: en
@@ -20,6 +20,16 @@ spec:
 work_docs:
   dir: work-docs/
 ref_folders:
+
+second_brain:
+  enabled: false
+  backend: "filesystem"
+  project_id: ""
+  vault_path: ""
+  trusted_allowlist: true
+  required_frontmatter: ["type", "created", "updated", "tags", "links"]
+
+  folders: []
 
 sibling_repos:
 

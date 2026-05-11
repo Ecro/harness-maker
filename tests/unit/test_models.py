@@ -20,6 +20,9 @@ from harness_maker.models import (
     Preset,
     ProjectProfile,
     ReconcileDecision,
+    SecondBrainConfig,
+    SecondBrainFolder,
+    SecondBrainNoteType,
     Target,
     WorkflowDef,
 )
@@ -180,6 +183,88 @@ def test_harness_config_targets_schema_gap_fallback() -> None:
     """
     cfg = HarnessConfig.model_validate({"locale": "en"})
     assert cfg.targets == [Target.CLAUDE_CODE]
+
+
+def test_second_brain_config_defaults_disabled() -> None:
+    cfg = SecondBrainConfig()
+    assert cfg.enabled is False
+    assert cfg.backend == "filesystem"
+    assert cfg.project_id == ""
+    assert cfg.vault_path == ""
+    assert cfg.trusted_allowlist is True
+    assert cfg.folders == []
+    assert cfg.required_frontmatter == ["type", "created", "updated", "tags", "links"]
+
+
+def test_second_brain_config_accepts_filesystem_allowlist() -> None:
+    cfg = SecondBrainConfig(
+        enabled=True,
+        project_id="harness-maker",
+        vault_path="../vault",
+        folders=[
+            SecondBrainFolder(
+                path="Projects/harness-maker",
+                read=True,
+                write=True,
+                note_types=[SecondBrainNoteType.DECISION, SecondBrainNoteType.FAILURE],
+            )
+        ],
+    )
+    assert cfg.enabled is True
+    assert cfg.folders[0].path == "Projects/harness-maker"
+    assert cfg.folders[0].note_types == [
+        SecondBrainNoteType.DECISION,
+        SecondBrainNoteType.FAILURE,
+    ]
+
+
+def test_second_brain_rejects_non_filesystem_backend() -> None:
+    with pytest.raises(ValidationError):
+        SecondBrainConfig(
+            enabled=True,
+            backend="rest",
+            project_id="harness-maker",
+            vault_path="../vault",
+        )
+
+
+def test_second_brain_folder_rejects_absolute_path() -> None:
+    with pytest.raises(ValidationError):
+        SecondBrainFolder(path="/Users/noel/Vault", read=True)
+
+
+def test_harness_config_carries_second_brain_config() -> None:
+    cfg = HarnessConfig(
+        second_brain=SecondBrainConfig(
+            enabled=True,
+            project_id="harness-maker",
+            vault_path="../vault",
+            folders=[SecondBrainFolder(path="Projects/harness-maker", read=True, write=True)],
+        )
+    )
+    restored = HarnessConfig.model_validate_json(cfg.model_dump_json())
+    assert restored.second_brain.enabled is True
+    assert restored.second_brain.project_id == "harness-maker"
+    assert restored.second_brain.folders[0].write is True
+
+
+def test_second_brain_requires_project_id_for_write_folders() -> None:
+    with pytest.raises(ValidationError, match="project_id is required"):
+        SecondBrainConfig(
+            enabled=True,
+            vault_path="../vault",
+            folders=[SecondBrainFolder(path="Projects/harness-maker", write=True)],
+        )
+
+
+def test_second_brain_write_folder_must_include_project_id_segment() -> None:
+    with pytest.raises(ValidationError, match="must include project_id"):
+        SecondBrainConfig(
+            enabled=True,
+            project_id="harness-maker",
+            vault_path="../vault",
+            folders=[SecondBrainFolder(path="Projects/shared", write=True)],
+        )
 
 
 # ──────────────────────────────────────────────────────────────────────────────

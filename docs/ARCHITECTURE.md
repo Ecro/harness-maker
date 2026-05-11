@@ -76,6 +76,8 @@ Three design commitments shape every decision below:
         │    loop.md          ◀── M7 autoloop driver          │
         │    ai-readiness.md  ◀── M5 scored readiness report   │
         │    refresh.md       ◀── M4 anti-rot, manual confirm │
+        │  second_brain       ◀── typed Obsidian R/W memory    │
+        │                          with project namespaces     │
         │  skills/  (11)      ◀── including verify-before,    │
         │                          conditional-router,        │
         │                          refdocs-search,            │
@@ -113,6 +115,7 @@ The four-stage core. Each stage has a single responsibility and a typed handoff.
 - **Interviewer** (`interview.py`) recommends a preset based on the profile, then runs an interactive interview across 10+ override dimensions: workflow naming, reviewers, models, autoloop, anti-rot, worktree, security, context-lint, memory, caching. Also captures `targets` (Claude Code / Cursor) and `recommended_model`. Locale-first; English is the default (`DEFAULT_LOCALE = "en"`) with Korean built-in and unknown locales silently falling back to English, via `i18n.py`. Emits `HarnessConfig`.
 - **Synthesizer** (`synthesize.py`) is **purely deterministic** — given a `HarnessConfig`, it produces the same `Blueprint` (a list of `FileEntry`) every time. No LLM call here; this guarantees reproducibility and snapshot testability.
 - **Renderer** (`render.py`) walks the `Blueprint`, loads each Jinja2 template, injects context, prepends provenance frontmatter (M13), and writes the result.
+- **Second Brain** (`second_brain.py`) treats an Obsidian vault as a typed Markdown graph for stage-aware memory. Read/write access is constrained by configured folder allowlists, and writable folders require `second_brain.project_id` in the folder path so several projects can share one vault without writing into the same namespace.
 
 The split lets you swap the interview UX (CLI prompt vs `AskUserQuestion`) without touching synthesis, and snapshot-test the synthesizer in isolation.
 

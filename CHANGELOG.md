@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Added
+- Added filesystem-backed Obsidian Second Brain configuration and helper
+  commands for typed Markdown notes, including project-scoped write allowlists,
+  frontmatter/tag/link validation, and stage-aware research/plan/review/wrapup
+  guidance.
+
 ### Changed
 - Updated `/hm:research` so broad trend, roadmap, and opportunity research
   starts with a user-workflow/product discovery lens before papers,

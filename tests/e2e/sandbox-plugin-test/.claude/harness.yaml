@@ -4,7 +4,7 @@ harness_maker_version: 0.9.4
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: harness-yaml/Production.yaml.j2
 provenance: official
-content_hash: a8218fe11ba6be63f51c02ee20807f32da4791e0ec6e98057799cea1718b919a
+content_hash: 954929dcc84498576e8d9dfe89aa64a3278837a6e08934e126a57fb1bc9c2a70
 ---
 preset: Production
 locale: en
@@ -20,6 +20,16 @@ spec:
 work_docs:
   dir: work-docs/
 ref_folders:
+
+second_brain:
+  enabled: false
+  backend: "filesystem"
+  project_id: ""
+  vault_path: ""
+  trusted_allowlist: true
+  required_frontmatter: ["type", "created", "updated", "tags", "links"]
+
+  folders: []
 
 sibling_repos:
 

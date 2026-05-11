@@ -499,6 +499,7 @@ def synthesize(
         spec={"dir": "specs/"},
         work_docs={"dir": "work-docs/"},
         ref_folders=list(answers.ref_folders),
+        second_brain=answers.second_brain,
         sibling_repos=list(answers.sibling_repos),
         mcp_servers=dict(answers.mcp_servers),
         wrapup_docs=list(answers.wrapup_docs),

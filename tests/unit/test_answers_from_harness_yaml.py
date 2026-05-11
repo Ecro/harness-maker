@@ -196,6 +196,70 @@ def test_round_trip_ref_folders(tmp_path: Path) -> None:
     assert reused.ref_folders[1].glob == "**/*.md"
 
 
+def test_round_trip_second_brain_config(tmp_path: Path) -> None:
+    """second_brain survives render → reverse map so upgrades keep vault config."""
+    from harness_maker.interview import interview
+    from harness_maker.models import SecondBrainConfig, SecondBrainFolder, SecondBrainNoteType
+    from harness_maker.profile import profile
+    from harness_maker.render import render
+    from harness_maker.synthesize import synthesize
+
+    p = profile(tmp_path)
+    a = interview(p, autoloop_mode=True).model_copy(
+        update={
+            "second_brain": SecondBrainConfig(
+                enabled=True,
+                project_id="harness-maker",
+                vault_path="../vault",
+                folders=[
+                    SecondBrainFolder(
+                        path="Projects/harness-maker",
+                        read=True,
+                        write=True,
+                        note_types=[SecondBrainNoteType.DECISION, SecondBrainNoteType.JOURNAL],
+                    )
+                ],
+            )
+        },
+    )
+    bp = synthesize(p, a)
+    target = tmp_path / ".claude"
+    render(bp, target, dry_run=False)
+    reused = answers_from_harness_yaml(target / "harness.yaml")
+    assert reused is not None
+    assert reused.second_brain.enabled is True
+    assert reused.second_brain.project_id == "harness-maker"
+    assert reused.second_brain.vault_path == "../vault"
+    assert reused.second_brain.folders[0].path == "Projects/harness-maker"
+    assert reused.second_brain.folders[0].write is True
+    assert reused.second_brain.folders[0].note_types == [
+        SecondBrainNoteType.DECISION,
+        SecondBrainNoteType.JOURNAL,
+    ]
+
+
+def test_default_second_brain_render_round_trips_without_warning(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Default render uses `folders: []`, not a YAML null that invalidates config."""
+    from harness_maker.interview import interview
+    from harness_maker.profile import profile
+    from harness_maker.render import render
+    from harness_maker.synthesize import synthesize
+
+    p = profile(tmp_path)
+    a = interview(p, autoloop_mode=True)
+    target = tmp_path / ".claude"
+    render(synthesize(p, a), target, dry_run=False)
+    with caplog.at_level(logging.WARNING, logger="harness_maker.interview"):
+        reused = answers_from_harness_yaml(target / "harness.yaml")
+    assert reused is not None
+    assert reused.second_brain.enabled is False
+    assert reused.second_brain.folders == []
+    assert not any("second_brain" in rec.message for rec in caplog.records)
+
+
 def test_targets_present_in_yaml_parsed(tmp_path: Path) -> None:
     """yaml 의 targets 키가 valid list 면 그대로 파싱."""
     target = _write_yaml(

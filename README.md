@@ -246,6 +246,20 @@ recommended_model: claude-opus-4-7
 ref_folders:
   - path: ../architecture-docs
     glob: "**/*.{md,txt,pdf}"
+
+second_brain:
+  enabled: true
+  backend: filesystem
+  project_id: my-app
+  vault_path: ../obsidian-vault
+  trusted_allowlist: true       # configured write folders need no confirmation/backup
+  required_frontmatter: [type, created, updated, tags, links]
+  folders:
+    - path: Projects/my-app
+      read: true
+      write: true
+      note_types: [decision, preference, failure, project, reference, journal]
+
 sibling_repos:
   - ../backend
 
@@ -272,6 +286,20 @@ memory:
 ```
 
 Run `/harness-maker:make` again and choose **Update** (same settings, pick up template improvements) or **Full reconfigure** to change any dimension.
+
+### Obsidian Second Brain
+
+`second_brain` connects a Markdown/Obsidian vault as a typed knowledge graph for
+stage-aware memory. `hm-research`, `hm-plan`, `hm-review`, and `hm-wrapup` use
+different note types (`reference`, `project`, `decision`, `preference`,
+`failure`, `journal`) instead of loading the whole vault. Writes are full
+Markdown writes inside configured `write: true` folders only. Configure narrow
+folders: the allowlist is trusted completely, with no per-write confirmation or
+backup. For multiple projects sharing one vault, give every project a distinct
+`project_id` and put writable folders under a path segment with the same value
+(for example `Projects/my-app`). harness-maker rejects writable Second Brain
+folders that do not include the configured `project_id`, which keeps one
+project from writing into another project's note namespace.
 
 ---
 

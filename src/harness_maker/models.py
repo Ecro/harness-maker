@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from enum import Enum
 from pathlib import Path
 from typing import Any
@@ -201,6 +202,118 @@ class RefFolder(BaseModel):
     glob: str = "**/*.{md,txt,pdf}"
 
 
+class SecondBrainNoteType(str, Enum):  # noqa: UP042
+    """Managed Obsidian Second Brain note types."""
+
+    DECISION = "decision"
+    PREFERENCE = "preference"
+    FAILURE = "failure"
+    PROJECT = "project"
+    REFERENCE = "reference"
+    JOURNAL = "journal"
+
+
+def _default_second_brain_note_types() -> list[SecondBrainNoteType]:
+    return list(SecondBrainNoteType)
+
+
+class SecondBrainFolder(BaseModel):
+    """One Obsidian vault folder allowlist entry.
+
+    Folder paths are relative to ``SecondBrainConfig.vault_path``. Absolute
+    folder paths would bypass the vault boundary and are rejected.
+    """
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    path: str
+    read: bool = True
+    write: bool = False
+    note_types: list[SecondBrainNoteType] = Field(
+        default_factory=_default_second_brain_note_types,
+        min_length=1,
+    )
+
+    @field_validator("path")
+    @classmethod
+    def _reject_absolute_or_empty_path(cls, v: str) -> str:
+        cleaned = v.strip()
+        if not cleaned:
+            raise ValueError("second_brain folder path cannot be empty")
+        if Path(cleaned).is_absolute() or cleaned.startswith("~"):
+            raise ValueError("second_brain folder path must be relative to vault_path")
+        return cleaned
+
+    @field_validator("note_types", mode="before")
+    @classmethod
+    def _parse_note_types(cls, v: object) -> object:
+        """Allow YAML/JSON string values while keeping the model strict elsewhere."""
+        if not isinstance(v, list):
+            return v
+        out: list[SecondBrainNoteType] = []
+        for item in v:
+            if isinstance(item, SecondBrainNoteType):
+                out.append(item)
+                continue
+            if isinstance(item, str):
+                out.append(SecondBrainNoteType(item))
+                continue
+            out.append(item)
+        return out
+
+
+class SecondBrainConfig(BaseModel):
+    """Obsidian Second Brain configuration.
+
+    The first backend is intentionally filesystem-only. Vault paths may be
+    absolute because personal Obsidian vaults often live outside the repo.
+    """
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    enabled: bool = False
+    backend: str = "filesystem"
+    project_id: str = ""
+    vault_path: str = ""
+    trusted_allowlist: bool = True
+    folders: list[SecondBrainFolder] = Field(default_factory=list)
+    required_frontmatter: list[str] = Field(
+        default_factory=lambda: ["type", "created", "updated", "tags", "links"],
+    )
+
+    @field_validator("backend")
+    @classmethod
+    def _filesystem_backend_only(cls, v: str) -> str:
+        if v != "filesystem":
+            raise ValueError("second_brain backend must be 'filesystem'")
+        return v
+
+    @field_validator("project_id")
+    @classmethod
+    def _project_id_slug(cls, v: str) -> str:
+        cleaned = v.strip()
+        if not cleaned:
+            return ""
+        if not re.fullmatch(r"[a-z][a-z0-9-]{0,63}", cleaned):
+            raise ValueError("second_brain project_id must be kebab-case")
+        return cleaned
+
+    @model_validator(mode="after")
+    def _write_folders_are_project_namespaced(self) -> SecondBrainConfig:
+        write_folders = [f for f in self.folders if f.write]
+        if not write_folders:
+            return self
+        if not self.project_id:
+            raise ValueError("second_brain.project_id is required when any folder has write=true")
+        for folder in write_folders:
+            if self.project_id not in Path(folder.path).parts:
+                raise ValueError(
+                    "writable second_brain folder paths must include project_id "
+                    f"{self.project_id!r} as a path segment"
+                )
+        return self
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Composite models
 # ──────────────────────────────────────────────────────────────────────────────
@@ -256,6 +369,7 @@ class HarnessConfig(BaseModel):
     spec: dict[str, Any] = Field(default_factory=lambda: {"dir": "specs/"})
     work_docs: dict[str, Any] = Field(default_factory=lambda: {"dir": "work-docs/"})
     ref_folders: list[RefFolder] = Field(default_factory=list)
+    second_brain: SecondBrainConfig = Field(default_factory=SecondBrainConfig)
     # MCP servers — propagated to .cursor/mcp.json (and future .claude/.mcp.json).
     # Shape: {"server-name": {"command": "...", "args": [...], "env": {...}}}.
     # Users add manually to harness.yaml; preserved across re-render via
@@ -311,6 +425,7 @@ class InterviewAnswers(BaseModel):
     dev_mode: DevMode = DevMode.SPEC_DRIVEN
     domains: list[str] = Field(default_factory=list)
     ref_folders: list[RefFolder] = Field(default_factory=list)
+    second_brain: SecondBrainConfig = Field(default_factory=SecondBrainConfig)
     # Map of user-named workflow → ordered atomic stages. Names are typically
     # auto-derived via STAGE_ABBREV (e.g. `exec-rev-wrap`) but user can override.
     fused_workflows: dict[str, list[AtomicStage]] = Field(

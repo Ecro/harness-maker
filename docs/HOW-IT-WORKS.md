@@ -45,6 +45,7 @@
     - 11.10 [Generated File Fingerprint + Block-Merge Markers — Upgrades Don't Overwrite User Edits](#1110-generated-file-fingerprint--block-merge-markers--upgrades-dont-overwrite-user-edits)
     - 11.11 [Drift Gate + pending-drift.md — Scope Drift Is Forwarded to the Next Session](#1111-drift-gate--pending-driftmd--scope-drift-is-forwarded-to-the-next-session)
     - 11.12 [Reference Document 2-Tier Search — Only Read What's Relevant from a Large Knowledge Base](#1112-reference-document-2-tier-search--only-read-whats-relevant-from-a-large-knowledge-base)
+        - 11.12.1 [Obsidian Second Brain — Typed R/W Memory with Project Namespaces](#11121-obsidian-second-brain--typed-rw-memory-with-project-namespaces)
     - 11.13 [Anti-Rot System — The Harness Itself Doesn't Go Stale](#1113-anti-rot-system--the-harness-itself-doesnt-go-stale)
     - 11.14 [7-Dimension AI Readiness + Extensible Rubric YAML](#1114-7-dimension-ai-readiness--extensible-rubric-yaml)
     - 11.15 [Deterministic Worktree Isolation](#1115-deterministic-worktree-isolation)
@@ -1669,6 +1670,20 @@ loop:
 ref_folders:
   - ./docs/reference
   - ~/knowledge-base
+
+# Obsidian Second Brain folders
+second_brain:
+  enabled: true
+  backend: filesystem
+  vault_path: ~/vault
+  project_id: my-app
+  trusted_allowlist:
+    - Projects/my-app
+  folders:
+    - path: Projects/my-app
+      read: true
+      write: true
+      note_types: [decision, preference, failure, project, reference, journal]
 ```
 
 ---
@@ -2002,6 +2017,16 @@ Tier 2 (source verify): Read   → directly read candidate files to verify actua
 PDFs are processed page-by-page with Read multimodal. DOCX is not supported (conversion required).
 
 **Token efficiency**: Instead of loading the entire knowledge base into context, Tier 1 filters out irrelevant files and Tier 2 loads only actual content. `relevance-filter` further scores and removes items below 0.7.
+
+---
+
+### 11.12.1 Obsidian Second Brain — Typed R/W Memory with Project Namespaces
+
+**Typical workflow**: A project either forgets durable user knowledge between sessions or treats a vault as read-only reference search.
+
+`second_brain` connects a generated harness to an Obsidian-compatible Markdown vault as a typed graph of decisions, preferences, failures, projects, references, and journals. Notes use YAML frontmatter plus tags and `[[links]]`, so stages can retrieve targeted memory instead of loading the whole vault.
+
+Writes are intentionally full Markdown writes inside trusted allowlisted folders. To keep several projects from colliding in the same vault, any writable folder requires `second_brain.project_id`, and the writable folder path must include that project id as a path segment, such as `Projects/my-app`. Managed notes also warn when frontmatter omits the project namespace.
 
 ---
 

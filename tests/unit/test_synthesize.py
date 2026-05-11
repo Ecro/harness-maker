@@ -197,6 +197,27 @@ def test_synthesize_targets_propagates_to_harness_config() -> None:
     assert bp.config.targets == [Target.CLAUDE_CODE, Target.CURSOR]
 
 
+def test_synthesize_propagates_second_brain_config() -> None:
+    from harness_maker.models import SecondBrainConfig, SecondBrainFolder
+
+    p = _profile()
+    a = interview(p, autoloop_mode=True).model_copy(
+        update={
+            "second_brain": SecondBrainConfig(
+                enabled=True,
+                project_id="harness-maker",
+                vault_path="../vault",
+                folders=[SecondBrainFolder(path="Projects/harness-maker", read=True, write=True)],
+            )
+        }
+    )
+    bp = synthesize(p, a)
+    assert bp.config.second_brain.enabled is True
+    assert bp.config.second_brain.project_id == "harness-maker"
+    assert bp.config.second_brain.vault_path == "../vault"
+    assert bp.config.second_brain.folders[0].write is True
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Codex target — Phase 1 stub + integration
 # ──────────────────────────────────────────────────────────────────────────────

@@ -212,6 +212,23 @@ def test_claude_code_stage_render_non_empty(stage: str) -> None:
     assert rendered.strip(), f"Claude Code {stage} render is empty"
 
 
+@pytest.mark.parametrize(
+    ("stage", "terms"),
+    [
+        ("research", ["second_brain", "reference", "project"]),
+        ("plan", ["second_brain", "decision", "preference"]),
+        ("review", ["second_brain", "failure", "preference"]),
+        ("wrapup", ["second_brain", "journal", "decision"]),
+    ],
+)
+def test_stage_aware_second_brain_guidance(stage: str, terms: list[str]) -> None:
+    rendered = _render_stage(stage, is_codex=True).lower()
+    for term in terms:
+        assert term in rendered
+    assert "harness_maker.second_brain" in rendered
+    assert "untrusted reference" in rendered
+
+
 def test_research_claude_code_render_has_dollar_arguments() -> None:
     """research rendered with is_codex=False must retain $ARGUMENTS (CC slash-arg)."""
     rendered = _render_stage("research", is_codex=False)

@@ -15,6 +15,23 @@ ref_folders:
 {% for f in config.ref_folders %}  - path: {{ f.path | tojson }}
     glob: {{ f.glob | tojson }}
 {% endfor %}
+second_brain:
+  enabled: {{ config.second_brain.enabled | lower }}
+  backend: {{ config.second_brain.backend | tojson }}
+  project_id: {{ config.second_brain.project_id | tojson }}
+  vault_path: {{ config.second_brain.vault_path | tojson }}
+  trusted_allowlist: {{ config.second_brain.trusted_allowlist | lower }}
+  required_frontmatter: {{ config.second_brain.required_frontmatter | tojson }}
+{% if config.second_brain.folders %}
+  folders:
+{% for f in config.second_brain.folders %}    - path: {{ f.path | tojson }}
+      read: {{ f.read | lower }}
+      write: {{ f.write | lower }}
+      note_types: {{ f.note_types | tojson }}
+{% endfor %}
+{% else %}
+  folders: []
+{% endif %}
 sibling_repos:
 {% for r in config.sibling_repos %}  - {{ r | tojson }}
 {% endfor %}

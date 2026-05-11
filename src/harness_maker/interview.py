@@ -29,6 +29,7 @@ from harness_maker.models import (
     Preset,
     ProjectProfile,
     RefFolder,
+    SecondBrainConfig,
     Target,
     auto_workflow_name,
 )
@@ -568,12 +569,14 @@ def answers_from_harness_yaml(yaml_path: Path) -> InterviewAnswers | None:
 
     domains = _list_of_strings(_dig(data, "project", "domains")) or list(base.domains)
     ref_folders = _parse_ref_folders(data.get("ref_folders"))
+    second_brain = _parse_second_brain(data.get("second_brain"))
     sibling_repos = _list_of_strings(data.get("sibling_repos"))
     wrapup_docs = _list_of_strings(data.get("wrapup_docs"))
 
     update: dict[str, Any] = {
         "domains": domains,
         "ref_folders": ref_folders,
+        "second_brain": second_brain,
         "sibling_repos": sibling_repos,
         "wrapup_docs": wrapup_docs,
         "reviewers": {
@@ -747,6 +750,17 @@ def _parse_ref_folders(value: object) -> list[RefFolder]:
         glob = glob_val if isinstance(glob_val, str) and glob_val else "**/*.{md,txt,pdf}"
         out.append(RefFolder(path=path, glob=glob))
     return out
+
+
+def _parse_second_brain(value: object) -> SecondBrainConfig:
+    """Reverse-map harness.yaml ``second_brain:`` block to typed config."""
+    if not isinstance(value, dict):
+        return SecondBrainConfig()
+    try:
+        return SecondBrainConfig.model_validate(value)
+    except Exception as e:  # noqa: BLE001 — tolerant upgrade path like mcp_servers
+        logger.warning("harness.yaml second_brain: invalid config ignored (%s).", e)
+        return SecondBrainConfig()
 
 
 def _string_or(value: object, fallback: str | None) -> str:
