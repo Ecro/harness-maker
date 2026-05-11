@@ -2,6 +2,52 @@
 
 ## Unreleased
 
+### Removed
+- Stripped the Anthropic-API-dependent surface from the 0.10.0 verifier
+  feature: `AnthropicVerifierClient` class, `ModelUnavailableError`
+  exception, and the `verify` CLI subcommand (`python -m
+  harness_maker.two_pass_review verify`). The target env (Claude Code as a
+  subscription tool) has no `ANTHROPIC_API_KEY`, so every shipped
+  invocation since 0.10.0 fell back to `model_unavailable` and Pass 1.5
+  never actually ran. See ADR-008 in
+  `work-docs/PLAN-llm-code-review-2026.md`.
+- Removed the Pass 1.5 step from `templates/stages/review.md.j2`. Pass 1
+  findings now flow directly to Pass 2; the deferral note in the rendered
+  stage points at ADR-008.
+- Discarded Phase A7 (wall-time baseline capture). Wall-time measurement,
+  if needed, is manual and out-of-band — no auto-test, no
+  `tests/fixtures/walltime_baseline_*.json` fixture.
+- Removed `test_verify_falls_back_on_model_unavailable`,
+  `test_verify_cli_rejects_missing_stdin`,
+  `test_verify_cli_rejects_malformed_payload`, and the structural
+  `tests/structural/test_review_stage_verifier_wiring.py` test along with
+  the corresponding `_RaisingClient` test helper.
+
+### Retained (library surface; future-callable)
+- `verify_findings()` function + `VerifierClient` Protocol — reduce-only
+  algorithm intact. Callers supplying a custom client (in-process Claude
+  Code Task, future external service, mock for tests) still get the
+  reduce-only invariant + demote validation + fence-escaped prompts.
+- `agents/code-verifier` definition retained as the role contract;
+  description unchanged.
+- Telemetry JSONL schema (15 fields including `verifier_*` counts +
+  `wall_time_ms`) retained — fields are now populated manually by the
+  stage orchestrator rather than by an auto-invoked CLI.
+
+### Fixed
+- `CHANGELOG.md` 0.10.0 "14-field schema" → "15-field schema"
+  (release-0-10-0 REVIEW M1; matches the actual `ReviewTelemetryRecord`
+  field count).
+- `src/harness_maker/two_pass_review.py:_build_verifier_user_prompt` —
+  `fixture_label` is now fence-escaped via `_fence_escape` and the
+  fixture-label block is relocated AFTER the data-treat preamble so an
+  attacker-controlled label cannot inject pre-preamble instructions
+  (release-0-10-0 REVIEW O1).
+- `src/harness_maker/review_telemetry.py:emit` — absolute
+  `observability_dir` is now containment-checked against
+  `project_root.resolve()` via `is_relative_to`; escape attempts raise
+  `ValueError` (release-0-10-0 REVIEW O2).
+
 ## 0.10.0 — 2026-05-11
 
 Adds a Pass-1.5 verifier sub-role and built-in JSONL telemetry to the
@@ -17,7 +63,7 @@ discovery-lens, and Codex model-omit fixes.
   P2 finding falls back to one-tier demotion + warning log).
 - New `harness_maker.review_telemetry` module emitting an append-only JSONL
   row per `/hm:review` invocation at `.claude/observability/review-{date}.jsonl`
-  (ADR-006). 14-field schema (`ts, slug, round, pass1_n, verifier_kept_n,
+  (ADR-006). 15-field schema (`ts, slug, round, pass1_n, verifier_kept_n,
   verifier_dropped_n, verifier_false_drop_n, verifier_false_keep_n,
   fixture_label, pass2_kept_n, consensus_passed_n, wall_time_ms,
   build_break_count, auto_fix_reverted_n, fallback`). Uses POSIX `O_APPEND` +

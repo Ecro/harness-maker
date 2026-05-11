@@ -118,10 +118,27 @@ def emit(
     ``..`` collapse into a concrete absolute path; callers that pass a
     deliberately relative path get the resolved equivalent for the same
     write target (security-reviewer P2 — emit hardening).
+
+    When ``observability_dir`` is an absolute path AND ``project_root`` is
+    set, the resolved absolute path must be contained within
+    ``project_root.resolve()``; otherwise ``ValueError`` is raised. This
+    prevents internal callers from accidentally (or via attacker-influenced
+    config) writing JSONL outside the project tree
+    (release-0-10-0 REVIEW O2 — absolute-path containment).
     """
     base_dir = observability_dir or DEFAULT_OBSERVABILITY_DIR
-    if project_root and not base_dir.is_absolute():
-        base_dir = project_root.resolve() / base_dir
+    if project_root:
+        resolved_root = project_root.resolve()
+        if base_dir.is_absolute():
+            resolved_base = base_dir.resolve()
+            if not resolved_base.is_relative_to(resolved_root):
+                raise ValueError(
+                    f"observability_dir {resolved_base} escapes project_root "
+                    f"{resolved_root}"
+                )
+            base_dir = resolved_base
+        else:
+            base_dir = resolved_root / base_dir
     path = _today_log_path(base_dir)
     line = json.dumps(record.model_dump(), ensure_ascii=False, sort_keys=True)
     _append_atomic_line(path, line)

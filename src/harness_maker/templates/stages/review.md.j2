@@ -140,39 +140,21 @@ anchoring-prone diffs):
    - Returns findings per the Finding Schema partial:
      `{severity, file, line, summary, suggestion, reasoning?, …}`.
 
-#### Pass 1.5 — verifier (reduce-only, redacted context)
+#### Pass 1.5 — verifier (deferred, ADR-008)
 
-3. Pipe the Pass 1 findings + redacted context through the verifier CLI.
-   The verifier role is REDUCE-ONLY (ADR-002 of PLAN-llm-code-review-2026):
-   it MUST NOT introduce new findings — its output is a strict subset of
-   `pass1_findings`, possibly with demoted severity.
-   {% if is_codex %}
-   ```bash
-   Bash("echo '<verifier_input_json>' | python -m harness_maker.two_pass_review verify")
-   ```
-   {% else %}
-   ```bash
-   echo '<verifier_input_json>' | python -m harness_maker.two_pass_review verify
-   ```
-   {% endif %}
-   Verifier input shape:
-   `{pass1_findings: [...], pass1_context: {...redacted...}, fixture_label?: str}`.
-   Verifier output shape:
-   `{kept: [...⊆ pass1_findings], dropped: [{finding, reason}], stats: {input_n, kept_n, dropped_n, demoted_n}}`.
-   If the verifier model is unavailable the CLI emits `stats.fallback="model_unavailable"` and `kept == pass1_findings` (guard for failures.md 2026-05-11).
-4. **The verifier-kept set is the input to Pass 2.** Pass 1 findings that
-   the verifier dropped MUST NOT be re-introduced by Pass 2 — surface
-   them only in the optional drift section of the REVIEW report.
+The Pass 1.5 reduce-only verifier role is documented at
+`agents/code-verifier` for future use. The auto-invoked CLI step was
+removed because the target env has no Anthropic API key — see ADR-008 in
+`work-docs/PLAN-llm-code-review-2026.md`. Pass 1 findings flow directly to
+Pass 2; revisit if/when an in-environment verifier client lands.
 
 #### Pass 2 — contextual verdict (full metadata restored)
 
-5. Re-run the same reviewer set with the **full** context (metadata
-   restored) and the **verifier-kept** findings list (NOT the raw Pass 1
-   list). Each reviewer validates each kept finding against the metadata,
-   drops any that the context proves spurious, and adjusts severity if
-   context changes risk. Pass 2 MUST NOT re-evaluate verifier-dropped
-   findings — its input is the verifier-kept set only.
-6. Merge the two passes via the harness CLI:
+3. Re-run the same reviewer set with the **full** context (metadata
+   restored) and the **Pass 1** findings list. Each reviewer validates
+   each finding against the metadata, drops any that the context proves
+   spurious, and adjusts severity if context changes risk.
+4. Merge the two passes via the harness CLI:
    {% if is_codex %}
    ```bash
    Bash("echo '{\"pass1\": [...], \"pass2\": [...]}' | python -m harness_maker.two_pass_review merge")
@@ -184,7 +166,7 @@ anchoring-prone diffs):
    {% endif %}
    Pass 2 is authoritative — Pass 1 findings absent from Pass 2 are
    invalidated by context and **dropped** (CP10 contract).
-7. The merged finding list is the input to the consensus filter (Step 4).
+5. The merged finding list is the input to the consensus filter (Step 4).
 
 ### Step 4 — Consensus filter (surface + reasoning alignment)
 

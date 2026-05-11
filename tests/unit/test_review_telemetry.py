@@ -154,6 +154,37 @@ def test_emit_oversized_slug_rejected_at_schema_layer() -> None:
         ReviewTelemetryRecord(**{**_BASE_FIELDS, "slug": "x" * 4500})
 
 
+def test_emit_absolute_observability_dir_inside_project_root_allowed(
+    tmp_path: Path,
+) -> None:
+    """An absolute observability_dir that lies inside project_root resolves."""
+    rec = ReviewTelemetryRecord(**_BASE_FIELDS)
+    abs_inside = tmp_path / "custom-observability"
+    path = emit(rec, project_root=tmp_path, observability_dir=abs_inside)
+    assert path.is_file()
+    assert path.parent == abs_inside.resolve()
+
+
+def test_emit_absolute_observability_dir_outside_project_root_rejected(
+    tmp_path: Path,
+) -> None:
+    """An absolute observability_dir that escapes project_root must raise.
+
+    Regression for release-0-10-0 REVIEW O2: previously an absolute base_dir
+    was used directly without containment validation, so an internal caller
+    passing an attacker-influenced absolute path could write JSONL anywhere
+    on the filesystem the process had write access to.
+    """
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    escape_target = tmp_path / "outside"
+    escape_target.mkdir()
+    rec = ReviewTelemetryRecord(**_BASE_FIELDS)
+
+    with pytest.raises(ValueError, match="escapes project_root"):
+        emit(rec, project_root=project_root, observability_dir=escape_target)
+
+
 # ── CLI shape ─────────────────────────────────────────────────────────────────
 
 

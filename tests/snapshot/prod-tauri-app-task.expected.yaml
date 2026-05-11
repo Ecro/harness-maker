@@ -52,13 +52,13 @@ files:
   body_sha256: 4b41df509190a5c0fcc5cd5bfd0e5b8d96674678cee3fbff7a803da5c198da9f
 - path: commands/hm/exec-rev-wrap-ver.md
   template: commands/hm/workflow_command.md.j2
-  body_sha256: 2555ebd5fb374310bc263d8add26ac628ccdb5551eaae4b229d8c758aa333f69
+  body_sha256: 003138b0b6736c004aad9a71db844db98b9264d469834664cd5f4bae851af9ef
 - path: commands/hm/exec-rev-wrap.md
   template: commands/hm/workflow_command.md.j2
-  body_sha256: 41cd1c5662123fc332877d2f225dca4efc7fd30523f841d6a9f96ccf430d9060
+  body_sha256: 552578df7a3292aa37beaaf7236989bccadfa1c3d03d56345457ef68eda94b03
 - path: commands/hm/exec-rev.md
   template: commands/hm/workflow_command.md.j2
-  body_sha256: 41ec31179b0cb4e1ae06331bda21c6c179c00c316bb4a1823615a3c9d16233d6
+  body_sha256: 4df4d36306dca6286d619a623f9a09d3b4e649f5ca059390634cddcd7cb79e4f
 - path: commands/hm/execute.md
   template: commands/hm/atomic_command.md.j2
   body_sha256: 2be1a94db316238100c0d2d15ff5bdf28d41aba05c2aedb2b2c9d816fc8f6be4
@@ -82,7 +82,7 @@ files:
   body_sha256: bf4793e43bea17c4b3e6b4ce890d25d4a37b9359107db5f35240edb181cb1445
 - path: commands/hm/review.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: 6104b59a2c8309b657029a1f788abee16b83c01cc193d9709a46f2aa6747e63d
+  body_sha256: 5518ffb45516fae17d7e628619d6f09c212fce9bdd67df228ca1dda7a425ba15
 - path: commands/hm/spec.md
   template: commands/hm/atomic_command.md.j2
   body_sha256: 0cbd4994524538d2261849473e1ccef051da37fe638fdffaa87b40b89047e671
@@ -172,7 +172,7 @@ files:
   body_sha256: bf4793e43bea17c4b3e6b4ce890d25d4a37b9359107db5f35240edb181cb1445
 - path: stages/review.md
   template: stages/review.md.j2
-  body_sha256: 6104b59a2c8309b657029a1f788abee16b83c01cc193d9709a46f2aa6747e63d
+  body_sha256: 5518ffb45516fae17d7e628619d6f09c212fce9bdd67df228ca1dda7a425ba15
 - path: stages/spec.md
   template: stages/spec.md.j2
   body_sha256: fea62ff883d1da8d211b09beb24be446be251ef67ed0457df1b3d6ccab2aa5cf
