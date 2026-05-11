@@ -13,6 +13,18 @@
   starts with a user-workflow/product discovery lens before papers,
   benchmarks, or architecture-only sources.
 
+### Fixed
+- Omit per-agent `model = ...` line from rendered `.codex/agents/*.toml`. The
+  hardcoded `o4` / `o4-mini` strings were rejected on ChatGPT-tier Codex CLI
+  subscriptions with HTTP 400 `invalid_request_error`, causing
+  reviewer/validator subagents (including `/hm:plan` Step 4 plan-validator) to
+  fail to spawn. With the field omitted Codex inherits the account's
+  `~/.codex/config.toml` profile default automatically. The template's
+  `{% if model_codex %}` gate is preserved so a future opt-in
+  `codex_agent_models` knob on `HarnessConfig` can re-enable per-agent models
+  without touching the template. See ADR-001 in
+  `work-docs/PLAN-codex-plan-validator-model-unavailable.md`.
+
 ## 0.9.3 — 2026-05-10
 
 Patch release after the Codex target rollout.

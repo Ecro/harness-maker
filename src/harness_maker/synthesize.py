@@ -132,84 +132,53 @@ def _agent_files() -> list[FileSpec]:
     ]
 
 
-# Codex agent metadata: (description, model_codex). Model maps Claude tier →
-# OpenAI equivalent (o4 for opus, o4-mini for sonnet) as a reasonable default;
-# users can override in .codex/agents/ directly.
-_CODEX_AGENT_META: dict[str, tuple[str, str]] = {
-    "autoloop-coder": (
-        "Implementation agent for autoloop iterations — bounded scope, "
-        "write-tool-only, no open-ended exploration; worktree-bounded writes",
-        "o4",
-    ),
-    "code-reviewer": (
-        "Reviews code changes for correctness, readability, maintainability, "
-        "and basic security/performance hygiene",
-        "o4-mini",
-    ),
-    "concurrency-reviewer": (
-        "Reviews changes for race conditions, deadlocks, ISR safety, and async correctness",
-        "o4-mini",
-    ),
-    "consensus-arbiter": (
-        "Aggregates findings from multiple reviewer agents via surface match + reasoning "
-        "alignment + severity resolution; tags every finding "
-        "consensus-passed | weak-consensus | manual-only",
-        "o4-mini",
-    ),
-    "executor": (
-        "Workflow executor with worktree-bounded write permissions — "
-        "only writes to .worktrees/, never to repo root",
-        "o4-mini",
-    ),
-    "performance-reviewer": (
-        "Reviews changes for hot-path regressions, allocation hotspots, "
-        "and algorithmic inefficiency",
-        "o4-mini",
-    ),
-    "plan-validator": (
-        "Critiques a draft PLAN document for gaps, ambiguities, missing exit criteria, "
-        "and feasibility risks before /hm:execute is invoked. Read-only.",
-        "o4",
-    ),
-    "security-auditor": (
-        "Deep 5-gate security audit (secrets, permissions, hook injection, "
-        "dependency CVEs, prompt injection) — read-only, returns structured findings JSON",
-        "o4-mini",
-    ),
-    "security-reviewer": (
-        "Reviews changes for secrets exposure, injection, auth flaws, "
-        "and unsafe permission grants",
-        "o4-mini",
-    ),
-    "stuck": (
-        "Escalation analyst — invoked when /hm:execute, /hm:review, or /hm:plan blocks. "
-        "Performs root-cause analysis, proposes 2-3 unblock paths, "
-        "and writes a structured escalation note. Read-only.",
-        "o4",
-    ),
-    "test-reviewer": (
-        "Phase A.5 gate for /hm:execute. Critiques RED-stage tests for SPEC alignment, "
-        "banned-pattern violations, and assertion quality before Phase B (RED gate) runs. "
-        "Read-only.",
-        "o4-mini",
-    ),
-    "ux-reviewer": (
-        "Reviews UI changes for accessibility, consistency, and interaction quality",
-        "o4-mini",
-    ),
+# Codex agent metadata: description only. ChatGPT-tier Codex CLI rejects every
+# hardcoded model string (o4, o4-mini, gpt-5-codex, gpt-5.5-codex) with HTTP
+# 400, so per-agent `model = ...` is omitted from rendered TOML. Codex inherits
+# the user's ~/.codex/config.toml profile default. ADR-001 in
+# work-docs/PLAN-codex-plan-validator-model-unavailable.md. The template's
+# `{% if model_codex %}` gate stays intact so a future opt-in knob can re-enable
+# per-agent models without touching the template.
+#
+# Each value is a plain `str` (no enclosing parens, no implicit concatenation)
+# so the literal shape cannot be visually mistaken for a tuple — the original
+# `dict[str, tuple[str, str]]` bug crept in by adding a trailing `, "model"`
+# to a parenthesized multi-line string that silently became a tuple. Plain
+# single-line string literals (with line-length suppression for long
+# descriptions) close that re-introduction surface.
+_CODEX_AGENT_META: dict[str, str] = {
+    "autoloop-coder": "Implementation agent for autoloop iterations — bounded scope, write-tool-only, no open-ended exploration; worktree-bounded writes",  # noqa: E501
+    "code-reviewer": "Reviews code changes for correctness, readability, maintainability, and basic security/performance hygiene",  # noqa: E501
+    "concurrency-reviewer": "Reviews changes for race conditions, deadlocks, ISR safety, and async correctness",  # noqa: E501
+    "consensus-arbiter": "Aggregates findings from multiple reviewer agents via surface match + reasoning alignment + severity resolution; tags every finding consensus-passed | weak-consensus | manual-only",  # noqa: E501
+    "executor": "Workflow executor with worktree-bounded write permissions — only writes to .worktrees/, never to repo root",  # noqa: E501
+    "performance-reviewer": "Reviews changes for hot-path regressions, allocation hotspots, and algorithmic inefficiency",  # noqa: E501
+    "plan-validator": "Critiques a draft PLAN document for gaps, ambiguities, missing exit criteria, and feasibility risks before /hm:execute is invoked. Read-only.",  # noqa: E501
+    "security-auditor": "Deep 5-gate security audit (secrets, permissions, hook injection, dependency CVEs, prompt injection) — read-only, returns structured findings JSON",  # noqa: E501
+    "security-reviewer": "Reviews changes for secrets exposure, injection, auth flaws, and unsafe permission grants",  # noqa: E501
+    "stuck": "Escalation analyst — invoked when /hm:execute, /hm:review, or /hm:plan blocks. Performs root-cause analysis, proposes 2-3 unblock paths, and writes a structured escalation note. Read-only.",  # noqa: E501
+    "test-reviewer": "Phase A.5 gate for /hm:execute. Critiques RED-stage tests for SPEC alignment, banned-pattern violations, and assertion quality before Phase B (RED gate) runs. Read-only.",  # noqa: E501
+    "ux-reviewer": "Reviews UI changes for accessibility, consistency, and interaction quality",
 }
 
 
 def _codex_agent_files() -> list[FileSpec]:
-    """Codex agent TOML files — one per agent using codex/agent.toml.j2."""
+    """Codex agent TOML files — one per agent using codex/agent.toml.j2.
+
+    `model_codex` is explicitly set to None so the template's
+    `{% if model_codex %}` gate evaluates falsy under StrictUndefined.
+    The gate is preserved (not removed) so a future opt-in knob
+    (`codex_agent_models` on HarnessConfig — see PLAN Non-Goals) can
+    pass a real model string without template changes. ADR-001.
+    """
     return [
         (
             "codex/agent.toml.j2",
             f".codex/agents/{n}.toml",
             {
                 "name": n,
-                "description": _CODEX_AGENT_META[n][0],
-                "model_codex": _CODEX_AGENT_META[n][1],
+                "description": _CODEX_AGENT_META[n],
+                "model_codex": None,
                 "reviewer_kind": _REVIEWER_KIND.get(n, ""),
             },
         )
@@ -368,6 +337,7 @@ def _codex_target_files(
 
     if config_dump is None:
         from harness_maker.models import HarnessConfig  # local import: avoid cycle
+
         config_dump = HarnessConfig().model_dump(mode="json")
     env = _make_env()
     loop_body = env.get_template("commands/hm/loop.md.j2").render(
@@ -379,7 +349,7 @@ def _codex_target_files(
         (
             "codex/config.toml.j2",
             ".codex/config.toml",
-            {"agents": {n: meta[0] for n, meta in _CODEX_AGENT_META.items()}},
+            {"agents": _CODEX_AGENT_META},
         ),
         (
             "codex/AGENTS.md.j2",
@@ -417,6 +387,7 @@ def _codex_stage_skills(*, config_dump: dict[str, object] | None = None) -> list
 
     if config_dump is None:
         from harness_maker.models import HarnessConfig  # local import: avoid cycle
+
         config_dump = HarnessConfig().model_dump(mode="json")
     env = _make_env()
     out: list[FileSpec] = []

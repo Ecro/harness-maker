@@ -2,14 +2,20 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
+
+import pytest
 
 from harness_maker.interview import interview
 from harness_maker.models import Blueprint, FileEntry, Preset, ProjectProfile
+from harness_maker.render import _make_env
 from harness_maker.synthesize import (
+    _ALL_AGENTS,
     PRODUCTION_FILES,
     SIDE_FILES,
     _base_files,
+    _codex_agent_files,
     _localized,
     synthesize,
 )
@@ -326,3 +332,42 @@ def test_localized_template_files_exist_on_disk() -> None:
         for locale in ("en", "ko"):
             path = template_dir / _localized(stem, locale)
             assert path.is_file(), f"missing template: {path}"
+
+
+# ── ADR-001: Codex agent TOMLs render without per-agent `model =` line ────────
+
+
+@pytest.mark.parametrize("name", _ALL_AGENTS)
+def test_codex_agent_toml_omits_model_field(name: str) -> None:
+    """Rendered .codex/agents/<name>.toml MUST NOT contain a `model =` line.
+
+    ChatGPT-tier Codex CLI rejects every hardcoded model string previously
+    shipped (o4, o4-mini, gpt-5-codex, gpt-5.5-codex) with HTTP 400. Omitting
+    the per-agent model field lets the user's ~/.codex/config.toml profile
+    default win automatically. Source: ADR-001 in
+    work-docs/PLAN-codex-plan-validator-model-unavailable.md.
+
+    The template `templates/codex/agent.toml.j2` still gates rendering on
+    truthy `model_codex` to preserve forward-compat when the deferred
+    `codex_agent_models` knob lands; this test guards the default behavior.
+
+    Context is built from `HarnessConfig().model_dump(mode='json')` so the
+    fixture stays in lockstep with production — a hand-rolled partial dict
+    would silently swallow KeyError if the template grew a new key.
+    """
+    from harness_maker.models import HarnessConfig
+
+    config = HarnessConfig().model_dump(mode="json")
+    specs = _codex_agent_files()
+    agent_ctx = next(
+        (ctx for _, out, ctx in specs if out == f".codex/agents/{name}.toml"),
+        None,
+    )
+    assert agent_ctx is not None, f"_codex_agent_files() returned no entry for {name!r}"
+    env = _make_env()
+    tpl = env.get_template("codex/agent.toml.j2")
+    rendered = tpl.render(**agent_ctx, config=config)
+    assert not re.search(r"^model\s*=", rendered, flags=re.MULTILINE), (
+        f"Rendered .codex/agents/{name}.toml still contains a `model =` line "
+        f"(ADR-001 violation). Full TOML:\n{rendered}"
+    )

@@ -202,3 +202,45 @@ def test_codex_target_files_template_names_exist() -> None:
     env = _make_env()
     for tpl_path, _, _ in _codex_target_files({}):
         env.get_template(tpl_path)  # raises TemplateNotFound if missing
+
+
+# ── ADR-001: config.toml agents-section shape contract ────────────────────────
+
+
+def test_codex_config_toml_agents_section_renders_string_descriptions() -> None:
+    """`config.toml.j2` receives `{name: str}` (not `{name: tuple}`) from synthesize.
+
+    Shape-regression guard: pre-ADR-001 `_CODEX_AGENT_META` was
+    `dict[str, tuple[str, str]]` and the caller projected `meta[0]` to keep
+    the template input a `str`. Post-ADR-001 the value IS the description
+    `str` directly. Either shape produces equivalent template output today,
+    but a partial revert (only one side) would render `description = ["desc",
+    "model"]` (TOML array) instead of a string — and `tojson` would accept
+    that, so the bug would NOT raise at parse time. This test locks the
+    contract: every agent description routed into the config template is a
+    plain `str`.
+    """
+    from harness_maker.synthesize import _CODEX_AGENT_META
+
+    specs = _codex_target_files({})
+    config_spec = next(
+        (ctx for tpl, out, ctx in specs if out == ".codex/config.toml"),
+        None,
+    )
+    assert config_spec is not None, (
+        "_codex_target_files() did not emit a .codex/config.toml spec — has the "
+        "synthesizer entry been removed?"
+    )
+    agents = config_spec.get("agents")
+    assert isinstance(agents, dict), (
+        f"config.toml context['agents'] must be a dict, got {type(agents).__name__}"
+    )
+    assert set(agents.keys()) == set(_CODEX_AGENT_META.keys()), (
+        "config.toml agents keys diverge from _CODEX_AGENT_META — synthesizer "
+        "wiring drifted from the source-of-truth mapping"
+    )
+    for name, desc in agents.items():
+        assert isinstance(desc, str), (
+            f"config.toml context['agents'][{name!r}] = {desc!r}; "
+            f"expected str (got {type(desc).__name__}). ADR-001 shape regression."
+        )
