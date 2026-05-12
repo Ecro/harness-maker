@@ -10,7 +10,7 @@ description: Orchestration guide for /hm:loop. Covers two modes (feature and imp
   loop intensity + exit criteria checklist (4-gate convergence), improve-mode loop
   body invariants, and safety rails. The /hm:loop command file owns the per-step procedure;
   this skill explains WHY and the invariants Claude must hold.
-content_hash: 5294ea09dfbb507e9d0401e67a31cc2105b39e5cfa186fc6c4852d70c65fcb26
+content_hash: 60d2d196d0242e61c149a01b87bc5a83a921411a0f9c2a97908117a82e45989d
 ---
 
 # autoloop-driver
@@ -63,7 +63,7 @@ measurable conditions and proposes them as additional `ExitCriterion` items.
 
 **Extraction first**: Claude reads all source material and extracts answers
 with LLM comprehension before asking anything. Only missing or ambiguous
-dimensions trigger `AskUserQuestion`.
+dimensions trigger the structured question tool (`AskQuestion` in Cursor, `AskUserQuestion` in Claude Code, `request_user_input` in Codex).
 
 **Ambiguity judgment**: after each answer, Claude evaluates actionability
 via LLM — not regex. A future Claude reading only the context file must
@@ -102,7 +102,7 @@ pass for 2 consecutive iters (`convergence_streak >= 2`):
   Skip items where `cmd=""`. `required: false` failures = warning only.
 - **Gate 2 — LLM individual**: evaluate each criterion's `label` independently
   against current `<WT>` state. Deadlock detector: `criterion_ambiguity_counts[label]`
-  increments on "Ambiguous"; at 3 → `AskUserQuestion` (continue/accept/remove).
+  increments on "Ambiguous"; at 3 → structured question tool (continue/accept/remove).
   Persist counts to `runtime.criterion_ambiguity_counts` after each iter.
 - **Gate 3 — Regression**: baseline = exit-code + set of failing test names,
   stored as `runtime.last_test_result`. No prior baseline → Gate 3 passes

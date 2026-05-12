@@ -1,6 +1,6 @@
 ---
 name: relevance-filter
-description: Score crawled anti-rot items against project context using LLM judgment + adaptive threshold (start 0.7, ±0.05 by accept/reject ratio). Use after research-crawler writes raw-<date>.jsonl, between crawl and AskUserQuestion confirmation in /hm:refresh.
+description: Score crawled anti-rot items against project context using LLM judgment + adaptive threshold (start 0.7, ±0.05 by accept/reject ratio). Use after research-crawler writes raw-<date>.jsonl, between crawl and structured question confirmation in /hm:refresh.
 ---
 
 # {{ name }}
@@ -21,7 +21,7 @@ description: Score crawled anti-rot items against project context using LLM judg
 ## Triggers
 
 - After `research-crawler` writes `raw-<date>.jsonl`
-- During `/hm:refresh` between crawl and AskUserQuestion confirmation
+- During `/hm:refresh` between crawl and structured question confirmation
 
 ## How you score
 
@@ -54,7 +54,7 @@ print(adaptive_threshold(history))
 
 ## Output
 
-Filtered list of `CrawlItem` records for the `/hm:refresh` AskUserQuestion
+Filtered list of `CrawlItem` records for the `/hm:refresh` structured question
 walk. Never auto-applies changes.
 
 <!-- @hm:user:extensions -->

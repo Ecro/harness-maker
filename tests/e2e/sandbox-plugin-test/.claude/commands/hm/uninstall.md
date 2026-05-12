@@ -4,7 +4,7 @@ harness_maker_version: 0.11.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/uninstall.md.j2
 provenance: official
-content_hash: 3b8224b8ec32150fe271a0d39cdcf24273b9cae58072ccbb97536286988f50d7
+content_hash: ad9979712f913800330dc619b36b399a336fcf529ccd6901e9bc4b8fde0191dc
 ---
 # /hm:uninstall
 
@@ -17,7 +17,7 @@ intent, and dispatch the CLI.
 
 ### 1. Confirm intent
 
-Use `AskUserQuestion`:
+Use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code):
 
 > **Remove harness-maker from this project?**
 >

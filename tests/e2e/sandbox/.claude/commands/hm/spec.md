@@ -4,7 +4,7 @@ harness_maker_version: 0.11.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/atomic_command.md.j2
 provenance: official
-content_hash: cc2d7399462866d793c11f741a470933386d76ae451764fb8430d620337f8a23
+content_hash: ef99352d431a71b6a9ca392c248fbd8080b1a034edbabf7642c02b016b838ffe
 ---
 # Stage: spec
 
@@ -81,7 +81,7 @@ Same UX rules as `/hm:plan`:
 - Use the configured locale for every live round preamble, decisions-so-far
   block, ambiguity explanation, question text and option labels, score display
   labels, and validation prompt.
-- Use `AskUserQuestion`. **Batch independent questions** per round (independence test: would Q2's options change based on Q1's answer? if yes → separate rounds).
+- Use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code). **Batch independent questions** per round (independence test: would Q2's options change based on Q1's answer? if yes → separate rounds).
 - Always include **"Other — let me describe"**.
 - From Round 2 onward, include **"SPEC is sufficiently clear — end interview"** on one foundational question per round.
 - Visualization OPTIONAL — prose / bullets preferred, ASCII for topology, Mermaid only in the final document (never in live terminal).
@@ -136,7 +136,7 @@ Five candidate types (use short label to track across rounds):
 - **PERF**: "What **performance or scale** expectations exist?" → implicit benchmarks
 
 **MUST NOT reuse a type label** from a prior gate round (track: WRONG/METHOD/STAKEHOLDER/STYLE/PERF used).
-Batch Layer 1 and Layer 2 questions into a single `AskUserQuestion` call (max 4).
+Batch Layer 1 and Layer 2 questions into a single `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code) call (max 4).
 
 **Layer 3 — Ambiguity Score (display every round)**
 
@@ -158,7 +158,7 @@ prior round given the same answer set; a drop ≥ 0.1 requires a one-line
 
 **Convergence**: total ≥ 0.8 AND all dims ≥ 0.7, **2 consecutive rounds** → PASS.
 On **NEEDS**: return to Layer 1 (focus on failing axis), new Layer 2 probes (no
-repeats). Max **3 rounds** total. After 3 NEEDS, offer via `AskUserQuestion`:
+repeats). Max **3 rounds** total. After 3 NEEDS, offer via `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code):
 - A: "Proceed — accept current ambiguity and move to §2.2"
 - B: "Refine further — return to Layer 1 with new focus"
 

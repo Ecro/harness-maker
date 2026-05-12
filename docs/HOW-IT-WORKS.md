@@ -252,7 +252,7 @@ If `specs/SPEC-{slug}.md` already exists:
 
 **Step 1 — 6-Category Interview**
 
-Converse with the user via `AskUserQuestion` to finalize 6 categories:
+Converse with the user via the structured question tool (`AskQuestion` in Cursor, `AskUserQuestion` in Claude Code) to finalize 6 categories:
 
 | # | Category | Content |
 |---|----------|---------|
@@ -335,7 +335,7 @@ If a SPEC file exists, read it and check status:
 
 **Step 3.0 — Light Confirmation in Case A**
 
-Ask exactly one `AskUserQuestion`:
+Ask exactly one structured question (`AskQuestion` / `AskUserQuestion`):
 - "Proceed directly to stage decomposition" vs "There are architecture decisions first" vs "There are several architecture questions"
 
 **Step 3 — Interview Loop**
@@ -350,7 +350,7 @@ Unlimited rounds. Each round follows steps A through E:
 - For topology: ASCII boxes
 - Mermaid: only in the final PLAN document (renders as raw text in terminal)
 
-**B. AskUserQuestion** (in priority order):
+**B. Structured question** (in priority order):
 1. Scope boundaries (in/out, whether breaking compatibility)
 2. Architecture (component ownership, pattern selection)
 3. Contract shape (API signature, schema, file format)
@@ -907,7 +907,7 @@ Loop start
 ```
 1. /hm:loop feature "Add error handling to CSV parser"
 2. autoloop-driver analyzes description → purpose confirmed, invariants/priority unconfirmed
-3. AskUserQuestion: "What are the invariants and priority?"
+3. Structured question: "What are the invariants and priority?"
 4. User reply: "Maintain existing API, quality first"
 5. Loop starts, worktree created: .worktrees/autoloop-20260509T0500Z
 6. [Iteration 1] Implement error type classification logic + tests → review → Grade B
@@ -966,7 +966,7 @@ LLM scores crawled items from 0–1.0:
 
 Save proposal list to `work-docs/proposed-{date}.md`.
 
-**Step 6 — User Confirmation (AskUserQuestion)**
+**Step 6 — User Confirmation (structured question)**
 
 Individual confirmation for each proposal:
 - Choose from "apply", "defer", or "ignore"
@@ -2299,7 +2299,7 @@ The entire loop shares **a single worktree**. Creating a new branch per iteratio
 Code writing is performed by the `autoloop-coder` agent:
 - **write-tool-only**: Executes only specified tasks without exploration (no open-ended exploration)
 - Write access restricted to within worktree boundaries
-- CLAUDE.md + TECH_SPEC.md take priority — make autonomous decisions when ambiguous and log them; **AskUserQuestion is prohibited**
+- CLAUDE.md + TECH_SPEC.md take priority — make autonomous decisions when ambiguous and log them; **user-facing questions are prohibited**
 
 #### 4-Gate Convergence
 

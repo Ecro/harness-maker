@@ -7,8 +7,8 @@ provenance: official
 name: relevance-filter
 description: Score crawled anti-rot items against project context using LLM judgment
   + adaptive threshold (start 0.7, ±0.05 by accept/reject ratio). Use after research-crawler
-  writes raw-<date>.jsonl, between crawl and AskUserQuestion confirmation in /hm:refresh.
-content_hash: 9e2fd2990fcd9ee100bbdaf080c2cc696889d8ec801963d49de69c75ff7bb12d
+  writes raw-<date>.jsonl, between crawl and structured question confirmation in /hm:refresh.
+content_hash: f1ef355942d7781bd6af45cc50b5ae5acd3270481abdd98802679d2eacbaf724
 ---
 
 # relevance-filter
@@ -29,7 +29,7 @@ content_hash: 9e2fd2990fcd9ee100bbdaf080c2cc696889d8ec801963d49de69c75ff7bb12d
 ## Triggers
 
 - After `research-crawler` writes `raw-<date>.jsonl`
-- During `/hm:refresh` between crawl and AskUserQuestion confirmation
+- During `/hm:refresh` between crawl and structured question confirmation
 
 ## How you score
 
@@ -62,7 +62,7 @@ print(adaptive_threshold(history))
 
 ## Output
 
-Filtered list of `CrawlItem` records for the `/hm:refresh` AskUserQuestion
+Filtered list of `CrawlItem` records for the `/hm:refresh` structured question
 walk. Never auto-applies changes.
 
 <!-- @hm:user:extensions -->

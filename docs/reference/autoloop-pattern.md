@@ -71,7 +71,7 @@ else:
 
 ## Autonomous Decision Protocol (DD#8)
 
-**All decisions inside autoloop are autonomous** — AskUserQuestion calls are forbidden.
+**All decisions inside autoloop are autonomous** — user-facing question tool calls are forbidden.
 When ambiguous, log the decision and proceed (do not block on user input).
 
 | Situation | Autonomous Action | Log Required? |

@@ -167,7 +167,7 @@ as **unresolved** and ask. Do not invent answers.
 
 Before interviewing for missing dimensions, lock in the loop's quality bar.
 
-{% if is_codex %}Ask in your response (two questions){% else %}Ask via `AskUserQuestion` (single call, two independent questions){% endif %}:
+{% if is_codex %}Use `request_user_input` (two questions). If the tool is unavailable, ask in your response.{% else %}Use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code) — single call, two independent questions:{% endif %}
 
 **Q1 — Loop intensity:**
 
@@ -215,7 +215,7 @@ own additions; `maximum` includes all `thorough` items plus its own.
 
 #### 4-B. Interview for missing dimensions
 
-For each unresolved dimension, {% if is_codex %}ask in your response{% else %}ask via `AskUserQuestion`{% endif %}. Present what you
+For each unresolved dimension, {% if is_codex %}use `request_user_input` (or ask in your response if unavailable){% else %}ask via `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code){% endif %}. Present what you
 found in the source (if anything) and ask the user to confirm or complete it.
 
 Ask dimensions in this order:
@@ -225,7 +225,7 @@ Ask dimensions in this order:
 4. test_reliability
 5. stopping_criteria
 
-Batch up to two related dimensions per {% if is_codex %}response question{% else %}`AskUserQuestion` call{% endif %} when they are
+Batch up to two related dimensions per {% if is_codex %}`request_user_input` call{% else %}`AskQuestion` / `AskUserQuestion` call{% endif %} when they are
 short (e.g., priority + test_reliability). Never batch stopping_criteria with
 others — it deserves its own focused question.
 
@@ -239,7 +239,7 @@ condition that is NOT already in `exit_criteria_checklist`:
 
 1. Propose it as a new `ExitCriterion` (set `cmd` if a shell command can
    check it, otherwise leave `cmd=""`).
-2. {% if is_codex %}Ask in your response{% else %}Ask via `AskUserQuestion`{% endif %}: "Add to exit checklist? {proposed label}"
+2. {% if is_codex %}Use `request_user_input` (or ask in your response){% else %}Ask via `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code){% endif %}: "Add to exit checklist? {proposed label}"
    Options: **Add (required)** / **Add (warning only)** / **Skip**.
 
 This ensures measurable stopping conditions become first-class checklist
@@ -256,7 +256,7 @@ After receiving each answer, evaluate whether it is **actionable**:
   qualifier ("important things")
 
 If not actionable, generate a targeted follow-up question (LLM-generated,
-not a fixed script) and {% if is_codex %}ask in your response{% else %}ask via `AskUserQuestion`{% endif %}. Continue until actionable.
+not a fixed script) and {% if is_codex %}use `request_user_input` (or ask in your response){% else %}ask via `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code){% endif %}. Continue until actionable.
 
 There is no maximum question count. The loop does not start until all five
 dimensions are actionable.
@@ -268,16 +268,16 @@ defined:
 
 - If input was a `--spec` file: propose features extracted from it (headings,
   roadmap items, TODO markers, DoD checklists). Cap proposal at one coherent
-  slice of 3–10 features. {% if is_codex %}Ask in your response{% else %}Ask via `AskUserQuestion`{% endif %} to accept / edit / retype.
+  slice of 3–10 features. {% if is_codex %}Use `request_user_input` (or ask in your response){% else %}Use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code){% endif %} to accept / edit / retype.
 - If input was a free-form `<goal>`: use the already-split feature list.
-  {% if is_codex %}Ask in your response{% else %}Ask via `AskUserQuestion`{% endif %} to add AC for each feature (batch 3–5 per call).
+  {% if is_codex %}Use `request_user_input` (or ask in your response){% else %}Use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code){% endif %} to add AC for each feature (batch 3–5 per call).
 
 For `improve` mode: features list stays empty. The iteration cycle is the
 "feature".
 
 #### 4-E. Convergence
 
-{% if is_codex %}Ask in your response{% else %}Ask via `AskUserQuestion`{% endif %} only if the stopping_criteria answer didn't make
+{% if is_codex %}Use `request_user_input` (or ask in your response){% else %}Use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code){% endif %} only if the stopping_criteria answer didn't make
 the convergence predicate obvious:
 
 - `feature` mode: translate stopping_criteria into one of the named
@@ -321,7 +321,7 @@ Five candidate types (use short label to track across rounds):
 - **PERF**: "What **performance or scale** expectations exist?" → implicit benchmarks
 
 **MUST NOT reuse a type label** from a previous round (track: WRONG/METHOD/STAKEHOLDER/STYLE/PERF used).
-{% if is_codex %}Ask Layer 1 and Layer 2 questions in your response (max 4).{% else %}Batch Layer 1 and Layer 2 questions into one `AskUserQuestion` call (max 4).{% endif %}
+{% if is_codex %}Use `request_user_input` to batch Layer 1 and Layer 2 questions (max 4). If the tool is unavailable, ask in your response.{% else %}Batch Layer 1 and Layer 2 questions into one `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code) call (max 4).{% endif %}
 
 **Layer 3 — Ambiguity Score (display and gate)**
 
@@ -345,7 +345,7 @@ appended to the Layer 3 display block, then applied.
 → proceed to step 4-F (Persist context).
 
 On **NEEDS**: return to Layer 1 (focus on failing axis); generate new Layer 2
-probes (no repeats). Max **3 rounds**. After 3 NEEDS, {% if is_codex %}ask in your response{% else %}offer via `AskUserQuestion`{% endif %}:
+probes (no repeats). Max **3 rounds**. After 3 NEEDS, {% if is_codex %}use `request_user_input` (or ask in your response){% else %}offer via `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code){% endif %}:
 - A: "Proceed — accept current ambiguity and start loop"
 - B: "Refine further — return to Layer 1 with new focus"
 
@@ -404,7 +404,7 @@ features:
       - <observable check>
 ```
 
-Show the user: saved paths + one-line summary, then {% if is_codex %}ask in your response{% else %}ask `AskUserQuestion`{% endif %}
+Show the user: saved paths + one-line summary, then {% if is_codex %}use `request_user_input` (or ask in your response){% else %}use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code){% endif %}
 for final go-ahead before starting the loop.
 
 ---
@@ -590,7 +590,7 @@ For each iter (until convergence or any safety rail fires):
    - "Clearly not satisfied" → fails. Reset `criterion_ambiguity_counts[label]` to 0.
    - "Ambiguous" → **deadlock detector**: increment `criterion_ambiguity_counts[label]`.
      Persist the updated map to `runtime.criterion_ambiguity_counts` in the
-     loop-context file. If the count reaches 3, {% if is_codex %}ask in your response{% else %}ask via `AskUserQuestion`{% endif %}:
+     loop-context file. If the count reaches 3, {% if is_codex %}use `request_user_input` (or ask in your response){% else %}ask via `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code){% endif %}:
      options **"Continue anyway"** / **"Accept criterion as met"** /
      **"Remove criterion"**. This prevents infinite loops on unresolvable
      qualitative bars.
@@ -665,7 +665,7 @@ When the loop halts (convergence, safety rail, or hard error):
      - Increment `checklist_fail_counts[label]`. Persist to
        `runtime.checklist_fail_counts` in loop-context file.
      - **Escape hatch (ADR-009)**: If `checklist_fail_counts[label] >= 3`,
-       {% if is_codex %}ask in your response{% else %}ask via `AskUserQuestion`{% endif %}:
+       {% if is_codex %}use `request_user_input` (or ask in your response){% else %}ask via `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code){% endif %}:
        - **"Override — accept loop as converged despite failing criterion"**
        - **"Abort — mark loop as not converged, exit without wrapup"**
        - **"Remove criterion and accept"** (removes from `exit_criteria_checklist`)

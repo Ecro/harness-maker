@@ -100,7 +100,7 @@ Three design commitments shape every decision below:
                                  │
                                  ▼
                   weekly /hm:refresh — M4 anti-rot crawl
-                  → AskUserQuestion (always manual)
+                  → structured question (always manual)
 ```
 
 ## 3. The 14 Mechanisms (M1-M14)
@@ -117,7 +117,7 @@ The four-stage core. Each stage has a single responsibility and a typed handoff.
 - **Renderer** (`render.py`) walks the `Blueprint`, loads each Jinja2 template, injects context, prepends provenance frontmatter (M13), and writes the result.
 - **Second Brain** (`second_brain.py`) treats an Obsidian vault as a typed Markdown graph for stage-aware memory. First-install onboarding is read-first; deeper write-capable setup is configured later. Read/write access is constrained by configured folder allowlists, and writable folders require `second_brain.project_id` in the folder path so several projects can share one vault without writing into the same namespace.
 
-The split lets you swap the interview UX (CLI prompt vs `AskUserQuestion`) without touching synthesis, and snapshot-test the synthesizer in isolation.
+The split lets you swap the interview UX (CLI prompt vs structured question tool) without touching synthesis, and snapshot-test the synthesizer in isolation.
 
 ### M2 — Reconciler (Brownfield Conflict Resolution)
 
@@ -148,7 +148,7 @@ Three stages:
 
 1. **Crawl** (weekly): four sources — Anthropic blog/changelog, GitHub releases (`anthropics/claude-code` by default), arxiv (cs.SE / cs.CL / cs.CR), OSV.dev. Implemented under `src/harness_maker/crawler/`. Raw output to `observability/refresh/raw-<date>.jsonl`.
 2. **Filter** (`relevance.py`): LLM scores each item for project-relevance. Threshold starts at 0.7 and adapts ±0.05 based on the recent accept/reject ratio.
-3. **Propose** (`templates/commands/hm/refresh.md.j2`): `/hm:refresh` opens an `AskUserQuestion` per surviving item — accept, reject, or defer. **Manual confirm is non-negotiable**: there is no `--auto-apply` path.
+3. **Propose** (`templates/commands/hm/refresh.md.j2`): `/hm:refresh` opens a structured question per surviving item — accept, reject, or defer. **Manual confirm is non-negotiable**: there is no `--auto-apply` path.
 
 This means harness-maker stays current without ever silently changing the user's runtime.
 

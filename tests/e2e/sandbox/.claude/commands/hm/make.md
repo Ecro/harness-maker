@@ -4,7 +4,7 @@ harness_maker_version: 0.11.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/make.md.j2
 provenance: official
-content_hash: e5d8d979619fc978134c3aeae24b2947bf23143f16ffb7c718459adb36c937ad
+content_hash: 730db90508c63b53a9197b64bc5d4cad35312a64b130898f7b16d0da90aa9244
 ---
 # /hm:make
 
@@ -37,7 +37,7 @@ After the CLI completes, summarize:
 ### `--reinterview`
 
 Routes to the full interactive setup. Run `/harness-maker:make` instead —
-it asks locale first, then drives `AskUserQuestion` for preset, dev_mode, targets, and
+it asks locale first, then drives the structured question tool (`AskQuestion` in Cursor, `AskUserQuestion` in Claude Code) for preset, dev_mode, targets, and
 dispatches with the collected flags.
 
 Tell the user:
@@ -48,7 +48,7 @@ Tell the user:
 
 Do **not** pass `--reinterview` to the CLI from a slash-command context —
 it falls back to autoloop defaults (no TTY). The plugin-level
-`/harness-maker:make` handles this correctly via `AskUserQuestion`.
+`/harness-maker:make` handles this correctly via the structured question tool.
 
 <!-- @hm:user:extensions -->
 <!-- Project-specific /hm:make overrides. Preserved across harness-maker upgrades. -->

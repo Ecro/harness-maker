@@ -114,4 +114,7 @@ Instructing a reviewer agent to consult `git log` for prior intent on a finding 
 ## [wiki:architecture] make-md-3-step-fallback | 2026-05-12
 `commands/make.md` Section 2 uses a 3-step fallback for plugin path resolution: (A) Claude Code `~/.claude/plugins/installed_plugins.json`, (B) Cursor `~/.cursor/plugins/local/harness-maker`, (C) `command -v harness-maker` CLI fallback. The resolved `$RESOLVE_MODE` (`claude-code`, `cursor`, or `CLI_FALLBACK`) selects the dispatch shape in Section 5: plugin modes use `uv run --directory "$plugin_dir"`, CLI mode uses direct `harness-maker` invocation via `console_scripts`.
 
+## [wiki:pattern] interview-tool-dual-name | 2026-05-12
+Templates rendered with `is_codex=False` (shared by Claude Code + Cursor) use dual-name references: `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code). The `is_codex=True` branch uses `request_user_input` with graceful fallback. Documentation and skill descriptions use generic "structured question" wording. The `.claude/commands/hm/*.md` files are single-source for both CC and Cursor — they must always mention both tool names.
+
 <!-- @hm:/user:entries -->

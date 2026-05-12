@@ -28,7 +28,7 @@ Block silent regressions and partial completions. Run a rigid 6-check rubric tha
 /hm:verify [--force] [--reason=<text>]
 ```
 
-- `--force` — proceed even when one or more checks FAIL. **Logged with the override reason.** Use only when the user has consciously chosen to bypass (emergency hotfix, intentional debt). Without `--reason=<text>`, `--force` requires confirmation {% if is_codex %}in your response{% else %}via AskUserQuestion in `{{ config.locale }}`{% endif %}.
+- `--force` — proceed even when one or more checks FAIL. **Logged with the override reason.** Use only when the user has consciously chosen to bypass (emergency hotfix, intentional debt). Without `--reason=<text>`, `--force` requires confirmation {% if is_codex %}via `request_user_input` (or in your response if unavailable){% else %}via `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code) in `{{ config.locale }}`{% endif %}.
 - `--reason=<text>` — free-form override rationale. Required for `--force` in non-interactive contexts (autoloop).
 
 ## Inputs

@@ -8,7 +8,7 @@ name: research-crawler
 description: Crawl 4 anti-rot sources (Anthropic blog/changelog, GitHub releases including
   anthropics/claude-code, arxiv cs.SE/CL/CR, OSV.dev CVEs) and write to .claude/observability/refresh/raw-<date>.jsonl.
   Use during /hm:refresh or when the freshness gauge crosses the staleness threshold.
-content_hash: ca17023045fbd8f5ef8ad569d25098c062bd31ffaacb89bda428dd1b80eb87bd
+content_hash: bd45b95fd98659d89d8ba864985cd1a37f4c813fe15e8924f272c18015cf7308
 ---
 
 # research-crawler
@@ -55,7 +55,7 @@ Downstream the `relevance-filter` skill scores each item.
 
 A `raw-<date>.jsonl` snapshot of `CrawlItem` records. Never auto-applies
 changes — only writes raw data; the `/hm:refresh` command is responsible for
-the AskUserQuestion confirmation flow.
+the structured question confirmation flow.
 
 <!-- @hm:user:extensions -->
 <!-- Project-specific crawler sources (additional RSS feeds, repos to track, etc.). Preserved across harness-maker upgrades. -->

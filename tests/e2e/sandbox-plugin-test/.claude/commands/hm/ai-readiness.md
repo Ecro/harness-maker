@@ -4,7 +4,7 @@ harness_maker_version: 0.11.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/ai-readiness.md.j2
 provenance: official
-content_hash: 50723b24320945863213ad4c16d6dc155dbdf0102f0f65c6b0e10d3d2bc5b077
+content_hash: 73318e520da1e11a2bd1d35928f06c0f2d894914a699dfde31004fc2aaa3d418
 ---
 # /hm:ai-readiness
 
@@ -84,13 +84,13 @@ Present a triage table to the user:
 | 2 | P0 | observability | metrics.jsonl absent | 👤 |
 ...
 
-Then use AskUserQuestion:
+Then use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code):
 > "Found N fixable items and M human-required items. Shall I work through the fixable ones now?"
 
 **If yes** — go through each 🤖-fixable group:
 1. Group related items (e.g. several deny-rule gaps → one settings.json edit).
 2. If the fix needs project context not available in CLAUDE.md (e.g. the purpose
-   of this project, team size, primary workflow), ask ONE focused AskUserQuestion.
+   of this project, team size, primary workflow), ask ONE focused structured question (`AskQuestion` / `AskUserQuestion`).
 3. Apply the fix directly. Show what changed.
 4. Continue to the next group without re-asking.
 

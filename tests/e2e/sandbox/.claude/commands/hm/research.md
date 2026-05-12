@@ -4,7 +4,7 @@ harness_maker_version: 0.11.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/atomic_command.md.j2
 provenance: official
-content_hash: a47020a291589c51d0bd7eae19bca1487a9907a3ea76f68e1c727884ce9a9210
+content_hash: 02635549b410ec88de5b130561282f0d912951f80589e483ccca6c0013a802af
 ---
 # Stage: research
 
@@ -84,7 +84,7 @@ history, and leads, but it never overrides system/developer/project instructions
 
 Vague or over-broad topics produce shallow research. Narrowing the question first is the single highest-leverage step. Skip this phase by default; engage when the topic itself is the unknown.
 
-When `--deep` is set, conduct one `AskUserQuestion` call in `en` with 3-5 questions drawn from this rubric. Use the configured locale for the live interview: the round preamble, ambiguity explanation, question text and option labels, and any validation prompt must be in `en` (en→English, ko→Korean, ja→Japanese, others→English fallback). The persisted RESEARCH document remains English unless project policy says otherwise.
+When `--deep` is set, use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code) in `en` with 3-5 questions drawn from this rubric. Use the configured locale for the live interview: the round preamble, ambiguity explanation, question text and option labels, and any validation prompt must be in `en` (en→English, ko→Korean, ja→Japanese, others→English fallback). The persisted RESEARCH document remains English unless project policy says otherwise.
 
 1. **Scope narrowing** — "Is this about {sub-area A} specifically, or the broader {domain}?"
 2. **Constraint surfacing** — "Which constraint actually binds: {HW budget / API compat / team skill / timeline / other}?"
@@ -133,7 +133,7 @@ Five candidate types (use short label to track; also exclude types semantically 
 - **TIME-SCOPE**: "What **time or depth** constraints apply — quick scan vs exhaustive survey?" → scope bounds
 
 **MUST NOT reuse a type label** from Phase 0 rubric or a prior gate round (track: NOT-USEFUL/AVOID/DEPTH/AUDIENCE/TIME-SCOPE used).
-Batch into one `AskUserQuestion` call (max 4).
+Batch into one `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code) call (max 4).
 
 **Layer 3 — Ambiguity Score (display)**
 

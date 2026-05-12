@@ -76,13 +76,13 @@ Present a triage table to the user:
 | 2 | P0 | observability | metrics.jsonl absent | 👤 |
 ...
 
-Then use AskUserQuestion:
+Then use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code):
 > "Found N fixable items and M human-required items. Shall I work through the fixable ones now?"
 
 **If yes** — go through each 🤖-fixable group:
 1. Group related items (e.g. several deny-rule gaps → one settings.json edit).
 2. If the fix needs project context not available in CLAUDE.md (e.g. the purpose
-   of this project, team size, primary workflow), ask ONE focused AskUserQuestion.
+   of this project, team size, primary workflow), ask ONE focused structured question (`AskQuestion` / `AskUserQuestion`).
 3. Apply the fix directly. Show what changed.
 4. Continue to the next group without re-asking.
 

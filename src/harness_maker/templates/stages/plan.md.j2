@@ -99,7 +99,7 @@ If `{{ config.spec.dir }}SPEC-{slug}.md` exists:
 
 #### Step 3.0 — Brief lock-in confirmation (Case A only)
 
-When SPEC is fully approved, the only remaining `/hm:plan` question is: **"Given this SPEC, are you ready for phase decomposition, or is there a how-question (architecture / phasing / library choice) you want to lock down first?"** {% if is_codex %}Ask in your response{% else %}Surface this as ONE `AskUserQuestion`{% endif %} with options:
+When SPEC is fully approved, the only remaining `/hm:plan` question is: **"Given this SPEC, are you ready for phase decomposition, or is there a how-question (architecture / phasing / library choice) you want to lock down first?"** {% if is_codex %}Use the `request_user_input` tool to present structured options to the user. If the tool is unavailable, ask in your response.{% else %}Use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code) to present structured options to the user.{% endif %} Options:
 
 - **"Proceed to phase decomposition"** — skip Step 3 entirely, jump to Step 4.
 - **"One architectural decision first: {topic}"** — engage Step 3 for that single round only.
@@ -113,7 +113,7 @@ This single confirmation prevents the "I just answered every SPEC question — w
 > **If Step 2 set Case A and Step 3.0 returned "Proceed to phase decomposition": SKIP this entire step.** Jump to Step 4.
 
 **Language rule (important):**
-- **Live interview** → conduct in `{{ config.locale }}` (en→English, ko→Korean, ja→Japanese, others→English fallback). Round preamble, "decisions so far", open ambiguity explanations, {% if is_codex %}questions asked in response{% else %}AskUserQuestion prompts{% endif %} and option labels — all in `{{ config.locale }}`.
+- **Live interview** → conduct in `{{ config.locale }}` (en→English, ko→Korean, ja→Japanese, others→English fallback). Round preamble, "decisions so far", open ambiguity explanations, {% if is_codex %}`request_user_input` prompts{% else %}`AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code) prompts{% endif %} and option labels — all in `{{ config.locale }}`.
 - Use the configured locale for every live round preamble, decisions-so-far
   block, ambiguity explanation, question text and option labels, ambiguity
   score display labels, and validation prompt.
@@ -148,13 +148,13 @@ Round preamble structure:
 
 If nothing topologically changed since last round, skip the "current plan state" block.
 
-#### Step B — {% if is_codex %}Ask in your response (in `{{ config.locale }}`){% else %}AskUserQuestion (in `{{ config.locale }}`){% endif %}
+#### Step B — {% if is_codex %}`request_user_input` (in `{{ config.locale }}`){% else %}`AskQuestion` / `AskUserQuestion` (in `{{ config.locale }}`){% endif %}
 
 Constraints:
 - **2-5 options per question**, each with trade-off in the label.
 - **Every question includes "Other — let me describe"** as an explicit option.
 - **From Round 2 onward**, include **"Plan is sufficiently clear — end interview"** on ONE foundational question per round. Not on Round 1 — require at least one substantive decision first.
-- **Batch independent questions** (up to 4{% if not is_codex %} per `AskUserQuestion` call{% endif %}). Independence test: "Would my choice of options or recommended default change based on the user's answer to another question in this batch?" If yes → separate rounds.
+- **Batch independent questions** (up to 4{% if not is_codex %} per structured question tool call{% endif %}). Independence test: "Would my choice of options or recommended default change based on the user's answer to another question in this batch?" If yes → separate rounds.
 - **Never re-ask answered questions** — re-read prior Interview Entries before each round.
 - **Never ask trivial questions** (naming conventions, file paths) — pick a defensible default and note it as an assumption.
 
@@ -257,7 +257,7 @@ Five candidate types (use short label to track across rounds):
 - **PERF**: "What **performance or scale** expectations?" → implicit benchmarks
 
 **MUST NOT reuse a type label** from a prior gate round (track: WRONG/METHOD/STAKEHOLDER/STYLE/PERF used).
-{% if is_codex %}Ask Layer 1 and Layer 2 questions in your response (max 4).{% else %}Batch with any Layer 1 questions into one `AskUserQuestion` call (max 4).{% endif %}
+{% if is_codex %}Use `request_user_input` to batch Layer 1 and Layer 2 questions (max 4). If the tool is unavailable, ask in your response.{% else %}Batch Layer 1 and Layer 2 questions into one `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code) call (max 4).{% endif %}
 
 **Layer 3 — Ambiguity Score (display every round)**
 

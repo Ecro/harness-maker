@@ -4,7 +4,7 @@ harness_maker_version: 0.11.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: stages/plan.md.j2
 provenance: official
-content_hash: ccf4eaef5d8e260d33fa3bc6b8c9f0a7dcd3a8f00948139d6f7ca6697d678c6d
+content_hash: 6aad3f6fe0c7ca7cc4d12c319e09d36db99fe24415d0744f2de08922daed3112
 ---
 # Stage: plan
 
@@ -99,7 +99,7 @@ If `specs/SPEC-{slug}.md` exists:
 
 #### Step 3.0 — Brief lock-in confirmation (Case A only)
 
-When SPEC is fully approved, the only remaining `/hm:plan` question is: **"Given this SPEC, are you ready for phase decomposition, or is there a how-question (architecture / phasing / library choice) you want to lock down first?"** Surface this as ONE `AskUserQuestion` with options:
+When SPEC is fully approved, the only remaining `/hm:plan` question is: **"Given this SPEC, are you ready for phase decomposition, or is there a how-question (architecture / phasing / library choice) you want to lock down first?"** Use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code) to present structured options to the user. Options:
 
 - **"Proceed to phase decomposition"** — skip Step 3 entirely, jump to Step 4.
 - **"One architectural decision first: {topic}"** — engage Step 3 for that single round only.
@@ -113,7 +113,7 @@ This single confirmation prevents the "I just answered every SPEC question — w
 > **If Step 2 set Case A and Step 3.0 returned "Proceed to phase decomposition": SKIP this entire step.** Jump to Step 4.
 
 **Language rule (important):**
-- **Live interview** → conduct in `en` (en→English, ko→Korean, ja→Japanese, others→English fallback). Round preamble, "decisions so far", open ambiguity explanations, AskUserQuestion prompts and option labels — all in `en`.
+- **Live interview** → conduct in `en` (en→English, ko→Korean, ja→Japanese, others→English fallback). Round preamble, "decisions so far", open ambiguity explanations, `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code) prompts and option labels — all in `en`.
 - Use the configured locale for every live round preamble, decisions-so-far
   block, ambiguity explanation, question text and option labels, ambiguity
   score display labels, and validation prompt.
@@ -148,13 +148,13 @@ Round preamble structure:
 
 If nothing topologically changed since last round, skip the "current plan state" block.
 
-#### Step B — AskUserQuestion (in `en`)
+#### Step B — `AskQuestion` / `AskUserQuestion` (in `en`)
 
 Constraints:
 - **2-5 options per question**, each with trade-off in the label.
 - **Every question includes "Other — let me describe"** as an explicit option.
 - **From Round 2 onward**, include **"Plan is sufficiently clear — end interview"** on ONE foundational question per round. Not on Round 1 — require at least one substantive decision first.
-- **Batch independent questions** (up to 4 per `AskUserQuestion` call). Independence test: "Would my choice of options or recommended default change based on the user's answer to another question in this batch?" If yes → separate rounds.
+- **Batch independent questions** (up to 4 per structured question tool call). Independence test: "Would my choice of options or recommended default change based on the user's answer to another question in this batch?" If yes → separate rounds.
 - **Never re-ask answered questions** — re-read prior Interview Entries before each round.
 - **Never ask trivial questions** (naming conventions, file paths) — pick a defensible default and note it as an assumption.
 
@@ -257,7 +257,7 @@ Five candidate types (use short label to track across rounds):
 - **PERF**: "What **performance or scale** expectations?" → implicit benchmarks
 
 **MUST NOT reuse a type label** from a prior gate round (track: WRONG/METHOD/STAKEHOLDER/STYLE/PERF used).
-Batch with any Layer 1 questions into one `AskUserQuestion` call (max 4).
+Batch Layer 1 and Layer 2 questions into one `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code) call (max 4).
 
 **Layer 3 — Ambiguity Score (display every round)**
 

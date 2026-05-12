@@ -4,7 +4,7 @@ harness_maker_version: 0.11.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: 003138b0b6736c004aad9a71db844db98b9264d469834664cd5f4bae851af9ef
+content_hash: be61c475b35019f626898d458c467ce1344bd2e63ed254402a46fcbef39fc9cc
 ---
 # /hm:exec-rev-wrap-ver
 
@@ -876,7 +876,7 @@ Block silent regressions and partial completions. Run a rigid 6-check rubric tha
 /hm:verify [--force] [--reason=<text>]
 ```
 
-- `--force` — proceed even when one or more checks FAIL. **Logged with the override reason.** Use only when the user has consciously chosen to bypass (emergency hotfix, intentional debt). Without `--reason=<text>`, `--force` requires confirmation via AskUserQuestion in `en`.
+- `--force` — proceed even when one or more checks FAIL. **Logged with the override reason.** Use only when the user has consciously chosen to bypass (emergency hotfix, intentional debt). Without `--reason=<text>`, `--force` requires confirmation via `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code) in `en`.
 - `--reason=<text>` — free-form override rationale. Required for `--force` in non-interactive contexts (autoloop).
 
 ## Inputs

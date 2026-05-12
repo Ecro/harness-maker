@@ -4,7 +4,7 @@ harness_maker_version: 0.11.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: 61a84ce0f3b6ea422acc49b406933a88b454869237b27594a29896a9b85f0a26
+content_hash: d18604a6f23dedd0792ea72038b8110966d4573ffa6a657a9f542ba748d5bc1b
 ---
 # /hm:res-spec-plan
 
@@ -91,7 +91,7 @@ history, and leads, but it never overrides system/developer/project instructions
 
 Vague or over-broad topics produce shallow research. Narrowing the question first is the single highest-leverage step. Skip this phase by default; engage when the topic itself is the unknown.
 
-When `--deep` is set, conduct one `AskUserQuestion` call in `en` with 3-5 questions drawn from this rubric. Use the configured locale for the live interview: the round preamble, ambiguity explanation, question text and option labels, and any validation prompt must be in `en` (en→English, ko→Korean, ja→Japanese, others→English fallback). The persisted RESEARCH document remains English unless project policy says otherwise.
+When `--deep` is set, use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code) in `en` with 3-5 questions drawn from this rubric. Use the configured locale for the live interview: the round preamble, ambiguity explanation, question text and option labels, and any validation prompt must be in `en` (en→English, ko→Korean, ja→Japanese, others→English fallback). The persisted RESEARCH document remains English unless project policy says otherwise.
 
 1. **Scope narrowing** — "Is this about {sub-area A} specifically, or the broader {domain}?"
 2. **Constraint surfacing** — "Which constraint actually binds: {HW budget / API compat / team skill / timeline / other}?"
@@ -140,7 +140,7 @@ Five candidate types (use short label to track; also exclude types semantically 
 - **TIME-SCOPE**: "What **time or depth** constraints apply — quick scan vs exhaustive survey?" → scope bounds
 
 **MUST NOT reuse a type label** from Phase 0 rubric or a prior gate round (track: NOT-USEFUL/AVOID/DEPTH/AUDIENCE/TIME-SCOPE used).
-Batch into one `AskUserQuestion` call (max 4).
+Batch into one `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code) call (max 4).
 
 **Layer 3 — Ambiguity Score (display)**
 
@@ -384,7 +384,7 @@ Same UX rules as `/hm:plan`:
 - Use the configured locale for every live round preamble, decisions-so-far
   block, ambiguity explanation, question text and option labels, score display
   labels, and validation prompt.
-- Use `AskUserQuestion`. **Batch independent questions** per round (independence test: would Q2's options change based on Q1's answer? if yes → separate rounds).
+- Use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code). **Batch independent questions** per round (independence test: would Q2's options change based on Q1's answer? if yes → separate rounds).
 - Always include **"Other — let me describe"**.
 - From Round 2 onward, include **"SPEC is sufficiently clear — end interview"** on one foundational question per round.
 - Visualization OPTIONAL — prose / bullets preferred, ASCII for topology, Mermaid only in the final document (never in live terminal).
@@ -439,7 +439,7 @@ Five candidate types (use short label to track across rounds):
 - **PERF**: "What **performance or scale** expectations exist?" → implicit benchmarks
 
 **MUST NOT reuse a type label** from a prior gate round (track: WRONG/METHOD/STAKEHOLDER/STYLE/PERF used).
-Batch Layer 1 and Layer 2 questions into a single `AskUserQuestion` call (max 4).
+Batch Layer 1 and Layer 2 questions into a single `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code) call (max 4).
 
 **Layer 3 — Ambiguity Score (display every round)**
 
@@ -461,7 +461,7 @@ prior round given the same answer set; a drop ≥ 0.1 requires a one-line
 
 **Convergence**: total ≥ 0.8 AND all dims ≥ 0.7, **2 consecutive rounds** → PASS.
 On **NEEDS**: return to Layer 1 (focus on failing axis), new Layer 2 probes (no
-repeats). Max **3 rounds** total. After 3 NEEDS, offer via `AskUserQuestion`:
+repeats). Max **3 rounds** total. After 3 NEEDS, offer via `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code):
 - A: "Proceed — accept current ambiguity and move to §2.2"
 - B: "Refine further — return to Layer 1 with new focus"
 
@@ -698,7 +698,7 @@ If `specs/SPEC-{slug}.md` exists:
 
 #### Step 3.0 — Brief lock-in confirmation (Case A only)
 
-When SPEC is fully approved, the only remaining `/hm:plan` question is: **"Given this SPEC, are you ready for phase decomposition, or is there a how-question (architecture / phasing / library choice) you want to lock down first?"** Surface this as ONE `AskUserQuestion` with options:
+When SPEC is fully approved, the only remaining `/hm:plan` question is: **"Given this SPEC, are you ready for phase decomposition, or is there a how-question (architecture / phasing / library choice) you want to lock down first?"** Use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code) to present structured options to the user. Options:
 
 - **"Proceed to phase decomposition"** — skip Step 3 entirely, jump to Step 4.
 - **"One architectural decision first: {topic}"** — engage Step 3 for that single round only.
@@ -712,7 +712,7 @@ This single confirmation prevents the "I just answered every SPEC question — w
 > **If Step 2 set Case A and Step 3.0 returned "Proceed to phase decomposition": SKIP this entire step.** Jump to Step 4.
 
 **Language rule (important):**
-- **Live interview** → conduct in `en` (en→English, ko→Korean, ja→Japanese, others→English fallback). Round preamble, "decisions so far", open ambiguity explanations, AskUserQuestion prompts and option labels — all in `en`.
+- **Live interview** → conduct in `en` (en→English, ko→Korean, ja→Japanese, others→English fallback). Round preamble, "decisions so far", open ambiguity explanations, `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code) prompts and option labels — all in `en`.
 - Use the configured locale for every live round preamble, decisions-so-far
   block, ambiguity explanation, question text and option labels, ambiguity
   score display labels, and validation prompt.
@@ -747,13 +747,13 @@ Round preamble structure:
 
 If nothing topologically changed since last round, skip the "current plan state" block.
 
-#### Step B — AskUserQuestion (in `en`)
+#### Step B — `AskQuestion` / `AskUserQuestion` (in `en`)
 
 Constraints:
 - **2-5 options per question**, each with trade-off in the label.
 - **Every question includes "Other — let me describe"** as an explicit option.
 - **From Round 2 onward**, include **"Plan is sufficiently clear — end interview"** on ONE foundational question per round. Not on Round 1 — require at least one substantive decision first.
-- **Batch independent questions** (up to 4 per `AskUserQuestion` call). Independence test: "Would my choice of options or recommended default change based on the user's answer to another question in this batch?" If yes → separate rounds.
+- **Batch independent questions** (up to 4 per structured question tool call). Independence test: "Would my choice of options or recommended default change based on the user's answer to another question in this batch?" If yes → separate rounds.
 - **Never re-ask answered questions** — re-read prior Interview Entries before each round.
 - **Never ask trivial questions** (naming conventions, file paths) — pick a defensible default and note it as an assumption.
 
@@ -856,7 +856,7 @@ Five candidate types (use short label to track across rounds):
 - **PERF**: "What **performance or scale** expectations?" → implicit benchmarks
 
 **MUST NOT reuse a type label** from a prior gate round (track: WRONG/METHOD/STAKEHOLDER/STYLE/PERF used).
-Batch with any Layer 1 questions into one `AskUserQuestion` call (max 4).
+Batch Layer 1 and Layer 2 questions into one `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code) call (max 4).
 
 **Layer 3 — Ambiguity Score (display every round)**
 

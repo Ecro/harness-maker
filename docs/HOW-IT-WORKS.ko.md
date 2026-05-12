@@ -241,7 +241,7 @@ RESEARCH 문서가 7개 섹션을 모두 갖추고 있는지, `libs_fetched` / `
 
 **Step 1 — 6개 카테고리 인터뷰**
 
-`AskUserQuestion` 으로 사용자와 대화하며 6개 카테고리를 확정한다:
+구조화 질문 도구 (`AskQuestion` in Cursor, `AskUserQuestion` in Claude Code) 로 사용자와 대화하며 6개 카테고리를 확정한다:
 
 | # | 카테고리 | 내용 |
 |---|---------|------|
@@ -324,7 +324,7 @@ SPEC 파일이 있으면 읽어서 상태 확인:
 
 **Step 3.0 — Case A 에서의 간단 확인**
 
-`AskUserQuestion` 으로 딱 하나만 물음:
+구조화 질문 도구로 딱 하나만 물음:
 - "단계 분해로 바로 진행" vs "먼저 아키텍처 결정이 있음" vs "여러 아키텍처 질문 있음"
 
 **Step 3 — 인터뷰 루프**
@@ -339,7 +339,7 @@ SPEC 파일이 있으면 읽어서 상태 확인:
 - 위상 파악 시: ASCII 박스
 - Mermaid 는 최종 PLAN 문서에만 사용 (터미널에서는 날 텍스트로 보임)
 
-**B. AskUserQuestion 질문** (우선순위 순서):
+**B. 구조화 질문** (우선순위 순서):
 1. 범위 경계 (안/밖, 호환성 파괴 여부)
 2. 아키텍처 (컴포넌트 소유권, 패턴 선택)
 3. 계약 형태 (API 시그니처, 스키마, 파일 형식)
@@ -894,7 +894,7 @@ wrapup 까지 완료한 후 verify 가 실패하면: 커밋은 이미 됐으므�
 ```
 1. /hm:loop feature "CSV 파서에 에러 핸들링 추가"
 2. autoloop-driver 가 설명 분석 → purpose 확인됨, invariants/priority 미확인
-3. AskUserQuestion: "불변 조건과 우선순위는?" 
+3. 구조화 질문: "불변 조건과 우선순위는?" 
 4. 사용자 답변: "기존 API 유지, 품질 우선"
 5. 루프 시작, 워크트리 생성: .worktrees/autoloop-20260509T0500Z
 6. [반복 1] 에러 타입 분류 로직 구현 + 테스트 → 리뷰 → B등급
@@ -952,7 +952,7 @@ wrapup 까지 완료한 후 verify 가 실패하면: 커밋은 이미 됐으므�
 
 `work-docs/proposed-{date}.md` 에 제안 목록 저장.
 
-**Step 6 — 사용자 확인 (AskUserQuestion)**
+**Step 6 — 사용자 확인 (구조화 질문)**
 
 각 제안에 대해 개별 확인:
 - "적용", "연기", "무시" 중 선택
@@ -2257,7 +2257,7 @@ PLAN 저장 전, "Accept?", "OK?", "Verify?", "Should we?" 같은 표현을 스�
 코드 작성은 `autoloop-coder` 에이전트가 수행:
 - **write-tool-only**: 탐색 없이 지정된 작업만 실행 (open-ended exploration 금지)
 - 워크트리 경계 내 쓰기만 허용
-- CLAUDE.md + TECH_SPEC.md 우선 — 모호하면 자율 결정 후 log, **AskUserQuestion 금지**
+- CLAUDE.md + TECH_SPEC.md 우선 — 모호하면 자율 결정 후 log, **사용자 질문 도구 호출 금지**
 
 #### 수렴 판단은 LLM 이 한다
 

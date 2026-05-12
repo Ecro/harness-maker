@@ -422,6 +422,8 @@ Run `/harness-maker:make` and pick `targets: [codex]` or include `codex` with th
 
 Codex TOML files are rendered as pure TOML, not markdown-with-frontmatter. `AGENTS.md` uses block-merge markers so user additions survive re-renders, while `.codex/*.toml` files are regenerated from the selected target configuration.
 
+**Structured questions in Codex:** Stage and loop skills instruct the agent to use the `request_user_input` tool for interview questions. This tool is available in Plan mode by default. To enable it in Code mode, add `default_mode_request_user_input = true` under `[features]` in `.codex/config.toml`. If the tool is unavailable at runtime, the agent falls back to asking in its response text.
+
 ---
 
 ## Reconcile rules (re-rendering an existing harness)
@@ -499,7 +501,7 @@ No. Every generated file carries a `content_hash` in its provenance frontmatter.
 `Side` is lean: 1 reviewer (code), verify-before-completion optional, worktree scope `[execute]`. `Production` is thorough: 5 reviewers, verify required, worktree scope `[execute, plan]`, security on high-finding = block. Both share the same anti-rot and caching defaults.
 
 **Q: Does anti-rot ever auto-apply?**
-Never. Every anti-rot item surfaces via `AskUserQuestion` in `/hm:refresh`. There is no `--auto-apply` flag and no plan to add one. The rationale: a wrong patch is worse than a stale harness.
+Never. Every anti-rot item surfaces via a structured question (`AskQuestion` in Cursor, `AskUserQuestion` in Claude Code) in `/hm:refresh`. There is no `--auto-apply` flag and no plan to add one. The rationale: a wrong patch is worse than a stale harness.
 
 **Q: Can I use only Claude Code? Only Cursor? Only Codex?**
 Yes. `targets` is a multi-select at the interview. Claude Code uses `.claude/`; Cursor reuses most `.claude/` assets and adds `.cursor/`; Codex adds `AGENTS.md`, `.codex/`, and `.agents/skills/`.

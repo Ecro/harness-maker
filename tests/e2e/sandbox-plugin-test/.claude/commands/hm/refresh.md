@@ -4,7 +4,7 @@ harness_maker_version: 0.11.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/refresh.md.j2
 provenance: official
-content_hash: 5bc24a2849705eaa6e63963ccf9311f59bfade58c61b1859cfeb0c35dfc6759a
+content_hash: e7af157710a06073ffe48d55964c32797cdd4c855646ead2d2450c8a2b81e474
 ---
 # /hm:refresh
 
@@ -25,9 +25,9 @@ content_hash: 5bc24a2849705eaa6e63963ccf9311f59bfade58c61b1859cfeb0c35dfc6759a
    Use your own judgment; do not call an external API.
 5. **Write proposal** — filtered items + stale + drift →
    `.claude/observability/refresh/proposed-<YYYY-MM-DD>.md`.
-6. **AskUserQuestion** for each proposal: `accept` / `reject` / `defer`.
+6. **Structured question** (`AskQuestion` in Cursor / `AskUserQuestion` in Claude Code) for each proposal: `accept` / `reject` / `defer`.
 
-**Hard rule:** never bypass AskUserQuestion. Auto-apply is forbidden.
+**Hard rule:** never bypass the structured question step. Auto-apply is forbidden.
 
 ## Run
 
@@ -73,7 +73,7 @@ CLAUDE.md and README.md — no API call needed. Apply the adaptive threshold
 from prior decisions in `decisions.jsonl` (default 0.7; use keyword overlap
 as a tiebreaker for borderline items).
 
-Then for each item in `proposed-<date>.md` use AskUserQuestion —
+Then for each item in `proposed-<date>.md` use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code) —
 `accept` / `reject` / `defer`. On `accept`:
 - Stale asset: run `update_last_reviewed_at(path)` via subprocess.
 - Crawl item: patch the relevant `.claude/` asset.
@@ -83,7 +83,7 @@ Append decisions to `.claude/observability/refresh/decisions.jsonl`.
 
 ## Autoloop behavior
 
-Stop after writing `proposed-<date>.md`. The AskUserQuestion step requires
+Stop after writing `proposed-<date>.md`. The structured question step requires
 interactive mode; autoloop must not synthesize a default answer.
 
 <!-- @hm:user:extensions -->

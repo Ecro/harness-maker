@@ -4,7 +4,7 @@ harness_maker_version: 0.11.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/configure.md.j2
 provenance: official
-content_hash: 7331e31fe2d090fa67c82e0de89c0a3a7f7dd16daa45480f4b9dade885ae6709
+content_hash: cb59bb8add023c4cec09b3844e29bb034303c16e27cc43cfbe0b0357538320ef
 ---
 # /hm:configure
 
@@ -14,7 +14,7 @@ content_hash: 7331e31fe2d090fa67c82e0de89c0a3a7f7dd16daa45480f4b9dade885ae6709
 ## Procedure
 
 You (Claude) act as the orchestrator. Read `.claude/harness.yaml` to
-show current settings, then drive targeted changes via `AskUserQuestion`.
+show current settings, then drive targeted changes via the structured question tool (`AskQuestion` in Cursor, `AskUserQuestion` in Claude Code).
 Use the configured locale for the live conversation. Every selected setting
 must show a concise decision receipt before dispatch: current value, new value,
 benefit, trade-off, re-render impact, and preservation note.
@@ -32,7 +32,7 @@ Read `.claude/harness.yaml` body (skip frontmatter) and surface:
 
 ### 2. Ask what to change
 
-Use `AskUserQuestion`: "What would you like to change?" This is a
+Use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code): "What would you like to change?" This is a
 multi-select flow; the user can update several settings in one pass.
 
 Options (multi-select):
@@ -62,7 +62,7 @@ Options (multi-select):
 
 ### 3. Collect changes
 
-For each selected dimension, show an `AskUserQuestion` with the current value,
+For each selected dimension, show a structured question (`AskQuestion` / `AskUserQuestion`) with the current value,
 new value alternatives, and a short explanation:
 
 - **Benefit** — what improves when this setting changes.

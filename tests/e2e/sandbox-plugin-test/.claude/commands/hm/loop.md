@@ -4,7 +4,7 @@ harness_maker_version: 0.11.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/loop.md.j2
 provenance: official
-content_hash: 9a3da1da521a74a1e58ecaebd487c38aa20f6884f39acb913bfa021063249b4b
+content_hash: 1ad716b81e02f206efcc5e9bbdca185e6799197b65b5430880db5c1e6a01dbf5
 ---
 # /hm:loop
 
@@ -162,7 +162,7 @@ as **unresolved** and ask. Do not invent answers.
 
 Before interviewing for missing dimensions, lock in the loop's quality bar.
 
-Ask via `AskUserQuestion` (single call, two independent questions):
+Use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code) — single call, two independent questions:
 
 **Q1 — Loop intensity:**
 
@@ -210,7 +210,7 @@ own additions; `maximum` includes all `thorough` items plus its own.
 
 #### 4-B. Interview for missing dimensions
 
-For each unresolved dimension, ask via `AskUserQuestion`. Present what you
+For each unresolved dimension, ask via `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code). Present what you
 found in the source (if anything) and ask the user to confirm or complete it.
 
 Ask dimensions in this order:
@@ -220,7 +220,7 @@ Ask dimensions in this order:
 4. test_reliability
 5. stopping_criteria
 
-Batch up to two related dimensions per `AskUserQuestion` call when they are
+Batch up to two related dimensions per `AskQuestion` / `AskUserQuestion` call when they are
 short (e.g., priority + test_reliability). Never batch stopping_criteria with
 others — it deserves its own focused question.
 
@@ -234,7 +234,7 @@ condition that is NOT already in `exit_criteria_checklist`:
 
 1. Propose it as a new `ExitCriterion` (set `cmd` if a shell command can
    check it, otherwise leave `cmd=""`).
-2. Ask via `AskUserQuestion`: "Add to exit checklist? {proposed label}"
+2. Ask via `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code): "Add to exit checklist? {proposed label}"
    Options: **Add (required)** / **Add (warning only)** / **Skip**.
 
 This ensures measurable stopping conditions become first-class checklist
@@ -251,7 +251,7 @@ After receiving each answer, evaluate whether it is **actionable**:
   qualifier ("important things")
 
 If not actionable, generate a targeted follow-up question (LLM-generated,
-not a fixed script) and ask via `AskUserQuestion`. Continue until actionable.
+not a fixed script) and ask via `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code). Continue until actionable.
 
 There is no maximum question count. The loop does not start until all five
 dimensions are actionable.
@@ -263,16 +263,16 @@ defined:
 
 - If input was a `--spec` file: propose features extracted from it (headings,
   roadmap items, TODO markers, DoD checklists). Cap proposal at one coherent
-  slice of 3–10 features. Ask via `AskUserQuestion` to accept / edit / retype.
+  slice of 3–10 features. Use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code) to accept / edit / retype.
 - If input was a free-form `<goal>`: use the already-split feature list.
-  Ask via `AskUserQuestion` to add AC for each feature (batch 3–5 per call).
+  Use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code) to add AC for each feature (batch 3–5 per call).
 
 For `improve` mode: features list stays empty. The iteration cycle is the
 "feature".
 
 #### 4-E. Convergence
 
-Ask via `AskUserQuestion` only if the stopping_criteria answer didn't make
+Use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code) only if the stopping_criteria answer didn't make
 the convergence predicate obvious:
 
 - `feature` mode: translate stopping_criteria into one of the named
@@ -316,7 +316,7 @@ Five candidate types (use short label to track across rounds):
 - **PERF**: "What **performance or scale** expectations exist?" → implicit benchmarks
 
 **MUST NOT reuse a type label** from a previous round (track: WRONG/METHOD/STAKEHOLDER/STYLE/PERF used).
-Batch Layer 1 and Layer 2 questions into one `AskUserQuestion` call (max 4).
+Batch Layer 1 and Layer 2 questions into one `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code) call (max 4).
 
 **Layer 3 — Ambiguity Score (display and gate)**
 
@@ -340,7 +340,7 @@ appended to the Layer 3 display block, then applied.
 → proceed to step 4-F (Persist context).
 
 On **NEEDS**: return to Layer 1 (focus on failing axis); generate new Layer 2
-probes (no repeats). Max **3 rounds**. After 3 NEEDS, offer via `AskUserQuestion`:
+probes (no repeats). Max **3 rounds**. After 3 NEEDS, offer via `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code):
 - A: "Proceed — accept current ambiguity and start loop"
 - B: "Refine further — return to Layer 1 with new focus"
 
@@ -399,7 +399,7 @@ features:
       - <observable check>
 ```
 
-Show the user: saved paths + one-line summary, then ask `AskUserQuestion`
+Show the user: saved paths + one-line summary, then use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code)
 for final go-ahead before starting the loop.
 
 ---
@@ -569,7 +569,7 @@ For each iter (until convergence or any safety rail fires):
    - "Clearly not satisfied" → fails. Reset `criterion_ambiguity_counts[label]` to 0.
    - "Ambiguous" → **deadlock detector**: increment `criterion_ambiguity_counts[label]`.
      Persist the updated map to `runtime.criterion_ambiguity_counts` in the
-     loop-context file. If the count reaches 3, ask via `AskUserQuestion`:
+     loop-context file. If the count reaches 3, ask via `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code):
      options **"Continue anyway"** / **"Accept criterion as met"** /
      **"Remove criterion"**. This prevents infinite loops on unresolvable
      qualitative bars.
@@ -644,7 +644,7 @@ When the loop halts (convergence, safety rail, or hard error):
      - Increment `checklist_fail_counts[label]`. Persist to
        `runtime.checklist_fail_counts` in loop-context file.
      - **Escape hatch (ADR-009)**: If `checklist_fail_counts[label] >= 3`,
-       ask via `AskUserQuestion`:
+       ask via `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code):
        - **"Override — accept loop as converged despite failing criterion"**
        - **"Abort — mark loop as not converged, exit without wrapup"**
        - **"Remove criterion and accept"** (removes from `exit_criteria_checklist`)

@@ -3,9 +3,9 @@
 Verifies that:
 - _codex_stage_skills() passes stage_body in context (Phase 1)
 - stage_body contains stage-specific procedure keywords (Phase 1+2)
-- hm-loop SKILL.md has interview procedure and no AskUserQuestion (Phase 1+3)
-- Claude Code renders are unchanged (regression guard)
-- AskUserQuestion is absent in all Codex renders (all 7 stages + loop)
+- hm-loop SKILL.md has interview procedure and uses request_user_input (Phase 1+3)
+- Claude Code + Cursor renders use dual-name pattern (regression guard)
+- AskUserQuestion is absent in all Codex renders; request_user_input present (all 7 stages + loop)
 - config_dump is threaded from synthesize() through to stage_body rendering
 - stage_skill.md.j2 does not double-render stage_body containing Jinja2 fragments
 """
@@ -149,15 +149,23 @@ def test_loop_codex_render_no_ask_user_question() -> None:
     """loop template rendered with is_codex=True must not contain 'AskUserQuestion'."""
     rendered = _render_loop(is_codex=True)
     assert "AskUserQuestion" not in rendered, (
-        "Codex loop render contains 'AskUserQuestion' — Codex uses response-based asking"
+        "Codex loop render contains 'AskUserQuestion' — Codex uses request_user_input"
+    )
+
+
+def test_loop_codex_render_has_request_user_input() -> None:
+    """loop template rendered with is_codex=True must reference request_user_input."""
+    rendered = _render_loop(is_codex=True)
+    assert "request_user_input" in rendered, (
+        "Codex loop render missing 'request_user_input' — Codex structured question tool"
     )
 
 
 def test_loop_codex_render_has_interview_and_bash() -> None:
     """loop template rendered with is_codex=True must have interview pattern and Bash calls."""
     rendered = _render_loop(is_codex=True)
-    assert "ask" in rendered.lower() or "in your response" in rendered.lower(), (
-        "Codex loop must have response-based asking pattern"
+    assert "request_user_input" in rendered.lower() or "ask" in rendered.lower(), (
+        "Codex loop must have structured asking pattern"
     )
     assert rendered.count("Bash(") >= 3, (
         f"Codex loop must have ≥3 Bash tool calls, got {rendered.count('Bash(')}"
@@ -181,9 +189,11 @@ def test_loop_codex_render_keeps_marker_on_non_convergence() -> None:
     assert "explicitly chooses Abort/Override" in rendered
 
 
-# ── AskUserQuestion absent in all Codex renders ───────────────────────────────
+# ── AskUserQuestion absent in all Codex renders; request_user_input present ───
 
 _ALL_STAGES = ["execute", "research", "spec", "plan", "review", "wrapup", "verify"]
+
+_STAGES_WITH_INTERVIEW = ["research", "spec", "plan", "verify"]
 
 
 @pytest.mark.parametrize("stage", _ALL_STAGES)
@@ -191,7 +201,16 @@ def test_codex_stage_render_no_ask_user_question(stage: str) -> None:
     """Every stage rendered with is_codex=True must not contain 'AskUserQuestion'."""
     rendered = _render_stage(stage, is_codex=True)
     assert "AskUserQuestion" not in rendered, (
-        f"Codex {stage} render contains 'AskUserQuestion' — Codex has no tool UI"
+        f"Codex {stage} render contains 'AskUserQuestion' — Codex uses request_user_input"
+    )
+
+
+@pytest.mark.parametrize("stage", _STAGES_WITH_INTERVIEW)
+def test_codex_stage_render_has_request_user_input(stage: str) -> None:
+    """Interview stages rendered with is_codex=True must reference request_user_input."""
+    rendered = _render_stage(stage, is_codex=True)
+    assert "request_user_input" in rendered, (
+        f"Codex {stage} render missing 'request_user_input' — structured question tool"
     )
 
 
@@ -310,7 +329,20 @@ def test_execute_claude_code_render_preserved() -> None:
 
 
 def test_loop_claude_code_render_preserved() -> None:
-    """loop rendered with is_codex=False must retain CC-specific constructs."""
+    """loop rendered with is_codex=False must retain dual-name question tool pattern."""
     rendered = _render_loop(is_codex=False)
     assert "$ARGUMENTS" in rendered, "CC loop render lost $ARGUMENTS"
-    assert "AskUserQuestion" in rendered, "CC loop render lost AskUserQuestion"
+    assert "AskQuestion" in rendered, "CC/Cursor loop render lost AskQuestion"
+    assert "AskUserQuestion" in rendered, "CC/Cursor loop render lost AskUserQuestion"
+
+
+@pytest.mark.parametrize("stage", _STAGES_WITH_INTERVIEW)
+def test_cc_stage_render_has_dual_name_pattern(stage: str) -> None:
+    """Interview stages with is_codex=False must have both AskQuestion and AskUserQuestion."""
+    rendered = _render_stage(stage, is_codex=False)
+    assert "AskQuestion" in rendered, (
+        f"CC/Cursor {stage} render missing 'AskQuestion' — dual-name pattern required"
+    )
+    assert "AskUserQuestion" in rendered, (
+        f"CC/Cursor {stage} render missing 'AskUserQuestion' — dual-name pattern required"
+    )

@@ -4,7 +4,7 @@ harness_maker_version: 0.11.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: stages/verify.md.j2
 provenance: official
-content_hash: a5fcd9509b8d873e124219c255de87e72f47d6198e510ee7ec28af19b26dd6ea
+content_hash: 6e55e88bd38e02e9952c445485ca32f276fd93d47a5376b3addf652faa394569
 ---
 # Stage: verify
 
@@ -34,7 +34,7 @@ Block silent regressions and partial completions. Run a rigid 6-check rubric tha
 /hm:verify [--force] [--reason=<text>]
 ```
 
-- `--force` — proceed even when one or more checks FAIL. **Logged with the override reason.** Use only when the user has consciously chosen to bypass (emergency hotfix, intentional debt). Without `--reason=<text>`, `--force` requires confirmation via AskUserQuestion in `en`.
+- `--force` — proceed even when one or more checks FAIL. **Logged with the override reason.** Use only when the user has consciously chosen to bypass (emergency hotfix, intentional debt). Without `--reason=<text>`, `--force` requires confirmation via `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code) in `en`.
 - `--reason=<text>` — free-form override rationale. Required for `--force` in non-interactive contexts (autoloop).
 
 ## Inputs
