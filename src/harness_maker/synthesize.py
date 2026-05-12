@@ -34,6 +34,44 @@ FileSpec = tuple[str, str, dict[str, Any]]
 # Works both from the source repo and from the plugin cache.
 _HARNESS_MAKER_PKG_ROOT = str(Path(__file__).parent.parent.parent)
 
+
+def _compute_install_ref() -> str:
+    """Return ``"harness-maker"`` when installed as a wheel, else the local abs path.
+
+    ADR-002: rendered templates use ``uv run --with <ref>`` to invoke harness-maker
+    modules.  When the package is a proper (non-editable) install the PyPI name
+    suffices; editable or source-tree installs need the absolute path so ``uv``
+    can resolve the local project.
+
+    Detection rule (locked in ADR-002):
+    1. ``distribution("harness-maker")`` succeeds → package is installed.
+       a. ``direct_url.json`` exists and ``dir_info.editable`` is True → editable
+          install, return local abs path.
+       b. Otherwise → proper install, return ``"harness-maker"``.
+    2. ``distribution()`` raises (PackageNotFoundError) → not installed,
+       fall back to local abs path for source-tree usage.
+    """
+    try:
+        from importlib.metadata import distribution
+
+        dist = distribution("harness-maker")
+    except Exception:  # noqa: BLE001 — PackageNotFoundError or any import issue
+        return _HARNESS_MAKER_PKG_ROOT
+
+    # Package IS installed — JSON parse errors should NOT revert to local path.
+    try:
+        import json
+
+        raw = dist.read_text("direct_url.json")
+        if raw is not None:
+            du = json.loads(raw)
+            if du.get("dir_info", {}).get("editable", False):
+                return _HARNESS_MAKER_PKG_ROOT
+    except (json.JSONDecodeError, KeyError, TypeError):
+        pass  # Corrupted metadata — package is installed, use PyPI name.
+    return "harness-maker"
+
+
 _ATOMIC_STAGES: list[str] = [s.value for s in AtomicStage]
 
 # Every preset installs the full reviewer/skill inventory; activation is data,
@@ -87,6 +125,7 @@ def _atomic_command_files() -> list[FileSpec]:
 
     env = _make_env()
     default_config = HarnessConfig().model_dump(mode="json")
+    install_ref = _compute_install_ref()
     for s in _ATOMIC_STAGES:
         tpl = env.get_template(f"stages/{s}.md.j2")
         body = tpl.render(
@@ -95,9 +134,7 @@ def _atomic_command_files() -> list[FileSpec]:
             project_name="",
             feature="",
             config=default_config,
-            # stages/execute.md.j2 calls `python -m harness_maker.worktree`
-            # via this absolute path baked into the rendered slash command.
-            harness_maker_src_path=_HARNESS_MAKER_PKG_ROOT,
+            harness_maker_src_path=install_ref,
             is_codex=False,
         )
         out.append(
@@ -342,8 +379,9 @@ def _codex_target_files(
 
         config_dump = HarnessConfig().model_dump(mode="json")
     env = _make_env()
+    install_ref = _compute_install_ref()
     loop_body = env.get_template("commands/hm/loop.md.j2").render(
-        harness_maker_src_path=_HARNESS_MAKER_PKG_ROOT,
+        harness_maker_src_path=install_ref,
         is_codex=True,
         config=config_dump,
     )
@@ -392,6 +430,7 @@ def _codex_stage_skills(*, config_dump: dict[str, object] | None = None) -> list
 
         config_dump = HarnessConfig().model_dump(mode="json")
     env = _make_env()
+    install_ref = _compute_install_ref()
     out: list[FileSpec] = []
     for s in _ATOMIC_STAGES:
         tpl = env.get_template(f"stages/{s}.md.j2")
@@ -401,7 +440,7 @@ def _codex_stage_skills(*, config_dump: dict[str, object] | None = None) -> list
             project_name="",
             feature="",
             config=config_dump,
-            harness_maker_src_path=_HARNESS_MAKER_PKG_ROOT,
+            harness_maker_src_path=install_ref,
             is_codex=True,
         )
         out.append(
@@ -496,6 +535,7 @@ def synthesize(
         "installed": answers.skills.get("installed", []),
         "enabled": answers.skills.get("enabled", []),
     }
+    install_ref = _compute_install_ref()
     files = [
         FileEntry(
             path=Path(out_path),
@@ -508,7 +548,7 @@ def synthesize(
                 "stack": profile.stack,
                 "scale": profile.scale,
                 "lifecycle": profile.lifecycle,
-                "harness_maker_src_path": _HARNESS_MAKER_PKG_ROOT,
+                "harness_maker_src_path": install_ref,
                 # is_codex gates Codex-specific branches; always False here since
                 # Codex skill bodies are pre-rendered in _codex_stage_skills().
                 "is_codex": ctx.get("is_codex", False),

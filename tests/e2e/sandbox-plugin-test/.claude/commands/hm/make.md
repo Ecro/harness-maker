@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.9.4
+harness_maker_version: 0.11.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/make.md.j2
 provenance: official
-content_hash: 37218410cd9e8d24ca79817a18e408984df2815d5fa3fbd5aad922957f1907e7
+content_hash: e5d8d979619fc978134c3aeae24b2947bf23143f16ffb7c718459adb36c937ad
 ---
 # /hm:make
 
@@ -37,7 +37,7 @@ After the CLI completes, summarize:
 ### `--reinterview`
 
 Routes to the full interactive setup. Run `/harness-maker:make` instead —
-it drives `AskUserQuestion` for preset, locale, dev_mode, targets, and
+it asks locale first, then drives `AskUserQuestion` for preset, dev_mode, targets, and
 dispatches with the collected flags.
 
 Tell the user:

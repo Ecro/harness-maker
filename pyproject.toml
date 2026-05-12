@@ -28,6 +28,9 @@ dev = [
     "respx>=0.20",
 ]
 
+[project.scripts]
+harness-maker = "harness_maker.cli:main"
+
 [build-system]
 requires = ["uv_build>=0.5"]
 build-backend = "uv_build"

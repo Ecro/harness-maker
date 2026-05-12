@@ -133,8 +133,7 @@ def emit(
             resolved_base = base_dir.resolve()
             if not resolved_base.is_relative_to(resolved_root):
                 raise ValueError(
-                    f"observability_dir {resolved_base} escapes project_root "
-                    f"{resolved_root}"
+                    f"observability_dir {resolved_base} escapes project_root {resolved_root}"
                 )
             base_dir = resolved_base
         else:

@@ -78,9 +78,7 @@ def test_codex_hooks_json_has_stop_with_flush_session() -> None:
     stop_commands = " ".join(
         h.get("command", "") for entry in stop_hooks for h in entry.get("hooks", [])
     )
-    assert "flush_session" in stop_commands, (
-        "Stop event must include flush_session (ADR-004)"
-    )
+    assert "flush_session" in stop_commands, "Stop event must include flush_session (ADR-004)"
 
 
 def test_codex_hooks_json_has_stop_with_loop_gate() -> None:
@@ -128,9 +126,7 @@ def test_codex_hooks_json_has_pretooluse_permission_gate() -> None:
     pre_commands = " ".join(
         h.get("command", "") for entry in pre_hooks for h in entry.get("hooks", [])
     )
-    assert "permission_gate" in pre_commands, (
-        "Codex PreToolUse must wire permission_gate"
-    )
+    assert "permission_gate" in pre_commands, "Codex PreToolUse must wire permission_gate"
 
 
 # ── permission_gate PermissionRequest branch ──────────────────────────────────

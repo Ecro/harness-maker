@@ -45,8 +45,7 @@ SPURIOUS_FINDING = {
     "summary": "Missing input validation",
     "suggestion": "Validate input",
     "reasoning": (
-        "OBSERVE: function takes user data. "
-        "INFER: could be malformed. CONCLUDE: might crash."
+        "OBSERVE: function takes user data. INFER: could be malformed. CONCLUDE: might crash."
     ),
 }
 
@@ -199,17 +198,15 @@ def test_verify_demote_rejects_promotion_attempt(
     promote it to P0.
     """
     p2 = {**REAL_FINDING, "severity": "P2"}
-    response = json.dumps(
-        {"decisions": [{"index": 0, "action": "demote", "new_severity": "P0"}]}
-    )
+    response = json.dumps({"decisions": [{"index": 0, "action": "demote", "new_severity": "P0"}]})
     with caplog.at_level(logging.WARNING, logger="harness_maker.two_pass_review"):
         result = verify_findings([p2], PASS1_CONTEXT, client=_FakeClient(response))
 
     # Promotion rejected → falls back to one-tier demote (P2 → P3).
     assert result["kept"][0]["severity"] == "P3", "promotion attempt must not stand"
-    assert any(
-        "promote" in r.message.lower() for r in caplog.records
-    ), "warning must be emitted when promotion is attempted"
+    assert any("promote" in r.message.lower() for r in caplog.records), (
+        "warning must be emitted when promotion is attempted"
+    )
 
 
 def test_verify_demote_with_missing_new_severity_no_silent_lie() -> None:

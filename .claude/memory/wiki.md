@@ -1,6 +1,6 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.10.0
+harness_maker_version: 0.11.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: memory/wiki.ko.md.j2
 provenance: official
@@ -108,7 +108,10 @@ Instructing a reviewer agent to consult `git log` for prior intent on a finding 
 ## [wiki:convention] sha256-baseline-update-on-intentional-refactor | 2026-05-11
 `tests/unit/test_agent_body_partials.py::test_full_agent_md_sha256_unchanged` was originally a Phase 3 body-split zero-diff guard. It hash-pins the rendered output of every agent. Any **intentional** reviewer-body change (Phase C1, future prompt iterations) WILL break this test for the modified agents. Update path: (1) make the body change, (2) run pytest to capture the actual new sha256, (3) update `_EXPECTED_SHA256[name]` for each modified agent ONLY (leave unmodified agents alone), (4) update the comment at the top of `_EXPECTED_SHA256` to note when the new baseline was taken and why. Do NOT delete the test — it still catches accidental drift on the unmodified agents (test-reviewer, plan-validator, stuck, etc.). Phase C1 (2026-05-11) updated 5 of the 12 entries: code/security/performance/concurrency/ux-reviewer; the other 7 retain their original Phase-3-refactor hashes.
 
-<!-- @hm:/user:entries -->
+## [wiki:architecture] ide-agnostic-install-ref | 2026-05-12
+`_compute_install_ref()` in `synthesize.py` dynamically selects between `"harness-maker"` (PyPI name) and the local absolute path for `uv run --with <ref>` in rendered templates. Detection rule (ADR-002, locked): (1) `importlib.metadata.distribution("harness-maker")` succeeds → package installed; check `direct_url.json` for `editable: true` → local path, else PyPI name. (2) `distribution()` fails → not installed, use `_HARNESS_MAKER_PKG_ROOT`. Critical: the two try/except blocks are split so JSON parse errors after successful `distribution()` return `"harness-maker"` (not the local path, which on a wheel points to `site-packages` parents). Call sites hoist `install_ref = _compute_install_ref()` once per function to avoid redundant `importlib.metadata` I/O.
 
-## [wiki:pattern] onboarding-locale-first-receipt | 2026-05-12
-Onboarding UX changes must preserve a locale-first contract across every live decision surface: `/harness-maker:make` asks locale before profile, preset, dev_mode, targets, or confirmation; `/hm:configure` explains each selected setting with current/new values, benefit, trade-off, re-render impact, and preservation note; Deep Interview prompts and option labels follow the configured locale while persisted PLAN/SPEC/RESEARCH artifacts stay English. First-install Second Brain remains read-first, with write-capable allowlist and namespace setup deferred to `/hm:configure`.
+## [wiki:architecture] make-md-3-step-fallback | 2026-05-12
+`commands/make.md` Section 2 uses a 3-step fallback for plugin path resolution: (A) Claude Code `~/.claude/plugins/installed_plugins.json`, (B) Cursor `~/.cursor/plugins/local/harness-maker`, (C) `command -v harness-maker` CLI fallback. The resolved `$RESOLVE_MODE` (`claude-code`, `cursor`, or `CLI_FALLBACK`) selects the dispatch shape in Section 5: plugin modes use `uv run --directory "$plugin_dir"`, CLI mode uses direct `harness-maker` invocation via `console_scripts`.
+
+<!-- @hm:/user:entries -->

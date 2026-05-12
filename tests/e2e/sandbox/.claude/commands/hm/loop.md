@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.9.4
+harness_maker_version: 0.11.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/loop.md.j2
 provenance: official
-content_hash: 98a818efe66617db70f28b9816d2bb13f8f9eb3409461dc863e496930ebfd8e8
+content_hash: 9a3da1da521a74a1e58ecaebd487c38aa20f6884f39acb913bfa021063249b4b
 ---
 # /hm:loop
 
@@ -115,6 +115,10 @@ Split `<goal>` on `;`, `\n`, or `·` into features with empty AC.
 
 **Goal**: start the loop with zero ambiguity. Use LLM judgment throughout —
 not keyword matching or pattern rules.
+Use the configured locale `en` for all live adaptive interview
+text: round preambles, extracted-context summaries, ambiguity explanations,
+question text and option labels, score display labels, and validation prompts.
+Persisted loop context remains structured YAML.
 
 #### 4-0. Derive slug (before reading any context file)
 
@@ -280,6 +284,8 @@ the convergence predicate obvious:
 
 Runs after steps 4-B through 4-E complete, before persisting context (4-F).
 This gate surfaces implicit requirements missed by the 5-dimension interview.
+Continue using the configured locale for Layer 1/2 question text and option
+labels, ambiguity explanations, score display labels, and validation prompts.
 
 **Layer 1 — GCIC Gap Check**
 

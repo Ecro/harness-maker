@@ -61,6 +61,7 @@ def is_excluded(path: str, exclusions: list[str]) -> bool:
     """True iff ``path`` matches any of the active fnmatch globs."""
     return any(fnmatch.fnmatch(path, g) for g in exclusions)
 
+
 FIXTURES = ["side-python-cli", "side-tauri-app", "prod-tauri-app", "prod-firmware"]
 DEV_MODES: tuple[tuple[str, DevMode], ...] = (
     ("task", DevMode.TASK_DRIVEN),

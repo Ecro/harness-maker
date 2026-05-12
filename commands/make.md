@@ -54,21 +54,51 @@ user explicitly changes it.
 
 ### 2. Detect state
 
-Resolve the plugin install path and check whether the project already has
-a harness:
+Resolve the harness-maker install path via a 3-step fallback, then check
+whether the project already has a harness.
 
 ```bash
+# Step A — Claude Code plugin resolution (works when installed via /plugin)
 !plugin_dir=$(python3 -c "
 import json, os, pathlib
-data = json.load(open(pathlib.Path.home() / '.claude/plugins/installed_plugins.json'))
-entries = data['plugins']['harness-maker@harness-maker-local']
-cwd = os.getcwd()
-match = next((e for e in entries if e.get('projectPath') == cwd), entries[0])
-print(match['installPath'])
-")
-echo "PLUGIN_DIR=$plugin_dir"
+try:
+    data = json.load(open(pathlib.Path.home() / '.claude/plugins/installed_plugins.json'))
+    entries = data['plugins']['harness-maker@harness-maker-local']
+    cwd = os.getcwd()
+    match = next((e for e in entries if e.get('projectPath') == cwd), entries[0])
+    print(match['installPath'])
+except Exception:
+    print('')
+" 2>/dev/null)
+
+if [ -n "$plugin_dir" ]; then
+    RESOLVE_MODE="claude-code"
+    echo "RESOLVE_MODE=claude-code  PLUGIN_DIR=$plugin_dir"
+else
+    # Step B — Cursor local plugin directory
+    cursor_local="$HOME/.cursor/plugins/local/harness-maker"
+    if [ -d "$cursor_local" ] && [ -f "$cursor_local/pyproject.toml" ]; then
+        plugin_dir="$cursor_local"
+        RESOLVE_MODE="cursor"
+        echo "RESOLVE_MODE=cursor  PLUGIN_DIR=$plugin_dir"
+    else
+        # Step C — CLI fallback (console_scripts or uv tool)
+        cli_path=$(command -v harness-maker 2>/dev/null || true)
+        if [ -n "$cli_path" ]; then
+            RESOLVE_MODE="CLI_FALLBACK"
+            echo "RESOLVE_MODE=CLI_FALLBACK  CLI_PATH=$cli_path"
+        else
+            echo "ERROR: harness-maker not found. Install with: uv tool install harness-maker  OR  pip install harness-maker"
+            exit 1
+        fi
+    fi
+fi
+
 [ -f "$(pwd)/.claude/harness.yaml" ] && echo "STATE=re-render" || echo "STATE=fresh-install"
 ```
+
+The variable `$RESOLVE_MODE` (`claude-code`, `cursor`, or `CLI_FALLBACK`)
+determines the dispatch shape in section 5.
 
 ### 3. If `STATE=re-render` — show current settings + ask intent
 
@@ -123,7 +153,10 @@ most common reason existing 0.4.x/0.5.0 users return to this command:
 #### 4.1 Run profile scan
 
 ```bash
+# claude-code / cursor:
 !uv run --directory "$plugin_dir" python -m harness_maker.cli profile "$(pwd)" --json
+# CLI_FALLBACK:
+!harness-maker profile "$(pwd)" --json
 ```
 
 Parse the JSON output. Extract: `stack`, `scale`, `lifecycle`, `detected_checks`.
@@ -263,12 +296,19 @@ Jump to Section 5 → Fresh install branch, passing all collected flags.
 
 ### 5. Dispatch — pick the right CLI invocation
 
-Branch on the chosen intent. Use `$plugin_dir` from section 2.
+Branch on the chosen intent. Use `$plugin_dir` and `$RESOLVE_MODE` from section 2.
+
+**Dispatch shape by RESOLVE_MODE:**
+- `claude-code` or `cursor`: `uv run --directory "$plugin_dir" python -m harness_maker.cli <args>`
+- `CLI_FALLBACK`: `harness-maker <args>` (direct CLI — console_scripts entry point)
 
 #### Update (re-render same settings)
 
 ```bash
+# claude-code / cursor:
 !uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)"
+# CLI_FALLBACK:
+!harness-maker make "$(pwd)"
 ```
 
 CLI prints `reusing settings from .claude/harness.yaml` and applies new
@@ -277,7 +317,10 @@ templates while preserving user `@hm:user:*` blocks via reconcile.
 #### Switch preset
 
 ```bash
+# claude-code / cursor:
 !uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" --preset Production
+# CLI_FALLBACK:
+!harness-maker make "$(pwd)" --preset Production
 ```
 
 (or `--preset Side` for the reverse). Other dimensions stay as before.
@@ -287,19 +330,28 @@ enables broader review and stricter gates; Side is lighter.
 #### Switch locale
 
 ```bash
+# claude-code / cursor:
 !uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" --locale ko
+# CLI_FALLBACK:
+!harness-maker make "$(pwd)" --locale ko
 ```
 
 #### Switch dev_mode
 
 ```bash
+# claude-code / cursor:
 !uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" --dev-mode spec-driven
+# CLI_FALLBACK:
+!harness-maker make "$(pwd)" --dev-mode spec-driven
 ```
 
 #### Switch runtime targets
 
 ```bash
+# claude-code / cursor:
 !uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" --targets claude-code,cursor,codex
+# CLI_FALLBACK:
+!harness-maker make "$(pwd)" --targets claude-code,cursor,codex
 ```
 
 (or `--targets cursor` for Cursor-only, `--targets codex` for Codex-only,
@@ -312,9 +364,14 @@ manually if you want a clean slate.
 #### Add / remove a component
 
 ```bash
+# claude-code / cursor:
 !uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" --add reviewer:security
 !uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" --remove skill:research-crawler
 !uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" --add-domain tauri
+# CLI_FALLBACK:
+!harness-maker make "$(pwd)" --add reviewer:security
+!harness-maker make "$(pwd)" --remove skill:research-crawler
+!harness-maker make "$(pwd)" --add-domain tauri
 ```
 
 Available reviewers: `code`, `security`, `performance`, `concurrency`, `ux`,
@@ -328,8 +385,11 @@ Ask the user for the new ref_folders value with `AskUserQuestion` (current
 value shown from harness.yaml), then dispatch:
 
 ```bash
+# claude-code / cursor:
 !uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" \
   --ref-folders "$REF_FOLDERS"
+# CLI_FALLBACK:
+!harness-maker make "$(pwd)" --ref-folders "$REF_FOLDERS"
 ```
 
 `$REF_FOLDERS` uses `::` between entries and `;` between path and glob within
@@ -341,8 +401,11 @@ Ask the user for the new sibling_repos value with `AskUserQuestion` (current
 value shown from harness.yaml), then dispatch:
 
 ```bash
+# claude-code / cursor:
 !uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" \
   --sibling-repos "$SIBLING_REPOS"
+# CLI_FALLBACK:
+!harness-maker make "$(pwd)" --sibling-repos "$SIBLING_REPOS"
 ```
 
 `$SIBLING_REPOS` is semicolon-separated relative paths (e.g. `../backend;../mobile`).
@@ -392,7 +455,15 @@ in turn, then dispatch with all collected flags:
 Then dispatch with the collected values:
 
 ```bash
+# claude-code / cursor:
 !uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" \
+  --preset "$PRESET" --locale "$LOCALE" --dev-mode "$DEV_MODE" --targets "$TARGETS" \
+  --focus "$FOCUS" --grade-threshold "$GRADE" --domains "$DOMAINS" \
+  --mechanical-checks "$CHECKS" --recommended-model "$MODEL" --wrapup-docs "$WRAPUP_DOCS" \
+  --ref-folders "$REF_FOLDERS" --sibling-repos "$SIBLING_REPOS" \
+  --second-brain-vault-path "$SB_VAULT_PATH" --second-brain-project-id "$SB_PROJECT_ID"
+# CLI_FALLBACK:
+!harness-maker make "$(pwd)" \
   --preset "$PRESET" --locale "$LOCALE" --dev-mode "$DEV_MODE" --targets "$TARGETS" \
   --focus "$FOCUS" --grade-threshold "$GRADE" --domains "$DOMAINS" \
   --mechanical-checks "$CHECKS" --recommended-model "$MODEL" --wrapup-docs "$WRAPUP_DOCS" \
@@ -407,7 +478,8 @@ flags for dimensions the user skipped or left at default.
 Existing settings outside these dimensions (workflow naming, anti-rot
 config, etc.) are reused from `.claude/harness.yaml`. For a deeper reset
 that re-asks those too, run from a real terminal:
-`uv run --directory <plugin_dir> python -m harness_maker.cli make <project> --reinterview`.
+`harness-maker make <project> --reinterview` (or
+`uv run --directory <plugin_dir> python -m harness_maker.cli make <project> --reinterview`).
 
 #### Audit only
 
@@ -432,7 +504,11 @@ setup, then ask:
    Markdown/frontmatter validation, and `project_id` namespace rules.
 
 ```bash
+# claude-code / cursor:
 !uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" \
+  --second-brain-vault-path "$SB_VAULT_PATH" --second-brain-project-id "$SB_PROJECT_ID"
+# CLI_FALLBACK:
+!harness-maker make "$(pwd)" \
   --second-brain-vault-path "$SB_VAULT_PATH" --second-brain-project-id "$SB_PROJECT_ID"
 ```
 
@@ -442,7 +518,16 @@ Pass empty string `""` for `--second-brain-vault-path` to disable. Omit
 #### Fresh install
 
 ```bash
+# claude-code / cursor:
 !uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" \
+  --preset "$PRESET" --locale "$LOCALE" --dev-mode "$DEV_MODE" --targets "$TARGETS" \
+  --focus "$FOCUS" --grade-threshold "$GRADE" --domains "$DOMAINS" \
+  --mechanical-checks "$CHECKS" --recommended-model "$MODEL" --wrapup-docs "$WRAPUP_DOCS" \
+  --ref-folders "$REF_FOLDERS" --sibling-repos "$SIBLING_REPOS" \
+  --second-brain-vault-path "$SB_VAULT_PATH" --second-brain-project-id "$SB_PROJECT_ID" \
+  --autoloop
+# CLI_FALLBACK:
+!harness-maker make "$(pwd)" \
   --preset "$PRESET" --locale "$LOCALE" --dev-mode "$DEV_MODE" --targets "$TARGETS" \
   --focus "$FOCUS" --grade-threshold "$GRADE" --domains "$DOMAINS" \
   --mechanical-checks "$CHECKS" --recommended-model "$MODEL" --wrapup-docs "$WRAPUP_DOCS" \

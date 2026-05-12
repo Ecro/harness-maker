@@ -82,6 +82,4 @@ def test_verifier_body_contains_no_introduction_invariant() -> None:
 def test_verifier_registered_in_synthesize() -> None:
     """Agent must be wired into the synthesizer's catalog or rendered output skips it."""
     src = (REPO_ROOT / "src/harness_maker/synthesize.py").read_text(encoding="utf-8")
-    assert '"code-verifier"' in src, (
-        "code-verifier missing from synthesize._ALL_AGENTS catalog"
-    )
+    assert '"code-verifier"' in src, "code-verifier missing from synthesize._ALL_AGENTS catalog"

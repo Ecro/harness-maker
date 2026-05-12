@@ -504,9 +504,7 @@ def _apply_dimension_overrides(
     if recommended_model_override:
         update["recommended_model"] = recommended_model_override
     if wrapup_docs_override is not None:
-        update["wrapup_docs"] = [
-            d.strip() for d in wrapup_docs_override.split(";") if d.strip()
-        ]
+        update["wrapup_docs"] = [d.strip() for d in wrapup_docs_override.split(";") if d.strip()]
     if ref_folders_override is not None:
         update["ref_folders"] = _parse_ref_folders_flag(ref_folders_override)
     if sibling_repos_override is not None:
@@ -524,9 +522,7 @@ def _apply_dimension_overrides(
                 enabled=True,
                 vault_path=second_brain_vault_path,
                 project_id=(
-                    second_brain_project_id
-                    if second_brain_project_id is not None
-                    else existing_id
+                    second_brain_project_id if second_brain_project_id is not None else existing_id
                 ),
             )
     elif second_brain_project_id is not None and answers.second_brain.enabled:
@@ -935,9 +931,8 @@ def _resolve_manifest_file(target_dotclaude: Path, rel: str) -> Path | None:
     raw = Path(rel)
     if raw.is_absolute():
         candidate = raw
-    elif (
-        (raw.parts and raw.parts[0] in {".claude", ".cursor", ".codex", ".agents"})
-        or (raw.name in {"CLAUDE.md", "AGENTS.md"} and len(raw.parts) == 1)
+    elif (raw.parts and raw.parts[0] in {".claude", ".cursor", ".codex", ".agents"}) or (
+        raw.name in {"CLAUDE.md", "AGENTS.md"} and len(raw.parts) == 1
     ):
         candidate = project_root / raw
     else:

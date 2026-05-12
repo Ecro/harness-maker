@@ -32,13 +32,15 @@ _TRIGGER_TOOL = "Bash"
 # policy for those; the permission gate is a Bash-specific safety net only.
 # Future work: extend to apply_patch once Codex sandbox compatibility is
 # verified in tests/codex-compat/.
-_KNOWN_HOOK_EVENTS = frozenset({
-    "PreToolUse",
-    "PostToolUse",
-    "PreCompact",
-    "Stop",
-    "PermissionRequest",
-})
+_KNOWN_HOOK_EVENTS = frozenset(
+    {
+        "PreToolUse",
+        "PostToolUse",
+        "PreCompact",
+        "Stop",
+        "PermissionRequest",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -119,12 +121,14 @@ def main() -> int:
     if hook_event == "PermissionRequest":
         behavior = "allow" if decision.allow else "deny"
         print(
-            json.dumps({
-                "hookSpecificOutput": {
-                    "hookEventName": "PermissionRequest",
-                    "decision": {"behavior": behavior},
+            json.dumps(
+                {
+                    "hookSpecificOutput": {
+                        "hookEventName": "PermissionRequest",
+                        "decision": {"behavior": behavior},
+                    }
                 }
-            })
+            )
         )
         return 0
     if decision.message:

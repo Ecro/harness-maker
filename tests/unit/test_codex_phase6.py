@@ -118,9 +118,7 @@ def test_codex_agent_files_correct_output_paths() -> None:
     specs = _codex_agent_files()
     out_paths = {out for _, out, _ in specs}
     for name in _ALL_AGENTS:
-        assert f".codex/agents/{name}.toml" in out_paths, (
-            f"Missing output path for agent {name!r}"
-        )
+        assert f".codex/agents/{name}.toml" in out_paths, f"Missing output path for agent {name!r}"
 
 
 def test_codex_target_files_includes_all_agent_tomls() -> None:

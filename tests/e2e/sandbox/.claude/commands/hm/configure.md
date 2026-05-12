@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.9.4
+harness_maker_version: 0.11.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/configure.md.j2
 provenance: official
-content_hash: 4b41df509190a5c0fcc5cd5bfd0e5b8d96674678cee3fbff7a803da5c198da9f
+content_hash: 7331e31fe2d090fa67c82e0de89c0a3a7f7dd16daa45480f4b9dade885ae6709
 ---
 # /hm:configure
 
@@ -15,6 +15,9 @@ content_hash: 4b41df509190a5c0fcc5cd5bfd0e5b8d96674678cee3fbff7a803da5c198da9f
 
 You (Claude) act as the orchestrator. Read `.claude/harness.yaml` to
 show current settings, then drive targeted changes via `AskUserQuestion`.
+Use the configured locale for the live conversation. Every selected setting
+must show a concise decision receipt before dispatch: current value, new value,
+benefit, trade-off, re-render impact, and preservation note.
 
 ### 1. Show current settings
 
@@ -25,26 +28,67 @@ Read `.claude/harness.yaml` body (skip frontmatter) and surface:
 - domains (if any)
 - recommended_model
 - wrapup_docs (if any)
+- second_brain: enabled, vault_path, project_id (if configured)
 
 ### 2. Ask what to change
 
-Use `AskUserQuestion`: "What would you like to change?"
+Use `AskUserQuestion`: "What would you like to change?" This is a
+multi-select flow; the user can update several settings in one pass.
 
 Options (multi-select):
-- **Preset** — Side ↔ Production
-- **Reviewers** — enable/disable individual reviewers
-- **Grade threshold** — A / B / C
-- **Dev mode** — task-driven ↔ spec-driven
-- **IDE targets** — claude-code, cursor, or both
-- **Domains** — add/remove domain packs
-- **Mechanical checks** — add/edit/clear pre-review commands
-- **Recommended model** — opus / sonnet / haiku
+- **Preset** — Side ↔ Production. Trade-off: Side is lighter; Production
+  increases review coverage and strictness.
+- **Reviewers** — enable/disable individual reviewers. Trade-off: more
+  reviewers improve coverage and can increase review time.
+- **Grade threshold** — A / B / C. Trade-off: stricter thresholds catch more
+  issues and can require more re-review.
+- **Dev mode** — task-driven ↔ spec-driven. Trade-off: spec-driven adds a
+  gate before implementation; task-driven is faster for small work.
+- **IDE targets** — claude-code, cursor, codex, or combinations. Trade-off:
+  extra targets render extra roots and dropping a target does not delete old
+  target-specific files.
+- **Domains** — add/remove domain packs. Trade-off: stronger project-specific
+  reviewer context vs more prompt surface.
+- **Mechanical checks** — add/edit/clear pre-review commands. Trade-off:
+  deterministic failures stop before LLM reviewers, but commands add their own
+  runtime.
+- **Recommended model** — opus / sonnet / haiku. Trade-off: quality/cost/speed
+  preference only; generated Codex agents still inherit the user's Codex
+  profile model.
 - **Wrapup documents** — add/edit/clear docs updated during /hm:wrapup (e.g. CHANGELOG.md, TODO.md)
+- **Second Brain** — configure Obsidian project memory. First install is
+  read-first; this path can continue into advanced vault, allowlist, and
+  writable-folder settings.
 
 ### 3. Collect changes
 
-For each selected dimension, show an `AskUserQuestion` with the current
-value and alternatives. Collect the new values.
+For each selected dimension, show an `AskUserQuestion` with the current value,
+new value alternatives, and a short explanation:
+
+- **Benefit** — what improves when this setting changes.
+- **Trade-off** — what cost the user pays, including review time where relevant.
+- **Re-render impact** — which generated roots may change (`.claude/`,
+  `.cursor/`, `.codex/`, `.agents/skills/`, `AGENTS.md`).
+- **Preservation note** — unspecified fields are preserved from
+  `.claude/harness.yaml`; user blocks marked `@hm:user:*` remain protected by
+  reconcile.
+
+Collect the new values.
+
+For **Second Brain**: ask two questions in sequence:
+1. Vault path — show current `second_brain.vault_path` (or "not configured");
+   user enters absolute/`~`-relative path, or "none" to disable.
+2. Project ID — show current `second_brain.project_id`; user enters
+   kebab-case id (e.g. `my-app`), or blank to keep existing.
+3. Explain advanced behavior before dispatch:
+   - **Read-first** means stages search configured project-memory notes; they
+     do not write arbitrary vault files during first setup.
+   - Folder entries are an allowlist under the vault path.
+   - Writable folders must include `project_id` as a path segment.
+   - Writes are limited to Markdown and validated against required
+     frontmatter such as `type`, `created`, `updated`, `tags`, and `links`.
+   - `/hm:configure` is the place to continue deeper Second Brain setup after
+     first install.
 
 ### 4. Dispatch
 
@@ -53,12 +97,15 @@ Run the CLI with only the changed flags:
 ```bash
 !uv run --with /home/noel/harness-maker python -m harness_maker.cli make "$(pwd)" \
   --grade-threshold "$GRADE" --domains "$DOMAINS" --mechanical-checks "$CHECKS" \
-  --recommended-model "$MODEL" --focus "$FOCUS" --wrapup-docs "$WRAPUP_DOCS"
+  --recommended-model "$MODEL" --focus "$FOCUS" --wrapup-docs "$WRAPUP_DOCS" \
+  --second-brain-vault-path "$SB_VAULT_PATH" --second-brain-project-id "$SB_PROJECT_ID"
 ```
 
-Omit flags for dimensions that weren't changed. The CLI preserves
-unspecified fields from `.claude/harness.yaml` — only changed dimensions
-are overwritten.
+Omit flags for dimensions that weren't changed. Omit `--second-brain-vault-path`
+when Second Brain wasn't selected; pass empty string `""` to disable it.
+Omit `--second-brain-project-id` when the user left it unchanged.
+The CLI preserves unspecified fields from `.claude/harness.yaml` — only
+changed dimensions are overwritten.
 
 ### 5. Confirm
 
@@ -66,6 +113,9 @@ After dispatch, show what changed:
 - Which dimensions were updated
 - New values applied
 - File count (from CLI output)
+- The re-render impact and preservation note for each changed dimension
+- For Second Brain, whether the result is disabled, read-first, or configured
+  for advanced writable-folder follow-up
 
 <!-- @hm:user:extensions -->
 <!-- Project-specific /hm:configure overrides. Preserved across harness-maker upgrades. -->

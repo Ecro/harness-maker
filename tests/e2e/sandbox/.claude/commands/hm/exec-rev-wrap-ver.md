@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.9.4
+harness_maker_version: 0.11.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: f37a3a25406f9e52a1080c4a9db488a959942aa4840855f984c3ec904715a22f
+content_hash: 003138b0b6736c004aad9a71db844db98b9264d469834664cd5f4bae851af9ef
 ---
 # /hm:exec-rev-wrap-ver
 
@@ -374,16 +374,26 @@ anchoring-prone diffs):
    - Returns findings per the Finding Schema partial:
      `{severity, file, line, summary, suggestion, reasoning?, …}`.
 
+#### Pass 1.5 — verifier (deferred, ADR-008)
+
+The Pass 1.5 reduce-only verifier role is documented at
+`agents/code-verifier` for future use. The auto-invoked CLI step was
+removed because the target env has no Anthropic API key — see ADR-008 in
+`work-docs/PLAN-llm-code-review-2026.md`. Pass 1 findings flow directly to
+Pass 2; revisit if/when an in-environment verifier client lands.
+
 #### Pass 2 — contextual verdict (full metadata restored)
 
 3. Re-run the same reviewer set with the **full** context (metadata
-   restored) and the Pass 1 findings list. Each reviewer validates each
-   finding against the metadata, drops any that the context proves to be
-   spurious, and adjusts severity if the context changes risk.
+   restored) and the **Pass 1** findings list. Each reviewer validates
+   each finding against the metadata, drops any that the context proves
+   spurious, and adjusts severity if context changes risk.
 4. Merge the two passes via the harness CLI:
+   
    ```bash
    echo '{"pass1": [...], "pass2": [...]}' | python -m harness_maker.two_pass_review merge
    ```
+   
    Pass 2 is authoritative — Pass 1 findings absent from Pass 2 are
    invalidated by context and **dropped** (CP10 contract).
 5. The merged finding list is the input to the consensus filter (Step 4).
@@ -553,6 +563,27 @@ human_review_needed: {true|false}
 
 - `APPROVED` → ready for wrapup.
 - `CHANGES_REQUESTED` (autoloop policy) → list remaining issues, set `human_review_needed=true`, **proceed to wrapup** (do NOT halt the loop on D/F — wrapup will surface the flag).
+
+## Telemetry Emit (always, per round)
+
+After each round's REVIEW report write, append one line to
+`.claude/observability/review-{YYYY-MM-DD}.jsonl` via the harness CLI.
+14-field schema (PLAN-llm-code-review-2026 ADR-006); numeric fields default
+to 0, `fixture_label` / `verifier_false_*` / `fallback` are null on real
+runs. Don't interpolate `wall_time_ms` into any other rendered template
+(determinism leakage — see `test_telemetry_no_leak`).
+
+
+```bash
+echo '<record_json>' | python -m harness_maker.review_telemetry emit
+```
+
+
+Record fields:
+`{ts, slug, round, pass1_n, verifier_kept_n, verifier_dropped_n, verifier_false_drop_n, verifier_false_keep_n, fixture_label, pass2_kept_n, consensus_passed_n, wall_time_ms, build_break_count, auto_fix_reverted_n, fallback}`.
+
+The CLI auto-stamps `ts` when omitted. Schema validation rejects unknown
+fields and negative counts.
 
 ## Outputs
 

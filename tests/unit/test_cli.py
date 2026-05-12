@@ -510,9 +510,7 @@ def test_partial_override_preserves_unchanged_fields(tmp_path: Path) -> None:
         patch("harness_maker.cli.answers_from_harness_yaml", return_value=answers),
         patch("harness_maker.cli.interview", return_value=answers),
     ):
-        result = runner.invoke(
-            app, ["make", str(tmp_path), "--grade-threshold", "B"]
-        )
+        result = runner.invoke(app, ["make", str(tmp_path), "--grade-threshold", "B"])
 
     assert result.exit_code == 0, f"exit {result.exit_code}:\n{result.output}"
     assert captured_bp["grade_threshold"] == "B"
@@ -601,10 +599,7 @@ def test_security_scan_blocks_high_when_policy_blocks(tmp_path: Path) -> None:
     claude = tmp_path / ".claude"
     claude.mkdir()
     (claude / "harness.yaml").write_text(
-        "---\ngenerated_by: harness-maker\n---\n"
-        "security:\n"
-        "  on_finding:\n"
-        "    high: block\n",
+        "---\ngenerated_by: harness-maker\n---\nsecurity:\n  on_finding:\n    high: block\n",
         encoding="utf-8",
     )
     finding = Finding(

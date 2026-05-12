@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.9.4
+harness_maker_version: 0.11.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: harness-yaml/Production.yaml.j2
 provenance: official
-content_hash: 954929dcc84498576e8d9dfe89aa64a3278837a6e08934e126a57fb1bc9c2a70
+content_hash: 725f83ff5054f5b33ca1bb1fe1b0ef0b1c044699e3749a0db2406a366c7c0820
 ---
 preset: Production
 locale: en
@@ -63,6 +63,7 @@ reviewers:
   auto_fix: true
   grade_threshold: A
   max_review_rounds: 3
+
   installed:
     - code-reviewer
     - security-reviewer

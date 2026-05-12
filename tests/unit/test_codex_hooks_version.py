@@ -31,16 +31,12 @@ def _render_codex_hooks_json(src_path: str) -> str:
 def test_codex_hooks_reference_current_version() -> None:
     """All .codex/hooks.json hook commands must reference the current harness-maker version."""
     versioned_path = (
-        f"/home/noel/.claude/plugins/cache/harness-maker-local/"
-        f"harness-maker/{__version__}"
+        f"/home/noel/.claude/plugins/cache/harness-maker-local/harness-maker/{__version__}"
     )
     rendered = _render_codex_hooks_json(versioned_path)
     data = json.loads(rendered)
     commands = [
-        h["command"]
-        for event in data["hooks"].values()
-        for block in event
-        for h in block["hooks"]
+        h["command"] for event in data["hooks"].values() for block in event for h in block["hooks"]
     ]
     for cmd in commands:
         assert __version__ in cmd, (

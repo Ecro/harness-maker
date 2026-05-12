@@ -68,17 +68,92 @@ The Claude Code, Cursor, and Codex ecosystem moves fast. harness-maker ships a w
 
 ## Quickstart
 
+### Universal Bootstrap Prompt
+
+> **Paste this prompt into any LLM agent (Claude Code, Cursor, Codex, or
+> a plain terminal with an AI assistant) to install harness-maker
+> automatically.** The agent detects your environment and runs the right
+> commands — no manual branching needed.
+
+<details>
+<summary><strong>Copy this prompt</strong></summary>
+
+```
+Install and bootstrap harness-maker for this project.
+
+Step 1 — Environment detection (do NOT ask me; detect silently):
+  - OS:    run `uname -s` (Linux/Darwin) or check for WSL; on Windows
+           without WSL, warn that a POSIX shell is required.
+  - IDE:   check which context you are running in:
+           • Claude Code  → $CLAUDE_CODE is set, or ~/.claude/ exists
+           • Cursor       → $CURSOR_SESSION or ~/.cursor/ exists
+           • Codex        → $CODEX_SESSION or ~/.codex/ exists
+           • None of the above → plain terminal (CLI mode)
+  - Python: run `python3 --version` (need 3.12+)
+  - uv:    run `uv --version`; if missing, install:
+           `curl -LsSf https://astral.sh/uv/install.sh | sh`
+  - Git:   run `git --version`
+
+Step 2 — Install harness-maker:
+  If `harness-maker --help` already works, skip this step.
+  Otherwise:
+    • From PyPI (when published): `uv tool install harness-maker`
+    • Pre-PyPI:
+      ```
+      git clone https://github.com/Ecro/harness-maker.git /tmp/harness-maker
+      uv tool install /tmp/harness-maker
+      ```
+
+Step 3 — Profile the project:
+  ```
+  harness-maker profile "$(pwd)" --json
+  ```
+  Read the output: stack, scale, lifecycle, detected_checks.
+  Tell me: "Your project looks like {stack}, {scale} scale, {lifecycle} lifecycle."
+  Suggest preset (Side or Production) based on the profile.
+
+Step 4 — Determine targets:
+  Based on the IDE detected in Step 1, suggest the appropriate targets:
+    • Claude Code   → targets=claude-code
+    • Cursor        → targets=cursor  (or claude-code,cursor if both)
+    • Codex         → targets=codex   (or claude-code,codex if both)
+    • CLI-only      → targets=claude-code (default)
+  Ask me to confirm the target selection before proceeding.
+
+Step 5 — Generate the harness:
+  ```
+  harness-maker make "$(pwd)" --preset <PRESET> --locale en \
+    --targets <TARGETS> --autoloop
+  ```
+  Substitute the confirmed preset and targets. Use --locale en unless
+  I specified otherwise.
+
+Step 6 — IDE reload:
+  • Claude Code: run `/harness-maker:make` to verify the plugin loads.
+  • Cursor: reload the window (Ctrl+Shift+P → "Reload Window") so
+    agents, skills, and commands under .claude/ are discovered.
+  • Codex: AGENTS.md and .codex/ are read on next session start.
+  Tell me the harness is ready and suggest: /hm:ai-readiness
+```
+
+</details>
+
+### Manual install (step by step)
+
 ```bash
-# 1. Clone and install (pre-PyPI — editable from clone)
-git clone git@github.com:Ecro/harness-maker.git
-uv pip install -e ./harness-maker
+# 1. Install harness-maker CLI
+uv tool install harness-maker          # from PyPI (when published)
+# — OR pre-PyPI —
+git clone https://github.com/Ecro/harness-maker.git /tmp/harness-maker
+uv tool install /tmp/harness-maker
 
-# 2. Load the plugin in your project
+# 2. Profile and generate the harness
 cd your-project
-claude --plugin-dir /path/to/harness-maker
+harness-maker profile . --json         # inspect your stack/scale/lifecycle
+harness-maker make . --preset Production --locale en --targets claude-code,cursor
 
-# 3. Generate the harness
-/harness-maker:make
+# 3. (Optional) Load as Claude Code plugin for /harness-maker:make command
+claude --plugin-dir /path/to/harness-maker
 ```
 
 The interview asks for locale first, then preset (`Side` or `Production`), dev mode, and target runtime. The setup preview explains generated roots, backups, preserved user blocks, target-specific leftovers, review trade-offs, and how to continue advanced Second Brain setup with `/hm:configure`. A fully-rendered harness is ready in one turn.
@@ -86,10 +161,10 @@ The interview asks for locale first, then preset (`Side` or `Production`), dev m
 Re-run with flags to evolve the harness:
 
 ```bash
-/harness-maker:make --audit          # score the existing .claude/ against the rubric
-/harness-maker:make --add NAME       # graft on a single skill/agent/command
-/harness-maker:make --remove NAME    # surgically remove one component
-/harness-maker:make --promote NAME   # move an ad-hoc artifact into the harness
+harness-maker make . --audit           # score the existing .claude/ against the rubric
+harness-maker make . --add NAME        # graft on a single skill/agent/command
+harness-maker make . --remove NAME     # surgically remove one component
+harness-maker make . --promote NAME    # move an ad-hoc artifact into the harness
 ```
 
 ---
@@ -99,7 +174,7 @@ Re-run with flags to evolve the harness:
 | Dependency | Notes |
 |---|---|
 | **Python 3.12+** and **[`uv`](https://docs.astral.sh/uv/)** | Required wherever Claude Code runs against your project — even if your project's primary language is Rust, Node, or Go. Hooks invoke `uv run python -m harness_maker.gates.*`; without `uv` they are silent no-ops. |
-| **Claude Code CLI** (plugin + hook support) | Loaded via `claude --plugin-dir /path/to/harness-maker`. |
+| **Claude Code CLI** (plugin + hook support) | Optional for plugin mode (`claude --plugin-dir /path/to/harness-maker`). Not required — the `harness-maker` CLI can generate harnesses independently. |
 | **Cursor IDE 2.4+** (3.2+ recommended) | Optional. Reads `.claude/agents/`, `.claude/skills/`, and `.claude/commands/hm/*.md` natively (verified empirically in 0.6.2, re-confirmed 0.7.1 — see `tests/cursor-compat/results-2026-05-08.md`). Hooks render to a separate `.cursor/hooks.json` with Cursor-native schema; both files are emitted when `targets` includes `cursor`. Cursor 3.0+ adds native `/worktree` and `/best-of-n` which coexist safely with harness-maker's prefix-matched cleanup. |
 | **OpenAI Codex CLI** | Optional. When `targets` includes `codex`, harness-maker renders Codex-native `.codex/` config, `AGENTS.md`, and `.agents/skills/` assets from the same workflow definitions. |
 | **Git** | Required for worktree isolation (every `/hm:execute` and `/hm:loop` run). |
@@ -393,13 +468,18 @@ Marketplace manifests are present for each runtime:
 Listings are **pending**. Until then, install locally:
 
 ```bash
-# Claude Code
+# Any IDE — CLI install (recommended)
+uv tool install harness-maker          # from PyPI (when published)
+uv tool install /path/to/harness-maker # pre-PyPI, from clone
+harness-maker make . --targets claude-code,cursor,codex
+
+# Claude Code — plugin mode (optional, enables /harness-maker:make command)
 claude --plugin-dir /path/to/harness-maker
 
 # Cursor — open the repo folder directly in Cursor as a workspace plugin
 
 # Codex — render Codex-native assets in your project harness
-/harness-maker:make --targets codex
+harness-maker make . --targets codex
 ```
 
 ---

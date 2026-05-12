@@ -100,9 +100,7 @@ def test_codex_stage_skills_no_dollar_arguments() -> None:
 def test_codex_target_files_loop_skill_has_loop_body() -> None:
     """_codex_target_files() must include loop_body in hm-loop/SKILL.md context."""
     specs = _codex_target_files({})
-    loop_spec = next(
-        (s for s in specs if s[1] == ".agents/skills/hm-loop/SKILL.md"), None
-    )
+    loop_spec = next((s for s in specs if s[1] == ".agents/skills/hm-loop/SKILL.md"), None)
     assert loop_spec is not None, "hm-loop/SKILL.md not found in _codex_target_files()"
     ctx = loop_spec[2]
     assert "loop_body" in ctx, "hm-loop context missing loop_body"
@@ -136,9 +134,7 @@ def test_execute_codex_render_has_bash_worktree_call() -> None:
     assert "Bash(" in rendered, (
         "Codex execute render must use Bash(...) form for CLI calls, not '!' prefix"
     )
-    assert "worktree" in rendered.lower(), (
-        "Codex execute render must mention worktree creation"
-    )
+    assert "worktree" in rendered.lower(), "Codex execute render must mention worktree creation"
 
 
 def test_execute_codex_render_no_bang_prefix() -> None:
@@ -160,9 +156,9 @@ def test_loop_codex_render_no_ask_user_question() -> None:
 def test_loop_codex_render_has_interview_and_bash() -> None:
     """loop template rendered with is_codex=True must have interview pattern and Bash calls."""
     rendered = _render_loop(is_codex=True)
-    assert (
-        "ask" in rendered.lower() or "in your response" in rendered.lower()
-    ), "Codex loop must have response-based asking pattern"
+    assert "ask" in rendered.lower() or "in your response" in rendered.lower(), (
+        "Codex loop must have response-based asking pattern"
+    )
     assert rendered.count("Bash(") >= 3, (
         f"Codex loop must have ≥3 Bash tool calls, got {rendered.count('Bash(')}"
     )
@@ -172,7 +168,8 @@ def test_loop_codex_render_has_worktree_fallback() -> None:
     """loop template rendered with is_codex=True must document worktree failure fallback."""
     rendered = _render_loop(is_codex=True)
     assert (
-        "in-place" in rendered.lower() or "worktree create fails" in rendered.lower()
+        "in-place" in rendered.lower()
+        or "worktree create fails" in rendered.lower()
         or "proceeding in-place" in rendered.lower()
     ), "Codex loop must document worktree fallback path (ADR-005)"
 

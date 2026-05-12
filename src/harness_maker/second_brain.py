@@ -101,13 +101,10 @@ def validate_note(frontmatter: dict[str, Any], body: str) -> list[str]:
     if missing_tags:
         warnings.append(f"recommended tags missing: {', '.join(missing_tags)}")
 
-    recommended_missing = [
-        key for key in _RECOMMENDED_FIELDS[note_type] if key not in frontmatter
-    ]
+    recommended_missing = [key for key in _RECOMMENDED_FIELDS[note_type] if key not in frontmatter]
     if recommended_missing:
         warnings.append(
-            "recommended frontmatter missing for "
-            f"{note_type}: {', '.join(recommended_missing)}"
+            f"recommended frontmatter missing for {note_type}: {', '.join(recommended_missing)}"
         )
 
     wikilinks = extract_links(body)

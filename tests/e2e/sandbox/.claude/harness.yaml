@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.9.4
+harness_maker_version: 0.11.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: harness-yaml/Side.yaml.j2
 provenance: official
-content_hash: 56167444d920667669f94061c4949e79294e7c5d485b0b291bbb3a4ed3005d2d
+content_hash: 4a336eaa4883fbd0cf5c5e4a9386d01aeb749569498ffe2ad2468fc5d8d9c210
 ---
 preset: Side
 locale: en
@@ -63,6 +63,7 @@ reviewers:
   auto_fix: true
   grade_threshold: A
   max_review_rounds: 3
+
   installed:
     - code-reviewer
     - security-reviewer

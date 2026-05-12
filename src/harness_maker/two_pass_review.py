@@ -211,9 +211,7 @@ def _demote_severity(current: str) -> str:
     try:
         idx = _SEVERITY_TIERS.index(current)
     except ValueError:
-        _LOG.warning(
-            "_demote_severity: unknown severity %r; returning unchanged", current
-        )
+        _LOG.warning("_demote_severity: unknown severity %r; returning unchanged", current)
         return current
     return _SEVERITY_TIERS[min(idx + 1, len(_SEVERITY_TIERS) - 1)]
 
@@ -283,7 +281,7 @@ def _build_verifier_user_prompt(
         summary = _fence_escape(str(f.get("summary", "?")), "finding")
         reasoning = _fence_escape(str(f.get("reasoning", "(missing)")), "finding")
         finding_blocks.append(
-            f"<finding index=\"{i}\">\n"
+            f'<finding index="{i}">\n'
             f"severity: {sev}\n"
             f"location: {file_}:{line}\n"
             f"summary: {summary}\n"
@@ -293,9 +291,7 @@ def _build_verifier_user_prompt(
     diff = pass1_context.get("diff", "(diff not provided)")
     if fixture_label:
         escaped_label = _fence_escape(str(fixture_label), "fixture-label")
-        label_block = (
-            f"<fixture-label>\n{escaped_label}\n</fixture-label>\n\n"
-        )
+        label_block = f"<fixture-label>\n{escaped_label}\n</fixture-label>\n\n"
     else:
         label_block = ""
     return (

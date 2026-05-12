@@ -903,9 +903,7 @@ def test_render_pure_toml_valid_toml_dry_run(tmp_path: Path) -> None:
     """_render_pure_toml() does not write when dry_run=True."""
     from harness_maker.render import _render_pure_toml
 
-    (tmp_path / "ok.toml.j2").write_text(
-        '[features]\ncodex_hooks = true\n'
-    )
+    (tmp_path / "ok.toml.j2").write_text("[features]\ncodex_hooks = true\n")
     from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
     from harness_maker.models import FileEntry
@@ -1003,7 +1001,9 @@ def test_render_agents_md_block_merge_preserves_user_blocks(tmp_path: Path) -> N
     merge_reports: dict = {}
     fe = FileEntry(path=Path("AGENTS.md"), template="agents.md.j2", context={})
     out = _render_agents_md(
-        fe, env, target_dir,
+        fe,
+        env,
+        target_dir,
         dry_run=False,
         freeze_time=DEFAULT_FREEZE_TIME,
         merge_reports=merge_reports,
@@ -1040,7 +1040,9 @@ def test_render_agents_md_block_merge_fallback_on_missing_file(tmp_path: Path) -
     merge_reports: dict = {}
     fe = FileEntry(path=Path("AGENTS.md"), template="agents.md.j2", context={})
     out = _render_agents_md(
-        fe, env, target_dir,
+        fe,
+        env,
+        target_dir,
         dry_run=False,
         freeze_time=DEFAULT_FREEZE_TIME,
         merge_reports=merge_reports,

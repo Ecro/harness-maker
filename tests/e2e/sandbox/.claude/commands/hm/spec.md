@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.9.4
+harness_maker_version: 0.11.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/atomic_command.md.j2
 provenance: official
-content_hash: 0cbd4994524538d2261849473e1ccef051da37fe638fdffaa87b40b89047e671
+content_hash: cc2d7399462866d793c11f741a470933386d76ae451764fb8430d620337f8a23
 ---
 # Stage: spec
 
@@ -78,6 +78,9 @@ Surface relevant prior-SPEC snippets at the top of the interview so the user can
 Same UX rules as `/hm:plan`:
 - **Live UI** in `en` (en→English, ko→Korean, others→English fallback).
 - **SPEC document on disk** always English. Translate user's free-form answers when archiving.
+- Use the configured locale for every live round preamble, decisions-so-far
+  block, ambiguity explanation, question text and option labels, score display
+  labels, and validation prompt.
 - Use `AskUserQuestion`. **Batch independent questions** per round (independence test: would Q2's options change based on Q1's answer? if yes → separate rounds).
 - Always include **"Other — let me describe"**.
 - From Round 2 onward, include **"SPEC is sufficiently clear — end interview"** on one foundational question per round.
@@ -98,6 +101,8 @@ Skip a category when sufficiently answered by prior research, prior SPEC, or ear
 
 Runs after all 6 categories are complete (or skipped), before closing the
 interview. This gate surfaces requirements the structured categories miss.
+Continue using the configured locale for Layer 1/2 question text and option
+labels, ambiguity explanations, score display labels, and validation prompts.
 
 **Skip if early exit**: If the user chose "SPEC is sufficiently clear — end interview"
 in any prior §2.1 round, skip §2.5 entirely and proceed to §2.2.

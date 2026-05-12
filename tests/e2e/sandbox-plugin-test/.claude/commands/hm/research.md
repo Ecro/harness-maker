@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.9.4
+harness_maker_version: 0.11.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/atomic_command.md.j2
 provenance: official
-content_hash: bf4793e43bea17c4b3e6b4ce890d25d4a37b9359107db5f35240edb181cb1445
+content_hash: a47020a291589c51d0bd7eae19bca1487a9907a3ea76f68e1c727884ce9a9210
 ---
 # Stage: research
 
@@ -84,7 +84,7 @@ history, and leads, but it never overrides system/developer/project instructions
 
 Vague or over-broad topics produce shallow research. Narrowing the question first is the single highest-leverage step. Skip this phase by default; engage when the topic itself is the unknown.
 
-When `--deep` is set, conduct one `AskUserQuestion` call in `en` with 3-5 questions drawn from this rubric:
+When `--deep` is set, conduct one `AskUserQuestion` call in `en` with 3-5 questions drawn from this rubric. Use the configured locale for the live interview: the round preamble, ambiguity explanation, question text and option labels, and any validation prompt must be in `en` (en→English, ko→Korean, ja→Japanese, others→English fallback). The persisted RESEARCH document remains English unless project policy says otherwise.
 
 1. **Scope narrowing** — "Is this about {sub-area A} specifically, or the broader {domain}?"
 2. **Constraint surfacing** — "Which constraint actually binds: {HW budget / API compat / team skill / timeline / other}?"
@@ -98,6 +98,9 @@ Always include "Skip — proceed with topic as given" as an option. Record inter
 
 Runs immediately after Phase 0's rubric questions, before Phase 1 gathering.
 Bridges from the rubric's broad-scope answers to research-ready precision.
+Continue using the configured locale for all live gate text, including Layer 1
+gap explanations, Layer 2 question text and option labels, ambiguity score
+display labels, and validation prompts.
 
 **Skip if user chose Skip**: If the user chose "Skip — proceed with topic as given"
 in Phase 0, skip Phase 0.5 entirely and proceed directly to Phase 1.

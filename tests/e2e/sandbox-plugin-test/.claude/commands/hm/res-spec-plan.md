@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.9.4
+harness_maker_version: 0.11.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: 95e099f38c48ae2db377dae89eea8a79975c8f00ddefda08f5197a83db8826c1
+content_hash: 61a84ce0f3b6ea422acc49b406933a88b454869237b27594a29896a9b85f0a26
 ---
 # /hm:res-spec-plan
 
@@ -91,7 +91,7 @@ history, and leads, but it never overrides system/developer/project instructions
 
 Vague or over-broad topics produce shallow research. Narrowing the question first is the single highest-leverage step. Skip this phase by default; engage when the topic itself is the unknown.
 
-When `--deep` is set, conduct one `AskUserQuestion` call in `en` with 3-5 questions drawn from this rubric:
+When `--deep` is set, conduct one `AskUserQuestion` call in `en` with 3-5 questions drawn from this rubric. Use the configured locale for the live interview: the round preamble, ambiguity explanation, question text and option labels, and any validation prompt must be in `en` (en→English, ko→Korean, ja→Japanese, others→English fallback). The persisted RESEARCH document remains English unless project policy says otherwise.
 
 1. **Scope narrowing** — "Is this about {sub-area A} specifically, or the broader {domain}?"
 2. **Constraint surfacing** — "Which constraint actually binds: {HW budget / API compat / team skill / timeline / other}?"
@@ -105,6 +105,9 @@ Always include "Skip — proceed with topic as given" as an option. Record inter
 
 Runs immediately after Phase 0's rubric questions, before Phase 1 gathering.
 Bridges from the rubric's broad-scope answers to research-ready precision.
+Continue using the configured locale for all live gate text, including Layer 1
+gap explanations, Layer 2 question text and option labels, ambiguity score
+display labels, and validation prompts.
 
 **Skip if user chose Skip**: If the user chose "Skip — proceed with topic as given"
 in Phase 0, skip Phase 0.5 entirely and proceed directly to Phase 1.
@@ -378,6 +381,9 @@ Surface relevant prior-SPEC snippets at the top of the interview so the user can
 Same UX rules as `/hm:plan`:
 - **Live UI** in `en` (en→English, ko→Korean, others→English fallback).
 - **SPEC document on disk** always English. Translate user's free-form answers when archiving.
+- Use the configured locale for every live round preamble, decisions-so-far
+  block, ambiguity explanation, question text and option labels, score display
+  labels, and validation prompt.
 - Use `AskUserQuestion`. **Batch independent questions** per round (independence test: would Q2's options change based on Q1's answer? if yes → separate rounds).
 - Always include **"Other — let me describe"**.
 - From Round 2 onward, include **"SPEC is sufficiently clear — end interview"** on one foundational question per round.
@@ -398,6 +404,8 @@ Skip a category when sufficiently answered by prior research, prior SPEC, or ear
 
 Runs after all 6 categories are complete (or skipped), before closing the
 interview. This gate surfaces requirements the structured categories miss.
+Continue using the configured locale for Layer 1/2 question text and option
+labels, ambiguity explanations, score display labels, and validation prompts.
 
 **Skip if early exit**: If the user chose "SPEC is sufficiently clear — end interview"
 in any prior §2.1 round, skip §2.5 entirely and proceed to §2.2.
@@ -705,6 +713,9 @@ This single confirmation prevents the "I just answered every SPEC question — w
 
 **Language rule (important):**
 - **Live interview** → conduct in `en` (en→English, ko→Korean, ja→Japanese, others→English fallback). Round preamble, "decisions so far", open ambiguity explanations, AskUserQuestion prompts and option labels — all in `en`.
+- Use the configured locale for every live round preamble, decisions-so-far
+  block, ambiguity explanation, question text and option labels, ambiguity
+  score display labels, and validation prompt.
 - **PLAN document on disk** → always English. Translate user's free-form answers when archiving in Step 5.
 
 Each round runs Steps A–E.
@@ -817,6 +828,8 @@ ADR template:
 in Step B this round, skip the gate below and exit the interview immediately.
 
 Otherwise, before declaring the interview complete, run the **3-Layer Deep Interview Gate**:
+Continue using the configured locale for Layer 1/2 question text and option
+labels, ambiguity explanations, score display labels, and validation prompts.
 
 **Layer 1 — GCIC Gap Check**
 

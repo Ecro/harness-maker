@@ -46,9 +46,7 @@ class _LabeledOracleClient:
         decisions = []
         for i, f in enumerate(self._findings):
             if f.get("ground_truth") == "spurious":
-                decisions.append(
-                    {"index": i, "action": "drop", "reason": "ground_truth=spurious"}
-                )
+                decisions.append({"index": i, "action": "drop", "reason": "ground_truth=spurious"})
             else:
                 decisions.append({"index": i, "action": "keep"})
         return json.dumps({"decisions": decisions})
@@ -71,9 +69,7 @@ def test_verifier_drops_all_spurious(adversarial: dict[str, Any]) -> None:
 
     kept_ids = {k["id"] for k in result["kept"]}
     dropped_ids = {d["finding"]["id"] for d in result["dropped"]}
-    assert kept_ids == set(adversarial["expected_keep_ids"]), (
-        f"unexpected kept set: {kept_ids}"
-    )
+    assert kept_ids == set(adversarial["expected_keep_ids"]), f"unexpected kept set: {kept_ids}"
     assert dropped_ids == set(adversarial["expected_drop_ids"]), (
         f"unexpected dropped set: {dropped_ids}"
     )
@@ -86,9 +82,7 @@ def test_verifier_invariant_no_introduction_on_fixture(adversarial: dict[str, An
     result = verify_findings(findings, adversarial["pass1_context"], client=client)
 
     input_ids = {f["id"] for f in findings}
-    output_ids = {k["id"] for k in result["kept"]} | {
-        d["finding"]["id"] for d in result["dropped"]
-    }
+    output_ids = {k["id"] for k in result["kept"]} | {d["finding"]["id"] for d in result["dropped"]}
     assert output_ids == input_ids, (
         f"set(kept ∪ dropped) != input: extra {output_ids - input_ids}, "
         f"missing {input_ids - output_ids}"

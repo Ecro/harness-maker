@@ -49,9 +49,7 @@ def test_stage_skill_renders_non_empty(stage: str) -> None:
 def test_stage_skill_has_yaml_frontmatter(stage: str) -> None:
     """Stage skill SKILL.md must start with YAML frontmatter (---\\n)."""
     rendered = _render_stage_skill(stage)
-    assert rendered.startswith("---\n"), (
-        f"Stage skill {stage!r} missing YAML frontmatter"
-    )
+    assert rendered.startswith("---\n"), f"Stage skill {stage!r} missing YAML frontmatter"
 
 
 @pytest.mark.parametrize("stage", _STAGES)

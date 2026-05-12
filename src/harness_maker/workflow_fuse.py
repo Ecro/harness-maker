@@ -48,9 +48,10 @@ def fuse(
         env = _make_env()
 
     from harness_maker.models import HarnessConfig
-    from harness_maker.synthesize import _HARNESS_MAKER_PKG_ROOT
+    from harness_maker.synthesize import _compute_install_ref
 
     default_config = HarnessConfig().model_dump(mode="json")
+    install_ref = _compute_install_ref()
 
     parts: list[str] = [f"# /hm:{workflow_name}\n"]
     for stage in stages:
@@ -61,9 +62,7 @@ def fuse(
             project_name="",
             feature="",
             config=default_config,
-            # stages/execute.md.j2 invokes `python -m harness_maker.worktree`
-            # via this absolute path baked into the rendered slash command.
-            harness_maker_src_path=_HARNESS_MAKER_PKG_ROOT,
+            harness_maker_src_path=install_ref,
             is_codex=False,
         )
         parts.append(f"\n## Stage: {stage.value}\n\n{body}")

@@ -53,12 +53,8 @@ def _scaffold_project(tmp_path: Path) -> Path:
         encoding="utf-8",
     )
     (claude / "hooks").mkdir(exist_ok=True)
-    (claude / "hooks" / "hooks.json").write_text(
-        '{"hooks": []}', encoding="utf-8"
-    )
-    (claude / "settings.json").write_text(
-        '{"permissions": {}}', encoding="utf-8"
-    )
+    (claude / "hooks" / "hooks.json").write_text('{"hooks": []}', encoding="utf-8")
+    (claude / "settings.json").write_text('{"permissions": {}}', encoding="utf-8")
     return tmp_path
 
 

@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.9.4
+harness_maker_version: 0.11.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/atomic_command.md.j2
 provenance: official
-content_hash: 71e153a3a91d904b3089029df1dde0993e082eb38006074a4752c477ad97879f
+content_hash: ccf4eaef5d8e260d33fa3bc6b8c9f0a7dcd3a8f00948139d6f7ca6697d678c6d
 ---
 # Stage: plan
 
@@ -114,6 +114,9 @@ This single confirmation prevents the "I just answered every SPEC question — w
 
 **Language rule (important):**
 - **Live interview** → conduct in `en` (en→English, ko→Korean, ja→Japanese, others→English fallback). Round preamble, "decisions so far", open ambiguity explanations, AskUserQuestion prompts and option labels — all in `en`.
+- Use the configured locale for every live round preamble, decisions-so-far
+  block, ambiguity explanation, question text and option labels, ambiguity
+  score display labels, and validation prompt.
 - **PLAN document on disk** → always English. Translate user's free-form answers when archiving in Step 5.
 
 Each round runs Steps A–E.
@@ -226,6 +229,8 @@ ADR template:
 in Step B this round, skip the gate below and exit the interview immediately.
 
 Otherwise, before declaring the interview complete, run the **3-Layer Deep Interview Gate**:
+Continue using the configured locale for Layer 1/2 question text and option
+labels, ambiguity explanations, score display labels, and validation prompts.
 
 **Layer 1 — GCIC Gap Check**
 

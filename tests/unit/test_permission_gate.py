@@ -192,5 +192,6 @@ def test_main_non_bash_permission_request_always_allows(tmp_path: Path) -> None:
     # PermissionRequest path: exit 0, JSON to stdout
     assert proc.returncode == 0
     import json
+
     output = json.loads(proc.stdout)
     assert output["hookSpecificOutput"]["decision"]["behavior"] == "allow"

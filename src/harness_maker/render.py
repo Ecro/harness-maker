@@ -593,9 +593,7 @@ def render(
             )
         elif _is_agents_md(fe):
             agents_merge = (
-                merge_reports
-                if merge_reports is not None and fe.path in paths_to_merge
-                else None
+                merge_reports if merge_reports is not None and fe.path in paths_to_merge else None
             )
             out = _render_agents_md(
                 fe,
