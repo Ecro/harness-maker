@@ -36,20 +36,29 @@ _HARNESS_MAKER_PKG_ROOT = str(Path(__file__).parent.parent.parent)
 
 
 def _compute_install_ref() -> str:
-    """Return ``"harness-maker"`` when installed as a wheel, else the local abs path.
+    """Return ``"harness-maker"`` only for true PyPI installs; else the local abs path.
 
-    ADR-002: rendered templates use ``uv run --with <ref>`` to invoke harness-maker
-    modules.  When the package is a proper (non-editable) install the PyPI name
-    suffices; editable or source-tree installs need the absolute path so ``uv``
-    can resolve the local project.
+    ADR-002 (revised 0.11.3): rendered templates use ``uv run --with <ref>`` to
+    invoke harness-maker modules. ``uv run --with harness-maker`` resolves the
+    name on PyPI; harness-maker is **not** published, so the PyPI name only
+    works when (and if) it eventually gets published. Until then, any install
+    that came from a local directory (Claude Code plugin cache, editable dev
+    tree, manual ``pip install /path``) must render the local abs path.
 
-    Detection rule (locked in ADR-002):
-    1. ``distribution("harness-maker")`` succeeds → package is installed.
-       a. ``direct_url.json`` exists and ``dir_info.editable`` is True → editable
-          install, return local abs path.
-       b. Otherwise → proper install, return ``"harness-maker"``.
-    2. ``distribution()`` raises (PackageNotFoundError) → not installed,
-       fall back to local abs path for source-tree usage.
+    Detection rule:
+    1. ``distribution("harness-maker")`` raises → not installed, return local path.
+    2. ``direct_url.json`` parses and its ``url`` is a ``file://`` URL → local
+       install (editable or not), return local path. Covers Claude Code plugin
+       cache where ``editable=true`` and a hypothetical wheel-from-local where
+       ``editable=false``.
+    3. ``url`` is non-``file://`` (real PyPI/registry) → return ``"harness-maker"``.
+    4. Any parse error → return local path (safer than a broken --with).
+
+    Previously this returned ``"harness-maker"`` whenever ``editable=false``,
+    which silently broke SessionStart drift hooks for plugin-cache installs:
+    Claude Code's plugin install records ``editable=false`` even though the
+    URL is ``file://``, and ``uv run --with harness-maker`` then fails to
+    resolve the package on PyPI.
     """
     try:
         from importlib.metadata import distribution
@@ -58,17 +67,17 @@ def _compute_install_ref() -> str:
     except Exception:  # noqa: BLE001 — PackageNotFoundError or any import issue
         return _HARNESS_MAKER_PKG_ROOT
 
-    # Package IS installed — JSON parse errors should NOT revert to local path.
     try:
         import json
 
         raw = dist.read_text("direct_url.json")
         if raw is not None:
             du = json.loads(raw)
-            if du.get("dir_info", {}).get("editable", False):
+            url = du.get("url", "")
+            if isinstance(url, str) and url.startswith("file://"):
                 return _HARNESS_MAKER_PKG_ROOT
     except (json.JSONDecodeError, KeyError, TypeError):
-        pass  # Corrupted metadata — package is installed, use PyPI name.
+        return _HARNESS_MAKER_PKG_ROOT
     return "harness-maker"
 
 

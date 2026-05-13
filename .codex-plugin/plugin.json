@@ -1,6 +1,6 @@
 {
   "name": "harness-maker",
-  "version": "0.11.2",
+  "version": "0.11.3",
   "description": "Project-tailored harness generator for Claude Code, Cursor IDE, and OpenAI Codex CLI. Interview-driven scaffolding with grade-gated review + auto-fix loop, multi-perspective reviewer consensus (code / security / performance / concurrency / UX), edit-preserving upgrades via block-merge markers, anti-rot crawlers, worktree isolation, permission separation, version-drift detection, and a 3-layer ai-readiness rubric. Renders single-source `.claude/` assets plus `.codex/` config, `AGENTS.md`, and `.agents/skills/` when Codex target is selected.",
   "author": {
     "name": "noel"

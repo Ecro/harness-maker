@@ -21,7 +21,8 @@ from pathlib import Path
 from harness_maker.relevance import detect_version_drift
 
 
-def _format_message(stamped: str, current: str, direction: str) -> str:
+def _format_context(stamped: str, current: str, direction: str) -> str:
+    """Long, Claude-facing context for grounded follow-up."""
     if direction == "upgrade":
         return (
             f"[harness-maker] Harness drift detected: project rendered with "
@@ -36,6 +37,21 @@ def _format_message(stamped: str, current: str, direction: str) -> str:
     )
 
 
+def _format_system_message(stamped: str, current: str, direction: str) -> str:
+    """Short, user-facing terminal notice. systemMessage is rendered to the
+    user at session start; additionalContext alone is invisible.
+    """
+    if direction == "upgrade":
+        return (
+            f"⚠ harness-maker drift: project at {stamped}, plugin at {current}. "
+            f"Run /hm:make to refresh."
+        )
+    return (
+        f"⚠ harness-maker drift: project at {stamped}, plugin at {current} "
+        f"(downgrade). Verify before /harness-maker:make."
+    )
+
+
 def run(cwd: Path | None = None) -> int:
     if cwd is None:
         cwd = Path.cwd()
@@ -47,7 +63,10 @@ def run(cwd: Path | None = None) -> int:
     payload = {
         "hookSpecificOutput": {
             "hookEventName": "SessionStart",
-            "additionalContext": _format_message(drift.stamped, drift.current, drift.direction),
+            "additionalContext": _format_context(drift.stamped, drift.current, drift.direction),
+            "systemMessage": _format_system_message(
+                drift.stamped, drift.current, drift.direction
+            ),
         }
     }
     sys.stdout.write(json.dumps(payload))

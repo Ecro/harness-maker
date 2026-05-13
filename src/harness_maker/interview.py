@@ -22,6 +22,7 @@ from typing import Any
 
 import yaml
 
+from harness_maker.io_utils import denormalize_home_to_tilde
 from harness_maker.models import (
     AtomicStage,
     DevMode,
@@ -391,7 +392,7 @@ def _ask_ref_folders() -> list[RefFolder]:
         if not line:
             return out
         path_part, _, glob_part = line.partition(";")
-        path_part = path_part.strip()
+        path_part = denormalize_home_to_tilde(path_part.strip())
         glob = glob_part.strip() or "**/*.{md,txt,pdf}"
         if not path_part:
             print("  empty path; skip.")
@@ -445,7 +446,7 @@ def _ask_second_brain() -> SecondBrainConfig:
     ).strip()
     return SecondBrainConfig(
         enabled=True,
-        vault_path=vault_raw,
+        vault_path=denormalize_home_to_tilde(vault_raw),
         project_id=project_id_raw,
     )
 

@@ -11,6 +11,7 @@ import typer
 from harness_maker.add_domain import AddDomainError, add_domain, validate_domain_name
 from harness_maker.block_merge import MergeReport
 from harness_maker.interview import answers_from_harness_yaml, interview
+from harness_maker.io_utils import denormalize_home_to_tilde
 from harness_maker.models import Blueprint, InterviewAnswers, Preset, RefFolder
 from harness_maker.modular_edit import ModularEditError
 from harness_maker.modular_edit import add as modular_add
@@ -520,7 +521,7 @@ def _apply_dimension_overrides(
             existing_id = answers.second_brain.project_id
             update["second_brain"] = SecondBrainConfig(
                 enabled=True,
-                vault_path=second_brain_vault_path,
+                vault_path=denormalize_home_to_tilde(second_brain_vault_path),
                 project_id=(
                     second_brain_project_id if second_brain_project_id is not None else existing_id
                 ),
@@ -586,6 +587,9 @@ def _parse_ref_folders_flag(raw: str) -> list[object]:
 
     Format: '::'-separated entries, each entry is 'path[;glob]'.
     Example: '../docs::../specs;**/*.pdf'
+
+    Absolute paths under $HOME are re-prefixed with ``~`` for portability
+    across machines (see ``denormalize_home_to_tilde``).
     """
     from harness_maker.models import RefFolder
 
@@ -595,7 +599,7 @@ def _parse_ref_folders_flag(raw: str) -> list[object]:
         if not entry:
             continue
         path_part, _, glob_part = entry.partition(";")
-        path_part = path_part.strip()
+        path_part = denormalize_home_to_tilde(path_part.strip())
         glob = glob_part.strip() or "**/*.{md,txt,pdf}"
         if path_part:
             out.append(RefFolder(path=path_part, glob=glob))

@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 from unittest.mock import patch
 
-from harness_maker.hooks.sessionstart_drift import _format_message, run
+from harness_maker.hooks.sessionstart_drift import _format_context, run
 
 # Pin both the imported __version__ AND latest_installed_version to a stable
 # value so this test suite is deterministic regardless of what's actually in
@@ -82,26 +82,43 @@ def test_run_emits_downgrade_warning(tmp_path: Path, capsys) -> None:
     assert "downgrade" in ctx.lower()
 
 
+def test_run_emits_system_message_on_drift(tmp_path: Path, capsys) -> None:
+    """systemMessage is required so the drift surfaces visibly to the user.
+
+    additionalContext alone only feeds Claude's internal context; the user
+    sees nothing unless systemMessage is also set.
+    """
+    _write_harness_yaml(tmp_path, "0.0.1")
+    with patch("harness_maker.relevance.latest_installed_version", return_value=_TEST_CURRENT):
+        rc = run(cwd=tmp_path)
+    assert rc == 0
+    payload = json.loads(capsys.readouterr().out)
+    sm = payload["hookSpecificOutput"].get("systemMessage", "")
+    assert sm, "systemMessage must be present so user sees the drift"
+    assert "0.0.1" in sm
+    assert _TEST_CURRENT in sm
+
+
 # ──────────────────────────────────────────────────────────────────────────────
-# _format_message
+# _format_context
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-def test_format_message_upgrade_mentions_make_command() -> None:
-    msg = _format_message("0.4.0", "0.5.5", "upgrade")
+def test_format_context_upgrade_mentions_make_command() -> None:
+    msg = _format_context("0.4.0", "0.5.5", "upgrade")
     assert "/harness-maker:make" in msg
     assert "0.4.0" in msg
     assert "0.5.5" in msg
 
 
-def test_format_message_downgrade_warns_intent() -> None:
-    msg = _format_message("0.5.5", "0.4.0", "downgrade")
+def test_format_context_downgrade_warns_intent() -> None:
+    msg = _format_context("0.5.5", "0.4.0", "downgrade")
     assert "downgrade" in msg.lower()
 
 
 def test_message_contains_update_flag() -> None:
     """Upgrade message mentions `make --update` so users know the fast re-render command."""
-    msg = _format_message("0.4.0", "0.5.5", "upgrade")
+    msg = _format_context("0.4.0", "0.5.5", "upgrade")
     assert "make --update" in msg, (
         f"Expected 'make --update' as actionable command in message:\n{msg}"
     )

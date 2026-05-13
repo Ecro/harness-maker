@@ -268,3 +268,56 @@ def test_empty_ref_folders_override_clears_ref_folders() -> None:
         ref_folders_override="",
     )
     assert out.ref_folders == []
+
+
+def test_ref_folders_override_denormalizes_home_to_tilde(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Bash expands ``~/foo`` to ``/home/user/foo`` at variable assignment;
+    the CLI must store ``~/foo`` so harness.yaml stays portable across machines.
+    """
+    monkeypatch.setenv("HOME", "/home/alice")
+    a = _baseline_side()
+    out = _apply_dimension_overrides(
+        a,
+        preset_override=None,
+        locale_override=None,
+        dev_mode_override=None,
+        targets_override=None,
+        ref_folders_override="/home/alice/edge_bsp_foundation",
+    )
+    assert len(out.ref_folders) == 1
+    assert out.ref_folders[0].path == "~/edge_bsp_foundation"
+
+
+def test_ref_folders_override_leaves_non_home_paths_alone(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Absolute paths outside $HOME and relative paths must pass through."""
+    monkeypatch.setenv("HOME", "/home/alice")
+    a = _baseline_side()
+    out = _apply_dimension_overrides(
+        a,
+        preset_override=None,
+        locale_override=None,
+        dev_mode_override=None,
+        targets_override=None,
+        ref_folders_override="/opt/docs::../shared",
+    )
+    paths = [rf.path for rf in out.ref_folders]
+    assert paths == ["/opt/docs", "../shared"]
+
+
+def test_second_brain_vault_path_denormalizes_home_to_tilde(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Same shell-expansion problem hits --second-brain-vault-path."""
+    monkeypatch.setenv("HOME", "/home/alice")
+    a = _baseline_side()
+    out = _apply_dimension_overrides(
+        a,
+        preset_override=None,
+        locale_override=None,
+        dev_mode_override=None,
+        targets_override=None,
+        second_brain_vault_path="/home/alice/Obsidian/Main",
+    )
+    assert out.second_brain.vault_path == "~/Obsidian/Main"
