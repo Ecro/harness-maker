@@ -66,6 +66,11 @@ def test_configure_template_has_per_setting_tradeoffs_and_second_brain_advanced_
         "frontmatter",
         "writable",
         "/hm:configure",
+        "ref_folders",
+        "sibling_repos",
+        "--ref-folders",
+        "--sibling-repos",
+        "refdocs-search",
     ]
     for needle in required:
         assert needle in text
