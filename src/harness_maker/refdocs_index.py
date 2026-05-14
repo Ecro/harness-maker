@@ -88,7 +88,14 @@ def _build_block(
     rf: RefFolder,
     warnings: list[str],
 ) -> dict[str, Any]:
-    abs_root = (harness_root / rf.path).expanduser().resolve()
+    # Expand ``~`` FIRST so it actually triggers — ``Path.expanduser()`` only
+    # expands when ``~`` is at position 0 of the path. ``harness_root / "~/foo"``
+    # joins to ``<root>/~/foo``, where ``~`` is no longer at the start, so a
+    # later ``.expanduser()`` is a silent no-op and resolve() produces a bogus
+    # path under harness_root. Only join with harness_root when the user-supplied
+    # path is genuinely relative (e.g. ``../docs``).
+    raw = Path(rf.path).expanduser()
+    abs_root = raw.resolve() if raw.is_absolute() else (harness_root / raw).resolve()
     entries: list[dict[str, Any]] = []
     if not abs_root.exists() or not abs_root.is_dir():
         warnings.append(

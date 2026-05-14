@@ -1,6 +1,6 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.11.1
+harness_maker_version: 0.11.3
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: memory/wiki.ko.md.j2
 provenance: official
@@ -122,6 +122,9 @@ Templates rendered with `is_codex=False` (shared by Claude Code + Cursor) use du
 
 ## [wiki:gotcha] install-ref-file-url-vs-editable | 2026-05-13
 `_compute_install_ref()` previously short-circuited on `dir_info.editable=True` only — but Claude Code's `/plugin install` produces an install with `editable=false` AND a `file://` URL in `direct_url.json` (the plugin cache directory). The old logic returned `"harness-maker"`, which `uv run --with harness-maker` then failed to resolve because harness-maker is not on PyPI. Result: every SessionStart drift hook silently failed with "No solution found when resolving --with dependencies". Revised rule (ADR-002 amendment, 0.11.3): any URL starting with `file://` → return local path (editable or not). PyPI name is reserved for installs where `direct_url.url` is a real registry/VCS URL. Parse-failure fallback also flipped to local path (safer ambiguity resolution: uv accepts a directory with `pyproject.toml` for both PyPI and local cases, but `--with harness-maker` only works for PyPI installs that have actually been published). Regression guard: `tests/unit/test_install_ref.py::test_returns_local_path_for_non_editable_file_install`.
+
+## [wiki:gotcha] expanduser-must-precede-join | 2026-05-13
+`Path.expanduser()` only expands `~` when it appears at **position 0** of the path string. `Path("/root") / "~/foo"` produces `Path("/root/~/foo")`, then `.expanduser()` is a silent no-op because `~` is at index 8, not 0. Bug pattern in `refdocs_index._build_block`: `(harness_root / rf.path).expanduser().resolve()` — when `rf.path = "~/foo"`, the resolved path was `<harness_root>/~/foo`, a non-existent directory. Fix: expand `~` BEFORE joining, then conditionally join only when the result is still relative. Canonical pattern: `raw = Path(p).expanduser(); abs_root = raw.resolve() if raw.is_absolute() else (root / raw).resolve()`. `second_brain.py` got this right (`Path(cfg.vault_path).expanduser()` — no prior join). The downstream consumer of any `~`-relative path stored by `denormalize_home_to_tilde` (see [[bash-tilde-expansion-on-var-assignment]]) MUST follow this expand-before-join rule.
 
 ## [wiki:gotcha] bash-tilde-expansion-on-var-assignment | 2026-05-13
 Bash expands `~` at variable assignment time when unquoted: `VAR=~/foo` → `VAR=/home/alice/foo`. Quoting (`VAR="~/foo"`) prevents the expansion. Claude Code's slash-command bash construction tends to write the unquoted form, so paths typed as `~/edge_bsp_foundation` reach the CLI as `/home/alice/edge_bsp_foundation`. Storing that absolute path in `harness.yaml` breaks team sharing — teammate Bob has `/home/bob`, not `/home/alice`. Fix lives at the CLI boundary: `io_utils.denormalize_home_to_tilde()` re-prefixes `$HOME`-rooted absolute paths with `~`. Applied in `_parse_ref_folders_flag` (cli.py), `_apply_dimension_overrides` for `--second-brain-vault-path`, and `_ask_ref_folders` / `_ask_second_brain` (interview.py). Downstream consumers call `Path(...).expanduser()` so the `~/...` form still resolves correctly on every machine.

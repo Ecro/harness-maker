@@ -1,6 +1,6 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.11.1
+harness_maker_version: 0.11.3
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: memory/failures.ko.md.j2
 provenance: official
@@ -73,6 +73,9 @@ SessionStart drift hook emitted `hookSpecificOutput.additionalContext` but the u
 
 ## [fail:design] install-ref-editable-only-check | 2026-05-13 | count:1
 `_compute_install_ref()` assumed `editable=true` was the only signal of a local install. Claude Code's `/plugin install` produces an install with `editable=false` AND `direct_url.url = "file://..."` (the plugin cache). The editable-only branch returned `"harness-maker"`, which `uv run --with harness-maker` failed to resolve since harness-maker is not on PyPI. Cascade: every SessionStart drift hook in every project that installed via `/plugin install` silently failed with "No solution found when resolving --with dependencies". Fix: check `direct_url.url.startswith("file://")` instead of `dir_info.editable`. Pattern: when a function disambiguates "local vs remote" install, branch on URL scheme (file:// vs https://) rather than mode flags — the mode flag captures one local variant, the URL scheme captures all of them.
+
+## [fail:design] expanduser-after-path-join-silent-noop | 2026-05-13 | count:1
+`refdocs_index._build_block` did `(harness_root / rf.path).expanduser().resolve()`. When `rf.path = "~/edge_bsp_foundation"`, the join produces `<harness_root>/~/edge_bsp_foundation` — `~` is no longer at position 0, so the subsequent `.expanduser()` is a silent no-op. Downstream resolve() yielded a bogus path under `harness_root`, the existence check failed, and the index emitted `ref_folder not found or not a directory` with the `~`-prefixed resolved path in the warning — visually confusing because the warning text contained `~` (showing both the input AND the broken resolution result). Found during end-to-end sanity check immediately after shipping the `denormalize_home_to_tilde` fix: storage normalization succeeded, but the indexer rejected the stored value. Fix: expand FIRST (`raw = Path(rf.path).expanduser()`), then conditionally join only if still relative. Pattern: `.expanduser()` belongs at the boundary where a user-supplied path is first lifted into Pathlib — never AFTER a join. Co-discovered with the parent shell-expansion bug because both halves of the round-trip must work for tilde paths to be usable.
 
 ## [fail:design] cli-path-tilde-expansion-shell-layer | 2026-05-13 | count:1
 ref_folders / second_brain_vault_path entered as `~/foo` got stored as `/home/alice/foo` (absolute) in harness.yaml. The Python code (`_parse_ref_folders_flag`, `RefFolder` validator, `refdocs_index._build_block`) does NOT expand `~`. Actual culprit was bash: `VAR=~/foo` is unquoted at assignment, so the shell expands `~` to `$HOME` before Python ever sees the value. Fix lives at the CLI boundary (`denormalize_home_to_tilde` in `io_utils.py`) — re-prefix `$HOME`-rooted absolutes with `~` AFTER the shell has clobbered them. Pattern: when a path transformation is observed in CLI-received input but the Python code shows no such logic, blame the shell quoting layer first; the simplest test is to call the function directly from pytest and confirm the bug only reproduces via the shell.

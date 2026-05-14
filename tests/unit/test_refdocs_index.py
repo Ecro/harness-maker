@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 import yaml
 
 from harness_maker.models import RefFolder
@@ -22,6 +23,37 @@ def test_build_empty_ref_folders_writes_skeleton(tmp_path: Path) -> None:
     data = yaml.safe_load(result.index_path.read_text())
     assert data["ref_folders"] == []
     assert data["generated_at"] == "2026-05-06T00:00:00Z"
+
+
+def test_build_resolves_tilde_relative_ref_folder(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``~/foo`` paths must resolve via $HOME — NOT under harness_root.
+
+    Regression guard for the 0.11.3 expanduser-after-join silent-no-op fix:
+    `Path("/harness_root") / "~/foo"` produces `/harness_root/~/foo`, and a
+    subsequent `.expanduser()` is a no-op because `~` is no longer at position 0.
+    The bug surfaced as "ref_folder not found" with a confusing resolved path
+    that visibly contained `~`. Expansion must happen BEFORE the join.
+    """
+    # $HOME points to a real directory containing a .md file; harness_root is
+    # somewhere else entirely. Pre-fix: the indexer joins harness_root + "~/docs"
+    # → bogus path under harness_root, returns 0 entries + a warning.
+    fake_home = tmp_path / "fake_home"
+    docs = fake_home / "docs"
+    docs.mkdir(parents=True)
+    (docs / "spec.md").write_text("# Spec\n\nbody\n")
+    monkeypatch.setenv("HOME", str(fake_home))
+    harness_root = tmp_path / "harness_project"
+    harness_root.mkdir()
+
+    result = build(harness_root, [_ref("~/docs")], now_iso="2026-05-13T00:00:00Z")
+
+    data = yaml.safe_load(result.index_path.read_text())
+    entries = data["ref_folders"][0]["entries"]
+    assert len(entries) == 1
+    assert entries[0]["relpath"] == "spec.md"
+    assert result.warnings == []
 
 
 def test_build_md_extracts_frontmatter_title_and_h2(tmp_path: Path) -> None:
