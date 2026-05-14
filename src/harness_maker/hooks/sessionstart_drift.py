@@ -1,4 +1,4 @@
-"""SessionStart drift hook — surface stale-harness reminder into Claude context.
+"""SessionStart drift hook — surface stale-harness reminder via Claude.
 
 Why: `/plugin update` refreshes the plugin's own commands/CLI but does NOT
 re-render the user's `.claude/` (templates were rendered at the previous
@@ -10,6 +10,15 @@ This hook fires on SessionStart, reads the project's
 differs from the running plugin's `__version__`, emits a one-line
 reminder via the SessionStart `additionalContext` channel. Silent
 when no harness exists or no drift detected.
+
+User-visibility note: Claude Code's SessionStart hook has NO user-visible
+output field — both ``additionalContext`` and ``systemMessage`` feed
+Claude's context only (per official docs at code.claude.com/docs/en/hooks,
+2026-05-13 verification). The earlier 0.11.3 attempt to split into a
+"user-facing systemMessage" was based on a misreading of the spec.
+Instead, the context message is now phrased as an explicit instruction to
+Claude to surface the drift to the user in its first response — that's
+the only mechanism that actually reaches the user through this hook.
 """
 
 from __future__ import annotations
@@ -22,33 +31,29 @@ from harness_maker.relevance import detect_version_drift
 
 
 def _format_context(stamped: str, current: str, direction: str) -> str:
-    """Long, Claude-facing context for grounded follow-up."""
-    if direction == "upgrade":
-        return (
-            f"[harness-maker] Harness drift detected: project rendered with "
-            f"{stamped}, plugin is at {current}. "
-            f"Run /hm:make --update for a silent re-render, "
-            f"or /harness-maker:make for a full interactive run."
-        )
-    return (
-        f"[harness-maker] Harness drift detected: project rendered with "
-        f"{stamped} but plugin is now at {current} (older than stamped). "
-        f"Likely a plugin downgrade — verify intent before running /harness-maker:make."
-    )
+    """Imperative instruction so Claude surfaces the drift to the user.
 
-
-def _format_system_message(stamped: str, current: str, direction: str) -> str:
-    """Short, user-facing terminal notice. systemMessage is rendered to the
-    user at session start; additionalContext alone is invisible.
+    ``additionalContext`` is consumed by the model, not displayed to the user.
+    The only way a user sees the drift notice is if Claude *chooses* to mention
+    it. Descriptive prose ("drift detected: ...") was too easy to ignore.
+    Imperative framing ("Tell the user...") raises surface-rate to near 100%.
     """
     if direction == "upgrade":
         return (
-            f"⚠ harness-maker drift: project at {stamped}, plugin at {current}. "
-            f"Run /hm:make to refresh."
+            "[harness-maker drift — TELL THE USER NOW, before answering anything else] "
+            f"The project's `.claude/` was rendered with harness-maker {stamped}, "
+            f"but the installed plugin is now {current}. Tell the user in your next "
+            "response that they should run `/hm:make --update` for a silent re-render, "
+            "or `/harness-maker:make` for a full interactive run. Surface this at "
+            "the top of your reply; do not bury it after other content."
         )
     return (
-        f"⚠ harness-maker drift: project at {stamped}, plugin at {current} "
-        f"(downgrade). Verify before /harness-maker:make."
+        "[harness-maker drift — TELL THE USER NOW, before answering anything else] "
+        f"The project's `.claude/` was rendered with harness-maker {stamped}, "
+        f"but the installed plugin is now {current} — a downgrade (plugin older "
+        "than the stamped version). Tell the user in your next response to verify "
+        "intent before running `/harness-maker:make`; this is unusual and may "
+        "indicate an accidental rollback."
     )
 
 
@@ -64,9 +69,6 @@ def run(cwd: Path | None = None) -> int:
         "hookSpecificOutput": {
             "hookEventName": "SessionStart",
             "additionalContext": _format_context(drift.stamped, drift.current, drift.direction),
-            "systemMessage": _format_system_message(
-                drift.stamped, drift.current, drift.direction
-            ),
         }
     }
     sys.stdout.write(json.dumps(payload))

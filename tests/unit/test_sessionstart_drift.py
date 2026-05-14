@@ -67,7 +67,7 @@ def test_run_emits_additional_context_on_upgrade(tmp_path: Path, capsys) -> None
     payload = json.loads(capsys.readouterr().out)
     assert payload["hookSpecificOutput"]["hookEventName"] == "SessionStart"
     ctx = payload["hookSpecificOutput"]["additionalContext"]
-    assert "[harness-maker]" in ctx
+    assert "harness-maker drift" in ctx
     assert "0.0.1" in ctx
     assert _TEST_CURRENT in ctx
     assert "/harness-maker:make" in ctx
@@ -82,21 +82,39 @@ def test_run_emits_downgrade_warning(tmp_path: Path, capsys) -> None:
     assert "downgrade" in ctx.lower()
 
 
-def test_run_emits_system_message_on_drift(tmp_path: Path, capsys) -> None:
-    """systemMessage is required so the drift surfaces visibly to the user.
+def test_run_does_not_emit_system_message(tmp_path: Path, capsys) -> None:
+    """systemMessage is NOT emitted (0.11.5).
 
-    additionalContext alone only feeds Claude's internal context; the user
-    sees nothing unless systemMessage is also set.
+    Per official Claude Code docs (2026-05-13), SessionStart hooks have no
+    user-visible output field — both ``additionalContext`` and
+    ``systemMessage`` feed Claude's context only. The 0.11.3 attempt to
+    split into a "user-facing systemMessage" was based on a misreading of
+    the spec. The replacement strategy: an imperative phrasing in
+    ``additionalContext`` that tells Claude to surface the drift in its
+    first response. Test guards against the dead field returning silently.
     """
     _write_harness_yaml(tmp_path, "0.0.1")
     with patch("harness_maker.relevance.latest_installed_version", return_value=_TEST_CURRENT):
         rc = run(cwd=tmp_path)
     assert rc == 0
     payload = json.loads(capsys.readouterr().out)
-    sm = payload["hookSpecificOutput"].get("systemMessage", "")
-    assert sm, "systemMessage must be present so user sees the drift"
-    assert "0.0.1" in sm
-    assert _TEST_CURRENT in sm
+    assert "systemMessage" not in payload["hookSpecificOutput"]
+
+
+def test_additional_context_is_imperative(tmp_path: Path, capsys) -> None:
+    """additionalContext must instruct Claude to surface drift to the user.
+
+    Descriptive phrasing ("drift detected: ...") is too easy to ignore.
+    The text must contain explicit instruction to mention the drift in
+    Claude's next response so the user actually finds out.
+    """
+    _write_harness_yaml(tmp_path, "0.0.1")
+    with patch("harness_maker.relevance.latest_installed_version", return_value=_TEST_CURRENT):
+        run(cwd=tmp_path)
+    ctx = json.loads(capsys.readouterr().out)["hookSpecificOutput"]["additionalContext"]
+    # Imperative markers that prompt Claude to surface the drift.
+    assert "TELL THE USER" in ctx
+    assert "Tell the user" in ctx
 
 
 # ──────────────────────────────────────────────────────────────────────────────
