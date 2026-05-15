@@ -118,6 +118,25 @@ FAIL when: there are unmerged paths, conflict markers, or unresolved merge state
 
 PASS when: working tree is clean OR has only the staged changes from `/hm:execute` Step 5 `stage-only`.
 
+## Advisory probes (non-blocking)
+
+These do **NOT** gate completion. They surface latent footguns and continue
+with `exit 0` regardless of outcome. They sit OUTSIDE the 6-check contract
+of `verify-before-completion` — adding new gating checks means changing
+that SKILL; adding new advisory probes means appending here.
+
+### A1. `work_docs/` (underscore) footgun probe
+
+```bash
+if [ -d "work_docs" ]; then
+  echo "WARN: work_docs/ (underscore) directory found." >&2
+  echo "      The harness-maker directory is work-docs/ (hyphen);" >&2
+  echo "      work_docs is only the YAML key in harness.yaml." >&2
+  echo "      Migration: git mv work_docs/* work-docs/ && rmdir work_docs" >&2
+fi
+exit 0
+```
+
 ## Output
 
 Write **both** formats:

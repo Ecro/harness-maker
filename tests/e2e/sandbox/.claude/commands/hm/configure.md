@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.11.1
+harness_maker_version: 0.11.6
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/configure.md.j2
 provenance: official
-content_hash: cb59bb8add023c4cec09b3844e29bb034303c16e27cc43cfbe0b0357538320ef
+content_hash: e55f125c9f1ff2e1a2d035f34c94c1e2884fc0db6b2cdfc61c4f935c9a3d146d
 ---
 # /hm:configure
 
@@ -28,6 +28,8 @@ Read `.claude/harness.yaml` body (skip frontmatter) and surface:
 - domains (if any)
 - recommended_model
 - wrapup_docs (if any)
+- ref_folders (paths + globs if any)
+- sibling_repos (relative paths if any)
 - second_brain: enabled, vault_path, project_id (if configured)
 
 ### 2. Ask what to change
@@ -56,6 +58,13 @@ Options (multi-select):
   preference only; generated Codex agents still inherit the user's Codex
   profile model.
 - **Wrapup documents** — add/edit/clear docs updated during /hm:wrapup (e.g. CHANGELOG.md, TODO.md)
+- **Reference folders** — add/edit/clear reference doc folders indexed by the
+  `refdocs-search` skill. Trade-off: more folders increase search coverage and
+  index build time; stale paths are registered with a warning.
+- **Sibling repos** — add/edit/clear relative paths to repos that form one
+  logical project with this one (e.g. backend + frontend split). Trade-off:
+  richer cross-repo context during research and review; absolute paths are
+  rejected for portability.
 - **Second Brain** — configure Obsidian project memory. First install is
   read-first; this path can continue into advanced vault, allowlist, and
   writable-folder settings.
@@ -74,6 +83,17 @@ new value alternatives, and a short explanation:
   reconcile.
 
 Collect the new values.
+
+For **Reference folders**: ask one structured question:
+1. Show current `ref_folders` list (paths + globs). Ask for the new value.
+   Format: `::` separates entries, `;` separates path from glob within an entry
+   (e.g. `../docs::../specs;**/*.pdf`). Default glob: `**/*.{md,txt,pdf}`.
+   DOCX unsupported — convert first. Enter "none" or blank to clear all folders.
+
+For **Sibling repos**: ask one structured question:
+1. Show current `sibling_repos` list. Ask for the new value.
+   Format: semicolon-separated relative paths (e.g. `../backend;../mobile`).
+   Absolute paths are rejected (portability). Enter "none" or blank to clear.
 
 For **Second Brain**: ask two questions in sequence:
 1. Vault path — show current `second_brain.vault_path` (or "not configured");
@@ -98,14 +118,17 @@ Run the CLI with only the changed flags:
 !uv run --with /home/noel/harness-maker python -m harness_maker.cli make "$(pwd)" \
   --grade-threshold "$GRADE" --domains "$DOMAINS" --mechanical-checks "$CHECKS" \
   --recommended-model "$MODEL" --focus "$FOCUS" --wrapup-docs "$WRAPUP_DOCS" \
+  --ref-folders "$REF_FOLDERS" --sibling-repos "$SIBLING_REPOS" \
   --second-brain-vault-path "$SB_VAULT_PATH" --second-brain-project-id "$SB_PROJECT_ID"
 ```
 
-Omit flags for dimensions that weren't changed. Omit `--second-brain-vault-path`
-when Second Brain wasn't selected; pass empty string `""` to disable it.
-Omit `--second-brain-project-id` when the user left it unchanged.
-The CLI preserves unspecified fields from `.claude/harness.yaml` — only
-changed dimensions are overwritten.
+Omit flags for dimensions that weren't changed. Omit `--ref-folders` when
+Reference folders wasn't selected; pass empty string `""` to clear all entries.
+Omit `--sibling-repos` when Sibling repos wasn't selected; pass empty string
+`""` to clear. Omit `--second-brain-vault-path` when Second Brain wasn't
+selected; pass empty string `""` to disable it. Omit `--second-brain-project-id`
+when the user left it unchanged. The CLI preserves unspecified fields from
+`.claude/harness.yaml` — only changed dimensions are overwritten.
 
 ### 5. Confirm
 
@@ -114,6 +137,9 @@ After dispatch, show what changed:
 - New values applied
 - File count (from CLI output)
 - The re-render impact and preservation note for each changed dimension
+- For Reference folders, how many entries are now registered and whether the
+  index build ran
+- For Sibling repos, how many repos are now registered
 - For Second Brain, whether the result is disabled, read-first, or configured
   for advanced writable-folder follow-up
 

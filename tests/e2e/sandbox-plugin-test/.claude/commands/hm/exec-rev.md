@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.11.1
+harness_maker_version: 0.11.6
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: d178e268454882620c3aab2710542a25e078510c6b4782e412ea13666b0c95ca
+content_hash: 2b4131718723c783ce70eac9459257502617d47253fa6c7421ec7eb3d7bf6305
 ---
 # /hm:exec-rev
 
@@ -586,6 +586,11 @@ The CLI auto-stamps `ts` when omitted. Schema validation rejects unknown
 fields and negative counts.
 
 ## Outputs
+
+> ⚠️ **Path note:** the directory is `work-docs/` (with hyphen). The YAML key
+> `work_docs` is the config key in `harness.yaml`, NOT a directory name.
+> Never write artifacts under `work_docs/` (underscore) — that path is a
+> known LLM footgun.
 
 - `work-docs/REVIEW-{slug}-{date}.md` with all findings, per-iteration records, and final grade summary.
 - File modifications applied during auto-fix (when enabled). **Not committed** — wrapup owns the commit.

@@ -283,6 +283,11 @@ If the user opts for "dig deeper" — re-enter Phase 1 with narrowed scope (one 
 
 ## Outputs
 
+> ⚠️ **Path note:** the directory is `work-docs/` (with hyphen). The YAML key
+> `work_docs` is the config key in `harness.yaml`, NOT a directory name.
+> Never write artifacts under `work_docs/` (underscore) — that path is a
+> known LLM footgun.
+
 - `{{ config.work_docs.dir }}RESEARCH-{slug}.md` — frontmatter + 7 sections above.
 - Validation summary surfaced to the user.
 

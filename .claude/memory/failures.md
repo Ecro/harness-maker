@@ -1,6 +1,6 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.11.3
+harness_maker_version: 0.11.5
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: memory/failures.ko.md.j2
 provenance: official
@@ -23,10 +23,13 @@ provenance: official
 ---
 
 <!-- @hm:user:entries -->
+## [fail:design] yaml-key-value-name-mismatch-llm-footgun | 2026-05-15 | count:1
+harness.yaml's snake_case YAML key `work_docs:` has a hyphenated value `work-docs/` — LLMs reading the config in an ad-hoc session (no stage template loaded) wrote `work_docs/PLAN-...md` (snake_case directory) instead of `work-docs/PLAN-...md`. Observed in `~/edge_testfarm_os/work_docs/PLAN-daily-architecture-review-20260514.md` with frontmatter `validator_outcome: SELF_REVIEW` (NOT a /hm:plan standard value) + no `harness_maker_version` — confirms ad-hoc-LLM not /hm:plan-pipeline origin. **No literal `work_docs/` directory reference exists anywhere in src/.** Pattern: one-character name asymmetry between YAML key and value is an LLM footgun, regardless of which convention is "right" (snake_case vs kebab-case). Fix landed in 0.11.6: two-layer guardrail — preventive warning paragraph in 4 stage templates' `## Outputs` (Layer 1) + non-blocking bash probe in `verify.md.j2` stage body (Layer 2, NOT in the `verify-before-completion` SKILL — preserving "6 checks" doc-truth invariant). Pattern guard: when designing a new harness.yaml key whose value is a path, prefer aligning key name to value name to eliminate the disambiguation cost entirely (`plans_dir: plans/` over `plans-dir: plans/`).
+
 ## [fail:design] prompt-builder-prose-without-data | 2026-05-11 | count:1
 `build_pass2_prompt(diff: str, findings, full_context)` accepted `diff` as a parameter but never appended it to the `parts` list assembled into the returned prompt string. The instruction in the prompt body ("Validate each finding against the full context") had no `## Diff` section to reference — Pass 2 reviewers received only metadata + finding summaries. Caught by code-reviewer in `/hm:review llm-code-review-2026` as P1 single-source finding; verified by direct file inspection (parts list at lines 120-137 had title/desc/author/findings + invariant prose, no diff fence). Fix: explicit `f"## Diff\n```\n{diff}\n```"` block added before the Pass 1 Findings heading. Pattern guard: when a prompt builder accepts a data parameter, the parameter must appear in the body assembly OR be removed from the signature; mismatched signatures vs body assembly are a class of latent bug.
 
-## [fail:test] snapshot-regen-inside-worktree | 2026-05-10 | count:3
+## [fail:test] snapshot-regen-inside-worktree | 2026-05-15 | count:4
 Running `tests/snapshot/regenerate.py` inside a git worktree embeds the worktree absolute path in all rendered template outputs (via `synthesize._HARNESS_MAKER_PKG_ROOT = Path(__file__).parent.parent.parent`). The resulting SHA-256 hashes diverge from hashes computed when tests run in the main repo. Fix: always run `regenerate.py` from the main repo root. This recurred again in the make-ux-gaps loop — the worktree squash-merge left snapshots with worktree-specific hashes. Recurred a third time in deep-interview-llm-delegation: regen ran from main repo BEFORE worktree finalize, so old template sha256s were generated; worktree must be finalized (stage-only) first so new templates are present in main before running regen. Correct sequence: (1) run unit tests from worktree, (2) finalize stage-only, (3) regen from main repo root, (4) full pytest from main.
 
 ## [fail:test] typer-cli-runner-mix-stderr | 2026-05-09 | count:1

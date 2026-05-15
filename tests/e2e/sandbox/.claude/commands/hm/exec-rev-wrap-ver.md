@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.11.1
+harness_maker_version: 0.11.6
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: be61c475b35019f626898d458c467ce1344bd2e63ed254402a46fcbef39fc9cc
+content_hash: ac4f92b3c6b0a889b5c32dac6f786143d878e0b97b52aba5d7394fe3eb1c8e33
 ---
 # /hm:exec-rev-wrap-ver
 
@@ -587,6 +587,11 @@ fields and negative counts.
 
 ## Outputs
 
+> ⚠️ **Path note:** the directory is `work-docs/` (with hyphen). The YAML key
+> `work_docs` is the config key in `harness.yaml`, NOT a directory name.
+> Never write artifacts under `work_docs/` (underscore) — that path is a
+> known LLM footgun.
+
 - `work-docs/REVIEW-{slug}-{date}.md` with all findings, per-iteration records, and final grade summary.
 - File modifications applied during auto-fix (when enabled). **Not committed** — wrapup owns the commit.
 - `human_review_needed` flag when threshold not reached.
@@ -817,6 +822,11 @@ If the user asks to push during wrapup, that is fine — but never push without 
 
 ## Outputs
 
+> ⚠️ **Path note:** the directory is `work-docs/` (with hyphen). The YAML key
+> `work_docs` is the config key in `harness.yaml`, NOT a directory name.
+> Never write artifacts under `work_docs/` (underscore) — that path is a
+> known LLM footgun.
+
 - **One** git commit including: implementation diff (from execute), wiki + failures + session log + PLAN status updates.
 - `.claude/memory/pending-drift.md` entries when drift was detected.
 - `.claude/memory/pending-proposals.md` entries when failure count crossed threshold.
@@ -956,6 +966,25 @@ When worktree isolation was engaged (`.worktrees/execute-*` exists or did exist)
 FAIL when: there are unmerged paths, conflict markers, or unresolved merge state.
 
 PASS when: working tree is clean OR has only the staged changes from `/hm:execute` Step 5 `stage-only`.
+
+## Advisory probes (non-blocking)
+
+These do **NOT** gate completion. They surface latent footguns and continue
+with `exit 0` regardless of outcome. They sit OUTSIDE the 6-check contract
+of `verify-before-completion` — adding new gating checks means changing
+that SKILL; adding new advisory probes means appending here.
+
+### A1. `work_docs/` (underscore) footgun probe
+
+```bash
+if [ -d "work_docs" ]; then
+  echo "WARN: work_docs/ (underscore) directory found." >&2
+  echo "      The harness-maker directory is work-docs/ (hyphen);" >&2
+  echo "      work_docs is only the YAML key in harness.yaml." >&2
+  echo "      Migration: git mv work_docs/* work-docs/ && rmdir work_docs" >&2
+fi
+exit 0
+```
 
 ## Output
 

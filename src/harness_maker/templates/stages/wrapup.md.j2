@@ -228,6 +228,11 @@ If the user asks to push during wrapup, that is fine — but never push without 
 
 ## Outputs
 
+> ⚠️ **Path note:** the directory is `work-docs/` (with hyphen). The YAML key
+> `work_docs` is the config key in `harness.yaml`, NOT a directory name.
+> Never write artifacts under `work_docs/` (underscore) — that path is a
+> known LLM footgun.
+
 - **One** git commit including: implementation diff (from execute), wiki + failures + session log + PLAN status updates.
 - `.claude/memory/pending-drift.md` entries when drift was detected.
 - `.claude/memory/pending-proposals.md` entries when failure count crossed threshold.

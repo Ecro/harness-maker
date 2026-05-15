@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.11.1
+harness_maker_version: 0.11.6
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/atomic_command.md.j2
 provenance: official
-content_hash: 723c07570562b440412fc6b2b8a96d1c15d7116bd7b5ce1fbd7aee3ea05f7de0
+content_hash: bbddace896f91bfb9871633c5e4a86e2321a9a854adf3ddb7bec7796989b9533
 ---
 # Stage: wrapup
 
@@ -207,6 +207,11 @@ Wrapup does **NOT** auto-push. The user explicitly requests push when ready:
 If the user asks to push during wrapup, that is fine — but never push without an explicit request.
 
 ## Outputs
+
+> ⚠️ **Path note:** the directory is `work-docs/` (with hyphen). The YAML key
+> `work_docs` is the config key in `harness.yaml`, NOT a directory name.
+> Never write artifacts under `work_docs/` (underscore) — that path is a
+> known LLM footgun.
 
 - **One** git commit including: implementation diff (from execute), wiki + failures + session log + PLAN status updates.
 - `.claude/memory/pending-drift.md` entries when drift was detected.

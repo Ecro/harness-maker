@@ -360,6 +360,11 @@ If verification fails, retry write **once**. If still failing, surface the path 
 
 ## Outputs
 
+> ⚠️ **Path note:** the directory is `work-docs/` (with hyphen). The YAML key
+> `work_docs` is the config key in `harness.yaml`, NOT a directory name.
+> Never write artifacts under `work_docs/` (underscore) — that path is a
+> known LLM footgun.
+
 - `{{ config.work_docs.dir }}PLAN-{slug}.md` (frontmatter + 10 sections above)
 - Interview Transcript as the single source of truth for user decisions
 - ADR set bound to this PLAN (numbered ADR-001…)

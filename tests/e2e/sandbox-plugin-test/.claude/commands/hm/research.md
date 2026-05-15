@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.11.1
+harness_maker_version: 0.11.6
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/atomic_command.md.j2
 provenance: official
-content_hash: 02635549b410ec88de5b130561282f0d912951f80589e483ccca6c0013a802af
+content_hash: 9afe0586c5a03c79501c5316c52e8cb161a243f015746a45815fbfeab4b5917f
 ---
 # Stage: research
 
@@ -275,6 +275,11 @@ If the user opts for "dig deeper" — re-enter Phase 1 with narrowed scope (one 
 **Stage terminal**: On success, output the RESEARCH document path and a one-line summary of the recommended direction, then **STOP**. Do not proceed to `/hm:spec`, `/hm:plan`, or any other stage without an explicit user command. This boundary must survive context compaction — the next stage is user-initiated.
 
 ## Outputs
+
+> ⚠️ **Path note:** the directory is `work-docs/` (with hyphen). The YAML key
+> `work_docs` is the config key in `harness.yaml`, NOT a directory name.
+> Never write artifacts under `work_docs/` (underscore) — that path is a
+> known LLM footgun.
 
 - `work-docs/RESEARCH-{slug}.md` — frontmatter + 7 sections above.
 - Validation summary surfaced to the user.

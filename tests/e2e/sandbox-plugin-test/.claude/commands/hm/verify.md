@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.11.1
+harness_maker_version: 0.11.6
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/atomic_command.md.j2
 provenance: official
-content_hash: 6e55e88bd38e02e9952c445485ca32f276fd93d47a5376b3addf652faa394569
+content_hash: d918df2ab0b8f55e4581957691d55c5882ea2fa9bf03f159993ad32737f96222
 ---
 # Stage: verify
 
@@ -114,6 +114,25 @@ When worktree isolation was engaged (`.worktrees/execute-*` exists or did exist)
 FAIL when: there are unmerged paths, conflict markers, or unresolved merge state.
 
 PASS when: working tree is clean OR has only the staged changes from `/hm:execute` Step 5 `stage-only`.
+
+## Advisory probes (non-blocking)
+
+These do **NOT** gate completion. They surface latent footguns and continue
+with `exit 0` regardless of outcome. They sit OUTSIDE the 6-check contract
+of `verify-before-completion` — adding new gating checks means changing
+that SKILL; adding new advisory probes means appending here.
+
+### A1. `work_docs/` (underscore) footgun probe
+
+```bash
+if [ -d "work_docs" ]; then
+  echo "WARN: work_docs/ (underscore) directory found." >&2
+  echo "      The harness-maker directory is work-docs/ (hyphen);" >&2
+  echo "      work_docs is only the YAML key in harness.yaml." >&2
+  echo "      Migration: git mv work_docs/* work-docs/ && rmdir work_docs" >&2
+fi
+exit 0
+```
 
 ## Output
 

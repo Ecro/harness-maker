@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import re
+import subprocess
 from pathlib import Path
 
 from harness_maker.interview import interview
@@ -61,4 +63,74 @@ def test_verify_md_content_hash_mismatch_fails(tmp_path: Path) -> None:
     errors = verify(tmp_path)
     assert any("content_hash mismatch" in e for e in errors), (
         f"expected mismatch error, got: {errors}"
+    )
+
+
+def test_work_docs_footgun_probe(tmp_path: Path) -> None:
+    """Phase 2 of PLAN-fix-work-docs-naming-footgun.
+
+    Three assertions:
+      (a) Rendered verify stage contains the Advisory probes section.
+      (b) verify-before-completion SKILL still has exactly 6 numbered
+          checks (regression guard against scope creep into the SKILL).
+      (c) The A1 probe bash snippet, when executed against a tempdir
+          containing work_docs/, exits 0 and emits the expected WARN
+          strings on stderr.
+    """
+    p = _profile()
+    a = interview(p, autoloop_mode=True)
+    bp = synthesize(p, a)
+    render(bp, tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
+
+    verify_stage = (tmp_path / "stages" / "verify.md").read_text(encoding="utf-8")
+
+    # (a) verify stage has the new advisory section
+    assert "## Advisory probes (non-blocking)" in verify_stage, (
+        "verify stage must include the Advisory probes section "
+        "(Layer 2 of the work_docs/ footgun guardrail)"
+    )
+
+    # (b) verify-before-completion SKILL has exactly 6 numbered checks
+    skill_text = (tmp_path / "skills" / "verify-before-completion" / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
+    check_headings = re.findall(r"^### (\d+)\. ", skill_text, flags=re.MULTILINE)
+    assert check_headings == ["1", "2", "3", "4", "5", "6"], (
+        f"verify-before-completion SKILL must keep exactly 6 numbered checks; "
+        f"got headings={check_headings}. Do NOT add a 7th — advisory probes "
+        "live in verify.md stage body (see ADR-003 in PLAN)."
+    )
+
+    # (c) A1 probe bash executes correctly against tempdir with work_docs/
+    probe_match = re.search(
+        r"### A1\. `work_docs/`.*?```bash\n(.*?)\n```",
+        verify_stage,
+        flags=re.DOTALL,
+    )
+    assert probe_match, (
+        "could not extract A1 probe bash block from rendered verify stage; "
+        "expected '### A1. `work_docs/`' heading followed by a ```bash fenced block"
+    )
+    probe_script = probe_match.group(1)
+
+    sandbox = tmp_path / "probe_sandbox"
+    sandbox.mkdir()
+    (sandbox / "work_docs").mkdir()
+    proc = subprocess.run(
+        ["bash", "-c", probe_script],
+        cwd=sandbox,
+        capture_output=True,
+        text=True,
+        timeout=10,
+        check=False,
+    )
+    assert proc.returncode == 0, (
+        f"probe must exit 0 (WARN-only); got rc={proc.returncode}, stderr={proc.stderr!r}"
+    )
+    assert "WARN" in proc.stderr, f"probe stderr must contain 'WARN'; got: {proc.stderr!r}"
+    assert "work-docs/ (hyphen)" in proc.stderr, (
+        f"probe stderr must mention hyphen directory; got: {proc.stderr!r}"
+    )
+    assert "git mv work_docs/* work-docs/" in proc.stderr, (
+        f"probe stderr must include copy-pasteable migration command; got: {proc.stderr!r}"
     )

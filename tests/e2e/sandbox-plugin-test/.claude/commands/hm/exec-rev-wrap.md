@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.11.1
+harness_maker_version: 0.11.6
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: 60ef5fe63c6ceaa7afcec9eb39db6e08838c59623116387f2335bd6d3c3eb2c0
+content_hash: bf45125372846ca705ced2e5dedd71d7d1583cb8994f15096daba3bcaaf4a05c
 ---
 # /hm:exec-rev-wrap
 
@@ -587,6 +587,11 @@ fields and negative counts.
 
 ## Outputs
 
+> ⚠️ **Path note:** the directory is `work-docs/` (with hyphen). The YAML key
+> `work_docs` is the config key in `harness.yaml`, NOT a directory name.
+> Never write artifacts under `work_docs/` (underscore) — that path is a
+> known LLM footgun.
+
 - `work-docs/REVIEW-{slug}-{date}.md` with all findings, per-iteration records, and final grade summary.
 - File modifications applied during auto-fix (when enabled). **Not committed** — wrapup owns the commit.
 - `human_review_needed` flag when threshold not reached.
@@ -816,6 +821,11 @@ Wrapup does **NOT** auto-push. The user explicitly requests push when ready:
 If the user asks to push during wrapup, that is fine — but never push without an explicit request.
 
 ## Outputs
+
+> ⚠️ **Path note:** the directory is `work-docs/` (with hyphen). The YAML key
+> `work_docs` is the config key in `harness.yaml`, NOT a directory name.
+> Never write artifacts under `work_docs/` (underscore) — that path is a
+> known LLM footgun.
 
 - **One** git commit including: implementation diff (from execute), wiki + failures + session log + PLAN status updates.
 - `.claude/memory/pending-drift.md` entries when drift was detected.

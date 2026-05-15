@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.11.1
+harness_maker_version: 0.11.6
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/atomic_command.md.j2
 provenance: official
-content_hash: 5518ffb45516fae17d7e628619d6f09c212fce9bdd67df228ca1dda7a425ba15
+content_hash: cc0027c6bb6b531bd7b1332e1940508ce1202a6036d0257c35e5a9b47ff98e48
 ---
 # Stage: review
 
@@ -330,6 +330,11 @@ The CLI auto-stamps `ts` when omitted. Schema validation rejects unknown
 fields and negative counts.
 
 ## Outputs
+
+> ⚠️ **Path note:** the directory is `work-docs/` (with hyphen). The YAML key
+> `work_docs` is the config key in `harness.yaml`, NOT a directory name.
+> Never write artifacts under `work_docs/` (underscore) — that path is a
+> known LLM footgun.
 
 - `work-docs/REVIEW-{slug}-{date}.md` with all findings, per-iteration records, and final grade summary.
 - File modifications applied during auto-fix (when enabled). **Not committed** — wrapup owns the commit.

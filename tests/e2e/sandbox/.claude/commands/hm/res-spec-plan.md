@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.11.1
+harness_maker_version: 0.11.6
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: c7b3487b542a0ef46ebcba991274f6f9efa21a8ba83f40ed689bb4d8006cb6ab
+content_hash: 82ad51945caa63ea2d5bec48a7db7805a74918f63742b6a358b175dc8d9d8b39
 ---
 # /hm:res-spec-plan
 
@@ -282,6 +282,11 @@ If the user opts for "dig deeper" — re-enter Phase 1 with narrowed scope (one 
 **Stage terminal**: On success, output the RESEARCH document path and a one-line summary of the recommended direction, then **STOP**. Do not proceed to `/hm:spec`, `/hm:plan`, or any other stage without an explicit user command. This boundary must survive context compaction — the next stage is user-initiated.
 
 ## Outputs
+
+> ⚠️ **Path note:** the directory is `work-docs/` (with hyphen). The YAML key
+> `work_docs` is the config key in `harness.yaml`, NOT a directory name.
+> Never write artifacts under `work_docs/` (underscore) — that path is a
+> known LLM footgun.
 
 - `work-docs/RESEARCH-{slug}.md` — frontmatter + 7 sections above.
 - Validation summary surfaced to the user.
@@ -958,6 +963,11 @@ If verification fails, retry write **once**. If still failing, surface the path 
 **Stage terminal**: On success, output a brief completion summary (PLAN path, interview rounds, ADR count, validator outcome) and **STOP**. Do not invoke any downstream stage (`/hm:execute` or any other) without an explicit user command. This boundary must survive context compaction — the next stage is user-initiated.
 
 ## Outputs
+
+> ⚠️ **Path note:** the directory is `work-docs/` (with hyphen). The YAML key
+> `work_docs` is the config key in `harness.yaml`, NOT a directory name.
+> Never write artifacts under `work_docs/` (underscore) — that path is a
+> known LLM footgun.
 
 - `work-docs/PLAN-{slug}.md` (frontmatter + 10 sections above)
 - Interview Transcript as the single source of truth for user decisions
