@@ -132,4 +132,19 @@ Templates rendered with `is_codex=False` (shared by Claude Code + Cursor) use du
 ## [wiki:gotcha] bash-tilde-expansion-on-var-assignment | 2026-05-13
 Bash expands `~` at variable assignment time when unquoted: `VAR=~/foo` → `VAR=/home/alice/foo`. Quoting (`VAR="~/foo"`) prevents the expansion. Claude Code's slash-command bash construction tends to write the unquoted form, so paths typed as `~/edge_bsp_foundation` reach the CLI as `/home/alice/edge_bsp_foundation`. Storing that absolute path in `harness.yaml` breaks team sharing — teammate Bob has `/home/bob`, not `/home/alice`. Fix lives at the CLI boundary: `io_utils.denormalize_home_to_tilde()` re-prefixes `$HOME`-rooted absolute paths with `~`. Applied in `_parse_ref_folders_flag` (cli.py), `_apply_dimension_overrides` for `--second-brain-vault-path`, and `_ask_ref_folders` / `_ask_second_brain` (interview.py). Downstream consumers call `Path(...).expanduser()` so the `~/...` form still resolves correctly on every machine.
 
+## [wiki:research-note] claude-opus-4-7-confirmed-current | 2026-05-16
+Anthropic blog 2026-05 "Introducing Claude Opus 4.7" confirms `claude-opus-4-7` as the current top model (stronger coding / agent / vision / multi-step). Our `harness.yaml.recommended_model` is already `claude-opus-4-7` (CLAUDE.md §Targets). No config change required — confirmation pass via `/hm:refresh` decisions.jsonl 2026-05-16 accept.
+
+## [wiki:research-note] memmachine-episodic-memory | 2026-05-16
+arxiv "MeMo: Memory as a Model" (2026-05) — frames LLM long-term memory as a trainable model component rather than retrieval over external store. Relevant to PLAN-personalization-depth-2026-05 Track B (adaptive layer) **future** evolution: our current `.claude/memory/{wiki,failures,session}.md` + `second_brain` are external-store designs. MemMachine class of techniques may inform a follow-up `.claude/memory/episodic/` design (RESEARCH-harness-gap-cot-2026-05 §Open Q #3). Not immediate adoption — awareness only for Track B reviewers.
+
+## [wiki:research-note] apwa-parallel-agentic-workflows | 2026-05-16
+arxiv "APWA: A Distributed Architecture for Parallelizable Agentic Workflows" (2026-05) — proposes typed task graph + per-node executor split for LLM-driven multi-agent systems. Adjacent to our reviewer cross-check + `consensus-arbiter` architecture (reviewer fan-out + arbiter aggregation). On the wishlist for `/hm:review` topology **if** cross-check Goodharting (REVIEW-2026-05-08 disjoint-specialist trap, RESEARCH-harness-gap-cot-2026-05 Pitfall #7) needs alternative routing.
+
+## [wiki:research-note] dual-dim-adaptive-inference | 2026-05-16
+arxiv "Dual-Dimensional Consistency: Balancing Budget and Quality in Adaptive Inference" (2026-05) — adaptive test-time compute varying per-query depth × breadth based on uncertainty. Relevant to `/hm:loop` intensity tiers (quick/standard/thorough/maximum) — currently a static user choice; future could be dynamic per-iter. Especially for `max-iter 80 + time 40h` budgets, dynamic intensity throttling would cut waste. Awareness for follow-up PLAN; not Track B/C scope of PLAN-personalization-depth-2026-05.
+
+## [wiki:research-note] async-function-calling | 2026-05-16
+arxiv "Concurrency without Model Changes: Future-based Asynchronous Function Calling for LLM Agents" (2026-05) — futures-style API to launch independent tool calls without architectural model change. Relevant to autoloop tool cascade (RESEARCH-harness-gap-cot-2026-05 Pitfall #5) and PLAN-personalization-depth-2026-05 Phase 6 foreign-config LLM mapping (could parallelize per-file mapping calls). Implementation-ready pattern, but adoption requires Anthropic SDK support — check next `/hm:refresh`.
+
 <!-- @hm:/user:entries -->
