@@ -53,6 +53,8 @@ _OBSERVABILITY_ALLOWLIST: frozenset[str] = frozenset(
         "src/harness_maker/templates/stages/verify.md.j2",  # pre-existing
         "src/harness_maker/templates/commands/hm/refresh.md.j2",  # pre-existing
         "src/harness_maker/templates/commands/hm/ai-readiness.md.j2",  # pre-existing
+        # Phase 10 — reads override telemetry log
+        "src/harness_maker/templates/commands/hm/personalization-audit.md.j2",
     }
 )
 

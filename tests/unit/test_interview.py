@@ -10,10 +10,13 @@ import pytest
 from harness_maker.interview import answers_from_harness_yaml, interview
 from harness_maker.models import (
     AtomicStage,
+    Confidence,
     DevMode,
     InterviewAnswers,
     Preset,
     ProjectProfile,
+    Recommendation,
+    RecommendationEvidence,
     Target,
 )
 
@@ -427,3 +430,230 @@ def test_focus_to_additional_reviewers_all_values() -> None:
     for focus in ("feature", "bugfix", "security", "performance", "refactoring"):
         result = _focus_to_additional_reviewers(focus, Preset.SIDE)
         assert isinstance(result, list)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Phase 8 — _dispatch_recommendation (confidence-bucketed UI dispatch)
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def _rec(
+    axis: str,
+    value: object,
+    confidence: Confidence,
+    signal: str = "",
+) -> Recommendation:
+    """Build a Recommendation with mirrored evidence — ADR-011 invariant."""
+    return Recommendation(
+        axis=axis,
+        value=value,
+        confidence=confidence,
+        evidence=RecommendationEvidence(
+            n_observations=1,
+            top_3_signals=[signal] if signal else [],
+            confidence=confidence,
+        ),
+        signal=signal,
+    )
+
+
+def test_dispatch_high_confidence_no_prompt() -> None:
+    """HIGH rec applies the default silently — input_provider must not be called."""
+    from harness_maker.interview import _dispatch_recommendation
+
+    calls: list[str] = []
+
+    def _stub(prompt: str) -> str:
+        calls.append(prompt)
+        return ""
+
+    rec = _rec("preset", Preset.SIDE, Confidence.HIGH, signal="scale=small")
+    out = _dispatch_recommendation(rec, target=Target.CLAUDE_CODE, input_provider=_stub)
+    assert out == Preset.SIDE
+    assert calls == []  # never prompted
+
+
+def test_dispatch_medium_confidence_y_accepts() -> None:
+    """MEDIUM rec + 'y' input → returns rec.value."""
+    from harness_maker.interview import _dispatch_recommendation
+
+    rec = _rec("preset", Preset.SIDE, Confidence.MEDIUM)
+    out = _dispatch_recommendation(
+        rec, target=Target.CLAUDE_CODE, input_provider=lambda _p: "y"
+    )
+    assert out == Preset.SIDE
+
+
+def test_dispatch_medium_confidence_blank_accepts() -> None:
+    """MEDIUM rec + blank input (Enter) → accepts default per Y/n convention."""
+    from harness_maker.interview import _dispatch_recommendation
+
+    rec = _rec("preset", Preset.SIDE, Confidence.MEDIUM)
+    out = _dispatch_recommendation(
+        rec, target=Target.CLAUDE_CODE, input_provider=lambda _p: ""
+    )
+    assert out == Preset.SIDE
+
+
+def test_dispatch_medium_confidence_n_rejects() -> None:
+    """MEDIUM rec + 'n' input → returns None (caller falls back to stock default)."""
+    from harness_maker.interview import _dispatch_recommendation
+
+    rec = _rec("preset", Preset.SIDE, Confidence.MEDIUM)
+    out = _dispatch_recommendation(
+        rec, target=Target.CLAUDE_CODE, input_provider=lambda _p: "n"
+    )
+    assert out is None
+
+
+def test_dispatch_low_confidence_returns_none() -> None:
+    """LOW rec → no surface, no prompt, return None."""
+    from harness_maker.interview import _dispatch_recommendation
+
+    calls: list[str] = []
+
+    def _stub(prompt: str) -> str:
+        calls.append(prompt)
+        return ""
+
+    rec = _rec("preset", Preset.SIDE, Confidence.LOW)
+    out = _dispatch_recommendation(
+        rec,
+        target=Target.CLAUDE_CODE,
+        input_provider=_stub,
+    )
+    assert out is None
+    assert calls == []
+
+
+def test_emit_yaml_comment_format() -> None:
+    """_emit_yaml_comment writes the expected ``# detected: ...`` line."""
+    import io
+
+    from harness_maker.interview import _emit_yaml_comment
+
+    rec = _rec("wrapup_docs", ["CHANGELOG.md"], Confidence.HIGH, signal="detected: CHANGELOG.md")
+    buf = io.StringIO()
+    _emit_yaml_comment(buf, rec)
+    out = buf.getvalue()
+    assert out.startswith("# detected: wrapup_docs=")
+    assert "(high)" in out
+    assert "— detected: CHANGELOG.md" in out
+    assert out.endswith("\n")
+
+
+def test_emit_yaml_comment_omits_signal_when_blank() -> None:
+    """No ``signal`` set → comment omits the trailing ``— ...`` clause."""
+    import io
+
+    from harness_maker.interview import _emit_yaml_comment
+
+    rec = _rec("preset", Preset.SIDE, Confidence.MEDIUM, signal="")
+    buf = io.StringIO()
+    _emit_yaml_comment(buf, rec)
+    out = buf.getvalue()
+    assert "—" not in out
+    assert out.startswith("# detected: preset=")
+    assert "(medium)" in out
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Phase 8 validator W3 — backward-compat regression on the existing 4 axes
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def test_load_0_11_x_harness_yaml_zero_diff_on_legacy_axes(
+    tmp_path: pathlib.Path,
+) -> None:
+    """0.11.x harness.yaml round-trips with zero diff on preset/dev_mode/checks/vault.
+
+    Validator W3: existing-user upgrade must NOT silently flip preset or
+    dev_mode to a different default. The four legacy axes (preset, dev_mode,
+    mechanical_checks, second_brain) are assigned MEDIUM (preset/dev_mode) or
+    HIGH (mechanical_checks/second_brain) confidence in Phase 8 — but
+    re-render of an existing 0.11.x yaml must preserve the on-disk values
+    exactly, regardless of how the recommendation framework would score them.
+    """
+    legacy_yaml = (
+        "locale: en\n"
+        "targets:\n"
+        "  - claude-code\n"
+        "recommended_model: claude-opus-4-7\n"
+        "preset: Side\n"
+        "dev_mode: task-driven\n"
+        "reviewers:\n"
+        "  installed:\n"
+        "    - code-reviewer\n"
+        "  enabled:\n"
+        "    - code-reviewer\n"
+        "  consensus: single\n"
+        "  mechanical_checks:\n"
+        "    - 'ruff check .'\n"
+        "    - 'uv run pytest tests/unit -x -q'\n"
+        "second_brain:\n"
+        "  enabled: true\n"
+        "  backend: filesystem\n"
+        "  vault_path: ~/vault\n"
+        "  project_id: my-app\n"
+    )
+    p = tmp_path / "harness.yaml"
+    p.write_text(legacy_yaml, encoding="utf-8")
+
+    answers = answers_from_harness_yaml(p)
+    assert answers is not None
+    # Direct round-trip preservation on the 4 axes.
+    assert answers.preset == Preset.SIDE
+    assert answers.dev_mode == DevMode.TASK_DRIVEN
+    assert answers.mechanical_checks == [
+        "ruff check .",
+        "uv run pytest tests/unit -x -q",
+    ]
+    assert answers.second_brain.enabled is True
+    assert answers.second_brain.project_id == "my-app"
+
+    # And synthesize → HarnessConfig must produce the SAME 4-axis values.
+    # (validator W3: zero-diff post-synthesize, not just post-load.)
+    from harness_maker.synthesize import synthesize
+
+    profile = _profile()
+    bp = synthesize(profile, answers)
+    cfg = bp.config
+    assert cfg.preset == Preset.SIDE
+    assert cfg.dev_mode == DevMode.TASK_DRIVEN
+    assert cfg.reviewers["mechanical_checks"] == [
+        "ruff check .",
+        "uv run pytest tests/unit -x -q",
+    ]
+    assert cfg.second_brain.enabled is True
+    assert cfg.second_brain.project_id == "my-app"
+
+
+def test_load_0_11_x_production_yaml_zero_diff_on_legacy_axes(
+    tmp_path: pathlib.Path,
+) -> None:
+    """Same W3 regression but for a Production+spec-driven legacy harness.yaml."""
+    legacy_yaml = (
+        "locale: en\n"
+        "targets:\n"
+        "  - claude-code\n"
+        "preset: Production\n"
+        "dev_mode: spec-driven\n"
+        "reviewers:\n"
+        "  installed:\n"
+        "    - code-reviewer\n"
+        "  enabled:\n"
+        "    - code-reviewer\n"
+        "    - security-reviewer\n"
+        "  consensus: cross-check\n"
+    )
+    p = tmp_path / "harness.yaml"
+    p.write_text(legacy_yaml, encoding="utf-8")
+
+    answers = answers_from_harness_yaml(p)
+    assert answers is not None
+    assert answers.preset == Preset.PRODUCTION
+    assert answers.dev_mode == DevMode.SPEC_DRIVEN
+    # second_brain absent → default disabled
+    assert answers.second_brain.enabled is False
+    # mechanical_checks absent → empty list
+    assert answers.mechanical_checks == []

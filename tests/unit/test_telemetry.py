@@ -395,3 +395,303 @@ def test_tool_input_redacts_known_secret_patterns(
     # The literal secret bytes must NOT appear in the persisted command.
     assert "sk-prod-abc" not in cmd
     assert "[REDACTED]" in cmd
+
+
+# ── Phase 9: harness_yaml_override capture (ADR-005, validator C3/W8) ─────
+
+
+def _overrides_jsonl(tmp_path: Path) -> Path:
+    return tmp_path / ".claude" / "observability" / "adaptive" / "overrides.jsonl"
+
+
+def test_override_record_extra_forbid() -> None:
+    """OverrideRecord rejects unknown fields — guards against schema drift
+    between Phase 9 emitter and Phase 10 reader (validator C3)."""
+    import pytest
+    from pydantic import ValidationError
+
+    from harness_maker.telemetry import OverrideRecord
+
+    with pytest.raises(ValidationError):
+        OverrideRecord(
+            ts="2026-05-16T12:00:00+00:00",
+            axis_path="preset",
+            before="Side",
+            after="Production",
+            source="configure-exit",
+            future_field="oops",  # type: ignore[call-arg]
+        )
+
+
+def test_override_record_required_fields() -> None:
+    """ts / axis_path / source are required; schema_version defaults to 1."""
+    import pytest
+    from pydantic import ValidationError
+
+    from harness_maker.telemetry import SCHEMA_VERSION, OverrideRecord
+
+    record = OverrideRecord(
+        ts="2026-05-16T12:00:00+00:00",
+        axis_path="preset",
+        before="Side",
+        after="Production",
+        source="configure-exit",
+    )
+    assert record.schema_version == SCHEMA_VERSION
+    # Missing required field raises
+    with pytest.raises(ValidationError):
+        OverrideRecord(ts="x", axis_path="y")  # type: ignore[call-arg]
+
+
+def test_emit_override_writes_jsonl(tmp_path: Path) -> None:
+    from harness_maker.telemetry import OverrideRecord, emit_override
+
+    record = OverrideRecord(
+        ts="2026-05-16T12:00:00+00:00",
+        axis_path="preset",
+        before="Side",
+        after="Production",
+        source="configure-exit",
+    )
+    emit_override(record, tmp_path)
+    path = _overrides_jsonl(tmp_path)
+    assert path.is_file()
+    lines = path.read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 1
+    data = json.loads(lines[0])
+    assert data["axis_path"] == "preset"
+    assert data["before"] == "Side"
+    assert data["after"] == "Production"
+    assert data["source"] == "configure-exit"
+    assert data["schema_version"] == 1
+
+
+def test_emit_override_disable_telemetry_is_noop(tmp_path: Path) -> None:
+    """ADR-005: opt-out short-circuits before any disk write."""
+    from harness_maker.telemetry import OverrideRecord, emit_override
+
+    record = OverrideRecord(
+        ts="2026-05-16T12:00:00+00:00",
+        axis_path="preset",
+        before="Side",
+        after="Production",
+        source="configure-exit",
+    )
+    emit_override(record, tmp_path, disable_telemetry=True)
+    assert not _overrides_jsonl(tmp_path).exists()
+
+
+def test_emit_override_dedup(tmp_path: Path) -> None:
+    """Same logical event (matching ts + axis_path + after) records once,
+    even if both capture sites observe it (validator W8)."""
+    from harness_maker.telemetry import OverrideRecord, emit_override
+
+    record_primary = OverrideRecord(
+        ts="2026-05-16T12:00:00+00:00",
+        axis_path="preset",
+        before="Side",
+        after="Production",
+        source="configure-exit",
+    )
+    record_secondary = OverrideRecord(
+        ts="2026-05-16T12:00:00+00:00",
+        axis_path="preset",
+        before="Side",
+        after="Production",
+        source="session-start",
+    )
+    emit_override(record_primary, tmp_path)
+    emit_override(record_secondary, tmp_path)
+    lines = _overrides_jsonl(tmp_path).read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 1
+    assert json.loads(lines[0])["source"] == "configure-exit"
+
+
+def test_emit_override_appends_distinct_records(tmp_path: Path) -> None:
+    """Distinct ts → distinct record. Verifies dedup is not over-broad."""
+    from harness_maker.telemetry import OverrideRecord, emit_override
+
+    rec1 = OverrideRecord(
+        ts="2026-05-16T12:00:00+00:00",
+        axis_path="preset",
+        before="Side",
+        after="Production",
+        source="configure-exit",
+    )
+    rec2 = OverrideRecord(
+        ts="2026-05-16T13:00:00+00:00",
+        axis_path="preset",
+        before="Production",
+        after="Side",
+        source="configure-exit",
+    )
+    emit_override(rec1, tmp_path)
+    emit_override(rec2, tmp_path)
+    lines = _overrides_jsonl(tmp_path).read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 2
+
+
+def test_dedup_key_stable() -> None:
+    from harness_maker.telemetry import OverrideRecord, _dedup_key
+
+    a = OverrideRecord(
+        ts="2026-05-16T12:00:00+00:00",
+        axis_path="preset",
+        before="Side",
+        after="Production",
+        source="configure-exit",
+    )
+    b = OverrideRecord(
+        ts="2026-05-16T12:00:00+00:00",
+        axis_path="preset",
+        before="ignored",
+        after="Production",
+        source="session-start",
+        reason="post-hoc",
+    )
+    # Same ts + axis + after → identical key (before/source/reason ignored).
+    assert _dedup_key(a) == _dedup_key(b)
+
+
+def test_load_overrides_filters_schema_version(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Unknown schema_version lines are skipped with a warning (validator C3)."""
+    from harness_maker.telemetry import load_overrides
+
+    path = _overrides_jsonl(tmp_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    valid = {
+        "schema_version": 1,
+        "ts": "2026-05-16T12:00:00+00:00",
+        "axis_path": "preset",
+        "before": "Side",
+        "after": "Production",
+        "source": "configure-exit",
+        "reason": "",
+    }
+    future = {
+        "schema_version": 99,
+        "ts": "2026-05-16T13:00:00+00:00",
+        "axis_path": "preset",
+        "before": "Side",
+        "after": "Production",
+        "source": "configure-exit",
+        "reason": "",
+    }
+    path.write_text(json.dumps(valid) + "\n" + json.dumps(future) + "\n", encoding="utf-8")
+    records = load_overrides(tmp_path)
+    assert len(records) == 1
+    assert records[0].schema_version == 1
+
+
+def test_load_overrides_missing_file_returns_empty(tmp_path: Path) -> None:
+    from harness_maker.telemetry import load_overrides
+
+    assert load_overrides(tmp_path) == []
+
+
+def test_load_overrides_skips_corrupt_lines(tmp_path: Path) -> None:
+    """Telemetry reader must NEVER block Phase 10 on corrupt jsonl —
+    one bad line cannot starve the audit."""
+    from harness_maker.telemetry import load_overrides
+
+    path = _overrides_jsonl(tmp_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    valid = {
+        "schema_version": 1,
+        "ts": "2026-05-16T12:00:00+00:00",
+        "axis_path": "preset",
+        "before": "Side",
+        "after": "Production",
+        "source": "configure-exit",
+        "reason": "",
+    }
+    path.write_text(
+        "not json {{{\n" + json.dumps(valid) + "\n" + "{}\n",
+        encoding="utf-8",
+    )
+    records = load_overrides(tmp_path)
+    assert len(records) == 1
+
+
+def test_compute_yaml_diff_leaf_change() -> None:
+    from harness_maker.telemetry import compute_yaml_diff
+
+    records = compute_yaml_diff(
+        {"preset": "Side"},
+        {"preset": "Production"},
+        ts="2026-05-16T12:00:00+00:00",
+    )
+    assert len(records) == 1
+    assert records[0].axis_path == "preset"
+    assert records[0].before == "Side"
+    assert records[0].after == "Production"
+    assert records[0].schema_version == 1
+
+
+def test_compute_yaml_diff_nested() -> None:
+    from harness_maker.telemetry import compute_yaml_diff
+
+    records = compute_yaml_diff(
+        {"second_brain": {"enabled": False, "vault_path": ""}},
+        {"second_brain": {"enabled": True, "vault_path": "/tmp/v"}},
+        ts="2026-05-16T12:00:00+00:00",
+    )
+    paths = sorted(r.axis_path for r in records)
+    assert paths == ["second_brain.enabled", "second_brain.vault_path"]
+
+
+def test_compute_yaml_diff_skips_identical() -> None:
+    from harness_maker.telemetry import compute_yaml_diff
+
+    records = compute_yaml_diff(
+        {"preset": "Side", "locale": "en"},
+        {"preset": "Side", "locale": "en"},
+        ts="2026-05-16T12:00:00+00:00",
+    )
+    assert records == []
+
+
+def test_compute_yaml_diff_skips_private_keys() -> None:
+    """Underscore-prefixed keys are reserved for telemetry breadcrumbs
+    and must NEVER bubble up as user-driven overrides."""
+    from harness_maker.telemetry import compute_yaml_diff
+
+    records = compute_yaml_diff(
+        {"_internal": "old", "preset": "Side"},
+        {"_internal": "new", "preset": "Production"},
+        ts="2026-05-16T12:00:00+00:00",
+    )
+    assert len(records) == 1
+    assert records[0].axis_path == "preset"
+
+
+def test_compute_yaml_diff_records_carry_schema_version() -> None:
+    """Validator C3 invariant: every emitted record has schema_version."""
+    from harness_maker.telemetry import SCHEMA_VERSION, compute_yaml_diff
+
+    records = compute_yaml_diff(
+        {"a": 1, "b": {"c": 2}},
+        {"a": 99, "b": {"c": 100}},
+        ts="2026-05-16T12:00:00+00:00",
+    )
+    assert all(r.schema_version == SCHEMA_VERSION for r in records)
+
+
+def test_emit_override_persists_schema_version_on_disk(tmp_path: Path) -> None:
+    """On-disk JSONL line must carry schema_version so Phase 10 reader
+    can filter (validator C3)."""
+    from harness_maker.telemetry import OverrideRecord, emit_override
+
+    record = OverrideRecord(
+        ts="2026-05-16T12:00:00+00:00",
+        axis_path="preset",
+        before="Side",
+        after="Production",
+        source="configure-exit",
+    )
+    emit_override(record, tmp_path)
+    line = _overrides_jsonl(tmp_path).read_text(encoding="utf-8").strip()
+    assert json.loads(line)["schema_version"] == 1

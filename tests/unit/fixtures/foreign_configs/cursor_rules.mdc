@@ -1,0 +1,10 @@
+---
+description: Flutter team guidelines for Cursor
+globs: ["lib/**/*.dart"]
+alwaysApply: true
+---
+
+# Flutter project rules
+
+This project is a Flutter mobile app. Use Riverpod for state management.
+Lint with `flutter analyze` before every commit. Production preset.

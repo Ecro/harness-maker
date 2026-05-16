@@ -8,8 +8,10 @@ import pytest
 from pydantic import ValidationError
 
 from harness_maker.models import (
+    AdaptiveConfig,
     AtomicStage,
     Blueprint,
+    Confidence,
     ConflictItem,
     DevMode,
     FileEntry,
@@ -19,6 +21,8 @@ from harness_maker.models import (
     ModelTier,
     Preset,
     ProjectProfile,
+    Recommendation,
+    RecommendationEvidence,
     ReconcileDecision,
     SecondBrainConfig,
     SecondBrainFolder,
@@ -463,3 +467,332 @@ def test_interview_answers_mechanical_checks_round_trip_via_synthesize() -> None
     ans = InterviewAnswers(mechanical_checks=checks)
     bp = synthesize(ProjectProfile(), ans)
     assert bp.config.reviewers["mechanical_checks"] == checks
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Confidence enum — ADR-007
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def test_confidence_members_exactly_three() -> None:
+    """ADR-007: exactly HIGH / MEDIUM / LOW (no float scale, no tunables)."""
+    assert {m.value for m in Confidence} == {"high", "medium", "low"}
+
+
+def test_confidence_value_strings() -> None:
+    assert Confidence.HIGH.value == "high"
+    assert Confidence.MEDIUM.value == "medium"
+    assert Confidence.LOW.value == "low"
+
+
+def test_confidence_is_str_enum() -> None:
+    """str-Enum so it round-trips through YAML/JSON dumps cleanly."""
+    assert isinstance(Confidence.HIGH, str)
+    assert Confidence.HIGH == "high"
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# ProjectProfile — Phase 1 new detection fields (backward compat)
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def test_project_profile_new_fields_defaults() -> None:
+    """New Phase 1 fields must default safely so old YAML loads keep working."""
+    p = ProjectProfile()
+    assert p.frameworks == []
+    assert p.package_manager == ""
+    assert p.ci_provider == ""
+    assert p.foreign_ai_configs == []
+    assert p.detection_confidence == {}
+
+
+def test_project_profile_new_fields_populated() -> None:
+    p = ProjectProfile(
+        frameworks=["react", "fastapi"],
+        package_manager="uv",
+        ci_provider="github-actions",
+        foreign_ai_configs=[".github/copilot-instructions.md"],
+        detection_confidence={
+            "frameworks": Confidence.HIGH,
+            "ci_provider": Confidence.MEDIUM,
+        },
+    )
+    assert "react" in p.frameworks
+    assert p.package_manager == "uv"
+    assert p.ci_provider == "github-actions"
+    assert p.foreign_ai_configs == [".github/copilot-instructions.md"]
+    assert p.detection_confidence == {
+        "frameworks": Confidence.HIGH,
+        "ci_provider": Confidence.MEDIUM,
+    }
+
+
+def test_project_profile_round_trip_json_with_new_fields() -> None:
+    p = ProjectProfile(
+        frameworks=["next.js"],
+        package_manager="pnpm",
+        ci_provider="github-actions",
+        foreign_ai_configs=[".cursor/rules/a.mdc"],
+        detection_confidence={"package_manager": Confidence.HIGH},
+    )
+    restored = ProjectProfile.model_validate_json(p.model_dump_json())
+    assert restored == p
+
+
+def test_project_profile_legacy_yaml_load_without_new_fields() -> None:
+    """Old profile YAML predating Phase 1 must still validate (defaults fill in)."""
+    p = ProjectProfile.model_validate(
+        {
+            "stack": ["python"],
+            "scale": "small",
+            "lifecycle": "experiment",
+            "existing_dotclaude": False,
+            "spec_only": False,
+            "vault_member": False,
+            "detected_checks": [],
+        }
+    )
+    assert p.frameworks == []
+    assert p.package_manager == ""
+    assert p.ci_provider == ""
+    assert p.foreign_ai_configs == []
+    assert p.detection_confidence == {}
+
+
+def test_project_profile_rejects_unknown_field() -> None:
+    """extra='forbid' is preserved — unknown field still raises."""
+    with pytest.raises(ValidationError):
+        ProjectProfile.model_validate({"mystery": 1})
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# AdaptiveConfig — ADR-005
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def test_adaptive_config_defaults() -> None:
+    """ADR-005: opt-out telemetry, 30 sessions / 14 days audit thresholds."""
+    ac = AdaptiveConfig()
+    assert ac.disable_telemetry is False
+    assert ac.audit_session_threshold == 30
+    assert ac.audit_days_threshold == 14
+
+
+def test_adaptive_config_disable_telemetry_override() -> None:
+    ac = AdaptiveConfig(disable_telemetry=True)
+    assert ac.disable_telemetry is True
+
+
+def test_adaptive_config_round_trip_json() -> None:
+    ac = AdaptiveConfig(
+        disable_telemetry=True,
+        audit_session_threshold=50,
+        audit_days_threshold=7,
+    )
+    restored = AdaptiveConfig.model_validate_json(ac.model_dump_json())
+    assert restored == ac
+
+
+def test_adaptive_config_extra_forbidden() -> None:
+    with pytest.raises(ValidationError):
+        AdaptiveConfig.model_validate({"unknown": 1})
+
+
+def test_harness_config_adaptive_default_is_adaptive_config() -> None:
+    cfg = HarnessConfig()
+    assert isinstance(cfg.adaptive, AdaptiveConfig)
+    assert cfg.adaptive.disable_telemetry is False
+    assert cfg.adaptive.audit_session_threshold == 30
+    assert cfg.adaptive.audit_days_threshold == 14
+
+
+def test_harness_config_adaptive_override() -> None:
+    cfg = HarnessConfig(adaptive=AdaptiveConfig(disable_telemetry=True))
+    assert cfg.adaptive.disable_telemetry is True
+
+
+def test_harness_config_adaptive_round_trip_json() -> None:
+    cfg = HarnessConfig(
+        adaptive=AdaptiveConfig(
+            disable_telemetry=True,
+            audit_session_threshold=42,
+            audit_days_threshold=21,
+        )
+    )
+    restored = HarnessConfig.model_validate_json(cfg.model_dump_json())
+    assert restored.adaptive == cfg.adaptive
+
+
+def test_harness_config_legacy_yaml_without_adaptive() -> None:
+    """Old harness.yaml predating Phase 1 must still load (default_factory)."""
+    cfg = HarnessConfig.model_validate({"locale": "en"})
+    assert isinstance(cfg.adaptive, AdaptiveConfig)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Recommendation + RecommendationEvidence — ADR-011
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def test_recommendation_evidence_defaults() -> None:
+    ev = RecommendationEvidence(confidence=Confidence.HIGH)
+    assert ev.n_observations == 0
+    assert ev.top_3_signals == []
+    assert ev.confidence == Confidence.HIGH
+
+
+def test_recommendation_evidence_full() -> None:
+    ev = RecommendationEvidence(
+        n_observations=5,
+        top_3_signals=["pyproject.toml", "uv.lock", "ruff.toml"],
+        confidence=Confidence.HIGH,
+    )
+    assert ev.n_observations == 5
+    assert ev.top_3_signals == ["pyproject.toml", "uv.lock", "ruff.toml"]
+
+
+def test_recommendation_minimal() -> None:
+    rec = Recommendation(
+        axis="preset",
+        value="Side",
+        confidence=Confidence.MEDIUM,
+        evidence=RecommendationEvidence(confidence=Confidence.MEDIUM),
+    )
+    assert rec.axis == "preset"
+    assert rec.value == "Side"
+    assert rec.confidence == Confidence.MEDIUM
+    assert rec.signal == ""
+
+
+def test_recommendation_with_signal() -> None:
+    rec = Recommendation(
+        axis="second_brain.vault_path",
+        value="../vault",
+        confidence=Confidence.HIGH,
+        evidence=RecommendationEvidence(
+            n_observations=1,
+            top_3_signals=["../vault/.obsidian"],
+            confidence=Confidence.HIGH,
+        ),
+        signal="found ../vault/.obsidian directory",
+    )
+    assert rec.signal == "found ../vault/.obsidian directory"
+    assert rec.evidence.top_3_signals == ["../vault/.obsidian"]
+
+
+def test_recommendation_round_trip_json() -> None:
+    rec = Recommendation(
+        axis="preset",
+        value="Production",
+        confidence=Confidence.HIGH,
+        evidence=RecommendationEvidence(
+            n_observations=3,
+            top_3_signals=["CI", "tests/", "CHANGELOG.md"],
+            confidence=Confidence.HIGH,
+        ),
+        signal="three production markers detected",
+    )
+    restored = Recommendation.model_validate_json(rec.model_dump_json())
+    assert restored == rec
+
+
+def test_recommendation_value_accepts_any_type() -> None:
+    """value: Any — axes carry strings, ints, lists, dicts, bools."""
+    Recommendation(
+        axis="targets",
+        value=["claude-code", "cursor"],
+        confidence=Confidence.LOW,
+        evidence=RecommendationEvidence(confidence=Confidence.LOW),
+    )
+    Recommendation(
+        axis="adaptive.disable_telemetry",
+        value=True,
+        confidence=Confidence.LOW,
+        evidence=RecommendationEvidence(confidence=Confidence.LOW),
+    )
+    Recommendation(
+        axis="adaptive.audit_session_threshold",
+        value=30,
+        confidence=Confidence.LOW,
+        evidence=RecommendationEvidence(confidence=Confidence.LOW),
+    )
+
+
+def test_recommendation_extra_forbidden() -> None:
+    with pytest.raises(ValidationError):
+        Recommendation.model_validate(
+            {
+                "axis": "preset",
+                "value": "Side",
+                "confidence": "high",
+                "evidence": {"confidence": "high"},
+                "rogue_field": 1,
+            }
+        )
+
+
+def test_recommendation_evidence_extra_forbidden() -> None:
+    with pytest.raises(ValidationError):
+        RecommendationEvidence.model_validate(
+            {"confidence": "high", "rogue": 1},
+        )
+
+
+def test_recommendation_requires_axis() -> None:
+    with pytest.raises(ValidationError):
+        Recommendation.model_validate(
+            {
+                "value": "Side",
+                "confidence": "high",
+                "evidence": {"confidence": "high"},
+            }
+        )
+
+
+def test_recommendation_rejects_invalid_confidence() -> None:
+    with pytest.raises(ValidationError):
+        Recommendation.model_validate(
+            {
+                "axis": "preset",
+                "value": "Side",
+                "confidence": "very-high",
+                "evidence": {"confidence": "very-high"},
+            }
+        )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Auto-fix round (PLAN-personalization-depth-2026-05 Phase 1)
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def test_adaptive_config_rejects_non_positive_thresholds() -> None:
+    with pytest.raises(ValidationError):
+        AdaptiveConfig(audit_session_threshold=0)
+    with pytest.raises(ValidationError):
+        AdaptiveConfig(audit_days_threshold=-1)
+
+
+def test_project_profile_rejects_absolute_foreign_ai_config_paths() -> None:
+    with pytest.raises(ValidationError, match="must contain relative paths"):
+        ProjectProfile(foreign_ai_configs=["/etc/passwd"])
+    with pytest.raises(ValidationError):
+        ProjectProfile(foreign_ai_configs=["~/secret.json"])
+
+
+def test_recommendation_evidence_rejects_more_than_three_signals() -> None:
+    with pytest.raises(ValidationError):
+        RecommendationEvidence(
+            confidence=Confidence.HIGH,
+            top_3_signals=["a", "b", "c", "d"],
+        )
+
+
+def test_recommendation_confidence_mirror_invariant() -> None:
+    with pytest.raises(ValidationError, match="mirror invariant"):
+        Recommendation(
+            axis="x",
+            value=1,
+            confidence=Confidence.HIGH,
+            evidence=RecommendationEvidence(confidence=Confidence.LOW),
+        )

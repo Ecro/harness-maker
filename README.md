@@ -520,6 +520,43 @@ The prompts are tuned for `claude-opus-4-7` — `<thinking>` blocks, role framin
 
 ---
 
+## Personalization Architecture
+
+harness-maker 0.12.0 introduces three tracks of personalization depth:
+
+- **Detection Depth (Track A)** — `harness_maker.profile.profile()`
+  detects stack (12+ languages), framework, package manager, and CI
+  provider. Results land in `ProjectProfile` and feed the recommendation
+  framework. Cache at `~/.cache/harness-maker/profile-<repo-hash>.json`
+  (manifest-mtime invalidation + 24h TTL).
+
+- **Foreign AI Config Migration (Track D)** — `/hm:configure` detects
+  `.cursor/rules/`, `AGENTS.md`, `CLAUDE.md`, `.continue/config.json`,
+  `.aider.conf.yml`, and `.github/copilot-instructions.md`. With user
+  confirmation, harness-maker imports the foreign config's intent into
+  `harness.yaml` and *re-generates the foreign file as part of the
+  harness on every render*. The `@hm:harness:*` block markers protect
+  user customizations outside the marked regions.
+
+  **Cursor power-user constraint (ADR-003)** — single-source means
+  harness re-generates `.cursor/rules/` on every render. If you prefer
+  Cursor-only ownership of those rules, the only opt-out today is to
+  drop the `cursor` target from `harness.yaml.targets`. A dedicated
+  opt-out flag is TODO for a future PLAN.
+
+- **Adaptive (Track B start)** —
+  `harness.yaml.adaptive.disable_telemetry: false` (opt-out per
+  ADR-005) enables override telemetry. `/hm:personalization-audit`
+  scores your harness composite (0–100; Bronze < 40 < Silver < 65 <
+  Gold < 85 ≤ Platinum) and surfaces ranked action items with
+  evidence. SessionStart drift hint fires after 30 overrides or 14
+  days without an audit.
+
+All adaptive features run **100% locally** — no network calls
+(asserted by `tests/unit/test_no_network.py`).
+
+---
+
 ## Roadmap
 
 - **PyPI publish** — remove the editable-from-clone requirement.

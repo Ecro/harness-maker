@@ -1,0 +1,38 @@
+# ADR-011 locked rubric — composite-score model.
+# Source of truth for /hm:personalization-audit (B4).
+#
+# WHY: keeping the weights + tier boundaries + evidence schema in a
+# data file (not Python constants) means a calibration milestone can
+# adjust the numbers without touching the audit module, and Validator
+# W7's "v0; calibration follow-up" promise has a single edit surface.
+version: 1
+tiers:
+  bronze: {min: 0, max: 39}
+  silver: {min: 40, max: 64}
+  gold: {min: 65, max: 84}
+  platinum: {min: 85, max: 100}
+layer_weights:
+  l1_conversion: 0.4
+  l2_stability: 0.3
+  l3_cadence: 0.3
+layers:
+  l1_conversion:
+    description: "Detection→recommendation conversion rate."
+    formula: "(medium_accepted + high_silent) / max(total_recommendations, 1) * 100"
+  l2_stability:
+    description: "Override frequency / axis stability (last 30 days)."
+    formula: "100 - min(100, override_events_last_30d * 5)"
+    penalty_factor: 5
+    window_days: 30
+  l3_cadence:
+    description: "Adaptive opt-in + audit cadence regularity."
+    score_table:
+      both_conditions_met: 100   # /hm:personalization-audit within 14 days AND disable_telemetry == false
+      one_condition_met: 50
+      neither_condition_met: 0
+    window_days: 14
+evidence_schema:
+  required: [n_observations, top_3_signals, confidence]
+  drop_when:
+    - n_observations == 0
+    - len(top_3_signals) == 0

@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.11.6
+harness_maker_version: 0.12.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/configure.md.j2
 provenance: official
-content_hash: e55f125c9f1ff2e1a2d035f34c94c1e2884fc0db6b2cdfc61c4f935c9a3d146d
+content_hash: badb960e4299ba640061902c8dfef0485c30ef982999e7fceeab4015b3169581
 ---
 # /hm:configure
 
@@ -115,7 +115,7 @@ For **Second Brain**: ask two questions in sequence:
 Run the CLI with only the changed flags:
 
 ```bash
-!uv run --with /home/noel/harness-maker python -m harness_maker.cli make "$(pwd)" \
+!uv run --with /home/noel/harness-maker/.worktrees/execute-20260516T0550Z python -m harness_maker.cli make "$(pwd)" \
   --grade-threshold "$GRADE" --domains "$DOMAINS" --mechanical-checks "$CHECKS" \
   --recommended-model "$MODEL" --focus "$FOCUS" --wrapup-docs "$WRAPUP_DOCS" \
   --ref-folders "$REF_FOLDERS" --sibling-repos "$SIBLING_REPOS" \
@@ -129,6 +129,7 @@ Omit `--sibling-repos` when Sibling repos wasn't selected; pass empty string
 selected; pass empty string `""` to disable it. Omit `--second-brain-project-id`
 when the user left it unchanged. The CLI preserves unspecified fields from
 `.claude/harness.yaml` — only changed dimensions are overwritten.
+
 
 ### 5. Confirm
 

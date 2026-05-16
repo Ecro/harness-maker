@@ -88,13 +88,14 @@ def test_synthesize_includes_harness_yaml_and_settings_json() -> None:
 
 
 def test_synthesize_fused_workflow_command_count() -> None:
-    """Side starter set has 3 fused + 7 atomic + 6 fixed = 16 commands/hm/."""
+    """Side starter set has 3 fused + 7 atomic + 7 fixed = 17 commands/hm/."""
     p = _profile()
     a = interview(p, autoloop_mode=True)
     bp = synthesize(p, a)
     cmd_paths = [str(f.path) for f in bp.files if str(f.path).startswith("commands/hm/")]
-    # atomic(7) + fixed(6: loop/ai-readiness/refresh/make/configure/uninstall) + fused
-    expected = 7 + 6 + len(a.fused_workflows)
+    # atomic(7) + fixed(7: loop/ai-readiness/personalization-audit/refresh/
+    # make/configure/uninstall) + fused
+    expected = 7 + 7 + len(a.fused_workflows)
     assert len(cmd_paths) == expected
 
 

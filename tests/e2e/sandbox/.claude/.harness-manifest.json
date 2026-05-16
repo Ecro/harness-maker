@@ -1,6 +1,6 @@
 {
   "generated_by": "harness-maker",
-  "version": "0.11.6",
+  "version": "0.12.0",
   "files": [
     ".claude/agents/autoloop-coder.md",
     ".claude/agents/code-reviewer.md",
@@ -22,6 +22,7 @@
     ".claude/commands/hm/execute.md",
     ".claude/commands/hm/loop.md",
     ".claude/commands/hm/make.md",
+    ".claude/commands/hm/personalization-audit.md",
     ".claude/commands/hm/plan.md",
     ".claude/commands/hm/refresh.md",
     ".claude/commands/hm/res-spec-plan.md",

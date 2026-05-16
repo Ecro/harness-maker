@@ -5,8 +5,10 @@ from __future__ import annotations
 import os
 import sys
 from pathlib import Path
+from typing import Any
 
 import typer
+import yaml
 
 from harness_maker.add_domain import AddDomainError, add_domain, validate_domain_name
 from harness_maker.block_merge import MergeReport
@@ -20,6 +22,11 @@ from harness_maker.profile import profile
 from harness_maker.reconcile import backup, reconcile
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
+from harness_maker.telemetry import (
+    compute_yaml_diff,
+    emit_override,
+    now_iso,
+)
 from harness_maker.verify import verify
 
 # Shipped sample packs that come bundled in templates/agents/_standards/<name>.md.j2.
@@ -172,6 +179,12 @@ def make(
 ) -> None:
     """Generate or refine the project harness at TARGET/.claude/."""
     existing_yaml = target / ".claude" / "harness.yaml"
+    # Phase 9 (personalization-depth) — primary capture site for axis-level
+    # overrides. Snapshot BEFORE any writes so the diff later picks up
+    # changes from CLI overrides + interview + reconcile. Captured even
+    # when /hm:configure dispatched without per-axis flags (e.g., domain
+    # add): the synthesize step may still mutate the yaml.
+    pre_yaml_body = _load_harness_yaml_body(existing_yaml)
     if update and not reinterview and not existing_yaml.is_file():
         typer.echo(
             f"No {existing_yaml.relative_to(target)} found — "
@@ -290,6 +303,14 @@ def make(
     _emit_post_make_readiness(target, a.preset)
     _emit_refdocs_index_build(target, a.ref_folders)
 
+    # Phase 9 — record axis-level overrides for Phase 10 audit. Failure
+    # here MUST NOT block the install: telemetry is a best-effort
+    # observability signal (ADR-005). Wrap broadly, swallow, log.
+    try:
+        _emit_configure_exit_overrides(target, pre_yaml_body)
+    except Exception as e:  # noqa: BLE001 — diagnostic, never fail the make
+        typer.echo(f"telemetry: override capture skipped ({e})", err=True)
+
 
 def _emit_dry_run_summary(bp: Blueprint, target_dotclaude: Path) -> None:
     """Print what make() would install without writing any files."""
@@ -355,6 +376,82 @@ def _emit_install_summary(
         typer.echo("  /hm:make                 — re-render after plugin update")
     except Exception:  # noqa: BLE001 — diagnostic, never fail the make
         pass
+
+
+def _load_harness_yaml_body(yaml_path: Path) -> dict[str, Any]:
+    """Parse a harness.yaml file's body (strips frontmatter) into a dict.
+
+    Returns an empty dict if the file does not exist, lacks a body, or
+    fails to parse — Phase 9 telemetry must never be the reason a make
+    blocks. Symmetric with ``_load_harness_yaml_body`` round-trips: we
+    only diff structures both sides could plausibly produce.
+    """
+    if not yaml_path.is_file():
+        return {}
+    try:
+        text = yaml_path.read_text(encoding="utf-8")
+    except OSError:
+        return {}
+    body = text
+    if text.startswith("---\n"):
+        end = text.find("\n---\n", 4)
+        if end != -1:
+            body = text[end + len("\n---\n") :]
+    try:
+        parsed = yaml.safe_load(body)
+    except yaml.YAMLError:
+        return {}
+    if isinstance(parsed, dict):
+        return parsed
+    return {}
+
+
+def _telemetry_disabled(yaml_body: dict[str, Any]) -> bool:
+    """Read ``adaptive.disable_telemetry`` from a parsed harness.yaml body.
+
+    Defensive: any non-dict / non-bool shape → False (telemetry on) so we
+    fail SAFE for the audit (better to record one extra noisy event than
+    silently swallow legitimate signal). The pydantic AdaptiveConfig
+    schema enforces the bool elsewhere; this helper just tolerates
+    pre-Phase-1 yamls that may lack the block entirely.
+    """
+    adaptive = yaml_body.get("adaptive")
+    if not isinstance(adaptive, dict):
+        return False
+    value = adaptive.get("disable_telemetry", False)
+    return value is True
+
+
+def _emit_configure_exit_overrides(
+    target: Path,
+    pre_yaml_body: dict[str, Any],
+) -> None:
+    """Diff pre-run vs post-run harness.yaml and emit one record per leaf change.
+
+    Why post-make capture (not earlier interception): pre/post compare
+    captures every mutation path — CLI flags, interview answers,
+    domain-add, foreign-config import — without re-implementing each.
+    The dedup key shared with SessionStart prevents double-record when
+    a user commits the change and starts a new session right after.
+    """
+    yaml_path = target / ".claude" / "harness.yaml"
+    post_yaml_body = _load_harness_yaml_body(yaml_path)
+    # First install: no prior state to diff against (every key would
+    # spuriously become a "configure-exit override" of None → value).
+    # Capture starts on the second invocation, when /hm:configure is
+    # actually doing what it's named for.
+    if not pre_yaml_body:
+        return
+    disabled = _telemetry_disabled(post_yaml_body) or _telemetry_disabled(pre_yaml_body)
+    ts = now_iso()
+    records = compute_yaml_diff(
+        pre_yaml_body,
+        post_yaml_body,
+        ts,
+        source="configure-exit",
+    )
+    for record in records:
+        emit_override(record, target, disable_telemetry=disabled)
 
 
 def _write_harness_manifest(target_dotclaude: Path, written: list[Path]) -> None:

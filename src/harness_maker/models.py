@@ -110,6 +110,25 @@ class ReconcileDecision(str, Enum):  # noqa: UP042
     MERGE_BLOCK = "merge_block"  # block-marker-aware 3-way merge (user blocks preserved)
 
 
+class Confidence(str, Enum):  # noqa: UP042
+    """Bucketed confidence for personalization recommendations.
+
+    ADR-004/007: exactly three buckets, no float scale, no user-tunable
+    thresholds. Per-detection convention — explicit manifest match → HIGH;
+    inferred from dep name → MEDIUM; pure guess → LOW.
+
+    Phase 3 cross-reference: presence-only detection maps a dep-name match
+    directly to HIGH (identity mapping — the manifest *says* the framework
+    is a dep). MEDIUM is reserved for genuinely opinion/inference mappings
+    introduced in Phase 4+ (e.g. dep-name → architectural style). LOW
+    applies when nothing was detected at all.
+    """
+
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Leaf models (no forward refs)
 # ──────────────────────────────────────────────────────────────────────────────
@@ -127,6 +146,27 @@ class ProjectProfile(BaseModel):
     spec_only: bool = False
     vault_member: bool = False
     detected_checks: list[str] = Field(default_factory=list)
+    # Phase 1 (personalization-depth): richer detection signals feeding the
+    # recommendation framework. All defaults empty so older serialized profiles
+    # still validate via Field defaults (CLAUDE.md §6 reverse-mapper rule).
+    frameworks: list[str] = Field(default_factory=list)
+    package_manager: str = ""
+    ci_provider: str = ""
+    foreign_ai_configs: list[str] = Field(default_factory=list)
+    detection_confidence: dict[str, Confidence] = Field(default_factory=dict)
+
+    @field_validator("foreign_ai_configs", mode="before")
+    @classmethod
+    def _reject_absolute_foreign_ai_paths(cls, v: object) -> object:
+        """Sibling-validator mirror: foreign-AI-config paths must be repo-relative."""
+        if not isinstance(v, list):
+            return v
+        for p in v:
+            if isinstance(p, str) and (Path(p).is_absolute() or p.startswith("~")):
+                raise ValueError(
+                    f"foreign_ai_configs must contain relative paths; got absolute: {p!r}"
+                )
+        return v
 
 
 class WorkflowDef(BaseModel):
@@ -314,6 +354,60 @@ class SecondBrainConfig(BaseModel):
         return self
 
 
+class RecommendationEvidence(BaseModel):
+    """Reused by personalization-audit (Phase 10) — evidence schema is contract.
+
+    ADR-011: ``confidence`` is mirrored from the parent Recommendation so the
+    evidence record stands alone in audit logs / Second Brain decision notes.
+    """
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    n_observations: int = 0
+    top_3_signals: list[str] = Field(default_factory=list, max_length=3)
+    confidence: Confidence
+
+
+class Recommendation(BaseModel):
+    """One recommendation produced by a per-axis recommender.
+
+    ADR-011: ``signal`` is the one-line human-readable "why" — emitted as a
+    yaml comment only when the bucket is HIGH (Phase 3+ writes harness.yaml).
+    """
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    axis: str
+    value: Any
+    confidence: Confidence
+    evidence: RecommendationEvidence
+    signal: str = ""
+
+    @model_validator(mode="after")
+    def _confidence_must_mirror_evidence(self) -> Recommendation:
+        if self.confidence != self.evidence.confidence:
+            raise ValueError(
+                f"Recommendation.confidence ({self.confidence}) must equal "
+                f"evidence.confidence ({self.evidence.confidence}); ADR-011 mirror invariant"
+            )
+        return self
+
+
+class AdaptiveConfig(BaseModel):
+    """Adaptive personalization knobs (telemetry + audit thresholds).
+
+    ADR-005: opt-out default for telemetry (``disable_telemetry=False`` means
+    telemetry is on); audit triggers after 30 sessions or 14 days, whichever
+    fires first. Wired into HarnessConfig.adaptive.
+    """
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    disable_telemetry: bool = False
+    audit_session_threshold: int = Field(default=30, gt=0)
+    audit_days_threshold: int = Field(default=14, gt=0)
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Composite models
 # ──────────────────────────────────────────────────────────────────────────────
@@ -380,6 +474,9 @@ class HarnessConfig(BaseModel):
     # RefFolder). Resolved against primary repo root at worktree create time.
     sibling_repos: list[str] = Field(default_factory=list)
     wrapup_docs: list[str] = Field(default_factory=list)
+    # Adaptive personalization knobs (Phase 1 of personalization-depth).
+    # default_factory keeps old harness.yaml files (no `adaptive:` key) loading.
+    adaptive: AdaptiveConfig = Field(default_factory=AdaptiveConfig)
 
     @field_validator("sibling_repos", mode="before")
     @classmethod

@@ -122,6 +122,49 @@ selected; pass empty string `""` to disable it. Omit `--second-brain-project-id`
 when the user left it unchanged. The CLI preserves unspecified fields from
 `.claude/harness.yaml` — only changed dimensions are overwritten.
 
+{% if has_foreign_configs is defined and has_foreign_configs %}
+### 4b. Foreign config import (Phase 6 — ADR-003 / ADR-009)
+
+The current project contains foreign AI assistant config files (Cursor
+rules, CLAUDE.md, AGENTS.md, Continue, Aider, or Copilot). harness-maker
+can import them — extract axis values you've already encoded there, and
+re-emit each file with `@hm:harness:*` markers so future re-renders keep
+your prose outside the markers byte-for-byte (ADR-009 inverted semantics).
+
+For each detected foreign config:
+
+1. Call the Python helper to map the file to harness.yaml axes via Claude:
+
+   ```bash
+   !uv run --with {{ harness_maker_src_path }} python -m harness_maker.cli \
+     foreign-map "$(pwd)" --path "<foreign-path>"
+   ```
+
+2. Show the resulting mapping table per axis. Use `AskQuestion` (Cursor) /
+   `AskUserQuestion` (Claude Code) with options **accept / reject / edit**
+   for each axis. Reject silently if the user has no opinion; edit lets the
+   user override the value.
+
+3. Once all axes confirmed, merge into the current `HarnessConfig` and call
+   the apply helper which renders the foreign file with `@hm:harness:*`
+   markers:
+
+   ```bash
+   !uv run --with {{ harness_maker_src_path }} python -m harness_maker.cli \
+     foreign-apply "$(pwd)" --path "<foreign-path>"
+   ```
+
+4. Surface the preservation note for each apply:
+   - User content OUTSIDE `@hm:harness:*` is preserved byte-for-byte.
+   - INSIDE `@hm:harness:*` is harness-managed (REPLACED on re-render).
+   - For legacy 0.11.x files (frontmatter `generated_by: harness-maker` but
+     no markers yet), the first apply rewrites the whole file with the new
+     marker family — explain this once to the user before they confirm.
+
+Skip an individual foreign config when the user declines; the file stays
+on disk untouched.
+
+{% endif %}
 ### 5. Confirm
 
 After dispatch, show what changed:

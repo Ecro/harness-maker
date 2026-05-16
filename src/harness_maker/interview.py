@@ -17,18 +17,21 @@ inline flags on the workflow command (documented in workflow_command.md.j2).
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, TextIO
 
 import yaml
 
 from harness_maker.io_utils import denormalize_home_to_tilde
 from harness_maker.models import (
     AtomicStage,
+    Confidence,
     DevMode,
     InterviewAnswers,
     Preset,
     ProjectProfile,
+    Recommendation,
     RefFolder,
     SecondBrainConfig,
     Target,
@@ -244,8 +247,30 @@ def _ask_targets() -> list[Target]:
 
 
 def _recommend_dev_mode(preset: Preset) -> DevMode:
-    """Side defaults to task-driven (lighter), Production defaults to spec-driven."""
-    return DevMode.TASK_DRIVEN if preset == Preset.SIDE else DevMode.SPEC_DRIVEN
+    """Side defaults to task-driven (lighter), Production defaults to spec-driven.
+
+    Phase 8: behavior delegated to ``recommendation.recommend_dev_mode`` so the
+    registry is the single source of truth for the heuristic. Thin wrapper
+    kept because callers pass a preset directly (not a full profile); we map
+    preset → minimal ProjectProfile so the registry call works.
+    """
+    # Map preset back to the profile signals that produce it (kept in lockstep
+    # with recommend_preset). If the registry recommender returns None for any
+    # reason, fall back to the same heuristic locally.
+    from harness_maker.recommendation import recommend_dev_mode
+
+    proxy_profile = (
+        ProjectProfile(scale="small", lifecycle="experiment")
+        if preset == Preset.SIDE
+        else ProjectProfile(scale="medium", lifecycle="active")
+    )
+    rec = recommend_dev_mode(proxy_profile, Path("."))
+    if rec is None:
+        return DevMode.TASK_DRIVEN if preset == Preset.SIDE else DevMode.SPEC_DRIVEN
+    value = rec.value
+    if not isinstance(value, DevMode):
+        return DevMode.TASK_DRIVEN if preset == Preset.SIDE else DevMode.SPEC_DRIVEN
+    return value
 
 
 def _ask_dev_mode(preset: Preset) -> DevMode:
@@ -269,10 +294,22 @@ def _ask_dev_mode(preset: Preset) -> DevMode:
 
 
 def _recommend_preset(profile: ProjectProfile) -> Preset:
-    """Heuristic: small + experimental/maintenance → Side; else Production."""
-    if profile.scale == "small" and profile.lifecycle in {"experiment", "maintenance"}:
-        return Preset.SIDE
-    return Preset.PRODUCTION
+    """Heuristic: small + experimental/maintenance → Side; else Production.
+
+    Phase 8: behavior delegated to ``recommendation.recommend_preset`` so the
+    registry is the single source of truth. Thin wrapper kept for callers
+    that only need the Preset value (not the full Recommendation wrapper).
+    """
+    from harness_maker.recommendation import recommend_preset
+
+    rec = recommend_preset(profile, Path("."))
+    if rec is None or not isinstance(rec.value, Preset):
+        # Defensive fallback — keeps legacy behaviour if registry recommender
+        # is somehow unavailable.
+        if profile.scale == "small" and profile.lifecycle in {"experiment", "maintenance"}:
+            return Preset.SIDE
+        return Preset.PRODUCTION
+    return rec.value
 
 
 def _ask_preset(recommended: Preset) -> Preset:
@@ -467,6 +504,54 @@ def _parse_stage_numbers(line: str) -> list[AtomicStage]:
             raise ValueError(msg)
         out.append(_STAGES[n - 1])
     return out
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Confidence-bucketed dispatch (Phase 8 — single tri-IDE dispatch site)
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def _dispatch_recommendation(
+    rec: Recommendation,
+    *,
+    target: Target,  # noqa: ARG001 — kept for future slash-command embedding (validator N1).
+    input_provider: Callable[[str], str] = input,
+) -> Any:
+    """Confidence-bucketed dispatch — single site for tri-IDE drift guard.
+
+    ADR-004/007 contract:
+      HIGH   → apply default + (caller emits yaml comment via _emit_yaml_comment)
+      MEDIUM → prompt user via input_provider; return user choice or None
+      LOW    → no recommendation surfaced; return None
+
+    The ``target`` argument is reserved for future slash-command-side rendering
+    (Claude Code → AskUserQuestion, Cursor → AskQuestion, Codex →
+    request_user_input). The Python-side contract is target-agnostic: the
+    return value is the same for the same Recommendation regardless of target
+    (validator N1 — tri-IDE payload equivalence asserted in tests).
+    """
+    if rec.confidence == Confidence.HIGH:
+        return rec.value
+    if rec.confidence == Confidence.LOW:
+        return None
+    # MEDIUM — explicit user confirm via injected input_provider.
+    label = f"{rec.axis} [{rec.value!r}] — accept? (Y/n): "
+    raw = input_provider(label).strip().lower()
+    return rec.value if raw in {"", "y", "yes"} else None
+
+
+def _emit_yaml_comment(stream: TextIO, rec: Recommendation) -> None:
+    """Emit ``# detected: <axis>=<value> (<confidence>) — <signal>`` to yaml output.
+
+    Called by callers after a HIGH-confidence dispatch so the rendered
+    harness.yaml carries a one-line trail of what was auto-applied. The
+    comment is informational only — re-render does not re-read it.
+    """
+    confidence_str = rec.confidence.value
+    line = f"# detected: {rec.axis}={rec.value!r} ({confidence_str})"
+    if rec.signal:
+        line += f" — {rec.signal}"
+    stream.write(line + "\n")
 
 
 # ──────────────────────────────────────────────────────────────────────────────

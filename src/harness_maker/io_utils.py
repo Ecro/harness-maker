@@ -51,4 +51,8 @@ def atomic_write(path: Path, content: str | bytes, *, encoding: str = "utf-8") -
             tmp_t.flush()
             os.fsync(tmp_t.fileno())
             tmp_path = Path(tmp_t.name)
-    os.replace(tmp_path, path)
+    try:
+        os.replace(tmp_path, path)
+    except Exception:
+        tmp_path.unlink(missing_ok=True)
+        raise

@@ -17,6 +17,11 @@ Event shapes (PLAN-cursor-rootcause.md follow-up):
 Each entry carries an `event` field so downstream readers can filter cleanly.
 Older entries (pre-0.5.4) lacked this field; cache_diagnostics treats absent
 `event` as `post_tool_use` for backward compatibility.
+
+Phase 9 (personalization-depth) adds the ``harness_yaml_override`` event type
+recorded in a separate file ``.claude/observability/adaptive/overrides.jsonl``.
+See ``OverrideRecord`` / ``emit_override`` / ``load_overrides`` /
+``compute_yaml_diff`` below. ADR-005: 100% local; never opens a socket.
 """
 
 from __future__ import annotations
@@ -28,7 +33,11 @@ import sys
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
+
+from pydantic import BaseModel, ConfigDict
+
+from harness_maker.io_utils import atomic_write
 
 COST_PER_MTK: dict[str, dict[str, float]] = {
     "opus": {"input": 15.0, "output": 75.0, "cache_read": 1.5, "cache_write": 18.75},
@@ -231,6 +240,229 @@ def main() -> int:
         return 0  # Never block Claude Code
     print("ok")
     return 0
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Phase 9 — harness_yaml_override event capture (ADR-005 / Validator C3 / W8)
+# ──────────────────────────────────────────────────────────────────────────────
+
+HARNESS_YAML_OVERRIDE = "harness_yaml_override"
+SCHEMA_VERSION = 1
+"""Bump only on incompatible schema change. Phase 10 reader skips unknown
+versions with a warning (validator C3)."""
+
+OverrideSource = Literal["configure-exit", "session-start", "git-fallback"]
+
+
+class OverrideRecord(BaseModel):
+    """One axis-level edit to ``harness.yaml`` captured for B4 audit.
+
+    Why pydantic + ``extra="forbid"``: a malformed jsonl line (e.g. an
+    older schema_version with foreign fields) would otherwise propagate
+    through Phase 10's audit reader as silently-typed dict noise. Forbid
+    + filter-on-load gives Phase 10 a clean contract.
+    """
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    schema_version: int = SCHEMA_VERSION
+    ts: str
+    axis_path: str
+    before: Any = None
+    after: Any = None
+    source: OverrideSource
+    reason: str = ""
+
+
+def _overrides_path(project_dir: Path) -> Path:
+    """Resolve the on-disk jsonl path. Centralised so tests + emitters
+    cannot diverge on the location."""
+    return project_dir / ".claude" / "observability" / "adaptive" / "overrides.jsonl"
+
+
+def _dedup_key(record: OverrideRecord) -> str:
+    """Stable identity for a logical override event.
+
+    Same ts + axis_path + after means the same user edit observed by the
+    primary (configure-exit) and secondary (session-start) capture sites;
+    we record it once. ``after`` uses ``repr`` so type information
+    survives (``True`` vs ``"True"`` are distinct)."""
+    return f"{record.ts}|{record.axis_path}|{record.after!r}"
+
+
+def _load_existing_lines(path: Path) -> list[str]:
+    """Read the existing jsonl as raw lines (preserves unknown-schema entries).
+
+    We keep unknown-schema lines verbatim on round-trip because dropping
+    them would silently lose data on a partial rollback. Filtering only
+    happens on the typed load path."""
+    if not path.is_file():
+        return []
+    text = path.read_text(encoding="utf-8")
+    return [line for line in text.splitlines() if line.strip()]
+
+
+def _is_duplicate(record: OverrideRecord, existing_lines: list[str]) -> bool:
+    """True when ``record`` matches the dedup key of any existing entry.
+
+    Skips lines that fail to parse — corrupt lines do not block emission
+    of new records (validator W8: dedup is best-effort, never gates write).
+    """
+    target_key = _dedup_key(record)
+    for line in existing_lines:
+        try:
+            existing_data = json.loads(line)
+        except (json.JSONDecodeError, ValueError):
+            continue
+        if not isinstance(existing_data, dict):
+            continue
+        ts = existing_data.get("ts")
+        axis = existing_data.get("axis_path")
+        after = existing_data.get("after")
+        if ts is None or axis is None:
+            continue
+        if f"{ts}|{axis}|{after!r}" == target_key:
+            return True
+    return False
+
+
+def emit_override(
+    record: OverrideRecord,
+    project_dir: Path,
+    *,
+    disable_telemetry: bool = False,
+) -> None:
+    """Append ``record`` to ``overrides.jsonl`` unless telemetry is opted out.
+
+    ADR-005: when ``disable_telemetry=True`` we short-circuit before any
+    disk I/O so the opt-out is observable in tests via mock-fs and so a
+    later audit reader does not see partial records.
+
+    Idempotent: re-emitting the same logical event (matching dedup key)
+    is a no-op — supports the dual-capture design (validator W8) where
+    both /hm:configure-exit and SessionStart can observe one edit.
+    """
+    if disable_telemetry:
+        return
+    path = _overrides_path(project_dir)
+    existing = _load_existing_lines(path)
+    if _is_duplicate(record, existing):
+        return
+    new_line = record.model_dump_json()
+    body = "\n".join(existing + [new_line]) + "\n"
+    atomic_write(path, body)
+
+
+def load_overrides(
+    project_dir: Path,
+    *,
+    schema_version_filter: int = SCHEMA_VERSION,
+) -> list[OverrideRecord]:
+    """Read overrides.jsonl, returning only records matching the schema filter.
+
+    Validator C3: a forward-compatible reader skips unknown schema_version
+    entries with a stderr warning instead of crashing. Lines that fail to
+    parse are skipped silently — telemetry must NEVER block the consumer.
+    """
+    path = _overrides_path(project_dir)
+    if not path.is_file():
+        return []
+    out: list[OverrideRecord] = []
+    text = path.read_text(encoding="utf-8")
+    for line in text.splitlines():
+        if not line.strip():
+            continue
+        try:
+            data = json.loads(line)
+        except (json.JSONDecodeError, ValueError):
+            continue
+        if not isinstance(data, dict):
+            continue
+        version = data.get("schema_version")
+        if version != schema_version_filter:
+            print(
+                f"telemetry: skipping override entry with schema_version={version!r} "
+                f"(expected {schema_version_filter})",
+                file=sys.stderr,
+            )
+            continue
+        try:
+            out.append(OverrideRecord.model_validate(data))
+        except (ValueError, TypeError) as e:
+            print(f"telemetry: malformed override entry skipped: {e}", file=sys.stderr)
+            continue
+    return out
+
+
+def _walk_diff(
+    before: Any,
+    after: Any,
+    *,
+    prefix: str,
+    ts: str,
+    source: OverrideSource,
+    out: list[OverrideRecord],
+) -> None:
+    """Recursive worker for ``compute_yaml_diff``.
+
+    Only leaf-value differences produce records. Nested dicts are
+    traversed deeper; for any branch where both sides are dicts we
+    recurse so nested-leaf changes get their own dotted ``axis_path``.
+    When the two sides have different structural shapes (one is dict,
+    the other scalar/list), the whole subtree counts as one leaf change.
+    """
+    if isinstance(before, dict) and isinstance(after, dict):
+        all_keys = set(before.keys()) | set(after.keys())
+        for key in sorted(all_keys):
+            if isinstance(key, str) and key.startswith("_"):
+                continue
+            sub_prefix = f"{prefix}.{key}" if prefix else str(key)
+            _walk_diff(
+                before.get(key),
+                after.get(key),
+                prefix=sub_prefix,
+                ts=ts,
+                source=source,
+                out=out,
+            )
+        return
+    if before == after:
+        return
+    out.append(
+        OverrideRecord(
+            ts=ts,
+            axis_path=prefix,
+            before=before,
+            after=after,
+            source=source,
+        )
+    )
+
+
+def compute_yaml_diff(
+    before_yaml: dict[str, Any],
+    after_yaml: dict[str, Any],
+    ts: str,
+    *,
+    source: OverrideSource = "configure-exit",
+) -> list[OverrideRecord]:
+    """Diff two yaml-loaded dicts, producing one OverrideRecord per leaf change.
+
+    Why dotted axis_path: the Phase 10 audit groups by axis_path for the
+    L2 (override stability) score, so a stable string key is the contract.
+
+    Keys starting with ``_`` are skipped — those are reserved for private
+    telemetry breadcrumbs (e.g. a future ``_render_provenance``) that
+    must not show up as user-driven overrides.
+    """
+    out: list[OverrideRecord] = []
+    _walk_diff(before_yaml, after_yaml, prefix="", ts=ts, source=source, out=out)
+    return out
+
+
+def now_iso() -> str:
+    """ISO 8601 UTC timestamp matching the existing metrics line schema."""
+    return datetime.now(UTC).isoformat()
 
 
 if __name__ == "__main__":

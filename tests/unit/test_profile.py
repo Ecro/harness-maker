@@ -2,8 +2,14 @@
 
 from __future__ import annotations
 
+import json
+import os
 from pathlib import Path
 
+import pytest
+
+from harness_maker import detection_cache
+from harness_maker.models import Confidence
 from harness_maker.profile import profile
 
 
@@ -157,3 +163,503 @@ def test_detect_checks_cap_at_4(tmp_path: Path) -> None:
     )
     p = profile(tmp_path)
     assert len(p.detected_checks) <= 4
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 — stack granularity expansion (12+ stacks)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("stack_name", "manifest_files"),
+    [
+        ("java", [("pom.xml", "<project/>")]),
+        ("java", [("build.gradle", "// gradle")]),
+        ("swift", [("Package.swift", "// swift package")]),
+        ("dart", [("pubspec.yaml", "name: x\n")]),
+        ("ruby", [("Gemfile", "source 'rubygems'\n")]),
+        ("php", [("composer.json", "{}")]),
+        ("elixir", [("mix.exs", "defmodule X do end")]),
+        ("scala", [("build.sbt", 'name := "x"\n')]),
+        ("zig", [("build.zig", "// zig build\n")]),
+    ],
+)
+def test_profile_stack_detection_concrete_manifest(
+    tmp_path: Path, stack_name: str, manifest_files: list[tuple[str, str]]
+) -> None:
+    """Concrete-filename manifests each map to their named stack."""
+    for fname, body in manifest_files:
+        (tmp_path / fname).write_text(body)
+    p = profile(tmp_path)
+    assert stack_name in p.stack
+
+
+def test_profile_stack_kotlin_via_gradle_kts(tmp_path: Path) -> None:
+    """build.gradle.kts triggers BOTH java and kotlin (PLAN: no precedence enforcement)."""
+    (tmp_path / "build.gradle.kts").write_text("// kts build")
+    p = profile(tmp_path)
+    assert "kotlin" in p.stack
+    assert "java" in p.stack
+
+
+def test_profile_stack_csharp_via_csproj_glob(tmp_path: Path) -> None:
+    """*.csproj glob match yields the `csharp` stack."""
+    (tmp_path / "MyApp.csproj").write_text("<Project/>")
+    p = profile(tmp_path)
+    assert "csharp" in p.stack
+
+
+def test_profile_stack_csharp_via_sln_glob(tmp_path: Path) -> None:
+    """*.sln glob match yields the `csharp` stack."""
+    (tmp_path / "MyApp.sln").write_text("Microsoft Visual Studio Solution File")
+    p = profile(tmp_path)
+    assert "csharp" in p.stack
+
+
+def test_profile_stack_haskell_via_cabal_glob(tmp_path: Path) -> None:
+    """*.cabal glob match yields the `haskell` stack."""
+    (tmp_path / "myproj.cabal").write_text("name: myproj\n")
+    p = profile(tmp_path)
+    assert "haskell" in p.stack
+
+
+def test_profile_stack_haskell_via_stack_yaml(tmp_path: Path) -> None:
+    """stack.yaml yields the `haskell` stack."""
+    (tmp_path / "stack.yaml").write_text("resolver: lts-22.0\n")
+    p = profile(tmp_path)
+    assert "haskell" in p.stack
+
+
+def test_profile_stack_c_cpp_via_makefile(tmp_path: Path) -> None:
+    """Makefile yields the `c-cpp` stack."""
+    (tmp_path / "Makefile").write_text("all:\n\tgcc -o x x.c\n")
+    p = profile(tmp_path)
+    assert "c-cpp" in p.stack
+
+
+def test_profile_stack_c_cpp_via_meson(tmp_path: Path) -> None:
+    """meson.build yields the `c-cpp` stack."""
+    (tmp_path / "meson.build").write_text("project('x', 'c')\n")
+    p = profile(tmp_path)
+    assert "c-cpp" in p.stack
+
+
+def test_profile_stack_cmake_and_c_cpp_coexist(tmp_path: Path) -> None:
+    """CMakeLists.txt triggers BOTH cmake (existing) and c-cpp (new) — same-file collision OK."""
+    (tmp_path / "CMakeLists.txt").write_text("project(x)\n")
+    p = profile(tmp_path)
+    assert "cmake" in p.stack
+    assert "c-cpp" in p.stack
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 — framework detection via dep parsing
+# ---------------------------------------------------------------------------
+
+
+def test_python_frameworks_detected_from_pyproject(tmp_path: Path) -> None:
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "x"\ndependencies = ["fastapi>=0.100", "pydantic~=2.0"]\n'
+    )
+    p = profile(tmp_path)
+    assert "fastapi" in p.frameworks
+    assert "pydantic" in p.frameworks
+
+
+def test_python_frameworks_detected_from_poetry_table(tmp_path: Path) -> None:
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.poetry]\nname = "x"\n\n'
+        "[tool.poetry.dependencies]\n"
+        'python = "^3.12"\n'
+        'django = "^5.0"\n'
+        'httpx = "^0.27"\n'
+    )
+    p = profile(tmp_path)
+    assert "django" in p.frameworks
+    assert "httpx" in p.frameworks
+
+
+def test_python_framework_with_extras_stripped(tmp_path: Path) -> None:
+    """`fastapi[all]==0.111` must still match `fastapi`."""
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "x"\ndependencies = ["fastapi[all]==0.111"]\n'
+    )
+    p = profile(tmp_path)
+    assert "fastapi" in p.frameworks
+
+
+def test_node_frameworks_detected_from_package_json(tmp_path: Path) -> None:
+    pkg = {
+        "name": "x",
+        "dependencies": {"react": "^18.0.0", "vite": "^5.0.0"},
+    }
+    (tmp_path / "package.json").write_text(json.dumps(pkg))
+    p = profile(tmp_path)
+    assert "react" in p.frameworks
+    assert "vite" in p.frameworks
+
+
+def test_node_frameworks_detected_from_dev_dependencies(tmp_path: Path) -> None:
+    pkg = {"name": "x", "devDependencies": {"vite": "^5.0.0"}}
+    (tmp_path / "package.json").write_text(json.dumps(pkg))
+    p = profile(tmp_path)
+    assert "vite" in p.frameworks
+
+
+def test_node_scoped_packages_detected(tmp_path: Path) -> None:
+    """Real-world npm scoped packages (@nestjs/core, @remix-run/node) match."""
+    pkg = tmp_path / "package.json"
+    pkg.write_text(
+        json.dumps(
+            {
+                "dependencies": {
+                    "@nestjs/core": "^10.0.0",
+                    "@nestjs/common": "^10.0.0",
+                    "@remix-run/node": "^2.0.0",
+                    "@remix-run/react": "^2.0.0",
+                }
+            }
+        )
+    )
+    p = profile(tmp_path)
+    assert "nestjs" in p.frameworks
+    assert "remix" in p.frameworks
+
+
+def test_node_unscoped_lookalike_does_not_match_scoped_framework(tmp_path: Path) -> None:
+    """`nestjs-helper-unrelated` (no @ prefix) must NOT false-match `nestjs`.
+
+    Scope-prefix guard requires the leading `@` — bare hyphen-prefixed names
+    are unrelated user packages.
+    """
+    pkg = tmp_path / "package.json"
+    pkg.write_text(json.dumps({"dependencies": {"nestjs-helper-unrelated": "^1.0.0"}}))
+    p = profile(tmp_path)
+    assert "nestjs" not in p.frameworks
+
+
+def test_rust_frameworks_detected_from_cargo_toml(tmp_path: Path) -> None:
+    (tmp_path / "Cargo.toml").write_text(
+        '[package]\nname = "x"\nversion = "0.1.0"\n\n'
+        "[dependencies]\n"
+        'tokio = { version = "1", features = ["full"] }\n'
+        'axum = "0.7"\n'
+    )
+    p = profile(tmp_path)
+    assert "tokio" in p.frameworks
+    assert "axum" in p.frameworks
+
+
+def test_frameworks_empty_when_no_deps(tmp_path: Path) -> None:
+    """Manifest exists but no recognized deps → empty frameworks list."""
+    (tmp_path / "pyproject.toml").write_text('[project]\nname = "x"\ndependencies = []\n')
+    p = profile(tmp_path)
+    assert p.frameworks == []
+
+
+def test_frameworks_unreadable_pyproject_graceful(tmp_path: Path) -> None:
+    """Malformed pyproject.toml does not raise — empty frameworks."""
+    (tmp_path / "pyproject.toml").write_text("this is not toml [[[ bad\n")
+    p = profile(tmp_path)
+    assert p.frameworks == []
+    assert "python" in p.stack  # still detected via existence
+
+
+def test_frameworks_malformed_package_json_graceful(tmp_path: Path) -> None:
+    (tmp_path / "package.json").write_text("{not json")
+    p = profile(tmp_path)
+    assert p.frameworks == []
+    assert "node" in p.stack
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 — package_manager detection
+# ---------------------------------------------------------------------------
+
+
+def test_package_manager_detected_python_uv(tmp_path: Path) -> None:
+    (tmp_path / "pyproject.toml").write_text("[project]\nname='x'\n")
+    (tmp_path / "uv.lock").write_text("# lock")
+    p = profile(tmp_path)
+    assert p.package_manager == "uv"
+
+
+def test_package_manager_detected_python_poetry(tmp_path: Path) -> None:
+    (tmp_path / "pyproject.toml").write_text("[tool.poetry]\nname='x'\n")
+    (tmp_path / "poetry.lock").write_text("# lock")
+    p = profile(tmp_path)
+    assert p.package_manager == "poetry"
+
+
+def test_package_manager_detected_python_pip(tmp_path: Path) -> None:
+    (tmp_path / "requirements.txt").write_text("pytest\n")
+    p = profile(tmp_path)
+    assert p.package_manager == "pip"
+
+
+def test_package_manager_detected_node_pnpm(tmp_path: Path) -> None:
+    (tmp_path / "package.json").write_text("{}")
+    (tmp_path / "pnpm-lock.yaml").write_text("lockfileVersion: 6.0\n")
+    p = profile(tmp_path)
+    assert p.package_manager == "pnpm"
+
+
+def test_package_manager_node_precedence_bun_over_pnpm(tmp_path: Path) -> None:
+    """bun > pnpm > yarn > npm."""
+    (tmp_path / "package.json").write_text("{}")
+    (tmp_path / "bun.lockb").write_text("")
+    (tmp_path / "pnpm-lock.yaml").write_text("")
+    p = profile(tmp_path)
+    assert p.package_manager == "bun"
+
+
+def test_package_manager_detected_bun_text_format(tmp_path: Path) -> None:
+    """Bun 1.1+ uses bun.lock (TOML text format) instead of bun.lockb."""
+    (tmp_path / "package.json").write_text("{}")
+    (tmp_path / "bun.lock").write_text("# bun lockfile")
+    p = profile(tmp_path)
+    assert p.package_manager == "bun"
+
+
+def test_package_manager_detected_rust_cargo(tmp_path: Path) -> None:
+    (tmp_path / "Cargo.toml").write_text("[package]\nname='x'\nversion='0.1.0'\n")
+    (tmp_path / "Cargo.lock").write_text("# cargo lock")
+    p = profile(tmp_path)
+    assert p.package_manager == "cargo"
+
+
+def test_package_manager_monorepo_python_wins_over_node(tmp_path: Path) -> None:
+    """Cross-stack precedence: python > node > rust > other."""
+    (tmp_path / "pyproject.toml").write_text("[project]\nname='x'\n")
+    (tmp_path / "uv.lock").write_text("")
+    (tmp_path / "package.json").write_text("{}")
+    (tmp_path / "pnpm-lock.yaml").write_text("")
+    p = profile(tmp_path)
+    assert p.package_manager == "uv"
+
+
+def test_package_manager_empty_when_no_lockfile(tmp_path: Path) -> None:
+    (tmp_path / "pyproject.toml").write_text("[project]\nname='x'\n")
+    p = profile(tmp_path)
+    assert p.package_manager == ""
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 — ci_provider detection
+# ---------------------------------------------------------------------------
+
+
+def test_ci_provider_github_actions(tmp_path: Path) -> None:
+    wf = tmp_path / ".github" / "workflows"
+    wf.mkdir(parents=True)
+    (wf / "ci.yml").write_text("name: ci\n")
+    p = profile(tmp_path)
+    assert p.ci_provider == "github-actions"
+
+
+def test_ci_provider_github_actions_yaml_suffix(tmp_path: Path) -> None:
+    """Either .yml or .yaml suffix counts."""
+    wf = tmp_path / ".github" / "workflows"
+    wf.mkdir(parents=True)
+    (wf / "ci.yaml").write_text("name: ci\n")
+    p = profile(tmp_path)
+    assert p.ci_provider == "github-actions"
+
+
+def test_ci_provider_github_actions_empty_dir_does_not_match(tmp_path: Path) -> None:
+    """Empty .github/workflows/ should NOT count as github-actions."""
+    wf = tmp_path / ".github" / "workflows"
+    wf.mkdir(parents=True)
+    p = profile(tmp_path)
+    assert p.ci_provider == ""
+
+
+def test_ci_provider_gitlab_ci(tmp_path: Path) -> None:
+    (tmp_path / ".gitlab-ci.yml").write_text("stages: []\n")
+    p = profile(tmp_path)
+    assert p.ci_provider == "gitlab-ci"
+
+
+def test_ci_provider_circleci(tmp_path: Path) -> None:
+    cc = tmp_path / ".circleci"
+    cc.mkdir()
+    (cc / "config.yml").write_text("version: 2.1\n")
+    p = profile(tmp_path)
+    assert p.ci_provider == "circleci"
+
+
+def test_ci_provider_jenkins(tmp_path: Path) -> None:
+    (tmp_path / "Jenkinsfile").write_text("pipeline {}\n")
+    p = profile(tmp_path)
+    assert p.ci_provider == "jenkins"
+
+
+def test_ci_provider_travis(tmp_path: Path) -> None:
+    (tmp_path / ".travis.yml").write_text("language: python\n")
+    p = profile(tmp_path)
+    assert p.ci_provider == "travis"
+
+
+def test_ci_provider_empty_when_no_signal(tmp_path: Path) -> None:
+    p = profile(tmp_path)
+    assert p.ci_provider == ""
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 — detection_confidence per signal
+# ---------------------------------------------------------------------------
+
+
+def test_detection_confidence_high_when_manifest_match(tmp_path: Path) -> None:
+    """A real manifest → stack=HIGH and other matched signals HIGH too."""
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "x"\ndependencies = ["fastapi"]\n'
+    )
+    (tmp_path / "uv.lock").write_text("")
+    wf = tmp_path / ".github" / "workflows"
+    wf.mkdir(parents=True)
+    (wf / "ci.yml").write_text("name: ci\n")
+
+    p = profile(tmp_path)
+    assert p.detection_confidence["stack"] == Confidence.HIGH
+    assert p.detection_confidence["frameworks"] == Confidence.HIGH
+    assert p.detection_confidence["package_manager"] == Confidence.HIGH
+    assert p.detection_confidence["ci_provider"] == Confidence.HIGH
+
+
+def test_detection_confidence_low_when_no_manifest(tmp_path: Path) -> None:
+    """Empty project — all four signals LOW."""
+    p = profile(tmp_path)
+    assert p.detection_confidence["stack"] == Confidence.LOW
+    assert p.detection_confidence["frameworks"] == Confidence.LOW
+    assert p.detection_confidence["package_manager"] == Confidence.LOW
+    assert p.detection_confidence["ci_provider"] == Confidence.LOW
+
+
+def test_foreign_ai_configs_always_empty_in_phase_3(tmp_path: Path) -> None:
+    """Phase 5 owns foreign-AI-config detection; Phase 3 must leave it empty."""
+    (tmp_path / "AGENTS.md").write_text("# agents\n")
+    (tmp_path / "CLAUDE.md").write_text("# claude\n")
+    p = profile(tmp_path)
+    assert p.foreign_ai_configs == []
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 — detection_cache wiring
+# ---------------------------------------------------------------------------
+
+
+def test_profile_uses_cache_on_second_call(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Second call with no manifest mtime change returns cached profile."""
+    cache_dir = tmp_path / "cache"
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "pyproject.toml").write_text("[project]\nname='x'\n")
+
+    p1 = profile(repo, cache_dir=cache_dir)
+    assert "python" in p1.stack
+
+    # Sentinel: replace the inner detector to ensure a cache hit short-circuits.
+    sentinel_calls = {"count": 0}
+
+    def _boom(*_a: object, **_kw: object) -> list[str]:
+        sentinel_calls["count"] += 1
+        return []
+
+    monkeypatch.setattr("harness_maker.profile._detect_frameworks", _boom)
+    p2 = profile(repo, cache_dir=cache_dir)
+    assert sentinel_calls["count"] == 0  # framework detection NEVER ran
+    assert p2.stack == p1.stack
+
+
+def test_profile_cache_invalidated_on_manifest_mtime_bump(tmp_path: Path) -> None:
+    """Touching the manifest later than the cache file forces a fresh detection."""
+    cache_dir = tmp_path / "cache"
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    manifest = repo / "pyproject.toml"
+    manifest.write_text('[project]\nname = "x"\ndependencies = []\n')
+
+    p1 = profile(repo, cache_dir=cache_dir)
+    assert p1.frameworks == []
+
+    # Rewrite with a framework dep and bump mtime past the cache.
+    manifest.write_text('[project]\nname = "x"\ndependencies = ["fastapi"]\n')
+    cache_file = cache_dir / f"profile-{detection_cache._repo_hash(repo)}.json"
+    future = cache_file.stat().st_mtime + 100.0
+    os.utime(manifest, (future, future))
+
+    p2 = profile(repo, cache_dir=cache_dir)
+    assert "fastapi" in p2.frameworks
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 — legacy backward compatibility
+# ---------------------------------------------------------------------------
+
+
+def test_profile_legacy_signals_unchanged(tmp_path: Path) -> None:
+    """Reproduce the baseline `test_profile_python_cli_with_git` fixture exactly.
+
+    Phase 3 must not alter the seven pre-existing signals. Any change here
+    means the legacy contract drifted and downstream callers may break.
+    """
+    (tmp_path / "pyproject.toml").write_text("[project]\nname='x'\n")
+    (tmp_path / ".git").mkdir()
+    p = profile(tmp_path)
+    assert "python" in p.stack
+    assert p.lifecycle == "experiment"
+    assert p.existing_dotclaude is False
+    assert p.vault_member is False
+    assert p.spec_only is False
+    assert p.scale == "small"
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 — dogfood: profile() on the harness-maker repo itself
+# ---------------------------------------------------------------------------
+
+
+def _find_repo_root(start: Path) -> Path | None:
+    """Walk up looking for a directory that contains both pyproject.toml and src/harness_maker/."""
+    for candidate in [start, *start.parents]:
+        if (candidate / "pyproject.toml").exists() and (
+            candidate / "src" / "harness_maker"
+        ).is_dir():
+            return candidate
+    return None
+
+
+def test_profile_dogfood_on_harness_maker_repo(tmp_path: Path) -> None:
+    """Run profile() on the harness-maker repo itself and check core signals.
+
+    Skips when the expected env is missing (e.g. an installed wheel rather
+    than a source checkout). When present, asserts the pieces of the
+    expected env that ARE present — `.github/workflows/` was deliberately
+    removed from this repo (see commit 565d7ce), so ci_provider is only
+    asserted when the directory exists.
+    """
+    repo_root = _find_repo_root(Path(__file__).resolve())
+    if repo_root is None:
+        pytest.skip("not running inside a harness-maker source checkout")
+    if not (repo_root / "uv.lock").exists():
+        pytest.skip("uv.lock missing — not the expected dev env")
+
+    p = profile(repo_root, cache_dir=tmp_path / "dogfood-cache")
+
+    assert "python" in p.stack, f"expected python in stack, got {p.stack}"
+    assert p.package_manager == "uv", f"expected uv, got {p.package_manager!r}"
+
+    gh_workflows = repo_root / ".github" / "workflows"
+    has_workflow_files = gh_workflows.is_dir() and any(
+        entry.is_file() and entry.suffix in {".yml", ".yaml"}
+        for entry in gh_workflows.iterdir()
+    )
+    if has_workflow_files:
+        assert p.ci_provider == "github-actions"
+    else:
+        # The harness-maker repo currently has no .github/workflows/ (commit
+        # 565d7ce). Detector must report empty — never fabricate.
+        assert p.ci_provider == ""

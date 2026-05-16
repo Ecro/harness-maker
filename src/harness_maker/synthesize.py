@@ -303,6 +303,11 @@ def _base_files(preset: Preset, locale: str = "en") -> list[FileSpec]:
         *_atomic_command_files(),
         ("commands/hm/loop.md.j2", "commands/hm/loop.md", {}),
         ("commands/hm/ai-readiness.md.j2", "commands/hm/ai-readiness.md", {}),
+        (
+            "commands/hm/personalization-audit.md.j2",
+            "commands/hm/personalization-audit.md",
+            {},
+        ),
         ("commands/hm/refresh.md.j2", "commands/hm/refresh.md", {}),
         ("commands/hm/make.md.j2", "commands/hm/make.md", {}),
         ("commands/hm/configure.md.j2", "commands/hm/configure.md", {}),
