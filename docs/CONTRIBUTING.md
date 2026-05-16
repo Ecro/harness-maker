@@ -30,6 +30,12 @@ harness-maker/
 │   ├── agent_quality.py      # M5: Platinum/Gold/Silver/Bronze rubric
 │   ├── crawler/              # M4: 4-source anti-rot crawl
 │   ├── relevance.py          # M4: LLM scoring + adaptive threshold
+│   ├── recommendation.py     # M16: Confidence-bucketed recommendation registry (Phase 1/4/8 of PLAN-personalization-depth-2026-05)
+│   ├── detection_cache.py    # M15: profile cache with manifest-mtime + 24h ceiling invalidation
+│   ├── foreign_config.py     # M17: foreign AI config detection + LLM mapping + apply with @hm:harness:* markers
+│   ├── personalization_audit.py # M19: /hm:personalization-audit rubric runner per ADR-011
+│   ├── rubrics/
+│   │   └── personalization.yaml # locked v0 rubric (L1/L2/L3 formulas + tier boundaries)
 │   └── i18n.py               # locale-first messaging
 ├── templates/                # Jinja2 templates (the harness's payload)
 │   ├── commands/hm/          # /hm:<stage> + /hm:loop / ai-readiness / refresh
@@ -39,12 +45,14 @@ harness-maker/
 │   ├── harness-yaml/<Preset>.yaml.j2
 │   ├── settings/<Preset>.json.j2
 │   ├── cursor/               # M14: Cursor-only assets (rules/*.mdc, mcp.json)
+│   ├── foreign-configs/      # M17: 6 foreign-AI-config templates (cursor_rules / claude_md / agents_md / continue_config / aider_conf / copilot_instructions)
 │   └── hooks/                # telemetry hooks
 ├── commands/make.md          # /harness-maker:make plugin entry
 ├── .claude-plugin/plugin.json  # Claude Code marketplace manifest
 ├── .cursor-plugin/plugin.json  # Cursor Marketplace manifest
 ├── tests/
 │   ├── unit/                 # per-module pytest
+│   │   └── test_no_network.py # ADR-005 positive obligation (no outbound socket during audit / telemetry)
 │   ├── fixtures/             # 4 reference projects (side-python-cli, side-tauri-app, prod-tauri-app, prod-firmware)
 │   ├── snapshot/             # golden Blueprint YAMLs + regenerate.py
 │   ├── e2e/                  # dogfood + plugin entry

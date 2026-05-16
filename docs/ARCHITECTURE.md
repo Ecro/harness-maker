@@ -103,7 +103,15 @@ Three design commitments shape every decision below:
                   → structured question (always manual)
 ```
 
-## 3. The 14 Mechanisms (M1-M14)
+### Three additional 0.12.0+ flows
+
+The diagram above covers the original render pipeline. Three flows added in 0.12.0 run alongside it:
+
+1. **Detection cache flow (M15)**: `profile.profile()` calls `detection_cache.load_or_run()`, which checks cache freshness against manifest-mtime with a 24h ceiling (per `detection_cache.CACHED_MANIFESTS`). On cache miss, the full detection runs and `detection_cache.write()` persists the result to `~/.cache/harness-maker/profile-<repo-hash>.json`. The cached `ProjectProfile` is what feeds the Interviewer + M16 recommendation registry.
+2. **Foreign config import flow (M17)**: `foreign_config.detect()` scans the project root for 6 known foreign-AI-tool configs (cursor rules, claude.md, agents.md, continue, aider, copilot). `foreign_config.llm_map()` calls Anthropic with a sha256-keyed 24h cache and proposes a mapping to harness.yaml axes. The slash command UI in `interview.py` confirms with the user before `foreign_config.apply()` returns a `ChangeSet`. The caller writes via `atomic_write`. Re-renders use `@hm:harness:*` inverted block markers so user content outside the harness-managed region is preserved byte-for-byte (see `docs/reference/block-merge-spec.md`).
+3. **Adaptive telemetry flow (M18 + M19)**: `harness_yaml_override` events are captured at two sites — (a) `/hm:configure` exit (primary; computes pre/post yaml diff via `telemetry.compute_yaml_diff()` so uncommitted edits are caught), and (b) the SessionStart drift hook (secondary; git diff since the last recorded `ts`). Both call `telemetry.emit_override()`, which deduplicates on `(ts, axis_path, after)` and appends to `.claude/observability/adaptive/overrides.jsonl`. `/hm:personalization-audit` reads that file plus the current harness.yaml plus the ProjectProfile cache and runs `personalization_audit.run_audit()`, which returns a composite-score `PersonalizationPlan` with ranked `PersonalizationActionItem` list (per ADR-011 rubric).
+
+## 3. The 19 Mechanisms (M1-M19)
 
 Every mechanism below maps to a module under `src/harness_maker/` and at least one verification check in `.claude-verify.sh`.
 
@@ -306,6 +314,68 @@ Codex TOML files intentionally carry no provenance frontmatter because TOML pars
 
 **Minimum supported Cursor**: 2.4 (2026-01-22 — first to bundle subagents, skills, Claude Code hooks compatibility). **Recommended**: 3.2+ (2026-04-24 — agent-first redesign, native `/worktree` and `/best-of-n`). The native worktree commands coexist safely with `/hm:execute` because cleanup is prefix-matched (`phase-*`, `autoloop-*`, `execute-*` reserved for harness-maker).
 
+### M15 — Detection Depth (Track A)
+
+`harness_maker.profile.profile()` detects 12+ language stacks via `STACK_MANIFESTS` + `STACK_GLOB_MANIFESTS`. It parses python / node / rust dependency files for known frameworks. The detector also picks up `package_manager` (`uv` / `poetry` / `pip` / `pipenv` / `npm` / `pnpm` / `yarn` / `bun` / `cargo`) and `ci_provider` (`github-actions` / `gitlab-ci` / `circleci` / `jenkins` / `travis`). The result populates `ProjectProfile` and feeds the M16 recommendation registry.
+
+Caching: results are stored at `~/.cache/harness-maker/profile-<repo-hash>.json` with manifest-mtime invalidation + a 24h ceiling, both governed by `detection_cache.CACHED_MANIFESTS`. The cache makes back-to-back `/hm:configure` runs cheap and keeps `/hm:personalization-audit` from re-walking the source tree.
+
+**Key files**: `src/harness_maker/profile.py`, `src/harness_maker/detection_cache.py`.
+
+### M16 — Recommendation Framework
+
+`harness_maker.recommendation` provides a registry of `recommend_<axis>(profile, project_dir) -> Recommendation | None` functions. Each function declares per-detection `Confidence` (`HIGH` / `MEDIUM` / `LOW`, per ADR-007). The `interview.py` dispatcher (`_dispatch_recommendation`) routes by confidence bucket:
+
+- **HIGH** → silent default, recorded as a yaml comment so the user can see *why* later.
+- **MEDIUM** → explicit `AskUserQuestion` so the user explicitly accepts or overrides.
+- **LOW** → no surface (we don't show low-confidence guesses).
+
+Tri-IDE payload equivalence is asserted (validator N1: the same `Recommendation` flows through Claude Code, Cursor, and Codex). Backward-compat regression test guards 0.11.x users from silent default changes (validator W3).
+
+**Key files**: `src/harness_maker/recommendation.py`, `src/harness_maker/interview.py`, `src/harness_maker/models.py` (`Confidence`, `Recommendation`, `RecommendationEvidence`, `AdaptiveConfig`).
+
+### M17 — Foreign AI Config Migration (Track D)
+
+`harness_maker.foreign_config` detects 6 known foreign-AI-tool configs in the project, LLM-maps their content to harness.yaml axes (Anthropic call, sha256-keyed 24h cache), and applies single-source re-renders with `@hm:harness:*` inverted block markers (ADR-003 + ADR-009).
+
+`MarkerStyle` dispatch routes by file extension:
+- `HTML_COMMENT` for `.md` / `.mdc`
+- `HASH_COMMENT` for `.yml` / `.yaml`
+- `JSON_KEY` (`_hm_harness` top-level key) for `.json`
+
+0.11.x files (frontmatter `generated_by: harness-maker` + zero `@hm:harness:*` markers in body) are upgraded on first encounter post-0.12.0 — the whole file is rewritten with the new marker family; the second render is a no-op (idempotent). See `docs/reference/block-merge-spec.md` for the marker syntax + reconcile decision tree.
+
+**Key files**: `src/harness_maker/foreign_config.py`, `src/harness_maker/block_merge.py`, `src/harness_maker/templates/foreign-configs/*.j2`.
+
+### M18 — Adaptive Telemetry (Track B start)
+
+`harness_yaml_override` events are captured at two sites:
+
+- **Primary** — `/hm:configure` exit: pre/post yaml diff. Catches uncommitted edits the user just made.
+- **Secondary** — SessionStart hook: git diff since the last recorded `ts`. Catches changes made outside `/hm:configure` (e.g., direct yaml edits between sessions).
+
+Dedup key `(ts, axis_path, after)` prevents the two sites from double-recording the same change. The schema is versioned (`schema_version: 1` mandatory per validator C3); the Phase 10 reader skips unknown versions so new schema additions remain forward-compatible.
+
+Storage: `.claude/observability/adaptive/overrides.jsonl` via `atomic_write`. Opt-out via `harness.yaml.adaptive.disable_telemetry: true` (default `false` per ADR-005 default-on). 100% local — `tests/unit/test_no_network.py` asserts no socket call (ADR-005 positive obligation).
+
+**Key files**: `src/harness_maker/telemetry.py`, `src/harness_maker/hooks/sessionstart_drift.py`, `src/harness_maker/cli.py` (configure-exit hook).
+
+### M19 — Personalization Audit
+
+`/hm:personalization-audit` computes a composite score from telemetry + harness.yaml + ProjectProfile cache, per ADR-011 locked formulas in `rubrics/personalization.yaml v0`:
+
+```
+composite = L1 conversion × 0.4 + L2 stability × 0.3 + L3 cadence × 0.3
+```
+
+Tier boundaries: **Bronze** < 40 ≤ **Silver** ≤ 64 < **Gold** ≤ 84 < **Platinum** ≤ 100.
+
+Output: `PersonalizationPlan` with a ranked `PersonalizationActionItem` list, each carrying `evidence = {n_observations, top_3_signals, confidence}`. Items lacking observations *or* signals are dropped (ADR-010 mode C noise mitigation — avoid producing recommendations whose justification is thinner than the recommendation itself).
+
+The runner reuses the `rubric_loader` pattern from `ai_readiness.py` so the v0 calibration is just one YAML file. The rubric itself is provisional; revisit after 30+ projects accumulate audit runs.
+
+**Key files**: `src/harness_maker/personalization_audit.py`, `src/harness_maker/rubrics/personalization.yaml`, `src/harness_maker/templates/commands/hm/personalization-audit.md.j2`.
+
 ## 4. Preset Comparison
 
 The two presets bracket the design space. Most projects pick one and tune 1-3 dimensions.
@@ -326,13 +396,21 @@ The two presets bracket the design space. Most projects pick one and tune 1-3 di
 | Hooks | statusline + telemetry | statusline + telemetry |
 | Verify-before-completion (M8) | optional | **required** |
 | Worktree scope (M9) | `[execute]` | `[execute, plan]` |
+| `adaptive.disable_telemetry` (M18) | `false` (opt-out) | `false` (opt-out) |
 
 The two presets share most defaults intentionally — the gap is concentrated in the multi-reviewer set, the additional `careful`/`audit` workflows, and the mandatory verify gate. This keeps the surface area small for users graduating from `Side` to `Production`.
 
+Telemetry (M18) is default-on for both presets per ADR-005: the audit is only useful with data, so opt-out is set rather than opt-in. No preset variation. The flag flips it off project-wide; there is no per-event consent.
+
 ## 5. Where to Read Next
 
-- **Design rationale & decisions:** [`TECH_SPEC.md`](../TECH_SPEC.md) Section 6 (ADRs + risk register K1-K17)
+- **Design rationale & decisions:** [`TECH_SPEC.md`](../TECH_SPEC.md) Section 6 (ADRs + risk register K1-K17), and Section 7 "Personalization Architecture" for the deeper M15-M19 detail.
 - **How to extend:** [`CONTRIBUTING.md`](CONTRIBUTING.md)
 - **What's verified:** [`.claude-verify.sh`](../.claude-verify.sh) — every mechanism above has at least one phase check
-- **Reference patterns:** [`docs/reference/autoloop-pattern.md`](reference/autoloop-pattern.md)
+- **Reference patterns:** [`docs/reference/autoloop-pattern.md`](reference/autoloop-pattern.md), [`docs/reference/block-merge-spec.md`](reference/block-merge-spec.md) (covers the `@hm:harness:*` inverted marker family used by M17)
 - **Target details:** [`../README.md#targets`](../README.md) — Cursor and Codex asset layout, KEEP rule trade-off, recommended model, manual checklist
+- **0.12.0 ADRs (in `work-docs/PLAN-personalization-depth-2026-05.md`):**
+  - ADR-005 — default-on telemetry + no-network positive obligation
+  - ADR-009 — `@hm:harness:*` inverted markers (foreign config re-render)
+  - ADR-010 — evidence schema (n_observations / top_3_signals / confidence) for personalization items
+  - ADR-011 — locked v0 rubric formulas (L1/L2/L3 + composite + tier boundaries)

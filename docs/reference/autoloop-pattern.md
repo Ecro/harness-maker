@@ -57,6 +57,8 @@ else:
     DROP  # single agent = noise
 ```
 
+> **Disjoint-specialist trap (REVIEW-2026-05-08)**: the cross-check assumes overlapping reviewer scopes. When every reviewer is a fully disjoint specialist (e.g., security-only + perf-only + concurrency-only with non-overlapping files of interest), every finding is single-source by construction — and the rule above will `DROP` it as noise. Mitigation: either deliberately overlap reviewer scopes (e.g., `code-reviewer` plus one specialist on the same diff), or extend the rule with an "explicit single-source allowed" tier for known-disjoint specialists. See **Pitfall #7** in `work-docs/RESEARCH-personalization-depth-2026-05.md`.
+
 ## Adaptive Reviewer Selection (DD#9)
 
 **Always spawned (5):**
@@ -68,6 +70,15 @@ else:
 - side-effect-reviewer: when public function signatures change
 - concurrency-reviewer: when async/await/thread/mutex/lock is present
 - test-quality-reviewer: when test files are modified
+
+**0.12.0 module → reviewer mapping** (informational; the conditional-router skill decides per-task):
+
+| Touched module | Reviewers routed |
+|---|---|
+| `src/harness_maker/recommendation.py` | `code-reviewer` |
+| `src/harness_maker/foreign_config.py` | `code-reviewer` + `security-reviewer` (LLM input handling — adversarial foreign content) |
+| `src/harness_maker/personalization_audit.py` | `code-reviewer` (no security surface — local-only diagnostic) |
+| `src/harness_maker/hooks/sessionstart_drift.py` | `code-reviewer` + `concurrency-reviewer` (hook timing + git-diff race window) |
 
 ## Autonomous Decision Protocol (DD#8)
 

@@ -28,6 +28,7 @@
 6. [Special Commands](#6-special-commands)
    - 6.1 [/hm:refresh — Anti-Rot Updates](#61-hmrefresh--anti-rot-updates)
    - 6.2 [/hm:ai-readiness — AI Readiness Analysis](#62-hmai-readiness--ai-readiness-analysis)
+   - 6.3 [/hm:personalization-audit — Composite-score rubric](#63-hmpersonalization-audit--composite-score-rubric)
 7. [Skills Reference](#7-skills-reference)
 8. [Agent Reference](#8-agent-reference)
 9. [Hook Details](#9-hook-details)
@@ -149,6 +150,7 @@ harness-maker is a multi-target harness generator for **Claude Code, Cursor IDE,
 │   ├── hooks/hooks.json      ← Hook event definitions
 │   ├── memory/               ← wiki.md / failures.md / session/
 │   └── observability/        ← metrics.jsonl / security/ / refresh/
+│       └── adaptive/         ← overrides.jsonl (0.12.0+: M18 yaml-override telemetry)
 ├── work-docs/
 │   ├── PLAN-{slug}.md        ← Implementation plan
 │   └── RESEARCH-{slug}.md    ← Research results
@@ -156,6 +158,20 @@ harness-maker is a multi-target harness generator for **Claude Code, Cursor IDE,
 │   └── SPEC-{slug}.md        ← Acceptance criteria
 └── .worktrees/               ← Isolated implementation workspace (gitignored)
     └── execute-<ts>/
+```
+
+### 0.12.0 source modules (recommendation + telemetry + audit)
+
+Four new Python modules + one rubric YAML landed in 0.12.0 to support the personalization-depth track. They live next to the existing M1-M14 modules and follow the same conventions (typed contracts in `models.py`, atomic writes, tests in `tests/unit/`):
+
+```
+src/harness_maker/
+├── recommendation.py          ← M16: Confidence-bucketed recommendation registry
+├── detection_cache.py         ← M15: profile cache with manifest-mtime + 24h ceiling
+├── foreign_config.py          ← M17: foreign AI config detect + LLM map + apply
+├── personalization_audit.py   ← M19: composite-score rubric runner (/hm:personalization-audit)
+└── rubrics/
+    └── personalization.yaml   ← ADR-011 v0 rubric (locked formulas + tier boundaries)
 ```
 
 ---
@@ -430,6 +446,8 @@ Read the file and verify: frontmatter present, Interview Transcript section exis
 ### 3.4 /hm:execute — TDD Implementation
 
 **Purpose**: Implement each PLAN stage using TDD. The 4-step cycle of writing tests first, verifying test quality, implementing, then validating is repeated for each PLAN stage.
+
+> **0.12.0 scope expansion**: execute now covers the M16 recommendation registry (`src/harness_maker/recommendation.py`) and the M17 foreign-config apply path (`src/harness_maker/foreign_config.py`). When a PLAN stage touches either, the conditional router routes the diff to `code-reviewer` (plus `security-reviewer` for `foreign_config.py` because of LLM-mapped input handling).
 
 #### Execution Procedure
 
@@ -852,6 +870,8 @@ The most comprehensive fusion command. Use when safely deploying a new feature e
 
 **Purpose**: Progressively improve toward a single goal through multiple iterations. Each loop uses one shared worktree, and safety rails prevent infinite loops.
 
+> **Learned pattern (PLAN-personalization-depth-2026-05, validator W5)**: validator-driven phase merge. When two adjacent loop phases produce overlapping diffs that the validator can collapse without losing signal, the loop merges them — saving one iteration round and one set of reviewer spawns. This is now a default pattern, not an opt-in.
+
 ### Two Modes
 
 | Mode | Usage | Behavior |
@@ -1042,6 +1062,94 @@ Propose a `/hm:loop` command for each AI-fixable item.
 #### Outputs
 - `docs/ai-readiness-{date}.md` (dashboard)
 - `ImprovementPlan` structure (can be passed to the loop)
+
+---
+
+### 6.3 /hm:personalization-audit — Composite-score rubric
+
+**Purpose**: Compute a personalization fit score from accumulated telemetry (M18 overrides) + the current harness.yaml + the cached ProjectProfile, then emit a ranked list of action items so the user can see *which* harness axes are mis-tuned to their actual workflow.
+
+Added in 0.12.0 as the final M19 mechanism. Local-only — zero network calls (asserted by `tests/unit/test_no_network.py`, per ADR-005).
+
+#### 3-Layer Rubric Structure (per ADR-011 v0, locked)
+
+```
+Composite = L1 conversion × 0.4 + L2 stability × 0.3 + L3 cadence × 0.3
+```
+
+**Layer 1 — Conversion (recommendation acceptance)**
+
+```
+L1 = (medium_accepted + high_silent) / max(total_recommendations, 1) × 100
+```
+
+How often the M16 recommendation registry's HIGH-confidence silent defaults were left in place + how often MEDIUM-confidence prompts converted to acceptance. Low conversion means we are recommending things the user does not want.
+
+**Layer 2 — Stability (override volatility)**
+
+```
+L2 = 100 - min(100, override_events_last_30d × 5)
+```
+
+Penalises projects where the user keeps flipping harness.yaml axes back and forth — that signals we got the recommendation wrong and they are working around it.
+
+**Layer 3 — Cadence (audit + telemetry hygiene)**
+
+```
+100  if (audit run within last 14 days) AND (disable_telemetry == False)
+ 50  if exactly one of the two is true
+  0  otherwise
+```
+
+#### Tier Boundaries
+
+| Tier | Composite range |
+|------|-----------------|
+| **Bronze** | < 40 |
+| **Silver** | 40 – 64 |
+| **Gold** | 65 – 85 |
+| **Platinum** | ≥ 85 |
+
+#### Output
+
+`PersonalizationPlan`:
+- Composite score (0-100) + per-layer scores (L1, L2, L3)
+- Ranked `PersonalizationActionItem` list, each with mandatory `evidence = {n_observations, top_3_signals, confidence}`
+
+**Evidence-drop rule** (per ADR-010 mode C noise mitigation): action items lacking `n_observations` OR lacking `top_3_signals` are dropped before ranking. Recommendations whose justification is thinner than the recommendation itself never reach the user.
+
+#### Execution Procedure
+
+**Step 1 — Load inputs**
+
+- `.claude/observability/adaptive/overrides.jsonl` (M18 telemetry, schema_version-aware)
+- `harness.yaml` (current axis values)
+- `~/.cache/harness-maker/profile-<repo-hash>.json` (M15 cached ProjectProfile)
+
+**Step 2 — Compute layer scores**
+
+`personalization_audit.run_audit()` reads `rubrics/personalization.yaml` and applies the locked formulas above. The same `rubric_loader` pattern from `ai_readiness.py` is reused — adding new layers later is just a YAML edit + a small Python change.
+
+**Step 3 — Generate + filter action items**
+
+Each layer can contribute action items. The evidence-drop rule (ADR-010) prunes any item missing `n_observations` or `top_3_signals`.
+
+**Step 4 — Render report**
+
+Composite score, tier, layer breakdown, and the surviving action items.
+
+#### Local-only guarantee
+
+`tests/unit/test_no_network.py` blocks all outbound socket calls during audit runs. ADR-005 makes this a positive obligation — the audit must work fully offline.
+
+#### Outputs
+
+- Stdout report (composite + tier + layer + action items)
+- No file written — the audit is a read-only diagnostic. Re-running gives a fresh snapshot.
+
+#### Calibration note
+
+The v0 rubric is provisional. Tier boundaries and weight coefficients should be revisited once 30+ projects have accumulated audit runs (per ADR-011 deferred decision).
 
 ---
 

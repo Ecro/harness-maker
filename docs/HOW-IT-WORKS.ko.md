@@ -28,6 +28,7 @@
 6. [특수 명령](#6-특수-명령)
    - 6.1 [/hm:refresh — 안티-rot 업데이트](#61-hmrefresh--안티-rot-업데이트)
    - 6.2 [/hm:ai-readiness — AI 준비도 분석](#62-hmai-readiness--ai-준비도-분석)
+   - 6.3 [/hm:personalization-audit — Composite-score 루브릭](#63-hmpersonalization-audit--composite-score-루브릭)
 7. [스킬 참조](#7-스킬-참조)
 8. [에이전트 참조](#8-에이전트-참조)
 9. [훅 상세](#9-훅-상세)
@@ -150,6 +151,7 @@ harness-maker 는 **Claude Code 와 Cursor 양쪽 IDE** 에서 동작하는 듀�
 │   ├── hooks/hooks.json      ← 훅 이벤트 정의
 │   ├── memory/               ← wiki.md / failures.md / session/
 │   └── observability/        ← metrics.jsonl / security/ / refresh/
+│       └── adaptive/         ← overrides.jsonl (0.12.0+: M18 yaml-override 텔레메트리)
 ├── work-docs/
 │   ├── PLAN-{slug}.md        ← 구현 계획
 │   └── RESEARCH-{slug}.md    ← 리서치 결과
@@ -157,6 +159,20 @@ harness-maker 는 **Claude Code 와 Cursor 양쪽 IDE** 에서 동작하는 듀�
 │   └── SPEC-{slug}.md        ← 인수 조건
 └── .worktrees/               ← 격리된 구현 작업 공간 (gitignored)
     └── execute-<ts>/
+```
+
+### 0.12.0 신규 소스 모듈 (recommendation + telemetry + audit)
+
+Personalization-depth 트랙 지원을 위해 0.12.0 에서 Python 모듈 4개 + 루브릭 YAML 1개가 추가되었다. 기존 M1-M14 모듈 옆에 위치하며 같은 규약을 따른다 (`models.py` 의 typed contract, atomic write, `tests/unit/` 테스트):
+
+```
+src/harness_maker/
+├── recommendation.py          ← M16: Confidence 버킷 기반 추천 레지스트리
+├── detection_cache.py         ← M15: manifest-mtime + 24h 상한 프로필 캐시
+├── foreign_config.py          ← M17: foreign AI config 감지 + LLM 매핑 + 적용
+├── personalization_audit.py   ← M19: composite-score 루브릭 러너 (/hm:personalization-audit)
+└── rubrics/
+    └── personalization.yaml   ← ADR-011 v0 루브릭 (locked 공식 + tier 경계)
 ```
 
 ---
@@ -419,6 +435,8 @@ ADR 형식:
 ### 3.4 /hm:execute — TDD 구현
 
 **목적**: PLAN 의 각 단계를 TDD 방식으로 구현한다. 테스트 먼저 작성하고, 테스트 품질 검증 후, 구현하고, 검증하는 4단계를 각 PLAN 단계마다 반복한다.
+
+> **0.12.0 스코프 확장**: execute 는 이제 M16 추천 레지스트리 (`src/harness_maker/recommendation.py`) 와 M17 foreign-config apply 경로 (`src/harness_maker/foreign_config.py`) 도 포함한다. PLAN 단계가 이 둘 중 하나라도 건드리면 conditional router 가 diff 를 `code-reviewer` 로 라우팅한다 (`foreign_config.py` 는 LLM-mapped 입력 처리 때문에 `security-reviewer` 도 추가).
 
 #### 실행 절차
 
@@ -841,6 +859,8 @@ wrapup 까지 완료한 후 verify 가 실패하면: 커밋은 이미 됐으므�
 
 **목적**: 하나의 목표를 향해 여러 번 반복하며 점진적으로 개선한다. 루프마다 독립된 워크트리를 사용하고, 안전 레일이 무한 반복을 방지한다.
 
+> **학습된 패턴 (PLAN-personalization-depth-2026-05, validator W5)**: validator-driven phase merge. 인접한 두 루프 단계가 겹치는 diff 를 생성하면서 validator 가 신호 손실 없이 합칠 수 있는 경우, 루프는 둘을 머지한다 — 반복 라운드 한 번과 리뷰어 spawn 세트 한 번을 절약. 이제는 opt-in 이 아닌 기본 패턴.
+
 ### 두 가지 모드
 
 | 모드 | 사용 방법 | 동작 |
@@ -1028,6 +1048,94 @@ Layer 2: 각 루브릭 YAML 을 순서대로 LLM 이 평가.
 #### 출력물
 - `docs/ai-readiness-{date}.md` (대시보드)
 - `ImprovementPlan` 구조체 (루프에 전달 가능)
+
+---
+
+### 6.3 /hm:personalization-audit — Composite-score 루브릭
+
+**목적**: 누적된 텔레메트리 (M18 overrides) + 현재 `harness.yaml` + 캐싱된 `ProjectProfile` 로부터 personalization fit 점수를 계산하고, *어떤* harness 축이 실제 워크플로우와 어긋나 있는지 순위가 매겨진 액션 아이템 목록으로 제시한다.
+
+0.12.0 에서 M19 메커니즘으로 추가. 100% 로컬 — `tests/unit/test_no_network.py` 가 네트워크 호출이 없음을 보장한다 (ADR-005 positive obligation).
+
+#### 3레이어 루브릭 구조 (ADR-011 v0, locked)
+
+```
+Composite = L1 conversion × 0.4 + L2 stability × 0.3 + L3 cadence × 0.3
+```
+
+**Layer 1 — Conversion (추천 수락률)**
+
+```
+L1 = (medium_accepted + high_silent) / max(total_recommendations, 1) × 100
+```
+
+M16 추천 레지스트리의 HIGH-confidence 사일런트 디폴트가 그대로 유지된 비율 + MEDIUM-confidence 질문이 수락으로 전환된 비율. 낮은 conversion 은 사용자가 원하지 않는 것을 추천하고 있다는 신호.
+
+**Layer 2 — Stability (override 변동성)**
+
+```
+L2 = 100 - min(100, override_events_last_30d × 5)
+```
+
+사용자가 `harness.yaml` 축을 반복적으로 뒤집는 프로젝트를 감점한다. 이는 추천이 틀려서 사용자가 우회 작업을 하고 있다는 의미.
+
+**Layer 3 — Cadence (audit + telemetry 위생)**
+
+```
+100  if (지난 14일 내 audit 실행) AND (disable_telemetry == False)
+ 50  둘 중 하나만 충족
+  0  둘 다 미충족
+```
+
+#### 등급 경계
+
+| 등급 | Composite 범위 |
+|------|----------------|
+| **Bronze** | < 40 |
+| **Silver** | 40 – 64 |
+| **Gold** | 65 – 85 |
+| **Platinum** | ≥ 85 |
+
+#### 출력
+
+`PersonalizationPlan`:
+- Composite 점수 (0-100) + 레이어별 점수 (L1, L2, L3)
+- 순위가 매겨진 `PersonalizationActionItem` 목록. 각 항목은 필수 `evidence = {n_observations, top_3_signals, confidence}` 포함.
+
+**Evidence drop 규칙** (ADR-010 mode C 노이즈 완화): `n_observations` 가 없거나 `top_3_signals` 가 없는 액션 아이템은 순위 매김 전에 폐기한다. 근거가 추천 자체보다 얇은 항목은 사용자에게 도달하지 않는다.
+
+#### 실행 절차
+
+**Step 1 — 입력 로드**
+
+- `.claude/observability/adaptive/overrides.jsonl` (M18 텔레메트리, schema_version-aware)
+- `harness.yaml` (현재 축 값들)
+- `~/.cache/harness-maker/profile-<repo-hash>.json` (M15 캐싱된 `ProjectProfile`)
+
+**Step 2 — 레이어 점수 계산**
+
+`personalization_audit.run_audit()` 가 `rubrics/personalization.yaml` 을 읽고 위의 locked 공식을 적용한다. `ai_readiness.py` 의 `rubric_loader` 패턴을 재사용 — 향후 새 레이어 추가는 YAML 편집 + 작은 Python 변경.
+
+**Step 3 — 액션 아이템 생성 + 필터**
+
+각 레이어가 액션 아이템을 기여할 수 있다. Evidence drop 규칙 (ADR-010) 이 `n_observations` 또는 `top_3_signals` 가 누락된 항목을 잘라낸다.
+
+**Step 4 — 보고서 렌더**
+
+Composite 점수, 등급, 레이어 breakdown, 살아남은 액션 아이템.
+
+#### Local-only 보장
+
+`tests/unit/test_no_network.py` 가 audit 실행 중 모든 아웃바운드 소켓 호출을 차단한다. ADR-005 가 이를 positive obligation 으로 명시 — audit 은 완전 오프라인 동작 필수.
+
+#### 출력물
+
+- Stdout 보고서 (composite + 등급 + 레이어 + 액션 아이템)
+- 파일 쓰기 없음 — audit 은 read-only 진단. 재실행 시 새 스냅샷.
+
+#### 보정 노트
+
+v0 루브릭은 잠정적. 30+ 프로젝트가 audit 실행을 누적한 후 등급 경계와 가중치를 재검토한다 (ADR-011 deferred decision).
 
 ---
 
