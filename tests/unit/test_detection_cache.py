@@ -181,6 +181,57 @@ def test_concurrent_writes_no_tear(tmp_path: Path) -> None:
         )
 
 
+def test_cache_invalidated_when_stack_glob_concrete_manifest_changes(
+    tmp_path: Path,
+) -> None:
+    """STACK_GLOB_MANIFESTS literal `stack.yaml` triggers cache invalidation.
+
+    Closes the Phase 3 gap for concrete filenames inside STACK_GLOB_MANIFESTS
+    (haskell's `stack.yaml` / `package.yaml`). ``*``-pattern globs (csharp's
+    ``*.csproj`` / ``*.sln``) still rely on the 24h ceiling.
+    """
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    cache_dir = tmp_path / "cache"
+    manifest = repo / "stack.yaml"
+    manifest.write_text("# minimal stack.yaml\n", encoding="utf-8")
+
+    write(_make_profile(stack=["haskell"]), repo, cache_dir=cache_dir)
+
+    cached = load_or_run(repo, cache_dir=cache_dir)
+    assert cached is not None
+    assert cached.stack == ["haskell"]
+
+    # Deterministic mtime bump — avoids racy filesystem mtime resolution.
+    cache_file = cache_dir / f"profile-{_repo_hash(repo)}.json"
+    cache_mtime = cache_file.stat().st_mtime
+    future = cache_mtime + 100.0
+    os.utime(manifest, (future, future))
+
+    assert load_or_run(repo, cache_dir=cache_dir) is None, (
+        "Cache must invalidate when stack.yaml mtime > cache mtime"
+    )
+
+
+def test_cache_invalidated_when_package_yaml_changes(tmp_path: Path) -> None:
+    """STACK_GLOB_MANIFESTS `package.yaml` (haskell) triggers cache invalidation."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    cache_dir = tmp_path / "cache"
+    manifest = repo / "package.yaml"
+    manifest.write_text("name: foo\n", encoding="utf-8")
+
+    write(_make_profile(stack=["haskell"]), repo, cache_dir=cache_dir)
+    assert load_or_run(repo, cache_dir=cache_dir) is not None
+
+    cache_file = cache_dir / f"profile-{_repo_hash(repo)}.json"
+    cache_mtime = cache_file.stat().st_mtime
+    future = cache_mtime + 100.0
+    os.utime(manifest, (future, future))
+
+    assert load_or_run(repo, cache_dir=cache_dir) is None
+
+
 def test_backward_compat_old_cache_loads(tmp_path: Path) -> None:
     """Old cache JSON lacking Phase-1 fields must load via ProjectProfile defaults."""
     repo = tmp_path / "repo"

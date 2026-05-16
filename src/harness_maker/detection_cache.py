@@ -43,9 +43,32 @@ def _flatten_stack_manifests() -> tuple[str, ...]:
     return tuple(seen)
 
 
-# All filenames whose mtime invalidates the cache. Stack manifests + foreign-AI
-# config locations. Phase 5 extends this with any new foreign-AI types.
-CACHED_MANIFESTS: tuple[str, ...] = _flatten_stack_manifests() + _FOREIGN_AI_CONFIGS
+def _flatten_stack_glob_concrete() -> tuple[str, ...]:
+    """Literal filenames from STACK_GLOB_MANIFESTS (no ``*``-glob patterns).
+
+    Glob patterns like ``*.csproj`` cannot be stat'd; they remain out of
+    ``CACHED_MANIFESTS`` and rely on the 24h ceiling for invalidation.
+    Function-scope import mirrors the module-level pattern that keeps
+    ``profile`` ↔ ``detection_cache`` free of circular import deadlock.
+    """
+    from harness_maker.profile import STACK_GLOB_MANIFESTS
+
+    out: list[str] = []
+    for patterns in STACK_GLOB_MANIFESTS.values():
+        for pat in patterns:
+            if "*" not in pat:
+                out.append(pat)
+    return tuple(sorted(set(out)))
+
+
+# All filenames whose mtime invalidates the cache. Stack manifests +
+# STACK_GLOB literal filenames + foreign-AI config locations. Phase 5
+# extends this with any new foreign-AI types. STACK_GLOB ``*``-pattern
+# globs (e.g. ``*.csproj``) cannot be stat'd cheaply and rely on the
+# 24h ceiling for invalidation — partial closure of the Phase 3 gap.
+CACHED_MANIFESTS: tuple[str, ...] = (
+    _flatten_stack_manifests() + _flatten_stack_glob_concrete() + _FOREIGN_AI_CONFIGS
+)
 
 
 def _default_cache_dir() -> Path:

@@ -1512,6 +1512,75 @@ bash .claude-verify.sh all
 
 ---
 
+## 7. Personalization Architecture (0.12.0)
+
+> Added in 0.12.0 — PLAN-personalization-depth-2026-05. Tracks A (Detection Depth) + D (Foreign AI Config Migration) + B-start (Adaptive Self-Tuning) landed as 11 active features (Phase 7 merged into Phase 6 per validator W5). 11 ADRs locked in `work-docs/PLAN-personalization-depth-2026-05.md`. README mirrors this section at a higher level.
+
+### 7.1 Three Tracks
+
+**Track A — Detection Depth.** `harness_maker.profile.profile()` detects 12+ language stacks (java/kotlin/swift/dart/ruby/php/csharp/elixir/scala/c-cpp/zig/haskell on top of python/node/rust/cmake/go), parses framework deps (fastapi/django/flask/streamlit/jupyter/react/vue/next/express/nestjs/remix/astro/tauri/axum/tokio/bevy/etc), and surfaces `package_manager` (uv/poetry/pip/pipenv/npm/pnpm/yarn/bun/cargo) + `ci_provider` (github-actions/gitlab-ci/circleci/jenkins/travis). Results flow through `Recommendation` (ADR-001/002).
+
+**Track D — Foreign AI Config Migration.** Detects 6 known foreign configs: `.cursor/rules/`, `AGENTS.md`, `CLAUDE.md`, `.continue/config.json`, `.aider.conf.yml`, `.github/copilot-instructions.md`. With user confirmation, `foreign_config.llm_map()` (single Anthropic call, sha256+24h cached) extracts axis mappings into `harness.yaml`, then `foreign_config.apply()` re-renders the foreign file with `@hm:harness:*` inverted markers preserving user content outside marked regions (ADR-003 + ADR-009).
+
+**Track B-start — Adaptive Self-Tuning.** `harness_yaml_override` telemetry event (schema_version=1) captures axis edits at two sites (`/hm:configure`-exit primary + SessionStart secondary, dedup-keyed). `/hm:personalization-audit` consumes telemetry + `harness.yaml` + `ProjectProfile` cache and emits a composite-score `ImprovementPlan` with evidence-bearing `ActionItem` list. SessionStart drift surface fires after 30 overrides or 14 days without audit (ADR-005, ADR-006).
+
+### 7.2 Confidence-Bucketed Recommendation UI (ADR-004, ADR-007)
+
+Every `recommend_<axis>(profile, project_dir) -> Recommendation | None` declares its own `Confidence`:
+- **HIGH** — explicit manifest match (e.g., pyproject lists `fastapi` as dep). Silent default + `# detected: <axis>=<value> (high) — <signal>` yaml comment in `harness.yaml`. User can audit but isn't prompted.
+- **MEDIUM** — inferred / opinion mapping (e.g., framework→MCP server suggestion). Explicit `AskUserQuestion` during `/hm:configure`.
+- **LOW** — pure heuristic guess. No recommendation surfaced; stock default used.
+
+Backward-compat for 0.11.x users (Validator W3): the four pre-existing transitive recommends (`preset`, `dev_mode`, `mechanical_checks`, `vault_member`) were assigned MEDIUM/MEDIUM/HIGH/HIGH respectively to preserve 0.11.x UX. Regression test `test_load_0_11_x_harness_yaml_zero_diff_on_legacy_axes` enforces zero diff.
+
+### 7.3 Foreign Config Marker Family — `@hm:harness:*` inverted (ADR-009, ADR-009 amendment)
+
+`block_merge.py` now dispatches on `MarkerStyle`:
+- `HTML_COMMENT` (default, `.md` / `.mdc`): `<!-- @hm:harness:<id> -->` ... `<!-- @hm:/harness:<id> -->`
+- `HASH_COMMENT` (`.yml` / `.yaml`): `# @hm:harness:<id>` ... `# @hm:/harness:<id>`
+- `JSON_KEY` (`.json`): top-level `_hm_harness` key holds harness-managed content; merge preserves all other user keys
+
+Semantics are **inverted** vs the existing `@hm:user:*` family: with `@hm:harness:*`, content INSIDE the markers is harness-owned (replaced on every render); content OUTSIDE is user-owned (byte-for-byte preserved). The two marker families coexist orthogonally in the same file — neither affects the other.
+
+Typed errors `MarkerMismatchError` + `MarkerNestedError` raised on malformed inputs. Literal `@hm:` strings inside fenced code blocks are correctly skipped by the parser.
+
+**0.11.x migration (ADR-009 amendment):** files with `generated_by: harness-maker` frontmatter AND zero `@hm:harness:*` markers are treated as wholly harness-owned on first encounter post-upgrade; re-rendered into the new marker family. Second render is no-op (idempotent).
+
+### 7.4 Personalization Rubric — `/hm:personalization-audit` (ADR-011)
+
+`rubrics/personalization.yaml` v0 (locked formulas, calibration deferred to follow-up PLAN after 30+ projects):
+
+**Composite score** = `L1×0.4 + L2×0.3 + L3×0.3`, range [0, 100].
+
+| Layer | Formula |
+|-------|---------|
+| L1 conversion | `(medium_accepted + high_silent) / max(total_recommendations, 1) × 100` |
+| L2 stability  | `100 - min(100, override_events_last_30d × 5)` |
+| L3 cadence    | `100` if audit within 14d AND `disable_telemetry==False`; `50` if one met; `0` otherwise |
+
+| Tier | Composite range |
+|------|-----------------|
+| Bronze | 0–39 |
+| Silver | 40–64 |
+| Gold | 65–84 |
+| Platinum | 85–100 |
+
+Every emitted `ActionItem` carries `evidence: {n_observations: int, top_3_signals: list[str], confidence: Confidence}`. Items with `n_observations == 0` OR empty `top_3_signals` are dropped (ADR-010 mode C noise mitigation).
+
+### 7.5 Telemetry — Local-Only, Opt-Out (ADR-005)
+
+`harness.yaml.adaptive.disable_telemetry: false` by default (opt-out). All telemetry (`harness_yaml_override` events + audit reads) is read-only suggestion-only — **never auto-applies**. Stored as JSONL at `.claude/observability/adaptive/overrides.jsonl` with `schema_version: 1` mandatory on every record (Validator C3).
+
+**ADR-005 positive obligation enforced by `tests/unit/test_no_network.py`:** monkeypatches `socket.socket` to raise on any outbound connection, then invokes `emit_override`, `load_overrides`, `compute_yaml_diff`, and the SessionStart hook's `run()` — all 4 paths must complete without triggering the patched socket. Any future regression that adds an HTTP call to telemetry/audit/hook fails CI.
+
+Dual capture (Validator W8): primary site is `/hm:configure` exit pre/post yaml diff (no git dependency, catches uncommitted edits); secondary is SessionStart hook reading `git diff` since last recorded override `ts` (no fixed HEAD~N window). Both share a dedup key `(ts, axis_path, after)` so the same event never records twice.
+
+### 7.6 Cursor Power-User Constraint (ADR-003)
+
+Single-source means harness-maker re-generates `.cursor/rules/` on every render (with `@hm:harness:*` markers preserving user customizations inside `.mdc` files). For users who want Cursor-only ownership of their rules directory, the current opt-out is to drop `cursor` from `harness.yaml.targets`. A finer-grained `harness.yaml.cursor.opt_out_render: bool` flag is deferred to a follow-up PLAN.
+
+---
+
 ## Appendix A: Decisions Log (v0.1 → v2.0)
 
 Detailed change history is absorbed into all ADR + Risk + Goal decisions in this spec. Key evolution:
