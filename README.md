@@ -227,6 +227,14 @@ harness-maker make . --promote NAME    # move an ad-hoc artifact into the harnes
 
 - **Pre-LLM mechanical checks gate.** Add shell commands to `harness.yaml` once and they run at the start of every `/hm:review` — before any reviewer agent spawns. Stop-on-first: the first non-zero exit emits `## MECHANICAL_BLOCK: <cmd> exit=<N>`, halts the review, and exits `CHANGES_REQUESTED`. Lint clean and tests green are enforced mechanically, not by reviewer prompt. `--no-auto-fix` does not skip mechanical checks.
 
+- **Detection Depth** — 12+ stack/framework granularity (python/node/rust + java/kotlin/swift/dart/ruby/php/csharp/elixir/scala/c-cpp/zig/haskell), framework dep parsing, package_manager + ci_provider detection, manifest-mtime cache with 24h ceiling.
+
+- **Foreign AI Config Migration** — detect 6 known foreign configs (`.cursor/rules/`, `AGENTS.md`, `CLAUDE.md`, `.continue/config.json`, `.aider.conf.yml`, `.github/copilot-instructions.md`); LLM-driven import; `@hm:harness:*` inverted markers preserve user content across re-renders.
+
+- **Adaptive Personalization** — `/hm:personalization-audit` composite-score rubric (Bronze/Silver/Gold/Platinum) with evidence-bearing ActionItems; 100% local telemetry; SessionStart drift hint after 30 axis overrides or 14 days.
+
+- **Confidence-Bucketed Recommendation UI** — every detection declares its own confidence (HIGH/MEDIUM/LOW); high → silent yaml comment, medium → explicit prompt, low → no surface. Backward-compat regression test guards 0.11.x users from surprise silent-default changes.
+
 For the complete mechanics behind each feature — all procedures, decision paths, and internal invariants — see [**docs/HOW-IT-WORKS.md**](docs/HOW-IT-WORKS.md).
 
 ---
@@ -249,6 +257,8 @@ flowchart TD
 ```
 
 **14 mechanisms** (M1-M14) back every feature. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full breakdown including the privilege-separation model, security gate triggers, and reconcile invariants.
+
+Since 0.12.0 the synthesis pipeline also threads through a typed `Recommendation` registry: every `recommend_<axis>(profile, project_dir)` function declares per-detection confidence (ADR-007), and the `interview.py` dispatcher routes by bucket. Detection results land in `~/.cache/harness-maker/profile-<repo-hash>.json` with manifest-mtime + 24h-ceiling invalidation. Foreign AI config files detected at `/hm:configure` time can be imported into `harness.yaml` and re-rendered single-source with `@hm:harness:*` inverted block markers (ADR-009).
 
 ---
 
@@ -283,6 +293,7 @@ Fused workflows combine atomic stages into a single command. The interview gener
 |---|---|
 | `/hm:loop "<goal>"` | Autoloop driver — `feature` or `improve` mode, time/iter-bounded |
 | `/hm:ai-readiness` | 3-layer readiness score + P0/P1/P2 ranked actions |
+| `/hm:personalization-audit` | Composite-score rubric (Bronze/Silver/Gold/Platinum) from telemetry + harness.yaml + ProjectProfile. Reads `.claude/observability/adaptive/overrides.jsonl`; outputs ranked ActionItem list with evidence schema. ADR-011 (v0); calibration deferred to 30+ project sample. |
 | `/hm:refresh` | Anti-rot crawl — manual confirm required |
 
 ---
@@ -358,7 +369,14 @@ context_lint:
 
 memory:
   files: [failures.md, wiki.md]
+
+adaptive:
+  disable_telemetry: false   # opt-out per ADR-005; 100% local capture
+  audit_session_threshold: 30  # SessionStart hint after N axis overrides
+  audit_days_threshold: 14     # SessionStart hint after N days without audit
 ```
+
+All adaptive features are 100% local. `tests/unit/test_no_network.py` asserts no socket call during telemetry emit, audit, or SessionStart hook execution (ADR-005 positive obligation).
 
 Run `/harness-maker:make` again and choose **Update** (same settings, pick up template improvements) or **Full reconfigure** to change any dimension.
 
@@ -442,6 +460,8 @@ rm .claude/harness.yaml
 
 `.cursor/rules/*.mdc` follow the same KEEP behavior. A future phase introduces a sidecar `.hm-meta.yaml` so harness-maker can hash-track Cursor assets without polluting Cursor frontmatter.
 
+**`@hm:harness:*` inverted markers (0.12.0)** — for foreign-AI-config files we generate post-import (`.cursor/rules/*.mdc`, `AGENTS.md`, `CLAUDE.md`, etc.), content INSIDE `@hm:harness:<id>` markers is harness-owned (replaced on every render); content OUTSIDE is user-owned (byte-for-byte preserved). The block-merge parser dispatches per file extension: HTML comments for `.md`/`.mdc`, `# @hm:harness:` for `.yml`/`.yaml`, top-level `_hm_harness` JSON key for `.json`. 0.11.x files (frontmatter `generated_by: harness-maker` + zero `@hm:harness:*` markers) are treated as wholly harness-owned on first encounter post-upgrade and re-rendered into the new marker family (ADR-009 amendment).
+
 ---
 
 ## Observability
@@ -454,6 +474,8 @@ All observability is 100% local — nothing is transmitted externally.
 | `.claude/observability/metrics-YYYY-MM-DD.jsonl` | Per-turn telemetry (cache hit %, tool calls, durations) — date-rotated daily (ADR-103, 0.7.1). Pre-0.7.1 `metrics.jsonl` is read as the trailing legacy shard. |
 | `.claude/observability/refresh/raw-*.jsonl` | Anti-rot crawl evidence (accepted / rejected items) |
 | `.claude/observability/security/findings-*.jsonl` | 7-gate security scan findings |
+| `.claude/observability/adaptive/overrides.jsonl` | `harness_yaml_override` events with `schema_version: 1`, dual capture sites (`/hm:configure` exit primary + SessionStart secondary), dedup-keyed |
+| `.claude/observability/adaptive/last-audit.txt` | Last `/hm:personalization-audit` run timestamp |
 
 Run `/hm:ai-readiness` to regenerate the dashboard on demand.
 
@@ -555,16 +577,39 @@ harness-maker 0.12.0 introduces three tracks of personalization depth:
 All adaptive features run **100% locally** — no network calls
 (asserted by `tests/unit/test_no_network.py`).
 
+0.12.1 patch extended `CACHED_MANIFESTS` with literal filenames from `STACK_GLOB_MANIFESTS` (`stack.yaml`, `package.yaml`) so Haskell projects now properly invalidate the profile cache on those manifests' mtime bump.
+
 ---
 
 ## Roadmap
 
-- **PyPI publish** — remove the editable-from-clone requirement.
-- **Claude Code + Cursor + Codex Marketplace listings** — submit all plugin manifests.
-- **`.hm-meta.yaml` sidecar for Cursor assets** — enable hash-tracking of `.cursor/rules/*.mdc` without polluting Cursor frontmatter, unblocking auto-upgrade for Cursor-target files.
-- **User-configurable anti-rot repo list** — `harness.yaml.anti_rot.github_repos` to track additional Claude Code ecosystem repos beyond the default.
-- **Demo screencast** — record a first-install + `/hm:loop` session.
-- **`Enterprise` preset** — stricter security gates, mandatory spec-driven dev mode.
+**Done (0.12.0–0.12.1):**
+- Track A (Detection Depth): 12+ stacks/frameworks/pkg-mgr/CI
+- Track D (Foreign AI Config Migration): 6 config types, single-source re-render, `@hm:harness:*` markers, 0.11.x migration
+- Track B-start (Adaptive): override telemetry, `/hm:personalization-audit`, SessionStart drift surface
+
+**Next (0.13.0 — Track B completion + Cursor opt-out):**
+- Track B-extra: B2 permission-frequency capture + B3 reviewer-signal aggregation
+- `harness.yaml.cursor.opt_out_render` flag for Cursor power-users (ADR-003 documented constraint)
+- `github/spec-kit` external e2e fixture vendoring (currently pytest.skip with TODO)
+
+**Future (0.14.0+ — Track C strategic expansion, ranked by user value):**
+- C2 privacy/regulated tier (HIPAA/PCI/GDPR — enterprise entry barrier)
+- C1 team-profile axis (solo vs small-team vs large-team)
+- C3 code-style detection (docstring conventions, naming patterns)
+- C4 cross-project user-defaults
+- C5 per-developer overlay in shared harness
+
+**Deferred-by-data:**
+- Rubric v0 calibration after 30+ projects accumulate `/hm:personalization-audit` runs (passive trigger)
+
+**Standing items:**
+- PyPI publish — remove the editable-from-clone requirement.
+- Claude Code + Cursor + Codex Marketplace listings — submit all plugin manifests.
+- `.hm-meta.yaml` sidecar for Cursor assets — enable hash-tracking of `.cursor/rules/*.mdc` without polluting Cursor frontmatter.
+- User-configurable anti-rot repo list — `harness.yaml.anti_rot.github_repos` to track additional Claude Code ecosystem repos beyond the default.
+- Demo screencast — record a first-install + `/hm:loop` session.
+- `Enterprise` preset — stricter security gates, mandatory spec-driven dev mode.
 
 ---
 

@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.12.1 — Group A follow-up patch
+
+### Added
+- TECH_SPEC.md `## 7. Personalization Architecture (0.12.0)` section — mirrors README.md update with deeper ADR cross-refs (PLAN-personalization-depth-2026-05).
+
+### Fixed
+- `detection_cache.CACHED_MANIFESTS` now includes literal filenames from `STACK_GLOB_MANIFESTS` (`stack.yaml`, `package.yaml`). Haskell projects' profile cache correctly invalidates on these manifests' mtime bump; previously stale until 24h ceiling. Glob patterns (`*.csproj`, `*.sln`, `*.cabal`) remain on 24h-ceiling-only path — they cannot be stat'd. (Closes Phase 3 known limitation from 0.12.0.)
+- Snapshot fixtures regenerated — 0.12.0 release shipped with 8 failing `test_synthesize_snapshot.py` tests (`commands/hm/ai-readiness.md.j2` hash drift after Phase 10/12 template additions). 0.12.1 closes that quality gap.
+
+### Notes
+- 5-file version sync: 0.11.6 → 0.12.0 → 0.12.1 (.claude-plugin, .cursor-plugin, .codex-plugin, pyproject.toml, src/harness_maker/__init__.py).
+- Code-review grade A (2 cosmetic nits deferred): asymmetric dedup in `_flatten_stack_manifests` vs `_flatten_stack_glob_concrete`; test sequencing comment.
+
 ## 0.12.0 — personalization depth (Tracks A + D + B-start)
 
 ### Added — Track A (Detection Depth)
