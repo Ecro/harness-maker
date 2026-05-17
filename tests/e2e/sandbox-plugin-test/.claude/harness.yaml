@@ -1,15 +1,15 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.13.1
+harness_maker_version: 0.15.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: harness-yaml/Production.yaml.j2
 provenance: official
-content_hash: 1f134a64e5cc9e12fe9f15742d7e45c8051f9a0649669065e5868fc21d8f92cb
+content_hash: cdb3b69a02588709347b2f6d0d6dadc89210890fc91d4a511e1cdad634d769c7
 ---
 preset: Production
 locale: en
 targets: [claude-code]
-recommended_model: claude-opus-4-7
+default_model: claude-opus-4-7
 dev_mode: spec-driven
 default_workflow: exec-rev-wrap-ver
 caching: agent-aware

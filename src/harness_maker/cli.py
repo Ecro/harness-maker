@@ -132,10 +132,18 @@ def make(
         "--mechanical-checks",
         help="Semicolon-separated pre-review commands.",
     ),
+    default_model_override: str | None = typer.Option(
+        None,
+        "--default-model",
+        help=(
+            "Floor fallback Claude model: opus | sonnet | haiku. "
+            "Per-agent overrides go in harness.yaml > agent_models."
+        ),
+    ),
     recommended_model_override: str | None = typer.Option(
         None,
         "--recommended-model",
-        help="Claude model: opus | sonnet | haiku.",
+        help="[DEPRECATED — use --default-model. Removed no earlier than 0.17.0 per ADR-012.]",
     ),
     focus_override: str | None = typer.Option(
         None,
@@ -180,6 +188,38 @@ def make(
     ),
 ) -> None:
     """Generate or refine the project harness at TARGET/.claude/."""
+    # ADR-013 (PLAN-model-routing-multi-ide): turn the documented footgun
+    # `[fail:snapshot-regen-inside-worktree]` (count:4) into enforced
+    # prevention. Reject `--update` if cwd is inside a `.worktrees/`
+    # ancestor — running regen from a worktree corrupts state because the
+    # regen reads/writes the wrong working tree.
+    #
+    # Accepted risk: an explicit `target` argument pointing to a worktree
+    # path (e.g. `make ./.worktrees/foo --update` from a clean cwd) is NOT
+    # blocked. Adding that check would break harness-maker's own dogfood
+    # sandbox regen pipeline (`tests/e2e/sandbox` lives inside the worktree
+    # during local dev). Documented in REVIEW-... 2026-05-18.
+    #
+    # Bypass for CI / programmatic runs: HARNESS_MAKER_BYPASS_WORKTREE_GUARD=1.
+    if update and not os.environ.get("HARNESS_MAKER_BYPASS_WORKTREE_GUARD"):
+        try:
+            cwd = Path.cwd().resolve()
+        except OSError as exc:
+            typer.echo(f"[ERROR] cannot resolve cwd: {exc}", err=True)
+            raise typer.Exit(code=1) from exc
+        for ancestor in [cwd, *cwd.parents]:
+            if ancestor.name == ".worktrees":
+                typer.echo(
+                    f"[ERROR] Snapshot regen invoked from inside .worktrees/ — "
+                    f"this corrupts state.\n"
+                    f"        Run from the main repo root instead:\n"
+                    f"          cd <repo-root>\n"
+                    f"          uv run harness-maker make . --update\n"
+                    f"        (cwd={cwd})\n"
+                    f"        (CI/programmatic: set HARNESS_MAKER_BYPASS_WORKTREE_GUARD=1)",
+                    err=True,
+                )
+                raise typer.Exit(code=1)
     existing_yaml = target / ".claude" / "harness.yaml"
     # Phase 9 (personalization-depth) — primary capture site for axis-level
     # overrides. Snapshot BEFORE any writes so the diff later picks up
@@ -211,6 +251,21 @@ def make(
         if effective_autoloop and not autoloop:
             typer.echo("non-tty stdin detected; using --autoloop defaults")
         a = interview(p, autoloop_mode=effective_autoloop)
+    # ADR-012 deprecation: --recommended-model is a back-compat alias for
+    # --default-model. Emit DeprecationWarning on use; new code should use
+    # --default-model. Removal no earlier than 0.17.0.
+    if recommended_model_override is not None:
+        import warnings
+
+        warnings.warn(
+            "--recommended-model is renamed to --default-model. The old name "
+            "will be removed no earlier than 0.17.0 (ADR-012, "
+            "PLAN-model-routing-multi-ide).",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        if default_model_override is None:
+            default_model_override = recommended_model_override
     a = _apply_dimension_overrides(
         a,
         preset_override=preset_override,
@@ -220,7 +275,7 @@ def make(
         grade_threshold_override=grade_threshold_override,
         domains_override=domains_override,
         mechanical_checks_override=mechanical_checks_override,
-        recommended_model_override=recommended_model_override,
+        recommended_model_override=default_model_override,
         focus_override=focus_override,
         wrapup_docs_override=wrapup_docs_override,
         ref_folders_override=ref_folders_override,
@@ -609,7 +664,23 @@ def _apply_dimension_overrides(
             c.strip() for c in mechanical_checks_override.split(";") if c.strip()
         ]
     if recommended_model_override:
-        update["recommended_model"] = recommended_model_override
+        # Phase 3 mid-step: route the legacy CLI arg into the new canonical
+        # field. Phase 5 formalizes the --recommended-model deprecation alias
+        # to --default-model (ADR-012) with DeprecationWarning.
+        # Phase 8 review security fix: model_copy(update=...) bypasses the
+        # Pydantic field_validator on default_model — enforce the same safe
+        # character set at the CLI boundary so injection payloads can't slip
+        # through the kwarg path.
+        from harness_maker.models import _MODEL_ID_PATTERN
+
+        if not _MODEL_ID_PATTERN.fullmatch(recommended_model_override):
+            typer.echo(
+                f"[ERROR] --default-model / --recommended-model must match "
+                f"[a-zA-Z0-9_.:-]+ (got {recommended_model_override!r})",
+                err=True,
+            )
+            raise typer.Exit(code=1)
+        update["default_model"] = recommended_model_override
     if wrapup_docs_override is not None:
         update["wrapup_docs"] = [d.strip() for d in wrapup_docs_override.split(";") if d.strip()]
     if ref_folders_override is not None:

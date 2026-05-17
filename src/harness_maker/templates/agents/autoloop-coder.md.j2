@@ -3,7 +3,7 @@ name: autoloop-coder
 communication_variant: full
 description: Implementation agent for autoloop iterations — bounded scope, write-tool-only, no open-ended exploration; worktree-bounded writes
 tools: Read, Grep, Glob, Write, Edit, Bash
-model: opus
+model: {% if claude_model is defined %}{{ claude_model }}{% else %}sonnet{% endif %}
 ---
 
 {% include "agents/autoloop-coder_body.md.j2" -%}

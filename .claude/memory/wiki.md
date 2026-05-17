@@ -240,4 +240,7 @@ misbehaved on fenced literal markers). Lesson for future wrapup-template edits:
 ANY instruction that touches a marker-bearing file MUST name the marker
 explicitly. "Append" is a footgun verb in this codebase.
 
+### [wiki:model-routing-multi-ide] 2026-05-18 — per-agent model pinning + preset defaults shipped (0.15.0)
+13 ADRs landed via /hm:loop with per-phase /hm:review. Schema: HarnessConfig.default_model (renamed from recommended_model via AliasChoices for back-compat) + agent_models: dict[str, AgentModelSpec]. New presets.py: PRESET_AGENT_MODELS for Production (opus on reasoning agents, sonnet on reviewers) and Side (sonnet everywhere with downshifted reasoning_effort), CURSOR_MODEL_IDS canonical alias→ID table, 3-tier resolve_agent_spec (override → preset → default_model fallback — never KeyErrors). Per-IDE render: Claude `model: {{ claude_model }}` (decorative per #43869 until upstream fix), Cursor concrete IDs via CURSOR_MODEL_IDS normalization, Codex `model_reasoning_effort` per-agent + `[profiles.cheap]`/`[profiles.deep]` in .codex/config.toml. /hm:health Layer-1 model_routing dimension with 3 advisory sub-checks (weight 0). CLI `--default-model` flag + `--recommended-model` deprecated alias (ADR-012, removal no earlier than 0.17.0). `--update` cwd guard (ADR-013) rejects worktree-internal regen — turned 4× recurring `[fail:snapshot-regen-inside-worktree]` into enforced prevention.
+
 <!-- @hm:/user:entries -->

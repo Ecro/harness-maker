@@ -21,6 +21,9 @@ _DIM_NAMES = {
     "memory_continuity",
     "observability_setup",
     "governance",
+    # ADR-010 (PLAN-model-routing-multi-ide): advisory sub-check added 0.15.0.
+    # Weight 0; surfaces signals without changing composite.
+    "model_routing",
 }
 
 

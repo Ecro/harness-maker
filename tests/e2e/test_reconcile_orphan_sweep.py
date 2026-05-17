@@ -140,11 +140,16 @@ def _git_init(project: Path) -> None:
 
 
 def _inherited_env() -> dict[str, str]:
-    return {
+    env = {
         k: os.environ[k]
         for k in ("PATH", "HOME", "USER", "VIRTUAL_ENV", "UV_PROJECT_ENVIRONMENT")
         if k in os.environ
     }
+    # ADR-013 bypass: e2e runs `make ... --update` from cwd=REPO_ROOT, which
+    # has `.worktrees/` as ancestor during local dev. The guard would exit 1
+    # before the orphan sweep runs.
+    env["HARNESS_MAKER_BYPASS_WORKTREE_GUARD"] = "1"
+    return env
 
 
 def _run_make_update(project: Path) -> subprocess.CompletedProcess[str]:

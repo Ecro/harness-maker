@@ -2,6 +2,9 @@ name = "{{ name }}"
 description = "{{ description }}"
 {% if model_codex -%}
 model = "{{ model_codex }}"
+{% endif -%}
+{% if codex_reasoning_effort -%}
+model_reasoning_effort = "{{ codex_reasoning_effort }}"
 {% endif %}
 developer_instructions = """
 {% include "agents/" + name + "_body.md.j2" -%}

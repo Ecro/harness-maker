@@ -3,7 +3,7 @@ name: code-reviewer
 communication_variant: reframe
 description: Reviews code changes for correctness, readability, maintainability, and basic security/performance hygiene
 tools: Read, Grep, Glob
-model: sonnet
+model: {% if claude_model is defined %}{{ claude_model }}{% else %}sonnet{% endif %}
 review_scope: [code]
 permissions:
   allow:

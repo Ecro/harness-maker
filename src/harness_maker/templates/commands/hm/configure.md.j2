@@ -18,7 +18,7 @@ Read `.claude/harness.yaml` body (skip frontmatter) and surface:
 - enabled reviewers, grade_threshold, auto_fix
 - mechanical_checks (if any)
 - domains (if any)
-- recommended_model
+- default_model (per-agent overrides in `agent_models` if any)
 - wrapup_docs (if any)
 - ref_folders (paths + globs if any)
 - sibling_repos (relative paths if any)
@@ -46,7 +46,7 @@ Options (multi-select):
 - **Mechanical checks** — add/edit/clear pre-review commands. Trade-off:
   deterministic failures stop before LLM reviewers, but commands add their own
   runtime.
-- **Recommended model** — opus / sonnet / haiku. Trade-off: quality/cost/speed
+- **Default model** — opus / sonnet / haiku. Trade-off: quality/cost/speed. Per-agent overrides go in `harness.yaml` > `agent_models`.
   preference only; generated Codex agents still inherit the user's Codex
   profile model.
 - **Wrapup documents** — add/edit/clear docs updated during /hm:wrapup (e.g. CHANGELOG.md, TODO.md)
@@ -140,7 +140,7 @@ Run the CLI with only the changed flags:
 ```bash
 !uv run --with {{ harness_maker_src_path }} python -m harness_maker.cli make "$(pwd)" \
   --grade-threshold "$GRADE" --domains "$DOMAINS" --mechanical-checks "$CHECKS" \
-  --recommended-model "$MODEL" --focus "$FOCUS" --wrapup-docs "$WRAPUP_DOCS" \
+  --default-model "$MODEL" --focus "$FOCUS" --wrapup-docs "$WRAPUP_DOCS" \
   --ref-folders "$REF_FOLDERS" --sibling-repos "$SIBLING_REPOS" \
   --second-brain-vault-path "$SB_VAULT_PATH" --second-brain-project-id "$SB_PROJECT_ID"
 ```

@@ -178,7 +178,7 @@ def _build_map_system_prompt() -> str:
         "  - dev_mode: 'spec-driven' or 'task-driven'\n"
         "  - locale: language tag like 'en' or 'ko'\n"
         "  - targets: list of 'claude-code'|'cursor'|'codex'\n"
-        "  - recommended_model: free-text model id\n"
+        "  - default_model: free-text model id\n"
         "  - reviewers: list of reviewer names mentioned in the file\n"
         "  - domains: list of project domain keywords (e.g. 'flutter', 'zephyr')\n\n"
         "Respond with strict JSON ONLY, no markdown fences, no prose:\n"
@@ -449,7 +449,7 @@ def _build_render_context(
         "dev_mode": harness_config.dev_mode.value,
         "locale": harness_config.locale,
         "targets": [t.value for t in harness_config.targets],
-        "recommended_model": harness_config.recommended_model,
+        "default_model": harness_config.default_model,
         "mappings": [m.model_dump() for m in mapping.mappings],
     }
 

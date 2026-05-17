@@ -1,5 +1,18 @@
 [features]
 hooks = true
+
+# ADR-008 (PLAN-model-routing-multi-ide): per-loop invocation profiles.
+# Use `codex -p cheap "trivial turn"` to skip the reasoning step entirely
+# (largest cost lever per OpenAI platform docs), or `codex -p deep "..."` for
+# maximum reasoning. Both inherit your account's default model — they only
+# adjust reasoning_effort. Codex hooks cannot natively pick a model, so
+# cheap-precheck hook commands should shell out via `codex -p cheap ...`.
+[profiles.cheap]
+model_reasoning_effort = "minimal"
+
+[profiles.deep]
+model_reasoning_effort = "high"
+
 {% for agent_name, agent_desc in agents.items() %}
 [agents.{{ agent_name }}]
 config_file = "agents/{{ agent_name }}.toml"

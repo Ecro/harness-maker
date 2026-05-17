@@ -3,7 +3,7 @@ name: trajectory-monitor
 communication_variant: full
 description: Detect trajectory drift between current stage output and baseline (SPEC → PLAN → original prompt) — read-only, returns drift_score JSON
 tools: Read, Grep, Bash
-model: sonnet
+model: {% if claude_model is defined %}{{ claude_model }}{% else %}sonnet{% endif %}
 review_scope: [drift]
 ---
 

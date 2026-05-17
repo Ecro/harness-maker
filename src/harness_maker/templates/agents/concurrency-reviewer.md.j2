@@ -3,7 +3,7 @@ name: concurrency-reviewer
 communication_variant: reframe
 description: Reviews changes for race conditions, deadlocks, ISR safety, and async correctness
 tools: Read, Grep, Glob
-model: sonnet
+model: {% if claude_model is defined %}{{ claude_model }}{% else %}sonnet{% endif %}
 review_scope: [concurrency]
 permissions:
   allow:

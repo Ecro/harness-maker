@@ -11,6 +11,14 @@ from harness_maker import detection_cache, foreign_config, synthesize
 
 
 @pytest.fixture(autouse=True)
+def _bypass_worktree_guard(monkeypatch: pytest.MonkeyPatch) -> None:
+    """ADR-013 cwd guard fires when pytest itself runs inside the harness-maker
+    `.worktrees/<branch>/` checkout (which is the normal development case).
+    Set the documented bypass env var so unit tests can exercise --update."""
+    monkeypatch.setenv("HARNESS_MAKER_BYPASS_WORKTREE_GUARD", "1")
+
+
+@pytest.fixture(autouse=True)
 def _pin_harness_maker_pkg_root(monkeypatch: pytest.MonkeyPatch) -> None:
     """Pin synthesize._HARNESS_MAKER_PKG_ROOT for worktree-invariant snapshots.
 

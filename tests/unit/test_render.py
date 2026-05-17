@@ -548,7 +548,7 @@ def test_render_cursor_target_writes_targets_to_harness_yaml(tmp_path: Path) -> 
 
     yaml_text = (target / "harness.yaml").read_text(encoding="utf-8")
     assert "targets: [claude-code, cursor]" in yaml_text
-    assert "recommended_model: claude-opus-4-7" in yaml_text
+    assert "default_model: claude-opus-4-7" in yaml_text
 
 
 def test_render_agents_have_structured_permissions_frontmatter(tmp_path: Path) -> None:

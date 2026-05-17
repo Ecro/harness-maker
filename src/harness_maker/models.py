@@ -5,9 +5,17 @@ from __future__ import annotations
 import re
 from enum import Enum
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    AliasChoices,
+    BaseModel,
+    ConfigDict,
+    Field,
+    computed_field,
+    field_validator,
+    model_validator,
+)
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Enums (string-valued)
@@ -414,6 +422,64 @@ class AdaptiveConfig(BaseModel):
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# Per-agent model routing (ADR-001/002/003 from PLAN-model-routing-multi-ide)
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+class CodexAgentSpec(BaseModel):
+    """Codex-side per-agent routing knobs.
+
+    ``model`` ``None`` means "inherit ~/.codex/config.toml default" (preferred
+    on ChatGPT-tier accounts which reject most explicit Codex IDs — see
+    RESEARCH-codex-plan-validator-model-unavailable). ``reasoning_effort`` is
+    the dominant cost lever on reasoning models.
+    """
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    model: str | None = None
+    reasoning_effort: (
+        Literal["none", "minimal", "low", "medium", "high", "xhigh"] | None
+    ) = None
+
+
+_MODEL_ID_PATTERN = re.compile(r"^[a-zA-Z0-9_.:-]+$")
+
+
+class AgentModelSpec(BaseModel):
+    """Per-agent override carrying optional Claude / Cursor / Codex values.
+
+    ADR-003 R5: ``cursor`` accepts either an alias key (``opus``/``sonnet``/
+    ``haiku``) or a concrete model ID (``claude-4-7-opus``). Alias-form is
+    normalized to concrete ID at render boundary by ``presets.resolve_agent_spec``.
+
+    Security: ``claude``/``cursor`` values flow into Jinja2-rendered YAML
+    frontmatter (``model: {{ claude_model }}``); a field_validator enforces a
+    strict character set [a-zA-Z0-9_.:-] to prevent YAML-injection via embedded
+    newlines / colons / hash signs (review security-reviewer P0/P1 fix).
+    """
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    claude: str | None = None
+    cursor: str | None = None
+    codex: CodexAgentSpec | None = None
+
+    @field_validator("claude", "cursor")
+    @classmethod
+    def _validate_model_id_chars(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        if not _MODEL_ID_PATTERN.fullmatch(v):
+            raise ValueError(
+                f"model id must match [a-zA-Z0-9_.:-]+ (got {v!r}) — "
+                "embedded YAML-significant characters are rejected to prevent "
+                "frontmatter injection"
+            )
+        return v
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Composite models
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -421,7 +487,9 @@ class AdaptiveConfig(BaseModel):
 class HarnessConfig(BaseModel):
     """harness.yaml schema — single source of truth for a project's harness."""
 
-    model_config = ConfigDict(strict=True, extra="forbid")
+    # populate_by_name=True lets `recommended_model` (old) and `default_model`
+    # (new canonical, ADR-002) both populate the field via AliasChoices below.
+    model_config = ConfigDict(strict=True, extra="forbid", populate_by_name=True)
 
     # Free-text locale tag. en/ko ship with built-in i18n catalogs; unknown
     # tags fall back to English in i18n.t().
@@ -434,11 +502,44 @@ class HarnessConfig(BaseModel):
         default_factory=lambda: [Target.CLAUDE_CODE],
         min_length=1,
     )
-    # Cursor 사용자에게 권장 모델 — agent frontmatter `model` 에 박힘. user
-    # override 자유. prompt 자체는 model-agnostic 재작성 안 함
-    # (CLAUDE.md § Targets 정책).
-    recommended_model: str = "claude-opus-4-7"
+    # ADR-002: floor fallback model. Renamed from `recommended_model` (which
+    # remains a read-side property below and a validation alias for old
+    # harness.yaml files — ADR-004 silent migration).
+    default_model: str = Field(
+        default="claude-opus-4-7",
+        validation_alias=AliasChoices("default_model", "recommended_model"),
+    )
+    # ADR-001/002: per-agent override map. Empty default → preset map applies
+    # via presets.resolve_agent_spec (ADR-005 3-tier chain).
+    agent_models: dict[str, AgentModelSpec] = Field(default_factory=dict)
     preset: Preset = Preset.SIDE
+
+    @model_validator(mode="before")
+    @classmethod
+    def _migrate_recommended_model_dual_key(cls, data: object) -> object:
+        """ADR-004 silent migration: if both `default_model` and the deprecated
+        `recommended_model` are present in the input dict, `default_model` wins
+        and `recommended_model` is silently dropped (instead of raising
+        extra_forbidden). Required because AliasChoices alone treats the
+        non-chosen key as an extra field under `extra="forbid"`.
+        """
+        if isinstance(data, dict) and "default_model" in data and "recommended_model" in data:
+            data = {k: v for k, v in data.items() if k != "recommended_model"}
+        return data
+
+    @field_validator("default_model")
+    @classmethod
+    def _validate_default_model_chars(cls, v: str) -> str:
+        """Security: default_model reaches Jinja2-rendered configs (aider, claude
+        frontmatter, etc.) without escaping. Enforce safe character set to block
+        YAML / config injection (review security-reviewer P0 fix)."""
+        if not _MODEL_ID_PATTERN.fullmatch(v):
+            raise ValueError(
+                f"default_model must match [a-zA-Z0-9_.:-]+ (got {v!r}) — "
+                "embedded YAML-significant characters are rejected to prevent "
+                "rendered-config injection"
+            )
+        return v
     dev_mode: DevMode = DevMode.SPEC_DRIVEN
     workflows: dict[str, list[AtomicStage]] = Field(
         default_factory=lambda: {
@@ -482,7 +583,9 @@ class HarnessConfig(BaseModel):
     # Adaptive personalization knobs (Phase 1 of personalization-depth).
     # default_factory keeps old harness.yaml files (no `adaptive:` key) loading.
     adaptive: AdaptiveConfig = Field(default_factory=AdaptiveConfig)
-    schema_version: int = 1
+    # ADR-011: schema_version bumped 1 → 2 for the agent_models/default_model
+    # rename. ADR-004 silent migration handles existing v1 harness.yaml.
+    schema_version: int = 2
     interview: dict[str, Any] = Field(
         default_factory=lambda: {
             "deep_gate": {"max_rounds": 3, "streak_target": 2},
@@ -505,6 +608,16 @@ class HarnessConfig(BaseModel):
                 raise ValueError(f"sibling_repos must contain relative paths; got absolute: {p!r}")
         return v
 
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def recommended_model(self) -> str:
+        """Read-side back-compat — deprecated, slated for removal in 0.17.0 per
+        ADR-012. computed_field (not plain @property) so Jinja2 templates that
+        access ``config.recommended_model`` via ``model_dump()`` dicts continue
+        to resolve until templates are migrated to ``default_model`` in Phase 3.
+        """
+        return self.default_model
+
 
 class Blueprint(BaseModel):
     """Synthesizer output: a full HarnessConfig plus the file list to render."""
@@ -518,7 +631,9 @@ class Blueprint(BaseModel):
 class InterviewAnswers(BaseModel):
     """Typed interview output — replaces loose dict[str, Any]."""
 
-    model_config = ConfigDict(strict=True, extra="forbid")
+    # populate_by_name=True lets the deprecated `recommended_model` key
+    # still construct InterviewAnswers (per ADR-004 silent migration).
+    model_config = ConfigDict(strict=True, extra="forbid", populate_by_name=True)
 
     locale: str = "en"
     # IDE target multi-select (preset/dev_mode 와 직교). 빈 list 거부 (min_length=1).
@@ -527,10 +642,39 @@ class InterviewAnswers(BaseModel):
         default_factory=lambda: [Target.CLAUDE_CODE],
         min_length=1,
     )
-    # Recommended Claude model — written into agent frontmatter `model` field.
-    # Maps to HarnessConfig.recommended_model in synthesize.
-    recommended_model: str = "claude-opus-4-7"
+    # ADR-002 mirror of HarnessConfig.default_model. AliasChoices accepts both
+    # the new canonical name and the old `recommended_model` key.
+    default_model: str = Field(
+        default="claude-opus-4-7",
+        validation_alias=AliasChoices("default_model", "recommended_model"),
+    )
+    # ADR-001/002 mirror.
+    agent_models: dict[str, AgentModelSpec] = Field(default_factory=dict)
     preset: Preset = Preset.SIDE
+
+    @model_validator(mode="before")
+    @classmethod
+    def _migrate_recommended_model_dual_key(cls, data: object) -> object:
+        """Mirror of HarnessConfig validator — same ADR-004 silent migration.
+        Required for InterviewAnswers.model_validate paths that originate from
+        load_harness_yaml() in Phase 2 (dual-key inputs would raise
+        extra_forbidden without this guard)."""
+        if isinstance(data, dict) and "default_model" in data and "recommended_model" in data:
+            data = {k: v for k, v in data.items() if k != "recommended_model"}
+        return data
+
+    @field_validator("default_model")
+    @classmethod
+    def _validate_default_model_chars(cls, v: str) -> str:
+        """Mirror of HarnessConfig: enforce safe character set to block injection."""
+        if not _MODEL_ID_PATTERN.fullmatch(v):
+            raise ValueError(
+                f"default_model must match [a-zA-Z0-9_.:-]+ (got {v!r}) — "
+                "embedded YAML-significant characters are rejected to prevent "
+                "rendered-config injection"
+            )
+        return v
+
     dev_mode: DevMode = DevMode.SPEC_DRIVEN
     domains: list[str] = Field(default_factory=list)
     ref_folders: list[RefFolder] = Field(default_factory=list)
@@ -610,3 +754,10 @@ class InterviewAnswers(BaseModel):
             )
             raise ValueError(msg)
         return self
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def recommended_model(self) -> str:
+        """Read-side back-compat — ADR-012 deprecation window. computed_field
+        so the key appears in model_dump() for downstream template consumers."""
+        return self.default_model

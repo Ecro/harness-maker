@@ -1,0 +1,35 @@
+---
+generated_by: harness-maker
+content_hash: "fixture-fake-hash-for-test"
+source_template: harness-yaml/Production.yaml.j2
+harness_maker_version: "0.14.3"
+generated_at: "2026-05-17T00:00:00Z"
+---
+locale: en
+targets:
+  - claude-code
+preset: Production
+dev_mode: spec-driven
+recommended_model: claude-opus-4-7
+workflows:
+  exec-rev-wrap:
+    - execute
+    - review
+    - wrapup
+default_workflow: exec-rev-wrap
+caching: agent-aware
+reviewers:
+  installed:
+    - code-reviewer
+    - security-reviewer
+  enabled:
+    - code-reviewer
+    - security-reviewer
+  consensus: cross-check
+  auto_fix: true
+  grade_threshold: A
+  max_review_rounds: 3
+skills:
+  installed: []
+  enabled: []
+schema_version: 1

@@ -102,10 +102,11 @@ harness_maker.gates.X`.
 
 ## Models
 
-Default recommendation: `claude-opus-4-7` (`harness.yaml.recommended_model`).
-Agent frontmatter `model` carries the same recommendation. Cursor users may
-override freely, but prompts contain Claude-specific patterns
-(`<thinking>` blocks, role framing) so quality may degrade on other models.
+Default recommendation: `claude-opus-4-7` (`harness.yaml.default_model`).
+Per-agent overrides go in `harness.yaml.agent_models` (see ADR-002 +
+docs/HOW-IT-WORKS.md > Agent Models). Cursor users may override freely, but
+prompts contain Claude-specific patterns (`<thinking>` blocks, role framing)
+so quality may degrade on other models.
 
 ## Memory
 

@@ -1,5 +1,74 @@
 # Changelog
 
+## 0.15.0 — per-agent model routing + preset-aware defaults (2026-05-18)
+
+Token-cost optimization across Claude Code / Cursor / Codex via declarative
+per-agent model pinning. 13 ADRs locked in PLAN-model-routing-multi-ide.md.
+8 implementation phases shipped via /hm:loop with per-phase /hm:review.
+
+### Added
+
+- **Per-agent model schema** (ADR-001/002) — new `HarnessConfig.agent_models:
+  dict[str, AgentModelSpec]` with nested `{claude, cursor, codex: {model,
+  reasoning_effort}}`. `recommended_model: str` renamed to `default_model: str`
+  (deprecated read-side property kept for 0.15.x / 0.16.x; removed no earlier
+  than 0.17.0 per ADR-012).
+- **Preset-aware defaults** (ADR-005) — new `src/harness_maker/presets.py`
+  ships `PRESET_AGENT_MODELS` for Production (opus on 3 reasoning agents,
+  sonnet on 11 reviewers) and Side (sonnet everywhere with downshifted
+  reasoning_effort). 3-tier `resolve_agent_spec()`: explicit override →
+  preset map → `_spec_from_default_model` fallback (never KeyErrors on
+  user-authored agents).
+- **Canonical Cursor ID table** (ADR-003) — `CURSOR_MODEL_IDS` maps aliases
+  (`opus`/`sonnet`/`haiku`) to concrete IDs. Users write aliases in
+  `agent_models`; renderer normalizes via this table at render boundary
+  (single-point upgrade across Claude releases). Templates lint-enforced
+  against raw concrete IDs.
+- **Codex profiles** (ADR-008) — `.codex/config.toml` now renders
+  `[profiles.cheap]` (`reasoning_effort=minimal`) + `[profiles.deep]`
+  (`reasoning_effort=high`). Codex agent TOMLs render
+  `model_reasoning_effort` per-agent (the dominant cost lever; keep `model =`
+  omission per RESEARCH-codex-plan-validator-model-unavailable).
+- **/hm:health Layer-1 sub-check** (ADR-010) — new `model_routing` dimension
+  with 3 advisory signals: Claude #43869 reliance, Cursor alias-form
+  warnings, Codex reasoning_effort coverage. Weight 0 (advisory only;
+  doesn't change composite).
+- **CLI `--default-model` flag** + back-compat alias `--recommended-model`
+  (ADR-012) with DeprecationWarning.
+- **`--update` cwd guard** (ADR-013) — rejects snapshot regen invoked from
+  inside `.worktrees/<branch>/`, turning the documented footgun
+  (`[fail:snapshot-regen-inside-worktree]` count:4) into enforced
+  prevention with actionable error message.
+- **Silent schema migration** (ADR-004 + ADR-011) — `recommended_model:` in
+  v1 harness.yaml migrates silently to `default_model`; INFO log gated on
+  `schema_version<2` to avoid noise on fresh v2 renders. Multi-doc YAML
+  provenance frontmatter handled via `io_utils.load_harness_yaml()`.
+- **HOW-IT-WORKS docs** — new "Agent Models" section with worked example
+  covering preset defaults, per-agent override, and the 3-tier resolution chain.
+
+### Changed
+
+- `HarnessConfig.schema_version`: 1 → 2.
+- 14 agent `.md.j2` templates: hardcoded `model: opus|sonnet` → `model:
+  {{ claude_model }}` (context driven by `resolve_agent_spec`).
+- 2 preset YAML templates + 5 foreign-config templates: `recommended_model:`
+  → `default_model:` rename.
+
+### Fixed
+
+- Pydantic dual-key handling for AliasChoices + `extra="forbid"` —
+  `model_validator(mode="before")` silently drops `recommended_model` when
+  `default_model` is also present (avoids `extra_forbidden` on rendered
+  output round-trip).
+- `agent_models` parse path catches `pydantic.ValidationError` in addition
+  to `TypeError`/`ValueError` so a malformed override drops with a WARNING
+  log instead of silently nuking the whole `answers_from_harness_yaml`
+  return (Phase 2 /hm:review consensus-passed P1 fix).
+- Migration log message sanitizes newline + ANSI escape sequences in
+  user-provided values (security-reviewer P1 fix).
+- Migration log includes the harness.yaml path so multi-repo runs can
+  identify which file triggered the advisory (code-reviewer P1 fix).
+
 ## 0.14.3 — universal bootstrap prompt restored over the plugin-install paths (2026-05-17)
 
 0.14.2 replaced the universal LLM bootstrap prompt with three per-IDE install

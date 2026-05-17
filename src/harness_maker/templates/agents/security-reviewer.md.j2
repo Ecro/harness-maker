@@ -3,7 +3,7 @@ name: security-reviewer
 communication_variant: reframe
 description: Reviews changes for secrets exposure, injection, auth flaws, and unsafe permission grants
 tools: Read, Grep, Glob
-model: sonnet
+model: {% if claude_model is defined %}{{ claude_model }}{% else %}sonnet{% endif %}
 review_scope: [security]
 permissions:
   allow:

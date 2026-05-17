@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from harness_maker.models import (
+    AgentModelSpec,
     AtomicStage,
     Blueprint,
     FileEntry,
@@ -192,15 +193,46 @@ _COMMUNICATION_VARIANT: dict[str, str] = {
 }
 
 
-def _agent_files() -> list[FileSpec]:
-    return [
-        (
-            f"agents/{n}.md.j2",
-            f"agents/{n}.md",
-            {"name": n, "reviewer_kind": _REVIEWER_KIND.get(n, "")},
+def _agent_files(
+    preset: Preset = Preset.SIDE,
+    agent_models: dict[str, AgentModelSpec] | None = None,
+    default_model: str = "claude-opus-4-7",
+) -> list[FileSpec]:
+    """Agent .md.j2 contexts include per-agent model values resolved through
+    the 3-tier presets.resolve_agent_spec chain (ADR-005). Templates render
+    `model: {{ claude_model }}` instead of hardcoded aliases (ADR-003).
+
+    Module-load skeletons (SIDE_FILES / PRODUCTION_FILES) pass defaults so
+    the FileSpec list stays import-time-evaluable; synthesize() passes the
+    live HarnessConfig values at render time.
+    """
+    from harness_maker.models import HarnessConfig
+    from harness_maker.presets import resolve_agent_spec
+
+    config = HarnessConfig(
+        preset=preset,
+        agent_models=agent_models or {},
+        default_model=default_model,
+    )
+    out: list[FileSpec] = []
+    for n in _ALL_AGENTS:
+        spec = resolve_agent_spec(n, config)
+        out.append(
+            (
+                f"agents/{n}.md.j2",
+                f"agents/{n}.md",
+                {
+                    "name": n,
+                    "reviewer_kind": _REVIEWER_KIND.get(n, ""),
+                    "claude_model": spec.claude,
+                    "cursor_model": spec.cursor,
+                    "codex_reasoning_effort": (
+                        spec.codex.reasoning_effort if spec.codex else None
+                    ),
+                },
+            )
         )
-        for n in _ALL_AGENTS
-    ]
+    return out
 
 
 # Codex agent metadata: description only. ChatGPT-tier Codex CLI rejects every
@@ -234,29 +266,47 @@ _CODEX_AGENT_META: dict[str, str] = {
 }
 
 
-def _codex_agent_files() -> list[FileSpec]:
+def _codex_agent_files(
+    preset: Preset = Preset.SIDE,
+    agent_models: dict[str, AgentModelSpec] | None = None,
+    default_model: str = "claude-opus-4-7",
+) -> list[FileSpec]:
     """Codex agent TOML files — one per agent using codex/agent.toml.j2.
 
-    `model_codex` is explicitly set to None so the template's
-    `{% if model_codex %}` gate evaluates falsy under StrictUndefined.
-    The gate is preserved (not removed) so a future opt-in knob
-    (`codex_agent_models` on HarnessConfig — see PLAN Non-Goals) can
-    pass a real model string without template changes. ADR-001.
+    `model_codex` stays None (Codex CLI rejects most hardcoded IDs on
+    ChatGPT-tier accounts — see RESEARCH-codex-plan-validator-model-unavailable).
+    ADR-008 (PLAN-model-routing-multi-ide): `model_reasoning_effort` is the
+    tier-agnostic cost lever and IS rendered per-agent when set by the
+    resolved spec.
     """
-    return [
-        (
-            "codex/agent.toml.j2",
-            f".codex/agents/{n}.toml",
-            {
-                "name": n,
-                "description": _CODEX_AGENT_META[n],
-                "model_codex": None,
-                "reviewer_kind": _REVIEWER_KIND.get(n, ""),
-                "communication_variant": _COMMUNICATION_VARIANT[n],
-            },
+    from harness_maker.models import HarnessConfig
+    from harness_maker.presets import resolve_agent_spec
+
+    config = HarnessConfig(
+        preset=preset,
+        agent_models=agent_models or {},
+        default_model=default_model,
+    )
+    out: list[FileSpec] = []
+    for n in _ALL_AGENTS:
+        spec = resolve_agent_spec(n, config)
+        out.append(
+            (
+                "codex/agent.toml.j2",
+                f".codex/agents/{n}.toml",
+                {
+                    "name": n,
+                    "description": _CODEX_AGENT_META[n],
+                    "model_codex": None,
+                    "codex_reasoning_effort": (
+                        spec.codex.reasoning_effort if spec.codex else None
+                    ),
+                    "reviewer_kind": _REVIEWER_KIND.get(n, ""),
+                    "communication_variant": _COMMUNICATION_VARIANT[n],
+                },
+            )
         )
-        for n in _ALL_AGENTS
-    ]
+    return out
 
 
 def _skill_files() -> list[FileSpec]:
@@ -303,12 +353,19 @@ def _localized(stem: str, locale: str) -> str:
     return f"{stem}.{suffix}.md.j2"
 
 
-def _base_files(preset: Preset, locale: str = "en") -> list[FileSpec]:
+def _base_files(
+    preset: Preset,
+    locale: str = "en",
+    agent_models: dict[str, AgentModelSpec] | None = None,
+    default_model: str = "claude-opus-4-7",
+) -> list[FileSpec]:
     """Shared base: stages + atomic commands + all agents/skills + fixed assets.
 
     Preset gates the structural variants (harness.yaml / settings.json /
     CLAUDE.md). Locale gates the prose-only templates (CLAUDE.md +
     memory/{failures,wiki}). Unknown locales silently fall back to en.
+    `agent_models` + `default_model` flow into `_agent_files()` for per-agent
+    model frontmatter resolution (ADR-005).
     """
     yaml_template = (
         "harness-yaml/Side.yaml.j2" if preset == Preset.SIDE else "harness-yaml/Production.yaml.j2"
@@ -332,7 +389,7 @@ def _base_files(preset: Preset, locale: str = "en") -> list[FileSpec]:
         ("commands/hm/configure.md.j2", "commands/hm/configure.md", {}),
         ("commands/hm/uninstall.md.j2", "commands/hm/uninstall.md", {}),
         *_skill_files(),
-        *_agent_files(),
+        *_agent_files(preset, agent_models, default_model),
         *_rubric_files(),
         ("hooks/hooks.json.j2", "hooks/hooks.json", {}),
         ("observability/dashboard.md.j2", "observability/dashboard.md", {}),
@@ -403,8 +460,16 @@ def _codex_target_files(
     fused_workflows: dict[str, list[AtomicStage]],
     *,
     config_dump: dict[str, object] | None = None,
+    preset: Preset = Preset.SIDE,
+    agent_models: dict[str, AgentModelSpec] | None = None,
+    default_model: str = "claude-opus-4-7",
 ) -> list[FileSpec]:
-    """Codex target-specific assets: config.toml + AGENTS.md + hooks.json + agents + skills."""
+    """Codex target-specific assets: config.toml + AGENTS.md + hooks.json + agents + skills.
+
+    Phase 4 (ADR-008): `agent_models` + `default_model` flow into both
+    `_codex_agent_files` (per-agent `model_reasoning_effort`) and the
+    `.codex/config.toml` `[profiles.cheap]` / `[profiles.deep]` blocks.
+    """
     from harness_maker.render import _make_env  # local import: avoid cycle
 
     if config_dump is None:
@@ -434,7 +499,7 @@ def _codex_target_files(
             ".codex/hooks.json",
             {},
         ),
-        *_codex_agent_files(),
+        *_codex_agent_files(preset, agent_models, default_model),
         *_codex_skill_files(),
         *_codex_stage_skills(config_dump=config_dump),
         *_codex_workflow_skills(fused_workflows),
@@ -511,13 +576,19 @@ def synthesize(
     Workflow command FileEntries are generated from `answers.fused_workflows`.
     """
     effective_preset = preset or answers.preset
-    base_specs = _base_files(effective_preset, answers.locale)
+    base_specs = _base_files(
+        effective_preset,
+        answers.locale,
+        agent_models=dict(answers.agent_models),
+        default_model=answers.default_model,
+    )
 
     # Build config before file_specs so Codex skill rendering gets real user values.
     config = HarnessConfig(
         locale=answers.locale,
         targets=list(answers.targets),
-        recommended_model=answers.recommended_model,
+        default_model=answers.default_model,
+        agent_models=dict(answers.agent_models),
         preset=effective_preset,
         dev_mode=answers.dev_mode,
         workflows=dict(answers.fused_workflows),
@@ -562,7 +633,15 @@ def synthesize(
         file_specs.extend(_cursor_target_files())
 
     if Target.CODEX in answers.targets:
-        file_specs.extend(_codex_target_files(answers.fused_workflows, config_dump=config_dump))
+        file_specs.extend(
+            _codex_target_files(
+                answers.fused_workflows,
+                config_dump=config_dump,
+                preset=effective_preset,
+                agent_models=dict(answers.agent_models),
+                default_model=answers.default_model,
+            )
+        )
 
     # Skills inventory + enabled list aren't part of HarnessConfig today, but
     # templates need them; expose via per-file context.

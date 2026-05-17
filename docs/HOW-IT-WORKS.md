@@ -1353,6 +1353,81 @@ worktree:
 
 ---
 
+## 7a. Agent Models (per-agent model routing, 0.15.0+)
+
+`harness.yaml` ships two model-related fields:
+
+- `default_model: str` — floor fallback (default `claude-opus-4-7`). Used
+  when an agent has no preset entry and no explicit override.
+- `agent_models: dict[str, AgentModelSpec]` — per-agent override map. Each
+  spec carries optional `claude`, `cursor`, and `codex: {model,
+  reasoning_effort}` fields.
+
+### Resolution chain (3 tiers)
+
+For every agent name the renderer asks `presets.resolve_agent_spec(name, config)`:
+
+1. **Tier 1** — `config.agent_models.get(name)` (your explicit override)
+2. **Tier 2** — `PRESET_AGENT_MODELS[config.preset].get(name)` (preset default
+   for shipped agents — Production puts opus on `autoloop-coder`,
+   `plan-validator`, `stuck`; sonnet on the 11 reviewer/structured agents)
+3. **Tier 3** — `_spec_from_default_model(config.default_model)` (catch-all
+   for user-authored custom agents — never KeyErrors)
+
+### Per-IDE rendering
+
+- **Claude** — `model: {{ claude_model }}` in agent `.md` frontmatter.
+  Note: Anthropic [#43869](https://github.com/anthropics/claude-code/issues/43869)
+  silently ignores subagent model frontmatter today; we render it anyway
+  for forward-compatibility and surface the gap via `/hm:health` Layer-1
+  `model_routing` advisory.
+- **Cursor** — concrete IDs are emitted (works on 2.4+); aliases in
+  `agent_models[*].cursor` are normalized via the `CURSOR_MODEL_IDS`
+  canonical table at render boundary. Editing a single dict in `presets.py`
+  upgrades every rendered file across a Claude version bump.
+- **Codex** — `model_reasoning_effort = "..."` per agent (the dominant
+  cost lever on reasoning models; `model =` stays omitted per
+  ChatGPT-tier constraints). `.codex/config.toml` also gets
+  `[profiles.cheap]` (`minimal`) and `[profiles.deep]` (`high`) blocks
+  for invocation-time switching via `codex -p cheap` / `codex -p deep`.
+
+### Worked example
+
+A Production project that wants `autoloop-coder` on Haiku for cost-pinning,
+keeps everything else on preset defaults:
+
+```yaml
+preset: Production
+default_model: claude-opus-4-7
+agent_models:
+  autoloop-coder:
+    claude: haiku
+    cursor: haiku          # alias; renderer normalizes to "claude-4-5-haiku"
+    codex:
+      reasoning_effort: minimal
+```
+
+Renders as:
+
+- `.claude/agents/autoloop-coder.md` → `model: haiku`
+  (Cursor 2.4+ reads this same file natively — single source, no separate
+  `.cursor/agents/`.) For the Cursor-consumed value, the renderer normalizes
+  the alias to a concrete ID via `CURSOR_MODEL_IDS` so the same template
+  context emits `claude-4-5-haiku` in the cursor-side context variable.
+- `.codex/agents/autoloop-coder.toml` → `model_reasoning_effort = "minimal"`
+
+All other agents (`code-reviewer`, `plan-validator`, …) inherit
+`PRESET_AGENT_MODELS[Preset.PRODUCTION]` defaults silently.
+
+### Migration from `recommended_model:`
+
+Existing v1 harness.yaml files with `recommended_model: ...` migrate
+silently at re-render time. One INFO log per migration. The deprecated
+key remains valid as a Pydantic `AliasChoices` input alongside
+`default_model` until the 0.17.0 hard removal (ADR-012).
+
+---
+
 ## 8. Agent Reference
 
 Agents are sub-agents with independent contexts. When the main Claude context invokes them with the Task tool, a separate LLM call occurs and returns results.

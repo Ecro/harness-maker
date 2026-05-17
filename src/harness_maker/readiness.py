@@ -21,6 +21,8 @@ from harness_maker.context_lint import _count_body_lines
 from harness_maker.models import Preset
 
 # Layer-1 dimension weights (sum to 1.0 per preset).
+# model_routing is weight 0 (advisory per ADR-010) — surfaces signals/actions
+# in the dashboard without changing the composite score.
 WEIGHTS_SIDE: dict[str, float] = {
     "context_quality": 0.26,
     "guardrails": 0.21,
@@ -29,6 +31,7 @@ WEIGHTS_SIDE: dict[str, float] = {
     "memory_continuity": 0.11,
     "observability_setup": 0.10,
     "governance": 0.00,
+    "model_routing": 0.00,
 }
 WEIGHTS_PROD: dict[str, float] = {
     "context_quality": 0.21,
@@ -38,6 +41,7 @@ WEIGHTS_PROD: dict[str, float] = {
     "memory_continuity": 0.11,
     "observability_setup": 0.05,
     "governance": 0.05,
+    "model_routing": 0.00,
 }
 
 # CLAUDE.md / agent / skill body line caps (per preset). Mirrors context_lint.THRESHOLDS.
@@ -784,6 +788,184 @@ def _dim_observability_setup(project_dir: Path) -> DimensionScore:
     )
 
 
+def _dim_model_routing(project_dir: Path) -> DimensionScore:
+    """ADR-010 (PLAN-model-routing-multi-ide): 3 advisory sub-checks per IDE target.
+
+    All checks are advisory (score-only, not failure-grade):
+    (a) Claude target + any agent_models.<*>.claude set → relies on Anthropic
+        issue #43869 which is currently silently broken — subagents inherit
+        parent model regardless. Render frontmatter anyway for forward-compat.
+    (b) Cursor target + any agent_models.<*>.cursor value matching a known
+        alias key (PRE-resolution) → user opted into alias-form; renderer
+        normalizes via CURSOR_MODEL_IDS, but the raw value in harness.yaml
+        may surprise future readers and pre-3.3 Cursor versions need
+        concrete IDs.
+    (c) Codex target + agents with reasoning_effort=None → the dominant cost
+        lever isn't pinned; defaults will apply.
+    """
+    from harness_maker.io_utils import load_harness_yaml
+    from harness_maker.presets import CURSOR_MODEL_IDS
+
+    signals: list[Signal] = []
+    harness_yaml = project_dir / ".claude" / "harness.yaml"
+    if not harness_yaml.exists():
+        signals.append(
+            _signal(
+                "harness_yaml_present",
+                False,
+                100,
+                ".claude/harness.yaml missing — cannot evaluate model routing",
+                "Run /hm:make to scaffold the harness",
+            )
+        )
+        return DimensionScore(
+            name="model_routing", score=_score_signals(signals), signals=signals
+        )
+
+    try:
+        import yaml as _yaml
+
+        data = load_harness_yaml(harness_yaml)
+    except (OSError, _yaml.YAMLError, ValueError, KeyError):
+        # Best-effort readiness: malformed/inaccessible harness.yaml → empty
+        # data, advisory checks still surface as N/A. AssertionError from a
+        # logic bug intentionally NOT caught — surface it for fixing (review
+        # security-reviewer P2 fix).
+        data = {}
+    targets = data.get("targets") or []
+    targets_set = {str(t) for t in targets} if isinstance(targets, list) else set()
+    raw_agent_models = data.get("agent_models") or {}
+    if not isinstance(raw_agent_models, dict):
+        raw_agent_models = {}
+
+    # (a) Claude — #43869 advisory
+    has_claude = "claude-code" in targets_set
+    claude_overrides = [
+        name
+        for name, spec in raw_agent_models.items()
+        if isinstance(spec, dict) and spec.get("claude")
+    ]
+    if has_claude:
+        claude_ok = not claude_overrides  # no override → no reliance on #43869
+        signals.append(
+            _signal(
+                "claude_subagent_routing_43869",
+                claude_ok,
+                33,
+                "no per-agent claude overrides"
+                if claude_ok
+                else (
+                    f"{len(claude_overrides)} agent(s) with `claude:` "
+                    f"override — Anthropic #43869 silently ignores subagent "
+                    f"model frontmatter today (frontmatter rendered for "
+                    f"forward-compat). See docs/HOW-IT-WORKS.md > Agent Models."
+                ),
+                None
+                if claude_ok
+                else (
+                    "Track https://github.com/anthropics/claude-code/issues/43869; "
+                    "overrides will activate when fix lands."
+                ),
+            )
+        )
+    else:
+        # No claude target → check inapplicable, pass for free
+        signals.append(
+            _signal(
+                "claude_subagent_routing_43869",
+                True,
+                33,
+                "claude-code not in targets — check N/A",
+                None,
+            )
+        )
+
+    # (b) Cursor — alias vs concrete-ID advisory (inspects PRE-resolution raw values)
+    has_cursor = "cursor" in targets_set
+    cursor_alias_overrides = [
+        name
+        for name, spec in raw_agent_models.items()
+        if isinstance(spec, dict)
+        and isinstance(spec.get("cursor"), str)
+        and spec["cursor"] in CURSOR_MODEL_IDS
+    ]
+    if has_cursor:
+        cursor_ok = not cursor_alias_overrides
+        signals.append(
+            _signal(
+                "cursor_alias_vs_concrete_id",
+                cursor_ok,
+                33,
+                "no alias-form cursor values in agent_models"
+                if cursor_ok
+                else (
+                    f"{len(cursor_alias_overrides)} agent(s) wrote alias-form "
+                    f"`cursor:` (renderer normalizes via CURSOR_MODEL_IDS; "
+                    f"works on Cursor 3.3+; on 2.4-3.2 the renderer emits "
+                    f"concrete IDs so this is informational only)."
+                ),
+                None,
+            )
+        )
+    else:
+        signals.append(
+            _signal(
+                "cursor_alias_vs_concrete_id",
+                True,
+                33,
+                "cursor not in targets — check N/A",
+                None,
+            )
+        )
+
+    # (c) Codex — reasoning_effort coverage
+    has_codex = "codex" in targets_set
+    codex_missing_effort = [
+        name
+        for name, spec in raw_agent_models.items()
+        if isinstance(spec, dict)
+        and (
+            not isinstance(spec.get("codex"), dict)
+            or not spec.get("codex", {}).get("reasoning_effort")
+        )
+    ]
+    if has_codex:
+        # Codex check passes when the override map either is empty (preset map
+        # applies) or every override sets reasoning_effort. Missing effort on a
+        # user override means the default profile applies — advisory only.
+        codex_ok = not raw_agent_models or not codex_missing_effort
+        signals.append(
+            _signal(
+                "codex_reasoning_effort_coverage",
+                codex_ok,
+                34,
+                "all per-agent codex overrides set reasoning_effort, or no overrides"
+                if codex_ok
+                else (
+                    f"{len(codex_missing_effort)} agent(s) override claude/cursor "
+                    f"but not codex.reasoning_effort — Codex default profile applies. "
+                    f"See `codex -p cheap` / `codex -p deep` in .codex/config.toml "
+                    f"for invocation-time cost control."
+                ),
+                None,
+            )
+        )
+    else:
+        signals.append(
+            _signal(
+                "codex_reasoning_effort_coverage",
+                True,
+                34,
+                "codex not in targets — check N/A",
+                None,
+            )
+        )
+
+    return DimensionScore(
+        name="model_routing", score=_score_signals(signals), signals=signals
+    )
+
+
 def _dim_governance(project_dir: Path, preset: Preset) -> DimensionScore:
     """Side preset: weight-0 (irrelevant). Production: ADR + CONTRIBUTING."""
     signals: list[Signal] = []
@@ -867,6 +1049,7 @@ def compute_readiness(project_dir: Path, preset: Preset) -> ReadinessResult:
         "memory_continuity": _dim_memory_continuity(project_dir),
         "observability_setup": _dim_observability_setup(project_dir),
         "governance": _dim_governance(project_dir, preset),
+        "model_routing": _dim_model_routing(project_dir),
     }
 
     weighted = sum(dims[k].score * weights[k] for k in weights)

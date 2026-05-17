@@ -3,7 +3,7 @@ name: ux-reviewer
 communication_variant: reframe
 description: Reviews UI changes for accessibility, consistency, and interaction quality
 tools: Read, Grep, Glob
-model: sonnet
+model: {% if claude_model is defined %}{{ claude_model }}{% else %}sonnet{% endif %}
 review_scope: [ux]
 permissions:
   allow:

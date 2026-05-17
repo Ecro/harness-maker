@@ -39,6 +39,9 @@ def _render_reviewer(name: str, verbosity: str) -> str:
             "project": {"domains": []},
         },
         communication_variant="reframe",
+        claude_model="sonnet",
+        cursor_model="claude-4-6-sonnet",
+        codex_reasoning_effort="medium",
     )
 
 
@@ -116,6 +119,9 @@ def _render_with_domains(name: str, domains: list[str]) -> str:
             "project": {"domains": domains},
         },
         communication_variant="reframe",
+        claude_model="sonnet",
+        cursor_model="claude-4-6-sonnet",
+        codex_reasoning_effort="medium",
     )
 
 

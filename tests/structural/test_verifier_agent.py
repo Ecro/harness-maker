@@ -38,11 +38,25 @@ REQUIRED_ALLOWS = {
 
 
 def _parse_frontmatter(path: Path) -> dict[str, object]:
+    """Parse the agent frontmatter from a `.md.j2` source template.
+
+    Phase 3 (PLAN-model-routing-multi-ide) introduced Jinja2 expressions inside
+    the frontmatter (`model: {% if claude_model is defined %}...{% endif %}`),
+    so the raw source is no longer valid YAML. Strip Jinja2 constructs to bare
+    text before parsing — sufficient for this structural test which only
+    inspects the `permissions` block, never the `model:` line.
+    """
+    import re
+
     text = path.read_text(encoding="utf-8")
     assert text.startswith("---\n"), f"missing frontmatter: {path}"
     end = text.find("\n---\n", 4)
     assert end != -1, f"unterminated frontmatter: {path}"
-    return yaml.safe_load(text[4:end]) or {}
+    fm_text = text[4:end]
+    # Strip Jinja2 statements + expressions before YAML parse.
+    fm_text = re.sub(r"\{%[^%]*%\}", "", fm_text)
+    fm_text = re.sub(r"\{\{[^}]*\}\}", "stripped", fm_text)
+    return yaml.safe_load(fm_text) or {}
 
 
 def test_verifier_template_exists() -> None:

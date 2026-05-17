@@ -46,14 +46,27 @@ _FULL_CONFIG = {
 
 
 def _render_agent(name: str) -> str:
+    from harness_maker.models import HarnessConfig, Preset
+    from harness_maker.presets import resolve_agent_spec
+
     env = _make_env()
     variant = _extract_source_communication_variant(f"agents/{name}.md.j2", env)
     tpl = env.get_template(f"agents/{name}.md.j2")
+    # Phase 3 (PLAN-model-routing-multi-ide) added claude_model/cursor_model/
+    # codex_reasoning_effort context vars. Pass the Production preset's resolved
+    # values so the sha256 pin reflects what synthesize() emits in real renders
+    # (autoloop-coder/plan-validator/stuck → opus; others → sonnet).
+    spec = resolve_agent_spec(name, HarnessConfig(preset=Preset.PRODUCTION))
     return tpl.render(
         name=name,
         reviewer_kind=_REVIEWER_KINDS.get(name, ""),
         config=_FULL_CONFIG,
         communication_variant=variant,
+        claude_model=spec.claude,
+        cursor_model=spec.cursor,
+        codex_reasoning_effort=(
+            spec.codex.reasoning_effort if spec.codex else None
+        ),
     )
 
 

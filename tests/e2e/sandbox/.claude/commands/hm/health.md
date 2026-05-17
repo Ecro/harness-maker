@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.14.0
+harness_maker_version: 0.15.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/health.md.j2
 provenance: official
-content_hash: 5571e73913d60d3424dc3e425a9a3438c7d99bae5a3337e36f74ba54064f9a78
+content_hash: e8da967916049c0c5e801822b83104de2aa214bf39ba0620df2935efecb69bcb
 ---
 # /hm:health
 
@@ -23,7 +23,7 @@ content_hash: 5571e73913d60d3424dc3e425a9a3438c7d99bae5a3337e36f74ba54064f9a78
 ## Run
 
 ```bash
-!uv run --with /home/noel/harness-maker python -m harness_maker.cli health . --json-output .claude/observability/.health.tmp.json
+!uv run --with /home/noel/harness-maker/.worktrees/execute-20260517T1454Z python -m harness_maker.cli health . --json-output .claude/observability/.health.tmp.json
 ```
 
 Then read `.claude/observability/dashboard.md` to inspect the three sections.

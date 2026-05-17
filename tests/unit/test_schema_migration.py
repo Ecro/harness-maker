@@ -69,10 +69,14 @@ def test_interview_py_preserves_side_v1_old_defaults() -> None:
 
 
 def test_schema_version_field_present_in_models() -> None:
-    """Both HarnessConfig and InterviewAnswers should have schema_version."""
+    """Both HarnessConfig and InterviewAnswers should have schema_version.
+
+    HarnessConfig bumped 1 → 2 per ADR-011 (PLAN-model-routing-multi-ide) for
+    the agent_models + default_model rename; InterviewAnswers was already at 2.
+    """
     hc = HarnessConfig()
     assert hasattr(hc, "schema_version")
-    assert hc.schema_version == 1
+    assert hc.schema_version == 2
 
     ia = InterviewAnswers()
     assert hasattr(ia, "schema_version")

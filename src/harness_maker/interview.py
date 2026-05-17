@@ -22,10 +22,13 @@ from pathlib import Path
 from typing import Any, TextIO
 
 import yaml
+from pydantic import ValidationError
 
-from harness_maker.io_utils import denormalize_home_to_tilde
+from harness_maker.io_utils import denormalize_home_to_tilde, load_harness_yaml
 from harness_maker.models import (
+    AgentModelSpec,
     AtomicStage,
+    CodexAgentSpec,
     Confidence,
     DevMode,
     InterviewAnswers,
@@ -646,19 +649,15 @@ def answers_from_harness_yaml(yaml_path: Path) -> InterviewAnswers | None:
     """
     if not yaml_path.exists():
         return None
+    # CLAUDE.md §2 + Phase 2 ADR: use the canonical multi-doc loader so the
+    # renderer's provenance frontmatter is traversed correctly. Falling back
+    # to a single-doc parse would either fail outright (multi-doc stream) or
+    # silently return provenance keys as user data on truncated writes.
     try:
-        text = yaml_path.read_text(encoding="utf-8")
-    except OSError:
+        data = load_harness_yaml(yaml_path)
+    except (OSError, yaml.YAMLError):
         return None
-    if text.startswith("---\n"):
-        end = text.find("\n---\n", 4)
-        if end != -1:
-            text = text[end + 5 :]
-    try:
-        data = yaml.safe_load(text)
-    except yaml.YAMLError:
-        return None
-    if not isinstance(data, dict):
+    if not isinstance(data, dict) or not data:
         return None
     try:
         preset = Preset(data.get("preset", "Side"))
@@ -728,9 +727,77 @@ def answers_from_harness_yaml(yaml_path: Path) -> InterviewAnswers | None:
             "enabled": skills_enabled,
         },
     }
+    # ADR-002/004 silent migration: prefer the new `default_model` key; fall
+    # back to the deprecated `recommended_model`. When ONLY the deprecated key
+    # is present AND the file is schema_version<2, emit an advisory INFO log
+    # so users discover the rename.
+    #
+    # Review code-reviewer P1 fix: gate on schema_version<2 — without this the
+    # log fires on every fresh Phase 2 render cycle because Phase 2 templates
+    # still emit `recommended_model:` (templates migrate in Phase 3, ADR-009).
+    # Review security-reviewer P1 fix: sanitise newline + ESC before logging
+    # to prevent log forging via crafted YAML values.
+    # Review code-reviewer P1 fix: include yaml_path so users can identify
+    # which file triggered the advisory across multi-repo sessions.
+    raw_default_model = data.get("default_model")
     raw_recommended_model = data.get("recommended_model")
-    if isinstance(raw_recommended_model, str) and raw_recommended_model.strip():
-        update["recommended_model"] = raw_recommended_model.strip()
+    if isinstance(raw_default_model, str) and raw_default_model.strip():
+        update["default_model"] = raw_default_model.strip()
+    elif isinstance(raw_recommended_model, str) and raw_recommended_model.strip():
+        cleaned = raw_recommended_model.strip()
+        update["default_model"] = cleaned
+        if schema_version < 2:
+            safe_value = cleaned.replace("\n", "\\n").replace("\x1b", "\\x1b")
+            logger.info(
+                "harness.yaml %s: deprecated `recommended_model: %s` migrated "
+                "to `default_model` (schema v1 → v2). Preset defaults will "
+                "apply per-agent unless `agent_models:` overrides are set. "
+                "See docs/HOW-IT-WORKS.md > Agent Models.",
+                str(yaml_path),
+                safe_value,
+            )
+
+    # ADR-001/002 agent_models — parse nested {claude, cursor, codex:{...}} per
+    # agent name. Unknown keys (extra="forbid" via Pydantic) raise; we surface
+    # as a warning and drop the whole agent override so the loader stays
+    # tolerant (the renderer's Tier-2 preset map will fill in).
+    raw_agent_models = data.get("agent_models")
+    if isinstance(raw_agent_models, dict):
+        parsed: dict[str, AgentModelSpec] = {}
+        for agent_name, spec_dict in raw_agent_models.items():
+            if not isinstance(agent_name, str) or not isinstance(spec_dict, dict):
+                logger.warning(
+                    "harness.yaml agent_models: dropping malformed entry %r "
+                    "(expected dict, got %s)",
+                    agent_name,
+                    type(spec_dict).__name__,
+                )
+                continue
+            try:
+                # Build kwargs by pre-converting `codex` sub-dict but otherwise
+                # passing through the raw user dict so AgentModelSpec's
+                # extra="forbid" rejects unknown keys (not silently dropping
+                # them via selective .get() — that masks typos in the user's
+                # harness.yaml).
+                spec_kwargs = dict(spec_dict)
+                codex_spec_raw = spec_kwargs.pop("codex", None)
+                if isinstance(codex_spec_raw, dict):
+                    spec_kwargs["codex"] = CodexAgentSpec(**codex_spec_raw)
+                elif codex_spec_raw is None:
+                    spec_kwargs.pop("codex", None)
+                parsed[agent_name] = AgentModelSpec(**spec_kwargs)
+            except (TypeError, ValueError, ValidationError) as exc:
+                # Pydantic v2 raises ValidationError (not ValueError) for
+                # strict-mode type violations and extra="forbid" rejections —
+                # consensus-passed P1 fix from /hm:review Round 1.
+                logger.warning(
+                    "harness.yaml agent_models[%s]: dropping invalid spec — %s",
+                    agent_name,
+                    exc,
+                )
+        if parsed:
+            update["agent_models"] = parsed
+
     if isinstance(auto_fix, bool):
         update["auto_fix"] = auto_fix
     if isinstance(grade_threshold, str) and grade_threshold:

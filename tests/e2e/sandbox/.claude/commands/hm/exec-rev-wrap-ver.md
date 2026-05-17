@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.14.0
+harness_maker_version: 0.15.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: 76dc33e5986b5479f463b6787e3adb367e8ce21097222f4cbfc851159f2b188f
+content_hash: eab540564a4f789f8c9de25ec929505373023134f53fc460205811f42bb08653
 ---
 # /hm:exec-rev-wrap-ver
 
@@ -79,7 +79,7 @@ Engage isolation if `harness.yaml.worktree.scope` includes `execute`. The `workt
 
 
 ```bash
-!uv run --with /home/noel/harness-maker python -m harness_maker.worktree create execute "$(pwd)"
+!uv run --with /home/noel/harness-maker/.worktrees/execute-20260517T1454Z python -m harness_maker.worktree create execute "$(pwd)"
 ```
 
 
@@ -215,12 +215,12 @@ Pick **exactly one** finalize command. Substitute `<WT>` with the literal absolu
 ```bash
 # All phases GREEN — stage-merge the branch back (NO commit) + cleanup the worktree.
 # /hm:wrapup will create the single user-facing commit (with proper message + Co-Authored-By).
-!uv run --with /home/noel/harness-maker python -m harness_maker.worktree finalize <WT> stage-only
+!uv run --with /home/noel/harness-maker/.worktrees/execute-20260517T1454Z python -m harness_maker.worktree finalize <WT> stage-only
 ```
 
 ```bash
 # Stage halted on a blocker — preserve the worktree for inspection:
-!uv run --with /home/noel/harness-maker python -m harness_maker.worktree finalize <WT> fail
+!uv run --with /home/noel/harness-maker/.worktrees/execute-20260517T1454Z python -m harness_maker.worktree finalize <WT> fail
 ```
 
 
@@ -722,7 +722,9 @@ Use a single Edit / Write call (atomic). Verify by reading back: assert `status:
 
 #### 5.1 Wiki
 
-Append (or update) one entry under `.claude/memory/wiki.md`:
+Insert (or update) one entry inside `.claude/memory/wiki.md`. **Critical marker discipline** — the entry MUST land **inside** the `<!-- @hm:user:entries -->` block, immediately **before** the `<!-- @hm:/user:entries -->` closing marker. Content placed AFTER the closing marker (e.g. naïve EOF append) is template-owned and gets silently discarded on the next `/hm:make --update` (regression 2026-05-17: 5 wiki entries lost across 7 commits before detection).
+
+Procedure: read the file, locate the line `<!-- @hm:/user:entries -->`, insert the new entry on the lines directly above it (separated from the previous entry by one blank line).
 
 ```markdown
 ## [wiki:<category>] <slug> | <YYYY-MM-DD>
@@ -731,11 +733,12 @@ Append (or update) one entry under `.claude/memory/wiki.md`:
 
 - **category**: `pattern` | `convention` | `gotcha` | `architecture` | `tooling` | `api` | `other`.
 - **slug**: kebab-case, ≤40 chars, derived from the work unit.
+- **Position**: inside the `@hm:user:entries` block, above the closing marker. Never EOF-append.
 - If a `[wiki:<same-slug>]` entry already exists: replace its body with the updated learning (do NOT duplicate).
 
 #### 5.2 Failures
 
-For each new failure pattern that emerged this work unit, append (or increment count) under `.claude/memory/failures.md`:
+For each new failure pattern that emerged this work unit, insert (or increment count) **inside** `.claude/memory/failures.md`. **Same marker discipline as 5.1**: the entry MUST land inside the `<!-- @hm:user:entries -->` block, immediately before the `<!-- @hm:/user:entries -->` closing marker. EOF-append loses the entry on the next `/hm:make --update`.
 
 ```markdown
 ## [fail:<category>] <slug> | <YYYY-MM-DD> | count:<N>
@@ -744,6 +747,7 @@ For each new failure pattern that emerged this work unit, append (or increment c
 
 - **category**: `import` | `test` | `render` | `hook` | `lint` | `type` | `runtime` | `design` | `other`.
 - **count**: increment when the same `<category>:<slug>` already exists; do NOT duplicate sections.
+- **Position**: inside `@hm:user:entries` block, above the closing marker. Never EOF-append.
 - **Qualifies as failure**: incorrect API usage, wrong syntax, convention misunderstanding, build failures, tool mistakes, workflow violations.
 - **Does NOT qualify**: user preference changes, expected errors, normal debugging cycles, design evolution.
 

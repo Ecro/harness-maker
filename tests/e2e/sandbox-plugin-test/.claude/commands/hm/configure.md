@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.13.1
+harness_maker_version: 0.15.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/configure.md.j2
 provenance: official
-content_hash: 516352580cba8ee37dbe5c035a3b8697515c6927b9283a5562c5a2e4db9e53a7
+content_hash: d4db70eabd01871d9e415049de28058ca20ad88b47ee296ce0db45e4cce52306
 ---
 # /hm:configure
 
@@ -26,7 +26,7 @@ Read `.claude/harness.yaml` body (skip frontmatter) and surface:
 - enabled reviewers, grade_threshold, auto_fix
 - mechanical_checks (if any)
 - domains (if any)
-- recommended_model
+- default_model (per-agent overrides in `agent_models` if any)
 - wrapup_docs (if any)
 - ref_folders (paths + globs if any)
 - sibling_repos (relative paths if any)
@@ -54,7 +54,7 @@ Options (multi-select):
 - **Mechanical checks** — add/edit/clear pre-review commands. Trade-off:
   deterministic failures stop before LLM reviewers, but commands add their own
   runtime.
-- **Recommended model** — opus / sonnet / haiku. Trade-off: quality/cost/speed
+- **Default model** — opus / sonnet / haiku. Trade-off: quality/cost/speed. Per-agent overrides go in `harness.yaml` > `agent_models`.
   preference only; generated Codex agents still inherit the user's Codex
   profile model.
 - **Wrapup documents** — add/edit/clear docs updated during /hm:wrapup (e.g. CHANGELOG.md, TODO.md)
@@ -100,7 +100,7 @@ For **Second Brain**: first inspect current state via the CLI subcommand
 time — they MUST delegate state inspection to the CLI per CLAUDE.md §4):
 
 ```bash
-!uv run --with /home/noel/harness-maker python -m harness_maker.cli \
+!uv run --with /home/noel/harness-maker/.worktrees/execute-20260517T1454Z python -m harness_maker.cli \
   configure-second-brain "$(pwd)" --check
 ```
 
@@ -122,7 +122,7 @@ which prompts to surface:
    non-skip answer, dispatch the folder add through the CLI:
 
    ```bash
-   !uv run --with /home/noel/harness-maker python -m harness_maker.cli \
+   !uv run --with /home/noel/harness-maker/.worktrees/execute-20260517T1454Z python -m harness_maker.cli \
      configure-second-brain "$(pwd)" --add-folder "$SB_FOLDER"
    ```
 
@@ -146,9 +146,9 @@ which prompts to surface:
 Run the CLI with only the changed flags:
 
 ```bash
-!uv run --with /home/noel/harness-maker python -m harness_maker.cli make "$(pwd)" \
+!uv run --with /home/noel/harness-maker/.worktrees/execute-20260517T1454Z python -m harness_maker.cli make "$(pwd)" \
   --grade-threshold "$GRADE" --domains "$DOMAINS" --mechanical-checks "$CHECKS" \
-  --recommended-model "$MODEL" --focus "$FOCUS" --wrapup-docs "$WRAPUP_DOCS" \
+  --default-model "$MODEL" --focus "$FOCUS" --wrapup-docs "$WRAPUP_DOCS" \
   --ref-folders "$REF_FOLDERS" --sibling-repos "$SIBLING_REPOS" \
   --second-brain-vault-path "$SB_VAULT_PATH" --second-brain-project-id "$SB_PROJECT_ID"
 ```
