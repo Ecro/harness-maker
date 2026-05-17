@@ -1,14 +1,15 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.12.0
+harness_maker_version: 0.13.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: skills/relevance-filter/SKILL.md.j2
 provenance: official
 name: relevance-filter
 description: Score crawled anti-rot items against project context using LLM judgment
   + adaptive threshold (start 0.7, ±0.05 by accept/reject ratio). Use after research-crawler
-  writes raw-<date>.jsonl, between crawl and structured question confirmation in /hm:refresh.
-content_hash: b09eb3410076874b0e4f5fa90f2afc1b7c83bd3270de2fb3cab483fed0c982fe
+  writes raw-<date>.jsonl, between crawl and structured question confirmation in /hm:health
+  Step 2 (external risks layer).
+content_hash: e9a04e210073147730b0de0fb80ef95eb47c74e6726b47b0e54613d797e0d9ae
 ---
 
 # relevance-filter
@@ -21,7 +22,7 @@ content_hash: b09eb3410076874b0e4f5fa90f2afc1b7c83bd3270de2fb3cab483fed0c982fe
 
 **Invoke when:**
 - `research-crawler` has just emitted `raw-<date>.jsonl` and the proposal queue needs filtering.
-- `/hm:refresh` is between crawl and user-confirm phases.
+- `/hm:health` Step 2 is between crawl and user-confirm phases.
 
 **Skip when:**
 - No crawl output exists yet (run `research-crawler` first).
@@ -29,13 +30,13 @@ content_hash: b09eb3410076874b0e4f5fa90f2afc1b7c83bd3270de2fb3cab483fed0c982fe
 ## Triggers
 
 - After `research-crawler` writes `raw-<date>.jsonl`
-- During `/hm:refresh` between crawl and structured question confirmation
+- During `/hm:health` Step 2 between crawl and structured question confirmation
 
 ## How you score
 
 You are the relevance judge — no external API call needed.
 
-1. Load `CrawlItem` records from `.claude/observability/refresh/raw-<date>.jsonl`.
+1. Load `CrawlItem` records from `.claude/observability/health/raw-<date>.jsonl`.
 2. Read project keywords from `CLAUDE.md` and `README.md`.
 3. For each item: does it touch the project's stack, tooling, security, or domain?
    - Direct match (e.g. Anthropic SDK update for an Anthropic project) → high
@@ -44,10 +45,10 @@ You are the relevance judge — no external API call needed.
 4. Compute the adaptive threshold from prior decisions in `decisions.jsonl`:
 
 ```bash
-!uv run --with /home/noel/harness-maker/.worktrees/execute-20260516T0550Z python -c "
+!uv run --with /home/noel/harness-maker/.worktrees/execute-20260516T1406Z python -c "
 from pathlib import Path
 from harness_maker.relevance import adaptive_threshold, load_decisions
-history = load_decisions(Path('.claude/observability/refresh/decisions.jsonl'))
+history = load_decisions(Path('.claude/observability/health/decisions.jsonl'))
 print(adaptive_threshold(history))
 "
 ```
@@ -62,7 +63,7 @@ print(adaptive_threshold(history))
 
 ## Output
 
-Filtered list of `CrawlItem` records for the `/hm:refresh` structured question
+Filtered list of `CrawlItem` records for the `/hm:health` Step 2 structured question
 walk. Never auto-applies changes.
 
 <!-- @hm:user:extensions -->

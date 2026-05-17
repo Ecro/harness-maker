@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.12.0
+harness_maker_version: 0.13.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: 82ad51945caa63ea2d5bec48a7db7805a74918f63742b6a358b175dc8d9d8b39
+content_hash: f63c0b60195bf55418e30ac604c372f3a02f1b9a5221e19df4b1ba1a5bbcba3e
 ---
 # /hm:res-spec-plan
 
@@ -1008,7 +1008,7 @@ harness value wins.
 | `reviewers.auto_fix` | `true` |
 | `reviewers.max_review_rounds` | `3` |
 | `reviewers.consensus` | `cross-check` |
-| `dev_mode` | `task-driven` |
+| `dev_mode` | `spec-driven` |
 | `caching` | `agent-aware` |
 
 Re-read `.claude/harness.yaml` whenever you are unsure of the current value.

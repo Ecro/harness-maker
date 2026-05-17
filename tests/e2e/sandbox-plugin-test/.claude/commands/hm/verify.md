@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.12.0
+harness_maker_version: 0.13.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/atomic_command.md.j2
 provenance: official
-content_hash: d918df2ab0b8f55e4581957691d55c5882ea2fa9bf03f159993ad32737f96222
+content_hash: 4e4644c2382ba3ffe9ae98a7f6a4aae45f1c4913b15bc4fcf0285966379b3b1b
 ---
 # Stage: verify
 
@@ -41,9 +41,9 @@ Block silent regressions and partial completions. Run a rigid 6-check rubric tha
 
 - Current working tree state (staged + unstaged).
 - `work-docs/PLAN-{slug}.md` and `specs/SPEC-{slug}.md` (when present) — drive Check 1.
-- Most recent Health snapshot at `.claude/observability/dashboard.md`.
+- Most recent Health snapshot at `.claude/observability/dashboard.md` (3-section schema: `Structural` / `External risks` / `Personalization`; pre-0.13.0 single-`Health:` scalar is intentionally unreadable here).
 - Most recent security findings at `.claude/observability/security/findings-*.jsonl`.
-- Anti-rot pending queue at `.claude/observability/refresh/pending.jsonl`.
+- Anti-rot pending queue at `.claude/observability/health/pending.jsonl` (renamed from `refresh/pending.jsonl` in 0.13.0; the dashboard `External risks` section also exposes the same count).
 
 ## The 6 Checks (run in order; STOP on first FAIL unless `--force`)
 
@@ -78,21 +78,32 @@ If the harness has its own `.claude-verify.sh phase_<N>` script, prefer it over 
 
 FAIL when: any subprocess returns non-zero.
 
-### Check 3 — Health delta
+### Check 3 — Structural delta (formerly "Health delta")
 
-Read the prior Health score from `.claude/observability/dashboard.md` (the snapshot recorded at the start of this work unit, or the last `/hm:ai-readiness` run).
+Read the prior `structural` score from `.claude/observability/dashboard.md` — specifically the `score:` line under the **`## Structural`** section of the 3-section dashboard (0.13.0+ schema). Do NOT average with `External risks` / `Personalization`; those are orthogonal signals owned by Check 4 and (deliberately) by no check at all.
 
-Recompute current Health (or invoke `/hm:ai-readiness` if a fresh score is needed).
+Recompute current structural score (or invoke `/hm:health` Step 1 if a fresh score is needed). Compare ONLY structural values.
 
-FAIL when: `current - prior < -5` (Health dropped more than 5 points). Mid-work-unit dips are normal; a 5+ point drop signals quality regression.
+**No-baseline PASS rule (ADR-004):** when `dashboard.md` is absent OR exists but does NOT begin with `---\ngenerated_by: harness-maker\n` (pre-0.13.0 single-`Health:` scalar schema) OR is missing the `## Structural` section / `score:` line, emit a **PASS** for this check with a `reason` string `"no-baseline: <cause>"` (e.g. `"no-baseline: dashboard.md missing"`, `"no-baseline: pre-0.13.0 schema"`). Record both `prior: null` and `current: <value-or-null>` in the JSONL.
 
-### Check 4 — Anti-rot pending queue
+FAIL when: a parseable prior baseline exists AND `current_structural - prior_structural < -5` (structural score dropped more than 5 points). Mid-work-unit dips are normal; a 5+ point drop signals quality regression.
 
-Read `.claude/observability/refresh/pending.jsonl` (when present).
+> **Personalization is NOT a gating field.** The `## Personalization` section (composite / tier / action_items) is informational only — verify must never read it for pass/fail. ADR-002 (amended by ADR-006).
 
-FAIL when: any pending item has `relevance_score >= 0.8` AND `category in {security, breaking-change}`. These are blocking items — `wrapup`-ing while ignoring them silently absorbs the rot.
+### Check 4 — Anti-rot pending queue (external_risks)
 
-PASS when: queue is empty, or remaining items are below the blocking threshold.
+Read the pending external-risk queue. Two sources, prefer the first that exists:
+
+1. `.claude/observability/health/pending.jsonl` (0.13.0+) — one JSON record per line, fields: `id`, `relevance_score`, `category`, `source`, `first_seen`, ...
+2. The `## External risks` section of `.claude/observability/dashboard.md` — `pending: <int>` line + `items: <JSON-list>` line.
+
+> Note: 0.12.x used `.claude/observability/refresh/pending.jsonl`. That path is intentionally NOT read here — ADR-004 (no compatibility shim). Missing 0.13.0 source = no-baseline PASS.
+
+**No-baseline PASS rule (ADR-004):** when neither source exists (or the dashboard is pre-0.13.0 schema), emit **PASS** with `reason: "no-baseline: <cause>"`.
+
+FAIL when: at least one source is readable AND any pending item has `relevance_score >= 0.8` AND `category in {security, breaking-change}`. These are blocking items — `wrapup`-ing while ignoring them silently absorbs the rot. Include the offending item ids in the JSONL `items` array so the failure is actionable.
+
+PASS when: queue is empty, or remaining items are below the blocking threshold, or no-baseline.
 
 ### Check 5 — Security high findings
 
@@ -145,12 +156,12 @@ Write **both** formats:
 
 [1/6] PLAN/SPEC satisfaction       ✅ PASS
 [2/6] Regression smoke             ✅ PASS
-[3/6] Health delta                 ✅ PASS  (87 → 89, +2)
-[4/6] Anti-rot pending queue       ❌ FAIL
+[3/6] Structural delta             ✅ PASS  (structural 87 → 89, +2)
+[4/6] External risks pending       ❌ FAIL
         2 items at relevance≥0.8 + category=security:
         - CVE-2026-12345 in dependency `httpx` (pending since 2026-05-01)
         - Anthropic blog "tool-use schema v3" (pending since 2026-05-03)
-        Run /hm:refresh to triage these before wrapup.
+        Run /hm:health to triage these before wrapup.
 
 [5/6] (skipped — stopped at first FAIL)
 [6/6] (skipped — stopped at first FAIL)
@@ -163,14 +174,14 @@ Override: --force --reason="<text>"  (logs to verify-<date>.jsonl with the reaso
 
 ```json
 {
-  "timestamp": "2026-05-08T14:23:01Z",
+  "timestamp": "2026-05-17T14:23:01Z",
   "stage": "verify",
   "result": "FAIL",
   "checks": [
     {"id": 1, "name": "plan_spec_satisfaction", "result": "PASS"},
     {"id": 2, "name": "regression_smoke", "result": "PASS"},
-    {"id": 3, "name": "health_delta", "result": "PASS", "delta": 2, "prior": 87, "current": 89},
-    {"id": 4, "name": "antirot_pending", "result": "FAIL", "blocking_items": 2, "items": [...]},
+    {"id": 3, "name": "structural_delta", "result": "PASS", "delta": 2, "prior": 87, "current": 89, "reason": null},
+    {"id": 4, "name": "external_risks_pending", "result": "FAIL", "blocking_items": 2, "items": ["CVE-2026-12345", "anthropic-tool-use-v3"], "reason": null},
     {"id": 5, "name": "security_high", "result": "SKIPPED"},
     {"id": 6, "name": "worktree_merge", "result": "SKIPPED"}
   ],
@@ -178,6 +189,10 @@ Override: --force --reason="<text>"  (logs to verify-<date>.jsonl with the reaso
   "override_reason": null
 }
 ```
+
+For no-baseline PASS, the corresponding check record carries `"result": "PASS"` and a populated `"reason"` string (e.g. `"no-baseline: dashboard.md missing"` / `"no-baseline: pre-0.13.0 schema"`); `prior` / `current` may be `null`. Verify never emits `result: "PASS"` for Check 3/4 silently — a populated `reason` is mandatory whenever the baseline was missing or unparseable.
+
+> **Personalization field is informational only.** The JSONL record never contains a `personalization` check entry. Verify reads structural + external_risks; the `## Personalization` section of dashboard.md is for `/hm:health` reporting and is ignored by this stage. ADR-002 amendment.
 
 When `--force` is set, append the same record with `"force_override": true, "override_reason": "<text>"`.
 

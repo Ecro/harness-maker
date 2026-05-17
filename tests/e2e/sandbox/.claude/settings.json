@@ -3,9 +3,13 @@
     "allow": [
       "Read",
       "Bash(uv:*)",
-      "Bash(pytest:*)"
+      "Bash(pytest:*)",
+      "Bash(git:*)"
     ],
-    "deny": []
+    "deny": [
+      "Bash(rm:*)",
+      "Bash(curl:*)"
+    ]
   },
-  "preset": "Side"
+  "preset": "Production"
 }

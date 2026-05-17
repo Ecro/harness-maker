@@ -1,11 +1,11 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.12.0
+harness_maker_version: 0.13.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: memory/wiki.en.md.j2
 provenance: official
 ---
-# Wiki Index — Side preset
+# Wiki Index — Production preset
 
 > Project-specific patterns / conventions index. The wrapup stage appends entries automatically.
 >

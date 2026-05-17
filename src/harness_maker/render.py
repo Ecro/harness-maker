@@ -13,6 +13,14 @@ hooks.json (Phase 4 F1 amendment §E):
 - The cross-phase frontmatter invariant gate explicitly excludes `*/hooks/hooks.json`,
   so we render hooks.json as pure JSON via `_render_pure_json` (no symlink, no sidecar).
 - Provenance is sacrificed for hooks.json (acceptable since it's small + reproducible).
+
+Render manifest (ADR-005, Phase 0):
+- Every blueprint file render appends one JSON line to
+  ``<target_dir>/.hm-render-manifest.jsonl`` ({path, content_hash, timestamp}).
+  The reconcile orphan-sweep uses this manifest as the authoritative
+  ours-vs-theirs registry for files that lack provenance frontmatter (.sh,
+  .json, .toml). Duplicates are intentionally not collapsed — re-renders
+  accumulate so historical hashes remain matchable.
 """
 
 from __future__ import annotations
@@ -30,7 +38,7 @@ from jinja2 import Environment, FileSystemLoader, StrictUndefined
 from harness_maker import __version__
 from harness_maker.block_merge import MergeReport
 from harness_maker.block_merge import merge as block_merge
-from harness_maker.io_utils import atomic_write
+from harness_maker.io_utils import atomic_append, atomic_write
 from harness_maker.models import Blueprint, FileEntry
 
 # Module constants — templates ship inside the harness_maker package so they're
@@ -38,6 +46,12 @@ from harness_maker.models import Blueprint, FileEntry
 # installs (importable as package data).
 TEMPLATE_DIR = Path(__file__).resolve().parent / "templates"
 DEFAULT_FREEZE_TIME = datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC)
+
+# Append-only audit log consulted by the reconcile orphan-sweep (ADR-005).
+# Lives inside the rendered ``.claude/`` directory so it travels with the
+# harness and can be inspected/git-ignored alongside other internal state
+# files (e.g. ``.hm-loop-*``).
+RENDER_MANIFEST_NAME = ".hm-render-manifest.jsonl"
 
 
 def _make_env() -> Environment:
@@ -550,6 +564,78 @@ def _strip_agents_md_metadata(text: str) -> str:
     return text
 
 
+_SIBLING_TREE_PREFIXES = (".cursor/", ".codex/", ".agents/")
+
+
+def _manifest_key_for(fe_path: Path) -> str:
+    """Project-root-relative key for the manifest, derived from ``fe.path``.
+
+    Matches the orphan-sweep's disk walk (``_iter_disk_files`` returns keys
+    like ``.claude/commands/hm/x.md`` or ``.cursor/rules/x.mdc``). The
+    ``synthesize.py`` convention is to store sibling-tree files (``.cursor/
+    ``, ``.codex/``, ``.agents/``) and ``AGENTS.md`` WITH their prefix and
+    ``.claude/``-bound files WITHOUT it; this helper restores the missing
+    ``.claude/`` so writer and reader agree on a single key shape.
+
+    Deriving from ``fe.path`` (not the resolved ``out_path``) keeps the
+    manifest deterministic across runs even when callers pass a transient
+    ``target_dir`` (e.g. ``tmp_path`` in unit tests) — the manifest key
+    must never leak parent-dir basenames.
+    """
+    p = str(fe_path).replace("\\", "/")
+    if p == "AGENTS.md" or p.startswith(_SIBLING_TREE_PREFIXES):
+        return p
+    return ".claude/" + p
+
+
+def _append_render_manifest(
+    target_dir: Path,
+    fe_path: Path,
+    content_hash: str,
+    *,
+    freeze_time: datetime | None,
+) -> None:
+    """Append one JSON line to ``<target_dir>/.hm-render-manifest.jsonl``.
+
+    The recorded ``path`` is **project-root-relative** (derived from
+    ``fe.path`` via ``_manifest_key_for``). That convention matches the
+    orphan-sweep's disk walk so a key written here is queryable as-is on
+    the next reconcile — covers both ``.claude/``-bound files
+    (``commands/hm/x.md`` → ``.claude/commands/hm/x.md``) and sibling
+    locations (``.cursor/``, ``.codex/``, ``.agents/``, ``AGENTS.md``).
+
+    POSIX guarantees that a single ``write()`` <= PIPE_BUF (4096 bytes) is
+    atomic. Each record we emit is well below that limit (path + 64-char
+    hex hash + iso8601 timestamp), so a plain append is safe. Re-renders of
+    the same file produce additional lines — the orphan-sweep does an
+    any-match against the historical set, so duplicates are wanted, not
+    a bug.
+
+    The manifest file is created on first append. Errors are propagated:
+    a render that cannot record its manifest entry would silently break
+    ADR-005's orphan detection, so failure should surface.
+
+    Phase 0 deliberately does NOT inject ``.hm-render-manifest.jsonl`` into
+    the user's ``.gitignore`` — no gitignore template ships with the harness
+    yet (PLAN-health-consolidation Phase 0 calls for the addition, but the
+    template surface does not exist). Wiring the entry is deferred to a
+    later phase / wrapup stage. Users with the file showing in ``git status``
+    can add the line manually until then.
+    """
+    target_dir.mkdir(parents=True, exist_ok=True)
+    manifest_path = target_dir / RENDER_MANIFEST_NAME
+    ts = (freeze_time or datetime.now(UTC)).isoformat()
+    record = {
+        "path": _manifest_key_for(fe_path),
+        "content_hash": content_hash,
+        "timestamp": ts,
+    }
+    line = json.dumps(record, sort_keys=True, ensure_ascii=False) + "\n"
+    # Single os.write() on O_APPEND fd — concurrent renderers cannot interleave.
+    # The buffered ``open("a")`` could split across syscalls. See atomic_append docstring.
+    atomic_append(manifest_path, line)
+
+
 def render(
     blueprint: Blueprint,
     target_dir: Path,
@@ -568,6 +654,10 @@ def render(
     ``merge_reports`` — optional out-dict. When provided, each successfully
     merged path is recorded with its ``MergeReport`` so the CLI can display
     what was preserved/seeded/orphaned.
+
+    Side-effect: every rendered FileEntry appends one JSON line to
+    ``<target_dir>/.hm-render-manifest.jsonl`` (ADR-005). Skipped when
+    ``dry_run`` is True so the audit log only reflects on-disk state.
 
     Returns list of paths written (or would-write paths if dry_run).
     """
@@ -634,4 +724,13 @@ def render(
                 merge_reports=file_merge_reports,
             )
         written.append(out)
+        # ADR-005: record the on-disk render. Skip during dry_run so the
+        # audit log only reflects files that actually exist.
+        if not dry_run and fe.body_sha256 is not None:
+            _append_render_manifest(
+                target_dir,
+                fe.path,
+                fe.body_sha256,
+                freeze_time=freeze_time,
+            )
     return written

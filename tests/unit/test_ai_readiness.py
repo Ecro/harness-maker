@@ -327,3 +327,41 @@ def test_finalize_from_verdicts_json_malformed_scores_raises(tmp_path: Path) -> 
 def test_judge_client_protocol_satisfied_by_fake() -> None:
     fake: JudgeClient = _FakeJudgeClient()
     assert callable(getattr(fake, "judge", None))
+
+
+# ── 0.13.0 health-consolidation: structural-only entrypoint ────────────────
+
+
+def test_run_structural_returns_split_schema(tmp_path: Path) -> None:
+    """ADR-002 amended by ADR-006: ai_readiness emits the ``structural``
+    field of /hm:health, not a single composite scalar. The dashboard
+    writer keys off this exact shape — pin it here."""
+    from harness_maker.ai_readiness import run_structural
+
+    _seed_minimal_project(tmp_path)
+    result = run_structural(tmp_path, preset=Preset.SIDE)
+    assert set(result.keys()) == {"structural", "signals_failed"}
+    assert isinstance(result["structural"], int)
+    assert 0 <= result["structural"] <= 100
+    assert isinstance(result["signals_failed"], list)
+
+
+def test_run_structural_signals_failed_are_strings(tmp_path: Path) -> None:
+    """Each signal entry uses the `dim:signal_id` form so dashboard
+    consumers can split + group by dimension without re-running the layer."""
+    from harness_maker.ai_readiness import run_structural
+
+    _seed_minimal_project(tmp_path)
+    result = run_structural(tmp_path, preset=Preset.SIDE)
+    for sig in result["signals_failed"]:
+        assert isinstance(sig, str)
+        assert ":" in sig, f"expected dim:signal_id form, got {sig!r}"
+
+
+def test_run_structural_score_clamped(tmp_path: Path) -> None:
+    """Even a degenerate project must yield a score in [0, 100]."""
+    from harness_maker.ai_readiness import run_structural
+
+    # No CLAUDE.md / README.md → many failed signals; readiness still bounded.
+    result = run_structural(tmp_path, preset=Preset.SIDE)
+    assert 0 <= result["structural"] <= 100

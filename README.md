@@ -133,7 +133,7 @@ Step 6 — IDE reload:
   • Cursor: reload the window (Ctrl+Shift+P → "Reload Window") so
     agents, skills, and commands under .claude/ are discovered.
   • Codex: AGENTS.md and .codex/ are read on next session start.
-  Tell me the harness is ready and suggest: /hm:ai-readiness
+  Tell me the harness is ready and suggest: /hm:health
 ```
 
 </details>
@@ -189,7 +189,7 @@ harness-maker make . --promote NAME    # move an ad-hoc artifact into the harnes
 
 - **Three targets from one harness.** Claude Code gets the native `.claude/` runtime. Cursor reuses `.claude/agents/`, `.claude/skills/`, and `.claude/commands/hm/` while receiving Cursor-specific hooks and rules. Codex receives `AGENTS.md`, `.codex/config.toml`, `.codex/hooks.json`, agent TOML files, and `.agents/skills/` so the same stage and workflow model runs in Codex without hand-porting prompts.
 
-- **AI-readiness scoring.** `/hm:ai-readiness` runs a 3-layer composite: deterministic structural checks (70%), LLM rubric evaluation (25%), prompt-cache diagnostics (5%). Outputs a 0-100 score with P0/P1/P2 ranked action items and updates `.claude/observability/dashboard.md`. All telemetry stays local.
+- **Unified health audit.** `/hm:health` runs a 3-layer composite: **structural** (ai-readiness deterministic + LLM rubric, 70%/25%/5%), **external risks** (4-source anti-rot crawl + LLM relevance filter), and **personalization** (ADR-011 rubric — Bronze/Silver/Gold/Platinum). Outputs a 3-section `.claude/observability/dashboard.md`. Every item routes through `accept` / `reject` / `defer` — no auto-apply, ever (ADR-001). All telemetry stays local. Replaces 0.12.x's separate `/hm:ai-readiness`, `/hm:refresh`, and `/hm:personalization-audit` commands.
 
 - **Anti-rot pipeline.** Weekly crawl across 4 sources: Anthropic blog/changelog, GitHub releases (`anthropics/claude-code`), arxiv (cs.SE / cs.CL / cs.CR), OSV.dev CVEs. Each item is LLM-scored for relevance with an adaptive threshold (starts at 0.7, adapts ±0.05 based on your accept/reject history). **Always manual-confirmed** — there is no `--auto-apply` path.
 
@@ -209,7 +209,7 @@ harness-maker make . --promote NAME    # move an ad-hoc artifact into the harnes
 
 - **Refdocs search skill.** Register your project's reference folders (architecture docs, API specs, design docs) in `harness.yaml`. `/harness-maker:make` builds a local `docs_index.yaml`, and the `refdocs-search` skill gives the LLM lossless full-text search across registered folders — no chunking, no RAG index.
 
-- **SessionStart drift reminder.** A hook fires on every session open and warns if the running harness-maker version differs from the version that rendered the harness — so you notice when a `/plugin update` needs a re-render. The detector compares `harness.yaml.harness_maker_version` against the **latest plugin version cached on disk** (not just the imported `__version__`), so `/hm:refresh` and SessionStart agree even when the slash command runs against a pinned older version (0.6.2).
+- **SessionStart drift reminder.** A hook fires on every session open and warns if the running harness-maker version differs from the version that rendered the harness — so you notice when a `/plugin update` needs a re-render. The detector compares `harness.yaml.harness_maker_version` against the **latest plugin version cached on disk** (not just the imported `__version__`), so `/hm:health` and SessionStart agree even when the slash command runs against a pinned older version (0.6.2).
 
 - **Memory tier with cross-process safety.** `.claude/memory/` holds `episodic/` (per-day JSONL), `semantic.jsonl` (queryable index), `profile.json`, `wiki.md`, and `failures.md`. Concurrent writers from parallel sessions are serialised via a re-entrant POSIX flock — same thread can re-acquire without deadlock, different threads block normally (ADR-106, 0.7.1). Telemetry hooks append atomically via raw `os.write()` on `O_APPEND` (single-syscall, ≤ PIPE_BUF) so concurrent Claude Code + Cursor hooks cannot interleave JSONL lines.
 
@@ -231,7 +231,7 @@ harness-maker make . --promote NAME    # move an ad-hoc artifact into the harnes
 
 - **Foreign AI Config Migration** — detect 6 known foreign configs (`.cursor/rules/`, `AGENTS.md`, `CLAUDE.md`, `.continue/config.json`, `.aider.conf.yml`, `.github/copilot-instructions.md`); LLM-driven import; `@hm:harness:*` inverted markers preserve user content across re-renders.
 
-- **Adaptive Personalization** — `/hm:personalization-audit` composite-score rubric (Bronze/Silver/Gold/Platinum) with evidence-bearing ActionItems; 100% local telemetry; SessionStart drift hint after 30 axis overrides or 14 days.
+- **Adaptive Personalization** — `/hm:health` Step 3 composite-score rubric (Bronze/Silver/Gold/Platinum) with evidence-bearing ActionItems; 100% local telemetry; SessionStart drift hint after 30 axis overrides or 14 days. (Absorbs the 0.12.x `/hm:personalization-audit` command; ADR-011 rubric unchanged.)
 
 - **Confidence-Bucketed Recommendation UI** — every detection declares its own confidence (HIGH/MEDIUM/LOW); high → silent yaml comment, medium → explicit prompt, low → no surface. Backward-compat regression test guards 0.11.x users from surprise silent-default changes.
 
@@ -253,7 +253,7 @@ flowchart TD
     H --> G
     G --> I["Extra targets?\nRender .cursor/ and/or .codex/ assets"]
     I --> J["User runs /hm:* commands"]
-    J --> K["Weekly /hm:refresh\n4-source anti-rot crawl\n→ manual confirm"]
+    J --> K["Weekly /hm:health (Step 2)\n4-source anti-rot crawl\n→ manual confirm"]
 ```
 
 **14 mechanisms** (M1-M14) back every feature. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the full breakdown including the privilege-separation model, security gate triggers, and reconcile invariants.

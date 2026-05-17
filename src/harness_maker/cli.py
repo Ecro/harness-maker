@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import sys
 from pathlib import Path
@@ -13,13 +14,13 @@ import yaml
 from harness_maker.add_domain import AddDomainError, add_domain, validate_domain_name
 from harness_maker.block_merge import MergeReport
 from harness_maker.interview import answers_from_harness_yaml, interview
-from harness_maker.io_utils import denormalize_home_to_tilde
+from harness_maker.io_utils import atomic_write, denormalize_home_to_tilde
 from harness_maker.models import Blueprint, InterviewAnswers, Preset, RefFolder
 from harness_maker.modular_edit import ModularEditError
 from harness_maker.modular_edit import add as modular_add
 from harness_maker.modular_edit import remove as modular_remove
 from harness_maker.profile import profile
-from harness_maker.reconcile import backup, reconcile
+from harness_maker.reconcile import OrphanSweepReport, backup, reconcile, sweep_orphans
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
 from harness_maker.telemetry import (
@@ -235,6 +236,10 @@ def make(
         if add_domain_name not in a.domains:
             a.domains.append(add_domain_name)
     bp = synthesize(p, a)
+    # full_bp holds the unfiltered blueprint for orphan-sweep: KEEP'd files
+    # are still expected on disk (the user owns them now), so we must NOT
+    # let the post-reconcile mutation classify them as orphans.
+    full_bp = bp
     target_dotclaude = target / ".claude"
 
     if dry_run:
@@ -263,6 +268,12 @@ def make(
         merge_reports=merge_reports,
     )
     _write_harness_manifest(target_dotclaude, written)
+    # ADR-005 orphan sweep — delete blueprint-orphaned ours-clean files
+    # (legacy commands removed by /hm:make --update). Uses full_bp (with
+    # KEEP entries intact) so user-preserved files survive. Runs AFTER
+    # render so the manifest is up-to-date for the classifier.
+    sweep_report = sweep_orphans(target, full_bp)
+    _emit_orphan_sweep_report(sweep_report)
     _emit_reconcile_report(keep_count, merge_reports)
     errors = verify(target_dotclaude)
     if errors:
@@ -371,7 +382,7 @@ def _emit_install_summary(
 
         typer.echo("\nQuick start:")
         typer.echo("  /hm:execute <task>       — implement a feature with TDD")
-        typer.echo("  /hm:ai-readiness         — check AI-readiness score")
+        typer.echo("  /hm:health               — check the 3-layer harness health")
         typer.echo("  /hm:configure            — adjust settings later")
         typer.echo("  /hm:make                 — re-render after plugin update")
     except Exception:  # noqa: BLE001 — diagnostic, never fail the make
@@ -478,10 +489,7 @@ def _write_harness_manifest(target_dotclaude: Path, written: list[Path]) -> None
     }
     manifest_path = target_dotclaude / ".harness-manifest.json"
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
-    manifest_path.write_text(
-        json.dumps(manifest, indent=2) + "\n",
-        encoding="utf-8",
-    )
+    atomic_write(manifest_path, json.dumps(manifest, indent=2) + "\n")
 
 
 def _emit_refdocs_index_build(target: Path, ref_folders: list[RefFolder]) -> None:
@@ -521,11 +529,11 @@ def _emit_post_make_readiness(target: Path, preset: Preset) -> None:
         typer.echo(f"\n(ai-readiness scan skipped: {type(e).__name__}: {e})")
         return
     typer.echo("\n" + "─" * 64)
-    typer.echo("Initial AI-readiness scan (LLM judge skipped — see hint below)")
+    typer.echo("Initial structural-health scan (LLM judge skipped — see hint below)")
     typer.echo("─" * 64)
     typer.echo(render_terminal_summary(plan, max_actions=5))
     typer.echo("\nNext steps:")
-    typer.echo("  • Run /hm:ai-readiness for the full LLM-judged scan + dashboard.")
+    typer.echo("  • Run /hm:health for the full 3-layer scan + unified dashboard.")
     typer.echo("  • Walk the action list above; fix P0 items first.")
 
 
@@ -703,6 +711,24 @@ def _parse_ref_folders_flag(raw: str) -> list[object]:
     return out
 
 
+def _emit_orphan_sweep_report(report: OrphanSweepReport) -> None:
+    """Surface what the orphan-sweep did so the user can audit deletions.
+
+    Deleted paths are listed inline (typically a handful of legacy commands);
+    kept-with-classification entries point to the date-stamped observability
+    log for follow-up review.
+    """
+    if report.deleted:
+        typer.echo(f"  SWEEP: {len(report.deleted)} orphan(s) deleted (ours-clean):")
+        for p in report.deleted:
+            typer.echo(f"    - {p.as_posix()}")
+    if report.kept:
+        typer.echo(
+            f"  SWEEP: {len(report.kept)} orphan(s) kept "
+            f"(see .claude/observability/orphans-*.jsonl)",
+        )
+
+
 def _emit_reconcile_report(
     keep_count: int,
     merge_reports: dict[Path, MergeReport],
@@ -734,19 +760,44 @@ def _emit_reconcile_report(
             typer.echo(f"  MERGE_BLOCK: {path} — {'; '.join(bits)}")
 
 
-_AI_READINESS_TARGET = typer.Argument(
+_HEALTH_TARGET = typer.Argument(
     Path("."),
     help="Project root (the directory containing .claude/).",
 )
 
 
-@app.command("ai-readiness")
-def ai_readiness_cmd(
-    target: Path = _AI_READINESS_TARGET,
+def _personalization_section_from_plan(plan: object) -> dict[str, Any]:
+    """Map ``PersonalizationPlan`` → dashboard third-section dict (ADR-006).
+
+    Centralised so the integration test can compare bytes built from the
+    same helper against bytes written into dashboard.md. Lives here (not in
+    ``personalization_audit``) because the module is intentionally
+    UNCHANGED per ADR-006 hard rule — wiring belongs to the consumer.
+    """
+    from harness_maker.personalization_audit import PersonalizationPlan
+
+    if not isinstance(plan, PersonalizationPlan):
+        return {
+            "composite": 0,
+            "tier": "bronze",
+            "layers": {},
+            "action_items": [],
+        }
+    return {
+        "composite": plan.composite_score,
+        "tier": plan.tier,
+        "layers": dict(plan.layer_scores),
+        "action_items": [item.model_dump() for item in plan.actions],
+    }
+
+
+@app.command("health")
+def health_cmd(
+    target: Path = _HEALTH_TARGET,
     skip_llm: bool = typer.Option(
         False,
         "--skip-llm",
-        help="Skip Layer 2 (LLM judge). Use with --json-output to feed Claude-native L2.",
+        help="Skip the optional LLM relevance scorer for external risks.",
     ),
     model: str = typer.Option(
         "claude-sonnet-4-6",
@@ -756,93 +807,153 @@ def ai_readiness_cmd(
     update_dashboard: bool = typer.Option(
         True,
         "--update-dashboard/--no-update-dashboard",
-        help="Write the rendered plan to .claude/observability/dashboard.md.",
+        help="Write the rendered three-section dashboard.md.",
     ),
     json_output: Path | None = typer.Option(  # noqa: B008
         None,
         "--json-output",
-        help="Write L1+L3 structural scores as JSON to this path (implies --skip-llm).",
+        help=(
+            "Write structural L1+L3 JSON to this path. Used by the slash "
+            "command flow to feed Claude-native L2 evaluation; finalize "
+            "with `harness-maker health-finalize`."
+        ),
     ),
 ) -> None:
-    """Compute ai-readiness composite + ranked improvement actions."""
-    from harness_maker.ai_readiness import (
-        render_dashboard_markdown,
-        render_terminal_summary,
-        run_ai_readiness,
-        run_ai_readiness_structural,
-    )
-    from harness_maker.io_utils import atomic_write
+    """Run the three /hm:health layers and write the unified dashboard.
 
+    Layer 1 — structural (ai_readiness L1+L3, /hm:health Step 1).
+    Layer 2 — external risks (placeholder count until the LLM relevance
+              orchestrator lands in Phase 2; the structured-question loop
+              fills in items).
+    Layer 3 — personalization (personalization_audit.run_audit, ADR-006
+              rubric UNCHANGED).
+    """
+    from harness_maker.ai_readiness import run_structural
+    from harness_maker.observability.dashboard import write_dashboard
+    from harness_maker.personalization_audit import run_audit
+
+    _ = skip_llm  # external-risk LLM scorer is wired in Phase 2 template work
     target = target.resolve()
     preset = _read_preset(target / ".claude" / "harness.yaml") or Preset.SIDE
 
     if json_output is not None:
-        # Structural-only mode: write L1+L3 as JSON for Claude-native L2 finalize.
         import json
 
-        scores = run_ai_readiness_structural(target, preset=preset, model=model)
+        scores = {
+            "structural": run_structural(target, preset=preset, model=model),
+        }
         json_output.parent.mkdir(parents=True, exist_ok=True)
         json_output.write_text(json.dumps(scores, indent=2), encoding="utf-8")
         typer.echo(f"Structural scores written to {json_output}")
-        # Also print L1+L3 partial summary (L2=50 neutral placeholder).
-        from harness_maker.cache_diagnostics import CacheDiagnosis
-        from harness_maker.improvement import build_improvement_plan
-        from harness_maker.readiness import ReadinessResult
-
-        readiness = ReadinessResult.model_validate(scores["readiness"])
-        cache = CacheDiagnosis.model_validate(scores["cache"])
-        plan = build_improvement_plan(readiness, [], cache)
-        typer.echo(render_terminal_summary(plan))
-        typer.echo("(Layer 2 pending — run ai-readiness-finalize after Claude evaluates rubrics)")
+        typer.echo(
+            "(Step 2 external risks + Step 3 personalization pending — run "
+            "`harness-maker health-finalize` after Claude evaluates rubrics)",
+        )
         return
 
-    plan = run_ai_readiness(target, preset=preset, skip_llm=skip_llm, model=model)
-    typer.echo(render_terminal_summary(plan))
+    structural = run_structural(target, preset=preset, model=model)
+    # External risks: Phase 1 emits an empty queue. The Phase 2 template
+    # populates it via the crawler + relevance + stale-asset orchestration.
+    external_risks: dict[str, Any] = {"pending": 0, "items": []}
+    personalization_plan = run_audit(target)
+    personalization = _personalization_section_from_plan(personalization_plan)
+
+    typer.echo(
+        f"health: structural={structural['structural']}/100 "
+        f"external_risks_pending={external_risks['pending']} "
+        f"personalization={personalization['composite']}/100 "
+        f"(tier: {personalization['tier']})",
+    )
+
     if update_dashboard:
-        dashboard = target / ".claude" / "observability" / "dashboard.md"
-        body = render_dashboard_markdown(plan, target.name)
-        atomic_write(dashboard, body)
-        typer.echo(f"\nDashboard updated: {dashboard}")
+        dashboard_path = write_dashboard(
+            target,
+            structural,
+            external_risks,
+            personalization,
+        )
+        typer.echo(f"Dashboard updated: {dashboard_path}")
 
 
-@app.command("ai-readiness-finalize")
-def ai_readiness_finalize_cmd(
+@app.command("health-finalize")
+def health_finalize_cmd(
     target: Path = typer.Argument(  # noqa: B008
         default_factory=Path.cwd,
-        help="Project root (the directory containing .claude/).  Defaults to cwd.",
+        help="Project root (the directory containing .claude/). Defaults to cwd.",
     ),
     scores_json: Path = typer.Option(  # noqa: B008
         ...,
         "--scores-json",
-        help="Path to L1+L3 scores JSON written by ai-readiness --json-output.",
+        help="Path to structural scores JSON written by `health --json-output`.",
     ),
-    verdicts_json: Path = typer.Option(  # noqa: B008
-        ...,
-        "--verdicts-json",
-        help="Path to Claude-provided L2 verdicts JSON.",
+    external_risks_json: Path | None = typer.Option(  # noqa: B008
+        None,
+        "--external-risks-json",
+        help=(
+            "Path to JSON with pending external-risk items "
+            '({"pending": N, "items": [...]}). Optional; defaults to '
+            "empty queue when omitted."
+        ),
     ),
     update_dashboard: bool = typer.Option(
         True,
         "--update-dashboard/--no-update-dashboard",
-        help="Write the rendered plan to .claude/observability/dashboard.md.",
+        help="Write the rendered three-section dashboard.md.",
     ),
 ) -> None:
-    """Combine pre-computed L1+L3 scores with Claude-provided L2 verdicts."""
-    from harness_maker.ai_readiness import (
-        finalize_from_verdicts_json,
-        render_dashboard_markdown,
-        render_terminal_summary,
-    )
-    from harness_maker.io_utils import atomic_write
+    """Combine pre-computed structural scores with Claude-provided external
+    risk + personalization layers into the unified dashboard."""
+    import json
 
-    plan = finalize_from_verdicts_json(scores_json, verdicts_json)
-    typer.echo(render_terminal_summary(plan))
+    from harness_maker.observability.dashboard import write_dashboard
+    from harness_maker.personalization_audit import run_audit
+
+    target = target.resolve()
+    try:
+        scores = json.loads(scores_json.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as e:
+        typer.echo(f"health-finalize: cannot read {scores_json}: {e}", err=True)
+        raise typer.Exit(code=1) from e
+    structural = scores.get("structural")
+    if not isinstance(structural, dict):
+        typer.echo(
+            f"health-finalize: scores JSON missing 'structural' key in {scores_json}",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    external_risks: dict[str, Any] = {"pending": 0, "items": []}
+    if external_risks_json is not None:
+        try:
+            payload = json.loads(external_risks_json.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as e:
+            typer.echo(
+                f"health-finalize: cannot read {external_risks_json}: {e}",
+                err=True,
+            )
+            raise typer.Exit(code=1) from e
+        if isinstance(payload, dict):
+            external_risks = {
+                "pending": payload.get("pending", 0),
+                "items": payload.get("items", []),
+            }
+
+    personalization_plan = run_audit(target)
+    personalization = _personalization_section_from_plan(personalization_plan)
+
+    typer.echo(
+        f"health-finalize: structural={structural.get('structural', 0)}/100 "
+        f"external_risks_pending={external_risks['pending']} "
+        f"personalization={personalization['composite']}/100",
+    )
     if update_dashboard:
-        target = target.resolve()
-        dashboard = target / ".claude" / "observability" / "dashboard.md"
-        body = render_dashboard_markdown(plan, target.name)
-        atomic_write(dashboard, body)
-        typer.echo(f"\nDashboard updated: {dashboard}")
+        dashboard_path = write_dashboard(
+            target,
+            structural,
+            external_risks,
+            personalization,
+        )
+        typer.echo(f"Dashboard updated: {dashboard_path}")
 
 
 def _read_preset(harness_yaml: Path) -> Preset | None:
@@ -1096,12 +1207,335 @@ def profile_cmd(
             typer.echo("detected_checks: (none)")
 
 
+@app.command("verify")
+def verify_stage_cmd(
+    target: Path = typer.Argument(  # noqa: B008
+        default_factory=Path.cwd,
+        help="Project root (the directory containing .claude/). Defaults to cwd.",
+    ),
+    prior_dashboard: Path | None = typer.Option(  # noqa: B008
+        None,
+        "--prior-dashboard",
+        help=(
+            "Path to the prior dashboard.md snapshot (Check 3 baseline). "
+            "When omitted, Check 3 emits a no-baseline PASS — the slash "
+            "command should pre-stage the snapshot from the start of the "
+            "work unit when a delta gate is wanted."
+        ),
+    ),
+    pending: Path | None = typer.Option(  # noqa: B008
+        None,
+        "--pending",
+        help=(
+            "Override path to the external_risks pending JSONL. Defaults "
+            "to <target>/.claude/observability/health/pending.jsonl."
+        ),
+    ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        help="Treat FAIL as PASS for the exit code. --reason required.",
+    ),
+    reason: str | None = typer.Option(
+        None,
+        "--reason",
+        help="Required when --force is set. Logged in the JSONL record.",
+    ),
+) -> None:
+    """CI/automation wrapper for the verify stage.
+
+    Runs the **machine-checkable subset** of the 6-check protocol — Check 3
+    (structural delta) and Check 4 (external_risks pending). Checks 1, 2, 5,
+    6 are prompt-driven and are emitted as ``SKIPPED`` records. ADR-002 /
+    ADR-004 semantics: missing baseline = no-baseline PASS with an explicit
+    ``reason`` field. ``personalization`` is intentionally never read here.
+
+    The full 6-check protocol still lives in the verify-stage slash command
+    template (templates/stages/verify.md.j2); this CLI is a thin wrapper for
+    CI pipelines and the e2e harness.
+    """
+    from harness_maker.observability.dashboard import parse_dashboard
+
+    target = target.resolve()
+    dotclaude = target / ".claude"
+    obs = dotclaude / "observability"
+    current_dashboard = obs / "dashboard.md"
+
+    # ── Check 3 ─────────────────────────────────────────────────────────
+    check3 = _verify_structural_check(current_dashboard, prior_dashboard, parse_dashboard)
+
+    # ── Check 4 ─────────────────────────────────────────────────────────
+    pending_path = pending if pending is not None else obs / "health" / "pending.jsonl"
+    check4 = _verify_external_risks_check(pending_path, current_dashboard, parse_dashboard)
+
+    checks: list[dict[str, Any]] = [
+        {"id": 1, "name": "plan_spec_satisfaction", "result": "SKIPPED"},
+        {"id": 2, "name": "regression_smoke", "result": "SKIPPED"},
+        check3,
+        check4,
+        {"id": 5, "name": "security_high", "result": "SKIPPED"},
+        {"id": 6, "name": "worktree_merge", "result": "SKIPPED"},
+    ]
+    failing = [c for c in checks if c["result"] == "FAIL"]
+    overall_fail = bool(failing)
+    if overall_fail and force and not reason:
+        typer.echo("--force requires --reason=<text>", err=True)
+        raise typer.Exit(code=2)
+
+    result = "FAIL" if overall_fail else "PASS"
+    record = {
+        "timestamp": _verify_timestamp(),
+        "stage": "verify",
+        "result": result,
+        "checks": checks,
+        "force_override": bool(force and overall_fail),
+        "override_reason": reason if (force and overall_fail) else None,
+    }
+    _write_verify_jsonl(obs, record)
+    _emit_verify_text(checks, result, force_override=bool(force and overall_fail), reason=reason)
+    if overall_fail and not force:
+        raise typer.Exit(code=1)
+
+
+def _verify_timestamp() -> str:
+    """Deterministic-friendly timestamp source for tests via env override."""
+    from datetime import UTC, datetime  # noqa: PLC0415
+
+    pinned = os.environ.get("HARNESS_MAKER_VERIFY_TIMESTAMP")
+    if pinned:
+        return pinned
+    return datetime.now(UTC).isoformat()
+
+
+def _verify_structural_check(
+    current_path: Path,
+    prior_path: Path | None,
+    parser: Any,
+) -> dict[str, Any]:
+    """Compute Check 3 (structural delta) per ADR-002 / ADR-004."""
+    current = parser(current_path) if current_path.is_file() else None
+    prior = parser(prior_path) if (prior_path is not None and prior_path.is_file()) else None
+    current_score = (
+        current["structural"]["score"]
+        if current is not None and isinstance(current["structural"]["score"], int)
+        else None
+    )
+    prior_score = (
+        prior["structural"]["score"]
+        if prior is not None and isinstance(prior["structural"]["score"], int)
+        else None
+    )
+    # No-baseline branches: either current OR prior missing/unparseable.
+    if current is None:
+        cause = (
+            "dashboard.md missing"
+            if not current_path.is_file()
+            else "pre-0.13.0 schema or unparseable"
+        )
+        return {
+            "id": 3,
+            "name": "structural_delta",
+            "result": "PASS",
+            "delta": None,
+            "prior": prior_score,
+            "current": None,
+            "reason": f"no-baseline: {cause}",
+        }
+    if prior_path is None:
+        return {
+            "id": 3,
+            "name": "structural_delta",
+            "result": "PASS",
+            "delta": None,
+            "prior": None,
+            "current": current_score,
+            "reason": "no-baseline: prior dashboard not provided",
+        }
+    if prior is None or prior_score is None:
+        cause = (
+            "prior dashboard.md missing"
+            if not prior_path.is_file()
+            else "prior pre-0.13.0 schema or unparseable"
+        )
+        return {
+            "id": 3,
+            "name": "structural_delta",
+            "result": "PASS",
+            "delta": None,
+            "prior": None,
+            "current": current_score,
+            "reason": f"no-baseline: {cause}",
+        }
+    if current_score is None:
+        return {
+            "id": 3,
+            "name": "structural_delta",
+            "result": "PASS",
+            "delta": None,
+            "prior": prior_score,
+            "current": None,
+            "reason": "no-baseline: current structural score missing",
+        }
+    delta = current_score - prior_score
+    return {
+        "id": 3,
+        "name": "structural_delta",
+        "result": "FAIL" if delta < -5 else "PASS",
+        "delta": delta,
+        "prior": prior_score,
+        "current": current_score,
+        "reason": None,
+    }
+
+
+def _verify_external_risks_check(
+    pending_path: Path,
+    current_dashboard: Path,
+    parser: Any,
+) -> dict[str, Any]:
+    """Compute Check 4 (external_risks) per ADR-002 / ADR-004.
+
+    Source precedence:
+      1. <obs>/health/pending.jsonl (one JSON record per line).
+      2. <obs>/dashboard.md → ``## External risks`` items[].
+    Missing both → no-baseline PASS.
+    """
+    items: list[dict[str, Any]] = []
+    source_used: str | None = None
+    if pending_path.is_file():
+        source_used = "pending.jsonl"
+        try:
+            raw = pending_path.read_text(encoding="utf-8")
+        except OSError:
+            raw = ""
+        for line in raw.splitlines():
+            stripped = line.strip()
+            if not stripped:
+                continue
+            try:
+                rec = json.loads(stripped)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(rec, dict):
+                items.append(rec)
+    elif current_dashboard.is_file():
+        parsed = parser(current_dashboard)
+        if parsed is not None:
+            source_used = "dashboard.md"
+            dashboard_items = parsed["external_risks"]["items"]
+            if isinstance(dashboard_items, list):
+                for it in dashboard_items:
+                    if isinstance(it, dict):
+                        items.append(it)
+    if source_used is None:
+        return {
+            "id": 4,
+            "name": "external_risks_pending",
+            "result": "PASS",
+            "blocking_items": 0,
+            "items": [],
+            "reason": "no-baseline: no pending.jsonl and no parseable dashboard.md",
+        }
+    blocking_categories = {"security", "breaking-change"}
+    blockers: list[dict[str, Any]] = []
+    for it in items:
+        score = it.get("relevance_score")
+        cat = it.get("category")
+        if isinstance(score, (int, float)) and score >= 0.8 and cat in blocking_categories:
+            blockers.append(it)
+    if blockers:
+        return {
+            "id": 4,
+            "name": "external_risks_pending",
+            "result": "FAIL",
+            "blocking_items": len(blockers),
+            "items": [str(b.get("id", "")) for b in blockers],
+            "reason": None,
+        }
+    return {
+        "id": 4,
+        "name": "external_risks_pending",
+        "result": "PASS",
+        "blocking_items": 0,
+        "items": [],
+        "reason": None,
+    }
+
+
+def _write_verify_jsonl(obs_dir: Path, record: dict[str, Any]) -> None:
+    """Append the verify record to ``verify-<YYYY-MM-DD>.jsonl``.
+
+    Atomic append per the io_utils contract — concurrent runs cannot
+    interleave lines.
+    """
+    from datetime import UTC, datetime  # noqa: PLC0415
+
+    from harness_maker.io_utils import atomic_append  # noqa: PLC0415
+
+    pinned = os.environ.get("HARNESS_MAKER_VERIFY_TIMESTAMP")
+    if pinned and "T" in pinned:
+        # Best-effort date derivation from the pinned timestamp.
+        date_str = pinned.split("T", 1)[0]
+    else:
+        date_str = datetime.now(UTC).date().isoformat()
+    obs_dir.mkdir(parents=True, exist_ok=True)
+    out_path = obs_dir / f"verify-{date_str}.jsonl"
+    atomic_append(out_path, json.dumps(record, sort_keys=True, ensure_ascii=False) + "\n")
+
+
+def _emit_verify_text(
+    checks: list[dict[str, Any]],
+    result: str,
+    *,
+    force_override: bool,
+    reason: str | None,
+) -> None:
+    """Human-readable verify summary on stdout."""
+    typer.echo("=== /hm:verify ===\n")
+    for c in checks:
+        cid = c["id"]
+        name = c["name"]
+        outcome = c["result"]
+        extra = ""
+        if name == "structural_delta" and outcome != "SKIPPED":
+            prior = c.get("prior")
+            current = c.get("current")
+            delta = c.get("delta")
+            if delta is not None:
+                extra = f"  (structural {prior} -> {current}, delta {delta:+d})"
+            elif c.get("reason"):
+                extra = f"  ({c['reason']})"
+        elif name == "external_risks_pending" and outcome != "SKIPPED":
+            blocking = c.get("blocking_items", 0)
+            if outcome == "FAIL":
+                extra = f"  ({blocking} blocking item(s): {', '.join(c.get('items', []))})"
+            elif c.get("reason"):
+                extra = f"  ({c['reason']})"
+        typer.echo(f"[{cid}/6] {name:30s} {outcome}{extra}")
+    typer.echo("")
+    typer.echo(f"RESULT: {result}")
+    if force_override:
+        typer.echo(f"FORCE OVERRIDE: --reason={reason!r}")
+
+
+verify_stage = verify_stage_cmd
+
+
 @app.command(hidden=True)
 def _version() -> None:
     """Print version (hidden command, forces multi-command mode)."""
     from harness_maker import __version__
 
     typer.echo(__version__)
+
+
+# Module-level aliases for the 0.13.0 surface check
+# (``'health' in dir(harness_maker.cli)``). The typer-registered names
+# are kebab-case ("health" / "health-finalize"); exposing snake-case
+# module attributes lets external tools introspect the surface without
+# poking at typer internals.
+health = health_cmd
+health_finalize = health_finalize_cmd
 
 
 def main() -> None:

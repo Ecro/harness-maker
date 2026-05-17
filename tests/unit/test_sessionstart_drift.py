@@ -49,7 +49,10 @@ def test_run_silent_when_no_harness_yaml(tmp_path: Path, capsys) -> None:
 
 def test_run_silent_when_versions_match(tmp_path: Path, capsys) -> None:
     _write_harness_yaml(tmp_path, _TEST_CURRENT)
-    with patch("harness_maker.relevance.latest_installed_version", return_value=_TEST_CURRENT):
+    with patch(
+        "harness_maker.hooks.sessionstart_drift.latest_installed_version",
+        return_value=_TEST_CURRENT,
+    ):
         rc = run(cwd=tmp_path)
     assert rc == 0
     captured = capsys.readouterr()
@@ -78,7 +81,10 @@ def test_run_silent_when_harness_yaml_has_no_frontmatter(tmp_path: Path, capsys)
 
 def test_run_emits_additional_context_on_upgrade(tmp_path: Path, capsys) -> None:
     _write_harness_yaml(tmp_path, "0.0.1")
-    with patch("harness_maker.relevance.latest_installed_version", return_value=_TEST_CURRENT):
+    with patch(
+        "harness_maker.hooks.sessionstart_drift.latest_installed_version",
+        return_value=_TEST_CURRENT,
+    ):
         rc = run(cwd=tmp_path)
     assert rc == 0
 
@@ -93,7 +99,10 @@ def test_run_emits_additional_context_on_upgrade(tmp_path: Path, capsys) -> None
 
 def test_run_emits_downgrade_warning(tmp_path: Path, capsys) -> None:
     _write_harness_yaml(tmp_path, "999.0.0")
-    with patch("harness_maker.relevance.latest_installed_version", return_value=_TEST_CURRENT):
+    with patch(
+        "harness_maker.hooks.sessionstart_drift.latest_installed_version",
+        return_value=_TEST_CURRENT,
+    ):
         rc = run(cwd=tmp_path)
     assert rc == 0
     ctx = json.loads(capsys.readouterr().out)["hookSpecificOutput"]["additionalContext"]
@@ -112,7 +121,10 @@ def test_run_does_not_emit_system_message(tmp_path: Path, capsys) -> None:
     first response. Test guards against the dead field returning silently.
     """
     _write_harness_yaml(tmp_path, "0.0.1")
-    with patch("harness_maker.relevance.latest_installed_version", return_value=_TEST_CURRENT):
+    with patch(
+        "harness_maker.hooks.sessionstart_drift.latest_installed_version",
+        return_value=_TEST_CURRENT,
+    ):
         rc = run(cwd=tmp_path)
     assert rc == 0
     payload = json.loads(capsys.readouterr().out)
@@ -127,7 +139,10 @@ def test_additional_context_is_imperative(tmp_path: Path, capsys) -> None:
     Claude's next response so the user actually finds out.
     """
     _write_harness_yaml(tmp_path, "0.0.1")
-    with patch("harness_maker.relevance.latest_installed_version", return_value=_TEST_CURRENT):
+    with patch(
+        "harness_maker.hooks.sessionstart_drift.latest_installed_version",
+        return_value=_TEST_CURRENT,
+    ):
         run(cwd=tmp_path)
     ctx = json.loads(capsys.readouterr().out)["hookSpecificOutput"]["additionalContext"]
     # Imperative markers that prompt Claude to surface the drift.
@@ -253,7 +268,10 @@ def test_no_hint_when_under_thresholds(tmp_path: Path, capsys) -> None:
     _write_phase11_harness_yaml(tmp_path)
     _write_overrides(tmp_path, 5)
     _write_last_audit(tmp_path, 7.0)
-    with patch("harness_maker.relevance.latest_installed_version", return_value=_TEST_CURRENT):
+    with patch(
+        "harness_maker.hooks.sessionstart_drift.latest_installed_version",
+        return_value=_TEST_CURRENT,
+    ):
         rc = run(cwd=tmp_path)
     assert rc == 0
     assert capsys.readouterr().out == ""
@@ -264,14 +282,17 @@ def test_hint_when_override_count_exceeds_threshold(tmp_path: Path, capsys) -> N
     _write_phase11_harness_yaml(tmp_path)
     _write_overrides(tmp_path, 35)
     _write_last_audit(tmp_path, 1.0)  # well under the days threshold
-    with patch("harness_maker.relevance.latest_installed_version", return_value=_TEST_CURRENT):
+    with patch(
+        "harness_maker.hooks.sessionstart_drift.latest_installed_version",
+        return_value=_TEST_CURRENT,
+    ):
         rc = run(cwd=tmp_path)
     assert rc == 0
     payload = json.loads(capsys.readouterr().out)
     hook_out = payload["hookSpecificOutput"]
     assert hook_out["hookEventName"] == "SessionStart"
     assert "35 axis overrides" in hook_out["additionalContext"]
-    assert "/hm:personalization-audit" in hook_out["additionalContext"]
+    assert "/hm:health" in hook_out["additionalContext"]
     assert "35 personalization axis overrides" in hook_out["systemMessage"]
 
 
@@ -280,13 +301,16 @@ def test_hint_when_days_since_audit_exceeds_threshold(tmp_path: Path, capsys) ->
     _write_phase11_harness_yaml(tmp_path)
     _write_overrides(tmp_path, 3)
     _write_last_audit(tmp_path, 15.0)
-    with patch("harness_maker.relevance.latest_installed_version", return_value=_TEST_CURRENT):
+    with patch(
+        "harness_maker.hooks.sessionstart_drift.latest_installed_version",
+        return_value=_TEST_CURRENT,
+    ):
         rc = run(cwd=tmp_path)
     assert rc == 0
     payload = json.loads(capsys.readouterr().out)
     hook_out = payload["hookSpecificOutput"]
-    assert "/hm:personalization-audit" in hook_out["additionalContext"]
-    assert "/hm:personalization-audit" in hook_out["systemMessage"]
+    assert "/hm:health" in hook_out["additionalContext"]
+    assert "/hm:health" in hook_out["systemMessage"]
 
 
 def test_no_hint_when_telemetry_disabled(tmp_path: Path, capsys) -> None:
@@ -295,7 +319,10 @@ def test_no_hint_when_telemetry_disabled(tmp_path: Path, capsys) -> None:
     _write_phase11_harness_yaml(tmp_path, disable_telemetry=True)
     _write_overrides(tmp_path, 100)
     # Deliberately no last-audit.txt — would otherwise trip the days branch.
-    with patch("harness_maker.relevance.latest_installed_version", return_value=_TEST_CURRENT):
+    with patch(
+        "harness_maker.hooks.sessionstart_drift.latest_installed_version",
+        return_value=_TEST_CURRENT,
+    ):
         rc = run(cwd=tmp_path)
     assert rc == 0
     assert capsys.readouterr().out == ""
@@ -307,7 +334,10 @@ def test_systemMessage_and_additionalContext_both_present(tmp_path: Path, capsys
     _write_phase11_harness_yaml(tmp_path)
     _write_overrides(tmp_path, 40)
     _write_last_audit(tmp_path, 0.5)
-    with patch("harness_maker.relevance.latest_installed_version", return_value=_TEST_CURRENT):
+    with patch(
+        "harness_maker.hooks.sessionstart_drift.latest_installed_version",
+        return_value=_TEST_CURRENT,
+    ):
         rc = run(cwd=tmp_path)
     assert rc == 0
     payload = json.loads(capsys.readouterr().out)
@@ -323,10 +353,13 @@ def test_missing_last_audit_treated_as_infinity(tmp_path: Path, capsys) -> None:
     _write_phase11_harness_yaml(tmp_path)
     _write_overrides(tmp_path, 2)
     # Deliberately no last-audit.txt.
-    with patch("harness_maker.relevance.latest_installed_version", return_value=_TEST_CURRENT):
+    with patch(
+        "harness_maker.hooks.sessionstart_drift.latest_installed_version",
+        return_value=_TEST_CURRENT,
+    ):
         rc = run(cwd=tmp_path)
     assert rc == 0
     payload = json.loads(capsys.readouterr().out)
     hook_out = payload["hookSpecificOutput"]
-    assert "/hm:personalization-audit" in hook_out["additionalContext"]
-    assert "/hm:personalization-audit" in hook_out["systemMessage"]
+    assert "/hm:health" in hook_out["additionalContext"]
+    assert "/hm:health" in hook_out["systemMessage"]

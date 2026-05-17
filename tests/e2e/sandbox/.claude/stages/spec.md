@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.12.0
+harness_maker_version: 0.13.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: stages/spec.md.j2
 provenance: official
-content_hash: c75f5f7bd6effc7e59d37f0ac568425ddf17323c1de935d0afec0245b7ad65c1
+content_hash: ef99352d431a71b6a9ca392c248fbd8080b1a034edbabf7642c02b016b838ffe
 ---
 # Stage: spec
 
@@ -247,7 +247,7 @@ completeness, testability, unambiguity, consistency, scope_boundary.
 
 ```bash
 jq -n --arg spec "$(cat specs/SPEC-{slug}.md)" \
-      --arg mode "task-driven" \
+      --arg mode "spec-driven" \
       '{spec_text: $spec, dev_mode: $mode}' \
   | python -m harness_maker.spec_quality eval
 ```

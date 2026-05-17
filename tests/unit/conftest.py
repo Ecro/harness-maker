@@ -2,11 +2,29 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
 
-from harness_maker import detection_cache, foreign_config
+from harness_maker import detection_cache, foreign_config, synthesize
+
+
+@pytest.fixture(autouse=True)
+def _pin_harness_maker_pkg_root(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Pin synthesize._HARNESS_MAKER_PKG_ROOT for worktree-invariant snapshots.
+
+    From within a ``.worktrees/<x>/`` checkout the constant resolves via
+    ``__file__`` to the worktree path and leaks into rendered templates
+    (``harness_maker_src_path``), breaking byte-identical snapshot comparisons.
+    Pin to the canonical main checkout so unit tests are invariant to where
+    they are invoked from.
+    """
+    main_path = os.environ.get(
+        "HM_MAIN_CHECKOUT_PATH",
+        "/home/noel/harness-maker",
+    )
+    monkeypatch.setattr(synthesize, "_HARNESS_MAKER_PKG_ROOT", main_path)
 
 
 @pytest.fixture(autouse=True)

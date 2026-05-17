@@ -1,6 +1,6 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.12.0
+harness_maker_version: 0.13.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: skills/verify-before-completion/SKILL.md.j2
 provenance: official
@@ -8,7 +8,7 @@ name: verify-before-completion
 description: Pre-wrapup gate enforcing 6 checks before any /hm:wrapup or autoloop
   iteration close. Failure on any check blocks completion and surfaces the failing
   check name + remediation hint.
-content_hash: 7a81b75361498428f46347719016761ad0bb8747c86f16ddb2b8a29c434b6f81
+content_hash: 4bd2933d233f340786863f209dc3f50c29a8acef9d6ffa92764f6911e2debf11
 ---
 
 # verify-before-completion
@@ -65,7 +65,7 @@ bash .claude-verify.sh phase_${CURRENT_PHASE} || exit 1
 ### 3. Health score within −5 of baseline
 
 ```bash
-uv run --with /home/noel/harness-maker/.worktrees/execute-20260516T0550Z python -c "
+uv run --with /home/noel/harness-maker/.worktrees/execute-20260516T1406Z python -c "
 from pathlib import Path
 from harness_maker.readiness import compute_readiness
 from harness_maker.models import Preset

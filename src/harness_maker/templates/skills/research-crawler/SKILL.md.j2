@@ -1,6 +1,6 @@
 ---
 name: research-crawler
-description: Crawl 4 anti-rot sources (Anthropic blog/changelog, GitHub releases including anthropics/claude-code, arxiv cs.SE/CL/CR, OSV.dev CVEs) and write to .claude/observability/refresh/raw-<date>.jsonl. Use during /hm:refresh or when the freshness gauge crosses the staleness threshold.
+description: Crawl 4 anti-rot sources (Anthropic blog/changelog, GitHub releases including anthropics/claude-code, arxiv cs.SE/CL/CR, OSV.dev CVEs) and write to .claude/observability/health/raw-<date>.jsonl. Invoked by /hm:health Step 2 (external risks layer).
 ---
 
 # {{ name }}
@@ -11,16 +11,16 @@ description: Crawl 4 anti-rot sources (Anthropic blog/changelog, GitHub releases
 ## When to invoke vs skip
 
 **Invoke when:**
-- `/hm:refresh` runs (manual or weekly schedule).
-- Anti-rot freshness gauge in `/hm:ai-readiness` crosses the staleness threshold (default 7 days since last refresh).
+- `/hm:health` Step 2 (external risks layer) runs (manual or weekly schedule).
+- Anti-rot freshness gauge crosses the staleness threshold (default 7 days since last health check).
 
 **Skip when:**
 - A `raw-<date>.jsonl` from less than 24h ago already exists (running again would just bloat the queue).
 - The user is offline / OSV.dev unreachable (skill will silently skip with stderr warning).
 ## Triggers
 
-- `/hm:refresh` invocation (manual or weekly schedule)
-- Anti-rot freshness gauge crosses staleness threshold (`days since refresh`)
+- `/hm:health` Step 2 invocation (manual or weekly schedule)
+- Anti-rot freshness gauge crosses staleness threshold (`days since health check`)
 
 ## Behavior
 
@@ -40,13 +40,13 @@ items += osv_dev.crawl(packages=osv_dev.parse_uv_lock("uv.lock"))
 write_raw(items, project_dir=".")
 ```
 
-Output goes to `<project>/.claude/observability/refresh/raw-<YYYY-MM-DD>.jsonl`.
+Output goes to `<project>/.claude/observability/health/raw-<YYYY-MM-DD>.jsonl`.
 Downstream the `relevance-filter` skill scores each item.
 
 ## Output
 
 A `raw-<date>.jsonl` snapshot of `CrawlItem` records. Never auto-applies
-changes — only writes raw data; the `/hm:refresh` command is responsible for
+changes — only writes raw data; the `/hm:health` command is responsible for
 the structured question confirmation flow.
 
 <!-- @hm:user:extensions -->

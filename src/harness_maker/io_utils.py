@@ -56,3 +56,29 @@ def atomic_write(path: Path, content: str | bytes, *, encoding: str = "utf-8") -
     except Exception:
         tmp_path.unlink(missing_ok=True)
         raise
+
+
+def atomic_append(path: Path, line: str) -> None:
+    """Append one short text line atomically (single os.write on O_APPEND fd).
+
+    POSIX guarantees a single ``write()`` syscall ≤ PIPE_BUF (4096 bytes) on
+    an ``O_APPEND`` descriptor is atomic — two concurrent writers cannot
+    interleave their bytes. The buffered ``TextIOWrapper`` returned by
+    ``Path.open("a")`` may split a write across multiple syscalls and is
+    therefore unsafe for concurrent appenders (render manifest, orphan log).
+
+    The caller MUST include any trailing newline in ``line`` — this helper
+    does not append one. The caller MUST also ensure ``len(line.encode()) <
+    4096``; longer lines lose the POSIX guarantee.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    data = line.encode("utf-8")
+    fd = os.open(
+        str(path),
+        os.O_WRONLY | os.O_APPEND | os.O_CREAT,
+        0o644,
+    )
+    try:
+        os.write(fd, data)
+    finally:
+        os.close(fd)

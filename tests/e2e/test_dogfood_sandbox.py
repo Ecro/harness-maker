@@ -33,8 +33,7 @@ REQUIRED_COMMANDS = [
     "verify",
     "exec-rev",
     "loop",
-    "ai-readiness",
-    "refresh",
+    "health",
 ]
 
 

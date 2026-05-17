@@ -1,6 +1,6 @@
 ---
 name: ai-readiness-rubric
-description: 3-layer rubric scoring AI-readiness — Layer 1 deterministic structural signals, Layer 2 LLM-judged content quality vs rubric YAMLs, Layer 3 prompt-cache failure-mode classification. Invoke via /hm:ai-readiness.
+description: 3-layer rubric scoring AI-readiness — Layer 1 deterministic structural signals, Layer 2 LLM-judged content quality vs rubric YAMLs, Layer 3 prompt-cache failure-mode classification. Invoked by /hm:health Step 1 (structural layer).
 ---
 
 # ai-readiness-rubric
@@ -12,7 +12,7 @@ folded into a single 0-100 score plus a ranked list of actionable items.
 ## When to invoke vs skip
 
 **Invoke when:**
-- `/hm:ai-readiness` computes the 3-layer composite score.
+- `/hm:health` Step 1 (structural layer) computes the 3-layer composite score.
 - A regression check after a major harness change to confirm Health did not drop.
 
 **Skip when:**
@@ -20,7 +20,7 @@ folded into a single 0-100 score plus a ranked list of actionable items.
 - The user only wants Layer 1 (deterministic) — the rubric loader supports a layer-only mode.
 ## When to Invoke
 
-- `/hm:ai-readiness` — full scan (terminal summary + dashboard.md update)
+- `/hm:health` Step 1 — full scan (terminal summary + dashboard.md `structural` section update)
 - `/hm:verify` — Layer 1 composite as the baseline-comparison gate
 
 ## Layers

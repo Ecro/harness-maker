@@ -103,6 +103,17 @@ if __name__ == "__main__":
     # Pin HOME to an empty tmp dir so any environment-dependent helper
     # (e.g., user-global config probes) returns deterministic results,
     # keeping snapshots stable across developer machines.
+    #
+    # ALSO pin synthesize._HARNESS_MAKER_PKG_ROOT to the canonical main
+    # checkout so snapshots remain worktree-invariant. Matches the autouse
+    # fixture in ``tests/unit/conftest.py`` (HM_MAIN_CHECKOUT_PATH override
+    # available for non-default layouts).
+    from harness_maker import synthesize as _synth
+
+    _synth._HARNESS_MAKER_PKG_ROOT = os.environ.get(
+        "HM_MAIN_CHECKOUT_PATH",
+        "/home/noel/harness-maker",
+    )
     with tempfile.TemporaryDirectory() as fake_home:
         os.environ["HOME"] = fake_home
         with patch.object(Path, "home", lambda: Path(fake_home)):

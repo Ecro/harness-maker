@@ -48,6 +48,10 @@ def _all_patches(*, interview_spy: MagicMock | None = None, answers=None):
         patch("harness_maker.cli.verify", return_value=[]),
         patch("harness_maker.cli.backup"),
         patch("harness_maker.cli.reconcile", return_value=[]),
+        patch(
+            "harness_maker.cli.sweep_orphans",
+            return_value=MagicMock(deleted=[], kept=[]),
+        ),
         patch("harness_maker.cli._emit_post_make_readiness"),
         patch("harness_maker.cli._emit_refdocs_index_build"),
         patch("harness_maker.cli.answers_from_harness_yaml", return_value=_answers),
@@ -568,6 +572,65 @@ def test_wrapup_docs_flag(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 # security-scan CLI command
 # ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# 0.13.0 health-consolidation Phase 1: subcommand surface
+# ---------------------------------------------------------------------------
+
+
+def _registered_subcommand_names() -> set[str]:
+    """All names typer has registered on the cli app — sourced via the
+    underlying Click context. Using the public CLI introspection keeps the
+    assertion meaningful even if typer's internal layout changes."""
+    from typer.main import get_command
+
+    cmd = get_command(app)
+    if not hasattr(cmd, "commands"):
+        return set()
+    return set(cmd.commands.keys())
+
+
+def test_ai_readiness_subcommand_removed() -> None:
+    """ADR-003: /hm:ai-readiness is removed atomically in 0.13.0."""
+    names = _registered_subcommand_names()
+    assert "ai-readiness" not in names, (
+        f"ai-readiness must be removed in 0.13.0; got {sorted(names)}"
+    )
+    assert "ai-readiness-finalize" not in names, (
+        f"ai-readiness-finalize must be removed in 0.13.0; got {sorted(names)}"
+    )
+
+
+def test_health_subcommand_registered() -> None:
+    """/hm:health is the only audit-style command in 0.13.0."""
+    names = _registered_subcommand_names()
+    assert "health" in names, f"health must be registered; got {sorted(names)}"
+    assert "health-finalize" in names, (
+        f"health-finalize must be registered; got {sorted(names)}"
+    )
+
+
+def test_health_runs_against_minimal_project(tmp_path: Path) -> None:
+    """Smoke test the unified entrypoint end-to-end on tmp_path."""
+    _write_harness_yaml(tmp_path)
+    result = runner.invoke(app, ["health", str(tmp_path), "--no-update-dashboard"])
+    assert result.exit_code == 0, f"exit {result.exit_code}:\n{result.output}"
+    assert "health: structural=" in result.output
+    assert "personalization=" in result.output
+
+
+def test_health_writes_three_section_dashboard(tmp_path: Path) -> None:
+    """End-to-end: health → dashboard.md contains all three sections."""
+    _write_harness_yaml(tmp_path)
+    result = runner.invoke(app, ["health", str(tmp_path)])
+    assert result.exit_code == 0, f"exit {result.exit_code}:\n{result.output}"
+    dashboard = tmp_path / ".claude" / "observability" / "dashboard.md"
+    assert dashboard.is_file()
+    body = dashboard.read_text(encoding="utf-8")
+    assert "## Structural" in body
+    assert "## External risks" in body
+    assert "## Personalization" in body
 
 
 def test_security_scan_command_reports_findings(tmp_path: Path) -> None:

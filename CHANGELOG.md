@@ -1,5 +1,76 @@
 # Changelog
 
+## 0.13.0 — health consolidation (PLAN-health-consolidation)
+
+### Added — Phase 0 (framework groundwork)
+- `reconcile.sweep_orphans()` content_hash-gated orphan-sweep (ADR-005). Walks
+  `.claude/`, `.cursor/`, `.codex/`, `.agents/`, `AGENTS.md`; deletes only files
+  whose frontmatter `generated_by: harness-maker` AND `content_hash` match a
+  historical entry in `.claude/.hm-render-manifest.jsonl`. Theirs / copy-paste /
+  `.claude/observability/adaptive/*` always KEEP + warn.
+- `.hm-render-manifest.jsonl` append-only audit log written by every render via
+  `io_utils.atomic_append` (`os.open(O_APPEND) + os.write`, POSIX line-atomic).
+- 14 new unit tests covering the 5 ADR-005 fixture cases + R4 (adaptive
+  preserved) + R7 (copy-paste foreign generated_by) + manifest idempotency.
+
+### Added — Phase 1 (core refactor)
+- `/hm:health` + `health-finalize` CLI subcommands (ADR-002/006). Replaces
+  `ai-readiness*`, `refresh*`, and `personalization-audit` typer surfaces.
+- `observability/dashboard.py` 3-section schema writer (`Structural` +
+  `External risks` + `Personalization`) via `atomic_write`. Each layer scored
+  separately; verify Check 3 reads `structural`, Check 4 reads `external_risks`,
+  personalization is informational only.
+- `ai_readiness.run_structural()` emits the new `structural` field shape.
+
+### Removed — Phase 1
+- `relevance.detect_version_drift` + helpers (migrated to
+  `hooks/sessionstart_drift` — sole consumer; behavior bit-for-bit preserved).
+
+### Changed — Phase 2 (template consolidation)
+- DELETED `templates/commands/hm/{ai-readiness,refresh,personalization-audit}.md.j2`.
+- ADDED `templates/commands/hm/health.md.j2` — three sequential layers with
+  per-item `accept` / `reject` / `defer` flow (ADR-001 hard rule, no batching).
+- UPDATED 3 skill SKILL.md descriptions (ai-readiness-rubric, research-crawler,
+  relevance-filter) to reference the new command.
+
+### Changed — Phase 3 (verify gate)
+- `templates/stages/verify.md.j2` rewritten:
+  - Check 3 reads `structural` (was `Health: NN` scalar).
+  - Check 4 reads `external_risks` (path renamed `refresh/` → `health/`).
+  - Both emit explicit "no-baseline PASS" when prior dashboard absent or pre-
+    0.13.0 schema.
+  - Personalization field never gates verify.
+- New CI-safe e2e fixtures (invoke `harness_maker.cli` via `subprocess.run` —
+  no Claude binary needed): `test_verify_health_dashboard.py` (engineered
+  deltas + missing-baseline + pre-0.13.0 + personalization-ignored cases),
+  `test_reconcile_orphan_sweep.py` (3 legacy + R4 simultaneously).
+
+### Changed — Phase 4 (this release)
+- 5-file version sync `0.12.1 → 0.13.0` (`.claude-plugin`, `.cursor-plugin`,
+  `.codex-plugin`, `pyproject.toml`, `src/harness_maker/__init__.py`).
+- `CLAUDE.md` + `README.md` updated to reference `/hm:health`. Atomic-stage
+  list at line 145 UNCHANGED (health is a command, not a stage).
+- New e2e `test_make_update_0_12_1_to_0_13_0.py` asserts `/hm:make --update`
+  removes 3 legacy command files from upgraded sandboxes; user-edited theirs
+  copies preserved with stdout warning; `.claude/observability/adaptive/`
+  untouched.
+
+### Architectural decisions (this PLAN)
+- ADR-001: structured-question-only across all 3 layers (no auto-apply).
+- ADR-002: scores remain split (3 separate dashboard fields), dashboard view
+  unified.
+- ADR-003: legacy commands removed atomically (rely on ADR-005 sweep).
+- ADR-004: no observability-file compatibility shim; `adaptive/` preserved.
+- ADR-005: reconcile gains content_hash-gated orphan-sweep.
+- ADR-006: `/hm:personalization-audit` absorbed; `personalization_audit` module
+  and `rubrics/personalization.yaml` are byte-identical to pre-PR state.
+
+### Notes
+- `personalization_audit.run()` output is bit-identical to 0.12.x — pinned by
+  `tests/unit/test_health_personalization_integration.py`.
+- ~3500 LOC delta across 4 commits on `phase0-execute-20260516T1406Z` worktree
+  branch; squash-merged into main as a single 0.13.0 release commit.
+
 ## 0.12.1 — Group A follow-up patch
 
 ### Added

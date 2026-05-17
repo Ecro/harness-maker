@@ -9,32 +9,26 @@ The adaptive-threshold algorithm follows ``phase_5_amendments.md §E``.
 
 Stale-asset detection (``detect_stale_assets``) reads the ``last_reviewed_at``
 annotation that domain packs and reviewer partials carry, and reports those
-older than a configurable threshold. ``/hm:refresh`` consumes the result via
+older than a configurable threshold. ``/hm:health`` consumes the result via
 ``build_proposal_lines`` to prompt the user (or write proposed-<date>.md under
 autoloop). Accepted proposals are applied through ``update_last_reviewed_at``.
 
-Version-drift detection (``detect_version_drift``) compares the
-``harness_maker_version`` stamped in the project's ``harness.yaml`` frontmatter
-against the **latest installed** harness-maker version (not just the imported
-``__version__``). This alignment matters because ``/hm:refresh`` is rendered as
-a pinned-version template — its ``--with <path>`` clause locks the import to
-the render-time version, which would falsely appear "in sync" with harness.yaml
-even after a plugin upgrade. Scanning the plugin cache makes the result match
-the SessionStart drift hook regardless of which import path called us.
+Version-drift detection moved out of this module as of 0.13.0 (PLAN
+health-consolidation Phase 1). The single remaining caller — the SessionStart
+drift hook — owns the implementation now (``harness_maker.hooks.sessionstart_drift``).
+Removing it from ``relevance`` shrinks the public surface that ``/hm:health``
+imports and eliminates the duplicate code path that previously needed to agree
+with the hook on cache scanning.
 """
 
 from __future__ import annotations
 
-import functools
 import json
 import re
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from importlib import resources
 from pathlib import Path
-from typing import Literal
-
-import yaml
 
 from harness_maker.io_utils import atomic_write
 from harness_maker.llm_judge import JudgeClient
@@ -200,7 +194,7 @@ def score(
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Stale-asset detection (Phase 5 — /hm:refresh anti-rot)
+# Stale-asset detection (Phase 5 → /hm:health Step 2)
 # ──────────────────────────────────────────────────────────────────────────────
 
 DEFAULT_STALE_DAYS = 90
@@ -369,7 +363,7 @@ def detect_stale_assets(
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Mutator + proposal formatting (Phase 5 — /hm:refresh accept handler)
+# Mutator + proposal formatting (Phase 5 → /hm:health accept handler)
 # ──────────────────────────────────────────────────────────────────────────────
 
 
@@ -394,7 +388,7 @@ def update_last_reviewed_at(path: Path, new_date: date | None = None) -> date:
     if _LAST_REVIEWED_RE.search(text) is None:
         msg = (
             f"{path} has no last_reviewed_at annotation; add one "
-            "(YAML frontmatter or HTML comment) before /hm:refresh can track it"
+            "(YAML frontmatter or HTML comment) before /hm:health can track it"
         )
         raise StaleAssetUpdateError(msg)
     new_text = _LAST_REVIEWED_RE.sub(
@@ -406,187 +400,9 @@ def update_last_reviewed_at(path: Path, new_date: date | None = None) -> date:
     return new_date
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Version-drift detection (/hm:refresh anti-rot, Layer 1 option B)
-# ──────────────────────────────────────────────────────────────────────────────
-
-
-@dataclass(frozen=True)
-class VersionDrift:
-    """Mismatch between a project's stamped harness_maker_version and the
-    latest-installed harness-maker package. Direction is from the project's
-    perspective: ``upgrade`` = newer package available, ``downgrade`` = package
-    is older than what stamped the project (rare, usually a rollback).
-
-    Field naming (REVIEW M2, 2026-05-08): ``stamped`` is the version baked
-    into ``harness.yaml`` at last render; ``current`` is the latest plugin
-    cached on disk. Older codebases used ``installed`` for the stamped value,
-    which read as the opposite semantic to most readers.
-    """
-
-    stamped: str  # the version stamped in harness.yaml frontmatter
-    current: str  # the latest plugin version on disk (or fallback __version__)
-    direction: Literal["upgrade", "downgrade"]
-
-
-_CACHE_TOPK = 10
-"""Cap _scan_plugin_cache_versions to the top-K most recent semver-parseable
-entries to bound worst-case scan cost on long-lived installs where every
-``/plugin update`` adds a directory and Claude Code does not prune them
-(REVIEW M9, 2026-05-08)."""
-
-
-def _scan_plugin_cache_versions() -> list[str]:
-    """Return up to ``_CACHE_TOPK`` highest-semver harness-maker versions cached
-    under ``~/.claude/plugins/cache/harness-maker-local/harness-maker/``.
-
-    The Claude Code plugin cache layout is one subdirectory per cached
-    version. Missing/unreadable cache returns an empty list (caller falls
-    back to ``__version__``).
-
-    Why top-K cap (REVIEW M9): Claude Code does not prune the cache on
-    ``/plugin update`` — directories accumulate monotonically. Capping at
-    ``_CACHE_TOPK`` bounds scan cost for long-lived installs while preserving
-    correctness (the caller only needs the maximum, so older entries cannot
-    affect the result).
-    """
-    cache_root = (
-        Path.home() / ".claude" / "plugins" / "cache" / "harness-maker-local" / "harness-maker"
-    )
-    try:
-        if not cache_root.is_dir():
-            return []
-        names = [d.name for d in cache_root.iterdir() if d.is_dir()]
-    except OSError:
-        # Symlink loop, permission error, broken filesystem — skip and let
-        # latest_installed_version fall back to __version__.
-        return []
-    # Sort by semver descending; unparseable entries float to the end (they're
-    # not in the comparison key but still preserved for caller's filter pass).
-    parsed = [(_parse_semver(n), n) for n in names]
-    parsed.sort(key=lambda x: (x[0] is not None, x[0] or (0, 0, 0)), reverse=True)
-    return [name for _p, name in parsed[:_CACHE_TOPK]]
-
-
-@functools.cache
-def latest_installed_version() -> str:
-    """Resolve the latest harness-maker version visible to the running session.
-
-    Strategy:
-    1. Scan ``~/.claude/plugins/cache/harness-maker-local/harness-maker/`` for
-       version subdirectories (capped at ``_CACHE_TOPK``).
-    2. Pick the highest semver-parseable version.
-    3. Fall back to imported ``__version__`` if scan yields nothing.
-
-    Why memoized (REVIEW M3): pure-read deterministic-within-process. Process
-    lifetime for SessionStart hook + /hm:refresh is short enough that cache
-    invalidation is not a concern. Avoids repeat iterdir + stat syscalls when
-    multiple call sites land in the same process.
-
-    Why not just use ``__version__``: ``/hm:refresh`` is rendered with a
-    pinned ``--with <path>`` clause, so its in-process ``__version__`` is the
-    render-time version (not the running plugin). SessionStart hook runs
-    against the active plugin so its ``__version__`` is current. To make both
-    code paths agree, both must consult the same external truth — the cache.
-    """
-    from harness_maker import __version__
-
-    versions = _scan_plugin_cache_versions()
-    if not versions:
-        return __version__
-    parsed = [(_parse_semver(v), v) for v in versions]
-    valid = [(p, raw) for p, raw in parsed if p is not None]
-    if not valid:
-        return __version__
-    # Pick highest by semver tuple (parse_semver returns (major, minor, patch))
-    valid.sort(key=lambda x: x[0], reverse=True)
-    return valid[0][1]
-
-
-def detect_version_drift(project_dir: Path) -> VersionDrift | None:
-    """Return drift info or None when no drift / harness.yaml unreadable.
-
-    Reads ``<project_dir>/.claude/harness.yaml`` frontmatter for
-    ``harness_maker_version`` and compares against the **latest installed**
-    plugin version (resolved via ``latest_installed_version()``). Missing
-    file, missing frontmatter, missing key, or matching versions all return
-    None — the caller treats None as "no drift to surface".
-
-    Single-source consistency: both ``/hm:refresh`` (pinned) and SessionStart
-    hook (system) call the same function and see the same drift verdict.
-    """
-    harness_yaml = project_dir / ".claude" / "harness.yaml"
-    if not harness_yaml.exists():
-        return None
-    try:
-        text = harness_yaml.read_text(encoding="utf-8")
-    except OSError:
-        return None
-    if not text.startswith("---\n"):
-        return None
-    end = text.find("\n---\n", 4)
-    if end == -1:
-        return None
-    try:
-        fm = yaml.safe_load(text[4:end])
-    except yaml.YAMLError:
-        return None
-    if not isinstance(fm, dict):
-        return None
-    stamped = fm.get("harness_maker_version")
-    if not isinstance(stamped, str) or not stamped:
-        return None
-    current = latest_installed_version()
-    if stamped == current:
-        return None
-    direction = _drift_direction(stamped, current)
-    return VersionDrift(stamped=stamped, current=current, direction=direction)
-
-
-def _drift_direction(stamped: str, current: str) -> Literal["upgrade", "downgrade"]:
-    """Compare two versions; semver-aware with lexical fallback for unparseable.
-
-    Returns ``upgrade`` when the running package is newer than what's stamped
-    in the project (typical case after harness-maker is bumped). Returns
-    ``downgrade`` otherwise. Equal versions are filtered before this is called.
-    """
-    pa = _parse_semver(stamped)
-    pb = _parse_semver(current)
-    if pa is not None and pb is not None:
-        return "upgrade" if pa < pb else "downgrade"
-    # Fallback: lexical comparison. Coarse but deterministic for non-semver
-    # tags (e.g. dev / rc suffixes that we don't ship today).
-    return "upgrade" if stamped < current else "downgrade"
-
-
-def _parse_semver(v: str) -> tuple[int, int, int] | None:
-    parts = v.split(".")
-    if len(parts) != 3:
-        return None
-    try:
-        return (int(parts[0]), int(parts[1]), int(parts[2]))
-    except ValueError:
-        return None
-
-
-def build_drift_lines(drift: VersionDrift | None) -> list[str]:
-    """Format a VersionDrift as bullet lines for proposed-<date>.md.
-
-    Returns an empty list when drift is None so callers can unconditionally
-    extend their proposal-line list.
-    """
-    if drift is None:
-        return []
-    arrow = "↑" if drift.direction == "upgrade" else "↓"
-    suggestion = (
-        "Run `/plugin update harness-maker@harness-maker-local` then `/harness-maker:make`."
-        if drift.direction == "upgrade"
-        else "Re-render with `/harness-maker:make` to align stamps with the current package."
-    )
-    return [
-        f"- harness-maker: `{drift.stamped}` {arrow} `{drift.current}` ({drift.direction})",
-        f"  - {suggestion}",
-    ]
+# Version-drift detection moved to harness_maker.hooks.sessionstart_drift
+# (PLAN health-consolidation Phase 1, ADR-006 / Interview #9). The hook is
+# the sole consumer; ``/hm:health`` no longer surfaces version drift.
 
 
 def build_proposal_lines(

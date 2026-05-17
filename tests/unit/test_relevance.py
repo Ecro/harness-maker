@@ -229,3 +229,54 @@ def test_extract_context_caps_long_files(tmp_path: Path) -> None:
     ctx = extract_project_context(tmp_path)
     # 2KB cap per file, plus header overhead
     assert len(ctx) < 2500
+
+
+# ─── 0.13.0 health-consolidation Phase 1: drop version-drift ────────────────
+
+
+def test_detect_version_drift_no_longer_exported_from_relevance() -> None:
+    """detect_version_drift moved into harness_maker.hooks.sessionstart_drift.
+
+    Importing it from ``relevance`` MUST fail — the public surface of the
+    module shrinks deliberately so /hm:health does not pull cache-scanning
+    logic in via that path. See ADR-006 / Interview #9.
+    """
+    import harness_maker.relevance as rel
+
+    assert not hasattr(rel, "detect_version_drift"), (
+        "relevance.detect_version_drift must be removed in 0.13.0 — "
+        "version-drift detection lives only in the SessionStart hook."
+    )
+    assert not hasattr(rel, "VersionDrift"), (
+        "VersionDrift dataclass moved alongside detect_version_drift."
+    )
+    assert not hasattr(rel, "latest_installed_version"), (
+        "latest_installed_version moved alongside detect_version_drift."
+    )
+
+
+def test_build_drift_lines_dropped_entirely() -> None:
+    """build_drift_lines is gone — version-drift no longer surfaces in
+    /hm:health proposed-<date>.md output (it was a /hm:refresh-only formatter)."""
+    import harness_maker.relevance as rel
+
+    assert not hasattr(rel, "build_drift_lines"), (
+        "build_drift_lines must be removed in 0.13.0 — version-drift is "
+        "communicated only via SessionStart hook additionalContext."
+    )
+
+
+def test_detect_stale_assets_still_exported() -> None:
+    """Stale-asset detection survives the version-drift drop — it powers
+    /hm:health Step 2 (external risks). Regression guard for Interview #9."""
+    from harness_maker.relevance import detect_stale_assets
+
+    assert callable(detect_stale_assets)
+
+
+def test_arxiv_crawler_still_importable() -> None:
+    """Per Interview #9, all four crawler sources stay (only version-drift
+    is dropped). The wiki refresh at 785179e proved arxiv pays for itself."""
+    from harness_maker.crawler import arxiv
+
+    assert hasattr(arxiv, "crawl"), "arxiv.crawl must remain wired"

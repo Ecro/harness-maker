@@ -31,24 +31,151 @@ ADR-005 — only invokes local ``git`` via subprocess.
 
 from __future__ import annotations
 
+import functools
 import json
 import math
 import subprocess
 import sys
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import yaml
 
 from harness_maker.models import AdaptiveConfig
-from harness_maker.relevance import detect_version_drift
 from harness_maker.telemetry import (
     compute_yaml_diff,
     emit_override,
     load_overrides,
     now_iso,
 )
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Version-drift detection (moved from harness_maker.relevance in 0.13.0).
+# PLAN health-consolidation Phase 1: the hook is the only consumer now that
+# /hm:refresh has been folded into /hm:health, so the implementation lives
+# alongside its caller.
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class VersionDrift:
+    """Mismatch between a project's stamped harness_maker_version and the
+    latest-installed harness-maker package. Direction is from the project's
+    perspective: ``upgrade`` = newer package available, ``downgrade`` = package
+    is older than what stamped the project (rare, usually a rollback).
+
+    Field naming (REVIEW M2, 2026-05-08): ``stamped`` is the version baked
+    into ``harness.yaml`` at last render; ``current`` is the latest plugin
+    cached on disk. Older codebases used ``installed`` for the stamped value,
+    which read as the opposite semantic to most readers.
+    """
+
+    stamped: str  # the version stamped in harness.yaml frontmatter
+    current: str  # the latest plugin version on disk (or fallback __version__)
+    direction: Literal["upgrade", "downgrade"]
+
+
+_CACHE_TOPK = 10
+"""Cap _scan_plugin_cache_versions to the top-K most recent semver-parseable
+entries to bound worst-case scan cost on long-lived installs where every
+``/plugin update`` adds a directory and Claude Code does not prune them
+(REVIEW M9, 2026-05-08)."""
+
+
+def _parse_semver(v: str) -> tuple[int, int, int] | None:
+    parts = v.split(".")
+    if len(parts) != 3:
+        return None
+    try:
+        return (int(parts[0]), int(parts[1]), int(parts[2]))
+    except ValueError:
+        return None
+
+
+def _scan_plugin_cache_versions() -> list[str]:
+    """Return up to ``_CACHE_TOPK`` highest-semver harness-maker versions cached
+    under ``~/.claude/plugins/cache/harness-maker-local/harness-maker/``.
+    """
+    cache_root = (
+        Path.home() / ".claude" / "plugins" / "cache" / "harness-maker-local" / "harness-maker"
+    )
+    try:
+        if not cache_root.is_dir():
+            return []
+        names = [d.name for d in cache_root.iterdir() if d.is_dir()]
+    except OSError:
+        return []
+    parsed = [(_parse_semver(n), n) for n in names]
+    parsed.sort(key=lambda x: (x[0] is not None, x[0] or (0, 0, 0)), reverse=True)
+    return [name for _p, name in parsed[:_CACHE_TOPK]]
+
+
+@functools.cache
+def latest_installed_version() -> str:
+    """Resolve the latest harness-maker version visible to the running session.
+
+    Scans the Claude Code plugin cache; falls back to the imported
+    ``__version__`` when the cache is empty or unparseable. Memoized for the
+    process lifetime of the hook (cheap-startup rule, validator C3).
+    """
+    from harness_maker import __version__
+
+    versions = _scan_plugin_cache_versions()
+    if not versions:
+        return __version__
+    parsed = [(_parse_semver(v), v) for v in versions]
+    valid = [(p, raw) for p, raw in parsed if p is not None]
+    if not valid:
+        return __version__
+    valid.sort(key=lambda x: x[0], reverse=True)
+    return valid[0][1]
+
+
+def _drift_direction(stamped: str, current: str) -> Literal["upgrade", "downgrade"]:
+    """Semver-aware comparison with lexical fallback for unparseable tags."""
+    pa = _parse_semver(stamped)
+    pb = _parse_semver(current)
+    if pa is not None and pb is not None:
+        return "upgrade" if pa < pb else "downgrade"
+    return "upgrade" if stamped < current else "downgrade"
+
+
+def detect_version_drift(project_dir: Path) -> VersionDrift | None:
+    """Return drift info or None when no drift / harness.yaml unreadable.
+
+    Reads ``<project_dir>/.claude/harness.yaml`` frontmatter for
+    ``harness_maker_version`` and compares against
+    ``latest_installed_version()``. Missing file, missing frontmatter,
+    missing key, or matching versions all return None.
+    """
+    harness_yaml = project_dir / ".claude" / "harness.yaml"
+    if not harness_yaml.exists():
+        return None
+    try:
+        text = harness_yaml.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    if not text.startswith("---\n"):
+        return None
+    end = text.find("\n---\n", 4)
+    if end == -1:
+        return None
+    try:
+        fm = yaml.safe_load(text[4:end])
+    except yaml.YAMLError:
+        return None
+    if not isinstance(fm, dict):
+        return None
+    stamped = fm.get("harness_maker_version")
+    if not isinstance(stamped, str) or not stamped:
+        return None
+    current = latest_installed_version()
+    if stamped == current:
+        return None
+    direction = _drift_direction(stamped, current)
+    return VersionDrift(stamped=stamped, current=current, direction=direction)
 
 
 def _format_context(stamped: str, current: str, direction: str) -> str:
@@ -291,11 +418,11 @@ def _personalization_hint(cwd: Path) -> tuple[str, str] | None:
     additional = (
         f"personalization-audit recommended: {n_overrides} axis overrides recorded "
         f"since last audit (threshold {config.audit_session_threshold}). "
-        "Run /hm:personalization-audit to review."
+        "Run /hm:health (Step 3 Personalization) to review."
     )
     system = (
         f"harness-maker: {n_overrides} personalization axis overrides queued. "
-        "/hm:personalization-audit to review."
+        "Run /hm:health (Step 3 Personalization) to review."
     )
     return additional, system
 

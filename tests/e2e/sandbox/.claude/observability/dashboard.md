@@ -1,15 +1,15 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.12.0
+harness_maker_version: 0.13.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: observability/dashboard.md.j2
 provenance: official
-content_hash: eee6c910e0302f8cb0391482ec61c9f9dd3a4b59a38bddb5c5274fc39cb58608
+content_hash: b4570b96aa7bacf396b079f45d1fe03a91bb0e8e85245b061469bca4d4645efd
 ---
 # AI Readiness Dashboard
 
 **Project:** unknown
-**Preset:** Side
+**Preset:** Production
 
 > This file is re-rendered every time `/hm:ai-readiness` runs.
 > The composite, layer breakdown, and ranked action list below reflect the

@@ -1,17 +1,20 @@
-"""Orchestrator — combine all 3 readiness layers into a plan + renders.
+"""Orchestrator — combine readiness layers into a plan + renders.
+
+PLAN health-consolidation Phase 1 (0.13.0) split the 3-layer composite
+score into a ``structural`` field of the unified ``/hm:health`` dashboard.
+The new entrypoint ``run_structural(project_dir, preset)`` returns a
+minimal ``{"structural": int, "signals_failed": [...]}`` dict suitable
+for the dashboard third-section writer; the legacy ``run_ai_readiness``
+and rendering helpers are retained so existing callers and tests in the
+package continue to work until the templates catch up (Phase 2).
 
 Public API:
-- ``run_ai_readiness(project_dir, preset, ...)`` — full pipeline returning
-  ``ImprovementPlan``. In Claude Code context, call with ``skip_llm=True``
-  and let the executing Claude agent evaluate rubrics inline; then feed
-  results to ``finalize_from_verdicts_json``.
-- ``run_ai_readiness_structural(project_dir, preset, ...)`` — L1+L3 only,
-  returns a JSON-serializable dict suitable for ``--json-output`` flag.
-- ``finalize_from_verdicts_json(scores_path, verdicts_path)`` — reconstruct
-  a full plan from pre-computed structural scores + Claude-provided L2
-  verdicts (used by the ``ai-readiness-finalize`` CLI subcommand).
+- ``run_structural(project_dir, preset)`` — NEW, 0.13.0 health field.
+- ``run_ai_readiness(project_dir, preset, ...)`` — legacy full pipeline.
+- ``run_ai_readiness_structural(project_dir, preset, ...)`` — L1+L3 only.
+- ``finalize_from_verdicts_json(scores_path, verdicts_path)`` — legacy.
 - ``render_terminal_summary(plan)`` — concise text for CLI output.
-- ``render_dashboard_markdown(plan, project_name)`` — dashboard.md content.
+- ``render_dashboard_markdown(plan, project_name)`` — legacy dashboard body.
 """
 
 from __future__ import annotations
@@ -92,6 +95,50 @@ def run_ai_readiness_structural(
         "cache": cache.model_dump(),
         "preset": preset.value,
     }
+
+
+def run_structural(
+    project_dir: Path,
+    *,
+    preset: Preset,
+    model: str = "claude-sonnet-4-6",
+) -> dict[str, Any]:
+    """Compute the ``structural`` field for the /hm:health dashboard (0.13.0).
+
+    Returns ``{"structural": <0-100 int>, "signals_failed": [...]}``. The
+    score is the weighted blend of the deterministic L1 readiness signals
+    (70%) and the L3 cache-diagnostic score (5% in the legacy weighting —
+    surfaced here as a small additive component so a degenerate cache
+    state can still pull the structural score down). L2 is intentionally
+    NOT folded into ``structural``: the LLM-judged content score belongs
+    to a different concern and the verify-stage Check 3 contract names
+    "structural" specifically.
+
+    ``signals_failed`` is the flat list of ``layer1:<signal_id>`` entries
+    whose ``passed`` flag is False — one line per failed deterministic
+    check so the dashboard reader can show a count without re-running the
+    layer.
+    """
+    readiness = compute_readiness(project_dir, preset)
+    metrics = project_dir / ".claude" / "observability" / "metrics.jsonl"
+    cache = diagnose_cache(metrics, model=model)
+
+    # Blend: 70% readiness (deterministic structural) + 5% cache; the
+    # remaining 25% slot belongs to L2 (llm_judge) which lives in a
+    # separate field of the dashboard once the templates land in Phase 2.
+    # Until then we treat L2 as neutral 50 so the structural number remains
+    # comparable to the pre-0.13.0 single-score dashboard for users mid-
+    # migration. Renormalize after dropping L2 so the result is in [0, 100].
+    weighted = (readiness.composite * 0.70 + cache.score * 0.05) / 0.75
+    structural_score = max(0, min(100, round(weighted)))
+
+    signals_failed: list[str] = []
+    for dim_name, dim in readiness.dimensions.items():
+        for sig in dim.signals:
+            if not sig.passed:
+                signals_failed.append(f"{dim_name}:{sig.id}")
+
+    return {"structural": structural_score, "signals_failed": signals_failed}
 
 
 def finalize_from_verdicts_json(

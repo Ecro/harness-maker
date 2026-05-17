@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.12.0
+harness_maker_version: 0.13.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/configure.md.j2
 provenance: official
-content_hash: badb960e4299ba640061902c8dfef0485c30ef982999e7fceeab4015b3169581
+content_hash: c731173e0115ed7f94c99c20f2ffcd83a6baaed94bee74cab61221bea7653ad9
 ---
 # /hm:configure
 
@@ -115,7 +115,7 @@ For **Second Brain**: ask two questions in sequence:
 Run the CLI with only the changed flags:
 
 ```bash
-!uv run --with /home/noel/harness-maker/.worktrees/execute-20260516T0550Z python -m harness_maker.cli make "$(pwd)" \
+!uv run --with /home/noel/harness-maker/.worktrees/execute-20260516T1406Z python -m harness_maker.cli make "$(pwd)" \
   --grade-threshold "$GRADE" --domains "$DOMAINS" --mechanical-checks "$CHECKS" \
   --recommended-model "$MODEL" --focus "$FOCUS" --wrapup-docs "$WRAPUP_DOCS" \
   --ref-folders "$REF_FOLDERS" --sibling-repos "$SIBLING_REPOS" \

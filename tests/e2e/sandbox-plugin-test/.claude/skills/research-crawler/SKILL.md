@@ -1,14 +1,14 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.12.0
+harness_maker_version: 0.13.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: skills/research-crawler/SKILL.md.j2
 provenance: official
 name: research-crawler
 description: Crawl 4 anti-rot sources (Anthropic blog/changelog, GitHub releases including
-  anthropics/claude-code, arxiv cs.SE/CL/CR, OSV.dev CVEs) and write to .claude/observability/refresh/raw-<date>.jsonl.
-  Use during /hm:refresh or when the freshness gauge crosses the staleness threshold.
-content_hash: bd45b95fd98659d89d8ba864985cd1a37f4c813fe15e8924f272c18015cf7308
+  anthropics/claude-code, arxiv cs.SE/CL/CR, OSV.dev CVEs) and write to .claude/observability/health/raw-<date>.jsonl.
+  Invoked by /hm:health Step 2 (external risks layer).
+content_hash: d06bd710a50b4c936cf5bfd2369843e3a9cc16d14c06c487d1de910becf0469c
 ---
 
 # research-crawler
@@ -19,16 +19,16 @@ content_hash: bd45b95fd98659d89d8ba864985cd1a37f4c813fe15e8924f272c18015cf7308
 ## When to invoke vs skip
 
 **Invoke when:**
-- `/hm:refresh` runs (manual or weekly schedule).
-- Anti-rot freshness gauge in `/hm:ai-readiness` crosses the staleness threshold (default 7 days since last refresh).
+- `/hm:health` Step 2 (external risks layer) runs (manual or weekly schedule).
+- Anti-rot freshness gauge crosses the staleness threshold (default 7 days since last health check).
 
 **Skip when:**
 - A `raw-<date>.jsonl` from less than 24h ago already exists (running again would just bloat the queue).
 - The user is offline / OSV.dev unreachable (skill will silently skip with stderr warning).
 ## Triggers
 
-- `/hm:refresh` invocation (manual or weekly schedule)
-- Anti-rot freshness gauge crosses staleness threshold (`days since refresh`)
+- `/hm:health` Step 2 invocation (manual or weekly schedule)
+- Anti-rot freshness gauge crosses staleness threshold (`days since health check`)
 
 ## Behavior
 
@@ -48,13 +48,13 @@ items += osv_dev.crawl(packages=osv_dev.parse_uv_lock("uv.lock"))
 write_raw(items, project_dir=".")
 ```
 
-Output goes to `<project>/.claude/observability/refresh/raw-<YYYY-MM-DD>.jsonl`.
+Output goes to `<project>/.claude/observability/health/raw-<YYYY-MM-DD>.jsonl`.
 Downstream the `relevance-filter` skill scores each item.
 
 ## Output
 
 A `raw-<date>.jsonl` snapshot of `CrawlItem` records. Never auto-applies
-changes — only writes raw data; the `/hm:refresh` command is responsible for
+changes — only writes raw data; the `/hm:health` command is responsible for
 the structured question confirmation flow.
 
 <!-- @hm:user:extensions -->
