@@ -1,6 +1,6 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.13.0
+harness_maker_version: 0.14.3
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: memory/failures.ko.md.j2
 provenance: official
@@ -100,5 +100,8 @@ SessionStart drift hook emitted `hookSpecificOutput.additionalContext` but the u
 
 ## [fail:design] cli-path-tilde-expansion-shell-layer | 2026-05-13 | count:1
 ref_folders / second_brain_vault_path entered as `~/foo` got stored as `/home/alice/foo` (absolute) in harness.yaml. The Python code (`_parse_ref_folders_flag`, `RefFolder` validator, `refdocs_index._build_block`) does NOT expand `~`. Actual culprit was bash: `VAR=~/foo` is unquoted at assignment, so the shell expands `~` to `$HOME` before Python ever sees the value. Fix lives at the CLI boundary (`denormalize_home_to_tilde` in `io_utils.py`) — re-prefix `$HOME`-rooted absolutes with `~` AFTER the shell has clobbered them. Pattern: when a path transformation is observed in CLI-received input but the Python code shows no such logic, blame the shell quoting layer first; the simplest test is to call the function directly from pytest and confirm the bug only reproduces via the shell.
+
+## [fail:render] wrapup-eof-append-outside-marker | 2026-05-17 | count:1
+`/hm:wrapup` Step 5 instruction said "Append (or update) one entry under `.claude/memory/wiki.md`" with no positional constraint. LLM naturally interpreted "append" as EOF-append → wiki entries landed AFTER the `<!-- @hm:/user:entries -->` closing marker. `block_merge.merge()` (block_merge.py:17-18 contract) treats outside-marker content as template-owned → silent REPLACE on next `/hm:make --update`. Compound footgun: CLI emitted `MERGE_BLOCK: ... preserved 1 user block(s): entries` — technically true (empty block survived) but masked the 33-line orphan drop entirely. 4 wiki entries dated 2026-05-17 (communication-variant-pre-render-extractor, codex-render-bypasses-dispatcher-source, frontmatter-source-vs-output-separation, workflow-optimization-inverted-env) vanished across 7 commits before detection. Three-layer fix: (1) wrapup.md.j2 5.1/5.2 now name `<!-- @hm:user:entries -->` explicitly + cite this regression in prose. (2) `MergeReport.orphan_outside_content` populated via `Counter` subtraction; cli.py surfaces dropped-line count without echoing content (the preview itself would leak user-controlled bytes to Bash stdout → LLM next-turn context, opening a stored-prompt-injection vector — the very feature added to "make the bug visible" almost reintroduced a different bug). (3) `merge()` walk gained fence tracking (was diverging from parse_segments — validator passed, executor misbehaved on fenced literal markers). Pattern: any wrapup-stage prompt that touches a marker-bearing file MUST name the marker; "append" is a footgun in this codebase.
 
 <!-- @hm:/user:entries -->

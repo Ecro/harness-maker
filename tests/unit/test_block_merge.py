@@ -297,6 +297,130 @@ def test_merge_raises_on_malformed_new() -> None:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# orphan_outside_content — silent-drop detection (2026-05-17 wiki.md regression)
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def test_merge_detects_orphan_content_after_closing_marker() -> None:
+    """The 2026-05-17 wiki.md bug: LLM appended entries AFTER the closing
+    @hm:/user:entries marker. merge() drops them silently (outside markers =
+    template-owned). orphan_outside_content surfaces the loss for CLI WARN.
+    """
+    old = (
+        "# Wiki\n"
+        "<!-- @hm:user:entries -->\n"
+        "(seed)\n"
+        "<!-- @hm:/user:entries -->\n"
+        "\n"
+        "## [wiki:pattern] appended-by-mistake | 2026-05-17\n"
+        "LLM appended this below the closing marker — will be dropped.\n"
+    )
+    new = (
+        "# Wiki\n"
+        "<!-- @hm:user:entries -->\n"
+        "(seed)\n"
+        "<!-- @hm:/user:entries -->\n"
+    )
+    merged, report = merge(old, new)
+    # The misplaced entry is dropped from the merged output (existing behaviour).
+    assert "appended-by-mistake" not in merged
+    # P1: but the loss is now reported.
+    assert any(
+        "appended-by-mistake" in line for line in report.orphan_outside_content
+    )
+    assert any(
+        "LLM appended this below" in line for line in report.orphan_outside_content
+    )
+
+
+def test_merge_no_orphan_when_outside_content_matches_template() -> None:
+    """False-positive guard: template prelude/postlude that's identical in OLD
+    and NEW must not register as orphan content.
+    """
+    text = (
+        "# Header\n"
+        "> Some prose owned by the template.\n"
+        "\n"
+        "<!-- @hm:user:notes -->\n"
+        "user-added content\n"
+        "<!-- @hm:/user:notes -->\n"
+    )
+    merged, report = merge(text, text)
+    assert report.orphan_outside_content == []
+    assert "user-added content" in merged
+
+
+def test_merge_orphan_outside_ignores_blank_lines() -> None:
+    """Whitespace-only line differences between OLD and NEW outside markers
+    must not produce false-positive orphans.
+    """
+    old = (
+        "# Header\n"
+        "\n"
+        "\n"
+        "<!-- @hm:user:notes -->\nuser\n<!-- @hm:/user:notes -->\n"
+    )
+    new = "# Header\n<!-- @hm:user:notes -->\nseed\n<!-- @hm:/user:notes -->\n"
+    _, report = merge(old, new)
+    assert report.orphan_outside_content == []
+
+
+def test_merge_orphan_outside_skips_marker_lines_in_fenced_code() -> None:
+    """Validator W2 contract: literal @hm:* strings inside ``` fences are not
+    markers. Fence-aware merge() walk (REVIEW M3) lets documented marker
+    examples in NEW templates coexist with real markers below them.
+    """
+    old = (
+        "# Header\n"
+        "```\n"
+        "<!-- @hm:user:notes -->\n"  # literal inside fence — not a real marker
+        "```\n"
+        "<!-- @hm:user:notes -->\n"
+        "real user content\n"
+        "<!-- @hm:/user:notes -->\n"
+        "extra orphan line\n"
+    )
+    new = (
+        "# Header\n"
+        "```\n"
+        "<!-- @hm:user:notes -->\n"
+        "```\n"
+        "<!-- @hm:user:notes -->\n"
+        "seed\n"
+        "<!-- @hm:/user:notes -->\n"
+    )
+    merged, report = merge(old, new)
+    # User content inside the real (post-fence) block is preserved.
+    assert "real user content" in merged
+    # The line below the closing marker is the orphan.
+    assert any("extra orphan line" in line for line in report.orphan_outside_content)
+    # Fence delimiter lines should not be flagged (identical in OLD/NEW).
+    assert not any(line.strip() == "```" for line in report.orphan_outside_content)
+
+
+def test_merge_orphan_outside_counts_duplicates() -> None:
+    """REVIEW M2: Counter-based dedup preserves multiplicity. If OLD has N
+    copies of a line and NEW has M (M<N), the (N-M) excess copies must surface
+    as orphans — set-membership would silently drop all of them.
+    """
+    old = (
+        "# Header\n"
+        "<!-- @hm:user:notes -->\nuser\n<!-- @hm:/user:notes -->\n"
+        "shared\n"
+        "shared\n"
+        "shared\n"
+    )
+    new = (
+        "# Header\n"
+        "<!-- @hm:user:notes -->\nseed\n<!-- @hm:/user:notes -->\n"
+        "shared\n"
+    )
+    _, report = merge(old, new)
+    # 3 copies in OLD - 1 copy in NEW = 2 excess orphans, not 0.
+    assert sum(1 for line in report.orphan_outside_content if line == "shared") == 2
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Phase 6 — @hm:harness:* family (ADR-009 inverted markers)
 # Validator W2: 6 marker test cases enumerated below.
 # ──────────────────────────────────────────────────────────────────────────────

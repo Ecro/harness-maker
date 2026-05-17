@@ -757,6 +757,18 @@ def _emit_reconcile_report(
                 f"⚠ orphaned {len(report.user_blocks_orphaned)} block(s): "
                 f"{', '.join(report.user_blocks_orphaned)}",
             )
+        if report.orphan_outside_content:
+            # Count + path + remediation only — never echo the dropped content
+            # itself. The lines are user-controlled file fragments that may
+            # contain secrets (API keys / tokens) or attacker-supplied prompt-
+            # injection payloads; this string lands in Bash tool stdout and
+            # therefore in the LLM's next-turn context. Open the file to see
+            # what was dropped.
+            bits.append(
+                f"⚠ dropped {len(report.orphan_outside_content)} line(s) outside "
+                f"@hm:user:* blocks — open the file, move content inside the "
+                f"marker, re-run /hm:make --update",
+            )
         if bits:
             typer.echo(f"  MERGE_BLOCK: {path} — {'; '.join(bits)}")
 

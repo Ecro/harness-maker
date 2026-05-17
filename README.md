@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/Ecro/harness-maker/main/docs/assets/brand-block.svg" alt="harness-maker" width="720">
+  <img src="https://raw.githubusercontent.com/Ecro/harness-maker/main/docs/assets/brand-block.png" alt="harness-maker" width="720">
 </p>
 
 # harness-maker

@@ -31,7 +31,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from collections import OrderedDict
+from collections import Counter, OrderedDict
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
@@ -107,6 +107,14 @@ class MergeReport:
     user_blocks_seeded: list[str] = field(default_factory=list)  # NEW ids absent from OLD
     user_blocks_orphaned: list[str] = field(default_factory=list)  # OLD ids absent from NEW
     template_blocks_drifted: list[str] = field(default_factory=list)  # block:<id> user-edited
+    # OLD lines outside any @hm:user/block/harness marker that don't appear in
+    # NEW's outside-marker content — silently dropped by merge() because content
+    # outside markers is template-owned (REPLACE). Surfaced so the CLI can WARN
+    # the user before they lose appended content. Empty when no drop occurred.
+    # Triggered by the 2026-05-17 wiki.md regression: wrapup LLM appended 5
+    # entries AFTER the closing @hm:/user:entries marker; 33 lines silently
+    # lost across 7 commits before detection.
+    orphan_outside_content: list[str] = field(default_factory=list)
 
 
 class ParseError(ValueError):
@@ -457,8 +465,24 @@ def merge(old_text: str, new_text: str) -> tuple[str, MergeReport]:
     lines = new_text.splitlines(keepends=True)
     i = 0
     n = len(lines)
+    # Fence tracking mirrors parse_segments / merge_inverted — literal marker
+    # strings inside fenced code blocks must NOT be treated as live markers,
+    # otherwise documented marker examples in NEW templates break the walk
+    # (REVIEW M3, 2026-05-17). merge() has no `style` parameter (HTML_COMMENT
+    # only by construction); if a `style` arg is ever added, gate this fence
+    # check on `style is MarkerStyle.HTML_COMMENT` like every other call site.
+    in_fence = False
     while i < n:
         bare = _strip_eol(lines[i])
+        if _FENCE_RE.match(bare):
+            in_fence = not in_fence
+            out.append(lines[i])
+            i += 1
+            continue
+        if in_fence:
+            out.append(lines[i])
+            i += 1
+            continue
         open_m = _OPEN_RE.match(bare)
         if open_m and open_m.group(1) == "user":
             user_id = open_m.group(2)
@@ -480,6 +504,19 @@ def merge(old_text: str, new_text: str) -> tuple[str, MergeReport]:
     if orphan_ids:
         report.user_blocks_orphaned.extend(orphan_ids)
         out.append(_format_orphan_block(orphan_ids, old_user))
+
+    # Detect OLD content sitting outside any marker that has no counterpart in
+    # NEW — silently dropped by this merge (outside-marker is template-owned).
+    # Counter subtraction preserves multiplicity: if OLD has 3 copies of `---`
+    # and NEW has 1, the 2 excess copies still surface as orphans (set-based
+    # membership would miss this — REVIEW M2, 2026-05-17).
+    # See MergeReport.orphan_outside_content for the failure mode this catches.
+    excess = Counter(_collect_outside_marker_lines(old_text)) - Counter(
+        _collect_outside_marker_lines(new_text)
+    )
+    report.orphan_outside_content = [
+        line for line, count in excess.items() if line.strip() for _ in range(count)
+    ]
 
     return "".join(out), report
 
@@ -582,3 +619,45 @@ def _format_orphan_block(orphan_ids: list[str], old_user: dict[str, str]) -> str
             parts.append("\n")
     parts.append("<!-- @hm:/user:_orphans -->\n")
     return "".join(parts)
+
+
+def _collect_outside_marker_lines(
+    text: str, style: MarkerStyle = MarkerStyle.HTML_COMMENT
+) -> list[str]:
+    """Return text lines that sit OUTSIDE any @hm:* marker block.
+
+    Used by merge() to detect OLD content that the merge silently drops —
+    everything outside markers is template-owned, so when the LLM appends a
+    wiki/failures entry below the closing marker instead of inside the user
+    block, those lines vanish on the next /hm:make --update.
+
+    Fence-aware (markdown ``` blocks) so literal marker strings inside fenced
+    code are skipped — matches parse_segments' validator W2 contract.
+    JSON_KEY style returns [] since outside-content is structural (any key
+    that isn't ``_hm_harness``) and not amenable to line-level diffing.
+    """
+    if style is MarkerStyle.JSON_KEY:
+        return []
+    if style is MarkerStyle.HASH_COMMENT:
+        open_re, close_re = _HASH_OPEN_RE, _HASH_CLOSE_RE
+    else:
+        open_re, close_re = _OPEN_RE, _CLOSE_RE
+    out: list[str] = []
+    inside_marker = False
+    in_fence = False
+    for raw in text.splitlines():
+        if style is MarkerStyle.HTML_COMMENT and _FENCE_RE.match(raw):
+            in_fence = not in_fence
+            if not inside_marker:
+                out.append(raw)
+            continue
+        if not in_fence:
+            if open_re.match(raw):
+                inside_marker = True
+                continue
+            if close_re.match(raw):
+                inside_marker = False
+                continue
+        if not inside_marker:
+            out.append(raw)
+    return out

@@ -1,6 +1,6 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.13.0
+harness_maker_version: 0.14.3
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: memory/wiki.ko.md.j2
 provenance: official
@@ -189,8 +189,6 @@ harness-maker 0.12.0 shipped Tracks A (Detection Depth — 12+ stacks/frameworks
 ## [wiki:milestone] 0-12-1-patch-shipped | 2026-05-16
 0.12.1 patch closed 3 Group A follow-up items from PLAN-personalization-depth-2026-05's deferred list: (1) `## 7. Personalization Architecture` section in TECH_SPEC.md (Phase 12 agent deferral); (2) `_flatten_stack_glob_concrete()` adds `stack.yaml` + `package.yaml` from STACK_GLOB_MANIFESTS into CACHED_MANIFESTS (Phase 3 known limitation, partial closure — `*`-globs remain on 24h-ceiling); (3) 8 snapshot fixtures regenerated (Phase 10 had regen'd mid-loop but Phase 12's personalization-audit.md.j2 template re-introduced drift; 0.12.0 release shipped with 8 failing snapshot tests — now resolved). Code review grade A (2 cosmetic nits). Full suite 1796/0 fail. 5-file version sync 0.12.0 → 0.12.1.
 
-<!-- @hm:/user:entries -->
-
 ## [wiki:pattern] communication-variant-pre-render-extractor | 2026-05-17
 PLAN-antisycophancy-2026-05. Template-side frontmatter keys that drive a Jinja
 `{% include %}` expression (e.g. `communication_variant: full|reframe|soft`)
@@ -221,3 +219,25 @@ allowlist 가 아닌 **inverted ignorelist** 로 처리. `ENV_IGNORE` 에 명시
 제외하고 나머지 전부 hash 에 포함 → 새 env 변수 추가 시 자동 invalidate (안전 방향).
 schema_version 기반 migration (ADR-016) 은 기존 Side 사용자가 silent downshift 안 받게
 옛 default 유지 + advisory 메시지로 opt-in 유도.
+
+## [wiki:gotcha] wrapup-marker-discipline-silent-loss | 2026-05-17
+**The bug**: `/hm:wrapup` told the LLM to "append (or update) one entry under
+`.claude/memory/wiki.md`" without saying WHERE — the LLM naturally EOF-appended,
+landing outside the `<!-- @hm:user:entries -->` marker. block_merge's documented
+contract (block_merge.py:17-18) treats outside-marker content as template-owned
+and silently REPLACEs it on the next `/hm:make --update`. CLI reported "preserved
+1 user block(s): entries" — technically true (the empty block survived) while
+33 lines of user content vanished. 4 entries dated 2026-05-17 evaporated across
+7 commits before detection. **Three-layer fix shipped together**: (1) wrapup.md.j2
+5.1/5.2 now name the marker explicitly + cite this regression; (2) `block_merge.merge()`
+populates `MergeReport.orphan_outside_content` via `Counter` subtraction so
+multiplicity-preserved orphan lines surface; cli.py emits `⚠ dropped N line(s)
+outside @hm:user:* blocks` — count + remediation only, no preview (the preview
+itself would leak user-controlled content to Bash stdout → LLM next-turn context,
+opening a stored-prompt-injection vector); (3) `merge()` main walk gained fence
+tracking (was diverging from parse_segments — validator passed, executor
+misbehaved on fenced literal markers). Lesson for future wrapup-template edits:
+ANY instruction that touches a marker-bearing file MUST name the marker
+explicitly. "Append" is a footgun verb in this codebase.
+
+<!-- @hm:/user:entries -->
