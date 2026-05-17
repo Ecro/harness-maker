@@ -42,6 +42,9 @@ __pycache__/
 *.swo
 .DS_Store
 
+# Playwright MCP — local browser session artifacts (downloads, screenshots, logs)
+.playwright-mcp/
+
 # Local env
 .env
 .env.local
