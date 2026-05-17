@@ -5,6 +5,13 @@ recommended_model: {{ config.recommended_model }}
 dev_mode: {{ config.dev_mode }}
 default_workflow: {{ config.default_workflow }}
 caching: {{ config.caching }}
+schema_version: {{ config.schema_version }}
+interview:
+  deep_gate:
+    max_rounds: {{ config.interview.deep_gate.max_rounds }}
+    streak_target: {{ config.interview.deep_gate.streak_target }}
+  main_loop:
+    max_rounds: {{ config.interview.main_loop.max_rounds | default('null', true) }}
 project:
   domains: [{{ config.project.domains | join(", ") }}]
 spec:

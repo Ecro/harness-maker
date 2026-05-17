@@ -97,11 +97,65 @@ def _build_pi_client() -> JudgeClient | None:
         return None
 
 
+_SCAN_TTL = 86400.0  # 24 hours
+
+
+def _config_mtimes(target_dir: Path) -> float:
+    """Max mtime of security-relevant config files."""
+    candidates = [
+        target_dir / "uv.lock",
+        target_dir / "pyproject.toml",
+    ]
+    claude_dir = target_dir / ".claude"
+    if claude_dir.is_dir():
+        candidates.extend(claude_dir.rglob("*"))
+    max_mt = 0.0
+    for p in candidates:
+        try:
+            max_mt = max(max_mt, p.stat().st_mtime)
+        except OSError:
+            pass
+    return max_mt
+
+
+def _check_fresh_scan(target_dir: Path) -> list[Finding] | None:
+    """Return cached findings if scan is fresh (< 24h, no config changes)."""
+    sec_dir = target_dir / ".claude" / "observability" / "security"
+    if not sec_dir.is_dir():
+        return None
+
+    findings_files = sorted(sec_dir.glob("findings-*.jsonl"), reverse=True)
+    if not findings_files:
+        return None
+
+    latest = findings_files[0]
+    try:
+        scan_mtime = latest.stat().st_mtime
+    except OSError:
+        return None
+
+    import time
+
+    if time.time() - scan_mtime > _SCAN_TTL:
+        return None
+
+    config_mt = _config_mtimes(target_dir)
+    if config_mt > scan_mtime:
+        return None
+
+    try:
+        lines = latest.read_text(encoding="utf-8").strip().splitlines()
+        return [Finding(**json.loads(line)) for line in lines if line.strip()]
+    except (json.JSONDecodeError, OSError, ValueError):
+        return None
+
+
 def scan_all(
     target_dir: Path,
     harness_config: dict[str, Any] | None = None,
     *,
     pi_client: JudgeClient | None = None,
+    force: bool = False,
 ) -> list[Finding]:
     """Run all 7 security gates against ``target_dir``; persist + return findings.
 
@@ -111,6 +165,11 @@ def scan_all(
     raise, since blocking edits on a flaky network call is worse than a
     one-off missed polymorphic injection.
     """
+    if not force:
+        cached = _check_fresh_scan(target_dir)
+        if cached is not None:
+            return cached
+
     findings: list[Finding] = []
 
     findings.extend(scan_secrets(target_dir))

@@ -62,7 +62,7 @@ from pathlib import Path
 from harness_maker.readiness import compute_readiness
 from harness_maker.models import Preset
 import json, sys
-result = compute_readiness(Path('.'), Preset.SIDE)
+result = compute_readiness(Path('.'), Preset('{{ config.preset }}'))
 score = result.composite
 metrics = Path('.claude/observability/metrics.jsonl')
 baseline = 0

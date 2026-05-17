@@ -12,14 +12,18 @@ else Bronze (which auto-flags an agent for /hm:refresh anti-rot review).
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 from pathlib import Path
 from typing import Any
 
+from harness_maker.cache import HttpCache
 from harness_maker.llm_judge import JudgeClient, judge_file
 from harness_maker.rubric_loader import load_rubric_file
 
 _LOG = logging.getLogger(__name__)
+_SKIP_TIERS = {"Platinum", "Gold"}
 
 
 def _static_score(agent_md: Path) -> int:
@@ -55,12 +59,43 @@ def _tier(composite: int) -> str:
     return "Bronze"
 
 
+def _content_hash(agent_md: Path) -> str:
+    try:
+        content = agent_md.read_bytes()
+    except OSError:
+        return ""
+    return hashlib.sha256(content).hexdigest()[:16]
+
+
+def _get_cached_score(agent_md: Path) -> dict[str, Any] | None:
+    """Return previous score if tier was Platinum/Gold and content unchanged."""
+    cache = HttpCache("agent-quality")
+    key = hashlib.sha256(str(agent_md.resolve()).encode()).hexdigest()[:16]
+    cached = cache.get(key, ttl=float("inf"))  # no TTL — content-based
+    if not isinstance(cached, dict):
+        return None
+    if cached.get("tier") not in _SKIP_TIERS:
+        return None
+    if cached.get("content_hash") != _content_hash(agent_md):
+        return None
+    _LOG.info("agent_quality: skip (cached tier=%s) for %s", cached["tier"], agent_md.name)
+    return cached
+
+
+def _cache_score(agent_md: Path, result: dict[str, Any]) -> None:
+    cache = HttpCache("agent-quality")
+    key = hashlib.sha256(str(agent_md.resolve()).encode()).hexdigest()[:16]
+    entry = {**result, "content_hash": _content_hash(agent_md)}
+    cache.put(key, entry)
+
+
 def score_agent(
     agent_md: Path,
     *,
     rubric_dir: Path | None = None,
     client: JudgeClient | None = None,
     model: str = "claude-sonnet-4-6",
+    force: bool = False,
 ) -> dict[str, Any]:
     """Score one agent prompt and emit a tier.
 
@@ -77,6 +112,11 @@ def score_agent(
     Returns:
         ``{"static": int, "llm": int|None, "composite": int, "tier": str}``.
     """
+    if not force:
+        cached = _get_cached_score(agent_md)
+        if cached is not None:
+            return {k: cached[k] for k in ("static", "llm", "composite", "tier") if k in cached}
+
     static = _static_score(agent_md)
     llm: int | None = None
 
@@ -97,9 +137,11 @@ def score_agent(
                 _LOG.warning("agent_quality: LLM judge reported %s", result.error)
 
     composite = static if llm is None else (static + llm) // 2
-    return {
+    result = {
         "static": static,
         "llm": llm,
         "composite": composite,
         "tier": _tier(composite),
     }
+    _cache_score(agent_md, result)
+    return result

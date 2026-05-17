@@ -108,7 +108,7 @@ When SPEC is fully approved, the only remaining `/hm:plan` question is: **"Given
 
 This single confirmation prevents the "I just answered every SPEC question — why is plan asking again?" foot-shooting.
 
-### Step 3 — Interview loop (skipped in Case A; unlimited rounds otherwise)
+### Step 3 — Interview loop (skipped in Case A; {% if config.interview.main_loop.max_rounds %}up to {{ config.interview.main_loop.max_rounds }} rounds{% else %}unlimited rounds{% endif %} otherwise)
 
 > **If Step 2 set Case A and Step 3.0 returned "Proceed to phase decomposition": SKIP this entire step.** Jump to Step 4.
 
@@ -267,7 +267,7 @@ Ambiguity Score: {X.X}/1.0  (Goal×40% + Constraint×30% + SC×30%)
   Constraints:       {c:.1f}/1.0  ✅ or ⚠️
   Success Criteria:  {sc:.1f}/1.0 ✅ or ⚠️
   Weighted total:    {g*0.4 + c*0.3 + sc*0.3:.2f}
-  → PASS or NEEDS  (streak: {N}/2)
+  → PASS or NEEDS  (streak: {N}/{{ config.interview.deep_gate.streak_target | default(2) }})
 ```
 
 Inputs/Context absorbed into Goals/Constraints scores. Score monotonicity rule:
@@ -275,10 +275,10 @@ score must not decrease from the prior round given the same answers; a drop ≥ 
 requires a one-line `[score-drop-reason]: ...` note appended to the Layer 3
 display block, then applied.
 
-**Gate convergence**: total ≥ 0.8 AND all dims ≥ 0.7, **2 consecutive rounds**
+**Gate convergence**: total ≥ 0.8 AND all dims ≥ 0.7, **{{ config.interview.deep_gate.streak_target | default(2) }} consecutive rounds**
 → PASS → exit check proceeds to the standard exit conditions below.
-On **NEEDS**: generate new Layer 1/2 questions (no repeats). Max **3 rounds**.
-After 3 NEEDS, offer: "Proceed with current answers (some ambiguity accepted)?"
+On **NEEDS**: generate new Layer 1/2 questions (no repeats). Max **{{ config.interview.deep_gate.max_rounds | default(3) }} rounds**.
+After {{ config.interview.deep_gate.max_rounds | default(3) }} NEEDS, offer: "Proceed with current answers (some ambiguity accepted)?"
 
 ---
 

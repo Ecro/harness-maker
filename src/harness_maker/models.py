@@ -484,6 +484,13 @@ class HarnessConfig(BaseModel):
     # Adaptive personalization knobs (Phase 1 of personalization-depth).
     # default_factory keeps old harness.yaml files (no `adaptive:` key) loading.
     adaptive: AdaptiveConfig = Field(default_factory=AdaptiveConfig)
+    schema_version: int = 1
+    interview: dict[str, Any] = Field(
+        default_factory=lambda: {
+            "deep_gate": {"max_rounds": 3, "streak_target": 2},
+            "main_loop": {"max_rounds": None},
+        }
+    )
 
     @field_validator("sibling_repos", mode="before")
     @classmethod
@@ -572,6 +579,13 @@ class InterviewAnswers(BaseModel):
     worktree: dict[str, Any] = Field(default_factory=dict)
     security: dict[str, Any] = Field(default_factory=dict)
     context_lint: dict[str, Any] = Field(default_factory=dict)
+    interview: dict[str, Any] = Field(
+        default_factory=lambda: {
+            "deep_gate": {"max_rounds": 3, "streak_target": 2},
+            "main_loop": {"max_rounds": None},
+        }
+    )
+    schema_version: int = 2
     sibling_repos: list[str] = Field(default_factory=list)
     # Paths to additional documents that wrapup should update/manage.
     # User specifies via --wrapup-docs or /hm:configure. Examples:

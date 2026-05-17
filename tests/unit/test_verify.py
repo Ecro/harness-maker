@@ -7,7 +7,7 @@ import subprocess
 from pathlib import Path
 
 from harness_maker.interview import interview
-from harness_maker.models import ProjectProfile
+from harness_maker.models import Preset, ProjectProfile
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
 from harness_maker.verify import verify
@@ -133,4 +133,46 @@ def test_work_docs_footgun_probe(tmp_path: Path) -> None:
     )
     assert "git mv work_docs/* work-docs/" in proc.stderr, (
         f"probe stderr must include copy-pasteable migration command; got: {proc.stderr!r}"
+    )
+
+
+def _prod_profile() -> ProjectProfile:
+    return ProjectProfile(stack=["python"], scale="medium", lifecycle="active")
+
+
+def test_preset_dynamic(tmp_path: Path) -> None:
+    """Phase 1 (C2): verify SKILL uses the project's actual preset, not hardcoded SIDE.
+
+    Regression guard: Production harness must render Preset('Production')
+    in the health-score check, not Preset.SIDE.
+    """
+    prod_out = tmp_path / "prod"
+    prod_out.mkdir()
+    p = _prod_profile()
+    a = interview(p, autoloop_mode=True)
+    bp = synthesize(p, a, preset=Preset.PRODUCTION)
+    render(bp, prod_out, freeze_time=DEFAULT_FREEZE_TIME)
+
+    skill_text = (prod_out / "skills" / "verify-before-completion" / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
+    assert "Preset('Production')" in skill_text, (
+        "Production harness must use Preset('Production'), not Preset.SIDE"
+    )
+    assert "Preset.SIDE" not in skill_text, (
+        "Production harness must NOT contain hardcoded Preset.SIDE"
+    )
+
+    side_out = tmp_path / "side"
+    side_out.mkdir()
+    p_side = _profile()
+    a_side = interview(p_side, autoloop_mode=True)
+    bp_side = synthesize(p_side, a_side, preset=Preset.SIDE)
+    render(bp_side, side_out, freeze_time=DEFAULT_FREEZE_TIME)
+
+    side_skill = (side_out / "skills" / "verify-before-completion" / "SKILL.md").read_text(
+        encoding="utf-8"
+    )
+    assert "Preset('Side')" in side_skill, (
+        "Side harness must use Preset('Side')"
     )

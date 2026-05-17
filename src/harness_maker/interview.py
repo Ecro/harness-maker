@@ -603,6 +603,7 @@ def _build_answers(
     second_brain: SecondBrainConfig | None = None,
     ref_folders: list[RefFolder] | None = None,
     sibling_repos: list[str] | None = None,
+    schema_version: int = 2,
 ) -> InterviewAnswers:
     is_side = preset == Preset.SIDE
     return InterviewAnswers(
@@ -625,7 +626,7 @@ def _build_answers(
         },
         consensus=consensus or _consensus_for(preset),
         caching=caching or "agent-aware",
-        **_preset_extras(preset),
+        **_preset_extras(preset, schema_version=schema_version),
     )
 
 
@@ -675,6 +676,9 @@ def answers_from_harness_yaml(yaml_path: Path) -> InterviewAnswers | None:
 
     targets = _parse_targets(data.get("targets"))
 
+    sv_raw = data.get("schema_version")
+    schema_version = int(sv_raw) if isinstance(sv_raw, (int, float)) else 1
+
     base = _build_answers(
         locale=_string_or(data.get("locale"), "en"),
         targets=targets,
@@ -684,6 +688,7 @@ def answers_from_harness_yaml(yaml_path: Path) -> InterviewAnswers | None:
         default_workflow=default_workflow,
         consensus=_string_or(_dig(data, "reviewers", "consensus"), None),
         caching=_string_or(data.get("caching"), None),
+        schema_version=schema_version,
     )
 
     # Overlay user-tuned reviewer/skill enablement.
@@ -919,8 +924,29 @@ def _dig(data: dict[str, Any], *keys: str) -> object:
     return cur
 
 
-def _preset_extras(preset: Preset) -> dict[str, Any]:
+def _preset_extras(
+    preset: Preset, *, schema_version: int = 2
+) -> dict[str, Any]:
+    """Preset-specific config defaults.
+
+    ADR-016: schema_version governs which Side defaults apply.
+    - schema_version >= 2 (new harness): Side gets new caps (1/1/5/2)
+    - schema_version < 2 (existing harness): Side keeps old defaults (3/2/null/3)
+    Production defaults are unchanged across schema versions.
+    """
     if preset == Preset.SIDE:
+        if schema_version >= 2:
+            interview_config = {
+                "deep_gate": {"max_rounds": 1, "streak_target": 1},
+                "main_loop": {"max_rounds": 5},
+            }
+            review_rounds = 2
+        else:
+            interview_config = {
+                "deep_gate": {"max_rounds": 3, "streak_target": 2},
+                "main_loop": {"max_rounds": None},
+            }
+            review_rounds = 3
         return {
             "models": {"default": "sonnet"},
             "autoloop": {"allowed": False},
@@ -929,6 +955,9 @@ def _preset_extras(preset: Preset) -> dict[str, Any]:
             "worktree": {"enabled": False},
             "security": {"gates": []},
             "context_lint": {"enabled": False},
+            "interview": interview_config,
+            "max_review_rounds": review_rounds,
+            "schema_version": schema_version,
         }
     return {
         "models": {"default": "opus", "lite": "sonnet"},
@@ -946,4 +975,9 @@ def _preset_extras(preset: Preset) -> dict[str, Any]:
             ],
         },
         "context_lint": {"enabled": True},
+        "interview": {
+            "deep_gate": {"max_rounds": 3, "streak_target": 2},
+            "main_loop": {"max_rounds": None},
+        },
+        "schema_version": schema_version,
     }

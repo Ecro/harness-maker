@@ -2,6 +2,31 @@
 
 ---
 
+## Shared Session Context
+
+> **Loaded once** for the entire fused workflow. Individual stages below may
+> reference memory tiers — the content is already in the prompt cache from
+> this preamble, so repeated loads are near-zero cost.
+
+Before executing any stage, load memory in tier order:
+
+1. **Hot tier** — Read `.claude/memory/session/<today>.md` if it exists.
+   Prior session decisions, `checkpoint:compaction` entries, and partial
+   state from interrupted sessions are here.
+2. **Warm tier** — Skim `.claude/memory/failures.md` for patterns relevant
+   to the task: `rg -F "[fail:" .claude/memory/failures.md`.
+3. **Warm tier** — Skim `.claude/memory/wiki.md` first 40 lines for project
+   conventions in the implementation area.
+
+### Harness config summary
+
+Re-read `.claude/harness.yaml` now. Key values for this workflow run:
+
+- **Preset**: `{{ config.preset }}`
+- **Workflow**: `{{ workflow_name }}`
+
+---
+
 ## Harness Configuration [MUST FOLLOW — overrides built-in defaults]
 
 These values come from `.claude/harness.yaml` and **must not be replaced by
