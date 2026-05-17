@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.14.2 — IDE plugin marketplace as primary install path (2026-05-17)
+
+Reframes the install story around **plugin marketplace install**, the dominant
+pattern across Claude Code / Codex / Cursor ecosystem peers (superpowers,
+ruflo, spec-kit, anthropics/skills, everything-claude-code). PyPI install is
+preserved as a CLI-only fallback inside a collapsed `<details>` block.
+
+### Changed
+
+- `.claude-plugin/marketplace.json` — renamed `name` from `harness-maker-local`
+  (private-dev leftover) to `harness-maker`, owner from `noel` to `Ecro`,
+  added `description` + per-plugin metadata (version, author, homepage,
+  repository, license, keywords). Install command is now
+  `/plugin install harness-maker@harness-maker`.
+- README Quickstart — replaced the single Universal Bootstrap Prompt with
+  three explicit per-IDE install sections:
+  - **Claude Code**: `/plugin marketplace add Ecro/harness-maker` +
+    `/plugin install harness-maker@harness-maker`.
+  - **Codex CLI**: `codex plugin marketplace add Ecro/harness-maker`
+    (`--ref v0.14.2` for pinned releases). marketplace add IS install for
+    Codex; no separate install step.
+  - **Cursor**: documents the curated-marketplace gap honestly — Team
+    marketplace import path + community `~/.cursor/plugins/local/` symlink
+    path.
+- "First-time setup" prompt now assumes the plugin is already installed and
+  only orchestrates `/harness-maker:make` + `/hm:health`. No more
+  PyPI-install / uv-bootstrap steps in the LLM-facing prompt.
+- README.ko.md mirrored.
+
+### Preserved
+
+- PyPI install (`uv tool install harness-maker`) survives inside a
+  `<details>` fallback block for CI / headless / no-IDE-plugin use cases.
+
+5-file version sync: 0.14.1 → 0.14.2.
+
 ## 0.14.1 — PyPI page Korean README link fix (2026-05-17)
 
 Patch release. README marketing rewrite landed in commit `8e894e0` between

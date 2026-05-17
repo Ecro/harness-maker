@@ -133,24 +133,92 @@
 
 ## 빠른 시작
 
-영문 README의 [Universal Bootstrap Prompt](README.md#universal-bootstrap-prompt)를 사용하세요. 어떤 LLM 에이전트 (Claude Code / Cursor / Codex / 일반 채팅) 든, 어떤 OS (Linux / macOS / Windows / WSL) 든 한 번의 paste로 설치 + 첫 하네스 생성까지 자동으로 진행됩니다.
+> 설치 경로는 **IDE별로 따로**. 여러 경로를 동시에 쓰지 마세요.
 
-배포된 PyPI 패키지로부터 직접 설치하려면:
+### Claude Code
+
+```
+/plugin marketplace add Ecro/harness-maker
+/plugin install harness-maker@harness-maker
+```
+
+이 한 repo가 marketplace metadata + plugin 본체를 모두 담고 있어서 두 줄로 끝. Claude Code 재시작 후 `/harness-maker:make` 슬래시 명령이 활성화됩니다.
+
+### Codex CLI
+
+```
+codex plugin marketplace add Ecro/harness-maker
+```
+
+특정 릴리스로 고정 (재현성):
+
+```
+codex plugin marketplace add Ecro/harness-maker --ref v0.14.2
+```
+
+Codex 안에서 `/plugins` 실행하여 활성화. `marketplace add` 자체가 설치이며, 별도 install 단계 없음.
+
+### Cursor
+
+Cursor의 공식 plugin marketplace는 큐레이션 방식 ([cursor.com/marketplace/publish](https://cursor.com/marketplace/publish) submit & review)이고 GitHub 직접 install은 Cursor 2.5+ 로드맵상 아직 미지원입니다. 현재 동작하는 두 경로:
+
+**A. Team marketplace (Team/Enterprise plan):**
+Dashboard → Settings → Plugins → Team Marketplaces → Import → `https://github.com/Ecro/harness-maker` 붙여넣기 → 팀원에게 푸시.
+
+**B. Local 개발 install (커뮤니티 패턴):**
 
 ```bash
+git clone https://github.com/Ecro/harness-maker.git ~/.cursor/plugins/local/harness-maker
+```
+
+Cursor 재시작 (Ctrl+Shift+P → "Reload Window")으로 plugin 인식.
+
+### 첫 사용 (모든 IDE 공통)
+
+플러그인이 로드된 후, 다음을 AI 에이전트에 paste 해서 프로젝트 분석 + 하네스 렌더링:
+
+```
+당신은 harness-maker 플러그인이 설치된 Claude Code, Cursor, 또는 Codex 안에 있습니다.
+이 프로젝트의 하네스를 부트스트랩하세요:
+
+1. /harness-maker:make 실행하고 인터뷰 따라가기.
+   • Preset (Side / Production), dev mode, 대상 IDE, locale 확인.
+   • 특별한 이유 없으면 default 수용.
+
+2. 하네스 렌더 후 /hm:health 실행.
+   .claude/observability/dashboard.md 에 3-섹션 대시보드 생성됨
+   (구조 / 외부 리스크 / 개인화).
+
+3. 하네스 준비 완료 + 개인화 audit 의 tier 결과를 알려주세요.
+```
+
+<details>
+<summary><strong>대안: PyPI Python CLI로 설치 (IDE plugin 미사용)</strong></summary>
+
+IDE plugin 경로가 어느 것도 맞지 않을 때 (CI 스크립트, headless 서버, 또는 단순 취향):
+
+```bash
+uv tool install harness-maker          # POSIX / macOS / WSL
+# 또는 PowerShell:
+irm https://astral.sh/uv/install.ps1 | iex
 uv tool install harness-maker
+
 cd your-project
 harness-maker profile . --json
 harness-maker make . --preset Production --locale ko --targets claude-code,cursor
 ```
 
-Windows PowerShell:
+일회성 렌더는 가능하지만, IDE 내 슬래시 명령 (`/hm:health`, `/hm:plan`, `/hm:execute` 등)은 IDE plugin이 로드해야 나타납니다.
 
-```powershell
-irm https://astral.sh/uv/install.ps1 | iex
-uv tool install harness-maker
-harness-maker profile . --json
-harness-maker make . --preset Production --locale ko --targets claude-code,cursor
+</details>
+
+하네스 렌더 이후 플래그로 진화:
+
+```bash
+harness-maker make . --audit           # 기존 .claude/ 를 rubric 으로 채점
+harness-maker make . --add NAME        # 단일 skill/agent/command 추가
+harness-maker make . --remove NAME     # 외과적 컴포넌트 제거
+harness-maker make . --promote NAME    # ad-hoc 자산을 하네스로 승격
 ```
 
 ---

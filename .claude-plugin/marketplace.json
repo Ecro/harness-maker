@@ -1,7 +1,29 @@
 {
-  "name": "harness-maker-local",
-  "owner": { "name": "noel" },
+  "name": "harness-maker",
+  "owner": {
+    "name": "Ecro",
+    "email": "e839638@gmail.com"
+  },
+  "description": "Interview-shaped AI coding harness for Claude Code / Cursor / Codex — grade-gated review, block-merge edit preservation, anti-rot crawlers, worktree isolation.",
   "plugins": [
-    { "name": "harness-maker", "source": "./" }
+    {
+      "name": "harness-maker",
+      "source": "./",
+      "description": "Project-tailored harness generator — single source renders to .claude/, .cursor/, and .codex/.",
+      "version": "0.14.2",
+      "author": { "name": "Ecro" },
+      "homepage": "https://github.com/Ecro/harness-maker",
+      "repository": "https://github.com/Ecro/harness-maker",
+      "license": "MIT",
+      "keywords": [
+        "claude-code",
+        "cursor",
+        "codex",
+        "harness",
+        "personalization",
+        "code-review",
+        "multi-ide"
+      ]
+    }
   ]
 }

@@ -158,104 +158,86 @@ For the mechanics behind each step — full procedures, decision paths, internal
 
 ## Quickstart
 
-### Universal Bootstrap Prompt
+> Install path is **per-IDE** — pick the one for your editor. Don't stack installs.
 
-> **Paste into any LLM agent — it installs harness-maker and generates your project harness
-> automatically.** Works in Claude Code, Cursor, Codex CLI, or any chat with shell access. The
-> agent detects your OS (Linux / macOS / Windows / WSL) and IDE on its own; you do not branch
-> by hand.
+### Claude Code
 
 ```
-Install and bootstrap harness-maker for this project, end-to-end.
+/plugin marketplace add Ecro/harness-maker
+/plugin install harness-maker@harness-maker
+```
 
-You are an LLM agent with shell access. Detect the environment silently, install
-harness-maker, and render the harness. Ask me ONE question (target IDE confirmation)
-and otherwise proceed autonomously. Conduct the conversation in the language of my
-first reply; default to English if you cannot tell.
+That's it — the marketplace metadata and the plugin both ship in this repo, so two commands cover discovery + install. Reload Claude Code; the `/harness-maker:make` slash command becomes available.
 
-Step 1 — Environment detection (silent — do NOT ask me):
-  - OS: try `uname -s` (POSIX → Linux / Darwin / CYGWIN* / MINGW*). If `uname` fails,
-        returns empty, or returns a value outside that set, treat the host as native
-        Windows.
-  - WSL: when `uname -s` returns Linux AND `/proc/version` contains "microsoft" or
-        "Microsoft" (case-insensitive), treat as WSL — use the POSIX path below.
-  - IDE: pick the first match — `$CLAUDE_CODE` or `~/.claude/` → Claude Code;
-        `$CURSOR_SESSION` or `~/.cursor/` → Cursor; `$CODEX_SESSION` or `~/.codex/` → Codex;
-        none → plain terminal (CLI mode).
-  - Python: run `python3 --version` (POSIX) or `python --version` (Windows). Need 3.12+.
-        If missing, install via `uv python install 3.12` after Step 2.
-  - uv: run `uv --version`. If missing, install:
-        • POSIX / macOS / WSL: `curl -LsSf https://astral.sh/uv/install.sh | sh`
-        • Native Windows (PowerShell): `irm https://astral.sh/uv/install.ps1 | iex`
+### Codex CLI
 
-Step 2 — Install harness-maker (skip if harness-maker is already on PATH):
-  uv tool install harness-maker
+```
+codex plugin marketplace add Ecro/harness-maker
+```
 
-Step 3 — Profile the project:
-  # POSIX / macOS / WSL:
-  harness-maker profile "$(pwd)" --json
-  # PowerShell (Windows native) — quote-expanded for paths with spaces:
-  harness-maker profile "$((Get-Location).Path)" --json
-  Read stack / scale / lifecycle. Tell me: "Your project looks like {stack}, {scale} scale,
-  {lifecycle} lifecycle." Recommend a preset (Side or Production) based on the profile.
+Pin a release for reproducibility:
 
-Step 4 — Confirm targets (ask me ONCE):
-  Based on Step 1's IDE detection, suggest one of:
-    • Claude Code only → targets=claude-code
-    • Cursor only       → targets=cursor
-    • Codex only        → targets=codex
-    • Multiple          → comma-separated (e.g. claude-code,cursor)
-  Wait for my confirmation, then continue.
+```
+codex plugin marketplace add Ecro/harness-maker --ref v0.14.2
+```
 
-Step 5 — Generate the harness:
-  # POSIX / macOS / WSL:
-  harness-maker make "$(pwd)" --preset <PRESET> --locale en \
-    --targets <TARGETS> --autoloop
-  # PowerShell (Windows native):
-  harness-maker make "$((Get-Location).Path)" --preset <PRESET> --locale en `
-    --targets <TARGETS> --autoloop
+Then run `/plugins` inside Codex to enable. `marketplace add` is the install — there is no separate install step.
 
-Step 6 — IDE reload:
-  • Claude Code: run `/harness-maker:make` to verify the plugin loads.
-  • Cursor: reload the window (Ctrl+Shift+P → "Reload Window") so agents, skills, and
-    commands under .claude/ are discovered.
-  • Codex: AGENTS.md and .codex/ are read on next session start.
-  Tell me the harness is ready and suggest: /hm:health
+### Cursor
+
+Cursor's public plugin marketplace is curated (submit-and-review at [cursor.com/marketplace/publish](https://cursor.com/marketplace/publish)) and direct GitHub install is still on the roadmap as of Cursor 2.5+. Two working paths today:
+
+**A. Team marketplace (Team/Enterprise plans):**
+Dashboard → Settings → Plugins → Team Marketplaces → Import → paste `https://github.com/Ecro/harness-maker` → push to team members.
+
+**B. Local dev install (community pattern):**
+
+```bash
+git clone https://github.com/Ecro/harness-maker.git ~/.cursor/plugins/local/harness-maker
+```
+
+Reload Cursor (Ctrl+Shift+P → "Reload Window") to pick up the new plugin.
+
+### First-time setup (any IDE)
+
+Once the plugin is loaded, paste this into your AI agent to profile the project and render the harness:
+
+```
+You are inside Claude Code, Cursor, or Codex with the harness-maker plugin installed.
+Bootstrap the harness for this project:
+
+1. Run /harness-maker:make and follow the interview.
+   • Confirm preset (Side / Production), dev mode, target IDEs, and locale.
+   • Accept the defaults unless you have a strong reason to override.
+
+2. After the harness renders, run /hm:health.
+   This produces a 3-section dashboard at .claude/observability/dashboard.md
+   (structural / external-risks / personalization).
+
+3. Tell me the harness is ready and what tier the personalization audit returned.
 ```
 
 <details>
-<summary><strong>Manual install (step-by-step, no LLM)</strong></summary>
+<summary><strong>Fallback: install as a Python CLI tool (no IDE plugin)</strong></summary>
+
+When none of the IDE plugin paths apply (CI scripts, headless servers, or just preference), the harness-maker CLI is on PyPI:
 
 ```bash
-# 1. Install harness-maker CLI from PyPI
-uv tool install harness-maker
-
-# 2. Profile and generate the harness
-cd your-project
-harness-maker profile . --json         # inspect your stack/scale/lifecycle
-harness-maker make . --preset Production --locale en --targets claude-code,cursor
-
-# 3. (Optional) Load as Claude Code plugin for /harness-maker:make command
-claude --plugin-dir /path/to/harness-maker
-```
-
-Native Windows / PowerShell equivalents:
-
-```powershell
-# Install uv if you don't have it
+uv tool install harness-maker          # POSIX / macOS / WSL
+# or PowerShell:
 irm https://astral.sh/uv/install.ps1 | iex
-
-# Install harness-maker and run
 uv tool install harness-maker
+
+cd your-project
 harness-maker profile . --json
 harness-maker make . --preset Production --locale en --targets claude-code,cursor
 ```
 
+This path is fine for one-off renders but skips the in-IDE slash-command surface — `/hm:health`, `/hm:plan`, `/hm:execute` etc. only appear after the IDE plugin loads them.
+
 </details>
 
-The interview asks for locale first, then preset (`Side` or `Production`), dev mode, and target runtime. The setup preview explains generated roots, backups, preserved user blocks, target-specific leftovers, review trade-offs, and how to continue advanced Second Brain setup with `/hm:configure`. A fully-rendered harness is ready in one turn.
-
-Re-run with flags to evolve the harness:
+After the harness is rendered, re-run with flags to evolve it:
 
 ```bash
 harness-maker make . --audit           # score the existing .claude/ against the rubric
