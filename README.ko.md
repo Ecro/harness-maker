@@ -6,7 +6,7 @@
 [![Cursor 2.4+ (3.2+ rec)](https://img.shields.io/badge/Cursor-2.4%2B_(3.2%2B_rec)-black)](https://cursor.com)
 [![Built with uv](https://img.shields.io/badge/built_with-uv-261230.svg)](https://docs.astral.sh/uv/)
 
-[English](README.md) · **한국어**
+[English](https://github.com/Ecro/harness-maker/blob/main/README.md) · **한국어**
 
 > **내 프로젝트를 아는 하네스 — 그 모양을 끝까지 지킵니다.**
 

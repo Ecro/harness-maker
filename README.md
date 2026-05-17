@@ -6,7 +6,7 @@
 [![Cursor 2.4+ (3.2+ rec)](https://img.shields.io/badge/Cursor-2.4%2B_(3.2%2B_rec)-black)](https://cursor.com)
 [![Built with uv](https://img.shields.io/badge/built_with-uv-261230.svg)](https://docs.astral.sh/uv/)
 
-**English** · [한국어](README.ko.md)
+**English** · [한국어](https://github.com/Ecro/harness-maker/blob/main/README.ko.md)
 
 > **A harness that knows your project — and stays that way.**
 

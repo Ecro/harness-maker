@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.14.1 — PyPI page Korean README link fix (2026-05-17)
+
+Patch release. README marketing rewrite landed in commit `8e894e0` between
+0.14.0 tag and now — the new English README ships an `**English** · [한국어](...)`
+language switcher at the top. The relative link target was `README.ko.md`,
+which resolves on GitHub but **breaks on PyPI** because PyPI's markdown
+renderer does not rewrite relative paths to other files in the repository.
+
+Fixes:
+- README.md / README.ko.md language switchers now use absolute GitHub URLs
+  (`https://github.com/Ecro/harness-maker/blob/main/...`).
+- `pyproject.toml [project.urls]` gains a `한국어 README` entry so the
+  PyPI Project Links sidebar links directly to the Korean version.
+
+5-file version sync: 0.14.0 → 0.14.1.
+
 ## 0.14.0 — first PyPI release + communication-protocol variant family (2026-05-17)
 
 ### PyPI publication infrastructure (PLAN-pypi-publish-llm-prompts)
