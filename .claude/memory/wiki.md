@@ -205,3 +205,10 @@ RENDERED output frontmatter. Implementation: `template_fm.pop("<key>", None)`
 right after `_split_template_frontmatter` in `_render_text_file`. Variant
 identity carried via HTML comment marker in body instead — survives Cursor
 `.mdc` / Codex TOML strict parsers.
+
+## [wiki:pattern] workflow-optimization-inverted-env | 2026-05-17
+ADR-007 (PLAN-workflow-optimization-2026-05): check-suite skip-key 에서 env 변수를
+allowlist 가 아닌 **inverted ignorelist** 로 처리. `ENV_IGNORE` 에 명시된 noise 변수만
+제외하고 나머지 전부 hash 에 포함 → 새 env 변수 추가 시 자동 invalidate (안전 방향).
+schema_version 기반 migration (ADR-016) 은 기존 Side 사용자가 silent downshift 안 받게
+옛 default 유지 + advisory 메시지로 opt-in 유도.
