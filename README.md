@@ -6,11 +6,14 @@
 [![Cursor 2.4+ (3.2+ rec)](https://img.shields.io/badge/Cursor-2.4%2B_(3.2%2B_rec)-black)](https://cursor.com)
 [![Built with uv](https://img.shields.io/badge/built_with-uv-261230.svg)](https://docs.astral.sh/uv/)
 
+**English** · [한국어](README.ko.md)
+
 > **A harness that knows your project — and stays that way.**
 
-Interview-born. Grade-gated. Anti-rot by design. Multi-target.
+Interview-shaped. Grade-gated. Self-evolving. Multi-IDE.
 
 [Why](#why-harness-maker) ·
+[How it fits](#how-it-fits-your-project) ·
 [Quickstart](#quickstart) ·
 [Features](#features) ·
 [How it works](#how-it-works) ·
@@ -26,27 +29,114 @@ Interview-born. Grade-gated. Anti-rot by design. Multi-target.
 
 ## Why harness-maker?
 
-Most Claude Code setups start from a generic template and drift from day one. harness-maker takes a different stance — it builds a harness that is **shaped around your project** and **keeps that shape over time**.
+Most AI coding setups start from a generic template and drift from day one — same reviewer set on every project, same prompts on every stack, same defaults that nobody ever revisits. harness-maker takes the opposite stance: **the harness is shaped by your project, and it keeps that shape as the project moves.**
 
-Four principles drive every design decision:
+| | Principle | What this means in practice |
+|--|---|---|
+| 🎯 | **Personalized** | Profiler reads 12+ stack/framework/CI signals. Interview locks 10+ dimensions. A `Side` experiment and a `Production` service get **structurally different** harnesses — different reviewer sets, different workflow stages, different security gates. No generic defaults silently shipped. |
+| 🛡️ | **Trusted** | Every `/hm:execute` runs in a fresh worktree with a TDD loop. `/hm:review` doesn't just report — it applies consensus-passed fixes and re-reviews until grade ≥ A. Mechanical checks (lint/tests) gate the LLM reviewer before any token is spent. |
+| 🌱 | **Self-evolving** | Hand-edit any agent, skill, CLAUDE.md — block-merge markers preserve your edits across `--update`. Memory accumulates project-specific patterns; recurring failures auto-propose new guardrails. |
+| 🌀 | **Anti-rot** | Weekly crawl across 4 sources (Anthropic, GitHub releases, arXiv, OSV CVEs). Adaptive relevance filter learns from your accept/reject history. Always manual-confirmed — no silent auto-apply path exists. |
+| 🎛️ | **Multi-IDE** | Claude Code + Cursor + Codex. One `harness.yaml`, three target-native renders. Existing Cursor rules / Aider config / Copilot instructions get absorbed on first run — no manual port. |
 
-**1. Personalized — Interview-born, not template-pasted.**
-The profiler reads your stack, scale, and lifecycle. The interview locks in preset, dev mode, target runtimes, and reviewer depth. A `Side` experiment and a `Production` service get structurally different harnesses — different reviewer sets, different workflow stage counts, different security gates. No generic defaults silently shipped.
+---
 
-**2. Trusted — Grade-gated, not hope-based.**
-Every `/hm:execute` runs in a fresh git worktree and follows a TDD loop. `/hm:review` doesn't just report findings — it applies consensus-passed fixes and re-reviews until the grade meets the configured threshold (default A). Pre-LLM mechanical checks (lint, tests) gate the review before any reviewer agent spawns. Reviews you trust don't need second-guessing.
+## How it fits your project
 
-**3. Anti-rot — Built-in, not retrofitted.**
-The Claude Code, Cursor, and Codex ecosystem moves fast. harness-maker ships a weekly crawl across 4 sources (Anthropic blog, GitHub releases, arxiv cs.SE/CL/CR, OSV.dev), scores each item for relevance, and surfaces only what matters — always manual-confirmed, never auto-applied. The failure-memory system proposes new skills and rules when the same failure recurs 3× across sessions.
+```
+SENSE  →  DECIDE  →  RENDER  →  EVOLVE
+```
 
-**4. Evolving — Refresh cycles, not rewrites.**
-`/harness-maker:make --update` picks up new template improvements without touching your edits (hash-based KEEP/REPLACE per file). The session memory and wiki build up project-specific conventions. Failure proposals turn recurring stumbles into permanent fixes. The harness improves with the project, not against it.
+Four steps. Each is a question harness-maker answers for you — once, then continuously.
+
+### 1. SENSE — *What kind of project is this?*
+
+The profiler scans concrete signals **before** asking you anything. Every detection is tagged with a confidence (HIGH / MEDIUM / LOW) that decides whether the default is applied silently, prompted, or skipped.
+
+| Signal | Detection source |
+|---|---|
+| **Stack** (12+) | `pyproject.toml`, `package.json`, `Cargo.toml`, `go.mod`, `pubspec.yaml`, … + extension counts |
+| **Scale** | Total source files, monorepo depth, presence of `apps/` or `packages/` |
+| **Lifecycle** | Git commit velocity, branch protection rules, CI workflow presence |
+| **Frameworks** | React / Vue / FastAPI / Django / Tauri / Zephyr / Next.js / Tailwind / Pydantic … (dependency-parsed, not keyword-guessed) |
+| **Package manager** | uv · poetry · pnpm · yarn · cargo · go mod · gradle · maven |
+| **CI provider** | GitHub Actions · GitLab CI · CircleCI · Bitbucket Pipelines |
+| **Foreign AI config** | Pre-existing `.cursor/rules/`, `AGENTS.md`, `CLAUDE.md`, `.continue/`, `.aider.conf.yml`, `.github/copilot-instructions.md` |
+
+> **Result:** A 24-hour cached `ProjectProfile` you can inspect with `harness-maker profile . --json` before any interview runs.
+
+---
+
+### 2. DECIDE — *What harness does this project need?*
+
+A short interview locks the dimensions that shape every downstream render. Re-runs silently reuse prior answers; explicit `--reinterview` re-prompts.
+
+| Dimension | Choices | What it changes |
+|---|---|---|
+| **Preset** | `Side` · `Production` | Reviewer count (1 vs 5), workflow stage count, security gate depth, verify-required flag |
+| **Dev mode** | `task-driven` · `spec-driven` | Whether SPEC stage is mandatory; whether plan stages chain into execute |
+| **Targets** | `claude-code` · `cursor` · `codex` (multi-select) | Which IDE-native asset trees are rendered |
+| **Locale** | `en` · `ko` · any tag | Interview text + user-facing error messages |
+| **Workflows** | Fused sequences from atomic stages | Which `/hm:<name>` slash commands appear |
+| **Reviewers / skills** | Preset defaults + overrides | Which agents and skills install |
+| **Ref folders** | Path + glob pairs | Which external docs are searchable via `refdocs-search` skill |
+| **Sibling repos** | Relative paths | Which adjacent repos share the same harness session |
+| **Second Brain** | Obsidian vault path + project_id | Where cross-session memory writes |
+| **Recommended model** | `claude-opus-4-7` default | The model frontmatter on every generated agent |
+
+> **Result:** `.claude/harness.yaml` — a single source of truth that survives upgrades.
+
+---
+
+### 3. RENDER — *How does this become a working harness?*
+
+One source tree, three IDE-native renders, all from a single `harness.yaml`:
+
+```
+.claude/                 ← single source: agents, skills, commands/hm/, hooks, memory, observability
+├── .cursor/             ← + Cursor-native rules, hooks, mcp.json     (if cursor target)
+├── .codex/              ← + Codex-native config.toml, agent TOMLs    (if codex target)
+├── AGENTS.md            ← + Codex root instructions                  (if codex target)
+└── .agents/skills/      ← + Codex skill paths                        (if codex target)
+```
+
+Layered on top of the base render:
+
+- **Domain packs** — `--add-domain python` (or `node`, `rust`) grafts stack-specific standards, agents, and skills onto the harness. Custom domains scaffold as stubs.
+- **Foreign config absorption** — pre-existing Cursor rules, Aider config, Copilot instructions get LLM-translated into `harness.yaml` axes. `@hm:harness:*` inverted markers keep them synced on re-renders.
+- **Sibling repos** — frontend + backend + library share one harness session via relative-path bindings in `harness.yaml`. Cross-machine portable.
+- **Ref folders + Second Brain** — registered project docs + Obsidian vault notes become searchable from any stage.
+
+> **Result:** Every IDE you use sees the same agents, the same skills, the same workflows — natively. Zero manual porting.
+
+---
+
+### 4. EVOLVE — *How does the harness stay useful?*
+
+Three independent feedback loops keep the harness aligned with your project as it grows.
+
+**A. Your edits survive upgrades.**
+Hand-tune `agents/code-reviewer.md`. Add a custom skill. Edit a CLAUDE.md section. All survive `harness-maker make --update` because content hashes per file plus `@hm:user:*` block-merge markers separate your edits from template-owned regions. `@hm:harness:*` inverted markers do the opposite (for foreign config: preserve outside, replace inside).
+
+**B. The harness learns your project.**
+- `.claude/memory/wiki.md` — patterns, conventions, gotchas. Each `/hm:wrapup` appends new entries.
+- `.claude/memory/failures.md` — recurring mistakes, deduplicated by slug + count.
+- `.claude/memory/session/<date>.md` — non-obvious decisions per workday.
+- When any failure slug reaches **count ≥ 3**, wrapup writes a proposal to `pending-proposals.md` — a new skill, rule, or hook that would have prevented the recurrence. The user reviews and decides whether to ingest.
+
+**C. Defaults adapt to your overrides.**
+Override telemetry (100% local) tracks every time you change a default. `/hm:health` scores three layers — detection→recommendation conversion, override stability, audit cadence — and surfaces a **Bronze → Silver → Gold → Platinum** tier with ranked action items. Drift the harness too far from your real usage and the audit will tell you exactly which default is wrong.
+
+> **Result:** The harness improves with the project, not against it. No silent re-litigation of decisions you've already made.
+
+For the mechanics behind each step — full procedures, decision paths, internal invariants — see [**docs/HOW-IT-WORKS.md**](docs/HOW-IT-WORKS.md).
 
 ---
 
 ## Table of Contents
 
 - [Why harness-maker?](#why-harness-maker)
+- [How it fits your project](#how-it-fits-your-project)
 - [Quickstart](#quickstart)
 - [Requirements](#requirements)
 - [Features](#features)
@@ -190,59 +280,59 @@ harness-maker make . --promote NAME    # move an ad-hoc artifact into the harnes
 
 ## Features
 
-- **Single command, no subcommand sprawl.** `/harness-maker:make` is the only entry point. Everything else is a flag (`--audit`, `--add`, `--remove`, `--promote`). No muscle-memory tax.
+Grouped by what they do for your project, not by component.
 
-- **Two presets, ten override dimensions.** `Side` (1 reviewer, lean, fast) and `Production` (5 reviewers, verify-required, secure) cover ~90% of teams. The remaining 10% comes from override dimensions surfaced in the interview: workflow naming, models, autoloop, anti-rot, worktree, security, context-lint, memory, caching.
+### 🎯 Personalization — *fits your project*
 
-- **Three targets from one harness.** Claude Code gets the native `.claude/` runtime. Cursor reuses `.claude/agents/`, `.claude/skills/`, and `.claude/commands/hm/` while receiving Cursor-specific hooks and rules. Codex receives `AGENTS.md`, `.codex/config.toml`, `.codex/hooks.json`, agent TOML files, and `.agents/skills/` so the same stage and workflow model runs in Codex without hand-porting prompts.
+- **Project-shaped harness.** Profiler + 10-dimension interview produce **structurally different** harnesses for Side experiments vs Production services. Reviewer count, workflow stages, security gate depth, mechanical-check enforcement — all derived from your answers.
+- **12+ stack detection.** Python · Node · Rust · Java · Kotlin · Swift · Dart · Ruby · PHP · C# · Elixir · Scala · C/C++ · Zig · Haskell. Framework + package-manager + CI provider parsed from manifests, not keyword-guessed. 24h cache ceiling on manifest mtime.
+- **Confidence-bucketed defaults.** Every detection declares HIGH/MEDIUM/LOW confidence. HIGH → silent default with `# detected:` provenance. MEDIUM → explicit interview prompt. LOW → skipped (you decide). Regression test guards against surprise silent-default changes between minor versions.
+- **Adaptive personalization tier.** `/hm:health` scores three layers (detection→recommendation conversion, override stability, audit cadence) and reports Bronze → Silver → Gold → Platinum tier. Auto-proposes default changes when one axis has been overridden 5+ times. 100% local telemetry; nothing leaves the project.
+- **Domain packs.** `--add-domain python` (or `node`, `rust`) grafts stack-specific standards, agents, and skills. Custom domains scaffold as stubs — teams add their own without forking harness-maker.
+- **Single command, no subcommand sprawl.** `/harness-maker:make` is the only entry point. Everything else is a flag (`--audit`, `--add`, `--remove`, `--promote`, `--add-domain`, `--reinterview`, `--update`).
 
-- **Unified health audit.** `/hm:health` runs a 3-layer composite: **structural** (ai-readiness deterministic + LLM rubric, 70%/25%/5%), **external risks** (4-source anti-rot crawl + LLM relevance filter), and **personalization** (ADR-011 rubric — Bronze/Silver/Gold/Platinum). Outputs a 3-section `.claude/observability/dashboard.md`. Every item routes through `accept` / `reject` / `defer` — no auto-apply, ever (ADR-001). All telemetry stays local. Replaces 0.12.x's separate `/hm:ai-readiness`, `/hm:refresh`, and `/hm:personalization-audit` commands.
+### 🛡️ Trust — *grade-gated work*
 
-- **Anti-rot pipeline.** Weekly crawl across 4 sources: Anthropic blog/changelog, GitHub releases (`anthropics/claude-code`), arxiv (cs.SE / cs.CL / cs.CR), OSV.dev CVEs. Each item is LLM-scored for relevance with an adaptive threshold (starts at 0.7, adapts ±0.05 based on your accept/reject history). **Always manual-confirmed** — there is no `--auto-apply` path.
+- **Grade-based auto-fix loop.** `/hm:review` doesn't just report. It applies consensus-passed fixes → re-reviews (selectively, only reviewers whose scope was touched) → regrades, until grade ≥ threshold (default A) or `max_review_rounds` is exhausted. Weak-consensus and manual-only findings are never auto-applied.
+- **Mechanical pre-checks before any LLM token.** Lint clean + tests green are enforced **before** reviewers spawn. First non-zero exit emits `## MECHANICAL_BLOCK: <cmd> exit=<N>` and halts. `--no-auto-fix` does not skip this gate.
+- **Conditional reviewer routing.** `.env` change → security-reviewer. `/perf/` → performance-reviewer. `.tsx` → ux-reviewer. Async/locking → concurrency-reviewer. 10× cheaper than fanning out to every reviewer on every diff.
+- **2-pass redaction (+47pp precision).** Pass 1 strips PR metadata so findings can't anchor on author/title. Pass 2 restores full context — reviewers must validate or drop each Pass 1 finding. Ablation-measured precision gain on anchoring-prone diffs.
+- **7 security gates.** `secrets` · `permissions` (settings.json over-grant) · `hook-injection` (AST scan for `rm -rf`, `curl|sh`, `eval`) · `CVEs` (OSV.dev) · `hallucination` (AST scan for non-existent imports) · `prod-name guard` · `prompt-injection`. Findings stay local in `.claude/observability/security/`.
+- **Privilege separation.** Reviewer agents deny `Write` / `Edit` / interpreter `Bash` calls. Executor agents allow only `.worktrees/**` writes + paired Edit/Write denies on system paths. Defense-in-depth survives prompt injection, agent compromise, and tool_input poisoning.
+- **Worktree isolation per run.** Every execute runs in a fresh `git worktree`. Failed runs preserve evidence; successful runs auto-cleanup with prefix-match (Cursor's own worktrees never touched).
 
-- **Worktree isolation per run.** Every `/hm:execute` runs in a fresh `git worktree` under `.worktrees/`. `/hm:loop` allocates one worktree for the whole loop, shared across iterations to reduce branch churn. `sibling_repos` can opt related repos into the same isolation session for split frontend/backend or app/library work. Successful runs clean up; failed runs preserve evidence. Prefix-match cleanup never touches Cursor-managed worktrees in the same directory.
+### 🌱 Self-evolving — *grows with your project*
 
-- **7 security gates.** `secrets` (regex + entropy, gitleaks-style), `permissions` (`settings.json` over-grant detection), `hook injection` (`hooks.json` AST scan for `rm -rf`, `curl | sh`, `eval`), `dependency CVEs` (OSV.dev), `hallucination` (AST scan for non-existent imports — pure-filesystem check, no execution of LLM-generated code), `prod-name guard` (cross-tool sequence detection for production-targeting patterns), `prompt injection` (hidden-instruction pattern detection + privilege separation, regex + LLM second pass). Findings go to `.claude/observability/security/findings-*.jsonl` — never transmitted.
+- **Block-merge preservation.** Hand-tune any agent, skill, CLAUDE.md section. Survives `--update` because content hashes per file plus `@hm:user:*` markers separate your edits from template-owned regions. `@hm:harness:*` inverted markers do the opposite for foreign config absorption.
+- **Three-tier memory accumulation.** `wiki.md` (patterns) · `failures.md` (recurring mistakes deduplicated by slug) · `session/<date>.md` (non-obvious decisions). Wrapup writes these automatically; every stage reads them automatically.
+- **Self-improving failure proposals.** When a `[fail:*]` slug recurs 3× across sessions, wrapup writes a proposal to `pending-proposals.md` — a new skill, rule, or hook that would have prevented the recurrence. You review and decide whether to ingest.
+- **ADR system as binding execute constraints.** Architecture Decision Records promoted during `/hm:plan` are hard constraints on `/hm:execute`. Conflicts surface as blockers, never silently proceed. Future sessions don't re-litigate settled decisions.
+- **Refdocs search.** Register architecture docs, API specs, design docs in `harness.yaml`. `refdocs-search` skill gives lossless full-text search — no chunking, no RAG index.
+- **Optional Second Brain.** Obsidian vault integration. Allowlisted write folders by note type (decision · preference · failure · project · reference · journal). Cross-session memory survives plugin reinstalls and machine moves.
+- **Brownfield-safe upgrades.** `Reconciler` hashes existing `.claude/` and offers per-conflict keep/replace/both. Apply is ADD-only with timestamped backups. User edits never silently overwritten.
 
-- **Privilege separation.** Reviewer agents get `permissions.deny: [Write(*), Edit(*), Bash(rm:*), Bash(curl:*), Bash(npm:*), Bash(eval *), Bash(python:*), Bash(node:*), Bash(sh:*), Bash(bash:*)]` — interpreter denies block subprocess-bypass attempts (0.6.2 hardening). Executor agents get `permissions.allow: [Write(.worktrees/**), Edit(.worktrees/**), Bash(uv run:*), Bash(pytest:*), …]` plus paired Edit/Write denies on system paths (`/etc`, `~/.ssh`, `~/.aws`). Combined with worktree isolation and the 0.7.1 telemetry tool-input whitelist + secret redaction (ADR-107), this gives defense-in-depth: even a prompt-injected reviewer cannot write to disk or shell out via interpreters; even a compromised executor cannot write outside the active worktree or touch system credentials; even a poisoned `tool_input` payload cannot leak credentials into the metrics log.
+### 🌀 Anti-rot — *survives the ecosystem*
 
-- **Brownfield-safe.** `Reconciler` indexes existing `.claude/`, computes hash-based ours/theirs decisions via provenance frontmatter, and offers per-conflict keep/replace/both. Apply is ADD-only with timestamped backups. User edits are never silently overwritten.
+- **4-source weekly crawl.** Anthropic blog/changelog · `anthropics/claude-code` GitHub releases · arxiv cs.SE/CL/CR · OSV.dev CVEs. Manifested as `pending` items in `/hm:health`.
+- **Adaptive relevance filter.** Threshold starts at 0.7, adjusts ±0.05 based on your accept/reject history per source. Always manual-confirmed — no `--auto-apply` path exists.
+- **Unified health audit.** `/hm:health` composites three orthogonal layers — Structural (70% deterministic + 25% LLM rubric + 5% cache diagnostic), External Risks (anti-rot pending queue), Personalization (Bronze→Platinum tier). One 3-section dashboard at `.claude/observability/dashboard.md`. No auto-apply ever (ADR-001).
+- **SessionStart drift reminder.** Hook fires on every session open and warns if running plugin version differs from the version that rendered the harness — so you notice when `/plugin update` needs a re-render. Detector compares against latest cached plugin version (not just imported `__version__`).
+- **Cache-miss classification.** Prompt-cache diagnostic reports `min_threshold` · `invalidation` · `ttl` · `first` (cold start). 5% weight in AI-readiness distinguishes cold-start misses (benign) from structural misses (actionable).
 
-- **Mechanical pre-checks in review.** Add shell commands to `harness.yaml.reviewers.mechanical_checks` (e.g., `ruff check .`, `uv run pytest tests/unit -x -q`). These run **before** any LLM reviewer — stop-on-first. If a command fails, `/hm:review` emits `## MECHANICAL_BLOCK: <cmd> exit=<N>` and halts immediately: no grade, no auto-fix loop, no wasted reviewer tokens on broken code. The list is preserved across re-renders.
+### 🎛️ Multi-IDE — *one source, every IDE*
 
-- **Deep interview before every implementation.** `/hm:spec` runs a 6-category interview (Intent → Outcomes → In-Scope Scenarios → Non-Goals → Constraints → Verification) scored for completeness; incomplete categories trigger follow-up questions, not silent gaps. `/hm:plan` runs a 9-category interview (scope → architecture → contract → risk → testing → phasing → dependencies → failure handling → observability) in impact order. Each decision that changes a component boundary, introduces a new contract, or rejects a viable alternative is promoted to a formal **Architecture Decision Record** (ADR) and becomes a binding constraint for `/hm:execute` — not advisory. A `plan-validator` agent gates the plan before it is written to disk: NEEDS_REVISION triggers targeted follow-up rounds; MAJOR_REVISION escalates to the user. The interview ends with a "no deferred decisions" scan — any "Accept?/OK?/Verify?" phrasing is a missed interview round, not a plan checkpoint.
+- **Three targets from one harness.** Claude Code + Cursor (2.4+, 3.0+ recommended) + Codex CLI. Single `.claude/` source tree; Cursor reads it natively plus its own `.cursor/` for hooks and rules; Codex reads `.codex/`, `AGENTS.md`, and `.agents/skills/`. All rendered from one `harness.yaml`.
+- **Foreign AI config migration.** Detects 6 known foreign configs (`.cursor/rules/`, `AGENTS.md`, `CLAUDE.md`, `.continue/config.json`, `.aider.conf.yml`, `.github/copilot-instructions.md`). LLM-translates them into harness.yaml axes. `@hm:harness:*` inverted markers keep them synced across re-renders.
+- **Sibling repos.** Frontend + backend + library bind into one harness session via relative paths in harness.yaml. Cross-machine portable (relative paths survive `git clone`).
 
-- **Autoloop with adaptive interview and 4-gate convergence.** `/hm:loop` runs time-and-iteration-bounded loops. Before the first iteration, `autoloop-driver` reads the goal description, extracts already-answered dimensions (purpose / invariants / priority / stopping_criteria), and asks only what's missing — no fixed question script. It locks a loop intensity and explicit exit checklist, then requires mechanical checks, per-criterion LLM judgment, regression comparison, and a two-iteration convergence streak before accepting completion. A single worktree is shared across all iterations, and failed iterations preserve the worktree for inspection.
+### 🔁 Workflow primitives — *the rest of the toolchain*
 
-- **Refdocs search skill.** Register your project's reference folders (architecture docs, API specs, design docs) in `harness.yaml`. `/harness-maker:make` builds a local `docs_index.yaml`, and the `refdocs-search` skill gives the LLM lossless full-text search across registered folders — no chunking, no RAG index.
+- **Deep interview before every implementation.** `/hm:spec` runs a 6-category interview (Intent → Outcomes → In-Scope Scenarios → Non-Goals → Constraints → Verification) scored for completeness. `/hm:plan` runs a 9-category interview (scope → architecture → contract → risk → testing → phasing → dependencies → failure handling → observability) in impact order. Every settled decision promotes to a binding ADR.
+- **Autoloop with adaptive interview + 4-gate convergence.** `/hm:loop` runs time-and-iteration-bounded loops. `autoloop-driver` reads the goal, asks only what's missing, locks intensity + exit checklist, then requires mechanical checks + LLM judgment + regression comparison + 2-iter convergence streak before accepting completion.
+- **3-tier context loading + compaction recovery.** Hot tier (today's session) · Warm tier (failures + wiki first 60/40 lines) · Cold tier (git log / PLANs on demand). `PreCompact` hook flushes session before context compaction; next turn detects the marker and resumes from the last in-progress phase.
+- **Cross-process memory safety.** `.claude/memory/` writers serialise via re-entrant POSIX flock. Telemetry hooks append atomically via raw `os.write()` on `O_APPEND` (single-syscall, ≤PIPE_BUF) so concurrent Claude Code + Cursor sessions cannot interleave JSONL lines.
 
-- **SessionStart drift reminder.** A hook fires on every session open and warns if the running harness-maker version differs from the version that rendered the harness — so you notice when a `/plugin update` needs a re-render. The detector compares `harness.yaml.harness_maker_version` against the **latest plugin version cached on disk** (not just the imported `__version__`), so `/hm:health` and SessionStart agree even when the slash command runs against a pinned older version (0.6.2).
-
-- **Memory tier with cross-process safety.** `.claude/memory/` holds `episodic/` (per-day JSONL), `semantic.jsonl` (queryable index), `profile.json`, `wiki.md`, and `failures.md`. Concurrent writers from parallel sessions are serialised via a re-entrant POSIX flock — same thread can re-acquire without deadlock, different threads block normally (ADR-106, 0.7.1). Telemetry hooks append atomically via raw `os.write()` on `O_APPEND` (single-syscall, ≤ PIPE_BUF) so concurrent Claude Code + Cursor hooks cannot interleave JSONL lines.
-
-- **3-tier context loading + compaction recovery.** Every stage opens memory in tier order — Hot (`session/<today>.md`), Warm (`failures.md` + `wiki.md` first 60/40 lines), Cold (git log / PLANs on demand). `PreCompact` hook flushes the session to `session/<today>.md` with a `checkpoint:compaction` marker before Claude compacts context; the next turn detects the marker and resumes from the last in-progress phase without losing progress.
-
-- **2-pass redaction for review precision (+47 pp).** Reviewers run twice: Pass 1 strips PR title, author, and commit message so findings aren't anchored to metadata; Pass 2 restores full context and each reviewer validates or drops their Pass 1 findings. Findings absent from Pass 2 are dropped (CP10 contract). Ablation showed a +47 percentage-point precision gain on anchoring-prone diffs.
-
-- **Self-improving failure memory.** Every stage appends failure patterns (wrong API usage, broken convention, unexpected build failure) to `failures.md` with a count. When any failure slug reaches count ≥ 3, a proposal is automatically appended to `pending-proposals.md` — suggesting a new skill, rule, or hook that would have prevented the recurrence. The user reviews and decides whether to ingest.
-
-- **ADR system as binding execute constraints.** Architecture Decision Records promoted during `/hm:plan` are hard constraints — `/hm:execute` must not violate them. If a PLAN phase conflicts with an ADR, execute surfaces it as a blocker rather than silently proceeding. ADRs capture rejected alternatives and the reasoning, so future sessions don't re-litigate settled decisions.
-
-- **Cache miss classification (4 reasons).** The prompt-cache diagnostic layer reports why a cache miss occurred: `min_threshold` (content too short), `invalidation` (context changed), `ttl` (5-min TTL expired), or `first` (cold start). The 5% weight in the AI-readiness score distinguishes cold-start misses (benign) from structural misses (actionable), so you fix the right thing.
-
-- **Grade-based auto-fix loop.** `/hm:review` computes a grade (A–F) from `consensus-passed` P0/P1 findings and loops: apply fixes → re-review (selective — only re-spawn reviewers whose scope was touched) → regrade, until grade meets `grade_threshold` (default A) or `max_review_rounds` is exhausted. Failed fixes that break the build are automatically reverted and logged. Weak-consensus and manual-only findings are never auto-applied.
-
-- **Pre-LLM mechanical checks gate.** Add shell commands to `harness.yaml` once and they run at the start of every `/hm:review` — before any reviewer agent spawns. Stop-on-first: the first non-zero exit emits `## MECHANICAL_BLOCK: <cmd> exit=<N>`, halts the review, and exits `CHANGES_REQUESTED`. Lint clean and tests green are enforced mechanically, not by reviewer prompt. `--no-auto-fix` does not skip mechanical checks.
-
-- **Detection Depth** — 12+ stack/framework granularity (python/node/rust + java/kotlin/swift/dart/ruby/php/csharp/elixir/scala/c-cpp/zig/haskell), framework dep parsing, package_manager + ci_provider detection, manifest-mtime cache with 24h ceiling.
-
-- **Foreign AI Config Migration** — detect 6 known foreign configs (`.cursor/rules/`, `AGENTS.md`, `CLAUDE.md`, `.continue/config.json`, `.aider.conf.yml`, `.github/copilot-instructions.md`); LLM-driven import; `@hm:harness:*` inverted markers preserve user content across re-renders.
-
-- **Adaptive Personalization** — `/hm:health` Step 3 composite-score rubric (Bronze/Silver/Gold/Platinum) with evidence-bearing ActionItems; 100% local telemetry; SessionStart drift hint after 30 axis overrides or 14 days. (Absorbs the 0.12.x `/hm:personalization-audit` command; ADR-011 rubric unchanged.)
-
-- **Confidence-Bucketed Recommendation UI** — every detection declares its own confidence (HIGH/MEDIUM/LOW); high → silent yaml comment, medium → explicit prompt, low → no surface. Backward-compat regression test guards 0.11.x users from surprise silent-default changes.
-
-For the complete mechanics behind each feature — all procedures, decision paths, and internal invariants — see [**docs/HOW-IT-WORKS.md**](docs/HOW-IT-WORKS.md).
+For the complete mechanics — all procedures, decision paths, internal invariants — see [**docs/HOW-IT-WORKS.md**](docs/HOW-IT-WORKS.md).
 
 ---
 
