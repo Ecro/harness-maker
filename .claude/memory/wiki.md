@@ -1,6 +1,6 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.11.5
+harness_maker_version: 0.13.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: memory/wiki.ko.md.j2
 provenance: official
@@ -22,6 +22,21 @@ provenance: official
 ---
 
 <!-- @hm:user:entries -->
+## [wiki:pattern] harness-yaml-load-via-io-utils | 2026-05-17
+Rendered `.claude/harness.yaml` carries a provenance YAML frontmatter block (`generated_by`, `content_hash`, …) injected by `render.py:_format_frontmatter`. The resulting file is a **multi-document YAML stream**, so single-document `yaml.safe_load` rejects it (this was the root cause of the original Second Brain write failure — every CLI call crashed with `yaml.composer.ComposerError: expected a single document in the stream`). All new readers MUST use `harness_maker.io_utils.load_harness_yaml(path)` — it iterates `safe_load_all(text)`, filters out any doc with `generated_by: harness-maker` (so a truncated provenance-only write returns `{}` instead of leaking frontmatter keys as user data), and returns the last non-provenance mapping. The helper also raises `FileNotFoundError` for missing files and surfaces `yaml.YAMLError` for malformed content; callers do their own error translation. Reverse mapper: `interview.answers_from_harness_yaml`. Direct legacy callers tracked for migration in `docs/followups/io-utils-migration.md` (`verify.py`, `worktree.py`); `autoloop_driver.py` + `context_lint.py` handle different file types and are out of scope for ADR-001.
+
+## [wiki:gotcha] second-brain-smart-vault-and-degrade | 2026-05-17
+The Second Brain connector now has TWO layered behaviours that look identical from a casual read but are deliberately separated:
+
+1. **Smart vault detection** (`second_brain._validate_vault_existence`, ADR-002): when `vault_path` does not exist on disk, the connector accepts it **iff** `vault_path.parent / '.obsidian'` is a directory — the canonical "create a subfolder of my real Obsidian vault on first write" intent. A path whose parent has no `.obsidian/` raises `SecondBrainError("vault parent is not an Obsidian vault")`. Helper takes `harness_root` so relative `vault_path` values resolve identically to `_vault_root` (fix: same canonical path in check and use; prior to REVIEW-2026-05-17 the two diverged on relative paths).
+
+2. **Graceful degrade** (ADR-008): when `cfg.folders == []` (post-upgrade gap for users who rendered `harness.yaml` before this PR), `_load_config` returns the config cleanly + logs `second_brain.folders is empty — run /hm:configure to add at least one folder`; `search_notes` returns `[]` while emitting the same warning; `write_note` / `append_note` / `patch_note` raise `SecondBrainError(_EMPTY_FOLDERS_REMEDIATION)` whose message points at `/hm:configure`. The constant `_EMPTY_FOLDERS_REMEDIATION` is the single canonical string for this remediation hint — keep it that way.
+
+Auto-mkdir within configured folders (`write_note` line 145: `path.parent.mkdir(parents=True, exist_ok=True)`) is **intentional** (ADR-002 + Round 3 user lock-in) — once a folder is in `cfg.folders`, subdirs under it get created at first write. Do NOT gate this behind a flag without re-opening ADR-002.
+
+## [wiki:pattern] test-fixture-must-mirror-renderer | 2026-05-17
+The Second Brain crash went undetected because `tests/unit/test_second_brain.py:_write_harness_yaml` built `harness.yaml` via `yaml.safe_dump(payload)` — a single-document write with no provenance frontmatter. Real renderer output carries the frontmatter (see `[wiki:pattern] harness-yaml-load-via-io-utils`), so the unit suite passed while production was 100% broken. **Pattern**: whenever a fixture writes a file that the production code reads, the fixture must mirror the exact shape the renderer emits — including frontmatter. Defense-in-depth pair: (a) update the unit fixture (`_write_harness_yaml` now injects the frontmatter block, ADR-005), AND (b) add a render-based e2e test (`tests/integration/test_second_brain_e2e.py`) that calls `harness_maker.render.render` LIVE without snapshot-pinning so any future renderer-vs-consumer drift fails in CI. Snapshot-pinning the rendered bytes would defeat this — validator W8 in the PLAN's Plan Validation section spells out why.
+
 ## [wiki:pattern] orphan-sweep-content-hash-gating | 2026-05-17
 ADR-005 file-level analogue of `block_merge.py`'s `_orphans` block-level pattern. `reconcile()` runs a second pass that walks `.claude/`, `.cursor/`, `.codex/`, `.agents/`, root `AGENTS.md`; a file is deleted only when fingerprint matches "ours" via BOTH frontmatter `generated_by: harness-maker` AND `content_hash` recorded in `.hm-render-manifest.jsonl` (or, for frontmatter-less files, when disk SHA-256 matches a manifest entry for that path). Theirs / copy-paste / `.claude/observability/adaptive/*` always KEEP+warn. Writer and reader MUST use the same project-root-relative key — `_normalize_expected_path` (reconcile) and `_manifest_key_for` (render) are the canonical key derivers. Atomic append via `io_utils.atomic_append` (`os.open` + `os.write`, POSIX line-atomic under PIPE_BUF) — never buffered `open("a")` because TextIOWrapper can split.
 

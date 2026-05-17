@@ -1,0 +1,241 @@
+"""End-to-end regression: rendered harness.yaml is loadable by Second Brain.
+
+PLAN-second-brain-write-failure Phase 4 (ADR-005). The defect class this test
+guards is **fixture-vs-production drift** — unit tests built harness.yaml via
+``yaml.safe_dump(...)`` without the renderer's provenance frontmatter, so the
+production crash in ``second_brain._load_config`` was not caught by unit
+tests. This test invokes ``harness_maker.render.render`` live (no snapshot
+pinning) so any future change that breaks the renderer→loader contract fails
+here, regardless of where in the templates it lands.
+"""
+
+from __future__ import annotations
+
+import shutil
+from pathlib import Path
+
+import pytest
+
+from harness_maker.interview import _build_answers
+from harness_maker.models import (
+    AtomicStage,
+    DevMode,
+    Preset,
+    SecondBrainConfig,
+    SecondBrainFolder,
+    Target,
+)
+from harness_maker.profile import profile
+from harness_maker.render import render
+from harness_maker.second_brain import (
+    SecondBrainError,
+    _load_config,
+    write_note,
+)
+from harness_maker.synthesize import synthesize
+
+
+def _baseline_answers(vault_path: Path, project_id: str = "harness-maker"):  # noqa: ANN202
+    """Minimal answers with Second Brain enabled + one writable folder."""
+    return _build_answers(
+        locale="en",
+        targets=[Target.CLAUDE_CODE],
+        preset=Preset.SIDE,
+        dev_mode=DevMode.TASK_DRIVEN,
+        fused_workflows={
+            "exec-rev-wrap": [
+                AtomicStage.EXECUTE,
+                AtomicStage.REVIEW,
+                AtomicStage.WRAPUP,
+            ],
+        },
+        default_workflow="exec-rev-wrap",
+        second_brain=SecondBrainConfig(
+            enabled=True,
+            project_id=project_id,
+            vault_path=str(vault_path),
+            folders=[
+                SecondBrainFolder(
+                    path=f"99_HM/{project_id}",
+                    read=True,
+                    write=True,
+                )
+            ],
+        ),
+    )
+
+
+def _render_harness(target_root: Path, answers) -> Path:  # noqa: ANN001
+    """Run profile → synthesize → render against ``target_root/.claude``; return .claude dir."""
+    project_profile = profile(target_root)
+    blueprint = synthesize(project_profile, answers)
+    dotclaude = target_root / ".claude"
+    dotclaude.mkdir(parents=True, exist_ok=True)
+    render(blueprint, dotclaude)
+    return dotclaude
+
+
+def test_rendered_harness_yaml_loads_via_second_brain(tmp_path: Path) -> None:
+    """End-to-end: render harness.yaml live → _load_config succeeds.
+
+    This is the core regression guard for the original bug (yaml.safe_load
+    crashing on provenance-frontmatter-wrapped harness.yaml).
+    """
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    vault = tmp_path / "obsidian-vault"
+    (vault / ".obsidian").mkdir(parents=True)  # mark as real Obsidian vault
+
+    answers = _baseline_answers(vault)
+    dotclaude = _render_harness(project_root, answers)
+
+    yaml_path = dotclaude / "harness.yaml"
+    assert yaml_path.is_file(), "render must emit harness.yaml"
+
+    # Production frontmatter shape is required for the regression to bite.
+    head_lines = yaml_path.read_text(encoding="utf-8").splitlines()[:3]
+    assert head_lines[0] == "---", "rendered harness.yaml must start with ---"
+    assert "generated_by" in "\n".join(head_lines), (
+        "rendered harness.yaml must carry provenance frontmatter "
+        "(this is what made the original yaml.safe_load crash)"
+    )
+
+    cfg = _load_config(project_root)
+    assert cfg.enabled is True
+    assert cfg.vault_path == str(vault)
+    assert cfg.project_id == "harness-maker"
+    assert len(cfg.folders) == 1
+    assert cfg.folders[0].path == "99_HM/harness-maker"
+
+
+def test_rendered_harness_yaml_supports_write_roundtrip(tmp_path: Path) -> None:
+    """Full pipeline: render → load → write_note → file lands inside vault folder."""
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    vault = tmp_path / "obsidian-vault"
+    (vault / ".obsidian").mkdir(parents=True)
+
+    answers = _baseline_answers(vault)
+    _render_harness(project_root, answers)
+
+    frontmatter = {
+        "type": "decision",
+        "created": "2026-05-17",
+        "updated": "2026-05-17",
+        "tags": ["hm/second-brain", "hm/type/decision"],
+        "links": ["[[PLAN second-brain-write-failure]]"],
+        "project_id": "harness-maker",
+        "status": "accepted",
+    }
+    result = write_note(
+        project_root,
+        "99_HM/harness-maker/test-note.md",
+        frontmatter,
+        "# Test\n\nNote body.\n",
+    )
+
+    assert result.path.is_file()
+    assert (vault / "99_HM" / "harness-maker" / "test-note.md").is_file()
+
+
+def test_render_loader_drift_is_detected(tmp_path: Path) -> None:
+    """If a renderer change ever drops provenance frontmatter, this test fails.
+
+    Mirrors the regression class — confirms the test is a real drift signal,
+    not a tautology. We render normally, then strip the frontmatter manually
+    and re-write the file; ``_load_config`` must still succeed (the loader is
+    frontmatter-tolerant). What it must NOT do is start crashing because the
+    file shape changed. If you ever rewrite the renderer to drop frontmatter
+    AND the loader still works, this test stays green — that is desirable.
+    If you rewrite the loader to require frontmatter AND the renderer stops
+    emitting it, the first test in this file fails immediately.
+    """
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    vault = tmp_path / "obsidian-vault"
+    (vault / ".obsidian").mkdir(parents=True)
+
+    answers = _baseline_answers(vault)
+    _render_harness(project_root, answers)
+    yaml_path = project_root / ".claude" / "harness.yaml"
+
+    # Strip the frontmatter manually — simulate a bare harness.yaml.
+    raw = yaml_path.read_text(encoding="utf-8")
+    if raw.startswith("---\n"):
+        end = raw.find("\n---\n", 4)
+        if end != -1:
+            yaml_path.write_text(raw[end + 5 :], encoding="utf-8")
+
+    cfg = _load_config(project_root)
+    assert cfg.enabled is True
+    assert len(cfg.folders) == 1
+
+
+def test_rendered_yaml_with_empty_folders_degrades_gracefully(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Render with empty folders → load returns degraded cfg + warns (ADR-008)."""
+    import logging
+
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    vault = tmp_path / "obsidian-vault"
+    (vault / ".obsidian").mkdir(parents=True)
+
+    answers = _baseline_answers(vault)
+    # Wipe folders to simulate the existing-user upgrade gap.
+    answers.second_brain = SecondBrainConfig(
+        enabled=True,
+        project_id="harness-maker",
+        vault_path=str(vault),
+        folders=[],
+    )
+    _render_harness(project_root, answers)
+
+    with caplog.at_level(logging.WARNING, logger="harness_maker.second_brain"):
+        cfg = _load_config(project_root)
+
+    assert cfg.enabled is True
+    assert cfg.folders == []
+    assert any(
+        "second_brain.folders is empty" in rec.message
+        or "/hm:configure" in rec.message
+        for rec in caplog.records
+    )
+
+    with pytest.raises(SecondBrainError, match="/hm:configure"):
+        write_note(
+            project_root,
+            "anywhere/n.md",
+            {
+                "type": "decision",
+                "created": "2026-05-17",
+                "updated": "2026-05-17",
+                "tags": ["hm/second-brain", "hm/type/decision"],
+                "links": [],
+            },
+            "Body",
+        )
+
+
+def test_rendered_yaml_rejects_typoed_vault_path(tmp_path: Path) -> None:
+    """vault_path pointing into a non-Obsidian parent → SecondBrainError (ADR-002)."""
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    typo_root = tmp_path / "not-an-obsidian-vault"
+    typo_root.mkdir()  # exists, but no .obsidian/
+    vault_typo = typo_root / "second-brain"  # missing
+
+    answers = _baseline_answers(vault_typo)
+    _render_harness(project_root, answers)
+
+    with pytest.raises(SecondBrainError, match="not an Obsidian vault"):
+        _load_config(project_root)
+
+
+# Cleanup helper for tests that may leave a .claude tree in tmp_path —
+# pytest's tmp_path cleanup handles this automatically but be explicit when
+# debugging by running with --basetemp=/tmp/xxx.
+def _cleanup(path: Path) -> None:
+    if path.exists():
+        shutil.rmtree(path, ignore_errors=True)

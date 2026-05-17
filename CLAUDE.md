@@ -275,6 +275,12 @@ parser 가 받아들이는 형식을 따라야 함.
 - `.cursor-plugin/plugin.json` / `.claude-plugin/plugin.json` → 두
   marketplace 가 schema 검증. 알 수 없는 필드는 일반적으로 무시되나
   manifest 표준 외 키 추가 금지.
+- `.claude/harness.yaml` → 렌더러가 **provenance YAML frontmatter** 를
+  prefix 로 박는다 (`generated_by`, `content_hash`, …). 결과 파일은
+  multi-document YAML stream 이므로 단일 `yaml.safe_load` 는 거부한다.
+  새 reader 는 `harness_maker.io_utils.load_harness_yaml()` 헬퍼를 쓰거나,
+  `safe_load_all` 의 마지막 non-empty mapping 을 사용해야 한다.
+  Reverse mapper: `interview.answers_from_harness_yaml`.
 
 새 파일 종류 추가 시: 그 파일을 누가 읽는지 + 그 reader 가 frontmatter
 허용하는지 먼저 확인. 안 되면 `_is_pure_text` / `_is_hooks_json` 같은

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import sys
@@ -1519,6 +1520,128 @@ def _emit_verify_text(
 
 
 verify_stage = verify_stage_cmd
+
+
+@app.command("configure-second-brain")
+def configure_second_brain_cmd(
+    target: Path = typer.Argument(  # noqa: B008
+        default_factory=Path.cwd,
+        help="Target project directory (defaults to cwd)",
+    ),
+    check: bool = typer.Option(
+        False,
+        "--check",
+        help="Emit JSON state guidance for the slash command to render.",
+    ),
+    add_folder: str | None = typer.Option(
+        None,
+        "--add-folder",
+        help=(
+            "Add a writable Second Brain folder entry to harness.yaml. Path is "
+            "vault-relative and must contain project_id (see ADR-004)."
+        ),
+    ),
+) -> None:
+    """Inspect or extend Second Brain configuration (ADR-003 dispatch surface).
+
+    The slash command ``/hm:configure`` calls this subcommand with ``--check``
+    to inspect state, then dispatches user intent through ``--add-folder`` on
+    a second invocation. Pure stdin/stdout — no AskUserQuestion (slash command
+    owns the user interaction; this command only manipulates files).
+    """
+    from harness_maker.io_utils import load_harness_yaml
+    from harness_maker.models import SecondBrainConfig, SecondBrainFolder
+
+    yaml_path = target / ".claude" / "harness.yaml"
+    if not yaml_path.exists():
+        typer.echo(
+            json.dumps({"error": f"no harness.yaml at {yaml_path}"}),
+            err=True,
+        )
+        raise typer.Exit(code=2)
+    raw = load_harness_yaml(yaml_path)
+    sb_block: dict[str, Any] = raw.get("second_brain") or {}
+    try:
+        cfg = SecondBrainConfig.model_validate(sb_block)
+    except Exception as exc:  # noqa: BLE001 — surface YAML validation issues
+        typer.echo(json.dumps({"error": f"invalid second_brain block: {exc}"}), err=True)
+        raise typer.Exit(code=2) from exc
+
+    if check:
+        default_suggestion = (
+            f"99_HM/{cfg.project_id}" if cfg.project_id else ""
+        )
+        guidance = {
+            "enabled": cfg.enabled,
+            "vault_path": cfg.vault_path,
+            "project_id": cfg.project_id,
+            "folders_empty": len(cfg.folders) == 0,
+            "folder_count": len(cfg.folders),
+            "default_suggestion": default_suggestion,
+        }
+        typer.echo(json.dumps(guidance))
+        return
+
+    if add_folder is not None:
+        cleaned = add_folder.strip()
+        if not cleaned:
+            typer.echo(json.dumps({"error": "--add-folder requires a path"}), err=True)
+            raise typer.Exit(code=2)
+        existing_folders = sb_block.get("folders", []) or []
+        if any(
+            isinstance(f, dict) and f.get("path") == cleaned for f in existing_folders
+        ):
+            typer.echo(
+                json.dumps(
+                    {"already_present": cleaned, "folder_count": len(cfg.folders)}
+                )
+            )
+            return
+        new_folder = SecondBrainFolder(path=cleaned, read=True, write=True)
+        merged_folders = [*existing_folders, new_folder.model_dump(mode="json")]
+        updated = SecondBrainConfig.model_validate(
+            {**sb_block, "folders": merged_folders}
+        )
+        new_body_yaml = yaml.safe_dump(
+            {**raw, "second_brain": updated.model_dump(mode="json")},
+            sort_keys=False,
+            allow_unicode=True,
+        )
+        # Preserve the provenance frontmatter shape while recomputing content_hash
+        # — otherwise the reconciler sees a stale hash and treats harness.yaml as
+        # user-modified, blocking future re-renders (REVIEW-2026-05-17 finding).
+        text = yaml_path.read_text(encoding="utf-8")
+        frontmatter_block = ""
+        if text.startswith("---\n"):
+            end = text.find("\n---\n", 4)
+            if end != -1:
+                raw_fm_text = text[len("---\n") : end]
+                fm_data = yaml.safe_load(raw_fm_text) or {}
+                if isinstance(fm_data, dict):
+                    fm_data["content_hash"] = hashlib.sha256(
+                        new_body_yaml.encode("utf-8")
+                    ).hexdigest()
+                    frontmatter_block = (
+                        "---\n"
+                        + yaml.safe_dump(
+                            fm_data,
+                            sort_keys=False,
+                            allow_unicode=True,
+                            default_flow_style=False,
+                        )
+                        + "---\n"
+                    )
+                else:
+                    frontmatter_block = text[: end + len("\n---\n")]
+        atomic_write(yaml_path, frontmatter_block + new_body_yaml)
+        typer.echo(json.dumps({"added": cleaned, "folder_count": len(updated.folders)}))
+        return
+
+    typer.echo(
+        json.dumps({"error": "pass --check or --add-folder"}),
+        err=True,
+    )
+    raise typer.Exit(code=2)
 
 
 @app.command(hidden=True)

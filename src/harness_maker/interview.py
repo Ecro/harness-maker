@@ -34,6 +34,7 @@ from harness_maker.models import (
     Recommendation,
     RefFolder,
     SecondBrainConfig,
+    SecondBrainFolder,
     Target,
     auto_workflow_name,
 )
@@ -465,9 +466,10 @@ def _ask_sibling_repos() -> list[str]:
 def _ask_second_brain() -> SecondBrainConfig:
     """Ask whether to connect an Obsidian vault as Second Brain.
 
-    Blank vault_path skips (disabled). project_id is required only when
-    writable folders will be configured later — we don't ask for folders here;
-    the user adds them directly to harness.yaml after initial setup.
+    Blank vault_path skips (disabled). When vault_path + project_id are both
+    set, the user is also prompted for the writable-folder path so the
+    rendered harness.yaml is immediately functional (ADR-003 enforcement
+    at interview entry). Default suggestion: ``99_HM/{project_id}/`` (ADR-004).
     """
     print("\nObsidian Second Brain (connect a Markdown vault for stage-aware memory).")
     print("  Vault path: absolute or ~-relative path to the Obsidian vault root.")
@@ -481,10 +483,27 @@ def _ask_second_brain() -> SecondBrainConfig:
     project_id_raw = _input_or_empty(
         "  project_id (kebab-case, e.g. my-app — blank to omit): "
     ).strip()
+    folders: list[SecondBrainFolder] = []
+    if project_id_raw:
+        default_folder = f"99_HM/{project_id_raw}"
+        print(
+            "  Note folder (vault-relative path where harness writes durable "
+            "notes — must contain project_id)."
+        )
+        folder_raw = _input_or_empty(f"  folder [{default_folder}]: ").strip()
+        folder_path = folder_raw or default_folder
+        folders = [
+            SecondBrainFolder(
+                path=folder_path,
+                read=True,
+                write=True,
+            )
+        ]
     return SecondBrainConfig(
         enabled=True,
         vault_path=denormalize_home_to_tilde(vault_raw),
         project_id=project_id_raw,
+        folders=folders,
     )
 
 

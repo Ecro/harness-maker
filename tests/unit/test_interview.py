@@ -7,7 +7,7 @@ from collections.abc import Iterator
 
 import pytest
 
-from harness_maker.interview import answers_from_harness_yaml, interview
+from harness_maker.interview import _ask_second_brain, answers_from_harness_yaml, interview
 from harness_maker.models import (
     AtomicStage,
     Confidence,
@@ -17,6 +17,7 @@ from harness_maker.models import (
     ProjectProfile,
     Recommendation,
     RecommendationEvidence,
+    SecondBrainFolder,
     Target,
 )
 
@@ -657,3 +658,81 @@ def test_load_0_11_x_production_yaml_zero_diff_on_legacy_axes(
     assert answers.second_brain.enabled is False
     # mechanical_checks absent → empty list
     assert answers.mechanical_checks == []
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 — Interview folder enforcement (ADR-003 / ADR-004)
+# ---------------------------------------------------------------------------
+
+
+def test_ask_second_brain_proposes_default_folder_with_project_id(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    """When vault_path + project_id are set, the interview enforces a folder entry.
+
+    ADR-003 says folder configuration is enforced at interview entry, with the
+    default proposal from ADR-004 (99_HM/{project_id}/). Accepting the default
+    must produce a writable folder validator can satisfy.
+    """
+    vault = tmp_path / "obsidian-vault"
+    vault.mkdir()
+    inputs = iter(
+        [
+            str(vault),  # vault_path
+            "test-project",  # project_id
+            "",  # accept default folder path (blank → default)
+        ]
+    )
+    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
+
+    cfg = _ask_second_brain()
+
+    assert cfg.enabled is True
+    assert cfg.project_id == "test-project"
+    assert len(cfg.folders) == 1
+    folder = cfg.folders[0]
+    assert isinstance(folder, SecondBrainFolder)
+    assert folder.path == "99_HM/test-project"
+    assert folder.write is True
+
+
+def test_ask_second_brain_skips_folder_when_project_id_absent(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    """No project_id → no default folder (validator requires project_id in path)."""
+    vault = tmp_path / "obsidian-vault"
+    vault.mkdir()
+    inputs = iter(
+        [
+            str(vault),  # vault_path
+            "",  # project_id blank
+        ]
+    )
+    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
+
+    cfg = _ask_second_brain()
+
+    assert cfg.enabled is True
+    assert cfg.project_id == ""
+    assert cfg.folders == []
+
+
+def test_ask_second_brain_accepts_custom_folder_path(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: pathlib.Path
+) -> None:
+    """User can override the default folder path during interview."""
+    vault = tmp_path / "obsidian-vault"
+    vault.mkdir()
+    inputs = iter(
+        [
+            str(vault),
+            "my-proj",
+            "Projects/my-proj/notes",  # override default
+        ]
+    )
+    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
+
+    cfg = _ask_second_brain()
+
+    assert len(cfg.folders) == 1
+    assert cfg.folders[0].path == "Projects/my-proj/notes"

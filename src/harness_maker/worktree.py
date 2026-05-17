@@ -307,6 +307,7 @@ def cleanup_all(base_dir: Path, force: bool = False) -> int:
 
 def _scope_includes(harness_yaml: Path, stage: str) -> bool:
     """Read harness.yaml; return True iff worktree.scope includes the stage."""
+    # TODO(io-utils-migration): use harness_maker.io_utils.load_harness_yaml.
     try:
         text = harness_yaml.read_text(encoding="utf-8")
     except OSError:
@@ -332,6 +333,7 @@ _EXECUTE_MD_REL = Path(".claude") / "commands" / "hm" / "execute.md"
 
 def _load_sibling_dirs(harness_yaml: Path, base: Path) -> list[Path]:
     """Read sibling_repos from harness.yaml; resolve relative paths against base."""
+    # TODO(io-utils-migration): use harness_maker.io_utils.load_harness_yaml.
     try:
         text = harness_yaml.read_text(encoding="utf-8")
     except OSError:

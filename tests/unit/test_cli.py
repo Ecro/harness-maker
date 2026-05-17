@@ -749,3 +749,202 @@ def test_make_update_clear_and_remove_real_tmp_project(tmp_path: Path) -> None:
     assert (claude / "harness.yaml").is_file()
     assert not (claude / ".harness-manifest.json").exists()
     assert not (claude / "commands" / "hm" / "make.md").exists()
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 — configure-second-brain CLI subcommand (ADR-003)
+# ---------------------------------------------------------------------------
+
+
+def _write_provenance_harness_yaml(project: Path, body: str) -> None:
+    """Mirror the renderer's provenance-frontmatter shape for fixture parity."""
+    claude = project / ".claude"
+    claude.mkdir(parents=True, exist_ok=True)
+    frontmatter = (
+        "---\n"
+        "generated_by: harness-maker\n"
+        "harness_maker_version: 0.13.0\n"
+        "generated_at: '2026-01-01T00:00:00+00:00'\n"
+        "source_template: harness-yaml/Side.yaml.j2\n"
+        "provenance: official\n"
+        "content_hash: " + "0" * 64 + "\n"
+        "---\n"
+    )
+    (claude / "harness.yaml").write_text(frontmatter + body, encoding="utf-8")
+
+
+def test_configure_second_brain_check_emits_guidance_when_folders_empty(
+    tmp_path: Path,
+) -> None:
+    """--check on a folders=[] harness.yaml returns JSON with folders_empty=true."""
+    body = (
+        "preset: Side\n"
+        "second_brain:\n"
+        "  enabled: true\n"
+        "  vault_path: /tmp/vault\n"
+        "  project_id: harness-maker\n"
+        "  folders: []\n"
+    )
+    _write_provenance_harness_yaml(tmp_path, body)
+
+    result = runner.invoke(
+        app, ["configure-second-brain", str(tmp_path), "--check"]
+    )
+
+    assert result.exit_code == 0, result.output
+    guidance = json.loads(result.output)
+    assert guidance["folders_empty"] is True
+    assert guidance["folder_count"] == 0
+    assert guidance["default_suggestion"] == "99_HM/harness-maker"
+    assert guidance["enabled"] is True
+
+
+def test_configure_second_brain_check_reports_existing_folder(tmp_path: Path) -> None:
+    """--check on a populated config reports folders_empty=False."""
+    body = (
+        "preset: Side\n"
+        "second_brain:\n"
+        "  enabled: true\n"
+        "  vault_path: /tmp/vault\n"
+        "  project_id: harness-maker\n"
+        "  folders:\n"
+        "    - path: 99_HM/harness-maker\n"
+        "      read: true\n"
+        "      write: true\n"
+    )
+    _write_provenance_harness_yaml(tmp_path, body)
+
+    result = runner.invoke(
+        app, ["configure-second-brain", str(tmp_path), "--check"]
+    )
+
+    assert result.exit_code == 0, result.output
+    guidance = json.loads(result.output)
+    assert guidance["folders_empty"] is False
+    assert guidance["folder_count"] == 1
+
+
+def test_configure_second_brain_add_folder_writes_entry(tmp_path: Path) -> None:
+    """--add-folder appends a writable folder entry to harness.yaml."""
+    body = (
+        "preset: Side\n"
+        "second_brain:\n"
+        "  enabled: true\n"
+        "  vault_path: /tmp/vault\n"
+        "  project_id: harness-maker\n"
+        "  folders: []\n"
+    )
+    _write_provenance_harness_yaml(tmp_path, body)
+
+    result = runner.invoke(
+        app,
+        [
+            "configure-second-brain",
+            str(tmp_path),
+            "--add-folder",
+            "99_HM/harness-maker",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["added"] == "99_HM/harness-maker"
+    assert payload["folder_count"] == 1
+
+    # Re-running --check after the write reports folders_empty=False.
+    check = runner.invoke(app, ["configure-second-brain", str(tmp_path), "--check"])
+    assert check.exit_code == 0
+    assert json.loads(check.output)["folders_empty"] is False
+
+
+def test_configure_second_brain_errors_when_harness_yaml_missing(
+    tmp_path: Path,
+) -> None:
+    """Missing harness.yaml → exit 2 with JSON error (ADR-003 — actionable failure)."""
+    result = runner.invoke(app, ["configure-second-brain", str(tmp_path), "--check"])
+
+    assert result.exit_code == 2
+    payload = json.loads(result.stderr if hasattr(result, "stderr") else result.output)
+    assert "no harness.yaml" in payload.get("error", "")
+
+
+def test_configure_second_brain_requires_a_subcommand_flag(tmp_path: Path) -> None:
+    """Invoking with neither --check nor --add-folder fails with exit 2."""
+    body = "preset: Side\nsecond_brain:\n  enabled: false\n"
+    _write_provenance_harness_yaml(tmp_path, body)
+
+    result = runner.invoke(app, ["configure-second-brain", str(tmp_path)])
+
+    assert result.exit_code == 2
+    # message is on stderr, but typer's CliRunner mixes streams by default
+    combined = (result.output or "") + (
+        result.stderr if hasattr(result, "stderr") else ""
+    )
+    assert "--check" in combined or "--add-folder" in combined
+
+
+def test_configure_second_brain_add_folder_is_idempotent(tmp_path: Path) -> None:
+    """REVIEW-2026-05-17 P2: --add-folder must dedupe, not append a duplicate."""
+    body = (
+        "preset: Side\n"
+        "second_brain:\n"
+        "  enabled: true\n"
+        "  vault_path: /tmp/vault\n"
+        "  project_id: harness-maker\n"
+        "  folders: []\n"
+    )
+    _write_provenance_harness_yaml(tmp_path, body)
+
+    args = ["configure-second-brain", str(tmp_path), "--add-folder", "99_HM/harness-maker"]
+    first = runner.invoke(app, args)
+    assert first.exit_code == 0
+    assert json.loads(first.output)["folder_count"] == 1
+
+    second = runner.invoke(app, args)
+    assert second.exit_code == 0
+    payload = json.loads(second.output)
+    assert payload.get("already_present") == "99_HM/harness-maker"
+    assert payload["folder_count"] == 1
+
+
+def test_configure_second_brain_add_folder_refreshes_content_hash(
+    tmp_path: Path,
+) -> None:
+    """REVIEW-2026-05-17 P1: content_hash must match the new body so the
+    reconciler does not silently mark harness.yaml as user-modified.
+    """
+    import hashlib
+
+    import yaml as _yaml
+
+    body = (
+        "preset: Side\n"
+        "second_brain:\n"
+        "  enabled: true\n"
+        "  vault_path: /tmp/vault\n"
+        "  project_id: harness-maker\n"
+        "  folders: []\n"
+    )
+    _write_provenance_harness_yaml(tmp_path, body)
+
+    result = runner.invoke(
+        app,
+        [
+            "configure-second-brain",
+            str(tmp_path),
+            "--add-folder",
+            "99_HM/harness-maker",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+
+    text = (tmp_path / ".claude" / "harness.yaml").read_text(encoding="utf-8")
+    assert text.startswith("---\n")
+    end = text.find("\n---\n", 4)
+    raw_fm = _yaml.safe_load(text[4:end])
+    raw_body = text[end + len("\n---\n"):]
+    expected_hash = hashlib.sha256(raw_body.encode("utf-8")).hexdigest()
+    assert raw_fm["content_hash"] == expected_hash, (
+        f"content_hash in frontmatter ({raw_fm['content_hash']!r}) must equal "
+        f"sha256(body) ({expected_hash!r}); stale hash blocks reconciler re-render"
+    )

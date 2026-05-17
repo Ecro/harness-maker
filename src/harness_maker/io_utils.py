@@ -5,6 +5,9 @@ from __future__ import annotations
 import os
 import tempfile
 from pathlib import Path
+from typing import Any
+
+import yaml
 
 
 def denormalize_home_to_tilde(path_str: str) -> str:
@@ -82,3 +85,36 @@ def atomic_append(path: Path, line: str) -> None:
         os.write(fd, data)
     finally:
         os.close(fd)
+
+
+def load_harness_yaml(path: Path) -> dict[str, Any]:
+    """Load `harness.yaml` while tolerating the renderer's provenance frontmatter.
+
+    Why: `render.py:_format_frontmatter` prepends a YAML provenance block
+    (``generated_by``, ``content_hash``, …) to every rendered ``harness.yaml``.
+    The resulting file is a *multi-document* YAML stream and ``yaml.safe_load``
+    rejects it. Consumers (second_brain, verify, worktree, …) historically each
+    invented their own parse strategy; this helper centralises it so the
+    contract stops drifting. The user-data body is the LAST non-provenance
+    mapping document — provenance always comes first and is filtered out so a
+    truncated file (provenance written, body not yet flushed — possible on
+    WSL2/NTFS partial writes) does not return provenance keys as user data.
+
+    Returns ``{}`` for empty files, files with no top-level mapping, and any
+    YAML that yields only non-mapping documents. Raises ``FileNotFoundError``
+    when the file is absent and ``yaml.YAMLError`` when the content is
+    structurally invalid.
+    """
+    text = path.read_text(encoding="utf-8")
+    last_mapping: dict[str, Any] = {}
+    for doc in yaml.safe_load_all(text):
+        if not isinstance(doc, dict):
+            continue
+        # Skip the renderer-injected provenance doc — see ADR-005 (frontmatter
+        # invariant). Identifying it by `generated_by: harness-maker` is
+        # tighter than positional ("first doc"); also avoids accidentally
+        # treating a provenance-only truncated write as valid user data.
+        if doc.get("generated_by") == "harness-maker":
+            continue
+        last_mapping = doc
+    return last_mapping

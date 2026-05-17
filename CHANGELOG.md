@@ -1,5 +1,50 @@
 # Changelog
 
+## Unreleased — Second Brain write-failure fix (PLAN-second-brain-write-failure)
+
+### Fixed
+- `second_brain._load_config` no longer crashes with
+  `yaml.composer.ComposerError: expected a single document in the stream` on
+  rendered `harness.yaml` files. Root cause: the renderer prepends a
+  provenance YAML frontmatter block, making `harness.yaml` a multi-document
+  stream that single-document `yaml.safe_load` rejects. Every `/hm:research`,
+  `/hm:wrapup`, and `/hm:plan` Second Brain invocation previously failed
+  immediately. (ADR-001)
+
+### Added
+- `harness_maker.io_utils.load_harness_yaml(path)` — central provenance-
+  frontmatter-aware loader for `harness.yaml`. Used by `second_brain`; a
+  staged migration tracker (`docs/followups/io-utils-migration.md`) covers
+  the remaining direct readers. (ADR-001 + ADR-007)
+- Smart vault detection in `_load_config` (ADR-002): when `vault_path` does
+  not exist on disk, accept it iff the parent is a real Obsidian vault
+  (`.obsidian/` present) — the subdir is created on first write. A typo'd
+  path with no Obsidian-vault parent fails loudly.
+- Graceful degrade for `folders: []` (ADR-008): `_load_config` returns a
+  degraded config + logs a remediation warning; `search_notes` returns `[]`
+  + warns; `write_note` / `append_note` / `patch_note` raise
+  `SecondBrainError` whose message points to `/hm:configure`.
+- Interview folder enforcement (ADR-003): `_ask_second_brain` now prompts
+  for a writable folder when `vault_path + project_id` are set, defaulting
+  to `99_HM/{project_id}/` (ADR-004 — matches the `99_*/01_*` Obsidian
+  organization style).
+- `configure-second-brain` CLI subcommand (slash-command dispatch surface):
+  `--check` emits guidance JSON; `--add-folder <path>` appends a writable
+  folder entry to `harness.yaml`.
+- `tests/integration/test_second_brain_e2e.py` — live render → load
+  regression net. No snapshot pinning, so any future renderer-vs-loader
+  drift fails here.
+
+### Changed — testing
+- `tests/unit/test_second_brain.py:_write_harness_yaml` now injects the
+  provenance frontmatter block, mirroring real renderer output. Previous
+  fixture omitted it, which is why the production crash went undetected.
+  (ADR-005)
+
+### Docs
+- `CLAUDE.md` "외부 소비자의 파서 정합성" list now includes
+  `.claude/harness.yaml` with explicit pointer to `load_harness_yaml`.
+
 ## 0.13.0 — health consolidation (PLAN-health-consolidation)
 
 ### Added — Phase 0 (framework groundwork)

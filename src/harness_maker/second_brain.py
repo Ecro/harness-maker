@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import re
 import sys
 from dataclasses import dataclass
@@ -16,8 +17,10 @@ from typing import Any
 
 import yaml
 
-from harness_maker.io_utils import atomic_write
+from harness_maker.io_utils import atomic_write, load_harness_yaml
 from harness_maker.models import SecondBrainConfig, SecondBrainFolder, SecondBrainNoteType
+
+logger = logging.getLogger(__name__)
 
 _FRONTMATTER_OPEN = "---\n"
 _FRONTMATTER_CLOSE = "\n---\n"
@@ -25,6 +28,9 @@ _WIKILINK_RE = re.compile(r"\[\[[^\]\n]+?\]\]")
 _MARKDOWN_EXTS = {".md", ".markdown"}
 _TYPE_TAG_PREFIX = "hm/type/"
 _SECOND_BRAIN_TAG = "hm/second-brain"
+_EMPTY_FOLDERS_REMEDIATION = (
+    "second_brain.folders is empty — run /hm:configure to add at least one folder"
+)
 
 _RECOMMENDED_FIELDS: dict[str, tuple[str, ...]] = {
     "decision": ("status", "related_projects", "supersedes"),
@@ -137,6 +143,8 @@ def write_note(
     body: str,
 ) -> WriteResult:
     cfg = _load_config(harness_root)
+    if not cfg.folders:
+        raise SecondBrainError(_EMPTY_FOLDERS_REMEDIATION)
     path, folder = _resolve_authorized(harness_root, cfg, relpath, mode="write")
     _require_markdown(path)
     _ensure_type_allowed(frontmatter, folder)
@@ -149,6 +157,8 @@ def write_note(
 
 def append_note(harness_root: Path, relpath: str, text: str) -> WriteResult:
     cfg = _load_config(harness_root)
+    if not cfg.folders:
+        raise SecondBrainError(_EMPTY_FOLDERS_REMEDIATION)
     path, folder = _resolve_authorized(harness_root, cfg, relpath, mode="write")
     _require_markdown(path)
     existing = path.read_text(encoding="utf-8") if path.exists() else ""
@@ -163,6 +173,8 @@ def append_note(harness_root: Path, relpath: str, text: str) -> WriteResult:
 
 def patch_note(harness_root: Path, relpath: str, old_text: str, new_text: str) -> WriteResult:
     cfg = _load_config(harness_root)
+    if not cfg.folders:
+        raise SecondBrainError(_EMPTY_FOLDERS_REMEDIATION)
     path, folder = _resolve_authorized(harness_root, cfg, relpath, mode="write")
     _require_markdown(path)
     existing = path.read_text(encoding="utf-8")
@@ -229,15 +241,47 @@ def _load_config(harness_root: Path) -> SecondBrainConfig:
     yaml_path = harness_root / ".claude" / "harness.yaml"
     if not yaml_path.exists():
         raise SecondBrainError(f"no harness.yaml at {yaml_path}")
-    data = yaml.safe_load(yaml_path.read_text(encoding="utf-8")) or {}
-    if not isinstance(data, dict):
-        raise SecondBrainError("harness.yaml is not a mapping")
+    # Why load_harness_yaml: rendered harness.yaml carries a provenance
+    # frontmatter block, so it is a multi-document YAML stream that
+    # yaml.safe_load rejects. See io_utils.load_harness_yaml.
+    data = load_harness_yaml(yaml_path)
     cfg = SecondBrainConfig.model_validate(data.get("second_brain") or {})
     if not cfg.enabled:
         raise SecondBrainError("second_brain is disabled")
     if not cfg.vault_path:
         raise SecondBrainError("second_brain.vault_path is required")
+    _validate_vault_existence(harness_root, cfg)
+    if not cfg.folders:
+        logger.warning(_EMPTY_FOLDERS_REMEDIATION)
     return cfg
+
+
+def _validate_vault_existence(harness_root: Path, cfg: SecondBrainConfig) -> None:
+    """Smart vault check (ADR-002): accept missing subdir if parent is an Obsidian vault.
+
+    The user's intent of pointing at a not-yet-created subfolder of a real Obsidian
+    vault (the canonical Second Brain pattern) is honoured — the subdir gets created
+    at first write. A typo'd path whose parent is not an Obsidian vault fails loudly.
+
+    Resolves relative vault_path values against ``harness_root`` to match
+    ``_vault_root`` — otherwise a relative path would resolve against cwd here
+    and against harness_root downstream, producing a divergent check.
+    """
+    vault = _vault_root(harness_root, cfg)
+    if vault.exists():
+        return
+    parent_obsidian = vault.parent / ".obsidian"
+    if parent_obsidian.is_dir():
+        logger.warning(
+            "vault parent has .obsidian/ but the configured subdir %s does not exist "
+            "— it will be created on first write",
+            vault,
+        )
+        return
+    raise SecondBrainError(
+        f"vault parent is not an Obsidian vault (no .obsidian/ at {vault.parent}); "
+        f"create {vault} manually or fix second_brain.vault_path"
+    )
 
 
 def _vault_root(harness_root: Path, cfg: SecondBrainConfig) -> Path:

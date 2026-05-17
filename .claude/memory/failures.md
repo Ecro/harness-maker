@@ -1,6 +1,6 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.11.5
+harness_maker_version: 0.13.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: memory/failures.ko.md.j2
 provenance: official
@@ -23,6 +23,12 @@ provenance: official
 ---
 
 <!-- @hm:user:entries -->
+## [fail:design] yaml-safe-load-on-multi-doc-harness-yaml | 2026-05-17 | count:1
+`second_brain._load_config` used single-document `yaml.safe_load` against `.claude/harness.yaml`, which the renderer always wraps in a provenance frontmatter block (`generated_by`, `content_hash`, …). The resulting file is a multi-document YAML stream, so every Second Brain CLI invocation crashed with `yaml.composer.ComposerError: expected a single document in the stream`. The user reported "Obsidian에 저장이 안 되던데" — the connector had been 100% non-functional since whenever the provenance frontmatter contract landed. Fix: `harness_maker.io_utils.load_harness_yaml(path)` central helper (`safe_load_all`, filter `generated_by: harness-maker` docs, return last non-provenance mapping). Pattern guard: any new `harness.yaml` reader MUST import the helper instead of rolling its own — CLAUDE.md §"외부 소비자의 파서 정합성 확인" now lists `.claude/harness.yaml` explicitly with the provenance-frontmatter contract called out, and `docs/followups/io-utils-migration.md` tracks the staged migration of pre-existing direct readers (`verify.py`, `worktree.py`).
+
+## [fail:test] unit-fixture-skips-renderer-frontmatter | 2026-05-17 | count:1
+`tests/unit/test_second_brain.py:_write_harness_yaml` built fixture harness.yaml via `yaml.safe_dump(payload)` — single-document, no provenance frontmatter. Production reads renderer output which always carries the frontmatter block. Result: unit suite passed for months while production crashed on every CLI call. Fixture-vs-production drift is a recurring class — the same defect would catch any new file type the renderer writes (frontmatter-wrapped) and any new consumer test that fakes the file shape. Fix (defense-in-depth pair): (a) update `_write_harness_yaml` to inject the provenance frontmatter, (b) add `tests/integration/test_second_brain_e2e.py` that invokes `harness_maker.render.render` LIVE without snapshot-pinning so future renderer-vs-consumer drift fails in CI. Snapshot-pinning the rendered bytes would defeat the test's purpose — the security/code review's W8 finding explicitly documents this trap.
+
 ## [fail:design] yaml-key-value-name-mismatch-llm-footgun | 2026-05-15 | count:1
 harness.yaml's snake_case YAML key `work_docs:` has a hyphenated value `work-docs/` — LLMs reading the config in an ad-hoc session (no stage template loaded) wrote `work_docs/PLAN-...md` (snake_case directory) instead of `work-docs/PLAN-...md`. Observed in `~/edge_testfarm_os/work_docs/PLAN-daily-architecture-review-20260514.md` with frontmatter `validator_outcome: SELF_REVIEW` (NOT a /hm:plan standard value) + no `harness_maker_version` — confirms ad-hoc-LLM not /hm:plan-pipeline origin. **No literal `work_docs/` directory reference exists anywhere in src/.** Pattern: one-character name asymmetry between YAML key and value is an LLM footgun, regardless of which convention is "right" (snake_case vs kebab-case). Fix landed in 0.11.6: two-layer guardrail — preventive warning paragraph in 4 stage templates' `## Outputs` (Layer 1) + non-blocking bash probe in `verify.md.j2` stage body (Layer 2, NOT in the `verify-before-completion` SKILL — preserving "6 checks" doc-truth invariant). Pattern guard: when designing a new harness.yaml key whose value is a path, prefer aligning key name to value name to eliminate the disambiguation cost entirely (`plans_dir: plans/` over `plans-dir: plans/`).
 

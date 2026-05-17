@@ -237,6 +237,19 @@ def test_second_brain_folder_rejects_absolute_path() -> None:
         SecondBrainFolder(path="/Users/noel/Vault", read=True)
 
 
+def test_second_brain_folder_rejects_dot_dot_traversal() -> None:
+    """REVIEW-2026-05-17 security finding: '..' segments must be blocked.
+
+    Without this guard, --add-folder ../escape could persist a traversal
+    path into harness.yaml; downstream search_notes would then iterate
+    Markdown files outside the vault boundary.
+    """
+    with pytest.raises(ValidationError, match="\\.\\.|traversal"):
+        SecondBrainFolder(path="../escape", read=True)
+    with pytest.raises(ValidationError, match="\\.\\.|traversal"):
+        SecondBrainFolder(path="Projects/../../outside", read=True)
+
+
 def test_harness_config_carries_second_brain_config() -> None:
     cfg = HarnessConfig(
         second_brain=SecondBrainConfig(

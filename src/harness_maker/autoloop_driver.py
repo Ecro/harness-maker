@@ -230,6 +230,8 @@ def parse_goal(goal: str) -> list[Feature]:
     return [Feature(name=stripped)] if stripped else []
 
 
+# TODO(io-utils-migration): different file type (loop-spec/loop-context, not
+# harness.yaml). Out of scope for ADR-001 — see docs/followups/io-utils-migration.md.
 def _strip_frontmatter(raw: str) -> str:
     """Remove provenance frontmatter (--- ... ---) if present."""
     if raw.startswith("---\n"):

@@ -282,6 +282,13 @@ class SecondBrainFolder(BaseModel):
             raise ValueError("second_brain folder path cannot be empty")
         if Path(cleaned).is_absolute() or cleaned.startswith("~"):
             raise ValueError("second_brain folder path must be relative to vault_path")
+        # Block `..` traversal — otherwise a folder path with parent-dir segments
+        # could be persisted into harness.yaml and used as a runtime allowlist root
+        # outside the vault boundary (REVIEW-2026-05-17 security finding).
+        if ".." in Path(cleaned).parts:
+            raise ValueError(
+                "second_brain folder path must not contain '..' segments"
+            )
         return cleaned
 
     @field_validator("note_types", mode="before")

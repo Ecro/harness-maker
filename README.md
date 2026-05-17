@@ -380,6 +380,7 @@ All adaptive features are 100% local. `tests/unit/test_no_network.py` asserts no
 
 Run `/harness-maker:make` again and choose **Update** (same settings, pick up template improvements) or **Full reconfigure** to change any dimension.
 
+<a id="second-brain-setup"></a>
 ### Obsidian Second Brain
 
 `second_brain` connects a Markdown/Obsidian vault as a typed knowledge graph for
@@ -393,6 +394,31 @@ backup. For multiple projects sharing one vault, give every project a distinct
 (for example `Projects/my-app`). harness-maker rejects writable Second Brain
 folders that do not include the configured `project_id`, which keeps one
 project from writing into another project's note namespace.
+
+**Setup walkthrough**
+
+1. **At interview time** — when prompted for `vault_path`, supply the absolute
+   path to your Obsidian vault root (or a not-yet-created subfolder of it; the
+   harness creates the subfolder on first write iff the parent has
+   `.obsidian/`). The interview then asks for `project_id` and a writable
+   folder, defaulting to `99_HM/{project_id}/` (matches the `99_*/01_*`
+   numeric-prefix organization style).
+2. **Post-install adjustment** — run `/hm:configure` to revisit Second Brain
+   settings. The slash command dispatches to
+   `harness-maker configure-second-brain --check`, which inspects state and
+   returns guidance JSON so the slash command can prompt only when something
+   is missing. To add a folder non-interactively, call
+   `harness-maker configure-second-brain --add-folder 99_HM/my-project/`.
+3. **Existing harnesses upgraded from a pre-fix release** — the loader now
+   tolerates `folders: []` (logs a one-shot warning + remediation hint
+   pointing at `/hm:configure`); writes raise `SecondBrainError` with the
+   same hint instead of an obscure "not under a configured write folder"
+   message.
+
+Internals: the rendered `harness.yaml` carries a provenance frontmatter block;
+all readers route through `harness_maker.io_utils.load_harness_yaml` (the
+canonical multi-document-tolerant loader) to avoid the parser-strategy drift
+that produced the original bug.
 
 ---
 

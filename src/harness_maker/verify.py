@@ -26,6 +26,8 @@ def verify(target_dir: Path) -> list[str]:
     errors: list[str] = []
 
     # 1. harness.yaml parses (multi-doc: provenance frontmatter + actual config)
+    # TODO(io-utils-migration): use harness_maker.io_utils.load_harness_yaml
+    # once docs/followups/io-utils-migration.md ships.
     hy = target_dir / "harness.yaml"
     if not hy.exists():
         errors.append("harness.yaml missing")

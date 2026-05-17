@@ -39,6 +39,8 @@ THRESHOLDS: dict[tuple[str, str], int] = {
 }
 
 
+# TODO(io-utils-migration): out of scope for ADR-001 — strips frontmatter for
+# body-line counting on non-YAML body types. See docs/followups/io-utils-migration.md.
 def _strip_frontmatter(text: str) -> str:
     """Remove provenance header before counting body lines.
 
