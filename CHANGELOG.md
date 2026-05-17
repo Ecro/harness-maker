@@ -1,6 +1,28 @@
 # Changelog
 
-## 0.14.0 — communication-protocol variant family (2026-05-17)
+## 0.14.0 — first PyPI release + communication-protocol variant family (2026-05-17)
+
+### PyPI publication infrastructure (PLAN-pypi-publish-llm-prompts)
+
+First public PyPI release of `harness-maker`. Install with `uv tool install harness-maker`.
+
+**Added:**
+- `.github/workflows/release.yml` — `uv publish --trusted-publishing always` to TestPyPI then PyPI on `v*` tag push. OIDC-based, no long-lived tokens. Third-party actions pinned to commit SHAs (`actions/checkout`, `actions/upload-artifact`, `actions/download-artifact`, `astral-sh/setup-uv`).
+- `tests/integration/test_package_artifacts.py` — INTEGRATION=1-gated wheel/sdist regression tests (zipfile/tarfile membership of representative templates; no `__pycache__` leak).
+- `scripts/release_smoke.py` — local end-to-end rehearsal (build → venv → install → CLI smoke).
+- `docs/release-checklist.md` — maintainer runbook covering Phase 0 prerequisites, exact Trusted Publisher subject strings, tag command, yank procedure.
+- Universal cross-platform LLM bootstrap prompt in README — single block, LLM-autonomous OS detection (Linux/macOS/Windows/WSL), works in Claude Code / Cursor / Codex / generic chat.
+
+**Changed:**
+- `pyproject.toml` — added PyPI classifiers, keywords, license-files (PEP 639), project.urls (Homepage/Repository/Issues), authors with email.
+- `.claude-plugin/`, `.cursor-plugin/`, `.codex-plugin/plugin.json` — homepage/repository URLs corrected to `https://github.com/Ecro/harness-maker`.
+- README install section — bootstrap prompt promoted from `<details>` to visible primary path; manual install moved into `<details>`.
+
+**Maintenance:**
+- Repo-wide ruff/mypy hygiene pass — 7 mypy --strict errors fixed (cache.py cast, interview.py dict annotation, render.py BaseLoader None guard, agent_quality.py variable shadowing), `ruff format` applied to 35 files. CI lint/type now clean.
+- `tests/e2e/sandbox` regenerated to absorb post-0.13.0 schema additions and unblock 23 dogfood e2e tests that depended on `commands/hm/health.md`.
+
+### Communication-protocol variant family (PLAN-antisycophancy-2026-05)
 
 PLAN-antisycophancy-2026-05. Promotes the single `_partials/communication.md.j2`
 into a 3-variant family (`_full`, `_reframe`, `_soft`) driven by explicit
