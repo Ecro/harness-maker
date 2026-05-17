@@ -46,7 +46,7 @@ files:
   body_sha256: 227a4b9d9ba42d98cc6229ed4a2f05754b104e2d5667fef40e79488fa175d047
 - path: commands/hm/configure.md
   template: commands/hm/configure.md.j2
-  body_sha256: 89d01e7de042ef18f206bb45b25613e4d2dbf2d17133eb9ab3ce392afc2f7fbd
+  body_sha256: 516352580cba8ee37dbe5c035a3b8697515c6927b9283a5562c5a2e4db9e53a7
 - path: commands/hm/exec-rev-wrap-ver.md
   template: commands/hm/workflow_command.md.j2
   body_sha256: e08d64e814a0dc52eb34d57503bfefe3e600e27637ef59ac057e6a6e370fb4b3

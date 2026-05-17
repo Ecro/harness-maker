@@ -27,6 +27,8 @@ from pathlib import Path
 
 import yaml
 
+from harness_maker.io_utils import load_harness_yaml
+
 WORKTREE_DIR_NAME = ".worktrees"
 _TS_FMT = "%Y%m%dT%H%MZ"
 _GIT_TIMEOUT = 60  # seconds — prevent hang on SSH prompt or NFS stall
@@ -307,24 +309,15 @@ def cleanup_all(base_dir: Path, force: bool = False) -> int:
 
 def _scope_includes(harness_yaml: Path, stage: str) -> bool:
     """Read harness.yaml; return True iff worktree.scope includes the stage."""
-    # TODO(io-utils-migration): use harness_maker.io_utils.load_harness_yaml.
     try:
-        text = harness_yaml.read_text(encoding="utf-8")
-    except OSError:
+        data = load_harness_yaml(harness_yaml)
+    except (OSError, yaml.YAMLError):
         return False
-    try:
-        for doc in yaml.safe_load_all(text):
-            if not isinstance(doc, dict):
-                continue
-            wt = doc.get("worktree")
-            if not isinstance(wt, dict):
-                continue
-            scope = wt.get("scope")
-            if isinstance(scope, list) and stage in scope:
-                return True
-    except yaml.YAMLError:
+    wt = data.get("worktree")
+    if not isinstance(wt, dict):
         return False
-    return False
+    scope = wt.get("scope")
+    return isinstance(scope, list) and stage in scope
 
 
 _SIBLING_SENTINEL = "SIBLING_WORKTREE_PATHS"
@@ -333,28 +326,14 @@ _EXECUTE_MD_REL = Path(".claude") / "commands" / "hm" / "execute.md"
 
 def _load_sibling_dirs(harness_yaml: Path, base: Path) -> list[Path]:
     """Read sibling_repos from harness.yaml; resolve relative paths against base."""
-    # TODO(io-utils-migration): use harness_maker.io_utils.load_harness_yaml.
     try:
-        text = harness_yaml.read_text(encoding="utf-8")
-    except OSError:
+        data = load_harness_yaml(harness_yaml)
+    except (OSError, yaml.YAMLError):
         return []
-    try:
-        for doc in yaml.safe_load_all(text):
-            if not isinstance(doc, dict):
-                continue
-            raw = doc.get("sibling_repos")
-            if not isinstance(raw, list):
-                continue
-            result: list[Path] = []
-            for rel in raw:
-                if not isinstance(rel, str):
-                    continue
-                resolved = (base / rel).resolve()
-                result.append(resolved)
-            return result
-    except yaml.YAMLError:
-        pass
-    return []
+    raw = data.get("sibling_repos")
+    if not isinstance(raw, list):
+        return []
+    return [(base / rel).resolve() for rel in raw if isinstance(rel, str)]
 
 
 def _execute_md_has_sentinel(base: Path) -> bool:

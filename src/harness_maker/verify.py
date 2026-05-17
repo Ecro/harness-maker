@@ -7,6 +7,7 @@ from pathlib import Path
 
 import yaml
 
+from harness_maker.io_utils import load_harness_yaml
 from harness_maker.reconcile import compute_body_hash, parse_frontmatter
 
 
@@ -25,17 +26,22 @@ def verify(target_dir: Path) -> list[str]:
     """Return list of error messages (empty list = clean)."""
     errors: list[str] = []
 
-    # 1. harness.yaml parses (multi-doc: provenance frontmatter + actual config)
-    # TODO(io-utils-migration): use harness_maker.io_utils.load_harness_yaml
-    # once docs/followups/io-utils-migration.md ships.
+    # 1. harness.yaml parses (provenance frontmatter + actual config).
+    # Use the canonical multi-document-tolerant loader so this stays in sync with
+    # second_brain._load_config; see docs/followups/io-utils-migration.md.
     hy = target_dir / "harness.yaml"
     if not hy.exists():
         errors.append("harness.yaml missing")
     else:
         try:
-            list(yaml.safe_load_all(hy.read_text(encoding="utf-8")))
+            load_harness_yaml(hy)
         except yaml.YAMLError as e:
             errors.append(f"harness.yaml YAML error: {e}")
+        except OSError as e:
+            # Defense in depth: hy.exists() guards FileNotFoundError, but other
+            # OSErrors (permission denied, NTFS lock on WSL2) should append a
+            # clean error rather than crash verify() entirely.
+            errors.append(f"harness.yaml read error: {e}")
 
     # 2. settings.json parses (after stripping YAML frontmatter)
     sj = target_dir / "settings.json"

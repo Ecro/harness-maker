@@ -308,3 +308,63 @@ def test_cli_create_with_sentinel_emits_both_paths(
     assert str(primary) in lines[0]
     # Second line = sibling repo path
     assert str(sibling) in lines[1]
+
+
+def test_cli_create_with_provenance_frontmatter_resolves_siblings(
+    primary: Path, sibling: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """`_load_sibling_dirs` resolves sibling paths from a real (provenance-prefixed) harness.yaml.
+
+    Regression guard for the io_utils.load_harness_yaml migration
+    (docs/followups/io-utils-migration.md). Production harness.yaml always
+    carries the renderer's provenance frontmatter block as the FIRST YAML
+    document; `_load_sibling_dirs` must still find `sibling_repos` in the
+    user-body doc. Pre-migration coverage used `yaml.dump` (bare single-doc)
+    so the multi-document path was uncovered.
+    """
+    import io
+    import sys
+
+    import yaml
+
+    claude_dir = primary / ".claude"
+    claude_dir.mkdir(parents=True, exist_ok=True)
+    harness_yaml = claude_dir / "harness.yaml"
+    provenance = (
+        "---\n"
+        "generated_by: harness-maker\n"
+        "harness_maker_version: 0.13.0\n"
+        "generated_at: '2026-01-01T00:00:00+00:00'\n"
+        "source_template: harness-yaml/Side.yaml.j2\n"
+        "provenance: official\n"
+        "content_hash: " + "0" * 64 + "\n"
+        "---\n"
+    )
+    body = yaml.dump(
+        {
+            "preset": "Side",
+            "locale": "en",
+            "targets": ["claude-code"],
+            "sibling_repos": [f"../{sibling.name}"],
+            "worktree": {"scope": ["execute"]},
+        }
+    )
+    harness_yaml.write_text(provenance + body, encoding="utf-8")
+
+    cmd_dir = claude_dir / "commands" / "hm"
+    cmd_dir.mkdir(parents=True)
+    (cmd_dir / "execute.md").write_text("# SIBLING_WORKTREE_PATHS\nbody\n")
+
+    old_stdout = sys.stdout
+    sys.stdout = io.StringIO()
+    try:
+        worktree._cli_create(["execute", str(primary)])
+        output = sys.stdout.getvalue()
+    finally:
+        sys.stdout = old_stdout
+
+    lines = [ln for ln in output.splitlines() if ln.strip()]
+    # Provenance frontmatter must NOT block sibling resolution — both paths emit.
+    assert len(lines) == 2
+    assert str(primary) in lines[0]
+    assert str(sibling) in lines[1]
