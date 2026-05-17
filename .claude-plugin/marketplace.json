@@ -10,7 +10,6 @@
       "name": "harness-maker",
       "source": "./",
       "description": "Project-tailored harness generator — single source renders to .claude/, .cursor/, and .codex/.",
-      "version": "0.14.2",
       "author": { "name": "Ecro" },
       "homepage": "https://github.com/Ecro/harness-maker",
       "repository": "https://github.com/Ecro/harness-maker",

@@ -133,36 +133,88 @@
 
 ## 빠른 시작
 
-> 설치 경로는 **IDE별로 따로**. 여러 경로를 동시에 쓰지 마세요.
+### Universal Bootstrap Prompt
 
-### Claude Code
+> **AI 에이전트에 paste 하세요 — 현재 IDE (Claude Code / Cursor / Codex)를 감지해서
+> 그 IDE의 plugin install 명령을 실행하고 하네스까지 부트스트랩합니다.**
+> 한 번의 copy, 모든 지원 IDE 대응.
+
+```
+Install harness-maker for this project and bootstrap the harness end-to-end.
+
+You are an AI agent running inside one of: Claude Code, Cursor, or Codex CLI.
+Detect which one (silently — do NOT ask me), run the matching plugin install,
+then drive /harness-maker:make + /hm:health.
+
+Step 1 — Detect the host IDE (silent):
+  - Claude Code  → $CLAUDE_CODE is set, or ~/.claude/ exists, or you have
+                   access to slash commands like /plugin
+  - Cursor       → $CURSOR_SESSION is set, or ~/.cursor/ exists, or you have
+                   access to Cursor's plugin manager
+  - Codex CLI    → $CODEX_SESSION is set, or ~/.codex/ exists, or the
+                   `codex` command is on PATH
+
+Step 2 — Install harness-maker as a plugin (skip if `/harness-maker:make` is
+already available):
+
+  IF Claude Code:
+    /plugin marketplace add Ecro/harness-maker
+    /plugin install harness-maker@harness-maker
+    (reload Claude Code if prompted)
+
+  IF Codex CLI:
+    codex plugin marketplace add Ecro/harness-maker
+    # marketplace add IS install for Codex — no separate install step
+    # then run /plugins inside Codex to enable
+
+  IF Cursor (public marketplace does not yet support direct GitHub install):
+    git clone https://github.com/Ecro/harness-maker.git \
+      ~/.cursor/plugins/local/harness-maker
+    # tell me to reload the window (Ctrl+Shift+P → "Reload Window")
+
+  IF you can't tell which IDE (or none of the above), STOP and ask me which
+  IDE you're in.
+
+Step 3 — Run /harness-maker:make and follow the interview:
+  • Confirm preset (Side / Production), dev mode, target IDEs, and locale.
+  • Accept the recommended defaults unless I object.
+
+Step 4 — Run /hm:health after the harness renders:
+  Produces a 3-section dashboard at .claude/observability/dashboard.md
+  (structural / external-risks / personalization). Tell me the personalization
+  tier and any high-priority action items.
+
+Conduct the conversation in the language of my first reply; default to English
+if you cannot tell.
+```
+
+<details>
+<summary><strong>수동 설치 — IDE에 맞는 한 가지 선택</strong></summary>
+
+#### Claude Code (plugin marketplace)
 
 ```
 /plugin marketplace add Ecro/harness-maker
 /plugin install harness-maker@harness-maker
 ```
 
-이 한 repo가 marketplace metadata + plugin 본체를 모두 담고 있어서 두 줄로 끝. Claude Code 재시작 후 `/harness-maker:make` 슬래시 명령이 활성화됩니다.
+이 repo가 marketplace metadata와 plugin 본체를 모두 담고 있어서 두 줄로 끝. Claude Code 재시작 후 `/harness-maker:make` 활성화.
 
-### Codex CLI
+#### Codex CLI (plugin marketplace)
 
 ```
 codex plugin marketplace add Ecro/harness-maker
+# 특정 릴리스로 고정 (재현성):
+codex plugin marketplace add Ecro/harness-maker --ref v0.14.3
 ```
 
-특정 릴리스로 고정 (재현성):
+Codex 에서 `marketplace add`가 곧 설치 — 별도 install 단계 없음. 이후 Codex 안에서 `/plugins` 실행하여 활성화.
 
-```
-codex plugin marketplace add Ecro/harness-maker --ref v0.14.2
-```
+#### Cursor (Team marketplace 임포트 또는 local symlink)
 
-Codex 안에서 `/plugins` 실행하여 활성화. `marketplace add` 자체가 설치이며, 별도 install 단계 없음.
+Cursor의 공식 plugin marketplace는 큐레이션 방식 ([cursor.com/marketplace/publish](https://cursor.com/marketplace/publish), submit-and-review)이고 GitHub 직접 install은 Cursor 2.5+ 로드맵상 미지원. 현재 동작하는 두 경로:
 
-### Cursor
-
-Cursor의 공식 plugin marketplace는 큐레이션 방식 ([cursor.com/marketplace/publish](https://cursor.com/marketplace/publish) submit & review)이고 GitHub 직접 install은 Cursor 2.5+ 로드맵상 아직 미지원입니다. 현재 동작하는 두 경로:
-
-**A. Team marketplace (Team/Enterprise plan):**
+**A. Team marketplace (Team / Enterprise plan):**
 Dashboard → Settings → Plugins → Team Marketplaces → Import → `https://github.com/Ecro/harness-maker` 붙여넣기 → 팀원에게 푸시.
 
 **B. Local 개발 install (커뮤니티 패턴):**
@@ -173,36 +225,20 @@ git clone https://github.com/Ecro/harness-maker.git ~/.cursor/plugins/local/harn
 
 Cursor 재시작 (Ctrl+Shift+P → "Reload Window")으로 plugin 인식.
 
-### 첫 사용 (모든 IDE 공통)
+#### PyPI (IDE plugin 미사용 — CI / headless / 스크립트)
 
-플러그인이 로드된 후, 다음을 AI 에이전트에 paste 해서 프로젝트 분석 + 하네스 렌더링:
-
-```
-당신은 harness-maker 플러그인이 설치된 Claude Code, Cursor, 또는 Codex 안에 있습니다.
-이 프로젝트의 하네스를 부트스트랩하세요:
-
-1. /harness-maker:make 실행하고 인터뷰 따라가기.
-   • Preset (Side / Production), dev mode, 대상 IDE, locale 확인.
-   • 특별한 이유 없으면 default 수용.
-
-2. 하네스 렌더 후 /hm:health 실행.
-   .claude/observability/dashboard.md 에 3-섹션 대시보드 생성됨
-   (구조 / 외부 리스크 / 개인화).
-
-3. 하네스 준비 완료 + 개인화 audit 의 tier 결과를 알려주세요.
-```
-
-<details>
-<summary><strong>대안: PyPI Python CLI로 설치 (IDE plugin 미사용)</strong></summary>
-
-IDE plugin 경로가 어느 것도 맞지 않을 때 (CI 스크립트, headless 서버, 또는 단순 취향):
+IDE plugin 경로가 맞지 않을 때 (CI 스크립트, headless 서버, 자동화, 또는 Python CLI 도구 선호):
 
 ```bash
 uv tool install harness-maker          # POSIX / macOS / WSL
-# 또는 PowerShell:
+# Native Windows / PowerShell:
 irm https://astral.sh/uv/install.ps1 | iex
 uv tool install harness-maker
+```
 
+이후:
+
+```bash
 cd your-project
 harness-maker profile . --json
 harness-maker make . --preset Production --locale ko --targets claude-code,cursor

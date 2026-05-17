@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.14.3 — universal bootstrap prompt restored over the plugin-install paths (2026-05-17)
+
+0.14.2 replaced the universal LLM bootstrap prompt with three per-IDE install
+sections. User feedback: the universal prompt has its own value — a single
+copy that any AI agent can run regardless of IDE — and should coexist with
+the per-IDE manual instructions, not be replaced by them. This patch
+restores the universal prompt on top of the manual section, but with the
+install commands rewritten around plugin marketplaces (Claude Code,
+Codex CLI) and a Cursor local-symlink fallback. The PyPI / `uv tool install`
+path is preserved as a separate manual entry inside the same `<details>`
+block for CI / headless / no-IDE-plugin contexts.
+
+### Changed
+
+- README Quickstart structure:
+  - **Universal Bootstrap Prompt** at the top — IDE-autodetecting, runs
+    the right `/plugin marketplace add` (Claude Code) /
+    `codex plugin marketplace add` (Codex) / `git clone ~/.cursor/plugins/local/`
+    (Cursor) command for the detected IDE, then drives
+    `/harness-maker:make` + `/hm:health`.
+  - **Manual install** in `<details>` covers four numbered paths:
+    Claude Code marketplace · Codex CLI marketplace · Cursor (Team
+    marketplace OR local symlink) · PyPI fallback.
+- `.claude-plugin/marketplace.json` — removed `plugins[0].version`
+  field. Auto-versioning by git commit SHA means future plugin patches
+  don't require touching marketplace.json. Reduces the 5-file version
+  sync footgun surface.
+- Codex `--ref` example bumped to `v0.14.3` (current release pin).
+- README.ko.md mirrored.
+
+5-file version sync: 0.14.2 → 0.14.3.
+
 ## 0.14.2 — IDE plugin marketplace as primary install path (2026-05-17)
 
 Reframes the install story around **plugin marketplace install**, the dominant
