@@ -1,8 +1,44 @@
 # Changelog
 
-## Unreleased — Second Brain write-failure fix (PLAN-second-brain-write-failure)
+## 0.13.1 — health bug fixes + Second Brain write fix (2026-05-17)
 
-### Fixed
+This patch bundles two unrelated bug fix PLANs that landed on the same day:
+the `/hm:health` plugin bugs (PLAN-health-plugin-bugs-2026-05) and the
+Second Brain write failure (PLAN-second-brain-write-failure).
+
+### Fixed — /hm:health plugin bugs (PLAN-health-plugin-bugs-2026-05)
+- `readiness._dim_observability_setup` now reads date-sharded telemetry
+  (`metrics-YYYY-MM-DD.jsonl`) via `_metrics_io._candidate_files`, not only
+  the legacy `metrics.jsonl`. Both `metrics_jsonl_present` and
+  `metrics_has_samples` signals now PASS on projects with rotated telemetry
+  — pre-fix they failed with the misleading "Install the PostToolUse
+  telemetry hook (run /hm:make)" recommendation on already-instrumented
+  projects. (PLAN ADR-103 reuse.)
+- `ai_readiness.run_structural()` return key renamed `"structural"` →
+  `"score"`. Pre-fix the producer drifted to use the same name as the outer
+  layer namespace (`{"structural": {"structural": <int>}}`), and the
+  dashboard renderer + its unit tests always read `.get("score")` → every
+  rendered dashboard showed `Structural score: 0 / 100` regardless of the
+  real score. The `.health.tmp.json` schema between `health` and
+  `health-finalize` changes by this one key rename — internal to the
+  pipeline, no documented external consumers. (PLAN ADR-001.)
+
+### Added — /hm:health regression nets
+- `tests/integration/test_health_dashboard_roundtrip.py` — round-trip
+  contract test that calls real `run_structural()` → real `write_dashboard()`
+  → `parse_dashboard()`. Asserts `producer_score >= MIN_FIXTURE_SCORE (30)`
+  AND `parsed_score == producer_score`. Plus a meta-test that fakes the OLD
+  shape and proves the equality assertion fires on drift — closing the
+  exact test-suite gap that let Bug 2 ship green. (PLAN ADR-002.)
+- `tests/integration/conftest.py:build_min_fixture` — reusable minimal
+  fixture (`.claude/`, `CLAUDE.md`, rotated telemetry, settings.json deny,
+  `.github/workflows/ci.yml`, etc.) that deterministically clears the
+  30-point floor on Side preset.
+- Two paired regression tests in `tests/unit/test_readiness.py` covering
+  the rotation-aware metrics signals (rotated-only project, rotated +
+  legacy summation).
+
+### Fixed — Second Brain (PLAN-second-brain-write-failure)
 - `second_brain._load_config` no longer crashes with
   `yaml.composer.ComposerError: expected a single document in the stream` on
   rendered `harness.yaml` files. Root cause: the renderer prepends a

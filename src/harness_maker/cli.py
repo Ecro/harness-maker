@@ -860,7 +860,7 @@ def health_cmd(
     personalization = _personalization_section_from_plan(personalization_plan)
 
     typer.echo(
-        f"health: structural={structural['structural']}/100 "
+        f"health: structural={structural['score']}/100 "
         f"external_risks_pending={external_risks['pending']} "
         f"personalization={personalization['composite']}/100 "
         f"(tier: {personalization['tier']})",
@@ -943,7 +943,7 @@ def health_finalize_cmd(
     personalization = _personalization_section_from_plan(personalization_plan)
 
     typer.echo(
-        f"health-finalize: structural={structural.get('structural', 0)}/100 "
+        f"health-finalize: structural={structural.get('score', 0)}/100 "
         f"external_risks_pending={external_risks['pending']} "
         f"personalization={personalization['composite']}/100",
     )

@@ -3,7 +3,7 @@
 PLAN health-consolidation Phase 1 (0.13.0) split the 3-layer composite
 score into a ``structural`` field of the unified ``/hm:health`` dashboard.
 The new entrypoint ``run_structural(project_dir, preset)`` returns a
-minimal ``{"structural": int, "signals_failed": [...]}`` dict suitable
+minimal ``{"score": int, "signals_failed": [...]}`` dict suitable
 for the dashboard third-section writer; the legacy ``run_ai_readiness``
 and rendering helpers are retained so existing callers and tests in the
 package continue to work until the templates catch up (Phase 2).
@@ -105,7 +105,7 @@ def run_structural(
 ) -> dict[str, Any]:
     """Compute the ``structural`` field for the /hm:health dashboard (0.13.0).
 
-    Returns ``{"structural": <0-100 int>, "signals_failed": [...]}``. The
+    Returns ``{"score": <0-100 int>, "signals_failed": [...]}``. The
     score is the weighted blend of the deterministic L1 readiness signals
     (70%) and the L3 cache-diagnostic score (5% in the legacy weighting —
     surfaced here as a small additive component so a degenerate cache
@@ -113,6 +113,13 @@ def run_structural(
     NOT folded into ``structural``: the LLM-judged content score belongs
     to a different concern and the verify-stage Check 3 contract names
     "structural" specifically.
+
+    Key rename (0.13.1, PLAN-health-plugin-bugs-2026-05 ADR-001): the
+    inner score key was renamed from ``"structural"`` to ``"score"`` so
+    the schema is no longer nested under the same name as the outer
+    section. The dashboard renderer and its unit tests have always read
+    ``.get("score")`` — pre-0.13.1 the producer drifted to ``"structural"``
+    silently, causing every rendered dashboard to show ``score: 0 / 100``.
 
     ``signals_failed`` is the flat list of ``layer1:<signal_id>`` entries
     whose ``passed`` flag is False — one line per failed deterministic
@@ -138,7 +145,7 @@ def run_structural(
             if not sig.passed:
                 signals_failed.append(f"{dim_name}:{sig.id}")
 
-    return {"structural": structural_score, "signals_failed": signals_failed}
+    return {"score": structural_score, "signals_failed": signals_failed}
 
 
 def finalize_from_verdicts_json(

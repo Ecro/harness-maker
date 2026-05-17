@@ -16,6 +16,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
+from harness_maker._metrics_io import _candidate_files
 from harness_maker.context_lint import _count_body_lines
 from harness_maker.models import Preset
 
@@ -716,11 +717,16 @@ def _dim_memory_continuity(project_dir: Path) -> DimensionScore:
 
 
 def _dim_observability_setup(project_dir: Path) -> DimensionScore:
-    """observability dir + metrics.jsonl + dashboard.md."""
+    """observability dir + telemetry files (legacy + date-sharded) + dashboard.md.
+
+    Telemetry rotates per-day to `metrics-YYYY-MM-DD.jsonl` (see ADR-103 in
+    `_metrics_io.py`); both presence and sample-count signals count across
+    the full rotation set plus the legacy `metrics.jsonl` fallback.
+    """
     signals: list[Signal] = []
     obs = project_dir / ".claude" / "observability"
-    metrics = obs / "metrics.jsonl"
     dashboard = obs / "dashboard.md"
+    metrics_files = _candidate_files(obs, days=365) if obs.is_dir() else []
 
     signals.append(
         _signal(
@@ -731,13 +737,18 @@ def _dim_observability_setup(project_dir: Path) -> DimensionScore:
             None if obs.is_dir() else "Run /hm:make to scaffold the observability directory",
         )
     )
+    has_telemetry = bool(metrics_files)
     signals.append(
         _signal(
             "metrics_jsonl_present",
-            metrics.is_file(),
+            has_telemetry,
             25,
-            "metrics.jsonl exists" if metrics.is_file() else "metrics.jsonl missing",
-            None if metrics.is_file() else "Install the PostToolUse telemetry hook (run /hm:make)",
+            f"telemetry present ({len(metrics_files)} file(s))"
+            if has_telemetry
+            else "no telemetry files (metrics.jsonl or metrics-YYYY-MM-DD.jsonl)",
+            None
+            if has_telemetry
+            else "Install the PostToolUse telemetry hook (run /hm:make)",
         )
     )
     signals.append(
@@ -751,20 +762,21 @@ def _dim_observability_setup(project_dir: Path) -> DimensionScore:
     )
 
     sample_size = 0
-    if metrics.is_file():
+    for path in metrics_files:
         try:
-            sample_size = sum(1 for line in _read_text(metrics).splitlines() if line.strip())
+            sample_size += sum(1 for line in _read_text(path).splitlines() if line.strip())
         except OSError:
-            sample_size = 0
+            continue
     has_samples = sample_size >= 5
     signals.append(
         _signal(
             "metrics_has_samples",
             has_samples,
             25,
-            f"metrics.jsonl has {sample_size} entr{'y' if sample_size == 1 else 'ies'}"
-            if metrics.is_file()
-            else "no metrics.jsonl",
+            f"telemetry has {sample_size} entr{'y' if sample_size == 1 else 'ies'} "
+            f"across {len(metrics_files)} file(s)"
+            if has_telemetry
+            else "no telemetry files",
             None if has_samples else "Use Claude Code for ≥ 5 turns to accumulate telemetry",
         )
     )

@@ -335,14 +335,19 @@ def test_judge_client_protocol_satisfied_by_fake() -> None:
 def test_run_structural_returns_split_schema(tmp_path: Path) -> None:
     """ADR-002 amended by ADR-006: ai_readiness emits the ``structural``
     field of /hm:health, not a single composite scalar. The dashboard
-    writer keys off this exact shape — pin it here."""
+    writer keys off this exact shape — pin it here.
+
+    Key rename (PLAN-health-plugin-bugs-2026-05 ADR-001): the inner
+    score key was renamed ``structural`` → ``score`` so it matches the
+    contract the dashboard renderer + its unit tests have always used.
+    """
     from harness_maker.ai_readiness import run_structural
 
     _seed_minimal_project(tmp_path)
     result = run_structural(tmp_path, preset=Preset.SIDE)
-    assert set(result.keys()) == {"structural", "signals_failed"}
-    assert isinstance(result["structural"], int)
-    assert 0 <= result["structural"] <= 100
+    assert set(result.keys()) == {"score", "signals_failed"}
+    assert isinstance(result["score"], int)
+    assert 0 <= result["score"] <= 100
     assert isinstance(result["signals_failed"], list)
 
 
@@ -364,4 +369,4 @@ def test_run_structural_score_clamped(tmp_path: Path) -> None:
 
     # No CLAUDE.md / README.md → many failed signals; readiness still bounded.
     result = run_structural(tmp_path, preset=Preset.SIDE)
-    assert 0 <= result["structural"] <= 100
+    assert 0 <= result["score"] <= 100

@@ -289,6 +289,39 @@ def test_observability_setup_metrics_too_few_samples(tmp_path: Path) -> None:
     assert not sigs["metrics_has_samples"].passed
 
 
+def test_observability_setup_metrics_jsonl_present_with_rotated_only(tmp_path: Path) -> None:
+    """Regression: signal must recognize date-sharded files when legacy metrics.jsonl is absent.
+
+    Pre-fix: both `metrics_jsonl_present` and `metrics_has_samples` failed on a
+    project that had rotated telemetry but no legacy `metrics.jsonl` — yielding
+    the misleading "Install the PostToolUse telemetry hook" recommendation on
+    an already-correctly-instrumented project.
+    """
+    obs = tmp_path / ".claude" / "observability"
+    obs.mkdir(parents=True)
+    (obs / "metrics-2026-05-10.jsonl").write_text("\n".join("{}" for _ in range(6)) + "\n")
+    res = compute_readiness(tmp_path, Preset.SIDE)
+    sigs = {s.id: s for s in res.dimensions["observability_setup"].signals}
+    assert sigs["metrics_jsonl_present"].passed
+    assert sigs["metrics_has_samples"].passed
+
+
+def test_observability_setup_metrics_counts_across_rotation(tmp_path: Path) -> None:
+    """Regression: sample count must sum across rotated + legacy files.
+
+    Pre-fix: only the legacy `metrics.jsonl` was counted; rotated files were
+    silently ignored even when they held thousands of entries.
+    """
+    obs = tmp_path / ".claude" / "observability"
+    obs.mkdir(parents=True)
+    (obs / "metrics-2026-05-10.jsonl").write_text("{}\n{}\n{}\n")  # 3 entries
+    (obs / "metrics.jsonl").write_text("{}\n{}\n")  # 2 entries — 5 total
+    res = compute_readiness(tmp_path, Preset.SIDE)
+    sigs = {s.id: s for s in res.dimensions["observability_setup"].signals}
+    assert sigs["metrics_jsonl_present"].passed
+    assert sigs["metrics_has_samples"].passed
+
+
 # ── governance ──────────────────────────────────────────────────────────────
 
 

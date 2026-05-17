@@ -1,6 +1,6 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.13.0
+harness_maker_version: 0.13.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: skills/relevance-filter/SKILL.md.j2
 provenance: official
@@ -9,7 +9,7 @@ description: Score crawled anti-rot items against project context using LLM judg
   + adaptive threshold (start 0.7, ±0.05 by accept/reject ratio). Use after research-crawler
   writes raw-<date>.jsonl, between crawl and structured question confirmation in /hm:health
   Step 2 (external risks layer).
-content_hash: e9a04e210073147730b0de0fb80ef95eb47c74e6726b47b0e54613d797e0d9ae
+content_hash: d449f424ec9f5d1923bbafc19e930662ab6f620b919e47a77aa7bddf6c56c70c
 ---
 
 # relevance-filter
@@ -45,7 +45,7 @@ You are the relevance judge — no external API call needed.
 4. Compute the adaptive threshold from prior decisions in `decisions.jsonl`:
 
 ```bash
-!uv run --with /home/noel/harness-maker/.worktrees/execute-20260516T1406Z python -c "
+!uv run --with /home/noel/harness-maker python -c "
 from pathlib import Path
 from harness_maker.relevance import adaptive_threshold, load_decisions
 history = load_decisions(Path('.claude/observability/health/decisions.jsonl'))

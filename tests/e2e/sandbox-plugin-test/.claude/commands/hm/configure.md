@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.13.0
+harness_maker_version: 0.13.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/configure.md.j2
 provenance: official
-content_hash: c731173e0115ed7f94c99c20f2ffcd83a6baaed94bee74cab61221bea7653ad9
+content_hash: 516352580cba8ee37dbe5c035a3b8697515c6927b9283a5562c5a2e4db9e53a7
 ---
 # /hm:configure
 
@@ -95,16 +95,47 @@ For **Sibling repos**: ask one structured question:
    Format: semicolon-separated relative paths (e.g. `../backend;../mobile`).
    Absolute paths are rejected (portability). Enter "none" or blank to clear.
 
-For **Second Brain**: ask two questions in sequence:
+For **Second Brain**: first inspect current state via the CLI subcommand
+(slash commands cannot conditionally branch on file state at invocation
+time — they MUST delegate state inspection to the CLI per CLAUDE.md §4):
+
+```bash
+!uv run --with /home/noel/harness-maker python -m harness_maker.cli \
+  configure-second-brain "$(pwd)" --check
+```
+
+The output is a JSON object with `enabled`, `vault_path`, `project_id`,
+`folders_empty`, `folder_count`, `default_suggestion`. Use it to decide
+which prompts to surface:
+
 1. Vault path — show current `second_brain.vault_path` (or "not configured");
    user enters absolute/`~`-relative path, or "none" to disable.
 2. Project ID — show current `second_brain.project_id`; user enters
    kebab-case id (e.g. `my-app`), or blank to keep existing.
-3. Explain advanced behavior before dispatch:
+3. Writable folder — surface this prompt only when the JSON above reports
+   `folders_empty: true` AND the user has both `vault_path` and `project_id`
+   set. Show the `default_suggestion` (e.g. `99_HM/<project_id>`) and ask
+   for the folder path. The user can accept the default by leaving blank,
+   type a different vault-relative path, or type "skip" to leave `folders`
+   empty (Second Brain stays in graceful-degrade mode — search returns
+   `[]`, write raises with a `/hm:configure` remediation pointer). On a
+   non-skip answer, dispatch the folder add through the CLI:
+
+   ```bash
+   !uv run --with /home/noel/harness-maker python -m harness_maker.cli \
+     configure-second-brain "$(pwd)" --add-folder "$SB_FOLDER"
+   ```
+
+   This atomically rewrites `harness.yaml` with the new folder entry AND
+   refreshes the provenance `content_hash` so the reconciler does not mark
+   the file as user-modified on the next re-render. Repeat invocations
+   with the same path are idempotent (the CLI reports `already_present`).
+4. Explain advanced behavior before dispatch:
    - **Read-first** means stages search configured project-memory notes; they
      do not write arbitrary vault files during first setup.
    - Folder entries are an allowlist under the vault path.
    - Writable folders must include `project_id` as a path segment.
+   - `..` segments are rejected by the validator (no traversal outside vault).
    - Writes are limited to Markdown and validated against required
      frontmatter such as `type`, `created`, `updated`, `tags`, and `links`.
    - `/hm:configure` is the place to continue deeper Second Brain setup after
@@ -115,7 +146,7 @@ For **Second Brain**: ask two questions in sequence:
 Run the CLI with only the changed flags:
 
 ```bash
-!uv run --with /home/noel/harness-maker/.worktrees/execute-20260516T1406Z python -m harness_maker.cli make "$(pwd)" \
+!uv run --with /home/noel/harness-maker python -m harness_maker.cli make "$(pwd)" \
   --grade-threshold "$GRADE" --domains "$DOMAINS" --mechanical-checks "$CHECKS" \
   --recommended-model "$MODEL" --focus "$FOCUS" --wrapup-docs "$WRAPUP_DOCS" \
   --ref-folders "$REF_FOLDERS" --sibling-repos "$SIBLING_REPOS" \
