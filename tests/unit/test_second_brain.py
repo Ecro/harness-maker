@@ -358,8 +358,7 @@ def test_load_config_degrade_returns_config_when_folders_empty(
     assert loaded.enabled is True
     assert loaded.folders == []
     assert any(
-        "second_brain.folders is empty" in rec.message
-        or "/hm:configure" in rec.message
+        "second_brain.folders is empty" in rec.message or "/hm:configure" in rec.message
         for rec in caplog.records
     )
 
@@ -381,8 +380,7 @@ def test_search_notes_degrades_to_empty_with_warning_when_folders_empty(
 
     assert results == []
     assert any(
-        "second_brain.folders is empty" in rec.message
-        or "/hm:configure" in rec.message
+        "second_brain.folders is empty" in rec.message or "/hm:configure" in rec.message
         for rec in caplog.records
     )
 

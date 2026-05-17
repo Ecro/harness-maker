@@ -61,9 +61,7 @@ def test_profile_detects_python_stack_on_harness_maker() -> None:
     p = profile(WORKTREE_ROOT)
 
     assert "python" in p.stack, f"expected python in stack, got {p.stack!r}"
-    assert p.package_manager == "uv", (
-        f"expected package_manager='uv', got {p.package_manager!r}"
-    )
+    assert p.package_manager == "uv", f"expected package_manager='uv', got {p.package_manager!r}"
     assert isinstance(p.frameworks, list)
     assert len(p.frameworks) >= 1, (
         f"expected at least one detected framework, got empty list (stack={p.stack!r})"
@@ -92,9 +90,7 @@ def test_run_audit_returns_valid_personalization_plan() -> None:
 
     assert isinstance(plan, PersonalizationPlan)
     assert isinstance(plan.composite_score, int)
-    assert 0 <= plan.composite_score <= 100, (
-        f"composite_score out of range: {plan.composite_score}"
-    )
+    assert 0 <= plan.composite_score <= 100, f"composite_score out of range: {plan.composite_score}"
     assert plan.tier in VALID_TIERS, f"unexpected tier: {plan.tier!r}"
     assert isinstance(plan.layer_scores, dict)
     assert isinstance(plan.actions, list)

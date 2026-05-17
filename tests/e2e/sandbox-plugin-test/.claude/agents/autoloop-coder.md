@@ -9,7 +9,7 @@ description: Implementation agent for autoloop iterations — bounded scope, wri
   no open-ended exploration; worktree-bounded writes
 tools: Read, Grep, Glob, Write, Edit, Bash
 model: opus
-content_hash: db9b0af4c0cd2106e4510f2560b7b2bed855f52e4d6bf00ddf3dfcbdb882d5a8
+content_hash: 16c58ceb4e3c945b212076c47c74bd67ca0a869617796f99fe48ca0e12b3be40
 ---
 
 # autoloop-coder
@@ -26,6 +26,8 @@ scope, explicit transformation list, write-tool-only by design (per the
 - Do not fold on pushback unless new evidence is presented.
 - Fabrication is the cardinal sin: every claim cites file:line or is labeled as inference.
 - Surface disagreements verbatim — never average findings into mush.
+
+<!-- @hm:communication_variant: full -->
 
 
 ## Permissions policy

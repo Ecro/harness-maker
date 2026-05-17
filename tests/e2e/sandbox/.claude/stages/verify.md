@@ -4,7 +4,7 @@ harness_maker_version: 0.13.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: stages/verify.md.j2
 provenance: official
-content_hash: 4e4644c2382ba3ffe9ae98a7f6a4aae45f1c4913b15bc4fcf0285966379b3b1b
+content_hash: 4ad8a22afc3c5cae8ad8530fa19a31042dd1e7ae5101f4b24602eee0af56c3bf
 ---
 # Stage: verify
 
@@ -47,9 +47,13 @@ Block silent regressions and partial completions. Run a rigid 6-check rubric tha
 
 ## The 6 Checks (run in order; STOP on first FAIL unless `--force`)
 
-### Check 1 — PLAN/SPEC satisfaction
+### Check 1 — PLAN/SPEC satisfaction + drift verdict
 
-Every SPEC In-Scope Scenario in `specs/SPEC-{slug}.md` (when SPEC exists) is covered by a passing test in the work unit's diff, OR has an explicit waiver recorded in the PLAN's `## ❓ Open Questions` resolution.
+**1a. Drift verdict existence** (ADR-006): Read `work-docs/REVIEW-{slug}.md` frontmatter.
+- `drift_verdict` present AND `task_slug` matches current PLAN → proceed to 1b.
+- `drift_verdict` absent OR `task_slug` mismatch → **FAIL**: `BLOCKED: check 1 (drift) — run /hm:review first`.
+
+**1b. PLAN/SPEC coverage**: Every SPEC In-Scope Scenario in `specs/SPEC-{slug}.md` (when SPEC exists) is covered by a passing test in the work unit's diff, OR has an explicit waiver recorded in the PLAN's `## ❓ Open Questions` resolution.
 
 ```bash
 # When SPEC exists:
@@ -60,6 +64,12 @@ Every SPEC In-Scope Scenario in `specs/SPEC-{slug}.md` (when SPEC exists) is cov
 FAIL when: any scenario lacks coverage AND lacks waiver.
 
 ### Check 2 — Regression smoke
+
+**Check-suite skip** (ADR-007): Compute the verification skip-key from HEAD
+sha + diff + lockfile + tool versions + env. If a passing marker exists at
+`~/.cache/harness-maker/verify/<key>.json`, print `PASS (cached at <timestamp>)`
+and skip to Check 3. Otherwise run the suite below and, on all-pass, write the
+marker for future skips.
 
 Run the project's full check suite. Pick the toolchain that matches the project:
 

@@ -512,9 +512,7 @@ def test_ci_provider_empty_when_no_signal(tmp_path: Path) -> None:
 
 def test_detection_confidence_high_when_manifest_match(tmp_path: Path) -> None:
     """A real manifest → stack=HIGH and other matched signals HIGH too."""
-    (tmp_path / "pyproject.toml").write_text(
-        '[project]\nname = "x"\ndependencies = ["fastapi"]\n'
-    )
+    (tmp_path / "pyproject.toml").write_text('[project]\nname = "x"\ndependencies = ["fastapi"]\n')
     (tmp_path / "uv.lock").write_text("")
     wf = tmp_path / ".github" / "workflows"
     wf.mkdir(parents=True)
@@ -549,9 +547,7 @@ def test_foreign_ai_configs_always_empty_in_phase_3(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_profile_uses_cache_on_second_call(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_profile_uses_cache_on_second_call(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Second call with no manifest mtime change returns cached profile."""
     cache_dir = tmp_path / "cache"
     repo = tmp_path / "repo"
@@ -654,8 +650,7 @@ def test_profile_dogfood_on_harness_maker_repo(tmp_path: Path) -> None:
 
     gh_workflows = repo_root / ".github" / "workflows"
     has_workflow_files = gh_workflows.is_dir() and any(
-        entry.is_file() and entry.suffix in {".yml", ".yaml"}
-        for entry in gh_workflows.iterdir()
+        entry.is_file() and entry.suffix in {".yml", ".yaml"} for entry in gh_workflows.iterdir()
     )
     if has_workflow_files:
         assert p.ci_provider == "github-actions"

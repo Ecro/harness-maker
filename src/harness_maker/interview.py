@@ -924,9 +924,7 @@ def _dig(data: dict[str, Any], *keys: str) -> object:
     return cur
 
 
-def _preset_extras(
-    preset: Preset, *, schema_version: int = 2
-) -> dict[str, Any]:
+def _preset_extras(preset: Preset, *, schema_version: int = 2) -> dict[str, Any]:
     """Preset-specific config defaults.
 
     ADR-016: schema_version governs which Side defaults apply.
@@ -935,6 +933,7 @@ def _preset_extras(
     Production defaults are unchanged across schema versions.
     """
     if preset == Preset.SIDE:
+        interview_config: dict[str, dict[str, int | None]]
         if schema_version >= 2:
             interview_config = {
                 "deep_gate": {"max_rounds": 1, "streak_target": 1},

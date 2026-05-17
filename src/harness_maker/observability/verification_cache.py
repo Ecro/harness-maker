@@ -13,7 +13,7 @@ import json
 import os
 import subprocess
 import tempfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -51,9 +51,7 @@ def _should_ignore_env(key: str) -> bool:
 
 def _env_hash() -> str:
     """Hash all env vars except the known-safe ignore set (inverted policy)."""
-    items = sorted(
-        (k, v) for k, v in os.environ.items() if not _should_ignore_env(k)
-    )
+    items = sorted((k, v) for k, v in os.environ.items() if not _should_ignore_env(k))
     return hashlib.sha256(json.dumps(items).encode()).hexdigest()
 
 
@@ -161,7 +159,7 @@ def mark_passed(
 
     marker = {
         "passed": True,
-        "passed_at": datetime.now(tz=timezone.utc).isoformat(),
+        "passed_at": datetime.now(tz=UTC).isoformat(),
         "checks": checks or ["lint", "mypy", "pytest"],
         "project_root": project_root,
         "key": key,

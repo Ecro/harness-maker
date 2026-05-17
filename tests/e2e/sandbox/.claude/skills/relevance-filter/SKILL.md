@@ -9,13 +9,24 @@ description: Score crawled anti-rot items against project context using LLM judg
   + adaptive threshold (start 0.7, ±0.05 by accept/reject ratio). Use after research-crawler
   writes raw-<date>.jsonl, between crawl and structured question confirmation in /hm:health
   Step 2 (external risks layer).
-content_hash: d449f424ec9f5d1923bbafc19e930662ab6f620b919e47a77aa7bddf6c56c70c
+content_hash: ce0fd85f079bd2b7587b52130f134aa964f620cd32508f875649ef33fa4e7154
 ---
 
 # relevance-filter
 
 > Score crawled items against project context using your own judgment, then
 > apply an adaptive threshold to filter the proposal list.
+
+
+## Communication Protocol
+
+- Be direct. No flattery, no preamble, no "Great question!"
+- Lead with concerns before agreement; when you agree, explain WHY with specific reasoning.
+- Do not fold on pushback unless new evidence is presented.
+- Fabrication is the cardinal sin: every claim cites file:line or is labeled as inference.
+- Surface disagreements verbatim — never average findings into mush.
+
+<!-- @hm:communication_variant: full -->
 
 
 ## When to invoke vs skip

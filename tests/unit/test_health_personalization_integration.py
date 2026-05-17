@@ -53,9 +53,7 @@ def test_run_audit_output_flows_into_dashboard_personalization_section(
         "layers": dict(plan.layer_scores),
         "action_items": [item.model_dump() for item in plan.actions],
     }
-    assert json.dumps(section_via_helper, sort_keys=True) == json.dumps(
-        expected, sort_keys=True
-    )
+    assert json.dumps(section_via_helper, sort_keys=True) == json.dumps(expected, sort_keys=True)
 
 
 def test_personalization_section_bytes_match_when_rendered_into_dashboard(
@@ -91,9 +89,11 @@ def test_personalization_section_bytes_match_when_rendered_into_dashboard(
 
     # Reconstruct what we'd expect, line-for-line.
     layers_json = json.dumps(section["layers"], ensure_ascii=False, sort_keys=False)
-    actions_json = json.dumps(
-        section["action_items"], ensure_ascii=False, sort_keys=False
-    ) if section["action_items"] else "[]"
+    actions_json = (
+        json.dumps(section["action_items"], ensure_ascii=False, sort_keys=False)
+        if section["action_items"]
+        else "[]"
+    )
     expected = [
         "## Personalization",
         f"composite: {section['composite']} / 100",

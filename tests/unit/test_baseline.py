@@ -2,18 +2,16 @@
 
 from __future__ import annotations
 
+# Import after ensuring the scripts dir is importable
+import importlib
 import json
+import sys
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
-# Import after ensuring the scripts dir is importable
-import importlib
-import sys
 
-
-@pytest.fixture()
+@pytest.fixture
 def baseline_module():
     """Import the baseline script as a module."""
     scripts_dir = Path(__file__).resolve().parent.parent.parent / "scripts"
@@ -26,7 +24,9 @@ def baseline_module():
         sys.modules.pop("measure_workflow_baseline", None)
 
 
-def test_baseline_collects_all_axes(baseline_module, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_baseline_collects_all_axes(
+    baseline_module, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """All required axes must be present in the baseline output."""
     commands_dir = tmp_path / ".claude" / "commands" / "hm"
     commands_dir.mkdir(parents=True)
@@ -93,7 +93,9 @@ def test_baseline_save_and_load(baseline_module, tmp_path: Path) -> None:
     assert loaded["pytest_seconds"] == 42.0
 
 
-def test_baseline_cache_dir_env_override(baseline_module, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_baseline_cache_dir_env_override(
+    baseline_module, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """HARNESS_MAKER_CACHE_DIR must override the default cache path."""
     custom = tmp_path / "custom-cache"
     monkeypatch.setenv("HARNESS_MAKER_CACHE_DIR", str(custom))
@@ -103,13 +105,21 @@ def test_baseline_cache_dir_env_override(baseline_module, monkeypatch: pytest.Mo
 
 def test_baseline_compare(baseline_module, tmp_path: Path) -> None:
     """Compare must produce a markdown delta table."""
-    prior = {"pytest_seconds": 10.0, "mypy_seconds": 5.0, "ruff_seconds": 0.5,
-             "drift_call_count_fused_exec_rev_wrap_ver": 4}
+    prior = {
+        "pytest_seconds": 10.0,
+        "mypy_seconds": 5.0,
+        "ruff_seconds": 0.5,
+        "drift_call_count_fused_exec_rev_wrap_ver": 4,
+    }
     prior_path = tmp_path / "prior.json"
     prior_path.write_text(json.dumps(prior), encoding="utf-8")
 
-    current = {"pytest_seconds": 8.0, "mypy_seconds": 4.0, "ruff_seconds": 0.4,
-               "drift_call_count_fused_exec_rev_wrap_ver": 1}
+    current = {
+        "pytest_seconds": 8.0,
+        "mypy_seconds": 4.0,
+        "ruff_seconds": 0.4,
+        "drift_call_count_fused_exec_rev_wrap_ver": 1,
+    }
 
     report = baseline_module.compare_baselines(current, prior_path)
     assert "Delta" in report

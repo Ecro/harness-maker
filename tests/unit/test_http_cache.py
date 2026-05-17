@@ -5,11 +5,10 @@ from __future__ import annotations
 import json
 import time
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
-from harness_maker.cache import HttpCache, SOURCE_TTLS, TTL_1H, TTL_24H
+from harness_maker.cache import SOURCE_TTLS, TTL_1H, TTL_24H, HttpCache
 
 
 def test_http_cache_ttl(tmp_path: Path) -> None:

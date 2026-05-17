@@ -4,7 +4,7 @@ harness_maker_version: 0.13.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/atomic_command.md.j2
 provenance: official
-content_hash: cc0027c6bb6b531bd7b1332e1940508ce1202a6036d0257c35e5a9b47ff98e48
+content_hash: 881cb2d55564c9b50d193a9e44c1535d6d23631062d55b60781d0966b39e64f5
 ---
 # Stage: review
 
@@ -85,7 +85,7 @@ Per-invocation overrides (workflow command flags):
 - `routing: conditional` → use Conditional Router (M6) on the changed-file paths to pick the subset.
 - Add any extras from `--with-reviewers=<csv>`.
 
-### Step 2 — Drift gate (PLAN/SPEC vs actual diff)
+### Step 2 — Drift gate (PLAN/SPEC vs actual diff) — SINGLE OWNER
 
 Before reviewers run, scan the diff against PLAN scope:
 - Files changed that are NOT in any PLAN phase's "scope" → flag as **scope drift**.
@@ -93,43 +93,32 @@ Before reviewers run, scan the diff against PLAN scope:
 
 Drift findings get severity `P1` and surface in the REVIEW report; reviewers still run on the actual diff.
 
+**Emit drift_verdict** in the REVIEW report frontmatter (mandatory — wrapup and verify depend on this):
+
+```yaml
+drift_verdict:
+  result: clean | scope_violation | scenario_miss
+  scope_violations: [<list of files outside PLAN scope>]
+  scenario_misses: [<list of SPEC scenarios without coverage>]
+  task_slug: <current task slug from PLAN frontmatter>
+  computed_at: <ISO timestamp>
+```
+
+When no drift is detected, emit `result: clean` with empty lists. This record is the single source of truth for drift status — wrapup and verify read it without re-running the analysis.
+
 ### Step 3 — Parallel reviewer invocation (2-pass redaction)
 
-Run reviewers in **two sequential passes** to neutralize metadata anchoring
-(Phase 0 ablation showed +47 percentage-point precision gain on
-anchoring-prone diffs):
 
-#### Pass 1 — rubric-only (metadata redacted)
 
-1. Build `pass1_context` from the diff context with PR title / description /
-   author / commit message redacted. Pipe the JSON context through the
-   harness CLI rather than redacting in prose:
-   ```bash
-   echo '<full_context_json>' | python -m harness_maker.two_pass_review redact
-   ```
-   The CLI returns a JSON object with the same fields but anchoring values
-   replaced by `[REDACTED]`.
-2. Run all selected reviewers in a **single message with multiple Task tool
-   uses** for parallel execution, passing `pass1_context`. Each reviewer:
-   - Reads the diff with full context (use Read on changed files
-     end-to-end, not just the patch).
-   - Walks the runtime path the diff touches — what runs first, what state
-     mutates, what can fail.
-   - Returns findings per the Finding Schema partial:
-     `{severity, file, line, summary, suggestion, reasoning?, …}`.
+With a single enabled reviewer, the 2-pass redaction protocol is skipped
+(no cross-reviewer anchoring bias to mitigate). If `--with-reviewers=` adds
+extras at runtime bringing total > 1, re-enable Pass 1 + Pass 1.5 manually.
 
-#### Pass 1.5 — verifier (deferred, ADR-008)
+#### Direct review (single reviewer — Pass 2 only)
 
-The Pass 1.5 reduce-only verifier role is documented at
-`agents/code-verifier` for future use. The auto-invoked CLI step was
-removed because the target env has no Anthropic API key — see ADR-008 in
-`work-docs/PLAN-llm-code-review-2026.md`. Pass 1 findings flow directly to
-Pass 2; revisit if/when an in-environment verifier client lands.
-
-#### Pass 2 — contextual verdict (full metadata restored)
 
 3. Re-run the same reviewer set with the **full** context (metadata
-   restored) and the **Pass 1** findings list. Each reviewer validates
+   restored) and the **Pass 1.5 verified findings** list. Each reviewer validates
    each finding against the metadata, drops any that the context proves
    spurious, and adjusts severity if context changes risk.
 4. Merge the two passes via the harness CLI:

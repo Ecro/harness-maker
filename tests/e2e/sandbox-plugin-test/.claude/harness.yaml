@@ -4,7 +4,7 @@ harness_maker_version: 0.13.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: harness-yaml/Production.yaml.j2
 provenance: official
-content_hash: 725f83ff5054f5b33ca1bb1fe1b0ef0b1c044699e3749a0db2406a366c7c0820
+content_hash: 1f134a64e5cc9e12fe9f15742d7e45c8051f9a0649669065e5868fc21d8f92cb
 ---
 preset: Production
 locale: en
@@ -13,6 +13,13 @@ recommended_model: claude-opus-4-7
 dev_mode: spec-driven
 default_workflow: exec-rev-wrap-ver
 caching: agent-aware
+schema_version: 1
+interview:
+  deep_gate:
+    max_rounds: 3
+    streak_target: 2
+  main_loop:
+    max_rounds: null
 project:
   domains: []
 spec:

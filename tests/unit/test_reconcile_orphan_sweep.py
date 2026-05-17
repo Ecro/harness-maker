@@ -52,13 +52,7 @@ def _append_manifest(target_dir: Path, path_str: str, content_hash: str) -> None
 
 def _frontmatter_doc(content_hash: str, generated_by: str = "harness-maker") -> str:
     """Build a minimal frontmatter-wrapped file matching the renderer's contract."""
-    return (
-        "---\n"
-        f"generated_by: {generated_by}\n"
-        f"content_hash: {content_hash}\n"
-        "---\n"
-        "hello\n"
-    )
+    return f"---\ngenerated_by: {generated_by}\ncontent_hash: {content_hash}\n---\nhello\n"
 
 
 def _hash_for(body: str) -> str:
@@ -139,21 +133,14 @@ def test_theirs_no_frontmatter_kept_with_warning(project_root: Path) -> None:
     assert Path(".claude/lib/user_script.sh") in kept_paths
     log = _read_orphan_log(project_root)
     assert any(
-        r["path"] == ".claude/lib/user_script.sh" and r["classification"] == "theirs"
-        for r in log
+        r["path"] == ".claude/lib/user_script.sh" and r["classification"] == "theirs" for r in log
     )
 
 
 def test_theirs_with_frontmatter_kept_with_warning(project_root: Path) -> None:
     """Frontmatter present but generated_by != harness-maker → KEEP + warn."""
     target_file = project_root / ".claude" / "agents" / "user_agent.md"
-    body = (
-        "---\n"
-        "name: user_agent\n"
-        "generated_by: hand-written\n"
-        "---\n"
-        "user content\n"
-    )
+    body = "---\nname: user_agent\ngenerated_by: hand-written\n---\nuser content\n"
     _write(target_file, body)
     report = sweep_orphans(project_root, _empty_blueprint())
     assert target_file.exists()
@@ -161,8 +148,7 @@ def test_theirs_with_frontmatter_kept_with_warning(project_root: Path) -> None:
     assert Path(".claude/agents/user_agent.md") in kept_paths
     log = _read_orphan_log(project_root)
     assert any(
-        r["path"] == ".claude/agents/user_agent.md" and r["classification"] == "theirs"
-        for r in log
+        r["path"] == ".claude/agents/user_agent.md" and r["classification"] == "theirs" for r in log
     )
 
 
@@ -180,8 +166,7 @@ def test_missing_in_manifest_kept_with_warning(project_root: Path) -> None:
     assert Path(".claude/skills/copy.md") in kept_paths
     log = _read_orphan_log(project_root)
     assert any(
-        r["path"] == ".claude/skills/copy.md"
-        and r["classification"] == "missing-in-manifest"
+        r["path"] == ".claude/skills/copy.md" and r["classification"] == "missing-in-manifest"
         for r in log
     )
 
@@ -189,12 +174,8 @@ def test_missing_in_manifest_kept_with_warning(project_root: Path) -> None:
 def test_adaptive_telemetry_files_preserved(project_root: Path) -> None:
     """R4 critical: user telemetry under .claude/observability/adaptive/
     has no frontmatter AND no manifest entry → falls into 'theirs' branch → KEEP."""
-    overrides = (
-        project_root / ".claude" / "observability" / "adaptive" / "overrides.jsonl"
-    )
-    last_audit = (
-        project_root / ".claude" / "observability" / "adaptive" / "last-audit.txt"
-    )
+    overrides = project_root / ".claude" / "observability" / "adaptive" / "overrides.jsonl"
+    last_audit = project_root / ".claude" / "observability" / "adaptive" / "last-audit.txt"
     _write(overrides, '{"recommendation":"x","action":"reject"}\n')
     _write(last_audit, "2026-05-15T12:00:00Z\n")
     report = sweep_orphans(project_root, _empty_blueprint())

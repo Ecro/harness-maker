@@ -19,7 +19,7 @@ import sys
 from datetime import date
 from pathlib import Path
 
-from harness_maker.cache import HttpCache, SOURCE_TTLS
+from harness_maker.cache import SOURCE_TTLS, HttpCache
 from harness_maker.crawler import anthropic_blog, arxiv, github_releases, osv_dev
 from harness_maker.io_utils import atomic_write
 from harness_maker.models import CrawlItem

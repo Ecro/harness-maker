@@ -31,9 +31,7 @@ PINNED_SKILLS: tuple[str, ...] = (
 )
 
 VALID_VARIANTS: frozenset[str] = frozenset({"full", "reframe", "soft"})
-_MARKER_PATTERN = re.compile(
-    r"<!--\s*@hm:communication_variant:\s*(full|reframe|soft)\s*-->"
-)
+_MARKER_PATTERN = re.compile(r"<!--\s*@hm:communication_variant:\s*(full|reframe|soft)\s*-->")
 
 
 def discover_dispatchers(template_dir: Path) -> list[Path]:
@@ -41,9 +39,7 @@ def discover_dispatchers(template_dir: Path) -> list[Path]:
     agents = template_dir / "agents"
     if not agents.is_dir():
         return []
-    return sorted(
-        f for f in agents.glob("*.md.j2") if not f.name.endswith("_body.md.j2")
-    )
+    return sorted(f for f in agents.glob("*.md.j2") if not f.name.endswith("_body.md.j2"))
 
 
 def discover_pinned_skills(template_dir: Path) -> list[Path]:
@@ -54,9 +50,7 @@ def discover_pinned_skills(template_dir: Path) -> list[Path]:
     return [f for name in PINNED_SKILLS if (f := skills / name / "SKILL.md.j2").is_file()]
 
 
-_VARIANT_KEY_RE = re.compile(
-    r"^communication_variant:\s*([A-Za-z_-]+)\s*$", re.MULTILINE
-)
+_VARIANT_KEY_RE = re.compile(r"^communication_variant:\s*([A-Za-z_-]+)\s*$", re.MULTILINE)
 
 
 def _read_source_frontmatter(path: Path) -> dict[str, Any] | None:
@@ -156,9 +150,7 @@ def _rendered_path_for_template(
     return None
 
 
-def audit_communication(
-    template_dir: Path, output_dir: Path | None = None
-) -> list[ActionItem]:
+def audit_communication(template_dir: Path, output_dir: Path | None = None) -> list[ActionItem]:
     """Run the full sub-check; return ActionItems for /hm:health Layer 1.
 
     Without ``output_dir`` only source-side checks run (pre-render gate). With

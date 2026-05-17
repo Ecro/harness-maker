@@ -606,9 +606,7 @@ def test_health_subcommand_registered() -> None:
     """/hm:health is the only audit-style command in 0.13.0."""
     names = _registered_subcommand_names()
     assert "health" in names, f"health must be registered; got {sorted(names)}"
-    assert "health-finalize" in names, (
-        f"health-finalize must be registered; got {sorted(names)}"
-    )
+    assert "health-finalize" in names, f"health-finalize must be registered; got {sorted(names)}"
 
 
 def test_health_runs_against_minimal_project(tmp_path: Path) -> None:
@@ -787,9 +785,7 @@ def test_configure_second_brain_check_emits_guidance_when_folders_empty(
     )
     _write_provenance_harness_yaml(tmp_path, body)
 
-    result = runner.invoke(
-        app, ["configure-second-brain", str(tmp_path), "--check"]
-    )
+    result = runner.invoke(app, ["configure-second-brain", str(tmp_path), "--check"])
 
     assert result.exit_code == 0, result.output
     guidance = json.loads(result.output)
@@ -814,9 +810,7 @@ def test_configure_second_brain_check_reports_existing_folder(tmp_path: Path) ->
     )
     _write_provenance_harness_yaml(tmp_path, body)
 
-    result = runner.invoke(
-        app, ["configure-second-brain", str(tmp_path), "--check"]
-    )
+    result = runner.invoke(app, ["configure-second-brain", str(tmp_path), "--check"])
 
     assert result.exit_code == 0, result.output
     guidance = json.loads(result.output)
@@ -877,9 +871,7 @@ def test_configure_second_brain_requires_a_subcommand_flag(tmp_path: Path) -> No
 
     assert result.exit_code == 2
     # message is on stderr, but typer's CliRunner mixes streams by default
-    combined = (result.output or "") + (
-        result.stderr if hasattr(result, "stderr") else ""
-    )
+    combined = (result.output or "") + (result.stderr if hasattr(result, "stderr") else "")
     assert "--check" in combined or "--add-folder" in combined
 
 
@@ -942,7 +934,7 @@ def test_configure_second_brain_add_folder_refreshes_content_hash(
     assert text.startswith("---\n")
     end = text.find("\n---\n", 4)
     raw_fm = _yaml.safe_load(text[4:end])
-    raw_body = text[end + len("\n---\n"):]
+    raw_body = text[end + len("\n---\n") :]
     expected_hash = hashlib.sha256(raw_body.encode("utf-8")).hexdigest()
     assert raw_fm["content_hash"] == expected_hash, (
         f"content_hash in frontmatter ({raw_fm['content_hash']!r}) must equal "

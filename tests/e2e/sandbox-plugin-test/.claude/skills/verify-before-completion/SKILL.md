@@ -8,7 +8,7 @@ name: verify-before-completion
 description: Pre-wrapup gate enforcing 6 checks before any /hm:wrapup or autoloop
   iteration close. Failure on any check blocks completion and surfaces the failing
   check name + remediation hint.
-content_hash: 3e1f44a26a6e41abeefb422e46a42f61febed138ed89b2b3d188caeeefa1c8a9
+content_hash: e2a7e0c549c647192b6cf0a53b23673d21fa7b28b9a473b7a46ef705f2f16e7b
 ---
 
 # verify-before-completion
@@ -70,7 +70,7 @@ from pathlib import Path
 from harness_maker.readiness import compute_readiness
 from harness_maker.models import Preset
 import json, sys
-result = compute_readiness(Path('.'), Preset.SIDE)
+result = compute_readiness(Path('.'), Preset('Production'))
 score = result.composite
 metrics = Path('.claude/observability/metrics.jsonl')
 baseline = 0

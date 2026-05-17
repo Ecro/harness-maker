@@ -162,11 +162,7 @@ def compute_composite(
 ) -> int:
     """ADR-011 weighted sum, rounded to int and bounded to [0, 100]."""
     w = weights or {"l1_conversion": 0.4, "l2_stability": 0.3, "l3_cadence": 0.3}
-    raw = (
-        l1 * w["l1_conversion"]
-        + l2 * w["l2_stability"]
-        + l3 * w["l3_cadence"]
-    )
+    raw = l1 * w["l1_conversion"] + l2 * w["l2_stability"] + l3 * w["l3_cadence"]
     return max(0, min(100, round(raw)))
 
 
@@ -350,11 +346,7 @@ def run_audit(
     adaptive = _read_adaptive_config(harness_data)
     profile = load_or_run(project_dir)
     harness_yaml_path = project_dir / ".claude" / "harness.yaml"
-    yaml_text = (
-        harness_yaml_path.read_text(encoding="utf-8")
-        if harness_yaml_path.is_file()
-        else ""
-    )
+    yaml_text = harness_yaml_path.read_text(encoding="utf-8") if harness_yaml_path.is_file() else ""
 
     # ── L1: conversion ─────────────────────────────────────────────────
     high_silent = _count_high_silent_lines(yaml_text)
@@ -417,9 +409,7 @@ def run_audit(
     # we apply the same filter defensively here so any future code path
     # that builds an item directly cannot violate the contract.
     actions = [
-        a
-        for a in actions
-        if a.evidence.n_observations > 0 and len(a.evidence.top_3_signals) > 0
+        a for a in actions if a.evidence.n_observations > 0 and len(a.evidence.top_3_signals) > 0
     ]
 
     # Rank: P0 → P1 → P2 then by descending observation count.

@@ -66,8 +66,7 @@ def recommend(
         return None
     if result.axis != axis:
         raise ValueError(
-            f"recommender for axis {axis!r} returned Recommendation "
-            f"with axis={result.axis!r}",
+            f"recommender for axis {axis!r} returned Recommendation with axis={result.axis!r}",
         )
     return result
 
@@ -88,8 +87,7 @@ def recommend_all(
             continue
         if result.axis != axis:
             raise ValueError(
-                f"recommender for axis {axis!r} returned Recommendation "
-                f"with axis={result.axis!r}",
+                f"recommender for axis {axis!r} returned Recommendation with axis={result.axis!r}",
             )
         out.append(result)
     out.sort(key=lambda r: _BUCKET_ORDER[r.confidence])

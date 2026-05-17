@@ -198,8 +198,7 @@ def test_rendered_yaml_with_empty_folders_degrades_gracefully(
     assert cfg.enabled is True
     assert cfg.folders == []
     assert any(
-        "second_brain.folders is empty" in rec.message
-        or "/hm:configure" in rec.message
+        "second_brain.folders is empty" in rec.message or "/hm:configure" in rec.message
         for rec in caplog.records
     )
 

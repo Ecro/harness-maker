@@ -8,13 +8,24 @@ name: ai-readiness-rubric
 description: 3-layer rubric scoring AI-readiness — Layer 1 deterministic structural
   signals, Layer 2 LLM-judged content quality vs rubric YAMLs, Layer 3 prompt-cache
   failure-mode classification. Invoked by /hm:health Step 1 (structural layer).
-content_hash: d5b070da05f4fe70ea7eaa5975656d0e630d7388d244acacd6b5f3d1fed764c4
+content_hash: 752821a90419f28cf346ca5be6c3964a16807db4f82184875092ad75c8e1069e
 ---
 
 # ai-readiness-rubric
 
 Composite ai-readiness rubric. Three layers, distinct evidence types,
 folded into a single 0-100 score plus a ranked list of actionable items.
+
+
+## Communication Protocol
+
+- Be direct. No flattery, no preamble, no "Great question!"
+- Lead with concerns before agreement; when you agree, explain WHY with specific reasoning.
+- Do not fold on pushback unless new evidence is presented.
+- Fabrication is the cardinal sin: every claim cites file:line or is labeled as inference.
+- Surface disagreements verbatim — never average findings into mush.
+
+<!-- @hm:communication_variant: full -->
 
 
 ## When to invoke vs skip

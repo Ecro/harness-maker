@@ -25,9 +25,7 @@ def _render_preset(tmp_path: Path, preset: Preset) -> Path:
 def test_workflow_preamble_present(tmp_path: Path) -> None:
     """Fused workflow output must contain Shared Session Context exactly once."""
     out = _render_preset(tmp_path, Preset.PRODUCTION)
-    wf = (out / "commands" / "hm" / "exec-rev-wrap-ver.md").read_text(
-        encoding="utf-8"
-    )
+    wf = (out / "commands" / "hm" / "exec-rev-wrap-ver.md").read_text(encoding="utf-8")
     count = wf.count("## Shared Session Context")
     assert count == 1, f"Expected exactly 1 occurrence, found {count}"
     assert "Hot tier" in wf
@@ -38,9 +36,7 @@ def test_workflow_preamble_present(tmp_path: Path) -> None:
 def test_workflow_preamble_has_config_summary(tmp_path: Path) -> None:
     """Preamble must include harness config summary with preset and workflow name."""
     out = _render_preset(tmp_path, Preset.PRODUCTION)
-    wf = (out / "commands" / "hm" / "exec-rev-wrap-ver.md").read_text(
-        encoding="utf-8"
-    )
+    wf = (out / "commands" / "hm" / "exec-rev-wrap-ver.md").read_text(encoding="utf-8")
     assert "Harness config summary" in wf
     assert "Production" in wf
     assert "exec-rev-wrap-ver" in wf
@@ -64,8 +60,6 @@ def test_all_fused_workflows_have_preamble(tmp_path: Path) -> None:
 def test_side_preset_preamble(tmp_path: Path) -> None:
     """Side preset fused workflows should also get the preamble with Side values."""
     out = _render_preset(tmp_path, Preset.SIDE)
-    wf = (out / "commands" / "hm" / "exec-rev-wrap.md").read_text(
-        encoding="utf-8"
-    )
+    wf = (out / "commands" / "hm" / "exec-rev-wrap.md").read_text(encoding="utf-8")
     assert "## Shared Session Context" in wf
     assert "Side" in wf

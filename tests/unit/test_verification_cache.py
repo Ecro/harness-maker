@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import os
 from pathlib import Path
 from unittest.mock import patch
@@ -10,7 +9,6 @@ from unittest.mock import patch
 import pytest
 
 from harness_maker.observability.verification_cache import (
-    _env_hash,
     _should_ignore_env,
     compute_skip_key,
     is_fresh,
@@ -18,7 +16,7 @@ from harness_maker.observability.verification_cache import (
 )
 
 
-@pytest.fixture()
+@pytest.fixture
 def fake_project(tmp_path: Path) -> Path:
     """Create a minimal git repo for skip-key computation."""
     (tmp_path / "pyproject.toml").write_text("[project]\nname='test'\n")
@@ -26,9 +24,7 @@ def fake_project(tmp_path: Path) -> Path:
 
     import subprocess
 
-    subprocess.run(
-        ["git", "init"], cwd=tmp_path, capture_output=True, check=True
-    )
+    subprocess.run(["git", "init"], cwd=tmp_path, capture_output=True, check=True)
     subprocess.run(
         ["git", "config", "user.email", "test@test.com"],
         cwd=tmp_path,
@@ -41,9 +37,7 @@ def fake_project(tmp_path: Path) -> Path:
         capture_output=True,
         check=True,
     )
-    subprocess.run(
-        ["git", "add", "."], cwd=tmp_path, capture_output=True, check=True
-    )
+    subprocess.run(["git", "add", "."], cwd=tmp_path, capture_output=True, check=True)
     subprocess.run(
         ["git", "commit", "-m", "init"],
         cwd=tmp_path,
@@ -59,9 +53,7 @@ def test_verification_key_includes_sha(fake_project: Path) -> None:
     (fake_project / "new.txt").write_text("data")
     import subprocess
 
-    subprocess.run(
-        ["git", "add", "."], cwd=fake_project, capture_output=True, check=True
-    )
+    subprocess.run(["git", "add", "."], cwd=fake_project, capture_output=True, check=True)
     subprocess.run(
         ["git", "commit", "-m", "second"],
         cwd=fake_project,
@@ -100,23 +92,25 @@ def test_verification_key_includes_project_root(tmp_path: Path) -> None:
         d.mkdir()
         (d / "pyproject.toml").write_text("[project]\nname='test'\n")
         (d / "uv.lock").write_text("# lock\n")
-        subprocess.run(
-            ["git", "init"], cwd=d, capture_output=True, check=True
-        )
+        subprocess.run(["git", "init"], cwd=d, capture_output=True, check=True)
         subprocess.run(
             ["git", "config", "user.email", "test@test.com"],
-            cwd=d, capture_output=True, check=True,
+            cwd=d,
+            capture_output=True,
+            check=True,
         )
         subprocess.run(
             ["git", "config", "user.name", "Test"],
-            cwd=d, capture_output=True, check=True,
+            cwd=d,
+            capture_output=True,
+            check=True,
         )
-        subprocess.run(
-            ["git", "add", "."], cwd=d, capture_output=True, check=True
-        )
+        subprocess.run(["git", "add", "."], cwd=d, capture_output=True, check=True)
         subprocess.run(
             ["git", "commit", "-m", "init"],
-            cwd=d, capture_output=True, check=True,
+            cwd=d,
+            capture_output=True,
+            check=True,
         )
 
     key_a = compute_skip_key(tmp_path / "repo_a")
@@ -172,9 +166,7 @@ def test_verification_key_ignores_pwd(fake_project: Path) -> None:
             os.environ["PWD"] = old_pwd
 
 
-def test_verification_skip_hit_only_when_all_match(
-    fake_project: Path, tmp_path: Path
-) -> None:
+def test_verification_skip_hit_only_when_all_match(fake_project: Path, tmp_path: Path) -> None:
     """is_fresh returns marker only after mark_passed; different key returns None."""
     cache_dir = tmp_path / "cache"
     with patch.dict(os.environ, {"HARNESS_MAKER_CACHE_DIR": str(cache_dir)}):

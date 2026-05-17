@@ -33,7 +33,7 @@ permissions:
   - Bash(curl * | sh)
   - Bash(eval *)
   - Bash(rm -rf /:*)
-content_hash: c2086f966bae9e22e9d3672f016dfa392ca6c7bc1960a3c82ade570f16ef743e
+content_hash: 97318897a6f733bbf04840ac2f3ddb4bf7ba12517114b522af4d13374746668c
 ---
 
 # executor
@@ -51,6 +51,8 @@ is read-only from this agent's perspective.
 - Do not fold on pushback unless new evidence is presented.
 - Fabrication is the cardinal sin: every claim cites file:line or is labeled as inference.
 - Surface disagreements verbatim — never average findings into mush.
+
+<!-- @hm:communication_variant: full -->
 
 
 ## Permissions policy

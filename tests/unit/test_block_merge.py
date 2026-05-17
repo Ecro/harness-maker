@@ -344,9 +344,7 @@ def test_only_harness_markers_inverted_semantics() -> None:
         "stays exactly here\n"
     )
     new = (
-        "<!-- @hm:harness:overview -->\n"
-        "fresh overview from v0.2\n"
-        "<!-- @hm:/harness:overview -->\n"
+        "<!-- @hm:harness:overview -->\nfresh overview from v0.2\n<!-- @hm:/harness:overview -->\n"
     )
     merged, report = merge_inverted(user_owns, new)
     # Inside-marker REPLACED.
@@ -374,11 +372,7 @@ def test_both_marker_families_coexist_orthogonally() -> None:
         "<!-- @hm:/user:notes -->\n"
         "trailing user prose\n"
     )
-    new = (
-        "<!-- @hm:harness:meta -->\n"
-        "new meta\n"
-        "<!-- @hm:/harness:meta -->\n"
-    )
+    new = "<!-- @hm:harness:meta -->\nnew meta\n<!-- @hm:/harness:meta -->\n"
     merged, _ = merge_inverted(old, new)
     # Harness region REPLACED.
     assert "new meta" in merged
@@ -506,13 +500,7 @@ def test_detect_marker_style_case_insensitive(tmp_path: Path) -> None:
 
 def test_yaml_hash_markers_recognized() -> None:
     """C1/C2/F2 — YAML / hash-comment marker family must parse correctly."""
-    text = (
-        "# preamble\n"
-        "# @hm:harness:foo\n"
-        "key: value\n"
-        "# @hm:/harness:foo\n"
-        "# tail\n"
-    )
+    text = "# preamble\n# @hm:harness:foo\nkey: value\n# @hm:/harness:foo\n# tail\n"
     segs = parse_segments(text, MarkerStyle.HASH_COMMENT)
     assert len(segs) == 1
     assert segs[0].kind is BlockKind.HARNESS
@@ -532,11 +520,7 @@ def test_yaml_hash_markers_inverted_merge_replaces_inside() -> None:
         "# @hm:/harness:settings\n"
         "# user tail\n"
     )
-    new = (
-        "# @hm:harness:settings\n"
-        "model: new-model\n"
-        "# @hm:/harness:settings\n"
-    )
+    new = "# @hm:harness:settings\nmodel: new-model\n# @hm:/harness:settings\n"
     merged, report = merge_inverted(old, new, MarkerStyle.HASH_COMMENT)
     assert "model: new-model" in merged
     assert "model: old-model" not in merged

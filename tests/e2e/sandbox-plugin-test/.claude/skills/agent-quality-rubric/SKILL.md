@@ -8,7 +8,7 @@ name: agent-quality-rubric
 description: Tier-rank an agent .md file Platinum/Gold/Silver/Bronze using static
   structural checks combined with the agent_prompt LLM rubric. Bronze tier auto-flags
   for anti-rot review. Calls harness_maker.agent_quality.score_agent.
-content_hash: c9c137fde3bfbf550e7ef1427e98c951493d6a60936c47ee0a5a67a203434106
+content_hash: 47aeaa6729c0aac5bfecb437cb41204317c912542f650e89ff0a78c7d36ddeb0
 ---
 
 # agent-quality-rubric
@@ -16,6 +16,17 @@ content_hash: c9c137fde3bfbf550e7ef1427e98c951493d6a60936c47ee0a5a67a203434106
 Hybrid: static structural signals + Layer-2 LLM judgment against
 `.claude/rubrics/agent_prompt.yaml`. Composite = `(static + llm) // 2`
 when both run, static alone when the LLM is unreachable.
+
+
+## Communication Protocol
+
+- Be direct. No flattery, no preamble, no "Great question!"
+- Lead with concerns before agreement; when you agree, explain WHY with specific reasoning.
+- Do not fold on pushback unless new evidence is presented.
+- Fabrication is the cardinal sin: every claim cites file:line or is labeled as inference.
+- Surface disagreements verbatim — never average findings into mush.
+
+<!-- @hm:communication_variant: full -->
 
 
 ## When to invoke vs skip

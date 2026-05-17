@@ -1,11 +1,40 @@
 [project]
 name = "harness-maker"
 version = "0.13.1"
-description = "Project-tailored Claude Code harness generator. Grade-gated review + auto-fix, multi-reviewer consensus, edit-preserving block-merge upgrades, anti-rot crawlers, worktree isolation, version-drift detection, and a 3-layer ai-readiness rubric with ranked improvement actions."
+description = "Project-tailored Claude Code / Cursor / Codex harness generator. Grade-gated review + auto-fix, multi-reviewer consensus, edit-preserving block-merge upgrades, anti-rot crawlers, worktree isolation, version-drift detection, and a 3-layer ai-readiness rubric with ranked improvement actions."
 readme = "README.md"
 requires-python = ">=3.12"
 license = "MIT"
-authors = [{ name = "noel" }]
+license-files = ["LICENSE"]
+authors = [{ name = "Ecro", email = "e839638@gmail.com" }]
+keywords = [
+    "claude-code",
+    "cursor",
+    "codex",
+    "harness",
+    "autoloop",
+    "anti-rot",
+    "code-review",
+    "consensus",
+    "block-merge",
+    "worktree",
+    "observability",
+    "anthropic",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development",
+    "Topic :: Software Development :: Code Generators",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Software Development :: Testing",
+    "Typing :: Typed",
+]
 dependencies = [
     "jinja2>=3",
     "pyyaml>=6",
@@ -17,6 +46,11 @@ dependencies = [
     "rich",
     "beautifulsoup4>=4.12",
 ]
+
+[project.urls]
+Homepage = "https://github.com/Ecro/harness-maker"
+Repository = "https://github.com/Ecro/harness-maker"
+Issues = "https://github.com/Ecro/harness-maker/issues"
 
 [dependency-groups]
 dev = [

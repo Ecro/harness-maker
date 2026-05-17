@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from harness_maker.interview import interview, _preset_extras
+from harness_maker.interview import _preset_extras, interview
 from harness_maker.models import HarnessConfig, InterviewAnswers, Preset, ProjectProfile
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize

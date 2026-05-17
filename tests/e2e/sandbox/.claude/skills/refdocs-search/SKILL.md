@@ -9,13 +9,24 @@ description: Search registered reference-document folders (architecture docs, AP
   specs, design docs) via lossless full-text search; no chunking, no RAG index. Use
   during research / spec / plan / execute when the question references documentation
   outside the source tree, or on direct prompts like "search the design docs for X".
-content_hash: 8366ccb51da372f42f73058c82c7bb75c4d6a66e22f378056599e021c871d533
+content_hash: cc7d9e2c7dbc02ded11f10bf3acdc9132aba55794452d933a8397d90fe8c8380
 ---
 
 # refdocs-search
 
 > Search registered reference document folders without extracting their content
 > — lossy yaml index for triage, *original* files for answers.
+
+
+## Communication Protocol
+
+- Be direct. No flattery, no preamble, no "Great question!"
+- Lead with concerns before agreement; when you agree, explain WHY with specific reasoning.
+- Do not fold on pushback unless new evidence is presented.
+- Fabrication is the cardinal sin: every claim cites file:line or is labeled as inference.
+- Surface disagreements verbatim — never average findings into mush.
+
+<!-- @hm:communication_variant: full -->
 
 
 ## When to invoke vs skip

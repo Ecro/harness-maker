@@ -201,7 +201,7 @@ def test_signals_failed_round_trips_via_json() -> None:
         "signals_failed": [
             "dim1:sig with spaces",
             "dim2:sig|with|pipes",
-            "dim3:sig\"with\"quotes",
+            'dim3:sig"with"quotes',
         ],
     }
     body = render_dashboard_markdown(

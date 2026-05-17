@@ -109,9 +109,7 @@ def test_cache_path_keyed_by_repo_sha256(tmp_path: Path) -> None:
     assert b_loaded.stack == ["rust"]
 
 
-def test_corruption_recovery(
-    tmp_path: Path, caplog: pytest.LogCaptureFixture
-) -> None:
+def test_corruption_recovery(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
     cache_dir = tmp_path / "cache"

@@ -1,0 +1,185 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Always dry run — workflow_dispatch is build/test only; publish requires a v* tag push"
+        type: boolean
+        default: true
+
+# Trusted Publisher subject (must match PyPI / TestPyPI registration):
+#   repository:  Ecro/harness-maker
+#   workflow:    release.yml
+#   environment: testpypi (for TestPyPI), pypi (for PyPI)
+#
+# The quality-gate job duplicates ci.yml's lint/type/test on purpose — it
+# re-runs at tag time so a slow regression between the last CI run and the
+# tag push cannot reach PyPI.
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  quality-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Set up Python
+        run: uv python install 3.12
+      - name: Sync dependencies
+        run: uv sync --frozen
+      - name: Ruff check
+        run: uv run ruff check .
+      - name: Ruff format check
+        run: uv run ruff format --check .
+      - name: Mypy strict
+        run: uv run mypy --strict src
+      - name: Pytest
+        run: uv run pytest -x --tb=short
+
+  build:
+    needs: [quality-gate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Set up Python
+        run: uv python install 3.12
+      - name: Build wheel + sdist
+        run: uv build --out-dir dist/
+      - name: Upload dist artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          retention-days: 7
+
+  publish-testpypi:
+    needs: [build]
+    # Publishing is tag-only — workflow_dispatch never reaches this job.
+    # This prevents an OIDC-authenticated publish from any branch ref.
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: testpypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Set up Python
+        run: uv python install 3.12
+      - name: Download dist artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - name: Show Trusted Publisher subject (for audit)
+        run: |
+          echo "Trusted Publisher subject:"
+          echo "  repository:  ${GITHUB_REPOSITORY}"
+          echo "  workflow:    release.yml"
+          echo "  environment: testpypi"
+          echo "  ref:         ${GITHUB_REF}"
+      - name: Publish to TestPyPI
+        run: uv publish --trusted-publishing always --publish-url https://test.pypi.org/legacy/ dist/*
+      - name: Smoke install from TestPyPI
+        timeout-minutes: 5
+        run: |
+          uv venv /tmp/testpypi-venv
+          uv pip install harness-maker \
+            --python /tmp/testpypi-venv/bin/python \
+            --index-url https://test.pypi.org/simple/ \
+            --extra-index-url https://pypi.org/simple/
+          /tmp/testpypi-venv/bin/harness-maker --help
+
+  publish-pypi:
+    needs: [publish-testpypi]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Set up Python
+        run: uv python install 3.12
+      - name: Download dist artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - name: Show Trusted Publisher subject (for audit)
+        run: |
+          echo "Trusted Publisher subject:"
+          echo "  repository:  ${GITHUB_REPOSITORY}"
+          echo "  workflow:    release.yml"
+          echo "  environment: pypi"
+          echo "  ref:         ${GITHUB_REF}"
+      - name: Publish to PyPI
+        run: uv publish --trusted-publishing always dist/*
+
+  github-release:
+    needs: [publish-pypi]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download dist artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF##*/}"
+          VERSION="${TAG#v}"
+          # Extract the section for this version from CHANGELOG.md (if present).
+          NOTES_FILE="$(mktemp)"
+          if [ -f CHANGELOG.md ]; then
+            awk -v ver="$VERSION" '
+              BEGIN { found = 0 }
+              /^##[[:space:]]/ {
+                if (found) exit
+                if (index($0, ver)) { found = 1; print; next }
+              }
+              found { print }
+            ' CHANGELOG.md > "$NOTES_FILE"
+          fi
+          if [ ! -s "$NOTES_FILE" ]; then
+            echo "Release ${TAG}" > "$NOTES_FILE"
+          fi
+          gh release create "$TAG" dist/* \
+            --title "$TAG" \
+            --notes-file "$NOTES_FILE"

@@ -479,9 +479,7 @@ def test_dispatch_medium_confidence_y_accepts() -> None:
     from harness_maker.interview import _dispatch_recommendation
 
     rec = _rec("preset", Preset.SIDE, Confidence.MEDIUM)
-    out = _dispatch_recommendation(
-        rec, target=Target.CLAUDE_CODE, input_provider=lambda _p: "y"
-    )
+    out = _dispatch_recommendation(rec, target=Target.CLAUDE_CODE, input_provider=lambda _p: "y")
     assert out == Preset.SIDE
 
 
@@ -490,9 +488,7 @@ def test_dispatch_medium_confidence_blank_accepts() -> None:
     from harness_maker.interview import _dispatch_recommendation
 
     rec = _rec("preset", Preset.SIDE, Confidence.MEDIUM)
-    out = _dispatch_recommendation(
-        rec, target=Target.CLAUDE_CODE, input_provider=lambda _p: ""
-    )
+    out = _dispatch_recommendation(rec, target=Target.CLAUDE_CODE, input_provider=lambda _p: "")
     assert out == Preset.SIDE
 
 
@@ -501,9 +497,7 @@ def test_dispatch_medium_confidence_n_rejects() -> None:
     from harness_maker.interview import _dispatch_recommendation
 
     rec = _rec("preset", Preset.SIDE, Confidence.MEDIUM)
-    out = _dispatch_recommendation(
-        rec, target=Target.CLAUDE_CODE, input_provider=lambda _p: "n"
-    )
+    out = _dispatch_recommendation(rec, target=Target.CLAUDE_CODE, input_provider=lambda _p: "n")
     assert out is None
 
 

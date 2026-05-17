@@ -22,9 +22,7 @@ from harness_maker.communication_audit import (
     scan_output_marker,
 )
 
-_REPO_TEMPLATES = (
-    Path(__file__).resolve().parents[2] / "src/harness_maker/templates"
-)
+_REPO_TEMPLATES = Path(__file__).resolve().parents[2] / "src/harness_maker/templates"
 
 
 def test_discover_dispatchers_returns_14_agents() -> None:

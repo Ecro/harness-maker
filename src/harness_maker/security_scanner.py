@@ -14,6 +14,7 @@ Returns aggregated findings; persists to ``.claude/observability/security/findin
 
 from __future__ import annotations
 
+import contextlib
 import json
 from datetime import UTC, datetime
 from pathlib import Path
@@ -111,10 +112,8 @@ def _config_mtimes(target_dir: Path) -> float:
         candidates.extend(claude_dir.rglob("*"))
     max_mt = 0.0
     for p in candidates:
-        try:
+        with contextlib.suppress(OSError):
             max_mt = max(max_mt, p.stat().st_mtime)
-        except OSError:
-            pass
     return max_mt
 
 

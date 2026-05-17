@@ -7,11 +7,11 @@ route through this cached path.
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
-from harness_maker.llm_judge import AnthropicJudgeClient, JudgeClient
+from harness_maker.llm_judge import AnthropicJudgeClient
 from harness_maker.relevance import score_item
 from harness_maker.secscan.prompt_injection import scan_with_llm
 

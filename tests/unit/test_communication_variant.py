@@ -74,8 +74,7 @@ def test_variant_missing_raises_explicit_error() -> None:
     """ADR-002: no default-to-FULL. Missing variant → loud render-time error."""
     env = _make_env()
     template_text = (
-        '{% include "agents/_partials/communication_"'
-        ' ~ communication_variant ~ ".md.j2" %}'
+        '{% include "agents/_partials/communication_" ~ communication_variant ~ ".md.j2" %}'
     )
     tpl = env.from_string(template_text)
     with pytest.raises(UndefinedError):
@@ -85,8 +84,7 @@ def test_variant_missing_raises_explicit_error() -> None:
 def test_variant_invalid_value_raises() -> None:
     env = _make_env()
     template_text = (
-        '{% include "agents/_partials/communication_"'
-        ' ~ communication_variant ~ ".md.j2" %}'
+        '{% include "agents/_partials/communication_" ~ communication_variant ~ ".md.j2" %}'
     )
     tpl = env.from_string(template_text)
     with pytest.raises(TemplateNotFound):

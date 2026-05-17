@@ -29,9 +29,7 @@ def _make_socket_explode(monkeypatch: pytest.MonkeyPatch) -> None:
     """
 
     def _no_socket(*_args: object, **_kwargs: object) -> object:
-        raise RuntimeError(
-            "ADR-005 violation: telemetry/audit/SessionStart attempted network call"
-        )
+        raise RuntimeError("ADR-005 violation: telemetry/audit/SessionStart attempted network call")
 
     monkeypatch.setattr(socket, "socket", _no_socket)
 

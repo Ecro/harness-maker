@@ -30,7 +30,7 @@ permissions:
   - Bash(node:*)
   - Bash(sh:*)
   - Bash(bash:*)
-content_hash: 3235c5a61f1dba51e28d3f4ee7a3943bdf0fcc0a2b7966b59ef09f07c3ea54e7
+content_hash: d7a5c13f6a0a625905ca83ce86e2cb05cd634d96998d2a44d297e24cccadb4c7
 ---
 
 # concurrency-reviewer
@@ -46,6 +46,14 @@ async runtime, or a background worker.
 - Do not fold on pushback unless new evidence is presented.
 - Fabrication is the cardinal sin: every claim cites file:line or is labeled as inference.
 - Surface disagreements verbatim — never average findings into mush.
+
+## Input Processing
+
+Before analysing, reframe the submission internally as a question:
+"Does this code/plan meet the stated requirements without issues?"
+The reframing dampens confirmation bias toward the author's intent.
+
+<!-- @hm:communication_variant: reframe -->
 
 
 ## Triggers

@@ -10,8 +10,9 @@ from __future__ import annotations
 import json
 import os
 import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, TypeVar
+from typing import Any, TypeVar, cast
 
 from harness_maker.io_utils import atomic_write
 
@@ -70,7 +71,7 @@ class HttpCache:
         """Return cached value if fresh, else call fetcher and cache result."""
         cached = self.get(key, ttl)
         if cached is not None:
-            return cached  # type: ignore[return-value]
+            return cast("T", cached)
         result = fetcher()
         self.put(key, result)
         return result

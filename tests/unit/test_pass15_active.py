@@ -37,7 +37,7 @@ def test_review_pass_15_feeds_pass_2(tmp_path: Path) -> None:
     """Pass 2 should reference verified findings, not raw Pass 1."""
     out = _render_preset(tmp_path, Preset.PRODUCTION)
     review = (out / "stages" / "review.md").read_text(encoding="utf-8")
-    pass2_section = review[review.find("Pass 2"):]
+    pass2_section = review[review.find("Pass 2") :]
     assert "verified findings" in pass2_section or "Pass 1.5" in pass2_section
 
 

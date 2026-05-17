@@ -4,7 +4,7 @@ harness_maker_version: 0.13.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: stages/wrapup.md.j2
 provenance: official
-content_hash: bbddace896f91bfb9871633c5e4a86e2321a9a854adf3ddb7bec7796989b9533
+content_hash: d5c06c9e869a0920e51163cae069078c9af30e991abd249345f094431809b92a
 ---
 # Stage: wrapup
 
@@ -71,6 +71,12 @@ Before touching anything, verify state:
 
 ### Step 2 — Final verification pass
 
+**Check-suite skip** (ADR-007): Before running, compute the verification
+skip-key from HEAD sha + diff + lockfile + tool versions + env. If a passing
+marker exists at `~/.cache/harness-maker/verify/<key>.json`, print
+`PASS (cached at <timestamp>)` and skip to Step 3. Otherwise run the suite
+below and, on all-pass, write the marker for future skips.
+
 Run the project's full check suite once before committing. Catch regressions wrapup-stage edits could introduce:
 
 
@@ -86,15 +92,19 @@ Run the project's full check suite once before committing. Catch regressions wra
 
 If any fail: STOP, surface the failure, do NOT proceed. Reverting an executed-merge is more painful than diagnosing here.
 
-### Step 3 — Drift gate (advisory)
+### Step 3 — Drift verdict check (read-only — no LLM re-analysis)
 
-Diff intent (SPEC scenarios + PLAN phase scopes) against the actual staged changes:
+Read the most recent REVIEW report frontmatter for `drift_verdict`.
 
-- **Files staged but NOT in any PLAN phase scope** → log to `.claude/memory/pending-drift.md`.
-- **Files in PLAN scope but NOT staged** → log incomplete-phase warning to `pending-drift.md`.
-- **SPEC scenarios with no test coverage in the diff** → log missing-coverage warning.
+1. **Locate**: find `work-docs/REVIEW-{slug}.md` matching the current task slug.
+2. **Validate**: check that `drift_verdict.task_slug` matches the current PLAN's `task_slug`.
+3. **Decide**:
+   - `drift_verdict` present AND `task_slug` matches → log the verdict, continue.
+   - `drift_verdict` absent OR `task_slug` mismatch → **FAIL** with message: `BLOCKED: step 3 (drift) — run /hm:review first (no drift_verdict found for current task)`.
 
-This is advisory; do not block the commit. The next session reads `pending-drift.md` to catch up.
+> Advisory: if you made changes after `/hm:review`, re-run `/hm:review` to refresh the drift verdict.
+
+This step does NOT re-run the drift analysis. Review is the single owner (ADR-006).
 
 ### Step 4 — PLAN status update
 

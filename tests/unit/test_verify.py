@@ -173,6 +173,4 @@ def test_preset_dynamic(tmp_path: Path) -> None:
     side_skill = (side_out / "skills" / "verify-before-completion" / "SKILL.md").read_text(
         encoding="utf-8"
     )
-    assert "Preset('Side')" in side_skill, (
-        "Side harness must use Preset('Side')"
-    )
+    assert "Preset('Side')" in side_skill, "Side harness must use Preset('Side')"

@@ -298,9 +298,7 @@ def test_llm_map_24h_ceiling_invalidation(tmp_path: Path) -> None:
     """A cached result older than 24h must trigger a fresh LLM call."""
     fc = _seed_foreign_file(tmp_path, "copilot")
     stub = _StubMapClient(
-        _stub_payload(
-            [{"axis": "targets", "value": ["claude-code"], "confidence": "high"}]
-        )
+        _stub_payload([{"axis": "targets", "value": ["claude-code"], "confidence": "high"}])
     )
     llm_map(fc, tmp_path, client=stub, now=1_000_000.0)
     assert stub.calls == 1
@@ -325,11 +323,7 @@ def test_llm_map_graceful_degrade_on_json_parse_fail(
 def test_llm_map_strips_markdown_fenced_json(tmp_path: Path) -> None:
     """LLMs sometimes wrap JSON in ```json fences — must be stripped."""
     fc = _seed_foreign_file(tmp_path, "cursor_rules")
-    fenced = (
-        "```json\n"
-        '{"axis_mappings":[{"axis":"preset","value":"Side","confidence":"low"}]}\n'
-        "```"
-    )
+    fenced = '```json\n{"axis_mappings":[{"axis":"preset","value":"Side","confidence":"low"}]}\n```'
     stub = _StubMapClient(fenced)
     result = llm_map(fc, tmp_path, client=stub)
     assert [m.axis for m in result.mappings] == ["preset"]
@@ -602,9 +596,7 @@ def test_apply_aider_yaml_round_trip_preserves_user_content(tmp_path: Path) -> N
     cs2 = apply(AxisMapping(), fc2, tmp_path, hcfg)
     second = cs2.edits[0].new_content
     # Idempotent — no silent duplication.
-    assert second == first, (
-        "second apply must be a no-op — silent duplication is the C2 regression"
-    )
+    assert second == first, "second apply must be a no-op — silent duplication is the C2 regression"
     # Single harness region (open marker appears exactly once).
     assert second.count("# @hm:harness:settings") == 1
 
@@ -618,18 +610,14 @@ def test_apply_rejects_path_traversal_relative_escape(tmp_path: Path) -> None:
     """F1 — ``../escape.md`` must be rejected so apply() cannot clobber files
     outside the project tree (e.g. /etc, ~/.ssh, sibling repos).
     """
-    fc = ForeignConfig(
-        path="../escape.md", type="claude_md", size=10, confidence=Confidence.HIGH
-    )
+    fc = ForeignConfig(path="../escape.md", type="claude_md", size=10, confidence=Confidence.HIGH)
     with pytest.raises(ValueError, match="outside project_dir"):
         apply(AxisMapping(), fc, tmp_path, _build_harness_config())
 
 
 def test_apply_rejects_path_traversal_absolute_path(tmp_path: Path) -> None:
     """F1 — absolute path /etc/passwd-like attempts must also be rejected."""
-    fc = ForeignConfig(
-        path="/etc/escape.md", type="claude_md", size=10, confidence=Confidence.HIGH
-    )
+    fc = ForeignConfig(path="/etc/escape.md", type="claude_md", size=10, confidence=Confidence.HIGH)
     with pytest.raises(ValueError, match="outside project_dir"):
         apply(AxisMapping(), fc, tmp_path, _build_harness_config())
 

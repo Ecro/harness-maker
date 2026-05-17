@@ -13,7 +13,6 @@ else Bronze (which auto-flags an agent for /hm:refresh anti-rot review).
 from __future__ import annotations
 
 import hashlib
-import json
 import logging
 from pathlib import Path
 from typing import Any
@@ -137,11 +136,11 @@ def score_agent(
                 _LOG.warning("agent_quality: LLM judge reported %s", result.error)
 
     composite = static if llm is None else (static + llm) // 2
-    result = {
+    score: dict[str, Any] = {
         "static": static,
         "llm": llm,
         "composite": composite,
         "tier": _tier(composite),
     }
-    _cache_score(agent_md, result)
-    return result
+    _cache_score(agent_md, score)
+    return score

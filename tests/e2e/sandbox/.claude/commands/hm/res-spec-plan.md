@@ -4,7 +4,7 @@ harness_maker_version: 0.13.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: f63c0b60195bf55418e30ac604c372f3a02f1b9a5221e19df4b1ba1a5bbcba3e
+content_hash: f45885337a0356491ca77aa4aee88d87cb9e280a53832d0f4f4f6eefdbffc58a
 ---
 # /hm:res-spec-plan
 
@@ -993,6 +993,31 @@ If verification fails, retry write **once**. If still failing, surface the path 
 <!-- Free-form project-specific additions to the plan stage. Preserved across harness-maker upgrades. -->
 <!-- @hm:/user:extensions -->
 
+
+---
+
+## Shared Session Context
+
+> **Loaded once** for the entire fused workflow. Individual stages below may
+> reference memory tiers — the content is already in the prompt cache from
+> this preamble, so repeated loads are near-zero cost.
+
+Before executing any stage, load memory in tier order:
+
+1. **Hot tier** — Read `.claude/memory/session/<today>.md` if it exists.
+   Prior session decisions, `checkpoint:compaction` entries, and partial
+   state from interrupted sessions are here.
+2. **Warm tier** — Skim `.claude/memory/failures.md` for patterns relevant
+   to the task: `rg -F "[fail:" .claude/memory/failures.md`.
+3. **Warm tier** — Skim `.claude/memory/wiki.md` first 40 lines for project
+   conventions in the implementation area.
+
+### Harness config summary
+
+Re-read `.claude/harness.yaml` now. Key values for this workflow run:
+
+- **Preset**: `Production`
+- **Workflow**: `res-spec-plan`
 
 ---
 

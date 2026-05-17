@@ -457,14 +457,10 @@ def _render_json_file(
     )
 
 
-_VARIANT_KEY_RE = re.compile(
-    r"^communication_variant:\s*([A-Za-z_-]+)\s*$", re.MULTILINE
-)
+_VARIANT_KEY_RE = re.compile(r"^communication_variant:\s*([A-Za-z_-]+)\s*$", re.MULTILINE)
 
 
-def _extract_source_communication_variant(
-    template_name: str, env: Environment
-) -> str | None:
+def _extract_source_communication_variant(template_name: str, env: Environment) -> str | None:
     """Pre-render: read template source frontmatter, return ``communication_variant``.
 
     ADR-002 (PLAN-antisycophancy-2026-05). Variant must be available as a
@@ -481,6 +477,8 @@ def _extract_source_communication_variant(
     the source has no frontmatter or no key (caller decides whether absence
     is an error — Jinja's StrictUndefined makes the consequence loud).
     """
+    if env.loader is None:
+        return None
     try:
         source, _, _ = env.loader.get_source(env, template_name)
     except Exception:  # noqa: BLE001 — template missing is the caller's concern
@@ -533,9 +531,7 @@ def _render_text_file(
     # templates can resolve the variant-aware {% include %} (ADR-002).
     variant = _extract_source_communication_variant(fe.template, env)
     render_context = (
-        {**fe.context, "communication_variant": variant}
-        if variant is not None
-        else fe.context
+        {**fe.context, "communication_variant": variant} if variant is not None else fe.context
     )
     rendered = template.render(**render_context)
     # If template authored its own frontmatter (e.g. SubAgent name/description/tools/model),

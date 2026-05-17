@@ -219,9 +219,7 @@ def test_evidence_drop_when_filter_post_construction() -> None:
     )
     # Manual filter mirrors the inline filter in run_audit.
     filtered = [
-        a
-        for a in [invalid]
-        if a.evidence.n_observations > 0 and len(a.evidence.top_3_signals) > 0
+        a for a in [invalid] if a.evidence.n_observations > 0 and len(a.evidence.top_3_signals) > 0
     ]
     assert filtered == []
 
@@ -329,9 +327,7 @@ def test_full_audit_pure_platinum_state(
 
     # Recent last-audit (1 day ago) → L3=100.
     now = datetime(2026, 5, 16, tzinfo=UTC)
-    last_audit_path = (
-        tmp_path / ".claude" / "observability" / "adaptive" / "last-audit.txt"
-    )
+    last_audit_path = tmp_path / ".claude" / "observability" / "adaptive" / "last-audit.txt"
     last_audit_path.parent.mkdir(parents=True, exist_ok=True)
     last_audit_path.write_text((now - timedelta(days=1)).isoformat(), encoding="utf-8")
 

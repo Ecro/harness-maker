@@ -291,11 +291,7 @@ def _detect_frameworks(project_dir: Path, stack: list[str]) -> list[str]:
                 # the framework identity in the scope segment. Require the
                 # leading `@` so unscoped lookalikes (e.g. `nestjs-helper`)
                 # never false-positive.
-                if (
-                    low == fw
-                    or low.startswith(f"@{fw}/")
-                    or low.startswith(f"@{fw}-")
-                ):
+                if low == fw or low.startswith(f"@{fw}/") or low.startswith(f"@{fw}-"):
                     _add(fw)
     if "rust" in stack:
         for dep in _read_rust_deps(project_dir):

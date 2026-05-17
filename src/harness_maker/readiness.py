@@ -746,9 +746,7 @@ def _dim_observability_setup(project_dir: Path) -> DimensionScore:
             f"telemetry present ({len(metrics_files)} file(s))"
             if has_telemetry
             else "no telemetry files (metrics.jsonl or metrics-YYYY-MM-DD.jsonl)",
-            None
-            if has_telemetry
-            else "Install the PostToolUse telemetry hook (run /hm:make)",
+            None if has_telemetry else "Install the PostToolUse telemetry hook (run /hm:make)",
         )
     )
     signals.append(

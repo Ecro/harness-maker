@@ -49,12 +49,8 @@ _ANY_MARKER_RE = re.compile(r"<!--[ \t]*@hm:/?(?:block|user|harness):")
 # then ``@hm:<kind>:<id>`` for open and ``@hm:/<kind>:<id>`` for close. Leading
 # whitespace permitted so indented YAML keys still match. Must not match
 # double-hash ``##`` (markdown headings inside a hash-commented YAML body).
-_HASH_OPEN_RE = re.compile(
-    rf"^[ \t]*#[ \t]*@hm:(block|user|harness):({_ID_PATTERN})[ \t]*$"
-)
-_HASH_CLOSE_RE = re.compile(
-    rf"^[ \t]*#[ \t]*@hm:/(block|user|harness):({_ID_PATTERN})[ \t]*$"
-)
+_HASH_OPEN_RE = re.compile(rf"^[ \t]*#[ \t]*@hm:(block|user|harness):({_ID_PATTERN})[ \t]*$")
+_HASH_CLOSE_RE = re.compile(rf"^[ \t]*#[ \t]*@hm:/(block|user|harness):({_ID_PATTERN})[ \t]*$")
 _ANY_HASH_MARKER_RE = re.compile(r"#[ \t]*@hm:/?(?:block|user|harness):")
 # Fenced code block boundary — markdown ``` (optional info string).
 # Validator W2 requires literal ``@hm:`` strings inside fenced code blocks to
@@ -165,9 +161,7 @@ def has_markers(text: str, style: MarkerStyle = MarkerStyle.HTML_COMMENT) -> boo
     return isinstance(parsed, dict) and _JSON_HARNESS_KEY in parsed
 
 
-def parse_segments(
-    text: str, style: MarkerStyle = MarkerStyle.HTML_COMMENT
-) -> list[Segment]:
+def parse_segments(text: str, style: MarkerStyle = MarkerStyle.HTML_COMMENT) -> list[Segment]:
     """Walk text and return all marker-delimited segments. Validates structure.
 
     Raises ParseError on: unclosed marker, mismatched close, duplicate id,
@@ -208,9 +202,7 @@ def parse_segments(
             if key in seen:
                 msg = f"Duplicate marker id @hm:{kind.value}:{blk_id} at line {i + 1}"
                 raise ParseError(msg)
-            close_idx = _find_close(
-                lines, i + 1, kind, blk_id, open_line=i + 1, style=style
-            )
+            close_idx = _find_close(lines, i + 1, kind, blk_id, open_line=i + 1, style=style)
             body = "".join(lines[i + 1 : close_idx])
             segments.append(Segment(kind=kind, id=blk_id, content=body))
             seen.add(key)
@@ -245,14 +237,10 @@ def _parse_segments_json(text: str) -> list[Segment]:
     return [Segment(kind=BlockKind.HARNESS, id=_JSON_HARNESS_KEY, content=body)]
 
 
-def parse_user_blocks(
-    text: str, style: MarkerStyle = MarkerStyle.HTML_COMMENT
-) -> dict[str, str]:
+def parse_user_blocks(text: str, style: MarkerStyle = MarkerStyle.HTML_COMMENT) -> dict[str, str]:
     """Return ``{user_id: content}`` for every ``user:<id>`` block in text."""
     return {
-        seg.id: seg.content
-        for seg in parse_segments(text, style)
-        if seg.kind == BlockKind.USER
+        seg.id: seg.content for seg in parse_segments(text, style) if seg.kind == BlockKind.USER
     }
 
 
@@ -261,9 +249,7 @@ def parse_harness_blocks(
 ) -> dict[str, str]:
     """Return ``{harness_id: content}`` for every ``harness:<id>`` block (Phase 6)."""
     return {
-        seg.id: seg.content
-        for seg in parse_segments(text, style)
-        if seg.kind == BlockKind.HARNESS
+        seg.id: seg.content for seg in parse_segments(text, style) if seg.kind == BlockKind.HARNESS
     }
 
 
@@ -366,9 +352,7 @@ def merge_inverted(
     return "".join(out), report
 
 
-def _merge_inverted_json(
-    old_text: str, new_text: str
-) -> tuple[str, MergeReport]:
+def _merge_inverted_json(old_text: str, new_text: str) -> tuple[str, MergeReport]:
     """JSON_KEY merge: replace top-level ``_hm_harness`` value with NEW's;
     preserve every other top-level key from OLD.
 

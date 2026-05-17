@@ -16,7 +16,7 @@ import re
 import subprocess
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 
@@ -104,7 +104,12 @@ def _estimate_review_token_sizes(project_dir: Path) -> dict[str, int]:
 def _count_crawler_sources() -> int:
     """Count the number of crawler source modules (= expected HTTP call sites)."""
     try:
-        from harness_maker.crawler import anthropic_blog, arxiv, github_releases, osv_dev  # noqa: F401
+        from harness_maker.crawler import (  # noqa: F401
+            anthropic_blog,
+            arxiv,
+            github_releases,
+            osv_dev,
+        )
 
         return 4
     except ImportError:
@@ -114,7 +119,7 @@ def _count_crawler_sources() -> int:
 def measure_baseline(project_dir: Path) -> dict[str, object]:
     """Collect all baseline axes."""
     results: dict[str, object] = {
-        "measured_at": datetime.now(tz=timezone.utc).isoformat(),
+        "measured_at": datetime.now(tz=UTC).isoformat(),
         "project_dir": str(project_dir),
         "machine": _machine_fingerprint(),
     }

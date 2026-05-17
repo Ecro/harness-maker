@@ -524,8 +524,7 @@ def sweep_orphans(project_root: Path, blueprint: Blueprint) -> OrphanSweepReport
             report.deleted.append(rel_path)
         else:
             print(
-                f"WARN: orphan-sweep KEPT {rel_key} ({classification}) — "
-                "manual review needed",
+                f"WARN: orphan-sweep KEPT {rel_key} ({classification}) — manual review needed",
                 file=sys.stdout,
             )
             _log_orphan_kept(project_root, rel_path, classification, recorded_hash)

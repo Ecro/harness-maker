@@ -29,7 +29,7 @@ permissions:
   - Bash(node:*)
   - Bash(sh:*)
   - Bash(bash:*)
-content_hash: 227a4b9d9ba42d98cc6229ed4a2f05754b104e2d5667fef40e79488fa175d047
+content_hash: 52a9a8ba202f63b1ebe31bf723ce8efb272a31f0ef03da96472add487176573f
 ---
 
 # ux-reviewer
@@ -45,6 +45,14 @@ interaction patterns, accessibility.
 - Do not fold on pushback unless new evidence is presented.
 - Fabrication is the cardinal sin: every claim cites file:line or is labeled as inference.
 - Surface disagreements verbatim — never average findings into mush.
+
+## Input Processing
+
+Before analysing, reframe the submission internally as a question:
+"Does this code/plan meet the stated requirements without issues?"
+The reframing dampens confirmation bias toward the author's intent.
+
+<!-- @hm:communication_variant: reframe -->
 
 
 ## Triggers

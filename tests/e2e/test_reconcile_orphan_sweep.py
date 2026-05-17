@@ -184,18 +184,14 @@ def test_orphan_sweep_deletes_three_legacy_commands_preserves_user_assets(
     body_audit = "# /hm:personalization-audit\n\nLegacy personalization-audit body.\n"
     _, hash_air = _write_legacy_command(project, "ai-readiness", body=body_air)
     _, hash_refresh = _write_legacy_command(project, "refresh", body=body_refresh)
-    _, hash_audit = _write_legacy_command(
-        project, "personalization-audit", body=body_audit
-    )
+    _, hash_audit = _write_legacy_command(project, "personalization-audit", body=body_audit)
 
     # ── 2. R4: adaptive/overrides.jsonl (user telemetry; no frontmatter; not
     # in manifest). Must survive the sweep.
     adaptive_dir = project / ".claude" / "observability" / "adaptive"
     adaptive_dir.mkdir(parents=True, exist_ok=True)
     overrides_path = adaptive_dir / "overrides.jsonl"
-    overrides_payload = (
-        json.dumps({"key": "preset", "old": "Side", "new": "Production"}) + "\n"
-    )
+    overrides_payload = json.dumps({"key": "preset", "old": "Side", "new": "Production"}) + "\n"
     overrides_path.write_text(overrides_payload, encoding="utf-8")
 
     # ── 3. "theirs" fixture — a legacy command whose body has been edited
@@ -246,15 +242,11 @@ def test_orphan_sweep_deletes_three_legacy_commands_preserves_user_assets(
     assert not (commands / "ai-readiness.md").exists(), (
         "ai-readiness.md should have been ours-clean-swept"
     )
-    assert not (commands / "refresh.md").exists(), (
-        "refresh.md should have been ours-clean-swept"
-    )
+    assert not (commands / "refresh.md").exists(), "refresh.md should have been ours-clean-swept"
     assert not (commands / "personalization-audit.md").exists(), (
         "personalization-audit.md should have been ours-clean-swept"
     )
-    assert (commands / "health.md").is_file(), (
-        "blueprint-present health.md should be rendered"
-    )
+    assert (commands / "health.md").is_file(), "blueprint-present health.md should be rendered"
     # R4 — adaptive/overrides.jsonl untouched.
     assert overrides_path.is_file(), "adaptive/overrides.jsonl must survive sweep"
     assert overrides_path.read_text(encoding="utf-8") == overrides_payload, (

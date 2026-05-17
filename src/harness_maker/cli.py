@@ -1568,9 +1568,7 @@ def configure_second_brain_cmd(
         raise typer.Exit(code=2) from exc
 
     if check:
-        default_suggestion = (
-            f"99_HM/{cfg.project_id}" if cfg.project_id else ""
-        )
+        default_suggestion = f"99_HM/{cfg.project_id}" if cfg.project_id else ""
         guidance = {
             "enabled": cfg.enabled,
             "vault_path": cfg.vault_path,
@@ -1588,20 +1586,12 @@ def configure_second_brain_cmd(
             typer.echo(json.dumps({"error": "--add-folder requires a path"}), err=True)
             raise typer.Exit(code=2)
         existing_folders = sb_block.get("folders", []) or []
-        if any(
-            isinstance(f, dict) and f.get("path") == cleaned for f in existing_folders
-        ):
-            typer.echo(
-                json.dumps(
-                    {"already_present": cleaned, "folder_count": len(cfg.folders)}
-                )
-            )
+        if any(isinstance(f, dict) and f.get("path") == cleaned for f in existing_folders):
+            typer.echo(json.dumps({"already_present": cleaned, "folder_count": len(cfg.folders)}))
             return
         new_folder = SecondBrainFolder(path=cleaned, read=True, write=True)
         merged_folders = [*existing_folders, new_folder.model_dump(mode="json")]
-        updated = SecondBrainConfig.model_validate(
-            {**sb_block, "folders": merged_folders}
-        )
+        updated = SecondBrainConfig.model_validate({**sb_block, "folders": merged_folders})
         new_body_yaml = yaml.safe_dump(
             {**raw, "second_brain": updated.model_dump(mode="json")},
             sort_keys=False,
