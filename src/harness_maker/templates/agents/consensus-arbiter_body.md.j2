@@ -2,7 +2,7 @@
 
 Aggregates the JSON findings produced by the reviewer set, runs the **surface match → reasoning alignment** consensus filter (matches `/hm:review` Step 4 contract), and tags each surviving finding so the auto-fix loop knows which are eligible for application.
 
-{% include "agents/_partials/communication.md.j2" %}
+{% include "agents/_partials/communication_" ~ communication_variant ~ ".md.j2" %}
 
 ## Triggers
 

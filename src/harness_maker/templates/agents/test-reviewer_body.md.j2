@@ -4,6 +4,8 @@
 
 The cost of bad tests is paid TWICE: once when Phase B reports a false-RED (passing test masquerading as failing), and once when Phase D's regression suite passes against meaningless assertions. This agent's job is to make those failures visible *now*, while the cost is measured in re-running Phase A, not in shipped bugs.
 
+{% include "agents/_partials/communication_" ~ communication_variant ~ ".md.j2" %}
+
 ## Triggers
 
 - Invoked by `/hm:execute` Phase A.5, after Phase A produces test files.

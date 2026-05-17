@@ -11,7 +11,7 @@ import hashlib
 
 import pytest
 
-from harness_maker.render import _make_env
+from harness_maker.render import _extract_source_communication_variant, _make_env
 
 _ALL_AGENTS: list[str] = [
     "autoloop-coder",
@@ -47,21 +47,25 @@ _FULL_CONFIG = {
 
 def _render_agent(name: str) -> str:
     env = _make_env()
+    variant = _extract_source_communication_variant(f"agents/{name}.md.j2", env)
     tpl = env.get_template(f"agents/{name}.md.j2")
     return tpl.render(
         name=name,
         reviewer_kind=_REVIEWER_KINDS.get(name, ""),
         config=_FULL_CONFIG,
+        communication_variant=variant,
     )
 
 
 def _render_body(name: str) -> str:
     env = _make_env()
+    variant = _extract_source_communication_variant(f"agents/{name}.md.j2", env)
     tpl = env.get_template(f"agents/{name}_body.md.j2")
     return tpl.render(
         name=name,
         reviewer_kind=_REVIEWER_KINDS.get(name, ""),
         config=_FULL_CONFIG,
+        communication_variant=variant,
     )
 
 
@@ -74,18 +78,18 @@ def _render_body(name: str) -> str:
 # 5 reviewer entries below are the post-Phase-C hashes; the remaining 7
 # agents keep their pre-refactor hashes.
 _EXPECTED_SHA256: dict[str, str] = {
-    "autoloop-coder": "1889773f6ad10e9659f32fdea9300c5a041178e9c1546540ee80cbfa0089426a",
-    "code-reviewer": "16cf2956aa9a308962e31d678dd12892f8dedcf8f93c7647016acf6e94864d13",
-    "concurrency-reviewer": "aa5798ffb748818836d58ad61deec5bf477333416feafc79d24266261c2d6419",
-    "consensus-arbiter": "1e628aa224fd2a668a6e6c08b64b42459e8e545b78a5720042572599a3301d3c",
-    "executor": "d78b2df7a3a04008ee5f87c5b5610732fcd706563d23e3ced30fc1916db1fa73",
-    "performance-reviewer": "d13cd090174ea4a187f6f3596ce9a57f2aade97d3106751a582d3921101f78e0",
-    "plan-validator": "c3bc0546ad28adfdc36401ae2c3d189f443d3f120b20a5603e0c8cf32ea6afe1",
-    "security-auditor": "8ac1b082fcd2fe1ad2d520f85f068f5f1f1082e54230fb6ecec7dd0d446f0b32",
-    "security-reviewer": "20eecaa7969675cbf64756b8ba7c9672f2df963c091d66aeddc7444c97aa42ba",
-    "stuck": "d0c5e1655ef5253390198d7916ce36b955c72ef54f5a8677128fef35535d637a",
-    "test-reviewer": "ebda93df78ecf4df3eaf90821b0d7d9b2ab3c116015b065867913fe2e3ce5220",
-    "ux-reviewer": "e9481a0d680056d9f83ceeb011b3ef6e1f60e8c7eda9b2580da230ac07f398ee",
+    "autoloop-coder": "125bc43d1848570c88d38212b7c9ed69e3cc6b6604ce6b1e7c8989eaa0b446a7",
+    "code-reviewer": "d9172c478af1837c186a9bc8d8f3903f6b28aa8887184fe46c1030b7a205c12c",
+    "concurrency-reviewer": "b5f1343184940919ae15e5363a3a9f793d3271c036d4b94c1811f586d14c637c",
+    "consensus-arbiter": "2bd9ff2373a47ac36bc77e4f1fc5a93c66eaec3241aaabbbbc94042e31c7432e",
+    "executor": "226482b939449c7515f6befd6d20b0cc7aa689daebdd110a319d3314627dd5d9",
+    "performance-reviewer": "fcb80fdee6cc5a407f06e7ec5f9248d2ffe2818cd6e9611fd7e63ec3ef55e549",
+    "plan-validator": "964ff4330221e2dd12f203f58160364d09b76c98fdacc2e5f427e62254cd7489",
+    "security-auditor": "0409a3b2dfaed33bc6b4c7a9dbb73bd5582bdcaf7e7f0cc5f66b9dee8a77892b",
+    "security-reviewer": "628be7d748daac293341b671d940b22d5db3de8bb6c62549e3f4bf5f8e69d7bb",
+    "stuck": "b6ae0cff58351ac80b232fda6984d9f1e6f080e1dbe2b6195e032f7caaf32979",
+    "test-reviewer": "a72bcc15d7989d9176d9795befac41a8358ff4ad9b4d5c4d3de2f6c12ba731d2",
+    "ux-reviewer": "eaa88cdca9f9b764fcd97f080318738a323da8358971c0a71a131c32f838211b",
 }
 
 

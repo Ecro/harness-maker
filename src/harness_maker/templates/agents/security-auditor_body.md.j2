@@ -2,7 +2,7 @@
 
 Performs the deep 5-gate security audit on changed code paths. This is the **on-demand** audit invoked manually or after a security-gate failure — it goes deeper than `security-reviewer` (which only spot-checks per-diff).
 
-{% include "agents/_partials/communication.md.j2" %}
+{% include "agents/_partials/communication_" ~ communication_variant ~ ".md.j2" %}
 
 ## Triggers
 

@@ -1,5 +1,70 @@
 # Changelog
 
+## 0.14.0 — communication-protocol variant family (2026-05-17)
+
+PLAN-antisycophancy-2026-05. Promotes the single `_partials/communication.md.j2`
+into a 3-variant family (`_full`, `_reframe`, `_soft`) driven by explicit
+`communication_variant` frontmatter on each dispatcher template. Variant
+identity rides as an HTML comment marker in the rendered body — output
+frontmatter / TOML stays clean so Cursor `.mdc` and Codex TOML strict parsers
+are unaffected (ADR-004). `/hm:health` Layer 1 (structural) gains a
+`communication_protocol` sub-check that surfaces silent-miss (a new agent
+template added without declaring a variant) as a structured
+accept/reject/defer item (ADR-006).
+
+### Added
+- `_partials/communication_full.md.j2`, `_partials/communication_reframe.md.j2`,
+  `_partials/communication_soft.md.j2` — paraphrased from user SYCOPHANCY.md
+  ANTISYC-FULL-v1 / REFRAME-v1 / SOFT-v1 (ADR-007). SOFT ships dormant: no
+  consumer in current 14 agents.
+- `harness_maker.communication_audit` — discovery + frontmatter requirement +
+  marker scan + source ↔ output drift detection. Returns `ActionItem` records
+  compatible with `/hm:health` Step "Per-item structured question" loop
+  (0.13.0 ADR-001 "no auto-apply").
+- `harness_maker.render._extract_source_communication_variant` — NEW
+  pre-render extractor. Regex-based (survives Jinja expressions like
+  `name: {{ name }}` in source frontmatter that break `yaml.safe_load`).
+  Injects variant as Jinja context before `template.render()`.
+- `_COMMUNICATION_VARIANT` table in `synthesize.py` — Codex render path
+  (which bypasses dispatcher source frontmatter and includes `_body.md.j2`
+  directly into TOML) gets the variant from this explicit map.
+- 5 named unit tests for the variant resolver
+  (`test_variant_full/reframe/soft_renders_*`,
+  `test_variant_missing_raises_explicit_error` — ADR-002 forbids
+  default-to-FULL, `test_variant_invalid_value_raises`).
+- `tests/unit/test_communication_audit.py` with 2 acceptance fixtures
+  (Fixture A: block removed from output; Fixture B: synthetic dispatcher
+  missing frontmatter — silent-miss proof).
+
+### Changed
+- 14 dispatcher templates carry `communication_variant: full|reframe|soft`
+  source-side frontmatter. FULL=4 (autoloop-coder, executor, stuck,
+  trajectory-monitor — JSON-output, REFRAME inapplicable). REFRAME=10 (10
+  reviewer-shaped agents). SOFT=0 (no idea-shaped agents).
+- 14 body include sites use the variant-aware
+  `{% include "agents/_partials/communication_" ~ communication_variant ~ ".md.j2" %}`
+  pattern. plan-validator_body and test-reviewer_body newly receive REFRAME
+  (behavior change explicitly accepted in PLAN R5).
+- 5 LLM-judgment skills (agent-quality-rubric, ai-readiness-rubric,
+  relevance-filter, security-scanner, refdocs-search) gain
+  `communication_variant: full` frontmatter + body include (ADR-005).
+  Other 7 procedural skills unchanged.
+- `ai_readiness.run_structural()` invokes `audit_communication`; emits
+  per-item entries via `signals_failed` and a new `communication_items`
+  field on the returned dict.
+
+### Removed
+- `_partials/communication.md.j2` (single-variant partial; replaced by the
+  3-variant family).
+
+### Notes
+- Stage templates retain their inline communication blocks (ADR-003
+  RETRACTED in PLAN R5 after stage-specific protocol lines were surfaced as
+  load-bearing — e.g. verify.md.j2's "PASS / FAIL — no soft language").
+- Cursor `.mdc` render path unaffected (does not include agent bodies).
+- New agent template checklist: declare `communication_variant` in source
+  frontmatter; `/hm:health` Layer 1 catches the omission.
+
 ## 0.13.1 — health bug fixes + Second Brain write fix (2026-05-17)
 
 This patch bundles two unrelated bug fix PLANs that landed on the same day:

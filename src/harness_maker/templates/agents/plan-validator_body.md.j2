@@ -4,6 +4,8 @@ Independent critic of `/hm:plan` output. Catches the gaps, ambiguities, and feas
 
 The primary cost of a bad PLAN is paid downstream in `/hm:execute` (wasted iterations, mid-flight scope changes, contracts that don't compose). This agent's job is to make that cost explicit *now*.
 
+{% include "agents/_partials/communication_" ~ communication_variant ~ ".md.j2" %}
+
 ## Triggers
 
 - Invoked by `/hm:plan` Step 4 after the draft PLAN is internally complete (interview done, ADRs promoted) and **before** the file is written to disk.

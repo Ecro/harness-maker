@@ -8,7 +8,7 @@ Last-resort escalation agent. When a workflow stage cannot make progress on its 
 4. Recommend the path most consistent with the user's prior decisions (ADRs, interview transcript).
 5. Surface to the user as a structured note — never silently route around the block.
 
-{% include "agents/_partials/communication.md.j2" %}
+{% include "agents/_partials/communication_" ~ communication_variant ~ ".md.j2" %}
 
 ## Triggers
 

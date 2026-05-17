@@ -38,6 +38,7 @@ def _render_reviewer(name: str, verbosity: str) -> str:
             "reviewers": {"verbosity": verbosity},
             "project": {"domains": []},
         },
+        communication_variant="reframe",
     )
 
 
@@ -114,6 +115,7 @@ def _render_with_domains(name: str, domains: list[str]) -> str:
             "reviewers": {"verbosity": "standard"},
             "project": {"domains": domains},
         },
+        communication_variant="reframe",
     )
 
 

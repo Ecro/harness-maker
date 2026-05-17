@@ -345,10 +345,13 @@ def test_run_structural_returns_split_schema(tmp_path: Path) -> None:
 
     _seed_minimal_project(tmp_path)
     result = run_structural(tmp_path, preset=Preset.SIDE)
-    assert set(result.keys()) == {"score", "signals_failed"}
+    # PLAN-antisycophancy-2026-05 ADR-006: communication_items added as a new
+    # field for the /hm:health Layer 1 communication-protocol sub-check.
+    assert set(result.keys()) == {"score", "signals_failed", "communication_items"}
     assert isinstance(result["score"], int)
     assert 0 <= result["score"] <= 100
     assert isinstance(result["signals_failed"], list)
+    assert isinstance(result["communication_items"], list)
 
 
 def test_run_structural_signals_failed_are_strings(tmp_path: Path) -> None:

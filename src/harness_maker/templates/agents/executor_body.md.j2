@@ -5,7 +5,7 @@ The implementation agent that runs inside a worktree-isolated execute phase.
 Strict invariant: only writes inside `.worktrees/<workflow>-<ts>/`. Repo root
 is read-only from this agent's perspective.
 
-{% include "agents/_partials/communication.md.j2" %}
+{% include "agents/_partials/communication_" ~ communication_variant ~ ".md.j2" %}
 
 ## Permissions policy
 

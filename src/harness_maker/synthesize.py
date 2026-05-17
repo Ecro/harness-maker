@@ -167,6 +167,30 @@ _REVIEWER_KIND: dict[str, str] = {
     "ux-reviewer": "ux",
 }
 
+# Communication-protocol variant per agent (PLAN-antisycophancy-2026-05 ADR-002).
+# Claude render path reads source dispatcher frontmatter automatically via
+# render._extract_source_communication_variant. Codex/Cursor render paths
+# bypass dispatcher source — they need the variant explicitly in context.
+_COMMUNICATION_VARIANT: dict[str, str] = {
+    "autoloop-coder": "full",
+    "executor": "full",
+    "stuck": "full",
+    # trajectory-monitor is intentionally absent from _ALL_AGENTS (no body
+    # file, JSON-output agent); Codex render path does not need a variant
+    # entry for it. If it is ever added to _ALL_AGENTS, also add the matching
+    # variant here.
+    "code-reviewer": "reframe",
+    "code-verifier": "reframe",
+    "concurrency-reviewer": "reframe",
+    "consensus-arbiter": "reframe",
+    "performance-reviewer": "reframe",
+    "plan-validator": "reframe",
+    "security-auditor": "reframe",
+    "security-reviewer": "reframe",
+    "test-reviewer": "reframe",
+    "ux-reviewer": "reframe",
+}
+
 
 def _agent_files() -> list[FileSpec]:
     return [
@@ -228,6 +252,7 @@ def _codex_agent_files() -> list[FileSpec]:
                 "description": _CODEX_AGENT_META[n],
                 "model_codex": None,
                 "reviewer_kind": _REVIEWER_KIND.get(n, ""),
+                "communication_variant": _COMMUNICATION_VARIANT[n],
             },
         )
         for n in _ALL_AGENTS

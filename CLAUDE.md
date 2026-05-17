@@ -238,6 +238,18 @@ def normalize_for_snapshot(text: str) -> str:
 - shell=True 금지 (security_scanner 의 hook injection 검사가 자기 코드도 잡으면 안 됨)
 - 외부 명령 실패 시 graceful fallback (예: GitHub API rate limit → empty result + 경고 로그)
 
+### Communication variant policy (PLAN-antisycophancy-2026-05)
+
+- 새 agent dispatcher template 추가 시 source frontmatter 에 `communication_variant: full|reframe|soft` **필수**. 누락 시 render 시 Jinja `UndefinedError` + `/hm:health` Layer 1 `communication_protocol` sub-check 가 actionable item 으로 surface (silent-miss = R4 canonical failure mode).
+- 분류:
+  - **FULL** — 일반 executor 형 (autoloop-coder, executor, stuck, trajectory-monitor — JSON output, REFRAME inapplicable).
+  - **REFRAME** — reviewer / evaluator 형 (10 reviewer agents). FULL + "Input Processing" 섹션 (confirmation bias 완화).
+  - **SOFT** — idea / brainstorm 형. 현재 consumer 없음 (dormant ship).
+- Output frontmatter / TOML metadata 에는 키 노출 X — body 안 HTML comment 마커 `<!-- @hm:communication_variant: X -->` 로만 식별. Cursor `.mdc` / Codex TOML strict parser 호환 (ADR-004).
+- Skill 도 동일 패턴, **5 LLM-judgment skill 만 적용** — agent-quality-rubric, ai-readiness-rubric, relevance-filter, security-scanner, refdocs-search (ADR-005). 7 procedural skill 제외.
+- Render path: `render._extract_source_communication_variant` 가 pre-render 단계에서 source frontmatter 에서 regex 로 추출 (yaml.safe_load 는 `{{ name }}` 같은 Jinja expression 에 fail). Codex 는 dispatcher source 우회하므로 `synthesize._COMMUNICATION_VARIANT` table 명시.
+- 변경 후 `/hm:health` 실행하여 silent-miss + source ↔ output drift 확인.
+
 ## 무언가를 고치거나 개선하기 전에 — 필수 체크리스트
 
 > **이 섹션은 다음 fix/feature 시작 전에 반드시 읽고 통과시킬 것.**

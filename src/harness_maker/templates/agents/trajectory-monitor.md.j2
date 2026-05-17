@@ -1,5 +1,6 @@
 ---
 name: trajectory-monitor
+communication_variant: full
 description: Detect trajectory drift between current stage output and baseline (SPEC → PLAN → original prompt) — read-only, returns drift_score JSON
 tools: Read, Grep, Bash
 model: sonnet
@@ -13,7 +14,7 @@ Reads the configured baseline (SPEC/PLAN/prompt fallback), embeds both
 baseline and current text, runs the cosine pre-filter, and falls through
 to the LLM precision judge when `cos_sim < harness.yaml.drift.threshold`.
 
-{% include "agents/_partials/communication.md.j2" %}
+{% include "agents/_partials/communication_" ~ communication_variant ~ ".md.j2" %}
 
 ## Triggers
 

@@ -1,5 +1,6 @@
 ---
 name: refdocs-search
+communication_variant: full
 description: Search registered reference-document folders (architecture docs, API specs, design docs) via lossless full-text search; no chunking, no RAG index. Use during research / spec / plan / execute when the question references documentation outside the source tree, or on direct prompts like "search the design docs for X".
 ---
 
@@ -8,6 +9,7 @@ description: Search registered reference-document folders (architecture docs, AP
 > Search registered reference document folders without extracting their content
 > — lossy yaml index for triage, *original* files for answers.
 
+{% include "agents/_partials/communication_" ~ communication_variant ~ ".md.j2" %}
 
 ## When to invoke vs skip
 

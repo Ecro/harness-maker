@@ -1,5 +1,6 @@
 ---
 name: ai-readiness-rubric
+communication_variant: full
 description: 3-layer rubric scoring AI-readiness — Layer 1 deterministic structural signals, Layer 2 LLM-judged content quality vs rubric YAMLs, Layer 3 prompt-cache failure-mode classification. Invoked by /hm:health Step 1 (structural layer).
 ---
 
@@ -8,6 +9,7 @@ description: 3-layer rubric scoring AI-readiness — Layer 1 deterministic struc
 Composite ai-readiness rubric. Three layers, distinct evidence types,
 folded into a single 0-100 score plus a ranked list of actionable items.
 
+{% include "agents/_partials/communication_" ~ communication_variant ~ ".md.j2" %}
 
 ## When to invoke vs skip
 

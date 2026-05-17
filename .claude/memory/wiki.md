@@ -181,3 +181,27 @@ harness-maker 0.12.0 shipped Tracks A (Detection Depth — 12+ stacks/frameworks
 0.12.1 patch closed 3 Group A follow-up items from PLAN-personalization-depth-2026-05's deferred list: (1) `## 7. Personalization Architecture` section in TECH_SPEC.md (Phase 12 agent deferral); (2) `_flatten_stack_glob_concrete()` adds `stack.yaml` + `package.yaml` from STACK_GLOB_MANIFESTS into CACHED_MANIFESTS (Phase 3 known limitation, partial closure — `*`-globs remain on 24h-ceiling); (3) 8 snapshot fixtures regenerated (Phase 10 had regen'd mid-loop but Phase 12's personalization-audit.md.j2 template re-introduced drift; 0.12.0 release shipped with 8 failing snapshot tests — now resolved). Code review grade A (2 cosmetic nits). Full suite 1796/0 fail. 5-file version sync 0.12.0 → 0.12.1.
 
 <!-- @hm:/user:entries -->
+
+## [wiki:pattern] communication-variant-pre-render-extractor | 2026-05-17
+PLAN-antisycophancy-2026-05. Template-side frontmatter keys that drive a Jinja
+`{% include %}` expression (e.g. `communication_variant: full|reframe|soft`)
+must be extracted in a NEW pre-render step (`render._extract_source_communication_variant`)
+because the existing `_split_template_frontmatter` operates on rendered output —
+too late. Extractor uses regex not `yaml.safe_load` because source frontmatter
+may carry Jinja expressions (`name: {{ name }}`) that break YAML parsing. ADR-002.
+
+## [wiki:convention] codex-render-bypasses-dispatcher-source | 2026-05-17
+Codex agent TOML render path (`codex/agent.toml.j2`) includes `_body.md.j2`
+directly into the TOML `developer_instructions` string — dispatcher source
+frontmatter is never read. Any template-side context key used by body
+templates (variant-aware includes, reviewer_kind, etc.) must be passed
+explicitly via `_codex_agent_files()` context. Maintain side-tables like
+`_COMMUNICATION_VARIANT` keyed to `_ALL_AGENTS` for this path.
+
+## [wiki:gotcha] frontmatter-source-vs-output-separation | 2026-05-17
+ADR-004 (PLAN-antisycophancy-2026-05): a frontmatter key may be required
+on the SOURCE template (read by pre-render extractor) but must NOT leak to
+RENDERED output frontmatter. Implementation: `template_fm.pop("<key>", None)`
+right after `_split_template_frontmatter` in `_render_text_file`. Variant
+identity carried via HTML comment marker in body instead — survives Cursor
+`.mdc` / Codex TOML strict parsers.

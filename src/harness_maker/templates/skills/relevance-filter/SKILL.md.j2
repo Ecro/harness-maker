@@ -1,5 +1,6 @@
 ---
 name: relevance-filter
+communication_variant: full
 description: Score crawled anti-rot items against project context using LLM judgment + adaptive threshold (start 0.7, ±0.05 by accept/reject ratio). Use after research-crawler writes raw-<date>.jsonl, between crawl and structured question confirmation in /hm:health Step 2 (external risks layer).
 ---
 
@@ -8,6 +9,7 @@ description: Score crawled anti-rot items against project context using LLM judg
 > Score crawled items against project context using your own judgment, then
 > apply an adaptive threshold to filter the proposal list.
 
+{% include "agents/_partials/communication_" ~ communication_variant ~ ".md.j2" %}
 
 ## When to invoke vs skip
 

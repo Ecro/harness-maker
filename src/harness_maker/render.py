@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import tomllib
 from datetime import UTC, datetime
 from pathlib import Path
@@ -456,6 +457,48 @@ def _render_json_file(
     )
 
 
+_VARIANT_KEY_RE = re.compile(
+    r"^communication_variant:\s*([A-Za-z_-]+)\s*$", re.MULTILINE
+)
+
+
+def _extract_source_communication_variant(
+    template_name: str, env: Environment
+) -> str | None:
+    """Pre-render: read template source frontmatter, return ``communication_variant``.
+
+    ADR-002 (PLAN-antisycophancy-2026-05). Variant must be available as a
+    Jinja context variable BEFORE ``template.render()`` resolves the body's
+    ``{% include "agents/_partials/communication_" ~ communication_variant ~ ".md.j2" %}``.
+    The existing ``_split_template_frontmatter`` reads RENDERED output
+    (post-render) and is unrelated. This is a separate, new code path.
+
+    Uses regex on the raw frontmatter block instead of ``yaml.safe_load``
+    because template-side frontmatter may carry Jinja expressions (e.g.
+    ``name: {{ name }}``) that break YAML parsing. We only need the one key.
+
+    Returns the variant string when frontmatter declares it; ``None`` when
+    the source has no frontmatter or no key (caller decides whether absence
+    is an error — Jinja's StrictUndefined makes the consequence loud).
+    """
+    try:
+        source, _, _ = env.loader.get_source(env, template_name)
+    except Exception:  # noqa: BLE001 — template missing is the caller's concern
+        return None
+    if not source.startswith("---\n"):
+        return None
+    end = source.find("\n---\n", 4)
+    if end == -1:
+        return None
+    m = _VARIANT_KEY_RE.search(source[4:end])
+    if not m:
+        return None
+    variant = m.group(1)
+    if variant not in {"full", "reframe", "soft"}:
+        return None
+    return variant
+
+
 def _split_template_frontmatter(rendered: str) -> tuple[dict[str, Any], str]:
     """If rendered text starts with YAML frontmatter (---...---), split and parse it.
 
@@ -486,10 +529,22 @@ def _render_text_file(
     merge_reports: dict[Path, MergeReport] | None = None,
 ) -> Path:
     template = env.get_template(fe.template)
-    rendered = template.render(**fe.context)
+    # Pre-render: inject communication_variant from source frontmatter so body
+    # templates can resolve the variant-aware {% include %} (ADR-002).
+    variant = _extract_source_communication_variant(fe.template, env)
+    render_context = (
+        {**fe.context, "communication_variant": variant}
+        if variant is not None
+        else fe.context
+    )
+    rendered = template.render(**render_context)
     # If template authored its own frontmatter (e.g. SubAgent name/description/tools/model),
     # merge it into the single provenance frontmatter so Claude Code's loaders see one block.
     template_fm, body_text = _split_template_frontmatter(rendered)
+    # REVIEW P2 #1 (ADR-004): communication_variant is template-side-only;
+    # do not propagate to rendered output frontmatter. Variant identity
+    # rides on the body's HTML comment marker instead.
+    template_fm.pop("communication_variant", None)
     out = resolve_output_path(target_dir, fe.path)
     # Block-merge: caller signals "this file is mergeable" by passing a
     # non-None merge_reports dict. We splice OLD user blocks into NEW before

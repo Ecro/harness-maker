@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Any
 
 from harness_maker.cache_diagnostics import CacheDiagnosis, diagnose_cache
+from harness_maker.communication_audit import audit_communication
 from harness_maker.improvement import ActionItem, ImprovementPlan, build_improvement_plan
 from harness_maker.llm_judge import (
     AnthropicJudgeClient,
@@ -145,7 +146,25 @@ def run_structural(
             if not sig.passed:
                 signals_failed.append(f"{dim_name}:{sig.id}")
 
-    return {"score": structural_score, "signals_failed": signals_failed}
+    # PLAN-antisycophancy-2026-05 ADR-006: communication-protocol sub-check.
+    # Discovers dispatcher templates + 5 pinned LLM-judgment skills, requires
+    # `communication_variant` frontmatter on each, and verifies the rendered
+    # marker matches source. Silent-miss (the R4 WRONG-probe failure mode)
+    # surfaces here as structured ActionItem records; the /hm:health
+    # accept/reject/defer loop walks them unchanged (0.13.0 ADR-001).
+    templates_root = Path(__file__).resolve().parent / "templates"
+    output_root = project_dir / ".claude"
+    comm_items = audit_communication(
+        templates_root, output_dir=output_root if output_root.is_dir() else None
+    )
+    for item in comm_items:
+        signals_failed.append(f"communication_protocol:{item.target}")
+
+    return {
+        "score": structural_score,
+        "signals_failed": signals_failed,
+        "communication_items": [it.model_dump() for it in comm_items],
+    }
 
 
 def finalize_from_verdicts_json(

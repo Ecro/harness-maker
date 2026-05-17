@@ -1,5 +1,6 @@
 ---
 name: agent-quality-rubric
+communication_variant: full
 description: Tier-rank an agent .md file Platinum/Gold/Silver/Bronze using static structural checks combined with the agent_prompt LLM rubric. Bronze tier auto-flags for anti-rot review. Calls harness_maker.agent_quality.score_agent.
 ---
 
@@ -9,6 +10,7 @@ Hybrid: static structural signals + Layer-2 LLM judgment against
 `.claude/rubrics/agent_prompt.yaml`. Composite = `(static + llm) // 2`
 when both run, static alone when the LLM is unreachable.
 
+{% include "agents/_partials/communication_" ~ communication_variant ~ ".md.j2" %}
 
 ## When to invoke vs skip
 

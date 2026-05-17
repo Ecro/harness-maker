@@ -1,6 +1,7 @@
 ---
 type: skill
 name: {{ name | default('security-scanner') }}
+communication_variant: full
 description: 5-gate security scan (secrets · permissions · hook injection · CVEs · prompt injection)
 tools: Read, Grep, Glob, Bash
 ---
@@ -10,6 +11,7 @@ tools: Read, Grep, Glob, Bash
 Runs all 5 security gates and persists findings to
 `.claude/observability/security/findings-<YYYY-MM-DD>.jsonl`.
 
+{% include "agents/_partials/communication_" ~ communication_variant ~ ".md.j2" %}
 
 ## When to invoke vs skip
 
