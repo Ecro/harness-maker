@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="https://raw.githubusercontent.com/Ecro/harness-maker/main/docs/assets/brand-block.svg" alt="harness-maker" width="720">
+</p>
+
 # harness-maker
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)

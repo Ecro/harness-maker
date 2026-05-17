@@ -106,9 +106,9 @@ harness-maker 는 **triple plugin** — 세 marketplace 모두에 등록 가능:
 ## Git 정책
 - 커밋 메시지: `<type>: <short subject>` 또는 autoloop 자동 형식 `autoloop(harness-maker): phase N - <name>`
 - type: `feat | fix | chore | ci | test | docs | refactor`
-- **Remote**: `git@github.com-personal:Ecro/harness-maker.git` (private). push 허용 — backup 용도.
+- **Remote**: `git@github.com-personal:Ecro/harness-maker.git` (**public**). push 허용 — backup 용도.
   - 사용자가 명시적으로 요청해야 push (자동 push 금지).
-  - public 공개 시점·조건은 별도 결정 (현재는 private 유지).
+  - 공개 repo 이므로 raw.githubusercontent.com URL 사용 가능 (README 의 이미지 등). 비밀·자격 증명·미공개 작업물은 commit 금지.
 - 로컬 author: `Ecro <e839638@gmail.com>` (project-scoped git config).
 - 모든 phase 완료 시 자동 commit (autoloop wrapup stage). push 는 별도.
 
