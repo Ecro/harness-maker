@@ -1,7 +1,7 @@
 {
   "permissions": {
     "allow": ["Read", "Bash(uv:*)", "Bash(pytest:*)", "Bash(git:*)"],
-    "deny": ["Bash(rm:*)", "Bash(curl:*)"]
+    "deny": ["Bash(rm:*)", "Bash(curl * | sh)", "Write(/etc/**)", "Write(~/.ssh/**)"]
   },
   "preset": "{{ preset }}"
 }

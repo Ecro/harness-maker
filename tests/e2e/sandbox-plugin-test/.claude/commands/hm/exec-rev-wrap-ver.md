@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.15.0
+harness_maker_version: 0.17.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: eab540564a4f789f8c9de25ec929505373023134f53fc460205811f42bb08653
+content_hash: bc4f3e700c7e1412ed644e0293863f42a737cae67035bf3a565d8606871804ea
 ---
 # /hm:exec-rev-wrap-ver
 
@@ -79,7 +79,7 @@ Engage isolation if `harness.yaml.worktree.scope` includes `execute`. The `workt
 
 
 ```bash
-!uv run --with /home/noel/harness-maker/.worktrees/execute-20260517T1454Z python -m harness_maker.worktree create execute "$(pwd)"
+!uv run --with /home/noel/harness-maker/.worktrees/execute-20260518T1438Z python -m harness_maker.worktree create execute "$(pwd)"
 ```
 
 
@@ -215,12 +215,12 @@ Pick **exactly one** finalize command. Substitute `<WT>` with the literal absolu
 ```bash
 # All phases GREEN — stage-merge the branch back (NO commit) + cleanup the worktree.
 # /hm:wrapup will create the single user-facing commit (with proper message + Co-Authored-By).
-!uv run --with /home/noel/harness-maker/.worktrees/execute-20260517T1454Z python -m harness_maker.worktree finalize <WT> stage-only
+!uv run --with /home/noel/harness-maker/.worktrees/execute-20260518T1438Z python -m harness_maker.worktree finalize <WT> stage-only
 ```
 
 ```bash
 # Stage halted on a blocker — preserve the worktree for inspection:
-!uv run --with /home/noel/harness-maker/.worktrees/execute-20260517T1454Z python -m harness_maker.worktree finalize <WT> fail
+!uv run --with /home/noel/harness-maker/.worktrees/execute-20260518T1438Z python -m harness_maker.worktree finalize <WT> fail
 ```
 
 
@@ -348,6 +348,36 @@ Before reviewers run, scan the diff against PLAN scope:
 - Files in PLAN phase's scope that have NOT changed → flag as **incomplete phase**.
 
 Drift findings get severity `P1` and surface in the REVIEW report; reviewers still run on the actual diff.
+
+#### Step 2.5 — Silent-intent-miss hook (ADR-008)
+
+If the PLAN has `common_ground_marks:` in its frontmatter (recorded by the
+inequality gate when slots were skipped as common-ground), cross-reference
+each reviewer-flagged mis-specification against that list:
+
+1. Read PLAN frontmatter `common_ground_marks` array.
+2. For each REVIEW finding that flags an under-specified slot, extract the slot identifier from the finding's structured field (NOT free-form prose — prose-only mentions are out of scope for this hook). Look it up by exact, case-sensitive match against the `slot` field of each `common_ground_marks` entry.
+3. If the slot was marked common-ground at `inferred_by: "llm-inference:*"` (i.e., the aggressive ADR-003 path inferred it as known), call:
+
+   ```python
+   from harness_maker.observability.intent_miss import record_intent_miss
+   from pathlib import Path
+
+   record_intent_miss(
+       slot=<slot>,
+       trigger="review-mismatch",
+       original_mark=<mark dict from PLAN frontmatter>,
+       notes=f"REVIEW flagged '{<slot>}' as {<reviewer finding summary>}",
+       audit_path=Path(".claude/observability") / f"silent-intent-miss-{<task_slug>}.jsonl",
+   )
+   ```
+
+4. The event is appended to `.claude/observability/silent-intent-miss-{slug}.jsonl`; `/hm:health` Layer 1 sub-check reads it to compute `silent_intent_miss_rate` for drift alerting.
+
+This is the ADR-008 telemetry hook for the aggressive common-ground-inference
+choice (ADR-003). It does NOT block REVIEW or change the verdict — it only
+records the post-hoc signal so the threshold can be re-calibrated if the
+silent-miss rate exceeds tolerance.
 
 **Emit drift_verdict** in the REVIEW report frontmatter (mandatory — wrapup and verify depend on this):
 

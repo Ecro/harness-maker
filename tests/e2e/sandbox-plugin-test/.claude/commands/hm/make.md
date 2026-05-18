@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.15.0
+harness_maker_version: 0.17.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/make.md.j2
 provenance: official
-content_hash: 7e4b614756eaacf58d32c170193a3a124dbcc985a6057e485913188d4c878dcc
+content_hash: 8de2554e65728f8fa6a24f73dfe9e44bdcee032ae6a841e1303d7eaa494df535
 ---
 # /hm:make
 
@@ -27,7 +27,7 @@ Silent re-render using existing `.claude/harness.yaml` answers. Picks up
 new template improvements without re-interviewing.
 
 ```bash
-!uv run --with /home/noel/harness-maker/.worktrees/execute-20260517T1454Z python -m harness_maker.cli make "$(pwd)" --update
+!uv run --with /home/noel/harness-maker/.worktrees/execute-20260518T1438Z python -m harness_maker.cli make "$(pwd)" --update
 ```
 
 After the CLI completes, summarize:

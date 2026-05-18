@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.15.0
+harness_maker_version: 0.17.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: stages/plan.md.j2
 provenance: official
-content_hash: fb1e2a689b648e735294bd871d8223527109b6fc831e6cece664a8ed31dd37cb
+content_hash: 18fde7d1f4fbb5b5a66718cb8be9fe8f07a2c9078bcf49b8c75156899cb6f3bf
 ---
 # Stage: plan
 
@@ -228,57 +228,49 @@ ADR template:
 **Skip gate if early exit**: If the user chose "Plan is sufficiently clear — end interview"
 in Step B this round, skip the gate below and exit the interview immediately.
 
-Otherwise, before declaring the interview complete, run the **3-Layer Deep Interview Gate**:
-Continue using the configured locale for Layer 1/2 question text and option
-labels, ambiguity explanations, score display labels, and validation prompts.
-
-**Layer 1 — GCIC Gap Check**
-
-Map all collected answers to 4 underspecification axes
-(0.0 = absent · 0.5 = partial · 1.0 = clear):
-
-- **Goals**: Purpose and desired end-state are clearly defined?
-- **Constraints**: Inviolable boundaries (ADRs, scope) are clearly defined?
-- **Inputs**: Available resources and starting state are clearly defined?
-- **Context**: Team / tooling / timeline / reviewer environment is clearly defined?
-
-For any axis < 0.7, apply the **CLARITI filter** before generating a question:
-1. Task Relevance: "Does this axis change implementation decisions?" (0–1)
-2. User Answerability: "Can the user answer this realistically now?" (0–1)
-→ Ask only if both ≥ 0.7. Otherwise log `"LLM-inferred"`.
-
-**Layer 2 — Implicit Probing**
-
-Five candidate types (use short label to track across rounds):
-- **WRONG**: "What would make you say the result is **wrong**?" → implicit rejection criteria
-- **METHOD**: "What assumptions about **how** this will be built?" → implicit method constraints
-- **STAKEHOLDER**: "Who else reviews/uses this and by what standard?" → implicit stakeholders
-- **STYLE**: "What **format or style** constraints apply?" → style requirements
-- **PERF**: "What **performance or scale** expectations?" → implicit benchmarks
-
-**MUST NOT reuse a type label** from a prior gate round (track: WRONG/METHOD/STAKEHOLDER/STYLE/PERF used).
-Batch Layer 1 and Layer 2 questions into one `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code) call (max 4).
-
-**Layer 3 — Ambiguity Score (display every round)**
+Otherwise, before declaring the interview complete, run the **5-Term Inequality Gate**
+(0.16.0, PLAN-deep-interview-question-criteria):
 
 ```
-Ambiguity Score: {X.X}/1.0  (Goal×40% + Constraint×30% + SC×30%)
-  Goals:             {g:.1f}/1.0  ✅ or ⚠️  (threshold 0.8)
-  Constraints:       {c:.1f}/1.0  ✅ or ⚠️
-  Success Criteria:  {sc:.1f}/1.0 ✅ or ⚠️
-  Weighted total:    {g*0.4 + c*0.3 + sc*0.3:.2f}
-  → PASS or NEEDS  (streak: {N}/2)
+ask(Q) iff EIG(Q) ≥ ε  ∧  TaskRel·UserAns ≥ 0.7
+        ∧ slot ∉ common_ground  ∧  confidence < τ
+        ∧ open_ended_count < cap_locale
 ```
 
-Inputs/Context absorbed into Goals/Constraints scores. Score monotonicity rule:
-score must not decrease from the prior round given the same answers; a drop ≥ 0.1
-requires a one-line `[score-drop-reason]: ...` note appended to the Layer 3
-display block, then applied.
+Continue using the configured locale for all live gate text.
 
-**Gate convergence**: total ≥ 0.8 AND all dims ≥ 0.7, **2 consecutive rounds**
-→ PASS → exit check proceeds to the standard exit conditions below.
-On **NEEDS**: generate new Layer 1/2 questions (no repeats). Max **3 rounds**.
-After 3 NEEDS, offer: "Proceed with current answers (some ambiguity accepted)?"
+**Term meanings (this stage's settings, rendered from harness.yaml):**
+
+1. **EIG** — Expected information gain ≥ `ε = 0.5`. Skip Qs whose answer won't change PLAN content (ADRs / phase scope / risk register).
+2. **CLARITI** — Task-relevance × user-answerability ≥ 0.7. Skip Qs the user cannot answer right now (e.g. depends on a downstream measurement).
+3. **Common-ground** — Skip slots already determined by CLAUDE.md / harness.yaml / prior interview answers / SPEC frontmatter (when SPEC exists) / RESEARCH frontmatter / same-slug PLAN|REVIEW history, **OR** by LLM self-inference at confidence ≥ 0.95 (kill-switch: `interview.deep_gate.common_ground.llm_inference_enabled: false` in harness.yaml).
+4. **Confidence** — Slot's current resolution confidence must be `< τ = 0.7`. Architectural decisions reach the ADR threshold once confidence ≥ τ.
+5. **Open-ended cap** — At most `2` open-ended question(s) per turn for locale `en`. Closed-form (multi-select / yes-no) unrestricted.
+
+<!-- F6-deferred: see inequality_gate.py; F6 wires the real mechanism.
+     Locale cap above is render-time baked — re-render to refresh after locale change. -->
+
+**Per-round display (ADR-005):**
+
+```
+✅ EIG ✅ CLARITI ❌ common-ground ✅ confidence ✅ open-ended → 4/5 met (NEEDS)
+```
+
+Render the checklist for EVERY candidate question. A candidate is asked iff
+all 5 terms are ✅. The "common-ground" term is the primary defense against
+asking obvious questions; silent-intent-miss telemetry (ADR-008) monitors
+its post-hoc accuracy and surfaces in `/hm:health`.
+
+**Question generation:** LLM generates 1-3 follow-up candidates targeting the
+PLAN's remaining ambiguity (architecture / contract / risk / phasing).
+WRONG / METHOD / STAKEHOLDER / STYLE / PERF style cues are inputs to the
+generator, not gating labels (post-hoc classification covers coverage drift
+per ADR-010 — see Phase 7 coverage_classifier). Ranking is by EIG descending.
+
+**Gate exit:** proceed to the standard exit conditions below once either:
+- All PLAN slots reach confidence ≥ τ (the inequality naturally stops the loop), OR
+- User chose "Plan is sufficiently clear — end interview", OR
+- User chose "Proceed with current ambiguity accepted" after a non-progressing round.
 
 ---
 

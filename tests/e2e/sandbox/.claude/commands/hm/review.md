@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.15.0
+harness_maker_version: 0.17.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/atomic_command.md.j2
 provenance: official
-content_hash: 881cb2d55564c9b50d193a9e44c1535d6d23631062d55b60781d0966b39e64f5
+content_hash: b1306892e94a13dc757daece41fdeacff694a89b599dd577fcba1c322a0cf302
 ---
 # Stage: review
 
@@ -92,6 +92,36 @@ Before reviewers run, scan the diff against PLAN scope:
 - Files in PLAN phase's scope that have NOT changed → flag as **incomplete phase**.
 
 Drift findings get severity `P1` and surface in the REVIEW report; reviewers still run on the actual diff.
+
+#### Step 2.5 — Silent-intent-miss hook (ADR-008)
+
+If the PLAN has `common_ground_marks:` in its frontmatter (recorded by the
+inequality gate when slots were skipped as common-ground), cross-reference
+each reviewer-flagged mis-specification against that list:
+
+1. Read PLAN frontmatter `common_ground_marks` array.
+2. For each REVIEW finding that flags an under-specified slot, extract the slot identifier from the finding's structured field (NOT free-form prose — prose-only mentions are out of scope for this hook). Look it up by exact, case-sensitive match against the `slot` field of each `common_ground_marks` entry.
+3. If the slot was marked common-ground at `inferred_by: "llm-inference:*"` (i.e., the aggressive ADR-003 path inferred it as known), call:
+
+   ```python
+   from harness_maker.observability.intent_miss import record_intent_miss
+   from pathlib import Path
+
+   record_intent_miss(
+       slot=<slot>,
+       trigger="review-mismatch",
+       original_mark=<mark dict from PLAN frontmatter>,
+       notes=f"REVIEW flagged '{<slot>}' as {<reviewer finding summary>}",
+       audit_path=Path(".claude/observability") / f"silent-intent-miss-{<task_slug>}.jsonl",
+   )
+   ```
+
+4. The event is appended to `.claude/observability/silent-intent-miss-{slug}.jsonl`; `/hm:health` Layer 1 sub-check reads it to compute `silent_intent_miss_rate` for drift alerting.
+
+This is the ADR-008 telemetry hook for the aggressive common-ground-inference
+choice (ADR-003). It does NOT block REVIEW or change the verdict — it only
+records the post-hoc signal so the threshold can be re-calibrated if the
+silent-miss rate exceeds tolerance.
 
 **Emit drift_verdict** in the REVIEW report frontmatter (mandatory — wrapup and verify depend on this):
 

@@ -105,15 +105,9 @@ def test_invalid_confidence_coerced_to_zero() -> None:
 def test_multiple_events_append_to_jsonl(tmp_path: Path) -> None:
     """Each call appends ONE line; the file is JSONL (one JSON object per line)."""
     audit = tmp_path / "im.jsonl"
-    record_intent_miss(
-        "A", trigger="review-mismatch", original_mark=_mark("A"), audit_path=audit
-    )
-    record_intent_miss(
-        "B", trigger="session-reopen", original_mark=_mark("B"), audit_path=audit
-    )
-    lines = [
-        line for line in audit.read_text(encoding="utf-8").splitlines() if line.strip()
-    ]
+    record_intent_miss("A", trigger="review-mismatch", original_mark=_mark("A"), audit_path=audit)
+    record_intent_miss("B", trigger="session-reopen", original_mark=_mark("B"), audit_path=audit)
+    lines = [line for line in audit.read_text(encoding="utf-8").splitlines() if line.strip()]
     assert len(lines) == 2
     payloads = [json.loads(line) for line in lines]
     assert payloads[0]["slot"] == "A"
@@ -159,9 +153,7 @@ def test_simulated_review_hook_contract(tmp_path: Path) -> None:
     events_recorded: list[IntentMissEvent] = []
     for slot in review_flagged_slots:
         # Look up the original mark by slot name.
-        original = next(
-            (m for m in plan_frontmatter_marks if m["slot"] == slot), None
-        )
+        original = next((m for m in plan_frontmatter_marks if m["slot"] == slot), None)
         if original is None:
             continue  # not common-ground — no intent-miss
         event = record_intent_miss(

@@ -1,6 +1,6 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.15.0
+harness_maker_version: 0.17.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: skills/autoloop-driver/SKILL.md.j2
 provenance: official
@@ -10,7 +10,7 @@ description: Orchestration guide for /hm:loop. Covers two modes (feature and imp
   loop intensity + exit criteria checklist (4-gate convergence), improve-mode loop
   body invariants, and safety rails. The /hm:loop command file owns the per-step procedure;
   this skill explains WHY and the invariants Claude must hold.
-content_hash: 60d2d196d0242e61c149a01b87bc5a83a921411a0f9c2a97908117a82e45989d
+content_hash: 135e175ca2833377f3a6741f76aff2cdae22d82e0c953268eb5821666cc5dccf
 ---
 
 # autoloop-driver
@@ -18,23 +18,10 @@ content_hash: 60d2d196d0242e61c149a01b87bc5a83a921411a0f9c2a97908117a82e45989d
 `/hm:loop` is **prompt-driven and LLM-maximised**. Claude plays the role of
 the autoloop driver. No Python module is imported at runtime.
 
-
-## When to invoke vs skip
-
-**Invoke when:**
-- `/hm:loop "<goal>"` starts and the orchestrator needs the WHY behind feature/improve mode + per-loop worktree invariants.
-- A loop iteration boundary needs to confirm the LoopContext schema rules.
-
-**Skip when:**
-- A single non-loop stage runs (`/hm:execute`, `/hm:review`, etc.) — autoloop-driver is loop-scope.
-- The loop is interrupted mid-iteration (resume logic lives in the command file, not this skill).
 ## Two Modes
 
-**`feature` mode (default)**: implement discrete features one per iteration.
-Executor = configured fused workflow. Convergence = named predicate.
-
-**`improve` mode**: continuous quality improvement — review → fix → test →
-review — until LLM judges stopping criteria met. No feature list.
+- **`feature`** (default): one discrete feature per iteration. Executor = configured fused workflow; convergence = named predicate.
+- **`improve`**: continuous quality loop (review → fix → test → re-review) until LLM judges stopping criteria met. No feature list.
 
 Mode detection order: explicit `--mode` flag → spec `mode` field → keyword
 scan of goal (`improve`, `refactor`, `quality`, `clean`, `cleanup`,
@@ -42,10 +29,14 @@ scan of goal (`improve`, `refactor`, `quality`, `clean`, `cleanup`,
 
 ## Coverage-Driven Adaptive Interview
 
-**Invariant**: zero ambiguity before the first iteration. The interview is
-not a fixed script — it is a coverage problem solved by LLM judgment.
-
-Five required dimensions (every loop, every mode):
+**Invariant**: zero ambiguity before iter 1. The interview is a coverage
+problem over 5 dimensions, solved by LLM judgment — not a fixed script.
+Claude extracts answers from source material first; only missing/ambiguous
+dimensions trigger the structured question tool (`AskQuestion` in Cursor,
+`AskUserQuestion` in Claude Code, `request_user_input` in Codex).
+Actionability is LLM-judged, not regex. No question cap. Step 4-G fires
+**before** 4-B so the quality bar is set first; 4-B post-hook proposes
+measurable `stopping_criteria` items as additional `ExitCriterion`.
 
 | Dimension | Actionable = |
 |-----------|-------------|
@@ -55,28 +46,11 @@ Five required dimensions (every loop, every mode):
 | **test_reliability** | Coverage % or scenario count + known gaps |
 | **stopping_criteria** | Measurable bar (issue counts, test results) |
 
-**Interview order** — step 4-G fires **before** 4-B (missing dimensions):
-4-G locks in `loop_intensity` and `exit_criteria_checklist` first, so the
-quality bar is known before the rest of the context is collected.
-After 4-B finalises `stopping_criteria`, the 4-B post-hook re-scans for
-measurable conditions and proposes them as additional `ExitCriterion` items.
-
-**Extraction first**: Claude reads all source material and extracts answers
-with LLM comprehension before asking anything. Only missing or ambiguous
-dimensions trigger the structured question tool (`AskQuestion` in Cursor, `AskUserQuestion` in Claude Code, `request_user_input` in Codex).
-
-**Ambiguity judgment**: after each answer, Claude evaluates actionability
-via LLM — not regex. A future Claude reading only the context file must
-be able to make correct decisions without asking again. If not, generate
-a targeted follow-up. No question cap.
-
 ## Context Persistence
 
-`work-docs/loop-context/<slug>.yaml` — survives across multiple loop runs.
-Merge on re-run: keep unchanged answers, update new ones, append notes.
-
-`.claude/loop-specs/<slug>.yaml` — generated per run, references context
-via `context_ref`.
+`work-docs/loop-context/<slug>.yaml` survives across runs (merge: keep
+unchanged answers, update new, append notes). `.claude/loop-specs/<slug>.yaml`
+is generated per run and references context via `context_ref`.
 
 ## Loop Intensity + Exit Criteria
 
@@ -90,73 +64,42 @@ via `context_ref`.
 | `maximum` | + security scan, no regressions |
 
 `exit_criteria_checklist: list[ExitCriterion]` — each item has `label`,
-`cmd` (shell command or `""`), and `required` flag. All items in the list
-are checked at convergence time via the 4-gate system.
+`cmd` (shell or `""`), `required` flag. Checked by the 4-gate system.
 
 ## 4-Gate Convergence
 
-Replace single-LLM stopping judgment with four independent gates. All must
-pass for 2 consecutive iters (`convergence_streak >= 2`):
+Four independent gates replace single-LLM stopping judgment. All pass for 2
+consecutive iters (`convergence_streak >= 2`) → converged.
 
-- **Gate 1 — Mechanical**: run `ExitCriterion.cmd` items; exit 0 = pass.
-  Skip items where `cmd=""`. `required: false` failures = warning only.
-- **Gate 2 — LLM individual**: evaluate each criterion's `label` independently
-  against current `<WT>` state. Deadlock detector: `criterion_ambiguity_counts[label]`
-  increments on "Ambiguous"; at 3 → structured question tool (continue/accept/remove).
-  Persist counts to `runtime.criterion_ambiguity_counts` after each iter.
-- **Gate 3 — Regression**: baseline = exit-code + set of failing test names,
-  stored as `runtime.last_test_result`. No prior baseline → Gate 3 passes
-  unconditionally (post-compaction safe). Skip on iter 1.
-- **Gate 4 — Streak**: `convergence_streak` is the **single reset site**.
-  Gates 1+2+3 pass → `convergence_streak += 1` (persisted to
-  `runtime.convergence_streak`); any gate fails → `convergence_streak = 0`.
-  Converged when streak ≥ 2.
+- **Gate 1 — Mechanical**: run `ExitCriterion.cmd`; `required:false` failures = warning.
+- **Gate 2 — LLM individual**: evaluate each criterion's `label` against `<WT>`. Deadlock detector at 3 "Ambiguous" → question tool.
+- **Gate 3 — Regression**: baseline = exit-code + failing test names. No prior baseline → pass; skip on iter 1.
+- **Gate 4 — Streak**: single reset site. All 3 pass → increment; any fail → 0.
 
 ## Improve Mode — Invariants
 
-Each iteration: read target → review (classify critical/high/medium/low)
-→ run 4-gate convergence check → fix if not converged → run tests
-→ re-review. The convergence check runs **before** fixing (converge early
-when criteria are already met).
+Each iter: read target → review (classify critical/high/medium/low) →
+4-gate check → fix if not converged → tests → re-review. Convergence check
+runs **before** fixing (converge early when criteria already met).
 
-Hard invariants:
-- Never make changes that would cause context invariants to be violated
-- Convergence requires 4-gate ALL-pass for 2 consecutive iters, not a
-  single LLM judgment that "stopping criteria are met"
+- Never change anything that violates context invariants
+- Convergence requires 4-gate ALL-pass × 2 iters, not a single LLM verdict
 - Detect test command from project structure (Makefile, pyproject.toml…)
 
-## Safety Rails (always on, never skip)
+## Safety Rails (always on)
 
 1. `iter >= max_iter` → halt
 2. `elapsed >= time_h × 3600` → halt
-3. `failed_streak >= N` → halt (default N=5, configurable via `--failed-streak-cap`)
-4. *(feature mode only)* Same feature retried ≥ 3 times → halt and report
-   blocker. Not applicable in improve mode (no feature list).
+3. `failed_streak >= N` → halt (default N=5, `--failed-streak-cap`)
+4. *(feature mode only)* same feature retried ≥ 3 times → halt + blocker report
 5. Ping every 5 iterations
 6. Convergence check **before** each iteration body
 
-## LLM-Maximised Design Principle
+## Non-stopping Discipline
 
-Every judgment benefiting from language understanding is delegated to Claude:
-ambiguity detection, follow-up question generation, answer extraction from
-source documents, stopping criteria evaluation, issue classification.
-Python types enforce schema and enable unit tests — they contain no
-business logic.
-
-## Dev-time Python API (NOT for runtime use)
-
-`harness_maker.autoloop_driver`: `LoopMode`, `LoopIntensity`, `ExitCriterion`,
-`ImprovementContext`, `LoopContext`, `Feature`, `LoopSpec`, `AutoloopState`,
-`detect_mode`, `parse_goal`, `parse_loop_spec`, `parse_loop_context`,
-`is_loop_consumable`, `run`. Exists for harness-maker unit tests only.
-`/hm:loop` must not import.
-
-## Reference
-
-- Command: Claude Code: `commands/hm/loop.md` · Codex: `@hm-loop` skill
-- Agent: `autoloop-coder` (per-iteration implementation worker)
-- Context: `work-docs/loop-context/<slug>.yaml`
-- Spec: `.claude/loop-specs/<slug>.yaml`
+Iteration boundaries are checkpoints, not stop signs. Unless a safety rail
+fires or the 4-gate streak ≥ 2, the loop continues without prompting the
+user. See `commands/hm/loop.md` for the canonical procedure.
 
 <!-- @hm:user:extensions -->
 <!-- Project-specific autoloop rules. Preserved across upgrades. -->

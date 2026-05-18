@@ -199,6 +199,19 @@ def _merge_permissions(
         existing_list = existing_perms.get(key, [])
         if not isinstance(new_list, list) or not isinstance(existing_list, list):
             continue
+        # Skip emitting the sub-key when neither side provided it. Without this
+        # guard, the second render adds `"ask": []` (since new_perms.get default
+        # was substituted into out via dict(new_perms)? No — actually the bug
+        # is that we always set out[key] = [] when both sides empty, which adds
+        # a key that wasn't present in either input. Idempotency requires not
+        # creating phantom keys. (Phase 4 byte-identical regression guard.)
+        if (
+            not new_list
+            and not existing_list
+            and key not in new_perms
+            and key not in existing_perms
+        ):
+            continue
         seen: set[str] = set()
         merged_list: list[str] = []
         for item in (*new_list, *existing_list):

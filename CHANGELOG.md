@@ -1,5 +1,72 @@
 # Changelog
 
+## 0.17.0 — Fresh-install /hm:health zero false-positive P0 (2026-05-19)
+
+PLAN-fresh-install-health-baseline. A freshly-rendered `/hm:make` harness
+now passes its own `/hm:health` with zero P0 outside a small, named
+allowlist of "intended fresh-install noise" (telemetry × 2, CI workflow,
+governance docs requiring user authoring). Bundles 4 fix categories:
+template gaps, Side context-lint threshold raise, unknown-stack
+auto-degrade, telemetry intended-noise allowlist.
+
+### Highlights
+
+- **Templates ship security + memory baselines**:
+  - `harness.yaml` now renders a `memory:` block by default
+    (`{enabled: true, dir: .claude/memory, files: [failures.md, wiki.md]}`).
+  - `settings.json` `permissions.deny` ships 4 baseline patterns on
+    both Side and Production: `["Bash(rm:*)", "Bash(curl * | sh)",
+    "Write(/etc/**)", "Write(~/.ssh/**)"]`.
+- **Side context-lint thresholds raised** to match shipped content:
+  agent ≤ 150 (was 100), skill ≤ 100 (was 50). Production unchanged
+  at 200/150. Side identity now differentiates on reviewer count +
+  grade threshold + spec_gate, not on prompt size (ADR-001).
+- **Unknown-stack auto-degrade**: projects without recognized manifest
+  (board YAML, shell-only, etc.) no longer cascade into two P0 signals
+  from `_detect_stacks() == set()`. Both `stack_detected` and
+  `tests_present` weights drop to 5/10 advisory on unknown stack
+  (ADR-004).
+- **Telemetry intended-noise allowlist**: `metrics_jsonl_present` hint
+  copy clarified ("First Claude Code tool use will create this file
+  (PostToolUse hook is installed).") + `INTENDED_P0_SIGNALS` constant
+  exposed for the new fresh-install integration test gate (ADR-006).
+- **`_merge_permissions` idempotency fix** (`render.py`) — no phantom
+  `ask: []` key emitted when neither input had it. Repeated `/hm:make`
+  now produces byte-identical output.
+
+### BREAKING — Production `permissions.deny` scope narrowed
+
+Production previously shipped `["Bash(rm:*)", "Bash(curl:*)"]` (broader
+`curl:*` blocks ALL curl). New baseline collapses to the 4-pattern
+canonical (`Bash(curl * | sh)` only), aligning Side·Production identical
+per ADR-003 option A. **Production users relying on blanket curl block
+silently lose that protection on re-render**. If your project needs
+all-curl blocked, append `Bash(curl:*)` to `permissions.deny` after the
+next `/hm:make`; the user addition is preserved via `_merge_permissions`
+list-union semantics.
+
+### Migration
+
+No flag. Existing 0.16.x users running `/hm:make` once pick up the
+additive baselines automatically via the existing render path
+(`_merge_permissions` list-union for `settings.json`,
+`_preserve_yaml_user_keys` + template-emit for `harness.yaml.memory:`).
+
+### Quality gate
+
+New integration test `tests/integration/test_fresh_install_readiness.py`
+runs in `release.yml` quality-gate with `INTEGRATION=1`. 5 cases: fresh
+Side + Production within composite-score floors (66 / 72 measured);
+existing-install harness.yaml + settings.json migration via existing
+render semantics; byte-identical idempotency on re-render.
+
+### Loop UX
+
+`commands/hm/loop.md.j2` gains a "Non-stopping discipline" section —
+codifies that `/hm:loop` iters never halt for verification or status
+confirmation. Background-task notifications trigger automatic next-step
+transitions, not user reports.
+
 ## 0.16.0 — BREAKING: 5-term inequality deep-interview gate replaces 3-layer (2026-05-18)
 
 PLAN-deep-interview-question-criteria. Replaces the 3-layer interview gate

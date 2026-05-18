@@ -165,8 +165,8 @@ Cursor / Codex 의 plugin marketplace 가 GitHub 에서 직접 fetch.
 
 ## Context Lint (v1.6)
 - CLAUDE.md ≤ Side 200행 / Production 500행
-- agent prompt ≤ Side 100행 / Production 200행
-- skill SKILL.md ≤ Side 50행 / Production 150행
+- agent prompt ≤ Side 150행 / Production 200행
+- skill SKILL.md ≤ Side 100행 / Production 150행
 - `.cursor/rules/*.mdc` ≤ 500행 (Cursor 권장. 분할 권장 임계 200행)
 - 초과 시 renderer 가 warn
 

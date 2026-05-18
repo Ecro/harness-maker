@@ -64,7 +64,7 @@ files:
   body_sha256: 8043f244b91b8091d3c61b67e2ffc0fc052912bd8f40002224d9c3f7ed35c2a5
 - path: commands/hm/loop.md
   template: commands/hm/loop.md.j2
-  body_sha256: 9f562f7f9516e9488ff1f961cc9dad7b2c2dbe80ac4afd2870857798c80a8681
+  body_sha256: 3888d7f1771277695ddb1e17ebc6e601a6c1cab9a119e82f52bd4f447d36b125
 - path: commands/hm/make.md
   template: commands/hm/make.md.j2
   body_sha256: 730db90508c63b53a9197b64bc5d4cad35312a64b130898f7b16d0da90aa9244
@@ -94,7 +94,7 @@ files:
   body_sha256: bfc3d3064b3091687634e607c524bdd910a28a0d3a17c0462b778f6d60cc4e9d
 - path: harness.yaml
   template: harness-yaml/Production.yaml.j2
-  body_sha256: f4e560c9fb8c3ebfa80799fbdae1be6c5280d810083813b1a06a3ed809e330cb
+  body_sha256: 36a3d29317475b3e1018839e94443a8ed738416b9b7b22255edb994970be8fa0
 - path: hooks/hooks.json
   template: hooks/hooks.json.j2
   body_sha256: 92f746338c07975c1c9b1fac1971f8353d31e165dc80a8107171c3ae8bfd7218
@@ -124,7 +124,7 @@ files:
   body_sha256: bd46a9af3e1a0912ef132227b7b509bbc3c1a14758c9fb620dd1392f2059899f
 - path: settings.json
   template: settings/Production.json.j2
-  body_sha256: ccca560d99dc320945f8c31c92e5c69ecbcf2d615bc145496ae9583698b7c11d
+  body_sha256: cb9f95dbabab7fc630345ae4d4dbb7a7cd4e29e278ece023d97110ed2d567e5d
 - path: skills/agent-quality-rubric/SKILL.md
   template: skills/agent-quality-rubric/SKILL.md.j2
   body_sha256: 47aeaa6729c0aac5bfecb437cb41204317c912542f650e89ff0a78c7d36ddeb0
@@ -133,7 +133,7 @@ files:
   body_sha256: 752821a90419f28cf346ca5be6c3964a16807db4f82184875092ad75c8e1069e
 - path: skills/autoloop-driver/SKILL.md
   template: skills/autoloop-driver/SKILL.md.j2
-  body_sha256: 60d2d196d0242e61c149a01b87bc5a83a921411a0f9c2a97908117a82e45989d
+  body_sha256: 135e175ca2833377f3a6741f76aff2cdae22d82e0c953268eb5821666cc5dccf
 - path: skills/conditional-router/SKILL.md
   template: skills/conditional-router/SKILL.md.j2
   body_sha256: 83644120dd2c6fd16289ec749f4f8f57895e2c055b19e540f588cb254c08f726
@@ -154,7 +154,7 @@ files:
   body_sha256: 1e383cfd05adf9ed189ab003a54c6e21467d3330c0fb7fab97d2d84009d29937
 - path: skills/verify-before-completion/SKILL.md
   template: skills/verify-before-completion/SKILL.md.j2
-  body_sha256: e2a7e0c549c647192b6cf0a53b23673d21fa7b28b9a473b7a46ef705f2f16e7b
+  body_sha256: a34a1e7064e17d85aaf3a90ab05e761e066a4b48d99a1a404eb5f88a4e491f55
 - path: skills/worktree-isolator/SKILL.md
   template: skills/worktree-isolator/SKILL.md.j2
   body_sha256: f041a9abf2791ee59eaefc867a7f3dbc47d31860282f3ff527bfc2607ccfdec5

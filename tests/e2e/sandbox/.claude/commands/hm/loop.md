@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.15.0
+harness_maker_version: 0.17.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/loop.md.j2
 provenance: official
-content_hash: 350d29526cf131c6cd629e8ab1e11c95cd2f824250d4169de334e45d86b85722
+content_hash: 00ac133c230a72b2d9532b9e2471eef9774b955780b7d7765decaf869b0feff8
 ---
 # /hm:loop
 
@@ -17,6 +17,34 @@ parse input, detect mode, run the adaptive interview, track state, invoke
 the per-iteration workflow, and enforce safety rails. Do NOT try to import
 any Python module — `harness_maker.*` exists only in the harness-maker
 development repository, not in the projects this command runs in.
+
+## Non-stopping discipline (autoloop invariant)
+
+**Never halt the loop for verification or status confirmation.** The whole
+point of `/hm:loop` is autonomous progress; pausing every gate check defeats
+the value. Concretely:
+
+- Gates green (pytest, lint, mypy, snapshot) → proceed to the next phase
+  immediately. A one-line status line is fine; **do not wait for user input**.
+- Gates red → run one autofix cycle (autoloop-coder or direct Edit). If still
+  red after a second attempt, increment `failed_streak`; safety rail #3 fires
+  at the configured cap.
+- Background-task notifications are NOT user input. When a backgrounded
+  `pytest` / `mypy` completes, immediately read the result and continue the
+  iter — do not summarize back to the user mid-iter and wait.
+- code-reviewer returning `NEEDS_WORK` → fix and re-review automatically.
+  Only escalate after **3 consecutive** NEEDS_WORK on the same diff slice.
+
+**Halt only for:**
+1. A safety rail fires (max-iter, time cap, failed-streak cap, hard error).
+2. An architectural ambiguity that genuinely changes implementation direction
+   (e.g., the PLAN's validator demands an ADR pivot). "Should I rename this
+   variable?" is not such a question — pick a sensible default and proceed.
+3. A spec-marked halt point (e.g., release `git tag` push, irreversible side
+   effects on shared infra).
+
+If unsure whether something qualifies as a halt point: **don't halt**. The
+worktree is reversible; converging-then-rolling-back costs less than asking.
 
 ## Usage
 
@@ -280,69 +308,51 @@ the convergence predicate obvious:
   `min-N-features`, `stopping-criteria`).
 - `improve` mode: always `stopping-criteria` (LLM evaluates each iteration).
 
-#### 4-H. 3-Layer Deep Interview Gate
+#### 4-H. 5-Term Inequality Gate
 
 Runs after steps 4-B through 4-E complete, before persisting context (4-F).
-This gate surfaces implicit requirements missed by the 5-dimension interview.
-Continue using the configured locale for Layer 1/2 question text and option
-labels, ambiguity explanations, score display labels, and validation prompts.
-
-**Layer 1 — GCIC Gap Check**
-
-Map the 5 collected dimensions to 4 underspecification axes
-(0.0 = absent · 0.5 = partial · 1.0 = clear):
-
-- **Goals**: `purpose` + `stopping_criteria` clearly define the desired end-state?
-- **Constraints**: `invariants` covers all inviolable boundaries?
-- **Inputs**: `test_reliability` captures available tooling and starting state?
-- **Context**: `priority` + `immediate_task` capture team/environment adequately?
-
-Dimensions already scored 1.0 from the 5-dimension interview are skipped.
-For any axis < 0.7, apply the **CLARITI filter** before asking:
-1. Task Relevance: "Does knowing this axis change loop execution decisions?" (0–1)
-2. User Answerability: "Can the user answer this now?" (0–1)
-→ Ask only if **both ≥ 0.7**. Otherwise log `"LLM-inferred"`.
-
-**Layer 2 — Implicit Probing**
-
-Read all collected context. Dynamically generate 1–3 reverse questions from
-the most contextually relevant candidate types (apply CLARITI filter to each):
-
-Five candidate types (use short label to track across rounds):
-- **WRONG**: "What would make you say the result is **wrong**?" → implicit rejection criteria
-- **METHOD**: "What assumptions about **how** this will be done?" → implicit method constraints
-- **STAKEHOLDER**: "Who else reviews/uses this output and by what standard?" → implicit stakeholders
-- **STYLE**: "What **format or style** constraints apply?" → style (hardest to elicit)
-- **PERF**: "What **performance or scale** expectations exist?" → implicit benchmarks
-
-**MUST NOT reuse a type label** from a previous round (track: WRONG/METHOD/STAKEHOLDER/STYLE/PERF used).
-Batch Layer 1 and Layer 2 questions into one `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code) call (max 4).
-
-**Layer 3 — Ambiguity Score (display and gate)**
-
-After receiving answers, compute and display:
+This gate surfaces implicit requirements the 5-dimension interview missed
+by filtering candidate follow-up questions through the 5-term inequality
+(0.16.0, PLAN-deep-interview-question-criteria):
 
 ```
-Ambiguity Score: {X.X}/1.0  (Goal×40% + Constraint×30% + SC×30%)
-  Goals:             {g:.1f}/1.0  ✅ or ⚠️  (threshold 0.8)
-  Constraints:       {c:.1f}/1.0  ✅ or ⚠️
-  Success Criteria:  {sc:.1f}/1.0 ✅ or ⚠️
-  Weighted total:    {g*0.4 + c*0.3 + sc*0.3:.2f}
-  → PASS or NEEDS  (streak: {N}/2)
+ask(Q) iff EIG(Q) ≥ ε  ∧  TaskRel·UserAns ≥ 0.7
+        ∧ slot ∉ common_ground  ∧  confidence < τ
+        ∧ open_ended_count < cap_locale
 ```
 
-Inputs/Context gaps resolved in Layer 1 are absorbed into Goals/Constraints scores
-respectively. Score monotonicity rule: score must not decrease round-over-round given
-the same answers; a drop ≥ 0.1 requires a one-line `[score-drop-reason]: ...` note
-appended to the Layer 3 display block, then applied.
+Continue using the configured locale for all live gate text.
 
-**Convergence**: total ≥ 0.8 AND all dims ≥ 0.7, **2 consecutive rounds** → PASS
-→ proceed to step 4-F (Persist context).
+**Term meanings (this stage's settings, rendered from harness.yaml):**
 
-On **NEEDS**: return to Layer 1 (focus on failing axis); generate new Layer 2
-probes (no repeats). Max **3 rounds**. After 3 NEEDS, offer via `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code):
-- A: "Proceed — accept current ambiguity and start loop"
-- B: "Refine further — return to Layer 1 with new focus"
+1. **EIG** — Expected information gain ≥ `ε = 0.5`. Skip Qs whose answer won't change loop-execution decisions (intensity, exit criteria, convergence predicate, feature list).
+2. **CLARITI** — Task-relevance × user-answerability ≥ 0.7. Skip Qs the user cannot answer right now.
+3. **Common-ground** — Skip dimensions already determined by CLAUDE.md / harness.yaml / prior interview answers / `--spec` file content / SPEC|RESEARCH frontmatter when present, **OR** by LLM self-inference at confidence ≥ 0.95 (kill-switch: `interview.deep_gate.common_ground.llm_inference_enabled: false` in harness.yaml).
+4. **Confidence** — Dimension's current resolution confidence must be `< τ = 0.7`. Once a dimension reaches τ it is considered actionable; the loop body can use it.
+5. **Open-ended cap** — At most `2` open-ended question(s) per turn for locale `en`. Closed-form (multi-select / yes-no) unrestricted.
+
+<!-- F6-deferred: see inequality_gate.py; F6 wires the real mechanism.
+     Locale cap above is render-time baked — re-render to refresh after locale change. -->
+
+**Per-round display (ADR-005):**
+
+```
+✅ EIG ✅ CLARITI ❌ common-ground ✅ confidence ✅ open-ended → 4/5 met (NEEDS)
+```
+
+Render the checklist for EVERY candidate. A candidate is asked iff all 5
+terms are ✅. The "common-ground" term prevents asking the obvious; silent-
+intent-miss telemetry (ADR-008) surfaces in `/hm:health` to monitor post-hoc
+accuracy of the aggressive ADR-003 inference path.
+
+**Question generation:** LLM generates 1-3 follow-up candidates targeting
+the 5 loop dimensions (`purpose`, `invariants`, `priority`, `test_reliability`,
+`stopping_criteria`). Style cues (WRONG / METHOD / STAKEHOLDER / STYLE / PERF)
+are inputs to the generator, not gating labels. Ranking is by EIG descending.
+
+**Exit:** proceed to step 4-F (Persist context) once either:
+- All 5 dimensions reach confidence ≥ τ (the inequality naturally stops the loop), OR
+- User chose "Proceed with current ambiguity accepted" after a non-progressing round.
 
 #### 4-F. Persist context
 
@@ -413,7 +423,7 @@ worktree would explode commit count.
 
 
 ```bash
-!uv run --with /home/noel/harness-maker/.worktrees/execute-20260517T1454Z python -m harness_maker.worktree create execute "$(pwd)"
+!uv run --with /home/noel/harness-maker/.worktrees/execute-20260518T1438Z python -m harness_maker.worktree create execute "$(pwd)"
 ```
 
 
@@ -697,7 +707,7 @@ When the loop halts (convergence, safety rail, or hard error):
 
 
    ```bash
-   !uv run --with /home/noel/harness-maker/.worktrees/execute-20260517T1454Z python -m harness_maker.worktree finalize <WT> <STATUS>
+   !uv run --with /home/noel/harness-maker/.worktrees/execute-20260518T1438Z python -m harness_maker.worktree finalize <WT> <STATUS>
    ```
 
 

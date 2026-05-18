@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.15.0
+harness_maker_version: 0.17.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: stages/spec.md.j2
 provenance: official
-content_hash: ef99352d431a71b6a9ca392c248fbd8080b1a034edbabf7642c02b016b838ffe
+content_hash: 3a68eff22b69baf34a6fc8d4451fcbe1164182551a8769b712d3bfcb05a70b10
 ---
 # Stage: spec
 
@@ -97,70 +97,54 @@ Skip a category when sufficiently answered by prior research, prior SPEC, or ear
 5. **Constraints** — HW, SW, security, performance, compatibility, **and test framework** (mandatory — pick `pytest` / `gtest` / `vitest` / `bats` / etc; `/hm:execute` Phase A uses this to write tests).
 6. **Verification Criteria** — per-scenario, how we'll prove it: unit / integration / manual. Each scenario MUST map to at least one verification mode.
 
-#### 2.5 — 3-Layer Deep Interview Gate
+#### 2.5 — 5-Term Inequality Gate
 
-Runs after all 6 categories are complete (or skipped), before closing the
-interview. This gate surfaces requirements the structured categories miss.
-Continue using the configured locale for Layer 1/2 question text and option
-labels, ambiguity explanations, score display labels, and validation prompts.
-
-**Skip if early exit**: If the user chose "SPEC is sufficiently clear — end interview"
-in any prior §2.1 round, skip §2.5 entirely and proceed to §2.2.
-
-**Layer 1 — GCIC Gap Check**
-
-Map the collected answers to 4 underspecification axes and score each
-(0.0 = absent · 0.5 = partial/vague · 1.0 = clear and actionable):
-
-- **Goals**: Intent + Outcomes clearly define the desired end-state?
-- **Constraints**: Constraints category covers all inviolable boundaries?
-- **Inputs**: Scenarios (Given clauses) + Constraints capture available resources?
-- **Context**: Constraints / Non-Goals capture team / tooling / reviewer environment?
-
-For any axis scoring below 0.7, apply the **CLARITI filter** before asking:
-1. Task Relevance: "Does knowing this axis change the task outcome?" (0–1)
-2. User Answerability: "Can the user realistically answer this now?" (0–1)
-→ Ask only if **both ≥ 0.7**. Otherwise log `"LLM-inferred"` and skip.
-
-**Layer 2 — Implicit Probing**
-
-Read all collected answers. Dynamically generate 1–3 reverse questions from
-the candidate types most relevant to this specific context (apply CLARITI filter
-to each candidate before selecting):
-
-Five candidate types (use short label to track across rounds):
-- **WRONG**: "What would make you say the result is **wrong**?" → implicit rejection criteria
-- **METHOD**: "What assumptions about **how** this will be built?" → implicit method constraints
-- **STAKEHOLDER**: "Who else reviews/uses this output and by what standard?" → implicit stakeholders
-- **STYLE**: "What **format or style** constraints apply?" → style (hardest type to elicit)
-- **PERF**: "What **performance or scale** expectations exist?" → implicit benchmarks
-
-**MUST NOT reuse a type label** from a prior gate round (track: WRONG/METHOD/STAKEHOLDER/STYLE/PERF used).
-Batch Layer 1 and Layer 2 questions into a single `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code) call (max 4).
-
-**Layer 3 — Ambiguity Score (display every round)**
-
-After receiving answers, compute and display:
+Runs after the 6 structured categories are complete, before §2.2 promotion.
+This gate surfaces requirements the structured categories miss by filtering
+candidate follow-up questions through the 5-term inequality
+(0.16.0, PLAN-deep-interview-question-criteria):
 
 ```
-Ambiguity Score: {X.X}/1.0  (Goal×40% + Constraint×30% + SC×30%)
-  Goals:             {g:.1f}/1.0  ✅ or ⚠️  (threshold 0.8)
-  Constraints:       {c:.1f}/1.0  ✅ or ⚠️
-  Success Criteria:  {sc:.1f}/1.0 ✅ or ⚠️
-  Weighted total:    {g*0.4 + c*0.3 + sc*0.3:.2f}
-  → PASS or NEEDS  (streak: {N}/2)
+ask(Q) iff EIG(Q) ≥ ε  ∧  TaskRel·UserAns ≥ 0.7
+        ∧ slot ∉ common_ground  ∧  confidence < τ
+        ∧ open_ended_count < cap_locale
 ```
 
-Inputs/Context gaps resolved in Layer 1 are absorbed into Goals/Constraints
-scores respectively. Score monotonicity rule: score must not decrease from the
-prior round given the same answer set; a drop ≥ 0.1 requires a one-line
-`[score-drop-reason]: ...` note appended to the Layer 3 display, then applied.
+Continue using the configured locale for all live gate text.
 
-**Convergence**: total ≥ 0.8 AND all dims ≥ 0.7, **2 consecutive rounds** → PASS.
-On **NEEDS**: return to Layer 1 (focus on failing axis), new Layer 2 probes (no
-repeats). Max **3 rounds** total. After 3 NEEDS, offer via `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code):
-- A: "Proceed — accept current ambiguity and move to §2.2"
-- B: "Refine further — return to Layer 1 with new focus"
+**Skip if early exit**: If the user chose "SPEC is sufficiently clear — end
+interview" in any prior §2.1 round, skip §2.5 entirely and proceed to §2.2.
+
+**Term meanings (this stage's settings, rendered from harness.yaml):**
+
+1. **EIG** — Expected information gain ≥ `ε = 0.5`. Skip Qs whose answer won't change SPEC content.
+2. **CLARITI** — Task-relevance × user-answerability ≥ 0.7. Skip Qs the user cannot meaningfully answer right now.
+3. **Common-ground** — Skip slots already determined by CLAUDE.md / harness.yaml / prior answers / RESEARCH frontmatter / same-slug PLAN|REVIEW history, **OR** by LLM self-inference at confidence ≥ 0.95 (kill-switch: `interview.deep_gate.common_ground.llm_inference_enabled: false` in harness.yaml).
+4. **Confidence** — Slot's current resolution confidence must be `< τ = 0.7`.
+5. **Open-ended cap** — At most `2` open-ended question(s) per turn for locale `en`. Closed-form (multi-select / yes-no) unrestricted.
+
+<!-- F6-deferred: see inequality_gate.py; F6 wires the real mechanism.
+     Locale cap above is render-time baked — re-render to refresh after locale change. -->
+
+**Per-round display (ADR-005):**
+
+```
+✅ EIG ✅ CLARITI ❌ common-ground ✅ confidence ✅ open-ended → 4/5 met (NEEDS)
+```
+
+Render the checklist for EVERY candidate question. A candidate is asked iff
+all 5 terms are ✅. The "common-ground" term is the primary defense against
+asking obvious questions (silent-intent-miss telemetry per ADR-008 monitors
+its post-hoc accuracy).
+
+**Question generation:** LLM generates 1-3 follow-up candidates targeting the
+SPEC slots Layer-0 categories did not lock down (WRONG / METHOD / STAKEHOLDER
+/ STYLE / PERF style cues are inputs to the generator, not gating labels).
+Ranking among passing candidates is by EIG descending.
+
+**Exit:** Continue until either:
+- All SPEC slots reach confidence ≥ τ (the inequality naturally stops the loop), OR
+- User chooses "end interview" / "Proceed to §2.2 with current ambiguity accepted".
 
 ---
 

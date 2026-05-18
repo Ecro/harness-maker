@@ -609,17 +609,19 @@ def test_render_harness_yaml_preserves_user_added_top_level_key(tmp_path: Path) 
     render(bp, target, freeze_time=DEFAULT_FREEZE_TIME)
 
     # Step 2: user appends a free-form top-level block.
+    # Use a key the template does NOT emit. (memory: is template-owned as of
+    # 0.17.0 / ADR-002; using it here would test the overlap path instead.)
     yaml_path = target / "harness.yaml"
     existing = yaml_path.read_text(encoding="utf-8")
     user_block = (
-        "\nmemory:\n"
+        "\nproject_notes:\n"
         "  enabled: true\n"
-        "  session_dir: .claude/memory/session/\n"
-        "  wiki: .claude/memory/wiki.md\n"
+        "  notebooks_dir: .claude/notebooks/\n"
+        "  index: .claude/notebooks/index.md\n"
     )
     yaml_path.write_text(existing + user_block, encoding="utf-8")
 
-    # Step 3: re-render. Memory block must survive.
+    # Step 3: re-render. project_notes block must survive.
     bp2 = synthesize(p, a)
     render(bp2, target, freeze_time=DEFAULT_FREEZE_TIME)
     after_text = yaml_path.read_text(encoding="utf-8")
@@ -629,9 +631,11 @@ def test_render_harness_yaml_preserves_user_added_top_level_key(tmp_path: Path) 
 
     body = load_harness_yaml(yaml_path)
     assert isinstance(body, dict)
-    assert "memory" in body, f"user-added `memory:` block wiped on re-render: {after_text}"
-    assert body["memory"]["enabled"] is True
-    assert body["memory"]["wiki"] == ".claude/memory/wiki.md"
+    assert "project_notes" in body, (
+        f"user-added `project_notes:` block wiped on re-render: {after_text}"
+    )
+    assert body["project_notes"]["enabled"] is True
+    assert body["project_notes"]["index"] == ".claude/notebooks/index.md"
 
 
 def test_render_harness_yaml_user_key_marker_present(tmp_path: Path) -> None:

@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.15.0
+harness_maker_version: 0.17.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: harness-yaml/Production.yaml.j2
 provenance: official
-content_hash: cdb3b69a02588709347b2f6d0d6dadc89210890fc91d4a511e1cdad634d769c7
+content_hash: cdab6a782600d2e49fbe7ab8ce8a10d51688c7b1b406bb93505187671064bc99
 ---
 preset: Production
 locale: en
@@ -16,8 +16,17 @@ caching: agent-aware
 schema_version: 1
 interview:
   deep_gate:
-    max_rounds: 3
-    streak_target: 2
+    # 0.16.0: 5-term inequality gate (PLAN-deep-interview-question-criteria).
+    eig_epsilon: 0.5
+    confidence_tau: 0.7
+    open_ended_cap_by_locale:
+      en: 2
+      ko: 1
+      ja: 1
+      default: 1
+    common_ground:
+      llm_inference_threshold: 0.95
+      llm_inference_enabled: true
   main_loop:
     max_rounds: null
 project:
@@ -117,6 +126,10 @@ skills:
 worktree:
   scope: [execute, plan]
   branch_prefix: hm-
+memory:
+  enabled: true
+  dir: .claude/memory
+  files: [failures.md, wiki.md]
 security:
   on_finding:
     high: block

@@ -5,25 +5,14 @@ description: Pre-wrapup gate enforcing 6 checks before any /hm:wrapup or autoloo
 
 # verify-before-completion
 
-Mandatory gate before `/hm:wrapup` or autoloop iteration close.
-All 6 checks must pass; the first failure short-circuits and blocks.
+Mandatory gate before `/hm:wrapup` or autoloop iteration close. All 6
+checks must pass; the first failure short-circuits and blocks.
 
-
-## When to invoke vs skip
-
-**Invoke when:**
-- Just before `/hm:wrapup` (M8 invariant).
-- At the end of every `/hm:loop` iteration.
-- On demand via `/hm:verify` whenever doubt arises.
-
-**Skip when:**
-- The work unit is trivial (typo / docs-only / config-only — wrapup's pre-flight already covers it).
-- A previous PASS in this same session is still valid (no new commits, no test changes since).
-## When to Invoke
-
-- `/hm:wrapup` — automatically before commit
-- `/hm:loop` — at the end of each iteration
-- Manual: `/hm:verify`
+Invoke before `/hm:wrapup` (M8 invariant), at the end of every `/hm:loop`
+iteration, or on demand via `/hm:verify`. Skip only for trivial work units
+(typo / docs-only / config-only — wrapup's pre-flight covers it) or when a
+previous PASS in the same session is still valid (no new commits / test
+changes since).
 
 ## The 6 Checks
 
@@ -40,13 +29,11 @@ echo "PLAN=$plan"
 !git diff HEAD~1 HEAD 2>/dev/null || git diff
 ```
 
-Read the PLAN file printed above (`$plan`). Read the git diff output.
-For each numbered item, task, or acceptance criterion in the PLAN:
-- The diff must contain matching code/test/doc changes (ticked checkbox alone does NOT pass)
-
-If any item is absent from the diff, output exactly:
-`BLOCKED: check 1 (PLAN-fulfillment) — <item text> not found in diff`
-then stop (do not proceed to check 2).
+Read the PLAN file (`$plan`) and the diff. For each numbered item, task,
+or acceptance criterion the diff must contain matching code/test/doc
+changes — a ticked checkbox alone does NOT pass. On any miss, output
+`BLOCKED: check 1 (PLAN-fulfillment) — <item text> not found in diff` and
+stop (do not proceed to check 2).
 
 ### 2. Regression / smoke gate
 

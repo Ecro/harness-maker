@@ -48,6 +48,15 @@ jobs:
         run: uv run mypy --strict src
       - name: Pytest
         run: uv run pytest -x --tb=short
+      - name: Integration test — fresh install readiness
+        # PLAN-fresh-install-health-baseline Phase 5: gate the release on the
+        # integration test that exercises Side+Production fresh-install
+        # readiness + existing-install migration via existing render
+        # semantics + byte-identical idempotency. CI for PR triggers was
+        # removed (565d7ce); this is the canonical gate.
+        env:
+          INTEGRATION: "1"
+        run: uv run pytest tests/integration/test_fresh_install_readiness.py -x --tb=short
 
   build:
     needs: [quality-gate]

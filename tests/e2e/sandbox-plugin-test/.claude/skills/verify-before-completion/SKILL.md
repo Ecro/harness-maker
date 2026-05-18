@@ -1,6 +1,6 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.15.0
+harness_maker_version: 0.17.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: skills/verify-before-completion/SKILL.md.j2
 provenance: official
@@ -8,30 +8,19 @@ name: verify-before-completion
 description: Pre-wrapup gate enforcing 6 checks before any /hm:wrapup or autoloop
   iteration close. Failure on any check blocks completion and surfaces the failing
   check name + remediation hint.
-content_hash: 0f0eab07917027a330e2cd85d605281ffbe43de65659acd0a8356847b97b2043
+content_hash: 1a248fadb1ad0d7c4152906b5a946d4828f75446c13f39976daceb91a369e680
 ---
 
 # verify-before-completion
 
-Mandatory gate before `/hm:wrapup` or autoloop iteration close.
-All 6 checks must pass; the first failure short-circuits and blocks.
+Mandatory gate before `/hm:wrapup` or autoloop iteration close. All 6
+checks must pass; the first failure short-circuits and blocks.
 
-
-## When to invoke vs skip
-
-**Invoke when:**
-- Just before `/hm:wrapup` (M8 invariant).
-- At the end of every `/hm:loop` iteration.
-- On demand via `/hm:verify` whenever doubt arises.
-
-**Skip when:**
-- The work unit is trivial (typo / docs-only / config-only — wrapup's pre-flight already covers it).
-- A previous PASS in this same session is still valid (no new commits, no test changes since).
-## When to Invoke
-
-- `/hm:wrapup` — automatically before commit
-- `/hm:loop` — at the end of each iteration
-- Manual: `/hm:verify`
+Invoke before `/hm:wrapup` (M8 invariant), at the end of every `/hm:loop`
+iteration, or on demand via `/hm:verify`. Skip only for trivial work units
+(typo / docs-only / config-only — wrapup's pre-flight covers it) or when a
+previous PASS in the same session is still valid (no new commits / test
+changes since).
 
 ## The 6 Checks
 
@@ -48,13 +37,11 @@ echo "PLAN=$plan"
 !git diff HEAD~1 HEAD 2>/dev/null || git diff
 ```
 
-Read the PLAN file printed above (`$plan`). Read the git diff output.
-For each numbered item, task, or acceptance criterion in the PLAN:
-- The diff must contain matching code/test/doc changes (ticked checkbox alone does NOT pass)
-
-If any item is absent from the diff, output exactly:
-`BLOCKED: check 1 (PLAN-fulfillment) — <item text> not found in diff`
-then stop (do not proceed to check 2).
+Read the PLAN file (`$plan`) and the diff. For each numbered item, task,
+or acceptance criterion the diff must contain matching code/test/doc
+changes — a ticked checkbox alone does NOT pass. On any miss, output
+`BLOCKED: check 1 (PLAN-fulfillment) — <item text> not found in diff` and
+stop (do not proceed to check 2).
 
 ### 2. Regression / smoke gate
 
@@ -65,7 +52,7 @@ bash .claude-verify.sh phase_${CURRENT_PHASE} || exit 1
 ### 3. Health score within −5 of baseline
 
 ```bash
-uv run --with /home/noel/harness-maker/.worktrees/execute-20260517T1454Z python -c "
+uv run --with /home/noel/harness-maker/.worktrees/execute-20260518T1438Z python -c "
 from pathlib import Path
 from harness_maker.readiness import compute_readiness
 from harness_maker.models import Preset

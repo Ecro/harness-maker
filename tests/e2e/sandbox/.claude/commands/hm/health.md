@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.15.0
+harness_maker_version: 0.17.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/health.md.j2
 provenance: official
-content_hash: e8da967916049c0c5e801822b83104de2aa214bf39ba0620df2935efecb69bcb
+content_hash: 10fa53205e82cde70c429f2c546f57eaf6fddadd0d3dfe89ddcf83bc4595e35c
 ---
 # /hm:health
 
@@ -16,14 +16,30 @@ content_hash: e8da967916049c0c5e801822b83104de2aa214bf39ba0620df2935efecb69bcb
 
 | Layer | What it measures |
 |-------|------------------|
-| `structural`     | ai_readiness 3-layer score (CLAUDE.md, ADRs, frontmatter, etc.) |
+| `structural`     | ai_readiness 3-layer score (CLAUDE.md, ADRs, frontmatter, etc.) + `silent_intent_miss_rate` sub-check |
 | `external_risks` | crawler (anthropic_blog/github/arxiv/osv) + stale assets filtered by LLM relevance |
 | `personalization`| ADR-011 rubric: L1 conversion (0.4) + L2 stability (0.3) + L3 cadence (0.3) |
+
+### Layer 1 sub-check — `silent_intent_miss_rate` (ADR-008)
+
+Reads `.claude/observability/silent-intent-miss-*.jsonl` audit logs (one per
+task slug; appended by `harness_maker.observability.intent_miss.record_intent_miss`
+when REVIEW flags mis-specification on a slot previously marked common-ground
+at LLM-inference ≥ 0.95, or when a user reopens such a slot in-session).
+
+Compute `silent_intent_miss_rate = miss_events / common_ground_marks_total` and
+surface as a Layer 1 ActionItem when rate exceeds the calibrated threshold.
+Initial default = `0.10` (10% miss); this is narrative-only for the first
+release pending telemetry-driven calibration — promote to
+`harness.yaml.observability.silent_intent_miss_threshold` when post-ship data
+justifies a different value. When triggered, the suggested remediation is
+either raising `interview.deep_gate.common_ground.llm_inference_threshold` or
+flipping the ADR-012 kill-switch (`llm_inference_enabled: false`).
 
 ## Run
 
 ```bash
-!uv run --with /home/noel/harness-maker/.worktrees/execute-20260517T1454Z python -m harness_maker.cli health . --json-output .claude/observability/.health.tmp.json
+!uv run --with /home/noel/harness-maker/.worktrees/execute-20260518T1438Z python -m harness_maker.cli health . --json-output .claude/observability/.health.tmp.json
 ```
 
 Then read `.claude/observability/dashboard.md` to inspect the three sections.

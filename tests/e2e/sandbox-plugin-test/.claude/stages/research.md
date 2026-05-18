@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.15.0
+harness_maker_version: 0.17.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: stages/research.md.j2
 provenance: official
-content_hash: 9afe0586c5a03c79501c5316c52e8cb161a243f015746a45815fbfeab4b5917f
+content_hash: b30bb6f66402e1bd1547493625c4d982ec05a4c7f8f5d48b6d62cdd95724ed93
 ---
 # Stage: research
 
@@ -94,65 +94,53 @@ When `--deep` is set, use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Co
 
 Always include "Skip — proceed with topic as given" as an option. Record interview outcomes under `## Refinement Decisions` in the output document.
 
-### Phase 0.5 — 3-Layer Deep Interview Gate (only when `--deep` is set)
+### Phase 0.5 — 5-Term Inequality Gate (only when `--deep` is set)
 
-Runs immediately after Phase 0's rubric questions, before Phase 1 gathering.
-Bridges from the rubric's broad-scope answers to research-ready precision.
-Continue using the configured locale for all live gate text, including Layer 1
-gap explanations, Layer 2 question text and option labels, ambiguity score
-display labels, and validation prompts.
-
-**Skip if user chose Skip**: If the user chose "Skip — proceed with topic as given"
-in Phase 0, skip Phase 0.5 entirely and proceed directly to Phase 1.
-
-**Layer 1 — GCIC Gap Check**
-
-Map Phase 0 answers to 4 research-scoping axes
-(0.0 = absent · 0.5 = partial · 1.0 = clear):
-
-- **Goals**: Research objective — what decision or output does this research inform?
-- **Constraints**: Binding constraints on the recommended approach (budget, compat, risk tolerance)?
-- **Inputs**: Prior knowledge, rejected approaches, existing code to build on?
-- **Context**: Team skill level, timeline, and who evaluates the research output?
-
-Note: axes already clearly answered by Phase 0 rubric questions are scored 1.0 and
-skipped — do NOT re-ask. Only probe uncovered axes.
-
-For any axis < 0.7 that wasn't covered by the rubric, apply the **CLARITI filter**:
-1. Task Relevance: "Does knowing this axis change which sources to search?" (0–1)
-2. User Answerability: "Can the user answer this now?" (0–1)
-→ Ask only if both ≥ 0.7. Otherwise log `"LLM-inferred"`.
-
-**Layer 2 — Implicit Probing**
-
-Five candidate types (use short label to track; also exclude types semantically covered by Phase 0 rubric questions):
-- **NOT-USEFUL**: "What would make this research **not useful** to you?" → implicit failure criteria
-- **AVOID**: "What direction are you hoping I **won't** recommend?" → implicit bias/constraints
-- **DEPTH**: "What **depth** is needed — proof of concept vs production-grade?" → scope expectations
-- **AUDIENCE**: "Who else will read this research output?" → implicit audience / quality bar
-- **TIME-SCOPE**: "What **time or depth** constraints apply — quick scan vs exhaustive survey?" → scope bounds
-
-**MUST NOT reuse a type label** from Phase 0 rubric or a prior gate round (track: NOT-USEFUL/AVOID/DEPTH/AUDIENCE/TIME-SCOPE used).
-Batch into one `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code) call (max 4).
-
-**Layer 3 — Ambiguity Score (display)**
+Runs after Phase 0's rubric, before Phase 1 gathering. Each candidate
+follow-up question is filtered through the 5-term inequality (0.16.0,
+PLAN-deep-interview-question-criteria):
 
 ```
-Research Scope Score: {X.X}/1.0  (Goal×40% + Constraint×30% + OC×30%)
-  Goals (research objective):  {g:.1f}/1.0  ✅ or ⚠️
-  Constraints (approach):      {c:.1f}/1.0  ✅ or ⚠️
-  Output Criteria (usefulness):{oc:.1f}/1.0 ✅ or ⚠️
-  Weighted total: {g*0.4 + c*0.3 + oc*0.3:.2f}
-  → PASS or NEEDS  (streak: {N}/2)
+ask(Q) iff EIG(Q) ≥ ε  ∧  TaskRel·UserAns ≥ 0.7
+        ∧ slot ∉ common_ground  ∧  confidence < τ
+        ∧ open_ended_count < cap_locale
 ```
 
-Score monotonicity rule: score must not decrease round-over-round for the same answers;
-a drop ≥ 0.1 requires a one-line `[score-drop-reason]: ...` note appended to the
-Layer 3 display block, then applied.
+Continue using the configured locale for all live gate text.
 
-**Convergence**: total ≥ 0.8 AND all dims ≥ 0.7, **2 consecutive rounds** → PASS.
-On **NEEDS**: new probes only (no repeats). Max **3 rounds**. After 3 NEEDS,
-offer "Proceed with current scope?" and continue to Phase 1 regardless.
+**Skip if user chose Skip**: If the user chose "Skip — proceed with topic as
+given" in Phase 0, skip Phase 0.5 entirely and proceed directly to Phase 1.
+
+**Term meanings (this stage's settings, rendered from harness.yaml):**
+
+1. **EIG** — Expected information gain ≥ `ε = 0.5`. Skip Qs whose answer won't change the research direction.
+2. **CLARITI** — Task-relevance × user-answerability ≥ 0.7. Skip Qs the user cannot meaningfully answer right now.
+3. **Common-ground** — Skip slots already determined by CLAUDE.md / harness.yaml / prior answers / SPEC|RESEARCH frontmatter / same-slug PLAN|REVIEW history, **OR** by LLM self-inference at confidence ≥ 0.95 (kill-switch: set `interview.deep_gate.common_ground.llm_inference_enabled: false` in harness.yaml to disable).
+4. **Confidence** — Slot's current resolution confidence must be `< τ = 0.7`. Once confidence reaches τ, stop asking about that slot.
+5. **Open-ended cap** — At most `2` open-ended question(s) per turn for locale `en`. Closed-form (multi-select / yes-no) questions are unrestricted.
+
+<!-- F6-deferred: the apply_inequality_gate Python implementation lives in
+     src/harness_maker/inequality_gate.py; the interview agent (F6) wires
+     the real LLM-backed EIG + common-ground mechanisms. LLMs reading this
+     template at decision time should apply the gate using their own judgment.
+     Note: the locale cap above is baked at render time — switching locale in
+     harness.yaml requires `/harness-maker:make` to refresh the rendered value. -->
+
+**Per-round display (ADR-005):**
+
+```
+✅ EIG ✅ CLARITI ❌ common-ground ✅ confidence ✅ open-ended → 4/5 met (NEEDS)
+```
+
+Render the checklist for EVERY candidate question (not just the ones presented), so the gate's reasoning is transparent. A candidate is asked iff all 5 terms are ✅.
+
+**Question generation:** LLM generates 1-3 follow-up candidates from the gaps Phase 0 rubric did not cover. Generation is mechanism-agnostic (no fixed type labels); ranking is by EIG descending.
+
+**Exit:** Continue presenting passing candidates until either:
+- All research-scoping slots reach confidence ≥ τ (the inequality naturally stops the loop — no more candidates pass the confidence term), OR
+- User chooses "end interview".
+
+If the gate cannot make progress (no candidate passes for 2 consecutive attempts at the SAME slot), offer "Proceed with current scope?" and continue to Phase 1.
 
 ### Phase 0.75 — Discovery lens calibration
 

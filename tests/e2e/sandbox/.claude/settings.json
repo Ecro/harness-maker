@@ -6,8 +6,12 @@
       "Bash(pytest:*)",
       "Bash(git:*)"
     ],
+    "ask": [],
     "deny": [
       "Bash(rm:*)",
+      "Bash(curl * | sh)",
+      "Write(/etc/**)",
+      "Write(~/.ssh/**)",
       "Bash(curl:*)"
     ]
   },

@@ -136,28 +136,22 @@ def test_killswitch_overlay_false_propagates(tmp_path: Path) -> None:
     """ADR-012: user-set common_ground.llm_inference_enabled: false in
     harness.yaml must overlay onto the resulting InterviewAnswers.interview
     (the F6 read-side wiring of the F1-shipped schema key)."""
-    deep_gate_block = (
-        "  deep_gate:\n    common_ground:\n      llm_inference_enabled: false\n"
-    )
+    deep_gate_block = "  deep_gate:\n    common_ground:\n      llm_inference_enabled: false\n"
     yaml_path = _write_yaml(tmp_path, _base_yaml(deep_gate_block=deep_gate_block))
     answers = answers_from_harness_yaml(yaml_path)
     assert answers is not None
-    assert (
-        answers.interview["deep_gate"]["common_ground"]["llm_inference_enabled"] is False
-    ), "kill-switch False must propagate from harness.yaml into InterviewAnswers"
+    assert answers.interview["deep_gate"]["common_ground"]["llm_inference_enabled"] is False, (
+        "kill-switch False must propagate from harness.yaml into InterviewAnswers"
+    )
 
 
 def test_killswitch_overlay_true_keeps_default(tmp_path: Path) -> None:
     """Sanity: explicit true matches the default — no spurious mutation."""
-    deep_gate_block = (
-        "  deep_gate:\n    common_ground:\n      llm_inference_enabled: true\n"
-    )
+    deep_gate_block = "  deep_gate:\n    common_ground:\n      llm_inference_enabled: true\n"
     yaml_path = _write_yaml(tmp_path, _base_yaml(deep_gate_block=deep_gate_block))
     answers = answers_from_harness_yaml(yaml_path)
     assert answers is not None
-    assert (
-        answers.interview["deep_gate"]["common_ground"]["llm_inference_enabled"] is True
-    )
+    assert answers.interview["deep_gate"]["common_ground"]["llm_inference_enabled"] is True
 
 
 def test_killswitch_overlay_missing_key_keeps_default(tmp_path: Path) -> None:
@@ -165,9 +159,7 @@ def test_killswitch_overlay_missing_key_keeps_default(tmp_path: Path) -> None:
     yaml_path = _write_yaml(tmp_path, _base_yaml(deep_gate_block=""))
     answers = answers_from_harness_yaml(yaml_path)
     assert answers is not None
-    assert (
-        answers.interview["deep_gate"]["common_ground"]["llm_inference_enabled"] is True
-    )
+    assert answers.interview["deep_gate"]["common_ground"]["llm_inference_enabled"] is True
 
 
 def test_killswitch_overlay_with_deprecated_keys_coexist(
@@ -177,23 +169,17 @@ def test_killswitch_overlay_with_deprecated_keys_coexist(
     kill-switch (common_ground.llm_inference_enabled: false), both code paths
     fire correctly: deprecated key warns + kill-switch overlays."""
     deep_gate_block = (
-        "  deep_gate:\n"
-        "    max_rounds: 3\n"
-        "    common_ground:\n"
-        "      llm_inference_enabled: false\n"
+        "  deep_gate:\n    max_rounds: 3\n    common_ground:\n      llm_inference_enabled: false\n"
     )
     yaml_path = _write_yaml(tmp_path, _base_yaml(deep_gate_block=deep_gate_block))
     with caplog.at_level(logging.WARNING, logger="harness_maker.interview"):
         answers = answers_from_harness_yaml(yaml_path)
     assert answers is not None
     # Kill-switch overlay still fires.
-    assert (
-        answers.interview["deep_gate"]["common_ground"]["llm_inference_enabled"] is False
-    )
+    assert answers.interview["deep_gate"]["common_ground"]["llm_inference_enabled"] is False
     # Deprecated warning still emitted.
     assert any(
-        "deprecated key interview.deep_gate.max_rounds ignored" in r.message
-        for r in caplog.records
+        "deprecated key interview.deep_gate.max_rounds ignored" in r.message for r in caplog.records
     )
 
 
@@ -208,12 +194,10 @@ def test_killswitch_overlay_invalid_value_warns(
     with caplog.at_level(logging.WARNING, logger="harness_maker.interview"):
         answers = answers_from_harness_yaml(yaml_path)
     assert answers is not None
-    assert (
-        answers.interview["deep_gate"]["common_ground"]["llm_inference_enabled"] is True
+    assert answers.interview["deep_gate"]["common_ground"]["llm_inference_enabled"] is True
+    assert any("llm_inference_enabled must be a boolean" in r.message for r in caplog.records), (
+        "expected warning about invalid kill-switch value"
     )
-    assert any(
-        "llm_inference_enabled must be a boolean" in r.message for r in caplog.records
-    ), "expected warning about invalid kill-switch value"
 
 
 def test_clean_0_16_0_yaml_silent(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:

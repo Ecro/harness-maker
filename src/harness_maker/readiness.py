@@ -48,9 +48,9 @@ WEIGHTS_PROD: dict[str, float] = {
 _CONTEXT_LIMITS: dict[tuple[str, str], int] = {
     ("CLAUDE.md", "Side"): 200,
     ("CLAUDE.md", "Production"): 500,
-    ("agent", "Side"): 100,
+    ("agent", "Side"): 150,  # was 100
     ("agent", "Production"): 200,
-    ("skill", "Side"): 50,
+    ("skill", "Side"): 100,  # was 50
     ("skill", "Production"): 150,
 }
 
@@ -61,6 +61,27 @@ _DANGEROUS_DENY_PATTERNS = [
     "Write(/etc",  # write to root config
     "Write(~/.ssh",  # write to ssh keys
 ]
+
+# ADR-006: signals that fail on fresh install for reasons /hm:make cannot
+# resolve in a single shot — either because the artefact only appears after
+# real Claude Code use (telemetry) or because it requires user authoring
+# (CI workflow, ADR notes, CONTRIBUTING). Used by Phase 4 integration test
+# allowlist; readiness scoring itself unchanged.
+#
+# Two sub-categories share the same flat set today:
+#   - auto-resolve via use: metrics_jsonl_present, metrics_has_samples
+#     (samples-based TTL — beyond samples ≥ 5 these surface normally).
+#   - require user authoring: ci_workflow_present, adr_present,
+#     contributing_present (no TTL — surface remains until user creates).
+INTENDED_P0_SIGNALS: frozenset[str] = frozenset(
+    {
+        "metrics_jsonl_present",
+        "metrics_has_samples",
+        "ci_workflow_present",
+        "adr_present",
+        "contributing_present",
+    }
+)
 
 # Dirs to skip when scanning source files
 _SCAN_IGNORE = {"build", "_build", ".git", "node_modules", "__pycache__", ".venv", "target", "dist"}
@@ -494,18 +515,28 @@ def _dim_guardrails(project_dir: Path) -> DimensionScore:
 
 
 def _dim_verification(project_dir: Path) -> DimensionScore:
-    """Tests for detected stack + CI + verify-before-completion."""
+    """Tests for detected stack + CI + verify-before-completion.
+
+    ADR-004: unknown-stack (`stacks == set()`) auto-degrade — stack_detected
+    and tests_present signals run at reduced weight (5/10 vs 20/30) so
+    non-standard projects (board-yaml, shell-only) don't get P0-flagged.
+    """
     signals: list[Signal] = []
     stacks = _detect_stacks(project_dir)
+    stacks_unknown = not stacks
+
+    # Stack detection — degrade weight when unknown.
     signals.append(
         _signal(
             "stack_detected",
             bool(stacks),
-            20,
+            5 if stacks_unknown else 20,
             f"Detected stacks: {', '.join(sorted(stacks))}"
             if stacks
-            else "No language stack detected",
-            None if stacks else "Add a manifest (pyproject.toml, package.json, Cargo.toml, etc.)",
+            else "No language stack detected (non-standard project)",
+            None
+            if stacks
+            else "If non-standard project, this is expected. Otherwise add pyproject.toml/etc.",
         )
     )
 
@@ -516,7 +547,7 @@ def _dim_verification(project_dir: Path) -> DimensionScore:
         _signal(
             "tests_present",
             has_tests,
-            30,
+            10 if stacks_unknown else 30,
             "Tests detected for project's stack" if has_tests else "No tests detected",
             None if has_tests else "Add tests for the detected stack",
         )
@@ -750,7 +781,11 @@ def _dim_observability_setup(project_dir: Path) -> DimensionScore:
             f"telemetry present ({len(metrics_files)} file(s))"
             if has_telemetry
             else "no telemetry files (metrics.jsonl or metrics-YYYY-MM-DD.jsonl)",
-            None if has_telemetry else "Install the PostToolUse telemetry hook (run /hm:make)",
+            None
+            if has_telemetry
+            else (
+                "First Claude Code tool use will create this file (PostToolUse hook is installed)."
+            ),
         )
     )
     signals.append(

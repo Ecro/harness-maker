@@ -10,6 +10,34 @@ the per-iteration workflow, and enforce safety rails. Do NOT try to import
 any Python module — `harness_maker.*` exists only in the harness-maker
 development repository, not in the projects this command runs in.
 
+## Non-stopping discipline (autoloop invariant)
+
+**Never halt the loop for verification or status confirmation.** The whole
+point of `/hm:loop` is autonomous progress; pausing every gate check defeats
+the value. Concretely:
+
+- Gates green (pytest, lint, mypy, snapshot) → proceed to the next phase
+  immediately. A one-line status line is fine; **do not wait for user input**.
+- Gates red → run one autofix cycle (autoloop-coder or direct Edit). If still
+  red after a second attempt, increment `failed_streak`; safety rail #3 fires
+  at the configured cap.
+- Background-task notifications are NOT user input. When a backgrounded
+  `pytest` / `mypy` completes, immediately read the result and continue the
+  iter — do not summarize back to the user mid-iter and wait.
+- code-reviewer returning `NEEDS_WORK` → fix and re-review automatically.
+  Only escalate after **3 consecutive** NEEDS_WORK on the same diff slice.
+
+**Halt only for:**
+1. A safety rail fires (max-iter, time cap, failed-streak cap, hard error).
+2. An architectural ambiguity that genuinely changes implementation direction
+   (e.g., the PLAN's validator demands an ADR pivot). "Should I rename this
+   variable?" is not such a question — pick a sensible default and proceed.
+3. A spec-marked halt point (e.g., release `git tag` push, irreversible side
+   effects on shared infra).
+
+If unsure whether something qualifies as a halt point: **don't halt**. The
+worktree is reversible; converging-then-rolling-back costs less than asking.
+
 ## Usage
 
 {% if is_codex %}
