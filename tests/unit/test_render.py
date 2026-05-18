@@ -98,6 +98,10 @@ def test_render_settings_json_is_pure_json(tmp_path: Path) -> None:
 def test_render_settings_json_shallow_merges_existing(tmp_path: Path) -> None:
     """When Claude Code already wrote settings.json with `enabledPlugins`, the
     re-render must preserve that key while adding our own.
+
+    0.15.2+: `permissions.{allow,deny,ask}` lists are deep-merged (union)
+    rather than replaced. Template entries come first; user additions
+    survive. Other `permissions.*` keys still follow template-wins.
     """
     import json
 
@@ -113,9 +117,68 @@ def test_render_settings_json_shallow_merges_existing(tmp_path: Path) -> None:
     data = json.loads(settings_path.read_text(encoding="utf-8"))
     # User's enabledPlugins survived (template doesn't define this key).
     assert data["enabledPlugins"] == {"foo@bar": True}
-    # Template's permissions won (template owns this key).
-    assert data["permissions"]["allow"] != ["custom"]
-    assert "Read" in data["permissions"]["allow"]
+    # permissions.allow now unions: template + user.
+    assert "Read" in data["permissions"]["allow"]  # template entry present
+    assert "custom" in data["permissions"]["allow"]  # user entry preserved
+
+
+def test_render_settings_json_unions_permissions_deny(tmp_path: Path) -> None:
+    """Permissions.deny user-added entries (e.g. Write(/etc/**)) must survive re-render.
+
+    Regression guard for the 0.15.1 /hm:health audit finding: users add
+    dangerous-pattern denies (Write(/etc/**), Write(~/.ssh/**), ...) to
+    settings.json after /hm:health Layer 1 accept. Pre-0.15.2 the next
+    re-render wiped them, silently downgrading the security posture.
+    """
+    import json
+
+    settings_path = tmp_path / "settings.json"
+    settings_path.write_text(
+        json.dumps(
+            {
+                "permissions": {
+                    "deny": [
+                        "Write(/etc/**)",
+                        "Write(~/.ssh/**)",
+                        "Edit(/etc/**)",
+                    ],
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    p = _profile()
+    a = interview(p, autoloop_mode=True)
+    bp = synthesize(p, a)
+    render(bp, tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
+    data = json.loads(settings_path.read_text(encoding="utf-8"))
+    deny = data["permissions"]["deny"]
+    # All three user-added denies survived.
+    assert "Write(/etc/**)" in deny
+    assert "Write(~/.ssh/**)" in deny
+    assert "Edit(/etc/**)" in deny
+
+
+def test_render_settings_json_unions_dedup_no_duplicates(tmp_path: Path) -> None:
+    """When user has a deny entry that the template also ships, no duplicate appears."""
+    import json
+
+    settings_path = tmp_path / "settings.json"
+    # Side preset baseline ships Bash(rm:*) — user has the same plus a custom one.
+    settings_path.write_text(
+        json.dumps({"permissions": {"deny": ["Bash(rm:*)", "Write(/etc/**)"]}}),
+        encoding="utf-8",
+    )
+    p = _profile()
+    a = interview(p, autoloop_mode=True)
+    bp = synthesize(p, a)
+    render(bp, tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
+    data = json.loads(settings_path.read_text(encoding="utf-8"))
+    deny = data["permissions"]["deny"]
+    # No duplicate of the shared entry.
+    assert deny.count("Bash(rm:*)") == 1
+    # User-only entry survived.
+    assert "Write(/etc/**)" in deny
 
 
 def test_render_settings_json_falls_back_when_existing_corrupt(tmp_path: Path) -> None:
@@ -525,6 +588,110 @@ def test_render_both_targets_byte_identical_across_runs(tmp_path: Path) -> None:
     r2 = tmp_path / "r2"
     r2.mkdir()
     assert _run(r1) == _run(r2)
+
+
+def test_render_harness_yaml_preserves_user_added_top_level_key(tmp_path: Path) -> None:
+    """Free-form top-level YAML keys (e.g. `memory:`) survive re-render.
+
+    Regression guard for the 0.15.1 /hm:health audit follow-up: users add
+    project-specific config blocks to harness.yaml that the template doesn't
+    emit. Pre-0.15.2 the renderer wiped these on every `make` invocation.
+    The fix appends user-only top-level keys after a marker comment.
+    """
+    import yaml
+
+    project_root = tmp_path
+    target = project_root / ".claude"
+    target.mkdir()
+
+    # Step 1: do a fresh render so harness.yaml exists.
+    p = _profile()
+    a = interview(p, autoloop_mode=True)
+    bp = synthesize(p, a)
+    render(bp, target, freeze_time=DEFAULT_FREEZE_TIME)
+
+    # Step 2: user appends a free-form top-level block.
+    yaml_path = target / "harness.yaml"
+    existing = yaml_path.read_text(encoding="utf-8")
+    user_block = (
+        "\nmemory:\n"
+        "  enabled: true\n"
+        "  session_dir: .claude/memory/session/\n"
+        "  wiki: .claude/memory/wiki.md\n"
+    )
+    yaml_path.write_text(existing + user_block, encoding="utf-8")
+
+    # Step 3: re-render. Memory block must survive.
+    bp2 = synthesize(p, a)
+    render(bp2, target, freeze_time=DEFAULT_FREEZE_TIME)
+    after_text = yaml_path.read_text(encoding="utf-8")
+
+    # The canonical multi-doc loader returns the body data (skips frontmatter).
+    from harness_maker.io_utils import load_harness_yaml
+
+    body = load_harness_yaml(yaml_path)
+    assert isinstance(body, dict)
+    assert "memory" in body, f"user-added `memory:` block wiped on re-render: {after_text}"
+    assert body["memory"]["enabled"] is True
+    assert body["memory"]["wiki"] == ".claude/memory/wiki.md"
+
+
+def test_render_harness_yaml_user_key_marker_present(tmp_path: Path) -> None:
+    """The preservation appendix carries a `@hm:user:extensions` marker comment.
+
+    Documents the convention so users discover that anything they add as
+    a top-level YAML key persists. Marker is also a forward-compatibility
+    anchor if we later need to address the block specifically.
+    """
+    project_root = tmp_path
+    target = project_root / ".claude"
+    target.mkdir()
+
+    p = _profile()
+    a = interview(p, autoloop_mode=True)
+    bp = synthesize(p, a)
+    render(bp, target, freeze_time=DEFAULT_FREEZE_TIME)
+
+    yaml_path = target / "harness.yaml"
+    yaml_path.write_text(
+        yaml_path.read_text(encoding="utf-8") + "\ncustom_block:\n  k: v\n",
+        encoding="utf-8",
+    )
+    render(synthesize(p, a), target, freeze_time=DEFAULT_FREEZE_TIME)
+    after = yaml_path.read_text(encoding="utf-8")
+    assert "@hm:user:extensions" in after
+
+
+def test_render_harness_yaml_template_key_wins_over_user(tmp_path: Path) -> None:
+    """If a future template natively adds a key the user previously added,
+    the template's value wins on the next render (no merge).
+
+    Documents the contract: preservation only applies to keys the template
+    does NOT emit. Once the template natively emits a key, it owns it.
+    """
+    import yaml
+
+    project_root = tmp_path
+    target = project_root / ".claude"
+    target.mkdir()
+
+    p = _profile()
+    a = interview(p, autoloop_mode=True)
+    bp = synthesize(p, a)
+    render(bp, target, freeze_time=DEFAULT_FREEZE_TIME)
+
+    yaml_path = target / "harness.yaml"
+    # The template always emits `preset:`. User tries to override it via append.
+    yaml_path.write_text(
+        yaml_path.read_text(encoding="utf-8") + "\npreset: USER_OVERRIDE\n",
+        encoding="utf-8",
+    )
+    render(synthesize(p, a), target, freeze_time=DEFAULT_FREEZE_TIME)
+    from harness_maker.io_utils import load_harness_yaml
+
+    body = load_harness_yaml(yaml_path)
+    # Template's value (Side, from _profile()) wins; user's USER_OVERRIDE is dropped.
+    assert body["preset"] != "USER_OVERRIDE"
 
 
 def test_render_cursor_target_writes_targets_to_harness_yaml(tmp_path: Path) -> None:

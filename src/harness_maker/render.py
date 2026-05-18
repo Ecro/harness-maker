@@ -169,6 +169,45 @@ _SETTINGS_KEYS_OWNED_BY_HARNESS: frozenset[str] = frozenset(
     }
 )
 
+# Permission sub-keys whose lists are unioned (template entries first, then
+# user-added entries). This preserves user-added denies/allows across
+# re-renders — e.g. dangerous-pattern denies added via /hm:health Layer 1
+# (Write(/etc/**), Write(~/.ssh/**), ...) survive when the template only
+# ships the minimal baseline (Bash(rm:*), Bash(curl:*)).
+_PERMISSIONS_LIST_KEYS: tuple[str, ...] = ("allow", "deny", "ask")
+
+
+def _merge_permissions(
+    existing_perms: dict[str, Any],
+    new_perms: dict[str, Any],
+) -> dict[str, Any]:
+    """Deep-merge permissions: union list sub-keys; template wins on scalars.
+
+    Why list union (not "template wins"): users add to ``permissions.deny``
+    via /hm:health Layer 1 acceptance + manual edits. The template ships a
+    minimal baseline; user additions are project-specific guardrails. A
+    naive replace wipes them on every re-render, which silently downgrades
+    the project's security posture. List union preserves both.
+
+    Template entries come first (preserving the template's intended order),
+    then any user-added entries that aren't already in the template list
+    are appended. Non-string entries in either list are dropped (malformed).
+    """
+    out: dict[str, Any] = dict(new_perms)
+    for key in _PERMISSIONS_LIST_KEYS:
+        new_list = new_perms.get(key, [])
+        existing_list = existing_perms.get(key, [])
+        if not isinstance(new_list, list) or not isinstance(existing_list, list):
+            continue
+        seen: set[str] = set()
+        merged_list: list[str] = []
+        for item in (*new_list, *existing_list):
+            if isinstance(item, str) and item not in seen:
+                merged_list.append(item)
+                seen.add(item)
+        out[key] = merged_list
+    return out
+
 
 def _shallow_merge_existing_json(
     out: Path,
@@ -178,6 +217,10 @@ def _shallow_merge_existing_json(
 
     Previously-owned harness-maker keys absent from new_data are removed so
     stale keys don't linger after a template drops them.
+
+    ``permissions`` is the one nested key with a documented deep-merge: list
+    sub-keys (allow/deny/ask) union via ``_merge_permissions`` so user-added
+    deny patterns survive re-render.
     """
     existing: dict[str, Any] = {}
     if out.exists():
@@ -193,6 +236,10 @@ def _shallow_merge_existing_json(
             if isinstance(parsed, dict):
                 existing = parsed
     merged = {**existing, **new_data}
+    new_perms = new_data.get("permissions")
+    existing_perms = existing.get("permissions")
+    if isinstance(new_perms, dict) and isinstance(existing_perms, dict):
+        merged["permissions"] = _merge_permissions(existing_perms, new_perms)
     for key in _SETTINGS_KEYS_OWNED_BY_HARNESS:
         if key not in new_data:
             merged.pop(key, None)
@@ -547,6 +594,11 @@ def _render_text_file(
     # hashing. Parse failures fall through to plain REPLACE.
     if merge_reports is not None and out.exists():
         body_text = _try_block_merge(out, body_text, fe.path, merge_reports)
+    # harness.yaml: preserve top-level keys the user added that the template
+    # doesn't emit (e.g. `memory:`). Without this, free-form user blocks get
+    # wiped on every re-render. Hash is computed on the post-preservation body.
+    if fe.path.name == "harness.yaml":
+        body_text = _preserve_yaml_user_keys(out, body_text)
     body_bytes = _normalize_body(body_text)
     body_hash = hashlib.sha256(body_bytes).hexdigest()
     fe.body_sha256 = body_hash
@@ -563,6 +615,71 @@ def _render_text_file(
     if not dry_run:
         atomic_write(out, final_bytes)
     return out
+
+
+def _preserve_yaml_user_keys(out: Path, new_body: str) -> str:
+    """Append top-level YAML keys from the existing file that the new render omits.
+
+    harness.yaml is the project's primary config. The template only emits
+    schema-known keys (preset, locale, reviewers, ...). Users may add
+    free-form top-level blocks (e.g. ``memory:`` for cross-session memory
+    paths, ``custom:`` for project-specific config) that the template
+    doesn't know about. A naive REPLACE wipes those blocks on every
+    re-render.
+
+    Strategy:
+    - Parse existing file via the canonical multi-doc loader (skips the
+      provenance frontmatter; returns the body data only).
+    - Parse the rendered new_body.
+    - Diff top-level keys: anything in existing but not in new_body is
+      user-only — append it as a YAML block after a marker comment.
+    - On any parse failure (truncated file, mid-write race, malformed
+      user YAML), silently fall back to new_body unchanged. Re-render
+      then behaves as before this patch.
+
+    Template-emitted keys always win on overlap — if a future template
+    natively adds ``memory:``, the template's value replaces the user's
+    on the next re-render. Users can re-customize via /hm:configure if
+    that happens.
+    """
+    if not out.exists():
+        return new_body
+    # Avoid an import cycle at module top: io_utils transitively imports yaml.
+    from harness_maker.io_utils import load_harness_yaml
+
+    try:
+        existing_data = load_harness_yaml(out)
+    except (OSError, yaml.YAMLError):
+        return new_body
+    if not isinstance(existing_data, dict) or not existing_data:
+        return new_body
+    try:
+        new_data = yaml.safe_load(new_body)
+    except yaml.YAMLError:
+        return new_body
+    if not isinstance(new_data, dict):
+        return new_body
+    user_only = [k for k in existing_data if k not in new_data]
+    if not user_only:
+        return new_body
+    blocks: list[str] = [
+        "",
+        "# @hm:user:extensions — top-level keys preserved across re-renders.",
+        "# Add free-form blocks here (memory:, custom:, etc.); the renderer",
+        "# leaves them alone unless a future template natively emits the key.",
+    ]
+    for key in user_only:
+        block = yaml.safe_dump(
+            {key: existing_data[key]},
+            sort_keys=False,
+            default_flow_style=False,
+            allow_unicode=True,
+        )
+        blocks.append(block.rstrip("\n"))
+    appendix = "\n".join(blocks) + "\n"
+    if not new_body.endswith("\n"):
+        new_body += "\n"
+    return new_body + appendix
 
 
 def _try_block_merge(

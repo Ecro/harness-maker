@@ -1,5 +1,41 @@
 # Changelog
 
+## 0.15.2 — preserve user edits to settings.json + harness.yaml across re-render (2026-05-18)
+
+Two patches to the renderer's reconcile path. Both address user-edit
+durability across `/hm:make` invocations.
+
+### Fixed
+
+- **`settings.json` `permissions.{allow,deny,ask}` now deep-merge as a
+  union** (template entries first, then user-added entries appended,
+  dedup). Previously the template's `permissions` value won wholesale,
+  silently wiping user-added denies (e.g. `Write(/etc/**)`,
+  `Write(~/.ssh/**)` added via `/hm:health` Layer 1 acceptance) on every
+  re-render. Documented as a "v1 limitation" in 0.3.1; promoted to a
+  proper fix in 0.15.2. Other `permissions.*` keys (scalars, unknown
+  sub-keys) still follow template-wins.
+
+- **`harness.yaml` preserves user-added top-level keys** that the
+  template doesn't emit (e.g. `memory:`, `custom:`, project-specific
+  blocks). New keys are appended after a `@hm:user:extensions` marker
+  comment. Template-emitted keys still win on overlap — if a future
+  template natively adds a key the user previously added, the template's
+  value replaces the user's on the next render (consistent with the
+  block-merge model elsewhere in the codebase).
+
+### Tests
+
+- `tests/unit/test_render.py`:
+  - Updated `test_render_settings_json_shallow_merges_existing` to
+    reflect the new union contract.
+  - Added `test_render_settings_json_unions_permissions_deny` (regression
+    guard for the `/hm:health` audit finding).
+  - Added `test_render_settings_json_unions_dedup_no_duplicates`.
+  - Added `test_render_harness_yaml_preserves_user_added_top_level_key`,
+    `test_render_harness_yaml_user_key_marker_present`, and
+    `test_render_harness_yaml_template_key_wins_over_user`.
+
 ## 0.15.1 — fix uv archive cache path bug in renderer (2026-05-18)
 
 ### Fixed
