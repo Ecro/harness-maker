@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.15.3 — fix ruff quality-gate regressions from 0.15.1 + 0.15.2 (2026-05-18)
+
+CI-only patch. No runtime change.
+
+### Fixed
+
+- Removed two unused `import yaml` lines added to `tests/unit/test_render.py`
+  in 0.15.2 (`F401`).
+- Re-formatted a long-assertion message in `tests/unit/test_install_ref.py`
+  added in 0.15.1 to match ruff format's preferred line break.
+
+The release.yml `quality-gate` job now passes (was failing on both
+v0.15.1 and v0.15.2 tag pushes at `ruff check .` / `ruff format --check .`).
+End users were unaffected (harness-maker isn't on PyPI; distribution goes
+through the Claude Code plugin marketplace, which reads the GitHub
+release artifact directly).
+
 ## 0.15.2 — preserve user edits to settings.json + harness.yaml across re-render (2026-05-18)
 
 Two patches to the renderer's reconcile path. Both address user-edit
