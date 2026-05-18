@@ -1,5 +1,77 @@
 # Changelog
 
+## 0.16.0 — BREAKING: 5-term inequality deep-interview gate replaces 3-layer (2026-05-18)
+
+PLAN-deep-interview-question-criteria. Replaces the 3-layer interview gate
+(5-rubric + GCIC + CLARITI + 5 implicit probes + weighted Ambiguity Score
++ 2-round streak) with a single 5-term inequality applied uniformly across
+`/hm:research`, `/hm:spec`, `/hm:plan`, and `/hm:loop`:
+
+```
+ask(Q) iff EIG(Q) >= ε  ∧  TaskRel·UserAns >= 0.7
+        ∧ slot ∉ common_ground  ∧  confidence < τ
+        ∧ open_ended_count < cap_locale
+```
+
+### BREAKING
+
+- **harness.yaml schema (deep_gate)** — `interview.deep_gate.max_rounds` and
+  `interview.deep_gate.streak_target` are deprecated. On read they emit a
+  warning and are ignored. Existing 0.15.x users upgrade without manual
+  intervention; new defaults ship via `interview_deep_gate_defaults()`.
+  New keys (ADR-007 uniform across Side/Production):
+  - `eig_epsilon: 0.5`
+  - `confidence_tau: 0.7`
+  - `open_ended_cap_by_locale: {en: 2, ko: 1, ja: 1, default: 1}`
+  - `common_ground.llm_inference_threshold: 0.95`
+  - `common_ground.llm_inference_enabled: true` (ADR-012 kill-switch — only
+    user-tunable key)
+- **work-docs/loop-context/*.yaml** — old `ambiguity_score` weighted-sum
+  format is no longer read. Active loops on upgrade abort with a schema
+  error; restart via `/hm:loop --spec <slug>` to rebuild context.
+- **Stage templates** (`templates/stages/{research,spec,plan}.md.j2` and
+  `templates/commands/hm/loop.md.j2`) — Layer 1-3 GCIC/probing/score blocks
+  replaced with 5-term checklist rendering (ADR-005).
+
+### Added
+
+- `harness_maker.common_ground` — explicit-evidence + LLM-inference (ADR-003)
+  common-ground detector. Atomic JSONL audit at
+  `.claude/observability/cg-marks-{slug}.jsonl`. 10-slot false-positive guard.
+- `harness_maker.eig` — `score_eig(q, ctx) -> float` mechanism-agnostic
+  public interface (ADR-002 rollback path enforced).
+- `harness_maker.inequality_gate` — composes the 5-term inequality + ranks
+  + enforces locale open-ended cap.
+- `harness_maker.observability.intent_miss` — ADR-008 silent-intent-miss
+  telemetry. `/hm:health` Layer 1 surfaces the rate.
+- `harness_maker.observability.coverage_classifier` — ADR-010 post-hoc
+  coverage-kind classifier (telemetry-only labels; ADR-004 deletes gating).
+
+### Changed
+
+- `templates/harness-yaml/{Production,Side}.yaml.j2` render new 5-term schema.
+- `templates/stages/review.md.j2` — new Step 2.5 silent-intent-miss hook.
+- `templates/commands/hm/health.md.j2` — new Layer 1 sub-check
+  `silent_intent_miss_rate` (initial threshold 0.10, narrative-only pending
+  telemetry calibration).
+
+### Migration
+
+For users on 0.15.x:
+1. `/plugin update` then re-render via `/harness-maker:make`.
+2. Old `deep_gate.max_rounds`/`streak_target` in user-edited harness.yaml
+   are warn-and-ignored — no manual cleanup required (removing them silences
+   the warning).
+3. Active loops (`.claude/.hm-loop-active` present + a
+   `work-docs/loop-context/<slug>.yaml` exists) must restart — run
+   `/hm:loop --spec <slug>` to rebuild loop context. There is no automatic
+   migration of the old `ambiguity_score` weighted-sum format.
+4. Optional kill-switch: set
+   `interview.deep_gate.common_ground.llm_inference_enabled: false` in
+   `.claude/harness.yaml` to disable the aggressive LLM-inferred
+   common-ground path (ADR-012). Default is `true`; flipping to `false`
+   reverts the gate to explicit-evidence-only matching.
+
 ## 0.15.3 — fix ruff quality-gate regressions from 0.15.1 + 0.15.2 (2026-05-18)
 
 CI-only patch. No runtime change.
@@ -575,24 +647,6 @@ Second Brain write failure (PLAN-second-brain-write-failure).
 - v0 rubric calibration — boundaries conservative; follow-up PLAN
   reviews after 30+ projects.
 - ~150 tests added across 11 phases; full unit suite 1700+ green.
-
-## Unreleased
-
-### Changed
-- `/harness-maker:make` now asks locale as the first non-CI onboarding
-  decision and expands its setup receipt with generated roots, backups,
-  preserved user blocks, target leftovers, qualitative review trade-offs,
-  and read-first Second Brain guidance.
-- `/hm:configure` now presents settings as a multi-select decision receipt
-  with current/new values, benefits, trade-offs, re-render impact, and
-  preservation notes; Second Brain configuration points users toward the
-  advanced allowlist / writable-folder path.
-- Deep Interview surfaces in research, spec, plan, and loop now explicitly
-  require configured-locale live prompts and option labels.
-
-### Fixed
-- Cleaned up a pre-existing line-length lint failure in the Second Brain CLI
-  override path so the full wrapup ruff gate passes.
 
 ## 0.11.0 — 2026-05-11
 

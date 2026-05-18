@@ -1,11 +1,12 @@
-"""Version sync — 4 files must agree on harness-maker version (Phase 2.5).
+"""Version sync — 5 files must agree on harness-maker version (Phase 2.5, expanded 0.16.0).
 
-CLAUDE.md "버전업 정책": four files must be bumped together; if any one is
-out of date Claude Code's ``/plugin update`` 또는 Cursor Marketplace reports
-"already at latest" with a stale version. The four sources of truth are:
+CLAUDE.md "버전업 정책": five files must be bumped together; if any one is
+out of date Claude Code's ``/plugin update`` 또는 Cursor / Codex Marketplace
+reports "already at latest" with a stale version. The five sources of truth:
 
 - ``.claude-plugin/plugin.json``  — Claude Code marketplace
 - ``.cursor-plugin/plugin.json``  — Cursor Marketplace
+- ``.codex-plugin/plugin.json``   — Codex CLI manifest
 - ``pyproject.toml``              — Python package distribution
 - ``src/harness_maker/__init__.py`` — runtime ``__version__``
 """
@@ -30,6 +31,11 @@ def _claude_plugin_version() -> str:
 
 def _cursor_plugin_version() -> str:
     raw: str = json.loads(_read_text(".cursor-plugin/plugin.json"))["version"]
+    return raw
+
+
+def _codex_plugin_version() -> str:
+    raw: str = json.loads(_read_text(".codex-plugin/plugin.json"))["version"]
     return raw
 
 
@@ -60,11 +66,17 @@ def test_runtime_init_and_pyproject_versions_match() -> None:
     assert _runtime_version() == _pyproject_version()
 
 
-def test_all_four_version_sources_agree() -> None:
-    """4-way agreement gate (CLAUDE.md "버전업 정책")."""
+def test_codex_plugin_and_pyproject_versions_match() -> None:
+    """0.16.0: codex-plugin manifest joins the 5-file sync policy."""
+    assert _codex_plugin_version() == _pyproject_version()
+
+
+def test_all_five_version_sources_agree() -> None:
+    """5-way agreement gate (CLAUDE.md "버전업 정책", expanded 0.16.0)."""
     versions = {
         ".claude-plugin/plugin.json": _claude_plugin_version(),
         ".cursor-plugin/plugin.json": _cursor_plugin_version(),
+        ".codex-plugin/plugin.json": _codex_plugin_version(),
         "pyproject.toml": _pyproject_version(),
         "src/harness_maker/__init__.py": _runtime_version(),
     }

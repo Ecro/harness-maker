@@ -285,69 +285,51 @@ the convergence predicate obvious:
   `min-N-features`, `stopping-criteria`).
 - `improve` mode: always `stopping-criteria` (LLM evaluates each iteration).
 
-#### 4-H. 3-Layer Deep Interview Gate
+#### 4-H. 5-Term Inequality Gate
 
 Runs after steps 4-B through 4-E complete, before persisting context (4-F).
-This gate surfaces implicit requirements missed by the 5-dimension interview.
-Continue using the configured locale for Layer 1/2 question text and option
-labels, ambiguity explanations, score display labels, and validation prompts.
-
-**Layer 1 — GCIC Gap Check**
-
-Map the 5 collected dimensions to 4 underspecification axes
-(0.0 = absent · 0.5 = partial · 1.0 = clear):
-
-- **Goals**: `purpose` + `stopping_criteria` clearly define the desired end-state?
-- **Constraints**: `invariants` covers all inviolable boundaries?
-- **Inputs**: `test_reliability` captures available tooling and starting state?
-- **Context**: `priority` + `immediate_task` capture team/environment adequately?
-
-Dimensions already scored 1.0 from the 5-dimension interview are skipped.
-For any axis < 0.7, apply the **CLARITI filter** before asking:
-1. Task Relevance: "Does knowing this axis change loop execution decisions?" (0–1)
-2. User Answerability: "Can the user answer this now?" (0–1)
-→ Ask only if **both ≥ 0.7**. Otherwise log `"LLM-inferred"`.
-
-**Layer 2 — Implicit Probing**
-
-Read all collected context. Dynamically generate 1–3 reverse questions from
-the most contextually relevant candidate types (apply CLARITI filter to each):
-
-Five candidate types (use short label to track across rounds):
-- **WRONG**: "What would make you say the result is **wrong**?" → implicit rejection criteria
-- **METHOD**: "What assumptions about **how** this will be done?" → implicit method constraints
-- **STAKEHOLDER**: "Who else reviews/uses this output and by what standard?" → implicit stakeholders
-- **STYLE**: "What **format or style** constraints apply?" → style (hardest to elicit)
-- **PERF**: "What **performance or scale** expectations exist?" → implicit benchmarks
-
-**MUST NOT reuse a type label** from a previous round (track: WRONG/METHOD/STAKEHOLDER/STYLE/PERF used).
-{% if is_codex %}Use `request_user_input` to batch Layer 1 and Layer 2 questions (max 4). If the tool is unavailable, ask in your response.{% else %}Batch Layer 1 and Layer 2 questions into one `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code) call (max 4).{% endif %}
-
-**Layer 3 — Ambiguity Score (display and gate)**
-
-After receiving answers, compute and display:
+This gate surfaces implicit requirements the 5-dimension interview missed
+by filtering candidate follow-up questions through the 5-term inequality
+(0.16.0, PLAN-deep-interview-question-criteria):
 
 ```
-Ambiguity Score: {X.X}/1.0  (Goal×40% + Constraint×30% + SC×30%)
-  Goals:             {g:.1f}/1.0  ✅ or ⚠️  (threshold 0.8)
-  Constraints:       {c:.1f}/1.0  ✅ or ⚠️
-  Success Criteria:  {sc:.1f}/1.0 ✅ or ⚠️
-  Weighted total:    {g*0.4 + c*0.3 + sc*0.3:.2f}
-  → PASS or NEEDS  (streak: {N}/2)
+ask(Q) iff EIG(Q) ≥ ε  ∧  TaskRel·UserAns ≥ 0.7
+        ∧ slot ∉ common_ground  ∧  confidence < τ
+        ∧ open_ended_count < cap_locale
 ```
 
-Inputs/Context gaps resolved in Layer 1 are absorbed into Goals/Constraints scores
-respectively. Score monotonicity rule: score must not decrease round-over-round given
-the same answers; a drop ≥ 0.1 requires a one-line `[score-drop-reason]: ...` note
-appended to the Layer 3 display block, then applied.
+Continue using the configured locale for all live gate text.
 
-**Convergence**: total ≥ 0.8 AND all dims ≥ 0.7, **2 consecutive rounds** → PASS
-→ proceed to step 4-F (Persist context).
+**Term meanings (this stage's settings, rendered from harness.yaml):**
 
-On **NEEDS**: return to Layer 1 (focus on failing axis); generate new Layer 2
-probes (no repeats). Max **3 rounds**. After 3 NEEDS, {% if is_codex %}use `request_user_input` (or ask in your response){% else %}offer via `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code){% endif %}:
-- A: "Proceed — accept current ambiguity and start loop"
-- B: "Refine further — return to Layer 1 with new focus"
+1. **EIG** — Expected information gain ≥ `ε = {{ config.interview.deep_gate.eig_epsilon | default(0.5) }}`. Skip Qs whose answer won't change loop-execution decisions (intensity, exit criteria, convergence predicate, feature list).
+2. **CLARITI** — Task-relevance × user-answerability ≥ 0.7. Skip Qs the user cannot answer right now.
+3. **Common-ground** — Skip dimensions already determined by CLAUDE.md / harness.yaml / prior interview answers / `--spec` file content / SPEC|RESEARCH frontmatter when present{% if config.interview.deep_gate.common_ground.llm_inference_enabled | default(true) %}, **OR** by LLM self-inference at confidence ≥ {{ config.interview.deep_gate.common_ground.llm_inference_threshold | default(0.95) }} (kill-switch: `interview.deep_gate.common_ground.llm_inference_enabled: false` in harness.yaml){% endif %}.
+4. **Confidence** — Dimension's current resolution confidence must be `< τ = {{ config.interview.deep_gate.confidence_tau | default(0.7) }}`. Once a dimension reaches τ it is considered actionable; the loop body can use it.
+5. **Open-ended cap** — At most `{{ config.interview.deep_gate.get('open_ended_cap_by_locale', {'default': 1}).get(config.locale, config.interview.deep_gate.get('open_ended_cap_by_locale', {'default': 1}).get('default', 1)) }}` open-ended question(s) per turn for locale `{{ config.locale }}`. Closed-form (multi-select / yes-no) unrestricted.
+
+<!-- F6-deferred: see inequality_gate.py; F6 wires the real mechanism.
+     Locale cap above is render-time baked — re-render to refresh after locale change. -->
+
+**Per-round display (ADR-005):**
+
+```
+✅ EIG ✅ CLARITI ❌ common-ground ✅ confidence ✅ open-ended → 4/5 met (NEEDS)
+```
+
+Render the checklist for EVERY candidate. A candidate is asked iff all 5
+terms are ✅. The "common-ground" term prevents asking the obvious; silent-
+intent-miss telemetry (ADR-008) surfaces in `/hm:health` to monitor post-hoc
+accuracy of the aggressive ADR-003 inference path.
+
+**Question generation:** LLM generates 1-3 follow-up candidates targeting
+the 5 loop dimensions (`purpose`, `invariants`, `priority`, `test_reliability`,
+`stopping_criteria`). Style cues (WRONG / METHOD / STAKEHOLDER / STYLE / PERF)
+are inputs to the generator, not gating labels. Ranking is by EIG descending.
+
+**Exit:** proceed to step 4-F (Persist context) once either:
+- All 5 dimensions reach confidence ≥ τ (the inequality naturally stops the loop), OR
+- User chose "Proceed with current ambiguity accepted" after a non-progressing round.
 
 #### 4-F. Persist context
 

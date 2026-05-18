@@ -585,9 +585,12 @@ class HarnessConfig(BaseModel):
     # ADR-011: schema_version bumped 1 → 2 for the agent_models/default_model
     # rename. ADR-004 silent migration handles existing v1 harness.yaml.
     schema_version: int = 2
+    # 0.16.0: deep_gate redesigned as 5-term inequality (PLAN-deep-interview-question-criteria).
+    # Default literal lives in `interview_deep_gate_defaults()` at module bottom —
+    # also consumed by `harness_maker.interview._preset_extras` to avoid 3-way drift.
     interview: dict[str, Any] = Field(
         default_factory=lambda: {
-            "deep_gate": {"max_rounds": 3, "streak_target": 2},
+            "deep_gate": interview_deep_gate_defaults(),
             "main_loop": {"max_rounds": None},
         }
     )
@@ -720,9 +723,10 @@ class InterviewAnswers(BaseModel):
     worktree: dict[str, Any] = Field(default_factory=dict)
     security: dict[str, Any] = Field(default_factory=dict)
     context_lint: dict[str, Any] = Field(default_factory=dict)
+    # Mirror of HarnessConfig.interview (0.16.0 deep_gate redesign — see HarnessConfig).
     interview: dict[str, Any] = Field(
         default_factory=lambda: {
-            "deep_gate": {"max_rounds": 3, "streak_target": 2},
+            "deep_gate": interview_deep_gate_defaults(),
             "main_loop": {"max_rounds": None},
         }
     )
@@ -760,3 +764,26 @@ class InterviewAnswers(BaseModel):
         """Read-side back-compat — ADR-012 deprecation window. computed_field
         so the key appears in model_dump() for downstream template consumers."""
         return self.default_model
+
+
+def interview_deep_gate_defaults() -> dict[str, Any]:
+    """5-term inequality gate defaults (0.16.0 — PLAN-deep-interview-question-criteria).
+
+    Consumed by:
+      - HarnessConfig.interview default_factory
+      - InterviewAnswers.interview default_factory
+      - harness_maker.interview._preset_extras (Side + Production branches)
+
+    Single source of truth — changing ε/τ/threshold/locale-cap here propagates
+    to all three sites. ADR-007: uniform across Side/Production presets.
+    ADR-012: only `common_ground.llm_inference_enabled` is user-tunable.
+    """
+    return {
+        "eig_epsilon": 0.5,
+        "confidence_tau": 0.7,
+        "open_ended_cap_by_locale": {"en": 2, "ko": 1, "ja": 1, "default": 1},
+        "common_ground": {
+            "llm_inference_threshold": 0.95,
+            "llm_inference_enabled": True,
+        },
+    }

@@ -8,8 +8,17 @@ caching: {{ config.caching }}
 schema_version: {{ config.schema_version }}
 interview:
   deep_gate:
-    max_rounds: {{ config.interview.deep_gate.max_rounds }}
-    streak_target: {{ config.interview.deep_gate.streak_target }}
+    # 0.16.0: 5-term inequality gate (PLAN-deep-interview-question-criteria).
+    eig_epsilon: {{ config.interview.deep_gate.eig_epsilon }}
+    confidence_tau: {{ config.interview.deep_gate.confidence_tau }}
+    open_ended_cap_by_locale:
+      en: {{ config.interview.deep_gate.open_ended_cap_by_locale.en }}
+      ko: {{ config.interview.deep_gate.open_ended_cap_by_locale.ko }}
+      ja: {{ config.interview.deep_gate.open_ended_cap_by_locale.ja }}
+      default: {{ config.interview.deep_gate.open_ended_cap_by_locale.default }}
+    common_ground:
+      llm_inference_threshold: {{ config.interview.deep_gate.common_ground.llm_inference_threshold }}
+      llm_inference_enabled: {{ config.interview.deep_gate.common_ground.llm_inference_enabled | lower }}
   main_loop:
     max_rounds: {{ config.interview.main_loop.max_rounds | default('null', true) }}
 project:

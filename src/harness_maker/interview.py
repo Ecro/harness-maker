@@ -40,6 +40,7 @@ from harness_maker.models import (
     SecondBrainFolder,
     Target,
     auto_workflow_name,
+    interview_deep_gate_defaults,
 )
 from harness_maker.validators import validate_workflow_name
 
@@ -678,6 +679,30 @@ def answers_from_harness_yaml(yaml_path: Path) -> InterviewAnswers | None:
     sv_raw = data.get("schema_version")
     schema_version = int(sv_raw) if isinstance(sv_raw, (int, float)) else 1
 
+    # 0.16.0 PLAN-deep-interview-question-criteria ADR-011 — warn-and-ignore for
+    # deprecated deep_gate keys. The 5-term inequality gate replaces
+    # max_rounds/streak_target uniformly across presets (ADR-007); these keys
+    # no longer affect runtime, but we keep loading the rest of the file so
+    # existing 0.15.x users upgrade without manual intervention.
+    _deep_gate_raw = _dig(data, "interview", "deep_gate")
+    if isinstance(_deep_gate_raw, dict):
+        for _deprecated in ("max_rounds", "streak_target"):
+            if _deprecated in _deep_gate_raw:
+                logger.warning(
+                    "harness.yaml %s: deprecated key interview.deep_gate.%s "
+                    "ignored — see CHANGELOG-0.16.0 migration note (5-term "
+                    "inequality gate replaces 3-layer).",
+                    str(yaml_path),
+                    _deprecated,
+                )
+    # ADR-012 kill-switch overlay: when harness.yaml has
+    # interview.deep_gate.common_ground.llm_inference_enabled explicitly set,
+    # apply it to the rebuilt InterviewAnswers below (after `base` is built).
+    # ε / τ / inference_threshold / locale-cap are constants in code per
+    # ADR-012; only this kill-switch is user-tunable. The actual overlay is
+    # applied just before `return base.model_copy(...)` at the bottom — this
+    # comment is the locator for that read-side hook.
+
     base = _build_answers(
         locale=_string_or(data.get("locale"), "en"),
         targets=targets,
@@ -875,6 +900,33 @@ def answers_from_harness_yaml(yaml_path: Path) -> InterviewAnswers | None:
         if clean:
             update["mcp_servers"] = clean
 
+    # ADR-012 kill-switch overlay (F6). When harness.yaml's
+    # interview.deep_gate.common_ground.llm_inference_enabled is explicitly
+    # set, override base.interview's default True. Other deep_gate keys are
+    # code-constants per ADR-012 and ignored if present (no warning — they
+    # would normally be there because we render them; we just don't read them
+    # back).
+    if isinstance(_deep_gate_raw, dict):
+        cg_raw = _deep_gate_raw.get("common_ground")
+        if isinstance(cg_raw, dict) and "llm_inference_enabled" in cg_raw:
+            user_value = cg_raw["llm_inference_enabled"]
+            if isinstance(user_value, bool):
+                new_interview = dict(base.interview)
+                new_dg = dict(new_interview.get("deep_gate", {}))
+                new_cg = dict(new_dg.get("common_ground", {}))
+                new_cg["llm_inference_enabled"] = user_value
+                new_dg["common_ground"] = new_cg
+                new_interview["deep_gate"] = new_dg
+                update["interview"] = new_interview
+            else:
+                logger.warning(
+                    "harness.yaml %s: interview.deep_gate.common_ground."
+                    "llm_inference_enabled must be a boolean (got %s); "
+                    "using default True.",
+                    str(yaml_path),
+                    type(user_value).__name__,
+                )
+
     return base.model_copy(update=update)
 
 
@@ -994,24 +1046,21 @@ def _dig(data: dict[str, Any], *keys: str) -> object:
 def _preset_extras(preset: Preset, *, schema_version: int = 2) -> dict[str, Any]:
     """Preset-specific config defaults.
 
-    ADR-016: schema_version governs which Side defaults apply.
-    - schema_version >= 2 (new harness): Side gets new caps (1/1/5/2)
-    - schema_version < 2 (existing harness): Side keeps old defaults (3/2/null/3)
-    Production defaults are unchanged across schema versions.
+    0.16.0 (PLAN-deep-interview-question-criteria): deep_gate now uses 5-term
+    inequality with uniform ε/τ across presets (ADR-007). main_loop and other
+    preset-divergent fields unchanged.
+
+    Legacy ADR-016 schema_version logic (Side v2 vs v1 differentiation) is
+    retained for `main_loop.max_rounds` + `max_review_rounds` only; deep_gate
+    no longer varies by schema_version.
     """
     if preset == Preset.SIDE:
-        interview_config: dict[str, dict[str, int | None]]
+        main_loop: dict[str, int | None]
         if schema_version >= 2:
-            interview_config = {
-                "deep_gate": {"max_rounds": 1, "streak_target": 1},
-                "main_loop": {"max_rounds": 5},
-            }
+            main_loop = {"max_rounds": 5}
             review_rounds = 2
         else:
-            interview_config = {
-                "deep_gate": {"max_rounds": 3, "streak_target": 2},
-                "main_loop": {"max_rounds": None},
-            }
+            main_loop = {"max_rounds": None}
             review_rounds = 3
         return {
             "models": {"default": "sonnet"},
@@ -1021,7 +1070,10 @@ def _preset_extras(preset: Preset, *, schema_version: int = 2) -> dict[str, Any]
             "worktree": {"enabled": False},
             "security": {"gates": []},
             "context_lint": {"enabled": False},
-            "interview": interview_config,
+            "interview": {
+                "deep_gate": interview_deep_gate_defaults(),
+                "main_loop": main_loop,
+            },
             "max_review_rounds": review_rounds,
             "schema_version": schema_version,
         }
@@ -1042,7 +1094,7 @@ def _preset_extras(preset: Preset, *, schema_version: int = 2) -> dict[str, Any]
         },
         "context_lint": {"enabled": True},
         "interview": {
-            "deep_gate": {"max_rounds": 3, "streak_target": 2},
+            "deep_gate": interview_deep_gate_defaults(),
             "main_loop": {"max_rounds": None},
         },
         "schema_version": schema_version,
