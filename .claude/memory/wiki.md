@@ -1,6 +1,6 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.15.2
+harness_maker_version: 0.16.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: memory/wiki.ko.md.j2
 provenance: official
@@ -242,5 +242,8 @@ explicitly. "Append" is a footgun verb in this codebase.
 
 ### [wiki:model-routing-multi-ide] 2026-05-18 — per-agent model pinning + preset defaults shipped (0.15.0)
 13 ADRs landed via /hm:loop with per-phase /hm:review. Schema: HarnessConfig.default_model (renamed from recommended_model via AliasChoices for back-compat) + agent_models: dict[str, AgentModelSpec]. New presets.py: PRESET_AGENT_MODELS for Production (opus on reasoning agents, sonnet on reviewers) and Side (sonnet everywhere with downshifted reasoning_effort), CURSOR_MODEL_IDS canonical alias→ID table, 3-tier resolve_agent_spec (override → preset → default_model fallback — never KeyErrors). Per-IDE render: Claude `model: {{ claude_model }}` (decorative per #43869 until upstream fix), Cursor concrete IDs via CURSOR_MODEL_IDS normalization, Codex `model_reasoning_effort` per-agent + `[profiles.cheap]`/`[profiles.deep]` in .codex/config.toml. /hm:health Layer-1 model_routing dimension with 3 advisory sub-checks (weight 0). CLI `--default-model` flag + `--recommended-model` deprecated alias (ADR-012, removal no earlier than 0.17.0). `--update` cwd guard (ADR-013) rejects worktree-internal regen — turned 4× recurring `[fail:snapshot-regen-inside-worktree]` into enforced prevention.
+
+### [wiki:fresh-install-health-baseline] 2026-05-19 — 0.17.0 ships fresh-install zero-P0 via templates-only path
+PLAN-fresh-install-health-baseline. Investigation found 11 fresh-install P0/P1 cluster into 4 categories (intended noise, template gaps, self-violated thresholds, unknown-stack cascade). plan-validator pass 2 produced the critical pivot: `render.py` already had `_merge_permissions` (list-union of `permissions.allow|deny|ask`) at lines 180-209 + `_preserve_yaml_user_keys` at 620-682 + `content_hash` recompute at 602-603 — meaning Phase 1's template change alone delivered existing-install migration with zero new code path. Original ADR-005 (`--upgrade` flag + KNOWN_SHIPPED_HASHES table + content_hash recompute) dropped entirely; 7 phases collapsed to 6. Lesson: before designing a migration path, grep `render.py` for the merge semantics already present — `_merge_permissions` + `_preserve_yaml_user_keys` cover most additive-baseline cases without a flag. Side context-lint thresholds raised 100/50 → 150/100 because every shipped agent body + every shipped skill violated the old ones (Side identity now lives in reviewer count + grade + spec_gate). ADR-006 telemetry allowlist gained samples-based TTL (allowlist applies only while samples < 5) so long-running projects don't get permanent blind spots for hook regressions. Production `deny` baseline narrowed (`Bash(curl:*)` → `Bash(curl * | sh)` per ADR-003 Side=Production uniformity) — flagged as BREAKING in CHANGELOG.
 
 <!-- @hm:/user:entries -->

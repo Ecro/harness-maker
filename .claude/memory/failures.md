@@ -1,6 +1,6 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.15.2
+harness_maker_version: 0.16.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: memory/failures.ko.md.j2
 provenance: official
@@ -103,5 +103,11 @@ ref_folders / second_brain_vault_path entered as `~/foo` got stored as `/home/al
 
 ## [fail:render] wrapup-eof-append-outside-marker | 2026-05-17 | count:1
 `/hm:wrapup` Step 5 instruction said "Append (or update) one entry under `.claude/memory/wiki.md`" with no positional constraint. LLM naturally interpreted "append" as EOF-append → wiki entries landed AFTER the `<!-- @hm:/user:entries -->` closing marker. `block_merge.merge()` (block_merge.py:17-18 contract) treats outside-marker content as template-owned → silent REPLACE on next `/hm:make --update`. Compound footgun: CLI emitted `MERGE_BLOCK: ... preserved 1 user block(s): entries` — technically true (empty block survived) but masked the 33-line orphan drop entirely. 4 wiki entries dated 2026-05-17 (communication-variant-pre-render-extractor, codex-render-bypasses-dispatcher-source, frontmatter-source-vs-output-separation, workflow-optimization-inverted-env) vanished across 7 commits before detection. Three-layer fix: (1) wrapup.md.j2 5.1/5.2 now name `<!-- @hm:user:entries -->` explicitly + cite this regression in prose. (2) `MergeReport.orphan_outside_content` populated via `Counter` subtraction; cli.py surfaces dropped-line count without echoing content (the preview itself would leak user-controlled bytes to Bash stdout → LLM next-turn context, opening a stored-prompt-injection vector — the very feature added to "make the bug visible" almost reintroduced a different bug). (3) `merge()` walk gained fence tracking (was diverging from parse_segments — validator passed, executor misbehaved on fenced literal markers). Pattern: any wrapup-stage prompt that touches a marker-bearing file MUST name the marker; "append" is a footgun in this codebase.
+
+## [fail:test] template-owned-key-as-user-example-broken | 2026-05-19 | count:1
+`test_render.py::test_render_harness_yaml_preserves_user_added_top_level_key` used `memory:` as the exemplar "user-added top-level key the template doesn't emit". Phase 1 of PLAN-fresh-install-health-baseline made `memory:` template-owned (ADR-002 baseline). Per `_preserve_yaml_user_keys` docstring at render.py:640-643 ("Template-emitted keys always win on overlap"), the next render writes the template's `memory:` block, the test's `body["memory"]["wiki"] == ".claude/memory/wiki.md"` KeyErrors because the new dict has no `wiki` field. Fix: switch the user-extension example to `project_notes:` (template-never-emit). Pattern: any test verifying user-extension preservation MUST use a key the template provably never claims — if a future ADR makes that key template-owned, the test silently breaks. Sniff-check: `grep -rn "memory" tests/unit/` before introducing a new top-level template key.
+
+## [fail:design] phantom-key-on-rerender-breaks-idempotency | 2026-05-19 | count:1
+`render._merge_permissions` (render.py:180-209) emitted `out[key] = []` for every key in `_PERMISSIONS_LIST_KEYS = ("allow", "deny", "ask")` regardless of whether the key was present in `new_perms` or `existing_perms`. First render: only `allow + deny` present (templates don't emit `ask`). Second render: file from first run has no `ask` key either, but the function still wrote `"ask": []` because the loop unconditionally assigned. Byte-identical rerender assertion in `tests/integration/test_fresh_install_readiness.py::test_render_idempotent_byte_identical` caught it. Fix: guard with `if not new_list and not existing_list and key not in new_perms and key not in existing_perms: continue`. Pattern: when a function "deep-merges" with a fixed key list, the loop MUST NOT emit phantom keys for slots absent in BOTH sides. Idempotency invariant: `merge(out, out) == out` (fixed point).
 
 <!-- @hm:/user:entries -->
