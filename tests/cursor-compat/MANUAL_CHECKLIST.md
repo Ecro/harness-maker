@@ -301,3 +301,75 @@ PASS/FAIL 을 RESULTS.md Phase 2.9 row 에 기입.
   Output 패널에 표시하지 않을 수 있음. stdout 으로 전환 고려.
 - `Phase2.9.still-exits-0` FAIL (도구 block) → `_pretooluse` 가 exit 0 을
   반환하는지 코드 재확인. 다른 hook 이 exit 2 를 반환하는 충돌 가능성 배제.
+
+---
+
+## Phase 3 — README one-prompt paste flow (Cursor + Claude Code)
+
+> PLAN-readme-one-prompt-autoinstall 의 paste flow 가 실제 IDE 에서 promise (per-IDE step budget 표 의 액션 수) 와 일치하는지 확인. 매번 fresh-state IDE 에서 수동 측정.
+
+**예상 소요**: 10 분 (Claude Code 5분 + Cursor 5분)
+
+### Phase 3.1 — Claude Code paste flow
+
+1. **Fresh state**: harness-maker 미설치 환경 (`~/.claude/plugins/installed_plugins.json` 에 `harness-maker@harness-maker` 없음). 이미 있으면 먼저:
+   ```bash
+   claude plugin uninstall harness-maker@harness-maker
+   ```
+2. 빈 tmp 디렉토리에서 `claude` 실행, 새 세션 시작.
+3. README.md 의 Quickstart > Universal Bootstrap Prompt 코드 펜스 안 내용을 **그대로 paste**.
+4. **관찰 (정상 경로)**:
+   - Claude 가 IDE 감지 → Claude Code branch 선택
+   - Claude 가 Bash 권한 요청 → 사용자 1회 승인
+   - Claude 가 `claude plugin marketplace add Ecro/harness-maker` 실행
+   - Claude 가 `claude plugin install harness-maker@harness-maker` 실행
+   - Claude 가 메시지 출력: `Type /reload-plugins now, then press enter once.`
+5. 사용자가 `/reload-plugins` type → enter 한 번.
+6. **관찰**: Claude 가 후속 turn 에서 Skill(harness-maker:make) 자동 발사 — `harness-maker:make` 인터뷰 시작.
+7. 인터뷰 끝나면 Claude 가 자동으로 Skill(hm:health) 발사 → `.claude/observability/dashboard.md` 생성.
+
+**총 사용자 액션 측정**: paste(1) + Bash 승인(1) + `/reload-plugins`(1) + enter(1) = **3-4** (Bash 승인 제외 시 3, README 의 표에 명시된 2-3 과 일치하는지 확인)
+
+**Fail 분기**:
+- Claude 가 슬래시 명령 typing 을 요청 → README 의 prompt 가 잘못 읽힘. prompt 의 `via Bash (NOT slash commands typed by me)` 문구 강도 부족.
+- `/reload-plugins` 후 Claude 가 자동 이어가지 않음 → `manual-enter-required` 가정이 맞음. README 의 "press enter once" 문구가 작동하는지 확인.
+- Bash 권한 거부 → Claude 가 graceful fallback 으로 manual 안내해야 함. 그렇지 않으면 prompt 의 에러 처리 부실.
+
+### Phase 3.2 — Cursor paste flow
+
+1. **Fresh state**: `~/.cursor/plugins/local/harness-maker/` 디렉토리 없음. 있으면:
+   ```bash
+   rm -rf ~/.cursor/plugins/local/harness-maker
+   ```
+2. Cursor IDE 열기, 빈 폴더 (또는 본 repo 의 `tests/cursor-compat/fixture`) 에서 새 chat 세션 시작.
+3. README.md 의 Quickstart > Universal Bootstrap Prompt 코드 펜스 paste.
+4. **관찰**:
+   - Claude 가 IDE 감지 → Cursor branch 선택
+   - Claude 가 Bash 권한 요청 → 사용자 1회 승인
+   - Claude 가 `git clone https://github.com/Ecro/harness-maker.git ~/.cursor/plugins/local/harness-maker` 실행
+   - Claude 가 메시지 출력: `Reload the Cursor window now (Ctrl+Shift+P → Reload Window).`
+5. 사용자가 `Ctrl+Shift+P` → `Reload Window` 선택. Cursor 가 reload.
+6. Reload 후 chat 다시 열기. Claude 가 자동 이어가지 않음 — 사용자가 짧은 메시지 (예: `continue`) 입력.
+7. **관찰**: Claude 가 harness-maker:make skill 발사 → 인터뷰 → hm:health 자동.
+
+**총 사용자 액션 측정**: paste(1) + Bash 승인(1) + `Reload Window`(1 GUI) + continue 메시지(1) = **3-4** (README 표의 2 와 일치하는지 확인 — Bash 승인 + continue 메시지는 표 외 일 수 있음, RESULTS.md 에 차이 기록)
+
+**Fail 분기**:
+- Cursor 의 chat 세션이 reload 후 새 세션으로 시작 → context 손실. paste prompt 다시 필요. 이 경우 README 의 promise 가 Cursor 에서 깨짐 → 별도 ADR 필요.
+- `git clone` 실패 (네트워크 / 권한) → manual fallback 명시되어 있는지 확인.
+
+### Phase 3.3 — Codex CLI paste flow
+
+(Codex CLI 사용자 별도 검증 — Phase 3.3 는 codex CLI 가 설치된 환경에서만)
+
+1. **Fresh state**: codex 의 marketplace 목록에 `harness-maker` 없음.
+2. 빈 디렉토리에서 `codex` 실행, 새 세션 시작.
+3. README.md 의 Quickstart 코드 펜스 paste.
+4. **관찰**:
+   - AI 가 Codex CLI branch 선택
+   - AI 가 `codex plugin marketplace add Ecro/harness-maker` 실행 (Bash)
+   - AI 가 메시지: `Open Codex's /plugins list; if harness-maker isn't enabled, restart codex.`
+5. 사용자가 `/plugins` type → harness-maker 확인. 없으면 `Ctrl+C` 후 `codex` 재실행.
+6. 이후 harness-maker:make / hm:health 진행 (Codex 의 skill 호출 방식 따름).
+
+**Fail 분기**: Codex CLI 의 plugin lifecycle 이 marketplace-add ≠ install 일 수도 — `/plugins` 목록에 없으면 별도 `codex plugin install` 필요한지 확인.

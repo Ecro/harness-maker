@@ -1,5 +1,9 @@
 # Changelog
 
+## [Unreleased]
+
+- **README one-prompt rewrites slash-command typing to Bash auto-install** for all three IDEs. The AI now runs `claude plugin marketplace add` + `claude plugin install` (and `git clone` for Cursor, `codex plugin marketplace add` for Codex) via the Bash tool instead of telling the user to type `/plugin install ...` themselves. User-typed slash commands on Claude Code drop from 3 to 1 (`/reload-plugins`). Per-IDE step budget table now shipped at the top of the Quickstart. PLAN-readme-one-prompt-autoinstall; Phase 0 empirical verification deferred — README uses the conservative `manual-enter-required` wording (harmless when reload auto-triggers).
+
 ## 0.17.0 — Fresh-install /hm:health zero false-positive P0 (2026-05-19)
 
 PLAN-fresh-install-health-baseline. A freshly-rendered `/hm:make` harness

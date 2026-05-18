@@ -165,50 +165,61 @@ For the mechanics behind each step — full procedures, decision paths, internal
 ### Universal Bootstrap Prompt
 
 > **Paste into your AI agent — it detects whether you're in Claude Code, Cursor,
-> or Codex, runs the right plugin install for that IDE, and bootstraps the
-> harness end-to-end.** One copy, every supported IDE.
+> or Codex, runs the matching plugin install via Bash (no slash-command typing
+> by you), and bootstraps the harness end-to-end.** One paste, every supported IDE.
+
+**Per-IDE user actions** (the AI does the rest):
+
+| IDE | Paste | Typed slash | GUI / restart action | Total user actions |
+|---|---|---|---|---|
+| **Claude Code** | 1 | 1 (`/reload-plugins`) | 0 (then press enter once) | **2-3** |
+| **Cursor** | 1 | 0 | 1 (`Ctrl+Shift+P → Reload Window`) | **2-3** |
+| **Codex CLI** | 1 | 0 | 0-1 (restart codex if `/plugins` doesn't show harness-maker) | **2-3** |
+
+> **First-use Bash approval.** Claude Code / Cursor will request Bash permission for the install commands shown below. Approve **only** the exact commands in the prompt (`claude plugin install harness-maker@harness-maker` for Claude Code, `git clone --depth 1 https://github.com/Ecro/harness-maker.git ~/.cursor/plugins/local/harness-maker` for Cursor). Do **NOT** grant blanket `Bash(*)` — if the AI requests a different command, stop and inspect. The Cursor clone fetches the current `main` branch of a public repo; future `git pull` updates are not integrity-verified — pin a release tag manually if this matters for your threat model.
 
 ```
 Install harness-maker for this project and bootstrap the harness end-to-end.
 
 You are an AI agent running inside one of: Claude Code, Cursor, or Codex CLI.
-Detect which one (silently — do NOT ask me), run the matching plugin install,
-then drive /harness-maker:make + /hm:health.
+Detect which one (silently — do NOT ask me), run the matching plugin install
+via Bash (NOT slash commands typed by me), then invoke harness-maker:make
+and hm:health via the Skill tool.
 
 Step 1 — Detect the host IDE (silent):
   - Claude Code  → $CLAUDE_CODE is set, or ~/.claude/ exists, or you have
-                   access to slash commands like /plugin
+                   the Bash tool with access to the `claude` CLI
   - Cursor       → $CURSOR_SESSION is set, or ~/.cursor/ exists, or you have
-                   access to Cursor's plugin manager
+                   Cursor's plugin manager available
   - Codex CLI    → $CODEX_SESSION is set, or ~/.codex/ exists, or the
                    `codex` command is on PATH
 
-Step 2 — Install harness-maker as a plugin (skip if `/harness-maker:make` is
-already available):
+Step 2 — Install harness-maker as a plugin via Bash (skip when the
+harness-maker:make skill is already available):
 
   IF Claude Code:
-    /plugin marketplace add Ecro/harness-maker
-    /plugin install harness-maker@harness-maker
-    (reload Claude Code if prompted)
+    Bash: claude plugin marketplace add Ecro/harness-maker
+    Bash: claude plugin install harness-maker@harness-maker
+    Then tell me verbatim: "Type /reload-plugins now, then press enter once."
+
+  IF Cursor:
+    Bash: git clone --depth 1 https://github.com/Ecro/harness-maker.git ~/.cursor/plugins/local/harness-maker
+    Then tell me verbatim: "Reload the Cursor window now (Ctrl+Shift+P → Reload Window)."
 
   IF Codex CLI:
-    codex plugin marketplace add Ecro/harness-maker
-    # marketplace add IS install for Codex — no separate install step
-    # then run /plugins inside Codex to enable
-
-  IF Cursor (public marketplace does not yet support direct GitHub install):
-    git clone https://github.com/Ecro/harness-maker.git \
-      ~/.cursor/plugins/local/harness-maker
-    # tell me to reload the window (Ctrl+Shift+P → "Reload Window")
+    Bash: codex plugin marketplace add Ecro/harness-maker
+    Then tell me verbatim: "Open Codex's /plugins list; if harness-maker isn't enabled, restart codex."
 
   IF you can't tell which IDE (or none of the above), STOP and ask me which
   IDE you're in.
 
-Step 3 — Run /harness-maker:make and follow the interview:
+Step 3 — After I confirm the reload/restart, invoke harness-maker:make via the
+Skill tool (do NOT ask me to type any slash command) and drive the interview:
   • Confirm preset (Side / Production), dev mode, target IDEs, and locale.
   • Accept the recommended defaults unless I object.
 
-Step 4 — Run /hm:health after the harness renders:
+Step 4 — After harness-maker:make finishes, invoke hm:health via the Skill tool
+(again, do NOT ask me to type it):
   Produces a 3-section dashboard at .claude/observability/dashboard.md
   (structural / external-risks / personalization). Tell me the personalization
   tier and any high-priority action items.
