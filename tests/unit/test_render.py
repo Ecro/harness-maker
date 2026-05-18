@@ -598,8 +598,6 @@ def test_render_harness_yaml_preserves_user_added_top_level_key(tmp_path: Path) 
     emit. Pre-0.15.2 the renderer wiped these on every `make` invocation.
     The fix appends user-only top-level keys after a marker comment.
     """
-    import yaml
-
     project_root = tmp_path
     target = project_root / ".claude"
     target.mkdir()
@@ -669,8 +667,6 @@ def test_render_harness_yaml_template_key_wins_over_user(tmp_path: Path) -> None
     Documents the contract: preservation only applies to keys the template
     does NOT emit. Once the template natively emits a key, it owns it.
     """
-    import yaml
-
     project_root = tmp_path
     target = project_root / ".claude"
     target.mkdir()

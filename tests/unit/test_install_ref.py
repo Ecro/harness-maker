@@ -142,9 +142,9 @@ def test_url_path_wins_over_uv_archive_pkg_root(monkeypatch: pytest.MonkeyPatch)
     with patch("importlib.metadata.distribution", return_value=dist):
         result = synthesize._compute_install_ref()
 
-    assert (
-        result == "/home/dev/.claude/plugins/cache/harness-maker-local/harness-maker/0.15.1"
-    ), f"renderer fell back to broken archive PKG_ROOT instead of URL path: {result}"
+    assert result == "/home/dev/.claude/plugins/cache/harness-maker-local/harness-maker/0.15.1", (
+        f"renderer fell back to broken archive PKG_ROOT instead of URL path: {result}"
+    )
 
 
 def test_console_scripts_entry_point_callable() -> None:
