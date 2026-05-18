@@ -39,11 +39,14 @@ _HARNESS_MAKER_PKG_ROOT = str(Path(__file__).parent.parent.parent)
 def _compute_install_ref() -> str:
     """Return the source path/name to embed in rendered ``uv run --with <ref>`` calls.
 
-    ADR-002 (revised 0.15.1): the value is baked into every rendered hook,
+    ADR-002 (revised 0.15.3): the value is baked into every rendered hook,
     skill, and slash command. It must be either a directory uv can resolve as
     a Python project (containing ``pyproject.toml``) or a PyPI distribution
-    name. harness-maker is not currently on PyPI, so all real installs go
-    through a local source path.
+    name. As of 0.15.3 harness-maker is published on PyPI, so the
+    ``"harness-maker"`` branch is reachable for users who install via
+    ``pip install harness-maker`` or ``uv add harness-maker``. The
+    ``file://`` branch still dominates in practice because Claude Code /
+    Cursor / Codex marketplaces install via local plugin cache, not PyPI.
 
     Detection rule:
     1. ``distribution("harness-maker")`` raises → not installed (running from a
@@ -54,9 +57,13 @@ def _compute_install_ref() -> str:
        correct value when ``synthesize`` is imported from a uv archive cache
        (``~/.cache/uv/archive-v0/<hash>/lib/python3.12/site-packages/...``),
        where ``_HARNESS_MAKER_PKG_ROOT`` resolves to the archive's
-       ``lib/python3.12`` directory rather than a Python project.
-    3. ``url`` is non-``file://`` (real PyPI/registry/git) → return
-       ``"harness-maker"`` so uv resolves the name from the index.
+       ``lib/python3.12`` directory rather than a Python project. This is
+       also the path that 99% of plugin-marketplace installs take, since
+       ``/plugin install harness-maker@harness-maker-local`` writes a
+       ``file://`` URL pointing at the cache directory.
+    3. ``url`` is non-``file://`` (PyPI / git+https / other index) → return
+       ``"harness-maker"`` so uv resolves the name from the index. Reachable
+       starting 0.15.3.
     4. Any parse error → fall back to ``_HARNESS_MAKER_PKG_ROOT``.
 
     Before 0.15.1, step 2 returned ``_HARNESS_MAKER_PKG_ROOT`` instead of the

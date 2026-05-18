@@ -126,6 +126,35 @@ harness-maker 는 **triple plugin** — 세 marketplace 모두에 등록 가능:
 
 > **왜:** Claude Code 의 `/plugin update` 는 `.claude-plugin/plugin.json` 의 `version` 필드를 기준으로 최신 여부를 판단한다. Cursor 도 `.cursor-plugin/plugin.json`, Codex 도 `.codex-plugin/plugin.json` 으로 동일 판단. `pyproject.toml` 만 올리고 세 manifest 가 구버전이면 모두 "already at latest" 로 오보. (0.4.9 릴리스 시 발견; cursor 도입 시 4 파일, codex 도입 시 5 파일로 확장)
 
+## 릴리스 절차 (race-free)
+
+5 파일 버전 동기화 + CHANGELOG 엔트리 commit 한 뒤:
+
+```
+git tag -a vX.Y.Z -m "..."
+git push origin main vX.Y.Z
+```
+
+**그 후 아무것도 더 하지 말 것.** `.github/workflows/release.yml` 이 tag push 를
+받아 `quality-gate → build → publish-testpypi → publish-pypi → github-release`
+순서로 모든 산출물을 만든다. github-release 잡이 GitHub Release 페이지를 자동
+생성하니, **수동으로 `gh release create` 호출 금지**.
+
+> **왜:** 0.15.3 릴리스 때 tag push 직후 `gh release create` 를 수동 실행했더니
+> workflow 의 `github-release` 잡이 "a release with the same tag name already
+> exists" 로 fail. 산출물·publish 는 모두 성공했지만 latest tag 가 빨갛게
+> 표시됨. push 만 하고 workflow 가 끝낼 때까지 기다리는 것이 race-free.
+
+워크플로 실패 시:
+- `quality-gate` 실패 → ruff/mypy/pytest 로컬에서 재현, fix commit, 새 patch tag
+- 그 외 잡 실패 → `gh run view <id> --log-failed` 로 진단 후 fix patch tag.
+  **이미 created 된 GitHub Release / PyPI publish 는 되돌리지 않음** (immutable).
+
+PyPI 노출: harness-maker 는 **0.15.3 부터 PyPI 에 publish 됨** (Trusted
+Publisher via GitHub OIDC; 자세한 건 `release.yml` 의 `publish-pypi` 잡).
+이전 릴리스 (0.15.2 이하) 는 GitHub Release 만 존재 — Claude Code /
+Cursor / Codex 의 plugin marketplace 가 GitHub 에서 직접 fetch.
+
 ## 보안 / 권한 (v1.6, REVIEW-2026-05-08 개정)
 - Reviewer agent (code, security, perf, ux, concurrency) — `permissions.allow: [Read(*), Grep(*), Glob(*), Bash(git diff:*), Bash(git log:*), Bash(git status:*)]`, `deny: [Write(*), Edit(*), Bash(rm:*), Bash(curl:*), Bash(npm:*), Bash(eval *), Bash(python:*), Bash(node:*), Bash(sh:*), Bash(bash:*)]`. **Why 추가 Bash deny**: REVIEW M7 발견 — 단순 rm/curl/npm 차단만으로는 `Bash(python -c "...")` / `Bash(sh -c "...")` 우회 가능. 인터프리터 호출도 모두 deny.
 - Executor agent — `allow: [Read(*), Grep(*), Glob(*), Write(.worktrees/**), Edit(.worktrees/**), Bash(uv run:*), Bash(pytest:*), Bash(npm test:*), Bash(cargo test:*), Bash(git diff:*), Bash(git log:*), Bash(git status:*)]`, `deny: [Write(/etc/**), Write(~/.ssh/**), Write(~/.aws/**), Edit(/etc/**), Edit(~/.ssh/**), Edit(~/.aws/**), Bash(curl * | sh), Bash(eval *), Bash(rm -rf /:*)]`. **Why Edit/Write 페어링**: REVIEW M1 발견 — `Write(/etc/**)` 만 deny 면 `Edit(/etc/sudoers)` 로 동일 파일 수정 가능 (escalation path). 같은 시스템 경로에 대해 Write 와 Edit 은 항상 페어로 deny.
