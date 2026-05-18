@@ -20,19 +20,24 @@ def _bypass_worktree_guard(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.fixture(autouse=True)
 def _pin_harness_maker_pkg_root(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Pin synthesize._HARNESS_MAKER_PKG_ROOT for worktree-invariant snapshots.
+    """Pin the renderer's install-ref output for worktree-invariant snapshots.
 
     From within a ``.worktrees/<x>/`` checkout the constant resolves via
     ``__file__`` to the worktree path and leaks into rendered templates
     (``harness_maker_src_path``), breaking byte-identical snapshot comparisons.
     Pin to the canonical main checkout so unit tests are invariant to where
     they are invoked from.
+
+    Since 0.15.1 the renderer reads ``direct_url.json`` directly instead of
+    using ``_HARNESS_MAKER_PKG_ROOT``; pin both so snapshot determinism
+    survives the dev's actual install state.
     """
     main_path = os.environ.get(
         "HM_MAIN_CHECKOUT_PATH",
         "/home/noel/harness-maker",
     )
     monkeypatch.setattr(synthesize, "_HARNESS_MAKER_PKG_ROOT", main_path)
+    monkeypatch.setattr(synthesize, "_compute_install_ref", lambda: main_path)
 
 
 @pytest.fixture(autouse=True)

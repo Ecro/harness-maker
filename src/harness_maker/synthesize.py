@@ -37,29 +37,35 @@ _HARNESS_MAKER_PKG_ROOT = str(Path(__file__).parent.parent.parent)
 
 
 def _compute_install_ref() -> str:
-    """Return ``"harness-maker"`` only for true PyPI installs; else the local abs path.
+    """Return the source path/name to embed in rendered ``uv run --with <ref>`` calls.
 
-    ADR-002 (revised 0.11.3): rendered templates use ``uv run --with <ref>`` to
-    invoke harness-maker modules. ``uv run --with harness-maker`` resolves the
-    name on PyPI; harness-maker is **not** published, so the PyPI name only
-    works when (and if) it eventually gets published. Until then, any install
-    that came from a local directory (Claude Code plugin cache, editable dev
-    tree, manual ``pip install /path``) must render the local abs path.
+    ADR-002 (revised 0.15.1): the value is baked into every rendered hook,
+    skill, and slash command. It must be either a directory uv can resolve as
+    a Python project (containing ``pyproject.toml``) or a PyPI distribution
+    name. harness-maker is not currently on PyPI, so all real installs go
+    through a local source path.
 
     Detection rule:
-    1. ``distribution("harness-maker")`` raises → not installed, return local path.
-    2. ``direct_url.json`` parses and its ``url`` is a ``file://`` URL → local
-       install (editable or not), return local path. Covers Claude Code plugin
-       cache where ``editable=true`` and a hypothetical wheel-from-local where
-       ``editable=false``.
-    3. ``url`` is non-``file://`` (real PyPI/registry) → return ``"harness-maker"``.
-    4. Any parse error → return local path (safer than a broken --with).
+    1. ``distribution("harness-maker")`` raises → not installed (running from a
+       source checkout without ``pip install``). Use the source-tree fallback
+       derived from ``__file__``.
+    2. ``direct_url.json`` exists with a ``file://`` URL → the URL path is the
+       *original* source uv was given. Return that. This is the **only**
+       correct value when ``synthesize`` is imported from a uv archive cache
+       (``~/.cache/uv/archive-v0/<hash>/lib/python3.12/site-packages/...``),
+       where ``_HARNESS_MAKER_PKG_ROOT`` resolves to the archive's
+       ``lib/python3.12`` directory rather than a Python project.
+    3. ``url`` is non-``file://`` (real PyPI/registry/git) → return
+       ``"harness-maker"`` so uv resolves the name from the index.
+    4. Any parse error → fall back to ``_HARNESS_MAKER_PKG_ROOT``.
 
-    Previously this returned ``"harness-maker"`` whenever ``editable=false``,
-    which silently broke SessionStart drift hooks for plugin-cache installs:
-    Claude Code's plugin install records ``editable=false`` even though the
-    URL is ``file://``, and ``uv run --with harness-maker`` then fails to
-    resolve the package on PyPI.
+    Before 0.15.1, step 2 returned ``_HARNESS_MAKER_PKG_ROOT`` instead of the
+    URL path. When the renderer ran from a uv archive cache (the default for
+    ``uv run --with /plugin/cache/...``), that constant pointed at the
+    archive's ``lib/python3.12`` directory — not a Python project — and every
+    rendered hook fired ``uv run --with <archive>/lib/python3.12 ...`` which
+    failed with "does not appear to be a Python project". Bug surfaced by
+    /hm:health audit 2026-05-18.
     """
     try:
         from importlib.metadata import distribution
@@ -70,14 +76,15 @@ def _compute_install_ref() -> str:
 
     try:
         import json
+        from urllib.parse import unquote, urlparse
 
         raw = dist.read_text("direct_url.json")
         if raw is not None:
             du = json.loads(raw)
             url = du.get("url", "")
             if isinstance(url, str) and url.startswith("file://"):
-                return _HARNESS_MAKER_PKG_ROOT
-    except (json.JSONDecodeError, KeyError, TypeError):
+                return unquote(urlparse(url).path)
+    except (json.JSONDecodeError, KeyError, TypeError, ValueError):
         return _HARNESS_MAKER_PKG_ROOT
     return "harness-maker"
 

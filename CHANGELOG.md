@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.15.1 — fix uv archive cache path bug in renderer (2026-05-18)
+
+### Fixed
+
+- **`_compute_install_ref` returned a broken path when invoked from a uv
+  archive cache** — when `uv run --with /plugin/cache/<version>` archived
+  the package into `~/.cache/uv/archive-v0/<hash>/lib/python3.12/
+  site-packages/harness_maker/`, the renderer's
+  `Path(__file__).parent.parent.parent` math resolved to
+  `<archive>/lib/python3.12` — not a Python project. That value got baked
+  into every rendered hook, skill, and slash command as
+  `uv run --with <archive>/lib/python3.12 python -m harness_maker.<module>`,
+  and every invocation failed with `does not appear to be a Python project`.
+  Fixed by reading the `file://` URL path from `direct_url.json` directly
+  (the original source path uv was given), bypassing the `__file__`-derived
+  guess. Surfaced by `/hm:health` audit 2026-05-18. Regression test:
+  `tests/unit/test_install_ref.py::test_url_path_wins_over_uv_archive_pkg_root`.
+
 ## 0.15.0 — per-agent model routing + preset-aware defaults (2026-05-18)
 
 Token-cost optimization across Claude Code / Cursor / Codex via declarative

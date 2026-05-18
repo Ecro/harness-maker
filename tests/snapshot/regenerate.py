@@ -110,10 +110,15 @@ if __name__ == "__main__":
     # available for non-default layouts).
     from harness_maker import synthesize as _synth
 
-    _synth._HARNESS_MAKER_PKG_ROOT = os.environ.get(
+    _pinned = os.environ.get(
         "HM_MAIN_CHECKOUT_PATH",
         "/home/noel/harness-maker",
     )
+    _synth._HARNESS_MAKER_PKG_ROOT = _pinned
+    # 0.15.1: renderer reads direct_url.json instead of the constant; pin the
+    # function too so snapshots stay byte-identical regardless of the dev's
+    # actual install layout.
+    _synth._compute_install_ref = lambda: _pinned  # type: ignore[assignment]
     with tempfile.TemporaryDirectory() as fake_home:
         os.environ["HOME"] = fake_home
         with patch.object(Path, "home", lambda: Path(fake_home)):
