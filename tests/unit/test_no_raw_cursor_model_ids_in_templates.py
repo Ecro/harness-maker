@@ -10,9 +10,7 @@ Scope per R5 W-11: assignment-only patterns. Prose mentions like
 import re
 from pathlib import Path
 
-TEMPLATES_DIR = (
-    Path(__file__).resolve().parents[2] / "src" / "harness_maker" / "templates"
-)
+TEMPLATES_DIR = Path(__file__).resolve().parents[2] / "src" / "harness_maker" / "templates"
 
 # Each pattern targets a position where a literal concrete ID would actually
 # affect rendered output. Comments / prose / examples are not matched.
@@ -77,6 +75,4 @@ def test_lint_patterns_do_not_match_prose() -> None:
     ]
     for line in prose_lines:
         for pattern, _name in ASSIGNMENT_PATTERNS:
-            assert not re.search(pattern, line), (
-                f"Prose unexpectedly matched {pattern!r}: {line!r}"
-            )
+            assert not re.search(pattern, line), f"Prose unexpectedly matched {pattern!r}: {line!r}"

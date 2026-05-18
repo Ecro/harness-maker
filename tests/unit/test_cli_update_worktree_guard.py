@@ -14,9 +14,7 @@ from typer.testing import CliRunner
 from harness_maker.cli import app
 
 
-def test_update_rejects_cwd_inside_worktrees(
-    tmp_path: Path, monkeypatch: object
-) -> None:
+def test_update_rejects_cwd_inside_worktrees(tmp_path: Path, monkeypatch: object) -> None:
     """cwd inside `.worktrees/<branch>/` → CLI exits 1 with actionable error.
 
     Conftest autouse bypass is removed here so the guard actually fires.
@@ -60,9 +58,7 @@ def test_update_bypass_env_var_skips_guard(tmp_path: Path, monkeypatch: object) 
         bootstrap = runner.invoke(app, ["make", str(fake_worktree), "--autoloop"])
         assert bootstrap.exit_code == 0, bootstrap.output
         # Even though cwd is inside .worktrees/, bypass env var lets --update proceed
-        result = runner.invoke(
-            app, ["make", str(fake_worktree), "--autoloop", "--update"]
-        )
+        result = runner.invoke(app, ["make", str(fake_worktree), "--autoloop", "--update"])
         assert result.exit_code == 0, result.output
         assert "Snapshot regen invoked from inside" not in result.output
     finally:
@@ -87,9 +83,7 @@ def test_update_proceeds_when_cwd_outside_worktrees(tmp_path: Path) -> None:
         result1 = runner.invoke(app, ["make", str(fake_repo), "--autoloop"])
         assert result1.exit_code == 0, result1.output
         # Re-render with --update — guard should NOT fire (cwd has no .worktrees/ ancestor).
-        result2 = runner.invoke(
-            app, ["make", str(fake_repo), "--autoloop", "--update"]
-        )
+        result2 = runner.invoke(app, ["make", str(fake_repo), "--autoloop", "--update"])
         assert result2.exit_code == 0, result2.output
         assert "Snapshot regen invoked from inside" not in result2.output
     finally:

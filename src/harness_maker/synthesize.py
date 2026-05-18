@@ -226,9 +226,7 @@ def _agent_files(
                     "reviewer_kind": _REVIEWER_KIND.get(n, ""),
                     "claude_model": spec.claude,
                     "cursor_model": spec.cursor,
-                    "codex_reasoning_effort": (
-                        spec.codex.reasoning_effort if spec.codex else None
-                    ),
+                    "codex_reasoning_effort": (spec.codex.reasoning_effort if spec.codex else None),
                 },
             )
         )
@@ -298,9 +296,7 @@ def _codex_agent_files(
                     "name": n,
                     "description": _CODEX_AGENT_META[n],
                     "model_codex": None,
-                    "codex_reasoning_effort": (
-                        spec.codex.reasoning_effort if spec.codex else None
-                    ),
+                    "codex_reasoning_effort": (spec.codex.reasoning_effort if spec.codex else None),
                     "reviewer_kind": _REVIEWER_KIND.get(n, ""),
                     "communication_variant": _COMMUNICATION_VARIANT[n],
                 },

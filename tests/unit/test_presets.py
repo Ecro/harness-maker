@@ -28,11 +28,7 @@ def test_preset_agent_models_completeness_vs_shipped_templates() -> None:
     This is the "adding a new agent forces a default map entry" contract from ADR-005.
     """
     agents_dir = (
-        Path(__file__).resolve().parents[2]
-        / "src"
-        / "harness_maker"
-        / "templates"
-        / "agents"
+        Path(__file__).resolve().parents[2] / "src" / "harness_maker" / "templates" / "agents"
     )
     shipped_agents: set[str] = set()
     for path in agents_dir.glob("*.md.j2"):
@@ -80,9 +76,7 @@ def test_resolve_agent_spec_tier1_explicit_override_beats_preset() -> None:
         cursor="haiku",
         codex=CodexAgentSpec(reasoning_effort="minimal"),
     )
-    config = HarnessConfig(
-        preset=Preset.PRODUCTION, agent_models={"autoloop-coder": custom}
-    )
+    config = HarnessConfig(preset=Preset.PRODUCTION, agent_models={"autoloop-coder": custom})
     spec = resolve_agent_spec("autoloop-coder", config)
     assert spec.claude == "haiku"
     # Cursor field comes in as alias, gets normalized to concrete ID.

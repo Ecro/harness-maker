@@ -20,9 +20,7 @@ FIXTURE_V1_PROVENANCE = (
 )
 
 
-def test_v1_with_provenance_loads_as_v2_with_default_model(
-    tmp_path: Path, caplog: object
-) -> None:
+def test_v1_with_provenance_loads_as_v2_with_default_model(tmp_path: Path, caplog: object) -> None:
     """The wire-path test (validator C-3 + ADR-004): real provenance-frontmatter
     fixture loads via io_utils.load_harness_yaml, recommended_model migrates to
     default_model, agent_models defaults to {}.
@@ -115,9 +113,7 @@ def test_uses_io_utils_load_harness_yaml_for_provenance(tmp_path: Path) -> None:
     assert answers.preset.value == "Production"
 
 
-def test_agent_models_malformed_entry_drops_with_warning(
-    tmp_path: Path, caplog: object
-) -> None:
+def test_agent_models_malformed_entry_drops_with_warning(tmp_path: Path, caplog: object) -> None:
     """Review code-reviewer + security-reviewer P1 fix: ValidationError must be
     caught when AgentModelSpec construction fails (Pydantic v2 strict mode
     raises ValidationError, not ValueError, so the original except (TypeError,

@@ -64,9 +64,7 @@ def _render_agent(name: str) -> str:
         communication_variant=variant,
         claude_model=spec.claude,
         cursor_model=spec.cursor,
-        codex_reasoning_effort=(
-            spec.codex.reasoning_effort if spec.codex else None
-        ),
+        codex_reasoning_effort=(spec.codex.reasoning_effort if spec.codex else None),
     )
 
 

@@ -438,9 +438,7 @@ class CodexAgentSpec(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
 
     model: str | None = None
-    reasoning_effort: (
-        Literal["none", "minimal", "low", "medium", "high", "xhigh"] | None
-    ) = None
+    reasoning_effort: Literal["none", "minimal", "low", "medium", "high", "xhigh"] | None = None
 
 
 _MODEL_ID_PATTERN = re.compile(r"^[a-zA-Z0-9_.:-]+$")
@@ -540,6 +538,7 @@ class HarnessConfig(BaseModel):
                 "rendered-config injection"
             )
         return v
+
     dev_mode: DevMode = DevMode.SPEC_DRIVEN
     workflows: dict[str, list[AtomicStage]] = Field(
         default_factory=lambda: {

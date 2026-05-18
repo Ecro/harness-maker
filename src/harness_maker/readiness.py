@@ -818,9 +818,7 @@ def _dim_model_routing(project_dir: Path) -> DimensionScore:
                 "Run /hm:make to scaffold the harness",
             )
         )
-        return DimensionScore(
-            name="model_routing", score=_score_signals(signals), signals=signals
-        )
+        return DimensionScore(name="model_routing", score=_score_signals(signals), signals=signals)
 
     try:
         import yaml as _yaml
@@ -961,9 +959,7 @@ def _dim_model_routing(project_dir: Path) -> DimensionScore:
             )
         )
 
-    return DimensionScore(
-        name="model_routing", score=_score_signals(signals), signals=signals
-    )
+    return DimensionScore(name="model_routing", score=_score_signals(signals), signals=signals)
 
 
 def _dim_governance(project_dir: Path, preset: Preset) -> DimensionScore:

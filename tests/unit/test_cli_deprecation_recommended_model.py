@@ -35,8 +35,7 @@ def test_recommended_model_emits_deprecation_warning(tmp_path: Path) -> None:
     dep_warnings = [
         w
         for w in recorded
-        if issubclass(w.category, DeprecationWarning)
-        and "recommended-model" in str(w.message)
+        if issubclass(w.category, DeprecationWarning) and "recommended-model" in str(w.message)
     ]
     assert dep_warnings, (
         f"expected DeprecationWarning mentioning --recommended-model, got: "
@@ -65,8 +64,7 @@ def test_default_model_works_without_deprecation(tmp_path: Path) -> None:
     dep_warnings = [
         w
         for w in recorded
-        if issubclass(w.category, DeprecationWarning)
-        and "recommended-model" in str(w.message)
+        if issubclass(w.category, DeprecationWarning) and "recommended-model" in str(w.message)
     ]
     assert not dep_warnings, (
         f"--default-model should NOT trigger deprecation warning: "
@@ -85,9 +83,7 @@ def test_recommended_model_value_applied(tmp_path: Path) -> None:
     cwd_before = os.getcwd()
     try:
         os.chdir(tmp_path)
-        result1 = runner.invoke(
-            app, ["make", str(tmp_path), "--autoloop"]
-        )
+        result1 = runner.invoke(app, ["make", str(tmp_path), "--autoloop"])
         assert result1.exit_code == 0, result1.output
         result2 = runner.invoke(
             app,

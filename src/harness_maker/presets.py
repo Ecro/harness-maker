@@ -67,22 +67,22 @@ def _spec(claude_alias: str, effort: _Effort) -> AgentModelSpec:
 # medium; trajectory-monitor (lightweight observability) gets sonnet + low.
 _PRODUCTION_MAP: dict[str, AgentModelSpec] = {
     # Reasoning-heavy
-    "autoloop-coder":       _spec("opus", "high"),
-    "plan-validator":       _spec("opus", "high"),
-    "stuck":                _spec("opus", "high"),
+    "autoloop-coder": _spec("opus", "high"),
+    "plan-validator": _spec("opus", "high"),
+    "stuck": _spec("opus", "high"),
     # Reviewer / structured agents
-    "code-reviewer":        _spec("sonnet", "medium"),
-    "code-verifier":        _spec("sonnet", "medium"),
+    "code-reviewer": _spec("sonnet", "medium"),
+    "code-verifier": _spec("sonnet", "medium"),
     "concurrency-reviewer": _spec("sonnet", "medium"),
-    "consensus-arbiter":    _spec("sonnet", "medium"),
-    "executor":             _spec("sonnet", "medium"),
+    "consensus-arbiter": _spec("sonnet", "medium"),
+    "executor": _spec("sonnet", "medium"),
     "performance-reviewer": _spec("sonnet", "medium"),
-    "security-auditor":     _spec("sonnet", "medium"),
-    "security-reviewer":    _spec("sonnet", "medium"),
-    "test-reviewer":        _spec("sonnet", "medium"),
-    "ux-reviewer":          _spec("sonnet", "medium"),
+    "security-auditor": _spec("sonnet", "medium"),
+    "security-reviewer": _spec("sonnet", "medium"),
+    "test-reviewer": _spec("sonnet", "medium"),
+    "ux-reviewer": _spec("sonnet", "medium"),
     # Observability (lightweight)
-    "trajectory-monitor":   _spec("sonnet", "low"),
+    "trajectory-monitor": _spec("sonnet", "low"),
 }
 
 
@@ -90,22 +90,22 @@ _PRODUCTION_MAP: dict[str, AgentModelSpec] = {
 # reviewers drop to low, trajectory-monitor drops to minimal.
 _SIDE_MAP: dict[str, AgentModelSpec] = {
     # Reasoning agents (still need decent quality even in Side)
-    "autoloop-coder":       _spec("sonnet", "medium"),
-    "plan-validator":       _spec("sonnet", "medium"),
-    "stuck":                _spec("sonnet", "medium"),
+    "autoloop-coder": _spec("sonnet", "medium"),
+    "plan-validator": _spec("sonnet", "medium"),
+    "stuck": _spec("sonnet", "medium"),
     # Reviewers downshift
-    "code-reviewer":        _spec("sonnet", "low"),
-    "code-verifier":        _spec("sonnet", "low"),
+    "code-reviewer": _spec("sonnet", "low"),
+    "code-verifier": _spec("sonnet", "low"),
     "concurrency-reviewer": _spec("sonnet", "low"),
-    "consensus-arbiter":    _spec("sonnet", "low"),
-    "executor":             _spec("sonnet", "low"),
+    "consensus-arbiter": _spec("sonnet", "low"),
+    "executor": _spec("sonnet", "low"),
     "performance-reviewer": _spec("sonnet", "low"),
-    "security-auditor":     _spec("sonnet", "low"),
-    "security-reviewer":    _spec("sonnet", "low"),
-    "test-reviewer":        _spec("sonnet", "low"),
-    "ux-reviewer":          _spec("sonnet", "low"),
+    "security-auditor": _spec("sonnet", "low"),
+    "security-reviewer": _spec("sonnet", "low"),
+    "test-reviewer": _spec("sonnet", "low"),
+    "ux-reviewer": _spec("sonnet", "low"),
     # Observability — cheapest path
-    "trajectory-monitor":   _spec("sonnet", "minimal"),
+    "trajectory-monitor": _spec("sonnet", "minimal"),
 }
 
 

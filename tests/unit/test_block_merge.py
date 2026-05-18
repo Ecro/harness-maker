@@ -315,22 +315,13 @@ def test_merge_detects_orphan_content_after_closing_marker() -> None:
         "## [wiki:pattern] appended-by-mistake | 2026-05-17\n"
         "LLM appended this below the closing marker — will be dropped.\n"
     )
-    new = (
-        "# Wiki\n"
-        "<!-- @hm:user:entries -->\n"
-        "(seed)\n"
-        "<!-- @hm:/user:entries -->\n"
-    )
+    new = "# Wiki\n<!-- @hm:user:entries -->\n(seed)\n<!-- @hm:/user:entries -->\n"
     merged, report = merge(old, new)
     # The misplaced entry is dropped from the merged output (existing behaviour).
     assert "appended-by-mistake" not in merged
     # P1: but the loss is now reported.
-    assert any(
-        "appended-by-mistake" in line for line in report.orphan_outside_content
-    )
-    assert any(
-        "LLM appended this below" in line for line in report.orphan_outside_content
-    )
+    assert any("appended-by-mistake" in line for line in report.orphan_outside_content)
+    assert any("LLM appended this below" in line for line in report.orphan_outside_content)
 
 
 def test_merge_no_orphan_when_outside_content_matches_template() -> None:
@@ -354,12 +345,7 @@ def test_merge_orphan_outside_ignores_blank_lines() -> None:
     """Whitespace-only line differences between OLD and NEW outside markers
     must not produce false-positive orphans.
     """
-    old = (
-        "# Header\n"
-        "\n"
-        "\n"
-        "<!-- @hm:user:notes -->\nuser\n<!-- @hm:/user:notes -->\n"
-    )
+    old = "# Header\n\n\n<!-- @hm:user:notes -->\nuser\n<!-- @hm:/user:notes -->\n"
     new = "# Header\n<!-- @hm:user:notes -->\nseed\n<!-- @hm:/user:notes -->\n"
     _, report = merge(old, new)
     assert report.orphan_outside_content == []
@@ -410,11 +396,7 @@ def test_merge_orphan_outside_counts_duplicates() -> None:
         "shared\n"
         "shared\n"
     )
-    new = (
-        "# Header\n"
-        "<!-- @hm:user:notes -->\nseed\n<!-- @hm:/user:notes -->\n"
-        "shared\n"
-    )
+    new = "# Header\n<!-- @hm:user:notes -->\nseed\n<!-- @hm:/user:notes -->\nshared\n"
     _, report = merge(old, new)
     # 3 copies in OLD - 1 copy in NEW = 2 excess orphans, not 0.
     assert sum(1 for line in report.orphan_outside_content if line == "shared") == 2

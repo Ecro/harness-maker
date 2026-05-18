@@ -71,12 +71,7 @@ def test_codex_template_renders_reasoning_effort_line() -> None:
 
     from harness_maker.models import HarnessConfig
 
-    templates_dir = (
-        Path(__file__).resolve().parents[2]
-        / "src"
-        / "harness_maker"
-        / "templates"
-    )
+    templates_dir = Path(__file__).resolve().parents[2] / "src" / "harness_maker" / "templates"
     env = Environment(
         loader=FileSystemLoader(str(templates_dir)),
         undefined=StrictUndefined,
@@ -104,12 +99,7 @@ def test_codex_config_toml_renders_profile_blocks() -> None:
 
     from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
-    templates_dir = (
-        Path(__file__).resolve().parents[2]
-        / "src"
-        / "harness_maker"
-        / "templates"
-    )
+    templates_dir = Path(__file__).resolve().parents[2] / "src" / "harness_maker" / "templates"
     env = Environment(
         loader=FileSystemLoader(str(templates_dir)),
         undefined=StrictUndefined,

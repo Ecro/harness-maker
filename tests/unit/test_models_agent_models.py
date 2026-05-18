@@ -193,9 +193,7 @@ def test_harness_config_schema_version_bumped_to_2() -> None:
 
 def test_interview_answers_default_model_alias() -> None:
     """Same AliasChoices contract on InterviewAnswers (the interview-side mirror)."""
-    answers = InterviewAnswers.model_validate(
-        {"recommended_model": "claude-opus-4-7"}
-    )
+    answers = InterviewAnswers.model_validate({"recommended_model": "claude-opus-4-7"})
     assert answers.default_model == "claude-opus-4-7"
 
 
