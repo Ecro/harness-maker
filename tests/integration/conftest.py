@@ -3,12 +3,21 @@
 Other integration tests can import ``build_min_fixture`` to get a
 deterministic project directory that exercises real signal computation
 without depending on the harness-maker repo itself.
+
+Boundary-parse tests (PLAN-test-fidelity-gap):
+- ``rendered_harness_all_targets`` session-scoped LIVE-render fixture.
+- ``boundary_negative`` pytest marker registration — Phase 4 meta-test
+  enumerates negative tests by collecting this marker.
 """
 
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+
+import pytest
+
+from tests.integration._boundary_helpers import invoke_make_all_targets
 
 # Per-run telemetry shard date. Dynamic (always "yesterday in UTC") so the
 # fixture stays within _candidate_files(obs, days=365)'s file-count cap
@@ -93,3 +102,38 @@ def build_min_fixture(tmp_path: Path) -> Path:
     )
 
     return tmp_path
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# Boundary-parse tests (PLAN-test-fidelity-gap)
+# ──────────────────────────────────────────────────────────────────────────
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    """Register custom markers so ``--strict-markers`` does not reject them.
+
+    Phase 4's meta-test enumerates boundary-negative tests by collecting
+    on this marker. Registration here also silences ``PytestUnknownMarkWarning``.
+    """
+    config.addinivalue_line(
+        "markers",
+        "boundary_negative: mark test as a boundary-parse negative "
+        "(injects synthetic bad bytes; template-state-independent; "
+        "Phase 4 meta-test counts these per module).",
+    )
+
+
+@pytest.fixture(scope="session")
+def rendered_harness_all_targets(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> Path:
+    """Session-scoped LIVE-rendered harness with all three IDE targets.
+
+    Rendered once per test session; boundary tests across the 5 file-type
+    modules share the output. Skip-gated on ``INTEGRATION=1`` at each
+    consuming test's decorator level — this fixture only constructs when
+    a positive test actually requests it.
+    """
+    target = tmp_path_factory.mktemp("hm-boundary-all-targets")
+    invoke_make_all_targets(target)
+    return target

@@ -128,7 +128,19 @@ harness-maker 는 **triple plugin** — 세 marketplace 모두에 등록 가능:
 
 ## 릴리스 절차 (race-free)
 
-5 파일 버전 동기화 + CHANGELOG 엔트리 commit 한 뒤:
+5 파일 버전 동기화 + CHANGELOG 엔트리 commit 한 뒤, **boundary-parse tests 를 로컬에서 advisory 로 실행 권장**:
+
+```
+INTEGRATION=1 uv run pytest tests/integration/test_boundary_*.py -v
+```
+
+PLAN-test-fidelity-gap Layer 1 (ADR-003/004): 이 단계는 PR 을 막지 않는다.
+release.yml 의 `boundary-advisory` 잡이 tag push 후 동일 suite 를 자동 실행 +
+결과를 GitHub Release page 의 body 에 append 하므로, 로컬에서 빼먹어도 visible.
+단 5-file version sync 와 같은 자리에 두고 같이 돌리면 release 전에 빨간 줄을
+미리 잡는다.
+
+그 다음 tag push:
 
 ```
 git tag -a vX.Y.Z -m "..."

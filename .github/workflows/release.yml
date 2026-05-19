@@ -194,3 +194,72 @@ jobs:
           gh release create "$TAG" dist/* \
             --title "$TAG" \
             --notes-file "$NOTES_FILE"
+
+  # PLAN-test-fidelity-gap Layer 1 (ADR-004 v2):
+  # Boundary-parse tests run as advisory after the Release exists, then
+  # append their summary to the Release body via `gh release edit`. They
+  # are pure parser tests (json/tomllib/yaml) — no LLM calls, no secrets
+  # needed. continue-on-error on both the pytest step and the job ensures
+  # publish-pypi / github-release results are never overwritten by a
+  # boundary test failure.
+  boundary-advisory:
+    needs: [github-release]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+    permissions:
+      contents: write  # to `gh release edit`
+      id-token: none   # explicit denial; this job never publishes (defense-in-depth)
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+        with:
+          enable-cache: true
+      - name: Set up Python
+        run: uv python install 3.12
+      - name: Sync dependencies
+        run: uv sync --frozen
+      - name: Run boundary tests
+        id: boundary
+        continue-on-error: true
+        env:
+          INTEGRATION: "1"
+        run: |
+          set +e
+          uv run pytest tests/integration/test_boundary_*.py -v --tb=short 2>&1 | tee /tmp/boundary.txt
+          # PIPESTATUS[0] = pytest's exit code (not tee's, which is always 0
+          # on successful disk write). Without this, a real boundary failure
+          # would be silently reported as PASS in the Release body.
+          # (REVIEW-test-fidelity-gap consensus-passed P1.)
+          echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+      - name: Append boundary results to GitHub Release body
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF##*/}"
+          EXIT="${{ steps.boundary.outputs.exit_code }}"
+          if [ "$EXIT" = "0" ]; then
+            STATUS="✅ PASS"
+          else
+            STATUS="⚠️ FAIL (advisory — publish already succeeded)"
+          fi
+          # Strip ANSI escape sequences from pytest -v output so the fenced
+          # block renders cleanly on the Release UI.
+          SUMMARY="$(tail -30 /tmp/boundary.txt | sed -E 's/\x1b\[[0-9;]*[a-zA-Z]//g')"
+          NEW_NOTES="$(mktemp)"
+          # Guard: `gh release view` failure must NOT silently overwrite the
+          # original Release notes with the advisory section alone (a partial
+          # github-release job or transient gh API failure would otherwise
+          # destroy the CHANGELOG-derived notes). Skip the append on fetch
+          # failure; the boundary section can be re-added manually later.
+          if ! gh release view "$TAG" --json body -q .body > "$NEW_NOTES"; then
+            echo "WARNING: could not fetch release body for $TAG — skipping advisory append (notes preserved)" >&2
+            exit 0
+          fi
+          {
+            printf '\n\n## Boundary tests (advisory)\n\nLayer 1 of PLAN-test-fidelity-gap. Pure parser checks; advisory only.\n\nStatus: %s\n\n```\n%s\n```\n' "$STATUS" "$SUMMARY"
+          } >> "$NEW_NOTES"
+          gh release edit "$TAG" --notes-file "$NEW_NOTES"
