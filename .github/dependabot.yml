@@ -18,6 +18,21 @@ updates:
     commit-message:
       prefix: "deps"
       include: scope
+    # Bundle all minor + patch updates from this ecosystem into ONE PR per
+    # cycle to keep solo-maintainer noise low.
+    groups:
+      python-deps:
+        applies-to: version-updates
+        update-types:
+          - minor
+          - patch
+    # Skip major bumps. We will revisit majors manually on a quarterly
+    # cadence — each major often carries CHANGELOG-worthy breaking changes
+    # that need a release-runbook decision, not a Dependabot rubber-stamp.
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - version-update:semver-major
 
   # Pin SHAs in workflows and update them when upstream tags new versions.
   - package-ecosystem: github-actions
@@ -34,3 +49,16 @@ updates:
     commit-message:
       prefix: "ci"
       include: scope
+    groups:
+      github-actions:
+        applies-to: version-updates
+        update-types:
+          - minor
+          - patch
+    # Skip major bumps for actions too — upload-artifact v4→v7, setup-uv
+    # v5→v8 and similar jumps require reading upstream migration notes.
+    # We will manually bump on a release-prep schedule.
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - version-update:semver-major
