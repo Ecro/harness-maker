@@ -1,0 +1,44 @@
+name: nightly
+
+on:
+  schedule:
+    - cron: "0 6 * * *"  # 06:00 UTC daily
+  workflow_dispatch:
+
+# Runs the full quality-gate (matches ci.yml steps) PLUS the integration
+# test that requires INTEGRATION=1. release.yml:quality-gate duplicates the
+# same set at tag time; this workflow catches regressions in the window
+# between PR merge and the next release.
+
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+jobs:
+  full-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+        with:
+          enable-cache: true
+      - name: Set up Python
+        run: uv python install 3.12
+      - name: Sync dependencies
+        run: uv sync --frozen
+      - name: Ruff check
+        run: uv run ruff check .
+      - name: Ruff format check
+        run: uv run ruff format --check .
+      - name: Mypy strict
+        run: uv run mypy --strict src
+      - name: Pytest
+        run: uv run pytest -x --tb=short
+      - name: Integration test — fresh install readiness
+        env:
+          INTEGRATION: "1"
+        run: uv run pytest tests/integration/test_fresh_install_readiness.py -x --tb=short

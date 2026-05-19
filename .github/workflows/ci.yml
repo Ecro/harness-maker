@@ -1,0 +1,62 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+# Mirrors release.yml's quality-gate job by design (see release.yml lines
+# 19–21 — the release-time quality-gate intentionally duplicates ci.yml so a
+# slow regression between the last CI run and the tag push cannot reach
+# PyPI). Steps below MUST stay byte-identical to release.yml:quality-gate
+# (excluding the INTEGRATION step — that runs nightly + at tag time only).
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+        with:
+          enable-cache: true
+      - name: Set up Python
+        run: uv python install 3.12
+      - name: Sync dependencies
+        run: uv sync --frozen
+      - name: Ruff check
+        run: uv run ruff check .
+      - name: Ruff format check
+        run: uv run ruff format --check .
+      - name: Mypy strict
+        run: uv run mypy --strict src
+      - name: Pytest
+        run: uv run pytest -x --tb=short
+
+  dependency-review:
+    # Runs only on PRs — blocks introduction of vulnerable transitive deps.
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Dependency Review
+        # TODO(maintainer): replace `@v4` with a SHA pin before merging.
+        # Look up the latest v4 SHA at https://github.com/actions/dependency-review-action/releases
+        # and update Dependabot config to track it. Tag form is used here only because
+        # the executing LLM cannot verify SHAs without network access at write time.
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: on-failure

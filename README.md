@@ -26,8 +26,42 @@ Interview-shaped. Grade-gated. Self-evolving. Multi-IDE.
 [Configuration](#configuration) ·
 [Targets](#targets) ·
 [FAQ](#faq) ·
+[Stability](#stability) ·
 [Roadmap](#roadmap) ·
 [Deep dive](docs/HOW-IT-WORKS.md)
+
+---
+
+## Try in 30 seconds
+
+Paste this into Claude Code, Cursor, or Codex CLI. It auto-detects your IDE, installs the matching plugin via Bash (no slash-command typing), runs the interview, and prints a personalization-tier report.
+
+```
+Install harness-maker for this project and bootstrap the harness end-to-end.
+
+You are an AI agent running inside Claude Code, Cursor, or Codex CLI.
+Detect which one (silently — don't ask me), install the matching plugin via
+Bash (NOT slash commands typed by me), then invoke harness-maker:make and
+hm:health via the Skill tool. Conduct the conversation in the language of
+my first reply.
+
+Install path per IDE:
+  Claude Code:  Bash  claude plugin marketplace add Ecro/harness-maker
+                Bash  claude plugin install harness-maker@harness-maker
+                Then tell me: "Type /reload-plugins, then send any short message (e.g. `go`) to re-trigger me."
+  Cursor:       Bash  git clone --depth 1 https://github.com/Ecro/harness-maker.git ~/.cursor/plugins/local/harness-maker
+                Then tell me: "Reload the Cursor window (Ctrl+Shift+P → Reload Window)."
+  Codex CLI:    Bash  codex plugin marketplace add Ecro/harness-maker
+                Then tell me: "Open /plugins; if harness-maker isn't enabled, restart codex."
+
+After the reload, run harness-maker:make (drive the interview — accept defaults
+unless I object), then hm:health (read out the personalization tier and top
+action items).
+```
+
+> **Bash approval:** approve only the exact install commands shown above (`claude plugin install …`, `git clone --depth 1 https://github.com/Ecro/harness-maker.git …`, `codex plugin marketplace add …`). Do **NOT** grant blanket `Bash(*)`. If the AI requests a different command, stop and inspect.
+
+For the long form (per-IDE action counts, manual install fallbacks, integrity-pin guidance), see [Quickstart](#quickstart) below.
 
 ---
 
@@ -430,18 +464,17 @@ Fused workflows combine atomic stages into a single command. The interview gener
 
 ## How it compares
 
-Other Claude Code harnesses pick a niche; harness-maker is the **meta-tool** that builds them — and then keeps them current.
+Most AI-coding harnesses ship a fixed bundle — same agents, same prompts, same defaults for every project. harness-maker takes a different stance on five axes:
 
-| Project | Scope | What harness-maker adds |
-|---|---|---|
-| **ohmyclaudecode** | Curated commands/agents bundle | Project-tailored synthesis (preset + 10 override dims), brownfield reconcile, provenance frontmatter, anti-rot pipeline |
-| **superpowers** | Powerful sub-agents and workflows | Single-command entry, AI-readiness scoring, worktree isolation by default, privilege-separated reviewer/executor |
-| **Archon** | Knowledge-base + RAG-backed planning | Stack/scale/lifecycle profiler, atomic+fused workflow engine, conditional reviewer routing, 7 security gates |
-| **aider** | Terminal pair programmer, LLM-agnostic | Claude Code / Cursor / Codex native assets; harness output is the runtime (not the session); anti-rot keeps it current |
-| **ouroboros** | Autonomous self-bootstrapping AI software factory | Project-shaped interview (not one pipeline for all), grade-gated reviews with mechanical pre-checks, anti-rot pipeline, brownfield reconcile, multi-target support |
-| **Hand-rolled `.claude/`** | Full control, zero automation | Drift detection via provenance hash, weekly anti-rot crawl, AI-readiness scoring, worktree isolation — without writing it yourself |
+| Axis | What harness-maker does |
+|---|---|
+| **Project-tailored synthesis** | Profiler reads 12+ stack/framework/CI signals before any prompt. A 10-dimension interview locks the rest. A `Side` experiment and a `Production` service get *structurally different* harnesses (reviewer counts, workflow stages, security gates) — not the same set of files with different flags. |
+| **Edit-preserving upgrades** | Hand-edit any agent, skill, or CLAUDE.md. Block-merge markers (`@hm:user:*`) carry your edits across `--update`. No "your customisations will be overwritten" warning at the top of every file. |
+| **Anti-rot crawl** | Weekly fetch across Anthropic blog · GitHub releases · arXiv · OSV CVEs. Adaptive relevance filter learns from your accept/reject history. Manual confirmation is mandatory — no silent auto-apply. |
+| **Multi-IDE single source** | One `harness.yaml` renders Claude Code, Cursor, and Codex CLI native assets. Foreign configs (`.cursor/rules/`, `AGENTS.md`, `.aider.conf.yml`, `.continue/`, `.github/copilot-instructions.md`) are absorbed on first run — no manual port. |
+| **Privilege-separated reviewers** | Reviewer agents (`code`, `security`, `performance`, `concurrency`, `UX`) have read-only permissions — no `Write`, no `Edit`, no shell interpreters. The stage orchestrator applies fixes, preserving the boundary. Mechanical checks (lint/tests) gate the LLM reviewer before any token is spent. |
 
-The core difference: harness-maker generates and **owns the lifecycle** of your `.claude/` directory. A static tool gives you a starting point. harness-maker gives you a starting point that knows who it was created for and can be updated without losing your changes.
+harness-maker generates and **owns the lifecycle** of your `.claude/` directory. A static template gives you a starting point. harness-maker gives you a starting point that knows who it was created for, and can be updated without losing your changes.
 
 ---
 
@@ -661,6 +694,23 @@ claude --plugin-dir /path/to/harness-maker
 # Codex — render Codex-native assets in your project harness
 harness-maker make . --targets codex
 ```
+
+---
+
+## Stability
+
+harness-maker is on `0.x` and stays there until enough projects depend on it that a 1.0 commitment is honest (see [ADR-001 in `work-docs/PLAN-oss-readiness-audit.md`](work-docs/PLAN-oss-readiness-audit.md)).
+
+**Frozen surfaces** — these will not break in any 0.x.minor without a deprecation cycle:
+
+- **Slash command names**: `/hm:make`, `/hm:research`, `/hm:plan`, `/hm:execute`, `/hm:review`, `/hm:wrapup`, `/hm:verify`, `/hm:health`, `/hm:loop`, `/hm:configure`, `/hm:personalization-audit`, `/harness-maker:make`.
+- **`harness.yaml` top-level keys**: `targets`, `preset`, `dev_mode`, `locale`, `reviewers`, `skills`, `agents`, `worktree`, `anti_rot`, `observability`, `ref_folders`, `second_brain`, `recommended_model`.
+- **Plugin manifest schemas**: `.claude-plugin/plugin.json`, `.cursor-plugin/plugin.json`, `.codex-plugin/plugin.json` — fields covered by each marketplace's published spec.
+- **Local-only telemetry guarantee** — see [`PRIVACY.md`](PRIVACY.md). A documented-vs-actual mismatch is treated as a P0 bug.
+
+**Everything else may break in any 0.x.minor.** Internal Python APIs, file formats under `.claude/observability/`, template contents, ADR numbering, reviewer prompt phrasing, interview wording. Pin a specific release (`uvx --from harness-maker==0.17.0 ...`) if reproducibility matters before 1.0.
+
+**What "broken" looks like in practice**: read [`CHANGELOG.md`](CHANGELOG.md). Patches inside a single minor (e.g., 0.15.0 → 0.15.3) have included fixes that rolled forward without a deprecation; that's the kind of velocity 0.x is for.
 
 ---
 

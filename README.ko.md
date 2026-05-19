@@ -29,6 +29,37 @@
 
 ---
 
+## 30초 만에 시도하기
+
+Claude Code · Cursor · Codex CLI 중 하나의 AI 에이전트에 아래 프롬프트를 붙여넣으세요. IDE를 자동 감지하고, 매칭되는 플러그인을 Bash로 설치한 뒤, 인터뷰를 진행하고 personalization tier 리포트까지 출력합니다.
+
+```
+Install harness-maker for this project and bootstrap the harness end-to-end.
+
+You are an AI agent running inside Claude Code, Cursor, or Codex CLI.
+Detect which one (silently — don't ask me), install the matching plugin via
+Bash (NOT slash commands typed by me), then invoke harness-maker:make and
+hm:health via the Skill tool. Conduct the conversation in the language of
+my first reply.
+
+Install path per IDE:
+  Claude Code:  Bash  claude plugin marketplace add Ecro/harness-maker
+                Bash  claude plugin install harness-maker@harness-maker
+                Then tell me: "Type /reload-plugins, then send any short message (e.g. `go`) to re-trigger me."
+  Cursor:       Bash  git clone --depth 1 https://github.com/Ecro/harness-maker.git ~/.cursor/plugins/local/harness-maker
+                Then tell me: "Reload the Cursor window (Ctrl+Shift+P → Reload Window)."
+  Codex CLI:    Bash  codex plugin marketplace add Ecro/harness-maker
+                Then tell me: "Open /plugins; if harness-maker isn't enabled, restart codex."
+
+After the reload, run harness-maker:make (drive the interview — accept defaults
+unless I object), then hm:health (read out the personalization tier and top
+action items).
+```
+
+긴 형식 (IDE별 사용자 액션 수, Bash 권한 주의사항, 수동 설치 fallback)은 영문 [Quickstart](README.md#quickstart) 참조.
+
+---
+
 ## 왜 harness-maker?
 
 대부분의 AI 코딩 도구는 범용 템플릿에서 시작합니다 — 모든 프로젝트에 같은 reviewer, 모든 스택에 같은 프롬프트, 아무도 다시 손보지 않는 default. harness-maker는 정반대로 갑니다: **하네스가 당신의 프로젝트에 의해 빚어지고, 프로젝트가 변해도 그 모양을 유지합니다.**
@@ -329,6 +360,23 @@ harness-maker make . --promote NAME    # ad-hoc 자산을 하네스로 승격
 - **Cross-process 메모리 안전성.** `.claude/memory/` 쓰기는 re-entrant POSIX flock으로 serialize. Telemetry hook이 `O_APPEND`에 raw `os.write()`로 원자적 append (single-syscall, ≤PIPE_BUF) — concurrent Claude Code + Cursor 세션이 JSONL 라인을 interleave 불가.
 
 각 기능의 완전한 메커니즘 — 모든 절차, 결정 경로, 내부 invariant — 는 [**docs/HOW-IT-WORKS.md**](docs/HOW-IT-WORKS.md) 참조.
+
+---
+
+## 안정성
+
+harness-maker는 `0.x` 단계이며 1.0 약속이 정직해질 만큼의 의존 프로젝트가 누적되기 전까지는 이 상태를 유지합니다 ([ADR-001 in `work-docs/PLAN-oss-readiness-audit.md`](work-docs/PLAN-oss-readiness-audit.md) 참조).
+
+**고정 표면(Frozen surfaces)** — deprecation cycle 없이는 어떤 0.x.minor에서도 깨지지 않습니다:
+
+- **슬래시 명령 이름**: `/hm:make`, `/hm:research`, `/hm:plan`, `/hm:execute`, `/hm:review`, `/hm:wrapup`, `/hm:verify`, `/hm:health`, `/hm:loop`, `/hm:configure`, `/hm:personalization-audit`, `/harness-maker:make`.
+- **`harness.yaml` 최상위 키**: `targets`, `preset`, `dev_mode`, `locale`, `reviewers`, `skills`, `agents`, `worktree`, `anti_rot`, `observability`, `ref_folders`, `second_brain`, `recommended_model`.
+- **Plugin manifest 스키마**: `.claude-plugin/plugin.json`, `.cursor-plugin/plugin.json`, `.codex-plugin/plugin.json` — 각 marketplace 공식 spec에 포함된 필드들.
+- **로컬 전용 telemetry 보장** — [`PRIVACY.md`](PRIVACY.md) 참조. 문서-vs-실제 불일치는 P0 버그로 취급합니다.
+
+**그 외 모든 것은 어떤 0.x.minor 에서든 바뀔 수 있습니다.** 내부 Python API, `.claude/observability/` 파일 포맷, 템플릿 내용, ADR 번호 부여, reviewer 프롬프트 표현, 인터뷰 문구. 1.0 전 reproducibility가 중요하다면 특정 릴리스로 핀 (`uvx --from harness-maker==0.17.0 ...`) 사용을 권장합니다.
+
+**실제로 "깨진다"는 게 어떤 모양인지** — [`CHANGELOG.md`](CHANGELOG.md) 참조. 같은 minor 안의 patch (예: 0.15.0 → 0.15.3) 들은 deprecation 없이 직전 patch의 수정을 다시 손본 적이 있습니다. 0.x 단계의 의도된 속도입니다.
 
 ---
 

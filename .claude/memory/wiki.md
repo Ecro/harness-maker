@@ -1,6 +1,6 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.16.0
+harness_maker_version: 0.17.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: memory/wiki.ko.md.j2
 provenance: official
@@ -251,5 +251,8 @@ Built-in slash commands (`/plugin`, `/reload-plugins`, `/clear`, `/help`) **cann
 
 ### [wiki:gotcha] worktree-finalize-conflicts-with-parallel-main-edits | 2026-05-19
 `harness_maker.worktree finalize <WT> stage-only` does `git merge --squash <wt-branch>` into main. If main was modified during the worktree's lifetime (e.g. another session committed sandbox-plugin-test fixtures or a new CHANGELOG release entry), the squash-merge surfaces conflicts on files the worktree never touched — 118 unmerged files in one observed case. Resolution: take `--ours` (main's version) for fixture conflicts the worktree didn't intend to edit (`git checkout --ours -- <path>; git add <path>`), then manually merge intentional conflicts (e.g. CHANGELOG `[Unreleased]` section against new release). After resolution, manually clean up: `git worktree remove --force <WT>; git branch -D <wt-branch>`. The finalize CLI does NOT retry-after-resolution.
+
+### [wiki:pattern] oss-launch-readiness-three-layer | 2026-05-19
+PLAN-oss-readiness-audit's 11-phase structure decomposes "make the public repo survivable" into three independent layers, each cheap on its own but only useful when the layer below it lands first: **(1) Trust floor** — PR CI restored (565d7ce had removed it the day after going public), CONTRIBUTING/CoC/SECURITY/ISSUE+PR templates, Dependabot, PVR, AST-walk drift defense for PRIVACY.md. Without this layer, any external PR is unsafe to merge and any vulnerability has no disclosure path. **(2) Positioning surface** — README hero ("Try in 30 seconds" code block before line 100), Stability section naming frozen surfaces (slash command names + harness.yaml top-level keys + plugin manifest schemas), comparison rewrite to category-axis (zero named competitors per ADR-007/012). Without this layer, the launch announcement competes with 20k★ incumbents on a stack of "1 star, no SLA messaging." **(3) Discovery + announcement** — repo description + Discussions + social preview, then marketplace submissions, then 1-week soak, then low-key Show HN. Each gates the next; layer 3 cannot ship until 1+2 are in place. Phase ordering matters because launch attention amplifies whatever floor exists at the moment of announcement. Cross-ref: `work-docs/RESEARCH-oss-readiness-audit.md` § "Concrete OSS Launch-Readiness Checklist" (20-item time-boxed list) and `work-docs/PLAN-oss-readiness-audit.md` § "Phases" (11-phase decomposition with dependencies).
 
 <!-- @hm:/user:entries -->

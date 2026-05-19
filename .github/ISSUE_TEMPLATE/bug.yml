@@ -1,0 +1,81 @@
+name: Bug report
+description: Report a defect in harness-maker
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug.
+
+        **Before filing:** if this is a security issue, please use the [Security tab → Report a vulnerability](https://github.com/Ecro/harness-maker/security/advisories/new) instead. Public bug reports for security issues expose users.
+
+        This is a solo-maintained project. Triage is best-effort; allow days, not hours.
+  - type: input
+    id: version
+    attributes:
+      label: harness-maker version
+      description: Output of `harness-maker --version` (or commit SHA if running from source).
+      placeholder: "0.17.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: ide
+    attributes:
+      label: IDE / target where the bug appears
+      multiple: true
+      options:
+        - Claude Code
+        - Cursor
+        - Codex CLI
+        - CLI only (not IDE-related)
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: OS + version
+      placeholder: "macOS 14.5 / Ubuntu 24.04 / Windows 11 WSL2"
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      description: Minimal sequence of commands or harness.yaml that reproduces the bug. The maintainer cannot triage what cannot be reproduced.
+      placeholder: |
+        1. `uvx harness-maker init`
+        2. Answer interview: Preset = Side, ...
+        3. Observe error
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior (with full error output)
+      description: Paste error tracebacks verbatim. Wrap in triple-backtick code fences.
+    validations:
+      required: true
+  - type: dropdown
+    id: integration_mode
+    attributes:
+      label: Was INTEGRATION=1 set? (developer-only — leave default if unsure)
+      description: Only relevant if you were running the project's integration tests. End-users hitting install or CLI bugs can skip this.
+      options:
+        - "No / not sure (default)"
+        - "Yes"
+        - "Not applicable"
+    validations:
+      required: false
+  - type: textarea
+    id: extra
+    attributes:
+      label: Additional context (optional)
+      description: Screenshots, logs, harness.yaml excerpts. Redact secrets.
+    validations:
+      required: false

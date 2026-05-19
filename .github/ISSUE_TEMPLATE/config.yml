@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Q&A — GitHub Discussions
+    url: https://github.com/Ecro/harness-maker/discussions/categories/q-a
+    about: Ask how to configure a preset, use a slash command, or migrate from another harness.
+  - name: Security vulnerability
+    url: https://github.com/Ecro/harness-maker/security/advisories/new
+    about: Report a security issue privately via GitHub Private Vulnerability Reporting. Do NOT file a public issue.
+  - name: Ideas / proposals
+    url: https://github.com/Ecro/harness-maker/discussions/categories/ideas
+    about: Long-form proposals or roadmap discussions belong in Discussions, not Issues.

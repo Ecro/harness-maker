@@ -1,0 +1,36 @@
+version: 2
+
+updates:
+  # uv-managed Python deps in pyproject.toml. Dependabot understands pip
+  # ecosystem and will propose updates from PyPI; uv.lock gets refreshed
+  # by the maintainer after merge.
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - python
+    commit-message:
+      prefix: "deps"
+      include: scope
+
+  # Pin SHAs in workflows and update them when upstream tags new versions.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - github-actions
+    commit-message:
+      prefix: "ci"
+      include: scope

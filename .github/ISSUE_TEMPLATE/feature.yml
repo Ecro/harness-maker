@@ -1,0 +1,42 @@
+name: Feature request
+description: Propose a new capability or behavior change
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for proposing a feature.
+
+        This project is solo-maintained — most feature requests will be closed without action unless they match the maintainer's roadmap. That's not a reflection on the idea; it's a bandwidth statement. Forks are welcome under MIT.
+  - type: textarea
+    id: use_case
+    attributes:
+      label: What are you trying to do?
+      description: Describe the end-user goal, not the implementation. "I want to X so that Y."
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What have you already tried?
+      description: Existing slash commands, configuration knobs, foreign-config import paths. If nothing works yet, say so.
+    validations:
+      required: true
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Which target IDE(s) would this affect?
+      multiple: true
+      options:
+        - Claude Code
+        - Cursor
+        - Codex CLI
+        - All (cross-cutting)
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Additional context (optional)
+    validations:
+      required: false

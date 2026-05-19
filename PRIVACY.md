@@ -1,0 +1,152 @@
+# Privacy
+
+> **TL;DR:** harness-maker writes telemetry **only to your local disk** under `.claude/observability/` inside your project. Nothing is transmitted off your machine by this tool. There is no opt-out env var (see ADR-004 in `work-docs/PLAN-oss-readiness-audit.md`); you control telemetry by deleting the files. A unit test (`tests/unit/test_privacy_doc_schema.py`) fails any PR that adds a telemetry field without updating this document.
+
+## What is recorded
+
+harness-maker writes four kinds of JSONL files under your project's `.claude/observability/` directory:
+
+| File | Schema source | Purpose |
+|---|---|---|
+| `metrics-{YYYY-MM-DD}.jsonl` | [`telemetry.py`](src/harness_maker/telemetry.py) `_build_entry` | Per-tool-use + per-stop hook output. Powers cache-diagnostics, cost dashboards, and the ai-readiness rubric's "cadence" layer. Daily rotation. |
+| `adaptive/overrides.jsonl` | [`telemetry.py`](src/harness_maker/telemetry.py) `OverrideRecord` | One row per axis-level edit to `harness.yaml` (manual override of an interview default). Feeds `/hm:personalization-audit`. |
+| `review-{YYYY-MM-DD}.jsonl` | [`review_telemetry.py`](src/harness_maker/review_telemetry.py) `ReviewTelemetryRecord` | One row per `/hm:review` iteration. Records reviewer counts, verifier drop rate, grade transitions. Daily rotation. |
+| `silent-intent-miss-{slug}.jsonl` | [`observability/intent_miss.py`](src/harness_maker/observability/intent_miss.py) `IntentMissEvent` | One row when the inequality gate's LLM-inference common-ground answer is later contradicted (slot was wrongly skipped). |
+
+## Where it's stored
+
+```
+<your-project>/
+└── .claude/
+    └── observability/
+        ├── metrics-2026-05-19.jsonl
+        ├── metrics-2026-05-18.jsonl       # daily rotation
+        ├── adaptive/
+        │   └── overrides.jsonl
+        ├── review-2026-05-19.jsonl
+        └── silent-intent-miss-<slug>.jsonl
+```
+
+All paths are inside your project root (or `CLAUDE_PROJECT_DIR` / `CURSOR_PROJECT_DIR` if set). The telemetry hook resolves the project directory via an env-var-first chain documented in [`telemetry.py`](src/harness_maker/telemetry.py) lines 194–204 and explicitly rejects the bare stdin `cwd` field (which was a path-traversal primitive prior to 0.7.1).
+
+## JSON schemas (every field documented)
+
+### `metrics-{YYYY-MM-DD}.jsonl` — common fields (all events)
+
+| Field | Type | Description |
+|---|---|---|
+| `timestamp` | string | ISO-8601 UTC timestamp |
+| `span_id` | string | 16-char hex random per-event |
+| `trace_id` | string | Source `conversation_id` (Claude Code) or random hex |
+| `event` | string | One of `post_tool_use`, `stop`, `unknown` |
+
+### `metrics-{YYYY-MM-DD}.jsonl` — `post_tool_use` event additional fields
+
+| Field | Type | Description |
+|---|---|---|
+| `tool_name` | string | Name of the tool that just ran (e.g., `Read`, `Bash`) |
+| `input_tokens` | int | Input tokens reported by the model |
+| `output_tokens` | int | Output tokens |
+| `cache_read_tokens` | int | Tokens served from cache (cost-saving signal) |
+| `cache_creation_tokens` | int | Tokens written to cache |
+| `cost_usd` | float (optional) | Estimated cost in USD (rounded to 6 decimals) |
+| `tool_input` | string (optional) | Whitelist-projected, value-redacted, 256-char-capped JSON serialization of the tool input. Path traversal–free per the 0.7.1 ADR-107 hardening. |
+
+### `metrics-{YYYY-MM-DD}.jsonl` — `stop` event additional fields
+
+| Field | Type | Description |
+|---|---|---|
+| `status` | string \| null | Cursor agent stop status |
+| `loop_count` | int \| null | Loop count if reported |
+| `duration_ms` | int \| null | Agent turn duration in milliseconds |
+| `model` | string \| null | Model identifier used in this turn |
+| `conversation_id` | string \| null | Conversation correlator |
+
+### `adaptive/overrides.jsonl` — `OverrideRecord`
+
+| Field | Type | Description |
+|---|---|---|
+| `schema_version` | int | Schema version (currently 1) |
+| `ts` | string | ISO-8601 UTC timestamp |
+| `axis_path` | string | Dot-notation path of the harness.yaml axis being overridden (e.g., `reviewers.grade_threshold`) |
+| `before` | any | Previous value (may be null on first-time set) |
+| `after` | any | New value |
+| `source` | string | One of `configure-exit`, `session-start`, `git-fallback` (`OverrideSource` Literal in `telemetry.py`) |
+| `reason` | string | Free-form note (default empty string) |
+
+### `review-{YYYY-MM-DD}.jsonl` — `ReviewTelemetryRecord`
+
+| Field | Type | Description |
+|---|---|---|
+| `ts` | string | ISO-8601 UTC timestamp (CLI auto-stamps if omitted) |
+| `slug` | string | Task slug (max 200 chars) |
+| `round` | int | Review iteration number (≥ 1) |
+| `pass1_n` | int | Total findings from Pass 1 (redacted-context review) |
+| `verifier_kept_n` | int | Pass 1.5 verifier KEEPs |
+| `verifier_dropped_n` | int | Pass 1.5 verifier DROPs |
+| `verifier_false_drop_n` | int \| null | Labeled-fixture only — verifier dropped a real bug |
+| `verifier_false_keep_n` | int \| null | Labeled-fixture only — verifier kept a false positive |
+| `fixture_label` | string \| null | Labeled-fixture identifier (null on real runs) |
+| `pass2_kept_n` | int | Findings surviving Pass 2 (full-context review) |
+| `consensus_passed_n` | int | Findings surviving consensus filter |
+| `wall_time_ms` | int | Wall-clock time of the review round |
+| `build_break_count` | int | How many auto-fixes broke the build |
+| `auto_fix_reverted_n` | int | How many auto-fixes were reverted because of build break |
+| `fallback` | string \| null | Set only when the verifier model was unavailable and a fallback path ran |
+
+### `silent-intent-miss-{slug}.jsonl` — `IntentMissEvent`
+
+| Field | Type | Description |
+|---|---|---|
+| `slot` | string | The interview slot identifier that was wrongly skipped |
+| `trigger` | string | What surfaced the miss: `review-mismatch`, `session-reopen` (`Trigger` Literal in `observability/intent_miss.py`) |
+| `original_mark_source` | string | Where the original "common-ground" mark came from (e.g., `llm-inference:0.97`) |
+| `original_mark_confidence` | float | The confidence value the inference recorded |
+| `detected_at` | string | ISO-8601 UTC timestamp |
+| `notes` | string | Free-form context (default empty) |
+
+## What is **never** recorded
+
+- File contents you read or edit. The `tool_input` field captures only the keys, not file bodies.
+- Your messages or model output. Tokens are counted but content is not stored by harness-maker (Claude Code / Cursor itself may store transcripts — that's a separate matter).
+- Credentials, API keys, environment variables. The `_redact_value` and `_project_tool_input` functions in `telemetry.py` explicitly redact secret-shaped values before write.
+- Your personal information. Anonymous identifiers (`span_id`, `trace_id`) are random per-run.
+
+## Where it is **never** sent
+
+Nowhere. harness-maker does not make outbound network requests to send telemetry. The crawler that fetches Anthropic blog posts / GitHub releases / arXiv / OSV CVEs (anti-rot pipeline) does make outbound HTTPS requests, but those are for *reading* upstream content into your local cache — they do not include any of your telemetry as request bodies or query parameters.
+
+You can verify this with:
+
+```bash
+# Search the source for any HTTP POST / PUT / send that includes telemetry data:
+rg -n "post|put|requests\.send|httpx\.send|aiohttp" src/harness_maker/telemetry.py src/harness_maker/review_telemetry.py src/harness_maker/observability/
+# Expect: no matches.
+```
+
+## How to disable
+
+There is no env var to disable telemetry (deliberate — see ADR-004). To opt out:
+
+```bash
+# Delete the observability directory; the hook continues to fire but write failures
+# are caught and logged to stderr (won't break your workflow).
+rm -rf .claude/observability/
+```
+
+Or remove the telemetry hook entirely from `.claude/hooks/hooks.json` (and `.cursor/hooks.json` if you use Cursor).
+
+If you do not want any local files written, comment out or delete the `hooks` registration. The rest of harness-maker still functions; you lose the cache-diagnostics layer of the ai-readiness rubric and the personalization-audit signal.
+
+## Retention
+
+- `metrics-*.jsonl` and `review-*.jsonl` rotate daily — old files are not auto-pruned. You decide retention by deleting files.
+- `adaptive/overrides.jsonl` and `silent-intent-miss-*.jsonl` are append-only single files; same deletion-controlled retention.
+
+## Schema drift defense
+
+The unit test [`tests/unit/test_privacy_doc_schema.py`](tests/unit/test_privacy_doc_schema.py) AST-walks the telemetry source files and asserts every field defined on a telemetry-record model is documented above. Adding a field without updating this file will fail PR CI.
+
+## Reporting a privacy concern
+
+If you believe harness-maker is writing or transmitting data not documented above, file a security report via the [SECURITY policy](SECURITY.md) — a documented-vs-actual mismatch is a P0 issue per the P0 definition.
