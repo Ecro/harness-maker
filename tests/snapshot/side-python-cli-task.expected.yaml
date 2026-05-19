@@ -67,10 +67,10 @@ files:
   body_sha256: 730db90508c63b53a9197b64bc5d4cad35312a64b130898f7b16d0da90aa9244
 - path: commands/hm/plan-exec-rev-wrap.md
   template: commands/hm/workflow_command.md.j2
-  body_sha256: 529d7b73f7de42675c1ead28136890403600e45b4650c8b77b3caf8f81bb3edd
+  body_sha256: 9930186366ac09c2da121ee070e99cfa45a68ed4996bfd07779a7c79491de95c
 - path: commands/hm/plan.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: 18fde7d1f4fbb5b5a66718cb8be9fe8f07a2c9078bcf49b8c75156899cb6f3bf
+  body_sha256: 9143825ab1b4020983c8286d32b97df7b68f360511deaa80cf275ae8f097a07a
 - path: commands/hm/research.md
   template: commands/hm/atomic_command.md.j2
   body_sha256: b30bb6f66402e1bd1547493625c4d982ec05a4c7f8f5d48b6d62cdd95724ed93
@@ -79,7 +79,7 @@ files:
   body_sha256: b1306892e94a13dc757daece41fdeacff694a89b599dd577fcba1c322a0cf302
 - path: commands/hm/spec.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: 3a68eff22b69baf34a6fc8d4451fcbe1164182551a8769b712d3bfcb05a70b10
+  body_sha256: 23ca86640257bddf75784f2672f00edd9ddf3769da645e13804c8a5a31d485b6
 - path: commands/hm/uninstall.md
   template: commands/hm/uninstall.md.j2
   body_sha256: ad9979712f913800330dc619b36b399a336fcf529ccd6901e9bc4b8fde0191dc

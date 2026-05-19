@@ -141,14 +141,24 @@ def _stage_files() -> list[FileSpec]:
     ]
 
 
-def _atomic_command_files() -> list[FileSpec]:
-    """Generate one /hm:<stage> command per atomic stage, with rendered body."""
+def _atomic_command_files(
+    config_dump: dict[str, object] | None = None,
+) -> list[FileSpec]:
+    """Generate one /hm:<stage> command per atomic stage, with rendered body.
+
+    `config_dump` is the user's resolved HarnessConfig as a dict — when
+    provided, the stage body is rendered with real values (locale, deep_gate
+    thresholds, …). When None, a fresh default HarnessConfig is used; this
+    fallback exists only for the legacy module-level SIDE_FILES /
+    PRODUCTION_FILES constants and for any test paths that don't have answers.
+    """
     out: list[FileSpec] = []
     from harness_maker.models import HarnessConfig  # local import: avoid cycle
     from harness_maker.render import _make_env  # local import: avoid cycle
 
     env = _make_env()
-    default_config = HarnessConfig().model_dump(mode="json")
+    if config_dump is None:
+        config_dump = HarnessConfig().model_dump(mode="json")
     install_ref = _compute_install_ref()
     for s in _ATOMIC_STAGES:
         tpl = env.get_template(f"stages/{s}.md.j2")
@@ -157,7 +167,7 @@ def _atomic_command_files() -> list[FileSpec]:
             stage=s,
             project_name="",
             feature="",
-            config=default_config,
+            config=config_dump,
             harness_maker_src_path=install_ref,
             is_codex=False,
         )
@@ -368,6 +378,7 @@ def _base_files(
     locale: str = "en",
     agent_models: dict[str, AgentModelSpec] | None = None,
     default_model: str = "claude-opus-4-7",
+    config_dump: dict[str, object] | None = None,
 ) -> list[FileSpec]:
     """Shared base: stages + atomic commands + all agents/skills + fixed assets.
 
@@ -392,7 +403,7 @@ def _base_files(
         (_localized("memory/wiki", locale), "memory/wiki.md", {}),
         ("memory/session-readme.md.j2", "memory/session/README.md", {}),
         *_stage_files(),
-        *_atomic_command_files(),
+        *_atomic_command_files(config_dump=config_dump),
         ("commands/hm/loop.md.j2", "commands/hm/loop.md", {}),
         ("commands/hm/health.md.j2", "commands/hm/health.md", {}),
         ("commands/hm/make.md.j2", "commands/hm/make.md", {}),
@@ -415,11 +426,17 @@ PRODUCTION_FILES: list[FileSpec] = _base_files(Preset.PRODUCTION)
 
 def _workflow_command_files(
     fused_workflows: dict[str, list[AtomicStage]],
+    config_dump: dict[str, object] | None = None,
 ) -> list[FileSpec]:
-    """Build a FileSpec per workflow with the fused body in context."""
+    """Build a FileSpec per workflow with the fused body in context.
+
+    `config_dump` propagates to ``fuse()`` so each stage fragment inside the
+    fused workflow body sees the user's real locale + interview thresholds
+    (sibling fix to ``_atomic_command_files``).
+    """
     out: list[FileSpec] = []
     for name, stages in fused_workflows.items():
-        body = fuse(stages, name)
+        body = fuse(stages, name, config_dump=config_dump)
         out.append(
             (
                 "commands/hm/workflow_command.md.j2",
@@ -586,14 +603,11 @@ def synthesize(
     Workflow command FileEntries are generated from `answers.fused_workflows`.
     """
     effective_preset = preset or answers.preset
-    base_specs = _base_files(
-        effective_preset,
-        answers.locale,
-        agent_models=dict(answers.agent_models),
-        default_model=answers.default_model,
-    )
 
-    # Build config before file_specs so Codex skill rendering gets real user values.
+    # Build config FIRST so atomic/workflow stage bodies render with the user's
+    # real locale + deep-gate thresholds. Building it after _base_files() was
+    # the silent-default-locale bug (rendered commands hardcoded `en` even when
+    # answers.locale == 'ko').
     config = HarnessConfig(
         locale=answers.locale,
         targets=list(answers.targets),
@@ -634,9 +648,17 @@ def synthesize(
     )
     config_dump = config.model_dump(mode="json")
 
+    base_specs = _base_files(
+        effective_preset,
+        answers.locale,
+        agent_models=dict(answers.agent_models),
+        default_model=answers.default_model,
+        config_dump=config_dump,
+    )
+
     file_specs: list[FileSpec] = [
         *base_specs,
-        *_workflow_command_files(answers.fused_workflows),
+        *_workflow_command_files(answers.fused_workflows, config_dump=config_dump),
     ]
 
     if Target.CURSOR in answers.targets:

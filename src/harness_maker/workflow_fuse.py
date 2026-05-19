@@ -29,6 +29,7 @@ def fuse(
     stages: list[AtomicStage],
     workflow_name: str,
     env: Environment | None = None,
+    config_dump: dict[str, object] | None = None,
 ) -> str:
     """Fuse atomic stage fragments into a single workflow prompt body.
 
@@ -36,6 +37,14 @@ def fuse(
     fragment can mention which workflow it's part of. Fragments are joined
     with a `## Stage: <name>` separator so the resulting prompt has clear
     section breaks.
+
+    `config_dump` is the user's resolved HarnessConfig as a dict — when
+    provided, fragment bodies render with real values (locale, deep_gate
+    thresholds, …). When None, a fresh default HarnessConfig is used; this
+    fallback exists only for callers that don't have answers (CLI helpers,
+    snapshot fixtures). Passing the default silently bakes ``locale: en``
+    into every rendered ``commands/hm/<workflow>.md`` — the user-facing
+    locale-propagation bug that prompted this parameter.
 
     Returns:
         The full fused prompt body, with a leading `# /hm:<workflow>` header
@@ -50,7 +59,8 @@ def fuse(
     from harness_maker.models import HarnessConfig
     from harness_maker.synthesize import _compute_install_ref
 
-    default_config = HarnessConfig().model_dump(mode="json")
+    if config_dump is None:
+        config_dump = HarnessConfig().model_dump(mode="json")
     install_ref = _compute_install_ref()
 
     parts: list[str] = [f"# /hm:{workflow_name}\n"]
@@ -61,7 +71,7 @@ def fuse(
             stage=stage.value,
             project_name="",
             feature="",
-            config=default_config,
+            config=config_dump,
             harness_maker_src_path=install_ref,
             is_codex=False,
         )

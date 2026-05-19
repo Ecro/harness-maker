@@ -49,13 +49,13 @@ files:
   body_sha256: 97786f65124e496d77adf30d8e29aebfd2c938702e79f6fb4eeaefe16bd73dc9
 - path: commands/hm/exec-rev-wrap-ver.md
   template: commands/hm/workflow_command.md.j2
-  body_sha256: e98191868531abdaad97ee80fdc0f9f6e6874f66b1866263186adaf162425dca
+  body_sha256: 312e05be65a3750540c5ac6c9d75cdd067a582415da67da95bc43cf5063fd776
 - path: commands/hm/exec-rev-wrap.md
   template: commands/hm/workflow_command.md.j2
-  body_sha256: 4c4fd8cf0da0fdf76f61d60e80ef16247fbfa18d1469cc9a245694977ad7710d
+  body_sha256: b56224fda121c168d7cf6da89cfcee96345f5ec9fd8a6f63fc50c2e099dc51f9
 - path: commands/hm/exec-rev.md
   template: commands/hm/workflow_command.md.j2
-  body_sha256: af99a42a66853a549eb2142ebc36ab37318a3550f238615ae5d8c0807123a510
+  body_sha256: ddb3fcef24159bfe44e441b8f6f5dd96fe4642c5241f6b83209113d7f6e2c0f8
 - path: commands/hm/execute.md
   template: commands/hm/atomic_command.md.j2
   body_sha256: 2be1a94db316238100c0d2d15ff5bdf28d41aba05c2aedb2b2c9d816fc8f6be4
@@ -73,16 +73,16 @@ files:
   body_sha256: 18fde7d1f4fbb5b5a66718cb8be9fe8f07a2c9078bcf49b8c75156899cb6f3bf
 - path: commands/hm/res-spec-plan.md
   template: commands/hm/workflow_command.md.j2
-  body_sha256: efe3aa32b32af35341368c26a2a6ba7d9fb540cee59ed6a5f86715b0336e556f
+  body_sha256: 26e2065ccb9fb6aa901fb2705a119401e8279cb8a9d2583843ee77d75f4dd538
 - path: commands/hm/research.md
   template: commands/hm/atomic_command.md.j2
   body_sha256: b30bb6f66402e1bd1547493625c4d982ec05a4c7f8f5d48b6d62cdd95724ed93
 - path: commands/hm/review.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: b1306892e94a13dc757daece41fdeacff694a89b599dd577fcba1c322a0cf302
+  body_sha256: a0d474f9d2ba9642e95f235d5021a11cde0dcf64edc45074009f01722aa6adc7
 - path: commands/hm/spec.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: 3a68eff22b69baf34a6fc8d4451fcbe1164182551a8769b712d3bfcb05a70b10
+  body_sha256: 23ca86640257bddf75784f2672f00edd9ddf3769da645e13804c8a5a31d485b6
 - path: commands/hm/uninstall.md
   template: commands/hm/uninstall.md.j2
   body_sha256: ad9979712f913800330dc619b36b399a336fcf529ccd6901e9bc4b8fde0191dc

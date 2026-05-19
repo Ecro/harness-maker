@@ -322,6 +322,76 @@ def test_synthesize_with_ko_locale_picks_ko_templates() -> None:
     assert claude_md.template == "claude-md/Side.ko.md.j2"
 
 
+def test_synthesize_ko_locale_propagates_into_atomic_command_body(tmp_path: Path) -> None:
+    """Regression: locale must flow into stage-body pre-render.
+
+    Bug (pre-fix): ``_atomic_command_files`` and ``fuse()`` used a fresh
+    ``HarnessConfig()`` (locale defaults to ``en``) to pre-render stage
+    bodies. The outer ``commands/hm/<stage>.md`` template received the real
+    ``config.locale='ko'`` but the body was already a plain-text string with
+    ``en`` baked in — so every ``/hm:<stage>`` instructed Claude to interview
+    in English even when ``harness.yaml`` said ``locale: ko``.
+    """
+    from harness_maker.render import render
+
+    p = _profile()
+    a = interview(p, autoloop_mode=True).model_copy(update={"locale": "ko"})
+    bp = synthesize(p, a)
+    render(bp, tmp_path)
+
+    plan_text = (tmp_path / "commands/hm/plan.md").read_text()
+    spec_text = (tmp_path / "commands/hm/spec.md").read_text()
+
+    # The "Live interview / Live UI" lines must reflect ko, not en.
+    assert "conduct in `ko`" in plan_text, "plan.md still bakes en into stage body"
+    assert "Live UI** in `ko`" in spec_text, "spec.md still bakes en into stage body"
+
+    # No bare `en` directive should leak through for ko-locale renders. We
+    # whitelist the legend text that lists the mapping (`en→English, ...`).
+    en_directives = [
+        line
+        for line in plan_text.splitlines()
+        if "`en`" in line and "en→English" not in line
+    ]
+    assert not en_directives, f"unexpected en directives in plan.md: {en_directives}"
+
+
+def test_synthesize_ko_locale_propagates_into_workflow_command_body(tmp_path: Path) -> None:
+    """Sibling regression: ``_workflow_command_files`` must pass config_dump to fuse().
+
+    Pre-fix, fused workflow bodies (e.g. ``/hm:exec-rev-wrap-ver``) had each
+    stage fragment rendered with default ``HarnessConfig()`` → locale baked
+    to ``en`` regardless of ``answers.locale``.
+    """
+    from harness_maker.render import render
+
+    p = _profile()
+    a = interview(p, autoloop_mode=True).model_copy(update={"locale": "ko"})
+    bp = synthesize(p, a)
+    render(bp, tmp_path)
+
+    # Pick the first fused workflow that includes a stage with a live-interview
+    # locale directive (plan / research / spec). execute / review / wrapup
+    # don't talk to the user during their run, so they don't reference
+    # config.locale and are not a useful probe for this bug.
+    from harness_maker.models import AtomicStage
+
+    locale_carrying = {AtomicStage.PLAN, AtomicStage.RESEARCH, AtomicStage.SPEC}
+    candidates = [
+        name
+        for name, stages in a.fused_workflows.items()
+        if any(s in locale_carrying for s in stages)
+    ]
+    assert candidates, "fixture missing a workflow that includes plan/research/spec"
+    workflow_name = candidates[0]
+    workflow_path = tmp_path / "commands/hm" / f"{workflow_name}.md"
+    assert workflow_path.exists(), f"workflow command missing: {workflow_path}"
+    text = workflow_path.read_text()
+    assert "`ko`" in text, "workflow command body did not propagate locale"
+    bad = [line for line in text.splitlines() if "`en`" in line and "en→English" not in line]
+    assert not bad, f"unexpected en directives in workflow body: {bad}"
+
+
 def test_localized_template_files_exist_on_disk() -> None:
     """Each path that `_localized()` can return must point at a real template file.
 
