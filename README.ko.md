@@ -147,7 +147,7 @@
 
 | IDE | Paste | 타이핑할 슬래시 | GUI / restart 액션 | 총 액션 |
 |---|---|---|---|---|
-| **Claude Code** | 1 | 1 (`/reload-plugins`) | 0 (그 후 enter 한 번) | **2-3** |
+| **Claude Code** | 1 | 1 (`/reload-plugins`) | 짧은 메시지 1개 (예: `go`) — Claude re-trigger 용 | **3** |
 | **Cursor** | 1 | 0 | 1 (`Ctrl+Shift+P → Reload Window`) | **2-3** |
 | **Codex CLI** | 1 | 0 | 0-1 (`/plugins` 에 harness-maker 없으면 codex restart) | **2-3** |
 
@@ -175,7 +175,7 @@ harness-maker:make skill is already available):
   IF Claude Code:
     Bash: claude plugin marketplace add Ecro/harness-maker
     Bash: claude plugin install harness-maker@harness-maker
-    Then tell me verbatim: "Type /reload-plugins now, then press enter once."
+    Then tell me verbatim: "Type /reload-plugins, then send any short message (e.g. `go`) to re-trigger me."
 
   IF Cursor:
     Bash: git clone --depth 1 https://github.com/Ecro/harness-maker.git ~/.cursor/plugins/local/harness-maker

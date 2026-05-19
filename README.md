@@ -172,7 +172,7 @@ For the mechanics behind each step — full procedures, decision paths, internal
 
 | IDE | Paste | Typed slash | GUI / restart action | Total user actions |
 |---|---|---|---|---|
-| **Claude Code** | 1 | 1 (`/reload-plugins`) | 0 (then press enter once) | **2-3** |
+| **Claude Code** | 1 | 1 (`/reload-plugins`) | 1 short message (e.g. `go`) to re-trigger Claude | **3** |
 | **Cursor** | 1 | 0 | 1 (`Ctrl+Shift+P → Reload Window`) | **2-3** |
 | **Codex CLI** | 1 | 0 | 0-1 (restart codex if `/plugins` doesn't show harness-maker) | **2-3** |
 
@@ -200,7 +200,7 @@ harness-maker:make skill is already available):
   IF Claude Code:
     Bash: claude plugin marketplace add Ecro/harness-maker
     Bash: claude plugin install harness-maker@harness-maker
-    Then tell me verbatim: "Type /reload-plugins now, then press enter once."
+    Then tell me verbatim: "Type /reload-plugins, then send any short message (e.g. `go`) to re-trigger me."
 
   IF Cursor:
     Bash: git clone --depth 1 https://github.com/Ecro/harness-maker.git ~/.cursor/plugins/local/harness-maker
