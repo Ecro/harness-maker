@@ -29,6 +29,22 @@ Convert acceptance criteria into a concrete sequence of implementation phases. *
 - Existing TECH_SPEC.md, ADRs, prior PLANs in `{{ config.work_docs.dir }}`.
 - Codebase structure (modules, conventions, test layout).
 
+## Session Context Loading
+
+Before drafting the plan, surface top-K wiki + failures entries relevant to the task slug via the lexical-prefilter + Claude-rerank helper. Replace `<topic>` (typically the task slug) before running.
+
+{% if is_codex %}
+```bash
+Bash("uv run python -m harness_maker.memory_retrieve --topic '<topic>' --k 6 --pre-k 30")
+```
+{% else %}
+```bash
+!uv run python -m harness_maker.memory_retrieve --topic "<topic>" --k 6 --pre-k 30
+```
+{% endif %}
+
+The helper prints a `<memory_candidates>` fence; the directive line after it instructs you to surface the top-6 semantically relevant entries inline. Hot tier — also read `.claude/memory/session/<today's date>.md` if it exists.
+
 ## Stage-Aware Second Brain
 
 If `.claude/harness.yaml` has `second_brain.enabled: true`, load relevant

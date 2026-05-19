@@ -41,7 +41,10 @@ WINDOW = 20  # last N decisions
 MIN_SAMPLES = 5
 
 # Tokenize on word boundaries (alnum + underscore).
-_WORD_RE = re.compile(r"[A-Za-z0-9_]+")
+WORD_RE = re.compile(r"[A-Za-z0-9_]+")
+# Backward-compat alias for the prior private name (some call sites still
+# import this). Prefer the public ``WORD_RE`` in new code.
+_WORD_RE = WORD_RE
 
 
 def adaptive_threshold(history: list[bool]) -> float:

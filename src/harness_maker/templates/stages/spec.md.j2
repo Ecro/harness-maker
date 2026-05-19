@@ -58,9 +58,12 @@ Search prior work to ground the interview (token budget ≤3k):
 Grep "<key terms>" --glob "{{ config.spec.dir }}SPEC-*.md"
 # Prior PLANs (for scope reference)
 Grep "<key terms>" --glob "{{ config.work_docs.dir }}PLAN-*.md"
-# Repo memory
-[ -f .claude/memory/failures.md ] && rg "<key terms>" .claude/memory/failures.md
-[ -f .claude/memory/wiki.md ] && rg "<key terms>" .claude/memory/wiki.md
+# Repo memory — replace `<topic>` with the actual SPEC topic before running.
+{% if is_codex %}
+Bash("uv run python -m harness_maker.memory_retrieve --topic '<topic>' --k 6 --pre-k 30")
+{% else %}
+!uv run python -m harness_maker.memory_retrieve --topic "<topic>" --k 6 --pre-k 30
+{% endif %}
 # When research ran, read its cache
 [ -f {{ config.work_docs.dir }}RESEARCH-{slug}.md ] && Read {{ config.work_docs.dir }}RESEARCH-{slug}.md
 ```

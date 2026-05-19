@@ -61,8 +61,19 @@ Parse from the user's natural-language input:
 Before starting, load memory in tier order (stops at first miss per tier):
 
 1. **Hot tier** — Read `.claude/memory/session/<today's date>.md` if it exists.
-2. **Warm tier** — Skim `.claude/memory/failures.md` (first 60 lines); search relevant: `rg -F "[fail:" .claude/memory/failures.md`.
-3. **Warm tier** — Skim `.claude/memory/wiki.md` (first 60 lines); search relevant: `rg -F "[wiki:" .claude/memory/wiki.md`.
+2. **Warm tier** — Surface top-K wiki + failures entries relevant to the topic via the lexical-prefilter + Claude-rerank helper. Replace `<topic>` with the actual topic before running.
+
+{% if is_codex %}
+```bash
+Bash("uv run python -m harness_maker.memory_retrieve --topic '<topic>' --k 6 --pre-k 30")
+```
+{% else %}
+```bash
+!uv run python -m harness_maker.memory_retrieve --topic "<topic>" --k 6 --pre-k 30
+```
+{% endif %}
+
+The helper prints a `<memory_candidates>` fence; the directive line after it instructs you to surface the top-6 semantically relevant entries inline.
 
 ### Stage-Aware Second Brain
 
