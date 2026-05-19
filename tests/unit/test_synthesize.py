@@ -349,9 +349,7 @@ def test_synthesize_ko_locale_propagates_into_atomic_command_body(tmp_path: Path
     # No bare `en` directive should leak through for ko-locale renders. We
     # whitelist the legend text that lists the mapping (`en→English, ...`).
     en_directives = [
-        line
-        for line in plan_text.splitlines()
-        if "`en`" in line and "en→English" not in line
+        line for line in plan_text.splitlines() if "`en`" in line and "en→English" not in line
     ]
     assert not en_directives, f"unexpected en directives in plan.md: {en_directives}"
 
