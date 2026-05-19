@@ -1,6 +1,6 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.17.0
+harness_maker_version: 0.17.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: agents/stuck.md.j2
 provenance: official
@@ -9,7 +9,7 @@ description: Escalation analyst — invoked when /hm:execute, /hm:review, or /hm
   blocks. Performs root-cause analysis, proposes 2-3 unblock paths, and writes a structured
   escalation note. Read-only.
 tools: Read, Grep, Glob
-model: opus
+model: claude-4-7-opus
 content_hash: 1717ca0df764aec53d9a56084089e1271d1c7c6987b0df608d456c8781fbe86f
 ---
 

@@ -1,6 +1,6 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.17.0
+harness_maker_version: 0.17.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: agents/security-auditor.md.j2
 provenance: official
@@ -8,7 +8,7 @@ name: security-auditor
 description: Deep 5-gate security audit (secrets, permissions, hook injection, dependency
   CVEs, prompt injection) — read-only, returns structured findings JSON
 tools: Read, Grep, Glob, Bash
-model: sonnet
+model: claude-4-6-sonnet
 content_hash: 9392968d59fba165c43822d08b878baa1fa40d7d63365d7bb1401974c2e63bd6
 ---
 

@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.17.0
+harness_maker_version: 0.17.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/atomic_command.md.j2
 provenance: official
-content_hash: 3a68eff22b69baf34a6fc8d4451fcbe1164182551a8769b712d3bfcb05a70b10
+content_hash: b2b66ee573d08ea427f0e8156cd278a7a19cec7250c955696cad56cc1f352273
 ---
 # Stage: spec
 
@@ -64,9 +64,10 @@ Search prior work to ground the interview (token budget ≤3k):
 Grep "<key terms>" --glob "specs/SPEC-*.md"
 # Prior PLANs (for scope reference)
 Grep "<key terms>" --glob "work-docs/PLAN-*.md"
-# Repo memory
-[ -f .claude/memory/failures.md ] && rg "<key terms>" .claude/memory/failures.md
-[ -f .claude/memory/wiki.md ] && rg "<key terms>" .claude/memory/wiki.md
+# Repo memory — replace `<topic>` with the actual SPEC topic before running.
+
+!uv run python -m harness_maker.memory_retrieve --topic "<topic>" --k 6 --pre-k 30
+
 # When research ran, read its cache
 [ -f work-docs/RESEARCH-{slug}.md ] && Read work-docs/RESEARCH-{slug}.md
 ```

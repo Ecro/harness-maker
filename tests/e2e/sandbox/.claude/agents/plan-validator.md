@@ -1,6 +1,6 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.17.0
+harness_maker_version: 0.17.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: agents/plan-validator.md.j2
 provenance: official
@@ -8,7 +8,7 @@ name: plan-validator
 description: Critiques a draft PLAN document for gaps, ambiguities, missing exit criteria,
   and feasibility risks before /hm:execute is invoked. Read-only.
 tools: Read, Grep, Glob
-model: opus
+model: claude-4-7-opus
 content_hash: afb3210720b8189bd31aad645d952a796fc691f28586a3b476740eefcbcc28c1
 ---
 

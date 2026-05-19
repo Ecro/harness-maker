@@ -229,6 +229,22 @@ EOF
 
 The commit captures: the staged execute changes + the memory updates + the PLAN status update — **all in one commit**.
 
+### Step 7.5 — Post-commit stash pop (stage-only handshake)
+
+If `/hm:execute` ran in stage-only mode AND the base repo had unrelated dirty work, finalize deferred the stash pop to this point so the user's WIP does not contaminate the commit. Run `post-commit-pop` to restore it (no-op when no ref file is present):
+
+{% if is_codex %}
+```
+Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree post-commit-pop \"$(pwd)\"")
+```
+{% else %}
+```bash
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree post-commit-pop "$(pwd)"
+```
+{% endif %}
+
+You **MAY** call {% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %} (autoloop exception) **ONLY IF** the literal substring `[finalize] stash-pop conflict` OR `[finalize] untracked-file collision` appears in `post-commit-pop`'s stderr. Any other non-zero exit: surface verbatim and halt, do NOT ask.
+
 ### Step 8 — Push (manual; never automatic)
 
 Wrapup does **NOT** auto-push. The user explicitly requests push when ready:

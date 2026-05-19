@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.17.0
+harness_maker_version: 0.17.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/atomic_command.md.j2
 provenance: official
-content_hash: b1306892e94a13dc757daece41fdeacff694a89b599dd577fcba1c322a0cf302
+content_hash: a0d474f9d2ba9642e95f235d5021a11cde0dcf64edc45074009f01722aa6adc7
 ---
 # Stage: review
 
@@ -139,12 +139,46 @@ When no drift is detected, emit `result: clean` with empty lists. This record is
 ### Step 3 — Parallel reviewer invocation (2-pass redaction)
 
 
+Run reviewers in **two sequential passes** to neutralize metadata anchoring
+(Phase 0 ablation showed +47 percentage-point precision gain on
+anchoring-prone diffs):
 
-With a single enabled reviewer, the 2-pass redaction protocol is skipped
-(no cross-reviewer anchoring bias to mitigate). If `--with-reviewers=` adds
-extras at runtime bringing total > 1, re-enable Pass 1 + Pass 1.5 manually.
+#### Pass 1 — rubric-only (metadata redacted)
 
-#### Direct review (single reviewer — Pass 2 only)
+1. Build `pass1_context` from the diff context with PR title / description /
+   author / commit message redacted. Pipe the JSON context through the
+   harness CLI rather than redacting in prose:
+   ```bash
+   echo '<full_context_json>' | python -m harness_maker.two_pass_review redact
+   ```
+   The CLI returns a JSON object with the same fields but anchoring values
+   replaced by `[REDACTED]`.
+2. Run all selected reviewers in a **single message with multiple Task tool
+   uses** for parallel execution, passing `pass1_context`. Each reviewer:
+   - Reads the diff with full context (use Read on changed files
+     end-to-end, not just the patch).
+   - Walks the runtime path the diff touches — what runs first, what state
+     mutates, what can fail.
+   - Returns findings per the Finding Schema partial:
+     `{severity, file, line, summary, suggestion, reasoning?, …}`.
+
+#### Pass 1.5 — verifier (active, ADR-008)
+
+After collecting Pass 1 findings, invoke the `code-verifier` agent to reduce
+false positives before Pass 2 restores metadata. The verifier sees the same
+redacted context as Pass 1 and makes KEEP / DROP / DEMOTE decisions on each
+finding.
+
+
+Launch the `code-verifier` agent via Task with:
+- `pass1_findings`: the collected Pass 1 findings JSON
+- `pass1_context`: the same redacted diff context from Pass 1
+
+The verifier returns `{kept, dropped, stats}`. Use `kept` as the input to
+Pass 2 instead of the raw Pass 1 list. Log `stats.dropped_n` for telemetry.
+
+
+#### Pass 2 — contextual verdict (full metadata restored)
 
 
 3. Re-run the same reviewer set with the **full** context (metadata

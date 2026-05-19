@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.17.0
+harness_maker_version: 0.17.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: stages/research.md.j2
 provenance: official
-content_hash: b30bb6f66402e1bd1547493625c4d982ec05a4c7f8f5d48b6d62cdd95724ed93
+content_hash: 6631d1e8ed6c7cd224dd314df58b512661f6b6f2b7091b64cd8af297e05bfa66
 ---
 # Stage: research
 
@@ -59,8 +59,15 @@ Research deliberately avoids heavy interaction — it is silent multi-source gat
 Before starting, load memory in tier order (stops at first miss per tier):
 
 1. **Hot tier** — Read `.claude/memory/session/<today's date>.md` if it exists.
-2. **Warm tier** — Skim `.claude/memory/failures.md` (first 60 lines); search relevant: `rg -F "[fail:" .claude/memory/failures.md`.
-3. **Warm tier** — Skim `.claude/memory/wiki.md` (first 60 lines); search relevant: `rg -F "[wiki:" .claude/memory/wiki.md`.
+2. **Warm tier** — Surface top-K wiki + failures entries relevant to the topic via the lexical-prefilter + Claude-rerank helper. Replace `<topic>` with the actual topic before running.
+
+
+```bash
+!uv run python -m harness_maker.memory_retrieve --topic "<topic>" --k 6 --pre-k 30
+```
+
+
+The helper prints a `<memory_candidates>` fence; the directive line after it instructs you to surface the top-6 semantically relevant entries inline.
 
 ### Stage-Aware Second Brain
 

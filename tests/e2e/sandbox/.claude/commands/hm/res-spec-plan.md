@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.17.0
+harness_maker_version: 0.17.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: 009fbfae513c699b00bb9f7646c60bff5b2fe5e33799de5a36b27fc42af86a8d
+content_hash: 81cca35520eba5838290ce6ebb24cd5141994288db3bd6c3b49f71af479246d5
 ---
 # /hm:res-spec-plan
 
@@ -66,8 +66,15 @@ Research deliberately avoids heavy interaction — it is silent multi-source gat
 Before starting, load memory in tier order (stops at first miss per tier):
 
 1. **Hot tier** — Read `.claude/memory/session/<today's date>.md` if it exists.
-2. **Warm tier** — Skim `.claude/memory/failures.md` (first 60 lines); search relevant: `rg -F "[fail:" .claude/memory/failures.md`.
-3. **Warm tier** — Skim `.claude/memory/wiki.md` (first 60 lines); search relevant: `rg -F "[wiki:" .claude/memory/wiki.md`.
+2. **Warm tier** — Surface top-K wiki + failures entries relevant to the topic via the lexical-prefilter + Claude-rerank helper. Replace `<topic>` with the actual topic before running.
+
+
+```bash
+!uv run python -m harness_maker.memory_retrieve --topic "<topic>" --k 6 --pre-k 30
+```
+
+
+The helper prints a `<memory_candidates>` fence; the directive line after it instructs you to surface the top-6 semantically relevant entries inline.
 
 ### Stage-Aware Second Brain
 
@@ -360,9 +367,10 @@ Search prior work to ground the interview (token budget ≤3k):
 Grep "<key terms>" --glob "specs/SPEC-*.md"
 # Prior PLANs (for scope reference)
 Grep "<key terms>" --glob "work-docs/PLAN-*.md"
-# Repo memory
-[ -f .claude/memory/failures.md ] && rg "<key terms>" .claude/memory/failures.md
-[ -f .claude/memory/wiki.md ] && rg "<key terms>" .claude/memory/wiki.md
+# Repo memory — replace `<topic>` with the actual SPEC topic before running.
+
+!uv run python -m harness_maker.memory_retrieve --topic "<topic>" --k 6 --pre-k 30
+
 # When research ran, read its cache
 [ -f work-docs/RESEARCH-{slug}.md ] && Read work-docs/RESEARCH-{slug}.md
 ```
@@ -610,6 +618,18 @@ Convert acceptance criteria into a concrete sequence of implementation phases. *
 - Research notes at `work-docs/RESEARCH-{slug}.md` (when present).
 - Existing TECH_SPEC.md, ADRs, prior PLANs in `work-docs/`.
 - Codebase structure (modules, conventions, test layout).
+
+## Session Context Loading
+
+Before drafting the plan, surface top-K wiki + failures entries relevant to the task slug via the lexical-prefilter + Claude-rerank helper. Replace `<topic>` (typically the task slug) before running.
+
+
+```bash
+!uv run python -m harness_maker.memory_retrieve --topic "<topic>" --k 6 --pre-k 30
+```
+
+
+The helper prints a `<memory_candidates>` fence; the directive line after it instructs you to surface the top-6 semantically relevant entries inline. Hot tier — also read `.claude/memory/session/<today's date>.md` if it exists.
 
 ## Stage-Aware Second Brain
 

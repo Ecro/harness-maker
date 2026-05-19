@@ -221,6 +221,13 @@ If a PLAN phase blocks (Phase A.5 retry exhausted, Phase D unfixable, or ADR con
 
 ### Step 5 — Worktree finalize
 
+Before invoking finalize, run `git status --porcelain` in the **base** repo (parent of `<WT>`'s `.worktrees/`). If non-empty, surface to the user, informationally (no question — finalize proceeds):
+
+> "다음 파일이 base 에 dirty 상태로 있어 finalize 가 자동 stash 후 복원합니다: {file list}
+> **알림:** staged 파일은 unstaged 상태로 복원됩니다 — 필요시 다시 `git add` 하세요."
+
+You **MAY** call {% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %} (autoloop exception) **ONLY IF** the literal substring `[finalize] stash-pop conflict` OR `[finalize] untracked-file collision` appears in finalize's stderr. Any other failure: halt with stderr message, do NOT ask.
+
 Pick **exactly one** finalize command. Substitute `<WT>` with the literal absolute path from Step 0.
 
 {% if is_codex %}

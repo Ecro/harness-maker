@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.17.0
+harness_maker_version: 0.17.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: stages/plan.md.j2
 provenance: official
-content_hash: 18fde7d1f4fbb5b5a66718cb8be9fe8f07a2c9078bcf49b8c75156899cb6f3bf
+content_hash: ef7bf6fff5599e2f6ffe751aea78c14a0df210b7f3f2bae3cfe217e35f6487a7
 ---
 # Stage: plan
 
@@ -34,6 +34,18 @@ Convert acceptance criteria into a concrete sequence of implementation phases. *
 - Research notes at `work-docs/RESEARCH-{slug}.md` (when present).
 - Existing TECH_SPEC.md, ADRs, prior PLANs in `work-docs/`.
 - Codebase structure (modules, conventions, test layout).
+
+## Session Context Loading
+
+Before drafting the plan, surface top-K wiki + failures entries relevant to the task slug via the lexical-prefilter + Claude-rerank helper. Replace `<topic>` (typically the task slug) before running.
+
+
+```bash
+!uv run python -m harness_maker.memory_retrieve --topic "<topic>" --k 6 --pre-k 30
+```
+
+
+The helper prints a `<memory_candidates>` fence; the directive line after it instructs you to surface the top-6 semantically relevant entries inline. Hot tier — also read `.claude/memory/session/<today's date>.md` if it exists.
 
 ## Stage-Aware Second Brain
 

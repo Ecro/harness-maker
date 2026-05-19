@@ -1,6 +1,6 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.17.0
+harness_maker_version: 0.17.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: agents/executor.md.j2
 provenance: official
@@ -8,7 +8,7 @@ name: executor
 description: Workflow executor with worktree-bounded write permissions — only writes
   to .worktrees/, never to repo root
 tools: Read, Grep, Glob, Write, Edit, Bash
-model: sonnet
+model: claude-4-6-sonnet
 permissions:
   allow:
   - Read(*)

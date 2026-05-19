@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.17.0
+harness_maker_version: 0.17.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/loop.md.j2
 provenance: official
-content_hash: 00ac133c230a72b2d9532b9e2471eef9774b955780b7d7765decaf869b0feff8
+content_hash: 3888d7f1771277695ddb1e17ebc6e601a6c1cab9a119e82f52bd4f447d36b125
 ---
 # /hm:loop
 
@@ -423,7 +423,7 @@ worktree would explode commit count.
 
 
 ```bash
-!uv run --with /home/noel/harness-maker/.worktrees/execute-20260518T1438Z python -m harness_maker.worktree create execute "$(pwd)"
+!uv run --with /home/noel/harness-maker python -m harness_maker.worktree create execute "$(pwd)"
 ```
 
 
@@ -707,7 +707,7 @@ When the loop halts (convergence, safety rail, or hard error):
 
 
    ```bash
-   !uv run --with /home/noel/harness-maker/.worktrees/execute-20260518T1438Z python -m harness_maker.worktree finalize <WT> <STATUS>
+   !uv run --with /home/noel/harness-maker python -m harness_maker.worktree finalize <WT> <STATUS>
    ```
 
 

@@ -1,6 +1,6 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.17.0
+harness_maker_version: 0.17.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: agents/autoloop-coder.md.j2
 provenance: official
@@ -8,7 +8,7 @@ name: autoloop-coder
 description: Implementation agent for autoloop iterations — bounded scope, write-tool-only,
   no open-ended exploration; worktree-bounded writes
 tools: Read, Grep, Glob, Write, Edit, Bash
-model: opus
+model: claude-4-7-opus
 content_hash: 16c58ceb4e3c945b212076c47c74bd67ca0a869617796f99fe48ca0e12b3be40
 ---
 

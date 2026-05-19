@@ -1,6 +1,6 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.17.0
+harness_maker_version: 0.17.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: agents/code-reviewer.md.j2
 provenance: official
@@ -8,7 +8,7 @@ name: code-reviewer
 description: Reviews code changes for correctness, readability, maintainability, and
   basic security/performance hygiene
 tools: Read, Grep, Glob
-model: sonnet
+model: claude-4-6-sonnet
 review_scope:
 - code
 permissions:

@@ -230,6 +230,251 @@ def _capture_pending_in_worktree(wt_path: Path) -> bool:
     return True
 
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Base-side stash isolation envelope (PLAN-worktree-finalize-stash-isolation).
+#
+# Before squash-merging the worktree branch into base, stash any pre-existing
+# dirty work in base (tracked + staged + untracked). After the merge completes,
+# pop the stash so the user's unrelated work is restored — collapsed to
+# unstaged per ADR-001 §3 (accepted trade-off; alternative `--keep-index`
+# exposes staged content to squash, creating a different silent corruption).
+# ──────────────────────────────────────────────────────────────────────────────
+
+_STASH_MESSAGE_PREFIX = "hm-finalize-"
+
+# Substrings consumers (Step 5 LLM contract, ADR-003) literal-match for the
+# autoloop AskUserQuestion exception. Keep stable — changing breaks the gate.
+_POP_CONFLICT_SIGNAL = "[finalize] stash-pop conflict — autoloop must halt"
+_UNTRACKED_COLLISION_SIGNAL = "[finalize] untracked-file collision — autoloop must halt"
+
+
+def _probe_submodules(base: Path) -> None:
+    """ADR-005: abort if any submodule has dirty pointer or uninit state.
+
+    `git submodule status` prefixes lines: `+` = SHA differs from index,
+    `-` = uninitialized, `U` = merge conflict. Any of these means transparent
+    stash cannot isolate the submodule's working tree (`git stash` only
+    touches the parent's pointer entry, not the submodule's index).
+    """
+    try:
+        cp = _run(["git", "submodule", "status"], cwd=base)
+    except RuntimeError:
+        # No `.gitmodules` or git config quirk → treat as no submodules.
+        return
+    bad: list[str] = []
+    for line in cp.stdout.splitlines():
+        if line and line[0] in "+-U":
+            parts = line.split()
+            bad.append(parts[1] if len(parts) >= 2 else line)
+    if bad:
+        raise RuntimeError(
+            "[finalize] submodule state cannot be transparently isolated — "
+            "please commit or reset submodule changes before finalize.\n"
+            f"Submodules with state: {bad}"
+        )
+
+
+_HARNESS_ARTIFACT_PREFIXES = (
+    ".worktrees/",
+    ".claude/.hm-loop-",
+    ".claude/.hm-finalize-stash-",
+)
+
+
+def _is_harness_artifact(porcelain_line: str) -> bool:
+    """Return True if a porcelain status line refers to a path we manage.
+
+    Porcelain v1 format: ``XY path`` where XY is a 2-char status code and the
+    path starts at column 3. Harness-managed paths are excluded from the
+    "is base dirty" check so users who don't gitignore ``.worktrees/`` etc.
+    don't see spurious stash activity (the artifacts get carried by the stash
+    anyway when real user dirty is present; we just don't TRIGGER on them).
+    """
+    if len(porcelain_line) < 4:
+        return False
+    path = porcelain_line[3:].strip()
+    # Rename entries can have "from -> to"; consider the destination.
+    if " -> " in path:
+        path = path.split(" -> ", 1)[1]
+    # Strip optional quote wrapping that git adds for paths with special chars.
+    path = path.strip('"')
+    return path.startswith(_HARNESS_ARTIFACT_PREFIXES)
+
+
+def _stash_base_dirty(base: Path, wt_name: str) -> str | None:
+    """Stash base's dirty (tracked + staged + untracked) before squash.
+
+    Returns the stash ref (`stash@{N}`) when something was stashed, or None
+    when base was clean OR only harness-managed artifacts (.worktrees/, our
+    markers, our stash refs) are present. The ref is resolved by message-grep
+    so a concurrent stash from another tool doesn't shift ``stash@{0}`` out
+    from under us.
+    """
+    status = _run(["git", "status", "--porcelain"], cwd=base)
+    user_lines = [
+        line for line in status.stdout.splitlines() if not _is_harness_artifact(line)
+    ]
+    if not user_lines:
+        return None
+    message = f"{_STASH_MESSAGE_PREFIX}{wt_name}"
+    _run(["git", "stash", "push", "-u", "-m", message], cwd=base)
+    listing = _run(["git", "stash", "list"], cwd=base)
+    # Exact-match the message field (after the last `": "`) to avoid substring
+    # collisions with prefix-shared messages from prior failed runs. Format
+    # is `stash@{N}: On <branch>: <message>` or `stash@{N}: WIP on ...: <message>`;
+    # splitting on `": "` with maxsplit=2 isolates the message field cleanly.
+    for line in listing.stdout.splitlines():
+        parts = line.split(": ", 2)
+        if len(parts) == 3 and parts[2].strip() == message:
+            ref = parts[0].strip()
+            if ref.startswith("stash@{"):
+                return ref
+    raise RuntimeError(
+        f"stash push reported success but ref not found in `git stash list` for message {message!r}"
+    )
+
+
+def _classify_pop_failure(error_text: str, base: Path) -> tuple[str, list[Path]]:
+    """Return (class, files). class ∈ {merge_conflict, untracked_collision, unknown}.
+
+    untracked_collision: git stash pop refuses to overwrite untracked files
+      already created in the working tree (e.g., by the just-completed squash).
+      Stderr contains "could not restore untracked files".
+    merge_conflict: stash pop applied but left `<<<<<<<` markers in tracked
+      files. Detected by `git diff --diff-filter=U`.
+    """
+    if "could not restore untracked files" in error_text:
+        # Best-effort filename extraction from stderr; falls back to empty list
+        # when git's output format changes. Step 5 LLM still gets actionable
+        # guidance from the signal + stash ref.
+        files: list[Path] = []
+        for raw in error_text.splitlines():
+            stripped = raw.strip()
+            # Skip git's diagnostic preamble; collect bare-looking filenames.
+            if (
+                stripped
+                and not stripped.endswith(":")
+                and "could not" not in stripped
+                and "stderr:" not in stripped
+                and " " not in stripped
+            ):
+                files.append(Path(stripped))
+        return ("untracked_collision", files)
+    try:
+        cp = _run(["git", "diff", "--name-only", "--diff-filter=U"], cwd=base)
+        conflicted = [Path(p) for p in cp.stdout.split() if p.strip()]
+    except RuntimeError:
+        conflicted = []
+    if conflicted:
+        return ("merge_conflict", conflicted)
+    return ("unknown", [])
+
+
+def _restore_base_dirty(base: Path, stash_ref: str) -> tuple[bool, str, list[Path]]:
+    """Pop the stash. Returns (ok, klass, files); on failure stash is preserved.
+
+    Success → (True, "", []).
+    Failure → (False, "merge_conflict" | "untracked_collision" | "unknown", files).
+    """
+    try:
+        _run(["git", "stash", "pop", stash_ref], cwd=base)
+        return (True, "", [])
+    except RuntimeError as e:
+        klass, files = _classify_pop_failure(str(e), base)
+        return (False, klass, files)
+
+
+def _emit_pop_failure_signal(
+    klass: str, stash_ref: str, files: list[Path], wt_name: str
+) -> None:
+    """Write the literal stderr block Step 5 LLM matches on (ADR-003)."""
+    if klass == "merge_conflict":
+        signal = _POP_CONFLICT_SIGNAL
+        recovery = (
+            f"Resolve: grep -l '<<<<<<<' . then edit + git add + "
+            f"git stash drop {stash_ref}"
+        )
+    elif klass == "untracked_collision":
+        signal = _UNTRACKED_COLLISION_SIGNAL
+        recovery = (
+            f"Recover: git checkout {stash_ref} -- <file> "
+            f"(rename first if needed) then git stash drop {stash_ref}"
+        )
+    else:
+        signal = "[finalize] stash-pop failed (class=unknown) — autoloop must halt"
+        recovery = (
+            f"Inspect: git stash show -p {stash_ref}; "
+            f"resolve manually; git stash drop {stash_ref}"
+        )
+    print(signal, file=sys.stderr)
+    print(f"Stash: {stash_ref} ({_STASH_MESSAGE_PREFIX}{wt_name})", file=sys.stderr)
+    label = "Files (in stash, not restored)" if klass == "untracked_collision" else "Files"
+    print(f"{label}: {[str(f) for f in files]}", file=sys.stderr)
+    print(recovery, file=sys.stderr)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Stage-only handshake: finalize writes a stash-ref file; wrapup's
+# `post-commit-pop` CLI pops it AFTER its commit (ADR-001 §2).
+# ──────────────────────────────────────────────────────────────────────────────
+
+_STASH_REF_PREFIX = ".hm-finalize-stash-"
+_STASH_REF_GITIGNORE_PATTERN = ".claude/.hm-finalize-stash-*"
+
+
+def _stash_ref_path(base: Path, wt_name: str) -> Path:
+    """Return the per-worktree stash-ref file path under ``<base>/.claude/``."""
+    return base / _LOOP_MARKER_DIR / f"{_STASH_REF_PREFIX}{wt_name}"
+
+
+def _write_stash_ref_file(base: Path, wt_name: str, stash_ref: str) -> Path:
+    """Persist the stash handoff state (ADR-001 §2).
+
+    Body is 4 simple ``key: value`` lines so ``post-commit-pop`` can read with
+    a trivial parser without dragging a YAML dep into the worktree subpackage.
+    The session field is the per-session marker basename so we can later
+    cross-check that the live session matches before popping (validator 2nd-pass
+    warning #3).
+    """
+    from harness_maker.io_utils import atomic_write
+
+    path = _stash_ref_path(base, wt_name)
+    body = (
+        f"ref: {stash_ref}\n"
+        f"base: {base.resolve()}\n"
+        f"session: {_LOOP_MARKER_PREFIX}{wt_name}\n"
+        f"created_at: {datetime.now(UTC).isoformat()}\n"
+    )
+    atomic_write(path, body)
+    _ensure_gitignore_entry(base, _STASH_REF_GITIGNORE_PATTERN)
+    return path
+
+
+def _read_stash_ref_file(path: Path) -> dict[str, str]:
+    """Parse the 4-line key:value format. Returns {} on parse failure."""
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return {}
+    out: dict[str, str] = {}
+    for line in text.splitlines():
+        if ":" in line:
+            k, v = line.split(":", 1)
+            out[k.strip()] = v.strip()
+    return out
+
+
+def _session_marker_present(base: Path, session_basename: str) -> bool:
+    """True iff ``<base>/.claude/<session_basename>`` exists as a file.
+
+    A live session marker means the wrapup invocation belongs to the same
+    session that created the stash; an absent marker means the prior session
+    died without wrapup and the ref file is stale (do not pop, validator
+    2nd-pass warning #3).
+    """
+    return (base / _LOOP_MARKER_DIR / session_basename).is_file()
+
+
 def merge(wt_path: Path, strategy: str = "squash", commit: bool = True) -> None:
     """Merge the worktree's branch back into the base repo's current branch.
 
@@ -498,7 +743,11 @@ def _ensure_gitignore_entry(project_root: Path, entry: str) -> None:
             with gitignore.open("a", encoding="utf-8") as f:
                 f.write(f"{sep}{entry}\n")
         else:
-            gitignore.write_text(f"{entry}\n", encoding="utf-8")
+            # Atomic write via tempfile + os.replace — CLAUDE.md project rule
+            # forbids plain open(path, "w") outside tempfile-owned directories.
+            from harness_maker.io_utils import atomic_write
+
+            atomic_write(gitignore, f"{entry}\n")
     except OSError:
         # Best-effort; don't fail loop creation over a gitignore write.
         pass
@@ -619,37 +868,105 @@ def _cli_finalize(args: list[str]) -> int:
             continue
 
         wt_rc = 0
-        # CRITICAL: capture uncommitted work before merge — see finalize bug 2026-05-08.
+        pop_rc = 0
+        base_repo = current_wt.resolve().parent.parent
+
+        # ADR-005: submodule dirty state cannot be transparently isolated.
+        # Probe BEFORE stashing so we never leave an orphan stash on abort.
         try:
-            captured = _capture_pending_in_worktree(current_wt)
-            if captured:
-                print(
-                    f"[finalize] captured uncommitted work in {current_wt.name} as WIP commit",
-                    file=sys.stderr,
-                )
+            _probe_submodules(base_repo)
         except RuntimeError as e:
-            print(
-                f"failed to capture uncommitted work in {current_wt}: {e}; preserving worktree",
-                file=sys.stderr,
-            )
-            wt_rc = 1
+            print(str(e), file=sys.stderr)
+            return 1
 
-        if wt_rc == 0:
-            try:
-                merge(current_wt, strategy=strategy, commit=auto_commit)
-            except RuntimeError as e:
-                print(f"merge failed, preserving worktree: {e}", file=sys.stderr)
-                wt_rc = 1
+        # ADR-001: stash base's pre-existing dirty BEFORE squash so the merge
+        # runs on a clean tree. Both modes engage isolation; success mode pops
+        # inside the envelope, stage-only hands off via the ref file.
+        stash_ref: str | None = None
+        try:
+            stash_ref = _stash_base_dirty(base_repo, current_wt.name)
+        except RuntimeError as e:
+            print(f"[finalize] stash setup failed: {e}", file=sys.stderr)
+            return 1
 
-        if wt_rc == 0:
+        # handed_off: True means recovery is owned by a downstream actor
+        # (the wrapup-side post-commit-pop). When True, the finally clause
+        # must NOT pop — doing so would re-contaminate the index with the
+        # user's dirty on top of the staged squash (validator 2nd-pass critical).
+        handed_off = stash_ref is None  # no stash → vacuously complete
+
+        try:
+            # CRITICAL: capture uncommitted work before merge — see finalize bug 2026-05-08.
             try:
-                cleanup(current_wt, on_success=True)
+                captured = _capture_pending_in_worktree(current_wt)
+                if captured:
+                    print(
+                        f"[finalize] captured uncommitted work in {current_wt.name} as WIP commit",
+                        file=sys.stderr,
+                    )
             except RuntimeError as e:
                 print(
-                    f"cleanup failed, worktree preserved at {current_wt}: {e}",
+                    f"failed to capture uncommitted work in {current_wt}: {e}; preserving worktree",
                     file=sys.stderr,
                 )
                 wt_rc = 1
+
+            if wt_rc == 0:
+                try:
+                    merge(current_wt, strategy=strategy, commit=auto_commit)
+                except RuntimeError as e:
+                    print(f"merge failed, preserving worktree: {e}", file=sys.stderr)
+                    wt_rc = 1
+
+            # ADR-001 §2 stage-only handshake: write the ref file AFTER merge
+            # succeeds but BEFORE cleanup, then flip handed_off. Cleanup failure
+            # after this point cannot re-contaminate because the finally pop is
+            # suppressed by handed_off=True; recovery is owned by post-commit-pop.
+            if wt_rc == 0 and not auto_commit and stash_ref is not None:
+                try:
+                    _write_stash_ref_file(base_repo, current_wt.name, stash_ref)
+                    handed_off = True
+                except OSError as e:
+                    print(
+                        f"[finalize] ref file write failed: {e}; rolling back",
+                        file=sys.stderr,
+                    )
+                    wt_rc = 1
+
+            if wt_rc == 0:
+                try:
+                    cleanup(current_wt, on_success=True)
+                except RuntimeError as e:
+                    print(
+                        f"cleanup failed, worktree preserved at {current_wt}: {e}",
+                        file=sys.stderr,
+                    )
+                    wt_rc = 1
+
+            # Success mode pop happens INSIDE the envelope: in success mode the
+            # squash is already in HEAD (commit=True), so popping over the now-
+            # clean index is safe even if cleanup failed.
+            if wt_rc == 0 and auto_commit and stash_ref is not None:
+                ok, klass, files = _restore_base_dirty(base_repo, stash_ref)
+                handed_off = True  # success-mode pop done; suppress finally pop
+                if not ok:
+                    _emit_pop_failure_signal(klass, stash_ref, files, current_wt.name)
+                    pop_rc = 1
+        finally:
+            # Rollback path: only pop when something raised BEFORE handoff. For
+            # stage-only rollback, reset the partially-staged squash first so
+            # pop doesn't conflict with our half-applied merge state.
+            if stash_ref is not None and not handed_off:
+                if not auto_commit:
+                    with contextlib.suppress(RuntimeError):
+                        _run(["git", "reset", "--hard", "HEAD"], cwd=base_repo)
+                ok, klass, files = _restore_base_dirty(base_repo, stash_ref)
+                if not ok:
+                    _emit_pop_failure_signal(klass, stash_ref, files, current_wt.name)
+                    pop_rc = 1
+
+        if wt_rc == 0 and pop_rc != 0:
+            wt_rc = pop_rc
 
         if wt_rc != 0:
             # Fail-fast: emit per-repo status; keep marker so gate protects all.
@@ -666,22 +983,93 @@ def _cli_finalize(args: list[str]) -> int:
         succeeded.append(current_wt)
         pending.remove(current_wt)
 
-    # All WTs processed successfully — clear this session's marker (ADR-006).
-    _clear_loop_marker(project_root, primary_wt_name)
+    # All WTs processed successfully. Stage-only handoffs keep the loop marker
+    # alive as the session signal post-commit-pop checks before popping; success
+    # mode clears immediately because recovery already happened inside finalize.
+    if status == "success" or not any(
+        _stash_ref_path(p.resolve().parent.parent, p.name).is_file() for p in all_wts
+    ):
+        _clear_loop_marker(project_root, primary_wt_name)
     return 0
+
+
+def _cli_post_commit_pop(args: list[str]) -> int:
+    """Wrapup handshake: pop deferred stashes (ADR-001 §2, post-commit-pop CLI).
+
+    Globs ``<base_dir>/.claude/.hm-finalize-stash-*`` ref files, pops only
+    those whose ``session:`` marker is still on disk (live session check —
+    validator 2nd-pass warning #3 — prevents stale-ref contamination across
+    sessions). On successful pop, deletes the ref file and the session marker.
+
+    Exit codes:
+      0 — every actionable ref popped cleanly (or no refs found, or all stale).
+      1 — at least one pop failed; the failing ref + stash are preserved with
+          a classified signal so the wrapup-side LLM can AskUserQuestion.
+    """
+    if len(args) != 1:
+        print("usage: post-commit-pop <base_dir>", file=sys.stderr)
+        return 2
+    base = Path(args[0]).resolve()
+    claude_dir = base / _LOOP_MARKER_DIR
+    if not claude_dir.is_dir():
+        return 0  # nothing to do
+
+    overall_rc = 0
+    for ref_file in sorted(claude_dir.glob(f"{_STASH_REF_PREFIX}*")):
+        fields = _read_stash_ref_file(ref_file)
+        stash_ref = fields.get("ref", "")
+        session = fields.get("session", "")
+        if not stash_ref or not session:
+            print(
+                f"[post-commit-pop] skipping malformed ref file: {ref_file}",
+                file=sys.stderr,
+            )
+            continue
+
+        if not _session_marker_present(base, session):
+            # Stale ref from a prior session that never wrapped up. Skip without
+            # touching either the stash or the ref file — the next live session
+            # owning that worktree name will recover; or user resolves manually.
+            print(
+                f"[post-commit-pop] stale ref (session {session!r} not active): "
+                f"{ref_file.name} — skipping, stash + ref preserved",
+                file=sys.stderr,
+            )
+            continue
+
+        # Live session match — pop and clean up.
+        # Derive worktree name from filename (everything after the prefix).
+        wt_name = ref_file.name[len(_STASH_REF_PREFIX) :]
+        ok, klass, files = _restore_base_dirty(base, stash_ref)
+        if not ok:
+            _emit_pop_failure_signal(klass, stash_ref, files, wt_name)
+            overall_rc = 1
+            continue
+
+        # Successful pop: delete the ref file and the session marker so the
+        # next wrapup invocation doesn't try to pop a drained stash.
+        ref_file.unlink(missing_ok=True)
+        (claude_dir / session).unlink(missing_ok=True)
+
+    return overall_rc
 
 
 def main(argv: list[str] | None = None) -> int:
     """Dispatch worktree subcommand from argv."""
     args = list(sys.argv[1:] if argv is None else argv)
     if not args:
-        print("usage: python -m harness_maker.worktree <create|finalize> [...]", file=sys.stderr)
+        print(
+            "usage: python -m harness_maker.worktree <create|finalize|post-commit-pop> [...]",
+            file=sys.stderr,
+        )
         return 2
     sub, rest = args[0], args[1:]
     if sub == "create":
         return _cli_create(rest)
     if sub == "finalize":
         return _cli_finalize(rest)
+    if sub == "post-commit-pop":
+        return _cli_post_commit_pop(rest)
     print(f"unknown subcommand: {sub}", file=sys.stderr)
     return 2
 

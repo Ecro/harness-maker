@@ -1,6 +1,6 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.17.0
+harness_maker_version: 0.17.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: agents/code-verifier.md.j2
 provenance: official
@@ -8,7 +8,7 @@ name: code-verifier
 description: Pass 1.5 reduce-only verifier — KEEP/DROP/DEMOTE Pass 1 findings against
   the redacted diff. MUST NOT introduce new findings.
 tools: Read, Grep, Glob
-model: sonnet
+model: claude-4-6-sonnet
 review_scope:
 - verifier
 permissions:

@@ -34,6 +34,12 @@ def repo(tmp_path: Path) -> Path:
     _git(["config", "user.email", "test@example.com"], cwd=r)
     _git(["config", "user.name", "Test"], cwd=r)
     (r / "README.md").write_text("# repo\n")
+    # Pre-track .gitignore so worktree.create() doesn't auto-create it as an
+    # untracked file (which would otherwise appear in `git status --porcelain`
+    # and trigger the stash isolation envelope on a "clean" base).
+    (r / ".gitignore").write_text(
+        ".worktrees/\n.claude/.hm-loop-*\n.claude/.hm-finalize-stash-*\n"
+    )
     _git(["add", "."], cwd=r)
     _git(["commit", "-m", "init"], cwd=r)
     return r

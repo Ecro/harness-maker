@@ -1,6 +1,6 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.17.0
+harness_maker_version: 0.17.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: agents/performance-reviewer.md.j2
 provenance: official
@@ -8,7 +8,7 @@ name: performance-reviewer
 description: Reviews changes for hot-path regressions, allocation hotspots, and algorithmic
   inefficiency
 tools: Read, Grep, Glob
-model: sonnet
+model: claude-4-6-sonnet
 review_scope:
 - performance
 permissions:

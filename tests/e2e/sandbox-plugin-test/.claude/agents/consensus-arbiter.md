@@ -1,6 +1,6 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.17.0
+harness_maker_version: 0.17.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: agents/consensus-arbiter.md.j2
 provenance: official
@@ -9,7 +9,7 @@ description: Aggregates findings from multiple reviewer agents via surface match
   reasoning alignment + severity resolution; tags every finding consensus-passed |
   weak-consensus | manual-only
 tools: Read, Grep, Glob
-model: sonnet
+model: claude-4-6-sonnet
 content_hash: 6343f55957f2ed946c6d5be02d8316a6b9cf68f34859e41f24475901f859c56d
 ---
 

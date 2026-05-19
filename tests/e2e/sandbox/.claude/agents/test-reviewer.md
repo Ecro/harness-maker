@@ -1,6 +1,6 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.17.0
+harness_maker_version: 0.17.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: agents/test-reviewer.md.j2
 provenance: official
@@ -9,7 +9,7 @@ description: Phase A.5 gate for /hm:execute. Critiques RED-stage tests for SPEC 
   banned-pattern violations, and assertion quality before Phase B (RED gate) runs.
   Read-only.
 tools: Read, Grep, Glob
-model: sonnet
+model: claude-4-6-sonnet
 content_hash: ac455fa1acbc0ef1212e2ee9560a80dbd5c3c75cb3322d54f18354e974987c13
 ---
 
