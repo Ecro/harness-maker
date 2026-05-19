@@ -259,11 +259,21 @@ def merge(wt_path: Path, strategy: str = "squash", commit: bool = True) -> None:
         _run(args, cwd=base)
 
 
+# PLAN-untested-trio-fix ADR-002 + ADR-004: owned-prefix set for cleanup safety.
+# cleanup_all must not touch worktrees created by other tools (e.g. Cursor IDE's
+# /worktree command) that happen to share the same `.worktrees/` parent dir.
+# Adding a new stage prefix requires updating this tuple (accepted manual-update
+# risk per ADR-002; sentinel test rejected as tautological in PLAN R3).
+_OWNED_PREFIXES: tuple[str, ...] = ("execute-", "plan-", "phase-", "autoloop-")
+
+
 def _list_worktrees(base_dir: Path) -> list[Path]:
-    """Return absolute paths of all worktrees under base_dir/.worktrees/.
+    """Return absolute paths of harness-maker-owned worktrees under base_dir/.worktrees/.
 
     Uses `git worktree list --porcelain` so we don't depend on directory
-    enumeration and naturally skip the main worktree.
+    enumeration and naturally skip the main worktree. Filters by
+    `_OWNED_PREFIXES` so cleanup_all does not affect cross-tool worktrees
+    (PLAN-untested-trio-fix ADR-002).
     """
     base = base_dir.resolve()
     cp = _run(["git", "worktree", "list", "--porcelain"], cwd=base)
@@ -276,8 +286,12 @@ def _list_worktrees(base_dir: Path) -> list[Path]:
         if p == main_path:
             continue
         # Restrict to ones under base/.worktrees/ — leave external worktrees alone.
-        if WORKTREE_DIR_NAME in p.parts and p.is_relative_to(base):
-            paths.append(p)
+        if not (WORKTREE_DIR_NAME in p.parts and p.is_relative_to(base)):
+            continue
+        # Restrict to owned prefixes — leave other tools' worktrees alone.
+        if not p.name.startswith(_OWNED_PREFIXES):
+            continue
+        paths.append(p)
     return paths
 
 

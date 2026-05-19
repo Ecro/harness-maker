@@ -12,6 +12,7 @@ import logging
 import re
 import sys
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -40,6 +41,24 @@ _RECOMMENDED_FIELDS: dict[str, tuple[str, ...]] = {
     "reference": ("source", "authority", "captured_from"),
     "journal": ("date", "session", "work_item"),
 }
+
+
+def _autofill_timestamps(frontmatter: dict[str, Any]) -> dict[str, Any]:
+    """Return a NEW dict with `created` (if missing) and `updated` (always now) set.
+
+    Mutation-free per PLAN-untested-trio-fix ADR-010: caller's input dict is
+    never modified — slash-command templates that reuse a frontmatter dict
+    across multiple notes would otherwise lock `created` to the first call's
+    timestamp.
+
+    `created` policy: setdefault — preserve user-supplied or on-disk values.
+    `updated` policy: always overwrite to current UTC (ADR-006: last-touch semantic).
+    """
+    out = dict(frontmatter)
+    now = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    out.setdefault("created", now)
+    out["updated"] = now
+    return out
 
 
 class SecondBrainError(RuntimeError):
@@ -147,11 +166,22 @@ def write_note(
         raise SecondBrainError(_EMPTY_FOLDERS_REMEDIATION)
     path, folder = _resolve_authorized(harness_root, cfg, relpath, mode="write")
     _require_markdown(path)
-    _ensure_type_allowed(frontmatter, folder)
-    warnings = validate_note(frontmatter, body)
-    warnings.extend(_project_namespace_warnings(frontmatter, cfg))
+    # ADR-008: preserve on-disk `created` across re-writes. Without this, a
+    # second write_note with no `created` in fm would silently install a NEW
+    # `created` (auto-fill assigns current time), losing the original.
+    if path.exists():
+        try:
+            existing_fm, _ = parse_frontmatter(path.read_text(encoding="utf-8"))
+            if "created" in existing_fm and "created" not in frontmatter:
+                frontmatter = {**frontmatter, "created": existing_fm["created"]}
+        except OSError:
+            pass  # treat as fresh write
+    fm = _autofill_timestamps(frontmatter)  # ADR-006/010: returns NEW dict
+    _ensure_type_allowed(fm, folder)
+    warnings = validate_note(fm, body)
+    warnings.extend(_project_namespace_warnings(fm, cfg))
     path.parent.mkdir(parents=True, exist_ok=True)
-    atomic_write(path, _format_note(frontmatter, body))
+    atomic_write(path, _format_note(fm, body))
     return WriteResult(path=path, warnings=warnings)
 
 
@@ -161,13 +191,18 @@ def append_note(harness_root: Path, relpath: str, text: str) -> WriteResult:
         raise SecondBrainError(_EMPTY_FOLDERS_REMEDIATION)
     path, folder = _resolve_authorized(harness_root, cfg, relpath, mode="write")
     _require_markdown(path)
+    # ADR-009: re-serialize via _format_note so the `updated` bump from
+    # _autofill_timestamps actually lands on disk. Pre-fix path used raw
+    # `existing + text` concat which discarded the fm mutation.
     existing = path.read_text(encoding="utf-8") if path.exists() else ""
     fm, body = parse_frontmatter(existing)
+    new_body = body + text
+    fm = _autofill_timestamps(fm)  # ADR-006: bumps updated
     _ensure_type_allowed(fm, folder)
-    warnings = validate_note(fm, body + text)
+    warnings = validate_note(fm, new_body)
     warnings.extend(_project_namespace_warnings(fm, cfg))
     path.parent.mkdir(parents=True, exist_ok=True)
-    atomic_write(path, existing + text)
+    atomic_write(path, _format_note(fm, new_body))
     return WriteResult(path=path, warnings=warnings)
 
 
@@ -177,15 +212,18 @@ def patch_note(harness_root: Path, relpath: str, old_text: str, new_text: str) -
         raise SecondBrainError(_EMPTY_FOLDERS_REMEDIATION)
     path, folder = _resolve_authorized(harness_root, cfg, relpath, mode="write")
     _require_markdown(path)
+    # ADR-009 corrective: match `old_text` against the body only, not the
+    # full file. Frontmatter-substring patching was undefined behavior pre-fix.
     existing = path.read_text(encoding="utf-8")
-    if old_text not in existing:
+    fm, body = parse_frontmatter(existing)
+    if old_text not in body:
         raise SecondBrainError("old text not found")
-    updated = existing.replace(old_text, new_text, 1)
-    fm, body = parse_frontmatter(updated)
+    new_body = body.replace(old_text, new_text, 1)
+    fm = _autofill_timestamps(fm)  # ADR-006: bumps updated
     _ensure_type_allowed(fm, folder)
-    warnings = validate_note(fm, body)
+    warnings = validate_note(fm, new_body)
     warnings.extend(_project_namespace_warnings(fm, cfg))
-    atomic_write(path, updated)
+    atomic_write(path, _format_note(fm, new_body))
     return WriteResult(path=path, warnings=warnings)
 
 

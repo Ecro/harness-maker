@@ -368,3 +368,57 @@ def test_cli_create_with_provenance_frontmatter_resolves_siblings(
     assert len(lines) == 2
     assert str(primary) in lines[0]
     assert str(sibling) in lines[1]
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# _OWNED_PREFIXES filter (PLAN-untested-trio-fix ADR-002 + ADR-004)
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def test_list_worktrees_only_includes_owned_prefixes(primary: Path) -> None:
+    """_list_worktrees must filter out non-owned-prefix worktrees (ADR-002 + ADR-004).
+
+    Creates owned (execute-) and unowned (cursor-) worktrees. Only the owned
+    one appears in _list_worktrees output. Mirrors the Cursor-IDE-cross-tool
+    scenario where another tool's worktree must not be visible to cleanup_all.
+    """
+    owned = worktree.create("execute", primary)
+    unowned = worktree.create("cursor-bar", primary)
+
+    listed = worktree._list_worktrees(primary)
+    listed_names = [p.name for p in listed]
+
+    assert owned[0].name in listed_names, (
+        f"owned worktree missing from _list_worktrees: {listed_names}"
+    )
+    assert unowned[0].name not in listed_names, (
+        f"unowned worktree leaked into _list_worktrees: {listed_names}"
+    )
+
+
+def test_cleanup_all_does_not_touch_unowned_worktrees(primary: Path) -> None:
+    """cleanup_all must leave non-owned-prefix worktrees registered (ADR-002).
+
+    Cursor (or any other tool) creating a `.worktrees/<other-prefix>/` worktree
+    must survive `cleanup_all(force=True)`. This is the load-bearing cross-tool
+    safety claim from CLAUDE.md §"Worktree 공유".
+    """
+    owned = worktree.create("execute", primary)
+    unowned = worktree.create("cursor-bar", primary)
+
+    removed = worktree.cleanup_all(primary, force=True)
+
+    assert removed == 1, f"expected 1 owned removal, got {removed}"
+    assert not owned[0].exists(), f"owned worktree survived cleanup: {owned[0]}"
+    assert unowned[0].exists(), f"unowned worktree removed by cleanup: {unowned[0]}"
+
+    # Verify unowned is still registered with git (cleanup must not have run
+    # `git worktree remove` against it).
+    out = subprocess.run(
+        ["git", "worktree", "list", "--porcelain"],
+        cwd=str(primary),
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    assert str(unowned[0]) in out, f"unowned worktree unregistered from git: {out}"

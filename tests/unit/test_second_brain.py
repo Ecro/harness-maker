@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import re
+import time
 from pathlib import Path
 
 import pytest
@@ -440,3 +442,210 @@ def test_cli_write_and_read(tmp_path: Path, capsys: pytest.CaptureFixture[str]) 
     code = _cli(["--root", str(root), "read", "Projects/harness-maker/Decisions/CLI.md"])
     assert code == 0
     assert "# CLI" in capsys.readouterr().out
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Timestamp auto-fill (PLAN-untested-trio-fix ADR-006/008/009/010)
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+_ISO_UTC_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
+
+
+def _minimal_fm(note_type: str = "decision") -> dict[str, object]:
+    """Frontmatter with all required fields EXCEPT created + updated.
+
+    Used to exercise the auto-fill path (ADR-006). Mirrors the wrapup-stage
+    minimal call pattern that REVIEW-second-brain I1 flagged as critical.
+    """
+    return {
+        "type": note_type,
+        "tags": ["hm/second-brain", f"hm/type/{note_type}"],
+        "links": [],
+    }
+
+
+def test_write_note_autofills_created_when_missing(tmp_path: Path) -> None:
+    """write_note with minimal frontmatter (no created/updated) writes both fields
+    via _autofill_timestamps. Resolves REVIEW-second-brain I1 wrapup gap."""
+    root = _harness_root(tmp_path)
+    _write_harness_yaml(root, _enabled_config(root))
+    result = write_note(
+        root,
+        "Projects/harness-maker/Decisions/autofill.md",
+        _minimal_fm("decision"),
+        "Body\n",
+    )
+    text = result.path.read_text(encoding="utf-8")
+    fm, _ = parse_frontmatter(text)
+    assert isinstance(fm.get("created"), str)
+    assert _ISO_UTC_RE.match(fm["created"])
+    assert isinstance(fm.get("updated"), str)
+    assert _ISO_UTC_RE.match(fm["updated"])
+
+
+def test_write_note_preserves_user_supplied_created(tmp_path: Path) -> None:
+    """User-supplied `created` is NOT overwritten by auto-fill (ADR-006)."""
+    root = _harness_root(tmp_path)
+    _write_harness_yaml(root, _enabled_config(root))
+    user_created = "2026-01-01T00:00:00Z"
+    fm = _minimal_fm("decision")
+    fm["created"] = user_created
+    result = write_note(
+        root,
+        "Projects/harness-maker/Decisions/created-preserve.md",
+        fm,
+        "Body\n",
+    )
+    on_disk_fm, _ = parse_frontmatter(result.path.read_text(encoding="utf-8"))
+    assert on_disk_fm["created"] == user_created
+
+
+def test_write_note_overwrites_user_supplied_updated(tmp_path: Path) -> None:
+    """User-supplied `updated` IS overwritten by auto-fill (ADR-006 — last-touch semantics)."""
+    root = _harness_root(tmp_path)
+    _write_harness_yaml(root, _enabled_config(root))
+    user_updated = "2020-01-01T00:00:00Z"
+    fm = _minimal_fm("decision")
+    fm["updated"] = user_updated
+    result = write_note(
+        root,
+        "Projects/harness-maker/Decisions/updated-bump.md",
+        fm,
+        "Body\n",
+    )
+    on_disk_fm, _ = parse_frontmatter(result.path.read_text(encoding="utf-8"))
+    assert on_disk_fm["updated"] != user_updated
+    assert _ISO_UTC_RE.match(on_disk_fm["updated"])
+
+
+def test_write_note_preserves_on_disk_created_on_rewrite(tmp_path: Path) -> None:
+    """Second write_note with no `created` in fm must preserve on-disk created (ADR-008).
+
+    Without this, calling write_note twice with minimal fm would install a NEW
+    `created` on the second call — silently losing the first-write history.
+    """
+    root = _harness_root(tmp_path)
+    _write_harness_yaml(root, _enabled_config(root))
+    rel = "Projects/harness-maker/Decisions/rewrite.md"
+
+    # First write — auto-fill installs created.
+    r1 = write_note(root, rel, _minimal_fm("decision"), "Body 1\n")
+    fm1, _ = parse_frontmatter(r1.path.read_text(encoding="utf-8"))
+    first_created = fm1["created"]
+    assert _ISO_UTC_RE.match(first_created)
+
+    # Sleep so a fresh now() would differ.
+    time.sleep(1.0)
+
+    # Second write — fm has no `created`. ADR-008 says the on-disk value wins.
+    write_note(root, rel, _minimal_fm("decision"), "Body 2\n")
+    fm2, _ = parse_frontmatter(r1.path.read_text(encoding="utf-8"))
+    assert fm2["created"] == first_created, (
+        f"created drifted across rewrite: {fm2['created']!r} vs {first_created!r}"
+    )
+
+
+def test_write_note_does_not_mutate_caller_dict(tmp_path: Path) -> None:
+    """_autofill_timestamps must not mutate the caller's frontmatter dict (ADR-010).
+
+    Slash-command templates and Python callers reuse a fm dict across multiple
+    write_note calls. In-place mutation would lock `created` to the first call's
+    timestamp for all subsequent notes from the same template.
+    """
+    root = _harness_root(tmp_path)
+    _write_harness_yaml(root, _enabled_config(root))
+    template_fm = _minimal_fm("decision")
+    write_note(
+        root,
+        "Projects/harness-maker/Decisions/no-mutation.md",
+        template_fm,
+        "Body\n",
+    )
+    assert "created" not in template_fm, f"caller dict mutated: {template_fm}"
+    assert "updated" not in template_fm, f"caller dict mutated: {template_fm}"
+
+
+def test_append_note_bumps_updated_on_disk(tmp_path: Path) -> None:
+    """append_note must bump the on-disk `updated` field (ADR-009 re-serialization).
+
+    Without ADR-009 the local fm mutation was discarded (raw concat write).
+    This test will FAIL pre-fix and pass post-fix.
+    """
+    root = _harness_root(tmp_path)
+    _write_harness_yaml(root, _enabled_config(root))
+    rel = "Projects/harness-maker/Journal/append-bump.md"
+
+    write_note(root, rel, _minimal_fm("journal"), "# Day 1\n")
+    fm_before, _ = parse_frontmatter((root.parent / "vault" / rel).read_text(encoding="utf-8"))
+    updated_before = fm_before["updated"]
+
+    time.sleep(1.0)
+    append_note(root, rel, "\nDay 1.5 entry.\n")
+
+    note_path = root.parent / "vault" / rel
+    fm_after, body_after = parse_frontmatter(note_path.read_text(encoding="utf-8"))
+    assert fm_after["updated"] != updated_before, (
+        f"updated did not bump on append: {fm_after['updated']!r}"
+    )
+    assert _ISO_UTC_RE.match(fm_after["updated"])
+    assert "Day 1.5 entry." in body_after
+
+
+def test_append_note_preserves_existing_created(tmp_path: Path) -> None:
+    """append_note must keep the original `created` while bumping `updated` (ADR-009)."""
+    root = _harness_root(tmp_path)
+    _write_harness_yaml(root, _enabled_config(root))
+    rel = "Projects/harness-maker/Journal/append-keep-created.md"
+
+    write_note(root, rel, _minimal_fm("journal"), "# Initial\n")
+    fm_before, _ = parse_frontmatter((root.parent / "vault" / rel).read_text(encoding="utf-8"))
+    original_created = fm_before["created"]
+
+    time.sleep(1.0)
+    append_note(root, rel, "\nmore body\n")
+
+    fm_after, _ = parse_frontmatter((root.parent / "vault" / rel).read_text(encoding="utf-8"))
+    assert fm_after["created"] == original_created
+
+
+def test_patch_note_bumps_updated_on_disk(tmp_path: Path) -> None:
+    """patch_note must bump the on-disk `updated` field (ADR-009)."""
+    root = _harness_root(tmp_path)
+    _write_harness_yaml(root, _enabled_config(root))
+    rel = "Projects/harness-maker/Journal/patch-bump.md"
+
+    write_note(root, rel, _minimal_fm("journal"), "# Title\noriginal body\n")
+    fm_before, _ = parse_frontmatter((root.parent / "vault" / rel).read_text(encoding="utf-8"))
+    updated_before = fm_before["updated"]
+
+    time.sleep(1.0)
+    patch_note(root, rel, "original", "patched")
+
+    note_path = root.parent / "vault" / rel
+    fm_after, body_after = parse_frontmatter(note_path.read_text(encoding="utf-8"))
+    assert fm_after["updated"] != updated_before, (
+        f"updated did not bump on patch: {fm_after['updated']!r}"
+    )
+    assert "patched" in body_after
+    assert "original" not in body_after
+
+
+def test_patch_note_matches_body_only(tmp_path: Path) -> None:
+    """patch_note must match `old_text` against body only, not frontmatter (ADR-009 corrective).
+
+    Pre-fix patch_note searched the full file text; a substring uniquely in
+    frontmatter would be replaceable, which is undefined behavior. ADR-009
+    restricts matching to the body. This test passes only when patch raises
+    on a match that lives only in frontmatter.
+    """
+    root = _harness_root(tmp_path)
+    _write_harness_yaml(root, _enabled_config(root))
+    rel = "Projects/harness-maker/Journal/body-only.md"
+
+    # Use a tag value that lives ONLY in frontmatter — body has none of it.
+    write_note(root, rel, _minimal_fm("journal"), "# Plain body\nno tag here.\n")
+
+    # `hm/second-brain` lives in frontmatter tags only — must not be patchable.
+    with pytest.raises(SecondBrainError, match="old text not found"):
+        patch_note(root, rel, "hm/second-brain", "replaced")

@@ -87,7 +87,7 @@ harness-maker 는 **triple plugin** — 세 marketplace 모두에 등록 가능:
 - `.agents/skills/<name>/SKILL.md` — 기존 11개 skill 의 Codex 경로 dual-render
 - `.agents/skills/hm-<stage>/SKILL.md` — 7개 atomic stage 용 stage-trigger skill
 
-**Worktree 공유**: `.worktrees/` 단일 디렉토리. Cursor 의 `/worktree` 자체 관리와 같은 위치. cleanup 은 prefix 매치로 자기 것만 (우리 `phase-*`, `autoloop-*`).
+**Worktree 공유**: `.worktrees/` 단일 디렉토리. Cursor 의 `/worktree` 자체 관리와 같은 위치. cleanup 은 prefix 매치로 자기 것만 (`execute-*`, `plan-*`, `phase-*`, `autoloop-*`).
 
 ## 코드 스타일
 - 파일 상단 docstring 1줄 (모듈 목적)
@@ -264,7 +264,7 @@ Integration test 는 `tests/integration/` 에 두고 `pytest.mark.skipif(not os.
 - 정상 종료: `harness.yaml.worktree.cleanup` 따름 (default `on_success`)
 - **autoloop iter / phase blocker 발생 시 강제 cleanup**: `worktree.cleanup_all(force=True)` 호출 → halt 전 모든 `.worktrees/*` 제거 (디스크 누적 방지). 단, `--debug-worktree` 플래그 시 보존.
 - weekly cleanup hook: `/hm:health` (Step 2 external risks) 와 동시 실행되는 별도 함수가 24h 이상 stale worktree 청소.
-- **Cursor 와 공유 시 주의**: prefix 매치로 자기 것만 cleanup (`phase-*`, `autoloop-*`). Cursor 가 만든 worktree (다른 prefix) 는 건드리지 않음.
+- **Cursor 와 공유 시 주의**: prefix 매치로 자기 것만 cleanup (`execute-*`, `plan-*`, `phase-*`, `autoloop-*`). Cursor 가 만든 worktree (다른 prefix) 는 건드리지 않음.
 
 ### Snapshot test 결정성
 Renderer 의 `freeze_time` 인자 적극 활용. snapshot 비교 시 `generated_at` 필드 마스크:
