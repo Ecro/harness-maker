@@ -140,7 +140,7 @@ One source tree, three IDE-native renders, all from a single `harness.yaml`:
 
 Layered on top of the base render:
 
-- **Domain packs** — `--add-domain python` (or `node`, `rust`) grafts stack-specific standards, agents, and skills onto the harness. Custom domains scaffold as stubs.
+- **Domain packs** — `--add-domain python` inlines a stack-specific standards block into the 5 reviewer agents (code, security, performance, concurrency, ux). `python` is the only sample that ships pre-filled; `--add-domain <other>` scaffolds a blank user-side stub at `.claude/agents/_standards/<name>.md` for teams to fill in without forking harness-maker.
 - **Foreign config absorption** — pre-existing Cursor rules, Aider config, Copilot instructions get LLM-translated into `harness.yaml` axes. `@hm:harness:*` inverted markers keep them synced on re-renders.
 - **Sibling repos** — frontend + backend + library share one harness session via relative-path bindings in `harness.yaml`. Cross-machine portable.
 - **Ref folders + Second Brain** — registered project docs + Obsidian vault notes become searchable from any stage.
@@ -355,7 +355,7 @@ Grouped by what they do for your project, not by component.
 - **12+ stack detection.** Python · Node · Rust · Java · Kotlin · Swift · Dart · Ruby · PHP · C# · Elixir · Scala · C/C++ · Zig · Haskell. Framework + package-manager + CI provider parsed from manifests, not keyword-guessed. 24h cache ceiling on manifest mtime.
 - **Confidence-bucketed defaults.** Every detection declares HIGH/MEDIUM/LOW confidence. HIGH → silent default with `# detected:` provenance. MEDIUM → explicit interview prompt. LOW → skipped (you decide). Regression test guards against surprise silent-default changes between minor versions.
 - **Adaptive personalization tier.** `/hm:health` scores three layers (detection→recommendation conversion, override stability, audit cadence) and reports Bronze → Silver → Gold → Platinum tier. Auto-proposes default changes when one axis has been overridden 5+ times. 100% local telemetry; nothing leaves the project.
-- **Domain packs.** `--add-domain python` (or `node`, `rust`) grafts stack-specific standards, agents, and skills. Custom domains scaffold as stubs — teams add their own without forking harness-maker.
+- **Domain packs.** `--add-domain python` inlines stack-specific standards into the 5 reviewer agents. `python` is the only pre-filled sample; other domain names scaffold blank user-side stubs that teams fill in without forking harness-maker.
 - **Single command, no subcommand sprawl.** `/harness-maker:make` is the only entry point. Everything else is a flag (`--audit`, `--add`, `--remove`, `--promote`, `--add-domain`, `--reinterview`, `--update`).
 
 ### 🛡️ Trust — *grade-gated work*
