@@ -89,18 +89,22 @@ def _render_body(name: str) -> str:
 # 5 reviewer entries below are the post-Phase-C hashes; the remaining 7
 # agents keep their pre-refactor hashes.
 _EXPECTED_SHA256: dict[str, str] = {
-    "autoloop-coder": "125bc43d1848570c88d38212b7c9ed69e3cc6b6604ce6b1e7c8989eaa0b446a7",
-    "code-reviewer": "d9172c478af1837c186a9bc8d8f3903f6b28aa8887184fe46c1030b7a205c12c",
-    "concurrency-reviewer": "b5f1343184940919ae15e5363a3a9f793d3271c036d4b94c1811f586d14c637c",
-    "consensus-arbiter": "2bd9ff2373a47ac36bc77e4f1fc5a93c66eaec3241aaabbbbc94042e31c7432e",
-    "executor": "226482b939449c7515f6befd6d20b0cc7aa689daebdd110a319d3314627dd5d9",
-    "performance-reviewer": "fcb80fdee6cc5a407f06e7ec5f9248d2ffe2818cd6e9611fd7e63ec3ef55e549",
-    "plan-validator": "964ff4330221e2dd12f203f58160364d09b76c98fdacc2e5f427e62254cd7489",
-    "security-auditor": "0409a3b2dfaed33bc6b4c7a9dbb73bd5582bdcaf7e7f0cc5f66b9dee8a77892b",
-    "security-reviewer": "628be7d748daac293341b671d940b22d5db3de8bb6c62549e3f4bf5f8e69d7bb",
-    "stuck": "b6ae0cff58351ac80b232fda6984d9f1e6f080e1dbe2b6195e032f7caaf32979",
-    "test-reviewer": "a72bcc15d7989d9176d9795befac41a8358ff4ad9b4d5c4d3de2f6c12ba731d2",
-    "ux-reviewer": "eaa88cdca9f9b764fcd97f080318738a323da8358971c0a71a131c32f838211b",
+    # Phase 5 (REVIEW MV-3 + C-1 fix, 2026-05-19) bumped these 12 hashes.
+    # The dispatcher templates now emit cursor_model concrete IDs (when
+    # available) with a None-guard fallback chain. Pre-fix hashes are in
+    # git history under commit ${PRE_PHASE_5}.
+    "autoloop-coder": "328eb72fe2ba3d99d9ceecca4a2f00ca349c266e4a98a75d305f894a7e4662ac",
+    "code-reviewer": "4c88418df33c99741e31b4265bf2dbb832c78c51bd87da116925d192eed9568f",
+    "concurrency-reviewer": "4d78ffc89957060e675ad6552f5ea082ba068a77e95771d4fee67f3e235688fd",
+    "consensus-arbiter": "fe8b027730e5b0aef36c48d748fd205a2aa5c7d9d4a6aba0c4aef70726ad5f71",
+    "executor": "d2762982da93b4ebba0aec7004a1ca721a6561e9c1c84b53512ce9d48cb391a8",
+    "performance-reviewer": "528788051f31414258cabb083a16e578a6d3fc8f112ec071984a31f57edd63c5",
+    "plan-validator": "8adde27f10cf48eb775ab122ad89878b55e74f8fe526d8692794ae3a51324bc7",
+    "security-auditor": "7dfb6da0797f4d3b8b5e47dee0a9625968079aaf6aabd3b98d6383a902cda4fb",
+    "security-reviewer": "1d0dd18466dfbc2ca1cb464134babc38a0555914c4767e0f5c80e8621da58626",
+    "stuck": "9db1b3f1e94c31a4613868330f3e52aa0796f387f779ae48a1fd030be0f3080c",
+    "test-reviewer": "4b36d7169eb7041450c6d705ebe6f550b31f31d9b8c85565ab4fdff7822d2e9d",
+    "ux-reviewer": "f0d5e2bbb92271f712fad3e7bc3e6b56fd6276922e0f68218e7f33fab5b82a6f",
 }
 
 

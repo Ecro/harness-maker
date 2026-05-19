@@ -322,7 +322,14 @@ def _codex_agent_files(
                     "model_codex": None,
                     "codex_reasoning_effort": (spec.codex.reasoning_effort if spec.codex else None),
                     "reviewer_kind": _REVIEWER_KIND.get(n, ""),
-                    "communication_variant": _COMMUNICATION_VARIANT[n],
+                    # REVIEW Phase 5 CP-2: defensive .get() fallback. If a
+                    # future agent is added to _ALL_AGENTS without a matching
+                    # _COMMUNICATION_VARIANT entry, render falls back to
+                    # "full" (the safest universal default) rather than
+                    # KeyError-ing at user render time. The structural test
+                    # `test_cp2_all_agents_subset_of_communication_variant`
+                    # catches the omission at test time.
+                    "communication_variant": _COMMUNICATION_VARIANT.get(n, "full"),
                 },
             )
         )

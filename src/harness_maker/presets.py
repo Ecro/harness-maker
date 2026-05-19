@@ -64,7 +64,9 @@ def _spec(claude_alias: str, effort: _Effort) -> AgentModelSpec:
 
 
 # Production: reasoning agents get opus + high effort; reviewers get sonnet +
-# medium; trajectory-monitor (lightweight observability) gets sonnet + low.
+# medium. (REVIEW Phase 5 CP-1: trajectory-monitor removed — agent is dormant,
+# not in `synthesize._ALL_AGENTS` / `_ALL_SKILLS` / `_COMMUNICATION_VARIANT`.
+# Reactivate by adding to those tables AND restoring the entry here.)
 _PRODUCTION_MAP: dict[str, AgentModelSpec] = {
     # Reasoning-heavy
     "autoloop-coder": _spec("opus", "high"),
@@ -81,13 +83,11 @@ _PRODUCTION_MAP: dict[str, AgentModelSpec] = {
     "security-reviewer": _spec("sonnet", "medium"),
     "test-reviewer": _spec("sonnet", "medium"),
     "ux-reviewer": _spec("sonnet", "medium"),
-    # Observability (lightweight)
-    "trajectory-monitor": _spec("sonnet", "low"),
 }
 
 
 # Side: everything downshifted to sonnet; reasoning agents stay at medium effort,
-# reviewers drop to low, trajectory-monitor drops to minimal.
+# reviewers drop to low. (CP-1: trajectory-monitor removed — see _PRODUCTION_MAP comment.)
 _SIDE_MAP: dict[str, AgentModelSpec] = {
     # Reasoning agents (still need decent quality even in Side)
     "autoloop-coder": _spec("sonnet", "medium"),
@@ -104,8 +104,6 @@ _SIDE_MAP: dict[str, AgentModelSpec] = {
     "security-reviewer": _spec("sonnet", "low"),
     "test-reviewer": _spec("sonnet", "low"),
     "ux-reviewer": _spec("sonnet", "low"),
-    # Observability — cheapest path
-    "trajectory-monitor": _spec("sonnet", "minimal"),
 }
 
 

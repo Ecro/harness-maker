@@ -26,6 +26,7 @@ from pydantic import ValidationError
 
 from harness_maker.io_utils import denormalize_home_to_tilde, load_harness_yaml
 from harness_maker.models import (
+    _MODEL_ID_PATTERN,
     AgentModelSpec,
     AtomicStage,
     CodexAgentSpec,
@@ -764,20 +765,49 @@ def answers_from_harness_yaml(yaml_path: Path) -> InterviewAnswers | None:
     # to prevent log forging via crafted YAML values.
     # Review code-reviewer P1 fix: include yaml_path so users can identify
     # which file triggered the advisory across multi-repo sessions.
+    # Review Phase 5 MV-1/MV-2 fix: Pydantic v2 `model_copy(update=...)` at
+    # the bottom of this function bypasses `_validate_default_model_chars`.
+    # Validate against the charset regex BEFORE assignment so the validator's
+    # protection actually applies to the harness.yaml load path. On rejection
+    # log a WARNING and fall through to the HarnessConfig default — never
+    # propagate a malicious value into rendered frontmatter.
     raw_default_model = data.get("default_model")
     raw_recommended_model = data.get("recommended_model")
     if isinstance(raw_default_model, str) and raw_default_model.strip():
-        update["default_model"] = raw_default_model.strip()
+        cleaned = raw_default_model.strip()
+        if _MODEL_ID_PATTERN.fullmatch(cleaned):
+            update["default_model"] = cleaned
+        else:
+            safe_value = cleaned.replace("\n", "\\n").replace("\x1b", "\\x1b")
+            logger.warning(
+                "harness.yaml %s: `default_model: %s` rejected — value contains "
+                "characters outside [a-zA-Z0-9_.:-]+ (newline / hash / quote / "
+                "etc.). Falling back to harness default to prevent YAML "
+                "injection into rendered agent frontmatter.",
+                str(yaml_path),
+                safe_value,
+            )
     elif isinstance(raw_recommended_model, str) and raw_recommended_model.strip():
         cleaned = raw_recommended_model.strip()
-        update["default_model"] = cleaned
-        if schema_version < 2:
+        if _MODEL_ID_PATTERN.fullmatch(cleaned):
+            update["default_model"] = cleaned
+            if schema_version < 2:
+                safe_value = cleaned.replace("\n", "\\n").replace("\x1b", "\\x1b")
+                logger.info(
+                    "harness.yaml %s: deprecated `recommended_model: %s` migrated "
+                    "to `default_model` (schema v1 → v2). Preset defaults will "
+                    "apply per-agent unless `agent_models:` overrides are set. "
+                    "See docs/HOW-IT-WORKS.md > Agent Models.",
+                    str(yaml_path),
+                    safe_value,
+                )
+        else:
             safe_value = cleaned.replace("\n", "\\n").replace("\x1b", "\\x1b")
-            logger.info(
-                "harness.yaml %s: deprecated `recommended_model: %s` migrated "
-                "to `default_model` (schema v1 → v2). Preset defaults will "
-                "apply per-agent unless `agent_models:` overrides are set. "
-                "See docs/HOW-IT-WORKS.md > Agent Models.",
+            logger.warning(
+                "harness.yaml %s: deprecated `recommended_model: %s` rejected — "
+                "value contains characters outside [a-zA-Z0-9_.:-]+. Falling "
+                "back to harness default to prevent YAML injection into rendered "
+                "agent frontmatter.",
                 str(yaml_path),
                 safe_value,
             )

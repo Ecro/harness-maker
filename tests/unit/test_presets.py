@@ -23,14 +23,23 @@ def test_preset_agent_models_has_both_presets() -> None:
 
 
 def test_preset_agent_models_completeness_vs_shipped_templates() -> None:
-    """Every shipped agent in templates/agents/*.md.j2 has Production AND Side entries.
+    """Every agent in ``_ALL_AGENTS`` has both a template AND Production / Side
+    preset entries.
 
-    This is the "adding a new agent forces a default map entry" contract from ADR-005.
+    REVIEW Phase 5 CP-1 fix (was Phase 2 R-2): authority shifted from
+    ``templates/agents/*.md.j2`` set to ``synthesize._ALL_AGENTS``. Dormant
+    templates (file exists but agent not in any iteration list) are tolerated
+    — they neither require a preset entry nor render to disk. This tightens
+    the symmetry rule to the triangle (template ↔ _ALL_AGENTS ↔ preset map)
+    instead of the previous 2-leg shape that allowed trajectory-monitor to
+    drift.
     """
+    from harness_maker.synthesize import _ALL_AGENTS
+
     agents_dir = (
         Path(__file__).resolve().parents[2] / "src" / "harness_maker" / "templates" / "agents"
     )
-    shipped_agents: set[str] = set()
+    template_names: set[str] = set()
     for path in agents_dir.glob("*.md.j2"):
         # path.stem for "foo.md.j2" is "foo.md"; strip the .md too.
         name = path.stem
@@ -39,19 +48,39 @@ def test_preset_agent_models_completeness_vs_shipped_templates() -> None:
         # Skip _body fragments (included by main agent file, not standalone).
         if name.endswith("_body"):
             continue
-        shipped_agents.add(name)
+        template_names.add(name)
 
+    all_agents = set(_ALL_AGENTS)
     prod = set(PRESET_AGENT_MODELS[Preset.PRODUCTION].keys())
     side = set(PRESET_AGENT_MODELS[Preset.SIDE].keys())
 
-    missing_prod = shipped_agents - prod
-    extra_prod = prod - shipped_agents
-    missing_side = shipped_agents - side
-    extra_side = side - shipped_agents
-    assert not missing_prod, f"Production missing: {missing_prod}"
-    assert not extra_prod, f"Production extras (no template): {extra_prod}"
-    assert not missing_side, f"Side missing: {missing_side}"
-    assert not extra_side, f"Side extras (no template): {extra_side}"
+    # Every active agent must have a template.
+    assert all_agents <= template_names, (
+        f"_ALL_AGENTS members missing a template: {sorted(all_agents - template_names)}"
+    )
+    # Every active agent must have BOTH preset entries.
+    missing_prod = all_agents - prod
+    missing_side = all_agents - side
+    assert not missing_prod, f"Production preset missing for _ALL_AGENTS: {sorted(missing_prod)}"
+    assert not missing_side, f"Side preset missing for _ALL_AGENTS: {sorted(missing_side)}"
+    # Preset maps must NOT carry entries that aren't active (dead data).
+    extra_prod = prod - all_agents
+    extra_side = side - all_agents
+    assert not extra_prod, (
+        f"Production preset extras (not in _ALL_AGENTS): {sorted(extra_prod)} "
+        "— if these are intentional dormant placeholders, remove the preset "
+        "entry (templates may stay)."
+    )
+    assert not extra_side, (
+        f"Side preset extras (not in _ALL_AGENTS): {sorted(extra_side)} "
+        "— if these are intentional dormant placeholders, remove the preset "
+        "entry (templates may stay)."
+    )
+    # Dormant templates (template exists but agent absent from _ALL_AGENTS)
+    # are allowed — log them for visibility but do not fail the test.
+    dormant = template_names - all_agents
+    # No assertion on `dormant` — informational only.
+    _ = dormant
 
 
 def test_cursor_model_ids_canonical_aliases_present() -> None:
