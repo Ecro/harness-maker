@@ -12,9 +12,9 @@
 
 [English](https://github.com/Ecro/harness-maker/blob/main/README.md) · **한국어**
 
-> **내 프로젝트를 아는 하네스 — 그 모양을 끝까지 지킵니다.**
+> **프로젝트마다 다른 하네스 — 당신 프로젝트로부터 빚어지고, 절대 generic 하지 않습니다.**
 
-인터뷰로 빚어진다. 등급으로 게이트된다. 스스로 진화한다. 모든 IDE에서 동작한다.
+**프로젝트별 개인화** · 등급 게이트 · 자가 진화 · 멀티 IDE
 
 [왜?](#왜-harness-maker) ·
 [어떻게 맞춰지나](#어떻게-내-프로젝트에-맞춰지나) ·
@@ -31,7 +31,7 @@
 
 ## 30초 만에 시도하기
 
-Claude Code · Cursor · Codex CLI 중 하나의 AI 에이전트에 아래 프롬프트를 붙여넣으세요. IDE를 자동 감지하고, 매칭되는 플러그인을 Bash로 설치한 뒤, 인터뷰를 진행하고 personalization tier 리포트까지 출력합니다.
+Claude Code · Cursor · Codex CLI 중 하나의 AI 에이전트에 아래 프롬프트를 붙여넣으세요. **프로파일러가 12개 이상의 스택 신호를 읽고 10차원 인터뷰가 당신 프로젝트 전용 하네스를 합성합니다** — generic 템플릿이 아닙니다. IDE를 자동 감지하고, 매칭되는 플러그인을 Bash로 설치한 뒤, 인터뷰를 진행하고 personalization tier 리포트까지 출력합니다.
 
 ```
 Install harness-maker for this project and bootstrap the harness end-to-end.

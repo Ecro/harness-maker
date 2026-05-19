@@ -12,9 +12,9 @@
 
 **English** · [한국어](https://github.com/Ecro/harness-maker/blob/main/README.ko.md)
 
-> **A harness that knows your project — and stays that way.**
+> **A different harness for every project — built from yours, never generic.**
 
-Interview-shaped. Grade-gated. Self-evolving. Multi-IDE.
+**Per-project personalization** · Grade-gated · Self-evolving · Multi-IDE
 
 [Why](#why-harness-maker) ·
 [How it fits](#how-it-fits-your-project) ·
@@ -34,7 +34,7 @@ Interview-shaped. Grade-gated. Self-evolving. Multi-IDE.
 
 ## Try in 30 seconds
 
-Paste this into Claude Code, Cursor, or Codex CLI. It auto-detects your IDE, installs the matching plugin via Bash (no slash-command typing), runs the interview, and prints a personalization-tier report.
+Paste this into Claude Code, Cursor, or Codex CLI. **A profiler reads 12+ stack signals + a 10-dimension interview synthesizes a harness specific to YOUR project** — not a generic template. It auto-detects your IDE, installs the matching plugin via Bash (no slash-command typing), runs the interview, and prints a personalization-tier report.
 
 ```
 Install harness-maker for this project and bootstrap the harness end-to-end.
