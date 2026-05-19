@@ -52,11 +52,7 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Dependency Review
-        # TODO(maintainer): replace `@v4` with a SHA pin before merging.
-        # Look up the latest v4 SHA at https://github.com/actions/dependency-review-action/releases
-        # and update Dependabot config to track it. Tag form is used here only because
-        # the executing LLM cannot verify SHAs without network access at write time.
-        uses: actions/dependency-review-action@v4
+        uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4.9.0
         with:
           fail-on-severity: high
           comment-summary-in-pr: on-failure
