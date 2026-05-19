@@ -88,8 +88,7 @@ def test_meta_module_has_boundary_negative(module_name: str) -> None:
         proc.stdout,
     )
     assert count_match is not None, (
-        f"could not parse collection count for {module_name} from pytest stdout:\n"
-        f"{proc.stdout}"
+        f"could not parse collection count for {module_name} from pytest stdout:\n{proc.stdout}"
     )
     collected = int(count_match.group(1))
     assert collected >= 1, (
@@ -117,9 +116,7 @@ def test_meta_claude_md_runbook_references_boundary_suite() -> None:
         text,
         re.MULTILINE | re.DOTALL,
     )
-    assert section_match is not None, (
-        "Could not locate '## 릴리스 절차' section in CLAUDE.md"
-    )
+    assert section_match is not None, "Could not locate '## 릴리스 절차' section in CLAUDE.md"
     section_body = section_match.group("body")
     assert "tests/integration/test_boundary" in section_body, (
         "릴리스 절차 section does not reference the boundary-parse test "

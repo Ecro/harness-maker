@@ -60,50 +60,56 @@ class BoundaryParseError(ValueError):
 
 # Claude Code's documented PascalCase event keys. Extending this set is a
 # deliberate change — bump it when Claude Code adds an event we render.
-_CLAUDE_EVENTS: frozenset[str] = frozenset({
-    "PreToolUse",
-    "PostToolUse",
-    "Stop",
-    "PreCompact",
-    "SessionStart",
-    "SessionEnd",
-    "Notification",
-    "SubagentStop",
-    "UserPromptSubmit",
-    "PermissionRequest",
-})
+_CLAUDE_EVENTS: frozenset[str] = frozenset(
+    {
+        "PreToolUse",
+        "PostToolUse",
+        "Stop",
+        "PreCompact",
+        "SessionStart",
+        "SessionEnd",
+        "Notification",
+        "SubagentStop",
+        "UserPromptSubmit",
+        "PermissionRequest",
+    }
+)
 
 # Cursor's documented lowercase camelCase event keys. Mirrors the Claude
 # set in terminology but lowercase per Cursor's documented schema; see
 # kairos 0.5.7 forensic (CLAUDE.md §"Hook schema diverges by design").
-_CURSOR_EVENTS: frozenset[str] = frozenset({
-    "preToolUse",
-    "postToolUse",
-    "stop",
-    "preCompact",
-    "sessionStart",
-    "sessionEnd",
-    "notification",
-    "subagentStop",
-    "userPromptSubmit",
-})
+_CURSOR_EVENTS: frozenset[str] = frozenset(
+    {
+        "preToolUse",
+        "postToolUse",
+        "stop",
+        "preCompact",
+        "sessionStart",
+        "sessionEnd",
+        "notification",
+        "subagentStop",
+        "userPromptSubmit",
+    }
+)
 
 # Codex's documented PascalCase event keys (ADR-004/006 in
 # PLAN-codex-target-support). Shares Claude's PascalCase + nested-hooks
 # shape but: adds ``PermissionRequest`` (Codex-exclusive), and Codex does
 # NOT support ``PreCompact`` (Stop is used instead — flush_session is
 # wired to Stop in the template).
-_CODEX_EVENTS: frozenset[str] = frozenset({
-    "PreToolUse",
-    "PostToolUse",
-    "Stop",
-    "SessionStart",
-    "SessionEnd",
-    "Notification",
-    "SubagentStop",
-    "UserPromptSubmit",
-    "PermissionRequest",
-})
+_CODEX_EVENTS: frozenset[str] = frozenset(
+    {
+        "PreToolUse",
+        "PostToolUse",
+        "Stop",
+        "SessionStart",
+        "SessionEnd",
+        "Notification",
+        "SubagentStop",
+        "UserPromptSubmit",
+        "PermissionRequest",
+    }
+)
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -155,21 +161,15 @@ def parse_claude_hooks_json(text: str) -> dict[str, Any]:
                     f"(Cursor schema). Claude requires nested 'hooks: [...]'."
                 )
             if "hooks" not in entry:
-                raise BoundaryParseError(
-                    f"event {event_name!r} entry missing nested 'hooks' list"
-                )
+                raise BoundaryParseError(f"event {event_name!r} entry missing nested 'hooks' list")
             inner = entry["hooks"]
             if not isinstance(inner, list):
-                raise BoundaryParseError(
-                    f"event {event_name!r} entry's 'hooks' must be a list"
-                )
+                raise BoundaryParseError(f"event {event_name!r} entry's 'hooks' must be a list")
             for h in inner:
                 if not isinstance(h, dict):
                     raise BoundaryParseError("inner hook entry must be an object")
                 if "type" not in h or "command" not in h:
-                    raise BoundaryParseError(
-                        "inner hook entry requires 'type' and 'command' keys"
-                    )
+                    raise BoundaryParseError("inner hook entry requires 'type' and 'command' keys")
     return parsed
 
 
@@ -189,9 +189,7 @@ def parse_cursor_hooks_json(text: str) -> dict[str, Any]:
         raise BoundaryParseError("top level must be a JSON object")
 
     if parsed.get("version") != 1:
-        raise BoundaryParseError(
-            "Cursor hooks file must declare 'version: 1' at top level"
-        )
+        raise BoundaryParseError("Cursor hooks file must declare 'version: 1' at top level")
 
     hooks = parsed.get("hooks")
     if not isinstance(hooks, dict):
@@ -214,9 +212,7 @@ def parse_cursor_hooks_json(text: str) -> dict[str, Any]:
                     f"(Claude schema). Cursor requires a flat 'command' field."
                 )
             if "command" not in entry:
-                raise BoundaryParseError(
-                    f"event {event_name!r} entry missing flat 'command' field"
-                )
+                raise BoundaryParseError(f"event {event_name!r} entry missing flat 'command' field")
     return parsed
 
 
@@ -258,9 +254,7 @@ def parse_codex_hooks_json(text: str) -> dict[str, Any]:
                     f"Codex requires nested 'hooks: [...]'."
                 )
             if "hooks" not in entry:
-                raise BoundaryParseError(
-                    f"event {event_name!r} entry missing nested 'hooks' list"
-                )
+                raise BoundaryParseError(f"event {event_name!r} entry missing nested 'hooks' list")
     return parsed
 
 
@@ -301,9 +295,7 @@ def parse_harness_yaml_at(path: Path) -> dict[str, Any]:
         raise BoundaryParseError(f"canonical load_harness_yaml failed: {exc}") from exc
 
     if not isinstance(body, dict):
-        raise BoundaryParseError(
-            f"canonical helper returned {type(body).__name__}, expected dict"
-        )
+        raise BoundaryParseError(f"canonical helper returned {type(body).__name__}, expected dict")
 
     if body.get("generated_by") == "harness-maker":
         raise BoundaryParseError(
@@ -356,11 +348,13 @@ def parse_harness_yaml_at(path: Path) -> dict[str, Any]:
 # version (CLAUDE.md §Targets 정책 — currently min Cursor 2.4).
 # ──────────────────────────────────────────────────────────────────────────
 
-_CURSOR_MDC_FRONTMATTER_KEYS: frozenset[str] = frozenset({
-    "description",
-    "globs",
-    "alwaysApply",
-})
+_CURSOR_MDC_FRONTMATTER_KEYS: frozenset[str] = frozenset(
+    {
+        "description",
+        "globs",
+        "alwaysApply",
+    }
+)
 
 
 def parse_cursor_mdc(text: str) -> dict[str, Any]:
@@ -382,9 +376,7 @@ def parse_cursor_mdc(text: str) -> dict[str, Any]:
     import yaml
 
     if not text.startswith("---\n"):
-        raise BoundaryParseError(
-            ".mdc file must begin with frontmatter marker '---\\n'"
-        )
+        raise BoundaryParseError(".mdc file must begin with frontmatter marker '---\\n'")
 
     # Walk past the opening "---\n" and locate the closing "---" on its own
     # line. Operate on lines so the body cleanly begins at the line after
@@ -400,7 +392,7 @@ def parse_cursor_mdc(text: str) -> dict[str, Any]:
     if close_lineno is None:
         raise BoundaryParseError(".mdc frontmatter has no closing '---' line")
     frontmatter_text = "\n".join(lines[1:close_lineno])
-    body_lines_after = lines[close_lineno + 1:]
+    body_lines_after = lines[close_lineno + 1 :]
 
     # Regression detection: if the first non-empty line after the closing
     # marker is another '---', the renderer produced TWO frontmatter blocks
@@ -426,8 +418,7 @@ def parse_cursor_mdc(text: str) -> dict[str, Any]:
 
     if not isinstance(frontmatter, dict):
         raise BoundaryParseError(
-            f".mdc frontmatter must be a YAML mapping, got "
-            f"{type(frontmatter).__name__}"
+            f".mdc frontmatter must be a YAML mapping, got {type(frontmatter).__name__}"
         )
 
     unknown_keys = set(frontmatter) - _CURSOR_MDC_FRONTMATTER_KEYS
@@ -440,13 +431,11 @@ def parse_cursor_mdc(text: str) -> dict[str, Any]:
 
     if "description" in frontmatter and not isinstance(frontmatter["description"], str):
         raise BoundaryParseError(
-            f"'description' must be str, got "
-            f"{type(frontmatter['description']).__name__}"
+            f"'description' must be str, got {type(frontmatter['description']).__name__}"
         )
     if "alwaysApply" in frontmatter and not isinstance(frontmatter["alwaysApply"], bool):
         raise BoundaryParseError(
-            f"'alwaysApply' must be bool, got "
-            f"{type(frontmatter['alwaysApply']).__name__}"
+            f"'alwaysApply' must be bool, got {type(frontmatter['alwaysApply']).__name__}"
         )
 
     return frontmatter
@@ -479,14 +468,11 @@ def parse_settings_json(text: str) -> dict[str, Any]:
     perms = parsed.get("permissions")
     if perms is not None:
         if not isinstance(perms, dict):
-            raise BoundaryParseError(
-                f"'permissions' must be an object, got {type(perms).__name__}"
-            )
+            raise BoundaryParseError(f"'permissions' must be an object, got {type(perms).__name__}")
         for key in ("allow", "deny", "ask"):
             if key in perms and not isinstance(perms[key], list):
                 raise BoundaryParseError(
-                    f"'permissions.{key}' must be a list, got "
-                    f"{type(perms[key]).__name__}"
+                    f"'permissions.{key}' must be a list, got {type(perms[key]).__name__}"
                 )
     return parsed
 
@@ -616,6 +602,4 @@ def invoke_make_all_targets(project_dir: Path) -> None:
             os.environ["HARNESS_MAKER_FREEZE"] = old_freeze
 
     if result.exit_code != 0:
-        raise RuntimeError(
-            f"harness-maker make failed (exit={result.exit_code}):\n{result.output}"
-        )
+        raise RuntimeError(f"harness-maker make failed (exit={result.exit_code}):\n{result.output}")

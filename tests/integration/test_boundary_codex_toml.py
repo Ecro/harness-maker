@@ -119,10 +119,7 @@ def test_codex_hooks_accepts_permission_request() -> None:
     well-formed PermissionRequest entry. If the allow-list were
     accidentally narrowed, this fires red.
     """
-    good = (
-        '{"hooks": {"PermissionRequest": [{"hooks": '
-        '[{"type": "command", "command": "x"}]}]}}'
-    )
+    good = '{"hooks": {"PermissionRequest": [{"hooks": [{"type": "command", "command": "x"}]}]}}'
     parsed = parse_codex_hooks_json(good)
     assert "PermissionRequest" in parsed["hooks"]
 
@@ -141,7 +138,7 @@ def test_codex_config_dotted_key_injection_rejected() -> None:
     # tomllib happily parses unquoted dotted keys as nested. The parser's
     # job is to detect that the result is *not* the expected flat shape.
     bad_unquoted = (
-        '[features]\nhooks = true\n'
+        "[features]\nhooks = true\n"
         '[profiles.cheap]\nmodel_reasoning_effort = "minimal"\n'
         '[profiles.deep]\nmodel_reasoning_effort = "high"\n'
         # Note: NO quotes around the server name — TOML interprets as hierarchy
@@ -166,7 +163,7 @@ def test_codex_config_accepts_quoted_dotted_server_name() -> None:
     rejection. If the parser's invariant becomes too tight, this fires red.
     """
     good_quoted = (
-        '[features]\nhooks = true\n'
+        "[features]\nhooks = true\n"
         '[profiles.cheap]\nmodel_reasoning_effort = "minimal"\n'
         '[profiles.deep]\nmodel_reasoning_effort = "high"\n'
         '[mcp_servers."example.com"]\ncommand = "x"\n'

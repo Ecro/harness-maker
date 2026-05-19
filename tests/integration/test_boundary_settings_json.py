@@ -61,9 +61,7 @@ def test_rendered_settings_json_permissions_lists_well_formed(
     # `deny` is always seeded with the 4 dangerous patterns; assert
     # explicitly because parse_settings_json only enforces the *type* (list).
     assert isinstance(perms.get("deny"), list), "permissions.deny must be a list"
-    assert perms["deny"], (
-        "permissions.deny must be non-empty with the 4 dangerous patterns"
-    )
+    assert perms["deny"], "permissions.deny must be non-empty with the 4 dangerous patterns"
 
 
 # ──────────────────────────────────────────────────────────────────────────
