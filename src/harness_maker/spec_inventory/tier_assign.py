@@ -48,18 +48,37 @@ class CriticalitySignal:
 
 # Static signal table — module name fragments → criticality booster.
 _USER_FACING_HINTS: tuple[str, ...] = (
-    "render", "interview", "synthesize", "autoloop", "cli", "make",
-    "command", "agent",
+    "render",
+    "interview",
+    "synthesize",
+    "autoloop",
+    "cli",
+    "make",
+    "command",
+    "agent",
 )
 _SECURITY_HINTS: tuple[str, ...] = (
-    "security", "secscan", "permission", "secret", "auth", "hook",
+    "security",
+    "secscan",
+    "permission",
+    "secret",
+    "auth",
+    "hook",
 )
 _REPRODUCIBILITY_HINTS: tuple[str, ...] = (
-    "reconcile", "render", "worktree", "synthesize", "io_utils",
+    "reconcile",
+    "render",
+    "worktree",
+    "synthesize",
+    "io_utils",
 )
 _AI_DEPENDENCY_HINTS: tuple[str, ...] = (
-    "llm_judge", "ai_readiness", "spec_quality", "agent_quality",
-    "inequality_gate", "common_ground",
+    "llm_judge",
+    "ai_readiness",
+    "spec_quality",
+    "agent_quality",
+    "inequality_gate",
+    "common_ground",
 )
 
 

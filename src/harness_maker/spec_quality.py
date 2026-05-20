@@ -286,6 +286,7 @@ def main() -> int:
     if _os.getenv("INTEGRATION"):
         try:
             from harness_maker.llm_judge import AnthropicJudgeClient
+
             judge_client = AnthropicJudgeClient()
         except (ImportError, Exception):  # noqa: BLE001 — degrade silently to heuristic
             judge_client = None

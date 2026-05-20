@@ -80,7 +80,9 @@ def _cmd_generate_all(args: argparse.Namespace) -> int:
     specs_dir = Path(args.specs_dir)
     catalog, inventory = load_catalog_and_inventory(catalog_path, inventory_path)
     counts = write_specs(
-        catalog, inventory, specs_dir,
+        catalog,
+        inventory,
+        specs_dir,
         skip_existing=not args.force,
     )
     sys.stdout.write(

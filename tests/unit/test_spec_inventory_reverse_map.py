@@ -238,7 +238,10 @@ def test_classify_test_normalizes_bad_ac_type() -> None:
         }
     )
     entry = classify_test(
-        test_id="t::f", docstring="", snippet="", judge=judge,
+        test_id="t::f",
+        docstring="",
+        snippet="",
+        judge=judge,
     )
     assert entry.ac_type == "mechanical"
 

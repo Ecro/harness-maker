@@ -59,7 +59,10 @@ def test_validate_mechanical_requires_predicate() -> None:
         verification_tier=1,
         ac=[
             AcceptanceCriterion(
-                id="AC-001", title="t", type="mechanical", test_ids=["t::f"],
+                id="AC-001",
+                title="t",
+                type="mechanical",
+                test_ids=["t::f"],
                 executable_predicate="",  # empty
             )
         ],
@@ -91,7 +94,10 @@ def test_validate_judgment_requires_rubric_id() -> None:
         verification_tier=1,
         ac=[
             AcceptanceCriterion(
-                id="AC-001", title="t", type="judgment", test_ids=["t::f"],
+                id="AC-001",
+                title="t",
+                type="judgment",
+                test_ids=["t::f"],
             )
         ],
     )
@@ -214,14 +220,10 @@ def _write_md_yaml_pair(
     yaml_overrides: dict | None = None,
 ) -> tuple[Path, Path]:
     md_frontmatter = (
-        md_frontmatter
-        if md_frontmatter is not None
-        else {"type": "spec", "tier": 1, "slug": slug}
+        md_frontmatter if md_frontmatter is not None else {"type": "spec", "tier": 1, "slug": slug}
     )
     md_acs = (
-        md_acs
-        if md_acs is not None
-        else [{"id": "AC-001", "title": "render emits content_hash"}]
+        md_acs if md_acs is not None else [{"id": "AC-001", "title": "render emits content_hash"}]
     )
     fm = yaml.safe_dump(md_frontmatter).strip()
     body_lines = []

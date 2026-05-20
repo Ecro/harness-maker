@@ -114,8 +114,9 @@ def refine_spec(
     md_path = specs_dir / f"SPEC-{slug}.md"
     yaml_path = specs_dir / f"SPEC-{slug}.machine.yaml"
     if not (md_path.exists() and yaml_path.exists()):
-        return RefinementResult(slug=slug, refined=False, test_ids_resolved=0,
-                                test_ids_total=0, note="missing files")
+        return RefinementResult(
+            slug=slug, refined=False, test_ids_resolved=0, test_ids_total=0, note="missing files"
+        )
 
     yaml_data = yaml.safe_load(yaml_path.read_text(encoding="utf-8"))
     md_text = md_path.read_text(encoding="utf-8")
@@ -155,17 +156,13 @@ def refine_spec(
         if old_title and old_title in body:
             # Replace the matching md heading line too.
             new_body_lines = [
-                ln.replace(old_title, new_title) if old_title in ln else ln
-                for ln in new_body_lines
+                ln.replace(old_title, new_title) if old_title in ln else ln for ln in new_body_lines
             ]
             body_dirty = True
 
     # 4) Mark status=verified if every AC has either pending_test=true or
     #    test_ids resolved (i.e., no dangling unverified non-pending AC).
-    all_clean = all(
-        (ac.get("pending_test") is True) or bool(ac.get("test_ids"))
-        for ac in ac_list
-    )
+    all_clean = all((ac.get("pending_test") is True) or bool(ac.get("test_ids")) for ac in ac_list)
     if all_clean:
         fm["status"] = "verified-skeleton"
     yaml_data["ac"] = ac_list
@@ -220,9 +217,8 @@ def run_batches(
                 bs.mark_failed(entry.feature_id, note=str(exc)[:200])
             else:
                 if res.refined:
-                    note = (
-                        f"resolved {res.test_ids_resolved}/{res.test_ids_total} test_ids"
-                        + (f"; {res.note}" if res.note else "")
+                    note = f"resolved {res.test_ids_resolved}/{res.test_ids_total} test_ids" + (
+                        f"; {res.note}" if res.note else ""
                     )
                     bs.mark_complete(entry.feature_id, note=note)
                 else:

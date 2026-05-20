@@ -129,11 +129,15 @@ def measure_baseline(
         # Preserve partial stdout/stderr so a partial mutation result still
         # parses into MutationReport — otherwise a slow run produces a 0%
         # score that spuriously fails the gate (REVIEW C-P1-E).
-        partial_stdout = exc.stdout if isinstance(exc.stdout, str) else (
-            exc.stdout.decode("utf-8", errors="replace") if exc.stdout else ""
+        partial_stdout = (
+            exc.stdout
+            if isinstance(exc.stdout, str)
+            else (exc.stdout.decode("utf-8", errors="replace") if exc.stdout else "")
         )
-        partial_stderr = exc.stderr if isinstance(exc.stderr, str) else (
-            exc.stderr.decode("utf-8", errors="replace") if exc.stderr else ""
+        partial_stderr = (
+            exc.stderr
+            if isinstance(exc.stderr, str)
+            else (exc.stderr.decode("utf-8", errors="replace") if exc.stderr else "")
         )
         raw = (
             (partial_stdout or "")
@@ -145,9 +149,7 @@ def measure_baseline(
     return _parse_mutmut_output(raw, tuple(paths_to_mutate), sampled=sampled)
 
 
-_COUNTERS_RE = re.compile(
-    r"(killed|survived|timeout|suspicious|skipped)[:\s]+(\d+)", re.IGNORECASE
-)
+_COUNTERS_RE = re.compile(r"(killed|survived|timeout|suspicious|skipped)[:\s]+(\d+)", re.IGNORECASE)
 
 
 def _parse_mutmut_output(raw: str, paths: tuple[str, ...], *, sampled: bool) -> MutationReport:

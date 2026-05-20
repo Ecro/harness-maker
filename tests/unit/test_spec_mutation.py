@@ -62,8 +62,14 @@ def test_threshold_accepts_pct_or_fraction() -> None:
 
 def test_gate_t3_always_passes() -> None:
     rep = MutationReport(
-        paths=("x.py",), killed=0, survived=10, timeout=0, suspicious=0,
-        skipped=0, sampled=False, raw_output="",
+        paths=("x.py",),
+        killed=0,
+        survived=10,
+        timeout=0,
+        suspicious=0,
+        skipped=0,
+        sampled=False,
+        raw_output="",
     )
     passes, _ = gate(rep, 3, baseline=None)
     assert passes is True
@@ -71,8 +77,14 @@ def test_gate_t3_always_passes() -> None:
 
 def test_gate_score_meets_threshold() -> None:
     rep = MutationReport(
-        paths=("x.py",), killed=85, survived=15, timeout=0, suspicious=0,
-        skipped=0, sampled=False, raw_output="",
+        paths=("x.py",),
+        killed=85,
+        survived=15,
+        timeout=0,
+        suspicious=0,
+        skipped=0,
+        sampled=False,
+        raw_output="",
     )
     passes, reason = gate(rep, 1, baseline=None)
     assert passes is True
@@ -81,8 +93,14 @@ def test_gate_score_meets_threshold() -> None:
 
 def test_gate_score_below_threshold() -> None:
     rep = MutationReport(
-        paths=("x.py",), killed=70, survived=30, timeout=0, suspicious=0,
-        skipped=0, sampled=False, raw_output="",
+        paths=("x.py",),
+        killed=70,
+        survived=30,
+        timeout=0,
+        suspicious=0,
+        skipped=0,
+        sampled=False,
+        raw_output="",
     )
     passes, reason = gate(rep, 1, baseline=None)
     assert passes is False
@@ -90,24 +108,42 @@ def test_gate_score_below_threshold() -> None:
 
 def test_mutation_report_score_zero_for_empty() -> None:
     rep = MutationReport(
-        paths=(), killed=0, survived=0, timeout=0, suspicious=0,
-        skipped=0, sampled=False, raw_output="",
+        paths=(),
+        killed=0,
+        survived=0,
+        timeout=0,
+        suspicious=0,
+        skipped=0,
+        sampled=False,
+        raw_output="",
     )
     assert rep.score == 0.0
 
 
 def test_mutation_report_total_counts() -> None:
     rep = MutationReport(
-        paths=("x.py",), killed=10, survived=5, timeout=2, suspicious=1,
-        skipped=0, sampled=False, raw_output="",
+        paths=("x.py",),
+        killed=10,
+        survived=5,
+        timeout=2,
+        suspicious=1,
+        skipped=0,
+        sampled=False,
+        raw_output="",
     )
     assert rep.total == 18
 
 
 def test_report_to_json_round_trip() -> None:
     rep = MutationReport(
-        paths=("x.py",), killed=85, survived=15, timeout=0, suspicious=0,
-        skipped=0, sampled=False, raw_output="",
+        paths=("x.py",),
+        killed=85,
+        survived=15,
+        timeout=0,
+        suspicious=0,
+        skipped=0,
+        sampled=False,
+        raw_output="",
     )
     blob = report_to_json(rep)
     data = json.loads(blob)
@@ -121,9 +157,7 @@ def test_measure_baseline_no_paths_returns_zero(tmp_path: Path) -> None:
     assert rep.total == 0
 
 
-def test_measure_baseline_mutmut_missing(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_measure_baseline_mutmut_missing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """When mutmut is not installed, wrapper returns a zero-counter report.
 
     REVIEW T-P1-B: prior implementation declared monkeypatch but never used
@@ -139,7 +173,9 @@ def test_measure_baseline_mutmut_missing(
     monkeypatch.setattr(sm.subprocess, "run", _raise_fnf)
 
     rep = measure_baseline(
-        ["src/harness_maker/render.py"], cwd=tmp_path, timeout_seconds=1,
+        ["src/harness_maker/render.py"],
+        cwd=tmp_path,
+        timeout_seconds=1,
     )
     assert isinstance(rep, MutationReport)
     assert rep.killed == 0

@@ -158,9 +158,7 @@ def test_mutation_coverage_set_omitted_for_non_python() -> None:
     Including it as 0 unfairly dragged the overall average for agents/templates
     whose verification path is ADR-009 3-layer (not mutation).
     """
-    machine_yaml = yaml.safe_dump(
-        {"spec_slug": "x", "verification_tier": 3, "ac": []}
-    )
+    machine_yaml = yaml.safe_dump({"spec_slug": "x", "verification_tier": 3, "ac": []})
     result = evaluate_spec(MINIMAL_GOOD_SPEC, machine_yaml=machine_yaml)
     assert "mutation_coverage_set" not in result.scores
     # Other machine dims still present
@@ -203,9 +201,7 @@ def test_non_python_omits_mutation_dim_in_average() -> None:
             "verification_tier": 1,
             "mutation_threshold": None,
             "paths_to_mutate": [],
-            "ac": [
-                {"id": "AC-001", "title": "t", "type": "judgment", "rubric_id": "x"}
-            ],
+            "ac": [{"id": "AC-001", "title": "t", "type": "judgment", "rubric_id": "x"}],
         }
     )
     result = evaluate_spec(MINIMAL_GOOD_SPEC, machine_yaml=machine_yaml)

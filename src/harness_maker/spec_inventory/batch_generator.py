@@ -33,21 +33,54 @@ L1_ASSIGNMENT_RULES: tuple[tuple[tuple[str, ...], str], ...] = (
     (("synthesize", "harness-yaml"), "synthesis"),
     (("interview", "eig", "common-ground", "common_ground", "inequality"), "interview"),
     (("autoloop", "trajectory"), "autoloop"),
-    (("reviewer", "code-reviewer", "security-reviewer", "performance-reviewer",
-      "concurrency-reviewer", "test-reviewer", "ux-reviewer",
-      "consensus-arbiter", "plan-validator", "code-verifier", "executor", "stuck"), "reviewers"),
+    (
+        (
+            "reviewer",
+            "code-reviewer",
+            "security-reviewer",
+            "performance-reviewer",
+            "concurrency-reviewer",
+            "test-reviewer",
+            "ux-reviewer",
+            "consensus-arbiter",
+            "plan-validator",
+            "code-verifier",
+            "executor",
+            "stuck",
+        ),
+        "reviewers",
+    ),
     (("security", "secscan", "permission", "gate"), "security-permissions"),
-    (("observability", "telemetry", "health", "drift", "intent-miss",
-      "coverage-classifier", "dashboard", "verification-cache"), "observability"),
-    (("memory", "episodic", "semantic", "second-brain", "second_brain",
-      "memory-retrieve"), "memory"),
+    (
+        (
+            "observability",
+            "telemetry",
+            "health",
+            "drift",
+            "intent-miss",
+            "coverage-classifier",
+            "dashboard",
+            "verification-cache",
+        ),
+        "observability",
+    ),
+    (
+        ("memory", "episodic", "semantic", "second-brain", "second_brain", "memory-retrieve"),
+        "memory",
+    ),
     (("worktree",), "worktree"),
-    (("plugin", "manifest", "harness-yaml", "harness_yaml", "config",
-      "configure", "cli"), "configuration-manifests"),
-    (("hook", "loop-gate", "loop_gate", "flush", "post-write", "post_write",
-      "sessionstart"), "hooks"),
-    (("template", "tpl-", "claude-md", "claude_md", "codex", "cursor",
-      "settings", "rubric"), "templates"),
+    (
+        ("plugin", "manifest", "harness-yaml", "harness_yaml", "config", "configure", "cli"),
+        "configuration-manifests",
+    ),
+    (
+        ("hook", "loop-gate", "loop_gate", "flush", "post-write", "post_write", "sessionstart"),
+        "hooks",
+    ),
+    (
+        ("template", "tpl-", "claude-md", "claude_md", "codex", "cursor", "settings", "rubric"),
+        "templates",
+    ),
     (("cache", "detection-cache", "detection_cache", "cache-diagnostics"), "caching"),
     (("crawler", "anthropic-blog", "arxiv", "github-releases", "osv"), "crawler"),
     (("agent-",), "reviewers"),  # generic agent fallback
@@ -121,12 +154,9 @@ def _make_ac_for_template(feature: Feature, test_ids: list[str]) -> list[dict[st
             "id": "AC-001",
             "title": "rendered output snapshot-stable (Layer 1)",
             "type": "mechanical",
-            "test_ids": [
-                t for t in test_ids if "snapshot" in t
-            ][:2] or [],
+            "test_ids": [t for t in test_ids if "snapshot" in t][:2] or [],
             "executable_predicate": (
-                f"rendered_bytes('{feature.path}') == "
-                "read_snapshot(matching_snap_path)"
+                f"rendered_bytes('{feature.path}') == read_snapshot(matching_snap_path)"
             ),
             "pending_test": True,
         },
@@ -241,9 +271,7 @@ def render_skeleton_spec(
         ]
     )
     if mutation_threshold is not None:
-        md_lines.append(
-            f"| Mutation gate | ≥ {mutation_threshold}% | T{tier_int} floor (ADR-005)"
-        )
+        md_lines.append(f"| Mutation gate | ≥ {mutation_threshold}% | T{tier_int} floor (ADR-005)")
     md_lines.extend(
         [
             "",
@@ -406,9 +434,7 @@ def write_specs(
     # Pass 1: L2 features.
     for f in catalog.features:
         original_slug = f.id
-        write_slug = (
-            f"{original_slug}-module" if original_slug in l1_slugs else original_slug
-        )
+        write_slug = f"{original_slug}-module" if original_slug in l1_slugs else original_slug
         md_path = specs_dir / f"SPEC-{write_slug}.md"
         yaml_path = specs_dir / f"SPEC-{write_slug}.machine.yaml"
         if skip_existing and md_path.exists() and yaml_path.exists():

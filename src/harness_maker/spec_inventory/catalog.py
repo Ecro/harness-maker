@@ -115,8 +115,7 @@ def build_catalog(
     """Construct an initial Catalog with seed L1 clusters + enumerated L2 features."""
     features = enumerate_features(repo_root)
     clusters = [
-        L1Cluster(slug=slug, title=title, member_feature_ids=[])
-        for slug, title in SEED_L1_CLUSTERS
+        L1Cluster(slug=slug, title=title, member_feature_ids=[]) for slug, title in SEED_L1_CLUSTERS
     ]
     return Catalog(
         generated_at=generated_at or date.today().isoformat(),

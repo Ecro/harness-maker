@@ -47,7 +47,8 @@ def _seed_spec(
         "mutation_threshold": 85 if tier == 1 else 70,
         "last_mutation_run": last_mutation_run,
         "paths_to_mutate": ["x.py"],
-        "ac": ac or [
+        "ac": ac
+        or [
             {
                 "id": "AC-001",
                 "title": "t",
@@ -71,8 +72,16 @@ def test_scan_finds_coverage_gap(tmp_path: Path) -> None:
     _seed_spec(
         specs,
         "x",
-        ac=[{"id": "AC-001", "title": "t", "type": "mechanical",
-             "executable_predicate": "True", "test_ids": [], "pending_test": False}],
+        ac=[
+            {
+                "id": "AC-001",
+                "title": "t",
+                "type": "mechanical",
+                "executable_predicate": "True",
+                "test_ids": [],
+                "pending_test": False,
+            }
+        ],
     )
     report = scan(specs, dev_mode="spec-driven")
     assert "x::AC-001" in report.coverage_gaps
@@ -83,8 +92,16 @@ def test_scan_pending_test_does_not_flag_coverage_gap(tmp_path: Path) -> None:
     _seed_spec(
         specs,
         "x",
-        ac=[{"id": "AC-001", "title": "t", "type": "mechanical",
-             "executable_predicate": "True", "test_ids": [], "pending_test": True}],
+        ac=[
+            {
+                "id": "AC-001",
+                "title": "t",
+                "type": "mechanical",
+                "executable_predicate": "True",
+                "test_ids": [],
+                "pending_test": True,
+            }
+        ],
     )
     report = scan(specs, dev_mode="spec-driven")
     assert report.coverage_gaps == []

@@ -283,9 +283,7 @@ def verify_inventory(json_path: Path) -> dict[str, Any]:
     return {
         "count": len(data),
         "avg_confidence": avg,
-        "passes_gate_a": (
-            len(data) >= GATE_A_MIN_ENTRIES and avg >= GATE_A_MIN_CONFIDENCE
-        ),
+        "passes_gate_a": (len(data) >= GATE_A_MIN_ENTRIES and avg >= GATE_A_MIN_CONFIDENCE),
     }
 
 

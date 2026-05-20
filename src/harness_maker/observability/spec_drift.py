@@ -118,9 +118,8 @@ def scan(specs_dir: Path, *, dev_mode: str = "task-driven") -> SpecDriftReport:
                 report.coverage_gaps.append(f"{machine.spec_slug}::{ac.id}")
             referenced_test_ids.update(ac.test_ids)
         # stale mutations
-        if (
-            machine.mutation_threshold is not None
-            and _is_stale(machine.last_mutation_run, int(machine.verification_tier))
+        if machine.mutation_threshold is not None and _is_stale(
+            machine.last_mutation_run, int(machine.verification_tier)
         ):
             report.stale_mutations.append(machine.spec_slug)
         # OQ overflow (read sibling .md)
