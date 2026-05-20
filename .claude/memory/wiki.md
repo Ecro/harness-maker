@@ -287,3 +287,5 @@ Cross-session contamination at finalize time prevented via transparent stash env
 
 ## [wiki:pattern] interview-mid-round-reframe-pattern | 2026-05-20
 PLAN-worktree-finalize-stash-isolation 의 Round 4 에서 사용자가 abort-style guard 전체를 거부하고 transparent stash isolation 으로 reframe ("어떤 상황에서도 알아서 머지해줘야지. 이걸 abort 해버리면 어떻게 마음 놓고 병렬로 작업을 하겠어"). LLM 의 옵션 framing 이 abort/escape-flag 위주였고 사용자의 parallel-work peace-of-mind 우선순위를 미리 못 잡음 → 4 라운드 진행 후 philosophy 자체가 뒤집힘. 패턴: interview Round 2-3 에서 사용자가 ambiguity 를 깊이 파고들기 시작하면, 미리 framing 의 underlying assumption (e.g. "friction 은 안전의 대가다") 을 surface 해서 사용자 동의 받는 단계 추가. PLAN-deep-interview-question-criteria 의 5-term inequality gate 의 "common-ground" 항목이 이걸 부분적으로 잡지만, **philosophy assumption** 은 slot 단위 검사로는 안 보임. 다음 deep interview 시 Round 1-2 에서 "기본 stance 가 friction-acceptable vs transparent-mandatory 인가" 같은 메타 질문을 명시 라운드로.
+
+<!-- @hm:/user:entries -->
