@@ -37,9 +37,7 @@ def repo(tmp_path: Path) -> Path:
     # Pre-track .gitignore so worktree.create() doesn't auto-create it as an
     # untracked file (which would otherwise appear in `git status --porcelain`
     # and trigger the stash isolation envelope on a "clean" base).
-    (r / ".gitignore").write_text(
-        ".worktrees/\n.claude/.hm-loop-*\n.claude/.hm-finalize-stash-*\n"
-    )
+    (r / ".gitignore").write_text(".worktrees/\n.claude/.hm-loop-*\n.claude/.hm-finalize-stash-*\n")
     _git(["add", "."], cwd=r)
     _git(["commit", "-m", "init"], cwd=r)
     return r

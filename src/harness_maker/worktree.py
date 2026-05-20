@@ -341,9 +341,7 @@ def _stash_base_dirty(base: Path, wt_name: str) -> str | None:
     commit, not its reflog position).
     """
     status = _run(["git", "status", "--porcelain"], cwd=base)
-    user_lines = [
-        line for line in status.stdout.splitlines() if not _is_harness_artifact(line)
-    ]
+    user_lines = [line for line in status.stdout.splitlines() if not _is_harness_artifact(line)]
     if not user_lines:
         return None
     # UUID suffix gives globally-unique stash messages — eliminates the
@@ -361,9 +359,7 @@ def _stash_base_dirty(base: Path, wt_name: str) -> str | None:
     )
     # `--pretty=format:'%H %gs'` prints `<sha> <subject>` per stash entry;
     # subject is the message body without the `On <branch>:` prefix.
-    listing = _run(
-        ["git", "stash", "list", "--pretty=format:%H %gs"], cwd=base
-    )
+    listing = _run(["git", "stash", "list", "--pretty=format:%H %gs"], cwd=base)
     for line in listing.stdout.splitlines():
         # Each line is `<40-char sha> <subject>`. Subject often has the form
         # `On main: <message>`; some git versions include the branch prefix
@@ -376,9 +372,7 @@ def _stash_base_dirty(base: Path, wt_name: str) -> str | None:
         # Match either the bare message or the "On <branch>: <message>" form.
         if subject.endswith(f": {message}") or subject == message:
             return sha
-    raise RuntimeError(
-        f"stash push reported success but no entry matches message {message!r}"
-    )
+    raise RuntimeError(f"stash push reported success but no entry matches message {message!r}")
 
 
 def _classify_pop_failure(error_text: str, base: Path) -> tuple[str, list[Path]]:
@@ -471,9 +465,7 @@ def _restore_base_dirty(base: Path, ref_sha: str) -> tuple[bool, str, list[Path]
     return (True, "", [])
 
 
-def _emit_pop_failure_signal(
-    klass: str, ref_sha: str, files: list[Path], wt_name: str
-) -> None:
+def _emit_pop_failure_signal(klass: str, ref_sha: str, files: list[Path], wt_name: str) -> None:
     """Write the literal stderr block Step 5 LLM matches on (ADR-003).
 
     Recovery hints use ``ref_sha[:8]`` for discoverability via
@@ -481,8 +473,7 @@ def _emit_pop_failure_signal(
     """
     short = ref_sha[:8]
     drop_hint = (
-        f"git stash drop "
-        f"$(git stash list --format='%gd %H' | grep {short} | awk '{{print $1}}')"
+        f"git stash drop $(git stash list --format='%gd %H' | grep {short} | awk '{{print $1}}')"
     )
     if klass == "merge_conflict":
         signal = _POP_CONFLICT_SIGNAL
@@ -490,8 +481,7 @@ def _emit_pop_failure_signal(
     elif klass == "untracked_collision":
         signal = _UNTRACKED_COLLISION_SIGNAL
         recovery = (
-            f"Recover: git checkout {ref_sha} -- <file> "
-            f"(rename first if needed) then {drop_hint}"
+            f"Recover: git checkout {ref_sha} -- <file> (rename first if needed) then {drop_hint}"
         )
     else:
         signal = _POP_UNKNOWN_SIGNAL
@@ -1342,9 +1332,7 @@ def _cli_post_commit_pop(args: list[str]) -> int:
             siblings_field = fields.get("sibling_bases", "")
             if siblings_field:
                 sibling_bases = [
-                    Path(p.strip()).resolve()
-                    for p in siblings_field.split("|")
-                    if p.strip()
+                    Path(p.strip()).resolve() for p in siblings_field.split("|") if p.strip()
                 ]
                 # Containment: each MUST be a real git working tree per
                 # `git rev-parse --git-dir`. `.git/.exists()` accepted a

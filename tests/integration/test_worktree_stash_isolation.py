@@ -87,18 +87,14 @@ def integration_repo(tmp_path: Path) -> Path:
     _git(["config", "user.email", "t@t"], cwd=r)
     _git(["config", "user.name", "t"], cwd=r)
     (r / "README.md").write_text("# repo\n")
-    (r / ".gitignore").write_text(
-        ".worktrees/\n.claude/.hm-loop-*\n.claude/.hm-finalize-stash-*\n"
-    )
+    (r / ".gitignore").write_text(".worktrees/\n.claude/.hm-loop-*\n.claude/.hm-finalize-stash-*\n")
     # Pre-track files that wrapup will later scoped-add.
     (r / ".claude").mkdir()
     (r / ".claude" / "memory").mkdir()
     (r / ".claude" / "memory" / "wiki.md").write_text("# wiki\n")
     (r / ".claude" / "memory" / "failures.md").write_text("# failures\n")
     (r / "work-docs").mkdir()
-    (r / "work-docs" / "PLAN-phase4-integration.md").write_text(
-        "# plan stub\nstatus: planning\n"
-    )
+    (r / "work-docs" / "PLAN-phase4-integration.md").write_text("# plan stub\nstatus: planning\n")
     _git(
         [
             "add",

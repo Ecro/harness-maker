@@ -41,9 +41,7 @@ def repo(tmp_path: Path) -> Path:
     _git(["config", "user.email", "test@example.com"], cwd=r)
     _git(["config", "user.name", "Test"], cwd=r)
     (r / "README.md").write_text("# repo\n")
-    (r / ".gitignore").write_text(
-        ".worktrees/\n.claude/.hm-loop-*\n.claude/.hm-finalize-stash-*\n"
-    )
+    (r / ".gitignore").write_text(".worktrees/\n.claude/.hm-loop-*\n.claude/.hm-finalize-stash-*\n")
     _git(["add", "README.md", ".gitignore"], cwd=r)
     _git(["commit", "-m", "init"], cwd=r)
     return r
@@ -145,9 +143,7 @@ def test_stage_only_writes_ref_file_when_dirty(repo: Path) -> None:
     import re
 
     sha_match = re.search(r"^ref_sha: ([0-9a-f]{40})$", body, re.MULTILINE)
-    assert sha_match is not None, (
-        f"ref_sha line must contain a 40-char hex SHA. body: {body!r}"
-    )
+    assert sha_match is not None, f"ref_sha line must contain a 40-char hex SHA. body: {body!r}"
     assert f"base: {repo.resolve()}" in body, f"base: line missing. body: {body!r}"
     # session_marker must be an absolute path pointing at the primary repo's marker
     expected_marker = repo.resolve() / ".claude" / f".hm-loop-{wt_name}"
@@ -355,8 +351,10 @@ def test_submodule_abort_prevents_stash(repo: Path, monkeypatch: pytest.MonkeyPa
 
     def faked_run(args: list[str], cwd: Path, **kwargs: object) -> object:
         if args[:2] == ["git", "submodule"] and args[2:3] == ["status"]:
+
             class _FakeResult:
                 stdout = "+abc123 mysubmodule (1.0.0-dirty)\n"
+
             return _FakeResult()
         return original_run(args, cwd, **kwargs)  # type: ignore[arg-type]
 
@@ -392,7 +390,8 @@ def test_cleanup_failure_after_squash_preserves_handoff(
     wt_name = wt.name
     # Inject cleanup failure
     monkeypatch.setattr(
-        worktree, "cleanup",
+        worktree,
+        "cleanup",
         lambda *a, **k: (_ for _ in ()).throw(RuntimeError("simulated cleanup fail")),
     )
 
@@ -416,9 +415,7 @@ def test_cleanup_failure_after_squash_preserves_handoff(
 
     # Index must still contain the squash result (feature.py)
     index = _git(["diff", "--cached", "--name-only"], cwd=repo).stdout
-    assert "feature.py" in index, (
-        f"staged squash must persist on cleanup failure. index: {index!r}"
-    )
+    assert "feature.py" in index, f"staged squash must persist on cleanup failure. index: {index!r}"
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -572,9 +569,7 @@ def test_multi_repo_untracked_harness_yaml_still_discoverable(
     # harness.yaml is written AFTER init commit — untracked from git's view
     (primary / ".claude").mkdir()
     rel_sibling = sibling.resolve().relative_to(tmp_path.resolve())
-    (primary / ".claude" / "harness.yaml").write_text(
-        f"sibling_repos:\n  - ../{rel_sibling}\n"
-    )
+    (primary / ".claude" / "harness.yaml").write_text(f"sibling_repos:\n  - ../{rel_sibling}\n")
 
     # Sanity: yaml is untracked
     status = _git(["status", "--porcelain"], cwd=primary).stdout
@@ -632,9 +627,7 @@ def test_validate_stash_ref_fields_edge_cases(tmp_path: Path) -> None:
         "session_marker": str(marker),
         "created_at": "2026-05-20T00:00:00+00:00",
     }
-    assert worktree._validate_stash_ref_fields(valid) is not None, (
-        "baseline valid ref must pass"
-    )
+    assert worktree._validate_stash_ref_fields(valid) is not None, "baseline valid ref must pass"
 
     # Rejection table — each row mutates ONE field, expects None
     reject_cases: list[tuple[str, str, str]] = [
@@ -710,7 +703,7 @@ def test_load_sibling_dirs_rejects_path_traversal(tmp_path: Path) -> None:
         "sibling_repos:\n"
         f"  - ../{real_sibling.name}\n"
         "  - ../../etc/secrets\n"  # adversarial — doesn't exist OR not a git repo
-        "  - /tmp\n"                # absolute non-git path
+        "  - /tmp\n"  # absolute non-git path
     )
 
     resolved = worktree._load_sibling_dirs(yaml_path, primary)
