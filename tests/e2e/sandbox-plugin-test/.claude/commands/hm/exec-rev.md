@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.17.1
+harness_maker_version: 0.19.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: 336c370aa984740289178cacdfcdef9cfd780cc7ffeeeec51959838a88ca3dcf
+content_hash: 109c37ab60b1f723bc8c3303af59608b9e932eee86927c7ff55c36d3e54656d9
 ---
 # /hm:exec-rev
 
@@ -208,6 +208,13 @@ If a PLAN phase blocks (Phase A.5 retry exhausted, Phase D unfixable, or ADR con
 - Do NOT silently change scope.
 
 ### Step 5 — Worktree finalize
+
+Before invoking finalize, run `git status --porcelain` in the **base** repo (parent of `<WT>`'s `.worktrees/`). If non-empty, surface to the user, informationally (no question — finalize proceeds):
+
+> "다음 파일이 base 에 dirty 상태로 있어 finalize 가 자동 stash 후 복원합니다: {file list}
+> **알림:** staged 파일은 unstaged 상태로 복원됩니다 — 필요시 다시 `git add` 하세요."
+
+You **MAY** call `AskUserQuestion` (autoloop exception) **ONLY IF** the literal substring `[finalize] stash-pop conflict` OR `[finalize] untracked-file collision` appears in finalize's stderr. Any other failure: halt with stderr message, do NOT ask.
 
 Pick **exactly one** finalize command. Substitute `<WT>` with the literal absolute path from Step 0.
 

@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.17.1
+harness_maker_version: 0.19.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: stages/spec.md.j2
 provenance: official
-content_hash: b2b66ee573d08ea427f0e8156cd278a7a19cec7250c955696cad56cc1f352273
+content_hash: 0b38f11919eed82f20dd49baf3becef28931a2b924b7cd1612f6b8ad80693d83
 ---
 # Stage: spec
 
@@ -215,9 +215,75 @@ summary: "{≤100 char one-line: what this SPEC is for}"
 7. **❓ Open Questions** — items the user could not resolve in interview. These feed `/hm:plan`'s ADRs. Empty list = SPEC ready for plan.
 8. **🔍 Refinement Decisions** — 1-line per round summarizing what was locked in (or "skipped — task is trivial: {reason}").
 
-### Step 4 — Verify write
+### Step 3.5 — Write SPEC.machine.yaml (ADR-006 dual-file)
 
-After writing, Read the file back and assert:
+Alongside SPEC.md write the machine-readable companion at
+`specs/SPEC-{slug}.machine.yaml`. This carries the
+fields that AI verifiers consume directly (test_ids[], executable_predicate,
+golden_table, rubric_id, mutation_threshold, verification_tier) — values
+the human SPEC.md describes but doesn't structure.
+
+**Required machine.yaml schema (schema_version=1):**
+
+```yaml
+schema_version: 1
+spec_slug: {slug}
+parent_spec: SPEC-{l1-cluster-slug}   # null OR L1 file in same specs/ dir
+verification_tier: 1 | 2 | 3          # T1/T2/T3 per ADR-008
+mutation_threshold: 85 | 70 | null    # Python only; null = ADR-009 3-layer
+mutation_threshold_rationale: "..."
+last_mutation_run: null | "YYYY-MM-DD"
+paths_to_mutate:                       # Python source files; reject `..` or absolute
+  - src/<module>.py
+spec_quality_score: null               # filled by Step 4.5
+spec_quality_score_at: null
+ac:
+  - id: AC-001
+    title: "<matches the ### AC-001 heading in .md within fuzzy ≥ 0.85>"
+    type: mechanical | parametric | judgment    # ADR-003
+    test_ids:
+      - tests/<path>::<fn_name>         # must resolve via `pytest --collect-only`
+    executable_predicate: "<Python expr>"        # mechanical only (else null)
+    golden_table: []                              # parametric only
+    rubric_id: null                               # judgment only
+    pending_test: true                            # false ONLY when test_ids verified
+```
+
+Each AC's heading in SPEC.md must be `### AC-NNN: <title>` (NNN ≥ 3 digits)
+to satisfy `spec_machine.cross_validate` rule 1. The title in `.md` and the
+`title:` field in `.machine.yaml` must be similar within fuzzy ratio 0.85
+(rule 2). At least one of `(test_ids != [])` OR `pending_test=true` per AC.
+
+### Step 4 — Verify write + cross-validate dual-file contract
+
+After writing both files, run:
+
+```bash
+python -m harness_maker.spec_machine validate specs/SPEC-{slug}.machine.yaml
+```
+
+Then the 6-rule cross-validation:
+
+```bash
+python -c "
+from pathlib import Path
+from harness_maker.spec_machine import cross_validate
+errors = cross_validate(Path('specs/SPEC-{slug}.md'),
+                        Path('specs/SPEC-{slug}.machine.yaml'))
+for e in errors: print(e)
+exit(1 if errors else 0)
+"
+```
+
+Cross-validate enforces (ADR-007):
+1. Every `ac.id` in .yaml has a matching `### AC-NNN` heading in .md.
+2. `ac.title` in .yaml ≈ heading title (fuzzy ratio ≥ 0.85).
+3. Every `test_ids[]` entry resolves via `pytest --collect-only` (skipped when `pending_test=true`).
+4. Every `rubric_id` resolves under `.claude/rubrics/` or `templates/rubrics/`.
+5. `verification_tier` matches `tier:` in .md frontmatter.
+6. `parent_spec` resolves to an existing L1 SPEC file.
+
+Plus the legacy .md checks:
 - Starts with `---` frontmatter.
 - `test_framework:` field is non-empty.
 - ≥1 scenario in G-W-T form.
@@ -232,10 +298,16 @@ completeness, testability, unambiguity, consistency, scope_boundary.
 
 ```bash
 jq -n --arg spec "$(cat specs/SPEC-{slug}.md)" \
+      --arg machine "$(cat specs/SPEC-{slug}.machine.yaml)" \
       --arg mode "spec-driven" \
-      '{spec_text: $spec, dev_mode: $mode}' \
+      '{spec_text: $spec, machine_yaml: $machine, dev_mode: $mode}' \
   | python -m harness_maker.spec_quality eval
 ```
+
+The `machine_yaml` field (ADR-006) enables the 3 machine dims —
+`machine_verifiability`, `mutation_coverage_set` (Python only),
+`non_python_intent_alignment` — to be scored. Without it only the 5 narrative
+dims are evaluated and the gate is less informative.
 
 Read the returned JSON `{overall, scores, weak_dimensions, blocked, dev_mode}`.
 

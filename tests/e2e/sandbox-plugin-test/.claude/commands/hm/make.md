@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.17.1
+harness_maker_version: 0.19.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/make.md.j2
 provenance: official
-content_hash: 730db90508c63b53a9197b64bc5d4cad35312a64b130898f7b16d0da90aa9244
+content_hash: 16b00b1643b293fbcda24b9ab51be1a5362bb71c52a2c670357f479d3b935636
 ---
 # /hm:make
 
@@ -26,8 +26,16 @@ Parse `$ARGUMENTS` for flags.
 Silent re-render using existing `.claude/harness.yaml` answers. Picks up
 new template improvements without re-interviewing.
 
+The bash line below discovers the **latest** harness-maker version cached
+under `~/.claude/plugins/cache/` and uses it, falling back to the version
+that rendered this file when discovery fails. Without this self-upgrade
+shim, `/hm:make --update` would re-render with the same pinned version
+forever — `/plugin update` bumps the plugin cache but the rendered
+`make.md` keeps calling the OLD CLI, which re-emits its OLD pin (the
+self-update bootstrap trap fixed in 0.19.1).
+
 ```bash
-!uv run --with /home/noel/harness-maker python -m harness_maker.cli make "$(pwd)" --update
+!HM=$(ls -1d "$HOME"/.claude/plugins/cache/harness-maker*/harness-maker/[0-9]*.[0-9]*.[0-9]* 2>/dev/null | awk -F/ '{print $NF, $0}' | sort -V | tail -1 | cut -d' ' -f2-); uv run --with "${HM:-/home/noel/harness-maker}" python -m harness_maker.cli make "$(pwd)" --update
 ```
 
 After the CLI completes, summarize:
