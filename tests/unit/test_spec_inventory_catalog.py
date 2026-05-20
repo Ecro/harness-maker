@@ -96,7 +96,14 @@ def test_criticality_signal_score_uses_weights() -> None:
 def test_assign_tiers_user_facing_path_yields_t2_or_better() -> None:
     cat = Catalog(
         generated_at="2026-05-20",
-        features=[Feature(id="render", kind="python", path="src/harness_maker/render.py", suggested_tier=3)],
+        features=[
+            Feature(
+                id="render",
+                kind="python",
+                path="src/harness_maker/render.py",
+                suggested_tier=3,
+            )
+        ],
     )
     assign_tiers(cat)
     # render → user_facing + reproducibility hits → score 0.6 → T2
@@ -106,7 +113,14 @@ def test_assign_tiers_user_facing_path_yields_t2_or_better() -> None:
 def test_assign_tiers_helper_module_yields_t3() -> None:
     cat = Catalog(
         generated_at="2026-05-20",
-        features=[Feature(id="unrelated", kind="python", path="src/harness_maker/unrelated.py", suggested_tier=1)],
+        features=[
+            Feature(
+                id="unrelated",
+                kind="python",
+                path="src/harness_maker/unrelated.py",
+                suggested_tier=1,
+            )
+        ],
     )
     assign_tiers(cat)
     assert cat.features[0].suggested_tier == 3
@@ -115,7 +129,14 @@ def test_assign_tiers_helper_module_yields_t3() -> None:
 def test_assign_tiers_security_path() -> None:
     cat = Catalog(
         generated_at="2026-05-20",
-        features=[Feature(id="security-scanner", kind="python", path="src/harness_maker/security_scanner.py", suggested_tier=3)],
+        features=[
+            Feature(
+                id="security-scanner",
+                kind="python",
+                path="src/harness_maker/security_scanner.py",
+                suggested_tier=3,
+            )
+        ],
     )
     assign_tiers(cat)
     assert cat.features[0].suggested_tier in (1, 2)

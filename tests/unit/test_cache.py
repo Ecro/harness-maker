@@ -16,7 +16,6 @@ import pytest
 
 from harness_maker.cache import HttpCache, _cache_base
 
-
 # ---------------------------------------------------------------------------
 # Original smoke tests (kept for backward compat)
 # ---------------------------------------------------------------------------

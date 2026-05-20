@@ -441,9 +441,9 @@ def test_public_surface_includes_judge_protocol_and_gate_constants() -> None:
 
     assert isinstance(_Conformant(), JudgeProtocol)
     assert not isinstance(_NonConformant(), JudgeProtocol)
-    assert AC_TYPES == frozenset({"mechanical", "parametric", "judgment"})
+    assert frozenset({"mechanical", "parametric", "judgment"}) == AC_TYPES
     assert GATE_A_MIN_ENTRIES == 145
-    assert GATE_A_MIN_CONFIDENCE == pytest.approx(0.85)
+    assert pytest.approx(0.85) == GATE_A_MIN_CONFIDENCE
 
 
 # ---------------------------------------------------------------------------

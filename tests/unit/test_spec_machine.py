@@ -213,8 +213,16 @@ def _write_md_yaml_pair(
     md_acs: list[dict] | None = None,
     yaml_overrides: dict | None = None,
 ) -> tuple[Path, Path]:
-    md_frontmatter = md_frontmatter if md_frontmatter is not None else {"type": "spec", "tier": 1, "slug": slug}
-    md_acs = md_acs if md_acs is not None else [{"id": "AC-001", "title": "render emits content_hash"}]
+    md_frontmatter = (
+        md_frontmatter
+        if md_frontmatter is not None
+        else {"type": "spec", "tier": 1, "slug": slug}
+    )
+    md_acs = (
+        md_acs
+        if md_acs is not None
+        else [{"id": "AC-001", "title": "render emits content_hash"}]
+    )
     fm = yaml.safe_dump(md_frontmatter).strip()
     body_lines = []
     for ac in md_acs:

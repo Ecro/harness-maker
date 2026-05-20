@@ -70,9 +70,16 @@ def test_l1_cluster_slug_validator() -> None:
 def test_catalog_round_trip() -> None:
     c = Catalog(
         generated_at="2026-05-20",
-        l1_clusters=[L1Cluster(slug="rendering", title="Render", member_feature_ids=["render"])],
+        l1_clusters=[
+            L1Cluster(slug="rendering", title="Render", member_feature_ids=["render"])
+        ],
         features=[
-            Feature(id="render", kind="python", path="src/harness_maker/render.py", suggested_tier=1)
+            Feature(
+                id="render",
+                kind="python",
+                path="src/harness_maker/render.py",
+                suggested_tier=1,
+            )
         ],
     )
     blob = c.model_dump(mode="json")
