@@ -226,8 +226,12 @@ def render_terminal_summary(plan: ImprovementPlan, *, max_actions: int = 10) -> 
         f"  cache      : {plan.layer_scores['cache']:>3}  (prompt-caching efficiency)",
         "",
     ]
+    footer = _deferred_items_footer(plan)
     if not plan.actions:
-        lines.append("No actions — project looks healthy.")
+        if footer:
+            lines.append(footer)
+        else:
+            lines.append("No actions — project looks healthy.")
         return "\n".join(lines)
 
     lines.append(f"Top {min(max_actions, len(plan.actions))} of {len(plan.actions)} actions:")
@@ -236,7 +240,32 @@ def render_terminal_summary(plan: ImprovementPlan, *, max_actions: int = 10) -> 
         lines.append(f"        → {a.suggestion}")
     if len(plan.actions) > max_actions:
         lines.append(f"  … {len(plan.actions) - max_actions} more (run --verbose for full list)")
+    if footer:
+        lines.append(footer)
     return "\n".join(lines)
+
+
+def _deferred_items_footer(plan: ImprovementPlan) -> str:
+    """One-line note explaining the deferred/demoted items (ADR-004).
+
+    Empty string when neither category is active so callers can branch.
+    """
+    pieces: list[str] = []
+    if plan.deferred_telemetry > 0:
+        pieces.append(
+            f"{plan.deferred_telemetry} telemetry signal(s) auto-populate after ≥ 5 turns"
+        )
+    if plan.demoted_governance > 0:
+        pieces.append(
+            f"{plan.demoted_governance} aspirational governance item(s) demoted to P2"
+        )
+    if not pieces:
+        return ""
+    total = plan.deferred_telemetry + plan.demoted_governance
+    return (
+        f"  … {total} item(s) deferred ({'; '.join(pieces)}). "
+        f"Run /hm:health for full list."
+    )
 
 
 def _format_action_row(a: ActionItem) -> str:

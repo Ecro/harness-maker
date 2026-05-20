@@ -65,23 +65,39 @@ _DANGEROUS_DENY_PATTERNS = [
 # ADR-006: signals that fail on fresh install for reasons /hm:make cannot
 # resolve in a single shot — either because the artefact only appears after
 # real Claude Code use (telemetry) or because it requires user authoring
-# (CI workflow, ADR notes, CONTRIBUTING). Used by Phase 4 integration test
-# allowlist; readiness scoring itself unchanged.
+# (CI workflow, ADR notes, CONTRIBUTING). Used by:
+#   - Phase 4 integration test allowlist (was the ONLY consumer in 0.17.0).
+#   - PLAN-fresh-install-p0-calibration (0.19.2): the user-facing priority
+#     emitter `improvement._extract_layer1_actions` now consults these subsets
+#     to suppress auto-resolve signals while samples < 5 and to override
+#     user-author signals to "P2" regardless of weight.
 #
-# Two sub-categories share the same flat set today:
-#   - auto-resolve via use: metrics_jsonl_present, metrics_has_samples
-#     (samples-based TTL — beyond samples ≥ 5 these surface normally).
-#   - require user authoring: ci_workflow_present, adr_present,
-#     contributing_present (no TTL — surface remains until user creates).
-INTENDED_P0_SIGNALS: frozenset[str] = frozenset(
+# TELEMETRY_AUTO_RESOLVE_SIGNALS:
+#   Samples-based TTL — once `metrics_has_samples.passed` becomes True
+#   (samples ≥ 5) the suppression lifts and these surface normally as P0,
+#   so a real telemetry regression at steady state still alerts.
+#
+# USER_AUTHOR_SIGNALS:
+#   No TTL — these never auto-resolve; emitter demotes them to P2 to surface
+#   them as aspirational items rather than urgent alerts.
+TELEMETRY_AUTO_RESOLVE_SIGNALS: frozenset[str] = frozenset(
     {
         "metrics_jsonl_present",
         "metrics_has_samples",
+    }
+)
+
+USER_AUTHOR_SIGNALS: frozenset[str] = frozenset(
+    {
         "ci_workflow_present",
         "adr_present",
         "contributing_present",
     }
 )
+
+# Backwards-compatible union — preserved for the Phase 4 integration test
+# allowlist and any other consumer that imports the original symbol.
+INTENDED_P0_SIGNALS: frozenset[str] = TELEMETRY_AUTO_RESOLVE_SIGNALS | USER_AUTHOR_SIGNALS
 
 # Dirs to skip when scanning source files
 _SCAN_IGNORE = {"build", "_build", ".git", "node_modules", "__pycache__", ".venv", "target", "dist"}

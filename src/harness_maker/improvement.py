@@ -18,7 +18,11 @@ from pydantic import BaseModel, ConfigDict
 
 from harness_maker.cache_diagnostics import CacheDiagnosis
 from harness_maker.llm_judge import JudgeResult
-from harness_maker.readiness import ReadinessResult
+from harness_maker.readiness import (
+    TELEMETRY_AUTO_RESOLVE_SIGNALS,
+    USER_AUTHOR_SIGNALS,
+    ReadinessResult,
+)
 
 # Layer weighting toward the final composite.
 _LAYER_WEIGHTS: dict[str, float] = {
@@ -53,6 +57,11 @@ class ImprovementPlan(BaseModel):
     composite_score: int  # 0-100
     layer_scores: dict[str, int]
     actions: list[ActionItem]
+    # PLAN-fresh-install-p0-calibration (0.19.2) — counters drive the footer
+    # in `ai_readiness.render_terminal_summary`. Both default to 0 so existing
+    # callers that don't set them get the steady-state (no-footer) behavior.
+    deferred_telemetry: int = 0
+    demoted_governance: int = 0
 
 
 # ── priority assignment ────────────────────────────────────────────────────
@@ -69,8 +78,22 @@ def _layer1_priority(signal_weight: int) -> str:
 # ── action extractors ──────────────────────────────────────────────────────
 
 
-def _extract_layer1_actions(readiness: ReadinessResult) -> list[ActionItem]:
+def _extract_layer1_actions(
+    readiness: ReadinessResult,
+) -> tuple[list[ActionItem], int, int]:
+    """Return (actions, deferred_telemetry_count, demoted_governance_count).
+
+    PLAN-fresh-install-p0-calibration (0.19.2): two-branch policy on
+    INTENDED_P0_SIGNALS — telemetry signals are suppressed entirely while
+    `metrics_has_samples` is failing (samples < 5); governance signals are
+    forced to "P2" regardless of weight so they surface as aspirational
+    rather than urgent. Counters feed the CLI footer (ADR-004).
+    """
+    has_samples = _telemetry_samples_passed(readiness)
+
     out: list[ActionItem] = []
+    deferred_telemetry = 0
+    demoted_governance = 0
     for dim_name, dim in readiness.dimensions.items():
         # governance on Side preset is intentionally skipped (weight 0).
         if dim_name == "governance" and readiness.weights.get("governance", 0) == 0:
@@ -78,9 +101,17 @@ def _extract_layer1_actions(readiness: ReadinessResult) -> list[ActionItem]:
         for sig in dim.signals:
             if sig.passed or sig.action is None:
                 continue
+            if sig.id in TELEMETRY_AUTO_RESOLVE_SIGNALS and not has_samples:
+                deferred_telemetry += 1
+                continue
+            if sig.id in USER_AUTHOR_SIGNALS:
+                priority = "P2"
+                demoted_governance += 1
+            else:
+                priority = _layer1_priority(sig.weight)
             out.append(
                 ActionItem(
-                    priority=_layer1_priority(sig.weight),
+                    priority=priority,
                     dimension=dim_name,
                     target=dim_name,
                     summary=sig.evidence,
@@ -89,7 +120,23 @@ def _extract_layer1_actions(readiness: ReadinessResult) -> list[ActionItem]:
                     source=f"layer1:{sig.id}",
                 )
             )
-    return out
+    return out, deferred_telemetry, demoted_governance
+
+
+def _telemetry_samples_passed(readiness: ReadinessResult) -> bool:
+    """True iff ``metrics_has_samples`` is present and passing (samples ≥ 5).
+
+    Used by `_extract_layer1_actions` to lift telemetry suppression once the
+    project has accrued real telemetry data — at that point genuine telemetry
+    regressions must surface as P0 (steady-state alerting).
+    """
+    obs_dim = readiness.dimensions.get("observability_setup")
+    if obs_dim is None:
+        return False
+    for sig in obs_dim.signals:
+        if sig.id == "metrics_has_samples":
+            return sig.passed
+    return False
 
 
 def _extract_layer2_actions(judge_results: Iterable[JudgeResult]) -> list[ActionItem]:
@@ -184,7 +231,10 @@ def build_improvement_plan(
     composite = _composite(layer_scores)
 
     actions: list[ActionItem] = []
-    actions.extend(_extract_layer1_actions(readiness))
+    layer1_actions, deferred_telemetry, demoted_governance = _extract_layer1_actions(
+        readiness
+    )
+    actions.extend(layer1_actions)
     actions.extend(_extract_layer2_actions(judge_results))
     actions.extend(_extract_layer3_actions(cache_diagnosis))
 
@@ -192,4 +242,6 @@ def build_improvement_plan(
         composite_score=composite,
         layer_scores=layer_scores,
         actions=_sort_actions(actions),
+        deferred_telemetry=deferred_telemetry,
+        demoted_governance=demoted_governance,
     )
