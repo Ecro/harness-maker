@@ -111,7 +111,7 @@ def test_cache_corruption_falls_through_to_fetcher(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_typevar_T_name() -> None:
+def test_typevar_t_name() -> None:  # noqa: N802 — kills mutants targeting TypeVar("T")
     """Kills mutants 1, 2 — TypeVar("T") name / None."""
     from harness_maker.cache import T
 
@@ -154,15 +154,10 @@ def test_get_treats_missing_cached_at_as_ancient(tmp_path: Path) -> None:
     cache = HttpCache("src", base_dir=tmp_path)
     cache._base.mkdir(parents=True, exist_ok=True)
     p = cache._entry_path("k")
-    # Write entry WITHOUT cached_at — get() should treat as ancient (0) → None.
+    # Write entry WITHOUT cached_at — get() treats absence as ancient (0).
     p.write_text(json.dumps({"value": "v"}))
-    # With default=0: time.time() - 0 > ttl → True for any sane ttl → return None
-    # With mutant default=1: same outcome here, BUT the contract is that absence
-    # means "ancient", not "1 second ago"; verify by using very generous ttl.
-    huge_ttl = time.time() + 86400  # ridiculously large; only default=0 ensures expiry
-    # Actually with default=0, time.time() - 0 ≈ now (~1.7e9) > huge_ttl (~1.7e9+86400) is False.
-    # So both 0 and 1 would yield a HIT here. The semantic kill is via behavior on small ttl.
-    assert cache.get("k", ttl=10) is None  # tiny ttl → 0 default gives expired
+    # tiny ttl + default=0 → time.time() - 0 > 10 → True → expired
+    assert cache.get("k", ttl=10) is None
 
 
 def test_get_hit_with_explicit_cached_at(tmp_path: Path) -> None:
