@@ -67,7 +67,7 @@ files:
   body_sha256: bc623a09da3574f8e9423e12e2b0b82d5df6c9db663a6f9511326e31878bd634
 - path: commands/hm/make.md
   template: commands/hm/make.md.j2
-  body_sha256: 730db90508c63b53a9197b64bc5d4cad35312a64b130898f7b16d0da90aa9244
+  body_sha256: 16b00b1643b293fbcda24b9ab51be1a5362bb71c52a2c670357f479d3b935636
 - path: commands/hm/plan.md
   template: commands/hm/atomic_command.md.j2
   body_sha256: ef7bf6fff5599e2f6ffe751aea78c14a0df210b7f3f2bae3cfe217e35f6487a7
