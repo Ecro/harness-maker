@@ -1,0 +1,19 @@
+schema_version: 1
+spec_slug: presets
+parent_spec: SPEC-configuration-manifests
+verification_tier: 3
+mutation_threshold: null
+mutation_threshold_rationale: non-Python (python); uses ADR-009 3-layer verification
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/presets.py
+ac:
+- id: AC-001
+  title: Preset-aware per-agent model defaults + 3-tier render resolution
+  type: mechanical
+  test_ids:
+  - tests/unit/test_presets.py::test_cursor_model_ids_canonical_aliases_present
+  - tests/unit/test_presets.py::test_cursor_model_ids_values_look_like_concrete_ids
+  - tests/unit/test_presets.py::test_normalize_cursor_alias_pass_through_when_concrete
+  executable_predicate: '# placeholder — refine in /hm:spec presets'
+  pending_test: false

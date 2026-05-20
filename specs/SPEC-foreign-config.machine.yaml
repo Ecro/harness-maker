@@ -1,0 +1,19 @@
+schema_version: 1
+spec_slug: foreign-config
+parent_spec: SPEC-interview
+verification_tier: 3
+mutation_threshold: null
+mutation_threshold_rationale: non-Python (python); uses ADR-009 3-layer verification
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/foreign_config.py
+ac:
+- id: AC-001
+  title: Detect + map foreign AI assistant config files (Phase 5 + Phase 6)
+  type: mechanical
+  test_ids:
+  - tests/e2e/test_personalization_dogfood.py::test_foreign_config_detect_returns_list
+  - tests/e2e/test_personalization_external.py::test_foreign_config_detection_on_spec_kit
+  - tests/unit/test_foreign_config.py::test_apply_0_11_x_migration
+  executable_predicate: '# placeholder — refine in /hm:spec foreign-config'
+  pending_test: false

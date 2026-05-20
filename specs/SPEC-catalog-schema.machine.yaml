@@ -1,0 +1,17 @@
+schema_version: 1
+spec_slug: catalog-schema
+parent_spec: SPEC-configuration-manifests
+verification_tier: 3
+mutation_threshold: null
+mutation_threshold_rationale: non-Python (python); uses ADR-009 3-layer verification
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/spec_inventory/catalog_schema.py
+ac:
+- id: AC-001
+  title: Catalog schema (ADR-012) — pydantic models for spec-catalog yaml + SPEC.machine.yaml
+    metadata
+  type: mechanical
+  test_ids: []
+  executable_predicate: '# placeholder — refine in /hm:spec catalog-schema'
+  pending_test: true

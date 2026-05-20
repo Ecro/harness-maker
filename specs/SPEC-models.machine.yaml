@@ -1,0 +1,19 @@
+schema_version: 1
+spec_slug: models
+parent_spec: SPEC-configuration-manifests
+verification_tier: 3
+mutation_threshold: null
+mutation_threshold_rationale: non-Python (python); uses ADR-009 3-layer verification
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/models.py
+ac:
+- id: AC-001
+  title: Pydantic v2 data models for harness-maker (config, blueprint, profile, interview)
+  type: mechanical
+  test_ids:
+  - tests/unit/test_interview_migration_v1_to_v2.py::test_agent_models_malformed_entry_drops_with_warning
+  - tests/unit/test_models.py::test_adaptive_config_defaults
+  - tests/unit/test_models.py::test_adaptive_config_disable_telemetry_override
+  executable_predicate: '# placeholder — refine in /hm:spec models'
+  pending_test: false

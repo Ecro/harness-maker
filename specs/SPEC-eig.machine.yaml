@@ -1,0 +1,19 @@
+schema_version: 1
+spec_slug: eig
+parent_spec: SPEC-interview
+verification_tier: 3
+mutation_threshold: null
+mutation_threshold_rationale: non-Python (python); uses ADR-009 3-layer verification
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/eig.py
+ac:
+- id: AC-001
+  title: EIG (Expected Information Gain) scoring for the 5-term inequality gate
+  type: mechanical
+  test_ids:
+  - tests/e2e/test_personalization_dogfood.py::test_foreign_config_detect_returns_list
+  - tests/e2e/test_personalization_external.py::test_foreign_config_detection_on_spec_kit
+  - tests/integration/test_foreign_map_live.py::test_llm_map_live_for_each_type
+  executable_predicate: '# placeholder — refine in /hm:spec eig'
+  pending_test: false

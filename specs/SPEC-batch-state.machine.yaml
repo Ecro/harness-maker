@@ -1,0 +1,17 @@
+schema_version: 1
+spec_slug: batch-state
+parent_spec: SPEC-configuration-manifests
+verification_tier: 3
+mutation_threshold: null
+mutation_threshold_rationale: non-Python (python); uses ADR-009 3-layer verification
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/spec_inventory/batch_state.py
+ac:
+- id: AC-001
+  title: BatchSpecState — CRUD helper for prompt-driven /hm:loop p5-batch-N (ADR-013
+    R2)
+  type: mechanical
+  test_ids: []
+  executable_predicate: '# placeholder — refine in /hm:spec batch-state'
+  pending_test: true

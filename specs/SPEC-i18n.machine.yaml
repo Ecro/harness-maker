@@ -1,0 +1,19 @@
+schema_version: 1
+spec_slug: i18n
+parent_spec: SPEC-configuration-manifests
+verification_tier: 3
+mutation_threshold: null
+mutation_threshold_rationale: non-Python (python); uses ADR-009 3-layer verification
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/i18n.py
+ac:
+- id: AC-001
+  title: Locale resolution and message lookup; English baseline with silent fallback
+  type: mechanical
+  test_ids:
+  - tests/unit/test_i18n.py::test_resolve_locale_accepts_arbitrary_tag
+  - tests/unit/test_i18n.py::test_resolve_locale_en
+  - tests/unit/test_i18n.py::test_resolve_locale_falls_back_to_en_when_no_yaml
+  executable_predicate: '# placeholder — refine in /hm:spec i18n'
+  pending_test: false

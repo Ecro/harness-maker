@@ -1,0 +1,19 @@
+schema_version: 1
+spec_slug: tool-cascade
+parent_spec: SPEC-configuration-manifests
+verification_tier: 3
+mutation_threshold: null
+mutation_threshold_rationale: non-Python (python); uses ADR-009 3-layer verification
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/tool_cascade.py
+ac:
+- id: AC-001
+  title: Tool cascade firewall — recovery taxonomy for tool failures (Phase 7)
+  type: mechanical
+  test_ids:
+  - tests/unit/test_tool_cascade.py::test_concurrent_append_no_loss
+  - tests/unit/test_tool_cascade.py::test_failure_logged_to_jsonl
+  - tests/unit/test_tool_cascade.py::test_full_cascade_sequence
+  executable_predicate: '# placeholder — refine in /hm:spec tool-cascade'
+  pending_test: false

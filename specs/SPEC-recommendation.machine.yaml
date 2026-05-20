@@ -1,0 +1,19 @@
+schema_version: 1
+spec_slug: recommendation
+parent_spec: SPEC-configuration-manifests
+verification_tier: 3
+mutation_threshold: null
+mutation_threshold_rationale: non-Python (python); uses ADR-009 3-layer verification
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/recommendation.py
+ac:
+- id: AC-001
+  title: Per-axis recommendation registry + confidence-bucketed dispatcher
+  type: mechanical
+  test_ids:
+  - tests/unit/test_dispatch_recommendation.py::test_dispatch_tri_ide_high_returns_same_value
+  - tests/unit/test_dispatch_recommendation.py::test_dispatch_tri_ide_low_returns_none
+  - tests/unit/test_dispatch_recommendation.py::test_dispatch_tri_ide_medium_accept_returns_same_value
+  executable_predicate: '# placeholder — refine in /hm:spec recommendation'
+  pending_test: false

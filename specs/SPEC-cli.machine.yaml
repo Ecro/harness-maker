@@ -1,0 +1,21 @@
+schema_version: 1
+spec_slug: cli
+parent_spec: SPEC-configuration-manifests
+verification_tier: 2
+mutation_threshold: 70
+mutation_threshold_rationale: T2 floor; baseline pending P0.5 measurement
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/cli.py
+ac:
+- id: AC-001
+  title: harness-maker CLI entrypoint
+  type: mechanical
+  test_ids:
+  - tests/integration/test_memory_retrieve_cli.py::test_cli_byte_cap_enforced
+  - tests/integration/test_memory_retrieve_cli.py::test_cli_invocation_does_not_load_anthropic
+  - tests/integration/test_memory_retrieve_cli.py::test_cli_missing_memory_dir_graceful
+  executable_predicate: '# placeholder — refine in /hm:spec cli'
+  pending_test: false
+spec_quality_score: 91
+spec_quality_score_at: '2026-05-20'

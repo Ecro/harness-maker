@@ -1,0 +1,19 @@
+schema_version: 1
+spec_slug: anthropic-blog
+parent_spec: SPEC-crawler
+verification_tier: 3
+mutation_threshold: null
+mutation_threshold_rationale: non-Python (python); uses ADR-009 3-layer verification
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/crawler/anthropic_blog.py
+ac:
+- id: AC-001
+  title: Anthropic news/blog scraper (HTML → CrawlItem)
+  type: mechanical
+  test_ids:
+  - tests/unit/crawler/test_anthropic_blog.py::test_crawl_caps_at_max_items
+  - tests/unit/crawler/test_anthropic_blog.py::test_crawl_returns_empty_list_on_http_error
+  - tests/unit/crawler/test_anthropic_blog.py::test_crawl_returns_items_from_mocked_html
+  executable_predicate: '# placeholder — refine in /hm:spec anthropic-blog'
+  pending_test: false

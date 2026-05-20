@@ -1,0 +1,44 @@
+schema_version: 1
+spec_slug: agent-code-reviewer
+parent_spec: SPEC-reviewers
+verification_tier: 1
+mutation_threshold: null
+mutation_threshold_rationale: non-Python agent — uses ADR-009 3-layer verification
+last_mutation_run: null
+paths_to_mutate: []
+ac:
+- id: AC-001
+  title: rendered output is snapshot-stable
+  type: mechanical
+  test_ids: []
+  executable_predicate: rendered_bytes == read_snapshot('agents/code-reviewer.snap')
+  pending_test: true
+- id: AC-002
+  title: frontmatter parses and denies write tools
+  type: parametric
+  test_ids: []
+  golden_table:
+  - input:
+      field: permissions.deny
+    expected:
+    - Write(*)
+    - Edit(*)
+    - Bash(rm:*)
+    - Bash(python:*)
+    - Bash(sh:*)
+    note: REVIEW-2026-05-08 M7 deny list
+  pending_test: true
+- id: AC-003
+  title: body contains REFRAME Communication Protocol marker
+  type: mechanical
+  test_ids: []
+  executable_predicate: '''<!-- @hm:communication_variant: reframe -->'' in body'
+  pending_test: true
+- id: AC-004
+  title: prompt fulfills SPEC AC (LLM judge)
+  type: judgment
+  test_ids: []
+  rubric_id: agent_prompt
+  pending_test: true
+spec_quality_score: 86
+spec_quality_score_at: '2026-05-20'

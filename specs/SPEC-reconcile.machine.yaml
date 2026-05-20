@@ -1,0 +1,19 @@
+schema_version: 1
+spec_slug: reconcile
+parent_spec: SPEC-rendering
+verification_tier: 3
+mutation_threshold: null
+mutation_threshold_rationale: non-Python (python); uses ADR-009 3-layer verification
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/reconcile.py
+ac:
+- id: AC-001
+  title: Reconciler (Task 3.3) — decide per-file action in brownfield projects
+  type: mechanical
+  test_ids:
+  - tests/e2e/test_dogfood_sandbox.py::test_reconcile_preserves_user_edits
+  - tests/e2e/test_reconcile_orphan_sweep.py::test_orphan_sweep_deletes_three_legacy_commands_preserves_user_assets
+  - tests/unit/test_codex_phase4.py::test_reconcile_agents_md_both_when_new
+  executable_predicate: '# placeholder — refine in /hm:spec reconcile'
+  pending_test: false

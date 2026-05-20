@@ -1,0 +1,16 @@
+schema_version: 1
+spec_slug: worktree-module
+parent_spec: SPEC-worktree
+verification_tier: 3
+mutation_threshold: null
+mutation_threshold_rationale: non-Python (python); uses ADR-009 3-layer verification
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/worktree.py
+ac:
+- id: AC-001
+  title: Git worktree lifecycle (Phase 8 / Task 8.1)
+  type: mechanical
+  test_ids: []
+  executable_predicate: '# placeholder — refine in /hm:spec worktree-module'
+  pending_test: true

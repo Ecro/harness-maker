@@ -1,0 +1,19 @@
+schema_version: 1
+spec_slug: test-dep-map
+parent_spec: SPEC-configuration-manifests
+verification_tier: 3
+mutation_threshold: null
+mutation_threshold_rationale: non-Python (python); uses ADR-009 3-layer verification
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/test_dep_map.py
+ac:
+- id: AC-001
+  title: Test dependency map — map changed source files to affected tests (TDAD)
+  type: mechanical
+  test_ids:
+  - tests/unit/test_dep_map.py::test_build_test_hints_deduplicates
+  - tests/unit/test_dep_map.py::test_build_test_hints_empty_input
+  - tests/unit/test_dep_map.py::test_build_test_hints_maps_source_to_tests
+  executable_predicate: '# placeholder — refine in /hm:spec test-dep-map'
+  pending_test: false

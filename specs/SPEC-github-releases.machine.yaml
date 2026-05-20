@@ -1,0 +1,20 @@
+schema_version: 1
+spec_slug: github-releases
+parent_spec: SPEC-crawler
+verification_tier: 3
+mutation_threshold: null
+mutation_threshold_rationale: non-Python (python); uses ADR-009 3-layer verification
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/crawler/github_releases.py
+ac:
+- id: AC-001
+  title: GitHub releases crawler — fetches /repos/{owner}/{repo}/releases for each
+    repo
+  type: mechanical
+  test_ids:
+  - tests/unit/crawler/test_github_releases.py::test_crawl_handles_non_200
+  - tests/unit/crawler/test_github_releases.py::test_crawl_handles_rate_limit
+  - tests/unit/crawler/test_github_releases.py::test_crawl_returns_items_for_each_release
+  executable_predicate: '# placeholder — refine in /hm:spec github-releases'
+  pending_test: false

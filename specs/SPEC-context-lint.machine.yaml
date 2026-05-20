@@ -1,0 +1,19 @@
+schema_version: 1
+spec_slug: context-lint
+parent_spec: SPEC-configuration-manifests
+verification_tier: 3
+mutation_threshold: null
+mutation_threshold_rationale: non-Python (python); uses ADR-009 3-layer verification
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/context_lint.py
+ac:
+- id: AC-001
+  title: Context Lint — flag verbose files and context window overuse
+  type: mechanical
+  test_ids:
+  - tests/unit/test_context_lint.py::test_agents_md_html_comment_excluded_from_count
+  - tests/unit/test_context_lint.py::test_at_threshold_returns_no_warnings
+  - tests/unit/test_context_lint.py::test_frontmatter_excluded_from_count
+  executable_predicate: '# placeholder — refine in /hm:spec context-lint'
+  pending_test: false

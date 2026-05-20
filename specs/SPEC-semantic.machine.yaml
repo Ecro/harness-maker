@@ -1,0 +1,19 @@
+schema_version: 1
+spec_slug: semantic
+parent_spec: SPEC-memory
+verification_tier: 3
+mutation_threshold: null
+mutation_threshold_rationale: non-Python (python); uses ADR-009 3-layer verification
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/memory/semantic.py
+ac:
+- id: AC-001
+  title: Semantic memory layer — LLM-summarized knowledge with keyword index
+  type: mechanical
+  test_ids:
+  - tests/unit/test_block_merge.py::test_only_harness_markers_inverted_semantics
+  - tests/unit/test_memory/test_retrieval.py::test_retrieve_semantic_only
+  - tests/unit/test_memory/test_semantic.py::test_concurrent_set_no_lost_update
+  executable_predicate: '# placeholder — refine in /hm:spec semantic'
+  pending_test: false

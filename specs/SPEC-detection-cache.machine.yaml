@@ -1,0 +1,19 @@
+schema_version: 1
+spec_slug: detection-cache
+parent_spec: SPEC-caching
+verification_tier: 3
+mutation_threshold: null
+mutation_threshold_rationale: non-Python (python); uses ADR-009 3-layer verification
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/detection_cache.py
+ac:
+- id: AC-001
+  title: Filesystem cache for ProjectProfile keyed by repo path sha256
+  type: mechanical
+  test_ids:
+  - tests/unit/test_detection_cache.py::test_backward_compat_old_cache_loads
+  - tests/unit/test_detection_cache.py::test_cache_invalidated_when_package_yaml_changes
+  - tests/unit/test_detection_cache.py::test_cache_invalidated_when_stack_glob_concrete_manifest_changes
+  executable_predicate: '# placeholder — refine in /hm:spec detection-cache'
+  pending_test: false

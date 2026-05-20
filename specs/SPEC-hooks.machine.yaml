@@ -1,0 +1,14 @@
+schema_version: 1
+spec_slug: hooks
+verification_tier: 2
+mutation_threshold: null
+paths_to_mutate: []
+ac:
+- id: AC-001
+  title: cluster invariants hold across members
+  type: mechanical
+  test_ids: []
+  executable_predicate: all(member_passes('hooks') for member in cluster_members)
+  pending_test: true
+spec_quality_score: 90
+spec_quality_score_at: '2026-05-20'

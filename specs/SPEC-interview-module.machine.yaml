@@ -1,0 +1,19 @@
+schema_version: 1
+spec_slug: interview-module
+parent_spec: SPEC-interview
+verification_tier: 2
+mutation_threshold: 70
+mutation_threshold_rationale: T2 floor; baseline pending P0.5 measurement
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/interview.py
+ac:
+- id: AC-001
+  title: Interview the user (or accept defaults) to derive InterviewAnswers from a
+    profile
+  type: mechanical
+  test_ids: []
+  executable_predicate: '# placeholder — refine in /hm:spec interview-module'
+  pending_test: true
+spec_quality_score: 91
+spec_quality_score_at: '2026-05-20'

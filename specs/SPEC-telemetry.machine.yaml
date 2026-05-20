@@ -1,0 +1,19 @@
+schema_version: 1
+spec_slug: telemetry
+parent_spec: SPEC-observability
+verification_tier: 3
+mutation_threshold: null
+mutation_threshold_rationale: non-Python (python); uses ADR-009 3-layer verification
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/telemetry.py
+ac:
+- id: AC-001
+  title: Hybrid telemetry hook — adapts to both Claude Code and Cursor IDE
+  type: mechanical
+  test_ids:
+  - tests/structural/test_telemetry_no_leak.py::test_no_jinja_injection_of_wall_time_ms_in_templates
+  - tests/structural/test_telemetry_no_leak.py::test_observability_dir_referenced_only_in_allowlist
+  - tests/unit/test_models.py::test_adaptive_config_disable_telemetry_override
+  executable_predicate: '# placeholder — refine in /hm:spec telemetry'
+  pending_test: false

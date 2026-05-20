@@ -1,0 +1,21 @@
+schema_version: 1
+spec_slug: hook-injection
+parent_spec: SPEC-hooks
+verification_tier: 2
+mutation_threshold: 70
+mutation_threshold_rationale: T2 floor; baseline pending P0.5 measurement
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/secscan/hook_injection.py
+ac:
+- id: AC-001
+  title: Hook injection gate — flag dangerous shell patterns in hooks.json commands
+  type: mechanical
+  test_ids:
+  - tests/unit/test_hook_injection.py::test_curl_pipe_sh_detected
+  - tests/unit/test_hook_injection.py::test_eval_detected
+  - tests/unit/test_hook_injection.py::test_handles_frontmatter
+  executable_predicate: '# placeholder — refine in /hm:spec hook-injection'
+  pending_test: false
+spec_quality_score: 91
+spec_quality_score_at: '2026-05-20'

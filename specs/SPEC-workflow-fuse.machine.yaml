@@ -1,0 +1,19 @@
+schema_version: 1
+spec_slug: workflow-fuse
+parent_spec: SPEC-configuration-manifests
+verification_tier: 3
+mutation_threshold: null
+mutation_threshold_rationale: non-Python (python); uses ADR-009 3-layer verification
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/workflow_fuse.py
+ac:
+- id: AC-001
+  title: Workflow fuse — compose atomic stage fragments into a single workflow prompt
+  type: mechanical
+  test_ids:
+  - tests/unit/test_workflow_fuse.py::test_fuse_dev_workflow_orders_4_stages
+  - tests/unit/test_workflow_fuse.py::test_fuse_empty_stages_returns_header_only
+  - tests/unit/test_workflow_fuse.py::test_fuse_full_atomic_workflow
+  executable_predicate: '# placeholder — refine in /hm:spec workflow-fuse'
+  pending_test: false

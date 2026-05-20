@@ -1,0 +1,19 @@
+schema_version: 1
+spec_slug: llm-judge
+parent_spec: SPEC-configuration-manifests
+verification_tier: 3
+mutation_threshold: null
+mutation_threshold_rationale: non-Python (python); uses ADR-009 3-layer verification
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/llm_judge.py
+ac:
+- id: AC-001
+  title: Layer-2 LLM judge — evaluate file content against rubric YAMLs
+  type: mechanical
+  test_ids:
+  - tests/unit/test_llm_judge.py::test_anthropic_judge_client_lazy_imports
+  - tests/unit/test_llm_judge.py::test_compute_score_from_verdicts_exported
+  - tests/unit/test_llm_judge.py::test_judge_client_protocol_satisfied_by_fake
+  executable_predicate: '# placeholder — refine in /hm:spec llm-judge'
+  pending_test: false

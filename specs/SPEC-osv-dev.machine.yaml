@@ -1,0 +1,19 @@
+schema_version: 1
+spec_slug: osv-dev
+parent_spec: SPEC-crawler
+verification_tier: 3
+mutation_threshold: null
+mutation_threshold_rationale: non-Python (python); uses ADR-009 3-layer verification
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/crawler/osv_dev.py
+ac:
+- id: AC-001
+  title: OSV.dev CVE crawler — POSTs package specs to ``https://api.osv.dev/v1/query``
+  type: mechanical
+  test_ids:
+  - tests/unit/crawler/test_osv_dev.py::test_crawl_handles_http_error
+  - tests/unit/crawler/test_osv_dev.py::test_crawl_returns_vulnerabilities
+  - tests/unit/crawler/test_osv_dev.py::test_crawl_with_no_packages_returns_empty
+  executable_predicate: '# placeholder — refine in /hm:spec osv-dev'
+  pending_test: false

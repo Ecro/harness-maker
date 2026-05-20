@@ -1,0 +1,19 @@
+schema_version: 1
+spec_slug: improvement
+parent_spec: SPEC-configuration-manifests
+verification_tier: 3
+mutation_threshold: null
+mutation_threshold_rationale: non-Python (python); uses ADR-009 3-layer verification
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/improvement.py
+ac:
+- id: AC-001
+  title: Aggregate failures from all 3 layers into a ranked improvement plan
+  type: mechanical
+  test_ids:
+  - tests/unit/test_autoloop_driver.py::test_improvement_context_fields
+  - tests/unit/test_autoloop_driver.py::test_improvement_context_notes_field
+  - tests/unit/test_autoloop_driver.py::test_s6_improvement_context_backward_compat
+  executable_predicate: '# placeholder — refine in /hm:spec improvement'
+  pending_test: false

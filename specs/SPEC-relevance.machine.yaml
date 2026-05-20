@@ -1,0 +1,20 @@
+schema_version: 1
+spec_slug: relevance
+parent_spec: SPEC-configuration-manifests
+verification_tier: 3
+mutation_threshold: null
+mutation_threshold_rationale: non-Python (python); uses ADR-009 3-layer verification
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/relevance.py
+ac:
+- id: AC-001
+  title: Relevance filter — adaptive threshold + simple keyword scorer + stale-asset
+    scan
+  type: mechanical
+  test_ids:
+  - tests/unit/test_prompt_cache_control.py::test_relevance_cache_control
+  - tests/unit/test_relevance.py::test_adaptive_threshold_below_min_samples_returns_default
+  - tests/unit/test_relevance.py::test_adaptive_threshold_clamped_to_max
+  executable_predicate: '# placeholder — refine in /hm:spec relevance'
+  pending_test: false

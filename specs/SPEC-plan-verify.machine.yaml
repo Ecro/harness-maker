@@ -1,0 +1,20 @@
+schema_version: 1
+spec_slug: plan-verify
+parent_spec: SPEC-configuration-manifests
+verification_tier: 3
+mutation_threshold: null
+mutation_threshold_rationale: non-Python (python); uses ADR-009 3-layer verification
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/plan_verify.py
+ac:
+- id: AC-001
+  title: Deep PLAN-fulfillment verification — LLM judges every PLAN item against a
+    diff
+  type: mechanical
+  test_ids:
+  - tests/unit/test_plan_verify.py::test_parse_all_fulfilled
+  - tests/unit/test_plan_verify.py::test_parse_invalid_item_shape_raises
+  - tests/unit/test_plan_verify.py::test_parse_invalid_json_raises
+  executable_predicate: '# placeholder — refine in /hm:spec plan-verify'
+  pending_test: false

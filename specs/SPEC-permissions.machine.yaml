@@ -1,0 +1,19 @@
+schema_version: 1
+spec_slug: permissions
+parent_spec: SPEC-security-permissions
+verification_tier: 3
+mutation_threshold: null
+mutation_threshold_rationale: non-Python (python); uses ADR-009 3-layer verification
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/secscan/permissions.py
+ac:
+- id: AC-001
+  title: Permissions gate — flag over-broad ``permissions.allow`` entries in settings.json
+  type: mechanical
+  test_ids:
+  - tests/integration/test_boundary_harness_yaml.py::test_rendered_harness_yaml_permissions_no_phantom_ask
+  - tests/integration/test_boundary_settings_json.py::test_rendered_settings_json_permissions_lists_well_formed
+  - tests/integration/test_boundary_settings_json.py::test_settings_rejects_permissions_deny_scalar
+  executable_predicate: '# placeholder — refine in /hm:spec permissions'
+  pending_test: false

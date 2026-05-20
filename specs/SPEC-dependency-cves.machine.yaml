@@ -1,0 +1,16 @@
+schema_version: 1
+spec_slug: dependency-cves
+parent_spec: SPEC-configuration-manifests
+verification_tier: 3
+mutation_threshold: null
+mutation_threshold_rationale: non-Python (python); uses ADR-009 3-layer verification
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/secscan/dependency_cves.py
+ac:
+- id: AC-001
+  title: Dependency CVE gate — query OSV.dev for packages declared in uv.lock / pyproject.toml
+  type: mechanical
+  test_ids: []
+  executable_predicate: '# placeholder — refine in /hm:spec dependency-cves'
+  pending_test: true

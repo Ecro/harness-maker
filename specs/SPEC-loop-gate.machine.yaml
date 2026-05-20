@@ -1,0 +1,16 @@
+schema_version: 1
+spec_slug: loop-gate
+parent_spec: SPEC-security-permissions
+verification_tier: 3
+mutation_threshold: null
+mutation_threshold_rationale: non-Python (python); uses ADR-009 3-layer verification
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/hooks/loop_gate.py
+ac:
+- id: AC-001
+  title: Loop gate hook — prevents session termination while .hm-loop-active is set
+  type: mechanical
+  test_ids: []
+  executable_predicate: '# placeholder — refine in /hm:spec loop-gate'
+  pending_test: true

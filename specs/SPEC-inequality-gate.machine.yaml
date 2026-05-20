@@ -1,0 +1,19 @@
+schema_version: 1
+spec_slug: inequality-gate
+parent_spec: SPEC-interview
+verification_tier: 3
+mutation_threshold: null
+mutation_threshold_rationale: non-Python (python); uses ADR-009 3-layer verification
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/inequality_gate.py
+ac:
+- id: AC-001
+  title: 5-term inequality gate composition for the deep-interview system (0.16.0)
+  type: mechanical
+  test_ids:
+  - tests/integration/test_inequality_gate_e2e.py::test_e2e_full_inequality_pipeline
+  - tests/integration/test_inequality_gate_e2e.py::test_e2e_kill_switch_disables_llm_inference_path
+  - tests/unit/test_inequality_gate.py::test_accumulator_collects_common_ground_marks
+  executable_predicate: '# placeholder — refine in /hm:spec inequality-gate'
+  pending_test: false

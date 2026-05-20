@@ -1,0 +1,37 @@
+schema_version: 1
+spec_slug: sample-feature
+parent_spec: SPEC-rendering          # L1 cluster slug per ADR-002
+verification_tier: 1                 # T1/T2/T3 per ADR-008
+mutation_threshold: 85               # max(baseline + 5pp, T1=85) per ADR-005
+mutation_threshold_rationale: ""     # rationale required for per-SPEC overrides
+last_mutation_run: "2026-05-20"
+paths_to_mutate:
+  - src/harness_maker/sample.py
+spec_quality_score: 87
+spec_quality_score_at: "2026-05-20"
+ac:
+  - id: AC-001
+    title: sample.run() returns a non-empty payload
+    type: mechanical
+    test_ids:
+      - tests/unit/test_sample.py::test_run_returns_payload
+    executable_predicate: "len(sample.run()) > 0"
+  - id: AC-002
+    title: locale fallback table is honored
+    type: parametric
+    test_ids:
+      - tests/unit/test_sample.py::test_locale_fallback
+    golden_table:
+      - input: {locale: "en"}
+        expected: english
+      - input: {locale: "ko"}
+        expected: korean
+      - input: {locale: "jp"}
+        expected: english        # unknown → en fallback
+        edge: true
+  - id: AC-003
+    title: rendered output respects line budget per preset
+    type: judgment
+    test_ids:
+      - tests/structural/test_context_lint.py::test_sample_under_budget
+    rubric_id: claude_md_v1

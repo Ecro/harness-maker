@@ -1,0 +1,19 @@
+schema_version: 1
+spec_slug: second-brain
+parent_spec: SPEC-memory
+verification_tier: 3
+mutation_threshold: null
+mutation_threshold_rationale: non-Python (python); uses ADR-009 3-layer verification
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/second_brain.py
+ac:
+- id: AC-001
+  title: Filesystem-backed Obsidian Second Brain helper
+  type: mechanical
+  test_ids:
+  - tests/integration/test_boundary_harness_yaml.py::test_parser_rejects_second_brain_folders_as_null
+  - tests/integration/test_second_brain_e2e.py::test_render_loader_drift_is_detected
+  - tests/integration/test_second_brain_e2e.py::test_rendered_harness_yaml_loads_via_second_brain
+  executable_predicate: '# placeholder — refine in /hm:spec second-brain'
+  pending_test: false

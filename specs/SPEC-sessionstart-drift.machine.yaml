@@ -1,0 +1,19 @@
+schema_version: 1
+spec_slug: sessionstart-drift
+parent_spec: SPEC-observability
+verification_tier: 3
+mutation_threshold: null
+mutation_threshold_rationale: non-Python (python); uses ADR-009 3-layer verification
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/hooks/sessionstart_drift.py
+ac:
+- id: AC-001
+  title: SessionStart drift hook — surface stale-harness reminder via Claude
+  type: mechanical
+  test_ids:
+  - tests/unit/test_sessionstart_drift.py::test_additional_context_is_imperative
+  - tests/unit/test_sessionstart_drift.py::test_format_context_downgrade_warns_intent
+  - tests/unit/test_sessionstart_drift.py::test_format_context_upgrade_mentions_make_command
+  executable_predicate: '# placeholder — refine in /hm:spec sessionstart-drift'
+  pending_test: false

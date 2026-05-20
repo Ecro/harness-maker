@@ -1,0 +1,19 @@
+schema_version: 1
+spec_slug: prompt-injection
+parent_spec: SPEC-configuration-manifests
+verification_tier: 3
+mutation_threshold: null
+mutation_threshold_rationale: non-Python (python); uses ADR-009 3-layer verification
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/secscan/prompt_injection.py
+ac:
+- id: AC-001
+  title: Prompt-injection gate — regex first pass, optional LLM second pass
+  type: mechanical
+  test_ids:
+  - tests/unit/test_prompt_injection.py::test_base64_block_medium
+  - tests/unit/test_prompt_injection.py::test_clean_text_returns_empty
+  - tests/unit/test_prompt_injection.py::test_disregard_above_detected
+  executable_predicate: '# placeholder — refine in /hm:spec prompt-injection'
+  pending_test: false

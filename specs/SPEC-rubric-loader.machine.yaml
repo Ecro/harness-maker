@@ -1,0 +1,19 @@
+schema_version: 1
+spec_slug: rubric-loader
+parent_spec: SPEC-templates
+verification_tier: 3
+mutation_threshold: null
+mutation_threshold_rationale: non-Python (python); uses ADR-009 3-layer verification
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/rubric_loader.py
+ac:
+- id: AC-001
+  title: Load Layer-2 rubric YAML files for LLM-judged content quality
+  type: mechanical
+  test_ids:
+  - tests/unit/test_rubric_loader.py::test_load_malformed_yaml
+  - tests/unit/test_rubric_loader.py::test_load_missing_file
+  - tests/unit/test_rubric_loader.py::test_load_rubrics_directory
+  executable_predicate: '# placeholder — refine in /hm:spec rubric-loader'
+  pending_test: false

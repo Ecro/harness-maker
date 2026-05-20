@@ -1,0 +1,19 @@
+schema_version: 1
+spec_slug: personalization-audit
+parent_spec: SPEC-configuration-manifests
+verification_tier: 3
+mutation_threshold: null
+mutation_threshold_rationale: non-Python (python); uses ADR-009 3-layer verification
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/personalization_audit.py
+ac:
+- id: AC-001
+  title: Compute personalization rubric score from telemetry + harness.yaml + ProjectProfile
+  type: mechanical
+  test_ids:
+  - tests/e2e/test_personalization_external.py::test_personalization_audit_on_spec_kit
+  - tests/unit/test_health_personalization_integration.py::test_personalization_audit_module_not_modified
+  - tests/unit/test_no_network.py::test_personalization_audit_no_network
+  executable_predicate: '# placeholder — refine in /hm:spec personalization-audit'
+  pending_test: false

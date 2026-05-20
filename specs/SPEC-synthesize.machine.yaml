@@ -1,0 +1,22 @@
+schema_version: 1
+spec_slug: synthesize
+parent_spec: SPEC-rendering
+verification_tier: 1
+mutation_threshold: 85
+mutation_threshold_rationale: T1 floor; baseline pending P0.5 measurement
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/synthesize.py
+ac:
+- id: AC-001
+  title: Synthesizer — map preset+answers to deterministic Blueprint with FileEntry
+    list
+  type: mechanical
+  test_ids:
+  - tests/structural/test_verifier_agent.py::test_verifier_registered_in_synthesize
+  - tests/unit/test_models.py::test_interview_answers_mechanical_checks_round_trip_via_synthesize
+  - tests/unit/test_synthesize.py::test_base_files_default_locale_is_en
+  executable_predicate: '# placeholder — refine in /hm:spec synthesize'
+  pending_test: false
+spec_quality_score: 91
+spec_quality_score_at: '2026-05-20'

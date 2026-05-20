@@ -1,0 +1,20 @@
+schema_version: 1
+spec_slug: add-domain
+parent_spec: SPEC-configuration-manifests
+verification_tier: 3
+mutation_threshold: null
+mutation_threshold_rationale: non-Python (python); uses ADR-009 3-layer verification
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/add_domain.py
+ac:
+- id: AC-001
+  title: '--add-domain helper: render a user-authored standards stub + register the
+    name'
+  type: mechanical
+  test_ids:
+  - tests/unit/test_add_domain.py::test_add_domain_creates_stub_and_registers
+  - tests/unit/test_add_domain.py::test_add_domain_refuses_overwrite
+  - tests/unit/test_add_domain.py::test_add_domain_rejects_invalid_name
+  executable_predicate: '# placeholder — refine in /hm:spec add-domain'
+  pending_test: false

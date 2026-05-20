@@ -1,0 +1,19 @@
+schema_version: 1
+spec_slug: communication-audit
+parent_spec: SPEC-configuration-manifests
+verification_tier: 3
+mutation_threshold: null
+mutation_threshold_rationale: non-Python (python); uses ADR-009 3-layer verification
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/communication_audit.py
+ac:
+- id: AC-001
+  title: PLAN-antisycophancy-2026-05 ADR-006 — communication-protocol drift audit
+  type: mechanical
+  test_ids:
+  - tests/unit/test_communication_audit.py::test_discover_dispatchers_returns_14_agents
+  - tests/unit/test_communication_audit.py::test_discover_pinned_skills_returns_five_llm_judgment
+  - tests/unit/test_communication_audit.py::test_fixture_a_block_removed_in_output_surfaces_item
+  executable_predicate: '# placeholder — refine in /hm:spec communication-audit'
+  pending_test: false

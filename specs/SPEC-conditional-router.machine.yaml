@@ -1,0 +1,19 @@
+schema_version: 1
+spec_slug: conditional-router
+parent_spec: SPEC-configuration-manifests
+verification_tier: 3
+mutation_threshold: null
+mutation_threshold_rationale: non-Python (python); uses ADR-009 3-layer verification
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/conditional_router.py
+ac:
+- id: AC-001
+  title: Conditional Router (M6) — pick reviewers based on changed files
+  type: mechanical
+  test_ids:
+  - tests/unit/test_conditional_router.py::test_always_all_returns_preset_unchanged
+  - tests/unit/test_conditional_router.py::test_conditional_async_triggers_concurrency
+  - tests/unit/test_conditional_router.py::test_conditional_auth_path_triggers_security
+  executable_predicate: '# placeholder — refine in /hm:spec conditional-router'
+  pending_test: false

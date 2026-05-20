@@ -1,0 +1,19 @@
+schema_version: 1
+spec_slug: drift-monitor
+parent_spec: SPEC-observability
+verification_tier: 3
+mutation_threshold: null
+mutation_threshold_rationale: non-Python (python); uses ADR-009 3-layer verification
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/drift_monitor.py
+ac:
+- id: AC-001
+  title: Trajectory drift monitor — hybrid cosine pre-filter + LLM precision scoring
+  type: mechanical
+  test_ids:
+  - tests/unit/test_drift_monitor.py::test_check_no_baseline_skips
+  - tests/unit/test_drift_monitor.py::test_check_warns_on_high_drift
+  - tests/unit/test_drift_monitor.py::test_check_with_multilayer_fallback
+  executable_predicate: '# placeholder — refine in /hm:spec drift-monitor'
+  pending_test: false

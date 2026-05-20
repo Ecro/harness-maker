@@ -1,0 +1,19 @@
+schema_version: 1
+spec_slug: verify
+parent_spec: SPEC-configuration-manifests
+verification_tier: 3
+mutation_threshold: null
+mutation_threshold_rationale: non-Python (python); uses ADR-009 3-layer verification
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/verify.py
+ac:
+- id: AC-001
+  title: Verifier (Task 3.4) — minimal sanity checks on the rendered .claude/ tree
+  type: mechanical
+  test_ids:
+  - tests/e2e/test_verify_health_dashboard.py::test_check3_fail_structural_dropped_by_six
+  - tests/e2e/test_verify_health_dashboard.py::test_check3_no_baseline_pass_when_dashboard_absent
+  - tests/e2e/test_verify_health_dashboard.py::test_check3_no_baseline_pass_when_pre_0_13_0_schema
+  executable_predicate: '# placeholder — refine in /hm:spec verify'
+  pending_test: false

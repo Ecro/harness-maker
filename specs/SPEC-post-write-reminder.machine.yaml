@@ -1,0 +1,20 @@
+schema_version: 1
+spec_slug: post-write-reminder
+parent_spec: SPEC-hooks
+verification_tier: 3
+mutation_threshold: null
+mutation_threshold_rationale: non-Python (python); uses ADR-009 3-layer verification
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/hooks/post_write_reminder.py
+ac:
+- id: AC-001
+  title: PostToolUse hook — surfaces a one-line reminder after Write/Edit on watched
+    paths
+  type: mechanical
+  test_ids:
+  - tests/unit/test_post_write_reminder.py::test_caps_at_three_reminders
+  - tests/unit/test_post_write_reminder.py::test_malformed_json_does_not_crash
+  - tests/unit/test_post_write_reminder.py::test_match_default_rule_emits_reminder
+  executable_predicate: '# placeholder — refine in /hm:spec post-write-reminder'
+  pending_test: false

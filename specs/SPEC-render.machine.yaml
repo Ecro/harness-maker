@@ -1,0 +1,22 @@
+schema_version: 1
+spec_slug: render
+parent_spec: SPEC-rendering
+verification_tier: 1
+mutation_threshold: 85
+mutation_threshold_rationale: T1 floor; baseline pending P0.5 measurement
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/render.py
+ac:
+- id: AC-001
+  title: Renderer (Task 3.2) — render Blueprint FileEntries to disk with deterministic
+    output
+  type: mechanical
+  test_ids:
+  - tests/integration/test_boundary_cursor_mdc.py::test_rendered_cursor_mdc_frontmatter_passes_allowlist
+  - tests/integration/test_boundary_harness_yaml.py::test_rendered_harness_yaml_loads_via_canonical_helper
+  - tests/integration/test_boundary_harness_yaml.py::test_rendered_harness_yaml_permissions_no_phantom_ask
+  executable_predicate: '# placeholder — refine in /hm:spec render'
+  pending_test: false
+spec_quality_score: 95
+spec_quality_score_at: '2026-05-20'

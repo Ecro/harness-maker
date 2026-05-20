@@ -1,0 +1,19 @@
+schema_version: 1
+spec_slug: modular-edit
+parent_spec: SPEC-configuration-manifests
+verification_tier: 3
+mutation_threshold: null
+mutation_threshold_rationale: non-Python (python); uses ADR-009 3-layer verification
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/modular_edit.py
+ac:
+- id: AC-001
+  title: Modular installer (M_extra) — `--add` and `--remove` for components
+  type: mechanical
+  test_ids:
+  - tests/unit/test_modular_edit.py::test_add_invalid_component_raises
+  - tests/unit/test_modular_edit.py::test_add_reviewer_idempotent
+  - tests/unit/test_modular_edit.py::test_add_reviewer_security_creates_file
+  executable_predicate: '# placeholder — refine in /hm:spec modular-edit'
+  pending_test: false

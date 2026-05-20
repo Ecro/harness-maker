@@ -1,0 +1,19 @@
+schema_version: 1
+spec_slug: intent-miss
+parent_spec: SPEC-observability
+verification_tier: 3
+mutation_threshold: null
+mutation_threshold_rationale: non-Python (python); uses ADR-009 3-layer verification
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/observability/intent_miss.py
+ac:
+- id: AC-001
+  title: Silent-intent-miss telemetry (ADR-008)
+  type: mechanical
+  test_ids:
+  - tests/integration/test_review_intent_miss.py::test_event_logged_with_provenance
+  - tests/integration/test_review_intent_miss.py::test_invalid_confidence_coerced_to_zero
+  - tests/integration/test_review_intent_miss.py::test_missing_original_mark_defaults_unknown
+  executable_predicate: '# placeholder — refine in /hm:spec intent-miss'
+  pending_test: false

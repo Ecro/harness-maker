@@ -1,0 +1,20 @@
+schema_version: 1
+spec_slug: prod-name-guard
+parent_spec: SPEC-configuration-manifests
+verification_tier: 3
+mutation_threshold: null
+mutation_threshold_rationale: non-Python (python); uses ADR-009 3-layer verification
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/secscan/prod_name_guard.py
+ac:
+- id: AC-001
+  title: Production-name guard — environment regex + sequence pattern detection (Phase
+    8, ADR-008)
+  type: mechanical
+  test_ids:
+  - tests/unit/test_prod_name_guard.py::test_allows_staging
+  - tests/unit/test_prod_name_guard.py::test_allows_test_db
+  - tests/unit/test_prod_name_guard.py::test_detects_prod_db_in_args
+  executable_predicate: '# placeholder — refine in /hm:spec prod-name-guard'
+  pending_test: false

@@ -1,0 +1,20 @@
+schema_version: 1
+spec_slug: refdocs-index
+parent_spec: SPEC-configuration-manifests
+verification_tier: 3
+mutation_threshold: null
+mutation_threshold_rationale: non-Python (python); uses ADR-009 3-layer verification
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/refdocs_index.py
+ac:
+- id: AC-001
+  title: Build a minimal yaml index of user-registered ref_folders for skill-driven
+    search
+  type: mechanical
+  test_ids:
+  - tests/unit/test_refdocs_index.py::test_build_brace_glob_expansion
+  - tests/unit/test_refdocs_index.py::test_build_docx_emits_warning_and_skips_entry
+  - tests/unit/test_refdocs_index.py::test_build_docx_inside_user_glob_warns_only_once
+  executable_predicate: '# placeholder — refine in /hm:spec refdocs-index'
+  pending_test: false

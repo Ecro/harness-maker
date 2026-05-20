@@ -1,0 +1,20 @@
+schema_version: 1
+spec_slug: cache
+parent_spec: SPEC-caching
+verification_tier: 3
+mutation_threshold: 97
+mutation_threshold_rationale: "Measured 98.08% baseline (51/52 killed; 2 survivors are equivalent mutants — typing.cast no-op + indistinguishable default); threshold set 1pp below for regression headroom per ADR-005"
+last_mutation_run: "2026-05-20"
+baseline_score_pct: 98.08
+paths_to_mutate:
+- src/harness_maker/cache.py
+ac:
+- id: AC-001
+  title: HTTP response / crawl-result cache with TTL
+  type: mechanical
+  test_ids:
+  - tests/e2e/test_personalization_dogfood.py::test_no_cache_writes_outside_tmp
+  - tests/integration/test_package_artifacts.py::test_sdist_excludes_pycache
+  - tests/integration/test_package_artifacts.py::test_wheel_excludes_pycache
+  executable_predicate: '# placeholder — refine in /hm:spec cache'
+  pending_test: false

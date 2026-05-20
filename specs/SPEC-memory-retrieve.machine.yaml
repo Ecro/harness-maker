@@ -1,0 +1,20 @@
+schema_version: 1
+spec_slug: memory-retrieve
+parent_spec: SPEC-memory
+verification_tier: 3
+mutation_threshold: null
+mutation_threshold_rationale: non-Python (python); uses ADR-009 3-layer verification
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/memory_retrieve.py
+ac:
+- id: AC-001
+  title: Markdown retrieval for .claude/memory/{wiki,failures}.md → research/plan/spec
+    stages
+  type: mechanical
+  test_ids:
+  - tests/integration/test_memory_retrieve_cli.py::test_cli_byte_cap_enforced
+  - tests/integration/test_memory_retrieve_cli.py::test_cli_invocation_does_not_load_anthropic
+  - tests/integration/test_memory_retrieve_cli.py::test_cli_missing_memory_dir_graceful
+  executable_predicate: '# placeholder — refine in /hm:spec memory-retrieve'
+  pending_test: false

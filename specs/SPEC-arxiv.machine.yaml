@@ -1,0 +1,19 @@
+schema_version: 1
+spec_slug: arxiv
+parent_spec: SPEC-crawler
+verification_tier: 3
+mutation_threshold: null
+mutation_threshold_rationale: non-Python (python); uses ADR-009 3-layer verification
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/crawler/arxiv.py
+ac:
+- id: AC-001
+  title: arxiv crawler — uses ``feedparser`` against the public Atom query API
+  type: mechanical
+  test_ids:
+  - tests/unit/crawler/test_arxiv.py::test_crawl_returns_empty_on_parser_error
+  - tests/unit/crawler/test_arxiv.py::test_crawl_returns_items_from_mocked_feed
+  - tests/unit/crawler/test_arxiv.py::test_crawl_skips_entries_missing_required_fields
+  executable_predicate: '# placeholder — refine in /hm:spec arxiv'
+  pending_test: false

@@ -1,0 +1,19 @@
+schema_version: 1
+spec_slug: spec-gate
+parent_spec: SPEC-security-permissions
+verification_tier: 3
+mutation_threshold: null
+mutation_threshold_rationale: non-Python (python); uses ADR-009 3-layer verification
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/gates/spec_gate.py
+ac:
+- id: AC-001
+  title: spec_gate hook — refuse test writes that lack a SPEC reference
+  type: mechanical
+  test_ids:
+  - tests/unit/test_render.py::test_render_cursor_hooks_json_includes_spec_gate_when_spec_driven
+  - tests/unit/test_render.py::test_render_cursor_hooks_json_omits_spec_gate_when_task_driven
+  - tests/unit/test_spec_gate.py::test_derive_test_slug
+  executable_predicate: '# placeholder — refine in /hm:spec spec-gate'
+  pending_test: false

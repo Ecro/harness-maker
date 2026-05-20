@@ -1,0 +1,19 @@
+schema_version: 1
+spec_slug: flush-session
+parent_spec: SPEC-hooks
+verification_tier: 3
+mutation_threshold: null
+mutation_threshold_rationale: non-Python (python); uses ADR-009 3-layer verification
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/hooks/flush_session.py
+ac:
+- id: AC-001
+  title: PreCompact flush hook — snapshot autoloop progress before context compaction
+  type: mechanical
+  test_ids:
+  - tests/unit/test_codex_phase5.py::test_codex_hooks_json_has_stop_with_flush_session
+  - tests/unit/test_flush_session.py::test_append_accumulates_on_existing_log
+  - tests/unit/test_flush_session.py::test_append_creates_parent_dirs
+  executable_predicate: '# placeholder — refine in /hm:spec flush-session'
+  pending_test: false

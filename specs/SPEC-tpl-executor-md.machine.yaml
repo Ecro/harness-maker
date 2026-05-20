@@ -1,0 +1,29 @@
+schema_version: 1
+spec_slug: tpl-executor-md
+parent_spec: SPEC-reviewers
+verification_tier: 3
+mutation_threshold: null
+mutation_threshold_rationale: non-Python (agent); uses ADR-009 3-layer verification
+last_mutation_run: null
+paths_to_mutate: []
+ac:
+- id: AC-001
+  title: rendered output snapshot-stable (Layer 1)
+  type: mechanical
+  test_ids: []
+  executable_predicate: rendered_bytes('src/harness_maker/templates/agents/executor.md.j2')
+    == read_snapshot(matching_snap_path)
+  pending_test: true
+- id: AC-002
+  title: rendered output parses under consumer schema (Layer 2)
+  type: mechanical
+  test_ids: []
+  executable_predicate: consumer_parser('src/harness_maker/templates/agents/executor.md.j2').parse(rendered)
+    is not None
+  pending_test: true
+- id: AC-003
+  title: rendered prompt fulfills SPEC intent (Layer 3, LLM-judged)
+  type: judgment
+  test_ids: []
+  rubric_id: agent_prompt
+  pending_test: true

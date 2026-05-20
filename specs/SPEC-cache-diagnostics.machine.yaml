@@ -1,0 +1,19 @@
+schema_version: 1
+spec_slug: cache-diagnostics
+parent_spec: SPEC-caching
+verification_tier: 3
+mutation_threshold: null
+mutation_threshold_rationale: non-Python (python); uses ADR-009 3-layer verification
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/cache_diagnostics.py
+ac:
+- id: AC-001
+  title: Classify cache failure modes from PostToolUse telemetry
+  type: mechanical
+  test_ids:
+  - tests/unit/test_cache_diagnostics.py::test_classify_first_when_creation_positive_no_prev
+  - tests/unit/test_cache_diagnostics.py::test_classify_hit_when_cache_read_positive
+  - tests/unit/test_cache_diagnostics.py::test_classify_invalidation_handles_alt_timestamp_field
+  executable_predicate: '# placeholder — refine in /hm:spec cache-diagnostics'
+  pending_test: false

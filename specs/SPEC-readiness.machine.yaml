@@ -1,0 +1,19 @@
+schema_version: 1
+spec_slug: readiness
+parent_spec: SPEC-configuration-manifests
+verification_tier: 3
+mutation_threshold: null
+mutation_threshold_rationale: non-Python (python); uses ADR-009 3-layer verification
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/readiness.py
+ac:
+- id: AC-001
+  title: AI-readiness Layer-1 scoring — deterministic, evidence-anchored
+  type: mechanical
+  test_ids:
+  - tests/integration/test_fresh_install_readiness.py::test_existing_install_harness_yaml_migrate
+  - tests/integration/test_fresh_install_readiness.py::test_existing_install_settings_json_migrate
+  - tests/integration/test_fresh_install_readiness.py::test_fresh_install_no_unexpected_p0
+  executable_predicate: '# placeholder — refine in /hm:spec readiness'
+  pending_test: false

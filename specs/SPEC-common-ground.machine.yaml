@@ -1,0 +1,19 @@
+schema_version: 1
+spec_slug: common-ground
+parent_spec: SPEC-interview
+verification_tier: 3
+mutation_threshold: null
+mutation_threshold_rationale: non-Python (python); uses ADR-009 3-layer verification
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/common_ground.py
+ac:
+- id: AC-001
+  title: Common-ground detection for the 5-term inequality gate (0.16.0)
+  type: mechanical
+  test_ids:
+  - tests/unit/test_common_ground.py::test_accumulator_collects_marks
+  - tests/unit/test_common_ground.py::test_accumulator_unchanged_on_no_match
+  - tests/unit/test_common_ground.py::test_cgmark_to_dict_roundtrip
+  executable_predicate: '# placeholder — refine in /hm:spec common-ground'
+  pending_test: false

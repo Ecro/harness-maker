@@ -1,0 +1,21 @@
+schema_version: 1
+spec_slug: permission-gate
+parent_spec: SPEC-security-permissions
+verification_tier: 2
+mutation_threshold: 70
+mutation_threshold_rationale: T2 floor; baseline pending P0.5 measurement
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/gates/permission_gate.py
+ac:
+- id: AC-001
+  title: permission_gate hook — block Bash invocations that match dangerous patterns
+  type: mechanical
+  test_ids:
+  - tests/unit/test_codex_phase5.py::test_codex_hooks_json_has_pretooluse_permission_gate
+  - tests/unit/test_codex_phase5.py::test_permission_gate_permission_request_dangerous_command_deny
+  - tests/unit/test_codex_phase5.py::test_permission_gate_permission_request_safe_command_allow
+  executable_predicate: '# placeholder — refine in /hm:spec permission-gate'
+  pending_test: false
+spec_quality_score: 91
+spec_quality_score_at: '2026-05-20'

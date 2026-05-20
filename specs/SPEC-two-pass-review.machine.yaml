@@ -1,0 +1,16 @@
+schema_version: 1
+spec_slug: two-pass-review
+parent_spec: SPEC-configuration-manifests
+verification_tier: 3
+mutation_threshold: null
+mutation_threshold_rationale: non-Python (python); uses ADR-009 3-layer verification
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/two_pass_review.py
+ac:
+- id: AC-001
+  title: 2-pass review engine — metadata redaction + Pass-1.5 verifier + Pass-2 verdict
+  type: mechanical
+  test_ids: []
+  executable_predicate: '# placeholder — refine in /hm:spec two-pass-review'
+  pending_test: true

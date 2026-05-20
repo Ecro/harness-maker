@@ -1,0 +1,19 @@
+schema_version: 1
+spec_slug: verification-cache
+parent_spec: SPEC-observability
+verification_tier: 3
+mutation_threshold: null
+mutation_threshold_rationale: non-Python (python); uses ADR-009 3-layer verification
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/observability/verification_cache.py
+ac:
+- id: AC-001
+  title: Check-suite verification cache — skip lint/mypy/test when input is unchanged
+  type: mechanical
+  test_ids:
+  - tests/unit/test_verification_cache.py::test_env_ignore_patterns
+  - tests/unit/test_verification_cache.py::test_verification_key_ignores_pwd
+  - tests/unit/test_verification_cache.py::test_verification_key_includes_project_root
+  executable_predicate: '# placeholder — refine in /hm:spec verification-cache'
+  pending_test: false

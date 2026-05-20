@@ -46,6 +46,15 @@ RUBRIC_DIMENSIONS: dict[str, str] = {
     "scope_boundary": "In-scope and out-of-scope clearly delineated",
 }
 
+#: Extended dims (ADR-006/009) — only scored when SPEC.machine.yaml is provided.
+RUBRIC_DIMENSIONS_MACHINE: dict[str, str] = {
+    "machine_verifiability": "Every AC has a runnable predicate, golden table, or rubric_id",
+    "mutation_coverage_set": "Python SPEC has mutation_threshold + paths_to_mutate populated",
+    "non_python_intent_alignment": (
+        "Rendered prompt/template content fulfills the SPEC AC (LLM-judged)"
+    ),
+}
+
 _WEAK_THRESHOLD = 40
 
 
@@ -54,11 +63,15 @@ def evaluate_spec(
     dev_mode: DevMode | str = DevMode.TASK_DRIVEN,
     *,
     judge: Any = None,
+    machine_yaml: str | None = None,
 ) -> SpecQualityResult:
     """Evaluate spec quality using rubric dimensions.
 
-    When judge is None, uses heuristic scoring (keyword-based).
-    When judge is provided, delegates to LLM for precise scoring.
+    Backward-compatible 2-arg signature preserved for existing callsites
+    (ADR-006 + Risk R12). When ``machine_yaml`` is provided, three additional
+    dims (machine_verifiability, mutation_coverage_set,
+    non_python_intent_alignment) are scored from the parsed yaml structure
+    so the LLM judge does not have to redo work the schema already encodes.
     """
     if isinstance(dev_mode, str):
         try:
@@ -69,6 +82,9 @@ def evaluate_spec(
         dev_mode_enum = dev_mode
 
     scores = _judge_with_llm(spec_text, judge) if judge is not None else _heuristic_score(spec_text)
+
+    if machine_yaml is not None:
+        scores.update(_score_machine_dims(machine_yaml, judge=judge))
 
     weak_dims = [dim for dim, score in scores.items() if score < _WEAK_THRESHOLD]
     overall = sum(scores.values()) // max(len(scores), 1)
@@ -83,6 +99,57 @@ def evaluate_spec(
     )
 
 
+def _score_machine_dims(machine_yaml: str, *, judge: Any = None) -> dict[str, int]:
+    """Heuristic + optional LLM scoring for the 3 ADR-006/009 dims.
+
+    Parses yaml inline (avoids a hard dep on spec_machine module here).
+    """
+    import yaml as _yaml
+
+    try:
+        data = _yaml.safe_load(machine_yaml) or {}
+    except _yaml.YAMLError:
+        return dict.fromkeys(RUBRIC_DIMENSIONS_MACHINE, 0)
+    ac = data.get("ac") or []
+    total = len(ac) or 1
+
+    # machine_verifiability — count AC whose declared type has its required slot filled.
+    verified = 0
+    for a in ac:
+        atype = a.get("type")
+        predicate_ok = bool((a.get("executable_predicate") or "").strip())
+        golden_ok = bool(a.get("golden_table"))
+        rubric_ok = bool((a.get("rubric_id") or "").strip())
+        if (
+            (atype == "mechanical" and predicate_ok)
+            or (atype == "parametric" and golden_ok)
+            or (atype == "judgment" and rubric_ok)
+        ):
+            verified += 1
+    machine_verifiability = round(100 * verified / total)
+
+    # mutation_coverage_set — only meaningful for Python features (ADR-005).
+    # When mutation_threshold is null (non-Python; ADR-009 3-layer instead),
+    # omit the dim entirely so it doesn't drag the overall average.
+    mt = data.get("mutation_threshold")
+    paths = data.get("paths_to_mutate") or []
+    out: dict[str, int] = {
+        "machine_verifiability": min(100, max(0, machine_verifiability)),
+        "non_python_intent_alignment": 70,
+    }
+    if mt is not None:
+        if paths:
+            out["mutation_coverage_set"] = 100
+        else:
+            out["mutation_coverage_set"] = 50
+    elif paths:
+        # paths set but threshold absent — partial signal, half credit
+        out["mutation_coverage_set"] = 50
+    # else (non-Python): dim omitted entirely
+
+    return out
+
+
 def _heuristic_score(spec_text: str) -> dict[str, int]:
     """Keyword-based heuristic scoring (fallback when no LLM available)."""
     text_lower = spec_text.lower()
@@ -94,6 +161,11 @@ def _heuristic_score(spec_text: str) -> dict[str, int]:
         sum(30 for s in completeness_signals if s in text_lower),
     )
 
+    # testability — keyword score + bonus for explicit testable-structure signals
+    # (G-W-T markers, AC headings, verification tables). Without the structural
+    # bonus, generated skeleton SPECs with G-W-T form scored ~40 even when they
+    # were well-structured — the prior keyword-only list missed the marker
+    # convention this codebase uses.
     testability_signals = [
         "acceptance criteria",
         "then",
@@ -102,11 +174,20 @@ def _heuristic_score(spec_text: str) -> dict[str, int]:
         "test",
         "observable",
         "measurable",
+        "scenario",
+        "pytest",
+        "predicate",
     ]
-    scores["testability"] = min(
-        100,
-        sum(20 for s in testability_signals if s in text_lower),
-    )
+    keyword_score = min(70, sum(20 for s in testability_signals if s in text_lower))
+    structural_signals = [
+        "**given**",
+        "**when**",
+        "**then**",
+        "### ac-",
+        "verification criteria",
+    ]
+    structural_score = min(30, sum(10 for s in structural_signals if s in text_lower))
+    scores["testability"] = min(100, keyword_score + structural_score)
 
     vague_terms = ["fast", "good", "important", "better", "nice", "adequate", "proper"]
     vague_count = sum(1 for v in vague_terms if v in text_lower)
@@ -165,10 +246,12 @@ def _judge_with_llm(spec_text: str, judge: Any) -> dict[str, int]:
 def main() -> int:
     """CLI entry: `python -m harness_maker.spec_quality eval`.
 
-    Reads `{"spec_text": "...", "dev_mode": "spec-driven|task-driven"}`
-    from stdin and prints `{"overall": N, "scores": {...}, "blocked": bool,
-    "weak_dimensions": [...]}` to stdout. The spec-stage prompt invokes
-    this CLI rather than re-implementing the rubric inline.
+    Reads ``{"spec_text": "...", "dev_mode": "spec-driven|task-driven",
+    "machine_yaml": "..."}`` from stdin and prints ``{"overall": N,
+    "scores": {...}, "blocked": bool, "weak_dimensions": [...]}`` to
+    stdout. ``machine_yaml`` is optional — when provided, the ADR-006/009
+    machine dims (machine_verifiability, mutation_coverage_set,
+    non_python_intent_alignment) are added to the score set.
     """
     import sys
 
@@ -186,12 +269,28 @@ def main() -> int:
         return 1
     spec_text = data.get("spec_text", "")
     dev_mode = data.get("dev_mode", "task-driven")
+    machine_yaml = data.get("machine_yaml")
     if not isinstance(spec_text, str):
         sys.stderr.write("spec_quality: spec_text must be a string\n")
         return 1
     if not isinstance(dev_mode, str):
         dev_mode = "task-driven"
-    result = evaluate_spec(spec_text, dev_mode)
+    if machine_yaml is not None and not isinstance(machine_yaml, str):
+        machine_yaml = None
+
+    # INTEGRATION=1 → wire the real Anthropic judge for semantic scoring.
+    # Default (no env var): heuristic only (fast, deterministic for CI).
+    judge_client = None
+    import os as _os
+
+    if _os.getenv("INTEGRATION"):
+        try:
+            from harness_maker.llm_judge import AnthropicJudgeClient
+            judge_client = AnthropicJudgeClient()
+        except (ImportError, Exception):  # noqa: BLE001 — degrade silently to heuristic
+            judge_client = None
+
+    result = evaluate_spec(spec_text, dev_mode, judge=judge_client, machine_yaml=machine_yaml)
     payload = {
         "overall": result.overall,
         "scores": result.scores,
