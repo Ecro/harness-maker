@@ -550,12 +550,25 @@ def test_cli_create_picks_innermost_when_nested_dotworktrees(
     )
     # Create a real worktree first via the API
     outer_wt = worktree.create("outer", repo)[0]
-    # Manually manufacture a nested .worktrees/inner inside the outer
-    # worktree root — synthesizes the pathological structure with a fake
-    # .git file so the inner candidate passes the .git probe.
-    nested_root = outer_wt / worktree.WORKTREE_DIR_NAME / "inner"
-    nested_root.mkdir(parents=True)
-    (nested_root / ".git").write_text("gitdir: /fake\n")  # marker file
+    # Manufacture a REAL nested git worktree inside the outer worktree's
+    # `.worktrees/` directory. Using a real worktree (not a planted `.git`
+    # file) is required since round 4 hardening: `_detect_existing_worktree`
+    # now uses `git rev-parse --git-dir` (authoritative) instead of bare
+    # `.git`-existence — which means planted regular files no longer pass.
+    # This test still verifies innermost-wins; the path-walking logic is
+    # unchanged, only the leaf gate is stricter.
+    nested_parent = outer_wt / worktree.WORKTREE_DIR_NAME
+    nested_parent.mkdir(parents=True, exist_ok=True)
+    # Create a real worktree of the OUTER repo as the nested entry. Branch
+    # name must differ from the outer's existing branches.
+    nested_root = nested_parent / "inner"
+    subprocess.run(
+        ["git", "worktree", "add", "-b", "inner-branch", str(nested_root)],
+        cwd=str(outer_wt),
+        check=True,
+        capture_output=True,
+        text=True,
+    )
 
     rc = worktree.main(["create", "execute", str(nested_root)])
     out = capsys.readouterr().out.strip()

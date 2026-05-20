@@ -20,8 +20,10 @@ Conventions
 from __future__ import annotations
 
 import contextlib
+import re
 import subprocess
 import sys
+import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -29,9 +31,18 @@ import yaml
 
 from harness_maker.io_utils import load_harness_yaml
 
+# Used by both stash list SHA capture and ref-file validation (ADR-002).
+_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+# Anchors the session_marker absolute-path regex (ADR-002): leading `/`,
+# followed by some directory chain, then `/.claude/.hm-loop-<wt-name>`.
+_SESSION_MARKER_RE = re.compile(r"^/.+/\.claude/\.hm-loop-[A-Za-z0-9_.-]+$")
+
 WORKTREE_DIR_NAME = ".worktrees"
 _TS_FMT = "%Y%m%dT%H%MZ"
 _GIT_TIMEOUT = 60  # seconds — prevent hang on SSH prompt or NFS stall
+# Longer timeout for `git stash push -u` on large working trees with untracked
+# binary artifacts. Bumped per REVIEW M-P1-3 — 60s was tight for repos >100MB.
+_GIT_TIMEOUT_LONG = 300
 
 # Per-session marker files: .claude/.hm-loop-{primary-wt-basename}
 # One file per active session — parallel sessions coexist without collision.
@@ -41,8 +52,16 @@ _LOOP_MARKER_PREFIX = ".hm-loop-"
 _LOOP_MARKER_GITIGNORE_PATTERN = ".claude/.hm-loop-*"
 
 
-def _run(args: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
-    """Wrap subprocess.run with check=True + capture; uniform error surface."""
+def _run(
+    args: list[str], cwd: Path, timeout: int | None = None
+) -> subprocess.CompletedProcess[str]:
+    """Wrap subprocess.run with check=True + capture; uniform error surface.
+
+    The optional ``timeout`` parameter overrides the default ``_GIT_TIMEOUT``
+    for individual call sites that need more time (e.g., ``git stash push -u``
+    on a large working tree).
+    """
+    effective_timeout = _GIT_TIMEOUT if timeout is None else timeout
     try:
         return subprocess.run(  # noqa: S603 — args list, no shell
             args,
@@ -50,7 +69,7 @@ def _run(args: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
             check=True,
             capture_output=True,
             text=True,
-            timeout=_GIT_TIMEOUT,
+            timeout=effective_timeout,
         )
     except subprocess.CalledProcessError as e:
         msg = (
@@ -59,7 +78,9 @@ def _run(args: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
         )
         raise RuntimeError(msg) from e
     except subprocess.TimeoutExpired as e:
-        raise RuntimeError(f"git command timed out after {_GIT_TIMEOUT}s: {' '.join(args)}") from e
+        raise RuntimeError(
+            f"git command timed out after {effective_timeout}s: {' '.join(args)}"
+        ) from e
 
 
 def _timestamp() -> str:
@@ -246,6 +267,7 @@ _STASH_MESSAGE_PREFIX = "hm-finalize-"
 # autoloop AskUserQuestion exception. Keep stable — changing breaks the gate.
 _POP_CONFLICT_SIGNAL = "[finalize] stash-pop conflict — autoloop must halt"
 _UNTRACKED_COLLISION_SIGNAL = "[finalize] untracked-file collision — autoloop must halt"
+_POP_UNKNOWN_SIGNAL = "[finalize] stash-pop failed (class=unknown) — autoloop must halt"
 
 
 def _probe_submodules(base: Path) -> None:
@@ -304,11 +326,19 @@ def _is_harness_artifact(porcelain_line: str) -> bool:
 def _stash_base_dirty(base: Path, wt_name: str) -> str | None:
     """Stash base's dirty (tracked + staged + untracked) before squash.
 
-    Returns the stash ref (`stash@{N}`) when something was stashed, or None
-    when base was clean OR only harness-managed artifacts (.worktrees/, our
-    markers, our stash refs) are present. The ref is resolved by message-grep
-    so a concurrent stash from another tool doesn't shift ``stash@{0}`` out
-    from under us.
+    Returns the stash's 40-char commit SHA when something was stashed, or
+    None when base was clean / only harness-managed artifacts are present.
+
+    Race-free SHA capture: ADR-001 originally specified ``git stash create`` +
+    ``git stash store`` to avoid the ``rev-parse stash@{0}`` window, but
+    ``git stash create`` does NOT include untracked files (no ``-u`` flag on
+    that subcommand — verified against git source). We instead use
+    ``git stash push -u`` with a UUID-suffixed message to guarantee global
+    uniqueness, then resolve the SHA via ``git stash list --pretty=format:'%H %gs'``
+    matched on the exact full message. Because the message is unique, position
+    drift in the stash stack from concurrent pushers cannot misidentify our
+    entry — we always find OUR commit by message content (a property of the
+    commit, not its reflog position).
     """
     status = _run(["git", "status", "--porcelain"], cwd=base)
     user_lines = [
@@ -316,21 +346,38 @@ def _stash_base_dirty(base: Path, wt_name: str) -> str | None:
     ]
     if not user_lines:
         return None
-    message = f"{_STASH_MESSAGE_PREFIX}{wt_name}"
-    _run(["git", "stash", "push", "-u", "-m", message], cwd=base)
-    listing = _run(["git", "stash", "list"], cwd=base)
-    # Exact-match the message field (after the last `": "`) to avoid substring
-    # collisions with prefix-shared messages from prior failed runs. Format
-    # is `stash@{N}: On <branch>: <message>` or `stash@{N}: WIP on ...: <message>`;
-    # splitting on `": "` with maxsplit=2 isolates the message field cleanly.
+    # UUID suffix gives globally-unique stash messages — eliminates the
+    # numeric-suffix substring collision class entirely and rules out any
+    # cross-process message clash (git GUI, sibling session, Cursor IDE).
+    # Full 32-char UUID — 128 bits of entropy makes coincident message clash
+    # cryptographically infeasible. Stash messages aren't user-displayed in
+    # casual use; length doesn't matter (REVIEW M-P1-3 closure).
+    unique = uuid.uuid4().hex
+    message = f"{_STASH_MESSAGE_PREFIX}{wt_name}-{unique}"
+    _run(
+        ["git", "stash", "push", "-u", "-m", message],
+        cwd=base,
+        timeout=_GIT_TIMEOUT_LONG,
+    )
+    # `--pretty=format:'%H %gs'` prints `<sha> <subject>` per stash entry;
+    # subject is the message body without the `On <branch>:` prefix.
+    listing = _run(
+        ["git", "stash", "list", "--pretty=format:%H %gs"], cwd=base
+    )
     for line in listing.stdout.splitlines():
-        parts = line.split(": ", 2)
-        if len(parts) == 3 and parts[2].strip() == message:
-            ref = parts[0].strip()
-            if ref.startswith("stash@{"):
-                return ref
+        # Each line is `<40-char sha> <subject>`. Subject often has the form
+        # `On main: <message>`; some git versions include the branch prefix
+        # in %gs output, others don't. Match by message suffix to handle both.
+        if not line:
+            continue
+        sha, _, subject = line.partition(" ")
+        if len(sha) != 40 or not _SHA_RE.match(sha):
+            continue
+        # Match either the bare message or the "On <branch>: <message>" form.
+        if subject.endswith(f": {message}") or subject == message:
+            return sha
     raise RuntimeError(
-        f"stash push reported success but ref not found in `git stash list` for message {message!r}"
+        f"stash push reported success but no entry matches message {message!r}"
     )
 
 
@@ -370,46 +417,90 @@ def _classify_pop_failure(error_text: str, base: Path) -> tuple[str, list[Path]]
     return ("unknown", [])
 
 
-def _restore_base_dirty(base: Path, stash_ref: str) -> tuple[bool, str, list[Path]]:
-    """Pop the stash. Returns (ok, klass, files); on failure stash is preserved.
+def _restore_base_dirty(base: Path, ref_sha: str) -> tuple[bool, str, list[Path]]:
+    """Apply the stash by SHA then drop the matching reflog entry.
 
-    Success → (True, "", []).
-    Failure → (False, "merge_conflict" | "untracked_collision" | "unknown", files).
+    `git stash pop <sha>` does NOT accept arbitrary SHAs — git requires the
+    ``stash@{N}`` reflog form. ``git stash apply <sha>`` DOES accept any commit
+    that "looks like a stash entry", which our captured SHA is. So we use
+    `apply` (race-free SHA target) then locate the matching `stash@{N}` and
+    drop it manually. Position drift is irrelevant: even if the reflog
+    position shifted, we identify our entry by SHA equality (`--format=%H`)
+    not by index.
+
+    Success → (True, "", []). On apply failure stash is preserved with
+    classified signal; on drop failure (apply succeeded but cleanup missed)
+    we still return success — the user has their work back, and a leftover
+    stash entry is a low-impact disk leak resolvable by hand.
     """
     try:
-        _run(["git", "stash", "pop", stash_ref], cwd=base)
-        return (True, "", [])
+        _run(["git", "stash", "apply", ref_sha], cwd=base)
     except RuntimeError as e:
         klass, files = _classify_pop_failure(str(e), base)
         return (False, klass, files)
+    # Apply succeeded — find the matching reflog ENTRY by refname and drop it.
+    # Use `--format='%gd %H'` so we read the `stash@{N}` refname AND the SHA in
+    # one git call. Dropping by refname (e.g. `stash@{0}`) eliminates the
+    # enumerate-then-stale-index race the prior implementation had: even if a
+    # concurrent push shifted the stack between our enumeration and our drop,
+    # the refname `%gd` captures git's own naming at the moment of the list
+    # call. (Residual one-step race: a push landing BETWEEN list and drop is
+    # the same single-window race git itself has — unavoidable.)
+    dropped = False
+    try:
+        listing = _run(["git", "stash", "list", "--format=%gd %H"], cwd=base)
+        for line in listing.stdout.splitlines():
+            stash_refname, _, sha = line.partition(" ")
+            if sha.strip() == ref_sha and stash_refname.startswith("stash@{"):
+                _run(["git", "stash", "drop", stash_refname], cwd=base)
+                dropped = True
+                break
+    except RuntimeError:
+        # Best-effort: apply already restored the user's work. Leaking a stash
+        # entry is far better than losing the apply.
+        pass
+    if not dropped:
+        # SHA didn't match any stash entry — likely already dropped by the user
+        # or removed via reflog gc. Surface a warning so the leak is visible
+        # (REVIEW round 2 P2: silent stash leak when SHA not found).
+        print(
+            f"[finalize] stash drop skipped — SHA {ref_sha[:8]} not found in "
+            f"reflog (stash may be leaked; check `git stash list`)",
+            file=sys.stderr,
+        )
+    return (True, "", [])
 
 
 def _emit_pop_failure_signal(
-    klass: str, stash_ref: str, files: list[Path], wt_name: str
+    klass: str, ref_sha: str, files: list[Path], wt_name: str
 ) -> None:
-    """Write the literal stderr block Step 5 LLM matches on (ADR-003)."""
+    """Write the literal stderr block Step 5 LLM matches on (ADR-003).
+
+    Recovery hints use ``ref_sha[:8]`` for discoverability via
+    `git stash list | grep <prefix>` — full SHA in `Stash:` line for precision.
+    """
+    short = ref_sha[:8]
+    drop_hint = (
+        f"git stash drop "
+        f"$(git stash list --format='%gd %H' | grep {short} | awk '{{print $1}}')"
+    )
     if klass == "merge_conflict":
         signal = _POP_CONFLICT_SIGNAL
-        recovery = (
-            f"Resolve: grep -l '<<<<<<<' . then edit + git add + "
-            f"git stash drop {stash_ref}"
-        )
+        recovery = f"Resolve: grep -l '<<<<<<<' . then edit + git add + {drop_hint}"
     elif klass == "untracked_collision":
         signal = _UNTRACKED_COLLISION_SIGNAL
         recovery = (
-            f"Recover: git checkout {stash_ref} -- <file> "
-            f"(rename first if needed) then git stash drop {stash_ref}"
+            f"Recover: git checkout {ref_sha} -- <file> "
+            f"(rename first if needed) then {drop_hint}"
         )
     else:
-        signal = "[finalize] stash-pop failed (class=unknown) — autoloop must halt"
-        recovery = (
-            f"Inspect: git stash show -p {stash_ref}; "
-            f"resolve manually; git stash drop {stash_ref}"
-        )
+        signal = _POP_UNKNOWN_SIGNAL
+        recovery = f"Inspect: git stash show -p {ref_sha}; resolve manually; {drop_hint}"
     print(signal, file=sys.stderr)
-    print(f"Stash: {stash_ref} ({_STASH_MESSAGE_PREFIX}{wt_name})", file=sys.stderr)
+    print(f"Stash: {ref_sha} ({_STASH_MESSAGE_PREFIX}{wt_name})", file=sys.stderr)
     label = "Files (in stash, not restored)" if klass == "untracked_collision" else "Files"
     print(f"{label}: {[str(f) for f in files]}", file=sys.stderr)
+    print(f"Find: git stash list | grep {short}", file=sys.stderr)
     print(recovery, file=sys.stderr)
 
 
@@ -427,22 +518,59 @@ def _stash_ref_path(base: Path, wt_name: str) -> Path:
     return base / _LOOP_MARKER_DIR / f"{_STASH_REF_PREFIX}{wt_name}"
 
 
-def _write_stash_ref_file(base: Path, wt_name: str, stash_ref: str) -> Path:
-    """Persist the stash handoff state (ADR-001 §2).
+def _write_stash_ref_file(
+    base: Path,
+    wt_name: str,
+    ref_sha: str,
+    session_marker_path: Path,
+    sibling_bases: list[Path] | None = None,
+) -> Path:
+    """Persist the stash handoff state (ADR-001 + ADR-002).
 
-    Body is 4 simple ``key: value`` lines so ``post-commit-pop`` can read with
-    a trivial parser without dragging a YAML dep into the worktree subpackage.
-    The session field is the per-session marker basename so we can later
-    cross-check that the live session matches before popping (validator 2nd-pass
-    warning #3).
+    Body is up to 5 ``key: value`` lines parsed by a trivial reader.
+    Schema:
+    - ``ref_sha``: 40-char immutable stash commit SHA (no position drift)
+    - ``base``: absolute path to THIS repo's base (sibling in multi-repo)
+    - ``session_marker``: absolute path to the PRIMARY repo's
+      ``.claude/.hm-loop-{primary_wt_name}`` file
+    - ``sibling_bases``: pipe (``|``)-separated absolute paths to peer repos
+      (only written on the PRIMARY's ref file; empty for sibling refs). Used
+      by ``_cli_post_commit_pop`` for multi-repo scan discovery — replaces
+      reading ``harness.yaml`` at pop time, which was vulnerable to a
+      chicken-and-egg deadlock if the yaml was swept into the stash itself.
+      Paths containing ``|``, ``\n``, ``\r``, or NUL are REJECTED at write
+      time (RuntimeError) rather than silently produce an ambiguous body
+      (REVIEW round 4 P1).
+    - ``created_at``: ISO 8601 UTC (forensic only)
     """
     from harness_maker.io_utils import atomic_write
 
     path = _stash_ref_path(base, wt_name)
+    # Pipe-separated absolute paths inside a single body line (the line-based
+    # parser splits each `key: value` at the first `:` — multi-line values
+    # break it). `|` is legal in POSIX paths but extraordinarily rare; we
+    # FAIL-FAST at write time if any sibling path contains `|`, `\n`, `\r`,
+    # or NUL — same forbidden-character set the validator enforces at read
+    # time. Without this guard the write would produce an ambiguous body
+    # the validator would silently reject at pop time, leaving stash leaked
+    # with no diagnostic (REVIEW round 4 P1).
+    sibling_strs: list[str] = []
+    for p in sibling_bases or []:
+        s = str(p.resolve())
+        if any(ch in s for ch in "\x00|\n\r"):
+            raise RuntimeError(
+                f"sibling base path contains a reserved character "
+                f"(NUL, |, newline, CR) — cannot encode safely: {s!r}\n"
+                f"Recovery: rename the sibling directory to remove the "
+                f"character, update harness.yaml.sibling_repos, then re-run."
+            )
+        sibling_strs.append(s)
+    sibling_str = "|".join(sibling_strs)
     body = (
-        f"ref: {stash_ref}\n"
+        f"ref_sha: {ref_sha}\n"
         f"base: {base.resolve()}\n"
-        f"session: {_LOOP_MARKER_PREFIX}{wt_name}\n"
+        f"session_marker: {session_marker_path.resolve()}\n"
+        f"sibling_bases: {sibling_str}\n"
         f"created_at: {datetime.now(UTC).isoformat()}\n"
     )
     atomic_write(path, body)
@@ -464,15 +592,139 @@ def _read_stash_ref_file(path: Path) -> dict[str, str]:
     return out
 
 
-def _session_marker_present(base: Path, session_basename: str) -> bool:
-    """True iff ``<base>/.claude/<session_basename>`` exists as a file.
+def _is_git_repo(path: Path) -> bool:
+    """Canonical check: ``git rev-parse --git-dir`` succeeds when cwd is a
+    git working tree.
 
-    A live session marker means the wrapup invocation belongs to the same
-    session that created the stash; an absent marker means the prior session
-    died without wrapup and the ref file is stale (do not pop, validator
-    2nd-pass warning #3).
+    Cheaper substitutes (`(path / ".git").exists()` or `.is_dir()`) accept a
+    PLANTED regular file as a fake `.git` — REVIEW round 3 P1 surfaced this
+    as an injection vector. Trusting git's own resolver is the authoritative
+    answer that handles all four legitimate forms: normal `.git/` directory,
+    worktree `.git` file containing `gitdir: ...`, bare repos, and submodule
+    gitdir links.
     """
-    return (base / _LOOP_MARKER_DIR / session_basename).is_file()
+    if not path.is_dir():
+        return False
+    try:
+        _run(["git", "rev-parse", "--git-dir"], cwd=path)
+    except RuntimeError:
+        return False
+    return True
+
+
+def _is_safe_absolute_path(value: str) -> bool:
+    """Common safety predicate for ref-file path fields.
+
+    Returns True iff value: starts with `/`, contains no NUL byte, normalizes
+    consistently (no `.` / `..` segments after normalization), and is not a
+    symlink. All filesystem stat calls are wrapped — `OSError` (e.g. embedded
+    NUL → ValueError on POSIX) returns False, never raises (REVIEW round 3 P1:
+    NUL-byte injection must not crash validation).
+    """
+    if not value or not value.startswith("/"):
+        return False
+    # POSIX "//" prefix is implementation-defined; on Linux `pathlib`
+    # preserves it (`str(Path("//foo"))` == `"//foo"`), letting a crafted
+    # double-slash path slip past downstream `Path(...)` normalization.
+    # Reject explicitly (REVIEW round 5 P2 defense-in-depth).
+    if value.startswith("//"):
+        return False
+    # Forbidden characters: NUL (crashes os.stat with ValueError on POSIX);
+    # `|` (reserved as sibling_bases delimiter); `\n` and `\r` (would inject
+    # extra `key: value` lines into the ref-file body and bypass validation
+    # of injected keys — REVIEW round 4 P1: newline-in-path → ref body
+    # injection). Any path containing these is rejected regardless of
+    # whether the OS technically allows the character.
+    if any(ch in value for ch in "\x00|\n\r"):
+        return False
+    try:
+        p = Path(value)
+        # Reject both `..` AND `.` segments explicitly (not relying on the
+        # normalization check below as the sole gate — REVIEW round 4 P2).
+        if any(part in {".", ".."} for part in p.parts):
+            return False
+        norm = str(p)
+        if norm != value.rstrip("/") and norm + "/" != value:
+            return False
+        if p.is_symlink():
+            return False
+    except (OSError, ValueError):
+        return False
+    return True
+
+
+def _validate_stash_ref_fields(fields: dict[str, str]) -> dict[str, str] | None:
+    """ADR-002 + REVIEW round 3 hardening: validate ref-file fields before any
+    filesystem op.
+
+    Rejects (returns None) any of:
+    - ``ref_sha`` not a 40-char lowercase hex string
+    - ``base`` not absolute, contains ``..``, fails normalization, has NUL
+      byte, or is a symlink
+    - ``session_marker`` not matching the harness pattern, fails the same
+      path-safety predicate, or is a symlink
+    - ``sibling_bases`` (pipe (``|``)-separated absolute paths): any token
+      fails ``_is_safe_absolute_path``
+    - ``created_at`` empty or not ISO 8601 parseable
+
+    On success returns the dict unchanged so callers can use validated values.
+    Never raises — even adversarial NUL-byte content returns clean None
+    (REVIEW round 3 P0: discovery + crash).
+    """
+    try:
+        ref_sha = fields.get("ref_sha", "")
+        if not _SHA_RE.match(ref_sha):
+            return None
+
+        base_str = fields.get("base", "")
+        if not _is_safe_absolute_path(base_str):
+            return None
+
+        session_marker_str = fields.get("session_marker", "")
+        if not _SESSION_MARKER_RE.match(session_marker_str):
+            return None
+        if not _is_safe_absolute_path(session_marker_str):
+            return None
+
+        # sibling_bases is OPTIONAL (only the primary's ref writes it).
+        # Encoding is pipe (`|`)-separated to keep the value within one
+        # line of the `key: value` body (multi-line values would break the
+        # parser). `|` is legal in POSIX paths but extraordinarily rare,
+        # and `_is_safe_absolute_path` rejects any token containing `|`,
+        # `\n`, `\r`, or NUL — closing newline-injection and ambiguous-
+        # split vectors at validation time. Comma was considered and
+        # rejected because comma is more common in POSIX paths than `|`.
+        sibling_bases_raw = fields.get("sibling_bases", "")
+        if sibling_bases_raw:
+            for token in sibling_bases_raw.split("|"):
+                t = token.strip()
+                if t and not _is_safe_absolute_path(t):
+                    return None
+
+        # `created_at` is REQUIRED — empty fails validation (forensic anchor).
+        created_at = fields.get("created_at", "")
+        if not created_at:
+            return None
+        try:
+            datetime.fromisoformat(created_at)
+        except ValueError:
+            return None
+    except (OSError, ValueError):
+        # Defense-in-depth: any unexpected OS-level path error becomes clean
+        # rejection rather than uncaught propagation (REVIEW round 3 P1).
+        return None
+
+    return fields
+
+
+def _session_marker_present(session_marker_path: str) -> bool:
+    """True iff the absolute marker path resolves to a real file.
+
+    Caller passes the validated absolute path from the ref file. A live marker
+    means the wrapup invocation belongs to the same session that created the
+    stash; an absent marker = stale (don't pop, REVIEW M-P1-2 + parent ADR-006).
+    """
+    return Path(session_marker_path).is_file()
 
 
 def merge(wt_path: Path, strategy: str = "squash", commit: bool = True) -> None:
@@ -584,7 +836,15 @@ _EXECUTE_MD_REL = Path(".claude") / "commands" / "hm" / "execute.md"
 
 
 def _load_sibling_dirs(harness_yaml: Path, base: Path) -> list[Path]:
-    """Read sibling_repos from harness.yaml; resolve relative paths against base."""
+    """Read sibling_repos from harness.yaml; resolve relative paths against base.
+
+    REVIEW round 2 hardening (P1: path traversal): each resolved path is gated by
+    (a) existence as a directory and (b) presence of a ``.git`` entry (file or
+    dir). Adversarial or typo'd entries like ``../../etc/secrets`` or absolute
+    non-repo paths are silently dropped with a stderr warning. Entries pointing
+    back at the primary base are deduplicated by callers (`bases_to_scan` uses
+    dict.fromkeys to preserve order while removing dupes).
+    """
     try:
         data = load_harness_yaml(harness_yaml)
     except (OSError, yaml.YAMLError):
@@ -592,7 +852,26 @@ def _load_sibling_dirs(harness_yaml: Path, base: Path) -> list[Path]:
     raw = data.get("sibling_repos")
     if not isinstance(raw, list):
         return []
-    return [(base / rel).resolve() for rel in raw if isinstance(rel, str)]
+
+    resolved: list[Path] = []
+    for rel in raw:
+        if not isinstance(rel, str):
+            continue
+        candidate = (base / rel).resolve()
+        # Containment via canonical git check: catches path-traversal AND
+        # planted `.git` files. REVIEW round 3 P1: `.exists()` accepted a
+        # regular file at `<path>/.git` as proof of git-repo status, so we
+        # now rely on `git rev-parse --git-dir` (the authoritative answer).
+        if not _is_git_repo(candidate):
+            print(
+                f"[worktree] sibling_repos entry {rel!r} is not a git "
+                f"working tree (git rev-parse failed); skipping — "
+                f"path-traversal guard",
+                file=sys.stderr,
+            )
+            continue
+        resolved.append(candidate)
+    return resolved
 
 
 def _execute_md_has_sentinel(base: Path) -> bool:
@@ -730,6 +1009,8 @@ def _ensure_gitignore_entry(project_root: Path, entry: str) -> None:
     a hard correctness requirement. The gate still works; users may have
     a marker to manually clean up if a loop crashes.
     """
+    from harness_maker.io_utils import atomic_write
+
     gitignore = project_root / ".gitignore"
     try:
         if gitignore.is_file():
@@ -740,8 +1021,10 @@ def _ensure_gitignore_entry(project_root: Path, entry: str) -> None:
                 if line.strip() == entry:
                     return
             sep = "" if existing.endswith("\n") else "\n"
-            with gitignore.open("a", encoding="utf-8") as f:
-                f.write(f"{sep}{entry}\n")
+            # Atomic-append: read full content + append entry + atomic_write
+            # the whole file. Mirrors the new-file branch below and prevents
+            # the SIGINT-leaves-partial-line failure mode (REVIEW M-P1-2).
+            atomic_write(gitignore, f"{existing}{sep}{entry}\n")
         else:
             # Atomic write via tempfile + os.replace — CLAUDE.md project rule
             # forbids plain open(path, "w") outside tempfile-owned directories.
@@ -780,7 +1063,10 @@ def _detect_existing_worktree(base: Path) -> Path | None:
         candidate = Path(*parts[: i + 2])
         if not candidate.is_dir():
             continue
-        if (candidate / ".git").exists():
+        # Use canonical `git rev-parse --git-dir` check rather than
+        # `.git`-existence (REVIEW round 4 P1: planted regular file at
+        # `<dir>/.git` would otherwise pass as a worktree).
+        if _is_git_repo(candidate):
             return candidate
     return None
 
@@ -858,13 +1144,15 @@ def _cli_finalize(args: list[str]) -> int:
 
     # success / stage-only: fail-fast multi-WT merge loop.
     succeeded: list[Path] = []
-    pending = list(all_wts)
+    # `pending` is a set: `.discard()` is O(1) and doesn't raise if the value
+    # was never added (idempotent re-runs may skip an already-cleaned WT).
+    pending: set[Path] = set(all_wts)
 
     for current_wt in all_wts:
         if not current_wt.is_dir():
             # Already processed in a prior run (idempotent re-run).
             succeeded.append(current_wt)
-            pending.remove(current_wt)
+            pending.discard(current_wt)
             continue
 
         wt_rc = 0
@@ -922,11 +1210,33 @@ def _cli_finalize(args: list[str]) -> int:
             # succeeds but BEFORE cleanup, then flip handed_off. Cleanup failure
             # after this point cannot re-contaminate because the finally pop is
             # suppressed by handed_off=True; recovery is owned by post-commit-pop.
+            # ADR-002: pass the PRIMARY repo's marker path so sibling refs point
+            # at the primary marker (siblings have no marker of their own).
             if wt_rc == 0 and not auto_commit and stash_ref is not None:
                 try:
-                    _write_stash_ref_file(base_repo, current_wt.name, stash_ref)
+                    primary_marker = _marker_path(project_root, primary_wt_name)
+                    # Only the primary's ref file records the sibling list;
+                    # post-commit-pop reads sibling_bases from the FIRST valid
+                    # ref under primary's `.claude/` and uses it as the scan
+                    # set. Sibling refs leave the field empty (no recursion).
+                    siblings_for_ref: list[Path] = (
+                        [p.resolve().parent.parent for p in all_wts[1:]]
+                        if current_wt == all_wts[0] and len(all_wts) > 1
+                        else []
+                    )
+                    _write_stash_ref_file(
+                        base_repo,
+                        current_wt.name,
+                        stash_ref,
+                        primary_marker,
+                        sibling_bases=siblings_for_ref,
+                    )
                     handed_off = True
-                except OSError as e:
+                except (OSError, RuntimeError) as e:
+                    # OSError = atomic_write disk failure.
+                    # RuntimeError = sibling_bases encoding violation
+                    # (reserved char in path). Both route through the same
+                    # rollback path so finally pops the base stash.
                     print(
                         f"[finalize] ref file write failed: {e}; rolling back",
                         file=sys.stderr,
@@ -981,7 +1291,7 @@ def _cli_finalize(args: list[str]) -> int:
             return 1
 
         succeeded.append(current_wt)
-        pending.remove(current_wt)
+        pending.discard(current_wt)
 
     # All WTs processed successfully. Stage-only handoffs keep the loop marker
     # alive as the session signal post-commit-pop checks before popping; success
@@ -996,10 +1306,13 @@ def _cli_finalize(args: list[str]) -> int:
 def _cli_post_commit_pop(args: list[str]) -> int:
     """Wrapup handshake: pop deferred stashes (ADR-001 §2, post-commit-pop CLI).
 
-    Globs ``<base_dir>/.claude/.hm-finalize-stash-*`` ref files, pops only
-    those whose ``session:`` marker is still on disk (live session check —
-    validator 2nd-pass warning #3 — prevents stale-ref contamination across
-    sessions). On successful pop, deletes the ref file and the session marker.
+    Globs ``<base_dir>/.claude/.hm-finalize-stash-*`` ref files for the primary
+    base AND every sibling base read from ``<primary>/.claude/harness.yaml``
+    ``sibling_repos`` (multi-repo M-P0-1 closure). For each ref, validates the
+    body via ``_validate_stash_ref_fields``, checks the recorded session_marker
+    is still live, and pops the stash IN THE REPO THE REF RECORDS (M-P0-2 fix:
+    use ``fields['base']`` for the pop target, not the primary base passed in
+    via argv — sibling stashes live in sibling git repos).
 
     Exit codes:
       0 — every actionable ref popped cleanly (or no refs found, or all stale).
@@ -1007,49 +1320,118 @@ def _cli_post_commit_pop(args: list[str]) -> int:
           a classified signal so the wrapup-side LLM can AskUserQuestion.
     """
     if len(args) != 1:
-        print("usage: post-commit-pop <base_dir>", file=sys.stderr)
+        print("usage: post-commit-pop <primary_base>", file=sys.stderr)
         return 2
-    base = Path(args[0]).resolve()
-    claude_dir = base / _LOOP_MARKER_DIR
-    if not claude_dir.is_dir():
-        return 0  # nothing to do
+    primary_base = Path(args[0]).resolve()
+
+    # Multi-repo discovery: read sibling_bases from the PRIMARY's ref file body.
+    # REVIEW round 3 hardening: each candidate ref file must pass the full
+    # _validate_stash_ref_fields schema check AND its session_marker must be
+    # currently live. A stale ref from an aborted prior session must NEVER
+    # poison the discovery for the current session.
+    sibling_bases: list[Path] = []
+    primary_claude = primary_base / _LOOP_MARKER_DIR
+    if primary_claude.is_dir():
+        for ref_file in sorted(primary_claude.glob(f"{_STASH_REF_PREFIX}*")):
+            raw = _read_stash_ref_file(ref_file)
+            fields = _validate_stash_ref_fields(raw)
+            if fields is None:
+                continue  # schema fail → not trusted for discovery
+            if not _session_marker_present(fields["session_marker"]):
+                continue  # stale (dead session) → don't trust its sibling list
+            siblings_field = fields.get("sibling_bases", "")
+            if siblings_field:
+                sibling_bases = [
+                    Path(p.strip()).resolve()
+                    for p in siblings_field.split("|")
+                    if p.strip()
+                ]
+                # Containment: each MUST be a real git working tree per
+                # `git rev-parse --git-dir`. `.git/.exists()` accepted a
+                # planted regular file as proof — REVIEW round 3 P1. The
+                # canonical git check eliminates that injection.
+                sibling_bases = [b for b in sibling_bases if _is_git_repo(b)]
+                break  # First live + valid ref's list is authoritative
+
+    # Dedupe while preserving order: sibling pointing back at primary would
+    # otherwise scan primary's `.claude/` twice (REVIEW round 2 P2).
+    bases_to_scan = list(dict.fromkeys([primary_base, *sibling_bases]))
+    bases_set = set(bases_to_scan)  # for O(1) target_base membership checks
 
     overall_rc = 0
-    for ref_file in sorted(claude_dir.glob(f"{_STASH_REF_PREFIX}*")):
-        fields = _read_stash_ref_file(ref_file)
-        stash_ref = fields.get("ref", "")
-        session = fields.get("session", "")
-        if not stash_ref or not session:
-            print(
-                f"[post-commit-pop] skipping malformed ref file: {ref_file}",
-                file=sys.stderr,
-            )
-            continue
+    # Snapshot the glob ONCE per base. Ref files created mid-iteration (e.g.,
+    # a sibling session's finalize completes while we're popping) are
+    # intentionally deferred to the next post-commit-pop invocation — REVIEW
+    # M-P1-5. Defer marker deletions until after the loop so a marker shared
+    # across multiple ref files in this invocation cannot be unlinked mid-loop
+    # and cause subsequent refs to misclassify as stale — REVIEW P2-2.
+    markers_to_unlink: set[Path] = set()
 
-        if not _session_marker_present(base, session):
-            # Stale ref from a prior session that never wrapped up. Skip without
-            # touching either the stash or the ref file — the next live session
-            # owning that worktree name will recover; or user resolves manually.
-            print(
-                f"[post-commit-pop] stale ref (session {session!r} not active): "
-                f"{ref_file.name} — skipping, stash + ref preserved",
-                file=sys.stderr,
-            )
+    for base in bases_to_scan:
+        claude_dir = base / _LOOP_MARKER_DIR
+        if not claude_dir.is_dir():
             continue
+        for ref_file in sorted(claude_dir.glob(f"{_STASH_REF_PREFIX}*")):
+            raw_fields = _read_stash_ref_file(ref_file)
+            # ADR-002: validate before touching the filesystem. Any invalid
+            # field (bad SHA, non-absolute base, path-traversal, symlinked
+            # marker) => skip without deleting the ref.
+            fields = _validate_stash_ref_fields(raw_fields)
+            if fields is None:
+                print(
+                    f"[post-commit-pop] skipping invalid ref file (validation failed): "
+                    f"{ref_file.name}",
+                    file=sys.stderr,
+                )
+                continue
 
-        # Live session match — pop and clean up.
-        # Derive worktree name from filename (everything after the prefix).
-        wt_name = ref_file.name[len(_STASH_REF_PREFIX) :]
-        ok, klass, files = _restore_base_dirty(base, stash_ref)
-        if not ok:
-            _emit_pop_failure_signal(klass, stash_ref, files, wt_name)
-            overall_rc = 1
-            continue
+            ref_sha = fields["ref_sha"]
+            session_marker = fields["session_marker"]
+            # M-P0-2 fix: use the ref-file's own `base` as the pop target —
+            # for a sibling's ref file, this is the sibling's repo, not the
+            # primary. The argv-derived base is only used for DISCOVERY (the
+            # glob entry point); the pop targets the OWNING repo.
+            target_base = Path(fields["base"]).resolve()
+            # REVIEW round 2 P1 hardening: reject ref files whose `base` field
+            # points outside our known scan set. Even though the regex + symlink
+            # checks already constrain the field, an adversarial ref pointing
+            # at e.g. `/etc` would pass those checks. Containment to the same
+            # bases_to_scan we derived from harness.yaml ensures pop targets
+            # are real harness-known repos.
+            if target_base not in bases_set:
+                print(
+                    f"[post-commit-pop] ref {ref_file.name} `base` "
+                    f"{target_base!r} not in scan set; skipping (path-traversal guard)",
+                    file=sys.stderr,
+                )
+                continue
 
-        # Successful pop: delete the ref file and the session marker so the
-        # next wrapup invocation doesn't try to pop a drained stash.
-        ref_file.unlink(missing_ok=True)
-        (claude_dir / session).unlink(missing_ok=True)
+            if not _session_marker_present(session_marker):
+                print(
+                    f"[post-commit-pop] stale ref (session marker {session_marker!r} "
+                    f"not active): {ref_file.name} — skipping, stash + ref preserved",
+                    file=sys.stderr,
+                )
+                continue
+
+            # Live session match — pop and clean up.
+            wt_name = ref_file.name[len(_STASH_REF_PREFIX) :]
+            ok, klass, files = _restore_base_dirty(target_base, ref_sha)
+            if not ok:
+                _emit_pop_failure_signal(klass, ref_sha, files, wt_name)
+                overall_rc = 1
+                continue
+
+            # Successful pop: delete the ref file inline (each ref is owned by
+            # exactly one iteration). The session marker is deferred to a
+            # post-loop set so a marker referenced by multiple refs in the
+            # same invocation is not deleted mid-loop.
+            ref_file.unlink(missing_ok=True)
+            markers_to_unlink.add(Path(session_marker))
+
+    # Post-loop: clean up markers belonging to successfully popped sessions.
+    for marker in markers_to_unlink:
+        marker.unlink(missing_ok=True)
 
     return overall_rc
 
