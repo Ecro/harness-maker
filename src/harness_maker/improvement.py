@@ -57,7 +57,7 @@ class ImprovementPlan(BaseModel):
     composite_score: int  # 0-100
     layer_scores: dict[str, int]
     actions: list[ActionItem]
-    # PLAN-fresh-install-p0-calibration (0.19.2) — counters drive the footer
+    # PLAN-fresh-install-p0-calibration (0.19.3) — counters drive the footer
     # in `ai_readiness.render_terminal_summary`. Both default to 0 so existing
     # callers that don't set them get the steady-state (no-footer) behavior.
     deferred_telemetry: int = 0
@@ -83,7 +83,7 @@ def _extract_layer1_actions(
 ) -> tuple[list[ActionItem], int, int]:
     """Return (actions, deferred_telemetry_count, demoted_governance_count).
 
-    PLAN-fresh-install-p0-calibration (0.19.2): two-branch policy on
+    PLAN-fresh-install-p0-calibration (0.19.3): two-branch policy on
     INTENDED_P0_SIGNALS — telemetry signals are suppressed entirely while
     `metrics_has_samples` is failing (samples < 5); governance signals are
     forced to "P2" regardless of weight so they surface as aspirational
@@ -231,9 +231,7 @@ def build_improvement_plan(
     composite = _composite(layer_scores)
 
     actions: list[ActionItem] = []
-    layer1_actions, deferred_telemetry, demoted_governance = _extract_layer1_actions(
-        readiness
-    )
+    layer1_actions, deferred_telemetry, demoted_governance = _extract_layer1_actions(readiness)
     actions.extend(layer1_actions)
     actions.extend(_extract_layer2_actions(judge_results))
     actions.extend(_extract_layer3_actions(cache_diagnosis))

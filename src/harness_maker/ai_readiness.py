@@ -256,16 +256,11 @@ def _deferred_items_footer(plan: ImprovementPlan) -> str:
             f"{plan.deferred_telemetry} telemetry signal(s) auto-populate after ≥ 5 turns"
         )
     if plan.demoted_governance > 0:
-        pieces.append(
-            f"{plan.demoted_governance} aspirational governance item(s) demoted to P2"
-        )
+        pieces.append(f"{plan.demoted_governance} aspirational governance item(s) demoted to P2")
     if not pieces:
         return ""
     total = plan.deferred_telemetry + plan.demoted_governance
-    return (
-        f"  … {total} item(s) deferred ({'; '.join(pieces)}). "
-        f"Run /hm:health for full list."
-    )
+    return f"  … {total} item(s) deferred ({'; '.join(pieces)}). Run /hm:health for full list."
 
 
 def _format_action_row(a: ActionItem) -> str:

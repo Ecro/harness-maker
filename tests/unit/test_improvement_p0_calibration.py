@@ -83,9 +83,7 @@ def test_telemetry_suppressed_when_samples_below_threshold() -> None:
 
     actions, deferred_telemetry, demoted_governance = _extract_layer1_actions(readiness)
 
-    telemetry_actions = [
-        a for a in actions if a.source.startswith("layer1:metrics_")
-    ]
+    telemetry_actions = [a for a in actions if a.source.startswith("layer1:metrics_")]
     assert telemetry_actions == [], "telemetry signals must be hidden on fresh install"
     assert deferred_telemetry == 2
     assert demoted_governance == 0
@@ -254,9 +252,7 @@ def test_improvement_plan_carries_counters() -> None:
     gov_signals = [
         _sig("adr_present", passed=False, weight=50),
     ]
-    readiness = _readiness(
-        observability_signals=obs_signals, governance_signals=gov_signals
-    )
+    readiness = _readiness(observability_signals=obs_signals, governance_signals=gov_signals)
     cache = CacheDiagnosis(
         hit_rate=0,
         score=50,

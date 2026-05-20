@@ -82,9 +82,7 @@ def test_footer_present_when_both_categories_active() -> None:
     )
     output = render_terminal_summary(plan)
     # Single consolidated footer line — not duplicated per category.
-    deferred_lines = [
-        line for line in output.splitlines() if "deferred" in line.lower()
-    ]
+    deferred_lines = [line for line in output.splitlines() if "deferred" in line.lower()]
     assert len(deferred_lines) == 1
     assert "2 telemetry" in deferred_lines[0]
     assert "3 aspirational" in deferred_lines[0]
@@ -103,9 +101,7 @@ def test_footer_present_when_no_actions_remain() -> None:
         demoted_governance=0,
     )
     output = render_terminal_summary(plan)
-    assert "No actions" not in output, (
-        "the bare 'No actions' message hides the deferral context"
-    )
+    assert "No actions" not in output, "the bare 'No actions' message hides the deferral context"
     assert "2 telemetry" in output
 
 

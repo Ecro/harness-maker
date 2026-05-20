@@ -79,8 +79,7 @@ def test_fresh_install_no_p0_for_intended_signals(tmp_path) -> None:
     )
     offending = [line for line in p0_lines if forbidden.search(line)]
     assert offending == [], (
-        "fresh install must not emit [P0] for INTENDED signals; got:\n"
-        + "\n".join(offending)
+        "fresh install must not emit [P0] for INTENDED signals; got:\n" + "\n".join(offending)
     )
 
 

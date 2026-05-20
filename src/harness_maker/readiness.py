@@ -67,7 +67,7 @@ _DANGEROUS_DENY_PATTERNS = [
 # real Claude Code use (telemetry) or because it requires user authoring
 # (CI workflow, ADR notes, CONTRIBUTING). Used by:
 #   - Phase 4 integration test allowlist (was the ONLY consumer in 0.17.0).
-#   - PLAN-fresh-install-p0-calibration (0.19.2): the user-facing priority
+#   - PLAN-fresh-install-p0-calibration (0.19.3): the user-facing priority
 #     emitter `improvement._extract_layer1_actions` now consults these subsets
 #     to suppress auto-resolve signals while samples < 5 and to override
 #     user-author signals to "P2" regardless of weight.
