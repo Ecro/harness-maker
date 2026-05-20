@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.19.0] - 2026-05-20
+
+- **CI infrastructure: upgrade 4 GitHub Actions to Node.js 24-compatible versions** — `actions/checkout` v4 → v6.0.2 (SHA `de0fac2`), `astral-sh/setup-uv` v5 → v8.1.0 (SHA `08807647`), `actions/upload-artifact` v4 → v7.0.1 (SHA `043fb46d`), `actions/download-artifact` v4 → v8.0.1 (SHA `3e5f45b2`). Each new pin verified by reading the action's `action.yml` `using:` field == `node24`. SHA-pinning preserved per project security policy. The 0.18.0 release run emitted Node 20 deprecation annotations on every job; this minor closes that warning and prepares for the June 2nd, 2026 forced migration. Single sed-driven replacement across `ci.yml`, `nightly.yml`, `release.yml` (20 reference points total). No semantic workflow change — only the action version pins moved.
+
 ## [0.18.0] - 2026-05-20
 
 - **Total SPEC coverage initiative — `/hm:spec` framework upgrade + dual-file SPECs (PLAN-total-spec-coverage, 10 phases / 13 ADRs)**: ship the foundation for AI-verifiable per-feature SPECs across the ~146 surface (52 Python + 94 templates per ADR-001 computed universe). Loop ran in `.worktrees/execute-20260519T1544Z/` with `--per-iter-workflow exec-rev`, plan-validator passes R1 + R2 → MAJOR_REVISION resolved via interview round 5 (P5 redesign to prompt-driven `/hm:loop p5-batch-N`, NOT `autoloop_driver.run()`) + round 6 (P0.5 baseline fallback rule).
