@@ -13,6 +13,16 @@ from harness_maker.cli import app
 
 runner = CliRunner()
 
+# CI runners set FORCE_COLOR=1, which makes Click 8.2 / Typer 0.16+ render
+# `--help` through Rich with ANSI escapes + width-driven line wraps. Strip
+# ANSI from --help output before substring assertions so tests pass under
+# both local TTYs and CI's FORCE_COLOR environment.
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*[mK]")
+
+
+def _strip_ansi(text: str) -> str:
+    return _ANSI_RE.sub("", text)
+
 
 # ---------- fixture helpers ----------
 
@@ -128,13 +138,14 @@ def test_locate_require_version_bad_input_exit_2(
 
 def test_locate_help_documents_exit_codes_and_constraint() -> None:
     """`locate --help` mentions the >=X.Y constraint and exit codes."""
-    result = runner.invoke(app, ["locate", "--help"])
+    result = runner.invoke(app, ["locate", "--help"], color=False)
     assert result.exit_code == 0
-    assert ">=X.Y" in result.stdout
+    out = _strip_ansi(result.stdout)
+    assert ">=X.Y" in out
     # Help text rendered by typer may wrap lines, so check the constituent
     # exit-code tokens rather than the literal "0 found+ok" phrasing.
-    assert "2" in result.stdout
-    assert "3" in result.stdout
+    assert "2" in out
+    assert "3" in out
 
 
 # ---------- make --require-version ----------
@@ -182,6 +193,6 @@ def test_make_require_version_ok_does_not_block(
 
 def test_make_help_documents_require_version() -> None:
     """`make --help` exposes the --require-version flag."""
-    result = runner.invoke(app, ["make", "--help"])
+    result = runner.invoke(app, ["make", "--help"], color=False)
     assert result.exit_code == 0
-    assert "--require-version" in result.stdout
+    assert "--require-version" in _strip_ansi(result.stdout)

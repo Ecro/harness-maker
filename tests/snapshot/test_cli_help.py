@@ -7,18 +7,38 @@ surfaces as a test failure. Mandated by PLAN-locate-cli-version-gate
 
 from __future__ import annotations
 
+import re
+
 from typer.testing import CliRunner
 
 from harness_maker.cli import app
 
+# `mix_stderr=False` so stderr (where Rich often emits ANSI under FORCE_COLOR)
+# stays out of `result.stdout`. CI runners (GitHub Actions) set FORCE_COLOR=1
+# which makes Click 8.2 / Typer 0.16+ render `--help` through Rich with ANSI
+# escapes + width-driven line wraps, breaking naive substring matches; passing
+# `color=False` to `.invoke()` defuses that on a per-call basis. ANSI-strip
+# regex is a belt-and-suspenders fallback for cases where `color=False` does
+# not fully suppress (e.g. Rich's panel borders).
 runner = CliRunner()
+
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*[mK]")
+
+
+def _help_text(*args: str) -> str:
+    """Invoke the CLI with color disabled and ANSI-strip the resulting output.
+
+    Returns a single string (stdout) safe for substring assertions across
+    both local terminals and CI runners with FORCE_COLOR=1.
+    """
+    result = runner.invoke(app, list(args), color=False)
+    assert result.exit_code == 0, f"CLI exited {result.exit_code}: {result.output!r}"
+    return _ANSI_RE.sub("", result.stdout)
 
 
 def test_locate_help_mentions_constraint_and_exit_codes() -> None:
     """locate --help must document `>=X.Y` semantics and exit codes 0/2/3."""
-    result = runner.invoke(app, ["locate", "--help"])
-    assert result.exit_code == 0
-    out = result.stdout
+    out = _help_text("locate", "--help")
     assert ">=X.Y" in out, f"missing >=X.Y constraint: {out!r}"
     assert "--plain" in out
     assert "--require-version" in out
@@ -30,9 +50,7 @@ def test_locate_help_mentions_constraint_and_exit_codes() -> None:
 
 def test_make_help_exposes_require_version_with_constraint_hint() -> None:
     """make --help must expose --require-version and mention >=X.Y."""
-    result = runner.invoke(app, ["make", "--help"])
-    assert result.exit_code == 0
-    out = result.stdout
+    out = _help_text("make", "--help")
     assert "--require-version" in out, f"flag missing from make --help: {out!r}"
     assert ">=X.Y" in out
     # cross-reference to locate
@@ -41,8 +59,6 @@ def test_make_help_exposes_require_version_with_constraint_hint() -> None:
 
 def test_locate_help_mentions_priority_rules() -> None:
     """locate --help (via the command docstring) describes the resolver priority."""
-    result = runner.invoke(app, ["locate", "--help"])
-    assert result.exit_code == 0
-    out = result.stdout.lower()
+    out = _help_text("locate", "--help").lower()
     # Either prose explanation or pointer to docs/BOOTSTRAP.md is acceptable.
     assert "resolver" in out or "resolve" in out or "priority" in out or "tier" in out
