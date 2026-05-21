@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.17.1
+harness_maker_version: 0.20.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: stages/wrapup.md.j2
 provenance: official
-content_hash: bfc3d3064b3091687634e607c524bdd910a28a0d3a17c0462b778f6d60cc4e9d
+content_hash: 70472b8a24649ef1e5f727676b05ee758fcf95dc2d7707cc9f33e105fedaf6c6
 ---
 # Stage: wrapup
 
@@ -208,6 +208,18 @@ EOF
 **Type** (per CLAUDE.md `<type>(<scope>): <subject>` convention): `feat | fix | chore | ci | test | docs | refactor`.
 
 The commit captures: the staged execute changes + the memory updates + the PLAN status update — **all in one commit**.
+
+### Step 7.5 — Post-commit stash pop (stage-only handshake)
+
+If `/hm:execute` ran in stage-only mode AND the base repo had unrelated dirty work, finalize deferred the stash pop to this point so the user's WIP does not contaminate the commit. Run `post-commit-pop` to restore it (no-op when no ref file is present):
+
+
+```bash
+!uv run --with /home/noel/harness-maker python -m harness_maker.worktree post-commit-pop "$(pwd)"
+```
+
+
+You **MAY** call `AskUserQuestion` (autoloop exception) **ONLY IF** the literal substring `[finalize] stash-pop conflict` OR `[finalize] untracked-file collision` appears in `post-commit-pop`'s stderr. Any other non-zero exit: surface verbatim and halt, do NOT ask.
 
 ### Step 8 — Push (manual; never automatic)
 

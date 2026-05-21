@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.17.1
+harness_maker_version: 0.20.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/make.md.j2
 provenance: official
-content_hash: 730db90508c63b53a9197b64bc5d4cad35312a64b130898f7b16d0da90aa9244
+content_hash: 82a77dee44eccb7d4fb741742bb0e8e6ecdc1641d31972f16bdf2f76d1193251
 ---
 # /hm:make
 
@@ -26,8 +26,21 @@ Parse `$ARGUMENTS` for flags.
 Silent re-render using existing `.claude/harness.yaml` answers. Picks up
 new template improvements without re-interviewing.
 
+The bash line below discovers which harness-maker plugin install is active
+and uses it. Resolution path: a cache-glob bootstraps discovery (works even
+on first upgrade from <0.20 where `locate` is not yet available), then
+`harness-maker locate --plain` is invoked through that bootstrap to get the
+**canonical** install per the priority rules (projectPath==cwd > scope=user >
+installedAt desc — see docs/BOOTSTRAP.md + PLAN-locate-cli-version-gate
+ADR-001). The cache-glob result is used as fallback when `locate` is absent.
+
+Why both: `/plugin update` bumps the plugin cache but the rendered `make.md`
+keeps calling the OLD CLI, which re-emits its OLD pin (the self-update
+bootstrap trap fixed in 0.19.1). The cache glob lets us reach the new
+binary; `locate` then disambiguates between scopes/projects.
+
 ```bash
-!uv run --with /home/noel/harness-maker python -m harness_maker.cli make "$(pwd)" --update
+!HM=$(ls -1d "$HOME"/.claude/plugins/cache/harness-maker*/harness-maker/[0-9]*.[0-9]*.[0-9]* 2>/dev/null | awk -F/ '{print $NF, $0}' | sort -V | tail -1 | cut -d' ' -f2-); HM=$(uv run --with "${HM:-/home/noel/harness-maker}" python -m harness_maker.cli locate --plain 2>/dev/null || echo "${HM:-/home/noel/harness-maker}"); uv run --with "$HM" python -m harness_maker.cli make "$(pwd)" --update
 ```
 
 After the CLI completes, summarize:

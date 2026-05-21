@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.17.1
+harness_maker_version: 0.20.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: 4d14b3302446c44ce7f7c30487cfaf62001b28e1e0893fb2b9c9887a9baaf490
+content_hash: bc1148a6a3cbc1463f56366087cb64126dcbe538d7afb5e7f010df9520ff8fe7
 ---
 # /hm:exec-rev-wrap-ver
 
@@ -208,6 +208,13 @@ If a PLAN phase blocks (Phase A.5 retry exhausted, Phase D unfixable, or ADR con
 - Do NOT silently change scope.
 
 ### Step 5 — Worktree finalize
+
+Before invoking finalize, run `git status --porcelain` in the **base** repo (parent of `<WT>`'s `.worktrees/`). If non-empty, surface to the user, informationally (no question — finalize proceeds):
+
+> "다음 파일이 base 에 dirty 상태로 있어 finalize 가 자동 stash 후 복원합니다: {file list}
+> **알림:** staged 파일은 unstaged 상태로 복원됩니다 — 필요시 다시 `git add` 하세요."
+
+You **MAY** call `AskUserQuestion` (autoloop exception) **ONLY IF** the literal substring `[finalize] stash-pop conflict` OR `[finalize] untracked-file collision` appears in finalize's stderr. Any other failure: halt with stderr message, do NOT ask.
 
 Pick **exactly one** finalize command. Substitute `<WT>` with the literal absolute path from Step 0.
 
@@ -875,6 +882,18 @@ EOF
 **Type** (per CLAUDE.md `<type>(<scope>): <subject>` convention): `feat | fix | chore | ci | test | docs | refactor`.
 
 The commit captures: the staged execute changes + the memory updates + the PLAN status update — **all in one commit**.
+
+### Step 7.5 — Post-commit stash pop (stage-only handshake)
+
+If `/hm:execute` ran in stage-only mode AND the base repo had unrelated dirty work, finalize deferred the stash pop to this point so the user's WIP does not contaminate the commit. Run `post-commit-pop` to restore it (no-op when no ref file is present):
+
+
+```bash
+!uv run --with /home/noel/harness-maker python -m harness_maker.worktree post-commit-pop "$(pwd)"
+```
+
+
+You **MAY** call `AskUserQuestion` (autoloop exception) **ONLY IF** the literal substring `[finalize] stash-pop conflict` OR `[finalize] untracked-file collision` appears in `post-commit-pop`'s stderr. Any other non-zero exit: surface verbatim and halt, do NOT ask.
 
 ### Step 8 — Push (manual; never automatic)
 

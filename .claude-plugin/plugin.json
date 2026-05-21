@@ -1,6 +1,6 @@
 {
   "name": "harness-maker",
-  "version": "0.19.3",
+  "version": "0.20.0",
   "description": "Project-tailored Claude Code harness generator. Interview-driven scaffolding with grade-gated review + auto-fix loop, multi-perspective reviewer consensus (code / security / performance / concurrency / UX), edit-preserving upgrades via block-merge markers, anti-rot crawlers (Anthropic blog / GitHub releases / arxiv / OSV CVEs), worktree isolation, permission separation, version-drift detection, and a 3-layer ai-readiness rubric (deterministic + LLM-judged + cache-diagnostic) with ranked improvement actions.",
   "author": {
     "name": "noel"

@@ -16,6 +16,8 @@ from harness_maker.add_domain import AddDomainError, add_domain, validate_domain
 from harness_maker.block_merge import MergeReport
 from harness_maker.interview import answers_from_harness_yaml, interview
 from harness_maker.io_utils import atomic_write, denormalize_home_to_tilde
+from harness_maker.locate import compare_version
+from harness_maker.locate import resolve as resolve_plugin
 from harness_maker.models import Blueprint, InterviewAnswers, Preset, RefFolder
 from harness_maker.modular_edit import ModularEditError
 from harness_maker.modular_edit import add as modular_add
@@ -186,8 +188,52 @@ def make(
         "--dry-run",
         help="Print what would be installed; do not write files.",
     ),
+    require_version: str | None = typer.Option(
+        None,
+        "--require-version",
+        help=(
+            ">=X.Y constraint on the installed harness-maker plugin. "
+            "Exit 2 before any work if the resolved version is older. "
+            "See `harness-maker locate --help` for resolution rules."
+        ),
+    ),
 ) -> None:
     """Generate or refine the project harness at TARGET/.claude/."""
+    # PLAN-locate-cli-version-gate ADR-002 + REVIEW-2026-05-21 fixes:
+    # - Resolve against `target` (not Path.cwd()) so the gate matches the
+    #   project the user is operating on (F7).
+    # - Exit 3 (not 2) when no install found to match locate's contract (F2).
+    # - Multi-IDE recovery message — installed_plugins.json only holds Claude
+    #   Code entries, but Cursor / Codex users may share that JSON or run
+    #   their own update flows; list all three commands so the user picks (F17).
+    # - Actionable "what to do" pointer for the no-install case (F18).
+    if require_version is not None:
+        entry = resolve_plugin(cwd=target.resolve())
+        if entry is None:
+            typer.echo(
+                "harness-maker: --require-version specified but no installed "
+                "plugin entry found (checked ~/.claude/plugins/installed_plugins.json). "
+                "See docs/BOOTSTRAP.md for install instructions.",
+                err=True,
+            )
+            raise typer.Exit(3)
+        try:
+            ok = compare_version(entry.version, require_version)
+        except ValueError as e:
+            typer.echo(f"harness-maker: --require-version invalid ({e})", err=True)
+            raise typer.Exit(2) from None
+        if not ok:
+            typer.echo(
+                f"harness-maker installed={entry.version} "
+                f"(marketplace={entry.marketplace}) "
+                f"required=>={require_version} — to update: "
+                "`claude plugin update harness-maker` (Claude Code), "
+                "`git -C <installPath> pull` (Cursor git clone), or "
+                "`codex plugin update harness-maker` (Codex CLI)",
+                err=True,
+            )
+            raise typer.Exit(2)
+
     # ADR-013 (PLAN-model-routing-multi-ide): turn the documented footgun
     # `[fail:snapshot-regen-inside-worktree]` (count:4) into enforced
     # prevention. Reject `--update` if cwd is inside a `.worktrees/`
@@ -377,6 +423,71 @@ def make(
         _emit_configure_exit_overrides(target, pre_yaml_body)
     except Exception as e:  # noqa: BLE001 — diagnostic, never fail the make
         typer.echo(f"telemetry: override capture skipped ({e})", err=True)
+
+
+@app.command("locate")
+def locate_cmd(
+    plain: bool = typer.Option(
+        False,
+        "--plain",
+        help="Print installPath only (no JSON, no decoration).",
+    ),
+    require_version: str | None = typer.Option(
+        None,
+        "--require-version",
+        help=">=X.Y constraint. Exit 2 if installed version is older.",
+    ),
+) -> None:
+    """Resolve the active harness-maker plugin install for the current cwd.
+
+    Single source of truth so external bootstrap scripts don't re-implement
+    the resolver and pick the wrong version (see PLAN-locate-cli-version-gate).
+
+    Exit codes: 0 found+ok, 2 version mismatch, 3 no install found.
+    """
+    entry = resolve_plugin(cwd=Path.cwd())
+    if entry is None:
+        typer.echo(
+            "harness-maker: no installed plugin entry found "
+            "(checked ~/.claude/plugins/installed_plugins.json). "
+            "See docs/BOOTSTRAP.md for install instructions per IDE.",
+            err=True,
+        )
+        raise typer.Exit(3)
+
+    if require_version is not None:
+        try:
+            ok = compare_version(entry.version, require_version)
+        except ValueError as e:
+            typer.echo(f"harness-maker: --require-version invalid ({e})", err=True)
+            raise typer.Exit(2) from None
+        if not ok:
+            typer.echo(
+                f"harness-maker installed={entry.version} "
+                f"(marketplace={entry.marketplace}) "
+                f"required=>={require_version} — to update: "
+                "`claude plugin update harness-maker` (Claude Code), "
+                "`git -C <installPath> pull` (Cursor git clone), or "
+                "`codex plugin update harness-maker` (Codex CLI)",
+                err=True,
+            )
+            raise typer.Exit(2)
+
+    if plain:
+        typer.echo(str(entry.install_path))
+        return
+
+    payload: dict[str, Any] = {
+        "marketplace": entry.marketplace,
+        "version": entry.version,
+        "scope": entry.scope,
+        "installPath": str(entry.install_path),
+        "gitCommitSha": entry.git_commit_sha,
+        "installedAt": entry.installed_at,
+    }
+    if entry.project_path is not None:
+        payload["projectPath"] = str(entry.project_path)
+    typer.echo(json.dumps(payload, indent=2))
 
 
 def _emit_dry_run_summary(bp: Blueprint, target_dotclaude: Path) -> None:

@@ -1,6 +1,6 @@
 {
   "generated_by": "harness-maker",
-  "version": "0.17.1",
+  "version": "0.20.0",
   "files": [
     ".claude/agents/autoloop-coder.md",
     ".claude/agents/code-reviewer.md",
