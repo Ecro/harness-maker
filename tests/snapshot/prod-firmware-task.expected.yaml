@@ -1,6 +1,6 @@
 preset: Production
 dev_mode: task-driven
-file_count: 59
+file_count: 60
 files:
 - path: ../CLAUDE.md
   template: claude-md/Production.en.md.j2
@@ -62,6 +62,9 @@ files:
 - path: commands/hm/health.md
   template: commands/hm/health.md.j2
   body_sha256: 8043f244b91b8091d3c61b67e2ffc0fc052912bd8f40002224d9c3f7ed35c2a5
+- path: commands/hm/help.md
+  template: commands/hm/help.en.md.j2
+  body_sha256: 0ade9a3eee44728d1f5a1c0ab4be4604d45bf7f204de18597bd0c3e2309bf17d
 - path: commands/hm/loop.md
   template: commands/hm/loop.md.j2
   body_sha256: bc623a09da3574f8e9423e12e2b0b82d5df6c9db663a6f9511326e31878bd634

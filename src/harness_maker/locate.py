@@ -124,9 +124,7 @@ def resolve(
         return None
 
     # installedAt desc tiebreak (lexicographic ISO-8601 sort works as time sort)
-    marketplace, raw = max(
-        chosen_tier, key=lambda mr: str(mr[1].get("installedAt", ""))
-    )
+    marketplace, raw = max(chosen_tier, key=lambda mr: str(mr[1].get("installedAt", "")))
     return _to_entry(marketplace, raw)
 
 
@@ -151,9 +149,7 @@ def _parse(v: str) -> tuple[int, int, int]:
     nums: list[int] = []
     for p in parts:
         if not _ASCII_DIGITS_RE.fullmatch(p):
-            raise ValueError(
-                f"version {v!r} contains non-numeric (or non-ASCII) part {p!r}"
-            )
+            raise ValueError(f"version {v!r} contains non-numeric (or non-ASCII) part {p!r}")
         nums.append(int(p))
     while len(nums) < 3:
         nums.append(0)

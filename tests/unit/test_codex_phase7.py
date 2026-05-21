@@ -126,6 +126,6 @@ def test_codex_target_files_includes_stage_skills() -> None:
 
 
 def test_codex_target_files_total_skill_count() -> None:
-    """_codex_target_files({}) must include 11 + 7 + 1 (loop) = 19 .agents/skills/ entries."""
+    """_codex_target_files({}) emits 11 base + 7 stage + 1 loop + 1 help = 20 .agents/skills/."""
     out_paths = [out for _, out, _ in _codex_target_files({}) if out.startswith(".agents/skills/")]
-    assert len(out_paths) == 19, f"Expected 19 skill paths, got {len(out_paths)}"
+    assert len(out_paths) == 20, f"Expected 20 skill paths, got {len(out_paths)}"

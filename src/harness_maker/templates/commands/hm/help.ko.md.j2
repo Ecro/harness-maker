@@ -1,0 +1,70 @@
+{%- set cmd = "@hm-" if is_codex else "/hm:" -%}
+# {{ cmd }}help — harness-maker (ko)
+
+> 사용 가능한 모든 `{{ cmd }}*` 명령, 추천 워크플로 경로, 현재 하네스 설정을
+> 한 화면에 모아둔 도움말. 특정 명령의 상세는 `.claude/commands/hm/<name>.md` 참고.
+
+## 📋 사용 가능한 명령
+
+### Atomic stages (7)
+
+| 명령 | 용도 |
+|---|---|
+| `{{ cmd }}research` | 컨텍스트·선행 작업·라이브러리 문서 조사 |
+| `{{ cmd }}spec`     | 수용 기준 확정 (intent / outcomes / scenarios) |
+| `{{ cmd }}plan`     | 깊은 인터뷰 → ADR → 단계 분해 |
+| `{{ cmd }}execute`  | TDD 머신 — PLAN 단계별 RED → GREEN |
+| `{{ cmd }}review`   | 다중 reviewer 합의 + grade gate + auto-fix |
+| `{{ cmd }}wrapup`   | 단일 commit, CHANGELOG, 문서 갱신 |
+| `{{ cmd }}verify`   | wrapup 이후 독립 invariant 검증 |
+
+### Fused workflows ({{ config.workflows | length }}개 등록)
+
+| 명령 | 시퀀스 |
+|---|---|
+{% for name, stages in config.workflows.items() -%}
+| `{{ cmd }}{{ name }}`{% if name == config.default_workflow %} ⭐ (기본){% endif %} | {{ stages | join(" → ") }} |
+{% endfor %}
+
+### Meta
+
+| 명령 | 용도 |
+|---|---|
+| `{{ cmd }}make`      | 전체 재렌더 (인터랙티브) |
+| `{{ cmd }}configure` | 개별 설정 변경 (재인터뷰 없이) |
+| `{{ cmd }}health`    | 3-layer 진단 (structural / external / personalization) |
+| `{{ cmd }}loop`      | 안전 레일 있는 bounded autoloop |
+| `{{ cmd }}uninstall` | 하네스 제거 |
+| `{{ cmd }}help`      | (이 명령) |
+
+## 🔁 추천 워크플로
+
+```
+  research ─► spec ─► plan ─► execute ─► review ─► wrapup
+                                  │
+                                  └─► verify (invariant 재검증 필요시)
+```
+
+**기본 설정:** `{{ cmd }}{{ config.default_workflow }}` ⭐
+
+## ⚙️ 현재 설정
+
+| 키 | 값 |
+|---|---|
+| preset | `{{ config.preset }}` |
+| locale | `{{ config.locale }}` |
+| targets | `{{ config.targets | join(", ") }}` |
+| 기본 워크플로 | `{{ config.default_workflow }}` |
+
+{% if "cursor" in config.targets -%}
+> **Cursor:** `/hm:*` 명령이 동일하게 동작. Subagent · skill 은 `.claude/` 에서 공유.
+{% endif -%}
+{% if "codex" in config.targets -%}
+> **Codex CLI:** `@hm-*` 형식으로 호출 (예: `@hm-help`, `@hm-execute`). Skill 은 `.agents/skills/` 경로.
+{% endif %}
+
+## 💡 다음 단계
+
+- 처음이라면      →  `{{ cmd }}{{ config.default_workflow }}` 로 시작
+- 설정 변경       →  `{{ cmd }}configure`
+- 하네스 진단     →  `{{ cmd }}health`

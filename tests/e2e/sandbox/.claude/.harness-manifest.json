@@ -20,6 +20,7 @@
     ".claude/commands/hm/exec-rev-wrap.md",
     ".claude/commands/hm/execute.md",
     ".claude/commands/hm/health.md",
+    ".claude/commands/hm/help.md",
     ".claude/commands/hm/loop.md",
     ".claude/commands/hm/make.md",
     ".claude/commands/hm/plan.md",

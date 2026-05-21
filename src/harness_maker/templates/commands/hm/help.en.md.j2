@@ -1,0 +1,71 @@
+{%- set cmd = "@hm-" if is_codex else "/hm:" -%}
+# {{ cmd }}help — harness-maker (en)
+
+> One-screen overview of every `{{ cmd }}*` command you can run, the recommended
+> workflow path, and your current harness settings. For per-command details,
+> open `.claude/commands/hm/<name>.md`.
+
+## 📋 Available commands
+
+### Atomic stages (7)
+
+| Command | Purpose |
+|---|---|
+| `{{ cmd }}research` | Gather context, prior art, library docs |
+| `{{ cmd }}spec`     | Lock acceptance criteria (intent / outcomes / scenarios) |
+| `{{ cmd }}plan`     | Deep interview → ADRs → phase decomposition |
+| `{{ cmd }}execute`  | TDD machine — RED → GREEN per PLAN phase |
+| `{{ cmd }}review`   | Multi-reviewer consensus + grade gate + auto-fix |
+| `{{ cmd }}wrapup`   | Single commit, CHANGELOG, doc updates |
+| `{{ cmd }}verify`   | Independent post-wrapup invariant checks |
+
+### Fused workflows ({{ config.workflows | length }})
+
+| Command | Sequence |
+|---|---|
+{% for name, stages in config.workflows.items() -%}
+| `{{ cmd }}{{ name }}`{% if name == config.default_workflow %} ⭐ (your default){% endif %} | {{ stages | join(" → ") }} |
+{% endfor %}
+
+### Meta
+
+| Command | Purpose |
+|---|---|
+| `{{ cmd }}make`      | Full re-render (interactive) |
+| `{{ cmd }}configure` | Targeted setting change (no full re-interview) |
+| `{{ cmd }}health`    | 3-layer audit (structural / external / personalization) |
+| `{{ cmd }}loop`      | Bounded autoloop with safety rails |
+| `{{ cmd }}uninstall` | Remove the harness |
+| `{{ cmd }}help`      | (this command) |
+
+## 🔁 Recommended workflow
+
+```
+  research ─► spec ─► plan ─► execute ─► review ─► wrapup
+                                  │
+                                  └─► verify (when invariants need an extra pass)
+```
+
+**Your default:** `{{ cmd }}{{ config.default_workflow }}` ⭐
+
+## ⚙️ Your current settings
+
+| Key | Value |
+|---|---|
+| preset | `{{ config.preset }}` |
+| locale | `{{ config.locale }}` |
+| targets | `{{ config.targets | join(", ") }}` |
+| default workflow | `{{ config.default_workflow }}` |
+
+{% if "cursor" in config.targets -%}
+> **Cursor:** `/hm:*` commands work identically. Subagents and skills are read from `.claude/`.
+{% endif -%}
+{% if "codex" in config.targets -%}
+> **Codex CLI:** invoke as `@hm-*` (e.g. `@hm-help`, `@hm-execute`). Skills live under `.agents/skills/`.
+{% endif %}
+
+## 💡 Next steps
+
+- New to this harness?  →  run `{{ cmd }}{{ config.default_workflow }}`
+- Change a setting?     →  run `{{ cmd }}configure`
+- Audit harness health? →  run `{{ cmd }}health`

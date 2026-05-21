@@ -48,9 +48,7 @@ def patched_installed_plugins_json(monkeypatch, tmp_path: Path) -> Path:
     fixture = _write_installed_plugins_json(tmp_path)
     import harness_maker.locate as locate_mod
 
-    monkeypatch.setattr(
-        locate_mod, "_default_plugins_json", lambda: fixture, raising=True
-    )
+    monkeypatch.setattr(locate_mod, "_default_plugins_json", lambda: fixture, raising=True)
     return fixture
 
 
@@ -99,9 +97,9 @@ def test_locate_require_version_mismatch_exit_2(
     """--require-version 99.0 against installed 0.20.0 → exit 2 + structured stderr."""
     result = runner.invoke(app, ["locate", "--require-version", "99.0"])
     assert result.exit_code == 2
-    assert re.search(
-        r"installed=0\.20\.0.*required=>=99\.0", result.stderr
-    ), f"stderr did not match expected format: {result.stderr!r}"
+    assert re.search(r"installed=0\.20\.0.*required=>=99\.0", result.stderr), (
+        f"stderr did not match expected format: {result.stderr!r}"
+    )
     assert "claude plugin update harness-maker" in result.stderr
 
 
@@ -153,9 +151,9 @@ def test_make_require_version_mismatch_exit_2(
         ["make", str(target), "--require-version", "99.0", "--autoloop"],
     )
     assert result.exit_code == 2, result.stderr
-    assert re.search(
-        r"installed=0\.20\.0.*required=>=99\.0", result.stderr
-    ), f"stderr did not match expected format: {result.stderr!r}"
+    assert re.search(r"installed=0\.20\.0.*required=>=99\.0", result.stderr), (
+        f"stderr did not match expected format: {result.stderr!r}"
+    )
     # No .claude/ should have been written — the gate fires BEFORE any work.
     assert not (target / ".claude").exists()
 

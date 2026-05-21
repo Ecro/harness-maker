@@ -1,6 +1,6 @@
 preset: Side
 dev_mode: spec-driven
-file_count: 58
+file_count: 59
 files:
 - path: ../CLAUDE.md
   template: claude-md/Side.en.md.j2
@@ -59,6 +59,9 @@ files:
 - path: commands/hm/health.md
   template: commands/hm/health.md.j2
   body_sha256: 8043f244b91b8091d3c61b67e2ffc0fc052912bd8f40002224d9c3f7ed35c2a5
+- path: commands/hm/help.md
+  template: commands/hm/help.en.md.j2
+  body_sha256: 8d4504310dc3a2f66094cab54d04536550e93b68e8e7285bd0c3a5791b728690
 - path: commands/hm/loop.md
   template: commands/hm/loop.md.j2
   body_sha256: 9179b9c5bed95f81633302c8220ac5abf036283a72b52a20aba097171e57a470

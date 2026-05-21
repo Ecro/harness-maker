@@ -56,3 +56,4 @@ tests/e2e/sandbox/.worktrees/
 tests/e2e/sandbox/.backup-*/
 tests/e2e/sandbox-plugin-test/.backup-*/
 .claude/.hm-loop-*
+.claude/.hm-finalize-stash-*

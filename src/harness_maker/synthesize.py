@@ -416,6 +416,7 @@ def _base_files(
         ("commands/hm/make.md.j2", "commands/hm/make.md", {}),
         ("commands/hm/configure.md.j2", "commands/hm/configure.md", {}),
         ("commands/hm/uninstall.md.j2", "commands/hm/uninstall.md", {}),
+        (_localized("commands/hm/help", locale), "commands/hm/help.md", {}),
         *_skill_files(),
         *_agent_files(preset, agent_models, default_model),
         *_rubric_files(),
@@ -517,6 +518,12 @@ def _codex_target_files(
         is_codex=True,
         config=config_dump,
     )
+    help_locale_raw = str(config_dump.get("locale", "en")) if config_dump else "en"
+    help_body = env.get_template(_localized("commands/hm/help", help_locale_raw)).render(
+        harness_maker_src_path=install_ref,
+        is_codex=True,
+        config=config_dump,
+    )
     return [
         (
             "codex/config.toml.j2",
@@ -541,6 +548,11 @@ def _codex_target_files(
             "codex/loop_skill.md.j2",
             ".agents/skills/hm-loop/SKILL.md",
             {"loop_body": loop_body},
+        ),
+        (
+            "codex/help_skill.md.j2",
+            ".agents/skills/hm-help/SKILL.md",
+            {"help_body": help_body},
         ),
     ]
 
