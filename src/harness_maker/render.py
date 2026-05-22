@@ -570,6 +570,41 @@ def _render_json_file(
 # ──────────────────────────────────────────────────────────────────────────────
 
 
+# Matches the harness-maker-managed `uv run --with <cache-path-with-version>`
+# prefix in a hook command. Each `/plugin update` bumps the version segment
+# (e.g. 0.23.4 → 0.23.7), so the command string identity changes across
+# renders even when the hook is semantically the same entry.
+# Captures the module name (after `python -m`) which IS stable.
+_HM_CACHE_CMD_RE = re.compile(
+    r"^uv run --with \S*harness-maker-local/harness-maker/[^/\s]+ python -m (?P<module>\S+)"
+)
+
+
+def _normalize_hm_managed_command(cmd: str) -> str:
+    """Strip the version-pinned cache path from a harness-maker-managed hook command.
+
+    Why this is the load-bearing dedup primitive: each `/plugin update` re-
+    renders every hook command with a new cache-version-pinned `--with` path
+    (`.../harness-maker/0.23.4/...` → `.../harness-maker/0.23.7/...`). Without
+    normalization, ``_entry_identity`` treats the old-version + new-version
+    forms of the *same* hook as distinct entries — the merge classifies the
+    on-disk old-version entry as "user-added" (because it's not in the new
+    shipped set) and preserves it, producing duplicate hook entries that
+    fire twice on every event AND dangle pointing at a cache version that
+    `/plugin update` later cleans up.
+
+    For harness-maker-managed commands the normalized identity is
+    ``"<HM_CACHE>:<module>"`` — the cache path elided, the stable module
+    name retained. For commands that don't match the harness-maker cache
+    shape (user-authored hooks running their own tooling), the command is
+    returned unchanged so user identity stays exact.
+    """
+    m = _HM_CACHE_CMD_RE.match(cmd)
+    if m is None:
+        return cmd
+    return f"<HM_CACHE>:{m.group('module')}"
+
+
 def _entry_identity(
     entry: Any,  # noqa: ANN401 — JSON entries are heterogeneous
     *,
@@ -578,9 +613,14 @@ def _entry_identity(
     """Compute a hooks.json entry's identity tuple for dedup; None on malformed.
 
     Returns:
-      - nested (Claude/Codex): ``(matcher_or_empty, hooks[0]['command'], hooks[0]['type'])``
-      - flat (Cursor): ``(matcher_or_empty, command_string, "")`` — third slot
+      - nested (Claude/Codex): ``(matcher_or_empty, normalized_command, hooks[0]['type'])``
+      - flat (Cursor): ``(matcher_or_empty, normalized_command, "")`` — third slot
         always empty so both schemas share a single tuple type for set ops.
+
+    The command portion is normalized via ``_normalize_hm_managed_command``
+    so harness-maker-managed entries dedup correctly across cache-version
+    bumps (the original bug: each /plugin update accumulated stale entries).
+    User-authored commands round-trip unchanged.
 
     "Malformed" includes: not a dict, non-string fields, missing required field
     (`hooks` for nested with non-empty list of dicts; `command` for flat).
@@ -605,12 +645,12 @@ def _entry_identity(
         type_val = first.get("type", "command")
         if not isinstance(type_val, str):
             return None
-        return (matcher_val, cmd_val, type_val)
+        return (matcher_val, _normalize_hm_managed_command(cmd_val), type_val)
     # flat (Cursor)
     flat_cmd = entry.get("command")
     if not isinstance(flat_cmd, str):
         return None
-    return (matcher_val, flat_cmd, "")
+    return (matcher_val, _normalize_hm_managed_command(flat_cmd), "")
 
 
 def _merge_hooks_json(

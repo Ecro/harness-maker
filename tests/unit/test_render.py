@@ -1439,6 +1439,103 @@ def test_merge_hooks_json_malformed_entries_dropped() -> None:
     assert merged["hooks"]["PostToolUse"][0]["hooks"][0]["command"] == "good"
 
 
+def test_merge_hooks_json_dedupes_across_hm_cache_version_bumps() -> None:
+    """Regression for spoton 2026-05-23: each `/plugin update` re-renders hook
+    commands with a fresh `uv run --with .../harness-maker/X.Y.Z/...` path.
+    Without command-path normalization, the merge treated the on-disk
+    previous-version entry as a "user addition" (its full command string
+    differed by 5 chars from the shipped command), preserved it alongside
+    the new entry, and produced duplicate hooks that fired twice per event
+    AND dangled at a cache version `/plugin update` later cleaned up.
+
+    This test pins the FIX: the harness-maker-managed cache-version-pinned
+    portion of the command is elided before identity comparison, so the same
+    semantic hook entry across versions dedupes correctly.
+    """
+    from harness_maker.render import _merge_hooks_json
+
+    # Existing on-disk: a previous-version (0.23.2) harness-maker-managed
+    # entry — the situation in spoton after /plugin update bumped to 0.23.4.
+    old_cmd = (
+        "uv run --with /home/noel/.claude/plugins/cache/"
+        "harness-maker-local/harness-maker/0.23.2 python -m "
+        "harness_maker.gates.permission_gate"
+    )
+    new_cmd = (
+        "uv run --with /home/noel/.claude/plugins/cache/"
+        "harness-maker-local/harness-maker/0.23.7 python -m "
+        "harness_maker.gates.permission_gate"
+    )
+    existing = {
+        "hooks": {
+            "PermissionRequest": [
+                {"hooks": [{"type": "command", "command": old_cmd}]},
+            ],
+        },
+    }
+    new_data = {
+        "hooks": {
+            "PermissionRequest": [
+                {"hooks": [{"type": "command", "command": new_cmd}]},
+            ],
+        },
+    }
+    merged = _merge_hooks_json(existing, new_data, schema="nested")
+    # Exactly ONE entry — the new-version command. The old-version entry
+    # MUST NOT survive as a "user addition" because it's the SAME semantic
+    # hook, just pinned at the prior cache version.
+    assert len(merged["hooks"]["PermissionRequest"]) == 1, (
+        f"merge produced {len(merged['hooks']['PermissionRequest'])} entries; "
+        f"version-bump dedup is broken — spoton-class regression"
+    )
+    assert merged["hooks"]["PermissionRequest"][0]["hooks"][0]["command"] == new_cmd, (
+        "merged entry should be the new shipped command, not the stale on-disk one"
+    )
+
+
+def test_merge_hooks_json_preserves_genuine_user_added_command_alongside_hm() -> None:
+    """The counter-test: a user-authored hook command (NOT matching the
+    harness-maker cache shape) is correctly preserved as a user addition
+    even when a harness-maker-managed entry also exists. Confirms the
+    normalize-only-hm-managed surface is tight."""
+    from harness_maker.render import _merge_hooks_json
+
+    hm_old = (
+        "uv run --with /home/noel/.claude/plugins/cache/"
+        "harness-maker-local/harness-maker/0.23.2 python -m "
+        "harness_maker.gates.permission_gate"
+    )
+    hm_new = (
+        "uv run --with /home/noel/.claude/plugins/cache/"
+        "harness-maker-local/harness-maker/0.23.7 python -m "
+        "harness_maker.gates.permission_gate"
+    )
+    user_cmd = "/usr/local/bin/my-custom-permission-check.sh"
+    existing = {
+        "hooks": {
+            "PermissionRequest": [
+                {"hooks": [{"type": "command", "command": hm_old}]},
+                {"hooks": [{"type": "command", "command": user_cmd}]},
+            ],
+        },
+    }
+    new_data = {
+        "hooks": {
+            "PermissionRequest": [
+                {"hooks": [{"type": "command", "command": hm_new}]},
+            ],
+        },
+    }
+    merged = _merge_hooks_json(existing, new_data, schema="nested")
+    cmds = [e["hooks"][0]["command"] for e in merged["hooks"]["PermissionRequest"]]
+    # New hm-managed command replaces the old one; user-authored command
+    # survives as a user addition.
+    assert hm_new in cmds, "new hm-managed command must be present"
+    assert user_cmd in cmds, "genuine user-added command must be preserved"
+    assert hm_old not in cmds, "old hm-managed command must be deduped out"
+    assert len(cmds) == 2, f"expected 2 entries (hm-new + user), got {len(cmds)}: {cmds}"
+
+
 def test_render_hooks_json_merged_manifest_records_merged_hash(tmp_path: Path) -> None:
     """REVIEW fix (code-reviewer P1): Phase 1+3 exit criterion explicitly required
     a manifest test. After in-place merge, `.hm-render-manifest.jsonl` MUST

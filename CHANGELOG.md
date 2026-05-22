@@ -1,5 +1,41 @@
 # Changelog
 
+## [0.23.7] - 2026-05-23
+
+### fix(render): dedupe hooks.json across cache-version bumps
+
+Discovered in spoton 2026-05-23 dogfood: every `/plugin update` was leaving
+stale hook entries in `.codex/hooks.json` (and `.claude/hooks/hooks.json`,
+`.cursor/hooks.json` by the same path). After bumping spoton from 0.23.2
+to 0.23.4, each event (`PreToolUse`, `PostToolUse`, `Stop`, `SessionStart`,
+`PermissionRequest`) had **TWO** entries — one for each cache version
+— firing the same hook twice per event and dangling at a cache path
+`/plugin update` would later clean up.
+
+Root cause: `_entry_identity()` used the full command string as part of
+the identity tuple, including the `--with .../harness-maker/X.Y.Z/...`
+cache-version-pinned path. Different cache versions = different command
+strings = different identities → merge classified the on-disk previous-
+version entry as "user-added" and preserved it alongside the new entry.
+
+- **fix(render): `_entry_identity` now normalizes harness-maker-managed
+  commands** via new `_normalize_hm_managed_command` helper. Cache-version
+  prefix collapses to a stable `<HM_CACHE>:<module>` form before identity
+  tuple comparison. User-authored hook commands (which don't match the
+  harness-maker cache shape) round-trip unchanged — genuine user
+  additions still preserve correctly.
+- **test(render): 2 new tests in `test_render.py`**:
+  - `test_merge_hooks_json_dedupes_across_hm_cache_version_bumps` —
+    regression pin for the spoton scenario.
+  - `test_merge_hooks_json_preserves_genuine_user_added_command_alongside_hm`
+    — counter-test confirming user-authored commands are NOT touched.
+- 5-file version sync 0.23.6 → 0.23.7.
+
+**Brownfield recovery for users hit by the duplicate-entries state**: after
+`/plugin update` brings 0.23.7 into the cache, run `/hm:make --update`
+once. The 0.23.7 merge logic will identify both old-version stale entries
+as duplicates of the new shipped entry and dedup them to a single entry.
+
 ## [0.23.6] - 2026-05-23
 
 ### CI hotfix — strip ANSI codes before `make` subcommand assertion
