@@ -56,3 +56,57 @@ jobs:
         with:
           fail-on-severity: high
           comment-summary-in-pr: on-failure
+
+  install-cmd-regression:
+    # ADR-001 Q4 trigger (3rd recurrence 2026-05-22): mechanical defense
+    # against the "README overpromises IDE parity" failure class. Positive
+    # install tests + README lint = BLOCKING; codex negative test = ADVISORY
+    # (separate step with continue-on-error per ADR-002 Round 2). Job runs
+    # after quality-gate to avoid burning CI minutes on broken commits.
+    needs: quality-gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Install uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          enable-cache: true
+      - name: Set up Python
+        run: uv python install 3.12
+      - name: Sync dependencies
+        run: uv sync --frozen
+      - name: Install codex CLI (for negative ADVISORY test)
+        # Pinned version (supply-chain hardening — REVIEW security P1-1,
+        # 2026-05-23): unpinned `npm install -g @openai/codex` would execute
+        # whatever resolves to `latest` on every PR build, including a
+        # compromised future version. Pin to the version exercised at
+        # PLAN-install-cmd-cifence execute time; updating this pin is a
+        # deliberate review-gated step.
+        # NO continue-on-error (REVIEW security P1-2): a failing install IS
+        # a signal worth surfacing. The advisory test consuming this binary
+        # has its own `shutil.which("codex")` skip-guard which handles the
+        # "codex absent" case; that's a separate failure mode from "install
+        # itself broke" (which we want to know about).
+        run: npm install -g @openai/codex@0.133.0
+      - name: Run BLOCKING install-cmd tests
+        # Positive PyPI install + Cursor git-clone + README lint allowlist.
+        # `-m "not advisory"` excludes the codex negative test from this step.
+        env:
+          INSTALL_CMD_TEST: "1"
+        run: |
+          uv run pytest tests/integration/test_readme_install_commands.py \
+            -v -m "not advisory" --tb=short
+      - name: Run ADVISORY codex negative test
+        # Verifies codex marketplace install still fails as README documents.
+        # `continue-on-error: true` per ADR-002 Round 2 amend — external codex
+        # CLI behavior changes (or npm install failures upstream) must not
+        # block CI; surfaces as a workflow warning instead.
+        env:
+          INSTALL_CMD_TEST: "1"
+        continue-on-error: true
+        run: |
+          uv run pytest tests/integration/test_readme_install_commands.py \
+            -v -m advisory --tb=short

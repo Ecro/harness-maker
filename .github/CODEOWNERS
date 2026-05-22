@@ -1,0 +1,22 @@
+# CODEOWNERS — review-gated changes for the README install-command defense.
+#
+# REVIEW security P2 (PLAN-install-cmd-cifence, 2026-05-23): the README
+# install-command allowlist + the workflow that enforces it are the
+# mechanical defense against the "README overpromises IDE parity"
+# failure class (3rd recurrence triggered the Q4 promote). Without owner
+# review, a single PR could simultaneously add a new install command to
+# README AND expand the allowlist — defeating the gate.
+#
+# These paths require @Ecro review on every PR:
+
+# README install commands — the source of truth users follow
+/README.md @Ecro
+/README.ko.md @Ecro
+
+# Install allowlist + helpers — anything that loosens the gate
+/tests/integration/_install_helpers.py @Ecro
+/tests/integration/test_readme_install_commands.py @Ecro
+
+# CI workflow that enforces the gate
+/.github/workflows/ci.yml @Ecro
+/.github/CODEOWNERS @Ecro
