@@ -1,5 +1,21 @@
 # Changelog
 
+## [Unreleased]
+
+### Docs — Codex install path truthification
+
+- **docs(readme): rewrite Codex CLI install path to match reality.** README,
+  README.ko, `docs/BOOTSTRAP.md`, and both `tests/{codex,cursor}-compat/MANUAL_CHECKLIST.md`
+  used to claim `codex plugin marketplace add Ecro/harness-maker` was a
+  working install path. In reality Codex accepts the marketplace
+  registration but `codex plugin add` then fails because the repo ships
+  no Codex `marketplace.json`. The new docs state the two working install
+  paths — Claude Code marketplace (canonical) or PyPI (`uv tool install
+  harness-maker`) — and call out the `.codex-plugin/plugin.json` manifest
+  as a stub for future native install (not relied on today). See
+  `work-docs/PLAN-readme-codex-truthification.md` + ADR-001 for the full
+  decision record. Doc-only change; no code, template, or version sync.
+
 ## [0.23.4] - 2026-05-22
 
 ### Release-recovery — ruff format fix-up

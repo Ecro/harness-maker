@@ -38,13 +38,13 @@
 
 ## Try in 30 seconds
 
-Paste this into Claude Code, Cursor, or Codex CLI. **A profiler reads 12+ stack signals + a 10-dimension interview synthesizes a harness specific to YOUR project** — not a generic template. It auto-detects your IDE, installs the matching plugin via Bash (no slash-command typing), runs the interview, and prints a personalization-tier report.
+Paste this into Claude Code, Cursor, or Codex CLI. **A profiler reads 12+ stack signals + a 10-dimension interview synthesizes a harness specific to YOUR project** — not a generic template. It auto-detects your IDE, installs harness-maker via Bash (no slash-command typing), runs the interview, and prints a personalization-tier report.
 
 ```
 Install harness-maker for this project and bootstrap the harness end-to-end.
 
 You are an AI agent running inside Claude Code, Cursor, or Codex CLI.
-Detect which one (silently — don't ask me), install the matching plugin via
+Detect which one (silently — don't ask me), install harness-maker via
 Bash (NOT slash commands typed by me), then invoke harness-maker:make and
 hm:health via the Skill tool. Conduct the conversation in the language of
 my first reply.
@@ -55,15 +55,22 @@ Install path per IDE:
                 Then tell me: "Type /reload-plugins, then send any short message (e.g. `go`) to re-trigger me."
   Cursor:       Bash  git clone --depth 1 https://github.com/Ecro/harness-maker.git ~/.cursor/plugins/local/harness-maker
                 Then tell me: "Reload the Cursor window (Ctrl+Shift+P → Reload Window)."
-  Codex CLI:    Bash  codex plugin marketplace add Ecro/harness-maker
-                Then tell me: "Open /plugins; if harness-maker isn't enabled, restart codex."
+  Codex CLI:    Codex has no native marketplace install for this plugin.
+                Use one of these two install paths via Bash:
+                A. If `claude` CLI is on PATH (Codex coexisting with Claude Code):
+                     Bash  claude plugin marketplace add Ecro/harness-maker
+                     Bash  claude plugin install harness-maker@harness-maker
+                B. Otherwise install via PyPI:
+                     Bash  uv tool install harness-maker
+                After install, invoke harness-maker:make directly — `.codex/`
+                artifacts are produced by `make`, not by a Codex plugin reload.
 
-After the reload, run harness-maker:make (drive the interview — accept defaults
+After install, run harness-maker:make (drive the interview — accept defaults
 unless I object), then hm:health (read out the personalization tier and top
 action items).
 ```
 
-> **Bash approval:** approve only the exact install commands shown above (`claude plugin install …`, `git clone --depth 1 https://github.com/Ecro/harness-maker.git …`, `codex plugin marketplace add …`). Do **NOT** grant blanket `Bash(*)`. If the AI requests a different command, stop and inspect.
+> **Bash approval:** approve only the exact install commands shown above (`claude plugin install …`, `git clone --depth 1 https://github.com/Ecro/harness-maker.git …`, `uv tool install harness-maker`). Do **NOT** grant blanket `Bash(*)`. If the AI requests a different command (especially any `codex plugin …` variant — Codex has no working native install path for this plugin today), stop and inspect.
 
 For the long form (per-IDE action counts, manual install fallbacks, integrity-pin guidance), see [Quickstart](#quickstart) below.
 
@@ -211,9 +218,11 @@ For the mechanics behind each step — full procedures, decision paths, internal
 |---|---|---|---|---|
 | **Claude Code** | 1 | 1 (`/reload-plugins`) | 1 short message (e.g. `go`) to re-trigger Claude | **3** |
 | **Cursor** | 1 | 0 | 1 (`Ctrl+Shift+P → Reload Window`) | **2-3** |
-| **Codex CLI** | 1 | 0 | 0-1 (restart codex if `/plugins` doesn't show harness-maker) | **2-3** |
+| **Codex CLI** | 1 | 0 | 0 (no Codex reload needed — `.codex/` artifacts come from `make`, not a plugin) | **2** |
 
-> **First-use Bash approval.** Claude Code / Cursor will request Bash permission for the install commands shown below. Approve **only** the exact commands in the prompt (`claude plugin install harness-maker@harness-maker` for Claude Code, `git clone --depth 1 https://github.com/Ecro/harness-maker.git ~/.cursor/plugins/local/harness-maker` for Cursor). Do **NOT** grant blanket `Bash(*)` — if the AI requests a different command, stop and inspect. The Cursor clone fetches the current `main` branch of a public repo; future `git pull` updates are not integrity-verified — pin a release tag manually if this matters for your threat model.
+> **Codex CLI install path.** harness-maker has no native Codex marketplace registration today; adding this repo via `codex plugin marketplace add` accepts the marketplace root but the subsequent `codex plugin add` fails with "plugin not found". The AI must install via Claude Code's marketplace (if `claude` CLI is on PATH) OR via PyPI (`uv tool install harness-maker`) — both are working install paths that result in the same `.codex/` rendered artifacts on disk.
+
+> **First-use Bash approval.** Claude Code / Cursor / Codex CLI will request Bash permission for the install commands shown below. Approve **only** the exact commands in the prompt (`claude plugin install harness-maker@harness-maker`, `git clone --depth 1 https://github.com/Ecro/harness-maker.git ~/.cursor/plugins/local/harness-maker`, or `uv tool install harness-maker`). Do **NOT** grant blanket `Bash(*)` — if the AI requests a different command, stop and inspect. The Cursor clone fetches the current `main` branch of a public repo; future `git pull` updates are not integrity-verified — pin a release tag manually if this matters for your threat model.
 
 ```
 Install harness-maker for this project and bootstrap the harness end-to-end.
@@ -244,14 +253,26 @@ harness-maker:make skill is already available):
     Then tell me verbatim: "Reload the Cursor window now (Ctrl+Shift+P → Reload Window)."
 
   IF Codex CLI:
-    Bash: codex plugin marketplace add Ecro/harness-maker
-    Then tell me verbatim: "Open Codex's /plugins list; if harness-maker isn't enabled, restart codex."
+    Codex has no native marketplace install for this plugin
+    (registering this repo as a Codex marketplace accepts the
+    marketplace root, but the subsequent `codex plugin add` fails
+    with "plugin not found"). Pick whichever install path works
+    on this machine:
+    A. If `claude` CLI is on PATH (Codex coexists with Claude Code):
+       Bash: claude plugin marketplace add Ecro/harness-maker
+       Bash: claude plugin install harness-maker@harness-maker
+    B. Otherwise install via PyPI:
+       Bash: uv tool install harness-maker
+    No Codex reload is needed — `.codex/` artifacts are produced
+    by `harness-maker make`, not by a Codex plugin.
 
   IF you can't tell which IDE (or none of the above), STOP and ask me which
   IDE you're in.
 
-Step 3 — After I confirm the reload/restart, invoke harness-maker:make via the
-Skill tool (do NOT ask me to type any slash command) and drive the interview:
+Step 3 — After I confirm the reload (Claude Code / Cursor only — Codex
+needs no reload; for Codex, proceed immediately after install), invoke
+harness-maker:make via the Skill tool (do NOT ask me to type any slash
+command) and drive the interview:
   • Confirm preset (Side / Production), dev mode, target IDEs, and locale.
   • Accept the recommended defaults unless I object.
 
@@ -277,15 +298,30 @@ if you cannot tell.
 
 The marketplace metadata and the plugin both ship in this repo, so two commands cover discovery + install. Reload Claude Code; `/harness-maker:make` becomes available.
 
-#### Codex CLI (plugin marketplace)
+#### Codex CLI (no native marketplace — use Claude Code or PyPI)
 
-```
-codex plugin marketplace add Ecro/harness-maker
-# pin a specific release for reproducibility:
-codex plugin marketplace add Ecro/harness-maker --ref v0.14.3
+**Codex CLI does not currently support installing harness-maker natively.** Registering this repo as a Codex marketplace via `codex plugin marketplace add` accepts the marketplace root, but `codex plugin add harness-maker@harness-maker` then fails with `plugin 'harness-maker' was not found in marketplace 'harness-maker'` because the repo ships no Codex `marketplace.json`. The plugin manifest at `.codex-plugin/plugin.json` is a stub for future native install; **do not rely on it today**.
+
+Two working install paths for Codex CLI users:
+
+**A. Claude Code marketplace (if you have Claude Code installed locally):**
+
+```bash
+claude plugin marketplace add Ecro/harness-maker
+claude plugin install harness-maker@harness-maker
 ```
 
-`marketplace add` is the install — there is no separate install step in Codex. Then run `/plugins` inside Codex to enable.
+The Python source lands in `~/.claude/plugins/cache/harness-maker-local/`. `harness-maker make` becomes available and renders `.codex/` artifacts that reference the cached Python install. This is the canonical install path — same source-of-truth as Claude Code and Cursor users.
+
+**B. PyPI (Codex-only, no Claude Code subscription needed):**
+
+```bash
+uv tool install harness-maker
+```
+
+The `harness-maker` CLI is installed via `uv`; `harness-maker make` then renders `.codex/` artifacts. This is the right path for users who run Codex CLI without Claude Code.
+
+After install, `harness-maker make` is the entry point for both paths — there is no Codex plugin reload step.
 
 #### Cursor (Team marketplace import OR local symlink)
 

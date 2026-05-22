@@ -31,13 +31,13 @@
 
 ## 30초 만에 시도하기
 
-Claude Code · Cursor · Codex CLI 중 하나의 AI 에이전트에 아래 프롬프트를 붙여넣으세요. **프로파일러가 12개 이상의 스택 신호를 읽고 10차원 인터뷰가 당신 프로젝트 전용 하네스를 합성합니다** — generic 템플릿이 아닙니다. IDE를 자동 감지하고, 매칭되는 플러그인을 Bash로 설치한 뒤, 인터뷰를 진행하고 personalization tier 리포트까지 출력합니다.
+Claude Code · Cursor · Codex CLI 중 하나의 AI 에이전트에 아래 프롬프트를 붙여넣으세요. **프로파일러가 12개 이상의 스택 신호를 읽고 10차원 인터뷰가 당신 프로젝트 전용 하네스를 합성합니다** — generic 템플릿이 아닙니다. IDE를 자동 감지하고, harness-maker 를 Bash로 설치한 뒤, 인터뷰를 진행하고 personalization tier 리포트까지 출력합니다.
 
 ```
 Install harness-maker for this project and bootstrap the harness end-to-end.
 
 You are an AI agent running inside Claude Code, Cursor, or Codex CLI.
-Detect which one (silently — don't ask me), install the matching plugin via
+Detect which one (silently — don't ask me), install harness-maker via
 Bash (NOT slash commands typed by me), then invoke harness-maker:make and
 hm:health via the Skill tool. Conduct the conversation in the language of
 my first reply.
@@ -48,10 +48,17 @@ Install path per IDE:
                 Then tell me: "Type /reload-plugins, then send any short message (e.g. `go`) to re-trigger me."
   Cursor:       Bash  git clone --depth 1 https://github.com/Ecro/harness-maker.git ~/.cursor/plugins/local/harness-maker
                 Then tell me: "Reload the Cursor window (Ctrl+Shift+P → Reload Window)."
-  Codex CLI:    Bash  codex plugin marketplace add Ecro/harness-maker
-                Then tell me: "Open /plugins; if harness-maker isn't enabled, restart codex."
+  Codex CLI:    Codex has no native marketplace install for this plugin.
+                Use one of these two install paths via Bash:
+                A. If `claude` CLI is on PATH (Codex coexisting with Claude Code):
+                     Bash  claude plugin marketplace add Ecro/harness-maker
+                     Bash  claude plugin install harness-maker@harness-maker
+                B. Otherwise install via PyPI:
+                     Bash  uv tool install harness-maker
+                After install, invoke harness-maker:make directly — `.codex/`
+                artifacts are produced by `make`, not by a Codex plugin reload.
 
-After the reload, run harness-maker:make (drive the interview — accept defaults
+After install, run harness-maker:make (drive the interview — accept defaults
 unless I object), then hm:health (read out the personalization tier and top
 action items).
 ```
@@ -180,9 +187,11 @@ action items).
 |---|---|---|---|---|
 | **Claude Code** | 1 | 1 (`/reload-plugins`) | 짧은 메시지 1개 (예: `go`) — Claude re-trigger 용 | **3** |
 | **Cursor** | 1 | 0 | 1 (`Ctrl+Shift+P → Reload Window`) | **2-3** |
-| **Codex CLI** | 1 | 0 | 0-1 (`/plugins` 에 harness-maker 없으면 codex restart) | **2-3** |
+| **Codex CLI** | 1 | 0 | 0 (Codex reload 불필요 — `.codex/` 자산은 `make` 가 생성, plugin 이 아님) | **2** |
 
-> **첫 사용 시 Bash 승인 가이드.** Claude Code / Cursor 가 아래 prompt 의 install 명령에 대해 Bash 권한을 요청. prompt 에 명시된 **정확한 명령만** 승인 (`claude plugin install harness-maker@harness-maker` for Claude Code, `git clone --depth 1 https://github.com/Ecro/harness-maker.git ~/.cursor/plugins/local/harness-maker` for Cursor). **`Bash(*)` 전체 허용은 거부** — AI 가 다른 명령을 요청하면 중지하고 검토. Cursor clone 은 public repo 의 현재 `main` 브랜치를 받고 이후 `git pull` 업데이트는 무결성 검증되지 않음 — threat model 에 따라 release tag 수동 pin 권장.
+> **Codex CLI install path.** harness-maker 는 현재 native Codex marketplace 등록이 없습니다. 이 repo 를 Codex marketplace 로 등록하면 marketplace root 는 받아들이지만, 후속 `codex plugin add` 는 "plugin not found" 로 실패합니다. AI 는 Claude Code marketplace (`claude` CLI 가 PATH 에 있을 때) 또는 PyPI (`uv tool install harness-maker`) 로 설치해야 함 — 두 경로 모두 디스크에 동일한 `.codex/` 산출물을 생성합니다.
+
+> **첫 사용 시 Bash 승인 가이드.** Claude Code / Cursor / Codex CLI 가 아래 prompt 의 install 명령에 대해 Bash 권한을 요청. prompt 에 명시된 **정확한 명령만** 승인 (`claude plugin install harness-maker@harness-maker`, `git clone --depth 1 https://github.com/Ecro/harness-maker.git ~/.cursor/plugins/local/harness-maker`, 또는 `uv tool install harness-maker`). **`Bash(*)` 전체 허용은 거부** — AI 가 다른 명령을 요청하면 중지하고 검토 (특히 `codex plugin …` 변형은 현재 작동하지 않음). Cursor clone 은 public repo 의 현재 `main` 브랜치를 받고 이후 `git pull` 업데이트는 무결성 검증되지 않음 — threat model 에 따라 release tag 수동 pin 권장.
 
 ```
 Install harness-maker for this project and bootstrap the harness end-to-end.
@@ -213,14 +222,26 @@ harness-maker:make skill is already available):
     Then tell me verbatim: "Reload the Cursor window now (Ctrl+Shift+P → Reload Window)."
 
   IF Codex CLI:
-    Bash: codex plugin marketplace add Ecro/harness-maker
-    Then tell me verbatim: "Open Codex's /plugins list; if harness-maker isn't enabled, restart codex."
+    Codex has no native marketplace install for this plugin
+    (registering this repo as a Codex marketplace accepts the
+    marketplace root, but the subsequent `codex plugin add` fails
+    with "plugin not found"). Pick whichever install path works
+    on this machine:
+    A. If `claude` CLI is on PATH (Codex coexists with Claude Code):
+       Bash: claude plugin marketplace add Ecro/harness-maker
+       Bash: claude plugin install harness-maker@harness-maker
+    B. Otherwise install via PyPI:
+       Bash: uv tool install harness-maker
+    No Codex reload is needed — `.codex/` artifacts are produced
+    by `harness-maker make`, not by a Codex plugin.
 
   IF you can't tell which IDE (or none of the above), STOP and ask me which
   IDE you're in.
 
-Step 3 — After I confirm the reload/restart, invoke harness-maker:make via the
-Skill tool (do NOT ask me to type any slash command) and drive the interview:
+Step 3 — After I confirm the reload (Claude Code / Cursor only — Codex
+needs no reload; for Codex, proceed immediately after install), invoke
+harness-maker:make via the Skill tool (do NOT ask me to type any slash
+command) and drive the interview:
   • Confirm preset (Side / Production), dev mode, target IDEs, and locale.
   • Accept the recommended defaults unless I object.
 
@@ -246,15 +267,30 @@ if you cannot tell.
 
 이 repo가 marketplace metadata와 plugin 본체를 모두 담고 있어서 두 줄로 끝. Claude Code 재시작 후 `/harness-maker:make` 활성화.
 
-#### Codex CLI (plugin marketplace)
+#### Codex CLI (native marketplace 미지원 — Claude Code 또는 PyPI 사용)
 
-```
-codex plugin marketplace add Ecro/harness-maker
-# 특정 릴리스로 고정 (재현성):
-codex plugin marketplace add Ecro/harness-maker --ref v0.14.3
+**Codex CLI 는 현재 harness-maker 의 native 설치를 지원하지 않습니다.** 이 repo 를 Codex marketplace 로 등록 (`codex plugin marketplace add ...`) 하면 marketplace root 는 받아들이지만, 후속 `codex plugin add harness-maker@harness-maker` 는 `plugin 'harness-maker' was not found in marketplace 'harness-maker'` 로 실패합니다 (repo 가 Codex `marketplace.json` 을 ship 하지 않음). `.codex-plugin/plugin.json` 의 plugin manifest 는 future native install 을 위한 stub 입니다 — **현재는 의존하지 마세요**.
+
+Codex CLI 사용자에게 가능한 두 가지 install path:
+
+**A. Claude Code marketplace (Claude Code 가 로컬에 설치되어 있다면):**
+
+```bash
+claude plugin marketplace add Ecro/harness-maker
+claude plugin install harness-maker@harness-maker
 ```
 
-Codex 에서 `marketplace add`가 곧 설치 — 별도 install 단계 없음. 이후 Codex 안에서 `/plugins` 실행하여 활성화.
+Python 소스가 `~/.claude/plugins/cache/harness-maker-local/` 에 install 됨. `harness-maker make` 가 사용 가능해지고, 그 install 을 참조하는 `.codex/` 산출물을 렌더합니다. 이게 canonical install path — Claude Code 와 Cursor 사용자와 동일한 source-of-truth.
+
+**B. PyPI (Codex-only, Claude Code 구독 불필요):**
+
+```bash
+uv tool install harness-maker
+```
+
+`uv` 로 `harness-maker` CLI 가 설치되고, `harness-maker make` 가 `.codex/` 산출물을 렌더합니다. Claude Code 없이 Codex CLI 만 쓰는 사용자에게 적합한 path.
+
+설치 후, 두 경로 모두 `harness-maker make` 가 entry point — Codex plugin reload 단계 없음.
 
 #### Cursor (Team marketplace 임포트 또는 local symlink)
 

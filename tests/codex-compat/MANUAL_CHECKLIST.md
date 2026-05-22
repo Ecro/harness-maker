@@ -14,8 +14,8 @@
 
 | Step | Threshold | 이유 |
 |---|---|---|
-| **1. install** | **BLOCK** — fail = P0, Show HN 차단 | README 에 명시된 install path. fail 시 약속 깨짐 |
-| **2. discovery (`/plugins` 노출)** | DEFER acceptable — fail = P2 + README disclaimer | UX detail; ADR-003 = "discovery 가 살짝 어려워도 install 자체는 OK" |
+| **1. install (Claude Code marketplace OR PyPI)** | **BLOCK** — fail = P0, Show HN 차단 | README 가 약속하는 install path. native Codex marketplace 가 아닌 우회 path 이지만, 둘 중 하나는 작동해야 함 |
+| **2. discovery (`harness-maker` CLI on PATH)** | DEFER acceptable — fail = P2 + README disclaimer | UX detail; install path 에 따라 PATH 위치가 다름 |
 | **3. interactive interview** | DEFER acceptable — fail = P2 + README disclaimer | Cursor 의 manual checklist 수준 fully verified 까지는 아님 (smoke-only) |
 | **4. AGENTS.md absorption** | **BLOCK** — fail = P0, Show HN 차단 | README 명시 + block-merge marker 의 핵심 약속 |
 | **5. `.codex/*` render** | **BLOCK** — fail = P0, Show HN 차단 | Codex target 의 가장 visible 산출물. hooks.json PascalCase 포함 |
@@ -35,37 +35,50 @@
 
 ---
 
-## Step 1 — Install via Codex plugin marketplace [BLOCK]
+## Step 1 — Install via Claude Code marketplace OR PyPI [BLOCK]
+
+**Background (0.23.5+):** Codex CLI has no native marketplace install for harness-maker today. README documents two working install paths — pick whichever applies on this test machine:
+
+**Path A — Claude Code marketplace (if `claude` CLI is on PATH):**
 
 ```bash
-codex plugin marketplace add Ecro/harness-maker
+claude plugin marketplace add Ecro/harness-maker
+claude plugin install harness-maker@harness-maker
 ```
 
-**기대 결과**: 명령 exit 0, "marketplace added" 류 메시지.
+**기대 결과**: `~/.claude/plugins/cache/harness-maker-local/harness-maker/<version>/` 디렉토리 존재.
 
 **Verify**:
-- `codex plugin marketplace list` 의 출력에 `Ecro/harness-maker` 노출.
+- `ls ~/.claude/plugins/cache/harness-maker-local/harness-maker/` shows the installed version.
 
-**PASS 조건**: exit 0 + list 에 노출.
-**FAIL = P0**. README 의 "Codex: `codex plugin marketplace add Ecro/harness-maker`" 약속 거짓. 즉시 Phase 0 redux (patch + 0.17.2 cut) 또는 README 의 Codex install path 를 제거.
+**Path B — PyPI (Codex-only, no Claude Code):**
+
+```bash
+uv tool install harness-maker
+```
+
+**기대 결과**: `which harness-maker` returns a `uv tool` install path.
+
+**Verify**:
+- `harness-maker --version` returns the installed version.
+
+**PASS 조건 (Step 1 overall)**: at least one of Path A or Path B leaves `harness-maker` CLI reachable (either directly or via the cached Python install). **FAIL = P0**: both install paths failed; README 의 promise 깨짐.
 
 ---
 
-## Step 2 — Discovery [DEFER acceptable]
+## Step 2 — Discovery (`harness-maker` CLI on PATH) [DEFER acceptable]
 
-Codex CLI 안에서:
-
-```
-/plugins
+```bash
+which harness-maker || ls ~/.claude/plugins/cache/harness-maker-local/harness-maker/
 ```
 
-**기대 결과**: harness-maker 가 enabled / available 상태로 보임.
+**기대 결과**: 적어도 하나의 CLI / cache 경로가 노출됨.
 
 **Verify**:
-- 보이지 않으면 `codex` 재시작 후 다시 시도.
-- 여전히 안 보이면 DEFER — README 에 "Codex 의 `/plugins` 탐색은 restart 가 필요할 수 있음" 명시 추가.
+- 보이지 않으면 `uv tool list | grep harness-maker` (PyPI path) 또는 `claude plugin list` (Claude Code path) 로 install 상태 재확인.
+- 여전히 안 보이면 DEFER — README 에 "install path 별 PATH 위치 안내 추가" 명시.
 
-**PASS 조건**: enabled 상태 노출 (재시작 후라도).
+**PASS 조건**: 두 install path 중 하나의 결과물이 PATH 또는 알려진 cache 경로에 존재.
 **FAIL = P2 + README disclaimer 추가** (BLOCK 아님 per ADR-003).
 
 ---

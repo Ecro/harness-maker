@@ -362,17 +362,22 @@ PASS/FAIL 을 RESULTS.md Phase 2.9 row 에 기입.
 
 (Codex CLI 사용자 별도 검증 — Phase 3.3 는 codex CLI 가 설치된 환경에서만)
 
-1. **Fresh state**: codex 의 marketplace 목록에 `harness-maker` 없음.
+**Background (0.23.5+):** Codex CLI 는 native marketplace install 을 지원하지 않습니다. README 의 paste prompt 는 AI 가 Codex CLI 안에서 두 install path 중 하나를 선택하도록 안내합니다.
+
+1. **Fresh state**: harness-maker CLI 가 PATH 에 없음 + Claude Code cache 에 없음.
 2. 빈 디렉토리에서 `codex` 실행, 새 세션 시작.
 3. README.md 의 Quickstart 코드 펜스 paste.
 4. **관찰**:
-   - AI 가 Codex CLI branch 선택
-   - AI 가 `codex plugin marketplace add Ecro/harness-maker` 실행 (Bash)
-   - AI 가 메시지: `Open Codex's /plugins list; if harness-maker isn't enabled, restart codex.`
-5. 사용자가 `/plugins` type → harness-maker 확인. 없으면 `Ctrl+C` 후 `codex` 재실행.
-6. 이후 harness-maker:make / hm:health 진행 (Codex 의 skill 호출 방식 따름).
+   - AI 가 Codex CLI branch 선택.
+   - 두 install path 중 하나를 선택해 Bash 로 실행:
+     - **Path A** (Claude Code marketplace 있을 때): `claude plugin marketplace add Ecro/harness-maker` + `claude plugin install harness-maker@harness-maker`.
+     - **Path B** (PyPI fallback): `uv tool install harness-maker`.
+   - AI 가 Codex reload 단계를 **요구하지 않음** — `.codex/` 자산은 `harness-maker make` 가 생성하기 때문 (plugin 이 아님).
+5. 이후 harness-maker:make / hm:health 진행 (Codex 의 skill 호출 방식 따름).
 
-**Fail 분기**: Codex CLI 의 plugin lifecycle 이 marketplace-add ≠ install 일 수도 — `/plugins` 목록에 없으면 별도 `codex plugin install` 필요한지 확인.
+**Fail 분기**:
+- AI 가 `codex plugin marketplace add ...` 류의 native Codex install 변형을 시도 → 잘못된 README 잔재. Issue 보고 + README 재truthification 필요.
+- 두 install path 모두 실패 → Path A 는 `claude` CLI 부재 또는 marketplace fetch 실패, Path B 는 `uv` 부재 또는 PyPI 접근 불가. 각각 다른 해결책 필요.
 
 ---
 

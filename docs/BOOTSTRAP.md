@@ -49,11 +49,24 @@ up the plugin's skills, agents, and commands.
 
 ### Codex CLI
 
+**Codex CLI has no native marketplace install for harness-maker today.** Registering this repo as a Codex marketplace via `codex plugin marketplace add` accepts the marketplace root, but the follow-up `codex plugin add` then fails with `plugin 'harness-maker' was not found in marketplace 'harness-maker'` — the repo ships no Codex `marketplace.json`. Two working install paths instead:
+
+**A. Claude Code marketplace (if Claude Code is on the same machine):**
+
 ```bash
-codex plugin marketplace add Ecro/harness-maker
+claude plugin marketplace add Ecro/harness-maker
+claude plugin install harness-maker@harness-maker
 ```
 
-If the plugin doesn't show up in `/plugins`, restart `codex`.
+This is the canonical path — the rendered `.codex/` artifacts reference the Python source cached under `~/.claude/plugins/cache/harness-maker-local/`.
+
+**B. PyPI (Codex-only, no Claude Code subscription):**
+
+```bash
+uv tool install harness-maker
+```
+
+The `harness-maker` CLI is installed via `uv`; `harness-maker make` then renders `.codex/` artifacts that reference the uv-tool install path. Codex CLI does NOT need a plugin reload step — `.codex/` artifacts are pure files on disk that Codex reads at session start.
 
 ---
 
