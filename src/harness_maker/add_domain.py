@@ -47,9 +47,9 @@ def _today_iso() -> str:
 def _render_skeleton(name: str, today: str) -> str:
     """Render `_template.md.j2` with the domain name + today's date filled in.
 
-    ``include_metadata=True`` switches on the HTML-comment annotation in the
-    skeleton so the rendered user-side ``.md`` carries a ``last_reviewed_at``
-    that ``detect_stale_assets`` can later parse.
+    ``include_metadata=True`` annotates the rendered ``.md`` with a
+    ``last_reviewed_at`` field — preserved as passive provenance metadata.
+    (The reader, ``detect_stale_assets``, was removed in 0.22.3 per ADR-0007.)
     """
     env = _make_env()
     tpl = env.get_template("agents/_standards/_template.md.j2")

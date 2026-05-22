@@ -1,6 +1,6 @@
 {
   "generated_by": "harness-maker",
-  "version": "0.22.1",
+  "version": "0.22.3",
   "files": [
     ".claude/agents/autoloop-coder.md",
     ".claude/agents/code-reviewer.md",
@@ -48,8 +48,6 @@
     ".claude/skills/conditional-router/SKILL.md",
     ".claude/skills/context-linter/SKILL.md",
     ".claude/skills/refdocs-search/SKILL.md",
-    ".claude/skills/relevance-filter/SKILL.md",
-    ".claude/skills/research-crawler/SKILL.md",
     ".claude/skills/security-scanner/SKILL.md",
     ".claude/skills/verify-before-completion/SKILL.md",
     ".claude/skills/worktree-isolator/SKILL.md",

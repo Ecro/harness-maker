@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.22.1
+harness_maker_version: 0.22.3
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: harness-yaml/Production.yaml.j2
 provenance: official
-content_hash: cdab6a782600d2e49fbe7ab8ce8a10d51688c7b1b406bb93505187671064bc99
+content_hash: caf38fad42537aac4d7d9a5d534b838f4180b8d289a082111ebba373b50a2734
 ---
 preset: Production
 locale: en
@@ -104,11 +104,9 @@ skills:
     - ai-readiness-rubric
     - agent-quality-rubric
     - conditional-router
-    - relevance-filter
     - worktree-isolator
     - security-scanner
     - context-linter
-    - research-crawler
     - refdocs-search
   enabled:
     - verify-before-completion

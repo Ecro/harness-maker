@@ -268,34 +268,14 @@ phase_4() {
 }
 
 # ──────────────────────────────────────────────────────────────────────
-# Phase 5: Anti-rot Pipeline
+# Phase 5: OSV CVE crawler (ADR-0007 collapsed anti-rot to OSV only)
 # ──────────────────────────────────────────────────────────────────────
 
-phase_5_anthropic()      { uv run pytest tests/unit/crawler/test_anthropic_blog.py -q  || fail "anthropic crawler"; ok "phase_5_anthropic"; }
-phase_5_github()         { uv run pytest tests/unit/crawler/test_github_releases.py -q || fail "gh crawler";        ok "phase_5_github"; }
-phase_5_arxiv()          { uv run pytest tests/unit/crawler/test_arxiv.py -q           || fail "arxiv crawler";     ok "phase_5_arxiv"; }
 phase_5_osv()            { uv run pytest tests/unit/crawler/test_osv_dev.py -q         || fail "osv crawler";       ok "phase_5_osv"; }
-phase_5_relevance()      { uv run pytest tests/unit/test_relevance.py -q               || fail "relevance";         ok "phase_5_relevance"; }
-phase_5_skill_template() { require_file src/harness_maker/templates/skills/research-crawler/SKILL.md.j2; ok "phase_5_skill_template"; }
-phase_5_filter_template(){ require_file src/harness_maker/templates/skills/relevance-filter/SKILL.md.j2; ok "phase_5_filter_template"; }
-
-phase_5_refresh_template() {
-  require_file src/harness_maker/templates/commands/hm/refresh.md.j2
-  grep -q "AskUserQuestion" src/harness_maker/templates/commands/hm/refresh.md.j2 \
-    || fail "refresh.md.j2 missing AskUserQuestion (manual confirm 필수)"
-  ok "phase_5_refresh_template"
-}
 
 phase_5() {
-  phase_5_anthropic
-  phase_5_github
-  phase_5_arxiv
   phase_5_osv
-  phase_5_relevance
-  phase_5_skill_template
-  phase_5_filter_template
-  phase_5_refresh_template
-  uv run python -c "from harness_maker.crawler import anthropic_blog, github_releases, arxiv, osv_dev" \
+  uv run python -c "from harness_maker.crawler import osv_dev" \
     || fail "crawler imports"
   phase_5_invariants
   ok "Phase 5 Exit Criteria"
@@ -522,7 +502,7 @@ phase_11_apply() {
 }
 
 phase_11_commands() {
-  for cmd in research spec plan execute review wrapup verify dev loop monitor refresh; do
+  for cmd in research spec plan execute review wrapup verify dev loop monitor; do
     require_file "tests/e2e/sandbox/.claude/commands/hm/$cmd.md"
   done
   uv run pytest tests/e2e/test_dogfood_sandbox.py -q -k commands || fail "dogfood commands"
@@ -601,11 +581,10 @@ final_acceptance() {
   uv run python -c "from harness_maker.i18n import resolve_locale, t; from harness_maker.models import Locale; assert t('q1_choose_language', Locale.KO, lang='ko')" \
     || fail "R1: i18n broken"
 
-  # R2 Anti-rot
-  log "R2 Anti-rot"
-  uv run python -c "from harness_maker.crawler import anthropic_blog, github_releases, arxiv, osv_dev; from harness_maker.relevance import score" \
-    || fail "R2: anti-rot modules missing"
-  grep -q "AskUserQuestion" src/harness_maker/templates/commands/hm/refresh.md.j2 || fail "R2: refresh missing manual confirm"
+  # R2 Anti-rot (ADR-0007 narrowed to OSV CVE channel; the 4-source crawl was removed)
+  log "R2 OSV CVE channel"
+  uv run python -c "from harness_maker.crawler import osv_dev" \
+    || fail "R2: osv_dev module missing"
 
   # R3 Monitoring
   log "R3 Monitoring"
@@ -641,10 +620,10 @@ from harness_maker import (
 )
 " || fail "M1-M13: missing mechanism module"
 
-  # 자산 존재 — Skills 10
-  log "Skills (10) 존재"
+  # 자산 존재 — Skills 9 (ADR-0007 removed research-crawler + relevance-filter)
+  log "Skills (9) 존재"
   for sk in verify-before-completion conditional-router ai-readiness-rubric agent-quality-rubric \
-            research-crawler relevance-filter autoloop-driver worktree-isolator security-scanner context-linter; do
+            autoloop-driver worktree-isolator security-scanner context-linter refdocs-search; do
     require_file "src/harness_maker/templates/skills/$sk/SKILL.md.j2"
   done
 

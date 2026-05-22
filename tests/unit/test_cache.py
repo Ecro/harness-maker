@@ -227,20 +227,13 @@ def test_ttl_constants_exact_values() -> None:
 
 
 def test_source_ttls_full_dict() -> None:
-    """Kills mutants 48, 49, 50, 51, 52 — SOURCE_TTLS exact keys + values + non-null."""
-    from harness_maker.cache import SOURCE_TTLS, TTL_1H, TTL_24H
+    """SOURCE_TTLS shape — only osv_dev after ADR-0007."""
+    from harness_maker.cache import SOURCE_TTLS, TTL_1H
 
     assert SOURCE_TTLS is not None
-    assert SOURCE_TTLS == {
-        "anthropic_blog": TTL_24H,
-        "github_releases": TTL_1H,
-        "arxiv": TTL_24H,
-        "osv_dev": TTL_1H,
-    }
-    # Key set is exactly these four — string mutations are detected.
-    assert set(SOURCE_TTLS.keys()) == {"anthropic_blog", "github_releases", "arxiv", "osv_dev"}
-    # Value set narrows to the two constants.
-    assert set(SOURCE_TTLS.values()) == {TTL_1H, TTL_24H}
+    assert SOURCE_TTLS == {"osv_dev": TTL_1H}
+    assert set(SOURCE_TTLS.keys()) == {"osv_dev"}
+    assert set(SOURCE_TTLS.values()) == {TTL_1H}
 
 
 def test_put_then_get_explicit_value_type(tmp_path: Path) -> None:

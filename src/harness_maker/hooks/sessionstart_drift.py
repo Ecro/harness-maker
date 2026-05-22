@@ -52,10 +52,9 @@ from harness_maker.telemetry import (
 )
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Version-drift detection (moved from harness_maker.relevance in 0.13.0).
-# PLAN health-consolidation Phase 1: the hook is the only consumer now that
-# /hm:refresh has been folded into /hm:health, so the implementation lives
-# alongside its caller.
+# Version-drift detection — self-contained in this hook (the original
+# ``harness_maker.relevance`` module that previously housed related helpers
+# was removed in 0.22.3 per ADR-0007 alongside the external_risks layer).
 # ──────────────────────────────────────────────────────────────────────────────
 
 

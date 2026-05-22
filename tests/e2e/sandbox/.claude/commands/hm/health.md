@@ -1,15 +1,15 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.22.1
+harness_maker_version: 0.22.3
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/health.md.j2
 provenance: official
-content_hash: 8043f244b91b8091d3c61b67e2ffc0fc052912bd8f40002224d9c3f7ed35c2a5
+content_hash: 558525e535d41484fe5780eeaf185b854994f299ed7ebca1164a1ae1c0e31506
 ---
 # /hm:health
 
-> Three-layer health audit (ADR-002 amended by ADR-006).
-> Layer 1 Structural · Layer 2 External risks · Layer 3 Personalization.
+> Two-layer health audit (ADR-007 supersedes ADR-006; ADR-002 amended).
+> Layer 1 Structural · Layer 2 Personalization.
 > 100% structured-question gated — no auto-apply (ADR-001).
 
 ## Layers
@@ -17,8 +17,11 @@ content_hash: 8043f244b91b8091d3c61b67e2ffc0fc052912bd8f40002224d9c3f7ed35c2a5
 | Layer | What it measures |
 |-------|------------------|
 | `structural`     | ai_readiness 3-layer score (CLAUDE.md, ADRs, frontmatter, etc.) + `silent_intent_miss_rate` sub-check |
-| `external_risks` | crawler (anthropic_blog/github/arxiv/osv) + stale assets filtered by LLM relevance |
 | `personalization`| ADR-011 rubric: L1 conversion (0.4) + L2 stability (0.3) + L3 cadence (0.3) |
+
+CVE detection lives in `/hm:verify` (`secscan/dependency_cves.py` via OSV.dev),
+not here. ADR-0007 removed the external_risks layer after 2026-05-22 runtime
+evidence showed 91% noise on a representative run.
 
 ### Layer 1 sub-check — `silent_intent_miss_rate` (ADR-008)
 
@@ -42,13 +45,12 @@ flipping the ADR-012 kill-switch (`llm_inference_enabled: false`).
 !uv run --with /home/noel/harness-maker python -m harness_maker.cli health . --json-output .claude/observability/.health.tmp.json
 ```
 
-Then read `.claude/observability/dashboard.md` to inspect the three sections.
+Then read `.claude/observability/dashboard.md` to inspect the two sections.
 
 ## Per-item structured question (ADR-001 hard rule)
 
-For each unresolved item across the three layers, present:
+For each unresolved item across the two layers, present:
 - **structural**: file-level remediation suggestion (e.g. "add docs/adr/").
-- **external_risks**: each pending item with relevance ≥ 0.7 (CVE, breaking-change, stale standard).
 - **personalization**: each ADR-011 ActionItem with priority P0/P1.
 
 Use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code) per item with three options:

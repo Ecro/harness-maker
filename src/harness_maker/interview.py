@@ -112,11 +112,9 @@ _ALL_SKILLS: list[str] = [
     "ai-readiness-rubric",
     "agent-quality-rubric",
     "conditional-router",
-    "relevance-filter",
     "worktree-isolator",
     "security-scanner",
     "context-linter",
-    "research-crawler",
     "refdocs-search",
 ]
 

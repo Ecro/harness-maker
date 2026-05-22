@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from harness_maker.cache import SOURCE_TTLS, TTL_1H, TTL_24H, HttpCache
+from harness_maker.cache import SOURCE_TTLS, TTL_1H, HttpCache
 
 
 def test_http_cache_ttl(tmp_path: Path) -> None:
@@ -61,28 +61,10 @@ def test_http_cache_env_override(tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     assert result == custom_dir
 
 
-def test_crawler_cache_hit_zero_http(tmp_path: Path) -> None:
-    """On cache hit, crawl_all_cached must make zero HTTP calls."""
-    from harness_maker.crawler import crawl_all_cached
-
-    cache_base = tmp_path / "cache"
-
-    for source in ["anthropic_blog", "github_releases", "arxiv", "osv_dev"]:
-        c = HttpCache(source, base_dir=cache_base)
-        c.put("latest", [])
-
-    items = crawl_all_cached(cache_base=cache_base)
-    assert items == []
-
-
 def test_source_ttls_defined() -> None:
-    """All 4 crawler sources must have TTL definitions."""
-    assert "anthropic_blog" in SOURCE_TTLS
-    assert "github_releases" in SOURCE_TTLS
-    assert "arxiv" in SOURCE_TTLS
+    """OSV crawler source has a TTL definition (ADR-0007 removed the other 3)."""
     assert "osv_dev" in SOURCE_TTLS
-    assert SOURCE_TTLS["anthropic_blog"] == TTL_24H
-    assert SOURCE_TTLS["github_releases"] == TTL_1H
+    assert SOURCE_TTLS["osv_dev"] == TTL_1H
 
 
 def test_cache_atomic_write(tmp_path: Path) -> None:

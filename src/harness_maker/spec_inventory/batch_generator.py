@@ -82,7 +82,7 @@ L1_ASSIGNMENT_RULES: tuple[tuple[tuple[str, ...], str], ...] = (
         "templates",
     ),
     (("cache", "detection-cache", "detection_cache", "cache-diagnostics"), "caching"),
-    (("crawler", "anthropic-blog", "arxiv", "github-releases", "osv"), "crawler"),
+    (("crawler", "osv"), "crawler"),
     (("agent-",), "reviewers"),  # generic agent fallback
     (("skill-",), "templates"),  # generic skill fallback
     (("hook-",), "hooks"),

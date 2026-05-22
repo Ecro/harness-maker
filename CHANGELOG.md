@@ -1,5 +1,87 @@
 # Changelog
 
+## [0.22.3] - 2026-05-22
+
+### Removed (ADR-0007 supersedes ADR-0006)
+
+- **`/hm:health` external_risks layer** — the entire 4-source crawl
+  (`anthropic_blog`, `github_releases`, `arxiv`) + LLM relevance filter +
+  adaptive threshold + per-item AskUserQuestion gate is gone. A 2026-05-22
+  production run surfaced 12 items, 1 accepted (already known), 11 rejected
+  — 91% noise. CVE detection (the one source with rare-but-critical value)
+  survives via `secscan/dependency_cves.py` consumed by `/hm:verify`.
+  Dashboard collapses from 3 sections to 2 (Structural + Personalization).
+- **Skills deleted**: `research-crawler`, `relevance-filter` (templates +
+  rendered output). Pinned LLM-judgment skill count: 5 → 4.
+- **CLI subcommand `harness-maker health-finalize`** — folded into the
+  single `harness-maker health` command. The split existed only because
+  the 3-layer flow had a Python-then-Claude handoff via a tmp JSON file;
+  with 2 layers, personalization stays Claude-judged inside the slash
+  template which edits `dashboard.md` directly. `--external-risks-json`
+  flag removed; `--skip-llm` flag removed (it gated the deleted relevance
+  scorer).
+- **Verify Check 4 (`external_risks_pending`)** — 6-check protocol becomes
+  5-check. Remaining check IDs renumber 5→4 and 6→5. CI pipelines that
+  key off check NAMES are unaffected; pipelines that key off check IDs
+  must update. The `_emit_verify_text` denominator changed from a
+  hardcoded `/6` to dynamic `f"/{total}"`.
+- **Python source modules**: `crawler/anthropic_blog.py`,
+  `crawler/arxiv.py`, `crawler/github_releases.py`, and `relevance.py`
+  (entire file — includes the stale-asset half: `StaleAsset`,
+  `detect_stale_assets`, `build_proposal_lines`, `update_last_reviewed_at`,
+  `StaleAssetUpdateError`). The stale-asset functions had zero production
+  caller. `crawler/osv_dev.py` preserved (consumed by
+  `secscan/dependency_cves.py`).
+- **Tests deleted**: `tests/unit/test_relevance.py`,
+  `tests/unit/test_relevance_stale.py`,
+  `tests/unit/crawler/test_anthropic_blog.py`,
+  `tests/unit/crawler/test_arxiv.py`,
+  `tests/unit/crawler/test_github_releases.py`. `test_crawler_osv_dev.py`
+  preserved.
+
+### Migration
+
+Existing users running 0.22.3 the first time:
+
+- Run `/hm:health` once — produces a fresh 2-section `dashboard.md`. The
+  parser silently drops any stale `## External risks` section from
+  pre-0.22.3 dashboards; no breakage.
+- (Optional, gitignored anyway) clean up orphan artifacts:
+  ```bash
+  rm -rf .claude/observability/health/raw-*.jsonl \
+         .claude/observability/health/decisions.jsonl \
+         .claude/observability/.health-external-risks.tmp.json
+  ```
+- `/hm:verify` shrinks 6 checks → 5. CI pipelines keying on check IDs
+  must shift `id 5 → 4` and `id 6 → 5`.
+
+### Internal changes
+
+- `synthesize.py` + `interview.py` `_ALL_SKILLS` lists pruned: 11 → 9.
+- `communication_audit.py:PINNED_SKILLS`: 5 → 4 (`relevance-filter` removed).
+- `cache.py:SOURCE_TTLS` trimmed to `{"osv_dev": TTL_1H}` only.
+- `models.py:CrawlItem` docstring + source-field comment narrowed to OSV.
+- `spec_inventory/{batch_generator,catalog}.py` classification tuples
+  trimmed to OSV-only.
+- `.claude-verify.sh`: `phase_5` reduced to OSV-only test; R2 anti-rot
+  check narrowed to `osv_dev` import; skill assertions reduced to 8 entries.
+- `templates/stages/verify.md.j2` rewritten for 5-check protocol; Check 4
+  description deleted.
+- `templates/cursor/rules/harness.mdc.j2` drops `/hm:refresh` 4-source
+  description.
+- `cli.py:552` + `:703` "3-layer harness health" strings → "2-layer".
+
+### Version bump
+
+5-file version sync 0.22.2 → 0.22.3: `pyproject.toml`,
+`src/harness_maker/__init__.py`, `.claude-plugin/plugin.json`,
+`.cursor-plugin/plugin.json`, `.codex-plugin/plugin.json`.
+
+Per ADR-0007 §Consequences: shipped as patch despite CLI subcommand
+removal because the surface is internal (`health-finalize` had no
+public-docs reference; only known caller was the auto-updating slash
+template). Accepted risk documented.
+
 ## [0.22.2] - 2026-05-22
 
 - **fix(wrapup): add `ruff format --check` to Step 2 verification command set** — closes the recurrence vector for `[fail:lint] ruff-format-not-in-local-verify-pass` (now count:2 — v0.19.2 + v0.22.0 both shipped as ghost tags because `ruff format --check` was missing from `/hm:wrapup` Step 2's "Final verification pass" command list, while CI's `quality-gate` ran both `ruff check` AND `ruff format --check`). The wrapup template's Step 2 had only `ruff check src/ tests/` + `mypy --strict src/` + `pytest -x` — `ruff check` does NOT catch formatting violations, only lint rules. This patch adds one line to both rendered branches (Claude Code and Codex) of `src/harness_maker/templates/stages/wrapup.md.j2`: `uv run ruff format --check src/ tests/` with an inline comment citing the failure entry. snapshot fixtures regenerated (8 files). 5-file version bump 0.22.1 → 0.22.2. Wrapup-template self-fix — when our own template causes a known failure to recur, fix the template rather than relying on human discipline at every wrapup.

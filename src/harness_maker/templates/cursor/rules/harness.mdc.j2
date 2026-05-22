@@ -45,8 +45,7 @@ Representative commands:
 
 - `/hm:research`, `/hm:plan`, `/hm:execute`, `/hm:review`, `/hm:wrapup`, `/hm:verify`
 - `/hm:loop` — bounded autoloop runner
-- `/hm:refresh` — anti-rot crawl + stale-asset scan
-- `/hm:ai-readiness` — 3-layer readiness audit
+- `/hm:health` — 2-layer health audit (structural + personalization)
 
 ## Atomic stages
 
@@ -115,11 +114,11 @@ so quality may degrade on other models.
 - `.claude/memory/wiki.md` — domain notes added by the user
 - `.claude/memory/session/` — per-session progress snapshots
 
-## Anti-rot
+## Health audit
 
-`/hm:refresh` crawls four sources (Anthropic blog, GitHub releases, arxiv,
-OSV.dev), checks for stale domain packs, and runs a version-drift check.
-Nothing is auto-applied — the user confirms each proposed change.
+`/hm:health` produces a 2-layer dashboard (structural + personalization). CVE
+detection lives in `/hm:verify` (`secscan/dependency_cves.py`). Nothing is
+auto-applied — the user confirms each proposed change.
 
 ## References
 

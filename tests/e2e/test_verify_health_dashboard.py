@@ -1,9 +1,10 @@
-"""E2E — /hm:verify CLI against engineered dashboard fixtures (Phase 3).
+"""E2E — /hm:verify CLI against engineered dashboard fixtures.
 
-Covers the 0.13.0 verify Check 3 (structural delta) + Check 4 (external_risks
-pending) contracts per PLAN-health-consolidation ADR-002 / ADR-004:
+Covers the verify Check 3 (structural delta) contract per
+PLAN-health-consolidation ADR-002 / ADR-004 (amended by ADR-007 in 0.22.3
+which removed the former Check 4 / external_risks layer):
 
-  * Engineered delta cases (PASS / FAIL for both checks).
+  * Engineered delta cases (PASS / FAIL for Check 3).
   * Missing baseline → no-baseline PASS.
   * Pre-0.13.0 single-`Health:` scalar schema → no-baseline PASS.
   * Personalization section present → ignored (never gates).
@@ -17,7 +18,6 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
-from collections.abc import Iterable
 from pathlib import Path
 
 import pytest
@@ -30,7 +30,6 @@ def _run_verify(
     target: Path,
     *,
     prior: Path | None = None,
-    pending: Path | None = None,
     force: bool = False,
     reason: str | None = None,
 ) -> subprocess.CompletedProcess[str]:
@@ -46,8 +45,6 @@ def _run_verify(
     ]
     if prior is not None:
         cmd.extend(["--prior-dashboard", str(prior)])
-    if pending is not None:
-        cmd.extend(["--pending", str(pending)])
     if force:
         cmd.append("--force")
     if reason is not None:
@@ -78,15 +75,12 @@ def _write_dashboard(
     target: Path,
     *,
     structural_score: int,
-    pending_count: int = 0,
-    pending_items: Iterable[dict[str, object]] = (),
     personalization_composite: int = 50,
     personalization_tier: str = "silver",
 ) -> Path:
-    """Write a valid 0.13.0 dashboard.md to ``<target>/.claude/observability``."""
+    """Write a valid 0.22.3 (2-section) dashboard.md."""
     obs = target / ".claude" / "observability"
     obs.mkdir(parents=True, exist_ok=True)
-    items_json = json.dumps(list(pending_items), ensure_ascii=False) if pending_items else "[]"
     lines = [
         "---",
         "generated_by: harness-maker",
@@ -97,10 +91,6 @@ def _write_dashboard(
         "## Structural",
         f"score: {structural_score} / 100",
         "signals_failed: []",
-        "",
-        "## External risks",
-        f"pending: {pending_count}",
-        f"items: {items_json}",
         "",
         "## Personalization",
         f"composite: {personalization_composite} / 100",
@@ -199,66 +189,6 @@ def test_check3_fail_structural_dropped_by_six(tmp_path: Path) -> None:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Engineered deltas — Check 4
-# ──────────────────────────────────────────────────────────────────────────────
-
-
-def test_check4_pass_no_blocking_external_risks(tmp_path: Path) -> None:
-    """Pending queue has one item, but it's below the relevance threshold."""
-    project = tmp_path / "proj"
-    project.mkdir()
-    _write_dashboard(project, structural_score=80)
-    obs = project / ".claude" / "observability"
-    (obs / "health").mkdir(parents=True, exist_ok=True)
-    pending = obs / "health" / "pending.jsonl"
-    pending.write_text(
-        json.dumps({"id": "low-rel", "relevance_score": 0.5, "category": "security"}) + "\n",
-        encoding="utf-8",
-    )
-    cp = _run_verify(project)
-    assert cp.returncode == 0, cp.stderr
-    record = _read_jsonl(_expected_jsonl_path(project))[-1]
-    c4 = _checks_by_id(record)[4]
-    assert c4["result"] == "PASS"
-    assert c4["blocking_items"] == 0
-
-
-def test_check4_fail_blocking_cve(tmp_path: Path) -> None:
-    """One pending CVE at relevance 0.9 category security → FAIL with id in evidence."""
-    project = tmp_path / "proj"
-    project.mkdir()
-    # Provide a prior dashboard so Check 3 passes cleanly (and we isolate
-    # the failure to Check 4).
-    prior = tmp_path / "prior.md"
-    prior.write_text(_dashboard_text(structural_score=80), encoding="utf-8")
-    _write_dashboard(project, structural_score=80)
-    obs = project / ".claude" / "observability"
-    (obs / "health").mkdir(parents=True, exist_ok=True)
-    pending = obs / "health" / "pending.jsonl"
-    pending.write_text(
-        json.dumps(
-            {
-                "id": "CVE-2026-99999",
-                "relevance_score": 0.9,
-                "category": "security",
-                "source": "osv.dev",
-            }
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-    cp = _run_verify(project, prior=prior)
-    assert cp.returncode == 1
-    record = _read_jsonl(_expected_jsonl_path(project))[-1]
-    c4 = _checks_by_id(record)[4]
-    assert c4["result"] == "FAIL"
-    assert c4["blocking_items"] == 1
-    items = c4["items"]
-    assert isinstance(items, list)
-    assert "CVE-2026-99999" in items
-
-
-# ──────────────────────────────────────────────────────────────────────────────
 # Missing baseline — no-baseline PASS
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -275,8 +205,6 @@ def test_check3_no_baseline_pass_when_dashboard_absent(tmp_path: Path) -> None:
     reason = c3["reason"]
     assert isinstance(reason, str)
     assert "no-baseline" in reason or "no baseline" in reason
-    c4 = _checks_by_id(record)[4]
-    assert c4["result"] == "PASS"
 
 
 def test_check3_no_baseline_pass_when_pre_0_13_0_schema(tmp_path: Path) -> None:
@@ -300,7 +228,7 @@ def test_check3_no_baseline_pass_when_pre_0_13_0_schema(tmp_path: Path) -> None:
 
 
 def test_personalization_section_does_not_gate_verify(tmp_path: Path) -> None:
-    """All three sections present with a low personalization composite — verify still PASSes."""
+    """Both sections present with a low personalization composite — verify still PASSes."""
     project = tmp_path / "proj"
     project.mkdir()
     prior = tmp_path / "prior.md"
@@ -316,10 +244,9 @@ def test_personalization_section_does_not_gate_verify(tmp_path: Path) -> None:
     record = _read_jsonl(_expected_jsonl_path(project))[-1]
     assert record["result"] == "PASS"
     checks_by_id = _checks_by_id(record)
-    # Personalization must NOT appear in the JSONL — only the five named
-    # checks (1, 2, 3, 4, 5, 6).
-    assert set(checks_by_id.keys()) == {1, 2, 3, 4, 5, 6}
-    for cid in (1, 2, 3, 4, 5, 6):
+    # ADR-0007: 5-check verify (1..5). Personalization must NOT appear.
+    assert set(checks_by_id.keys()) == {1, 2, 3, 4, 5}
+    for cid in (1, 2, 3, 4, 5):
         assert checks_by_id[cid]["result"] in {"PASS", "FAIL", "SKIPPED"}
     # No record carries a "personalization" key at any level.
     payload = json.dumps(record)
@@ -334,7 +261,7 @@ def test_personalization_section_does_not_gate_verify(tmp_path: Path) -> None:
 
 
 def _dashboard_text(*, structural_score: int) -> str:
-    """Render a minimal valid 0.13.0 dashboard body without writing to disk."""
+    """Render a minimal valid 0.22.3 (2-section) dashboard body."""
     return "\n".join(
         [
             "---",
@@ -346,10 +273,6 @@ def _dashboard_text(*, structural_score: int) -> str:
             "## Structural",
             f"score: {structural_score} / 100",
             "signals_failed: []",
-            "",
-            "## External risks",
-            "pending: 0",
-            "items: []",
             "",
             "## Personalization",
             "composite: 50 / 100",

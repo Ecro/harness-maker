@@ -70,7 +70,6 @@ def test_personalization_section_bytes_match_when_rendered_into_dashboard(
 
     full = render_dashboard_markdown(
         {"score": 50, "signals_failed": []},
-        {"pending": 0, "items": []},
         section,
         generated_at="2026-05-16T00:00:00+00:00",
     )

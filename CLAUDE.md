@@ -287,7 +287,7 @@ def normalize_for_snapshot(text: str) -> str:
   - **REFRAME** — reviewer / evaluator 형 (10 reviewer agents). FULL + "Input Processing" 섹션 (confirmation bias 완화).
   - **SOFT** — idea / brainstorm 형. 현재 consumer 없음 (dormant ship).
 - Output frontmatter / TOML metadata 에는 키 노출 X — body 안 HTML comment 마커 `<!-- @hm:communication_variant: X -->` 로만 식별. Cursor `.mdc` / Codex TOML strict parser 호환 (ADR-004).
-- Skill 도 동일 패턴, **5 LLM-judgment skill 만 적용** — agent-quality-rubric, ai-readiness-rubric, relevance-filter, security-scanner, refdocs-search (ADR-005). 7 procedural skill 제외.
+- Skill 도 동일 패턴, **4 LLM-judgment skill 만 적용** — agent-quality-rubric, ai-readiness-rubric, security-scanner, refdocs-search (ADR-005, reduced from 5 in 0.22.3 per ADR-0007). 7 procedural skill 제외.
 - Render path: `render._extract_source_communication_variant` 가 pre-render 단계에서 source frontmatter 에서 regex 로 추출 (yaml.safe_load 는 `{{ name }}` 같은 Jinja expression 에 fail). Codex 는 dispatcher source 우회하므로 `synthesize._COMMUNICATION_VARIANT` table 명시.
 - 변경 후 `/hm:health` 실행하여 silent-miss + source ↔ output drift 확인.
 

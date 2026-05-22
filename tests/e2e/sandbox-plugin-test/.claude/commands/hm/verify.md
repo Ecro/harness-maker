@@ -1,14 +1,14 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.22.1
+harness_maker_version: 0.22.3
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/atomic_command.md.j2
 provenance: official
-content_hash: 4ad8a22afc3c5cae8ad8530fa19a31042dd1e7ae5101f4b24602eee0af56c3bf
+content_hash: 1343b0cdc8b698698d57796bbc5594951a06835e1d526a78c9e973aaf5289230
 ---
 # Stage: verify
 
-> Atomic stage. Pre-completion verification gate — 6-check stop sign before `wrapup`. Failures block by default; `--force` overrides explicitly.
+> Atomic stage. Pre-completion verification gate — 5-check stop sign before `wrapup`. Failures block by default; `--force` overrides explicitly.
 
 
 ## Communication Protocol
@@ -20,7 +20,7 @@ content_hash: 4ad8a22afc3c5cae8ad8530fa19a31042dd1e7ae5101f4b24602eee0af56c3bf
 
 ## Purpose
 
-Block silent regressions and partial completions. Run a rigid 6-check rubric that any work unit MUST pass before being declared done. This is the machine-checkable stop sign before `/hm:wrapup`.
+Block silent regressions and partial completions. Run a rigid 5-check rubric that any work unit MUST pass before being declared done. This is the machine-checkable stop sign before `/hm:wrapup`.
 
 ## When to Run
 
@@ -41,11 +41,10 @@ Block silent regressions and partial completions. Run a rigid 6-check rubric tha
 
 - Current working tree state (staged + unstaged).
 - `work-docs/PLAN-{slug}.md` and `specs/SPEC-{slug}.md` (when present) — drive Check 1.
-- Most recent Health snapshot at `.claude/observability/dashboard.md` (3-section schema: `Structural` / `External risks` / `Personalization`; pre-0.13.0 single-`Health:` scalar is intentionally unreadable here).
+- Most recent Health snapshot at `.claude/observability/dashboard.md` (2-section schema: `Structural` / `Personalization`; pre-0.13.0 single-`Health:` scalar is intentionally unreadable here). ADR-0007 removed the former `External risks` section in 0.22.3.
 - Most recent security findings at `.claude/observability/security/findings-*.jsonl`.
-- Anti-rot pending queue at `.claude/observability/health/pending.jsonl` (renamed from `refresh/pending.jsonl` in 0.13.0; the dashboard `External risks` section also exposes the same count).
 
-## The 6 Checks (run in order; STOP on first FAIL unless `--force`)
+## The 5 Checks (run in order; STOP on first FAIL unless `--force`)
 
 ### Check 1 — PLAN/SPEC satisfaction + drift verdict
 
@@ -90,7 +89,7 @@ FAIL when: any subprocess returns non-zero.
 
 ### Check 3 — Structural delta (formerly "Health delta")
 
-Read the prior `structural` score from `.claude/observability/dashboard.md` — specifically the `score:` line under the **`## Structural`** section of the 3-section dashboard (0.13.0+ schema). Do NOT average with `External risks` / `Personalization`; those are orthogonal signals owned by Check 4 and (deliberately) by no check at all.
+Read the prior `structural` score from `.claude/observability/dashboard.md` — specifically the `score:` line under the **`## Structural`** section of the 2-section dashboard (0.22.3+ schema). Do NOT average with `Personalization`; it is an orthogonal signal (deliberately) owned by no check at all.
 
 Recompute current structural score (or invoke `/hm:health` Step 1 if a fresh score is needed). Compare ONLY structural values.
 
@@ -98,24 +97,9 @@ Recompute current structural score (or invoke `/hm:health` Step 1 if a fresh sco
 
 FAIL when: a parseable prior baseline exists AND `current_structural - prior_structural < -5` (structural score dropped more than 5 points). Mid-work-unit dips are normal; a 5+ point drop signals quality regression.
 
-> **Personalization is NOT a gating field.** The `## Personalization` section (composite / tier / action_items) is informational only — verify must never read it for pass/fail. ADR-002 (amended by ADR-006).
+> **Personalization is NOT a gating field.** The `## Personalization` section (composite / tier / action_items) is informational only — verify must never read it for pass/fail. ADR-002 (amended by ADR-007).
 
-### Check 4 — Anti-rot pending queue (external_risks)
-
-Read the pending external-risk queue. Two sources, prefer the first that exists:
-
-1. `.claude/observability/health/pending.jsonl` (0.13.0+) — one JSON record per line, fields: `id`, `relevance_score`, `category`, `source`, `first_seen`, ...
-2. The `## External risks` section of `.claude/observability/dashboard.md` — `pending: <int>` line + `items: <JSON-list>` line.
-
-> Note: 0.12.x used `.claude/observability/refresh/pending.jsonl`. That path is intentionally NOT read here — ADR-004 (no compatibility shim). Missing 0.13.0 source = no-baseline PASS.
-
-**No-baseline PASS rule (ADR-004):** when neither source exists (or the dashboard is pre-0.13.0 schema), emit **PASS** with `reason: "no-baseline: <cause>"`.
-
-FAIL when: at least one source is readable AND any pending item has `relevance_score >= 0.8` AND `category in {security, breaking-change}`. These are blocking items — `wrapup`-ing while ignoring them silently absorbs the rot. Include the offending item ids in the JSONL `items` array so the failure is actionable.
-
-PASS when: queue is empty, or remaining items are below the blocking threshold, or no-baseline.
-
-### Check 5 — Security high findings
+### Check 4 — Security high findings
 
 Read the most recent `.claude/observability/security/findings-*.jsonl`.
 
@@ -123,7 +107,7 @@ FAIL when: any finding has `severity == "high"` AND `resolution != "accepted-ris
 
 PASS when: zero unresolved high findings.
 
-### Check 6 — Worktree merge cleanliness
+### Check 5 — Worktree merge cleanliness
 
 When worktree isolation was engaged (`.worktrees/execute-*` exists or did exist), confirm the merge happened cleanly:
 
@@ -139,7 +123,7 @@ PASS when: working tree is clean OR has only the staged changes from `/hm:execut
 ## Advisory probes (non-blocking)
 
 These do **NOT** gate completion. They surface latent footguns and continue
-with `exit 0` regardless of outcome. They sit OUTSIDE the 6-check contract
+with `exit 0` regardless of outcome. They sit OUTSIDE the 5-check contract
 of `verify-before-completion` — adding new gating checks means changing
 that SKILL; adding new advisory probes means appending here.
 
@@ -164,19 +148,17 @@ Write **both** formats:
 ```
 === /hm:verify ===
 
-[1/6] PLAN/SPEC satisfaction       ✅ PASS
-[2/6] Regression smoke             ✅ PASS
-[3/6] Structural delta             ✅ PASS  (structural 87 → 89, +2)
-[4/6] External risks pending       ❌ FAIL
-        2 items at relevance≥0.8 + category=security:
-        - CVE-2026-12345 in dependency `httpx` (pending since 2026-05-01)
-        - Anthropic blog "tool-use schema v3" (pending since 2026-05-03)
-        Run /hm:health to triage these before wrapup.
+[1/5] PLAN/SPEC satisfaction       ✅ PASS
+[2/5] Regression smoke             ✅ PASS
+[3/5] Structural delta             ✅ PASS  (structural 87 → 89, +2)
+[4/5] Security high findings       ❌ FAIL
+        1 unresolved high finding:
+        - CVE-2026-12345 in dependency `httpx` (severity=high, no rationale).
+        Resolve or record accepted-risk-with-rationale.
 
-[5/6] (skipped — stopped at first FAIL)
-[6/6] (skipped — stopped at first FAIL)
+[5/5] (skipped — stopped at first FAIL)
 
-RESULT: FAIL — 1 of 6 checks failed.
+RESULT: FAIL — 1 of 5 checks failed.
 Override: --force --reason="<text>"  (logs to verify-<date>.jsonl with the reason)
 ```
 
@@ -191,26 +173,25 @@ Override: --force --reason="<text>"  (logs to verify-<date>.jsonl with the reaso
     {"id": 1, "name": "plan_spec_satisfaction", "result": "PASS"},
     {"id": 2, "name": "regression_smoke", "result": "PASS"},
     {"id": 3, "name": "structural_delta", "result": "PASS", "delta": 2, "prior": 87, "current": 89, "reason": null},
-    {"id": 4, "name": "external_risks_pending", "result": "FAIL", "blocking_items": 2, "items": ["CVE-2026-12345", "anthropic-tool-use-v3"], "reason": null},
-    {"id": 5, "name": "security_high", "result": "SKIPPED"},
-    {"id": 6, "name": "worktree_merge", "result": "SKIPPED"}
+    {"id": 4, "name": "security_high", "result": "FAIL", "blocking_items": 1, "items": ["CVE-2026-12345"], "reason": null},
+    {"id": 5, "name": "worktree_merge", "result": "SKIPPED"}
   ],
   "force_override": false,
   "override_reason": null
 }
 ```
 
-For no-baseline PASS, the corresponding check record carries `"result": "PASS"` and a populated `"reason"` string (e.g. `"no-baseline: dashboard.md missing"` / `"no-baseline: pre-0.13.0 schema"`); `prior` / `current` may be `null`. Verify never emits `result: "PASS"` for Check 3/4 silently — a populated `reason` is mandatory whenever the baseline was missing or unparseable.
+For no-baseline PASS, the corresponding check record carries `"result": "PASS"` and a populated `"reason"` string (e.g. `"no-baseline: dashboard.md missing"` / `"no-baseline: pre-0.13.0 schema"`); `prior` / `current` may be `null`. Verify never emits `result: "PASS"` for Check 3 silently — a populated `reason` is mandatory whenever the baseline was missing or unparseable.
 
-> **Personalization field is informational only.** The JSONL record never contains a `personalization` check entry. Verify reads structural + external_risks; the `## Personalization` section of dashboard.md is for `/hm:health` reporting and is ignored by this stage. ADR-002 amendment.
+> **Personalization field is informational only.** The JSONL record never contains a `personalization` check entry. Verify reads structural only; the `## Personalization` section of dashboard.md is for `/hm:health` reporting and is ignored by this stage. ADR-002 (amended by ADR-007).
 
 When `--force` is set, append the same record with `"force_override": true, "override_reason": "<text>"`.
 
 ## Procedure
 
-1. Read inputs (PLAN, SPEC, dashboard, security findings, pending queue).
+1. Read inputs (PLAN, SPEC, dashboard, security findings).
 2. Run Check 1. If PASS, continue. If FAIL: emit text + JSON record + STOP (unless `--force`).
-3. Repeat for Checks 2-6.
+3. Repeat for Checks 2-5.
 4. Emit final RESULT line + JSON record.
 5. When `--force` is set with FAILing checks: emit text + JSON record with override flag + reason, then return PASS exit code (let the workflow proceed). Wrapup will surface the override in the commit body footer.
 6. **Stage terminal**: Emit the RESULT line and **STOP**. Do not proceed to `/hm:wrapup` or any other stage without an explicit user command — unless this stage was invoked as part of a fused workflow (e.g., `exec-rev-wrap-ver`), in which case the fused workflow owns the transition.

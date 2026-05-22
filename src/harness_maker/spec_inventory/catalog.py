@@ -35,7 +35,7 @@ SEED_L1_CLUSTERS: tuple[tuple[str, str], ...] = (
     ("hooks", "Claude/Cursor/Codex hook schemas"),
     ("templates", "Jinja templates (claude-md/agents/skills/codex/cursor)"),
     ("caching", "LLM judge cache + detection cache"),
-    ("crawler", "Anti-rot crawler (anthropic_blog/arxiv/github/osv)"),
+    ("crawler", "OSV CVE crawler (consumed by /hm:verify via secscan)"),
 )
 
 

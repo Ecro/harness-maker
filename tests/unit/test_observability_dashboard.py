@@ -1,8 +1,9 @@
-"""3-section health dashboard writer/reader (0.13.0).
+"""2-section health dashboard writer/reader (0.22.3 per ADR-0007).
 
-PLAN health-consolidation Phase 1 / ADR-002 (amended by ADR-006). The
-verify stage (Phase 3) reads the schema produced here; this test pins
-the public contract so a future tweak can't silently break Check 3.
+ADR-0007 supersedes ADR-0006: the dashboard schema collapsed from 3 sections
+to 2 after the external_risks layer was removed. The verify stage (Phase 3)
+reads the schema produced here; this test pins the public contract so a
+future tweak can't silently break Check 3.
 """
 
 from __future__ import annotations
@@ -19,27 +20,10 @@ from harness_maker.observability.dashboard import (
 # ─── render_dashboard_markdown ──────────────────────────────────────────────
 
 
-def _sample_inputs() -> tuple[dict, dict, dict]:
+def _sample_inputs() -> tuple[dict, dict]:
     structural = {
         "score": 72,
         "signals_failed": ["context_quality:has_stack", "agent_quality:has_charter"],
-    }
-    external_risks = {
-        "pending": 2,
-        "items": [
-            {
-                "source": "osv.dev",
-                "id": "CVE-2026-0001",
-                "severity": "high",
-                "relevance": 0.82,
-            },
-            {
-                "source": "anthropic_blog",
-                "id": "post-2026-05-01",
-                "severity": "info",
-                "relevance": 0.81,
-            },
-        ],
     }
     personalization = {
         "composite": 67,
@@ -53,43 +37,37 @@ def _sample_inputs() -> tuple[dict, dict, dict]:
             }
         ],
     }
-    return structural, external_risks, personalization
+    return structural, personalization
 
 
-def test_render_has_three_sections() -> None:
-    s, e, p = _sample_inputs()
-    body = render_dashboard_markdown(s, e, p, generated_at="2026-05-16T00:00:00+00:00")
+def test_render_has_two_sections() -> None:
+    s, p = _sample_inputs()
+    body = render_dashboard_markdown(s, p, generated_at="2026-05-16T00:00:00+00:00")
     assert "## Structural" in body
-    assert "## External risks" in body
     assert "## Personalization" in body
+    # ADR-0007: External risks section removed.
+    assert "## External risks" not in body
 
 
 def test_render_includes_frontmatter() -> None:
-    s, e, p = _sample_inputs()
-    body = render_dashboard_markdown(s, e, p, generated_at="2026-05-16T00:00:00+00:00")
+    s, p = _sample_inputs()
+    body = render_dashboard_markdown(s, p, generated_at="2026-05-16T00:00:00+00:00")
     assert body.startswith("---\n")
     assert "generated_by: harness-maker" in body.split("\n---\n", 1)[0]
     assert "generated_at: 2026-05-16T00:00:00+00:00" in body
 
 
 def test_render_structural_fields() -> None:
-    s, e, p = _sample_inputs()
-    body = render_dashboard_markdown(s, e, p, generated_at="2026-05-16T00:00:00+00:00")
+    s, p = _sample_inputs()
+    body = render_dashboard_markdown(s, p, generated_at="2026-05-16T00:00:00+00:00")
     assert "score: 72 / 100" in body
     # signals_failed is JSON-encoded so a verify reader can parse it
     assert '"context_quality:has_stack"' in body
 
 
-def test_render_external_risks_fields() -> None:
-    s, e, p = _sample_inputs()
-    body = render_dashboard_markdown(s, e, p, generated_at="2026-05-16T00:00:00+00:00")
-    assert "pending: 2" in body
-    assert '"CVE-2026-0001"' in body
-
-
 def test_render_personalization_fields() -> None:
-    s, e, p = _sample_inputs()
-    body = render_dashboard_markdown(s, e, p, generated_at="2026-05-16T00:00:00+00:00")
+    s, p = _sample_inputs()
+    body = render_dashboard_markdown(s, p, generated_at="2026-05-16T00:00:00+00:00")
     assert "composite: 67 / 100" in body
     assert "tier: gold" in body
     assert '"l1_conversion": 60' in body
@@ -98,20 +76,18 @@ def test_render_personalization_fields() -> None:
 
 def test_render_clamps_out_of_range_scores() -> None:
     s = {"score": 250, "signals_failed": []}
-    e = {"pending": 0, "items": []}
     p = {"composite": -10, "tier": "bronze", "layers": {}, "action_items": []}
-    body = render_dashboard_markdown(s, e, p, generated_at="2026-05-16T00:00:00+00:00")
+    body = render_dashboard_markdown(s, p, generated_at="2026-05-16T00:00:00+00:00")
     assert "score: 100 / 100" in body
     assert "composite: 0 / 100" in body
 
 
 def test_render_handles_missing_optional_fields() -> None:
     """A degenerate section dict must still produce a valid markdown body."""
-    body = render_dashboard_markdown({}, {}, {}, generated_at="2026-05-16T00:00:00+00:00")
+    body = render_dashboard_markdown({}, {}, generated_at="2026-05-16T00:00:00+00:00")
     assert "## Structural" in body
     assert "score: 0 / 100" in body
     assert "signals_failed: []" in body
-    assert "pending: 0" in body
     assert "tier: bronze" in body
     assert "layers: {}" in body
     assert "action_items: []" in body
@@ -121,19 +97,19 @@ def test_render_handles_missing_optional_fields() -> None:
 
 
 def test_write_dashboard_creates_file_at_canonical_path(tmp_path: Path) -> None:
-    s, e, p = _sample_inputs()
-    out = write_dashboard(tmp_path, s, e, p, generated_at="2026-05-16T00:00:00+00:00")
+    s, p = _sample_inputs()
+    out = write_dashboard(tmp_path, s, p, generated_at="2026-05-16T00:00:00+00:00")
     expected = tmp_path / ".claude" / "observability" / "dashboard.md"
     assert out == expected
     assert expected.is_file()
 
 
 def test_write_dashboard_overwrites_existing(tmp_path: Path) -> None:
-    s, e, p = _sample_inputs()
-    write_dashboard(tmp_path, s, e, p, generated_at="2026-05-16T00:00:00+00:00")
+    s, p = _sample_inputs()
+    write_dashboard(tmp_path, s, p, generated_at="2026-05-16T00:00:00+00:00")
     # Bump structural and re-write — first body must be gone.
     s2 = {**s, "score": 99}
-    write_dashboard(tmp_path, s2, e, p, generated_at="2026-05-17T00:00:00+00:00")
+    write_dashboard(tmp_path, s2, p, generated_at="2026-05-17T00:00:00+00:00")
     body = (tmp_path / ".claude" / "observability" / "dashboard.md").read_text(encoding="utf-8")
     assert "score: 99 / 100" in body
     assert "score: 72 / 100" not in body
@@ -143,18 +119,38 @@ def test_write_dashboard_overwrites_existing(tmp_path: Path) -> None:
 
 
 def test_parse_round_trips_known_inputs(tmp_path: Path) -> None:
-    s, e, p = _sample_inputs()
-    out = write_dashboard(tmp_path, s, e, p, generated_at="2026-05-16T00:00:00+00:00")
+    s, p = _sample_inputs()
+    out = write_dashboard(tmp_path, s, p, generated_at="2026-05-16T00:00:00+00:00")
     parsed = parse_dashboard(out)
     assert parsed is not None
     assert parsed["structural"]["score"] == 72
     assert parsed["structural"]["signals_failed"][0] == "context_quality:has_stack"
-    assert parsed["external_risks"]["pending"] == 2
-    assert parsed["external_risks"]["items"][0]["id"] == "CVE-2026-0001"
     assert parsed["personalization"]["composite"] == 67
     assert parsed["personalization"]["tier"] == "gold"
     assert parsed["personalization"]["layers"]["l1_conversion"] == 60
     assert parsed["personalization"]["action_items"][0]["priority"] == "P1"
+    # ADR-0007: external_risks key no longer in parser output.
+    assert "external_risks" not in parsed
+
+
+def test_parse_silently_drops_legacy_external_risks_section(tmp_path: Path) -> None:
+    """A pre-0.22.3 dashboard with `## External risks` parses cleanly with the
+    section ignored. Backwards compat — no breakage for in-flight workspaces."""
+    legacy = tmp_path / "old.md"
+    legacy.write_text(
+        "---\ngenerated_by: harness-maker\ngenerated_at: 2026-05-22T00:00:00Z\n---\n"
+        "# Health\n\n"
+        "## Structural\nscore: 80 / 100\nsignals_failed: []\n\n"
+        "## External risks\npending: 12\nitems: []\n\n"
+        "## Personalization\ncomposite: 70 / 100\ntier: gold\n"
+        'layers: {"l1": 0.7}\naction_items: []\n',
+        encoding="utf-8",
+    )
+    parsed = parse_dashboard(legacy)
+    assert parsed is not None
+    assert parsed["structural"]["score"] == 80
+    assert parsed["personalization"]["composite"] == 70
+    assert "external_risks" not in parsed
 
 
 def test_parse_returns_none_for_old_single_scalar_schema(tmp_path: Path) -> None:
@@ -204,9 +200,7 @@ def test_signals_failed_round_trips_via_json() -> None:
             'dim3:sig"with"quotes',
         ],
     }
-    body = render_dashboard_markdown(
-        s, {"pending": 0, "items": []}, {}, generated_at="2026-05-16T00:00:00+00:00"
-    )
+    body = render_dashboard_markdown(s, {}, generated_at="2026-05-16T00:00:00+00:00")
     # Recover the line and JSON-parse it.
     [line] = [ln for ln in body.splitlines() if ln.startswith("signals_failed: ")]
     payload = line.removeprefix("signals_failed: ")

@@ -603,10 +603,18 @@ def test_ai_readiness_subcommand_removed() -> None:
 
 
 def test_health_subcommand_registered() -> None:
-    """/hm:health is the only audit-style command in 0.13.0."""
+    """/hm:health is the only audit-style command in 0.22.3.
+
+    ADR-0007 (0.22.3) removed the ``health-finalize`` subcommand alongside
+    the external_risks layer; the single ``health`` entrypoint now emits the
+    structural section, and the slash template handles personalization in
+    place via dashboard.md edit.
+    """
     names = _registered_subcommand_names()
     assert "health" in names, f"health must be registered; got {sorted(names)}"
-    assert "health-finalize" in names, f"health-finalize must be registered; got {sorted(names)}"
+    assert "health-finalize" not in names, (
+        f"health-finalize must be removed in 0.22.3; got {sorted(names)}"
+    )
 
 
 def test_health_runs_against_minimal_project(tmp_path: Path) -> None:
@@ -618,8 +626,8 @@ def test_health_runs_against_minimal_project(tmp_path: Path) -> None:
     assert "personalization=" in result.output
 
 
-def test_health_writes_three_section_dashboard(tmp_path: Path) -> None:
-    """End-to-end: health → dashboard.md contains all three sections."""
+def test_health_writes_two_section_dashboard(tmp_path: Path) -> None:
+    """End-to-end: health → dashboard.md contains the two ADR-0007 sections."""
     _write_harness_yaml(tmp_path)
     result = runner.invoke(app, ["health", str(tmp_path)])
     assert result.exit_code == 0, f"exit {result.exit_code}:\n{result.output}"
@@ -627,8 +635,9 @@ def test_health_writes_three_section_dashboard(tmp_path: Path) -> None:
     assert dashboard.is_file()
     body = dashboard.read_text(encoding="utf-8")
     assert "## Structural" in body
-    assert "## External risks" in body
     assert "## Personalization" in body
+    # ADR-0007: External risks section removed in 0.22.3.
+    assert "## External risks" not in body
 
 
 def test_security_scan_command_reports_findings(tmp_path: Path) -> None:

@@ -122,8 +122,6 @@ _ALL_SKILLS: list[str] = [
     "conditional-router",
     "context-linter",
     "refdocs-search",
-    "relevance-filter",
-    "research-crawler",
     "security-scanner",
     "verify-before-completion",
     "worktree-isolator",
@@ -558,7 +556,10 @@ def _codex_target_files(
 
 
 def _codex_skill_files() -> list[FileSpec]:
-    """Existing 11 skills dual-rendered to .agents/skills/ for Codex."""
+    """Existing 9 skills dual-rendered to .agents/skills/ for Codex.
+
+    ADR-0007 (0.22.3) removed research-crawler + relevance-filter; base count 11 → 9.
+    """
     return [
         (f"skills/{n}/SKILL.md.j2", f".agents/skills/{n}/SKILL.md", {"name": n})
         for n in _ALL_SKILLS

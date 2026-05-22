@@ -86,8 +86,5 @@ TTL_1H = 3600.0
 TTL_24H = 86400.0
 
 SOURCE_TTLS: dict[str, float] = {
-    "anthropic_blog": TTL_24H,
-    "github_releases": TTL_1H,
-    "arxiv": TTL_24H,
     "osv_dev": TTL_1H,
 }

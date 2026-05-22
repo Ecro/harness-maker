@@ -1,12 +1,17 @@
 ---
 name: verify-before-completion
-description: Pre-wrapup gate enforcing 6 checks before any /hm:wrapup or autoloop iteration close. Failure on any check blocks completion and surfaces the failing check name + remediation hint.
+description: Pre-wrapup gate enforcing 5 checks before any /hm:wrapup or autoloop iteration close. Failure on any check blocks completion and surfaces the failing check name + remediation hint.
 ---
 
 # verify-before-completion
 
-Mandatory gate before `/hm:wrapup` or autoloop iteration close. All 6
+Mandatory gate before `/hm:wrapup` or autoloop iteration close. All 5
 checks must pass; the first failure short-circuits and blocks.
+
+ADR-0007 (0.22.3) reduced the gate from 6 to 5 checks by removing the
+former Check 4 (anti-rot pending queue) when the `/hm:health`
+external_risks layer was dropped. CVE coverage now lives in `/hm:verify`
+Check 5 (security) via `secscan/dependency_cves.py`, not here.
 
 Invoke before `/hm:wrapup` (M8 invariant), at the end of every `/hm:loop`
 iteration, or on demand via `/hm:verify`. Skip only for trivial work units
@@ -14,7 +19,7 @@ iteration, or on demand via `/hm:verify`. Skip only for trivial work units
 previous PASS in the same session is still valid (no new commits / test
 changes since).
 
-## The 6 Checks
+## The 5 Checks
 
 ### 1. PLAN/SPEC fulfillment — you verify (hard fail)
 
@@ -61,14 +66,7 @@ sys.exit(0 if score >= baseline - 5 else 1)
 "
 ```
 
-### 4. Anti-rot pending resolved
-
-```bash
-test ! -f .claude/observability/refresh/pending.jsonl || \
-  grep -q '"action":"defer"' .claude/observability/refresh/pending.jsonl || exit 1
-```
-
-### 5. Zero high-severity security findings
+### 4. Zero high-severity security findings
 
 ```bash
 findings=.claude/observability/security/findings.jsonl
@@ -78,7 +76,7 @@ if [ -f "$findings" ]; then
 fi
 ```
 
-### 6. Worktree merge-safe
+### 5. Worktree merge-safe
 
 ```bash
 git diff --check || exit 1
@@ -92,9 +90,9 @@ First failing check halts the gate.
 Output: `BLOCKED: check <N> (<name>) — <reason>`.
 When blocked, the calling command must abort. Remediation hints:
 PLAN unclosed → list incomplete tasks; smoke fail → re-run failing test;
-Health drop → show 6-dim breakdown; pending refresh → `/hm:refresh`;
-security high → list findings; merge conflict → show conflicting paths.
+Health drop → show 6-dim breakdown; security high → list findings;
+merge conflict → show conflicting paths.
 
 <!-- @hm:user:extensions -->
-<!-- Project-specific verify checks beyond the 6 baseline. Preserved across harness-maker upgrades. -->
+<!-- Project-specific verify checks beyond the 5 baseline. Preserved across harness-maker upgrades. -->
 <!-- @hm:/user:extensions -->

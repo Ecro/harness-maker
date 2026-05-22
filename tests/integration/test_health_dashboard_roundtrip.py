@@ -33,11 +33,10 @@ from tests.integration.conftest import build_min_fixture
 # floor assertion is meaningful (not vacuously true with score=0).
 MIN_FIXTURE_SCORE = 30
 
-# Minimal valid external-risks and personalization sections — these are
-# orthogonal to Bug 2 (which is about the structural section's schema)
-# and we keep them constant so the test isolates the producer↔renderer
-# contract for the structural layer alone.
-_EMPTY_EXTERNAL_RISKS: dict[str, object] = {"pending": 0, "items": []}
+# Minimal valid personalization section — orthogonal to Bug 2 (which is
+# about the structural section's schema). Kept constant so the test
+# isolates the producer↔renderer contract for the structural layer alone.
+# ADR-0007 removed the external_risks section in 0.22.3.
 _MIN_PERSONALIZATION: dict[str, object] = {
     "composite": 0,
     "tier": "bronze",
@@ -73,7 +72,6 @@ def test_dashboard_roundtrip_preserves_structural_score(tmp_path: Path) -> None:
     dashboard_path = write_dashboard(
         fixture,
         result,
-        _EMPTY_EXTERNAL_RISKS,
         _MIN_PERSONALIZATION,
         generated_at="2026-05-17T00:00:00+00:00",
     )
@@ -112,7 +110,6 @@ def test_dashboard_roundtrip_catches_producer_key_drift(tmp_path: Path) -> None:
     dashboard_path = write_dashboard(
         fixture,
         old_shape_result,
-        _EMPTY_EXTERNAL_RISKS,
         _MIN_PERSONALIZATION,
         generated_at="2026-05-17T00:00:00+00:00",
     )

@@ -1,20 +1,19 @@
-"""3-section health dashboard writer (0.13.0).
+"""2-section health dashboard writer (0.22.3, per ADR-0007).
 
-PLAN health-consolidation Phase 1 / ADR-002 (amended by ADR-006): the
-single ``Health`` score is split into three orthogonal fields written as
-distinct sections of ``dashboard.md``:
+ADR-0007 supersedes ADR-0006. The dashboard schema collapsed from 3 sections
+to 2 after 2026-05-22 runtime evidence showed the external_risks layer (4-source
+crawler + LLM relevance filter + stale-asset detection) was 91% noise. CVE
+detection survives via ``secscan/dependency_cves.py`` consumed by ``/hm:verify``.
+
+The remaining sections:
 
   - ``Structural``      — ai_readiness layer 1+3 score (verify Check 3)
-  - ``External risks``  — crawler + relevance + stale-asset count
-                          (verify Check 4)
   - ``Personalization`` — composite + tier + ADR-011 ActionItems
                           (NOT read by verify)
 
-The writer is intentionally pure formatting; the three section payloads
-are computed by their owning modules (``ai_readiness``, the future
-external-risks orchestrator inside ``cli.health``, and
-``personalization_audit.run_audit`` respectively). Atomic write per
-CLAUDE.md WSL2/NTFS rule.
+The writer is intentionally pure formatting; the two section payloads are
+computed by their owning modules (``ai_readiness`` and
+``personalization_audit.run_audit``). Atomic write per CLAUDE.md WSL2/NTFS rule.
 """
 
 from __future__ import annotations
@@ -33,7 +32,7 @@ _VALID_TIERS = {"bronze", "silver", "gold", "platinum"}
 def _coerce_score(value: object, *, default: int = 0) -> int:
     """Map an int-like payload to a clamped 0-100 int.
 
-    Why defensive: the three section dicts are assembled by independent
+    Why defensive: the two section dicts are assembled by independent
     layers; a mis-shaped payload should write a visible "0 / 100" rather
     than crash the whole /hm:health command.
     """
@@ -69,12 +68,11 @@ def _format_dict_block(d: dict[str, Any]) -> str:
 
 def render_dashboard_markdown(
     structural: dict[str, Any],
-    external_risks: dict[str, Any],
     personalization: dict[str, Any],
     *,
     generated_at: str | None = None,
 ) -> str:
-    """Render the 3-section dashboard.md body.
+    """Render the 2-section dashboard.md body.
 
     ``generated_at`` defaults to ``datetime.now(UTC).isoformat()``; tests
     inject a frozen value for snapshot determinism. The frontmatter
@@ -88,13 +86,6 @@ def render_dashboard_markdown(
     signals_failed = structural.get("signals_failed", [])
     if not isinstance(signals_failed, list):
         signals_failed = []
-
-    pending = external_risks.get("pending", 0)
-    if not isinstance(pending, int) or isinstance(pending, bool):
-        pending = 0
-    items = external_risks.get("items", [])
-    if not isinstance(items, list):
-        items = []
 
     composite = _coerce_score(personalization.get("composite"))
     tier = personalization.get("tier", "bronze")
@@ -118,10 +109,6 @@ def render_dashboard_markdown(
         f"score: {structural_score} / 100",
         f"signals_failed: {_format_list_block(signals_failed)}",
         "",
-        "## External risks",
-        f"pending: {pending}",
-        f"items: {_format_list_block(items)}",
-        "",
         "## Personalization",
         f"composite: {composite} / 100",
         f"tier: {tier}",
@@ -135,7 +122,6 @@ def render_dashboard_markdown(
 def write_dashboard(
     project_root: Path,
     structural: dict[str, Any],
-    external_risks: dict[str, Any],
     personalization: dict[str, Any],
     *,
     generated_at: str | None = None,
@@ -148,7 +134,6 @@ def write_dashboard(
     """
     body = render_dashboard_markdown(
         structural,
-        external_risks,
         personalization,
         generated_at=generated_at,
     )
@@ -168,6 +153,10 @@ def parse_dashboard(path: Path) -> dict[str, Any] | None:
     in markdown body. That schema is intentionally unparseable here so the
     verify stage cannot mistake it for a fresh baseline (ADR-004: no
     compatibility shim; missing baseline = "no-baseline PASS").
+
+    Backwards compat: pre-0.22.3 dashboards with an ``## External risks``
+    section are still parseable — the section is silently dropped (the
+    key no longer appears in the returned dict).
     """
     if not path.is_file():
         return None
@@ -190,7 +179,6 @@ def parse_dashboard(path: Path) -> dict[str, Any] | None:
 
     out: dict[str, Any] = {
         "structural": {"score": None, "signals_failed": []},
-        "external_risks": {"pending": None, "items": []},
         "personalization": {
             "composite": None,
             "tier": None,
@@ -205,11 +193,11 @@ def parse_dashboard(path: Path) -> dict[str, Any] | None:
             label = stripped.removeprefix("## ").strip().lower()
             if label == "structural":
                 section = "structural"
-            elif label == "external risks":
-                section = "external_risks"
             elif label == "personalization":
                 section = "personalization"
             else:
+                # Old "external risks" section (pre-0.22.3) or any unknown
+                # section: skip — drop silently for forwards-compat.
                 section = None
             continue
         if section is None or ":" not in stripped:
@@ -222,11 +210,6 @@ def parse_dashboard(path: Path) -> dict[str, Any] | None:
                 out["structural"]["score"] = _parse_score(value)
             elif key == "signals_failed":
                 out["structural"]["signals_failed"] = _parse_json_list(value)
-        elif section == "external_risks":
-            if key == "pending":
-                out["external_risks"]["pending"] = _parse_int(value)
-            elif key == "items":
-                out["external_risks"]["items"] = _parse_json_list(value)
         elif section == "personalization":
             if key == "composite":
                 out["personalization"]["composite"] = _parse_score(value)
@@ -246,13 +229,6 @@ def _parse_score(value: str) -> int | None:
     head = value.split("/", 1)[0].strip()
     try:
         return int(head)
-    except ValueError:
-        return None
-
-
-def _parse_int(value: str) -> int | None:
-    try:
-        return int(value.strip())
     except ValueError:
         return None
 

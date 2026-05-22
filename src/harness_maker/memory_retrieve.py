@@ -22,7 +22,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from harness_maker.relevance import WORD_RE
+WORD_RE = re.compile(r"[A-Za-z0-9_]+")
 
 # Sentinel for the fence-close substring; entry bodies containing this literal
 # would otherwise let a malicious committer break out of the fence and feed

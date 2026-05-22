@@ -1,8 +1,26 @@
 # ADR-0006: Three-layer health audit (amends ADR-0002)
 
-- **Status**: accepted (amends [ADR-0002](0002-three-layer-ai-readiness-rubric.md))
+- **Status**: superseded by [ADR-0007](0007-two-layer-health-audit.md) (2026-05-22)
 - **Date**: 2026-05-17 (extracted into `docs/adr/` from PLAN-health-consolidation)
 - **Source PLAN**: `work-docs/PLAN-health-consolidation` (commit 82eaddb)
+
+## Reversal rationale (2026-05-22)
+
+A 2026-05-22 production run of `/hm:health` surfaced 12 items via the
+external_risks layer (4-source crawl × LLM relevance × adaptive threshold);
+1 was already known (Claude Opus 4.7 — already pinned), 11 were rejected.
+91% noise. The per-item AskUserQuestion contract (this ADR's hard rule)
+made the noise interruptive. The user requested an honest evaluation;
+`/hm:research` surfaced full demolition as the cleanest path.
+
+ADR-0007 (2026-05-22) supersedes this decision: `/hm:health` collapses to
+2 layers (structural + personalization). CVE coverage (the one
+external_risks source with rare-but-critical value) survives via
+`secscan/dependency_cves.py` consumed by `/hm:verify`. See
+`work-docs/PLAN-hm-health-crawl-removal.md` for the execution plan and
+ADR-0007 for the full new-decision body.
+
+The original ADR-0006 decision body below remains as historical record.
 
 ## Context
 

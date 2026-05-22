@@ -21,11 +21,11 @@ import yaml
 
 from harness_maker.improvement import ActionItem
 
-# Pinned 5 LLM-judgment skills (PLAN-antisycophancy-2026-05 ADR-005).
+# Pinned 4 LLM-judgment skills (PLAN-antisycophancy-2026-05 ADR-005;
+# relevance-filter removed in 0.22.3 per ADR-0007 health-crawl-removal).
 PINNED_SKILLS: tuple[str, ...] = (
     "agent-quality-rubric",
     "ai-readiness-rubric",
-    "relevance-filter",
     "security-scanner",
     "refdocs-search",
 )
@@ -43,7 +43,7 @@ def discover_dispatchers(template_dir: Path) -> list[Path]:
 
 
 def discover_pinned_skills(template_dir: Path) -> list[Path]:
-    """5 LLM-judgment skill SKILL.md.j2 (ADR-005)."""
+    """4 LLM-judgment skill SKILL.md.j2 (ADR-005; relevance-filter removed in 0.22.3)."""
     skills = template_dir / "skills"
     if not skills.is_dir():
         return []

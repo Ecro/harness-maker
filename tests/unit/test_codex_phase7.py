@@ -8,7 +8,7 @@ RED before Phase 7:
 GREEN after Phase 7:
 - stage_skill.md.j2 renders valid SKILL.md frontmatter
 - hm-research skill description mentions "harness-maker research stage"
-- _codex_target_files() includes 11 existing + 7 stage + 1 loop = 19 skill paths
+- _codex_target_files() includes 9 existing + 7 stage + 1 loop = 19 skill paths
 
 ADR-001 overrides ADR-008: stage skills now embed procedure bodies directly,
 not via AGENTS.md reference. The AGENTS.md assertion has been removed.
@@ -104,11 +104,11 @@ def test_codex_stage_skills_output_paths() -> None:
         )
 
 
-# ── synthesize: _codex_target_files includes 11 + 7 = 18 skill paths ─────────
+# ── synthesize: _codex_target_files includes 9 + 7 + 1 + 1 = 18 skill paths ──
 
 
 def test_codex_target_files_includes_existing_skills() -> None:
-    """_codex_target_files() must include all 11 existing skills at .agents/skills/."""
+    """_codex_target_files() must include all 9 existing skills at .agents/skills/."""
     out_paths = {out for _, out, _ in _codex_target_files({})}
     for skill in _ALL_SKILLS:
         assert f".agents/skills/{skill}/SKILL.md" in out_paths, (
@@ -126,6 +126,10 @@ def test_codex_target_files_includes_stage_skills() -> None:
 
 
 def test_codex_target_files_total_skill_count() -> None:
-    """_codex_target_files({}) emits 11 base + 7 stage + 1 loop + 1 help = 20 .agents/skills/."""
+    """_codex_target_files({}) emits 9 base + 7 stage + 1 loop + 1 help = 18 .agents/skills/.
+
+    ADR-0007 (0.22.3) removed 2 skills (research-crawler + relevance-filter)
+    when scrapping the external_risks layer; base count dropped 11 → 9.
+    """
     out_paths = [out for _, out, _ in _codex_target_files({}) if out.startswith(".agents/skills/")]
-    assert len(out_paths) == 20, f"Expected 20 skill paths, got {len(out_paths)}"
+    assert len(out_paths) == 18, f"Expected 18 skill paths, got {len(out_paths)}"

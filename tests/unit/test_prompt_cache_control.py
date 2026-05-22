@@ -9,10 +9,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
-import pytest
-
 from harness_maker.llm_judge import AnthropicJudgeClient
-from harness_maker.relevance import score_item
 from harness_maker.secscan.prompt_injection import scan_with_llm
 
 
@@ -44,42 +41,6 @@ def test_anthropic_judge_sends_cache_control() -> None:
     assert block["type"] == "text"
     assert block["text"] == "test system prompt"
     assert block["cache_control"] == {"type": "ephemeral"}
-
-
-class _MockJudge:
-    """JudgeClient that records calls and returns canned JSON."""
-
-    def __init__(self) -> None:
-        self.calls: list[tuple[str, str, str]] = []
-
-    def judge(self, system: str, user: str, model: str) -> str:
-        self.calls.append((system, user, model))
-        return '{"score": 0.85, "rationale": "relevant"}'
-
-
-def test_relevance_cache_control() -> None:
-    """Relevance scorer must route through JudgeClient.judge (→ cached system block)."""
-    from harness_maker.models import CrawlItem
-
-    mock = _MockJudge()
-    item = CrawlItem(
-        source="test",
-        item_id="test-001",
-        title="Test item",
-        summary="Testing cache control",
-    )
-
-    score = score_item(
-        item,
-        project_keywords=["test"],
-        project_context="Project context for testing",
-        client=mock,
-    )
-
-    assert len(mock.calls) == 1
-    system, _user, _model = mock.calls[0]
-    assert "Project context" in system
-    assert score == pytest.approx(0.85)
 
 
 class _MockPIJudge:

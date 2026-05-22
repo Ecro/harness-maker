@@ -209,11 +209,11 @@ class ConflictItem(BaseModel):
 
 
 class CrawlItem(BaseModel):
-    """One refreshed item from a crawler source (Anthropic blog, GitHub releases, arxiv, OSV)."""
+    """One CVE record from OSV.dev (consumed by secscan/dependency_cves.py)."""
 
     model_config = ConfigDict(strict=True, extra="forbid")
 
-    source: str  # "anthropic_blog" | "github_releases" | "arxiv" | "osv_dev"
+    source: str  # "osv_dev"
     item_id: str  # URL or unique id
     title: str
     summary: str = ""

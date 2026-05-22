@@ -90,15 +90,16 @@ def test_work_docs_footgun_probe(tmp_path: Path) -> None:
         "(Layer 2 of the work_docs/ footgun guardrail)"
     )
 
-    # (b) verify-before-completion SKILL has exactly 6 numbered checks
+    # (b) verify-before-completion SKILL has exactly 5 numbered checks
+    # (ADR-0007 removed the former Check 4 — anti-rot pending queue — in 0.22.3)
     skill_text = (tmp_path / "skills" / "verify-before-completion" / "SKILL.md").read_text(
         encoding="utf-8"
     )
     check_headings = re.findall(r"^### (\d+)\. ", skill_text, flags=re.MULTILINE)
-    assert check_headings == ["1", "2", "3", "4", "5", "6"], (
-        f"verify-before-completion SKILL must keep exactly 6 numbered checks; "
-        f"got headings={check_headings}. Do NOT add a 7th — advisory probes "
-        "live in verify.md stage body (see ADR-003 in PLAN)."
+    assert check_headings == ["1", "2", "3", "4", "5"], (
+        f"verify-before-completion SKILL must keep exactly 5 numbered checks; "
+        f"got headings={check_headings}. Do NOT add a 6th — advisory probes "
+        "live in verify.md stage body (see ADR-003 in PLAN; ADR-0007 dropped Check 4)."
     )
 
     # (c) A1 probe bash executes correctly against tempdir with work_docs/
