@@ -14,11 +14,12 @@ import yaml
 
 from harness_maker.add_domain import AddDomainError, add_domain, validate_domain_name
 from harness_maker.block_merge import MergeReport
+from harness_maker.codex_user_config import bootstrap_user_codex_profiles
 from harness_maker.interview import answers_from_harness_yaml, interview
 from harness_maker.io_utils import atomic_write, denormalize_home_to_tilde
 from harness_maker.locate import compare_version
 from harness_maker.locate import resolve as resolve_plugin
-from harness_maker.models import Blueprint, InterviewAnswers, Preset, RefFolder
+from harness_maker.models import Blueprint, InterviewAnswers, Preset, RefFolder, Target
 from harness_maker.modular_edit import ModularEditError
 from harness_maker.modular_edit import add as modular_add
 from harness_maker.modular_edit import remove as modular_remove
@@ -425,6 +426,23 @@ def make(
     _emit_install_summary(a, bp)
     _emit_post_make_readiness(target, a.preset)
     _emit_refdocs_index_build(target, a.ref_folders)
+
+    # ADR-008: when codex is a target, install `[profiles.cheap]` /
+    # `[profiles.deep]` into ~/.codex/config.toml (Codex CLI rejects
+    # them in project-local config). Idempotent — silent no-op once
+    # they're already present.
+    if Target.CODEX in a.targets:
+        try:
+            result = bootstrap_user_codex_profiles()
+        except OSError as e:
+            typer.echo(f"codex profiles: skipped ({e})", err=True)
+        else:
+            if result.changed:
+                installed = ", ".join(result.installed)
+                typer.echo(
+                    f"codex profiles installed in {result.path}: {installed} "
+                    f"(use `codex -p cheap` / `codex -p deep`)"
+                )
 
     # Phase 9 — record axis-level overrides for Phase 10 audit. Failure
     # here MUST NOT block the install: telemetry is a best-effort

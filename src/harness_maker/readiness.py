@@ -993,7 +993,8 @@ def _dim_model_routing(project_dir: Path) -> DimensionScore:
                 else (
                     f"{len(codex_missing_effort)} agent(s) override claude/cursor "
                     f"but not codex.reasoning_effort — Codex default profile applies. "
-                    f"See `codex -p cheap` / `codex -p deep` in .codex/config.toml "
+                    f"See `codex -p cheap` / `codex -p deep` (installed by "
+                    f"`harness-maker make` into ~/.codex/config.toml) "
                     f"for invocation-time cost control."
                 ),
                 None,

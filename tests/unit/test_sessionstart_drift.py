@@ -128,7 +128,13 @@ def test_run_does_not_emit_system_message(tmp_path: Path, capsys) -> None:
         rc = run(cwd=tmp_path)
     assert rc == 0
     payload = json.loads(capsys.readouterr().out)
+    # Negative guard at BOTH levels (REVIEW P2-3, 2026-05-22): the
+    # drift-only path must emit no systemMessage anywhere — neither
+    # nested (Claude Code legacy mistake, would re-introduce the
+    # Codex deny_unknown_fields rejection) nor top-level (would be a
+    # silent behavior change for Claude Code's user-visible banner).
     assert "systemMessage" not in payload["hookSpecificOutput"]
+    assert "systemMessage" not in payload
 
 
 def test_additional_context_is_imperative(tmp_path: Path, capsys) -> None:
@@ -293,7 +299,10 @@ def test_hint_when_override_count_exceeds_threshold(tmp_path: Path, capsys) -> N
     assert hook_out["hookEventName"] == "SessionStart"
     assert "35 axis overrides" in hook_out["additionalContext"]
     assert "/hm:health" in hook_out["additionalContext"]
-    assert "35 personalization axis overrides" in hook_out["systemMessage"]
+    # systemMessage is a universal hook-output field — lives at the top level
+    # of the payload, NOT inside hookSpecificOutput. Codex strict schema
+    # would reject it nested; Claude Code documents it top-level too.
+    assert "35 personalization axis overrides" in payload["systemMessage"]
 
 
 def test_hint_when_days_since_audit_exceeds_threshold(tmp_path: Path, capsys) -> None:
@@ -310,7 +319,7 @@ def test_hint_when_days_since_audit_exceeds_threshold(tmp_path: Path, capsys) ->
     payload = json.loads(capsys.readouterr().out)
     hook_out = payload["hookSpecificOutput"]
     assert "/hm:health" in hook_out["additionalContext"]
-    assert "/hm:health" in hook_out["systemMessage"]
+    assert "/hm:health" in payload["systemMessage"]
 
 
 def test_no_hint_when_telemetry_disabled(tmp_path: Path, capsys) -> None:
@@ -330,7 +339,12 @@ def test_no_hint_when_telemetry_disabled(tmp_path: Path, capsys) -> None:
 
 def test_systemMessage_and_additionalContext_both_present(tmp_path: Path, capsys) -> None:  # noqa: N802
     """Wiki [[sessionstart-systemmessage-required]] — banner needs both
-    fields populated. Guard against one being dropped in a future refactor."""
+    fields populated. Guard against one being dropped in a future refactor.
+
+    Placement contract (0.23.3+, Codex compat): additionalContext lives
+    inside hookSpecificOutput; systemMessage lives at the TOP level of the
+    payload. Both Claude Code and Codex strict schemas agree on this split.
+    """
     _write_phase11_harness_yaml(tmp_path)
     _write_overrides(tmp_path, 40)
     _write_last_audit(tmp_path, 0.5)
@@ -343,9 +357,12 @@ def test_systemMessage_and_additionalContext_both_present(tmp_path: Path, capsys
     payload = json.loads(capsys.readouterr().out)
     hook_out = payload["hookSpecificOutput"]
     assert "additionalContext" in hook_out
-    assert "systemMessage" in hook_out
     assert hook_out["additionalContext"]
-    assert hook_out["systemMessage"]
+    assert "systemMessage" in payload
+    assert payload["systemMessage"]
+    # Negative guard: systemMessage must NEVER appear inside hookSpecificOutput,
+    # or Codex's deny_unknown_fields parser will reject the entire payload.
+    assert "systemMessage" not in hook_out
 
 
 def test_missing_last_audit_treated_as_infinity(tmp_path: Path, capsys) -> None:
@@ -362,4 +379,4 @@ def test_missing_last_audit_treated_as_infinity(tmp_path: Path, capsys) -> None:
     payload = json.loads(capsys.readouterr().out)
     hook_out = payload["hookSpecificOutput"]
     assert "/hm:health" in hook_out["additionalContext"]
-    assert "/hm:health" in hook_out["systemMessage"]
+    assert "/hm:health" in payload["systemMessage"]

@@ -1,5 +1,39 @@
 # Changelog
 
+## [0.23.3] - 2026-05-22
+
+### Codex compatibility fixes — SessionStart hook + profiles bootstrap
+
+- **fix(hooks/sessionstart_drift): `systemMessage` lifted to top-level payload.**
+  Codex CLI v0.130+'s `SessionStartHookSpecificOutputWire` is
+  `deny_unknown_fields` and accepts only `{hookEventName, additionalContext}`
+  nested. The prior 0.11.x layout nested `systemMessage` inside
+  `hookSpecificOutput`, which Claude Code silently tolerated but Codex
+  rejected on every session with "hook returned invalid session start
+  JSON output". Both IDEs' official schemas place `systemMessage` at the
+  top level — that's where it now lives. Tests updated with negative
+  guards at BOTH levels (drift-only path AND hint path).
+- **fix(templates/codex): `[profiles.cheap]` / `[profiles.deep]` removed from
+  project-local `.codex/config.toml`.** Codex CLI v0.130+ rejects
+  `[profiles.*]` at the project layer with "Ignored unsupported
+  project-local config keys ... profiles". The template now carries a
+  reference comment instead.
+- **feat(codex_user_config): new module installs `[profiles.cheap]` /
+  `[profiles.deep]` into user-level `~/.codex/config.toml`** when `codex`
+  is in targets. Idempotent regex-based detection tolerates TOML
+  whitespace variants (`[ profiles.cheap ]`), respects user-disabled
+  blocks (`# [profiles.cheap]`), preserves all other user content
+  byte-for-byte, and does not duplicate the ADR-008 explanatory header
+  on partial-install re-runs. Wired from `cli.make` post-render; failure
+  is graceful (printed to stderr, never blocks `make`).
+- **fix(readiness): readiness hint updated** to point users at
+  `~/.codex/config.toml` for the cheap/deep profile shortcuts.
+- **test(boundary): `parse_codex_config_toml` now rejects project-local
+  `[profiles.*]`** — guards future template regressions at the boundary
+  layer instead of surfacing as a user-visible Codex warning on every
+  session start.
+- 5-file version sync 0.23.2 → 0.23.3.
+
 ## [0.23.2] - 2026-05-22
 
 ### L2 stability is convergence-aware (false-positive fix)

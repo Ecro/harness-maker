@@ -453,15 +453,25 @@ def run(cwd: Path | None = None) -> int:
 
     hook_output: dict[str, Any] = {"hookEventName": "SessionStart"}
     additional_parts: list[str] = []
+    payload: dict[str, Any] = {}
     if drift is not None:
         additional_parts.append(_format_context(drift.stamped, drift.current, drift.direction))
     if hint is not None:
         additional, system = hint
         additional_parts.append(additional)
-        hook_output["systemMessage"] = system
+        # systemMessage lives at the TOP level of the payload (universal hook
+        # output field), NOT inside hookSpecificOutput. Codex's wire schema
+        # has deny_unknown_fields on SessionStartHookSpecificOutputWire and
+        # only permits {hookEventName, additionalContext} there; nesting
+        # systemMessage made every Codex SessionStart fail with "hook
+        # returned invalid session start JSON output". Claude Code's
+        # official schema also documents systemMessage as a top-level
+        # universal field — older code that nested it was tolerated only
+        # because Claude Code silently ignored the extra key.
+        payload["systemMessage"] = system
     hook_output["additionalContext"] = "\n\n".join(additional_parts)
 
-    payload = {"hookSpecificOutput": hook_output}
+    payload["hookSpecificOutput"] = hook_output
     sys.stdout.write(json.dumps(payload))
     return 0
 

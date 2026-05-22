@@ -520,8 +520,11 @@ def parse_codex_config_toml(text: str) -> dict[str, Any]:
        ``command`` field, NOT nested deeper than one level (which would
        indicate dotted-key injection per
        ``[fail:render] toml-section-header-variable-injection``).
-    4. ``[profiles.cheap]``, ``[profiles.deep]`` reasoning profiles present
-       (ADR-008 PLAN-model-routing-multi-ide).
+    4. ``[profiles.*]`` MUST NOT appear here. Codex CLI v0.130+ rejects
+       project-local profiles with a "Ignored unsupported project-local
+       config keys ... profiles" warning. The cheap/deep profiles live
+       at the USER level (~/.codex/config.toml); harness-maker installs
+       them there via ``codex_user_config.bootstrap_user_codex_profiles``.
     """
     parsed = _load_toml(text)
 
@@ -531,14 +534,11 @@ def parse_codex_config_toml(text: str) -> dict[str, Any]:
     if not isinstance(features.get("hooks"), bool):
         raise BoundaryParseError("config.toml [features].hooks must be a bool")
 
-    profiles = parsed.get("profiles", {})
-    if not isinstance(profiles, dict):
-        raise BoundaryParseError("[profiles] must be a table when present")
-    for required in ("cheap", "deep"):
-        if required not in profiles:
-            raise BoundaryParseError(
-                f"config.toml [profiles] missing required sub-table {required!r}"
-            )
+    if "profiles" in parsed:
+        raise BoundaryParseError(
+            "project-local config.toml MUST NOT contain [profiles.*] — Codex "
+            "CLI v0.130+ rejects them at this layer. Move to ~/.codex/config.toml."
+        )
 
     mcp_servers = parsed.get("mcp_servers")
     if mcp_servers is not None:

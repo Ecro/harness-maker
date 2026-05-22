@@ -1,17 +1,16 @@
 [features]
 hooks = true
 
-# ADR-008 (PLAN-model-routing-multi-ide): per-loop invocation profiles.
-# Use `codex -p cheap "trivial turn"` to skip the reasoning step entirely
-# (largest cost lever per OpenAI platform docs), or `codex -p deep "..."` for
-# maximum reasoning. Both inherit your account's default model — they only
-# adjust reasoning_effort. Codex hooks cannot natively pick a model, so
-# cheap-precheck hook commands should shell out via `codex -p cheap ...`.
-[profiles.cheap]
-model_reasoning_effort = "minimal"
-
-[profiles.deep]
-model_reasoning_effort = "high"
+# ADR-008 (PLAN-model-routing-multi-ide): per-loop invocation profiles
+# (`codex -p cheap` / `codex -p deep`) live in your USER-level config —
+# `~/.codex/config.toml` — not here. Codex CLI v0.130+ rejects
+# `[profiles.*]` in project-local `.codex/config.toml` with
+# "Ignored unsupported project-local config keys ... profiles".
+# `harness-maker make` (when codex is a target) idempotently installs
+# `[profiles.cheap]` (`model_reasoning_effort = "minimal"`) and
+# `[profiles.deep]` (`"high"`) into `~/.codex/config.toml`. Per-project
+# tuning happens via `.codex/agents/<name>.toml` `model_reasoning_effort`
+# instead, which IS honored at the project level.
 
 {% for agent_name, agent_desc in agents.items() %}
 [agents.{{ agent_name }}]

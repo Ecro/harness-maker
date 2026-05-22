@@ -93,8 +93,17 @@ def test_codex_template_renders_reasoning_effort_line() -> None:
     assert "\nmodel = " not in rendered
 
 
-def test_codex_config_toml_renders_profile_blocks() -> None:
-    """.codex/config.toml has [profiles.cheap] + [profiles.deep] blocks."""
+def test_codex_config_toml_does_not_render_profile_blocks() -> None:
+    """Project-local .codex/config.toml MUST NOT contain [profiles.*] blocks.
+
+    Codex CLI v0.130+ enforces a strict whitelist for project-local config
+    (features/agents/mcp_servers/hooks) and rejects [profiles.*] with the
+    user-visible warning "Ignored unsupported project-local config keys
+    ... profiles" at every session start. The profiles now live at the
+    USER level — see codex_user_config.bootstrap_user_codex_profiles
+    + test_codex_user_config.py for the install path. This test guards
+    against an accidental revert to project-local profiles.
+    """
     from pathlib import Path
 
     from jinja2 import Environment, FileSystemLoader, StrictUndefined
@@ -109,7 +118,28 @@ def test_codex_config_toml_renders_profile_blocks() -> None:
         agents={"code-reviewer": "Reviews code"},
         config={"mcp_servers": {}},
     )
-    assert "[profiles.cheap]" in rendered
-    assert 'model_reasoning_effort = "minimal"' in rendered
-    assert "[profiles.deep]" in rendered
-    assert 'model_reasoning_effort = "high"' in rendered
+    # No TOML section header for profiles. Match only non-comment lines —
+    # the explanatory comment that points users to ~/.codex/config.toml
+    # legitimately mentions ``[profiles.cheap]`` / ``[profiles.deep]`` as
+    # prose, and that's fine. What must not appear is an actual section
+    # header (a line whose first non-whitespace character is ``[``).
+    section_lines = [
+        line for line in rendered.splitlines()
+        if line.lstrip().startswith("[") and not line.lstrip().startswith("#")
+    ]
+    assert not any(line.startswith("[profiles.") for line in section_lines), (
+        f"project-local config.toml must not declare [profiles.*] — found: {section_lines}"
+    )
+    # Defensive: model_reasoning_effort can still appear in agent TOML files
+    # (per-agent overrides). It must NOT appear as an ACTUAL TOML key here
+    # — comment mentions in the explanatory header are allowed.
+    non_comment_lines = [
+        line for line in rendered.splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    ]
+    non_comment_body = "\n".join(non_comment_lines)
+    assert 'model_reasoning_effort = "minimal"' not in non_comment_body
+    assert 'model_reasoning_effort = "high"' not in non_comment_body
+    # Sanity: the reference comment pointing the user to ~/.codex/ should
+    # be present so anyone wondering "where did profiles go?" finds it.
+    assert "~/.codex/config.toml" in rendered

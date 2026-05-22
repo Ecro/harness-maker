@@ -4,8 +4,11 @@ PLAN-test-fidelity-gap Phase 1. Codex CLI is Rust → its ``toml`` crate is
 stricter than Python's ``tomllib``. We test what ``tomllib`` accepts AND
 additionally pin structural invariants the Codex template enforces:
 
-- ``.codex/config.toml`` — TOML with ``[features]``, ``[profiles.cheap]``,
-  ``[profiles.deep]``, optional ``[mcp_servers."<name>"]``. The
+- ``.codex/config.toml`` — TOML with ``[features]`` (``hooks=true``) and
+  optional ``[mcp_servers."<name>"]``. ``[profiles.*]`` MUST NOT appear
+  at this layer (Codex CLI v0.130+ rejects them; they live in the
+  user-level ``~/.codex/config.toml`` and are installed by
+  ``codex_user_config.bootstrap_user_codex_profiles``). The
   ``[fail:render] toml-section-header-variable-injection`` regression
   (2026-05-10): unquoted dotted server names silently nest under hierarchy
   tables. Test pins quoted-key parsing to a single key.
@@ -139,8 +142,6 @@ def test_codex_config_dotted_key_injection_rejected() -> None:
     # job is to detect that the result is *not* the expected flat shape.
     bad_unquoted = (
         "[features]\nhooks = true\n"
-        '[profiles.cheap]\nmodel_reasoning_effort = "minimal"\n'
-        '[profiles.deep]\nmodel_reasoning_effort = "high"\n'
         # Note: NO quotes around the server name — TOML interprets as hierarchy
         '[mcp_servers.example.com]\ncommand = "x"\n'
     )
@@ -164,8 +165,6 @@ def test_codex_config_accepts_quoted_dotted_server_name() -> None:
     """
     good_quoted = (
         "[features]\nhooks = true\n"
-        '[profiles.cheap]\nmodel_reasoning_effort = "minimal"\n'
-        '[profiles.deep]\nmodel_reasoning_effort = "high"\n'
         '[mcp_servers."example.com"]\ncommand = "x"\n'
     )
     parsed = parse_codex_config_toml(good_quoted)
@@ -178,10 +177,28 @@ def test_codex_config_accepts_quoted_dotted_server_name() -> None:
 def test_codex_config_rejects_missing_features() -> None:
     """Codex config without [features] table must be rejected."""
     bad = (
-        '[profiles.cheap]\nmodel_reasoning_effort = "minimal"\n'
-        '[profiles.deep]\nmodel_reasoning_effort = "high"\n'
+        "[mcp_servers.\"example\"]\ncommand = \"x\"\n"
     )
     with pytest.raises(BoundaryParseError, match="features"):
+        parse_codex_config_toml(bad)
+
+
+@pytest.mark.boundary_negative
+def test_codex_config_rejects_project_level_profiles() -> None:
+    """[profiles.*] in project-local config must be rejected.
+
+    Codex CLI v0.130+ silently drops [profiles.*] from project-local
+    .codex/config.toml with a "Ignored unsupported project-local
+    config keys ... profiles" warning. Our parser surfaces this as a
+    hard error so a future template regression that re-injects the
+    blocks here gets caught at boundary-test time, not by a user
+    seeing the Codex warning on every session start.
+    """
+    bad = (
+        "[features]\nhooks = true\n"
+        '[profiles.cheap]\nmodel_reasoning_effort = "minimal"\n'
+    )
+    with pytest.raises(BoundaryParseError, match="profiles"):
         parse_codex_config_toml(bad)
 
 
