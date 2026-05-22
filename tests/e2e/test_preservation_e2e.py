@@ -200,23 +200,10 @@ def test_e2e_codex_hooks_json_permission_request_user_entry_survives(
 
 
 @INTEGRATION_GATE
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Phase 2 ships in two halves: (a) reconcile detection returns MERGE_BLOCK "
-        "for HASH_COMMENT-markered .toml/.sh (verified by test_m7a/m7b in "
-        "test_preservation_matrix.py); (b) render's `block_merge.merge()` is "
-        "HTML_COMMENT-only by construction (block_merge.py:477-479) — extending "
-        "`merge()` with a `style` parameter is a follow-up that touches the "
-        "marker-walk hot path. Until that lands, render's `_render_pure_toml` "
-        "ignores merge_paths and template overwrite wins. Backup remains the "
-        "recovery path per ADR-001 — user data is NOT lost, just not auto-merged."
-    ),
-)
 def test_e2e_codex_config_toml_user_block_survives(tmp_path: Path) -> None:
-    """User-written `# @hm:user:start:...` block in .codex/config.toml survives.
+    """User-written `# @hm:user:NAME` ... `# @hm:/user:NAME` block in .codex/config.toml survives.
 
-    Phase 2 (ADR-004/007): shipped template ships an empty user_extensions
+    Phase 2 (ADR-004/007): shipped template ships an empty user-extensions
     block; users add content between the markers; reconcile dispatches
     MERGE_BLOCK; render preserves the user-block content.
     """
@@ -230,19 +217,19 @@ def test_e2e_codex_config_toml_user_block_survives(tmp_path: Path) -> None:
     assert config_path.is_file()
 
     initial_text = config_path.read_text(encoding="utf-8")
-    # Locate the shipped user_extensions block and seed it with user content.
+    # Locate the shipped user-extensions block and seed it with user content.
     seeded_text = initial_text.replace(
-        "# @hm:user:start:user_extensions\n"
+        "# @hm:user:extensions\n"
         '# Add custom Codex configuration here ([mcp_servers."..."], '
         "[agents.NAME], etc.).\n"
         "# Content between these markers is preserved across `harness-maker make` "
         "re-renders\n"
         "# (PLAN-onboarding-backup-friction Phase 2, ADR-004/007).\n"
-        "# @hm:user:end:user_extensions",
-        "# @hm:user:start:user_extensions\n"
+        "# @hm:/user:extensions",
+        "# @hm:user:extensions\n"
         '[mcp_servers."my-custom-server"]\n'
         'command = "uv run my-server"\n'
-        "# @hm:user:end:user_extensions",
+        "# @hm:/user:extensions",
     )
     # Sanity: the replace landed (the shipped marker block text matched verbatim)
     assert seeded_text != initial_text, (
@@ -257,8 +244,8 @@ def test_e2e_codex_config_toml_user_block_survives(tmp_path: Path) -> None:
     # User block content survived
     assert "my-custom-server" in after_text
     # Shipped block markers still present (round-trip intact)
-    assert "# @hm:user:start:user_extensions" in after_text
-    assert "# @hm:user:end:user_extensions" in after_text
+    assert "# @hm:user:extensions" in after_text
+    assert "# @hm:/user:extensions" in after_text
 
 
 # ─────────────────────────────────────────────────────────────────────────────

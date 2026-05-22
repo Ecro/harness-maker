@@ -422,7 +422,7 @@ PASS/FAIL 을 RESULTS.md Phase 2.9 row 에 기입.
 
 **알림**: Phase 2 render merge for HASH_COMMENT 파일은 v0.23.0 에서 **deferred** 상태 (docs/reference/preservation-matrix.md "Phase 2 render-merge follow-up" 섹션). 다음 step 은 **현재 fail 이 expected** 임을 확인하는 negative test.
 
-1. `.codex/config.toml` 의 shipped `# @hm:user:start:user_extensions` 블록 안에 user 가 직접 다음 입력:
+1. `.codex/config.toml` 의 shipped `# @hm:user:extensions` 블록 안에 user 가 직접 다음 입력:
    ```toml
    [mcp_servers."manual-test-server"]
    command = "echo PHASE2_USER_BLOCK_SURVIVED"

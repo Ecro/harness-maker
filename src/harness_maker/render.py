@@ -344,13 +344,24 @@ def _render_pure_toml(
     *,
     dry_run: bool,
     freeze_time: datetime | None,  # noqa: ARG001 — kept for dispatch signature parity
+    merge_with_existing: bool = False,
+    merge_reports: dict[Path, MergeReport] | None = None,
 ) -> Path:
     """Render pure TOML (no frontmatter prefix), validated via tomllib.loads().
 
     Used for ``.codex/config.toml`` and ``.codex/agents/<name>.toml``.
     Raises ``ValueError`` (with template name) if the rendered output is not
     valid TOML — mirrors ``_render_pure_json`` error contract.
+
+    When ``merge_with_existing`` is True (Phase 2 v0.23.1, ADR-004/007), and an
+    existing file on disk carries ``# @hm:user:<id>`` / ``# @hm:/user:<id>`` markers,
+    ``block_merge`` is invoked with ``HASH_COMMENT`` style to preserve user-block content.
+    The merged result must still parse as valid TOML — if a user's content
+    between markers breaks TOML syntax, the merge raises ``ValueError`` rather
+    than silently writing invalid TOML; backup remains the recovery path.
     """
+    from harness_maker.block_merge import MarkerStyle, has_markers
+
     template = env.get_template(fe.template)
     rendered = template.render(**fe.context)
     try:
@@ -358,10 +369,47 @@ def _render_pure_toml(
     except tomllib.TOMLDecodeError as e:
         msg = f"Template {fe.template} rendered invalid TOML for {fe.path}: {e}"
         raise ValueError(msg) from e
-    body_bytes = _normalize_body(rendered)
+
+    body_text = _normalize_body(rendered).decode("utf-8")
+    out = resolve_output_path(target_dir, fe.path)
+
+    if merge_with_existing and out.exists():
+        try:
+            existing_text = out.read_text(encoding="utf-8")
+        except OSError as exc:
+            import typer
+
+            typer.echo(
+                f"WARN: could not read existing {fe.path} ({exc}); "
+                f"falling back to template overwrite. Backup is the recovery path.",
+                err=True,
+            )
+        else:
+            if has_markers(existing_text, MarkerStyle.HASH_COMMENT) and has_markers(
+                body_text, MarkerStyle.HASH_COMMENT
+            ):
+                merged, report = block_merge(existing_text, body_text, MarkerStyle.HASH_COMMENT)
+                # Verify merged result still parses as valid TOML — user content
+                # inside markers can be arbitrary; if it breaks the TOML, fall
+                # back to template overwrite + WARN (user data still in backup).
+                try:
+                    tomllib.loads(merged)
+                except tomllib.TOMLDecodeError as exc:
+                    import typer
+
+                    typer.echo(
+                        f"WARN: merged {fe.path} is invalid TOML ({exc}); "
+                        f"falling back to template overwrite. Backup is the recovery path.",
+                        err=True,
+                    )
+                else:
+                    body_text = merged
+                    if merge_reports is not None:
+                        merge_reports[fe.path] = report
+
+    body_bytes = body_text.encode("utf-8") if isinstance(body_text, str) else body_text
     body_hash = hashlib.sha256(body_bytes).hexdigest()
     fe.body_sha256 = body_hash
-    out = resolve_output_path(target_dir, fe.path)
     if not dry_run:
         atomic_write(out, body_bytes)
     return out
@@ -1067,12 +1115,21 @@ def render(
                 freeze_time=freeze_time,
             )
         elif _is_codex_config_toml(fe) or _is_codex_agent_toml(fe):
+            # Phase 2 v0.23.1 (ADR-004/007): when reconcile flagged this TOML
+            # path as MERGE_BLOCK (both shipped + existing carry HASH_COMMENT
+            # `# @hm:user:*` markers), invoke block_merge to preserve user-block
+            # content. Otherwise plain template overwrite.
+            toml_merge_reports = (
+                merge_reports if merge_reports is not None and fe.path in paths_to_merge else None
+            )
             out = _render_pure_toml(
                 fe,
                 env,
                 target_dir,
                 dry_run=dry_run,
                 freeze_time=freeze_time,
+                merge_with_existing=fe.path in paths_to_merge,
+                merge_reports=toml_merge_reports,
             )
         elif _is_agents_md(fe):
             agents_merge = (

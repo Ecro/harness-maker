@@ -17,7 +17,7 @@ context:
     - "ADR-004: TOML markers at file/TOML-statement level only; no descent into developer_instructions multi-line strings."
     - "ADR-005: .backup-*/ auto-gitignore on every backup; retention pruning user-gated only (harness-maker prune-backups CLI)."
     - "ADR-006: hooks.json entry discriminator is schema-aware. Claude/Codex nested = (matcher_or_empty, hooks[0]['command'], hooks[0]['type']); Cursor flat = (matcher_or_empty, command_string). Manifest records merged hash, not template-only hash."
-    - "ADR-007: `# @hm:user:start:NAME` marker syntax for TOML/sh; block_merge.parse_segments style param already exists at block_merge.py:172; Phase 2 work is in detect_marker_style + reconcile dispatch wiring only."
+    - "ADR-007: `# @hm:user:NAME` marker syntax for TOML/sh; block_merge.parse_segments style param already exists at block_merge.py:172; Phase 2 work is in detect_marker_style + reconcile dispatch wiring only."
     - "Phase 1 + Phase 3 ship as one atomic PR/commit-series — no intermediate state on main where literal-match REPLACE exists without merge logic."
     - "block_merge parser is the R4 silent-loss surface — extensive parametrized tests required before any reconcile branch flips."
     - "wrapup owns the commit; loop body must not invoke `git commit`."

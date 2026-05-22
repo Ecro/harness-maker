@@ -145,7 +145,7 @@ def detect_marker_style(path: Path) -> MarkerStyle:
 
     Phase 2 (PLAN-onboarding-backup-friction, ADR-007): ``.toml`` and ``.sh``
     join ``.yml``/``.yaml`` in returning ``HASH_COMMENT``. All four formats
-    use ``# @hm:user:start:NAME`` / ``# @hm:user:end:NAME`` at file/statement
+    use ``# @hm:user:NAME`` / ``# @hm:/user:NAME`` at file/statement
     level. Multi-line string descent (TOML triple-quoted bodies) is explicitly
     NOT supported; markers must appear at file scope.
     """
@@ -445,7 +445,11 @@ def block_hashes(text: str) -> dict[str, str]:
     }
 
 
-def merge(old_text: str, new_text: str) -> tuple[str, MergeReport]:
+def merge(
+    old_text: str,
+    new_text: str,
+    style: MarkerStyle = MarkerStyle.HTML_COMMENT,
+) -> tuple[str, MergeReport]:
     """Produce merged text — NEW structure with OLD's ``user:<id>`` contents.
 
     Strategy:
@@ -458,29 +462,40 @@ def merge(old_text: str, new_text: str) -> tuple[str, MergeReport]:
     The OLD file's ``block:<id>`` content is discarded (NEW always wins).
     Drift detection (``block:<id>`` user-edited) is reconcile's responsibility,
     not ours.
-    """
-    # Validate both sides — raises ParseError on malformed markers.
-    parse_segments(old_text)
-    parse_segments(new_text)
 
-    old_user = parse_user_blocks(old_text)
-    new_user_ids = {seg.id for seg in parse_segments(new_text) if seg.kind == BlockKind.USER}
+    ``style`` — marker syntax used by both OLD and NEW. ``HTML_COMMENT`` is the
+    historic default (markdown agents/skills, AGENTS.md). ``HASH_COMMENT`` is
+    used by TOML config files and shell wrappers (PLAN-onboarding-backup-friction
+    Phase 2 v0.23.1, ADR-007). JSON_KEY is not supported here — JSON merge
+    has its own dedicated path (``_merge_hooks_json``).
+    """
+    if style is MarkerStyle.JSON_KEY:
+        msg = "block_merge.merge() does not support JSON_KEY style — use _merge_hooks_json instead."
+        raise ValueError(msg)
+
+    # Validate both sides — raises ParseError on malformed markers.
+    parse_segments(old_text, style)
+    parse_segments(new_text, style)
+
+    old_user = parse_user_blocks(old_text, style)
+    new_user_ids = {seg.id for seg in parse_segments(new_text, style) if seg.kind == BlockKind.USER}
+
+    open_re = _HASH_OPEN_RE if style is MarkerStyle.HASH_COMMENT else _OPEN_RE
 
     report = MergeReport()
     out: list[str] = []
     lines = new_text.splitlines(keepends=True)
     i = 0
     n = len(lines)
-    # Fence tracking mirrors parse_segments / merge_inverted — literal marker
-    # strings inside fenced code blocks must NOT be treated as live markers,
-    # otherwise documented marker examples in NEW templates break the walk
-    # (REVIEW M3, 2026-05-17). merge() has no `style` parameter (HTML_COMMENT
-    # only by construction); if a `style` arg is ever added, gate this fence
-    # check on `style is MarkerStyle.HTML_COMMENT` like every other call site.
+    # Fence tracking only applies to HTML_COMMENT (markdown ``` fenced code
+    # blocks). TOML/sh hash-comment files don't have an analogous "inline
+    # documentation that contains literal marker strings" footgun; gate the
+    # fence check on style to keep the walk simple. Mirrors parse_segments,
+    # merge_inverted, _collect_outside_marker_lines.
     in_fence = False
     while i < n:
         bare = _strip_eol(lines[i])
-        if _FENCE_RE.match(bare):
+        if style is MarkerStyle.HTML_COMMENT and _FENCE_RE.match(bare):
             in_fence = not in_fence
             out.append(lines[i])
             i += 1
@@ -489,10 +504,12 @@ def merge(old_text: str, new_text: str) -> tuple[str, MergeReport]:
             out.append(lines[i])
             i += 1
             continue
-        open_m = _OPEN_RE.match(bare)
+        open_m = open_re.match(bare)
         if open_m and open_m.group(1) == "user":
             user_id = open_m.group(2)
-            close_idx = _find_close(lines, i + 1, BlockKind.USER, user_id, open_line=i + 1)
+            close_idx = _find_close(
+                lines, i + 1, BlockKind.USER, user_id, open_line=i + 1, style=style
+            )
             out.append(lines[i])  # open marker line
             if user_id in old_user:
                 _emit_preserved(out, old_user[user_id])
@@ -517,8 +534,8 @@ def merge(old_text: str, new_text: str) -> tuple[str, MergeReport]:
     # and NEW has 1, the 2 excess copies still surface as orphans (set-based
     # membership would miss this — REVIEW M2, 2026-05-17).
     # See MergeReport.orphan_outside_content for the failure mode this catches.
-    excess = Counter(_collect_outside_marker_lines(old_text)) - Counter(
-        _collect_outside_marker_lines(new_text)
+    excess = Counter(_collect_outside_marker_lines(old_text, style)) - Counter(
+        _collect_outside_marker_lines(new_text, style)
     )
     report.orphan_outside_content = [
         line for line, count in excess.items() if line.strip() for _ in range(count)

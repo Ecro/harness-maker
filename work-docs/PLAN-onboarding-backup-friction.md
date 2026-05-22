@@ -36,7 +36,7 @@ summary: "Audit brownfield in-place preservation; close hooks.json/TOML/sh gaps;
 - [ADR-004](#adr-004-toml-marker-scope) — All blueprint TOML, TOML/file-level only.
 - [ADR-005](#adr-005-backup-housekeeping-gitignore-auto-retention-user-gated) — Gitignore auto, retention user-gated.
 - [ADR-006](#adr-006-hooksjson-entry-discriminator-schema-aware) — Schema-aware entry identity + manifest extension.
-- [ADR-007](#adr-007-tomlsh-marker-syntax-and-scope) — `# @hm:user:start:NAME`; TOML-level only (no inside-string).
+- [ADR-007](#adr-007-tomlsh-marker-syntax-and-scope) — `# @hm:user:NAME`; TOML-level only (no inside-string).
 
 **Estimated impact:** ~9 source files touched (reconcile.py, render.py, block_merge.py, cli.py, models.py for new enum, commands/make.md, three test files + two new test files + one new doc file). Risk profile: 1 medium-high phase (Phase 3 — schema-aware merge), 2 medium (Phases 2 and 7), 4 low.
 
@@ -110,7 +110,7 @@ summary: "Audit brownfield in-place preservation; close hooks.json/TOML/sh gaps;
 ### ADR-004: TOML marker scope
 **Status:** Accepted (2026-05-22, via /hm:plan interview Round 3b; clarified Round 5b)
 **Context:** Extending block-merge support to TOML hash-comment markers. Three scopes possible: `config.toml` only; `config.toml` + `agents/*.toml`; all blueprint TOML.
-**Decision:** All blueprint TOML accepts TOML-level (`# @hm:user:start:NAME`) markers. Round 5b clarification: **markers are recognized only at TOML statement level** — they are NOT recognized inside multi-line string values like `developer_instructions = """ … """`. To preserve a custom agent body, the user wraps the entire `developer_instructions = """ … """` assignment with `# @hm:user:start:body_override` / `# @hm:user:end:body_override` at TOML statement level. Partial-body edits inside the triple-quoted string are not supported by this PLAN.
+**Decision:** All blueprint TOML accepts TOML-level (`# @hm:user:NAME`) markers. Round 5b clarification: **markers are recognized only at TOML statement level** — they are NOT recognized inside multi-line string values like `developer_instructions = """ … """`. To preserve a custom agent body, the user wraps the entire `developer_instructions = """ … """` assignment with `# @hm:user:body-override` / `# @hm:/user:body-override` at TOML statement level. Partial-body edits inside the triple-quoted string are not supported by this PLAN.
 **Consequences:**
 - ✅ Symmetric with markdown agent bodies (which already accept `<!-- @hm:user:* -->`).
 - ✅ User can extend shipped Codex agents with custom `[some_field]` blocks or wrapped-body replacements without losing them on re-render.
@@ -172,16 +172,16 @@ An entry is "shipped" iff its identity tuple appears in the freshly-rendered tem
 
 ### ADR-007: TOML/sh marker syntax and scope
 **Status:** Accepted (2026-05-22, default lock-in via Round 4; revised by Round 5b)
-**Context:** ADR-004 extends block-marker support to TOML and `.sh`. The existing parser handles `<!-- @hm:user:start:NAME -->` HTML-comment markers in markdown. TOML and `.sh` use `#` line comments.
+**Context:** ADR-004 extends block-marker support to TOML and `.sh`. The existing parser handles `<!-- @hm:user:NAME -->` HTML-comment markers in markdown. TOML and `.sh` use `#` line comments.
 
 Validator critical #3 surfaced a design gap in the initial ADR-007: it claimed markers INSIDE `developer_instructions` (a multi-line TOML string) follow markdown convention. `block_merge.parse_segments()` is line-by-line and dispatched on file extension, with no mechanism to descend into TOML string values and re-parse with a different syntax. That claim was retracted by Round 5b.
 
 **Decision:**
 
-1. **Marker syntax for hash-comment file types:** `# @hm:user:start:NAME` and `# @hm:user:end:NAME`. Each marker occupies its own line; leading whitespace tolerated; trailing content rejected per existing strict-parse rule.
+1. **Marker syntax for hash-comment file types:** `# @hm:user:NAME` and `# @hm:/user:NAME`. Each marker occupies its own line; leading whitespace tolerated; trailing content rejected per existing strict-parse rule.
 2. **Scope:** TOML and `.sh` files in the blueprint accept these markers at the file's top-level statement level only. **Multi-line string values are opaque** — markers inside them are NOT recognized.
 3. **Parser dispatch:** `block_merge.parse_segments(text, style: MarkerStyle = MarkerStyle.HTML_COMMENT)` **already accepts a `style` parameter** in the current codebase (block_merge.py:172); Phase 2's work on the parser is therefore zero-line. The actual Phase 2 changes are: (a) extend `detect_marker_style()` to return `MarkerStyle.HASH_COMMENT` for `.toml` and `.sh` suffixes (resolves validator warning #4 — currently only `.yml`/`.yaml` map to `HASH_COMMENT`), and (b) wire `reconcile.py`'s TOML+sh branches to pass the path through `detect_marker_style()` before calling `has_markers()` / `parse_segments()`.
-4. **Full-body replacement for TOML agents:** A user who wants to override an entire agent body wraps the entire `developer_instructions = """ … """` assignment with TOML-level markers — e.g., `# @hm:user:start:body_override` ... `developer_instructions = """ custom """` ... `# @hm:user:end:body_override`.
+4. **Full-body replacement for TOML agents:** A user who wants to override an entire agent body wraps the entire `developer_instructions = """ … """` assignment with TOML-level markers — e.g., `# @hm:user:body-override` ... `developer_instructions = """ custom """` ... `# @hm:/user:body-override`.
 
 **Consequences:**
 - ✅ Symmetric naming across file types — users learn one marker family.
@@ -191,7 +191,7 @@ Validator critical #3 surfaced a design gap in the initial ADR-007: it claimed m
 **Rejected alternatives:**
 - Two-pass parser (TOML descent + inner HTML markers) — Rejected per Round 5b: complexity not justified.
 - TOML-specific marker syntax (e.g., `# [hm-user:NAME]`) — Rejected because consistency across file types beats schema-specific cleverness.
-- Reuse HTML-comment markers in TOML (`# <!-- @hm:user:start:NAME -->`) — Rejected because the leading `<!--` is meaningless noise outside HTML/Markdown.
+- Reuse HTML-comment markers in TOML (`# <!-- @hm:user:NAME -->`) — Rejected because the leading `<!--` is meaningless noise outside HTML/Markdown.
 **Source:** Round 4 exit gate (initial default) + Round 5b.
 
 ## 🏗️ Technical Design
@@ -358,13 +358,13 @@ When `/hm:make` runs on a brownfield project after this PLAN ships:
 ### Phase 2 — TOML/sh `#`-comment block-marker support
 
 - **Scope (in):**
-  - `src/harness_maker/block_merge.py` — extend `detect_marker_style()` to return `MarkerStyle.HASH_COMMENT` for `.toml` and `.sh` suffixes (resolves validator warning #4). **No change to `parse_segments` signature** — the `style: MarkerStyle = MarkerStyle.HTML_COMMENT` parameter already exists at block_merge.py:172 (validator 2nd-pass S3). `HASH_COMMENT` mode already recognizes `# @hm:user:start:NAME` / `# @hm:user:end:NAME` on their own line (leading whitespace tolerated; trailing content rejected per existing strict-parse rule). No descent into TOML multi-line string values.
+  - `src/harness_maker/block_merge.py` — extend `detect_marker_style()` to return `MarkerStyle.HASH_COMMENT` for `.toml` and `.sh` suffixes (resolves validator warning #4). **No change to `parse_segments` signature** — the `style: MarkerStyle = MarkerStyle.HTML_COMMENT` parameter already exists at block_merge.py:172 (validator 2nd-pass S3). `HASH_COMMENT` mode already recognizes `# @hm:user:NAME` / `# @hm:/user:NAME` on their own line (leading whitespace tolerated; trailing content rejected per existing strict-parse rule). No descent into TOML multi-line string values.
   - `src/harness_maker/reconcile.py` — TOML branch (`reconcile.py:147-155`) and sh branch (`reconcile.py:159-167`) replaced: call `detect_marker_style(fe.path)` then check `has_markers()` / `parse_segments()` with that style; if both shipped template and existing file have markers, return MERGE_BLOCK; else REPLACE.
   - Tests: `tests/unit/test_block_merge.py` — new test for `detect_marker_style('.toml')` and `detect_marker_style('.sh')` returning `HASH_COMMENT`; regression test asserting `detect_marker_style('.md')` still returns `HTML_COMMENT`; `tests/unit/test_reconcile.py` — new TOML+sh marker scenarios.
   - `tests/unit/test_preservation_matrix.py` — remove `pytest.mark.xfail` from TOML/sh cells; they should now pass with strict=True under the new path-based dispatch (validator 2nd-pass W1 cleanup).
   - Matrix doc updated: `.toml` + `.sh` cells flip to `✅ MERGE_BLOCK when TOML-level markers present`; partial-edit-inside-string limitation noted.
 - **Scope (out):** hooks.json (Phase 1+3); migration tooling; descent into TOML string values.
-- **Exit criterion:** Phase 0's RED tests for TOML/sh cells flip to GREEN. `uv run pytest tests/unit/test_block_merge.py tests/unit/test_reconcile.py -v` green. Round-trip test: write a `.codex/config.toml` with a `# @hm:user:start:my_mcp` block, re-render, assert block survives. Regression test: existing `.md` files with HTML-comment markers still parse correctly via `detect_marker_style`.
+- **Exit criterion:** Phase 0's RED tests for TOML/sh cells flip to GREEN. `uv run pytest tests/unit/test_block_merge.py tests/unit/test_reconcile.py -v` green. Round-trip test: write a `.codex/config.toml` with a `# @hm:user:my-mcp` block, re-render, assert block survives. Regression test: existing `.md` files with HTML-comment markers still parse correctly via `detect_marker_style`.
 - **Risk:** medium. `block_merge.py` is the R4-canonical silent-loss surface; parser change must be paired with rigorous tests. The `detect_marker_style` extension is a small but load-bearing change; a regression here could silently break markdown parsing.
 - **Rollback:** revert block_merge.py + reconcile.py changes. `.toml` and `.sh` files return to always-REPLACE behavior; matrix annotation reverts to gap.
 

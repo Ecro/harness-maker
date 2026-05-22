@@ -150,7 +150,7 @@ def test_m6c_codex_hooks_json_merges(tmp_path: Path) -> None:
 
 # ─── M7a: Codex config.toml with @hm:user:* markers → MERGE_BLOCK (Phase 2) ──
 def test_m7a_codex_config_toml_marker_aware(tmp_path: Path) -> None:
-    """Phase 2: TOML files with `# @hm:user:start/end` markers get MERGE_BLOCK.
+    """Phase 2: TOML files with `# @hm:user:NAME` / `# @hm:/user:NAME` markers get MERGE_BLOCK.
 
     Currently `.toml` is always-REPLACE (reconcile.py:147-155). After Phase 2,
     the dispatch detects HASH_COMMENT markers via detect_marker_style and
@@ -161,10 +161,10 @@ def test_m7a_codex_config_toml_marker_aware(tmp_path: Path) -> None:
     codex_dir = tmp_path.parent / ".codex"
     codex_dir.mkdir(exist_ok=True)
     body = (
-        "# @hm:user:start:my_mcp\n"
+        "# @hm:user:my-mcp\n"
         '[mcp_servers."my-server"]\n'
         'command = "uv run my-server"\n'
-        "# @hm:user:end:my_mcp\n"
+        "# @hm:/user:my-mcp\n"
     )
     (codex_dir / "config.toml").write_text(body, encoding="utf-8")
     bp = Blueprint(
@@ -181,14 +181,14 @@ def test_m7b_codex_agent_toml_marker_aware(tmp_path: Path) -> None:
 
     Inside `developer_instructions = '''…'''` multi-line strings markers are NOT
     recognized. To preserve a custom body the user wraps the entire assignment
-    with TOML-level `# @hm:user:start:body_override` ... `# @hm:user:end:body_override`.
+    with TOML-level `# @hm:user:body-override` ... `# @hm:/user:body-override`.
     """
     agents_dir = tmp_path.parent / ".codex" / "agents"
     agents_dir.mkdir(parents=True, exist_ok=True)
     body = (
-        "# @hm:user:start:body_override\n"
+        "# @hm:user:body-override\n"
         'developer_instructions = """custom body content"""\n'
-        "# @hm:user:end:body_override\n"
+        "# @hm:/user:body-override\n"
     )
     (agents_dir / "code-reviewer.toml").write_text(body, encoding="utf-8")
     bp = Blueprint(
@@ -213,12 +213,7 @@ def test_m7b_codex_agent_toml_marker_aware(tmp_path: Path) -> None:
 def test_m8_claude_lib_sh_marker_aware(tmp_path: Path) -> None:
     lib_dir = tmp_path / "lib"
     lib_dir.mkdir(exist_ok=True)
-    body = (
-        "#!/bin/sh\n"
-        "# @hm:user:start:custom_pre\n"
-        'echo "custom user logic"\n'
-        "# @hm:user:end:custom_pre\n"
-    )
+    body = '#!/bin/sh\n# @hm:user:custom-pre\necho "custom user logic"\n# @hm:/user:custom-pre\n'
     (lib_dir / "wrapper.sh").write_text(body, encoding="utf-8")
     bp = Blueprint(
         files=[FileEntry(path=Path("lib/wrapper.sh"), template="lib/wrapper.sh.j2")],
