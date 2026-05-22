@@ -831,8 +831,8 @@ def test_detected_checks_python_strict_block_match_positive(tmp_path: Path) -> N
     from harness_maker.profile import _detect_mechanical_checks
 
     (tmp_path / "pyproject.toml").write_text(
-        '[tool.ruff]\nline-length = 100\n\n'
-        '[tool.mypy]\nstrict = true\n\n'
+        "[tool.ruff]\nline-length = 100\n\n"
+        "[tool.mypy]\nstrict = true\n\n"
         '[tool.pytest.ini_options]\nminversion = "7"\n'
     )
     checks = _detect_mechanical_checks(tmp_path)
