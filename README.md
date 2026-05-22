@@ -15,6 +15,8 @@
 > **A different harness for every project — built from yours, never generic.**
 
 > Other harnesses give everyone the same starting point. harness-maker reads YOUR repo and builds YOUR harness.
+>
+> 📸 **[See it on two real projects →](docs/assets/showcase-diff.md)** — same maintainer, same Python stack, +5 agents and +15 multi-IDE files between Side and Production preset renders.
 
 **Per-project personalization** · Grade-gated · Self-evolving · Multi-IDE
 
