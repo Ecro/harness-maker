@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.21.0
+harness_maker_version: 0.22.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/atomic_command.md.j2
 provenance: official
-content_hash: a64c6b34a57296da6281a8ec131f0965e4c308d5f561a1b8ae58c4f1c3b1ab9a
+content_hash: 0033104bf432e33d2cb03ba8d8e2fcdfdcfbd04d06257068616dbc3797d0f411
 ---
 # Stage: wrapup
 
@@ -82,8 +82,9 @@ Run the project's full check suite once before committing. Catch regressions wra
 
 ```bash
 # Pick the toolchain that matches the project. Examples:
-!uv run pytest -x                      # Python
+!uv run pytest -x                      # Python tests
 !uv run ruff check src/ tests/          # lint
+!uv run ruff format --check src/ tests/ # format — REQUIRED (lint alone misses format violations; [fail:lint] ruff-format-not-in-local-verify-pass count:2 if skipped)
 !uv run mypy --strict src/              # type
 # Rust: cargo test && cargo check
 # Node: pnpm test && pnpm build
@@ -215,7 +216,7 @@ If `/hm:execute` ran in stage-only mode AND the base repo had unrelated dirty wo
 
 
 ```bash
-!uv run --with /home/noel/harness-maker/.worktrees/execute-20260522T0302Z python -m harness_maker.worktree post-commit-pop "$(pwd)"
+!uv run --with /home/noel/harness-maker python -m harness_maker.worktree post-commit-pop "$(pwd)"
 ```
 
 

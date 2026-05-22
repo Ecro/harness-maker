@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.21.0
+harness_maker_version: 0.22.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: 1861aeca18c736ee9f94ec6f18e2ef8c4e9b05421335843e9f70035ef9532c5b
+content_hash: ead768d15aae0903a2aafe7aa1da4cb1bcda28af4c36f0e7ced87c3dac0ce2fb
 ---
 # /hm:exec-rev-wrap-ver
 
@@ -79,7 +79,7 @@ Engage isolation if `harness.yaml.worktree.scope` includes `execute`. The `workt
 
 
 ```bash
-!uv run --with /home/noel/harness-maker/.worktrees/execute-20260522T0302Z python -m harness_maker.worktree create execute "$(pwd)"
+!uv run --with /home/noel/harness-maker python -m harness_maker.worktree create execute "$(pwd)"
 ```
 
 
@@ -222,12 +222,12 @@ Pick **exactly one** finalize command. Substitute `<WT>` with the literal absolu
 ```bash
 # All phases GREEN — stage-merge the branch back (NO commit) + cleanup the worktree.
 # /hm:wrapup will create the single user-facing commit (with proper message + Co-Authored-By).
-!uv run --with /home/noel/harness-maker/.worktrees/execute-20260522T0302Z python -m harness_maker.worktree finalize <WT> stage-only
+!uv run --with /home/noel/harness-maker python -m harness_maker.worktree finalize <WT> stage-only
 ```
 
 ```bash
 # Stage halted on a blocker — preserve the worktree for inspection:
-!uv run --with /home/noel/harness-maker/.worktrees/execute-20260522T0302Z python -m harness_maker.worktree finalize <WT> fail
+!uv run --with /home/noel/harness-maker python -m harness_maker.worktree finalize <WT> fail
 ```
 
 
@@ -756,8 +756,9 @@ Run the project's full check suite once before committing. Catch regressions wra
 
 ```bash
 # Pick the toolchain that matches the project. Examples:
-!uv run pytest -x                      # Python
+!uv run pytest -x                      # Python tests
 !uv run ruff check src/ tests/          # lint
+!uv run ruff format --check src/ tests/ # format — REQUIRED (lint alone misses format violations; [fail:lint] ruff-format-not-in-local-verify-pass count:2 if skipped)
 !uv run mypy --strict src/              # type
 # Rust: cargo test && cargo check
 # Node: pnpm test && pnpm build
@@ -889,7 +890,7 @@ If `/hm:execute` ran in stage-only mode AND the base repo had unrelated dirty wo
 
 
 ```bash
-!uv run --with /home/noel/harness-maker/.worktrees/execute-20260522T0302Z python -m harness_maker.worktree post-commit-pop "$(pwd)"
+!uv run --with /home/noel/harness-maker python -m harness_maker.worktree post-commit-pop "$(pwd)"
 ```
 
 

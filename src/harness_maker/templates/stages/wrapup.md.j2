@@ -79,8 +79,9 @@ Run the project's full check suite once before committing. Catch regressions wra
 {% if is_codex %}
 ```
 # Pick the toolchain that matches the project. Examples:
-Bash("uv run pytest -x")                      # Python
+Bash("uv run pytest -x")                      # Python tests
 Bash("uv run ruff check src/ tests/")          # lint
+Bash("uv run ruff format --check src/ tests/") # format — REQUIRED (lint alone misses format violations; [fail:lint] ruff-format-not-in-local-verify-pass count:2 if skipped)
 Bash("uv run mypy --strict src/")              # type
 # Rust: Bash("cargo test && cargo check")
 # Node: Bash("pnpm test && pnpm build")
@@ -88,8 +89,9 @@ Bash("uv run mypy --strict src/")              # type
 {% else %}
 ```bash
 # Pick the toolchain that matches the project. Examples:
-!uv run pytest -x                      # Python
+!uv run pytest -x                      # Python tests
 !uv run ruff check src/ tests/          # lint
+!uv run ruff format --check src/ tests/ # format — REQUIRED (lint alone misses format violations; [fail:lint] ruff-format-not-in-local-verify-pass count:2 if skipped)
 !uv run mypy --strict src/              # type
 # Rust: cargo test && cargo check
 # Node: pnpm test && pnpm build
