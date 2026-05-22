@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.22.0] - 2026-05-22
+
+### BREAKING
+
+- **`ProjectProfile.lifecycle` enum changed: 4-tier → 3-tier (`active` | `maintenance` | `dormant`); `"experiment"` removed entirely (ADR-006, PLAN-harness-maker-cold-eval Phase 2).** Migration: external Python code that imports `ProjectProfile` and string-matches `profile.lifecycle == "experiment"` must change to `profile.lifecycle == "dormant"` (semantic replacement — the new tier is the most conservative bucket and routes to the same SIDE preset downstream). Internal callers updated in the same commit (5 production modules + 13 test files). Root cause this fixes: reality-check on 5 public repos showed `BurntSushi/ripgrep` mis-classified as `"experiment"` despite being a mature CLI; the prior algorithm conflated "no .git", "git error", and "zero recent commits" under one vague label. New algorithm: `active` = ≥10 commits in last 30d, `maintenance` = 1–9 commits in last 30d, `dormant` = 0 commits in last 30d (or `.git` missing, or subprocess error).
+
+### Phase 2 features (PLAN-harness-maker-cold-eval ADRs 005, 006, 007)
+
+- **Rust `detected_checks` whitelist (ADR-007).** `Cargo.toml` present → emits `cargo test`, `cargo clippy`, `cargo fmt --check`. Standard cargo subcommands always work when Cargo.toml exists, so the whitelist is provably safe (no false positive risk). Closes the empty-`detected_checks` gap that `ripgrep` reality-check exposed.
+- **Node `detected_checks` whitelist (ADR-007).** `package.json` scripts that match the keys `test`, `lint`, `check`, `typecheck`, `format`, `build` emit `<runner> run <key>`. Runner picked from lockfile (`pnpm-lock.yaml` → pnpm, `yarn.lock` → yarn, otherwise npm). Scripts with non-whitelisted keys (`build:prod`, `deploy`, project-specific names) are skipped to avoid emitting commands the user didn't intend as harness checks.
+- **Python strict block matching (ADR-007).** Pre-v0.22.0 had bare-string `"mypy" in content` / `"pytest" in content` matching pyproject.toml, which emitted `uv run mypy .` on repos that merely listed mypy as a dep (`psf/requests` reality-check). New policy: only `[tool.ruff]`, `[tool.mypy]`, `[tool.pytest.ini_options]` block presence triggers detection. False-positive vector closed.
+- **`package_manager` manifest fallback (ADR-007 exception).** Lower-stakes documentation hint — pyproject.toml without lockfile narrows by header inspection (`[tool.uv]` → "uv", `[tool.poetry]` → "poetry", otherwise "pip"). package.json without lockfile → "npm" default. Pre-v0.22.0 returned `""` when no lockfile was present even when manifest was clearly stack-specific. Documented as an intentional asymmetry vs `detected_checks` strictness because `package_manager` is a documentation hint, not a runnable command — false positives there are softer.
+- **`detected_checks` cap raised 4 → 6.** The whitelist now spans Python + Rust + Node + Makefile; a polyglot repo can legitimately want more than 4 distinct check commands.
+
+### Verification
+
+- 5 production modules updated: `profile.py` (`_detect_lifecycle`, `_detect_mechanical_checks`, `_python_package_manager`, `_node_package_manager`), `models.py` (`ProjectProfile.lifecycle` Literal), `interview.py` (`proxy_profile` + `_recommend_preset` set literal at 269/315), `recommendation.py` (preset set literal at 249), `modular_edit.py` (hardcoded dict at 121).
+- 13 test files refreshed (validator critique #1 enumerated each — full list in PLAN-harness-maker-cold-eval.md ADR-006 affected-files).
+- 11 new unit tests added in `tests/unit/test_profile.py` covering 3-tier lifecycle dispatch (mock subprocess), Rust/Node whitelist positives, Python strict-block negative (no false positive on dep listing), and manifest-fallback exception cases.
+- 1 new integration test `tests/integration/test_profile_reality_check.py` — gates the regression against 6 real public repos (requests, fastapi, ripgrep, fastify, htmx, embedeval) behind `INTEGRATION=1` env guard. Each repo's expected lifecycle/`package_manager`/`detected_checks` shape encoded directly from PLAN Phase 2.5.
+- 4 snapshot fixtures regenerated (CLAUDE.md frontmatter version 0.21.1 → 0.22.0; behavior fixtures unaffected because the lifecycle field is computed at profile-time, not pinned into the rendered harness).
+- Phase D: ruff + mypy --strict + pytest -x all green on main after worktree finalize + snapshot regen (the `snapshot-regen-inside-worktree` count:7 recurrence pattern was deliberately avoided by running `regenerate.py` from main, not the worktree).
+
+### Phase 3 deferred to v0.22.1
+
+`docs/observability/launch-baseline.md` (Day-0 metric snapshot + 30/60/90-day target dates) is the Phase 3 deliverable. Best-fit timing is within 24h of the v0.22.0 tag; the file ships in the v0.22.1 wrapup alongside the baseline observation.
+
 ## [0.21.1] - 2026-05-22
 
 - **feat(readme): showcase artifact + ADR-002 PNG→MD amendment (PLAN-harness-maker-cold-eval Phase 1.2)** — the v0.21.0 headline ("Other harnesses give everyone the same starting point. harness-maker reads YOUR repo and builds YOUR harness.") gets its proof artifact this patch. `docs/assets/showcase-diff.md` (170 lines) captures a real `harness-maker make` comparison between two public maintainer projects: **embedeval** (Python embedded-firmware LLM benchmark, Side preset, `claude-code` target) vs **harness-maker** self (Production preset, `claude-code + cursor + codex` targets). Same maintainer, same Python+uv+Pydantic stack — yet 99 vs 54 rendered files (+45 diff). Five Production-only agents (`autoloop-coder`, `concurrency-reviewer`, `plan-validator`, `stuck`, `test-reviewer`) are each tied to a stage that Side preset disables; 15 multi-IDE-only assets (13 Codex agent TOMLs + Codex config + Cursor hooks + AGENTS.md root) are driven by the targets axis. ADR-002 quantitative threshold (≥3 file additions OR ≥1 distinct agent/skill) cleared by 15×.

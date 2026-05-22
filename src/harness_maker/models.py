@@ -149,7 +149,7 @@ class ProjectProfile(BaseModel):
 
     stack: list[str] = Field(default_factory=lambda: ["unknown"])
     scale: str = "small"  # small | medium | large
-    lifecycle: str = "experiment"  # experiment | active | maintenance
+    lifecycle: str = "dormant"  # active | maintenance | dormant (ADR-006)
     existing_dotclaude: bool = False
     spec_only: bool = False
     vault_member: bool = False

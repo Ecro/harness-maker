@@ -118,7 +118,7 @@ def _render_single_component(
             "config": config,
             "stack": [],
             "scale": "small",
-            "lifecycle": "experiment",
+            "lifecycle": "dormant",
         },
         frontmatter={},
     )

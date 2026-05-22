@@ -14,7 +14,7 @@ from harness_maker.verify import verify
 
 
 def _profile() -> ProjectProfile:
-    return ProjectProfile(stack=["python"], scale="small", lifecycle="experiment")
+    return ProjectProfile(stack=["python"], scale="small", lifecycle="dormant")
 
 
 def test_verify_clean_blueprint_passes(tmp_path: Path) -> None:

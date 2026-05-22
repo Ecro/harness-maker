@@ -13,7 +13,7 @@ from harness_maker.synthesize import synthesize
 
 
 def _profile() -> ProjectProfile:
-    return ProjectProfile(stack=["python"], scale="small", lifecycle="experiment")
+    return ProjectProfile(stack=["python"], scale="small", lifecycle="dormant")
 
 
 def test_render_empty_blueprint(tmp_path: Path) -> None:
@@ -309,7 +309,7 @@ def test_render_cursor_target_emits_mdc_and_mcp_json(tmp_path: Path) -> None:
     target_dir = project_root / ".claude"
     target_dir.mkdir()
 
-    p = ProjectProfile(stack=["python"], scale="small", lifecycle="experiment")
+    p = ProjectProfile(stack=["python"], scale="small", lifecycle="dormant")
     a = interview(p, autoloop_mode=True).model_copy(update={"targets": [Target.CURSOR]})
     bp = synthesize(p, a)
     render(bp, target_dir, freeze_time=DEFAULT_FREEZE_TIME)
@@ -346,7 +346,7 @@ def test_render_cursor_mdc_lacks_our_provenance_frontmatter(tmp_path: Path) -> N
     target_dir = project_root / ".claude"
     target_dir.mkdir()
 
-    p = ProjectProfile(stack=["python"], scale="small", lifecycle="experiment")
+    p = ProjectProfile(stack=["python"], scale="small", lifecycle="dormant")
     a = interview(p, autoloop_mode=True).model_copy(update={"targets": [Target.CURSOR]})
     bp = synthesize(p, a)
     render(bp, target_dir, freeze_time=DEFAULT_FREEZE_TIME)
@@ -364,7 +364,7 @@ def test_render_claude_only_target_omits_cursor_directory(tmp_path: Path) -> Non
     target_dir = project_root / ".claude"
     target_dir.mkdir()
 
-    p = ProjectProfile(stack=["python"], scale="small", lifecycle="experiment")
+    p = ProjectProfile(stack=["python"], scale="small", lifecycle="dormant")
     a = interview(p, autoloop_mode=True)  # default [claude-code]
     bp = synthesize(p, a)
     render(bp, target_dir, freeze_time=DEFAULT_FREEZE_TIME)
@@ -389,7 +389,7 @@ def test_render_cursor_hooks_json_camelcase_with_path_wrap(tmp_path: Path) -> No
     target_dir = project_root / ".claude"
     target_dir.mkdir()
 
-    p = ProjectProfile(stack=["python"], scale="small", lifecycle="experiment")
+    p = ProjectProfile(stack=["python"], scale="small", lifecycle="dormant")
     a = interview(p, autoloop_mode=True).model_copy(update={"targets": [Target.CURSOR]})
     bp = synthesize(p, a)
     render(bp, target_dir, freeze_time=DEFAULT_FREEZE_TIME)
@@ -448,7 +448,7 @@ def test_render_cursor_hooks_json_omits_spec_gate_when_task_driven(
     target_dir = project_root / ".claude"
     target_dir.mkdir()
 
-    p = ProjectProfile(stack=["python"], scale="small", lifecycle="experiment")
+    p = ProjectProfile(stack=["python"], scale="small", lifecycle="dormant")
     a = interview(p, autoloop_mode=True).model_copy(
         update={"targets": [Target.CURSOR], "dev_mode": DevMode.TASK_DRIVEN},
     )
@@ -479,7 +479,7 @@ def test_render_hooks_json_valid_in_both_dev_modes(
     target_dir.mkdir()
 
     dev_mode = DevMode.SPEC_DRIVEN if dev_mode_label == "spec" else DevMode.TASK_DRIVEN
-    p = ProjectProfile(stack=["python"], scale="small", lifecycle="experiment")
+    p = ProjectProfile(stack=["python"], scale="small", lifecycle="dormant")
     a = interview(p, autoloop_mode=True).model_copy(
         update={"targets": [Target.CLAUDE_CODE, Target.CURSOR], "dev_mode": dev_mode},
     )
@@ -511,7 +511,7 @@ def test_render_cursor_hooks_json_includes_spec_gate_when_spec_driven(
     target_dir = project_root / ".claude"
     target_dir.mkdir()
 
-    p = ProjectProfile(stack=["python"], scale="small", lifecycle="experiment")
+    p = ProjectProfile(stack=["python"], scale="small", lifecycle="dormant")
     a = interview(p, autoloop_mode=True).model_copy(
         update={"targets": [Target.CURSOR], "dev_mode": DevMode.SPEC_DRIVEN},
     )
@@ -550,7 +550,7 @@ def test_render_cursor_target_byte_identical_across_runs(tmp_path: Path) -> None
     """Phase 2.7: targets=[cursor] 두 번 render → byte-identical (frozen time)."""
     from harness_maker.models import Target
 
-    p = ProjectProfile(stack=["python"], scale="small", lifecycle="experiment")
+    p = ProjectProfile(stack=["python"], scale="small", lifecycle="dormant")
     a = interview(p, autoloop_mode=True).model_copy(update={"targets": [Target.CURSOR]})
 
     def _run(root: Path) -> dict[Path, bytes]:
@@ -571,7 +571,7 @@ def test_render_both_targets_byte_identical_across_runs(tmp_path: Path) -> None:
     """Phase 2.7: targets=[claude-code, cursor] 두 번 render → byte-identical."""
     from harness_maker.models import Target
 
-    p = ProjectProfile(stack=["python"], scale="small", lifecycle="experiment")
+    p = ProjectProfile(stack=["python"], scale="small", lifecycle="dormant")
     a = interview(p, autoloop_mode=True).model_copy(
         update={"targets": [Target.CLAUDE_CODE, Target.CURSOR]},
     )
@@ -706,7 +706,7 @@ def test_render_cursor_target_writes_targets_to_harness_yaml(tmp_path: Path) -> 
     target = project_root / ".claude"
     target.mkdir()
 
-    p = ProjectProfile(stack=["python"], scale="small", lifecycle="experiment")
+    p = ProjectProfile(stack=["python"], scale="small", lifecycle="dormant")
     a = interview(p, autoloop_mode=True).model_copy(
         update={"targets": [Target.CLAUDE_CODE, Target.CURSOR]},
     )

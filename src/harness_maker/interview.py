@@ -266,7 +266,7 @@ def _recommend_dev_mode(preset: Preset) -> DevMode:
     from harness_maker.recommendation import recommend_dev_mode
 
     proxy_profile = (
-        ProjectProfile(scale="small", lifecycle="experiment")
+        ProjectProfile(scale="small", lifecycle="dormant")
         if preset == Preset.SIDE
         else ProjectProfile(scale="medium", lifecycle="active")
     )
@@ -312,7 +312,7 @@ def _recommend_preset(profile: ProjectProfile) -> Preset:
     if rec is None or not isinstance(rec.value, Preset):
         # Defensive fallback — keeps legacy behaviour if registry recommender
         # is somehow unavailable.
-        if profile.scale == "small" and profile.lifecycle in {"experiment", "maintenance"}:
+        if profile.scale == "small" and profile.lifecycle in {"dormant", "maintenance"}:
             return Preset.SIDE
         return Preset.PRODUCTION
     return rec.value

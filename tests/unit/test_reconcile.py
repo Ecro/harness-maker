@@ -171,7 +171,7 @@ def test_reconcile_cursor_first_render_returns_both(tmp_path: Path) -> None:
     from harness_maker.models import ProjectProfile, Target
     from harness_maker.synthesize import synthesize
 
-    p = ProjectProfile(stack=["python"], scale="small", lifecycle="experiment")
+    p = ProjectProfile(stack=["python"], scale="small", lifecycle="dormant")
     a = interview(p, autoloop_mode=True).model_copy(update={"targets": [Target.CURSOR]})
     bp = synthesize(p, a)
 
@@ -203,7 +203,7 @@ def test_reconcile_cursor_mdc_keeps_after_render(tmp_path: Path) -> None:
     from harness_maker.render import DEFAULT_FREEZE_TIME, render
     from harness_maker.synthesize import synthesize
 
-    p = ProjectProfile(stack=["python"], scale="small", lifecycle="experiment")
+    p = ProjectProfile(stack=["python"], scale="small", lifecycle="dormant")
     a = interview(p, autoloop_mode=True).model_copy(update={"targets": [Target.CURSOR]})
 
     project_root = tmp_path
@@ -451,7 +451,7 @@ def test_backup_after_full_render_preserves_cursor_user_modifications(tmp_path: 
     from harness_maker.render import DEFAULT_FREEZE_TIME, render
     from harness_maker.synthesize import synthesize
 
-    p = ProjectProfile(stack=["python"], scale="small", lifecycle="experiment")
+    p = ProjectProfile(stack=["python"], scale="small", lifecycle="dormant")
     a = interview(p, autoloop_mode=True).model_copy(update={"targets": [Target.CURSOR]})
 
     project_root = tmp_path

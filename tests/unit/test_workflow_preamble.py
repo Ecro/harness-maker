@@ -12,7 +12,7 @@ from harness_maker.synthesize import synthesize
 
 def _render_preset(tmp_path: Path, preset: Preset) -> Path:
     profile = (
-        ProjectProfile(stack=["python"], scale="small", lifecycle="experiment")
+        ProjectProfile(stack=["python"], scale="small", lifecycle="dormant")
         if preset == Preset.SIDE
         else ProjectProfile(stack=["python"], scale="medium", lifecycle="active")
     )

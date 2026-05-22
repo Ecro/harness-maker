@@ -22,7 +22,7 @@ from harness_maker.models import (
 )
 
 
-def _profile(scale: str = "small", lifecycle: str = "experiment") -> ProjectProfile:
+def _profile(scale: str = "small", lifecycle: str = "dormant") -> ProjectProfile:
     return ProjectProfile(
         stack=["python"],
         scale=scale,
@@ -67,7 +67,7 @@ def test_interview_autoloop_recommends_spec_driven_for_production() -> None:
 
 
 def test_interview_recommends_side_for_experiment_small() -> None:
-    result = interview(_profile(scale="small", lifecycle="experiment"), autoloop_mode=True)
+    result = interview(_profile(scale="small", lifecycle="dormant"), autoloop_mode=True)
     assert result.preset == Preset.SIDE
     assert result.consensus == "single"
     assert result.caching == "agent-aware"

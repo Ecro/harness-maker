@@ -19,7 +19,7 @@ def test_profile_python_cli_with_git(tmp_path: Path) -> None:
     p = profile(tmp_path)
     assert "python" in p.stack
     # No git binary available or empty repo → experiment
-    assert p.lifecycle == "experiment"
+    assert p.lifecycle == "dormant"
     assert p.existing_dotclaude is False
     assert p.vault_member is False
 
@@ -32,7 +32,7 @@ def test_profile_no_manifests_returns_unknown(tmp_path: Path) -> None:
 def test_profile_no_git_lifecycle_experiment(tmp_path: Path) -> None:
     (tmp_path / "package.json").write_text("{}")
     p = profile(tmp_path)
-    assert p.lifecycle == "experiment"
+    assert p.lifecycle == "dormant"
     assert "node" in p.stack
 
 
@@ -132,8 +132,16 @@ def test_detect_checks_pyproject_mypy(tmp_path: Path) -> None:
 
 
 def test_detect_checks_pyproject_pytest(tmp_path: Path) -> None:
-    """pyproject.toml with pytest dependency → detected_checks includes pytest."""
-    (tmp_path / "pyproject.toml").write_text('[project]\ndependencies = ["pytest"]\n')
+    """pyproject.toml with [tool.pytest.*] block → detected_checks includes pytest.
+
+    ADR-007 (v0.22.0): bare dependency listing does NOT trigger detection — the
+    [tool.pytest.ini_options] block must be present. The pre-v0.22.0 behavior
+    (string-match on "pytest") produced false positives on dep-listed-but-
+    unconfigured repos (psf/requests reality-check).
+    """
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "x"\nversion = "0.1"\n\n[tool.pytest.ini_options]\nminversion = "7"\n'
+    )
     p = profile(tmp_path)
     assert any("pytest" in c for c in p.detected_checks)
 
@@ -153,16 +161,25 @@ def test_detect_checks_empty_project(tmp_path: Path) -> None:
     assert p.detected_checks == []
 
 
-def test_detect_checks_cap_at_4(tmp_path: Path) -> None:
-    """detected_checks is capped at 4 to avoid overwhelming."""
+def test_detect_checks_cap_at_6(tmp_path: Path) -> None:
+    """detected_checks is capped at 6 (ADR-007 v0.22.0, raised from 4 because the
+    whitelist now spans Python + Rust + Node + Makefile and a polyglot repo
+    can legitimately want more than 4 distinct check commands)."""
     (tmp_path / "pyproject.toml").write_text(
-        "[tool.ruff]\n[tool.mypy]\n[project]\ndependencies = ['pytest']\n"
+        "[tool.ruff]\nline-length = 100\n"
+        "[tool.mypy]\nstrict = true\n"
+        "[tool.pytest.ini_options]\nminversion = '7'\n"
     )
     (tmp_path / "Makefile").write_text(
-        "lint:\n\truff .\ntest:\n\tpytest\ntypecheck:\n\tmypy .\ncheck:\n\tall\n"
+        "lint:\n\truff .\n"
+        "test:\n\tpytest\n"
+        "typecheck:\n\tmypy .\n"
+        "check:\n\tall\n"
+        "format:\n\truff format\n"
+        "build:\n\tpython -m build\n"
     )
     p = profile(tmp_path)
-    assert len(p.detected_checks) <= 4
+    assert len(p.detected_checks) <= 6
 
 
 # ---------------------------------------------------------------------------
@@ -438,8 +455,22 @@ def test_package_manager_monorepo_python_wins_over_node(tmp_path: Path) -> None:
     assert p.package_manager == "uv"
 
 
-def test_package_manager_empty_when_no_lockfile(tmp_path: Path) -> None:
+def test_package_manager_manifest_fallback_pip(tmp_path: Path) -> None:
+    """ADR-007 manifest-fallback exception (v0.22.0): pyproject.toml without
+    [tool.uv]/[tool.poetry] and no lockfile → "pip" default. Pre-v0.22.0 this
+    returned "" but reality-check on psf/requests showed users wanted *some*
+    package_manager signal for documentation hint rather than empty string."""
     (tmp_path / "pyproject.toml").write_text("[project]\nname='x'\n")
+    p = profile(tmp_path)
+    assert p.package_manager == "pip"
+
+
+def test_package_manager_empty_when_no_manifest(tmp_path: Path) -> None:
+    """Empty repo (no pyproject.toml, no package.json, no Cargo.toml) → "".
+
+    The empty-string return is still valid when there is genuinely no manifest
+    signal. ADR-007 manifest-fallback only kicks in when a manifest IS present.
+    """
     p = profile(tmp_path)
     assert p.package_manager == ""
 
@@ -606,7 +637,7 @@ def test_profile_legacy_signals_unchanged(tmp_path: Path) -> None:
     (tmp_path / ".git").mkdir()
     p = profile(tmp_path)
     assert "python" in p.stack
-    assert p.lifecycle == "experiment"
+    assert p.lifecycle == "dormant"
     assert p.existing_dotclaude is False
     assert p.vault_member is False
     assert p.spec_only is False
@@ -658,3 +689,177 @@ def test_profile_dogfood_on_harness_maker_repo(tmp_path: Path) -> None:
         # The harness-maker repo currently has no .github/workflows/ (commit
         # 565d7ce). Detector must report empty — never fabricate.
         assert p.ci_provider == ""
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ADR-006 / ADR-007 (v0.22.0) — lifecycle 3-tier + detect_checks whitelist
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def test_lifecycle_no_git_returns_dormant(tmp_path: Path) -> None:
+    """No .git → dormant (was "experiment" pre-v0.22.0, ADR-006)."""
+    from harness_maker.profile import _detect_lifecycle
+
+    assert _detect_lifecycle(tmp_path) == "dormant"
+
+
+def test_lifecycle_active_for_ten_or_more_commits(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """≥10 commits in last 30d → active. ADR-006 threshold."""
+    import subprocess
+
+    from harness_maker import profile as profile_mod
+
+    (tmp_path / ".git").mkdir()
+
+    def fake_run(*_args: object, **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        # 12 commits worth of oneline output
+        return subprocess.CompletedProcess(args=[], returncode=0, stdout="x\n" * 12, stderr="")
+
+    monkeypatch.setattr(profile_mod.subprocess, "run", fake_run)
+    assert profile_mod._detect_lifecycle(tmp_path) == "active"
+
+
+def test_lifecycle_maintenance_for_partial_commits(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """1-9 commits in last 30d → maintenance."""
+    import subprocess
+
+    from harness_maker import profile as profile_mod
+
+    (tmp_path / ".git").mkdir()
+
+    def fake_run(*_args: object, **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(args=[], returncode=0, stdout="x\n" * 5, stderr="")
+
+    monkeypatch.setattr(profile_mod.subprocess, "run", fake_run)
+    assert profile_mod._detect_lifecycle(tmp_path) == "maintenance"
+
+
+def test_lifecycle_dormant_for_zero_commits(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """0 commits in last 30d → dormant (was "experiment" pre-v0.22.0)."""
+    import subprocess
+
+    from harness_maker import profile as profile_mod
+
+    (tmp_path / ".git").mkdir()
+
+    def fake_run(*_args: object, **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(profile_mod.subprocess, "run", fake_run)
+    assert profile_mod._detect_lifecycle(tmp_path) == "dormant"
+
+
+def test_lifecycle_subprocess_failure_returns_dormant(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Subprocess error → dormant (most conservative fallback, ADR-006)."""
+    import subprocess
+
+    from harness_maker import profile as profile_mod
+
+    (tmp_path / ".git").mkdir()
+
+    def fake_run(*_args: object, **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        raise subprocess.SubprocessError("git timed out")
+
+    monkeypatch.setattr(profile_mod.subprocess, "run", fake_run)
+    assert profile_mod._detect_lifecycle(tmp_path) == "dormant"
+
+
+def test_detected_checks_rust_cargo_whitelist(tmp_path: Path) -> None:
+    """Cargo.toml present → cargo test + clippy + fmt --check. ADR-007 whitelist."""
+    from harness_maker.profile import _detect_mechanical_checks
+
+    (tmp_path / "Cargo.toml").write_text('[package]\nname = "x"\nversion = "0.1.0"\n')
+    checks = _detect_mechanical_checks(tmp_path)
+    assert "cargo test" in checks
+    assert "cargo clippy" in checks
+    assert "cargo fmt --check" in checks
+
+
+def test_detected_checks_node_scripts_whitelist(tmp_path: Path) -> None:
+    """package.json scripts → npm run <whitelisted-key>. ADR-007."""
+    from harness_maker.profile import _detect_mechanical_checks
+
+    (tmp_path / "package.json").write_text(
+        '{"scripts": {"test": "jest", "lint": "eslint .", "irrelevant": "echo skip"}}'
+    )
+    checks = _detect_mechanical_checks(tmp_path)
+    assert "npm run test" in checks
+    assert "npm run lint" in checks
+    assert "npm run irrelevant" not in checks  # not in whitelist
+
+
+def test_detected_checks_node_pnpm_runner(tmp_path: Path) -> None:
+    """pnpm-lock.yaml present → runner is pnpm."""
+    from harness_maker.profile import _detect_mechanical_checks
+
+    (tmp_path / "package.json").write_text('{"scripts": {"test": "jest"}}')
+    (tmp_path / "pnpm-lock.yaml").write_text("")
+    checks = _detect_mechanical_checks(tmp_path)
+    assert "pnpm run test" in checks
+    assert "npm run test" not in checks
+
+
+def test_detected_checks_python_no_false_positive_on_dep_listing(tmp_path: Path) -> None:
+    """ADR-007: bare "mypy"/"pytest" in deps must NOT trigger detection.
+
+    Pre-v0.22.0 had bare-string `"mypy" in content` / `"pytest" in content`
+    matching, which emitted false positives on dep-listed-but-unconfigured
+    tools. v0.22.0 requires [tool.X] block explicitly.
+    """
+    from harness_maker.profile import _detect_mechanical_checks
+
+    # Has only dep mentions, no [tool.X] blocks
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "x"\nversion = "0.1"\ndependencies = ["mypy", "pytest", "ruff"]\n'
+    )
+    checks = _detect_mechanical_checks(tmp_path)
+    assert "uv run ruff check ." not in checks
+    assert "uv run mypy ." not in checks
+    assert "uv run pytest --tb=short -q" not in checks
+
+
+def test_detected_checks_python_strict_block_match_positive(tmp_path: Path) -> None:
+    """[tool.ruff] / [tool.mypy] / [tool.pytest.*] blocks → respective check emitted."""
+    from harness_maker.profile import _detect_mechanical_checks
+
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.ruff]\nline-length = 100\n\n'
+        '[tool.mypy]\nstrict = true\n\n'
+        '[tool.pytest.ini_options]\nminversion = "7"\n'
+    )
+    checks = _detect_mechanical_checks(tmp_path)
+    assert "uv run ruff check ." in checks
+    assert "uv run mypy ." in checks
+    assert "uv run pytest --tb=short -q" in checks
+
+
+def test_package_manager_python_manifest_fallback(tmp_path: Path) -> None:
+    """pyproject.toml without lockfile → infer from header (ADR-007 exception)."""
+    from harness_maker.profile import _python_package_manager
+
+    (tmp_path / "pyproject.toml").write_text("[tool.uv]\n")
+    assert _python_package_manager(tmp_path) == "uv"
+
+
+def test_package_manager_node_manifest_fallback(tmp_path: Path) -> None:
+    """package.json without lockfile → "npm" default (ADR-007 exception)."""
+    from harness_maker.profile import _node_package_manager
+
+    (tmp_path / "package.json").write_text("{}")
+    assert _node_package_manager(tmp_path) == "npm"
+
+
+def test_package_manager_python_default_pip_when_no_uv_or_poetry_block(tmp_path: Path) -> None:
+    """pyproject.toml without [tool.uv]/[tool.poetry] → "pip" fallback."""
+    from harness_maker.profile import _python_package_manager
+
+    (tmp_path / "pyproject.toml").write_text("[project]\nname = 'x'\n")
+    assert _python_package_manager(tmp_path) == "pip"

@@ -182,20 +182,56 @@ def _glob_match_root(project_dir: Path, pattern: str) -> bool:
 
 
 def _detect_mechanical_checks(project_dir: Path) -> list[str]:
-    """Scan pyproject.toml and Makefile for common check commands."""
+    """Detect runnable checks per ADR-007 (manifest-explicit OR command-pattern whitelist).
+
+    Conservative policy — emit only commands that the manifest signals are
+    actually configured (not just dependency-listed) OR commands tied to a
+    standard target where presence of the manifest proves the toolchain.
+    The prior version's bare `"mypy" in content` / `"pytest" in content`
+    string-match produced false positives (e.g. psf/requests reality-check
+    showed `uv run ruff check .` emitted on a repo that uses neither uv
+    nor configures ruff — only dep-listed pytest at all). v0.22.0 replaces
+    that with strict-block matching + per-stack whitelists.
+    """
     checks: list[str] = []
+
+    # Python — manifest-explicit only ([tool.X] blocks, not dep mentions).
     pyproject = project_dir / "pyproject.toml"
     if pyproject.exists():
         try:
             content = pyproject.read_text(encoding="utf-8")
         except OSError:
             content = ""
-        if "[tool.ruff]" in content:
+        if "[tool.ruff]" in content or "[tool.ruff." in content:
             checks.append("uv run ruff check .")
-        if "[tool.mypy]" in content or "mypy" in content:
+        if "[tool.mypy]" in content:
             checks.append("uv run mypy .")
-        if "pytest" in content:
+        if "[tool.pytest.ini_options]" in content or "[tool.pytest." in content:
             checks.append("uv run pytest --tb=short -q")
+
+    # Rust — Cargo standard whitelist (presence of Cargo.toml proves the commands work).
+    if (project_dir / "Cargo.toml").exists():
+        checks.extend(["cargo test", "cargo clippy", "cargo fmt --check"])
+
+    # Node — package.json scripts whitelist, runner picked by lockfile.
+    pkgjson = project_dir / "package.json"
+    if pkgjson.exists():
+        try:
+            data = json.loads(pkgjson.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            data = {}
+        scripts = data.get("scripts", {}) if isinstance(data, dict) else {}
+        if (project_dir / "pnpm-lock.yaml").exists():
+            runner = "pnpm"
+        elif (project_dir / "yarn.lock").exists():
+            runner = "yarn"
+        else:
+            runner = "npm"
+        for key in ("test", "lint", "check", "typecheck", "format", "build"):
+            if isinstance(scripts, dict) and key in scripts:
+                checks.append(f"{runner} run {key}")
+
+    # Makefile — target whitelist.
     makefile = project_dir / "Makefile"
     if makefile.exists():
         try:
@@ -203,10 +239,20 @@ def _detect_mechanical_checks(project_dir: Path) -> list[str]:
         except OSError:
             content = ""
         for line in content.splitlines():
-            if line.strip().startswith(("lint:", "check:", "typecheck:", "test:")):
-                target = line.split(":")[0].strip()
-                checks.append(f"make {target}")
-    return checks[:4]
+            line_stripped = line.strip()
+            for target in ("test", "lint", "check", "typecheck", "format", "build"):
+                if line_stripped.startswith(f"{target}:"):
+                    checks.append(f"make {target}")
+                    break
+
+    # Deduplicate while preserving order.
+    seen: set[str] = set()
+    out: list[str] = []
+    for c in checks:
+        if c not in seen:
+            seen.add(c)
+            out.append(c)
+    return out[:6]
 
 
 def _count_tracked_files(project_dir: Path) -> int:
@@ -237,9 +283,19 @@ def _count_tracked_files(project_dir: Path) -> int:
 
 
 def _detect_lifecycle(project_dir: Path) -> str:
-    """Map last-30-days commit count to a lifecycle bucket."""
+    """3-tier classifier per ADR-006.
+
+    Buckets: active (>=10 commits/30d) | maintenance (1-9/30d) | dormant (0/30d).
+    Replaces the prior 4-tier algorithm which conflated "no .git", "git error",
+    and "zero recent commits" under "experiment" — too vague for user-facing
+    output (reality-check showed BurntSushi/ripgrep mis-classified). The label
+    "experiment" was removed entirely in v0.22.0. Missing .git or subprocess
+    failure now degrade to "dormant" (the most conservative bucket — same
+    downstream SIDE-preset routing as the old "experiment" label, but with
+    honest semantics).
+    """
     if not (project_dir / ".git").exists():
-        return "experiment"
+        return "dormant"
     try:
         result = subprocess.run(
             ["git", "log", "--since=30.days.ago", "--oneline"],
@@ -250,10 +306,10 @@ def _detect_lifecycle(project_dir: Path) -> str:
             check=True,
         )
     except (subprocess.SubprocessError, FileNotFoundError):
-        return "experiment"
+        return "dormant"
     commit_count = len(result.stdout.splitlines())
     if commit_count == 0:
-        return "experiment"
+        return "dormant"
     if commit_count < 10:
         return "maintenance"
     return "active"
@@ -421,6 +477,20 @@ def _python_package_manager(project_dir: Path) -> str:
         return "pipenv"
     if (project_dir / "requirements.txt").exists():
         return "pip"
+    # ADR-007 manifest-fallback exception (lower-stakes documentation hint):
+    # pyproject.toml without a lockfile still narrows down the package manager
+    # by header inspection. requests/fastify reality-check failed without this.
+    pyproject = project_dir / "pyproject.toml"
+    if pyproject.exists():
+        try:
+            content = pyproject.read_text(encoding="utf-8")
+        except OSError:
+            content = ""
+        if "[tool.uv]" in content or "[tool.uv." in content:
+            return "uv"
+        if "[tool.poetry]" in content or "[tool.poetry." in content:
+            return "poetry"
+        return "pip"
     return ""
 
 
@@ -434,6 +504,10 @@ def _node_package_manager(project_dir: Path) -> str:
     if (project_dir / "yarn.lock").exists():
         return "yarn"
     if (project_dir / "package-lock.json").exists():
+        return "npm"
+    # ADR-007 manifest-fallback exception: package.json without lockfile
+    # narrows to npm as the default tooling.
+    if (project_dir / "package.json").exists():
         return "npm"
     return ""
 

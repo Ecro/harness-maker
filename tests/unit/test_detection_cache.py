@@ -19,7 +19,7 @@ def _make_profile(stack: list[str] | None = None) -> ProjectProfile:
     return ProjectProfile(
         stack=stack if stack is not None else ["python"],
         scale="small",
-        lifecycle="experiment",
+        lifecycle="dormant",
         existing_dotclaude=False,
         spec_only=False,
         vault_member=False,
@@ -240,7 +240,7 @@ def test_backward_compat_old_cache_loads(tmp_path: Path) -> None:
     legacy_payload = {
         "stack": ["python"],
         "scale": "small",
-        "lifecycle": "experiment",
+        "lifecycle": "dormant",
         "existing_dotclaude": False,
         "spec_only": False,
         "vault_member": False,

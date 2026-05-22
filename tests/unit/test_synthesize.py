@@ -21,7 +21,7 @@ from harness_maker.synthesize import (
 )
 
 
-def _profile(scale: str = "small", lifecycle: str = "experiment") -> ProjectProfile:
+def _profile(scale: str = "small", lifecycle: str = "dormant") -> ProjectProfile:
     return ProjectProfile(
         stack=["python"],
         scale=scale,

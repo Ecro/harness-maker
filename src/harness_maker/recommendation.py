@@ -246,7 +246,7 @@ def recommend_preset(
     inference, not an identity match. validator W3 keeps this MEDIUM on first
     release so 0.11.x users get an explicit prompt rather than a silent flip.
     """
-    if profile.scale == "small" and profile.lifecycle in {"experiment", "maintenance"}:
+    if profile.scale == "small" and profile.lifecycle in {"dormant", "maintenance"}:
         value = Preset.SIDE
     else:
         value = Preset.PRODUCTION

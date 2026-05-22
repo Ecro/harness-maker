@@ -348,7 +348,7 @@ def test_project_profile_defaults() -> None:
     p = ProjectProfile()
     assert p.stack == ["unknown"]
     assert p.scale == "small"
-    assert p.lifecycle == "experiment"
+    assert p.lifecycle == "dormant"
     assert p.existing_dotclaude is False
     assert p.spec_only is False
     assert p.vault_member is False
@@ -558,7 +558,7 @@ def test_project_profile_legacy_yaml_load_without_new_fields() -> None:
         {
             "stack": ["python"],
             "scale": "small",
-            "lifecycle": "experiment",
+            "lifecycle": "dormant",
             "existing_dotclaude": False,
             "spec_only": False,
             "vault_member": False,
