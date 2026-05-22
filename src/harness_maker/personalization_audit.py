@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from jinja2 import Environment, FileSystemLoader, StrictUndefined
 from pydantic import BaseModel, ConfigDict
 
 from harness_maker.detection_cache import load_or_run
@@ -131,9 +132,34 @@ def compute_l1_conversion(
     return max(0, min(100, round(raw)))
 
 
-def compute_l2_stability(override_events_last_30d: int, penalty_factor: int = 5) -> int:
-    """ADR-011 L2 formula: 100 - min(100, N * penalty_factor)."""
-    return max(0, 100 - min(100, override_events_last_30d * penalty_factor))
+def compute_l2_stability(
+    override_events_last_30d: int | list[OverrideRecord],
+    penalty_factor: int = 5,
+    *,
+    current_defaults: dict[str, Any] | None = None,
+) -> int:
+    """ADR-011 L2 formula: 100 - min(100, N * penalty_factor).
+
+    Two input shapes (PLAN-audit-convergence-2026-05 ADR-003):
+    - ``int`` — legacy count-only path; behaviour unchanged.
+    - ``list[OverrideRecord]`` + ``current_defaults`` — convergence-aware path.
+      Each event whose ``after`` aligns with ``current_defaults`` is dropped
+      before the penalty multiplier is applied. ``current_defaults=None`` on
+      the list path is treated as "no convergence data available" and counts
+      every event (matches legacy behaviour).
+    """
+    if isinstance(override_events_last_30d, int):
+        n = override_events_last_30d
+    else:
+        if current_defaults is None:
+            n = len(override_events_last_30d)
+        else:
+            n = sum(
+                1
+                for r in override_events_last_30d
+                if not _converged_on_default(r, current_defaults)
+            )
+    return max(0, 100 - min(100, n * penalty_factor))
 
 
 def compute_l3_cadence(
@@ -257,6 +283,86 @@ def _action_for_l3_failure(
     )
 
 
+# ── Convergence baseline (PLAN-audit-convergence-2026-05) ─────────────────
+
+
+def _load_preset_defaults(preset_name: str) -> dict[str, Any]:
+    """Render `templates/harness-yaml/<preset>.yaml.j2` with InterviewAnswers
+    defaults and return the parsed YAML. ADR-001: this rendered shape is the
+    canonical baseline for `_converged_on_default` — the file a user sees
+    after `/hm:make --update` is what they're compared against.
+    """
+    # Late import: synthesize transitively pulls a lot; the audit module is
+    # also imported during `/hm:health` startup where we want to keep cold-path
+    # cost bounded. Importing inside the helper defers that cost to actual
+    # convergence checks.
+    from harness_maker.models import InterviewAnswers, Preset
+    from harness_maker.render import TEMPLATE_DIR
+    from harness_maker.synthesize import synthesize
+
+    normalized = preset_name.strip().capitalize()
+    try:
+        preset = Preset(normalized)
+    except ValueError as exc:
+        valid = ", ".join(p.value for p in Preset)
+        msg = f"unknown preset {preset_name!r}; valid: {valid}"
+        raise ValueError(msg) from exc
+    answers = InterviewAnswers(preset=preset)
+    blueprint = synthesize(ProjectProfile(), answers, preset)
+    config_dump = blueprint.config.model_dump(mode="json")
+
+    env = Environment(
+        loader=FileSystemLoader(str(TEMPLATE_DIR)),
+        undefined=StrictUndefined,
+        autoescape=False,
+        keep_trailing_newline=True,
+    )
+    template_name = f"harness-yaml/{preset.value}.yaml.j2"
+    rendered = env.get_template(template_name).render(
+        config=config_dump,
+        skills={
+            "installed": answers.skills.get("installed", []),
+            "enabled": answers.skills.get("enabled", []),
+        },
+    )
+    parsed = yaml.safe_load(rendered)
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def _walk_axis_path(defaults: dict[str, Any], axis_path: str) -> tuple[bool, Any]:
+    """Return (exists, value) for `axis_path` inside `defaults`. Returns
+    (False, None) if any intermediate key is missing or non-dict — audit
+    input is user data, so this must never raise."""
+    parts = axis_path.split(".") if axis_path else []
+    current: Any = defaults
+    for part in parts:
+        if not isinstance(current, dict) or part not in current:
+            return False, None
+        current = current[part]
+    return True, current
+
+
+def _converged_on_default(record: OverrideRecord, current_defaults: dict[str, Any]) -> bool:
+    """Decide if `record` represents user state that already matches the
+    current default. Used to exclude already-aligned overrides from L2
+    stability and from frequent-axis action items.
+
+    Truth table (ADR-001 + ADR-002):
+    - record.after == default.value at axis_path → convergent.
+    - record.after is None AND default has any value at axis_path → convergent
+      (the default re-emits this on the next render; the user's clear is a no-op).
+    - record.after is None AND default does NOT have the axis → convergent
+      (clearing a field that's already absent has no lasting effect).
+    - Otherwise → divergent.
+    """
+    exists, default_value = _walk_axis_path(current_defaults, record.axis_path)
+    if record.after is None:
+        return True
+    if not exists:
+        return False
+    return bool(record.after == default_value)
+
+
 # ── State loading helpers ──────────────────────────────────────────────────
 
 
@@ -361,7 +467,35 @@ def run_audit(
     l2_window = int(rubric["layers"]["l2_stability"].get("window_days", 30))
     penalty = int(rubric["layers"]["l2_stability"].get("penalty_factor", 5))
     recent = _filter_recent(overrides, current, l2_window)
-    l2 = compute_l2_stability(len(recent), penalty)
+
+    # ADR-001/003: render the preset's harness-yaml template once and treat
+    # the parsed result as the convergence baseline. The same `recent_divergent`
+    # list feeds both the L2 penalty and the frequent-axis action loop so the
+    # score and the surfaced actions can never disagree. A missing/invalid
+    # preset key falls back to "no defaults" → legacy behaviour.
+    preset_raw = harness_data.get("preset")
+    current_defaults: dict[str, Any] = {}
+    if isinstance(preset_raw, str):
+        try:
+            current_defaults = _load_preset_defaults(preset_raw)
+        except Exception as exc:  # noqa: BLE001
+            # Audit must never crash a /hm:health run (ADR-001). Any failure
+            # in the convergence baseline — unknown preset, jinja template
+            # not found, synthesize error, yaml parse error, pydantic
+            # validation — falls back to legacy un-filtered behaviour with a
+            # stderr note so the failure is visible without breaking health.
+            print(
+                f"personalization_audit: convergence baseline unavailable "
+                f"({type(exc).__name__}: {exc}); L2 falling back to legacy behaviour",
+                file=sys.stderr,
+            )
+            current_defaults = {}
+    recent_divergent = (
+        [r for r in recent if not _converged_on_default(r, current_defaults)]
+        if current_defaults
+        else recent
+    )
+    l2 = compute_l2_stability(len(recent_divergent), penalty)
 
     # ── L3: cadence ────────────────────────────────────────────────────
     l3_window = int(rubric["layers"]["l3_cadence"].get("window_days", 14))
@@ -377,7 +511,9 @@ def run_audit(
 
     # ── Actions ────────────────────────────────────────────────────────
     actions: list[PersonalizationActionItem] = []
-    axis_counts: Counter[str] = Counter(r.axis_path for r in recent)
+    # ADR-003: action-item generation uses the same divergent filter as L2,
+    # so a converged axis cannot earn a P1/P2 finding while the score ignores it.
+    axis_counts: Counter[str] = Counter(r.axis_path for r in recent_divergent)
     for axis_path, count in axis_counts.most_common():
         if count < 3:
             continue

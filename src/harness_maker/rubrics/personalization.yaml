@@ -24,6 +24,12 @@ layers:
     formula: "100 - min(100, override_events_last_30d * 5)"
     penalty_factor: 5
     window_days: 30
+    # ADR-0012 (2026-05-22): formula unchanged; the input set narrowed.
+    # `override_events_last_30d` counts only DIVERGENT overrides — events
+    # whose `after` value already matches the preset's rendered template
+    # default at the same axis_path are excluded as "converged" and don't
+    # incur a penalty. See docs/adr/0012-l2-convergence-semantics.md.
+    note: "input filtered for convergence per ADR-0012"
   l3_cadence:
     description: "Adaptive opt-in + audit cadence regularity."
     score_table:

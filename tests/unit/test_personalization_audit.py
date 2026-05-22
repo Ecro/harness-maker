@@ -362,12 +362,17 @@ def test_frequent_axis_drives_action_item(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """≥3 overrides on one axis in 30d → at least one ActionItem with that
-    axis_path in evidence.top_3_signals."""
+    axis_path in evidence.top_3_signals.
+
+    Each override sets `preset` to a value differing from the seeded
+    harness.yaml default (Side), so the convergence filter (PLAN-audit-
+    convergence-2026-05) keeps all three events as divergent and the
+    frequent-axis threshold (≥3) is met."""
     _seed_overrides(
         tmp_path,
         [
             _override("preset", "Side", "Production", "2026-05-15T12:00:00+00:00"),
-            _override("preset", "Production", "Side", "2026-05-14T12:00:00+00:00"),
+            _override("preset", "Side", "Production", "2026-05-14T12:00:00+00:00"),
             _override("preset", "Side", "Production", "2026-05-13T12:00:00+00:00"),
         ],
     )

@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.23.2] - 2026-05-22
+
+### L2 stability is convergence-aware (false-positive fix)
+
+- **fix(personalization_audit): `compute_l2_stability` + `run_audit` now exclude
+  override events that converged on the current preset default** before applying
+  the penalty multiplier. ADR-0012 (amends ADR-0011 input set, formula unchanged).
+  - Resolves a dogfood false-positive: `/hm:health` 2026-05-22 docked L2 from
+    100 to 5 because the user's 2026-05-19 hand edits migrating `memory.*` onto
+    the new `{enabled, dir, files}` template default were counted as instability.
+    Every future schema rename in harness-maker would hit the same pattern for
+    ~30 days. The L2 score and the surfaced `override_stability` action item
+    are now both gated by the same divergent-event filter (ADR-003 in PLAN).
+- **feat(personalization_audit): new helpers `_load_preset_defaults`,
+  `_walk_axis_path`, `_converged_on_default`** + back-compat `int|list[OverrideRecord]`
+  overload on `compute_l2_stability`. List path opt-in via `current_defaults` kwarg.
+- **docs(adr): ADR-0012 added** (`docs/adr/0012-l2-convergence-semantics.md`).
+  Documents the three sub-decisions: preset YAML template as baseline, `after=None`
+  as clearing event, single `recent_divergent` list feeds both L2 score and actions.
+- **rubric(personalization.yaml): inline note under `l2_stability`** pointing at
+  ADR-0012 so the rubric file and the audit module agree on the new input semantics.
+- 5-file version sync 0.23.1 → 0.23.2.
+
 ## [0.23.1] - 2026-05-22
 
 ### Phase 2 render-merge fully shipped + marker-syntax fix
