@@ -163,10 +163,7 @@ def test_codex_config_accepts_quoted_dotted_server_name() -> None:
     Inverse-of-negative: the correct (quoted) shape must NOT trigger
     rejection. If the parser's invariant becomes too tight, this fires red.
     """
-    good_quoted = (
-        "[features]\nhooks = true\n"
-        '[mcp_servers."example.com"]\ncommand = "x"\n'
-    )
+    good_quoted = '[features]\nhooks = true\n[mcp_servers."example.com"]\ncommand = "x"\n'
     parsed = parse_codex_config_toml(good_quoted)
     # The dotted name resolves to a single key — NOT nested.
     assert "example.com" in parsed["mcp_servers"]
@@ -176,9 +173,7 @@ def test_codex_config_accepts_quoted_dotted_server_name() -> None:
 @pytest.mark.boundary_negative
 def test_codex_config_rejects_missing_features() -> None:
     """Codex config without [features] table must be rejected."""
-    bad = (
-        "[mcp_servers.\"example\"]\ncommand = \"x\"\n"
-    )
+    bad = '[mcp_servers."example"]\ncommand = "x"\n'
     with pytest.raises(BoundaryParseError, match="features"):
         parse_codex_config_toml(bad)
 
@@ -194,10 +189,7 @@ def test_codex_config_rejects_project_level_profiles() -> None:
     blocks here gets caught at boundary-test time, not by a user
     seeing the Codex warning on every session start.
     """
-    bad = (
-        "[features]\nhooks = true\n"
-        '[profiles.cheap]\nmodel_reasoning_effort = "minimal"\n'
-    )
+    bad = '[features]\nhooks = true\n[profiles.cheap]\nmodel_reasoning_effort = "minimal"\n'
     with pytest.raises(BoundaryParseError, match="profiles"):
         parse_codex_config_toml(bad)
 

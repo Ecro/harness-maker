@@ -124,7 +124,8 @@ def test_codex_config_toml_does_not_render_profile_blocks() -> None:
     # prose, and that's fine. What must not appear is an actual section
     # header (a line whose first non-whitespace character is ``[``).
     section_lines = [
-        line for line in rendered.splitlines()
+        line
+        for line in rendered.splitlines()
         if line.lstrip().startswith("[") and not line.lstrip().startswith("#")
     ]
     assert not any(line.startswith("[profiles.") for line in section_lines), (
@@ -134,8 +135,7 @@ def test_codex_config_toml_does_not_render_profile_blocks() -> None:
     # (per-agent overrides). It must NOT appear as an ACTUAL TOML key here
     # — comment mentions in the explanatory header are allowed.
     non_comment_lines = [
-        line for line in rendered.splitlines()
-        if line.strip() and not line.lstrip().startswith("#")
+        line for line in rendered.splitlines() if line.strip() and not line.lstrip().startswith("#")
     ]
     non_comment_body = "\n".join(non_comment_lines)
     assert 'model_reasoning_effort = "minimal"' not in non_comment_body

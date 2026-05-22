@@ -51,10 +51,7 @@ def test_only_missing_block_is_added(tmp_path: Path) -> None:
     """User has cheap but not deep → only deep is appended; cheap is left alone."""
     cfg = tmp_path / ".codex" / "config.toml"
     cfg.parent.mkdir(parents=True)
-    pre = (
-        "[profiles.cheap]\n"
-        'model_reasoning_effort = "low"   # user customized to low\n'
-    )
+    pre = '[profiles.cheap]\nmodel_reasoning_effort = "low"   # user customized to low\n'
     cfg.write_text(pre, encoding="utf-8")
     result = bootstrap_user_codex_profiles(home=tmp_path)
     assert result.changed
@@ -105,7 +102,7 @@ def test_trailing_newline_appended_if_missing(tmp_path: Path) -> None:
     would concatenate onto the user's last value)."""
     cfg = tmp_path / ".codex" / "config.toml"
     cfg.parent.mkdir(parents=True)
-    cfg.write_text('[features]\nhooks = true', encoding="utf-8")  # no \n
+    cfg.write_text("[features]\nhooks = true", encoding="utf-8")  # no \n
     result = bootstrap_user_codex_profiles(home=tmp_path)
     assert result.changed
     body = cfg.read_text(encoding="utf-8")

@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.23.4] - 2026-05-22
+
+### Release-recovery — ruff format fix-up
+
+- **chore(format): apply `ruff format` to three test files** that were
+  ruff-lint-clean but not formatter-clean. The 0.23.3 release attempt
+  failed at the `quality-gate` job (ruff format --check), skipping every
+  downstream publish job (TestPyPI, PyPI, GitHub Release) — nothing was
+  published under 0.23.3, so no artifact recall needed. This patch
+  re-formats `tests/integration/test_boundary_codex_toml.py`,
+  `tests/unit/test_codex_user_config.py`, and
+  `tests/unit/test_synthesize_codex_reasoning_effort.py`. Functionally
+  identical to 0.23.3.
+- 5-file version sync 0.23.3 → 0.23.4.
+
 ## [0.23.3] - 2026-05-22
 
 ### Codex compatibility fixes — SessionStart hook + profiles bootstrap
