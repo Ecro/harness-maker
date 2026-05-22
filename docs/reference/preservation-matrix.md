@@ -32,12 +32,23 @@ phases 1+3 and 2.
 | M6a | `hooks/hooks.json` (Claude PascalCase nested) | shipped | **always-REPLACE** ❌ | **`MERGE_JSON`** (Phase 1+3, schema-aware merge per [ADR-006]) | `test_m6a_claude_hooks_json_merges` |
 | M6b | `.cursor/hooks.json` (Cursor flat camelCase) | shipped | **always-REPLACE** ❌ | **`MERGE_JSON`** (Phase 1+3) | `test_m6b_cursor_hooks_json_merges` |
 | M6c | `.codex/hooks.json` (Codex PascalCase + PermissionRequest) | shipped | `.codex/hooks.json` NOT in reconcile literal-match → falls through to KEEP-fallback (latent bug, [ADR-002]) | **`MERGE_JSON`** (Phase 1+3 fixes both literal-match AND wires merge) | `test_m6c_codex_hooks_json_merges` |
-| M7a | `.codex/config.toml` | shipped | **always-REPLACE** ❌ | **`MERGE_BLOCK` when `# @hm:user:*` markers present, REPLACE otherwise** (Phase 2, [ADR-004]+[ADR-007]) | `test_m7a_codex_config_toml_marker_aware` |
-| M7b | `.codex/agents/*.toml` | shipped 6+ agents | **always-REPLACE** ❌ | **`MERGE_BLOCK` when markers present at TOML statement level** (Phase 2) | `test_m7b_codex_agent_toml_marker_aware` |
-| M8 | `.claude/lib/*.sh` | shipped wrappers | **always-REPLACE** ❌ | **`MERGE_BLOCK` when `# @hm:user:*` markers present** (Phase 2) | `test_m8_claude_lib_sh_marker_aware` |
+| M7a | `.codex/config.toml` | shipped | **always-REPLACE** ❌ | ⚠️ **reconcile returns `MERGE_BLOCK` when markers present; render's `_render_pure_toml` falls back to template overwrite** (Phase 2 half-shipped — detection complete, render merge deferred — see "Phase 2 render-merge follow-up" below) | `test_m7a_codex_config_toml_marker_aware` (decision) + e2e xfail |
+| M7b | `.codex/agents/*.toml` | shipped 6+ agents | **always-REPLACE** ❌ | ⚠️ same half-shipped state as M7a | `test_m7b_codex_agent_toml_marker_aware` (decision) + e2e xfail |
+| M8 | `.claude/lib/*.sh` | shipped wrappers | **always-REPLACE** ❌ | ⚠️ same half-shipped state as M7a (no shipped `.sh` templates yet; dispatch ready) | `test_m8_claude_lib_sh_marker_aware` xfail (no template) |
 | M9 | `AGENTS.md` (project root) | shipped | `MERGE_BLOCK` (codex-agents-merge rule, `reconcile.py:122-129`) | unchanged ✅ user blocks preserved | `test_m9_agents_md_block_merge` |
 | M10 | User custom file at blueprint root, NOT in blueprint | `.codex/agents/my-custom.toml` user-authored | orphan-sweep classifies as "theirs" → KEEP+warn | unchanged ✅ | `test_m10_user_orphan_kept` |
 | M11 | `.cursor/mcp.json` | shipped | pure-render REPLACE | unchanged (out of PLAN scope; not a hook file) | `test_m11_cursor_mcp_json_replaces` |
+
+## Phase 2 render-merge follow-up (v0.23.x)
+
+Phase 2 (TOML/sh hash-comment markers) shipped in two halves:
+
+- ✅ **Detection complete (v0.23.0):** `block_merge.detect_marker_style` returns `HASH_COMMENT` for `.toml`/`.sh` suffixes; `reconcile._decide_hash_comment_branch` correctly returns `MERGE_BLOCK` when both the shipped template and the existing file carry `# @hm:user:start:NAME` markers; shipped `codex/config.toml.j2` and `codex/agent.toml.j2` carry empty `user_extensions` blocks ready for user content.
+- ⚠️ **Render merge deferred:** `block_merge.merge()` is HTML_COMMENT-only by construction (`block_merge.py:477-479` explicitly documents this; adding a `style` parameter touches the marker-walk hot path with fence tracking, etc.). Until that lands, `render._render_pure_toml` ignores `merge_paths` and **template overwrite wins** — the user's content between `# @hm:user:*` markers is overwritten on re-render.
+
+User data **is not lost** — `backup()` runs unconditionally per [ADR-001], so the prior file (with user content) is recoverable from `.backup-<ts>/`. The Phase 2 contract is the auto-merge path, not the safety net.
+
+Follow-up scope (v0.23.x): extend `merge()` with `style: MarkerStyle` parameter, forward to `parse_segments` / `parse_user_blocks` / fence detection. e2e cell `test_e2e_codex_config_toml_user_block_survives` xfail-strict marker flips to GREEN at that point.
 
 ## Known limitations (documented contracts, not bugs)
 

@@ -373,3 +373,62 @@ PASS/FAIL 을 RESULTS.md Phase 2.9 row 에 기입.
 6. 이후 harness-maker:make / hm:health 진행 (Codex 의 skill 호출 방식 따름).
 
 **Fail 분기**: Codex CLI 의 plugin lifecycle 이 marketplace-add ≠ install 일 수도 — `/plugins` 목록에 없으면 별도 `codex plugin install` 필요한지 확인.
+
+---
+
+## Phase 7 manual IDE acceptance — brownfield preservation (v0.23.0)
+
+> 사용자가 Cursor 2.4+ / Codex CLI 환경에서 직접 실행. 자동화 e2e (`tests/e2e/test_preservation_e2e.py`, INTEGRATION=1) 는 on-disk reconcile + render 출력을 검증하지만, **IDE 가 실제로 merged hooks.json 을 fire 하는지** 는 IDE-driven runtime 이라 manual 검증.
+
+**예상 소요**: 15분 (Cursor 8분 + Codex CLI 7분; v0.23.0 plugin update 후 1회 충분)
+
+### C7.1 — Cursor IDE: merged hooks.json 실제 fire
+
+**시나리오**: brownfield project 에서 user 가 custom hook entry 를 추가한 후 `/hm:make --update` 실행, Cursor 가 실제로 merged hook 을 fire 하는지 확인.
+
+1. **준비**: Cursor 2.4+ 에서 harness-maker 가 설치된 brownfield project 열기 (이미 `.claude/`, `.cursor/` 가 있는 상태).
+2. `.cursor/hooks.json` 을 IDE 에서 직접 열어 `preToolUse` 배열에 다음 entry 추가:
+   ```json
+   {"matcher": "Read", "command": "echo USER_CUSTOM_HOOK_FIRED && exit 0"}
+   ```
+   파일 저장.
+3. Cursor chat 에서 `/hm:make` (Update branch) 실행.
+4. **확인 #1 — preservation**: 명령 종료 후 `.cursor/hooks.json` 다시 열어 `USER_CUSTOM_HOOK_FIRED` 라인이 남아있는지 확인. 사라졌으면 P0 — REVIEW report 에 보고.
+5. **확인 #2 — runtime fire**: Cursor 가 다른 turn 에서 `Read` 도구 호출 시 IDE 의 통합 콘솔 (View → Output → Hooks 채널) 또는 chat 의 도구 결과 박스에 `USER_CUSTOM_HOOK_FIRED` 표시되는지 관찰. 안 보이면 schema 호환성 (lowercase `preToolUse` + flat `{matcher, command}`) 문제일 수 있음 — `tests/cursor-compat/results-2026-05-08.md` 의 검증 결과와 비교.
+6. **회복 확인**: `git status` 에 `.backup-<ts>/` 나타나지 않으면 Phase 4 gitignore 자동 wiring 작동 확인. 나타나면 P1 — wiring 미적용.
+
+**Fail 분기**:
+- preservation 실패 → `tests/unit/test_preservation_matrix.py::test_m6b_cursor_hooks_json_merges` 가 unit 에서는 GREEN 인데 IDE 환경에서 깨짐 → render 의 schema dispatch 가 잘못된 경로 — render.py 의 `schema = "flat" if str(fe.path) == ".cursor/hooks.json" else "nested"` 분기 재검토.
+- runtime fire 실패 → schema 출력은 맞지만 Cursor 가 안 읽음 → `tests/cursor-compat/results-2026-05-08.md` 의 kairos 0.5.7 forensic 시점부터 Cursor 가 변했을 가능성 — 별도 ADR 로 schema drift 검증.
+
+### C7.2 — Codex CLI: merged hooks.json + PermissionRequest
+
+**시나리오**: Codex 의 nested PascalCase 스키마 + matcher-less `PermissionRequest` event 가 user-added entry 보존 + 실제 fire.
+
+1. **준비**: Codex CLI 환경에서 harness-maker brownfield project (이미 `.codex/`, `AGENTS.md` 있음).
+2. `.codex/hooks.json` 의 `PermissionRequest` 배열에 다음 entry 추가:
+   ```json
+   {"hooks": [{"type": "command", "command": "echo CODEX_PERMISSION_HOOK_FIRED && exit 0"}]}
+   ```
+3. Codex CLI 에서 `/hm:make` 실행 (Update branch).
+4. **확인 #1 — preservation**: `.codex/hooks.json` 다시 열어 `CODEX_PERMISSION_HOOK_FIRED` 라인 보존 확인.
+5. **확인 #2 — runtime fire**: Codex 가 permission gate 가 fire 되는 작업 (e.g. Bash 명령) 호출 시 `CODEX_PERMISSION_HOOK_FIRED` 출력 관찰.
+6. **gitignore wiring 확인**: 동일 (C7.1 #6 와 같음).
+
+**Fail 분기**:
+- Codex 가 `PermissionRequest` 의 matcher-less 두 번째 entry 를 무시 → Codex schema 가 첫 번째 entry 만 처리하도록 변경되었을 가능성 — Codex CLI changelog 확인.
+
+### C7.3 — Codex `.codex/config.toml` user-block survives (xfail expected)
+
+**알림**: Phase 2 render merge for HASH_COMMENT 파일은 v0.23.0 에서 **deferred** 상태 (docs/reference/preservation-matrix.md "Phase 2 render-merge follow-up" 섹션). 다음 step 은 **현재 fail 이 expected** 임을 확인하는 negative test.
+
+1. `.codex/config.toml` 의 shipped `# @hm:user:start:user_extensions` 블록 안에 user 가 직접 다음 입력:
+   ```toml
+   [mcp_servers."manual-test-server"]
+   command = "echo PHASE2_USER_BLOCK_SURVIVED"
+   ```
+2. Codex CLI 에서 `/hm:make --update` 실행.
+3. **확인 (현재 expected behavior)**: `.codex/config.toml` 다시 열어 `manual-test-server` 가 **사라졌고**, shipped 의 default `# Add custom Codex configuration here...` 프로즈로 돌아왔는지 확인. 만약 보존되었다면 Phase 2 follow-up 이 이미 land 한 상태 — preservation-matrix.md 의 ⚠️ 표기를 ✅ 로 업데이트.
+4. **회복 검증**: `.backup-<ts>/.codex/config.toml` 안에 `manual-test-server` 가 있어야 함 (backup = 회복 수단 per ADR-001).
+
+이 step 의 fail (= user block survives) 는 좋은 fail. 의도된 deferral 이 closed 됐다는 signal.
