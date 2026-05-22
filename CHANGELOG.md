@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.23.6] - 2026-05-23
+
+### CI hotfix — strip ANSI codes before `make` subcommand assertion
+
+The 0.23.5 `install-cmd-regression` job failed on its very first CI run:
+`test_pypi_install_works` asserted that `harness-maker --help` advertises
+the `make` subcommand via regex `^\s*[│|]?\s*make\b`, but Typer/Rich emits
+ANSI color codes into the captured subprocess stdout even when not on a
+TTY (`\x1b[1;36mmake` inside the Commands box). The regex matched only
+when the local terminal happened to suppress ANSI; in CI the test
+discovered the gap immediately.
+
+- **fix(test): strip ANSI escape sequences from `harness-maker --help`
+  stdout before regex matching** in
+  `tests/integration/test_readme_install_commands.py::test_pypi_install_works`.
+  Uses `re.sub(r"\x1b\[[0-9;]*[a-zA-Z]", "", stdout)` — standard ANSI CSI
+  pattern. The cleaned stdout is then matched against the `make`
+  command-list regex.
+- 5-file version sync 0.23.5 → 0.23.6.
+
+The `install-cmd-regression` defense IS working — it caught the first
+real regression on the first CI run (itself). Fitting.
+
 ## [0.23.5] - 2026-05-23
 
 ### CI install-cmd regression test + Codex first-run Skill doc fix (ADR-001 Q4 trigger fired)

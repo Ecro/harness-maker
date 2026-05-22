@@ -107,15 +107,21 @@ def test_pypi_install_works(tmp_path: Path) -> None:
         timeout=30,
         check=True,
     )
-    # --help must advertise the `make` subcommand as a Typer command-list
-    # entry (line starts with optional whitespace + box-drawing chars + `make`
+    # --help must advertise the `make` subcommand. Typer/Rich emits ANSI
+    # color codes into the captured stdout even when not on a TTY (verified
+    # 2026-05-23 CI failure: `\x1b[1;36mmake` inside the Commands box). Strip
+    # ANSI sequences first, then look for `make` as a command-list entry
+    # (line starts with optional whitespace + box-drawing chars + `make`
     # followed by a space or end-of-word). Substring match (REVIEW code P2-2)
     # would false-positive on future help prose containing the word "make".
     import re
 
-    assert re.search(r"(?m)^\s*[│|]?\s*make\b", result.stdout), (
+    ansi_re = re.compile(r"\x1b\[[0-9;]*[a-zA-Z]")
+    clean_stdout = ansi_re.sub("", result.stdout)
+    assert re.search(r"(?m)^\s*[│|]?\s*make\b", clean_stdout), (
         f"`{binary} --help` did not advertise the `make` subcommand as a "
-        f"command-list entry. stdout: {result.stdout!r}\nstderr: {result.stderr!r}"
+        f"command-list entry. cleaned stdout: {clean_stdout!r}\n"
+        f"raw stderr: {result.stderr!r}"
     )
 
 
