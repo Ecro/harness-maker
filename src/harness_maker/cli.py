@@ -349,14 +349,23 @@ def make(
         raise typer.Exit(0)
 
     merge_paths: set[Path] = set()
+    merge_json_paths: set[Path] = set()
     keep_count = 0
     if target_dotclaude.exists() and any(target_dotclaude.iterdir()):
         backup(target_dotclaude)
+        # Phase 4 (PLAN-onboarding-backup-friction, ADR-005): hide
+        # .backup-<ts>/ directories from `git status` so the safety net
+        # doesn't surface as repo clutter. Idempotent line-append via the
+        # proven worktree.py helper.
+        from harness_maker.worktree import _ensure_gitignore_entry
+
+        _ensure_gitignore_entry(target, ".backup-*/")
         conflicts = reconcile(target_dotclaude, bp)
         from harness_maker.models import ReconcileDecision
 
         keep_paths = {c.path for c in conflicts if c.decision == ReconcileDecision.KEEP}
         merge_paths = {c.path for c in conflicts if c.decision == ReconcileDecision.MERGE_BLOCK}
+        merge_json_paths = {c.path for c in conflicts if c.decision == ReconcileDecision.MERGE_JSON}
         keep_count = len(keep_paths)
         new_files = [f for f in bp.files if f.path not in keep_paths]
         bp = bp.model_copy(update={"files": new_files})
@@ -367,6 +376,7 @@ def make(
         target_dotclaude,
         freeze_time=freeze,
         merge_paths=merge_paths,
+        merge_json_paths=merge_json_paths,
         merge_reports=merge_reports,
     )
     _write_harness_manifest(target_dotclaude, written)
@@ -488,6 +498,157 @@ def locate_cmd(
     if entry.project_path is not None:
         payload["projectPath"] = str(entry.project_path)
     typer.echo(json.dumps(payload, indent=2))
+
+
+@app.command("prune-backups")
+def prune_backups_cmd(
+    project_root: Path = typer.Argument(  # noqa: B008
+        Path("."),
+        help="Project root (parent of .backup-*/ directories). Defaults to cwd.",
+    ),
+    keep_last: int = typer.Option(
+        5,
+        "--keep-last",
+        help="Keep the most-recent N snapshots regardless of age (default 5).",
+    ),
+    keep_days: int = typer.Option(
+        14,
+        "--keep-days",
+        help="Keep all snapshots younger than N days regardless of rank (default 14).",
+    ),
+    apply: bool = typer.Option(
+        False,
+        "--apply",
+        help="Actually delete prune candidates. Without this flag, prints a "
+        "read-only audit only — no filesystem changes.",
+    ),
+) -> None:
+    """Prune accumulated `.backup-<ts>/` snapshot directories.
+
+    Read-only by default — lists candidates outside the keep-window (a snapshot
+    is KEPT if its rank is < --keep-last OR its age in days is <= --keep-days;
+    UNION, not intersection) along with their disk usage. Pass --apply to
+    actually delete. Symlinks named .backup-* are skipped both at scan time
+    and again immediately before deletion (TOCTOU guard).
+
+    This command is the ONLY way to delete backup snapshots; /hm:make never
+    auto-prunes. Backup snapshots may contain state not yet committed to git,
+    so silent auto-deletion has caused unrecoverable loss in practice.
+    """
+    import shutil
+    import time
+    from datetime import datetime
+    from pathlib import Path as _Path
+
+    root = _Path(project_root).resolve()
+    backups: list[tuple[_Path, float, int]] = []
+    for child in root.iterdir() if root.is_dir() else []:
+        # REVIEW fix (security-reviewer P1): exclude symlinks at enumeration to
+        # prevent a `.backup-evil -> /home/user/.ssh` style traversal. is_dir()
+        # follows symlinks by default; an attacker who can write to project_root
+        # could plant a dir-symlink that passes the `.backup-` basename gate.
+        if child.is_symlink() or not child.is_dir() or not child.name.startswith(".backup-"):
+            continue
+        try:
+            mtime = child.stat().st_mtime
+        except OSError:
+            continue
+        size = _dir_size_bytes(child)
+        backups.append((child, mtime, size))
+
+    if not backups:
+        typer.echo(f"prune-backups: no .backup-*/ directories under {root}")
+        return
+
+    # Sort newest-first by mtime (rank 0 = newest)
+    backups.sort(key=lambda x: x[1], reverse=True)
+    now = time.time()
+    age_cutoff_seconds = float(keep_days) * 86400.0
+
+    candidates: list[tuple[_Path, float, int]] = []
+    kept_count = 0
+    kept_bytes = 0
+    for rank, (path, mtime, size) in enumerate(backups):
+        age_sec = now - mtime
+        keep = (rank < keep_last) or (age_sec <= age_cutoff_seconds)
+        if keep:
+            kept_count += 1
+            kept_bytes += size
+        else:
+            candidates.append((path, mtime, size))
+
+    typer.echo(
+        f"prune-backups: scanned {len(backups)} .backup-*/ under {root}\n"
+        f"  keep window: rank < {keep_last}  OR  age ≤ {keep_days}d (union)\n"
+        f"  keeping {kept_count} ({_human_bytes(kept_bytes)}), "
+        f"prune candidates: {len(candidates)} ({_human_bytes(sum(s for _, _, s in candidates))})",
+    )
+    for path, mtime, size in candidates:
+        ts = datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M")
+        typer.echo(f"  - {path.name}  {_human_bytes(size):>10}  {ts}")
+
+    if not apply:
+        # REVIEW fix (ux-reviewer P1): footer must show even when candidates is
+        # empty so users always know the run was non-destructive.
+        typer.echo(
+            "\nRead-only audit (no files removed). Re-run with --apply to delete.",
+        )
+        return
+
+    deleted = 0
+    freed_bytes = 0
+    for path, _mtime, size in candidates:
+        # REVIEW fix (security-reviewer P1): re-check symlink status immediately
+        # before rmtree to close the TOCTOU window between scan and deletion,
+        # and re-verify the path is still under root.resolve().
+        try:
+            real = path.resolve()
+        except OSError as e:
+            typer.echo(f"WARN: could not resolve {path}: {e}", err=True)
+            continue
+        if path.is_symlink() or not str(real).startswith(str(root) + os.sep):
+            typer.echo(
+                f"WARN: skipping {path} — became a symlink or moved outside "
+                f"project_root after scan (TOCTOU guard).",
+                err=True,
+            )
+            continue
+        try:
+            shutil.rmtree(path)
+            deleted += 1
+            freed_bytes += size
+        except OSError as e:
+            typer.echo(f"WARN: could not delete {path}: {e}", err=True)
+    # REVIEW fix (ux-reviewer P2): report disk savings on --apply success.
+    typer.echo(
+        f"prune-backups: deleted {deleted}/{len(candidates)} directories, "
+        f"freed {_human_bytes(freed_bytes)}.",
+    )
+
+
+def _dir_size_bytes(root: Path) -> int:
+    """Recursive total size in bytes; ignores errors per file."""
+    total = 0
+    for p in root.rglob("*"):
+        try:
+            if p.is_file():
+                total += p.stat().st_size
+        except OSError:
+            continue
+    return total
+
+
+def _human_bytes(n: int) -> str:
+    """Compact human-readable byte size."""
+    val = float(n)
+    for unit in ("B", "KB", "MB", "GB"):
+        if val < 1024 or unit == "GB":
+            return f"{val:.1f} {unit}"
+        val /= 1024
+    # Unreachable — the "GB" branch above always returns. REVIEW (code-reviewer P2)
+    # flagged the prior trailing return as dead code; replaced with assert-False
+    # so a future loop change that breaks the invariant is caught loudly.
+    raise AssertionError("_human_bytes: loop guard invariant broken")
 
 
 def _emit_dry_run_summary(bp: Blueprint, target_dotclaude: Path) -> None:

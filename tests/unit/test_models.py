@@ -78,7 +78,15 @@ def test_atomic_stage_members() -> None:
 
 
 def test_reconcile_decision_members() -> None:
-    assert {m.value for m in ReconcileDecision} == {"keep", "replace", "both", "merge_block"}
+    # merge_json added by PLAN-onboarding-backup-friction Phase 1+3 (ADR-003/006)
+    # — schema-aware hooks.json 3-way merge.
+    assert {m.value for m in ReconcileDecision} == {
+        "keep",
+        "replace",
+        "both",
+        "merge_block",
+        "merge_json",
+    }
 
 
 # ──────────────────────────────────────────────────────────────────────────────

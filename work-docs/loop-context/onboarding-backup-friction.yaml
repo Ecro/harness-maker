@@ -1,0 +1,76 @@
+slug: onboarding-backup-friction
+source: work-docs/PLAN-onboarding-backup-friction.md
+created_at: 2026-05-22
+updated_at: 2026-05-22
+context:
+  purpose: >-
+    Audit brownfield in-place preservation; close hooks.json (3 schemas) +
+    TOML + sh always-REPLACE gaps; auto-gitignore .backup-*/; expose
+    harness-maker prune-backups CLI. Per PLAN ADR-001, backup itself is
+    non-negotiable — the real goal is verifying and fixing in-place
+    preservation so backup serves as a secondary safety net rather than
+    the primary recovery mechanism for whole file categories.
+  invariants:
+    - "ADR-001: backup() runs unconditionally; conditional-skip vetoed."
+    - "ADR-002: full audit + gap closure scope; not audit-only."
+    - "ADR-003: hooks.json gap closure via in-place 3-way merge (settings.json pattern), not sidecar split."
+    - "ADR-004: TOML markers at file/TOML-statement level only; no descent into developer_instructions multi-line strings."
+    - "ADR-005: .backup-*/ auto-gitignore on every backup; retention pruning user-gated only (harness-maker prune-backups CLI)."
+    - "ADR-006: hooks.json entry discriminator is schema-aware. Claude/Codex nested = (matcher_or_empty, hooks[0]['command'], hooks[0]['type']); Cursor flat = (matcher_or_empty, command_string). Manifest records merged hash, not template-only hash."
+    - "ADR-007: `# @hm:user:start:NAME` marker syntax for TOML/sh; block_merge.parse_segments style param already exists at block_merge.py:172; Phase 2 work is in detect_marker_style + reconcile dispatch wiring only."
+    - "Phase 1 + Phase 3 ship as one atomic PR/commit-series — no intermediate state on main where literal-match REPLACE exists without merge logic."
+    - "block_merge parser is the R4 silent-loss surface — extensive parametrized tests required before any reconcile branch flips."
+    - "wrapup owns the commit; loop body must not invoke `git commit`."
+  priority: >-
+    Safety (user-data preservation) > correctness > readability > speed.
+    The medium-high risk Phase 1+3 must complete before Phase 2 starts;
+    Phase 2's block_merge change cannot regress markdown parsing.
+  test_reliability: >-
+    pytest is the test framework. Unit tests are mock-first per project
+    policy. Integration tests gated by INTEGRATION=1. Phase 0 RED tests
+    use pytest.mark.xfail(strict=True) for TOML/sh cells (validator
+    pass-2 W1 fix) so the matrix suite doesn't block Phase 1+3 PR's CI
+    on still-RED cells. Phase 2 removes those xfails as cells flip GREEN.
+    Cross-IDE e2e (Phase 7) is split: (a) on-disk reconcile outcomes
+    automated; (b) Cursor/Codex IDE acceptance is manual per CLAUDE.md
+    checkpoint 8.
+  stopping_criteria: >-
+    All PLAN Success Criteria 1-8 met (item 9 is the out-of-loop manual
+    IDE checklist; flagged separately at loop close):
+    (1) docs/reference/preservation-matrix.md exists + referenced from
+    commands/make.md;
+    (2) test_preservation_matrix.py green (TOML/sh xfailed in Phase 0,
+    flipped GREEN in Phase 2);
+    (3) test_reconcile, test_block_merge, test_render, test_cli,
+    test_onboarding_ux_contract all green;
+    (4) INTEGRATION=1 tests/e2e/test_preservation_e2e.py green for all
+    three target file trees;
+    (5) gitignore unit test passes;
+    (6) harness-maker prune-backups subcommand works (dry-run + --apply);
+    (7) ruff check + ruff format --check + mypy --strict src/ all green;
+    (8) commands/make.md UX contract test passes with new required
+    strings 'docs/reference/preservation-matrix.md' and
+    'harness-maker prune-backups'.
+  loop_intensity: thorough
+  exit_criteria_checklist:
+    - {label: "all tests pass", cmd: "uv run pytest -q --tb=short", required: true}
+    - {label: "lint clean", cmd: "uv run ruff check src/ tests/", required: true}
+    - {label: "format clean", cmd: "uv run ruff format --check src/ tests/", required: true}
+    - {label: "type check clean", cmd: "uv run mypy --strict src/", required: true}
+    - {label: "review grade = A", cmd: "", required: true}
+    - {label: "all acceptance criteria verified", cmd: "", required: true}
+    - {label: "preservation matrix doc exists", cmd: "test -f docs/reference/preservation-matrix.md", required: true}
+    - {label: "preservation-matrix test module green (excluding xfail)", cmd: "uv run pytest tests/unit/test_preservation_matrix.py -v", required: true}
+    - {label: "INTEGRATION e2e green", cmd: "INTEGRATION=1 uv run pytest tests/e2e/test_preservation_e2e.py -v", required: false}
+    - {label: "UX contract new strings present", cmd: "grep -q 'docs/reference/preservation-matrix.md' commands/make.md && grep -q 'harness-maker prune-backups' commands/make.md", required: true}
+  notes:
+    - "User invoked /hm:loop directly after rejecting an AskUserQuestion about scope — derive everything from PLAN, no further interview questions during loop body."
+    - "Phase 7 manual IDE acceptance checklist is out-of-loop — surface at loop close as Success Criterion #9 deferred."
+    - "108 .backup-*/ dirs in this dogfood repo at loop start; Phase 5 prune --apply will clean them up."
+runtime:
+  convergence_streak: 0
+  checklist_fail_counts: {}
+  criterion_ambiguity_counts: {}
+  last_test_result:
+    exit_code: null
+    failing: []

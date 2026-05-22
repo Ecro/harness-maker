@@ -9,3 +9,11 @@ model_reasoning_effort = "{{ codex_reasoning_effort }}"
 developer_instructions = """
 {% include "agents/" + name + "_body.md.j2" -%}
 """
+
+# @hm:user:start:user_extensions
+# Add custom agent fields here (e.g., extra context_files, custom timeouts).
+# Content between these markers is preserved across `harness-maker make` re-renders
+# (PLAN-onboarding-backup-friction Phase 2, ADR-004/007).
+# Note: markers are recognized only at TOML statement level; do NOT place them
+# inside the `developer_instructions` multi-line string above (ADR-007).
+# @hm:user:end:user_extensions

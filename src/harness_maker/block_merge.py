@@ -142,11 +142,17 @@ def detect_marker_style(path: Path) -> MarkerStyle:
     Why per-extension: the downstream parser (Cursor / Aider / Continue) only
     accepts its own native comment syntax. Pure JSON has no comment syntax at
     all, so we use a top-level key merge instead.
+
+    Phase 2 (PLAN-onboarding-backup-friction, ADR-007): ``.toml`` and ``.sh``
+    join ``.yml``/``.yaml`` in returning ``HASH_COMMENT``. All four formats
+    use ``# @hm:user:start:NAME`` / ``# @hm:user:end:NAME`` at file/statement
+    level. Multi-line string descent (TOML triple-quoted bodies) is explicitly
+    NOT supported; markers must appear at file scope.
     """
     suffix = path.suffix.lower()
     if suffix == ".json":
         return MarkerStyle.JSON_KEY
-    if suffix in {".yml", ".yaml"}:
+    if suffix in {".yml", ".yaml", ".toml", ".sh"}:
         return MarkerStyle.HASH_COMMENT
     return MarkerStyle.HTML_COMMENT
 

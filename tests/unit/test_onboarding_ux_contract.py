@@ -43,6 +43,10 @@ def test_make_command_explains_receipt_safety_boundaries() -> None:
         "trade-off",
         "without predicting exact review time",
         "/hm:configure",
+        # Phase 6 (PLAN-onboarding-backup-friction): preservation matrix +
+        # prune-backups CLI mentioned in the safety receipt prose.
+        "docs/reference/preservation-matrix.md",
+        "harness-maker prune-backups",
     ]
     for needle in required:
         assert needle in text

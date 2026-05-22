@@ -31,7 +31,7 @@ import re
 import tomllib
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import yaml
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
@@ -517,6 +517,187 @@ def _render_json_file(
     )
 
 
+# ──────────────────────────────────────────────────────────────────────────────
+# hooks.json in-place 3-way merge (Phase 1+3, ADR-003/006)
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def _entry_identity(
+    entry: Any,  # noqa: ANN401 — JSON entries are heterogeneous
+    *,
+    schema: Literal["nested", "flat"],
+) -> tuple[str, str, str] | None:
+    """Compute a hooks.json entry's identity tuple for dedup; None on malformed.
+
+    Returns:
+      - nested (Claude/Codex): ``(matcher_or_empty, hooks[0]['command'], hooks[0]['type'])``
+      - flat (Cursor): ``(matcher_or_empty, command_string, "")`` — third slot
+        always empty so both schemas share a single tuple type for set ops.
+
+    "Malformed" includes: not a dict, non-string fields, missing required field
+    (`hooks` for nested with non-empty list of dicts; `command` for flat).
+    Malformed entries are dropped from both shipped and user sets — backup is
+    the recovery path per ADR-001.
+    """
+    if not isinstance(entry, dict):
+        return None
+    matcher_val = entry.get("matcher", "")
+    if not isinstance(matcher_val, str):
+        return None
+    if schema == "nested":
+        hooks_list = entry.get("hooks")
+        if not isinstance(hooks_list, list) or not hooks_list:
+            return None
+        first = hooks_list[0]
+        if not isinstance(first, dict):
+            return None
+        cmd_val = first.get("command")
+        if not isinstance(cmd_val, str):
+            return None
+        type_val = first.get("type", "command")
+        if not isinstance(type_val, str):
+            return None
+        return (matcher_val, cmd_val, type_val)
+    # flat (Cursor)
+    flat_cmd = entry.get("command")
+    if not isinstance(flat_cmd, str):
+        return None
+    return (matcher_val, flat_cmd, "")
+
+
+def _merge_hooks_json(
+    existing: dict[str, Any],
+    new_data: dict[str, Any],
+    *,
+    schema: Literal["nested", "flat"],
+) -> dict[str, Any]:
+    """Schema-aware in-place 3-way merge of hooks.json (ADR-003/006).
+
+    Per-event union: template entries (in template order) + user entries whose
+    identity tuple is NOT in the template set (preserving original disk order
+    within the user-entries group).
+
+    Events present in existing but not in new_data (user-added events for
+    custom hook surfaces) are preserved verbatim.
+
+    Top-level non-``hooks`` keys (e.g., Cursor's ``"version": 1``, our
+    ``"preset"`` stamp) follow template-wins-on-conflict, existing-survives-
+    when-absent — same shape as ``_shallow_merge_existing_json``.
+    """
+    existing_hooks = existing.get("hooks", {})
+    new_hooks = new_data.get("hooks", {})
+
+    if not isinstance(existing_hooks, dict) or not isinstance(new_hooks, dict):
+        # Malformed shape on either side — fall back to template overwrite.
+        return new_data
+
+    merged_hooks: dict[str, list[Any]] = {}
+    all_events = set(existing_hooks.keys()) | set(new_hooks.keys())
+
+    for event in all_events:
+        existing_entries = existing_hooks.get(event, [])
+        new_entries = new_hooks.get(event, [])
+
+        if not isinstance(existing_entries, list):
+            existing_entries = []
+        if not isinstance(new_entries, list):
+            new_entries = []
+
+        shipped_identities: set[tuple[str, str, str]] = set()
+        for e in new_entries:
+            ident = _entry_identity(e, schema=schema)
+            if ident is not None:
+                shipped_identities.add(ident)
+
+        user_entries: list[Any] = []
+        for e in existing_entries:
+            ident = _entry_identity(e, schema=schema)
+            if ident is not None and ident not in shipped_identities:
+                user_entries.append(e)
+
+        merged_hooks[event] = list(new_entries) + user_entries
+
+    # Top-level: template wins on overlap; existing survives where template
+    # is silent. ``hooks`` is overwritten with the merged dict explicitly.
+    result: dict[str, Any] = {**existing, **new_data}
+    result["hooks"] = merged_hooks
+    return result
+
+
+def _render_hooks_json_merged(
+    fe: FileEntry,
+    env: Environment,
+    target_dir: Path,
+    *,
+    dry_run: bool,
+    freeze_time: datetime | None,  # noqa: ARG001 — dispatch signature parity
+) -> Path:
+    """Render hooks.json with in-place 3-way merge (ADR-003/006).
+
+    Schema dispatch by path:
+      - ``.cursor/hooks.json`` → flat (lowercase camelCase, command at entry level)
+      - everything else (``hooks/hooks.json``, ``.codex/hooks.json``) → nested
+
+    Malformed existing JSON → fall back to template overwrite with warning on
+    stderr. Backup (``.backup-<ts>/``) is the recovery path per ADR-001.
+
+    ``fe.body_sha256`` is set to the MERGED file's hash (not template-only) so
+    ``sweep_orphans()`` classifies the merged file as "ours-clean" via the
+    manifest match path (resolves validator pass-2 W8).
+    """
+    template = env.get_template(fe.template)
+    rendered = template.render(**fe.context)
+    try:
+        new_data: dict[str, Any] = json.loads(rendered)
+    except json.JSONDecodeError as e:
+        msg = f"Template {fe.template} rendered invalid JSON for {fe.path}: {e}"
+        raise ValueError(msg) from e
+    if not isinstance(new_data, dict):
+        msg = f"Template {fe.template} must render a JSON object (got {type(new_data).__name__})"
+        raise ValueError(msg)
+
+    out = resolve_output_path(target_dir, fe.path)
+    schema: Literal["nested", "flat"] = "flat" if str(fe.path) == ".cursor/hooks.json" else "nested"
+
+    merged_data: dict[str, Any] = new_data
+    if out.exists():
+        try:
+            existing_text = out.read_text(encoding="utf-8")
+            existing_data = json.loads(existing_text)
+        except (OSError, json.JSONDecodeError) as exc:
+            # REVIEW fix (3/3 weak-consensus P1): use typer.echo(err=True) so
+            # the warning is consistent with cli.py's stderr-aggregation and
+            # surfaces in /hm:make slash-command conversation context (bare
+            # print to sys.stderr is silently dropped by some slash-command
+            # runners).
+            import typer
+
+            typer.echo(
+                f"WARN: could not parse existing {fe.path} ({exc}); "
+                f"falling back to template overwrite. Backup is the recovery path.",
+                err=True,
+            )
+        else:
+            if isinstance(existing_data, dict):
+                merged_data = _merge_hooks_json(existing_data, new_data, schema=schema)
+            else:
+                import typer
+
+                typer.echo(
+                    f"WARN: existing {fe.path} is not a JSON object "
+                    f"(got {type(existing_data).__name__}); falling back to "
+                    f"template overwrite. Backup is the recovery path.",
+                    err=True,
+                )
+
+    body_bytes = _format_settings_json(merged_data)
+    body_hash = hashlib.sha256(body_bytes).hexdigest()
+    fe.body_sha256 = body_hash
+    if not dry_run:
+        atomic_write(out, body_bytes)
+    return out
+
+
 _VARIANT_KEY_RE = re.compile(r"^communication_variant:\s*([A-Za-z_-]+)\s*$", re.MULTILINE)
 
 
@@ -824,6 +1005,7 @@ def render(
     dry_run: bool = False,
     freeze_time: datetime | None = None,
     merge_paths: set[Path] | None = None,
+    merge_json_paths: set[Path] | None = None,
     merge_reports: dict[Path, MergeReport] | None = None,
 ) -> list[Path]:
     """Render blueprint to target_dir.
@@ -831,6 +1013,12 @@ def render(
     ``merge_paths`` — when non-empty, files at those (relative) paths receive
     block-marker-aware merge: NEW template structure with OLD ``user:<id>``
     block contents preserved. Spec: docs/reference/block-merge-spec.md.
+
+    ``merge_json_paths`` — when non-empty, hooks.json files at those (relative)
+    paths receive schema-aware in-place 3-way merge per ADR-003/006: shipped
+    entries from the freshly rendered template + user entries from disk whose
+    identity tuple is not in the template set. ``.cursor/mcp.json`` is NOT a
+    hook file and is excluded from this dispatch (retains pure-render path).
 
     ``merge_reports`` — optional out-dict. When provided, each successfully
     merged path is recorded with its ``MergeReport`` so the CLI can display
@@ -845,8 +1033,32 @@ def render(
     env = _make_env()
     written: list[Path] = []
     paths_to_merge = merge_paths or set()
+    json_merge_paths = merge_json_paths or set()
     for fe in blueprint.files:
-        if _is_hooks_json(fe) or _is_cursor_mcp_json(fe) or _is_codex_hooks_json(fe):
+        if _is_hooks_json(fe) or _is_codex_hooks_json(fe):
+            # Hook files (Claude/Cursor/Codex): in-place merge when existing
+            # file is on disk (reconcile decided MERGE_JSON); template-render
+            # otherwise. .cursor/mcp.json is NOT a hook file (Phase 1+3 W2 fix).
+            if fe.path in json_merge_paths:
+                out = _render_hooks_json_merged(
+                    fe,
+                    env,
+                    target_dir,
+                    dry_run=dry_run,
+                    freeze_time=freeze_time,
+                )
+            else:
+                out = _render_pure_json(
+                    fe,
+                    env,
+                    target_dir,
+                    dry_run=dry_run,
+                    freeze_time=freeze_time,
+                )
+        elif _is_cursor_mcp_json(fe):
+            # .cursor/mcp.json is MCP server config, NOT a hook file. Retains
+            # the existing pure-render path unchanged by Phase 1+3. Out of scope
+            # for PLAN-onboarding-backup-friction.
             out = _render_pure_json(
                 fe,
                 env,

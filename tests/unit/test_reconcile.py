@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from harness_maker.models import Blueprint, FileEntry, ReconcileDecision
@@ -307,10 +308,11 @@ def test_reconcile_legacy_ours_with_markers_returns_merge_block(tmp_path: Path) 
     assert conflicts[0].reason == "memory-block-merge"
 
 
-def test_reconcile_cursor_hooks_json_always_replaces(tmp_path: Path) -> None:
+def test_reconcile_cursor_hooks_json_merges_in_place(tmp_path: Path) -> None:
     """`.cursor/hooks.json` is pure JSON (no frontmatter possible — Cursor's
-    parser is strict). Always REPLACE so template updates land, mirroring
-    `.claude/hooks/hooks.json` policy. User edits are overwritten by design.
+    parser is strict). Phase 1+3 (PLAN-onboarding-backup-friction, ADR-003/006):
+    in-place 3-way merge so user-added entries survive template updates.
+    Render dispatches the flat (Cursor) schema per ADR-006.
     """
     from harness_maker.models import Blueprint, FileEntry
 
@@ -334,8 +336,51 @@ def test_reconcile_cursor_hooks_json_always_replaces(tmp_path: Path) -> None:
     )
     conflicts = reconcile(target, bp)
     assert len(conflicts) == 1
-    assert conflicts[0].decision == ReconcileDecision.REPLACE
-    assert conflicts[0].reason == "pure-json-no-frontmatter"
+    assert conflicts[0].decision == ReconcileDecision.MERGE_JSON
+    assert conflicts[0].reason == "hooks-in-place-merge"
+
+
+def test_reconcile_codex_hooks_json_merges_in_place(tmp_path: Path) -> None:
+    """`.codex/hooks.json` joins the literal-match list (Phase 1 fix). Latent
+    KEEP-fallback bug from pre-PLAN era is eliminated — Codex template updates
+    propagate via MERGE_JSON, user entries preserved per ADR-006 nested schema.
+    """
+    from harness_maker.models import Blueprint, FileEntry
+
+    target = tmp_path / ".claude"
+    target.mkdir()
+    codex_dir = tmp_path / ".codex"
+    codex_dir.mkdir()
+    (codex_dir / "hooks.json").write_text(
+        json.dumps(
+            {
+                "hooks": {
+                    "PostToolUse": [
+                        {
+                            "matcher": "*",
+                            "hooks": [{"type": "command", "command": "user-cmd"}],
+                        },
+                    ],
+                },
+            },
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    bp = Blueprint(
+        files=[
+            FileEntry(
+                path=Path(".codex/hooks.json"),
+                template="codex/hooks.json.j2",
+                context={},
+                frontmatter={},
+            ),
+        ],
+    )
+    conflicts = reconcile(target, bp)
+    assert len(conflicts) == 1
+    assert conflicts[0].decision == ReconcileDecision.MERGE_JSON
+    assert conflicts[0].reason == "hooks-in-place-merge"
 
 
 def test_reconcile_user_frontmatter_no_hash_returns_keep(tmp_path: Path) -> None:
@@ -440,8 +485,12 @@ def test_reconcile_codex_toml_always_replaces(tmp_path: Path) -> None:
     )
     conflicts = reconcile(target, bp)
     assert len(conflicts) == 1
+    # Phase 2 (PLAN-onboarding-backup-friction): marker-aware dispatch
+    # returns REPLACE when no HASH_COMMENT markers are present on either side
+    # (existing file lacks markers in this fixture). New reason string reflects
+    # the dispatch path; behavior unchanged for users without marker blocks.
     assert conflicts[0].decision == ReconcileDecision.REPLACE
-    assert conflicts[0].reason == "pure-toml-no-frontmatter"
+    assert conflicts[0].reason == "pure-hashcomment-no-markers"
 
 
 def test_backup_after_full_render_preserves_cursor_user_modifications(tmp_path: Path) -> None:

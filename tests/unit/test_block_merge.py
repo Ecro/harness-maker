@@ -585,12 +585,16 @@ def test_merge_inverted_seeds_new_harness_block_when_absent_in_old() -> None:
 
 
 def test_detect_marker_style_per_extension(tmp_path: Path) -> None:
-    """File-extension dispatch: JSON → JSON_KEY, YAML → HASH_COMMENT,
-    everything else → HTML_COMMENT.
+    """File-extension dispatch: JSON → JSON_KEY, hash-comment formats
+    (YAML, TOML, sh) → HASH_COMMENT, everything else → HTML_COMMENT.
     """
     assert detect_marker_style(tmp_path / "foo.json") is MarkerStyle.JSON_KEY
     assert detect_marker_style(tmp_path / "foo.yml") is MarkerStyle.HASH_COMMENT
     assert detect_marker_style(tmp_path / "foo.yaml") is MarkerStyle.HASH_COMMENT
+    # Phase 2 (PLAN-onboarding-backup-friction, ADR-007): TOML + sh join.
+    assert detect_marker_style(tmp_path / "foo.toml") is MarkerStyle.HASH_COMMENT
+    assert detect_marker_style(tmp_path / "foo.sh") is MarkerStyle.HASH_COMMENT
+    # Markdown regression — must not flip to HASH_COMMENT (validator W4).
     assert detect_marker_style(tmp_path / "foo.md") is MarkerStyle.HTML_COMMENT
     assert detect_marker_style(tmp_path / "foo.mdc") is MarkerStyle.HTML_COMMENT
     # Unknown / no extension → HTML_COMMENT (default).

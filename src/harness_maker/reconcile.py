@@ -39,7 +39,7 @@ from typing import Any
 
 import yaml
 
-from harness_maker.block_merge import ParseError, has_markers, parse_segments
+from harness_maker.block_merge import MarkerStyle, ParseError, has_markers, parse_segments
 from harness_maker.io_utils import atomic_append
 from harness_maker.models import Blueprint, ConflictItem, ReconcileDecision
 from harness_maker.render import RENDER_MANIFEST_NAME, resolve_output_path
@@ -128,41 +128,46 @@ def reconcile(existing_dir: Path, blueprint: Blueprint) -> list[ConflictItem]:
                 ),
             )
             continue
-        # hooks.json is pure JSON (no frontmatter). Always REPLACE so template
-        # updates (e.g., new hook commands) propagate on re-render. Same rule
-        # for the Cursor hooks file at .cursor/hooks.json — Cursor reads only
-        # this path (PLAN-cursor-rootcause.md R1.A) and its parser is strict
-        # about JSON-only.
-        if fe.path == Path("hooks/hooks.json") or fe.path == Path(".cursor/hooks.json"):
+        # hooks.json is pure JSON (no frontmatter). Phase 1+3 (PLAN-onboarding-
+        # backup-friction, ADR-003/006): all three schemas use in-place 3-way
+        # merge so user-added entries survive template updates. Schema dispatch
+        # happens in render: Claude Code (hooks/hooks.json) and Codex
+        # (.codex/hooks.json) use the nested {matcher?, hooks:[{type, command}]}
+        # shape; Cursor (.cursor/hooks.json) uses the flat {matcher?, command}
+        # shape. `reason="hooks-in-place-merge"` is the dispatch flag the render
+        # path reads to invoke _merge_hooks_json instead of overwriting.
+        if (
+            fe.path == Path("hooks/hooks.json")
+            or fe.path == Path(".cursor/hooks.json")
+            or fe.path == Path(".codex/hooks.json")
+        ):
             conflicts.append(
                 ConflictItem(
                     path=fe.path,
-                    decision=ReconcileDecision.REPLACE,
-                    reason="pure-json-no-frontmatter",
+                    decision=ReconcileDecision.MERGE_JSON,
+                    reason="hooks-in-place-merge",
                 ),
             )
             continue
         # Codex TOML files carry no YAML frontmatter (tomllib would reject it).
-        # Always REPLACE so template updates (new MCP fields, model defaults) land.
+        # Phase 2 (PLAN-onboarding-backup-friction, ADR-004/007): when both
+        # the shipped template and the existing file carry `# @hm:user:*`
+        # markers at TOML statement level, return MERGE_BLOCK so user blocks
+        # survive re-render. Else REPLACE so template updates land.
         if str(fe.path).endswith(".toml"):
+            decision, reason = _decide_hash_comment_branch(fe.template, existing_path)
             conflicts.append(
-                ConflictItem(
-                    path=fe.path,
-                    decision=ReconcileDecision.REPLACE,
-                    reason="pure-toml-no-frontmatter",
-                ),
+                ConflictItem(path=fe.path, decision=decision, reason=reason),
             )
             continue
         # Generated wrappers under `.claude/lib/*.sh` carry no provenance
-        # frontmatter (interpreters reject YAML preambles). Always REPLACE so
-        # template updates land.
+        # frontmatter (interpreters reject YAML preambles). Phase 2 same rule
+        # as TOML: marker-aware MERGE_BLOCK when both sides have markers,
+        # REPLACE otherwise.
         if str(fe.path).endswith(".sh"):
+            decision, reason = _decide_hash_comment_branch(fe.template, existing_path)
             conflicts.append(
-                ConflictItem(
-                    path=fe.path,
-                    decision=ReconcileDecision.REPLACE,
-                    reason="pure-text-no-frontmatter",
-                ),
+                ConflictItem(path=fe.path, decision=decision, reason=reason),
             )
             continue
         fm, body = parse_frontmatter(existing_path)
@@ -229,6 +234,41 @@ def reconcile(existing_dir: Path, blueprint: Blueprint) -> list[ConflictItem]:
                 ConflictItem(path=fe.path, decision=decision, reason=reason),
             )
     return conflicts
+
+
+def _decide_hash_comment_branch(
+    template_name: str,
+    existing_path: Path,
+) -> tuple[ReconcileDecision, str]:
+    """Phase 2 marker-aware dispatch for hash-comment file types (.toml, .sh).
+
+    Returns MERGE_BLOCK when both shipped template and existing file carry
+    `# @hm:user:*` HASH_COMMENT markers; KEEP on malformed marker syntax in
+    the existing file (preserve user data); REPLACE otherwise (so template
+    updates land for marker-less files).
+    """
+    template_path = _TEMPLATE_DIR / template_name
+    try:
+        template_src = template_path.read_text(encoding="utf-8")
+    except OSError:
+        # Template unreadable → conservative REPLACE preserves prior behaviour.
+        return ReconcileDecision.REPLACE, "hashcomment-template-unreadable"
+    try:
+        existing_src = existing_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return ReconcileDecision.REPLACE, "hashcomment-existing-unreadable"
+    if has_markers(template_src, MarkerStyle.HASH_COMMENT) and has_markers(
+        existing_src,
+        MarkerStyle.HASH_COMMENT,
+    ):
+        # Validate existing marker syntax before promising a merge — a typo'd
+        # close-marker should KEEP the user's file rather than silently REPLACE.
+        try:
+            parse_segments(existing_src, MarkerStyle.HASH_COMMENT)
+        except ParseError:
+            return ReconcileDecision.KEEP, "hashcomment-malformed-markers"
+        return ReconcileDecision.MERGE_BLOCK, "hashcomment-marker-merge"
+    return ReconcileDecision.REPLACE, "pure-hashcomment-no-markers"
 
 
 def _decide_user_modified(template_name: str, old_body: bytes) -> tuple[ReconcileDecision, str]:

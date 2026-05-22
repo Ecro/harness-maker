@@ -116,6 +116,7 @@ class ReconcileDecision(str, Enum):  # noqa: UP042
     REPLACE = "replace"
     BOTH = "both"
     MERGE_BLOCK = "merge_block"  # block-marker-aware 3-way merge (user blocks preserved)
+    MERGE_JSON = "merge_json"  # schema-aware JSON 3-way merge (hooks.json; ADR-003/006)
 
 
 class Confidence(str, Enum):  # noqa: UP042

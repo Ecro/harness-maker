@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -1216,3 +1217,319 @@ def test_render_agents_md_block_merge_fallback_on_missing_file(tmp_path: Path) -
     )
     assert out.read_text(encoding="utf-8").startswith("<!-- harness-maker:")
     assert Path("AGENTS.md") not in merge_reports  # no merge; no existing file
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 1+3 (PLAN-onboarding-backup-friction, ADR-003/006):
+# _merge_hooks_json schema-aware in-place 3-way merge tests.
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def test_merge_hooks_json_claude_nested_preserves_user_entries() -> None:
+    """Claude PascalCase nested schema: user entries with distinct (matcher,
+    command, type) identity survive template re-render; shipped entries get
+    template-replaced; matcher-less events (Stop, SessionStart) work."""
+    from harness_maker.render import _merge_hooks_json
+
+    existing = {
+        "hooks": {
+            "PostToolUse": [
+                {
+                    "matcher": "*",
+                    "hooks": [{"type": "command", "command": "shipped-telemetry"}],
+                },
+                {
+                    "matcher": "Write|Edit",
+                    "hooks": [{"type": "command", "command": "user-custom-write-hook"}],
+                },
+            ],
+            "Stop": [
+                {"hooks": [{"type": "command", "command": "shipped-stop"}]},
+                {"hooks": [{"type": "command", "command": "user-custom-stop"}]},
+            ],
+        },
+        "preset": "Side",  # user wrote this; template has Production
+    }
+    new_data = {
+        "hooks": {
+            "PostToolUse": [
+                {
+                    "matcher": "*",
+                    "hooks": [{"type": "command", "command": "shipped-telemetry"}],
+                },
+            ],
+            "Stop": [
+                {"hooks": [{"type": "command", "command": "shipped-stop"}]},
+            ],
+        },
+        "preset": "Production",
+    }
+    merged = _merge_hooks_json(existing, new_data, schema="nested")
+    # PostToolUse: shipped (telemetry) + user (Write|Edit custom)
+    post_tool = merged["hooks"]["PostToolUse"]
+    assert len(post_tool) == 2
+    assert post_tool[0]["hooks"][0]["command"] == "shipped-telemetry"
+    assert post_tool[1]["hooks"][0]["command"] == "user-custom-write-hook"
+    # Stop: shipped + user (matcher-less event preserved correctly)
+    stop = merged["hooks"]["Stop"]
+    assert len(stop) == 2
+    assert stop[0]["hooks"][0]["command"] == "shipped-stop"
+    assert stop[1]["hooks"][0]["command"] == "user-custom-stop"
+    # Top-level: template wins on conflict
+    assert merged["preset"] == "Production"
+
+
+def test_merge_hooks_json_cursor_flat_preserves_user_entries() -> None:
+    """Cursor flat lowercase camelCase: command at entry level; matcher-less
+    events (stop, preCompact) work."""
+    from harness_maker.render import _merge_hooks_json
+
+    existing = {
+        "version": 1,
+        "hooks": {
+            "preToolUse": [
+                {"matcher": "Bash", "command": "shipped-perm-gate"},
+                {"matcher": "Custom", "command": "user-custom-pretool"},
+            ],
+            "stop": [
+                {"command": "shipped-stop-telemetry"},
+                {"command": "user-custom-stop-hook"},
+            ],
+        },
+    }
+    new_data = {
+        "version": 1,
+        "hooks": {
+            "preToolUse": [
+                {"matcher": "Bash", "command": "shipped-perm-gate"},
+            ],
+            "stop": [
+                {"command": "shipped-stop-telemetry"},
+            ],
+        },
+    }
+    merged = _merge_hooks_json(existing, new_data, schema="flat")
+    pretool = merged["hooks"]["preToolUse"]
+    assert len(pretool) == 2
+    assert pretool[0]["command"] == "shipped-perm-gate"
+    assert pretool[1]["command"] == "user-custom-pretool"
+    stop = merged["hooks"]["stop"]
+    assert len(stop) == 2
+    assert stop[0]["command"] == "shipped-stop-telemetry"
+    assert stop[1]["command"] == "user-custom-stop-hook"
+    assert merged["version"] == 1
+
+
+def test_merge_hooks_json_codex_permission_request_event() -> None:
+    """Codex's PermissionRequest event (matcher-less, nested) preserves user
+    custom entries with different commands."""
+    from harness_maker.render import _merge_hooks_json
+
+    existing = {
+        "hooks": {
+            "PermissionRequest": [
+                {"hooks": [{"type": "command", "command": "shipped-permission-gate"}]},
+                {"hooks": [{"type": "command", "command": "user-extra-permission-check"}]},
+            ],
+        },
+    }
+    new_data = {
+        "hooks": {
+            "PermissionRequest": [
+                {"hooks": [{"type": "command", "command": "shipped-permission-gate"}]},
+            ],
+        },
+    }
+    merged = _merge_hooks_json(existing, new_data, schema="nested")
+    pr = merged["hooks"]["PermissionRequest"]
+    assert len(pr) == 2
+    assert pr[0]["hooks"][0]["command"] == "shipped-permission-gate"
+    assert pr[1]["hooks"][0]["command"] == "user-extra-permission-check"
+
+
+def test_merge_hooks_json_user_event_unknown_to_template_preserved() -> None:
+    """User added a hook for an event our template doesn't ship — preserve verbatim."""
+    from harness_maker.render import _merge_hooks_json
+
+    existing = {
+        "hooks": {
+            "PostToolUse": [
+                {"matcher": "*", "hooks": [{"type": "command", "command": "shipped"}]},
+            ],
+            "UserSpecialEvent": [
+                {"matcher": "X", "hooks": [{"type": "command", "command": "user-only"}]},
+            ],
+        },
+    }
+    new_data = {
+        "hooks": {
+            "PostToolUse": [
+                {"matcher": "*", "hooks": [{"type": "command", "command": "shipped"}]},
+            ],
+        },
+    }
+    merged = _merge_hooks_json(existing, new_data, schema="nested")
+    assert "UserSpecialEvent" in merged["hooks"]
+    assert merged["hooks"]["UserSpecialEvent"][0]["hooks"][0]["command"] == "user-only"
+
+
+def test_merge_hooks_json_malformed_existing_falls_back_to_template() -> None:
+    """Existing has non-dict 'hooks' field → fall back to template overwrite."""
+    from harness_maker.render import _merge_hooks_json
+
+    existing = {"hooks": "this is not a dict"}
+    new_data = {"hooks": {"PostToolUse": [{"matcher": "*", "hooks": []}]}}
+    merged = _merge_hooks_json(existing, new_data, schema="nested")
+    # Fell back to template (new_data) unchanged
+    assert merged == new_data
+
+
+def test_merge_hooks_json_collapses_duplicate_user_and_shipped() -> None:
+    """User entry with identical (matcher, command, type) to shipped → dedup
+    to template-only (no double entries). Documented semantic dedup."""
+    from harness_maker.render import _merge_hooks_json
+
+    existing = {
+        "hooks": {
+            "PostToolUse": [
+                {"matcher": "*", "hooks": [{"type": "command", "command": "X"}]},
+                {"matcher": "*", "hooks": [{"type": "command", "command": "X"}]},
+            ],
+        },
+    }
+    new_data = {
+        "hooks": {
+            "PostToolUse": [
+                {"matcher": "*", "hooks": [{"type": "command", "command": "X"}]},
+            ],
+        },
+    }
+    merged = _merge_hooks_json(existing, new_data, schema="nested")
+    # Both existing entries match template identity → no user-only addition;
+    # result has exactly one entry from template.
+    assert len(merged["hooks"]["PostToolUse"]) == 1
+
+
+def test_merge_hooks_json_malformed_entries_dropped() -> None:
+    """Entry with non-string command, missing matcher, or non-list hooks →
+    dropped from identity computation; doesn't crash merge."""
+    from harness_maker.render import _merge_hooks_json
+
+    existing = {
+        "hooks": {
+            "PostToolUse": [
+                {"matcher": "*", "hooks": [{"type": "command", "command": "good"}]},
+                {"matcher": 123, "hooks": [{"command": "bad-matcher-type"}]},  # noqa: E501 - matcher must be str
+                "not even a dict",  # malformed entry
+                {"hooks": "not a list"},  # malformed
+            ],
+        },
+    }
+    new_data = {
+        "hooks": {
+            "PostToolUse": [
+                {"matcher": "*", "hooks": [{"type": "command", "command": "good"}]},
+            ],
+        },
+    }
+    merged = _merge_hooks_json(existing, new_data, schema="nested")
+    # Only the well-formed shipped entry; malformed entries dropped silently
+    # (backup is the recovery path per ADR-001).
+    assert len(merged["hooks"]["PostToolUse"]) == 1
+    assert merged["hooks"]["PostToolUse"][0]["hooks"][0]["command"] == "good"
+
+
+def test_render_hooks_json_merged_manifest_records_merged_hash(tmp_path: Path) -> None:
+    """REVIEW fix (code-reviewer P1): Phase 1+3 exit criterion explicitly required
+    a manifest test. After in-place merge, `.hm-render-manifest.jsonl` MUST
+    record the SHA-256 of the MERGED bytes (not template-only). Otherwise
+    sweep_orphans._classify_orphan falls into the "theirs" branch on every
+    brownfield re-render and emits permanent KEEP+warn for hooks.json.
+
+    This test exercises the full render → manifest → sweep_orphans path,
+    not just `_merge_hooks_json` in isolation.
+    """
+    import hashlib
+    import json
+
+    from harness_maker.models import Blueprint, FileEntry
+    from harness_maker.reconcile import sweep_orphans
+    from harness_maker.render import RENDER_MANIFEST_NAME, render
+
+    # Existing brownfield hooks.json with a user-added entry the template doesn't ship
+    target_dir = tmp_path / ".claude"
+    target_dir.mkdir()
+    existing_path = target_dir / "hooks" / "hooks.json"
+    existing_path.parent.mkdir(parents=True)
+    existing_path.write_text(
+        json.dumps(
+            {
+                "hooks": {
+                    "PostToolUse": [
+                        {
+                            "matcher": "Bash",
+                            "hooks": [{"type": "command", "command": "user-custom"}],
+                        },
+                    ],
+                },
+            },
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    bp = Blueprint(
+        files=[
+            FileEntry(
+                path=Path("hooks/hooks.json"),
+                template="hooks/hooks.json.j2",
+                context={
+                    "harness_maker_src_path": "/dummy",
+                    "preset": "Side",
+                    "config": SimpleNamespace(dev_mode="task-driven"),
+                },
+                frontmatter={},
+            ),
+        ],
+    )
+
+    # MERGE_JSON path: render() must (a) merge in place + (b) record MERGED hash
+    render(
+        bp,
+        target_dir,
+        merge_json_paths={Path("hooks/hooks.json")},
+        freeze_time=DEFAULT_FREEZE_TIME,
+    )
+
+    # User-added entry survived
+    merged_text = existing_path.read_text(encoding="utf-8")
+    assert "user-custom" in merged_text, "User entry must survive the merge"
+
+    # Manifest hash matches the merged bytes (not template-only)
+    manifest_path = target_dir / RENDER_MANIFEST_NAME
+    assert manifest_path.is_file()
+    manifest_lines = [
+        json.loads(line) for line in manifest_path.read_text(encoding="utf-8").splitlines() if line
+    ]
+    # Manifest key for .claude/-bound files is prefixed with ".claude/" per
+    # _manifest_key_for (render.py:933-951). Cross-tree files (.cursor/, .codex/)
+    # keep their prefix; this is the .claude/-bound case.
+    hooks_entries = [e for e in manifest_lines if e["path"] == ".claude/hooks/hooks.json"]
+    assert hooks_entries, "Manifest must record an entry for hooks/hooks.json"
+    recorded_hash = hooks_entries[-1]["content_hash"]
+    merged_bytes = existing_path.read_bytes()
+    expected_hash = hashlib.sha256(merged_bytes).hexdigest()
+    assert recorded_hash == expected_hash, (
+        f"Manifest recorded {recorded_hash} but on-disk merged hash is {expected_hash}. "
+        f"sweep_orphans._classify_orphan would mis-route this file to 'theirs'."
+    )
+
+    # sweep_orphans does NOT classify the merged hooks.json as orphan/theirs
+    # (the manifest match path in reconcile.py:411-428 sees ours-clean)
+    sweep_report = sweep_orphans(tmp_path, bp)
+    # hooks/hooks.json is in the blueprint, so orphan-sweep skips it as expected.
+    # The key invariant: it must NOT appear in kept with classification "theirs".
+    theirs_paths = [str(p) for p, classifier in sweep_report.kept if classifier == "theirs"]
+    assert "hooks/hooks.json" not in theirs_paths, (
+        f"Merged hooks.json mis-classified as 'theirs' by sweep_orphans: {theirs_paths}"
+    )

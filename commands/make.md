@@ -197,9 +197,14 @@ Use `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code):
 > - Generated roots may include `.claude/`, `.cursor/`, `.codex/`,
 >   `.agents/skills/`, and `AGENTS.md`, depending on selected targets.
 > - Existing generated state is backed up under `.backup-<timestamp>` before
->   re-render when applicable.
+>   re-render when applicable. `.backup-*/` is auto-added to your `.gitignore`
+>   so the safety net doesn't surface as repo clutter. Clean up old snapshots
+>   with `harness-maker prune-backups [--keep-last N] [--keep-days D] [--apply]`
+>   (read-only by default; pass `--apply` to actually delete).
 > - User blocks marked `@hm:user:*` are preserved; reconcile may report `KEEP`,
->   `MERGE_BLOCK`, or `REPLACE`.
+>   `MERGE_BLOCK`, or `REPLACE`. See `docs/reference/preservation-matrix.md` for
+>   the per-file-type preservation contract (markdown / TOML / sh / hooks.json /
+>   settings.json / AGENTS.md / harness.yaml).
 >
 > Options:
 > - **Looks right** — install with these settings

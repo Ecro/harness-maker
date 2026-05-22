@@ -949,3 +949,139 @@ def test_configure_second_brain_add_folder_refreshes_content_hash(
         f"content_hash in frontmatter ({raw_fm['content_hash']!r}) must equal "
         f"sha256(body) ({expected_hash!r}); stale hash blocks reconciler re-render"
     )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 4 (PLAN-onboarding-backup-friction, ADR-005):
+# .backup-*/ auto-gitignore wiring.
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def test_backup_dir_auto_added_to_user_gitignore(tmp_path: Path) -> None:
+    """Brownfield /hm:make run appends `.backup-*/` to <project>/.gitignore.
+
+    Idempotent: a second run does not duplicate the entry. The Phase 4
+    contract (ADR-005) hides the safety-net snapshot directories from
+    `git status`. The helper used (worktree._ensure_gitignore_entry) is the
+    same proven pattern from worktree creation.
+    """
+    _write_harness_yaml(tmp_path)
+    # Add any non-yaml file under .claude/ so the brownfield branch fires
+    # (the gate is `target_dotclaude.exists() AND any(target_dotclaude.iterdir())`).
+    (tmp_path / ".claude" / "sentinel.txt").write_text("placeholder", encoding="utf-8")
+
+    with (
+        patch("harness_maker.cli.profile", return_value=MagicMock()),
+        patch("harness_maker.cli.synthesize", return_value=MagicMock(files=[])),
+        patch("harness_maker.cli.render"),
+        patch("harness_maker.cli.verify", return_value=[]),
+        patch("harness_maker.cli.backup"),
+        patch("harness_maker.cli.reconcile", return_value=[]),
+        patch(
+            "harness_maker.cli.sweep_orphans",
+            return_value=MagicMock(deleted=[], kept=[]),
+        ),
+        patch("harness_maker.cli._emit_post_make_readiness"),
+        patch("harness_maker.cli._emit_refdocs_index_build"),
+        patch("harness_maker.cli.answers_from_harness_yaml", return_value=_minimal_answers()),
+        patch("harness_maker.cli.interview", return_value=_minimal_answers()),
+    ):
+        result1 = runner.invoke(app, ["make", str(tmp_path), "--update"])
+        assert result1.exit_code == 0, result1.output
+
+    gitignore = tmp_path / ".gitignore"
+    assert gitignore.is_file(), "Expected .gitignore created after brownfield make"
+    body_after_first = gitignore.read_text(encoding="utf-8")
+    assert ".backup-*/" in body_after_first
+
+    # Second run — idempotency: entry not duplicated
+    with (
+        patch("harness_maker.cli.profile", return_value=MagicMock()),
+        patch("harness_maker.cli.synthesize", return_value=MagicMock(files=[])),
+        patch("harness_maker.cli.render"),
+        patch("harness_maker.cli.verify", return_value=[]),
+        patch("harness_maker.cli.backup"),
+        patch("harness_maker.cli.reconcile", return_value=[]),
+        patch(
+            "harness_maker.cli.sweep_orphans",
+            return_value=MagicMock(deleted=[], kept=[]),
+        ),
+        patch("harness_maker.cli._emit_post_make_readiness"),
+        patch("harness_maker.cli._emit_refdocs_index_build"),
+        patch("harness_maker.cli.answers_from_harness_yaml", return_value=_minimal_answers()),
+        patch("harness_maker.cli.interview", return_value=_minimal_answers()),
+    ):
+        result2 = runner.invoke(app, ["make", str(tmp_path), "--update"])
+        assert result2.exit_code == 0, result2.output
+
+    body_after_second = gitignore.read_text(encoding="utf-8")
+    # Substring count must be exactly 1 — idempotent line-append
+    assert body_after_second.count(".backup-*/") == 1
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 5 (PLAN-onboarding-backup-friction, ADR-005):
+# `harness-maker prune-backups` CLI subcommand.
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def test_prune_backups_dry_run_lists_candidates(tmp_path: Path) -> None:
+    """Read-only by default: lists prune candidates without deleting."""
+    import time
+
+    # Create 8 .backup-*/ dirs; 3 most-recent + 1 within keep-days window survive
+    now = time.time()
+    dirs = []
+    for i in range(8):
+        d = tmp_path / f".backup-{i:04d}"
+        d.mkdir()
+        (d / "marker.txt").write_text("x" * 100, encoding="utf-8")
+        # Backdate older ones by 30 days each
+        age_offset = i * 30 * 86400
+        old_time = now - age_offset
+        import os as _os
+
+        _os.utime(d, (old_time, old_time))
+        dirs.append(d)
+
+    result = runner.invoke(
+        app,
+        ["prune-backups", str(tmp_path), "--keep-last", "3", "--keep-days", "14"],
+    )
+    assert result.exit_code == 0, result.output
+    # Expected: 3 newest (rank 0,1,2) kept; rank 3+ also outside 14-day window → pruned
+    assert "scanned 8" in result.output
+    assert "keeping 3" in result.output
+    assert "prune candidates: 5" in result.output
+    # Read-only: nothing deleted on disk
+    for d in dirs:
+        assert d.exists()
+
+
+def test_prune_backups_apply_deletes(tmp_path: Path) -> None:
+    """--apply flag actually removes prune candidates."""
+    import time
+
+    now = time.time()
+    keep = tmp_path / ".backup-recent"
+    keep.mkdir()
+    prune = tmp_path / ".backup-very-old"
+    prune.mkdir()
+    import os as _os
+
+    _os.utime(prune, (now - 365 * 86400, now - 365 * 86400))
+
+    result = runner.invoke(
+        app,
+        ["prune-backups", str(tmp_path), "--keep-last", "1", "--keep-days", "14", "--apply"],
+    )
+    assert result.exit_code == 0, result.output
+    assert keep.exists()
+    assert not prune.exists()
+
+
+def test_prune_backups_empty_set_graceful(tmp_path: Path) -> None:
+    """No .backup-*/ dirs → graceful zero-output, no error."""
+    result = runner.invoke(app, ["prune-backups", str(tmp_path)])
+    assert result.exit_code == 0
+    assert "no .backup-*/" in result.output
