@@ -1,7 +1,7 @@
 {
   "name": "harness-maker",
-  "version": "0.20.2",
-  "description": "Project-tailored Claude Code harness generator. Interview-driven scaffolding with grade-gated review + auto-fix loop, multi-perspective reviewer consensus (code / security / performance / concurrency / UX), edit-preserving upgrades via block-merge markers, anti-rot crawlers (Anthropic blog / GitHub releases / arxiv / OSV CVEs), worktree isolation, permission separation, version-drift detection, and a 3-layer ai-readiness rubric (deterministic + LLM-judged + cache-diagnostic) with ranked improvement actions.",
+  "version": "0.21.0",
+  "description": "Per-project AI coding harness for Claude Code · Cursor · Codex. Profiler + 10-dim interview build a different harness for every project.",
   "author": {
     "name": "noel"
   },

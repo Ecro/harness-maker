@@ -14,6 +14,8 @@
 
 > **A different harness for every project — built from yours, never generic.**
 
+> Other harnesses give everyone the same starting point. harness-maker reads YOUR repo and builds YOUR harness.
+
 **Per-project personalization** · Grade-gated · Self-evolving · Multi-IDE
 
 [Why](#why-harness-maker) ·
@@ -74,7 +76,6 @@ Most AI coding setups start from a generic template and drift from day one — s
 | 🎯 | **Personalized** | Profiler reads 12+ stack/framework/CI signals. Interview locks 10+ dimensions. A `Side` experiment and a `Production` service get **structurally different** harnesses — different reviewer sets, different workflow stages, different security gates. No generic defaults silently shipped. |
 | 🛡️ | **Trusted** | Every `/hm:execute` runs in a fresh worktree with a TDD loop. `/hm:review` doesn't just report — it applies consensus-passed fixes and re-reviews until grade ≥ A. Mechanical checks (lint/tests) gate the LLM reviewer before any token is spent. |
 | 🌱 | **Self-evolving** | Hand-edit any agent, skill, CLAUDE.md — block-merge markers preserve your edits across `--update`. Memory accumulates project-specific patterns; recurring failures auto-propose new guardrails. |
-| 🌀 | **Anti-rot** | Weekly crawl across 4 sources (Anthropic, GitHub releases, arXiv, OSV CVEs). Adaptive relevance filter learns from your accept/reject history. Always manual-confirmed — no silent auto-apply path exists. |
 | 🎛️ | **Multi-IDE** | Claude Code + Cursor + Codex. One `harness.yaml`, three target-native renders. Existing Cursor rules / Aider config / Copilot instructions get absorbed on first run — no manual port. |
 
 ---
@@ -378,14 +379,6 @@ Grouped by what they do for your project, not by component.
 - **Optional Second Brain.** Obsidian vault integration. Allowlisted write folders by note type (decision · preference · failure · project · reference · journal). Cross-session memory survives plugin reinstalls and machine moves.
 - **Brownfield-safe upgrades.** `Reconciler` hashes existing `.claude/` and offers per-conflict keep/replace/both. Apply is ADD-only with timestamped backups. User edits never silently overwritten.
 
-### 🌀 Anti-rot — *survives the ecosystem*
-
-- **4-source weekly crawl.** Anthropic blog/changelog · `anthropics/claude-code` GitHub releases · arxiv cs.SE/CL/CR · OSV.dev CVEs. Manifested as `pending` items in `/hm:health`.
-- **Adaptive relevance filter.** Threshold starts at 0.7, adjusts ±0.05 based on your accept/reject history per source. Always manual-confirmed — no `--auto-apply` path exists.
-- **Unified health audit.** `/hm:health` composites three orthogonal layers — Structural (70% deterministic + 25% LLM rubric + 5% cache diagnostic), External Risks (anti-rot pending queue), Personalization (Bronze→Platinum tier). One 3-section dashboard at `.claude/observability/dashboard.md`. No auto-apply ever (ADR-001).
-- **SessionStart drift reminder.** Hook fires on every session open and warns if running plugin version differs from the version that rendered the harness — so you notice when `/plugin update` needs a re-render. Detector compares against latest cached plugin version (not just imported `__version__`).
-- **Cache-miss classification.** Prompt-cache diagnostic reports `min_threshold` · `invalidation` · `ttl` · `first` (cold start). 5% weight in AI-readiness distinguishes cold-start misses (benign) from structural misses (actionable).
-
 ### 🎛️ Multi-IDE — *one source, every IDE*
 
 - **Three targets from one harness.** Claude Code + Cursor (2.4+, 3.0+ recommended) + Codex CLI. Single `.claude/` source tree; Cursor reads it natively plus its own `.cursor/` for hooks and rules; Codex reads `.codex/`, `AGENTS.md`, and `.agents/skills/`. All rendered from one `harness.yaml`.
@@ -398,6 +391,15 @@ Grouped by what they do for your project, not by component.
 - **Autoloop with adaptive interview + 4-gate convergence.** `/hm:loop` runs time-and-iteration-bounded loops. `autoloop-driver` reads the goal, asks only what's missing, locks intensity + exit checklist, then requires mechanical checks + LLM judgment + regression comparison + 2-iter convergence streak before accepting completion.
 - **3-tier context loading + compaction recovery.** Hot tier (today's session) · Warm tier (failures + wiki first 60/40 lines) · Cold tier (git log / PLANs on demand). `PreCompact` hook flushes session before context compaction; next turn detects the marker and resumes from the last in-progress phase.
 - **Cross-process memory safety.** `.claude/memory/` writers serialise via re-entrant POSIX flock. Telemetry hooks append atomically via raw `os.write()` on `O_APPEND` (single-syscall, ≤PIPE_BUF) so concurrent Claude Code + Cursor sessions cannot interleave JSONL lines.
+
+### 🔧 Advanced features — *background mechanisms, tunable but not in the way*
+
+These run automatically and don't need attention day-to-day. Teams who care can tune them via `harness.yaml`; everyone else can ignore them.
+
+- **4-source weekly anti-rot crawl.** Anthropic blog/changelog · `anthropics/claude-code` GitHub releases · arxiv cs.SE/CL/CR · OSV.dev CVEs. Manifested as `pending` items in `/hm:health`. Adaptive relevance filter (threshold 0.7, ±0.05 by accept/reject history). Always manual-confirmed — no `--auto-apply` path exists.
+- **Unified health audit (3-layer).** `/hm:health` composites three orthogonal layers — Structural (70% deterministic + 25% LLM rubric + 5% cache diagnostic), External Risks (anti-rot pending queue), Personalization (Bronze→Platinum tier). One 3-section dashboard at `.claude/observability/dashboard.md`. No auto-apply ever (ADR-001).
+- **SessionStart drift reminder.** Hook fires on every session open and warns if running plugin version differs from the version that rendered the harness — so you notice when `/plugin update` needs a re-render.
+- **Cache-miss classification.** Prompt-cache diagnostic reports `min_threshold` · `invalidation` · `ttl` · `first` (cold start). 5% weight in AI-readiness distinguishes cold-start misses (benign) from structural misses (actionable).
 
 For the complete mechanics — all procedures, decision paths, internal invariants — see [**docs/HOW-IT-WORKS.md**](docs/HOW-IT-WORKS.md).
 
@@ -464,13 +466,12 @@ Fused workflows combine atomic stages into a single command. The interview gener
 
 ## How it compares
 
-Most AI-coding harnesses ship a fixed bundle — same agents, same prompts, same defaults for every project. harness-maker takes a different stance on five axes:
+Other harnesses give everyone the same starting point. harness-maker reads YOUR repo and builds YOUR harness. The differences fan out from there:
 
 | Axis | What harness-maker does |
 |---|---|
 | **Project-tailored synthesis** | Profiler reads 12+ stack/framework/CI signals before any prompt. A 10-dimension interview locks the rest. A `Side` experiment and a `Production` service get *structurally different* harnesses (reviewer counts, workflow stages, security gates) — not the same set of files with different flags. |
 | **Edit-preserving upgrades** | Hand-edit any agent, skill, or CLAUDE.md. Block-merge markers (`@hm:user:*`) carry your edits across `--update`. No "your customisations will be overwritten" warning at the top of every file. |
-| **Anti-rot crawl** | Weekly fetch across Anthropic blog · GitHub releases · arXiv · OSV CVEs. Adaptive relevance filter learns from your accept/reject history. Manual confirmation is mandatory — no silent auto-apply. |
 | **Multi-IDE single source** | One `harness.yaml` renders Claude Code, Cursor, and Codex CLI native assets. Foreign configs (`.cursor/rules/`, `AGENTS.md`, `.aider.conf.yml`, `.continue/`, `.github/copilot-instructions.md`) are absorbed on first run — no manual port. |
 | **Privilege-separated reviewers** | Reviewer agents (`code`, `security`, `performance`, `concurrency`, `UX`) have read-only permissions — no `Write`, no `Edit`, no shell interpreters. The stage orchestrator applies fixes, preserving the boundary. Mechanical checks (lint/tests) gate the LLM reviewer before any token is spent. |
 

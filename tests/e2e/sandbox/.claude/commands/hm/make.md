@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.20.1
+harness_maker_version: 0.21.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/make.md.j2
 provenance: official
-content_hash: 4ea7a5bfa70ffd8ca08dc8390f34b326bcd3ad66195b39da6c8fcd8d637aff74
+content_hash: 25fe6fcd44152f5e0b94e857e5c67a480ec58db19089eb6df66c472e5577c17c
 ---
 # /hm:make
 
@@ -40,7 +40,7 @@ bootstrap trap fixed in 0.19.1). The cache glob lets us reach the new
 binary; `locate` then disambiguates between scopes/projects.
 
 ```bash
-!HM=$(ls -1d "$HOME"/.claude/plugins/cache/harness-maker*/harness-maker/[0-9]*.[0-9]*.[0-9]* 2>/dev/null | awk -F/ '{print $NF, $0}' | sort -V | tail -1 | cut -d' ' -f2-); HM=$(uv run --with "${HM:-'/home/noel/harness-maker'}" python -m harness_maker.cli locate --plain 2>/dev/null || echo "${HM:-'/home/noel/harness-maker'}"); uv run --with "$HM" python -m harness_maker.cli make "$(pwd)" --update
+!HM=$(ls -1d "$HOME"/.claude/plugins/cache/harness-maker*/harness-maker/[0-9]*.[0-9]*.[0-9]* 2>/dev/null | awk -F/ '{print $NF, $0}' | sort -V | tail -1 | cut -d' ' -f2-); HM=$(uv run --with "${HM:-'/home/noel/harness-maker/.worktrees/execute-20260522T0302Z'}" python -m harness_maker.cli locate --plain 2>/dev/null || echo "${HM:-'/home/noel/harness-maker/.worktrees/execute-20260522T0302Z'}"); uv run --with "$HM" python -m harness_maker.cli make "$(pwd)" --update
 ```
 
 After the CLI completes, summarize:
