@@ -280,6 +280,30 @@ If the user opts for "dig deeper" — re-enter Phase 1 with narrowed scope (one 
 
 **Stage terminal**: On success, output the RESEARCH document path and a one-line summary of the recommended direction, then **STOP**. Do not proceed to `/hm:spec`, `/hm:plan`, or any other stage without an explicit user command. This boundary must survive context compaction — the next stage is user-initiated.
 
+## Emit Gate 0 receipt (ADR-001, ADR-005)
+
+You have completed the stage. Emit a receipt so the autoloop driver's Gate 0 can detect missing stages at the next convergence check. Pick `<verdict>`:
+
+- **`pass`** — RESEARCH document written with all 7 required sections and at least the discovery lens recorded.
+- **`fail`** — RESEARCH write failed, or the document is missing required sections (Recommended Direction, Approaches, Pitfalls, Open Questions, Sources, Related Docs).
+- **`skipped`** — **DO NOT emit this value from a stage prompt.** Reserved for the autoloop driver's auto-retry escape hatch (ADR-005 of PLAN-loop-mid-stop-and-review-skip).
+
+The shell guard below makes the receipt a no-op when `.current-iter` is absent — that file is written only by the autoloop driver at iter start. Standalone runs (no autoloop), no-isolation runs, and post-`/compact` restoration before iter 1 all skip the write naturally. This is by design — Gate 0 only reads receipts written under `iter-N` for N≥1. In standalone `/hm:research` (no fused execute stage to engage isolation), `<WT>` may be undefined; the guard's `[ -f ]` test on a literal `<WT>` path is also false, so no write fires.
+
+{% if is_codex %}
+```
+Bash("if [ -f <WT>/.claude/.hm-iter-receipts/.current-iter ]; then ITER=$(cat <WT>/.claude/.hm-iter-receipts/.current-iter); uv run --with {{ harness_maker_src_path }} python -m harness_maker.iter_receipts write --iter \"$ITER\" --stage research --verdict <verdict> --root <WT>; fi")
+```
+{% else %}
+```bash
+!if [ -f <WT>/.claude/.hm-iter-receipts/.current-iter ]; then \
+   ITER=$(cat <WT>/.claude/.hm-iter-receipts/.current-iter); \
+   uv run --with {{ harness_maker_src_path }} python -m harness_maker.iter_receipts write \
+     --iter "$ITER" --stage research --verdict <verdict> --root <WT>; \
+ fi
+```
+{% endif %}
+
 ## Outputs
 
 > ⚠️ **Path note:** the directory is `work-docs/` (with hyphen). The YAML key

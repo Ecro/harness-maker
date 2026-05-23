@@ -38,9 +38,12 @@ def test_interview_autoloop_returns_typed_answers() -> None:
     assert isinstance(result, InterviewAnswers)
     assert result.locale == "en"
     assert result.preset == Preset.SIDE
-    # Side starter set: exec-rev, exec-rev-wrap, plan-exec-rev-wrap
+    # Side starter set: exec-rev, exec-rev-wrap, plan-exec-rev (3-stage,
+    # PLAN-loop-mid-stop-and-review-skip ADR-002), plan-exec-rev-wrap (4-stage).
     assert "exec-rev" in result.fused_workflows
     assert "exec-rev-wrap" in result.fused_workflows
+    assert "plan-exec-rev" in result.fused_workflows
+    assert "plan-exec-rev-wrap" in result.fused_workflows
     assert result.default_workflow == "exec-rev-wrap"
     assert result.consensus
     assert result.caching

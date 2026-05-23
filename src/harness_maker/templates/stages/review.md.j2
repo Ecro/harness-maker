@@ -425,6 +425,30 @@ Record fields:
 The CLI auto-stamps `ts` when omitted. Schema validation rejects unknown
 fields and negative counts.
 
+## Emit Gate 0 receipt (ADR-001, ADR-005)
+
+You have completed the stage. Emit a receipt so the autoloop driver's Gate 0 can detect missing stages at the next convergence check. Pick `<verdict>`:
+
+- **`pass`** — final grade ≥ `grade_threshold` (Status: APPROVED).
+- **`fail`** — final grade < `grade_threshold` after `max_review_rounds` (Status: CHANGES_REQUESTED, `human_review_needed=true`).
+- **`skipped`** — **DO NOT emit this value from a stage prompt.** Reserved for the autoloop driver's auto-retry escape hatch (ADR-005 of PLAN-loop-mid-stop-and-review-skip).
+
+The shell guard below makes the receipt a no-op when `.current-iter` is absent — that file is written only by the autoloop driver at iter start. Standalone runs (no autoloop), no-isolation runs, and post-`/compact` restoration before iter 1 all skip the write naturally. This is by design — Gate 0 only reads receipts written under `iter-N` for N≥1. In standalone `/hm:review` (no fused execute stage to engage isolation), `<WT>` may be undefined; the guard's `[ -f ]` test on a literal `<WT>` path is also false, so no write fires.
+
+{% if is_codex %}
+```
+Bash("if [ -f <WT>/.claude/.hm-iter-receipts/.current-iter ]; then ITER=$(cat <WT>/.claude/.hm-iter-receipts/.current-iter); uv run --with {{ harness_maker_src_path }} python -m harness_maker.iter_receipts write --iter \"$ITER\" --stage review --verdict <verdict> --root <WT>; fi")
+```
+{% else %}
+```bash
+!if [ -f <WT>/.claude/.hm-iter-receipts/.current-iter ]; then \
+   ITER=$(cat <WT>/.claude/.hm-iter-receipts/.current-iter); \
+   uv run --with {{ harness_maker_src_path }} python -m harness_maker.iter_receipts write \
+     --iter "$ITER" --stage review --verdict <verdict> --root <WT>; \
+ fi
+```
+{% endif %}
+
 ## Outputs
 
 > ⚠️ **Path note:** the directory is `work-docs/` (with hyphen). The YAML key

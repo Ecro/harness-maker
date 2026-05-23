@@ -65,6 +65,14 @@ _SIDE_STARTER: dict[str, list[AtomicStage]] = {
         AtomicStage.REVIEW,
         AtomicStage.WRAPUP,
     ],
+    # 3-stage variant for /hm:loop per-iter use: wrapup belongs to loop-close,
+    # never per-iter, so this strips wrapup vs plan-exec-rev-wrap below.
+    # PLAN-loop-mid-stop-and-review-skip ADR-002.
+    "plan-exec-rev": [
+        AtomicStage.PLAN,
+        AtomicStage.EXECUTE,
+        AtomicStage.REVIEW,
+    ],
     "plan-exec-rev-wrap": [
         AtomicStage.PLAN,
         AtomicStage.EXECUTE,
@@ -74,6 +82,10 @@ _SIDE_STARTER: dict[str, list[AtomicStage]] = {
 }
 _SIDE_DEFAULT = "exec-rev-wrap"
 
+# Production preset deliberately OMITS plan-exec-rev-wrap (4-stage with wrapup).
+# Production loop use expects plan-exec-rev (3-stage); loop-close owns wrapup
+# (see loop.md.j2 step 7 + ADR-002 of PLAN-loop-mid-stop-and-review-skip).
+# The 4-stage variant exists only in SIDE as a non-loop linear workflow option.
 _PRODUCTION_STARTER: dict[str, list[AtomicStage]] = {
     "exec-rev": [AtomicStage.EXECUTE, AtomicStage.REVIEW],
     "exec-rev-wrap": [
@@ -86,6 +98,13 @@ _PRODUCTION_STARTER: dict[str, list[AtomicStage]] = {
         AtomicStage.REVIEW,
         AtomicStage.WRAPUP,
         AtomicStage.VERIFY,
+    ],
+    # 3-stage variant for /hm:loop per-iter use (no wrapup — owned by loop-close).
+    # PLAN-loop-mid-stop-and-review-skip ADR-002.
+    "plan-exec-rev": [
+        AtomicStage.PLAN,
+        AtomicStage.EXECUTE,
+        AtomicStage.REVIEW,
     ],
     "res-spec-plan": [
         AtomicStage.RESEARCH,

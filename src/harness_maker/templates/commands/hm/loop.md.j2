@@ -391,6 +391,7 @@ runtime:
   convergence_streak: 0
   checklist_fail_counts: {}          # {criterion_label: int}
   criterion_ambiguity_counts: {}     # {criterion_label: int}
+  stage_retry_counts: {}             # {"iter-<N>:<stage>": int}  — Gate 0 auto-retry budget (ADR-005, cap=2)
   last_test_result:
     exit_code: null
     failing: []
@@ -498,14 +499,15 @@ You are the driver. Track state via `TodoWrite` and your working memory.
   stopping_criteria.
 - Note the start timestamp: `Bash` → `date +%s`.
 - Maintain counters: `iter` (0), `failed_streak` (0), `convergence_streak` (0),
-  `completed` (list), `checklist_fail_counts` ({}), `criterion_ambiguity_counts` ({}).
+  `completed` (list), `checklist_fail_counts` ({}), `criterion_ambiguity_counts` ({}),
+  `stage_retry_counts` ({}).
 - **Post-`/compact` recovery**: after any compaction event, reload
-  `convergence_streak`, `checklist_fail_counts`, and `criterion_ambiguity_counts`
-  from `work-docs/loop-context/<slug>.yaml` `runtime:` section (see step 4-F
-  for the persistence schema). If the `runtime:` section is absent, reinitialize
-  all counters to their zero values — this is safe because Gate 3 and Gate 4
-  skip or reset on missing baseline, and the escape hatch merely takes one
-  extra cycle to fire.
+  `convergence_streak`, `checklist_fail_counts`, `criterion_ambiguity_counts`, and
+  `stage_retry_counts` from `work-docs/loop-context/<slug>.yaml` `runtime:` section
+  (see step 4-F for the persistence schema). If the `runtime:` section is absent,
+  reinitialize all counters to their zero values — this is safe because Gate 0
+  resets on a fresh iter, Gate 3 / Gate 4 skip or reset on missing baseline,
+  and the escape hatch merely takes one extra cycle to fire.
 
 #### Safety rails (always on, never skip)
 
@@ -636,6 +638,23 @@ For each iter (until convergence or any safety rail fires):
    prevents exiting on the very first passing iter.
 
 3. **Increment `iter`**.
+3.5. **Write `.current-iter` marker** (Gate 0 contract — ADR-001 of PLAN-loop-mid-stop-and-review-skip).
+   Each stage template's receipt-emit block reads ITER from this file. Without
+   the marker, the stage's shell guard `[ -f .../.current-iter ]` is false and
+   the receipt block becomes a no-op — meaning the next Gate 0 sees no receipts
+   and triggers fruitless retries.
+{% if is_codex %}
+   ```
+   Bash("mkdir -p <WT>/.claude/.hm-iter-receipts && printf '%s' <N> > <WT>/.claude/.hm-iter-receipts/.current-iter")
+   ```
+{% else %}
+   ```bash
+   !mkdir -p <WT>/.claude/.hm-iter-receipts
+   !printf '%s' <N> > <WT>/.claude/.hm-iter-receipts/.current-iter
+   ```
+{% endif %}
+
+   `printf '%s'` is used instead of `echo <N>` to write without a trailing newline. The Phase 2 stage templates strip trailing whitespace via `$(cat ...)` command substitution, but explicit single-byte writes avoid any context where newline could leak into `--iter "$ITER"`.
 4. **Invoke per-iter workflow**: read
    `.claude/commands/hm/<WORKFLOW>.md` and execute **every stage it
    defines, in order, without skipping any**. Operate inside `<WT>`:
@@ -643,6 +662,85 @@ For each iter (until convergence or any safety rail fires):
    tests / lints / type checks run via `cd <WT> && <cmd>`. Stage "When
    to Run" skip conditions apply only to standalone invocation, not
    under loop dispatch.
+
+4.5. **Gate 0 — Receipt verification** (ADR-001 + ADR-005 of PLAN-loop-mid-stop-and-review-skip).
+
+   The autoloop driver MUST verify every expected stage of `<WORKFLOW>` emitted
+   a receipt with `verdict == "pass"`. This is the mechanical defense against
+   the 2026-05-22 silent-review-skip failure mode (`[wiki:gotcha]
+   loop-body-skipping-review-stage`). Gate 0 runs every iter regardless of
+   mode (feature or improve).
+
+   Derive `EXPECTED_STAGES` from `<WORKFLOW>`. The six canonical entries match
+   the fused workflow registry in `interview.py:_SIDE_STARTER` /
+   `_PRODUCTION_STARTER`:
+   - `exec-rev` → `execute,review`
+   - `exec-rev-wrap` → `execute,review,wrapup`
+   - `exec-rev-wrap-ver` → `execute,review,wrapup,verify` *(production default)*
+   - `plan-exec-rev` → `plan,execute,review` *(3-stage variant for loop per-iter planning — wrapup stripped because loop-close owns it; ADR-002 of PLAN-loop-mid-stop-and-review-skip)*
+   - `plan-exec-rev-wrap` → `plan,execute,review,wrapup` *(4-stage variant — SIDE preset only, not for per-iter loop use)*
+   - `res-spec-plan` → `research,spec,plan`
+   - any other fused workflow → read the workflow command file
+     `.claude/commands/hm/<WORKFLOW>.md` and extract the stage list from its
+     fused-stage `## Stage:` headers (one per stage, top-down order). Treat
+     the resulting comma-joined list as `EXPECTED_STAGES`.
+
+   Run the verify CLI inside `<WT>`:
+{% if is_codex %}
+   ```
+   Bash("cd <WT> && uv run --with {{ harness_maker_src_path }} python -m harness_maker.iter_receipts verify --iter <N> --expected <EXPECTED_STAGES> --root <WT>")
+   ```
+{% else %}
+   ```bash
+   !cd <WT> && uv run --with {{ harness_maker_src_path }} python -m harness_maker.iter_receipts verify \
+      --iter <N> --expected <EXPECTED_STAGES> --root <WT>
+   ```
+{% endif %}
+
+   Exit-code semantics (per `iter_receipts` CLI contract):
+   - **exit 0** → Gate 0 PASS. All expected stages present with `verdict == "pass"`.
+     Reset `stage_retry_counts[(iter, *)]` entries for the current iter to 0
+     and proceed to step 5 (Update state).
+   - **exit 1** → Gate 0 FAIL. The stdout `FAIL` line lists missing stages and
+     non-pass verdicts. **Critical: verdict `skipped` or `fail` counts as Gate 0
+     failure**, not just absence — this closes the "forge skipped to bypass"
+     loophole.
+
+   **Auto-retry semantics (ADR-005, cap=2 per (iter, stage)):**
+
+   For each missing or non-pass stage:
+
+   1. Compute key `K = "iter-<N>:<stage>"`.
+   2. `stage_retry_counts[K] += 1`. Persist to `runtime.stage_retry_counts`
+      in the loop-context file.
+   3. If `stage_retry_counts[K] <= 2`:
+      Re-invoke that stage's prompt only — read
+      `.claude/commands/hm/<stage>.md` and execute it. Do NOT re-invoke the
+      full `<WORKFLOW>`. After the stage re-runs, return to step 4.5 and
+      re-verify Gate 0.
+   4. If `stage_retry_counts[K] >= 3`:
+      Escalate via {% if is_codex %}`request_user_input` (or ask in your response){% else %}`AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code){% endif %}.
+      Options:
+      - **A. 수동 재실행 (manual re-run)** — user runs the stage themselves and
+        writes a passing receipt (or fixes the underlying break). After the
+        user signals completion, return to step 4.5 to re-verify.
+      - **B. Skip with explicit `verdict: skipped` marker** — invoke the
+        receipt CLI manually:
+        `uv run python -m harness_maker.iter_receipts write --iter <N> --stage <stage> --verdict skipped --root <WT>`
+        then **jump directly to step 5 — do NOT return to step 4.5**. The
+        operator has explicitly acknowledged the hole; re-verifying would
+        deadlock because Gate 0 treats `skipped` as failure. Set
+        `gate0_skipped_explicitly[K] = true` in your working memory so step 5
+        knows this iter's `<stage>` was a deliberate hole, not a workflow success.
+      - **C. Abort the loop** — halt with `stop_reason="Gate 0 exhausted retries on
+        iter-<N>:<stage>"`, preserve the worktree for inspection.
+
+   **Critical invariant (ADR-005)**: Gate 0 auto-retries do NOT increment
+   `failed_streak`. The `failed_streak` counter is for workflow-level failures
+   (tests fail, build break), not gate misses. Mixing them would let safety
+   rail #3 (cap=5) fire before per-stage diagnosis surfaces. Reset
+   `stage_retry_counts` entries to 0 once Gate 0 passes for an iter.
+
 5. **Update state**:
    - Workflow returned success (review verdict ≥ grade_threshold and
      tests pass) → mark completed, append to `completed`, reset
@@ -659,6 +757,14 @@ For each iter (until convergence or any safety rail fires):
 ### 7. Loop close — UNIFIED
 
 When the loop halts (convergence, safety rail, or hard error):
+
+0. **Clear `stage_retry_counts`** (Gate 0 hygiene — ADR-005 of PLAN-loop-mid-stop-and-review-skip).
+   At loop close, write an empty map to `runtime.stage_retry_counts` in the
+   loop-context file. Without this, a long-running loop accumulates one entry
+   per `(iter, stage)` retry forever; a subsequent `/compact` recovery reloads
+   all of them even though every prior iter's Gate 0 cycle is closed. Only
+   the current iter's keys ever matter at runtime, so an empty-map reset is
+   safe.
 
 1. **Exit criteria checklist gate** (skipped when `converged = False` — safety
    rail halts skip the gate entirely):

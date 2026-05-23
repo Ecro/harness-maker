@@ -87,12 +87,49 @@ If any criterion fails → **run the interview by default** (do not ask permissi
 
 ### Step 1 — Pre-interview internal draft (NOT shown to user)
 
+> **Loop-mode short-circuit**: if `.hm-loop-active` exists at the project root, **skip this entire Step 1** and jump directly to Step 1.5 below. The internal draft is pure waste in loop-mode (the per-iter plan is master-PLAN-derived, not from scratch). Saves tokens + avoids confusing intermediate state.
+
 Synthesize a working plan from inputs:
 - Tentative architecture (components, boundaries, data flow).
 - Candidate phase decomposition.
 - **Explicit list of ambiguities** ranked by blast radius (affects contracts > affects internal logic > affects naming).
 
 This seed is what the interview refines. Investigate code unknowns with Read/Grep before treating them as ambiguities — don't outsource research to the user.
+
+### Step 1.5 — Loop-mode detection (ADR-002, ADR-007, ADR-008 of PLAN-loop-mid-stop-and-review-skip)
+
+Before Step 2, check whether `/hm:plan` is running inside an active `/hm:loop` iteration. **If `.hm-loop-active` marker file exists at the project root**, this is loop-mode: do NOT engage the deep interview (loop body cannot block on {% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %}). Instead, scope the plan to the next master-PLAN phase only.
+
+**Loop-mode procedure (when `.hm-loop-active` exists):**
+
+1. Derive `<N>` from `<WT>/.claude/.hm-iter-receipts/.current-iter` (driver-written at iter start per Phase 3 contract). If the marker file is absent for some reason, fall through to standard mode — the loop driver is in an inconsistent state and the interview is the safer choice.
+2. Read the master `work-docs/PLAN-{slug}.md`. Find the next phase whose status is NOT `DONE` (look for `## Phase N` headers and their `Status:` lines). Call this `<M>`.
+3. **Skip Steps 2 and 3 entirely** (no SPEC inheritance check, no deep interview). The master PLAN's ADRs and phase scope are the source of truth.
+4. Write a per-iter scoped plan to `<WT>/work-docs/PLAN-{slug}-iter{N}.md` with this frontmatter:
+
+   ```yaml
+   ---
+   type: plan
+   derived_from: PLAN-{slug}.md
+   iter: <N>
+   phase: <M>
+   loop_mode: true
+   created: <ISO>
+   ---
+   ```
+
+   Body: scoped re-plan of Phase `<M>` only, refined against the current code state. Include:
+   - One-paragraph "what's changed since the master PLAN was written" if relevant.
+   - The phase's scope (files in/out), exit criterion, risk, rollback — copied or sharpened from the master PLAN.
+   - Any in-flight architectural decision that does NOT require an ADR.
+
+   > ⚠️ **LOOP-MODE ADR CONSTRAINT (CRITICAL)** — If implementation during this iteration reveals a decision that genuinely requires an ADR (component boundary change, new contract, precedent-setting choice, rejection of viable alternative), **HALT the loop immediately**. Do NOT defer the ADR. Do NOT document it as a local per-iter decision. The autoloop has no {% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %} channel; new ADRs must be added to the master PLAN through standalone {% if is_codex %}`@hm-plan`{% else %}`/hm:plan {slug}`{% endif %} (which engages the deep interview). Halt mechanism: write a blocker note in the per-iter PLAN, then exit non-zero so safety rail #4 (same feature retried 3 times) fires.
+
+5. Skip directly to Step 4 (plan-validator). Validator runs against the per-iter PLAN, not the master PLAN.
+
+6. **Cleanup boundary**: per-iter PLAN files (`PLAN-{slug}-iter*.md`) accumulate inside `<WT>/work-docs/`. They are squash-merged at loop close (ADR-008) and the squash commit on the parent branch carries them as artifacts. No standalone cleanup is needed — the worktree's lifecycle owns it.
+
+If `.hm-loop-active` is absent → proceed to Step 2 as normal.
 
 ### Step 2 — SPEC inheritance check (when SPEC exists)
 
@@ -365,6 +402,30 @@ After writing, Read the file back and assert:
 If verification fails, retry write **once**. If still failing, surface the path + error and stop — do NOT proceed to a downstream stage.
 
 **Stage terminal**: On success, output a brief completion summary (PLAN path, interview rounds, ADR count, validator outcome) and **STOP**. Do not invoke any downstream stage (`/hm:execute` or any other) without an explicit user command. This boundary must survive context compaction — the next stage is user-initiated.
+
+## Emit Gate 0 receipt (ADR-001, ADR-005)
+
+You have completed the stage. Emit a receipt so the autoloop driver's Gate 0 can detect missing stages at the next convergence check. Pick `<verdict>`:
+
+- **`pass`** — PLAN written + validator outcome was APPROVED or NEEDS_REVISION_RESOLVED.
+- **`fail`** — validator returned MAJOR_REVISION after re-run, OR Step 6 verification failed (frontmatter/ADR/phase-field invariants).
+- **`skipped`** — **DO NOT emit this value from a stage prompt.** Reserved for the autoloop driver's auto-retry escape hatch (ADR-005 of PLAN-loop-mid-stop-and-review-skip).
+
+The shell guard below makes the receipt a no-op when `.current-iter` is absent — that file is written only by the autoloop driver at iter start. Standalone runs (no autoloop), no-isolation runs, and post-`/compact` restoration before iter 1 all skip the write naturally. This is by design — Gate 0 only reads receipts written under `iter-N` for N≥1. In standalone `/hm:plan` (no fused execute stage to engage isolation), `<WT>` may be undefined; the guard's `[ -f ]` test on a literal `<WT>` path is also false, so no write fires.
+
+{% if is_codex %}
+```
+Bash("if [ -f <WT>/.claude/.hm-iter-receipts/.current-iter ]; then ITER=$(cat <WT>/.claude/.hm-iter-receipts/.current-iter); uv run --with {{ harness_maker_src_path }} python -m harness_maker.iter_receipts write --iter \"$ITER\" --stage plan --verdict <verdict> --root <WT>; fi")
+```
+{% else %}
+```bash
+!if [ -f <WT>/.claude/.hm-iter-receipts/.current-iter ]; then \
+   ITER=$(cat <WT>/.claude/.hm-iter-receipts/.current-iter); \
+   uv run --with {{ harness_maker_src_path }} python -m harness_maker.iter_receipts write \
+     --iter "$ITER" --stage plan --verdict <verdict> --root <WT>; \
+ fi
+```
+{% endif %}
 
 ## Outputs
 
