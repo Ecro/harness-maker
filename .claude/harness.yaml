@@ -1,0 +1,145 @@
+---
+generated_by: harness-maker
+harness_maker_version: 0.24.0
+generated_at: '2026-01-01T00:00:00+00:00'
+source_template: harness-yaml/Production.yaml.j2
+provenance: official
+content_hash: 4e1d4b88ad0bbf0068cbef6276889219911f857aaff96f499798d96fa7fe34d2
+---
+preset: Production
+locale: ko
+targets: [claude-code, cursor, codex]
+default_model: claude-opus-4-7
+dev_mode: task-driven
+default_workflow: exec-rev-wrap-ver
+caching: agent-aware
+schema_version: 1
+interview:
+  deep_gate:
+    # 0.16.0: 5-term inequality gate (PLAN-deep-interview-question-criteria).
+    eig_epsilon: 0.5
+    confidence_tau: 0.7
+    open_ended_cap_by_locale:
+      en: 2
+      ko: 1
+      ja: 1
+      default: 1
+    common_ground:
+      llm_inference_threshold: 0.95
+      llm_inference_enabled: true
+  main_loop:
+    max_rounds: null
+project:
+  domains: [python]
+spec:
+  dir: specs/
+work_docs:
+  dir: work-docs/
+ref_folders:
+
+second_brain:
+  enabled: true
+  backend: "filesystem"
+  project_id: "harness-maker"
+  vault_path: "/mnt/c/Users/euncheol.ro/Documents/obsidian-vault/second-brain"
+  trusted_allowlist: true
+  required_frontmatter: ["type", "created", "updated", "tags", "links"]
+
+  folders: []
+
+sibling_repos:
+
+wrapup_docs:
+  - "README.md"
+  - "TECH_SPEC.md"
+  - "CHANGELOG.md"
+  - "docs/ARCHITECTURE.md"
+  - "docs/HOW-IT-WORKS.md"
+
+workflows:
+
+  exec-rev:
+    - execute
+    - review
+
+  exec-rev-wrap:
+    - execute
+    - review
+    - wrapup
+
+  exec-rev-wrap-ver:
+    - execute
+    - review
+    - wrapup
+    - verify
+
+  plan-exec-rev:
+    - plan
+    - execute
+    - review
+
+  res-spec-plan:
+    - research
+    - spec
+    - plan
+
+reviewers:
+  consensus: cross-check
+  verbosity: standard
+  auto_fix: true
+  grade_threshold: A
+  max_review_rounds: 3
+
+  installed:
+    - code-reviewer
+    - security-reviewer
+    - security-auditor
+    - performance-reviewer
+    - ux-reviewer
+    - concurrency-reviewer
+    - consensus-arbiter
+    - executor
+    - autoloop-coder
+  enabled:
+    - code-reviewer
+    - security-reviewer
+
+skills:
+  installed:
+    - verify-before-completion
+    - autoloop-driver
+    - ai-readiness-rubric
+    - agent-quality-rubric
+    - conditional-router
+    - worktree-isolator
+    - security-scanner
+    - context-linter
+    - refdocs-search
+  enabled:
+    - verify-before-completion
+    - autoloop-driver
+    - ai-readiness-rubric
+    - agent-quality-rubric
+    - conditional-router
+    - relevance-filter
+    - worktree-isolator
+    - security-scanner
+    - context-linter
+    - research-crawler
+    - refdocs-search
+
+worktree:
+  scope: [execute, plan]
+  branch_prefix: hm-
+memory:
+  enabled: true
+  dir: .claude/memory
+  files: [failures.md, wiki.md]
+security:
+  on_finding:
+    high: block
+    medium: log
+  gates:
+    spec_gate: block
+feedback:
+  enabled: false
