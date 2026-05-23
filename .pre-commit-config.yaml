@@ -1,0 +1,10 @@
+# Run on git commit to catch ruff format/check failures before CI.
+# Install: uv run pre-commit install
+# Manual run: uv run pre-commit run --all-files
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.12
+    hooks:
+      - id: ruff-format
+      - id: ruff-check
+        args: [--fix]

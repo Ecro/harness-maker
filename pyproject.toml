@@ -62,6 +62,7 @@ dev = [
     "types-PyYAML",
     "respx>=0.20",
     "mutmut>=2.4,<3",  # 3.x CLI dropped --paths-to-mutate; pin pending wrapper rewrite
+    "pre-commit>=4.6.0",
 ]
 
 [project.scripts]

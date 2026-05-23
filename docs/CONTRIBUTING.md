@@ -188,10 +188,24 @@ bash .claude-verify.sh phase_3_render       # just the render task
 bash .claude-verify.sh phase_3_invariants   # frontmatter invariants only
 ```
 
+## Local Setup
+
+After cloning, install the pre-commit hook once. It auto-runs `ruff format` +
+`ruff check --fix` on every `git commit`, catching the same failure CI's
+quality-gate job catches — but locally, before the push.
+
+```bash
+uv sync
+uv run pre-commit install
+```
+
+To run the hook manually across the whole repo: `uv run pre-commit run --all-files`.
+
 ## Pull Request Checklist
 
 Before opening a PR:
 
+- [ ] `uv run pre-commit install` once after cloning (one-time)
 - [ ] `uv run ruff format src/ tests/` — formatted
 - [ ] `uv run ruff check src/ tests/` — 0 errors
 - [ ] `uv run mypy --strict src/` — 0 errors
