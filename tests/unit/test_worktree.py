@@ -439,13 +439,34 @@ def test_cli_create_preserves_existing_gitignore_content(
         "# user gitignore\n*.pyc\n.env\n.claude/\n.worktrees/\n",
         encoding="utf-8",
     )
+    # Phase 2 dirty-base guard would ABORT create on the unstaged .gitignore
+    # modification; commit the gitignore overwrite so the test exercises
+    # gitignore-append semantics (the actual contract under test), not
+    # dirty-base guard interaction (covered separately in
+    # test_worktree_dirty_base_guard.py).
+    _git(["add", ".gitignore"], cwd=repo)
+    _git(["commit", "-m", "test-fixture: rewrite gitignore"], cwd=repo)
     worktree.main(["create", "execute", str(repo)])
     capsys.readouterr()
     text = (repo / ".gitignore").read_text(encoding="utf-8")
     assert "# user gitignore" in text
     assert "*.pyc" in text
     assert ".env" in text
-    assert ".claude/.hm-loop-*" in text
+    # `_ensure_gitignore_entry` (2026-05-24) gained a subsumption check via
+    # `git check-ignore` — when the entry is already covered by a broader
+    # pattern (e.g. `.claude/` covers `.claude/.hm-loop-*`), no append. Both
+    # outcomes satisfy the contract "marker file ends up gitignored".
+    import subprocess
+
+    proves_covered = subprocess.run(
+        ["git", "check-ignore", "-q", "--", ".claude/.hm-loop-x"],
+        cwd=str(repo),
+        capture_output=True,
+    )
+    assert (
+        ".claude/.hm-loop-*" in text
+        or proves_covered.returncode == 0  # subsumed by .claude/ broader pattern
+    )
 
 
 def test_cli_create_no_marker_when_scope_off(

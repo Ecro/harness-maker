@@ -1,5 +1,0 @@
-[project]
-name = "sandbox"
-version = "0.1.0"
-description = "Dogfood sandbox for harness-maker e2e tests (Phase 11)"
-requires-python = ">=3.12"

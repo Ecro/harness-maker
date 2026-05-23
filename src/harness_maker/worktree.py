@@ -1457,7 +1457,15 @@ def _ensure_gitignore_entry(project_root: Path, entry: str) -> None:
     Cheap idempotent line-append:
     - File missing → create with the entry as sole content
     - File present, entry already (exact line match) → no-op
-    - File present, entry absent → append with leading newline if needed
+    - File present, entry semantically subsumed by broader pattern → no-op
+      (e.g. `.claude/` covers `.claude/.hm-session-uuid`; check via
+      `git check-ignore`). Without this guard, every test fixture or user
+      who has `.claude/` ignored at the dir level gets a spurious
+      `.claude/.hm-session-uuid` line appended on first session-uuid
+      generation → `.gitignore` shows as `M` in status → trips
+      `_stash_base_dirty` → ref file written → marker not cleared
+      (fail mode reproduced in test_worktree_multi.py 2026-05-24).
+    - File present, entry absent + not subsumed → append.
 
     Failures are silently swallowed: gitignore hygiene is best-effort, not
     a hard correctness requirement. The gate still works; users may have
@@ -1474,6 +1482,26 @@ def _ensure_gitignore_entry(project_root: Path, entry: str) -> None:
             for line in existing.splitlines():
                 if line.strip() == entry:
                     return
+            # Semantic-subsumption check via git: if the entry-as-path is
+            # already ignored by a broader pattern, skip the append. The
+            # entry typically looks like `.claude/.hm-session-uuid` (path-like)
+            # rather than a glob — `git check-ignore` correctly classifies
+            # path-like entries. For glob entries (e.g. `.claude/.hm-loop-*`)
+            # check-ignore returns non-zero on the glob string itself, so the
+            # subsumption check only succeeds for path-shaped entries —
+            # exactly the case where unnecessary appending is the bug.
+            try:
+                check = subprocess.run(  # noqa: S603
+                    ["git", "check-ignore", "-q", "--", entry],
+                    cwd=str(project_root),
+                    capture_output=True,
+                    timeout=5,
+                )
+                if check.returncode == 0:
+                    return  # Already covered by existing pattern.
+            except (subprocess.SubprocessError, FileNotFoundError, OSError):
+                # Best-effort — fall through to append if check fails.
+                pass
             sep = "" if existing.endswith("\n") else "\n"
             # Atomic-append: read full content + append entry + atomic_write
             # the whole file. Mirrors the new-file branch below and prevents
