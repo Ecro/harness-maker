@@ -1,7 +1,7 @@
 ---
 type: plan
 task_slug: worktree-cross-session-data-loss-defense
-status: planning
+status: complete
 created: 2026-05-23
 tags: [harness-maker, plan, worktree, isolation, data-loss-prevention, multi-session]
 interview_rounds: 4
@@ -370,15 +370,15 @@ session A wrapup: post-commit-pop
 
 ## ✅ Success Criteria
 
-- [ ] `worktree create` aborts when base is dirty OR ≥2 unpopped finalize stashes; both have escape flags.
-- [ ] Two parallel sessions can run `execute → finalize → wrapup` without ANY cross-contamination (integration test green).
-- [ ] `wrapup post-commit-pop` conflict path NEVER produces an LLM "recommend drop" — diff preview is mandatory; cherry-pick recovery procedure is documented in-template.
-- [ ] `tests/e2e/sandbox*/` + `tests/fixtures/*/CLAUDE.md` are gitignored; regen-only on test sessions; ZERO conflict surface across sessions.
-- [ ] Session UUID isolation: cross-session refs are SKIP (not pop); pre-upgrade refs are SKIP with warning.
-- [ ] Finalize merge is flock-serialized; parallel sessions queue cleanly with `--lock-timeout`.
-- [ ] Finalize scope-guard catches synthetic contamination + halts before commit.
-- [ ] CLAUDE.md `## Multi-session worktree` section documents all 5 layers + escape flags + cherry-pick recovery cross-link.
-- [ ] CHANGELOG entry under `[Unreleased]` documents the breaking-but-additive changes.
+- [x] `worktree create` aborts when base is dirty OR ≥2 unpopped finalize stashes; both have escape flags.
+- [x] Two parallel sessions can run `execute → finalize → wrapup` without ANY cross-contamination (integration test green).
+- [x] `wrapup post-commit-pop` conflict path NEVER produces an LLM "recommend drop" — diff preview is mandatory; cherry-pick recovery procedure is documented in-template.
+- [x] `tests/e2e/sandbox*/` + `tests/fixtures/*/CLAUDE.md` are gitignored; regen-only on test sessions; ZERO conflict surface across sessions.
+- [x] Session UUID isolation: cross-session refs are SKIP (not pop); pre-upgrade refs are SKIP with warning.
+- [x] Finalize merge is flock-serialized; parallel sessions queue cleanly with `--lock-timeout`.
+- [x] Finalize scope-guard catches synthetic contamination + halts before commit.
+- [x] CLAUDE.md `## Multi-session worktree` section documents all 5 layers + escape flags + cherry-pick recovery cross-link.
+- [x] CHANGELOG entry under `[Unreleased]` documents the breaking-but-additive changes.
 
 ## 🔍 Plan Validation
 

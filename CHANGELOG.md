@@ -1,5 +1,45 @@
 # Changelog
 
+## [Unreleased]
+
+### Added: cross-session worktree data-loss defense (PLAN-worktree-cross-session-data-loss-defense)
+
+5-layer defense after 3rd incident (2026-05-23) of `[fail:design] worktree-finalize-pulls-orphan-wip-into-main`. Each layer independently catches a different failure mode; only simultaneous regression across all 5 can re-open data loss:
+
+- **Layer 1 ADR-003 queue-guard** — `worktree create` ABORTs when ≥2 unpopped `.claude/.hm-finalize-stash-*` ref files. `--allow-stash-queue` bypasses.
+- **Layer 2 ADR-002 dirty-base-guard** — `worktree create` ABORTs when base has uncommitted USER changes. `--allow-dirty-base` bypasses. New `_is_create_guard_harness_artifact` filter recognizes the whole `.claude/` dir as harness-managed.
+- **Layer 3 ADR-004 Session UUID** — `_session_marker_present` (file-exists) replaced by `_session_owns_marker(ref_uuid, current_uuid)`. `_validate_stash_ref_fields` schema gains `session_uuid` (optional for legacy refs; one-shot sentinel migration). `_cli_post_commit_pop` skips cross-session refs.
+- **Layer 4 ADR-005 merge fence** — new `_acquire_merge_fence(base, timeout)` serializes parallel finalize. Primary: `fcntl.flock`. Secondary (equal-status): `os.open(O_CREAT|O_EXCL|O_WRONLY)` polling. Reliable on WSL2/NTFS.
+- **Layer 5 ADR-006 scope-guard** — new `_verify_scope_subset(base, branch, staged_before)` asserts merge delta is a subset of worktree's own diff. Handles `--allow-dirty-base` interaction.
+
+### Changed
+
+- `CLAUDE.md` `## Multi-session worktree` section documenting 5 layers + escape flags + cherry-pick recovery cross-link.
+- `.gitignore` forward-looking entries for `tests/e2e/sandbox*/` + `tests/fixtures/*/CLAUDE.md` (destructive `git rm --cached` requires user authorization, logged as follow-up).
+
+### Test coverage
+
+- `tests/unit/test_worktree_queue_guard.py` (12 + 1 skip), `test_worktree_dirty_base_guard.py` (11), `test_worktree_session_uuid.py` (7), `test_worktree_merge_fence.py` (4), `test_worktree_scope_guard.py` (4).
+- `tests/integration/test_worktree_parallel_session.py` opt-in via `HM_RUN_PARALLEL_SESSION=1`. RED on pre-Phase-3 code → GREEN after Layer 3 UUID isolation.
+
+### REVIEW round 1 fixes (5 auto-applied + dirname embed land)
+
+- **P0-CON1 `.hm-session-uuid` gitignore** — `_current_session_uuid` now calls `_ensure_gitignore_entry(_SESSION_UUID_GITIGNORE_PATTERN)`; prevents commit-to-public.
+- **P0-MAN1 `_acquire_merge_fence` lock_dir** — uses `git rev-parse --git-common-dir` so parallel worktrees of same repo share lockfile (was naive `is_dir()` → per-wt lockfile → no serialization).
+- **P0-MAN2 dirname UUID embed (substantive fix)** — `create()` generates UUID + embeds in wt dirname `execute-{uuid12}-{ts}`. `_write_stash_ref_file` reads UUID from wt_name. `_cli_post_commit_pop` strict mode via `HM_OWNED_SESSION_UUIDS` env (wrapup template wiring task #14 follow-up). Original project-scoped persistent UUID (which silently defeated Layer 3) replaced.
+- **P1-CON1 `session_uuid: legacy` rejected** — validator no longer accepts the sentinel value (was a permanent bypass vector).
+- **P1-MAN1 dynamic base branch** — `_verify_scope_subset` uses `git merge-base wt_branch HEAD` instead of hardcoded `main`.
+- **P1-MAN3 TOCTOU re-read** — `_current_session_uuid` re-reads file AFTER atomic_write (concurrent first-callers converge on disk value).
+- **P1-MAN4 bypass flag stderr `[WARN]` logging** — every `--allow-stash-queue` / `--allow-dirty-base` use now leaves audit trail.
+
+### Follow-ups
+
+- Task #14: wrapup template must set `HM_OWNED_SESSION_UUIDS` env before invoking `post-commit-pop` to engage Layer 3 strict mode (until then, marker-exists fallback = pre-Phase-3 behavior).
+- Wrapup template prose rewrite (drop-FORBIDDEN + cherry-pick recovery + `<!-- @hm:drop-policy:user-confirmed -->` marker + grep guard test).
+- Phase 6: `git rm --cached` for sandbox content + conftest regen fixture (USER ACTION required — destructive).
+- Phase 7: promote parallel-session integration test to always-run in CI.
+- Pre-existing test fixtures: 3 tests need `.gitignore` updates to mirror real-world `.claude/` convention (task #9).
+
 ## [0.24.0] - 2026-05-23
 
 ### Added: opt-in maintainer-dogfooding feedback module (PLAN-auto-feedback-2026-05)

@@ -27,11 +27,11 @@ def _make_repo(path: Path, name: str = "main") -> Path:
     _git(["config", "user.email", "test@example.com"], cwd=path)
     _git(["config", "user.name", "Test"], cwd=path)
     (path / "README.md").write_text(f"# {path.name}\n")
-    # Pre-track .gitignore — see test_worktree.py fixture rationale (avoids
-    # spurious stash on "clean" base from auto-created untracked .gitignore).
-    (path / ".gitignore").write_text(
-        ".worktrees/\n.claude/.hm-loop-*\n.claude/.hm-finalize-stash-*\n"
-    )
+    # Pre-track .gitignore — mirrors real-world (`.claude/` is fully
+    # gitignored at user repos so harness-managed config + runtime state
+    # never pollute `git status --porcelain`; ADR-002 dirty-base guard
+    # relies on this convention).
+    (path / ".gitignore").write_text(".worktrees/\n.claude/\n")
     _git(["add", "."], cwd=path)
     _git(["commit", "-m", "init"], cwd=path)
     return path

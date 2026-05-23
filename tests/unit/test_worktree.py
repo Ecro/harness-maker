@@ -436,7 +436,7 @@ def test_cli_create_preserves_existing_gitignore_content(
         encoding="utf-8",
     )
     (repo / ".gitignore").write_text(
-        "# user gitignore\n*.pyc\n.env\n",
+        "# user gitignore\n*.pyc\n.env\n.claude/\n.worktrees/\n",
         encoding="utf-8",
     )
     worktree.main(["create", "execute", str(repo)])

@@ -60,3 +60,13 @@ tests/e2e/sandbox-plugin-test/.backup-*/
 
 # /hm:loop Step 5 creates .hm-loop-active marker at project root
 .hm-loop-*
+
+# PLAN-worktree-cross-session-data-loss-defense ADR-007:
+# sandbox fixtures regen-only — every version bump re-renders ~2400+ files,
+# two parallel sessions both bumping = guaranteed stash conflict at finalize.
+# Untracking the currently-committed content via `git rm --cached` is a
+# destructive operation requiring user authorization (see Phase 6 follow-up
+# task). These .gitignore entries take effect AFTER `git rm --cached` runs.
+tests/e2e/sandbox/
+tests/e2e/sandbox-plugin-test/
+tests/fixtures/*/CLAUDE.md

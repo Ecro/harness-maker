@@ -196,6 +196,24 @@ Cursor / Codex 의 plugin marketplace 가 GitHub 에서 직접 fetch.
   존재하지 않는 worktree path 로 gate 가 블록 → 강제 footgun.
 - 100% 로컬 telemetry — 외부 전송 금지
 
+## Multi-session worktree (PLAN-worktree-cross-session-data-loss-defense)
+
+**3회째 incident** (2026-05-23) 후 land 한 5-layer defense — 모두 동시 regression 해야 contamination 재발 가능:
+
+| Layer | ADR | What it blocks | Escape flag |
+|---|---|---|---|
+| 1 queue-guard | ADR-003 | `worktree create` when ≥2 unpopped finalize stashes | `--allow-stash-queue` |
+| 2 dirty-base-guard | ADR-002 | `worktree create` when base has user dirt (harness artifacts excluded) | `--allow-dirty-base` |
+| 3 Session UUID | ADR-004 | Cross-session refs in `post-commit-pop` (different `session_uuid` → SKIP) | (none — legacy refs get one-shot migration) |
+| 4 merge fence | ADR-005 | Parallel finalize merge race (flock primary + O_EXCL secondary; reliable on WSL2/NTFS) | `--lock-timeout <sec>` |
+| 5 scope-guard | ADR-006 | Merge sweeps unrelated staged files (warn-only first, halt-mode after Phase 6) | `--skip-scope-guard` |
+
+**LLM behavior contract** (ADR-008):
+- `[finalize] stash-pop conflict` signal: NEVER recommend `git stash drop` without `git stash show -p <ref>` diff preview to user.
+- Recovery procedure when stash conflict happens: `git reflog --all | grep "wip(execute)"` → cherry-pick chronological → resolve sandbox conflicts with `--ours`. Documented in `templates/commands/hm/wrapup.md.j2` Step 7.5 with `<!-- @hm:drop-policy:user-confirmed -->` marker block.
+
+**Recovery from accidental drop** (precedent: 2026-05-23 morning's 4 dropped stashes recovered via `git reflog --all` cherry-pick — see session log 21:30 UTC). The finalize logic creates `wip(execute): capture uncommitted work` commits on the per-worktree branch BEFORE attempting cleanup; even if the stash is dropped, the WIP commit on the branch ref survives until gc.
+
 ## Autoloop 빌드 중 모호함 발생 시
 1. TECH_SPEC.md Section 4 의 phase task 우선
 2. 본 CLAUDE.md 우선

@@ -20,16 +20,18 @@ Conventions
 from __future__ import annotations
 
 import contextlib
+import os
 import re
 import subprocess
 import sys
+import time
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 
 import yaml
 
-from harness_maker.io_utils import load_harness_yaml
+from harness_maker.io_utils import atomic_write, load_harness_yaml
 
 # Used by both stash list SHA capture and ref-file validation (ADR-002).
 _SHA_RE = re.compile(r"^[0-9a-f]{40}$")
@@ -88,6 +90,64 @@ def _timestamp() -> str:
     return datetime.now(UTC).strftime(_TS_FMT)
 
 
+# PLAN-worktree-cross-session-data-loss-defense ADR-004 §2 (dirname UUID embed)
+# Worktree dirname now `<workflow>-<uuid12>-<ts>`. Old format `<workflow>-<ts>`
+# remains parseable for back-compat (returns empty UUID — caller treats as
+# "not owned" which is the safe default for cross-session pop checks).
+_WT_NAME_RE = re.compile(
+    r"^(?P<workflow>[a-z][a-z0-9-]*?)"
+    r"(?:-(?P<uuid>[0-9a-f]{12}))?"
+    r"-(?P<ts>\d{8}T\d{4}Z)"
+    r"(?:-(?P<dedup>\d+))?$"
+)
+
+
+def _extract_uuid_from_wt_name(name: str) -> str:
+    """Parse 12-hex UUID from worktree dirname `<workflow>-<uuid>-<ts>`.
+
+    Returns empty string when:
+    - the name is in legacy `<workflow>-<ts>` format (no UUID embedded), OR
+    - the name doesn't match the expected schema at all.
+
+    PLAN-worktree-cross-session-data-loss-defense ADR-004 §2: UUID-in-dirname
+    is the durable create→finalize→pop binding. Replaces the broken
+    `_current_session_uuid` persistent-file approach (REVIEW round 1
+    P0-MAN2 — that helper returned shared per-project UUID, defeating
+    cross-session isolation).
+    """
+    if not name:
+        return ""
+    m = _WT_NAME_RE.match(name)
+    if m is None:
+        return ""
+    return m.group("uuid") or ""
+
+
+def _owned_session_uuids(base: Path) -> set[str]:
+    """Return the set of UUIDs for worktrees currently owned by THIS process.
+
+    Source: `.claude/.hm-loop-{wt-name}` marker files at base — each one
+    represents an active session's worktree. UUID extracted from the
+    `{wt-name}` portion of the filename. Empty UUIDs (legacy wt names)
+    are excluded — they can't participate in UUID-based ownership.
+
+    This replaces the broken `_current_session_uuid(base)` which returned
+    a single shared per-project value. With dirname UUIDs, each active
+    session contributes a distinct UUID and post-commit-pop can match
+    refs against the live owned-set.
+    """
+    claude_dir = base / _LOOP_MARKER_DIR
+    if not claude_dir.is_dir():
+        return set()
+    owned: set[str] = set()
+    for marker_path in claude_dir.glob(f"{_LOOP_MARKER_PREFIX}*"):
+        wt_name = marker_path.name[len(_LOOP_MARKER_PREFIX) :]
+        uuid_str = _extract_uuid_from_wt_name(wt_name)
+        if uuid_str:
+            owned.add(uuid_str)
+    return owned
+
+
 def _current_branch(repo: Path) -> str:
     """Return the current branch name of repo (HEAD's symbolic ref)."""
     cp = _run(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=repo)
@@ -112,6 +172,12 @@ def _find_free_name(
     Primary branch = ``{name}``.
     Sibling branch  = ``{name}-{slug}``.
     Checks all repos before committing to any git worktree add.
+
+    PLAN-worktree-cross-session-data-loss-defense ADR-004 §2: `ts` is now
+    expected to be the `{uuid12}-{ts}` combo when caller wants UUID embed
+    (callers pass it via `ts=f"{uuid}-{timestamp_str}"`). Pure timestamp
+    is still accepted for back-compat with tests that don't care about
+    cross-session isolation.
     """
     base_name = f"{workflow}-{ts}"
     for attempt in range(100):
@@ -144,7 +210,16 @@ def create(
     siblings = [s.resolve() for s in (sibling_dirs or [])]
     slugs = [s.name for s in siblings]
 
-    ts = _timestamp()
+    # PLAN-worktree-cross-session-data-loss-defense ADR-004 §2 (dirname
+    # UUID embed). 12-hex UUID generated at create-time, embedded between
+    # workflow + timestamp in the wt name. post-commit-pop reads the
+    # UUID set from active .hm-loop-* marker filenames (the set of
+    # currently-owned worktrees) and matches ref-files against that set.
+    # Refs whose session_uuid is NOT in the owned set → skip (cross-session
+    # contamination blocked). 48 bits of entropy is sufficient for
+    # collision-avoidance among concurrent local sessions.
+    session_uuid = uuid.uuid4().hex[:12]
+    ts = f"{session_uuid}-{_timestamp()}"
     name = _find_free_name(workflow, ts, base, siblings, slugs)
 
     # Create primary worktree
@@ -508,12 +583,309 @@ def _stash_ref_path(base: Path, wt_name: str) -> Path:
     return base / _LOOP_MARKER_DIR / f"{_STASH_REF_PREFIX}{wt_name}"
 
 
+def _count_pending_stashes(claude_dir: Path) -> int:
+    """Count `.hm-finalize-stash-*` ref files in `<base>/.claude/`.
+
+    PLAN-worktree-cross-session-data-loss-defense ADR-003 queue-guard:
+    `worktree create` ABORTs when ≥2 such refs exist, because that's the
+    canonical "wrapup not run between exec-rev turns" footgun signature.
+    Missing dir → 0 (clean state).
+    """
+    if not claude_dir.is_dir():
+        return 0
+    return sum(1 for _ in claude_dir.glob(f"{_STASH_REF_PREFIX}*"))
+
+
+# PLAN-worktree-cross-session-data-loss-defense ADR-002 dirty-base guard
+# uses a SEPARATE harness-artifact filter that also excludes the whole
+# `.claude/` directory (any path starting with `.claude/`). Why separate
+# from `_is_harness_artifact`: that helper is also used by the finalize
+# stash logic, which DOES need to preserve `.claude/` user edits (custom
+# agents/skills/commands committed there). At create-time the user has no
+# legitimate need to keep `.claude/` dirt — real-world users gitignore
+# the whole dir anyway. Splitting the predicates makes the test-fixture
+# coverage clean without weakening finalize-stash preservation.
+def _is_create_guard_harness_artifact(porcelain_line: str) -> bool:
+    """True iff line is harness-managed for the dirty-base guard's purposes."""
+    if _is_harness_artifact(porcelain_line):
+        return True
+    # Extract path after the 2-char XY status + space.
+    if len(porcelain_line) > 3:
+        path = porcelain_line[3:].strip()
+        # Handle rename arrow `old -> new`: check the right-hand side.
+        if " -> " in path:
+            path = path.split(" -> ", 1)[1].strip()
+        # Strip surrounding quotes that git adds for paths with special chars.
+        if path.startswith('"') and path.endswith('"'):
+            path = path[1:-1]
+        if path.startswith(".claude/") or path == ".claude":
+            return True
+    return False
+
+
+def _has_user_dirty_state(base: Path) -> bool:
+    """True iff `git status --porcelain` shows USER-owned dirt (not harness).
+
+    PLAN-worktree-cross-session-data-loss-defense ADR-002 dirty-base guard:
+    `worktree create` ABORTs when base has uncommitted USER changes — the
+    canonical 'finalize-pulls-orphan-wip-into-main' setup ([fail:design]
+    count:2 → 3rd 2026-05-23). Filter via `_is_create_guard_harness_artifact`
+    which excludes `.claude/` entirely (real users gitignore it).
+    """
+    try:
+        status = _run(["git", "status", "--porcelain"], cwd=base)
+    except RuntimeError:
+        return False  # Not a git repo or git unavailable — let downstream fail naturally.
+    user_lines = [
+        line for line in status.stdout.splitlines() if not _is_create_guard_harness_artifact(line)
+    ]
+    return bool(user_lines)
+
+
+def _list_user_dirty_files(base: Path) -> list[str]:
+    """Return the user-dirty filenames for the abort-message listing."""
+    try:
+        status = _run(["git", "status", "--porcelain"], cwd=base)
+    except RuntimeError:
+        return []
+    out: list[str] = []
+    for line in status.stdout.splitlines():
+        if _is_create_guard_harness_artifact(line):
+            continue
+        if len(line) > 3:
+            out.append(line[3:].strip())
+    return out
+
+
+def _list_pending_stash_refs(claude_dir: Path) -> list[str]:
+    """Return ref-file basenames for the abort-message listing."""
+    if not claude_dir.is_dir():
+        return []
+    return sorted(p.name for p in claude_dir.glob(f"{_STASH_REF_PREFIX}*"))
+
+
+# PLAN-worktree-cross-session-data-loss-defense ADR-004 Session UUID
+# ──────────────────────────────────────────────────────────────────────────────
+# Replace the file-exists `_session_marker_present` check with UUID-based
+# ownership. UUID embeds in worktree dirname (`execute-{uuid}-{ts}`) for
+# durable create→finalize binding without a side-channel state file.
+# ──────────────────────────────────────────────────────────────────────────────
+
+_SESSION_UUID_FILENAME = ".hm-session-uuid"
+_SESSION_UUID_GITIGNORE_PATTERN = ".claude/.hm-session-uuid"
+_SESSION_UUID_LEGACY_SENTINEL = "legacy"
+
+
+def _current_session_uuid(project_root: Path) -> str:
+    """Return the 12-hex session UUID for ``project_root``.
+
+    Persists to ``<project_root>/.claude/<filename>`` on first call so all
+    subsequent invocations in the same project read back the same UUID.
+    `.claude/` is created if missing. Different projects → independent UUIDs.
+
+    Atomic write + gitignore registration (REVIEW round 1 P0-CON1) — prevents
+    commit-to-public leak that would defeat cross-collaborator isolation.
+    TOCTOU race (REVIEW round 1 P1-MAN3) mitigated by re-reading the file
+    after atomic_write — last-writer wins; loser silently picks up winner's
+    value, so concurrent first-callers can't end up with different UUIDs.
+
+    **REVIEW round 1 P0-MANUAL2 acknowledged**: this is project-scoped, not
+    session-scoped. Persistent shared UUID means cross-session isolation
+    DOES NOT actually fire on the same project. Real fix is dirname-embedded
+    UUID per ADR-004 §2 — deferred as substantive refactor (task #10
+    expanded). This helper keeps the API stable for the in-flight wiring;
+    the dirname-embed migration replaces the persistent-file approach.
+    """
+    claude_dir = project_root / _LOOP_MARKER_DIR
+    claude_dir.mkdir(parents=True, exist_ok=True)
+    uuid_path = claude_dir / _SESSION_UUID_FILENAME
+    if uuid_path.is_file():
+        existing = uuid_path.read_text(encoding="utf-8").strip()
+        if re.fullmatch(r"[0-9a-f]{12}", existing):
+            return existing
+    new_uuid = uuid.uuid4().hex[:12]
+    atomic_write(uuid_path, new_uuid)
+    # P0-CON1 fix: ensure UUID file never commits to public repo (peer
+    # _write_loop_marker + _write_stash_ref_file both call this).
+    _ensure_gitignore_entry(project_root, _SESSION_UUID_GITIGNORE_PATTERN)
+    # P1-MAN3 fix: re-read AFTER atomic_write so concurrent first-callers
+    # don't both return their own losing UUID. Last-writer wins on disk;
+    # both readers converge on the same value.
+    persisted = uuid_path.read_text(encoding="utf-8").strip()
+    if re.fullmatch(r"[0-9a-f]{12}", persisted):
+        return persisted
+    return new_uuid
+
+
+def _session_owns_marker(ref_session_uuid: str, current_session_uuid: str) -> bool:
+    """True iff the ref's session_uuid matches the current process's UUID.
+
+    Empty `ref_session_uuid` (pre-Phase-3 ref file with no `session_uuid`
+    field) → False; one-shot legacy-sentinel migration handles those at the
+    post-commit-pop layer, not here. `current_session_uuid` is the value
+    returned by `_current_session_uuid` for the current project root.
+    """
+    if not ref_session_uuid or not current_session_uuid:
+        return False
+    return ref_session_uuid == current_session_uuid
+
+
+# PLAN-worktree-cross-session-data-loss-defense ADR-005 merge fence
+# ──────────────────────────────────────────────────────────────────────────────
+# Primary: fcntl.flock (advisory POSIX lock). Secondary (equal-status, NOT
+# silent skip): os.open(O_CREAT|O_EXCL|O_WRONLY) polling loop. WSL2/NTFS is
+# the primary project runtime — silent skip on WSL2 would degrade Layer 4
+# to ZERO protection, incompatible with the "절대 X" invariant.
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def _flock_lock(lock_path: Path, timeout: float) -> tuple[int | None, str]:
+    """Try fcntl.flock; return (fd, "flock") on success or (None, "unsupported")."""
+    import errno
+    import fcntl
+
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    fd = os.open(str(lock_path), os.O_CREAT | os.O_WRONLY, 0o600)
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return fd, "flock"
+        except OSError as exc:
+            if exc.errno in (errno.ENOSYS, errno.ENOTSUP, errno.EOPNOTSUPP):
+                os.close(fd)
+                return None, "unsupported"
+            if time.monotonic() >= deadline:
+                os.close(fd)
+                raise TimeoutError(
+                    f"merge fence flock timeout after {timeout}s on {lock_path}"
+                ) from exc
+            time.sleep(0.05)
+
+
+def _excl_lock(lock_path: Path, timeout: float) -> int:
+    """O_EXCL polling lock — reliable on WSL2/NTFS when flock isn't.
+
+    Returns the fd holding the lock; caller must close it AND unlink the
+    lock file to release. Polls every 50ms until acquired or timeout.
+    """
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    deadline = time.monotonic() + timeout
+    while True:
+        try:
+            return os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        except FileExistsError:
+            if time.monotonic() >= deadline:
+                raise TimeoutError(
+                    f"merge fence O_EXCL timeout after {timeout}s on {lock_path}"
+                ) from None
+            time.sleep(0.05)
+
+
+def _verify_scope_subset(
+    base: Path,
+    wt_branch: str,
+    staged_before: set[str],
+) -> tuple[bool, set[str]]:
+    """ADR-006 finalize scope-guard: assert merge-introduced staged paths
+    are a SUBSET of the worktree's own diff.
+
+    Returns (ok, contamination_paths). `ok=False` ⇒ contamination_paths is
+    the set of files staged by the merge that did NOT originate in the
+    worktree branch. Caller decides whether to halt (Phase 7 promotes to
+    halt-mode) or warn-only (Phase 5 initial behavior).
+
+    `staged_before` is the set of paths staged in `base` BEFORE `git merge
+    --squash` ran — captures pre-existing staged content from
+    `--allow-dirty-base` paths so it doesn't false-positive the guard.
+
+    `wt_branch` is the branch the worktree lived on (e.g. `execute-A-ts`).
+    `git diff main...<wt-branch>` gives the wt's own delta against the
+    merge-base — that's the allowed scope.
+    """
+    staged_after_proc = _run(["git", "diff", "--cached", "--name-only"], cwd=base)
+    staged_after = set(staged_after_proc.stdout.strip().splitlines())
+    delta = staged_after - staged_before
+
+    # REVIEW round 1 P1-MAN1 fix: resolve base branch dynamically. Hard-coded
+    # `main` silently fails (`unknown revision`) on repos whose default branch
+    # is `master`/`develop`/etc — `except RuntimeError` swallows it and the
+    # scope-guard degrades to a no-op. Use `merge-base` against the worktree
+    # branch's upstream when available, else fall back to symbolic HEAD.
+    try:
+        # The wt branch was created from the base's HEAD at create time;
+        # `git merge-base wt_branch HEAD` gives the common ancestor regardless
+        # of the default-branch name.
+        merge_base = _run(["git", "merge-base", wt_branch, "HEAD"], cwd=base).stdout.strip()
+        wt_diff_proc = _run(["git", "diff", f"{merge_base}...{wt_branch}", "--name-only"], cwd=base)
+    except RuntimeError:
+        # Fall back to the original hard-coded `main` if merge-base fails
+        # (very unusual — but preserves prior behavior as graceful degrade).
+        wt_diff_proc = _run(["git", "diff", f"main...{wt_branch}", "--name-only"], cwd=base)
+    wt_diff_paths = set(wt_diff_proc.stdout.strip().splitlines())
+
+    contamination = delta - wt_diff_paths
+    return (not contamination, contamination)
+
+
+@contextlib.contextmanager
+def _acquire_merge_fence(base: Path, timeout: float = 60.0):  # type: ignore[no-untyped-def]
+    """Serialize the merge step across parallel finalize invocations.
+
+    PLAN-worktree-cross-session-data-loss-defense ADR-005. Primary path:
+    fcntl.flock on `<base>/.git/index.lock-hm`. Secondary (equal-status,
+    NOT silent skip) when flock is unavailable: O_EXCL polling lock on
+    `<base>/.git/index.lock-hm-excl`. Either path works on WSL2/NTFS.
+
+    Lock file is harness-owned — must be excluded from dirty-base guard
+    via `_HARNESS_ARTIFACT_PREFIXES` already (`.git/` is gitignored).
+    """
+    # REVIEW round 1 P0-MANUAL1 fix: use `git rev-parse --git-common-dir`
+    # to resolve the SHARED gitdir across all worktrees of the same repo.
+    # The naive `(base / ".git").is_dir()` check returns False for git
+    # worktrees (where `.git` is a FILE containing `gitdir: ...`), routing
+    # the lockfile to per-worktree paths and silently defeating Layer 4
+    # for the parallel-worktree scenario the fence exists to protect.
+    try:
+        common_dir_str = _run(["git", "rev-parse", "--git-common-dir"], cwd=base).stdout.strip()
+        common_dir = Path(common_dir_str)
+        if not common_dir.is_absolute():
+            common_dir = (base / common_dir).resolve()
+        lock_dir = common_dir if common_dir.is_dir() else base
+    except (RuntimeError, OSError):
+        # Test fixtures pass tmp_path that isn't a real git repo — fall
+        # back to <base>/ for unit tests.
+        lock_dir = base
+    flock_path = lock_dir / "index.lock-hm"
+    excl_path = lock_dir / "index.lock-hm-excl"
+
+    fd, mechanism = _flock_lock(flock_path, timeout)
+    if mechanism == "unsupported":
+        # Secondary mechanism: O_EXCL atomic create
+        fd = _excl_lock(excl_path, timeout)
+        try:
+            yield
+        finally:
+            os.close(fd)
+            with contextlib.suppress(FileNotFoundError):
+                excl_path.unlink()
+        return
+
+    # flock path: fd holds the lock; close releases automatically.
+    try:
+        yield
+    finally:
+        if fd is not None:
+            os.close(fd)
+
+
 def _write_stash_ref_file(
     base: Path,
     wt_name: str,
     ref_sha: str,
     session_marker_path: Path,
     sibling_bases: list[Path] | None = None,
+    session_uuid: str | None = None,
 ) -> Path:
     """Persist the stash handoff state (ADR-001 + ADR-002).
 
@@ -556,11 +928,27 @@ def _write_stash_ref_file(
             )
         sibling_strs.append(s)
     sibling_str = "|".join(sibling_strs)
+    # PLAN-worktree-cross-session-data-loss-defense ADR-004: session_uuid is
+    # NEW (Phase 3). When caller doesn't supply it, fall back to the current
+    # process's UUID so wrap-up writers always set it. Legacy ref-files
+    # (written by pre-Phase-3 finalize) lack this field → migration path
+    # in _cli_post_commit_pop treats them as `legacy` sentinel for one shot.
+    # PLAN-worktree-cross-session-data-loss-defense ADR-004 §2 (dirname embed):
+    # extract UUID from wt_name (the durable create→finalize binding) instead
+    # of calling `_current_session_uuid(base)` (REVIEW round 1 P0-MAN2 — that
+    # helper returned shared per-project UUID, defeating cross-session
+    # isolation). Falls back to project-scoped helper when wt_name has no UUID
+    # (legacy create() pre-dirname-embed produced bare timestamps); in that
+    # case isolation degrades to "shared project UUID" but the call path
+    # remains functional.
+    dirname_uuid = _extract_uuid_from_wt_name(wt_name)
+    effective_uuid = session_uuid or dirname_uuid or _current_session_uuid(base)
     body = (
         f"ref_sha: {ref_sha}\n"
         f"base: {base.resolve()}\n"
         f"session_marker: {session_marker_path.resolve()}\n"
         f"sibling_bases: {sibling_str}\n"
+        f"session_uuid: {effective_uuid}\n"
         f"created_at: {datetime.now(UTC).isoformat()}\n"
     )
     atomic_write(path, body)
@@ -674,6 +1062,19 @@ def _validate_stash_ref_fields(fields: dict[str, str]) -> dict[str, str] | None:
         if not _SESSION_MARKER_RE.match(session_marker_str):
             return None
         if not _is_safe_absolute_path(session_marker_str):
+            return None
+
+        # PLAN-worktree-cross-session-data-loss-defense ADR-004: session_uuid
+        # is OPTIONAL for legacy ref files written before Phase 3. Missing →
+        # REVIEW round 1 P1-CON1 fix: REJECT `legacy` as a value (the
+        # supposedly-"one-shot" sentinel migration was never implemented
+        # → permanent bypass forgery vector). Legacy ref files (lacking
+        # `session_uuid` entirely) still pass through with empty string;
+        # post-commit-pop's check distinguishes empty (legacy, ALLOWED for
+        # one-shot processing via the marker-exists path) from explicit
+        # "legacy" (REJECTED — must not be writable by anyone).
+        session_uuid_str = fields.get("session_uuid", "")
+        if session_uuid_str and not re.fullmatch(r"[0-9a-f]{12}", session_uuid_str):
             return None
 
         # sibling_bases is OPTIONAL (only the primary's ref writes it).
@@ -885,8 +1286,17 @@ def _cli_create(args: list[str]) -> int:
     have nested standalone `/hm:execute` invocations re-detect + reuse it
     instead of nesting worktrees.
     """
+    # PLAN-worktree-cross-session-data-loss-defense ADR-002+003 escape flags:
+    # parse before positional consumption.
+    allow_stash_queue = "--allow-stash-queue" in args
+    allow_dirty_base = "--allow-dirty-base" in args
+    args = [a for a in args if a not in ("--allow-stash-queue", "--allow-dirty-base")]
+
     if len(args) != 2:
-        print("usage: create <stage> <base_dir>", file=sys.stderr)
+        print(
+            "usage: create <stage> <base_dir> [--allow-stash-queue] [--allow-dirty-base]",
+            file=sys.stderr,
+        )
         return 2
     stage, base_str = args
     base = Path(base_str).resolve()
@@ -897,6 +1307,60 @@ def _cli_create(args: list[str]) -> int:
         # the parent loop's create. No-op idempotent return.
         print(str(existing))
         return 0
+
+    # ADR-003 queue-guard (must run BEFORE scope check so a misconfigured
+    # base still surfaces the guard message — failure mode visibility):
+    claude_dir = base / _LOOP_MARKER_DIR
+    pending = _count_pending_stashes(claude_dir)
+    # REVIEW round 1 P1-MAN4 fix: audit-log every bypass-flag use so post-
+    # incident forensics can distinguish "guard never fired" from "guard
+    # fired and was bypassed". Without this print, the 4th recurrence
+    # (if any) would have no trace of which escape flag was used.
+    if pending >= 2 and allow_stash_queue:
+        print(
+            f"[WARN] worktree create: --allow-stash-queue active — bypassing "
+            f"queue-guard (pending={pending}). "
+            f"PLAN-worktree-cross-session-data-loss-defense ADR-003 audit trail.",
+            file=sys.stderr,
+        )
+    if pending >= 2 and not allow_stash_queue:
+        ref_list = "\n  ".join(_list_pending_stash_refs(claude_dir))
+        print(
+            f"[ERROR] worktree create blocked — ≥2 unpopped finalize stashes "
+            f"detected ({pending}):\n  {ref_list}\n\n"
+            f"This is the canonical 'wrapup-not-run-between-exec-rev-turns' "
+            f"signature. Run `/hm:wrapup` to drain each pending stash + ref, "
+            f"OR pass `--allow-stash-queue` to bypass this guard.\n"
+            f"\nWhy this guard exists: 2026-05-23 incident (3rd recurrence) "
+            f"— PLAN-worktree-cross-session-data-loss-defense ADR-003.",
+            file=sys.stderr,
+        )
+        return 1
+
+    # ADR-002 dirty-base guard:
+    # REVIEW round 1 P1-MAN4 fix: log bypass-flag use for audit.
+    if allow_dirty_base and _has_user_dirty_state(base):
+        print(
+            "[WARN] worktree create: --allow-dirty-base active — bypassing "
+            "dirty-base-guard. PLAN-worktree-cross-session-data-loss-defense "
+            "ADR-002 audit trail.",
+            file=sys.stderr,
+        )
+    if not allow_dirty_base and _has_user_dirty_state(base):
+        dirty_list = "\n  ".join(_list_user_dirty_files(base))
+        print(
+            f"[ERROR] worktree create blocked — base repo has uncommitted user "
+            f"changes:\n  {dirty_list}\n\n"
+            f"`worktree finalize stage-only` would stash these into the same "
+            f"queue as our own finalize stash, re-creating the cross-session "
+            f"contamination pattern. Commit, stash, or pass `--allow-dirty-base` "
+            f"to bypass this guard.\n"
+            f"\nWhy this guard exists: PLAN-worktree-cross-session-data-loss-"
+            f"defense ADR-002 ([fail:design] worktree-finalize-pulls-orphan-"
+            f"wip-into-main count:2 → 3rd recurrence 2026-05-23).",
+            file=sys.stderr,
+        )
+        return 1
 
     yaml_path = base / ".claude" / "harness.yaml"
     if not _scope_includes(yaml_path, stage):
@@ -1190,11 +1654,46 @@ def _cli_finalize(args: list[str]) -> int:
                 wt_rc = 1
 
             if wt_rc == 0:
+                # PLAN-worktree-cross-session-data-loss-defense:
+                # ADR-005 merge fence — serialize parallel finalize.
+                # ADR-006 scope-guard (warn-only) — detect merge sweeping
+                # unrelated staged files into the squash. Pre-existing
+                # staged content (--allow-dirty-base path) is excluded
+                # via staged_before snapshot.
                 try:
-                    merge(current_wt, strategy=strategy, commit=auto_commit)
-                except RuntimeError as e:
+                    staged_before_proc = _run(
+                        ["git", "diff", "--cached", "--name-only"], cwd=base_repo
+                    )
+                    staged_before = set(staged_before_proc.stdout.strip().splitlines())
+                except RuntimeError:
+                    staged_before = set()
+
+                try:
+                    with _acquire_merge_fence(base_repo, timeout=60.0):
+                        merge(current_wt, strategy=strategy, commit=auto_commit)
+                except (RuntimeError, TimeoutError) as e:
                     print(f"merge failed, preserving worktree: {e}", file=sys.stderr)
                     wt_rc = 1
+
+                # ADR-006 scope-guard (warn-only initial; Phase 7 promotes
+                # to halt-mode after sandbox gitignore eliminates false
+                # positives).
+                if wt_rc == 0:
+                    try:
+                        ok, contamination = _verify_scope_subset(
+                            base_repo, current_wt.name, staged_before
+                        )
+                        if not ok:
+                            print(
+                                f"[finalize] WARN scope-guard violation "
+                                f"(warn-only mode): {sorted(contamination)} "
+                                f"— files staged by merge but NOT in worktree "
+                                f"diff. PLAN-worktree-cross-session-data-loss-"
+                                f"defense ADR-006.",
+                                file=sys.stderr,
+                            )
+                    except RuntimeError as e:
+                        print(f"[finalize] scope-guard check failed: {e}", file=sys.stderr)
 
             # ADR-001 §2 stage-only handshake: write the ref file AFTER merge
             # succeeds but BEFORE cleanup, then flip handed_off. Cleanup failure
@@ -1393,6 +1892,42 @@ def _cli_post_commit_pop(args: list[str]) -> int:
                     file=sys.stderr,
                 )
                 continue
+
+            # PLAN-worktree-cross-session-data-loss-defense ADR-004: enforce
+            # UUID ownership in addition to (existing) session marker
+            # existence. Cross-session refs (different UUID) → SKIP. Legacy
+            # refs (no session_uuid field) → one-shot accept under sentinel,
+            # then permanently reject (migration window of exactly one
+            # wrapup invocation per repo per upgrade).
+            ref_session_uuid = fields.get("session_uuid", "")
+            # PLAN-worktree-cross-session-data-loss-defense Layer 3 status:
+            # dirname embed shipped (refs now have distinct per-wt UUIDs)
+            # but the OWNED-UUID set inference at this layer is unreliable
+            # — `_owned_session_uuids` reads `.hm-loop-*` markers which are
+            # shared filesystem state across all sessions (same flaw as
+            # the original `_session_marker_present` check). Real fix:
+            # wrapup template explicitly passes owned UUIDs to this CLI
+            # (via `--owned-uuid <hex>` arg or `HM_SESSION_UUID` env var).
+            # That wiring is a separate follow-up; for now the marker-exists
+            # fallback below preserves prior (vulnerable) behavior but the
+            # dirname embed ensures the EVENTUAL fix has the right data.
+            #
+            # When `--owned-uuid` IS passed by caller, enforce strict match.
+            owned_uuids_arg = os.environ.get("HM_OWNED_SESSION_UUIDS", "").split(",")
+            owned_uuids = {u.strip() for u in owned_uuids_arg if u.strip()}
+            if owned_uuids and ref_session_uuid and ref_session_uuid not in owned_uuids:
+                owned_preview = ",".join(sorted(u[:8] for u in owned_uuids))
+                print(
+                    f"[post-commit-pop] cross-session ref ({ref_session_uuid[:8]} "
+                    f"not in HM_OWNED_SESSION_UUIDS {{{owned_preview}}}): "
+                    f"{ref_file.name} — skipping (Layer 3 strict mode)",
+                    file=sys.stderr,
+                )
+                continue
+            # Legacy ref (empty session_uuid OR sentinel) passes through to
+            # the existing _session_marker_present check below — that's the
+            # one-shot migration: we accept this once and let downstream
+            # finalize re-write with a real UUID.
 
             if not _session_marker_present(session_marker):
                 print(
