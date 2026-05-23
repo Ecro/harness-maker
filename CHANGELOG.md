@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-05-24
+
 ### Added: cross-session worktree data-loss defense (PLAN-worktree-cross-session-data-loss-defense)
 
 5-layer defense after 3rd incident (2026-05-23) of `[fail:design] worktree-finalize-pulls-orphan-wip-into-main`. Each layer independently catches a different failure mode; only simultaneous regression across all 5 can re-open data loss:
@@ -32,13 +34,12 @@
 - **P1-MAN3 TOCTOU re-read** — `_current_session_uuid` re-reads file AFTER atomic_write (concurrent first-callers converge on disk value).
 - **P1-MAN4 bypass flag stderr `[WARN]` logging** — every `--allow-stash-queue` / `--allow-dirty-base` use now leaves audit trail.
 
-### Follow-ups
+### Follow-ups landed
 
-- Task #14: wrapup template must set `HM_OWNED_SESSION_UUIDS` env before invoking `post-commit-pop` to engage Layer 3 strict mode (until then, marker-exists fallback = pre-Phase-3 behavior).
-- Wrapup template prose rewrite (drop-FORBIDDEN + cherry-pick recovery + `<!-- @hm:drop-policy:user-confirmed -->` marker + grep guard test).
-- Phase 6: `git rm --cached` for sandbox content + conftest regen fixture (USER ACTION required — destructive).
-- Phase 7: promote parallel-session integration test to always-run in CI.
-- Pre-existing test fixtures: 3 tests need `.gitignore` updates to mirror real-world `.claude/` convention (task #9).
+- **Task #14 closed (c6617fe)**: wrapup template Step 7.5 now exports `HM_OWNED_SESSION_UUIDS` via new `owned-uuids` CLI subcommand before invoking `post-commit-pop`. Layer 3 strict mode is now end-to-end load-bearing — env-var per-process boundary replaces filesystem-shared marker scan.
+- **Phase 6 closed (8d50bac)**: `git rm --cached` applied to `tests/e2e/sandbox*/` (130 files) + `tests/fixtures/*/CLAUDE.md`. Sandbox seed scaffolding now re-created at test time via session-scoped autouse fixture (513c224, `tests/e2e/conftest.py`).
+- **Phase 7 closed (f567899)**: `tests/integration/test_worktree_parallel_session.py` opt-in via `HM_RUN_PARALLEL_SESSION=1`; passes after Phase 3 follow-up dirname-embed land.
+- **Phase 9 closed (f567899)**: 3 pre-existing test fixtures updated to match real-world `.gitignore` convention.
 
 ## [0.24.0] - 2026-05-23
 
