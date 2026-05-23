@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+## [0.25.1] - 2026-05-24
+
+### Changed: loop self-pause prohibition rail (`templates/commands/hm/loop.md.j2`)
+
+After a 2026-05-24 forensic observed a `/hm:loop` driver halting iter 1/50 with an invented `stop_reason="context-budget pause (operator decision; ... needs fresh context to avoid half-merged state)"` instead of running `/compact`, the loop spec gains a 3-layer prohibition that closes the rationalization path:
+
+- **L0 — Self-pause prohibition rail** (new subsection right after Safety rails). Negatively enumerates the 4 forbidden halt rationales (context-budget / phase-boundary / operator-decision / half-merge-risk) with corrective action per row. Output prefix is strict — final report MUST start with `loop done — `; `loop paused` / `loop stopped` / `loop suspended` / `loop hold` are spec violations.
+- **L1 — `/compact` mandatory procedure** (replaces the prior "Context advisory" block). The advisory wording is gone; `iter % 10 == 0` OR context usage ≥60% triggers a 4-step procedure (persist runtime → `/compact` → reload counters → continue iter). Explicitly states `/compact` and halt are mutually exclusive — there is no third branch where pause is correct.
+- **L6 — Per-iter anti-self-pause reminder** (4-bullet block at every iter start). Reinforces legal halt list, mandatory `/compact`, phase-boundary ≠ stopping point, and required output prefix.
+- **Section 8 schema strictness** — `stop_reason` field now enumerates the 8 legal strings (incl. `blocked: <reason>` escape hatch and `user interrupt`). Any other string surfaces as a regression, not normalized into schema.
+
+### Why patch-level
+
+Behavior-strengthening only — no breaking change. Existing legitimate halts (max_iter / time_cap / failed_streak / feature×3 / Gate 0 exhausted / convergence) all continue to fire on the same conditions. The rail only blocks LLM-invented `stop_reason` strings that were never in the schema.
+
 ## [0.25.0] - 2026-05-24
 
 ### Added: cross-session worktree data-loss defense (PLAN-worktree-cross-session-data-loss-defense)

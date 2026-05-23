@@ -518,6 +518,40 @@ You are the driver. Track state via `TodoWrite` and your working memory.
 5. Ping every 5 iterations: `autoloop ping: iter=<N> target=<name>`
 6. Convergence check **before** each iteration body
 
+#### Self-pause prohibition (anti-drift rail)
+
+The 6 safety rails above are the **COMPLETE LIST** of legal halt
+conditions. Any other halt is a spec regression. The following are
+explicitly forbidden as halt reasons — they are all anti-patterns the
+loop driver has been observed to invent under context pressure or at
+phase boundaries:
+
+| Forbidden halt reason | Correct action |
+|---|---|
+| "context-budget pause" / "context window full" / "need fresh context" | Run `/compact`, then continue iter. NEVER halt. |
+| "Phase N complete, pause before Phase N+1" / "natural stopping boundary" / "logical chunk done" | Continue to next iter. The per-iter workflow already handles fresh planning when needed. |
+| "operator decision to pause" / "user wants fresh context" | The loop body **cannot** use {% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %} (autoloop autonomous-decision protocol). Any "operator decision" emitted from inside the loop body is a hallucination. |
+| "half-merged state risk" / "Phase N+1 needs clean slate to avoid X" | Worktree isolation already separates state. The concern is unfounded by design. |
+
+**Output format is strict.** The final report (Section 8) MUST start with
+`loop done — `. The prefixes `loop paused`, `loop stopped`, `loop suspended`,
+`loop hold`, or any other variant are forbidden — they are not in the
+emit schema. There is no "pause" state in the loop lifecycle. The loop
+is either running, converged, or halted via one of the 6 safety rails.
+
+**Genuinely cannot continue?** (tooling broken, irrecoverable conflict,
+environment failure) — increment `failed_streak` and halt with
+`stop_reason="blocked: <one-sentence reason>"`. This routes through
+safety rail #3 and surfaces the failure on the standard path. Do NOT
+invent a new `stop_reason` string.
+
+**Why this rail exists**: 2026-05-24 forensic — a `multi-pane-deep-review`
+loop driver halted iter 1/50 with the invented `stop_reason="context-budget
+pause (operator decision; Phase 2 ... needs fresh context to avoid
+half-merged state)"`. The model rationalized self-pause when context grew
+instead of running `/compact` per the procedure below. This rail makes
+the prohibition negatively explicit so the rationalization path is closed.
+
 #### Per-iter workflow selection
 
 Each iter invokes one fused workflow command:
@@ -556,12 +590,39 @@ intent and could iterate over the wrong stages.
 
 #### Iteration body (same for feature and improve mode)
 
-> **Context advisory**: Every 10 iterations (`iter % 10 == 0`) or when you
-> notice the context window is more than 60% full, run `/compact` before
-> starting the next iteration. Long loops lose spec details to compaction;
-> proactively compacting keeps the full specification in context.
+##### Context maintenance (MANDATORY, NOT advisory)
+
+At the start of every iter — **before** the cap+convergence check — run
+this procedure. It is not optional and not an advisory:
+
+1. Estimate current context usage. If unsure, assume `≥ 60%` once
+   `iter ≥ 8` (long loops drift below the spec horizon quickly).
+2. If `iter % 10 == 0` OR estimated context usage `≥ 60%`:
+   - **a.** Persist the `runtime:` section to
+     `work-docs/loop-context/<slug>.yaml` per Step 4-F's schema (counters,
+     `completed[]`, streaks). This is the safety net for the next step.
+   - **b.** Run `/compact` immediately.
+   - **c.** After `/compact` completes, reload counters per
+     "Post-`/compact` recovery" (Step 3 of section 4-F).
+   - **d.** Continue the iter body. **`/compact` is the alternative to
+     halting. The two are mutually exclusive — never both, never
+     neither.** There is no third branch where "pause the loop" is
+     a valid response to context pressure.
+
+> If `/compact` itself fails (e.g. the harness rejects the call), that is
+> a genuine environmental blocker — `failed_streak++` and halt with
+> `stop_reason="blocked: /compact unavailable"` per the self-pause
+> prohibition rail.
 
 For each iter (until convergence or any safety rail fires):
+
+> **Per-iter anti-self-pause reminder** (read at every iter start):
+> 1. Legal halt reasons are ONLY the 6 safety rails above. Any other
+>    `stop_reason` string is a regression.
+> 2. Context usage ≥ 60% → mandatory `/compact`, never halt.
+> 3. Phase boundary reached ≠ stopping point. The default is to enter
+>    the next iter; the loop is sized to span phase boundaries.
+> 4. Final report MUST start with `loop done — ` (no `loop paused`).
 
 1. **Cap + convergence checks** (safety rails above)
 2. **Pick work unit** (mode-specific):
@@ -890,7 +951,7 @@ When the loop halts (convergence, safety rail, or hard error):
 
 ### 8. Report
 
-When the loop halts (any reason):
+When the loop halts (any reason — per the 6 safety rails above):
 
 ```
 loop done — converged=<bool> iter=<N>/<max_iter>  mode=<mode>
@@ -901,6 +962,27 @@ loop done — converged=<bool> iter=<N>/<max_iter>  mode=<mode>
   spec: <spec path>
   context: work-docs/loop-context/<slug>.yaml
 ```
+
+**Prefix is part of the schema.** The first token MUST be `loop done`.
+The variants `loop paused`, `loop stopped`, `loop suspended`, `loop hold`
+are NOT in the schema — they are anti-pattern outputs flagged by the
+self-pause prohibition rail (Section 4 "Safety rails"). If you find
+yourself about to emit such a prefix, the correct path is to either
+run `/compact` (context pressure) or halt via safety rail #3 with
+`stop_reason="blocked: ..."` (genuine blocker).
+
+**`stop_reason` is constrained.** It must be one of:
+- `max_iter (<N>) reached`
+- `time_cap (<N>h) reached`
+- `<N> consecutive failures`
+- `feature <name> retried <N> times`
+- `Gate 0 exhausted retries on <stage>`
+- `stopping criteria met` (improve mode convergence)
+- `blocked: <one-sentence reason>` (escape hatch via failed_streak)
+- `user interrupt` (explicit operator Ctrl+C / /esc from outside the loop body)
+
+Any other `stop_reason` string is a regression — surface it as a bug
+report, do not normalize it into the schema.
 
 For non-converged halts, also emit:
 - In-flight feature/cycle when stopped
