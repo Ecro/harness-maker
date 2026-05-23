@@ -120,3 +120,57 @@ def test_session_owns_marker_mismatched_uuid_returns_false() -> None:
 
 def test_session_owns_marker_empty_ref_uuid_returns_false() -> None:
     assert _session_owns_marker("", "aabbccddeeff") is False
+
+
+# ── owned-uuids CLI (task #14 — HM_OWNED_SESSION_UUIDS env source) ─────────
+
+
+def test_owned_uuids_cli_empty(tmp_path: Path) -> None:
+    """No markers → prints empty CSV (single newline)."""
+    import subprocess
+    import sys
+
+    proc = subprocess.run(
+        [sys.executable, "-m", "harness_maker.worktree", "owned-uuids", str(tmp_path)],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert proc.stdout.strip() == ""
+
+
+def test_owned_uuids_cli_csv_sorted(tmp_path: Path) -> None:
+    """Multiple markers → CSV sorted by UUID."""
+    import subprocess
+    import sys
+
+    cd = tmp_path / _LOOP_MARKER_DIR
+    cd.mkdir()
+    (cd / f"{_LOOP_MARKER_PREFIX}execute-bbbbbbbbbbbb-20260524T0100Z").write_text("x")
+    (cd / f"{_LOOP_MARKER_PREFIX}execute-aaaaaaaaaaaa-20260524T0101Z").write_text("x")
+    proc = subprocess.run(
+        [sys.executable, "-m", "harness_maker.worktree", "owned-uuids", str(tmp_path)],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert proc.stdout.strip() == "aaaaaaaaaaaa,bbbbbbbbbbbb"
+
+
+def test_owned_uuids_cli_excludes_legacy_markers(tmp_path: Path) -> None:
+    """Legacy wt names without UUID → omitted (already covered by helper test;
+    this asserts CLI surface."""
+    import subprocess
+    import sys
+
+    cd = tmp_path / _LOOP_MARKER_DIR
+    cd.mkdir()
+    (cd / f"{_LOOP_MARKER_PREFIX}execute-20260524T0100Z").write_text("x")
+    (cd / f"{_LOOP_MARKER_PREFIX}execute-aaaaaaaaaaaa-20260524T0101Z").write_text("x")
+    proc = subprocess.run(
+        [sys.executable, "-m", "harness_maker.worktree", "owned-uuids", str(tmp_path)],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert proc.stdout.strip() == "aaaaaaaaaaaa"

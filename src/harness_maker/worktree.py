@@ -1987,12 +1987,33 @@ def _cli_post_commit_pop(args: list[str]) -> int:
     return overall_rc
 
 
+def _cli_owned_uuids(args: list[str]) -> int:
+    """`python -m harness_maker.worktree owned-uuids <base_dir>` — CSV of active UUIDs.
+
+    PLAN-worktree-cross-session-data-loss-defense task #14: wrapup template
+    captures the active-marker owned set via this subcommand and exports it
+    as `HM_OWNED_SESSION_UUIDS` env before invoking `post-commit-pop`, which
+    then runs in Layer 3 strict mode (cross-session refs SKIPped).
+
+    Prints the CSV (or empty string) to stdout, newline-terminated. Empty
+    output is a legitimate "no active sessions" state, not an error.
+    """
+    if len(args) != 1:
+        print("usage: owned-uuids <base_dir>", file=sys.stderr)
+        return 2
+    base = Path(args[0]).resolve()
+    uuids = sorted(_owned_session_uuids(base))
+    print(",".join(uuids))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     """Dispatch worktree subcommand from argv."""
     args = list(sys.argv[1:] if argv is None else argv)
     if not args:
         print(
-            "usage: python -m harness_maker.worktree <create|finalize|post-commit-pop> [...]",
+            "usage: python -m harness_maker.worktree "
+            "<create|finalize|post-commit-pop|owned-uuids> [...]",
             file=sys.stderr,
         )
         return 2
@@ -2003,6 +2024,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cli_finalize(rest)
     if sub == "post-commit-pop":
         return _cli_post_commit_pop(rest)
+    if sub == "owned-uuids":
+        return _cli_owned_uuids(rest)
     print(f"unknown subcommand: {sub}", file=sys.stderr)
     return 2
 

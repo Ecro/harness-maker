@@ -233,15 +233,17 @@ The commit captures: the staged execute changes + the memory updates + the PLAN 
 
 ### Step 7.5 — Post-commit stash pop (stage-only handshake)
 
-If `/hm:execute` ran in stage-only mode AND the base repo had unrelated dirty work, finalize deferred the stash pop to this point so the user's WIP does not contaminate the commit. Run `post-commit-pop` to restore it (no-op when no ref file is present):
+If `/hm:execute` ran in stage-only mode AND the base repo had unrelated dirty work, finalize deferred the stash pop to this point so the user's WIP does not contaminate the commit. Run `post-commit-pop` to restore it (no-op when no ref file is present).
+
+**Cross-session isolation (PLAN-worktree-cross-session-data-loss-defense task #14):** capture the set of session-UUIDs owned by THIS process (one UUID per active `.claude/.hm-loop-*` marker) and export it as `HM_OWNED_SESSION_UUIDS` before invoking `post-commit-pop`. The CLI then runs in Layer 3 **strict mode** — any finalize-stash ref file whose `session_uuid` is not in this env-supplied set is SKIPped rather than popped. This prevents Session B's wrapup from touching Session A's stash entries when both sessions write to the same base repo. Empty CSV is the legitimate "no active sessions" state (not an error).
 
 {% if is_codex %}
 ```
-Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree post-commit-pop \"$(pwd)\"")
+Bash("HM_OWNED_SESSION_UUIDS=\"$(uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree owned-uuids \"$(pwd)\")\" uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree post-commit-pop \"$(pwd)\"")
 ```
 {% else %}
 ```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree post-commit-pop "$(pwd)"
+!HM_OWNED_SESSION_UUIDS="$(uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree owned-uuids "$(pwd)")" uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree post-commit-pop "$(pwd)"
 ```
 {% endif %}
 
