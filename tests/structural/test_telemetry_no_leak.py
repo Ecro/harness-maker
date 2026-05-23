@@ -57,6 +57,11 @@ _OBSERVABILITY_ALLOWLIST: frozenset[str] = frozenset(
         # `.claude/observability/metrics-*.jsonl` for the LLM judgment context
         # (in-band only; no socket; gated on feedback.enabled).
         "src/harness_maker/templates/agents/_partials/feedback_dispatcher.md.j2",
+        # PLAN-loop-mid-stop-and-review-skip post-commit P1 #7 fix — Gate 0
+        # Option B writes a JSONL audit entry at
+        # `.claude/observability/gate0-skips.jsonl` so /hm:health can detect
+        # systematic skip patterns.
+        "src/harness_maker/templates/commands/hm/loop.md.j2",
     }
 )
 

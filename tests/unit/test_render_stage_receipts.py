@@ -42,7 +42,7 @@ def rendered_root(tmp_path_factory: pytest.TempPathFactory) -> Path:
     return out
 
 
-STAGE_NAMES = ("execute", "review", "wrapup", "plan", "spec", "research")
+STAGE_NAMES = ("execute", "review", "wrapup", "plan", "spec", "research", "verify")
 
 
 @pytest.mark.parametrize("stage", STAGE_NAMES)

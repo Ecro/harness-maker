@@ -100,6 +100,43 @@ class ImprovementContext(BaseModel):
     notes: list[str] = Field(default_factory=list)
 
 
+class LastTestResult(BaseModel):
+    """Baseline for Gate 3 (regression check) in /hm:loop.
+
+    Stored under runtime.last_test_result. exit_code is None until iter 1
+    runs; failing is the set of failing test names.
+    """
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    exit_code: int | None = None
+    failing: list[str] = Field(default_factory=list)
+
+
+class RuntimeBlock(BaseModel):
+    """Ephemeral per-run state persisted alongside LoopContext.
+
+    Lives in `runtime:` of work-docs/loop-context/<slug>.yaml. Cleared at
+    loop start; reloaded after /compact. Must not bleed across runs (only
+    `context:` persists across runs).
+
+    PLAN-loop-mid-stop-and-review-skip ADR-006: `stage_retry_counts` was
+    added by Phase 3 but the original LoopContext was strict + extra='forbid'
+    with no runtime field declared — every /compact recovery would raise
+    ValidationError. This model closes that gap.
+    """
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    convergence_streak: int = 0
+    checklist_fail_counts: dict[str, int] = Field(default_factory=dict)
+    criterion_ambiguity_counts: dict[str, int] = Field(default_factory=dict)
+    # Key format: "iter-<N>:<stage>" (e.g. "iter-3:review"). Cap=2 per ADR-005.
+    # Cleared at loop close (Step 7.0) to prevent unbounded YAML growth.
+    stage_retry_counts: dict[str, int] = Field(default_factory=dict)
+    last_test_result: LastTestResult = Field(default_factory=LastTestResult)
+
+
 class LoopContext(BaseModel):
     """Persisted to work-docs/loop-context/<slug>.yaml.
 
@@ -114,6 +151,10 @@ class LoopContext(BaseModel):
     created_at: str
     updated_at: str
     context: ImprovementContext
+    # PLAN-loop-mid-stop-and-review-skip ADR-006 — ephemeral per-run state.
+    # Optional so legacy YAML (pre-Phase-3) round-trips cleanly. Loop driver
+    # writes/reads this after every Gate 0 retry + on /compact recovery.
+    runtime: RuntimeBlock | None = None
 
 
 class Feature(BaseModel):
@@ -259,6 +300,26 @@ def parse_loop_context(path: Path) -> LoopContext:
         msg = f"loop-context at {path} is not a YAML mapping"
         raise ValueError(msg)
     return LoopContext.model_validate(data)
+
+
+def save_loop_context(ctx: LoopContext, path: Path) -> Path:
+    """Atomically persist a LoopContext to disk via io_utils.atomic_write.
+
+    PLAN-loop-mid-stop-and-review-skip ADR-006 — prompt-driven YAML rewrites
+    by the LLM driver are not atomic on WSL2/NTFS. The loop template now
+    routes runtime-block persistence through this helper so a crash mid-write
+    cannot corrupt the YAML and break /compact recovery.
+
+    `runtime: None` is serialized as the literal `null` YAML value (skipping
+    the field would be slightly cleaner but pydantic v2's `exclude_none=True`
+    requires per-call opt-in; null roundtrips fine through parse_loop_context).
+    """
+    from harness_maker.io_utils import atomic_write
+
+    data = ctx.model_dump(mode="python")
+    serialized = yaml.safe_dump(data, sort_keys=False, allow_unicode=True)
+    atomic_write(path, serialized)
+    return path
 
 
 def is_loop_consumable(text: str) -> bool:

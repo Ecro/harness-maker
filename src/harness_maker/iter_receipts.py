@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import re
 import sys
 from dataclasses import dataclass, field
@@ -133,6 +134,104 @@ def write(
     return path
 
 
+def set_iter_marker(*, iter: int, root: Path = Path(".")) -> Path:  # noqa: A002
+    """Atomically write the `.current-iter` driver marker (replaces shell `printf > file`).
+
+    Phase 3 contract — the autoloop driver writes this at iter start so each
+    stage's receipt-emit shell guard can read it. Atomic semantics matter:
+    a crash between `printf` truncation and write completion leaves the file
+    empty, causing every subsequent stage receipt write to fail with
+    `--iter ""` argparse error. atomic_write (tempfile + os.replace) prevents
+    that corruption window.
+    """
+    if iter < 1:
+        raise ValueError(f"iter must be >= 1 (got {iter})")
+    path = _receipts_root(root) / ".current-iter"
+    atomic_write(path, str(iter))
+    return path
+
+
+def patch_runtime_block(
+    *,
+    context_path: Path,
+    counter: str,
+    key: str | None = None,
+    value: int | str | None = None,
+    reset_keys: list[str] | None = None,
+    clear: bool = False,
+) -> Path:
+    """Atomically patch a single field of the LoopContext runtime: block.
+
+    PLAN-loop-mid-stop-and-review-skip post-commit P1 #3 — the autoloop
+    driver prompt previously instructed the LLM to "persist to
+    runtime.stage_retry_counts in the loop-context file" with no Python
+    helper reachable from a shell command, leaving the persist path
+    vulnerable to non-atomic plain-YAML rewrites. This function is the
+    CLI-callable analog that uses ``save_loop_context`` (which delegates
+    to ``io_utils.atomic_write``).
+
+    counter ∈ {stage_retry_counts, checklist_fail_counts,
+        criterion_ambiguity_counts, convergence_streak, last_test_result}.
+
+    Modes:
+      - ``clear=True`` resets the named counter (loop-close cleanup, Step 7.0).
+      - ``key`` + ``value`` → set ``runtime.<counter>[key] = value`` (dict counters).
+      - ``key`` only → delete ``runtime.<counter>[key]``.
+      - ``reset_keys`` → for dict counters, delete all listed keys at once.
+      - Scalar counters (convergence_streak): pass ``value`` without ``key``.
+
+    Round-trips through pydantic so the YAML stays schema-valid.
+    """
+    from harness_maker.autoloop_driver import (
+        LoopContext,
+        RuntimeBlock,
+        parse_loop_context,
+        save_loop_context,
+    )
+
+    ctx = parse_loop_context(context_path)
+    runtime = ctx.runtime or RuntimeBlock()
+
+    if clear:
+        if counter == "convergence_streak":
+            runtime.convergence_streak = 0
+        elif counter in (
+            "stage_retry_counts",
+            "checklist_fail_counts",
+            "criterion_ambiguity_counts",
+        ):
+            getattr(runtime, counter).clear()
+        else:
+            raise ValueError(f"clear not supported for counter={counter!r}")
+    elif counter == "convergence_streak":
+        if value is None:
+            raise ValueError("convergence_streak requires --value")
+        runtime.convergence_streak = int(value)
+    elif counter in (
+        "stage_retry_counts",
+        "checklist_fail_counts",
+        "criterion_ambiguity_counts",
+    ):
+        target = getattr(runtime, counter)
+        if reset_keys:
+            for k in reset_keys:
+                target.pop(k, None)
+        elif key is not None and value is None:
+            target.pop(key, None)
+        elif key is not None and value is not None:
+            target[key] = int(value)
+        else:
+            raise ValueError(f"{counter} requires --key (+ --value), --reset-keys, or --clear")
+    else:
+        raise ValueError(f"unknown counter: {counter!r}")
+
+    ctx_with_runtime = ctx.model_copy(update={"runtime": runtime})
+    if not isinstance(ctx_with_runtime, LoopContext):  # safety net
+        raise RuntimeError("model_copy returned non-LoopContext")
+    save_loop_context(ctx_with_runtime, context_path)
+    return context_path
+
+
 def read(path: Path) -> IterReceipt:
     """Load + validate a receipt from disk. Raises ValidationError on drift."""
     return IterReceipt.model_validate_json(path.read_text(encoding="utf-8"))
@@ -199,7 +298,54 @@ def _build_parser() -> argparse.ArgumentParser:
     w.add_argument("--stage", required=True)
     w.add_argument("--verdict", required=True, choices=("pass", "fail", "skipped"))
     w.add_argument("--root", default=".", type=Path)
-    w.add_argument("--written-at", default=None)
+    # --written-at: test-only flag (deterministic timestamp). NOT for operators
+    # — allows backdating receipts which would corrupt Gate 0's audit trail.
+    # Hidden from help and rejected unless HM_TEST_RECEIPTS=1 is set.
+    w.add_argument("--written-at", default=None, help=argparse.SUPPRESS)
+
+    sim = sub.add_parser(
+        "set-iter-marker",
+        help="Atomically write the .current-iter driver marker (Phase 3 contract).",
+    )
+    sim.add_argument("--iter", type=int, required=True)
+    sim.add_argument("--root", default=".", type=Path)
+
+    pr = sub.add_parser(
+        "patch-runtime",
+        help="Atomically patch a runtime: counter in loop-context YAML.",
+    )
+    pr.add_argument(
+        "--context",
+        required=True,
+        type=Path,
+        help="Path to work-docs/loop-context/<slug>.yaml",
+    )
+    pr.add_argument(
+        "--counter",
+        required=True,
+        choices=(
+            "stage_retry_counts",
+            "checklist_fail_counts",
+            "criterion_ambiguity_counts",
+            "convergence_streak",
+        ),
+    )
+    pr.add_argument("--key", default=None, help="Dict key (e.g., 'iter-3:review')")
+    pr.add_argument(
+        "--value",
+        default=None,
+        help="New value. For dict counters set value; for convergence_streak set scalar.",
+    )
+    pr.add_argument(
+        "--reset-keys",
+        default=None,
+        help="Comma-separated dict keys to delete (e.g., 'iter-3:execute,iter-3:review').",
+    )
+    pr.add_argument(
+        "--clear",
+        action="store_true",
+        help="Clear the entire counter (dict → {}, convergence_streak → 0). Step 7.0 cleanup.",
+    )
 
     r = sub.add_parser("read", help="Read a receipt by (iter,stage) or path.")
     r.add_argument("--iter", type=int)
@@ -227,6 +373,12 @@ def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
 
     if args.cmd == "write":
+        if args.written_at is not None and os.environ.get("HM_TEST_RECEIPTS") != "1":
+            sys.stderr.write(
+                "write: --written-at requires HM_TEST_RECEIPTS=1 "
+                "(test-only flag — backdating receipts corrupts Gate 0 audit trail)\n"
+            )
+            return 1
         try:
             path = write(
                 iter=args.iter,
@@ -236,7 +388,37 @@ def main(argv: list[str] | None = None) -> int:
                 written_at=args.written_at,
             )
         except (ValidationError, ValueError) as exc:
-            sys.stderr.write(f"write: {exc}\n")
+            sys.stderr.write(f"write failed: {exc}\n")
+            return 1
+        sys.stdout.write(str(path) + "\n")
+        return 0
+
+    if args.cmd == "set-iter-marker":
+        try:
+            path = set_iter_marker(iter=args.iter, root=args.root)
+        except (ValueError, OSError) as exc:
+            sys.stderr.write(f"set-iter-marker failed: {exc}\n")
+            return 1
+        sys.stdout.write(str(path) + "\n")
+        return 0
+
+    if args.cmd == "patch-runtime":
+        reset_keys = (
+            [k.strip() for k in args.reset_keys.split(",") if k.strip()]
+            if args.reset_keys
+            else None
+        )
+        try:
+            path = patch_runtime_block(
+                context_path=args.context,
+                counter=args.counter,
+                key=args.key,
+                value=args.value,
+                reset_keys=reset_keys,
+                clear=args.clear,
+            )
+        except (ValueError, FileNotFoundError, ValidationError) as exc:
+            sys.stderr.write(f"patch-runtime failed: {exc}\n")
             return 1
         sys.stdout.write(str(path) + "\n")
         return 0

@@ -645,16 +645,15 @@ For each iter (until convergence or any safety rail fires):
    and triggers fruitless retries.
 {% if is_codex %}
    ```
-   Bash("mkdir -p <WT>/.claude/.hm-iter-receipts && printf '%s' <N> > <WT>/.claude/.hm-iter-receipts/.current-iter")
+   Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.iter_receipts set-iter-marker --iter <N> --root \"<WT>\"")
    ```
 {% else %}
    ```bash
-   !mkdir -p <WT>/.claude/.hm-iter-receipts
-   !printf '%s' <N> > <WT>/.claude/.hm-iter-receipts/.current-iter
+   !uv run --with {{ harness_maker_src_path }} python -m harness_maker.iter_receipts set-iter-marker --iter <N> --root "<WT>"
    ```
 {% endif %}
 
-   `printf '%s'` is used instead of `echo <N>` to write without a trailing newline. The Phase 2 stage templates strip trailing whitespace via `$(cat ...)` command substitution, but explicit single-byte writes avoid any context where newline could leak into `--iter "$ITER"`.
+   Use the `set-iter-marker` CLI subcommand (Python `atomic_write`: tempfile + os.replace) instead of a shell `printf '%s' <N> > .current-iter` redirect. The shell redirect is NOT atomic — a crash between truncation and write completion leaves the file empty, causing every subsequent stage receipt-emit block to read an empty `$ITER` and silently drop the receipt (Gate 0 would then loop forever). The CLI also creates the parent directory if missing.
 4. **Invoke per-iter workflow**: read
    `.claude/commands/hm/<WORKFLOW>.md` and execute **every stage it
    defines, in order, without skipping any**. Operate inside `<WT>`:
@@ -688,12 +687,12 @@ For each iter (until convergence or any safety rail fires):
    Run the verify CLI inside `<WT>`:
 {% if is_codex %}
    ```
-   Bash("cd <WT> && uv run --with {{ harness_maker_src_path }} python -m harness_maker.iter_receipts verify --iter <N> --expected <EXPECTED_STAGES> --root <WT>")
+   Bash("cd \"<WT>\" && uv run --with {{ harness_maker_src_path }} python -m harness_maker.iter_receipts verify --iter <N> --expected <EXPECTED_STAGES> --root \"<WT>\"")
    ```
 {% else %}
    ```bash
-   !cd <WT> && uv run --with {{ harness_maker_src_path }} python -m harness_maker.iter_receipts verify \
-      --iter <N> --expected <EXPECTED_STAGES> --root <WT>
+   !cd "<WT>" && uv run --with {{ harness_maker_src_path }} python -m harness_maker.iter_receipts verify \
+      --iter <N> --expected <EXPECTED_STAGES> --root "<WT>"
    ```
 {% endif %}
 
@@ -711,8 +710,21 @@ For each iter (until convergence or any safety rail fires):
    For each missing or non-pass stage:
 
    1. Compute key `K = "iter-<N>:<stage>"`.
-   2. `stage_retry_counts[K] += 1`. Persist to `runtime.stage_retry_counts`
-      in the loop-context file.
+   2. Read the current value of `stage_retry_counts[K]` from
+      `work-docs/loop-context/<slug>.yaml` `runtime.stage_retry_counts` (0 if
+      absent). Increment by 1. **Persist atomically via the CLI** — do NOT
+      hand-edit the YAML (non-atomic rewrites corrupt the file on WSL2/NTFS):
+{% if is_codex %}
+      ```
+      Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.iter_receipts patch-runtime --context work-docs/loop-context/<slug>.yaml --counter stage_retry_counts --key iter-<N>:<stage> --value <count>")
+      ```
+{% else %}
+      ```bash
+      !uv run --with {{ harness_maker_src_path }} python -m harness_maker.iter_receipts patch-runtime \
+         --context work-docs/loop-context/<slug>.yaml \
+         --counter stage_retry_counts --key "iter-<N>:<stage>" --value <count>
+      ```
+{% endif %}
    3. If `stage_retry_counts[K] <= 2`:
       Re-invoke that stage's prompt only — read
       `.claude/commands/hm/<stage>.md` and execute it. Do NOT re-invoke the
@@ -721,17 +733,23 @@ For each iter (until convergence or any safety rail fires):
    4. If `stage_retry_counts[K] >= 3`:
       Escalate via {% if is_codex %}`request_user_input` (or ask in your response){% else %}`AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code){% endif %}.
       Options:
-      - **A. 수동 재실행 (manual re-run)** — user runs the stage themselves and
+      - **A. Manual re-run** ({% if config.locale == 'ko' %}수동 재실행{% else %}user runs the stage themselves{% endif %}) — user runs the stage and
         writes a passing receipt (or fixes the underlying break). After the
         user signals completion, return to step 4.5 to re-verify.
       - **B. Skip with explicit `verdict: skipped` marker** — invoke the
-        receipt CLI manually:
-        `uv run python -m harness_maker.iter_receipts write --iter <N> --stage <stage> --verdict skipped --root <WT>`
-        then **jump directly to step 5 — do NOT return to step 4.5**. The
+        receipt CLI manually (the `--with` flag is required because
+        `harness_maker` is not on the user project's default `uv` PATH):
+        `uv run --with {{ harness_maker_src_path }} python -m harness_maker.iter_receipts write --iter <N> --stage <stage> --verdict skipped --root "<WT>"`
+        then ALSO append a durable audit entry so `/hm:health` can detect
+        systematic skip patterns (quote `<WT>` + create parent dir; single
+        `printf` write of well under 4 KiB stays atomic via POSIX `O_APPEND`):
+        `mkdir -p "<WT>/.claude/observability" && printf '{"ts":"%s","slug":"<slug>","iter":<N>,"stage":"<stage>","reason":"gate0-cap-exhausted"}\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "<WT>/.claude/observability/gate0-skips.jsonl"`
+        After both writes, **jump directly to step 5 — specifically "5. Update state" (the per-iter step inside this section 6 — NOT outer Step 5 "Engage worktree") — do NOT return to step 4.5**. The
         operator has explicitly acknowledged the hole; re-verifying would
         deadlock because Gate 0 treats `skipped` as failure. Set
-        `gate0_skipped_explicitly[K] = true` in your working memory so step 5
-        knows this iter's `<stage>` was a deliberate hole, not a workflow success.
+        `gate0_skipped_explicitly[K] = true` in your working memory so the
+        per-iter step 5 (Update state) knows this iter's `<stage>` was a
+        deliberate hole, not a workflow success.
       - **C. Abort the loop** — halt with `stop_reason="Gate 0 exhausted retries on
         iter-<N>:<stage>"`, preserve the worktree for inspection.
 
@@ -759,12 +777,24 @@ For each iter (until convergence or any safety rail fires):
 When the loop halts (convergence, safety rail, or hard error):
 
 0. **Clear `stage_retry_counts`** (Gate 0 hygiene — ADR-005 of PLAN-loop-mid-stop-and-review-skip).
-   At loop close, write an empty map to `runtime.stage_retry_counts` in the
-   loop-context file. Without this, a long-running loop accumulates one entry
-   per `(iter, stage)` retry forever; a subsequent `/compact` recovery reloads
-   all of them even though every prior iter's Gate 0 cycle is closed. Only
-   the current iter's keys ever matter at runtime, so an empty-map reset is
-   safe.
+   At loop close, reset `runtime.stage_retry_counts` to an empty map via the
+   atomic CLI (do NOT hand-edit the YAML — non-atomic rewrites corrupt the
+   file on WSL2/NTFS):
+{% if is_codex %}
+   ```
+   Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.iter_receipts patch-runtime --context work-docs/loop-context/<slug>.yaml --counter stage_retry_counts --clear")
+   ```
+{% else %}
+   ```bash
+   !uv run --with {{ harness_maker_src_path }} python -m harness_maker.iter_receipts patch-runtime \
+      --context work-docs/loop-context/<slug>.yaml \
+      --counter stage_retry_counts --clear
+   ```
+{% endif %}
+   Without this, a long-running loop accumulates one entry per `(iter, stage)`
+   retry forever; a subsequent `/compact` recovery reloads all of them even
+   though every prior iter's Gate 0 cycle is closed. Only the current iter's
+   keys ever matter at runtime.
 
 1. **Exit criteria checklist gate** (skipped when `converged = False` — safety
    rail halts skip the gate entirely):

@@ -49,16 +49,16 @@ files:
   body_sha256: 97786f65124e496d77adf30d8e29aebfd2c938702e79f6fb4eeaefe16bd73dc9
 - path: commands/hm/exec-rev-wrap-ver.md
   template: commands/hm/workflow_command.md.j2
-  body_sha256: 29f5ce347b9345588f936c81054e02ea94c7aff77e4e9e0bf7c198f7215949a8
+  body_sha256: d7cee3dd87a390ce944e5447b5f5a19ee07f2b9b91bcdbaf421c7c1003ce31e9
 - path: commands/hm/exec-rev-wrap.md
   template: commands/hm/workflow_command.md.j2
-  body_sha256: 7455cdae9846e669cfcef90c1aba70c68e3879601894c1aa2432968bda89bfd7
+  body_sha256: 9344a08e674a963a229b336dd393a7fec68b00a92076abe73fe386cc9de65346
 - path: commands/hm/exec-rev.md
   template: commands/hm/workflow_command.md.j2
-  body_sha256: d83e09b58d5640eea435db00346288dba915d379a1f9f7bb945122e98f43991c
+  body_sha256: 974648757f08222dad806991d76f41d9e9a1c0bb4c87cb4a009a6488cb3570ba
 - path: commands/hm/execute.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: 7db719d7203061216c99cc63717c8f20a36605b2d380bb76f8a61fd94c4c2e2f
+  body_sha256: 3d3bb4e01c2085d997170bcce5d656d60d58c11c8bb5e180c2d67eda9b236994
 - path: commands/hm/health.md
   template: commands/hm/health.md.j2
   body_sha256: 558525e535d41484fe5780eeaf185b854994f299ed7ebca1164a1ae1c0e31506
@@ -67,37 +67,37 @@ files:
   body_sha256: e72c9476188e60fd1853c01fb49a6c68819b80a55d4f403fafda7cca8e7208ec
 - path: commands/hm/loop.md
   template: commands/hm/loop.md.j2
-  body_sha256: 92de135f38cb9d7cd3ce3bfbdca1e049e34a46cfdc8252629436db06ad8836e9
+  body_sha256: a1b6594147281ffed0f3c6ccc1737bb78d8d76227bf92243979281a6ab2820fb
 - path: commands/hm/make.md
   template: commands/hm/make.md.j2
   body_sha256: 4ea7a5bfa70ffd8ca08dc8390f34b326bcd3ad66195b39da6c8fcd8d637aff74
 - path: commands/hm/plan-exec-rev.md
   template: commands/hm/workflow_command.md.j2
-  body_sha256: a805f785658dafaa29cced8dab89a1c6f942c70c74e0b91e04e162316c768fd1
+  body_sha256: a8923e737909d0aba1669ab240988c04206f5808a32d3819b4fef9323ff90a33
 - path: commands/hm/plan.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: a4ce940448acae47da02eb72b1b33b7b6f5491908d19c028fdea126c68bbae3d
+  body_sha256: 842643f061db9e1f6ee13adfcf752ae6227ddfbc38e447519211660cff321f0e
 - path: commands/hm/res-spec-plan.md
   template: commands/hm/workflow_command.md.j2
-  body_sha256: 65a0034c7d3e6fc40dcb6d3a42b62bf6196330b3a58f29a0650d9a544b7dae3a
+  body_sha256: 47701c5e7d172754b29c76cf7824006c1135dd91a3e024caa8999674020faa7b
 - path: commands/hm/research.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: 93d3e40288cf49e481a5c7296711bdc321d19a04f55e9d137a8b9f1961b84b60
+  body_sha256: 77a7fee84ef13ef21d22b0e9fcc0177b25894ff0e49bbef6cb35e12c7e166f66
 - path: commands/hm/review.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: b00f5d64ce104d4c32f0ee8cb6fd383abe0e6c46effbecf7042f9bd115c59abe
+  body_sha256: a140638402ce7a62b63f6f058ad25b70b1b630ac8b8c19be1cfe161555f1bd90
 - path: commands/hm/spec.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: 10908db266a7b01aa4dd6a2ef2a677903e5aeebbb9815ece66767fd1ad58e682
+  body_sha256: ec5c2761158c20b2f87ea697a1c5be5f9cdde783556177c36d983608186e87d2
 - path: commands/hm/uninstall.md
   template: commands/hm/uninstall.md.j2
   body_sha256: ad9979712f913800330dc619b36b399a336fcf529ccd6901e9bc4b8fde0191dc
 - path: commands/hm/verify.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: 1343b0cdc8b698698d57796bbc5594951a06835e1d526a78c9e973aaf5289230
+  body_sha256: a25100f168443bcc46d423410a25f7b83a528f27f704d95d15983b0cd39b17e5
 - path: commands/hm/wrapup.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: 347793f12def3bf8a65f885e13a21c0c096ab6807f6bbf00d044e1ed471b9e96
+  body_sha256: eea7a16b857ae29267ec0bbfd8cf81f85e9047608f3c47f806d77f9eb1471478
 - path: harness.yaml
   template: harness-yaml/Production.yaml.j2
   body_sha256: c832c335f8b0f4fb74201ee9dd165f536ef7a5cd114bd7c059fa08cc2e3e5b81
@@ -160,22 +160,22 @@ files:
   body_sha256: f041a9abf2791ee59eaefc867a7f3dbc47d31860282f3ff527bfc2607ccfdec5
 - path: stages/execute.md
   template: stages/execute.md.j2
-  body_sha256: 7db719d7203061216c99cc63717c8f20a36605b2d380bb76f8a61fd94c4c2e2f
+  body_sha256: 3d3bb4e01c2085d997170bcce5d656d60d58c11c8bb5e180c2d67eda9b236994
 - path: stages/plan.md
   template: stages/plan.md.j2
-  body_sha256: a4ce940448acae47da02eb72b1b33b7b6f5491908d19c028fdea126c68bbae3d
+  body_sha256: 842643f061db9e1f6ee13adfcf752ae6227ddfbc38e447519211660cff321f0e
 - path: stages/research.md
   template: stages/research.md.j2
-  body_sha256: 93d3e40288cf49e481a5c7296711bdc321d19a04f55e9d137a8b9f1961b84b60
+  body_sha256: 77a7fee84ef13ef21d22b0e9fcc0177b25894ff0e49bbef6cb35e12c7e166f66
 - path: stages/review.md
   template: stages/review.md.j2
-  body_sha256: b00f5d64ce104d4c32f0ee8cb6fd383abe0e6c46effbecf7042f9bd115c59abe
+  body_sha256: a140638402ce7a62b63f6f058ad25b70b1b630ac8b8c19be1cfe161555f1bd90
 - path: stages/spec.md
   template: stages/spec.md.j2
-  body_sha256: 10908db266a7b01aa4dd6a2ef2a677903e5aeebbb9815ece66767fd1ad58e682
+  body_sha256: ec5c2761158c20b2f87ea697a1c5be5f9cdde783556177c36d983608186e87d2
 - path: stages/verify.md
   template: stages/verify.md.j2
-  body_sha256: 1343b0cdc8b698698d57796bbc5594951a06835e1d526a78c9e973aaf5289230
+  body_sha256: a25100f168443bcc46d423410a25f7b83a528f27f704d95d15983b0cd39b17e5
 - path: stages/wrapup.md
   template: stages/wrapup.md.j2
-  body_sha256: 347793f12def3bf8a65f885e13a21c0c096ab6807f6bbf00d044e1ed471b9e96
+  body_sha256: eea7a16b857ae29267ec0bbfd8cf81f85e9047608f3c47f806d77f9eb1471478

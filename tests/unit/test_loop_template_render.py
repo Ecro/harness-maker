@@ -80,8 +80,16 @@ def test_current_iter_marker_written_at_iter_start(loop_md: str) -> None:
     blocks (P2 contract). Without the driver writing it, the stage's shell
     guard sees no file and the receipt block is a no-op.
     """
-    assert ".hm-iter-receipts/.current-iter" in loop_md, (
-        "loop.md missing the .current-iter driver write (Phase 3 contract)"
+    # Phase 3 originally wrote the marker via `printf > file`. Post-commit
+    # P1 #1 fix replaced that non-atomic redirect with the atomic
+    # `iter_receipts set-iter-marker` CLI subcommand (Python atomic_write).
+    has_marker_write = (
+        "iter_receipts set-iter-marker" in loop_md
+        or ".hm-iter-receipts/.current-iter" in loop_md
+    )
+    assert has_marker_write, (
+        "loop.md missing the .current-iter driver write — expected the "
+        "`iter_receipts set-iter-marker` CLI invocation in Step 3.5"
     )
 
 
@@ -99,7 +107,7 @@ def test_gate0_documents_auto_retry_cap(loop_md: str) -> None:
     """ADR-005: cap=2 auto-retries per (iter, stage), then escalation."""
     gate0_idx = loop_md.find("Gate 0 — Receipt verification")
     assert gate0_idx > 0, "loop.md missing 'Gate 0' section heading"
-    gate0_section = loop_md[gate0_idx : gate0_idx + 5000]
+    gate0_section = loop_md[gate0_idx : gate0_idx + 7000]
     # The cap is explicit numeric, not vague.
     has_cap = (
         "cap=2" in gate0_section
@@ -136,7 +144,7 @@ def test_gate0_failure_does_not_increment_failed_streak(loop_md: str) -> None:
     cannot mis-route.
     """
     gate0_idx = loop_md.find("Gate 0 — Receipt verification")
-    gate0_section = loop_md[gate0_idx : gate0_idx + 5000]
+    gate0_section = loop_md[gate0_idx : gate0_idx + 7000]
     # Phrase may span a line break ("do NOT increment\n  `failed_streak`"),
     # so check the two halves and proximity rather than a single literal.
     idx_neg = gate0_section.find("do NOT increment")
@@ -157,11 +165,11 @@ def test_gate0_option_b_breaks_out_of_reverify_loop(loop_md: str) -> None:
     short-circuit the loop.
     """
     gate0_idx = loop_md.find("Gate 0 — Receipt verification")
-    gate0_section = loop_md[gate0_idx : gate0_idx + 5000]
+    gate0_section = loop_md[gate0_idx : gate0_idx + 7000]
     # Find Option B
     option_b_idx = gate0_section.find("Skip with explicit")
     assert option_b_idx > 0, "Gate 0 escalation missing 'Skip with explicit' option"
-    option_b_block = gate0_section[option_b_idx : option_b_idx + 700]
+    option_b_block = gate0_section[option_b_idx : option_b_idx + 1500]
     # Must explicitly tell driver NOT to return to step 4.5
     has_bypass = (
         "do NOT return to step 4.5" in option_b_block
@@ -195,7 +203,7 @@ def test_loop_close_clears_stage_retry_counts(loop_md: str) -> None:
 def test_gate0_treats_non_pass_verdict_as_failure(loop_md: str) -> None:
     """ADR-005 closes verdict-forging: skipped/fail trigger retry."""
     gate0_idx = loop_md.find("Gate 0 — Receipt verification")
-    gate0_section = loop_md[gate0_idx : gate0_idx + 5000]
+    gate0_section = loop_md[gate0_idx : gate0_idx + 7000]
     # Must mention non-pass verdict triggering Gate 0 failure.
     has_verdict_rule = (
         "verdict != \"pass\"" in gate0_section

@@ -98,9 +98,14 @@ This seed is what the interview refines. Investigate code unknowns with Read/Gre
 
 ### Step 1.5 — Loop-mode detection (ADR-002, ADR-007, ADR-008 of PLAN-loop-mid-stop-and-review-skip)
 
-Before Step 2, check whether `/hm:plan` is running inside an active `/hm:loop` iteration. **If `.hm-loop-active` marker file exists at the project root**, this is loop-mode: do NOT engage the deep interview (loop body cannot block on {% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %}). Instead, scope the plan to the next master-PLAN phase only.
+Before Step 2, check whether `/hm:plan` is running inside an active `/hm:loop` iteration. The marker file lives at the **project root**, NOT inside `<WT>` — the loop driver writes it before engaging any worktree. Locate the project root one of two ways:
 
-**Loop-mode procedure (when `.hm-loop-active` exists):**
+- If you have a recent Step 0 worktree output telling you `<WT>` like `/path/to/project/.worktrees/execute-20260523T*`, the project root is two path-components above `.worktrees/` (i.e., strip `/.worktrees/<wt-name>/` suffix).
+- Otherwise call `git -C . rev-parse --show-toplevel` and walk up out of `.worktrees/` if cwd is inside one.
+
+**If the marker `<PROJECT_ROOT>/.hm-loop-active` exists**, this is loop-mode: do NOT engage the deep interview (loop body cannot block on {% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %}). Instead, scope the plan to the next master-PLAN phase only.
+
+**Loop-mode procedure (when `<PROJECT_ROOT>/.hm-loop-active` exists):**
 
 1. Derive `<N>` from `<WT>/.claude/.hm-iter-receipts/.current-iter` (driver-written at iter start per Phase 3 contract). If the marker file is absent for some reason, fall through to standard mode — the loop driver is in an inconsistent state and the interview is the safer choice.
 2. Read the master `work-docs/PLAN-{slug}.md`. Find the next phase whose status is NOT `DONE` (look for `## Phase N` headers and their `Status:` lines). Call this `<M>`.
@@ -123,7 +128,15 @@ Before Step 2, check whether `/hm:plan` is running inside an active `/hm:loop` i
    - The phase's scope (files in/out), exit criterion, risk, rollback — copied or sharpened from the master PLAN.
    - Any in-flight architectural decision that does NOT require an ADR.
 
-   > ⚠️ **LOOP-MODE ADR CONSTRAINT (CRITICAL)** — If implementation during this iteration reveals a decision that genuinely requires an ADR (component boundary change, new contract, precedent-setting choice, rejection of viable alternative), **HALT the loop immediately**. Do NOT defer the ADR. Do NOT document it as a local per-iter decision. The autoloop has no {% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %} channel; new ADRs must be added to the master PLAN through standalone {% if is_codex %}`@hm-plan`{% else %}`/hm:plan {slug}`{% endif %} (which engages the deep interview). Halt mechanism: write a blocker note in the per-iter PLAN, then exit non-zero so safety rail #4 (same feature retried 3 times) fires.
+   > ⚠️ **LOOP-MODE ADR CONSTRAINT (CRITICAL)** — If implementation during this iteration reveals a decision that genuinely requires an ADR (component boundary change, new contract, precedent-setting choice, rejection of viable alternative), **HALT the loop immediately**. Do NOT defer the ADR. Do NOT document it as a local per-iter decision. The autoloop has no {% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %} channel; new ADRs must be added to the master PLAN through standalone {% if is_codex %}`@hm-plan`{% else %}`/hm:plan {slug}`{% endif %} (which engages the deep interview).
+   >
+   > **Halt mechanism (3 concrete steps — an LLM driver has no shell exit code to use):**
+   >
+   > 1. In the per-iter PLAN frontmatter, set `status: blocked` and add `halt_reason: adr-required` plus `halt_note: "<one-sentence description of the decision needing an ADR>"`.
+   > 2. Emit a `verdict: fail` receipt via the Phase 2 shell guard at the end of this stage (do NOT use `verdict: skipped` — that bypasses Gate 0 silently; `fail` causes Gate 0 to retry the plan stage, eventually triggering the cap=2 escalation where the operator picks A/B/C with full context).
+   > 3. Surface the halt note + ADR question text in your turn output so the operator sees it before the next gate evaluation.
+   >
+   > Operator response: re-run `/hm:plan <slug>` standalone (outside the loop — `.hm-loop-active` must be temporarily removed: `rm .hm-loop-active`) to engage the deep interview, lock the new ADR into the master PLAN, then re-enter the loop with `/hm:loop --spec <spec-path>`.
 
 5. Skip directly to Step 4 (plan-validator). Validator runs against the per-iter PLAN, not the master PLAN.
 
@@ -415,14 +428,16 @@ The shell guard below makes the receipt a no-op when `.current-iter` is absent �
 
 {% if is_codex %}
 ```
-Bash("if [ -f <WT>/.claude/.hm-iter-receipts/.current-iter ]; then ITER=$(cat <WT>/.claude/.hm-iter-receipts/.current-iter); uv run --with {{ harness_maker_src_path }} python -m harness_maker.iter_receipts write --iter \"$ITER\" --stage plan --verdict <verdict> --root <WT>; fi")
+Bash("if [ -f \"<WT>/.claude/.hm-iter-receipts/.current-iter\" ]; then ITER=$(cat \"<WT>/.claude/.hm-iter-receipts/.current-iter\" 2>/dev/null); if [ -n \"$ITER\" ]; then uv run --with {{ harness_maker_src_path }} python -m harness_maker.iter_receipts write --iter \"$ITER\" --stage plan --verdict <verdict> --root \"<WT>\"; fi; fi")
 ```
 {% else %}
 ```bash
-!if [ -f <WT>/.claude/.hm-iter-receipts/.current-iter ]; then \
-   ITER=$(cat <WT>/.claude/.hm-iter-receipts/.current-iter); \
-   uv run --with {{ harness_maker_src_path }} python -m harness_maker.iter_receipts write \
-     --iter "$ITER" --stage plan --verdict <verdict> --root <WT>; \
+!if [ -f "<WT>/.claude/.hm-iter-receipts/.current-iter" ]; then \
+   ITER=$(cat "<WT>/.claude/.hm-iter-receipts/.current-iter" 2>/dev/null); \
+   if [ -n "$ITER" ]; then \
+     uv run --with {{ harness_maker_src_path }} python -m harness_maker.iter_receipts write \
+       --iter "$ITER" --stage plan --verdict <verdict> --root "<WT>"; \
+   fi; \
  fi
 ```
 {% endif %}

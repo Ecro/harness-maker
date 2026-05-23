@@ -338,14 +338,16 @@ The shell guard below makes the receipt a no-op when `.current-iter` is absent â
 
 {% if is_codex %}
 ```
-Bash("if [ -f <WT>/.claude/.hm-iter-receipts/.current-iter ]; then ITER=$(cat <WT>/.claude/.hm-iter-receipts/.current-iter); uv run --with {{ harness_maker_src_path }} python -m harness_maker.iter_receipts write --iter \"$ITER\" --stage spec --verdict <verdict> --root <WT>; fi")
+Bash("if [ -f \"<WT>/.claude/.hm-iter-receipts/.current-iter\" ]; then ITER=$(cat \"<WT>/.claude/.hm-iter-receipts/.current-iter\" 2>/dev/null); if [ -n \"$ITER\" ]; then uv run --with {{ harness_maker_src_path }} python -m harness_maker.iter_receipts write --iter \"$ITER\" --stage spec --verdict <verdict> --root \"<WT>\"; fi; fi")
 ```
 {% else %}
 ```bash
-!if [ -f <WT>/.claude/.hm-iter-receipts/.current-iter ]; then \
-   ITER=$(cat <WT>/.claude/.hm-iter-receipts/.current-iter); \
-   uv run --with {{ harness_maker_src_path }} python -m harness_maker.iter_receipts write \
-     --iter "$ITER" --stage spec --verdict <verdict> --root <WT>; \
+!if [ -f "<WT>/.claude/.hm-iter-receipts/.current-iter" ]; then \
+   ITER=$(cat "<WT>/.claude/.hm-iter-receipts/.current-iter" 2>/dev/null); \
+   if [ -n "$ITER" ]; then \
+     uv run --with {{ harness_maker_src_path }} python -m harness_maker.iter_receipts write \
+       --iter "$ITER" --stage spec --verdict <verdict> --root "<WT>"; \
+   fi; \
  fi
 ```
 {% endif %}
