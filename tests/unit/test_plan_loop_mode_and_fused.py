@@ -123,18 +123,13 @@ def test_plan_template_loop_mode_skips_interview(plan_md: str) -> None:
         or "skip the interview" in branch_section
         or "no deep interview" in branch_section
     )
-    assert has_skip, (
-        "Loop-mode plan branch must explicitly state Step 2/3 (interview) is skipped"
-    )
+    assert has_skip, "Loop-mode plan branch must explicitly state Step 2/3 (interview) is skipped"
 
 
 def test_plan_template_writes_per_iter_file(plan_md: str) -> None:
     """Loop-mode plan must write to <WT>/work-docs/PLAN-{slug}-iter{N}.md."""
     # The literal path pattern must appear so the LLM driver knows where to write.
-    has_per_iter_path = (
-        "PLAN-{slug}-iter{N}.md" in plan_md
-        or "PLAN-{slug}-iter" in plan_md
-    )
+    has_per_iter_path = "PLAN-{slug}-iter{N}.md" in plan_md or "PLAN-{slug}-iter" in plan_md
     assert has_per_iter_path, (
         "plan.md loop-mode branch must specify the per-iter PLAN path "
         "PLAN-{slug}-iter{N}.md (ADR-008)"

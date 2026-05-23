@@ -84,8 +84,7 @@ def test_current_iter_marker_written_at_iter_start(loop_md: str) -> None:
     # P1 #1 fix replaced that non-atomic redirect with the atomic
     # `iter_receipts set-iter-marker` CLI subcommand (Python atomic_write).
     has_marker_write = (
-        "iter_receipts set-iter-marker" in loop_md
-        or ".hm-iter-receipts/.current-iter" in loop_md
+        "iter_receipts set-iter-marker" in loop_md or ".hm-iter-receipts/.current-iter" in loop_md
     )
     assert has_marker_write, (
         "loop.md missing the .current-iter driver write — expected the "
@@ -110,9 +109,7 @@ def test_gate0_documents_auto_retry_cap(loop_md: str) -> None:
     gate0_section = loop_md[gate0_idx : gate0_idx + 7000]
     # The cap is explicit numeric, not vague.
     has_cap = (
-        "cap=2" in gate0_section
-        or "2 retries" in gate0_section
-        or "cap of 2" in gate0_section
+        "cap=2" in gate0_section or "2 retries" in gate0_section or "cap of 2" in gate0_section
     )
     assert has_cap, "Gate 0 prose must state the auto-retry cap=2 from ADR-005"
     # Escalation route mentions the standard ask-tool.
@@ -192,12 +189,9 @@ def test_loop_close_clears_stage_retry_counts(loop_md: str) -> None:
     assert close_idx > 0, "loop.md missing Step 7 'Loop close' heading"
     close_section = loop_md[close_idx : close_idx + 2000]
     has_cleanup = (
-        "Clear `stage_retry_counts`" in close_section
-        or "clear stage_retry_counts" in close_section
+        "Clear `stage_retry_counts`" in close_section or "clear stage_retry_counts" in close_section
     )
-    assert has_cleanup, (
-        "Step 7 must clear stage_retry_counts at loop close (memory hygiene)"
-    )
+    assert has_cleanup, "Step 7 must clear stage_retry_counts at loop close (memory hygiene)"
 
 
 def test_gate0_treats_non_pass_verdict_as_failure(loop_md: str) -> None:
@@ -206,7 +200,7 @@ def test_gate0_treats_non_pass_verdict_as_failure(loop_md: str) -> None:
     gate0_section = loop_md[gate0_idx : gate0_idx + 7000]
     # Must mention non-pass verdict triggering Gate 0 failure.
     has_verdict_rule = (
-        "verdict != \"pass\"" in gate0_section
+        'verdict != "pass"' in gate0_section
         or "verdict != 'pass'" in gate0_section
         or "non-pass verdict" in gate0_section
         or "verdict is not pass" in gate0_section

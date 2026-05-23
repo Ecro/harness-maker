@@ -57,3 +57,6 @@ tests/e2e/sandbox/.backup-*/
 tests/e2e/sandbox-plugin-test/.backup-*/
 .claude/.hm-loop-*
 .claude/.hm-finalize-stash-*
+
+# /hm:loop Step 5 creates .hm-loop-active marker at project root
+.hm-loop-*
