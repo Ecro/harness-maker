@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.23.2
+harness_maker_version: 0.24.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/health.md.j2
 provenance: official
-content_hash: 558525e535d41484fe5780eeaf185b854994f299ed7ebca1164a1ae1c0e31506
+content_hash: b5730c59f9e264746fae4f2554c596b1fb0ee7d6869ef544e7279a3811a7ed77
 ---
 # /hm:health
 
@@ -42,7 +42,7 @@ flipping the ADR-012 kill-switch (`llm_inference_enabled: false`).
 ## Run
 
 ```bash
-!uv run --with /home/noel/harness-maker python -m harness_maker.cli health . --json-output .claude/observability/.health.tmp.json
+!uv run --with /home/noel/harness-maker/.worktrees/execute-20260523T0815Z python -m harness_maker.cli health . --json-output .claude/observability/.health.tmp.json
 ```
 
 Then read `.claude/observability/dashboard.md` to inspect the two sections.

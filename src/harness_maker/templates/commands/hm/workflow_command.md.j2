@@ -67,3 +67,7 @@ Flags are additive to the harness defaults (`reviewers.enabled` /
 `skills.enabled`) and apply only to this run. Unknown identifiers are warned
 and ignored. The flags themselves are stripped from `$ARGUMENTS` before the
 fused stages read the user's task description.
+{%- if feedback_enabled %}
+
+{% include "agents/_partials/feedback_dispatcher.md.j2" %}
+{%- endif %}

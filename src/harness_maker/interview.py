@@ -16,6 +16,7 @@ inline flags on the workflow command (documented in workflow_command.md.j2).
 
 from __future__ import annotations
 
+import contextlib
 import logging
 from collections.abc import Callable
 from pathlib import Path
@@ -32,6 +33,7 @@ from harness_maker.models import (
     CodexAgentSpec,
     Confidence,
     DevMode,
+    FeedbackConfig,
     InterviewAnswers,
     Preset,
     ProjectProfile,
@@ -751,6 +753,17 @@ def answers_from_harness_yaml(yaml_path: Path) -> InterviewAnswers | None:
             "enabled": skills_enabled,
         },
     }
+    # PLAN-auto-feedback-2026-05 ADR-002 — tolerant fallback: malformed feedback
+    # section (non-dict, non-bool enabled) silently defaults to FeedbackConfig()
+    # so the rest of the yaml load proceeds. CLAUDE.md checkpoint 6 reverse-mapper
+    # schema-gap pattern: missing key → silent default, malformed → silent default.
+    feedback_raw = data.get("feedback")
+    if isinstance(feedback_raw, dict):
+        feedback_enabled_raw = feedback_raw.get("enabled")
+        if isinstance(feedback_enabled_raw, bool):
+            # Future schema fields that fail strict validation: stay tolerant.
+            with contextlib.suppress(ValidationError):
+                update["feedback"] = FeedbackConfig(enabled=feedback_enabled_raw)
     # ADR-002/004 silent migration: prefer the new `default_model` key; fall
     # back to the deprecated `recommended_model`. When ONLY the deprecated key
     # is present AND the file is schema_version<2, emit an advisory INFO log

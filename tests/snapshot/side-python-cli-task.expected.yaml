@@ -94,7 +94,7 @@ files:
   body_sha256: 0033104bf432e33d2cb03ba8d8e2fcdfdcfbd04d06257068616dbc3797d0f411
 - path: harness.yaml
   template: harness-yaml/Side.yaml.j2
-  body_sha256: 04dc2489adc35fb8989e26db38c239d4070f30cea68d495bbc4277ebb1e7de06
+  body_sha256: 666f1183cc766d06e7cd2e690152724a61d1a40aa89fa5ab70c61ac6d015b9ab
 - path: hooks/hooks.json
   template: hooks/hooks.json.j2
   body_sha256: dc4d30118b567fc39978e2910537f576383a2da0fc2325f1a5892255c7017be4

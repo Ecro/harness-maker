@@ -1,0 +1,53 @@
+<!-- @hm:feedback:dispatcher-block (do not edit; rendered by feedback.enabled) -->
+
+---
+
+## Feedback draft (maintainer dogfooding — opt-in)
+
+After completing the stage above, run this Bash command to grep the last
+telemetry stop event + matching tool-use rows + harness-self signals
+(silent-intent-miss, build-break) bounded to ≤2KB:
+
+```bash
+uv run python -m harness_maker.feedback.telemetry_grep \
+  --metrics-dir .claude/observability
+```
+
+Decide: is there evidence of a HARNESS-SELF issue (hook error,
+silent-intent-miss, /hm:review build-break, plan-validator hang, dispatcher
+render regression, etc.) that the maintainer would want to file as a GitHub
+issue against harness-maker itself? Distinguish from user-code issues (their
+failing test, their slow build, their syntax error) — those are NOT in scope.
+
+If YES (harness-self issue):
+
+1. Construct a `FeedbackDraft` JSON using ONLY the 5 whitelisted fields:
+   - `harness_maker_version` (`harness-maker --version`)
+   - `ide` (claude-code / cursor / codex)
+   - `os` (platform.system() + release)
+   - `stage` (this stage's name)
+   - `task_slug` (from frontmatter, if present)
+   - `trigger_signal` (`{id, count, duration_ms}` — numbers only)
+   - `error_message` (≤256 chars; will be redacted by `_SECRET_PATTERNS`)
+   - `file_paths` (list; ONLY paths starting with `.claude/` — others rejected)
+2. Call the writer; it returns the resolved draft path on stdout. Dedup by
+   `sha256(trigger_signal_id, slug, today)` → silent skip if already exists.
+
+```bash
+echo '<FeedbackDraft-JSON>' | uv run python -m harness_maker.feedback.draft_writer
+```
+
+3. Emit the one-line footer using the returned path:
+
+```bash
+uv run python -m harness_maker.feedback.footer \
+  --path <path> --locale {{ config.locale | default('en') }}
+```
+
+If NO: emit nothing.
+
+NEVER include: user repo absolute paths, file content from the user's project,
+command args verbatim, or any string that doesn't originate from the
+whitelisted fields above.
+
+<!-- @hm:/feedback:dispatcher-block -->

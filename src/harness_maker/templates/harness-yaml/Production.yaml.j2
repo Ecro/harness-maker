@@ -93,3 +93,5 @@ security:
     medium: log
   gates:
     spec_gate: block
+feedback:
+  enabled: {{ (config.feedback.enabled if config.feedback else false) | string | lower }}

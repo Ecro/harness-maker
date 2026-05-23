@@ -105,6 +105,53 @@ All paths are inside your project root (or `CLAUDE_PROJECT_DIR` / `CURSOR_PROJEC
 | `detected_at` | string | ISO-8601 UTC timestamp |
 | `notes` | string | Free-form context (default empty) |
 
+<!-- @hm:privacy:feedback-module -->
+## Optional feedback module (opt-in, default off)
+
+harness-maker ships an opt-in maintainer-dogfooding feedback module
+(`feedback.enabled` in `harness.yaml`, defaults to `false`; togglable only
+via the `/hm:configure` interview — no CLI flag, no env var). When `false`,
+the module is a dead Jinja branch — **zero file IO, zero token cost, zero
+behavior change**. The "Nothing is transmitted off your machine by this tool"
+guarantee above remains literally true.
+
+When toggled on, dispatcher wrappers emit a Jinja-conditional block asking
+the current turn's LLM to inspect local telemetry, decide whether a
+HARNESS-SELF issue occurred (hook error, silent-intent-miss, /hm:review
+build-break, plan-validator hang, dispatcher render regression), and if so
+write a draft to `.claude/observability/feedback/{YYYY-MM-DD}-{slug}-{hash}.md`
+plus print a one-line footer with the exact `gh issue create --web --body-file`
+command. The footer is the only network call — and it is the maintainer
+invoking the `gh` CLI from their own terminal, not harness-maker.
+
+### `FeedbackDraft` schema (5 top-level fields)
+
+| Field | Type | Description |
+|---|---|---|
+| `harness_maker_version` | string | Output of `harness-maker --version` |
+| `ide` | string | One of `claude-code`, `cursor`, `codex` |
+| `os` | string | `platform.system()` + release |
+| `stage` | string | Atomic stage name (e.g., `research`, `execute`) |
+| `task_slug` | string | Task identifier from PLAN frontmatter |
+| `trigger_signal` | object (`TriggerSignal`) | Numeric evidence — see schema below |
+| `error_message` | string \| null | Optional, ≤256 chars, run through `_SECRET_PATTERNS` |
+| `file_paths` | list[string] | Optional, **hard-rejected** unless every entry starts with `.claude/` |
+
+### `TriggerSignal` nested schema (3 fields)
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | string | Signal type, e.g. `hook-error`, `silent-intent-miss`, `build-break` |
+| `count` | int (≥0) | Occurrence count |
+| `duration_ms` | int (≥0) \| null | Optional latency evidence |
+
+### Dedup
+
+Filename hash is `sha256(trigger_signal_id, task_slug, YYYY-MM-DD)[:16]` —
+identical inputs on the same day silently return the existing path; next-day
+re-emergence produces a fresh draft.
+<!-- @hm:/privacy:feedback-module -->
+
 ## What is **never** recorded
 
 - File contents you read or edit. The `tool_input` field captures only the keys, not file bodies.

@@ -422,6 +422,22 @@ class AdaptiveConfig(BaseModel):
     audit_days_threshold: int = Field(default=14, gt=0)
 
 
+class FeedbackConfig(BaseModel):
+    """Maintainer-dogfooding feedback drafts (PLAN-auto-feedback-2026-05 ADR-001/002).
+
+    Default off. When ``enabled=True``, dispatcher wrappers emit an in-band
+    LLM-judgment block that writes local drafts to
+    ``.claude/observability/feedback/`` and prints a footer with the exact
+    ``gh issue create --web`` command for manual submission. Zero socket
+    calls from harness-maker Python — preserves PRIVACY.md + ADR-005 of
+    PLAN-oss-readiness-audit (``tests/unit/test_no_network.py``).
+    """
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    enabled: bool = False
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Per-agent model routing (ADR-001/002/003 from PLAN-model-routing-multi-ide)
 # ──────────────────────────────────────────────────────────────────────────────
@@ -583,6 +599,10 @@ class HarnessConfig(BaseModel):
     # Adaptive personalization knobs (Phase 1 of personalization-depth).
     # default_factory keeps old harness.yaml files (no `adaptive:` key) loading.
     adaptive: AdaptiveConfig = Field(default_factory=AdaptiveConfig)
+    # Maintainer-dogfooding feedback drafts (PLAN-auto-feedback-2026-05 ADR-002).
+    # default_factory keeps old harness.yaml without `feedback:` key loading;
+    # `enabled: false` ⇒ dispatcher conditional is dead branch (zero IO).
+    feedback: FeedbackConfig = Field(default_factory=FeedbackConfig)
     # ADR-011: schema_version bumped 1 → 2 for the agent_models/default_model
     # rename. ADR-004 silent migration handles existing v1 harness.yaml.
     schema_version: int = 2
@@ -737,6 +757,10 @@ class InterviewAnswers(BaseModel):
     # User specifies via --wrapup-docs or /hm:configure. Examples:
     # CHANGELOG.md, TODO.md, docs/ADR-index.md.
     wrapup_docs: list[str] = Field(default_factory=list)
+    # Mirror of HarnessConfig.feedback (PLAN-auto-feedback-2026-05 ADR-002).
+    # default_factory mirrors HarnessConfig default (enabled=false). Survives
+    # answers_from_harness_yaml round-trip per CLAUDE.md checkpoint 6.
+    feedback: FeedbackConfig = Field(default_factory=FeedbackConfig)
 
     @field_validator("sibling_repos", mode="before")
     @classmethod

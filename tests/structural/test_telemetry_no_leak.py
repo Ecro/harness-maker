@@ -53,6 +53,10 @@ _OBSERVABILITY_ALLOWLIST: frozenset[str] = frozenset(
         "src/harness_maker/templates/stages/verify.md.j2",  # pre-existing
         # /hm:health absorbs ai-readiness/refresh/personalization-audit (ADR-006)
         "src/harness_maker/templates/commands/hm/health.md.j2",
+        # PLAN-auto-feedback-2026-05 — dispatcher partial reads
+        # `.claude/observability/metrics-*.jsonl` for the LLM judgment context
+        # (in-band only; no socket; gated on feedback.enabled).
+        "src/harness_maker/templates/agents/_partials/feedback_dispatcher.md.j2",
     }
 )
 

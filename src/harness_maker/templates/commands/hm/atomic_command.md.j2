@@ -1,1 +1,5 @@
 {{ stage_body | default('# /hm:' + stage) }}
+{%- if feedback_enabled %}
+
+{% include "agents/_partials/feedback_dispatcher.md.j2" %}
+{%- endif %}

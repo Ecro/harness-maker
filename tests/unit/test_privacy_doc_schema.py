@@ -19,7 +19,23 @@ TELEMETRY_SOURCES: list[tuple[str, str, str]] = [
     ("src/harness_maker/telemetry.py", "_build_entry", "build_entry"),
     ("src/harness_maker/review_telemetry.py", "ReviewTelemetryRecord", "model"),
     ("src/harness_maker/observability/intent_miss.py", "IntentMissEvent", "model"),
+    # PLAN-auto-feedback-2026-05 Phase 6 — feedback draft Pydantic models
+    # (drafts ship to GitHub when the maintainer runs `gh issue create --web`,
+    # so schema drift is a real privacy surface, not just internal telemetry).
+    ("src/harness_maker/feedback/draft_writer.py", "FeedbackDraft", "model"),
+    ("src/harness_maker/feedback/draft_writer.py", "TriggerSignal", "model"),
 ]
+
+# PLAN-auto-feedback-2026-05 Phase 6 validator-C3 follow-up:
+# TriggerSignal nested fields (`id`, `count`, `duration_ms`) are too generic
+# to rely on the document-wide backtick scan (`count` etc. can appear in any
+# unrelated section and pass trivially). Instead, do a scoped check INSIDE
+# the `<!-- @hm:privacy:feedback-module -->` marker block.
+_FEEDBACK_MODULE_MARKER_RE = re.compile(
+    r"<!-- @hm:privacy:feedback-module -->(.*?)<!-- @hm:/privacy:feedback-module -->",
+    re.DOTALL,
+)
+_FEEDBACK_NESTED_FIELDS: tuple[str, ...] = ("id", "count", "duration_ms")
 
 # `model_config = ConfigDict(...)` on pydantic BaseModel uses a plain Assign,
 # not AnnAssign — the collector below ignores it without needing a deny-list.
@@ -130,3 +146,57 @@ def test_privacy_doc_lists_all_four_jsonl_paths() -> None:
     ]
     missing = [p for p in expected_path_substrings if p not in text]
     assert not missing, f"PRIVACY.md does not mention these JSONL paths: {missing}"
+
+
+# ── PLAN-auto-feedback-2026-05 Phase 6 — feedback module marker block ────────
+
+
+def _extract_feedback_module_block(text: str) -> str:
+    m = _FEEDBACK_MODULE_MARKER_RE.search(text)
+    if not m:
+        pytest.fail(
+            "PRIVACY.md missing @hm:privacy:feedback-module marker block. "
+            "PLAN-auto-feedback-2026-05 ADR-003 requires this anchored paragraph."
+        )
+    return m.group(1)
+
+
+def test_privacy_doc_feedback_module_block_present() -> None:
+    text = PRIVACY_DOC.read_text(encoding="utf-8")
+    block = _extract_feedback_module_block(text)
+    assert "feedback.enabled" in block, "feedback-module block must name the config key"
+    assert "opt-in" in block.lower()
+
+
+def test_privacy_doc_feedback_module_block_documents_trigger_signal_nested_fields() -> None:
+    """Scoped check (validator C3 follow-up): TriggerSignal fields must appear
+    INSIDE the feedback-module marker block, not just anywhere in PRIVACY.md.
+    Prevents false-pass from generic tokens like `count` appearing elsewhere.
+    """
+    text = PRIVACY_DOC.read_text(encoding="utf-8")
+    block = _extract_feedback_module_block(text)
+    missing = [f for f in _FEEDBACK_NESTED_FIELDS if f"`{f}`" not in block]
+    assert not missing, (
+        f"TriggerSignal fields {missing} not documented inside the "
+        "@hm:privacy:feedback-module marker block. Add them to the nested "
+        "schema table — generic appearance elsewhere in PRIVACY.md is "
+        "insufficient (PLAN-auto-feedback-2026-05 validator C3 guard)."
+    )
+
+
+def test_privacy_doc_feedback_module_block_documents_top_level_fields() -> None:
+    """The 5 (8) FeedbackDraft top-level fields must appear inside the block."""
+    text = PRIVACY_DOC.read_text(encoding="utf-8")
+    block = _extract_feedback_module_block(text)
+    expected = (
+        "harness_maker_version",
+        "ide",
+        "os",
+        "stage",
+        "task_slug",
+        "trigger_signal",
+        "error_message",
+        "file_paths",
+    )
+    missing = [f for f in expected if f"`{f}`" not in block]
+    assert not missing, f"FeedbackDraft fields missing from marker block: {missing}"

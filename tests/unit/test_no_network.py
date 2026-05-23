@@ -67,6 +67,55 @@ def test_load_overrides_no_network(
     assert overrides == []
 
 
+def test_telemetry_grep_no_network(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """PLAN-auto-feedback-2026-05 Phase 2: telemetry_grep must run socket-free.
+
+    The dispatcher block runs this helper to bundle telemetry context for the
+    in-band LLM judgment (ADR-005). It MUST stay local — opening a socket
+    would re-litigate PRIVACY.md and the existing ADR-005 positive obligation.
+    """
+    _make_socket_explode(monkeypatch)
+    from harness_maker.feedback.telemetry_grep import (
+        gather_recent_signals,
+        last_stop_with_trace,
+    )
+
+    obs = tmp_path / ".claude" / "observability"
+    obs.mkdir(parents=True)
+    # Empty dir — exercise both readers; should not open any socket.
+    assert last_stop_with_trace(obs) == ""
+    out = gather_recent_signals(obs)
+    assert out  # non-empty JSON bundle
+
+
+def test_draft_writer_no_network(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """PLAN-auto-feedback-2026-05 Phase 3: draft_writer.write() must run socket-free.
+
+    The writer is purely local file IO + Pydantic validation; if a future
+    change accidentally added a phone-home (e.g., posting to a telemetry
+    service), this test trips before any user receives the regression.
+    """
+    _make_socket_explode(monkeypatch)
+    from harness_maker.feedback.draft_writer import FeedbackDraft, TriggerSignal, write
+
+    draft = FeedbackDraft(
+        harness_maker_version="0.23.7",
+        ide="claude-code",
+        os="Linux 6.6.0",
+        stage="execute",
+        task_slug="auto-feedback-2026-05",
+        trigger_signal=TriggerSignal(id="hook-error", count=1, duration_ms=100),
+    )
+    p = write(draft, base_dir=tmp_path, date="2026-05-23")
+    assert p.is_file()
+
+
 def test_compute_yaml_diff_no_network(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

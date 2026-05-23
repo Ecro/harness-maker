@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.23.2
+harness_maker_version: 0.24.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/configure.md.j2
 provenance: official
-content_hash: 97786f65124e496d77adf30d8e29aebfd2c938702e79f6fb4eeaefe16bd73dc9
+content_hash: fcc0bce58df9301de0d4c7eb1f3fb9bcdc4b9382e882ee7b55933efa42fea6af
 ---
 # /hm:configure
 
@@ -100,7 +100,7 @@ For **Second Brain**: first inspect current state via the CLI subcommand
 time — they MUST delegate state inspection to the CLI per CLAUDE.md §4):
 
 ```bash
-!uv run --with /home/noel/harness-maker python -m harness_maker.cli \
+!uv run --with /home/noel/harness-maker/.worktrees/execute-20260523T0815Z python -m harness_maker.cli \
   configure-second-brain "$(pwd)" --check
 ```
 
@@ -122,7 +122,7 @@ which prompts to surface:
    non-skip answer, dispatch the folder add through the CLI:
 
    ```bash
-   !uv run --with /home/noel/harness-maker python -m harness_maker.cli \
+   !uv run --with /home/noel/harness-maker/.worktrees/execute-20260523T0815Z python -m harness_maker.cli \
      configure-second-brain "$(pwd)" --add-folder "$SB_FOLDER"
    ```
 
@@ -146,7 +146,7 @@ which prompts to surface:
 Run the CLI with only the changed flags:
 
 ```bash
-!uv run --with /home/noel/harness-maker python -m harness_maker.cli make "$(pwd)" \
+!uv run --with /home/noel/harness-maker/.worktrees/execute-20260523T0815Z python -m harness_maker.cli make "$(pwd)" \
   --grade-threshold "$GRADE" --domains "$DOMAINS" --mechanical-checks "$CHECKS" \
   --default-model "$MODEL" --focus "$FOCUS" --wrapup-docs "$WRAPUP_DOCS" \
   --ref-folders "$REF_FOLDERS" --sibling-repos "$SIBLING_REPOS" \

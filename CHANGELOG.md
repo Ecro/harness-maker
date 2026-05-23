@@ -1,5 +1,49 @@
 # Changelog
 
+## [0.24.0] - 2026-05-23
+
+### Added: opt-in maintainer-dogfooding feedback module (PLAN-auto-feedback-2026-05)
+
+New `harness.yaml.feedback.enabled: bool` (default `false`, togglable only
+via the `/hm:configure` interview — no CLI flag, no env var). When `true`,
+dispatcher wrappers (`atomic_command.md.j2` + `workflow_command.md.j2`) emit
+a Jinja-conditional block instructing the current turn's LLM to inspect
+local telemetry (`telemetry_grep.gather_recent_signals`, ≤2KB output),
+decide whether a harness-self issue occurred, and if so write a draft to
+`.claude/observability/feedback/{YYYY-MM-DD}-{slug}-{hash}.md` plus print a
+one-line footer with the exact `gh issue create --web --body-file` command.
+
+When `false` (every non-maintainer user), the dispatcher block is a dead
+Jinja branch — **zero file IO, zero token cost, byte-identical render**.
+
+Zero socket calls from harness-maker Python — preserves PRIVACY.md +
+ADR-005 of PLAN-oss-readiness-audit (`tests/unit/test_no_network.py`
+extended with two new functions covering `feedback/telemetry_grep.py` and
+`feedback/draft_writer.py`).
+
+Surface additions:
+- `FeedbackConfig` + `FeedbackDraft` + `TriggerSignal` Pydantic models
+  with `strict=True` + `extra="forbid"`. AST-walk drift test
+  (`tests/unit/test_privacy_doc_schema.py`) extended to cover the new
+  schemas inside a scoped `@hm:privacy:feedback-module` marker block
+  (validator C3 follow-up guards against generic-token false-pass).
+- 5-field whitelist for draft body (`harness_maker_version + ide + os +
+  stage + task_slug + trigger_signal + redacted error_message +
+  .claude/-only file_paths`). Free-text markdown body — `bug.yml` form
+  alignment intentionally dropped (ADR-004).
+- Dedup by `sha256(trigger_signal_id, task_slug, YYYY-MM-DD)[:16]` —
+  skip-if-exists today, regenerate next day (ADR-006).
+- `PRIVACY.md` gains one anchored paragraph documenting the opt-in module
+  (`@hm:privacy:feedback-module` marker block). Existing "Nothing is
+  transmitted off your machine by this tool" sentence remains literally
+  true.
+
+Out of scope (deferred to follow-up PLAN): Codex stage skills bypass the
+wrapper layer (use `codex/stage_skill.md.j2` / `codex/workflow_skill.md.j2`
+directly), so Codex users who flip `feedback.enabled: true` see no
+behavior change. Interview wiring also deferred — toggle via direct
+`harness.yaml` edit in 0.24.0.
+
 ## [0.23.7] - 2026-05-23
 
 ### fix(render): dedupe hooks.json across cache-version bumps

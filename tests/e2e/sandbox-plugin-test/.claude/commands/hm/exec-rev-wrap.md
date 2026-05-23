@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.23.2
+harness_maker_version: 0.24.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: c5905688b39dd485d3046b31d2be755a77f28ba6b6b459c6cd4650c4033a926e
+content_hash: 3e33f6159898fd64041805f6ef483194228d8e4106840ef3970d6c7572dd61c9
 ---
 # /hm:exec-rev-wrap
 
@@ -79,7 +79,7 @@ Engage isolation if `harness.yaml.worktree.scope` includes `execute`. The `workt
 
 
 ```bash
-!uv run --with /home/noel/harness-maker python -m harness_maker.worktree create execute "$(pwd)"
+!uv run --with /home/noel/harness-maker/.worktrees/execute-20260523T0815Z python -m harness_maker.worktree create execute "$(pwd)"
 ```
 
 
@@ -222,12 +222,12 @@ Pick **exactly one** finalize command. Substitute `<WT>` with the literal absolu
 ```bash
 # All phases GREEN — stage-merge the branch back (NO commit) + cleanup the worktree.
 # /hm:wrapup will create the single user-facing commit (with proper message + Co-Authored-By).
-!uv run --with /home/noel/harness-maker python -m harness_maker.worktree finalize <WT> stage-only
+!uv run --with /home/noel/harness-maker/.worktrees/execute-20260523T0815Z python -m harness_maker.worktree finalize <WT> stage-only
 ```
 
 ```bash
 # Stage halted on a blocker — preserve the worktree for inspection:
-!uv run --with /home/noel/harness-maker python -m harness_maker.worktree finalize <WT> fail
+!uv run --with /home/noel/harness-maker/.worktrees/execute-20260523T0815Z python -m harness_maker.worktree finalize <WT> fail
 ```
 
 
@@ -890,7 +890,7 @@ If `/hm:execute` ran in stage-only mode AND the base repo had unrelated dirty wo
 
 
 ```bash
-!uv run --with /home/noel/harness-maker python -m harness_maker.worktree post-commit-pop "$(pwd)"
+!uv run --with /home/noel/harness-maker/.worktrees/execute-20260523T0815Z python -m harness_maker.worktree post-commit-pop "$(pwd)"
 ```
 
 

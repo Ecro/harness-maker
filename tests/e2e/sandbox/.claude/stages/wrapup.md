@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.23.2
+harness_maker_version: 0.24.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: stages/wrapup.md.j2
 provenance: official
-content_hash: 0033104bf432e33d2cb03ba8d8e2fcdfdcfbd04d06257068616dbc3797d0f411
+content_hash: a340ae2e498a24b03fa0c000665c4ccacf631c23fdec73f3a1b4281a253eb196
 ---
 # Stage: wrapup
 
@@ -216,7 +216,7 @@ If `/hm:execute` ran in stage-only mode AND the base repo had unrelated dirty wo
 
 
 ```bash
-!uv run --with /home/noel/harness-maker python -m harness_maker.worktree post-commit-pop "$(pwd)"
+!uv run --with /home/noel/harness-maker/.worktrees/execute-20260523T0815Z python -m harness_maker.worktree post-commit-pop "$(pwd)"
 ```
 
 

@@ -669,6 +669,8 @@ def synthesize(
         wrapup_docs=list(answers.wrapup_docs),
         schema_version=answers.schema_version,
         interview=answers.interview,
+        # PLAN-auto-feedback-2026-05 ADR-002 — propagate opt-in flag to render.
+        feedback=answers.feedback,
     )
     config_dump = config.model_dump(mode="json")
 
@@ -706,6 +708,11 @@ def synthesize(
         "enabled": answers.skills.get("enabled", []),
     }
     install_ref = _compute_install_ref()
+    # PLAN-auto-feedback-2026-05 ADR-005: in-band LLM feedback dispatcher
+    # block is gated on `feedback.enabled` at the wrapper render level. Inject
+    # globally (StrictUndefined raises on ACCESS, not PRESENCE — templates
+    # that don't reference `feedback_enabled` are unaffected).
+    feedback_enabled = bool(config_dump.get("feedback", {}).get("enabled", False))
     files = [
         FileEntry(
             path=Path(out_path),
@@ -719,6 +726,7 @@ def synthesize(
                 "scale": profile.scale,
                 "lifecycle": profile.lifecycle,
                 "harness_maker_src_path": install_ref,
+                "feedback_enabled": feedback_enabled,
                 # is_codex gates Codex-specific branches; always False here since
                 # Codex skill bodies are pre-rendered in _codex_stage_skills().
                 "is_codex": ctx.get("is_codex", False),
