@@ -1,0 +1,72 @@
+{#-
+  Conditional "Codex second opinion" body section for reviewer agents.
+
+  PLAN-codex-second-llm-integration ADR-007: rendered into 3 allow-listed
+  reviewer agent bodies (code-reviewer, consensus-arbiter, plan-validator)
+  when codex_second_opinion.enabled.
+
+  Whitespace control: {%- ... -%} dashes so the disabled branch is
+  byte-zero (ADR-007 P-W1, Jinja env trim_blocks=False).
+
+  Marker `<!-- @hm:codex-second-opinion -->` is a single, distinct token
+  used by tests to assert presence/absence precisely.
+
+  Rendered Bash recipe is hermetic by default (ADR-006). The
+  `--output-schema` path points at the rendered schema file (ADR-008).
+  Failure mode is warn-and-proceed (ADR-003).
+-#}
+{%- set _csoo = config.get('codex_second_opinion', {}) if config else {} -%}
+{%- if _csoo.get('enabled') and name in _csoo.get('agents', []) %}
+
+<!-- @hm:codex-second-opinion -->
+
+## Optional: Codex second opinion
+
+You **MAY** invoke Codex CLI as a second-LLM reviewer when you reach a
+finding that benefits from cross-model judgment (M-of-N consensus,
+tie-break, architectural sanity check). This is opt-in per call — no
+ambient Claude self-dispatch.
+
+**Invocation contract** (hermetic by default per ADR-006 — `--ignore-user-config`
+and `--ignore-rules` strip developer-specific Codex AGENTS.md so the
+second opinion is reproducible across machines):
+
+```bash
+tmp=$(mktemp)
+# Build the prompt body in a tmpfile so adversarial diff content
+# (e.g. a bare `PROMPT_END` line) CANNOT terminate a heredoc early
+# (security-reviewer P1: heredoc terminator injection via reviewed diff).
+prompt_tmp=$(mktemp)
+# IMPORTANT: write the question / diff context to "$prompt_tmp" using
+# `printf '%s' "$content" > "$prompt_tmp"` — never inline the content in
+# this heredoc and never use eval/sh -c on it.
+codex exec \
+  --sandbox read-only \
+  --ask-for-approval never \
+  {%- if _csoo.get('hermetic', true) %}
+  --ignore-user-config --ignore-rules \
+  {%- endif %}
+  --json \
+  --output-schema "{{ _csoo.get('output_schema_path', '.claude/schemas/codex-finding.schema.json') }}" \
+  --output-last-message "$tmp" \
+  - < "$prompt_tmp"
+status=$?
+if [ "$status" -ne 0 ]; then
+  echo "[codex second-opinion] skipped: exit=$status (proceeding Claude-only)" >&2
+else
+  cat "$tmp"  # JSON conforming to the configured output_schema_path
+fi
+rm -f "$tmp" "$prompt_tmp"
+```
+
+**Output schema**: `{ findings: [{file, line, severity, message, evidence}],
+summary, confidence }` — see `{{ _csoo.get('output_schema_path', '.claude/schemas/codex-finding.schema.json') }}`.
+
+**Failure policy** (ADR-003 — warn-and-proceed): on any non-zero exit
+(auth, rate-limit, network, schema rejection), log one line to stderr
+and continue with Claude-only output. Do NOT block the stage.
+
+**Prerequisite**: user must have run `codex login` on their machine.
+First call surfaces an auth error if missing.
+{%- endif -%}
+

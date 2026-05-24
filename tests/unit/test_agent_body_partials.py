@@ -96,10 +96,20 @@ _EXPECTED_SHA256: dict[str, str] = {
     "autoloop-coder": "328eb72fe2ba3d99d9ceecca4a2f00ca349c266e4a98a75d305f894a7e4662ac",
     "code-reviewer": "4c88418df33c99741e31b4265bf2dbb832c78c51bd87da116925d192eed9568f",
     "concurrency-reviewer": "4d78ffc89957060e675ad6552f5ea082ba068a77e95771d4fee67f3e235688fd",
-    "consensus-arbiter": "fe8b027730e5b0aef36c48d748fd205a2aa5c7d9d4a6aba0c4aef70726ad5f71",
+    # consensus-arbiter + plan-validator: hashes bumped 2026-05-24 per
+    # PLAN-codex-second-llm-integration ADR-007 + review security fix.
+    # Both agents previously had NO frontmatter permissions block; Phase 2
+    # added a minimal one with allow: [Read(*), Grep(*), Glob(*)] + conditional
+    # Bash(codex exec:*), and the security review added the full deny:
+    # baseline (Write/Edit + Bash interpreter denies) matching code-reviewer.
+    # The conditional codex line is BYTE-ZERO when enabled=false (test config),
+    # so the rendered hash reflects the new allow-list + deny baseline.
+    # PLAN R8 risk: any future drift in the baseline changes these hashes —
+    # re-pin and document the reason here.
+    "consensus-arbiter": "9a5833320294faaeff0819573fabbee349a23aef8c313facdc8214ae06f2dd24",
     "executor": "d2762982da93b4ebba0aec7004a1ca721a6561e9c1c84b53512ce9d48cb391a8",
     "performance-reviewer": "528788051f31414258cabb083a16e578a6d3fc8f112ec071984a31f57edd63c5",
-    "plan-validator": "8adde27f10cf48eb775ab122ad89878b55e74f8fe526d8692794ae3a51324bc7",
+    "plan-validator": "e333c2d3d9ef1f9cb325a3da51da8f240a077e92b6d651c9387c644d3da9504a",
     "security-auditor": "7dfb6da0797f4d3b8b5e47dee0a9625968079aaf6aabd3b98d6383a902cda4fb",
     "security-reviewer": "1d0dd18466dfbc2ca1cb464134babc38a0555914c4767e0f5c80e8621da58626",
     "stuck": "9db1b3f1e94c31a4613868330f3e52aa0796f387f779ae48a1fd030be0f3080c",

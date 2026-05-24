@@ -1,0 +1,17 @@
+{#-
+  Conditional `Bash(codex exec:*)` permission line for reviewer agents.
+
+  PLAN-codex-second-llm-integration ADR-007: when codex_second_opinion.enabled
+  AND the agent name appears in codex_second_opinion.agents, inject the Bash
+  permission so the agent can invoke `codex exec` for a second-LLM opinion.
+
+  Whitespace: BOTH outer dashes ({%- and -%}) AND `endif -%}` strip the
+  surrounding newlines so the disabled branch produces byte-zero output
+  (ADR-007 P-W1 — Jinja env trim_blocks=False, lstrip_blocks=False).
+  Defensive `_csoo` uses `.get()` so tests passing partial config dicts
+  without `codex_second_opinion` don't raise.
+-#}
+{%- set _csoo = config.get('codex_second_opinion', {}) if config else {} -%}
+{%- if _csoo.get('enabled') and name in _csoo.get('agents', []) %}
+    - "Bash(codex exec:*)"
+{%- endif -%}

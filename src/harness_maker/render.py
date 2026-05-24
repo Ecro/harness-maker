@@ -317,6 +317,17 @@ def _is_cursor_mcp_json(fe: FileEntry) -> bool:
     return str(fe.path) == ".cursor/mcp.json"
 
 
+def _is_schemas_json(fe: FileEntry) -> bool:
+    """Schema files under ``.claude/schemas/*.json`` — pure JSON, frontmatter-prohibited.
+
+    The external consumer is ``codex exec --output-schema`` (PLAN-codex-second-llm-integration
+    ADR-008), which expects a JSON Schema document. ``fe.path`` inside ``.claude/``
+    uses paths relative to the target dir, so the prefix is ``schemas/`` (no
+    leading dot, no ``.claude/`` prefix — see ``resolve_output_path``).
+    """
+    return str(fe.path).startswith("schemas/") and fe.path.suffix == ".json"
+
+
 def _is_codex_hooks_json(fe: FileEntry) -> bool:
     """Codex hooks — ``.codex/hooks.json`` (pure JSON, PascalCase Codex schema)."""
     return str(fe.path) == ".codex/hooks.json"
@@ -1147,6 +1158,18 @@ def render(
             # .cursor/mcp.json is MCP server config, NOT a hook file. Retains
             # the existing pure-render path unchanged by Phase 1+3. Out of scope
             # for PLAN-onboarding-backup-friction.
+            out = _render_pure_json(
+                fe,
+                env,
+                target_dir,
+                dry_run=dry_run,
+                freeze_time=freeze_time,
+            )
+        elif _is_schemas_json(fe):
+            # .claude/schemas/*.json — pure JSON Schema for external consumers
+            # (codex exec --output-schema, jsonschema-aware tooling). No YAML
+            # provenance prefix, no content_hash. PLAN-codex-second-llm-integration
+            # ADR-008 P-W3: reuses the existing _render_pure_json renderer.
             out = _render_pure_json(
                 fe,
                 env,

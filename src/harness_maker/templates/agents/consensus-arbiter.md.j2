@@ -4,6 +4,23 @@ communication_variant: reframe
 description: Aggregates findings from multiple reviewer agents via surface match + reasoning alignment + severity resolution; tags every finding consensus-passed | weak-consensus | manual-only
 tools: Read, Grep, Glob
 model: {% if cursor_model is defined and cursor_model is not none %}{{ cursor_model }}{% elif claude_model is defined and claude_model is not none %}{{ claude_model }}{% else %}sonnet{% endif %}
+permissions:
+  allow:
+    - "Read(*)"
+    - "Grep(*)"
+    - "Glob(*)"
+{%- include "agents/_partials/codex_permission_line.md.j2" %}
+  deny:
+    - "Write(*)"
+    - "Edit(*)"
+    - "Bash(rm:*)"
+    - "Bash(curl:*)"
+    - "Bash(npm:*)"
+    - "Bash(eval *)"
+    - "Bash(python:*)"
+    - "Bash(node:*)"
+    - "Bash(sh:*)"
+    - "Bash(bash:*)"
 ---
 
 {% include "agents/consensus-arbiter_body.md.j2" -%}

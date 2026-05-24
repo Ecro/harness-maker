@@ -438,6 +438,53 @@ class FeedbackConfig(BaseModel):
     enabled: bool = False
 
 
+class CodexSecondOpinionConfig(BaseModel):
+    """Claude→Codex second-LLM routing (PLAN-codex-second-llm-integration).
+
+    Default off. When ``enabled=True``, the allow-listed reviewer agents
+    (``agents``) receive a ``Bash(codex exec:*)`` permission line and a
+    rendered second-opinion section in their body. Calls are hermetic
+    (``--ignore-user-config --ignore-rules``) by default to keep second
+    opinions reproducible across machines (ADR-006). Failures degrade
+    silently via ``failure_policy`` (ADR-003 — warn-and-proceed only in
+    this iteration; per-agent override deferred).
+    """
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    enabled: bool = False
+    agents: list[str] = Field(
+        default_factory=lambda: ["code-reviewer", "consensus-arbiter", "plan-validator"],
+    )
+    failure_policy: Literal["warn-and-proceed"] = "warn-and-proceed"
+    hermetic: bool = True
+    output_schema_path: str = ".claude/schemas/codex-finding.schema.json"
+
+    @field_validator("output_schema_path")
+    @classmethod
+    def _validate_output_schema_path(cls, v: str) -> str:
+        """Reject absolute paths, traversal, and shell metacharacters.
+
+        Defense in depth — review security-reviewer P1: this field flows
+        into the rendered Bash recipe as `--output-schema <path>`. Without
+        strict validation, a tampered harness.yaml could achieve path
+        traversal (reading `~/.ssh/id_rsa`) or shell injection (via
+        `;`, `|`, `$()`, backticks, quote-escape).
+        """
+        if not v:
+            raise ValueError("output_schema_path must not be empty")
+        path = Path(v)
+        if path.is_absolute():
+            raise ValueError(f"output_schema_path must be project-relative, got absolute: {v!r}")
+        if ".." in path.parts:
+            raise ValueError(f"output_schema_path must not contain '..' segments: {v!r}")
+        if not v.endswith(".json"):
+            raise ValueError(f"output_schema_path must end with '.json': {v!r}")
+        if any(c in v for c in "`$();|&\"'\n\r\\"):
+            raise ValueError(f"output_schema_path contains shell-significant characters: {v!r}")
+        return v
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Per-agent model routing (ADR-001/002/003 from PLAN-model-routing-multi-ide)
 # ──────────────────────────────────────────────────────────────────────────────
@@ -603,6 +650,12 @@ class HarnessConfig(BaseModel):
     # default_factory keeps old harness.yaml without `feedback:` key loading;
     # `enabled: false` ⇒ dispatcher conditional is dead branch (zero IO).
     feedback: FeedbackConfig = Field(default_factory=FeedbackConfig)
+    # Codex as second-LLM (PLAN-codex-second-llm-integration ADRs-001/002/009).
+    # default_factory keeps legacy harness.yaml loading; `enabled: false` keeps
+    # Jinja conditionals in agent templates as dead branches (zero render impact).
+    codex_second_opinion: CodexSecondOpinionConfig = Field(
+        default_factory=CodexSecondOpinionConfig,
+    )
     # ADR-011: schema_version bumped 1 → 2 for the agent_models/default_model
     # rename. ADR-004 silent migration handles existing v1 harness.yaml.
     schema_version: int = 2
@@ -761,6 +814,12 @@ class InterviewAnswers(BaseModel):
     # default_factory mirrors HarnessConfig default (enabled=false). Survives
     # answers_from_harness_yaml round-trip per CLAUDE.md checkpoint 6.
     feedback: FeedbackConfig = Field(default_factory=FeedbackConfig)
+    # Mirror of HarnessConfig.codex_second_opinion (PLAN-codex-second-llm-integration
+    # ADR-005 P-W2: validator P0#3 — InterviewAnswers extra='forbid' would reject
+    # the key without this declaration on round-trip).
+    codex_second_opinion: CodexSecondOpinionConfig = Field(
+        default_factory=CodexSecondOpinionConfig,
+    )
 
     @field_validator("sibling_repos", mode="before")
     @classmethod

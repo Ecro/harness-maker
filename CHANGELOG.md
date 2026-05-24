@@ -2,6 +2,36 @@
 
 ## [Unreleased]
 
+### Added: Codex CLI as second-LLM reviewer — `codex_second_opinion` opt-in (PLAN-codex-second-llm-integration)
+
+New `harness.yaml.codex_second_opinion` block lets `code-reviewer`,
+`consensus-arbiter`, and `plan-validator` invoke `codex exec` for a cross-model
+second opinion. Disabled by default. Set `codex_second_opinion.enabled: true`
+to activate.
+
+When enabled, the 3 allow-listed reviewer agents receive:
+- A `Bash(codex exec:*)` permission in their frontmatter (Jinja-conditional —
+  ADR-007 byte-zero whitespace control keeps disabled-state rendering identical
+  to today).
+- A rendered `## Optional: Codex second opinion` section with a hermetic Bash
+  recipe (`--ignore-user-config --ignore-rules` by default — ADR-006) that
+  enforces a `finding[]` JSON schema (`.claude/schemas/codex-finding.schema.json`,
+  newly rendered when enabled — ADR-008).
+
+Failure policy is `warn-and-proceed` globally (ADR-003) — Codex outages do not
+block reviewer agents. No in-code budget (ADR-004); Codex account rate limits
+are the only ceiling. Transport is `codex exec` Bash dispatch only — no MCP
+server registration (ADR-001).
+
+**Prerequisite**: user must have `codex` CLI installed and `codex login`
+completed. First call surfaces an auth error if missing.
+
+**Orthogonal to `targets`** (ADR-009): `codex_second_opinion.enabled=true` works
+even when `codex` is not in `harness.yaml.targets`.
+
+Schema changes (back-compat): legacy harness.yaml files without
+`codex_second_opinion:` load with safe defaults (`enabled: false`).
+
 ## [0.25.1] - 2026-05-24
 
 ### Changed: loop self-pause prohibition rail (`templates/commands/hm/loop.md.j2`)

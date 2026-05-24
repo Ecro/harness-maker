@@ -378,6 +378,27 @@ def _localized(stem: str, locale: str) -> str:
     return f"{stem}.{suffix}.md.j2"
 
 
+def _schema_files(codex_second_opinion_enabled: bool) -> list[FileSpec]:
+    """JSON Schema files rendered to ``.claude/schemas/*.json``.
+
+    PLAN-codex-second-llm-integration ADR-008: schema is gated on the opt-in
+    flag — rendered only when ``codex_second_opinion.enabled=True``. Path uses
+    the inside-.claude/ convention (no leading dot, no .claude/ prefix), so
+    ``_is_schemas_json`` predicate matches and ``_render_pure_json`` is the
+    dispatch target (no provenance frontmatter; external consumer is
+    ``codex exec --output-schema``).
+    """
+    if not codex_second_opinion_enabled:
+        return []
+    return [
+        (
+            "schemas/codex-finding.schema.json",
+            "schemas/codex-finding.schema.json",
+            {},
+        ),
+    ]
+
+
 def _base_files(
     preset: Preset,
     locale: str = "en",
@@ -671,6 +692,10 @@ def synthesize(
         interview=answers.interview,
         # PLAN-auto-feedback-2026-05 ADR-002 — propagate opt-in flag to render.
         feedback=answers.feedback,
+        # PLAN-codex-second-llm-integration — propagate codex_second_opinion so
+        # config.codex_second_opinion.{enabled,agents,...} is available in every
+        # agent template's render context (ADR-007 Jinja-conditional pattern).
+        codex_second_opinion=answers.codex_second_opinion,
     )
     config_dump = config.model_dump(mode="json")
 
@@ -685,6 +710,8 @@ def synthesize(
     file_specs: list[FileSpec] = [
         *base_specs,
         *_workflow_command_files(answers.fused_workflows, config_dump=config_dump),
+        # PLAN-codex-second-llm-integration ADR-008 — schema only when enabled.
+        *_schema_files(answers.codex_second_opinion.enabled),
     ]
 
     if Target.CURSOR in answers.targets:

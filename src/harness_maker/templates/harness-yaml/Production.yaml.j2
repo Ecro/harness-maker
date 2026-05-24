@@ -95,3 +95,9 @@ security:
     spec_gate: block
 feedback:
   enabled: {{ (config.feedback.enabled if config.feedback else false) | string | lower }}
+codex_second_opinion:
+  enabled: {{ (config.codex_second_opinion.enabled if config.codex_second_opinion else false) | string | lower }}
+  agents: {{ (config.codex_second_opinion.agents if config.codex_second_opinion else ['code-reviewer', 'consensus-arbiter', 'plan-validator']) | tojson }}
+  failure_policy: {{ (config.codex_second_opinion.failure_policy if config.codex_second_opinion else "warn-and-proceed") | tojson }}
+  hermetic: {{ (config.codex_second_opinion.hermetic if config.codex_second_opinion else true) | string | lower }}
+  output_schema_path: {{ (config.codex_second_opinion.output_schema_path if config.codex_second_opinion else ".claude/schemas/codex-finding.schema.json") | tojson }}

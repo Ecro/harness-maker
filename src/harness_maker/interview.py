@@ -31,6 +31,7 @@ from harness_maker.models import (
     AgentModelSpec,
     AtomicStage,
     CodexAgentSpec,
+    CodexSecondOpinionConfig,
     Confidence,
     DevMode,
     FeedbackConfig,
@@ -203,6 +204,7 @@ def interview(
     ref_folders = _ask_ref_folders()
     sibling_repos = _ask_sibling_repos()
     second_brain = _ask_second_brain()
+    codex_second_opinion = _ask_codex_second_opinion()
     return _build_answers(
         locale=locale,
         targets=targets,
@@ -215,6 +217,7 @@ def interview(
         ref_folders=ref_folders,
         sibling_repos=sibling_repos,
         second_brain=second_brain,
+        codex_second_opinion=codex_second_opinion,
     )
 
 
@@ -549,6 +552,26 @@ def _parse_stage_numbers(line: str) -> list[AtomicStage]:
     return out
 
 
+def _ask_codex_second_opinion() -> CodexSecondOpinionConfig:
+    """Ask whether to enable Codex CLI as a second-LLM reviewer (PLAN-codex-second-llm-integration).
+
+    Default off (safe). When enabled, the 3 default reviewer agents
+    (code-reviewer, consensus-arbiter, plan-validator) get ``Bash(codex exec:*)``
+    permission + a rendered second-opinion section that invokes ``codex exec``
+    hermetic-by-default (ADR-006). Requires user to have run ``codex login``.
+    No follow-up sub-questions — advanced tuning happens via direct
+    ``harness.yaml.codex_second_opinion.*`` edits.
+    """
+    print("\nCodex as second-LLM reviewer (opt-in).")
+    print("  When enabled, code-reviewer / consensus-arbiter / plan-validator")
+    print("  may invoke `codex exec` for cross-model second opinions.")
+    print("  Prerequisite: run `codex login` on your machine first.")
+    answer = _input_or_empty("  Enable Codex second opinion? [y/N]: ").strip().lower()
+    if answer in {"y", "yes"}:
+        return CodexSecondOpinionConfig(enabled=True)
+    return CodexSecondOpinionConfig()
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Confidence-bucketed dispatch (Phase 8 — single tri-IDE dispatch site)
 # ──────────────────────────────────────────────────────────────────────────────
@@ -627,6 +650,7 @@ def _build_answers(
     second_brain: SecondBrainConfig | None = None,
     ref_folders: list[RefFolder] | None = None,
     sibling_repos: list[str] | None = None,
+    codex_second_opinion: CodexSecondOpinionConfig | None = None,
     schema_version: int = 2,
 ) -> InterviewAnswers:
     is_side = preset == Preset.SIDE
@@ -640,6 +664,9 @@ def _build_answers(
         ref_folders=list(ref_folders) if ref_folders else [],
         sibling_repos=list(sibling_repos) if sibling_repos else [],
         second_brain=second_brain if second_brain is not None else SecondBrainConfig(),
+        codex_second_opinion=(
+            codex_second_opinion if codex_second_opinion is not None else CodexSecondOpinionConfig()
+        ),
         reviewers={
             "installed": list(_ALL_REVIEWERS),
             "enabled": list(_SIDE_ENABLED_REVIEWERS if is_side else _PROD_ENABLED_REVIEWERS),
@@ -783,6 +810,30 @@ def answers_from_harness_yaml(yaml_path: Path) -> InterviewAnswers | None:
             # Future schema fields that fail strict validation: stay tolerant.
             with contextlib.suppress(ValidationError):
                 update["feedback"] = FeedbackConfig(enabled=feedback_enabled_raw)
+    # PLAN-codex-second-llm-integration — same tolerant-fallback pattern as
+    # feedback: missing key OR malformed block → silent default
+    # CodexSecondOpinionConfig() (enabled=False). Only the recognized fields
+    # round-trip; unknown keys are ignored (forward-compat).
+    csoo_raw = data.get("codex_second_opinion")
+    if isinstance(csoo_raw, dict):
+        # Filter to recognized keys with strict per-field validation; let
+        # Pydantic do the final validation via model_validate (preserves
+        # default_factory for omitted fields).
+        csoo_clean: dict[str, object] = {}
+        enabled_raw = csoo_raw.get("enabled")
+        if isinstance(enabled_raw, bool):
+            csoo_clean["enabled"] = enabled_raw
+        agents_raw = csoo_raw.get("agents")
+        if isinstance(agents_raw, list) and all(isinstance(a, str) for a in agents_raw):
+            csoo_clean["agents"] = list(agents_raw)
+        hermetic_raw = csoo_raw.get("hermetic")
+        if isinstance(hermetic_raw, bool):
+            csoo_clean["hermetic"] = hermetic_raw
+        output_schema_raw = csoo_raw.get("output_schema_path")
+        if isinstance(output_schema_raw, str):
+            csoo_clean["output_schema_path"] = output_schema_raw
+        with contextlib.suppress(ValidationError):
+            update["codex_second_opinion"] = CodexSecondOpinionConfig.model_validate(csoo_clean)
     # ADR-002/004 silent migration: prefer the new `default_model` key; fall
     # back to the deprecated `recommended_model`. When ONLY the deprecated key
     # is present AND the file is schema_version<2, emit an advisory INFO log

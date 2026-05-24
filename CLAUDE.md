@@ -32,6 +32,7 @@ harness-maker 는 Claude Code + Cursor 양쪽 IDE 의 플러그인으로, **LLM 
 - **Cursor 추가 자산**: `targets` 에 `cursor` 포함 시에만 `.cursor/rules/*.mdc`, `.cursor/commands/hm-*.md`, `.cursor/mcp.json` 추가 렌더.
 - **Cursor 사용자 모델 권장**: `harness.yaml.recommended_model: claude-opus-4-7` + agent frontmatter `model` 명시. user override 자유. prompt 자체는 model-agnostic 재작성 안 함 (`<thinking>` blocks 등 Claude-specific 표현 유지).
 - **최소 지원 Cursor 버전**: 2.4 (subagents + skills + Claude Code hooks 호환 최초 도입). Cursor 3.0 이상 권장.
+- **Codex dual role** (PLAN-codex-second-llm-integration ADR-009): `codex` 는 IDE asset 렌더링 (`.codex/`) 뿐 아니라 second-LLM provider 역할도 한다. `harness.yaml.codex_second_opinion.enabled=true` 면 `code-reviewer / consensus-arbiter / plan-validator` 가 `codex exec` 을 호출 (Bash dispatch only, no MCP). 두 축은 직교 — `targets` 에 `codex` 없어도 `codex_second_opinion` 활성화 가능 (사용자 측 `codex` CLI + `codex login` 만 있으면 됨). 실패 정책은 warn-and-proceed.
 
 ## 기술 결정 (변경 금지)
 

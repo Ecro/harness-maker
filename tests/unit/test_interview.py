@@ -110,9 +110,10 @@ def test_interview_interactive_accepts_recommended(monkeypatch: pytest.MonkeyPat
     """Empty answers ⇒ accept recommended locale/preset/dev_mode/starter/defaults."""
     # locale, targets, preset, dev_mode, use-recommended?, default workflow,
     # consensus, caching, ref_folders (blank=skip), sibling_repos (blank=skip),
-    # vault_path (blank=skip)
+    # vault_path (blank=skip), codex_second_opinion (blank=skip/default N).
+    # next(inputs, "") fallback handles extra prompts gracefully.
     inputs: Iterator[str] = iter(["", "", "", "", "", "", "", "", "", "", ""])
-    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
+    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs, ""))
     result = interview(_profile(), autoloop_mode=False)
     assert result.locale == "en"
     assert result.targets == [Target.CLAUDE_CODE]
@@ -127,7 +128,7 @@ def test_interview_locale_first_question_accepts_arbitrary_tag(
 ) -> None:
     """Locale is the first prompt; user types ``ja`` and it passes through."""
     inputs: Iterator[str] = iter(["ja", "", "", "", "", "", "", "", "", "", ""])
-    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
+    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs, ""))
     result = interview(_profile(), autoloop_mode=False)
     assert result.locale == "ja"
 
@@ -139,7 +140,7 @@ def test_interview_dev_mode_explicit_override_to_spec_driven(
     # locale, targets, preset, dev_mode=spec, use-rec?, default, consensus, caching,
     # ref_folders, sibling_repos, vault_path
     inputs: Iterator[str] = iter(["", "", "", "spec", "", "", "", "", "", "", ""])
-    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
+    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs, ""))
     result = interview(_profile(), autoloop_mode=False)
     assert result.preset == Preset.SIDE
     assert result.dev_mode == DevMode.SPEC_DRIVEN
@@ -150,7 +151,7 @@ def test_interview_dev_mode_explicit_override_to_task_on_production(
 ) -> None:
     """Production+task-driven cross is allowed."""
     inputs: Iterator[str] = iter(["", "", "Production", "task", "", "", "", "", "", "", ""])
-    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
+    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs, ""))
     result = interview(_profile(), autoloop_mode=False)
     assert result.preset == Preset.PRODUCTION
     assert result.dev_mode == DevMode.TASK_DRIVEN
@@ -159,7 +160,7 @@ def test_interview_dev_mode_explicit_override_to_task_on_production(
 def test_interview_interactive_overrides_default(monkeypatch: pytest.MonkeyPatch) -> None:
     """User picks a different default workflow from the starter set."""
     inputs: Iterator[str] = iter(["", "", "", "", "", "exec-rev", "", "", "", "", ""])
-    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
+    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs, ""))
     result = interview(_profile(), autoloop_mode=False)
     assert result.default_workflow == "exec-rev"
 
@@ -171,7 +172,7 @@ def test_interview_interactive_custom_workflows(monkeypatch: pytest.MonkeyPatch)
     inputs: Iterator[str] = iter(
         ["", "", "", "", "n", "4,5", "", "done", "", "", "", "", "", ""],
     )
-    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
+    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs, ""))
     result = interview(_profile(), autoloop_mode=False)
     assert result.fused_workflows == {
         "exec-rev": [AtomicStage.EXECUTE, AtomicStage.REVIEW],
@@ -186,7 +187,7 @@ def test_interview_interactive_custom_named_override(
     inputs: Iterator[str] = iter(
         ["", "", "", "", "n", "4,5,6", "ship", "done", "", "", "", "", "", ""],
     )
-    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
+    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs, ""))
     result = interview(_profile(), autoloop_mode=False)
     assert "ship" in result.fused_workflows
     assert result.fused_workflows["ship"] == [
@@ -199,7 +200,7 @@ def test_interview_interactive_custom_named_override(
 def test_interview_preset_override_to_production(monkeypatch: pytest.MonkeyPatch) -> None:
     """User on a small-experiment profile picks Production explicitly."""
     inputs: Iterator[str] = iter(["", "", "Production", "", "", "", "", "", "", "", ""])
-    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
+    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs, ""))
     result = interview(_profile(), autoloop_mode=False)
     assert result.preset == Preset.PRODUCTION
     assert result.default_workflow == "exec-rev-wrap-ver"
@@ -215,7 +216,7 @@ def test_interview_custom_workflow_rejects_reserved(
     inputs: Iterator[str] = iter(
         ["", "", "", "", "n", "4,5", "plan", "3,4", "", "done", "", "", "", "", "", ""],
     )
-    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
+    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs, ""))
     result = interview(_profile(), autoloop_mode=False)
     # The reserved-name attempt was rejected; only the second valid entry remains.
     assert "plan" not in result.fused_workflows
@@ -231,7 +232,7 @@ def test_interview_ref_folders_multiple_with_glob_override(
     inputs: Iterator[str] = iter(
         ["", "", "", "", "", "", "", "", "./docs", "../shared ; **/*.md", "", "", ""],
     )
-    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
+    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs, ""))
     result = interview(_profile(), autoloop_mode=False)
     assert len(result.ref_folders) == 2
     assert result.ref_folders[0].path == "./docs"
@@ -245,7 +246,7 @@ def test_interview_targets_multi_select_input(monkeypatch: pytest.MonkeyPatch) -
     inputs: Iterator[str] = iter(
         ["", "claude-code, cursor", "", "", "", "", "", "", "", "", ""],
     )
-    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
+    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs, ""))
     result = interview(_profile(), autoloop_mode=False)
     assert result.targets == [Target.CLAUDE_CODE, Target.CURSOR]
 
@@ -253,7 +254,7 @@ def test_interview_targets_multi_select_input(monkeypatch: pytest.MonkeyPatch) -
 def test_interview_targets_cursor_only_input(monkeypatch: pytest.MonkeyPatch) -> None:
     """User can pick Cursor as the sole target."""
     inputs: Iterator[str] = iter(["", "cursor", "", "", "", "", "", "", "", "", ""])
-    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
+    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs, ""))
     result = interview(_profile(), autoloop_mode=False)
     assert result.targets == [Target.CURSOR]
 
@@ -263,7 +264,7 @@ def test_interview_targets_unknown_value_skipped(monkeypatch: pytest.MonkeyPatch
     inputs: Iterator[str] = iter(
         ["", "claude-code, vscode-fork", "", "", "", "", "", "", "", "", ""],
     )
-    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
+    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs, ""))
     result = interview(_profile(), autoloop_mode=False)
     assert result.targets == [Target.CLAUDE_CODE]
 
@@ -271,7 +272,7 @@ def test_interview_targets_unknown_value_skipped(monkeypatch: pytest.MonkeyPatch
 def test_interview_targets_codex_input(monkeypatch: pytest.MonkeyPatch) -> None:
     """User can pick codex as the sole target."""
     inputs: Iterator[str] = iter(["", "codex", "", "", "", "", "", "", "", "", ""])
-    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
+    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs, ""))
     result = interview(_profile(), autoloop_mode=False)
     assert result.targets == [Target.CODEX]
 
@@ -281,7 +282,7 @@ def test_interview_targets_all_three(monkeypatch: pytest.MonkeyPatch) -> None:
     inputs: Iterator[str] = iter(
         ["", "claude-code, cursor, codex", "", "", "", "", "", "", "", "", ""],
     )
-    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
+    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs, ""))
     result = interview(_profile(), autoloop_mode=False)
     assert result.targets == [Target.CLAUDE_CODE, Target.CURSOR, Target.CODEX]
 
@@ -680,7 +681,7 @@ def test_ask_second_brain_proposes_default_folder_with_project_id(
             "",  # accept default folder path (blank → default)
         ]
     )
-    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
+    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs, ""))
 
     cfg = _ask_second_brain()
 
@@ -705,7 +706,7 @@ def test_ask_second_brain_skips_folder_when_project_id_absent(
             "",  # project_id blank
         ]
     )
-    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
+    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs, ""))
 
     cfg = _ask_second_brain()
 
@@ -727,7 +728,7 @@ def test_ask_second_brain_accepts_custom_folder_path(
             "Projects/my-proj/notes",  # override default
         ]
     )
-    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
+    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs, ""))
 
     cfg = _ask_second_brain()
 
