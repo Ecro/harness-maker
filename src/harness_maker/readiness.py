@@ -1061,7 +1061,16 @@ def _dim_governance(project_dir: Path, preset: Preset) -> DimensionScore:
 
 
 def _count_user_md_files(claude_dir: Path) -> int:
-    """Count .md files in .claude/ without harness-maker provenance frontmatter."""
+    """Count .md files in .claude/ without harness-maker provenance frontmatter.
+
+    Sniff window for ``content_hash:`` is 2000 bytes — large enough to cover
+    agent frontmatter blocks that include both ``permissions: allow`` and
+    ``permissions: deny`` lists (longest observed today is executor.md with
+    content_hash at byte 809). 500-byte windows mis-counted any agent with
+    a deny baseline as a "user file", inflating ceremony_penalty (0.26.0
+    quality-gate regression — PLAN-codex-second-llm-integration pushed two
+    more agents over the old 500-byte boundary).
+    """
     if not claude_dir.is_dir():
         return 0
     count = 0
@@ -1073,7 +1082,7 @@ def _count_user_md_files(claude_dir: Path) -> int:
         except OSError:
             count += 1
             continue
-        if not (text.startswith("---\n") and "content_hash:" in text[:500]):
+        if not (text.startswith("---\n") and "content_hash:" in text[:2000]):
             count += 1
     return count
 

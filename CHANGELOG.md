@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+## [0.26.1] - 2026-05-24
+
+### Fixed: `_count_user_md_files` 500-byte sniff window too tight (quality-gate regression on 0.26.0)
+
+`readiness._count_user_md_files` searched `text[:500]` for `content_hash:` to
+distinguish harness-rendered files from user-authored ones. The 0.26.0 feature
+added `permissions: allow + deny` blocks to consensus-arbiter and plan-validator
+(~280 bytes of new frontmatter), pushing `content_hash:` past byte 500. Both
+agents were then mis-counted as "user files", inflating `ceremony_penalty` by
+3 points (2 × 1.5) and dropping Side fresh-install composite 67 → 64, below
+the test floor of 66.
+
+Sniff window widened to 2000 bytes — covers the longest observed agent
+frontmatter (executor.md at byte 809) with ample margin. Pure bug fix; no
+behavior change for files whose `content_hash:` was already within 500 bytes.
+
+Side fresh-install composite restored to 67 (above floor 66). Production
+unaffected (its floor / signals are different).
+
 ## [0.26.0] - 2026-05-24
 
 ### Added: Codex CLI as second-LLM reviewer — `codex_second_opinion` opt-in (PLAN-codex-second-llm-integration)
