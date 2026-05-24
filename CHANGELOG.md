@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-05-24
+
 ### Added: Codex CLI as second-LLM reviewer — `codex_second_opinion` opt-in (PLAN-codex-second-llm-integration)
 
 New `harness.yaml.codex_second_opinion` block lets `code-reviewer`,
@@ -31,6 +33,21 @@ even when `codex` is not in `harness.yaml.targets`.
 
 Schema changes (back-compat): legacy harness.yaml files without
 `codex_second_opinion:` load with safe defaults (`enabled: false`).
+
+### Security (review Round 2 fixes shipped in the same feature)
+
+- `output_schema_path` strict field validator: rejects absolute paths, `..`
+  traversal, and shell metacharacters. yaml templates interpolate via
+  `| tojson`; the rendered Bash recipe shell-quotes the argument. Closes a
+  shell-injection / path-traversal vector via tampered harness.yaml.
+- `consensus-arbiter` and `plan-validator` agents gain the full `deny:`
+  baseline matching `code-reviewer` (Write, Edit, Bash bash/sh/python/eval/
+  node/curl/npm/rm). Both agents previously had NO permissions frontmatter
+  block at all — this feature's `allow:` addition exposed a gap that the
+  review caught.
+- Heredoc terminator `<<'PROMPT'` replaced with `mktemp` tmpfile + stdin
+  redirect to prevent adversarial-diff content containing a bare `PROMPT`
+  line from terminating the heredoc early and injecting shell commands.
 
 ## [0.25.1] - 2026-05-24
 
