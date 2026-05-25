@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.26.1
+harness_maker_version: 0.26.2
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: e062d5429bf8f40c6035097a1bdc98942cfc00556115c1c55c4510d49a420a6a
+content_hash: 72e50b653fcb5d7d045c4482b86ec2a90030a81a29d5cde57d2af037e42b6f4f
 ---
 # /hm:plan-exec-rev
 
@@ -398,6 +398,9 @@ summary: "{≤100 char one-line TL;DR}"
 4. **📐 Architecture Decision Records** — every promoted ADR with full template
 5. **🏗️ Technical Design** — Current State / Affected Components / Dependencies / Architecture / Design Decisions (referencing ADRs) / Data Flow / API Changes
 6. **📝 Implementation Plan** — numbered phases. **Each phase MUST have**:
+   - `depends_on` (phase numbers or `[]`)
+   - `parallel_group` (shared label for phases that can be considered together; use `serial-*` when not parallelizable)
+   - `merge_hazards` (specific files/contracts/generated outputs that force serial handling, or `none`)
    - Scope (files in / out)
    - Exit criterion (a runnable command or check that proves the phase is done)
    - Risk: `low` | `medium` | `high`
@@ -413,7 +416,7 @@ After writing, Read the file back and assert:
 - Starts with `---` frontmatter.
 - Contains `## 🎙️ Interview Transcript` with ≥1 entry (or skip-justification line).
 - ADR count in frontmatter matches `## 📐 Architecture Decision Records` heading count.
-- Every phase has all 4 required fields (scope / exit / risk / rollback).
+- Every phase has all required fields (depends_on / parallel_group / merge_hazards / scope / exit / risk / rollback).
 
 If verification fails, retry write **once**. If still failing, surface the path + error and stop — do NOT proceed to a downstream stage.
 
@@ -434,7 +437,7 @@ The shell guard below makes the receipt a no-op when `.current-iter` is absent �
 !if [ -f "<WT>/.claude/.hm-iter-receipts/.current-iter" ]; then \
    ITER=$(cat "<WT>/.claude/.hm-iter-receipts/.current-iter" 2>/dev/null); \
    if [ -n "$ITER" ]; then \
-     uv run --with /home/noel/.claude/plugins/cache/harness-maker-local/harness-maker/0.26.1 python -m harness_maker.iter_receipts write \
+     uv run --with /home/noel/.claude/plugins/cache/harness-maker-local/harness-maker/0.26.2 python -m harness_maker.iter_receipts write \
        --iter "$ITER" --stage plan --verdict <verdict> --root "<WT>"; \
    fi; \
  fi
@@ -456,6 +459,7 @@ The shell guard below makes the receipt a no-op when `.current-iter` is absent �
 ## Quality Bar
 
 - An independent reader can predict the file diff per phase.
+- Execute can decide upfront whether any sub-agent work can run in parallel from the phase dependency metadata.
 - Each exit criterion is checkable (script, test, or manual checklist).
 - Risks are concrete, not platitudes ("might break things").
 - Every architectural decision in `## 🏗️ Technical Design` links back to an ADR or Interview Entry.
@@ -543,7 +547,7 @@ Engage isolation if `harness.yaml.worktree.scope` includes `execute`. The `workt
 
 
 ```bash
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker-local/harness-maker/0.26.1 python -m harness_maker.worktree create execute "$(pwd)"
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker-local/harness-maker/0.26.2 python -m harness_maker.worktree create execute "$(pwd)"
 ```
 
 
@@ -572,6 +576,29 @@ Parse flags from `$ARGUMENTS`:
 - `--no-tdd` → set `tdd_active = false`.
 - Otherwise `tdd_active = true`.
 
+
+### Step 1.5 — Parallel split assessment
+
+Before editing, decide whether any work can safely run in parallel. Use the
+PLAN phase metadata (`depends_on`, `parallel_group`, `merge_hazards`) as the
+source of truth.
+
+Proceed in parallel ONLY when all of these hold:
+- The shards have disjoint file ownership OR are read-only analysis tasks.
+- No shard touches shared generated files, snapshot baselines, migrations,
+  public contracts, workflow registries, or global config.
+- The PLAN's `merge_hazards` for the relevant phases is `none` or already
+  resolved by a serial predecessor phase.
+
+Force serial execution when:
+- Two phases touch the same file.
+- A phase changes shared API/schema/CLI contracts.
+- A phase updates generated artifacts consumed by later phases.
+- Ownership is unclear.
+
+When parallel work is safe, assign explicit file ownership to each sub-agent
+and require each worker to avoid reverting other workers' edits. When unsafe,
+write a one-line serial justification in your progress notes and continue.
 
 ### Step 2 — Resolve SPEC + RESEARCH cache (when frontmatter references them)
 
@@ -686,7 +713,7 @@ The shell guard below makes the receipt a no-op when `.current-iter` is absent �
 !if [ -f "<WT>/.claude/.hm-iter-receipts/.current-iter" ]; then \
    ITER=$(cat "<WT>/.claude/.hm-iter-receipts/.current-iter" 2>/dev/null); \
    if [ -n "$ITER" ]; then \
-     uv run --with /home/noel/.claude/plugins/cache/harness-maker-local/harness-maker/0.26.1 python -m harness_maker.iter_receipts write \
+     uv run --with /home/noel/.claude/plugins/cache/harness-maker-local/harness-maker/0.26.2 python -m harness_maker.iter_receipts write \
        --iter "$ITER" --stage execute --verdict <verdict> --root "<WT>"; \
    fi; \
  fi
@@ -695,7 +722,12 @@ The shell guard below makes the receipt a no-op when `.current-iter` is absent �
 
 ### Step 5 — Worktree finalize
 
-Before invoking finalize, run `git status --porcelain` in the **base** repo (parent of `<WT>`'s `.worktrees/`). If non-empty, surface to the user, informationally (no question — finalize proceeds):
+Normal flow blocks a dirty base repo during Step 0 `worktree create`. Finalize
+auto-stashes base dirt only when the user explicitly bypassed that guard with
+`--allow-dirty-base` or when new base dirt appeared after create. Before
+invoking finalize, run `git status --porcelain` in the **base** repo (parent
+of `<WT>`'s `.worktrees/`). If non-empty, surface to the user,
+informationally (no question — finalize proceeds):
 
 > "다음 파일이 base 에 dirty 상태로 있어 finalize 가 자동 stash 후 복원합니다: {file list}
 > **알림:** staged 파일은 unstaged 상태로 복원됩니다 — 필요시 다시 `git add` 하세요."
@@ -708,12 +740,12 @@ Pick **exactly one** finalize command. Substitute `<WT>` with the literal absolu
 ```bash
 # All phases GREEN — stage-merge the branch back (NO commit) + cleanup the worktree.
 # /hm:wrapup will create the single user-facing commit (with proper message + Co-Authored-By).
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker-local/harness-maker/0.26.1 python -m harness_maker.worktree finalize <WT> stage-only
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker-local/harness-maker/0.26.2 python -m harness_maker.worktree finalize <WT> stage-only
 ```
 
 ```bash
 # Stage halted on a blocker — preserve the worktree for inspection:
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker-local/harness-maker/0.26.1 python -m harness_maker.worktree finalize <WT> fail
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker-local/harness-maker/0.26.2 python -m harness_maker.worktree finalize <WT> fail
 ```
 
 
@@ -724,6 +756,16 @@ If Step 0 printed empty (no isolation engaged), skip both — there is nothing t
 ```bash
 git commit -m "<your message>"
 ```
+
+If finalize reported a deferred stash handoff or wrote
+`.claude/.hm-finalize-stash-*`, run the post-commit restore after the manual
+commit; otherwise the user's pre-existing WIP remains in the stash queue:
+
+
+```bash
+!HM_OWNED_SESSION_UUIDS="$(uv run --with /home/noel/.claude/plugins/cache/harness-maker-local/harness-maker/0.26.2 python -m harness_maker.worktree owned-uuids "$(pwd)")" uv run --with /home/noel/.claude/plugins/cache/harness-maker-local/harness-maker/0.26.2 python -m harness_maker.worktree post-commit-pop "$(pwd)"
+```
+
 
 ## Outputs
 
@@ -833,6 +875,10 @@ Per-invocation overrides (workflow command flags):
 - `routing: always-all` → invoke every enabled reviewer in parallel.
 - `routing: conditional` → use Conditional Router (M6) on the changed-file paths to pick the subset.
 - Add any extras from `--with-reviewers=<csv>`.
+- For large diffs with independent file clusters, optionally split the same
+  reviewer type across clusters only when clusters have disjoint file ownership
+  and no shared contract/generated-file dependency. Preserve the legacy
+  reviewer-set path when clusters are absent.
 
 ### Step 2 — Drift gate (PLAN/SPEC vs actual diff) — SINGLE OWNER
 
@@ -931,9 +977,11 @@ Pass 2 instead of the raw Pass 1 list. Log `stats.dropped_n` for telemetry.
 
 
 3. Re-run the same reviewer set with the **full** context (metadata
-   restored) and the **Pass 1.5 verified findings** list. Each reviewer validates
-   each finding against the metadata, drops any that the context proves
-   spurious, and adjusts severity if context changes risk.
+   restored) and the **Pass 1.5 verified findings** list. Launch these reviewer
+   calls in parallel, using one Task call per reviewer (or per reviewer × file
+   cluster when safe). Each reviewer validates each finding against the
+   metadata, drops any that the context proves spurious, and adjusts severity
+   if context changes risk.
 4. Merge the two passes via the harness CLI:
    
    ```bash
@@ -1069,7 +1117,7 @@ Per iteration:
 
    On failure: identify the last fix that touched the failing file → **revert** it (restore original snippet) and log `Fix #{N} reverted — caused build failure`. Continue with remaining fixes (do not abort the round).
 
-4. **Re-review (selective)** — re-spawn ONLY reviewers whose scope was touched by applied fixes. Reviewers that approved untouched files are NOT re-run. Multi-instance code-reviewer consensus (when configured) still uses the configured number of instances on modified files.
+4. **Re-review (selective)** — re-spawn ONLY reviewers whose scope was touched by applied fixes. Launch all required re-reviewers in parallel in one Task batch when their scopes are independent. Reviewers that approved untouched files are NOT re-run. Multi-instance code-reviewer consensus (when configured) still uses the configured number of instances on modified files.
 
 5. **Recompute grade** using the new findings (Step 4 consensus filter again).
 
@@ -1146,7 +1194,7 @@ The shell guard below makes the receipt a no-op when `.current-iter` is absent �
 !if [ -f "<WT>/.claude/.hm-iter-receipts/.current-iter" ]; then \
    ITER=$(cat "<WT>/.claude/.hm-iter-receipts/.current-iter" 2>/dev/null); \
    if [ -n "$ITER" ]; then \
-     uv run --with /home/noel/.claude/plugins/cache/harness-maker-local/harness-maker/0.26.1 python -m harness_maker.iter_receipts write \
+     uv run --with /home/noel/.claude/plugins/cache/harness-maker-local/harness-maker/0.26.2 python -m harness_maker.iter_receipts write \
        --iter "$ITER" --stage review --verdict <verdict> --root "<WT>"; \
    fi; \
  fi
