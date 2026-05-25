@@ -54,22 +54,21 @@ user explicitly changes it.
 
 ### 2. Detect state
 
-Resolve the harness-maker install path via a 3-step fallback, then check
-whether the project already has a harness.
+Resolve the harness-maker install path via the canonical `locate` resolver,
+then check whether the project already has a harness.
 
 ```bash
-# Step A — Claude Code plugin resolution (works when installed via /plugin)
-!plugin_dir=$(python3 -c "
-import json, os, pathlib
-try:
-    data = json.load(open(pathlib.Path.home() / '.claude/plugins/installed_plugins.json'))
-    entries = data['plugins']['harness-maker@harness-maker-local']
-    cwd = os.getcwd()
-    match = next((e for e in entries if e.get('projectPath') == cwd), entries[0])
-    print(match['installPath'])
-except Exception:
-    print('')
-" 2>/dev/null)
+# Step A — Claude Code plugin resolution (works when installed via /plugin).
+# Bootstrap through the newest cache path, then let `harness-maker locate`
+# apply the real priority rules: projectPath==cwd > user scope > installedAt.
+!cache_bootstrap=$(ls -1d "$HOME"/.claude/plugins/cache/harness-maker*/harness-maker/[0-9]*.[0-9]*.[0-9]* 2>/dev/null | awk -F/ '{print $NF, $0}' | sort -V | tail -1 | cut -d' ' -f2-)
+plugin_dir=""
+if [ -n "$cache_bootstrap" ]; then
+    plugin_dir=$(uv run --with "$cache_bootstrap" python -m harness_maker.cli locate --plain 2>/dev/null || true)
+    if [ -z "$plugin_dir" ]; then
+        plugin_dir="$cache_bootstrap"
+    fi
+fi
 
 if [ -n "$plugin_dir" ]; then
     RESOLVE_MODE="claude-code"

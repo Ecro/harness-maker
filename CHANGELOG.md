@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Fixed: `/harness-maker:make` no longer resolves stale project installs
+
+The plugin-level `/harness-maker:make` command now bootstraps through the newest
+cached harness-maker package and delegates install selection to
+`harness_maker.cli locate --plain`. This closes the stale resolver path where a
+project without its own plugin entry could fall back to the first
+`harness-maker@harness-maker-local` record, reusing another project's old cache
+such as `kairos@0.7.3` and leaving `.claude/harness.yaml` stale after a full
+interactive make run.
+
 ## [0.26.2] - 2026-05-25
 
 ### Changed: verify-before-wrapup workflow cuts duplicate final checks
