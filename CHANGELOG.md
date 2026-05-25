@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.26.2] - 2026-05-25
+
 ### Changed: verify-before-wrapup workflow cuts duplicate final checks
 
 Production's recommended fused workflow now runs `execute -> review -> verify -> wrapup`
@@ -15,6 +17,12 @@ The relevant fingerprint ignores wrapup-only churn such as `.claude/memory/`,
 source, tests, lockfiles, tool configuration, CI, and harness templates. The
 worktree handoff prose now makes deferred stash restoration visible, and both
 wrapup and manual commit paths run `post-commit-pop` in UUID strict mode.
+
+### Version bump
+
+5-file version sync 0.26.1 -> 0.26.2: `pyproject.toml`,
+`src/harness_maker/__init__.py`, `.claude-plugin/plugin.json`,
+`.cursor-plugin/plugin.json`, `.codex-plugin/plugin.json`.
 
 ### Fixed: worktree artifact janitor no longer blocks multi-session create
 
