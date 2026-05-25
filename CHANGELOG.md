@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.26.3] - 2026-05-25
+
 ### Fixed: `/harness-maker:make` no longer resolves stale project installs
 
 The plugin-level `/harness-maker:make` command now bootstraps through the newest
@@ -11,6 +13,12 @@ project without its own plugin entry could fall back to the first
 `harness-maker@harness-maker-local` record, reusing another project's old cache
 such as `kairos@0.7.3` and leaving `.claude/harness.yaml` stale after a full
 interactive make run.
+
+### Version bump
+
+6-file version sync 0.26.2 -> 0.26.3: `pyproject.toml`,
+`src/harness_maker/__init__.py`, `.claude-plugin/plugin.json`,
+`.cursor-plugin/plugin.json`, `.codex-plugin/plugin.json`, `uv.lock`.
 
 ## [0.26.2] - 2026-05-25
 
