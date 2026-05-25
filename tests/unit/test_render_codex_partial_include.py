@@ -27,6 +27,16 @@ _ALLOW_LISTED = ("code-reviewer", "consensus-arbiter", "plan-validator")
 _NOT_ALLOW_LISTED = ("executor", "autoloop-coder", "security-auditor")
 _SECTION_MARKER = "<!-- @hm:codex-second-opinion -->"
 
+# PLAN-codex-mandatory-second-opinion: plan-validator's Codex call becomes
+# mandatory (MAY→MUST) with a top-level reconciliation contract. The array
+# reviewers (code-reviewer, consensus-arbiter) keep the opt-in MAY text until
+# the follow-up PLAN (ADR-004 — their output is a top-level JSON array that
+# the two-pass/verifier/consensus pipeline would strip an envelope from).
+_MANDATORY_TITLE = "## Required: Codex second opinion"
+_OPTIONAL_TITLE = "## Optional: Codex second opinion"
+_OPT_IN_PHRASE = "opt-in per call"
+_ARRAY_REVIEWERS = ("code-reviewer", "consensus-arbiter")
+
 
 def _render_agent_files(tmp_path: Path, *, enabled: bool) -> dict[str, str]:
     """Run real synthesize → render path so communication_variant injection fires."""
@@ -72,3 +82,35 @@ def test_second_opinion_section_absent_in_non_allowlisted_agents(tmp_path: Path)
         assert _SECTION_MARKER not in rendered[agent], (
             f"{_SECTION_MARKER!r} leaked into NON-allow-listed agent {agent}"
         )
+
+
+def test_plan_validator_mandatory_when_enabled(tmp_path: Path) -> None:
+    """plan-validator: MAY→MUST + top-level reconciliation contract + loud-skip."""
+    rendered = _render_agent_files(tmp_path, enabled=True)
+    body = rendered["plan-validator"]
+    # forced call (no longer opt-in)
+    assert _MANDATORY_TITLE in body, "plan-validator missing the Required section title"
+    assert "invoke Codex" in body, "forced-call phrasing missing"
+    assert "MUST" in body, "mandatory 'MUST' phrasing missing"
+    assert _OPTIONAL_TITLE not in body, "stale Optional title still present"
+    assert "MAY invoke" not in body, "opt-in 'MAY invoke' phrasing not flipped"
+    assert _OPT_IN_PHRASE not in body, "'opt-in per call' phrasing not removed"
+    # top-level reconciliation contract + anti-boilerplate floor
+    assert "codex_reconciliation" in body, "reconciliation contract missing"
+    assert "codex_status" in body, "codex_status field missing"
+    assert "codex_finding_ref" in body, "anti-boilerplate finding-reference floor missing"
+    # loud-skip path documented
+    assert "codex_skip_reason" in body, "loud-skip reason field missing"
+
+
+def test_array_reviewers_unchanged_when_enabled(tmp_path: Path) -> None:
+    """code-reviewer + consensus-arbiter keep opt-in MAY (deferred to follow-up PLAN)."""
+    rendered = _render_agent_files(tmp_path, enabled=True)
+    for agent in _ARRAY_REVIEWERS:
+        body = rendered[agent]
+        assert _OPTIONAL_TITLE in body, f"{agent} lost its opt-in Optional section"
+        assert _OPT_IN_PHRASE in body, f"{agent} opt-in phrasing changed unexpectedly"
+        # the mandatory contract must NOT leak into the array reviewers
+        assert "codex_reconciliation" not in body, f"reconciliation leaked into {agent}"
+        assert "codex_status" not in body, f"codex_status leaked into {agent}"
+        assert _MANDATORY_TITLE not in body, f"Required title leaked into {agent}"

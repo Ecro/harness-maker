@@ -354,7 +354,7 @@ After the internal plan is complete (interview done, draft synthesized), invoke 
 Task(
   subagent_type="plan-validator",
   description="Plan validator: {slug}",
-  prompt="<full draft PLAN body + Interview Transcript + ADRs>\n\nReturn JSON: {overall: APPROVED|NEEDS_REVISION|MAJOR_REVISION, critiques: [...]}"
+  prompt="<full draft PLAN body + Interview Transcript + ADRs>\n\nReturn JSON: {overall: APPROVED|NEEDS_REVISION|MAJOR_REVISION, critiques: [...]{% if config.codex_second_opinion.enabled %}, codex_status: invoked|skipped, codex_reconciliation: [...]{% endif %}}"
 )
 ```
 
@@ -364,7 +364,9 @@ Resolution:
 - **MAJOR_REVISION** (critical issues) → run follow-up rounds for each critical critique. After resolution, **re-run validator once only** (no infinite loop). If second pass still MAJOR_REVISION, ask user: A. proceed with remaining critiques as accepted-risk / B. abort planning.
 
 Each follow-up interview answer is appended to `## 🎙️ Interview Transcript` and promoted to ADR when Step D criteria apply.
-
+{% if config.codex_second_opinion.enabled %}
+> **Codex second-opinion relay (mandatory call active).** `plan-validator` is configured to invoke Codex on every run. After reading the validator's returned JSON and **before** resolving the verdict, inspect its top-level `codex_status`. If it is `"skipped"`, the mandatory Codex call could not complete — surface the validator's `codex_skip_reason` to the user in your turn output (one line, e.g. `⚠️ Codex second opinion skipped: <reason> — verdict is Claude-only`). This is a loud notice, **not** a block: resolve the verdict regardless, since it is Claude-derived and valid without Codex.
+{% endif %}
 ### Step 5 — Write PLAN document
 
 Write to `{{ config.work_docs.dir }}PLAN-{slug}.md` with the structure below.

@@ -445,9 +445,16 @@ class CodexSecondOpinionConfig(BaseModel):
     (``agents``) receive a ``Bash(codex exec:*)`` permission line and a
     rendered second-opinion section in their body. Calls are hermetic
     (``--ignore-user-config --ignore-rules``) by default to keep second
-    opinions reproducible across machines (ADR-006). Failures degrade
-    silently via ``failure_policy`` (ADR-003 — warn-and-proceed only in
-    this iteration; per-agent override deferred).
+    opinions reproducible across machines (ADR-006).
+
+    PLAN-codex-mandatory-second-opinion: ``enabled=True`` makes the Codex
+    call *mandatory* for ``plan-validator`` (MAY→MUST) — it must invoke
+    Codex and reconcile every finding in its output. code-reviewer and
+    consensus-arbiter keep the opt-in MAY behavior for now (their array
+    output needs pipeline-preserving handling — deferred to a follow-up
+    PLAN). Failures degrade via ``failure_policy`` (ADR-003 —
+    warn-and-proceed, made loud for plan-validator: the skip is surfaced
+    rather than silent).
     """
 
     model_config = ConfigDict(strict=True, extra="forbid")

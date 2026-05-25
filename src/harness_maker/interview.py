@@ -562,10 +562,10 @@ def _ask_codex_second_opinion() -> CodexSecondOpinionConfig:
     No follow-up sub-questions — advanced tuning happens via direct
     ``harness.yaml.codex_second_opinion.*`` edits.
     """
-    print("\nCodex as second-LLM reviewer (opt-in).")
-    print("  When enabled, code-reviewer / consensus-arbiter / plan-validator")
-    print("  may invoke `codex exec` for cross-model second opinions.")
-    print("  Prerequisite: run `codex login` on your machine first.")
+    print("\nCodex as second-LLM reviewer.")
+    print("  When enabled, plan-validator MUST invoke `codex exec` (mandatory")
+    print("  cross-model second opinion); code-reviewer / consensus-arbiter may")
+    print("  invoke it (opt-in for now). Prerequisite: run `codex login` first.")
     answer = _input_or_empty("  Enable Codex second opinion? [y/N]: ").strip().lower()
     if answer in {"y", "yes"}:
         return CodexSecondOpinionConfig(enabled=True)

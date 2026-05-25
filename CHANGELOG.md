@@ -2,6 +2,30 @@
 
 ## [Unreleased]
 
+### Changed: Codex second opinion is now mandatory for `plan-validator` (was opt-in)
+
+When `codex_second_opinion.enabled=true`, the `plan-validator` agent now
+**MUST** invoke Codex on every run (was "MAY … opt-in per call", which LLMs
+correctly declined whenever findings were file:line-confirmable — so Codex
+never actually fired). The validator must emit two new **top-level** output
+keys, `codex_status` and `codex_reconciliation` (one entry per Codex finding,
+each citing the finding's `file:line` or verbatim `message` — boilerplate
+`"rejected: n/a"` does not satisfy the anti-boilerplate floor). The
+Claude-derived verdict still owns `overall_assessment` (Codex stays input, not
+a verdict source). On Codex failure the call degrades **loudly**:
+`codex_status: "skipped"` + `codex_skip_reason`, surfaced to the user by
+`/hm:plan` Step 4 — no hard-fail.
+
+**Behavior change (intended):** harnesses with `codex_second_opinion.enabled=true`
+get this on the next `/hm:make` re-render. `enabled` is the single knob — there
+is no `mode` field; set `enabled=false` for the old soft behavior.
+
+**Scope:** `code-reviewer` and `consensus-arbiter` keep their opt-in MAY
+behavior for now — their output is a top-level JSON array that the
+two-pass/verifier/consensus pipeline would strip a reconciliation envelope
+from. Forcing them (with `k-of-n` spend implications) is deferred to a
+follow-up PLAN. See `work-docs/PLAN-codex-mandatory-second-opinion.md`.
+
 ## [0.26.1] - 2026-05-24
 
 ### Fixed: `_count_user_md_files` 500-byte sniff window too tight (quality-gate regression on 0.26.0)

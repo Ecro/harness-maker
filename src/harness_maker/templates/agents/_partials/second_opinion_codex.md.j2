@@ -5,6 +5,15 @@
   reviewer agent bodies (code-reviewer, consensus-arbiter, plan-validator)
   when codex_second_opinion.enabled.
 
+  PLAN-codex-mandatory-second-opinion: the call is now MANDATORY for
+  `plan-validator` (MAY→MUST) with a top-level `codex_status`/
+  `codex_reconciliation` output contract + anti-boilerplate floor + loud
+  warn-and-proceed (ADR-001/002/003 of that PLAN). code-reviewer and
+  consensus-arbiter KEEP the opt-in MAY text — their output is a top-level
+  JSON array that the two-pass/verifier/consensus pipeline would strip an
+  envelope from, so forcing them is deferred to a follow-up PLAN (ADR-004).
+  The branch is on `name`; the marker + Bash recipe + prerequisite are shared.
+
   Whitespace control: {%- ... -%} dashes so the disabled branch is
   byte-zero (ADR-007 P-W1, Jinja env trim_blocks=False).
 
@@ -13,19 +22,26 @@
 
   Rendered Bash recipe is hermetic by default (ADR-006). The
   `--output-schema` path points at the rendered schema file (ADR-008).
-  Failure mode is warn-and-proceed (ADR-003).
 -#}
 {%- set _csoo = config.get('codex_second_opinion', {}) if config else {} -%}
 {%- if _csoo.get('enabled') and name in _csoo.get('agents', []) %}
 
 <!-- @hm:codex-second-opinion -->
 
+{% if name == 'plan-validator' -%}
+## Required: Codex second opinion
+
+You **MUST** invoke Codex CLI as a second-LLM reviewer on **every** run —
+this is mandatory whenever `codex_second_opinion.enabled`, not opt-in. Run
+the invocation below, then reconcile **every** Codex finding in your output.
+{%- else -%}
 ## Optional: Codex second opinion
 
 You **MAY** invoke Codex CLI as a second-LLM reviewer when you reach a
 finding that benefits from cross-model judgment (M-of-N consensus,
 tie-break, architectural sanity check). This is opt-in per call — no
 ambient Claude self-dispatch.
+{%- endif %}
 
 **Invocation contract** (hermetic by default per ADR-006 — `--ignore-user-config`
 and `--ignore-rules` strip developer-specific Codex AGENTS.md so the
@@ -59,14 +75,38 @@ fi
 rm -f "$tmp" "$prompt_tmp"
 ```
 
+{% if name == 'plan-validator' -%}
+**Output contract — this EXTENDS the `## Output JSON Schema` above.** Despite
+its "Return ONLY this JSON" wording, when Codex is enabled your returned object
+**MUST** carry two **additional top-level** keys alongside `overall_assessment`,
+`critiques`, and `clean_categories` (NOT nested inside `critiques`):
+- `codex_status`: `"invoked"` when the call succeeded, `"skipped"` when it failed.
+- `codex_reconciliation`: an array, one entry per Codex finding —
+  `{ "codex_finding_ref": "...", "disposition": "accepted" | "rejected" | "duplicate", "reason": "..." }`.
+  Empty array `[]` when `codex_status` is `"skipped"`.
+
+**Anti-boilerplate floor** — every entry's `codex_finding_ref` MUST cite the
+specific Codex finding it dispositions: its `file:line` (when present) or a
+verbatim quote of the Codex finding `message`. A bare `"rejected: n/a"` with
+no reference does NOT satisfy the contract — the mandatory call is a forced
+*consideration*, not a decorative one. Your `overall_assessment` stays your
+own Claude-derived verdict (Codex is input you cannot silently discard, not a
+verdict source — preserves ADR-005 of PLAN-codex-second-llm-integration).
+
+**Failure policy** (ADR-003 — warn-and-proceed, made loud): on any non-zero
+exit (auth, rate-limit, network, schema rejection), do NOT block. Set
+`codex_status: "skipped"`, `codex_skip_reason: "<one-line cause>"`, and
+`codex_reconciliation: []`, then proceed with Claude-only analysis. `/hm:plan`
+Step 4 surfaces the skip reason to the user.
+{%- else -%}
 **Output schema**: `{ findings: [{file, line, severity, message, evidence}],
 summary, confidence }` — see `{{ _csoo.get('output_schema_path', '.claude/schemas/codex-finding.schema.json') }}`.
 
 **Failure policy** (ADR-003 — warn-and-proceed): on any non-zero exit
 (auth, rate-limit, network, schema rejection), log one line to stderr
 and continue with Claude-only output. Do NOT block the stage.
+{%- endif %}
 
 **Prerequisite**: user must have run `codex login` on their machine.
 First call surfaces an auth error if missing.
 {%- endif -%}
-

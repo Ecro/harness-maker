@@ -136,7 +136,7 @@ A short interview locks the dimensions that shape every downstream render. Re-ru
 | **Ref folders** | Path + glob pairs | Which external docs are searchable via `refdocs-search` skill |
 | **Sibling repos** | Relative paths | Which adjacent repos share the same harness session |
 | **Second Brain** | Obsidian vault path + project_id | Where cross-session memory writes |
-| **Codex second opinion** | opt-in `codex_second_opinion.enabled` | When true, `code-reviewer` / `consensus-arbiter` / `plan-validator` may invoke `codex exec` for cross-model second opinions (requires `codex` CLI + `codex login`; orthogonal to `targets`) |
+| **Codex second opinion** | `codex_second_opinion.enabled` | When true, `plan-validator` **must** invoke `codex exec` (mandatory; reconciles each Codex finding, loud warn-and-proceed on failure); `code-reviewer` / `consensus-arbiter` may invoke it (opt-in, pending a follow-up PLAN). Requires `codex` CLI + `codex login`; orthogonal to `targets` |
 | **Recommended model** | `claude-opus-4-7` default | The model frontmatter on every generated agent |
 
 > **Result:** `.claude/harness.yaml` — a single source of truth that survives upgrades.
