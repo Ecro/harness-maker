@@ -524,7 +524,7 @@ class ConflictItem(BaseModel):
 - `/hm:execute` automatically creates a git worktree (`.worktrees/<workflow>-<ts>/` — relative to project root, not inside `.claude/`)
 - LLM modifies files only within the worktree
 - Cleanup on success; preserved on failure
-- Prefix-match cleanup (`phase-*`, `autoloop-*`, `execute-*`): does not touch worktrees owned by other tools even when Cursor shares the same `.worktrees/` directory. ADR-106: the re-entrant flock guards the cleanup path as well, ensuring concurrent wrapup and loop-close do not double-free the same worktree.
+- Prefix-match cleanup (`phase-*`, `autoloop-*`, `execute-*`): does not touch worktrees owned by other tools even when Cursor shares the same `.worktrees/` directory. `worktree create` now runs an opportunistic janitor before its guards: orphan markers and dangling owned worktrees are removed, stale finalize-stash refs are preserved unless their tracked and untracked content is already in `HEAD`, and queue pressure counts only live refs with active session markers. ADR-106: the re-entrant flock guards the cleanup path as well, ensuring concurrent wrapup and loop-close do not double-free the same worktree.
 
 **(M10) 7 Security Gates (Phase 7)**
 | Check | Technique | Trigger |

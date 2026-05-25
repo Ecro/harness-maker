@@ -416,7 +416,7 @@ Grouped by what they do for your project, not by component.
 - **2-pass redaction (+47pp precision).** Pass 1 strips PR metadata so findings can't anchor on author/title. Pass 2 restores full context — reviewers must validate or drop each Pass 1 finding. Ablation-measured precision gain on anchoring-prone diffs.
 - **7 security gates.** `secrets` · `permissions` (settings.json over-grant) · `hook-injection` (AST scan for `rm -rf`, `curl|sh`, `eval`) · `CVEs` (OSV.dev) · `hallucination` (AST scan for non-existent imports) · `prod-name guard` · `prompt-injection`. Findings stay local in `.claude/observability/security/`.
 - **Privilege separation.** Reviewer agents deny `Write` / `Edit` / interpreter `Bash` calls. Executor agents allow only `.worktrees/**` writes + paired Edit/Write denies on system paths. Defense-in-depth survives prompt injection, agent compromise, and tool_input poisoning.
-- **Worktree isolation per run.** Every execute runs in a fresh `git worktree`. Failed runs preserve evidence; successful runs auto-cleanup with prefix-match (Cursor's own worktrees never touched).
+- **Worktree isolation per run.** Every execute runs in a fresh `git worktree`. Failed runs preserve evidence; successful runs auto-cleanup with prefix-match (Cursor's own worktrees never touched). Create also prunes stale harness-owned markers/worktrees first, and stale finalize-stash refs do not count as live queue pressure.
 
 ### 🌱 Self-evolving — *grows with your project*
 

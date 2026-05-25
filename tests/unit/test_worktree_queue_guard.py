@@ -21,6 +21,21 @@ def _make_claude_dir(tmp_path: Path) -> Path:
     return cd
 
 
+def _write_live_ref(claude_dir: Path, name: str, *, base: Path | None = None) -> None:
+    marker = claude_dir / f".hm-loop-{name}"
+    marker.write_text(f"{claude_dir.parent}\n", encoding="utf-8")
+    ref = claude_dir / f".hm-finalize-stash-{name}"
+    ref.write_text(
+        "ref_sha: " + ("a" * 40) + "\n"
+        f"base: {(base or claude_dir.parent).resolve()}\n"
+        f"session_marker: {marker.resolve()}\n"
+        "sibling_bases: \n"
+        "session_uuid: deadbeef1234\n"
+        "created_at: 2026-05-25T00:00:00+00:00\n",
+        encoding="utf-8",
+    )
+
+
 # ── _count_pending_stashes helper ────────────────────────────────────────────
 
 
@@ -31,14 +46,14 @@ def test_count_pending_stashes_zero(tmp_path: Path) -> None:
 
 def test_count_pending_stashes_one(tmp_path: Path) -> None:
     cd = _make_claude_dir(tmp_path)
-    (cd / ".hm-finalize-stash-execute-A").write_text("x")
+    _write_live_ref(cd, "execute-A")
     assert _count_pending_stashes(cd) == 1
 
 
 def test_count_pending_stashes_three(tmp_path: Path) -> None:
     cd = _make_claude_dir(tmp_path)
     for n in ("A", "B", "C"):
-        (cd / f".hm-finalize-stash-execute-{n}").write_text("x")
+        _write_live_ref(cd, f"execute-{n}")
     assert _count_pending_stashes(cd) == 3
 
 
@@ -46,8 +61,24 @@ def test_count_pending_stashes_ignores_unrelated_files(tmp_path: Path) -> None:
     cd = _make_claude_dir(tmp_path)
     (cd / ".hm-loop-A").write_text("x")
     (cd / "harness.yaml").write_text("x")
-    (cd / ".hm-finalize-stash-X").write_text("x")
+    _write_live_ref(cd, "X")
     assert _count_pending_stashes(cd) == 1
+
+
+def test_count_pending_stashes_ignores_invalid_or_stale_refs(tmp_path: Path) -> None:
+    cd = _make_claude_dir(tmp_path)
+    (cd / ".hm-finalize-stash-invalid").write_text("x")
+    stale_marker = cd / ".hm-loop-execute-stale"
+    (cd / ".hm-finalize-stash-execute-stale").write_text(
+        "ref_sha: " + ("a" * 40) + "\n"
+        f"base: {cd.parent.resolve()}\n"
+        f"session_marker: {stale_marker.resolve()}\n"
+        "sibling_bases: \n"
+        "session_uuid: deadbeef1234\n"
+        "created_at: 2026-05-25T00:00:00+00:00\n",
+        encoding="utf-8",
+    )
+    assert _count_pending_stashes(cd) == 0
 
 
 def test_count_pending_stashes_missing_dir(tmp_path: Path) -> None:
@@ -95,15 +126,15 @@ def test_cli_create_passes_with_zero_pending_stashes(tmp_path: Path) -> None:
 
 def test_cli_create_passes_with_one_pending_stash(tmp_path: Path) -> None:
     repo = _setup_git_repo_with_harness_yaml(tmp_path)
-    (repo / ".claude" / ".hm-finalize-stash-execute-A").write_text("x")
+    _write_live_ref(repo / ".claude", "execute-A", base=repo)
     proc = _run_cli_create(repo)
     assert proc.returncode == 0, f"unexpected fail: {proc.stderr}"
 
 
 def test_cli_create_aborts_with_two_pending_stashes(tmp_path: Path) -> None:
     repo = _setup_git_repo_with_harness_yaml(tmp_path)
-    (repo / ".claude" / ".hm-finalize-stash-execute-A").write_text("x")
-    (repo / ".claude" / ".hm-finalize-stash-execute-B").write_text("x")
+    _write_live_ref(repo / ".claude", "execute-A", base=repo)
+    _write_live_ref(repo / ".claude", "execute-B", base=repo)
     proc = _run_cli_create(repo)
     assert proc.returncode != 0, f"expected ABORT, got success: {proc.stdout}"
     # Literal-substring contract for the wrapup-template LLM gate.
@@ -116,7 +147,7 @@ def test_cli_create_aborts_with_two_pending_stashes(tmp_path: Path) -> None:
 def test_cli_create_aborts_with_three_pending_stashes(tmp_path: Path) -> None:
     repo = _setup_git_repo_with_harness_yaml(tmp_path)
     for n in ("A", "B", "C"):
-        (repo / ".claude" / f".hm-finalize-stash-execute-{n}").write_text("x")
+        _write_live_ref(repo / ".claude", f"execute-{n}", base=repo)
     proc = _run_cli_create(repo)
     assert proc.returncode != 0
 
@@ -124,8 +155,8 @@ def test_cli_create_aborts_with_three_pending_stashes(tmp_path: Path) -> None:
 def test_cli_create_allow_stash_queue_bypasses_two_stashes(tmp_path: Path) -> None:
     """--allow-stash-queue escape hatch lets user proceed with N ≥ 2."""
     repo = _setup_git_repo_with_harness_yaml(tmp_path)
-    (repo / ".claude" / ".hm-finalize-stash-execute-A").write_text("x")
-    (repo / ".claude" / ".hm-finalize-stash-execute-B").write_text("x")
+    _write_live_ref(repo / ".claude", "execute-A", base=repo)
+    _write_live_ref(repo / ".claude", "execute-B", base=repo)
     proc = subprocess.run(
         [
             sys.executable,
@@ -147,8 +178,8 @@ def test_cli_create_allow_stash_queue_bypasses_two_stashes(tmp_path: Path) -> No
 def test_cli_create_abort_message_lists_pending_refs(tmp_path: Path) -> None:
     """Abort stderr names the pending ref files so user can /hm:wrapup them."""
     repo = _setup_git_repo_with_harness_yaml(tmp_path)
-    (repo / ".claude" / ".hm-finalize-stash-execute-A").write_text("x")
-    (repo / ".claude" / ".hm-finalize-stash-execute-B").write_text("x")
+    _write_live_ref(repo / ".claude", "execute-A", base=repo)
+    _write_live_ref(repo / ".claude", "execute-B", base=repo)
     proc = _run_cli_create(repo)
     assert proc.returncode != 0
     assert ".hm-finalize-stash-execute-A" in proc.stderr
@@ -158,8 +189,8 @@ def test_cli_create_abort_message_lists_pending_refs(tmp_path: Path) -> None:
 def test_cli_create_abort_message_suggests_wrapup(tmp_path: Path) -> None:
     """Abort stderr suggests /hm:wrapup as the remediation path."""
     repo = _setup_git_repo_with_harness_yaml(tmp_path)
-    (repo / ".claude" / ".hm-finalize-stash-execute-A").write_text("x")
-    (repo / ".claude" / ".hm-finalize-stash-execute-B").write_text("x")
+    _write_live_ref(repo / ".claude", "execute-A", base=repo)
+    _write_live_ref(repo / ".claude", "execute-B", base=repo)
     proc = _run_cli_create(repo)
     assert "/hm:wrapup" in proc.stderr or "wrapup" in proc.stderr.lower()
 

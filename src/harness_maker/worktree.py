@@ -26,6 +26,7 @@ import subprocess
 import sys
 import time
 import uuid
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -584,16 +585,25 @@ def _stash_ref_path(base: Path, wt_name: str) -> Path:
 
 
 def _count_pending_stashes(claude_dir: Path) -> int:
-    """Count `.hm-finalize-stash-*` ref files in `<base>/.claude/`.
+    """Count live `.hm-finalize-stash-*` ref files in `<base>/.claude/`.
 
     PLAN-worktree-cross-session-data-loss-defense ADR-003 queue-guard:
-    `worktree create` ABORTs when ≥2 such refs exist, because that's the
+    `worktree create` ABORTs when ≥2 live refs exist, because that's the
     canonical "wrapup not run between exec-rev turns" footgun signature.
+    Stale refs with absent session markers are cleanup artifacts, not active
+    multi-session pressure, and must not block unrelated worktree creation.
     Missing dir → 0 (clean state).
     """
     if not claude_dir.is_dir():
         return 0
-    return sum(1 for _ in claude_dir.glob(f"{_STASH_REF_PREFIX}*"))
+    count = 0
+    for ref_file in claude_dir.glob(f"{_STASH_REF_PREFIX}*"):
+        fields = _validate_stash_ref_fields(_read_stash_ref_file(ref_file))
+        if fields is None:
+            continue
+        if _session_marker_present(fields["session_marker"]):
+            count += 1
+    return count
 
 
 # PLAN-worktree-cross-session-data-loss-defense ADR-002 dirty-base guard
@@ -658,10 +668,15 @@ def _list_user_dirty_files(base: Path) -> list[str]:
 
 
 def _list_pending_stash_refs(claude_dir: Path) -> list[str]:
-    """Return ref-file basenames for the abort-message listing."""
+    """Return live ref-file basenames for the abort-message listing."""
     if not claude_dir.is_dir():
         return []
-    return sorted(p.name for p in claude_dir.glob(f"{_STASH_REF_PREFIX}*"))
+    out: list[str] = []
+    for ref_file in claude_dir.glob(f"{_STASH_REF_PREFIX}*"):
+        fields = _validate_stash_ref_fields(_read_stash_ref_file(ref_file))
+        if fields is not None and _session_marker_present(fields["session_marker"]):
+            out.append(ref_file.name)
+    return sorted(out)
 
 
 # PLAN-worktree-cross-session-data-loss-defense ADR-004 Session UUID
@@ -1155,6 +1170,17 @@ def merge(wt_path: Path, strategy: str = "squash", commit: bool = True) -> None:
 _OWNED_PREFIXES: tuple[str, ...] = ("execute-", "plan-", "phase-", "autoloop-")
 
 
+@dataclass
+class PruneReport:
+    """Summary of a stale harness-artifact prune pass."""
+
+    removed_markers: list[Path] = field(default_factory=list)
+    removed_worktrees: list[Path] = field(default_factory=list)
+    removed_stash_refs: list[Path] = field(default_factory=list)
+    preserved_stash_refs: list[tuple[Path, str]] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
+
+
 def _list_worktrees(base_dir: Path) -> list[Path]:
     """Return absolute paths of harness-maker-owned worktrees under base_dir/.worktrees/.
 
@@ -1181,6 +1207,192 @@ def _list_worktrees(base_dir: Path) -> list[Path]:
             continue
         paths.append(p)
     return paths
+
+
+def _registered_worktree_paths(base_dir: Path) -> set[Path]:
+    """Return every git-registered worktree path for ``base_dir``."""
+    base = base_dir.resolve()
+    try:
+        cp = _run(["git", "worktree", "list", "--porcelain"], cwd=base)
+    except RuntimeError:
+        return set()
+    out: set[Path] = set()
+    for line in cp.stdout.splitlines():
+        if line.startswith("worktree "):
+            out.add(Path(line[len("worktree ") :]).resolve())
+    return out
+
+
+def _marker_referenced_paths(marker: Path) -> list[Path]:
+    """Read absolute paths listed in a loop marker; invalid markers return []."""
+    try:
+        text = marker.read_text(encoding="utf-8")
+    except OSError:
+        return []
+    paths: list[Path] = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("/"):
+            paths.append(Path(stripped).resolve())
+    return paths
+
+
+def _is_orphan_marker(marker: Path) -> bool:
+    """A loop marker is stale iff all referenced worktree dirs are absent."""
+    refs = _marker_referenced_paths(marker)
+    return bool(refs) and not any(p.exists() for p in refs)
+
+
+def _live_marker_references(base: Path) -> set[Path]:
+    """Return worktree paths referenced by non-orphan marker files."""
+    claude_dir = base / _LOOP_MARKER_DIR
+    refs: set[Path] = set()
+    if not claude_dir.is_dir():
+        return refs
+    for marker in claude_dir.glob(f"{_LOOP_MARKER_PREFIX}*"):
+        marker_refs = _marker_referenced_paths(marker)
+        if any(p.exists() for p in marker_refs):
+            refs.update(marker_refs)
+    return refs
+
+
+def _scan_dangling_worktrees(base_dir: Path) -> list[Path]:
+    """Owned ``.worktrees/*`` dirs absent from git registration and live markers."""
+    base = base_dir.resolve()
+    worktrees_dir = base / WORKTREE_DIR_NAME
+    if not worktrees_dir.is_dir():
+        return []
+    registered = _registered_worktree_paths(base)
+    live_refs = _live_marker_references(base)
+    dangling: list[Path] = []
+    for candidate in worktrees_dir.iterdir():
+        if not candidate.is_dir():
+            continue
+        resolved = candidate.resolve()
+        if not candidate.name.startswith(_OWNED_PREFIXES):
+            continue
+        if resolved in registered or resolved in live_refs:
+            continue
+        dangling.append(resolved)
+    return dangling
+
+
+def _git_blob_sha(repo: Path, rev: str, path: str) -> str | None:
+    """Return blob SHA for ``rev:path`` or None when the path is absent."""
+    try:
+        cp = _run(["git", "rev-parse", f"{rev}:{path}"], cwd=repo)
+    except RuntimeError:
+        return None
+    sha = cp.stdout.strip()
+    return sha if _SHA_RE.match(sha) else None
+
+
+def _stash_has_third_parent(base: Path, ref_sha: str) -> bool:
+    try:
+        _run(["git", "rev-parse", "--verify", f"{ref_sha}^3^{{tree}}"], cwd=base)
+    except RuntimeError:
+        return False
+    return True
+
+
+def _stash_content_in_head(base_dir: Path, ref_sha: str) -> bool:
+    """True iff every tracked and untracked stash blob already exists in HEAD.
+
+    The predicate is HEAD-relative and covers the stash's optional untracked
+    tree (``S^3``). Missing in HEAD means preserve the ref; cleanup must bias
+    toward retention when uncertain.
+    """
+    base = base_dir.resolve()
+    try:
+        _run(["git", "cat-file", "-e", f"{ref_sha}^{{commit}}"], cwd=base)
+    except RuntimeError:
+        return False
+
+    try:
+        tracked = _run(
+            ["git", "diff", "--name-only", f"{ref_sha}^1", ref_sha],
+            cwd=base,
+        )
+    except RuntimeError:
+        return False
+    for path in [p for p in tracked.stdout.splitlines() if p.strip()]:
+        stash_blob = _git_blob_sha(base, ref_sha, path)
+        head_blob = _git_blob_sha(base, "HEAD", path)
+        if stash_blob != head_blob:
+            return False
+
+    if not _stash_has_third_parent(base, ref_sha):
+        return True
+    try:
+        untracked = _run(["git", "ls-tree", "-r", f"{ref_sha}^3"], cwd=base)
+    except RuntimeError:
+        return False
+    for line in untracked.stdout.splitlines():
+        if "\t" not in line:
+            continue
+        meta, path = line.split("\t", 1)
+        parts = meta.split()
+        if len(parts) < 3 or parts[1] != "blob":
+            continue
+        stash_blob = parts[2]
+        head_blob = _git_blob_sha(base, "HEAD", path)
+        if stash_blob != head_blob:
+            return False
+    return True
+
+
+def prune_stale(base_dir: Path, *, dry_run: bool = False) -> PruneReport:
+    """Prune stale harness-owned markers, dangling worktrees, and safe refs.
+
+    Destructive actions are restricted by owned prefixes and orphan checks.
+    Stash refs are deleted only when their tracked and untracked content is
+    already present in HEAD; otherwise they are preserved with a warning.
+    """
+    import shutil
+
+    base = base_dir.resolve()
+    report = PruneReport()
+    with contextlib.suppress(RuntimeError):
+        if not dry_run:
+            _run(["git", "worktree", "prune"], cwd=base)
+
+    claude_dir = base / _LOOP_MARKER_DIR
+    if claude_dir.is_dir():
+        for marker in sorted(claude_dir.glob(f"{_LOOP_MARKER_PREFIX}*")):
+            if not _is_orphan_marker(marker):
+                continue
+            report.removed_markers.append(marker)
+            if not dry_run:
+                marker.unlink(missing_ok=True)
+
+    for wt in _scan_dangling_worktrees(base):
+        report.removed_worktrees.append(wt)
+        if not dry_run:
+            shutil.rmtree(wt, ignore_errors=True)
+
+    if claude_dir.is_dir():
+        for ref_file in sorted(claude_dir.glob(f"{_STASH_REF_PREFIX}*")):
+            fields = _validate_stash_ref_fields(_read_stash_ref_file(ref_file))
+            if fields is None:
+                continue
+            wt_name = ref_file.name[len(_STASH_REF_PREFIX) :]
+            wt_dir = base / WORKTREE_DIR_NAME / wt_name
+            if wt_dir.exists() or _session_marker_present(fields["session_marker"]):
+                continue
+            ref_sha = fields["ref_sha"]
+            ref_base = Path(fields["base"]).resolve()
+            if _stash_content_in_head(ref_base, ref_sha):
+                report.removed_stash_refs.append(ref_file)
+                if not dry_run:
+                    ref_file.unlink(missing_ok=True)
+            else:
+                hint = (
+                    f"preserved {ref_file.name}: stash content not fully present in HEAD; "
+                    f"inspect with `git stash show -p --include-untracked {ref_sha}`"
+                )
+                report.preserved_stash_refs.append((ref_file, hint))
+                report.warnings.append(hint)
+    return report
 
 
 def cleanup_all(base_dir: Path, force: bool = False) -> int:
@@ -1290,11 +1502,17 @@ def _cli_create(args: list[str]) -> int:
     # parse before positional consumption.
     allow_stash_queue = "--allow-stash-queue" in args
     allow_dirty_base = "--allow-dirty-base" in args
-    args = [a for a in args if a not in ("--allow-stash-queue", "--allow-dirty-base")]
+    debug_worktree = "--debug-worktree" in args
+    args = [
+        a
+        for a in args
+        if a not in ("--allow-stash-queue", "--allow-dirty-base", "--debug-worktree")
+    ]
 
     if len(args) != 2:
         print(
-            "usage: create <stage> <base_dir> [--allow-stash-queue] [--allow-dirty-base]",
+            "usage: create <stage> <base_dir> [--allow-stash-queue] "
+            "[--allow-dirty-base] [--debug-worktree]",
             file=sys.stderr,
         )
         return 2
@@ -1311,6 +1529,10 @@ def _cli_create(args: list[str]) -> int:
     # ADR-003 queue-guard (must run BEFORE scope check so a misconfigured
     # base still surfaces the guard message — failure mode visibility):
     claude_dir = base / _LOOP_MARKER_DIR
+    if not debug_worktree:
+        prune_report = prune_stale(base)
+        for warning in prune_report.warnings:
+            print(f"[WARN] worktree prune: {warning}", file=sys.stderr)
     pending = _count_pending_stashes(claude_dir)
     # REVIEW round 1 P1-MAN4 fix: audit-log every bypass-flag use so post-
     # incident forensics can distinguish "guard never fired" from "guard

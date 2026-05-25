@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+### Fixed: worktree artifact janitor no longer blocks multi-session create
+
+`worktree create` now prunes stale harness-owned artifacts before evaluating
+the stash queue guard. Orphan loop markers and dangling owned `.worktrees/*`
+directories are cleaned opportunistically, while finalize-stash refs are
+deleted only when their tracked and untracked blob content is already present
+in `HEAD`; otherwise they are preserved with an explicit warning.
+
+The queue guard now counts only live finalize-stash refs whose session marker
+still exists. Stale refs can no longer make unrelated multi-session worktree
+creation fail, but genuinely live queued handoffs still trigger the existing
+guard. Render manifests are also compacted by deduping unique
+`(path, content_hash)` pairs so re-renders no longer grow the manifest without
+bound.
+
 ### Changed: Codex second opinion is now mandatory for `plan-validator` (was opt-in)
 
 When `codex_second_opinion.enabled=true`, the `plan-validator` agent now

@@ -53,6 +53,7 @@ DEFAULT_FREEZE_TIME = datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC)
 # harness and can be inspected/git-ignored alongside other internal state
 # files (e.g. ``.hm-loop-*``).
 RENDER_MANIFEST_NAME = ".hm-render-manifest.jsonl"
+RENDER_MANIFEST_COMPACT_LINE_THRESHOLD = 2000
 
 
 def _make_env() -> Environment:
@@ -1097,6 +1098,56 @@ def _append_render_manifest(
     atomic_append(manifest_path, line)
 
 
+def compact_render_manifest(
+    target_dir: Path,
+    *,
+    line_threshold: int = RENDER_MANIFEST_COMPACT_LINE_THRESHOLD,
+) -> bool:
+    """Dedupe compact the render manifest while preserving reconcile semantics.
+
+    Keeps one latest-timestamp record for every unique ``(path, content_hash)``
+    pair. Returns True when the file was rewritten.
+    """
+    manifest_path = target_dir / RENDER_MANIFEST_NAME
+    if not manifest_path.is_file():
+        return False
+    try:
+        lines = manifest_path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return False
+    if len(lines) <= line_threshold:
+        return False
+
+    latest: dict[tuple[str, str], dict[str, object]] = {}
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        try:
+            rec = json.loads(stripped)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(rec, dict):
+            continue
+        path = rec.get("path")
+        content_hash = rec.get("content_hash")
+        timestamp = rec.get("timestamp")
+        if not isinstance(path, str) or not isinstance(content_hash, str):
+            continue
+        key = (path, content_hash)
+        prior = latest.get(key)
+        if prior is None or str(timestamp) >= str(prior.get("timestamp", "")):
+            latest[key] = rec
+
+    compacted = sorted(
+        latest.values(),
+        key=lambda r: (str(r.get("path", "")), str(r.get("content_hash", ""))),
+    )
+    body = "".join(json.dumps(rec, sort_keys=True, ensure_ascii=False) + "\n" for rec in compacted)
+    atomic_write(manifest_path, body)
+    return True
+
+
 def render(
     blueprint: Blueprint,
     target_dir: Path,
@@ -1133,6 +1184,8 @@ def render(
     written: list[Path] = []
     paths_to_merge = merge_paths or set()
     json_merge_paths = merge_json_paths or set()
+    if not dry_run:
+        compact_render_manifest(target_dir)
     for fe in blueprint.files:
         if _is_hooks_json(fe) or _is_codex_hooks_json(fe):
             # Hook files (Claude/Cursor/Codex): in-place merge when existing

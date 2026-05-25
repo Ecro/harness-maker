@@ -1909,6 +1909,7 @@ second_brain:
 Created: .worktrees/execute-20260509T0402Z/
   └─ New branch starting from HEAD
   └─ Name format: <stage>-<UTC-timestamp>
+  └─ Before create, stale harness-owned markers/worktrees are pruned
 
 Isolated execution:
   └─ All Write/Edit operations happen only inside worktree
@@ -1950,7 +1951,7 @@ A: No. The `execute` and `review` stages do not commit. `wrapup` creates exactly
 
 **Q: What if worktrees accumulate too many?**
 
-A: Running `/hm:refresh` cleans up worktrees that have been stale for more than 24 hours. When an autoloop blocker occurs, `worktree.cleanup_all(force=True)` immediately cleans up.
+A: `worktree create` opportunistically removes orphan markers and dangling harness-owned worktree directories before queue guards run. Stale finalize-stash refs are preserved unless their tracked and untracked content is already in `HEAD`, and preserved stale refs do not count as live queue pressure. When an autoloop blocker occurs, `worktree.cleanup_all(force=True)` immediately cleans up registered harness-owned worktrees.
 
 **Q: When should I use `--no-tdd`?**
 

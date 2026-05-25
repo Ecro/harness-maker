@@ -111,6 +111,18 @@ The diagram above covers the original render pipeline. Three flows added in 0.12
 2. **Foreign config import flow (M17)**: `foreign_config.detect()` scans the project root for 6 known foreign-AI-tool configs (cursor rules, claude.md, agents.md, continue, aider, copilot). `foreign_config.llm_map()` calls Anthropic with a sha256-keyed 24h cache and proposes a mapping to harness.yaml axes. The slash command UI in `interview.py` confirms with the user before `foreign_config.apply()` returns a `ChangeSet`. The caller writes via `atomic_write`. Re-renders use `@hm:harness:*` inverted block markers so user content outside the harness-managed region is preserved byte-for-byte (see `docs/reference/block-merge-spec.md`).
 3. **Adaptive telemetry flow (M18 + M19)**: `harness_yaml_override` events are captured at two sites — (a) `/hm:configure` exit (primary; computes pre/post yaml diff via `telemetry.compute_yaml_diff()` so uncommitted edits are caught), and (b) the SessionStart drift hook (secondary; git diff since the last recorded `ts`). Both call `telemetry.emit_override()`, which deduplicates on `(ts, axis_path, after)` and appends to `.claude/observability/adaptive/overrides.jsonl`. `/hm:personalization-audit` reads that file plus the current harness.yaml plus the ProjectProfile cache and runs `personalization_audit.run_audit()`, which returns a composite-score `PersonalizationPlan` with ranked `PersonalizationActionItem` list (per ADR-011 rubric).
 
+### Worktree artifact janitor
+
+Worktree isolation has an opportunistic cleanup pass at `worktree create`.
+`prune_stale(base)` runs before the queue and dirty-base guards so leaked
+harness bookkeeping does not become false live-session pressure. It removes
+orphan loop markers, removes owned dangling worktree directories only when
+they have a `.git` entry and are neither git-registered nor live-marker
+referenced, and deletes finalize-stash refs only when every tracked and
+untracked stash blob already exists in `HEAD`. Refs that fail the content gate
+are preserved and warned, but they do not count as live queue pressure unless
+their session marker still exists.
+
 ## 3. The 19 Mechanisms (M1-M19)
 
 Every mechanism below maps to a module under `src/harness_maker/` and at least one verification check in `.claude-verify.sh`.
