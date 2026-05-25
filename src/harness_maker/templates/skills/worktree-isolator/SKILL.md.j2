@@ -30,7 +30,7 @@ than the live working tree.
 
 ## Behavior
 
-Four-step flow, executed deterministically by the orchestrator:
+CLI-owned flow, executed deterministically by the orchestrator:
 
 1. **/hm:execute invoked → read `harness.yaml.worktree.scope`.**
    Parse the `worktree.scope` list (e.g. `[execute]` for Side, `[execute, plan]`
@@ -38,21 +38,21 @@ Four-step flow, executed deterministically by the orchestrator:
    the stage in-place — this preserves the lightweight default for stages where
    isolation costs more than it saves.
 
-2. **If "execute" (or current stage) in scope → call `worktree.create()`.**
+2. **If "execute" (or current stage) in scope → call the worktree CLI.**
 
    CLI (used by stage skills directly):
    ```
    uv run python -m harness_maker.worktree create execute "$(pwd)"
    ```
 
-   Python API (used by harness-maker internals):
-   ```python
-   from harness_maker import worktree
-   wt = worktree.create(workflow="execute", base_dir=Path.cwd())
-   # wt = <repo>/.worktrees/execute-<UTC-iso8601-minute>/
-   ```
-   Branch name matches the directory basename. The worktree starts from the
-   current HEAD of the base repo.
+   Create is the primary dirty-base boundary. If the base repo has user WIP,
+   the CLI aborts unless the caller explicitly passes `--allow-dirty-base`.
+   If two or more deferred finalize stash refs already exist, the CLI aborts
+   unless the caller explicitly passes `--allow-stash-queue`.
+
+   The worktree directory includes a session UUID, e.g.
+   `.worktrees/execute-<uuid>-<timestamp>/`. Branch name matches the directory
+   basename. The worktree starts from the current HEAD of the base repo.
 
 3. **Run workflow inside the worktree.**
    Switch the agent's working directory to `wt`. All Write/Edit/Bash tool calls
@@ -61,21 +61,30 @@ Four-step flow, executed deterministically by the orchestrator:
    read the base repo (they have read-only permissions per M12 privilege
    separation).
 
-4. **On success → `worktree.merge()` then `worktree.cleanup(on_success=True)`.
-   On failure → `worktree.cleanup(on_success=False)` with backup preserved.**
-   ```python
-   try:
-       run_workflow(stage="execute", cwd=wt)
-   except Exception:
-       worktree.cleanup(wt, on_success=False)   # non-force: keeps dirty WT for inspection
-       raise
-   else:
-       worktree.merge(wt, strategy="squash")
-       worktree.cleanup(wt, on_success=True)    # force: drop the now-merged branch WT
+4. **Finalize through the CLI, not direct merge/cleanup calls.**
+
+   Success for `/hm:execute` uses stage-only handoff so wrapup owns the single
+   user-facing commit:
+   ```bash
+   uv run python -m harness_maker.worktree finalize <WT> stage-only
    ```
-   Failure path uses non-force `git worktree remove`, so a dirty worktree
-   stays on disk under `.worktrees/` for manual triage. The autoloop blocker
-   recovery path (`worktree.cleanup_all(force=True)`) sweeps these up later.
+
+   Failure preserves the worktree for inspection:
+   ```bash
+   uv run python -m harness_maker.worktree finalize <WT> fail
+   ```
+
+   If dirty-base bypass was used or new base dirt appeared after create,
+   `finalize stage-only` may stash that base WIP and write
+   `.claude/.hm-finalize-stash-*`. After the wrapup commit, restore it with:
+   ```bash
+   uv run python -m harness_maker.worktree post-commit-pop "$(pwd)"
+   ```
+
+   Never replace this flow with direct `worktree.merge()` +
+   `worktree.cleanup()` calls; that bypasses the dirty-base guard, queue guard,
+   session UUID handoff, merge fence, scope guard, and post-commit-pop
+   recovery contract.
 
 ## Output
 

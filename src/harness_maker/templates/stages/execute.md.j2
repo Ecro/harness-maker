@@ -111,6 +111,29 @@ Parse flags from `$ARGUMENTS`:
 - Otherwise `tdd_active = true`.
 {% endif %}
 
+### Step 1.5 — Parallel split assessment
+
+Before editing, decide whether any work can safely run in parallel. Use the
+PLAN phase metadata (`depends_on`, `parallel_group`, `merge_hazards`) as the
+source of truth.
+
+Proceed in parallel ONLY when all of these hold:
+- The shards have disjoint file ownership OR are read-only analysis tasks.
+- No shard touches shared generated files, snapshot baselines, migrations,
+  public contracts, workflow registries, or global config.
+- The PLAN's `merge_hazards` for the relevant phases is `none` or already
+  resolved by a serial predecessor phase.
+
+Force serial execution when:
+- Two phases touch the same file.
+- A phase changes shared API/schema/CLI contracts.
+- A phase updates generated artifacts consumed by later phases.
+- Ownership is unclear.
+
+When parallel work is safe, assign explicit file ownership to each sub-agent
+and require each worker to avoid reverting other workers' edits. When unsafe,
+write a one-line serial justification in your progress notes and continue.
+
 ### Step 2 — Resolve SPEC + RESEARCH cache (when frontmatter references them)
 
 Per PLAN frontmatter:
@@ -247,7 +270,12 @@ Bash("if [ -f \"<WT>/.claude/.hm-iter-receipts/.current-iter\" ]; then ITER=$(ca
 
 ### Step 5 — Worktree finalize
 
-Before invoking finalize, run `git status --porcelain` in the **base** repo (parent of `<WT>`'s `.worktrees/`). If non-empty, surface to the user, informationally (no question — finalize proceeds):
+Normal flow blocks a dirty base repo during Step 0 `worktree create`. Finalize
+auto-stashes base dirt only when the user explicitly bypassed that guard with
+`--allow-dirty-base` or when new base dirt appeared after create. Before
+invoking finalize, run `git status --porcelain` in the **base** repo (parent
+of `<WT>`'s `.worktrees/`). If non-empty, surface to the user,
+informationally (no question — finalize proceeds):
 
 > "다음 파일이 base 에 dirty 상태로 있어 finalize 가 자동 stash 후 복원합니다: {file list}
 > **알림:** staged 파일은 unstaged 상태로 복원됩니다 — 필요시 다시 `git add` 하세요."
@@ -287,6 +315,20 @@ If Step 0 printed empty (no isolation engaged), skip both — there is nothing t
 ```bash
 git commit -m "<your message>"
 ```
+
+If finalize reported a deferred stash handoff or wrote
+`.claude/.hm-finalize-stash-*`, run the post-commit restore after the manual
+commit; otherwise the user's pre-existing WIP remains in the stash queue:
+
+{% if is_codex %}
+```
+Bash("HM_OWNED_SESSION_UUIDS=\"$(uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree owned-uuids \"$(pwd)\")\" uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree post-commit-pop \"$(pwd)\"")
+```
+{% else %}
+```bash
+!HM_OWNED_SESSION_UUIDS="$(uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree owned-uuids "$(pwd)")" uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree post-commit-pop "$(pwd)"
+```
+{% endif %}
 
 ## Outputs
 

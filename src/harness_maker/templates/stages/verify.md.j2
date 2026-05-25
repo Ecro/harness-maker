@@ -58,11 +58,25 @@ FAIL when: any scenario lacks coverage AND lacks waiver.
 
 ### Check 2 — Regression smoke
 
-**Check-suite skip** (ADR-007): Compute the verification skip-key from HEAD
-sha + diff + lockfile + tool versions + env. If a passing marker exists at
-`~/.cache/harness-maker/verify/<key>.json`, print `PASS (cached at <timestamp>)`
-and skip to Check 3. Otherwise run the suite below and, on all-pass, write the
-marker for future skips.
+**Check-suite skip** (ADR-007 + PLAN-workflow-overhead-post024): use the
+deterministic verification-cache CLI, not prose reasoning, before running
+the suite. The default `relevant` mode ignores wrapup-only memory/work-docs
+churn but invalidates on source, tests, lockfiles, tool config, CI, and
+verification script changes.
+
+{% if is_codex %}
+```
+Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.observability.verification_cache check --root . --mode relevant")
+```
+{% else %}
+```bash
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.observability.verification_cache check --root . --mode relevant
+```
+{% endif %}
+
+If this exits `0`, print `PASS (cached)` and skip to Check 3. If it exits
+`1`, run the suite below. Do not write a passing marker until every suite
+command has passed.
 
 Run the project's full check suite. Pick the toolchain that matches the project:
 
@@ -71,6 +85,7 @@ Run the project's full check suite. Pick the toolchain that matches the project:
 # Python:
 Bash("uv run pytest -q")
 Bash("uv run ruff check src/ tests/")
+Bash("uv run ruff format --check src/ tests/")
 Bash("uv run mypy --strict src/")
 # Rust: Bash("cargo test && cargo check")
 # Node: Bash("pnpm test && pnpm build")
@@ -80,6 +95,7 @@ Bash("uv run mypy --strict src/")
 # Python:
 !uv run pytest -q
 !uv run ruff check src/ tests/
+!uv run ruff format --check src/ tests/
 !uv run mypy --strict src/
 # Rust: cargo test && cargo check
 # Node: pnpm test && pnpm build
@@ -89,6 +105,18 @@ Bash("uv run mypy --strict src/")
 If the harness has its own `.claude-verify.sh phase_<N>` script, prefer it over the generic toolchain commands.
 
 FAIL when: any subprocess returns non-zero.
+
+After every selected suite command passes, write the marker:
+
+{% if is_codex %}
+```
+Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.observability.verification_cache mark-pass --root . --mode relevant --checks lint,format,mypy,pytest")
+```
+{% else %}
+```bash
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.observability.verification_cache mark-pass --root . --mode relevant --checks lint,format,mypy,pytest
+```
+{% endif %}
 
 ### Check 3 — Structural delta (formerly "Health delta")
 
@@ -150,7 +178,7 @@ You have completed the stage. Emit a receipt so the autoloop driver's Gate 0 can
 - **`fail`** — any gating check failed; the report's status is non-OK.
 - **`skipped`** — **DO NOT emit this value from a stage prompt.** Reserved for the autoloop driver's auto-retry escape hatch (ADR-005 of PLAN-loop-mid-stop-and-review-skip).
 
-The shell guard below makes the receipt a no-op when `.current-iter` is absent — that file is written only by the autoloop driver at iter start. Standalone runs (no autoloop), no-isolation runs, and post-`/compact` restoration before iter 1 all skip the write naturally. This is by design — Gate 0 only reads receipts written under `iter-N` for N≥1. `exec-rev-wrap-ver` (production default workflow) requires this receipt; without it Gate 0 would loop forever.
+The shell guard below makes the receipt a no-op when `.current-iter` is absent — that file is written only by the autoloop driver at iter start. Standalone runs (no autoloop), no-isolation runs, and post-`/compact` restoration before iter 1 all skip the write naturally. This is by design — Gate 0 only reads receipts written under `iter-N` for N≥1. `exec-rev-ver-wrap` (canonical production default workflow) requires this receipt; without it Gate 0 would loop forever.
 
 {% if is_codex %}
 ```
@@ -223,7 +251,7 @@ When `--force` is set, append the same record with `"force_override": true, "ove
 3. Repeat for Checks 2-5.
 4. Emit final RESULT line + JSON record.
 5. When `--force` is set with FAILing checks: emit text + JSON record with override flag + reason, then return PASS exit code (let the workflow proceed). Wrapup will surface the override in the commit body footer.
-6. **Stage terminal**: Emit the RESULT line and **STOP**. Do not proceed to `/hm:wrapup` or any other stage without an explicit user command — unless this stage was invoked as part of a fused workflow (e.g., `exec-rev-wrap-ver`), in which case the fused workflow owns the transition.
+6. **Stage terminal**: Emit the RESULT line and **STOP**. Do not proceed to `/hm:wrapup` or any other stage without an explicit user command — unless this stage was invoked as part of a fused workflow (e.g., `exec-rev-ver-wrap`), in which case the fused workflow owns the transition.
 
 ## Outputs
 

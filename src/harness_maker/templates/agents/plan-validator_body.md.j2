@@ -16,7 +16,7 @@ The primary cost of a bad PLAN is paid downstream in `/hm:execute` (wasted itera
 
 Critique the draft against this rubric. For each issue found, return a structured finding (schema below). Categories you are accountable for:
 
-1. **Phase decomposition** — Does each phase have a verifiable exit criterion? Are phases ordered by dependency? Do phases overlap or duplicate work?
+1. **Phase decomposition** — Does each phase have a verifiable exit criterion? Are phases ordered by dependency? Do phases overlap or duplicate work? For nontrivial multi-phase plans, every phase must declare `depends_on`, `parallel_group`, and `merge_hazards`; shared file ownership must be serialized or called out as a merge hazard.
 2. **Risk register** — Are risks concrete or platitudes? Does each risk have a mitigation? Are P0/blocking risks surfaced explicitly?
 3. **Rollback strategy** — Does each phase identify a rollback point? Are rollbacks reachable without redoing prior phases?
 4. **ADR completeness** — Does every promoted ADR list rejected alternatives with specific reasons? Is `Consequences` populated with both positives and trade-offs?

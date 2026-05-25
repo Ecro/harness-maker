@@ -7,11 +7,13 @@ env policy: hash ALL env vars except a known-safe ignore set.
 
 from __future__ import annotations
 
+import argparse
 import fnmatch
 import hashlib
 import json
 import os
 import subprocess
+import sys
 import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
@@ -119,6 +121,102 @@ def compute_skip_key(project_root: Path) -> str:
     return hashlib.sha256(raw.encode()).hexdigest()
 
 
+_DEFAULT_RELEVANT_PATTERNS: tuple[str, ...] = (
+    "src/**",
+    "tests/**",
+    ".github/workflows/**",
+    ".claude-verify.sh",
+    "pyproject.toml",
+    "uv.lock",
+    "requirements*.txt",
+    "package.json",
+    "pnpm-lock.yaml",
+    "package-lock.json",
+    "Cargo.toml",
+    "Cargo.lock",
+    "go.mod",
+    "go.sum",
+    "Makefile",
+    "noxfile.py",
+    "tox.ini",
+)
+
+_DEFAULT_IRRELEVANT_PATTERNS: tuple[str, ...] = (
+    ".claude/memory/**",
+    ".claude/observability/review-*.jsonl",
+    "work-docs/**",
+    "CHANGELOG.md",
+)
+
+
+def _match_any(path: str, patterns: tuple[str, ...]) -> bool:
+    return any(fnmatch.fnmatch(path, pat) for pat in patterns)
+
+
+def is_relevant_path(path: str, *, docs_are_behavior: bool = False) -> bool:
+    """Return True when a changed path can affect verification outcomes.
+
+    The default policy intentionally treats wrapup-managed memory/work-docs
+    edits as irrelevant so a post-verify PLAN status or memory append does not
+    force another full regression suite. Unknown paths stay conservative.
+    """
+    normalized = path.replace("\\", "/")
+    if docs_are_behavior and normalized.endswith((".md", ".rst", ".txt")):
+        return True
+    if _match_any(normalized, _DEFAULT_IRRELEVANT_PATTERNS):
+        return False
+    if _match_any(normalized, _DEFAULT_RELEVANT_PATTERNS):
+        return True
+    # Conservative fallback: unknown source-control changes might matter.
+    return True
+
+
+def _changed_paths(project_root: Path) -> list[str]:
+    names = set[str]()
+    for cmd in (
+        ["git", "diff", "--name-only", "HEAD"],
+        ["git", "diff", "--cached", "--name-only"],
+        ["git", "ls-files", "--others", "--exclude-standard"],
+    ):
+        out = _run_quiet(cmd, cwd=project_root)
+        if out:
+            names.update(line.strip() for line in out.splitlines() if line.strip())
+    return sorted(names)
+
+
+def compute_relevant_skip_key(project_root: Path, *, docs_are_behavior: bool = False) -> str:
+    """Compute a verification key that ignores wrapup-only document churn."""
+    parts: list[str] = []
+    root = project_root.resolve()
+    parts.append(hashlib.sha256(str(root).encode()).hexdigest())
+    parts.append(_run_quiet(["git", "rev-parse", "HEAD"], cwd=root))
+
+    relevant_paths = [
+        path
+        for path in _changed_paths(root)
+        if is_relevant_path(path, docs_are_behavior=docs_are_behavior)
+    ]
+    if relevant_paths:
+        diff_parts: list[str] = []
+        for path in relevant_paths:
+            file_path = root / path
+            diff_parts.append(path)
+            diff_parts.append(_run_quiet(["git", "diff", "HEAD", "--", path], cwd=root))
+            diff_parts.append(_run_quiet(["git", "diff", "--cached", "--", path], cwd=root))
+            if file_path.is_file():
+                diff_parts.append(_file_hash(file_path))
+        parts.append(hashlib.sha256("\n".join(diff_parts).encode()).hexdigest())
+    else:
+        parts.append("")
+
+    parts.append(_file_hash(root / "uv.lock"))
+    parts.append(_file_hash(root / "pyproject.toml"))
+    parts.append(json.dumps(_tool_versions(root), sort_keys=True))
+    parts.append(_env_hash())
+    parts.append("docs_are_behavior=1" if docs_are_behavior else "docs_are_behavior=0")
+    return hashlib.sha256("|".join(parts).encode()).hexdigest()
+
+
 def _cache_dir() -> Path:
     env_override = os.environ.get("HARNESS_MAKER_CACHE_DIR")
     if env_override:
@@ -188,3 +286,78 @@ def invalidate(key: str) -> bool:
         path.unlink()
         return True
     return False
+
+
+def _compute_key_for_args(args: argparse.Namespace) -> str:
+    root = Path(args.root)
+    if args.mode == "relevant":
+        return compute_relevant_skip_key(root, docs_are_behavior=args.docs_are_behavior)
+    return compute_skip_key(root)
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(prog="verification-cache")
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    def add_common(p: argparse.ArgumentParser) -> None:
+        p.add_argument("--root", default=".")
+        p.add_argument("--mode", choices=("full", "relevant"), default="relevant")
+        p.add_argument("--docs-are-behavior", action="store_true")
+
+    key_p = sub.add_parser("key")
+    add_common(key_p)
+
+    check_p = sub.add_parser("check")
+    add_common(check_p)
+
+    mark_p = sub.add_parser("mark-pass")
+    add_common(mark_p)
+    mark_p.add_argument("--checks", default="lint,mypy,pytest")
+
+    explain_p = sub.add_parser("explain")
+    add_common(explain_p)
+
+    args = parser.parse_args(argv)
+    key = _compute_key_for_args(args)
+
+    if args.command == "key":
+        print(key)
+        return 0
+    if args.command == "check":
+        marker = is_fresh(key)
+        if marker is None:
+            print(json.dumps({"fresh": False, "key": key}))
+            return 1
+        print(json.dumps({"fresh": True, "key": key, "marker": marker}, sort_keys=True))
+        return 0
+    if args.command == "mark-pass":
+        checks = [c.strip() for c in args.checks.split(",") if c.strip()]
+        path = mark_passed(key, checks=checks, project_root=str(Path(args.root).resolve()))
+        print(json.dumps({"marked": True, "key": key, "path": str(path)}, sort_keys=True))
+        return 0
+    if args.command == "explain":
+        root = Path(args.root)
+        changed = _changed_paths(root)
+        relevant = [
+            path
+            for path in changed
+            if is_relevant_path(path, docs_are_behavior=args.docs_are_behavior)
+        ]
+        print(
+            json.dumps(
+                {
+                    "key": key,
+                    "mode": args.mode,
+                    "changed_paths": changed,
+                    "relevant_paths": relevant,
+                    "ignored_paths": [path for path in changed if path not in relevant],
+                },
+                sort_keys=True,
+            )
+        )
+        return 0
+    return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))

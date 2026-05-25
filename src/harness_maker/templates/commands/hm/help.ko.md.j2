@@ -16,7 +16,7 @@
 | `{{ cmd }}execute`  | TDD 머신 — PLAN 단계별 RED → GREEN |
 | `{{ cmd }}review`   | 다중 reviewer 합의 + grade gate + auto-fix |
 | `{{ cmd }}wrapup`   | 단일 commit, CHANGELOG, 문서 갱신 |
-| `{{ cmd }}verify`   | wrapup 이후 독립 invariant 검증 |
+| `{{ cmd }}verify`   | wrapup 전 독립 invariant 검증 |
 
 ### Fused workflows ({{ config.workflows | length }}개 등록)
 
@@ -40,9 +40,9 @@
 ## 🔁 추천 워크플로
 
 ```
-  research ─► spec ─► plan ─► execute ─► review ─► wrapup
+  research ─► spec ─► plan ─► execute ─► review ─► verify ─► wrapup
                                   │
-                                  └─► verify (invariant 재검증 필요시)
+                                  └─► legacy workflow는 wrapup 후 verify 가능
 ```
 
 **기본 설정:** `{{ cmd }}{{ config.default_workflow }}` ⭐

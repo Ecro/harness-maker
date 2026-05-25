@@ -66,6 +66,12 @@ _SIDE_STARTER: dict[str, list[AtomicStage]] = {
         AtomicStage.REVIEW,
         AtomicStage.WRAPUP,
     ],
+    "exec-rev-ver-wrap": [
+        AtomicStage.EXECUTE,
+        AtomicStage.REVIEW,
+        AtomicStage.VERIFY,
+        AtomicStage.WRAPUP,
+    ],
     # 3-stage variant for /hm:loop per-iter use: wrapup belongs to loop-close,
     # never per-iter, so this strips wrapup vs plan-exec-rev-wrap below.
     # PLAN-loop-mid-stop-and-review-skip ADR-002.
@@ -94,6 +100,12 @@ _PRODUCTION_STARTER: dict[str, list[AtomicStage]] = {
         AtomicStage.REVIEW,
         AtomicStage.WRAPUP,
     ],
+    "exec-rev-ver-wrap": [
+        AtomicStage.EXECUTE,
+        AtomicStage.REVIEW,
+        AtomicStage.VERIFY,
+        AtomicStage.WRAPUP,
+    ],
     "exec-rev-wrap-ver": [
         AtomicStage.EXECUTE,
         AtomicStage.REVIEW,
@@ -113,7 +125,7 @@ _PRODUCTION_STARTER: dict[str, list[AtomicStage]] = {
         AtomicStage.PLAN,
     ],
 }
-_PRODUCTION_DEFAULT = "exec-rev-wrap-ver"
+_PRODUCTION_DEFAULT = "exec-rev-ver-wrap"
 
 # Inventory of all reviewers/skills the synthesizer installs. The `enabled`
 # subset depends on preset.

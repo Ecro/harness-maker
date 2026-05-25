@@ -68,13 +68,29 @@ Before touching anything, verify state:
 
 ### Step 2 — Final verification pass
 
-**Check-suite skip** (ADR-007): Before running, compute the verification
-skip-key from HEAD sha + diff + lockfile + tool versions + env. If a passing
-marker exists at `~/.cache/harness-maker/verify/<key>.json`, print
-`PASS (cached at <timestamp>)` and skip to Step 3. Otherwise run the suite
-below and, on all-pass, write the marker for future skips.
+**Verification marker reuse** (ADR-007 + PLAN-workflow-overhead-post024):
+`/hm:verify` is the single owner of the full regression suite in the canonical
+workflow. Before running any final suite here, ask the deterministic
+verification-cache CLI whether the code/test-relevant fingerprint is still
+fresh. This ignores wrapup-only memory/work-docs churn but invalidates on
+source, tests, lockfiles, tool config, CI, and verification script changes.
 
-Run the project's full check suite once before committing. Catch regressions wrapup-stage edits could introduce:
+{% if is_codex %}
+```
+Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.observability.verification_cache check --root . --mode relevant")
+```
+{% else %}
+```bash
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.observability.verification_cache check --root . --mode relevant
+```
+{% endif %}
+
+If this exits `0`, print `PASS (verification marker fresh)` and skip to Step
+3. If it exits `1`, run the suite below once. Do not write a passing marker
+until every suite command has passed.
+
+Run the project's full check suite only when the marker is absent or stale.
+Catch regressions wrapup-stage edits could introduce:
 
 {% if is_codex %}
 ```
@@ -99,6 +115,18 @@ Bash("uv run mypy --strict src/")              # type
 {% endif %}
 
 If any fail: STOP, surface the failure, do NOT proceed. Reverting an executed-merge is more painful than diagnosing here.
+
+After every selected suite command passes, write the marker:
+
+{% if is_codex %}
+```
+Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.observability.verification_cache mark-pass --root . --mode relevant --checks lint,format,mypy,pytest")
+```
+{% else %}
+```bash
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.observability.verification_cache mark-pass --root . --mode relevant --checks lint,format,mypy,pytest
+```
+{% endif %}
 
 ### Step 3 — Drift verdict check (read-only — no LLM re-analysis)
 
@@ -235,7 +263,13 @@ The commit captures: the staged execute changes + the memory updates + the PLAN 
 
 If `/hm:execute` ran in stage-only mode AND the base repo had unrelated dirty work, finalize deferred the stash pop to this point so the user's WIP does not contaminate the commit. Run `post-commit-pop` to restore it (no-op when no ref file is present).
 
-**Cross-session isolation (PLAN-worktree-cross-session-data-loss-defense task #14):** capture the set of session-UUIDs owned by THIS process (one UUID per active `.claude/.hm-loop-*` marker) and export it as `HM_OWNED_SESSION_UUIDS` before invoking `post-commit-pop`. The CLI then runs in Layer 3 **strict mode** — any finalize-stash ref file whose `session_uuid` is not in this env-supplied set is SKIPped rather than popped. This prevents Session B's wrapup from touching Session A's stash entries when both sessions write to the same base repo. Empty CSV is the legitimate "no active sessions" state (not an error).
+**Cross-session isolation:** export the session UUID set discovered from live
+worktree/session markers in this base repo as `HM_OWNED_SESSION_UUIDS` before
+invoking `post-commit-pop`. The CLI then runs in Layer 3 strict mode — any
+finalize-stash ref file whose `session_uuid` is not in this env-supplied set
+is SKIPped rather than popped. This is marker-derived ownership, not a magic
+process-local guarantee; if the UUID set is empty, the CLI safely treats that
+as "no owned deferred stashes" and stale refs remain preserved.
 
 {% if is_codex %}
 ```

@@ -736,7 +736,8 @@ For each iter (until convergence or any safety rail fires):
    `_PRODUCTION_STARTER`:
    - `exec-rev` → `execute,review`
    - `exec-rev-wrap` → `execute,review,wrapup`
-   - `exec-rev-wrap-ver` → `execute,review,wrapup,verify` *(production default)*
+   - `exec-rev-ver-wrap` → `execute,review,verify,wrapup` *(canonical production default)*
+   - `exec-rev-wrap-ver` → `execute,review,wrapup,verify` *(legacy/post-commit audit)*
    - `plan-exec-rev` → `plan,execute,review` *(3-stage variant for loop per-iter planning — wrapup stripped because loop-close owns it; ADR-002 of PLAN-loop-mid-stop-and-review-skip)*
    - `plan-exec-rev-wrap` → `plan,execute,review,wrapup` *(4-stage variant — SIDE preset only, not for per-iter loop use)*
    - `res-spec-plan` → `research,spec,plan`

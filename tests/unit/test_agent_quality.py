@@ -143,7 +143,7 @@ def test_llm_all_pass_lifts_to_platinum(tmp_path: Path) -> None:
     _make_rich_agent(agent)
     rubrics = _seed_rubric_dir(tmp_path)
     fake = _FakeJudge(_all_pass_response())
-    res = score_agent(agent, rubric_dir=rubrics, client=fake)
+    res = score_agent(agent, rubric_dir=rubrics, client=fake, force=True)
     assert res["llm"] == 100
     assert res["composite"] >= 90
     assert res["tier"] == "Platinum"
@@ -155,7 +155,7 @@ def test_llm_all_fail_drops_score(tmp_path: Path) -> None:
     _make_rich_agent(agent)
     rubrics = _seed_rubric_dir(tmp_path)
     fake = _FakeJudge(_all_fail_response())
-    res_with_llm = score_agent(agent, rubric_dir=rubrics, client=fake)
+    res_with_llm = score_agent(agent, rubric_dir=rubrics, client=fake, force=True)
     res_static_only = score_agent(agent)
     assert res_with_llm["llm"] == 0
     # LLM score 0 averaged with static lifts can drop below static-only.
@@ -167,7 +167,7 @@ def test_llm_failure_falls_back_to_static(tmp_path: Path) -> None:
     _make_rich_agent(agent)
     rubrics = _seed_rubric_dir(tmp_path)
     fake = _FakeJudge(RuntimeError("rate limited"))
-    res = score_agent(agent, rubric_dir=rubrics, client=fake)
+    res = score_agent(agent, rubric_dir=rubrics, client=fake, force=True)
     assert res["llm"] is None
     assert res["composite"] == res["static"]
 
@@ -177,7 +177,7 @@ def test_invalid_json_falls_back_to_static(tmp_path: Path) -> None:
     _make_rich_agent(agent)
     rubrics = _seed_rubric_dir(tmp_path)
     fake = _FakeJudge("not json at all")
-    res = score_agent(agent, rubric_dir=rubrics, client=fake)
+    res = score_agent(agent, rubric_dir=rubrics, client=fake, force=True)
     # judge_file returns score=50 with error set; we treat error as fallback.
     assert res["llm"] is None
     assert res["composite"] == res["static"]
@@ -189,7 +189,7 @@ def test_missing_rubric_falls_back_to_static(tmp_path: Path) -> None:
     empty_rubrics = tmp_path / "no_rubrics"
     empty_rubrics.mkdir()
     fake = _FakeJudge(_all_pass_response())
-    res = score_agent(agent, rubric_dir=empty_rubrics, client=fake)
+    res = score_agent(agent, rubric_dir=empty_rubrics, client=fake, force=True)
     assert res["llm"] is None
     assert fake.calls == []  # judge never called
 

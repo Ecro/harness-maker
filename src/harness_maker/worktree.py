@@ -1970,6 +1970,11 @@ def _cli_finalize(args: list[str]) -> int:
                         primary_marker,
                         sibling_bases=siblings_for_ref,
                     )
+                    print(
+                        "[finalize] base WIP stashed; deferred restore will run "
+                        "during wrapup post-commit-pop",
+                        file=sys.stderr,
+                    )
                     handed_off = True
                 except (OSError, RuntimeError) as e:
                     # OSError = atomic_write disk failure.

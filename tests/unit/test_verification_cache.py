@@ -10,8 +10,11 @@ import pytest
 
 from harness_maker.observability.verification_cache import (
     _should_ignore_env,
+    compute_relevant_skip_key,
     compute_skip_key,
     is_fresh,
+    is_relevant_path,
+    main,
     mark_passed,
 )
 
@@ -193,3 +196,36 @@ def test_env_ignore_patterns() -> None:
     assert not _should_ignore_env("LANG")
     assert not _should_ignore_env("PATH")
     assert not _should_ignore_env("TZ")
+
+
+def test_relevant_key_ignores_work_docs_and_memory(fake_project: Path) -> None:
+    key1 = compute_relevant_skip_key(fake_project)
+    (fake_project / "work-docs").mkdir()
+    (fake_project / "work-docs" / "PLAN-x.md").write_text("status: complete\n")
+    (fake_project / ".claude" / "memory").mkdir(parents=True)
+    (fake_project / ".claude" / "memory" / "session.md").write_text("note\n")
+    key2 = compute_relevant_skip_key(fake_project)
+    assert key1 == key2
+
+
+def test_relevant_key_invalidates_on_source_change(fake_project: Path) -> None:
+    key1 = compute_relevant_skip_key(fake_project)
+    (fake_project / "src").mkdir()
+    (fake_project / "src" / "pkg.py").write_text("VALUE = 1\n")
+    key2 = compute_relevant_skip_key(fake_project)
+    assert key1 != key2
+
+
+def test_relevant_path_docs_behavior_opt_in() -> None:
+    assert not is_relevant_path("CHANGELOG.md")
+    assert is_relevant_path("CHANGELOG.md", docs_are_behavior=True)
+    assert is_relevant_path("src/harness_maker/cli.py")
+    assert not is_relevant_path(".claude/memory/session/2026-05-25.md")
+
+
+def test_verification_cache_cli_check_and_mark(fake_project: Path, tmp_path: Path) -> None:
+    cache_dir = tmp_path.parent / "verification-cache"
+    with patch.dict(os.environ, {"HARNESS_MAKER_CACHE_DIR": str(cache_dir)}):
+        assert main(["check", "--root", str(fake_project)]) == 1
+        assert main(["mark-pass", "--root", str(fake_project), "--checks", "lint,pytest"]) == 0
+        assert main(["check", "--root", str(fake_project)]) == 0

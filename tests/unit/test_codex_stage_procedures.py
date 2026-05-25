@@ -292,6 +292,16 @@ def test_codex_stage_skills_uses_passed_config_dump() -> None:
     )
 
 
+def test_codex_execute_manual_post_commit_pop_uses_uuid_strict_mode() -> None:
+    """Manual no-wrapup restore must keep the cross-session stash guard."""
+    specs = _codex_stage_skills(config_dump=_make_default_config())
+    execute_spec = next(s for s in specs if "hm-execute" in s[1])
+    body = execute_spec[2]["stage_body"]
+    assert "HM_OWNED_SESSION_UUIDS" in body
+    assert "harness_maker.worktree owned-uuids" in body
+    assert "harness_maker.worktree post-commit-pop" in body
+
+
 def test_codex_target_files_threads_config_dump_to_stage_skills() -> None:
     """config_dump passed to _codex_target_files() must reach the stage skill bodies."""
     custom_config = _make_default_config()

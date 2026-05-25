@@ -106,6 +106,10 @@ If a command exits non-zero:
 - `routing: always-all` → invoke every enabled reviewer in parallel.
 - `routing: conditional` → use Conditional Router (M6) on the changed-file paths to pick the subset.
 - Add any extras from `--with-reviewers=<csv>`.
+- For large diffs with independent file clusters, optionally split the same
+  reviewer type across clusters only when clusters have disjoint file ownership
+  and no shared contract/generated-file dependency. Preserve the legacy
+  reviewer-set path when clusters are absent.
 
 ### Step 2 — Drift gate (PLAN/SPEC vs actual diff) — SINGLE OWNER
 
@@ -217,9 +221,11 @@ extras at runtime bringing total > 1, re-enable Pass 1 + Pass 1.5 manually.
 {% endif %}
 
 3. Re-run the same reviewer set with the **full** context (metadata
-   restored) and the **Pass 1.5 verified findings** list. Each reviewer validates
-   each finding against the metadata, drops any that the context proves
-   spurious, and adjusts severity if context changes risk.
+   restored) and the **Pass 1.5 verified findings** list. Launch these reviewer
+   calls in parallel, using one Task call per reviewer (or per reviewer × file
+   cluster when safe). Each reviewer validates each finding against the
+   metadata, drops any that the context proves spurious, and adjusts severity
+   if context changes risk.
 4. Merge the two passes via the harness CLI:
    {% if is_codex %}
    ```bash
@@ -359,7 +365,7 @@ Per iteration:
 
    On failure: identify the last fix that touched the failing file → **revert** it (restore original snippet) and log `Fix #{N} reverted — caused build failure`. Continue with remaining fixes (do not abort the round).
 
-4. **Re-review (selective)** — re-spawn ONLY reviewers whose scope was touched by applied fixes. Reviewers that approved untouched files are NOT re-run. Multi-instance code-reviewer consensus (when configured) still uses the configured number of instances on modified files.
+4. **Re-review (selective)** — re-spawn ONLY reviewers whose scope was touched by applied fixes. Launch all required re-reviewers in parallel in one Task batch when their scopes are independent. Reviewers that approved untouched files are NOT re-run. Multi-instance code-reviewer consensus (when configured) still uses the configured number of instances on modified files.
 
 5. **Recompute grade** using the new findings (Step 4 consensus filter again).
 

@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+### Changed: verify-before-wrapup workflow cuts duplicate final checks
+
+Production's recommended fused workflow now runs `execute -> review -> verify -> wrapup`
+so the full regression suite has a single pre-commit owner. `verify` and
+`wrapup` both call the `verification_cache` CLI; wrapup reuses a fresh
+code/test-relevant marker instead of rerunning the same lint, format, type, and
+test suite after memory or work-doc updates.
+
+The relevant fingerprint ignores wrapup-only churn such as `.claude/memory/`,
+`work-docs/`, review logs, and changelog edits, while still invalidating on
+source, tests, lockfiles, tool configuration, CI, and harness templates. The
+worktree handoff prose now makes deferred stash restoration visible, and both
+wrapup and manual commit paths run `post-commit-pop` in UUID strict mode.
+
 ### Fixed: worktree artifact janitor no longer blocks multi-session create
 
 `worktree create` now prunes stale harness-owned artifacts before evaluating

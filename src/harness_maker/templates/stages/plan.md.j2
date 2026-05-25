@@ -397,6 +397,9 @@ summary: "{≤100 char one-line TL;DR}"
 4. **📐 Architecture Decision Records** — every promoted ADR with full template
 5. **🏗️ Technical Design** — Current State / Affected Components / Dependencies / Architecture / Design Decisions (referencing ADRs) / Data Flow / API Changes
 6. **📝 Implementation Plan** — numbered phases. **Each phase MUST have**:
+   - `depends_on` (phase numbers or `[]`)
+   - `parallel_group` (shared label for phases that can be considered together; use `serial-*` when not parallelizable)
+   - `merge_hazards` (specific files/contracts/generated outputs that force serial handling, or `none`)
    - Scope (files in / out)
    - Exit criterion (a runnable command or check that proves the phase is done)
    - Risk: `low` | `medium` | `high`
@@ -412,7 +415,7 @@ After writing, Read the file back and assert:
 - Starts with `---` frontmatter.
 - Contains `## 🎙️ Interview Transcript` with ≥1 entry (or skip-justification line).
 - ADR count in frontmatter matches `## 📐 Architecture Decision Records` heading count.
-- Every phase has all 4 required fields (scope / exit / risk / rollback).
+- Every phase has all required fields (depends_on / parallel_group / merge_hazards / scope / exit / risk / rollback).
 
 If verification fails, retry write **once**. If still failing, surface the path + error and stop — do NOT proceed to a downstream stage.
 
@@ -459,6 +462,7 @@ Bash("if [ -f \"<WT>/.claude/.hm-iter-receipts/.current-iter\" ]; then ITER=$(ca
 ## Quality Bar
 
 - An independent reader can predict the file diff per phase.
+- Execute can decide upfront whether any sub-agent work can run in parallel from the phase dependency metadata.
 - Each exit criterion is checkable (script, test, or manual checklist).
 - Risks are concrete, not platitudes ("might break things").
 - Every architectural decision in `## 🏗️ Technical Design` links back to an ADR or Interview Entry.

@@ -32,9 +32,10 @@ Invoke a stage by mentioning the skill name (e.g. `@hm-execute task-slug`).
 |-------|-------|
 | `@hm-exec-rev` | execute → review |
 | `@hm-exec-rev-wrap` | execute → review → wrapup |
-| `@hm-exec-rev-wrap-ver` | execute → review → wrapup → verify |
+| `@hm-exec-rev-ver-wrap` | execute → review → verify → wrapup |
+| `@hm-exec-rev-wrap-ver` | legacy/post-commit audit: execute → review → wrapup → verify |
 
-Default per-iteration workflow: `@hm-{{ config.default_workflow }}`.
+Default fused workflow: `@hm-{{ config.default_workflow }}`.
 
 ## Configuration
 

@@ -17,7 +17,7 @@
 | `{{ cmd }}execute`  | TDD machine — RED → GREEN per PLAN phase |
 | `{{ cmd }}review`   | Multi-reviewer consensus + grade gate + auto-fix |
 | `{{ cmd }}wrapup`   | Single commit, CHANGELOG, doc updates |
-| `{{ cmd }}verify`   | Independent post-wrapup invariant checks |
+| `{{ cmd }}verify`   | Independent pre-wrapup invariant checks |
 
 ### Fused workflows ({{ config.workflows | length }})
 
@@ -41,9 +41,9 @@
 ## 🔁 Recommended workflow
 
 ```
-  research ─► spec ─► plan ─► execute ─► review ─► wrapup
+  research ─► spec ─► plan ─► execute ─► review ─► verify ─► wrapup
                                   │
-                                  └─► verify (when invariants need an extra pass)
+                                  └─► legacy workflows may run verify after wrapup
 ```
 
 **Your default:** `{{ cmd }}{{ config.default_workflow }}` ⭐

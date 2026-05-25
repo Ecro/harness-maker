@@ -137,6 +137,21 @@ def test_work_docs_footgun_probe(tmp_path: Path) -> None:
     )
 
 
+def test_verify_marker_covers_wrapup_python_checks(tmp_path: Path) -> None:
+    """A verify marker must not let wrapup skip checks verify did not run."""
+    p = _profile()
+    a = interview(p, autoloop_mode=True)
+    bp = synthesize(p, a)
+    render(bp, tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
+
+    verify_stage = (tmp_path / "stages" / "verify.md").read_text(encoding="utf-8")
+    wrapup_stage = (tmp_path / "stages" / "wrapup.md").read_text(encoding="utf-8")
+
+    assert "uv run ruff format --check src/ tests/" in verify_stage
+    assert "--checks lint,format,mypy,pytest" in verify_stage
+    assert "--checks lint,format,mypy,pytest" in wrapup_stage
+
+
 def _prod_profile() -> ProjectProfile:
     return ProjectProfile(stack=["python"], scale="medium", lifecycle="active")
 

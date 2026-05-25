@@ -203,7 +203,7 @@ def test_interview_preset_override_to_production(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs, ""))
     result = interview(_profile(), autoloop_mode=False)
     assert result.preset == Preset.PRODUCTION
-    assert result.default_workflow == "exec-rev-wrap-ver"
+    assert result.default_workflow == "exec-rev-ver-wrap"
 
 
 def test_interview_custom_workflow_rejects_reserved(
