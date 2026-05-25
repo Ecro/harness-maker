@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.25.1
+harness_maker_version: 0.26.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: harness-yaml/Production.yaml.j2
 provenance: official
-content_hash: 4e1d4b88ad0bbf0068cbef6276889219911f857aaff96f499798d96fa7fe34d2
+content_hash: 127ebad8f03849e6d23ed8741bd0043ac82802cb44cb6483961fb4e70cd48413
 ---
 preset: Production
 locale: ko
@@ -143,3 +143,9 @@ security:
     spec_gate: block
 feedback:
   enabled: false
+codex_second_opinion:
+  enabled: false
+  agents: ["code-reviewer", "consensus-arbiter", "plan-validator"]
+  failure_policy: "warn-and-proceed"
+  hermetic: true
+  output_schema_path: ".claude/schemas/codex-finding.schema.json"
