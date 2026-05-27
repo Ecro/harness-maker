@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Fixed: Second Brain fully operational after config + runtime overhaul
+
+- Corrected `vault_path` to actual Obsidian vault root (was pointing to non-existent subdir)
+- Added `99_HM/harness-maker` folder entry with read+write and full note types
+- Removed dead `trusted_allowlist` field from model, templates, and docs
+- Added warn-and-strip migration for legacy `harness.yaml` files still carrying the field
+- Wired `required_frontmatter` config to `validate_note()` at runtime
+- Implemented search scoring: word-boundary detection + title 3x boost + tag 2x boost
+- Enhanced degraded-mode empty-folders warning with stderr `ACTION:` message
+
 ## [0.26.3] - 2026-05-25
 
 ### Fixed: `/harness-maker:make` no longer resolves stale project installs

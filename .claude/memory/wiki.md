@@ -381,4 +381,7 @@ To diverge a shared partial's behavior per consuming agent, branch on the in-sco
 ## [wiki:pattern] verify-owns-full-suite-before-wrapup | 2026-05-25
 Canonical Production workflow now puts `verify` before `wrapup`; wrapup should reuse a deterministic verification marker when the code/test-relevant fingerprint is unchanged. The marker contract must include every gate that wrapup would otherwise run (`lint,format,mypy,pytest`) and must ignore wrapup-only churn like memory, work-docs, review reports, and changelog edits. Safety invariant: if a later stage edits source, tests, lockfiles, tool config, CI, or harness templates, the relevant fingerprint changes and wrapup reruns the suite before commit.
 
+## [wiki:gotcha] second-brain-vault-path-must-be-root | 2026-05-27
+`harness.yaml.second_brain.vault_path` must point to the actual Obsidian vault root (where `.obsidian/` lives), NOT a subfolder. Subfolders are addressed via `folders[].path` relative to vault root. Misconfiguring vault_path to a non-existent subdir causes silent empty-result degradation — all searches return `[]` without error because the loader degrades gracefully when the vault directory is missing.
+
 <!-- @hm:/user:entries -->
