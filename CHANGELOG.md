@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.26.4] - 2026-05-27
+
 ### Fixed: Second Brain fully operational after config + runtime overhaul
 
 - Corrected `vault_path` to actual Obsidian vault root (was pointing to non-existent subdir)
