@@ -32,6 +32,10 @@ _SECOND_BRAIN_TAG = "hm/second-brain"
 _EMPTY_FOLDERS_REMEDIATION = (
     "second_brain.folders is empty — run /hm:configure to add at least one folder"
 )
+_EMPTY_FOLDERS_ACTION = (
+    "ACTION: add at least one folder to second_brain.folders in .claude/harness.yaml, "
+    "or run /hm:configure"
+)
 
 _RECOMMENDED_FIELDS: dict[str, tuple[str, ...]] = {
     "decision": ("status", "related_projects", "supersedes"),
@@ -101,9 +105,17 @@ def parse_frontmatter(text: str) -> tuple[dict[str, Any], str]:
     return (parsed if isinstance(parsed, dict) else {}), body
 
 
-def validate_note(frontmatter: dict[str, Any], body: str) -> list[str]:
+_DEFAULT_REQUIRED_FRONTMATTER = ["type", "created", "updated", "tags", "links"]
+
+
+def validate_note(
+    frontmatter: dict[str, Any],
+    body: str,
+    *,
+    required_fields: list[str] | None = None,
+) -> list[str]:
     """Validate managed-note core schema and return warning strings."""
-    required = ["type", "created", "updated", "tags", "links"]
+    required = required_fields if required_fields is not None else _DEFAULT_REQUIRED_FRONTMATTER
     missing = [k for k in required if k not in frontmatter]
     if missing:
         raise SecondBrainError(f"missing required frontmatter: {', '.join(missing)}")
@@ -178,7 +190,7 @@ def write_note(
             pass  # treat as fresh write
     fm = _autofill_timestamps(frontmatter)  # ADR-006/010: returns NEW dict
     _ensure_type_allowed(fm, folder)
-    warnings = validate_note(fm, body)
+    warnings = validate_note(fm, body, required_fields=cfg.required_frontmatter)
     warnings.extend(_project_namespace_warnings(fm, cfg))
     path.parent.mkdir(parents=True, exist_ok=True)
     atomic_write(path, _format_note(fm, body))
@@ -199,7 +211,7 @@ def append_note(harness_root: Path, relpath: str, text: str) -> WriteResult:
     new_body = body + text
     fm = _autofill_timestamps(fm)  # ADR-006: bumps updated
     _ensure_type_allowed(fm, folder)
-    warnings = validate_note(fm, new_body)
+    warnings = validate_note(fm, new_body, required_fields=cfg.required_frontmatter)
     warnings.extend(_project_namespace_warnings(fm, cfg))
     path.parent.mkdir(parents=True, exist_ok=True)
     atomic_write(path, _format_note(fm, new_body))
@@ -221,10 +233,46 @@ def patch_note(harness_root: Path, relpath: str, old_text: str, new_text: str) -
     new_body = body.replace(old_text, new_text, 1)
     fm = _autofill_timestamps(fm)  # ADR-006: bumps updated
     _ensure_type_allowed(fm, folder)
-    warnings = validate_note(fm, new_body)
+    warnings = validate_note(fm, new_body, required_fields=cfg.required_frontmatter)
     warnings.extend(_project_namespace_warnings(fm, cfg))
     atomic_write(path, _format_note(fm, new_body))
     return WriteResult(path=path, warnings=warnings)
+
+
+_WORD_BOUNDARY_RE = re.compile(r"\b", re.UNICODE)
+_TITLE_BOOST = 3.0
+_TAG_BOOST = 2.0
+_WORD_BOUNDARY_BONUS = 2.0
+
+
+def _score_result(
+    query_tokens: list[str],
+    relpath: str,
+    title: str | None,
+    tags: list[str],
+    body: str,
+) -> float:
+    """Score a search result by relevance. Higher = more relevant."""
+    score = 1.0
+    lower_title = (title or "").lower()
+    lower_tags = " ".join(tags).lower()
+    lower_body = body.lower()
+    lower_relpath = relpath.lower()
+
+    for token in query_tokens:
+        if token in lower_title:
+            score += _TITLE_BOOST
+            if re.search(rf"\b{re.escape(token)}\b", lower_title):
+                score += _WORD_BOUNDARY_BONUS
+        if token in lower_tags:
+            score += _TAG_BOOST
+        if re.search(rf"\b{re.escape(token)}\b", lower_body):
+            score += _WORD_BOUNDARY_BONUS
+        elif token in lower_body:
+            score += 1.0
+        if token in lower_relpath:
+            score += 1.0
+    return score
 
 
 def search_notes(
@@ -239,7 +287,8 @@ def search_notes(
     if not query.strip():
         raise SecondBrainError("search query cannot be empty")
     q = query.lower()
-    results: list[SearchResult] = []
+    query_tokens = [t for t in q.split() if t]
+    candidates: list[tuple[float, SearchResult]] = []
     for folder in cfg.folders:
         if not folder.read:
             continue
@@ -260,19 +309,26 @@ def search_notes(
                 continue
             if q not in rel.lower() and q not in text.lower():
                 continue
-            results.append(
-                SearchResult(
-                    relpath=rel,
-                    title=_title_for(fm, body),
-                    note_type=fm_type if isinstance(fm_type, str) else None,
-                    tags=tags,
-                    links=_merged_links(fm, body),
-                    snippet=_snippet(body, q),
+            title = _title_for(fm, body)
+            score = _score_result(query_tokens, rel, title, tags, body)
+            candidates.append(
+                (
+                    score,
+                    SearchResult(
+                        relpath=rel,
+                        title=title,
+                        note_type=fm_type if isinstance(fm_type, str) else None,
+                        tags=tags,
+                        links=_merged_links(fm, body),
+                        snippet=_snippet(body, q),
+                    ),
                 )
             )
-            if len(results) >= limit:
-                return results
-    return results
+    candidates.sort(key=lambda x: x[0], reverse=True)
+    return [r for _, r in candidates[:limit]]
+
+
+_DEPRECATED_FIELDS = ("trusted_allowlist",)
 
 
 def _load_config(harness_root: Path) -> SecondBrainConfig:
@@ -283,7 +339,15 @@ def _load_config(harness_root: Path) -> SecondBrainConfig:
     # frontmatter block, so it is a multi-document YAML stream that
     # yaml.safe_load rejects. See io_utils.load_harness_yaml.
     data = load_harness_yaml(yaml_path)
-    cfg = SecondBrainConfig.model_validate(data.get("second_brain") or {})
+    sb_raw = data.get("second_brain") or {}
+    if isinstance(sb_raw, dict):
+        for field in _DEPRECATED_FIELDS:
+            if field in sb_raw:
+                logger.warning(
+                    "second_brain.%s is deprecated and ignored — remove from harness.yaml", field
+                )
+                sb_raw.pop(field)
+    cfg = SecondBrainConfig.model_validate(sb_raw)
     if not cfg.enabled:
         raise SecondBrainError("second_brain is disabled")
     if not cfg.vault_path:
@@ -291,6 +355,8 @@ def _load_config(harness_root: Path) -> SecondBrainConfig:
     _validate_vault_existence(harness_root, cfg)
     if not cfg.folders:
         logger.warning(_EMPTY_FOLDERS_REMEDIATION)
+        print(f"\u26a0\ufe0f  WARNING: {_EMPTY_FOLDERS_REMEDIATION}", file=sys.stderr)
+        print(f"   {_EMPTY_FOLDERS_ACTION}", file=sys.stderr)
     return cfg
 
 
@@ -495,7 +561,8 @@ def _cli(argv: list[str]) -> int:
         elif args.cmd == "validate":
             text = read_note(root, args.path)
             fm, body = parse_frontmatter(text)
-            warnings = validate_note(fm, body)
+            cfg = _load_config(root)
+            warnings = validate_note(fm, body, required_fields=cfg.required_frontmatter)
             print(json.dumps({"warnings": warnings}, indent=2))
     except (OSError, json.JSONDecodeError, SecondBrainError, yaml.YAMLError) as e:
         print(f"ERROR: {e}", file=sys.stderr)

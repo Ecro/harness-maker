@@ -1860,8 +1860,6 @@ second_brain:
   backend: filesystem
   vault_path: ~/vault
   project_id: my-app
-  trusted_allowlist:
-    - Projects/my-app
   folders:
     - path: Projects/my-app
       read: true

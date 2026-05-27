@@ -41,11 +41,14 @@ second_brain:
   enabled: true
   backend: "filesystem"
   project_id: "harness-maker"
-  vault_path: "/mnt/c/Users/euncheol.ro/Documents/obsidian-vault/second-brain"
-  trusted_allowlist: true
+  vault_path: "/mnt/c/Users/euncheol.ro/Documents/obsidian-vault"
   required_frontmatter: ["type", "created", "updated", "tags", "links"]
 
-  folders: []
+  folders:
+    - path: "99_HM/harness-maker"
+      read: true
+      write: true
+      note_types: ["decision", "preference", "failure", "project", "reference", "journal"]
 
 sibling_repos:
 

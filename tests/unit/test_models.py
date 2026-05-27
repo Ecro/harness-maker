@@ -203,7 +203,6 @@ def test_second_brain_config_defaults_disabled() -> None:
     assert cfg.backend == "filesystem"
     assert cfg.project_id == ""
     assert cfg.vault_path == ""
-    assert cfg.trusted_allowlist is True
     assert cfg.folders == []
     assert cfg.required_frontmatter == ["type", "created", "updated", "tags", "links"]
 

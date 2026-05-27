@@ -329,7 +329,6 @@ class SecondBrainConfig(BaseModel):
     backend: str = "filesystem"
     project_id: str = ""
     vault_path: str = ""
-    trusted_allowlist: bool = True
     folders: list[SecondBrainFolder] = Field(default_factory=list)
     required_frontmatter: list[str] = Field(
         default_factory=lambda: ["type", "created", "updated", "tags", "links"],

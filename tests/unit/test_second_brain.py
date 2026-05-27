@@ -365,6 +365,86 @@ def test_load_config_degrade_returns_config_when_folders_empty(
     )
 
 
+def test_load_config_strips_deprecated_trusted_allowlist(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Legacy harness.yaml with trusted_allowlist loads successfully via warn-and-strip."""
+    import logging
+
+    from harness_maker.second_brain import _load_config
+
+    root = _harness_root(tmp_path)
+    cfg = _degraded_config(root)
+    _write_harness_yaml(root, cfg)
+    yaml_path = root / ".claude" / "harness.yaml"
+    text = yaml_path.read_text(encoding="utf-8")
+    text = text.replace("  folders: []\n", "  trusted_allowlist: true\n  folders: []\n")
+    yaml_path.write_text(text, encoding="utf-8")
+
+    with caplog.at_level(logging.WARNING, logger="harness_maker.second_brain"):
+        loaded = _load_config(root)
+
+    assert loaded.enabled is True
+    assert not hasattr(loaded, "trusted_allowlist")
+    assert any(
+        "trusted_allowlist" in rec.message and "deprecated" in rec.message for rec in caplog.records
+    )
+
+
+def test_validate_note_uses_config_required_frontmatter(tmp_path: Path) -> None:
+    """validate_note respects custom required_fields from config."""
+    from harness_maker.second_brain import validate_note
+
+    fm = {"type": "decision", "tags": ["hm/second-brain", "hm/type/decision"], "links": []}
+    body = "# Test\n"
+
+    with pytest.raises(SecondBrainError, match="missing required frontmatter"):
+        validate_note(fm, body)
+
+    warnings = validate_note(fm, body, required_fields=["type", "tags"])
+    assert not any("missing required" in w for w in warnings)
+
+
+def test_degraded_stderr_warning_visible(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Empty folders emits a visible stderr warning with ACTION remediation."""
+    from harness_maker.second_brain import _load_config
+
+    root = _harness_root(tmp_path)
+    _write_harness_yaml(root, _degraded_config(root))
+
+    _load_config(root)
+    captured = capsys.readouterr()
+    assert "WARNING" in captured.err
+    assert "ACTION" in captured.err
+    assert "/hm:configure" in captured.err
+
+
+def test_search_score_title_match_ranks_above_body_only(tmp_path: Path) -> None:
+    """Title-match result ranks above body-only match (ADR-003 of PLAN-second-brain-fix)."""
+    from harness_maker.second_brain import _score_result
+
+    title_match_score = _score_result(
+        ["harness"], "notes/a.md", "harness maker project", [], "unrelated body"
+    )
+    body_only_score = _score_result(
+        ["harness"], "notes/b.md", "unrelated title", [], "the harness is here"
+    )
+
+    assert title_match_score > body_only_score
+
+
+def test_search_score_tag_boost(tmp_path: Path) -> None:
+    """Tag matches receive a boost over substring-only body matches."""
+    from harness_maker.second_brain import _score_result
+
+    tag_score = _score_result(["python"], "a.md", "note", ["python", "dev"], "body text")
+    no_tag_score = _score_result(["python"], "b.md", "note", ["dev"], "pythonic code here")
+
+    assert tag_score > no_tag_score
+
+
 def test_search_notes_degrades_to_empty_with_warning_when_folders_empty(
     tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:

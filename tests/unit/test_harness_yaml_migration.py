@@ -58,7 +58,6 @@ def _base_yaml(*, deep_gate_block: str = "") -> str:
         "  backend: null\n"
         "  project_id: null\n"
         "  vault_path: null\n"
-        "  trusted_allowlist: false\n"
         "  required_frontmatter: []\n"
         "  folders: []\n"
         "sibling_repos: []\n"

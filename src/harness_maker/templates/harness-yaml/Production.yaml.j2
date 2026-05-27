@@ -36,7 +36,6 @@ second_brain:
   backend: {{ config.second_brain.backend | tojson }}
   project_id: {{ config.second_brain.project_id | tojson }}
   vault_path: {{ config.second_brain.vault_path | tojson }}
-  trusted_allowlist: {{ config.second_brain.trusted_allowlist | lower }}
   required_frontmatter: {{ config.second_brain.required_frontmatter | tojson }}
 {% if config.second_brain.folders %}
   folders:

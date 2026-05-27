@@ -551,7 +551,6 @@ second_brain:
   backend: filesystem
   project_id: my-app
   vault_path: ../obsidian-vault
-  trusted_allowlist: true       # configured write folders need no confirmation/backup
   required_frontmatter: [type, created, updated, tags, links]
   folders:
     - path: Projects/my-app
