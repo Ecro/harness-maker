@@ -30,6 +30,8 @@ from harness_maker.render import render
 from harness_maker.second_brain import (
     SecondBrainError,
     _load_config,
+    promote_note,
+    search_notes,
     write_note,
 )
 from harness_maker.synthesize import synthesize
@@ -230,6 +232,79 @@ def test_rendered_yaml_rejects_typoed_vault_path(tmp_path: Path) -> None:
 
     with pytest.raises(SecondBrainError, match="not an Obsidian vault"):
         _load_config(project_root)
+
+
+# ---------------------------------------------------------------------------
+# PLAN-second-brain-promotion — wrapup promotion Step regression guards
+# ---------------------------------------------------------------------------
+
+
+def _wrapup_procedure_files(dotclaude: Path) -> list[Path]:
+    """Rendered files carrying the wrapup PROCEDURE body.
+
+    Discovered by content (the stable "Memory append" step header) rather than
+    a fixed path, so the guard covers the atomic stage file AND any fused
+    workflow command embedding it (W3 — the body is NOT in the thin
+    commands/hm/wrapup.md dispatcher).
+    """
+    return [p for p in dotclaude.rglob("*.md") if "Memory append" in p.read_text(encoding="utf-8")]
+
+
+def test_wrapup_renders_promote_step(tmp_path: Path) -> None:
+    """The rendered wrapup procedure MUST call `second_brain promote` + emit the receipt.
+
+    Regression guard against silently relapsing to the old advisory-only
+    preamble (the root-cause bug). Live-render + substring grep — NOT a
+    snapshot/hash pin — so it stays valid inside a worktree.
+    """
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    vault = tmp_path / "obsidian-vault"
+    (vault / ".obsidian").mkdir(parents=True)
+
+    answers = _baseline_answers(vault)
+    dotclaude = _render_harness(project_root, answers)
+
+    procedure_files = _wrapup_procedure_files(dotclaude)
+    assert procedure_files, "no rendered file carries the wrapup procedure body"
+
+    for path in procedure_files:
+        text = path.read_text(encoding="utf-8")
+        assert "second_brain promote" in text, (
+            f"{path} lost the promote Step — relapsed to advisory-only?"
+        )
+        assert "promotion evaluated:" in text, f"{path} lost the promotion receipt line (ADR-006)"
+        assert "wrapup also writes" not in text, f"{path} still carries the old advisory preamble"
+        # `--root` is a TOP-LEVEL flag — it must precede the subcommand. A
+        # rendered `promote --root` is an invalid invocation (argparse rejects
+        # it); dogfooding 0.27.0's first real wrapup caught exactly this.
+        assert "promote --root" not in text, (
+            f"{path} renders an invalid `promote --root` (--root must precede the subcommand)"
+        )
+
+
+def test_render_promote_search_roundtrip(tmp_path: Path) -> None:
+    """Full pipeline: render harness → promote_note → search finds the note."""
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    vault = tmp_path / "obsidian-vault"
+    (vault / ".obsidian").mkdir(parents=True)
+
+    answers = _baseline_answers(vault)
+    _render_harness(project_root, answers)
+
+    result = promote_note(
+        project_root,
+        note_type="decision",
+        source_slug="promotion-pipeline",
+        title="Promotion pipeline",
+        body="Local memory promotes to Obsidian at wrapup.\n",
+    )
+    assert result.path.is_file()
+    assert (vault / "99_HM" / "harness-maker" / "decision-promotion-pipeline.md").is_file()
+
+    hits = search_notes(project_root, "promotion", note_type="decision")
+    assert any("decision-promotion-pipeline" in h.relpath for h in hits)
 
 
 # Cleanup helper for tests that may leave a .claude tree in tmp_path —

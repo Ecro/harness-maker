@@ -1,6 +1,6 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.26.8
+harness_maker_version: 0.27.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: memory/wiki.ko.md.j2
 provenance: official
@@ -392,5 +392,8 @@ hooks.json dedup identity (`render._normalize_hm_managed_command` → `_entry_id
 
 ## [wiki:gotcha] reconcile-phantom-hash-heal | 2026-05-28
 reconcile's REPLACE-vs-KEEP gate trusts `stored content_hash == compute_body_hash(body)` as the SOLE "did the user edit this?" signal. Pre-0.26.2 the Codex skill pre-render path (synthesize pre-renders stage/loop bodies with the install_ref `uv run --with <path>` baked in, hashed BEFORE substitution) wrote a content_hash over a body ≠ the persisted bytes — a "phantom" hash that can never self-verify under any normalization. reconcile then misread it as user-modified → KEEP → the file froze at its old version on EVERY re-render (`hm-execute/verify/wrapup/loop` stuck at 0.26.1 while sibling skills reached 0.26.6; symptom = stale `.../0.26.1` paths after an update touched only 4 files). Orphan-sweep can't help: these are blueprint files, not orphans. Fix: `reconcile._is_healable_phantom_ours` flips KEEP→REPLACE for `generated_by: harness-maker` + `source_template ∈ {codex/stage_skill,loop_skill}.md.j2` (STABLE key, never version/path enumeration) + `harness_maker_version` < 0.26.2 floor (protects current/future edits) + KEEP-reason ∈ {user-modified, malformed-markers}; the CLI's pre-render `.backup-<ts>/` covers the residual pre-floor skill-body-edit case. Lesson: "stored hash mismatches body" ≠ "user edited it" — a render-time hash/body divergence yields the same signal, so any unverifiable-hash class needs an explicit scoped heal or it silently freezes forever. Render must always hash the EXACT bytes it persists (current code does; the bug was pre-0.26.2).
+
+## [wiki:architecture] second-brain-promotion-pipeline | 2026-05-28
+Local `.claude/memory/` (wiki/failures/session) and the Obsidian Second Brain are a PROMOTION PIPELINE, not two parallel stores: local = project working memory (written every wrapup Step 5.1–5.5), Obsidian = curated cross-project durable layer. wrapup **Step 5.6** (`second_brain promote`) escalates the cross-project-durable subset. KEY LESSON: an LLM-facing prompt instruction that is *advisory/floating* (not a numbered procedure step) gets silently skipped ~100% of the time — the vault sat empty for weeks because the only write path was an advisory preamble competing with the concrete numbered Step 5. Fix = numbered **MUST-evaluate** step + an observable `promotion evaluated: N candidates, M promoted` receipt (no count-gate, to avoid synthetic-note pressure). `promote_note` is the idempotency safety rail: deterministic `<type>-<slug>.md` filename + `project_id`/`hm_source` link-back + dedup via `write_note`; `_resolve_authorized` picks the **longest-root** matching folder so nested per-type writable folders don't shadow each other. Stage SB sections use PROSE gating (always render + runtime `if enabled` check), NOT Jinja `{% if %}` — sibling consistency + `test_stage_aware_second_brain_guidance` require the terms to render unconditionally.
 
 <!-- @hm:/user:entries -->

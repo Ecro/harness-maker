@@ -239,6 +239,121 @@ def patch_note(harness_root: Path, relpath: str, old_text: str, new_text: str) -
     return WriteResult(path=path, warnings=warnings)
 
 
+_SLUG_NON_ALNUM_RE = re.compile(r"[^a-z0-9]+")
+_SLUG_MAX_LEN = 60
+
+
+# Frontmatter keys promote_note owns — callers may not override identity,
+# timestamp, or namespace fields via extra_frontmatter (REVIEW P2).
+_PROMOTE_RESERVED_KEYS = frozenset(
+    {
+        "type",
+        "title",
+        "tags",
+        "links",
+        "hm_source",
+        "created",
+        "updated",
+        "project",
+        "project_id",
+        "projects",
+    }
+)
+
+
+def _slugify(text: str) -> str:
+    """Deterministic kebab slug for promotion filenames.
+
+    The slug is the idempotency anchor: re-promoting the same source must
+    resolve to the same `<type>-<slug>.md` path so write_note updates in place
+    instead of creating a duplicate. Never returns empty (filename safety).
+
+    Caller contract: `source_slug` must be stable AND unique *after*
+    kebab-normalization — two inputs that collapse to the same slug (or share a
+    60-char prefix) map to the same note. The wrapup Step 5.6 prompt requires a
+    stable local identifier (wiki/failure slug or ADR id) precisely for this.
+    """
+    cleaned = _SLUG_NON_ALNUM_RE.sub("-", text.lower()).strip("-")
+    return cleaned[:_SLUG_MAX_LEN].strip("-") or "note"
+
+
+def promote_note(
+    harness_root: Path,
+    *,
+    note_type: str,
+    source_slug: str,
+    title: str,
+    body: str,
+    links: list[str] | None = None,
+    extra_frontmatter: dict[str, Any] | None = None,
+) -> WriteResult:
+    """Promote a local-memory entry into an idempotent, namespaced Obsidian note.
+
+    Python owns the safety rail (deterministic path, link-back + project
+    namespace, dedup via write_note); the caller (wrapup Step 5.6) owns the
+    judgment of WHAT to promote and the note's prose. Re-promoting the same
+    `(note_type, source_slug)` updates the existing note in place — never a dup.
+    """
+    cfg = _load_config(harness_root)
+    if not cfg.folders:
+        raise SecondBrainError(_EMPTY_FOLDERS_REMEDIATION)
+    # Validate note_type against the enum at the source (REVIEW P1/P2): keeps a
+    # raw caller string out of the write path, and lets us pick a folder that
+    # actually accepts the type instead of blindly taking the first writable one.
+    try:
+        nt = SecondBrainNoteType(note_type)
+    except ValueError as exc:
+        raise SecondBrainError(f"unknown note type: {note_type!r}") from exc
+    folder = next((f for f in cfg.folders if f.write and nt in f.note_types), None)
+    if folder is None:
+        raise SecondBrainError(f"no writable second_brain folder accepts note type {note_type!r}")
+    relpath = f"{folder.path}/{nt.value}-{_slugify(source_slug)}.md"
+
+    # promote_note owns identity / timestamp / namespace keys; callers may only
+    # contribute recommended per-type fields (status, severity, …) + extra
+    # tags/links. Strip reserved keys so the safety rail can't be overridden.
+    extra = dict(extra_frontmatter or {})
+    caller_tags = extra.get("tags")
+    caller_links = [link for link in (extra.get("links") or []) if isinstance(link, str)]
+    frontmatter: dict[str, Any] = {
+        k: v for k, v in extra.items() if k not in _PROMOTE_RESERVED_KEYS
+    }
+    tags = [_SECOND_BRAIN_TAG, f"{_TYPE_TAG_PREFIX}{nt.value}"]
+    if isinstance(caller_tags, list):
+        tags.extend(t for t in caller_tags if isinstance(t, str) and t not in tags)
+    merged_links = list(caller_links)
+    merged_links.extend(
+        link for link in (links or []) if isinstance(link, str) and link not in merged_links
+    )
+    if not merged_links and cfg.project_id:
+        # Default backlink keeps the note connected to the project graph and
+        # avoids the spurious "weak graph connectivity" warning (REVIEW P2).
+        merged_links = [f"[[{cfg.project_id}]]"]
+    frontmatter.update(
+        {
+            "type": nt.value,
+            "title": title,
+            "tags": tags,
+            "links": merged_links,
+            "hm_source": source_slug,
+        }
+    )
+    if cfg.project_id:
+        # W1: _project_namespace_warnings recognizes project_id, NOT hm_source.
+        frontmatter["project_id"] = cfg.project_id
+    result = write_note(harness_root, relpath, frontmatter, body)
+    # Surface silently-dropped reserved keys so a caller (or the wrapup LLM)
+    # learns its namespace/identity input was ignored, instead of losing it
+    # silently (REVIEW: --frontmatter-json contract gap). tags/links are merged
+    # rather than dropped, so they are excluded from this warning.
+    dropped = sorted((set(extra) & _PROMOTE_RESERVED_KEYS) - {"tags", "links"})
+    if dropped:
+        result.warnings.append(
+            "ignored caller frontmatter keys owned by promote_note: " + ", ".join(dropped)
+        )
+    return result
+
+
 _WORD_BOUNDARY_RE = re.compile(r"\b", re.UNICODE)
 _TITLE_BOOST = 3.0
 _TAG_BOOST = 2.0
@@ -408,6 +523,12 @@ def _resolve_authorized(
         raise ValueError(f"unknown mode: {mode}")
     vault = _vault_root(harness_root, cfg)
     target = (vault / relpath).resolve()
+    # Pick the MOST SPECIFIC (longest-root) matching folder, not the first.
+    # With nested writable folders, a broad first-listed folder would otherwise
+    # shadow a narrow per-type one and make _ensure_type_allowed reject a note
+    # the path's real owner would have accepted (silent promotion no-op).
+    best: tuple[Path, SecondBrainFolder] | None = None
+    best_depth = -1
     for folder in cfg.folders:
         if mode == "read" and not folder.read:
             continue
@@ -415,7 +536,11 @@ def _resolve_authorized(
             continue
         root = _folder_root(harness_root, cfg, folder.path)
         if target == root or target.is_relative_to(root):
-            return target, folder
+            depth = len(root.parts)
+            if depth > best_depth:
+                best, best_depth = (target, folder), depth
+    if best is not None:
+        return best
     raise SecondBrainError(f"{relpath!r} is not under a configured {mode} folder")
 
 
@@ -528,6 +653,19 @@ def _cli(argv: list[str]) -> int:
     p_append.add_argument("path")
     p_append.add_argument("--text-file", required=True)
 
+    p_promote = sub.add_parser("promote")
+    p_promote.add_argument(
+        "--type",
+        dest="note_type",
+        required=True,
+        choices=[t.value for t in SecondBrainNoteType],
+    )
+    p_promote.add_argument("--source-slug", dest="source_slug", required=True)
+    p_promote.add_argument("--title", required=True)
+    p_promote.add_argument("--body-file", required=True)
+    p_promote.add_argument("--link", dest="links", action="append", default=[])
+    p_promote.add_argument("--frontmatter-json", dest="frontmatter_json")
+
     p_patch = sub.add_parser("patch")
     p_patch.add_argument("path")
     p_patch.add_argument("--old-text", required=True)
@@ -554,6 +692,24 @@ def _cli(argv: list[str]) -> int:
         elif args.cmd == "append":
             text = Path(args.text_file).read_text(encoding="utf-8")
             result = append_note(root, args.path, text)
+            _print_write_result(result)
+        elif args.cmd == "promote":
+            extra: dict[str, Any] | None = None
+            if args.frontmatter_json:
+                parsed = json.loads(args.frontmatter_json)
+                if not isinstance(parsed, dict):
+                    raise SecondBrainError("--frontmatter-json must decode to an object")
+                extra = parsed
+            body = Path(args.body_file).read_text(encoding="utf-8")
+            result = promote_note(
+                root,
+                note_type=args.note_type,
+                source_slug=args.source_slug,
+                title=args.title,
+                body=body,
+                links=args.links or None,
+                extra_frontmatter=extra,
+            )
             _print_write_result(result)
         elif args.cmd == "patch":
             result = patch_note(root, args.path, args.old_text, args.new_text)

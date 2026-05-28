@@ -2212,6 +2212,8 @@ First install keeps this setup read-first and points advanced write-capable conf
 
 Writes are intentionally full Markdown writes inside trusted allowlisted folders. To keep several projects from colliding in the same vault, any writable folder requires `second_brain.project_id`, and the writable folder path must include that project id as a path segment, such as `Projects/my-app`. Managed notes also warn when frontmatter omits the project namespace.
 
+**Promotion pipeline (how the vault actually fills)**: local `.claude/memory/` (wiki/failures/session) is the project working memory; the Second Brain is the *curated cross-project durable* layer. `/hm:wrapup` runs a required **Step 5.6** that evaluates the local entries it just wrote and promotes the cross-project-durable subset (`failures.md` → `failure`, PLAN ADRs and session `[decision:...]` → `decision`, confirmed preferences → `preference`) via `second_brain promote`. Promotion is idempotent — the deterministic `<type>-<slug>.md` filename plus an `hm_source` link-back means re-promoting the same source updates the note in place rather than duplicating. The step prints a `promotion evaluated: N candidates, M promoted` receipt so under-promotion is visible. Because promotion fires only at wrapup, finishing a work unit with `/hm:wrapup` (not a bare commit) is what keeps the vault current.
+
 ---
 
 ### 11.13 Anti-Rot System — The Harness Itself Doesn't Go Stale

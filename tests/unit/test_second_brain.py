@@ -13,9 +13,11 @@ import yaml
 from harness_maker.models import SecondBrainConfig, SecondBrainFolder, SecondBrainNoteType
 from harness_maker.second_brain import (
     SecondBrainError,
+    _slugify,
     append_note,
     parse_frontmatter,
     patch_note,
+    promote_note,
     read_note,
     search_notes,
     validate_note,
@@ -729,3 +731,242 @@ def test_patch_note_matches_body_only(tmp_path: Path) -> None:
     # `hm/second-brain` lives in frontmatter tags only — must not be patchable.
     with pytest.raises(SecondBrainError, match="old text not found"):
         patch_note(root, rel, "hm/second-brain", "replaced")
+
+
+# ---------------------------------------------------------------------------
+# Promotion safety rail — _slugify + promote_note (PLAN-second-brain-promotion)
+# ---------------------------------------------------------------------------
+
+
+def test_slugify_normalizes_to_kebab() -> None:
+    assert _slugify("Hooks Dedup: keyed on namespace!") == "hooks-dedup-keyed-on-namespace"
+    assert _slugify("  Multiple   spaces  ") == "multiple-spaces"
+    assert _slugify("already-kebab-99") == "already-kebab-99"
+
+
+def test_slugify_caps_length_and_never_empty() -> None:
+    assert len(_slugify("x" * 200)) <= 60
+    assert _slugify("!!!") == "note"  # non-alnum collapses → fallback
+
+
+def test_promote_note_deterministic_relpath(tmp_path: Path) -> None:
+    """Same (note_type, source_slug) always resolves to the same file (idempotency anchor)."""
+    root = _harness_root(tmp_path)
+    _write_harness_yaml(root, _enabled_config(root))
+    r1 = promote_note(
+        root,
+        note_type="decision",
+        source_slug="ADR-001 Reverse Advisory",
+        title="Reverse advisory",
+        body="Decision body\n",
+    )
+    r2 = promote_note(
+        root,
+        note_type="decision",
+        source_slug="ADR-001 Reverse Advisory",
+        title="Reverse advisory (edited)",
+        body="Decision body edited\n",
+    )
+    assert r1.path == r2.path
+    assert r1.path.name == "decision-adr-001-reverse-advisory.md"
+
+
+def test_promote_note_idempotent_no_duplicate(tmp_path: Path) -> None:
+    """Re-promoting updates in place: one file, created preserved, body refreshed."""
+    root = _harness_root(tmp_path)
+    _write_harness_yaml(root, _enabled_config(root))
+    folder = root.parent / "vault" / "Projects" / "harness-maker"
+
+    promote_note(
+        root, note_type="failure", source_slug="hooks-dedup", title="Hooks", body="First\n"
+    )
+    note = folder / "failure-hooks-dedup.md"
+    fm1, _ = parse_frontmatter(note.read_text(encoding="utf-8"))
+    first_created = fm1["created"]
+
+    promote_note(
+        root, note_type="failure", source_slug="hooks-dedup", title="Hooks", body="Second\n"
+    )
+    matches = list(folder.glob("failure-hooks-dedup.md"))
+    assert len(matches) == 1, f"duplicate notes created: {matches}"
+    fm2, body2 = parse_frontmatter(note.read_text(encoding="utf-8"))
+    assert fm2["created"] == first_created
+    assert "Second" in body2
+
+
+def test_promote_note_injects_project_id_no_namespace_warning(tmp_path: Path) -> None:
+    """W1: promote_note injects project_id so _project_namespace_warnings stays silent."""
+    root = _harness_root(tmp_path)
+    _write_harness_yaml(root, _enabled_config(root))
+    result = promote_note(
+        root, note_type="decision", source_slug="pipeline", title="Pipeline", body="Body\n"
+    )
+    assert not any("project namespace" in w for w in result.warnings), result.warnings
+    fm, _ = parse_frontmatter(result.path.read_text(encoding="utf-8"))
+    assert fm["project_id"] == "harness-maker"
+    assert fm["hm_source"] == "pipeline"
+    assert "hm/second-brain" in fm["tags"]
+    assert "hm/type/decision" in fm["tags"]
+
+
+def test_promote_note_rejects_disallowed_type(tmp_path: Path) -> None:
+    """nit1: a note_type outside the writable folder's note_types raises SecondBrainError."""
+    root = _harness_root(tmp_path)
+    _write_harness_yaml(root, _enabled_config(root))  # allows decision/failure/journal only
+    with pytest.raises(SecondBrainError):
+        promote_note(root, note_type="preference", source_slug="x", title="x", body="b\n")
+
+
+def test_promote_note_merges_extra_frontmatter(tmp_path: Path) -> None:
+    """Caller-supplied recommended fields land; core keys are not clobbered."""
+    root = _harness_root(tmp_path)
+    _write_harness_yaml(root, _enabled_config(root))
+    result = promote_note(
+        root,
+        note_type="failure",
+        source_slug="ns-key",
+        title="NS",
+        body="Body\n",
+        links=["[[Other Note]]"],
+        extra_frontmatter={"severity": "high", "tags": ["hm/scope/global"]},
+    )
+    fm, _ = parse_frontmatter(result.path.read_text(encoding="utf-8"))
+    assert fm["severity"] == "high"
+    assert fm["type"] == "failure"  # core key wins over any extra
+    assert "hm/scope/global" in fm["tags"]
+    assert "hm/second-brain" in fm["tags"]
+    assert "[[Other Note]]" in fm["links"]
+
+
+def test_promote_note_rejects_unknown_type(tmp_path: Path) -> None:
+    """REVIEW P1/P2: a note_type outside the enum (incl. a traversal payload) is
+    rejected at the source with a clear error — never reaches the write path."""
+    root = _harness_root(tmp_path)
+    _write_harness_yaml(root, _enabled_config(root))
+    with pytest.raises(SecondBrainError, match="unknown note type"):
+        promote_note(root, note_type="../../../../tmp/evil", source_slug="x", title="x", body="b\n")
+    # No file escaped the vault.
+    assert not (tmp_path / "tmp" / "evil-x.md").exists()
+
+
+def test_promote_note_source_slug_traversal_is_neutralized(tmp_path: Path) -> None:
+    """REVIEW: a traversal-bearing source_slug is slugified to a safe in-folder name."""
+    root = _harness_root(tmp_path)
+    _write_harness_yaml(root, _enabled_config(root))
+    result = promote_note(
+        root, note_type="decision", source_slug="../../etc/passwd", title="x", body="b\n"
+    )
+    assert result.path.name == "decision-etc-passwd.md"
+    folder = root.parent / "vault" / "Projects" / "harness-maker"
+    assert folder in result.path.parents, f"{result.path} escaped {folder}"
+
+
+def test_promote_note_selects_writable_folder_by_note_type(tmp_path: Path) -> None:
+    """REVIEW P1: with per-type writable folders, promote picks the one that
+    accepts the note_type — not just the first writable folder."""
+    root = _harness_root(tmp_path)
+    vault = root.parent / "vault"
+    vault.mkdir(parents=True, exist_ok=True)
+    cfg = SecondBrainConfig(
+        enabled=True,
+        project_id="harness-maker",
+        vault_path=str(vault),
+        folders=[
+            SecondBrainFolder(
+                path="Projects/harness-maker/decisions",
+                read=True,
+                write=True,
+                note_types=[SecondBrainNoteType.DECISION],
+            ),
+            SecondBrainFolder(
+                path="Projects/harness-maker/failures",
+                read=True,
+                write=True,
+                note_types=[SecondBrainNoteType.FAILURE],
+            ),
+        ],
+    )
+    _write_harness_yaml(root, cfg)
+    result = promote_note(root, note_type="failure", source_slug="hooks", title="Hooks", body="b\n")
+    assert "Projects/harness-maker/failures/" in result.path.as_posix(), result.path
+
+
+def test_promote_note_extra_frontmatter_cannot_override_reserved(tmp_path: Path) -> None:
+    """REVIEW P2: extra_frontmatter cannot inject created/project to defeat the rail."""
+    root = _harness_root(tmp_path)
+    _write_harness_yaml(root, _enabled_config(root))
+    result = promote_note(
+        root,
+        note_type="decision",
+        source_slug="reserved",
+        title="R",
+        body="b\n",
+        extra_frontmatter={"created": "1999-01-01", "project": "other-project"},
+    )
+    fm, _ = parse_frontmatter(result.path.read_text(encoding="utf-8"))
+    assert fm["created"] != "1999-01-01", "caller overrode reserved 'created'"
+    assert fm.get("project") != "other-project", "caller injected conflicting 'project'"
+    assert fm["project_id"] == "harness-maker"
+
+
+def test_promote_note_defaults_project_backlink_no_weak_graph_warning(tmp_path: Path) -> None:
+    """REVIEW P2: with no caller links, a project backlink is injected so the
+    'weak graph connectivity' warning does not fire on the happy path."""
+    root = _harness_root(tmp_path)
+    _write_harness_yaml(root, _enabled_config(root))
+    result = promote_note(root, note_type="decision", source_slug="backlink", title="B", body="b\n")
+    fm, _ = parse_frontmatter(result.path.read_text(encoding="utf-8"))
+    assert "[[harness-maker]]" in fm["links"]
+    assert not any("graph connectivity" in w for w in result.warnings), result.warnings
+
+
+def test_promote_note_nested_writable_folders_resolve_to_specific(tmp_path: Path) -> None:
+    """DEEP REVIEW P1: with a broad writable folder listed BEFORE a nested
+    per-type one, promoting the nested type must land in the nested folder —
+    not get rejected because first-match picked the broad type-incompatible one."""
+    root = _harness_root(tmp_path)
+    vault = root.parent / "vault"
+    vault.mkdir(parents=True, exist_ok=True)
+    cfg = SecondBrainConfig(
+        enabled=True,
+        project_id="harness-maker",
+        vault_path=str(vault),
+        folders=[
+            SecondBrainFolder(
+                path="Projects/harness-maker",  # broad, listed first
+                read=True,
+                write=True,
+                note_types=[SecondBrainNoteType.DECISION],
+            ),
+            SecondBrainFolder(
+                path="Projects/harness-maker/failures",  # nested, per-type
+                read=True,
+                write=True,
+                note_types=[SecondBrainNoteType.FAILURE],
+            ),
+        ],
+    )
+    _write_harness_yaml(root, cfg)
+    result = promote_note(root, note_type="failure", source_slug="nested", title="N", body="b\n")
+    assert result.path.as_posix().endswith("Projects/harness-maker/failures/failure-nested.md"), (
+        result.path
+    )
+
+
+def test_promote_note_warns_on_dropped_reserved_keys(tmp_path: Path) -> None:
+    """DEEP REVIEW P1: caller-supplied reserved keys are surfaced as a warning,
+    not silently dropped (the --frontmatter-json contract gap)."""
+    root = _harness_root(tmp_path)
+    _write_harness_yaml(root, _enabled_config(root))
+    result = promote_note(
+        root,
+        note_type="decision",
+        source_slug="dropped",
+        title="D",
+        body="b\n",
+        extra_frontmatter={"projects": ["other-repo"], "status": "accepted"},
+    )
+    assert any("ignored caller frontmatter keys" in w for w in result.warnings), result.warnings
+    assert any("projects" in w for w in result.warnings), result.warnings
+    fm, _ = parse_frontmatter(result.path.read_text(encoding="utf-8"))
+    assert fm["status"] == "accepted"  # non-reserved kept

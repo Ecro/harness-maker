@@ -2,6 +2,29 @@
 
 ## [Unreleased]
 
+## [0.27.0] - 2026-05-28
+
+### Added: Second Brain promotion — wrapup now escalates local memory to Obsidian
+
+- **Root cause fixed:** the Obsidian Second Brain vault was empty despite being
+  enabled. The only write path was an *advisory floating preamble* in the wrapup
+  stage — not a numbered procedure step, so the LLM completed the concrete local
+  `.claude/memory/` Step 5 and silently dropped the advisory every time
+  (locked as "Advisory" by PLAN-second-brain-write-failure ADR-006).
+- **wrapup Step 5.6 (must-evaluate):** a new numbered step promotes qualifying
+  local-memory entries into the curated, cross-project Obsidian vault. It is
+  evaluated every wrapup; notes are written only when the LLM judges them
+  *cross-project durable* (no count gate → no synthetic notes). Supersedes the
+  prior "Advisory" decision.
+- **`second_brain promote` CLI + `promote_note`:** the idempotency/path safety
+  rail. Deterministic filename `<type>-<slug>.md`, `project_id`/`hm_source`
+  link-back, dedup via `write_note` (re-promoting the same `--source-slug`
+  updates in place, never duplicates).
+- **Promotion receipt:** Step 5.6 emits `promotion evaluated: N candidates,
+  M promoted` so silent under-promotion is observable.
+- **Known limitation:** promotion fires only at `/hm:wrapup` — manual/quick
+  commits bypass it (documented in CLAUDE.md).
+
 ## [0.26.8] - 2026-05-28
 
 ### Fixed: SessionStart drift hook no longer reports a phantom "downgrade"
