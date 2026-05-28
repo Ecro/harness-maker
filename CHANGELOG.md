@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.26.7] - 2026-05-28
+
 ### Fixed: reconcile self-heals legacy Codex skills frozen by a pre-0.26.2 "phantom" content_hash
 
 - Pre-0.26.2, the Codex skill pre-render path hashed stage/loop bodies (which
