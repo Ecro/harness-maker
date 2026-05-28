@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+## [0.26.5] - 2026-05-28
+
+### Fixed: orphan-sweep now removes provenance-stripped assets of de-selected targets
+
+- `reconcile._classify_orphan` consulted the render manifest only for files
+  WITHOUT frontmatter. A file carrying a non-harness frontmatter — e.g.
+  `.cursor/rules/*.mdc`, whose `generated_by`/`content_hash` provenance is
+  intentionally stripped for Cursor's strict frontmatter parser — short-circuited
+  to "theirs" and was kept forever. Dropping the `cursor` target therefore leaked
+  a stale `.cursor/rules/harness.mdc` (the pure-JSON `.cursor/hooks.json` /
+  `mcp.json` siblings were already swept via the no-frontmatter branch).
+- The non-harness-provenance branch now runs the same per-path full-file-hash
+  check the no-frontmatter branch already used: a byte-identical,
+  blueprint-orphaned render is classified ours-clean and swept; user-authored,
+  edited, or content-colliding-under-a-different-path files are kept. R4 safety
+  preserved — a file with no manifest fingerprint is never deleted.
+
 ## [0.26.4] - 2026-05-27
 
 ### Fixed: Second Brain fully operational after config + runtime overhaul

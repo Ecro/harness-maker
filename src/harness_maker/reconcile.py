@@ -461,6 +461,16 @@ def _classify_orphan(
         return ("theirs", None)
 
     if fm is not None:
+        # Frontmatter present but not harness-maker provenance. The file may
+        # still be ours: pure-text renders (.cursor/rules/*.mdc,
+        # .cursor/commands/*.md) carry only the external consumer's frontmatter
+        # and have OUR provenance stripped (render._render_pure_text), yet the
+        # render manifest records their full-file hash. Consult it — same
+        # per-path scoping the no-frontmatter branch relies on — before
+        # declaring "theirs". R4 holds: a user .mdc has no manifest entry under
+        # its path, and an edited render's bytes miss the recorded hash.
+        if current_hash in manifest.get(rel_key, set()):
+            return ("ours-clean", current_hash)
         return ("theirs", None)
 
     # No frontmatter (pure-text / pure-json / pure-toml / binary).

@@ -236,3 +236,113 @@ def test_no_frontmatter_file_in_manifest_deleted(project_root: Path) -> None:
     report = sweep_orphans(project_root, _empty_blueprint())
     assert not target_file.exists()
     assert Path(".cursor/mcp.json") in report.deleted
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# RC1: provenance-stripped pure-text renders (.cursor/rules/*.mdc).
+# These carry only the external consumer's frontmatter (description/globs/
+# alwaysApply) with OUR provenance stripped (render._render_pure_text), so they
+# land in the `fm is not None` non-harness-provenance branch of _classify_orphan.
+# They must still be sweepable when byte-identical to a manifest entry under
+# their OWN path — while R4 safety (never delete what we can't fingerprint as
+# ours) is preserved by per-path scoping. (PLAN-cursor-mdc-orphan-sweep)
+# ──────────────────────────────────────────────────────────────────────────
+
+
+def _cursor_mdc(body_line: str = "rule body") -> str:
+    """A .cursor/rules/*.mdc exactly as _render_pure_text emits it: Cursor-only
+    frontmatter, NO generated_by / content_hash (provenance stripped)."""
+    return (
+        "---\n"
+        "description: harness rules\n"
+        "globs: []\n"
+        "alwaysApply: true\n"
+        "---\n\n"
+        f"# Rules\n{body_line}\n"
+    )
+
+
+def _full_file_hash(content: str) -> str:
+    """Full-file sha256 — what _render_pure_text records in the manifest, and
+    what _classify_orphan recomputes via _sha256_bytes(raw)."""
+    return hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+
+def test_cursor_mdc_ours_clean_deleted(project_root: Path) -> None:
+    """RC1 (a): a provenance-stripped .mdc (Cursor frontmatter, no generated_by)
+    whose full-file hash is recorded in the manifest under its own path, and which
+    is no longer in the blueprint, must classify ours-clean → DELETE."""
+    content = _cursor_mdc()
+    target_file = project_root / ".cursor" / "rules" / "harness.mdc"
+    _write(target_file, content)
+    _append_manifest(
+        project_root / ".claude", ".cursor/rules/harness.mdc", _full_file_hash(content)
+    )
+    report = sweep_orphans(project_root, _empty_blueprint())
+    assert not target_file.exists(), "unmodified orphaned .mdc must be swept"
+    assert Path(".cursor/rules/harness.mdc") in report.deleted
+
+
+def test_cursor_mdc_no_manifest_entry_kept(project_root: Path) -> None:
+    """RC1 (b) R4: a .mdc with Cursor frontmatter but NO manifest entry under its
+    path (user-authored rule) → KEEP (theirs)."""
+    content = _cursor_mdc("user wrote this")
+    target_file = project_root / ".cursor" / "rules" / "user_rule.mdc"
+    _write(target_file, content)
+    report = sweep_orphans(project_root, _empty_blueprint())
+    assert target_file.exists(), "user-authored .mdc must survive"
+    assert Path(".cursor/rules/user_rule.mdc") in [p for p, _ in report.kept]
+    log = _read_orphan_log(project_root)
+    assert any(
+        r["path"] == ".cursor/rules/user_rule.mdc" and r["classification"] == "theirs" for r in log
+    )
+
+
+def test_cursor_mdc_edited_hash_mismatch_kept(project_root: Path) -> None:
+    """RC1 (c) R4: a harness .mdc the user EDITED — manifest has an entry for the
+    path but with a different hash → current bytes miss → KEEP (theirs)."""
+    target_file = project_root / ".cursor" / "rules" / "edited.mdc"
+    _write(target_file, _cursor_mdc("USER EDITED"))
+    _append_manifest(
+        project_root / ".claude",
+        ".cursor/rules/edited.mdc",
+        _full_file_hash(_cursor_mdc("original")),
+    )
+    report = sweep_orphans(project_root, _empty_blueprint())
+    assert target_file.exists(), "edited .mdc must be preserved"
+    assert Path(".cursor/rules/edited.mdc") in [p for p, _ in report.kept]
+    assert report.deleted == []
+
+
+def test_cursor_mdc_hash_under_different_path_kept(project_root: Path) -> None:
+    """RC1 (d) R4 path-scoping (load-bearing): the .mdc's byte-hash exists in the
+    manifest ONLY under a DIFFERENT path key. The lookup is manifest[rel_key], so
+    this file has no entry under its own path → KEEP. Locks that the hash check is
+    per-path, not a global hash set — a global lookup would delete a user file that
+    happens to be byte-identical to a harness file rendered at another path."""
+    content = _cursor_mdc("identical bytes")
+    target_file = project_root / ".cursor" / "rules" / "mine.mdc"
+    _write(target_file, content)
+    # the SAME hash is recorded, but under a DIFFERENT path
+    _append_manifest(project_root / ".claude", ".cursor/rules/other.mdc", _full_file_hash(content))
+    report = sweep_orphans(project_root, _empty_blueprint())
+    assert target_file.exists(), "content-colliding file under a different path must survive"
+    assert Path(".cursor/rules/mine.mdc") in [p for p, _ in report.kept]
+    assert report.deleted == []
+
+
+def test_cursor_mdc_trailing_newline_perturbation_kept(project_root: Path) -> None:
+    """RC1 (e) byte-exact invariant: a trailing-newline perturbation changes the
+    full-file hash, so a file whose body matches but whose bytes differ misses the
+    manifest → KEEP. Documents that the sweep is byte-exact (not body-normalized)
+    and that sweep safety depends on _render_pure_text writing normalized bytes
+    verbatim."""
+    content = _cursor_mdc()
+    target_file = project_root / ".cursor" / "rules" / "perturbed.mdc"
+    _write(target_file, content + "\n")  # extra trailing newline on disk
+    _append_manifest(
+        project_root / ".claude", ".cursor/rules/perturbed.mdc", _full_file_hash(content)
+    )
+    report = sweep_orphans(project_root, _empty_blueprint())
+    assert target_file.exists(), "byte-perturbed file must not match a normalized manifest hash"
+    assert Path(".cursor/rules/perturbed.mdc") in [p for p, _ in report.kept]
