@@ -109,6 +109,128 @@ def test_reconcile_malformed_markers_falls_back_to_keep(tmp_path: Path) -> None:
     assert conflicts[0].reason == "hash-mismatch-malformed-markers"
 
 
+def _phantom_file(
+    tmp_path: Path,
+    rel: str,
+    *,
+    version: str,
+    generated_by: str = "harness-maker",
+    source_template: str = "codex/stage_skill.md.j2",
+) -> Path:
+    """Write a file whose stored content_hash does NOT match its own body —
+    mimicking the pre-0.26.2 phantom-hash render bug (hash computed over a
+    body that differed from the persisted bytes).
+    """
+    target = tmp_path / rel
+    body = "# stage skill procedure\nrun the thing\n"
+    bogus_hash = "0" * 64  # provably != compute_body_hash(body)
+    fm = (
+        "---\n"
+        f"generated_by: {generated_by}\n"
+        f"harness_maker_version: {version}\n"
+        f"source_template: {source_template}\n"
+        f"content_hash: {bogus_hash}\n"
+        "---\n"
+    )
+    target.write_text(fm + body, encoding="utf-8")
+    return target
+
+
+def test_reconcile_legacy_phantom_hash_ours_is_healed(tmp_path: Path) -> None:
+    """A pre-0.26.2 ours-stamped, marker-less file with an unverifiable
+    content_hash must be REPLACED (self-healed), not frozen as KEEP. Without
+    this, the install_ref-embedding stage/loop skills written by 0.26.1 stay
+    stale forever because their phantom hash can never self-verify.
+    """
+    _phantom_file(tmp_path, "a.md", version="0.26.1")
+    bp = Blueprint(files=[FileEntry(path=Path("a.md"), template="codex/stage_skill.md.j2")])
+    conflicts = reconcile(tmp_path, bp)
+    assert conflicts[0].decision == ReconcileDecision.REPLACE
+    assert conflicts[0].reason == "legacy-phantom-hash-heal"
+
+
+def test_reconcile_legacy_phantom_malformed_markers_is_healed(tmp_path: Path) -> None:
+    """Real pre-0.26.2 stage/loop skills carry duplicate ``@hm:user`` marker
+    ids emitted by the old renderer, so they classify as malformed-markers
+    rather than marker-less. Those ours files must also be healed (REPLACE) —
+    the fresh render emits correct, non-duplicate markers.
+    """
+    target = tmp_path / "a.md"
+    body = (
+        "# stage skill\n"
+        "<!-- @hm:user:extensions -->\n<!-- @hm:/user:extensions -->\n"
+        "<!-- @hm:user:extensions -->\n<!-- @hm:/user:extensions -->\n"  # duplicate id
+    )
+    fm = (
+        "---\ngenerated_by: harness-maker\nharness_maker_version: 0.26.1\n"
+        "source_template: codex/stage_skill.md.j2\n"
+        "content_hash: " + "0" * 64 + "\n---\n"
+    )
+    target.write_text(fm + body, encoding="utf-8")
+    bp = Blueprint(files=[FileEntry(path=Path("a.md"), template="codex/stage_skill.md.j2")])
+    conflicts = reconcile(tmp_path, bp)
+    assert conflicts[0].decision == ReconcileDecision.REPLACE
+    assert conflicts[0].reason == "legacy-phantom-hash-heal"
+
+
+def test_reconcile_phantom_non_affected_template_not_healed(tmp_path: Path) -> None:
+    """The heal is scoped to the Codex skill templates the phantom bug touched.
+    A pre-floor ours file from any OTHER template (e.g. a stage command, agent,
+    CLAUDE.md) is a genuine-edit candidate and must stay KEEP — never clobbered.
+    """
+    _phantom_file(tmp_path, "a.md", version="0.26.1", source_template="stages/research.md.j2")
+    bp = Blueprint(files=[FileEntry(path=Path("a.md"), template="stages/research.md.j2")])
+    conflicts = reconcile(tmp_path, bp)
+    assert conflicts[0].decision == ReconcileDecision.KEEP
+    assert conflicts[0].reason == "hash-mismatch-user-modified"
+
+
+def test_reconcile_phantom_template_unreadable_not_healed(tmp_path: Path) -> None:
+    """Even a phantom-affected, pre-floor ours file is NOT healed when its
+    template is unreadable — REPLACE would have no content to render. The
+    excluded KEEP reason guards this.
+    """
+    _phantom_file(tmp_path, "a.md", version="0.26.1")  # source_template = stage_skill
+    bp = _bp(["a.md"])  # template="x.j2" does not exist → template-unreadable
+    conflicts = reconcile(tmp_path, bp)
+    assert conflicts[0].decision == ReconcileDecision.KEEP
+    assert conflicts[0].reason == "hash-mismatch-template-unreadable"
+
+
+def test_reconcile_phantom_malformed_version_not_healed(tmp_path: Path) -> None:
+    """A non-numeric harness_maker_version cannot be ordered against the floor;
+    the heal fails safe to KEEP rather than risking a wrong overwrite.
+    """
+    _phantom_file(tmp_path, "a.md", version="not-a-version")
+    bp = Blueprint(files=[FileEntry(path=Path("a.md"), template="codex/stage_skill.md.j2")])
+    conflicts = reconcile(tmp_path, bp)
+    assert conflicts[0].decision == ReconcileDecision.KEEP
+    assert conflicts[0].reason == "hash-mismatch-user-modified"
+
+
+def test_reconcile_current_version_hash_mismatch_still_keeps(tmp_path: Path) -> None:
+    """A file stamped with the phantom-fix version (or newer) and a hash
+    mismatch is a genuine user edit → KEEP. The heal floor is a FIXED
+    historical constant so current/future user edits are never clobbered.
+    """
+    _phantom_file(tmp_path, "a.md", version="0.26.2")
+    bp = Blueprint(files=[FileEntry(path=Path("a.md"), template="codex/stage_skill.md.j2")])
+    conflicts = reconcile(tmp_path, bp)
+    assert conflicts[0].decision == ReconcileDecision.KEEP
+    assert conflicts[0].reason == "hash-mismatch-user-modified"
+
+
+def test_reconcile_phantom_hash_not_ours_is_not_healed(tmp_path: Path) -> None:
+    """An old-versioned file WITHOUT the harness-maker provenance stamp is a
+    user file → KEEP. The heal only applies to our own legacy output.
+    """
+    _phantom_file(tmp_path, "a.md", version="0.26.1", generated_by="someone-else")
+    bp = Blueprint(files=[FileEntry(path=Path("a.md"), template="codex/stage_skill.md.j2")])
+    conflicts = reconcile(tmp_path, bp)
+    assert conflicts[0].decision == ReconcileDecision.KEEP
+    assert conflicts[0].reason == "hash-mismatch-user-modified"
+
+
 def test_parse_frontmatter_no_marker(tmp_path: Path) -> None:
     p = tmp_path / "x.md"
     p.write_text("plain text\n")

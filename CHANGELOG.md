@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+### Fixed: reconcile self-heals legacy Codex skills frozen by a pre-0.26.2 "phantom" content_hash
+
+- Pre-0.26.2, the Codex skill pre-render path hashed stage/loop bodies (which
+  embed the install_ref `uv run --with <path>` command) **before** path
+  substitution, persisting a `content_hash` that never matches the file's own
+  body. reconcile's REPLACE-vs-KEEP gate read that unverifiable hash as a user
+  edit and KEPT the file, so the affected skills (`hm-execute`, `hm-verify`,
+  `hm-wrapup`, `hm-loop`) **froze at their old version** on every
+  `/hm:make --update` while sibling skills upgraded normally.
+- reconcile now heals these: a `generated_by: harness-maker` file whose
+  `source_template` is a Codex skill template (`codex/stage_skill.md.j2` /
+  `codex/loop_skill.md.j2`) and whose `harness_maker_version` is below the
+  0.26.2 floor is REPLACED instead of frozen. The heal is keyed on the **stable
+  `source_template`** (never on volatile path/version enumeration) and bounded
+  by a **fixed** version floor, so current/future user edits are never
+  clobbered; the CLI's pre-render `.backup-<ts>/` covers the residual case.
+- Render itself was already correct (0.26.2+ hashes the exact bytes it
+  persists); this change recovers files left stale by the historical bug.
+
 ## [0.26.6] - 2026-05-28
 
 ### Fixed: hooks.json dedup now path-agnostic — no more triplicated hooks on marketplace switch

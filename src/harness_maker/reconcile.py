@@ -41,6 +41,7 @@ import yaml
 
 from harness_maker.block_merge import MarkerStyle, ParseError, has_markers, parse_segments
 from harness_maker.io_utils import atomic_append
+from harness_maker.locate import compare_version
 from harness_maker.models import Blueprint, ConflictItem, ReconcileDecision
 from harness_maker.render import RENDER_MANIFEST_NAME, resolve_output_path
 
@@ -79,6 +80,63 @@ def compute_body_hash(body_bytes: bytes) -> str:
     while text.endswith("\n\n"):
         text = text[:-1]
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+# The pre-0.26.2 "phantom hash" bug: render persisted a ``content_hash``
+# computed over a body that differed from the bytes written. It was specific to
+# the Codex skill pre-render path — synthesize pre-renders these bodies with the
+# volatile install_ref path baked in, and the old renderer hashed them BEFORE
+# substitution. Other generated files (CLAUDE.md, agents, commands) were hashed
+# over their final bytes and never phantomed. A phantom hash can never
+# self-verify, so reconcile's hash-mismatch branch froze the file as a false
+# "user-modified" KEEP — stale on every re-render (the orphan-sweep can't help:
+# the file is in the blueprint, not an orphan). ``_is_healable_phantom_ours``
+# lets reconcile REPLACE these instead of freezing.
+#
+# Two STABLE gates bound the heal so genuine user edits survive:
+#   * source_template ∈ _PHANTOM_AFFECTED_TEMPLATES — scopes the heal to the
+#     exact file class the bug touched. A hand-edit to any OTHER pre-floor ours
+#     file (CLAUDE.md, agents, commands) is never healed/clobbered.
+#     source_template is a STABLE identity (unlike version/path/host) — this is
+#     the repo's "key on the invariant, never enumerate volatile values" rule.
+#   * harness_maker_version < a FIXED floor — a hash mismatch on a skill stamped
+#     with the floor version or newer is treated as a genuine user edit (KEPT),
+#     so current/future edits are never clobbered.
+# Residual (accepted): a hand-edit to a *pre-floor Codex skill body* is
+# indistinguishable from a phantom and IS healed — recoverable via the
+# .backup-<ts>/ the CLI takes before every render. That narrow, backed-up case
+# is the price of unfreezing the skills. A future phantom-class regression at
+# >= the floor would NOT auto-heal (it would re-freeze) — the safe direction
+# (never auto-overwrite a possibly-edited file); such a regression must bump the
+# floor explicitly.
+_PHANTOM_HASH_FIX_VERSION = "0.26.2"
+_PHANTOM_AFFECTED_TEMPLATES: frozenset[str] = frozenset(
+    {"codex/stage_skill.md.j2", "codex/loop_skill.md.j2"},
+)
+
+# KEEP reasons that, for a healable phantom file, signal a stale render artifact
+# rather than a genuine user edit. "malformed-markers" is included because real
+# phantom skills carry duplicate ``@hm:user`` ids emitted by the old renderer,
+# which parse_segments rejects. "template-unreadable" / "binary-old" are
+# excluded — those cannot be safely re-rendered, so KEEP stays conservative.
+_HEALABLE_KEEP_REASONS: frozenset[str] = frozenset(
+    {"hash-mismatch-user-modified", "hash-mismatch-malformed-markers"},
+)
+
+
+def _is_healable_phantom_ours(fm: dict[str, object]) -> bool:
+    """True iff ``fm`` is a pre-fix harness-maker file of a phantom-affected template."""
+    if fm.get("generated_by") != "harness-maker":
+        return False
+    if fm.get("source_template") not in _PHANTOM_AFFECTED_TEMPLATES:
+        return False
+    version = fm.get("harness_maker_version")
+    if not isinstance(version, str):
+        return False
+    try:
+        return not compare_version(version, _PHANTOM_HASH_FIX_VERSION)
+    except ValueError:
+        return False
 
 
 def reconcile(existing_dir: Path, blueprint: Blueprint) -> list[ConflictItem]:
@@ -230,6 +288,18 @@ def reconcile(existing_dir: Path, blueprint: Blueprint) -> list[ConflictItem]:
             )
         else:
             decision, reason = _decide_user_modified(fe.template, body)
+            # Heal pre-0.26.2 Codex-skill phantom-hash files instead of freezing
+            # them as KEEP. Reachable only here — i.e. when existing_hash !=
+            # recomputed — so the "hash already mismatched" precondition holds.
+            if (
+                decision == ReconcileDecision.KEEP
+                and reason in _HEALABLE_KEEP_REASONS
+                and _is_healable_phantom_ours(fm)
+            ):
+                decision, reason = (
+                    ReconcileDecision.REPLACE,
+                    "legacy-phantom-hash-heal",
+                )
             conflicts.append(
                 ConflictItem(path=fe.path, decision=decision, reason=reason),
             )

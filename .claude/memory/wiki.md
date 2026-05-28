@@ -1,6 +1,6 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.26.2
+harness_maker_version: 0.26.6
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: memory/wiki.ko.md.j2
 provenance: official
@@ -389,5 +389,8 @@ Files harness-maker renders via `_render_pure_text` (`.cursor/rules/*.mdc`, `.cu
 
 ## [wiki:gotcha] hooks-merge-identity-keys-on-module-namespace | 2026-05-28
 hooks.json dedup identity (`render._normalize_hm_managed_command` → `_entry_identity` → `_merge_hooks_json`) MUST key harness-owned hooks on their `python -m harness_maker.<invocation>` module-namespace suffix (module + trailing args), NOT on the `uv run --with <path>` prefix. The prefix is volatile: it changes on `/plugin update` (cache version), on a marketplace switch (`harness-maker-local` cache ↔ GitHub `harness-maker` cache), and for dev-repo installs (`/home/noel/...`). Any path-ENUMERATING regex re-opens the duplication bug on the next unforeseen path form (spoton triplication, 2026-05-28). `harness_maker.*` is our namespace, so a suffix match is proof of ownership; user-authored commands (other tooling) round-trip unchanged and are preserved. The merge self-heals already-duplicated files: stale-path on-disk entries normalize to the template identity and are dropped, leaving one entry per (event, matcher, module+args). Extends [wiki:pattern] schema-aware-json-merge-discriminator (05-22), which built the identity tuple but enumerated only the local-cache path.
+
+## [wiki:gotcha] reconcile-phantom-hash-heal | 2026-05-28
+reconcile's REPLACE-vs-KEEP gate trusts `stored content_hash == compute_body_hash(body)` as the SOLE "did the user edit this?" signal. Pre-0.26.2 the Codex skill pre-render path (synthesize pre-renders stage/loop bodies with the install_ref `uv run --with <path>` baked in, hashed BEFORE substitution) wrote a content_hash over a body ≠ the persisted bytes — a "phantom" hash that can never self-verify under any normalization. reconcile then misread it as user-modified → KEEP → the file froze at its old version on EVERY re-render (`hm-execute/verify/wrapup/loop` stuck at 0.26.1 while sibling skills reached 0.26.6; symptom = stale `.../0.26.1` paths after an update touched only 4 files). Orphan-sweep can't help: these are blueprint files, not orphans. Fix: `reconcile._is_healable_phantom_ours` flips KEEP→REPLACE for `generated_by: harness-maker` + `source_template ∈ {codex/stage_skill,loop_skill}.md.j2` (STABLE key, never version/path enumeration) + `harness_maker_version` < 0.26.2 floor (protects current/future edits) + KEEP-reason ∈ {user-modified, malformed-markers}; the CLI's pre-render `.backup-<ts>/` covers the residual pre-floor skill-body-edit case. Lesson: "stored hash mismatches body" ≠ "user edited it" — a render-time hash/body divergence yields the same signal, so any unverifiable-hash class needs an explicit scoped heal or it silently freezes forever. Render must always hash the EXACT bytes it persists (current code does; the bug was pre-0.26.2).
 
 <!-- @hm:/user:entries -->
