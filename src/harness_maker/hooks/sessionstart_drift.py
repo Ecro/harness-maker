@@ -72,7 +72,7 @@ class VersionDrift:
     """
 
     stamped: str  # the version stamped in harness.yaml frontmatter
-    current: str  # the latest plugin version on disk (or fallback __version__)
+    current: str  # newest available = max(running __version__, highest cached)
     direction: Literal["upgrade", "downgrade"]
 
 
@@ -95,15 +95,30 @@ def _parse_semver(v: str) -> tuple[int, int, int] | None:
 
 def _scan_plugin_cache_versions() -> list[str]:
     """Return up to ``_CACHE_TOPK`` highest-semver harness-maker versions cached
-    under ``~/.claude/plugins/cache/harness-maker-local/harness-maker/``.
+    under any marketplace at ``~/.claude/plugins/cache/<marketplace>/harness-maker/``.
+
+    Why glob every marketplace: the cache is keyed by the *marketplace name*
+    the user registered the plugin under — ``harness-maker`` for the published
+    marketplace, ``harness-maker-local`` for a local dev checkout, etc. A
+    previous version hardcoded the ``harness-maker-local`` name and so read a
+    stale sibling marketplace whose newest cached build (0.26.4) was older than
+    the active install (0.26.7), reporting a phantom "downgrade". Scanning every
+    marketplace dir that holds a ``harness-maker/`` plugin subtree fixes this
+    regardless of the registration name.
     """
-    cache_root = (
-        Path.home() / ".claude" / "plugins" / "cache" / "harness-maker-local" / "harness-maker"
-    )
+    cache_root = Path.home() / ".claude" / "plugins" / "cache"
+    names: set[str] = set()
     try:
         if not cache_root.is_dir():
             return []
-        names = [d.name for d in cache_root.iterdir() if d.is_dir()]
+        for marketplace in cache_root.iterdir():
+            plugin_dir = marketplace / "harness-maker"
+            try:
+                if not plugin_dir.is_dir():
+                    continue
+                names.update(d.name for d in plugin_dir.iterdir() if d.is_dir())
+            except OSError:
+                continue
     except OSError:
         return []
     parsed = [(_parse_semver(n), n) for n in names]
@@ -113,23 +128,31 @@ def _scan_plugin_cache_versions() -> list[str]:
 
 @functools.cache
 def latest_installed_version() -> str:
-    """Resolve the latest harness-maker version visible to the running session.
+    """Resolve the newest harness-maker version available to this session.
 
-    Scans the Claude Code plugin cache; falls back to the imported
-    ``__version__`` when the cache is empty or unparseable. Memoized for the
-    process lifetime of the hook (cheap-startup rule, validator C3).
+    Defined as the maximum (by semver) of the running plugin code's
+    ``__version__`` and every version cached on disk across all marketplaces.
+    The running version is a *floor*: "latest available" can never be older
+    than the code executing this hook. Without that floor, a session running a
+    source/editable build ahead of the published marketplace cache (the common
+    case in the harness-maker dev repo itself) would report a phantom
+    "downgrade" against a freshly-rendered harness. Memoized for the process
+    lifetime of the hook (cheap-startup rule, validator C3).
     """
     from harness_maker import __version__
 
-    versions = _scan_plugin_cache_versions()
-    if not versions:
+    pairs: list[tuple[tuple[int, int, int], str]] = []
+    running = _parse_semver(__version__)
+    if running is not None:
+        pairs.append((running, __version__))
+    for raw in _scan_plugin_cache_versions():
+        parsed = _parse_semver(raw)
+        if parsed is not None:
+            pairs.append((parsed, raw))
+    if not pairs:
         return __version__
-    parsed = [(_parse_semver(v), v) for v in versions]
-    valid = [(p, raw) for p, raw in parsed if p is not None]
-    if not valid:
-        return __version__
-    valid.sort(key=lambda x: x[0], reverse=True)
-    return valid[0][1]
+    pairs.sort(key=lambda x: x[0], reverse=True)
+    return pairs[0][1]
 
 
 def _drift_direction(stamped: str, current: str) -> Literal["upgrade", "downgrade"]:

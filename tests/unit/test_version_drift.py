@@ -14,6 +14,7 @@ import pytest
 
 from harness_maker.hooks.sessionstart_drift import (
     VersionDrift,
+    _scan_plugin_cache_versions,
     detect_version_drift,
     latest_installed_version,
 )
@@ -154,19 +155,76 @@ def test_latest_installed_version_falls_back_to_imported_when_cache_empty(
 
 
 def test_latest_installed_version_picks_highest_semver(tmp_path: Path) -> None:
-    with patch(
-        "harness_maker.hooks.sessionstart_drift._scan_plugin_cache_versions",
-        return_value=["0.3.2", "0.6.1", "0.5.7", "0.10.0", "0.6.0"],
+    # Pin __version__ below the cache so the running-version floor doesn't win;
+    # this case asserts the cache-scan max selection in isolation.
+    with (
+        patch(
+            "harness_maker.hooks.sessionstart_drift._scan_plugin_cache_versions",
+            return_value=["0.3.2", "0.6.1", "0.5.7", "0.10.0", "0.6.0"],
+        ),
+        patch("harness_maker.__version__", "0.0.1"),
     ):
         assert latest_installed_version() == "0.10.0"
 
 
 def test_latest_installed_version_skips_unparseable(tmp_path: Path) -> None:
-    with patch(
-        "harness_maker.hooks.sessionstart_drift._scan_plugin_cache_versions",
-        return_value=["random-text", "0.6.1", "not.a.version", ".tmp"],
+    with (
+        patch(
+            "harness_maker.hooks.sessionstart_drift._scan_plugin_cache_versions",
+            return_value=["random-text", "0.6.1", "not.a.version", ".tmp"],
+        ),
+        patch("harness_maker.__version__", "0.0.1"),
     ):
         assert latest_installed_version() == "0.6.1"
+
+
+def test_latest_installed_version_floored_by_running_version(tmp_path: Path) -> None:
+    """A source build newer than anything cached must not read as a downgrade.
+
+    Regression for the harness-maker dev-repo case: the active session runs a
+    source/editable build (e.g. 0.30.0) ahead of the published marketplace
+    cache (max 0.26.7). latest_installed_version() must return the running
+    version so detect_version_drift does not flag a phantom 'downgrade'
+    against a just-rendered harness.
+    """
+    with (
+        patch(
+            "harness_maker.hooks.sessionstart_drift._scan_plugin_cache_versions",
+            return_value=["0.26.4", "0.26.7"],
+        ),
+        patch("harness_maker.__version__", "0.30.0"),
+    ):
+        assert latest_installed_version() == "0.30.0"
+
+
+def test_scan_plugin_cache_versions_globs_all_marketplaces(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The cache scan must read every marketplace dir, not a hardcoded name.
+
+    Regression for the phantom-downgrade bug: the published marketplace
+    ('harness-maker') held 0.26.7 while a stale local-dev marketplace
+    ('harness-maker-local') topped out at 0.26.4. Scanning only the latter
+    reported 0.26.4 as the latest version, producing a false downgrade alarm.
+    """
+    cache = tmp_path / ".claude" / "plugins" / "cache"
+    layout = {
+        "harness-maker": ["0.26.5", "0.26.6", "0.26.7"],
+        "harness-maker-local": ["0.26.3", "0.26.4"],
+        "unrelated-marketplace": [],  # no harness-maker subtree → ignored
+    }
+    for marketplace, versions in layout.items():
+        if not versions:
+            (cache / marketplace).mkdir(parents=True)
+            continue
+        for v in versions:
+            (cache / marketplace / "harness-maker" / v).mkdir(parents=True)
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+
+    found = _scan_plugin_cache_versions()
+    assert found, "expected versions discovered across marketplaces"
+    assert found[0] == "0.26.7", "highest semver across all marketplaces wins"
+    assert "0.26.4" in found, "stale local-dev marketplace still scanned"
 
 
 def test_latest_installed_version_all_unparseable_falls_back(tmp_path: Path) -> None:

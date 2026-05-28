@@ -2,6 +2,27 @@
 
 ## [Unreleased]
 
+## [0.26.8] - 2026-05-28
+
+### Fixed: SessionStart drift hook no longer reports a phantom "downgrade"
+
+- `sessionstart_drift._scan_plugin_cache_versions` scanned a single **hardcoded**
+  marketplace dir (`…/cache/harness-maker-local/harness-maker/`). When a project
+  was installed from the published GitHub marketplace (cache key `harness-maker`)
+  but a stale local-dev marketplace (`harness-maker-local`) still sat in the cache
+  with an older top version, the hook read the stale dir, decided the "latest
+  installed" version was *older* than the version stamped in `harness.yaml`, and
+  fired a false `accidental rollback` alarm on every session start. (Same family
+  as the 0.26.6 hardcoded-cache-path bug.)
+- The scan now globs **every** marketplace dir
+  (`…/cache/<marketplace>/harness-maker/`), so the highest cached version wins
+  regardless of the registration name.
+- `latest_installed_version` is now additionally **floored by the running
+  `__version__`**: "latest available" can never be older than the plugin code
+  executing the hook. This also removes phantom downgrades in the harness-maker
+  dev repo itself, where a source/editable build routinely runs ahead of any
+  published marketplace cache.
+
 ## [0.26.7] - 2026-05-28
 
 ### Fixed: reconcile self-heals legacy Codex skills frozen by a pre-0.26.2 "phantom" content_hash
