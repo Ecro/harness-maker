@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.27.1] - 2026-05-29
+
 ### Fixed: parallel `/hm:execute` no longer blocked by the harness's own churn
 
 - **Root cause:** the harness wrote per-session churn (telemetry on every tool
