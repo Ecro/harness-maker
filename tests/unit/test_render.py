@@ -1536,6 +1536,187 @@ def test_merge_hooks_json_preserves_genuine_user_added_command_alongside_hm() ->
     assert len(cmds) == 2, f"expected 2 entries (hm-new + user), got {len(cmds)}: {cmds}"
 
 
+# ──────────────────────────────────────────────────────────────────────────
+# PLAN-hooks-merge-stale-path-dedup: the 05-22 normalizer matched ONLY the
+# `harness-maker-local` cache path, so the GitHub marketplace cache and the
+# dev-repo `--with` path evaded dedup → triplication on marketplace switch
+# (spoton 2026-05-28). Identity must key on the `python -m harness_maker.*`
+# module namespace, path-agnostic. (ADR-001)
+# ──────────────────────────────────────────────────────────────────────────
+
+_GH = "/home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.26.6"
+_GH_OLD = "/home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.26.5"
+_LOCAL = "/home/noel/.claude/plugins/cache/harness-maker-local/harness-maker/0.26.4"
+_DEVREPO = "/home/noel/harness-maker"
+
+
+def _hm_cmd(path: str, invocation: str = "harness_maker.gates.permission_gate") -> str:
+    return f"uv run --with {path} python -m {invocation}"
+
+
+def _nested_entry(command: str, matcher: str | None = None) -> dict:
+    e: dict = {"hooks": [{"type": "command", "command": command}]}
+    if matcher is not None:
+        e["matcher"] = matcher
+    return e
+
+
+def test_merge_hooks_json_dedupes_across_github_cache_version_bump() -> None:
+    """github marketplace cache path (no `-local`) must dedup across version bumps,
+    just like the local cache already did."""
+    from harness_maker.render import _merge_hooks_json
+
+    existing = {"hooks": {"PreToolUse": [_nested_entry(_hm_cmd(_GH_OLD), "Bash")]}}
+    new_data = {"hooks": {"PreToolUse": [_nested_entry(_hm_cmd(_GH), "Bash")]}}
+    merged = _merge_hooks_json(existing, new_data, schema="nested")
+    entries = merged["hooks"]["PreToolUse"]
+    assert len(entries) == 1, f"github-cache version bump must dedup, got {len(entries)}"
+    assert entries[0]["hooks"][0]["command"] == _hm_cmd(_GH)
+
+
+def test_merge_hooks_json_collapses_marketplace_switch_local_and_devrepo() -> None:
+    """spoton scenario: existing on-disk has local-cache + dev-repo forms; the
+    template ships the github form. All three are the SAME hook → collapse to one
+    (the github/template entry)."""
+    from harness_maker.render import _merge_hooks_json
+
+    existing = {
+        "hooks": {
+            "PreToolUse": [
+                _nested_entry(_hm_cmd(_LOCAL), "Bash"),
+                _nested_entry(_hm_cmd(_DEVREPO), "Bash"),
+            ],
+        },
+    }
+    new_data = {"hooks": {"PreToolUse": [_nested_entry(_hm_cmd(_GH), "Bash")]}}
+    merged = _merge_hooks_json(existing, new_data, schema="nested")
+    entries = merged["hooks"]["PreToolUse"]
+    assert len(entries) == 1, f"local+devrepo+github are one hook; got {len(entries)}"
+    assert entries[0]["hooks"][0]["command"] == _hm_cmd(_GH)
+
+
+def test_merge_hooks_json_self_heals_full_triplication() -> None:
+    """An already-triplicated on-disk file (github-old + local + dev-repo) re-rendered
+    against the current github template self-heals to one entry per (event,matcher,module)."""
+    from harness_maker.render import _merge_hooks_json
+
+    existing = {
+        "hooks": {
+            "PreToolUse": [
+                _nested_entry(_hm_cmd(_GH_OLD), "Bash"),
+                _nested_entry(_hm_cmd(_LOCAL), "Bash"),
+                _nested_entry(_hm_cmd(_DEVREPO), "Bash"),
+            ],
+        },
+    }
+    new_data = {"hooks": {"PreToolUse": [_nested_entry(_hm_cmd(_GH), "Bash")]}}
+    merged = _merge_hooks_json(existing, new_data, schema="nested")
+    entries = merged["hooks"]["PreToolUse"]
+    assert len(entries) == 1, f"triplication must self-heal to 1, got {len(entries)}"
+    assert entries[0]["hooks"][0]["command"] == _hm_cmd(_GH)
+
+
+def test_merge_hooks_json_normalizes_with_intermediate_uv_flag() -> None:
+    """W1: identity must be prefix-agnostic. Use the LOCAL cache path (which the
+    old regex DID match) plus an intermediate `--python 3.12` flag (which the old
+    anchored `<path> python` regex could NOT tolerate), isolating the flag
+    dimension from the path-family dimension."""
+    from harness_maker.render import _merge_hooks_json
+
+    local_new = _LOCAL.replace("/0.26.4", "/0.26.5")
+    old = f"uv run --with {_LOCAL} --python 3.12 python -m harness_maker.telemetry"
+    new = f"uv run --with {local_new} --python 3.12 python -m harness_maker.telemetry"
+    existing = {"hooks": {"PostToolUse": [_nested_entry(old, "*")]}}
+    new_data = {"hooks": {"PostToolUse": [_nested_entry(new, "*")]}}
+    merged = _merge_hooks_json(existing, new_data, schema="nested")
+    entries = merged["hooks"]["PostToolUse"]
+    assert len(entries) == 1, f"intermediate-flag command must still dedup, got {len(entries)}"
+
+
+def test_merge_hooks_json_matcherless_args_discriminate() -> None:
+    """W4: matcher-less Stop hooks — trailing args are the sole discriminator.
+    Same module + DIFFERENT args stay distinct; same module + same args across
+    different paths collapse to one."""
+    from harness_maker.render import _merge_hooks_json
+
+    stop_a = "harness_maker.hooks.loop_gate --mode stop-hook"
+    stop_b = "harness_maker.hooks.loop_gate --mode subagent-stop"
+    # Different args → must stay distinct (2 entries).
+    existing = {"hooks": {"Stop": [_nested_entry(_hm_cmd(_GH, stop_b))]}}
+    new_data = {
+        "hooks": {
+            "Stop": [_nested_entry(_hm_cmd(_GH, stop_a)), _nested_entry(_hm_cmd(_GH, stop_b))],
+        },
+    }
+    merged = _merge_hooks_json(existing, new_data, schema="nested")
+    assert len(merged["hooks"]["Stop"]) == 2, "different --mode args must NOT collapse"
+    # Same args, different paths → must collapse to one.
+    existing2 = {"hooks": {"Stop": [_nested_entry(_hm_cmd(_LOCAL, stop_a))]}}
+    new_data2 = {"hooks": {"Stop": [_nested_entry(_hm_cmd(_GH, stop_a))]}}
+    merged2 = _merge_hooks_json(existing2, new_data2, schema="nested")
+    assert len(merged2["hooks"]["Stop"]) == 1, "same module+args across paths must collapse"
+
+
+def test_merge_hooks_json_dedupes_across_paths_cursor_flat() -> None:
+    """Cursor flat schema (.cursor/hooks.json) must dedup across path forms too."""
+    from harness_maker.render import _merge_hooks_json
+
+    existing = {
+        "hooks": {
+            "afterFileEdit": [
+                {"matcher": "*", "command": _hm_cmd(_LOCAL, "harness_maker.telemetry")},
+            ],
+        },
+    }
+    new_data = {
+        "hooks": {
+            "afterFileEdit": [
+                {"matcher": "*", "command": _hm_cmd(_GH, "harness_maker.telemetry")},
+            ],
+        },
+    }
+    merged = _merge_hooks_json(existing, new_data, schema="flat")
+    entries = merged["hooks"]["afterFileEdit"]
+    assert len(entries) == 1, f"flat-schema path dedup broken, got {len(entries)}"
+    assert entries[0]["command"] == _hm_cmd(_GH, "harness_maker.telemetry")
+
+
+def test_rendered_hooks_template_has_unique_identity_per_event(tmp_path: Path) -> None:
+    """W2 / ADR-003: self-heal collapses ON-DISK dups against the template set but
+    never dedups template-internal entries. Guard the template-side invariant:
+    the freshly-rendered nested hooks.json has exactly one identity per
+    (event, matcher, module) — so a future Jinja change that emits a duplicate
+    fails loudly here instead of shipping a dup the merge can't fix."""
+    import json
+
+    from harness_maker.models import Blueprint, FileEntry
+    from harness_maker.render import _entry_identity, render
+
+    target_dir = tmp_path / ".claude"
+    target_dir.mkdir()
+    bp = Blueprint(
+        files=[
+            FileEntry(
+                path=Path("hooks/hooks.json"),
+                template="hooks/hooks.json.j2",
+                context={
+                    "harness_maker_src_path": "/dummy",
+                    "preset": "Production",
+                    "config": SimpleNamespace(dev_mode="spec-driven"),
+                },
+                frontmatter={},
+            ),
+        ],
+    )
+    render(bp, target_dir, merge_json_paths={Path("hooks/hooks.json")})
+    data = json.loads((target_dir / "hooks" / "hooks.json").read_text(encoding="utf-8"))
+    for event, entries in data["hooks"].items():
+        idents = [_entry_identity(e, schema="nested") for e in entries]
+        assert len(idents) == len(set(idents)), (
+            f"template emits duplicate hook identities in event {event!r}: {idents}"
+        )
+
+
 def test_render_hooks_json_merged_manifest_records_merged_hash(tmp_path: Path) -> None:
     """REVIEW fix (code-reviewer P1): Phase 1+3 exit criterion explicitly required
     a manifest test. After in-place merge, `.hm-render-manifest.jsonl` MUST

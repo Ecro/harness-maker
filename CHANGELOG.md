@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+## [0.26.6] - 2026-05-28
+
+### Fixed: hooks.json dedup now path-agnostic — no more triplicated hooks on marketplace switch
+
+- The 0.26.x hooks merge normalizer (`render._normalize_hm_managed_command`)
+  matched only the `harness-maker-local` cache path, so the GitHub-marketplace
+  cache (`…/cache/harness-maker/harness-maker/<ver>/…`) and dev-repo
+  (`--with /home/noel/harness-maker …`) command forms evaded dedup. Switching a
+  project from the local to the GitHub marketplace (or bumping versions across
+  them) left every harness hook **duplicated 2-3×** — each firing per event, the
+  stale copies running old plugin code and dangling once the old cache was pruned.
+- Hook identity is now keyed on the `python -m harness_maker.<invocation>` module
+  suffix (module + trailing args), path-agnostic — covering local-cache,
+  GitHub-cache, dev-repo, and any future path form. Already-duplicated `hooks.json`
+  files **self-heal** to one entry per (event, matcher, module) on the next
+  `/hm:make --update`. User-authored hooks are preserved unchanged.
+
 ## [0.26.5] - 2026-05-28
 
 ### Fixed: orphan-sweep now removes provenance-stripped assets of de-selected targets

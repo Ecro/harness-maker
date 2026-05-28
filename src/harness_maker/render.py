@@ -582,39 +582,40 @@ def _render_json_file(
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-# Matches the harness-maker-managed `uv run --with <cache-path-with-version>`
-# prefix in a hook command. Each `/plugin update` bumps the version segment
-# (e.g. 0.23.4 → 0.23.7), so the command string identity changes across
-# renders even when the hook is semantically the same entry.
-# Captures the module name (after `python -m`) which IS stable.
-_HM_CACHE_CMD_RE = re.compile(
-    r"^uv run --with \S*harness-maker-local/harness-maker/[^/\s]+ python -m (?P<module>\S+)"
-)
+# Matches any harness-maker-managed hook command by its `python -m
+# harness_maker.<invocation>` suffix, regardless of the `uv run --with <path>`
+# prefix. The prefix is volatile: it changes on every `/plugin update` (cache
+# version bump), on a marketplace switch (`harness-maker-local` cache ↔ GitHub
+# `harness-maker` cache), and for dev-repo installs (`--with /home/noel/...`).
+# The module namespace is the stable identity — `harness_maker.*` is ours, so a
+# match is proof of ownership. Capturing the full invocation (module + trailing
+# args) keeps e.g. `loop_gate --mode stop-hook` distinct from other modes.
+_HM_MANAGED_CMD_RE = re.compile(r"(?:^|\s)python -m (?P<invocation>harness_maker\.\S.*)$")
 
 
 def _normalize_hm_managed_command(cmd: str) -> str:
-    """Strip the version-pinned cache path from a harness-maker-managed hook command.
+    """Elide the volatile `uv run --with <path>` prefix from a harness-maker hook.
 
-    Why this is the load-bearing dedup primitive: each `/plugin update` re-
-    renders every hook command with a new cache-version-pinned `--with` path
-    (`.../harness-maker/0.23.4/...` → `.../harness-maker/0.23.7/...`). Without
-    normalization, ``_entry_identity`` treats the old-version + new-version
-    forms of the *same* hook as distinct entries — the merge classifies the
-    on-disk old-version entry as "user-added" (because it's not in the new
-    shipped set) and preserves it, producing duplicate hook entries that
-    fire twice on every event AND dangle pointing at a cache version that
-    `/plugin update` later cleans up.
+    Why this is the load-bearing dedup primitive: each `/plugin update` OR
+    marketplace switch re-renders every hook command with a different `--with`
+    path while the hook is semantically identical. Without path-agnostic
+    normalization, ``_entry_identity`` treats the on-disk form and the freshly
+    shipped form as distinct — the merge classifies the on-disk entry as
+    "user-added" (not in the shipped set) and preserves it, accumulating
+    duplicate hooks that fire 2-3x per event AND dangle at paths a later
+    `/plugin update` cleans up (spoton triplication, 2026-05-28).
 
-    For harness-maker-managed commands the normalized identity is
-    ``"<HM_CACHE>:<module>"`` — the cache path elided, the stable module
-    name retained. For commands that don't match the harness-maker cache
-    shape (user-authored hooks running their own tooling), the command is
-    returned unchanged so user identity stays exact.
+    Keying identity on the `python -m harness_maker.<invocation>` suffix is
+    path-agnostic by design (ADR-001 of PLAN-hooks-merge-stale-path-dedup): it
+    matches local-cache, GitHub-cache, dev-repo, and any future path form. The
+    normalized identity is ``"<HM>:<invocation>"`` (module + trailing args).
+    Commands without our module namespace (user-authored hooks) are returned
+    unchanged so user identity stays exact.
     """
-    m = _HM_CACHE_CMD_RE.match(cmd)
+    m = _HM_MANAGED_CMD_RE.search(cmd)
     if m is None:
         return cmd
-    return f"<HM_CACHE>:{m.group('module')}"
+    return f"<HM>:{m.group('invocation')}"
 
 
 def _entry_identity(
