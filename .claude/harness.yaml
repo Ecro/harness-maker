@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.26.2
+harness_maker_version: 0.26.6
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: harness-yaml/Production.yaml.j2
 provenance: official
-content_hash: 127ebad8f03849e6d23ed8741bd0043ac82802cb44cb6483961fb4e70cd48413
+content_hash: 05def5a147130a9e8b0690166a13c92637b919e6446f559dc3766db5d0888874
 ---
 preset: Production
 locale: ko
@@ -49,6 +49,7 @@ second_brain:
       read: true
       write: true
       note_types: ["decision", "preference", "failure", "project", "reference", "journal"]
+
 
 sibling_repos:
 
