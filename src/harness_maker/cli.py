@@ -381,6 +381,14 @@ def make(
         merge_reports=merge_reports,
     )
     _write_harness_manifest(target_dotclaude, written)
+    # PLAN-worktree-base-artifact-pollution ADR-002: seed the harness-churn
+    # .gitignore patterns at make time (new installs) so observability,
+    # iter-receipts, loop-context, render-manifest etc. never dirty the base.
+    # Idempotent + subsumption-safe; the worktree create path also runs this
+    # for existing installs that pre-date the churn set.
+    from harness_maker.worktree import _ensure_harness_gitignore
+
+    _ensure_harness_gitignore(target)
     # ADR-005 orphan sweep — delete blueprint-orphaned ours-clean files
     # (legacy commands removed by /hm:make --update). Uses full_bp (with
     # KEEP entries intact) so user-preserved files survive. Runs AFTER

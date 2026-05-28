@@ -1078,12 +1078,11 @@ def _append_render_manifest(
     a render that cannot record its manifest entry would silently break
     ADR-005's orphan detection, so failure should surface.
 
-    Phase 0 deliberately does NOT inject ``.hm-render-manifest.jsonl`` into
-    the user's ``.gitignore`` — no gitignore template ships with the harness
-    yet (PLAN-health-consolidation Phase 0 calls for the addition, but the
-    template surface does not exist). Wiring the entry is deferred to a
-    later phase / wrapup stage. Users with the file showing in ``git status``
-    can add the line manually until then.
+    ``.hm-render-manifest.jsonl`` is part of the harness-churn gitignore set
+    (PLAN-worktree-base-artifact-pollution ADR-002). It is added to the user's
+    ``.gitignore`` by ``_ensure_harness_gitignore`` — invoked at make time
+    (``cli.py``) and on every ``worktree create`` — so it no longer surfaces
+    in ``git status``. The render pass itself stays gitignore-agnostic.
     """
     target_dir.mkdir(parents=True, exist_ok=True)
     manifest_path = target_dir / RENDER_MANIFEST_NAME

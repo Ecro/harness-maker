@@ -54,6 +54,46 @@ _LOOP_MARKER_DIR = Path(".claude")
 _LOOP_MARKER_PREFIX = ".hm-loop-"
 _LOOP_MARKER_GITIGNORE_PATTERN = ".claude/.hm-loop-*"
 
+# PLAN-worktree-base-artifact-pollution ADR-002/ADR-003: single source of
+# truth for harness-generated CHURN paths. The gitignore set AND both
+# dirt-filters derive from these tuples so they cannot drift. These are
+# regenerable per-session artifacts — they must neither block `worktree
+# create` (dirty-base guard) nor trigger a finalize stash. Deliverables
+# (work-docs/{PLAN,REVIEW,RESEARCH,SPEC}, specs/, human memory tiers
+# wiki.md/failures.md/session/) are deliberately EXCLUDED so wrapup can
+# still commit them. Each entry doubles as a valid .gitignore pattern.
+#
+# Directory churn — matched by prefix (`startswith`); the trailing slash makes
+# the match unambiguous (`.claude/memory/semantic/` cannot collide with a
+# sibling like `.claude/memory/semantic-notes.md`).
+_HARNESS_CHURN_DIRS: tuple[str, ...] = (
+    ".claude/observability/",
+    ".claude/.hm-iter-receipts/",
+    ".claude/loop-specs/",
+    ".claude/memory/semantic/",
+    ".claude/memory/episodic/",
+    ".claude/memory/profile/",
+    "work-docs/loop-context/",
+)
+# File churn — matched EXACTLY (`==`), not by prefix, so a coincidental sibling
+# like `work-docs/p5-batch-state.yaml.bak` is NOT wrongly forgiven (REVIEW
+# consensus: code + security reviewers).
+#
+# Known limitation (REVIEW): the two `work-docs/` entries assume the default
+# `work_docs.dir` ("work-docs/"). A non-default `work_docs.dir` is not covered
+# by churn-isolation — these filters are pure porcelain-line predicates with no
+# harness.yaml access. The dominant churn (`.claude/observability/`, written on
+# every tool call) is NOT configurable, so the core fix holds regardless.
+_HARNESS_CHURN_FILES: tuple[str, ...] = (
+    ".claude/.hm-session-uuid",
+    ".claude/.hm-render-manifest.jsonl",
+    "work-docs/p5-batch-state.yaml",
+)
+# Patterns appended to the user's .gitignore (ADR-002) — dirs + exact files.
+# The Phase 2 sync test asserts this equals the dir+file union so the gitignore
+# set and the dirt-filters can never drift.
+_HARNESS_GITIGNORE_PATTERNS: tuple[str, ...] = _HARNESS_CHURN_DIRS + _HARNESS_CHURN_FILES
+
 
 def _run(
     args: list[str], cwd: Path, timeout: int | None = None
@@ -396,7 +436,26 @@ def _is_harness_artifact(porcelain_line: str) -> bool:
         path = path.split(" -> ", 1)[1]
     # Strip optional quote wrapping that git adds for paths with special chars.
     path = path.strip('"')
-    return path.startswith(_HARNESS_ARTIFACT_PREFIXES)
+    # ADR-002: `.gitignore` is co-managed — `_ensure_harness_gitignore` appends
+    # churn patterns to it at create/make, which shows as `M .gitignore`. That
+    # must NOT trip the dirty-base guard or get stashed at finalize (doing so
+    # would recreate the very churn this work removes). Safe because the
+    # finalize squash only carries the worktree branch's diff and never touches
+    # the base `.gitignore`, so a user's own `.gitignore` edit is left intact.
+    if path == ".gitignore":
+        return True
+    # ADR-003: recognize the shared churn set IN ADDITION to the legacy 3
+    # prefixes (union). Dir churn matches by prefix; file churn matches
+    # EXACTLY so sibling names (`...p5-batch-state.yaml.bak`) are not forgiven.
+    # This stays a strict subset of `.claude/` + the two work-docs/ churn
+    # paths — it does NOT forgive `.claude/agents`, `.claude/skills`,
+    # `.claude/harness.yaml`, etc., so genuine user `.claude/` edits are still
+    # preserved by the finalize stash (narrow-filter invariant).
+    return (
+        path.startswith(_HARNESS_ARTIFACT_PREFIXES)
+        or path.startswith(_HARNESS_CHURN_DIRS)
+        or path in _HARNESS_CHURN_FILES
+    )
 
 
 def _stash_base_dirty(base: Path, wt_name: str) -> str | None:
@@ -617,6 +676,10 @@ def _count_pending_stashes(claude_dir: Path) -> int:
 # coverage clean without weakening finalize-stash preservation.
 def _is_create_guard_harness_artifact(porcelain_line: str) -> bool:
     """True iff line is harness-managed for the dirty-base guard's purposes."""
+    # ADR-003: the delegated `_is_harness_artifact` now recognizes the shared
+    # churn set, including the work-docs/ churn paths (loop-context,
+    # p5-batch-state) — so committed+modified churn OUTSIDE `.claude/` no
+    # longer blocks `create`. No separate work-docs branch needed here.
     if _is_harness_artifact(porcelain_line):
         return True
     # Extract path after the 2-char XY status + space.
@@ -1295,6 +1358,23 @@ def _stash_has_third_parent(base: Path, ref_sha: str) -> bool:
     return True
 
 
+def _stash_object_exists(base: Path, ref_sha: str) -> bool:
+    """True iff the stash commit object is still resolvable in the object DB.
+
+    PLAN-worktree-base-artifact-pollution ADR-005. A merely *dropped* stash is
+    still reachable via the reflog, so `git cat-file -e <sha>^{commit}`
+    SUCCEEDS in that window and this returns True — the ref must be PRESERVED
+    (the work is recoverable). It returns False only once the object is truly
+    gone (gc-pruned or never existed), at which point the ref file is pure
+    cruft and is safe to drain (there is nothing left to restore).
+    """
+    try:
+        _run(["git", "cat-file", "-e", f"{ref_sha}^{{commit}}"], cwd=base)
+    except RuntimeError:
+        return False
+    return True
+
+
 def _stash_content_in_head(base_dir: Path, ref_sha: str) -> bool:
     """True iff every tracked and untracked stash blob already exists in HEAD.
 
@@ -1381,7 +1461,24 @@ def prune_stale(base_dir: Path, *, dry_run: bool = False) -> PruneReport:
                 continue
             ref_sha = fields["ref_sha"]
             ref_base = Path(fields["base"]).resolve()
-            if _stash_content_in_head(ref_base, ref_sha):
+            # The recorded base repo can be gone (e.g. a removed sibling repo).
+            # `_run` would raise FileNotFoundError on a non-existent cwd — which
+            # neither `_run` nor `_stash_object_exists` catches — so guard here.
+            # A gone base means the stash object is unreachable → pure cruft → drain.
+            if not ref_base.is_dir():
+                report.removed_stash_refs.append(ref_file)
+                if not dry_run:
+                    ref_file.unlink(missing_ok=True)
+                continue
+            # ADR-005: a ref whose stash object is truly gone (gc-pruned or
+            # never existed) is pure cruft — nothing to restore — so drain it.
+            # This is NOT a `git stash drop` (no object to drop), so the
+            # ADR-008 "never drop without diff preview" contract is untouched.
+            # Otherwise fall back to the content-in-HEAD test; only a resolvable
+            # stash whose content is NOT yet in HEAD is preserved + warned.
+            if not _stash_object_exists(ref_base, ref_sha) or _stash_content_in_head(
+                ref_base, ref_sha
+            ):
                 report.removed_stash_refs.append(ref_file)
                 if not dry_run:
                     ref_file.unlink(missing_ok=True)
@@ -1525,6 +1622,14 @@ def _cli_create(args: list[str]) -> int:
         # the parent loop's create. No-op idempotent return.
         print(str(existing))
         return 0
+
+    # PLAN-worktree-base-artifact-pollution ADR-002: auto-migrate the user's
+    # .gitignore to cover harness churn on every fresh create (idempotent +
+    # subsumption-safe). Existing installs that pre-date the churn set pick
+    # the patterns up here on their next create, so the base stops looking
+    # dirty for parallel sessions. Runs AFTER the existing-worktree early
+    # return (the nested-reuse path needs no migration) and BEFORE the guards.
+    _ensure_harness_gitignore(base)
 
     # ADR-003 queue-guard (must run BEFORE scope check so a misconfigured
     # base still surfaces the guard message — failure mode visibility):
@@ -1738,6 +1843,20 @@ def _ensure_gitignore_entry(project_root: Path, entry: str) -> None:
     except OSError:
         # Best-effort; don't fail loop creation over a gitignore write.
         pass
+
+
+def _ensure_harness_gitignore(project_root: Path) -> None:
+    """Append every harness-churn pattern to the project's .gitignore.
+
+    PLAN-worktree-base-artifact-pollution ADR-002. Keeps the base repo clean
+    of self-generated churn so parallel `worktree create` is not blocked and
+    finalize does not spuriously stash. Each call is idempotent and
+    subsumption-safe (delegates to `_ensure_gitignore_entry`, which no-ops
+    when a broader pattern such as a dir-level `.claude/` ignore already
+    covers the entry — verified via `git check-ignore`).
+    """
+    for pattern in _HARNESS_GITIGNORE_PATTERNS:
+        _ensure_gitignore_entry(project_root, pattern)
 
 
 def _detect_existing_worktree(base: Path) -> Path | None:

@@ -215,6 +215,12 @@ Cursor / Codex 의 plugin marketplace 가 GitHub 에서 직접 fetch.
 
 **Recovery from accidental drop** (precedent: 2026-05-23 morning's 4 dropped stashes recovered via `git reflog --all` cherry-pick — see session log 21:30 UTC). The finalize logic creates `wip(execute): capture uncommitted work` commits on the per-worktree branch BEFORE attempting cleanup; even if the stash is dropped, the WIP commit on the branch ref survives until gc.
 
+**Keep-base-clean (PLAN-worktree-base-artifact-pollution)** — the 5 layers above stop *contamination*; this work stops the layers from *firing on the harness's own churn* (the real cause of constant stash warnings + blocked parallel `create`). One shared source of truth, `worktree._HARNESS_CHURN_PREFIXES`, drives three things:
+- **gitignore** (`_ensure_harness_gitignore`, ADR-002) — appended at make time (`cli.py`) AND every `worktree create` (idempotent, subsumption-safe). Covers `.claude/observability/`, `.claude/.hm-iter-receipts/`, `.claude/loop-specs/`, `.claude/.hm-session-uuid`, `.claude/.hm-render-manifest.jsonl`, `.claude/memory/{semantic,episodic,profile}/`, `work-docs/loop-context/`, `work-docs/p5-batch-state.yaml`. Deliverables (PLAN/REVIEW/RESEARCH/SPEC, human memory tiers) are deliberately NOT ignored — wrapup commits them.
+- **both dirt-filters** (ADR-003) — `_is_harness_artifact` (finalize) recognizes the churn set as a UNION with the legacy 3 prefixes; `_is_create_guard_harness_artifact` (create) inherits it via delegation, so committed-then-modified `work-docs/` churn no longer blocks `create`. Still a strict subset — genuine user `.claude/agents`/`skills`/`harness.yaml` edits remain "dirt" the finalize stash preserves (narrow-filter invariant).
+- **wrapup deliverable commit** (ADR-004) — `git add` now also stages RESEARCH + SPEC, so they stop lingering as untracked dirt.
+- **accepted limitation**: a user who already *committed* `.claude/` churn keeps a cosmetic `M .claude/observability/...` in `git status` (gitignore can't untrack; we never auto-`git rm --cached` — CLAUDE.md git policy). It neither blocks nor stashes. Opt-in manual cleanup: `git rm -r --cached .claude/observability .claude/.hm-iter-receipts` then commit.
+
 ## Second Brain 승급 파이프라인 (PLAN-second-brain-promotion)
 
 로컬 `.claude/memory/` 와 Obsidian Second Brain 은 **두 개의 평행 기억 시스템이 아니라 승급 파이프라인**이다:
@@ -295,7 +301,7 @@ Integration test 는 `tests/integration/` 에 두고 `pytest.mark.skipif(not os.
 ### Worktree cleanup 정책
 - 정상 종료: `harness.yaml.worktree.cleanup` 따름 (default `on_success`)
 - **autoloop iter / phase blocker 발생 시 강제 cleanup**: `worktree.cleanup_all(force=True)` 호출 → halt 전 모든 `.worktrees/*` 제거 (디스크 누적 방지). 단, `--debug-worktree` 플래그 시 보존.
-- weekly cleanup hook: `/hm:health` (Step 2 external risks) 와 동시 실행되는 별도 함수가 24h 이상 stale worktree 청소.
+- stale-artifact janitor: `prune_stale(base)` 가 **`worktree create` 시점에만** 실행된다 (`_cli_create`, `--debug-worktree` 시 skip). orphan `.hm-loop-*` 마커, dangling `.worktrees/*`, 그리고 finalize-stash ref 를 정리한다. ref drain 정책: stash object 가 이미 사라진(gc/drop) ref 는 즉시 제거(복원할 내용 없음), 살아있지만 내용이 HEAD 에 없는 ref 는 preserve+warn (PLAN-worktree-base-artifact-pollution ADR-005). **24h/주기 기반 hook 은 없다** — 예전 문서의 "weekly `/hm:health` cleanup" 주장은 코드에 존재한 적 없는 오류였다.
 - **Cursor 와 공유 시 주의**: prefix 매치로 자기 것만 cleanup (`execute-*`, `plan-*`, `phase-*`, `autoloop-*`). Cursor 가 만든 worktree (다른 prefix) 는 건드리지 않음.
 
 ### Snapshot test 결정성

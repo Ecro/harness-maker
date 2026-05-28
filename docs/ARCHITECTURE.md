@@ -118,10 +118,30 @@ Worktree isolation has an opportunistic cleanup pass at `worktree create`.
 harness bookkeeping does not become false live-session pressure. It removes
 orphan loop markers, removes owned dangling worktree directories only when
 they have a `.git` entry and are neither git-registered nor live-marker
-referenced, and deletes finalize-stash refs only when every tracked and
-untracked stash blob already exists in `HEAD`. Refs that fail the content gate
-are preserved and warned, but they do not count as live queue pressure unless
-their session marker still exists.
+referenced, and drains a finalize-stash ref when ANY of: its recorded base
+dir is gone (unreachable stash → cruft), its stash object is gc-pruned/dropped
+(nothing to restore), or every tracked and untracked stash blob already exists
+in `HEAD`. A still-resolvable stash whose content is NOT yet in `HEAD` is
+preserved and warned (never auto-dropped — ADR-008), and does not count as live
+queue pressure unless its session marker still exists.
+
+### Keep-base-clean churn isolation
+
+The 5-layer cross-session worktree defense only fires correctly if the base
+repo is actually clean between sessions. The harness used to dirty its own base
+(telemetry writes `.claude/observability/` on every tool call; loop-context,
+iter-receipts, render manifest accumulate), so finalize stashed every run and
+the queue-guard blocked the next parallel `create`. A single churn source of
+truth — `worktree._HARNESS_CHURN_DIRS` (prefix-matched) + `_HARNESS_CHURN_FILES`
+(exact-matched), unioned into `_HARNESS_GITIGNORE_PATTERNS` — now drives both
+dirt-filters (`_is_harness_artifact` for finalize; the create-guard inherits via
+delegation) AND `_ensure_harness_gitignore`, which seeds the patterns into the
+user's `.gitignore` at make time and every `worktree create` (idempotent +
+subsumption-safe). The filter stays a strict subset (never forgives genuine user
+`.claude/agents|skills|commands|harness.yaml` edits), and `.gitignore` itself is
+treated as co-managed/non-dirtying so the seeding append cannot re-trip the
+guards. wrapup also commits RESEARCH + SPEC so deliverables stop lingering as
+untracked dirt (PLAN-worktree-base-artifact-pollution).
 
 ## 3. The 19 Mechanisms (M1-M19)
 

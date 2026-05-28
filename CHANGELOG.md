@@ -2,6 +2,37 @@
 
 ## [Unreleased]
 
+### Fixed: parallel `/hm:execute` no longer blocked by the harness's own churn
+
+- **Root cause:** the harness wrote per-session churn (telemetry on every tool
+  call → `.claude/observability/`, iter-receipts, loop-context, render manifest)
+  into the base repo, and the two dirt-filters disagreed — so `git status` was
+  never clean. Finalize stashed on every run (queue-guard then blocked the next
+  `create`), and `work-docs/` churn tripped the dirty-base guard directly. The
+  5-layer cross-session defense was firing constantly on self-inflicted dirt.
+- **Keep-base-clean:** one shared churn source of truth (`worktree.`
+  `_HARNESS_CHURN_DIRS` prefix-matched + `_HARNESS_CHURN_FILES` exact-matched,
+  unioned into `_HARNESS_GITIGNORE_PATTERNS`) now drives (a) a gitignore set
+  seeded at make time + every `worktree create` (`_ensure_harness_gitignore`,
+  idempotent + subsumption-safe), and (b) BOTH dirt-filters
+  (`_is_harness_artifact` union; create-guard via delegation) — so churn
+  neither blocks `create` nor triggers a finalize stash. Genuine user
+  `.claude/` edits are still preserved (narrow-filter invariant).
+- **Deliverables committed:** wrapup now `git add`s RESEARCH + SPEC alongside
+  PLAN + REVIEW, so they stop lingering as untracked dirt.
+- **Known limitation:** the two `work-docs/` churn entries assume the default
+  `work_docs.dir` (`work-docs/`); a non-default `work_docs.dir` is not yet
+  covered by churn-isolation (the `.claude/` churn — the dominant source — is
+  unaffected). Tracked as a follow-up.
+- **Orphan stash-ref drain:** `prune_stale` now removes a finalize-stash ref
+  whose stash object is gone (gc-pruned/dropped → nothing to restore); a
+  dropped-but-reflog-recoverable stash is still preserved.
+- **Docs:** corrected CLAUDE.md (no 24h `/hm:health` worktree cleanup exists;
+  `prune_stale` runs only at `worktree create`).
+- Accepted limitation: already-committed `.claude/` churn stays cosmetically
+  dirty in `git status` (no auto `git rm --cached`); opt-in manual cleanup
+  documented.
+
 ## [0.27.0] - 2026-05-28
 
 ### Added: Second Brain promotion — wrapup now escalates local memory to Obsidian
