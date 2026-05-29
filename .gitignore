@@ -70,3 +70,5 @@ tests/e2e/sandbox-plugin-test/.backup-*/
 tests/e2e/sandbox/
 tests/e2e/sandbox-plugin-test/
 tests/fixtures/*/CLAUDE.md
+.claude/loop-specs/
+work-docs/loop-context/
