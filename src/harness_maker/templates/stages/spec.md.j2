@@ -239,11 +239,21 @@ ac:
     type: mechanical | parametric | judgment    # ADR-003
     test_ids:
       - tests/<path>::<fn_name>         # must resolve via `pytest --collect-only`
-    executable_predicate: "<Python expr>"        # mechanical only (else null)
+    executable_predicate: "<runnable Python expr>" # mechanical only (else null) — see note
     golden_table: []                              # parametric only
     rubric_id: null                               # judgment only
     pending_test: true                            # false ONLY when test_ids verified
 ```
+
+**`executable_predicate` must be a *runnable* expression, not prose**
+(PLAN-spec-test-accumulation ADR-007). `spec_machine.validate` now rejects a
+mechanical AC unless its predicate `ast.parse`s as a Python expression whose
+top-level node is a comparison / call / bool-op / unary-op and references at
+least one symbol — `/hm:execute` turns it directly into a test assertion. Write
+`result.retry_count <= 3` or `is_idempotent(send(msg))`, never `"retries are
+bounded"` or the tautology `True`. Bind the free symbols to the system under
+test; if you cannot yet name them, leave the AC `parametric`/`judgment` instead
+of forcing a fake mechanical predicate.
 
 Each AC's heading in SPEC.md must be `### AC-NNN: <title>` (NNN ≥ 3 digits)
 to satisfy `spec_machine.cross_validate` rule 1. The title in `.md` and the

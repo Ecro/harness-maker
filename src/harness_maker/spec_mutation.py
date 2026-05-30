@@ -10,12 +10,14 @@ The fallback rule (60-min budget → sampled 200-mutant mode) is exposed via
 
 from __future__ import annotations
 
+import argparse
 import json
 import re
 import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Literal, cast
 
 VerificationTier = Literal[1, 2, 3]
 
@@ -196,6 +198,64 @@ def report_to_json(report: MutationReport) -> str:
     return json.dumps(payload, indent=2) + "\n"
 
 
+# ---------------------------------------------------------------------------
+# CLI (``python -m harness_maker.spec_mutation gate --yaml ... --tier 1``)
+# ---------------------------------------------------------------------------
+
+#: Substring mutmut-absent reports carry (see measure_baseline FileNotFoundError).
+_MUTMUT_ABSENT = "command not found"
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Tier-gated mutation gate over a SPEC.machine.yaml's paths_to_mutate.
+
+    Used by /hm:execute Phase D (T1 only, ADR-003 of PLAN-spec-test-accumulation)
+    and re-usable by /hm:loop. Degrades to non-gating (exit 0 + warning) when
+    mutmut is not installed — never blocks a user who lacks the dev tool.
+    """
+    from harness_maker.spec_machine import load as load_machine
+
+    parser = argparse.ArgumentParser(prog="python -m harness_maker.spec_mutation")
+    sub = parser.add_subparsers(dest="cmd", required=True)
+    p_gate = sub.add_parser("gate", help="run mutmut + gate one machine.yaml by tier")
+    p_gate.add_argument("--yaml", dest="yaml_path", type=Path, required=True)
+    p_gate.add_argument(
+        "--tier", type=int, default=None, help="override tier (default: yaml verification_tier)"
+    )
+    p_gate.add_argument("--sampled", action="store_true", help="200-mutant sampled mode")
+    p_gate.add_argument("--cwd", type=Path, default=Path.cwd())
+    args = parser.parse_args(argv)
+
+    machine = load_machine(args.yaml_path)
+    tier_raw = args.tier if args.tier is not None else int(machine.verification_tier)
+    if tier_raw not in (1, 2, 3):
+        print(f"mutation gate: invalid tier {tier_raw} (expected 1/2/3)", file=sys.stderr)
+        return 2
+    tier: VerificationTier = cast(VerificationTier, tier_raw)
+    paths = list(machine.paths_to_mutate)
+    if not paths:
+        print(f"mutation gate: {machine.spec_slug} has no paths_to_mutate (nothing to gate)")
+        return 0
+
+    report = measure_baseline(paths, cwd=args.cwd, sampled=args.sampled)
+    if _MUTMUT_ABSENT in report.raw_output:
+        print(
+            "mutation gate: mutmut not installed — skipping (non-gating). "
+            "Run `uv sync --group dev` to enable.",
+            file=sys.stderr,
+        )
+        return 0
+
+    passes, reason = gate(report, tier)  # baseline=None → tier floor (ADR-005)
+    stream = sys.stdout if passes else sys.stderr
+    print(f"mutation gate (T{tier}, {machine.spec_slug}): {reason}", file=stream)
+    return 0 if passes else 1
+
+
+if __name__ == "__main__":  # pragma: no cover - exercised via subprocess/main() in tests
+    raise SystemExit(main())
+
+
 __all__ = [
     "DEFAULT_SAMPLE_MUTANT_BUDGET",
     "DEFAULT_WALL_BUDGET_MIN",
@@ -204,6 +264,7 @@ __all__ = [
     "TIER_FLOORS",
     "VerificationTier",
     "gate",
+    "main",
     "measure_baseline",
     "report_to_json",
     "threshold_for",

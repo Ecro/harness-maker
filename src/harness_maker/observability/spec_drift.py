@@ -15,6 +15,7 @@ entirely.
 from __future__ import annotations
 
 import re
+import shutil
 from dataclasses import dataclass, field
 from datetime import date, datetime
 from pathlib import Path
@@ -23,6 +24,7 @@ from typing import Any
 import yaml
 
 from harness_maker.spec_machine import load as load_machine
+from harness_maker.spec_machine import unresolved_test_ids
 
 STALE_T1_DAYS: int = 7
 STALE_T2_DAYS: int = 14
@@ -38,6 +40,10 @@ class SpecDriftReport:
     stale_mutations: list[str] = field(default_factory=list)
     coverage_gaps: list[str] = field(default_factory=list)
     oq_overflow: list[str] = field(default_factory=list)  # SPECs with >3 OQs
+    # ACs whose test_ids resolve but pending_test is still true: the wrapup
+    # write-back never ran (e.g. manual commit instead of /hm:wrapup).
+    # ADR-009 of PLAN-spec-test-accumulation — surfaces the wrapup-gated gap.
+    resolved_but_pending: list[str] = field(default_factory=list)
     aggregate_oq_count: int = 0
     spec_count: int = 0
     skipped_reason: str | None = None
@@ -49,6 +55,7 @@ class SpecDriftReport:
             or self.stale_mutations
             or self.coverage_gaps
             or self.oq_overflow
+            or self.resolved_but_pending
             or self.aggregate_oq_count > OQ_AGGREGATE_CAP
         )
 
@@ -58,6 +65,7 @@ class SpecDriftReport:
             "stale_mutations": list(self.stale_mutations),
             "coverage_gaps": list(self.coverage_gaps),
             "oq_overflow": list(self.oq_overflow),
+            "resolved_but_pending": list(self.resolved_but_pending),
             "aggregate_oq_count": self.aggregate_oq_count,
             "spec_count": self.spec_count,
             "skipped_reason": self.skipped_reason,
@@ -106,6 +114,9 @@ def scan(specs_dir: Path, *, dev_mode: str = "task-driven") -> SpecDriftReport:
         return report
 
     referenced_test_ids: set[str] = set()
+    # (slug, ac_id, test_ids) for pending ACs that nonetheless carry test_ids —
+    # candidates for the resolved-but-pending (write-back-missed) check below.
+    pending_with_ids: list[tuple[str, str, tuple[str, ...]]] = []
     for yp in sorted(specs_dir.glob("SPEC-*.machine.yaml")):
         report.spec_count += 1
         try:
@@ -116,6 +127,8 @@ def scan(specs_dir: Path, *, dev_mode: str = "task-driven") -> SpecDriftReport:
         for ac in machine.ac:
             if not ac.test_ids and not ac.pending_test:
                 report.coverage_gaps.append(f"{machine.spec_slug}::{ac.id}")
+            if ac.pending_test and ac.test_ids:
+                pending_with_ids.append((machine.spec_slug, ac.id, tuple(ac.test_ids)))
             referenced_test_ids.update(ac.test_ids)
         # stale mutations
         if machine.mutation_threshold is not None and _is_stale(
@@ -129,6 +142,18 @@ def scan(specs_dir: Path, *, dev_mode: str = "task-driven") -> SpecDriftReport:
             report.aggregate_oq_count += oqs
             if oqs > OQ_PER_SPEC_CAP:
                 report.oq_overflow.append(f"{machine.spec_slug} ({oqs} OQs)")
+
+    # resolved-but-pending: one batched pytest collect over all candidate
+    # test_ids, then flag any AC whose test_ids all resolve yet stay pending.
+    # Skip entirely when pytest is unavailable (REVIEW C-P2a): unresolved_test_ids
+    # degrades to "all resolved" on a missing pytest, which would otherwise
+    # false-flag EVERY pending-with-ids AC as a write-back miss.
+    if pending_with_ids and shutil.which("pytest") is not None:
+        all_ids = sorted({tid for _, _, tids in pending_with_ids for tid in tids})
+        unresolved = set(unresolved_test_ids(all_ids, specs_dir.parent))
+        for slug, ac_id, tids in pending_with_ids:
+            if tids and not (set(tids) & unresolved):
+                report.resolved_but_pending.append(f"{slug}::{ac_id}")
 
     return report
 

@@ -210,3 +210,90 @@ def test_measure_baseline_timeout_preserves_partial_output(
     assert rep.killed == 80
     assert rep.survived == 20
     assert rep.score == pytest.approx(0.80)
+
+
+# ---------------------------------------------------------------------------
+# CLI gate (PLAN-spec-test-accumulation — execute Phase D T1 gate)
+# ---------------------------------------------------------------------------
+
+
+def _write_machine(tmp_path: Path, *, paths: list[str], tier: int = 1) -> Path:
+    import yaml
+
+    data = {
+        "schema_version": 1,
+        "spec_slug": "demo",
+        "verification_tier": tier,
+        "mutation_threshold": 85,
+        "paths_to_mutate": paths,
+        "ac": [
+            {
+                "id": "AC-001",
+                "title": "t",
+                "type": "mechanical",
+                "test_ids": ["t::f"],
+                "executable_predicate": "result == 1",
+            }
+        ],
+    }
+    p = tmp_path / "SPEC-demo.machine.yaml"
+    p.write_text(yaml.safe_dump(data))
+    return p
+
+
+def _report(killed: int, survived: int, *, raw: str = "") -> MutationReport:
+    return MutationReport(
+        paths=("src/x.py",),
+        killed=killed,
+        survived=survived,
+        timeout=0,
+        suspicious=0,
+        skipped=0,
+        sampled=False,
+        raw_output=raw or f"killed: {killed} survived: {survived}",
+    )
+
+
+def test_cli_gate_passes_when_score_above_floor(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import harness_maker.spec_mutation as sm
+
+    yp = _write_machine(tmp_path, paths=["src/x.py"])
+    monkeypatch.setattr(sm, "measure_baseline", lambda *a, **k: _report(90, 5))  # 94%
+    rc = sm.main(["gate", "--yaml", str(yp), "--tier", "1"])
+    assert rc == 0
+
+
+def test_cli_gate_fails_when_score_below_floor(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import harness_maker.spec_mutation as sm
+
+    yp = _write_machine(tmp_path, paths=["src/x.py"])
+    monkeypatch.setattr(sm, "measure_baseline", lambda *a, **k: _report(50, 50))  # 50% < 85
+    rc = sm.main(["gate", "--yaml", str(yp), "--tier", "1"])
+    assert rc == 1
+
+
+def test_cli_gate_degrades_when_mutmut_absent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """mutmut not installed → non-gating (exit 0) with a skip notice."""
+    import harness_maker.spec_mutation as sm
+
+    yp = _write_machine(tmp_path, paths=["src/x.py"])
+    monkeypatch.setattr(
+        sm, "measure_baseline", lambda *a, **k: _report(0, 0, raw="mutmut: command not found")
+    )
+    rc = sm.main(["gate", "--yaml", str(yp), "--tier", "1"])
+    assert rc == 0
+    assert "not installed" in capsys.readouterr().err
+
+
+def test_cli_gate_no_paths_is_noop(tmp_path: Path) -> None:
+    import harness_maker.spec_mutation as sm
+
+    yp = _write_machine(tmp_path, paths=[])
+    rc = sm.main(["gate", "--yaml", str(yp), "--tier", "1"])
+    assert rc == 0

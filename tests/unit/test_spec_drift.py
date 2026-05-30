@@ -161,3 +161,113 @@ def test_constants_unchanged() -> None:
 
 def test_is_stale_invalid_date_returns_false() -> None:
     assert _is_stale("not-a-date", 1) is False
+
+
+# ---------------------------------------------------------------------------
+# resolved-but-pending detector (ADR-009 of PLAN-spec-test-accumulation)
+# ---------------------------------------------------------------------------
+
+
+def test_scan_flags_resolved_but_pending(tmp_path, monkeypatch) -> None:
+    """A pending AC whose test_ids all resolve = wrapup write-back never ran."""
+    import harness_maker.observability.spec_drift as sd
+
+    specs = tmp_path / "specs"
+    _seed_spec(
+        specs,
+        "x",
+        ac=[
+            {
+                "id": "AC-001",
+                "title": "t",
+                "type": "mechanical",
+                "executable_predicate": "result == 1",
+                "test_ids": ["tests/test_x.py::test_y"],
+                "pending_test": True,  # but the test below resolves
+            }
+        ],
+    )
+    monkeypatch.setattr(sd, "unresolved_test_ids", lambda ids, cwd: [])  # all resolve
+    report = scan(specs, dev_mode="spec-driven")
+    assert "x::AC-001" in report.resolved_but_pending
+    assert report.has_findings
+
+
+def test_scan_pending_with_unresolved_test_not_flagged(tmp_path, monkeypatch) -> None:
+    """Genuinely-pending AC (test_ids do not resolve yet) is NOT a write-back miss."""
+    import harness_maker.observability.spec_drift as sd
+
+    specs = tmp_path / "specs"
+    _seed_spec(
+        specs,
+        "x",
+        ac=[
+            {
+                "id": "AC-001",
+                "title": "t",
+                "type": "mechanical",
+                "executable_predicate": "result == 1",
+                "test_ids": ["tests/test_x.py::test_missing"],
+                "pending_test": True,
+            }
+        ],
+    )
+    monkeypatch.setattr(sd, "unresolved_test_ids", lambda ids, cwd: list(ids))  # none resolve
+    report = scan(specs, dev_mode="spec-driven")
+    assert report.resolved_but_pending == []
+
+
+def test_scan_pending_without_test_ids_skips_collect(tmp_path, monkeypatch) -> None:
+    """Pending AC with empty test_ids is not a candidate — no pytest collect runs."""
+    import harness_maker.observability.spec_drift as sd
+
+    called = {"n": 0}
+
+    def _spy(ids, cwd):
+        called["n"] += 1
+        return []
+
+    specs = tmp_path / "specs"
+    _seed_spec(
+        specs,
+        "x",
+        ac=[
+            {
+                "id": "AC-001",
+                "title": "t",
+                "type": "mechanical",
+                "executable_predicate": "result == 1",
+                "test_ids": [],
+                "pending_test": True,
+            }
+        ],
+    )
+    monkeypatch.setattr(sd, "unresolved_test_ids", _spy)
+    report = scan(specs, dev_mode="spec-driven")
+    assert report.resolved_but_pending == []
+    assert called["n"] == 0  # no candidates → no collect
+
+
+def test_scan_resolved_but_pending_skipped_when_pytest_absent(tmp_path, monkeypatch) -> None:
+    """C-P2a: with pytest unavailable, do NOT false-flag every pending-with-ids AC."""
+    import harness_maker.observability.spec_drift as sd
+
+    specs = tmp_path / "specs"
+    _seed_spec(
+        specs,
+        "x",
+        ac=[
+            {
+                "id": "AC-001",
+                "title": "t",
+                "type": "mechanical",
+                "executable_predicate": "result == 1",
+                "test_ids": ["tests/test_x.py::test_y"],
+                "pending_test": True,
+            }
+        ],
+    )
+    monkeypatch.setattr(sd.shutil, "which", lambda name: None)  # pytest "absent"
+    # If the guard were missing, unresolved_test_ids would degrade to [] and flag this AC.
+    report = scan(specs, dev_mode="spec-driven")
+    assert report.resolved_but_pending == []

@@ -132,6 +132,49 @@ Read the most recent REVIEW report frontmatter for `drift_verdict`.
 
 This step does NOT re-run the drift analysis. Review is the single owner (ADR-006).
 
+### Step 3.5 — Forward write-back to machine SPEC (PLAN-spec-test-accumulation)
+
+Skip this step entirely when `{{ config.spec.dir }}SPEC-{slug}.machine.yaml` does
+not exist (no machine SPEC → nothing to bind). Otherwise the worktree is finalized
+(Step 1) and the suite is GREEN (Step 2), so the AC-bound tests `/hm:execute`
+authored now live in the **base repo** — the right place for the write-back
+(ADR-005: base cwd makes `cross_validate`'s collection resolve correctly, and
+there is no cross-session worktree race).
+
+For each bindable mechanical AC whose test `/hm:execute` authored and that is now
+GREEN, record the binding so the machine SPEC becomes a living document — flip
+`pending_test→false` and append the actual test node id(s):
+
+{% if is_codex %}
+```
+Bash("python -m harness_maker.spec_machine mark-tested --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml --md {{ config.spec.dir }}SPEC-{slug}.md --test-id AC-001=tests/path::test_name")
+```
+{% else %}
+```bash
+!python -m harness_maker.spec_machine mark-tested \
+   --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml \
+   --md {{ config.spec.dir }}SPEC-{slug}.md \
+   --test-id AC-001=tests/path::test_name
+```
+{% endif %}
+
+Pass one `--test-id AC-NNN=<node>` per AC↔test you authored (repeatable). A
+non-zero exit means a recorded test still does not resolve via
+`pytest --collect-only` — surface it; do not hand-edit `pending_test`.
+
+**Per-type coverage report (ADR-002/009 — make the half-state visible):** after
+the write-back, report how the machine SPEC's ACs break down so the
+mechanical-first half-state is explicit, not hidden behind a single number:
+
+- **mechanical, forward-bound** (`pending_test: false`, ≥1 `test_ids`) — count.
+- **mechanical, still pending** — count (write-back not yet run for these).
+- **parametric / judgment, still pending** — count. These are EXPECTED to remain
+  pending until the parametric/judgment follow-up PLAN; they are not a defect.
+
+Surface the three counts in your wrapup summary. `/hm:health`'s `spec_drift`
+layer additionally flags any AC whose tests resolve but stayed pending (the
+write-back-missed bucket) — see ADR-009.
+
 ### Step 4 — PLAN status update
 
 Update `{{ config.work_docs.dir }}PLAN-{slug}.md`:

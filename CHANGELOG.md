@@ -2,6 +2,40 @@
 
 ## [Unreleased]
 
+## [0.28.0] - 2026-05-30
+
+### Added: forward spec↔test binding on the everyday `/hm:execute` path
+
+`/hm:execute` now consumes `SPEC-{slug}.machine.yaml` as a source of truth, so
+the AC→test→mutation graph accumulates *forward* during normal feature work
+instead of being reconstructed retroactively by the spec-coverage backfill loop
+(PLAN-spec-test-accumulation).
+
+- **Predicate contract tightened (ADR-007):** `spec_machine.validate` now rejects
+  a mechanical AC unless its `executable_predicate` `ast.parse`s as an assertable
+  Python expression (comparison / call / bool-op / unary-op referencing ≥1
+  symbol). Prose (`"retries are bounded"`) and tautologies (`True`) are rejected.
+  `spec.md.j2` guidance updated accordingly. (Back-compat waived per ADR-008;
+  no CI gate runs validate over the real `specs/` tree.)
+- **`spec_machine` CLI:** `validate`, `cross-validate`, and `mark-tested`
+  subcommands (`python -m harness_maker.spec_machine ...`) — the `/hm:spec`
+  template's `validate` call is now real, not aspirational.
+- **Forward write-back (ADR-005):** `/hm:wrapup` calls `mark-tested` in the base
+  repo after finalize to flip `pending_test→false` + record the authored
+  `test_ids`, making `machine.yaml` a living document. Located post-finalize so
+  collection resolves correctly and there is no cross-session worktree race.
+- **`spec_mutation` CLI:** `gate --yaml ... --tier 1` runs a tier-gated mutation
+  check (execute Phase D, T1 only — ADR-003); degrades to non-gating when mutmut
+  is absent.
+- **`spec_drift` resolved-but-pending detector (ADR-009):** `/hm:health` now
+  flags ACs whose tests resolve but stayed `pending_test=true` (the
+  wrapup-was-skipped bucket), so the wrapup-gated write-back is never a silent miss.
+- **Fixed (latent):** `spec_machine._check_pytest_collect` used non-`-q`
+  `--collect-only`, whose tree output carries no `::` nodeids — rule-3 reported
+  *every* test_id as unresolved in real use (only ever tested with the helper
+  mocked). Now uses `-q` + return-code-aware degradation; guarded by an unmocked
+  lifecycle test.
+
 ## [0.27.1] - 2026-05-29
 
 ### Fixed: parallel `/hm:execute` no longer blocked by the harness's own churn

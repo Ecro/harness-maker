@@ -49,16 +49,16 @@ files:
   body_sha256: 97786f65124e496d77adf30d8e29aebfd2c938702e79f6fb4eeaefe16bd73dc9
 - path: commands/hm/exec-rev-ver-wrap.md
   template: commands/hm/workflow_command.md.j2
-  body_sha256: 9e54f0aabf5d89c2af84d2d5e80248f8cfab2839bb7f03740d43ba046143db32
+  body_sha256: 430805672117517afbc614ca7b60bbb6b6c03001fb129c7a023c38c0d702702c
 - path: commands/hm/exec-rev-wrap.md
   template: commands/hm/workflow_command.md.j2
-  body_sha256: fb3f5afdbdbd8de3a4807dea199747590c1d7ebf7bccbff80c903bc3a02ff605
+  body_sha256: c749274c31b3623aeb2b782d30b25dbf255d5e6278b7fb3553db6f9e8b2259f5
 - path: commands/hm/exec-rev.md
   template: commands/hm/workflow_command.md.j2
-  body_sha256: 18bb8fe9d6eea2657014d786cb22a7dc0e751d1a82d37c4fdb2a6c7e1a43386e
+  body_sha256: a9f2513f73674494736db00b3a886ca08b69d4e336ea7316807c4aeaebd7c437
 - path: commands/hm/execute.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: 27660bdfe920f3bf96fbb1a04dc37d250c7f05e2ae3ac8e5932a0d3d4d6f478e
+  body_sha256: 2fa6e84ce58a9b3e4959595fbf427564cd84cb6b2033e45ec37c074b48e93d0b
 - path: commands/hm/health.md
   template: commands/hm/health.md.j2
   body_sha256: 558525e535d41484fe5780eeaf185b854994f299ed7ebca1164a1ae1c0e31506
@@ -73,10 +73,10 @@ files:
   body_sha256: 4ea7a5bfa70ffd8ca08dc8390f34b326bcd3ad66195b39da6c8fcd8d637aff74
 - path: commands/hm/plan-exec-rev-wrap.md
   template: commands/hm/workflow_command.md.j2
-  body_sha256: a9392d6ece562b9f5719b03b6f30627bc6c9b4658601c17ea9dc054688090572
+  body_sha256: 82259a92ab27529a60e0afc253fea307ba5eced75e24b62fc5c5d173882af96b
 - path: commands/hm/plan-exec-rev.md
   template: commands/hm/workflow_command.md.j2
-  body_sha256: f3b337d371308bd469f1db99a72df3cc37f4785ca5a364db45d8f61f8b2a2aa9
+  body_sha256: 7e81b9507ac77ff86bfa0bef9afc692621e7204f99b5034b09d26378b4a2880e
 - path: commands/hm/plan.md
   template: commands/hm/atomic_command.md.j2
   body_sha256: c519957d87918a44975c13732f7424fe0d2584f6154d4ccb7c9aefccd2db7c7d
@@ -88,7 +88,7 @@ files:
   body_sha256: e8aa298487eefda6899191edb4077ffd2b522a029421711007b5412602571a1e
 - path: commands/hm/spec.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: de915f4a0c60b3ffafac10c1bc3f340a48d5ae649d0fc3bfca40337eb808a5f8
+  body_sha256: 1338b7d28b824998bb3f0281bbce6e64ef84fd8e12f1a7fc57f9f700ccfa0e26
 - path: commands/hm/uninstall.md
   template: commands/hm/uninstall.md.j2
   body_sha256: ad9979712f913800330dc619b36b399a336fcf529ccd6901e9bc4b8fde0191dc
@@ -97,7 +97,7 @@ files:
   body_sha256: 18c86ac192f191d1a0f58f987370af698f775d8efb482cdcfca0aad189cbb0bd
 - path: commands/hm/wrapup.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: c6198062c83e08214fbc9984a050366a53d3acd5eb8dcba401ae29e75c9c03ee
+  body_sha256: 92875ee5cdc62a08450d127decb0982ec08d0741c91726023676adf972f7608d
 - path: harness.yaml
   template: harness-yaml/Side.yaml.j2
   body_sha256: 4bfdf1af863e91bf0f89859374eb1d90f6b713fded61ac86f08ae009866aca72
@@ -160,7 +160,7 @@ files:
   body_sha256: cf42cbee9d48750e213474a49b36c1d9a8f453df4bfbb97afc2eb0768781cc6a
 - path: stages/execute.md
   template: stages/execute.md.j2
-  body_sha256: 27660bdfe920f3bf96fbb1a04dc37d250c7f05e2ae3ac8e5932a0d3d4d6f478e
+  body_sha256: 2fa6e84ce58a9b3e4959595fbf427564cd84cb6b2033e45ec37c074b48e93d0b
 - path: stages/plan.md
   template: stages/plan.md.j2
   body_sha256: c519957d87918a44975c13732f7424fe0d2584f6154d4ccb7c9aefccd2db7c7d
@@ -172,10 +172,10 @@ files:
   body_sha256: e8aa298487eefda6899191edb4077ffd2b522a029421711007b5412602571a1e
 - path: stages/spec.md
   template: stages/spec.md.j2
-  body_sha256: de915f4a0c60b3ffafac10c1bc3f340a48d5ae649d0fc3bfca40337eb808a5f8
+  body_sha256: 1338b7d28b824998bb3f0281bbce6e64ef84fd8e12f1a7fc57f9f700ccfa0e26
 - path: stages/verify.md
   template: stages/verify.md.j2
   body_sha256: 18c86ac192f191d1a0f58f987370af698f775d8efb482cdcfca0aad189cbb0bd
 - path: stages/wrapup.md
   template: stages/wrapup.md.j2
-  body_sha256: c6198062c83e08214fbc9984a050366a53d3acd5eb8dcba401ae29e75c9c03ee
+  body_sha256: 92875ee5cdc62a08450d127decb0982ec08d0741c91726023676adf972f7608d

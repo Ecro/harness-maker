@@ -149,6 +149,15 @@ If `spec:` resolves to an existing file:
 - Extract `## 📋 In-Scope Scenarios` — Phase A authors one test per scenario.
 - Extract `## ✅ Verification Criteria` — Phase B RED-gate uses the named test commands.
 
+**Machine SPEC (forward binding — PLAN-spec-test-accumulation):** if a sibling
+`specs/SPEC-{slug}.machine.yaml` also exists, load it and list the
+`type: mechanical` ACs whose `executable_predicate` is a parseable Python
+expression (the contract `python -m harness_maker.spec_machine validate` enforces).
+Call this set the **bindable mechanical ACs** — Phase A authors a real
+predicate-bound test for each, and `/hm:wrapup` records the binding back. When
+the file is absent or has zero bindable mechanical ACs, Phase A uses the scenario
+path unchanged (silent fallback — task-driven / `--no-tdd` / trivial SPECs).
+
 If `research_doc:` resolves to an existing file with mtime < `mtime_warn_days` (frontmatter, default 7):
 - Read it; reuse `libs_fetched`, `sources` to skip duplicate context-fetching.
 - Cache HIT → no re-retrieval.
@@ -161,11 +170,31 @@ For each phase in PLAN's `## 📝 Implementation Plan`, run Phases A → A.5 →
 
 #### Phase A — Author tests (skipped when `tdd_active == false`)
 
-For each SPEC In-Scope Scenario in scope of this PLAN phase:
-1. Write test file(s) at the project's test directory using `test_framework` from SPEC.
-2. Test function name encodes the scenario ID: `test_s1_<short-name>`, `test_s2_<short-name>`, etc.
-3. Assertions match the scenario's `**Then**` clause exactly. No tautologies, no over-mocking, no stub-only bodies (test-reviewer enforces — Phase A.5).
-4. Tests MUST be RED initially — they import / depend on functions that do not yet exist or are stubs. The implementation is written in Phase C.
+Author the **union** of two test sets (PLAN-spec-test-accumulation ADR-001/002/006):
+
+**(a) Bindable mechanical ACs** (when the machine SPEC has them — see Step 2):
+for each bindable mechanical AC in scope of this PLAN phase:
+1. Author the test at the AC's declared `test_ids[]` node id(s). If `test_ids` is
+   empty, name it `test_<ac-id-lowercased>_<short>` (e.g. `test_ac_001_bounded_retry`)
+   — `/hm:wrapup` records the chosen node back into the machine SPEC.
+2. The assertion **is** the AC's `executable_predicate`, evaluated against the real
+   subject under test — bind its free symbols to production objects. No tautology,
+   no mock-only body.
+
+**(b) Scenario tests** for every SPEC In-Scope Scenario NOT already covered by a
+bindable mechanical AC above:
+1. Write test file(s) using `test_framework` from SPEC.
+2. Test function name encodes the scenario ID: `test_s1_<short-name>`, etc.
+3. Assertions match the scenario's `**Then**` clause exactly.
+
+There is no machine-readable scenario↔AC link, so deciding which scenarios are
+"already covered" is a judgment call — do NOT write both an AC test and a scenario
+test for the same observable; the Phase A.5 test-reviewer adjudicates the union for
+duplication or coverage holes.
+
+All tests MUST be RED initially — they import / depend on functions that do not yet
+exist or are stubs. The implementation is written in Phase C. When no SPEC and no
+machine SPEC exist, author tests from the PLAN phase's exit-criterion instead.
 
 #### Phase A.5 — test-reviewer gate (skipped when `tdd_active == false`)
 
@@ -175,7 +204,7 @@ Invoke the `test-reviewer` agent on the just-authored test files:
 Task(
   subagent_type="test-reviewer",
   description="Phase A.5 test-quality gate: {slug}",
-  prompt="<SPEC body + Phase A test file paths + test_framework name>\n\nReturn ONLY the JSON output as specified in your instructions."
+  prompt="<SPEC body + bindable mechanical AC list (id + predicate, when present) + Phase A test file paths + test_framework name>\n\nThe AC list lets you adjudicate the scenario∪AC union for duplication / coverage holes.\n\nReturn ONLY the JSON output as specified in your instructions."
 )
 ```
 
@@ -229,6 +258,25 @@ Plus the PLAN phase's exit-criterion command. All must pass. If any fails:
 - Compile / type / lint failure → fix in Phase C (re-edit, re-check); do NOT advance.
 - Test failure that wasn't there before → regression. Find the offending change, fix or revert.
 - Phase exit-criterion failure → the PLAN phase is not done. Either fix or escalate.
+
+**T1 mutation gate (machine SPEC path only — ADR-003 of PLAN-spec-test-accumulation):**
+when this PLAN phase authored bindable-mechanical-AC tests and the machine SPEC is
+`verification_tier: 1`, run the tier-gated mutation check over its `paths_to_mutate`:
+
+{% if is_codex %}
+```
+Bash("cd <WT> && uv run python -m harness_maker.spec_mutation gate --yaml specs/SPEC-{slug}.machine.yaml --tier 1")
+```
+{% else %}
+```bash
+!cd <WT> && uv run python -m harness_maker.spec_mutation gate --yaml specs/SPEC-{slug}.machine.yaml --tier 1
+```
+{% endif %}
+
+Exit 1 = the predicate tests are too weak (mutants survived). **Strengthen the
+assertion — never lower the threshold.** T2/T3 mutation is deferred to `/hm:loop`
+or sampling; do NOT run it on this hot path. If mutmut is not installed the gate
+prints a skip notice and passes (non-gating) — that is intended, not a failure.
 
 ### Step 4 — Stage exit (NO commit — wrapup owns commits)
 
