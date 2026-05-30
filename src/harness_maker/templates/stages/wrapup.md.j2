@@ -307,14 +307,25 @@ Bash("uv run python -m harness_maker.second_brain promote --type <decision|failu
 ### Step 6 — Stage memory + PLAN updates
 
 ```bash
-!git add .claude/memory/ {{ config.work_docs.dir }}PLAN-{slug}.md {{ config.work_docs.dir }}REVIEW-{slug}-*.md {{ config.work_docs.dir }}RESEARCH-{slug}.md {{ config.spec.dir }}SPEC-{slug}.md {{ config.spec.dir }}SPEC-{slug}.machine.yaml 2>/dev/null
+!for p in .claude/memory/ {{ config.work_docs.dir }}PLAN-{slug}.md {{ config.work_docs.dir }}REVIEW-{slug}-*.md {{ config.work_docs.dir }}RESEARCH-{slug}.md {{ config.spec.dir }}SPEC-{slug}.md {{ config.spec.dir }}SPEC-{slug}.machine.yaml; do \
+  [ -e "$p" ] && git add "$p" 2>/dev/null || true; \
+done
 ```
 
 > Stages the deliverables this task produced — PLAN, REVIEW, **and** RESEARCH +
 > SPEC — so they land in git instead of lingering as untracked dirt that blocks
 > the next session's `worktree create` (PLAN-worktree-base-artifact-pollution
-> ADR-004). The `2>/dev/null` swallows globs that match nothing (slug ran
-> plan-only / no SPEC) and gitignored-file no-ops.
+> ADR-004).
+>
+> **Why a per-path loop, not one `git add a b c`:** a single multi-pathspec
+> `git add` is atomic — if ANY argument matches nothing (no SPEC for this slug,
+> a glob with zero hits) `git add` fatal-exits with `pathspec ... did not match`
+> and stages **nothing**, silently dropping the memory updates from the commit.
+> A blanket `2>/dev/null` makes that failure invisible. The loop adds each path
+> independently (`[ -e ]` guard + per-path `|| true`), so a missing or
+> gitignored path can never abort staging of the others. (Footgun observed
+> 2026-05-30: the old form dropped wiki + failures from a wrapup commit because
+> the slug had no `specs/SPEC-*` file.)
 
 (REVIEW-*.md is optional — only present when `/hm:review` ran.)
 
