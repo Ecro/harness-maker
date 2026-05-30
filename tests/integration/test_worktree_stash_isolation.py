@@ -7,7 +7,7 @@ commit. Asserts session A's WIP is never absorbed into the squash commit.
 Gated by INTEGRATION=1 because the test creates real worktrees, runs real
 git plumbing, and exercises the production code path (not a mocked stand-in).
 
-The wrapup `git add` line is sourced from `templates/stages/wrapup.md.j2:206`
+The wrapup Step 6 `git add` path list is sourced from `templates/stages/wrapup.md.j2`
 verbatim — extracted by regex at test setup. A sibling guard test
 (`test_wrapup_template_git_add_line_extractable`) acts as a snapshot-style
 canary: if the template changes shape, this guard fires before the integration
@@ -49,8 +49,11 @@ def _wrapup_template_path() -> Path:
     )
 
 
+# Step 6 stages deliverables via a per-path loop (`for p in <paths>; do
+# [ -e "$p" ] && git add "$p" …`) so one missing pathspec can't abort the rest.
+# We pin the path list out of the `for p in <paths>; do` header.
 _WRAPUP_GIT_ADD_RE = re.compile(
-    r"^!git add (.+?) 2>/dev/null$",
+    r"^!for p in (.+?); do\b",
     re.MULTILINE,
 )
 
@@ -67,8 +70,8 @@ def _extract_wrapup_git_add_args() -> str:
     match = _WRAPUP_GIT_ADD_RE.search(body)
     if not match:
         raise AssertionError(
-            "wrapup.md.j2 has no `!git add … 2>/dev/null` line — template drift "
-            "broke integration-test pinning. Update _WRAPUP_GIT_ADD_RE or restore "
+            "wrapup.md.j2 has no `!for p in … ; do … git add` Step 6 loop — template "
+            "drift broke integration-test pinning. Update _WRAPUP_GIT_ADD_RE or restore "
             "the template line shape."
         )
     return (
@@ -111,7 +114,7 @@ def integration_repo(tmp_path: Path) -> Path:
 
 
 def test_wrapup_template_git_add_line_extractable() -> None:
-    """Guard: the wrapup.md.j2 `!git add … 2>/dev/null` line must be regex-extractable.
+    """Guard: the wrapup.md.j2 Step 6 `for p in … ; do … git add` loop must be regex-extractable.
 
     If this fails, the template has drifted and the integration test below is
     no longer pinned to the real production command. Fix _WRAPUP_GIT_ADD_RE or
@@ -128,7 +131,7 @@ def test_cross_session_real_wrapup_chain(integration_repo: Path) -> None:
     """End-to-end cross-session reproducer (ADR-003 case 5).
 
     Reproduces the original 2026-05-19 user incident with the REAL wrapup
-    commit shape — `git add` path list sourced from wrapup.md.j2:206 verbatim,
+    commit shape — `git add` path list sourced from wrapup.md.j2 Step 6 verbatim,
     NOT a synthetic stand-in (validator finding #8).
 
     Setup: tmp repo with .claude/memory + work-docs already tracked. Synthesize
@@ -158,15 +161,17 @@ def test_cross_session_real_wrapup_chain(integration_repo: Path) -> None:
     rc = worktree._cli_finalize([str(wt), "stage-only"])
     assert rc == 0, "session B finalize stage-only should succeed"
 
-    # === Wrapup mimic — REAL `git add` shape from wrapup.md.j2:206 ===
+    # === Wrapup mimic — REAL Step 6 per-path loop shape from wrapup.md.j2 ===
     add_args = _extract_wrapup_git_add_args().split()
-    # Run via shell-equivalent so `*` glob expands AND `2>/dev/null` semantics
-    # apply (empty REVIEW glob is tolerated by the template's 2>/dev/null).
-    subprocess.run(  # noqa: S602 — controlled args, shell needed for glob
-        f"git add {' '.join(add_args)} 2>/dev/null",
+    # Replay the production loop verbatim: `[ -e ]` guard + per-path `|| true`
+    # so missing pathspecs (no SPEC, empty REVIEW glob) can't abort the rest.
+    subprocess.run(  # noqa: S602 — controlled args, shell needed for glob + loop
+        "for p in "
+        + " ".join(add_args)
+        + '; do [ -e "$p" ] && git add "$p" 2>/dev/null || true; done',
         cwd=str(repo),
         shell=True,
-        check=False,  # tolerate missing REVIEW glob (template uses 2>/dev/null)
+        check=False,
     )
     _git(["commit", "-m", "session B wrapup"], cwd=repo)
 
