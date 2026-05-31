@@ -3,6 +3,8 @@ name: hm-{{ workflow_name }}
 description: "Run the harness-maker {{ workflow_name }} workflow ({{ stages | join(' → ') }}). Use the user's input as the goal or task."
 ---
 
+{% include "agents/_partials/step_manifest.md.j2" %}
+
 # hm-{{ workflow_name }}
 
 Run the **{{ workflow_name }}** fused workflow: {{ stages | join(' → ') }}.

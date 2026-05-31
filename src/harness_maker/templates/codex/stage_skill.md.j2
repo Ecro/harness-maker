@@ -3,6 +3,8 @@ name: hm-{{ stage }}
 description: "harness-maker {{ stage }} stage. Invoke when the task requires the {{ stage }} stage of the harness-maker workflow."
 ---
 
+{% include "agents/_partials/step_manifest.md.j2" %}
+
 {{ stage_body | default('') }}
 
 <!-- @hm:user:extensions -->

@@ -1,0 +1,20 @@
+{#- Step-manifest preamble (ADR-003 of PLAN-latency-worktree-step-preview).
+    Injected at the head of the atomic + workflow command wrappers (Claude +
+    Codex). Prompt-level: the model echoes its own Procedure headings as a plan
+    before acting. Suppressed under an active autoloop so it does not flood the
+    per-iter transcript. Deliberately NOT included in capability skills — those
+    fire mid-task, not as user-invoked commands. -#}
+> **Before you begin — outline your plan.** First check whether an autoloop is
+> active: the marker `.hm-loop-active` lives at the **project root**, NOT inside
+> a worktree. If your cwd is inside a `.worktrees/<name>/` worktree, the project
+> root is the directory above `.worktrees/` (strip the `/.worktrees/<wt-name>/`
+> suffix, or run `git rev-parse --show-toplevel` and walk up out of `.worktrees/`).
+> **If `<project-root>/.hm-loop-active` exists, skip this preamble entirely and
+> operate without a manifest** — the autoloop runs silently and a per-iteration
+> manifest would flood the transcript. Otherwise, print a short numbered list of
+> the top-level steps you intend to take: for a single stage, read its `Step` /
+> `Phase` / `Check` headings; for a fused workflow, list **one line per stage**
+> (the `## Stage:` entries), not every sub-step. Present them as **intended,
+> conditional** steps — skip heuristics, early-exit / early-FAIL rules, and any
+> stage's own `STOP — do not proceed` boundary override this plan; never treat
+> the printed manifest as a commitment to run past a STOP. Then begin.

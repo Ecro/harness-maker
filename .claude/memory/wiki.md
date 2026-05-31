@@ -441,4 +441,20 @@ formula was truly identical. Extracting the "duplicated" prose would have forced
 convergence and lost per-stage nuance. Rule: a refactor premised on "these are duplicates"
 must show the diff proving identity before extraction.
 
+## [wiki:gotcha] loop-marker-check-must-resolve-from-worktree | 2026-05-31
+A prompt-level "skip X if the `.hm-loop-active` marker exists **at the project root**"
+instruction is WRONG when the executing context's cwd is inside a worktree. The autoloop
+writes `.hm-loop-active` at the project root (`loop.md.j2` `touch`), but the per-iter
+driver runs with cwd inside `<WT>` = `.worktrees/<name>/`, which is a SIBLING under the
+project, not an ancestor — so a naive "is the marker at the project root" check from the
+worktree misses it. The correct form (already canonical in `plan.md.j2:101-104` and
+enforced by `hooks/loop_gate.py:_worktree_parent_marker`) tells the LLM how to RESOLVE the
+project root first: strip the `/.worktrees/<wt-name>/` suffix, or `git rev-parse
+--show-toplevel` and walk out of `.worktrees/`. The step-manifest partial (ADR-003) shipped
+the naive form and would have flooded every loop iteration; caught only because the REVIEW
+ran TWO reviewers on disjoint lenses — the render/wiring reviewer saw nothing wrong, the
+BEHAVIORAL reviewer caught it. Lesson: any new marker/path check that can run from a
+worktree MUST mirror the project-root resolution precedent, and reviewing prompt changes on
+a single lens (syntax/render) misses runtime-context bugs.
+
 <!-- @hm:/user:entries -->
