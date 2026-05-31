@@ -43,8 +43,8 @@ def test_rendered_settings_json_is_pure_json(
     path = rendered_harness_all_targets / ".claude" / "settings.json"
     assert path.is_file(), f"renderer did not produce {path}"
     parsed = parse_settings_json(path.read_text(encoding="utf-8"))
-    # Sanity: production settings always carry permissions config — the
-    # 4 dangerous-pattern deny entries are part of the baseline.
+    # Sanity: production settings always carry a permissions block (allow list
+    # at minimum; the main-session deny list defaults empty — opt-in baseline).
     assert "permissions" in parsed, (
         "rendered settings.json missing 'permissions' — template invariant broken"
     )
@@ -58,10 +58,13 @@ def test_rendered_settings_json_permissions_lists_well_formed(
     path = rendered_harness_all_targets / ".claude" / "settings.json"
     parsed = parse_settings_json(path.read_text(encoding="utf-8"))
     perms = parsed["permissions"]
-    # `deny` is always seeded with the 4 dangerous patterns; assert
-    # explicitly because parse_settings_json only enforces the *type* (list).
+    # The boundary invariant is the TYPE — allow/deny/ask are JSON lists. The
+    # main-session `deny` list defaults EMPTY (2026-05-31: opt-out; the full
+    # dangerous baseline is opt-in via `harness.yaml.permissions.deny_dangerous`),
+    # so do NOT assert non-empty here — that content choice is covered by the
+    # settings-template unit tests, not this parse-boundary check.
+    assert isinstance(perms.get("allow"), list), "permissions.allow must be a list"
     assert isinstance(perms.get("deny"), list), "permissions.deny must be a list"
-    assert perms["deny"], "permissions.deny must be non-empty with the 4 dangerous patterns"
 
 
 # ──────────────────────────────────────────────────────────────────────────
