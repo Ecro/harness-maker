@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.28.2] - 2026-05-31
+
 ### Fixed: agent `model:` frontmatter is version-agnostic (alias, not pinned id)
 
 Rendered `.claude/agents/*.md` carried a stale **Cursor concrete id**
