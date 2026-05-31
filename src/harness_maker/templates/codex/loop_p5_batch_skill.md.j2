@@ -1,0 +1,10 @@
+---
+name: hm-loop-p5-batch
+description: "harness-maker P5-batch SPEC bulk-authoring mode. Invoke when the goal/slug begins with p5-batch (e.g. p5-batch-1, p5-batch-all). Extracted from the standard loop per ADR-006."
+---
+
+{{ p5_batch_body | default('') }}
+
+<!-- @hm:user:extensions -->
+<!-- Project-specific P5-batch configuration. Preserved across upgrades. -->
+<!-- @hm:/user:extensions -->

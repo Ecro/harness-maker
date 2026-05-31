@@ -1,6 +1,6 @@
 preset: Production
 dev_mode: spec-driven
-file_count: 60
+file_count: 61
 files:
 - path: ../CLAUDE.md
   template: claude-md/Production.en.md.j2
@@ -68,9 +68,12 @@ files:
 - path: commands/hm/help.md
   template: commands/hm/help.en.md.j2
   body_sha256: 5e7b433d8bbb5cb80c0fd03fb6f5dc4cd25203f09ab1d46064628a0a79aee3e7
+- path: commands/hm/loop-p5-batch.md
+  template: commands/hm/loop-p5-batch.md.j2
+  body_sha256: 65e0e633e6e5d3dd5d314768352240afde4db90ae1f47aaa638010937c7cd854
 - path: commands/hm/loop.md
   template: commands/hm/loop.md.j2
-  body_sha256: 5a03f162d5c8b043d7aa5c2a7bdbb6458367bf19054361e719eccf427365c952
+  body_sha256: 275a4168fe476c8779e35468ff8ce4413b09b06931cea1672455becce5ec497d
 - path: commands/hm/make.md
   template: commands/hm/make.md.j2
   body_sha256: 4ea7a5bfa70ffd8ca08dc8390f34b326bcd3ad66195b39da6c8fcd8d637aff74

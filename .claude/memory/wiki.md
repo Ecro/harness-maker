@@ -457,4 +457,20 @@ BEHAVIORAL reviewer caught it. Lesson: any new marker/path check that can run fr
 worktree MUST mirror the project-root resolution precedent, and reviewing prompt changes on
 a single lens (syntax/render) misses runtime-context bugs.
 
+## [wiki:gotcha] codex-bash-syntax-parity-on-shared-render | 2026-05-31
+Any command/skill content that is rendered into BOTH the Claude target AND the Codex target
+(e.g. `loop.md.j2` → `/hm:loop` + `.agents/skills/hm-loop/SKILL.md` via `synthesize.py`'s
+`is_codex=True` render; same for the extracted `loop-p5-batch.md.j2`) MUST branch every shell
+block: `{% if is_codex %}Bash("…"){% else %}!…{% endif %}`. Codex does NOT execute the
+Claude-CLI `!`-prefix run syntax — it expects `Bash(...)` tool calls — so an unbranched
+`!uv run …` block renders as INERT PROSE on the codex target. Caught in Phase 3: the P5-batch
+section had unbranched `!uv run python -c` blocks (pre-existing — the original loop section
+never branched them either), so the new full-parity codex skill was dead-on-arrival.
+Complication: multi-line `python -c "…"` heredocs don't fit Codex's single-line `Bash("…")`
+form, which is WHY the original left them unbranched. Pragmatic mitigation when a clean
+`Bash()` rewrite is too heavy: add a `{% if is_codex %}` note telling the codex model to run
+each `!`-block via its Bash tool verbatim. Proper fix: extract multi-line scripts to a helper
+module the skill calls as one line. Also: a test that only asserts "the codex skill file
+exists" does NOT catch this — assert the body is codex-executable (branched or noted).
+
 <!-- @hm:/user:entries -->

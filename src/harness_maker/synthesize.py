@@ -439,6 +439,7 @@ def _base_files(
         *_stage_files(),
         *_atomic_command_files(config_dump=config_dump),
         ("commands/hm/loop.md.j2", "commands/hm/loop.md", {}),
+        ("commands/hm/loop-p5-batch.md.j2", "commands/hm/loop-p5-batch.md", {}),
         ("commands/hm/health.md.j2", "commands/hm/health.md", {}),
         ("commands/hm/make.md.j2", "commands/hm/make.md", {}),
         ("commands/hm/configure.md.j2", "commands/hm/configure.md", {}),
@@ -549,6 +550,11 @@ def _codex_target_files(
         is_codex=True,
         config=config_dump,
     )
+    p5_batch_body = env.get_template("commands/hm/loop-p5-batch.md.j2").render(
+        harness_maker_src_path=install_ref,
+        is_codex=True,
+        config=config_dump,
+    )
     help_locale_raw = str(config_dump.get("locale", "en")) if config_dump else "en"
     help_body = env.get_template(_localized("commands/hm/help", help_locale_raw)).render(
         harness_maker_src_path=install_ref,
@@ -579,6 +585,11 @@ def _codex_target_files(
             "codex/loop_skill.md.j2",
             ".agents/skills/hm-loop/SKILL.md",
             {"loop_body": loop_body},
+        ),
+        (
+            "codex/loop_p5_batch_skill.md.j2",
+            ".agents/skills/hm-loop-p5-batch/SKILL.md",
+            {"p5_batch_body": p5_batch_body},
         ),
         (
             "codex/help_skill.md.j2",
