@@ -34,6 +34,8 @@ from pathlib import Path
 
 import pytest
 
+from harness_maker import worktree
+
 # Skip in default pytest run until Phase 7 promotes it; keep this guard until
 # the promote-to-CI-always-run commit lands. Set HM_RUN_PARALLEL_SESSION=1 to
 # exercise the RED case locally.
@@ -197,3 +199,64 @@ def test_post_commit_pop_does_not_touch_other_session_stash(tmp_path: Path) -> N
         f"the current process's post-commit-pop despite B's UUID not "
         f"being in the owned set.{diag}"
     )
+
+
+def _branch_exists(branch: str, repo: Path) -> bool:
+    return branch in _git("branch", "--list", branch, cwd=repo).stdout
+
+
+def test_create_time_prune_preserves_inflight_finalize_branch(tmp_path: Path) -> None:
+    """P1 cross-session (PLAN-p6-p7-worktree-finalize ADR-002, exit criterion #4).
+
+    Models session B's create-time `prune_stale` running while session A's
+    stage-only finalize is mid-flight. After A's `finalize stage-only`, A's work
+    is staged into the base index but NOT yet committed (wrapup commits later),
+    A's worktree dir is gone, and A's `execute-*` branch + `wip(execute)` commit
+    remain. B's orphan-branch sweep MUST preserve A's branch — A's content is
+    not in HEAD, so the content-gate keeps it (never delete another session's
+    unsaved work). Only once A's wrapup commits does a later prune sweep it.
+
+    This is the net-new cross-session behavior assertion the PLAN requires on
+    top of the single-session unit tests — "existing GREEN" cannot catch it.
+    """
+    base = _init_base_repo(tmp_path)
+
+    # Session A: create worktree, do work, commit the wip(execute) commit.
+    wt_a = worktree.create("execute", base)[0]
+    branch_a = wt_a.name
+    (wt_a / "feat.txt").write_text("A work\n", encoding="utf-8")
+    _git("add", ".", cwd=wt_a)
+    _git("commit", "-m", "wip(execute): A work", cwd=wt_a)
+
+    # Session A's stage-only finalize: stages into base, removes the dir, keeps
+    # the branch (the documented stash-conflict recovery net) — via the same CLI
+    # /hm:execute uses.
+    proc = subprocess.run(
+        [sys.executable, "-m", "harness_maker.worktree", "finalize", str(wt_a), "stage-only"],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert proc.returncode == 0, f"finalize stage-only failed: {proc.stderr}"
+    assert not wt_a.exists(), "stage-only finalize should remove A's worktree dir"
+    assert _branch_exists(branch_a, base), "finalize must NOT delete A's branch (recovery net)"
+
+    # Session B's create-time prune, mid-flight: A's work is staged, NOT in HEAD.
+    report_midflight = worktree.prune_stale(base)
+    assert _branch_exists(branch_a, base), (
+        "cross-session: in-flight finalize branch must survive (content not in HEAD)"
+    )
+    assert any(branch_a == b for b, _hint in report_midflight.preserved_branches), (
+        "A's branch must be reported preserved, not removed"
+    )
+    assert branch_a not in report_midflight.removed_branches
+
+    # Session A's wrapup commits → A's work now lands in HEAD.
+    _git("commit", "-m", "wrapup: land A work", cwd=base)
+
+    # A later create-time prune now sweeps the orphan branch (content in HEAD).
+    report_after = worktree.prune_stale(base)
+    assert not _branch_exists(branch_a, base), (
+        "after wrapup commit the orphan branch's content is in HEAD → swept"
+    )
+    assert branch_a in report_after.removed_branches

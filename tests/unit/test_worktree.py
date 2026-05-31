@@ -745,3 +745,78 @@ def test_cli_finalize_invalid_status() -> None:
 def test_create_inside_nonrepo_raises(tmp_path: Path) -> None:
     with pytest.raises(RuntimeError, match="git command failed"):
         worktree.create("execute", tmp_path)
+
+
+def _branch_exists(branch: str, repo: Path) -> bool:
+    cp = subprocess.run(  # noqa: S603 — fixed args, no shell
+        ["git", "branch", "--list", branch],
+        cwd=str(repo),
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return branch in cp.stdout
+
+
+def test_prune_sweeps_squash_merged_orphan_branch(repo: Path) -> None:
+    """P1: an orphan branch (worktree dir gone) whose work is in HEAD — tip is
+    NOT a HEAD ancestor (squash case), but all tip blobs ARE in HEAD — is swept."""
+    import shutil
+
+    wt = worktree.create("execute", repo)[0]
+    branch = wt.name
+    (wt / "feat.txt").write_text("feature\n")
+    _git(["add", "."], cwd=wt)
+    _git(["commit", "-m", "wip(execute): feature"], cwd=wt)
+    # Model squash-merge: the SAME content lands in base HEAD independently of the
+    # branch, so the branch tip is not a HEAD ancestor yet every tip blob is in HEAD.
+    (repo / "feat.txt").write_text("feature\n")
+    _git(["add", "."], cwd=repo)
+    _git(["commit", "-m", "land feature (squash-equiv)"], cwd=repo)
+    shutil.rmtree(wt)
+    _git(["worktree", "prune"], cwd=repo)
+    assert _branch_exists(branch, repo)  # leaked
+
+    report = worktree.prune_stale(repo)
+    assert not _branch_exists(branch, repo), "squash-merged orphan branch must be swept"
+    assert branch in report.removed_branches
+
+
+def test_prune_preserves_orphan_with_unmerged_content(repo: Path) -> None:
+    """P1 (biased-to-preserve): an orphan branch whose content is NOT in HEAD is
+    preserved + warned, never deleted."""
+    import shutil
+
+    wt = worktree.create("execute", repo)[0]
+    branch = wt.name
+    (wt / "unmerged.txt").write_text("only on the branch\n")
+    _git(["add", "."], cwd=wt)
+    _git(["commit", "-m", "wip(execute): unmerged work"], cwd=wt)
+    # Do NOT land the content in HEAD. Orphan the worktree.
+    shutil.rmtree(wt)
+    _git(["worktree", "prune"], cwd=repo)
+
+    report = worktree.prune_stale(repo)
+    assert _branch_exists(branch, repo), "orphan with unmerged content must be preserved"
+    assert any(branch == b for b, _hint in report.preserved_branches)
+    assert any(branch in w for w in report.warnings)
+
+
+def test_prune_does_not_sweep_live_worktree_branch(repo: Path) -> None:
+    """P1: a branch whose worktree dir is still present (live session) is never
+    swept — even when its content IS in HEAD, so only the dir-present check
+    (not the content-gate) is what holds it back."""
+    wt = worktree.create("execute", repo)[0]
+    branch = wt.name
+    # Land identical content in HEAD so the content-gate WOULD sweep — proving
+    # the dir-present skip is the thing preserving the branch, not the gate.
+    (wt / "feat.txt").write_text("feature\n")
+    _git(["add", "."], cwd=wt)
+    _git(["commit", "-m", "wip(execute): feature"], cwd=wt)
+    (repo / "feat.txt").write_text("feature\n")
+    _git(["add", "."], cwd=repo)
+    _git(["commit", "-m", "land feature"], cwd=repo)
+    assert wt.exists()  # live — dir present
+    report = worktree.prune_stale(repo)
+    assert _branch_exists(branch, repo), "live worktree's branch must not be swept"
+    assert branch not in report.removed_branches

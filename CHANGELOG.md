@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+### Fixed: orphan worktree-branch leak (`prune_stale` content-gated sweep)
+
+`worktree` cleanup never ran `git branch -D` (deliberately — it must keep the
+`wip(execute)` recovery net alive while a worktree is live), so every finalized
+worktree leaked its `execute-*`/`plan-*`/`phase-*`/`autoloop-*` branch forever.
+`prune_stale` (run at every `worktree create`) now sweeps such branches once
+their worktree dir is gone — but **only when their content is already in HEAD**.
+
+- New `_branch_content_in_head` gate mirrors the stash-ref drain: path-keyed blob
+  equality, **biased toward preserve** — any unresolvable ref / missing /
+  mismatched blob keeps the branch. It does NOT use `git branch --merged` (a
+  squash-merged tip is not a HEAD ancestor). (PLAN-p6-p7-worktree-finalize ADR-002.)
+- Cross-session safe: an in-flight session's stage-only branch (work staged, not
+  yet committed) is not in HEAD → preserved; swept only after its wrapup commits.
+- Live-skip keys on `_registered_worktree_paths`; failed deletes are reported
+  honestly (preserved+warned), never claimed as removed.
+
 ## [0.28.2] - 2026-05-31
 
 ### Fixed: agent `model:` frontmatter is version-agnostic (alias, not pinned id)

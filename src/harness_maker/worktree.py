@@ -1241,6 +1241,8 @@ class PruneReport:
     removed_worktrees: list[Path] = field(default_factory=list)
     removed_stash_refs: list[Path] = field(default_factory=list)
     preserved_stash_refs: list[tuple[Path, str]] = field(default_factory=list)
+    removed_branches: list[str] = field(default_factory=list)
+    preserved_branches: list[tuple[str, str]] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
 
 
@@ -1421,6 +1423,58 @@ def _stash_content_in_head(base_dir: Path, ref_sha: str) -> bool:
     return True
 
 
+def _branch_content_in_head(base_dir: Path, branch: str) -> bool:
+    """True iff every blob the branch changed since its merge-base with HEAD is
+    already byte-identical in HEAD.
+
+    Mirrors `_stash_content_in_head` (PLAN-p6-p7-worktree-finalize ADR-002): a
+    *squash-merged* branch tip is NOT a HEAD ancestor, so `git branch --merged`
+    would wrongly report it unmerged. We compare content, not ancestry. Biased
+    toward preserve — any unresolvable ref, missing, or mismatched blob returns
+    False so the orphan-branch sweep keeps the branch.
+
+    Unlike the stash predicate there is NO untracked-tree (``S^3``) leg: a
+    branch has no untracked tree — the worktree's untracked/uncommitted work is
+    captured into the ``wip(execute)`` commit before any cleanup, so the
+    merge-base diff below already enumerates it as tracked changes.
+    """
+    base = base_dir.resolve()
+    try:
+        _run(["git", "rev-parse", "--verify", f"{branch}^{{commit}}"], cwd=base)
+    except RuntimeError:
+        return False
+    try:
+        mb = _run(["git", "merge-base", branch, "HEAD"], cwd=base)
+    except RuntimeError:
+        return False
+    merge_base = mb.stdout.strip()
+    if not _SHA_RE.match(merge_base):
+        return False
+    try:
+        changed = _run(["git", "diff", "--name-only", merge_base, branch], cwd=base)
+    except RuntimeError:
+        return False
+    for path in [p for p in changed.stdout.splitlines() if p.strip()]:
+        if _git_blob_sha(base, branch, path) != _git_blob_sha(base, "HEAD", path):
+            return False
+    return True
+
+
+def _list_owned_branches(base_dir: Path) -> list[str]:
+    """Owned-prefix local branches. Branch name == worktree dir name (created
+    via `git worktree add -b <name>`), so `_OWNED_PREFIXES` is the single source
+    of truth for both — no separate branch-prefix constant (drift risk)."""
+    base = base_dir.resolve()
+    try:
+        cp = _run(
+            ["git", "for-each-ref", "--format=%(refname:short)", "refs/heads/"],
+            cwd=base,
+        )
+    except RuntimeError:
+        return []
+    return [b.strip() for b in cp.stdout.splitlines() if b.strip().startswith(_OWNED_PREFIXES)]
+
+
 def prune_stale(base_dir: Path, *, dry_run: bool = False) -> PruneReport:
     """Prune stale harness-owned markers, dangling worktrees, and safe refs.
 
@@ -1449,6 +1503,45 @@ def prune_stale(base_dir: Path, *, dry_run: bool = False) -> PruneReport:
         report.removed_worktrees.append(wt)
         if not dry_run:
             shutil.rmtree(wt, ignore_errors=True)
+
+    # Orphan worktree-branch sweep (PLAN-p6-p7-worktree-finalize ADR-002).
+    # `cleanup()` never runs `git branch -D` — it must preserve the
+    # `wip(execute)` recovery net while a worktree is live — so squash-merged
+    # branches leak forever. Here, at create-time prune, sweep an owned-prefix
+    # branch whose worktree dir is GONE, but ONLY when its content is already in
+    # HEAD (content-gated, biased-to-preserve). The recovery net is intact: a
+    # branch with work not yet in HEAD is preserved + warned, never deleted.
+    # Live-skip keyed on git REGISTRATION (ADR-002), not mere dir presence: a
+    # registered-but-dir-missing worktree still has the branch checked out, so a
+    # `git branch -D` would refuse anyway — skip it cleanly up front. `dir.exists()`
+    # stays as a belt-and-suspenders second signal.
+    registered = _registered_worktree_paths(base)
+    for branch in _list_owned_branches(base):
+        wt_dir = (base / WORKTREE_DIR_NAME / branch).resolve()
+        if wt_dir in registered or wt_dir.exists():
+            continue  # live worktree — never sweep its branch
+        if not _branch_content_in_head(base, branch):
+            hint = (
+                f"preserved branch {branch}: content not fully present in HEAD; "
+                f"inspect with `git log -p {branch}` before deleting"
+            )
+            report.preserved_branches.append((branch, hint))
+            report.warnings.append(hint)
+            continue
+        if dry_run:
+            report.removed_branches.append(branch)
+            continue
+        # Append only on a confirmed delete — never claim a removal that did not
+        # happen (e.g. a branch still checked out in a registration we did not
+        # skip). A failed delete is reported honestly instead.
+        try:
+            _run(["git", "branch", "-D", branch], cwd=base)
+        except RuntimeError as exc:
+            warn = f"branch sweep: `git branch -D {branch}` failed ({exc}); left in place"
+            report.preserved_branches.append((branch, warn))
+            report.warnings.append(warn)
+            continue
+        report.removed_branches.append(branch)
 
     if claude_dir.is_dir():
         for ref_file in sorted(claude_dir.glob(f"{_STASH_REF_PREFIX}*")):
