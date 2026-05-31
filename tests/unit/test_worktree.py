@@ -1029,3 +1029,34 @@ def test_finalize_fence_boundary_ordering(repo: Path, monkeypatch: pytest.Monkey
     # Pinned LOWER boundary: handoff + cleanup run AFTER the fence releases:
     assert i["fence-exit"] < i["ref-write"], events
     assert i["fence-exit"] < i["cleanup"], events
+
+
+def test_finalize_success_mode_conflict_resets_index_before_pop(repo: Path) -> None:
+    """CR1 (PLAN-p6-p7-worktree-finalize REVIEW): a success-mode (auto_commit)
+    finalize whose squash-merge CONFLICTS must reset the conflicted index to HEAD
+    before restoring the base stash — otherwise the stash pop runs over conflict
+    markers. The rollback reset must fire on ANY failure (wt_rc != 0), not only
+    the stage-only path (the old `if not auto_commit` guard skipped it here)."""
+    # base: a tracked file the worktree and base will both diverge.
+    (repo / "shared.txt").write_text("base\n")
+    _git(["add", "shared.txt"], cwd=repo)
+    _git(["commit", "-m", "add shared"], cwd=repo)
+    # worktree changes shared.txt and commits.
+    wt = worktree.create("execute", repo)[0]
+    (wt / "shared.txt").write_text("worktree\n")
+    _git(["add", "shared.txt"], cwd=wt)
+    _git(["commit", "-m", "wt change"], cwd=wt)
+    # base HEAD diverges the SAME file → the squash merge will conflict.
+    (repo / "shared.txt").write_text("base-changed\n")
+    _git(["add", "shared.txt"], cwd=repo)
+    _git(["commit", "-m", "base change"], cwd=repo)
+    # base dirty (untracked) so the stash path engages and the rollback pop fires.
+    (repo / "dirt.txt").write_text("user dirt\n")
+
+    rc = worktree._cli_finalize([str(wt), "success"])
+    assert rc != 0, "a conflicting success-mode finalize must fail"
+    # The conflicted index/working tree must have been reset to HEAD before the
+    # stash pop — no leftover conflict markers, content back at HEAD.
+    shared = (repo / "shared.txt").read_text()
+    assert "<<<<<<<" not in shared, f"conflict markers left in base (index not reset): {shared!r}"
+    assert shared == "base-changed\n", f"base shared.txt not restored to HEAD: {shared!r}"

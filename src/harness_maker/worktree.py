@@ -2242,11 +2242,16 @@ def _cli_finalize(args: list[str]) -> int:
                     _emit_pop_failure_signal(klass, stash_ref, files, current_wt.name)
                     pop_rc = 1
         finally:
-            # Rollback path: only pop when something raised BEFORE handoff. For
-            # stage-only rollback, reset the partially-staged squash first so
-            # pop doesn't conflict with our half-applied merge state.
+            # Rollback path: only pop when something raised BEFORE handoff.
+            # Reset the partial/conflicted merge to HEAD first so the pop doesn't
+            # apply over half-applied merge state. CR1 fix (PLAN-p6-p7-worktree-
+            # finalize REVIEW): gate on `wt_rc != 0` (ANY failure rollback), not
+            # `not auto_commit` — a success-mode `git merge --squash` CONFLICT
+            # also leaves a dirty/conflicted index without committing, and the
+            # old stage-only-only guard skipped the reset there, popping over
+            # conflict markers. `git reset --hard HEAD` is a no-op when clean.
             if stash_ref is not None and not handed_off:
-                if not auto_commit:
+                if wt_rc != 0:
                     with contextlib.suppress(RuntimeError):
                         _run(["git", "reset", "--hard", "HEAD"], cwd=base_repo)
                 ok, klass, files = _restore_base_dirty(base_repo, stash_ref)
