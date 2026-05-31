@@ -4,8 +4,24 @@ harness_maker_version: 0.28.2
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: 51704f1be1914b8bb51b1edf934acc999ec043c61a8ea899273578c3e073d076
+content_hash: 514a524b8606c9bed0487c10cbe2991e67424a724fe89c31d442ee267a603673
 ---
+> **Before you begin — outline your plan.** First check whether an autoloop is
+> active: the marker `.hm-loop-active` lives at the **project root**, NOT inside
+> a worktree. If your cwd is inside a `.worktrees/<name>/` worktree, the project
+> root is the directory above `.worktrees/` (strip the `/.worktrees/<wt-name>/`
+> suffix, or run `git rev-parse --show-toplevel` and walk up out of `.worktrees/`).
+> **If `<project-root>/.hm-loop-active` exists, skip this preamble entirely and
+> operate without a manifest** — the autoloop runs silently and a per-iteration
+> manifest would flood the transcript. Otherwise, print a short numbered list of
+> the top-level steps you intend to take: for a single stage, read its `Step` /
+> `Phase` / `Check` headings; for a fused workflow, list **one line per stage**
+> (the `## Stage:` entries), not every sub-step. Present them as **intended,
+> conditional** steps — skip heuristics, early-exit / early-FAIL rules, and any
+> stage's own `STOP — do not proceed` boundary override this plan; never treat
+> the printed manifest as a commitment to run past a STOP. Then begin.
+
+
 # /hm:plan-exec-rev
 
 
@@ -357,7 +373,7 @@ After the internal plan is complete (interview done, draft synthesized), invoke 
 Task(
   subagent_type="plan-validator",
   description="Plan validator: {slug}",
-  prompt="<full draft PLAN body + Interview Transcript + ADRs>\n\nReturn JSON: {overall: APPROVED|NEEDS_REVISION|MAJOR_REVISION, critiques: [...]}"
+  prompt="<full draft PLAN body + Interview Transcript + ADRs>\n\nReturn JSON: {overall: APPROVED|NEEDS_REVISION|MAJOR_REVISION, critiques: [...], codex_status: invoked|skipped, codex_reconciliation: [...]}"
 )
 ```
 
@@ -369,6 +385,8 @@ Resolution:
 > **If the validator agent itself fails to launch** (0 tool uses, model/launch error): retry the `Task(...)` call once with `model: "opus"` explicitly set (subagent frontmatter may be stale across a model upgrade). When you surface such a failure to the user, name the **tier** (`opus`/`sonnet`) — never a pinned concrete id like `claude-4-7-opus[1m]`; a pinned id in the message is itself the bug class this guidance exists to avoid. If it still cannot launch, self-review the PLAN in the validator's place and say so plainly.
 
 Each follow-up interview answer is appended to `## 🎙️ Interview Transcript` and promoted to ADR when Step D criteria apply.
+
+> **Codex second-opinion relay (mandatory call active).** `plan-validator` is configured to invoke Codex on every run. After reading the validator's returned JSON and **before** resolving the verdict, inspect its top-level `codex_status`. If it is `"skipped"`, the mandatory Codex call could not complete — surface the validator's `codex_skip_reason` to the user in your turn output (one line, e.g. `⚠️ Codex second opinion skipped: <reason> — verdict is Claude-only`). This is a loud notice, **not** a block: resolve the verdict regardless, since it is Claude-derived and valid without Codex.
 
 ### Step 5 — Write PLAN document
 
@@ -439,7 +457,7 @@ The shell guard below makes the receipt a no-op when `.current-iter` is absent �
 !if [ -f "<WT>/.claude/.hm-iter-receipts/.current-iter" ]; then \
    ITER=$(cat "<WT>/.claude/.hm-iter-receipts/.current-iter" 2>/dev/null); \
    if [ -n "$ITER" ]; then \
-     uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.28.2 python -m harness_maker.iter_receipts write \
+     uv run --with /home/noel/harness-maker python -m harness_maker.iter_receipts write \
        --iter "$ITER" --stage plan --verdict <verdict> --root "<WT>"; \
    fi; \
  fi
@@ -549,7 +567,7 @@ Engage isolation if `harness.yaml.worktree.scope` includes `execute`. The `workt
 
 
 ```bash
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.28.2 python -m harness_maker.worktree create execute "$(pwd)"
+!uv run --with /home/noel/harness-maker python -m harness_maker.worktree create execute "$(pwd)"
 ```
 
 
@@ -565,7 +583,7 @@ Read **all non-empty output lines** — that is the contract for the rest of thi
 
 
 ```bash
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.28.2 python -m harness_maker.worktree verify <WT>
+!uv run --with /home/noel/harness-maker python -m harness_maker.worktree verify <WT>
 ```
 
 
@@ -767,7 +785,7 @@ The shell guard below makes the receipt a no-op when `.current-iter` is absent �
 !if [ -f "<WT>/.claude/.hm-iter-receipts/.current-iter" ]; then \
    ITER=$(cat "<WT>/.claude/.hm-iter-receipts/.current-iter" 2>/dev/null); \
    if [ -n "$ITER" ]; then \
-     uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.28.2 python -m harness_maker.iter_receipts write \
+     uv run --with /home/noel/harness-maker python -m harness_maker.iter_receipts write \
        --iter "$ITER" --stage execute --verdict <verdict> --root "<WT>"; \
    fi; \
  fi
@@ -794,12 +812,12 @@ Pick **exactly one** finalize command. Substitute `<WT>` with the literal absolu
 ```bash
 # All phases GREEN — stage-merge the branch back (NO commit) + cleanup the worktree.
 # /hm:wrapup will create the single user-facing commit (with proper message + Co-Authored-By).
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.28.2 python -m harness_maker.worktree finalize <WT> stage-only
+!uv run --with /home/noel/harness-maker python -m harness_maker.worktree finalize <WT> stage-only
 ```
 
 ```bash
 # Stage halted on a blocker — preserve the worktree for inspection:
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.28.2 python -m harness_maker.worktree finalize <WT> fail
+!uv run --with /home/noel/harness-maker python -m harness_maker.worktree finalize <WT> fail
 ```
 
 
@@ -817,7 +835,7 @@ commit; otherwise the user's pre-existing WIP remains in the stash queue:
 
 
 ```bash
-!HM_OWNED_SESSION_UUIDS="$(uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.28.2 python -m harness_maker.worktree owned-uuids "$(pwd)")" uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.28.2 python -m harness_maker.worktree post-commit-pop "$(pwd)"
+!HM_OWNED_SESSION_UUIDS="$(uv run --with /home/noel/harness-maker python -m harness_maker.worktree owned-uuids "$(pwd)")" uv run --with /home/noel/harness-maker python -m harness_maker.worktree post-commit-pop "$(pwd)"
 ```
 
 
@@ -1248,7 +1266,7 @@ The shell guard below makes the receipt a no-op when `.current-iter` is absent �
 !if [ -f "<WT>/.claude/.hm-iter-receipts/.current-iter" ]; then \
    ITER=$(cat "<WT>/.claude/.hm-iter-receipts/.current-iter" 2>/dev/null); \
    if [ -n "$ITER" ]; then \
-     uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.28.2 python -m harness_maker.iter_receipts write \
+     uv run --with /home/noel/harness-maker python -m harness_maker.iter_receipts write \
        --iter "$ITER" --stage review --verdict <verdict> --root "<WT>"; \
    fi; \
  fi

@@ -4,7 +4,7 @@ harness_maker_version: 0.28.2
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: harness-yaml/Production.yaml.j2
 provenance: official
-content_hash: 206d523ac308069c78b84ba5e47e096146bad232639cb238cf81e61c958ff570
+content_hash: af795652c413ecfebfe48174234328e3412ca74ca60098394191e22cc98a571f
 ---
 preset: Production
 locale: ko
@@ -148,7 +148,7 @@ security:
 feedback:
   enabled: false
 codex_second_opinion:
-  enabled: false
+  enabled: true
   agents: ["code-reviewer", "consensus-arbiter", "plan-validator"]
   failure_policy: "warn-and-proceed"
   hermetic: true
