@@ -9,6 +9,7 @@ WSL2/NTFS (this project's primary runtime).
 
 from __future__ import annotations
 
+import contextlib
 import threading
 import time
 from pathlib import Path
@@ -113,3 +114,85 @@ def test_acquire_merge_fence_secondary_mechanism_works_when_flock_unavailable(
     # Should still acquire + release without raising.
     with _acquire_merge_fence(tmp_path, timeout=1.0):
         pass
+
+
+# ── P2 (PLAN-p6-p7-worktree-finalize ADR-003): stash gated by the fence ───────
+
+
+def test_finalize_stash_is_gated_by_merge_fence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """ADR-003: `_stash_base_dirty` runs INSIDE the merge fence, so a finalize
+    cannot stash the base while another holder owns the fence — the property
+    that serializes parallel finalizes. RED on the pre-move code (the stash ran
+    before the fence was acquired, so it was never gated)."""
+    import subprocess
+
+    from harness_maker import worktree
+
+    def _git(args: list[str], cwd: Path) -> None:
+        subprocess.run(  # noqa: S603
+            ["git", *args], cwd=str(cwd), check=True, capture_output=True, text=True
+        )
+
+    base = tmp_path / "base"
+    base.mkdir()
+    _git(["init", "-b", "main"], base)
+    _git(["config", "user.email", "t@example.com"], base)
+    _git(["config", "user.name", "T"], base)
+    (base / "README.md").write_text("# base\n")
+    (base / ".gitignore").write_text(
+        ".worktrees/\n.claude/.hm-loop-*\n.claude/.hm-finalize-stash-*\n"
+    )
+    _git(["add", "."], base)
+    _git(["commit", "-m", "init"], base)
+
+    wt = worktree.create("execute", base)[0]
+    (wt / "wt_file.txt").write_text("worktree work\n")
+    (base / "dirt.txt").write_text("user dirt\n")
+    _git(["add", "dirt.txt"], base)
+
+    stashed = threading.Event()
+    real_stash = worktree._stash_base_dirty
+    real_fence = worktree._acquire_merge_fence
+
+    def rec_stash(b: Path, wt_name: str) -> str | None:
+        stashed.set()  # we reached the stash → it was NOT gated out by the held fence
+        return real_stash(b, wt_name)
+
+    # Positive sync (no timing sleep): the worker signals the instant it reaches
+    # the fence-acquire boundary, BEFORE it blocks on the lock we hold. We then
+    # assert the stash has not run — robust regardless of how slow the worker's
+    # pre-fence `_capture_pending_in_worktree` is on WSL2/NTFS.
+    reached_fence = threading.Event()
+
+    @contextlib.contextmanager
+    def signaling_fence(b: Path, timeout: float = 60.0):  # type: ignore[no-untyped-def]
+        reached_fence.set()
+        with real_fence(b, timeout=timeout):
+            yield
+
+    monkeypatch.setattr(worktree, "_stash_base_dirty", rec_stash)
+    monkeypatch.setattr(worktree, "_acquire_merge_fence", signaling_fence)
+
+    rc_box: list[int] = []
+
+    def run() -> None:
+        rc_box.append(worktree._cli_finalize([str(wt), "stage-only"]))
+
+    t = threading.Thread(target=run)
+    # Main thread holds the REAL fence (bypassing the signaling wrapper).
+    with real_fence(base, timeout=10.0):
+        t.start()
+        assert reached_fence.wait(timeout=15.0), "worker never reached the fence-acquire boundary"
+        # Worker is now blocked acquiring the fence we hold. If the stash were
+        # gated by the fence (ADR-003), it cannot have run yet.
+        assert not stashed.is_set(), (
+            "finalize stashed the base while the fence was held — the stash is "
+            "NOT gated by the fence (ADR-003 regression)"
+        )
+    # Fence released → the finalize proceeds and stashes.
+    t.join(timeout=30.0)
+    assert stashed.is_set(), "finalize never stashed after the fence was released"
+    assert rc_box, "finalize thread did not complete"
+    assert rc_box[0] == 0, f"finalize rc={rc_box[0]}"

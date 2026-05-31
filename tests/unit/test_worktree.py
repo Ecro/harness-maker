@@ -7,6 +7,7 @@ its own one-commit repo so they remain independent.
 
 from __future__ import annotations
 
+import contextlib
 import subprocess
 from pathlib import Path
 
@@ -820,3 +821,211 @@ def test_prune_does_not_sweep_live_worktree_branch(repo: Path) -> None:
     report = worktree.prune_stale(repo)
     assert _branch_exists(branch, repo), "live worktree's branch must not be swept"
     assert branch not in report.removed_branches
+
+
+# ── P2: merge-fence boundary widening (PLAN-p6-p7-worktree-finalize ADR-003) ──
+#
+# The fence must wrap EXACTLY {_stash_base_dirty, staged_before snapshot,
+# merge()} — staged_before strictly AFTER the stash — with handed_off /
+# ref-write / cleanup / both pop paths pinned OUTSIDE. _capture_pending_in_worktree
+# is worktree-side (not base-repo), so it stays OUTSIDE the base-repo fence.
+
+
+def _make_base_dirty(repo: Path, name: str = "user_dirt.txt", body: str = "user wip\n") -> Path:
+    """Stage a non-harness user file in base so `_stash_base_dirty` actually stashes."""
+    p = repo / name
+    p.write_text(body)
+    _git(["add", name], cwd=repo)
+    return p
+
+
+def test_finalize_stash_runs_inside_merge_fence(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """RED gate for ADR-003: `_stash_base_dirty` must execute INSIDE the merge
+    fence (currently it runs before the fence is ever acquired). Records the
+    enter/stash/exit order via spies that delegate to the real impls."""
+    wt = worktree.create("execute", repo)[0]
+    (wt / "wt_file.txt").write_text("worktree work\n")
+    _make_base_dirty(repo)  # base dirty → stash path engages
+
+    events: list[str] = []
+    real_fence = worktree._acquire_merge_fence
+    real_stash = worktree._stash_base_dirty
+
+    @contextlib.contextmanager
+    def rec_fence(base: Path, timeout: float = 60.0):  # type: ignore[no-untyped-def]
+        events.append("fence-enter")
+        try:
+            with real_fence(base, timeout=timeout):
+                yield
+        finally:
+            events.append("fence-exit")
+
+    def rec_stash(base: Path, wt_name: str) -> str | None:
+        events.append("stash")
+        return real_stash(base, wt_name)
+
+    monkeypatch.setattr(worktree, "_acquire_merge_fence", rec_fence)
+    monkeypatch.setattr(worktree, "_stash_base_dirty", rec_stash)
+
+    rc = worktree._cli_finalize([str(wt), "stage-only"])
+    assert rc == 0, f"finalize rc={rc}, events={events}"
+    assert "fence-enter" in events, f"stash must run inside the fence; got {events}"
+    assert "stash" in events, f"stash must run inside the fence; got {events}"
+    i_enter = events.index("fence-enter")
+    i_stash = events.index("stash")
+    i_exit = events.index("fence-exit")
+    assert i_enter < i_stash, f"stash must run after the fence is entered; got {events}"
+    assert i_stash < i_exit, f"stash must run before the fence exits; got {events}"
+
+
+def test_finalize_releases_fence_on_stash_failure(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """ADR-003: a `_stash_base_dirty` that raises INSIDE the fence → finalize
+    returns 1 AND the fence is released (context-manager finally), so a
+    subsequent acquisition is not blocked."""
+    wt = worktree.create("execute", repo)[0]
+    (wt / "wt_file.txt").write_text("worktree work\n")
+    _make_base_dirty(repo)
+
+    events: list[str] = []
+    real_fence = worktree._acquire_merge_fence
+
+    @contextlib.contextmanager
+    def rec_fence(base: Path, timeout: float = 60.0):  # type: ignore[no-untyped-def]
+        events.append("fence-enter")
+        try:
+            with real_fence(base, timeout=timeout):
+                yield
+        finally:
+            events.append("fence-exit")
+
+    def boom_stash(base: Path, wt_name: str) -> str | None:
+        events.append("stash-raise")
+        raise RuntimeError("simulated stash failure")
+
+    monkeypatch.setattr(worktree, "_acquire_merge_fence", rec_fence)
+    monkeypatch.setattr(worktree, "_stash_base_dirty", boom_stash)
+
+    rc = worktree._cli_finalize([str(wt), "stage-only"])
+    assert rc == 1, f"stash failure must return 1; events={events}"
+    # The raise happened inside the fence, and the fence still released.
+    assert "fence-enter" in events, f"stash must raise inside the fence; got {events}"
+    i_enter = events.index("fence-enter")
+    i_raise = events.index("stash-raise")
+    i_exit = events.index("fence-exit")
+    assert i_enter < i_raise, f"stash must raise after the fence is entered; got {events}"
+    assert i_raise < i_exit, f"fence must exit (release) after the stash raises; got {events}"
+
+    # No leaked lock: the REAL fence acquires within a short timeout.
+    monkeypatch.setattr(worktree, "_acquire_merge_fence", real_fence)
+    with real_fence(repo, timeout=5.0):
+        pass
+
+
+def test_finalize_scope_guard_contamination_unchanged(
+    repo: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """ADR-003 ordering invariant: with `staged_before` captured AFTER the
+    stash, a dirty-base stage-only finalize introduces NO scope-guard
+    contamination — pre-existing user dirt is stashed out, the merge only
+    stages the worktree's own file."""
+    wt = worktree.create("execute", repo)[0]
+    (wt / "wt_only.txt").write_text("worktree-only change\n")
+    _make_base_dirty(repo, name="pre_existing.txt")  # pre-existing staged user content
+
+    rc = worktree._cli_finalize([str(wt), "stage-only"])
+    assert rc == 0
+    err = capsys.readouterr().err
+    assert "scope-guard violation" not in err, f"unexpected contamination flagged:\n{err}"
+
+
+def test_finalize_stage_only_deferred_pop_handoff_unchanged(repo: Path) -> None:
+    """ADR-003 pinned lower boundary: stage-only with a dirty base still writes
+    the `.hm-finalize-stash-*` ref file, sets handed_off=True, and the finally
+    does NOT pop — the user's dirt stays stashed for post-commit-pop, NOT
+    restored into the index on top of the squash."""
+    wt = worktree.create("execute", repo)[0]
+    (wt / "wt_file.txt").write_text("worktree work\n")
+    _make_base_dirty(repo, name="deferred_dirt.txt", body="defer me\n")
+
+    rc = worktree._cli_finalize([str(wt), "stage-only"])
+    assert rc == 0
+    # Ref file written (handoff to post-commit-pop).
+    refs = list((repo / ".claude").glob(".hm-finalize-stash-execute-*"))
+    assert refs, "stage-only with dirty base must write a finalize-stash ref file"
+    # Deferred, NOT popped: the user dirt is not restored into the working tree.
+    assert not (repo / "deferred_dirt.txt").exists(), (
+        "stage-only must NOT pop the base stash in the finally (deferred to post-commit-pop)"
+    )
+    # And it survives in the stash list for later restoration.
+    listing = subprocess.run(  # noqa: S603
+        ["git", "stash", "list"], cwd=str(repo), check=True, capture_output=True, text=True
+    )
+    assert "execute-" in listing.stdout, "the deferred stash must remain in the stash list"
+
+
+def test_finalize_fence_boundary_ordering(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """ADR-003 full boundary pin: the fence wraps EXACTLY {stash, staged_before
+    snapshot, merge} with `staged_before` STRICTLY AFTER the stash, while
+    `_write_stash_ref_file` (handoff) and `cleanup()` run STRICTLY AFTER the
+    fence releases (the pinned lower boundary). Records the execution order of
+    each named step and asserts the full ordering."""
+    wt = worktree.create("execute", repo)[0]
+    (wt / "wt_file.txt").write_text("worktree work\n")
+    _make_base_dirty(repo)  # dirty base → stash + ref-write handoff engage
+
+    events: list[str] = []
+    real_fence = worktree._acquire_merge_fence
+    real_stash = worktree._stash_base_dirty
+    real_snapshot = worktree._snapshot_staged_paths
+    real_refwrite = worktree._write_stash_ref_file
+    real_cleanup = worktree.cleanup
+
+    @contextlib.contextmanager
+    def rec_fence(base: Path, timeout: float = 60.0):  # type: ignore[no-untyped-def]
+        events.append("fence-enter")
+        try:
+            with real_fence(base, timeout=timeout):
+                yield
+        finally:
+            events.append("fence-exit")
+
+    def rec_stash(b: Path, wt_name: str) -> str | None:
+        events.append("stash")
+        return real_stash(b, wt_name)
+
+    def rec_snapshot(b: Path) -> set[str]:
+        events.append("snapshot")
+        return real_snapshot(b)
+
+    def rec_refwrite(*a: object, **k: object) -> None:
+        events.append("ref-write")
+        return real_refwrite(*a, **k)  # type: ignore[arg-type]
+
+    def rec_cleanup(*a: object, **k: object) -> None:
+        events.append("cleanup")
+        return real_cleanup(*a, **k)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(worktree, "_acquire_merge_fence", rec_fence)
+    monkeypatch.setattr(worktree, "_stash_base_dirty", rec_stash)
+    monkeypatch.setattr(worktree, "_snapshot_staged_paths", rec_snapshot)
+    monkeypatch.setattr(worktree, "_write_stash_ref_file", rec_refwrite)
+    monkeypatch.setattr(worktree, "cleanup", rec_cleanup)
+
+    rc = worktree._cli_finalize([str(wt), "stage-only"])
+    assert rc == 0, f"finalize rc={rc}, events={events}"
+
+    steps = ("fence-enter", "stash", "snapshot", "fence-exit", "ref-write", "cleanup")
+    for step in steps:
+        assert step in events, f"missing {step}; got {events}"
+    i = {s: events.index(s) for s in steps}
+    # Upper boundary + staged_before strictly after stash + both inside the fence:
+    assert i["fence-enter"] < i["stash"], events
+    assert i["stash"] < i["snapshot"], events  # staged_before STRICTLY after stash
+    assert i["snapshot"] < i["fence-exit"], events  # snapshot inside the fence
+    # Pinned LOWER boundary: handoff + cleanup run AFTER the fence releases:
+    assert i["fence-exit"] < i["ref-write"], events
+    assert i["fence-exit"] < i["cleanup"], events

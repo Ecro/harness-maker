@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Changed: merge fence wraps the full base-mutating critical section
+
+The Layer-4 finalize merge fence now wraps `{git stash, staged-before snapshot,
+squash merge}` instead of only the merge. Previously `_stash_base_dirty` ran
+*outside* the fence, so two parallel finalizes could `git stash push` the same
+base concurrently — the race the fence exists to prevent. `staged_before` is
+captured strictly after the stash (scope-guard `--allow-dirty-base` exemption);
+`_capture_pending_in_worktree` and all pop/cleanup/handoff paths stay outside the
+fence. (PLAN-p6-p7-worktree-finalize ADR-003.) Accepted trade-off: the 60s fence
+acquire-timeout is retained though the guarded section can hold longer on a large
+dirty tree — a rare parallel-finalize case degrades to preserve-and-rerun.
+
 ### Fixed: orphan worktree-branch leak (`prune_stale` content-gated sweep)
 
 `worktree` cleanup never ran `git branch -D` (deliberately — it must keep the

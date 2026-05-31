@@ -906,6 +906,21 @@ def _verify_scope_subset(
     return (not contamination, contamination)
 
 
+def _snapshot_staged_paths(base: Path) -> set[str]:
+    """Paths currently staged in ``base`` (``git diff --cached --name-only``).
+
+    PLAN-p6-p7-worktree-finalize ADR-003: captured INSIDE the merge fence,
+    strictly AFTER ``_stash_base_dirty``, so the scope-guard's
+    ``--allow-dirty-base`` exemption reads the post-stash index. Returns the
+    empty set on git failure (degrade to "nothing pre-staged").
+    """
+    try:
+        proc = _run(["git", "diff", "--cached", "--name-only"], cwd=base)
+    except RuntimeError:
+        return set()
+    return set(proc.stdout.strip().splitlines())
+
+
 @contextlib.contextmanager
 def _acquire_merge_fence(base: Path, timeout: float = 60.0):  # type: ignore[no-untyped-def]
     """Serialize the merge step across parallel finalize invocations.
@@ -2083,21 +2098,18 @@ def _cli_finalize(args: list[str]) -> int:
             print(str(e), file=sys.stderr)
             return 1
 
-        # ADR-001: stash base's pre-existing dirty BEFORE squash so the merge
-        # runs on a clean tree. Both modes engage isolation; success mode pops
-        # inside the envelope, stage-only hands off via the ref file.
+        # ADR-003: the base stash now runs INSIDE the merge fence (below), not
+        # here — two parallel finalizes must not `git stash push` the same base
+        # concurrently. handed_off: True means recovery is owned by a downstream
+        # actor (the wrapup-side post-commit-pop); when True the finally clause
+        # must NOT pop (it would re-contaminate the index with the user's dirty
+        # on top of the staged squash — validator 2nd-pass critical). Both are
+        # initialized before the outer try so the finally always has a value;
+        # the real handed_off is computed AFTER the fence releases (ADR-003
+        # pinned lower boundary).
         stash_ref: str | None = None
-        try:
-            stash_ref = _stash_base_dirty(base_repo, current_wt.name)
-        except RuntimeError as e:
-            print(f"[finalize] stash setup failed: {e}", file=sys.stderr)
-            return 1
-
-        # handed_off: True means recovery is owned by a downstream actor
-        # (the wrapup-side post-commit-pop). When True, the finally clause
-        # must NOT pop — doing so would re-contaminate the index with the
-        # user's dirty on top of the staged squash (validator 2nd-pass critical).
-        handed_off = stash_ref is None  # no stash → vacuously complete
+        handed_off = False
+        staged_before: set[str] = set()
 
         try:
             # CRITICAL: capture uncommitted work before merge — see finalize bug 2026-05-08.
@@ -2116,26 +2128,37 @@ def _cli_finalize(args: list[str]) -> int:
                 wt_rc = 1
 
             if wt_rc == 0:
-                # PLAN-worktree-cross-session-data-loss-defense:
-                # ADR-005 merge fence — serialize parallel finalize.
-                # ADR-006 scope-guard (warn-only) — detect merge sweeping
-                # unrelated staged files into the squash. Pre-existing
-                # staged content (--allow-dirty-base path) is excluded
-                # via staged_before snapshot.
-                try:
-                    staged_before_proc = _run(
-                        ["git", "diff", "--cached", "--name-only"], cwd=base_repo
-                    )
-                    staged_before = set(staged_before_proc.stdout.strip().splitlines())
-                except RuntimeError:
-                    staged_before = set()
-
+                # PLAN-worktree-cross-session-data-loss-defense ADR-005 merge
+                # fence (serialize parallel finalize) + PLAN-p6-p7-worktree-
+                # finalize ADR-003 boundary widening: the fence wraps EXACTLY
+                # the base-mutating critical section — {stash, staged_before
+                # snapshot, merge}. ADR-001 stashes base's pre-existing dirty so
+                # the squash runs on a clean tree; staged_before MUST be captured
+                # STRICTLY AFTER the stash (ADR-006 scope-guard reads the
+                # post-stash index, so the --allow-dirty-base path is exempt);
+                # then the squash merge. The fence (a context manager) releases
+                # on every exit, INCLUDING the stash-failure path below.
                 try:
                     with _acquire_merge_fence(base_repo, timeout=60.0):
+                        stash_ref = _stash_base_dirty(base_repo, current_wt.name)
+                        staged_before = _snapshot_staged_paths(base_repo)
                         merge(current_wt, strategy=strategy, commit=auto_commit)
                 except (RuntimeError, TimeoutError) as e:
-                    print(f"merge failed, preserving worktree: {e}", file=sys.stderr)
+                    print(
+                        f"[finalize] stash/merge failed, preserving worktree: {e}",
+                        file=sys.stderr,
+                    )
                     wt_rc = 1
+
+                # ADR-003: compute the real handed_off AFTER the fence releases
+                # (still inside this `if wt_rc == 0` block, so it does not orphan
+                # the scope-guard below). A clean base (no stash) is vacuously
+                # complete — the finally pops nothing. If `_capture` above failed,
+                # this block is skipped and handed_off stays False with stash_ref
+                # None, so the finally still pops nothing (correct). If the merge
+                # raised after a successful stash, handed_off is False here and
+                # the finally rolls the stash back.
+                handed_off = stash_ref is None
 
                 # ADR-006 scope-guard (warn-only initial; Phase 7 promotes
                 # to halt-mode after sandbox gitignore eliminates false
