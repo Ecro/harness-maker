@@ -1,0 +1,16 @@
+{#- Canonical 5-term inequality formula + locale line (ADR-004 of
+    PLAN-latency-worktree-step-preview). Single-sourced across the research/spec/plan
+    STAGES. NOTE: commands/hm/loop.md.j2:~323 (the autoloop 4-H interview gate)
+    holds a byte-identical 4th copy NOT yet folded in — that lives in loop.md.j2,
+    which Phase 3 owns; Phase 3 will replace it with this same include (golden-diff
+    verified). Until then this is not a complete single source. The surrounding
+    term-meanings + framing intentionally stay inline in each stage — auditing
+    showed they have diverged into genuinely stage-specific prose (only this
+    formula block was byte-identical), so they are NOT duplication to dedup. -#}
+```
+ask(Q) iff EIG(Q) ≥ ε  ∧  TaskRel·UserAns ≥ 0.7
+        ∧ slot ∉ common_ground  ∧  confidence < τ
+        ∧ open_ended_count < cap_locale
+```
+
+Continue using the configured locale for all live gate text.

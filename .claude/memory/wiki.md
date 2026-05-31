@@ -424,4 +424,21 @@ renders the real pipeline and fails if any concrete id reaches an agent `model:`
 Lesson: a field assumed "decorative" becomes a latent bug the moment upstream makes it
 load-bearing — pin nothing that an alias can express.
 
+## [wiki:pattern] prompt-template-shared-partials-dedup | 2026-05-31
+Prose blocks duplicated across the 7 `templates/stages/*.md.j2` (the Gate-0 receipt block,
+identical modulo stage name) are single-sourced via a PARAMETERIZED Jinja partial under
+`agents/_partials/` — each call site does `{% set gate0_* %}` then `{% include %}`. Optional
+per-stage fields stay StrictUndefined-safe via `{% if x is defined and x %}` (only the one
+stage that needs it sets the var). Verify a "pure dedup" refactor with a GOLDEN-MASTER render
+diff (render a fixture to a tmp dir before AND after, `diff` every rendered command — must be
+byte-identical) PLUS the snapshot suite, because the Jinja env is `trim_blocks=False,
+lstrip_blocks=False` (render.py:62-64) so whitespace is fragile and a stray include newline
+silently shifts output. KEY GOTCHA: do NOT trust an audit/RESEARCH "byte-for-byte duplicated
+×N" claim — DIFF the copies first. Here the 5-term inequality gate was asserted to be 3
+identical copies but was actually DRIFTED stage-specific prose (term-1 suffix "research
+direction" vs "SPEC content", per-stage frontmatter lists, F6 comment length); only the 4-line
+formula was truly identical. Extracting the "duplicated" prose would have forced false
+convergence and lost per-stage nuance. Rule: a refactor premised on "these are duplicates"
+must show the diff proving identity before extraction.
+
 <!-- @hm:/user:entries -->

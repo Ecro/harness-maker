@@ -297,13 +297,7 @@ in Step B this round, skip the gate below and exit the interview immediately.
 Otherwise, before declaring the interview complete, run the **5-Term Inequality Gate**
 (0.16.0, PLAN-deep-interview-question-criteria):
 
-```
-ask(Q) iff EIG(Q) ≥ ε  ∧  TaskRel·UserAns ≥ 0.7
-        ∧ slot ∉ common_ground  ∧  confidence < τ
-        ∧ open_ended_count < cap_locale
-```
-
-Continue using the configured locale for all live gate text.
+{% include "agents/_partials/inequality_gate_block.md.j2" %}
 
 **Term meanings (this stage's settings, rendered from harness.yaml):**
 
@@ -423,31 +417,7 @@ If verification fails, retry write **once**. If still failing, surface the path 
 
 **Stage terminal**: On success, output a brief completion summary (PLAN path, interview rounds, ADR count, validator outcome) and **STOP**. Do not invoke any downstream stage (`/hm:execute` or any other) without an explicit user command. This boundary must survive context compaction — the next stage is user-initiated.
 
-## Emit Gate 0 receipt (ADR-001, ADR-005)
-
-You have completed the stage. Emit a receipt so the autoloop driver's Gate 0 can detect missing stages at the next convergence check. Pick `<verdict>`:
-
-- **`pass`** — PLAN written + validator outcome was APPROVED or NEEDS_REVISION_RESOLVED.
-- **`fail`** — validator returned MAJOR_REVISION after re-run, OR Step 6 verification failed (frontmatter/ADR/phase-field invariants).
-- **`skipped`** — **DO NOT emit this value from a stage prompt.** Reserved for the autoloop driver's auto-retry escape hatch (ADR-005 of PLAN-loop-mid-stop-and-review-skip).
-
-The shell guard below makes the receipt a no-op when `.current-iter` is absent — that file is written only by the autoloop driver at iter start. Standalone runs (no autoloop), no-isolation runs, and post-`/compact` restoration before iter 1 all skip the write naturally. This is by design — Gate 0 only reads receipts written under `iter-N` for N≥1. In standalone `/hm:plan` (no fused execute stage to engage isolation), `<WT>` may be undefined; the guard's `[ -f ]` test on a literal `<WT>` path is also false, so no write fires.
-
-{% if is_codex %}
-```
-Bash("if [ -f \"<WT>/.claude/.hm-iter-receipts/.current-iter\" ]; then ITER=$(cat \"<WT>/.claude/.hm-iter-receipts/.current-iter\" 2>/dev/null); if [ -n \"$ITER\" ]; then uv run --with {{ harness_maker_src_path }} python -m harness_maker.iter_receipts write --iter \"$ITER\" --stage plan --verdict <verdict> --root \"<WT>\"; fi; fi")
-```
-{% else %}
-```bash
-!if [ -f "<WT>/.claude/.hm-iter-receipts/.current-iter" ]; then \
-   ITER=$(cat "<WT>/.claude/.hm-iter-receipts/.current-iter" 2>/dev/null); \
-   if [ -n "$ITER" ]; then \
-     uv run --with {{ harness_maker_src_path }} python -m harness_maker.iter_receipts write \
-       --iter "$ITER" --stage plan --verdict <verdict> --root "<WT>"; \
-   fi; \
- fi
-```
-{% endif %}
+{% set gate0_heading = "## Emit Gate 0 receipt (ADR-001, ADR-005)" %}{% set gate0_stage = "plan" %}{% set gate0_pass = "PLAN written + validator outcome was APPROVED or NEEDS_REVISION_RESOLVED." %}{% set gate0_fail = "validator returned MAJOR_REVISION after re-run, OR Step 6 verification failed (frontmatter/ADR/phase-field invariants)." %}{% set gate0_standalone = true %}{% include "agents/_partials/gate0_receipt.md.j2" %}
 
 ## Outputs
 

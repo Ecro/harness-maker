@@ -1,0 +1,37 @@
+{#- Shared Gate-0 receipt block (ADR-004 of PLAN-latency-worktree-step-preview).
+    Single source for the mechanical receipt-emit instruction across all 7 stages.
+    Caller sets before {% include %}:
+      gate0_heading    — full heading line (## or ### form)
+      gate0_stage      — stage name (used for --stage and /hm:<stage>)
+      gate0_pass       — text after "**`pass`** — "
+      gate0_fail       — text after "**`fail`** — "
+      gate0_standalone — bool; append the "<WT> may be undefined" note (true for
+                         stages that do NOT engage isolation themselves).
+      gate0_extra_note — optional; an extra sentence appended to the guard
+                         paragraph (verify uses this for its Gate-0 loop note).
+    Inherits is_codex + harness_maker_src_path from the parent stage context. -#}
+{{ gate0_heading }}
+
+You have completed the stage. Emit a receipt so the autoloop driver's Gate 0 can detect missing stages at the next convergence check. Pick `<verdict>`:
+
+- **`pass`** — {{ gate0_pass }}
+- **`fail`** — {{ gate0_fail }}
+- **`skipped`** — **DO NOT emit this value from a stage prompt.** Reserved for the autoloop driver's auto-retry escape hatch (ADR-005 of PLAN-loop-mid-stop-and-review-skip).
+
+The shell guard below makes the receipt a no-op when `.current-iter` is absent — that file is written only by the autoloop driver at iter start. Standalone runs (no autoloop), no-isolation runs, and post-`/compact` restoration before iter 1 all skip the write naturally. This is by design — Gate 0 only reads receipts written under `iter-N` for N≥1.{% if gate0_standalone %} In standalone `/hm:{{ gate0_stage }}` (no fused execute stage to engage isolation), `<WT>` may be undefined; the guard's `[ -f ]` test on a literal `<WT>` path is also false, so no write fires.{% endif %}{% if gate0_extra_note is defined and gate0_extra_note %} {{ gate0_extra_note }}{% endif %}
+
+{% if is_codex %}
+```
+Bash("if [ -f \"<WT>/.claude/.hm-iter-receipts/.current-iter\" ]; then ITER=$(cat \"<WT>/.claude/.hm-iter-receipts/.current-iter\" 2>/dev/null); if [ -n \"$ITER\" ]; then uv run --with {{ harness_maker_src_path }} python -m harness_maker.iter_receipts write --iter \"$ITER\" --stage {{ gate0_stage }} --verdict <verdict> --root \"<WT>\"; fi; fi")
+```
+{% else %}
+```bash
+!if [ -f "<WT>/.claude/.hm-iter-receipts/.current-iter" ]; then \
+   ITER=$(cat "<WT>/.claude/.hm-iter-receipts/.current-iter" 2>/dev/null); \
+   if [ -n "$ITER" ]; then \
+     uv run --with {{ harness_maker_src_path }} python -m harness_maker.iter_receipts write \
+       --iter "$ITER" --stage {{ gate0_stage }} --verdict <verdict> --root "<WT>"; \
+   fi; \
+ fi
+```
+{% endif %}
