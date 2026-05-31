@@ -94,6 +94,30 @@ def _invoke_make(project_dir: Path, preset: str) -> None:
     )
 
 
+def _invoke_make_update(project_dir: Path) -> None:
+    """Re-render an existing install via ``make --update`` (reuses the project's
+    harness.yaml answers — unlike ``--autoloop`` which resets to defaults). Used
+    to exercise opt-in config (e.g. `permissions.deny_dangerous`) that a test
+    wrote into harness.yaml after the initial seed."""
+    from harness_maker.cli import app
+
+    env = {**os.environ, "HARNESS_MAKER_FREEZE": "1"}
+    old = os.environ.get("HARNESS_MAKER_FREEZE")
+    os.environ["HARNESS_MAKER_FREEZE"] = "1"
+    try:
+        result = _runner.invoke(
+            app, ["make", str(project_dir), "--update"], env=env, catch_exceptions=False
+        )
+    finally:
+        if old is None:
+            os.environ.pop("HARNESS_MAKER_FREEZE", None)
+        else:
+            os.environ["HARNESS_MAKER_FREEZE"] = old
+    assert result.exit_code == 0, (
+        f"harness-maker make --update failed (exit={result.exit_code}):\n{result.output}"
+    )
+
+
 def _failing_p0_signal_ids(project_dir: Path, preset: str) -> set[str]:
     """Return the set of failing P0 signal IDs (canonical project definition).
 
@@ -272,36 +296,49 @@ _REQUIRED_DENY_TOKENS: tuple[str, ...] = (
 
 
 def test_existing_install_settings_json_migrate(tmp_path: Path) -> None:
-    """Pre-existing settings.json with deny:[] → cli.make → 4 patterns added.
+    """Pre-existing settings.json with deny:[] → re-render → 4 patterns re-added.
 
     Covers ``render._merge_permissions`` list-union semantics
-    (render.py:180). The template ships the four dangerous-pattern deny
-    entries; when the user file has an empty deny list, the union appends
-    them on re-render.
+    (render.py:180): when the template ships the four dangerous-pattern deny
+    entries and the user file has an empty deny list, the union appends them
+    on re-render.
+
+    Since 2026-05-31 the dangerous-deny baseline is OPT-IN
+    (`harness.yaml.permissions.deny_dangerous`, default off → empty deny). This
+    test opts in (writes the field + re-renders via `--update`) so the template
+    seeds a populated deny list — the precondition the union behavior is about.
     """
     project = tmp_path / "proj"
     project.mkdir()
 
-    # 1. Seed.
+    # 1. Seed (opt-out default → empty deny), then opt IN to the dangerous-deny
+    #    baseline and re-render via --update (reuses harness.yaml; --autoloop
+    #    would reset to the empty default).
     _invoke_make(project, "Side")
+    harness_yaml = project / ".claude" / "harness.yaml"
+    harness_yaml.write_text(
+        harness_yaml.read_text(encoding="utf-8") + "\npermissions:\n  deny_dangerous: true\n",
+        encoding="utf-8",
+    )
+    _invoke_make_update(project)
     settings_path = project / ".claude" / "settings.json"
-    assert settings_path.is_file(), "first render did not produce settings.json"
+    assert settings_path.is_file(), "render did not produce settings.json"
 
-    # Sanity: the template did seed the four patterns.
+    # Sanity: with deny_dangerous opted in, the template seeds the four patterns.
     seeded = json.loads(settings_path.read_text(encoding="utf-8"))
     seeded_deny = seeded.get("permissions", {}).get("deny", [])
     for token in _REQUIRED_DENY_TOKENS:
         assert any(token in entry for entry in seeded_deny), (
-            f"Sanity: template did not seed deny entry containing {token!r}; "
+            f"Sanity: opted-in template did not seed deny entry containing {token!r}; "
             f"deny={seeded_deny}. The rest of this test would be misdirected."
         )
 
-    # 2. Simulate the 0.16.0 install: empty out deny.
+    # 2. Simulate a user who emptied deny.
     seeded["permissions"]["deny"] = []
     settings_path.write_text(json.dumps(seeded, indent=2) + "\n", encoding="utf-8")
 
-    # 3. Re-render.
-    _invoke_make(project, "Side")
+    # 3. Re-render (still opted-in via harness.yaml).
+    _invoke_make_update(project)
 
     # 4. Post-condition: 4 patterns back.
     after = json.loads(settings_path.read_text(encoding="utf-8"))
