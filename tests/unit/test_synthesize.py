@@ -88,15 +88,16 @@ def test_synthesize_includes_harness_yaml_and_settings_json() -> None:
 
 
 def test_synthesize_fused_workflow_command_count() -> None:
-    """Side starter set has 3 fused + 7 atomic + 6 fixed = 16 commands/hm/."""
+    """Side starter set has 3 fused + 7 atomic + 7 fixed = 17 commands/hm/."""
     p = _profile()
     a = interview(p, autoloop_mode=True)
     bp = synthesize(p, a)
     cmd_paths = [str(f.path) for f in bp.files if str(f.path).startswith("commands/hm/")]
-    # atomic(7) + fixed(6: loop/health/make/configure/uninstall/help) + fused.
+    # atomic(7) + fixed(7: loop/loop-p5-batch/health/make/configure/uninstall/help) + fused.
     # /hm:health absorbed ai-readiness/refresh/personalization-audit (ADR-006).
     # /hm:help added in 0.19.4 (PLAN-help-command).
-    expected = 7 + 6 + len(a.fused_workflows)
+    # /hm:loop-p5-batch extracted from /hm:loop body (PLAN-latency-worktree-step-preview ADR-006).
+    expected = 7 + 7 + len(a.fused_workflows)
     assert len(cmd_paths) == expected
 
 

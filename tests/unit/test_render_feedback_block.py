@@ -69,7 +69,18 @@ def test_when_feedback_enabled_marker_appears_exactly_once_in_atomic_commands() 
         # atomic_command.md.j2 produces files like 'research.md', 'execute.md', etc.
         and not any(
             p.endswith(f"/{w}.md")
-            for w in ("configure", "make", "loop", "health", "uninstall", "help")
+            # loop-p5-batch is loop-family (a niche bulk-authoring orchestrator
+            # extracted from /hm:loop, PLAN-latency-worktree-step-preview ADR-006),
+            # NOT an atomic stage command — like /hm:loop it carries no feedback block.
+            for w in (
+                "configure",
+                "make",
+                "loop",
+                "loop-p5-batch",
+                "health",
+                "uninstall",
+                "help",
+            )
         )
         and not p.endswith("/exec-rev-wrap.md")  # workflow-fused (default in Side preset)
     }

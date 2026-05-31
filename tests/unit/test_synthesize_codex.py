@@ -49,16 +49,18 @@ def test_synthesize_codex_target_emits_codex_config_toml(tmp_path: Path) -> None
 
 
 def test_synthesize_codex_target_emits_skill_paths(tmp_path: Path) -> None:
-    """synthesize() with codex target must emit 9 + 7 + N workflows + 1 loop + 1 help skills.
+    """codex target emits 9 + 7 + N workflows + 1 loop + 1 loop-p5-batch + 1 help.
 
     ADR-0007 (0.22.3): base skill count dropped 11 → 9 after removing
     research-crawler and relevance-filter alongside the external_risks layer.
+    loop-p5-batch skill added (PLAN-latency-worktree-step-preview ADR-006).
     """
     answers = _make_answers(tmp_path, ["codex"])
     bp = synthesize(profile(tmp_path), answers)
     skill_paths = [str(f.path) for f in bp.files if str(f.path).startswith(".agents/skills/")]
     n_workflows = len(answers.fused_workflows)
-    expected = 9 + 7 + n_workflows + 1 + 1  # existing + stages + workflows + loop + help
+    # existing + stages + workflows + loop + loop-p5-batch + help
+    expected = 9 + 7 + n_workflows + 1 + 1 + 1
     assert len(skill_paths) == expected, (
         f"Expected {expected} .agents/skills/ entries, got {len(skill_paths)}"
     )
