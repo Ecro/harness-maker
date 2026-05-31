@@ -1147,3 +1147,98 @@ def test_ensure_gitignore_absent_creates_file_and_batches(
     assert len(check_ignore_calls) <= 1, (
         f"check-ignore must be batched (≤1), got {len(check_ignore_calls)}: {check_ignore_calls}"
     )
+
+
+# ── CR2 / CN1 / CN2 follow-ups (PLAN-p6-p7-worktree-finalize REVIEW) ──────────
+
+
+def test_match_stash_sha_finds_message_substring() -> None:
+    """CR2: `_match_stash_sha` finds the stash by its (UUID-bearing) message
+    appearing ANYWHERE in git's `%gs` subject — so a format quirk (e.g. a
+    trailing file-count) no longer makes `_stash_base_dirty` raise + orphan the
+    just-pushed stash. The 32-hex UUID in the message keeps substring-match
+    collision-safe."""
+    sha = "a" * 40
+    msg = "hm-finalize-execute-abc123-0123456789abcdef0123456789abcdef"
+    # Plain `On <branch>: <msg>` form.
+    assert worktree._match_stash_sha(f"{sha} On main: {msg}", msg) == sha
+    # Bare-message form (some git versions).
+    assert worktree._match_stash_sha(f"{sha} {msg}", msg) == sha
+    # Quirk: trailing extra after the message — the OLD endswith/== match missed
+    # this and raised (orphaning the stash); substring-match finds it.
+    assert worktree._match_stash_sha(f"{sha} On main: {msg} (2 files)", msg) == sha
+    # Genuinely absent → None (nothing to orphan; caller raises correctly).
+    assert worktree._match_stash_sha(f"{sha} On main: some-other-stash", msg) is None
+    assert worktree._match_stash_sha("", msg) is None
+
+
+def test_finalize_merge_fence_timeout_covers_stash_hold(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """CN1: the merge fence's acquire-timeout must be >= the worst-case time the
+    critical section can HOLD it. Since the section now includes
+    `_stash_base_dirty` (`git stash push -u`, timeout `_GIT_TIMEOUT_LONG`=300s),
+    a 60s acquire budget would spuriously time out a 2nd parallel finalize."""
+    wt = worktree.create("execute", repo)[0]
+    (wt / "f.txt").write_text("x\n")
+    timeouts: list[float] = []
+    real_fence = worktree._acquire_merge_fence
+
+    @contextlib.contextmanager
+    def rec(base: Path, timeout: float = 60.0):  # type: ignore[no-untyped-def]
+        timeouts.append(timeout)
+        with real_fence(base, timeout=timeout):
+            yield
+
+    monkeypatch.setattr(worktree, "_acquire_merge_fence", rec)
+    worktree._cli_finalize([str(wt), "stage-only"])
+    assert timeouts, "merge fence was never acquired"
+    assert all(t >= worktree._GIT_TIMEOUT_LONG for t in timeouts), (
+        f"fence acquire-timeout must cover the {worktree._GIT_TIMEOUT_LONG}s stash hold; "
+        f"got {timeouts}"
+    )
+
+
+def test_finalize_success_pop_runs_inside_fence(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """CN2: the base stash pop (`_restore_base_dirty`) must run INSIDE a merge
+    fence so two parallel finalizes don't race on the shared base stash/index.
+    Currently the success-mode pop runs after the merge fence has released."""
+    wt = worktree.create("execute", repo)[0]
+    (wt / "f.txt").write_text("x\n")
+    # base dirty so a stash is pushed → a pop happens in success mode.
+    (repo / "dirt.txt").write_text("user dirt\n")
+
+    events: list[str] = []
+    real_fence = worktree._acquire_merge_fence
+    real_restore = worktree._restore_base_dirty
+
+    @contextlib.contextmanager
+    def rec_fence(base: Path, timeout: float = 60.0):  # type: ignore[no-untyped-def]
+        events.append("fence-enter")
+        try:
+            with real_fence(base, timeout=timeout):
+                yield
+        finally:
+            events.append("fence-exit")
+
+    def rec_restore(base: Path, ref: str) -> tuple[bool, str, list[Path]]:
+        events.append("pop")
+        return real_restore(base, ref)
+
+    monkeypatch.setattr(worktree, "_acquire_merge_fence", rec_fence)
+    monkeypatch.setattr(worktree, "_restore_base_dirty", rec_restore)
+
+    rc = worktree._cli_finalize([str(wt), "success"])
+    assert rc == 0, f"finalize rc={rc}, events={events}"
+    assert "pop" in events, f"no base stash pop happened; events={events}"
+    i = events.index("pop")
+    assert i > 0, f"pop must be preceded by a fence-enter; events={events}"
+    assert events[i - 1] == "fence-enter", (
+        f"pop must be immediately inside a fence (fence-enter before it); events={events}"
+    )
+    assert i + 1 < len(events), f"the pop's fence must release after it; events={events}"
+    assert events[i + 1] == "fence-exit", (
+        f"the pop's fence must release right after it; events={events}"
+    )

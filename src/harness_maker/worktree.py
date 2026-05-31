@@ -46,6 +46,12 @@ _GIT_TIMEOUT = 60  # seconds — prevent hang on SSH prompt or NFS stall
 # Longer timeout for `git stash push -u` on large working trees with untracked
 # binary artifacts. Bumped per REVIEW M-P1-3 — 60s was tight for repos >100MB.
 _GIT_TIMEOUT_LONG = 300
+# Merge-fence acquire-timeout (PLAN-p6-p7-worktree-finalize CN1, supersedes
+# ADR-003's "keep 60s"). The fenced critical section now HOLDS the lock for up
+# to _GIT_TIMEOUT_LONG (the stash) + _GIT_TIMEOUT (the merge); a waiter's
+# acquire budget must exceed that worst-case hold, else a legitimately-slow
+# first finalize spuriously times out a parallel second one.
+_FENCE_TIMEOUT = _GIT_TIMEOUT_LONG + _GIT_TIMEOUT  # 360s
 
 # Per-session marker files: .claude/.hm-loop-{primary-wt-basename}
 # One file per active session — parallel sessions coexist without collision.
@@ -474,6 +480,31 @@ def _is_harness_artifact(porcelain_line: str) -> bool:
     )
 
 
+def _match_stash_sha(listing_stdout: str, message: str) -> str | None:
+    """Find the stash SHA carrying our unique `message` in
+    ``git stash list --pretty=format:%H %gs`` output, or None.
+
+    Matches `message` as a SUBSTRING of the subject. git renders the subject as
+    ``On <branch>: <message>`` and some versions append extra (e.g. a file
+    count), so an exact / endswith match could miss a stash that genuinely
+    exists and raise — orphaning the just-pushed stash (CR2 of
+    PLAN-p6-p7-worktree-finalize REVIEW). Collision-safety rests on the
+    freshly-generated 32-hex `uuid4().hex` SUFFIX of `message` (128 bits) — NOT
+    the wt_name's 12-hex id — so another session's subject cannot coincide.
+    Returns None only when no entry carries the message (genuinely absent →
+    caller raises; nothing orphaned).
+    """
+    for line in listing_stdout.splitlines():
+        if not line:
+            continue
+        sha, _, subject = line.partition(" ")
+        if len(sha) != 40 or not _SHA_RE.match(sha):
+            continue
+        if message in subject:
+            return sha
+    return None
+
+
 def _stash_base_dirty(base: Path, wt_name: str) -> str | None:
     """Stash base's dirty (tracked + staged + untracked) before squash.
 
@@ -511,18 +542,9 @@ def _stash_base_dirty(base: Path, wt_name: str) -> str | None:
     # `--pretty=format:'%H %gs'` prints `<sha> <subject>` per stash entry;
     # subject is the message body without the `On <branch>:` prefix.
     listing = _run(["git", "stash", "list", "--pretty=format:%H %gs"], cwd=base)
-    for line in listing.stdout.splitlines():
-        # Each line is `<40-char sha> <subject>`. Subject often has the form
-        # `On main: <message>`; some git versions include the branch prefix
-        # in %gs output, others don't. Match by message suffix to handle both.
-        if not line:
-            continue
-        sha, _, subject = line.partition(" ")
-        if len(sha) != 40 or not _SHA_RE.match(sha):
-            continue
-        # Match either the bare message or the "On <branch>: <message>" form.
-        if subject.endswith(f": {message}") or subject == message:
-            return sha
+    sha = _match_stash_sha(listing.stdout, message)
+    if sha is not None:
+        return sha
     raise RuntimeError(f"stash push reported success but no entry matches message {message!r}")
 
 
@@ -614,6 +636,26 @@ def _restore_base_dirty(base: Path, ref_sha: str) -> tuple[bool, str, list[Path]
             file=sys.stderr,
         )
     return (True, "", [])
+
+
+def _fenced_restore_base_dirty(base: Path, ref_sha: str) -> tuple[bool, str, list[Path]]:
+    """`_restore_base_dirty` serialized behind the merge fence (CN2 of
+    PLAN-p6-p7-worktree-finalize REVIEW, supersedes ADR-003's "pops stay outside
+    the fence").
+
+    Two parallel finalizes against the same base otherwise race on the shared
+    stash stack / base ``index.lock`` during ``git stash apply``+``drop``. The
+    fence serializes them. If the fence is unavailable (TimeoutError or an
+    unsupported-lock RuntimeError), fall back to an UNFENCED restore — popping
+    the user's work back matters more than serializing it, and the apply/drop is
+    already SHA-targeted (wrong-entry-safe), so the unfenced path is exactly the
+    pre-change behavior.
+    """
+    try:
+        with _acquire_merge_fence(base, timeout=_FENCE_TIMEOUT):
+            return _restore_base_dirty(base, ref_sha)
+    except (RuntimeError, TimeoutError):
+        return _restore_base_dirty(base, ref_sha)
 
 
 def _emit_pop_failure_signal(klass: str, ref_sha: str, files: list[Path], wt_name: str) -> None:
@@ -2192,7 +2234,7 @@ def _cli_finalize(args: list[str]) -> int:
                 # then the squash merge. The fence (a context manager) releases
                 # on every exit, INCLUDING the stash-failure path below.
                 try:
-                    with _acquire_merge_fence(base_repo, timeout=60.0):
+                    with _acquire_merge_fence(base_repo, timeout=_FENCE_TIMEOUT):
                         stash_ref = _stash_base_dirty(base_repo, current_wt.name)
                         staged_before = _snapshot_staged_paths(base_repo)
                         merge(current_wt, strategy=strategy, commit=auto_commit)
@@ -2289,7 +2331,7 @@ def _cli_finalize(args: list[str]) -> int:
             # squash is already in HEAD (commit=True), so popping over the now-
             # clean index is safe even if cleanup failed.
             if wt_rc == 0 and auto_commit and stash_ref is not None:
-                ok, klass, files = _restore_base_dirty(base_repo, stash_ref)
+                ok, klass, files = _fenced_restore_base_dirty(base_repo, stash_ref)
                 handed_off = True  # success-mode pop done; suppress finally pop
                 if not ok:
                     _emit_pop_failure_signal(klass, stash_ref, files, current_wt.name)
@@ -2307,7 +2349,7 @@ def _cli_finalize(args: list[str]) -> int:
                 if wt_rc != 0:
                     with contextlib.suppress(RuntimeError):
                         _run(["git", "reset", "--hard", "HEAD"], cwd=base_repo)
-                ok, klass, files = _restore_base_dirty(base_repo, stash_ref)
+                ok, klass, files = _fenced_restore_base_dirty(base_repo, stash_ref)
                 if not ok:
                     _emit_pop_failure_signal(klass, stash_ref, files, current_wt.name)
                     pop_rc = 1
