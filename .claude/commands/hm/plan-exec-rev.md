@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.27.1
+harness_maker_version: 0.28.2
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: dd52ed0b0522b1d89ecc141b0d8b50d894fe7b24d7020ab2b5ead8fd1ff4177a
+content_hash: 51704f1be1914b8bb51b1edf934acc999ec043c61a8ea899273578c3e073d076
 ---
 # /hm:plan-exec-rev
 
@@ -366,6 +366,8 @@ Resolution:
 - **NEEDS_REVISION** (warnings only) → run one follow-up interview round per warning. Options: A. revise plan / B. accept as risk (record in ADR) / C. reject / Other. Then write PLAN.
 - **MAJOR_REVISION** (critical issues) → run follow-up rounds for each critical critique. After resolution, **re-run validator once only** (no infinite loop). If second pass still MAJOR_REVISION, ask user: A. proceed with remaining critiques as accepted-risk / B. abort planning.
 
+> **If the validator agent itself fails to launch** (0 tool uses, model/launch error): retry the `Task(...)` call once with `model: "opus"` explicitly set (subagent frontmatter may be stale across a model upgrade). When you surface such a failure to the user, name the **tier** (`opus`/`sonnet`) — never a pinned concrete id like `claude-4-7-opus[1m]`; a pinned id in the message is itself the bug class this guidance exists to avoid. If it still cannot launch, self-review the PLAN in the validator's place and say so plainly.
+
 Each follow-up interview answer is appended to `## 🎙️ Interview Transcript` and promoted to ADR when Step D criteria apply.
 
 ### Step 5 — Write PLAN document
@@ -437,7 +439,7 @@ The shell guard below makes the receipt a no-op when `.current-iter` is absent �
 !if [ -f "<WT>/.claude/.hm-iter-receipts/.current-iter" ]; then \
    ITER=$(cat "<WT>/.claude/.hm-iter-receipts/.current-iter" 2>/dev/null); \
    if [ -n "$ITER" ]; then \
-     uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.27.1 python -m harness_maker.iter_receipts write \
+     uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.28.2 python -m harness_maker.iter_receipts write \
        --iter "$ITER" --stage plan --verdict <verdict> --root "<WT>"; \
    fi; \
  fi
@@ -547,7 +549,7 @@ Engage isolation if `harness.yaml.worktree.scope` includes `execute`. The `workt
 
 
 ```bash
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.27.1 python -m harness_maker.worktree create execute "$(pwd)"
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.28.2 python -m harness_maker.worktree create execute "$(pwd)"
 ```
 
 
@@ -558,6 +560,14 @@ Read **all non-empty output lines** — that is the contract for the rest of thi
   - Every Read/Write/Edit call uses absolute paths starting with `<WT>/`.
   - Tests / lints / type checks: `!cd <WT> && <cmd>`.
 - **Multiple lines** → multi-repo isolation. Line 1 = primary repo worktree (`<WT>`). Lines 2+ = sibling repo worktrees (`<WT-sibling-N>`). Use `<WT>` for primary-repo edits and `<WT-sibling-N>` for sibling-repo edits — the per-session gate marker covers all of them.
+
+**Verify before use (anti-drift gate).** Run `worktree verify <WT>` on the path you just read; `verify` confirms it is a real **linked** git worktree root (a non-zero exit means phantom, not-a-worktree, a subdir, or the main repo root — all signs of `<WT>` drift). On non-zero, **HALT** and re-run `worktree create` rather than operating on an unverified path. Never substitute a fabricated path or a `$WT` shell variable. The real dirname format is `execute-<uuid12>-<timestamp>`.
+
+
+```bash
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.28.2 python -m harness_maker.worktree verify <WT>
+```
+
 
 ### Step 1 — Load PLAN + flag parsing
 
@@ -615,6 +625,15 @@ If `spec:` resolves to an existing file:
 - Extract `## 📋 In-Scope Scenarios` — Phase A authors one test per scenario.
 - Extract `## ✅ Verification Criteria` — Phase B RED-gate uses the named test commands.
 
+**Machine SPEC (forward binding — PLAN-spec-test-accumulation):** if a sibling
+`specs/SPEC-{slug}.machine.yaml` also exists, load it and list the
+`type: mechanical` ACs whose `executable_predicate` is a parseable Python
+expression (the contract `python -m harness_maker.spec_machine validate` enforces).
+Call this set the **bindable mechanical ACs** — Phase A authors a real
+predicate-bound test for each, and `/hm:wrapup` records the binding back. When
+the file is absent or has zero bindable mechanical ACs, Phase A uses the scenario
+path unchanged (silent fallback — task-driven / `--no-tdd` / trivial SPECs).
+
 If `research_doc:` resolves to an existing file with mtime < `mtime_warn_days` (frontmatter, default 7):
 - Read it; reuse `libs_fetched`, `sources` to skip duplicate context-fetching.
 - Cache HIT → no re-retrieval.
@@ -627,11 +646,31 @@ For each phase in PLAN's `## 📝 Implementation Plan`, run Phases A → A.5 →
 
 #### Phase A — Author tests (skipped when `tdd_active == false`)
 
-For each SPEC In-Scope Scenario in scope of this PLAN phase:
-1. Write test file(s) at the project's test directory using `test_framework` from SPEC.
-2. Test function name encodes the scenario ID: `test_s1_<short-name>`, `test_s2_<short-name>`, etc.
-3. Assertions match the scenario's `**Then**` clause exactly. No tautologies, no over-mocking, no stub-only bodies (test-reviewer enforces — Phase A.5).
-4. Tests MUST be RED initially — they import / depend on functions that do not yet exist or are stubs. The implementation is written in Phase C.
+Author the **union** of two test sets (PLAN-spec-test-accumulation ADR-001/002/006):
+
+**(a) Bindable mechanical ACs** (when the machine SPEC has them — see Step 2):
+for each bindable mechanical AC in scope of this PLAN phase:
+1. Author the test at the AC's declared `test_ids[]` node id(s). If `test_ids` is
+   empty, name it `test_<ac-id-lowercased>_<short>` (e.g. `test_ac_001_bounded_retry`)
+   — `/hm:wrapup` records the chosen node back into the machine SPEC.
+2. The assertion **is** the AC's `executable_predicate`, evaluated against the real
+   subject under test — bind its free symbols to production objects. No tautology,
+   no mock-only body.
+
+**(b) Scenario tests** for every SPEC In-Scope Scenario NOT already covered by a
+bindable mechanical AC above:
+1. Write test file(s) using `test_framework` from SPEC.
+2. Test function name encodes the scenario ID: `test_s1_<short-name>`, etc.
+3. Assertions match the scenario's `**Then**` clause exactly.
+
+There is no machine-readable scenario↔AC link, so deciding which scenarios are
+"already covered" is a judgment call — do NOT write both an AC test and a scenario
+test for the same observable; the Phase A.5 test-reviewer adjudicates the union for
+duplication or coverage holes.
+
+All tests MUST be RED initially — they import / depend on functions that do not yet
+exist or are stubs. The implementation is written in Phase C. When no SPEC and no
+machine SPEC exist, author tests from the PLAN phase's exit-criterion instead.
 
 #### Phase A.5 — test-reviewer gate (skipped when `tdd_active == false`)
 
@@ -641,7 +680,7 @@ Invoke the `test-reviewer` agent on the just-authored test files:
 Task(
   subagent_type="test-reviewer",
   description="Phase A.5 test-quality gate: {slug}",
-  prompt="<SPEC body + Phase A test file paths + test_framework name>\n\nReturn ONLY the JSON output as specified in your instructions."
+  prompt="<SPEC body + bindable mechanical AC list (id + predicate, when present) + Phase A test file paths + test_framework name>\n\nThe AC list lets you adjudicate the scenario∪AC union for duplication / coverage holes.\n\nReturn ONLY the JSON output as specified in your instructions."
 )
 ```
 
@@ -686,6 +725,21 @@ Plus the PLAN phase's exit-criterion command. All must pass. If any fails:
 - Test failure that wasn't there before → regression. Find the offending change, fix or revert.
 - Phase exit-criterion failure → the PLAN phase is not done. Either fix or escalate.
 
+**T1 mutation gate (machine SPEC path only — ADR-003 of PLAN-spec-test-accumulation):**
+when this PLAN phase authored bindable-mechanical-AC tests and the machine SPEC is
+`verification_tier: 1`, run the tier-gated mutation check over its `paths_to_mutate`:
+
+
+```bash
+!cd <WT> && uv run python -m harness_maker.spec_mutation gate --yaml specs/SPEC-{slug}.machine.yaml --tier 1
+```
+
+
+Exit 1 = the predicate tests are too weak (mutants survived). **Strengthen the
+assertion — never lower the threshold.** T2/T3 mutation is deferred to `/hm:loop`
+or sampling; do NOT run it on this hot path. If mutmut is not installed the gate
+prints a skip notice and passes (non-gating) — that is intended, not a failure.
+
 ### Step 4 — Stage exit (NO commit — wrapup owns commits)
 
 When all PLAN phases complete GREEN:
@@ -713,7 +767,7 @@ The shell guard below makes the receipt a no-op when `.current-iter` is absent �
 !if [ -f "<WT>/.claude/.hm-iter-receipts/.current-iter" ]; then \
    ITER=$(cat "<WT>/.claude/.hm-iter-receipts/.current-iter" 2>/dev/null); \
    if [ -n "$ITER" ]; then \
-     uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.27.1 python -m harness_maker.iter_receipts write \
+     uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.28.2 python -m harness_maker.iter_receipts write \
        --iter "$ITER" --stage execute --verdict <verdict> --root "<WT>"; \
    fi; \
  fi
@@ -740,12 +794,12 @@ Pick **exactly one** finalize command. Substitute `<WT>` with the literal absolu
 ```bash
 # All phases GREEN — stage-merge the branch back (NO commit) + cleanup the worktree.
 # /hm:wrapup will create the single user-facing commit (with proper message + Co-Authored-By).
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.27.1 python -m harness_maker.worktree finalize <WT> stage-only
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.28.2 python -m harness_maker.worktree finalize <WT> stage-only
 ```
 
 ```bash
 # Stage halted on a blocker — preserve the worktree for inspection:
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.27.1 python -m harness_maker.worktree finalize <WT> fail
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.28.2 python -m harness_maker.worktree finalize <WT> fail
 ```
 
 
@@ -763,7 +817,7 @@ commit; otherwise the user's pre-existing WIP remains in the stash queue:
 
 
 ```bash
-!HM_OWNED_SESSION_UUIDS="$(uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.27.1 python -m harness_maker.worktree owned-uuids "$(pwd)")" uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.27.1 python -m harness_maker.worktree post-commit-pop "$(pwd)"
+!HM_OWNED_SESSION_UUIDS="$(uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.28.2 python -m harness_maker.worktree owned-uuids "$(pwd)")" uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.28.2 python -m harness_maker.worktree post-commit-pop "$(pwd)"
 ```
 
 
@@ -1194,7 +1248,7 @@ The shell guard below makes the receipt a no-op when `.current-iter` is absent �
 !if [ -f "<WT>/.claude/.hm-iter-receipts/.current-iter" ]; then \
    ITER=$(cat "<WT>/.claude/.hm-iter-receipts/.current-iter" 2>/dev/null); \
    if [ -n "$ITER" ]; then \
-     uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.27.1 python -m harness_maker.iter_receipts write \
+     uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.28.2 python -m harness_maker.iter_receipts write \
        --iter "$ITER" --stage review --verdict <verdict> --root "<WT>"; \
    fi; \
  fi
