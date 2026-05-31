@@ -419,23 +419,39 @@ _HARNESS_ARTIFACT_PREFIXES = (
 )
 
 
+def _porcelain_path(porcelain_line: str) -> str | None:
+    """Extract the path from a ``git status --porcelain`` v1 line, or None.
+
+    Format: ``XY <path>`` — a 2-char status code, a space, then the path at
+    column 3. Handles rename entries (``old -> new`` → the destination) and
+    git's quote-wrapping for paths with special chars. Returns None when the
+    line is too short to carry a path. Single source for the three sites that
+    previously inlined (divergent) copies of this parse — P3 of
+    PLAN-p6-p7-worktree-finalize.
+    """
+    if len(porcelain_line) < 4:
+        return None
+    path = porcelain_line[3:].strip()
+    # Rename: `old -> new` → take the destination.
+    if " -> " in path:
+        path = path.split(" -> ", 1)[1].strip()
+    # Strip git's quote-wrapping (added for paths with spaces/special chars).
+    if path.startswith('"') and path.endswith('"'):
+        path = path[1:-1]
+    return path
+
+
 def _is_harness_artifact(porcelain_line: str) -> bool:
     """Return True if a porcelain status line refers to a path we manage.
 
-    Porcelain v1 format: ``XY path`` where XY is a 2-char status code and the
-    path starts at column 3. Harness-managed paths are excluded from the
-    "is base dirty" check so users who don't gitignore ``.worktrees/`` etc.
-    don't see spurious stash activity (the artifacts get carried by the stash
-    anyway when real user dirty is present; we just don't TRIGGER on them).
+    Harness-managed paths are excluded from the "is base dirty" check so users
+    who don't gitignore ``.worktrees/`` etc. don't see spurious stash activity
+    (the artifacts get carried by the stash anyway when real user dirty is
+    present; we just don't TRIGGER on them).
     """
-    if len(porcelain_line) < 4:
+    path = _porcelain_path(porcelain_line)
+    if path is None:
         return False
-    path = porcelain_line[3:].strip()
-    # Rename entries can have "from -> to"; consider the destination.
-    if " -> " in path:
-        path = path.split(" -> ", 1)[1]
-    # Strip optional quote wrapping that git adds for paths with special chars.
-    path = path.strip('"')
     # ADR-002: `.gitignore` is co-managed — `_ensure_harness_gitignore` appends
     # churn patterns to it at create/make, which shows as `M .gitignore`. That
     # must NOT trip the dirty-base guard or get stashed at finalize (doing so
@@ -682,18 +698,8 @@ def _is_create_guard_harness_artifact(porcelain_line: str) -> bool:
     # longer blocks `create`. No separate work-docs branch needed here.
     if _is_harness_artifact(porcelain_line):
         return True
-    # Extract path after the 2-char XY status + space.
-    if len(porcelain_line) > 3:
-        path = porcelain_line[3:].strip()
-        # Handle rename arrow `old -> new`: check the right-hand side.
-        if " -> " in path:
-            path = path.split(" -> ", 1)[1].strip()
-        # Strip surrounding quotes that git adds for paths with special chars.
-        if path.startswith('"') and path.endswith('"'):
-            path = path[1:-1]
-        if path.startswith(".claude/") or path == ".claude":
-            return True
-    return False
+    path = _porcelain_path(porcelain_line)
+    return path is not None and (path.startswith(".claude/") or path == ".claude")
 
 
 def _has_user_dirty_state(base: Path) -> bool:
@@ -725,8 +731,9 @@ def _list_user_dirty_files(base: Path) -> list[str]:
     for line in status.stdout.splitlines():
         if _is_create_guard_harness_artifact(line):
             continue
-        if len(line) > 3:
-            out.append(line[3:].strip())
+        path = _porcelain_path(line)
+        if path is not None:
+            out.append(path)
     return out
 
 
@@ -1953,18 +1960,64 @@ def _ensure_gitignore_entry(project_root: Path, entry: str) -> None:
         pass
 
 
+def _ensure_gitignore_entries(project_root: Path, entries: tuple[str, ...]) -> None:
+    """Batched form of `_ensure_gitignore_entry` (P3 of PLAN-p6-p7-worktree-
+    finalize): ONE `git check-ignore --stdin` for all entries instead of one
+    subprocess per entry. Same semantics — skip exact-line matches, skip
+    entries subsumed by a broader existing pattern, append the rest atomically.
+    Best-effort: any failure falls through to appending the un-subsumed entries.
+    """
+    from harness_maker.io_utils import atomic_write
+
+    gitignore = project_root / ".gitignore"
+    try:
+        existing = gitignore.read_text(encoding="utf-8") if gitignore.is_file() else ""
+    except OSError:
+        return
+    existing_lines = {line.strip() for line in existing.splitlines()}
+    candidates = [e for e in entries if e not in existing_lines]
+    if not candidates:
+        return
+    # Single batched subsumption check: `git check-ignore --stdin` reads the
+    # candidate paths from stdin and prints the subset already ignored by a
+    # broader pattern (e.g. a dir-level `.claude/`). returncode 0 = ≥1 ignored,
+    # 1 = none, ≥2 = error. Glob-shaped entries (e.g. `.claude/.hm-loop-*`) are
+    # treated as literal paths and simply won't match unless covered — same as
+    # the per-entry path did.
+    covered: set[str] = set()
+    try:
+        check = subprocess.run(  # noqa: S603
+            ["git", "check-ignore", "--stdin"],
+            cwd=str(project_root),
+            input="\n".join(candidates) + "\n",
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if check.returncode in (0, 1):
+            covered = {line.strip() for line in check.stdout.splitlines() if line.strip()}
+    except (subprocess.SubprocessError, FileNotFoundError, OSError):
+        pass  # best-effort — fall through and append all candidates
+    to_append = [c for c in candidates if c not in covered]
+    if not to_append:
+        return
+    try:
+        sep = "" if (existing == "" or existing.endswith("\n")) else "\n"
+        atomic_write(gitignore, existing + sep + "".join(f"{e}\n" for e in to_append))
+    except OSError:
+        pass  # best-effort; don't fail loop creation over a gitignore write
+
+
 def _ensure_harness_gitignore(project_root: Path) -> None:
     """Append every harness-churn pattern to the project's .gitignore.
 
     PLAN-worktree-base-artifact-pollution ADR-002. Keeps the base repo clean
     of self-generated churn so parallel `worktree create` is not blocked and
-    finalize does not spuriously stash. Each call is idempotent and
-    subsumption-safe (delegates to `_ensure_gitignore_entry`, which no-ops
-    when a broader pattern such as a dir-level `.claude/` ignore already
-    covers the entry — verified via `git check-ignore`).
+    finalize does not spuriously stash. Idempotent and subsumption-safe; the
+    check-ignore subsumption test is BATCHED into a single subprocess
+    (`_ensure_gitignore_entries`) rather than one per pattern (P3).
     """
-    for pattern in _HARNESS_GITIGNORE_PATTERNS:
-        _ensure_gitignore_entry(project_root, pattern)
+    _ensure_gitignore_entries(project_root, _HARNESS_GITIGNORE_PATTERNS)
 
 
 def _detect_existing_worktree(base: Path) -> Path | None:

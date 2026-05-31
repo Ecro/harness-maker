@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Internal: porcelain-parse dedup + batched gitignore check-ignore
+
+`worktree` now extracts one `_porcelain_path()` helper for the
+`git status --porcelain` line parse (previously 3 divergent inline copies) and
+batches the `git check-ignore` subsumption test in `_ensure_harness_gitignore`
+into a single `--stdin` subprocess instead of one per churn pattern (N→1 on a
+typical `worktree create`). Behavior-preserving for the dirty-base guard; the
+parse unification was reviewed and confirmed fail-safe in the only direction it
+can diverge. (PLAN-p6-p7-worktree-finalize P3.)
+
 ### Changed: merge fence wraps the full base-mutating critical section
 
 The Layer-4 finalize merge fence now wraps `{git stash, staged-before snapshot,

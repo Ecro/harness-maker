@@ -1060,3 +1060,90 @@ def test_finalize_success_mode_conflict_resets_index_before_pop(repo: Path) -> N
     shared = (repo / "shared.txt").read_text()
     assert "<<<<<<<" not in shared, f"conflict markers left in base (index not reset): {shared!r}"
     assert shared == "base-changed\n", f"base shared.txt not restored to HEAD: {shared!r}"
+
+
+# ── P3: safe polish (PLAN-p6-p7-worktree-finalize ADR-001 non-defense scope) ──
+
+
+def test_porcelain_path_helper() -> None:
+    """P3: a single `_porcelain_path(line)` extracts the path from a porcelain v1
+    status line — handling the 2-char XY status, rename `old -> new` (RHS), and
+    git's quote-wrapping for special chars. Replaces 3 divergent inline copies."""
+    assert worktree._porcelain_path("?? foo.txt") == "foo.txt"
+    assert worktree._porcelain_path(" M src/a.py") == "src/a.py"
+    assert worktree._porcelain_path("A  staged.py") == "staged.py"
+    # Rename: take the destination (right of the arrow), stripped.
+    assert worktree._porcelain_path("R  old.py -> new.py") == "new.py"
+    # Quote-wrapped path (git adds quotes for spaces/special chars).
+    assert worktree._porcelain_path('?? "a b.txt"') == "a b.txt"
+    assert worktree._porcelain_path('R  "o ld.py" -> "n ew.py"') == "n ew.py"
+    # Too-short / empty → None (no path).
+    assert worktree._porcelain_path("XY") is None
+    assert worktree._porcelain_path("") is None
+
+
+def test_list_user_dirty_files_routes_through_porcelain_helper(repo: Path) -> None:
+    """P3: `_list_user_dirty_files` (previously did a bare `line[3:].strip()`,
+    NO rename handling) now routes through `_porcelain_path`, so a staged rename
+    of a USER file is listed as the destination path, not the raw `old -> new`."""
+    (repo / "orig.py").write_text("x\n")
+    _git(["add", "orig.py"], cwd=repo)
+    _git(["commit", "-m", "add orig"], cwd=repo)
+    _git(["mv", "orig.py", "renamed.py"], cwd=repo)  # staged rename → "R  orig.py -> renamed.py"
+    dirty = worktree._list_user_dirty_files(repo)
+    assert dirty == ["renamed.py"], f"rename must list the destination path only, got {dirty}"
+
+
+def test_ensure_gitignore_batches_check_ignore(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """P3: `_ensure_harness_gitignore` must invoke `git check-ignore` ONCE
+    (batched via --stdin), not once per churn pattern. Pre-seed a broad
+    `.claude/` ignore so the `.claude/*` churn patterns are subsumed — the case
+    that, in the per-entry loop, fired a check-ignore subprocess for each."""
+    (repo / ".gitignore").write_text(
+        ".claude/\nwork-docs/loop-context/\nwork-docs/p5-batch-state.yaml\n"
+    )
+    check_ignore_calls: list[list[str]] = []
+    real_run = worktree.subprocess.run
+
+    def counting_run(args: object, *a: object, **k: object) -> object:
+        if isinstance(args, (list, tuple)) and "check-ignore" in args:
+            check_ignore_calls.append(list(args))
+        return real_run(args, *a, **k)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(worktree.subprocess, "run", counting_run)
+    worktree._ensure_harness_gitignore(repo)
+    # RED-now lands at 8 (the 10 churn patterns minus the 2 work-docs lines this
+    # fixture seeds as exact matches → short-circuited before check-ignore). The
+    # broad `.claude/` seed makes the `.claude/*` patterns genuine subsumption
+    # candidates, so exactly ONE batched call is the correct target.
+    assert len(check_ignore_calls) == 1, (
+        f"check-ignore must be batched into ONE call; got {len(check_ignore_calls)}: "
+        f"{check_ignore_calls}"
+    )
+
+
+def test_ensure_gitignore_absent_creates_file_and_batches(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """P3: when `.gitignore` is ABSENT, `_ensure_harness_gitignore` creates it
+    with the churn patterns AND still batches check-ignore (≤1 call) — the old
+    per-entry loop created the file then fired a check-ignore per remaining
+    pattern."""
+    gi = repo / ".gitignore"
+    gi.unlink(missing_ok=True)  # the `repo` fixture pre-creates one — exercise the absent branch
+    check_ignore_calls: list[list[str]] = []
+    real_run = worktree.subprocess.run
+
+    def counting_run(args: object, *a: object, **k: object) -> object:
+        if isinstance(args, (list, tuple)) and "check-ignore" in args:
+            check_ignore_calls.append(list(args))
+        return real_run(args, *a, **k)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(worktree.subprocess, "run", counting_run)
+    worktree._ensure_harness_gitignore(repo)
+    assert gi.is_file(), ".gitignore must be created when absent"
+    content = gi.read_text()
+    assert ".claude/observability/" in content, f"churn patterns not written: {content!r}"
+    assert len(check_ignore_calls) <= 1, (
+        f"check-ignore must be batched (≤1), got {len(check_ignore_calls)}: {check_ignore_calls}"
+    )
