@@ -47,6 +47,27 @@ def test_backcompat_old_harness_yaml_without_permissions_key() -> None:
     assert cfg2.permissions.deny_dangerous is False
 
 
+def test_deny_dangerous_round_trips_through_synthesize(tmp_path: Path) -> None:
+    """REVIEW P1: a user's `permissions.deny_dangerous: true` must survive the
+    real re-render path (load harness.yaml → answers_from_harness_yaml →
+    synthesize), not just direct HarnessConfig construction. Before the fix the
+    flag was dropped at InterviewAnswers and synthesize, so settings.json always
+    rendered an empty deny regardless of harness.yaml."""
+    from harness_maker.interview import answers_from_harness_yaml
+    from harness_maker.profile import profile
+    from harness_maker.synthesize import synthesize
+
+    hy = tmp_path / "harness.yaml"
+    hy.write_text("preset: Side\npermissions:\n  deny_dangerous: true\n")
+    answers = answers_from_harness_yaml(hy)
+    assert answers is not None
+    # catches the answers_from_harness_yaml drop
+    assert answers.permissions.deny_dangerous is True
+    # catches the synthesize HarnessConfig-kwarg omission
+    bp = synthesize(profile(Path("tests/fixtures/side-python-cli")), answers)
+    assert bp.config.permissions.deny_dangerous is True
+
+
 def _write_claude(tmp: Path, deny: list[str], harness_yaml_body: str) -> Path:
     claude = tmp / ".claude"
     claude.mkdir(parents=True)

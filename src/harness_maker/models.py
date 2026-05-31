@@ -783,6 +783,10 @@ class InterviewAnswers(BaseModel):
     domains: list[str] = Field(default_factory=list)
     ref_folders: list[RefFolder] = Field(default_factory=list)
     second_brain: SecondBrainConfig = Field(default_factory=SecondBrainConfig)
+    # Mirrors HarnessConfig.permissions so it round-trips through
+    # answers_from_harness_yaml → synthesize (else a user's deny_dangerous=true
+    # is silently dropped on re-render — REVIEW P1).
+    permissions: PermissionsConfig = Field(default_factory=PermissionsConfig)
     # Map of user-named workflow → ordered atomic stages. Names are typically
     # auto-derived via STAGE_ABBREV (e.g. `exec-rev-wrap`) but user can override.
     fused_workflows: dict[str, list[AtomicStage]] = Field(

@@ -36,6 +36,7 @@ from harness_maker.models import (
     DevMode,
     FeedbackConfig,
     InterviewAnswers,
+    PermissionsConfig,
     Preset,
     ProjectProfile,
     Recommendation,
@@ -795,11 +796,20 @@ def answers_from_harness_yaml(yaml_path: Path) -> InterviewAnswers | None:
     second_brain = _parse_second_brain(data.get("second_brain"))
     sibling_repos = _list_of_strings(data.get("sibling_repos"))
     wrapup_docs = _list_of_strings(data.get("wrapup_docs"))
+    # Round-trip the deny-list opt-out so /hm:make --update preserves a user's
+    # `permissions.deny_dangerous: true` (REVIEW P1 — was dropped at this step).
+    perms_data = data.get("permissions")
+    permissions = (
+        PermissionsConfig(deny_dangerous=bool(perms_data.get("deny_dangerous", False)))
+        if isinstance(perms_data, dict)
+        else PermissionsConfig()
+    )
 
     update: dict[str, Any] = {
         "domains": domains,
         "ref_folders": ref_folders,
         "second_brain": second_brain,
+        "permissions": permissions,
         "sibling_repos": sibling_repos,
         "wrapup_docs": wrapup_docs,
         "reviewers": {
