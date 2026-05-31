@@ -1,4 +1,4 @@
 {
-  "permissions": {"allow": ["Read", "Bash(uv:*)", "Bash(pytest:*)"], "deny": ["Bash(rm:*)", "Bash(curl * | sh)", "Write(/etc/**)", "Write(~/.ssh/**)"]},
+  "permissions": {"allow": ["Read", "Bash(uv:*)", "Bash(pytest:*)"], "deny": {% if config.permissions.deny_dangerous %}["Bash(rm:*)", "Bash(curl * | sh)", "Write(/etc/**)", "Write(~/.ssh/**)"]{% else %}[]{% endif %}},
   "preset": "{{ preset }}"
 }

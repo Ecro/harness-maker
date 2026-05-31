@@ -552,6 +552,25 @@ class AgentModelSpec(BaseModel):
 # ──────────────────────────────────────────────────────────────────────────────
 
 
+class PermissionsConfig(BaseModel):
+    """Main-session ``settings.json`` permission deny-list policy.
+
+    Default ``deny_dangerous=False`` — solo-friendly: ``settings.json`` ships an
+    EMPTY ``permissions.deny`` so ``rm`` / ``curl | sh`` / writes to ``/etc`` /
+    ``~/.ssh`` are NOT blocked in the user's own session (too inefficient for
+    solo work). The reviewer AGENTS keep their own read-only ``Bash(rm:*)``
+    deny regardless — this toggle only governs the main-session settings.json.
+
+    Set ``deny_dangerous=True`` to restore the full destructive-pattern deny
+    baseline. ``readiness.py``'s two deny signals (``permissions_deny_present``,
+    ``deny_covers_dangerous``) become N/A — not penalized — when this is False,
+    because a deliberate opt-out is a config choice, not a missing guardrail.
+    """
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+    deny_dangerous: bool = False
+
+
 class HarnessConfig(BaseModel):
     """harness.yaml schema — single source of truth for a project's harness."""
 
@@ -633,6 +652,9 @@ class HarnessConfig(BaseModel):
     models: dict[str, Any] = Field(default_factory=dict)
     worktree: dict[str, Any] = Field(default_factory=dict)
     security: dict[str, Any] = Field(default_factory=dict)
+    # Main-session settings.json deny-list policy. Default off (empty deny) —
+    # see PermissionsConfig. Old harness.yaml without this key → default.
+    permissions: PermissionsConfig = Field(default_factory=PermissionsConfig)
     context_lint: dict[str, Any] = Field(default_factory=dict)
     project: dict[str, Any] = Field(default_factory=lambda: {"domains": []})
     spec: dict[str, Any] = Field(default_factory=lambda: {"dir": "specs/"})

@@ -473,4 +473,19 @@ each `!`-block via its Bash tool verbatim. Proper fix: extract multi-line script
 module the skill calls as one line. Also: a test that only asserts "the codex skill file
 exists" does NOT catch this — assert the body is codex-executable (branched or noted).
 
+## [wiki:pattern] loosening-a-security-default-needs-health-scorer-optout | 2026-05-31
+When you LOOSEN a security default (here: main-session `settings.json permissions.deny`
+made empty-by-default so `rm`/`curl|sh` aren't blocked for solo work, opt-in via
+`harness.yaml permissions.deny_dangerous: true`), you MUST also update any health/readiness
+scorer that REWARDED the old default — else every fresh install silently loses points for a
+deliberate config choice. `readiness._dim_guardrails` had two signals (`permissions_deny_present`
+=20, `deny_covers_dangerous`=15 → 35 pts) that rewarded a non-empty dangerous deny; the fix makes
+both read `harness.yaml permissions.deny_dangerous` and PASS (not penalize) when opted out — a
+deliberate opt-out is a config choice, not a missing guardrail (they still enforce when opted in).
+Implementation notes: new typed `PermissionsConfig(deny_dangerous=False)` on HarnessConfig via
+`default_factory` → old harness.yaml (no key) stays back-compat; `settings/*.json.j2` branch on
+`config.permissions.deny_dangerous` with NO synthesize wiring (the full `config` dump is already
+injected into every FileEntry context at synthesize.py ~769). Reviewer AGENTS keep their own
+read-only `Bash(rm:*)` deny — this toggle governs only the user's main session.
+
 <!-- @hm:/user:entries -->

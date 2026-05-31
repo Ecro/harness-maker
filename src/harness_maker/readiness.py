@@ -469,34 +469,64 @@ def _dim_guardrails(project_dir: Path) -> DimensionScore:
     deny = perms.get("deny") if isinstance(perms, dict) else None
     deny_list: list[str] = deny if isinstance(deny, list) else []
 
+    # The main-session deny-list is opt-in (PermissionsConfig.deny_dangerous,
+    # default off — solo-friendly). A deliberately-empty deny is a config choice,
+    # not a missing guardrail, so both deny signals PASS on the strength of the
+    # setting when the user opted out (no penalty); they enforce a non-empty /
+    # covering deny only when deny_dangerous=true.
+    deny_opt_in = False
+    harness_yaml = claude / "harness.yaml"
+    if harness_yaml.is_file():
+        try:
+            from harness_maker.io_utils import load_harness_yaml
+
+            _hy = load_harness_yaml(harness_yaml)
+            _hy_perms = _hy.get("permissions") if isinstance(_hy, dict) else None
+            deny_opt_in = bool(
+                isinstance(_hy_perms, dict) and _hy_perms.get("deny_dangerous", False)
+            )
+        except Exception:
+            deny_opt_in = False
+
+    deny_present_ok = (not deny_opt_in) or len(deny_list) > 0
     signals.append(
         _signal(
             "permissions_deny_present",
-            len(deny_list) > 0,
+            deny_present_ok,
             20,
             f"settings.json permissions.deny has {len(deny_list)} pattern(s)"
             if deny_list
-            else "settings.json permissions.deny is empty or missing",
+            else (
+                "permissions.deny intentionally empty (harness.yaml "
+                "permissions.deny_dangerous=false — solo opt-out)"
+                if not deny_opt_in
+                else "settings.json permissions.deny is empty or missing"
+            ),
             None
-            if deny_list
+            if deny_present_ok
             else "Add settings.json `permissions.deny` blocking dangerous Bash patterns",
         )
     )
 
     deny_text = " ".join(str(p) for p in deny_list).lower()
     matched = [p for p in _DANGEROUS_DENY_PATTERNS if p.lower() in deny_text]
+    cov_ok = (not deny_opt_in) or len(matched) >= 3
     cov_evidence = (
         f"Deny patterns cover {len(matched)}/{len(_DANGEROUS_DENY_PATTERNS)} dangerous patterns"
         if matched
-        else "Deny list does not cover dangerous patterns"
+        else (
+            "deny opted out (harness.yaml permissions.deny_dangerous=false) — not a finding"
+            if not deny_opt_in
+            else "Deny list does not cover dangerous patterns"
+        )
     )
     signals.append(
         _signal(
             "deny_covers_dangerous",
-            len(matched) >= 3,
+            cov_ok,
             15,
             cov_evidence,
-            None if len(matched) >= 3 else "Block rm -rf, curl|sh, writes to /etc and ~/.ssh",
+            None if cov_ok else "Block rm -rf, curl|sh, writes to /etc and ~/.ssh",
         )
     )
 
