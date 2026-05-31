@@ -174,20 +174,22 @@ def test_mv3_jinja_dispatcher_does_not_emit_model_none() -> None:
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-def test_c1_cursor_model_concrete_id_rendered_when_available() -> None:
-    """C-1 / R-7: When cursor_model is a concrete Cursor ID (post
-    `_normalize_cursor_alias`) AND is different from the claude_model alias,
-    the dispatcher template MUST prefer cursor_model for the rendered
-    `model:` line. Cursor 2.4 floor consumers thereby get a concrete ID per
-    ADR-003 R5.
+def test_c1_agent_model_renders_claude_alias_not_cursor_concrete() -> None:
+    """SUPERSEDES C-1 / R-7 (PLAN-agent-model-version-agnostic ADR-001).
+
+    The original C-1/R-7 made the dispatcher template prefer `cursor_model`
+    (the concrete Cursor id) for the `model:` line, valid while Claude Code
+    ignored the field (#43869). With #43869 fixed the field is load-bearing,
+    so a pinned concrete id fails to launch in a newer-model session. The
+    template MUST now render the Claude ALIAS (`claude_model`) and never the
+    concrete cursor id — single-source `.claude/agents/*.md` carries the alias
+    for both IDEs.
     """
     from jinja2 import Environment, FileSystemLoader
 
     templates_dir = Path(__file__).resolve().parents[2] / "src" / "harness_maker" / "templates"
     env = Environment(loader=FileSystemLoader(str(templates_dir)))
     template = env.get_template("agents/autoloop-coder.md.j2")
-    # Reference CURSOR_MODEL_IDS authoritative source instead of hard-coding
-    # the literal — survives Claude version updates (test-reviewer P5 fix).
     cursor_concrete = CURSOR_MODEL_IDS["opus"]
     rendered = template.render(
         name="autoloop-coder",
@@ -197,16 +199,13 @@ def test_c1_cursor_model_concrete_id_rendered_when_available() -> None:
         reviewer_kind="",
         communication_variant="full",
     )
-    # Positive assertion: the concrete ID reaches the model: line, not the
-    # alias. Distinguishes "template picks cursor_model over claude_model"
-    # from "template echoes whatever was passed".
-    assert f"model: {cursor_concrete}" in rendered, (
-        f"cursor_model concrete ID not preferred over alias; rendered head:\n{rendered[:300]}"
+    # The alias reaches the model: line ...
+    assert "model: opus" in rendered, (
+        f"claude_model alias not rendered on model: line; head:\n{rendered[:300]}"
     )
-    # Stronger: the alias-form claude_model value MUST NOT appear on the
-    # model: line. Catches the "echo both" anti-fix.
-    assert "model: opus" not in rendered, (
-        f"alias-form claude_model leaked into model: line; rendered head:\n{rendered[:300]}"
+    # ... and the concrete cursor id never does (the bug ADR-001 fixes).
+    assert f"model: {cursor_concrete}" not in rendered, (
+        f"concrete cursor id leaked into the Claude-launch model: line; head:\n{rendered[:300]}"
     )
 
 
@@ -263,41 +262,48 @@ def test_cp2_all_agents_subset_of_communication_variant() -> None:
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-def test_user_override_cursor_only_produces_valid_yaml() -> None:
-    """End-to-end: a user who writes `agent_models: {autoloop-coder: {cursor: opus}}`
-    must get a rendered .claude/agents/autoloop-coder.md whose `model:` field
-    is YAML-valid (not the literal string None). Combines MV-3 + C-1 fixes.
+def test_user_override_cursor_only_renders_alias() -> None:
+    """SUPERSEDES the C-1 tail (ADR-001 + synthesize intent-preservation).
+
+    A user who writes `agent_models: {autoloop-coder: {cursor: opus}}` (no
+    `claude:`) leaves spec.claude None. ADR-001 renders the Claude alias, so
+    `_agent_files` derives the alias back from the normalized cursor id —
+    otherwise the override would silently fall through to the `sonnet` default.
+    The rendered `model:` line must therefore be `opus` (intent preserved),
+    never the bare `None` / `null` (MV-3) and never the concrete cursor id.
     """
     from jinja2 import Environment, FileSystemLoader
+
+    from harness_maker.synthesize import _agent_files
 
     config = HarnessConfig(
         preset=Preset.PRODUCTION,
         agent_models={"autoloop-coder": AgentModelSpec(cursor="opus")},
     )
     spec = resolve_agent_spec("autoloop-coder", config)
-    # Tier 1 user override returns the whole spec — claude is None
-    assert spec.claude is None
-    # cursor normalized to concrete
-    assert spec.cursor == "claude-4-7-opus"
+    assert spec.claude is None  # Tier-1 cursor-only override
+    assert spec.cursor == CURSOR_MODEL_IDS["opus"]  # normalized to concrete
+
+    ctx = next(
+        c
+        for tmpl, dst, c in _agent_files(preset=Preset.PRODUCTION, agent_models=config.agent_models)
+        if dst == "agents/autoloop-coder.md"
+    )
+    # Intent preserved: the derived Claude alias, not the dropped `sonnet`.
+    assert ctx["claude_model"] == "opus"
 
     templates_dir = Path(__file__).resolve().parents[2] / "src" / "harness_maker" / "templates"
     env = Environment(loader=FileSystemLoader(str(templates_dir)))
-    template = env.get_template("agents/autoloop-coder.md.j2")
-    rendered = template.render(
-        name="autoloop-coder",
-        claude_model=spec.claude,
-        cursor_model=spec.cursor,
-        codex_reasoning_effort=None,
-        reviewer_kind="",
-        communication_variant="full",
+    rendered = env.get_template("agents/autoloop-coder.md.j2").render(
+        **ctx, communication_variant="full"
     )
-    # Combined assertions, both via authoritative sources (test-reviewer P5 fix):
-    # 1. MV-3: model: line is a concrete non-empty identifier (catches None / null / ~ / empty)
+    # MV-3: a valid non-empty model: line (not None/null/~/empty).
     assert _VALID_MODEL_LINE.search(rendered) is not None, (
         f"invalid model: line rendered; head:\n{rendered[:300]}"
     )
-    # 2. C-1: the spec.cursor concrete ID is what reaches the model: line
-    assert f"model: {spec.cursor}" in rendered
+    # ADR-001: the alias reaches the line; the concrete cursor id never does.
+    assert "model: opus" in rendered
+    assert f"model: {spec.cursor}" not in rendered
 
 
 # Phase A.5 / B reference: pytest -k phase5_test_model_routing

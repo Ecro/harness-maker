@@ -38,7 +38,10 @@ _LOGGER = logging.getLogger(__name__)
 _LLM_MAP_MAX_BYTES = 50 * 1024
 # Cache TTL — 24h per PLAN Phase 6.
 _LLM_MAP_CACHE_TTL_SEC = 24 * 60 * 60
-_LLM_MAP_MODEL = "claude-opus-4-7"
+# Concrete Anthropic id for the foreign-config mapping SDK call. Kept in step
+# with _FOREIGN_MODEL_IDS["opus"] below so the two opus ids in this module do
+# not skew (review consensus P2). A future model bump updates both.
+_LLM_MAP_MODEL = "claude-opus-4-8"
 
 
 class ForeignConfig(BaseModel):
@@ -432,6 +435,29 @@ def _render_template(template_name: str, ctx: dict[str, Any]) -> str:
     return template.render(**ctx)
 
 
+# Alias → concrete Anthropic API model id (PLAN-agent-model-version-agnostic
+# ADR-006, refined at implementation). All six foreign-config templates render
+# `{{ default_model }}` through `_build_render_context`, so all six receive the
+# resolved concrete id. It is load-bearing for aider / Continue (they call the
+# Anthropic API directly and reject the bare `opus`/`sonnet`/`haiku` aliases the
+# agent-launch surfaces (Claude Code) resolve natively); for the doc-style
+# templates (cursor_rules / claude_md / copilot / agents_md) the value is inert
+# prose. This map is intentionally SEPARATE from presets.CURSOR_MODEL_IDS: that
+# map holds Cursor's reversed-format ids (`claude-4-7-opus`) which are NOT valid
+# Anthropic API ids — a different namespace. Already-concrete `default_model`
+# values pass through unchanged.
+_FOREIGN_MODEL_IDS: dict[str, str] = {
+    "opus": "claude-opus-4-8",
+    "sonnet": "claude-sonnet-4-6",
+    "haiku": "claude-haiku-4-5",
+}
+
+
+def _resolve_foreign_model(model: str) -> str:
+    """Resolve an alias to a concrete Anthropic id for Anthropic-API consumers."""
+    return _FOREIGN_MODEL_IDS.get(model, model)
+
+
 def _build_render_context(
     foreign_config: ForeignConfig,
     harness_config: HarnessConfig,
@@ -449,7 +475,9 @@ def _build_render_context(
         "dev_mode": harness_config.dev_mode.value,
         "locale": harness_config.locale,
         "targets": [t.value for t in harness_config.targets],
-        "default_model": harness_config.default_model,
+        # aider/Continue need a concrete Anthropic id (ADR-006) — resolve the
+        # version-agnostic alias floor here, at the Anthropic-API boundary.
+        "default_model": _resolve_foreign_model(harness_config.default_model),
         "mappings": [m.model_dump() for m in mapping.mappings],
     }
 

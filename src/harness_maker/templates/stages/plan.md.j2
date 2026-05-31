@@ -363,6 +363,8 @@ Resolution:
 - **NEEDS_REVISION** (warnings only) → run one follow-up interview round per warning. Options: A. revise plan / B. accept as risk (record in ADR) / C. reject / Other. Then write PLAN.
 - **MAJOR_REVISION** (critical issues) → run follow-up rounds for each critical critique. After resolution, **re-run validator once only** (no infinite loop). If second pass still MAJOR_REVISION, ask user: A. proceed with remaining critiques as accepted-risk / B. abort planning.
 
+> **If the validator agent itself fails to launch** (0 tool uses, model/launch error): retry the `Task(...)` call once with `model: "opus"` explicitly set (subagent frontmatter may be stale across a model upgrade). When you surface such a failure to the user, name the **tier** (`opus`/`sonnet`) — never a pinned concrete id like `claude-4-7-opus[1m]`; a pinned id in the message is itself the bug class this guidance exists to avoid. If it still cannot launch, self-review the PLAN in the validator's place and say so plainly.
+
 Each follow-up interview answer is appended to `## 🎙️ Interview Transcript` and promoted to ADR when Step D criteria apply.
 {% if config.codex_second_opinion.enabled %}
 > **Codex second-opinion relay (mandatory call active).** `plan-validator` is configured to invoke Codex on every run. After reading the validator's returned JSON and **before** resolving the verdict, inspect its top-level `codex_status`. If it is `"skipped"`, the mandatory Codex call could not complete — surface the validator's `codex_skip_reason` to the user in your turn output (one line, e.g. `⚠️ Codex second opinion skipped: <reason> — verdict is Claude-only`). This is a loud notice, **not** a block: resolve the verdict regardless, since it is Claude-derived and valid without Codex.

@@ -342,7 +342,7 @@ Codex TOML files intentionally carry no provenance frontmatter because TOML pars
 
 **Plugin manifests**: `.claude-plugin/plugin.json`, `.cursor-plugin/plugin.json`, and `.codex-plugin/plugin.json` describe the same package for each runtime. All three manifests must be bumped in sync with `pyproject.toml` and `src/harness_maker/__init__.py` on every version release.
 
-**Recommended model**: `HarnessConfig.recommended_model` defaults to `claude-opus-4-7` and propagates to agent frontmatter. The harness does **not** rewrite prompts to be model-agnostic — `<thinking>` blocks and Claude-specific patterns are preserved deliberately.
+**Recommended model**: `HarnessConfig.recommended_model` defaults to `opus` and propagates to agent frontmatter. The harness does **not** rewrite prompts to be model-agnostic — `<thinking>` blocks and Claude-specific patterns are preserved deliberately.
 
 **Minimum supported Cursor**: 2.4 (2026-01-22 — first to bundle subagents, skills, Claude Code hooks compatibility). **Recommended**: 3.2+ (2026-04-24 — agent-first redesign, native `/worktree` and `/best-of-n`). The native worktree commands coexist safely with `/hm:execute` because cleanup is prefix-matched (`phase-*`, `autoloop-*`, `execute-*` reserved for harness-maker).
 

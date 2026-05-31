@@ -1,7 +1,7 @@
 ---
 type: plan
 task_slug: agent-model-version-agnostic
-status: planning
+status: complete
 created: 2026-05-31
 tags: [harness-maker, plan, python, agent-rendering, model-config, multi-ide]
 interview_rounds: 3
@@ -263,14 +263,14 @@ failure, reference the **tier** (`opus`/`sonnet`), never a pinned ID like `claud
 | 14-way duplication reintroduces drift | — (now addressed) | Blast radius | ADR-001/#8 shared partial |
 
 ## ✅ Success Criteria
-- [ ] All 14 `.claude/agents/*.md` render `model:` as an alias; none carry a concrete Claude ID.
-- [ ] `HarnessConfig().default_model == "opus"`; every consumer classified.
-- [ ] aider/Continue configs render a concrete ID under an alias floor (ADR-006).
-- [ ] Guard test present and proven to bite on regression.
-- [ ] `plan.md.j2` failure-messaging references tier names, not pinned IDs.
-- [ ] e2e snapshots regenerated; full pytest green; 5 version files synced + CHANGELOG entry.
-- [ ] Cursor manual-verification checklist entry added with owner/date (non-blocking).
-- [ ] Python-SDK call sites untouched (ADR-004 boundary held).
+- [x] All 14 `.claude/agents/*.md` render `model:` as an alias; none carry a concrete Claude ID.
+- [x] `HarnessConfig().default_model == "opus"`; every consumer classified.
+- [x] aider/Continue configs render a concrete ID under an alias floor (ADR-006).
+- [x] Guard test present and proven to bite on regression.
+- [x] `plan.md.j2` failure-messaging references tier names, not pinned IDs.
+- [x] e2e snapshots regenerated; full pytest green; 5 version files synced + CHANGELOG entry.
+- [x] Cursor manual-verification checklist entry added with owner/date (non-blocking).
+- [x] Python-SDK call sites untouched (ADR-004 boundary held).
 
 ## 🔍 Plan Validation
 
@@ -287,3 +287,16 @@ failure, reference the **tier** (`opus`/`sonnet`), never a pinned ID like `claud
 | suggestion | Cursor likelihood asserted | unverified assumption could linger | Phase 6 checklist gains a named owner + target date |
 
 Validator was launched with a one-off `model:"opus"` Task override (this repo's on-disk agent file predates the fix — ADR-003 Note).
+
+
+## ✅ Execution Status (2026-05-31)
+
+Executed standalone (base repo, no worktree — root-level snapshot regen + uv.lock churn made isolation counterproductive). Reviewed Grade A (`REVIEW-agent-model-version-agnostic-2026-05-31.md`).
+
+**Phases 1–4, 6: DONE.** Phase 5: snapshot regen DONE; **version bump + dogfood `.claude/` re-render deferred to the release step** (the published 0.28.1 predates this; next release is 0.28.2). The repo's own `.claude/agents/` is gitignored, so its stale pin is local-only — refreshed via `/hm:make --update`, not part of the shipped fix.
+
+**Implementation refinements (surfaced during TDD, supersede the literal PLAN):**
+- **ADR-006 refined** — foreign configs resolve alias→concrete via a NEW `foreign_config._FOREIGN_MODEL_IDS` (Anthropic-API format `claude-opus-4-8`), NOT `presets.CURSOR_MODEL_IDS` (Cursor reversed format `claude-4-7-opus`). The literal "reuse CURSOR_MODEL_IDS" conflated two namespaces; they are kept separate. All six foreign-config templates resolve through the boundary (doc-style ones get inert concrete prose).
+- **Intent preservation** — `synthesize._agent_files` derives the Claude alias back from a cursor-only override (`{cursor: opus}` with no `claude:`) so it no longer silently downgrades to the fallback.
+- **Superseded C-1/R-7** (PLAN-model-routing-multi-ide) — the 2 tests that *enforced* cursor-concrete precedence were rewritten to assert the alias contract; 12 agent SHA baselines + 3 default-model contract tests rebased.
+- **ADR-004 doc nit (M3)** — `memory_retrieve.py` makes NO Anthropic SDK call; it should not have been listed as an SDK call site in ADR-004's Non-Goal.

@@ -89,13 +89,15 @@ def _render_body(name: str) -> str:
 # 5 reviewer entries below are the post-Phase-C hashes; the remaining 7
 # agents keep their pre-refactor hashes.
 _EXPECTED_SHA256: dict[str, str] = {
-    # Phase 5 (REVIEW MV-3 + C-1 fix, 2026-05-19) bumped these 12 hashes.
-    # The dispatcher templates now emit cursor_model concrete IDs (when
-    # available) with a None-guard fallback chain. Pre-fix hashes are in
-    # git history under commit ${PRE_PHASE_5}.
-    "autoloop-coder": "328eb72fe2ba3d99d9ceecca4a2f00ca349c266e4a98a75d305f894a7e4662ac",
-    "code-reviewer": "4c88418df33c99741e31b4265bf2dbb832c78c51bd87da116925d192eed9568f",
-    "concurrency-reviewer": "4d78ffc89957060e675ad6552f5ea082ba068a77e95771d4fee67f3e235688fd",
+    # Bumped 2026-05-31 (PLAN-agent-model-version-agnostic ADR-001): the
+    # dispatcher `model:` line is now a shared partial rendering the Claude
+    # ALIAS (`{{ claude_model }}`), SUPERSEDING the Phase-5 (2026-05-19 C-1)
+    # cursor-concrete-id behavior — Claude Code now respects the field (#43869),
+    # so a pinned id fails to launch in a newer-model session. Pre-bump hashes
+    # are in git history.
+    "autoloop-coder": "32d2c32d8235b41fee0f639604f0e2541fc11cb746cd4195922189e91a0927b1",
+    "code-reviewer": "b0913e8b525720af28b22a98b2ab61c67f5e4b7ca172e6d7f2b5a2ffb106137c",
+    "concurrency-reviewer": "9c7bbeec8a91be20886f9cea706039aaef6b9519d77504b26be66197ff6bdc50",
     # consensus-arbiter + plan-validator: hashes bumped 2026-05-24 per
     # PLAN-codex-second-llm-integration ADR-007 + review security fix.
     # Both agents previously had NO frontmatter permissions block; Phase 2
@@ -106,15 +108,15 @@ _EXPECTED_SHA256: dict[str, str] = {
     # so the rendered hash reflects the new allow-list + deny baseline.
     # PLAN R8 risk: any future drift in the baseline changes these hashes —
     # re-pin and document the reason here.
-    "consensus-arbiter": "9a5833320294faaeff0819573fabbee349a23aef8c313facdc8214ae06f2dd24",
-    "executor": "d2762982da93b4ebba0aec7004a1ca721a6561e9c1c84b53512ce9d48cb391a8",
-    "performance-reviewer": "528788051f31414258cabb083a16e578a6d3fc8f112ec071984a31f57edd63c5",
-    "plan-validator": "7a68d3d977210a75185c9c044f20d46c4d3321d6d371b593be380af7967f5e64",
-    "security-auditor": "7dfb6da0797f4d3b8b5e47dee0a9625968079aaf6aabd3b98d6383a902cda4fb",
-    "security-reviewer": "1d0dd18466dfbc2ca1cb464134babc38a0555914c4767e0f5c80e8621da58626",
-    "stuck": "9db1b3f1e94c31a4613868330f3e52aa0796f387f779ae48a1fd030be0f3080c",
-    "test-reviewer": "4b36d7169eb7041450c6d705ebe6f550b31f31d9b8c85565ab4fdff7822d2e9d",
-    "ux-reviewer": "f0d5e2bbb92271f712fad3e7bc3e6b56fd6276922e0f68218e7f33fab5b82a6f",
+    "consensus-arbiter": "03c83ce43bd7ad15633f26e619240e16a7bdbe374e5f55bf83ef0bd73aeac891",
+    "executor": "178bd189e0a9dc392caed7865a6cead670a7c1bb557da4b79aa07cbb358be713",
+    "performance-reviewer": "7c36beda776925ea45fefd5176f0e359e9225eb8dbe949549216c6b9b1c6a228",
+    "plan-validator": "a06765191a94742d4ba35cb47ee80d703e87b6e2b29763209b482efd4ff4733d",
+    "security-auditor": "51a11902b9f56b9ebb0e0103e0d2047a64d1a218898d6cedc229a1a43fed2f53",
+    "security-reviewer": "af15f3f7606dd67a4f6cc0d4450df62ab8aa6a470978e65c7de9e77494d66555",
+    "stuck": "a62459d1205ed4fd67769ebb2f729a4de9b1d7b9ff5d770cc6ed767e63746fd0",
+    "test-reviewer": "d102698d962884761172fa6a241c8a578cb7c038596905c141fd9f596b37cabb",
+    "ux-reviewer": "5481270e21d80bf6114d04f9fa601f1d1fb938386aa5d9a1563dad16145f4280",
 }
 
 

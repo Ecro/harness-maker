@@ -3,7 +3,7 @@ name: stuck
 communication_variant: full
 description: Escalation analyst — invoked when /hm:execute, /hm:review, or /hm:plan blocks. Performs root-cause analysis, proposes 2-3 unblock paths, and writes a structured escalation note. Read-only.
 tools: Read, Grep, Glob
-model: {% if cursor_model is defined and cursor_model is not none %}{{ cursor_model }}{% elif claude_model is defined and claude_model is not none %}{{ claude_model }}{% else %}sonnet{% endif %}
+{% include "agents/_partials/model_frontmatter_line.md.j2" %}
 ---
 
 {% include "agents/stuck_body.md.j2" -%}

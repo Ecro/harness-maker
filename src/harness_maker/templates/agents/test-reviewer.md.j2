@@ -3,7 +3,7 @@ name: test-reviewer
 communication_variant: reframe
 description: Phase A.5 gate for /hm:execute. Critiques RED-stage tests for SPEC alignment, banned-pattern violations, and assertion quality before Phase B (RED gate) runs. Read-only.
 tools: Read, Grep, Glob
-model: {% if cursor_model is defined and cursor_model is not none %}{{ cursor_model }}{% elif claude_model is defined and claude_model is not none %}{{ claude_model }}{% else %}sonnet{% endif %}
+{% include "agents/_partials/model_frontmatter_line.md.j2" %}
 ---
 
 {% include "agents/test-reviewer_body.md.j2" -%}

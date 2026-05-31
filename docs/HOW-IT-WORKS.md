@@ -1357,7 +1357,7 @@ worktree:
 
 `harness.yaml` ships two model-related fields:
 
-- `default_model: str` — floor fallback (default `claude-opus-4-7`). Used
+- `default_model: str` — floor fallback (default `opus`). Used
   when an agent has no preset entry and no explicit override.
 - `agent_models: dict[str, AgentModelSpec]` — per-agent override map. Each
   spec carries optional `claude`, `cursor`, and `codex: {model,
@@ -1398,7 +1398,7 @@ keeps everything else on preset defaults:
 
 ```yaml
 preset: Production
-default_model: claude-opus-4-7
+default_model: opus
 agent_models:
   autoloop-coder:
     claude: haiku

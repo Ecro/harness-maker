@@ -574,7 +574,7 @@ class HarnessConfig(BaseModel):
     # remains a read-side property below and a validation alias for old
     # harness.yaml files — ADR-004 silent migration).
     default_model: str = Field(
-        default="claude-opus-4-7",
+        default="opus",
         validation_alias=AliasChoices("default_model", "recommended_model"),
     )
     # ADR-001/002: per-agent override map. Empty default → preset map applies
@@ -727,7 +727,7 @@ class InterviewAnswers(BaseModel):
     # ADR-002 mirror of HarnessConfig.default_model. AliasChoices accepts both
     # the new canonical name and the old `recommended_model` key.
     default_model: str = Field(
-        default="claude-opus-4-7",
+        default="opus",
         validation_alias=AliasChoices("default_model", "recommended_model"),
     )
     # ADR-001/002 mirror.

@@ -101,7 +101,8 @@ harness_maker.gates.X`.
 
 ## Models
 
-Default recommendation: `claude-opus-4-7` (`harness.yaml.default_model`).
+Default recommendation: `opus` (`harness.yaml.default_model`) — an alias that
+resolves to the current Opus tier, so it never goes stale across releases.
 Per-agent overrides go in `harness.yaml.agent_models` (see ADR-002 +
 docs/HOW-IT-WORKS.md > Agent Models). Cursor users may override freely, but
 prompts contain Claude-specific patterns (`<thinking>` blocks, role framing)

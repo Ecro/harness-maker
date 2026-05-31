@@ -3,7 +3,7 @@ name: code-verifier
 communication_variant: reframe
 description: Pass 1.5 reduce-only verifier — KEEP/DROP/DEMOTE Pass 1 findings against the redacted diff. MUST NOT introduce new findings.
 tools: Read, Grep, Glob
-model: {% if cursor_model is defined and cursor_model is not none %}{{ cursor_model }}{% elif claude_model is defined and claude_model is not none %}{{ claude_model }}{% else %}sonnet{% endif %}
+{% include "agents/_partials/model_frontmatter_line.md.j2" %}
 review_scope: [verifier]
 permissions:
   allow:

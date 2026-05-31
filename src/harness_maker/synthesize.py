@@ -218,7 +218,7 @@ _COMMUNICATION_VARIANT: dict[str, str] = {
 def _agent_files(
     preset: Preset = Preset.SIDE,
     agent_models: dict[str, AgentModelSpec] | None = None,
-    default_model: str = "claude-opus-4-7",
+    default_model: str = "opus",
 ) -> list[FileSpec]:
     """Agent .md.j2 contexts include per-agent model values resolved through
     the 3-tier presets.resolve_agent_spec chain (ADR-005). Templates render
@@ -229,7 +229,14 @@ def _agent_files(
     live HarnessConfig values at render time.
     """
     from harness_maker.models import HarnessConfig
-    from harness_maker.presets import resolve_agent_spec
+    from harness_maker.presets import CURSOR_MODEL_IDS, resolve_agent_spec
+
+    # Reverse map: a Tier-1 user override of `cursor:` only (no `claude:`) leaves
+    # spec.claude None. ADR-001 renders the agent `model:` from the Claude alias,
+    # so derive the alias back from the normalized cursor concrete id — otherwise
+    # the cursor-only override would silently fall through to the `sonnet` default
+    # in the partial, downgrading the user's intent.
+    _alias_by_cursor_id = {v: k for k, v in CURSOR_MODEL_IDS.items()}
 
     config = HarnessConfig(
         preset=preset,
@@ -239,6 +246,7 @@ def _agent_files(
     out: list[FileSpec] = []
     for n in _ALL_AGENTS:
         spec = resolve_agent_spec(n, config)
+        claude_model = spec.claude or _alias_by_cursor_id.get(spec.cursor or "")
         out.append(
             (
                 f"agents/{n}.md.j2",
@@ -246,7 +254,7 @@ def _agent_files(
                 {
                     "name": n,
                     "reviewer_kind": _REVIEWER_KIND.get(n, ""),
-                    "claude_model": spec.claude,
+                    "claude_model": claude_model,
                     "cursor_model": spec.cursor,
                     "codex_reasoning_effort": (spec.codex.reasoning_effort if spec.codex else None),
                 },
@@ -289,7 +297,7 @@ _CODEX_AGENT_META: dict[str, str] = {
 def _codex_agent_files(
     preset: Preset = Preset.SIDE,
     agent_models: dict[str, AgentModelSpec] | None = None,
-    default_model: str = "claude-opus-4-7",
+    default_model: str = "opus",
 ) -> list[FileSpec]:
     """Codex agent TOML files — one per agent using codex/agent.toml.j2.
 
@@ -403,7 +411,7 @@ def _base_files(
     preset: Preset,
     locale: str = "en",
     agent_models: dict[str, AgentModelSpec] | None = None,
-    default_model: str = "claude-opus-4-7",
+    default_model: str = "opus",
     config_dump: dict[str, object] | None = None,
 ) -> list[FileSpec]:
     """Shared base: stages + atomic commands + all agents/skills + fixed assets.
@@ -516,7 +524,7 @@ def _codex_target_files(
     config_dump: dict[str, object] | None = None,
     preset: Preset = Preset.SIDE,
     agent_models: dict[str, AgentModelSpec] | None = None,
-    default_model: str = "claude-opus-4-7",
+    default_model: str = "opus",
 ) -> list[FileSpec]:
     """Codex target-specific assets: config.toml + AGENTS.md + hooks.json + agents + skills.
 

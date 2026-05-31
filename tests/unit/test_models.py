@@ -177,9 +177,10 @@ def test_interview_answers_targets_codex() -> None:
 
 
 def test_harness_config_recommended_model_default() -> None:
-    """CLAUDE.md § Targets 정책: Cursor user 도 Anthropic 모델 권장."""
+    """ADR-002 (PLAN-agent-model-version-agnostic): floor default is the
+    version-agnostic alias `opus`, not a pinned concrete id."""
     cfg = HarnessConfig()
-    assert cfg.recommended_model == "claude-opus-4-7"
+    assert cfg.recommended_model == "opus"
 
 
 def test_harness_config_recommended_model_override() -> None:

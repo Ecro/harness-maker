@@ -405,4 +405,23 @@ PLAN-spec-test-accumulation (0.28.0). `/hm:execute` now reads `SPEC-{slug}.machi
 ## [wiki:gotcha] mock-only-test-hides-consumer-format-bug | 2026-05-30
 `spec_machine._check_pytest_collect` ran `pytest --collect-only` WITHOUT `-q`; that emits an indented `<Function ...>` tree with NO `::` nodeids, so the parser found zero nodeids and reported EVERY test_id as unresolved — rule-3 was silently broken for all real usage. It passed CI for months because every rule-3 test `monkeypatch`ed `_check_pytest_collect` away. The bug only surfaced when `mark_tested` (new) exercised the helper against a REAL pytest tree. Generalization (sibling of `[fail:design] producer-consumer-schema-drift`): a pure-function helper whose output format depends on an EXTERNAL tool's stdout MUST have ≥1 unmocked test that runs the real tool — mocking the helper everywhere proves the callers' logic but never the helper's contract against its actual consumer. Fix: `-q` + return-code-aware degradation (`not collected → return all-unresolved iff returncode!=0 else []`), guarded by `test_mark_tested_real_pytest_collect_lifecycle`.
 
+## [wiki:architecture] agent-model-alias-not-pinned | 2026-05-31
+Agent `model:` frontmatter in `.claude/agents/*.md` MUST render a version-agnostic
+Claude alias (`opus`/`sonnet`/`haiku`), never a pinned concrete id. Claude Code now
+*respects* the field (#43869 fixed); it was previously treated as decorative, so the
+dispatcher templates preferred `{{ cursor_model }}` (the CURSOR_MODEL_IDS concrete id,
+e.g. `claude-4-7-opus`) over `{{ claude_model }}`. Once the upstream fix landed, that
+stale pinned id failed to launch any subagent in a newer-model session (0 tool uses) —
+the same symptom as [fail:review] reviewer-subagent-model-unsupported. Fix
+(PLAN-agent-model-version-agnostic): a shared `_partials/model_frontmatter_line.md.j2`
+renders the alias; `default_model` floor defaults to `opus`. **Two-namespace boundary
+(ADR-004/006):** agent-launch surfaces (Claude Code) take ALIASES (resolved at launch);
+Anthropic-API surfaces (aider/Continue foreign configs, the Python SDK `messages.create`
+constants) require CONCRETE ids and resolve via a SEPARATE `foreign_config._FOREIGN_MODEL_IDS`
+map — `CURSOR_MODEL_IDS` holds Cursor's reversed-format ids (`claude-4-7-opus`) which are
+NOT valid Anthropic API ids, a different namespace. Guard: `test_agent_model_alias_rendering`
+renders the real pipeline and fails if any concrete id reaches an agent `model:` line.
+Lesson: a field assumed "decorative" becomes a latent bug the moment upstream makes it
+load-bearing — pin nothing that an alias can express.
+
 <!-- @hm:/user:entries -->

@@ -437,3 +437,16 @@ PASS/FAIL 을 RESULTS.md Phase 2.9 row 에 기입.
 4. **회복 검증**: `.backup-<ts>/.codex/config.toml` 안에 `manual-test-server` 가 있어야 함 (backup = 회복 수단 per ADR-001).
 
 이 step 의 fail (= user block survives) 는 좋은 fail. 의도된 deferral 이 closed 됐다는 signal.
+
+### C8 — Agent `model:` alias launches under Cursor (PLAN-agent-model-version-agnostic, ADR-005)
+
+**Why**: `.claude/agents/*.md` now render `model: opus` (alias), not a pinned
+concrete id. Claude Code resolves the alias natively; this verifies Cursor 2.4+
+also accepts it from the single-source `.claude/agents/` file.
+
+**Owner**: (assign) · **Target date**: before promoting ADR-005 risk to resolved.
+
+1. Render a harness with `targets` including `cursor`; open `.claude/agents/code-reviewer.md` and confirm the frontmatter line reads `model: sonnet` (alias), not `claude-…`.
+2. In Cursor 2.4+, trigger the agent (e.g. via `/hm:review`) and confirm the subagent **launches** (no "model not found / unsupported" error).
+3. **Pass** → the alias is Cursor-compatible; mark ADR-005 risk resolved in the PLAN risk register.
+   **Fail** → Cursor rejects the alias; open the follow-up PLAN for per-target divergence (sidecar or `.cursor/agents/`), as ADR-005 contingency specifies.

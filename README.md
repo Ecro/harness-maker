@@ -137,7 +137,7 @@ A short interview locks the dimensions that shape every downstream render. Re-ru
 | **Sibling repos** | Relative paths | Which adjacent repos share the same harness session |
 | **Second Brain** | Obsidian vault path + project_id | Where cross-session memory writes |
 | **Codex second opinion** | `codex_second_opinion.enabled` | When true, `plan-validator` **must** invoke `codex exec` (mandatory; reconciles each Codex finding, loud warn-and-proceed on failure); `code-reviewer` / `consensus-arbiter` may invoke it (opt-in, pending a follow-up PLAN). Requires `codex` CLI + `codex login`; orthogonal to `targets` |
-| **Recommended model** | `claude-opus-4-7` default | The model frontmatter on every generated agent |
+| **Recommended model** | `opus` default | The model frontmatter on every generated agent |
 
 > **Result:** `.claude/harness.yaml` — a single source of truth that survives upgrades.
 
@@ -540,7 +540,7 @@ targets:                     # which runtimes to drive
   - claude-code
   - cursor
   - codex
-recommended_model: claude-opus-4-7
+recommended_model: opus
 
 ref_folders:
   - path: ../architecture-docs
@@ -650,7 +650,7 @@ Run `/harness-maker:make` and pick `targets: [cursor]` or `[claude-code, cursor]
 
 ### Recommended model
 
-`harness.yaml.recommended_model` defaults to `claude-opus-4-7` and propagates to agent frontmatter. Cursor users may override model selection in their IDE. The harness does **not** rewrite prompts to be model-agnostic — `<thinking>` blocks and Claude-specific patterns are preserved deliberately.
+`harness.yaml.recommended_model` defaults to `opus` and propagates to agent frontmatter. Cursor users may override model selection in their IDE. The harness does **not** rewrite prompts to be model-agnostic — `<thinking>` blocks and Claude-specific patterns are preserved deliberately.
 
 ### Verification
 
@@ -793,7 +793,7 @@ Run `/harness-maker:make` → choose **Update**. For files where your hash match
 Shell commands listed under `reviewers.mechanical_checks` in `harness.yaml` run at the start of every `/hm:review` — before any LLM reviewer spawns. The first command that exits non-zero emits `## MECHANICAL_BLOCK: <cmd> exit=<N>` and halts review immediately (`CHANGES_REQUESTED`). Use them for fast, deterministic gates (lint, type-check, unit test) that shouldn't waste LLM tokens when the basics are broken. The list is user-managed; harness-maker never populates it automatically. `--no-auto-fix` does not skip mechanical checks — they are a hard gate, not part of the fix loop.
 
 **Q: Why doesn't harness-maker rewrite prompts to be model-agnostic?**
-The prompts are tuned for `claude-opus-4-7` — `<thinking>` blocks, role framing, chain-of-thought structure. Rewriting for model-neutrality would degrade quality on the recommended model for hypothetical gains on others. Override `recommended_model` in `harness.yaml` if you want a different model; the prompts remain as-is.
+The prompts are tuned for `opus` — `<thinking>` blocks, role framing, chain-of-thought structure. Rewriting for model-neutrality would degrade quality on the recommended model for hypothetical gains on others. Override `recommended_model` in `harness.yaml` if you want a different model; the prompts remain as-is.
 
 ---
 

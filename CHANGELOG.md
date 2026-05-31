@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+### Fixed: agent `model:` frontmatter is version-agnostic (alias, not pinned id)
+
+Rendered `.claude/agents/*.md` carried a stale **Cursor concrete id**
+(`claude-4-7-opus`) in the `model:` line instead of the Claude alias. Claude Code
+now respects that field (#43869), so subagents failed to launch (0 tool uses) in a
+newer-model session. (PLAN-agent-model-version-agnostic.)
+
+- **Agent frontmatter renders the Claude alias** (`opus`/`sonnet`/`haiku`) via a
+  shared `_partials/model_frontmatter_line.md.j2` — Claude Code resolves it to the
+  current tier model, so it never goes stale across releases (ADR-001).
+- **`default_model` floor defaults to `opus`** (was `claude-opus-4-7`) (ADR-002).
+- **Foreign-tool configs resolve alias→concrete** at the `foreign_config` render
+  boundary via a new `_FOREIGN_MODEL_IDS` map (aider/Continue call the Anthropic API
+  directly and need a concrete id). This is deliberately separate from
+  `CURSOR_MODEL_IDS` (Cursor's reversed-format ids are a different namespace) (ADR-006).
+- Guard: `test_agent_model_alias_rendering` fails if any concrete id reaches an agent
+  `model:` line. Supersedes the PLAN-model-routing-multi-ide C-1/R-7 cursor-precedence.
+
 ## [0.28.1] - 2026-05-31
 
 ### Fixed: autoloop worktree phantom-path cascade-cancel

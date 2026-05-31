@@ -126,9 +126,10 @@ def test_agent_model_spec_accepts_safe_values() -> None:
 
 
 def test_harness_config_default_model_default_value() -> None:
-    """HarnessConfig.default_model defaults to claude-opus-4-7 (replaces recommended_model)."""
+    """ADR-002: HarnessConfig.default_model defaults to the alias `opus`
+    (version-agnostic floor; replaces the pinned claude-opus-4-7)."""
     cfg = HarnessConfig()
-    assert cfg.default_model == "claude-opus-4-7"
+    assert cfg.default_model == "opus"
 
 
 def test_harness_config_default_model_explicit() -> None:
