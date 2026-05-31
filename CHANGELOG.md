@@ -1,6 +1,37 @@
 # Changelog
 
-## [Unreleased]
+## [0.28.3] - 2026-06-01
+
+Worktree-finalize robustness pass (PLAN-p6-p7-worktree-finalize, all phases +
+review follow-ups). All bug fixes / internal hardening; no API or breaking change.
+
+### Fixed: finalize stash-orphan + merge-fence hardening (CR2 / CN1 / CN2)
+
+- **CR2** — `_stash_base_dirty` matched its just-pushed stash by an exact/endswith
+  subject compare, which a `git stash list` `%gs` format quirk (e.g. a trailing
+  file count) could miss → raise → orphan the stash with the user's base dirt
+  stranded inside. It now matches the unique message as a substring (the 32-hex
+  `uuid4` suffix keeps it collision-safe).
+- **CN1** — the merge-fence acquire-timeout was raised 60s → 360s (= the
+  in-fence `git stash push -u` worst-case 300s + the 60s merge), so a
+  legitimately-slow first finalize no longer spuriously times out a parallel
+  second one. (Supersedes ADR-003's original "keep 60s".)
+- **CN2** — both base-stash pops are now serialized behind the merge fence
+  (`_fenced_restore_base_dirty`, with an unfenced fallback on fence-acquire
+  failure) so two parallel finalizes don't race the shared stash stack /
+  `index.lock`. (Supersedes ADR-003's "pops stay outside the fence".)
+- Accepted narrow downside: the 360s budget lengthens the O_EXCL *secondary*-path
+  stale-lock stall if a holder is SIGKILL'd (flock — the primary on Linux/WSL2 —
+  auto-releases on death); self-heals via the unfenced fallback.
+
+### Fixed: success-mode finalize rollback resets the conflicted index (CR1)
+
+The finalize rollback reset the partial merge to HEAD only `if not auto_commit`
+(stage-only). A success-mode `git merge --squash` CONFLICT also leaves a
+dirty/conflicted index without committing, so the success-mode rollback skipped
+the reset and applied the base stash over the conflict markers. The reset is now
+gated on `wt_rc != 0` (any failure rollback); `git reset --hard HEAD` is a no-op
+when the index is already clean.
 
 ### Internal: porcelain-parse dedup + batched gitignore check-ignore
 
