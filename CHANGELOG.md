@@ -1,9 +1,15 @@
 # Changelog
 
-## [0.28.3] - 2026-06-01
+## [0.28.4] - 2026-06-01
 
 Worktree-finalize robustness pass (PLAN-p6-p7-worktree-finalize, all phases +
 review follow-ups). All bug fixes / internal hardening; no API or breaking change.
+
+> Re-tag of the unpublished **v0.28.3**, which failed `quality-gate` on two
+> stale permissions-opt-out integration tests (a boundary test + the
+> fresh-install settings-migration test still asserted the pre-opt-out non-empty
+> `settings.json` deny default). v0.28.3 published nothing — quality-gate is the
+> first job — so no artifacts were produced; the stale tests are fixed here.
 
 ### Fixed: finalize stash-orphan + merge-fence hardening (CR2 / CN1 / CN2)
 
