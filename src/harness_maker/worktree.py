@@ -2353,19 +2353,72 @@ def _cli_owned_uuids(args: list[str]) -> int:
     return 0
 
 
+def _cli_verify(args: list[str]) -> int:
+    """`python -m harness_maker.worktree verify <worktree_path>` — anti-drift gate.
+
+    WHY: defends against LLM ``<WT>``-substitution drift — the driver running on
+    a path that ``worktree create`` never printed. The loop/execute driver runs
+    this immediately after ``create`` and HALTs on a non-zero exit instead of
+    cascade-cancelling a parallel stage batch.
+
+    The gate confirms structural validity, NOT name format: exit 0 (re-prints
+    the resolved path) means the path is an existing **linked** git worktree
+    root; exit 1 means missing, not a git worktree, a subdirectory of one, or
+    the **main** checkout (a drifted path that lands on the repo root must not
+    pass — review CR-1). It deliberately does not parse the ``execute-<uuid>-<ts>``
+    dirname; a non-existent fabricated path is already caught by ``is_dir()``.
+    """
+    if len(args) != 1:
+        print("usage: verify <worktree_path>", file=sys.stderr)
+        return 2
+    wt = Path(args[0]).resolve()
+    if not wt.is_dir():
+        print(f"[verify] FAIL: {wt} is not an existing directory", file=sys.stderr)
+        return 1
+    try:
+        cp = _run(["git", "rev-parse", "--show-toplevel"], cwd=wt)
+        git_dir = _run(["git", "rev-parse", "--git-dir"], cwd=wt).stdout.strip()
+        common_dir = _run(["git", "rev-parse", "--git-common-dir"], cwd=wt).stdout.strip()
+    except RuntimeError as e:
+        print(f"[verify] FAIL: {wt} is not inside a git worktree ({e})", file=sys.stderr)
+        return 1
+    top = Path(cp.stdout.strip()).resolve()
+    if top != wt:
+        print(
+            f"[verify] FAIL: {wt} is not a worktree root (git toplevel={top})",
+            file=sys.stderr,
+        )
+        return 1
+    # A linked worktree has a per-worktree git-dir (.git/worktrees/<name>) that
+    # differs from the shared common-dir; the main checkout has them equal. The
+    # loop only calls verify when `create` produced an isolated worktree, so the
+    # main repo root passing here would mean the driver drifted onto main.
+    if (wt / git_dir).resolve() == (wt / common_dir).resolve():
+        print(
+            f"[verify] FAIL: {wt} is the main repo root, not a linked worktree "
+            "— `worktree create` output drifted; re-run it",
+            file=sys.stderr,
+        )
+        return 1
+    print(str(wt))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     """Dispatch worktree subcommand from argv."""
     args = list(sys.argv[1:] if argv is None else argv)
     if not args:
         print(
             "usage: python -m harness_maker.worktree "
-            "<create|finalize|post-commit-pop|owned-uuids> [...]",
+            "<create|verify|finalize|post-commit-pop|owned-uuids> [...]",
             file=sys.stderr,
         )
         return 2
     sub, rest = args[0], args[1:]
     if sub == "create":
         return _cli_create(rest)
+    if sub == "verify":
+        return _cli_verify(rest)
     if sub == "finalize":
         return _cli_finalize(rest)
     if sub == "post-commit-pop":

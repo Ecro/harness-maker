@@ -93,6 +93,22 @@ def test_write_creates_expected_path(tmp_path: Path) -> None:
     assert path.is_file()
 
 
+def test_write_rejects_nonexistent_root(tmp_path: Path) -> None:
+    # Guard against phantom/fabricated --root: atomic_write would otherwise
+    # silently materialize a bogus receipts tree (review CR-3/CC-3).
+    phantom = tmp_path / ".worktrees" / "execute-20260531T120000Z"
+    with pytest.raises(ValueError, match="phantom worktree path"):
+        iter_receipts.write(iter=1, stage="execute", verdict="pass", root=phantom)
+    assert not phantom.exists()
+
+
+def test_set_iter_marker_rejects_nonexistent_root(tmp_path: Path) -> None:
+    phantom = tmp_path / ".worktrees" / "execute-20260531T120000Z"
+    with pytest.raises(ValueError, match="phantom worktree path"):
+        iter_receipts.set_iter_marker(iter=1, root=phantom)
+    assert not phantom.exists()
+
+
 def test_write_content_round_trips(tmp_path: Path) -> None:
     path = iter_receipts.write(iter=2, stage="review", verdict="fail", root=tmp_path)
     rec = iter_receipts.read(path)

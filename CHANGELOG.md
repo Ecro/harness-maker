@@ -2,6 +2,34 @@
 
 ## [Unreleased]
 
+## [0.28.1] - 2026-05-31
+
+### Fixed: autoloop worktree phantom-path cascade-cancel
+
+`/hm:loop` and `/hm:execute` could proceed on a fabricated `<WT>` worktree path
+(e.g. an LLM-substituted `execute-<round-timestamp>` with no uuid segment that
+`worktree create` never printed). Worktree-dependent operations — `.current-iter`
+marker, receipt writes, stage `Task(...)` dispatches — were issued as parallel
+tool calls, so one `cd <WT>` error into the non-existent path cancelled the
+entire batch (`Cancelled: parallel tool call … errored`).
+
+- **`worktree verify <path>` (new CLI subcommand):** the loop/execute driver runs
+  it immediately after `create` and HALTs on a non-zero exit. The gate is
+  structural — it accepts only an existing **linked** git worktree root and
+  rejects phantom paths, non-git dirs, worktree subdirectories, and the **main
+  repo root** (`git-dir` vs `git-common-dir`), so a drifted path that lands on
+  main does not pass.
+- **`iter_receipts` fail-loud root guard:** `write` and `set_iter_marker` now
+  reject a non-existent `--root` instead of silently materializing a bogus
+  receipts tree under it (`atomic_write` auto-creates parent dirs).
+- **Template guidance (`loop.md.j2`, `execute.md.j2`):** the verify gate is
+  documented at Step 5 / Step 0, multi-repo mode verifies every printed line,
+  and an explicit "never batch `create → verify → marker` in one parallel
+  tool-call turn" rule now also lives at the per-iter marker site (Step 3.5),
+  not only at the loop-top engage step.
+- Tests: `tests/unit/test_worktree_verify.py` + `_require_existing_root` guard
+  cases in `test_iter_receipts.py`.
+
 ## [0.28.0] - 2026-05-30
 
 ### Added: forward spec↔test binding on the everyday `/hm:execute` path

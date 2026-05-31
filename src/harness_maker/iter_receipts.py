@@ -94,6 +94,30 @@ def _receipts_root(root: Path) -> Path:
     return root / ".claude" / RECEIPT_DIR_NAME
 
 
+def _require_existing_root(root: Path) -> None:
+    """Refuse to write to a worktree root that does not exist on disk.
+
+    WHY: ``atomic_write`` auto-creates parent dirs, so without this guard a
+    drifted/fabricated ``--root`` (an LLM-hallucinated ``.worktrees/…`` path
+    that ``worktree create`` never produced) would silently materialize a bogus
+    receipts tree instead of failing. The phantom path then propagates into the
+    loop and cascade-cancels parallel stage dispatches. Fail loud at the first
+    touch instead.
+
+    SCOPE: this is a cheap *existence* check, not a worktree-validity check —
+    a real-but-wrong directory (e.g. cwd) still passes. The authoritative
+    anti-drift gate is ``worktree verify`` (worktree.py), which the loop runs
+    serially before any receipt write; this guard is the belt-and-suspenders
+    backstop for the non-existent-path case (review CC-2).
+    """
+    if not root.is_dir():
+        raise ValueError(
+            f"root {str(root)!r} is not an existing directory — refusing to write "
+            "to a phantom worktree path. Re-run `worktree create` and use its "
+            "exact printed path (never a fabricated or shell-variable path)."
+        )
+
+
 def _iter_dir(root: Path, iter_n: int) -> Path:
     return _receipts_root(root) / f"iter-{iter_n}"
 
@@ -123,6 +147,7 @@ def write(
     ADR-005 explicitly relies on a second write replacing the first.
     """
     _validate_stage(stage)
+    _require_existing_root(root)
     record = IterReceipt(
         iter=iter,
         stage=stage,
@@ -146,6 +171,7 @@ def set_iter_marker(*, iter: int, root: Path = Path(".")) -> Path:  # noqa: A002
     """
     if iter < 1:
         raise ValueError(f"iter must be >= 1 (got {iter})")
+    _require_existing_root(root)
     path = _receipts_root(root) / ".current-iter"
     atomic_write(path, str(iter))
     return path

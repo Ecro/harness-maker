@@ -454,6 +454,41 @@ Read **all non-empty output lines** the command prints. Three cases:
   (`<WT>`). Lines 2+ = sibling repo worktrees (`<WT-sibling-N>`). Use `<WT>`
   for primary-repo operations and `<WT-sibling-N>` for sibling-repo edits.
 
+**Verify the worktree before using it (anti-drift gate — do NOT skip).** `verify`
+confirms the path is a real **linked** git worktree root — it does NOT parse the
+name (a path with no uuid segment or a round timestamp like
+`execute-20260531T120000Z` is a human tell-tale of drift; the real format is
+`execute-<uuid12>-<timestamp>`, but the gate's actual check is structural, not
+textual). Run `verify` on the exact path you just read. **Multi-repo: run
+`verify` on EVERY printed line** — `<WT>` and each `<WT-sibling-N>` — and HALT
+if any one fails:
+
+{% if is_codex %}
+```
+Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree verify <WT>")
+```
+{% else %}
+```bash
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree verify <WT>
+```
+{% endif %}
+
+- **Exit 0** (re-prints `<WT>`) → the worktree is real. Proceed.
+- **Non-zero** → the path is phantom, not a worktree, a subdirectory of one, or
+  the main repo root (drift). **HALT the loop now**:
+  do NOT write `.current-iter`, do NOT dispatch any stage, do NOT issue further
+  calls. Re-run `worktree create`, read its exact printed path, and retry
+  `verify`. Never proceed on an unverified path.
+
+> ⚠️ **Never batch worktree-dependent operations in one parallel tool-call
+> turn.** `create` → `verify` → `.current-iter` marker must run **serially**,
+> each confirmed before the next. If you fire the marker write, receipt writes,
+> and stage `Task(...)` dispatches as parallel calls in a single turn and the
+> path is wrong, one `cd <WT>` error cancels the entire batch (every sibling
+> shows `Cancelled: parallel tool call … errored`). Serialize the
+> create→verify→marker prelude; only parallelize work already inside a
+> verified `<WT>`.
+
 After confirming the worktree path (or deciding to operate in cwd), **create
 the loop-active marker** in the project root:
 
@@ -715,6 +750,14 @@ For each iter (until convergence or any safety rail fires):
 {% endif %}
 
    Use the `set-iter-marker` CLI subcommand (Python `atomic_write`: tempfile + os.replace) instead of a shell `printf '%s' <N> > .current-iter` redirect. The shell redirect is NOT atomic — a crash between truncation and write completion leaves the file empty, causing every subsequent stage receipt-emit block to read an empty `$ITER` and silently drop the receipt (Gate 0 would then loop forever). The CLI also creates the parent directory if missing.
+
+   > ⚠️ **Serial, not batched (same rule as Step 5's gate).** Emit this marker
+   > write as its **own** turn and confirm exit 0 before Step 4 dispatches any
+   > stage. Do NOT batch the marker write + receipt writes + stage `Task(...)`
+   > calls into one parallel tool-call turn: if `<WT>` is wrong, one `cd <WT>`
+   > error cancels the entire batch (`Cancelled: parallel tool call … errored`).
+   > A non-zero exit here (`root … is not an existing directory`) means `<WT>`
+   > drifted — re-verify before continuing.
 4. **Invoke per-iter workflow**: read
    `.claude/commands/hm/<WORKFLOW>.md` and execute **every stage it
    defines, in order, without skipping any**. Operate inside `<WT>`:
