@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.28.8] - 2026-06-03
+
+Make rendered JSON schemas reach existing installs on re-render.
+
+### Fixed: `.claude/schemas/*.json` froze on `/hm:make --update`
+
+- `reconcile()` returns `KEEP("no-frontmatter")` for any rendered file without
+  provenance frontmatter. Pure-JSON schema files (`codex exec --output-schema`
+  contracts, no frontmatter by ADR-008) hit that branch, so an existing install
+  never picked up a fixed rendered schema on re-render — the 0.28.7
+  `codex-finding.schema.json` strict-mode fix reached fresh installs only.
+- Fix: add a forced-REPLACE reconcile branch for `.claude/schemas/*.json`
+  (machine artifacts with zero user-editable content), reusing the existing
+  `render._is_schemas_json` predicate so reconcile and the render dispatch stay
+  in lockstep. Mirrors the `settings.json` / `config-always-replace`
+  precedent; `cli.py`'s `backup()` covers recovery. The live schema now
+  re-renders on `/hm:make`, so existing installs get the strict-mode fix.
+
 ## [0.28.7] - 2026-06-03
 
 Fix the Codex second-opinion JSON schema so it is valid under OpenAI/Codex

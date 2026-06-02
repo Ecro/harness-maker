@@ -173,7 +173,7 @@ wheels = [
 
 [[package]]
 name = "harness-maker"
-version = "0.28.7"
+version = "0.28.8"
 source = { editable = "." }
 dependencies = [
     { name = "anthropic" },

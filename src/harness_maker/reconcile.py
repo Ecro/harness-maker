@@ -43,7 +43,7 @@ from harness_maker.block_merge import MarkerStyle, ParseError, has_markers, pars
 from harness_maker.io_utils import atomic_append
 from harness_maker.locate import compare_version
 from harness_maker.models import Blueprint, ConflictItem, ReconcileDecision
-from harness_maker.render import RENDER_MANIFEST_NAME, resolve_output_path
+from harness_maker.render import RENDER_MANIFEST_NAME, _is_schemas_json, resolve_output_path
 
 # Templates ship inside the package; reconcile peeks at the source to know
 # whether a fresh render will produce markers without re-rendering.
@@ -226,6 +226,23 @@ def reconcile(existing_dir: Path, blueprint: Blueprint) -> list[ConflictItem]:
             decision, reason = _decide_hash_comment_branch(fe.template, existing_path)
             conflicts.append(
                 ConflictItem(path=fe.path, decision=decision, reason=reason),
+            )
+            continue
+        # .claude/schemas/*.json are pure-JSON machine artifacts (codex
+        # `--output-schema` contracts, ADR-008) with NO provenance frontmatter
+        # and ZERO user-editable content. Without this branch they hit the
+        # no-frontmatter KEEP below and freeze forever, so a fixed rendered
+        # schema never reaches existing installs on re-render
+        # (PLAN-reconcile-schemas-always-replace ADR-001). Always REPLACE — the
+        # shared `render._is_schemas_json` predicate keeps reconcile and the
+        # render dispatch in lockstep. CLI backup() covers recovery.
+        if _is_schemas_json(fe):
+            conflicts.append(
+                ConflictItem(
+                    path=fe.path,
+                    decision=ReconcileDecision.REPLACE,
+                    reason="schema-always-replace",
+                ),
             )
             continue
         fm, body = parse_frontmatter(existing_path)
