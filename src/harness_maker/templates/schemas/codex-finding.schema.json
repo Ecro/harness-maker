@@ -3,27 +3,27 @@
   "title": "Codex Second-Opinion Finding List",
   "type": "object",
   "additionalProperties": false,
-  "required": ["findings", "summary"],
+  "required": ["findings", "summary", "confidence"],
   "properties": {
     "findings": {
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["severity", "message"],
+        "required": ["severity", "message", "evidence", "file", "line"],
         "properties": {
-          "file": {"type": "string"},
-          "line": {"type": "integer", "minimum": 1},
           "severity": {
             "type": "string",
             "enum": ["info", "low", "medium", "high", "critical"]
           },
-          "message": {"type": "string", "minLength": 1},
-          "evidence": {"type": "string"}
+          "message": {"type": "string"},
+          "evidence": {"type": ["string", "null"]},
+          "file": {"type": ["string", "null"]},
+          "line": {"type": ["integer", "null"]}
         }
       }
     },
-    "summary": {"type": "string", "minLength": 1},
-    "confidence": {"type": "number", "minimum": 0, "maximum": 1}
+    "summary": {"type": "string"},
+    "confidence": {"type": ["number", "null"]}
   }
 }

@@ -1,5 +1,34 @@
 # Changelog
 
+## [0.28.7] - 2026-06-03
+
+Fix the Codex second-opinion JSON schema so it is valid under OpenAI/Codex
+strict structured-output mode (`codex exec --output-schema`).
+
+### Fixed: `codex-finding.schema.json` rejected by Codex strict mode
+
+- Strict structured-output mode requires every key in an object's `properties`
+  to appear in `required` when `additionalProperties: false`. The shipped
+  schema violated this twice — top-level `confidence` and item-level
+  `file`/`line`/`evidence` were declared but not required — so `codex exec`
+  returned `invalid_json_schema` and the reviewer (`plan-validator` /
+  `code-reviewer` / `consensus-arbiter`) silently fell back to a prompt-pinned
+  shape each pass (retries + latency).
+- Fix: every property is now in `required`; genuinely-optional keys
+  (`confidence`, `evidence`, `file`, `line`) are expressed as nullable union
+  types (`["X", "null"]`) — strict mode's way to encode optionality. Dropped
+  the unsupported numeric/string constraint keywords (`minimum` / `maximum` /
+  `minLength`), a likely secondary rejection cause on several Codex/OpenAI
+  versions.
+
+### Added: static strict-mode invariant test
+
+- `tests/unit/test_schema_strict_mode.py` guards every rendered schema under
+  `templates/schemas/*.json`: every property ∈ `required` under
+  `additionalProperties: false`, and no banned constraint keywords. Carries a
+  committed negative fixture (the pre-fix shape) so the regression proof is
+  permanent. Previously the suite only checked schema *routing*, never *shape*.
+
 ## [0.28.6] - 2026-06-02
 
 Security follow-up to 0.28.5: gate the codex agents' Bash tool on opt-in.
