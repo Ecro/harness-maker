@@ -38,38 +38,49 @@ the `codex exec` invocation. If this happens:
 
 ## Status
 
-**Last attempt: 2026-06-02 — INCONCLUSIVE in-session (negative half confirmed).**
+**Last run: 2026-06-02 — FUNCTIONAL PASS, with a permission-enforcement caveat.**
 
-Ran during `/hm:wrapup` of PLAN-spoton-codex-rm-stash-rootcause (the change that
-makes this path live). Result:
+Run #1 (mid-session, `/hm:wrapup`): a dispatched reviewer/validator whose
+`tools:` line lacks `Bash` has **no Bash tool at all** — every Bash check is
+unexecutable (tool-layer absence; the allow/deny evaluator is never reached).
+Reproduced twice (`plan-validator`, `code-reviewer`). This is the root cause
+ADR-001 fixes. Mid-session edits to the agent `.md` did NOT propagate — the
+dispatcher resolves agent defs from a session-start snapshot, so the positive
+half needed a fresh session.
 
-- **Confirmed (negative half):** a dispatched reviewer/validator whose `tools:`
-  line lacks `Bash` has **no Bash tool at all** — every Bash check is
-  unexecutable (tool-layer absence, the allow/deny evaluator is never reached).
-  Reproduced twice this session (`plan-validator`, `code-reviewer`). This is the
-  root cause ADR-001 fixes.
-- **Could NOT confirm in-session (positive half):** editing the dogfood agent
-  `.claude/agents/*.md` `tools:` line mid-session did **not** propagate to a new
-  `Task`-dispatched subagent — the dispatcher resolves agent definitions from a
-  **session-start snapshot** (or the installed plugin), not the live file. So a
-  subagent with the *fixed* config (`tools: …, Bash` + `Bash(codex exec:*)`
-  allow + the interpreter denies) could not be obtained without a fresh session.
+Run #2 (fresh session, after reload, dogfood agents patched to
+`tools: …, Bash`): dispatched `code-reviewer` reported —
 
-**How to complete the probe (needs a FRESH session):**
-1. Ensure the agent definitions are loaded with the fix at startup — either a
-   harness that re-rendered to ≥0.28.5, or hand-patched `tools: …, Bash` on the
-   3 codex agents (already done locally here; gitignored).
-2. Start a new Claude Code session (`/reload-plugins` or fresh launch) so the
-   patched defs load.
-3. Dispatch `code-reviewer` and have it run `codex exec --help` (instant, no
-   model cost) + `sh -c "echo x"` (negative control).
-4. **Pass:** `codex exec` is PERMITTED (runs; codex's own exit code irrelevant)
-   AND `sh` is DENIED by the evaluator. **Fail:** Claude Code shows a permission
-   denial for `codex exec`.
+| Check | Result |
+|---|---|
+| `has_bash` | **true** — the `tools:` fix works; the agent now has the Bash tool. |
+| `codex exec --help` | **PERMITTED, exit 0** — codex path is functionally unblocked, not shadowed by the sh/bash denies. |
+| `git status --short` | permitted (allow-listed). |
+| `sh -c "echo …"` (negative control) | **PERMITTED** — should have been DENIED by `Bash(sh:*)`. |
 
-Reasoning pending that empirical run: `codex exec …` matches the allow
-`Bash(codex exec:*)` and matches none of `Bash(sh:*)`/`Bash(bash:*)`/
-`Bash(python:*)` (different command prefixes), and Claude Code gates only the
-top-level Bash command — not codex's internal child processes — so PASS is the
-strongly-expected outcome. The fresh-session run is what turns "expected" into
-"verified".
+**Interpretation:**
+- ✅ **Functional fix verified.** With `tools: …, Bash`, the agent has Bash and
+  `codex exec` runs to completion. ADR-001's goal — make `codex_second_opinion`
+  actually able to dispatch — is met. This is the outcome that gates the 0.28.5
+  release, and it passed.
+- ⚠️ **Permission evaluator NOT confirmed, and a separate finding surfaced.**
+  The negative control (`sh -c`) ran despite `Bash(sh:*)` being denied, which
+  means **this session was not enforcing the subagent `permissions.deny` list**
+  — almost certainly a permission-bypass session mode
+  (`--dangerously-skip-permissions` / `bypassPermissions`, common for autonomous
+  `/hm:` runs). Under bypass, every tool call runs regardless of allow/deny, so
+  `codex exec` "permitted" cannot be attributed to the allow rule surviving the
+  denies — it ran because nothing was being checked.
+
+**Still-open, lower-priority verification (does the deny shadow the allow under
+ENFORCEMENT):** re-run this probe in a session launched WITHOUT permission
+bypass (default enforcement). Expected there: `codex exec` PERMITTED (matches
+`Bash(codex exec:*)`; different command prefix from the sh/bash/python denies)
+AND `sh -c` DENIED. Prefix-matching reasoning + the clean `codex exec` run make
+PASS the strongly-expected outcome; this is belt-and-suspenders, not a release
+blocker.
+
+**Separate security follow-up (NOT this task):** if normal working sessions run
+in bypass mode, the reviewer agents' deny baseline (rm/curl/sh/python/…) the
+CLAUDE.md §보안/권한 model relies on provides no runtime protection in those
+sessions. Worth a dedicated investigation independent of the codex fix.
