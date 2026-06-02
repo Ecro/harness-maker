@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.28.6] - 2026-06-02
+
+Security follow-up to 0.28.5: gate the codex agents' Bash tool on opt-in.
+
+### Changed: codex agents' `tools: Bash` is now CONDITIONAL
+
+- 0.28.5 added `Bash` to `code-reviewer` / `consensus-arbiter` / `plan-validator`
+  `tools:` **unconditionally**. Investigation (codex permission probe, 2026-06-02)
+  established that **subagent-frontmatter `permissions.deny` is NOT enforced by
+  Claude Code** — only `tools:` / `disallowedTools:` and `settings.json` are. So
+  an unconditional bare `Bash` tool on a reviewer = unrestricted shell
+  (`sh`/`python`/`rm`), regardless of the frontmatter deny block that nominally
+  "scoped" it to `codex exec`.
+- 0.28.6 makes the `tools:` Bash token **conditional on
+  `codex_second_opinion.enabled` AND the agent being in its list** — the same
+  gate as the `Bash(codex exec:*)` allow line (new `codex_tools_bash_suffix.md.j2`
+  partial). Harnesses without codex second-opinion get the original
+  `tools: Read, Grep, Glob` (no shell). Accepted residual: with codex enabled,
+  the 3 agents still carry full Bash (frontmatter deny can't scope it); true
+  per-agent command scoping needs a PreToolUse hook or settings.json deny.
+- Tests: split the unconditional assertion into enabled→Bash / disabled→no-Bash;
+  the `_render_agent` SHA pins revert to their pre-0.28.5 values (no-codex config).
+- CLAUDE.md §보안/권한 annotated with the enforcement reality; see
+  `tests/manual/CODEX_PERMISSION_PROBE.md`.
+
 ## [0.28.5] - 2026-06-02
 
 Fix: codex second-opinion agents could never run `codex exec`

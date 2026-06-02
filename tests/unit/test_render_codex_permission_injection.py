@@ -100,22 +100,40 @@ def _tools_line(text: str) -> str:
     return ""
 
 
-def test_codex_agents_declare_bash_tool_unconditionally(tmp_path: Path) -> None:
-    """tools: must list Bash for the 3 codex agents so `codex exec` can run.
+def _tools_tokens(text: str) -> list[str]:
+    return [t.strip() for t in _tools_line(text).removeprefix("tools:").split(",")]
 
-    Unconditional (ADR-001): present whether or not codex is enabled —
-    `permissions` (not `tools`) scopes which Bash commands are allowed.
+
+def test_codex_agents_declare_bash_tool_when_codex_enabled(tmp_path: Path) -> None:
+    """tools: lists Bash for the 3 codex agents WHEN codex_second_opinion is
+    enabled, so `codex exec` can actually run (tools: is Claude Code's hard gate;
+    Bash(codex exec:*) is inert without it). The Bash token moves in lockstep
+    with the codex permission allow line.
     """
-    for enabled in (True, False):
-        rendered = _render_agent_files(tmp_path, enabled=enabled)
-        for agent in _ALLOW_LISTED:
-            assert agent in rendered, f"missing agent {agent} in blueprint"
-            line = _tools_line(rendered[agent])
-            tools = [t.strip() for t in line.removeprefix("tools:").split(",")]
-            assert "Bash" in tools, (
-                f"{agent} tools: line lacks Bash (enabled={enabled}) — "
-                f"Bash(codex exec:*) permission is inert without it. Got: {line!r}"
-            )
+    rendered = _render_agent_files(tmp_path, enabled=True)
+    for agent in _ALLOW_LISTED:
+        assert agent in rendered, f"missing agent {agent} in blueprint"
+        tools = _tools_tokens(rendered[agent])
+        assert "Bash" in tools, (
+            f"{agent} tools: lacks Bash when codex enabled — "
+            f"Bash(codex exec:*) is inert without it. Got: {tools!r}"
+        )
+
+
+def test_codex_agents_omit_bash_tool_when_codex_disabled(tmp_path: Path) -> None:
+    """When codex is DISABLED the 3 agents must NOT carry the Bash tool (0.28.6,
+    supersedes 0.28.5's unconditional grant). Rationale: subagent-frontmatter
+    `permissions.deny` is not enforced by Claude Code, so a bare Bash tool is
+    unrestricted shell with no codex use — confine it to opted-in users.
+    """
+    rendered = _render_agent_files(tmp_path, enabled=False)
+    for agent in _ALLOW_LISTED:
+        if agent not in rendered:
+            continue
+        tools = _tools_tokens(rendered[agent])
+        assert "Bash" not in tools, (
+            f"{agent} tools: carries Bash when codex DISABLED — should be gated. Got: {tools!r}"
+        )
 
 
 def test_codex_agents_keep_full_interpreter_deny_quartet(tmp_path: Path) -> None:

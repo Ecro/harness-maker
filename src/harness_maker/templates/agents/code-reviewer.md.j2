@@ -2,7 +2,7 @@
 name: code-reviewer
 communication_variant: reframe
 description: Reviews code changes for correctness, readability, maintainability, and basic security/performance hygiene
-tools: Read, Grep, Glob, Bash
+tools: Read, Grep, Glob{% include "agents/_partials/codex_tools_bash_suffix.md.j2" %}
 {% include "agents/_partials/model_frontmatter_line.md.j2" %}
 review_scope: [code]
 permissions:
