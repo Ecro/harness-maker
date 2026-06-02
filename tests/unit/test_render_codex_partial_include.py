@@ -114,3 +114,22 @@ def test_array_reviewers_unchanged_when_enabled(tmp_path: Path) -> None:
         assert "codex_reconciliation" not in body, f"reconciliation leaked into {agent}"
         assert "codex_status" not in body, f"codex_status leaked into {agent}"
         assert _MANDATORY_TITLE not in body, f"Required title leaked into {agent}"
+
+
+def test_codex_recipe_has_no_invalid_ask_for_approval_flag(tmp_path: Path) -> None:
+    """`codex exec` rejects --ask-for-approval (interactive-only); recipe must not emit it.
+
+    Regression guard for PLAN-codex-exec-ask-for-approval-flag-invalid: codex-cli
+    0.133.0 errors `unexpected argument '--ask-for-approval'` on the FIRST recipe
+    line, so the second opinion silently skips. The valid isolation flag is
+    `--sandbox read-only` (kept); `exec` is non-interactive — no approval flag applies.
+    """
+    rendered = _render_agent_files(tmp_path, enabled=True)
+    for agent in _ALLOW_LISTED:
+        body = rendered[agent]
+        assert "--ask-for-approval" not in body, (
+            f"{agent}: invalid `codex exec --ask-for-approval` flag present in recipe"
+        )
+        # the valid recipe is still intact
+        assert "codex exec" in body, f"{agent}: codex exec recipe missing"
+        assert "--sandbox read-only" in body, f"{agent}: --sandbox read-only flag missing"

@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.28.9] - 2026-06-03
+
+Fix the Codex second-opinion recipe so the call actually runs.
+
+### Fixed: `codex exec --ask-for-approval` rejected by the CLI
+
+- The rendered second-opinion recipe (`code-reviewer` / `consensus-arbiter` /
+  `plan-validator`) invoked `codex exec --ask-for-approval never`, but
+  `codex exec` does not accept `--ask-for-approval` (it's an interactive-only
+  flag; `exec` is non-interactive). On codex-cli 0.133.0 this errors on the
+  first recipe line, so the Codex second opinion silently skipped on every run
+  (warn-and-proceed masked it).
+- Fix: drop the `--ask-for-approval never` line from the recipe. `--sandbox
+  read-only` remains the isolation. Verified end-to-end — `codex exec
+  --sandbox read-only --ignore-user-config --ignore-rules --json
+  --output-schema <f> --output-last-message <f> -` returns schema-conforming
+  JSON. A render guard test (`test_codex_recipe_has_no_invalid_ask_for_approval_flag`)
+  prevents reintroduction.
+
 ## [0.28.8] - 2026-06-03
 
 Make rendered JSON schemas reach existing installs on re-render.

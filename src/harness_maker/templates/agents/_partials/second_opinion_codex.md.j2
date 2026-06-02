@@ -58,7 +58,6 @@ prompt_tmp=$(mktemp)
 # this heredoc and never use eval/sh -c on it.
 codex exec \
   --sandbox read-only \
-  --ask-for-approval never \
   {%- if _csoo.get('hermetic', true) %}
   --ignore-user-config --ignore-rules \
   {%- endif %}
