@@ -95,8 +95,12 @@ _EXPECTED_SHA256: dict[str, str] = {
     # cursor-concrete-id behavior — Claude Code now respects the field (#43869),
     # so a pinned id fails to launch in a newer-model session. Pre-bump hashes
     # are in git history.
+    # code-reviewer + consensus-arbiter + plan-validator: hashes bumped
+    # 2026-06-02 (PLAN-spoton-codex-rm-stash-rootcause ADR-001) — the 3 codex
+    # agents' `tools:` line gained `Bash` so `Bash(codex exec:*)` is usable
+    # (Claude Code's tools: is the hard gate). Pre-bump hashes are in git history.
     "autoloop-coder": "32d2c32d8235b41fee0f639604f0e2541fc11cb746cd4195922189e91a0927b1",
-    "code-reviewer": "b0913e8b525720af28b22a98b2ab61c67f5e4b7ca172e6d7f2b5a2ffb106137c",
+    "code-reviewer": "3380493556a6969bec99f6ae24f856b3a59e1bd6ff4b0b8c3a023c1411caeefe",
     "concurrency-reviewer": "9c7bbeec8a91be20886f9cea706039aaef6b9519d77504b26be66197ff6bdc50",
     # consensus-arbiter + plan-validator: hashes bumped 2026-05-24 per
     # PLAN-codex-second-llm-integration ADR-007 + review security fix.
@@ -108,10 +112,10 @@ _EXPECTED_SHA256: dict[str, str] = {
     # so the rendered hash reflects the new allow-list + deny baseline.
     # PLAN R8 risk: any future drift in the baseline changes these hashes —
     # re-pin and document the reason here.
-    "consensus-arbiter": "03c83ce43bd7ad15633f26e619240e16a7bdbe374e5f55bf83ef0bd73aeac891",
+    "consensus-arbiter": "21d9b89d14e0f1802a1a6de6abdd732ea6bfc7c4c5b490e053b63907a9c2c4fd",
     "executor": "178bd189e0a9dc392caed7865a6cead670a7c1bb557da4b79aa07cbb358be713",
     "performance-reviewer": "7c36beda776925ea45fefd5176f0e359e9225eb8dbe949549216c6b9b1c6a228",
-    "plan-validator": "a06765191a94742d4ba35cb47ee80d703e87b6e2b29763209b482efd4ff4733d",
+    "plan-validator": "c0d02aebe747bb1849e8ef7fa52554fd34b02c3a4549ed6d739af129f3f09133",
     "security-auditor": "51a11902b9f56b9ebb0e0103e0d2047a64d1a218898d6cedc229a1a43fed2f53",
     "security-reviewer": "af15f3f7606dd67a4f6cc0d4450df62ab8aa6a470978e65c7de9e77494d66555",
     "stuck": "a62459d1205ed4fd67769ebb2f729a4de9b1d7b9ff5d770cc6ed767e63746fd0",

@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.28.5] - 2026-06-02
+
+Fix: codex second-opinion agents could never run `codex exec`
+(PLAN-spoton-codex-rm-stash-rootcause, ADR-001).
+
+### Fixed: codex reviewer agents declare the `Bash` tool
+
+- `code-reviewer`, `consensus-arbiter`, and `plan-validator` listed
+  `tools: Read, Grep, Glob` while their `permissions.allow` carried
+  `Bash(codex exec:*)`. Claude Code's `tools:` field is the hard gate on tool
+  availability, so the Bash permission was **inert** — `codex_second_opinion`
+  silently skipped with "validator env had no Bash". The three templates now
+  declare `tools: Read, Grep, Glob, Bash` (unconditional; `permissions` still
+  scopes the allowable Bash commands to `codex exec` only).
+- Incidentally restores `code-reviewer`'s previously-inert `Bash(git diff:*)`
+  / `git log` / `git status` capability (same root cause).
+- No security regression: all three agents already deny the full
+  `python/node/sh/bash` interpreter quartet (REVIEW-M7), so the deny list — now
+  the sole barrier — stays complete. A new unit assertion pins both the
+  `tools:`-Bash presence and the deny-quartet completeness.
+
 ## [0.28.4] - 2026-06-01
 
 Worktree-finalize robustness pass (PLAN-p6-p7-worktree-finalize, all phases +

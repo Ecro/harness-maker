@@ -79,3 +79,54 @@ def test_codex_permission_absent_in_non_allowlisted_agents(tmp_path: Path) -> No
         assert _PERMISSION_MARKER not in rendered[agent], (
             f"{_PERMISSION_MARKER!r} leaked into NON-allow-listed agent {agent}"
         )
+
+
+# --- Issue 1 fix (PLAN-spoton-codex-rm-stash-rootcause ADR-001) -------------
+# The `tools:` frontmatter field is Claude Code's hard gate on tool
+# availability; `permissions.allow: Bash(codex exec:*)` is inert unless the
+# agent also lists `Bash` in `tools:`. The 3 codex agents must declare it.
+_INTERPRETER_DENY_QUARTET = (
+    "Bash(python:*)",
+    "Bash(node:*)",
+    "Bash(sh:*)",
+    "Bash(bash:*)",
+)
+
+
+def _tools_line(text: str) -> str:
+    for line in text.splitlines():
+        if line.startswith("tools:"):
+            return line
+    return ""
+
+
+def test_codex_agents_declare_bash_tool_unconditionally(tmp_path: Path) -> None:
+    """tools: must list Bash for the 3 codex agents so `codex exec` can run.
+
+    Unconditional (ADR-001): present whether or not codex is enabled —
+    `permissions` (not `tools`) scopes which Bash commands are allowed.
+    """
+    for enabled in (True, False):
+        rendered = _render_agent_files(tmp_path, enabled=enabled)
+        for agent in _ALLOW_LISTED:
+            assert agent in rendered, f"missing agent {agent} in blueprint"
+            line = _tools_line(rendered[agent])
+            tools = [t.strip() for t in line.removeprefix("tools:").split(",")]
+            assert "Bash" in tools, (
+                f"{agent} tools: line lacks Bash (enabled={enabled}) — "
+                f"Bash(codex exec:*) permission is inert without it. Got: {line!r}"
+            )
+
+
+def test_codex_agents_keep_full_interpreter_deny_quartet(tmp_path: Path) -> None:
+    """Granting the Bash tool makes deny the sole barrier — it must stay complete.
+
+    REVIEW-M7 / validator W1: rm+curl alone is bypassable via Bash(sh -c ...),
+    so the python/node/sh/bash quartet must remain denied on every codex agent.
+    """
+    rendered = _render_agent_files(tmp_path, enabled=True)
+    for agent in _ALLOW_LISTED:
+        assert agent in rendered, f"missing agent {agent} in blueprint"
+        body = rendered[agent]
+        missing = [d for d in _INTERPRETER_DENY_QUARTET if d not in body]
+        assert not missing, f"{agent} deny block missing interpreter guards: {missing}"
