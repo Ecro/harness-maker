@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.28.11] - 2026-06-03
+
+Re-release of 0.28.10 with corrected snapshot fixtures. The 0.28.10 tag's
+release workflow failed at `quality-gate` (nothing published) because two
+snapshot expected files were regenerated against a polluted local fixture.
+
+### Fixed: `side-python-cli` snapshots wrongly pinned to `Production`
+
+- `tests/snapshot/side-python-cli-{spec,task}.expected.yaml` were regenerated
+  while the `tests/fixtures/side-python-cli/` fixture had a leftover gitignored
+  `.claude/` build artifact (65 files) and a stale
+  `~/.cache/harness-maker/profile-*.json` entry, both of which pushed the
+  profiler to `scale: medium` → `preset: Production`. On a pristine CI checkout
+  the fixture profiles to `scale: small` → `preset: Side`, so the committed
+  snapshots mismatched and `test_synthesize_snapshot` failed on CI only.
+- Fix: regenerated both snapshots against the pristine fixture (cache cleared),
+  restoring `preset: Side`. No source/runtime change versus 0.28.10 — this
+  release carries the same TECH_SPEC audit fixes.
+
 ## [0.28.10] - 2026-06-03
 
 Fix a batch of real defects surfaced by a multi-agent audit of the
