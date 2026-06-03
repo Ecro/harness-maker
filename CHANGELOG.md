@@ -1,5 +1,68 @@
 # Changelog
 
+## [0.28.10] - 2026-06-03
+
+Fix a batch of real defects surfaced by a multi-agent audit of the
+implementation against TECH_SPEC.md. The audit found the code largely sound but
+the spec ~2 years stale; this release lands the genuine code/template fixes
+(doc-only stale-spec items are deferred to a separate doc sweep).
+
+### Fixed: multi-document `harness.yaml` parse defect (3 readers)
+
+- `i18n.resolve_locale`, `gates.permission_gate`, and `gates.spec_gate` parsed
+  `.claude/harness.yaml` with a bare `yaml.safe_load`. Every rendered
+  harness.yaml is a multi-document stream (provenance frontmatter + body), so
+  `safe_load` raised `ComposerError` and the readers silently degraded:
+  non-English users always got English messages, and — worst — `spec_gate`
+  returned `{}` so `dev_mode` never read as `spec-driven`, **silently disabling
+  the entire spec-driven TDD enforcement gate on every real install**. All three
+  now use `io_utils.load_harness_yaml`. Regression tests added with provenance
+  frontmatter (the old tests used a plain body that never exists on disk).
+
+### Fixed: readiness `no_high_security_findings` blind to P0
+
+- The signal counted only `"severity": "high"`, but `hallucination` and
+  `prod_name_guard` emit `P0`/`P1`/`P2`. A persisted critical P0 left the signal
+  passing. Now counts `high` and `P0` (matching `cli.py`'s gate).
+
+### Fixed: `verify-before-completion` SKILL drift
+
+- Three of the five checks were no-ops or wrong on modern installs: Check 3 read
+  a never-written `metrics.jsonl`/`health` key, Check 2 ran
+  `.claude-verify.sh phase_$CURRENT_PHASE` (never produced), Check 5 hardcoded
+  `main`. Realigned to the canonical `/hm:verify` stage: drift-verdict gate,
+  verification-cache + project toolchain, `dashboard.md` `## Structural`
+  baseline with the no-baseline PASS rule, branch-agnostic merge check, and
+  high/P0 findings honoring `accepted-risk-with-rationale`.
+
+### Fixed: `.claude-verify.sh` acceptance gate broken
+
+- `phase_1` asserted `__version__ == '0.1.0'` and aborted at 0.28.x; version
+  checks are now dynamic (and cross-check the manifest against the package
+  version per ADR-13). Deleted-template references (`dashboard.{ko,en}.md.j2`,
+  `monitor.md.j2`, `dev.md`) corrected to current names.
+
+### Fixed: smaller correctness issues
+
+- `context_lint` Side thresholds aligned to the canonical CLAUDE.md values
+  (agent 150, skill 100) so the linter and `/hm:health` agree.
+- `worktree cleanup-all` CLI subcommand added (the documented disk-cleanup
+  defense was unreachable); `finalize` now rejects unknown merge strategies.
+- `modular_edit.add()` raises a clean `ModularEditError` (listing available
+  components) instead of leaking `jinja2.TemplateNotFound`; `remove()` now runs
+  the verifier like `add()`.
+- SessionStart drift hint counts overrides **since the last audit**, not
+  lifetime (the banner never reset before).
+- Seed `dashboard.md.j2` aligned to the writer's 2-section schema; the
+  false-promise `@hm:user:extensions` block removed (the writer overwrites this
+  file, never block-merges it).
+- `personalization_audit` baseline seeds preset-specific axes
+  (consensus/default_workflow/fused_workflows) so it matches what `/hm:make`
+  actually produces.
+- `executor` agent description reworded — the write boundary is prompt-level
+  convention, not a runtime-enforced sandbox (subagent-frontmatter permissions
+  are not enforced by Claude Code).
+
 ## [0.28.9] - 2026-06-03
 
 Fix the Codex second-opinion recipe so the call actually runs.
