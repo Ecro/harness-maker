@@ -71,7 +71,7 @@ def test_work_docs_footgun_probe(tmp_path: Path) -> None:
 
     Three assertions:
       (a) Rendered verify stage contains the Advisory probes section.
-      (b) verify-before-completion SKILL still has exactly 6 numbered
+      (b) verify-before-completion SKILL still has exactly 5 numbered
           checks (regression guard against scope creep into the SKILL).
       (c) The A1 probe bash snippet, when executed against a tempdir
           containing work_docs/, exits 0 and emits the expected WARN
@@ -157,10 +157,13 @@ def _prod_profile() -> ProjectProfile:
 
 
 def test_preset_dynamic(tmp_path: Path) -> None:
-    """Phase 1 (C2): verify SKILL uses the project's actual preset, not hardcoded SIDE.
+    """Verify SKILL Check 3 uses the dashboard structural baseline (not the dead
+    metrics.jsonl/'health' path) and references the project's actual preset.
 
-    Regression guard: Production harness must render Preset('Production')
-    in the health-score check, not Preset.SIDE.
+    Regression guard (PLAN-techspec-audit-2026-06, F45/F48): Check 3 was a no-op
+    that read a never-written metrics.jsonl key and always passed. The SKILL must
+    now mirror the canonical stage — read dashboard.md `## Structural` — and stay
+    preset-dynamic so a Production harness does not hardcode Side.
     """
     prod_out = tmp_path / "prod"
     prod_out.mkdir()
@@ -172,12 +175,17 @@ def test_preset_dynamic(tmp_path: Path) -> None:
     skill_text = (prod_out / "skills" / "verify-before-completion" / "SKILL.md").read_text(
         encoding="utf-8"
     )
-    assert "Preset('Production')" in skill_text, (
-        "Production harness must use Preset('Production'), not Preset.SIDE"
+    # Check 3 reads the dashboard structural baseline, not the legacy no-op path.
+    assert "## Structural" in skill_text
+    assert "dashboard.md" in skill_text
+    assert "metrics.jsonl" not in skill_text, (
+        "Check 3 must not read the legacy metrics.jsonl (F45 no-op bug)"
     )
-    assert "Preset.SIDE" not in skill_text, (
-        "Production harness must NOT contain hardcoded Preset.SIDE"
+    # Preset-dynamic: Production harness references Production, never Side.
+    assert "preset `Production`" in skill_text, (
+        "Production harness must reference preset `Production`"
     )
+    assert "preset `Side`" not in skill_text, "Production harness must NOT reference preset `Side`"
 
     side_out = tmp_path / "side"
     side_out.mkdir()
@@ -189,4 +197,4 @@ def test_preset_dynamic(tmp_path: Path) -> None:
     side_skill = (side_out / "skills" / "verify-before-completion" / "SKILL.md").read_text(
         encoding="utf-8"
     )
-    assert "Preset('Side')" in side_skill, "Side harness must use Preset('Side')"
+    assert "preset `Side`" in side_skill, "Side harness must reference preset `Side`"

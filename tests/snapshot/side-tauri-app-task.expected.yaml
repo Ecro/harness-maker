@@ -22,7 +22,7 @@ files:
   body_sha256: 6343f55957f2ed946c6d5be02d8316a6b9cf68f34859e41f24475901f859c56d
 - path: agents/executor.md
   template: agents/executor.md.j2
-  body_sha256: 97318897a6f733bbf04840ac2f3ddb4bf7ba12517114b522af4d13374746668c
+  body_sha256: 9895756d67fa33cca1349040e8bce9557d516d4060f04943a5a2d20a4b1e8919
 - path: agents/performance-reviewer.md
   template: agents/performance-reviewer.md.j2
   body_sha256: de31b4eda7d9e125c21a60fd1fb1ea711cf3e834cd0569a0f632fd586746dc69
@@ -118,7 +118,7 @@ files:
   body_sha256: bc575d04e5ae1aedced9093ae7fc9513f3cfda0352ccbaf6d1b51137735ef0e6
 - path: observability/dashboard.md
   template: observability/dashboard.md.j2
-  body_sha256: eee6c910e0302f8cb0391482ec61c9f9dd3a4b59a38bddb5c5274fc39cb58608
+  body_sha256: a0676b4aaf02cd671ed94b741b11b54aecdf2d3d5babc7d816af6b02ad693a8c
 - path: rubrics/agent_prompt.yaml
   template: rubrics/agent_prompt.yaml.j2
   body_sha256: e31a0322210a7f5f4a07b190a5e65f9cc22da783c57a8878d7644cbda3547eb6
@@ -145,7 +145,7 @@ files:
   body_sha256: 135e175ca2833377f3a6741f76aff2cdae22d82e0c953268eb5821666cc5dccf
 - path: skills/conditional-router/SKILL.md
   template: skills/conditional-router/SKILL.md.j2
-  body_sha256: 83644120dd2c6fd16289ec749f4f8f57895e2c055b19e540f588cb254c08f726
+  body_sha256: 00509946f0b0d0438f373143a051cccee8833365f1f6e763f18f7804438a39d3
 - path: skills/context-linter/SKILL.md
   template: skills/context-linter/SKILL.md.j2
   body_sha256: 4d881419c548a69a5b2230e3f43d88dcd34852efd47296256b88ee6d5f5cde4f
@@ -157,7 +157,7 @@ files:
   body_sha256: 1e383cfd05adf9ed189ab003a54c6e21467d3330c0fb7fab97d2d84009d29937
 - path: skills/verify-before-completion/SKILL.md
   template: skills/verify-before-completion/SKILL.md.j2
-  body_sha256: 6d87794b1a536189470f72cf3251867961eaf2fa1ef637fdbb53af418665f6fa
+  body_sha256: 15c8109fd221e74aced599b0022f3d1074ef13be199b00d33bbc65bd7d9db285
 - path: skills/worktree-isolator/SKILL.md
   template: skills/worktree-isolator/SKILL.md.j2
   body_sha256: cf42cbee9d48750e213474a49b36c1d9a8f453df4bfbb97afc2eb0768781cc6a

@@ -117,7 +117,12 @@ _EXPECTED_SHA256: dict[str, str] = {
     # PLAN R8 risk: any future drift in the baseline changes these hashes —
     # re-pin and document the reason here.
     "consensus-arbiter": "03c83ce43bd7ad15633f26e619240e16a7bdbe374e5f55bf83ef0bd73aeac891",
-    "executor": "178bd189e0a9dc392caed7865a6cead670a7c1bb557da4b79aa07cbb358be713",
+    # executor: re-pinned 2026-06-03 (PLAN-techspec-audit F61). The description
+    # + body claimed a runtime-enforced "never writes to repo root" boundary that
+    # Claude Code does NOT enforce (subagent-frontmatter permissions are not
+    # enforced — see CLAUDE.md §보안/권한). Reworded to "by convention, prompt-
+    # level guidance, not runtime-enforced". Pre-bump hash in git history.
+    "executor": "fe9f9120c7e7abea7ed36958d7a68b5cd2a31f1c9a24dc6361c9e6a10e941523",
     "performance-reviewer": "7c36beda776925ea45fefd5176f0e359e9225eb8dbe949549216c6b9b1c6a228",
     "plan-validator": "a06765191a94742d4ba35cb47ee80d703e87b6e2b29763209b482efd4ff4733d",
     "security-auditor": "51a11902b9f56b9ebb0e0103e0d2047a64d1a218898d6cedc229a1a43fed2f53",

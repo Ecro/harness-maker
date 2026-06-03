@@ -91,9 +91,12 @@ phase_1_uv() {
   require_file uv.lock
   require_file src/harness_maker/__init__.py
   uv sync >/dev/null 2>&1 || fail "uv sync failed"
-  uv run python -c "from harness_maker import __version__; assert __version__ == '0.1.0', __version__" \
-    || fail "version mismatch (expected 0.1.0)"
-  ok "phase_1_uv"
+  # Why dynamic: the package is past 0.1.0; assert __version__ is present and
+  # well-formed rather than pinning a literal that rots on every release.
+  pkg_ver=$(uv run python -c "from harness_maker import __version__; print(__version__)") \
+    || fail "could not import __version__"
+  [[ "$pkg_ver" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]] || fail "malformed __version__: $pkg_ver"
+  ok "phase_1_uv (version=$pkg_ver)"
 }
 
 phase_1_manifest() {
@@ -101,8 +104,11 @@ phase_1_manifest() {
   require_cmd jq
   name=$(jq -r .name .claude-plugin/plugin.json)
   [[ "$name" == "harness-maker" ]] || fail "plugin.json name != harness-maker (got $name)"
+  # Why cross-check: ADR-13 version-sync invariant — the manifest version must
+  # equal the Python package version, not a hardcoded literal.
   ver=$(jq -r .version .claude-plugin/plugin.json)
-  [[ "$ver" == "0.1.0" ]] || fail "plugin.json version != 0.1.0 (got $ver)"
+  pkg_ver=$(uv run python -c "from harness_maker import __version__; print(__version__)")
+  [[ "$ver" == "$pkg_ver" ]] || fail "plugin.json version ($ver) != __version__ ($pkg_ver)"
   ok "phase_1_manifest"
 }
 
@@ -239,9 +245,10 @@ phase_4_agent_quality() {
 }
 
 phase_4_dashboard() {
-  require_file src/harness_maker/templates/observability/dashboard.ko.md.j2
-  require_file src/harness_maker/templates/observability/dashboard.en.md.j2
-  require_file src/harness_maker/templates/commands/hm/monitor.md.j2
+  # 0.13.0+ consolidated the locale-split dashboard.{ko,en}.md.j2 into a single
+  # dashboard.md.j2, and /hm:monitor became /hm:health.
+  require_file src/harness_maker/templates/observability/dashboard.md.j2
+  require_file src/harness_maker/templates/commands/hm/health.md.j2
   ok "phase_4_dashboard"
 }
 
@@ -302,7 +309,9 @@ phase_6_commands_render() {
   for s in research spec plan execute review wrapup verify; do
     require_file "tests/fixtures/side-python-cli/.claude/commands/hm/$s.md"
   done
-  require_file tests/fixtures/side-python-cli/.claude/commands/hm/dev.md
+  # The default fused workflow is exec-rev-wrap (0.4.0+); the old `dev` alias
+  # was never rendered.
+  require_file tests/fixtures/side-python-cli/.claude/commands/hm/exec-rev-wrap.md
   ok "phase_6_commands_render"
 }
 
@@ -502,7 +511,7 @@ phase_11_apply() {
 }
 
 phase_11_commands() {
-  for cmd in research spec plan execute review wrapup verify dev loop monitor; do
+  for cmd in research spec plan execute review wrapup verify loop health; do
     require_file "tests/e2e/sandbox/.claude/commands/hm/$cmd.md"
   done
   uv run pytest tests/e2e/test_dogfood_sandbox.py -q -k commands || fail "dogfood commands"

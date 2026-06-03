@@ -230,9 +230,9 @@ def scan_all(
 
     _persist(findings, target_dir)
 
-    policy = _on_finding_policy(harness_config)
-    _ = policy  # informational; callers decide blocking on high findings.
-
+    # The on_finding policy (warn/block) is applied by callers — cli.py gates on
+    # {"high","P0"} via _on_finding_policy. scan_all only collects + persists;
+    # harness_config stays in the signature for that caller contract.
     return findings
 
 

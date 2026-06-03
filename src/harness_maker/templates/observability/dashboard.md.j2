@@ -1,28 +1,16 @@
-# AI Readiness Dashboard
+# Health
 
-**Project:** {{ project_name | default('unknown') }}
-**Preset:** {{ preset | default('Side') }}
+> Latest-snapshot dashboard. `/hm:health` **overwrites** this file on every run
+> (`observability/dashboard.py:write_dashboard`, plain atomic write — not
+> append-only and not block-merged). Do not add hand-maintained panels here;
+> they are lost on the next health run. The 2-section schema below mirrors
+> exactly what the writer emits so `/hm:verify` Check 3 can read the
+> `## Structural` `score:` line.
 
-> This file is re-rendered every time `/hm:ai-readiness` runs.
-> The composite, layer breakdown, and ranked action list below reflect the
-> most recent scan.
+## Structural
 
-## Composite
+Run `/hm:health` to populate the structural score.
 
-Run `/hm:ai-readiness` to populate this section.
+## Personalization
 
-## Layer scores
-
-| Layer | What it measures |
-|-------|------------------|
-| readiness | Deterministic structural signals (CLAUDE.md, hooks, tests, CI, …) |
-| llm_judge | LLM-judged content quality vs `.claude/rubrics/*.yaml` |
-| cache | Prompt-cache hit rate + failure-mode diagnosis from `metrics.jsonl` |
-
-## Actions
-
-Run `/hm:ai-readiness` to populate the actions table.
-
-<!-- @hm:user:extensions -->
-<!-- Project-specific dashboard panels (KPIs, external dashboard links, etc.). Preserved across harness-maker upgrades. -->
-<!-- @hm:/user:extensions -->
+Run `/hm:health` to populate the personalization score.

@@ -44,13 +44,15 @@ WEIGHTS_PROD: dict[str, float] = {
     "model_routing": 0.00,
 }
 
-# CLAUDE.md / agent / skill body line caps (per preset). Mirrors context_lint.THRESHOLDS.
+# CLAUDE.md / agent / skill body line caps (per preset). Matches the canonical
+# CLAUDE.md Context Lint section and context_lint.THRESHOLDS (aligned 0.28.x —
+# context_lint's Side rows were raised from 100/50 to 150/100 to agree).
 _CONTEXT_LIMITS: dict[tuple[str, str], int] = {
     ("CLAUDE.md", "Side"): 200,
     ("CLAUDE.md", "Production"): 500,
-    ("agent", "Side"): 150,  # was 100
+    ("agent", "Side"): 150,
     ("agent", "Production"): 200,
-    ("skill", "Side"): 100,  # was 50
+    ("skill", "Side"): 100,
     ("skill", "Production"): 150,
 }
 
@@ -536,23 +538,35 @@ def _dim_guardrails(project_dir: Path) -> DimensionScore:
         for f in sec_dir.glob("findings-*.jsonl"):
             try:
                 for line in f.read_text(encoding="utf-8", errors="ignore").splitlines():
-                    if '"severity": "high"' in line or '"severity":"high"' in line:
+                    # Why both "high" and "P0": the 7 gates use two severity
+                    # vocabularies — most emit "high", but hallucination and
+                    # prod_name_guard emit "P0" (cli.py gates on {"high","P0"}).
+                    # Counting only "high" left critical P0 findings invisible.
+                    if (
+                        '"severity": "high"' in line
+                        or '"severity":"high"' in line
+                        or '"severity": "P0"' in line
+                        or '"severity":"P0"' in line
+                    ):
                         high_count += 1
             except OSError:
                 continue
     sec_action = (
         None
         if high_count == 0
-        else f"Resolve {high_count} high-severity finding(s) under .claude/observability/security/"
+        else (
+            f"Resolve {high_count} high/P0-severity finding(s) under "
+            ".claude/observability/security/"
+        )
     )
     signals.append(
         _signal(
             "no_high_security_findings",
             high_count == 0,
             15,
-            f"{high_count} high-severity security finding(s) recorded"
+            f"{high_count} high/P0-severity security finding(s) recorded"
             if high_count
-            else "No high-severity security findings (or not yet scanned)",
+            else "No high/P0-severity security findings (or not yet scanned)",
             sec_action,
         )
     )

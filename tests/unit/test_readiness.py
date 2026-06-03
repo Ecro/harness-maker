@@ -175,7 +175,21 @@ def test_guardrails_high_severity_finding_fails_signal(tmp_path: Path) -> None:
     res = compute_readiness(tmp_path, Preset.SIDE)
     sigs = {s.id: s for s in res.dimensions["guardrails"].signals}
     assert not sigs["no_high_security_findings"].passed
-    assert "1 high-severity" in sigs["no_high_security_findings"].evidence
+    assert "1 high/P0-severity" in sigs["no_high_security_findings"].evidence
+
+
+def test_guardrails_p0_finding_fails_signal(tmp_path: Path) -> None:
+    """Regression: hallucination + prod_name_guard emit P0, not 'high'. The
+    signal must treat P0 as critical (cli.py gates on {'high','P0'})."""
+    sec_dir = tmp_path / ".claude" / "observability" / "security"
+    sec_dir.mkdir(parents=True)
+    (sec_dir / "findings-2026-05-01.jsonl").write_text(
+        json.dumps({"severity": "P0", "category": "prod_name_guard"}) + "\n"
+    )
+    res = compute_readiness(tmp_path, Preset.SIDE)
+    sigs = {s.id: s for s in res.dimensions["guardrails"].signals}
+    assert not sigs["no_high_security_findings"].passed
+    assert "1 high/P0-severity" in sigs["no_high_security_findings"].evidence
 
 
 # ── verification ────────────────────────────────────────────────────────────

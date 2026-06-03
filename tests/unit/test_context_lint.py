@@ -41,7 +41,7 @@ def test_over_threshold_returns_warning(tmp_path: Path) -> None:
 
 
 def test_frontmatter_excluded_from_count(tmp_path: Path) -> None:
-    # 50 frontmatter lines + 5 body lines should be well under skill/Side (50)
+    # 50 frontmatter lines + 5 body lines should be well under skill/Side (100)
     fm_block = "---\n" + "\n".join([f"k{i}: v" for i in range(50)]) + "\n---\n"
     body = "\n".join(["line"] * 5) + "\n"
     f = tmp_path / "SKILL.md"
@@ -50,9 +50,8 @@ def test_frontmatter_excluded_from_count(tmp_path: Path) -> None:
 
 
 def test_production_thresholds_are_higher(tmp_path: Path) -> None:
-    # 250-line agent: over Side(100), under Production(200)? actually under(250 > 200) → still over.
-    # Use 150: over Side(100), under Production(200) ✓
-    body = "\n".join(["line"] * 150) + "\n"
+    # 175-line agent: over Side(150), under Production(200) ✓
+    body = "\n".join(["line"] * 175) + "\n"
     f = _write(tmp_path / "agent.md", body)
     assert len(lint(f, "agent", Preset.SIDE)) == 1
     assert lint(f, "agent", Preset.PRODUCTION) == []
@@ -78,12 +77,12 @@ def test_unknown_asset_type_no_limit(tmp_path: Path) -> None:
 
 
 def test_warning_message_includes_path_and_excess(tmp_path: Path) -> None:
-    body = "\n".join(["line"] * 80) + "\n"
+    body = "\n".join(["line"] * 130) + "\n"
     f = _write(tmp_path / "S.md", body)
     warnings = lint(f, "skill", Preset.SIDE)
     assert str(f) in warnings[0]
-    assert "80" in warnings[0]
-    assert "50" in warnings[0]
+    assert "130" in warnings[0]
+    assert "100" in warnings[0]
 
 
 # ── Phase 1: window % hard-cap ──────────────────────────────────────────

@@ -239,16 +239,29 @@ def _write_phase11_harness_yaml(
     (claude / "harness.yaml").write_text(fm, encoding="utf-8")
 
 
-def _write_overrides(project_dir: Path, n: int) -> None:
+def _write_overrides(project_dir: Path, n: int, *, days_ago: float | None = None) -> None:
     """Materialise ``n`` schema_version=1 override records on disk so
-    load_overrides() returns exactly n entries."""
+    load_overrides() returns exactly n entries.
+
+    ``days_ago`` stamps the records relative to now (so they fall AFTER a recent
+    last-audit and count toward the "since last audit" hint). When None, a fixed
+    2026-05-01 timestamp is used (records predate any recent audit → filtered).
+    """
+    from datetime import UTC, datetime, timedelta
+
     path = project_dir / ".claude" / "observability" / "adaptive" / "overrides.jsonl"
     path.parent.mkdir(parents=True, exist_ok=True)
+    base = datetime.now(UTC) - timedelta(days=days_ago) if days_ago is not None else None
     lines: list[str] = []
     for i in range(n):
+        ts = (
+            (base + timedelta(seconds=i)).isoformat()
+            if base is not None
+            else f"2026-05-01T00:00:{i:02d}+00:00"
+        )
         record = {
             "schema_version": 1,
-            "ts": f"2026-05-01T00:00:{i:02d}+00:00",
+            "ts": ts,
             "axis_path": f"axis.{i}",
             "before": None,
             "after": f"v{i}",
@@ -284,10 +297,10 @@ def test_no_hint_when_under_thresholds(tmp_path: Path, capsys) -> None:
 
 
 def test_hint_when_override_count_exceeds_threshold(tmp_path: Path, capsys) -> None:
-    """35 overrides ≥ default 30 → hint includes the count."""
+    """35 overrides since the last audit ≥ default 30 → hint includes the count."""
     _write_phase11_harness_yaml(tmp_path)
-    _write_overrides(tmp_path, 35)
     _write_last_audit(tmp_path, 1.0)  # well under the days threshold
+    _write_overrides(tmp_path, 35, days_ago=0.5)  # recorded AFTER the audit
     with patch(
         "harness_maker.hooks.sessionstart_drift.latest_installed_version",
         return_value=_TEST_CURRENT,
@@ -303,6 +316,23 @@ def test_hint_when_override_count_exceeds_threshold(tmp_path: Path, capsys) -> N
     # of the payload, NOT inside hookSpecificOutput. Codex strict schema
     # would reject it nested; Claude Code documents it top-level too.
     assert "35 personalization axis overrides" in payload["systemMessage"]
+
+
+def test_overrides_before_last_audit_do_not_count(tmp_path: Path, capsys) -> None:
+    """Regression (F66): the count is 'since last audit', not lifetime. 40
+    overrides all recorded BEFORE a recent audit must not trip the count
+    threshold — the audit already processed them."""
+    _write_phase11_harness_yaml(tmp_path)
+    _write_last_audit(tmp_path, 1.0)  # audited 1 day ago
+    _write_overrides(tmp_path, 40)  # fixed 2026-05-01 ts → predates the audit
+    with patch(
+        "harness_maker.hooks.sessionstart_drift.latest_installed_version",
+        return_value=_TEST_CURRENT,
+    ):
+        rc = run(cwd=tmp_path)
+    assert rc == 0
+    # Neither threshold tripped (0 fresh overrides, 1 day < days threshold).
+    assert capsys.readouterr().out == ""
 
 
 def test_hint_when_days_since_audit_exceeds_threshold(tmp_path: Path, capsys) -> None:
@@ -346,8 +376,8 @@ def test_systemMessage_and_additionalContext_both_present(tmp_path: Path, capsys
     payload. Both Claude Code and Codex strict schemas agree on this split.
     """
     _write_phase11_harness_yaml(tmp_path)
-    _write_overrides(tmp_path, 40)
     _write_last_audit(tmp_path, 0.5)
+    _write_overrides(tmp_path, 40, days_ago=0.1)  # recorded AFTER the audit
     with patch(
         "harness_maker.hooks.sessionstart_drift.latest_installed_version",
         return_value=_TEST_CURRENT,

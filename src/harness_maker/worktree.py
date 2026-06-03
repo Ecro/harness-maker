@@ -2140,6 +2140,11 @@ def _cli_finalize(args: list[str]) -> int:
     if status not in {"success", "fail", "stage-only"}:
         print("status must be 'success' | 'fail' | 'stage-only'", file=sys.stderr)
         return 2
+    if strategy not in {"squash", "merge"}:
+        # Why reject: merge() only knows squash/merge; an unknown value (e.g.
+        # "rebase") would otherwise build an invalid `git merge --rebase` command.
+        print(f"strategy must be 'squash' | 'merge', got {strategy!r}", file=sys.stderr)
+        return 2
     wt = Path(wt_str)
     # Project root = parent of `.worktrees/<name>` (mirrors cleanup's logic).
     project_root = wt.resolve().parent.parent
@@ -2620,13 +2625,30 @@ def _cli_verify(args: list[str]) -> int:
     return 0
 
 
+def _cli_cleanup_all(args: list[str]) -> int:
+    """`python -m harness_maker.worktree cleanup-all [base_dir] [--force]`.
+
+    WHY: the autoloop iter/phase-blocker path documented in CLAUDE.md
+    ("강제 cleanup → halt 전 모든 .worktrees/* 제거") had no reachable caller —
+    ``cleanup_all`` was defined but never wired into the CLI dispatch, so the
+    disk-accumulation defense could never fire. The loop/execute blocker path
+    invokes this before halting.
+    """
+    rest = [a for a in args if a != "--force"]
+    force = "--force" in args
+    base = Path(rest[0]).resolve() if rest else Path.cwd()
+    removed = cleanup_all(base, force=force)
+    print(removed)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     """Dispatch worktree subcommand from argv."""
     args = list(sys.argv[1:] if argv is None else argv)
     if not args:
         print(
             "usage: python -m harness_maker.worktree "
-            "<create|verify|finalize|post-commit-pop|owned-uuids> [...]",
+            "<create|verify|finalize|post-commit-pop|owned-uuids|cleanup-all> [...]",
             file=sys.stderr,
         )
         return 2
@@ -2641,6 +2663,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cli_post_commit_pop(rest)
     if sub == "owned-uuids":
         return _cli_owned_uuids(rest)
+    if sub == "cleanup-all":
+        return _cli_cleanup_all(rest)
     print(f"unknown subcommand: {sub}", file=sys.stderr)
     return 2
 

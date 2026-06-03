@@ -17,11 +17,9 @@ import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
-import yaml
-
-from harness_maker.i18n import t
+from harness_maker.i18n import resolve_locale, t
 from harness_maker.secscan.hook_injection import _DANGER_PATTERNS
 
 _TRIGGER_TOOL = "Bash"
@@ -60,23 +58,6 @@ def find_dangerous_pattern(command: str) -> tuple[str, re.Pattern[str]] | None:
     return None
 
 
-def _resolve_locale(project_dir: Path) -> str:
-    yaml_path = project_dir / ".claude" / "harness.yaml"
-    try:
-        text = yaml_path.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError):
-        return "en"
-    try:
-        raw = yaml.safe_load(text)
-    except yaml.YAMLError:
-        return "en"
-    if not isinstance(raw, dict):
-        return "en"
-    data = cast(dict[str, Any], raw)
-    locale = data.get("locale")
-    return locale if isinstance(locale, str) and locale else "en"
-
-
 def evaluate(
     tool_name: str,
     tool_input: dict[str, Any],
@@ -92,7 +73,7 @@ def evaluate(
     if hit is None:
         return GateDecision(allow=True, matched_pattern="", message="")
     category, _pattern = hit
-    locale = _resolve_locale(project_dir)
+    locale = resolve_locale(project_dir)
     msg = t("permission_gate_blocked", locale, pattern=category)
     return GateDecision(allow=False, matched_pattern=category, message=msg)
 

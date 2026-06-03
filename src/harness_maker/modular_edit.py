@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from jinja2 import TemplateNotFound
 
 from harness_maker.io_utils import atomic_write
 from harness_maker.models import FileEntry
@@ -126,6 +127,20 @@ def _render_single_component(
     return _render_text_file(fe, env, target_dir, dry_run=False, freeze_time=None)
 
 
+def _available(prefix: str, suffix: str) -> list[str]:
+    """List installable component names matching ``prefix...suffix`` templates.
+
+    Why: surfaced in ModularEditError when a user requests an unknown
+    reviewer/skill, so the failure is actionable instead of a raw traceback.
+    """
+    env = _make_env()
+    return sorted(
+        t.removeprefix(prefix).removesuffix(suffix)
+        for t in env.list_templates()
+        if t.startswith(prefix) and t.endswith(suffix)
+    )
+
+
 def add(component: str, target_dir: Path) -> Path:
     """Add a component to the existing .claude/ tree.
 
@@ -146,7 +161,13 @@ def add(component: str, target_dir: Path) -> Path:
             enabled.append(reviewer_full)
         template = f"agents/{reviewer_full}.md.j2"
         out = Path("agents") / f"{reviewer_full}.md"
-        rendered = _render_single_component(template, out, reviewer_full, target_dir, config)
+        try:
+            rendered = _render_single_component(template, out, reviewer_full, target_dir, config)
+        except TemplateNotFound as e:
+            raise ModularEditError(
+                f"no template for reviewer {reviewer_full!r}; "
+                f"available: {_available('agents/', '-reviewer.md.j2')}"
+            ) from e
     else:  # skill
         skills = config.setdefault("skills", {})
         if isinstance(skills, list):
@@ -158,7 +179,13 @@ def add(component: str, target_dir: Path) -> Path:
             skills_enabled.append(name)
         template = f"skills/{name}/SKILL.md.j2"
         out = Path("skills") / name / "SKILL.md"
-        rendered = _render_single_component(template, out, name, target_dir, config)
+        try:
+            rendered = _render_single_component(template, out, name, target_dir, config)
+        except TemplateNotFound as e:
+            raise ModularEditError(
+                f"no template for skill {name!r}; "
+                f"available: {_available('skills/', '/SKILL.md.j2')}"
+            ) from e
 
     _write_harness_yaml(target_dir, fm, config)
 
@@ -203,4 +230,9 @@ def remove(component: str, target_dir: Path) -> Path:
             parent.rmdir()
 
     _write_harness_yaml(target_dir, fm, config)
+
+    errors = verify(target_dir)
+    if errors:
+        msg = "Modular remove verify failed:\n  - " + "\n  - ".join(errors)
+        raise ModularEditError(msg)
     return out

@@ -45,6 +45,7 @@ import yaml
 
 from harness_maker.models import AdaptiveConfig
 from harness_maker.telemetry import (
+    OverrideRecord,
     compute_yaml_diff,
     emit_override,
     load_overrides,
@@ -427,12 +428,26 @@ def _personalization_hint(cwd: Path) -> tuple[str, str] | None:
         # ADR-005: opt-out is absolute — no hint, no banner.
         return None
     overrides = load_overrides(cwd)
-    n_overrides = len(overrides)
     last_audit = _read_last_audit_iso(cwd)
     if last_audit is None:
         days_since = math.inf
     else:
         days_since = (datetime.now(UTC) - last_audit).total_seconds() / 86400.0
+        # Why filter: overrides.jsonl is append-only and run_audit never prunes
+        # it, so an unfiltered len() counts lifetime overrides while the banner
+        # says "since last audit" — the count never resets after an audit (F66).
+        kept: list[OverrideRecord] = []
+        for r in overrides:
+            try:
+                ts = datetime.fromisoformat(r.ts)
+            except (TypeError, ValueError):
+                continue
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=UTC)
+            if ts > last_audit:
+                kept.append(r)
+        overrides = kept
+    n_overrides = len(overrides)
     over_count = n_overrides >= config.audit_session_threshold
     over_days = days_since >= config.audit_days_threshold
     if not (over_count or over_days):

@@ -13,6 +13,20 @@ def _write_harness_yaml(project_dir: Path, body: str) -> None:
     (claude_dir / "harness.yaml").write_text(body)
 
 
+# The renderer always prepends a provenance frontmatter document, making the
+# real on-disk file a multi-document YAML stream. Regression guard for the bug
+# where resolve_locale used a bare yaml.safe_load and silently degraded every
+# non-English user to "en".
+_PROVENANCE = (
+    "---\ngenerated_by: harness-maker\nharness_maker_version: 0.28.9\ncontent_hash: deadbeef\n---\n"
+)
+
+
+def test_resolve_locale_with_provenance_frontmatter(tmp_path: Path) -> None:
+    _write_harness_yaml(tmp_path, _PROVENANCE + "preset: Production\nlocale: ko\n")
+    assert resolve_locale(tmp_path) == "ko"
+
+
 def test_resolve_locale_falls_back_to_en_when_no_yaml(tmp_path: Path) -> None:
     assert resolve_locale(tmp_path) == DEFAULT_LOCALE == "en"
 

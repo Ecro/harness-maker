@@ -18,11 +18,12 @@ import sys
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 import yaml
 
 from harness_maker.i18n import t
+from harness_maker.io_utils import load_harness_yaml
 
 # Test-path heuristics — first match wins. Order matters: most-common forms first.
 _TEST_PATTERNS: tuple[re.Pattern[str], ...] = (
@@ -83,17 +84,15 @@ def find_spec_for_test(spec_dir: Path, test_path: str) -> Path | None:
 
 def _load_yaml_keys(project_dir: Path) -> dict[str, Any]:
     yaml_path = project_dir / ".claude" / "harness.yaml"
+    # Why load_harness_yaml (not yaml.safe_load): the rendered harness.yaml is a
+    # multi-document stream (provenance frontmatter + body). A bare safe_load
+    # raises ComposerError → caught here → {} → dev_mode never reads as
+    # 'spec-driven' → the entire spec-TDD gate silently disables on every real
+    # install. See io_utils.load_harness_yaml and CLAUDE.md checklist #2.
     try:
-        text = yaml_path.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError):
+        return load_harness_yaml(yaml_path)
+    except (OSError, UnicodeDecodeError, yaml.YAMLError):
         return {}
-    try:
-        raw = yaml.safe_load(text)
-    except yaml.YAMLError:
-        return {}
-    if not isinstance(raw, dict):
-        return {}
-    return cast(dict[str, Any], raw)
 
 
 def evaluate(

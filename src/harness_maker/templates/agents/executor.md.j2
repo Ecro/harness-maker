@@ -1,7 +1,7 @@
 ---
 name: executor
 communication_variant: full
-description: Workflow executor with worktree-bounded write permissions — only writes to .worktrees/, never to repo root
+description: Workflow executor with worktree-bounded write intent — targets .worktrees/ by convention (prompt-level guidance, not runtime-enforced)
 tools: Read, Grep, Glob, Write, Edit, Bash
 {% include "agents/_partials/model_frontmatter_line.md.j2" %}
 permissions:

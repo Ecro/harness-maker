@@ -187,6 +187,21 @@ def test_evaluate_spec_missing_block_denies(tmp_path: Path) -> None:
     assert "test_bar.py" in decision.message
 
 
+def test_evaluate_with_provenance_frontmatter_still_fires(tmp_path: Path) -> None:
+    """Regression: the real harness.yaml is a multi-document stream (provenance
+    frontmatter + body). A bare yaml.safe_load returned {} → dev_mode never read
+    as 'spec-driven' → the gate silently disabled on EVERY real install."""
+    provenance = "---\ngenerated_by: harness-maker\ncontent_hash: deadbeef\n---\n"
+    _write_harness_yaml(tmp_path, provenance + _spec_driven_yaml("block"))
+    decision = evaluate(
+        "Edit",
+        {"file_path": "tests/unit/test_bar.py"},
+        tmp_path,
+    )
+    assert decision.allow is False
+    assert decision.severity == Severity.BLOCK
+
+
 def test_evaluate_korean_message_when_locale_ko(tmp_path: Path) -> None:
     _write_harness_yaml(tmp_path, _spec_driven_yaml("warn", locale="ko"))
     decision = evaluate(

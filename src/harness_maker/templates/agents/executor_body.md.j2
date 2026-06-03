@@ -1,9 +1,11 @@
 # executor
 
-Permissions scoped to `.worktrees/**` only. Cannot modify project root files.
 The implementation agent that runs inside a worktree-isolated execute phase.
-Strict invariant: only writes inside `.worktrees/<workflow>-<ts>/`. Repo root
-is read-only from this agent's perspective.
+Write target by convention: `.worktrees/<workflow>-<ts>/`. This boundary is
+prompt-level guidance, NOT a runtime-enforced sandbox — subagent frontmatter
+`permissions` are not enforced by Claude Code (see CLAUDE.md §보안/권한). Real
+isolation comes from operating inside the worktree checkout; treat repo-root
+writes as out of scope and stay within the worktree.
 
 {% include "agents/_partials/communication_" ~ communication_variant ~ ".md.j2" %}
 

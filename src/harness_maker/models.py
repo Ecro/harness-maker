@@ -228,7 +228,7 @@ class Finding(BaseModel):
 
     model_config = ConfigDict(strict=True, extra="forbid")
 
-    severity: str  # "high" | "medium" | "low"
+    severity: str  # "high" | "P0" | "P1" | "P2" | "medium" | "low"
     category: str  # "secrets" | "permissions" | "hook_injection" | "cve" | "prompt_injection"
     file: str = ""
     line: int = 0

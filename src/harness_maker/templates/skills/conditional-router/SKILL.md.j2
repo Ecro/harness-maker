@@ -16,15 +16,12 @@ concurrency-relevant paths still trigger their owners).
 **Invoke when:**
 - `/hm:review` runs with `harness.yaml.reviewers.routing: conditional`.
 - A workflow step needs to map changed-file paths to a reviewer subset.
+- A pre-commit hook needs to pick a minimal reviewer set for fast feedback.
+- An autoloop iteration finishes and a quick targeted review is needed.
 
 **Skip when:**
 - `routing: always-all` is set (every reviewer fires regardless).
 - The diff is empty (nothing to route).
-## When to Invoke
-
-- `/hm:review` is running and `harness.yaml.reviewers.routing == 'conditional'`
-- A pre-commit hook needs to pick a minimal reviewer set for fast feedback
-- An autoloop iteration finishes and we need a quick targeted review
 
 ## Routing Rules
 

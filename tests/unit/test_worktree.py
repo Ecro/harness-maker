@@ -216,6 +216,14 @@ def test_cleanup_all_returns_zero_when_empty(repo: Path) -> None:
     assert worktree.cleanup_all(repo, force=True) == 0
 
 
+def test_cli_cleanup_all_dispatch(repo: Path) -> None:
+    """Regression (F50): cleanup_all was unreachable from main() — the disk
+    cleanup defense could never fire. The `cleanup-all` subcommand must dispatch."""
+    worktree.create("execute", repo)
+    assert worktree.main(["cleanup-all", str(repo), "--force"]) == 0
+    assert not list((repo / worktree.WORKTREE_DIR_NAME).glob("execute-*"))
+
+
 def test_cli_create_emits_path_when_scope_includes_stage(repo: Path) -> None:
     """`python -m harness_maker.worktree create execute <repo>` returns the
     new worktree path on stdout when harness.yaml.worktree.scope contains

@@ -30,9 +30,9 @@ THRESHOLDS: dict[tuple[str, str], int] = {
     # AGENTS.md is the Codex equivalent of CLAUDE.md — same parity thresholds.
     ("AGENTS.md", Preset.SIDE.value): 200,
     ("AGENTS.md", Preset.PRODUCTION.value): 500,
-    ("agent", Preset.SIDE.value): 100,
+    ("agent", Preset.SIDE.value): 150,
     ("agent", Preset.PRODUCTION.value): 200,
-    ("skill", Preset.SIDE.value): 50,
+    ("skill", Preset.SIDE.value): 100,
     ("skill", Preset.PRODUCTION.value): 150,
     ("workflow", Preset.SIDE.value): 300,
     ("workflow", Preset.PRODUCTION.value): 600,

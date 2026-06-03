@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import cast
 
 import yaml
 
 from harness_maker.i18n_messages import MESSAGES
+from harness_maker.io_utils import load_harness_yaml
 from harness_maker.models import Locale  # re-export for backward compat
 
 __all__ = ["DEFAULT_LOCALE", "Locale", "resolve_locale", "t"]
@@ -22,17 +22,13 @@ def resolve_locale(project_dir: Path) -> str:
     locales we don't yet have messages for. ``t()`` handles silent fallback.
     """
     yaml_path = project_dir / ".claude" / "harness.yaml"
+    # Why load_harness_yaml (not yaml.safe_load): the rendered harness.yaml is a
+    # multi-document stream (provenance frontmatter + body); a bare safe_load
+    # raises ComposerError and silently degrades every non-English user to 'en'.
     try:
-        text = yaml_path.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError):
+        data = load_harness_yaml(yaml_path)
+    except (OSError, UnicodeDecodeError, yaml.YAMLError):
         return DEFAULT_LOCALE
-    try:
-        raw = yaml.safe_load(text)
-    except yaml.YAMLError:
-        return DEFAULT_LOCALE
-    if not isinstance(raw, dict):
-        return DEFAULT_LOCALE
-    data = cast(dict[str, object], raw)
     locale_str = data.get("locale")
     if not isinstance(locale_str, str) or not locale_str:
         return DEFAULT_LOCALE
