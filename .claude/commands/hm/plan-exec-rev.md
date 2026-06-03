@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.28.9
+harness_maker_version: 0.28.11
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: 54bae7259bc9783864ef62cb4d5e622bf7a05eae26153ec66e6ae1a52415b7da
+content_hash: 6196d87829730fc72c47dfd303431695e39099ce7e3613e589ac8289bae532e5
 ---
 > **Before you begin â€” outline your plan.** First check whether an autoloop is
 > active: the marker `.hm-loop-active` lives at the **project root**, NOT inside
@@ -457,7 +457,7 @@ The shell guard below makes the receipt a no-op when `.current-iter` is absent â
 !if [ -f "<WT>/.claude/.hm-iter-receipts/.current-iter" ]; then \
    ITER=$(cat "<WT>/.claude/.hm-iter-receipts/.current-iter" 2>/dev/null); \
    if [ -n "$ITER" ]; then \
-     uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.28.9 python -m harness_maker.iter_receipts write \
+     uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.28.11 python -m harness_maker.iter_receipts write \
        --iter "$ITER" --stage plan --verdict <verdict> --root "<WT>"; \
    fi; \
  fi
@@ -567,7 +567,7 @@ Engage isolation if `harness.yaml.worktree.scope` includes `execute`. The `workt
 
 
 ```bash
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.28.9 python -m harness_maker.worktree create execute "$(pwd)"
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.28.11 python -m harness_maker.worktree create execute "$(pwd)"
 ```
 
 
@@ -583,7 +583,7 @@ Read **all non-empty output lines** â€” that is the contract for the rest of thi
 
 
 ```bash
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.28.9 python -m harness_maker.worktree verify <WT>
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.28.11 python -m harness_maker.worktree verify <WT>
 ```
 
 
@@ -785,7 +785,7 @@ The shell guard below makes the receipt a no-op when `.current-iter` is absent â
 !if [ -f "<WT>/.claude/.hm-iter-receipts/.current-iter" ]; then \
    ITER=$(cat "<WT>/.claude/.hm-iter-receipts/.current-iter" 2>/dev/null); \
    if [ -n "$ITER" ]; then \
-     uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.28.9 python -m harness_maker.iter_receipts write \
+     uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.28.11 python -m harness_maker.iter_receipts write \
        --iter "$ITER" --stage execute --verdict <verdict> --root "<WT>"; \
    fi; \
  fi
@@ -812,12 +812,12 @@ Pick **exactly one** finalize command. Substitute `<WT>` with the literal absolu
 ```bash
 # All phases GREEN â€” stage-merge the branch back (NO commit) + cleanup the worktree.
 # /hm:wrapup will create the single user-facing commit (with proper message + Co-Authored-By).
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.28.9 python -m harness_maker.worktree finalize <WT> stage-only
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.28.11 python -m harness_maker.worktree finalize <WT> stage-only
 ```
 
 ```bash
 # Stage halted on a blocker â€” preserve the worktree for inspection:
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.28.9 python -m harness_maker.worktree finalize <WT> fail
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.28.11 python -m harness_maker.worktree finalize <WT> fail
 ```
 
 
@@ -835,7 +835,7 @@ commit; otherwise the user's pre-existing WIP remains in the stash queue:
 
 
 ```bash
-!HM_OWNED_SESSION_UUIDS="$(uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.28.9 python -m harness_maker.worktree owned-uuids "$(pwd)")" uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.28.9 python -m harness_maker.worktree post-commit-pop "$(pwd)"
+!HM_OWNED_SESSION_UUIDS="$(uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.28.11 python -m harness_maker.worktree owned-uuids "$(pwd)")" uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.28.11 python -m harness_maker.worktree post-commit-pop "$(pwd)"
 ```
 
 
@@ -1266,7 +1266,7 @@ The shell guard below makes the receipt a no-op when `.current-iter` is absent â
 !if [ -f "<WT>/.claude/.hm-iter-receipts/.current-iter" ]; then \
    ITER=$(cat "<WT>/.claude/.hm-iter-receipts/.current-iter" 2>/dev/null); \
    if [ -n "$ITER" ]; then \
-     uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.28.9 python -m harness_maker.iter_receipts write \
+     uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.28.11 python -m harness_maker.iter_receipts write \
        --iter "$ITER" --stage review --verdict <verdict> --root "<WT>"; \
    fi; \
  fi
