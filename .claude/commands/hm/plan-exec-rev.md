@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.28.11
+harness_maker_version: 0.29.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: 6196d87829730fc72c47dfd303431695e39099ce7e3613e589ac8289bae532e5
+content_hash: bbee302c47d0da6650c52934cf7ef7bbb0e8d782f8048e0e626d83487ed6e63a
 ---
 > **Before you begin — outline your plan.** First check whether an autoloop is
 > active: the marker `.hm-loop-active` lives at the **project root**, NOT inside
@@ -457,7 +457,7 @@ The shell guard below makes the receipt a no-op when `.current-iter` is absent �
 !if [ -f "<WT>/.claude/.hm-iter-receipts/.current-iter" ]; then \
    ITER=$(cat "<WT>/.claude/.hm-iter-receipts/.current-iter" 2>/dev/null); \
    if [ -n "$ITER" ]; then \
-     uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.28.11 python -m harness_maker.iter_receipts write \
+     uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.29.0 python -m harness_maker.iter_receipts write \
        --iter "$ITER" --stage plan --verdict <verdict> --root "<WT>"; \
    fi; \
  fi
@@ -567,7 +567,7 @@ Engage isolation if `harness.yaml.worktree.scope` includes `execute`. The `workt
 
 
 ```bash
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.28.11 python -m harness_maker.worktree create execute "$(pwd)"
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.29.0 python -m harness_maker.worktree create execute "$(pwd)"
 ```
 
 
@@ -583,7 +583,7 @@ Read **all non-empty output lines** — that is the contract for the rest of thi
 
 
 ```bash
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.28.11 python -m harness_maker.worktree verify <WT>
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.29.0 python -m harness_maker.worktree verify <WT>
 ```
 
 
@@ -785,7 +785,7 @@ The shell guard below makes the receipt a no-op when `.current-iter` is absent �
 !if [ -f "<WT>/.claude/.hm-iter-receipts/.current-iter" ]; then \
    ITER=$(cat "<WT>/.claude/.hm-iter-receipts/.current-iter" 2>/dev/null); \
    if [ -n "$ITER" ]; then \
-     uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.28.11 python -m harness_maker.iter_receipts write \
+     uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.29.0 python -m harness_maker.iter_receipts write \
        --iter "$ITER" --stage execute --verdict <verdict> --root "<WT>"; \
    fi; \
  fi
@@ -812,12 +812,12 @@ Pick **exactly one** finalize command. Substitute `<WT>` with the literal absolu
 ```bash
 # All phases GREEN — stage-merge the branch back (NO commit) + cleanup the worktree.
 # /hm:wrapup will create the single user-facing commit (with proper message + Co-Authored-By).
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.28.11 python -m harness_maker.worktree finalize <WT> stage-only
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.29.0 python -m harness_maker.worktree finalize <WT> stage-only
 ```
 
 ```bash
 # Stage halted on a blocker — preserve the worktree for inspection:
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.28.11 python -m harness_maker.worktree finalize <WT> fail
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.29.0 python -m harness_maker.worktree finalize <WT> fail
 ```
 
 
@@ -835,7 +835,7 @@ commit; otherwise the user's pre-existing WIP remains in the stash queue:
 
 
 ```bash
-!HM_OWNED_SESSION_UUIDS="$(uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.28.11 python -m harness_maker.worktree owned-uuids "$(pwd)")" uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.28.11 python -m harness_maker.worktree post-commit-pop "$(pwd)"
+!HM_OWNED_SESSION_UUIDS="$(uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.29.0 python -m harness_maker.worktree owned-uuids "$(pwd)")" uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.29.0 python -m harness_maker.worktree post-commit-pop "$(pwd)"
 ```
 
 
@@ -1063,6 +1063,50 @@ Pass 2 instead of the raw Pass 1 list. Log `stats.dropped_n` for telemetry.
    Pass 2 is authoritative — Pass 1 findings absent from Pass 2 are
    invalidated by context and **dropped** (CP10 contract).
 5. The merged finding list is the input to the consensus filter (Step 4).
+### Step 3.5 — Codex heterogeneous voter (ADR-001, PLAN-crossmodel-codex-gaps)
+
+`codex_second_opinion.enabled` is set, so Codex joins Step 4 as a **third voter**
+(2 Claude reviewers + 1 Codex → **k-of-3**), not an advisory side-channel.
+
+**Mandatory gate (ADR-002/003 matrix):**
+- Production preset → invoke Codex on **every** review.
+- Side preset → invoke Codex only on a **high-diff** change. Classify first — note
+  `HEAD` (the post-execute diff is staged, so a bare `git diff` would see nothing) and
+  `--numstat` for the added-line count that drives the `boundary` signal:
+  ```bash
+  files=$(git diff --name-only HEAD); added=$(git diff --numstat HEAD | awk '{s+=$1} END{print s+0}'); printf '%s\n' "$files" | python -m harness_maker.high_diff classify --added-lines "$added"
+  ```
+  Invoke when `is_high` (or `boundary` and your judgment, reusing the When-to-Run
+  criteria, says high). Otherwise skip Codex this round (no third voter).
+
+**Invoke** (hermetic by default). Put the diff + review context in a shell **variable**
+first (so `$(...)`/backticks in adversarial diff text are never expanded), write it to
+a `mktemp` prompt file with `printf '%s'`, and use a `mktemp` output sink (never a
+fixed `/tmp/...` path — symlink-clobber, REVIEW security P2):
+```bash
+content="<diff + review context>"; prompt_tmp=$(mktemp); out_tmp=$(mktemp); printf '%s' "$content" > "$prompt_tmp"; codex exec --sandbox read-only --ignore-user-config --ignore-rules --output-schema .claude/schemas/codex-finding.schema.json --output-last-message "$out_tmp" - < "$prompt_tmp"; echo "exit=$?"; cat "$out_tmp"; rm -f "$prompt_tmp" "$out_tmp"
+```
+
+**Adapt** the returned Codex findings into reviewer-shaped findings by piping the
+output file through the adapter (deterministic — it maps severity
+`critical→P0 / high→P1 / medium→P2 / low,info→P3`, sets `source: "codex"`, and sets
+`needs_relaxation: true` when `file`/`line` is null; reading from the file keeps
+untrusted Codex content out of the shell):
+```bash
+python -m harness_maker.codex_adapter adapt < "$out_tmp"   # before the rm in the invoke block
+```
+Add the emitted adapted findings to the Step 4 input list as the third source.
+
+**Skip relay (mandatory surfacing):** inspect the `codex exec` exit. On non-zero set
+`codex_status: "skipped"` + a one-line `codex_skip_reason`, surface it in the REVIEW
+report (do NOT block — warn-and-proceed), and append a best-effort ledger row. Pass
+each value as a **separate `--flag`** (never inline an untrusted cause into a
+shell-quoted JSON blob — REVIEW security P1):
+```bash
+reason="<one-line cause>"; python -m harness_maker.codex_ledger emit --slug "<slug>" --stage review --finding-ref "n/a" --disposition unresolved --codex-status skipped --skip-reason "$reason"
+```
+On success set `codex_status: "invoked"`. A silently-degraded Codex is the H4 failure
+mode — the `/hm:health` smoke check is the positive backstop.
 
 ### Step 4 — Consensus filter (surface + reasoning alignment)
 
@@ -1075,6 +1119,14 @@ Two findings are consensus *candidates* iff they satisfy BOTH:
 2. Same `severity` tier (P0 vs P0; P1 vs P1; do not bridge tiers).
 
 Pairs failing surface match are recorded as **independent** findings — preserve both.
+**Codex null-location relaxation (ADR-001):** a finding with `source: "codex"` and
+`needs_relaxation: true` (null `file`/`line`) cannot satisfy predicate 1 as written.
+For these, substitute **symbol/message-similarity**: it is a candidate when its
+`summary`/message clearly refers to the same symbol or defect as a Claude finding
+(same function/class, or same described failure mode), with predicate 2 (severity
+tier) still required — the adapter already mapped Codex severities to P-tiers so the
+tiers are directly comparable. Without this relaxation a null-location Codex finding
+would always degrade to `manual-only`, making the third vote cosmetic.
 
 #### Step 4b — Reasoning alignment (verification)
 
@@ -1134,6 +1186,10 @@ Count **`consensus-passed`** findings only by severity:
 - `P1_count` = consensus-passed findings with severity P1.
 
 P2/P3, weak-consensus, and manual-only findings do NOT lower the grade.
+> **k-of-3 with Codex:** the adapted Codex finding counts as one of the three voices.
+> A finding that reaches `consensus-passed` *because* the Codex vote supplied an
+> agreeing voice counts toward `P0_count`/`P1_count` exactly like any reviewer-sourced
+> consensus-passed finding — Codex is a peer, not a tiebreaker footnote.
 
 | P0 | P1 | Grade |
 |----|----|-------|
@@ -1266,7 +1322,7 @@ The shell guard below makes the receipt a no-op when `.current-iter` is absent �
 !if [ -f "<WT>/.claude/.hm-iter-receipts/.current-iter" ]; then \
    ITER=$(cat "<WT>/.claude/.hm-iter-receipts/.current-iter" 2>/dev/null); \
    if [ -n "$ITER" ]; then \
-     uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.28.11 python -m harness_maker.iter_receipts write \
+     uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.29.0 python -m harness_maker.iter_receipts write \
        --iter "$ITER" --stage review --verdict <verdict> --root "<WT>"; \
    fi; \
  fi
