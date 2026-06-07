@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.29.0] - 2026-06-07
 
 ### Added — Cross-model (Codex) deepening (PLAN-crossmodel-codex-gaps)
 - `/hm:review` now runs Codex as a **k-of-3 consensus voter** (not advisory): Step 3.5
@@ -1123,7 +1123,7 @@ template). Accepted risk documented.
   - **P7** version bump — 5 files synchronized at **0.18.0**. **No git tag, no push** (user constraint mid-loop). Release workflow is intentionally not triggered; users can manually tag + push when ready.
   - **Deferred to follow-up**: (a) `templates/stages/spec.md.j2` dual-write extension; (b) `templates/commands/hm/loop.md.j2` P5 batch procedure baked; (c) `.github/workflows/spec-mutation.yml` + `spec-drift.yml`; (d) LLM judge wiring in `spec_inventory.reverse_map`. All four documented in `spec-framework-v1.1-deltas.md` as carry-over for the next minor.
 
-## [Unreleased]
+## [0.29.0] - 2026-06-07
 
 ## [0.19.3] - 2026-05-20
 
