@@ -38,11 +38,13 @@ _OPT_IN_PHRASE = "opt-in per call"
 _ARRAY_REVIEWERS = ("code-reviewer", "consensus-arbiter")
 
 
-def _render_agent_files(tmp_path: Path, *, enabled: bool) -> dict[str, str]:
+def _render_agent_files(
+    tmp_path: Path, *, enabled: bool, preset: Preset = Preset.SIDE
+) -> dict[str, str]:
     """Run real synthesize → render path so communication_variant injection fires."""
     profile = ProjectProfile()
     answers = InterviewAnswers(
-        preset=Preset.SIDE,
+        preset=preset,
         targets=[Target.CLAUDE_CODE],
         codex_second_opinion=CodexSecondOpinionConfig(enabled=enabled),
     )
@@ -84,23 +86,35 @@ def test_second_opinion_section_absent_in_non_allowlisted_agents(tmp_path: Path)
         )
 
 
-def test_plan_validator_mandatory_when_enabled(tmp_path: Path) -> None:
-    """plan-validator: MAY→MUST + top-level reconciliation contract + loud-skip."""
-    rendered = _render_agent_files(tmp_path, enabled=True)
+def test_plan_validator_production_always_mandatory(tmp_path: Path) -> None:
+    """Production plan-validator: always-MUST + reconciliation envelope (ADR-002 matrix)."""
+    rendered = _render_agent_files(tmp_path, enabled=True, preset=Preset.PRODUCTION)
     body = rendered["plan-validator"]
-    # forced call (no longer opt-in)
     assert _MANDATORY_TITLE in body, "plan-validator missing the Required section title"
     assert "invoke Codex" in body, "forced-call phrasing missing"
     assert "MUST" in body, "mandatory 'MUST' phrasing missing"
     assert _OPTIONAL_TITLE not in body, "stale Optional title still present"
     assert "MAY invoke" not in body, "opt-in 'MAY invoke' phrasing not flipped"
     assert _OPT_IN_PHRASE not in body, "'opt-in per call' phrasing not removed"
+    # Production = always, no high-diff gate
+    assert "high_diff" not in body, "Production must not be high-diff gated"
     # top-level reconciliation contract + anti-boilerplate floor
     assert "codex_reconciliation" in body, "reconciliation contract missing"
     assert "codex_status" in body, "codex_status field missing"
     assert "codex_finding_ref" in body, "anti-boilerplate finding-reference floor missing"
-    # loud-skip path documented
     assert "codex_skip_reason" in body, "loud-skip reason field missing"
+
+
+def test_plan_validator_side_high_diff_gated(tmp_path: Path) -> None:
+    """Side plan-validator: mandatory iff high-diff, envelope preserved (ADR-002/003 matrix)."""
+    rendered = _render_agent_files(tmp_path, enabled=True, preset=Preset.SIDE)
+    body = rendered["plan-validator"]
+    assert "high_diff classify" in body, "Side must gate on the high-diff detector"
+    assert "MUST" in body, "mandatory-on-high-diff phrasing missing"
+    assert _OPTIONAL_TITLE not in body, "plan-validator must not use the Optional title"
+    # envelope still present on Side
+    assert "codex_reconciliation" in body, "reconciliation contract missing on Side"
+    assert "codex_status" in body, "codex_status field missing on Side"
 
 
 def test_array_reviewers_unchanged_when_enabled(tmp_path: Path) -> None:
@@ -110,9 +124,11 @@ def test_array_reviewers_unchanged_when_enabled(tmp_path: Path) -> None:
         body = rendered[agent]
         assert _OPTIONAL_TITLE in body, f"{agent} lost its opt-in Optional section"
         assert _OPT_IN_PHRASE in body, f"{agent} opt-in phrasing changed unexpectedly"
-        # the mandatory contract must NOT leak into the array reviewers
-        assert "codex_reconciliation" not in body, f"reconciliation leaked into {agent}"
-        assert "codex_status" not in body, f"codex_status leaked into {agent}"
+        # the plan-validator reconciliation ENVELOPE must NOT leak into the array
+        # reviewers. (`codex_status` alone is no longer a clean marker — it is now
+        # also a shared skip-receipt ledger field; `codex_reconciliation` is the
+        # distinctive envelope key — ADR-002/005 of PLAN-crossmodel-codex-gaps.)
+        assert "codex_reconciliation" not in body, f"reconciliation envelope leaked into {agent}"
         assert _MANDATORY_TITLE not in body, f"Required title leaked into {agent}"
 
 

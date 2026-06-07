@@ -29,18 +29,37 @@
 <!-- @hm:codex-second-opinion -->
 
 {% if name == 'plan-validator' -%}
-## Required: Codex second opinion
+{% set _preset = config.get('preset', 'Production') if config else 'Production' -%}
+{% if _preset == 'Production' -%}
+## Required: Codex second opinion (Production — always mandatory)
 
 You **MUST** invoke Codex CLI as a second-LLM reviewer on **every** run —
-this is mandatory whenever `codex_second_opinion.enabled`, not opt-in. Run
-the invocation below, then reconcile **every** Codex finding in your output.
+on the Production preset this is mandatory whenever `codex_second_opinion.enabled`,
+not opt-in. Run the invocation below, then reconcile **every** Codex finding.
+{%- else -%}
+## Required on high-diff: Codex second opinion (Side — mandatory iff high-blast-radius)
+
+On the Side preset Codex is mandatory **only on high-diff changes** (PLAN-crossmodel-codex-gaps
+ADR-002/003). First classify the diff — use `HEAD` (the diff under review may be staged)
+and `--numstat` for the added-line count that drives the `boundary` signal:
+
+```bash
+files=$(git diff --name-only HEAD); added=$(git diff --numstat HEAD | awk '{s+=$1} END{print s+0}'); printf '%s\n' "$files" | python -m harness_maker.high_diff classify --added-lines "$added"
+```
+
+If `is_high` is true — or `boundary` is true and your judgment (reusing the review
+When-to-Run criteria: >3 files, security/auth/perms, contract/architecture surface,
+new public API) says high — you **MUST** invoke Codex below and reconcile **every**
+finding. Otherwise the call is optional (opt-in per finding).
+{%- endif %}
 {%- else -%}
 ## Optional: Codex second opinion
 
 You **MAY** invoke Codex CLI as a second-LLM reviewer when you reach a
 finding that benefits from cross-model judgment (M-of-N consensus,
 tie-break, architectural sanity check). This is opt-in per call — no
-ambient Claude self-dispatch.
+ambient Claude self-dispatch. (Heterogeneous-consensus mandatory wiring for
+reviewers lands in PLAN-crossmodel-codex-gaps Phase 4b.)
 {%- endif %}
 
 **Invocation contract** (hermetic by default per ADR-006 — `--ignore-user-config`
@@ -81,7 +100,7 @@ its "Return ONLY this JSON" wording, when Codex is enabled your returned object
 `critiques`, and `clean_categories` (NOT nested inside `critiques`):
 - `codex_status`: `"invoked"` when the call succeeded, `"skipped"` when it failed.
 - `codex_reconciliation`: an array, one entry per Codex finding —
-  `{ "codex_finding_ref": "...", "disposition": "accepted" | "rejected" | "duplicate", "reason": "..." }`.
+  `{ "codex_finding_ref": "...", "disposition": "accepted" | "rejected" | "duplicate" | "unresolved", "reason": "..." }`.
   Empty array `[]` when `codex_status` is `"skipped"`.
 
 **Anti-boilerplate floor** — every entry's `codex_finding_ref` MUST cite the
@@ -91,6 +110,19 @@ no reference does NOT satisfy the contract — the mandatory call is a forced
 *consideration*, not a decorative one. Your `overall_assessment` stays your
 own Claude-derived verdict (Codex is input you cannot silently discard, not a
 verdict source — preserves ADR-005 of PLAN-codex-second-llm-integration).
+
+**PIDA debate flow (ADR-004, PLAN-crossmodel-codex-gaps)** — do NOT self-adjudicate
+a Codex challenge silently. For each Codex finding:
+1. Form a **rebuttal**: `KEEP` (the finding stands — disposition `accepted`) or
+   `REFUTE` (with concrete evidence — disposition `rejected`/`duplicate`).
+2. If a **test/oracle** can settle the disagreement, let it decide and record the
+   oracle result in `reason`.
+3. **No-oracle short-circuit:** plan-validator works on a *plan* — there is **no test oracle**
+   here — so when KEEP/REFUTE cannot be settled by evidence, do NOT spend a
+   wasted rebuttal pass pretending to arbitrate: set disposition `unresolved` and
+   surface it. `[unresolved]` is visible-by-design (visibility > silent dismissal)
+   and **never blocks** — `overall_assessment` is still your Claude verdict
+   (warn-and-proceed). `/hm:plan` Step 4 shows `unresolved` entries to the user.
 
 **Failure policy** (ADR-003 — warn-and-proceed, made loud): on any non-zero
 exit (auth, rate-limit, network, schema rejection), do NOT block. Set
@@ -105,6 +137,21 @@ summary, confidence }` — see `{{ _csoo.get('output_schema_path', '.claude/sche
 (auth, rate-limit, network, schema rejection), log one line to stderr
 and continue with Claude-only output. Do NOT block the stage.
 {%- endif %}
+
+**Skip-receipt (ADR-005)** — best-effort: whenever the Codex call is skipped
+(non-zero exit) OR you disposition a Codex finding, append one ledger row so the
+skip-rate / disposition history is auditable over time. Pass each value as a
+**separate `--flag` argument** (never inline an untrusted cause/finding-ref into a
+shell-quoted JSON blob — `codex_ledger` builds the JSON in Python, so a quote or
+`;` in the value is data, not shell — REVIEW security P1):
+
+```bash
+reason="<one-line cause>"   # from the codex exit/stderr; quoting-safe as a shell var
+python -m harness_maker.codex_ledger emit --slug "<task-slug>" --stage "<review|plan>" --finding-ref "<file:line or n/a>" --disposition "<accepted|rejected|duplicate|unresolved>" --codex-status "<invoked|skipped>" --skip-reason "$reason"
+```
+(Omit `--skip-reason` on the `invoked` path.) Best-effort by design — a
+Bash-tool-gated agent may be unable to emit; the `/hm:health` Codex smoke check is
+the positive backstop (a silently-disabled Codex is caught there even with no receipt).
 
 **Prerequisite**: user must have run `codex login` on their machine.
 First call surfaces an auth error if missing.

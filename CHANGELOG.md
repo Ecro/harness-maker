@@ -1,5 +1,26 @@
 # Changelog
 
+## [Unreleased]
+
+### Added — Cross-model (Codex) deepening (PLAN-crossmodel-codex-gaps)
+- `/hm:review` now runs Codex as a **k-of-3 consensus voter** (not advisory): Step 3.5
+  invokes `codex exec`, a new `codex_adapter` normalizes findings (severity `critical→P0…`
+  + null-location symbol/message-similarity relaxation) into the Step 4 filter, and a
+  Codex-raised `consensus-passed` finding counts toward the grade.
+- **Preset × high-diff mandatory matrix** (when `codex_second_opinion.enabled`): Production
+  forces Codex on review+plan always; Side forces it only on a high-diff change
+  (`harness_maker.high_diff`, per-iteration in `/hm:loop`). Mandatory = loud-warn +
+  best-effort skip-receipt, never a hard block.
+- **Calibration ledger** `.claude/observability/codex-second-opinion.jsonl`
+  (`harness_maker.codex_ledger`, disposition + skip-rate v1) and a **positive Codex
+  smoke-check** in `/hm:health` that catches a silently-degraded integration.
+- **plan-validator PIDA**: Codex finding → Claude KEEP/REFUTE → oracle-or-`[unresolved]`,
+  with a no-oracle short-circuit; `[unresolved]` surfaces but never blocks.
+- Injection-safe CLIs: `codex_ledger emit --field …` (argv-built JSON) and
+  `codex_adapter adapt < file` (stdin) so rendered recipes never inline untrusted
+  content into a shell-quoted blob.
+- Deferred: H3 (generated-harness Codex audit), H5 (curated hermetic bundle), H8 (`/duel` routes).
+
 ## [0.28.11] - 2026-06-03
 
 Re-release of 0.28.10 with corrected snapshot fixtures. The 0.28.10 tag's

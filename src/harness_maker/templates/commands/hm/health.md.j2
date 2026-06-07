@@ -38,7 +38,27 @@ flipping the ADR-012 kill-switch (`llm_inference_enabled: false`).
 ```
 
 Then read `.claude/observability/dashboard.md` to inspect the two sections.
+{% if config.codex_second_opinion and config.codex_second_opinion.enabled %}
+## Codex second-opinion smoke check (ADR-005, PLAN-crossmodel-codex-gaps)
 
+`codex_second_opinion.enabled` is set, so verify the Codex path actually
+round-trips — a **positive** check, because the warn-and-proceed failure policy
+makes a broken Codex (missing `Bash` tool, `codex login` expired, strict-schema
+rejection, CLI-flag drift) look identical to "Codex agreed / nothing to add".
+A silently-degraded Codex means every *mandatory* review/plan second opinion is
+running Claude-only without anyone noticing.
+
+```bash
+!prompt_tmp=$(mktemp); out_tmp=$(mktemp); printf '%s' 'Return a finding list with an empty findings array, summary "smoke", confidence null.' > "$prompt_tmp"; codex exec --sandbox read-only {% if config.codex_second_opinion.hermetic %}--ignore-user-config --ignore-rules {% endif %}--output-schema .claude/schemas/codex-finding.schema.json --output-last-message "$out_tmp" - < "$prompt_tmp"; echo "exit=$?"; cat "$out_tmp"; rm -f "$prompt_tmp" "$out_tmp"
+```
+
+Report the result explicitly as a Layer 1 ActionItem:
+- **pass** — exit 0 AND the `--output-last-message` sink is schema-valid JSON.
+- **fail** — non-zero exit, auth error, or schema rejection. Surface the exact
+  cause; until fixed, treat all "Codex agreed" review/plan outcomes as untrusted
+  (they are Claude-only). Cross-ref the ledger
+  `.claude/observability/codex-second-opinion.jsonl` skip-rate.
+{% endif %}
 ## Per-item structured question (ADR-001 hard rule)
 
 For each unresolved item across the two layers, present:

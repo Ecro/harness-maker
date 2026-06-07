@@ -1,0 +1,31 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Codex Second-Opinion Calibration Ledger Row",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "ts",
+    "slug",
+    "stage",
+    "finding_ref",
+    "disposition",
+    "codex_status",
+    "skip_reason",
+    "oracle_result",
+    "later_regression_link"
+  ],
+  "properties": {
+    "ts": {"type": "string"},
+    "slug": {"type": "string"},
+    "stage": {"type": "string", "enum": ["review", "plan"]},
+    "finding_ref": {"type": "string"},
+    "disposition": {
+      "type": "string",
+      "enum": ["accepted", "rejected", "duplicate", "unresolved"]
+    },
+    "codex_status": {"type": "string", "enum": ["invoked", "skipped"]},
+    "skip_reason": {"type": ["string", "null"]},
+    "oracle_result": {"type": ["string", "null"]},
+    "later_regression_link": {"type": ["string", "null"]}
+  }
+}

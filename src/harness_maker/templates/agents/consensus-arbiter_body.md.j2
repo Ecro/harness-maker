@@ -18,6 +18,14 @@ Two findings are consensus *candidates* iff they satisfy BOTH:
 2. Same `severity` tier (P0 vs P0; P1 vs P1; **do not bridge tiers**).
 
 Pairs failing surface match are recorded as **independent** findings — preserve both.
+{%- if config and config.get('codex_second_opinion', {}).get('enabled') %}
+**Codex null-location relaxation (ADR-001, PLAN-crossmodel-codex-gaps):** a finding
+with `source: "codex"` and `needs_relaxation: true` (null `file`/`line`) substitutes
+**symbol/message-similarity** for predicate 1 — candidate when its message refers to
+the same symbol/defect as a Claude finding, predicate 2 (severity tier) still
+required. The adapter already mapped Codex severities to P-tiers. This lets the
+Codex vote reach `consensus-passed` in the k-of-3 ring instead of `manual-only`.
+{%- endif %}
 
 ### Step 4a-bis — Scope-aware exemption (ADR-005, Phase 5)
 
