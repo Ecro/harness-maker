@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.29.1] - 2026-06-12
 
 ### Fixed — worktree create no longer self-blocks on plan deliverables (PLAN-worktree-deliverable-blocks-create)
 - **`/hm:execute` no longer aborts on the `/hm:plan` deliverable it depends on.** Deliverables
