@@ -125,9 +125,23 @@ def test_create_guard_forgives_workdocs_churn(path: str) -> None:
     assert _is_create_guard_harness_artifact(_porcelain(path, " M ")) is True
 
 
-def test_create_guard_still_blocks_user_workdocs_deliverable() -> None:
-    # A real deliverable / user file under work-docs/ still counts as dirt.
-    assert _is_create_guard_harness_artifact(_porcelain("work-docs/PLAN-foo.md")) is False
+def test_create_guard_forgives_workdocs_deliverable() -> None:
+    # PLAN-worktree-deliverable-blocks-create ADR-001: a deliverable-shaped doc
+    # (/hm:plan output) is forgiven at CREATE time so plan→execute doesn't
+    # self-block. Finalize still preserves it (see test below).
+    assert _is_create_guard_harness_artifact(_porcelain("work-docs/PLAN-foo.md")) is True
+
+
+def test_create_guard_still_blocks_non_deliverable_workdocs_file() -> None:
+    # ADR-001 is anchored to deliverable filename shape — a genuine user file
+    # under work-docs/ (not PLAN/RESEARCH/SPEC/REVIEW-*.md) still counts as dirt.
+    assert _is_create_guard_harness_artifact(_porcelain("work-docs/scratch.py")) is False
+
+
+def test_finalize_filter_still_blocks_workdocs_deliverable() -> None:
+    # ADR-001 invariant: the finalize filter is UNCHANGED — the deliverable
+    # stays user-dirt there so the finalize stash PRESERVES it (not forgiven).
+    assert _is_harness_artifact(_porcelain("work-docs/PLAN-foo.md")) is False
 
 
 # ── Phase 2: file churn is matched EXACTLY, not by prefix (REVIEW consensus) ──

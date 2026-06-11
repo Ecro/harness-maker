@@ -1,5 +1,29 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed — worktree create no longer self-blocks on plan deliverables (PLAN-worktree-deliverable-blocks-create)
+- **`/hm:execute` no longer aborts on the `/hm:plan` deliverable it depends on.** Deliverables
+  (`work-docs/{PLAN,RESEARCH,SPEC,REVIEW}-*.md`, `specs/SPEC-*.md`) are deliberately tracked (wrapup
+  commits them), so they were always uncommitted at `worktree create` time → the Layer-2 dirty-base
+  guard blocked *every* plan→execute. The create-guard now forgives deliverable-shaped paths
+  **per-line** via `_is_deliverable_path` (anchored full-match, `[^/]+` so nested dirs aren't
+  over-forgiven); the **finalize filter is unchanged**, so deliverables are still stash-preserved
+  (ADR-001). Guard helpers use `git status --porcelain -uall` so a fresh project's first PLAN
+  (fully-untracked `work-docs/`, which git collapses to one line) is still seen.
+  *Non-goal:* a non-default `work_docs.dir` is not covered (pure porcelain predicate).
+
+### Fixed — leaked `execute-*` branch wall (same PLAN, ADR-003/004)
+- Finalize now records a **SHA-validated landed marker** `refs/hm-landed/v1/<branch>` (branch tip);
+  `prune_stale` deletes a landed branch iff `current_tip == marker_SHA` — surviving later HEAD edits
+  (the old current-blob compare preserved re-edited branches forever) and name-collision-safe (a
+  re-created same-named branch falls to the preserve-biased content-gate).
+- Orphan markers are reaped on every delete path so `refs/hm-landed/*` can't accumulate; the
+  per-branch `[WARN] preserved branch …` wall collapses to **one summary line**.
+- New **`python -m harness_maker.worktree prune-branches [--force]`** drains the legacy backlog;
+  `--force` prints a `git log -p <branch>` recovery hint before each delete (reflog `wip(execute)`
+  commits survive).
+
 ## [0.29.0] - 2026-06-07
 
 ### Added — Cross-model (Codex) deepening (PLAN-crossmodel-codex-gaps)

@@ -100,6 +100,31 @@ _HARNESS_CHURN_FILES: tuple[str, ...] = (
 # set and the dirt-filters can never drift.
 _HARNESS_GITIGNORE_PATTERNS: tuple[str, ...] = _HARNESS_CHURN_DIRS + _HARNESS_CHURN_FILES
 
+# PLAN-worktree-deliverable-blocks-create ADR-001: harness deliverable docs.
+# `/hm:plan` writes these to `work-docs/` (and `specs/`) BEFORE `/hm:execute`,
+# and they are excluded from the churn set above so `/hm:wrapup` can commit them
+# — so they are ALWAYS uncommitted at `worktree create` time and would block
+# every plan→execute. Anchored FULL-MATCH (mirrors the EXACT-match churn-file
+# discipline) so siblings like `PLAN-x.md.bak` / `random.md` are NOT forgiven.
+# NON-GOAL: a non-default harness.yaml `work_docs.dir` is not covered — same
+# accepted limitation as the churn-filter (pure porcelain predicate, no
+# harness.yaml access).
+# `[^/]+` (not `.+`) so the match is a FLAT file — a nested user dir like
+# `work-docs/PLAN-experiments/notes.md` must NOT be forgiven (anti-over-match;
+# `/hm:plan` only ever writes deliverables flat, so no real coverage is lost).
+_DELIVERABLE_RE = re.compile(
+    r"^(?:work-docs/(?:PLAN|RESEARCH|SPEC|REVIEW)-[^/]+\.md|specs/SPEC-[^/]+\.md)$"
+)
+
+
+def _is_deliverable_path(path: str) -> bool:
+    """True iff path is a harness deliverable doc (anchored full-match).
+
+    The create-guard forgives these per-line; the finalize filter
+    (`_is_harness_artifact`) does NOT, so they stay stash-preserved.
+    """
+    return bool(_DELIVERABLE_RE.match(path))
+
 
 def _run(
     args: list[str], cwd: Path, timeout: int | None = None
@@ -741,7 +766,14 @@ def _is_create_guard_harness_artifact(porcelain_line: str) -> bool:
     if _is_harness_artifact(porcelain_line):
         return True
     path = _porcelain_path(porcelain_line)
-    return path is not None and (path.startswith(".claude/") or path == ".claude")
+    if path is None:
+        return False
+    # PLAN-worktree-deliverable-blocks-create ADR-001: forgive deliverable docs
+    # at CREATE time only (finalize's `_is_harness_artifact` still preserves
+    # them). Per-line: coexisting code WIP keeps tripping the guard.
+    if _is_deliverable_path(path):
+        return True
+    return path.startswith(".claude/") or path == ".claude"
 
 
 def _has_user_dirty_state(base: Path) -> bool:
@@ -752,9 +784,15 @@ def _has_user_dirty_state(base: Path) -> bool:
     canonical 'finalize-pulls-orphan-wip-into-main' setup ([fail:design]
     count:2 → 3rd 2026-05-23). Filter via `_is_create_guard_harness_artifact`
     which excludes `.claude/` entirely (real users gitignore it).
+
+    `-uall` (PLAN-worktree-deliverable-blocks-create ADR-001): expand untracked
+    directories to individual files so the per-line deliverable/harness filter
+    sees `work-docs/PLAN-x.md` rather than a collapsed `work-docs/` line (git
+    collapses a fully-untracked dir by default). Without it, a fresh project's
+    first PLAN would still block create.
     """
     try:
-        status = _run(["git", "status", "--porcelain"], cwd=base)
+        status = _run(["git", "status", "--porcelain", "-uall"], cwd=base)
     except RuntimeError:
         return False  # Not a git repo or git unavailable — let downstream fail naturally.
     user_lines = [
@@ -766,7 +804,9 @@ def _has_user_dirty_state(base: Path) -> bool:
 def _list_user_dirty_files(base: Path) -> list[str]:
     """Return the user-dirty filenames for the abort-message listing."""
     try:
-        status = _run(["git", "status", "--porcelain"], cwd=base)
+        # `-uall` so the listing matches `_has_user_dirty_state`'s per-line view
+        # (ADR-001) — collapsed untracked dirs would otherwise hide the real file.
+        status = _run(["git", "status", "--porcelain", "-uall"], cwd=base)
     except RuntimeError:
         return []
     out: list[str] = []
@@ -1307,6 +1347,9 @@ class PruneReport:
     preserved_stash_refs: list[tuple[Path, str]] = field(default_factory=list)
     removed_branches: list[str] = field(default_factory=list)
     preserved_branches: list[tuple[str, str]] = field(default_factory=list)
+    # PLAN-worktree-deliverable-blocks-create ADR-004: orphan landed-marker refs
+    # (branch gone) reaped this pass — so refs/hm-landed/* can't accumulate.
+    removed_landed_markers: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
 
 
@@ -1539,6 +1582,69 @@ def _list_owned_branches(base_dir: Path) -> list[str]:
     return [b.strip() for b in cp.stdout.splitlines() if b.strip().startswith(_OWNED_PREFIXES)]
 
 
+# PLAN-worktree-deliverable-blocks-create ADR-003 — landed marker.
+# A git ref `refs/hm-landed/v1/<branch>` records the branch TIP at finalize
+# success. prune_stale deletes a markered branch iff its tip still equals this
+# SHA (survives later HEAD edits without a content re-compare; name-collision
+# safe — a re-created same-named branch has a different tip). Refs are not
+# work-tree files → zero gitignore churn. The `v1/` namespace allows a future
+# format migration.
+_LANDED_REF_PREFIX = "refs/hm-landed/v1/"
+
+
+def _landed_ref_name(branch: str) -> str:
+    return f"{_LANDED_REF_PREFIX}{branch}"
+
+
+def _branch_tip(base: Path, branch: str) -> str | None:
+    """Return the 40-hex tip commit of branch, or None if it doesn't resolve."""
+    try:
+        cp = _run(["git", "rev-parse", "--verify", f"{branch}^{{commit}}"], cwd=base)
+    except RuntimeError:
+        return None
+    sha = cp.stdout.strip()
+    return sha if _SHA_RE.match(sha) else None
+
+
+def _write_landed_marker(base: Path, branch: str) -> None:
+    """Record branch's tip SHA as its landed marker (atomic `git update-ref`)."""
+    tip = _branch_tip(base, branch)
+    if tip is None:
+        raise RuntimeError(f"cannot resolve tip of branch {branch!r} for landed marker")
+    _run(["git", "update-ref", _landed_ref_name(branch), tip], cwd=base)
+
+
+def _read_landed_marker(base: Path, branch: str) -> str | None:
+    """Return the recorded landed tip SHA for branch, or None if no marker."""
+    try:
+        sha = _run(
+            ["git", "rev-parse", "--verify", _landed_ref_name(branch)], cwd=base
+        ).stdout.strip()
+    except RuntimeError:
+        return None
+    return sha if _SHA_RE.match(sha) else None
+
+
+def _delete_landed_marker(base: Path, branch: str) -> None:
+    """Best-effort delete of branch's landed marker ref."""
+    with contextlib.suppress(RuntimeError):
+        _run(["git", "update-ref", "-d", _landed_ref_name(branch)], cwd=base)
+
+
+def _list_landed_markers(base: Path) -> list[str]:
+    """Return branch names that currently carry a landed marker."""
+    try:
+        cp = _run(["git", "for-each-ref", "--format=%(refname)", _LANDED_REF_PREFIX], cwd=base)
+    except RuntimeError:
+        return []
+    out: list[str] = []
+    for line in cp.stdout.splitlines():
+        ref = line.strip()
+        if ref.startswith(_LANDED_REF_PREFIX):
+            out.append(ref[len(_LANDED_REF_PREFIX) :])
+    return out
+
+
 def prune_stale(base_dir: Path, *, dry_run: bool = False) -> PruneReport:
     """Prune stale harness-owned markers, dangling worktrees, and safe refs.
 
@@ -1584,7 +1690,14 @@ def prune_stale(base_dir: Path, *, dry_run: bool = False) -> PruneReport:
         wt_dir = (base / WORKTREE_DIR_NAME / branch).resolve()
         if wt_dir in registered or wt_dir.exists():
             continue  # live worktree — never sweep its branch
-        if not _branch_content_in_head(base, branch):
+        # PLAN-worktree-deliverable-blocks-create ADR-003: a landed marker whose
+        # SHA still equals the branch tip proves THIS branch was squash-merged at
+        # finalize — delete unconditionally, no content re-compare (survives
+        # later HEAD edits). A stale/collision marker (tip moved on) does NOT
+        # match → fall through to the preserve-biased content-gate.
+        marker_sha = _read_landed_marker(base, branch)
+        landed_by_marker = marker_sha is not None and marker_sha == _branch_tip(base, branch)
+        if not landed_by_marker and not _branch_content_in_head(base, branch):
             hint = (
                 f"preserved branch {branch}: content not fully present in HEAD; "
                 f"inspect with `git log -p {branch}` before deleting"
@@ -1605,7 +1718,21 @@ def prune_stale(base_dir: Path, *, dry_run: bool = False) -> PruneReport:
             report.preserved_branches.append((branch, warn))
             report.warnings.append(warn)
             continue
+        # ADR-004: drop the landed marker in the SAME op as its branch so
+        # refs/hm-landed/* never outlives the branch it points at.
+        _delete_landed_marker(base, branch)
         report.removed_branches.append(branch)
+
+    # ADR-004 orphan reaping: any landed marker whose branch no longer exists
+    # (deleted externally or in a prior run) is pure cruft — reap it so the ref
+    # namespace cannot accumulate the way the branches did.
+    existing_branches = set(_list_owned_branches(base))
+    for marker_branch in _list_landed_markers(base):
+        if marker_branch in existing_branches:
+            continue
+        report.removed_landed_markers.append(marker_branch)
+        if not dry_run:
+            _delete_landed_marker(base, marker_branch)
 
     if claude_dir.is_dir():
         for ref_file in sorted(claude_dir.glob(f"{_STASH_REF_PREFIX}*")):
@@ -1793,8 +1920,7 @@ def _cli_create(args: list[str]) -> int:
     claude_dir = base / _LOOP_MARKER_DIR
     if not debug_worktree:
         prune_report = prune_stale(base)
-        for warning in prune_report.warnings:
-            print(f"[WARN] worktree prune: {warning}", file=sys.stderr)
+        _print_prune_warnings(prune_report)
     pending = _count_pending_stashes(claude_dir)
     # REVIEW round 1 P1-MAN4 fix: audit-log every bypass-flag use so post-
     # incident forensics can distinguish "guard never fired" from "guard
@@ -2323,6 +2449,21 @@ def _cli_finalize(args: list[str]) -> int:
                     wt_rc = 1
 
             if wt_rc == 0:
+                # PLAN-worktree-deliverable-blocks-create ADR-003: record the
+                # landed marker (branch tip, post-`_capture_pending_in_worktree`)
+                # BEFORE cleanup, on BOTH clean- and dirty-base paths — the
+                # `handed_off` handshake block above is stash-conditional and
+                # would miss the common clean-base finalize. Writing pre-cleanup
+                # means a cleanup failure (worktree dir preserved) can't leave a
+                # markerless branch. Best-effort: the marker is a sweep
+                # optimization, not a correctness gate.
+                try:
+                    _write_landed_marker(base_repo, current_wt.name)
+                except RuntimeError as e:
+                    print(
+                        f"[finalize] landed-marker skipped for {current_wt.name}: {e}",
+                        file=sys.stderr,
+                    )
                 try:
                     cleanup(current_wt, on_success=True)
                 except RuntimeError as e:
@@ -2642,13 +2783,91 @@ def _cli_cleanup_all(args: list[str]) -> int:
     return 0
 
 
+def _print_prune_warnings(report: PruneReport) -> None:
+    """Print prune warnings, collapsing the preserved-branch wall to ONE line.
+
+    PLAN-worktree-deliverable-blocks-create ADR-004: the routine "content not
+    fully present" preserves (the 74-line noise) summarize to a single
+    actionable line; genuine failures (e.g. `git branch -D … failed`) still
+    print individually.
+    """
+    routine = [(b, h) for (b, h) in report.preserved_branches if "not fully present" in h]
+    routine_hints = {h for _, h in routine}
+    if routine:
+        print(
+            f"[WARN] worktree prune: {len(routine)} branch(es) preserved "
+            f"(content not verifiably landed). Run `python -m harness_maker.worktree "
+            f"prune-branches` to review, or `… prune-branches --force` to delete "
+            f"after a `git log -p <branch>` check.",
+            file=sys.stderr,
+        )
+    for warning in report.warnings:
+        if warning in routine_hints:
+            continue
+        print(f"[WARN] worktree prune: {warning}", file=sys.stderr)
+
+
+def _cli_prune_branches(args: list[str]) -> int:
+    """`python -m harness_maker.worktree prune-branches [base_dir] [--force]`.
+
+    PLAN-worktree-deliverable-blocks-create ADR-004: drain the legacy backlog of
+    owned-prefix branches whose worktree dir is gone. The no-flag pass runs the
+    same gate as `prune_stale` (marker-matched or content-in-HEAD branches are
+    swept; the rest preserve+warn). `--force` deletes the remaining
+    markerless/diverged branches but prints a `git log -p <branch>` recovery hint
+    per branch first (reflog `wip(execute)` commits survive the gc window).
+    `--force` is parsed explicitly (not a substring-`in args` check).
+    """
+    rest = [a for a in args if a != "--force"]
+    force = "--force" in args
+    base = Path(rest[0]).resolve() if rest else Path.cwd()
+
+    report = prune_stale(base)
+    for b in report.removed_branches:
+        print(f"deleted branch (landed): {b}")
+    for marker_branch in report.removed_landed_markers:
+        print(f"reaped orphan landed marker: {marker_branch}")
+
+    if not force:
+        for _branch, hint in report.preserved_branches:
+            print(f"preserved: {hint}")
+        if report.preserved_branches:
+            print(
+                f"\n{len(report.preserved_branches)} branch(es) preserved. Re-run "
+                f"with --force to delete (inspect first with the printed "
+                f"`git log -p` hints)."
+            )
+        return 0
+
+    # --force: delete the branches prune_stale preserved (markerless/diverged),
+    # surfacing the recovery hint before each destructive `git branch -D`.
+    registered = _registered_worktree_paths(base)
+    deleted = 0
+    for branch in _list_owned_branches(base):
+        wt_dir = (base / WORKTREE_DIR_NAME / branch).resolve()
+        if wt_dir in registered or wt_dir.exists():
+            continue  # live worktree — never sweep its branch
+        print(f"[recovery] inspect before relying on gc: git log -p {branch}")
+        try:
+            _run(["git", "branch", "-D", branch], cwd=base)
+        except RuntimeError as exc:
+            print(f"failed to delete {branch}: {exc}", file=sys.stderr)
+            continue
+        _delete_landed_marker(base, branch)
+        deleted += 1
+        print(f"deleted branch (--force): {branch}")
+    print(f"\n{deleted} branch(es) deleted with --force.")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     """Dispatch worktree subcommand from argv."""
     args = list(sys.argv[1:] if argv is None else argv)
     if not args:
         print(
             "usage: python -m harness_maker.worktree "
-            "<create|verify|finalize|post-commit-pop|owned-uuids|cleanup-all> [...]",
+            "<create|verify|finalize|post-commit-pop|owned-uuids|cleanup-all|"
+            "prune-branches> [...]",
             file=sys.stderr,
         )
         return 2
@@ -2665,6 +2884,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cli_owned_uuids(rest)
     if sub == "cleanup-all":
         return _cli_cleanup_all(rest)
+    if sub == "prune-branches":
+        return _cli_prune_branches(rest)
     print(f"unknown subcommand: {sub}", file=sys.stderr)
     return 2
 
