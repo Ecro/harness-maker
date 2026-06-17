@@ -1,25 +1,37 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.29.1
+harness_maker_version: 0.30.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: e237cbfd7104ee65cbc6e9c226fe2fca4446826266ebf79df813a9ce0ff42193
+content_hash: 3e164a93a824b0574bd9e558da9122b4ee1b68bdf0d3dcd0cfb2ae0e19d865c1
 ---
 > **Before you begin — outline your plan.** First check whether an autoloop is
 > active: the marker `.hm-loop-active` lives at the **project root**, NOT inside
 > a worktree. If your cwd is inside a `.worktrees/<name>/` worktree, the project
 > root is the directory above `.worktrees/` (strip the `/.worktrees/<wt-name>/`
 > suffix, or run `git rev-parse --show-toplevel` and walk up out of `.worktrees/`).
-> **If `<project-root>/.hm-loop-active` exists, skip this preamble entirely and
-> operate without a manifest** — the autoloop runs silently and a per-iteration
-> manifest would flood the transcript. Otherwise, print a short numbered list of
-> the top-level steps you intend to take: for a single stage, read its `Step` /
-> `Phase` / `Check` headings; for a fused workflow, list **one line per stage**
-> (the `## Stage:` entries), not every sub-step. Present them as **intended,
-> conditional** steps — skip heuristics, early-exit / early-FAIL rules, and any
-> stage's own `STOP — do not proceed` boundary override this plan; never treat
-> the printed manifest as a commitment to run past a STOP. Then begin.
+> **If `<project-root>/.hm-loop-active` exists, skip this banner entirely and
+> operate without it** — the autoloop runs silently and a per-iteration banner
+> would flood the transcript. Otherwise, print the start banner below (in the
+> configured output language), then begin.
+
+<!-- @hm:banner:start -->
+> 🎯 **Goal:** one line — what this command will accomplish for the user.
+> 📋 **Plan:** a short numbered list of the top-level steps you intend to take —
+> for a single stage, its `Step` / `Phase` / `Check` headings; for a fused
+> workflow, **one line per stage** (the `## Stage:` entries), not every sub-step.
+> Present them as **intended, conditional** steps — skip heuristics, early-exit /
+> early-FAIL rules, and any stage's own `STOP — do not proceed` boundary override
+> this plan; never treat the banner as a commitment to run past a STOP.
+
+
+> **Output language.** Respond to the user in **ko**
+> (en→English, ko→Korean, ja→Japanese, others→English fallback) on **every turn** —
+> the live chat output and the start/end summary banners, not only the onboarding
+> interview. Code, identifiers, file paths, and the persisted deliverable documents
+> (PLAN / RESEARCH / REVIEW / SPEC) stay in **English**.
+<!-- @hm:output_language -->
 
 
 # /hm:plan-exec-rev
@@ -369,11 +381,79 @@ After the gate PASSes (or user accepts ambiguity), continue to next round UNLESS
 
 After the internal plan is complete (interview done, draft synthesized), invoke the `plan-validator` agent to critique it before writing to disk:
 
+**Step 4 (pre) — main-loop Codex second opinion (ADR-002/005, PLAN-codex-second-opinion-sandbox).**
+The **main loop** (this stage prompt) runs Codex — the `plan-validator` agent is tool-restricted
+(`Read, Grep, Glob`, no Bash) and cannot. The main loop runs `codex exec`, decides
+invoked-vs-skipped + the skip reason, adapts the findings, and **injects** them into the
+`plan-validator` Task() prompt below. The agent then *reconciles* the pre-injected findings and
+echoes the main-loop-supplied `codex_status` — it never runs Codex itself.
+
+**Mandatory gate (ADR-002/003 matrix):**
+- Production preset → run Codex on **every** plan validation (no high-diff gate).
+
+
+**Invoke.** Run Codex as a separate, sandbox-isolated step. Do NOT build the
+prompt inside the same shell line as the `codex exec` call.
+
+First create the temp files (ordinary sandboxed Bash) and note the two paths:
+
+```bash
+prompt_tmp=$(mktemp); out_tmp=$(mktemp); printf 'prompt=%s\nout=%s\n' "$prompt_tmp" "$out_tmp"
+```
+
+Then write the diff + plan context to the prompt-file path **using the
+Write tool** — not a shell variable. The Write tool stores the bytes verbatim, so
+command substitutions or backticks in adversarial diff text are never shell-expanded.
+
+> **Sandbox escape (ADR-003, Claude Code only).** The `codex exec` call needs
+> outbound network, which Claude Code's Bash sandbox blocks. Run THIS ONE Bash call
+> with the Bash tool parameter **`dangerouslyDisableSandbox: true`** — the
+> `Bash(codex exec:*)` settings `allow` rule pre-approves the prompt, and Codex stays
+> contained by its own `--sandbox read-only` flags. Do NOT disable the sandbox for
+> any other command.
+Finally run `codex exec` as its **own** Bash call — the command MUST begin with
+`codex exec` so the `Bash(codex exec:*)` allow rule matches it:
+
+```bash
+codex exec --sandbox read-only --ignore-user-config --ignore-rules --output-schema .claude/schemas/codex-finding.schema.json --output-last-message "$out_tmp" - < "$prompt_tmp"; echo "exit=$?"
+```
+
+**Adapt (status-guarded).** Only when the `codex exec` exit was 0, pipe the
+output file through the adapter (deterministic — it maps severity
+`critical→P0 / high→P1 / medium→P2 / low,info→P3`, sets `source: "codex"`, and sets
+`needs_relaxation: true` when `file`/`line` is null; reading from the file keeps
+untrusted Codex content out of the shell). Always clean up the temp files:
+
+```bash
+if [ "$exit" -eq 0 ]; then python -m harness_maker.codex_adapter adapt < "$out_tmp"; fi; rm -f "$prompt_tmp" "$out_tmp"
+```
+
+**Skip relay (mandatory surfacing):** on a non-zero `codex exec` exit set
+`codex_status: "skipped"` + a one-line `codex_skip_reason`, surface it (do NOT block
+— warn-and-proceed), and append a best-effort ledger row. Pass each value as a
+**separate `--flag`** (never inline an untrusted cause into a shell-quoted JSON blob
+— REVIEW security P1):
+
+```bash
+reason="<one-line cause>"; python -m harness_maker.codex_ledger emit --slug "<slug>" --stage plan --finding-ref "n/a" --disposition unresolved --codex-status skipped --skip-reason "$reason"
+```
+
+On success set `codex_status: "invoked"`. A silently-degraded Codex is the H4 failure
+mode — the `/hm:health` smoke check is the positive backstop.
+
+**Ownership contract (ADR-005):**
+
+| Owner | Responsibility |
+|-------|----------------|
+| Main loop (this prompt) | Run `codex exec`; decide invoked-vs-skipped + `codex_skip_reason`; adapt findings; inject findings + `codex_status` + `codex_skip_reason` into the validator Task() prompt. |
+| `plan-validator` agent | Reconcile the **pre-injected** findings (no Bash, no `codex exec`); emit `codex_status` (echo the main-loop value) + `codex_reconciliation` in its JSON. |
+| On skip | Injected findings empty → agent returns `codex_status: "skipped"`, `codex_reconciliation: []`. |
+
 ```
 Task(
   subagent_type="plan-validator",
   description="Plan validator: {slug}",
-  prompt="<full draft PLAN body + Interview Transcript + ADRs>\n\nReturn JSON: {overall: APPROVED|NEEDS_REVISION|MAJOR_REVISION, critiques: [...], codex_status: invoked|skipped, codex_reconciliation: [...]}"
+  prompt="<full draft PLAN body + Interview Transcript + ADRs>\n\nCodex second opinion (main-loop supplied — codex_status: <invoked|skipped>, codex_skip_reason: <reason or n/a>):\n<adapted Codex findings JSON from the Step 4 (pre) adapter, or [] on skip>\n\nReconcile every injected Codex finding (disposition + reason); echo the supplied codex_status in your output.\n\nReturn JSON: {overall: APPROVED|NEEDS_REVISION|MAJOR_REVISION, critiques: [...], codex_status: invoked|skipped, codex_reconciliation: [...]}"
 )
 ```
 
@@ -386,7 +466,7 @@ Resolution:
 
 Each follow-up interview answer is appended to `## 🎙️ Interview Transcript` and promoted to ADR when Step D criteria apply.
 
-> **Codex second-opinion relay (mandatory call active).** `plan-validator` is configured to invoke Codex on every run. After reading the validator's returned JSON and **before** resolving the verdict, inspect its top-level `codex_status`. If it is `"skipped"`, the mandatory Codex call could not complete — surface the validator's `codex_skip_reason` to the user in your turn output (one line, e.g. `⚠️ Codex second opinion skipped: <reason> — verdict is Claude-only`). This is a loud notice, **not** a block: resolve the verdict regardless, since it is Claude-derived and valid without Codex.
+> **Codex second-opinion relay (main loop owns the call — ADR-005).** The Step 4 (pre) main-loop step already ran (or skipped) Codex and injected the result into the validator; the agent only reconciles it. After reading the validator's returned JSON and **before** resolving the verdict, inspect its top-level `codex_status` (it echoes the main-loop value). If it is `"skipped"`, the Codex call could not complete — surface the `codex_skip_reason` you recorded in Step 4 (pre) to the user in your turn output (one line, e.g. `⚠️ Codex second opinion skipped: <reason> — verdict is Claude-only`). This is a loud notice, **not** a block: resolve the verdict regardless, since it is Claude-derived and valid without Codex.
 
 ### Step 5 — Write PLAN document
 
@@ -457,7 +537,7 @@ The shell guard below makes the receipt a no-op when `.current-iter` is absent �
 !if [ -f "<WT>/.claude/.hm-iter-receipts/.current-iter" ]; then \
    ITER=$(cat "<WT>/.claude/.hm-iter-receipts/.current-iter" 2>/dev/null); \
    if [ -n "$ITER" ]; then \
-     uv run --with /home/noel/harness-maker python -m harness_maker.iter_receipts write \
+     uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.30.0 python -m harness_maker.iter_receipts write \
        --iter "$ITER" --stage plan --verdict <verdict> --root "<WT>"; \
    fi; \
  fi
@@ -485,6 +565,18 @@ The shell guard below makes the receipt a no-op when `.current-iter` is absent �
 - Every architectural decision in `## 🏗️ Technical Design` links back to an ADR or Interview Entry.
 - No `Accept? / Verify? / OK?` phrasing anywhere in the PLAN — those are missed interview rounds.
 - Plan validator returned APPROVED, or the resolution path is fully recorded.
+
+## Stage summary — print before you STOP
+
+Skip this banner entirely if `.hm-loop-active` exists at the project root (the
+autoloop uses machine receipts, not prose). Otherwise emit it as your final output,
+in the configured output language:
+
+<!-- @hm:banner:end -->
+> ✅ **Done:** PLAN written with ADRs + phase decomposition; validator outcome recorded
+> 📁 **Artifacts:** work-docs/PLAN-{slug}.md
+> ➡️ **Next:** `/hm:execute {slug}` (STOP — user-initiated)
+
 
 <!-- @hm:user:extra-quality-checks -->
 <!-- Project-specific quality bar items. Preserved across harness-maker upgrades. -->
@@ -567,7 +659,7 @@ Engage isolation if `harness.yaml.worktree.scope` includes `execute`. The `workt
 
 
 ```bash
-!uv run --with /home/noel/harness-maker python -m harness_maker.worktree create execute "$(pwd)"
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.30.0 python -m harness_maker.worktree create execute "$(pwd)"
 ```
 
 
@@ -583,7 +675,7 @@ Read **all non-empty output lines** — that is the contract for the rest of thi
 
 
 ```bash
-!uv run --with /home/noel/harness-maker python -m harness_maker.worktree verify <WT>
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.30.0 python -m harness_maker.worktree verify <WT>
 ```
 
 
@@ -785,7 +877,7 @@ The shell guard below makes the receipt a no-op when `.current-iter` is absent �
 !if [ -f "<WT>/.claude/.hm-iter-receipts/.current-iter" ]; then \
    ITER=$(cat "<WT>/.claude/.hm-iter-receipts/.current-iter" 2>/dev/null); \
    if [ -n "$ITER" ]; then \
-     uv run --with /home/noel/harness-maker python -m harness_maker.iter_receipts write \
+     uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.30.0 python -m harness_maker.iter_receipts write \
        --iter "$ITER" --stage execute --verdict <verdict> --root "<WT>"; \
    fi; \
  fi
@@ -812,12 +904,12 @@ Pick **exactly one** finalize command. Substitute `<WT>` with the literal absolu
 ```bash
 # All phases GREEN — stage-merge the branch back (NO commit) + cleanup the worktree.
 # /hm:wrapup will create the single user-facing commit (with proper message + Co-Authored-By).
-!uv run --with /home/noel/harness-maker python -m harness_maker.worktree finalize <WT> stage-only
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.30.0 python -m harness_maker.worktree finalize <WT> stage-only
 ```
 
 ```bash
 # Stage halted on a blocker — preserve the worktree for inspection:
-!uv run --with /home/noel/harness-maker python -m harness_maker.worktree finalize <WT> fail
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.30.0 python -m harness_maker.worktree finalize <WT> fail
 ```
 
 
@@ -835,7 +927,7 @@ commit; otherwise the user's pre-existing WIP remains in the stash queue:
 
 
 ```bash
-!HM_OWNED_SESSION_UUIDS="$(uv run --with /home/noel/harness-maker python -m harness_maker.worktree owned-uuids "$(pwd)")" uv run --with /home/noel/harness-maker python -m harness_maker.worktree post-commit-pop "$(pwd)"
+!HM_OWNED_SESSION_UUIDS="$(uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.30.0 python -m harness_maker.worktree owned-uuids "$(pwd)")" uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.30.0 python -m harness_maker.worktree post-commit-pop "$(pwd)"
 ```
 
 
@@ -853,6 +945,18 @@ commit; otherwise the user's pre-existing WIP remains in the stash queue:
 - No diff outside the PLAN's stated scope — surprise edits are flagged.
 - No `git commit` invoked from this stage. (Verify: `git log` shows no new commit relative to stage start.)
 - Worktree finalized exactly once: success or fail.
+
+## Stage summary — print before you STOP
+
+Skip this banner entirely if `.hm-loop-active` exists at the project root (the
+autoloop uses machine receipts, not prose). Otherwise emit it as your final output,
+in the configured output language:
+
+<!-- @hm:banner:end -->
+> ✅ **Done:** PLAN phases implemented to GREEN; changes staged, no commit
+> 📁 **Artifacts:** staged worktree changes + updated PLAN phase status
+> ➡️ **Next:** `/hm:review {slug}` or `/hm:wrapup` (STOP — user-initiated)
+
 
 <!-- @hm:user:extra-quality-checks -->
 <!-- Project-specific quality bar items. Preserved across harness-maker upgrades. -->
@@ -1079,34 +1183,57 @@ Pass 2 instead of the raw Pass 1 list. Log `stats.dropped_n` for telemetry.
   Invoke when `is_high` (or `boundary` and your judgment, reusing the When-to-Run
   criteria, says high). Otherwise skip Codex this round (no third voter).
 
-**Invoke** (hermetic by default). Put the diff + review context in a shell **variable**
-first (so `$(...)`/backticks in adversarial diff text are never expanded), write it to
-a `mktemp` prompt file with `printf '%s'`, and use a `mktemp` output sink (never a
-fixed `/tmp/...` path — symlink-clobber, REVIEW security P2):
+
+**Invoke.** Run Codex as a separate, sandbox-isolated step. Do NOT build the
+prompt inside the same shell line as the `codex exec` call.
+
+First create the temp files (ordinary sandboxed Bash) and note the two paths:
+
 ```bash
-content="<diff + review context>"; prompt_tmp=$(mktemp); out_tmp=$(mktemp); printf '%s' "$content" > "$prompt_tmp"; codex exec --sandbox read-only --ignore-user-config --ignore-rules --output-schema .claude/schemas/codex-finding.schema.json --output-last-message "$out_tmp" - < "$prompt_tmp"; echo "exit=$?"; cat "$out_tmp"; rm -f "$prompt_tmp" "$out_tmp"
+prompt_tmp=$(mktemp); out_tmp=$(mktemp); printf 'prompt=%s\nout=%s\n' "$prompt_tmp" "$out_tmp"
 ```
 
-**Adapt** the returned Codex findings into reviewer-shaped findings by piping the
+Then write the diff + review context to the prompt-file path **using the
+Write tool** — not a shell variable. The Write tool stores the bytes verbatim, so
+command substitutions or backticks in adversarial diff text are never shell-expanded.
+
+> **Sandbox escape (ADR-003, Claude Code only).** The `codex exec` call needs
+> outbound network, which Claude Code's Bash sandbox blocks. Run THIS ONE Bash call
+> with the Bash tool parameter **`dangerouslyDisableSandbox: true`** — the
+> `Bash(codex exec:*)` settings `allow` rule pre-approves the prompt, and Codex stays
+> contained by its own `--sandbox read-only` flags. Do NOT disable the sandbox for
+> any other command.
+Finally run `codex exec` as its **own** Bash call — the command MUST begin with
+`codex exec` so the `Bash(codex exec:*)` allow rule matches it:
+
+```bash
+codex exec --sandbox read-only --ignore-user-config --ignore-rules --output-schema .claude/schemas/codex-finding.schema.json --output-last-message "$out_tmp" - < "$prompt_tmp"; echo "exit=$?"
+```
+
+**Adapt (status-guarded).** Only when the `codex exec` exit was 0, pipe the
 output file through the adapter (deterministic — it maps severity
 `critical→P0 / high→P1 / medium→P2 / low,info→P3`, sets `source: "codex"`, and sets
 `needs_relaxation: true` when `file`/`line` is null; reading from the file keeps
-untrusted Codex content out of the shell):
-```bash
-python -m harness_maker.codex_adapter adapt < "$out_tmp"   # before the rm in the invoke block
-```
-Add the emitted adapted findings to the Step 4 input list as the third source.
+untrusted Codex content out of the shell). Always clean up the temp files:
 
-**Skip relay (mandatory surfacing):** inspect the `codex exec` exit. On non-zero set
-`codex_status: "skipped"` + a one-line `codex_skip_reason`, surface it in the REVIEW
-report (do NOT block — warn-and-proceed), and append a best-effort ledger row. Pass
-each value as a **separate `--flag`** (never inline an untrusted cause into a
-shell-quoted JSON blob — REVIEW security P1):
+```bash
+if [ "$exit" -eq 0 ]; then python -m harness_maker.codex_adapter adapt < "$out_tmp"; fi; rm -f "$prompt_tmp" "$out_tmp"
+```
+
+**Skip relay (mandatory surfacing):** on a non-zero `codex exec` exit set
+`codex_status: "skipped"` + a one-line `codex_skip_reason`, surface it (do NOT block
+— warn-and-proceed), and append a best-effort ledger row. Pass each value as a
+**separate `--flag`** (never inline an untrusted cause into a shell-quoted JSON blob
+— REVIEW security P1):
+
 ```bash
 reason="<one-line cause>"; python -m harness_maker.codex_ledger emit --slug "<slug>" --stage review --finding-ref "n/a" --disposition unresolved --codex-status skipped --skip-reason "$reason"
 ```
+
 On success set `codex_status: "invoked"`. A silently-degraded Codex is the H4 failure
 mode — the `/hm:health` smoke check is the positive backstop.
+
+Add the emitted adapted findings to the Step 4 input list as the third source.
 
 ### Step 4 — Consensus filter (surface + reasoning alignment)
 
@@ -1322,7 +1449,7 @@ The shell guard below makes the receipt a no-op when `.current-iter` is absent �
 !if [ -f "<WT>/.claude/.hm-iter-receipts/.current-iter" ]; then \
    ITER=$(cat "<WT>/.claude/.hm-iter-receipts/.current-iter" 2>/dev/null); \
    if [ -n "$ITER" ]; then \
-     uv run --with /home/noel/harness-maker python -m harness_maker.iter_receipts write \
+     uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.30.0 python -m harness_maker.iter_receipts write \
        --iter "$ITER" --stage review --verdict <verdict> --root "<WT>"; \
    fi; \
  fi
@@ -1348,6 +1475,18 @@ The shell guard below makes the receipt a no-op when `.current-iter` is absent �
 - Auto-fix never silently overwrites a build break; failed fixes are reverted and logged.
 - No `git commit` invoked from this stage. (Verify: `git log` shows no new commit relative to stage start.)
 - `weak-consensus` items are surfaced separately — never silently merged with strong-consensus findings.
+
+## Stage summary — print before you STOP
+
+Skip this banner entirely if `.hm-loop-active` exists at the project root (the
+autoloop uses machine receipts, not prose). Otherwise emit it as your final output,
+in the configured output language:
+
+<!-- @hm:banner:end -->
+> ✅ **Done:** Code reviewed; findings graded against the grade gate
+> 📁 **Artifacts:** work-docs/REVIEW-{slug}.md
+> ➡️ **Next:** address findings then re-review, or `/hm:wrapup` (STOP — user-initiated)
+
 
 <!-- @hm:user:extra-quality-checks -->
 <!-- Project-specific quality bar items (additional invariants, domain rules). Preserved across harness-maker upgrades. -->
