@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.30.0] - 2026-06-17
 
 ### Fixed — Codex second opinion survives the Bash sandbox (PLAN-codex-second-opinion-sandbox)
 - **The Codex second opinion now actually runs instead of skipping with "Bash permission gate(sandbox)".**
