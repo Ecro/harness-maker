@@ -343,12 +343,43 @@ After the gate PASSes (or user accepts ambiguity), continue to next round UNLESS
 ### Step 4 — Plan validation (`plan-validator` agent)
 
 After the internal plan is complete (interview done, draft synthesized), invoke the `plan-validator` agent to critique it before writing to disk:
+{% if config.codex_second_opinion.enabled %}
+**Step 4 (pre) — main-loop Codex second opinion (ADR-002/005, PLAN-codex-second-opinion-sandbox).**
+The **main loop** (this stage prompt) runs Codex — the `plan-validator` agent is tool-restricted
+(`Read, Grep, Glob`, no Bash) and cannot. The main loop runs `codex exec`, decides
+invoked-vs-skipped + the skip reason, adapts the findings, and **injects** them into the
+`plan-validator` Task() prompt below. The agent then *reconciles* the pre-injected findings and
+echoes the main-loop-supplied `codex_status` — it never runs Codex itself.
 
+**Mandatory gate (ADR-002/003 matrix):**
+{% if config.preset == 'Production' -%}
+- Production preset → run Codex on **every** plan validation (no high-diff gate).
+{%- else -%}
+- Side preset → run Codex only on a **high-diff** change. Classify the drafted PLAN's blast
+  radius first — note `HEAD` (staged work) and `--numstat` for the added-line count that drives
+  the `boundary` signal:
+  ```bash
+  files=$(git diff --name-only HEAD); added=$(git diff --numstat HEAD | awk '{s+=$1} END{print s+0}'); printf '%s\n' "$files" | python -m harness_maker.high_diff classify --added-lines "$added"
+  ```
+  Run Codex when `is_high` (or `boundary` and your judgment says high). Otherwise skip — inject
+  empty findings, `codex_status: "skipped"`, `codex_reconciliation: []`.
+{%- endif %}
+
+{% set codex_stage = "plan" %}{% include "agents/_partials/codex_exec_mainloop.md.j2" %}
+
+**Ownership contract (ADR-005):**
+
+| Owner | Responsibility |
+|-------|----------------|
+| Main loop (this prompt) | Run `codex exec`; decide invoked-vs-skipped + `codex_skip_reason`; adapt findings; inject findings + `codex_status` + `codex_skip_reason` into the validator Task() prompt. |
+| `plan-validator` agent | Reconcile the **pre-injected** findings (no Bash, no `codex exec`); emit `codex_status` (echo the main-loop value) + `codex_reconciliation` in its JSON. |
+| On skip | Injected findings empty → agent returns `codex_status: "skipped"`, `codex_reconciliation: []`. |
+{% endif %}
 ```
 Task(
   subagent_type="plan-validator",
   description="Plan validator: {slug}",
-  prompt="<full draft PLAN body + Interview Transcript + ADRs>\n\nReturn JSON: {overall: APPROVED|NEEDS_REVISION|MAJOR_REVISION, critiques: [...]{% if config.codex_second_opinion.enabled %}, codex_status: invoked|skipped, codex_reconciliation: [...]{% endif %}}"
+  prompt="<full draft PLAN body + Interview Transcript + ADRs>{% if config.codex_second_opinion.enabled %}\n\nCodex second opinion (main-loop supplied — codex_status: <invoked|skipped>, codex_skip_reason: <reason or n/a>):\n<adapted Codex findings JSON from the Step 4 (pre) adapter, or [] on skip>\n\nReconcile every injected Codex finding (disposition + reason); echo the supplied codex_status in your output.{% endif %}\n\nReturn JSON: {overall: APPROVED|NEEDS_REVISION|MAJOR_REVISION, critiques: [...]{% if config.codex_second_opinion.enabled %}, codex_status: invoked|skipped, codex_reconciliation: [...]{% endif %}}"
 )
 ```
 
@@ -361,7 +392,7 @@ Resolution:
 
 Each follow-up interview answer is appended to `## 🎙️ Interview Transcript` and promoted to ADR when Step D criteria apply.
 {% if config.codex_second_opinion.enabled %}
-> **Codex second-opinion relay (mandatory call active).** `plan-validator` is configured to invoke Codex on every run. After reading the validator's returned JSON and **before** resolving the verdict, inspect its top-level `codex_status`. If it is `"skipped"`, the mandatory Codex call could not complete — surface the validator's `codex_skip_reason` to the user in your turn output (one line, e.g. `⚠️ Codex second opinion skipped: <reason> — verdict is Claude-only`). This is a loud notice, **not** a block: resolve the verdict regardless, since it is Claude-derived and valid without Codex.
+> **Codex second-opinion relay (main loop owns the call — ADR-005).** The Step 4 (pre) main-loop step already ran (or skipped) Codex and injected the result into the validator; the agent only reconciles it. After reading the validator's returned JSON and **before** resolving the verdict, inspect its top-level `codex_status` (it echoes the main-loop value). If it is `"skipped"`, the Codex call could not complete — surface the `codex_skip_reason` you recorded in Step 4 (pre) to the user in your turn output (one line, e.g. `⚠️ Codex second opinion skipped: <reason> — verdict is Claude-only`). This is a loud notice, **not** a block: resolve the verdict regardless, since it is Claude-derived and valid without Codex.
 {% endif %}
 ### Step 5 — Write PLAN document
 

@@ -129,7 +129,6 @@ Read-only: never call Edit or Write.
 - **Do not invent severity.** Only the Step 4c table resolves disagreements — no ad-hoc severity adjustments.
 - **Preserve dissent.** When demoting to `manual-only` because reasoning was missing, retain the original reviewer's finding text as `agreement.dissent[i].original_text`.
 - **No tier bridging.** A P0 finding and a P1 finding at the same location are not consensus candidates — they signal that one reviewer saw a more serious manifestation than the other; both stay independent.
-{%- include "agents/_partials/second_opinion_codex.md.j2" %}
 
 <!-- @hm:user:extensions -->
 <!-- Project-specific consensus rules (which categories to weigh higher, severity resolution overrides, etc.). Preserved across harness-maker upgrades. -->

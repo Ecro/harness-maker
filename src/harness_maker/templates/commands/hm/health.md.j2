@@ -48,8 +48,16 @@ rejection, CLI-flag drift) look identical to "Codex agreed / nothing to add".
 A silently-degraded Codex means every *mandatory* review/plan second opinion is
 running Claude-only without anyone noticing.
 
+> **Sandbox escape (ADR-003, PLAN-codex-second-opinion-sandbox).** `codex exec`
+> needs outbound network, which Claude Code's Bash sandbox blocks. Run this smoke
+> `codex exec` with the Bash tool parameter **`dangerouslyDisableSandbox: true`** —
+> otherwise the positive backstop is itself sandbox-gated and would report a false
+> skip. Do NOT disable the sandbox for any other command. The command below begins
+> with `codex exec` (a bare call, not a compound line) so the `Bash(codex exec:*)`
+> settings `allow` rule actually matches and pre-approves it headless.
+
 ```bash
-!prompt_tmp=$(mktemp); out_tmp=$(mktemp); printf '%s' 'Return a finding list with an empty findings array, summary "smoke", confidence null.' > "$prompt_tmp"; codex exec --sandbox read-only {% if config.codex_second_opinion.hermetic %}--ignore-user-config --ignore-rules {% endif %}--output-schema .claude/schemas/codex-finding.schema.json --output-last-message "$out_tmp" - < "$prompt_tmp"; echo "exit=$?"; cat "$out_tmp"; rm -f "$prompt_tmp" "$out_tmp"
+!codex exec --sandbox read-only {% if config.codex_second_opinion.hermetic %}--ignore-user-config --ignore-rules {% endif %}--output-schema .claude/schemas/codex-finding.schema.json - <<< 'Return a finding list with an empty findings array, summary "smoke", confidence null.'; echo "exit=$?"
 ```
 
 Report the result explicitly as a Layer 1 ActionItem:

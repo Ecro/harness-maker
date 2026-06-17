@@ -2,14 +2,13 @@
 name: consensus-arbiter
 communication_variant: reframe
 description: Aggregates findings from multiple reviewer agents via surface match + reasoning alignment + severity resolution; tags every finding consensus-passed | weak-consensus | manual-only
-tools: Read, Grep, Glob{% include "agents/_partials/codex_tools_bash_suffix.md.j2" %}
+tools: Read, Grep, Glob
 {% include "agents/_partials/model_frontmatter_line.md.j2" %}
 permissions:
   allow:
     - "Read(*)"
     - "Grep(*)"
     - "Glob(*)"
-{%- include "agents/_partials/codex_permission_line.md.j2" %}
   deny:
     - "Write(*)"
     - "Edit(*)"

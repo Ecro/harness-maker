@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+### Fixed — Codex second opinion survives the Bash sandbox (PLAN-codex-second-opinion-sandbox)
+- **The Codex second opinion now actually runs instead of skipping with "Bash permission gate(sandbox)".**
+  `codex exec` moved out of the tool-restricted reviewer subagents into the stage main loop via a new
+  shared `agents/_partials/codex_exec_mainloop.md.j2` partial. A `Bash(codex exec:*)` allow rule is
+  added to `settings.json` (Production + Side) and the orchestrator runs that one call with
+  `dangerouslyDisableSandbox: true` — both gated on `codex_second_opinion.enabled`, so disabled
+  renders are byte-identical (ADR-002/003).
+- **plan stage migrated from agent-body exec to main-loop exec** with an ownership contract (main loop
+  runs + injects findings/`codex_status`; `plan-validator` reconciles). The 3 dead agent-body partials
+  (`second_opinion_codex`, `codex_tools_bash_suffix`, `codex_permission_line`) are deleted and the 3
+  reviewer agents revert to `tools: Read, Grep, Glob` (ADR-004/005).
+- **Review hardening:** the sandbox-disabled call is rendered as a bare `codex exec … < file` command
+  so the `Bash(codex exec:*)` allow rule prefix-matches it headless; the untrusted diff is written to
+  the prompt file via the Write tool (no `$(...)` shell expansion); the Claude-only directive is gated
+  on `not is_codex` so codex-target skills aren't handed a parameter they can't honor.
+
 ### Added — persistent locale + per-command start/end observability (PLAN-locale-and-command-observability)
 - **The configured `locale` now governs user-facing output in every command, not just onboarding.**
   A new shared `output_language.md.j2` directive (driven by `{{ config.locale }}`, zero new

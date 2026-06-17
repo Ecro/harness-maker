@@ -256,34 +256,9 @@ extras at runtime bringing total > 1, re-enable Pass 1 + Pass 1.5 manually.
   Invoke when `is_high` (or `boundary` and your judgment, reusing the When-to-Run
   criteria, says high). Otherwise skip Codex this round (no third voter).
 
-**Invoke** (hermetic by default). Put the diff + review context in a shell **variable**
-first (so `$(...)`/backticks in adversarial diff text are never expanded), write it to
-a `mktemp` prompt file with `printf '%s'`, and use a `mktemp` output sink (never a
-fixed `/tmp/...` path — symlink-clobber, REVIEW security P2):
-```bash
-content="<diff + review context>"; prompt_tmp=$(mktemp); out_tmp=$(mktemp); printf '%s' "$content" > "$prompt_tmp"; codex exec --sandbox read-only {% if config.codex_second_opinion.hermetic %}--ignore-user-config --ignore-rules {% endif %}--output-schema {{ config.codex_second_opinion.output_schema_path }} --output-last-message "$out_tmp" - < "$prompt_tmp"; echo "exit=$?"; cat "$out_tmp"; rm -f "$prompt_tmp" "$out_tmp"
-```
+{% set codex_stage = "review" %}{% include "agents/_partials/codex_exec_mainloop.md.j2" %}
 
-**Adapt** the returned Codex findings into reviewer-shaped findings by piping the
-output file through the adapter (deterministic — it maps severity
-`critical→P0 / high→P1 / medium→P2 / low,info→P3`, sets `source: "codex"`, and sets
-`needs_relaxation: true` when `file`/`line` is null; reading from the file keeps
-untrusted Codex content out of the shell):
-```bash
-python -m harness_maker.codex_adapter adapt < "$out_tmp"   # before the rm in the invoke block
-```
 Add the emitted adapted findings to the Step 4 input list as the third source.
-
-**Skip relay (mandatory surfacing):** inspect the `codex exec` exit. On non-zero set
-`codex_status: "skipped"` + a one-line `codex_skip_reason`, surface it in the REVIEW
-report (do NOT block — warn-and-proceed), and append a best-effort ledger row. Pass
-each value as a **separate `--flag`** (never inline an untrusted cause into a
-shell-quoted JSON blob — REVIEW security P1):
-```bash
-reason="<one-line cause>"; python -m harness_maker.codex_ledger emit --slug "<slug>" --stage review --finding-ref "n/a" --disposition unresolved --codex-status skipped --skip-reason "$reason"
-```
-On success set `codex_status: "invoked"`. A silently-degraded Codex is the H4 failure
-mode — the `/hm:health` smoke check is the positive backstop.
 {%- endif %}
 
 ### Step 4 — Consensus filter (surface + reasoning alignment)

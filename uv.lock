@@ -214,7 +214,7 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "mutmut", specifier = ">=2.4,<3" },
+    { name = "mutmut", specifier = ">=2.4,<4" },
     { name = "mypy", specifier = ">=1.11" },
     { name = "pre-commit", specifier = ">=4.6.0" },
     { name = "pytest", specifier = ">=8" },
