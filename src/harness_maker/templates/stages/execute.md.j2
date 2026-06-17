@@ -381,6 +381,11 @@ Bash("HM_OWNED_SESSION_UUIDS=\"$(uv run --with {{ harness_maker_src_path }} pyth
 - No `git commit` invoked from this stage. (Verify: `git log` shows no new commit relative to stage start.)
 - Worktree finalized exactly once: success or fail.
 
+{% set summary_done = "PLAN phases implemented to GREEN; changes staged, no commit" -%}
+{% set summary_artifact = "staged worktree changes + updated PLAN phase status" -%}
+{% set summary_next = "`/hm:review {slug}` or `/hm:wrapup` (STOP — user-initiated)" -%}
+{% include "agents/_partials/stage_end_summary.md.j2" %}
+
 <!-- @hm:user:extra-quality-checks -->
 <!-- Project-specific quality bar items. Preserved across harness-maker upgrades. -->
 <!-- @hm:/user:extra-quality-checks -->

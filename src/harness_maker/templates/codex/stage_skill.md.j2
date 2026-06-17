@@ -5,6 +5,8 @@ description: "harness-maker {{ stage }} stage. Invoke when the task requires the
 
 {% include "agents/_partials/step_manifest.md.j2" %}
 
+{% include "agents/_partials/output_language.md.j2" %}
+
 {{ stage_body | default('') }}
 
 <!-- @hm:user:extensions -->

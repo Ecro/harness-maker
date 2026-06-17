@@ -1,0 +1,19 @@
+{#- Output-language directive (PLAN-locale-and-command-observability ADR-001/002/005).
+    Included by the atomic + workflow command wrappers (Claude + Codex) and under a
+    `## Output Language` heading in CLAUDE.md / AGENTS.md. Drives all user-facing live
+    output + the start/end summary banners to config.locale; code, identifiers, and
+    persisted deliverables stay English. Presence-audited by /hm:health (config.locale
+    always defaults to "en", so there is no StrictUndefined leg). is_codex-agnostic.
+    Absent-case (CLAUDE.md 2026-06-08): isolated wrapper renders may omit `config`
+    entirely — fall back to "en" rather than fail, matching the system locale default.
+    Guard with BOTH `is defined` AND truthiness: `is defined` alone is True for a
+    present-but-None/empty value → renders `**None**`/`****` (REVIEW P2); truthiness
+    alone (`and config.locale`) RAISES under StrictUndefined when the `locale` key is
+    absent (e.g. a partial config dict) → `config.locale is defined` must gate it first. -#}
+{% set _hm_locale = config.locale if config is defined and config.locale is defined and config.locale else "en" -%}
+> **Output language.** Respond to the user in **{{ _hm_locale }}**
+> (en→English, ko→Korean, ja→Japanese, others→English fallback) on **every turn** —
+> the live chat output and the start/end summary banners, not only the onboarding
+> interview. Code, identifiers, file paths, and the persisted deliverable documents
+> (PLAN / RESEARCH / REVIEW / SPEC) stay in **English**.
+<!-- @hm:output_language -->

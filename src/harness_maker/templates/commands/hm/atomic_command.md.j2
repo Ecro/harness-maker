@@ -1,5 +1,7 @@
 {% include "agents/_partials/step_manifest.md.j2" %}
 
+{% include "agents/_partials/output_language.md.j2" %}
+
 {{ stage_body | default('# /hm:' + stage) }}
 {%- if feedback_enabled %}
 

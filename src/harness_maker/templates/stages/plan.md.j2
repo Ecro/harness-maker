@@ -441,6 +441,11 @@ If verification fails, retry write **once**. If still failing, surface the path 
 - No `Accept? / Verify? / OK?` phrasing anywhere in the PLAN — those are missed interview rounds.
 - Plan validator returned APPROVED, or the resolution path is fully recorded.
 
+{% set summary_done = "PLAN written with ADRs + phase decomposition; validator outcome recorded" -%}
+{% set summary_artifact = "work-docs/PLAN-{slug}.md" -%}
+{% set summary_next = "`/hm:execute {slug}` (STOP — user-initiated)" -%}
+{% include "agents/_partials/stage_end_summary.md.j2" %}
+
 <!-- @hm:user:extra-quality-checks -->
 <!-- Project-specific quality bar items. Preserved across harness-maker upgrades. -->
 <!-- @hm:/user:extra-quality-checks -->

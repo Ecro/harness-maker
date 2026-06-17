@@ -1,5 +1,29 @@
 # Changelog
 
+## [Unreleased]
+
+### Added — persistent locale + per-command start/end observability (PLAN-locale-and-command-observability)
+- **The configured `locale` now governs user-facing output in every command, not just onboarding.**
+  A new shared `output_language.md.j2` directive (driven by `{{ config.locale }}`, zero new
+  translation files) is injected into the atomic + workflow command wrappers, the Codex
+  stage/workflow skills, and as a persistent `## Output Language` section in CLAUDE.md (×4) and
+  `AGENTS.md`. Code, identifiers, and persisted PLAN/RESEARCH/REVIEW/SPEC documents stay English
+  (ADR-001). Subagent output is out of scope (ADR-005).
+- **Every command shows a structured start banner (🎯 Goal / 📋 Plan) and a per-stage end banner
+  (✅ Done / 📁 Artifacts / ➡️ Next).** `step_manifest.md.j2` was reframed into the start banner
+  (keeps its `.hm-loop-active` autoloop self-skip); a new `stage_end_summary.md.j2` rides each of the
+  7 stage templates, so a fused workflow emits one banner per stage (the Codex `workflow_skill`
+  delegates and carries none). Banners self-skip inside an autoloop — machine receipts cover that
+  case (ADR-003).
+- **`/hm:health` gained two Layer-1 sub-checks** (`output_language_present`, `start_end_summary_present`)
+  that presence-audit the rendered stage/fused commands (meta commands excluded). The end-summary
+  vars are StrictUndefined-required so a stage that omits one fails render loud (ADR-002).
+
+### Security
+- `HarnessConfig.locale` / `InterviewAnswers.locale` are now sanitized (single-line, ≤35 chars, else
+  `en` fallback) — the value is interpolated raw into agent-facing rendered prose, so a multi-line
+  value could otherwise inject instructions. Legitimate tags (incl. non-ASCII) are preserved.
+
 ## [0.29.1] - 2026-06-12
 
 ### Fixed — worktree create no longer self-blocks on plan deliverables (PLAN-worktree-deliverable-blocks-create)

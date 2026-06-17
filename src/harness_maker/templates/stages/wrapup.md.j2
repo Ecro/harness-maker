@@ -410,6 +410,11 @@ If the user asks to push during wrapup, that is fine — but never push without 
 - PLAN frontmatter `status: complete` and zero `- [ ]` remain in the body.
 - Final verification pass GREEN before commit.
 
+{% set summary_done = "Final checks + drift gate passed; single commit created" -%}
+{% set summary_artifact = "the commit + committed deliverables (PLAN/RESEARCH/REVIEW/SPEC)" -%}
+{% set summary_next = "STOP — task complete" -%}
+{% include "agents/_partials/stage_end_summary.md.j2" %}
+
 <!-- @hm:user:extra-quality-checks -->
 <!-- Project-specific wrapup checklist items. Preserved across harness-maker upgrades. -->
 <!-- @hm:/user:extra-quality-checks -->

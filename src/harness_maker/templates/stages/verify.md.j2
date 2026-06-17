@@ -243,6 +243,11 @@ When `--force` is set, append the same record with `"force_override": true, "ove
 - `--force` is recorded in the JSONL with the reason — auditable later.
 - No check produces false PASS by missing inputs (e.g., a missing `findings-*.jsonl` is a soft skip, not a silent PASS).
 
+{% set summary_done = "Full check suite run — tests + lint + type" -%}
+{% set summary_artifact = "the RESULT line (PASS / FAIL) above" -%}
+{% set summary_next = "STOP — await the next user command" -%}
+{% include "agents/_partials/stage_end_summary.md.j2" %}
+
 <!-- @hm:user:extra-quality-checks -->
 <!-- Project-specific verify checklist items. Preserved across harness-maker upgrades. -->
 <!-- @hm:/user:extra-quality-checks -->

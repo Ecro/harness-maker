@@ -628,6 +628,21 @@ class HarnessConfig(BaseModel):
             )
         return v
 
+    @field_validator("locale")
+    @classmethod
+    def _sanitize_locale(cls, v: str) -> str:
+        """Security: locale is interpolated raw into Jinja2-rendered, agent-facing
+        prose (the output_language directive + ~8 other ``{{ config.locale }}``
+        sites) without escaping, so a multi-line or oversized value could inject
+        agent instructions (REVIEW security P3). Unlike ``default_model`` (which
+        rejects), locale's contract is *unknown tag → silent English fallback*, so
+        sanitize rather than raise: accept only a short single-line tag (preserving
+        legit non-ASCII tags like 한국어), else fall back to "en"."""
+        v = v.strip()
+        if not v or "\n" in v or "\r" in v or len(v) > 35:
+            return "en"
+        return v
+
     dev_mode: DevMode = DevMode.SPEC_DRIVEN
     workflows: dict[str, list[AtomicStage]] = Field(
         default_factory=lambda: {
@@ -777,6 +792,21 @@ class InterviewAnswers(BaseModel):
                 "embedded YAML-significant characters are rejected to prevent "
                 "rendered-config injection"
             )
+        return v
+
+    @field_validator("locale")
+    @classmethod
+    def _sanitize_locale(cls, v: str) -> str:
+        """Security: locale is interpolated raw into Jinja2-rendered, agent-facing
+        prose (the output_language directive + ~8 other ``{{ config.locale }}``
+        sites) without escaping, so a multi-line or oversized value could inject
+        agent instructions (REVIEW security P3). Unlike ``default_model`` (which
+        rejects), locale's contract is *unknown tag → silent English fallback*, so
+        sanitize rather than raise: accept only a short single-line tag (preserving
+        legit non-ASCII tags like 한국어), else fall back to "en"."""
+        v = v.strip()
+        if not v or "\n" in v or "\r" in v or len(v) > 35:
+            return "en"
         return v
 
     dev_mode: DevMode = DevMode.SPEC_DRIVEN

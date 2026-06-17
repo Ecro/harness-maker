@@ -294,6 +294,11 @@ If the user opts for "dig deeper" — re-enter Phase 1 with narrowed scope (one 
 - The Recommended Direction is informational — never written as an architectural commitment (that's `plan`'s job).
 - File is reusable: `/hm:plan` can read it without contacting the user for re-clarification on settled facts.
 
+{% set summary_done = "Research complete — recommended direction + open questions surfaced" -%}
+{% set summary_artifact = "work-docs/RESEARCH-{slug}.md" -%}
+{% set summary_next = "`/hm:plan {slug}` to lock the architecture, or dig deeper into one approach" -%}
+{% include "agents/_partials/stage_end_summary.md.j2" %}
+
 <!-- @hm:user:extra-quality-checks -->
 <!-- Project-specific quality bar items. Preserved across harness-maker upgrades. -->
 <!-- @hm:/user:extra-quality-checks -->

@@ -346,6 +346,11 @@ The user can resume by editing the SPEC directly or re-running `/hm:spec {slug}`
 - Every scenario in `## 📋 In-Scope Scenarios` is in G-W-T form (no prose-form scenarios).
 - Open Questions are explicit handoffs to `plan`, not silent assumptions.
 
+{% set summary_done = "SPEC authored with observable acceptance criteria" -%}
+{% set summary_artifact = "specs/SPEC-{slug}.md" -%}
+{% set summary_next = "`/hm:plan {slug}` (STOP — user-initiated)" -%}
+{% include "agents/_partials/stage_end_summary.md.j2" %}
+
 <!-- @hm:user:extra-quality-checks -->
 <!-- Project-specific quality bar items. Preserved across harness-maker upgrades. -->
 <!-- @hm:/user:extra-quality-checks -->

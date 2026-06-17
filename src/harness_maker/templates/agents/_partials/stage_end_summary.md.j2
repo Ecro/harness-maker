@@ -1,0 +1,20 @@
+{#- Per-stage end-summary banner (PLAN-locale-and-command-observability ADR-004/006).
+    Appended to every stages/*.md.j2. The caller MUST set before {% include %}:
+      summary_done     — one line: what this stage accomplished
+      summary_artifact — primary output artifact path / description
+      summary_next     — user-facing next step (a /hm:<stage> command or 'STOP')
+    Required bare vars (no | default) so a stage that forgets a {% set %} fails render
+    loud under StrictUndefined — absent-case guard, ADR-002. Renders in config.locale
+    via the output_language directive. Self-skips under an active autoloop. The banner
+    fires once per stage, so a fused (concatenated) workflow emits one per stage; the
+    Codex workflow_skill delegates and carries none. is_codex-agnostic prose. -#}
+## Stage summary — print before you STOP
+
+Skip this banner entirely if `.hm-loop-active` exists at the project root (the
+autoloop uses machine receipts, not prose). Otherwise emit it as your final output,
+in the configured output language:
+
+<!-- @hm:banner:end -->
+> ✅ **Done:** {{ summary_done }}
+> 📁 **Artifacts:** {{ summary_artifact }}
+> ➡️ **Next:** {{ summary_next }}

@@ -721,6 +721,52 @@ def _dim_workflow_clarity(project_dir: Path) -> DimensionScore:
         )
     )
 
+    # PLAN-locale-and-command-observability ADR-002/005: presence-audit that the
+    # locale directive + start/end summary banners landed in the rendered stage +
+    # fused-workflow commands (the wrappers that carry them). Meta commands
+    # (make/help/loop/loop-p5-batch/…) use their own templates and rely on the
+    # persistent CLAUDE.md/AGENTS.md anchor instead, so they MUST be excluded — note
+    # loop-p5-batch has a hyphen, so the `fused` classifier (`"-" in stem`) sweeps it
+    # in; without the meta denylist both signals false-fail on every install. REVIEW P1.
+    meta_cmds = {"make", "help", "health", "configure", "uninstall", "loop", "loop-p5-batch"}
+    stage_fused = [
+        c for c in commands if (c.stem in atomic_stages or c in fused) and c.stem not in meta_cmds
+    ]
+    _bodies = {c: _read_text(c) for c in stage_fused}
+    loc_hits = sum(1 for t in _bodies.values() if "<!-- @hm:output_language -->" in t)
+    loc_ok = (not stage_fused) or loc_hits == len(stage_fused)
+    signals.append(
+        _signal(
+            "output_language_present",
+            loc_ok,
+            15,
+            f"{loc_hits}/{len(stage_fused)} stage/fused commands carry the locale directive"
+            if stage_fused
+            else "No stage/fused commands to check",
+            None
+            if loc_ok
+            else "Re-render via /hm:make — commands missing the locale directive "
+            "(the output_language partial silently dropped from a wrapper)",
+        )
+    )
+    ban_markers = ("<!-- @hm:banner:start -->", "<!-- @hm:banner:end -->")
+    ban_hits = sum(1 for t in _bodies.values() if all(m in t for m in ban_markers))
+    ban_ok = (not stage_fused) or ban_hits == len(stage_fused)
+    signals.append(
+        _signal(
+            "start_end_summary_present",
+            ban_ok,
+            15,
+            f"{ban_hits}/{len(stage_fused)} stage/fused commands carry start + end summary banners"
+            if stage_fused
+            else "No stage/fused commands to check",
+            None
+            if ban_ok
+            else "Re-render via /hm:make — commands missing a start or end summary banner "
+            "(step_manifest or stage_end_summary partial silently dropped)",
+        )
+    )
+
     harness = project_dir / ".claude" / "harness.yaml"
     has_workflows = False
     if harness.is_file():

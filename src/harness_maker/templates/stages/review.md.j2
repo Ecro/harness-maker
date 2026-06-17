@@ -515,6 +515,11 @@ fields and negative counts.
 - No `git commit` invoked from this stage. (Verify: `git log` shows no new commit relative to stage start.)
 - `weak-consensus` items are surfaced separately — never silently merged with strong-consensus findings.
 
+{% set summary_done = "Code reviewed; findings graded against the grade gate" -%}
+{% set summary_artifact = "work-docs/REVIEW-{slug}.md" -%}
+{% set summary_next = "address findings then re-review, or `/hm:wrapup` (STOP — user-initiated)" -%}
+{% include "agents/_partials/stage_end_summary.md.j2" %}
+
 <!-- @hm:user:extra-quality-checks -->
 <!-- Project-specific quality bar items (additional invariants, domain rules). Preserved across harness-maker upgrades. -->
 <!-- @hm:/user:extra-quality-checks -->
