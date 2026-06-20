@@ -274,3 +274,86 @@ def test_main_blocks_write_to_settings_exit_2(tmp_path: Path, monkeypatch) -> No
     )
     monkeypatch.setattr("sys.stdin", io.StringIO(payload))
     assert guard.main() == 2
+
+
+# --- P3: Stop-hook backstop (block premature termination while autopilot active) --
+
+
+def test_stophook_blocks_while_active(tmp_path: Path) -> None:
+    _activate(tmp_path)
+    reason = guard._stophook_reason({"workspace": {"current_dir": str(tmp_path)}})
+    assert reason is not None
+    assert "autopilot" in reason.lower()
+
+
+def test_stophook_allows_when_marker_off(tmp_path: Path) -> None:
+    assert guard._stophook_reason({"workspace": {"current_dir": str(tmp_path)}}) is None
+
+
+def test_stophook_respects_stop_hook_active_guard(tmp_path: Path) -> None:
+    # The infinite-loop guard MUST win even when the marker is active, else exit-2
+    # re-fires the Stop event forever.
+    _activate(tmp_path)
+    payload = {"stop_hook_active": True, "workspace": {"current_dir": str(tmp_path)}}
+    assert guard._stophook_reason(payload) is None
+
+
+def test_stophook_worktree_aware(tmp_path: Path) -> None:
+    # Marker at base root, Stop fires with cwd = worktree subdir → must still block.
+    _activate(tmp_path)
+    wt = tmp_path / ".worktrees" / "execute-cafef00d-20260620T0000Z"
+    wt.mkdir(parents=True, exist_ok=True)
+    assert guard._stophook_reason({"workspace": {"current_dir": str(wt)}}) is not None
+
+
+def test_main_stophook_mode_exit_codes(tmp_path: Path, monkeypatch) -> None:  # noqa: ANN001
+    # `--mode stop-hook`: exit 2 (block) while active, exit 0 when off.
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("sys.argv", ["autopilot_guard", "--mode", "stop-hook"])
+    # Explicit workspace so root resolution matches the dedicated stop-hook tests.
+    payload = json.dumps({"hook_event_name": "Stop", "workspace": {"current_dir": str(tmp_path)}})
+    _activate(tmp_path)
+    monkeypatch.setattr("sys.stdin", io.StringIO(payload))
+    assert guard.main() == 2
+    autopilot.clear(tmp_path)
+    monkeypatch.setattr("sys.stdin", io.StringIO(payload))
+    assert guard.main() == 0
+
+
+def test_main_stophook_active_guard_through_main(tmp_path: Path, monkeypatch) -> None:  # noqa: ANN001
+    # The infinite-loop guard end-to-end through main(): stop_hook_active wins over
+    # an active marker → exit 0 (NOT 2), or exit-2 would re-fire Stop forever.
+    _activate(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("sys.argv", ["autopilot_guard", "--mode", "stop-hook"])
+    payload = json.dumps(
+        {
+            "hook_event_name": "Stop",
+            "stop_hook_active": True,
+            "workspace": {"current_dir": str(tmp_path)},
+        }
+    )
+    monkeypatch.setattr("sys.stdin", io.StringIO(payload))
+    assert guard.main() == 0
+
+
+def test_main_stophook_corrupt_stdin_exits_0(tmp_path: Path, monkeypatch) -> None:  # noqa: ANN001
+    # Corrupt / non-dict stdin must fail open (exit 0), never crash-as-block.
+    _activate(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("sys.argv", ["autopilot_guard", "--mode", "stop-hook"])
+    monkeypatch.setattr("sys.stdin", io.StringIO("{bad json"))
+    assert guard.main() == 0
+    monkeypatch.setattr("sys.stdin", io.StringIO('"just a string"'))
+    assert guard.main() == 0
+
+
+def test_main_default_mode_is_pretooluse(tmp_path: Path, monkeypatch) -> None:  # noqa: ANN001
+    # The PreToolUse hooks.json entry passes NO --mode → default must be pretooluse
+    # (a Stop-event payload has no tool_name → allow, exit 0). Documents the
+    # intentional default (required=True would break the no-flag PreToolUse entry).
+    _activate(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("sys.argv", ["autopilot_guard"])
+    monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps({"hook_event_name": "Stop"})))
+    assert guard.main() == 0

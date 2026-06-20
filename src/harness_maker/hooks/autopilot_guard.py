@@ -17,6 +17,7 @@ prefixes like `git -c k=v push` / `git -C dir push` cannot slip past (REVIEW P1)
 
 from __future__ import annotations
 
+import argparse
 import contextlib
 import json
 import os
@@ -216,16 +217,31 @@ def _resolve_root(payload: dict[str, Any]) -> Path:
     return start
 
 
-def main() -> int:
+def _stophook_reason(payload: dict[str, Any]) -> str | None:
+    """Stop-hook backstop (P3): return a block reason while autopilot is active, else None.
+
+    Prevents the session from terminating mid-pipeline when prompt-driven Skill chaining
+    (P6) hasn't finished — the marker is cleared only when the pipeline completes. The
+    `stop_hook_active` guard MUST be checked FIRST: omitting it makes the exit-2 re-fire
+    the Stop event forever (same contract as loop_gate). Worktree-aware via `_resolve_root`.
+    """
+    if payload.get("stop_hook_active"):
+        return None
+    if autopilot.active_marker(_resolve_root(payload)) is None:
+        return None
+    # Descriptive, NOT imperative: the prompt-driven chainer (P6) is what actually
+    # advances stages; until it lands, a "continue to the next stage" command would be
+    # a false imperative the agent cannot fulfil. The backstop's only job is "don't
+    # stop yet while a pipeline is in flight" (REVIEW P3 round-1).
+    return (
+        "[autopilot] pipeline in progress — not terminating. "
+        "Run `harness-maker autopilot off` to end the autopilot session."
+    )
+
+
+def _pretooluse(payload: dict[str, Any]) -> int:
     """PreToolUse: exit 0 (allow) / 2 (block) + stderr. PermissionRequest (Codex):
     always exit 0 — autopilot is a Claude-Code feature (ADR-004)."""
-    try:
-        text = sys.stdin.read()
-        payload: Any = json.loads(text) if text.strip() else {}
-    except json.JSONDecodeError:
-        return 0
-    if not isinstance(payload, dict):
-        return 0
     hook_event = str(payload.get("hook_event_name") or "")
     if hook_event == "PermissionRequest":
         return 0
@@ -238,6 +254,29 @@ def main() -> int:
     if decision.message:
         print(decision.message, file=sys.stderr)
     return 0 if decision.allow else 2
+
+
+def main() -> int:
+    """Dispatch on ``--mode`` (default pretooluse). stop-hook = the P3 backstop."""
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--mode", default="pretooluse", choices=["pretooluse", "stop-hook"])
+    args, _unknown = parser.parse_known_args()
+    try:
+        # isatty guard (mirror loop_gate): a bare TTY invocation must not block on
+        # read() waiting for EOF — only Claude's non-TTY hook stdin carries a payload.
+        text = "" if sys.stdin.isatty() else sys.stdin.read()
+        payload: Any = json.loads(text) if text.strip() else {}
+    except json.JSONDecodeError:
+        return 0
+    if not isinstance(payload, dict):
+        return 0
+    if args.mode == "stop-hook":
+        reason = _stophook_reason(payload)
+        if reason is None:
+            return 0
+        print(json.dumps({"decision": "block", "reason": reason}))
+        return 2
+    return _pretooluse(payload)
 
 
 if __name__ == "__main__":  # pragma: no cover — exercised via subprocess in tests

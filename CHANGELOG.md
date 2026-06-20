@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Added — Stop-hook backstop for autopilot (PLAN-human-bottleneck-auto-advance Phase 3 of 9)
+- **`autopilot_guard --mode stop-hook`** — the same module now also serves the `Stop` event: while the `.hm-autopilot` marker is active it returns `decision:block` + exit 2 to keep the session from terminating mid-pipeline (the marker is cleared only when the pipeline completes; the prompt-driven chainer lands in P6). `stop_hook_active` is checked FIRST so the exit-2 can never re-fire the Stop event into an infinite loop (same contract as `loop_gate`), and the block reason is descriptive-only ("pipeline in progress — not terminating"), not a false imperative before the P6 chainer exists. Worktree-aware root resolution; wired into `hooks.json` `Stop` alongside `loop_gate`. Claude-Code only. Reviewed k-of-3, Grade A.
+- Still **no live auto-advance** — P3 only prevents *premature termination*; nothing yet *selects* the next stage (P6). The P0 feasibility spike returned GO (runtime stage chaining via mid-turn Skill invocation proven live). Phases 5–8 remain.
+
+### Fixed — restored lost `@hm:/user:entries` close marker in `.claude/memory/wiki.md`
+- The P4 wrapup's wiki append (`7ac9c30`) overwrote the close-marker line, which made `memory_retrieve.parse_entries` return `[]` for the whole file — all 132 wiki entries became invisible to memory retrieval. Restored the marker (commit `5d5ea1e`); no test weakened. Recurrence of the EOF-append-outside-marker footgun (now count:3 → a mechanical-guard proposal was filed).
+
 ### Added — never-auto `autopilot_guard` PreToolUse hook (PLAN-human-bottleneck-auto-advance Phase 4 of 9)
 - **New `harness_maker.hooks.autopilot_guard`** — a PreToolUse hook that, **only while the `.hm-autopilot` marker is active**, blocks a code-fixed never-auto list (git push/force-push, `git reset --hard`, `git stash drop|clear`, `rm` escaping `.worktrees/`, publish/release/deploy, and edits to the permission surface incl. `.claude/settings*.json` + `.claude/hooks/hooks.json`). With autopilot OFF it is a pure no-op, so **manual/solo workflows are unchanged** (ADR-003 refined from "static settings.json deny" to "marker-gated hook" — a static deny would have blocked the user's own manual `git push`).
 - Hardened against bypass: git detection is **word-tokenized** (`git -c k=v push` can't slip past), the protected-surface check covers **Bash redirects** (`echo > settings.json`) not just the Write tool, the marker root is resolved **worktree-aware**, and the marker has a freshness TTL. `autonomy.extra_deny` only ADDs; the baseline is non-overridable. Claude-Code only (Codex `PermissionRequest` passes through). Wired into `hooks.json` PreToolUse (Bash + Write|Edit|MultiEdit).
