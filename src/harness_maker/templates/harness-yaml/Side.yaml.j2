@@ -82,6 +82,9 @@ skills:
 worktree:
   scope: [execute]
   branch_prefix: hm-
+{%- if 'feature_branch_workflow' in config.worktree %}
+  feature_branch_workflow: {{ config.worktree['feature_branch_workflow'] | tojson }}
+{%- endif %}
 memory:
   enabled: true
   dir: .claude/memory

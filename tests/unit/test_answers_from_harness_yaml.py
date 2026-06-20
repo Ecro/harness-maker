@@ -24,6 +24,60 @@ def test_returns_none_when_file_missing(tmp_path: Path) -> None:
     assert answers_from_harness_yaml(tmp_path / "nope.yaml") is None
 
 
+# ── Phase 6 (ADR-008): worktree round-trip so the migration reads on-disk truth ──
+
+
+def test_worktree_feature_branch_flag_true_round_trips(tmp_path: Path) -> None:
+    target = _write_yaml(
+        tmp_path,
+        "preset: Production\ndev_mode: task-driven\n"
+        "worktree:\n  enabled: true\n  feature_branch_workflow: true\n",
+    )
+    answers = answers_from_harness_yaml(target)
+    assert answers is not None
+    assert answers.worktree.get("feature_branch_workflow") is True
+
+
+def test_worktree_feature_branch_flag_false_opt_out_preserved(tmp_path: Path) -> None:
+    # An explicit `false` is a user opt-out — it MUST survive re-render (not be
+    # clobbered by the preset default).
+    target = _write_yaml(
+        tmp_path,
+        "preset: Production\ndev_mode: task-driven\n"
+        "worktree:\n  enabled: true\n  feature_branch_workflow: false\n",
+    )
+    answers = answers_from_harness_yaml(target)
+    assert answers is not None
+    assert answers.worktree.get("feature_branch_workflow") is False
+
+
+def test_worktree_flag_absent_stays_absent(tmp_path: Path) -> None:
+    # A never-migrated harness (no flag key) must NOT inherit a preset default —
+    # absence is the migration signal the enablement preflight keys on.
+    target = _write_yaml(
+        tmp_path,
+        "preset: Production\ndev_mode: task-driven\nworktree:\n  enabled: true\n",
+    )
+    answers = answers_from_harness_yaml(target)
+    assert answers is not None
+    assert "feature_branch_workflow" not in answers.worktree
+    assert answers.worktree.get("enabled") is True  # other keys still round-trip
+
+
+def test_worktree_flag_nonbool_stripped(tmp_path: Path) -> None:
+    # A hand-edited non-bool (e.g. the string "false") is truthy to the Jinja gate
+    # — it must NOT survive as an explicit decision; strip it so the migration
+    # preflight decides safely (REVIEW code+Codex P2).
+    target = _write_yaml(
+        tmp_path,
+        "preset: Production\ndev_mode: task-driven\n"
+        'worktree:\n  enabled: true\n  feature_branch_workflow: "false"\n',
+    )
+    answers = answers_from_harness_yaml(target)
+    assert answers is not None
+    assert "feature_branch_workflow" not in answers.worktree
+
+
 def test_returns_none_when_yaml_invalid(tmp_path: Path) -> None:
     target = tmp_path / "harness.yaml"
     target.write_text("---\n  bad:\nindent\n---\n: : :\n", encoding="utf-8")

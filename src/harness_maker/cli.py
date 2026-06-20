@@ -339,6 +339,28 @@ def make(
             raise typer.Exit(code=1) from e
         if add_domain_name not in a.domains:
             a.domains.append(add_domain_name)
+    # Phase 6 (ADR-008): make-time enablement preflight for EXISTING harnesses.
+    # Migrate a never-migrated, worktree-enabled harness to the feature-branch
+    # model ONLY on a clean live-state probe — else keep the old model + loud-warn,
+    # so the new in-worktree path never strands old preserved state. Gated on:
+    # reused (existing harness re-render) + worktree.enabled (the flag is inert
+    # without isolation; Phase-5's gate would mis-render the preflight on a
+    # no-worktree harness) + key-ABSENT (an explicit true/false is already a
+    # decision — round-tripped by answers_from_harness_yaml — and is respected).
+    # Config mutation only; no git is mutated on this path.
+    if (
+        reused is not None
+        and bool(a.worktree.get("enabled"))
+        and "feature_branch_workflow" not in a.worktree
+    ):
+        from harness_maker.worktree import enablement_preflight
+
+        should_flip, preflight_warning = enablement_preflight(target)
+        if should_flip:
+            a.worktree["feature_branch_workflow"] = True
+            typer.echo("migrated to the feature-branch worktree workflow (clean live-state)")
+        elif preflight_warning is not None:
+            typer.echo(preflight_warning, err=True)
     bp = synthesize(p, a)
     # full_bp holds the unfiltered blueprint for orphan-sweep: KEEP'd files
     # are still expected on disk (the user owns them now), so we must NOT
@@ -1020,6 +1042,14 @@ def _apply_dimension_overrides(
             typer.echo(f"--preset invalid: {preset_override}", err=True)
             raise typer.Exit(code=1) from e
         if new_preset != answers.preset:
+            # Phase 6 note (REVIEW code P2): on a preset SWITCH the worktree dict is
+            # rebuilt from the new preset's `_preset_extras` (NOT round-tripped from
+            # disk), so the new default `feature_branch_workflow` lands present and
+            # the make-time preflight is bypassed. Benign today: Side is
+            # worktree-disabled (no old-model state to strand) and there is no third
+            # worktree-enabled preset, so no reachable `false` opt-out is lost. If a
+            # third worktree-enabled preset is added, route this path through the
+            # round-trip strip + enablement_preflight, or it becomes a P1 opt-out loss.
             rebuilt = _build_answers(
                 locale=answers.locale,
                 targets=list(answers.targets),

@@ -806,7 +806,27 @@ def answers_from_harness_yaml(yaml_path: Path) -> InterviewAnswers | None:
         else PermissionsConfig()
     )
 
+    # Round-trip the on-disk `worktree` block (Phase 6 / ADR-008, validator C1):
+    # without this, `worktree` is rebuilt from `_preset_extras` and synthesize
+    # overwrites the file's block on every re-render, clobbering an explicit
+    # `feature_branch_workflow` opt-out. Overlay the on-disk values onto the preset
+    # default, BUT strip the preset's NEW `feature_branch_workflow` default unless
+    # the on-disk file set it explicitly — so an existing (never-migrated) harness
+    # stays key-ABSENT (the make-time enablement preflight then decides), and only
+    # fresh installs (which skip this reverse-mapper) get the new default.
+    disk_worktree = data.get("worktree")
+    disk_worktree = disk_worktree if isinstance(disk_worktree, dict) else {}
+    merged_worktree: dict[str, Any] = {**base.worktree, **disk_worktree}
+    # Treat the flag as an explicit user decision ONLY when it is a real bool
+    # (REVIEW code+Codex P2): a hand-edited non-bool like `feature_branch_workflow:
+    # "false"` is truthy to both the Jinja gate and `bool(...)`, so a string opt-out
+    # would wrongly read as enabled. Strip any non-bool → key-absent → the make-time
+    # preflight decides safely.
+    if not isinstance(disk_worktree.get("feature_branch_workflow"), bool):
+        merged_worktree.pop("feature_branch_workflow", None)
+
     update: dict[str, Any] = {
+        "worktree": merged_worktree,
         "domains": domains,
         "ref_folders": ref_folders,
         "second_brain": second_brain,
@@ -1235,7 +1255,12 @@ def _preset_extras(preset: Preset, *, schema_version: int = 2) -> dict[str, Any]
         "autoloop": {"allowed": True, "default_max_iter": 5},
         "memory": {"per_repo": True},
         "anti_rot": {"enabled": True, "sources": 4},
-        "worktree": {"enabled": True},
+        # Phase 6 (ADR-008): the per-task feature-branch model is the default for
+        # newly-rendered Production harnesses. NOT added to Side ({enabled: False}
+        # above) — the flag is inert without worktree isolation, and the Phase-5
+        # stage gate keys purely on `feature_branch_workflow`, so adding it to a
+        # no-worktree preset would wrongly render the preflight.
+        "worktree": {"enabled": True, "feature_branch_workflow": True},
         "security": {
             "gates": [
                 "secrets",

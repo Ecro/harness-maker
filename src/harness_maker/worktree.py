@@ -829,6 +829,47 @@ def _list_user_dirty_files(base: Path) -> list[str]:
     return out
 
 
+def enablement_preflight(target: Path) -> tuple[bool, str | None]:
+    """ADR-008 make-time migration probe: is the project clean enough to flip
+    `worktree.feature_branch_workflow` → True?
+
+    Returns `(should_flip, warning)`. Flips ONLY when there is NO pending old-model
+    state, so the new in-worktree path can never strand work that only the old
+    `post-commit-pop` would finalize. Blockers (each named in the warning):
+    - any `.hm-finalize-stash-*` ref (RAW marker-agnostic glob — a bare ref without
+      a live session marker still blocks; the marker-gated `_count_pending_stashes`
+      would false-pass it);
+    - any live `.hm-loop-*` marker;
+    - any in-flight `.worktrees/execute-*` worktree dir (the durable residue a
+      crashed old session leaves even without a live marker);
+    - user-dirty base (`_has_user_dirty_state`, a read-only `git status`).
+    Filesystem-only apart from that one read-only status — the migrate path never
+    MUTATES git (ADR-008 "never mutates live git state")."""
+    claude = target / _LOOP_MARKER_DIR
+    blockers: list[str] = []
+    if claude.is_dir() and any(claude.glob(f"{_STASH_REF_PREFIX}*")):
+        blockers.append("unpopped finalize stash (.hm-finalize-stash-*)")
+    if claude.is_dir() and any(claude.glob(f"{_LOOP_MARKER_PREFIX}*")):
+        blockers.append("active loop marker (.hm-loop-*)")
+    worktrees = target / WORKTREE_DIR_NAME
+    if worktrees.is_dir() and any(
+        p.is_dir() and p.name.startswith(_OWNED_PREFIXES) for p in worktrees.iterdir()
+    ):
+        # ALL owned old-model prefixes, not just `execute-` — the module's
+        # `_OWNED_PREFIXES` single-source-of-truth (REVIEW code P1): a crashed
+        # session under a non-`execute` workflow name leaves residue with no live
+        # marker, which an `execute-*`-only glob would miss → flip-while-stranded.
+        blockers.append("in-flight old-model worktree (.worktrees/<owned-prefix>-*)")
+    if _has_user_dirty_state(target):
+        blockers.append("uncommitted user changes in the base repo")
+    if blockers:
+        return False, (
+            "feature-branch workflow deferred: drain in-flight work then re-run "
+            f"make — pending: {', '.join(blockers)}"
+        )
+    return True, None
+
+
 def _list_pending_stash_refs(claude_dir: Path) -> list[str]:
     """Return live ref-file basenames for the abort-message listing."""
     if not claude_dir.is_dir():
