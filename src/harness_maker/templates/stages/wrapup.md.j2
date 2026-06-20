@@ -374,6 +374,25 @@ Bash("HM_OWNED_SESSION_UUIDS=\"$(uv run --with {{ harness_maker_src_path }} pyth
 
 You **MAY** call {% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %} (autoloop exception) **ONLY IF** the literal substring `[finalize] stash-pop conflict` OR `[finalize] untracked-file collision` appears in `post-commit-pop`'s stderr. Any other non-zero exit: surface verbatim and halt, do NOT ask.
 
+### Step 7.6 — Drain landed-branch backlog (ADR-009)
+
+After the commit + stash pop, drain the worktree backlog. The gated,
+biased-to-preserve sweep that previously ran ONLY at `worktree create` now also
+runs here, so squash-merged branches and orphan markers stop accumulating (the
+"N branch(es) preserved" cry-wolf wall). It is non-interactive and never deletes
+unmerged work — preserved branches surface as a count only; run `prune-branches`
+to review them. Create-time reaping is retained (this is additive).
+
+{% if is_codex %}
+```
+Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree drain \"$(pwd)\"")
+```
+{% else %}
+```bash
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree drain "$(pwd)"
+```
+{% endif %}
+
 ### Step 8 — Push (manual; never automatic)
 
 Wrapup does **NOT** auto-push. The user explicitly requests push when ready:

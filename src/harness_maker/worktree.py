@@ -2860,6 +2860,39 @@ def _cli_prune_branches(args: list[str]) -> int:
     return 0
 
 
+def _drain(base_dir: Path) -> PruneReport:
+    """ADR-009 drain trigger: the gated, biased-to-preserve sweep, off the create path.
+
+    Reuses `prune_stale` (the single gate) so /hm:wrapup and /hm:health can drain the
+    backlog. Create-time reaping in `_cli_create` is RETAINED additively — this only
+    ADDS off-create entry points, it does not move the create-time call.
+    """
+    return prune_stale(base_dir)
+
+
+def _drain_summary(report: PruneReport) -> str:
+    """One-line, non-interactive summary for the wrapup/health drain (ADR-009).
+
+    Unlike `prune-branches`, this never nags to re-run with --force — the drain is
+    automatic and biased-to-preserve, so preserved items surface as a count only.
+    """
+    preserved = len(report.preserved_branches) + len(report.preserved_stash_refs)
+    return (
+        f"worktree drain: removed {len(report.removed_branches)} branch(es), "
+        f"{len(report.removed_landed_markers)} marker(s), "
+        f"{len(report.removed_stash_refs)} stash-ref(s); "
+        f"{preserved} preserved (run `prune-branches` to review)"
+    )
+
+
+def _cli_drain(args: list[str]) -> int:
+    """`python -m harness_maker.worktree drain [base_dir]` — ADR-009 drain trigger."""
+    rest = [a for a in args if not a.startswith("--")]
+    base = Path(rest[0]).resolve() if rest else Path.cwd()
+    print(_drain_summary(_drain(base)))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     """Dispatch worktree subcommand from argv."""
     args = list(sys.argv[1:] if argv is None else argv)
@@ -2867,7 +2900,7 @@ def main(argv: list[str] | None = None) -> int:
         print(
             "usage: python -m harness_maker.worktree "
             "<create|verify|finalize|post-commit-pop|owned-uuids|cleanup-all|"
-            "prune-branches> [...]",
+            "prune-branches|drain> [...]",
             file=sys.stderr,
         )
         return 2
@@ -2886,6 +2919,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cli_cleanup_all(rest)
     if sub == "prune-branches":
         return _cli_prune_branches(rest)
+    if sub == "drain":
+        return _cli_drain(rest)
     print(f"unknown subcommand: {sub}", file=sys.stderr)
     return 2
 

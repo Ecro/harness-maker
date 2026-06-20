@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed — Worktree branch-backlog drain relocated off the create-only trigger (PLAN-multisession-worktree-concurrency Phase 0, ADR-009)
+- **The gated, biased-to-preserve worktree sweep (`prune_stale`) now also runs at `/hm:wrapup` and `/hm:health`, not only at `worktree create`.** Previously a paused project accumulated leaked `execute-*`/`plan-*` branches unbounded (this repo had 76 against 1 landed-marker), printing a "N branch(es) preserved" warning wall on every create.
+- New `worktree drain` subcommand (`_drain` / `_drain_summary` / `_cli_drain`) — a non-interactive, one-line-summary trigger that reuses the single `prune_stale` gate. It is **additive**: create-time reaping is retained, and it can never force-delete the legacy backlog (only the human-reviewed `prune-branches --force` does).
+- Wired into `templates/stages/wrapup.md.j2` (Step 7.6) and `templates/commands/hm/health.md.j2`.
+- This is Phase 0 of an 8-phase per-task feature-branch concurrency overhaul; Phases 1–7 remain.
+
 ## [0.30.0] - 2026-06-17
 
 ### Fixed — Codex second opinion survives the Bash sandbox (PLAN-codex-second-opinion-sandbox)

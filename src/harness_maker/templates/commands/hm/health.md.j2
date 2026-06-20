@@ -38,6 +38,26 @@ flipping the ADR-012 kill-switch (`llm_inference_enabled: false`).
 ```
 
 Then read `.claude/observability/dashboard.md` to inspect the two sections.
+
+## Worktree backlog drain (ADR-009)
+
+Run the gated, biased-to-preserve worktree sweep here so the orphan-branch /
+stale-marker backlog does not accumulate between `worktree create` calls (the
+create-only trigger leaves it unbounded when a project pauses). It is advisory
+and never deletes unmerged work — preserved branches surface as a count only.
+
+{% if is_codex %}
+```
+Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree drain .")
+```
+{% else %}
+```bash
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree drain .
+```
+{% endif %}
+
+Surface the one-line summary as a Layer 1 ActionItem when the preserved count is
+non-zero (`run prune-branches to review`).
 {% if config.codex_second_opinion and config.codex_second_opinion.enabled %}
 ## Codex second-opinion smoke check (ADR-005, PLAN-crossmodel-codex-gaps)
 
