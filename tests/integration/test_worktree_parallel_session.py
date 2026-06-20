@@ -339,6 +339,72 @@ def test_concurrent_task_lands_serialize_under_fence(tmp_path: Path) -> None:
     assert "feat-b.py" in tree
 
 
+def test_full_stage_chain_registry_lifecycle_and_refresh(tmp_path: Path) -> None:
+    """Phase 5 exit-criterion: one full stage chain that actually drives the
+    Phase-1 registry helpers + Phase-2 worktree lifecycle + Phase-5 preflight/
+    refresh (NOT snapshot determinism). Models a flag-on /hm: task end-to-end:
+
+      plan  → task_preflight (Phase 5 → Phase 2 task_create → Phase 1 register)
+      exec  → commit work on hm/<slug>
+      drift → base advances; a re-run preflight WARNS; task_refresh rebases it
+      wrap  → task_land squashes onto base + tears the task down
+
+    Asserts the cross-phase contract: the Phase-1 row is created by preflight and
+    removed by land; the Phase-2 branch/worktree are created then torn down; the
+    Phase-5 drift surface fires and `task_refresh` resolves it without losing the
+    task commit.
+    """
+    base = _init_base_repo(tmp_path)
+    slug, uuid = "checkout-flow", "u-chain-1"
+
+    # ── plan stage: preflight claims the persistent task worktree ─────────────
+    wt, warns = worktree.task_preflight(base, slug, session_uuid=uuid)
+    assert wt == worktree.task_worktree_path(base, slug)
+    assert worktree._current_branch(wt) == "hm/checkout-flow"
+    # Phase-1 registry row exists, owned by our uuid
+    rows = worktree._read_sessions(base)
+    assert [(r.branch, r.session_uuid) for r in rows] == [("hm/checkout-flow", uuid)]
+    assert not any("behind" in w for w in warns)  # fresh task, no drift yet
+
+    # ── execute stage: commit work on the task branch ─────────────────────────
+    (wt / "checkout.py").write_text("def pay(): ...\n", encoding="utf-8")
+    _git("add", "-A", cwd=wt)
+    _git("commit", "-m", "wip(execute): checkout-flow", cwd=wt)
+
+    # ── base advances elsewhere → the task branch drifts behind ───────────────
+    (base / "unrelated.py").write_text("x = 1\n", encoding="utf-8")
+    _git("add", "-A", cwd=base)
+    _git("commit", "-m", "base advance", cwd=base)
+    behind, ahead = worktree._branch_drift(base, "hm/checkout-flow")
+    assert (behind, ahead) == (1, 1)
+    # a re-run preflight surfaces the drift + points at task-refresh
+    _, warns2 = worktree.task_preflight(base, slug, session_uuid=uuid)
+    assert any("behind" in w and "task-refresh" in w for w in warns2)
+
+    # ── Phase-5 refresh: rebase the task branch onto the advanced base ────────
+    assert worktree.task_refresh(base, slug) == 0
+    assert worktree._branch_drift(base, "hm/checkout-flow")[0] == 0  # drift resolved
+    # the task commit survived the rebase (no work lost)
+    assert (
+        "wip(execute): checkout-flow"
+        in _git("log", "--format=%s", "hm/checkout-flow", cwd=base).stdout
+    )
+
+    # ── wrapup stage: land squashes onto base + tears the task down ───────────
+    assert worktree.task_land(base, slug, session_uuid=uuid) == 0
+    # Phase-1 row removed; Phase-2 branch + worktree gone
+    assert worktree._read_sessions(base) == []
+    assert (
+        "hm/checkout-flow"
+        not in _git("branch", "--format=%(refname:short)", cwd=base).stdout.split()
+    )
+    assert not worktree.task_worktree_path(base, slug).is_dir()
+    # both the task's work AND the concurrent base advance are in HEAD
+    landed = _git("ls-tree", "-r", "--name-only", "HEAD", cwd=base).stdout.split()
+    assert "checkout.py" in landed
+    assert "unrelated.py" in landed
+
+
 def test_concurrent_lands_serialize_via_oexcl_secondary(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
     """Phase 4 exit-criterion (b) / REVIEW concurrency C3: force the WSL2-reliable
     O_EXCL secondary lock leg (flock reported unsupported) and prove two concurrent

@@ -62,6 +62,9 @@ Before any code edits, load memory in tier order (stops at first miss):
 
 ## Procedure
 
+{% if config.worktree is defined and config.worktree.get('feature_branch_workflow') -%}
+{% include "agents/_partials/worktree_preflight.md.j2" -%}
+{% else -%}
 ### Step 0 — Worktree isolation (deterministic — do NOT rely on skill auto-discovery)
 
 <!-- # SIBLING_WORKTREE_PATHS -->
@@ -99,6 +102,7 @@ Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktre
 !uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree verify <WT>
 ```
 {% endif %}
+{%- endif %}
 
 ### Step 1 — Load PLAN + flag parsing
 

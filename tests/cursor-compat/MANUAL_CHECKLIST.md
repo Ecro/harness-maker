@@ -450,3 +450,34 @@ also accepts it from the single-source `.claude/agents/` file.
 2. In Cursor 2.4+, trigger the agent (e.g. via `/hm:review`) and confirm the subagent **launches** (no "model not found / unsupported" error).
 3. **Pass** → the alias is Cursor-compatible; mark ADR-005 risk resolved in the PLAN risk register.
    **Fail** → Cursor rejects the alias; open the follow-up PLAN for per-target divergence (sidecar or `.cursor/agents/`), as ADR-005 contingency specifies.
+
+### C9 — Flag-on worktree preflight wiring (PLAN-multisession-worktree-concurrency Phase 5, ADR-002/004/006)
+
+**Why**: when `harness.yaml worktree.feature_branch_workflow: true`, every `/hm:`
+stage template renders a shared "Task worktree preflight" block (a
+`worktree task-preflight <slug>` claim → `<WT>` entry + `task-refresh` drift
+recovery), and fused-workflow commands inherit it. Flag-off must render the legacy
+path byte-for-byte (the 8 snapshot fixtures are flag-off and the unit suite proves
+zero-diff). This is render-only; the worktree CLI is identical across IDEs, so the
+risk is purely whether each IDE surfaces the rendered prose + runs the command.
+
+**Owner**: (assign) · **Target date**: before promoting Phase 6 rollout.
+
+1. Render a harness with `worktree.feature_branch_workflow: true` and `targets`
+   including both `cursor` and `codex`. Open `.claude/commands/hm/execute.md`
+   (Claude Code / Cursor) and confirm Step 0 shows **"Task worktree preflight"**
+   with `worktree task-preflight <slug>` — NOT the legacy `worktree create execute`.
+2. Confirm a **fused** command (e.g. `.claude/commands/hm/exec-rev.md`) also carries
+   the preflight block in its execute fragment (inheritance).
+3. **Codex parity**: open the rendered Codex execute asset and confirm the preflight
+   uses the `Bash("…")` tool form, not the `!`-shell form.
+4. Render the SAME harness with the flag **off** (or absent) and confirm execute
+   shows the legacy `### Step 0 — Worktree isolation` + `worktree create execute`,
+   with **no** preflight block — and that `git diff` of the 8 snapshot fixtures is
+   empty (`uv run python tests/snapshot/regenerate.py`).
+5. **Cursor/Codex runtime**: in each IDE, trigger `/hm:execute <slug>` on a
+   flag-on harness and confirm the agent runs `task-preflight`, captures `<WT>`
+   from stdout, and operates inside `.worktrees/<slug>/` (branch `hm/<slug>`).
+   On a drifted branch, confirm `task-refresh <slug>` rebases without losing work.
+6. **Pass** → preflight wiring is IDE-portable; **Fail** → record which IDE failed
+   to surface/run the block and open a per-target follow-up.

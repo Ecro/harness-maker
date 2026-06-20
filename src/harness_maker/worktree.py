@@ -3377,6 +3377,134 @@ def task_create(
     return wt
 
 
+# ── Phase 5 (ADR-002): warm-branch-drift detection + refresh ─────────────────
+
+
+def _branch_drift(base: Path, branch: str) -> tuple[int, int]:
+    """`(behind, ahead)` commit counts of `branch` vs the base repo's HEAD tip.
+
+    behind = commits in base HEAD not reachable from `branch` (the base advanced
+    since the task branched). ahead = commits on `branch` not in base HEAD.
+    Base tip is the base repo's HEAD SHA — the same parent tip `task_land` squashes
+    onto — NOT a hardcoded `main`, so this is robust on repos whose default branch
+    isn't `main` (worktree.py:988-1001 precedent). Any git/parse failure → (0, 0)
+    (treat as no-drift; never raises)."""
+    try:
+        base_head = _run(["git", "rev-parse", "HEAD"], cwd=base).stdout.strip()
+        ahead = int(
+            _run(["git", "rev-list", "--count", f"{base_head}..{branch}"], cwd=base).stdout.strip()
+        )
+        behind = int(
+            _run(["git", "rev-list", "--count", f"{branch}..{base_head}"], cwd=base).stdout.strip()
+        )
+    except (RuntimeError, ValueError):
+        return (0, 0)
+    return (behind, ahead)
+
+
+def task_preflight(base_dir: Path, slug: str, *, session_uuid: str) -> tuple[Path, list[str]]:
+    """Flag-on stage preflight (ADR-002/004/006): ensure the task worktree + warn.
+
+    Idempotently ensures the persistent `.worktrees/<slug>/` task worktree (Phase 2
+    `task_create` — reused if present), reclaims genuinely-dead registry rows
+    (Phase 1), and returns `(wt_path, warnings)`. Warnings surface (a) a concurrent
+    SAME-task session (a different `session_uuid` already on our branch — the
+    highest-risk collision), (b) other LIVE sessions on different tasks, and (c) a
+    drift notice pointing at `task-refresh` when the task branch fell behind the
+    base tip. Flag-gating is the CALLER's job (the template)."""
+    base = base_dir.resolve()
+    branch = task_branch(slug)
+    reclaim_stale(base)  # drop dead rows before surfacing the active set
+    # Snapshot the registry BEFORE task_create: its register_session replaces the
+    # same-branch row, which would erase a concurrent SAME-slug session's row and
+    # hide the highest-risk collision (two agents in the SAME task worktree) from
+    # the surface below (REVIEW Codex P2).
+    prior = _read_sessions(base)
+    warnings: list[str] = []
+    same_task = [r for r in prior if r.branch == branch and r.session_uuid != session_uuid]
+    if same_task:
+        warnings.append(
+            f"[preflight] WARNING: {len(same_task)} other session(s) already hold task "
+            f"{slug!r} (branch {branch}); concurrent edits to the same worktree can collide."
+        )
+    other_tasks = sorted(
+        {r.task for r in prior if r.branch != branch and r.session_uuid != session_uuid}
+    )
+    if other_tasks:
+        warnings.append(
+            f"[preflight] {len(other_tasks)} other active session(s): {', '.join(other_tasks)}"
+        )
+    wt = task_create(base, slug, session_uuid=session_uuid)
+    behind, _ahead = _branch_drift(base, branch)
+    if behind > 0:
+        try:
+            base_br = _current_branch(base)
+        except RuntimeError:
+            base_br = "the base branch"
+        warnings.append(
+            f"[preflight] task branch {branch} is {behind} commit(s) behind "
+            f"{base_br}; run `task-refresh {slug}` to rebase."
+        )
+    return wt, warnings
+
+
+def task_refresh(base_dir: Path, slug: str) -> int:
+    """ADR-002: rebase `hm/<slug>` onto the base repo's current tip, in the worktree.
+
+    The rebase target is the base repo HEAD SHA (the parent tip `task_land` squashes
+    onto) — NOT a literal `main` (validator W3; worktree.py:988-1001 learned that
+    `main` breaks on non-`main` repos). Commits are preserved: a conflict aborts the
+    rebase (`git rebase --abort`), restoring the branch exactly, and returns `rc=1`.
+    A dirty worktree is refused up front. Returns 0 on a clean rebase or no-op."""
+    if not _valid_task_slug(slug):
+        print(f"[refresh] invalid task slug {slug!r}", file=sys.stderr)
+        return 1
+    base = base_dir.resolve()
+    branch = task_branch(slug)
+    wt = task_worktree_path(base, slug)
+    if not wt.is_dir():
+        print(f"[refresh] no task worktree for {slug!r} at {wt}", file=sys.stderr)
+        return 1
+    if _worktree_is_dirty(wt):
+        print(
+            f"[refresh] worktree {wt} has uncommitted changes; commit or discard before refresh",
+            file=sys.stderr,
+        )
+        return 1
+    # Rebase operates on whatever is checked out in `wt`; refuse unless it is the
+    # task branch, so a detached HEAD / manual checkout can't get silently rebased
+    # while we report success for `hm/<slug>` (REVIEW code P2).
+    try:
+        checked_out = _current_branch(wt)
+    except RuntimeError as exc:
+        print(f"[refresh] cannot read worktree branch: {exc}", file=sys.stderr)
+        return 1
+    if checked_out != branch:
+        print(
+            f"[refresh] worktree {wt} is on {checked_out!r}, not {branch!r}; "
+            "checkout the task branch before refresh",
+            file=sys.stderr,
+        )
+        return 1
+    try:
+        base_head = _run(["git", "rev-parse", "HEAD"], cwd=base).stdout.strip()
+    except RuntimeError as exc:
+        print(f"[refresh] cannot resolve base tip: {exc}", file=sys.stderr)
+        return 1
+    try:
+        _run(["git", "rebase", base_head], cwd=wt)
+    except RuntimeError as exc:
+        with contextlib.suppress(RuntimeError):
+            _run(["git", "rebase", "--abort"], cwd=wt)
+        print(
+            f"[refresh] rebase conflict; aborted, branch {branch} unchanged: {exc}",
+            file=sys.stderr,
+        )
+        return 1
+    print(f"[refresh] {branch} rebased onto {base_head[:12]}")
+    return 0
+
+
 def _untracked_files(base: Path) -> set[str]:
     """Non-ignored untracked files (`git ls-files --others --exclude-standard`).
 
@@ -3664,6 +3792,42 @@ def _cli_task_land(args: list[str]) -> int:
     return task_land(base, slug, message=message)
 
 
+def _cli_task_preflight(args: list[str]) -> int:
+    """`python -m harness_maker.worktree task-preflight <slug> [base_dir]` (Phase 5).
+
+    Prints the task worktree path to stdout (for `<WT>` capture) and any
+    preflight warnings (active sessions, drift) to stderr."""
+    rest = [a for a in args if not a.startswith("--")]
+    if not rest:
+        print("usage: task-preflight <slug> [base_dir]", file=sys.stderr)
+        return 2
+    slug = rest[0]
+    base = Path(rest[1]).resolve() if len(rest) > 1 else Path.cwd()
+    try:
+        wt, warnings = task_preflight(base, slug, session_uuid=uuid.uuid4().hex[:12])
+    except (ValueError, RuntimeError) as exc:
+        # ValueError = bad slug; RuntimeError = a failed git op surfaced by `_run`
+        # (non-git base dir, `git worktree add` failure). Return a controlled rc,
+        # never a traceback (REVIEW Codex P2).
+        print(f"[preflight] {exc}", file=sys.stderr)
+        return 1
+    for w in warnings:
+        print(w, file=sys.stderr)
+    print(str(wt))
+    return 0
+
+
+def _cli_task_refresh(args: list[str]) -> int:
+    """`python -m harness_maker.worktree task-refresh <slug> [base_dir]` (Phase 5)."""
+    rest = [a for a in args if not a.startswith("--")]
+    if not rest:
+        print("usage: task-refresh <slug> [base_dir]", file=sys.stderr)
+        return 2
+    slug = rest[0]
+    base = Path(rest[1]).resolve() if len(rest) > 1 else Path.cwd()
+    return task_refresh(base, slug)
+
+
 def _drain(base_dir: Path) -> PruneReport:
     """ADR-009 drain trigger: the gated, biased-to-preserve sweep, off the create path.
 
@@ -3704,7 +3868,8 @@ def main(argv: list[str] | None = None) -> int:
         print(
             "usage: python -m harness_maker.worktree "
             "<create|verify|finalize|post-commit-pop|owned-uuids|cleanup-all|"
-            "prune-branches|drain|task-create|task-land> [...]",
+            "prune-branches|drain|task-create|task-land|task-preflight|"
+            "task-refresh> [...]",
             file=sys.stderr,
         )
         return 2
@@ -3729,6 +3894,10 @@ def main(argv: list[str] | None = None) -> int:
         return _cli_task_create(rest)
     if sub == "task-land":
         return _cli_task_land(rest)
+    if sub == "task-preflight":
+        return _cli_task_preflight(rest)
+    if sub == "task-refresh":
+        return _cli_task_refresh(rest)
     print(f"unknown subcommand: {sub}", file=sys.stderr)
     return 2
 

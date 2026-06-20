@@ -1,0 +1,35 @@
+{#- Phase 5 (ADR-002/004/006): flag-on per-task worktree preflight.
+    Shared across every /hm: stage template. The INCLUDING stage owns the
+    `worktree.feature_branch_workflow` gate (a `{%- if … %}` wrapper) so this
+    partial is only rendered when the flag is on — its own whitespace therefore
+    never affects the flag-OFF snapshot fixtures. Inherits is_codex +
+    harness_maker_src_path from the parent stage context. Substitute <slug> with
+    the task slug and treat the command's stdout as <WT>. -#}
+### Task worktree preflight (feature-branch workflow)
+
+`harness.yaml worktree.feature_branch_workflow` is **on**: this stage operates inside the persistent per-task worktree `.worktrees/<slug>/` on branch `hm/<slug>` — shared by every `/hm:` stage for this task — NOT an ephemeral `execute-<uuid>` worktree. Claim/refresh it and surface concurrent work + drift:
+
+{% if is_codex %}
+```
+Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree task-preflight <slug> \"$(pwd)\"")
+```
+{% else %}
+```bash
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree task-preflight <slug> "$(pwd)"
+```
+{% endif %}
+
+- **stdout** = the task worktree absolute path. **Treat that exact string as `<WT>`** for every Read/Write/Edit and every {% if is_codex %}`Bash("cd <WT> && …")`{% else %}`!cd <WT> && …`{% endif %} in this stage. Do NOT use a shell variable.
+- **stderr warnings**: `[preflight] … other active session(s)` = another session holds a task concurrently (informational, no action needed). `[preflight] … behind …` = the task branch drifted behind the base tip; to rebase it cleanly onto the base before working, run:
+
+{% if is_codex %}
+```
+Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree task-refresh <slug> \"$(pwd)\"")
+```
+{% else %}
+```bash
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree task-refresh <slug> "$(pwd)"
+```
+{% endif %}
+
+  `task-refresh` rebases `hm/<slug>` onto the base tip (base HEAD, not a hardcoded `main`), preserving commits; a conflict aborts and leaves the branch untouched — resolve manually, then retry. Refuse to refresh a dirty worktree: commit or discard first.

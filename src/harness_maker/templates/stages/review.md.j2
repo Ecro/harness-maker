@@ -99,6 +99,10 @@ If a command exits non-zero:
 
 {% endif %}
 ## Procedure — Round 1 (initial review)
+{%- if config.worktree is defined and config.worktree.get('feature_branch_workflow') %}
+
+{% include "agents/_partials/worktree_preflight.md.j2" %}
+{%- endif %}
 
 ### Step 1 — Reviewer set selection
 
