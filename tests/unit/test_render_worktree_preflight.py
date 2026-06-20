@@ -156,3 +156,24 @@ def test_fused_workflows_omit_preflight_when_flag_off(tmp_path: Path) -> None:
     files = _render(tmp_path, flag_on=False)
     for path, body in _fused_execute_commands(files).items():
         assert "task-preflight" not in body, path
+
+
+# ── flag-ON: wrapup squash-lands the task branch (ADR-003 wiring; Phase 4 gap) ─
+
+
+def test_wrapup_lands_task_branch_when_flag_on(tmp_path: Path) -> None:
+    # ADR-003: wrapup is the land owner. Flag-on wrapup must wire the actual Step 7.7
+    # land invocation (the Phase-4 wiring gap Codex found) — pin the exact command +
+    # the heading so an incidental `task-*` mention can't satisfy this.
+    body = _stage(_render(tmp_path, flag_on=True), "wrapup")
+    assert "Squash-land the task branch" in body, "flag-on wrapup must render the Step 7.7 land step"
+    assert "worktree task-land <SLUG> <BASE>" in body, "flag-on wrapup must invoke task-land"
+
+
+def test_wrapup_no_land_when_flag_off(tmp_path: Path) -> None:
+    # Flag-off must render the legacy wrapup with NO land step (the Step 7.7 block is
+    # fully inside the flag gate). Byte-neutrality of the gate is asserted separately;
+    # here we pin that neither the heading nor the invocation leaks into flag-off.
+    body = _stage(_render(tmp_path, flag_on=False), "wrapup")
+    assert "task-land" not in body, "flag-off wrapup must not reference task-land"
+    assert "Squash-land the task branch" not in body, "flag-off must omit the Step 7.7 heading"

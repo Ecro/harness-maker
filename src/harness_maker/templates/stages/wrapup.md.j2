@@ -397,6 +397,46 @@ Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktre
 ```
 {% endif %}
 
+{%- if config.worktree is defined and config.worktree.get('feature_branch_workflow') %}
+### Step 7.7 — Squash-land the task branch (ADR-003, flag-on; task worktree only)
+
+Wrapup is the **land owner** for the per-task feature-branch model (ADR-003): when
+this wrapup ran inside a per-task worktree (current branch `hm/<slug>`), squash-land
+it onto **the base branch (the base repo's current HEAD — `main`, `master`, or
+whatever is checked out)** and tear it down. **Skip this step entirely** when NOT on
+an `hm/*` branch — e.g. a `/hm:loop`'s `execute-<uuid>` worktree (its land is owned by
+loop-close `finalize`) or a non-isolated run. The land does NOT run from `<WT>`; it
+runs from the **base repo** (the directory two levels above `<WT>` — i.e. strip the
+`/.worktrees/<name>/` suffix), because `task-land` squashes onto the base HEAD with `cwd=base`.
+
+1. Detect the task context (the Step-7 commit must already be on `hm/<slug>`):
+   - `BRANCH=$(cd <WT> && git rev-parse --abbrev-ref HEAD)`
+   - If `BRANCH` does NOT match `hm/*` → **skip the rest of this step** (not a task worktree).
+   - `SLUG="${BRANCH#hm/}"` ; `BASE` = `<WT>`'s base repo root (`<WT>/../..`).
+2. Squash-land from `BASE` (`task-land` is idempotent + self-aborts on a dirty base,
+   captures any pending worktree edits as a commit first, then squashes under the full
+   merge fence + tears down branch/worktree/registry-row/marker):
+
+{% if is_codex %}
+```
+Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree task-land <SLUG> <BASE>")
+```
+{% else %}
+```bash
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree task-land <SLUG> <BASE>
+```
+{% endif %}
+
+3. Outcome — **rc 0**: exactly one squash commit on the base branch (base HEAD),
+   the `hm/<slug>` branch + `.worktrees/<slug>/` worktree removed, registry row
+   dropped, landed-marker reaped. **`<WT>` no longer exists after this** — immediately
+   `cd <BASE>` (your tool/shell cwd is now a deleted directory) and run every later
+   step (the Step-8 push, etc.) from `<BASE>`. **rc 1**: `task-land` aborted (dirty
+   base or squash conflict) and PRESERVED the branch + worktree for re-run — surface
+   its stderr verbatim and STOP (do NOT push; resolve the base state, then re-run
+   `task-land <SLUG> <BASE>`).
+{%- endif %}
+
 ### Step 8 — Push (manual; never automatic)
 
 Wrapup does **NOT** auto-push. The user explicitly requests push when ready:
@@ -408,7 +448,7 @@ Wrapup does **NOT** auto-push. The user explicitly requests push when ready:
 
 If the user asks to push during wrapup, that is fine — but never push without an explicit request.
 
-{% set gate0_heading = "## Emit Gate 0 receipt (ADR-001, ADR-005)" %}{% set gate0_stage = "wrapup" %}{% set gate0_pass = "the wrapup commit landed and memory was appended. (Worktree finalization belongs to the execute stage; wrapup's job is the user-facing commit + memory.)" %}{% set gate0_fail = "the wrapup commit failed (pre-commit hook, signing, etc.) or memory append failed." %}{% set gate0_standalone = false %}{% include "agents/_partials/gate0_receipt.md.j2" %}
+{% set gate0_heading = "## Emit Gate 0 receipt (ADR-001, ADR-005)" %}{% set gate0_stage = "wrapup" %}{% set gate0_pass = "the wrapup commit landed and memory was appended (and, on the flag-on per-task path inside an hm/<slug> worktree, Step 7.7 squash-landed the task branch onto the base HEAD). Ephemeral execute-<uuid> worktree teardown still belongs to the execute/loop-close finalize, not wrapup." %}{% set gate0_fail = "the wrapup commit failed (pre-commit hook, signing, etc.) or memory append failed." %}{% set gate0_standalone = false %}{% include "agents/_partials/gate0_receipt.md.j2" %}
 
 ## Outputs
 

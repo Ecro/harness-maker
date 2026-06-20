@@ -3604,10 +3604,19 @@ def _untracked_files(base: Path) -> set[str]:
 
 def _squash_path_set(base: Path, branch: str) -> list[str]:
     """The files the squash will touch — branch's changes vs its merge-base with
-    HEAD. Used to bound conflict-cleanup to the squash's OWN path set."""
+    HEAD. Bounds both the conflict-cleanup AND the scoped land commit to the
+    squash's OWN path set.
+
+    `--no-renames` is REQUIRED: with a user's `diff.renames=true` (a common config),
+    `git diff --name-only` reports a rename as ONLY the destination path, omitting the
+    deleted source. The land then `git commit -- <new>` and never commits the staged
+    DELETION of the old path → the renamed-away file lingers in HEAD and a staged
+    deletion leaks into base for a later session's commit (Codex P1, data-loss).
+    Disabling rename detection makes a rename always two entries (old delete + new
+    add), so the scoped commit records both sides."""
     try:
         mb = _run(["git", "merge-base", branch, "HEAD"], cwd=base).stdout.strip()
-        out = _run(["git", "diff", "--name-only", mb, branch], cwd=base).stdout
+        out = _run(["git", "diff", "--name-only", "--no-renames", mb, branch], cwd=base).stdout
     except RuntimeError:
         return []
     return [p for p in out.splitlines() if p.strip()]
@@ -3776,10 +3785,35 @@ def task_land(
                 )
             else:
                 touched = _squash_path_set(base, branch)
+                if not touched:
+                    # Empty path set in the NOT-already branch means the merge-base
+                    # probe failed (unrelated histories) — `_branch_content_in_head`
+                    # and `_squash_path_set` fail independently, so `already` can be
+                    # False while `touched` is []. Do NOT `git merge --squash` here:
+                    # on unrelated histories it would stage content we cannot scope to
+                    # a path set, and we must NEVER reset the base index (a concurrent
+                    # session may have staged work there). Abort rc1 — preserve the
+                    # branch + worktree for manual resolution (code-reviewer P2).
+                    print(
+                        f"[land] cannot determine {branch}'s squash path set "
+                        "(merge-base failure / unrelated histories?); preserving "
+                        "branch + worktree for manual resolution",
+                        file=sys.stderr,
+                    )
+                    return 1
                 pre_untracked = _untracked_files(base)
                 try:
                     _run(["git", "merge", "--squash", branch], cwd=base)
-                    _run(["git", "commit", "-m", msg], cwd=base)
+                    # Commit ONLY the squash's own path set, never the whole index.
+                    # `git commit -m msg` (no pathspec) commits the ENTIRE index, so a
+                    # CONCURRENT session's pre-staged base churn — `.claude/` +
+                    # deliverables are EXCLUDED by `_has_user_dirty_state`, so the
+                    # base-dirty guard above does NOT abort on them — would be swept
+                    # into THIS task's squash commit (the count:3 cross-session
+                    # contamination class; Codex P1, empirically confirmed). Scoping
+                    # to `touched` leaves any unrelated staged base file untouched for
+                    # its owning session.
+                    _run(["git", "commit", "-m", msg, "--", *touched], cwd=base)
                 except RuntimeError as e:
                     _scoped_conflict_cleanup(base, touched, pre_untracked)
                     print(

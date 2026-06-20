@@ -49,10 +49,10 @@ files:
   body_sha256: 97786f65124e496d77adf30d8e29aebfd2c938702e79f6fb4eeaefe16bd73dc9
 - path: commands/hm/exec-rev-ver-wrap.md
   template: commands/hm/workflow_command.md.j2
-  body_sha256: 2cd2f77a137a6eb8bd31d17850ec8bdfd16d9636db7b9cfb499ef17d1d9b557f
+  body_sha256: 007faede022705691110e09d729b2398105752a894103f5158d9e64aa25e262d
 - path: commands/hm/exec-rev-wrap.md
   template: commands/hm/workflow_command.md.j2
-  body_sha256: 1ddce48d5cc22a458b13677d9b8f8a8a84f93f1829071b63a59bd2649ce7bfeb
+  body_sha256: af3b37ba4d0e76a10d153246f2bb7b0c0e2bfb2514ac25a0fec2b61ccb6bc01d
 - path: commands/hm/exec-rev.md
   template: commands/hm/workflow_command.md.j2
   body_sha256: 9f1fa5c0aa20e0173a8ee2d52d24099cb8af294eb5f6403b7e04d4bdb6476b0d
@@ -76,7 +76,7 @@ files:
   body_sha256: 4ea7a5bfa70ffd8ca08dc8390f34b326bcd3ad66195b39da6c8fcd8d637aff74
 - path: commands/hm/plan-exec-rev-wrap.md
   template: commands/hm/workflow_command.md.j2
-  body_sha256: 2a958326cd65e7a04542526698ac859a4cf5f1227b0b4e22ea5bc19e23e109c4
+  body_sha256: 25022fc25d1c124e483cd2d358d968028bbc10e05356b2f1fbaea87265d27350
 - path: commands/hm/plan-exec-rev.md
   template: commands/hm/workflow_command.md.j2
   body_sha256: 7ced55d7733f9c4162dfb0d6a1b86e43d5c5f09b814b963bde855bb8be9f7d54
@@ -100,7 +100,7 @@ files:
   body_sha256: 57ba2e1472e40f37fadf4ee16e66ff619e7dc3e06f8a5b7b3b076be0a26e4107
 - path: commands/hm/wrapup.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: c2ceb80e12c6a46ff65e6ce7893f13a317167e2dca275653fb87440f644595df
+  body_sha256: 90bbc42891263ca9c24c3a5ed97ea39f843bdcb3a7cca8a0bfb3ba4f2a043e17
 - path: harness.yaml
   template: harness-yaml/Side.yaml.j2
   body_sha256: d6a48ab983f6f41e420c487fe448405b1c808fc7505eb5f34564b1c12e1a7261
@@ -181,4 +181,4 @@ files:
   body_sha256: 1c4a87926f39ae6fa45ad1d26f916770207550b78ce0da37d4c688cafc93011d
 - path: stages/wrapup.md
   template: stages/wrapup.md.j2
-  body_sha256: 85eabf88db6384d1476938d86cceea0995063c40d51ea30b988e862dc03669cb
+  body_sha256: 02921416b07c57a7a78180e110b0f0259cff2954e35851daadf0bfb5d448988c

@@ -326,3 +326,59 @@ def test_task_land_missing_branch_with_worktree_is_inconsistent(tmp_path: Path) 
     # branch missing but worktree present → inconsistent → rc=1, preserved
     assert worktree.task_land(repo, "feat") == 1
     assert wt.is_dir()
+
+
+# ── cross-session: squash must NOT sweep concurrent pre-staged base churn ─────
+
+
+def test_task_land_does_not_sweep_concurrent_staged_base_churn(tmp_path: Path) -> None:
+    # Codex P1 (empirically confirmed): `git merge --squash` + `git commit` with NO
+    # pathspec commits the WHOLE index, so a concurrent session's pre-staged base
+    # churn — `.claude/` + deliverables are EXCLUDED by the dirty-base guard, so it
+    # does NOT abort — gets swept into THIS task's squash commit (the count:3
+    # contamination class). The land must commit ONLY the squash's own path set.
+    repo = _repo(tmp_path)
+    _make_task_with_committed_work(repo, "feat", content="feat work\n")
+    # Concurrent session stages an unrelated base file the dirty-base guard excludes
+    # (`.claude/` is force-added past the fixture's gitignore to mimic the real repo
+    # where `.claude/memory/wiki.md` is tracked-but-under-gitignored-`.claude/`).
+    mem = repo / ".claude" / "memory"
+    mem.mkdir(parents=True)
+    (mem / "wiki.md").write_text("concurrent session note\n")
+    _git(["add", "-f", ".claude/memory/wiki.md"], repo)
+
+    assert worktree.task_land(repo, "feat") == 0
+
+    landed = _git(["show", "--name-only", "--format=", "HEAD"], repo).split()
+    assert "feature.py" in landed
+    assert ".claude/memory/wiki.md" not in landed, "concurrent base churn swept into squash commit"
+    # The concurrent file must survive untouched (not lost, not committed by us) AND
+    # stay STAGED for its owning session — the actual cross-session contract.
+    assert (mem / "wiki.md").read_text() == "concurrent session note\n"
+    assert ".claude/memory/wiki.md" in _git(["diff", "--cached", "--name-only"], repo).split(), (
+        "concurrent session's staged change must remain staged after our land"
+    )
+
+
+def test_task_land_records_rename_under_diff_renames_config(tmp_path: Path) -> None:
+    # Codex P1: `_squash_path_set` uses `git diff --name-only`; with a user's
+    # `diff.renames=true` a rename is reported as ONLY the destination path, so a
+    # whole-index-vs-scoped commit could miss the staged DELETION of the old path —
+    # the renamed-away file would linger in HEAD. `--no-renames` makes it two entries.
+    repo = _repo(tmp_path)
+    _git(["config", "diff.renames", "true"], repo)  # the adversarial user config
+    # Seed a file on base, then a task branch that RENAMES it.
+    (repo / "old_name.py").write_text("x = 1\n" * 20)
+    _git(["add", "old_name.py"], repo)
+    _git(["commit", "-m", "seed file to rename"], repo)
+    wt = worktree.task_create(repo, "ren", session_uuid="u-ren")
+    _git(["mv", "old_name.py", "new_name.py"], wt)
+    _git(["commit", "-m", "wip(execute): rename"], wt)
+
+    assert worktree.task_land(repo, "ren") == 0
+
+    # After land: old path GONE from HEAD, new path present, no staged-deletion residue.
+    head_files = _git(["ls-tree", "-r", "--name-only", "HEAD"], repo).split()
+    assert "new_name.py" in head_files
+    assert "old_name.py" not in head_files, "rename's old path lingered in HEAD (missed deletion)"
+    assert _git(["status", "--porcelain"], repo) == "", "no staged-deletion residue left in base"
