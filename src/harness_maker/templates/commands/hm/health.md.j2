@@ -87,6 +87,26 @@ Report the result explicitly as a Layer 1 ActionItem:
   (they are Claude-only). Cross-ref the ledger
   `.claude/observability/codex-second-opinion.jsonl` skip-rate.
 {% endif %}
+{% if config.autonomy.level != "gated" %}
+## Autopilot auto-advance smoke check (PLAN-human-bottleneck-auto-advance P7, ADR-009)
+
+`autonomy.level` is `{{ config.autonomy.level }}` (not `gated`), so autopilot CAN
+auto-advance — verify it actually has. This is a **positive** check: an armed-but-never-firing
+autopilot (a broken boundary CLI, a marker that never gets written, a chain that always
+kill-switches) looks identical to "the user just never turned it on". Run the degradation probe:
+
+```bash
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.autopilot_ledger smoke --root . --level {{ config.autonomy.level }}
+```
+
+Report the JSON as a Layer 1 ActionItem:
+- `degraded: false` → pass (ledger has entries, or correctly off).
+- `degraded: true` → **surface it**: autopilot is configured but `.claude/observability/auto-advance.jsonl`
+  has zero `advanced`/`gate_blocked`/`halted_cap` entries across recent sessions — the feature
+  is armed yet never fired. Likely causes: marker never written (`autopilot on` / the
+  session-start picker not used), or the boundary CLI is failing. Investigate before trusting
+  that "the pipeline just stops" is the user's intent.
+{% endif %}
 ## Per-item structured question (ADR-001 hard rule)
 
 For each unresolved item across the two layers, present:

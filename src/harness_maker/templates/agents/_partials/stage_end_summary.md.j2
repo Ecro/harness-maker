@@ -28,8 +28,11 @@ banner (do not run any command below).
 
 **Step 1 — mandatory gate FIRST (absent-case = STOP).** Evaluate THIS stage's gate
 *before* anything else: {{ summary_autopilot_gate | default("No gate defined — treat as STOP (absent-case guard).") }}
-If the gate is pending/unresolved → **STOP** (print the banner). Do NOT run the boundary
-check — a stage that stops at its gate must not record an advance.
+If the gate is pending/unresolved → record it on the ledger, then **STOP** (print the
+banner). Do NOT run the boundary check — a stage that stops at its gate must not record an
+advance:
+
+!python -m harness_maker.autopilot_caps gate-blocked --root . --stage {{ summary_stage }}
 
 **Step 2 — boundary check (ONLY when the gate is clear).** Run the deterministic check
 (it enforces the Phase-5 runaway caps + kill switch, and on proceed records the advance it

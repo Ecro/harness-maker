@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Added — Auto-advance audit ledger consumers + /hm:health smoke (PLAN-human-bottleneck-auto-advance Phase 7 of 9)
+- **`gate_blocked` ledger event** — `autopilot_caps gate-blocked --stage <s>` records WHY an autopilot chain stopped at a mandatory gate (distinct from a runaway `halted_cap`); the stage-template gate-stop path now writes it before STOP. Completes the ADR-009 event vocabulary (`advanced` + `halted_cap` already shipped in P5/P6).
+- **`/hm:health` positive autopilot smoke** — `autopilot_ledger.smoke_check` + `smoke` CLI surface "armed but never fired" silent degradation (autonomy armed in `harness.yaml` yet the auto-advance ledger has zero entries). Render-gated into `health.md.j2` when `autonomy.level != gated`. Enablement uses a positive allow-list matching `effective_level`'s clamp-unknown-to-gated fail-safe, so a typo'd level can't raise a false alarm.
+- Reviewed k-of-3, Grade A. Only P8 (docs + INTEGRATION e2e live-chain + 5-file version bump) remains.
+
 ### Added — Live pipeline auto-advance (PLAN-human-bottleneck-auto-advance Phase 6 of 9)
 - **The feature is now functionally live.** With `harness-maker autopilot on` (or the new session-start picker) in a non-`gated` session, `/hm:` stages auto-advance through the pipeline instead of stopping after each one — halting only at the runaway caps, the kill switch, or a mandatory human gate.
 - **`autopilot_caps boundary` CLI** — the deterministic gate the stage terminal runs before advancing: resolves the live marker (kill switch when absent/foreign/stale), counts this session's `advanced` ledger events as the step count, applies the Phase-5 caps, reports the next pipeline stage, and clears the marker at the last stage. An unknown `--current` is surfaced as `unknown_stage` with the marker **preserved** (never a false completion). Plus `autopilot_ledger.count_events` (datetime-normalized `since` filter).

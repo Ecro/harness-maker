@@ -9,8 +9,11 @@ auto-advance event (ADR-009).
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
+import sys
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal, get_args
@@ -161,3 +164,60 @@ def count_events(
                 continue
         total += 1
     return total
+
+
+# The autonomy levels that actually arm auto-advance (gated = off; unknown = treated as
+# off, matching autopilot.effective_level's clamp-unknown-to-gated fail-safe).
+_ARMED_LEVELS: frozenset[str] = frozenset({"auto_safe", "full"})
+
+
+def _total_entries(project_root: Path, observability_dir: Path | None = None) -> int:
+    """Count ALL valid ledger entries (any event in EVENTS) — the smoke denominator."""
+    return sum(count_events(project_root, ev, observability_dir=observability_dir) for ev in EVENTS)
+
+
+def smoke_check(
+    project_root: Path,
+    *,
+    yaml_level: str,
+    observability_dir: Path | None = None,
+) -> dict[str, Any]:
+    """`/hm:health` positive smoke (P7): autonomy ARMED in yaml but ZERO ledger entries
+    → surface degradation (autopilot configured yet never fired — the H4 silent-degrade
+    failure mode). Only the canonical armed levels count: `gated` AND any unknown/garbage
+    level are treated as not-armed (mirrors `autopilot.effective_level`'s clamp-unknown-to-
+    gated fail-safe — REVIEW P1, the CLAUDE.md absent-case = feature-black-hole guard), so a
+    typo'd level can never raise a false 'never fired' alarm.
+    """
+    count = _total_entries(project_root, observability_dir)
+    armed = yaml_level in _ARMED_LEVELS
+    degraded = armed and count == 0
+    if degraded:
+        reason = (
+            f"autonomy.level={yaml_level!r} but the auto-advance ledger has 0 entries — "
+            "autopilot is configured yet never fired (possible silent degradation)"
+        )
+    elif not armed:
+        reason = f"autonomy not armed (level={yaml_level!r}) — no auto-advance expected"
+    else:
+        reason = f"autonomy.level={yaml_level!r}, {count} ledger entr{'y' if count == 1 else 'ies'}"
+    return {"degraded": degraded, "level": yaml_level, "entry_count": count, "reason": reason}
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    """`smoke` subcommand — the /hm:health auto-advance degradation probe (P7)."""
+    parser = argparse.ArgumentParser(add_help=False)
+    sub = parser.add_subparsers(dest="cmd", required=True)
+    s = sub.add_parser("smoke", add_help=False)
+    s.add_argument("--root", default=".")
+    # choices so a misspelled level errors loud (REVIEW P2); smoke_check also clamps unknown.
+    s.add_argument("--level", required=True, choices=("gated", "auto_safe", "full"))
+    args = parser.parse_args(argv)
+    if args.cmd == "smoke":
+        print(json.dumps(smoke_check(Path(args.root), yaml_level=args.level)))
+        return 0
+    return 0
+
+
+if __name__ == "__main__":  # pragma: no cover — exercised via main(argv) in tests
+    sys.exit(main())

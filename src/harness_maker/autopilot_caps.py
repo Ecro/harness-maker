@@ -198,11 +198,21 @@ def main(argv: Sequence[str] | None = None) -> int:
     b.add_argument("--current", required=True)
     b.add_argument("--step-cap", type=int, required=True, dest="step_cap")
     b.add_argument("--time-cap-min", type=int, required=True, dest="time_cap_min")
+    # gate-blocked (P7): the auto-branch records this when a mandatory gate holds the chain
+    # — distinct from a cap halt, so the ledger shows WHY the chain stopped.
+    g = sub.add_parser("gate-blocked", add_help=False)
+    g.add_argument("--root", default=".")
+    g.add_argument("--stage", required=True)
     # parse_args (not parse_known_args) so a stray/misspelled flag errors loud rather than
     # being silently swallowed (REVIEW P3).
     args = parser.parse_args(argv)
     if args.cmd == "boundary":
         return _cmd_boundary(args)
+    if args.cmd == "gate-blocked":
+        autopilot_ledger.append_event(
+            Path(args.root), event="gate_blocked", fields={"stage": args.stage}
+        )
+        return 0
     return 0
 
 
