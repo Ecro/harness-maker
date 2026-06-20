@@ -505,3 +505,23 @@ in-IDE (no orphan branch/worktree/registry row left behind).
 5. **Pass** → auto-land + registry teardown is IDE-portable; **Fail** → record the
    IDE + which artifact leaked (branch / worktree / registry row) and open a
    per-target follow-up.
+
+## Autopilot auto-advance — cross-IDE caveat (PLAN-human-bottleneck-auto-advance P8, ADR-004)
+
+Live auto-advance is **Claude-Code-only**. The auto-branch + session-start picker are
+rendered into the SHARED `.claude/commands/hm/<stage>.md` files (which Cursor also reads),
+gated `{% if is_codex is defined and not is_codex %}` (so the Codex `.agents/skills/` render
+omits them entirely). For **Cursor**, the block is present in the file but must be a runtime
+NO-OP — it depends on the `Skill` tool (Claude-only) + the `.hm-autopilot` marker. Verify
+manually on a `cursor` + `autonomy.level: auto_safe` harness:
+
+1. Open a `/hm:` stage command in Cursor. Confirm the "Auto-advance check" section's
+   precondition ("If the `Skill` tool is unavailable … this section is a NO-OP") causes the
+   agent to fall through to the STOP banner — it must NOT attempt `Skill(hm:<next>)`.
+2. Confirm the session-start picker does NOT silently write a `.hm-autopilot` marker in
+   Cursor (the picker says "Claude Code only"). If a marker IS written, the chain still
+   can't fire (no `Skill` tool) but the picker prose should be tightened.
+3. **Codex**: confirm the rendered `.agents/skills/hm-<stage>/SKILL.md` contains NO
+   `@hm:autopilot-advance` / `@hm:autopilot-picker` block (structural exclusion).
+4. **Pass** → auto-advance is correctly Claude-scoped; **Fail** → record the IDE + whether
+   the marker was written / Skill attempted, and tighten the prose precondition.

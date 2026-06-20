@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Added — Autopilot docs + e2e; ledger timestamp-resolution fix (PLAN-human-bottleneck-auto-advance Phase 8 of 9 — feature complete)
+- **`tests/e2e/test_autopilot_chain_e2e.py`** — drives the boundary CLI through a full pipeline (advance each stage → record `advanced` → last stage clears the marker + reports `pipeline_complete`; + a step-cap-halts-mid-chain case). The live Skill-chain is manually verified (cross-IDE checklist); this is the durable mechanical spine.
+- **Fixed** — `autopilot_ledger._utc_now_iso` was second-truncated while the marker's `created_at` is microsecond-resolution, so a same-second `advanced` event sorted before `created_at` and the session step-count filter dropped it → the step cap never fired. Aligned to `isoformat()` (the e2e caught this). `_parse_iso` still normalizes legacy `Z`-form rows.
+- **Docs** — README "Autopilot (pipeline auto-advance)" section + `tests/cursor-compat/MANUAL_CHECKLIST.md` autopilot cross-IDE caveat.
+- **The autonomy feature (P0–P8) is now code/docs/e2e complete, all phases reviewed Grade A.** The 5-file version bump + release sectioning is intentionally deferred to a coordinated 0.31.0 release.
+
 ### Added — Auto-advance audit ledger consumers + /hm:health smoke (PLAN-human-bottleneck-auto-advance Phase 7 of 9)
 - **`gate_blocked` ledger event** — `autopilot_caps gate-blocked --stage <s>` records WHY an autopilot chain stopped at a mandatory gate (distinct from a runaway `halted_cap`); the stage-template gate-stop path now writes it before STOP. Completes the ADR-009 event vocabulary (`advanced` + `halted_cap` already shipped in P5/P6).
 - **`/hm:health` positive autopilot smoke** — `autopilot_ledger.smoke_check` + `smoke` CLI surface "armed but never fired" silent degradation (autonomy armed in `harness.yaml` yet the auto-advance ledger has zero entries). Render-gated into `health.md.j2` when `autonomy.level != gated`. Enablement uses a positive allow-list matching `effective_level`'s clamp-unknown-to-gated fail-safe, so a typo'd level can't raise a false alarm.

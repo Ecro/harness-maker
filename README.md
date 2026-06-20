@@ -513,6 +513,32 @@ Fused workflows combine atomic stages into a single command. The interview gener
 
 ---
 
+## Autopilot (pipeline auto-advance)
+
+By default the workflow **stops after every stage** so you stay in the loop. When that
+hand-off becomes a bottleneck, opt into **autopilot**: stages auto-advance through the
+pipeline whenever no human decision is actually required.
+
+- **Off by default** (`autonomy.level: gated`). Opt in per-session with
+  `harness-maker autopilot on` (which arms `auto_safe` by default — pass `--level full`
+  for the wider policy), via the session-start picker, or by setting `autonomy.level` in
+  `harness.yaml`.
+- **Mandatory human gates always stop the chain** — a `/hm:plan` architecture interview,
+  a `/hm:review` `CHANGES_REQUESTED`, the `/hm:wrapup` commit/push, or a `/hm:verify`
+  failure. These safety gates are non-negotiable at every level (`full` does **not**
+  bypass them).
+- **Runaway guards**: `autonomy.step_cap` (default 20) / `autonomy.time_cap_min`
+  (default 60) halt a chain that runs too long; removing the `.hm-autopilot` marker
+  (`harness-maker autopilot off`) is an instant kill switch honored at the next boundary.
+- **Auditable**: every advance / gate-stop / cap-halt is recorded to
+  `.claude/observability/auto-advance.jsonl`; `/hm:health` surfaces an "armed but never
+  fired" degradation signal.
+- **Claude Code only** today — the auto-advance branch is excluded from the **Codex**
+  render entirely, and is a runtime **no-op under Cursor** (it needs the Claude-only `Skill`
+  tool + the `.hm-autopilot` marker, so a Cursor session just falls through to the STOP).
+
+---
+
 ## How it compares
 
 Other harnesses give everyone the same starting point. harness-maker reads YOUR repo and builds YOUR harness. The differences fan out from there:

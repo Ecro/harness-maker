@@ -57,7 +57,12 @@ def ledger_path(project_root: Path, observability_dir: Path | None = None) -> Pa
 
 
 def _utc_now_iso() -> str:
-    return datetime.now(tz=UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    # Microsecond + offset isoformat — MUST match the marker's created_at resolution
+    # (autopilot.write uses datetime.now(UTC).isoformat()). A second-truncated ts would
+    # sort BEFORE a same-second marker.created_at, so count_events' `ts >= since` filter
+    # would DROP a same-second `advanced` event → step count under-counts → the step cap
+    # never fires (P8 e2e caught this).
+    return datetime.now(tz=UTC).isoformat()
 
 
 def _append_atomic_line(path: Path, line: str) -> None:
@@ -137,11 +142,12 @@ def count_events(
     """Count ledger events of one type, optionally only those with ``ts >= since``.
 
     The `since` filter parses BOTH sides to aware datetimes (not a lexicographic string
-    compare) — the marker's `created_at` (`...SS.ffffff+00:00` from `datetime.isoformat`)
-    and the ledger ts (`...SSZ` from `_utc_now_iso`) have DIFFERENT shapes, so a byte
-    compare would only be correct by accident (REVIEW P2). The P6 boundary CLI passes the
-    marker's `created_at` to scope the `advanced` count to the current session. Fail-safe:
-    a missing ledger / unparseable line / unparseable ts counts as zero/skipped, never raises.
+    compare). The marker's `created_at` and the live ledger ts are now both `isoformat`
+    (`...SS.ffffff+00:00`, P8 fix to `_utc_now_iso`), but a byte compare is still wrong:
+    legacy rows on disk may carry the old `...SSZ` form, and `_parse_iso` normalizes the `Z`
+    so mixed-format ledgers still compare correctly. The P6 boundary CLI passes the marker's
+    `created_at` to scope the `advanced` count to the current session. Fail-safe: a missing
+    ledger / unparseable line / unparseable ts counts as zero/skipped, never raises.
     """
     path = ledger_path(project_root, observability_dir)
     if not path.is_file():
