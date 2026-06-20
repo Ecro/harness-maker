@@ -260,3 +260,109 @@ def test_create_time_prune_preserves_inflight_finalize_branch(tmp_path: Path) ->
         "after wrapup commit the orphan branch's content is in HEAD → swept"
     )
     assert branch_a in report_after.removed_branches
+
+
+def test_flag_on_finalize_commit_not_stash(tmp_path: Path) -> None:
+    """Phase 3 (ADR-007) flag-ON path: a task worktree's stage-only finalize
+    captures pending work as a commit on `hm/<slug>` and never touches the base
+    (no stash, no merge-to-base, no `.hm-finalize-stash-*` ref), leaving the
+    persistent worktree in place for the Phase-4 land. Exercises the real CLI
+    boundary (subprocess), mirroring how /hm:execute Step 5 invokes finalize.
+    """
+    base = _init_base_repo(tmp_path)
+    claude = base / ".claude"
+    claude.mkdir(exist_ok=True)
+    (claude / "harness.yaml").write_text(
+        "worktree:\n  feature_branch_workflow: true\n", encoding="utf-8"
+    )
+    base_head = _git("rev-parse", "HEAD", cwd=base).stdout.strip()
+
+    wt = worktree.task_create(base, "lifecycle", session_uuid="u-int-1")
+    (wt / "feature.py").write_text("print('work')\n", encoding="utf-8")
+
+    proc = subprocess.run(
+        [sys.executable, "-m", "harness_maker.worktree", "finalize", str(wt), "stage-only"],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert proc.returncode == 0, f"flag-ON finalize failed: {proc.stderr}"
+    # persistent worktree survives (land owns teardown, not finalize)
+    assert wt.is_dir()
+    # pending work is a reachable commit on the task branch
+    tree = _git("ls-tree", "-r", "--name-only", "hm/lifecycle", cwd=base).stdout
+    assert "feature.py" in tree.split()
+    # the CLI boundary actually CREATED a wip commit (tip advanced past base HEAD)
+    assert "wip" in _git("log", "--oneline", "hm/lifecycle", cwd=base).stdout.lower()
+    assert _git("rev-parse", "hm/lifecycle", cwd=base).stdout.strip() != base_head
+    # base never touched: HEAD unchanged + zero finalize-stash refs anywhere
+    assert _git("rev-parse", "HEAD", cwd=base).stdout.strip() == base_head
+    assert sorted((base / ".claude").glob(".hm-finalize-stash-*")) == []
+
+
+def test_concurrent_task_lands_serialize_under_fence(tmp_path: Path) -> None:
+    """Phase 4 (ADR-003) exit-criterion (a)+(b): two concurrent `task_land` calls
+    on DISTINCT slugs both squash onto the shared base branch. They serialize
+    under the merge fence (flock primary / O_EXCL secondary, WSL2-reliable) so
+    both land exactly once with no contamination — without the fence the two
+    `git commit`s on the shared base index would race/corrupt.
+    """
+    import concurrent.futures
+
+    base = _init_base_repo(tmp_path)
+    before = int(_git("rev-list", "--count", "HEAD", cwd=base).stdout.strip())
+
+    for slug, content in (("feat-a", "AAA\n"), ("feat-b", "BBB\n")):
+        wt = worktree.task_create(base, slug, session_uuid=f"u-{slug}")
+        (wt / f"{slug}.py").write_text(content, encoding="utf-8")
+        _git("add", "-A", cwd=wt)
+        _git("commit", "-m", f"wip(execute): {slug}", cwd=wt)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as ex:
+        results = list(ex.map(lambda s: worktree.task_land(base, s), ["feat-a", "feat-b"]))
+
+    assert results == [0, 0], f"both lands must succeed: {results}"
+    # exactly TWO new squash commits on base (one per task, serialized)
+    after = int(_git("rev-list", "--count", "HEAD", cwd=base).stdout.strip())
+    assert after == before + 2
+    # both branches + worktrees torn down, both rows gone, no leaked markers
+    branches = _git("branch", "--format=%(refname:short)", cwd=base).stdout.split()
+    assert "hm/feat-a" not in branches
+    assert "hm/feat-b" not in branches
+    assert not (base / ".worktrees" / "feat-a").is_dir()
+    assert not (base / ".worktrees" / "feat-b").is_dir()
+    assert worktree._read_sessions(base) == []
+    assert _git("for-each-ref", "--format=%(refname)", "refs/hm-landed/", cwd=base).stdout == ""
+    # both tasks' content actually landed in base HEAD (no contamination / loss)
+    tree = _git("ls-tree", "-r", "--name-only", "HEAD", cwd=base).stdout.split()
+    assert "feat-a.py" in tree
+    assert "feat-b.py" in tree
+
+
+def test_concurrent_lands_serialize_via_oexcl_secondary(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    """Phase 4 exit-criterion (b) / REVIEW concurrency C3: force the WSL2-reliable
+    O_EXCL secondary lock leg (flock reported unsupported) and prove two concurrent
+    lands still serialize and both land exactly once."""
+    import concurrent.futures
+
+    # Force `_acquire_merge_fence` onto the O_EXCL secondary mechanism.
+    monkeypatch.setattr(worktree, "_flock_lock", lambda path, timeout: (None, "unsupported"))
+
+    base = _init_base_repo(tmp_path)
+    before = int(_git("rev-list", "--count", "HEAD", cwd=base).stdout.strip())
+    for slug, content in (("ox-a", "A\n"), ("ox-b", "B\n")):
+        wt = worktree.task_create(base, slug, session_uuid=f"u-{slug}")
+        (wt / f"{slug}.py").write_text(content, encoding="utf-8")
+        _git("add", "-A", cwd=wt)
+        _git("commit", "-m", f"wip(execute): {slug}", cwd=wt)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as ex:
+        results = list(ex.map(lambda s: worktree.task_land(base, s), ["ox-a", "ox-b"]))
+
+    assert results == [0, 0], f"both lands must succeed via O_EXCL: {results}"
+    after = int(_git("rev-list", "--count", "HEAD", cwd=base).stdout.strip())
+    assert after == before + 2  # serialized: exactly two squash commits
+    branches = _git("branch", "--format=%(refname:short)", cwd=base).stdout.split()
+    assert "hm/ox-a" not in branches
+    assert "hm/ox-b" not in branches
+    assert worktree._read_sessions(base) == []

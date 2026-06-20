@@ -20,12 +20,14 @@ Conventions
 from __future__ import annotations
 
 import contextlib
+import json
 import os
 import re
 import subprocess
 import sys
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -41,6 +43,7 @@ _SHA_RE = re.compile(r"^[0-9a-f]{40}$")
 _SESSION_MARKER_RE = re.compile(r"^/.+/\.claude/\.hm-loop-[A-Za-z0-9_.-]+$")
 
 WORKTREE_DIR_NAME = ".worktrees"
+_TASK_BRANCH_PREFIX = "hm/"  # per-task feature-branch spine (ADR-002)
 _TS_FMT = "%Y%m%dT%H%MZ"
 _GIT_TIMEOUT = 60  # seconds — prevent hang on SSH prompt or NFS stall
 # Longer timeout for `git stash push -u` on large working trees with untracked
@@ -94,6 +97,7 @@ _HARNESS_CHURN_FILES: tuple[str, ...] = (
     ".claude/.hm-session-uuid",
     ".claude/.hm-autopilot",
     ".claude/.hm-render-manifest.jsonl",
+    ".claude/.hm-sessions.json",  # Phase 1 (ADR-004): session registry — operational churn
     "work-docs/p5-batch-state.yaml",
 )
 # Patterns appended to the user's .gitignore (ADR-002) — dirs + exact files.
@@ -364,10 +368,15 @@ def _capture_pending_in_worktree(wt_path: Path) -> bool:
 
     Known limitation: the status-check + add + commit sequence is not atomic
     against a concurrent writer (e.g., Cursor IDE editing the same worktree).
-    Cleanup --force may delete a Cursor write that arrived after our status
-    check but before our git add. CLAUDE.md "Worktree 공유" notes the prefix-
-    match cleanup boundary; in practice harness-maker and Cursor own different
-    worktree prefixes, so the actual race surface is small.
+    On the OLD/legacy teardown path, cleanup --force may delete a Cursor write
+    that arrived after our status check but before our git add — that loss
+    vector is teardown-specific. On the ADR-007 commit-not-stash path the
+    caller never tears the worktree down and re-checks `_worktree_is_dirty`
+    after this returns, so a late write is non-destructive (it stays in the
+    worktree and forces `rc=1` rather than a false success). CLAUDE.md
+    "Worktree 공유" notes the prefix-match cleanup boundary; in practice
+    harness-maker and Cursor own different worktree prefixes, so the actual
+    race surface is small.
     """
     wt = wt_path.resolve()
     status = _run(["git", "status", "--porcelain"], cwd=wt)
@@ -1012,16 +1021,24 @@ def _snapshot_staged_paths(base: Path) -> set[str]:
 
 
 @contextlib.contextmanager
-def _acquire_merge_fence(base: Path, timeout: float = 60.0):  # type: ignore[no-untyped-def]
-    """Serialize the merge step across parallel finalize invocations.
+def _acquire_merge_fence(  # type: ignore[no-untyped-def]
+    base: Path, timeout: float = 60.0, lock_basename: str = "index.lock-hm"
+):
+    """Serialize a critical section across parallel processes on one repo.
 
     PLAN-worktree-cross-session-data-loss-defense ADR-005. Primary path:
-    fcntl.flock on `<base>/.git/index.lock-hm`. Secondary (equal-status,
+    fcntl.flock on `<git-common-dir>/<lock_basename>`. Secondary (equal-status,
     NOT silent skip) when flock is unavailable: O_EXCL polling lock on
-    `<base>/.git/index.lock-hm-excl`. Either path works on WSL2/NTFS.
+    `<git-common-dir>/<lock_basename>-excl`. Either path works on WSL2/NTFS.
 
-    Lock file is harness-owned — must be excluded from dirty-base guard
-    via `_HARNESS_ARTIFACT_PREFIXES` already (`.git/` is gitignored).
+    `lock_basename` selects the lock file: the finalize merge uses the default
+    `index.lock-hm`; the Phase 1 session registry uses a DISTINCT
+    `index.lock-hm-registry` so a registry mutate can never contend with — or,
+    once wired inside a fenced finalize, self-deadlock against — the merge lock
+    (REVIEW Phase 1 P1: shared non-reentrant fence + 60-vs-360s timeout mismatch).
+
+    Lock file is harness-owned — `.git/` is gitignored so it never trips the
+    dirty-base guard.
     """
     # REVIEW round 1 P0-MANUAL1 fix: use `git rev-parse --git-common-dir`
     # to resolve the SHARED gitdir across all worktrees of the same repo.
@@ -1039,8 +1056,8 @@ def _acquire_merge_fence(base: Path, timeout: float = 60.0):  # type: ignore[no-
         # Test fixtures pass tmp_path that isn't a real git repo — fall
         # back to <base>/ for unit tests.
         lock_dir = base
-    flock_path = lock_dir / "index.lock-hm"
-    excl_path = lock_dir / "index.lock-hm-excl"
+    flock_path = lock_dir / lock_basename
+    excl_path = lock_dir / f"{lock_basename}-excl"
 
     fd, mechanism = _flock_lock(flock_path, timeout)
     if mechanism == "unsupported":
@@ -2241,6 +2258,105 @@ def _session_worktrees(project_root: Path, primary_wt_name: str, fallback: Path)
     return paths if paths else [fallback]
 
 
+def _is_task_worktree(wt: Path) -> bool:
+    """True when `wt` is checked out on an `hm/<slug>` task branch (new model).
+
+    Distinguishes a persistent task worktree from a legacy disposable
+    `execute-<uuid>` worktree so a migration-window flag flip (ADR-008) routes
+    each worktree to the correct finalize path: a worktree created by the OLD
+    `create` while the flag was off, then finalized after the flag flipped, must
+    still take the old stash+merge+clean path — not commit-and-leave (which
+    would leak the disposable worktree). Absent-case discipline (validator W4).
+    """
+    if not wt.is_dir():
+        return False
+    try:
+        return _current_branch(wt).startswith(_TASK_BRANCH_PREFIX)
+    except RuntimeError:
+        return False
+
+
+def _worktree_is_dirty(wt: Path) -> bool:
+    """True when `git status --porcelain` is non-empty (uncommitted, non-ignored
+    changes remain). A status failure returns False — the caller already handles
+    capture errors, and a broken status check after a successful capture is not a
+    durability signal we can act on."""
+    try:
+        return bool(_run(["git", "status", "--porcelain"], cwd=wt.resolve()).stdout.strip())
+    except RuntimeError:
+        return False
+
+
+def _finalize_commit_not_stash(all_wts: list[Path]) -> int:
+    """ADR-007 (Phase 3): commit-not-stash finalize for the feature-branch model.
+
+    Capture each live session worktree's pending work as a WIP commit on its
+    checked-out task branch (`hm/<slug>`) — durability is branch-reachable
+    commits, NOT a deferred base stash. The base working tree is never touched
+    (no `git stash`, no merge-to-base, no `.hm-finalize-stash-*` ref) and the
+    persistent worktree is left in place — including on `fail` (a blocked stage
+    must not destroy the persistent workspace the next stage reuses; teardown is
+    exclusively the Phase-4 land's job, per ADR-006). Leaves zero finalize-stash
+    refs by construction, and leaves the loop/session markers untouched (the
+    worktrees are still live until land). A worktree dir already gone
+    (landed/cleaned by a prior step) is skipped — idempotent re-run.
+
+    Multi-WT (sibling repos) is best-effort: each WT is captured independently
+    and a failure on one does NOT skip the others (maximize durability), but the
+    overall return code is 1 if ANY capture failed — finalize never reports a
+    false success that would let `/hm:execute` advance over un-committed work.
+    Phase 3 targets the single-repo task; the loop preserves the existing
+    multi-WT iteration for forward-compat.
+
+    Two safety rails (REVIEW iter-3 consensus, data-loss-sensitive core):
+    - **Per-WT identity routing (fail-closed)**: a non-`hm/` worktree present in
+      a mixed-migration marker is NEVER commit-and-left here — it is surfaced
+      (`rc=1`) and preserved, not silently mishandled (code-reviewer P3 + Codex
+      P2). In single-repo Phase 3 the primary is already gated as a task WT, so
+      this is forward-safety that never fires in the common path.
+    - **Post-capture durability re-check**: a concurrent writer can dirty the
+      worktree between `_capture_pending_in_worktree`'s status check and its
+      commit; if residual dirt remains, `rc=1` (never a false success a later
+      land could trust before teardown) (Codex P1).
+    """
+    overall_rc = 0
+    for current_wt in all_wts:
+        if not current_wt.is_dir():
+            continue
+        if not _is_task_worktree(current_wt):
+            print(
+                f"[finalize] {current_wt.name} is not an hm/ task worktree; "
+                "refusing commit-not-stash on it (mixed marker?) — preserving, "
+                "resolve manually",
+                file=sys.stderr,
+            )
+            overall_rc = 1
+            continue
+        try:
+            captured = _capture_pending_in_worktree(current_wt)
+            if captured:
+                print(
+                    f"[finalize] committed pending work in {current_wt.name} "
+                    "on its task branch (commit-not-stash, ADR-007)",
+                    file=sys.stderr,
+                )
+        except RuntimeError as e:
+            print(
+                f"failed to capture uncommitted work in {current_wt}: {e}; preserving worktree",
+                file=sys.stderr,
+            )
+            overall_rc = 1
+            continue
+        if _worktree_is_dirty(current_wt):
+            print(
+                f"[finalize] {current_wt.name} still dirty after capture "
+                "(concurrent writer?) — NOT reporting success; preserving worktree",
+                file=sys.stderr,
+            )
+            overall_rc = 1
+    return overall_rc
+
+
 def _cli_finalize(args: list[str]) -> int:
     """`python -m harness_maker.worktree finalize <wt_path> <success|fail|stage-only> [strategy]`.
 
@@ -2283,6 +2399,17 @@ def _cli_finalize(args: list[str]) -> int:
     # Nothing to do if all WTs have already been cleaned up (idempotent no-op).
     if not any(p.is_dir() for p in all_wts):
         return 0
+
+    # ADR-007 (Phase 3): commit-not-stash finalize. Route to the new path only
+    # for a genuine task worktree (checked out on `hm/<slug>`) under the flag —
+    # a legacy disposable `execute-<uuid>` worktree finalized during the
+    # migration window (flag flipped while it was in flight) still takes the old
+    # stash+merge+clean path below (absent-case discipline; validator W4). The
+    # new path captures pending work as branch commits and NEVER tears the
+    # persistent worktree down, for `fail` too (validator critical: a clean
+    # persistent WT must survive a blocked stage; teardown is Phase-4 land).
+    if _feature_branch_workflow_enabled(project_root) and _is_task_worktree(wt):
+        return _finalize_commit_not_stash(all_wts)
 
     if status == "fail":
         # Fail path: best-effort cleanup of all WTs; marker stays (ADR-003/005).
@@ -2861,6 +2988,682 @@ def _cli_prune_branches(args: list[str]) -> int:
     return 0
 
 
+# ── Phase 1 (ADR-008): feature-branch-workflow flag ──────────────────────────
+
+_SESSIONS_FILE = ".claude/.hm-sessions.json"
+_FLAG_WARNED = False
+
+
+def _reset_flag_warning_state() -> None:
+    """Test hook: clear the once-per-process absent-flag warning guard."""
+    global _FLAG_WARNED
+    _FLAG_WARNED = False
+
+
+def _feature_branch_workflow_enabled(base_dir: Path) -> bool:
+    """Read harness.yaml worktree.feature_branch_workflow (ADR-008).
+
+    Conservative absent-key fallback: a harness.yaml lacking the key (never
+    re-rendered) returns False (old model) and warns exactly once per process,
+    mirroring the `targets` absent-key precedent (CLAUDE.md #6).
+    """
+    global _FLAG_WARNED
+    yaml_path = base_dir / _LOOP_MARKER_DIR / "harness.yaml"
+    try:
+        data = load_harness_yaml(yaml_path)
+    except (OSError, yaml.YAMLError):
+        return False
+    wt = data.get("worktree")
+    if not isinstance(wt, dict) or "feature_branch_workflow" not in wt:
+        if not _FLAG_WARNED:
+            print(
+                "[worktree] harness.yaml worktree.feature_branch_workflow absent "
+                "→ defaulting to the old (non-feature-branch) model. Re-render with "
+                "`/harness-maker:make` to opt in.",
+                file=sys.stderr,
+            )
+            _FLAG_WARNED = True
+        return False
+    return bool(wt.get("feature_branch_workflow", False))
+
+
+# ── Phase 1 (ADR-004): session registry .claude/.hm-sessions.json ─────────────
+
+_REGISTRY_FIELD_RE = re.compile(r"^[^\x00\n\r|]*$")  # no NUL / newline / pipe
+
+
+@dataclass
+class SessionRow:
+    """One active /hm: session. `session_uuid` is the PRIMARY identity."""
+
+    task: str
+    branch: str
+    worktree: str
+    session_uuid: str
+    pid: int
+    created_at: str
+
+
+def _valid_registry_fields(row: SessionRow) -> bool:
+    """Reject NUL/newline/pipe + path-traversal in user-facing string fields."""
+    for value in (row.task, row.branch, row.worktree, row.session_uuid):
+        if not isinstance(value, str) or _REGISTRY_FIELD_RE.match(value) is None:
+            return False
+        if ".." in value.replace("\\", "/").split("/"):
+            return False
+    return isinstance(row.pid, int) and row.pid > 0
+
+
+def _read_sessions(base_dir: Path) -> list[SessionRow]:
+    """Load the registry. Missing/corrupt/invalid → [] (tolerant, never raises)."""
+    path = base_dir / _SESSIONS_FILE
+    try:
+        raw = path.read_text(encoding="utf-8")
+    except OSError:
+        return []
+    try:
+        data = json.loads(raw)
+    except (ValueError, TypeError):
+        return []
+    if not isinstance(data, list):
+        return []
+    rows: list[SessionRow] = []
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        try:
+            row = SessionRow(
+                task=str(item["task"]),
+                branch=str(item["branch"]),
+                worktree=str(item["worktree"]),
+                session_uuid=str(item["session_uuid"]),
+                pid=int(item["pid"]),
+                created_at=str(item.get("created_at", "")),
+            )
+        except (KeyError, ValueError, TypeError):
+            continue
+        if _valid_registry_fields(row):
+            rows.append(row)
+    return rows
+
+
+def _write_sessions(base_dir: Path, rows: list[SessionRow]) -> None:
+    path = base_dir / _SESSIONS_FILE
+    payload = [
+        {
+            "task": r.task,
+            "branch": r.branch,
+            "worktree": r.worktree,
+            "session_uuid": r.session_uuid,
+            "pid": r.pid,
+            "created_at": r.created_at,
+        }
+        for r in rows
+        if _valid_registry_fields(r)
+    ]
+    atomic_write(path, json.dumps(payload, indent=2, sort_keys=True) + "\n")
+
+
+_REGISTRY_LOCK = "index.lock-hm-registry"
+_REGISTRY_LOCK_TIMEOUT = 30.0
+
+
+def _registry_mutate(base_dir: Path, fn: Callable[[list[SessionRow]], list[SessionRow]]) -> None:
+    """Lock-serialized read-modify-write of the registry (no lost updates).
+
+    Uses a DEDICATED lock (`index.lock-hm-registry`), NOT the finalize merge
+    fence — so a registry mutate never contends with the 360s finalize hold and
+    never self-deadlocks if a future call-site runs inside the merge fence
+    (REVIEW Phase 1 P1). The registry is operational churn: if the lock cannot
+    be acquired (contention OR a stale O_EXCL lock left by a SIGKILL'd process on
+    WSL2/NTFS), a permanent wedge is worse than a rare lost update — so fall back
+    to a best-effort unfenced mutate + warn, mirroring the finalize-pop fallback.
+    """
+    try:
+        with _acquire_merge_fence(
+            base_dir, timeout=_REGISTRY_LOCK_TIMEOUT, lock_basename=_REGISTRY_LOCK
+        ):
+            rows = _read_sessions(base_dir)
+            _write_sessions(base_dir, fn(rows))
+        return
+    except (TimeoutError, RuntimeError, OSError) as exc:
+        print(
+            f"[worktree] session-registry lock unavailable ({exc}); best-effort unfenced update",
+            file=sys.stderr,
+        )
+    rows = _read_sessions(base_dir)
+    _write_sessions(base_dir, fn(rows))
+
+
+def _pid_alive(pid: int) -> bool:
+    """True if a process with pid exists (liveness HINT only — pid can be reused).
+
+    Relies on the upstream `_valid_registry_fields` `pid > 0` guard: `os.kill(0, 0)`
+    signals the caller's process group (returns True), so this helper is unsafe for
+    `pid <= 0` and must only be called on validated rows.
+    """
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True  # exists, owned by another user
+    except OSError:
+        return False
+    return True
+
+
+def register_session(
+    base_dir: Path,
+    *,
+    task: str,
+    branch: str,
+    wt: str,
+    session_uuid: str,
+    pid: int,
+) -> None:
+    """Claim a task↔branch↔worktree↔session row (ADR-004). Idempotent by uuid."""
+    row = SessionRow(
+        task=task,
+        branch=branch,
+        worktree=wt,
+        session_uuid=session_uuid,
+        pid=pid,
+        created_at=_timestamp(),
+    )
+    if not _valid_registry_fields(row):
+        return  # adversarial input dropped, never raises
+
+    def _add(rows: list[SessionRow]) -> list[SessionRow]:
+        # Dedup by uuid AND branch → one row per task branch (REVIEW Phase 2 P1:
+        # reuse re-registers with a fresh uuid; the prior same-branch row is replaced).
+        kept = [r for r in rows if r.session_uuid != session_uuid and r.branch != branch]
+        kept.append(row)
+        return kept
+
+    _registry_mutate(base_dir, _add)
+
+
+def release_session(base_dir: Path, *, session_uuid: str) -> None:
+    """Remove the row owned by session_uuid (and only that one)."""
+    _registry_mutate(base_dir, lambda rows: [r for r in rows if r.session_uuid != session_uuid])
+
+
+def reclaim_stale(base_dir: Path) -> None:
+    """Drop genuinely-dead rows. session_uuid primary; pid is a liveness hint only.
+
+    A row is reclaimed (dropped) iff its worktree dir is missing OR its pid is
+    dead — i.e. kept only while BOTH its worktree is on disk AND its pid is live.
+    pid-reuse can only make a dead session's pid look alive, which (combined with
+    a still-present worktree) merely preserves a stale row — the safe direction.
+    Dropping a row only releases the registry claim; it never deletes the worktree.
+    """
+
+    def _sweep(rows: list[SessionRow]) -> list[SessionRow]:
+        return [r for r in rows if Path(r.worktree).exists() and _pid_alive(r.pid)]
+
+    _registry_mutate(base_dir, _sweep)
+
+
+# ── Phase 2 (ADR-010): path-ownership classifier ─────────────────────────────
+
+
+def _path_owner(relpath: str) -> str:
+    """Classify a repo path per the ADR-010 path-ownership matrix.
+
+    deliverable → branch-owned, lands in the squash (PLAN/RESEARCH/SPEC/REVIEW,
+    human memory tiers). operational → gitignored churn, excluded from squash
+    (`.hm-loop-active`, registry, observability, iter-receipts). user → source +
+    `.claude/agents|skills|harness.yaml`, preserved. external → outside the repo
+    (the second-brain vault), unaffected.
+    """
+    norm = relpath.replace("\\", "/")
+    if norm.startswith("/") or ".." in norm.split("/"):
+        return "external"
+    if (
+        norm == ".hm-loop-active"
+        or norm.startswith(".claude/observability/")
+        or norm.startswith(".claude/.hm-")
+        or norm.startswith(".claude/memory/semantic/")
+        or norm.startswith(".claude/memory/episodic/")
+        or norm.startswith(".claude/memory/profile/")
+    ):
+        return "operational"
+    if (
+        _is_deliverable_path(norm)
+        or norm in (".claude/memory/wiki.md", ".claude/memory/failures.md")
+        or norm.startswith(".claude/memory/session/")
+    ):
+        return "deliverable"
+    return "user"
+
+
+# ── Phase 2 (ADR-002, ADR-006): persistent per-task worktree ─────────────────
+
+
+def task_branch(slug: str) -> str:
+    """The user-facing per-task branch name (ADR-002)."""
+    return f"{_TASK_BRANCH_PREFIX}{slug}"
+
+
+def task_worktree_path(base: Path, slug: str) -> Path:
+    """The persistent per-task worktree dir (ADR-006)."""
+    return base / WORKTREE_DIR_NAME / slug
+
+
+_TASK_SLUG_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+
+
+def _valid_task_slug(slug: str) -> bool:
+    """Reject slugs that escape `.worktrees/` or inject a git ref (REVIEW Phase 2 P1).
+
+    `_run` is list-argv (no shell), so this guards the FILESYSTEM-path + git-ref
+    namespace, not shell injection: no `/`, `\\`, leading `-`/`.`, whitespace,
+    absolute path, or `..` component.
+    """
+    return bool(_TASK_SLUG_RE.match(slug)) and ".." not in slug
+
+
+def _gitignore_literal(rel: str) -> str:
+    """Render `rel` as a LITERAL, anchored gitignore pattern (REVIEW Phase 2 P1).
+
+    A raw filename with gitignore metachars (`#` comment, `!` negation, `*?[]`
+    globs, leading/trailing space) would silently fail to exclude → the secret
+    lands in the squash. Anchor with `/` and backslash-escape the specials.
+    """
+    return "/" + re.sub(r"([#!*?\[\]\\ ])", r"\\\1", rel)
+
+
+def _copy_and_exclude_secrets(base: Path, wt: Path, include: list[str]) -> None:
+    """Copy gitignored secrets into the worktree, excluding them via the COMMON
+    `.git/info/exclude` (NOT the tracked `.gitignore`, which would land in the
+    squash). The secret is anchored+escaped (REVIEW Phase 2 P1).
+
+    Mechanism note (verified empirically): git does NOT honor the per-worktree
+    `.git/worktrees/<id>/info/exclude` for status/add — it reads the COMMON
+    git-dir's `info/exclude` (`--git-common-dir`). The pattern is anchored with `/`
+    so it excludes the secret at each worktree/base root; secrets are never
+    track-worthy anywhere, so repo-wide exclusion is acceptable and `.git/` is
+    never committed.
+
+    Each `include` entry is containment-checked (REVIEW Phase 2 P1): a traversal /
+    absolute path must not read outside `base` or write outside `wt`.
+    """
+    import shutil
+
+    common = _run(["git", "rev-parse", "--git-common-dir"], cwd=wt).stdout.strip()
+    common_dir = Path(common) if Path(common).is_absolute() else (wt / common).resolve()
+    exclude = common_dir / "info" / "exclude"
+    exclude.parent.mkdir(parents=True, exist_ok=True)
+    existing = exclude.read_text(encoding="utf-8") if exclude.exists() else ""
+    existing_lines = set(existing.splitlines())
+    base_r = base.resolve()
+    wt_r = wt.resolve()
+    new_lines: list[str] = []
+    for rel in include:
+        if _path_owner(rel) == "external":  # absolute / `..`-escaping → skip
+            continue
+        src = base / rel
+        dst = wt / rel
+        if (
+            not src.is_file()
+            or not src.resolve().is_relative_to(base_r)
+            or not dst.resolve().is_relative_to(wt_r)
+        ):
+            continue
+        # Only copy paths gitignored in base: info/exclude is a no-op for TRACKED
+        # files, so copying one would land its modification in the squash (REVIEW
+        # Phase 2 P2). `git check-ignore -q` exits 0 iff the path is ignored.
+        try:
+            _run(["git", "check-ignore", "-q", rel], cwd=base)
+        except RuntimeError:
+            continue
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dst)
+        entry = _gitignore_literal(rel)
+        if entry not in existing_lines:
+            new_lines.append(entry)
+            existing_lines.add(entry)
+    if new_lines:
+        sep = "" if (not existing or existing.endswith("\n")) else "\n"
+        atomic_write(exclude, existing + sep + "\n".join(new_lines) + "\n")
+
+
+def task_create(
+    base_dir: Path,
+    slug: str,
+    *,
+    session_uuid: str,
+    include: list[str] | None = None,
+) -> Path:
+    """Create (or idempotently reuse) the persistent per-task worktree (ADR-002/006).
+
+    A DETERMINISTIC `.worktrees/<slug>/` on branch `hm/<slug>` off the base HEAD —
+    not the ephemeral `execute-<uuid>`. Registers the session (Phase 1) and copies
+    gitignored secrets in (excluded via per-worktree info/exclude). Idempotent: a
+    repeated call returns the existing worktree and re-establishes the registry row
+    (self-healing the absent-case after `reclaim_stale` — REVIEW Phase 2 P1), with
+    no duplicate branch or row. Flag-gating is the CALLER's job (Phase 5).
+    """
+    if not _valid_task_slug(slug):
+        raise ValueError(
+            f"invalid task slug {slug!r}: expected [A-Za-z0-9][A-Za-z0-9._-]* with no '..'"
+        )
+    base = base_dir.resolve()
+    wt = task_worktree_path(base, slug)
+    branch = task_branch(slug)
+    if not wt.is_dir():
+        (base / WORKTREE_DIR_NAME).mkdir(parents=True, exist_ok=True)
+        # Reattach an existing branch (persistent dir removed but branch kept)
+        # instead of wedging on `-b ... already exists` (REVIEW Phase 2 P1).
+        add = (
+            ["git", "worktree", "add", str(wt), branch]
+            if _branch_exists(base, branch)
+            else ["git", "worktree", "add", "-b", branch, str(wt)]
+        )
+        _run(add, cwd=base)
+        if include:
+            try:
+                _copy_and_exclude_secrets(base, wt, include)
+            except Exception:
+                with contextlib.suppress(RuntimeError):
+                    _run(["git", "worktree", "remove", "--force", str(wt)], cwd=base)
+                raise
+    # ALWAYS (re-)register — register dedups by branch (one row/branch), so a reused
+    # worktree whose row was reclaimed is self-healed and repeats never duplicate.
+    register_session(
+        base, task=slug, branch=branch, wt=str(wt), session_uuid=session_uuid, pid=os.getpid()
+    )
+    return wt
+
+
+def _untracked_files(base: Path) -> set[str]:
+    """Non-ignored untracked files (`git ls-files --others --exclude-standard`).
+
+    Used to scope the squash-conflict cleanup to ONLY merge-introduced untracked
+    files — a blanket `git clean` would nuke pre-existing untracked deliverables
+    (work-docs/PLAN-*.md) that the base-cleanliness gate deliberately forgives.
+    """
+    try:
+        out = _run(["git", "ls-files", "--others", "--exclude-standard"], cwd=base).stdout
+    except RuntimeError:
+        return set()
+    return {ln.strip() for ln in out.splitlines() if ln.strip()}
+
+
+def _squash_path_set(base: Path, branch: str) -> list[str]:
+    """The files the squash will touch — branch's changes vs its merge-base with
+    HEAD. Used to bound conflict-cleanup to the squash's OWN path set."""
+    try:
+        mb = _run(["git", "merge-base", branch, "HEAD"], cwd=base).stdout.strip()
+        out = _run(["git", "diff", "--name-only", mb, branch], cwd=base).stdout
+    except RuntimeError:
+        return []
+    return [p for p in out.splitlines() if p.strip()]
+
+
+def _scoped_conflict_cleanup(base: Path, touched: list[str], pre_untracked: set[str]) -> None:
+    """Revert a failed `git merge --squash` touching ONLY the squash's own path
+    set — a blanket `git reset --hard` / `git clean` would discard a concurrent
+    editor's work on UNRELATED files (the merge fence does not lock external
+    editors; Codex P0). Restores tracked paths to HEAD, then removes only the
+    merge-introduced untracked files within that set (+ now-empty parent dirs)."""
+    if touched:
+        with contextlib.suppress(RuntimeError):
+            _run(["git", "reset", "-q", "HEAD", "--", *touched], cwd=base)
+        # Per-path checkout: `git checkout -- a b` fails atomically if ANY path
+        # is not in HEAD (a branch-added file), which would leave the others
+        # un-restored — so restore each independently.
+        for p in touched:
+            with contextlib.suppress(RuntimeError):
+                _run(["git", "checkout", "-f", "HEAD", "--", p], cwd=base)
+    for f in (_untracked_files(base) - pre_untracked) & set(touched):
+        path = base / f
+        with contextlib.suppress(OSError):
+            path.unlink()
+        with contextlib.suppress(OSError):
+            path.parent.rmdir()  # best-effort: drop a now-empty merge-introduced dir
+
+
+def task_land(
+    base_dir: Path, slug: str, *, message: str | None = None, session_uuid: str | None = None
+) -> int:
+    """ADR-003: squash-merge `hm/<slug>` onto the base branch + tear the task down.
+
+    The ENTIRE critical section runs under the merge fence (flock primary +
+    O_EXCL secondary, WSL2-reliable). The fence covers even distinct slugs
+    because all lands serialize on the SHARED base HEAD/index (every land
+    `git commit`s onto the same base branch). Order — each step individually
+    idempotent so a re-run after a crash at ANY point converges without a double
+    commit or an orphan:
+
+    1. **(in-fence) branch re-check** — a concurrent same-slug winner may have
+       landed + deleted the branch in the TOCTOU window since the pre-fence
+       check; converge to a no-op rather than re-squash a gone branch (REVIEW
+       concurrency C1).
+    2. **base-cleanliness** — abort (`rc=1`, listing the files) on user dirt
+       rather than clobber it (ADR-007 non-contact; `.claude/` churn excluded).
+    3. **capture pending worktree work** — commit any uncommitted worktree edits
+       onto the branch BEFORE the squash so the force-teardown can never lose
+       them (the squash sees only committed branch work; REVIEW code P1).
+    4. **idempotent squash** — skip when the branch already landed: the
+       landed-marker == branch tip (robust even once base HEAD advances) OR
+       `_branch_content_in_head` (content, not ancestry — squash-aware). Else
+       `git merge --squash` + one conventional commit. On conflict, a SCOPED
+       revert of only the squash's own path set (never a concurrent editor's
+       unrelated work; REVIEW Codex P0) leaves base clean, branch preserved.
+    5. **landed-marker** — written BEFORE teardown as the recovery anchor; a
+       write failure aborts (`rc=1`) rather than tearing down anchorless.
+    6. **teardown** — remove the worktree (skipped if gone), THEN delete the
+       branch; a branch-delete failure aborts (`rc=1`, marker+row kept) so a
+       non-converging orphan is never reported as success (REVIEW Codex P1).
+       Then delete the landed-marker inline (the drain's sweep does not know the
+       `hm/` namespace, so cleanup cannot depend on it).
+    7. **registry row** — drop OUR row: uuid match when supplied, else (no uuid)
+       only our-own-pid / a dead-pid row — a live mismatched-UUID/-pid row is
+       never deleted (ADR-004; REVIEW Codex P1 / concurrency C2).
+
+    The drain (`prune_stale`) runs AFTER the fence releases (best-effort,
+    re-entrant) for general backlog hygiene — NOT load-bearing for this land's
+    marker (deleted inline). Returns 0 on success or idempotent no-op, 1 on a
+    base-dirty / conflict / inconsistent / partial abort with worktree+branch
+    preserved.
+    """
+    if not _valid_task_slug(slug):
+        # A force-removing entry point must validate at least as strictly as
+        # task_create (REVIEW code P1: `..`/escape slug → path escape in teardown).
+        print(f"[land] invalid task slug {slug!r}", file=sys.stderr)
+        return 1
+    base = base_dir.resolve()
+    branch = task_branch(slug)
+    wt = task_worktree_path(base, slug)
+    own = session_uuid
+
+    def _drop_own_row(rows: list[SessionRow]) -> list[SessionRow]:
+        # ADR-004: never delete a LIVE mismatched row. Ours = uuid matches (when
+        # supplied), else (no uuid) our-own-pid OR a dead pid (stale). A foreign
+        # live-pid row on the same branch is PRESERVED (reclaimed later by its own
+        # session). Leaking a row is the safe direction.
+        out: list[SessionRow] = []
+        for r in rows:
+            if r.branch != branch:
+                out.append(r)
+                continue
+            ours = (own is not None and r.session_uuid == own) or (
+                own is None and (r.pid == os.getpid() or not _pid_alive(r.pid))
+            )
+            if not ours:
+                out.append(r)
+        return out
+
+    def _converge_landed() -> None:
+        _delete_landed_marker(base, branch)
+        _registry_mutate(base, _drop_own_row)
+
+    if not _branch_exists(base, branch):
+        if not wt.is_dir():
+            _converge_landed()  # fully-landed re-run → clear any leaked marker/row
+            return 0
+        print(
+            f"[land] branch {branch} missing but worktree {wt} present — "
+            "inconsistent; preserving for inspection",
+            file=sys.stderr,
+        )
+        return 1
+
+    msg = message or f"chore({slug}): squash-land {branch}"
+    try:
+        with _acquire_merge_fence(base, timeout=_FENCE_TIMEOUT):
+            # In-fence re-check: a concurrent winner may have deleted the branch
+            # since the pre-fence check (TOCTOU). Converge instead of re-squashing.
+            if not _branch_exists(base, branch):
+                if wt.is_dir():
+                    print(
+                        f"[land] {branch} landed concurrently but worktree {wt} "
+                        "remains — inconsistent; preserving for inspection",
+                        file=sys.stderr,
+                    )
+                    return 1
+                _converge_landed()
+                return 0
+
+            if _has_user_dirty_state(base):
+                dirty = _list_user_dirty_files(base)
+                print(
+                    f"[land] base has uncommitted user changes — aborting land to "
+                    f"avoid clobber: {dirty}",
+                    file=sys.stderr,
+                )
+                return 1
+
+            # Capture uncommitted worktree work onto the branch BEFORE the squash
+            # so the force-teardown can't silently lose it (REVIEW code P1).
+            if wt.is_dir():
+                try:
+                    if _capture_pending_in_worktree(wt):
+                        print(
+                            "[land] captured pending worktree work onto the branch before squash",
+                            file=sys.stderr,
+                        )
+                except RuntimeError as e:
+                    print(
+                        f"[land] failed to capture pending worktree work: {e}; preserving worktree",
+                        file=sys.stderr,
+                    )
+                    return 1
+
+            # Already-landed: marker==tip survives later base-HEAD edits (Codex
+            # P0); content-in-head is the fallback when no marker was written.
+            already = _read_landed_marker(base, branch) == _branch_tip(
+                base, branch
+            ) or _branch_content_in_head(base, branch)
+            if already:
+                print(
+                    f"[land] {branch} already landed — skipping squash "
+                    "(idempotent partial-land re-run)",
+                    file=sys.stderr,
+                )
+            else:
+                touched = _squash_path_set(base, branch)
+                pre_untracked = _untracked_files(base)
+                try:
+                    _run(["git", "merge", "--squash", branch], cwd=base)
+                    _run(["git", "commit", "-m", msg], cwd=base)
+                except RuntimeError as e:
+                    _scoped_conflict_cleanup(base, touched, pre_untracked)
+                    print(
+                        f"[land] squash-merge of {branch} failed (conflict?); base "
+                        f"reset clean, branch preserved for manual resolution: {e}",
+                        file=sys.stderr,
+                    )
+                    return 1
+
+            # Recovery anchor BEFORE teardown — NOT best-effort: without it a
+            # crash mid-teardown could not be recognized as already-landed.
+            try:
+                _write_landed_marker(base, branch)
+            except RuntimeError as e:
+                print(
+                    f"[land] landed-marker write failed; preserving for re-run: {e}",
+                    file=sys.stderr,
+                )
+                return 1
+
+            if wt.is_dir():
+                try:
+                    cleanup(wt, on_success=True)
+                except RuntimeError as e:
+                    print(
+                        f"[land] worktree cleanup failed (squash already in HEAD; "
+                        f"re-run to finish teardown): {e}",
+                        file=sys.stderr,
+                    )
+                    return 1
+            try:
+                _run(["git", "branch", "-D", branch], cwd=base)
+            except RuntimeError as e:
+                # Do NOT report success on a non-converging orphan (Codex P1).
+                # Keep marker + row so a re-run finishes the teardown.
+                print(
+                    f"[land] branch delete failed (squash already landed; re-run to "
+                    f"finish teardown): {e}",
+                    file=sys.stderr,
+                )
+                return 1
+            # Marker's recovery role is done — delete inline (the drain's sweep
+            # does not recognize the `hm/` namespace, so it would otherwise leak).
+            _delete_landed_marker(base, branch)
+            _registry_mutate(base, _drop_own_row)
+    except (RuntimeError, TimeoutError) as e:
+        print(
+            f"[land] fence/land failed, preserving worktree + branch for re-run: {e}",
+            file=sys.stderr,
+        )
+        return 1
+
+    # Drain AFTER the fence releases (general backlog hygiene; best-effort —
+    # NOT load-bearing for this land's marker, already deleted inline above).
+    with contextlib.suppress(Exception):
+        prune_stale(base)
+    return 0
+
+
+def _cli_task_create(args: list[str]) -> int:
+    """`python -m harness_maker.worktree task-create <slug> [base_dir]` (ADR-002/006)."""
+    rest = [a for a in args if not a.startswith("--")]
+    if not rest:
+        print("usage: task-create <slug> [base_dir]", file=sys.stderr)
+        return 2
+    slug = rest[0]
+    base = Path(rest[1]).resolve() if len(rest) > 1 else Path.cwd()
+    wt = task_create(base, slug, session_uuid=uuid.uuid4().hex[:12])
+    print(str(wt))
+    return 0
+
+
+def _cli_task_land(args: list[str]) -> int:
+    """`python -m harness_maker.worktree task-land <slug> [base_dir] [--message <m>]` (ADR-003)."""
+    message: str | None = None
+    rest: list[str] = []
+    i = 0
+    while i < len(args):
+        if args[i] == "--message":
+            if i + 1 >= len(args):
+                print("usage: task-land <slug> [base_dir] [--message <m>]", file=sys.stderr)
+                return 2
+            message = args[i + 1]
+            i += 2
+            continue
+        rest.append(args[i])
+        i += 1
+    if not rest:
+        print("usage: task-land <slug> [base_dir] [--message <m>]", file=sys.stderr)
+        return 2
+    slug = rest[0]
+    base = Path(rest[1]).resolve() if len(rest) > 1 else Path.cwd()
+    return task_land(base, slug, message=message)
+
+
 def _drain(base_dir: Path) -> PruneReport:
     """ADR-009 drain trigger: the gated, biased-to-preserve sweep, off the create path.
 
@@ -2901,7 +3704,7 @@ def main(argv: list[str] | None = None) -> int:
         print(
             "usage: python -m harness_maker.worktree "
             "<create|verify|finalize|post-commit-pop|owned-uuids|cleanup-all|"
-            "prune-branches|drain> [...]",
+            "prune-branches|drain|task-create|task-land> [...]",
             file=sys.stderr,
         )
         return 2
@@ -2922,6 +3725,10 @@ def main(argv: list[str] | None = None) -> int:
         return _cli_prune_branches(rest)
     if sub == "drain":
         return _cli_drain(rest)
+    if sub == "task-create":
+        return _cli_task_create(rest)
+    if sub == "task-land":
+        return _cli_task_land(rest)
     print(f"unknown subcommand: {sub}", file=sys.stderr)
     return 2
 
