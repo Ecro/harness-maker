@@ -209,3 +209,23 @@ def test_gate0_treats_non_pass_verdict_as_failure(loop_md: str) -> None:
         "Gate 0 must spell out: verdict != 'pass' counts as failure "
         "(closes 'forge skipped to bypass' loophole, ADR-005)"
     )
+
+
+def test_loop_close_wrapup_reuses_loop_worktree_not_a_task_worktree(loop_md: str) -> None:
+    """REVIEW-2026-06-21 P2-4: loop-close runs the standalone wrapup stage, whose
+    flag-on body carries its OWN worktree preflight (`task-preflight` → a fresh
+    `hm/<slug>` worktree) and Step 7.7 (`task-land`). Without an explicit override,
+    the loop's `<WT>` (execute-<uuid>) and wrapup's freshly-minted `hm/<slug>`
+    contradict → double-land of disjoint work or an orphan branch. The loop-close
+    wrapup step must instruct the LLM to SKIP wrapup's preflight + Step 7.7 and reuse
+    the loop's own `<WT>` (finalize owns the land)."""
+    close_idx = loop_md.find("Run wrapup ONCE")
+    assert close_idx > 0, "loop.md missing the loop-close 'Run wrapup ONCE' step"
+    section = loop_md[close_idx : close_idx + 1600]
+    assert "SKIP" in section, "loop-close wrapup must spell out a SKIP override"
+    assert "task-preflight" in section, (
+        "loop-close wrapup must SKIP wrapup's own task-preflight / worktree preflight"
+    )
+    assert "Step 7.7" in section or "task-land" in section, (
+        "loop-close wrapup must SKIP wrapup's Step 7.7 squash-land (finalize owns the land)"
+    )

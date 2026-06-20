@@ -1702,6 +1702,22 @@ def _branch_tip(base: Path, branch: str) -> str | None:
     return sha if _SHA_RE.match(sha) else None
 
 
+def _branch_tip_message(base: Path, branch: str) -> str | None:
+    """Return branch's tip commit message (full subject + body), or None.
+
+    The squash-land defaults to this so the user's curated wrapup commit — its
+    why-focused subject/body AND the `Co-Authored-By` trailer — survives onto the
+    base branch instead of a generic `chore(...): squash-land` placeholder
+    (REVIEW-2026-06-21 P2-3). Computed BEFORE the fence/`_capture_pending_in_worktree`
+    so the tip is the wrapup Step-7 commit, not a later `wip(execute): capture`.
+    Returns None on git failure or an empty message so the caller can fall back."""
+    try:
+        msg = _run(["git", "log", "-1", "--format=%B", branch], cwd=base).stdout.strip()
+    except RuntimeError:
+        return None
+    return msg or None
+
+
 def _write_landed_marker(base: Path, branch: str) -> None:
     """Record branch's tip SHA as its landed marker (atomic `git update-ref`)."""
     tip = _branch_tip(base, branch)
@@ -3117,7 +3133,20 @@ _REGISTRY_FIELD_RE = re.compile(r"^[^\x00\n\r|]*$")  # no NUL / newline / pipe
 
 @dataclass
 class SessionRow:
-    """One active /hm: session. `session_uuid` is the PRIMARY identity."""
+    """One active /hm: session.
+
+    `session_uuid` is the DESIGNED primary identity (ADR-004). **CLI-boundary reality
+    (REVIEW-2026-06-21 P3-1):** the shipped `task-create` / `task-preflight` / `task-land`
+    entry points each run in a short-lived subprocess and mint a throwaway
+    `uuid.uuid4()` (no stable per-session UUID is threaded — `_current_session_uuid`
+    is project-scoped, NOT session-scoped, per REVIEW round 1 P0-MANUAL2, and the real
+    per-session identity is the deferred dirname-embedded-UUID refactor). So in the
+    shipped path the LIVE-row protection is actually enforced by the `pid`-liveness +
+    worktree-existence heuristic in `_drop_own_row` / `reclaim_stale`, NOT by uuid match.
+    That heuristic is safe (it only ever drops a same-branch row whose worktree is
+    already gone, and preserves a live foreign-pid row — see
+    `test_task_land_no_uuid_preserves_foreign_live_pid_row`); the uuid-match path fires
+    only when a caller explicitly passes a stable uuid. `pid` is a liveness HINT only."""
 
     task: str
     branch: str
@@ -3398,7 +3427,7 @@ def _copy_and_exclude_secrets(base: Path, wt: Path, include: list[str]) -> None:
         # files, so copying one would land its modification in the squash (REVIEW
         # Phase 2 P2). `git check-ignore -q` exits 0 iff the path is ignored.
         try:
-            _run(["git", "check-ignore", "-q", rel], cwd=base)
+            _run(["git", "check-ignore", "-q", "--", rel], cwd=base)
         except RuntimeError:
             continue
         dst.parent.mkdir(parents=True, exist_ok=True)
@@ -3588,18 +3617,46 @@ def task_refresh(base_dir: Path, slug: str) -> int:
     return 0
 
 
+def _split_z(out: str) -> list[str]:
+    """Split a NUL-delimited git `-z` stream into raw path strings (trailing
+    empty dropped).
+
+    NUL-delimiting is the ONLY enumeration that survives non-ASCII / control-char
+    / whitespace filenames intact: git's default `core.quotepath=true` returns
+    such names C-quoted (e.g. `café.md` → the literal `"caf\\303\\251.md"`) in the
+    newline-delimited form, and a quoted literal handed back as a pathspec never
+    matches the real file (REVIEW-2026-06-21 P1-1: land permanently fails + leaves
+    staged contamination). `-z` paths are raw bytes-as-str and pass straight
+    through subprocess argv (no shell, no requoting)."""
+    return [p for p in out.split("\x00") if p]
+
+
+def _staged_files(base: Path) -> set[str]:
+    """Paths currently staged in base's index (`git diff --cached`, NUL-safe).
+
+    The squash-land treats these as a concurrent session's forgiven base churn
+    (`.claude/` + deliverables pass `_has_user_dirty_state`) that must NOT land in
+    our squash NOR be clobbered by a conflict-cleanup (REVIEW-2026-06-21 P1-2)."""
+    try:
+        out = _run(["git", "diff", "--cached", "-z", "--name-only"], cwd=base).stdout
+    except RuntimeError:
+        return set()
+    return set(_split_z(out))
+
+
 def _untracked_files(base: Path) -> set[str]:
     """Non-ignored untracked files (`git ls-files --others --exclude-standard`).
 
     Used to scope the squash-conflict cleanup to ONLY merge-introduced untracked
     files — a blanket `git clean` would nuke pre-existing untracked deliverables
     (work-docs/PLAN-*.md) that the base-cleanliness gate deliberately forgives.
-    """
+    `-z` so a non-ASCII untracked name matches the same-encoded `touched` set
+    (REVIEW-2026-06-21 P1-1)."""
     try:
-        out = _run(["git", "ls-files", "--others", "--exclude-standard"], cwd=base).stdout
+        out = _run(["git", "ls-files", "-z", "--others", "--exclude-standard"], cwd=base).stdout
     except RuntimeError:
         return set()
-    return {ln.strip() for ln in out.splitlines() if ln.strip()}
+    return set(_split_z(out))
 
 
 def _squash_path_set(base: Path, branch: str) -> list[str]:
@@ -3613,31 +3670,54 @@ def _squash_path_set(base: Path, branch: str) -> list[str]:
     DELETION of the old path → the renamed-away file lingers in HEAD and a staged
     deletion leaks into base for a later session's commit (Codex P1, data-loss).
     Disabling rename detection makes a rename always two entries (old delete + new
-    add), so the scoped commit records both sides."""
+    add), so the scoped commit records both sides.
+
+    `-z` is REQUIRED for the same reason `--no-renames` is: a non-ASCII / control-char
+    filename in the diff is C-quoted under the default `core.quotepath=true`, and a
+    quoted literal cannot be used to unstage / restore the real path (REVIEW-2026-06-21
+    P1-1). NUL-delimited names are raw."""
     try:
         mb = _run(["git", "merge-base", branch, "HEAD"], cwd=base).stdout.strip()
-        out = _run(["git", "diff", "--name-only", "--no-renames", mb, branch], cwd=base).stdout
+        out = _run(
+            ["git", "diff", "-z", "--name-only", "--no-renames", mb, branch], cwd=base
+        ).stdout
     except RuntimeError:
         return []
-    return [p for p in out.splitlines() if p.strip()]
+    return _split_z(out)
 
 
-def _scoped_conflict_cleanup(base: Path, touched: list[str], pre_untracked: set[str]) -> None:
+def _scoped_conflict_cleanup(
+    base: Path,
+    touched: list[str],
+    pre_untracked: set[str],
+    preserve: set[str] | None = None,
+) -> None:
     """Revert a failed `git merge --squash` touching ONLY the squash's own path
     set — a blanket `git reset --hard` / `git clean` would discard a concurrent
     editor's work on UNRELATED files (the merge fence does not lock external
     editors; Codex P0). Restores tracked paths to HEAD, then removes only the
-    merge-introduced untracked files within that set (+ now-empty parent dirs)."""
-    if touched:
+    merge-introduced untracked files within that set (+ now-empty parent dirs).
+
+    `preserve` = paths already STAGED/dirty in base BEFORE the squash (a concurrent
+    session's forgiven `.claude/` / deliverable churn). When the task branch touches
+    one of those SAME paths, `git merge --squash` aborts and `touched` includes the
+    colliding path — resetting it to HEAD would clobber the concurrent session's
+    staged work, re-opening the exact cross-session contamination class the scoped
+    land defends against (REVIEW-2026-06-21 P1-2). Such paths are excluded from the
+    reset/checkout/unlink, symmetric to how `pre_untracked` already protects
+    pre-existing untracked files."""
+    preserve = preserve or set()
+    cleanup_paths = [p for p in touched if p not in preserve]
+    if cleanup_paths:
         with contextlib.suppress(RuntimeError):
-            _run(["git", "reset", "-q", "HEAD", "--", *touched], cwd=base)
+            _run(["git", "reset", "-q", "HEAD", "--", *cleanup_paths], cwd=base)
         # Per-path checkout: `git checkout -- a b` fails atomically if ANY path
         # is not in HEAD (a branch-added file), which would leave the others
         # un-restored — so restore each independently.
-        for p in touched:
+        for p in cleanup_paths:
             with contextlib.suppress(RuntimeError):
                 _run(["git", "checkout", "-f", "HEAD", "--", p], cwd=base)
-    for f in (_untracked_files(base) - pre_untracked) & set(touched):
+    for f in (_untracked_files(base) - pre_untracked) & set(cleanup_paths):
         path = base / f
         with contextlib.suppress(OSError):
             path.unlink()
@@ -3731,7 +3811,11 @@ def task_land(
         )
         return 1
 
-    msg = message or f"chore({slug}): squash-land {branch}"
+    # Default the squash message to the branch tip's curated commit message
+    # (wrapup Step 7's why-message + Co-Authored-By) rather than a generic
+    # placeholder — REVIEW-2026-06-21 P2-3. Computed here, BEFORE the fence and
+    # `_capture_pending_in_worktree`, so the tip is the wrapup commit.
+    msg = message or _branch_tip_message(base, branch) or f"chore({slug}): squash-land {branch}"
     try:
         with _acquire_merge_fence(base, timeout=_FENCE_TIMEOUT):
             # In-fence re-check: a concurrent winner may have deleted the branch
@@ -3802,20 +3886,55 @@ def task_land(
                     )
                     return 1
                 pre_untracked = _untracked_files(base)
+                # Concurrent session's forgiven base churn staged BEFORE the squash:
+                # must survive both a conflict-cleanup (P1-2) AND not land in our
+                # commit (the count:3 contamination class).
+                pre_staged = _staged_files(base)
                 try:
                     _run(["git", "merge", "--squash", branch], cwd=base)
-                    # Commit ONLY the squash's own path set, never the whole index.
-                    # `git commit -m msg` (no pathspec) commits the ENTIRE index, so a
-                    # CONCURRENT session's pre-staged base churn — `.claude/` +
-                    # deliverables are EXCLUDED by `_has_user_dirty_state`, so the
-                    # base-dirty guard above does NOT abort on them — would be swept
-                    # into THIS task's squash commit (the count:3 cross-session
-                    # contamination class; Codex P1, empirically confirmed). Scoping
-                    # to `touched` leaves any unrelated staged base file untouched for
-                    # its owning session.
-                    _run(["git", "commit", "-m", msg, "--", *touched], cwd=base)
+                    # Commit the squash's OWN path set from the INDEX — never the whole
+                    # index, and never the WORKING TREE.
+                    #
+                    # `git commit -m msg` with NO pathspec would sweep a CONCURRENT
+                    # session's pre-staged base churn (`.claude/` + deliverables are
+                    # EXCLUDED by `_has_user_dirty_state`, so the base-dirty guard above
+                    # does NOT abort on them) into our squash commit (the count:3 class;
+                    # Codex P1). `git commit -m msg -- <touched>` (pathspec mode) avoided
+                    # that but is PARTIAL-COMMIT mode: it records each path's WORKING-TREE
+                    # blob, not the staged squash result, so an external editor touching a
+                    # path in the squash→commit window would be committed instead — the
+                    # fence does not lock external editors (REVIEW-2026-06-21 P2-1). It
+                    # also broke on non-ASCII names (P1-1).
+                    #
+                    # Instead: UNSTAGE the concurrent churn (paths staged that are NOT in
+                    # `touched`), leaving the index == HEAD + the squash's touched paths,
+                    # then a plain `git commit` records the INDEX. The unstaged churn stays
+                    # in the working tree (preserved, not lost, not ours) for its owning
+                    # session to re-stage; no working-tree read, no pathspec quoting.
+                    staged_after = _staged_files(base)
+                    if not (staged_after & set(touched)):
+                        # The 3-way merge resolved EVERY touched path to base HEAD content
+                        # (the branch's change is already present in HEAD via a prior land /
+                        # cherry-pick / subset edit), so the squash staged nothing of ours —
+                        # there is genuinely nothing to land. `_branch_content_in_head` missed
+                        # this (per-blob mismatch vs the actual 3-way result), leaving
+                        # `already` False. Converge to teardown instead of letting
+                        # `git commit` fail "nothing to commit" and mis-route to the conflict
+                        # path, which would NEVER converge — branch + worktree + registry row
+                        # would leak indefinitely (REVIEW-2026-06-21 P2-2). Leave any
+                        # concurrent churn staged exactly as found (do NOT touch the index).
+                        print(
+                            f"[land] {branch}'s changes are already present in HEAD "
+                            "(squash is empty) — converging to teardown",
+                            file=sys.stderr,
+                        )
+                    else:
+                        to_unstage = sorted(staged_after - set(touched))
+                        if to_unstage:
+                            _run(["git", "reset", "-q", "HEAD", "--", *to_unstage], cwd=base)
+                        _run(["git", "commit", "-m", msg], cwd=base)
                 except RuntimeError as e:
-                    _scoped_conflict_cleanup(base, touched, pre_untracked)
+                    _scoped_conflict_cleanup(base, touched, pre_untracked, preserve=pre_staged)
                     print(
                         f"[land] squash-merge of {branch} failed (conflict?); base "
                         f"reset clean, branch preserved for manual resolution: {e}",

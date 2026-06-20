@@ -86,6 +86,68 @@ def test_task_land_uses_conventional_message(tmp_path: Path) -> None:
     assert _git(["log", "-1", "--format=%s"], repo) == "feat(feat): add the feature"
 
 
+def test_task_land_reuses_branch_tip_message_when_none_given(tmp_path: Path) -> None:
+    # REVIEW-2026-06-21 P2-3: with no explicit --message, the squash must reuse the
+    # branch tip's curated commit message (the wrapup why-message + Co-Authored-By),
+    # NOT a generic `chore(<slug>): squash-land` placeholder that drops the rationale.
+    repo = _repo(tmp_path)
+    wt = worktree.task_create(repo, "feat", session_uuid="u-feat")
+    (wt / "feature.py").write_text("feat\n")
+    _git(["add", "-A"], wt)
+    coauthor = "Co-Authored-By: Claude <noreply@anthropic.com>"
+    body = f"feat(feat): add the widget\n\nWhy: users needed it.\n\n{coauthor}"
+    _git(["commit", "-m", body], wt)
+
+    assert worktree.task_land(repo, "feat") == 0
+
+    landed = _git(["log", "-1", "--format=%B"], repo)
+    assert landed.splitlines()[0] == "feat(feat): add the widget", "subject not from branch tip"
+    assert "Why: users needed it." in landed, "why-body lost in the squash"
+    assert coauthor in landed, "Co-Authored-By trailer lost"
+    assert "squash-land" not in landed, "fell back to the generic placeholder message"
+
+
+def test_task_land_converges_when_branch_change_already_in_head(tmp_path: Path) -> None:
+    # REVIEW-2026-06-21 P2-2: when base HEAD already contains the branch's change
+    # (a prior land / cherry-pick / subset edit), `_branch_content_in_head` still
+    # reports a per-blob mismatch so `already` is False, but `git merge --squash`
+    # stages NOTHING. The old code let `git commit` fail "nothing to commit" and
+    # routed to the conflict path → the land NEVER converged (branch/worktree/row
+    # leaked indefinitely). It must instead converge to a clean teardown (rc0, no
+    # new commit), exactly like the already-landed path.
+    repo = _repo(tmp_path)
+    lines = [f"line-{c}\n" for c in "abcdefghij"]
+    (repo / "f.txt").write_text("".join(lines))
+    _git(["add", "f.txt"], repo)
+    _git(["commit", "-m", "seed f.txt"], repo)  # the merge-base
+    # task branch changes ONE hunk (line c).
+    wt = worktree.task_create(repo, "feat", session_uuid="u-feat")
+    br = list(lines)
+    br[2] = "line-C\n"
+    (wt / "f.txt").write_text("".join(br))
+    _git(["add", "f.txt"], wt)
+    _git(["commit", "-m", "wip(execute): change c"], wt)
+    # base HEAD independently already has the SAME c-change PLUS an unrelated h-change,
+    # so the branch's delta is present in HEAD yet the full-file blobs differ.
+    base_head = list(lines)
+    base_head[2] = "line-C\n"
+    base_head[7] = "line-H\n"
+    (repo / "f.txt").write_text("".join(base_head))
+    _git(["add", "f.txt"], repo)
+    _git(["commit", "-m", "base: c + h"], repo)
+
+    before = _commit_count(repo)
+    rc = worktree.task_land(repo, "feat")
+
+    assert rc == 0, "content-equivalent land must converge, not fail as a conflict"
+    assert _commit_count(repo) == before, "converge must not create a new commit"
+    assert "hm/feat" not in _branches(repo), "branch leaked — land did not converge"
+    assert not wt.is_dir(), "worktree leaked — land did not converge"
+    assert worktree._read_sessions(repo) == [], "registry row leaked"
+    # base HEAD content is untouched (the unrelated h-change preserved).
+    assert (repo / "f.txt").read_text() == "".join(base_head)
+
+
 # ── base-cleanliness abort (ADR-007 non-contact) ─────────────────────────────
 
 
@@ -352,11 +414,74 @@ def test_task_land_does_not_sweep_concurrent_staged_base_churn(tmp_path: Path) -
     landed = _git(["show", "--name-only", "--format=", "HEAD"], repo).split()
     assert "feature.py" in landed
     assert ".claude/memory/wiki.md" not in landed, "concurrent base churn swept into squash commit"
-    # The concurrent file must survive untouched (not lost, not committed by us) AND
-    # stay STAGED for its owning session — the actual cross-session contract.
+    # The concurrent file must survive untouched (not lost, not committed by us). The
+    # land commits the INDEX (REVIEW-2026-06-21 P2-1: never the working tree), so the
+    # churn is UNSTAGED back to the working tree — content preserved for its owning
+    # session to re-stage, never clobbered, never landed.
     assert (mem / "wiki.md").read_text() == "concurrent session note\n"
-    assert ".claude/memory/wiki.md" in _git(["diff", "--cached", "--name-only"], repo).split(), (
-        "concurrent session's staged change must remain staged after our land"
+    # Not landed in our commit (checked above) and not in HEAD's tree at all — it
+    # remains the concurrent session's own uncommitted work, preserved on disk.
+    head_tree = _git(["ls-tree", "-r", "--name-only", "HEAD"], repo).split()
+    assert ".claude/memory/wiki.md" not in head_tree
+
+
+def test_task_land_lands_non_ascii_filename_and_leaves_base_clean(tmp_path: Path) -> None:
+    # REVIEW-2026-06-21 P1-1: `git diff --name-only` C-quotes non-ASCII names under
+    # the default core.quotepath=true; a quoted literal pathspec never matches → the
+    # land aborts rc1 AND leaves the squash staged-orphaned in base (re-opening the
+    # count:3 contamination class). `-z` enumeration + index-commit must land cleanly.
+    repo = _repo(tmp_path)
+    wt = worktree.task_create(repo, "i18n", session_uuid="u-i18n")
+    (wt / "café.md").write_text("한국어 deliverable\n")  # non-ASCII filename
+    (wt / "ascii_sibling.py").write_text("x = 1\n")
+    _git(["add", "-A"], wt)
+    _git(["commit", "-m", "wip(execute): i18n"], wt)
+
+    assert worktree.task_land(repo, "i18n") == 0
+
+    # core.quotepath=false so the non-ASCII name comes back raw, not C-quoted.
+    head_files = _git(
+        ["-c", "core.quotepath=false", "ls-tree", "-r", "--name-only", "HEAD"], repo
+    ).split()
+    assert "café.md" in head_files, "non-ASCII deliverable failed to land"
+    assert "ascii_sibling.py" in head_files, "ASCII sibling lost to all-or-nothing pathspec abort"
+    assert _git(["status", "--porcelain"], repo) == "", "non-ASCII land left staged residue in base"
+    assert "hm/i18n" not in _branches(repo)
+
+
+def test_task_land_conflict_preserves_concurrent_staged_same_path(tmp_path: Path) -> None:
+    # REVIEW-2026-06-21 P1-2: when the task branch touches the SAME guard-forgiven
+    # path a concurrent session has staged in base, `git merge --squash` aborts and
+    # `_scoped_conflict_cleanup` used to `reset`/`checkout -f HEAD` the colliding path
+    # — clobbering the concurrent session's staged work (the contamination class the
+    # scoped land defends against). The pre-staged set must be preserved.
+    repo = _repo(tmp_path)
+    # base seeds the shared deliverable so both sides diverge from a common ancestor.
+    docs = repo / "work-docs"
+    docs.mkdir()
+    (docs / "PLAN-x.md").write_text("base original\n")
+    _git(["add", "-A"], repo)
+    _git(["commit", "-m", "seed deliverable"], repo)
+    # task branch edits the deliverable + commits.
+    wt = worktree.task_create(repo, "feat", session_uuid="u-feat")
+    (wt / "work-docs" / "PLAN-x.md").write_text("branch edit\n")
+    (wt / "feature.py").write_text("feat\n")
+    _git(["add", "-A"], wt)
+    _git(["commit", "-m", "wip(execute): feat"], wt)
+    # concurrent session stages a DIFFERENT edit to the SAME deliverable in base
+    # (deliverables are forgiven by the dirty-base guard → land does not abort early).
+    (docs / "PLAN-x.md").write_text("CONCURRENT SESSION irreplaceable plan\n")
+    _git(["add", "work-docs/PLAN-x.md"], repo)
+
+    rc = worktree.task_land(repo, "feat")
+
+    # land aborts on the merge conflict (rc1), branch + worktree preserved …
+    assert rc == 1
+    assert (repo / ".worktrees" / "feat").is_dir()
+    assert "hm/feat" in _branches(repo)
+    # … and the concurrent session's staged content is NOT clobbered.
+    assert (docs / "PLAN-x.md").read_text() == "CONCURRENT SESSION irreplaceable plan\n", (
+        "conflict-cleanup clobbered a concurrent session's staged work (P1-2)"
     )
 
 

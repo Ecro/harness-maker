@@ -955,9 +955,20 @@ When the loop halts (convergence, safety rail, or hard error):
    ```
 {% endif %}
 
-3. **Run wrapup ONCE**: read `.claude/commands/hm/wrapup.md` and execute
-   the wrapup stage (commits, SESSION-md if `--session`, memory append
-   to `wiki.md` / `failures.md`). Operate inside `<WT>` if engaged.
+3. **Run wrapup ONCE — reusing THIS loop's `<WT>`, never a fresh task worktree**:
+   read `.claude/commands/hm/wrapup.md` and execute the wrapup stage (commits,
+   SESSION-md if `--session`, memory append to `wiki.md` / `failures.md`).
+   Operate inside `<WT>` if engaged.
+   - **SKIP wrapup's own worktree preflight / Step 0**: do NOT run `task-preflight`
+     and do NOT create an `hm/<slug>` worktree. This loop already owns its isolation —
+     `<WT>` is the `execute-<uuid>` worktree from the create step above (the loop just
+     removed `.hm-loop-active`, so wrapup's own preflight has no marker to key off and
+     would otherwise mint a *second*, unrelated worktree). Treat that exact `<WT>` as
+     the wrapup stage's `<WT>` for every Read/Write/Edit and `cd`.
+   - **SKIP wrapup's Step 7.7 (task-branch squash-land)**: the loop's `finalize`
+     (step 5 below) is the sole land owner for the `execute-<uuid>` worktree. Running
+     wrapup's `task-land` here would either double-land disjoint work or strand an
+     orphan `hm/<slug>` branch (the two `<WT>` definitions must not diverge).
 
 4. **Decide finalize status — explicit rule, not judgment**:
 

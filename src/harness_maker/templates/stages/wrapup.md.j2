@@ -310,8 +310,17 @@ Bash("uv run python -m harness_maker.second_brain promote --type <decision|failu
 
 ### Step 6 — Stage memory + PLAN updates
 
+{%- set wt_prefix = "cd <WT> && " if (config.worktree is defined and config.worktree.get('feature_branch_workflow')) else "" %}
+{%- if wt_prefix %}
+> **Flag-on (per-task worktree):** Step 6 and Step 7 MUST run inside `<WT>` — the
+> `hm/<slug>` task worktree from the Step-0 preflight — so the staging + commit land
+> on the task branch that Step 7.7 squash-lands. Without `cd <WT>` they would run in
+> the base repo, where the index is empty → the commit is a no-op and the curated
+> message never reaches the branch (which also defeats Step 7.7's reuse of it). The
+> `cd <WT> &&` prefix below enforces this.
+{% endif -%}
 ```bash
-!for p in .claude/memory/ {{ config.work_docs.dir }}PLAN-{slug}.md {{ config.work_docs.dir }}REVIEW-{slug}-*.md {{ config.work_docs.dir }}RESEARCH-{slug}.md {{ config.spec.dir }}SPEC-{slug}.md {{ config.spec.dir }}SPEC-{slug}.machine.yaml; do \
+!{{ wt_prefix }}for p in .claude/memory/ {{ config.work_docs.dir }}PLAN-{slug}.md {{ config.work_docs.dir }}REVIEW-{slug}-*.md {{ config.work_docs.dir }}RESEARCH-{slug}.md {{ config.spec.dir }}SPEC-{slug}.md {{ config.spec.dir }}SPEC-{slug}.machine.yaml; do \
   [ -e "$p" ] && git add "$p" 2>/dev/null || true; \
 done
 ```
@@ -338,7 +347,7 @@ done
 Write the commit message: `<type>(<scope>): <subject ≤72 chars>` followed by a body explaining **why**, not **what**. The diff already says what.
 
 ```bash
-!git commit -m "$(cat <<'EOF'
+!{{ wt_prefix }}git commit -m "$(cat <<'EOF'
 <type>(<scope>): <subject>
 
 <body — explains why this change exists, what trade-off was accepted, and

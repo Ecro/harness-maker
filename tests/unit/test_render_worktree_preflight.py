@@ -166,7 +166,9 @@ def test_wrapup_lands_task_branch_when_flag_on(tmp_path: Path) -> None:
     # land invocation (the Phase-4 wiring gap Codex found) — pin the exact command +
     # the heading so an incidental `task-*` mention can't satisfy this.
     body = _stage(_render(tmp_path, flag_on=True), "wrapup")
-    assert "Squash-land the task branch" in body, "flag-on wrapup must render the Step 7.7 land step"
+    assert "Squash-land the task branch" in body, (
+        "flag-on wrapup must render the Step 7.7 land step"
+    )
     assert "worktree task-land <SLUG> <BASE>" in body, "flag-on wrapup must invoke task-land"
 
 
@@ -177,3 +179,24 @@ def test_wrapup_no_land_when_flag_off(tmp_path: Path) -> None:
     body = _stage(_render(tmp_path, flag_on=False), "wrapup")
     assert "task-land" not in body, "flag-off wrapup must not reference task-land"
     assert "Squash-land the task branch" not in body, "flag-off must omit the Step 7.7 heading"
+
+
+# ── flag-ON: Step 6/7 commit inside <WT> so the curated commit lands on the branch ─
+
+
+def test_wrapup_commit_runs_inside_worktree_when_flag_on(tmp_path: Path) -> None:
+    # REVIEW-2026-06-21 P3-3: flag-on Step 6 (git add) + Step 7 (git commit) must run
+    # inside <WT> (the hm/<slug> task worktree), else they execute in the base repo
+    # against an empty index → the commit is a no-op and the curated message never
+    # reaches the branch Step 7.7 squash-lands (which also defeats P2-3's message reuse).
+    body = _stage(_render(tmp_path, flag_on=True), "wrapup")
+    assert "!cd <WT> && for p in" in body, "flag-on Step 6 (git add) must run inside <WT>"
+    assert "!cd <WT> && git commit" in body, "flag-on Step 7 (git commit) must run inside <WT>"
+
+
+def test_wrapup_commit_runs_in_base_when_flag_off(tmp_path: Path) -> None:
+    # Flag-off keeps the legacy base-repo commit (no <WT> isolation) byte-for-byte.
+    body = _stage(_render(tmp_path, flag_on=False), "wrapup")
+    assert "!for p in" in body, "flag-off Step 6 must keep the bare base-repo git add"
+    assert "!git commit -m" in body, "flag-off Step 7 must keep the bare base-repo git commit"
+    assert "cd <WT> && git commit" not in body, "flag-off must not inject <WT> into the commit"
