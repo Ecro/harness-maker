@@ -7,10 +7,11 @@ import json
 import os
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, cast
 
 import typer
 import yaml
+from pydantic import ValidationError
 
 from harness_maker.add_domain import AddDomainError, add_domain, validate_domain_name
 from harness_maker.block_merge import MergeReport
@@ -19,7 +20,7 @@ from harness_maker.interview import answers_from_harness_yaml, interview
 from harness_maker.io_utils import atomic_write, denormalize_home_to_tilde
 from harness_maker.locate import compare_version
 from harness_maker.locate import resolve as resolve_plugin
-from harness_maker.models import Blueprint, InterviewAnswers, Preset, RefFolder, Target
+from harness_maker.models import AtomicStage, Blueprint, InterviewAnswers, Preset, RefFolder, Target
 from harness_maker.modular_edit import ModularEditError
 from harness_maker.modular_edit import add as modular_add
 from harness_maker.modular_edit import remove as modular_remove
@@ -1850,6 +1851,68 @@ def _version() -> None:
 # surface without poking at typer internals. ADR-0007 removed
 # ``health_finalize`` in 0.22.3.
 health = health_cmd
+
+
+@app.command("autopilot")
+def autopilot_cmd(
+    action: str = typer.Argument(..., help="'on' enables autopilot this session; 'off' disables."),
+    level: str = typer.Option(
+        "auto_safe",
+        "--level",
+        help="Autonomy level when turning on: gated | auto_safe | full.",
+    ),
+    pipeline: str | None = typer.Option(
+        None,
+        "--pipeline",
+        help="Comma-separated stage sequence (default: the 7 atomic stages).",
+    ),
+    root: Path | None = typer.Option(  # noqa: B008
+        None,
+        "--root",
+        help="Project root containing .claude/. Defaults to cwd.",
+    ),
+) -> None:
+    """Toggle the per-session `.hm-autopilot` marker (PLAN-human-bottleneck-auto-advance).
+
+    Flag-driven only (CLAUDE.md checkpoint 4): the slash command collects intent and
+    dispatches here. Writes/clears the session-scoped marker; the marker is gitignored
+    and keyed to this session's UUID so it never leaks to collaborators or other sessions.
+    """
+    from harness_maker import autopilot
+
+    root = root or Path.cwd()
+
+    if action == "off":
+        autopilot.clear(root)
+        typer.echo("autopilot: off (marker cleared)")
+        return
+    if action != "on":
+        typer.echo(f"autopilot: unknown action {action!r} (expected 'on' or 'off')", err=True)
+        raise typer.Exit(2)
+
+    # Validate every input BEFORE touching the marker so a failed `on` neither
+    # writes a partial marker nor leaves a stale prior marker silently "active"
+    # under a value the user just tried (and failed) to change. Narrowing `level`
+    # here also removes the write()-call type:ignore.
+    if level not in ("gated", "auto_safe", "full"):
+        typer.echo(f"autopilot: invalid --level {level!r} (gated|auto_safe|full)", err=True)
+        raise typer.Exit(2)
+    if pipeline is None:
+        stages = list(AtomicStage)
+    else:
+        try:
+            stages = [AtomicStage(s.strip()) for s in pipeline.split(",") if s.strip()]
+        except ValueError as exc:
+            typer.echo(f"autopilot: invalid --pipeline ({exc})", err=True)
+            raise typer.Exit(2) from None
+    try:
+        marker = autopilot.write(
+            root, level=cast(Literal["gated", "auto_safe", "full"], level), pipeline=stages
+        )
+    except ValidationError as exc:
+        typer.echo(f"autopilot: invalid config ({exc})", err=True)
+        raise typer.Exit(2) from None
+    typer.echo(f"autopilot: on (level={marker.level}, {len(marker.pipeline)} stages)")
 
 
 def main() -> None:

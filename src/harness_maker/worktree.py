@@ -92,6 +92,7 @@ _HARNESS_CHURN_DIRS: tuple[str, ...] = (
 # every tool call) is NOT configurable, so the core fix holds regardless.
 _HARNESS_CHURN_FILES: tuple[str, ...] = (
     ".claude/.hm-session-uuid",
+    ".claude/.hm-autopilot",
     ".claude/.hm-render-manifest.jsonl",
     "work-docs/p5-batch-state.yaml",
 )

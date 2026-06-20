@@ -7,6 +7,11 @@
 - `AutonomyConfig` is wired round-trip (HarnessConfig + InterviewAnswers mirror + synthesize + both harness-yaml templates + `interview._parse_autonomy` reverse-mapper) so the policy survives `/hm:make --update`. The destructive never-auto deny baseline is deliberately NOT a config field (ADR-003) — only `extra_deny` is user-settable, so a yaml edit can never subtract a baseline guard.
 - Phases 0, 2–8 (feasibility spike, session marker, Stop-hook backstop, never-auto enforcement, runaway caps, stage-terminal advance, ledger, docs) remain — see `work-docs/PLAN-human-bottleneck-auto-advance.md` Execution Log.
 
+### Added — `.hm-autopilot` session marker + `autopilot` CLI (Phase 2 of 9)
+- **New `harness_maker.autopilot` module** — a session-scoped `.hm-autopilot` marker (session_uuid/level/pipeline/created_at) with `write`/`clear`/`load`/`active_marker`/`effective_level`, persisting a per-session autopilot choice that overrides the committed `autonomy.level` (ADR-006 precedence). Still **no runtime auto-advance** — this is state plumbing only.
+- **Fail-safe by construction**: an absent / corrupt / empty / schema-invalid / foreign-session marker resolves to OFF (gated); an unknown harness.yaml level is clamped to gated. The marker is registered in `worktree._HARNESS_CHURN_FILES` so it is gitignored and never blocks `worktree create` or leaks to collaborators.
+- **New `harness-maker autopilot on|off` CLI** (flag-driven: `--level` / `--pipeline` / `--root`) for the slash command to toggle the marker.
+
 ### Fixed — Worktree branch-backlog drain relocated off the create-only trigger (PLAN-multisession-worktree-concurrency Phase 0, ADR-009)
 - **The gated, biased-to-preserve worktree sweep (`prune_stale`) now also runs at `/hm:wrapup` and `/hm:health`, not only at `worktree create`.** Previously a paused project accumulated leaked `execute-*`/`plan-*` branches unbounded (this repo had 76 against 1 landed-marker), printing a "N branch(es) preserved" warning wall on every create.
 - New `worktree drain` subcommand (`_drain` / `_drain_summary` / `_cli_drain`) — a non-interactive, one-line-summary trigger that reuses the single `prune_stale` gate. It is **additive**: create-time reaping is retained, and it can never force-delete the legacy backlog (only the human-reviewed `prune-branches --force` does).
