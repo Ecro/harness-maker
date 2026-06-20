@@ -7,9 +7,11 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from harness_maker import autopilot, autopilot_caps, autopilot_ledger
-from harness_maker.models import AtomicStage
+from harness_maker.models import AutonomyConfig
 
-_PIPELINE = list(AtomicStage)  # research, spec, plan, execute, review, wrapup, verify
+# Canonical default order (verify BEFORE wrapup) — one source of truth with the e2e +
+# autonomy_config tests, NOT list(AtomicStage) whose enum order the P1-4 fix declared wrong.
+_PIPELINE = list(AutonomyConfig().pipeline)
 _STAGES = [s.value for s in _PIPELINE]
 
 
@@ -22,7 +24,8 @@ def _arm(root: Path, *, created: datetime) -> None:
 
 def test_next_stage_middle() -> None:
     assert autopilot_caps.next_stage(_STAGES, "research") == "spec"
-    assert autopilot_caps.next_stage(_STAGES, "review") == "wrapup"
+    # canonical order: verify comes before wrapup.
+    assert autopilot_caps.next_stage(_STAGES, "review") == "verify"
 
 
 def test_next_stage_last_is_none() -> None:
@@ -184,6 +187,64 @@ def test_boundary_unknown_current_preserves_marker(tmp_path: Path, capsys) -> No
     assert out["halt_kind"] == "unknown_stage"
     assert out["pipeline_complete"] is False
     assert autopilot.load(tmp_path) is not None  # marker NOT cleared
+
+
+def test_boundary_stops_before_wrapup_merge_gate(tmp_path: Path, capsys) -> None:  # noqa: ANN001
+    # P1-1: the chain must NEVER auto-enter wrapup (its Step 7.7 squash-land is a one-way
+    # door). At the verify→wrapup boundary it stops with halt_kind=merge_gate, records a
+    # gate_blocked event, clears the marker (Stop-hook stands down → human takes over), and
+    # records NO advance.
+    autopilot.write(
+        tmp_path, level="auto_safe", pipeline=_PIPELINE, now=datetime.now(UTC).isoformat()
+    )
+    rc = autopilot_caps.main(
+        ["boundary", "--root", str(tmp_path), "--current", "verify",
+         "--step-cap", "20", "--time-cap-min", "60"]
+    )  # fmt: skip
+    assert rc == 0
+    out = json.loads(capsys.readouterr().out)
+    assert out["proceed"] is False
+    assert out["halt_kind"] == "merge_gate"
+    assert out["next_stage"] == "wrapup"
+    assert autopilot.load(tmp_path) is None  # marker cleared → backstop stands down
+    assert autopilot_ledger.count_events(tmp_path, "gate_blocked") == 1
+    assert autopilot_ledger.count_events(tmp_path, "advanced") == 0
+
+
+def test_boundary_step_cap_clears_marker(tmp_path: Path, capsys) -> None:  # noqa: ANN001
+    # P2-6 / P3: a cap halt is TERMINAL → the marker is cleared so a later boundary call
+    # cannot re-fire a duplicate halted_cap (and the Stop-hook stands down).
+    now = datetime.now(UTC)
+    _arm(tmp_path, created=now)
+    for _ in range(3):
+        autopilot_ledger.append_event(tmp_path, event="advanced", now=now.isoformat())
+    rc = autopilot_caps.main(
+        ["boundary", "--root", str(tmp_path), "--current", "research",
+         "--step-cap", "3", "--time-cap-min", "60"]
+    )  # fmt: skip
+    assert rc == 0
+    assert json.loads(capsys.readouterr().out)["halt_kind"] == "step_cap"
+    assert autopilot.load(tmp_path) is None  # cleared
+    # a second call now sees kill_switch (no marker) → NO new halted_cap.
+    autopilot_caps.main(
+        ["boundary", "--root", str(tmp_path), "--current", "research",
+         "--step-cap", "3", "--time-cap-min", "60"]
+    )  # fmt: skip
+    capsys.readouterr()
+    assert autopilot_ledger.count_events(tmp_path, "halted_cap") == 1
+
+
+def test_count_events_includes_exact_since_boundary(tmp_path: Path) -> None:
+    # P3: ts == since must be INCLUDED (the same-second under-count the _utc_now_iso fix
+    # addressed — the filter is `>= since`, not `> since`), AND a legacy 'Z'-form row on
+    # disk still compares correctly against an isoformat `since` (mixed-format normalize).
+    base = datetime(2026, 6, 20, 12, 0, tzinfo=UTC)
+    autopilot_ledger.append_event(tmp_path, event="advanced", now=base.isoformat())
+    assert autopilot_ledger.count_events(tmp_path, "advanced", since=base.isoformat()) == 1
+    autopilot_ledger.append_event(tmp_path, event="advanced", now="2026-06-20T12:00:00Z")
+    assert (
+        autopilot_ledger.count_events(tmp_path, "advanced", since="2026-06-20T12:00:00+00:00") == 2
+    )
 
 
 def test_boundary_pipeline_complete_clears_marker(tmp_path: Path, capsys) -> None:  # noqa: ANN001

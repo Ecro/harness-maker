@@ -51,9 +51,11 @@ def _wrapup_template_path() -> Path:
 
 # Step 6 stages deliverables via a per-path loop (`for p in <paths>; do
 # [ -e "$p" ] && git add "$p" …`) so one missing pathspec can't abort the rest.
-# We pin the path list out of the `for p in <paths>; do` header.
+# We pin the path list out of the `for p in <paths>; do` header. The optional
+# `{{ wt_prefix }}` Jinja token (flag-on per-task worktree prepends a `cd <WT> &&`)
+# sits between `!` and `for`; tolerate it without capturing it into the path list.
 _WRAPUP_GIT_ADD_RE = re.compile(
-    r"^!for p in (.+?); do\b",
+    r"^!(?:\{\{ wt_prefix \}\})?for p in (.+?); do\b",
     re.MULTILINE,
 )
 

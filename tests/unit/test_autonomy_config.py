@@ -38,6 +38,33 @@ DEFAULT_PIPELINE = [
 ]
 
 
+def test_default_pipeline_runs_verify_before_wrapup() -> None:
+    # P1-4 invariant: the canonical default pipeline MUST place verify (the safety check)
+    # strictly before wrapup (the commit/land). The AtomicStage ENUM declares WRAPUP before
+    # VERIFY, so any pipeline built from list(AtomicStage) would be wrong — the config
+    # default must not be.
+    pipe = AutonomyConfig().pipeline
+    assert pipe.index(AtomicStage.VERIFY) < pipe.index(AtomicStage.WRAPUP)
+
+
+def test_cli_autopilot_on_uses_canonical_pipeline(tmp_path: Path) -> None:
+    # P1-4: `autopilot on` with no --pipeline must write the CANONICAL order (verify before
+    # wrapup), NOT list(AtomicStage). Guards the CLI bare-default regression directly.
+    from typer.testing import CliRunner
+
+    from harness_maker import autopilot
+    from harness_maker.cli import app
+
+    res = CliRunner().invoke(
+        app, ["autopilot", "on", "--level", "auto_safe", "--root", str(tmp_path)]
+    )
+    assert res.exit_code == 0, res.output
+    marker = autopilot.active_marker(tmp_path)
+    assert marker is not None
+    assert marker.pipeline == AutonomyConfig().pipeline
+    assert marker.pipeline.index(AtomicStage.VERIFY) < marker.pipeline.index(AtomicStage.WRAPUP)
+
+
 # --- model defaults / validation -------------------------------------------------
 
 

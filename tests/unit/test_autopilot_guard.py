@@ -121,15 +121,111 @@ def test_extra_deny_adds_a_pattern(tmp_path: Path) -> None:
 
 
 def test_baseline_constant_is_nonempty_code_fixed() -> None:
-    # Non-overridable: the baseline lives in code, not config. rm/find/publish/
-    # permission-surface are regex; git is word-tokenized (_git_segment_hit).
+    # Non-overridable: the baseline lives in code, not config. find/publish/
+    # permission-surface are regex; git AND rm are tokenized (_git_segment_hit /
+    # _segment_rm_escapes — rm moved off the prefix-char regex in REVIEW P1-2).
     cats = {c for c, _ in guard.NEVER_AUTO_BASH}
-    assert {
-        "rm-escapes-worktree",
-        "find-delete",
-        "publish-or-deploy",
-        "permission-surface-write",
-    } <= cats
+    assert {"find-delete", "publish-or-deploy", "permission-surface-write"} <= cats
+    # rm escape enforcement is now a tokenized operand check, not a regex category.
+    assert guard._segment_rm_escapes("rm -rf /etc")
+
+
+# --- REVIEW P1-2 / P2-1 / P2-2: rm-escape bypasses closed ------------------------
+
+
+def test_active_blocks_rm_midtoken_traversal(tmp_path: Path) -> None:
+    # P1-2: a `..` preceded by `/` (the canonical traversal inside ONE path token) slipped
+    # past the old prefix-char regex. The tokenized operand check must catch every form.
+    _activate(tmp_path)
+    for cmd in (
+        "rm -rf build/../../etc",
+        "rm -rf a/b/../../../sensitive",
+        "rm -rf node_modules/../../outside",
+        "rm -rf ./x/../../../y",
+    ):
+        assert guard.evaluate("Bash", _bash(cmd), tmp_path).allow is False, cmd
+
+
+def test_active_allows_relative_in_worktree_rm(tmp_path: Path) -> None:
+    # Relative, non-escaping rm stays allowed — block-biased ONLY on a real escape.
+    _activate(tmp_path)
+    for cmd in ("rm -rf node_modules", "rm -rf dist/cache", "rm foo.txt", "rm -f a/b/c"):
+        assert guard.evaluate("Bash", _bash(cmd), tmp_path).allow is True, cmd
+
+
+def test_active_blocks_cd_escape_then_rm(tmp_path: Path) -> None:
+    # P2-1: a `cd` OUT of the worktree before a (bare-relative) rm escapes the sandbox —
+    # segments are independent, so cross-segment cwd tracking must poison the later rm.
+    _activate(tmp_path)
+    for cmd in (
+        "cd / && rm -rf foo",
+        "cd ~ ; rm -rf bar",
+        "cd /etc && rm -rf hosts",
+        "cd && rm -rf x",
+    ):
+        assert guard.evaluate("Bash", _bash(cmd), tmp_path).allow is False, cmd
+
+
+def test_active_allows_cd_within_worktree_then_rm(tmp_path: Path) -> None:
+    # A relative cd stays inside the sandbox → the subsequent rm is allowed.
+    _activate(tmp_path)
+    assert guard.evaluate("Bash", _bash("cd build && rm -rf cache"), tmp_path).allow is True
+
+
+def test_active_blocks_malformed_rm(tmp_path: Path) -> None:
+    # An unclosed quote around rm → block-biased (a malformed rm must not slip through as
+    # a false-negative the way a shlex parse failure otherwise could).
+    _activate(tmp_path)
+    assert guard.evaluate("Bash", _bash('rm -rf "unclosed'), tmp_path).allow is False
+
+
+def test_active_blocks_cursor_codex_hooks_redirect(tmp_path: Path) -> None:
+    # P2-2: the Bash permission-surface regex now matches .cursor/.codex hooks too (it was
+    # asymmetric vs the Write-tool path regex, which already covered them).
+    _activate(tmp_path)
+    assert guard.evaluate("Bash", _bash("echo x > .cursor/hooks.json"), tmp_path).allow is False
+    assert guard.evaluate("Bash", _bash("echo x > .codex/hooks.json"), tmp_path).allow is False
+
+
+def test_active_blocks_rm_brace_expansion(tmp_path: Path) -> None:
+    # Round-2 P2: a brace list expands BEFORE the path is read, so `rm -rf {/etc,/home}`
+    # must be blocked even though the literal token isn't path-shaped.
+    _activate(tmp_path)
+    for cmd in ("rm -rf {/etc,/home}", "rm -rf {..,foo}", "rm -rf {../sibling,x}"):
+        assert guard.evaluate("Bash", _bash(cmd), tmp_path).allow is False, cmd
+
+
+def test_active_blocks_rm_operand_after_double_dash(tmp_path: Path) -> None:
+    # Round-2 P3: the `--` end-of-options separator and disguising flags must not let an
+    # escaping operand slip past _rm_operands' flag-skip.
+    _activate(tmp_path)
+    assert guard.evaluate("Bash", _bash("rm -rf -- /etc"), tmp_path).allow is False
+    assert guard.evaluate("Bash", _bash("rm -rf -- ../sibling"), tmp_path).allow is False
+    assert guard.evaluate("Bash", _bash("rm --no-preserve-root -rf /"), tmp_path).allow is False
+    # `--` with an in-worktree relative target stays allowed.
+    assert guard.evaluate("Bash", _bash("rm -rf -- node_modules"), tmp_path).allow is True
+
+
+def test_active_blocks_rm_command_substitution(tmp_path: Path) -> None:
+    # `$(...)` / backtick targets are statically unboundable → block-biased ($ caught).
+    _activate(tmp_path)
+    assert guard.evaluate("Bash", _bash("rm -rf $(echo /etc)"), tmp_path).allow is False
+    assert guard.evaluate("Bash", _bash("rm -rf `echo /etc`"), tmp_path).allow is False
+
+
+def test_active_blocks_malformed_cd_then_rm(tmp_path: Path) -> None:
+    # Round-2 P3: a malformed (unclosed-quote) cd block-biases like a malformed rm, so it
+    # still poisons a later bare-relative rm rather than failing open.
+    _activate(tmp_path)
+    assert guard.evaluate("Bash", _bash('cd "/etc && rm -rf passwd'), tmp_path).allow is False
+
+
+def test_active_blocks_rm_inworktree_dotdot_overblock(tmp_path: Path) -> None:
+    # Round-2 P3 (accepted over-block): ANY `..` component is treated as escape even when it
+    # resolves back inside the worktree (`build/../dist`). This is the intended fail-safe
+    # direction — static containment is undecidable, so block-biased.
+    _activate(tmp_path)
+    assert guard.evaluate("Bash", _bash("rm -rf build/../dist"), tmp_path).allow is False
 
 
 # --- REVIEW round 1 hardening: git tokenizer, bypass surface, marker root ---------

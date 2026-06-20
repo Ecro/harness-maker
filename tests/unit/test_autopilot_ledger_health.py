@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
 
-from harness_maker import autopilot_caps, autopilot_ledger
+from harness_maker import autopilot, autopilot_caps, autopilot_ledger
 from harness_maker.iter_receipts import Verdict
+from harness_maker.models import AtomicStage
 
 
 def _ledger_lines(root: Path) -> list[dict]:
@@ -22,12 +24,40 @@ def _ledger_lines(root: Path) -> list[dict]:
 
 
 def test_gate_blocked_cli_appends_event(tmp_path: Path) -> None:
+    # P2-5: gate-blocked records ONLY for a live autopilot session → arm a marker first.
+    autopilot.write(tmp_path, level="auto_safe", pipeline=list(AtomicStage))
     rc = autopilot_caps.main(["gate-blocked", "--root", str(tmp_path), "--stage", "review"])
     assert rc == 0
     lines = _ledger_lines(tmp_path)
     assert len(lines) == 1
     assert lines[0]["event"] == "gate_blocked"
     assert lines[0]["stage"] == "review"
+
+
+def test_gate_blocked_cli_noop_without_active_marker(tmp_path: Path) -> None:
+    # P2-5: no marker (off / foreign / stale) → no phantom gate_blocked row that would
+    # pollute the audit trail + smoke denominator.
+    rc = autopilot_caps.main(["gate-blocked", "--root", str(tmp_path), "--stage", "review"])
+    assert rc == 0
+    assert _ledger_lines(tmp_path) == []
+
+
+def test_count_events_counts_unparseable_ts_in_window(tmp_path: Path) -> None:
+    # P2-4: a row with a missing/garbage ts must be COUNTED on the `since` path (in-window)
+    # — dropping it would under-count `advanced` and delay the runaway step cap.
+    base = datetime(2026, 6, 20, 12, 0, tzinfo=UTC)
+    autopilot_ledger.append_event(tmp_path, event="advanced", now="not-a-timestamp")
+    autopilot_ledger.append_event(tmp_path, event="advanced", now=base.isoformat())
+    since = (base - timedelta(minutes=1)).isoformat()
+    # both count: the parseable one is after `since`, the garbage-ts one is kept block-biased.
+    assert autopilot_ledger.count_events(tmp_path, "advanced", since=since) == 2
+
+
+def test_ledger_rejects_oversized_line(tmp_path: Path) -> None:
+    # P3: the PIPE_BUF/4096 append-atomicity guard must reject an oversized line (the
+    # concurrent-writer atomicity guarantee depends on it).
+    with pytest.raises(ValueError, match="PIPE_BUF"):
+        autopilot_ledger.append_event(tmp_path, event="advanced", fields={"big": "x" * 5000})
 
 
 # ── /hm:health smoke (autopilot_ledger.smoke_check) ─────────────────────────

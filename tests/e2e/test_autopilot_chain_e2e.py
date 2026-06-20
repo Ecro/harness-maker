@@ -15,9 +15,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from harness_maker import autopilot, autopilot_caps, autopilot_ledger
-from harness_maker.models import AtomicStage
+from harness_maker.models import AutonomyConfig
 
-_PIPELINE = list(AtomicStage)
+# Use the CANONICAL default pipeline (verify BEFORE wrapup) — NOT list(AtomicStage), whose
+# enum order puts wrapup first and would run verify after the commit (REVIEW P1-4).
+_PIPELINE = list(AutonomyConfig().pipeline)
 _STAGES = [s.value for s in _PIPELINE]
 
 
@@ -39,31 +41,31 @@ def _boundary(root: Path, current: str, capsys) -> dict:  # noqa: ANN001
     return json.loads(capsys.readouterr().out)
 
 
-def test_full_pipeline_chain_advances_then_completes(tmp_path: Path, capsys) -> None:  # noqa: ANN001
-    # Arm a fresh autopilot session over the full default pipeline.
+def test_full_pipeline_chain_advances_then_stops_before_wrapup(tmp_path: Path, capsys) -> None:  # noqa: ANN001
+    # Arm a fresh autopilot session over the full default pipeline (…review, verify, wrapup).
     autopilot.write(
         tmp_path, level="auto_safe", pipeline=_PIPELINE, now=datetime.now(UTC).isoformat()
     )
 
-    # Walk every non-terminal boundary: each authorizes an advance to the NEXT stage.
-    for i, stage in enumerate(_STAGES[:-1]):
+    # The auto-chain advances research → … → verify (every two-way-door boundary), but the
+    # NEXT stage after verify is the human-gated `wrapup` (P1-1) — so the chain stops there.
+    advancing = _STAGES[: _STAGES.index("verify")]  # research..review (proceed to the one after)
+    for i, stage in enumerate(advancing):
         out = _boundary(tmp_path, stage, capsys)
         assert out["proceed"] is True, f"{stage} should advance"
         assert out["next_stage"] == _STAGES[i + 1]
         assert out["halt_kind"] is None
-        assert out["pipeline_complete"] is False
 
-    # The chain recorded exactly one `advanced` event per advance (steps - 1).
-    assert autopilot_ledger.count_events(tmp_path, "advanced") == len(_STAGES) - 1
-    # The marker is still live mid-chain.
-    assert autopilot.load(tmp_path) is not None
-
-    # The terminal boundary completes the pipeline + clears the marker (ADR-006).
-    final = _boundary(tmp_path, _STAGES[-1], capsys)
-    assert final["proceed"] is False
-    assert final["pipeline_complete"] is True
-    assert final["next_stage"] is None
-    assert autopilot.load(tmp_path) is None  # session ended
+    # verify's boundary refuses to auto-enter wrapup → merge_gate stop + marker cleared.
+    gate = _boundary(tmp_path, "verify", capsys)
+    assert gate["proceed"] is False
+    assert gate["halt_kind"] == "merge_gate"
+    assert gate["next_stage"] == "wrapup"
+    assert autopilot_ledger.count_events(tmp_path, "gate_blocked") == 1
+    # one `advanced` per real advance (research..review → verify), none into wrapup.
+    assert autopilot_ledger.count_events(tmp_path, "advanced") == len(advancing)
+    # the session ended at the merge gate — wrapup is never auto-run.
+    assert autopilot.load(tmp_path) is None
 
 
 def test_chain_halts_at_step_cap(tmp_path: Path, capsys) -> None:  # noqa: ANN001

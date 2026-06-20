@@ -20,7 +20,15 @@ from harness_maker.interview import answers_from_harness_yaml, interview
 from harness_maker.io_utils import atomic_write, denormalize_home_to_tilde
 from harness_maker.locate import compare_version
 from harness_maker.locate import resolve as resolve_plugin
-from harness_maker.models import AtomicStage, Blueprint, InterviewAnswers, Preset, RefFolder, Target
+from harness_maker.models import (
+    AtomicStage,
+    AutonomyConfig,
+    Blueprint,
+    InterviewAnswers,
+    Preset,
+    RefFolder,
+    Target,
+)
 from harness_maker.modular_edit import ModularEditError
 from harness_maker.modular_edit import add as modular_add
 from harness_maker.modular_edit import remove as modular_remove
@@ -1945,7 +1953,10 @@ def autopilot_cmd(
         typer.echo(f"autopilot: invalid --level {level!r} (gated|auto_safe|full)", err=True)
         raise typer.Exit(2)
     if pipeline is None:
-        stages = list(AtomicStage)
+        # P1-4: reuse the CANONICAL default pipeline (research…review, VERIFY, WRAPUP) —
+        # NOT `list(AtomicStage)`, whose enum declaration order puts WRAPUP before VERIFY
+        # and would run the safety check AFTER the commit/land. Single source of truth.
+        stages = list(AutonomyConfig().pipeline)
     else:
         try:
             stages = [AtomicStage(s.strip()) for s in pipeline.split(",") if s.strip()]

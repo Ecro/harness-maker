@@ -74,6 +74,13 @@ def fuse(
             config=config_dump,
             harness_maker_src_path=install_ref,
             is_codex=False,
+            # REVIEW P1-3: a fused command is ONE user-invoked unit — its inter-stage
+            # STOPs are already removed by fusion. The live auto-advance block must NOT be
+            # embedded per fragment, or an autopilot-armed fused run would `Skill(hm:next)`
+            # mid-fusion and escalate past the stages the user actually invoked (e.g.
+            # exec-rev → wrapup land). Atomic standalone renders omit this flag → default
+            # true → block present. Autopilot only auto-chains atomic stages.
+            autopilot_advance_enabled=False,
         )
         parts.append(f"\n## Stage: {stage.value}\n\n{body}")
     return "\n".join(parts)

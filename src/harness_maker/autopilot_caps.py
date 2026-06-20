@@ -20,8 +20,15 @@ from typing import Literal
 
 from harness_maker import autopilot, autopilot_ledger
 
-HaltKind = Literal["kill_switch", "step_cap", "time_cap"]
+HaltKind = Literal["kill_switch", "step_cap", "time_cap", "merge_gate", "unknown_stage"]
 CapKind = Literal["step_cap", "time_cap"]
+
+# Stages the chain must NEVER auto-ENTER — it hands off to the human before them. The
+# wrapup squash-land/merge is a one-way door (ADR-002: "the chain ALWAYS stops at the
+# wrapup merge/push"); auto-advancing INTO wrapup runs that land before any gate can stop
+# it (REVIEW P1-1, user-chosen "stop before wrapup" fix). Reaching one of these as the
+# NEXT stage stops the chain, records a gate_blocked event, and clears the marker.
+_HUMAN_GATED_STAGES: frozenset[str] = frozenset({"wrapup"})
 
 
 @dataclass(frozen=True)
@@ -72,7 +79,7 @@ def evaluate_boundary(
         return BoundaryDecision(
             proceed=False,
             halt_kind="time_cap",
-            reason=f"time cap reached ({elapsed_min:.0f}/{time_cap_min} min)",
+            reason=f"time cap reached ({elapsed_min:.1f}/{time_cap_min} min)",
         )
     return BoundaryDecision(proceed=True, halt_kind=None, reason="")
 
@@ -145,6 +152,17 @@ def _cmd_boundary(args: argparse.Namespace) -> int:
         out["reason"] = "autopilot marker absent/foreign/stale — aborting chain at boundary"
         print(json.dumps(out))
         return 0
+    # Unknown `--current` (typo / stage outside the pipeline) is checked FIRST — BEFORE the
+    # caps — so a bad value can't trigger the marker-clearing cap path and silently kill the
+    # session while falsely claiming a cap halt (REVIEW P3). Marker preserved; the user fixes
+    # the typo and re-runs (the cap still applies on the corrected call).
+    # marker.pipeline holds AtomicStage (str-enum) members; `in` uses str-equality so a plain
+    # stage name like "research" matches (str(member) gives the enum repr — do NOT stringify).
+    if args.current not in marker.pipeline:
+        out["halt_kind"] = "unknown_stage"
+        out["reason"] = f"current stage {args.current!r} not in the pipeline — marker preserved"
+        print(json.dumps(out))
+        return 0
     steps = autopilot_ledger.count_events(root, "advanced", since=marker.created_at)
     out["steps"] = steps
     decision = evaluate_boundary(
@@ -159,17 +177,12 @@ def _cmd_boundary(args: argparse.Namespace) -> int:
             record_cap_halt(root, halt_kind="step_cap", steps=steps)
         elif decision.halt_kind == "time_cap":
             record_cap_halt(root, halt_kind="time_cap", steps=steps)
-        print(json.dumps(out))
-        return 0
-    # marker.pipeline holds AtomicStage (str-enum) members; `in` / index use str-equality
-    # so a plain stage name like "research" matches (str(member) would give the enum repr,
-    # not the value — do NOT stringify).
-    if args.current not in marker.pipeline:
-        # Unknown `--current` (typo / stage outside the pipeline) is NOT completion —
-        # preserve the marker + surface a distinct halt so a bad value can't silently kill
-        # the session while falsely claiming success (REVIEW P2: Codex + 2 reviewers).
-        out["halt_kind"] = "unknown_stage"
-        out["reason"] = f"current stage {args.current!r} not in the pipeline — marker preserved"
+        # P2-6 / P3: a runaway cap is a TERMINAL halt. Clear the marker so the session
+        # ends cleanly — otherwise every later boundary call re-fires a duplicate
+        # halted_cap event AND the Stop-hook backstop keeps blocking termination until
+        # the 18h TTL. (kill_switch leaves no marker to clear.)
+        if decision.halt_kind in ("step_cap", "time_cap"):
+            autopilot.clear(root)
         print(json.dumps(out))
         return 0
     nxt = next_stage(marker.pipeline, args.current)
@@ -178,6 +191,22 @@ def _cmd_boundary(args: argparse.Namespace) -> int:
         autopilot.clear(root)
         out["pipeline_complete"] = True
         out["reason"] = "pipeline complete — autopilot session finished"
+        print(json.dumps(out))
+        return 0
+    if nxt in _HUMAN_GATED_STAGES:
+        # P1-1 (user-chosen fix): NEVER auto-enter a human-gated stage. wrapup's Step 7.7
+        # squash-land/merge is a one-way door, so the chain stops HERE (before wrapup),
+        # records the gate, and clears the marker (Stop-hook stands down) — the human
+        # then invokes `/hm:wrapup` deliberately. This is what enforces ADR-002's
+        # "always stop at the wrapup merge/push" at the auto-advance layer.
+        autopilot_ledger.append_event(root, event="gate_blocked", fields={"stage": nxt})
+        autopilot.clear(root)
+        out["halt_kind"] = "merge_gate"
+        out["next_stage"] = nxt
+        out["reason"] = (
+            f"next stage {nxt!r} is human-gated (merge/push, ADR-002) — "
+            "autopilot stopped; invoke it manually"
+        )
         print(json.dumps(out))
         return 0
     autopilot_ledger.append_event(root, event="advanced", fields={"to": nxt})
@@ -209,9 +238,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.cmd == "boundary":
         return _cmd_boundary(args)
     if args.cmd == "gate-blocked":
-        autopilot_ledger.append_event(
-            Path(args.root), event="gate_blocked", fields={"stage": args.stage}
-        )
+        # P2-5: only record for a LIVE autopilot session. A spurious call with no active
+        # marker (off / foreign / stale) must not pollute the ledger or the smoke-check
+        # denominator with a phantom gate_blocked event.
+        root = Path(args.root)
+        if autopilot.active_marker(root) is None:
+            return 0
+        autopilot_ledger.append_event(root, event="gate_blocked", fields={"stage": args.stage})
         return 0
     return 0
 

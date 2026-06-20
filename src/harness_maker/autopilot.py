@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 from datetime import UTC, datetime
@@ -12,7 +13,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from harness_maker.io_utils import atomic_write
 from harness_maker.models import AtomicStage
-from harness_maker.worktree import _current_session_uuid
+from harness_maker.worktree import _current_session_uuid, _ensure_gitignore_entry
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +68,11 @@ def write(
         # swapped for the live clock — keeps the injected-time contract honest.
         created_at=now if now is not None else datetime.now(UTC).isoformat(),
     )
+    # P2-3: self-seed the gitignore entry at marker-creation time so the marker is never
+    # committable even if `make` / `worktree create` (the other seed sites) never ran in
+    # this project. Best-effort — a gitignore failure must not block arming autopilot.
+    with contextlib.suppress(OSError):
+        _ensure_gitignore_entry(project_root, _MARKER_REL)
     atomic_write(marker_path(project_root), marker.model_dump_json())
     return marker
 

@@ -25,16 +25,17 @@ import re
 import shlex
 import sys
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from harness_maker import autopilot
 
 # Non-git never-auto Bash patterns (category, regex), matched per command-segment.
+# NOTE: `rm` escaping the worktree is NOT a regex here — a prefix-char regex missed
+# mid-token traversal like `rm -rf build/../../etc` (REVIEW P1-2). It is now a
+# shlex-tokenized operand check (`_segment_rm_escapes`), with cross-segment cd-tracking
+# for `cd /abs && rm …` (REVIEW P2-1), both run ahead of this list in `_bash_hit`.
 NEVER_AUTO_BASH: list[tuple[str, re.Pattern[str]]] = [
-    # rm targeting an absolute / home / parent path, or any $-expansion = escaping
-    # the worktree sandbox. Covers `rm -rf /etc`, `rm ../x`, `rm "$HOME"/x`, `rm '~/x'`.
-    ("rm-escapes-worktree", re.compile(r"\brm\b[^\n]*(?:[\s\"'`](?:/|~|\.\.)|\$)")),
     ("find-delete", re.compile(r"\bfind\b[^\n]*-delete\b")),
     (
         "publish-or-deploy",
@@ -45,11 +46,16 @@ NEVER_AUTO_BASH: list[tuple[str, re.Pattern[str]]] = [
             r"|terraform\s+(?:destroy|apply)|pulumi\s+(?:destroy|up)|kubectl\s+delete)\b"
         ),
     ),
-    # A Bash write/redirect to the harness's own permission surface — the agent must
-    # not `echo > .claude/settings.json` or rewrite hooks.json to disable this guard.
+    # A Bash write/redirect to ANY IDE's permission surface — the agent must not
+    # `echo > .claude/settings.json` or rewrite a hooks.json to disable this guard. The
+    # path set MUST match NEVER_AUTO_WRITE_PATH (Write-tool) — both cover .cursor/.codex
+    # hooks, not just .claude (REVIEW P2-2: the two were asymmetric).
     (
         "permission-surface-write",
-        re.compile(r"\.claude/(?:settings(?:\.local)?\.json|hooks/hooks\.json)\b"),
+        re.compile(
+            r"(?:\.claude/(?:settings(?:\.local)?\.json|hooks/hooks\.json)"
+            r"|\.cursor/hooks\.json|\.codex/hooks\.json)\b"
+        ),
     ),
 ]
 
@@ -140,15 +146,93 @@ def _extra_deny(project_dir: Path) -> list[str]:
     return []
 
 
+def _tokenize_segment(segment: str) -> tuple[list[str], bool]:
+    """(tokens, malformed). On an unclosed quote, fall back to a coarse whitespace split
+    and flag malformed — the caller block-biases a malformed rm rather than letting it
+    slip through (same safe direction as `_git_segment_hit`)."""
+    try:
+        return shlex.split(segment), False
+    except ValueError:
+        return segment.split(), True
+
+
+def _operand_escapes_worktree(operand: str) -> bool:
+    """True when a path operand resolves OUTSIDE the worktree sandbox.
+
+    Catches the canonical traversal forms the old prefix-char regex missed (REVIEW P1-2):
+    an absolute path, a `~` home path, ANY `..` component (incl. mid-token
+    `build/../../etc`), a `$`-expansion, or a `{a,b}` brace list — the last three cannot
+    be statically bounded (bash expands `rm -rf {/etc,foo}` to multiple operands BEFORE
+    the path is read — REVIEW P2). All are treated as escape (block-biased: a
+    false-positive merely pauses the chain for the human).
+    """
+    if "$" in operand or operand.startswith("~"):
+        return True
+    if "{" in operand and "}" in operand and "," in operand:
+        return True
+    pure = PurePosixPath(operand)
+    return pure.is_absolute() or any(part == ".." for part in pure.parts)
+
+
+def _rm_operands(tokens: list[str]) -> list[str]:
+    """Non-flag operands of every `rm` invocation in one tokenized segment."""
+    operands: list[str] = []
+    for i, tok in enumerate(tokens):
+        if tok != "rm" and not tok.endswith("/rm"):
+            continue
+        operands.extend(op for op in tokens[i + 1 :] if op != "--" and not op.startswith("-"))
+    return operands
+
+
+def _segment_rm_escapes(segment: str) -> bool:
+    """True when a segment's `rm` targets a path outside the worktree (or is malformed)."""
+    tokens, malformed = _tokenize_segment(segment)
+    has_rm = any(t == "rm" or t.endswith("/rm") for t in tokens)
+    if malformed and has_rm:
+        return True  # block-biased: an unparseable rm under autopilot is worth a pause
+    return any(_operand_escapes_worktree(op) for op in _rm_operands(tokens))
+
+
+def _segment_is_cd_escape(segment: str) -> bool:
+    """True when a `cd` moves cwd OUTSIDE the worktree (absolute/home/`..`/bare/`-`).
+
+    A later `rm` in the same command then operates on an escaped cwd even with a bare
+    relative target, so `_bash_hit` poisons subsequent rm segments (REVIEW P2-1).
+    """
+    tokens, malformed = _tokenize_segment(segment)
+    # Block-bias parity with `_segment_rm_escapes` (REVIEW P3): a malformed (unclosed-quote)
+    # cd conservatively poisons subsequent rm segments rather than silently failing open.
+    if malformed and any(t == "cd" for t in tokens):
+        return True
+    for i, tok in enumerate(tokens):
+        if tok != "cd":
+            continue
+        operands = [o for o in tokens[i + 1 :] if not o.startswith("-")]
+        if not operands or operands[0] == "-":
+            return True  # bare `cd` → $HOME; `cd -` → previous (unbounded) dir
+        return _operand_escapes_worktree(operands[0])
+    return False
+
+
 def _bash_hit(command: str, extra_deny: list[str]) -> str | None:
-    """Return the matched category, or None when the command is allowed."""
+    """Return the matched category, or None when the command is allowed.
+
+    Segments are scanned in order so a `cd` escaping the worktree poisons later `rm`
+    segments (cross-segment cwd tracking — REVIEW P2-1)."""
+    cwd_escaped = False
     for segment in _SEGMENT_SPLIT.split(command):
         git_hit = _git_segment_hit(segment)
         if git_hit is not None:
             return git_hit
+        if _segment_rm_escapes(segment):
+            return "rm-escapes-worktree"
+        if cwd_escaped and _rm_operands(_tokenize_segment(segment)[0]):
+            return "rm-after-cd-escape"
         for category, pattern in NEVER_AUTO_BASH:
             if pattern.search(segment):
                 return category
+        if _segment_is_cd_escape(segment):
+            cwd_escaped = True
     low = command.lower()
     for extra in extra_deny:
         if extra.lower() in low:

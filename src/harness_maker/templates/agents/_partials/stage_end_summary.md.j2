@@ -15,7 +15,7 @@
     StrictUndefined, so a stage can never pass `--current ""` (which the CLI would treat as
     an unknown stage and clear the marker). `summary_autopilot_gate` (the stage's
     mandatory-gate predicate prose) defaults STOP-biased. -#}
-{% if is_codex is defined and not is_codex %}
+{% if is_codex is defined and not is_codex and (autopilot_advance_enabled | default(true)) %}
 <!-- @hm:autopilot-advance -->
 ## Auto-advance check (autopilot — Claude Code only)
 
@@ -42,9 +42,11 @@ authorizes — so it must run only after Step 1 clears):
 
 Read the JSON:
 - `proceed: false` → **STOP** (print the banner). `halt_kind` `step_cap`/`time_cap` = a
-  runaway cap fired (`halted_cap` logged); `kill_switch` = autopilot off/expired;
-  `unknown_stage` = `--current` not in the pipeline (marker preserved); `pipeline_complete:
-  true` = the pipeline finished and the marker was cleared.
+  runaway cap fired (`halted_cap` logged, marker cleared); `kill_switch` = autopilot
+  off/expired; `merge_gate` = the next stage is human-gated (e.g. wrapup's merge/land —
+  the marker was cleared, so invoke `/hm:wrapup` manually when ready); `unknown_stage` =
+  `--current` not in the pipeline (marker preserved); `pipeline_complete: true` = the
+  pipeline finished and the marker was cleared.
 - `proceed: true` → **auto-advance**: invoke `Skill(hm:<next_stage from the JSON>)` to run
   the next pipeline stage in THIS session instead of printing the STOP banner.
 <!-- @hm:/autopilot-advance -->

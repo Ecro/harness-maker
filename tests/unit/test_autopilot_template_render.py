@@ -64,14 +64,60 @@ def test_picker_absent_under_default_gated_level(rendered_root: Path) -> None:
 
 
 def test_codex_exclusion_is_structural() -> None:
-    # ADR-004: the auto-branch + picker are wrapped in `{% if is_codex is defined and not
-    # is_codex %}` so the Codex render (is_codex=True) never emits a Skill auto-invoke
-    # branch, and a bare/partial render (is_codex unset) omits it too.
+    # ADR-004: the auto-branch is wrapped in `is_codex is defined and not is_codex` (so the
+    # Codex render never emits a Skill auto-invoke branch) AND `autopilot_advance_enabled`
+    # (REVIEW P1-3: fused renders pass False so the block is not embedded per fragment).
     partial = (_TEMPLATES / "agents" / "_partials" / "stage_end_summary.md.j2").read_text()
     manifest = (_TEMPLATES / "agents" / "_partials" / "step_manifest.md.j2").read_text()
-    assert "{% if is_codex is defined and not is_codex %}" in partial
+    assert (
+        "{% if is_codex is defined and not is_codex "
+        "and (autopilot_advance_enabled | default(true)) %}" in partial
+    )
     assert "@hm:autopilot-advance" in partial
     assert (
         '{% if is_codex is defined and not is_codex and config.autonomy.level != "gated" %}'
         in manifest
     )
+
+
+def _render_partial(is_codex: bool, *, advance_enabled: bool | None = None) -> str:
+    from harness_maker.models import HarnessConfig
+    from harness_maker.render import _make_env
+
+    env = _make_env()
+    ctx: dict[str, object] = {
+        "summary_stage": "research",
+        "summary_autopilot_gate": "no gate",
+        "summary_done": "d",
+        "summary_artifact": "a",
+        "summary_next": "n",
+        "config": HarnessConfig().model_dump(mode="json"),
+        "is_codex": is_codex,
+    }
+    if advance_enabled is not None:
+        ctx["autopilot_advance_enabled"] = advance_enabled
+    return env.get_template("agents/_partials/stage_end_summary.md.j2").render(**ctx)
+
+
+def test_autopilot_block_behaviorally_absent_for_codex() -> None:
+    # P2-7: behavioral (not just a source grep) — rendering the terminal with is_codex=True
+    # emits NO auto-advance branch; the Claude render (is_codex=False) does.
+    assert "@hm:autopilot-advance" not in _render_partial(is_codex=True)
+    assert "@hm:autopilot-advance" in _render_partial(is_codex=False)
+
+
+def test_autopilot_block_suppressed_in_fused_render() -> None:
+    # P1-3: a fused fragment (autopilot_advance_enabled=False) carries NO live auto-advance
+    # block even for Claude — else an armed fused run would escalate past the invoked stages.
+    assert "@hm:autopilot-advance" not in _render_partial(is_codex=False, advance_enabled=False)
+
+
+def test_fuse_emits_no_autopilot_advance_block() -> None:
+    # P1-3 end-to-end: workflow_fuse.fuse() threads autopilot_advance_enabled=False, so the
+    # fused command body is free of the boundary CLI + Skill auto-invoke branch.
+    from harness_maker.models import AtomicStage
+    from harness_maker.workflow_fuse import fuse
+
+    body = fuse([AtomicStage.EXECUTE, AtomicStage.REVIEW], "exec-rev")
+    assert "@hm:autopilot-advance" not in body
+    assert "autopilot_caps boundary" not in body

@@ -147,7 +147,8 @@ def count_events(
     legacy rows on disk may carry the old `...SSZ` form, and `_parse_iso` normalizes the `Z`
     so mixed-format ledgers still compare correctly. The P6 boundary CLI passes the marker's
     `created_at` to scope the `advanced` count to the current session. Fail-safe: a missing
-    ledger / unparseable line / unparseable ts counts as zero/skipped, never raises.
+    ledger / unparseable line never raises (counts as zero); a row with a missing/unparseable
+    ts is counted IN-WINDOW (block-biased toward firing the step cap — see P2-4 below).
     """
     path = ledger_path(project_root, observability_dir)
     if not path.is_file():
@@ -166,7 +167,11 @@ def count_events(
         if since_dt is not None:
             ts = record.get("ts")
             ts_dt = _parse_iso(ts) if isinstance(ts, str) else None
-            if ts_dt is None or ts_dt < since_dt:
+            # P2-4: only skip rows PROVABLY older than `since`. A missing/garbage ts is
+            # counted (in-window) — dropping it would UNDER-count `advanced` events and
+            # delay the runaway step cap (the wrong fail-safe direction; the cap must be
+            # block-biased toward firing, not toward running longer).
+            if ts_dt is not None and ts_dt < since_dt:
                 continue
         total += 1
     return total
@@ -194,6 +199,12 @@ def smoke_check(
     level are treated as not-armed (mirrors `autopilot.effective_level`'s clamp-unknown-to-
     gated fail-safe — REVIEW P1, the CLAUDE.md absent-case = feature-black-hole guard), so a
     typo'd level can never raise a false 'never fired' alarm.
+
+    Scope (P3): this reads ONLY the committed ``harness.yaml`` level. It deliberately does
+    NOT consult a live `.hm-autopilot` marker — `/hm:health` runs as its own session and a
+    marker from a *different* session is foreign anyway. A session that armed auto-advance
+    purely via the start-answer marker (yaml still `gated`) is therefore out of scope here;
+    its activity is visible directly in the ledger.
     """
     count = _total_entries(project_root, observability_dir)
     armed = yaml_level in _ARMED_LEVELS
