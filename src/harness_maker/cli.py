@@ -340,22 +340,39 @@ def make(
         if add_domain_name not in a.domains:
             a.domains.append(add_domain_name)
     # Phase 6 (ADR-008): make-time enablement preflight for EXISTING harnesses.
-    # Migrate a never-migrated, worktree-enabled harness to the feature-branch
-    # model ONLY on a clean live-state probe — else keep the old model + loud-warn,
-    # so the new in-worktree path never strands old preserved state. Gated on:
-    # reused (existing harness re-render) + worktree.enabled (the flag is inert
-    # without isolation; Phase-5's gate would mis-render the preflight on a
-    # no-worktree harness) + key-ABSENT (an explicit true/false is already a
-    # decision — round-tripped by answers_from_harness_yaml — and is respected).
+    # `--reinterview` bypasses the answers_from_harness_yaml round-trip, so an
+    # explicit on-disk opt-out/opt-in would be lost and the preset default would
+    # silently re-impose it (REVIEW security P2). Re-apply the on-disk explicit
+    # bool; if on-disk is absent, drop the preset default so key-ABSENT becomes the
+    # migration signal handled by the preflight below.
+    if reinterview and existing_yaml.is_file():
+        _disk_wt = pre_yaml_body.get("worktree")
+        _disk_flag = _disk_wt.get("feature_branch_workflow") if isinstance(_disk_wt, dict) else None
+        if isinstance(_disk_flag, bool):
+            a.worktree["feature_branch_workflow"] = _disk_flag
+        else:
+            a.worktree.pop("feature_branch_workflow", None)
+    # Migrate a never-migrated, worktree-enabled harness to the feature-branch model
+    # ONLY on a clean live-state probe — else keep the old model + loud-warn, so the
+    # new in-worktree path never strands old preserved state. Gated on: existing
+    # harness re-render (reused OR reinterview) + worktree.enabled (the flag is inert
+    # without isolation; Phase-5's gate would mis-render the preflight on a no-worktree
+    # harness) + key-ABSENT (an explicit true/false is a decision — respected). The
+    # preflight also sweeps sibling repos (multi-repo strand gap, REVIEW security P1).
     # Config mutation only; no git is mutated on this path.
     if (
-        reused is not None
+        (reused is not None or reinterview)
         and bool(a.worktree.get("enabled"))
         and "feature_branch_workflow" not in a.worktree
     ):
-        from harness_maker.worktree import enablement_preflight
+        from harness_maker.worktree import _load_sibling_dirs, enablement_preflight
 
-        should_flip, preflight_warning = enablement_preflight(target)
+        # Reuse the canonical sibling resolver (REVIEW security P2 / code P3): it
+        # `.resolve()`s, gates each on a real `.git` (drops traversal/non-repo
+        # entries), and reads from the same on-disk source the pop path uses — so
+        # the preflight and `post-commit-pop` can't drift on sibling discovery.
+        sibling_bases = _load_sibling_dirs(existing_yaml, target)
+        should_flip, preflight_warning = enablement_preflight(target, sibling_bases=sibling_bases)
         if should_flip:
             a.worktree["feature_branch_workflow"] = True
             typer.echo("migrated to the feature-branch worktree workflow (clean live-state)")

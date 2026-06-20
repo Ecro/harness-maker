@@ -829,39 +829,59 @@ def _list_user_dirty_files(base: Path) -> list[str]:
     return out
 
 
-def enablement_preflight(target: Path) -> tuple[bool, str | None]:
+def _old_model_residue_blockers(base: Path, label: str) -> list[str]:
+    """Filesystem-only old-model pending-state probes for ONE repo base (RAW
+    marker-agnostic globs — a bare ref/dir with no live marker still blocks; the
+    marker-gated `_count_pending_stashes` would false-pass it). `label` annotates
+    sibling bases in the warning."""
+    claude = base / _LOOP_MARKER_DIR
+    out: list[str] = []
+    if claude.is_dir() and any(claude.glob(f"{_STASH_REF_PREFIX}*")):
+        out.append(f"unpopped finalize stash (.hm-finalize-stash-*){label}")
+    if claude.is_dir() and any(claude.glob(f"{_LOOP_MARKER_PREFIX}*")):
+        out.append(f"active loop marker (.hm-loop-*){label}")
+    worktrees = base / WORKTREE_DIR_NAME
+    if worktrees.is_dir() and any(
+        p.is_dir() and p.name.startswith(_OWNED_PREFIXES) for p in worktrees.iterdir()
+    ):
+        # ALL owned old-model prefixes, not just `execute-` — `_OWNED_PREFIXES`
+        # single-source-of-truth (REVIEW code P1): a crashed session under a
+        # non-`execute` workflow name leaves residue with no live marker, which an
+        # `execute-*`-only glob would miss → flip-while-stranded.
+        out.append(f"in-flight old-model worktree (.worktrees/<owned-prefix>-*){label}")
+    return out
+
+
+def enablement_preflight(
+    target: Path, *, sibling_bases: list[Path] | None = None
+) -> tuple[bool, str | None]:
     """ADR-008 make-time migration probe: is the project clean enough to flip
     `worktree.feature_branch_workflow` → True?
 
     Returns `(should_flip, warning)`. Flips ONLY when there is NO pending old-model
-    state, so the new in-worktree path can never strand work that only the old
-    `post-commit-pop` would finalize. Blockers (each named in the warning):
-    - any `.hm-finalize-stash-*` ref (RAW marker-agnostic glob — a bare ref without
-      a live session marker still blocks; the marker-gated `_count_pending_stashes`
-      would false-pass it);
-    - any live `.hm-loop-*` marker;
-    - any in-flight `.worktrees/execute-*` worktree dir (the durable residue a
-      crashed old session leaves even without a live marker);
-    - user-dirty base (`_has_user_dirty_state`, a read-only `git status`).
-    Filesystem-only apart from that one read-only status — the migrate path never
-    MUTATES git (ADR-008 "never mutates live git state")."""
-    claude = target / _LOOP_MARKER_DIR
-    blockers: list[str] = []
-    if claude.is_dir() and any(claude.glob(f"{_STASH_REF_PREFIX}*")):
-        blockers.append("unpopped finalize stash (.hm-finalize-stash-*)")
-    if claude.is_dir() and any(claude.glob(f"{_LOOP_MARKER_PREFIX}*")):
-        blockers.append("active loop marker (.hm-loop-*)")
-    worktrees = target / WORKTREE_DIR_NAME
-    if worktrees.is_dir() and any(
-        p.is_dir() and p.name.startswith(_OWNED_PREFIXES) for p in worktrees.iterdir()
-    ):
-        # ALL owned old-model prefixes, not just `execute-` — the module's
-        # `_OWNED_PREFIXES` single-source-of-truth (REVIEW code P1): a crashed
-        # session under a non-`execute` workflow name leaves residue with no live
-        # marker, which an `execute-*`-only glob would miss → flip-while-stranded.
-        blockers.append("in-flight old-model worktree (.worktrees/<owned-prefix>-*)")
-    if _has_user_dirty_state(target):
-        blockers.append("uncommitted user changes in the base repo")
+    state — in the PRIMARY base AND every sibling base — so the new in-worktree path
+    can never strand work that only the old `post-commit-pop` would finalize. The
+    sibling sweep mirrors `_cli_post_commit_pop`'s per-sibling drain: a multi-repo
+    Production harness keeps per-sibling stash refs / worktrees while the loop marker
+    lives only on the primary, so a sibling-only pending state with a clean primary
+    must still block (REVIEW security P1).
+
+    Blockers per base: any `.hm-finalize-stash-*` ref, any live `.hm-loop-*` marker,
+    any in-flight `.worktrees/<owned-prefix>-*` dir. Plus a primary dirty/indeterminate
+    probe: a read-only `git status` — uncommitted user dirt blocks, and a status
+    FAILURE inside a git repo is INDETERMINATE → defer (REVIEW security/Codex P2:
+    don't report a flaky clean). A non-git target has no git state → no git block.
+    Filesystem-only apart from that one read-only status — never MUTATES git."""
+    blockers = _old_model_residue_blockers(target, "")
+    for sib in sibling_bases or []:
+        blockers += _old_model_residue_blockers(sib, f" [sibling {sib.name}]")
+    if (target / ".git").exists():
+        try:
+            status = _run(["git", "status", "--porcelain", "-uall"], cwd=target)
+            if any(not _is_create_guard_harness_artifact(ln) for ln in status.stdout.splitlines()):
+                blockers.append("uncommitted user changes in the base repo")
+        except RuntimeError:
+            blockers.append("could not verify base cleanliness (git status failed)")
     if blockers:
         return False, (
             "feature-branch workflow deferred: drain in-flight work then re-run "
@@ -3055,17 +3075,22 @@ def _feature_branch_workflow_enabled(base_dir: Path) -> bool:
     except (OSError, yaml.YAMLError):
         return False
     wt = data.get("worktree")
-    if not isinstance(wt, dict) or "feature_branch_workflow" not in wt:
+    val = wt.get("feature_branch_workflow") if isinstance(wt, dict) else None
+    # Absent OR non-bool → conservative old-model. A hand-edited non-bool (e.g. the
+    # string "false") must NOT read as enabled — `bool("false")` is True — so mirror
+    # the interview-layer bool-strictness (REVIEW code P2: the runtime reader and
+    # `answers_from_harness_yaml` must agree on the same on-disk bytes).
+    if not isinstance(val, bool):
         if not _FLAG_WARNED:
             print(
-                "[worktree] harness.yaml worktree.feature_branch_workflow absent "
-                "→ defaulting to the old (non-feature-branch) model. Re-render with "
-                "`/harness-maker:make` to opt in.",
+                "[worktree] harness.yaml worktree.feature_branch_workflow absent or "
+                "non-boolean → defaulting to the old (non-feature-branch) model. "
+                "Re-render with `/harness-maker:make` to opt in.",
                 file=sys.stderr,
             )
             _FLAG_WARNED = True
         return False
-    return bool(wt.get("feature_branch_workflow", False))
+    return val
 
 
 # ── Phase 1 (ADR-004): session registry .claude/.hm-sessions.json ─────────────

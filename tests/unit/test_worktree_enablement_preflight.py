@@ -147,3 +147,47 @@ def test_preflight_runs_no_mutating_git(tmp_path: Path, monkeypatch) -> None:  #
     for call in seen:
         verb = call[1] if len(call) > 1 else ""
         assert verb not in mutating, f"preflight spawned a mutating git: {call}"
+
+
+# ── sibling-repo strand sweep (REVIEW security P1) ───────────────────────────
+
+
+def test_pending_sibling_stash_blocks(tmp_path: Path) -> None:
+    # Clean PRIMARY but a sibling with a pending finalize stash must STILL block —
+    # multi-repo strand gap: the loop marker lives only on the primary.
+    repo = _clean_repo(tmp_path)
+    sib = tmp_path / "sibling"
+    (sib / ".claude").mkdir(parents=True)
+    (sib / ".claude" / ".hm-finalize-stash-execute-s").write_text("ref\n")
+    should_flip, warning = worktree.enablement_preflight(repo, sibling_bases=[sib])
+    assert should_flip is False
+    assert warning is not None
+    assert "sibling" in warning
+
+
+def test_clean_primary_and_sibling_flips(tmp_path: Path) -> None:
+    repo = _clean_repo(tmp_path)
+    sib = tmp_path / "sibling"
+    (sib / ".claude").mkdir(parents=True)
+    should_flip, warning = worktree.enablement_preflight(repo, sibling_bases=[sib])
+    assert should_flip is True
+    assert warning is None
+
+
+# ── git-status failure is INDETERMINATE → defer (REVIEW security/Codex P2) ────
+
+
+def test_git_status_failure_defers(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    repo = _clean_repo(tmp_path)  # has a real .git
+    real_run = worktree._run
+
+    def _run_failing_status(args, *a, **kw):  # type: ignore[no-untyped-def]
+        if isinstance(args, list) and args[:2] == ["git", "status"]:
+            raise RuntimeError("git status timed out")
+        return real_run(args, *a, **kw)
+
+    monkeypatch.setattr(worktree, "_run", _run_failing_status)
+    should_flip, warning = worktree.enablement_preflight(repo)
+    assert should_flip is False
+    assert warning is not None
+    assert "could not verify" in warning

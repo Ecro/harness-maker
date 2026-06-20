@@ -63,3 +63,16 @@ def test_flag_absent_not_serialized_runtime_old_model(tmp_path: Path) -> None:
     hy = root / ".claude" / "harness.yaml"
     assert "feature_branch_workflow" not in hy.read_text(encoding="utf-8")
     assert worktree._feature_branch_workflow_enabled(root) is False
+
+
+def test_runtime_reader_treats_string_flag_as_old_model(tmp_path: Path) -> None:
+    # REVIEW code P2: a hand-edited string "false" is truthy to bool() — the runtime
+    # reader must NOT read it as enabled (mirror the interview-layer bool-strictness).
+    claude = tmp_path / ".claude"
+    claude.mkdir(parents=True)
+    (claude / "harness.yaml").write_text(
+        "---\ngenerated_by: harness-maker\n---\n"
+        'preset: Production\nworktree:\n  enabled: true\n  feature_branch_workflow: "false"\n',
+        encoding="utf-8",
+    )
+    assert worktree._feature_branch_workflow_enabled(tmp_path) is False

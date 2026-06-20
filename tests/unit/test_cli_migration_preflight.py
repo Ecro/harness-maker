@@ -62,9 +62,12 @@ def _harness_dir(tmp_path: Path) -> Path:
     return tmp_path
 
 
-def _run_make_update(target: Path, answers: Any) -> tuple[Any, list[list[str]], Any]:
+def _run_make_update(
+    target: Path, answers: Any, *, reinterview: bool = False
+) -> tuple[Any, list[list[str]], Any]:
     """Run `make --update` with downstream mocked + synthesize capturing `a`; also
-    spy git calls. Returns (captured_answers, git_calls, cli_result)."""
+    spy git calls. `reinterview` appends --reinterview (reused=None → `interview`
+    supplies the answers). Returns (captured_answers, git_calls, cli_result)."""
     captured: dict[str, Any] = {}
     git_calls: list[list[str]] = []
     real_run = subprocess.run
@@ -78,6 +81,9 @@ def _run_make_update(target: Path, answers: Any) -> tuple[Any, list[list[str]], 
             git_calls.append(args)
         return real_run(args, *a, **kw)
 
+    argv = ["make", str(target), "--update"]
+    if reinterview:
+        argv.append("--reinterview")
     with (
         patch("harness_maker.cli.profile", return_value=MagicMock()),
         patch("harness_maker.cli.synthesize", side_effect=_syn),
@@ -89,9 +95,10 @@ def _run_make_update(target: Path, answers: Any) -> tuple[Any, list[list[str]], 
         patch("harness_maker.cli._emit_post_make_readiness"),
         patch("harness_maker.cli._emit_refdocs_index_build"),
         patch("harness_maker.cli.answers_from_harness_yaml", return_value=answers),
+        patch("harness_maker.cli.interview", return_value=answers),
         patch("harness_maker.worktree.subprocess.run", side_effect=_git_spy),
     ):
-        result = runner.invoke(app, ["make", str(target), "--update"])
+        result = runner.invoke(app, argv)
     return captured.get("a"), git_calls, result
 
 
@@ -182,3 +189,25 @@ def test_side_worktree_disabled_not_flipped(tmp_path: Path) -> None:
     )
     assert result.exit_code == 0, result.output
     assert "feature_branch_workflow" not in a.worktree
+
+
+# ── --reinterview preserves an explicit on-disk opt-out (REVIEW security P2) ──
+
+
+def test_reinterview_preserves_explicit_false_opt_out(tmp_path: Path) -> None:
+    # On-disk harness.yaml has an explicit `false`; --reinterview bypasses the
+    # round-trip and the preset default is True — the opt-out MUST still survive.
+    claude = tmp_path / ".claude"
+    claude.mkdir(parents=True)
+    (claude / "harness.yaml").write_text(
+        "---\nharness_maker_version: 0.1.0\n---\n"
+        "preset: Production\nworktree:\n  enabled: true\n  feature_branch_workflow: false\n",
+        encoding="utf-8",
+    )
+    # interview() returns Production answers carrying the preset default (True).
+    answers = _answers(
+        preset=Preset.PRODUCTION, worktree={"enabled": True, "feature_branch_workflow": True}
+    )
+    a, _g, result = _run_make_update(tmp_path, answers, reinterview=True)
+    assert result.exit_code == 0, result.output
+    assert a.worktree.get("feature_branch_workflow") is False  # opt-out preserved
