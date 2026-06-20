@@ -30,6 +30,7 @@ from harness_maker.models import (
     _MODEL_ID_PATTERN,
     AgentModelSpec,
     AtomicStage,
+    AutonomyConfig,
     CodexAgentSpec,
     CodexSecondOpinionConfig,
     Confidence,
@@ -810,6 +811,7 @@ def answers_from_harness_yaml(yaml_path: Path) -> InterviewAnswers | None:
         "ref_folders": ref_folders,
         "second_brain": second_brain,
         "permissions": permissions,
+        "autonomy": _parse_autonomy(data.get("autonomy")),
         "sibling_repos": sibling_repos,
         "wrapup_docs": wrapup_docs,
         "reviewers": {
@@ -1153,6 +1155,24 @@ def _parse_second_brain(value: object) -> SecondBrainConfig:
     except Exception as e:  # noqa: BLE001 — tolerant upgrade path like mcp_servers
         logger.warning("harness.yaml second_brain: invalid config ignored (%s).", e)
         return SecondBrainConfig()
+
+
+def _parse_autonomy(value: object) -> AutonomyConfig:
+    """Reverse-map harness.yaml ``autonomy:`` block to typed config.
+
+    Tolerant like ``_parse_second_brain``: a missing OR malformed block (bad enum,
+    wrong types) falls back to the default ``gated`` config so an old or hand-edited
+    harness.yaml never breaks the load (ADR-002 absent-case = gated). ``strict=False``
+    lets yaml stage strings coerce into ``AtomicStage`` for the pipeline list while
+    the ``level`` Literal still rejects unknown values (→ caught → gated fallback).
+    """
+    if not isinstance(value, dict):
+        return AutonomyConfig()
+    try:
+        return AutonomyConfig.model_validate(value, strict=False)
+    except Exception as e:  # noqa: BLE001 — tolerant upgrade path like second_brain
+        logger.warning("harness.yaml autonomy: invalid config ignored (%s).", e)
+        return AutonomyConfig()
 
 
 def _string_or(value: object, fallback: str | None) -> str:

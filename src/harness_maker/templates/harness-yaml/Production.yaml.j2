@@ -100,3 +100,9 @@ codex_second_opinion:
   failure_policy: {{ (config.codex_second_opinion.failure_policy if config.codex_second_opinion else "warn-and-proceed") | tojson }}
   hermetic: {{ (config.codex_second_opinion.hermetic if config.codex_second_opinion else true) | string | lower }}
   output_schema_path: {{ (config.codex_second_opinion.output_schema_path if config.codex_second_opinion else ".claude/schemas/codex-finding.schema.json") | tojson }}
+autonomy:
+  level: {{ (config.autonomy.level if config.autonomy else "gated") | tojson }}
+  pipeline: {{ (config.autonomy.pipeline if config.autonomy else ['research', 'spec', 'plan', 'execute', 'review', 'verify', 'wrapup']) | tojson }}
+  step_cap: {{ (config.autonomy.step_cap if config.autonomy else 20) }}
+  time_cap_min: {{ (config.autonomy.time_cap_min if config.autonomy else 60) }}
+  extra_deny: {{ (config.autonomy.extra_deny if config.autonomy else []) | tojson }}

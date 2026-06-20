@@ -688,6 +688,7 @@ def synthesize(
         worktree=answers.worktree,
         security=answers.security,
         permissions=answers.permissions,
+        autonomy=answers.autonomy,
         context_lint=answers.context_lint,
         models=answers.models,
         reviewers={

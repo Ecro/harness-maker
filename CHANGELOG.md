@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Added — `autonomy` config schema (PLAN-human-bottleneck-auto-advance Phase 1 of 9)
+- **New `autonomy:` block in harness.yaml** — `level` (`gated` | `auto_safe` | `full`, default `gated`), `pipeline` (the 7-stage default), `step_cap` / `time_cap_min` (runaway caps), `extra_deny` (additive-only). Schema foundation for an opt-in pipeline auto-advance feature; **no runtime behavior yet** — `gated` is the default and old harness.yaml without the key loads as `gated` (absent-case guard).
+- `AutonomyConfig` is wired round-trip (HarnessConfig + InterviewAnswers mirror + synthesize + both harness-yaml templates + `interview._parse_autonomy` reverse-mapper) so the policy survives `/hm:make --update`. The destructive never-auto deny baseline is deliberately NOT a config field (ADR-003) — only `extra_deny` is user-settable, so a yaml edit can never subtract a baseline guard.
+- Phases 0, 2–8 (feasibility spike, session marker, Stop-hook backstop, never-auto enforcement, runaway caps, stage-terminal advance, ledger, docs) remain — see `work-docs/PLAN-human-bottleneck-auto-advance.md` Execution Log.
+
 ### Fixed — Worktree branch-backlog drain relocated off the create-only trigger (PLAN-multisession-worktree-concurrency Phase 0, ADR-009)
 - **The gated, biased-to-preserve worktree sweep (`prune_stale`) now also runs at `/hm:wrapup` and `/hm:health`, not only at `worktree create`.** Previously a paused project accumulated leaked `execute-*`/`plan-*` branches unbounded (this repo had 76 against 1 landed-marker), printing a "N branch(es) preserved" warning wall on every create.
 - New `worktree drain` subcommand (`_drain` / `_drain_summary` / `_cli_drain`) — a non-interactive, one-line-summary trigger that reuses the single `prune_stale` gate. It is **additive**: create-time reaping is retained, and it can never force-delete the legacy backlog (only the human-reviewed `prune-branches --force` does).

@@ -571,6 +571,44 @@ class PermissionsConfig(BaseModel):
     deny_dangerous: bool = False
 
 
+class AutonomyConfig(BaseModel):
+    """Pipeline auto-advance policy (PLAN-human-bottleneck-auto-advance).
+
+    ADR-002: ``level`` decides how far the workflow auto-advances past inter-stage
+    STOP boundaries. Default ``gated`` (today's behavior). An old harness.yaml
+    without an ``autonomy`` key loads as ``gated`` via the default-factory — the
+    absent-case = feature-black-hole guard. ``auto_safe`` advances the two-way-door
+    boundaries but ALWAYS stops at the plan architecture interview, a review
+    CHANGES_REQUESTED grade-gate, and the wrapup merge/push. ``full`` ~= the
+    existing /hm:loop autonomy.
+
+    ADR-003: the destructive never-auto deny baseline is code/template-fixed and is
+    intentionally NOT a field here — only ``extra_deny`` (additive) is user-settable,
+    so a harness.yaml edit can never SUBTRACT a baseline guard.
+
+    ADR-007: ``step_cap`` / ``time_cap_min`` bound a chained interactive session so a
+    runaway chain halts instead of looping uncapped.
+    """
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    level: Literal["gated", "auto_safe", "full"] = "gated"
+    pipeline: list[AtomicStage] = Field(
+        default_factory=lambda: [
+            AtomicStage.RESEARCH,
+            AtomicStage.SPEC,
+            AtomicStage.PLAN,
+            AtomicStage.EXECUTE,
+            AtomicStage.REVIEW,
+            AtomicStage.VERIFY,
+            AtomicStage.WRAPUP,
+        ],
+    )
+    step_cap: int = Field(default=20, gt=0)
+    time_cap_min: int = Field(default=60, gt=0)
+    extra_deny: list[str] = Field(default_factory=list)
+
+
 class HarnessConfig(BaseModel):
     """harness.yaml schema — single source of truth for a project's harness."""
 
@@ -670,6 +708,9 @@ class HarnessConfig(BaseModel):
     # Main-session settings.json deny-list policy. Default off (empty deny) —
     # see PermissionsConfig. Old harness.yaml without this key → default.
     permissions: PermissionsConfig = Field(default_factory=PermissionsConfig)
+    # Pipeline auto-advance policy. Old harness.yaml without this key → default
+    # (level=gated) per AutonomyConfig — the absent-case = feature black hole guard.
+    autonomy: AutonomyConfig = Field(default_factory=AutonomyConfig)
     context_lint: dict[str, Any] = Field(default_factory=dict)
     project: dict[str, Any] = Field(default_factory=lambda: {"domains": []})
     spec: dict[str, Any] = Field(default_factory=lambda: {"dir": "specs/"})
@@ -817,6 +858,10 @@ class InterviewAnswers(BaseModel):
     # answers_from_harness_yaml → synthesize (else a user's deny_dangerous=true
     # is silently dropped on re-render — REVIEW P1).
     permissions: PermissionsConfig = Field(default_factory=PermissionsConfig)
+    # Mirrors HarnessConfig.autonomy so the pipeline auto-advance policy round-trips
+    # through answers_from_harness_yaml → synthesize (else level/pipeline/caps are
+    # silently dropped on re-render — same contract as permissions above).
+    autonomy: AutonomyConfig = Field(default_factory=AutonomyConfig)
     # Map of user-named workflow → ordered atomic stages. Names are typically
     # auto-derived via STAGE_ABBREV (e.g. `exec-rev-wrap`) but user can override.
     fused_workflows: dict[str, list[AtomicStage]] = Field(
