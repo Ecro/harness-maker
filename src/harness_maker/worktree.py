@@ -852,6 +852,25 @@ def _old_model_residue_blockers(base: Path, label: str) -> list[str]:
     return out
 
 
+def _git_dirt_blocker(base: Path, label: str) -> list[str]:
+    """Read-only `git status` dirt/indeterminate probe for ONE base, with the same
+    `label` annotation convention as `_old_model_residue_blockers` so it applies to
+    PRIMARY (`label=""`) and sibling (`label=" [sibling X]"`) bases identically.
+
+    A non-git base has no git state → `[]`. Uncommitted USER dirt blocks; a status
+    FAILURE inside a git repo is INDETERMINATE → defer (REVIEW security/Codex P2:
+    don't report a flaky clean). Never MUTATES git."""
+    if not (base / ".git").exists():
+        return []
+    try:
+        status = _run(["git", "status", "--porcelain", "-uall"], cwd=base)
+    except RuntimeError:
+        return [f"could not verify base cleanliness (git status failed){label}"]
+    if any(not _is_create_guard_harness_artifact(ln) for ln in status.stdout.splitlines()):
+        return [f"uncommitted user changes in the base repo{label}"]
+    return []
+
+
 def enablement_preflight(
     target: Path, *, sibling_bases: list[Path] | None = None
 ) -> tuple[bool, str | None]:
@@ -866,22 +885,20 @@ def enablement_preflight(
     lives only on the primary, so a sibling-only pending state with a clean primary
     must still block (REVIEW security P1).
 
-    Blockers per base: any `.hm-finalize-stash-*` ref, any live `.hm-loop-*` marker,
-    any in-flight `.worktrees/<owned-prefix>-*` dir. Plus a primary dirty/indeterminate
-    probe: a read-only `git status` — uncommitted user dirt blocks, and a status
-    FAILURE inside a git repo is INDETERMINATE → defer (REVIEW security/Codex P2:
-    don't report a flaky clean). A non-git target has no git state → no git block.
-    Filesystem-only apart from that one read-only status — never MUTATES git."""
-    blockers = _old_model_residue_blockers(target, "")
-    for sib in sibling_bases or []:
-        blockers += _old_model_residue_blockers(sib, f" [sibling {sib.name}]")
-    if (target / ".git").exists():
-        try:
-            status = _run(["git", "status", "--porcelain", "-uall"], cwd=target)
-            if any(not _is_create_guard_harness_artifact(ln) for ln in status.stdout.splitlines()):
-                blockers.append("uncommitted user changes in the base repo")
-        except RuntimeError:
-            blockers.append("could not verify base cleanliness (git status failed)")
+    Blockers per base (PRIMARY and every sibling, full parity — Phase 7 AC4): any
+    `.hm-finalize-stash-*` ref, any live `.hm-loop-*` marker, any in-flight
+    `.worktrees/<owned-prefix>-*` dir, PLUS a read-only `git status` dirty/
+    indeterminate probe (uncommitted user dirt blocks; a status FAILURE inside a git
+    repo defers). A non-git base has no git state → no git block. **Trade-off:** N
+    siblings → N defer-on-flake surfaces; safety-biased (defer > false-clean) and
+    accepted — the one-shot flip stays on old-model + warns, recoverable by re-run.
+    Filesystem-only apart from the read-only status calls — never MUTATES git."""
+    bases: list[tuple[Path, str]] = [(target, "")]
+    bases += [(sib, f" [sibling {sib.name}]") for sib in sibling_bases or []]
+    blockers: list[str] = []
+    for base, label in bases:
+        blockers += _old_model_residue_blockers(base, label)
+        blockers += _git_dirt_blocker(base, label)
     if blockers:
         return False, (
             "feature-branch workflow deferred: drain in-flight work then re-run "

@@ -212,7 +212,21 @@ Cursor / Codex 의 plugin marketplace 가 GitHub 에서 직접 fetch.
   존재하지 않는 worktree path 로 gate 가 블록 → 강제 footgun.
 - 100% 로컬 telemetry — 외부 전송 금지
 
-## Multi-session worktree (PLAN-worktree-cross-session-data-loss-defense)
+## Multi-session worktree (PLAN-worktree-cross-session-data-loss-defense + PLAN-multisession-worktree-concurrency)
+
+두 모델이 `harness.yaml worktree.feature_branch_workflow` 플래그로 직교 공존한다 (default **True**=Production / **False**=Side). 옛 harness 에 키 부재 시 old-model + 경고 1회 (CLAUDE.md #6). flag-off 경로는 migration soak 끝날 때까지 GREEN 유지.
+
+### Per-task feature-branch model (flag ON, ADR-001~010 LOCKED)
+
+세션마다 stash 를 쌓는 대신 **task 당 영속 브랜치 + 워크트리**를 쓴다 — 동시 세션이 서로의 커밋을 오염시킬 경로가 구조적으로 없음.
+
+- **Lifecycle CLI** (`python -m harness_maker.worktree …`): `task-create <slug>` → 영속 `.worktrees/<slug>/` 를 브랜치 `hm/<slug>` (base HEAD 기준) 에 멱등 생성; `task-preflight <slug>` → registry claim + warm-branch drift 경고 + 죽은 row reclaim; `task-refresh <slug>` → drift 난 task 브랜치를 base HEAD 로 rebase (commit 손실 0, conflict→abort); `task-land <slug>` → `hm/<slug>` 를 main 으로 squash-land (full merge fence) 후 registry row drop + 브랜치+워크트리 삭제. 모든 `/hm:` stage 가 flag-on 시 preflight 를 거쳐 `<WT>` 안에서 실행 (Phase 5 partial).
+- **Session registry** `.claude/.hm-sessions.json` — flock+O_EXCL 직렬화, **전용 락** `index.lock-hm-registry` (30s, 360s finalize fence 와 분리 — registry mutate 가 fence 와 경쟁 안 함). `session_uuid` primary identity, pid 는 liveness-hint. **live mismatched-UUID row 는 절대 삭제 안 함.** registry 는 operational churn → gitignore + dirt/preserve 결정에서 제외.
+- **wrapup auto squash-land** (ADR-003): `/hm:wrapup` 이 `task-land` 를 호출 → task 당 main 에 **정확히 1 squash 커밋** + 브랜치/워크트리/registry row 정리.
+- **Make-time migration** (ADR-008, `enablement_preflight`): `/harness-maker:make` 가 기존 harness 의 플래그를 **clean live-state probe 통과 시에만** flip — primary **와 모든 sibling** base 에 pending `.hm-finalize-stash-*` / live `.hm-loop-*` / in-flight `.worktrees/<owned>-*` / uncommitted user dirt 가 없어야 함 (sibling 도 git-dirt probe full parity — Phase 7 AC4). 하나라도 있으면 old-model 유지 + loud warn. **config + re-render only, git mutation 0.**
+- **Drain/prune**: `worktree drain` + create-time `prune_stale` 가 landed 브랜치를 `refs/hm-landed/v1/*` marker(tip SHA) 로 reap; `prune-branches [--force]` 가 legacy `execute-*` backlog 정리 (`--force` 전 per-branch `git log -p` 힌트, reflog `wip` 커밋은 gc 윈도우까지 생존).
+
+### Old-model 5-layer defense (flag OFF — 여전히 활성)
 
 **3회째 incident** (2026-05-23) 후 land 한 5-layer defense — 모두 동시 regression 해야 contamination 재발 가능:
 

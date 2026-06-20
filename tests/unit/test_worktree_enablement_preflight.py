@@ -3,7 +3,8 @@
 `enablement_preflight(target)` returns `(should_flip, warning)` — flip the
 `feature_branch_workflow` flag to True ONLY when the project has NO pending
 old-model state (no unpopped `.hm-finalize-stash-*` ref, no live `.hm-loop-*`
-marker, no in-flight `.worktrees/execute-*` worktree, no user-dirty base). It is
+marker, no in-flight `.worktrees/<owned-prefix>-*` worktree — all `_OWNED_PREFIXES`,
+not just `execute-` — and no user-dirty base in the PRIMARY or any sibling). It is
 filesystem-only apart from the read-only `git status` the dirty-probe runs — the
 migrate path never MUTATES git.
 """
@@ -191,3 +192,60 @@ def test_git_status_failure_defers(tmp_path: Path, monkeypatch) -> None:  # type
     assert should_flip is False
     assert warning is not None
     assert "could not verify" in warning
+
+
+# ── per-sibling git-dirt probe PARITY (Phase 7 AC4) ──────────────────────────
+# Phase 6.1 left the primary with a git-status dirt/indeterminate probe but gave
+# siblings only the filesystem residue sweep. A GIT sibling with uncommitted user
+# dirt (no residue) would silently flip. Parity closes ADR-008's stated contract
+# ("no pending stash/marker/dirty/in-flight") for siblings too.
+
+
+def _clean_git_sibling(tmp_path: Path, name: str = "sib-repo") -> Path:
+    sib = tmp_path / name
+    sib.mkdir()
+    _git(["init", "-b", "main"], sib)
+    _git(["config", "user.email", "t@e.com"], sib)
+    _git(["config", "user.name", "T"], sib)
+    (sib / ".gitignore").write_text(".worktrees/\n.claude/\n")
+    (sib / "README.md").write_text("x\n")
+    _git(["add", "."], sib)
+    _git(["commit", "-m", "init"], sib)
+    return sib
+
+
+def test_dirty_sibling_repo_blocks(tmp_path: Path) -> None:
+    # A GIT sibling with uncommitted user dirt (no residue) must block the flip
+    # just like the primary would — assert the sibling's actual name is surfaced.
+    repo = _clean_repo(tmp_path)
+    sib = _clean_git_sibling(tmp_path)
+    (sib / "user_edit.py").write_text("uncommitted sibling code\n")  # untracked user dirt
+    should_flip, warning = worktree.enablement_preflight(repo, sibling_bases=[sib])
+    assert should_flip is False
+    assert warning is not None
+    assert sib.name in warning
+
+
+def test_sibling_git_status_failure_defers(tmp_path: Path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    # A sibling whose `git status` flakes is INDETERMINATE → defer (mirror the
+    # primary test_git_status_failure_defers), naming the sibling. The PRIMARY
+    # status must still succeed so only the sibling path drives the defer.
+    repo = _clean_repo(tmp_path)
+    sib = _clean_git_sibling(tmp_path)
+    real_run = worktree._run
+
+    def _run_failing_sibling_status(args, *a, **kw):  # type: ignore[no-untyped-def]
+        if (
+            isinstance(args, list)
+            and args[:2] == ["git", "status"]
+            and str(kw.get("cwd")) == str(sib)
+        ):
+            raise RuntimeError("git status timed out")
+        return real_run(args, *a, **kw)
+
+    monkeypatch.setattr(worktree, "_run", _run_failing_sibling_status)
+    should_flip, warning = worktree.enablement_preflight(repo, sibling_bases=[sib])
+    assert should_flip is False
+    assert warning is not None
+    assert "could not verify" in warning
+    assert sib.name in warning

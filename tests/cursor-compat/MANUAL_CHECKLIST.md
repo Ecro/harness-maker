@@ -481,3 +481,27 @@ risk is purely whether each IDE surfaces the rendered prose + runs the command.
    On a drifted branch, confirm `task-refresh <slug>` rebases without losing work.
 6. **Pass** → preflight wiring is IDE-portable; **Fail** → record which IDE failed
    to surface/run the block and open a per-target follow-up.
+
+### C10 — Flag-on auto-land + registry teardown (PLAN-multisession-worktree-concurrency Phase 4/7, ADR-003)
+
+**Why**: with `worktree.feature_branch_workflow: true`, a completed task's
+`/hm:wrapup` must call `task-land` to squash `hm/<slug>` → `main` (one commit),
+then tear down the branch, the `.worktrees/<slug>/` worktree, AND the
+`.claude/.hm-sessions.json` registry row. The CLI is IDE-identical; the risk is
+whether each IDE actually runs wrapup's land step and the teardown completes
+in-IDE (no orphan branch/worktree/registry row left behind).
+
+**Owner**: (assign) · **Target date**: before promoting the feature-branch default.
+
+1. On a flag-on harness, run a full `/hm:` task to completion (e.g.
+   `/hm:execute <slug>` → `/hm:wrapup`) in the IDE under test (Cursor, then Codex).
+2. Confirm **exactly one** new squash commit landed on `main` for the task
+   (`git log --oneline main -1`) — not a merge commit, not per-iter commits.
+3. Confirm teardown: `git branch --list 'hm/<slug>'` is empty, `.worktrees/<slug>/`
+   is gone, and the task's row is absent from `.claude/.hm-sessions.json`.
+4. **Concurrency spot-check** (optional): start a second flag-on task in a parallel
+   session; confirm each lands its own squash commit and neither sweeps the other's
+   staged files (merge fence + scope-guard).
+5. **Pass** → auto-land + registry teardown is IDE-portable; **Fail** → record the
+   IDE + which artifact leaked (branch / worktree / registry row) and open a
+   per-target follow-up.
