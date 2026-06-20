@@ -1,0 +1,244 @@
+"""autopilot_guard PreToolUse hook — block never-auto ops WHILE autopilot is active.
+
+ADR-003 (P4-impl refinement, user-confirmed): the never-auto list is code-fixed and
+non-overridable, but it fires ONLY when the `.hm-autopilot` marker is active. With
+autopilot OFF (the default) this hook is a no-op, so a solo user's manual `git push`
+/ `rm` is never blocked — the footgun a static session-wide settings.json deny would
+have created. The list exists *because auto-advance removes the human*, so it is gated
+on exactly that condition. `autonomy.extra_deny` may ADD patterns, never subtract.
+Claude-Code only (ADR-004): PermissionRequest (Codex) is allowed through.
+
+Defense-in-depth, not the sole boundary (the worktree sandbox + host-IDE auto-mode are
+the real ones). It is deliberately block-biased while autopilot is active — a
+false-positive merely pauses the chain for the human; a false-negative ships an
+irreversible op. git detection is word-tokenized (not adjacency-regex) so option
+prefixes like `git -c k=v push` / `git -C dir push` cannot slip past (REVIEW P1).
+"""
+
+from __future__ import annotations
+
+import contextlib
+import json
+import os
+import re
+import shlex
+import sys
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+from harness_maker import autopilot
+
+# Non-git never-auto Bash patterns (category, regex), matched per command-segment.
+NEVER_AUTO_BASH: list[tuple[str, re.Pattern[str]]] = [
+    # rm targeting an absolute / home / parent path, or any $-expansion = escaping
+    # the worktree sandbox. Covers `rm -rf /etc`, `rm ../x`, `rm "$HOME"/x`, `rm '~/x'`.
+    ("rm-escapes-worktree", re.compile(r"\brm\b[^\n]*(?:[\s\"'`](?:/|~|\.\.)|\$)")),
+    ("find-delete", re.compile(r"\bfind\b[^\n]*-delete\b")),
+    (
+        "publish-or-deploy",
+        re.compile(
+            r"\b(?:npm\s+publish|uv\s+publish|poetry\s+publish|twine\s+upload"
+            r"|gh\s+release\s+create|docker\s+push|helm\s+upgrade"
+            r"|aws\s+s3\s+(?:cp|sync|rm)|gcloud\s+(?:deploy|run\s+deploy)"
+            r"|terraform\s+(?:destroy|apply)|pulumi\s+(?:destroy|up)|kubectl\s+delete)\b"
+        ),
+    ),
+    # A Bash write/redirect to the harness's own permission surface — the agent must
+    # not `echo > .claude/settings.json` or rewrite hooks.json to disable this guard.
+    (
+        "permission-surface-write",
+        re.compile(r"\.claude/(?:settings(?:\.local)?\.json|hooks/hooks\.json)\b"),
+    ),
+]
+
+# Write/Edit/MultiEdit targeting the permission surface — settings, this guard's own
+# hooks.json, and the Cursor/Codex hook files. An active autopilot must not edit these.
+NEVER_AUTO_WRITE_PATH = re.compile(
+    r"(?:\.claude/(?:settings(?:\.local)?\.json|hooks/hooks\.json)"
+    r"|\.cursor/hooks\.json|\.codex/hooks\.json)$"
+)
+
+# git options that consume the FOLLOWING token as their value (so the tokenizer must
+# skip both when scanning for the subcommand): `git -c k=v push`, `git -C dir push`.
+_GIT_VALUE_OPTS = frozenset({"-c", "-C", "--namespace", "--git-dir", "--work-tree", "--exec-path"})
+
+_BASH = "Bash"
+_WRITE_TOOLS = frozenset({"Write", "Edit", "MultiEdit"})
+_SEGMENT_SPLIT = re.compile(r"[;&|\n]+")
+_MARKER_REL = ".claude/.hm-autopilot"
+_KNOWN_HOOK_EVENTS = frozenset(
+    {"PreToolUse", "PostToolUse", "PreCompact", "Stop", "PermissionRequest"}
+)
+
+
+@dataclass(frozen=True)
+class GateDecision:
+    """Pure outcome — main() converts to exit code + stderr."""
+
+    allow: bool
+    matched: str  # category id, "" when allowed
+    message: str
+
+
+def _git_segment_hit(segment: str) -> str | None:
+    """Word-tokenize one command segment; block destructive git subcommands.
+
+    Tolerates global option prefixes (`-c k=v`, `-C dir`, `--no-pager`) between `git`
+    and the subcommand so they cannot be used to bypass the adjacency check.
+    """
+    try:
+        tokens = shlex.split(segment)
+    except ValueError:
+        # Malformed shell (unclosed quote). Fall back to a coarse whitespace split,
+        # NOT `return None`: a `git push "unclosed` would then slip through as a
+        # false-NEGATIVE bypass — the dangerous direction for a security guard. The
+        # coarse split is block-biased (it may over-block a malformed-but-benign
+        # command), which is the safe direction: a malformed command issued under
+        # active autopilot is worth pausing for the human anyway (REVIEW round-2).
+        tokens = segment.split()
+    for i, tok in enumerate(tokens):
+        if tok != "git" and not tok.endswith("/git"):
+            continue
+        rest = tokens[i + 1 :]
+        j = 0
+        while j < len(rest) and rest[j].startswith("-"):
+            opt = rest[j]
+            j += 1
+            if opt in _GIT_VALUE_OPTS and j < len(rest) and not rest[j].startswith("-"):
+                j += 1  # skip the option's value token
+        if j >= len(rest):
+            return None
+        sub = rest[j]
+        tail = rest[j:]
+        if sub == "push":
+            return "git-push"
+        if sub == "reset" and "--hard" in tail:
+            return "git-reset-hard"
+        if sub == "stash" and len(tail) > 1 and tail[1] in ("drop", "clear"):
+            return "git-stash-destroy"
+        return None
+    return None
+
+
+def _extra_deny(project_dir: Path) -> list[str]:
+    """Best-effort read of harness.yaml ``autonomy.extra_deny`` (additive substrings)."""
+    path = project_dir / ".claude" / "harness.yaml"
+    if not path.is_file():
+        return []
+    with contextlib.suppress(Exception):
+        from harness_maker.io_utils import load_harness_yaml
+
+        data = load_harness_yaml(path)
+        if isinstance(data, dict):
+            raw = data.get("autonomy", {})
+            if isinstance(raw, dict):
+                deny = raw.get("extra_deny", [])
+                if isinstance(deny, list):
+                    return [d for d in deny if isinstance(d, str) and d.strip()]
+    return []
+
+
+def _bash_hit(command: str, extra_deny: list[str]) -> str | None:
+    """Return the matched category, or None when the command is allowed."""
+    for segment in _SEGMENT_SPLIT.split(command):
+        git_hit = _git_segment_hit(segment)
+        if git_hit is not None:
+            return git_hit
+        for category, pattern in NEVER_AUTO_BASH:
+            if pattern.search(segment):
+                return category
+    low = command.lower()
+    for extra in extra_deny:
+        if extra.lower() in low:
+            return f"extra_deny:{extra}"
+    return None
+
+
+def evaluate(tool_name: str, tool_input: dict[str, Any], project_dir: Path) -> GateDecision:
+    """Allow everything unless autopilot is active AND the call is never-auto."""
+    if autopilot.active_marker(project_dir) is None:
+        return GateDecision(allow=True, matched="", message="")
+    if tool_name == _BASH:
+        command = tool_input.get("command")
+        if not isinstance(command, str) or not command.strip():
+            return GateDecision(allow=True, matched="", message="")
+        hit = _bash_hit(command, _extra_deny(project_dir))
+        if hit is None:
+            return GateDecision(allow=True, matched="", message="")
+        return GateDecision(
+            allow=False,
+            matched=hit,
+            message=(
+                f"[autopilot] blocked never-auto op ({hit}) while autopilot is active. "
+                "Turn autopilot off (`harness-maker autopilot off`) to run this manually."
+            ),
+        )
+    if tool_name in _WRITE_TOOLS:
+        path = tool_input.get("file_path")
+        if isinstance(path, str) and NEVER_AUTO_WRITE_PATH.search(path):
+            return GateDecision(
+                allow=False,
+                matched="permission-surface-edit",
+                message="[autopilot] blocked permission-surface edit while autopilot active",
+            )
+    return GateDecision(allow=True, matched="", message="")
+
+
+def _resolve_root(payload: dict[str, Any]) -> Path:
+    """Resolve the project root the autopilot marker lives at — worktree-aware.
+
+    The hook subprocess's cwd is often a `.worktrees/<wt>/` dir during an autonomous
+    execute, while the marker lives at the base repo root. Mirror worktree_gate's
+    payload-first resolution (workspace.current_dir / cwd / env) and THEN walk up for
+    the marker (handling the `.worktrees/` parent) so the guard is not a silent no-op
+    in exactly the mode it guards (REVIEW P0).
+    """
+    raw_ws = payload.get("workspace")
+    ws: dict[str, Any] = raw_ws if isinstance(raw_ws, dict) else {}
+    start = Path(
+        ws.get("current_dir")
+        or payload.get("cwd")
+        or os.environ.get("CLAUDE_PROJECT_DIR")
+        or os.environ.get("CURSOR_PROJECT_DIR")
+        or os.getcwd()
+    )
+    for directory in [start, *start.parents]:
+        if (directory / _MARKER_REL).exists():
+            return directory
+        parts = directory.parts
+        if ".worktrees" in parts:
+            idx = len(parts) - 1 - parts[::-1].index(".worktrees")
+            if idx > 0:
+                base = Path(*parts[:idx])
+                if (base / _MARKER_REL).exists():
+                    return base
+    return start
+
+
+def main() -> int:
+    """PreToolUse: exit 0 (allow) / 2 (block) + stderr. PermissionRequest (Codex):
+    always exit 0 — autopilot is a Claude-Code feature (ADR-004)."""
+    try:
+        text = sys.stdin.read()
+        payload: Any = json.loads(text) if text.strip() else {}
+    except json.JSONDecodeError:
+        return 0
+    if not isinstance(payload, dict):
+        return 0
+    hook_event = str(payload.get("hook_event_name") or "")
+    if hook_event == "PermissionRequest":
+        return 0
+    if hook_event and hook_event not in _KNOWN_HOOK_EVENTS:
+        return 0
+    tool_name = str(payload.get("tool_name") or "")
+    raw_input = payload.get("tool_input")
+    tool_input = raw_input if isinstance(raw_input, dict) else {}
+    decision = evaluate(tool_name, tool_input, _resolve_root(payload))
+    if decision.message:
+        print(decision.message, file=sys.stderr)
+    return 0 if decision.allow else 2
+
+
+if __name__ == "__main__":  # pragma: no cover — exercised via subprocess in tests
+    sys.exit(main())

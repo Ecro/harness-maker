@@ -29,13 +29,15 @@
       {
         "matcher": "Bash",
         "hooks": [
-          {"type": "command", "command": "uv run --with {{ harness_maker_src_path }} python -m harness_maker.gates.permission_gate"}
+          {"type": "command", "command": "uv run --with {{ harness_maker_src_path }} python -m harness_maker.gates.permission_gate"},
+          {"type": "command", "command": "uv run --with {{ harness_maker_src_path }} python -m harness_maker.hooks.autopilot_guard", "timeout": 10}
         ]
       },
       {
         "matcher": "Write|Edit|MultiEdit",
         "hooks": [
-          {"type": "command", "command": "uv run --with {{ harness_maker_src_path }} python -m harness_maker.gates.worktree_gate"}
+          {"type": "command", "command": "uv run --with {{ harness_maker_src_path }} python -m harness_maker.gates.worktree_gate"},
+          {"type": "command", "command": "uv run --with {{ harness_maker_src_path }} python -m harness_maker.hooks.autopilot_guard", "timeout": 10}
         ]
       }{% if config.dev_mode == "spec-driven" %},
       {

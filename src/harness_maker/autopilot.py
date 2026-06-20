@@ -100,25 +100,45 @@ def load(project_root: Path) -> AutopilotMarker | None:
         return None
 
 
-def active_marker(project_root: Path) -> AutopilotMarker | None:
-    """Return the marker ONLY when it belongs to the current session.
+# A live autopilot session is short-lived; a marker older than this is treated as a
+# crash leftover (REVIEW P1). Because `_current_session_uuid` is project-scoped, the
+# uuid check alone cannot tell a crashed session's marker apart from the current one
+# in the same project — the TTL is that fallback until the dirname-embed UUID migration.
+_MARKER_TTL_HOURS = 18
 
-    A foreign/stale ``session_uuid`` (left by a crashed or different session) →
-    None, so autopilot never silently activates from another session's marker.
+
+def active_marker(project_root: Path, *, now: datetime | None = None) -> AutopilotMarker | None:
+    """Return the marker ONLY when it belongs to the current session AND is fresh.
+
+    A foreign/stale ``session_uuid`` (left by a crashed or different session) → None;
+    a marker older than ``_MARKER_TTL_HOURS`` (or with an unparseable ``created_at``)
+    → None. So autopilot never silently activates from another session's or a crashed
+    session's leftover marker.
 
     NOTE: ``_current_session_uuid`` is project-scoped (worktree.py acknowledged
-    limitation, ADR-004 §2) — so within the SAME project the uuid is stable and
-    cross-session isolation does not yet fire; the dirname-embed UUID migration
-    closes that. The fail-safe against corrupt/absent/wrong-shape markers (via
-    ``load``) is unaffected and fires today.
+    limitation, ADR-004 §2) — within the SAME project the uuid is stable, so the TTL
+    is the real cross-session guard until the dirname-embed UUID migration lands.
     """
     marker = load(project_root)
     if marker is None:
         return None
     if marker.session_uuid != _current_session_uuid(project_root):
-        logger.warning(
-            ".hm-autopilot: marker session_uuid mismatch (foreign/stale) — ignoring.",
-        )
+        logger.warning(".hm-autopilot: marker session_uuid mismatch (foreign) — ignoring.")
+        return None
+    moment = now if now is not None else datetime.now(UTC)
+    try:
+        created = datetime.fromisoformat(marker.created_at)
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=UTC)
+        age_s = (moment - created).total_seconds()
+    except (ValueError, TypeError, OverflowError):
+        logger.warning(".hm-autopilot: unparseable created_at — treating as stale.")
+        return None
+    # Reject BOTH a too-old marker (crash leftover) AND a future-dated one (clock skew
+    # or a crafted created_at that would otherwise keep autopilot armed forever — a
+    # negative age slips past a one-sided `> TTL` check). REVIEW round-2 P2.
+    if age_s < 0 or age_s > _MARKER_TTL_HOURS * 3600:
+        logger.warning(".hm-autopilot: marker outside the freshness window — ignoring.")
         return None
     return marker
 

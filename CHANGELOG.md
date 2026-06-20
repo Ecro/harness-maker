@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added — never-auto `autopilot_guard` PreToolUse hook (PLAN-human-bottleneck-auto-advance Phase 4 of 9)
+- **New `harness_maker.hooks.autopilot_guard`** — a PreToolUse hook that, **only while the `.hm-autopilot` marker is active**, blocks a code-fixed never-auto list (git push/force-push, `git reset --hard`, `git stash drop|clear`, `rm` escaping `.worktrees/`, publish/release/deploy, and edits to the permission surface incl. `.claude/settings*.json` + `.claude/hooks/hooks.json`). With autopilot OFF it is a pure no-op, so **manual/solo workflows are unchanged** (ADR-003 refined from "static settings.json deny" to "marker-gated hook" — a static deny would have blocked the user's own manual `git push`).
+- Hardened against bypass: git detection is **word-tokenized** (`git -c k=v push` can't slip past), the protected-surface check covers **Bash redirects** (`echo > settings.json`) not just the Write tool, the marker root is resolved **worktree-aware**, and the marker has a freshness TTL. `autonomy.extra_deny` only ADDs; the baseline is non-overridable. Claude-Code only (Codex `PermissionRequest` passes through). Wired into `hooks.json` PreToolUse (Bash + Write|Edit|MultiEdit).
+
 ### Added — `autonomy` config schema (PLAN-human-bottleneck-auto-advance Phase 1 of 9)
 - **New `autonomy:` block in harness.yaml** — `level` (`gated` | `auto_safe` | `full`, default `gated`), `pipeline` (the 7-stage default), `step_cap` / `time_cap_min` (runaway caps), `extra_deny` (additive-only). Schema foundation for an opt-in pipeline auto-advance feature; **no runtime behavior yet** — `gated` is the default and old harness.yaml without the key loads as `gated` (absent-case guard).
 - `AutonomyConfig` is wired round-trip (HarnessConfig + InterviewAnswers mirror + synthesize + both harness-yaml templates + `interview._parse_autonomy` reverse-mapper) so the policy survives `/hm:make --update`. The destructive never-auto deny baseline is deliberately NOT a config field (ADR-003) — only `extra_deny` is user-settable, so a yaml edit can never subtract a baseline guard.
