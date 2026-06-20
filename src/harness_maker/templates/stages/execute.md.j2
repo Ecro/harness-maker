@@ -388,6 +388,8 @@ Bash("HM_OWNED_SESSION_UUIDS=\"$(uv run --with {{ harness_maker_src_path }} pyth
 {% set summary_done = "PLAN phases implemented to GREEN; changes staged, no commit" -%}
 {% set summary_artifact = "staged worktree changes + updated PLAN phase status" -%}
 {% set summary_next = "`/hm:review {slug}` or `/hm:wrapup` (STOP — user-initiated)" -%}
+{% set summary_stage = "execute" -%}
+{% set summary_autopilot_gate = "No mandatory gate — execute may auto-advance (the worktree finalize already ran)." -%}
 {% include "agents/_partials/stage_end_summary.md.j2" %}
 
 <!-- @hm:user:extra-quality-checks -->

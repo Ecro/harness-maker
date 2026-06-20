@@ -497,6 +497,8 @@ fields and negative counts.
 {% set summary_done = "Code reviewed; findings graded against the grade gate" -%}
 {% set summary_artifact = "work-docs/REVIEW-{slug}.md" -%}
 {% set summary_next = "address findings then re-review, or `/hm:wrapup` (STOP — user-initiated)" -%}
+{% set summary_stage = "review" -%}
+{% set summary_autopilot_gate = "If the REVIEW Status is CHANGES_REQUESTED (grade < threshold) or human_review_needed is true, STOP — never auto-advance past unresolved findings." -%}
 {% include "agents/_partials/stage_end_summary.md.j2" %}
 
 <!-- @hm:user:extra-quality-checks -->

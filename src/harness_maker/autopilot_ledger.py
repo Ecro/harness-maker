@@ -113,3 +113,51 @@ def append_event(
     _append_atomic_line(
         ledger_path(project_root, observability_dir), json.dumps(record, ensure_ascii=False)
     )
+
+
+def _parse_iso(value: str) -> datetime | None:
+    """Parse an ISO-8601 ts to an aware UTC datetime; None when unparseable."""
+    try:
+        dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except (ValueError, TypeError):
+        return None
+    return dt if dt.tzinfo is not None else dt.replace(tzinfo=UTC)
+
+
+def count_events(
+    project_root: Path,
+    event: str,
+    *,
+    since: str | None = None,
+    observability_dir: Path | None = None,
+) -> int:
+    """Count ledger events of one type, optionally only those with ``ts >= since``.
+
+    The `since` filter parses BOTH sides to aware datetimes (not a lexicographic string
+    compare) — the marker's `created_at` (`...SS.ffffff+00:00` from `datetime.isoformat`)
+    and the ledger ts (`...SSZ` from `_utc_now_iso`) have DIFFERENT shapes, so a byte
+    compare would only be correct by accident (REVIEW P2). The P6 boundary CLI passes the
+    marker's `created_at` to scope the `advanced` count to the current session. Fail-safe:
+    a missing ledger / unparseable line / unparseable ts counts as zero/skipped, never raises.
+    """
+    path = ledger_path(project_root, observability_dir)
+    if not path.is_file():
+        return 0
+    since_dt = _parse_iso(since) if since is not None else None
+    total = 0
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(record, dict) or record.get("event") != event:
+            continue
+        if since_dt is not None:
+            ts = record.get("ts")
+            ts_dt = _parse_iso(ts) if isinstance(ts, str) else None
+            if ts_dt is None or ts_dt < since_dt:
+                continue
+        total += 1
+    return total

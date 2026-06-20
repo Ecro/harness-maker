@@ -7,7 +7,45 @@
     loud under StrictUndefined — absent-case guard, ADR-002. Renders in config.locale
     via the output_language directive. Self-skips under an active autoloop. The banner
     fires once per stage, so a fused (concatenated) workflow emits one per stage; the
-    Codex workflow_skill delegates and carries none. is_codex-agnostic prose. -#}
+    Codex workflow_skill delegates and carries none. is_codex-agnostic prose.
+
+    P6 (PLAN-human-bottleneck-auto-advance): an autopilot auto-advance block is emitted
+    before the STOP banner for non-Codex renders. Callers MUST set `summary_stage` (this
+    stage's atomic name) — a bare REQUIRED var: a forgotten set fails render loud under
+    StrictUndefined, so a stage can never pass `--current ""` (which the CLI would treat as
+    an unknown stage and clear the marker). `summary_autopilot_gate` (the stage's
+    mandatory-gate predicate prose) defaults STOP-biased. -#}
+{% if is_codex is defined and not is_codex %}
+<!-- @hm:autopilot-advance -->
+## Auto-advance check (autopilot — Claude Code only)
+
+Before the STOP banner below, check whether this session runs under **autopilot** (live
+auto-advance, ADR-005). This is **Claude-Code-only**: it needs the `.hm-autopilot` marker
+(`harness-maker autopilot on`) and the `Skill` tool. **If the `Skill` tool is unavailable
+(any non-Claude-Code IDE such as Cursor) OR no `.hm-autopilot` marker is active OR
+`.hm-loop-active` exists, this section is a NO-OP** — fall straight through to the STOP
+banner (do not run any command below).
+
+**Step 1 — mandatory gate FIRST (absent-case = STOP).** Evaluate THIS stage's gate
+*before* anything else: {{ summary_autopilot_gate | default("No gate defined — treat as STOP (absent-case guard).") }}
+If the gate is pending/unresolved → **STOP** (print the banner). Do NOT run the boundary
+check — a stage that stops at its gate must not record an advance.
+
+**Step 2 — boundary check (ONLY when the gate is clear).** Run the deterministic check
+(it enforces the Phase-5 runaway caps + kill switch, and on proceed records the advance it
+authorizes — so it must run only after Step 1 clears):
+
+!python -m harness_maker.autopilot_caps boundary --root . --current {{ summary_stage }} --step-cap {{ config.autonomy.step_cap }} --time-cap-min {{ config.autonomy.time_cap_min }}
+
+Read the JSON:
+- `proceed: false` → **STOP** (print the banner). `halt_kind` `step_cap`/`time_cap` = a
+  runaway cap fired (`halted_cap` logged); `kill_switch` = autopilot off/expired;
+  `unknown_stage` = `--current` not in the pipeline (marker preserved); `pipeline_complete:
+  true` = the pipeline finished and the marker was cleared.
+- `proceed: true` → **auto-advance**: invoke `Skill(hm:<next_stage from the JSON>)` to run
+  the next pipeline stage in THIS session instead of printing the STOP banner.
+<!-- @hm:/autopilot-advance -->
+{% endif %}
 ## Stage summary — print before you STOP
 
 Skip this banner entirely if `.hm-loop-active` exists at the project root (the

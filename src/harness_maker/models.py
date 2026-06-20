@@ -579,8 +579,13 @@ class AutonomyConfig(BaseModel):
     without an ``autonomy`` key loads as ``gated`` via the default-factory — the
     absent-case = feature-black-hole guard. ``auto_safe`` advances the two-way-door
     boundaries but ALWAYS stops at the plan architecture interview, a review
-    CHANGES_REQUESTED grade-gate, and the wrapup merge/push. ``full`` ~= the
-    existing /hm:loop autonomy.
+    CHANGES_REQUESTED grade-gate, and the wrapup merge/push. ``full`` currently behaves
+    IDENTICALLY to ``auto_safe`` — the mandatory safety gates are non-negotiable and are
+    honored at every level (a `full` session must never auto-push or skip a
+    CHANGES_REQUESTED review). ``full`` is reserved for a future wider-advance policy; it
+    is NOT a gate-bypass. (REVIEW P6: the P6 stage-terminal applies the gates
+    unconditionally, so the earlier "full ~= /hm:loop bypass" wording was a code/doc
+    divergence — corrected here.)
 
     ADR-003: the destructive never-auto deny baseline is code/template-fixed and is
     intentionally NOT a field here — only ``extra_deny`` (additive) is user-settable,

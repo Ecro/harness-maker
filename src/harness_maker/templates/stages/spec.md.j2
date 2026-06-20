@@ -353,6 +353,8 @@ The user can resume by editing the SPEC directly or re-running `/hm:spec {slug}`
 {% set summary_done = "SPEC authored with observable acceptance criteria" -%}
 {% set summary_artifact = "specs/SPEC-{slug}.md" -%}
 {% set summary_next = "`/hm:plan {slug}` (STOP — user-initiated)" -%}
+{% set summary_stage = "spec" -%}
+{% set summary_autopilot_gate = "No mandatory gate — spec may auto-advance." -%}
 {% include "agents/_partials/stage_end_summary.md.j2" %}
 
 <!-- @hm:user:extra-quality-checks -->

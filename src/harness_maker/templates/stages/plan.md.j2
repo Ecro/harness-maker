@@ -479,6 +479,8 @@ If verification fails, retry write **once**. If still failing, surface the path 
 {% set summary_done = "PLAN written with ADRs + phase decomposition; validator outcome recorded" -%}
 {% set summary_artifact = "work-docs/PLAN-{slug}.md" -%}
 {% set summary_next = "`/hm:execute {slug}` (STOP — user-initiated)" -%}
+{% set summary_stage = "plan" -%}
+{% set summary_autopilot_gate = "If any architectural AskUserQuestion round is pending/unresolved (the deep interview did not complete), STOP — auto-advance must never skip a human architecture decision." -%}
 {% include "agents/_partials/stage_end_summary.md.j2" %}
 
 <!-- @hm:user:extra-quality-checks -->

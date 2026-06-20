@@ -436,6 +436,8 @@ If the user asks to push during wrapup, that is fine — but never push without 
 {% set summary_done = "Final checks + drift gate passed; single commit created" -%}
 {% set summary_artifact = "the commit + committed deliverables (PLAN/RESEARCH/REVIEW/SPEC)" -%}
 {% set summary_next = "STOP — task complete" -%}
+{% set summary_stage = "wrapup" -%}
+{% set summary_autopilot_gate = "If this is a commit/push boundary needing user confirmation (e.g. push to a shared branch), STOP — auto-advance never pushes without an explicit user request." -%}
 {% include "agents/_partials/stage_end_summary.md.j2" %}
 
 <!-- @hm:user:extra-quality-checks -->

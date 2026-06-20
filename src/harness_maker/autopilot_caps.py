@@ -9,6 +9,10 @@ over the caps so a user can always abort mid-chain. Token/cost budget is deferre
 
 from __future__ import annotations
 
+import argparse
+import json
+import sys
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -105,3 +109,102 @@ def record_cap_halt(
         now=ts,
         observability_dir=observability_dir,
     )
+
+
+def next_stage(pipeline: Sequence[str], current: str) -> str | None:
+    """The stage after ``current`` in ``pipeline``; None when ``current`` is last/unknown."""
+    try:
+        idx = list(pipeline).index(current)
+    except ValueError:
+        return None
+    nxt = idx + 1
+    return pipeline[nxt] if nxt < len(pipeline) else None
+
+
+def _cmd_boundary(args: argparse.Namespace) -> int:
+    """The deterministic boundary check the P6 auto-branch runs before advancing.
+
+    Single entrypoint: resolves the live marker (kill switch when absent/foreign/stale),
+    counts this session's prior ``advanced`` events as ``steps``, applies the caps, and
+    on the proceed path records the advance it authorizes (so the next call's step count
+    accrues) + reports the next pipeline stage. At the last stage it clears the marker
+    (ADR-006 — final stage ends the session) and reports pipeline_complete.
+    """
+    root = Path(args.root)
+    out: dict[str, object] = {
+        "proceed": False,
+        "halt_kind": None,
+        "reason": "",
+        "steps": 0,
+        "next_stage": None,
+        "pipeline_complete": False,
+    }
+    marker = autopilot.active_marker(root)
+    if marker is None:
+        out["halt_kind"] = "kill_switch"
+        out["reason"] = "autopilot marker absent/foreign/stale — aborting chain at boundary"
+        print(json.dumps(out))
+        return 0
+    steps = autopilot_ledger.count_events(root, "advanced", since=marker.created_at)
+    out["steps"] = steps
+    decision = evaluate_boundary(
+        root, steps=steps, step_cap=args.step_cap, time_cap_min=args.time_cap_min
+    )
+    if not decision.proceed:
+        out["halt_kind"] = decision.halt_kind
+        out["reason"] = decision.reason
+        # Only the two cap kinds are halted_cap-recordable (kill switch handled above).
+        # Explicit `==` branches so mypy narrows HaltKind → CapKind for record_cap_halt.
+        if decision.halt_kind == "step_cap":
+            record_cap_halt(root, halt_kind="step_cap", steps=steps)
+        elif decision.halt_kind == "time_cap":
+            record_cap_halt(root, halt_kind="time_cap", steps=steps)
+        print(json.dumps(out))
+        return 0
+    # marker.pipeline holds AtomicStage (str-enum) members; `in` / index use str-equality
+    # so a plain stage name like "research" matches (str(member) would give the enum repr,
+    # not the value — do NOT stringify).
+    if args.current not in marker.pipeline:
+        # Unknown `--current` (typo / stage outside the pipeline) is NOT completion —
+        # preserve the marker + surface a distinct halt so a bad value can't silently kill
+        # the session while falsely claiming success (REVIEW P2: Codex + 2 reviewers).
+        out["halt_kind"] = "unknown_stage"
+        out["reason"] = f"current stage {args.current!r} not in the pipeline — marker preserved"
+        print(json.dumps(out))
+        return 0
+    nxt = next_stage(marker.pipeline, args.current)
+    if nxt is None:
+        # `current` IS the last stage → end the session (ADR-006).
+        autopilot.clear(root)
+        out["pipeline_complete"] = True
+        out["reason"] = "pipeline complete — autopilot session finished"
+        print(json.dumps(out))
+        return 0
+    autopilot_ledger.append_event(root, event="advanced", fields={"to": nxt})
+    out["proceed"] = True
+    out["next_stage"] = nxt
+    out["steps"] = steps + 1
+    out["reason"] = f"advancing to {nxt}"
+    print(json.dumps(out))
+    return 0
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    """`boundary` subcommand — the prose auto-branch's deterministic gate (P6)."""
+    parser = argparse.ArgumentParser(add_help=False)
+    sub = parser.add_subparsers(dest="cmd", required=True)
+    b = sub.add_parser("boundary", add_help=False)
+    b.add_argument("--root", default=".")
+    b.add_argument("--current", required=True)
+    b.add_argument("--step-cap", type=int, required=True, dest="step_cap")
+    b.add_argument("--time-cap-min", type=int, required=True, dest="time_cap_min")
+    # parse_args (not parse_known_args) so a stray/misspelled flag errors loud rather than
+    # being silently swallowed (REVIEW P3).
+    args = parser.parse_args(argv)
+    if args.cmd == "boundary":
+        return _cmd_boundary(args)
+    return 0
+
+
+if __name__ == "__main__":  # pragma: no cover — exercised via main(argv) in tests
+    sys.exit(main())
