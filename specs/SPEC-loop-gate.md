@@ -24,11 +24,18 @@ Consumers of loop-gate can rely on the AC below holding under the SPEC's verific
 
 ## 📋 In-Scope Scenarios
 
-### AC-001: Loop gate hook — prevents session termination while .hm-loop-active is set
+### AC-001: Loop gate hook — prevents session termination while THIS session's loop is active
 
 **Given** the feature is loaded under default configuration
 **When** the contract surface of loop-gate is exercised
 **Then** AC (mechanical) holds per its predicate / table / rubric
+
+> **Session-scoped (PLAN-loop-marker-session-scoping):** the Stop-hook blocks
+> termination only when a `.claude/.hm-loop-*` marker's `claude_session_id:`
+> content header matches the hook payload's `session_id` — never merely because
+> another session's loop marker exists. A legacy global `.hm-loop-active` is
+> honored as a degraded fallback (written only when no Claude `session_id` is
+> available). Parallel loops across sessions therefore do not interfere.
 
 ## 🚫 Non-Goals
 
@@ -45,7 +52,7 @@ Consumers of loop-gate can rely on the AC below holding under the SPEC's verific
 
 | Scenario | Verification mode | Test reference |
 |---|---|---|
-| AC-001 | unit (predicate) | tests/unit/hooks/test_loop_gate.py::test_found_in_cwd, tests/unit/hooks/test_loop_gate.py::test_found_in_harness_worktree_parent, tests/unit/hooks/test_loop_gate.py::test_found_in_parent |
+| AC-001 | unit (predicate) | tests/unit/hooks/test_loop_gate.py::test_found_in_cwd, tests/unit/hooks/test_loop_gate.py::test_found_in_harness_worktree_parent, tests/unit/hooks/test_loop_gate.py::test_found_in_parent, tests/unit/test_loop_gate_session.py::TestStopHookSessionScoped::test_own_session_marker_blocks, tests/unit/test_loop_gate_session.py::TestStopHookSessionScoped::test_other_session_marker_allows |
 
 ## ❓ Open Questions
 

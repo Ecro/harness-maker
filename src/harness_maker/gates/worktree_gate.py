@@ -66,11 +66,15 @@ def _read_active_worktrees(project_root: Path) -> list[Path]:
 
     Globs .claude/.hm-loop-* (ADR-006 per-session files) — each file may list
     one or more newline-separated absolute paths (multi-repo session). The
-    legacy .hm-loop-active filename is matched by the glob, preserving backward
-    compatibility. Missing .claude/ dir, unreadable files, or paths that no
-    longer exist are silently filtered; missing enforcement is safer than
-    hard-blocking on inconsistent state.
+    leading ``claude_session_id:`` content header (PLAN-loop-marker-session-scoping
+    ADR-002) is dropped by the explicit ``startswith("/")`` path-line rule —
+    never by existence (validator W1) — so it can't be mistaken for a worktree
+    path. The legacy .hm-loop-active filename is matched by the glob, preserving
+    backward compatibility. Missing .claude/ dir, unreadable files, or paths
+    that no longer exist are silently filtered.
     """
+    from harness_maker.loop_marker import parse_marker_paths
+
     claude_dir = project_root / ".claude"
     if not claude_dir.is_dir():
         return []
@@ -82,10 +86,7 @@ def _read_active_worktrees(project_root: Path) -> list[Path]:
             text = marker.read_text(encoding="utf-8")
         except OSError:
             continue
-        for line in text.splitlines():
-            stripped = line.strip()
-            if not stripped:
-                continue
+        for stripped in parse_marker_paths(text):
             wt = Path(stripped)
             if wt.is_dir():
                 active.append(wt.resolve())

@@ -99,24 +99,53 @@ def test_create_primary_branch_name_no_slug(primary: Path, sibling: Path) -> Non
 
 
 def test_loop_marker_contains_both_paths(primary: Path, sibling: Path) -> None:
+    from harness_maker.loop_marker import parse_marker_paths
+
     result = worktree.create("execute", primary, sibling_dirs=[sibling])
     # Per-session marker: .hm-loop-{primary-wt-basename}
     marker = primary / ".claude" / f".hm-loop-{result[0].name}"
     assert marker.is_file()
     content = marker.read_text(encoding="utf-8")
-    lines = [ln for ln in content.splitlines() if ln.strip()]
-    assert len(lines) == 2
-    assert str(result[0]) in lines
-    assert str(result[1]) in lines
+    # The marker now carries a claude_session_id header (ADR-002); the path
+    # lines are extracted by the "/"-prefix rule.
+    paths = parse_marker_paths(content)
+    assert len(paths) == 2
+    assert str(result[0]) in paths
+    assert str(result[1]) in paths
 
 
 def test_loop_marker_single_repo_contains_one_path(primary: Path) -> None:
+    from harness_maker.loop_marker import parse_marker_paths
+
     result = worktree.create("execute", primary)
     marker = primary / ".claude" / f".hm-loop-{result[0].name}"
     content = marker.read_text(encoding="utf-8")
-    lines = [ln for ln in content.splitlines() if ln.strip()]
-    assert len(lines) == 1
-    assert str(result[0]) in lines
+    paths = parse_marker_paths(content)
+    assert len(paths) == 1
+    assert str(result[0]) in paths
+
+
+def test_standalone_create_stays_unscoped(primary: Path) -> None:
+    """Load-bearing invariant: a `create` WITHOUT --claude-session-id (i.e. a
+    standalone /hm:execute, not a loop) writes an empty content header, so the
+    Stop-hook / loop-mode-active never treat it as an active loop. Only loops
+    (which pass --claude-session-id) are session-scoped.
+    """
+    from harness_maker.loop_marker import marker_dir_has_session
+
+    worktree.create("execute", primary)  # no claude_session_id → standalone
+    claude = primary / ".claude"
+    assert marker_dir_has_session(claude, "deadbeefcafe") is False
+    assert marker_dir_has_session(claude, "") is False
+
+
+def test_loop_create_is_session_scoped(primary: Path) -> None:
+    """Counterpart: a `create` WITH a claude_session_id (a loop) IS matchable."""
+    from harness_maker.loop_marker import marker_dir_has_session
+
+    worktree.create("execute", primary, claude_session_id="deadbeefcafe")
+    assert marker_dir_has_session(primary / ".claude", "deadbeefcafe") is True
+    assert marker_dir_has_session(primary / ".claude", "feedfacefeed") is False
 
 
 def test_clear_loop_marker_removes_file(primary: Path, sibling: Path) -> None:

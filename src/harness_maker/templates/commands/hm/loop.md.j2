@@ -428,7 +428,7 @@ worktree would explode commit count.
 
 {% if is_codex %}
 ```
-Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree create execute $(pwd)")
+Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree create execute \"$(pwd)\" --claude-session-id \"$HM_SESSION_ID\"")
 ```
 
 If the command fails (non-zero exit or git error):
@@ -436,7 +436,7 @@ If the command fails (non-zero exit or git error):
 - Set `<WT>` = the current working directory. Continue.
 {% else %}
 ```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree create execute "$(pwd)"
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree create execute "$(pwd)" --claude-session-id "$HM_SESSION_ID"
 ```
 {% endif %}
 
@@ -488,28 +488,47 @@ Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktre
 > create→verify→marker prelude; only parallelize work already inside a
 > verified `<WT>`.
 
-After confirming the worktree path (or deciding to operate in cwd), **create
-the loop-active marker** in the project root:
+After confirming the worktree path (or deciding to operate in cwd), **activate
+the Stop-hook guard — session-scoped**. The guard now keys on THIS Claude
+session, so parallel loops in other sessions are never affected
+(PLAN-loop-marker-session-scoping):
+
+- **Normal path (worktree isolation engaged AND `$HM_SESSION_ID` is set):**
+  `worktree create --claude-session-id "$HM_SESSION_ID"` already wrote this
+  session's per-session marker, whose content header carries your `session_id`.
+  The Stop-hook matches that header against your own `session_id`, so the loop is
+  already guarded. **Do NOT touch the global `.hm-loop-active`** — it is
+  session-blind and would block other sessions' termination.
+- **Degraded path (`$HM_SESSION_ID` empty — no SessionStart env-file, or
+  Cursor/Codex — OR no isolation):** there is no session-scoped marker, so fall
+  back to the global marker and warn that parallel loops are NOT isolated:
+
+Substitute `<WT>` with the literal worktree path from the create step (or, when
+no isolation engaged, your cwd). The guard touches the global marker when EITHER
+`$HM_SESSION_ID` is empty (no content header to match) OR there is no isolation
+(`<WT>` equals your cwd → no per-session content marker exists) — both are the
+degraded path; otherwise the per-session content marker already guards you:
 
 {% if is_codex %}
 ```
-Bash("touch .hm-loop-active")
+Bash("if [ -z \"$HM_SESSION_ID\" ] || [ \"<WT>\" = \"$(pwd)\" ]; then touch .hm-loop-active; echo '[loop] degraded marker (no HM_SESSION_ID or no isolation) — parallel loops are NOT isolated'; fi")
 ```
 {% else %}
 ```bash
-!touch .hm-loop-active
+!if [ -z "$HM_SESSION_ID" ] || [ "<WT>" = "$(pwd)" ]; then touch .hm-loop-active; echo '[loop] degraded marker (no HM_SESSION_ID or no isolation) — parallel loops are NOT isolated'; fi
 ```
 {% endif %}
 
-This activates the Stop hook guard — the session will not terminate while
-this file exists. The marker is gitignored by the harness worktree setup.
+The marker(s) are gitignored by the harness worktree setup.
 
 > **Cursor users**: the Claude Code Stop event guard is not available in
-> Cursor IDE. The `.hm-loop-active` marker activates advisory stderr output
-> on each Bash tool call but cannot block session termination. **Do not
-> close the Cursor IDE window manually while the loop is running.** To
-> recover a loop broken by accidental close: `rm .hm-loop-active` then
-> re-run `/hm:loop --spec <spec-path>` with the remaining features.
+> Cursor IDE, and `$HM_SESSION_ID` (set by the Claude Code SessionStart hook) is
+> typically absent — so Cursor takes the degraded global-marker path above, which
+> activates advisory stderr output on each Bash tool call but cannot block
+> session termination. **Do not close the Cursor IDE window manually while the
+> loop is running.** To recover a loop broken by accidental close:
+> `rm .hm-loop-active` then re-run `/hm:loop --spec <spec-path>` with the
+> remaining features.
 
 Per-iter standalone `/hm:execute` (e.g. inside an invoked workflow's
 execute stage) calls `worktree create` again — its idempotency check
@@ -930,20 +949,23 @@ When the loop halts (convergence, safety rail, or hard error):
 
    This gate fires for **both** feature and improve mode when `converged = True`.
 
-2. **Delete the loop-active marker only on convergence or explicit override**.
+2. **Release this session's loop guard only on convergence or explicit override**.
 
-   Keep `.hm-loop-active` on every non-converged halt (max-iter, time cap,
+   Keep the guard active on every non-converged halt (max-iter, time cap,
    failed-streak cap, hard error, or unresolved checklist failure). In those
    states, report the blocker and ask for an explicit next action while the
    Stop hook remains active:
 
    - **Continue** — adjust budget/scope and re-enter the iteration body.
-   - **Abort** — user accepts non-convergence; delete marker and finalize `fail`.
-   - **Override** — user explicitly accepts the current state; delete marker
+   - **Abort** — user accepts non-convergence; release guard and finalize `fail`.
+   - **Override** — user explicitly accepts the current state; release guard
      and finalize using the user-approved status.
 
    After the checklist gate confirms `converged = True`, or after the user
-   explicitly chooses Abort/Override, delete the marker:
+   explicitly chooses Abort/Override, release the guard. The **per-session**
+   marker (`.claude/.hm-loop-<wt>`, the normal-path guard) is removed by the
+   worktree `finalize` in step 3 below; here only the **degraded global** marker
+   needs an explicit (idempotent, no-op if absent) cleanup:
 
 {% if is_codex %}
    ```

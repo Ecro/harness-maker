@@ -23,8 +23,9 @@ Before the STOP banner below, check whether this session runs under **autopilot*
 auto-advance, ADR-005). This is **Claude-Code-only**: it needs the `.hm-autopilot` marker
 (`harness-maker autopilot on`) and the `Skill` tool. **If the `Skill` tool is unavailable
 (any non-Claude-Code IDE such as Cursor) OR no `.hm-autopilot` marker is active OR
-`.hm-loop-active` exists, this section is a NO-OP** — fall straight through to the STOP
-banner (do not run any command below).
+loop-mode is active for THIS session (a `.claude/.hm-loop-*` marker matches
+`$HM_SESSION_ID`, or a legacy `.hm-loop-active` exists), this section is a NO-OP** —
+fall straight through to the STOP banner (do not run any command below).
 
 **Step 1 — mandatory gate FIRST (absent-case = STOP).** Evaluate THIS stage's gate
 *before* anything else: {{ summary_autopilot_gate | default("No gate defined — treat as STOP (absent-case guard).") }}
@@ -53,9 +54,10 @@ Read the JSON:
 {% endif %}
 ## Stage summary — print before you STOP
 
-Skip this banner entirely if `.hm-loop-active` exists at the project root (the
-autoloop uses machine receipts, not prose). Otherwise emit it as your final output,
-in the configured output language:
+Skip this banner entirely if loop-mode is active for THIS session (a
+`.claude/.hm-loop-*` marker matches `$HM_SESSION_ID`, or a legacy
+`.hm-loop-active` exists — the autoloop uses machine receipts, not prose).
+Otherwise emit it as your final output, in the configured output language:
 
 <!-- @hm:banner:end -->
 > ✅ **Done:** {{ summary_done }}

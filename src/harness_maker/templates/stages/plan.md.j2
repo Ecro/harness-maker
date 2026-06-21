@@ -91,7 +91,7 @@ If any criterion fails → **run the interview by default** (do not ask permissi
 
 ### Step 1 — Pre-interview internal draft (NOT shown to user)
 
-> **Loop-mode short-circuit**: if `.hm-loop-active` exists at the project root, **skip this entire Step 1** and jump directly to Step 1.5 below. The internal draft is pure waste in loop-mode (the per-iter plan is master-PLAN-derived, not from scratch). Saves tokens + avoids confusing intermediate state.
+> **Loop-mode short-circuit**: if loop-mode is active for THIS session (the Step 1.5 `loop-mode-active` check exits 0), **skip this entire Step 1** and jump directly to Step 1.5 below. The internal draft is pure waste in loop-mode (the per-iter plan is master-PLAN-derived, not from scratch). Saves tokens + avoids confusing intermediate state.
 
 Synthesize a working plan from inputs:
 - Tentative architecture (components, boundaries, data flow).
@@ -102,14 +102,16 @@ This seed is what the interview refines. Investigate code unknowns with Read/Gre
 
 ### Step 1.5 — Loop-mode detection (ADR-002, ADR-007, ADR-008 of PLAN-loop-mid-stop-and-review-skip)
 
-Before Step 2, check whether `/hm:plan` is running inside an active `/hm:loop` iteration. The marker file lives at the **project root**, NOT inside `<WT>` — the loop driver writes it before engaging any worktree. Locate the project root one of two ways:
+Before Step 2, check whether `/hm:plan` is running inside an active `/hm:loop` iteration. **Detection is session-scoped** (PLAN-loop-marker-session-scoping) — it keys on THIS Claude session, so a loop running in *another* session never makes your standalone `/hm:plan` skip its interview. Locate the project root (strip any `/.worktrees/<wt-name>/` suffix from cwd, or `git -C . rev-parse --show-toplevel` then walk up out of `.worktrees/`), then run:
 
-- If you have a recent Step 0 worktree output telling you `<WT>` like `/path/to/project/.worktrees/execute-20260523T*`, the project root is two path-components above `.worktrees/` (i.e., strip `/.worktrees/<wt-name>/` suffix).
-- Otherwise call `git -C . rev-parse --show-toplevel` and walk up out of `.worktrees/` if cwd is inside one.
+```bash
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree loop-mode-active "<PROJECT_ROOT>" --claude-session-id "$HM_SESSION_ID"
+```
 
-**If the marker `<PROJECT_ROOT>/.hm-loop-active` exists**, this is loop-mode: do NOT engage the deep interview (loop body cannot block on {% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %}). Instead, scope the plan to the next master-PLAN phase only.
+- **Exit 0 (`active`)** → loop-mode: some `.claude/.hm-loop-*` marker's content header matches YOUR `session_id` (or a legacy global `.hm-loop-active` exists — degraded fallback). Do NOT engage the deep interview (loop body cannot block on {% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %}). Scope the plan to the next master-PLAN phase only.
+- **Exit 1 (`inactive`)** → not loop-mode (no marker matches your session; another session's loop does not count). Proceed to Step 2 as normal.
 
-**Loop-mode procedure (when `<PROJECT_ROOT>/.hm-loop-active` exists):**
+**Loop-mode procedure (when `loop-mode-active` exited 0):**
 
 1. Derive `<N>` from `<WT>/.claude/.hm-iter-receipts/.current-iter` (driver-written at iter start per Phase 3 contract). If the marker file is absent for some reason, fall through to standard mode — the loop driver is in an inconsistent state and the interview is the safer choice.
 2. Read the master `work-docs/PLAN-{slug}.md`. Find the next phase whose status is NOT `DONE` (look for `## Phase N` headers and their `Status:` lines). Call this `<M>`.
@@ -140,13 +142,13 @@ Before Step 2, check whether `/hm:plan` is running inside an active `/hm:loop` i
    > 2. Emit a `verdict: fail` receipt via the Phase 2 shell guard at the end of this stage (do NOT use `verdict: skipped` — that bypasses Gate 0 silently; `fail` causes Gate 0 to retry the plan stage, eventually triggering the cap=2 escalation where the operator picks A/B/C with full context).
    > 3. Surface the halt note + ADR question text in your turn output so the operator sees it before the next gate evaluation.
    >
-   > Operator response: re-run `/hm:plan <slug>` standalone (outside the loop — `.hm-loop-active` must be temporarily removed: `rm .hm-loop-active`) to engage the deep interview, lock the new ADR into the master PLAN, then re-enter the loop with `/hm:loop --spec <spec-path>`.
+   > Operator response: re-run `/hm:plan <slug>` standalone in a **separate Claude session** (its different `session_id` makes the `loop-mode-active` check exit 1, so the deep interview engages) — or, in the degraded global-marker case, temporarily `rm .hm-loop-active`. Lock the new ADR into the master PLAN, then re-enter the loop with `/hm:loop --spec <spec-path>`.
 
 5. Skip directly to Step 4 (plan-validator). Validator runs against the per-iter PLAN, not the master PLAN.
 
 6. **Cleanup boundary**: per-iter PLAN files (`PLAN-{slug}-iter*.md`) accumulate inside `<WT>/work-docs/`. They are squash-merged at loop close (ADR-008) and the squash commit on the parent branch carries them as artifacts. No standalone cleanup is needed — the worktree's lifecycle owns it.
 
-If `.hm-loop-active` is absent → proceed to Step 2 as normal.
+If `loop-mode-active` exited 1 (not loop-mode for this session) → proceed to Step 2 as normal.
 
 ### Step 2 — SPEC inheritance check (when SPEC exists)
 

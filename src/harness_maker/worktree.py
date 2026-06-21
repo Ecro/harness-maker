@@ -274,6 +274,7 @@ def create(
     workflow: str,
     base_dir: Path,
     sibling_dirs: list[Path] | None = None,
+    claude_session_id: str = "",
 ) -> list[Path]:
     """Create git worktrees for primary and optional sibling repos.
 
@@ -324,7 +325,7 @@ def create(
         raise
 
     all_wts = [primary_wt, *sibling_wts]
-    _write_loop_marker(base, primary_wt.name, all_wts)
+    _write_loop_marker(base, primary_wt.name, all_wts, claude_session_id=claude_session_id)
     return all_wts
 
 
@@ -1492,17 +1493,19 @@ def _registered_worktree_paths(base_dir: Path) -> set[Path]:
 
 
 def _marker_referenced_paths(marker: Path) -> list[Path]:
-    """Read absolute paths listed in a loop marker; invalid markers return []."""
+    """Read absolute paths listed in a loop marker; invalid markers return [].
+
+    Uses the shared ``parse_marker_paths`` so all four marker readers apply ONE
+    header-skip rule (``startswith("/")``) — no per-reader drift if the content
+    schema changes (PLAN-loop-marker-session-scoping, validator W1).
+    """
+    from harness_maker.loop_marker import parse_marker_paths
+
     try:
         text = marker.read_text(encoding="utf-8")
     except OSError:
         return []
-    paths: list[Path] = []
-    for line in text.splitlines():
-        stripped = line.strip()
-        if stripped.startswith("/"):
-            paths.append(Path(stripped).resolve())
-    return paths
+    return [Path(p).resolve() for p in parse_marker_paths(text)]
 
 
 def _is_orphan_marker(marker: Path) -> bool:
@@ -2002,10 +2005,23 @@ def _cli_create(args: list[str]) -> int:
         if a not in ("--allow-stash-queue", "--allow-dirty-base", "--debug-worktree")
     ]
 
+    # PLAN-loop-marker-session-scoping ADR-002: optional value flag carrying the
+    # Claude session id (from $HM_SESSION_ID) — recorded in marker content so the
+    # Stop-hook can match it. Extract the flag + its value before the positional
+    # count check. Absent → empty (back-compat; marker header empty).
+    claude_session_id = ""
+    if "--claude-session-id" in args:
+        idx = args.index("--claude-session-id")
+        if idx + 1 >= len(args):
+            print("create: --claude-session-id requires a value", file=sys.stderr)
+            return 2
+        claude_session_id = args[idx + 1]
+        del args[idx : idx + 2]
+
     if len(args) != 2:
         print(
             "usage: create <stage> <base_dir> [--allow-stash-queue] "
-            "[--allow-dirty-base] [--debug-worktree]",
+            "[--allow-dirty-base] [--debug-worktree] [--claude-session-id <id>]",
             file=sys.stderr,
         )
         return 2
@@ -2092,7 +2108,12 @@ def _cli_create(args: list[str]) -> int:
     # Load sibling_repos from harness.yaml (empty list when field absent)
     sibling_dirs = _load_sibling_dirs(yaml_path, base)
 
-    wt_paths = create(stage, base, sibling_dirs=sibling_dirs if sibling_dirs else None)
+    wt_paths = create(
+        stage,
+        base,
+        sibling_dirs=sibling_dirs if sibling_dirs else None,
+        claude_session_id=claude_session_id,
+    )
 
     # Stale execute.md detection: if sibling repos configured but execute.md
     # lacks the SIBLING_WORKTREE_PATHS sentinel, degrade to primary-only output
@@ -2117,21 +2138,32 @@ def _marker_path(project_root: Path, wt_name: str) -> Path:
     return project_root / _LOOP_MARKER_DIR / f"{_LOOP_MARKER_PREFIX}{wt_name}"
 
 
-def _write_loop_marker(project_root: Path, wt_name: str, wt_paths: list[Path]) -> None:
+def _write_loop_marker(
+    project_root: Path,
+    wt_name: str,
+    wt_paths: list[Path],
+    claude_session_id: str = "",
+) -> None:
     """Persist active-worktree paths for this session to a per-session marker file.
 
     File: ``.claude/.hm-loop-{wt_name}`` — one file per active session so
-    parallel sessions coexist without overwriting each other (ADR-006).
-    Content: newline-separated absolute paths. Single-repo = one line,
-    multi-repo = N lines.
+    parallel sessions coexist without overwriting each other (ADR-006). The
+    filename stays worktree-keyed (``_owned_session_uuids`` reads the UUID from
+    it — ADR-005); the Claude ``session_id`` is recorded in the CONTENT header
+    so the Stop-hook can match it without renaming the file
+    (PLAN-loop-marker-session-scoping ADR-002).
+
+    Content: a ``claude_session_id:`` header line then newline-separated
+    absolute paths (single-repo = one path, multi-repo = N).
 
     Atomic write — concurrent readers (gate hook) must never see partial.
     Also ensures ``.claude/.hm-loop-*`` is in ``.gitignore``.
     """
     from harness_maker.io_utils import atomic_write
+    from harness_maker.loop_marker import format_marker_content
 
     marker = _marker_path(project_root, wt_name)
-    content = "\n".join(str(p) for p in wt_paths) + "\n"
+    content = format_marker_content(claude_session_id, wt_paths)
     atomic_write(marker, content)
     _ensure_gitignore_entry(project_root, _LOOP_MARKER_GITIGNORE_PATTERN)
 
@@ -2152,6 +2184,8 @@ def _read_active_worktrees(project_root: Path) -> list[Path]:
     collects every path listed in them, and filters non-existent entries.
     Returns empty list when no marker files exist.
     """
+    from harness_maker.loop_marker import parse_marker_paths
+
     marker_dir = project_root / _LOOP_MARKER_DIR
     paths: list[Path] = []
     try:
@@ -2163,10 +2197,9 @@ def _read_active_worktrees(project_root: Path) -> list[Path]:
             text = marker.read_text(encoding="utf-8")
         except OSError:
             continue
-        for line in text.splitlines():
-            stripped = line.strip()
-            if not stripped:
-                continue
+        # Drop the content header by the "/"-prefix rule (validator W1) — never
+        # by existence, so a header line can't be mistaken for a worktree path.
+        for stripped in parse_marker_paths(text):
             p = Path(stripped)
             if p.exists():
                 paths.append(p)
@@ -2341,6 +2374,8 @@ def _session_worktrees(project_root: Path, primary_wt_name: str, fallback: Path)
     Falls back to [fallback] when the marker is absent/unreadable (backward
     compat — single-repo sessions that wrote no marker, or pre-Phase 2 code).
     """
+    from harness_maker.loop_marker import parse_marker_paths
+
     marker = _marker_path(project_root, primary_wt_name)
     if not marker.is_file():
         return [fallback]
@@ -2348,7 +2383,9 @@ def _session_worktrees(project_root: Path, primary_wt_name: str, fallback: Path)
         text = marker.read_text(encoding="utf-8")
     except OSError:
         return [fallback]
-    paths = [Path(ln.strip()) for ln in text.splitlines() if ln.strip()]
+    # Drop the `claude_session_id:` content header by the "/"-prefix rule (W1);
+    # only absolute path lines are session worktrees.
+    paths = [Path(p) for p in parse_marker_paths(text)]
     return paths if paths else [fallback]
 
 
@@ -4097,6 +4134,44 @@ def _cli_drain(args: list[str]) -> int:
     return 0
 
 
+def _cli_loop_mode_active(args: list[str]) -> int:
+    """`worktree loop-mode-active <base> --claude-session-id <id>` — exit 0 if in a loop.
+
+    Session-scoped loop-mode detection for the stage templates (plan / banners):
+    exit 0 ("active") iff some ``.claude/.hm-loop-*`` marker's content header
+    matches this session's id, OR a legacy global ``.hm-loop-active`` exists
+    (degraded fallback). Exit 1 ("inactive") otherwise. The session id distinguishes
+    a loop (loop.md.j2 passes ``--claude-session-id``) from a standalone worktree
+    (empty header). PLAN-loop-marker-session-scoping ADR-002/003.
+    """
+    from harness_maker.loop_marker import marker_dir_has_session, sanitize_session_id
+
+    claude_session_id = ""
+    if "--claude-session-id" in args:
+        idx = args.index("--claude-session-id")
+        if idx + 1 >= len(args):
+            print("loop-mode-active: --claude-session-id requires a value", file=sys.stderr)
+            return 2
+        claude_session_id = args[idx + 1]
+        del args[idx : idx + 2]
+    if len(args) != 1:
+        print("usage: loop-mode-active <base> --claude-session-id <id>", file=sys.stderr)
+        return 2
+    base = Path(args[0]).resolve()
+    sid = sanitize_session_id(claude_session_id)
+    # Content-match is session-scoped. The legacy global is honored ONLY when
+    # THIS session has no id (degraded) — a valid-id session must NOT be pulled
+    # into loop-mode by another session's degraded global marker (re-review C1:
+    # bug-2 would otherwise survive in the degraded path for valid-id sessions).
+    if marker_dir_has_session(base / _LOOP_MARKER_DIR, sid) or (
+        not sid and (base / ".hm-loop-active").exists()
+    ):
+        print("active")
+        return 0
+    print("inactive")
+    return 1
+
+
 def main(argv: list[str] | None = None) -> int:
     """Dispatch worktree subcommand from argv."""
     args = list(sys.argv[1:] if argv is None else argv)
@@ -4134,6 +4209,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cli_task_preflight(rest)
     if sub == "task-refresh":
         return _cli_task_refresh(rest)
+    if sub == "loop-mode-active":
+        return _cli_loop_mode_active(rest)
     print(f"unknown subcommand: {sub}", file=sys.stderr)
     return 2
 

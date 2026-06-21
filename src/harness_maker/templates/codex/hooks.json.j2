@@ -43,7 +43,8 @@
     "SessionStart": [
       {
         "hooks": [
-          {"type": "command", "command": "uv run --with {{ harness_maker_src_path }} python -m harness_maker.hooks.sessionstart_drift"}
+          {"type": "command", "command": "uv run --with {{ harness_maker_src_path }} python -m harness_maker.hooks.sessionstart_drift"},
+          {"type": "command", "command": "uv run --with {{ harness_maker_src_path }} python -m harness_maker.hooks.sessionid_envfile"}
         ]
       }
     ],

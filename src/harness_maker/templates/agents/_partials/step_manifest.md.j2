@@ -5,14 +5,17 @@
     per-iter transcript. Deliberately NOT included in capability skills — those
     fire mid-task, not as user-invoked commands. -#}
 > **Before you begin — outline your plan.** First check whether an autoloop is
-> active: the marker `.hm-loop-active` lives at the **project root**, NOT inside
-> a worktree. If your cwd is inside a `.worktrees/<name>/` worktree, the project
-> root is the directory above `.worktrees/` (strip the `/.worktrees/<wt-name>/`
-> suffix, or run `git rev-parse --show-toplevel` and walk up out of `.worktrees/`).
-> **If `<project-root>/.hm-loop-active` exists, skip this banner entirely and
-> operate without it** — the autoloop runs silently and a per-iteration banner
-> would flood the transcript. Otherwise, print the start banner below (in the
-> configured output language), then begin.
+> active **for THIS session** (session-scoped — a loop in another session must
+> not suppress your banner). Loop-mode is active iff `$HM_SESSION_ID` matches a
+> `.claude/.hm-loop-*` marker's `claude_session_id:` content header, OR a legacy
+> `<project-root>/.hm-loop-active` exists (degraded fallback). The project root is
+> above `.worktrees/` if your cwd is inside a `.worktrees/<name>/` worktree (strip
+> the `/.worktrees/<wt-name>/` suffix, or `git rev-parse --show-toplevel` then walk
+> up out of `.worktrees/`).
+> **If loop-mode is active for this session, skip this banner entirely and operate
+> without it** — the autoloop runs silently and a per-iteration banner would flood
+> the transcript. Otherwise, print the start banner below (in the configured output
+> language), then begin.
 
 <!-- @hm:banner:start -->
 > 🎯 **Goal:** one line — what this command will accomplish for the user.
@@ -26,8 +29,8 @@
 
 <!-- @hm:autopilot-picker -->
 > **Autopilot session start (Claude Code only).** This harness is configured for
-> autonomy (`autonomy.level: {{ config.autonomy.level }}`). If `.hm-loop-active` exists,
-> SKIP this. Otherwise, if **no** `.hm-autopilot` marker is active yet (first eligible
+> autonomy (`autonomy.level: {{ config.autonomy.level }}`). If loop-mode is active for
+> this session (see above), SKIP this. Otherwise, if **no** `.hm-autopilot` marker is active yet (first eligible
 > stage of the session), offer the user — ONCE — to enable auto-advance for this session
 > via `AskUserQuestion`: "Run the `{{ config.autonomy.pipeline | join(' → ') }}` pipeline
 > on autopilot this session (stages auto-advance when no mandatory gate is pending), or

@@ -9,8 +9,11 @@ paths_to_mutate:
 - src/harness_maker/hooks/loop_gate.py
 ac:
 - id: AC-001
-  title: Loop gate hook — prevents session termination while .hm-loop-active is set
+  title: Loop gate hook — prevents session termination while THIS session's loop is active (session-scoped, content-match; legacy global fallback)
   type: mechanical
-  test_ids: []
+  test_ids:
+    - tests/unit/hooks/test_loop_gate.py::test_found_in_cwd
+    - tests/unit/test_loop_gate_session.py::TestStopHookSessionScoped::test_own_session_marker_blocks
+    - tests/unit/test_loop_gate_session.py::TestStopHookSessionScoped::test_other_session_marker_allows
   executable_predicate: '# placeholder — refine in /hm:spec loop-gate'
-  pending_test: true
+  pending_test: false
