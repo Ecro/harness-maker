@@ -11,6 +11,7 @@ The orchestrator in `/hm:ai-readiness` combines all three.
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -115,6 +116,10 @@ class Signal(BaseModel):
     weight: int  # contribution to the dim score when passed (sum across all signals = 100)
     evidence: str
     action: str | None  # remediation hint when failed
+    # ADR-004 (PLAN-multisession-10-fleet-hardening): a failed hard-gate floors the
+    # dimension score to 0 regardless of additive weight — for invariants that must
+    # fail health even when the dimension's passed-weights already cap at 100.
+    hard_gate: bool = False
 
 
 class DimensionScore(BaseModel):
@@ -180,11 +185,31 @@ def _read_json_with_optional_frontmatter(path: Path) -> dict[str, Any] | None:
     return data if isinstance(data, dict) else None
 
 
-def _signal(sig_id: str, passed: bool, weight: int, evidence: str, action: str | None) -> Signal:
-    return Signal(id=sig_id, passed=passed, weight=weight, evidence=evidence, action=action)
+def _signal(
+    sig_id: str,
+    passed: bool,
+    weight: int,
+    evidence: str,
+    action: str | None,
+    *,
+    hard_gate: bool = False,
+) -> Signal:
+    return Signal(
+        id=sig_id,
+        passed=passed,
+        weight=weight,
+        evidence=evidence,
+        action=action,
+        hard_gate=hard_gate,
+    )
 
 
 def _score_signals(signals: list[Signal]) -> int:
+    # ADR-004: a failed hard-gate signal floors the dimension to 0 — below any
+    # composite green cutoff — so a critical degraded invariant cannot be masked by
+    # the dimension's >100 additive passed-weight sum (capped at 100).
+    if any(s.hard_gate and not s.passed for s in signals):
+        return 0
     earned = sum(s.weight for s in signals if s.passed)
     return max(0, min(100, earned))
 
@@ -502,6 +527,7 @@ def _dim_guardrails(project_dir: Path) -> DimensionScore:
     # setting when the user opted out (no penalty); they enforce a non-empty /
     # covering deny only when deny_dangerous=true.
     deny_opt_in = False
+    targets_cfg: list[str] = []
     harness_yaml = claude / "harness.yaml"
     if harness_yaml.is_file():
         try:
@@ -512,8 +538,53 @@ def _dim_guardrails(project_dir: Path) -> DimensionScore:
             deny_opt_in = bool(
                 isinstance(_hy_perms, dict) and _hy_perms.get("deny_dangerous", False)
             )
+            _t = _hy.get("targets") if isinstance(_hy, dict) else None
+            targets_cfg = [str(x) for x in _t] if isinstance(_t, list) else []
         except Exception:
             deny_opt_in = False
+            targets_cfg = []
+
+    # Live runtime probe (ADR-004 of PLAN-multisession-10-fleet-hardening): the
+    # static `sessionid_envfile_registered` signal proves only that the hook is in
+    # hooks.json, NOT that HM_SESSION_ID actually reached the environment at runtime
+    # (env-file plumbing can fail on WSL2; Cursor/Codex never set it). This probes
+    # the health command's OWN session. HARD-GATE on Claude Code so a degraded loop
+    # substrate drops the dimension below green instead of being masked by the >100
+    # additive weight; N-A for Cursor/Codex-only harnesses (the var is structurally
+    # absent there). An old harness with no `targets` defaults to claude-code.
+    #
+    # CRITICAL: only emit when we are actually inside a Claude Code session, keyed
+    # on `CLAUDECODE` — verified (REVIEW follow-up env probe) to be the session
+    # marker Claude Code DOES export to slash-command Bash subprocesses. The
+    # original `CLAUDE_ENV_FILE` is exposed only to HOOKS, NOT to the command env,
+    # so gating on it left the probe permanently N-A (a silent-dead signal — the
+    # exact failure this check exists to catch). In a real session HM_SESSION_ID is
+    # sourced from the SessionStart env-file when the hook fired; absent (degraded)
+    # it is unset → caught. Outside a session (unit tests, CI, `make` audit,
+    # Cursor/Codex) CLAUDECODE is unset → N-A, so the hard-gate never floors a
+    # static disk-scan context.
+    claude_target = (not targets_cfg) or "claude-code" in targets_cfg
+    in_session = bool(os.environ.get("CLAUDECODE"))
+    if claude_target and in_session:
+        live_ok = bool(os.environ.get("HM_SESSION_ID"))
+        signals.append(
+            _signal(
+                "sessionid_envfile_live",
+                live_ok,
+                0,  # hard-gate, not additive — gating is via hard_gate, not weight
+                "HM_SESSION_ID is set (SessionStart env-file plumbing live)"
+                if live_ok
+                else "HM_SESSION_ID unset at runtime — SessionStart env-file plumbing "
+                "is not firing; /hm:loop runs degraded (peers block each other's Stop) "
+                "while the static hooks.json check may still read green",
+                None
+                if live_ok
+                else "Ensure the SessionStart sessionid_envfile hook fires and "
+                "CLAUDE_ENV_FILE is honored; re-render with /hm:make --update and "
+                "restart the session",
+                hard_gate=True,
+            )
+        )
 
     deny_present_ok = (not deny_opt_in) or len(deny_list) > 0
     signals.append(

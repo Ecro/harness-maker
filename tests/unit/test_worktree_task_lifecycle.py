@@ -113,14 +113,17 @@ def test_task_create_excludes_secret_via_per_worktree_info_exclude(tmp_path: Pat
 # ── REVIEW Phase 2 hardening (auto-fix) ──────────────────────────────────────
 
 
-def test_task_create_distinct_uuid_keeps_one_row_per_branch(tmp_path: Path) -> None:
-    """Reuse with a FRESH session_uuid self-heals the registry to exactly one row."""
+def test_task_create_distinct_uuid_foreign_live_hard_fails(tmp_path: Path) -> None:
+    """ADR-001: a DIFFERENT live session creating the same task branch hard-fails
+    (no silent overwrite of the first session's claim) unless allow_shared."""
     repo = _repo(tmp_path)
     worktree.task_create(repo, "feat", session_uuid="uuid-first-0001")
-    worktree.task_create(repo, "feat", session_uuid="uuid-second-002")  # new session
-    rows = worktree._read_sessions(repo)
-    assert [r.branch for r in rows] == ["hm/feat"]
-    assert rows[0].session_uuid == "uuid-second-002"  # latest session claims it
+    with pytest.raises(worktree.SharedSlugError):
+        worktree.task_create(repo, "feat", session_uuid="uuid-second-002")
+    # The escape hatch lets the two sessions coexist on the same task.
+    worktree.task_create(repo, "feat", session_uuid="uuid-second-002", allow_shared=True)
+    uuids = {r.session_uuid for r in worktree._read_sessions(repo)}
+    assert uuids == {"uuid-first-0001", "uuid-second-002"}
 
 
 def test_task_create_reregisters_after_row_reclaimed(tmp_path: Path) -> None:

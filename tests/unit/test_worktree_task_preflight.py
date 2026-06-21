@@ -13,6 +13,8 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
+import pytest
+
 from harness_maker import worktree
 
 
@@ -84,12 +86,17 @@ def test_preflight_no_foreign_warning_when_alone(tmp_path: Path) -> None:
     assert not any("active session" in w for w in warnings)
 
 
-def test_preflight_surfaces_concurrent_same_slug_session(tmp_path: Path) -> None:
-    # REVIEW Codex P2: a SECOND session entering the SAME task must be warned,
-    # even though task_create replaces the same-branch registry row.
+def test_preflight_concurrent_same_slug_session_hard_fails(tmp_path: Path) -> None:
+    # ADR-001: a SECOND live session entering the SAME task now HARD-FAILS (was a
+    # warn-only surface) — this is the silent-share path Fix 1 closes.
     repo = _repo(tmp_path)
     worktree.task_create(repo, "feat-x", session_uuid="u-first")
-    _, warnings = worktree.task_preflight(repo, "feat-x", session_uuid="u-second")
+    with pytest.raises(worktree.SharedSlugError):
+        worktree.task_preflight(repo, "feat-x", session_uuid="u-second")
+    # The escape hatch keeps the collision warning + lets the sessions coexist.
+    _, warnings = worktree.task_preflight(
+        repo, "feat-x", session_uuid="u-second", allow_shared=True
+    )
     collision = [w for w in warnings if "already hold task" in w]
     assert collision, f"expected a same-slug collision warning, got {warnings!r}"
     assert "feat-x" in collision[0]
@@ -125,16 +132,17 @@ def test_branch_drift_counts_behind_and_ahead(tmp_path: Path) -> None:
     assert ahead == 1
 
 
-def test_preflight_drift_warning_points_at_task_refresh(tmp_path: Path) -> None:
+def test_preflight_auto_refreshes_on_clean_drift(tmp_path: Path) -> None:
+    # ADR-002: a clean behind branch is auto-refreshed at preflight (was a manual
+    # "run task-refresh" warning). Drift is resolved by the time preflight returns.
     repo = _repo(tmp_path)
     worktree.task_create(repo, "feat-x", session_uuid="u-1")
     (repo / "a.txt").write_text("a\n")
     _git(["add", "-A"], repo)
     _git(["commit", "-m", "base advance"], repo)
     _, warnings = worktree.task_preflight(repo, "feat-x", session_uuid="u-1")
-    drift = [w for w in warnings if "behind" in w]
-    assert drift, f"expected a drift warning, got {warnings!r}"
-    assert "task-refresh" in drift[0]
+    assert any("auto-refreshed" in w for w in warnings), warnings
+    assert worktree._branch_drift(repo, "hm/feat-x")[0] == 0
 
 
 # ── CLI dispatch wiring (Phase-4 dead-entry-point lesson) ─────────────────────

@@ -55,6 +55,12 @@ _GIT_TIMEOUT_LONG = 300
 # acquire budget must exceed that worst-case hold, else a legitimately-slow
 # first finalize spuriously times out a parallel second one.
 _FENCE_TIMEOUT = _GIT_TIMEOUT_LONG + _GIT_TIMEOUT  # 360s
+# O_EXCL stale-lock reap threshold (PLAN-multisession-10-fleet-hardening ADR-003).
+# Only an UNPARSEABLE/legacy lock body is age-reaped; a live holder is NEVER
+# reaped by age (the fence acquire-timeout bounds waiting, not hold time, so a
+# slow/hung-but-live land legitimately holds past this). 2× the fence budget
+# comfortably exceeds any legitimate hold.
+_EXCL_STALE_AGE = 2 * _FENCE_TIMEOUT  # 720s
 
 # Per-session marker files: .claude/.hm-loop-{primary-wt-basename}
 # One file per active session — parallel sessions coexist without collision.
@@ -1019,23 +1025,171 @@ def _flock_lock(lock_path: Path, timeout: float) -> tuple[int | None, str]:
             time.sleep(0.05)
 
 
-def _excl_lock(lock_path: Path, timeout: float) -> int:
-    """O_EXCL polling lock — reliable on WSL2/NTFS when flock isn't.
+def _parse_excl_body(body: str) -> tuple[str | None, int | None, float | None]:
+    """Parse the 3-line O_EXCL lock body ``nonce\\npid\\ntimestamp`` (ADR-003).
 
-    Returns the fd holding the lock; caller must close it AND unlink the
-    lock file to release. Polls every 50ms until acquired or timeout.
+    Returns ``(nonce, pid, ts)``; any individual unparseable field → ``None``.
+    A fully empty/legacy body → ``(None, None, None)`` (routes reaping to the
+    age-gated path rather than the pid-liveness path).
+    """
+    lines = body.splitlines()
+    if len(lines) < 3:
+        return (None, None, None)
+    nonce = lines[0].strip() or None
+    try:
+        pid: int | None = int(lines[1].strip())
+    except ValueError:
+        pid = None
+    try:
+        ts: float | None = float(lines[2].strip())
+    except ValueError:
+        ts = None
+    return (nonce, pid, ts)
+
+
+def _reap_if_stale(lock_path: Path) -> bool:
+    """Reap a stale O_EXCL lock IFF its holder is provably gone (ADR-003).
+
+    Liveness-gated — a LIVE holder is never reaped by age (Codex P0: the fence
+    acquire-timeout bounds waiting, not hold time, so a slow/hung-but-live land
+    legitimately holds the lock). Rules: pid parseable + dead → reap; pid
+    parseable + alive → keep (the safe over-preservation direction, including a
+    reused pid); body unparseable/legacy → reap only when mtime exceeds
+    ``_EXCL_STALE_AGE``. The unlink is nonce/identity re-checked against the body
+    observed at decision time, so a successor that recreated the lock between the
+    decision and the unlink (Codex P1) is never removed. Returns True iff reaped.
+    """
+    try:
+        body = lock_path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return True  # already gone — caller can retry the create immediately
+    except OSError:
+        return False
+    _nonce, pid, _ts = _parse_excl_body(body)
+    if pid is not None:
+        if _pid_alive(pid):
+            return False  # live holder — never reaped by age
+        # holder genuinely dead → fall through to the identity-checked unlink
+    else:
+        try:
+            age = time.time() - lock_path.stat().st_mtime
+        except OSError:
+            return False
+        if age <= _EXCL_STALE_AGE:
+            return False  # fresh empty body (e.g. SIGKILL in create→write window)
+    return _reap_stale_file(lock_path, body)
+
+
+def _reap_stale_file(lock_path: Path, expected_body: str) -> bool:
+    """Atomically claim a stale O_EXCL lock via rename, then verify + remove.
+
+    REVIEW k-of-3 P1 (concurrency + Codex): the prior compare-then-``unlink()``
+    removed the lock BY PATHNAME, so if a peer reaper removed the dead holder and a
+    live successor recreated the lock between the equality check and the unlink,
+    this process unlinked the *successor's live* lock — re-opening the very O_EXCL
+    mutual-exclusion failure the hardening closes. Fix: ``os.replace`` moves the
+    stale file to a private, uniquely-named quarantine in ONE atomic step, so
+    (a) exactly one reaper wins — losers get ``FileNotFoundError``; (b) we only
+    ever ``unlink`` our private quarantine name, never the live lock at the
+    original path, which is immediately free for a successor's fresh create.
+
+    Residual (accepted, self-healing): if a successor recreated the lock in the
+    decision→rename window, ``os.replace`` grabs the successor's body instead; the
+    body-verify catches the mismatch and restores it via ``os.link`` (which
+    fail-safes on ``FileExistsError`` — never clobbering a yet-newer holder). A
+    live successor is never age-reaped, so any third-order disruption self-heals on
+    the next acquire. Returns True iff a genuinely-stale lock was removed.
+    """
+    quarantine = lock_path.with_name(f".{lock_path.name}.reap-{uuid.uuid4().hex}")
+    try:
+        os.replace(lock_path, quarantine)
+    except FileNotFoundError:
+        return True  # a peer reaped it first — original path is free to recreate
+    except OSError:
+        return False
+    try:
+        grabbed = quarantine.read_text(encoding="utf-8")
+    except OSError:
+        grabbed = ""
+    if grabbed == expected_body:
+        # Cleanup of OUR OWN private quarantine must never propagate (REVIEW
+        # re-review P3): a non-FNF OSError here would escape the merge fence.
+        with contextlib.suppress(OSError):
+            quarantine.unlink()
+        return True
+    # Grabbed a successor's fresh lock (recreated in the decision→rename window).
+    # Restore via os.link — FileExistsError means a yet-newer holder already owns
+    # the path, so we never clobber it; either way drop our quarantine name.
+    with contextlib.suppress(OSError):
+        os.link(str(quarantine), str(lock_path))
+    with contextlib.suppress(OSError):
+        quarantine.unlink()
+    return False
+
+
+def _excl_lock(lock_path: Path, timeout: float) -> tuple[int, str]:
+    """O_EXCL polling lock — reliable on WSL2/NTFS when flock isn't (ADR-003).
+
+    Returns ``(fd, nonce)``; caller must close ``fd`` AND release via
+    ``_excl_release(lock_path, nonce)`` (identity-checked). On contention a
+    genuinely-stale lock (dead holder, or an aged legacy body) self-heals via
+    ``_reap_if_stale``; a live holder polls every 50ms until acquired or timeout.
     """
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     deadline = time.monotonic() + timeout
+    nonce = uuid.uuid4().hex
     while True:
         try:
-            return os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+            fd = os.open(str(lock_path), os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
         except FileExistsError:
+            if _reap_if_stale(lock_path):
+                continue  # reaped a dead holder's lock — retry the create now
             if time.monotonic() >= deadline:
                 raise TimeoutError(
                     f"merge fence O_EXCL timeout after {timeout}s on {lock_path}"
                 ) from None
             time.sleep(0.05)
+            continue
+        # Won the create — stamp the ownership body. A body-write FAILURE or short
+        # write (ENOSPC/IO) would hand back a lock `_excl_release` can't identify by
+        # nonce → an un-releasable file that wedges the fence until the 720s age
+        # path (REVIEW Codex P2). Treat a failed/partial write as acquisition
+        # failure: drop the half-written lock and keep polling. (A SIGKILL between
+        # the create and this write still leaves an empty body — that narrow case
+        # is the age-gated path, documented in ADR-003.)
+        payload = f"{nonce}\n{os.getpid()}\n{time.time()}\n".encode()
+        try:
+            written = os.write(fd, payload)
+        except OSError:
+            written = -1
+        if written != len(payload):
+            os.close(fd)
+            # We exclusively own this freshly-created lock (only-fd holder; a fresh
+            # empty/partial body is not age-reapable for 720s, so no peer touches
+            # it) — a direct unlink of our own lock is safe.
+            with contextlib.suppress(FileNotFoundError):
+                lock_path.unlink()
+            if time.monotonic() >= deadline:
+                raise TimeoutError(f"merge fence O_EXCL body-write failed on {lock_path}") from None
+            time.sleep(0.05)
+            continue
+        return fd, nonce
+
+
+def _excl_release(lock_path: Path, nonce: str) -> None:
+    """Release an O_EXCL lock — unlink ONLY if it still carries OUR ``nonce``.
+
+    Never removes a successor's lock (a reaped-then-recreated lock has a
+    different nonce), closing the B-unlinks-C's-lock race (Codex P1).
+    """
+    try:
+        current = lock_path.read_text(encoding="utf-8")
+    except OSError:
+        return
+    cur_nonce, _pid, _ts = _parse_excl_body(current)
+    if cur_nonce == nonce:
+        with contextlib.suppress(FileNotFoundError):
+            lock_path.unlink()
 
 
 def _verify_scope_subset(
@@ -1140,14 +1294,14 @@ def _acquire_merge_fence(  # type: ignore[no-untyped-def]
 
     fd, mechanism = _flock_lock(flock_path, timeout)
     if mechanism == "unsupported":
-        # Secondary mechanism: O_EXCL atomic create
-        fd = _excl_lock(excl_path, timeout)
+        # Secondary mechanism: O_EXCL atomic create (ADR-003: pid+nonce body,
+        # liveness-gated reap-at-acquire, identity-checked release).
+        excl_fd, excl_nonce = _excl_lock(excl_path, timeout)
         try:
             yield
         finally:
-            os.close(fd)
-            with contextlib.suppress(FileNotFoundError):
-                excl_path.unlink()
+            os.close(excl_fd)
+            _excl_release(excl_path, excl_nonce)
         return
 
     # flock path: fd holds the lock; close releases automatically.
@@ -3257,7 +3411,12 @@ _REGISTRY_LOCK = "index.lock-hm-registry"
 _REGISTRY_LOCK_TIMEOUT = 30.0
 
 
-def _registry_mutate(base_dir: Path, fn: Callable[[list[SessionRow]], list[SessionRow]]) -> None:
+def _registry_mutate(
+    base_dir: Path,
+    fn: Callable[[list[SessionRow]], list[SessionRow]],
+    *,
+    strict: bool = False,
+) -> None:
     """Lock-serialized read-modify-write of the registry (no lost updates).
 
     Uses a DEDICATED lock (`index.lock-hm-registry`), NOT the finalize merge
@@ -3267,6 +3426,11 @@ def _registry_mutate(base_dir: Path, fn: Callable[[list[SessionRow]], list[Sessi
     be acquired (contention OR a stale O_EXCL lock left by a SIGKILL'd process on
     WSL2/NTFS), a permanent wedge is worse than a rare lost update — so fall back
     to a best-effort unfenced mutate + warn, mirroring the finalize-pop fallback.
+
+    `strict=True` DISABLES that fallback (REVIEW k-of-3 P1): an atomic CLAIM cannot
+    safely degrade to an unfenced read-modify-write — two concurrent claims would
+    both read no foreign row, both write, and silently SHARE the same task worktree.
+    A strict mutate re-raises the lock failure so the caller can fail closed.
     """
     try:
         with _acquire_merge_fence(
@@ -3276,6 +3440,8 @@ def _registry_mutate(base_dir: Path, fn: Callable[[list[SessionRow]], list[Sessi
             _write_sessions(base_dir, fn(rows))
         return
     except (TimeoutError, RuntimeError, OSError) as exc:
+        if strict:
+            raise  # claim: fail closed rather than silently share under a wedge
         print(
             f"[worktree] session-registry lock unavailable ({exc}); best-effort unfenced update",
             file=sys.stderr,
@@ -3300,6 +3466,94 @@ def _pid_alive(pid: int) -> bool:
     except OSError:
         return False
     return True
+
+
+class SharedSlugError(Exception):
+    """A foreign LIVE session already holds this task branch (ADR-001).
+
+    Deliberately NOT a RuntimeError/OSError subclass — `_registry_mutate`'s fenced
+    path catches those and would swallow this onto the unfenced fallback (with a
+    misleading "lock unavailable" warning + redundant re-run). A plain Exception
+    propagates straight out of the fenced `with`, so the atomic claim never
+    half-commits.
+    """
+
+
+def _foreign_live_rows(
+    rows: list[SessionRow], *, branch: str, session_uuid: str
+) -> list[SessionRow]:
+    """Rows representing a DIFFERENT live session holding `branch` (ADR-001).
+
+    'Live' mirrors `reclaim_stale`: pid alive AND worktree dir on disk. A
+    truly-simultaneous pre-create window (neither session's dir exists yet) is
+    covered by `git worktree add`'s own atomicity — the loser errors loudly and
+    rolls back its claim — not by this registry check.
+    """
+    return [
+        r
+        for r in rows
+        if r.branch == branch
+        and r.session_uuid != session_uuid
+        and _pid_alive(r.pid)
+        and Path(r.worktree).exists()
+    ]
+
+
+def claim_task_branch(
+    base_dir: Path,
+    *,
+    task: str,
+    branch: str,
+    wt: str,
+    session_uuid: str,
+    pid: int,
+    allow_shared: bool = False,
+) -> None:
+    """Atomically claim `branch` for this session, or raise `SharedSlugError` (ADR-001).
+
+    The foreign-live check AND the row insert run in ONE `_registry_mutate`
+    critical section — a separate pre-read then register would be check-then-act
+    and re-open the silent same-slug share (Codex P1). `allow_shared` permits
+    intentional pairing (foreign same-branch rows coexist). Own-uuid re-entry
+    never conflicts — it attaches (crash-recovery / idempotent re-run).
+    """
+    row = SessionRow(
+        task=task,
+        branch=branch,
+        worktree=wt,
+        session_uuid=session_uuid,
+        pid=pid,
+        created_at=_timestamp(),
+    )
+    if not _valid_registry_fields(row):
+        return  # adversarial input dropped, never raises
+
+    def _claim(rows: list[SessionRow]) -> list[SessionRow]:
+        if not allow_shared and _foreign_live_rows(rows, branch=branch, session_uuid=session_uuid):
+            raise SharedSlugError(
+                f"task {task!r} (branch {branch}) is already held by another live "
+                f"session; pass --allow-shared-slug to share it intentionally"
+            )
+        if allow_shared:
+            kept = [r for r in rows if r.session_uuid != session_uuid]
+        else:
+            kept = [r for r in rows if r.session_uuid != session_uuid and r.branch != branch]
+        kept.append(row)
+        return kept
+
+    # Fail CLOSED on a wedged registry lock when NOT allow_shared (REVIEW k-of-3
+    # P1): the unfenced fallback would let two concurrent claims both pass the
+    # foreign-live check and silently share hm/<slug>. With allow_shared the share
+    # is intentional, so best-effort is fine.
+    try:
+        _registry_mutate(base_dir, _claim, strict=not allow_shared)
+    except SharedSlugError:
+        raise
+    except (TimeoutError, RuntimeError, OSError) as exc:
+        raise SharedSlugError(
+            f"cannot safely claim task {task!r} (branch {branch}): registry lock "
+            f"unavailable ({exc}); retry, or pass --allow-shared-slug to share it"
+        ) from exc
 
 
 def register_session(
@@ -3484,6 +3738,7 @@ def task_create(
     *,
     session_uuid: str,
     include: list[str] | None = None,
+    allow_shared: bool = False,
 ) -> Path:
     """Create (or idempotently reuse) the persistent per-task worktree (ADR-002/006).
 
@@ -3501,28 +3756,42 @@ def task_create(
     base = base_dir.resolve()
     wt = task_worktree_path(base, slug)
     branch = task_branch(slug)
-    if not wt.is_dir():
-        (base / WORKTREE_DIR_NAME).mkdir(parents=True, exist_ok=True)
-        # Reattach an existing branch (persistent dir removed but branch kept)
-        # instead of wedging on `-b ... already exists` (REVIEW Phase 2 P1).
-        add = (
-            ["git", "worktree", "add", str(wt), branch]
-            if _branch_exists(base, branch)
-            else ["git", "worktree", "add", "-b", branch, str(wt)]
-        )
-        _run(add, cwd=base)
-        if include:
-            try:
-                _copy_and_exclude_secrets(base, wt, include)
-            except Exception:
-                with contextlib.suppress(RuntimeError):
-                    _run(["git", "worktree", "remove", "--force", str(wt)], cwd=base)
-                raise
-    # ALWAYS (re-)register — register dedups by branch (one row/branch), so a reused
-    # worktree whose row was reclaimed is self-healed and repeats never duplicate.
-    register_session(
-        base, task=slug, branch=branch, wt=str(wt), session_uuid=session_uuid, pid=os.getpid()
+    # Atomically claim the branch BEFORE creating the worktree (ADR-001): a
+    # foreign LIVE session holding it hard-fails here unless allow_shared. The
+    # claim IS the (re-)registration — dedups by branch, self-heals a reclaimed
+    # row, and own-uuid re-entry attaches.
+    claim_task_branch(
+        base,
+        task=slug,
+        branch=branch,
+        wt=str(wt),
+        session_uuid=session_uuid,
+        pid=os.getpid(),
+        allow_shared=allow_shared,
     )
+    try:
+        if not wt.is_dir():
+            (base / WORKTREE_DIR_NAME).mkdir(parents=True, exist_ok=True)
+            # Reattach an existing branch (persistent dir removed but branch kept)
+            # instead of wedging on `-b ... already exists` (REVIEW Phase 2 P1).
+            add = (
+                ["git", "worktree", "add", str(wt), branch]
+                if _branch_exists(base, branch)
+                else ["git", "worktree", "add", "-b", branch, str(wt)]
+            )
+            _run(add, cwd=base)
+            if include:
+                try:
+                    _copy_and_exclude_secrets(base, wt, include)
+                except Exception:
+                    with contextlib.suppress(RuntimeError):
+                        _run(["git", "worktree", "remove", "--force", str(wt)], cwd=base)
+                    raise
+    except Exception:
+        # A failed `git worktree add` (e.g. the loser of a truly-simultaneous
+        # create race) must not strand the claim — roll back our own row only.
+        release_session(base, session_uuid=session_uuid)
+        raise
     return wt
 
 
@@ -3551,7 +3820,9 @@ def _branch_drift(base: Path, branch: str) -> tuple[int, int]:
     return (behind, ahead)
 
 
-def task_preflight(base_dir: Path, slug: str, *, session_uuid: str) -> tuple[Path, list[str]]:
+def task_preflight(
+    base_dir: Path, slug: str, *, session_uuid: str, allow_shared: bool = False
+) -> tuple[Path, list[str]]:
     """Flag-on stage preflight (ADR-002/004/006): ensure the task worktree + warn.
 
     Idempotently ensures the persistent `.worktrees/<slug>/` task worktree (Phase 2
@@ -3583,17 +3854,25 @@ def task_preflight(base_dir: Path, slug: str, *, session_uuid: str) -> tuple[Pat
         warnings.append(
             f"[preflight] {len(other_tasks)} other active session(s): {', '.join(other_tasks)}"
         )
-    wt = task_create(base, slug, session_uuid=session_uuid)
+    wt = task_create(base, slug, session_uuid=session_uuid, allow_shared=allow_shared)
     behind, _ahead = _branch_drift(base, branch)
     if behind > 0:
-        try:
-            base_br = _current_branch(base)
-        except RuntimeError:
-            base_br = "the base branch"
-        warnings.append(
-            f"[preflight] task branch {branch} is {behind} commit(s) behind "
-            f"{base_br}; run `task-refresh {slug}` to rebase."
-        )
+        # ADR-002: try to auto-resolve drift before merely warning. Refresh is
+        # quiet (diagnostics on stderr) and refuses generically (conflict OR
+        # dirty OR wrong-branch) returning rc1 — on any decline, fall through to
+        # the warning + the land-block backstop.
+        refreshed = task_refresh(base, slug) == 0
+        if refreshed:
+            warnings.append(f"[preflight] task branch {branch} auto-refreshed onto the base tip.")
+        else:
+            try:
+                base_br = _current_branch(base)
+            except RuntimeError:
+                base_br = "the base branch"
+            warnings.append(
+                f"[preflight] task branch {branch} is {behind} commit(s) behind "
+                f"{base_br}; auto-refresh declined — run `task-refresh {slug}` to rebase."
+            )
     return wt, warnings
 
 
@@ -3650,7 +3929,10 @@ def task_refresh(base_dir: Path, slug: str) -> int:
             file=sys.stderr,
         )
         return 1
-    print(f"[refresh] {branch} rebased onto {base_head[:12]}")
+    # Diagnostics go to STDERR, never stdout (ADR-002 / Codex P2): preflight's
+    # auto-refresh runs inside `_cli_task_preflight`, whose stdout contract is
+    # exactly the `<WT>` path consumed by stage templates.
+    print(f"[refresh] {branch} rebased onto {base_head[:12]}", file=sys.stderr)
     return 0
 
 
@@ -3763,7 +4045,12 @@ def _scoped_conflict_cleanup(
 
 
 def task_land(
-    base_dir: Path, slug: str, *, message: str | None = None, session_uuid: str | None = None
+    base_dir: Path,
+    slug: str,
+    *,
+    message: str | None = None,
+    session_uuid: str | None = None,
+    allow_drift_land: bool = False,
 ) -> int:
     """ADR-003: squash-merge `hm/<slug>` onto the base branch + tear the task down.
 
@@ -3966,6 +4253,27 @@ def task_land(
                             file=sys.stderr,
                         )
                     else:
+                        # ADR-002 land drift-block: the squash DID stage real
+                        # divergent work, so this branch has un-landed content
+                        # developed against a base that has since advanced. Refuse
+                        # unless --allow-drift-land. Placed here — AFTER the
+                        # already-landed convergence check (Codex P1) AND after the
+                        # empty-squash no-op converges above — so a partial-land
+                        # re-run or an already-present change is NEVER drift-blocked.
+                        # Scoped-cleanup restores base so it is left untouched.
+                        behind, _ahead = _branch_drift(base, branch)
+                        if behind > 0 and not allow_drift_land:
+                            _scoped_conflict_cleanup(
+                                base, touched, pre_untracked, preserve=pre_staged
+                            )
+                            print(
+                                f"[land] {branch} is {behind} commit(s) behind the base "
+                                f"tip with un-landed work; run `task-refresh {slug}` then "
+                                "re-land, or pass --allow-drift-land. Base + branch "
+                                "left untouched.",
+                                file=sys.stderr,
+                            )
+                            return 1
                         to_unstage = sorted(staged_after - set(touched))
                         if to_unstage:
                             _run(["git", "reset", "-q", "HEAD", "--", *to_unstage], cwd=base)
@@ -4037,7 +4345,12 @@ def _cli_task_create(args: list[str]) -> int:
         return 2
     slug = rest[0]
     base = Path(rest[1]).resolve() if len(rest) > 1 else Path.cwd()
-    wt = task_create(base, slug, session_uuid=uuid.uuid4().hex[:12])
+    allow_shared = "--allow-shared-slug" in args
+    try:
+        wt = task_create(base, slug, session_uuid=uuid.uuid4().hex[:12], allow_shared=allow_shared)
+    except SharedSlugError as exc:
+        print(f"[task-create] {exc}", file=sys.stderr)
+        return 1
     print(str(wt))
     return 0
 
@@ -4055,6 +4368,9 @@ def _cli_task_land(args: list[str]) -> int:
             message = args[i + 1]
             i += 2
             continue
+        if args[i].startswith("--"):
+            i += 1  # other flags (e.g. --allow-drift-land) are not positional
+            continue
         rest.append(args[i])
         i += 1
     if not rest:
@@ -4062,7 +4378,8 @@ def _cli_task_land(args: list[str]) -> int:
         return 2
     slug = rest[0]
     base = Path(rest[1]).resolve() if len(rest) > 1 else Path.cwd()
-    return task_land(base, slug, message=message)
+    allow_drift_land = "--allow-drift-land" in args
+    return task_land(base, slug, message=message, allow_drift_land=allow_drift_land)
 
 
 def _cli_task_preflight(args: list[str]) -> int:
@@ -4076,8 +4393,16 @@ def _cli_task_preflight(args: list[str]) -> int:
         return 2
     slug = rest[0]
     base = Path(rest[1]).resolve() if len(rest) > 1 else Path.cwd()
+    allow_shared = "--allow-shared-slug" in args
     try:
-        wt, warnings = task_preflight(base, slug, session_uuid=uuid.uuid4().hex[:12])
+        wt, warnings = task_preflight(
+            base, slug, session_uuid=uuid.uuid4().hex[:12], allow_shared=allow_shared
+        )
+    except SharedSlugError as exc:
+        # ADR-001: a foreign LIVE session holds this task branch. Hard-fail with
+        # the escape-hatch hint rather than silently sharing the worktree.
+        print(f"[preflight] {exc}", file=sys.stderr)
+        return 1
     except (ValueError, RuntimeError) as exc:
         # ValueError = bad slug; RuntimeError = a failed git op surfaced by `_run`
         # (non-git base dir, `git worktree add` failure). Return a controlled rc,

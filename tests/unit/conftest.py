@@ -19,6 +19,18 @@ def _bypass_worktree_guard(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture(autouse=True)
+def _isolate_session_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Pin CLAUDECODE / CLAUDE_ENV_FILE / HM_SESSION_ID out of the env by default
+    so the readiness live-probe (ADR-004) is deterministic regardless of whether
+    pytest itself runs inside a Claude Code session (which sets CLAUDECODE and
+    would otherwise leak it into the static disk-scan and floor the dimension).
+    Tests that exercise the live probe set them explicitly via monkeypatch."""
+    monkeypatch.delenv("CLAUDECODE", raising=False)
+    monkeypatch.delenv("CLAUDE_ENV_FILE", raising=False)
+    monkeypatch.delenv("HM_SESSION_ID", raising=False)
+
+
+@pytest.fixture(autouse=True)
 def _pin_harness_maker_pkg_root(monkeypatch: pytest.MonkeyPatch) -> None:
     """Pin the renderer's install-ref output for worktree-invariant snapshots.
 
