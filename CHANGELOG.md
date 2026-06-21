@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.31.0] - 2026-06-21
 
 ### Fixed — Layer 3 cross-session pop is now per-session (PLAN-layer3-per-session-ownership)
 - **`post-commit-pop` no longer restores a PEER's deferred stash.** Its `HM_OWNED_SESSION_UUIDS` set was sourced from `owned-uuids` (ALL sessions' markers); it now comes from a **slug-keyed crumb** `.claude/.hm-owned-uuids-<slug>` that `/hm:execute`'s finalize writes (`owned-crumb-add … $(wt-uuid <WT>)`) and `/hm:wrapup` reads by its own slug (`owned-crumb-read`, machine-derived → works on a standalone/recovered wrapup), clearing it on pop-success. The pop guard dropped its `owned_uuids and` short-circuit so an **empty owned-set fail-safe-skips** a uuid-bearing ref (was: marker-present pop). New `wt-uuid` CLI; `owned-uuids` loud-deprecated; a render-grep gate fails if any rendered producer (commands or skills) calls `post-commit-pop` env-less.
