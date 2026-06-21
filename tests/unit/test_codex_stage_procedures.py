@@ -183,9 +183,12 @@ def test_loop_codex_render_has_worktree_fallback() -> None:
 
 
 def test_loop_codex_render_keeps_marker_on_non_convergence() -> None:
-    """Non-converged Codex loop halts must keep the Stop-hook marker active."""
+    """Non-converged Codex loop halts must keep the Stop-hook guard active."""
     rendered = _render_loop(is_codex=True)
-    assert "Keep `.hm-loop-active` on every non-converged halt" in rendered
+    # The guidance keeps the loop guard active on non-converged halts; the marker
+    # it refers to (`.hm-loop-active`) is named in the same section.
+    assert "Keep the guard active on every non-converged halt" in rendered
+    assert ".hm-loop-active" in rendered
     assert "explicitly chooses Abort/Override" in rendered
 
 
