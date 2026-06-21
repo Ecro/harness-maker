@@ -61,6 +61,13 @@ _FENCE_TIMEOUT = _GIT_TIMEOUT_LONG + _GIT_TIMEOUT  # 360s
 # slow/hung-but-live land legitimately holds past this). 2× the fence budget
 # comfortably exceeds any legitimate hold.
 _EXCL_STALE_AGE = 2 * _FENCE_TIMEOUT  # 720s
+# Pre-create reservation / prune grace (PLAN-worktree-prune-create-race ADR-001/002).
+# A peer's in-flight `create()` writes `.hm-creating-<name>` BEFORE `git worktree
+# add`; a reservation fresher than this is honored (the dir is protected from a
+# concurrent prune). Generous — must exceed a `git worktree add` + checkout +
+# post-checkout hooks, NOT coupled to `_GIT_TIMEOUT` (Codex: no margin there).
+_PRUNE_GRACE_SECONDS = 300
+_RESERVATION_GITIGNORE_PATTERN = ".claude/.hm-creating-*"
 
 # Per-session marker files: .claude/.hm-loop-{primary-wt-basename}
 # One file per active session — parallel sessions coexist without collision.
@@ -309,30 +316,40 @@ def create(
     # Create primary worktree
     (base / WORKTREE_DIR_NAME).mkdir(parents=True, exist_ok=True)
     primary_wt = base / WORKTREE_DIR_NAME / name
-    _run(["git", "worktree", "add", "-b", name, str(primary_wt)], cwd=base)
-
-    # Create sibling worktrees
-    sibling_wts: list[Path] = []
+    # ADR-001 (prune-create race): reserve the primary leaf BEFORE git creates it,
+    # so a concurrent `prune_stale` never rmtrees the in-flight dir. The outer
+    # try/finally MUST span the primary add through the marker write (the exact
+    # window the prune scan races) and remove the reservation on every exit.
+    reservation = _reservation_path(base, name)
+    _ensure_gitignore_entry(base, _RESERVATION_GITIGNORE_PATTERN)
+    atomic_write(reservation, f"{session_uuid}\n")
     try:
-        for sibling, slug in zip(siblings, slugs, strict=True):
-            sib_name = f"{name}-{slug}"
-            (sibling / WORKTREE_DIR_NAME).mkdir(parents=True, exist_ok=True)
-            sib_wt = sibling / WORKTREE_DIR_NAME / sib_name
-            _run(["git", "worktree", "add", "-b", sib_name, str(sib_wt)], cwd=sibling)
-            sibling_wts.append(sib_wt)
-    except RuntimeError:
-        # Rollback: remove all already-created worktrees (including primary) so no
-        # orphaned git worktrees accumulate without a marker or manual-cleanup path.
-        for created_wt, sib in zip(sibling_wts, siblings[: len(sibling_wts)], strict=False):
-            with contextlib.suppress(RuntimeError):
-                _run(["git", "worktree", "remove", "--force", str(created_wt)], cwd=sib)
-        with contextlib.suppress(RuntimeError):
-            _run(["git", "worktree", "remove", "--force", str(primary_wt)], cwd=base)
-        raise
+        _run(["git", "worktree", "add", "-b", name, str(primary_wt)], cwd=base)
 
-    all_wts = [primary_wt, *sibling_wts]
-    _write_loop_marker(base, primary_wt.name, all_wts, claude_session_id=claude_session_id)
-    return all_wts
+        # Create sibling worktrees
+        sibling_wts: list[Path] = []
+        try:
+            for sibling, slug in zip(siblings, slugs, strict=True):
+                sib_name = f"{name}-{slug}"
+                (sibling / WORKTREE_DIR_NAME).mkdir(parents=True, exist_ok=True)
+                sib_wt = sibling / WORKTREE_DIR_NAME / sib_name
+                _run(["git", "worktree", "add", "-b", sib_name, str(sib_wt)], cwd=sibling)
+                sibling_wts.append(sib_wt)
+        except RuntimeError:
+            # Rollback: remove all already-created worktrees (including primary) so
+            # no orphaned git worktrees accumulate without a marker or cleanup path.
+            for created_wt, sib in zip(sibling_wts, siblings[: len(sibling_wts)], strict=False):
+                with contextlib.suppress(RuntimeError):
+                    _run(["git", "worktree", "remove", "--force", str(created_wt)], cwd=sib)
+            with contextlib.suppress(RuntimeError):
+                _run(["git", "worktree", "remove", "--force", str(primary_wt)], cwd=base)
+            raise
+
+        all_wts = [primary_wt, *sibling_wts]
+        _write_loop_marker(base, primary_wt.name, all_wts, claude_session_id=claude_session_id)
+        return all_wts
+    finally:
+        reservation.unlink(missing_ok=True)
 
 
 def cleanup(wt_path: Path, on_success: bool) -> None:
@@ -464,6 +481,11 @@ _HARNESS_ARTIFACT_PREFIXES = (
     ".worktrees/",
     ".claude/.hm-loop-",
     ".claude/.hm-finalize-stash-",
+    # Pre-create reservation (PLAN-worktree-prune-create-race). A reservation
+    # leaked by a hard kill (no `finally`) must be recognized as harness churn so a
+    # peer's finalize never stashes it and it never surfaces as committable dirt —
+    # parity with the other two transient `.hm-*` markers (REVIEW consensus P2).
+    ".claude/.hm-creating-",
 )
 
 
@@ -1662,10 +1684,46 @@ def _marker_referenced_paths(marker: Path) -> list[Path]:
     return [Path(p).resolve() for p in parse_marker_paths(text)]
 
 
+def _marker_has_pending_stash(marker: Path) -> bool:
+    """True iff a pending finalize-stash ref points its ``session_marker`` at this
+    marker (ADR-003 — prune-create race).
+
+    Matched by the ref's ``session_marker`` CONTENT field (not a filename stem):
+    a multi-repo SIBLING-only stash is named ``.hm-finalize-stash-<primary>-<slug>``
+    yet its ``session_marker`` points at the PRIMARY marker — the marker
+    ``post-commit-pop`` keys on. Such a marker MUST survive prune so the deferred
+    base-dirty stash can still be restored (else it is permanently stranded).
+    """
+    target = marker.resolve()
+    for ref_file in marker.parent.glob(f"{_STASH_REF_PREFIX}*"):
+        fields = _validate_stash_ref_fields(_read_stash_ref_file(ref_file))
+        if fields is None:
+            continue
+        with contextlib.suppress(OSError, RuntimeError):
+            if Path(fields["session_marker"]).resolve() != target:
+                continue
+            # REVIEW Codex P2: only a LIVE stash immortalizes the marker. A ref
+            # whose stash object is gone OR whose content is already in HEAD is
+            # itself drainable (same liveness test as the stash-ref drain below) —
+            # preserving the marker for a DEAD ref would deadlock both forever
+            # (marker kept ⇒ ref-drain skips it ⇒ marker kept …).
+            ref_base = Path(fields["base"])
+            ref_sha = fields["ref_sha"]
+            if _stash_object_exists(ref_base, ref_sha) and not _stash_content_in_head(
+                ref_base, ref_sha
+            ):
+                return True
+    return False
+
+
 def _is_orphan_marker(marker: Path) -> bool:
-    """A loop marker is stale iff all referenced worktree dirs are absent."""
+    """A loop marker is stale iff all referenced worktree dirs are absent AND it
+    has no pending finalize-stash ref (ADR-003: a marker whose stash
+    ``post-commit-pop`` still needs is preserved, not pruned)."""
     refs = _marker_referenced_paths(marker)
-    return bool(refs) and not any(p.exists() for p in refs)
+    if not (bool(refs) and not any(p.exists() for p in refs)):
+        return False
+    return not _marker_has_pending_stash(marker)
 
 
 def _live_marker_references(base: Path) -> set[Path]:
@@ -1681,8 +1739,77 @@ def _live_marker_references(base: Path) -> set[Path]:
     return refs
 
 
+def _git_expire_arg(grace_s: int) -> str:
+    """git approxidate for `worktree prune --expire` keeping entries younger than
+    grace_s seconds (ADR-002). Entries OLDER than the cutoff are de-registered."""
+    return f"{grace_s}.seconds.ago"
+
+
+def _reservation_path(base: Path, name: str) -> Path:
+    """The pre-create reservation file for worktree ``name`` (ADR-001)."""
+    return base.resolve() / _LOOP_MARKER_DIR / f".hm-creating-{name}"
+
+
+def _any_fresh_reservation(base: Path) -> bool:
+    """True iff ANY peer `create()` is mid-flight (a fresh `.hm-creating-*`).
+
+    Used to defer `git worktree prune` while a peer is inside `git worktree add`:
+    pruning then would remove the peer's HALF-WRITTEN `.git/worktrees/<name>/`
+    admin entry (its `gitdir` not yet written) regardless of `--expire`, crashing
+    the peer's add. Deferring is brief (the reservation clears on create completion).
+    """
+    claude_dir = base.resolve() / _LOOP_MARKER_DIR
+    if not claude_dir.is_dir():
+        return False
+    cutoff = time.time() - _PRUNE_GRACE_SECONDS
+    for reservation in claude_dir.glob(".hm-creating-*"):
+        with contextlib.suppress(OSError):
+            if reservation.stat().st_mtime >= cutoff:
+                return True
+    return False
+
+
+def _has_fresh_reservation(base: Path, wt_dir: Path) -> bool:
+    """True iff a peer's in-flight `create()` reserved ``wt_dir`` < grace ago.
+
+    The reservation file's mtime is the create-START time (written once before
+    ``git worktree add``), so it is a reliable freshness signal — unlike the leaf
+    dir's own mtime, which goes stale during a nested checkout (Codex). PURE
+    predicate — reaping an aged/leaked reservation is the separate
+    ``_reap_aged_reservations`` step (REVIEW P2: no hidden mutation in a boolean,
+    no stat-then-unlink race against a name-colliding peer's fresh re-write).
+    """
+    reservation = _reservation_path(base, wt_dir.name)
+    try:
+        age = time.time() - reservation.stat().st_mtime
+    except OSError:
+        return False  # no reservation (or vanished) → not protected
+    return age <= _PRUNE_GRACE_SECONDS
+
+
+def _reap_aged_reservations(base: Path) -> None:
+    """Remove leaked aged ``.hm-creating-*`` reservations (a create SIGKILL'd before
+    its ``finally`` ran). Only reaps entries older than the grace — never a live
+    create's; a name-colliding peer's fresh re-write (negligible uuid+timestamp
+    collision) is spared by the ``< cutoff`` gate on the just-read mtime."""
+    claude_dir = base.resolve() / _LOOP_MARKER_DIR
+    if not claude_dir.is_dir():
+        return
+    cutoff = time.time() - _PRUNE_GRACE_SECONDS
+    for reservation in claude_dir.glob(".hm-creating-*"):
+        with contextlib.suppress(OSError):
+            if reservation.stat().st_mtime < cutoff:
+                reservation.unlink(missing_ok=True)
+
+
 def _scan_dangling_worktrees(base_dir: Path) -> list[Path]:
-    """Owned ``.worktrees/*`` dirs absent from git registration and live markers."""
+    """Owned ``.worktrees/*`` dirs absent from git registration and live markers.
+
+    ADR-001 (prune-create race): additionally never reap a dir that (a) has a
+    FRESH pre-create reservation (a peer's in-flight `create()`) or (b) has no
+    ``.git`` entry (a random non-worktree dir, or an incomplete add) — both are
+    biased-to-preserve filters that close the work-loss window.
+    """
     base = base_dir.resolve()
     worktrees_dir = base / WORKTREE_DIR_NAME
     if not worktrees_dir.is_dir():
@@ -1698,6 +1825,10 @@ def _scan_dangling_worktrees(base_dir: Path) -> list[Path]:
             continue
         if resolved in registered or resolved in live_refs:
             continue
+        if _has_fresh_reservation(base, candidate):
+            continue  # a peer's in-flight create() — never rmtree it
+        if not (candidate / ".git").exists():
+            continue  # not a worktree (or pre-`.git` incomplete add) — preserve
         dangling.append(resolved)
     return dangling
 
@@ -1926,8 +2057,21 @@ def prune_stale(base_dir: Path, *, dry_run: bool = False) -> PruneReport:
     base = base_dir.resolve()
     report = PruneReport()
     with contextlib.suppress(RuntimeError):
-        if not dry_run:
-            _run(["git", "worktree", "prune"], cwd=base)
+        # ADR-002: defer `git worktree prune` while a peer is mid-create — pruning
+        # then would remove the peer's half-written admin entry (`gitdir` not yet
+        # present) regardless of `--expire`, crashing its `git worktree add`
+        # (discovered by the Phase 4 concurrent test). `--expire` additionally
+        # spares a peer's RECENT COMPLETE admin entry; on an `--expire`-rejecting
+        # git the suppressed RuntimeError SKIPS the prune (never a bare prune,
+        # which would re-open the de-registration race).
+        if not dry_run and not _any_fresh_reservation(base):
+            _run(
+                ["git", "worktree", "prune", f"--expire={_git_expire_arg(_PRUNE_GRACE_SECONDS)}"],
+                cwd=base,
+            )
+
+    if not dry_run:
+        _reap_aged_reservations(base)
 
     claude_dir = base / _LOOP_MARKER_DIR
     if claude_dir.is_dir():

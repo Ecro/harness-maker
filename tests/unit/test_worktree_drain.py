@@ -139,6 +139,9 @@ def test_create_time_reaping_retained(tmp_path: Path) -> None:
     orphan_marker.write_text(f"{missing_wt}\n")
     dangling = repo / ".worktrees" / "execute-orphaned999-20260525T0000Z"
     dangling.mkdir(parents=True)
+    # ADR-001 `.git`-filter (prune-create race): only a real worktree dir (has a
+    # `.git` entry) is reapable — a genuine orphan from a crashed session has one.
+    (dangling / ".git").write_text("gitdir: /gone\n")
 
     rc = worktree._cli_create(["execute", str(repo)])
 
