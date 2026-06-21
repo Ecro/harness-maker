@@ -90,7 +90,11 @@ def test_boundary_proceeds_and_records_advance(tmp_path: Path, capsys) -> None: 
 
 
 def test_boundary_step_cap_halt(tmp_path: Path, capsys) -> None:  # noqa: ANN001
-    now = datetime(2026, 6, 20, 12, 0, tzinfo=UTC)
+    # The boundary CLI checks the marker against the LIVE clock (18h TTL), so the
+    # marker + its ledger events must be NOW, not a fixed past date — a hardcoded
+    # 2026-06-20 marker rotted to stale→kill_switch after 18h (same live-clock fix
+    # the time_cap test already uses).
+    now = datetime.now(UTC)
     _arm(tmp_path, created=now)
     # pre-seed the ledger to the cap.
     for _ in range(3):
