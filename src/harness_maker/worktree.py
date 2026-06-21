@@ -213,6 +213,60 @@ def _extract_uuid_from_wt_name(name: str) -> str:
     return m.group("uuid") or ""
 
 
+_OWNED_CRUMB_GITIGNORE_PATTERN = ".claude/.hm-owned-uuids-*"
+
+
+def _owned_crumb_path(base: Path, slug: str) -> Path:
+    """Slug-keyed crumb recording the uuid(s) a session deferred for ``<slug>``.
+
+    PLAN-layer3-per-session-ownership ADR-001: a machine-derived owned set that
+    survives the execute→wrapup boundary — a standalone/recovered wrapup reads it
+    by its own ``<slug>`` arg with no conversation memory. **Distinct-slug peers
+    never share** an owned set — that is the fleet-isolation guarantee this closes.
+
+    SCOPE LIMIT (REVIEW P1 — do NOT believe "fail-safe for same-slug"): the crumb
+    is keyed by SLUG, not session, and ``_owned_crumb_add`` UNIONs uuids. So TWO
+    DIFFERENT sessions both working the SAME ``<slug>`` accumulate both uuids into
+    one crumb, and the first wrapup then pops the OTHER session's still-live
+    deferred stash — a peer-pop, not a strand. This is the same-task concurrency
+    footgun: flag-ON blocks it (``claim_task_branch`` ``SharedSlugError``); flag-OFF
+    relies on single-session-per-slug discipline (two sessions on one slug already
+    share the ``.worktrees/<…>`` namespace). It is no worse than the pre-fix
+    all-markers behavior (which popped peers regardless of slug); a proper fix needs
+    a SharedSlug guard on this flag-off crumb path (follow-up). The empty-string slug
+    is rejected at the CLI to stop a missed substitution from sharing one crumb
+    across UNRELATED tasks.
+    """
+    safe = re.sub(r"[^A-Za-z0-9_.-]", "-", slug)
+    return base / _LOOP_MARKER_DIR / f".hm-owned-uuids-{safe}"
+
+
+def _owned_crumb_read(base: Path, slug: str) -> list[str]:
+    """Return the recorded uuids for ``<slug>`` (sorted, deduped); ``[]`` if absent."""
+    try:
+        text = _owned_crumb_path(base, slug).read_text(encoding="utf-8")
+    except OSError:
+        return []
+    return sorted({ln.strip() for ln in text.splitlines() if ln.strip()})
+
+
+def _owned_crumb_add(base: Path, slug: str, uuid_str: str) -> None:
+    """Idempotently append ``uuid_str`` to the slug crumb (atomic + gitignored)."""
+    from harness_maker.io_utils import atomic_write
+
+    if not uuid_str:
+        return
+    owned = set(_owned_crumb_read(base, slug))
+    owned.add(uuid_str)
+    atomic_write(_owned_crumb_path(base, slug), "\n".join(sorted(owned)) + "\n")
+    _ensure_gitignore_entry(base, _OWNED_CRUMB_GITIGNORE_PATTERN)
+
+
+def _owned_crumb_clear(base: Path, slug: str) -> None:
+    """Remove the slug crumb after a successful pop (idempotent)."""
+    _owned_crumb_path(base, slug).unlink(missing_ok=True)
+
+
 def _owned_session_uuids(base: Path) -> set[str]:
     """Return the set of UUIDs for worktrees currently owned by THIS process.
 
@@ -1405,12 +1459,17 @@ def _write_stash_ref_file(
     # extract UUID from wt_name (the durable create→finalize binding) instead
     # of calling `_current_session_uuid(base)` (REVIEW round 1 P0-MAN2 — that
     # helper returned shared per-project UUID, defeating cross-session
-    # isolation). Falls back to project-scoped helper when wt_name has no UUID
-    # (legacy create() pre-dirname-embed produced bare timestamps); in that
-    # case isolation degrades to "shared project UUID" but the call path
-    # remains functional.
+    # isolation). A legacy bare-timestamp `wt_name` (pre-dirname-embed) gets an
+    # EMPTY session_uuid so the ref falls through to `post-commit-pop`'s
+    # marker-present fallback — its old (pre-Layer3-per-session) behavior, where
+    # the owner pops its own stash by marker. PLAN-layer3-per-session-ownership
+    # REVIEW P1: the prior `_current_session_uuid` fallback wrote a NON-empty uuid
+    # that `wt-uuid` (empty on a bare-timestamp name) could never reproduce into
+    # the crumb, so the new strict guard stranded a legacy owner's OWN stash.
+    # Standard `execute-<uuid>-<ts>` names still derive a non-empty uuid (the
+    # writer-uuid-proof test pins this) — only genuine pre-upgrade refs change.
     dirname_uuid = _extract_uuid_from_wt_name(wt_name)
-    effective_uuid = session_uuid or dirname_uuid or _current_session_uuid(base)
+    effective_uuid = session_uuid or dirname_uuid
     body = (
         f"ref_sha: {ref_sha}\n"
         f"base: {base.resolve()}\n"
@@ -3221,7 +3280,7 @@ def _cli_post_commit_pop(args: list[str]) -> int:
             # When `--owned-uuid` IS passed by caller, enforce strict match.
             owned_uuids_arg = os.environ.get("HM_OWNED_SESSION_UUIDS", "").split(",")
             owned_uuids = {u.strip() for u in owned_uuids_arg if u.strip()}
-            if owned_uuids and ref_session_uuid and ref_session_uuid not in owned_uuids:
+            if ref_session_uuid and ref_session_uuid not in owned_uuids:
                 owned_preview = ",".join(sorted(u[:8] for u in owned_uuids))
                 print(
                     f"[post-commit-pop] cross-session ref ({ref_session_uuid[:8]} "
@@ -3275,13 +3334,89 @@ def _cli_owned_uuids(args: list[str]) -> int:
 
     Prints the CSV (or empty string) to stdout, newline-terminated. Empty
     output is a legitimate "no active sessions" state, not an error.
+
+    DEPRECATED (PLAN-layer3-per-session-ownership ADR-004): this returns ALL
+    sessions' marker UUIDs (shared FS state), NOT a per-session owned set. Feeding
+    it to `post-commit-pop` makes a session restore a PEER's deferred stash. Use
+    the slug crumb (`owned-crumb-read`) / `wt-uuid` instead. Kept for back-compat;
+    no template sources from it.
     """
     if len(args) != 1:
         print("usage: owned-uuids <base_dir>", file=sys.stderr)
         return 2
+    print(
+        "[owned-uuids] DEPRECATED diagnostic-only — returns ALL sessions' UUIDs, "
+        "NOT a per-session owned set; do NOT pipe to post-commit-pop "
+        "(PLAN-layer3-per-session-ownership ADR-004). Use owned-crumb-read / wt-uuid.",
+        file=sys.stderr,
+    )
     base = Path(args[0]).resolve()
     uuids = sorted(_owned_session_uuids(base))
     print(",".join(uuids))
+    return 0
+
+
+def _cli_wt_uuid(args: list[str]) -> int:
+    """`wt-uuid <wt-path-or-name>...` — CSV of per-session uuids parsed from each
+    `execute-<uuid>-<ts>` basename (pure string parse; the path need not exist).
+
+    PLAN-layer3-per-session-ownership ADR-001. Empty stdout for an unparseable
+    (e.g. slug) name is the fail-safe signal; a stderr warning aids the operator.
+    """
+    if not args:
+        print("usage: wt-uuid <wt-path-or-name>...", file=sys.stderr)
+        return 2
+    uuids: list[str] = []
+    for arg in args:
+        u = _extract_uuid_from_wt_name(Path(arg).name)
+        if u:
+            uuids.append(u)
+        else:
+            print(
+                f"[wt-uuid] no uuid in {Path(arg).name!r} "
+                "(not an execute-<uuid>-<ts> worktree) — empty",
+                file=sys.stderr,
+            )
+    print(",".join(uuids))
+    return 0
+
+
+def _cli_owned_crumb_add(args: list[str]) -> int:
+    """`owned-crumb-add <base_dir> <slug> <uuid>` — record an owned uuid (ADR-001)."""
+    if len(args) != 3:
+        print("usage: owned-crumb-add <base_dir> <slug> <uuid>", file=sys.stderr)
+        return 2
+    if not args[1].strip():
+        # REVIEW P2: an empty slug (LLM missed the <slug> substitution) would write
+        # a shared `.hm-owned-uuids-` crumb across unrelated tasks → cross-task pop.
+        print("owned-crumb-add: <slug> must be non-empty", file=sys.stderr)
+        return 2
+    _owned_crumb_add(Path(args[0]).resolve(), args[1], args[2])
+    return 0
+
+
+def _cli_owned_crumb_read(args: list[str]) -> int:
+    """`owned-crumb-read <base_dir> <slug>` — CSV of this slug's owned uuids."""
+    if len(args) != 2:
+        print("usage: owned-crumb-read <base_dir> <slug>", file=sys.stderr)
+        return 2
+    if not args[1].strip():
+        # REVIEW P2: empty slug → empty CSV (fail-safe), not a shared-crumb read.
+        print("owned-crumb-read: <slug> must be non-empty", file=sys.stderr)
+        return 2
+    print(",".join(_owned_crumb_read(Path(args[0]).resolve(), args[1])))
+    return 0
+
+
+def _cli_owned_crumb_clear(args: list[str]) -> int:
+    """`owned-crumb-clear <base_dir> <slug>` — drop the slug crumb after a pop."""
+    if len(args) != 2:
+        print("usage: owned-crumb-clear <base_dir> <slug>", file=sys.stderr)
+        return 2
+    if not args[1].strip():
+        print("owned-crumb-clear: <slug> must be non-empty", file=sys.stderr)
+        return 2
+    _owned_crumb_clear(Path(args[0]).resolve(), args[1])
     return 0
 
 
@@ -4660,7 +4795,8 @@ def main(argv: list[str] | None = None) -> int:
     if not args:
         print(
             "usage: python -m harness_maker.worktree "
-            "<create|verify|finalize|post-commit-pop|owned-uuids|cleanup-all|"
+            "<create|verify|finalize|post-commit-pop|owned-uuids|wt-uuid|"
+            "owned-crumb-add|owned-crumb-read|owned-crumb-clear|cleanup-all|"
             "prune-branches|drain|task-create|task-land|task-preflight|"
             "task-refresh> [...]",
             file=sys.stderr,
@@ -4677,6 +4813,14 @@ def main(argv: list[str] | None = None) -> int:
         return _cli_post_commit_pop(rest)
     if sub == "owned-uuids":
         return _cli_owned_uuids(rest)
+    if sub == "wt-uuid":
+        return _cli_wt_uuid(rest)
+    if sub == "owned-crumb-add":
+        return _cli_owned_crumb_add(rest)
+    if sub == "owned-crumb-read":
+        return _cli_owned_crumb_read(rest)
+    if sub == "owned-crumb-clear":
+        return _cli_owned_crumb_clear(rest)
     if sub == "cleanup-all":
         return _cli_cleanup_all(rest)
     if sub == "prune-branches":

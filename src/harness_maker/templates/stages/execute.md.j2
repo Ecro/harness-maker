@@ -350,6 +350,24 @@ Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktre
 
 If Step 0 printed empty (no isolation engaged), skip both — there is nothing to finalize.
 
+**Record the owned uuid for wrapup's pop (ADR-001, slug crumb).** After a stage-only
+finalize that deferred a stash, record THIS session's worktree uuid into a slug-keyed
+crumb so `/hm:wrapup`'s `post-commit-pop` restores **only your own** deferred stash
+(machine-derived, works even in a fresh/recovered wrapup window). Substitute `<slug>`
+(this `/hm:execute` arg) and `<WT>` (your `execute-<uuid>-<ts>` worktree from Step 0).
+On the `feature_branch_workflow` (flag-on) path there is no deferred stash → `wt-uuid`
+of a `hm/<slug>` task worktree is empty → nothing recorded, by design.
+
+{% if is_codex %}
+```
+Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree owned-crumb-add \"$(pwd)\" <slug> \"$(uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree wt-uuid <WT>)\"")
+```
+{% else %}
+```bash
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree owned-crumb-add "$(pwd)" <slug> "$(uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree wt-uuid <WT>)"
+```
+{% endif %}
+
 **Workflows without wrapup** (e.g., `/hm:exec-rev`): if you exit a fused workflow at this stage without wrapup running afterward, the staged changes remain uncommitted on the base branch. Either run `/hm:wrapup` to commit them, or commit manually:
 
 ```bash
@@ -362,11 +380,11 @@ commit; otherwise the user's pre-existing WIP remains in the stash queue:
 
 {% if is_codex %}
 ```
-Bash("HM_OWNED_SESSION_UUIDS=\"$(uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree owned-uuids \"$(pwd)\")\" uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree post-commit-pop \"$(pwd)\"")
+Bash("HM_OWNED_SESSION_UUIDS=\"$(uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree owned-crumb-read \"$(pwd)\" <slug>)\" uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree post-commit-pop \"$(pwd)\"")
 ```
 {% else %}
 ```bash
-!HM_OWNED_SESSION_UUIDS="$(uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree owned-uuids "$(pwd)")" uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree post-commit-pop "$(pwd)"
+!HM_OWNED_SESSION_UUIDS="$(uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree owned-crumb-read "$(pwd)" <slug>)" uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree post-commit-pop "$(pwd)"
 ```
 {% endif %}
 

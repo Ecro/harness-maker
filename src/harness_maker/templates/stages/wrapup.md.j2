@@ -367,21 +367,24 @@ The commit captures: the staged execute changes + the memory updates + the PLAN 
 
 If `/hm:execute` ran in stage-only mode AND the base repo had unrelated dirty work, finalize deferred the stash pop to this point so the user's WIP does not contaminate the commit. Run `post-commit-pop` to restore it (no-op when no ref file is present).
 
-**Cross-session isolation:** export the session UUID set discovered from live
-worktree/session markers in this base repo as `HM_OWNED_SESSION_UUIDS` before
-invoking `post-commit-pop`. The CLI then runs in Layer 3 strict mode — any
-finalize-stash ref file whose `session_uuid` is not in this env-supplied set
-is SKIPped rather than popped. This is marker-derived ownership, not a magic
-process-local guarantee; if the UUID set is empty, the CLI safely treats that
-as "no owned deferred stashes" and stale refs remain preserved.
+**Per-session isolation (ADR-001, slug crumb):** source `HM_OWNED_SESSION_UUIDS` from
+the **slug-keyed crumb** that `/hm:execute` wrote for THIS task (`owned-crumb-read
+"$(pwd)" <slug>`), NOT the all-markers `owned-uuids` (which would restore a PEER's
+deferred stash — the contamination this closes). `post-commit-pop` then SKIPs any ref
+whose `session_uuid` is not in your own owned set; an **empty** set (no crumb — e.g.
+`feature_branch_workflow` has no deferred stash, or a pre-upgrade harness) safely
+preserves all `session_uuid`-bearing refs rather than popping them. Substitute `<slug>`
+(the task you are wrapping up). If the crumb is somehow absent but you DO know the
+`execute-<uuid>-<ts>` worktree you created this session, you may instead pass
+`$(... wt-uuid <that path>)`. The crumb is cleared after a successful pop.
 
 {% if is_codex %}
 ```
-Bash("HM_OWNED_SESSION_UUIDS=\"$(uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree owned-uuids \"$(pwd)\")\" uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree post-commit-pop \"$(pwd)\"")
+Bash("HM_OWNED_SESSION_UUIDS=\"$(uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree owned-crumb-read \"$(pwd)\" <slug>)\" uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree post-commit-pop \"$(pwd)\" && uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree owned-crumb-clear \"$(pwd)\" <slug>")
 ```
 {% else %}
 ```bash
-!HM_OWNED_SESSION_UUIDS="$(uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree owned-uuids "$(pwd)")" uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree post-commit-pop "$(pwd)"
+!HM_OWNED_SESSION_UUIDS="$(uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree owned-crumb-read "$(pwd)" <slug>)" uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree post-commit-pop "$(pwd)" && uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree owned-crumb-clear "$(pwd)" <slug>
 ```
 {% endif %}
 

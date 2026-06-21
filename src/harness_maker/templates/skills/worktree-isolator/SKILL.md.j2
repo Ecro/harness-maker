@@ -76,9 +76,11 @@ CLI-owned flow, executed deterministically by the orchestrator:
 
    If dirty-base bypass was used or new base dirt appeared after create,
    `finalize stage-only` may stash that base WIP and write
-   `.claude/.hm-finalize-stash-*`. After the wrapup commit, restore it with:
+   `.claude/.hm-finalize-stash-*`. After the wrapup commit, restore it — source
+   `HM_OWNED_SESSION_UUIDS` from THIS task's slug crumb so only your own stash is
+   popped (PLAN-layer3-per-session-ownership; an empty set fail-safe-preserves):
    ```bash
-   uv run python -m harness_maker.worktree post-commit-pop "$(pwd)"
+   HM_OWNED_SESSION_UUIDS="$(uv run python -m harness_maker.worktree owned-crumb-read "$(pwd)" <slug>)" uv run python -m harness_maker.worktree post-commit-pop "$(pwd)"
    ```
 
    Never replace this flow with direct `worktree.merge()` +

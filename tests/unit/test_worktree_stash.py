@@ -190,9 +190,15 @@ def test_stage_only_skips_ref_file_when_clean(repo: Path) -> None:
     )
 
 
-def test_post_commit_pop_happy_path(repo: Path) -> None:
-    """post-commit-pop reads ref → session match → pops → restores WIP → deletes ref file."""
+def test_post_commit_pop_happy_path(repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """post-commit-pop reads ref → session match → pops → restores WIP → deletes ref file.
+
+    PLAN-layer3-per-session-ownership ADR-003: the owner must name its own uuid
+    (empty owned-set now fail-safe-skips a uuid'd ref). The realistic flow has
+    wrapup pass `HM_OWNED_SESSION_UUIDS` = the session's execute-worktree uuid.
+    """
     (wt,) = worktree.create("execute", repo)
+    monkeypatch.setenv("HM_OWNED_SESSION_UUIDS", worktree._extract_uuid_from_wt_name(wt.name))
     (wt / "feature.py").write_text("def feature() -> None:\n    pass\n")
     _git(["add", "feature.py"], cwd=wt)
     _git(["commit", "-m", "add feature"], cwd=wt)
@@ -450,7 +456,9 @@ def multi_repo(tmp_path: Path) -> tuple[Path, Path]:
     return primary, sibling
 
 
-def test_multi_repo_stage_only_pops_both_stashes(multi_repo: tuple[Path, Path]) -> None:
+def test_multi_repo_stage_only_pops_both_stashes(
+    multi_repo: tuple[Path, Path], monkeypatch: pytest.MonkeyPatch
+) -> None:
     """REVIEW M-P0-1 + M-P0-2: post-commit-pop must drain BOTH primary AND
     sibling stashes. Closes the test-coverage gap (M-P1-1) and the routing
     correctness gap in one verification.
@@ -491,6 +499,16 @@ def test_multi_repo_stage_only_pops_both_stashes(multi_repo: tuple[Path, Path]) 
     assert sibling_refs, (
         f"sibling ref file missing: {list((sibling / '.claude').iterdir())} — "
         f"PLAN ADR-002 requires per-repo ref files"
+    )
+
+    # ADR-003: the owner names ALL the uuids it deferred (primary + sibling refs);
+    # in practice the slug crumb records them. Empty owned-set now fail-safe-skips.
+    monkeypatch.setenv(
+        "HM_OWNED_SESSION_UUIDS",
+        ",".join(
+            worktree._read_stash_ref_file(r).get("session_uuid", "")
+            for r in primary_refs + sibling_refs
+        ),
     )
 
     # Simulate wrapup commit (just commit the staged squash on primary; in
@@ -536,6 +554,7 @@ def test_multi_repo_stage_only_pops_both_stashes(multi_repo: tuple[Path, Path]) 
 
 def test_multi_repo_untracked_harness_yaml_still_discoverable(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """REVIEW round 2 P1: untracked harness.yaml must NOT be swept into stash.
 
@@ -592,6 +611,15 @@ def test_multi_repo_untracked_harness_yaml_still_discoverable(
 
     rc = worktree._cli_finalize([str(primary_wt), "stage-only"])
     assert rc == 0, f"finalize must succeed; got rc={rc}"
+
+    # ADR-003: owner names all deferred uuids (read from the written refs).
+    _refs = list((primary / ".claude").glob(".hm-finalize-stash-*")) + list(
+        (sibling / ".claude").glob(".hm-finalize-stash-*")
+    )
+    monkeypatch.setenv(
+        "HM_OWNED_SESSION_UUIDS",
+        ",".join(worktree._read_stash_ref_file(r).get("session_uuid", "") for r in _refs),
+    )
 
     # Commit + post-commit-pop. With the new design (sibling_bases embedded in
     # ref body), harness.yaml is irrelevant to pop-time discovery — sibling
