@@ -465,6 +465,31 @@ def _dim_guardrails(project_dir: Path) -> DimensionScore:
         )
     )
 
+    # Loud smoke (PLAN-loop-marker-session-scoping P5): a rendered hooks.json that
+    # does NOT register the `sessionid_envfile` SessionStart hook silently degrades
+    # /hm:loop session-scoping (HM_SESSION_ID never set → parallel loops fall back
+    # to the session-blind global marker). N-A (passes) when hooks.json is absent —
+    # `hooks_json_present` owns that case; this signal only fires on a stale/broken
+    # render that HAS hooks.json but lost the hook.
+    sessionid_registered = (not hooks_path.exists()) or (
+        isinstance(hooks_data, dict) and "sessionid_envfile" in json.dumps(hooks_data)
+    )
+    signals.append(
+        _signal(
+            "sessionid_envfile_registered",
+            sessionid_registered,
+            15,
+            "SessionStart sessionid_envfile hook registered (loop session-scoping live)"
+            if sessionid_registered
+            else "hooks.json missing the sessionid_envfile SessionStart hook — "
+            "/hm:loop session-scoping is silently degraded",
+            None
+            if sessionid_registered
+            else "Re-render with /hm:make --update so SessionStart registers "
+            "harness_maker.hooks.sessionid_envfile (sets HM_SESSION_ID for /hm:loop)",
+        )
+    )
+
     settings_path = claude / "settings.json"
     settings = _read_json_with_optional_frontmatter(settings_path)
     perms = settings.get("permissions") if isinstance(settings, dict) else None

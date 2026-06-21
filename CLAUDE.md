@@ -251,6 +251,16 @@ Cursor / Codex 의 plugin marketplace 가 GitHub 에서 직접 fetch.
 - **wrapup deliverable commit** (ADR-004) — `git add` now also stages RESEARCH + SPEC, so they stop lingering as untracked dirt.
 - **accepted limitation**: a user who already *committed* `.claude/` churn keeps a cosmetic `M .claude/observability/...` in `git status` (gitignore can't untrack; we never auto-`git rm --cached` — CLAUDE.md git policy). It neither blocks nor stashes. Opt-in manual cleanup: `git rm -r --cached .claude/observability .claude/.hm-iter-receipts` then commit.
 
+### Loop-marker session-scoping (PLAN-loop-marker-session-scoping)
+
+`/hm:loop` is parallel-safe across concurrent Claude sessions — N loops + idle sessions coexist with zero interference on the normal path. The mechanism (shared helper `loop_marker.py`):
+- The Claude `session_id` is recorded in the per-session marker **content** header (`claude_session_id:`); the **filename** stays worktree-keyed so `_owned_session_uuids` (filename-suffix) and the 5-layer defense are untouched.
+- A SessionStart hook `sessionid_envfile` writes a sanitized `HM_SESSION_ID` to `$CLAUDE_ENV_FILE` (the only way slash-command Bash can read its own session_id). The Stop-hook (`loop_gate`) and the `worktree loop-mode-active` CLI block/detect **only on a content-match against the caller's own `session_id`**.
+- **ONLY `loop.md.j2` passes `--claude-session-id`** to `worktree create`. A standalone `/hm:execute` worktree has an empty header → never trips the Stop-hook. Empty-vs-set header is the sole loop-vs-worktree signal (both write a `.hm-loop-*` marker).
+- **All four** marker-content readers (`_read_active_worktrees` ×2, `_marker_referenced_paths`, `_session_worktrees`) drop the header via the shared `parse_marker_paths` (`startswith("/")` rule — never existence). Adding any field to this format = update every reader (regression: `_session_worktrees` once ingested the header as a phantom path).
+- **Degraded fallback** (no `HM_SESSION_ID`: SessionStart-hook failure / Cursor / Codex / no-isolation): the session-blind legacy global `.hm-loop-active` is honored **only when the caller has no id of its own** (`not sid`) — a valid-id session is never blocked/mis-detected by a peer's global. Two both-id-less loops still share the global (structurally unavoidable — no per-session key). The loud `[loop] degraded` warning + the `/hm:health` `sessionid_envfile_registered` smoke surface this.
+- `/hm:health` (`readiness._dim_guardrails`) fails the `sessionid_envfile_registered` signal when a rendered `hooks.json` lost the SessionStart hook (stale render → silent degradation).
+
 ## Second Brain 승급 파이프라인 (PLAN-second-brain-promotion)
 
 로컬 `.claude/memory/` 와 Obsidian Second Brain 은 **두 개의 평행 기억 시스템이 아니라 승급 파이프라인**이다:
