@@ -140,7 +140,11 @@ def test_make_production_preset(fresh_project: Path) -> None:
 @pytest.mark.skipif(not _claude_available(), reason="claude binary not in PATH")
 def test_make_no_interactive_prompts(fresh_project: Path) -> None:
     """With --ci, the session must complete without hanging on AskUserQuestion."""
-    cp = _run_make(fresh_project, timeout=60)
+    # Use the default 180s timeout (not a tight 60s override): a real `claude -p`
+    # full `make` session legitimately runs >60s under parallel-suite load, so the
+    # tight cap produced load-induced false TIMEOUTS. A genuine AskUserQuestion
+    # hang still raises at 180s; this only removes the flaky false-positive.
+    cp = _run_make(fresh_project)
     # AskUserQuestion hang → subprocess timeout (raises); error → rc != 0.
     assert cp.returncode == 0, (
         f"session hung or errored (rc={cp.returncode}); likely AskUserQuestion blocked\n"
