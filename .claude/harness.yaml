@@ -4,7 +4,7 @@ harness_maker_version: 0.31.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: harness-yaml/Production.yaml.j2
 provenance: official
-content_hash: b8e5b748a87dc149063a4c4d39349078b7cb5ae549428cb025a27e617a6215c3
+content_hash: 4c9c9df518ac8d7e6ee83bd6a6cee636bfb8bb59676eb8613f60da6a281ee326
 ---
 preset: Production
 locale: ko
@@ -135,6 +135,7 @@ skills:
 worktree:
   scope: [execute, plan]
   branch_prefix: hm-
+  feature_branch_workflow: true
 memory:
   enabled: true
   dir: .claude/memory
