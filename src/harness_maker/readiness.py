@@ -575,7 +575,9 @@ def _dim_guardrails(project_dir: Path) -> DimensionScore:
                 "HM_SESSION_ID is set (SessionStart env-file plumbing live)"
                 if live_ok
                 else "HM_SESSION_ID unset at runtime — SessionStart env-file plumbing "
-                "is not firing; /hm:loop runs degraded (peers block each other's Stop) "
+                "is not firing; a /hm:loop here self-stops after one iteration (the "
+                "Stop-hook has your session_id from stdin but the marker header is "
+                "empty, so content-match fails and the loop is allowed to stop) "
                 "while the static hooks.json check may still read green",
                 None
                 if live_ok

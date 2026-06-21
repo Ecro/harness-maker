@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed — `/hm:loop` degraded-symptom accuracy on WSL2 (PLAN-fleet-10-20-parallel-safety C1)
+- **`loop.md.j2` + `readiness.sessionid_envfile_live`** — when `HM_SESSION_ID` is unset (WSL2 SessionStart env-file failure) the degraded-loop guards previously claimed "peers block each other's Stop". A Phase-0 spike proved that is the Cursor/Codex case; for **Claude Code** the real symptom is the loop **self-stops after one iteration** (the Stop-hook has the real `session_id` from stdin but the empty-header marker can't content-match). Both surfaces now print the accurate self-stop message + remedy, `CLAUDECODE`-branched. The planned Stop-hook self-heal was dropped: the Stop payload `cwd` is the project root with no worktree field, so a degraded marker cannot be attributed to the stopping session (`tests/fixtures/stop_payload_wsl2.json`).
+- **C3 (per-session queue-guard) was attempted and REVERTED** (k-of-3 review P0): excluding foreign-owned stashes from `_count_pending_stashes` re-opens cross-session contamination because Layer 3 (`post-commit-pop`'s owned-UUID set) reads all sessions' markers. The foreign-counting is load-bearing; the real fix is hardening Layer 3 (a separate plan). Documented in CLAUDE.md + a load-bearing code comment.
+
 ### Added — Autopilot docs + e2e; ledger timestamp-resolution fix (PLAN-human-bottleneck-auto-advance Phase 8 of 9 — feature complete)
 - **`tests/e2e/test_autopilot_chain_e2e.py`** — drives the boundary CLI through a full pipeline (advance each stage → record `advanced` → last stage clears the marker + reports `pipeline_complete`; + a step-cap-halts-mid-chain case). The live Skill-chain is manually verified (cross-IDE checklist); this is the durable mechanical spine.
 - **Fixed** — `autopilot_ledger._utc_now_iso` was second-truncated while the marker's `created_at` is microsecond-resolution, so a same-second `advanced` event sorted before `created_at` and the session step-count filter dropped it → the step cap never fired. Aligned to `isoformat()` (the e2e caught this). `_parse_iso` still normalizes legacy `Z`-form rows.

@@ -1,0 +1,19 @@
+{
+  "_doc": "Phase-0 spike fixture (PLAN-fleet-10-20-parallel-safety). Records whether a Claude Stop-hook payload carries a per-session signal that can attribute a worktree-keyed loop marker to the stopping session when the session cwd is the project root. The `signal_present` field is the machine-checkable Phase-1 branch gate.",
+  "signal_present": false,
+  "evidence": [
+    "Claude Code docs (claude-code-guide): the Stop payload `cwd`/`workspace.current_dir` reflect the directory where `claude` was launched (project root) and are NOT affected by per-command subshell `cd`. No payload field identifies the `.worktrees/<name>/` the session operated in when cwd is the project root. `transcript_path` is in the payload but is NOT reachable from command-Bash (cannot be cross-referenced at marker-write time).",
+    "As-built test convention: tests/unit/test_loop_gate_session.py::_stop_payload sets cwd/workspace.current_dir to the project root (str(base)), and test_session_id_present_degraded_marker_allows already documents that a degraded (empty-header) loop whose Stop payload carries a real session_id loses its own continuation (returns 0).",
+    "Architecture: harness-maker /hm:loop runs from the project root; the worktree is entered only via per-command `cd <WT>` subshells, so the session's own cwd (hence the Stop payload cwd) stays at the project root."
+  ],
+  "conclusion": "No per-session attribution signal exists for a degraded empty-header marker (cwd is the project root; the marker has no claude_session_id). Per ADR-002 the spike-gated ownership self-heal is therefore DROPPED; only the unconditional loud floor ships. Count-based attribution remains rejected (would stamp a peer).",
+  "representative_stop_payload": {
+    "session_id": "deadbeefcafe",
+    "transcript_path": "/home/<user>/.claude/projects/<proj>/<session>.jsonl",
+    "cwd": "/home/<user>/project",
+    "workspace": {"current_dir": "/home/<user>/project"},
+    "hook_event_name": "Stop",
+    "stop_hook_active": false
+  },
+  "capture_method": "doc+as-built triangulation (3 independent sources agree). A fresh live capture would require an interactive /hm:loop Stop cycle; the existing test suite already encodes the same cwd=project-root convention this fixture asserts, so it is the strongest as-built evidence."
+}

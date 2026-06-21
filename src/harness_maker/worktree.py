@@ -774,6 +774,19 @@ def _count_pending_stashes(claude_dir: Path) -> int:
     Stale refs with absent session markers are cleanup artifacts, not active
     multi-session pressure, and must not block unrelated worktree creation.
     Missing dir → 0 (clean state).
+
+    PLAN-fleet-10-20-parallel-safety C3 (REVERTED — DO NOT re-attempt naively):
+    excluding FOREIGN-owned live stashes from this count to relieve the fleet
+    false-block re-opens the 3×-recurring `worktree-finalize-pulls-orphan-wip-
+    into-main` contamination. The reason this guard counts foreign stashes is
+    LOAD-BEARING: Layer 3 (`post-commit-pop`'s `HM_OWNED_SESSION_UUIDS` set,
+    sourced from `_owned_session_uuids`) is itself documented-vulnerable — it
+    reads ALL sessions' `.hm-loop-*` markers, so a session's `post-commit-pop`
+    will restore a PEER's deferred stash (see the comment at `_cli_post_commit_pop`
+    "preserves prior (vulnerable) behavior"). Blocking create while foreign
+    stashes exist is the operative gate that keeps the peer out of that path.
+    Safe per-session exclusion requires hardening Layer 3 first (the per-session
+    `--owned-uuid` wiring the post-commit-pop comment describes as a follow-up).
     """
     if not claude_dir.is_dir():
         return 0

@@ -501,7 +501,13 @@ session, so parallel loops in other sessions are never affected
   session-blind and would block other sessions' termination.
 - **Degraded path (`$HM_SESSION_ID` empty — no SessionStart env-file, or
   Cursor/Codex — OR no isolation):** there is no session-scoped marker, so fall
-  back to the global marker and warn that parallel loops are NOT isolated:
+  back to the global marker. **Two distinct symptoms** (PLAN-fleet-10-20-parallel-safety
+  Phase 0 spike): in **Claude Code** with an empty `$HM_SESSION_ID` (the WSL2
+  env-file case) the Stop-hook still has your real `session_id` from stdin, so it
+  cannot content-match the empty marker and **this loop self-stops after one
+  iteration** — peers are NOT affected. In **Cursor/Codex or no-isolation** the
+  global marker is the only guard and **parallel loops are NOT isolated**. The
+  guard warns with the symptom that actually applies:
 
 Substitute `<WT>` with the literal worktree path from the create step (or, when
 no isolation engaged, your cwd). The guard touches the global marker when EITHER
@@ -511,11 +517,11 @@ degraded path; otherwise the per-session content marker already guards you:
 
 {% if is_codex %}
 ```
-Bash("if [ -z \"$HM_SESSION_ID\" ] || [ \"<WT>\" = \"$(pwd)\" ]; then touch .hm-loop-active; echo '[loop] degraded marker (no HM_SESSION_ID or no isolation) — parallel loops are NOT isolated'; fi")
+Bash("if [ -z \"$HM_SESSION_ID\" ] || [ \"<WT>\" = \"$(pwd)\" ]; then touch .hm-loop-active; if [ -n \"$CLAUDECODE\" ] && [ -z \"$HM_SESSION_ID\" ]; then echo '⚠️ [loop] DEGRADED (HM_SESSION_ID unset — WSL2 SessionStart env-file not firing): this loop will STOP after one iteration. The Stop-hook has your session_id from stdin but the marker header is empty, so content-match fails and the loop is allowed to stop. Peers are NOT affected. Remedy: run /hm:health, fix the SessionStart env-file plumbing, or drive iterations manually.'; else echo '[loop] degraded marker (no isolation or non-Claude IDE) — parallel loops are NOT isolated'; fi; fi")
 ```
 {% else %}
 ```bash
-!if [ -z "$HM_SESSION_ID" ] || [ "<WT>" = "$(pwd)" ]; then touch .hm-loop-active; echo '[loop] degraded marker (no HM_SESSION_ID or no isolation) — parallel loops are NOT isolated'; fi
+!if [ -z "$HM_SESSION_ID" ] || [ "<WT>" = "$(pwd)" ]; then touch .hm-loop-active; if [ -n "$CLAUDECODE" ] && [ -z "$HM_SESSION_ID" ]; then echo '⚠️ [loop] DEGRADED (HM_SESSION_ID unset — WSL2 SessionStart env-file not firing): this loop will STOP after one iteration. The Stop-hook has your session_id from stdin but the marker header is empty, so content-match fails and the loop is allowed to stop. Peers are NOT affected (a valid-id session ignores the global marker). Remedy: run /hm:health to confirm, fix the SessionStart env-file plumbing, or drive iterations manually.'; else echo '[loop] degraded marker (no isolation or non-Claude IDE) — parallel loops are NOT isolated'; fi; fi
 ```
 {% endif %}
 
