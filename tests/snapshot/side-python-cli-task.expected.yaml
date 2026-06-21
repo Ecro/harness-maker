@@ -49,10 +49,10 @@ files:
   body_sha256: 97786f65124e496d77adf30d8e29aebfd2c938702e79f6fb4eeaefe16bd73dc9
 - path: commands/hm/exec-rev-ver-wrap.md
   template: commands/hm/workflow_command.md.j2
-  body_sha256: d457f294d00985a88638ed37966149917c3e54cc9452cd38e5d03903c6cdd7ea
+  body_sha256: 5b409928acffc6eab5f67ba851588429af1fb8de36ffaf0425902d781880a16e
 - path: commands/hm/exec-rev-wrap.md
   template: commands/hm/workflow_command.md.j2
-  body_sha256: 48ae828a82ab93b3584836af299121b91c3d87b652bcc2aca21d2ecad309af9d
+  body_sha256: 1a5808cf5b108732cf9cce4480bcd48f5daf2bd3fda5120289943aa36d0991a8
 - path: commands/hm/exec-rev.md
   template: commands/hm/workflow_command.md.j2
   body_sha256: 4770deb00f1db426eb77a650e9008e48a405163db0cc651ab37660226c05cfa6
@@ -76,7 +76,7 @@ files:
   body_sha256: 4ea7a5bfa70ffd8ca08dc8390f34b326bcd3ad66195b39da6c8fcd8d637aff74
 - path: commands/hm/plan-exec-rev-wrap.md
   template: commands/hm/workflow_command.md.j2
-  body_sha256: a57d765a06de45741836525755413d8537201be916c46bf9a3ef476356edacb0
+  body_sha256: b1243c66d431e6a5b21b65b954d666716dee18be283f8c88ce9658b55d55c57c
 - path: commands/hm/plan-exec-rev.md
   template: commands/hm/workflow_command.md.j2
   body_sha256: 23f9e1238b38137f4becb9f44b35e9bec88bb86ac88e80f8c702b36f94e643e9
@@ -100,7 +100,7 @@ files:
   body_sha256: 161d724eb0773b60693b107999902b7c620940c17e3500d36186b533a41fd4f6
 - path: commands/hm/wrapup.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: ba0e6197bd0723804460963472eee6945bebc537b2bae57e6391876dec62996f
+  body_sha256: 93402448cd54bda4b727ef40b3b2815180525adecb9561db17c21bdefcf27d59
 - path: harness.yaml
   template: harness-yaml/Side.yaml.j2
   body_sha256: d6a48ab983f6f41e420c487fe448405b1c808fc7505eb5f34564b1c12e1a7261
@@ -181,4 +181,4 @@ files:
   body_sha256: fdfdbee1ea80e182f12879ac223a85be19f134fb951f2d4b7cc5bf31b0add28d
 - path: stages/wrapup.md
   template: stages/wrapup.md.j2
-  body_sha256: abc4d3ae10177d1147aaec60ce89ff615c385880502094d565a5311fcbfe0820
+  body_sha256: 1019c9e6288a8c746a6a913a4069022ceed160a70cacfe1eb13cb4d7e784a940

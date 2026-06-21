@@ -192,34 +192,46 @@ Use a single Edit / Write call (atomic). Verify by reading back: assert `status:
 
 #### 5.1 Wiki
 
-Insert (or update) one entry inside `.claude/memory/wiki.md`. **Critical marker discipline** — the entry MUST land **inside** the `<!-- @hm:user:entries -->` block, immediately **before** the `<!-- @hm:/user:entries -->` closing marker. Content placed AFTER the closing marker (e.g. naïve EOF append) is template-owned and gets silently discarded on the next `/hm:make --update` (regression 2026-05-17: 5 wiki entries lost across 7 commits before detection).
+Insert (or update) one entry in `.claude/memory/wiki.md` **via the locked memory CLI** — it owns the flock, slug-dedup, and `@hm:user:entries` marker placement so concurrent fleet wrapups cannot clobber each other (H1, PLAN-multisession-fleet-reverify). **Do NOT `Edit`/`Write` `wiki.md` directly** — a raw whole-file edit races other sessions and can silently drop the close marker (regression 2026-05-17: 5 wiki entries lost; the CLI's read-modify-write happens inside the lock and is marker-safe).
 
-Procedure: read the file, locate the line `<!-- @hm:/user:entries -->`, insert the new entry on the lines directly above it (separated from the previous entry by one blank line).
+Write the one-paragraph body to a fresh temp file **outside the repo** with the **Write tool** — use a unique `mktemp`-style path (e.g. `/tmp/hm-wiki-<slug>.md`), never a fixed in-repo name (a predictable path collides under concurrent fleet wrapups, and a leftover under `.claude/memory/` would be mis-staged by Step 6's `git add`). Verbatim bytes — no shell expansion of backticks / `$`. Then run the CLI and delete the temp file:
 
-```markdown
-## [wiki:<category>] <slug> | <YYYY-MM-DD>
-<one-paragraph summary of the pattern / convention / gotcha learned>
+{% if is_codex %}
 ```
+Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.memory_md upsert-wiki --root . --slug <slug> --category <category> --body-file <tmpfile>")
+```
+{% else %}
+```bash
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.memory_md upsert-wiki --root . --slug <slug> --category <category> --body-file <tmpfile>
+```
+{% endif %}
 
+- **body** = the summary paragraph ONLY — the CLI builds the `## [wiki:<category>] <slug> | <YYYY-MM-DD>` heading.
 - **category**: `pattern` | `convention` | `gotcha` | `architecture` | `tooling` | `api` | `other`.
-- **slug**: kebab-case, ≤40 chars, derived from the work unit.
-- **Position**: inside the `@hm:user:entries` block, above the closing marker. Never EOF-append.
-- If a `[wiki:<same-slug>]` entry already exists: replace its body with the updated learning (do NOT duplicate).
+- **slug**: kebab-case, ≤40 chars, derived from the work unit. Same slug → replaced in place (no duplicate).
+- **Check the exit code.** Non-zero = the CLI fail-closed on a malformed tier file (duplicate/absent marker, etc.) — surface the stderr reason to the user; do not retry blindly.
 
 #### 5.2 Failures
 
-For each new failure pattern that emerged this work unit, insert (or increment count) **inside** `.claude/memory/failures.md`. **Same marker discipline as 5.1**: the entry MUST land inside the `<!-- @hm:user:entries -->` block, immediately before the `<!-- @hm:/user:entries -->` closing marker. EOF-append loses the entry on the next `/hm:make --update`.
+For each new failure pattern that emerged this work unit, insert (or increment count) in `.claude/memory/failures.md` **via the locked memory CLI** (same H1 reason + marker discipline as 5.1 — **do NOT `Edit`/`Write` `failures.md` directly**). The CLI owns the `count:<N>` increment: same slug → count++ with the first-seen date preserved.
 
-```markdown
-## [fail:<category>] <slug> | <YYYY-MM-DD> | count:<N>
-<symptom + cause + fix in one paragraph>
+Write the body paragraph to a fresh temp file **outside the repo** with the **Write tool** (unique `mktemp`-style path, never fixed/in-repo), then run the CLI and delete it:
+
+{% if is_codex %}
 ```
+Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.memory_md upsert-failure --root . --slug <slug> --category <category> --body-file <tmpfile>")
+```
+{% else %}
+```bash
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.memory_md upsert-failure --root . --slug <slug> --category <category> --body-file <tmpfile>
+```
+{% endif %}
 
+- **body** = symptom + cause + fix in one paragraph — the CLI builds the `## [fail:<category>] <slug> | <YYYY-MM-DD> | count:<N>` heading.
 - **category**: `import` | `test` | `render` | `hook` | `lint` | `type` | `runtime` | `design` | `other`.
-- **count**: increment when the same `<category>:<slug>` already exists; do NOT duplicate sections.
-- **Position**: inside `@hm:user:entries` block, above the closing marker. Never EOF-append.
 - **Qualifies as failure**: incorrect API usage, wrong syntax, convention misunderstanding, build failures, tool mistakes, workflow violations.
 - **Does NOT qualify**: user preference changes, expected errors, normal debugging cycles, design evolution.
+- **Check the exit code** (fail-closed on malformed tier file).
 
 #### 5.3 Failure-driven proposal
 
@@ -258,14 +270,28 @@ should update (e.g. CHANGELOG.md, TODO.md), run `/hm:configure` and select
 
 #### 5.5 Session log
 
-Append to `.claude/memory/session/<YYYY-MM-DD>.md` (today's date):
+Append today's decision entry to `.claude/memory/session/<YYYY-MM-DD>.md` **via the locked memory CLI** (H1: the `flush_session` compaction hook writes the same file under the same lock — **do NOT `Edit`/`Write` the session log directly**). The CLI creates the file with its header when absent and always targets the base repo.
+
+Write the full entry (heading + paragraph) to a fresh temp file **outside the repo** with the **Write tool** (unique `mktemp`-style path, never fixed/in-repo), then run the CLI and delete it:
+
+{% if is_codex %}
+```
+Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.memory_md append-session --root . --body-file <tmpfile>")
+```
+{% else %}
+```bash
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.memory_md append-session --root . --body-file <tmpfile>
+```
+{% endif %}
+
+Entry shape:
 
 ```markdown
 ## [decision:<slug>] <what was decided> | <HH:MM> UTC | stage:wrapup
 <one paragraph: non-obvious constraint, key trade-off, or surprise from this work unit>
 ```
 
-Create the file (with README header) if it doesn't exist. **Omit** when the work unit was trivial (typo fix, doc-only) — session log is for non-obvious decisions.
+**Omit** when the work unit was trivial (typo fix, doc-only) — session log is for non-obvious decisions.
 
 #### 5.6 Second Brain promotion (cross-project durable knowledge)
 

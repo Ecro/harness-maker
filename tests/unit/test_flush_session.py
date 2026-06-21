@@ -137,3 +137,43 @@ def test_main_as_subprocess(tmp_path: Path) -> None:
         timeout=15,
     )
     assert result.returncode == 0
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# ADR-005: canonical base-rooted session lock shared with memory_md CLI
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def test_append_targets_base_repo_from_worktree_cwd(tmp_path: Path) -> None:
+    # Session memory is shared project memory committed by wrapup from the base;
+    # a compaction firing with cwd inside a worktree must still write to base.
+    base = tmp_path
+    wt = base / ".worktrees" / "execute-abc123-20260621T0000Z"
+    wt.mkdir(parents=True)
+
+    _append_session_log(wt, "20260621T120000Z", "auto", None)
+
+    base_logs = list((base / ".claude" / "memory" / "session").glob("*.md"))
+    assert len(base_logs) == 1  # landed in BASE
+    assert not (wt / ".claude" / "memory" / "session").exists()  # NOT the worktree copy
+
+
+def test_hook_and_cli_coexist_in_one_session_file(tmp_path: Path) -> None:
+    from harness_maker import memory_md
+    from harness_maker.hooks import flush_session
+
+    class _FixedDT:
+        @staticmethod
+        def strftime(fmt: str) -> str:
+            return "2026-06-21" if fmt == "%Y-%m-%d" else "20260621T120000Z"
+
+    with patch.object(flush_session, "_utcnow", return_value=_FixedDT()):
+        _append_session_log(tmp_path, "20260621T120000Z", "auto", None)
+    memory_md.append_session(tmp_path, "## [decision:x] cli entry", today="2026-06-21")
+
+    logs = list((tmp_path / ".claude" / "memory" / "session").glob("*.md"))
+    assert len(logs) == 1  # both writers → one file, no split
+    content = logs[0].read_text("utf-8")
+    assert "checkpoint:compaction" in content  # hook entry survived
+    assert "cli entry" in content  # cli entry survived
+    assert content.count("# Session Log") == 1  # single header, no duplication
