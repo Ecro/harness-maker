@@ -1,20 +1,23 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.30.0
+harness_maker_version: 0.31.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: 3e164a93a824b0574bd9e558da9122b4ee1b68bdf0d3dcd0cfb2ae0e19d865c1
+content_hash: 83d15c4b53de24464a64649560d7691f8251268f8298ff5b9a332b3ce232ea0d
 ---
 > **Before you begin — outline your plan.** First check whether an autoloop is
-> active: the marker `.hm-loop-active` lives at the **project root**, NOT inside
-> a worktree. If your cwd is inside a `.worktrees/<name>/` worktree, the project
-> root is the directory above `.worktrees/` (strip the `/.worktrees/<wt-name>/`
-> suffix, or run `git rev-parse --show-toplevel` and walk up out of `.worktrees/`).
-> **If `<project-root>/.hm-loop-active` exists, skip this banner entirely and
-> operate without it** — the autoloop runs silently and a per-iteration banner
-> would flood the transcript. Otherwise, print the start banner below (in the
-> configured output language), then begin.
+> active **for THIS session** (session-scoped — a loop in another session must
+> not suppress your banner). Loop-mode is active iff `$HM_SESSION_ID` matches a
+> `.claude/.hm-loop-*` marker's `claude_session_id:` content header, OR a legacy
+> `<project-root>/.hm-loop-active` exists (degraded fallback). The project root is
+> above `.worktrees/` if your cwd is inside a `.worktrees/<name>/` worktree (strip
+> the `/.worktrees/<wt-name>/` suffix, or `git rev-parse --show-toplevel` then walk
+> up out of `.worktrees/`).
+> **If loop-mode is active for this session, skip this banner entirely and operate
+> without it** — the autoloop runs silently and a per-iteration banner would flood
+> the transcript. Otherwise, print the start banner below (in the configured output
+> language), then begin.
 
 <!-- @hm:banner:start -->
 > 🎯 **Goal:** one line — what this command will accomplish for the user.
@@ -24,6 +27,7 @@ content_hash: 3e164a93a824b0574bd9e558da9122b4ee1b68bdf0d3dcd0cfb2ae0e19d865c1
 > Present them as **intended, conditional** steps — skip heuristics, early-exit /
 > early-FAIL rules, and any stage's own `STOP — do not proceed` boundary override
 > this plan; never treat the banner as a commitment to run past a STOP.
+
 
 
 > **Output language.** Respond to the user in **ko**
@@ -118,7 +122,7 @@ If any criterion fails → **run the interview by default** (do not ask permissi
 
 ### Step 1 — Pre-interview internal draft (NOT shown to user)
 
-> **Loop-mode short-circuit**: if `.hm-loop-active` exists at the project root, **skip this entire Step 1** and jump directly to Step 1.5 below. The internal draft is pure waste in loop-mode (the per-iter plan is master-PLAN-derived, not from scratch). Saves tokens + avoids confusing intermediate state.
+> **Loop-mode short-circuit**: if loop-mode is active for THIS session (the Step 1.5 `loop-mode-active` check exits 0), **skip this entire Step 1** and jump directly to Step 1.5 below. The internal draft is pure waste in loop-mode (the per-iter plan is master-PLAN-derived, not from scratch). Saves tokens + avoids confusing intermediate state.
 
 Synthesize a working plan from inputs:
 - Tentative architecture (components, boundaries, data flow).
@@ -129,14 +133,16 @@ This seed is what the interview refines. Investigate code unknowns with Read/Gre
 
 ### Step 1.5 — Loop-mode detection (ADR-002, ADR-007, ADR-008 of PLAN-loop-mid-stop-and-review-skip)
 
-Before Step 2, check whether `/hm:plan` is running inside an active `/hm:loop` iteration. The marker file lives at the **project root**, NOT inside `<WT>` — the loop driver writes it before engaging any worktree. Locate the project root one of two ways:
+Before Step 2, check whether `/hm:plan` is running inside an active `/hm:loop` iteration. **Detection is session-scoped** (PLAN-loop-marker-session-scoping) — it keys on THIS Claude session, so a loop running in *another* session never makes your standalone `/hm:plan` skip its interview. Locate the project root (strip any `/.worktrees/<wt-name>/` suffix from cwd, or `git -C . rev-parse --show-toplevel` then walk up out of `.worktrees/`), then run:
 
-- If you have a recent Step 0 worktree output telling you `<WT>` like `/path/to/project/.worktrees/execute-20260523T*`, the project root is two path-components above `.worktrees/` (i.e., strip `/.worktrees/<wt-name>/` suffix).
-- Otherwise call `git -C . rev-parse --show-toplevel` and walk up out of `.worktrees/` if cwd is inside one.
+```bash
+!uv run --with /home/noel/harness-maker python -m harness_maker.worktree loop-mode-active "<PROJECT_ROOT>" --claude-session-id "$HM_SESSION_ID"
+```
 
-**If the marker `<PROJECT_ROOT>/.hm-loop-active` exists**, this is loop-mode: do NOT engage the deep interview (loop body cannot block on `AskUserQuestion`). Instead, scope the plan to the next master-PLAN phase only.
+- **Exit 0 (`active`)** → loop-mode: some `.claude/.hm-loop-*` marker's content header matches YOUR `session_id` (or a legacy global `.hm-loop-active` exists — degraded fallback). Do NOT engage the deep interview (loop body cannot block on `AskUserQuestion`). Scope the plan to the next master-PLAN phase only.
+- **Exit 1 (`inactive`)** → not loop-mode (no marker matches your session; another session's loop does not count). Proceed to Step 2 as normal.
 
-**Loop-mode procedure (when `<PROJECT_ROOT>/.hm-loop-active` exists):**
+**Loop-mode procedure (when `loop-mode-active` exited 0):**
 
 1. Derive `<N>` from `<WT>/.claude/.hm-iter-receipts/.current-iter` (driver-written at iter start per Phase 3 contract). If the marker file is absent for some reason, fall through to standard mode — the loop driver is in an inconsistent state and the interview is the safer choice.
 2. Read the master `work-docs/PLAN-{slug}.md`. Find the next phase whose status is NOT `DONE` (look for `## Phase N` headers and their `Status:` lines). Call this `<M>`.
@@ -167,13 +173,13 @@ Before Step 2, check whether `/hm:plan` is running inside an active `/hm:loop` i
    > 2. Emit a `verdict: fail` receipt via the Phase 2 shell guard at the end of this stage (do NOT use `verdict: skipped` — that bypasses Gate 0 silently; `fail` causes Gate 0 to retry the plan stage, eventually triggering the cap=2 escalation where the operator picks A/B/C with full context).
    > 3. Surface the halt note + ADR question text in your turn output so the operator sees it before the next gate evaluation.
    >
-   > Operator response: re-run `/hm:plan <slug>` standalone (outside the loop — `.hm-loop-active` must be temporarily removed: `rm .hm-loop-active`) to engage the deep interview, lock the new ADR into the master PLAN, then re-enter the loop with `/hm:loop --spec <spec-path>`.
+   > Operator response: re-run `/hm:plan <slug>` standalone in a **separate Claude session** (its different `session_id` makes the `loop-mode-active` check exit 1, so the deep interview engages) — or, in the degraded global-marker case, temporarily `rm .hm-loop-active`. Lock the new ADR into the master PLAN, then re-enter the loop with `/hm:loop --spec <spec-path>`.
 
 5. Skip directly to Step 4 (plan-validator). Validator runs against the per-iter PLAN, not the master PLAN.
 
 6. **Cleanup boundary**: per-iter PLAN files (`PLAN-{slug}-iter*.md`) accumulate inside `<WT>/work-docs/`. They are squash-merged at loop close (ADR-008) and the squash commit on the parent branch carries them as artifacts. No standalone cleanup is needed — the worktree's lifecycle owns it.
 
-If `.hm-loop-active` is absent → proceed to Step 2 as normal.
+If `loop-mode-active` exited 1 (not loop-mode for this session) → proceed to Step 2 as normal.
 
 ### Step 2 — SPEC inheritance check (when SPEC exists)
 
@@ -537,7 +543,7 @@ The shell guard below makes the receipt a no-op when `.current-iter` is absent �
 !if [ -f "<WT>/.claude/.hm-iter-receipts/.current-iter" ]; then \
    ITER=$(cat "<WT>/.claude/.hm-iter-receipts/.current-iter" 2>/dev/null); \
    if [ -n "$ITER" ]; then \
-     uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.30.0 python -m harness_maker.iter_receipts write \
+     uv run --with /home/noel/harness-maker python -m harness_maker.iter_receipts write \
        --iter "$ITER" --stage plan --verdict <verdict> --root "<WT>"; \
    fi; \
  fi
@@ -566,11 +572,13 @@ The shell guard below makes the receipt a no-op when `.current-iter` is absent �
 - No `Accept? / Verify? / OK?` phrasing anywhere in the PLAN — those are missed interview rounds.
 - Plan validator returned APPROVED, or the resolution path is fully recorded.
 
+
 ## Stage summary — print before you STOP
 
-Skip this banner entirely if `.hm-loop-active` exists at the project root (the
-autoloop uses machine receipts, not prose). Otherwise emit it as your final output,
-in the configured output language:
+Skip this banner entirely if loop-mode is active for THIS session (a
+`.claude/.hm-loop-*` marker matches `$HM_SESSION_ID`, or a legacy
+`.hm-loop-active` exists — the autoloop uses machine receipts, not prose).
+Otherwise emit it as your final output, in the configured output language:
 
 <!-- @hm:banner:end -->
 > ✅ **Done:** PLAN written with ADRs + phase decomposition; validator outcome recorded
@@ -659,7 +667,7 @@ Engage isolation if `harness.yaml.worktree.scope` includes `execute`. The `workt
 
 
 ```bash
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.30.0 python -m harness_maker.worktree create execute "$(pwd)"
+!uv run --with /home/noel/harness-maker python -m harness_maker.worktree create execute "$(pwd)"
 ```
 
 
@@ -675,7 +683,7 @@ Read **all non-empty output lines** — that is the contract for the rest of thi
 
 
 ```bash
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.30.0 python -m harness_maker.worktree verify <WT>
+!uv run --with /home/noel/harness-maker python -m harness_maker.worktree verify <WT>
 ```
 
 
@@ -877,7 +885,7 @@ The shell guard below makes the receipt a no-op when `.current-iter` is absent �
 !if [ -f "<WT>/.claude/.hm-iter-receipts/.current-iter" ]; then \
    ITER=$(cat "<WT>/.claude/.hm-iter-receipts/.current-iter" 2>/dev/null); \
    if [ -n "$ITER" ]; then \
-     uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.30.0 python -m harness_maker.iter_receipts write \
+     uv run --with /home/noel/harness-maker python -m harness_maker.iter_receipts write \
        --iter "$ITER" --stage execute --verdict <verdict> --root "<WT>"; \
    fi; \
  fi
@@ -904,16 +912,30 @@ Pick **exactly one** finalize command. Substitute `<WT>` with the literal absolu
 ```bash
 # All phases GREEN — stage-merge the branch back (NO commit) + cleanup the worktree.
 # /hm:wrapup will create the single user-facing commit (with proper message + Co-Authored-By).
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.30.0 python -m harness_maker.worktree finalize <WT> stage-only
+!uv run --with /home/noel/harness-maker python -m harness_maker.worktree finalize <WT> stage-only
 ```
 
 ```bash
 # Stage halted on a blocker — preserve the worktree for inspection:
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.30.0 python -m harness_maker.worktree finalize <WT> fail
+!uv run --with /home/noel/harness-maker python -m harness_maker.worktree finalize <WT> fail
 ```
 
 
 If Step 0 printed empty (no isolation engaged), skip both — there is nothing to finalize.
+
+**Record the owned uuid for wrapup's pop (ADR-001, slug crumb).** After a stage-only
+finalize that deferred a stash, record THIS session's worktree uuid into a slug-keyed
+crumb so `/hm:wrapup`'s `post-commit-pop` restores **only your own** deferred stash
+(machine-derived, works even in a fresh/recovered wrapup window). Substitute `<slug>`
+(this `/hm:execute` arg) and `<WT>` (your `execute-<uuid>-<ts>` worktree from Step 0).
+On the `feature_branch_workflow` (flag-on) path there is no deferred stash → `wt-uuid`
+of a `hm/<slug>` task worktree is empty → nothing recorded, by design.
+
+
+```bash
+!uv run --with /home/noel/harness-maker python -m harness_maker.worktree owned-crumb-add "$(pwd)" <slug> "$(uv run --with /home/noel/harness-maker python -m harness_maker.worktree wt-uuid <WT>)"
+```
+
 
 **Workflows without wrapup** (e.g., `/hm:exec-rev`): if you exit a fused workflow at this stage without wrapup running afterward, the staged changes remain uncommitted on the base branch. Either run `/hm:wrapup` to commit them, or commit manually:
 
@@ -927,7 +949,7 @@ commit; otherwise the user's pre-existing WIP remains in the stash queue:
 
 
 ```bash
-!HM_OWNED_SESSION_UUIDS="$(uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.30.0 python -m harness_maker.worktree owned-uuids "$(pwd)")" uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.30.0 python -m harness_maker.worktree post-commit-pop "$(pwd)"
+!HM_OWNED_SESSION_UUIDS="$(uv run --with /home/noel/harness-maker python -m harness_maker.worktree owned-crumb-read "$(pwd)" <slug>)" uv run --with /home/noel/harness-maker python -m harness_maker.worktree post-commit-pop "$(pwd)"
 ```
 
 
@@ -946,11 +968,13 @@ commit; otherwise the user's pre-existing WIP remains in the stash queue:
 - No `git commit` invoked from this stage. (Verify: `git log` shows no new commit relative to stage start.)
 - Worktree finalized exactly once: success or fail.
 
+
 ## Stage summary — print before you STOP
 
-Skip this banner entirely if `.hm-loop-active` exists at the project root (the
-autoloop uses machine receipts, not prose). Otherwise emit it as your final output,
-in the configured output language:
+Skip this banner entirely if loop-mode is active for THIS session (a
+`.claude/.hm-loop-*` marker matches `$HM_SESSION_ID`, or a legacy
+`.hm-loop-active` exists — the autoloop uses machine receipts, not prose).
+Otherwise emit it as your final output, in the configured output language:
 
 <!-- @hm:banner:end -->
 > ✅ **Done:** PLAN phases implemented to GREEN; changes staged, no commit
@@ -1449,7 +1473,7 @@ The shell guard below makes the receipt a no-op when `.current-iter` is absent �
 !if [ -f "<WT>/.claude/.hm-iter-receipts/.current-iter" ]; then \
    ITER=$(cat "<WT>/.claude/.hm-iter-receipts/.current-iter" 2>/dev/null); \
    if [ -n "$ITER" ]; then \
-     uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.30.0 python -m harness_maker.iter_receipts write \
+     uv run --with /home/noel/harness-maker python -m harness_maker.iter_receipts write \
        --iter "$ITER" --stage review --verdict <verdict> --root "<WT>"; \
    fi; \
  fi
@@ -1476,11 +1500,13 @@ The shell guard below makes the receipt a no-op when `.current-iter` is absent �
 - No `git commit` invoked from this stage. (Verify: `git log` shows no new commit relative to stage start.)
 - `weak-consensus` items are surfaced separately — never silently merged with strong-consensus findings.
 
+
 ## Stage summary — print before you STOP
 
-Skip this banner entirely if `.hm-loop-active` exists at the project root (the
-autoloop uses machine receipts, not prose). Otherwise emit it as your final output,
-in the configured output language:
+Skip this banner entirely if loop-mode is active for THIS session (a
+`.claude/.hm-loop-*` marker matches `$HM_SESSION_ID`, or a legacy
+`.hm-loop-active` exists — the autoloop uses machine receipts, not prose).
+Otherwise emit it as your final output, in the configured output language:
 
 <!-- @hm:banner:end -->
 > ✅ **Done:** Code reviewed; findings graded against the grade gate
