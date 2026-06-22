@@ -179,6 +179,42 @@ Surface the three counts in your wrapup summary. `/hm:health`'s `spec_drift`
 layer additionally flags any AC whose tests resolve but stayed pending (the
 write-back-missed bucket) — see ADR-009.
 
+{% if config.dev_mode == 'task-driven' %}
+### Step 3.6 — Oracle-waiver advisory (task-driven — PLAN-wrapup-waiver-enforcement)
+
+**Skip** when `{{ config.spec.dir }}SPEC-{slug}.machine.yaml` does not exist — no
+machine SPEC means no per-AC oracle to check (same skip-when-absent contract as
+Step 3.5; a task-driven unit with no machine SPEC is out of scope by design).
+
+This is **advisory, NEVER a STOP** (ADR-002): a task-driven AC with weak oracle
+evidence and no waiver is *surfaced and recorded*, not blocked — visibility over
+friction. Run the tri-state check (it always exits 0):
+
+{% if is_codex %}
+```
+Bash("python -m harness_maker.spec_machine waiver-check --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml --dev-mode task-driven --root .")
+```
+{% else %}
+```bash
+!python -m harness_maker.spec_machine waiver-check --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml --dev-mode task-driven --root .
+```
+{% endif %}
+
+Read the single JSON line's `status` and act — but **do NOT STOP** in any case:
+- `ok` → nothing to surface; continue to Step 4.
+- `flagged` → **loud-warn** each `flagged_acs` entry: a v2 AC with weak oracle
+  evidence and NO `oracle_independence_waiver`. Tell the user to either strengthen
+  `oracle_evidence` or add a one-line `oracle_independence_waiver` to that AC in the
+  machine.yaml (a recorded, auditable acceptance). Proceed to Step 4.
+- `check_error` → the check **could not run** (unparseable / missing / malformed
+  machine.yaml). **Loud-warn this DISTINCTLY from `flagged`** — it is a tool failure,
+  not a clean pass (surface the `reason`). Proceed; it does not block wrapup.
+
+The receipt is appended to `.claude/observability/oracle-waiver-check-{slug}.jsonl`
+(local-only telemetry per the 100%-local policy); `/hm:health` reads it as the
+auditable surface.
+
+{% endif %}
 ### Step 4 — PLAN status update
 
 Update `{{ config.work_docs.dir }}PLAN-{slug}.md`:

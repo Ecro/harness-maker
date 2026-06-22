@@ -11,6 +11,7 @@ import logging
 from typing import Any
 
 from harness_maker.models import DevMode
+from harness_maker.spec_machine import score_ac_oracle_evidence
 
 logger = logging.getLogger(__name__)
 
@@ -59,21 +60,10 @@ RUBRIC_DIMENSIONS_MACHINE: dict[str, str] = {
     ),
 }
 
-#: Substrings that signal oracle_evidence names an implementation-independent
-#: source (a path, a reference impl, a metamorphic rationale, a citation).
-_ORACLE_EVIDENCE_SPECIFICITY_MARKERS: tuple[str, ...] = (
-    "path",
-    "/",
-    "reference",
-    "golden",
-    "metamorphic",
-    "independent",
-    "citation",
-    "differential",
-    "attestation",
-    "rationale",
-    "invariant",
-)
+#: The per-AC oracle-evidence ladder + its specificity markers now live in
+#: spec_machine.score_ac_oracle_evidence (PLAN-wrapup-waiver-enforcement ADR-001)
+#: — the SINGLE source of truth shared with the waiver-check CLI. spec_quality
+#: imports it and must NOT redefine the markers/threshold (a static test guards).
 
 _WEAK_THRESHOLD = 40
 
@@ -224,19 +214,11 @@ def _score_oracle_independence(
     total = 0
     for a in ac_list:
         if waiver_active and (a.get("oracle_independence_waiver") or "").strip():
-            total += 100
+            total += 100  # waiver lift is the wrapper's job (task-driven only)
             continue
-        if a.get("oracle_source") == "legacy-unspecified":
-            continue  # 0 — no oracle declared
-        evidence = (a.get("oracle_evidence") or "").strip()
-        if not evidence:
-            total += 20
-        elif len(evidence) < 15:
-            total += 40
-        elif any(m in evidence.lower() for m in _ORACLE_EVIDENCE_SPECIFICITY_MARKERS):
-            total += 85
-        else:
-            total += 60
+        # The raw evidence ladder is the shared spec_machine scorer (ADR-001);
+        # legacy-unspecified → 0, denominator-retained (len counts it below).
+        total += score_ac_oracle_evidence(a)
     return round(total / len(ac_list))
 
 

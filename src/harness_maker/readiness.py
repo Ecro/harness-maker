@@ -515,6 +515,48 @@ def _dim_guardrails(project_dir: Path) -> DimensionScore:
         )
     )
 
+    # Render-drift guard (PLAN-wrapup-waiver-enforcement ADR-004/C5): the
+    # task-driven oracle-waiver advisory (wrapup Step 3.6) is baked at render time
+    # on the dev_mode branch. If harness.yaml's dev_mode was flipped without
+    # re-rendering, the rendered wrapup either silently LACKS the advisory
+    # (task-driven) or mis-fires it (spec-driven). N-A (no signal) when the wrapup
+    # command or a recognizable dev_mode is absent.
+    wrapup_cmd = claude / "commands" / "hm" / "wrapup.md"
+    _dev_mode: str | None = None
+    _hy_path = claude / "harness.yaml"
+    if _hy_path.is_file():
+        try:
+            from harness_maker.io_utils import load_harness_yaml as _lhy
+
+            _hy2 = _lhy(_hy_path)
+            _dm = _hy2.get("dev_mode") if isinstance(_hy2, dict) else None
+            _dev_mode = _dm if isinstance(_dm, str) else None
+        except Exception:  # noqa: BLE001 — degrade to N-A, never crash readiness
+            _dev_mode = None
+    _has_advisory: bool | None = None
+    if wrapup_cmd.is_file() and _dev_mode in ("task-driven", "spec-driven"):
+        try:
+            _has_advisory = "waiver-check" in wrapup_cmd.read_text(encoding="utf-8")
+        except (OSError, ValueError):
+            _has_advisory = None  # unreadable render → N-A, never crash /hm:health
+    if _has_advisory is not None and _dev_mode in ("task-driven", "spec-driven"):
+        _matched = _has_advisory == (_dev_mode == "task-driven")
+        signals.append(
+            _signal(
+                "wrapup_oracle_waiver_dev_mode_match",
+                _matched,
+                15,
+                "rendered wrapup oracle-waiver advisory matches harness.yaml dev_mode"
+                if _matched
+                else f"rendered wrapup advisory MISMATCHES dev_mode={_dev_mode} "
+                f"(advisory {'present' if _has_advisory else 'absent'}) — stale render",
+                None
+                if _matched
+                else "Re-render with /harness-maker:make --update so wrapup Step 3.6 "
+                "matches the current dev_mode (oracle-waiver advisory render-drift)",
+            )
+        )
+
     settings_path = claude / "settings.json"
     settings = _read_json_with_optional_frontmatter(settings_path)
     perms = settings.get("permissions") if isinstance(settings, dict) else None

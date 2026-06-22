@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import argparse
 import ast
+import contextlib
+import json
 import re
 import subprocess
 import sys
@@ -21,7 +23,7 @@ from typing import Any, Literal
 import yaml
 from pydantic import BaseModel, Field, field_validator
 
-from harness_maker.io_utils import atomic_write
+from harness_maker.io_utils import atomic_append, atomic_write
 
 #: Current authored schema version. Templates write ``schema_version: 2``.
 #: NOTE (ADR-006): the SpecMachine field default is the LITERAL ``1``, NOT this
@@ -51,6 +53,50 @@ ORACLE_SOURCES: tuple[str, ...] = (
     "consensus",
     "legacy-unspecified",
 )
+
+#: Substrings that signal oracle_evidence names an implementation-independent
+#: source (a path, a reference impl, a metamorphic rationale, a citation).
+#: SINGLE source of truth (PLAN-wrapup-waiver-enforcement ADR-001) — spec_quality
+#: imports this; it must NOT redefine the list (a static test enforces that).
+ORACLE_EVIDENCE_SPECIFICITY_MARKERS: tuple[str, ...] = (
+    "path",
+    "/",
+    "reference",
+    "golden",
+    "metamorphic",
+    "independent",
+    "citation",
+    "differential",
+    "attestation",
+    "rationale",
+    "invariant",
+)
+
+#: A per-AC evidence score below this is "weak" (needs a waiver in task-driven).
+ORACLE_EVIDENCE_WEAK_THRESHOLD: int = 40
+
+
+def score_ac_oracle_evidence(ac: dict[str, Any]) -> int:
+    """Raw per-AC oracle-evidence score (ADR-001). PURE: no waiver/mode/load.
+
+    The single shared ladder behind both `spec_quality`'s aggregate dim and the
+    `waiver-check` CLI — keeping it in one place is what prevents the
+    producer-consumer threshold drift. ``legacy-unspecified`` scores 0 (the
+    caller still counts it in its denominator — a denominator-retained 0, never
+    a skipped AC). The waiver lift (+100) is the CALLER's job, never here.
+    """
+    if ac.get("oracle_source") == "legacy-unspecified":
+        return 0
+    # str() coercion: spec_quality feeds raw (non-pydantic) yaml dicts here too, so
+    # a malformed `oracle_evidence: [x]` must degrade, not crash (REVIEW consensus).
+    evidence = str(ac.get("oracle_evidence") or "").strip()
+    if not evidence:
+        return 20
+    if len(evidence) < 15:
+        return 40
+    if any(m in evidence.lower() for m in ORACLE_EVIDENCE_SPECIFICITY_MARKERS):
+        return 85
+    return 60
 
 
 class GoldenRow(BaseModel):
@@ -588,8 +634,129 @@ def _parse_ac_test_id(raw: str) -> tuple[str, str]:
     return ac_id.strip(), node.strip()
 
 
+# ---------------------------------------------------------------------------
+# Oracle-waiver check (PLAN-wrapup-waiver-enforcement — tri-state, never blocks)
+# ---------------------------------------------------------------------------
+
+
+def _slug_from_machine_path(p: Path) -> str:
+    """``SPEC-<slug>.machine.yaml`` → ``<slug>`` (fallback: file stem)."""
+    m = re.match(r"^SPEC-(.+)\.machine\.ya?ml$", p.name)
+    return m.group(1) if m else p.stem
+
+
+def _safe_slug(slug: str) -> str:
+    return re.sub(r"[^a-zA-Z0-9._-]", "-", slug) or "unknown"
+
+
+def _waiver_error(slug: str, reason: str) -> dict[str, Any]:
+    return {"status": "check_error", "reason": reason, "slug": slug, "flagged_acs": []}
+
+
+def waiver_check(yaml_path: Path, dev_mode: str) -> dict[str, Any]:
+    """Tri-state oracle-waiver advisory (ADR-002/004). NEVER raises.
+
+    Returns ``{status, slug, flagged_acs, ...}`` where status is:
+    - ``check_error`` — the yaml could not be read/parsed / ``ac`` is not a list
+      (the check could NOT run — must not look like a clean pass).
+    - ``ok`` — no task-driven AC needs a waiver (incl. dev_mode != task-driven,
+      which spec_quality already hard-blocks at authoring, ADR-003).
+    - ``flagged`` — ≥1 task-driven AC has weak evidence + no waiver.
+    """
+    slug = _slug_from_machine_path(yaml_path)
+    try:
+        if not yaml_path.is_file():
+            return _waiver_error(slug, "file not found")
+        # ValueError covers UnicodeDecodeError (non-UTF-8 file) — a ValueError
+        # subclass that is NOT an OSError (REVIEW consensus P1).
+        data = yaml.safe_load(yaml_path.read_text(encoding="utf-8")) or {}
+    except (yaml.YAMLError, OSError, ValueError) as e:
+        return _waiver_error(slug, str(e))
+    if not isinstance(data, dict):
+        return _waiver_error(slug, "yaml is not a mapping")
+    ac = data.get("ac")
+    if not isinstance(ac, list):
+        return _waiver_error(slug, "ac is not a list")
+
+    if dev_mode != "task-driven":
+        return {"status": "ok", "slug": slug, "flagged_acs": [], "dev_mode": dev_mode}
+
+    # A malformed AC (non-dict entry, or a non-str field where a string is
+    # expected) means the check could NOT run for that AC → check_error, NEVER a
+    # clean `ok` (ADR-002; the false-clean-pass the tri-state exists to prevent).
+    flagged: list[str] = []
+    for a in ac:
+        if not isinstance(a, dict):
+            return _waiver_error(slug, "ac entry is not a mapping")
+        ac_id = str(a.get("id", "?"))
+        waiver = a.get("oracle_independence_waiver")
+        if waiver is not None and not isinstance(waiver, str):
+            return _waiver_error(slug, f"{ac_id}: oracle_independence_waiver is not a string")
+        if waiver and waiver.strip():
+            continue
+        evidence = a.get("oracle_evidence")
+        if evidence is not None and not isinstance(evidence, str):
+            return _waiver_error(slug, f"{ac_id}: oracle_evidence is not a string")
+        if score_ac_oracle_evidence(a) < ORACLE_EVIDENCE_WEAK_THRESHOLD:
+            flagged.append(ac_id)
+    return {
+        "status": "flagged" if flagged else "ok",
+        "slug": slug,
+        "flagged_acs": flagged,
+        "dev_mode": dev_mode,
+    }
+
+
+def _write_waiver_receipt(root: Path, result: dict[str, Any]) -> None:
+    """Append the result to a root-anchored JSONL receipt (path-guarded, atomic).
+
+    The path is COMPUTED under ``root`` (never a CLI arg) so a crafted slug
+    cannot escape the repo (ADR-004/C6); the ``is_relative_to`` guard is the
+    belt-and-suspenders backstop.
+    """
+    slug = _safe_slug(str(result.get("slug", "unknown")))
+    receipt = (root / ".claude" / "observability" / f"oracle-waiver-check-{slug}.jsonl").resolve()
+    if not receipt.is_relative_to(root.resolve()):
+        return
+    # atomic_append's POSIX single-write atomicity holds only for lines < 4096
+    # bytes (io_utils contract). A pathologically large flagged_acs list must be
+    # summarized so concurrent appends never interleave (REVIEW consensus P2).
+    line = json.dumps(result, ensure_ascii=False)
+    if len(line.encode("utf-8")) + 1 >= 4096:
+        flagged = result.get("flagged_acs") or []
+        line = json.dumps(
+            {
+                "status": result.get("status"),
+                "slug": slug,
+                "flagged_count": len(flagged),
+                "truncated": True,
+            },
+            ensure_ascii=False,
+        )
+    receipt.parent.mkdir(parents=True, exist_ok=True)
+    atomic_append(receipt, line + "\n")
+
+
+def _run_waiver_check(args: argparse.Namespace) -> int:
+    """ALWAYS exits 0 (ADR-002) — the tri-state status carries the verdict.
+
+    Belt-and-suspenders never-raises floor: any unexpected failure (incl. a
+    receipt write error) becomes a check_error / no-op so a tool failure never
+    escapes as a non-zero exit + traceback (REVIEW consensus P1/P2).
+    """
+    try:
+        result = waiver_check(args.yaml_path, args.dev_mode)
+    except Exception as e:  # noqa: BLE001 — the never-raises contract floor
+        result = _waiver_error(_slug_from_machine_path(args.yaml_path), f"{type(e).__name__}: {e}")
+    # receipt is advisory telemetry — its failure must not break exit-0
+    with contextlib.suppress(OSError):
+        _write_waiver_receipt(args.root, result)
+    print(json.dumps(result, ensure_ascii=False))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
-    """Entry point for validate / cross-validate / mark-tested."""
+    """Entry point for validate / cross-validate / mark-tested / waiver-check."""
     parser = argparse.ArgumentParser(prog="python -m harness_maker.spec_machine")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
@@ -617,7 +784,18 @@ def main(argv: list[str] | None = None) -> int:
         help="AC-ID=test_node to record (repeatable)",
     )
 
+    p_waiver = sub.add_parser(
+        "waiver-check",
+        help="tri-state task-driven oracle-waiver advisory (never blocks; exits 0)",
+    )
+    p_waiver.add_argument("--yaml", dest="yaml_path", type=Path, required=True)
+    p_waiver.add_argument("--dev-mode", dest="dev_mode", default="task-driven")
+    p_waiver.add_argument("--root", dest="root", type=Path, default=Path.cwd())
+
     args = parser.parse_args(argv)
+
+    if args.cmd == "waiver-check":
+        return _run_waiver_check(args)
 
     if args.cmd == "validate":
         errors = validate(load(args.yaml_path))
@@ -646,6 +824,8 @@ if __name__ == "__main__":  # pragma: no cover - exercised via subprocess in tes
 
 __all__ = [
     "FUZZY_RATIO_THRESHOLD",
+    "ORACLE_EVIDENCE_SPECIFICITY_MARKERS",
+    "ORACLE_EVIDENCE_WEAK_THRESHOLD",
     "ORACLE_SOURCES",
     "SCHEMA_VERSION",
     "ACType",
@@ -661,6 +841,8 @@ __all__ = [
     "mark_tested",
     "migrate",
     "resolve_pytest_selector",
+    "score_ac_oracle_evidence",
     "unresolved_test_ids",
     "validate",
+    "waiver_check",
 ]
