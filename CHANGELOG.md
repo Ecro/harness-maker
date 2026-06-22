@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.32.0] - 2026-06-22
+## [0.31.1] - 2026-06-22
 
 ### Changed — autopilot default time-cap raised 60 → 300 min (5h)
 - **`AutonomyConfig.time_cap_min` default is now 300** (was 60). The runaway time-cap that halts a chained autopilot session now bounds it to **5 hours** instead of 1, so a long but legitimate `plan→execute→review→verify→wrapup` run no longer trips the cap mid-pipeline (the 0.31.0 dogfood hit `time cap reached (65.3/60 min)` at verify). The `step_cap` (20) and the kill switch are unchanged — they remain the primary runaway guards. New harnesses pick up 300 from the model default; the dogfooded `.claude/harness.yaml` was bumped + re-rendered (`--time-cap-min 300` in every stage's boundary call).
