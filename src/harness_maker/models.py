@@ -610,7 +610,7 @@ class AutonomyConfig(BaseModel):
         ],
     )
     step_cap: int = Field(default=20, gt=0)
-    time_cap_min: int = Field(default=60, gt=0)
+    time_cap_min: int = Field(default=300, gt=0)
     extra_deny: list[str] = Field(default_factory=list)
 
 

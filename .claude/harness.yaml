@@ -4,7 +4,7 @@ harness_maker_version: 0.31.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: harness-yaml/Production.yaml.j2
 provenance: official
-content_hash: 4c9c9df518ac8d7e6ee83bd6a6cee636bfb8bb59676eb8613f60da6a281ee326
+content_hash: df9909c2250a2312666d47c682654713e8b5f0bfcfc3eb130fadd34ab3e49583
 ---
 preset: Production
 locale: ko
@@ -158,5 +158,5 @@ autonomy:
   level: "gated"
   pipeline: ["research", "spec", "plan", "execute", "review", "verify", "wrapup"]
   step_cap: 20
-  time_cap_min: 60
+  time_cap_min: 300
   extra_deny: []

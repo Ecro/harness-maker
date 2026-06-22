@@ -62,6 +62,11 @@ _OBSERVABILITY_ALLOWLIST: frozenset[str] = frozenset(
         # `.claude/observability/gate0-skips.jsonl` so /hm:health can detect
         # systematic skip patterns.
         "src/harness_maker/templates/commands/hm/loop.md.j2",
+        # PLAN-wrapup-waiver-enforcement — Step 3.6 task-driven oracle-waiver
+        # check appends a best-effort receipt at
+        # `.claude/observability/oracle-waiver-check-{slug}.jsonl` (gitignored,
+        # in-band only) so /hm:health can surface under-specified oracles.
+        "src/harness_maker/templates/stages/wrapup.md.j2",
     }
 )
 

@@ -83,7 +83,7 @@ def test_autonomy_has_caps_and_extra_deny_defaults() -> None:
     # caps is caught — review finding (Reviewer B P2).
     cfg = AutonomyConfig()
     assert cfg.step_cap == 20
-    assert cfg.time_cap_min == 60
+    assert cfg.time_cap_min == 300
     assert cfg.extra_deny == []
 
 
@@ -201,6 +201,6 @@ def test_synthesize_render_reload_roundtrip(tmp_path: Path) -> None:
     # Verify ALL 5 fields survive synth→render→reload, not just 2 (Reviewer B P1).
     assert restored.autonomy.level == "auto_safe"
     assert restored.autonomy.step_cap == 15
-    assert restored.autonomy.time_cap_min == 60
+    assert restored.autonomy.time_cap_min == 300
     assert restored.autonomy.pipeline == DEFAULT_PIPELINE
     assert restored.autonomy.extra_deny == []
