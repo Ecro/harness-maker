@@ -592,6 +592,165 @@ def mark_tested(
 
 
 # ---------------------------------------------------------------------------
+# Non-mechanical AC forward-binding (PLAN-nonmechanical-ac-binding)
+# ---------------------------------------------------------------------------
+
+#: AC types that have a deterministic pytest node and so can be forward-bound by
+#: `mark_tested` (everything but `judgment`, which is LLM-rubric-evaluated).
+_PYTEST_BINDABLE_TYPES: frozenset[str] = frozenset({"mechanical", "property", "parametric"})
+
+
+class GoldenTableError(Exception):
+    """A parametric AC's golden_table could not be loaded (ADR-006).
+
+    Carries ``yaml_path`` + ``ac_id`` + a cause so the consuming-project test
+    author gets a loud, local, actionable failure at collection time instead of
+    a raw pydantic/KeyError trace.
+    """
+
+    def __init__(self, yaml_path: Path, ac_id: str, cause: str) -> None:
+        self.yaml_path = yaml_path
+        self.ac_id = ac_id
+        self.cause = cause
+        super().__init__(f"golden_table[{ac_id}] in {yaml_path}: {cause}")
+
+
+def select_pytest_bindable(
+    model: SpecMachine, *, pending_only: bool = False
+) -> list[AcceptanceCriterion]:
+    """Return the ACs that have a deterministic pytest node (all but ``judgment``).
+
+    Drives BOTH the wrapup write-back set and the ADR-005 enforcement scan. The
+    name reflects the real predicate — "has a pytest-bindable test" — which
+    INCLUDES ``mechanical`` (so the write-back set is one list, not two).
+    """
+    return [
+        ac
+        for ac in model.ac
+        if ac.type in _PYTEST_BINDABLE_TYPES and (not pending_only or ac.pending_test)
+    ]
+
+
+def load_golden_table(yaml_path: Path, ac_id: str) -> list[GoldenRow]:
+    """Load a parametric AC's golden_table as the SSOT for its parametrize test (ADR-003).
+
+    Raises ``GoldenTableError`` (never a raw KeyError/ValidationError) for: a
+    nonexistent/malformed yaml, an unknown ac_id, a non-parametric AC, or an
+    absent/empty golden_table. Data-loading ONLY — the test author writes the
+    oracle body around these rows (ADR-003 rejects a universal ``f(**input)``
+    recipe).
+    """
+    try:
+        model = load(yaml_path)
+    except FileNotFoundError as e:
+        raise GoldenTableError(yaml_path, ac_id, f"yaml not found: {e}") from e
+    except Exception as e:  # noqa: BLE001 — wrap any load failure into actionable GoldenTableError (ADR-006)
+        raise GoldenTableError(yaml_path, ac_id, f"yaml load failed: {e}") from e
+    ac = next((a for a in model.ac if a.id == ac_id), None)
+    if ac is None:
+        raise GoldenTableError(yaml_path, ac_id, "unknown ac id")
+    if ac.type != "parametric":
+        raise GoldenTableError(yaml_path, ac_id, f"ac is type={ac.type!r}, not parametric")
+    if not ac.golden_table:
+        raise GoldenTableError(yaml_path, ac_id, "golden_table is absent or empty")
+    return list(ac.golden_table)
+
+
+def _ac_convention_prefix(ac_id: str) -> str:
+    """The test-function prefix execute Phase A authors for an AC (``AC-001`` → ``test_ac_001``)."""
+    return "test_" + ac_id.lower().replace("-", "_")
+
+
+class BindingGateUnavailableError(Exception):
+    """pytest could not adjudicate the binding state — fail-closed signal (ADR-005).
+
+    Raised (only when there IS pending work to adjudicate) when the repo-wide
+    ``pytest --collect-only`` was unavailable, timed out, or exited with a
+    collection ERROR. The Production caller converts this into a FAIL — an
+    unknown binding state is never a clean pass (the false-PASS the k-of-3
+    review caught: collapsing "ran cleanly" / "errored" / "unavailable" into one
+    boolean silently green-lit a missed binding).
+    """
+
+
+def _pytest_collect_nodeids(cwd: Path) -> tuple[list[str], bool]:
+    """Return ``(collected_nodeids, ran_cleanly)`` from a repo-wide ``--collect-only``.
+
+    ``ran_cleanly`` is False when pytest is unavailable/timed out OR exited with a
+    collection error (rc not in {0, 5} — 5 is pytest's "no tests collected", a
+    legitimately-empty clean run). A collection error (e.g. an import error in a
+    test file) must NOT pass as "no collectable test" — that broken-test AC would
+    be mis-classified as future work (false PASS). The caller fails closed on False.
+    """
+    try:
+        result = subprocess.run(
+            ["pytest", "--collect-only", "-q", "--no-header"],
+            cwd=str(cwd),
+            capture_output=True,
+            text=True,
+            timeout=120,
+            check=False,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return [], False
+    if result.returncode not in (0, 5):  # 5 = no-tests-collected (clean empty)
+        return [], False
+    nodeids = [ln.strip() for ln in result.stdout.splitlines() if "::" in ln]
+    return nodeids, True
+
+
+def _collectable_ac_tests(model: SpecMachine, cwd: Path) -> tuple[set[str], bool]:
+    """``(ac_ids_whose_test_collects, ran_cleanly)`` — by recorded ``test_ids`` OR convention.
+
+    The union (ADR-005, 2nd-pass-validator fix): a missed write-back leaves
+    ``pending_test=true`` with EITHER an empty ``test_ids`` (caught by the
+    convention name) OR a pre-populated ``test_ids`` authored at the declared
+    node (caught by the recorded id) — both must be discoverable. ``ran_cleanly``
+    is threaded up so the caller can fail closed when pytest could not adjudicate.
+    """
+    nodeids, ran = _pytest_collect_nodeids(cwd)
+    if not ran:
+        return set(), False
+    canonical = {nid.split("[", 1)[0] for nid in nodeids} | set(nodeids)
+    func_names = {nid.split("::")[-1].split("[", 1)[0] for nid in nodeids}
+    collectable: set[str] = set()
+    for ac in model.ac:
+        recorded_hit = any(
+            tid in canonical or tid.split("[", 1)[0] in canonical for tid in ac.test_ids
+        )
+        prefix = _ac_convention_prefix(ac.id)
+        # Boundary match: `test_ac_001` matches itself and `test_ac_001_adder`,
+        # NOT `test_ac_0012` (mixed-width AC ids — AC-001 vs AC-0012 collision).
+        convention_hit = any(fn == prefix or fn.startswith(prefix + "_") for fn in func_names)
+        if recorded_hit or convention_hit:
+            collectable.add(ac.id)
+    return collectable, True
+
+
+def find_unbound_closed_type_acs(yaml_path: Path, cwd: Path) -> list[str]:
+    """Return closed-type AC ids that are a MISSED write-back (ADR-005).
+
+    A miss = a pytest-bindable AC that is still ``pending_test`` AND whose test
+    COLLECTS (convention-named or recorded). An AC with no collectable test is
+    genuine future-PLAN work and is safe-skipped (CLAUDE.md absent-case). Raises
+    ``load``'s error on a malformed/absent yaml, and ``BindingGateUnavailableError``
+    when there IS pending work but pytest could not adjudicate it — so the
+    Production caller fails closed (never a false PASS by missing inputs).
+    """
+    model = load(yaml_path)  # raises on malformed → caller fails closed
+    pending = {ac.id for ac in select_pytest_bindable(model, pending_only=True)}
+    if not pending:
+        return []  # nothing to adjudicate → pytest never invoked → genuinely clean
+    collectable, ran = _collectable_ac_tests(model, cwd)
+    if not ran:
+        raise BindingGateUnavailableError(
+            f"pytest collect did not run cleanly for {yaml_path} — "
+            "binding state unknown (fail-closed)"
+        )
+    return sorted(pending & collectable)
+
+
+# ---------------------------------------------------------------------------
 # Migration policy (Appendix B)
 # ---------------------------------------------------------------------------
 
@@ -755,8 +914,34 @@ def _run_waiver_check(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_find_unbound(args: argparse.Namespace) -> int:
+    """Production gate (ADR-005): exit non-zero on a missed binding OR fail-closed error.
+
+    Absent machine.yaml = nothing to check = exit 0 (mirrors Step 3.5's skip). A
+    malformed/unreadable machine.yaml, or a genuine missed binding, = exit 1 — the
+    binding state is either bad or unknown, neither of which is a clean pass.
+    """
+    if not args.yaml_path.exists():
+        print("find-unbound: no machine SPEC — nothing to check", file=sys.stderr)
+        return 0
+    try:
+        misses = find_unbound_closed_type_acs(args.yaml_path, args.root)
+    except Exception as e:  # noqa: BLE001 — fail-closed: unknown state is not a pass
+        print(f"find-unbound: FAIL (fail-closed) — {type(e).__name__}: {e}", file=sys.stderr)
+        return 1
+    if misses:
+        print(
+            "find-unbound: FAIL — closed-type AC(s) authored but never bound "
+            f"(re-run mark-tested): {', '.join(misses)}",
+            file=sys.stderr,
+        )
+        return 1
+    print("find-unbound: OK — no missed binding")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
-    """Entry point for validate / cross-validate / mark-tested / waiver-check."""
+    """Entry point for validate / cross-validate / mark-tested / waiver-check / find-unbound."""
     parser = argparse.ArgumentParser(prog="python -m harness_maker.spec_machine")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
@@ -792,10 +977,20 @@ def main(argv: list[str] | None = None) -> int:
     p_waiver.add_argument("--dev-mode", dest="dev_mode", default="task-driven")
     p_waiver.add_argument("--root", dest="root", type=Path, default=Path.cwd())
 
+    p_unbound = sub.add_parser(
+        "find-unbound",
+        help="list closed-type ACs that are a missed binding (Production gate; fail-closed)",
+    )
+    p_unbound.add_argument("--yaml", dest="yaml_path", type=Path, required=True)
+    p_unbound.add_argument("--root", dest="root", type=Path, default=Path.cwd())
+
     args = parser.parse_args(argv)
 
     if args.cmd == "waiver-check":
         return _run_waiver_check(args)
+
+    if args.cmd == "find-unbound":
+        return _run_find_unbound(args)
 
     if args.cmd == "validate":
         errors = validate(load(args.yaml_path))
@@ -830,18 +1025,23 @@ __all__ = [
     "SCHEMA_VERSION",
     "ACType",
     "AcceptanceCriterion",
+    "BindingGateUnavailableError",
     "GoldenRow",
+    "GoldenTableError",
     "OracleSource",
     "SpecMachine",
     "VerificationTier",
     "cross_validate",
     "evaluate_coverage",
+    "find_unbound_closed_type_acs",
     "load",
+    "load_golden_table",
     "main",
     "mark_tested",
     "migrate",
     "resolve_pytest_selector",
     "score_ac_oracle_evidence",
+    "select_pytest_bindable",
     "unresolved_test_ids",
     "validate",
     "waiver_check",

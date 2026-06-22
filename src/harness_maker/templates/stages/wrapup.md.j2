@@ -145,7 +145,9 @@ authored now live in the **base repo** — the right place for the write-back
 (ADR-005: base cwd makes `cross_validate`'s collection resolve correctly, and
 there is no cross-session worktree race).
 
-For each bindable mechanical AC whose test `/hm:execute` authored and that is now
+For each **pytest-bindable** AC (`mechanical` predicate, `property` Hypothesis, or
+`parametric` golden-table — the `select_pytest_bindable` set; `judgment` is excluded,
+it has no deterministic pytest node) whose test `/hm:execute` authored and that is now
 GREEN, record the binding so the machine SPEC becomes a living document — flip
 `pending_test→false` and append the actual test node id(s):
 
@@ -166,18 +168,54 @@ Pass one `--test-id AC-NNN=<node>` per AC↔test you authored (repeatable). A
 non-zero exit means a recorded test still does not resolve via
 `pytest --collect-only` — surface it; do not hand-edit `pending_test`.
 
-**Per-type coverage report (ADR-002/009 — make the half-state visible):** after
-the write-back, report how the machine SPEC's ACs break down so the
-mechanical-first half-state is explicit, not hidden behind a single number:
+**Per-type coverage report (ADR-002/009 + PLAN-nonmechanical-ac-binding):** after
+the write-back, report how the machine SPEC's ACs break down so the binding state
+is explicit, not hidden behind a single number:
 
-- **mechanical, forward-bound** (`pending_test: false`, ≥1 `test_ids`) — count.
-- **mechanical, still pending** — count (write-back not yet run for these).
-- **parametric / judgment, still pending** — count. These are EXPECTED to remain
-  pending until the parametric/judgment follow-up PLAN; they are not a defect.
+- **pytest-bindable, forward-bound** (`mechanical`/`property`/`parametric` with
+  `pending_test: false`, ≥1 `test_ids`) — count.
+- **pytest-bindable, still pending** — count (a closed-type AC whose test exists but
+  whose write-back was not run — the Production block below catches these).
+- **judgment, deferred** — count. Judgment ACs have no deterministic pytest node and
+  are a SEPARATE, deliberately-unbound category (NOT a missed binding, NOT a
+  future-deterministic AC) — they stay pending until the judgment follow-up PLAN.
 
-Surface the three counts in your wrapup summary. `/hm:health`'s `spec_drift`
-layer additionally flags any AC whose tests resolve but stayed pending (the
-write-back-missed bucket) — see ADR-009.
+Surface the counts in your wrapup summary, keeping `judgment, deferred` distinct from
+`pytest-bindable, still pending`. **Do NOT call a pending property/parametric AC "EXPECTED" —
+in a closed type, a pending-after-write-back AC is a real miss.**
+
+{% if config.preset == 'Production' %}
+**Production enforcement (ADR-005, PLAN-nonmechanical-ac-binding) — fail-closed:**
+after the write-back, run the deterministic gate over the machine SPEC. It returns
+the closed-type ACs that are a MISSED binding (a `select_pytest_bindable` AC still
+`pending_test` whose convention-named OR recorded test COLLECTS); an AC with no
+collectable test is genuine future-PLAN work and is safe-skipped:
+
+The `--root .` makes the AC-test collection scan run from the base repo root (where the
+authored tests live), matching Step 3.5's base-cwd contract:
+
+{% if is_codex %}
+```
+Bash("python -m harness_maker.spec_machine find-unbound --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml --root .")
+```
+{% else %}
+```bash
+!python -m harness_maker.spec_machine find-unbound --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml --root .
+```
+{% endif %}
+
+- **Exit 0** → no missed binding (or no pending closed-type AC to adjudicate) → continue.
+- **Exit non-zero, AC ids listed** → **STOP**: a closed-type AC was authored but never
+  bound. Re-run the Step 3.5 `mark-tested` write-back for the listed ids, then re-run
+  this gate. Do NOT commit with a missed binding.
+- **Exit non-zero, `FAIL (fail-closed)`** (malformed machine SPEC, OR pytest unavailable /
+  a collection error while pending closed-type ACs exist) → **STOP** — the binding state is
+  unknown, which is not a pass. Fix the machine SPEC or the test environment, then re-run.
+{% else %}
+**Side preset — advisory only:** a closed-type AC that stayed pending after the
+write-back is surfaced in the per-type report above (visibility over friction), never
+a STOP. Run `python -m harness_maker.spec_machine find-unbound --yaml …` to list them.
+{% endif %}
 
 {% if config.dev_mode == 'task-driven' %}
 ### Step 3.6 — Oracle-waiver advisory (task-driven — PLAN-wrapup-waiver-enforcement)

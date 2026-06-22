@@ -1,5 +1,29 @@
 # Changelog
 
+## [Unreleased]
+
+### Added — non-mechanical AC forward-binding (property + parametric) — PLAN-nonmechanical-ac-binding
+- The spec-machine forward-binding loop (mechanical-only since 0.28.0) now also closes for
+  `property` and `parametric` ACs, so the living SPEC accumulates for 3 of 4 AC types. `judgment`
+  is deferred (no deterministic pytest node — a future PLAN). New `spec_machine` surface:
+  `select_pytest_bindable` (the judgment-excluded set), `load_golden_table` + `GoldenTableError`
+  (a parametric AC's `golden_table` as the test's SSOT — resolved relative to the test file, NOT
+  cwd; data-loading-only, the author writes the oracle body), and `find_unbound_closed_type_acs` +
+  the `find-unbound` CLI. `/hm:execute` Phase A gains a parametric-authoring block; `/hm:wrapup`
+  write-back + per-type report extend to property/parametric.
+- **Enforcement at `/hm:wrapup`, not `/hm:verify` (ADR-005):** the originally-planned verify gate
+  was structurally dead — `spec_drift.scan` is dev_mode-gated to spec-driven (a task-driven
+  Production harness gets an empty report) and keyed on recorded `test_ids` (blind to a missed
+  write-back, which leaves `pending_test=true` + `test_ids=[]`). The wrapup gate is dev_mode-agnostic
+  and scans the convention name ∪ recorded `test_ids` via `pytest --collect-only`; **Production
+  fails closed** (a malformed machine SPEC, or pytest unavailable / a collection error while pending
+  closed-type ACs exist, STOPs — never a false PASS), Side is advisory.
+- **k-of-3 review caught a fail-OPEN implementation** (2 Claude lenses + Codex, independently): the
+  "pytest could not run cleanly" signal was collapsed to an empty set and discarded, so the gate
+  exited 0 on the exact unknown-state branch it promised to fail-closed on. Fixed before commit
+  (`BindingGateUnavailableError` + rc∉{0,5} handling + the regression tests that mock the subprocess
+  helper, not the function under test).
+
 ## [0.31.1] - 2026-06-22
 
 ### Changed — autopilot default time-cap raised 60 → 300 min (5h)

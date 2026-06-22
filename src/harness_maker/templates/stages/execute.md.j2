@@ -222,6 +222,28 @@ bindable mechanical AC above:
    project's framework (`fast-check` / `proptest` / `glados`) from the same structured
    fields, and note the convention in the test file header.
 
+**(d) Parametric ACs** (`type: parametric` — PLAN-nonmechanical-ac-binding ADR-003) for
+every parametric AC with a `golden_table`:
+1. **`golden_table` is the SSOT** — do NOT inline the rows into the test (that re-creates
+   the drift this exists to remove). Load them at collection time via the harness helper:
+   ```python
+   from pathlib import Path
+   from harness_maker.spec_machine import load_golden_table
+   _ROWS = load_golden_table(Path(__file__).parents[N] / "specs/SPEC-{slug}.machine.yaml", "AC-0NN")
+   ```
+   **Path contract:** resolve the yaml **relative to the test file** (`Path(__file__).parents[N]`
+   for the project root) — NEVER cwd (pytest runs from varying cwds; a cwd-relative path breaks
+   collection). The consuming project must have `harness_maker` importable in its test env (a
+   loud `ImportError` is the failure mode — install it as a test dep or vendor the helper).
+2. **`@pytest.mark.parametrize`** over the rows with a STABLE `ids=` (derive from each row's
+   `note`/index so reordering the table gives readable, stable failure names). Bind at
+   **function level** — one `test_<ac-id>*` function = one `test_id` (per-row binding is out of
+   scope; `mark_tested`/collect already strip the `[case]` suffix).
+3. **`load_golden_table` is data-loading ONLY** — YOU author the oracle body. `f(**input) ==
+   expected` is the DEFAULT example, NOT the contract: a row may expect an exception
+   (`pytest.raises`), a partial/structural match, or multiple outputs. Bind free symbols to the
+   real production object — no mock-only body.
+
 There is no machine-readable scenario↔AC link, so deciding which scenarios are
 "already covered" is a judgment call — do NOT write both an AC test and a scenario
 test for the same observable; the Phase A.5 test-reviewer adjudicates the union for
