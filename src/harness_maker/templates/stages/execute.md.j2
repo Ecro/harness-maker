@@ -203,6 +203,25 @@ bindable mechanical AC above:
 2. Test function name encodes the scenario ID: `test_s1_<short-name>`, etc.
 3. Assertions match the scenario's `**Then**` clause exactly.
 
+**(c) Property ACs** (`type: property` — spec-tetrad ADR-001/002) for every AC whose
+`oracle_source` is `property`:
+1. **Python** (`test_framework: pytest`): author a **Hypothesis** property test from the
+   AC's structured fields — `@given(<strategy for input_domain>)` generating inputs,
+   the body applying `transformation`, and the assertion encoding `expected_relation`
+   (the metamorphic relation / invariant). Honor `preconditions` via `assume(...)`.
+   A metamorphic relation is the oracle — it needs no reference output, so it cannot
+   be satisfied by reading the implementation (this is the whole point).
+2. **Hypothesis profile contract** (ADR-002, do NOT bake determinism everywhere):
+   register two settings profiles and select by env —
+   - `ci` profile: `derandomize=True`, `database=...` (replay shrunk failures),
+     explicit `@seed` capture → the **reproducible gate** the mutmut check runs under.
+   - `dev` profile: broader generation, relaxed deadline → local **bug-finding**.
+   Default to `ci` in CI (`HYPOTHESIS_PROFILE=ci`), `dev` locally.
+3. **Non-Python targets** (Dart/TS/Rust): the plugin does NOT bundle a generator
+   (ADR-002 — domain content owner = user). Author a conventional property test in the
+   project's framework (`fast-check` / `proptest` / `glados`) from the same structured
+   fields, and note the convention in the test file header.
+
 There is no machine-readable scenario↔AC link, so deciding which scenarios are
 "already covered" is a judgment call — do NOT write both an AC test and a scenario
 test for the same observable; the Phase A.5 test-reviewer adjudicates the union for
@@ -293,6 +312,15 @@ Exit 1 = the predicate tests are too weak (mutants survived). **Strengthen the
 assertion — never lower the threshold.** T2/T3 mutation is deferred to `/hm:loop`
 or sampling; do NOT run it on this hot path. If mutmut is not installed the gate
 prints a skip notice and passes (non-gating) — that is intended, not a failure.
+
+> **Surviving-mutant classification (spec-tetrad ADR-004).** A survivor is NOT
+> automatically a test gap: `spec_mutation classify` tags each as `equivalent`
+> (a documented runtime no-op, e.g. a `typing.cast` string mutation — excluded
+> from the denominator **with a rule-id**), `real-not-killed` (a genuine gap —
+> strengthen the assertion), or `pending-review` (unknown — the default; stays
+> in the denominator, so kill-rate cannot be inflated by relabeling). The
+> excluded-equivalent count is shown next to the score and exclusion-set GROWTH
+> warns — never silently shrink the denominator to pass.
 
 ### Step 4 — Stage exit (NO commit — wrapup owns commits)
 

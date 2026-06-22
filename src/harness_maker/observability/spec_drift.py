@@ -44,6 +44,9 @@ class SpecDriftReport:
     # write-back never ran (e.g. manual commit instead of /hm:wrapup).
     # ADR-009 of PLAN-spec-test-accumulation — surfaces the wrapup-gated gap.
     resolved_but_pending: list[str] = field(default_factory=list)
+    # ACs with oracle_source == legacy-unspecified — pre-v2 specs that predate
+    # the oracle axis. Advisory only (ADR-006): nudge migration, never block.
+    missing_oracle_source: list[str] = field(default_factory=list)
     aggregate_oq_count: int = 0
     spec_count: int = 0
     skipped_reason: str | None = None
@@ -56,6 +59,7 @@ class SpecDriftReport:
             or self.coverage_gaps
             or self.oq_overflow
             or self.resolved_but_pending
+            or self.missing_oracle_source
             or self.aggregate_oq_count > OQ_AGGREGATE_CAP
         )
 
@@ -66,6 +70,7 @@ class SpecDriftReport:
             "coverage_gaps": list(self.coverage_gaps),
             "oq_overflow": list(self.oq_overflow),
             "resolved_but_pending": list(self.resolved_but_pending),
+            "missing_oracle_source": list(self.missing_oracle_source),
             "aggregate_oq_count": self.aggregate_oq_count,
             "spec_count": self.spec_count,
             "skipped_reason": self.skipped_reason,
@@ -129,6 +134,9 @@ def scan(specs_dir: Path, *, dev_mode: str = "task-driven") -> SpecDriftReport:
                 report.coverage_gaps.append(f"{machine.spec_slug}::{ac.id}")
             if ac.pending_test and ac.test_ids:
                 pending_with_ids.append((machine.spec_slug, ac.id, tuple(ac.test_ids)))
+            # Advisory migration nudge (ADR-006): a v1 AC predates the oracle axis.
+            if ac.oracle_source == "legacy-unspecified":
+                report.missing_oracle_source.append(f"{machine.spec_slug}::{ac.id}")
             referenced_test_ids.update(ac.test_ids)
         # stale mutations
         if machine.mutation_threshold is not None and _is_stale(

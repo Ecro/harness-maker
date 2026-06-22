@@ -23,13 +23,34 @@ from pydantic import BaseModel, Field, field_validator
 
 from harness_maker.io_utils import atomic_write
 
-SCHEMA_VERSION = 1
+#: Current authored schema version. Templates write ``schema_version: 2``.
+#: NOTE (ADR-006): the SpecMachine field default is the LITERAL ``1``, NOT this
+#: constant — an OMITTED schema_version must pin to v1 so a constant bump never
+#: silently re-tags legacy files as v2 (the migration footgun).
+SCHEMA_VERSION = 2
 
 #: ADR-007 rule 2 fuzzy-match threshold. P4 calibration may tune this.
 FUZZY_RATIO_THRESHOLD: float = 0.85
 
-ACType = Literal["mechanical", "parametric", "judgment"]
+ACType = Literal["mechanical", "parametric", "judgment", "property"]
 VerificationTier = Literal[1, 2, 3]
+
+#: Oracle source taxonomy (ADR-001/005/007). Maps conceptually onto sw-improve
+#: x-contract ``conformance.kind`` (see docs) — documented correspondence, not a
+#: validated isomorphism. ``legacy-unspecified`` is the absent-case default for
+#: pre-v2 specs (ADR-006): present so a v1 AC loads without an oracle, surfaced
+#: advisory by spec_drift, never hard-blocked.
+OracleSource = Literal[
+    "golden", "differential", "property", "rubric", "consensus", "legacy-unspecified"
+]
+ORACLE_SOURCES: tuple[str, ...] = (
+    "golden",
+    "differential",
+    "property",
+    "rubric",
+    "consensus",
+    "legacy-unspecified",
+)
 
 
 class GoldenRow(BaseModel):
@@ -53,6 +74,26 @@ class AcceptanceCriterion(BaseModel):
     rubric_id: str | None = None
     note: str = ""
     pending_test: bool = False  # Phase 3 cap escape per PLAN
+    # --- oracle axis (ADR-001/007) -----------------------------------------
+    #: Default ``legacy-unspecified`` = model-level backward compat for v1 ACs;
+    #: ``validate`` enforces an explicit non-legacy source only at schema_version>=2.
+    oracle_source: OracleSource = "legacy-unspecified"
+    #: Independence evidence the spec_quality gate scores (ADR-007). Required
+    #: (non-empty) at v2 — what (partially) earns the independence claim.
+    oracle_evidence: str | None = None
+    #: Durable task-driven override (ADR-003/C9): when set, a low-independence
+    #: oracle is a recorded, auditable decision rather than an ephemeral warning.
+    #: spec-driven mode blocks regardless; task-driven requires this before wrapup.
+    oracle_independence_waiver: str | None = None
+    # --- structured property AC fields (ADR-001, type == "property") -------
+    input_domain: str | None = None
+    transformation: str | None = None
+    expected_relation: str | None = None
+    preconditions: list[str] = Field(default_factory=list)
+    observable_output: str | None = None
+    #: Advisory generation hint — NOT a generator (C7). The structured triple
+    #: above is the gateable contract; this only nudges Phase A authoring.
+    generator_hint: str | None = None
 
     @field_validator("id")
     @classmethod
@@ -65,7 +106,10 @@ class AcceptanceCriterion(BaseModel):
 class SpecMachine(BaseModel):
     """Top-level SPEC.machine.yaml shape (ADR-006)."""
 
-    schema_version: int = SCHEMA_VERSION
+    #: LITERAL 1 by design (ADR-006): an omitted schema_version pins to v1 so a
+    #: SCHEMA_VERSION bump never silently promotes legacy files to v2. New specs
+    #: declare ``schema_version: 2`` explicitly.
+    schema_version: int = 1
     spec_slug: str
     parent_spec: str | None = None
     verification_tier: VerificationTier
@@ -158,6 +202,7 @@ def validate(model: SpecMachine) -> list[str]:
     predicate or parametric AC with empty golden table.
     """
     errors: list[str] = []
+    is_v2 = model.schema_version >= 2
     for ac in model.ac:
         if ac.type == "mechanical":
             predicate_error = _predicate_error(ac.id, ac.executable_predicate)
@@ -167,8 +212,44 @@ def validate(model: SpecMachine) -> list[str]:
             errors.append(f"{ac.id}: type=parametric requires non-empty golden_table")
         if ac.type == "judgment" and not (ac.rubric_id or "").strip():
             errors.append(f"{ac.id}: type=judgment requires rubric_id")
+        if ac.type == "property":
+            errors.extend(_property_errors(ac))
+            # The property AC type + the oracle axis are v2-only. A v1 file that
+            # hand-edits one in must declare the version (ADR-006.3 mixed-file).
+            if not is_v2:
+                errors.append(
+                    f"{ac.id}: type=property requires schema_version: 2 "
+                    f"(declare it to use property/oracle_source)"
+                )
         if not ac.test_ids and not ac.pending_test:
             errors.append(f"{ac.id}: needs >=1 test_ids OR pending_test=true")
+        if is_v2:
+            errors.extend(_oracle_errors(ac))
+    return errors
+
+
+def _property_errors(ac: AcceptanceCriterion) -> list[str]:
+    """A property AC needs the structured metamorphic contract, not free text (ADR-001, C7)."""
+    errors: list[str] = []
+    for field in ("input_domain", "transformation", "expected_relation", "observable_output"):
+        if not (getattr(ac, field) or "").strip():
+            errors.append(f"{ac.id}: type=property requires non-empty {field}")
+    return errors
+
+
+def _oracle_errors(ac: AcceptanceCriterion) -> list[str]:
+    """v2 ACs must name an explicit oracle source + attach independence evidence (ADR-001/007)."""
+    errors: list[str] = []
+    if ac.oracle_source == "legacy-unspecified":
+        errors.append(
+            f"{ac.id}: schema_version 2 requires an explicit oracle_source "
+            f"(one of {', '.join(s for s in ORACLE_SOURCES if s != 'legacy-unspecified')})"
+        )
+    if not (ac.oracle_evidence or "").strip():
+        errors.append(
+            f"{ac.id}: schema_version 2 requires non-empty oracle_evidence "
+            f"(independence evidence the quality gate scores)"
+        )
     return errors
 
 
@@ -565,10 +646,12 @@ if __name__ == "__main__":  # pragma: no cover - exercised via subprocess in tes
 
 __all__ = [
     "FUZZY_RATIO_THRESHOLD",
+    "ORACLE_SOURCES",
     "SCHEMA_VERSION",
     "ACType",
     "AcceptanceCriterion",
     "GoldenRow",
+    "OracleSource",
     "SpecMachine",
     "VerificationTier",
     "cross_validate",

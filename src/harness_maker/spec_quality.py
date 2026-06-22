@@ -53,7 +53,27 @@ RUBRIC_DIMENSIONS_MACHINE: dict[str, str] = {
     "non_python_intent_alignment": (
         "Rendered prompt/template content fulfills the SPEC AC (LLM-judged)"
     ),
+    "oracle_independence": (
+        "Each AC's oracle_evidence shows the oracle is independent of the "
+        "implementation (scored on evidence quality, NOT the declared source label)"
+    ),
 }
+
+#: Substrings that signal oracle_evidence names an implementation-independent
+#: source (a path, a reference impl, a metamorphic rationale, a citation).
+_ORACLE_EVIDENCE_SPECIFICITY_MARKERS: tuple[str, ...] = (
+    "path",
+    "/",
+    "reference",
+    "golden",
+    "metamorphic",
+    "independent",
+    "citation",
+    "differential",
+    "attestation",
+    "rationale",
+    "invariant",
+)
 
 _WEAK_THRESHOLD = 40
 
@@ -84,7 +104,7 @@ def evaluate_spec(
     scores = _judge_with_llm(spec_text, judge) if judge is not None else _heuristic_score(spec_text)
 
     if machine_yaml is not None:
-        scores.update(_score_machine_dims(machine_yaml, judge=judge))
+        scores.update(_score_machine_dims(machine_yaml, judge=judge, dev_mode=dev_mode_enum))
 
     weak_dims = [dim for dim, score in scores.items() if score < _WEAK_THRESHOLD]
     overall = sum(scores.values()) // max(len(scores), 1)
@@ -99,8 +119,19 @@ def evaluate_spec(
     )
 
 
-def _score_machine_dims(machine_yaml: str, *, judge: Any = None) -> dict[str, int]:
-    """Heuristic + optional LLM scoring for the 3 ADR-006/009 dims.
+#: The machine dims that are ALWAYS scored (oracle_independence is v2-gated and
+#: deliberately excluded — it must not appear for v1 or invalid specs, REVIEW C-P2).
+_ALWAYS_ON_MACHINE_DIMS: tuple[str, ...] = (
+    "machine_verifiability",
+    "mutation_coverage_set",
+    "non_python_intent_alignment",
+)
+
+
+def _score_machine_dims(
+    machine_yaml: str, *, judge: Any = None, dev_mode: DevMode | str = DevMode.TASK_DRIVEN
+) -> dict[str, int]:
+    """Heuristic + optional LLM scoring for the 3 ADR-006/009 dims + v2 oracle dim.
 
     Parses yaml inline (avoids a hard dep on spec_machine module here).
     """
@@ -109,7 +140,10 @@ def _score_machine_dims(machine_yaml: str, *, judge: Any = None) -> dict[str, in
     try:
         data = _yaml.safe_load(machine_yaml) or {}
     except _yaml.YAMLError:
-        return dict.fromkeys(RUBRIC_DIMENSIONS_MACHINE, 0)
+        # Invalid yaml zeros only the always-on dims; oracle_independence is
+        # v2-gated and must not appear here (else a malformed v1 spec is
+        # penalized on a dim a well-formed v1 spec never has — REVIEW C-P2).
+        return dict.fromkeys(_ALWAYS_ON_MACHINE_DIMS, 0)
     ac = data.get("ac") or []
     total = len(ac) or 1
 
@@ -120,10 +154,14 @@ def _score_machine_dims(machine_yaml: str, *, judge: Any = None) -> dict[str, in
         predicate_ok = bool((a.get("executable_predicate") or "").strip())
         golden_ok = bool(a.get("golden_table"))
         rubric_ok = bool((a.get("rubric_id") or "").strip())
+        # A property AC is verifiable when it carries the structured metamorphic
+        # relation the PBT test is generated from (spec-tetrad ADR-001).
+        property_ok = bool((a.get("expected_relation") or "").strip())
         if (
             (atype == "mechanical" and predicate_ok)
             or (atype == "parametric" and golden_ok)
             or (atype == "judgment" and rubric_ok)
+            or (atype == "property" and property_ok)
         ):
             verified += 1
     machine_verifiability = round(100 * verified / total)
@@ -147,7 +185,59 @@ def _score_machine_dims(machine_yaml: str, *, judge: Any = None) -> dict[str, in
         out["mutation_coverage_set"] = 50
     # else (non-Python): dim omitted entirely
 
+    # oracle_independence (ADR-003/007) — only meaningful at schema_version >= 2;
+    # v1 specs are surfaced advisory by spec_drift, not blocked here (ADR-006).
+    # int() is guarded: a hand-authored `schema_version: "two"` loads via
+    # yaml.safe_load but is not pydantic-coerced here, so it must degrade, not
+    # crash the gate (REVIEW C-P1).
+    try:
+        schema_version = int(data.get("schema_version", 1))
+    except (ValueError, TypeError):
+        schema_version = 1
+    if schema_version >= 2:
+        out["oracle_independence"] = _score_oracle_independence(ac, dev_mode)
+
     return out
+
+
+def _score_oracle_independence(
+    ac_list: list[dict[str, Any]], dev_mode: DevMode | str = DevMode.TASK_DRIVEN
+) -> int:
+    """Average per-AC evidence-quality score (ADR-007). Scores EVIDENCE, not the label.
+
+    A declared high-trust ``oracle_source`` with no evidence cannot pass (C2
+    anti-gaming). A durable ``oracle_independence_waiver`` is a **task-driven
+    only** auditable override (C9, ADR-003): in spec-driven mode a low-evidence
+    oracle blocks REGARDLESS of a waiver (you cannot waive the spec-driven
+    gate — you must fix it), so the waiver is ignored there (REVIEW Codex-M).
+    """
+    if isinstance(dev_mode, str):
+        try:
+            mode = DevMode(dev_mode)
+        except ValueError:
+            mode = DevMode.TASK_DRIVEN
+    else:
+        mode = dev_mode
+    waiver_active = mode != DevMode.SPEC_DRIVEN
+    if not ac_list:
+        return 100
+    total = 0
+    for a in ac_list:
+        if waiver_active and (a.get("oracle_independence_waiver") or "").strip():
+            total += 100
+            continue
+        if a.get("oracle_source") == "legacy-unspecified":
+            continue  # 0 — no oracle declared
+        evidence = (a.get("oracle_evidence") or "").strip()
+        if not evidence:
+            total += 20
+        elif len(evidence) < 15:
+            total += 40
+        elif any(m in evidence.lower() for m in _ORACLE_EVIDENCE_SPECIFICITY_MARKERS):
+            total += 85
+        else:
+            total += 60
+    return round(total / len(ac_list))
 
 
 def _heuristic_score(spec_text: str) -> dict[str, int]:

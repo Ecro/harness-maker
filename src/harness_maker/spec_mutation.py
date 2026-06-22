@@ -15,9 +15,12 @@ import json
 import re
 import subprocess
 import sys
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, cast
+
+from harness_maker.io_utils import atomic_write
 
 VerificationTier = Literal[1, 2, 3]
 
@@ -199,11 +202,300 @@ def report_to_json(report: MutationReport) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Equivalent-mutant classifier (ADR-004, audited no-shrink denominator)
+#
+# Only a documented closed set of rules may exclude a survivor from the
+# kill-rate denominator. Unknown survivors default to pending-review and STAY
+# in the denominator — coverage cannot improve by relabeling. ``real-not-killed``
+# is never produced by a rule; it is a human/caller override only.
+# ---------------------------------------------------------------------------
+
+Classification = Literal["equivalent", "real-not-killed", "pending-review"]
+
+
+@dataclass(frozen=True)
+class MutantDescriptor:
+    """Minimal mutant view a rule matcher inspects (synthetic-friendly)."""
+
+    mutant_id: str
+    source_line: str
+    context: str = ""
+
+
+@dataclass(frozen=True)
+class EquivalenceRule:
+    """A documented reason a survivor is provably an equivalent mutant."""
+
+    rule_id: str
+    description: str
+    matcher: Callable[[MutantDescriptor], bool]
+
+
+@dataclass(frozen=True)
+class ClassifiedMutant:
+    """Per-mutant verdict, JSON-serializable for baseline persistence."""
+
+    mutant_id: str
+    classification: Classification
+    rule_id: str | None
+
+
+@dataclass(frozen=True)
+class AdjustedScore:
+    """Kill rate after excluding ONLY rule-equivalent survivors.
+
+    ``excluded_equivalent`` is surfaced next to the score so a shrinking
+    denominator is always visible, never hidden.
+    """
+
+    killed: int
+    denominator: int
+    excluded_equivalent: int
+    score: float
+
+
+@dataclass(frozen=True)
+class GrowthVerdict:
+    """Anti-loophole guard: did the rule-excluded set grow between runs?"""
+
+    grew: bool
+    added: tuple[str, ...]
+    severity: Literal["ok", "warn", "fail"]
+
+
+# ``cast("Literal", x)`` / ``typing.cast('T', x)`` — first arg is a string
+# literal that is a type-checker-only no-op at runtime, so mutating it cannot
+# change behavior. We require the FIRST argument to be a quoted string.
+_CAST_STRING_RE = re.compile(
+    r"""(?:^|[^.\w])(?:typing\.)?cast\(\s*['"]""",
+)
+# An integer default like ``data.get(k, 1)`` whose value is later subtracted
+# from ``time.time()`` (~1.7e9) — an off-by-small-int is numerically
+# indistinguishable in the elapsed computation.
+_INT_DEFAULT_RE = re.compile(r"\.get\([^,]+,\s*\d+\s*\)")
+_TIME_SUB_RE = re.compile(r"time\.time\(\)\s*-|-\s*time\.time\(\)")
+
+
+def _matches_cast_string_noop(d: MutantDescriptor) -> bool:
+    # The mutation is to the cast's string arg, so the cast MUST be on the
+    # mutated source_line — an unrelated cast() in surrounding context must not
+    # exclude a real survivor (REVIEW consensus P2 / Codex-high over-match).
+    # Residual accepted limitation: a user helper literally named cast() taking a
+    # string first arg also matches; bounded + growth-guarded + count-surfaced.
+    return bool(_CAST_STRING_RE.search(d.source_line))
+
+
+def _matches_int_default_near_time(d: MutantDescriptor) -> bool:
+    # The mutated default (.get(k, N)) MUST be on the source_line; only the
+    # time.time() subtraction *usage* may live in nearby context. Requiring the
+    # default on the mutated line removes the "unrelated .get in context"
+    # false-exclusion (REVIEW consensus P2).
+    if not _INT_DEFAULT_RE.search(d.source_line):
+        return False
+    blob = d.source_line + "\n" + d.context
+    return bool(_TIME_SUB_RE.search(blob))
+
+
+EQUIVALENCE_RULES: tuple[EquivalenceRule, ...] = (
+    EquivalenceRule(
+        rule_id="typing-cast-string-noop",
+        description=(
+            "Mutation to the first (string) argument of typing.cast(...) — "
+            "type-checker-only, runtime no-op."
+        ),
+        matcher=_matches_cast_string_noop,
+    ),
+    EquivalenceRule(
+        rule_id="int-default-near-time",
+        description=(
+            "Integer default (data.get(k, N)) later subtracted from time.time() "
+            "(~1.7e9) — numerically indistinguishable."
+        ),
+        matcher=_matches_int_default_near_time,
+    ),
+)
+
+
+def classify_survivor(descriptor: MutantDescriptor) -> tuple[Classification, str | None]:
+    """Return ``("equivalent", rule_id)`` only on a documented rule match.
+
+    Never returns ``real-not-killed`` — that label is a human/caller override.
+    Unknown survivors fall through to ``pending-review`` (kept in denominator).
+    """
+    for rule in EQUIVALENCE_RULES:
+        if rule.matcher(descriptor):
+            return "equivalent", rule.rule_id
+    return "pending-review", None
+
+
+def classify_survivors(descriptors: Sequence[MutantDescriptor]) -> list[ClassifiedMutant]:
+    """Classify a batch, preserving per-mutant identity for persistence."""
+    out: list[ClassifiedMutant] = []
+    for d in descriptors:
+        classification, rule_id = classify_survivor(d)
+        out.append(
+            ClassifiedMutant(mutant_id=d.mutant_id, classification=classification, rule_id=rule_id)
+        )
+    return out
+
+
+def _excluded_ids(classified: Sequence[ClassifiedMutant]) -> set[str]:
+    """Mutant ids excluded from the denominator — ONLY rule-equivalent ones."""
+    return {c.mutant_id for c in classified if c.classification == "equivalent" and c.rule_id}
+
+
+def adjusted_score(report: MutationReport, survivors: Sequence[MutantDescriptor]) -> AdjustedScore:
+    """Kill rate excluding ONLY rule-equivalent survivors (count surfaced).
+
+    ``pending-review`` / ``real-not-killed`` survivors stay in the denominator,
+    so coverage cannot be inflated by relabeling.
+    """
+    classified = classify_survivors(survivors)
+    excluded = len(_excluded_ids(classified))
+    raw_denom = report.killed + report.survived + report.timeout
+    denom = raw_denom - excluded
+    score = report.killed / denom if denom > 0 else 0.0
+    return AdjustedScore(
+        killed=report.killed,
+        denominator=denom,
+        excluded_equivalent=excluded,
+        score=score,
+    )
+
+
+def baseline_to_json(classified: Sequence[ClassifiedMutant]) -> str:
+    """Stable JSON for the per-mutant classification baseline."""
+    payload = {
+        "classifications": [
+            {
+                "mutant_id": c.mutant_id,
+                "classification": c.classification,
+                "rule_id": c.rule_id,
+            }
+            for c in classified
+        ],
+    }
+    return json.dumps(payload, indent=2, sort_keys=True) + "\n"
+
+
+def load_baseline(path: Path) -> list[ClassifiedMutant]:
+    """Load a prior classification baseline; missing file → empty (absent-case)."""
+    if not path.exists():
+        return []
+    data = json.loads(path.read_text(encoding="utf-8"))
+    out: list[ClassifiedMutant] = []
+    for entry in data.get("classifications", []):
+        out.append(
+            ClassifiedMutant(
+                mutant_id=str(entry["mutant_id"]),
+                classification=cast(Classification, entry["classification"]),
+                rule_id=entry.get("rule_id"),
+            )
+        )
+    return out
+
+
+def detect_exclusion_growth(
+    prev_baseline: Sequence[ClassifiedMutant],
+    new_classifications: Sequence[ClassifiedMutant],
+    *,
+    fail_on_growth: bool = False,
+) -> GrowthVerdict:
+    """Flag when the rule-excluded set GROWS between runs (anti-loophole guard).
+
+    A previously-pending survivor relabeled as excluded is the loophole this
+    catches. Default severity is ``warn``; ``fail_on_growth`` escalates to
+    ``fail`` for a hard gate.
+    """
+    prev_excluded = _excluded_ids(prev_baseline)
+    new_excluded = _excluded_ids(new_classifications)
+    added = tuple(sorted(new_excluded - prev_excluded))
+    if not added:
+        return GrowthVerdict(grew=False, added=(), severity="ok")
+    return GrowthVerdict(
+        grew=True,
+        added=added,
+        severity="fail" if fail_on_growth else "warn",
+    )
+
+
+def _descriptors_from_payload(survivors: Sequence[object]) -> list[MutantDescriptor]:
+    """Parse survivor descriptors from a decoded JSON list (CLI input)."""
+    out: list[MutantDescriptor] = []
+    for raw in survivors:
+        if not isinstance(raw, dict):
+            continue
+        out.append(
+            MutantDescriptor(
+                mutant_id=str(raw.get("mutant_id", "")),
+                source_line=str(raw.get("source_line", "")),
+                context=str(raw.get("context", "")),
+            )
+        )
+    return out
+
+
+# ---------------------------------------------------------------------------
 # CLI (``python -m harness_maker.spec_mutation gate --yaml ... --tier 1``)
 # ---------------------------------------------------------------------------
 
 #: Substring mutmut-absent reports carry (see measure_baseline FileNotFoundError).
 _MUTMUT_ABSENT = "command not found"
+
+
+def _run_classify(args: argparse.Namespace) -> int:
+    """Classify survivors, print adjusted score + excluded count + growth verdict."""
+    raw = (
+        args.input_path.read_text(encoding="utf-8")
+        if args.input_path is not None
+        else sys.stdin.read()
+    )
+    doc = json.loads(raw)
+    killed = int(doc.get("killed", 0))
+    descriptors = _descriptors_from_payload(doc.get("survivors", []))
+
+    classified = classify_survivors(descriptors)
+    report = MutationReport(
+        paths=(),
+        killed=killed,
+        survived=len(descriptors),
+        timeout=0,
+        suspicious=0,
+        skipped=0,
+        sampled=False,
+        raw_output="",
+    )
+    adj = adjusted_score(report, descriptors)
+
+    # Growth is only meaningful against a provided prior baseline. A first run
+    # (no --prev-baseline) has nothing to grow from → never warn.
+    if args.prev_baseline is not None:
+        prev = load_baseline(args.prev_baseline)
+        verdict = detect_exclusion_growth(prev, classified, fail_on_growth=args.fail_on_growth)
+    else:
+        verdict = GrowthVerdict(grew=False, added=(), severity="ok")
+
+    for c in classified:
+        suffix = f" [{c.rule_id}]" if c.rule_id else ""
+        print(f"  {c.mutant_id}: {c.classification}{suffix}")
+    print(
+        f"adjusted score: {adj.score:.4f} "
+        f"(killed {adj.killed} / denom {adj.denominator}; "
+        f"excluded-equivalent {adj.excluded_equivalent})"
+    )
+    print(
+        f"exclusion-growth: grew={verdict.grew} severity={verdict.severity} "
+        f"added={list(verdict.added)}"
+    )
+
+    if args.baseline_out is not None:
+        atomic_write(args.baseline_out, baseline_to_json(classified))
+
+    if verdict.severity == "fail":
+        return 1
+    if verdict.severity == "warn":
+        return 3
+    return 0
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -224,7 +516,42 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_gate.add_argument("--sampled", action="store_true", help="200-mutant sampled mode")
     p_gate.add_argument("--cwd", type=Path, default=Path.cwd())
+
+    p_cls = sub.add_parser(
+        "classify",
+        help="classify survivor descriptors + adjusted score + exclusion-growth guard",
+    )
+    p_cls.add_argument(
+        "--input",
+        dest="input_path",
+        type=Path,
+        default=None,
+        help="JSON {killed, survivors:[{mutant_id,source_line,context}]} (default: stdin)",
+    )
+    p_cls.add_argument(
+        "--prev-baseline",
+        dest="prev_baseline",
+        type=Path,
+        default=None,
+        help="prior baseline JSON to detect exclusion-set growth against",
+    )
+    p_cls.add_argument(
+        "--baseline-out",
+        dest="baseline_out",
+        type=Path,
+        default=None,
+        help="write the new per-mutant classification baseline here (atomic)",
+    )
+    p_cls.add_argument(
+        "--fail-on-growth",
+        action="store_true",
+        help="exit non-zero when the rule-excluded set grows (hard gate)",
+    )
+
     args = parser.parse_args(argv)
+
+    if args.cmd == "classify":
+        return _run_classify(args)
 
     machine = load_machine(args.yaml_path)
     tier_raw = args.tier if args.tier is not None else int(machine.verification_tier)
@@ -259,11 +586,24 @@ if __name__ == "__main__":  # pragma: no cover - exercised via subprocess/main()
 __all__ = [
     "DEFAULT_SAMPLE_MUTANT_BUDGET",
     "DEFAULT_WALL_BUDGET_MIN",
-    "MutationReport",
+    "EQUIVALENCE_RULES",
     "PLUS_DELTA_PP",
     "TIER_FLOORS",
+    "AdjustedScore",
+    "Classification",
+    "ClassifiedMutant",
+    "EquivalenceRule",
+    "GrowthVerdict",
+    "MutantDescriptor",
+    "MutationReport",
     "VerificationTier",
+    "adjusted_score",
+    "baseline_to_json",
+    "classify_survivor",
+    "classify_survivors",
+    "detect_exclusion_growth",
     "gate",
+    "load_baseline",
     "main",
     "measure_baseline",
     "report_to_json",

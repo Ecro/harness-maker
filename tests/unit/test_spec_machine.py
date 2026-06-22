@@ -36,6 +36,8 @@ def _minimal_yaml(tmp_path: Path, **overrides) -> Path:
                 "type": "mechanical",
                 "test_ids": ["tests/unit/test_render.py::test_emits_hash"],
                 "executable_predicate": "'content_hash:' in render(answers())",
+                "oracle_source": "differential",
+                "oracle_evidence": "compared against the reference renderer golden",
             }
         ],
     }

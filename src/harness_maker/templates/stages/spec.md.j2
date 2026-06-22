@@ -98,6 +98,42 @@ Skip a category when sufficiently answered by prior research, prior SPEC, or ear
 5. **Constraints** — HW, SW, security, performance, compatibility, **and test framework** (mandatory — pick `pytest` / `gtest` / `vitest` / `bats` / etc; `/hm:execute` Phase A uses this to write tests).
 6. **Verification Criteria** — per-scenario, how we'll prove it: unit / integration / manual. Each scenario MUST map to at least one verification mode.
 
+#### 2.1.5 — Oracle elicitation (MANDATORY — ADR-001/007 of spec-tetrad)
+
+Verification *mode* (unit/integration/manual) is not the oracle. The **oracle**
+is what decides *correct vs plausible-but-wrong* for a scenario — and in the LLM
+era it is the scarce resource: `/hm:execute` must not invent an assertion derived
+from the very code it checks (the **circular oracle**). For **every** acceptance
+criterion / scenario, force two answers (closed-form — does not count against the
+open-ended cap):
+
+**(A) Oracle source** — pick one of:
+- `golden` — a hardcoded expected value / fixture (where did it come from?).
+- `differential` — a reference or second implementation the result is compared to.
+- `property` — a metamorphic relation or invariant that holds for *all* inputs
+  (e.g. `decode(encode(x)) == x`, idempotence, ordering) — independent of the impl,
+  so the LLM cannot satisfy it by reading the code. Promotes the AC to `type: property`.
+- `rubric` — human / LLM judgment against a named rubric.
+- `consensus` — agreement of independent reviewers (k-of-3 / Codex second opinion).
+
+**(B) Oracle evidence** — a one-line *independence* justification the
+`spec_quality` gate will score (NOT the label): the golden's provenance, the
+reference-impl identity, the metamorphic rationale ("why this relation holds
+regardless of implementation"), the rubric_id, or the attestation reference.
+**Reject "the test will check it"** the same way vague acceptance is rejected —
+that is the circular oracle. A declared high-trust source with no evidence
+**fails the gate** (spec-driven) or **requires a durable
+`oracle_independence_waiver`** (task-driven).
+
+For a `property` oracle, also collect the structured triple `input_domain` /
+`transformation` / `expected_relation` (+ optional `preconditions` /
+`observable_output`) — free-text alone is not gateable.
+
+> **x-contract correspondence (documented, not a guaranteed isomorphism — ADR-005):**
+> `oracle_source` ↔ sw-improve x-contract `conformance.kind`; `differential` ↔ a
+> cross-language golden pin; `consensus` ↔ the adversarial 3-skeptic verify;
+> mutation adequacy ↔ shared. `property` has no x-contract equivalent (new).
+
 #### 2.5 — 5-Term Inequality Gate
 
 Runs after the 6 structured categories are complete, before §2.2 promotion.
@@ -217,10 +253,15 @@ fields that AI verifiers consume directly (test_ids[], executable_predicate,
 golden_table, rubric_id, mutation_threshold, verification_tier) — values
 the human SPEC.md describes but doesn't structure.
 
-**Required machine.yaml schema (schema_version=1):**
+**Required machine.yaml schema (schema_version=2):**
+
+> **Version note (ADR-006 of spec-tetrad):** new specs declare `schema_version: 2`.
+> An **omitted** version pins to v1 (oracle_source NOT required) so legacy specs
+> keep working; do NOT hand-edit a v2 oracle field into a v1 file — declare the
+> version. v2 requires `oracle_source` + `oracle_evidence` on **every** AC.
 
 ```yaml
-schema_version: 1
+schema_version: 2
 spec_slug: {slug}
 parent_spec: SPEC-{l1-cluster-slug}   # null OR L1 file in same specs/ dir
 verification_tier: 1 | 2 | 3          # T1/T2/T3 per ADR-008
@@ -234,13 +275,24 @@ spec_quality_score_at: null
 ac:
   - id: AC-001
     title: "<matches the ### AC-001 heading in .md within fuzzy ≥ 0.85>"
-    type: mechanical | parametric | judgment    # ADR-003
+    type: mechanical | parametric | judgment | property   # ADR-003 + spec-tetrad
     test_ids:
       - tests/<path>::<fn_name>         # must resolve via `pytest --collect-only`
     executable_predicate: "<runnable Python expr>" # mechanical only (else null) — see note
     golden_table: []                              # parametric only
     rubric_id: null                               # judgment only
     pending_test: true                            # false ONLY when test_ids verified
+    # --- oracle axis (v2, ADR-001/007) — REQUIRED on every AC ---
+    oracle_source: golden | differential | property | rubric | consensus
+    oracle_evidence: "<one-line independence justification the gate scores>"
+    oracle_independence_waiver: null  # task-driven only: durable override reason
+    # --- structured property fields (type: property only) ---
+    input_domain: null        # e.g. "arbitrary UTF-8 strings"
+    transformation: null      # e.g. "encode then decode"
+    expected_relation: null   # e.g. "decode(encode(x)) == x"  (metamorphic/invariant)
+    preconditions: []         # optional list
+    observable_output: null   # e.g. "bytes"
+    generator_hint: null      # advisory only — NOT a generator
 ```
 
 **`executable_predicate` must be a *runnable* expression, not prose**

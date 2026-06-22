@@ -6,7 +6,6 @@ import yaml
 
 from harness_maker.spec_quality import (
     RUBRIC_DIMENSIONS,
-    RUBRIC_DIMENSIONS_MACHINE,
     evaluate_spec,
 )
 
@@ -69,8 +68,12 @@ def test_machine_yaml_adds_three_dims() -> None:
         }
     )
     result = evaluate_spec(MINIMAL_GOOD_SPEC, machine_yaml=machine_yaml)
-    for dim in RUBRIC_DIMENSIONS_MACHINE:
+    # The 3 unconditional machine dims are always added. oracle_independence is
+    # v2-gated (spec-tetrad ADR-006) and this fixture is schema_version 1, so it
+    # is correctly absent here (covered by test_spec_quality_oracle).
+    for dim in ("machine_verifiability", "mutation_coverage_set", "non_python_intent_alignment"):
         assert dim in result.scores
+    assert "oracle_independence" not in result.scores
 
 
 def test_machine_verifiability_full_pass() -> None:
@@ -167,10 +170,13 @@ def test_mutation_coverage_set_omitted_for_non_python() -> None:
 
 
 def test_invalid_machine_yaml_zeros_machine_dims() -> None:
-    # yaml load failure → all 3 machine dims = 0
+    # yaml load failure → the 3 always-on machine dims = 0. oracle_independence
+    # is v2-gated and must NOT appear on an invalid spec (REVIEW C-P2): a
+    # malformed v1 spec is not penalized on a dim a well-formed v1 spec lacks.
     result = evaluate_spec(MINIMAL_GOOD_SPEC, machine_yaml=":bad: : yaml :")
-    for dim in RUBRIC_DIMENSIONS_MACHINE:
+    for dim in ("machine_verifiability", "mutation_coverage_set", "non_python_intent_alignment"):
         assert result.scores[dim] == 0
+    assert "oracle_independence" not in result.scores
 
 
 def test_overall_includes_machine_dims_in_average() -> None:
