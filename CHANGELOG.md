@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+### Added — spec-driven `/hm:plan` auto-detects + routes to `/hm:spec` (SPEC-requirement gate) — PLAN-spec-requirement-gate
+- In **spec-driven** dev_mode, `/hm:plan` now auto-detects whether the work needs a machine SPEC
+  operation (`add`/`change`/`delete`) and routes the user into `/hm:spec` via a durable resume-marker —
+  so normal users never type `/hm:spec`, yet the declared spec-driven intent is enforced at the work
+  boundary (closing the absent-case footgun where spec-driven was unenforced). **Render-gated to
+  spec-driven only — task-driven harnesses are byte-unchanged.**
+- New `spec_need` module (prefilter / record / operation_satisfied / hash-bound waiver / one-shot
+  resume-marker state machine + `_validate_slug` path-traversal guard). Detection is **fail-closed**:
+  empty/uncertain/degraded ⇒ `not-evaluated` (distinct from `none`), which the new render-gated
+  **verify Check 6** FAILs on. The waiver escape is **content-hash-bound + diff-expiring** (a stale
+  waiver is rejected). Re-entry is a **one-shot marker** (plan→spec STOPs→re-run plan) with a
+  surface-never-re-invoke guard against an infinite plan→spec→plan loop. A weight-0 `/hm:health`
+  `spec_need_forcing` advisory surfaces the over/under-forcing rate.
+- 9 ADRs; built across 4 phases (101 tests). k-of-3 review (2 Claude + Codex) caught a **gate-defeating
+  fail-open** before commit — the plan stage recorded `spec_need_verdict` but its required frontmatter
+  schema omitted the field Check 6 keys on, so a literally-written PLAN would have bypassed the gate via
+  the absent-case N-A; fixed with a required-key + Step-6 presence assertion (plus 5 more findings auto-fixed).
+
 ### Added — stale-judgment verdicts surfaced in `/hm:health` — PLAN-judgment-stale-health-display
 - `/hm:health` now shows stale judgment-AC verdicts via a `judgment_verdict_freshness` advisory
   signal in `readiness._dim_guardrails` — closing the deferred display surface from

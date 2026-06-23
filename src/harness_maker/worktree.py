@@ -113,10 +113,18 @@ _HARNESS_CHURN_FILES: tuple[str, ...] = (
     ".claude/.hm-sessions.json",  # Phase 1 (ADR-004): session registry — operational churn
     "work-docs/p5-batch-state.yaml",
 )
-# Patterns appended to the user's .gitignore (ADR-002) — dirs + exact files.
-# The Phase 2 sync test asserts this equals the dir+file union so the gitignore
+# Glob patterns that are prefix-keyed (not exact files and not dir-prefixes).
+# These are gitignore-only entries — they appear in .gitignore but the dirt filter
+# handles them via the corresponding prefix in `_HARNESS_ARTIFACT_PREFIXES` instead.
+# PLAN-spec-requirement-gate ADR-009: `.hm-spec-need-{slug}` markers are slug-keyed
+# and therefore cannot be an exact-file or dir-prefix entry.
+_HARNESS_CHURN_GLOBS: tuple[str, ...] = (".claude/.hm-spec-need-*",)
+# Patterns appended to the user's .gitignore (ADR-002) — dirs + exact files + globs.
+# The Phase 2 sync test asserts this equals the dir+file+glob union so the gitignore
 # set and the dirt-filters can never drift.
-_HARNESS_GITIGNORE_PATTERNS: tuple[str, ...] = _HARNESS_CHURN_DIRS + _HARNESS_CHURN_FILES
+_HARNESS_GITIGNORE_PATTERNS: tuple[str, ...] = (
+    _HARNESS_CHURN_DIRS + _HARNESS_CHURN_FILES + _HARNESS_CHURN_GLOBS
+)
 
 # PLAN-worktree-deliverable-blocks-create ADR-001: harness deliverable docs.
 # `/hm:plan` writes these to `work-docs/` (and `specs/`) BEFORE `/hm:execute`,
@@ -540,6 +548,11 @@ _HARNESS_ARTIFACT_PREFIXES = (
     # peer's finalize never stashes it and it never surfaces as committable dirt —
     # parity with the other two transient `.hm-*` markers (REVIEW consensus P2).
     ".claude/.hm-creating-",
+    # PLAN-spec-requirement-gate ADR-009: durable one-shot resume markers are
+    # slug-suffixed (`.hm-spec-need-{slug}`) so they MUST be a PREFIX match, not
+    # an exact-match churn-file entry. Registered here so a present marker does
+    # NOT trip the dirty-base guard or get stashed at finalize.
+    ".claude/.hm-spec-need-",
 )
 
 

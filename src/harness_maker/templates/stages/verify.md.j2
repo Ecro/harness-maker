@@ -1,6 +1,6 @@
 # Stage: verify
 
-> Atomic stage. Pre-completion verification gate — 5-check stop sign before `wrapup`. Failures block by default; `--force` overrides explicitly.
+> Atomic stage. Pre-completion verification gate — {% if config.dev_mode == 'spec-driven' %}6{% else %}5{% endif %}-check stop sign before `wrapup`. Failures block by default; `--force` overrides explicitly.
 {% if workflow_context %}
 > Invoked as part of the **{{ workflow_context }}** workflow.
 {% endif %}
@@ -14,7 +14,7 @@
 
 ## Purpose
 
-Block silent regressions and partial completions. Run a rigid 5-check rubric that any work unit MUST pass before being declared done. This is the machine-checkable stop sign before `/hm:wrapup`.
+Block silent regressions and partial completions. Run a rigid {% if config.dev_mode == 'spec-driven' %}6{% else %}5{% endif %}-check rubric that any work unit MUST pass before being declared done. This is the machine-checkable stop sign before `/hm:wrapup`.
 
 ## When to Run
 
@@ -38,7 +38,7 @@ Block silent regressions and partial completions. Run a rigid 5-check rubric tha
 - Most recent Health snapshot at `.claude/observability/dashboard.md` (2-section schema: `Structural` / `Personalization`; pre-0.13.0 single-`Health:` scalar is intentionally unreadable here). ADR-0007 removed the former `External risks` section in 0.22.3.
 - Most recent security findings at `.claude/observability/security/findings-*.jsonl`.
 
-## The 5 Checks (run in order; STOP on first FAIL unless `--force`)
+## The {% if config.dev_mode == 'spec-driven' %}6{% else %}5{% endif %} Checks (run in order; STOP on first FAIL unless `--force`)
 
 ### Check 1 — PLAN/SPEC satisfaction + drift verdict
 
@@ -150,11 +150,62 @@ When worktree isolation was engaged (`.worktrees/execute-*` exists or did exist)
 FAIL when: there are unmerged paths, conflict markers, or unresolved merge state.
 
 PASS when: working tree is clean OR has only the staged changes from `/hm:execute` Step 5 `stage-only`.
+{% if config.dev_mode == 'spec-driven' %}
+### Check 6 — SPEC requirement (spec-driven)
 
+Read the PLAN frontmatter fields `spec_need_verdict` and `spec_need_target` from `{{ config.work_docs.dir }}PLAN-{slug}.md`.
+
+**Clean N-A (automatic PASS):** when the PLAN frontmatter is absent, belongs to a different task (foreign `task_slug`), or contains no `spec_need_verdict` key — emit `PASS (N-A: no spec_need_verdict in PLAN frontmatter)` and continue. Never false-FAIL on a missing or non-spec-need PLAN.
+
+**FAIL condition:** `spec_need_verdict ∈ {add, change, delete, not-evaluated}` AND the required SPEC operation has NOT been performed AND no valid, non-stale waiver exists. Note: `not-evaluated` is an explicit FAIL signal — it is the fail-closed detection state (LLM confidence too low or candidate set empty), not an absence of verdict.
+
+Evaluation sequence when `spec_need_verdict` is one of the above values:
+
+**Step 6a — operation check:**
+{% if is_codex %}
+```
+Bash("python -m harness_maker.spec_need op-check --verdict <spec_need_verdict> --target <spec_need_target> --root <WT> --changed-file <f1> --changed-file <f2> …")
+```
+{% else %}
+```bash
+!python -m harness_maker.spec_need op-check --verdict <spec_need_verdict> --target <spec_need_target> --root <WT> --changed-file <f1> --changed-file <f2> …
+```
+{% endif %}
+
+Exit 0 → operation satisfied → **PASS**. Proceed to next check.
+
+**Step 6b — waiver check** (only if Step 6a exits 1):
+{% if is_codex %}
+```
+Bash("python -m harness_maker.spec_need waiver-check --root <WT> --slug <task_slug> --changed-file <f1> --changed-file <f2> …")
+```
+{% else %}
+```bash
+!python -m harness_maker.spec_need waiver-check --root <WT> --slug <task_slug> --changed-file <f1> --changed-file <f2> …
+```
+{% endif %}
+
+The `waiver-check` command **recomputes** the content hash against the live diff. A waiver written before the diff changed is therefore rejected (expired), even if its frontmatter pointer is still present. Exit 0 → valid, non-stale, non-empty-rationale waiver exists → **PASS**.
+
+**FAIL** (Step 6a exits 1 AND Step 6b exits 1): emit the verdict and actionable evidence:
+
+```
+BLOCKED: check 6 (SPEC requirement) — verdict=<spec_need_verdict>, target=<spec_need_target>
+The required SPEC operation was not performed and no valid waiver exists.
+To resolve: author the SPEC via /hm:plan re-entry (/hm:plan <slug> — the
+resume-marker skips re-detection and routes directly to /hm:spec) or record
+a fresh, non-empty-rationale waiver with:
+  python -m harness_maker.spec_need waiver-set --root <WT> --slug <slug> \
+    --verdict <verdict> --target <target> --rationale "<reason>" \
+    --changed-file <f1> …
+Note: a stale waiver (diff changed since last waiver-set) is treated as NO waiver.
+```
+
+{% endif %}
 ## Advisory probes (non-blocking)
 
 These do **NOT** gate completion. They surface latent footguns and continue
-with `exit 0` regardless of outcome. They sit OUTSIDE the 5-check contract
+with `exit 0` regardless of outcome. They sit OUTSIDE the {% if config.dev_mode == 'spec-driven' %}6{% else %}5{% endif %}-check contract
 of `verify-before-completion` — adding new gating checks means changing
 that SKILL; adding new advisory probes means appending here.
 
@@ -178,6 +229,25 @@ Write **both** formats:
 
 ### Text (stdout, for humans)
 
+{% if config.dev_mode == 'spec-driven' %}
+```
+=== /hm:verify ===
+
+[1/6] PLAN/SPEC satisfaction       ✅ PASS
+[2/6] Regression smoke             ✅ PASS
+[3/6] Structural delta             ✅ PASS  (structural 87 → 89, +2)
+[4/6] Security high findings       ❌ FAIL
+        1 unresolved high finding:
+        - CVE-2026-12345 in dependency `httpx` (severity=high, no rationale).
+        Resolve or record accepted-risk-with-rationale.
+
+[5/6] (skipped — stopped at first FAIL)
+[6/6] (skipped — stopped at first FAIL)
+
+RESULT: FAIL — 1 of 6 checks failed.
+Override: --force --reason="<text>"  (logs to verify-<date>.jsonl with the reason)
+```
+{% else %}
 ```
 === /hm:verify ===
 
@@ -194,9 +264,29 @@ Write **both** formats:
 RESULT: FAIL — 1 of 5 checks failed.
 Override: --force --reason="<text>"  (logs to verify-<date>.jsonl with the reason)
 ```
+{% endif %}
 
 ### JSON (`.claude/observability/verify-<YYYY-MM-DD>.jsonl`, append one record)
 
+{% if config.dev_mode == 'spec-driven' %}
+```json
+{
+  "timestamp": "2026-05-17T14:23:01Z",
+  "stage": "verify",
+  "result": "FAIL",
+  "checks": [
+    {"id": 1, "name": "plan_spec_satisfaction", "result": "PASS"},
+    {"id": 2, "name": "regression_smoke", "result": "PASS"},
+    {"id": 3, "name": "structural_delta", "result": "PASS", "delta": 2, "prior": 87, "current": 89, "reason": null},
+    {"id": 4, "name": "security_high", "result": "FAIL", "blocking_items": 1, "items": ["CVE-2026-12345"], "reason": null},
+    {"id": 5, "name": "worktree_merge", "result": "SKIPPED"},
+    {"id": 6, "name": "spec_requirement", "result": "SKIPPED"}
+  ],
+  "force_override": false,
+  "override_reason": null
+}
+```
+{% else %}
 ```json
 {
   "timestamp": "2026-05-17T14:23:01Z",
@@ -213,6 +303,7 @@ Override: --force --reason="<text>"  (logs to verify-<date>.jsonl with the reaso
   "override_reason": null
 }
 ```
+{% endif %}
 
 For no-baseline PASS, the corresponding check record carries `"result": "PASS"` and a populated `"reason"` string (e.g. `"no-baseline: dashboard.md missing"` / `"no-baseline: pre-0.13.0 schema"`); `prior` / `current` may be `null`. Verify never emits `result: "PASS"` for Check 3 silently — a populated `reason` is mandatory whenever the baseline was missing or unparseable.
 
@@ -228,7 +319,7 @@ When `--force` is set, append the same record with `"force_override": true, "ove
 
 1. Read inputs (PLAN, SPEC, dashboard, security findings).
 2. Run Check 1. If PASS, continue. If FAIL: emit text + JSON record + STOP (unless `--force`).
-3. Repeat for Checks 2-5.
+3. Repeat for Checks 2-{% if config.dev_mode == 'spec-driven' %}6{% else %}5{% endif %}.
 4. Emit final RESULT line + JSON record.
 5. When `--force` is set with FAILing checks: emit text + JSON record with override flag + reason, then return PASS exit code (let the workflow proceed). Wrapup will surface the override in the commit body footer.
 6. **Stage terminal**: Emit the RESULT line and **STOP**. Do not proceed to `/hm:wrapup` or any other stage without an explicit user command — unless this stage was invoked as part of a fused workflow (e.g., `exec-rev-ver-wrap`), in which case the fused workflow owns the transition.

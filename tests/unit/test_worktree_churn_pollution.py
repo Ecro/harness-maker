@@ -19,6 +19,7 @@ from harness_maker import worktree
 from harness_maker.worktree import (
     _HARNESS_CHURN_DIRS,
     _HARNESS_CHURN_FILES,
+    _HARNESS_CHURN_GLOBS,
     _HARNESS_GITIGNORE_PATTERNS,
     _ensure_harness_gitignore,
     _is_create_guard_harness_artifact,
@@ -185,9 +186,13 @@ def test_is_harness_artifact_empty_or_short_line() -> None:
 
 
 def test_churn_gitignore_and_filter_sets_in_sync() -> None:
-    assert _HARNESS_GITIGNORE_PATTERNS == _HARNESS_CHURN_DIRS + _HARNESS_CHURN_FILES
+    assert _HARNESS_GITIGNORE_PATTERNS == (
+        _HARNESS_CHURN_DIRS + _HARNESS_CHURN_FILES + _HARNESS_CHURN_GLOBS
+    )
     assert all(p.endswith("/") for p in _HARNESS_CHURN_DIRS)  # dirs = prefix match
     assert all(not p.endswith("/") for p in _HARNESS_CHURN_FILES)  # files = exact
+    # glob entries contain '*' — they are neither dir-prefixes nor exact files
+    assert all("*" in p for p in _HARNESS_CHURN_GLOBS)
     # disjoint — no path is both a dir-prefix and an exact-file entry
     assert not (set(_HARNESS_CHURN_DIRS) & set(_HARNESS_CHURN_FILES))
 

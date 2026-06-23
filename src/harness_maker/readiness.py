@@ -634,6 +634,84 @@ def _dim_guardrails(project_dir: Path) -> DimensionScore:
                 )
             )
 
+    # Advisory — spec-need forcing/waiver rate (PLAN-spec-requirement-gate ADR-008).
+    # weight=0 AND hard_gate=False — display-only visibility into over/under-forcing;
+    # never docks the structural score (mirrors judgment_verdict_freshness ADR-001).
+    # N-A (no signal) when there is no spec-need-*.jsonl ledger at all (absent-case
+    # per CLAUDE.md §absent-case rule — no false finding, no crash; degrade on
+    # malformed lines).
+    #
+    # FIX 4 (R1-P1a): verdict scan reads ONLY verdict ledgers spec-need-{target}.jsonl,
+    # EXCLUDING spec-need-waiver-*.jsonl (whose "verdict" field duplicates the original
+    # verdict, inflating the forcing count).
+    # FIX 5 (R1-P1b): waiver count is derived from the count of waiver receipt files
+    # spec-need-waiver-*.jsonl — "verdict=='waived'" was never produced by any code path.
+    _obs_dir = claude / "observability"
+    # Verdict ledgers only — skip waiver receipts (FIX 4).
+    _sn_verdict_files = (
+        [f for f in sorted(_obs_dir.glob("spec-need-*.jsonl")) if "-waiver-" not in f.name]
+        if _obs_dir.is_dir()
+        else []
+    )
+    # Waiver receipt files — counted directly (FIX 5).
+    _sn_waiver_files = (
+        sorted(_obs_dir.glob("spec-need-waiver-*.jsonl")) if _obs_dir.is_dir() else []
+    )
+    if _sn_verdict_files:
+        _sn_verdict_counts: dict[str, int] = {}
+        _sn_total = 0
+        for _sn_fp in _sn_verdict_files:
+            try:
+                for _sn_line in _sn_fp.read_text(encoding="utf-8").splitlines():
+                    _sn_line = _sn_line.strip()
+                    if not _sn_line:
+                        continue
+                    try:
+                        _sn_ev = json.loads(_sn_line)
+                    except json.JSONDecodeError:
+                        continue  # degrade on malformed line, never crash
+                    _sn_v = (
+                        _sn_ev.get("verdict", "not-evaluated")
+                        if isinstance(_sn_ev, dict)
+                        else "not-evaluated"
+                    )
+                    _sn_verdict_counts[_sn_v] = _sn_verdict_counts.get(_sn_v, 0) + 1
+                    _sn_total += 1
+            except OSError:
+                continue  # unreadable file → degrade, never crash
+        if _sn_total > 0:
+            _sn_forcing = sum(
+                _sn_verdict_counts.get(v, 0) for v in ("add", "change", "delete", "not-evaluated")
+            )
+            _sn_none = _sn_verdict_counts.get("none", 0)
+            # Count waiver receipts from the dedicated waiver files (FIX 5).
+            _sn_waived = len(_sn_waiver_files)
+            _sn_waiver_rate = (
+                f"{_sn_waived}/{_sn_forcing} waived" if _sn_forcing > 0 else "0 forcing verdicts"
+            )
+            _sn_count_parts_list = [
+                f"{v}={_sn_verdict_counts[v]}"
+                for v in ("add", "change", "delete", "none", "not-evaluated")
+                if _sn_verdict_counts.get(v, 0) > 0
+            ]
+            if _sn_waived > 0:
+                _sn_count_parts_list.append(f"waived={_sn_waived}")
+            _sn_count_parts = ", ".join(_sn_count_parts_list)
+            _sn_evidence = (
+                f"spec-need ledger: {_sn_total} event(s) — {_sn_count_parts}; "
+                f"forcing={_sn_forcing}, none={_sn_none}, {_sn_waiver_rate}"
+            )
+            signals.append(
+                _signal(
+                    "spec_need_forcing",
+                    True,  # advisory: always passing — the content is the information
+                    0,  # ADR-008: display-only, never docks the structural score
+                    _sn_evidence,
+                    None,
+                    hard_gate=False,  # ADR-008: pinned, not defaulted — never a stealth gate
+                )
+            )
+
     settings_path = claude / "settings.json"
     settings = _read_json_with_optional_frontmatter(settings_path)
     perms = settings.get("permissions") if isinstance(settings, dict) else None

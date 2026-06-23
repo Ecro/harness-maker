@@ -150,6 +150,164 @@ Before Step 2, check whether `/hm:plan` is running inside an active `/hm:loop` i
 
 If `loop-mode-active` exited 1 (not loop-mode for this session) → proceed to Step 2 as normal.
 
+{% if config.dev_mode == 'spec-driven' %}
+### Step 1.7 — SPEC-need detection (spec-driven only, ADR-002/006/007/009)
+
+> This step fires **only in spec-driven mode**. Skip entirely in task-driven (not rendered). For loop-mode (Step 1.5 exited 0), this step still runs — but the response to a needed SPEC is a HALT rather than an interactive user question (see "loop-mode" branch below).
+
+#### 1.7.0 — Re-entry first (ADR-009 one-shot anti-loop guard)
+
+Before running any detection, check for a durable resume marker from a previous invocation:
+
+```bash
+!python -m harness_maker.spec_need marker-read --root <WT> --slug {slug}
+```
+
+(`<WT>` is the absolute worktree path from the preflight step above — use it as `--root` for ALL `spec_need` commands in this step so the marker, ledger, and waiver files are co-located with the files being hashed, preventing stale-read on new/add-case files under `feature_branch_workflow`.)
+
+**If the marker is `null` (absent):** fall through to detection (§1.7.1).
+
+**If a marker exists** for this slug, immediately run freshness check:
+
+```bash
+!python -m harness_maker.spec_need marker-fresh --root <WT> --slug {slug} --changed-files-hash <HASH>
+```
+
+Where `<HASH>` is the SHA256 of the sorted changed-file list (compute `git diff --name-only $(git merge-base HEAD <base>)` → sort → hash; this same `changed_files_hash` recipe is used at both the marker-write site in §1.7.2 and here, ensuring one-shot freshness is reliable). **You are resuming from an inline `/hm:spec` dispatch — SKIP re-detection entirely** (this is the one-shot anti-loop guarantee; do not run §1.7.1):
+
+- **Exit 0 (FRESH — hash matches current diff):** run `op-check` for the marker's stored verdict/target:
+
+  ```bash
+  !python -m harness_maker.spec_need op-check --verdict <marker.verdict> --target <marker.target> --root <WT> --changed-file <f1> --changed-file <f2> …
+  ```
+
+  - **Exit 0 (operation satisfied):** SPEC has been authored. Run `marker-clear`, then proceed to Step 2 with the new SPEC in place. The resume path enters Step 2's Case A/B/C logic normally.
+
+    ```bash
+    !python -m harness_maker.spec_need marker-clear --root <WT> --slug {slug}
+    ```
+
+  - **Exit 1 (NOT satisfied — SPEC was not authored or wrong target):** Surface to the user: **"SPEC still not authored for `<marker.target>` (verdict: `<marker.verdict>`). The `/hm:spec` step did not complete or targeted a different slug."** Offer two options — **[Retry: run `/hm:spec <marker.target>` again]** or **[Waive with reason]**. **NEVER auto-re-invoke `/hm:spec` here** — this is the hard anti-loop guard: surface-never-re-invoke. If user chooses [Waive], follow the waiver flow in §1.7.3 **and then clear the marker** (see below) and proceed.
+
+    **[Waive] sub-path in re-entry:** after running `waiver-set` per §1.7.3, ALSO clear the resume marker so the next `/hm:plan` invocation does not re-enter this re-entry path and loop:
+
+    ```bash
+    !python -m harness_maker.spec_need marker-clear --root <WT> --slug {slug}
+    ```
+
+    Without this clear, the marker persists, the next `/hm:plan` hits the fresh marker again, op-check fails, and the waiver prompt repeats forever. The satisfied-branch already clears; the waive-branch must mirror it.
+
+- **Exit 1 (STALE — hash mismatch, diff moved on):** The diff has changed since the marker was written; the marker is no longer valid for the current work. Clear it and fall through to fresh detection:
+
+  ```bash
+  !python -m harness_maker.spec_need marker-clear --root <WT> --slug {slug}
+  ```
+
+  Proceed to §1.7.1 as if no marker existed.
+
+#### 1.7.1 — Detection (fail-closed, ADR-002)
+
+Compute the diff of changed files vs base:
+
+```bash
+!git diff --name-only $(git merge-base HEAD <base>)
+```
+
+(Derive `<base>` from the worktree's base branch — typically `main` or the branch the worktree was created from. Include any staged + working-set additions not yet committed.)
+
+Run the path prefilter over `specs/` as a **HINT** (not a gate):
+
+```bash
+!python -m harness_maker.spec_need prefilter --specs-dir specs --changed-file <f1> --changed-file <f2> …
+```
+
+The prefilter returns a JSON array of `{slug, overlap}` candidate SPECs whose `paths_to_mutate ∪ judgment_subject_paths` overlap with the changed files. **This output is a hint only** — you, the LLM, now judge regardless of it.
+
+**LLM judgment — SPEC-need verdict:**
+
+Read the candidate SPECs (if any) and the full scope of this work, then judge a verdict ∈ `add | change | delete | none | not-evaluated` against the criterion:
+
+> **SPEC needed ⟺** the work establishes or changes an **externally-observable behavioral contract** whose regression could **silently** break something downstream, AND the contract is **AC-expressible** (its expected outcome can be stated as a testable acceptance criterion).
+
+Verdict semantics:
+- **`add`** — the work introduces a new behavioral contract with no covering SPEC. Judged from work scope alone; no existing candidates are expected.
+- **`change`** — the work modifies the semantics of an existing SPEC's AC (found in candidates).
+- **`delete`** — the work removes a previously-specified behavior (SPEC should be updated/removed).
+- **`none`** — a **confident** judgment that no externally-observable contract is established or changed. This is not the default.
+- **`not-evaluated`** — **fail-closed default**: use this when the candidate set is empty, the prefilter scan is degraded (malformed SPEC), LLM confidence is low, or the scope is ambiguous. An empty or low-overlap candidate set does NOT justify `none` — `not-evaluated` is the correct fail-closed response to uncertainty.
+
+**`none` requires a confident positive assertion. When in doubt, use `not-evaluated`.**
+
+#### 1.7.2 — Record + enforce
+
+Record the verdict:
+
+```bash
+!python -m harness_maker.spec_need record --verdict <verdict> --target <target> --root <WT> --rationale "<rationale>"
+```
+
+Where `<target>` is the task slug (or the SPEC slug for `change`/`delete`).
+
+Also write `spec_need_verdict: <verdict>` and `spec_need_target: <target>` into the PLAN frontmatter at Step 5.
+
+**If verdict is `none`:** proceed to Step 2 normally — no SPEC operation is required.
+
+**If verdict ∈ {`add`, `change`, `delete`, `not-evaluated`}** AND operation is NOT already satisfied, branch on loop-mode status (from Step 1.5):
+
+**Loop-mode (Step 1.5 exited 0 — active loop):**
+
+Set per-iter PLAN frontmatter:
+```yaml
+status: blocked
+halt_reason: spec-required
+halt_note: "spec_need_verdict=<verdict>, target=<target> — SPEC operation required before planning"
+```
+
+Emit a `verdict: fail` Gate 0 receipt, surface to operator: **"Loop halted: SPEC operation required for `<target>` (verdict: `<verdict>`). Re-run `/hm:plan {slug}` in a standalone session (not loop-mode) to route through the SPEC authoring flow."** Do NOT prompt the user interactively in loop-mode — the loop has no interactive channel.
+
+**Standalone (Step 1.5 exited 1 — not loop-mode):**
+
+{% if is_codex %}
+Use `request_user_input` (or ask in your response if the tool is unavailable) to present:
+{% else %}
+Use `AskUserQuestion` to present:
+{% endif %}
+
+> **SPEC operation required before planning**
+>
+> Verdict: `<verdict>` | Target: `<target>`
+>
+> The work establishes or changes a behavioral contract that needs a SPEC before a plan can be written.
+>
+> **Options:**
+> - **[Author now]** — write the SPEC first, then re-run `/hm:plan {slug}`. (Recommended)
+> - **[Waive with reason]** — bypass the SPEC requirement for this diff (requires a non-empty reason; the waiver expires when the diff changes).
+
+If user chooses **[Author now]:**
+
+1. Write the resume marker:
+   ```bash
+   !python -m harness_maker.spec_need marker-write --root <WT> --slug {slug} --verdict <verdict> --target <target> --base-sha <sha> --changed-files-hash <hash>
+   ```
+2. Dispatch `/hm:spec` for the target:
+{% if is_codex %}
+   - **Cursor/Codex (no Skill tool):** INSTRUCT the user: **"Run `/hm:spec <target>`, then re-run `/hm:plan {slug}` to continue. The resume marker has been written and will skip re-detection on the next run."**
+{% else %}
+   - **Claude Code:** invoke `Skill(hm:spec <target>)` (the Skill tool is available in Claude Code).
+   - **Cursor/Codex (no Skill tool):** INSTRUCT the user: **"Run `/hm:spec <target>`, then re-run `/hm:plan {slug}` to continue. The resume marker has been written and will skip re-detection on the next run."**
+{% endif %}
+3. **STOP this invocation of `/hm:plan`.** The user will re-run `/hm:plan {slug}` after `/hm:spec` completes; the §1.7.0 re-entry check will then resume from the marker state.
+
+If user chooses **[Waive with reason]:**
+
+Require a non-empty rationale (reject blank/whitespace). Write the hash-bound waiver receipt:
+```bash
+!python -m harness_maker.spec_need waiver-set --root <WT> --slug {slug} --verdict <verdict> --target <target> --rationale "<user-provided reason>" --changed-file <f1> --changed-file <f2> …
+```
+
+Proceed to Step 2. The waiver is bound to the current diff hash and expires when the diff changes.
+
+{% endif %}
 ### Step 2 — SPEC inheritance check (when SPEC exists)
 
 If `{{ config.spec.dir }}SPEC-{slug}.md` exists:
@@ -419,6 +577,8 @@ interview_rounds: {N}
 adrs: {M}
 validator_outcome: APPROVED | NEEDS_REVISION_RESOLVED | MAJOR_REVISION_RESOLVED
 summary: "{≤100 char one-line TL;DR}"
+{% if config.dev_mode == 'spec-driven' %}spec_need_verdict: <add|change|delete|none|not-evaluated>  # from Step 1.7 verdict; record "none" on confident no-op
+spec_need_target: <slug>  # the task slug or SPEC slug for change/delete{% endif %}
 ---
 ```
 
@@ -449,6 +609,7 @@ After writing, Read the file back and assert:
 - Contains `## 🎙️ Interview Transcript` with ≥1 entry (or skip-justification line).
 - ADR count in frontmatter matches `## 📐 Architecture Decision Records` heading count.
 - Every phase has all required fields (depends_on / parallel_group / merge_hazards / scope / exit / risk / rollback).
+{% if config.dev_mode == 'spec-driven' %}- **SPEC-need frontmatter assertion (spec-driven):** the frontmatter MUST contain `spec_need_verdict` (present and set to a valid value from Step 1.7 — one of `add`, `change`, `delete`, `none`, or `not-evaluated`). If this key is absent, the write is incomplete — retry once, then surface the path + error and stop. A missing `spec_need_verdict` closes the absent-case fail-open that defeats Check 6.{% endif %}
 
 If verification fails, retry write **once**. If still failing, surface the path + error and stop — do NOT proceed to a downstream stage.
 
