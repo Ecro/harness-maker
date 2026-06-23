@@ -12,10 +12,13 @@ from __future__ import annotations
 import argparse
 import ast
 import contextlib
+import hashlib
 import json
+import os
 import re
 import subprocess
 import sys
+from datetime import UTC, datetime
 from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any, Literal
@@ -140,12 +143,40 @@ class AcceptanceCriterion(BaseModel):
     #: Advisory generation hint — NOT a generator (C7). The structured triple
     #: above is the gateable contract; this only nudges Phase A authoring.
     generator_hint: str | None = None
+    # --- judgment AC binding (PLAN-judgment-ac-binding, type == "judgment") --
+    #: The independent rubric-reviewer's verdict (ADR-001/006). null = unjudged.
+    judgment_verdict: Literal["pass", "fail"] | None = None
+    judged_at: str | None = None  # ISO date the verdict was recorded
+    #: Criterion-keyed, locator-cited rationale (ADR-006). Non-empty when judged.
+    judgment_evidence: str | None = None
+    #: Repo-relative paths the rubric judges — the hashed subject (ADR-004/007).
+    #: Required non-empty for a v2 judgment AC (validate); ``..``/absolute rejected.
+    judgment_subject_paths: list[str] = Field(default_factory=list)
+    #: Canonical SHA-256 over the subject at judge time; the gate re-checks it (ADR-003/004).
+    judgment_subject_hash: str | None = None
 
     @field_validator("id")
     @classmethod
     def _ac_id_format(cls, v: str) -> str:
         if not re.match(r"^AC-\d{3,}$", v):
             raise ValueError(f"ac.id must be 'AC-NNN' (3+ digits), got {v!r}")
+        return v
+
+    @field_validator("judgment_subject_paths")
+    @classmethod
+    def _no_traversal_in_subject(cls, v: list[str]) -> list[str]:
+        """Reject absolute / ``..`` subject paths (ADR-004 — same trust boundary as paths)."""
+        for p in v:
+            if not isinstance(p, str) or not p.strip():
+                raise ValueError(
+                    f"judgment_subject_paths entry must be non-empty string, got {p!r}"
+                )
+            if Path(p).is_absolute():
+                raise ValueError(
+                    f"judgment_subject_paths must be repo-relative, got absolute {p!r}"
+                )
+            if ".." in Path(p).parts:
+                raise ValueError(f"judgment_subject_paths must not contain '..', got {p!r}")
         return v
 
 
@@ -256,8 +287,16 @@ def validate(model: SpecMachine) -> list[str]:
                 errors.append(predicate_error)
         if ac.type == "parametric" and not ac.golden_table:
             errors.append(f"{ac.id}: type=parametric requires non-empty golden_table")
-        if ac.type == "judgment" and not (ac.rubric_id or "").strip():
-            errors.append(f"{ac.id}: type=judgment requires rubric_id")
+        if ac.type == "judgment":
+            if not (ac.rubric_id or "").strip():
+                errors.append(f"{ac.id}: type=judgment requires rubric_id")
+            # ADR-007: non-empty subject paths at v2 — else the omission default
+            # silently exempts the AC from the find-unjudged gate forever.
+            if is_v2 and not ac.judgment_subject_paths:
+                errors.append(
+                    f"{ac.id}: type=judgment requires non-empty judgment_subject_paths "
+                    f"(schema_version: 2)"
+                )
         if ac.type == "property":
             errors.extend(_property_errors(ac))
             # The property AC type + the oracle axis are v2-only. A v1 file that
@@ -267,7 +306,8 @@ def validate(model: SpecMachine) -> list[str]:
                     f"{ac.id}: type=property requires schema_version: 2 "
                     f"(declare it to use property/oracle_source)"
                 )
-        if not ac.test_ids and not ac.pending_test:
+        # judgment ACs bind via a recorded verdict, not test_ids/pending_test (ADR-001).
+        if ac.type != "judgment" and not ac.test_ids and not ac.pending_test:
             errors.append(f"{ac.id}: needs >=1 test_ids OR pending_test=true")
         if is_v2:
             errors.extend(_oracle_errors(ac))
@@ -751,6 +791,206 @@ def find_unbound_closed_type_acs(yaml_path: Path, cwd: Path) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
+# Judgment AC binding (PLAN-judgment-ac-binding) — independent rubric verdict
+# ---------------------------------------------------------------------------
+
+#: Per-file byte cap for the canonical subject hash (ADR-004). A path exceeding it
+#: resolves to the SAME unbound disposition as missing/unreadable, NEVER a skip.
+_SUBJECT_FILE_SIZE_CAP = 5 * 1024 * 1024
+
+
+class SubjectHashError(Exception):
+    """A judgment AC's subject could not be canonically hashed (ADR-004).
+
+    Raised on a missing/unreadable path, a symlink escaping the repo root, or a
+    file over the size cap. The gate treats this as **unbound** (never a skip).
+    """
+
+
+def select_judgment(model: SpecMachine, *, unbound_only: bool = False) -> list[AcceptanceCriterion]:
+    """The judgment ACs (parallel to ``select_pytest_bindable``).
+
+    ``unbound_only`` keeps ACs whose verdict is not ``pass`` (null or ``fail``).
+    """
+    return [
+        ac
+        for ac in model.ac
+        if ac.type == "judgment" and (not unbound_only or ac.judgment_verdict != "pass")
+    ]
+
+
+def _iter_subject_files(rel: str, root: Path) -> list[tuple[str, Path]]:
+    """Expand one subject path to ``(manifest_name, file)`` tuples.
+
+    A directory expands via ``os.walk(followlinks=False)`` — symlinked SUBDIRS are
+    NOT descended (so no symlink-dir escape and no symlink cycle, REVIEW security
+    P1). Every yielded file is resolved and **rejected (SubjectHashError) if it
+    escapes ``root``** — this catches a symlinked file inside the tree too. The
+    manifest name is the DECLARED (walked) repo-relative path, not the symlink
+    target (rename-sensitive on the declared location, REVIEW Codex P2). A missing
+    path raises (the gate then treats the AC as unbound, never a silent skip).
+    """
+    base = (root / rel).resolve()
+    root_resolved = root.resolve()
+    if not base.exists():
+        raise SubjectHashError(f"subject path not found: {rel}")
+    if not base.is_relative_to(root_resolved):
+        raise SubjectHashError(f"subject path escapes repo root (symlink?): {rel}")
+    out: list[tuple[str, Path]] = []
+    if base.is_dir():
+        for dirpath, dirnames, filenames in os.walk(base, followlinks=False):
+            dirnames.sort()
+            for fn in sorted(filenames):
+                f = Path(dirpath) / fn
+                rf = f.resolve()
+                if not rf.is_relative_to(root_resolved):
+                    raise SubjectHashError(f"subject file escapes repo root (symlink?): {f}")
+                if rf.is_file():
+                    out.append((str(f.relative_to(root_resolved)), rf))
+    else:
+        out.append((str(base.relative_to(root_resolved)), base))
+    return out
+
+
+#: Caps for the canonical subject hash (ADR-004 — bound the gate's per-run cost on
+#: an untrusted, possibly-huge subject path; exceeding either = unbound, never a skip).
+_SUBJECT_TOTAL_FILES_CAP = 5000
+_SUBJECT_TOTAL_BYTES_CAP = 200 * 1024 * 1024
+#: Cap on a `--evidence-file` read (REVIEW security P2 — it lands verbatim in the YAML).
+_EVIDENCE_FILE_CAP = 64 * 1024
+
+
+def compute_subject_hash(subject_paths: list[str], root: Path) -> str:
+    """Canonical SHA-256 over the subject (ADR-004).
+
+    Manifest = sorted ``(declared_relative_name, sha256(file_bytes))`` tuples,
+    de-duped by name — NAMES included (a rename changes the hash), order- and
+    declaration-multiset-independent. A missing/unreadable path, a symlink escaping
+    the repo, an empty subject (zero files), or a per-file / total size/count cap
+    breach raises ``SubjectHashError`` (the caller treats it as unbound — never a
+    silent skip).
+    """
+    by_name: dict[str, str] = {}
+    total_bytes = 0
+    for rel in subject_paths:
+        for name, f in _iter_subject_files(rel, root):
+            if name in by_name:
+                continue  # de-dup overlapping declarations (REVIEW correctness P2)
+            try:
+                size = f.stat().st_size
+                if size > _SUBJECT_FILE_SIZE_CAP:
+                    raise SubjectHashError(f"subject file over size cap ({rel}): {name}")
+                total_bytes += size
+                if (
+                    len(by_name) >= _SUBJECT_TOTAL_FILES_CAP
+                    or total_bytes > _SUBJECT_TOTAL_BYTES_CAP
+                ):
+                    raise SubjectHashError(f"subject total size/count cap exceeded at {name}")
+                by_name[name] = hashlib.sha256(f.read_bytes()).hexdigest()
+            except OSError as e:
+                raise SubjectHashError(f"subject file unreadable ({rel}): {e}") from e
+    if not by_name:
+        raise SubjectHashError("subject expanded to zero files (empty/emptied subject)")
+    manifest = "\n".join(f"{name}\0{digest}" for name, digest in sorted(by_name.items()))
+    return hashlib.sha256(manifest.encode("utf-8")).hexdigest()
+
+
+def mark_judged(
+    yaml_path: Path,
+    ac_id: str,
+    verdict: str,
+    evidence: str,
+    *,
+    cwd: Path,
+) -> list[str]:
+    """Record an independent rubric-reviewer's verdict (ADR-005). Pure storage, NO LLM call.
+
+    Validates the AC is type=judgment, the verdict is exactly ``pass``/``fail``, and
+    the evidence is non-empty; computes the canonical subject hash; stores
+    verdict/evidence/judged_at/hash. Returns an error list (empty = clean); the
+    file is left UNTOUCHED on any error.
+    """
+    if verdict not in ("pass", "fail"):
+        return [f"mark-judged: verdict must be exactly 'pass' or 'fail', got {verdict!r}"]
+    if not evidence.strip():
+        return ["mark-judged: judgment_evidence must be non-empty (criterion-keyed, ADR-006)"]
+    model = load(yaml_path)
+    ac = next((a for a in model.ac if a.id == ac_id), None)
+    if ac is None:
+        return [f"mark-judged: unknown ac id: {ac_id}"]
+    if ac.type != "judgment":
+        return [f"mark-judged: {ac_id} is type={ac.type!r}, not judgment"]
+    try:
+        subject_hash = compute_subject_hash(ac.judgment_subject_paths, cwd)
+    except SubjectHashError as e:
+        return [f"mark-judged: {e}"]
+    ac.judgment_verdict = verdict  # type: ignore[assignment]
+    ac.judgment_evidence = evidence.strip()
+    ac.judged_at = datetime.now(UTC).date().isoformat()
+    ac.judgment_subject_hash = subject_hash
+    _dump_machine_yaml(yaml_path, model)
+    return []
+
+
+def _judgment_in_scope(ac: AcceptanceCriterion, cwd: Path) -> bool:
+    """Is this judgment AC in-scope for the gate (must be bound), vs genuine future work?
+
+    In-scope iff it has NO declared paths (misconfigured — validate rejects it, but the
+    gate must block, not skip) OR **ANY** declared path exists on disk (REVIEW correctness
+    P1: a partially-built multi-path subject must be gated, not skipped behind an absent
+    sibling). Only a fully-absent subject (every path not yet written) is future-PLAN.
+    """
+    if not ac.judgment_subject_paths:
+        return True  # misconfigured → block, never silently exempt (absent-case guard)
+    return any((cwd / p).exists() for p in ac.judgment_subject_paths)
+
+
+def find_unjudged(yaml_path: Path, cwd: Path) -> list[str]:
+    """Judgment ACs that are a MISSED binding in Production (ADR-003).
+
+    A miss = an IN-SCOPE judgment AC (see `_judgment_in_scope`) that is NOT bound: no
+    ``pass`` verdict, a recorded ``fail``, a `pass` whose recomputed hash != the stored
+    hash (STALE), or an unhashable subject (a partially-present multi-path subject raises
+    in `compute_subject_hash` → unbound). A fully-absent subject = future-PLAN = safe-skip.
+    Raises on a malformed yaml so the Production caller fails closed.
+    """
+    model = load(yaml_path)  # raises on malformed → caller fails closed
+    misses: list[str] = []
+    for ac in select_judgment(model):
+        if not _judgment_in_scope(ac, cwd):
+            continue  # future-PLAN: no subject path on disk yet
+        if ac.judgment_verdict != "pass":
+            misses.append(ac.id)
+            continue
+        # pass recorded — confirm it is not stale (hash must match the live subject).
+        try:
+            current = compute_subject_hash(ac.judgment_subject_paths, cwd)
+        except SubjectHashError:
+            misses.append(ac.id)  # unhashable / partially-present = unbound (fail-closed)
+            continue
+        if current != ac.judgment_subject_hash:
+            misses.append(ac.id)  # stale pass
+    return sorted(misses)
+
+
+def stale_judgment_verdicts(yaml_path: Path, cwd: Path) -> list[str]:
+    """Recorded-`pass` judgment ACs whose subject hash drifted (advisory health signal)."""
+    model = load(yaml_path)
+    stale: list[str] = []
+    for ac in select_judgment(model):
+        if ac.judgment_verdict != "pass" or not _judgment_in_scope(ac, cwd):
+            continue
+        try:
+            current = compute_subject_hash(ac.judgment_subject_paths, cwd)
+        except SubjectHashError:
+            stale.append(ac.id)
+            continue
+        if current != ac.judgment_subject_hash:
+            stale.append(ac.id)
+    return sorted(stale)
+
+
+# ---------------------------------------------------------------------------
 # Migration policy (Appendix B)
 # ---------------------------------------------------------------------------
 
@@ -940,6 +1180,49 @@ def _run_find_unbound(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_mark_judged(args: argparse.Namespace) -> int:
+    """Record an independent rubric verdict (ADR-005). Pure storage, no LLM call."""
+    evidence = args.evidence
+    if evidence is None and args.evidence_file is not None:
+        ev_path = Path(args.evidence_file)
+        try:
+            if ev_path.stat().st_size > _EVIDENCE_FILE_CAP:
+                print("mark-judged: --evidence-file exceeds 64 KiB cap", file=sys.stderr)
+                return 1
+            evidence = ev_path.read_text(encoding="utf-8")
+        except OSError as e:
+            print(f"mark-judged: cannot read --evidence-file: {e}", file=sys.stderr)
+            return 1
+    errors = mark_judged(args.yaml_path, args.ac_id, args.verdict, evidence or "", cwd=args.root)
+    for err in errors:
+        print(err, file=sys.stderr)
+    if errors:
+        return 1
+    print(f"mark-judged: OK — {args.ac_id} verdict={args.verdict}")
+    return 0
+
+
+def _run_find_unjudged(args: argparse.Namespace) -> int:
+    """Production gate (ADR-003): exit 1 on a not-pass/stale/unhashable judgment AC, fail-closed."""
+    if not args.yaml_path.exists():
+        print("find-unjudged: no machine SPEC — nothing to check", file=sys.stderr)
+        return 0
+    try:
+        misses = find_unjudged(args.yaml_path, args.root)
+    except Exception as e:  # noqa: BLE001 — fail-closed: unknown state is not a pass
+        print(f"find-unjudged: FAIL (fail-closed) — {type(e).__name__}: {e}", file=sys.stderr)
+        return 1
+    if misses:
+        print(
+            "find-unjudged: FAIL — judgment AC(s) not bound (no current pass verdict; "
+            f"re-judge via the judgment-reviewer): {', '.join(misses)}",
+            file=sys.stderr,
+        )
+        return 1
+    print("find-unjudged: OK — no unbound judgment AC")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     """Entry point for validate / cross-validate / mark-tested / waiver-check / find-unbound."""
     parser = argparse.ArgumentParser(prog="python -m harness_maker.spec_machine")
@@ -984,6 +1267,23 @@ def main(argv: list[str] | None = None) -> int:
     p_unbound.add_argument("--yaml", dest="yaml_path", type=Path, required=True)
     p_unbound.add_argument("--root", dest="root", type=Path, default=Path.cwd())
 
+    p_judge = sub.add_parser(
+        "mark-judged", help="record an independent rubric verdict (pure storage, no LLM call)"
+    )
+    p_judge.add_argument("--yaml", dest="yaml_path", type=Path, required=True)
+    p_judge.add_argument("--ac", dest="ac_id", required=True)
+    p_judge.add_argument("--verdict", required=True, help="exactly 'pass' or 'fail'")
+    p_judge.add_argument("--evidence", default=None, help="criterion-keyed rationale")
+    p_judge.add_argument("--evidence-file", dest="evidence_file", default=None)
+    p_judge.add_argument("--root", dest="root", type=Path, default=Path.cwd())
+
+    p_unjudged = sub.add_parser(
+        "find-unjudged",
+        help="list judgment ACs not bound by a current pass verdict (Production gate; fail-closed)",
+    )
+    p_unjudged.add_argument("--yaml", dest="yaml_path", type=Path, required=True)
+    p_unjudged.add_argument("--root", dest="root", type=Path, default=Path.cwd())
+
     args = parser.parse_args(argv)
 
     if args.cmd == "waiver-check":
@@ -991,6 +1291,12 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.cmd == "find-unbound":
         return _run_find_unbound(args)
+
+    if args.cmd == "mark-judged":
+        return _run_mark_judged(args)
+
+    if args.cmd == "find-unjudged":
+        return _run_find_unjudged(args)
 
     if args.cmd == "validate":
         errors = validate(load(args.yaml_path))
@@ -1028,20 +1334,26 @@ __all__ = [
     "BindingGateUnavailableError",
     "GoldenRow",
     "GoldenTableError",
+    "SubjectHashError",
     "OracleSource",
     "SpecMachine",
     "VerificationTier",
+    "compute_subject_hash",
     "cross_validate",
     "evaluate_coverage",
     "find_unbound_closed_type_acs",
+    "find_unjudged",
     "load",
     "load_golden_table",
     "main",
+    "mark_judged",
     "mark_tested",
     "migrate",
     "resolve_pytest_selector",
     "score_ac_oracle_evidence",
+    "select_judgment",
     "select_pytest_bindable",
+    "stale_judgment_verdicts",
     "unresolved_test_ids",
     "validate",
     "waiver_check",

@@ -2,6 +2,27 @@
 
 ## [Unreleased]
 
+### Added — judgment AC forward-binding (the 4th/last AC type) — PLAN-judgment-ac-binding
+- The forward-binding loop now closes for `judgment` ACs too — the SDD tetrad's 4 AC types all
+  accumulate in the living SPEC. judgment has no deterministic pytest node, so a judgment AC is
+  "bound" iff a recorded `pass` verdict whose stored `judgment_subject_hash` STILL matches the
+  recomputed canonical subject hash (a stale pass = unbound). The verdict comes from an
+  **independent** read-only `judgment-reviewer` agent (ADR-006) — NOT the builder; a self-graded
+  verdict is verification theater. `mark_judged` is pure Python storage (no LLM call — the
+  no-network contract; the judgment is LLM-in-template, in the reviewer agent).
+- New `spec_machine` surface: judgment AC fields + a `validate` rule (non-empty
+  `judgment_subject_paths` at v2, closing the absent-case black hole), `select_judgment`,
+  `compute_subject_hash` / `SubjectHashError` (canonical, traversal-confined manifest),
+  `mark_judged`, `find_unjudged`, `stale_judgment_verdicts`, and the `mark-judged` / `find-unjudged`
+  CLIs. New read-only `judgment-reviewer` agent. `/hm:wrapup` dispatches the reviewer, records the
+  verdict, and runs a Production `find-unjudged` gate (subject-present-but-not-current-pass / stale /
+  malformed → fail-closed STOP; subject-absent → future-skip); Side is advisory.
+- k-of-3 review caught + fixed pre-commit a symlink-directory path-traversal in the subject hasher
+  (leaf-only `is_symlink` check + Python 3.12 `rglob` following symlinked dirs) and an all-exists
+  gate-scope that skipped partially-present subjects (the absent-case class one level down).
+  **Deferred fast-follow:** the `/hm:health` stale-verdict *display* wiring (the detector is built +
+  tested and the gate already blocks stale).
+
 ### Added — non-mechanical AC forward-binding (property + parametric) — PLAN-nonmechanical-ac-binding
 - The spec-machine forward-binding loop (mechanical-only since 0.28.0) now also closes for
   `property` and `parametric` ACs, so the living SPEC accumulates for 3 of 4 AC types. `judgment`

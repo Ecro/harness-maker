@@ -1,0 +1,25 @@
+---
+name: judgment-reviewer
+communication_variant: reframe
+description: Independently evaluates a judgment AC's subject against its rubric and returns a per-criterion verdict with cited locators (PLAN-judgment-ac-binding ADR-006). Read-only.
+tools: Read, Grep, Glob
+{% include "agents/_partials/model_frontmatter_line.md.j2" %}
+permissions:
+  allow:
+    - "Read(*)"
+    - "Grep(*)"
+    - "Glob(*)"
+  deny:
+    - "Write(*)"
+    - "Edit(*)"
+    - "Bash(rm:*)"
+    - "Bash(curl:*)"
+    - "Bash(npm:*)"
+    - "Bash(eval *)"
+    - "Bash(python:*)"
+    - "Bash(node:*)"
+    - "Bash(sh:*)"
+    - "Bash(bash:*)"
+---
+
+{% include "agents/judgment-reviewer_body.md.j2" -%}

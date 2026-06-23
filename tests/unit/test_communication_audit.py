@@ -25,10 +25,11 @@ from harness_maker.communication_audit import (
 _REPO_TEMPLATES = Path(__file__).resolve().parents[2] / "src/harness_maker/templates"
 
 
-def test_discover_dispatchers_returns_14_agents() -> None:
+def test_discover_dispatchers_returns_15_agents() -> None:
     found = discover_dispatchers(_REPO_TEMPLATES)
-    # 14 dispatcher templates (excludes _body / _partials)
-    assert len(found) == 14
+    # 15 dispatcher templates (excludes _body / _partials); judgment-reviewer added
+    # in PLAN-judgment-ac-binding.
+    assert len(found) == 15
     names = {f.stem.removesuffix(".md") for f in found}
     assert "code-reviewer" in names
     assert "autoloop-coder" in names
@@ -46,7 +47,7 @@ def test_discover_pinned_skills_returns_four_llm_judgment() -> None:
 
 
 def test_repo_full_scan_returns_zero_items_when_clean() -> None:
-    """Baseline: with all 14 dispatchers + 4 skills correctly declared, audit is empty."""
+    """Baseline: with all 15 dispatchers + 4 skills correctly declared, audit is empty."""
     items = audit_communication(_REPO_TEMPLATES)
     assert items == [], f"Expected clean baseline, got items: {items}"
 

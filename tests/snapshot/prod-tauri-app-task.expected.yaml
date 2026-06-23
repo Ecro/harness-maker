@@ -1,6 +1,6 @@
 preset: Production
 dev_mode: task-driven
-file_count: 61
+file_count: 62
 files:
 - path: ../CLAUDE.md
   template: claude-md/Production.en.md.j2
@@ -23,6 +23,9 @@ files:
 - path: agents/executor.md
   template: agents/executor.md.j2
   body_sha256: 9895756d67fa33cca1349040e8bce9557d516d4060f04943a5a2d20a4b1e8919
+- path: agents/judgment-reviewer.md
+  template: agents/judgment-reviewer.md.j2
+  body_sha256: 9216a2c84e6d4365e76a45a3c2ee71fbf3717506fc171aa82dedce289f8d0985
 - path: agents/performance-reviewer.md
   template: agents/performance-reviewer.md.j2
   body_sha256: de31b4eda7d9e125c21a60fd1fb1ea711cf3e834cd0569a0f632fd586746dc69
@@ -49,13 +52,13 @@ files:
   body_sha256: 97786f65124e496d77adf30d8e29aebfd2c938702e79f6fb4eeaefe16bd73dc9
 - path: commands/hm/exec-rev-ver-wrap.md
   template: commands/hm/workflow_command.md.j2
-  body_sha256: 9dad3ce4b4ffec1bd646e6e45ff6e21e209f46417c26e53e190692f9869d0753
+  body_sha256: 13dc63d87c54600d2850425a9788234621cf62754dfb30b3fc62a87f5e66109d
 - path: commands/hm/exec-rev-wrap-ver.md
   template: commands/hm/workflow_command.md.j2
-  body_sha256: 9410f4749b59e0c934b692e24ce3864471cb326f148f361ea84dc5af58a4c4ab
+  body_sha256: f0b2d1d78478c6a7e8b57eee7151a03cb3cde6f6e0ebd5d34f88bd2a8b6927d3
 - path: commands/hm/exec-rev-wrap.md
   template: commands/hm/workflow_command.md.j2
-  body_sha256: ba4663d65e841abd2c654aefa11f425c70fd18eeacd0b8111b758bcabaafb184
+  body_sha256: a25ca0f1229ef2cf5f6ae88ec45898be0f2e15814f1a2fddc06cc323bb6e5056
 - path: commands/hm/exec-rev.md
   template: commands/hm/workflow_command.md.j2
   body_sha256: ce76aab3cac7bfadccf67b308e4cb87eddd31095fcbda33f60eddd41d6ff1368
@@ -103,7 +106,7 @@ files:
   body_sha256: 4ffe2ff4c5c56c0beb85a5e9bd395a7aafa1ff21b468a96d9891511d3ba624dc
 - path: commands/hm/wrapup.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: 8c4825b1a55d79b87683ea30cfdfbdaa55135245706b0400699849a9c7ee5566
+  body_sha256: 01635f3a27ca84e16083a367a8fd1b5bdd6043d93042ffc3b285c9022fd8b08c
 - path: harness.yaml
   template: harness-yaml/Production.yaml.j2
   body_sha256: 61982d95caa0e715f8e1d562cab8f70545596ea1f76ec4ff7e9baf9988802bc0
@@ -184,4 +187,4 @@ files:
   body_sha256: 2c7ce17e2c76f13662515077b38a3e8d9dcdca13bdf67e164db9c017fc8a4beb
 - path: stages/wrapup.md
   template: stages/wrapup.md.j2
-  body_sha256: 7952d1a3227d675b407bb28781162454c7c93bd513cc40027c896bb2a38bb901
+  body_sha256: 58b2f589c48bd2d1c520efcd7743a6e8abc139ca4b384d9f3875547c96be3299

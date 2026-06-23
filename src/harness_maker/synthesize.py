@@ -107,6 +107,7 @@ _ALL_AGENTS: list[str] = [
     "concurrency-reviewer",
     "consensus-arbiter",
     "executor",
+    "judgment-reviewer",
     "performance-reviewer",
     "plan-validator",
     "security-auditor",
@@ -206,6 +207,7 @@ _COMMUNICATION_VARIANT: dict[str, str] = {
     "code-verifier": "reframe",
     "concurrency-reviewer": "reframe",
     "consensus-arbiter": "reframe",
+    "judgment-reviewer": "reframe",
     "performance-reviewer": "reframe",
     "plan-validator": "reframe",
     "security-auditor": "reframe",
@@ -284,6 +286,7 @@ _CODEX_AGENT_META: dict[str, str] = {
     "concurrency-reviewer": "Reviews changes for race conditions, deadlocks, ISR safety, and async correctness",  # noqa: E501
     "consensus-arbiter": "Aggregates findings from multiple reviewer agents via surface match + reasoning alignment + severity resolution; tags every finding consensus-passed | weak-consensus | manual-only",  # noqa: E501
     "executor": "Workflow executor with worktree-bounded write permissions — only writes to .worktrees/, never to repo root",  # noqa: E501
+    "judgment-reviewer": "Independently evaluates a judgment AC's subject against its rubric and returns a per-criterion verdict with cited locators (PLAN-judgment-ac-binding ADR-006). Read-only.",  # noqa: E501
     "performance-reviewer": "Reviews changes for hot-path regressions, allocation hotspots, and algorithmic inefficiency",  # noqa: E501
     "plan-validator": "Critiques a draft PLAN document for gaps, ambiguities, missing exit criteria, and feasibility risks before /hm:execute is invoked. Read-only.",  # noqa: E501
     "security-auditor": "Deep 5-gate security audit (secrets, permissions, hook injection, dependency CVEs, prompt injection) — read-only, returns structured findings JSON",  # noqa: E501
