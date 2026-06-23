@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+### Added — stale-judgment verdicts surfaced in `/hm:health` — PLAN-judgment-stale-health-display
+- `/hm:health` now shows stale judgment-AC verdicts via a `judgment_verdict_freshness` advisory
+  signal in `readiness._dim_guardrails` — closing the deferred display surface from
+  PLAN-judgment-ac-binding (the `find-unjudged` Production gate already BLOCKS stale; this only
+  makes a drifting verdict *visible*). The signal is `weight=0` **and** `hard_gate=False` (both
+  pinned + asserted, not left to the `_signal` default), so it surfaces in the Structural
+  `signals_failed` list without docking the dimension score or the composite — `/hm:verify`
+  Check 3 is provably unaffected (ADR-001). Absent-case (no machine SPEC / zero judgment ACs) =
+  N-A (no signal); a **malformed** machine SPEC is fail-LOUD (a failed signal naming the spec,
+  NOT N-A — present-but-unreadable = freshness unknown, ADR-002). The "N fresh" count reuses the
+  detector's `_judgment_in_scope` scope predicate so an absent-subject pass is not miscounted
+  (k-of-3 review caught the overcount + narrowed the exception surface before commit).
+
 ### Added — judgment AC forward-binding (the 4th/last AC type) — PLAN-judgment-ac-binding
 - The forward-binding loop now closes for `judgment` ACs too — the SDD tetrad's 4 AC types all
   accumulate in the living SPEC. judgment has no deterministic pytest node, so a judgment AC is

@@ -15,7 +15,8 @@ import os
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
+import yaml
+from pydantic import BaseModel, ConfigDict, ValidationError
 
 from harness_maker._metrics_io import _candidate_files
 from harness_maker.context_lint import _count_body_lines
@@ -556,6 +557,82 @@ def _dim_guardrails(project_dir: Path) -> DimensionScore:
                 "matches the current dev_mode (oracle-waiver advisory render-drift)",
             )
         )
+
+    # Advisory — stale judgment-AC verdicts (PLAN-judgment-stale-health-display).
+    # weight=0 AND hard_gate=False so it surfaces in /hm:health WITHOUT docking the
+    # structural score: the find-unjudged Production gate is the teeth (ADR-001).
+    # N-A (no signal) when there is no judgment AC to talk about; fail-LOUD (a failed
+    # signal, NOT N-A) on a malformed machine SPEC — present-but-unreadable means
+    # freshness is UNKNOWN, unlike the waiver advisory's genuinely-absent render
+    # (ADR-002). Subject-hash errors come back from the detector as stale ids (not
+    # exceptions), so the only exception escaping it is a load()/parse failure.
+    specs_dir = project_dir / "specs"
+    if specs_dir.is_dir():
+        from harness_maker.spec_machine import _judgment_in_scope
+        from harness_maker.spec_machine import load as _load_machine
+        from harness_maker.spec_machine import select_judgment as _select_judgment
+        from harness_maker.spec_machine import stale_judgment_verdicts as _stale_verdicts
+
+        stale_ids: list[str] = []
+        unreadable_specs: list[str] = []
+        judgment_ac_total = 0
+        fresh_pass_total = 0
+        specs_with_judgment = 0
+        for yp in sorted(specs_dir.glob("SPEC-*.machine.yaml")):
+            spec_id = yp.name.removesuffix(".machine.yaml")
+            # Narrow catch (REVIEW F2, R1+Codex consensus): only a load/parse failure
+            # marks a SPEC malformed. A genuine internal bug (AttributeError/TypeError)
+            # must propagate LOUD, not be mislabeled as the user's "malformed SPEC".
+            try:
+                judgment_acs = _select_judgment(_load_machine(yp))
+                spec_stale = _stale_verdicts(yp, project_dir)
+            except (OSError, yaml.YAMLError, ValidationError, ValueError):
+                unreadable_specs.append(spec_id)
+                continue
+            if judgment_acs:
+                specs_with_judgment += 1
+                judgment_ac_total += len(judgment_acs)
+            # Count only IN-SCOPE passes (REVIEW F1, R1+R2 consensus): a pass whose
+            # subject is fully absent on disk is out-of-scope (the detector skips it),
+            # so it is neither fresh nor stale — it must not inflate the "N fresh" tally.
+            fresh_pass_total += sum(
+                1
+                for a in judgment_acs
+                if a.judgment_verdict == "pass" and _judgment_in_scope(a, project_dir)
+            )
+            stale_ids.extend(f"{spec_id}:{ac_id}" for ac_id in spec_stale)
+
+        if judgment_ac_total > 0 or unreadable_specs:
+            frags: list[str] = []
+            actions: list[str] = []
+            if stale_ids:
+                frags.append("stale judgment verdict(s): " + ", ".join(stale_ids))
+                actions.append(
+                    "Re-run /hm:wrapup (the find-unjudged gate blocks until the "
+                    "judgment-reviewer re-issues a pass for the drifted subject)"
+                )
+            if unreadable_specs:
+                frags.append(
+                    "could not verify freshness — malformed machine SPEC(s): "
+                    + ", ".join(unreadable_specs)
+                )
+                actions.append(
+                    "Run python -m harness_maker.spec_machine validate on the named SPEC(s)"
+                )
+            judgment_passed = not stale_ids and not unreadable_specs
+            signals.append(
+                _signal(
+                    "judgment_verdict_freshness",
+                    judgment_passed,
+                    0,  # ADR-001: advisory display-only — never docks the structural score
+                    f"{fresh_pass_total} judgment verdict(s) fresh across "
+                    f"{specs_with_judgment} SPEC(s)"
+                    if judgment_passed
+                    else " ; ".join(frags),
+                    None if judgment_passed else "; ".join(actions),
+                    hard_gate=False,  # ADR-001: pinned, not defaulted — never a stealth gate
+                )
+            )
 
     settings_path = claude / "settings.json"
     settings = _read_json_with_optional_frontmatter(settings_path)
