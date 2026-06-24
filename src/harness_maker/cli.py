@@ -399,6 +399,7 @@ def make(
 
     merge_paths: set[Path] = set()
     merge_json_paths: set[Path] = set()
+    keep_paths: set[Path] = set()
     keep_count = 0
     if target_dotclaude.exists() and any(target_dotclaude.iterdir()):
         backup(target_dotclaude)
@@ -444,7 +445,12 @@ def make(
     sweep_report = sweep_orphans(target, full_bp)
     _emit_orphan_sweep_report(sweep_report)
     _emit_reconcile_report(keep_count, merge_reports)
-    errors = verify(target_dotclaude)
+    # Exempt reconcile-KEPT files from the content_hash check: we deliberately
+    # left their on-disk body in place, so the declared hash (describing the
+    # template body we *would* have written) isn't ours to verify. Without this,
+    # any runtime-mutated KEEP file — e.g. observability/dashboard.md, whose body
+    # /hm:health rewrites in place below our frontmatter — hard-fails make.
+    errors = verify(target_dotclaude, skip_hash_paths=frozenset(keep_paths))
     if errors:
         for err in errors:
             typer.echo(f"VERIFY ERROR: {err}", err=True)

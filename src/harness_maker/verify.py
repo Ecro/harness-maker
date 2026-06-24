@@ -22,9 +22,24 @@ def _read_json_body(path: Path) -> str:
     return text[end + 5 :]
 
 
-def verify(target_dir: Path) -> list[str]:
-    """Return list of error messages (empty list = clean)."""
+def verify(
+    target_dir: Path,
+    *,
+    skip_hash_paths: frozenset[Path] | None = None,
+) -> list[str]:
+    """Return list of error messages (empty list = clean).
+
+    ``skip_hash_paths`` (``.claude``-relative paths) are exempt from the
+    content_hash check. Pass the reconcile KEEP set here: a KEPT file is one
+    we deliberately did NOT overwrite this render, so its on-disk body is owned
+    by the user or a runtime mutator (e.g. ``/hm:health`` rewrites
+    ``observability/dashboard.md`` in place below our frontmatter). The declared
+    content_hash describes the template body we *would* have written, so checking
+    it against a body we didn't author is a category error — and would hard-fail
+    `make` with exit 1 after every health run.
+    """
     errors: list[str] = []
+    skip = skip_hash_paths or frozenset()
 
     # 1. harness.yaml parses (provenance frontmatter + actual config).
     # Use the canonical multi-document-tolerant loader so this stays in sync with
@@ -75,6 +90,9 @@ def verify(target_dir: Path) -> list[str]:
             rel = md
         if fm is None or "content_hash" not in fm:
             # No provenance frontmatter → user-owned file, skip
+            continue
+        if rel in skip:
+            # KEPT by reconcile → on-disk body is not ours to verify
             continue
         declared = fm.get("content_hash")
         if not isinstance(declared, str):

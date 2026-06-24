@@ -66,6 +66,38 @@ def test_verify_md_content_hash_mismatch_fails(tmp_path: Path) -> None:
     )
 
 
+def test_verify_skip_hash_paths_exempts_kept_file(tmp_path: Path) -> None:
+    """A reconcile-KEPT file's body is not ours to verify against its hash.
+
+    Mirrors observability/dashboard.md: make renders provenance frontmatter with a
+    content_hash, then /hm:health rewrites the body in place. reconcile KEEPs it,
+    so make must NOT hard-fail on the now-stale hash. Passing the KEEP set via
+    skip_hash_paths exempts it; an unrelated mismatching file still fails.
+    """
+    (tmp_path / "harness.yaml").write_text("preset: Side\n", encoding="utf-8")
+    stale = (
+        "---\ngenerated_by: harness-maker\ncontent_hash: deadbeef\n---\n"
+        "runtime-mutated body that no longer matches the declared hash\n"
+    )
+    kept = tmp_path / "observability" / "dashboard.md"
+    kept.parent.mkdir(parents=True, exist_ok=True)
+    kept.write_text(stale, encoding="utf-8")
+    other = tmp_path / "other.md"
+    other.write_text(stale, encoding="utf-8")
+
+    # Without the exemption both files fail.
+    baseline = verify(tmp_path)
+    assert any("observability/dashboard.md" in e for e in baseline)
+    assert any("other.md" in e for e in baseline)
+
+    # KEEP set exempts only the kept file; the unrelated mismatch still fails.
+    errors = verify(tmp_path, skip_hash_paths=frozenset({Path("observability/dashboard.md")}))
+    assert not any("observability/dashboard.md" in e for e in errors), (
+        f"KEPT file must be exempt from content_hash check; got: {errors}"
+    )
+    assert any("other.md" in e for e in errors), f"non-KEPT mismatch must still fail; got: {errors}"
+
+
 def test_work_docs_footgun_probe(tmp_path: Path) -> None:
     """Phase 2 of PLAN-fix-work-docs-naming-footgun.
 

@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [0.32.1] - 2026-06-24
+
+### Fixed — `make` verify no longer hard-fails on reconcile-KEPT runtime-mutated files
+- `make`'s post-render verify pass now exempts reconcile **KEEP**-disposition files from the
+  content_hash check. A KEPT file is one we deliberately did NOT overwrite this render, so its on-disk
+  body is owned by the user or a runtime mutator — the declared `content_hash` (describing the template
+  body we *would* have written) isn't ours to verify. Without this, `observability/dashboard.md` —
+  whose body `/hm:health` rewrites in place below our frontmatter — caused `make` to exit 1 with
+  `VERIFY ERROR: content_hash mismatch` after every health run.
+- `verify()` gained an optional `skip_hash_paths` param (default empty → the four other callers are
+  unaffected); `cli.make` passes the reconcile `keep_paths` set. `keep_paths` is now initialized before
+  the reconcile block so the fresh-install path can't `NameError`.
+
 ## [0.32.0] - 2026-06-24
 
 ### Added — spec-driven `/hm:plan` auto-detects + routes to `/hm:spec` (SPEC-requirement gate) — PLAN-spec-requirement-gate
