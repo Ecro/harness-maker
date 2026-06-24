@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.32.0] - 2026-06-24
+
 ### Added — spec-driven `/hm:plan` auto-detects + routes to `/hm:spec` (SPEC-requirement gate) — PLAN-spec-requirement-gate
 - In **spec-driven** dev_mode, `/hm:plan` now auto-detects whether the work needs a machine SPEC
   operation (`add`/`change`/`delete`) and routes the user into `/hm:spec` via a durable resume-marker —
