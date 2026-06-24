@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.31.0
+harness_maker_version: 0.32.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: d31b597d51f144d0d533f34083125e234b303194dbced947a1134a305993a5d3
+content_hash: 2e37a9dcb756b0ad9d40cb2d116107bc3890c8541aa5e5aab867991c04c33d68
 ---
 > **Before you begin — outline your plan.** First check whether an autoloop is
 > active **for THIS session** (session-scoped — a loop in another session must
@@ -115,7 +115,7 @@ knowledge, write a typed `decision` or `preference` note through
 
 
 ```bash
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.31.0 python -m harness_maker.worktree task-preflight <slug> "$(pwd)"
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.32.1 python -m harness_maker.worktree task-preflight <slug> "$(pwd)"
 ```
 
 
@@ -124,7 +124,7 @@ knowledge, write a typed `decision` or `preference` note through
 
 
 ```bash
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.31.0 python -m harness_maker.worktree task-refresh <slug> "$(pwd)"
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.32.1 python -m harness_maker.worktree task-refresh <slug> "$(pwd)"
 ```
 
 
@@ -158,7 +158,7 @@ This seed is what the interview refines. Investigate code unknowns with Read/Gre
 Before Step 2, check whether `/hm:plan` is running inside an active `/hm:loop` iteration. **Detection is session-scoped** (PLAN-loop-marker-session-scoping) — it keys on THIS Claude session, so a loop running in *another* session never makes your standalone `/hm:plan` skip its interview. Locate the project root (strip any `/.worktrees/<wt-name>/` suffix from cwd, or `git -C . rev-parse --show-toplevel` then walk up out of `.worktrees/`), then run:
 
 ```bash
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.31.0 python -m harness_maker.worktree loop-mode-active "<PROJECT_ROOT>" --claude-session-id "$HM_SESSION_ID"
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.32.1 python -m harness_maker.worktree loop-mode-active "<PROJECT_ROOT>" --claude-session-id "$HM_SESSION_ID"
 ```
 
 - **Exit 0 (`active`)** → loop-mode: some `.claude/.hm-loop-*` marker's content header matches YOUR `session_id` (or a legacy global `.hm-loop-active` exists — degraded fallback). Do NOT engage the deep interview (loop body cannot block on `AskUserQuestion`). Scope the plan to the next master-PLAN phase only.
@@ -202,6 +202,7 @@ Before Step 2, check whether `/hm:plan` is running inside an active `/hm:loop` i
 6. **Cleanup boundary**: per-iter PLAN files (`PLAN-{slug}-iter*.md`) accumulate inside `<WT>/work-docs/`. They are squash-merged at loop close (ADR-008) and the squash commit on the parent branch carries them as artifacts. No standalone cleanup is needed — the worktree's lifecycle owns it.
 
 If `loop-mode-active` exited 1 (not loop-mode for this session) → proceed to Step 2 as normal.
+
 
 ### Step 2 — SPEC inheritance check (when SPEC exists)
 
@@ -515,6 +516,7 @@ interview_rounds: {N}
 adrs: {M}
 validator_outcome: APPROVED | NEEDS_REVISION_RESOLVED | MAJOR_REVISION_RESOLVED
 summary: "{≤100 char one-line TL;DR}"
+
 ---
 ```
 
@@ -546,6 +548,7 @@ After writing, Read the file back and assert:
 - ADR count in frontmatter matches `## 📐 Architecture Decision Records` heading count.
 - Every phase has all required fields (depends_on / parallel_group / merge_hazards / scope / exit / risk / rollback).
 
+
 If verification fails, retry write **once**. If still failing, surface the path + error and stop — do NOT proceed to a downstream stage.
 
 **Stage terminal**: On success, output a brief completion summary (PLAN path, interview rounds, ADR count, validator outcome) and **STOP**. Do not invoke any downstream stage (`/hm:execute` or any other) without an explicit user command. This boundary must survive context compaction — the next stage is user-initiated.
@@ -565,7 +568,7 @@ The shell guard below makes the receipt a no-op when `.current-iter` is absent �
 !if [ -f "<WT>/.claude/.hm-iter-receipts/.current-iter" ]; then \
    ITER=$(cat "<WT>/.claude/.hm-iter-receipts/.current-iter" 2>/dev/null); \
    if [ -n "$ITER" ]; then \
-     uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.31.0 python -m harness_maker.iter_receipts write \
+     uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.32.1 python -m harness_maker.iter_receipts write \
        --iter "$ITER" --stage plan --verdict <verdict> --root "<WT>"; \
    fi; \
  fi
@@ -685,7 +688,7 @@ Before any code edits, load memory in tier order (stops at first miss):
 
 
 ```bash
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.31.0 python -m harness_maker.worktree task-preflight <slug> "$(pwd)"
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.32.1 python -m harness_maker.worktree task-preflight <slug> "$(pwd)"
 ```
 
 
@@ -694,7 +697,7 @@ Before any code edits, load memory in tier order (stops at first miss):
 
 
 ```bash
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.31.0 python -m harness_maker.worktree task-refresh <slug> "$(pwd)"
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.32.1 python -m harness_maker.worktree task-refresh <slug> "$(pwd)"
 ```
 
 
@@ -795,6 +798,47 @@ bindable mechanical AC above:
 2. Test function name encodes the scenario ID: `test_s1_<short-name>`, etc.
 3. Assertions match the scenario's `**Then**` clause exactly.
 
+**(c) Property ACs** (`type: property` — spec-tetrad ADR-001/002) for every AC whose
+`oracle_source` is `property`:
+1. **Python** (`test_framework: pytest`): author a **Hypothesis** property test from the
+   AC's structured fields — `@given(<strategy for input_domain>)` generating inputs,
+   the body applying `transformation`, and the assertion encoding `expected_relation`
+   (the metamorphic relation / invariant). Honor `preconditions` via `assume(...)`.
+   A metamorphic relation is the oracle — it needs no reference output, so it cannot
+   be satisfied by reading the implementation (this is the whole point).
+2. **Hypothesis profile contract** (ADR-002, do NOT bake determinism everywhere):
+   register two settings profiles and select by env —
+   - `ci` profile: `derandomize=True`, `database=...` (replay shrunk failures),
+     explicit `@seed` capture → the **reproducible gate** the mutmut check runs under.
+   - `dev` profile: broader generation, relaxed deadline → local **bug-finding**.
+   Default to `ci` in CI (`HYPOTHESIS_PROFILE=ci`), `dev` locally.
+3. **Non-Python targets** (Dart/TS/Rust): the plugin does NOT bundle a generator
+   (ADR-002 — domain content owner = user). Author a conventional property test in the
+   project's framework (`fast-check` / `proptest` / `glados`) from the same structured
+   fields, and note the convention in the test file header.
+
+**(d) Parametric ACs** (`type: parametric` — PLAN-nonmechanical-ac-binding ADR-003) for
+every parametric AC with a `golden_table`:
+1. **`golden_table` is the SSOT** — do NOT inline the rows into the test (that re-creates
+   the drift this exists to remove). Load them at collection time via the harness helper:
+   ```python
+   from pathlib import Path
+   from harness_maker.spec_machine import load_golden_table
+   _ROWS = load_golden_table(Path(__file__).parents[N] / "specs/SPEC-{slug}.machine.yaml", "AC-0NN")
+   ```
+   **Path contract:** resolve the yaml **relative to the test file** (`Path(__file__).parents[N]`
+   for the project root) — NEVER cwd (pytest runs from varying cwds; a cwd-relative path breaks
+   collection). The consuming project must have `harness_maker` importable in its test env (a
+   loud `ImportError` is the failure mode — install it as a test dep or vendor the helper).
+2. **`@pytest.mark.parametrize`** over the rows with a STABLE `ids=` (derive from each row's
+   `note`/index so reordering the table gives readable, stable failure names). Bind at
+   **function level** — one `test_<ac-id>*` function = one `test_id` (per-row binding is out of
+   scope; `mark_tested`/collect already strip the `[case]` suffix).
+3. **`load_golden_table` is data-loading ONLY** — YOU author the oracle body. `f(**input) ==
+   expected` is the DEFAULT example, NOT the contract: a row may expect an exception
+   (`pytest.raises`), a partial/structural match, or multiple outputs. Bind free symbols to the
+   real production object — no mock-only body.
+
 There is no machine-readable scenario↔AC link, so deciding which scenarios are
 "already covered" is a judgment call — do NOT write both an AC test and a scenario
 test for the same observable; the Phase A.5 test-reviewer adjudicates the union for
@@ -872,6 +916,15 @@ assertion — never lower the threshold.** T2/T3 mutation is deferred to `/hm:lo
 or sampling; do NOT run it on this hot path. If mutmut is not installed the gate
 prints a skip notice and passes (non-gating) — that is intended, not a failure.
 
+> **Surviving-mutant classification (spec-tetrad ADR-004).** A survivor is NOT
+> automatically a test gap: `spec_mutation classify` tags each as `equivalent`
+> (a documented runtime no-op, e.g. a `typing.cast` string mutation — excluded
+> from the denominator **with a rule-id**), `real-not-killed` (a genuine gap —
+> strengthen the assertion), or `pending-review` (unknown — the default; stays
+> in the denominator, so kill-rate cannot be inflated by relabeling). The
+> excluded-equivalent count is shown next to the score and exclusion-set GROWTH
+> warns — never silently shrink the denominator to pass.
+
 ### Step 4 — Stage exit (NO commit — wrapup owns commits)
 
 When all PLAN phases complete GREEN:
@@ -899,7 +952,7 @@ The shell guard below makes the receipt a no-op when `.current-iter` is absent �
 !if [ -f "<WT>/.claude/.hm-iter-receipts/.current-iter" ]; then \
    ITER=$(cat "<WT>/.claude/.hm-iter-receipts/.current-iter" 2>/dev/null); \
    if [ -n "$ITER" ]; then \
-     uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.31.0 python -m harness_maker.iter_receipts write \
+     uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.32.1 python -m harness_maker.iter_receipts write \
        --iter "$ITER" --stage execute --verdict <verdict> --root "<WT>"; \
    fi; \
  fi
@@ -926,12 +979,12 @@ Pick **exactly one** finalize command. Substitute `<WT>` with the literal absolu
 ```bash
 # All phases GREEN — stage-merge the branch back (NO commit) + cleanup the worktree.
 # /hm:wrapup will create the single user-facing commit (with proper message + Co-Authored-By).
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.31.0 python -m harness_maker.worktree finalize <WT> stage-only
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.32.1 python -m harness_maker.worktree finalize <WT> stage-only
 ```
 
 ```bash
 # Stage halted on a blocker — preserve the worktree for inspection:
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.31.0 python -m harness_maker.worktree finalize <WT> fail
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.32.1 python -m harness_maker.worktree finalize <WT> fail
 ```
 
 
@@ -947,7 +1000,7 @@ of a `hm/<slug>` task worktree is empty → nothing recorded, by design.
 
 
 ```bash
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.31.0 python -m harness_maker.worktree owned-crumb-add "$(pwd)" <slug> "$(uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.31.0 python -m harness_maker.worktree wt-uuid <WT>)"
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.32.1 python -m harness_maker.worktree owned-crumb-add "$(pwd)" <slug> "$(uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.32.1 python -m harness_maker.worktree wt-uuid <WT>)"
 ```
 
 
@@ -963,7 +1016,7 @@ commit; otherwise the user's pre-existing WIP remains in the stash queue:
 
 
 ```bash
-!HM_OWNED_SESSION_UUIDS="$(uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.31.0 python -m harness_maker.worktree owned-crumb-read "$(pwd)" <slug>)" uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.31.0 python -m harness_maker.worktree post-commit-pop "$(pwd)"
+!HM_OWNED_SESSION_UUIDS="$(uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.32.1 python -m harness_maker.worktree owned-crumb-read "$(pwd)" <slug>)" uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.32.1 python -m harness_maker.worktree post-commit-pop "$(pwd)"
 ```
 
 
@@ -1089,7 +1142,7 @@ Per-invocation overrides (workflow command flags):
 
 
 ```bash
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.31.0 python -m harness_maker.worktree task-preflight <slug> "$(pwd)"
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.32.1 python -m harness_maker.worktree task-preflight <slug> "$(pwd)"
 ```
 
 
@@ -1098,7 +1151,7 @@ Per-invocation overrides (workflow command flags):
 
 
 ```bash
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.31.0 python -m harness_maker.worktree task-refresh <slug> "$(pwd)"
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.32.1 python -m harness_maker.worktree task-refresh <slug> "$(pwd)"
 ```
 
 
@@ -1509,7 +1562,7 @@ The shell guard below makes the receipt a no-op when `.current-iter` is absent �
 !if [ -f "<WT>/.claude/.hm-iter-receipts/.current-iter" ]; then \
    ITER=$(cat "<WT>/.claude/.hm-iter-receipts/.current-iter" 2>/dev/null); \
    if [ -n "$ITER" ]; then \
-     uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.31.0 python -m harness_maker.iter_receipts write \
+     uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.32.1 python -m harness_maker.iter_receipts write \
        --iter "$ITER" --stage review --verdict <verdict> --root "<WT>"; \
    fi; \
  fi
