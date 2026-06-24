@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -180,6 +181,9 @@ def test_measure_baseline_mutmut_missing(tmp_path: Path, monkeypatch: pytest.Mon
     def _raise_fnf(*_a: Any, **_kw: Any) -> None:
         raise FileNotFoundError("mutmut: not installed (mocked)")
 
+    # A fully-absent mutmut raises FNF on BOTH the `--version` precheck and the
+    # `mutmut run` call (same missing binary) — the realistic model. The precheck
+    # catches FNF and falls through, so the existing absent contract is preserved.
     monkeypatch.setattr(sm.subprocess, "run", _raise_fnf)
 
     rep = measure_baseline(
@@ -195,17 +199,38 @@ def test_measure_baseline_mutmut_missing(tmp_path: Path, monkeypatch: pytest.Mon
     assert rep.paths == ("src/harness_maker/render.py",)
 
 
+def _fake_run_factory(
+    version_out: str, *, on_run: Callable[..., Any], version_rc: int = 0
+) -> Callable[..., subprocess.CompletedProcess[str]]:
+    """Command-discriminating ``subprocess.run`` replacement (PLAN-mutmut-3x-pin).
+
+    ``mutmut --version`` returns a CompletedProcess carrying ``version_out`` (and
+    exit ``version_rc``, default 0); the ``mutmut run …`` invocation delegates to
+    ``on_run`` (which returns a CompletedProcess or raises). This isolates the
+    version-precheck from the mutation-run behavior so a test no longer
+    accidentally couples the two.
+    """
+
+    def _fake(cmd: list[str], *a: Any, **kw: Any) -> subprocess.CompletedProcess[str]:
+        if cmd[:2] == ["mutmut", "--version"]:
+            return subprocess.CompletedProcess(cmd, version_rc, stdout=version_out, stderr="")
+        return on_run(cmd, *a, **kw)
+
+    return _fake
+
+
 def test_measure_baseline_timeout_preserves_partial_output(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """TimeoutExpired keeps partial stdout/stderr (REVIEW C-P1-E).
+    """TimeoutExpired on ``mutmut run`` keeps partial stdout/stderr (REVIEW C-P1-E).
 
     Without this, a long mutmut run that completes 200/250 mutants returns a
-    0% score after timeout — spuriously failing the gate.
+    0% score after timeout — spuriously failing the gate. The version precheck
+    succeeds (2.x) so only the run call times out, isolating this behavior.
     """
     import harness_maker.spec_mutation as sm
 
-    def _raise_timeout(*_a: Any, **_kw: Any) -> None:
+    def _run_timeout(_cmd: list[str], *_a: Any, **_kw: Any) -> subprocess.CompletedProcess[str]:
         raise subprocess.TimeoutExpired(
             cmd=["mutmut"],
             timeout=10,
@@ -213,13 +238,122 @@ def test_measure_baseline_timeout_preserves_partial_output(
             stderr=b"",
         )
 
-    monkeypatch.setattr(sm.subprocess, "run", _raise_timeout)
+    monkeypatch.setattr(
+        sm.subprocess, "run", _fake_run_factory("mutmut 2.5.1", on_run=_run_timeout)
+    )
 
     rep = measure_baseline(["src/x.py"], cwd=tmp_path, timeout_seconds=10)
     # Partial output must be parsed — not zeroed.
     assert rep.killed == 80
     assert rep.survived == 20
     assert rep.score == pytest.approx(0.80)
+
+
+def test_measure_baseline_mutmut_3x_unsupported(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """mutmut 3.x detected → unsupported sentinel report; ``mutmut run`` is NEVER invoked.
+
+    The 2.x CLI (`--paths-to-mutate`) is incompatible with 3.x; the guard must
+    short-circuit before the run call rather than let it spuriously FAIL.
+    """
+    import harness_maker.spec_mutation as sm
+
+    def _run_must_not_run(cmd: list[str], *_a: Any, **_kw: Any) -> subprocess.CompletedProcess[str]:
+        raise AssertionError(f"mutmut run must not be invoked when 3.x is detected: {cmd}")
+
+    monkeypatch.setattr(
+        sm.subprocess, "run", _fake_run_factory("mutmut 3.0.0", on_run=_run_must_not_run)
+    )
+
+    rep = measure_baseline(["src/x.py"], cwd=tmp_path, timeout_seconds=5)
+    assert sm._MUTMUT_UNSUPPORTED in rep.raw_output
+    assert rep.killed == 0
+    assert rep.survived == 0
+    assert rep.total == 0
+    assert rep.paths == ("src/x.py",)
+
+
+def test_measure_baseline_unparsable_version_proceeds_as_supported(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Unparsable ``mutmut --version`` → treat as supported and reach the run path.
+
+    Ambiguity must never false-skip a working 2.x install.
+    """
+    import harness_maker.spec_mutation as sm
+
+    def _run_counts(_cmd: list[str], *_a: Any, **_kw: Any) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(_cmd, 0, stdout="killed: 7\nsurvived: 3\n", stderr="")
+
+    monkeypatch.setattr(
+        sm.subprocess, "run", _fake_run_factory("garbage with no version", on_run=_run_counts)
+    )
+
+    rep = measure_baseline(["src/x.py"], cwd=tmp_path, timeout_seconds=5)
+    assert sm._MUTMUT_UNSUPPORTED not in rep.raw_output
+    assert rep.killed == 7
+    assert rep.survived == 3
+
+
+def test_measure_baseline_version_nonzero_exit_proceeds_as_supported(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A non-zero `mutmut --version` exit is ambiguous → fall through, never skip.
+
+    Guards against a broken install whose failing `--version` spews version-shaped
+    text (here a stray '3.0.0') being misread as unsupported (REVIEW Codex P2).
+    """
+    import harness_maker.spec_mutation as sm
+
+    def _run_counts(_cmd: list[str], *_a: Any, **_kw: Any) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(_cmd, 0, stdout="killed: 5\nsurvived: 1\n", stderr="")
+
+    monkeypatch.setattr(
+        sm.subprocess,
+        "run",
+        _fake_run_factory("Traceback ... mutmut 3.0.0", on_run=_run_counts, version_rc=1),
+    )
+
+    rep = measure_baseline(["src/x.py"], cwd=tmp_path, timeout_seconds=5)
+    assert sm._MUTMUT_UNSUPPORTED not in rep.raw_output
+    assert rep.killed == 5
+
+
+def test_measure_baseline_2x_minor_not_unsupported(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A 2.x minor (2.10.3) must NOT be classified unsupported — locks the >=3 boundary."""
+    import harness_maker.spec_mutation as sm
+
+    def _run_counts(_cmd: list[str], *_a: Any, **_kw: Any) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(_cmd, 0, stdout="killed: 9\nsurvived: 1\n", stderr="")
+
+    monkeypatch.setattr(
+        sm.subprocess, "run", _fake_run_factory("mutmut version 2.10.3", on_run=_run_counts)
+    )
+
+    rep = measure_baseline(["src/x.py"], cwd=tmp_path, timeout_seconds=5)
+    assert sm._MUTMUT_UNSUPPORTED not in rep.raw_output
+    assert rep.killed == 9
+
+
+def test_measure_baseline_future_major_unsupported(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A future major (4.0.0) is also unsupported — the 2.x CLI stays incompatible."""
+    import harness_maker.spec_mutation as sm
+
+    def _run_must_not_run(cmd: list[str], *_a: Any, **_kw: Any) -> subprocess.CompletedProcess[str]:
+        raise AssertionError(f"mutmut run must not be invoked for an unsupported major: {cmd}")
+
+    monkeypatch.setattr(
+        sm.subprocess, "run", _fake_run_factory("mutmut 4.0.0", on_run=_run_must_not_run)
+    )
+
+    rep = measure_baseline(["src/x.py"], cwd=tmp_path, timeout_seconds=5)
+    assert sm._MUTMUT_UNSUPPORTED in rep.raw_output
+    assert rep.total == 0
 
 
 # ---------------------------------------------------------------------------
@@ -299,6 +433,48 @@ def test_cli_gate_degrades_when_mutmut_absent(
     rc = sm.main(["gate", "--yaml", str(yp), "--tier", "1"])
     assert rc == 0
     assert "not installed" in capsys.readouterr().err
+
+
+def test_cli_gate_loud_skips_when_mutmut_3x(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """mutmut 3.x → non-gating (exit 0) with an unsupported notice, not a spurious FAIL."""
+    import harness_maker.spec_mutation as sm
+
+    yp = _write_machine(tmp_path, paths=["src/x.py"])
+    monkeypatch.setattr(
+        sm,
+        "measure_baseline",
+        lambda *a, **k: _report(0, 0, raw=f"{sm._MUTMUT_UNSUPPORTED} 3.0.0"),
+    )
+    rc = sm.main(["gate", "--yaml", str(yp), "--tier", "1"])
+    err = capsys.readouterr().err
+    assert rc == 0
+    assert "unsupported" in err.lower()
+
+
+def test_cli_gate_absent_when_version_precheck_fnf(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """mutmut absent (FNF on the `--version` precheck) → absent-skip (exit 0).
+
+    Regression guard (PLAN-mutmut-3x-pin W1): the new version precheck must NOT
+    turn the genuinely-absent case into the unsupported notice or a spurious
+    FAIL. Uses the REAL measure_baseline so the precheck FNF → fall-through →
+    run-FNF → absent path is exercised end-to-end.
+    """
+    import harness_maker.spec_mutation as sm
+
+    def _raise_fnf(*_a: Any, **_kw: Any) -> None:
+        raise FileNotFoundError("mutmut: not installed (mocked)")
+
+    monkeypatch.setattr(sm.subprocess, "run", _raise_fnf)
+    yp = _write_machine(tmp_path, paths=["src/x.py"])
+    rc = sm.main(["gate", "--yaml", str(yp), "--tier", "1"])
+    err = capsys.readouterr().err
+    assert rc == 0
+    assert "not installed" in err  # absent notice
+    assert "unsupported" not in err.lower()  # NOT the 3.x notice
 
 
 def test_cli_gate_no_paths_is_noop(tmp_path: Path) -> None:

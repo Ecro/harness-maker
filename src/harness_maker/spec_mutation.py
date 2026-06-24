@@ -88,6 +88,57 @@ def gate(
     return False, f"score {score_pct}% < threshold {threshold}%"
 
 
+#: Substring an unsupported-mutmut report carries (see _detect_unsupported_mutmut).
+#: Paired with _MUTMUT_ABSENT (defined near the CLI) — both route main() to a non-gating skip.
+_MUTMUT_UNSUPPORTED = "mutmut: unsupported major version"
+
+#: mutmut's own version in `mutmut --version` output — anchored to the tool name so
+#: a stray dotted number in a preceding warning line cannot be read as the version.
+_MUTMUT_VERSION_RE = re.compile(r"mutmut[^\d]*(\d+)\.(\d+)(?:\.(\d+))?", re.IGNORECASE)
+
+#: The version pre-check is instant; a short timeout guards a hung binary.
+_VERSION_PRECHECK_TIMEOUT_S = 10
+
+
+def _detect_unsupported_mutmut(cwd: Path) -> str | None:
+    """Return an _MUTMUT_UNSUPPORTED report string when the installed mutmut major
+    version is >= 3, else None.
+
+    mutmut 3.x rewrote the CLI and dropped ``--paths-to-mutate`` (which the run
+    path hard-codes), so a 3.x binary makes ``mutmut run`` exit non-zero and the
+    gate spuriously FAIL at 0%. Detecting it here lets the caller loud-skip.
+    Any ambiguity (absent / timeout / unparsable / non-zero) returns None so the
+    caller falls through to the normal run path — never false-skip a working 2.x,
+    and let the existing run-FileNotFoundError handler own the absent contract.
+    """
+    try:
+        proc = subprocess.run(
+            ["mutmut", "--version"],
+            cwd=str(cwd),
+            capture_output=True,
+            text=True,
+            timeout=_VERSION_PRECHECK_TIMEOUT_S,
+            check=False,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        return None
+    if proc.returncode != 0:
+        # A broken/ambiguous `mutmut --version` (non-zero exit) may spew unrelated
+        # version-shaped text; treat as ambiguous → fall through so the real run
+        # path surfaces the failure instead of a silent unsupported-skip.
+        return None
+    blob = (proc.stdout or "") + "\n" + (proc.stderr or "")
+    m = _MUTMUT_VERSION_RE.search(blob)
+    if m is None:
+        return None
+    if int(m.group(1)) >= 3:
+        return (
+            f"{_MUTMUT_UNSUPPORTED} {m.group(0)} "
+            "(mutmut 3.x dropped --paths-to-mutate; pin mutmut<3)"
+        )
+    return None
+
+
 def measure_baseline(
     paths_to_mutate: list[str],
     *,
@@ -113,6 +164,9 @@ def measure_baseline(
             sampled=sampled,
             raw_output="",
         )
+    unsupported = _detect_unsupported_mutmut(cwd)
+    if unsupported is not None:
+        return _parse_mutmut_output(unsupported, tuple(paths_to_mutate), sampled=sampled)
     args = ["mutmut", "run", "--paths-to-mutate", ",".join(paths_to_mutate)]
     if sampled:
         args.extend(["--use-coverage"])  # narrow the universe
@@ -569,6 +623,14 @@ def main(argv: list[str] | None = None) -> int:
         print(
             "mutation gate: mutmut not installed — skipping (non-gating). "
             "Run `uv sync --group dev` to enable.",
+            file=sys.stderr,
+        )
+        return 0
+
+    if _MUTMUT_UNSUPPORTED in report.raw_output:
+        print(
+            "mutation gate: mutmut 3.x unsupported (pin mutmut<3) — skipping (non-gating). "
+            "The wrapper uses the 2.x `--paths-to-mutate` CLI; downgrade or pin to use the gate.",
             file=sys.stderr,
         )
         return 0

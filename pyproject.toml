@@ -61,7 +61,7 @@ dev = [
     "mypy>=1.11",
     "types-PyYAML",
     "respx>=0.20",
-    "mutmut>=2.4,<4",  # 3.x CLI dropped --paths-to-mutate; pin pending wrapper rewrite
+    "mutmut>=2.4,<3",  # 3.x rewrote the CLI/config (dropped --paths-to-mutate); staying on 2.x — see PLAN-mutmut-3x-pin
     "pre-commit>=4.6.0",
 ]
 

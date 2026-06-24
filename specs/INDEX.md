@@ -40,7 +40,7 @@ re-score with semantic understanding.
 | `cache.py` | **3.8%** (1 killed / 26 of 52 completed in 5-min sample) | T2 (floor 70%) | **70%** | measured — large gap to floor, test backfill needed |
 | `render.py` | — | T1 (floor 85%) | **85%** | pending (~hours of wall-clock; deferred to nightly CI) |
 
-Tool: mutmut 2.5.1 pinned (3.x removed `--paths-to-mutate`). Per ADR-005 formula `max(measured_baseline_pct + 5pp, tier_floor)`.
+Tool: mutmut pinned `>=2.4,<3` (resolves 2.5.1). 3.x rewrote the CLI/config and removed `--paths-to-mutate`, which the wrapper hard-codes; the pin enforces 2.x and a runtime guard loud-skips an unexpected 3.x (see PLAN-mutmut-3x-pin). Per ADR-005 formula `max(measured_baseline_pct + 5pp, tier_floor)`.
 
 ## Layer status
 

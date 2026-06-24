@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Fixed — mutmut pin tightened to `<3` + runtime 3.x guard (PLAN-mutmut-3x-pin)
+- The dev-group pin `mutmut>=2.4,<4` did not enforce its documented intent — `<4` allowed
+  mutmut 3.x, which dropped the `--paths-to-mutate` CLI flag the wrapper (`spec_mutation.py`)
+  hard-codes. Only `uv.lock` (2.5.1) prevented breakage. Tightened the constraint to
+  `mutmut>=2.4,<3` so it matches the comment + `specs/INDEX.md`.
+- Added a runtime version guard: when an unexpected mutmut 3.x is on `PATH` (a global install
+  bypassing the dev-group pin), the mutation gate now **loud-skips** (non-gating, exit 0 +
+  a notice) instead of producing a spurious gate FAIL (0% kill rate). The genuinely-absent
+  path is unchanged (still an absent-skip).
+
 ## [0.32.1] - 2026-06-24
 
 ### Fixed — `make` verify no longer hard-fails on reconcile-KEPT runtime-mutated files
