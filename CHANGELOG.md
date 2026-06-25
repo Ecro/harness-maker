@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.32.2] - 2026-06-25
+
 ### Added — autopilot surfaced in the interview + unlimited caps + cross-session persistence (PLAN-autopilot-config-surface)
 - The `/harness-maker:make` interview now asks about **autopilot** directly (enable? level?
   persist? caps?) via a new `_ask_autonomy()` round — previously the entire `autonomy` block
