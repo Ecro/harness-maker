@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.32.1
+harness_maker_version: 0.32.2
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: 2e37a9dcb756b0ad9d40cb2d116107bc3890c8541aa5e5aab867991c04c33d68
+content_hash: 66671666b03fd70a0bcf53e88c00fbc4e201d5c156a420529b213a214b535beb
 ---
 > **Before you begin — outline your plan.** First check whether an autoloop is
 > active **for THIS session** (session-scoped — a loop in another session must
@@ -27,6 +27,20 @@ content_hash: 2e37a9dcb756b0ad9d40cb2d116107bc3890c8541aa5e5aab867991c04c33d68
 > Present them as **intended, conditional** steps — skip heuristics, early-exit /
 > early-FAIL rules, and any stage's own `STOP — do not proceed` boundary override
 > this plan; never treat the banner as a commitment to run past a STOP.
+
+
+<!-- @hm:autopilot-picker -->
+> **Autopilot session start (Claude Code only).** This harness is configured for
+> autonomy (`autonomy.level: auto_safe`). If loop-mode is active for
+> this session (see above), SKIP this. Otherwise, if **no** `.hm-autopilot` marker is active yet (first eligible
+> stage of the session), offer the user — ONCE — to enable auto-advance for this session
+> via `AskUserQuestion`: "Run the `research → spec → plan → execute → review → verify → wrapup` pipeline
+> on autopilot this session (stages auto-advance when no mandatory gate is pending), or
+> stay gated (stop after each stage)?" On **yes**, run
+> `harness-maker autopilot on --level auto_safe --pipeline research,spec,plan,execute,review,verify,wrapup`
+> (writes the session marker). On **no**, proceed gated — do not re-prompt unless the user
+> asks. Once the marker exists, later stages skip this picker (the marker is the once-flag).
+<!-- @hm:/autopilot-picker -->
 
 
 
@@ -115,7 +129,7 @@ knowledge, write a typed `decision` or `preference` note through
 
 
 ```bash
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.32.1 python -m harness_maker.worktree task-preflight <slug> "$(pwd)"
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.32.2 python -m harness_maker.worktree task-preflight <slug> "$(pwd)"
 ```
 
 
@@ -124,7 +138,7 @@ knowledge, write a typed `decision` or `preference` note through
 
 
 ```bash
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.32.1 python -m harness_maker.worktree task-refresh <slug> "$(pwd)"
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.32.2 python -m harness_maker.worktree task-refresh <slug> "$(pwd)"
 ```
 
 
@@ -158,7 +172,7 @@ This seed is what the interview refines. Investigate code unknowns with Read/Gre
 Before Step 2, check whether `/hm:plan` is running inside an active `/hm:loop` iteration. **Detection is session-scoped** (PLAN-loop-marker-session-scoping) — it keys on THIS Claude session, so a loop running in *another* session never makes your standalone `/hm:plan` skip its interview. Locate the project root (strip any `/.worktrees/<wt-name>/` suffix from cwd, or `git -C . rev-parse --show-toplevel` then walk up out of `.worktrees/`), then run:
 
 ```bash
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.32.1 python -m harness_maker.worktree loop-mode-active "<PROJECT_ROOT>" --claude-session-id "$HM_SESSION_ID"
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.32.2 python -m harness_maker.worktree loop-mode-active "<PROJECT_ROOT>" --claude-session-id "$HM_SESSION_ID"
 ```
 
 - **Exit 0 (`active`)** → loop-mode: some `.claude/.hm-loop-*` marker's content header matches YOUR `session_id` (or a legacy global `.hm-loop-active` exists — degraded fallback). Do NOT engage the deep interview (loop body cannot block on `AskUserQuestion`). Scope the plan to the next master-PLAN phase only.
@@ -568,7 +582,7 @@ The shell guard below makes the receipt a no-op when `.current-iter` is absent �
 !if [ -f "<WT>/.claude/.hm-iter-receipts/.current-iter" ]; then \
    ITER=$(cat "<WT>/.claude/.hm-iter-receipts/.current-iter" 2>/dev/null); \
    if [ -n "$ITER" ]; then \
-     uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.32.1 python -m harness_maker.iter_receipts write \
+     uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.32.2 python -m harness_maker.iter_receipts write \
        --iter "$ITER" --stage plan --verdict <verdict> --root "<WT>"; \
    fi; \
  fi
@@ -688,7 +702,7 @@ Before any code edits, load memory in tier order (stops at first miss):
 
 
 ```bash
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.32.1 python -m harness_maker.worktree task-preflight <slug> "$(pwd)"
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.32.2 python -m harness_maker.worktree task-preflight <slug> "$(pwd)"
 ```
 
 
@@ -697,7 +711,7 @@ Before any code edits, load memory in tier order (stops at first miss):
 
 
 ```bash
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.32.1 python -m harness_maker.worktree task-refresh <slug> "$(pwd)"
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.32.2 python -m harness_maker.worktree task-refresh <slug> "$(pwd)"
 ```
 
 
@@ -952,7 +966,7 @@ The shell guard below makes the receipt a no-op when `.current-iter` is absent �
 !if [ -f "<WT>/.claude/.hm-iter-receipts/.current-iter" ]; then \
    ITER=$(cat "<WT>/.claude/.hm-iter-receipts/.current-iter" 2>/dev/null); \
    if [ -n "$ITER" ]; then \
-     uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.32.1 python -m harness_maker.iter_receipts write \
+     uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.32.2 python -m harness_maker.iter_receipts write \
        --iter "$ITER" --stage execute --verdict <verdict> --root "<WT>"; \
    fi; \
  fi
@@ -979,12 +993,12 @@ Pick **exactly one** finalize command. Substitute `<WT>` with the literal absolu
 ```bash
 # All phases GREEN — stage-merge the branch back (NO commit) + cleanup the worktree.
 # /hm:wrapup will create the single user-facing commit (with proper message + Co-Authored-By).
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.32.1 python -m harness_maker.worktree finalize <WT> stage-only
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.32.2 python -m harness_maker.worktree finalize <WT> stage-only
 ```
 
 ```bash
 # Stage halted on a blocker — preserve the worktree for inspection:
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.32.1 python -m harness_maker.worktree finalize <WT> fail
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.32.2 python -m harness_maker.worktree finalize <WT> fail
 ```
 
 
@@ -1000,7 +1014,7 @@ of a `hm/<slug>` task worktree is empty → nothing recorded, by design.
 
 
 ```bash
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.32.1 python -m harness_maker.worktree owned-crumb-add "$(pwd)" <slug> "$(uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.32.1 python -m harness_maker.worktree wt-uuid <WT>)"
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.32.2 python -m harness_maker.worktree owned-crumb-add "$(pwd)" <slug> "$(uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.32.2 python -m harness_maker.worktree wt-uuid <WT>)"
 ```
 
 
@@ -1016,7 +1030,7 @@ commit; otherwise the user's pre-existing WIP remains in the stash queue:
 
 
 ```bash
-!HM_OWNED_SESSION_UUIDS="$(uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.32.1 python -m harness_maker.worktree owned-crumb-read "$(pwd)" <slug>)" uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.32.1 python -m harness_maker.worktree post-commit-pop "$(pwd)"
+!HM_OWNED_SESSION_UUIDS="$(uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.32.2 python -m harness_maker.worktree owned-crumb-read "$(pwd)" <slug>)" uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.32.2 python -m harness_maker.worktree post-commit-pop "$(pwd)"
 ```
 
 
@@ -1142,7 +1156,7 @@ Per-invocation overrides (workflow command flags):
 
 
 ```bash
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.32.1 python -m harness_maker.worktree task-preflight <slug> "$(pwd)"
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.32.2 python -m harness_maker.worktree task-preflight <slug> "$(pwd)"
 ```
 
 
@@ -1151,7 +1165,7 @@ Per-invocation overrides (workflow command flags):
 
 
 ```bash
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.32.1 python -m harness_maker.worktree task-refresh <slug> "$(pwd)"
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.32.2 python -m harness_maker.worktree task-refresh <slug> "$(pwd)"
 ```
 
 
@@ -1562,7 +1576,7 @@ The shell guard below makes the receipt a no-op when `.current-iter` is absent �
 !if [ -f "<WT>/.claude/.hm-iter-receipts/.current-iter" ]; then \
    ITER=$(cat "<WT>/.claude/.hm-iter-receipts/.current-iter" 2>/dev/null); \
    if [ -n "$ITER" ]; then \
-     uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.32.1 python -m harness_maker.iter_receipts write \
+     uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.32.2 python -m harness_maker.iter_receipts write \
        --iter "$ITER" --stage review --verdict <verdict> --root "<WT>"; \
    fi; \
  fi

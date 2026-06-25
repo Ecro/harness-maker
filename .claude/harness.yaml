@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.32.1
+harness_maker_version: 0.32.2
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: harness-yaml/Production.yaml.j2
 provenance: official
-content_hash: df9909c2250a2312666d47c682654713e8b5f0bfcfc3eb130fadd34ab3e49583
+content_hash: 215cae6e84067586a2eaee1e4126925bbe104d592f91acb4ec6833fef031f812
 ---
 preset: Production
 locale: ko
@@ -155,8 +155,9 @@ codex_second_opinion:
   hermetic: true
   output_schema_path: ".claude/schemas/codex-finding.schema.json"
 autonomy:
-  level: "gated"
+  level: "auto_safe"
   pipeline: ["research", "spec", "plan", "execute", "review", "verify", "wrapup"]
-  step_cap: 20
-  time_cap_min: 300
+  step_cap: null
+  time_cap_min: null
   extra_deny: []
+  autopilot_persistent: true
