@@ -44,8 +44,8 @@ def evaluate_boundary(
     project_root: Path,
     *,
     steps: int,
-    step_cap: int,
-    time_cap_min: int,
+    step_cap: int | None,
+    time_cap_min: int | None,
     now: datetime | None = None,
 ) -> BoundaryDecision:
     """Decide whether the chain may advance past this boundary (PURE — no side effects).
@@ -53,6 +53,10 @@ def evaluate_boundary(
     Order is deliberate: the kill switch (marker removed / foreign / stale) is checked
     FIRST so a user `autopilot off` (or a crashed session's expired marker) aborts the
     chain regardless of cap state; then the step cap; then the time cap.
+
+    PLAN-autopilot-config-surface ADR-002: a ``None`` cap is UNLIMITED — that check is
+    skipped. The kill switch is unconditional, so a marker is still required to proceed;
+    unlimited removes only the runaway backstop, never the user's abort (marker removal).
     """
     moment = now if now is not None else datetime.now(UTC)
     marker = autopilot.active_marker(project_root, now=moment)
@@ -62,25 +66,26 @@ def evaluate_boundary(
             halt_kind="kill_switch",
             reason="autopilot marker absent/foreign/stale — aborting chain at boundary",
         )
-    if steps >= step_cap:
+    if step_cap is not None and steps >= step_cap:
         return BoundaryDecision(
             proceed=False,
             halt_kind="step_cap",
             reason=f"step cap reached ({steps}/{step_cap})",
         )
-    # active_marker already validated created_at is parseable + within the TTL, so this
-    # parse cannot raise here; re-parsed (not threaded out of active_marker) to keep the
-    # marker module's return surface minimal.
-    created = datetime.fromisoformat(marker.created_at)
-    if created.tzinfo is None:
-        created = created.replace(tzinfo=UTC)
-    elapsed_min = (moment - created).total_seconds() / 60.0
-    if elapsed_min >= time_cap_min:
-        return BoundaryDecision(
-            proceed=False,
-            halt_kind="time_cap",
-            reason=f"time cap reached ({elapsed_min:.1f}/{time_cap_min} min)",
-        )
+    if time_cap_min is not None:
+        # active_marker already validated created_at is parseable + within the TTL, so this
+        # parse cannot raise here; re-parsed (not threaded out of active_marker) to keep the
+        # marker module's return surface minimal.
+        created = datetime.fromisoformat(marker.created_at)
+        if created.tzinfo is None:
+            created = created.replace(tzinfo=UTC)
+        elapsed_min = (moment - created).total_seconds() / 60.0
+        if elapsed_min >= time_cap_min:
+            return BoundaryDecision(
+                proceed=False,
+                halt_kind="time_cap",
+                reason=f"time cap reached ({elapsed_min:.1f}/{time_cap_min} min)",
+            )
     return BoundaryDecision(proceed=True, halt_kind=None, reason="")
 
 
@@ -225,8 +230,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     b = sub.add_parser("boundary", add_help=False)
     b.add_argument("--root", default=".")
     b.add_argument("--current", required=True)
-    b.add_argument("--step-cap", type=int, required=True, dest="step_cap")
-    b.add_argument("--time-cap-min", type=int, required=True, dest="time_cap_min")
+    # PLAN-autopilot-config-surface ADR-002: optional → absent flag = None = unlimited. The
+    # stage template omits the flag when the config cap is null, so an unlimited harness simply
+    # does not pass it; a finite harness passes the rendered integer.
+    b.add_argument("--step-cap", type=int, default=None, dest="step_cap")
+    b.add_argument("--time-cap-min", type=int, default=None, dest="time_cap_min")
     # gate-blocked (P7): the auto-branch records this when a mandatory gate holds the chain
     # — distinct from a cap halt, so the ledger shows WHY the chain stopped.
     g = sub.add_parser("gate-blocked", add_help=False)

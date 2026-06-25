@@ -106,10 +106,10 @@ files:
   body_sha256: ad821742f7547933ff4cfd646cbaac8f6af8a5c7118c35a9717735b835ff2f04
 - path: harness.yaml
   template: harness-yaml/Side.yaml.j2
-  body_sha256: e729f30bdfdb9140e5697a632dbe95fe6b1c584326f2779ac89f44479cc491dd
+  body_sha256: 9b6a610385190c5ebef87b6f3f6c66fa29e641a7d76417ed4843fbee4ccc694a
 - path: hooks/hooks.json
   template: hooks/hooks.json.j2
-  body_sha256: 0624c17ca61a0b0d61a66a7bdaf7116f1f374ffee081db66b11b21f17ee1ce28
+  body_sha256: 0ef930a5d5dd8f567c1848516b50f570b31fb895ffe4b54e40d882255da7513e
 - path: memory/failures.md
   template: memory/failures.en.md.j2
   body_sha256: 9f2e56697242d3f8f846453a782e4f552265d1d2a63308a96717051d38ba376b

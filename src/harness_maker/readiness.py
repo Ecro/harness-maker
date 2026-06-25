@@ -516,6 +516,54 @@ def _dim_guardrails(project_dir: Path) -> DimensionScore:
         )
     )
 
+    # Loud smoke (PLAN-autopilot-config-surface ADR-003/P6): when
+    # autonomy.autopilot_persistent is committed true, a stale render that lost the
+    # autopilot_autoarm SessionStart hook means autopilot will NOT actually persist across
+    # sessions (silent degradation — the user re-arms manually, defeating the feature). N-A
+    # (passes, no penalty) when persistence is off or hooks.json is absent — an intentional
+    # opt-out is a config choice, not a missing guardrail (permissions_deny N-A precedent).
+    _autopilot_persistent = False
+    _ap_hy = claude / "harness.yaml"
+    if _ap_hy.is_file():
+        try:
+            from harness_maker.io_utils import load_harness_yaml as _lhy_ap
+
+            _ap_cfg = _lhy_ap(_ap_hy)
+            _ap_autonomy = _ap_cfg.get("autonomy") if isinstance(_ap_cfg, dict) else None
+            if isinstance(_ap_autonomy, dict):
+                _autopilot_persistent = _ap_autonomy.get("autopilot_persistent") is True
+        except Exception:  # noqa: BLE001 — degrade to N-A, never crash readiness
+            _autopilot_persistent = False
+    # N-A (passes) when persistence is off OR no hooks.json exists at all — the
+    # `hooks_json_present` signal owns the absent-hooks.json case, so this smoke must not
+    # double-penalize a partial harness that never rendered hooks.json (mirrors the
+    # `sessionid_envfile_registered` `not hooks_path.exists()` precedent). It fires only on a
+    # stale render that HAS hooks.json but dropped the autoarm hook.
+    autoarm_ok = (
+        (not _autopilot_persistent)
+        or (not hooks_path.exists())
+        or (isinstance(hooks_data, dict) and "autopilot_autoarm" in json.dumps(hooks_data))
+    )
+    signals.append(
+        _signal(
+            "autopilot_autoarm_registered",
+            autoarm_ok,
+            # weight=0 (display-only, like the other advisory guardrail signals): this is a
+            # narrow opt-in smoke that must SURFACE loudly when degraded but must NOT dock the
+            # composite or perturb the "guardrail signals sum to 100" budget (a non-zero weight
+            # inflated the empty-project score). hard_gate=False — visibility, not gating.
+            0,
+            "autopilot_persistent off (N-A) or autopilot_autoarm SessionStart hook registered"
+            if autoarm_ok
+            else "autonomy.autopilot_persistent is true but hooks.json lacks the "
+            "autopilot_autoarm SessionStart hook — autopilot will NOT persist across sessions",
+            None
+            if autoarm_ok
+            else "Re-render with /hm:make --update so SessionStart registers "
+            "harness_maker.hooks.autopilot_autoarm (re-arms the marker each session)",
+        )
+    )
+
     # Render-drift guard (PLAN-wrapup-waiver-enforcement ADR-004/C5): the
     # task-driven oracle-waiver advisory (wrapup Step 3.6) is baked at render time
     # on the dev_mode branch. If harness.yaml's dev_mode was flipped without

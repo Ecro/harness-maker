@@ -20,7 +20,7 @@ import contextlib
 import logging
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, TextIO
+from typing import Any, Literal, TextIO
 
 import yaml
 from pydantic import ValidationError
@@ -219,6 +219,7 @@ def interview(
     sibling_repos = _ask_sibling_repos()
     second_brain = _ask_second_brain()
     codex_second_opinion = _ask_codex_second_opinion()
+    autonomy = _ask_autonomy()
     return _build_answers(
         locale=locale,
         targets=targets,
@@ -232,6 +233,7 @@ def interview(
         sibling_repos=sibling_repos,
         second_brain=second_brain,
         codex_second_opinion=codex_second_opinion,
+        autonomy=autonomy,
     )
 
 
@@ -587,6 +589,55 @@ def _ask_codex_second_opinion() -> CodexSecondOpinionConfig:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# Autopilot / autonomy (PLAN-autopilot-config-surface — the only un-asked field surfaced)
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def _ask_cap(label: str) -> int | None:
+    """A runaway cap: ``unlimited`` (default) → None, or a positive int.
+
+    ADR-002: ``None`` = unlimited; a non-positive / non-numeric entry is not a valid bound,
+    so it falls back to unlimited (never 0 — ``gt=0`` would reject it anyway).
+    """
+    raw = _input_or_empty(f"    {label} [unlimited or a number] (unlimited): ").strip().lower()
+    if raw in {"", "unlimited", "none", "off"}:
+        return None
+    try:
+        value = int(raw)
+    except ValueError:
+        return None
+    return value if value > 0 else None
+
+
+def _ask_autonomy() -> AutonomyConfig:
+    """Ask whether to enable autopilot auto-advance + its level / persistence / caps.
+
+    PLAN-autopilot-config-surface ADR-001/002/003. Default OFF (``gated`` — today's behavior).
+    When enabled, ``unlimited`` is the offered cap default (the real safety boundary is the
+    mandatory plan/review/wrapup gates, not the caps); ``autopilot_persistent`` re-arms the
+    marker each session so the user need not re-enable it every time.
+    """
+    print("\nAutopilot (pipeline auto-advance).")
+    print("  When enabled, /hm: stages auto-advance past two-way-door boundaries but ALWAYS")
+    print("  stop at the plan interview, a CHANGES_REQUESTED review, and the wrapup merge.")
+    answer = _input_or_empty("  Enable autopilot auto-advance? [y/N]: ").strip().lower()
+    if answer not in {"y", "yes"}:
+        return AutonomyConfig()
+    level_raw = _input_or_empty("  Level [auto_safe/full] (auto_safe): ").strip().lower()
+    level: Literal["gated", "auto_safe", "full"] = "full" if level_raw == "full" else "auto_safe"
+    persist_raw = (
+        _input_or_empty("  Persist across sessions (re-arm each session)? [y/N]: ").strip().lower()
+    )
+    persistent = persist_raw in {"y", "yes"}
+    return AutonomyConfig(
+        level=level,
+        step_cap=_ask_cap("step cap (chained stages)"),
+        time_cap_min=_ask_cap("time cap (minutes)"),
+        autopilot_persistent=persistent,
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Confidence-bucketed dispatch (Phase 8 — single tri-IDE dispatch site)
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -665,6 +716,7 @@ def _build_answers(
     ref_folders: list[RefFolder] | None = None,
     sibling_repos: list[str] | None = None,
     codex_second_opinion: CodexSecondOpinionConfig | None = None,
+    autonomy: AutonomyConfig | None = None,
     schema_version: int = 2,
 ) -> InterviewAnswers:
     is_side = preset == Preset.SIDE
@@ -691,6 +743,7 @@ def _build_answers(
         },
         consensus=consensus or _consensus_for(preset),
         caching=caching or "agent-aware",
+        autonomy=autonomy if autonomy is not None else AutonomyConfig(),
         **_preset_extras(preset, schema_version=schema_version),
     )
 
@@ -1188,6 +1241,15 @@ def _parse_autonomy(value: object) -> AutonomyConfig:
     """
     if not isinstance(value, dict):
         return AutonomyConfig()
+    # `strict=False` is needed for the yaml stage strings → AtomicStage pipeline coercion, but
+    # it would ALSO coerce a hand-edited non-bool `autopilot_persistent` ("true" / "yes" / 1)
+    # into a real bool — which the autoarm hook's strict `is True` check was designed to reject,
+    # silently enabling persistent autoarm on the next re-render. Drop a non-bool so it falls to
+    # the safe default (False), mirroring the worktree.feature_branch_workflow strictness
+    # contract [[two-readers-of-one-config-must-agree-on-strictness]] (Codex review P2).
+    if "autopilot_persistent" in value and not isinstance(value["autopilot_persistent"], bool):
+        logger.warning("harness.yaml autonomy: non-bool autopilot_persistent ignored → false.")
+        value = {k: val for k, val in value.items() if k != "autopilot_persistent"}
     try:
         return AutonomyConfig.model_validate(value, strict=False)
     except Exception as e:  # noqa: BLE001 — tolerant upgrade path like second_brain

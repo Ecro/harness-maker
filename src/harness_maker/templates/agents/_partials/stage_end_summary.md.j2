@@ -39,7 +39,7 @@ advance:
 (it enforces the Phase-5 runaway caps + kill switch, and on proceed records the advance it
 authorizes — so it must run only after Step 1 clears):
 
-!python -m harness_maker.autopilot_caps boundary --root . --current {{ summary_stage }} --step-cap {{ config.autonomy.step_cap }} --time-cap-min {{ config.autonomy.time_cap_min }}
+!python -m harness_maker.autopilot_caps boundary --root . --current {{ summary_stage }}{% if config.autonomy.step_cap is not none %} --step-cap {{ config.autonomy.step_cap }}{% endif %}{% if config.autonomy.time_cap_min is not none %} --time-cap-min {{ config.autonomy.time_cap_min }}{% endif %}
 
 Read the JSON:
 - `proceed: false` → **STOP** (print the banner). `halt_kind` `step_cap`/`time_cap` = a

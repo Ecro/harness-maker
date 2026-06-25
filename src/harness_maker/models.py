@@ -609,9 +609,31 @@ class AutonomyConfig(BaseModel):
             AtomicStage.WRAPUP,
         ],
     )
-    step_cap: int = Field(default=20, gt=0)
-    time_cap_min: int = Field(default=300, gt=0)
+    # PLAN-autopilot-config-surface ADR-002: ``None`` = unlimited (the boundary cap check is
+    # skipped). The field DEFAULT stays bounded (20/300) so the absent/malformed fallback is
+    # SAFE — only a fresh interview opts into unlimited (ADR-005). ``gt=0`` still rejects a
+    # hand-edited 0/negative (→ tolerant ``_parse_autonomy`` fallback), preserving the existing
+    # zero-step-cap fallback test; the real runaway bound under unlimited is the finite pipeline
+    # + the wrapup merge-gate, not the cap (ADR-003).
+    step_cap: int | None = Field(default=20, gt=0)
+    time_cap_min: int | None = Field(default=300, gt=0)
     extra_deny: list[str] = Field(default_factory=list)
+    # ADR-003: when True, a SessionStart hook (``harness_maker.hooks.autopilot_autoarm``)
+    # re-arms a fresh ``.hm-autopilot`` marker each session from the committed level/pipeline,
+    # so the 18h TTL never trips in practice. The committed ``false`` is the real off-switch.
+    autopilot_persistent: bool = False
+
+    @field_validator("pipeline")
+    @classmethod
+    def _pipeline_no_duplicates(cls, v: list[AtomicStage]) -> list[AtomicStage]:
+        # next_stage() resolves the NEXT stage by first index, so a duplicate stage
+        # (e.g. [execute, execute]) makes the chain return the same stage forever. With the
+        # caps now nullable (unlimited), that runaway is no longer bounded — so the
+        # boundedness invariant (finite, strictly-advancing pipeline) requires uniqueness.
+        # Codex review P1 of PLAN-autopilot-config-surface.
+        if len(v) != len(set(v)):
+            raise ValueError("autonomy.pipeline must not contain duplicate stages")
+        return v
 
 
 class HarnessConfig(BaseModel):

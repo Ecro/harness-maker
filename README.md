@@ -519,17 +519,24 @@ By default the workflow **stops after every stage** so you stay in the loop. Whe
 hand-off becomes a bottleneck, opt into **autopilot**: stages auto-advance through the
 pipeline whenever no human decision is actually required.
 
-- **Off by default** (`autonomy.level: gated`). Opt in per-session with
+- **Off by default** (`autonomy.level: gated`). The make interview asks about autopilot
+  directly (enable? level? persist? caps?), or opt in per-session with
   `harness-maker autopilot on` (which arms `auto_safe` by default — pass `--level full`
   for the wider policy), via the session-start picker, or by setting `autonomy.level` in
   `harness.yaml`.
+- **Persist across sessions**: set `autonomy.autopilot_persistent: true` and a SessionStart
+  hook re-arms the marker every session — no more `harness-maker autopilot on` each time. The
+  committed `false` (default) is the explicit off-switch.
 - **Mandatory human gates always stop the chain** — a `/hm:plan` architecture interview,
   a `/hm:review` `CHANGES_REQUESTED`, the `/hm:wrapup` commit/push, or a `/hm:verify`
   failure. These safety gates are non-negotiable at every level (`full` does **not**
-  bypass them).
-- **Runaway guards**: `autonomy.step_cap` (default 20) / `autonomy.time_cap_min`
-  (default 60) halt a chain that runs too long; removing the `.hm-autopilot` marker
-  (`harness-maker autopilot off`) is an instant kill switch honored at the next boundary.
+  bypass them) — they, not the caps, are the real safety boundary.
+- **Runaway guards (optional)**: `autonomy.step_cap` / `autonomy.time_cap_min` halt a chain
+  that runs too long. Each accepts a positive integer **or `null` = unlimited** (the new
+  interview default, since the mandatory gates above bound the pipeline regardless). Existing
+  harnesses keep their committed caps on `--update`; only a fresh interview defaults to
+  unlimited. Removing the `.hm-autopilot` marker (`harness-maker autopilot off`) is an instant
+  kill switch honored at the next boundary.
 - **Auditable**: every advance / gate-stop / cap-halt is recorded to
   `.claude/observability/auto-advance.jsonl`; `/hm:health` surfaces an "armed but never
   fired" degradation signal.
@@ -597,6 +604,19 @@ reviewers:
 worktree:
   scope: [execute, plan]     # which stages run in a fresh worktree
   cleanup: on_success        # on_success | always | never
+  feature_branch_workflow: true  # per-task persistent branch + worktree (Production default)
+
+autonomy:                    # autopilot / pipeline auto-advance — see the Autopilot section
+  level: gated               # gated | auto_safe | full (off by default)
+  autopilot_persistent: false  # true → SessionStart re-arms the marker each session
+  step_cap: null             # positive int | null = unlimited (mandatory gates are the real bound)
+  time_cap_min: null         # positive int | null = unlimited
+
+permissions:
+  deny_dangerous: false      # true → restore the destructive-pattern deny baseline (rm, curl|sh, /etc, ~/.ssh)
+
+codex_second_opinion:
+  enabled: false             # true → Codex CLI as a cross-model second reviewer (plan-validator, code-reviewer)
 
 anti_rot:
   enabled: true

@@ -2,6 +2,32 @@
 
 ## [Unreleased]
 
+### Added — autopilot surfaced in the interview + unlimited caps + cross-session persistence (PLAN-autopilot-config-surface)
+- The `/harness-maker:make` interview now asks about **autopilot** directly (enable? level?
+  persist? caps?) via a new `_ask_autonomy()` round — previously the entire `autonomy` block
+  was silently defaulted and only reachable by hand-editing `harness.yaml` (ADR-001).
+- `autonomy.step_cap` / `autonomy.time_cap_min` are now `int | None` where **`null` = unlimited**
+  (the boundary cap check is skipped). The real safety boundary is the mandatory plan/review/
+  wrapup gates, which fire at every level regardless of caps; the caps are a runaway backstop
+  only, and the finite pipeline + wrapup merge-gate bound a chain even when unlimited (ADR-002/003).
+- `autonomy.autopilot_persistent: true` (new) makes a SessionStart hook
+  (`harness_maker.hooks.autopilot_autoarm`) re-arm a fresh `.hm-autopilot` marker each session,
+  so the 18h TTL never trips in practice — no more `harness-maker autopilot on` every session.
+  The committed `false` (default) is the explicit off-switch (ADR-003).
+- `/hm:health` gains an `autopilot_autoarm_registered` smoke: when persistence is committed but
+  a stale render dropped the autoarm hook, it surfaces loudly (N-A / passes when persistence is off).
+
+### Migration / defaults note
+- **Cap default flip applies to NEW interviews only.** The Pydantic field default stays bounded
+  (`step_cap: 20`, `time_cap_min: 300`), so an old harness with no `autonomy` block — or a
+  malformed one — falls back to the *bounded* default, never silently unbounded (ADR-005).
+  Existing harnesses keep their committed `step_cap`/`time_cap_min` across `--update`; only a
+  fresh interview defaults to `null` (unlimited). README also corrected: `time_cap_min`'s
+  documented default was `60`, the actual model default is `300`.
+- Persistence resets the marker's `created_at` every SessionStart, so the 18h TTL no longer
+  catches a crashed same-project session — the bound is now the committed flag + pipeline
+  finiteness + mandatory gates, by design.
+
 ### Fixed — mutmut pin tightened to `<3` + runtime 3.x guard (PLAN-mutmut-3x-pin)
 - The dev-group pin `mutmut>=2.4,<4` did not enforce its documented intent — `<4` allowed
   mutmut 3.x, which dropped the `--paths-to-mutate` CLI flag the wrapper (`spec_mutation.py`)

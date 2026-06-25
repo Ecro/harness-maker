@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from harness_maker.io_utils import atomic_write
 from harness_maker.models import AtomicStage
@@ -41,6 +41,19 @@ class AutopilotMarker(BaseModel):
     # (autopilot "on" but never advances) — reject it as a malformed marker instead.
     pipeline: list[AtomicStage] = Field(min_length=1)
     created_at: str
+
+    @field_validator("pipeline")
+    @classmethod
+    def _pipeline_no_duplicates(cls, v: list[AtomicStage]) -> list[AtomicStage]:
+        # autopilot_caps.next_stage() resolves by first index, so a duplicate stage makes
+        # the chain loop forever once the runaway caps are unlimited (PLAN-autopilot-config-
+        # surface Codex review P1). Reject duplicates so a marker — whoever wrote it (autoarm
+        # hook, `autopilot on --pipeline`, picker) — can only advance monotonically to the
+        # wrapup merge-gate. A duplicate pipeline → ValidationError → the autoarm hook's
+        # try/except fail-safe-skips the arm.
+        if len(v) != len(set(v)):
+            raise ValueError("pipeline must not contain duplicate stages")
+        return v
 
 
 def marker_path(project_root: Path) -> Path:
