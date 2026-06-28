@@ -394,14 +394,26 @@ def make(
     target_dotclaude = target / ".claude"
 
     if dry_run:
-        _emit_dry_run_summary(bp, target_dotclaude)
+        keep_n = merge_n = 0
+        if target_dotclaude.exists() and any(target_dotclaude.iterdir()):
+            from harness_maker.models import ReconcileDecision
+
+            conflicts = reconcile(target_dotclaude, bp)
+            keep_n = sum(1 for c in conflicts if c.decision == ReconcileDecision.KEEP)
+            merge_n = sum(
+                1
+                for c in conflicts
+                if c.decision in (ReconcileDecision.MERGE_BLOCK, ReconcileDecision.MERGE_JSON)
+            )
+        _emit_dry_run_summary(bp, target_dotclaude, keep_count=keep_n, merge_count=merge_n)
         raise typer.Exit(0)
 
     merge_paths: set[Path] = set()
     merge_json_paths: set[Path] = set()
     keep_paths: set[Path] = set()
     keep_count = 0
-    if target_dotclaude.exists() and any(target_dotclaude.iterdir()):
+    was_existing = target_dotclaude.exists() and any(target_dotclaude.iterdir())
+    if was_existing:
         backup(target_dotclaude)
         # Phase 4 (PLAN-onboarding-backup-friction, ADR-005): hide
         # .backup-<ts>/ directories from `git status` so the safety net
@@ -485,8 +497,13 @@ def make(
         typer.echo(f"--add-domain stub created: {stub}")
 
     typer.echo(f"harness applied to {target_dotclaude} ({len(bp.files)} files)")
+    # Stable machine-parseable summary line for the slash render narrative to parse.
+    typer.echo(
+        f"render-summary: files={len(bp.files)} keep={keep_count} "
+        f"merge={len(merge_reports)} targets={','.join(t.value for t in a.targets)}"
+    )
     _emit_install_summary(a, bp)
-    _emit_post_make_readiness(target, a.preset)
+    _emit_post_make_readiness(target, a.preset, is_fresh=not was_existing)
     _emit_refdocs_index_build(target, a.ref_folders)
 
     # ADR-008: when codex is a target, install `[profiles.cheap]` /
@@ -578,6 +595,49 @@ def locate_cmd(
     if entry.project_path is not None:
         payload["projectPath"] = str(entry.project_path)
     typer.echo(json.dumps(payload, indent=2))
+
+
+@app.command("git-status")
+def git_status_cmd(
+    project_root: Path = typer.Argument(  # noqa: B008
+        default_factory=Path.cwd,
+        help="Project root (parent of .claude/). Defaults to cwd.",
+    ),
+) -> None:
+    """Emit the inferred git disposition of the rendered harness roots as JSON.
+
+    The slash command reads this to decide whether to ask the user to commit or
+    gitignore the harness. JSON only — never mutates, never commits.
+    """
+    from harness_maker.git_disposition import compute_git_status
+
+    status = compute_git_status(project_root)
+    typer.echo(json.dumps(status.to_dict(), indent=2))
+
+
+@app.command("git-ignore-roots")
+def git_ignore_roots_cmd(
+    project_root: Path = typer.Argument(  # noqa: B008
+        default_factory=Path.cwd,
+        help="Project root (parent of .claude/). Defaults to cwd.",
+    ),
+) -> None:
+    """Idempotently gitignore the present harness roots (explicit user decision).
+
+    Fails loudly (exit 1) on a non-work-tree or when the append does not take
+    effect — an explicit decision must not silently no-op.
+    """
+    from harness_maker.git_disposition import GitDispositionError, ignore_roots
+
+    try:
+        ignored = ignore_roots(project_root)
+    except GitDispositionError as e:
+        typer.echo(f"git-ignore-roots failed: {e}", err=True)
+        raise typer.Exit(1) from e
+    if ignored:
+        typer.echo(f"gitignored harness roots: {', '.join(ignored)}")
+    else:
+        typer.echo("git-ignore-roots: no harness roots present to ignore")
 
 
 @app.command("prune-backups")
@@ -731,8 +791,19 @@ def _human_bytes(n: int) -> str:
     raise AssertionError("_human_bytes: loop guard invariant broken")
 
 
-def _emit_dry_run_summary(bp: Blueprint, target_dotclaude: Path) -> None:
-    """Print what make() would install without writing any files."""
+def _emit_dry_run_summary(
+    bp: Blueprint,
+    target_dotclaude: Path,
+    *,
+    keep_count: int = 0,
+    merge_count: int = 0,
+) -> None:
+    """Print what make() would install without writing any files.
+
+    ``keep_count`` / ``merge_count`` come from a read-only reconcile pass when
+    re-rendering over an existing harness, so the preview shows what the user's
+    own edits will preserve (KEEP) or block-merge (MERGE) before they confirm.
+    """
     existing = set()
     if target_dotclaude.exists():
         for p in target_dotclaude.rglob("*"):
@@ -752,6 +823,8 @@ def _emit_dry_run_summary(bp: Blueprint, target_dotclaude: Path) -> None:
     typer.echo("─" * 50)
     typer.echo(f"  NEW:     {new_count}")
     typer.echo(f"  REPLACE: {replace_count}")
+    typer.echo(f"  KEEP:    {keep_count}   (your edits preserved)")
+    typer.echo(f"  MERGE:   {merge_count}   (block-merged into your edits)")
     typer.echo(f"  Total:   {len(bp.files)} files")
     typer.echo("─" * 50)
 
@@ -924,10 +997,15 @@ def _emit_refdocs_index_build(target: Path, ref_folders: list[RefFolder]) -> Non
         typer.echo(f"  warn: {w}")
 
 
-def _emit_post_make_readiness(target: Path, preset: Preset) -> None:
+def _emit_post_make_readiness(target: Path, preset: Preset, *, is_fresh: bool = False) -> None:
     """Run the cheap (skip_llm) ai-readiness scan and surface the top actions.
 
-    Wrapped in a broad except so a diagnostic failure never breaks ``make``.
+    Fresh install is severity-aware (ADR-005): quiet one-liner when there are no
+    P0/P1 findings — so a clean first install is calm, not a wall of findings —
+    but loud (count + the P0/P1 lines) when any P0/P1 is present, so real
+    structural failures introduced by render are never buried. Re-render keeps
+    the full scan. Wrapped in a broad except so a diagnostic failure never
+    breaks ``make``.
     """
     try:
         from harness_maker.ai_readiness import render_terminal_summary, run_ai_readiness
@@ -936,6 +1014,23 @@ def _emit_post_make_readiness(target: Path, preset: Preset) -> None:
     except Exception as e:  # noqa: BLE001 — diagnostic, never fail the make
         typer.echo(f"\n(ai-readiness scan skipped: {type(e).__name__}: {e})")
         return
+
+    if is_fresh:
+        p0p1 = [a for a in plan.actions if a.priority in ("P0", "P1")]
+        if not p0p1:
+            typer.echo("\nstructural-health: clean (no P0/P1) — run /hm:health for the full scan.")
+            return
+        typer.echo("\n" + "─" * 64)
+        typer.echo(f"Structural-health: {len(p0p1)} P0/P1 finding(s) need attention")
+        typer.echo("─" * 64)
+        for a in p0p1[:5]:
+            typer.echo(f"  [{a.priority}] {a.dimension} :: {a.summary}")
+            typer.echo(f"        → {a.suggestion}")
+        typer.echo("\nNext steps:")
+        typer.echo("  • Run /hm:health for the full 2-layer scan + unified dashboard.")
+        typer.echo("  • Fix P0 items first.")
+        return
+
     typer.echo("\n" + "─" * 64)
     typer.echo("Initial structural-health scan (LLM judge skipped — see hint below)")
     typer.echo("─" * 64)

@@ -15,29 +15,97 @@ Parse `$ARGUMENTS` for flags.
 
 ### Default (no args or `--update`)
 
-Silent re-render using existing `.claude/harness.yaml` answers. Picks up
-new template improvements without re-interviewing.
+Re-render using existing `.claude/harness.yaml` answers, then guide you all the
+way to "your harness is in git the way you want." The flow is: resolve the active
+plugin → (only if `.claude/` already exists) **preview & confirm** → apply →
+narrate what changed → **git disposition**. A fresh `.claude/` skips the preview.
 
-The bash line below discovers which harness-maker plugin install is active
-and uses it. Resolution path: a cache-glob bootstraps discovery (works even
-on first upgrade from <0.20 where `locate` is not yet available), then
-`harness-maker locate --plain` is invoked through that bootstrap to get the
-**canonical** install per the priority rules (projectPath==cwd > scope=user >
-installedAt desc — see docs/BOOTSTRAP.md + PLAN-locate-cli-version-gate
-ADR-001). The cache-glob result is used as fallback when `locate` is absent.
+The bash line below discovers which harness-maker plugin install is active and
+uses it. Resolution path: a cache-glob bootstraps discovery (works even on first
+upgrade from <0.20 where `locate` is not yet available), then `harness-maker
+locate --plain` is invoked through that bootstrap to get the **canonical** install
+per the priority rules (projectPath==cwd > scope=user > installedAt desc — see
+docs/BOOTSTRAP.md + PLAN-locate-cli-version-gate ADR-001). The cache-glob result
+is used as fallback when `locate` is absent.
 
-Why both: `/plugin update` bumps the plugin cache but the rendered `make.md`
-keeps calling the OLD CLI, which re-emits its OLD pin (the self-update
-bootstrap trap fixed in 0.19.1). The cache glob lets us reach the new
-binary; `locate` then disambiguates between scopes/projects.
+Why both: `/plugin update` bumps the plugin cache but the rendered `make.md` keeps
+calling the OLD CLI, which re-emits its OLD pin (the self-update bootstrap trap
+fixed in 0.19.1). The cache glob lets us reach the new binary; `locate` then
+disambiguates between scopes/projects.
+
+**Step 1 — resolve the active plugin install.** Run this and capture the printed
+`HM=` path; use that exact path as `$HM` in every later step (shell state does not
+persist between Bash calls):
 
 ```bash
-!HM=$(ls -1d "$HOME"/.claude/plugins/cache/harness-maker*/harness-maker/[0-9]*.[0-9]*.[0-9]* 2>/dev/null | awk -F/ '{print $NF, $0}' | sort -V | tail -1 | cut -d' ' -f2-); HM=$(uv run --with "${HM:-'{{ harness_maker_src_path }}'}" python -m harness_maker.cli locate --plain 2>/dev/null || echo "${HM:-'{{ harness_maker_src_path }}'}"); uv run --with "$HM" python -m harness_maker.cli make "$(pwd)" --update
+!HM=$(ls -1d "$HOME"/.claude/plugins/cache/harness-maker*/harness-maker/[0-9]*.[0-9]*.[0-9]* 2>/dev/null | awk -F/ '{print $NF, $0}' | sort -V | tail -1 | cut -d' ' -f2-); HM=$(uv run --with "${HM:-'{{ harness_maker_src_path }}'}" python -m harness_maker.cli locate --plain 2>/dev/null || echo "${HM:-'{{ harness_maker_src_path }}'}"); echo "HM=$HM"
 ```
 
-After the CLI completes, summarize:
-- Files replaced / merged / kept (from CLI output)
-- Current harness_maker_version
+**Step 2 — preview (ONLY when `.claude/` already exists and is non-empty).** Show
+what the re-render will change before touching the tree — this is why `/hm:make`
+does NOT render in a worktree: the CLI backs up to `.backup-<ts>/` and reconcile
+preserves your edits, so a read-only preview + confirm is all the safety needed.
+
+```bash
+uv run --with "$HM" python -m harness_maker.cli make "$(pwd)" --update --dry-run
+```
+
+Surface the NEW / REPLACE / KEEP / MERGE counts (KEEP = your edits preserved,
+MERGE = block-merged into your edits), then ask with the structured question tool
+(`AskUserQuestion` in Claude Code, `AskQuestion` in Cursor) — **Proceed** /
+**Cancel**. On Cancel, stop here. If `.claude/` does not exist yet (fresh install),
+skip this step and apply directly.
+
+**Step 3 — apply.** Run the real re-render:
+
+```bash
+uv run --with "$HM" python -m harness_maker.cli make "$(pwd)" --update
+```
+
+**Step 4 — narrate what changed.** Parse the `render-summary:` line
+(`files=… keep=… merge=… targets=…`) plus the reconcile report from the CLI output,
+and tell the user, in their locale: what changed, what was preserved (KEEP/MERGE),
+and the current `harness_maker_version`.
+
+**Step 5 — git disposition.** Guide the user's git decision for the generated
+harness (**neutral** — present the two options as equals, with no recommended
+marker and no preference ordering). Run:
+
+```bash
+uv run --with "$HM" python -m harness_maker.cli git-status "$(pwd)"
+```
+
+Read the JSON and branch on `is_git` / `decision_needed` / `offer_stage` /
+`prior_decision`:
+
+- **`is_git: false`** — not a git repository. Tell the user the harness files are
+  not under version control; if they want to track them, they can run `git init`
+  and re-run `/hm:make`. Run no git commands. Done.
+- **`decision_needed: true`** — ask, in the user's locale, the two options **as
+  equals** (the order below is not a recommendation):
+  - **Commit them** — the harness roots are added to git and committed, so anyone
+    who clones the repo gets the harness. On this choice run (scopes both the add
+    AND the commit to only the existing roots — the `-- $roots` pathspec keeps any
+    unrelated pre-staged work OUT of the harness commit; churn + `.backup-*` are
+    already gitignored, so the commit is clean):
+    ```bash
+    roots=""; for r in .claude .cursor .codex .agents AGENTS.md; do [ -e "$r" ] && roots="$roots $r"; done; git add $roots && git commit -m "chore: add harness-maker harness" -- $roots
+    ```
+  - **Gitignore them** — the roots are added to `.gitignore` and kept local. On
+    this choice run (fails loudly if the write does not take effect):
+    ```bash
+    uv run --with "$HM" python -m harness_maker.cli git-ignore-roots "$(pwd)"
+    ```
+- **`offer_stage: true`** — already committing, and new harness files appeared on
+  this re-render. Ask "Stage the new harness files into a commit?"; on yes,
+  `git add` the paths in `untracked_files` then commit **scoped to those paths**:
+  `git commit -m "chore: update harness-maker harness" -- <untracked_files>` (the
+  `-- <paths>` keeps unrelated staged work out); on no, skip.
+- **`prior_decision: "commit"` (no `offer_stage`), `"ignore"`, or no rendered roots
+  present** — already decided (or nothing to dispose). Say one line ("harness
+  already tracked" / "harness already gitignored — nothing to do") and finish.
+  **Do NOT re-prompt** — the decision is inferred from git state, so a re-render
+  never re-nags.
 
 ### `--reinterview`
 

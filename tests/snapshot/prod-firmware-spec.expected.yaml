@@ -79,7 +79,7 @@ files:
   body_sha256: 0a67e446f23ff83667c9d91d151133e1fe658759919b691923865743fb5cc3d2
 - path: commands/hm/make.md
   template: commands/hm/make.md.j2
-  body_sha256: 4ea7a5bfa70ffd8ca08dc8390f34b326bcd3ad66195b39da6c8fcd8d637aff74
+  body_sha256: 1863417d699be77b34bd78d80ff90f46e9d3a607c29939ee19200cb94eb7cd17
 - path: commands/hm/plan-exec-rev.md
   template: commands/hm/workflow_command.md.j2
   body_sha256: b786e8527b72ebe2d48ec187c8059f7e6cdf0c1bb2c9bb34f1699e656676f7c3

@@ -176,6 +176,45 @@ src/harness_maker/
 
 ---
 
+## Render pipeline
+
+`/harness-maker:make` (and the rendered `/hm:make`) turn `harness.yaml` into the on-disk
+harness, then guide you all the way to a git decision. The flow is deliberately **not** run
+inside a git worktree — `make` writes the real `.claude/`, and safety comes from a backup +
+reconcile + a read-only preview, which also keeps non-git projects working.
+
+**1. Resolve + preview (re-render only).** When `.claude/` already exists and is non-empty,
+make runs `--dry-run` first and shows NEW / REPLACE / KEEP / MERGE counts (KEEP = files where
+your edits are preserved verbatim; MERGE = `@hm:user:*` blocks block-merged into the new
+template), then asks you to confirm before writing. A fresh install skips the preview and
+applies directly. Existing generated state is copied to `.backup-<ts>/` (auto-gitignored)
+before any overwrite.
+
+**2. Apply + narrate.** Files are written; the CLI emits a stable `render-summary:` line
+(`files= keep= merge= targets=`) that the slash command turns into a plain-language summary in
+your locale — what changed, what was preserved, the current version. A fresh install is calm:
+the structural-health scan is **quiet when clean** and only goes **loud when there are real
+P0/P1 findings** (run `/hm:health` for the full scan any time).
+
+**3. Git disposition — the last mile.** Render isn't "done" until the files are in git the way
+you intend. `harness-maker git-status` inspects the rendered manifest across every selected
+target root (`.claude/`, plus `.cursor/`, `.codex/`, `.agents/`, `AGENTS.md` for those
+targets), minus operational churn, and reports one of:
+
+| state | what make does |
+|-------|----------------|
+| not a git repo | tells you; suggests `git init` if you want tracking; runs no git commands |
+| undecided (neither tracked nor ignored) | asks **neutrally** — *commit them* (share with your team) or *gitignore them* (keep local). No recommended option. |
+| already committed | nothing — unless a re-render added new files, in which case it offers to stage just those (never a full re-prompt) |
+| already gitignored | nothing |
+
+The decision is **inferred from git state every run, never stored**, so re-rendering never
+re-nags. Committing is clean because churn (`observability/`, iter-receipts, `.backup-*`) is
+already gitignored; `git-ignore-roots` ignores the whole target roots and **fails loudly** if
+the write doesn't take effect, so the slash command can't falsely report success.
+
+---
+
 ## 3. The 7 Atomic Workflow Stages
 
 Each of the 7 stages can be invoked as an independent slash command. Executing them in order produces a complete development cycle.

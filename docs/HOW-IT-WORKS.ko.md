@@ -177,6 +177,44 @@ src/harness_maker/
 
 ---
 
+## 렌더 파이프라인
+
+`/harness-maker:make` (및 렌더된 `/hm:make`)는 `harness.yaml`을 디스크 위 하네스로 만든 뒤,
+git 결정까지 끝까지 가이드한다. 이 흐름은 의도적으로 git worktree 안에서 돌지 **않는다** —
+`make`는 실제 `.claude/`에 쓰고, 안전성은 backup + reconcile + 읽기 전용 미리보기에서 오며,
+이는 비-git 프로젝트도 작동하게 한다.
+
+**1. 해석 + 미리보기 (재렌더 한정).** `.claude/`가 이미 있고 비어있지 않으면 make는 먼저
+`--dry-run`을 돌려 NEW / REPLACE / KEEP / MERGE 카운트(KEEP = 내 편집이 그대로 보존되는 파일;
+MERGE = `@hm:user:*` 블록이 새 템플릿에 block-merge됨)를 보여주고, 쓰기 전에 확인을 받는다.
+신규 설치는 미리보기를 건너뛰고 바로 적용. 덮어쓰기 전에 기존 생성물은 `.backup-<ts>/`
+(자동 gitignore)로 복사된다.
+
+**2. 적용 + 설명.** 파일이 쓰여지고, CLI가 안정적인 `render-summary:` 라인
+(`files= keep= merge= targets=`)을 내보내면 슬래시 명령이 이를 사용자 locale의 평이한 설명으로
+바꾼다 — 무엇이 바뀌고, 무엇이 보존되고, 현재 버전. 신규 설치는 조용하다: structural-health
+스캔은 **깨끗하면 조용**하고 **실제 P0/P1이 있을 때만 loud**하다 (전체 스캔은 언제든
+`/hm:health`).
+
+**3. git 처분 — 마지막 한 걸음.** 파일이 의도대로 git에 들어가기 전까지 렌더는 "끝"이 아니다.
+`harness-maker git-status`가 선택된 모든 target root(`.claude/`, 그리고 해당 target이면
+`.cursor/`, `.codex/`, `.agents/`, `AGENTS.md`)에 걸쳐 렌더 manifest를 — 운영 churn은 제외하고 —
+검사해 다음 중 하나를 보고한다:
+
+| 상태 | make의 동작 |
+|------|------------|
+| git 저장소 아님 | 알려줌; 추적을 원하면 `git init` 제안; git 명령 실행 안 함 |
+| 미결정 (tracked도 ignored도 아님) | **중립적으로** 질문 — *commit*(팀과 공유) 또는 *gitignore*(로컬 유지). 권장 옵션 없음. |
+| 이미 commit됨 | 없음 — 단, 재렌더가 새 파일을 추가했으면 그것만 staging 제안 (전체 재질문 아님) |
+| 이미 gitignore됨 | 없음 |
+
+결정은 **매 실행마다 git 상태에서 추론, 저장 안 함**이라 재렌더가 다시 묻지 않는다. churn
+(`observability/`, iter-receipts, `.backup-*`)이 이미 gitignore되어 commit이 깨끗하고;
+`git-ignore-roots`는 target root 전체를 ignore하며 쓰기가 적용되지 않으면 **loud하게 실패**하므로
+슬래시 명령이 거짓 성공을 보고할 수 없다.
+
+---
+
 ## 3. 7단계 원자 워크플로우
 
 7단계는 각각 독립된 슬래시 명령으로 호출 가능하다. 순서대로 실행하면 완전한 개발 사이클이 된다.

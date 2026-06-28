@@ -308,15 +308,28 @@ Branch on the chosen intent. Use `$plugin_dir` and `$RESOLVE_MODE` from section 
 
 #### Update (re-render same settings)
 
+**Preview first when `.claude/` already exists & is non-empty** (re-render over
+existing files — this is why make does NOT use a worktree: backup + reconcile +
+a read-only preview cover the overwrite concern). Run `--dry-run`, surface the
+NEW / REPLACE / KEEP / MERGE counts (KEEP = your edits preserved), then confirm
+with `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code) — Proceed / Cancel.
+On a fresh install (no existing `.claude/`), skip the preview and apply directly.
+**Run these with the Bash tool when you reach them — the apply must fire only AFTER
+the Proceed confirm, so they are NOT `!`-autorun lines:**
+
 ```bash
-# claude-code / cursor:
-!uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)"
+# Preview (claude-code / cursor):
+uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)" --dry-run
+# Apply — only after the user confirms Proceed (claude-code / cursor):
+uv run --directory "$plugin_dir" python -m harness_maker.cli make "$(pwd)"
 # CLI_FALLBACK:
-!harness-maker make "$(pwd)"
+harness-maker make "$(pwd)" --dry-run
+harness-maker make "$(pwd)"
 ```
 
 CLI prints `reusing settings from .claude/harness.yaml` and applies new
-templates while preserving user `@hm:user:*` blocks via reconcile.
+templates while preserving user `@hm:user:*` blocks via reconcile. After applying,
+run the **git disposition** step (section 6.5).
 
 #### Switch preset
 
@@ -566,6 +579,58 @@ Then show a **quick-start** guide:
 
 If something's unclear, prompt the user with `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code) rather than
 guessing.
+
+### 6.5 Git disposition — the last mile (after any install / update)
+
+The harness files are written but the user still has to decide whether they go
+into version control. Guide that decision **neutrally** — present the two options
+as equals, with no recommended marker and no preference ordering (the order they
+appear below is not a recommendation). **Run each command block below with the Bash
+tool when you reach it — these are gated steps, NOT `!`-autorun lines: the commit /
+gitignore actions must fire only AFTER the user has explicitly chosen.** First read
+the state (dispatch shape per `$RESOLVE_MODE`):
+
+```bash
+# claude-code / cursor:
+uv run --directory "$plugin_dir" python -m harness_maker.cli git-status "$(pwd)"
+# CLI_FALLBACK:
+harness-maker git-status "$(pwd)"
+```
+
+Read the JSON and branch on `is_git` / `decision_needed` / `offer_stage` /
+`prior_decision`:
+
+- **`is_git: false`** — not a git repository. Tell the user the harness files are
+  not under version control; if they want to track them, they can run `git init`
+  and re-run `/harness-maker:make`. Run no git commands. Done.
+- **`decision_needed: true`** — ask with `AskQuestion` (Cursor) / `AskUserQuestion`
+  (Claude Code), in the user's locale, the two options **as equals**:
+  - **Commit them** — the harness roots are added to git and committed, so anyone
+    who clones the repo gets the harness (churn + `.backup-*` are already
+    gitignored, so the commit is clean). On this choice run (scopes both the add
+    AND the commit to only the existing roots — the `-- $roots` pathspec keeps any
+    unrelated pre-staged work OUT of the harness commit):
+    ```bash
+    roots=""; for r in .claude .cursor .codex .agents AGENTS.md; do [ -e "$r" ] && roots="$roots $r"; done; git add $roots && git commit -m "chore: add harness-maker harness" -- $roots
+    ```
+  - **Gitignore them** — the roots are added to `.gitignore` and kept local
+    (fails loudly if the write does not take effect):
+    ```bash
+    # claude-code / cursor:
+    uv run --directory "$plugin_dir" python -m harness_maker.cli git-ignore-roots "$(pwd)"
+    # CLI_FALLBACK:
+    harness-maker git-ignore-roots "$(pwd)"
+    ```
+- **`offer_stage: true`** — already committing, and new harness files appeared. Ask
+  "Stage the new harness files into a commit?"; on yes, `git add` the
+  `untracked_files` then commit **scoped to those paths**:
+  `git commit -m "chore: update harness-maker harness" -- <untracked_files>` (the
+  `-- <paths>` keeps unrelated staged work out); on no, skip.
+- **`prior_decision: "commit"` (no `offer_stage`), `"ignore"`, or no rendered roots
+  present** — already decided (or nothing to dispose). Say one line ("harness
+  already tracked" / "already gitignored — nothing to do") and finish. **Do NOT
+  re-prompt** — the decision is inferred from git state, so a re-render never
+  re-nags.
 
 ## Notes
 

@@ -148,12 +148,14 @@ action items).
 
 기본 렌더 위에 레이어링:
 
-- **Domain packs** — `--add-domain python` (또는 `node`, `rust`)이 스택별 표준, agent, skill을 하네스에 그래프트. 커스텀 domain은 스텁으로 생성.
+- **Domain packs** — `--add-domain python`이 스택별 표준 블록을 5개 reviewer agent(code, security, performance, concurrency, ux)에 inline. `python`만 pre-filled 샘플로 제공되고, `--add-domain <other>`는 `.claude/agents/_standards/<name>.md`에 빈 user-side 스텁을 생성 — 팀이 harness-maker fork 없이 채워 넣음.
 - **외부 설정 흡수** — 기존 Cursor rules, Aider 설정, Copilot instructions를 LLM이 `harness.yaml` 축으로 번역. `@hm:harness:*` inverted 마커가 재렌더 시에도 동기화 유지.
 - **Sibling repos** — frontend + backend + library가 `harness.yaml`의 상대 경로 바인딩으로 한 세션을 공유. 머신 간 portable.
 - **Ref folders + Second Brain** — 등록된 프로젝트 문서 + Obsidian vault 노트가 어떤 stage에서든 검색 가능.
 
 > **결과:** 사용하는 모든 IDE가 같은 agent, 같은 skill, 같은 워크플로를 native로 봄. 수동 포팅 0.
+
+**실행 경험 — 끝까지 가이드.** `.claude/`가 이미 있으면 `/hm:make`는 dry-run **미리보기**(NEW / REPLACE / KEEP / MERGE — KEEP = 내 편집 보존)를 보여주고 덮어쓰기 전에 확인을 받습니다; 신규 설치는 바로 적용. **git worktree 안 씀** — backup + reconcile이 덮어쓰기 우려를 커버하므로 비-git 프로젝트도 작동. 적용 후 무엇이 바뀌었는지 사용자 언어로 **설명**(깨끗한 첫 설치는 조용히, 실제 P0/P1이 있으면 loud). 그리고 **마지막 한 걸음**: git 상태를 감지해 — *중립적으로, 권유 없이* — 하네스를 **commit**(clone하는 팀원이 받도록)할지 **gitignore**(로컬 전용)할지 묻습니다. churn과 `.backup-*`은 항상 gitignore되어 commit이 깨끗하고, 결정은 **git 상태에서 추론**되므로 재렌더가 다시 묻지 않습니다. 전체 흐름: [**docs/HOW-IT-WORKS.ko.md → 렌더 파이프라인**](docs/HOW-IT-WORKS.ko.md#렌더-파이프라인).
 
 ---
 
@@ -361,7 +363,7 @@ harness-maker make . --promote NAME    # ad-hoc 자산을 하네스로 승격
 - **12+ 스택 감지.** Python · Node · Rust · Java · Kotlin · Swift · Dart · Ruby · PHP · C# · Elixir · Scala · C/C++ · Zig · Haskell. Framework + package-manager + CI provider는 manifest에서 파싱 (키워드 추측 X). manifest mtime 기반 24시간 캐시.
 - **Confidence 기반 default.** 모든 감지가 HIGH/MEDIUM/LOW confidence 선언. HIGH → `# detected:` provenance와 함께 silent default. MEDIUM → 명시적 인터뷰 프롬프트. LOW → 건너뜀 (당신이 결정). Regression 테스트가 minor 버전 간 surprise silent default 변화를 방지.
 - **적응형 개인화 tier.** `/hm:health`가 세 레이어 (감지→권장 전환율, 오버라이드 안정성, 감사 주기)를 점수화하여 Bronze → Silver → Gold → Platinum tier 보고. 한 axis가 5+ 회 오버라이드되면 default 변경 자동 제안. 100% 로컬 텔레메트리 — 프로젝트 밖으로 나가는 데이터 없음.
-- **Domain packs.** `--add-domain python` (또는 `node`, `rust`)이 스택별 표준, agent, skill을 그래프트. 커스텀 domain은 스텁으로 — 팀이 자기 것을 추가하는데 harness-maker fork 불필요.
+- **Domain packs.** `--add-domain python`이 스택별 표준을 5개 reviewer agent에 inline. `python`만 pre-filled 샘플이고, 다른 domain 이름은 빈 user-side 스텁을 생성 — 팀이 harness-maker fork 없이 채워 넣음.
 - **단일 명령, subcommand 폭증 없음.** `/harness-maker:make`가 유일한 진입점. 나머지는 모두 플래그 (`--audit`, `--add`, `--remove`, `--promote`, `--add-domain`, `--reinterview`, `--update`).
 
 ### 🛡️ 신뢰 — *등급 게이트된 작업*

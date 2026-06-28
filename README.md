@@ -164,6 +164,8 @@ Layered on top of the base render:
 
 > **Result:** Every IDE you use sees the same agents, the same skills, the same workflows — natively. Zero manual porting.
 
+**What running it feels like — guided to the end.** When `.claude/` already exists, `/hm:make` shows a dry-run **preview** (NEW / REPLACE / KEEP / MERGE — KEEP = your edits preserved) and asks before overwriting; a fresh install applies directly. There's **no git worktree** — a backup + reconcile cover the overwrite concern, so non-git projects work too. After applying, the command **narrates** what changed in your language (a clean first install stays quiet; real P0/P1 findings go loud). Then the **last mile**: it detects your git state and asks — *neutrally, no nudge* — whether to **commit** the harness (so teammates who clone get it) or **gitignore** it (keep it local). Churn and `.backup-*` are always gitignored, so a commit stays clean, and the decision is **inferred from git state** so re-renders never re-nag. Full flow: [**docs/HOW-IT-WORKS.md → Render pipeline**](docs/HOW-IT-WORKS.md#render-pipeline).
+
 ---
 
 ### 4. EVOLVE — *How does the harness stay useful?*

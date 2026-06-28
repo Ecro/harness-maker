@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+### Added — render guided to the end: preview + post-render git disposition (PLAN-render-finish-ux)
+- `/harness-maker:make` and `/hm:make` now guide the user past "files written" to a git
+  decision. A new `git_disposition` module + `harness-maker git-status` / `git-ignore-roots`
+  CLI subcommands own the **testable** mechanics (git-state detection + idempotent gitignore);
+  the slash command owns the `AskUserQuestion` and the `git commit` — the CLI never commits
+  (ADR-001).
+- The git decision is **neutral** (no recommended option) and **inferred from live git state
+  every run, never persisted**, so re-renders never re-nag: a committed harness offers to stage
+  only newly-rendered files; an ignored harness is silent (ADR-002/004). Detection spans **all
+  selected target roots** (`.claude/` + `.cursor/`/`.codex/`/`.agents/`/`AGENTS.md`), minus churn.
+- Re-rendering over an existing `.claude/` now shows a **`--dry-run` preview (NEW/REPLACE/KEEP/
+  MERGE) → confirm → apply**; a fresh install applies directly. No git worktree is used — backup
+  + reconcile cover overwrite safety and keep non-git installs working (ADR-003).
+- Fresh-install structural-health is **severity-aware**: quiet when clean, loud only on P0/P1
+  (ADR-005). `git check-ignore` is probed with `check=False` (it returns rc=1 when NOT ignored);
+  `git-ignore-roots` fails loudly on a non-work-tree / unwritten `.gitignore`.
+- README (en/ko) + `docs/HOW-IT-WORKS` (en/ko) document the render pipeline + git decision (ADR-006).
+
 ## [0.32.2] - 2026-06-25
 
 ### Added — autopilot surfaced in the interview + unlimited caps + cross-session persistence (PLAN-autopilot-config-surface)
