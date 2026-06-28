@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.33.0] - 2026-06-28
+
 ### Added — render guided to the end: preview + post-render git disposition (PLAN-render-finish-ux)
 - `/harness-maker:make` and `/hm:make` now guide the user past "files written" to a git
   decision. A new `git_disposition` module + `harness-maker git-status` / `git-ignore-roots`
