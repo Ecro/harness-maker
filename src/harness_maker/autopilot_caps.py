@@ -142,7 +142,11 @@ def _cmd_boundary(args: argparse.Namespace) -> int:
     accrues) + reports the next pipeline stage. At the last stage it clears the marker
     (ADR-006 — final stage ends the session) and reports pipeline_complete.
     """
-    root = Path(args.root)
+    # Resolve cwd→base ONCE so the marker (active_marker) AND the ledger ops
+    # (count_events / append_event / record_cap_halt / clear) below share one root —
+    # otherwise the marker resolves to base while 'advanced' events land in the
+    # worktree ledger, splitting the step count and breaking the smoke-check (REVIEW P2).
+    root = autopilot.resolve_marker_root(Path(args.root))
     out: dict[str, object] = {
         "proceed": False,
         "halt_kind": None,
@@ -249,7 +253,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         # P2-5: only record for a LIVE autopilot session. A spurious call with no active
         # marker (off / foreign / stale) must not pollute the ledger or the smoke-check
         # denominator with a phantom gate_blocked event.
-        root = Path(args.root)
+        # Resolve cwd→base so the marker check and the ledger write target one root
+        # (same asymmetry fix as _cmd_boundary — REVIEW P2).
+        root = autopilot.resolve_marker_root(Path(args.root))
         if autopilot.active_marker(root) is None:
             return 0
         autopilot_ledger.append_event(root, event="gate_blocked", fields={"stage": args.stage})

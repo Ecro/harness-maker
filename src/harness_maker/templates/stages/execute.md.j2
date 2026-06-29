@@ -322,11 +322,11 @@ when this PLAN phase authored bindable-mechanical-AC tests and the machine SPEC 
 
 {% if is_codex %}
 ```
-Bash("cd <WT> && uv run python -m harness_maker.spec_mutation gate --yaml specs/SPEC-{slug}.machine.yaml --tier 1")
+Bash("cd <WT> && uv run --with {{ harness_maker_src_path }} python -m harness_maker.spec_mutation gate --yaml specs/SPEC-{slug}.machine.yaml --tier 1")
 ```
 {% else %}
 ```bash
-!cd <WT> && uv run python -m harness_maker.spec_mutation gate --yaml specs/SPEC-{slug}.machine.yaml --tier 1
+!cd <WT> && uv run --with {{ harness_maker_src_path }} python -m harness_maker.spec_mutation gate --yaml specs/SPEC-{slug}.machine.yaml --tier 1
 ```
 {% endif %}
 

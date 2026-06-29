@@ -2,6 +2,26 @@
 
 ## [Unreleased]
 
+### Fixed — autopilot invocation convention + worktree-visible marker (PLAN-autopilot-invocation-and-marker-fix)
+- **Single invocation launcher.** All ~57 executable `harness_maker` invocations that used a
+  broken form — bare `python -m harness_maker` / `harness-maker <subcmd>` (no installed
+  entrypoint on a consumer plugin-cache install → `command not found`) or `uv run python -m
+  harness_maker` **without** `--with` (resolves the consumer's venv, which has no
+  `harness_maker`) — are normalized to the existing inline `uv run --with
+  {{ harness_maker_src_path }} python -m harness_maker.<module>` form. One greppable convention
+  across all 162 sites; no new render var (ADR-001).
+- **Regression gate.** A render gate (`test_invocation_render_gate`) renders the whole tree
+  (claude-code + cursor `.mdc` + codex `.toml`) and hard-fails on any executable context that
+  reintroduces a non-full-launcher form — count-based, with fenced-bash + multi-line `Bash(`
+  tracking; plus a source-grep test forbidding bare `harness-maker <subcmd>` remediation strings
+  in `src/**/*.py` (ADR-002).
+- **Worktree-visible autopilot marker.** A sentinel-validated `resolve_marker_root(start)` maps a
+  `.worktrees/<slug>/` cwd back to the base repo root for EVERY marker op — read, write (incl.
+  first-arm with no marker yet), clear, load, and the `autopilot_caps` boundary/gate-blocked
+  ledger ops — so `autopilot on` from a worktree writes the ROOT marker, auto-advance reads it,
+  and `off` clears it. The `.worktrees` strip-base requires `.claude/harness.yaml` (strict) so a
+  parent/home git repo cannot capture resolution (ADR-003).
+
 ## [0.33.0] - 2026-06-28
 
 ### Added — render guided to the end: preview + post-render git disposition (PLAN-render-finish-ux)

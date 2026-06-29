@@ -42,7 +42,7 @@ CLI-owned flow, executed deterministically by the orchestrator:
 
    CLI (used by stage skills directly):
    ```
-   uv run python -m harness_maker.worktree create execute "$(pwd)"
+   uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree create execute "$(pwd)"
    ```
 
    Create is the primary dirty-base boundary. If the base repo has user WIP,
@@ -66,12 +66,12 @@ CLI-owned flow, executed deterministically by the orchestrator:
    Success for `/hm:execute` uses stage-only handoff so wrapup owns the single
    user-facing commit:
    ```bash
-   uv run python -m harness_maker.worktree finalize <WT> stage-only
+   uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree finalize <WT> stage-only
    ```
 
    Failure preserves the worktree for inspection:
    ```bash
-   uv run python -m harness_maker.worktree finalize <WT> fail
+   uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree finalize <WT> fail
    ```
 
    If dirty-base bypass was used or new base dirt appeared after create,
@@ -80,7 +80,7 @@ CLI-owned flow, executed deterministically by the orchestrator:
    `HM_OWNED_SESSION_UUIDS` from THIS task's slug crumb so only your own stash is
    popped (PLAN-layer3-per-session-ownership; an empty set fail-safe-preserves):
    ```bash
-   HM_OWNED_SESSION_UUIDS="$(uv run python -m harness_maker.worktree owned-crumb-read "$(pwd)" <slug>)" uv run python -m harness_maker.worktree post-commit-pop "$(pwd)"
+   HM_OWNED_SESSION_UUIDS="$(uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree owned-crumb-read "$(pwd)" <slug>)" uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree post-commit-pop "$(pwd)"
    ```
 
    Never replace this flow with direct `worktree.merge()` +

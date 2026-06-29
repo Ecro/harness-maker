@@ -164,11 +164,11 @@ Evaluation sequence when `spec_need_verdict` is one of the above values:
 **Step 6a — operation check:**
 {% if is_codex %}
 ```
-Bash("python -m harness_maker.spec_need op-check --verdict <spec_need_verdict> --target <spec_need_target> --root <WT> --changed-file <f1> --changed-file <f2> …")
+Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.spec_need op-check --verdict <spec_need_verdict> --target <spec_need_target> --root <WT> --changed-file <f1> --changed-file <f2> …")
 ```
 {% else %}
 ```bash
-!python -m harness_maker.spec_need op-check --verdict <spec_need_verdict> --target <spec_need_target> --root <WT> --changed-file <f1> --changed-file <f2> …
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.spec_need op-check --verdict <spec_need_verdict> --target <spec_need_target> --root <WT> --changed-file <f1> --changed-file <f2> …
 ```
 {% endif %}
 
@@ -177,11 +177,11 @@ Exit 0 → operation satisfied → **PASS**. Proceed to next check.
 **Step 6b — waiver check** (only if Step 6a exits 1):
 {% if is_codex %}
 ```
-Bash("python -m harness_maker.spec_need waiver-check --root <WT> --slug <task_slug> --changed-file <f1> --changed-file <f2> …")
+Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.spec_need waiver-check --root <WT> --slug <task_slug> --changed-file <f1> --changed-file <f2> …")
 ```
 {% else %}
 ```bash
-!python -m harness_maker.spec_need waiver-check --root <WT> --slug <task_slug> --changed-file <f1> --changed-file <f2> …
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.spec_need waiver-check --root <WT> --slug <task_slug> --changed-file <f1> --changed-file <f2> …
 ```
 {% endif %}
 
@@ -195,7 +195,7 @@ The required SPEC operation was not performed and no valid waiver exists.
 To resolve: author the SPEC via /hm:plan re-entry (/hm:plan <slug> — the
 resume-marker skips re-detection and routes directly to /hm:spec) or record
 a fresh, non-empty-rationale waiver with:
-  python -m harness_maker.spec_need waiver-set --root <WT> --slug <slug> \
+  uv run --with {{ harness_maker_src_path }} python -m harness_maker.spec_need waiver-set --root <WT> --slug <slug> \
     --verdict <verdict> --target <target> --rationale "<reason>" \
     --changed-file <f1> …
 Note: a stale waiver (diff changed since last waiver-set) is treated as NO waiver.

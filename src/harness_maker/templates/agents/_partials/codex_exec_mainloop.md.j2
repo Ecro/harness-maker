@@ -73,7 +73,7 @@ output file through the adapter (deterministic — it maps severity
 untrusted Codex content out of the shell). Always clean up the temp files:
 
 ```bash
-if [ "$exit" -eq 0 ]; then python -m harness_maker.codex_adapter adapt < "$out_tmp"; fi; rm -f "$prompt_tmp" "$out_tmp"
+if [ "$exit" -eq 0 ]; then uv run --with {{ harness_maker_src_path }} python -m harness_maker.codex_adapter adapt < "$out_tmp"; fi; rm -f "$prompt_tmp" "$out_tmp"
 ```
 
 **Skip relay (mandatory surfacing):** on a non-zero `codex exec` exit set
@@ -83,7 +83,7 @@ if [ "$exit" -eq 0 ]; then python -m harness_maker.codex_adapter adapt < "$out_t
 — REVIEW security P1):
 
 ```bash
-reason="<one-line cause>"; python -m harness_maker.codex_ledger emit --slug "<slug>" --stage {{ _stage }} --finding-ref "n/a" --disposition unresolved --codex-status skipped --skip-reason "$reason"
+reason="<one-line cause>"; uv run --with {{ harness_maker_src_path }} python -m harness_maker.codex_ledger emit --slug "<slug>" --stage {{ _stage }} --finding-ref "n/a" --disposition unresolved --codex-status skipped --skip-reason "$reason"
 ```
 
 On success set `codex_status: "invoked"`. A silently-degraded Codex is the H4 failure

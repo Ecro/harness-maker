@@ -13,7 +13,11 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_valida
 
 from harness_maker.io_utils import atomic_write
 from harness_maker.models import AtomicStage
-from harness_maker.worktree import _current_session_uuid, _ensure_gitignore_entry
+from harness_maker.worktree import (
+    WORKTREE_DIR_NAME,
+    _current_session_uuid,
+    _ensure_gitignore_entry,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +65,71 @@ def marker_path(project_root: Path) -> Path:
     return project_root / _MARKER_REL
 
 
+def _is_harness_root(p: Path) -> bool:
+    """A directory is a harness PROJECT root iff it carries ``.claude/harness.yaml``.
+
+    The strict sentinel used for the ``.worktrees`` strip-base: a task worktree's base
+    is always a harness project (it owns the `.worktrees/`), so a bare ``.git`` or a
+    stray marker must NOT qualify the strip-base — otherwise a parent/home git repo
+    (``~/.worktrees/proj`` with ``~`` a dotfiles repo) or a stale marker would capture
+    resolution and write the marker into the wrong repo / silently disable the gate
+    (REVIEW P2: security + codex consensus).
+    """
+    return (p / ".claude" / "harness.yaml").is_file()
+
+
+def _is_marker_root(p: Path) -> bool:
+    """A directory owns the marker iff it carries a project sentinel OR the marker.
+
+    Used by the parent WALK (the non-worktree / standalone path). The project sentinel
+    (``.claude/harness.yaml`` / ``.git``) lets the WRITE-first-arm resolve before any
+    marker exists (plan-validator CRITICAL); an already-present marker is an additional
+    accept so a read resolves to wherever the marker actually lives. The ``.worktrees``
+    strip uses the stricter ``_is_harness_root`` instead (see ``resolve_marker_root``).
+    """
+    return (
+        (p / _MARKER_REL).exists()
+        or (p / ".claude" / "harness.yaml").is_file()
+        or (p / ".git").exists()
+    )
+
+
+def resolve_marker_root(start: Path) -> Path:
+    """Resolve the project root the autopilot marker lives at — worktree-aware.
+
+    A ``/hm:`` stage runs inside ``.worktrees/<wt>/`` but the marker is owned by the
+    base repo root (the SessionStart autoarm + the picker write it there, and the
+    project-scoped ``session_uuid`` is keyed to it). Resolving cwd→base for EVERY
+    op — read, write, clear — is what makes auto-advance see the marker from a
+    worktree and `autopilot off` clear the real one.
+
+    Sentinel-validated, NOT marker-existence-gated: the WRITE-first-arm from a
+    worktree (no marker yet) must still resolve to the base, so the strip branch
+    keys on a project sentinel, not on the marker file. The ``.worktrees`` strip is
+    checked BEFORE the parent walk because a git worktree itself carries a ``.git``
+    sentinel — walking first would wrongly stop at the worktree. The strip-base uses
+    the STRICT ``_is_harness_root`` (``.claude/harness.yaml`` only) — not a bare
+    ``.git`` / marker — so a parent/home git repo cannot capture resolution (REVIEW P2);
+    a non-harness strip-base falls through to the walk, which finds the real project.
+
+    Note: ``.absolute()`` (not ``.resolve()``) is deliberate — the strip is positional
+    on ``.worktrees`` and ``.resolve()`` would canonicalise a symlinked worktree path,
+    dropping the ``.worktrees`` component and breaking the strip (security-review).
+    """
+    start = Path(start).absolute()
+    parts = start.parts
+    if WORKTREE_DIR_NAME in parts:
+        idx = len(parts) - 1 - parts[::-1].index(WORKTREE_DIR_NAME)
+        if idx > 0:
+            base = Path(*parts[:idx])
+            if _is_harness_root(base):
+                return base
+    for directory in (start, *start.parents):
+        if _is_marker_root(directory):
+            return directory
+    return start
+
+
 def write(
     project_root: Path,
     *,
@@ -73,6 +142,10 @@ def write(
     ``now`` is injectable for deterministic tests (checkpoint 7); defaults to the
     current UTC time in ISO-8601.
     """
+    # Resolve cwd→base FIRST so both the marker path and the session_uuid below are
+    # keyed to the project root — a write from inside a worktree lands at the base
+    # (where reads look), not the worktree-local path (ADR-003 symmetric write).
+    project_root = resolve_marker_root(project_root)
     marker = AutopilotMarker(
         session_uuid=_current_session_uuid(project_root),
         level=level,
@@ -91,8 +164,13 @@ def write(
 
 
 def clear(project_root: Path) -> None:
-    """Remove the marker; idempotent (no error when absent)."""
-    marker_path(project_root).unlink(missing_ok=True)
+    """Remove the marker; idempotent (no error when absent).
+
+    Resolves cwd→base so `autopilot off` (and the boundary's terminal cap-halt /
+    pipeline-complete / merge-gate clears) deletes the ROOT marker, never a
+    worktree-local copy (Codex HIGH-2).
+    """
+    marker_path(resolve_marker_root(project_root)).unlink(missing_ok=True)
 
 
 def load(project_root: Path) -> AutopilotMarker | None:
@@ -101,7 +179,7 @@ def load(project_root: Path) -> AutopilotMarker | None:
     Fail-safe: ANY read or validation failure resolves to None (the caller treats
     None as gated). Does NOT check session ownership — see ``active_marker``.
     """
-    path = marker_path(project_root)
+    path = marker_path(resolve_marker_root(project_root))
     if not path.is_file():
         return None
     try:
@@ -138,6 +216,10 @@ def active_marker(project_root: Path, *, now: datetime | None = None) -> Autopil
     limitation, ADR-004 §2) — within the SAME project the uuid is stable, so the TTL
     is the real cross-session guard until the dirname-embed UUID migration lands.
     """
+    # Resolve once so the marker load AND the session_uuid comparison below agree on
+    # the base root — a worktree's own uuid differs, so an unresolved compare would
+    # foreign-reject the base marker (ADR-003).
+    project_root = resolve_marker_root(project_root)
     marker = load(project_root)
     if marker is None:
         return None

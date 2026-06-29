@@ -47,13 +47,13 @@ them to recognize known-good patterns and repeated failure modes:
 
 {% if is_codex %}
 ```bash
-Bash("uv run python -m harness_maker.second_brain search '<changed area or task slug>' --type failure")
-Bash("uv run python -m harness_maker.second_brain search '<changed area or task slug>' --type preference")
+Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.second_brain search '<changed area or task slug>' --type failure")
+Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.second_brain search '<changed area or task slug>' --type preference")
 ```
 {% else %}
 ```bash
-!uv run python -m harness_maker.second_brain search '<changed area or task slug>' --type failure
-!uv run python -m harness_maker.second_brain search '<changed area or task slug>' --type preference
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.second_brain search '<changed area or task slug>' --type failure
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.second_brain search '<changed area or task slug>' --type preference
 ```
 {% endif %}
 
@@ -179,7 +179,7 @@ anchoring-prone diffs):
    author / commit message redacted. Pipe the JSON context through the
    harness CLI rather than redacting in prose:
    ```bash
-   echo '<full_context_json>' | python -m harness_maker.two_pass_review redact
+   echo '<full_context_json>' | uv run --with {{ harness_maker_src_path }} python -m harness_maker.two_pass_review redact
    ```
    The CLI returns a JSON object with the same fields but anchoring values
    replaced by `[REDACTED]`.
@@ -233,11 +233,11 @@ extras at runtime bringing total > 1, re-enable Pass 1 + Pass 1.5 manually.
 4. Merge the two passes via the harness CLI:
    {% if is_codex %}
    ```bash
-   Bash("echo '{\"pass1\": [...], \"pass2\": [...]}' | python -m harness_maker.two_pass_review merge")
+   Bash("echo '{\"pass1\": [...], \"pass2\": [...]}' | uv run --with {{ harness_maker_src_path }} python -m harness_maker.two_pass_review merge")
    ```
    {% else %}
    ```bash
-   echo '{"pass1": [...], "pass2": [...]}' | python -m harness_maker.two_pass_review merge
+   echo '{"pass1": [...], "pass2": [...]}' | uv run --with {{ harness_maker_src_path }} python -m harness_maker.two_pass_review merge
    ```
    {% endif %}
    Pass 2 is authoritative — Pass 1 findings absent from Pass 2 are
@@ -255,7 +255,7 @@ extras at runtime bringing total > 1, re-enable Pass 1 + Pass 1.5 manually.
   `HEAD` (the post-execute diff is staged, so a bare `git diff` would see nothing) and
   `--numstat` for the added-line count that drives the `boundary` signal:
   ```bash
-  files=$(git diff --name-only HEAD); added=$(git diff --numstat HEAD | awk '{s+=$1} END{print s+0}'); printf '%s\n' "$files" | python -m harness_maker.high_diff classify --added-lines "$added"
+  files=$(git diff --name-only HEAD); added=$(git diff --numstat HEAD | awk '{s+=$1} END{print s+0}'); printf '%s\n' "$files" | uv run --with {{ harness_maker_src_path }} python -m harness_maker.high_diff classify --added-lines "$added"
   ```
   Invoke when `is_high` (or `boundary` and your judgment, reusing the When-to-Run
   criteria, says high). Otherwise skip Codex this round (no third voter).
@@ -458,11 +458,11 @@ runs. Don't interpolate `wall_time_ms` into any other rendered template
 
 {% if is_codex %}
 ```bash
-Bash("echo '<record_json>' | python -m harness_maker.review_telemetry emit")
+Bash("echo '<record_json>' | uv run --with {{ harness_maker_src_path }} python -m harness_maker.review_telemetry emit")
 ```
 {% else %}
 ```bash
-echo '<record_json>' | python -m harness_maker.review_telemetry emit
+echo '<record_json>' | uv run --with {{ harness_maker_src_path }} python -m harness_maker.review_telemetry emit
 ```
 {% endif %}
 

@@ -93,6 +93,9 @@ def _render_partial(is_codex: bool, *, advance_enabled: bool | None = None) -> s
         "summary_next": "n",
         "config": HarnessConfig().model_dump(mode="json"),
         "is_codex": is_codex,
+        # the autopilot-advance block now uses the canonical inline launcher (ADR-001),
+        # which the full render injects; supply it here for the isolated partial render.
+        "harness_maker_src_path": "/cache/harness-maker/0.0.0",
     }
     if advance_enabled is not None:
         ctx["autopilot_advance_enabled"] = advance_enabled

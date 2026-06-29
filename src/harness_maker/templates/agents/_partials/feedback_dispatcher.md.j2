@@ -9,7 +9,7 @@ telemetry stop event + matching tool-use rows + harness-self signals
 (silent-intent-miss, build-break) bounded to ≤2KB:
 
 ```bash
-uv run python -m harness_maker.feedback.telemetry_grep \
+uv run --with {{ harness_maker_src_path }} python -m harness_maker.feedback.telemetry_grep \
   --metrics-dir .claude/observability
 ```
 
@@ -34,13 +34,13 @@ If YES (harness-self issue):
    `sha256(trigger_signal_id, slug, today)` → silent skip if already exists.
 
 ```bash
-echo '<FeedbackDraft-JSON>' | uv run python -m harness_maker.feedback.draft_writer
+echo '<FeedbackDraft-JSON>' | uv run --with {{ harness_maker_src_path }} python -m harness_maker.feedback.draft_writer
 ```
 
 3. Emit the one-line footer using the returned path:
 
 ```bash
-uv run python -m harness_maker.feedback.footer \
+uv run --with {{ harness_maker_src_path }} python -m harness_maker.feedback.footer \
   --path <path> --locale {{ config.locale | default('en') }}
 ```
 

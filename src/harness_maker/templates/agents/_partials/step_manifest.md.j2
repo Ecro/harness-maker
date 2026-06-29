@@ -35,8 +35,17 @@
 > via `AskUserQuestion`: "Run the `{{ config.autonomy.pipeline | join(' → ') }}` pipeline
 > on autopilot this session (stages auto-advance when no mandatory gate is pending), or
 > stay gated (stop after each stage)?" On **yes**, run
-> `harness-maker autopilot on --level {{ config.autonomy.level }} --pipeline {{ config.autonomy.pipeline | join(',') }}`
+> `uv run --with {{ harness_maker_src_path }} python -m harness_maker autopilot on --level {{ config.autonomy.level }} --pipeline {{ config.autonomy.pipeline | join(',') }}`
 > (writes the session marker). On **no**, proceed gated — do not re-prompt unless the user
 > asks. Once the marker exists, later stages skip this picker (the marker is the once-flag).
+>
+> **Persistence (why autopilot may not auto-arm):** the `.hm-autopilot` marker is
+> session-scoped (18h TTL) and lives at the **project root** — every `/hm:` command
+> resolves it from the base repo even when run inside a `.worktrees/<slug>/` worktree, so
+> a stage's auto-advance check sees the same marker the picker wrote. To auto-arm **every**
+> session without this prompt, commit `autonomy.autopilot_persistent: true` (with
+> `level: auto_safe` or `full`) — a SessionStart hook then re-arms a fresh marker each
+> session. With the committed default `autopilot_persistent: false`, autopilot is
+> per-session: re-enable it here (or via the picker) each session.
 <!-- @hm:/autopilot-picker -->
 {% endif %}

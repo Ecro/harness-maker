@@ -35,11 +35,11 @@ Before drafting the plan, surface top-K wiki + failures entries relevant to the 
 
 {% if is_codex %}
 ```bash
-Bash("uv run python -m harness_maker.memory_retrieve --topic '<topic>' --k 6 --pre-k 30")
+Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.memory_retrieve --topic '<topic>' --k 6 --pre-k 30")
 ```
 {% else %}
 ```bash
-!uv run python -m harness_maker.memory_retrieve --topic "<topic>" --k 6 --pre-k 30
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.memory_retrieve --topic "<topic>" --k 6 --pre-k 30
 ```
 {% endif %}
 
@@ -54,15 +54,15 @@ questions:
 
 {% if is_codex %}
 ```bash
-Bash("uv run python -m harness_maker.second_brain search '<task slug or topic>' --type decision")
-Bash("uv run python -m harness_maker.second_brain search '<task slug or topic>' --type preference")
-Bash("uv run python -m harness_maker.second_brain search '<task slug or topic>' --type project")
+Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.second_brain search '<task slug or topic>' --type decision")
+Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.second_brain search '<task slug or topic>' --type preference")
+Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.second_brain search '<task slug or topic>' --type project")
 ```
 {% else %}
 ```bash
-!uv run python -m harness_maker.second_brain search '<task slug or topic>' --type decision
-!uv run python -m harness_maker.second_brain search '<task slug or topic>' --type preference
-!uv run python -m harness_maker.second_brain search '<task slug or topic>' --type project
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.second_brain search '<task slug or topic>' --type decision
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.second_brain search '<task slug or topic>' --type preference
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.second_brain search '<task slug or topic>' --type project
 ```
 {% endif %}
 
@@ -160,7 +160,7 @@ If `loop-mode-active` exited 1 (not loop-mode for this session) → proceed to S
 Before running any detection, check for a durable resume marker from a previous invocation:
 
 ```bash
-!python -m harness_maker.spec_need marker-read --root <WT> --slug {slug}
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.spec_need marker-read --root <WT> --slug {slug}
 ```
 
 (`<WT>` is the absolute worktree path from the preflight step above — use it as `--root` for ALL `spec_need` commands in this step so the marker, ledger, and waiver files are co-located with the files being hashed, preventing stale-read on new/add-case files under `feature_branch_workflow`.)
@@ -170,7 +170,7 @@ Before running any detection, check for a durable resume marker from a previous 
 **If a marker exists** for this slug, immediately run freshness check:
 
 ```bash
-!python -m harness_maker.spec_need marker-fresh --root <WT> --slug {slug} --changed-files-hash <HASH>
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.spec_need marker-fresh --root <WT> --slug {slug} --changed-files-hash <HASH>
 ```
 
 Where `<HASH>` is the SHA256 of the sorted changed-file list (compute `git diff --name-only $(git merge-base HEAD <base>)` → sort → hash; this same `changed_files_hash` recipe is used at both the marker-write site in §1.7.2 and here, ensuring one-shot freshness is reliable). **You are resuming from an inline `/hm:spec` dispatch — SKIP re-detection entirely** (this is the one-shot anti-loop guarantee; do not run §1.7.1):
@@ -178,13 +178,13 @@ Where `<HASH>` is the SHA256 of the sorted changed-file list (compute `git diff 
 - **Exit 0 (FRESH — hash matches current diff):** run `op-check` for the marker's stored verdict/target:
 
   ```bash
-  !python -m harness_maker.spec_need op-check --verdict <marker.verdict> --target <marker.target> --root <WT> --changed-file <f1> --changed-file <f2> …
+  !uv run --with {{ harness_maker_src_path }} python -m harness_maker.spec_need op-check --verdict <marker.verdict> --target <marker.target> --root <WT> --changed-file <f1> --changed-file <f2> …
   ```
 
   - **Exit 0 (operation satisfied):** SPEC has been authored. Run `marker-clear`, then proceed to Step 2 with the new SPEC in place. The resume path enters Step 2's Case A/B/C logic normally.
 
     ```bash
-    !python -m harness_maker.spec_need marker-clear --root <WT> --slug {slug}
+    !uv run --with {{ harness_maker_src_path }} python -m harness_maker.spec_need marker-clear --root <WT> --slug {slug}
     ```
 
   - **Exit 1 (NOT satisfied — SPEC was not authored or wrong target):** Surface to the user: **"SPEC still not authored for `<marker.target>` (verdict: `<marker.verdict>`). The `/hm:spec` step did not complete or targeted a different slug."** Offer two options — **[Retry: run `/hm:spec <marker.target>` again]** or **[Waive with reason]**. **NEVER auto-re-invoke `/hm:spec` here** — this is the hard anti-loop guard: surface-never-re-invoke. If user chooses [Waive], follow the waiver flow in §1.7.3 **and then clear the marker** (see below) and proceed.
@@ -192,7 +192,7 @@ Where `<HASH>` is the SHA256 of the sorted changed-file list (compute `git diff 
     **[Waive] sub-path in re-entry:** after running `waiver-set` per §1.7.3, ALSO clear the resume marker so the next `/hm:plan` invocation does not re-enter this re-entry path and loop:
 
     ```bash
-    !python -m harness_maker.spec_need marker-clear --root <WT> --slug {slug}
+    !uv run --with {{ harness_maker_src_path }} python -m harness_maker.spec_need marker-clear --root <WT> --slug {slug}
     ```
 
     Without this clear, the marker persists, the next `/hm:plan` hits the fresh marker again, op-check fails, and the waiver prompt repeats forever. The satisfied-branch already clears; the waive-branch must mirror it.
@@ -200,7 +200,7 @@ Where `<HASH>` is the SHA256 of the sorted changed-file list (compute `git diff 
 - **Exit 1 (STALE — hash mismatch, diff moved on):** The diff has changed since the marker was written; the marker is no longer valid for the current work. Clear it and fall through to fresh detection:
 
   ```bash
-  !python -m harness_maker.spec_need marker-clear --root <WT> --slug {slug}
+  !uv run --with {{ harness_maker_src_path }} python -m harness_maker.spec_need marker-clear --root <WT> --slug {slug}
   ```
 
   Proceed to §1.7.1 as if no marker existed.
@@ -218,7 +218,7 @@ Compute the diff of changed files vs base:
 Run the path prefilter over `specs/` as a **HINT** (not a gate):
 
 ```bash
-!python -m harness_maker.spec_need prefilter --specs-dir specs --changed-file <f1> --changed-file <f2> …
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.spec_need prefilter --specs-dir specs --changed-file <f1> --changed-file <f2> …
 ```
 
 The prefilter returns a JSON array of `{slug, overlap}` candidate SPECs whose `paths_to_mutate ∪ judgment_subject_paths` overlap with the changed files. **This output is a hint only** — you, the LLM, now judge regardless of it.
@@ -243,7 +243,7 @@ Verdict semantics:
 Record the verdict:
 
 ```bash
-!python -m harness_maker.spec_need record --verdict <verdict> --target <target> --root <WT> --rationale "<rationale>"
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.spec_need record --verdict <verdict> --target <target> --root <WT> --rationale "<rationale>"
 ```
 
 Where `<target>` is the task slug (or the SPEC slug for `change`/`delete`).
@@ -287,7 +287,7 @@ If user chooses **[Author now]:**
 
 1. Write the resume marker:
    ```bash
-   !python -m harness_maker.spec_need marker-write --root <WT> --slug {slug} --verdict <verdict> --target <target> --base-sha <sha> --changed-files-hash <hash>
+   !uv run --with {{ harness_maker_src_path }} python -m harness_maker.spec_need marker-write --root <WT> --slug {slug} --verdict <verdict> --target <target> --base-sha <sha> --changed-files-hash <hash>
    ```
 2. Dispatch `/hm:spec` for the target:
 {% if is_codex %}
@@ -302,7 +302,7 @@ If user chooses **[Waive with reason]:**
 
 Require a non-empty rationale (reject blank/whitespace). Write the hash-bound waiver receipt:
 ```bash
-!python -m harness_maker.spec_need waiver-set --root <WT> --slug {slug} --verdict <verdict> --target <target> --rationale "<user-provided reason>" --changed-file <f1> --changed-file <f2> …
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.spec_need waiver-set --root <WT> --slug {slug} --verdict <verdict> --target <target> --rationale "<user-provided reason>" --changed-file <f1> --changed-file <f2> …
 ```
 
 Proceed to Step 2. The waiver is bound to the current diff hash and expires when the diff changes.
@@ -523,7 +523,7 @@ echoes the main-loop-supplied `codex_status` — it never runs Codex itself.
   radius first — note `HEAD` (staged work) and `--numstat` for the added-line count that drives
   the `boundary` signal:
   ```bash
-  files=$(git diff --name-only HEAD); added=$(git diff --numstat HEAD | awk '{s+=$1} END{print s+0}'); printf '%s\n' "$files" | python -m harness_maker.high_diff classify --added-lines "$added"
+  files=$(git diff --name-only HEAD); added=$(git diff --numstat HEAD | awk '{s+=$1} END{print s+0}'); printf '%s\n' "$files" | uv run --with {{ harness_maker_src_path }} python -m harness_maker.high_diff classify --added-lines "$added"
   ```
   Run Codex when `is_high` (or `boundary` and your judgment says high). Otherwise skip — inject
   empty findings, `codex_status: "skipped"`, `codex_reconciliation: []`.

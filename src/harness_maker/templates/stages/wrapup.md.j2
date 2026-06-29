@@ -153,11 +153,11 @@ GREEN, record the binding so the machine SPEC becomes a living document — flip
 
 {% if is_codex %}
 ```
-Bash("python -m harness_maker.spec_machine mark-tested --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml --md {{ config.spec.dir }}SPEC-{slug}.md --test-id AC-001=tests/path::test_name")
+Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.spec_machine mark-tested --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml --md {{ config.spec.dir }}SPEC-{slug}.md --test-id AC-001=tests/path::test_name")
 ```
 {% else %}
 ```bash
-!python -m harness_maker.spec_machine mark-tested \
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.spec_machine mark-tested \
    --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml \
    --md {{ config.spec.dir }}SPEC-{slug}.md \
    --test-id AC-001=tests/path::test_name
@@ -196,11 +196,11 @@ authored tests live), matching Step 3.5's base-cwd contract:
 
 {% if is_codex %}
 ```
-Bash("python -m harness_maker.spec_machine find-unbound --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml --root .")
+Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.spec_machine find-unbound --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml --root .")
 ```
 {% else %}
 ```bash
-!python -m harness_maker.spec_machine find-unbound --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml --root .
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.spec_machine find-unbound --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml --root .
 ```
 {% endif %}
 
@@ -237,11 +237,11 @@ write its `evidence_summary` to a file and pass it verbatim, never re-typing the
 
 {% if is_codex %}
 ```
-Bash("python -m harness_maker.spec_machine mark-judged --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml --ac AC-NNN --verdict <reviewer's pass|fail> --evidence-file <reviewer evidence_summary file> --root .")
+Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.spec_machine mark-judged --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml --ac AC-NNN --verdict <reviewer's pass|fail> --evidence-file <reviewer evidence_summary file> --root .")
 ```
 {% else %}
 ```bash
-!python -m harness_maker.spec_machine mark-judged \
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.spec_machine mark-judged \
    --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml \
    --ac AC-NNN --verdict <reviewer's pass|fail> --evidence-file <evidence file> --root .
 ```
@@ -258,11 +258,11 @@ AC whose subject paths are absent (not yet on disk) is future-PLAN work, safe-sk
 
 {% if is_codex %}
 ```
-Bash("python -m harness_maker.spec_machine find-unjudged --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml --root .")
+Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.spec_machine find-unjudged --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml --root .")
 ```
 {% else %}
 ```bash
-!python -m harness_maker.spec_machine find-unjudged --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml --root .
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.spec_machine find-unjudged --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml --root .
 ```
 {% endif %}
 
@@ -291,11 +291,11 @@ friction. Run the tri-state check (it always exits 0):
 
 {% if is_codex %}
 ```
-Bash("python -m harness_maker.spec_machine waiver-check --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml --dev-mode task-driven --root .")
+Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.spec_machine waiver-check --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml --dev-mode task-driven --root .")
 ```
 {% else %}
 ```bash
-!python -m harness_maker.spec_machine waiver-check --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml --dev-mode task-driven --root .
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.spec_machine waiver-check --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml --dev-mode task-driven --root .
 ```
 {% endif %}
 
@@ -450,11 +450,11 @@ Entry shape:
 
 {% if is_codex %}
 ```
-Bash("uv run python -m harness_maker.second_brain promote --type <decision|failure|preference|project|reference|journal> --source-slug <stable-local-slug> --title '<title>' --body-file <path>")
+Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.second_brain promote --type <decision|failure|preference|project|reference|journal> --source-slug <stable-local-slug> --title '<title>' --body-file <path>")
 ```
 {% else %}
 ```bash
-!uv run python -m harness_maker.second_brain promote --type <decision|failure|preference|project|reference|journal> --source-slug <stable-local-slug> --title "<title>" --body-file <path>
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.second_brain promote --type <decision|failure|preference|project|reference|journal> --source-slug <stable-local-slug> --title "<title>" --body-file <path>
 ```
 {% endif %}
 

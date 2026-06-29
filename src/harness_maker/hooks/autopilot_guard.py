@@ -256,7 +256,7 @@ def evaluate(tool_name: str, tool_input: dict[str, Any], project_dir: Path) -> G
             matched=hit,
             message=(
                 f"[autopilot] blocked never-auto op ({hit}) while autopilot is active. "
-                "Turn autopilot off (`harness-maker autopilot off`) to run this manually."
+                "Remove the `.claude/.hm-autopilot` marker to run this manually."
             ),
         )
     if tool_name in _WRITE_TOOLS:
@@ -274,10 +274,10 @@ def _resolve_root(payload: dict[str, Any]) -> Path:
     """Resolve the project root the autopilot marker lives at — worktree-aware.
 
     The hook subprocess's cwd is often a `.worktrees/<wt>/` dir during an autonomous
-    execute, while the marker lives at the base repo root. Mirror worktree_gate's
-    payload-first resolution (workspace.current_dir / cwd / env) and THEN walk up for
-    the marker (handling the `.worktrees/` parent) so the guard is not a silent no-op
-    in exactly the mode it guards (REVIEW P0).
+    execute, while the marker lives at the base repo root. This is the payload→Path
+    adapter; the worktree-stripping + sentinel resolution itself lives in the shared
+    `autopilot.resolve_marker_root` so the hook, the CLI, and the marker read/write/
+    clear ops all resolve identically (ADR-003, validator W1).
     """
     raw_ws = payload.get("workspace")
     ws: dict[str, Any] = raw_ws if isinstance(raw_ws, dict) else {}
@@ -288,17 +288,7 @@ def _resolve_root(payload: dict[str, Any]) -> Path:
         or os.environ.get("CURSOR_PROJECT_DIR")
         or os.getcwd()
     )
-    for directory in [start, *start.parents]:
-        if (directory / _MARKER_REL).exists():
-            return directory
-        parts = directory.parts
-        if ".worktrees" in parts:
-            idx = len(parts) - 1 - parts[::-1].index(".worktrees")
-            if idx > 0:
-                base = Path(*parts[:idx])
-                if (base / _MARKER_REL).exists():
-                    return base
-    return start
+    return autopilot.resolve_marker_root(start)
 
 
 def _stophook_reason(payload: dict[str, Any]) -> str | None:
@@ -319,7 +309,7 @@ def _stophook_reason(payload: dict[str, Any]) -> str | None:
     # stop yet while a pipeline is in flight" (REVIEW P3 round-1).
     return (
         "[autopilot] pipeline in progress — not terminating. "
-        "Run `harness-maker autopilot off` to end the autopilot session."
+        "Remove the `.claude/.hm-autopilot` marker to end the autopilot session."
     )
 
 

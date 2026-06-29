@@ -87,8 +87,8 @@ def test_partial_stage_param_interpolated(tmp_path: Path) -> None:
             "output_schema_path": ".claude/schemas/codex-finding.schema.json",
         }
     }
-    review = tpl.render(config=cfg, codex_stage="review")
-    plan = tpl.render(config=cfg, codex_stage="plan")
+    review = tpl.render(config=cfg, codex_stage="review", harness_maker_src_path="/cache/hm/0.0.0")
+    plan = tpl.render(config=cfg, codex_stage="plan", harness_maker_src_path="/cache/hm/0.0.0")
     assert "--stage review" in review
     assert "--stage plan" in plan
     for out in (review, plan):
@@ -115,8 +115,18 @@ def test_partial_gates_sandbox_directive_on_is_codex() -> None:
     """
     env = _make_env()
     tpl = env.get_template(_PARTIAL)
-    claude = tpl.render(config=_CFG_ENABLED, codex_stage="review", is_codex=False)
-    codex = tpl.render(config=_CFG_ENABLED, codex_stage="review", is_codex=True)
+    claude = tpl.render(
+        config=_CFG_ENABLED,
+        codex_stage="review",
+        is_codex=False,
+        harness_maker_src_path="/cache/hm/0.0.0",
+    )
+    codex = tpl.render(
+        config=_CFG_ENABLED,
+        codex_stage="review",
+        is_codex=True,
+        harness_maker_src_path="/cache/hm/0.0.0",
+    )
     assert "dangerouslyDisableSandbox" in claude
     assert "dangerouslyDisableSandbox" not in codex
     assert "Codex runtime note" in codex
@@ -135,7 +145,12 @@ def test_partial_codex_exec_is_a_bare_command_for_allow_match() -> None:
 
     env = _make_env()
     tpl = env.get_template(_PARTIAL)
-    out = tpl.render(config=_CFG_ENABLED, codex_stage="review", is_codex=False)
+    out = tpl.render(
+        config=_CFG_ENABLED,
+        codex_stage="review",
+        is_codex=False,
+        harness_maker_src_path="/cache/hm/0.0.0",
+    )
     blocks = re.findall(r"```bash\n(.*?)\n```", out, re.DOTALL)
     assert any(b.lstrip().startswith("codex exec") for b in blocks), (
         f"no bare `codex exec` command block; blocks={[b[:40] for b in blocks]!r}"

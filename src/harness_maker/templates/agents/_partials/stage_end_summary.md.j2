@@ -21,7 +21,7 @@
 
 Before the STOP banner below, check whether this session runs under **autopilot** (live
 auto-advance, ADR-005). This is **Claude-Code-only**: it needs the `.hm-autopilot` marker
-(`harness-maker autopilot on`) and the `Skill` tool. **If the `Skill` tool is unavailable
+(armed by the autopilot picker) and the `Skill` tool. **If the `Skill` tool is unavailable
 (any non-Claude-Code IDE such as Cursor) OR no `.hm-autopilot` marker is active OR
 loop-mode is active for THIS session (a `.claude/.hm-loop-*` marker matches
 `$HM_SESSION_ID`, or a legacy `.hm-loop-active` exists), this section is a NO-OP** —
@@ -33,13 +33,13 @@ If the gate is pending/unresolved → record it on the ledger, then **STOP** (pr
 banner). Do NOT run the boundary check — a stage that stops at its gate must not record an
 advance:
 
-!python -m harness_maker.autopilot_caps gate-blocked --root . --stage {{ summary_stage }}
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.autopilot_caps gate-blocked --root . --stage {{ summary_stage }}
 
 **Step 2 — boundary check (ONLY when the gate is clear).** Run the deterministic check
 (it enforces the Phase-5 runaway caps + kill switch, and on proceed records the advance it
 authorizes — so it must run only after Step 1 clears):
 
-!python -m harness_maker.autopilot_caps boundary --root . --current {{ summary_stage }}{% if config.autonomy.step_cap is not none %} --step-cap {{ config.autonomy.step_cap }}{% endif %}{% if config.autonomy.time_cap_min is not none %} --time-cap-min {{ config.autonomy.time_cap_min }}{% endif %}
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.autopilot_caps boundary --root . --current {{ summary_stage }}{% if config.autonomy.step_cap is not none %} --step-cap {{ config.autonomy.step_cap }}{% endif %}{% if config.autonomy.time_cap_min is not none %} --time-cap-min {{ config.autonomy.time_cap_min }}{% endif %}
 
 Read the JSON:
 - `proceed: false` → **STOP** (print the banner). `halt_kind` `step_cap`/`time_cap` = a

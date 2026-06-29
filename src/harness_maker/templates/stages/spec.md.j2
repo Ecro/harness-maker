@@ -64,9 +64,9 @@ Grep "<key terms>" --glob "{{ config.spec.dir }}SPEC-*.md"
 Grep "<key terms>" --glob "{{ config.work_docs.dir }}PLAN-*.md"
 # Repo memory — replace `<topic>` with the actual SPEC topic before running.
 {% if is_codex %}
-Bash("uv run python -m harness_maker.memory_retrieve --topic '<topic>' --k 6 --pre-k 30")
+Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.memory_retrieve --topic '<topic>' --k 6 --pre-k 30")
 {% else %}
-!uv run python -m harness_maker.memory_retrieve --topic "<topic>" --k 6 --pre-k 30
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.memory_retrieve --topic "<topic>" --k 6 --pre-k 30
 {% endif %}
 # When research ran, read its cache
 [ -f {{ config.work_docs.dir }}RESEARCH-{slug}.md ] && Read {{ config.work_docs.dir }}RESEARCH-{slug}.md
@@ -315,7 +315,7 @@ to satisfy `spec_machine.cross_validate` rule 1. The title in `.md` and the
 After writing both files, run:
 
 ```bash
-python -m harness_maker.spec_machine validate {{ config.spec.dir }}SPEC-{slug}.machine.yaml
+uv run --with {{ harness_maker_src_path }} python -m harness_maker.spec_machine validate {{ config.spec.dir }}SPEC-{slug}.machine.yaml
 ```
 
 Then the 6-rule cross-validation:
@@ -357,7 +357,7 @@ jq -n --arg spec "$(cat {{ config.spec.dir }}SPEC-{slug}.md)" \
       --arg machine "$(cat {{ config.spec.dir }}SPEC-{slug}.machine.yaml)" \
       --arg mode "{{ config.dev_mode }}" \
       '{spec_text: $spec, machine_yaml: $machine, dev_mode: $mode}' \
-  | python -m harness_maker.spec_quality eval
+  | uv run --with {{ harness_maker_src_path }} python -m harness_maker.spec_quality eval
 ```
 
 The `machine_yaml` field (ADR-006) enables the 3 machine dims —

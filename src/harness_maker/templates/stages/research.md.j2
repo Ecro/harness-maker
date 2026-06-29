@@ -65,11 +65,11 @@ Before starting, load memory in tier order (stops at first miss per tier):
 
 {% if is_codex %}
 ```bash
-Bash("uv run python -m harness_maker.memory_retrieve --topic '<topic>' --k 6 --pre-k 30")
+Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.memory_retrieve --topic '<topic>' --k 6 --pre-k 30")
 ```
 {% else %}
 ```bash
-!uv run python -m harness_maker.memory_retrieve --topic "<topic>" --k 6 --pre-k 30
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.memory_retrieve --topic "<topic>" --k 6 --pre-k 30
 ```
 {% endif %}
 
@@ -83,13 +83,13 @@ context. Use `reference` and `project` notes first:
 
 {% if is_codex %}
 ```bash
-Bash("uv run python -m harness_maker.second_brain search '<topic terms>' --type reference")
-Bash("uv run python -m harness_maker.second_brain search '<topic terms>' --type project")
+Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.second_brain search '<topic terms>' --type reference")
+Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.second_brain search '<topic terms>' --type project")
 ```
 {% else %}
 ```bash
-!uv run python -m harness_maker.second_brain search '<topic terms>' --type reference
-!uv run python -m harness_maker.second_brain search '<topic terms>' --type project
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.second_brain search '<topic terms>' --type reference
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.second_brain search '<topic terms>' --type project
 ```
 {% endif %}
 
