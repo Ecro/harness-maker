@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.33.1] - 2026-06-30
+
 ### Fixed — wrapup memory-at-base seam: fold base-written memory into the squash (PLAN-wrapup-memory-base-seam)
 - **The seam.** In the per-task feature-branch model `/hm:wrapup` runs inside `.worktrees/<slug>/`,
   but `memory_md._base_root` strips the `.worktrees/<name>` suffix so the human memory tiers
