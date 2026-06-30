@@ -4407,6 +4407,11 @@ def task_land(
     branch = task_branch(slug)
     wt = task_worktree_path(base, slug)
     own = session_uuid
+    # The SHA of the squash commit THIS call freshly created — printed to stdout at the
+    # end so wrapup's memory-fold anchors `--expect-head` on the exact in-fence squash,
+    # not a post-hoc `rev-parse` a peer land could have advanced (REVIEW P2). Stays None on
+    # every converge/already-landed/abort path, so stdout is empty unless a squash was made.
+    landed_sha: str | None = None
 
     def _drop_own_row(rows: list[SessionRow]) -> list[SessionRow]:
         # ADR-004: never delete a LIVE mismatched row. Ours = uuid matches (when
@@ -4583,6 +4588,7 @@ def task_land(
                         if to_unstage:
                             _run(["git", "reset", "-q", "HEAD", "--", *to_unstage], cwd=base)
                         _run(["git", "commit", "-m", msg], cwd=base)
+                        landed_sha = _run(["git", "rev-parse", "HEAD"], cwd=base).stdout.strip()
                 except RuntimeError as e:
                     _scoped_conflict_cleanup(base, touched, pre_untracked, preserve=pre_staged)
                     print(
@@ -4639,6 +4645,12 @@ def task_land(
     # NOT load-bearing for this land's marker, already deleted inline above).
     with contextlib.suppress(Exception):
         prune_stale(base)
+    # Stdout contract (REVIEW P2): the fresh-squash SHA on its own line, ONLY when this
+    # call created it. Every diagnostic above goes to stderr, so stdout is empty on the
+    # converge/already-landed paths — wrapup reads this to decide whether to fold + what
+    # to anchor `--expect-head` on, without a race-prone second `rev-parse`.
+    if landed_sha is not None:
+        print(landed_sha)
     return 0
 
 
@@ -4658,6 +4670,193 @@ def _cli_task_create(args: list[str]) -> int:
         return 1
     print(str(wt))
     return 0
+
+
+# The human memory tiers wrapup writes to the BASE repo (memory_md._base_root strips
+# the .worktrees/<slug> suffix). The machine tiers (semantic/episodic/profile) are churn
+# and deliberately excluded. Kept in correspondence with memory_md's writer targets by
+# test_wrapup_memory_fold.test_tier_pathspec_corresponds_to_memory_md_writers.
+_HUMAN_MEMORY_TIER_PATHSPEC: tuple[str, ...] = (
+    ".claude/memory/wiki.md",
+    ".claude/memory/failures.md",
+    ".claude/memory/session",
+)
+
+
+def _is_human_memory_tier_path(rel: str) -> bool:
+    """WHY: scope the fold to the exact human tiers, never a machine-churn path."""
+    rel = rel.strip()
+    if rel in (".claude/memory/wiki.md", ".claude/memory/failures.md"):
+        return True
+    return rel.startswith(".claude/memory/session/") and rel.endswith(".md")
+
+
+def commit_base_memory(base: Path, expect_head: str) -> int:
+    """Fold the human memory tiers into the fresh squash commit (ADR-001/004; ADR-003 rev).
+
+    Memory is written to the BASE repo, so after `task-land` it sits as base working-tree
+    dirt outside the squash's path set — never committed. This amends it into the squash.
+    Both tracked-modified AND untracked tiers are folded, but ONLY paths inside the human-
+    tier pathspec — an untracked path outside it is never newly tracked (narrow-filter).
+
+    Accepted limitation (REVIEW P3): wiki/failures/session-<date> are cross-session SHARED
+    base files. A peer's UN-fenced memory append (wrapup Step 5) landing between the
+    `ls-files` and the `git add -f` here can be co-staged into this commit. It is append-
+    only / non-destructive (the peer's lines are preserved; only their commit attribution
+    differs), so it is not hardened. The safety argument for this fold is the amend fence +
+    `--only` pathspec, NOT a 'single session owns its memory writes' invariant — that
+    invariant is false for these shared dated files.
+
+    The amend is gated (ADR-004) and concurrency-fenced (REVIEW): the check->add->amend
+    runs under the same `index.lock-hm` merge fence task_land uses, re-asserts HEAD ==
+    expect_head INSIDE the fence, and amends with `--only -- <memory pathspec>`. So a
+    converge/no-op land, a peer that advances base HEAD mid-amend, or a peer that stages
+    foreign churn into the shared base index can never be folded into the wrong commit
+    (the count:3 'finalize-pulls-orphan-wip-into-main' contamination class).
+    """
+    base = Path(base)
+
+    def _git(*args: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(  # noqa: S603 — args list, no shell
+            ["git", *args],
+            cwd=str(base),
+            capture_output=True,
+            text=True,
+            timeout=_GIT_TIMEOUT,
+        )
+
+    head = _git("rev-parse", "HEAD")
+    if head.returncode != 0:
+        print(f"[commit-base-memory] cannot read HEAD: {head.stderr.strip()}", file=sys.stderr)
+        return head.returncode or 1
+    if head.stdout.strip() != expect_head:
+        print(
+            f"[commit-base-memory] refusing: HEAD {head.stdout.strip()} is not the expected "
+            f"fresh squash {expect_head} — not amending",
+            file=sys.stderr,
+        )
+        return 1
+
+    # The check->add->amend critical section runs under the SAME merge fence task_land
+    # uses (index.lock-hm), so a concurrent session's fenced squash cannot stage into the
+    # shared base index or advance HEAD mid-amend (REVIEW: unfenced amend race, count:3
+    # 'finalize-pulls-orphan-wip-into-main' class). Inside the fence we (a) re-assert HEAD
+    # == expect_head — a peer could have landed between the pre-check and fence acquisition,
+    # and `git commit --amend` rewrites *current* HEAD, so amending a peer's commit must be
+    # impossible — and (b) scope the amend to the memory pathspec via `--only`, so even a
+    # residual foreign staged entry is structurally never swept into this commit.
+    fold: list[str] = []
+    try:
+        with _acquire_merge_fence(base, timeout=_FENCE_TIMEOUT):
+            head = _git("rev-parse", "HEAD")
+            if head.returncode != 0 or head.stdout.strip() != expect_head:
+                print(
+                    f"[commit-base-memory] refusing: HEAD moved to {head.stdout.strip()} under "
+                    f"the fence (expected {expect_head}) — not amending",
+                    file=sys.stderr,
+                )
+                return 1
+
+            staged = [
+                ln
+                for ln in _git("diff", "--cached", "--name-only").stdout.splitlines()
+                if ln.strip()
+            ]
+            foreign = [s for s in staged if not _is_human_memory_tier_path(s)]
+            if foreign:
+                print(
+                    f"[commit-base-memory] refusing: non-memory content already staged: "
+                    f"{foreign} — not amending",
+                    file=sys.stderr,
+                )
+                return 1
+
+            # Fold tracked-modified human tiers AND untracked ones that fall INSIDE the tier
+            # pathspec (ADR-003 revised): memory_md creates today's session/<date>.md fresh
+            # (and wiki/failures on a greenfield base), so they are untracked-and-ignored on
+            # first write — `ls-files -m` misses them and the seam this fix targets would
+            # persist for the richest per-task tier. `--others` (no --exclude-standard) lists
+            # untracked INCLUDING gitignored; the `_is_human_memory_tier_path` filter keeps the
+            # force-add strictly bounded to the tier — an untracked path OUTSIDE it is never
+            # newly tracked (the narrow-filter invariant the original ADR-003 protected).
+            tracked_mod = [
+                p
+                for p in _git(
+                    "ls-files", "-m", "--", *_HUMAN_MEMORY_TIER_PATHSPEC
+                ).stdout.splitlines()
+                if p.strip() and _is_human_memory_tier_path(p)
+            ]
+            untracked_tier = [
+                p
+                for p in _git(
+                    "ls-files", "--others", "--", *_HUMAN_MEMORY_TIER_PATHSPEC
+                ).stdout.splitlines()
+                if p.strip() and _is_human_memory_tier_path(p)
+            ]
+            to_add = sorted(set(tracked_mod) | set(untracked_tier))
+            if to_add:
+                add = _git("add", "-f", "--", *to_add)
+                if add.returncode != 0:
+                    print(
+                        f"[commit-base-memory] git add failed: {add.stderr.strip()}",
+                        file=sys.stderr,
+                    )
+                    return add.returncode
+
+            fold = [
+                ln
+                for ln in _git("diff", "--cached", "--name-only").stdout.splitlines()
+                if ln.strip() and _is_human_memory_tier_path(ln.strip())
+            ]
+            if not fold:
+                print("[commit-base-memory] no tracked memory changes to fold (no-op)")
+                return 0
+
+            # `--only -- <memory paths>` builds the amended commit from HEAD's tree plus ONLY
+            # these paths, disregarding any other staged entry — airtight against sweep-in.
+            amend = _git("commit", "--amend", "--no-edit", "--only", "--", *fold)
+            if amend.returncode != 0:
+                print(amend.stderr.strip() or amend.stdout.strip(), file=sys.stderr)
+                return amend.returncode
+    except (RuntimeError, TimeoutError) as exc:
+        # Mirror task_land's fence error handling (REVIEW P2): a 360s fence-contention
+        # timeout or gitdir-resolve failure degrades gracefully — the memory is still on
+        # disk as base dirt and a re-run folds it once the contending session releases.
+        print(
+            f"[commit-base-memory] could not acquire the base merge fence ({exc}) — memory "
+            "left as base dirt; re-run after the contending session finishes",
+            file=sys.stderr,
+        )
+        return 1
+
+    # Every human tier inside the pathspec — tracked-modified or untracked — is folded
+    # (ADR-003 revised), so there is no longer a skipped-untracked class to report.
+    print(f"[commit-base-memory] folded {len(fold)} tier(s): {', '.join(fold)}")
+    return 0
+
+
+def _cli_commit_base_memory(args: list[str]) -> int:
+    """`worktree commit-base-memory <base> --expect-head <sha>` — fold memory (ADR-001)."""
+    expect_head: str | None = None
+    rest: list[str] = []
+    i = 0
+    while i < len(args):
+        if args[i] == "--expect-head":
+            if i + 1 >= len(args):
+                print("usage: commit-base-memory <base> --expect-head <sha>", file=sys.stderr)
+                return 2
+            expect_head = args[i + 1]
+            i += 2
+            continue
+        if args[i].startswith("--"):
+            i += 1
+            continue
+        rest.append(args[i])
+        i += 1
+    if not rest or expect_head is None:
+        print("usage: commit-base-memory <base> --expect-head <sha>", file=sys.stderr)
+        return 2
+    return commit_base_memory(Path(rest[0]).resolve(), expect_head=expect_head)
 
 
 def _cli_task_land(args: list[str]) -> int:
@@ -4844,6 +5043,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cli_task_create(rest)
     if sub == "task-land":
         return _cli_task_land(rest)
+    if sub == "commit-base-memory":
+        return _cli_commit_base_memory(rest)
     if sub == "task-preflight":
         return _cli_task_preflight(rest)
     if sub == "task-refresh":

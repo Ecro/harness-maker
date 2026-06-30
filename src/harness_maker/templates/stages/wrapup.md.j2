@@ -586,9 +586,12 @@ runs from the **base repo** (the directory two levels above `<WT>` — i.e. stri
    - `BRANCH=$(cd <WT> && git rev-parse --abbrev-ref HEAD)`
    - If `BRANCH` does NOT match `hm/*` → **skip the rest of this step** (not a task worktree).
    - `SLUG="${BRANCH#hm/}"` ; `BASE` = `<WT>`'s base repo root (`<WT>/../..`).
-2. Squash-land from `BASE` (`task-land` is idempotent + self-aborts on a dirty base,
-   captures any pending worktree edits as a commit first, then squashes under the full
-   merge fence + tears down branch/worktree/registry-row/marker):
+2. Squash-land from `BASE` (`task-land` is idempotent + self-aborts on a dirty base, captures
+   any pending worktree edits as a commit first, then squashes under the full merge fence +
+   tears down branch/worktree/registry-row/marker). **On the fresh-squash path it prints the
+   new squash commit SHA as its only stdout line** (every diagnostic goes to stderr); a
+   converge / already-landed run prints nothing. **Capture that stdout SHA line as
+   `SQUASH_SHA`** (empty on a converge run) — you need it for the memory fold in step 4:
 
 {% if is_codex %}
 ```
@@ -608,6 +611,31 @@ Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktre
    base or squash conflict) and PRESERVED the branch + worktree for re-run — surface
    its stderr verbatim and STOP (do NOT push; resolve the base state, then re-run
    `task-land <SLUG> <BASE>`).
+4. **Fold base memory into the squash commit** (the per-task seam — memory_md writes the
+   human tiers to BASE, so Step 6's worktree `git add` never staged them and the squash
+   preserved-but-never-committed them). **Only when `task-land` printed a `SQUASH_SHA`**
+   (a fresh squash was created — a converge / already-landed run prints nothing) fold the
+   human memory tiers into that exact commit, anchoring `--expect-head` on the SHA
+   `task-land` created **in-fence** — NOT a post-hoc `rev-parse`, which a concurrent peer
+   land could have advanced between task-land returning and the capture (REVIEW P2). The
+   helper is amend-safety gated AND merge-fenced (it re-asserts `HEAD == --expect-head`
+   under the same `index.lock-hm` fence and amends with `--only` over the tier pathspec),
+   so it can never amend a foreign commit or sweep concurrent staged churn:
+
+{% if is_codex %}
+```
+Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree commit-base-memory <BASE> --expect-head <SQUASH_SHA>")
+```
+{% else %}
+```bash
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree commit-base-memory <BASE> --expect-head <SQUASH_SHA>
+```
+{% endif %}
+
+   A non-zero exit (refused: HEAD drift / foreign staged content, fence-contention timeout,
+   or an amend hook failure) is surfaced verbatim — the code squash already landed safely;
+   finish the memory commit manually if needed. An empty `SQUASH_SHA` (already-landed /
+   empty-squash converge) skips the fold entirely.
 {%- endif %}
 
 ### Step 8 — Push (manual; never automatic)

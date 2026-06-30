@@ -12,6 +12,8 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
+import pytest
+
 from harness_maker import worktree
 
 
@@ -77,6 +79,23 @@ def test_task_land_squashes_and_tears_down(tmp_path: Path) -> None:
     assert worktree._read_sessions(repo) == []
     # the orphan landed-marker was reaped by the post-fence drain
     assert _landed_markers(repo) == ""
+
+
+def test_task_land_prints_fresh_squash_sha_to_stdout(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """REVIEW P2: the fresh-squash path prints its new commit SHA as the only stdout line;
+    converge / already-landed runs print nothing — wrapup anchors the memory fold's
+    `--expect-head` on this in-fence SHA, never a race-prone post-hoc `rev-parse`."""
+    repo = _repo(tmp_path)
+    _make_task_with_committed_work(repo, "feat")
+    assert worktree.task_land(repo, "feat") == 0
+    out = capsys.readouterr().out.strip()
+    head = _git(["rev-parse", "HEAD"], repo)
+    assert out == head, "fresh squash must print exactly the new HEAD SHA to stdout"
+    # a fully-landed re-run converges and prints NOTHING to stdout (no SHA to fold against)
+    assert worktree.task_land(repo, "feat") == 0
+    assert capsys.readouterr().out.strip() == "", "converge/no-op land must not print a SHA"
 
 
 def test_task_land_uses_conventional_message(tmp_path: Path) -> None:

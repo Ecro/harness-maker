@@ -1,0 +1,157 @@
+schema_version: 2
+spec_slug: wrapup-memory-base-seam
+parent_spec: null
+verification_tier: 2
+mutation_threshold: null
+mutation_threshold_rationale: tier 2 — mutation deferred to loop/sampling; the new
+  fold helper lives in the ~4k-line worktree.py and full-file mutmut is too heavy
+  for the execute hot path.
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/worktree.py
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: flag-on wrapup folds memory into the single squash commit
+  type: mechanical
+  test_ids:
+  - tests/unit/test_wrapup_memory_fold.py::test_fold_memory_into_squash_commit
+  executable_predicate: new_commit_count(base, pre_tip) == 1 and 'wiki.md' in committed_memory_paths(base)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: the test writes a known line to base wiki.md, runs the fold, and
+    asserts that exact line is in the HEAD commit blob while exactly one new commit
+    exists relative to pre_tip — the expected value is test-authored input, independent
+    of the helper's internals (not derived from the code under test).
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: memory fold is idempotent on re-run
+  type: property
+  test_ids:
+  - tests/unit/test_wrapup_memory_fold.py::test_fold_memory_idempotent_noop
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: 'idempotence is a metamorphic relation: fold(fold(state)) == fold(state).
+    A second invocation on a clean memory tree must create no commit and leave HEAD
+    unchanged — this holds for any correct implementation, so it cannot be satisfied
+    by reading the code.'
+  oracle_independence_waiver: null
+  input_domain: a base repo whose memory tiers are already committed into HEAD (clean
+    working tree)
+  transformation: invoke the memory-fold helper a second time
+  expected_relation: HEAD sha is unchanged AND no new commit is created AND exit code
+    == 0
+  preconditions:
+  - a prior fold has already committed the memory tiers
+  observable_output: process exit code + base branch HEAD sha
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: fold force-adds gitignored tracked memory tiers
+  type: mechanical
+  test_ids:
+  - tests/unit/test_wrapup_memory_fold.py::test_fold_memory_force_adds_gitignored_tracked_tiers
+  executable_predicate: is_committed(base, '.claude/memory/wiki.md')
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: 'fixture: a repo whose .gitignore blanket-ignores .claude/ but
+    with force-tracked wiki.md; the test modifies wiki.md to a known value and asserts
+    that exact value is in the resulting commit (proving git add -f, not a silent
+    skip) — expected is the test-written content, independent of the helper.'
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: memory fold step is gated on the feature-branch flag
+  type: mechanical
+  test_ids:
+  - tests/unit/test_wrapup_memory_fold.py::test_wrapup_memory_fold_gated_on_feature_branch_flag
+  executable_predicate: fold_marker_in_render(flag_on=True) and not fold_marker_in_render(flag_on=False)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: 'the rendered wrapup output is the artifact under test: flag-on
+    render must contain the fold-helper invocation marker and flag-off render must
+    not. Expected marker strings are fixed and compared against the deterministic
+    (freeze_time) render — independent of the template internals.'
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: fold refuses an unexpected HEAD or foreign staged content
+  type: mechanical
+  test_ids:
+  - tests/unit/test_wrapup_memory_fold.py::test_fold_refuses_unexpected_head_or_foreign_staged
+  executable_predicate: commit_base_memory(base, expect_head='deadbeef') != 0 and
+    git_head(base) == head_before
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: 'safety invariant (refusal): when HEAD != expect_head OR a non-tier
+    path is staged, the helper must NOT amend — HEAD sha is unchanged and exit is
+    non-zero. This is an independent invariant (no amend may mutate a commit the caller
+    did not authorize), provable by comparing HEAD before/after regardless of the
+    helper''s internals.'
+  oracle_independence_waiver: null
+  input_domain: a base repo whose HEAD is not the expected fresh squash, or whose
+    index has a staged non-tier path
+  transformation: invoke commit_base_memory with the fresh-squash expect_head
+  expected_relation: exit code != 0 AND base HEAD sha is unchanged AND no foreign
+    path is committed
+  preconditions:
+  - the base index may carry a concurrent session's staged churn
+  observable_output: process exit code + base HEAD sha + committed tree
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null

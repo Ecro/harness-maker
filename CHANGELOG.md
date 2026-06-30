@@ -2,6 +2,31 @@
 
 ## [Unreleased]
 
+### Fixed — wrapup memory-at-base seam: fold base-written memory into the squash (PLAN-wrapup-memory-base-seam)
+- **The seam.** In the per-task feature-branch model `/hm:wrapup` runs inside `.worktrees/<slug>/`,
+  but `memory_md._base_root` strips the `.worktrees/<name>` suffix so the human memory tiers
+  (wiki/failures/session) are written to the BASE repo — outside `task-land`'s squash path set,
+  so they were preserved-but-never-committed (a silent non-commit, not a dirty-base abort).
+- **`commit-base-memory` CLI (ADR-001).** A new `worktree commit-base-memory <BASE> --expect-head
+  <SHA>` subcommand amends the base-written human tiers into the fresh squash. `/hm:wrapup` Step 7.7
+  invokes it after `task-land`, gated on the flag-on per-task path.
+- **Amend-safety, concurrency-fenced (ADR-004 + REVIEW P1).** The check→add→amend runs under
+  task_land's `index.lock-hm` merge fence, re-asserts `HEAD == expect_head` in-fence, and amends
+  with `git commit --amend --only -- <human-tier pathspec>` — so a concurrent session's staged
+  churn is never swept in and a peer's HEAD is never rewritten (the count:3
+  `finalize-pulls-orphan-wip-into-main` class). Fence-contention degrades gracefully (rc 1, memory
+  left as recoverable base dirt).
+- **SHA anchor, not a racy rev-parse (REVIEW P2).** `task_land` now prints its in-fence squash SHA
+  to stdout on the fresh-squash path only (converge/already-landed paths print nothing); wrapup
+  anchors `--expect-head` on that `SQUASH_SHA` instead of a post-hoc `rev-parse` a peer land could
+  have advanced.
+- **Untracked session tier IS folded (ADR-003 revised at review).** Today's `session/<today>.md` is
+  untracked-and-ignored on first write; the fold force-adds untracked paths INSIDE the human-tier
+  pathspec while never newly-tracking anything outside it (narrow-filter invariant kept).
+- **Accepted limitation (REVIEW P3, documented).** wiki/failures/session-by-date are cross-session
+  shared base files; a peer's un-fenced append can be co-committed (append-only, non-destructive).
+  The safety argument is the fence + `--only` pathspec, not a single-session-ownership invariant.
+
 ### Fixed — autopilot invocation convention + worktree-visible marker (PLAN-autopilot-invocation-and-marker-fix)
 - **Single invocation launcher.** All ~57 executable `harness_maker` invocations that used a
   broken form — bare `python -m harness_maker` / `harness-maker <subcmd>` (no installed
