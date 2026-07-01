@@ -15,6 +15,8 @@ import json
 import sys
 from typing import Any
 
+from harness_maker import command_registry
+
 # critical->P0, high->P1, medium->P2, low/info->P3 (ADR-001, validator pass-2 critical).
 _SEVERITY_TO_PTIER: dict[str, str] = {
     "critical": "P0",
@@ -71,6 +73,9 @@ def main(argv: list[str] | None = None) -> int:
     Reading from stdin/file (not an inlined shell arg) keeps untrusted Codex content out of
     the shell, and makes the severity map + null-location flag actually deterministic rather
     than LLM-applied prose (REVIEW round 3, finding C)."""
+    _guard = command_registry.guard_or_none("codex_adapter", argv)
+    if _guard is not None:
+        return _guard
     args = list(sys.argv[1:]) if argv is None else list(argv)
     if not args or args[0] != "adapt":
         sys.stderr.write("usage: python -m harness_maker.codex_adapter adapt < codex-output.json\n")

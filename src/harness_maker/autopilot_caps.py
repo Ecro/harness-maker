@@ -18,7 +18,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
-from harness_maker import autopilot, autopilot_ledger
+from harness_maker import autopilot, autopilot_ledger, command_registry
 
 HaltKind = Literal["kill_switch", "step_cap", "time_cap", "merge_gate", "unknown_stage"]
 CapKind = Literal["step_cap", "time_cap"]
@@ -229,25 +229,12 @@ def _cmd_boundary(args: argparse.Namespace) -> int:
 
 def main(argv: Sequence[str] | None = None) -> int:
     """`boundary` subcommand — the prose auto-branch's deterministic gate (P6)."""
-    resolved = list(sys.argv[1:] if argv is None else argv)
-    # Guardrail (observed 2026-07-01): `autopilot on/off` is a Typer command on the
-    # ROOT module — `python -m harness_maker autopilot on` — NOT a subcommand of THIS
-    # boundary-check module. The two invocation paths (`harness_maker autopilot` vs
-    # `harness_maker.autopilot_caps`) look alike and get conflated, and argparse's stock
-    # "invalid choice: 'on' (choose from boundary, gate-blocked)" hides the real fix.
-    # Redirect loudly to the correct command instead. (The reverse misroute —
-    # `autopilot boundary` — is already handled by cli.py's unknown-action message.)
-    if resolved and resolved[0] in {"on", "off"}:
-        rest = " ".join(resolved[1:])
-        suffix = f" {rest}" if rest else ""
-        print(
-            f"autopilot_caps: {resolved[0]!r} is not a command of this module — it only "
-            "runs the boundary / gate-blocked auto-advance checks.\n"
-            "To toggle autopilot, call the root CLI instead:\n"
-            f"    python -m harness_maker autopilot {resolved[0]}{suffix}",
-            file=sys.stderr,
-        )
-        return 2
+    # Registry-driven misroute guard (PLAN-command-surface-registry ADR-004): redirects
+    # the observed `autopilot_caps on` → `autopilot on` (and any cross-module misroute),
+    # replacing the hand-written one-off that pointed at the now-deprecated Typer form.
+    guard = command_registry.guard_or_none("autopilot_caps", argv)
+    if guard is not None:
+        return guard
     parser = argparse.ArgumentParser(add_help=False)
     sub = parser.add_subparsers(dest="cmd", required=True)
     b = sub.add_parser("boundary", add_help=False)

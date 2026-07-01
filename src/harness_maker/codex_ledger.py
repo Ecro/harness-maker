@@ -19,6 +19,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from harness_maker import command_registry
+
 DEFAULT_OBSERVABILITY_DIR = Path(".claude/observability")
 LEDGER_FILENAME = "codex-second-opinion.jsonl"
 
@@ -151,6 +153,9 @@ def main(argv: list[str] | None = None) -> int:
     When any ``--field`` flag is present the row is built from argv (each value a
     separate, shell-quoted argument); otherwise a JSON object is read from stdin.
     """
+    _guard = command_registry.guard_or_none("codex_ledger", argv)
+    if _guard is not None:
+        return _guard
     args = list(sys.argv[1:]) if argv is None else list(argv)
     if not args or args[0] != "emit":
         sys.stderr.write("usage: python -m harness_maker.codex_ledger emit [--slug ...|stdin]\n")

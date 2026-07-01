@@ -7,7 +7,7 @@ import json
 import os
 import sys
 from pathlib import Path
-from typing import Any, Literal, cast
+from typing import Any
 
 import typer
 import yaml
@@ -21,8 +21,6 @@ from harness_maker.io_utils import atomic_write, denormalize_home_to_tilde
 from harness_maker.locate import compare_version
 from harness_maker.locate import resolve as resolve_plugin
 from harness_maker.models import (
-    AtomicStage,
-    AutonomyConfig,
     Blueprint,
     InterviewAnswers,
     Preset,
@@ -2046,28 +2044,16 @@ def autopilot_cmd(
         typer.echo(f"autopilot: unknown action {action!r} (expected 'on' or 'off')", err=True)
         raise typer.Exit(2)
 
-    # Validate every input BEFORE touching the marker so a failed `on` neither
-    # writes a partial marker nor leaves a stale prior marker silently "active"
-    # under a value the user just tried (and failed) to change. Narrowing `level`
-    # here also removes the write()-call type:ignore.
-    if level not in ("gated", "auto_safe", "full"):
-        typer.echo(f"autopilot: invalid --level {level!r} (gated|auto_safe|full)", err=True)
-        raise typer.Exit(2)
-    if pipeline is None:
-        # P1-4: reuse the CANONICAL default pipeline (research…review, VERIFY, WRAPUP) —
-        # NOT `list(AtomicStage)`, whose enum declaration order puts WRAPUP before VERIFY
-        # and would run the safety check AFTER the commit/land. Single source of truth.
-        stages = list(AutonomyConfig().pipeline)
-    else:
-        try:
-            stages = [AtomicStage(s.strip()) for s in pipeline.split(",") if s.strip()]
-        except ValueError as exc:
-            typer.echo(f"autopilot: invalid --pipeline ({exc})", err=True)
-            raise typer.Exit(2) from None
+    # Validate every input BEFORE touching the marker via the SHARED helper (ADR-003) so
+    # the Typer alias and the dot-form `python -m harness_maker.autopilot` entry can never
+    # drift. A failed `on` neither writes a partial marker nor leaves a stale prior one.
     try:
-        marker = autopilot.write(
-            root, level=cast(Literal["gated", "auto_safe", "full"], level), pipeline=stages
-        )
+        level_v, stages = autopilot.resolve_toggle_config(level, pipeline)
+    except ValueError as exc:
+        typer.echo(f"autopilot: {exc}", err=True)
+        raise typer.Exit(2) from None
+    try:
+        marker = autopilot.write(root, level=level_v, pipeline=stages)
     except ValidationError as exc:
         typer.echo(f"autopilot: invalid config ({exc})", err=True)
         raise typer.Exit(2) from None

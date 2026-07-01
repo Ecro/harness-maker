@@ -15,6 +15,8 @@ import sys
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
+from harness_maker import command_registry
+
 if TYPE_CHECKING:
     from harness_maker.llm_judge import JudgeClient
 
@@ -134,6 +136,9 @@ def judge_boundary_llm(
 
 def main(argv: list[str] | None = None) -> int:
     """CLI: ``<paths-on-stdin> | python -m harness_maker.high_diff classify [--added-lines N]``."""
+    _guard = command_registry.guard_or_none("high_diff", argv)
+    if _guard is not None:
+        return _guard
     args = list(sys.argv[1:]) if argv is None else list(argv)
     parser = argparse.ArgumentParser(prog="python -m harness_maker.high_diff")
     sub = parser.add_subparsers(dest="cmd", required=True)

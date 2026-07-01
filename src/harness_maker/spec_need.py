@@ -15,6 +15,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
 
+from harness_maker import command_registry
 from harness_maker.io_utils import atomic_append, atomic_write
 
 logger = logging.getLogger(__name__)
@@ -450,6 +451,9 @@ def _cli_validate_slug(value: str, field: str = "slug") -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    _guard = command_registry.guard_or_none("spec_need", argv)
+    if _guard is not None:
+        return _guard
     parser = _build_parser()
     args = parser.parse_args(argv)
 

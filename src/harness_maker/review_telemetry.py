@@ -19,6 +19,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from harness_maker import command_registry
+
 # Default location relative to project root — overridable via parameter.
 DEFAULT_OBSERVABILITY_DIR = Path(".claude/observability")
 
@@ -169,6 +171,9 @@ def main(argv: list[str] | None = None) -> int:
     Reads a JSON object from stdin, validates, appends to today's JSONL.
     Writes the resolved log path to stdout on success.
     """
+    _guard = command_registry.guard_or_none("review_telemetry", argv)
+    if _guard is not None:
+        return _guard
     args = list(sys.argv[1:]) if argv is None else list(argv)
     if not args or args[0] != "emit":
         sys.stderr.write("usage: python -m harness_maker.review_telemetry emit\n")

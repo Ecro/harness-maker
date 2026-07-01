@@ -17,6 +17,7 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
+from harness_maker import command_registry
 from harness_maker.io_utils import atomic_write
 from harness_maker.memory._locking import exclusive_lock
 
@@ -310,6 +311,9 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    _guard = command_registry.guard_or_none("memory_md", argv)
+    if _guard is not None:
+        return _guard
     args = _build_parser().parse_args(argv)
     try:
         body = _read_body(args)

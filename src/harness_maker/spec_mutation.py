@@ -20,6 +20,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, cast
 
+from harness_maker import command_registry
 from harness_maker.io_utils import atomic_write
 
 VerificationTier = Literal[1, 2, 3]
@@ -559,6 +560,9 @@ def main(argv: list[str] | None = None) -> int:
     and re-usable by /hm:loop. Degrades to non-gating (exit 0 + warning) when
     mutmut is not installed — never blocks a user who lacks the dev tool.
     """
+    _guard = command_registry.guard_or_none("spec_mutation", argv)
+    if _guard is not None:
+        return _guard
     from harness_maker.spec_machine import load as load_machine
 
     parser = argparse.ArgumentParser(prog="python -m harness_maker.spec_mutation")

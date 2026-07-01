@@ -26,6 +26,7 @@ from typing import Any, Literal
 import yaml
 from pydantic import BaseModel, Field, field_validator
 
+from harness_maker import command_registry
 from harness_maker.io_utils import atomic_append, atomic_write
 
 #: Current authored schema version. Templates write ``schema_version: 2``.
@@ -1225,6 +1226,9 @@ def _run_find_unjudged(args: argparse.Namespace) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     """Entry point for validate / cross-validate / mark-tested / waiver-check / find-unbound."""
+    _guard = command_registry.guard_or_none("spec_machine", argv)
+    if _guard is not None:
+        return _guard
     parser = argparse.ArgumentParser(prog="python -m harness_maker.spec_machine")
     sub = parser.add_subparsers(dest="cmd", required=True)
 

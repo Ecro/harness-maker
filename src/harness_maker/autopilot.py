@@ -2,17 +2,20 @@
 
 from __future__ import annotations
 
+import argparse
 import contextlib
 import json
 import logging
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Literal
+from typing import Literal, cast
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
+from harness_maker import command_registry
 from harness_maker.io_utils import atomic_write
-from harness_maker.models import AtomicStage
+from harness_maker.models import AtomicStage, AutonomyConfig
 from harness_maker.worktree import (
     WORKTREE_DIR_NAME,
     _current_session_uuid,
@@ -267,3 +270,67 @@ def effective_level(project_root: Path, *, yaml_level: str) -> str:
         logger.warning(".hm-autopilot: unknown yaml autonomy.level %r → gated.", yaml_level)
         return "gated"
     return yaml_level
+
+
+def resolve_toggle_config(
+    level: str, pipeline: str | None
+) -> tuple[Literal["gated", "auto_safe", "full"], list[AtomicStage]]:
+    """Validate `--level` + `--pipeline` for an autopilot 'on'; raise ValueError on bad input.
+
+    Shared by the Typer alias (`cli.autopilot_cmd`) and the dot-form entry (`main`) so the
+    two entry points can never drift (PLAN-command-surface-registry ADR-003). Validates all
+    inputs BEFORE any marker write so a failed 'on' leaves no partial/stale marker.
+    """
+    if level not in ("gated", "auto_safe", "full"):
+        raise ValueError(f"invalid --level {level!r} (gated|auto_safe|full)")
+    if pipeline is None:
+        # Canonical default (research…review, VERIFY, WRAPUP) — NOT list(AtomicStage), whose
+        # enum order puts WRAPUP before VERIFY. Single source of truth.
+        stages = list(AutonomyConfig().pipeline)
+    else:
+        try:
+            stages = [AtomicStage(s.strip()) for s in pipeline.split(",") if s.strip()]
+        except ValueError as exc:
+            raise ValueError(f"invalid --pipeline ({exc})") from None
+    return cast("Literal['gated', 'auto_safe', 'full']", level), stages
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Dot-form entry: `python -m harness_maker.autopilot on|off [...]`.
+
+    Down-unified from the Typer `autopilot` toggle (ADR-001) so all `autopilot*` operations
+    share the dominant `python -m harness_maker.<module>` convention. The Typer command
+    survives as a thin backward-compat alias delegating to the same `resolve_toggle_config`
+    + `write`/`clear`.
+    """
+    raw = list(sys.argv[1:] if argv is None else argv)
+    guard = command_registry.misroute_guard("autopilot", raw)
+    if guard is not None:
+        return guard
+    parser = argparse.ArgumentParser(add_help=False, prog="python -m harness_maker.autopilot")
+    parser.add_argument("action", choices=["on", "off"])
+    parser.add_argument("--level", default="auto_safe")
+    parser.add_argument("--pipeline", default=None)
+    parser.add_argument("--root", default=None)
+    args = parser.parse_args(raw)
+    root = Path(args.root) if args.root else Path.cwd()
+    if args.action == "off":
+        clear(root)
+        print("autopilot: off (marker cleared)")
+        return 0
+    try:
+        level, stages = resolve_toggle_config(args.level, args.pipeline)
+    except ValueError as exc:
+        print(f"autopilot: {exc}", file=sys.stderr)
+        return 2
+    try:
+        marker = write(root, level=level, pipeline=stages)
+    except ValidationError as exc:
+        print(f"autopilot: invalid config ({exc})", file=sys.stderr)
+        return 2
+    print(f"autopilot: on (level={marker.level}, {len(marker.pipeline)} stages)")
+    return 0
+
+
+if __name__ == "__main__":  # pragma: no cover — exercised via main(argv) in tests
+    sys.exit(main())

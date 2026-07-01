@@ -14,6 +14,7 @@ import os
 import sys
 from pathlib import Path
 
+from harness_maker import command_registry
 from harness_maker.io_utils import atomic_write
 from harness_maker.spec_inventory.batch_generator import (
     load_catalog_and_inventory,
@@ -93,6 +94,9 @@ def _cmd_generate_all(args: argparse.Namespace) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    _guard = command_registry.guard_or_none("spec_inventory", argv)
+    if _guard is not None:
+        return _guard
     parser = argparse.ArgumentParser(prog="harness_maker.spec_inventory")
     sub = parser.add_subparsers(dest="cmd")
 

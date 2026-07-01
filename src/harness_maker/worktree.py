@@ -34,6 +34,7 @@ from pathlib import Path
 
 import yaml
 
+from harness_maker import command_registry
 from harness_maker.io_utils import atomic_write, load_harness_yaml
 
 # Used by both stash list SHA capture and ref-file validation (ADR-002).
@@ -5003,6 +5004,9 @@ def _cli_loop_mode_active(args: list[str]) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     """Dispatch worktree subcommand from argv."""
+    _guard = command_registry.guard_or_none("worktree", argv)
+    if _guard is not None:
+        return _guard
     args = list(sys.argv[1:] if argv is None else argv)
     if not args:
         print(

@@ -26,6 +26,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
+from harness_maker import command_registry
 from harness_maker.io_utils import atomic_write
 
 logger = logging.getLogger(__name__)
@@ -396,6 +397,9 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    _guard = command_registry.guard_or_none("iter_receipts", argv)
+    if _guard is not None:
+        return _guard
     args = _build_parser().parse_args(argv)
 
     if args.cmd == "write":

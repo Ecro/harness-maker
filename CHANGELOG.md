@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+### Added — self-describing command surface + misroute guard (PLAN-command-surface-registry)
+- **`command_registry.py`** — a single source of truth for the `python -m harness_maker[.<module>]`
+  command surface (every module → its subcommands + a reverse index). The plugin can now
+  describe its own CLI surface, which powers the guard and the CI gates below.
+- **Runtime misroute guard** wired into every subcommand-bearing module. `python -m
+  harness_maker.autopilot_caps on` now prints a "did you mean `python -m
+  harness_maker.autopilot on`" redirect instead of argparse's cryptic
+  `invalid choice: 'on'`. The guard is **fail-open** — it redirects only when the token is a
+  valid subcommand of a *different* module, so it can never break a valid command.
+- **`python -m harness_maker.autopilot on|off`** dot-form entry, down-unified from the lone
+  Typer `autopilot` form (which was the outlier the LLM misroute-copied). The Typer command
+  is retained as a thin alias; both share one `resolve_toggle_config` validator so they can't drift.
+- **CI gates**: T-C1 (every rendered `python -m harness_maker…` invocation is registry-valid)
+  and T-C2 (registry ↔ source **bidirectional** parity for subparser modules + guard-wiring
+  per module) — a subcommand added in code but missing from the registry now fails CI.
+
 ## [0.33.1] - 2026-06-30
 
 ### Fixed — wrapup memory-at-base seam: fold base-written memory into the squash (PLAN-wrapup-memory-base-seam)

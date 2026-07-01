@@ -18,6 +18,8 @@ import json
 import logging
 from typing import Any, Protocol
 
+from harness_maker import command_registry
+
 _LOG = logging.getLogger(__name__)
 
 
@@ -429,6 +431,9 @@ def main() -> int:
     verifier client (ADR-008). ``verify_findings()`` remains as a library
     function for callers that supply a custom ``VerifierClient``.
     """
+    _guard = command_registry.guard_or_none("two_pass_review")
+    if _guard is not None:
+        return _guard
     import sys
 
     if len(sys.argv) < 2:

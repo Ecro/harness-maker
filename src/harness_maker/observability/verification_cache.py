@@ -19,6 +19,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from harness_maker import command_registry
+
 _ENV_IGNORE: frozenset[str] = frozenset(
     {
         "PWD",
@@ -296,6 +298,9 @@ def _compute_key_for_args(args: argparse.Namespace) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
+    _guard = command_registry.guard_or_none("observability.verification_cache", argv)
+    if _guard is not None:
+        return _guard
     parser = argparse.ArgumentParser(prog="verification-cache")
     sub = parser.add_subparsers(dest="command", required=True)
 

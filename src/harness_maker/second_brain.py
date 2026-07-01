@@ -18,6 +18,7 @@ from typing import Any
 
 import yaml
 
+from harness_maker import command_registry
 from harness_maker.io_utils import atomic_write, load_harness_yaml
 from harness_maker.models import SecondBrainConfig, SecondBrainFolder, SecondBrainNoteType
 
@@ -632,6 +633,9 @@ def _snippet(body: str, query_lower: str) -> str:
 
 
 def _cli(argv: list[str]) -> int:
+    _guard = command_registry.guard_or_none("second_brain", argv)
+    if _guard is not None:
+        return _guard
     parser = argparse.ArgumentParser(prog="python -m harness_maker.second_brain")
     parser.add_argument("--root", default=".", help="Harness root containing .claude/harness.yaml")
     sub = parser.add_subparsers(dest="cmd", required=True)

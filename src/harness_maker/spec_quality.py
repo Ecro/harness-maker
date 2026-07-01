@@ -10,6 +10,7 @@ import json
 import logging
 from typing import Any
 
+from harness_maker import command_registry
 from harness_maker.models import DevMode
 from harness_maker.spec_machine import score_ac_oracle_evidence
 
@@ -325,6 +326,9 @@ def main() -> int:
     machine dims (machine_verifiability, mutation_coverage_set,
     non_python_intent_alignment) are added to the score set.
     """
+    _guard = command_registry.guard_or_none("spec_quality")
+    if _guard is not None:
+        return _guard
     import sys
 
     if len(sys.argv) < 2 or sys.argv[1] != "eval":

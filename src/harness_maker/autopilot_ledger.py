@@ -18,6 +18,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal, get_args
 
+from harness_maker import command_registry
 from harness_maker.iter_receipts import Verdict
 
 DEFAULT_OBSERVABILITY_DIR = Path(".claude/observability")
@@ -223,6 +224,9 @@ def smoke_check(
 
 def main(argv: Sequence[str] | None = None) -> int:
     """`smoke` subcommand — the /hm:health auto-advance degradation probe (P7)."""
+    _guard = command_registry.guard_or_none("autopilot_ledger", argv)
+    if _guard is not None:
+        return _guard
     parser = argparse.ArgumentParser(add_help=False)
     sub = parser.add_subparsers(dest="cmd", required=True)
     s = sub.add_parser("smoke", add_help=False)

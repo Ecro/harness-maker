@@ -21,6 +21,7 @@ from typing import Any
 
 import yaml
 
+from harness_maker import command_registry
 from harness_maker.io_utils import atomic_write
 from harness_maker.models import RefFolder
 
@@ -215,6 +216,9 @@ def _safe_rel(fp: Path, root: Path) -> str:
 
 def _cli(argv: list[str]) -> int:
     """Entry: ``python -m harness_maker.refdocs_index build [harness_root]``."""
+    _guard = command_registry.guard_or_none("refdocs_index", argv)
+    if _guard is not None:
+        return _guard
     if not argv or argv[0] != "build":
         print("usage: python -m harness_maker.refdocs_index build [harness_root]")
         return 2

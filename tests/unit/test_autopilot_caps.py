@@ -196,19 +196,20 @@ def test_step_cap_wins_over_time_cap(tmp_path: Path) -> None:
     assert d.halt_kind == "step_cap"
 
 
-# ── misroute guardrail: `autopilot_caps on/off` → redirect to root CLI ─────────
+# ── misroute guardrail: `autopilot_caps on/off` → registry-driven dot-form redirect ──
+# Migrated from the hand-written one-off (which pointed at the deprecated Typer form) to
+# the shared registry guard, which redirects to the new dot-form `python -m
+# harness_maker.autopilot on` (PLAN-command-surface-registry ADR-004).
 
 
 @pytest.mark.parametrize("verb", ["on", "off"])
-def test_toggle_verb_redirects_to_root_cli(verb: str, capsys: pytest.CaptureFixture[str]) -> None:
+def test_toggle_verb_redirects_to_dotform(verb: str, capsys: pytest.CaptureFixture[str]) -> None:
     rc = autopilot_caps.main([verb, "--level", "auto_safe"])
     assert rc == 2
     err = capsys.readouterr().err
-    # Names the real command so the operator (or LLM) can copy it verbatim.
-    assert "python -m harness_maker autopilot" in err
-    assert f"autopilot {verb}" in err
-    # Passthrough of the trailing args so the corrected command is complete.
-    assert "--level auto_safe" in err
+    # Names the real command (dot-form) so the operator (or LLM) can copy it verbatim,
+    # with the trailing args preserved.
+    assert f"python -m harness_maker.autopilot {verb} --level auto_safe" in err
     # Must NOT emit argparse's cryptic "invalid choice" for these verbs.
     assert "invalid choice" not in err
 
