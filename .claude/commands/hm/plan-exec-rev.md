@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.33.1
+harness_maker_version: 0.34.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: b6523c2f59d991787a19da9713c07d30649eb5ab8874160cc68a7e4addb9d859
+content_hash: ca09631a5e093545f9249e50f5e64ef484b3968e0a8266e3564a34e47ab1a418
 ---
 > **Before you begin — outline your plan.** First check whether an autoloop is
 > active **for THIS session** (session-scoped — a loop in another session must
@@ -37,7 +37,7 @@ content_hash: b6523c2f59d991787a19da9713c07d30649eb5ab8874160cc68a7e4addb9d859
 > via `AskUserQuestion`: "Run the `research → spec → plan → execute → review → verify → wrapup` pipeline
 > on autopilot this session (stages auto-advance when no mandatory gate is pending), or
 > stay gated (stop after each stage)?" On **yes**, run
-> `uv run --with /home/noel/harness-maker python -m harness_maker autopilot on --level auto_safe --pipeline research,spec,plan,execute,review,verify,wrapup`
+> `uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.34.0 python -m harness_maker.autopilot on --level auto_safe --pipeline research,spec,plan,execute,review,verify,wrapup`
 > (writes the session marker). On **no**, proceed gated — do not re-prompt unless the user
 > asks. Once the marker exists, later stages skip this picker (the marker is the once-flag).
 >
@@ -103,7 +103,7 @@ Before drafting the plan, surface top-K wiki + failures entries relevant to the 
 
 
 ```bash
-!uv run --with /home/noel/harness-maker python -m harness_maker.memory_retrieve --topic "<topic>" --k 6 --pre-k 30
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.34.0 python -m harness_maker.memory_retrieve --topic "<topic>" --k 6 --pre-k 30
 ```
 
 
@@ -118,9 +118,9 @@ questions:
 
 
 ```bash
-!uv run --with /home/noel/harness-maker python -m harness_maker.second_brain search '<task slug or topic>' --type decision
-!uv run --with /home/noel/harness-maker python -m harness_maker.second_brain search '<task slug or topic>' --type preference
-!uv run --with /home/noel/harness-maker python -m harness_maker.second_brain search '<task slug or topic>' --type project
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.34.0 python -m harness_maker.second_brain search '<task slug or topic>' --type decision
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.34.0 python -m harness_maker.second_brain search '<task slug or topic>' --type preference
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.34.0 python -m harness_maker.second_brain search '<task slug or topic>' --type project
 ```
 
 
@@ -138,7 +138,7 @@ knowledge, write a typed `decision` or `preference` note through
 
 
 ```bash
-!uv run --with /home/noel/harness-maker python -m harness_maker.worktree task-preflight <slug> "$(pwd)"
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.34.0 python -m harness_maker.worktree task-preflight <slug> "$(pwd)"
 ```
 
 
@@ -147,7 +147,7 @@ knowledge, write a typed `decision` or `preference` note through
 
 
 ```bash
-!uv run --with /home/noel/harness-maker python -m harness_maker.worktree task-refresh <slug> "$(pwd)"
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.34.0 python -m harness_maker.worktree task-refresh <slug> "$(pwd)"
 ```
 
 
@@ -181,7 +181,7 @@ This seed is what the interview refines. Investigate code unknowns with Read/Gre
 Before Step 2, check whether `/hm:plan` is running inside an active `/hm:loop` iteration. **Detection is session-scoped** (PLAN-loop-marker-session-scoping) — it keys on THIS Claude session, so a loop running in *another* session never makes your standalone `/hm:plan` skip its interview. Locate the project root (strip any `/.worktrees/<wt-name>/` suffix from cwd, or `git -C . rev-parse --show-toplevel` then walk up out of `.worktrees/`), then run:
 
 ```bash
-!uv run --with /home/noel/harness-maker python -m harness_maker.worktree loop-mode-active "<PROJECT_ROOT>" --claude-session-id "$HM_SESSION_ID"
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.34.0 python -m harness_maker.worktree loop-mode-active "<PROJECT_ROOT>" --claude-session-id "$HM_SESSION_ID"
 ```
 
 - **Exit 0 (`active`)** → loop-mode: some `.claude/.hm-loop-*` marker's content header matches YOUR `session_id` (or a legacy global `.hm-loop-active` exists — degraded fallback). Do NOT engage the deep interview (loop body cannot block on `AskUserQuestion`). Scope the plan to the next master-PLAN phase only.
@@ -477,7 +477,7 @@ output file through the adapter (deterministic — it maps severity
 untrusted Codex content out of the shell). Always clean up the temp files:
 
 ```bash
-if [ "$exit" -eq 0 ]; then uv run --with /home/noel/harness-maker python -m harness_maker.codex_adapter adapt < "$out_tmp"; fi; rm -f "$prompt_tmp" "$out_tmp"
+if [ "$exit" -eq 0 ]; then uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.34.0 python -m harness_maker.codex_adapter adapt < "$out_tmp"; fi; rm -f "$prompt_tmp" "$out_tmp"
 ```
 
 **Skip relay (mandatory surfacing):** on a non-zero `codex exec` exit set
@@ -487,7 +487,7 @@ if [ "$exit" -eq 0 ]; then uv run --with /home/noel/harness-maker python -m harn
 — REVIEW security P1):
 
 ```bash
-reason="<one-line cause>"; uv run --with /home/noel/harness-maker python -m harness_maker.codex_ledger emit --slug "<slug>" --stage plan --finding-ref "n/a" --disposition unresolved --codex-status skipped --skip-reason "$reason"
+reason="<one-line cause>"; uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.34.0 python -m harness_maker.codex_ledger emit --slug "<slug>" --stage plan --finding-ref "n/a" --disposition unresolved --codex-status skipped --skip-reason "$reason"
 ```
 
 On success set `codex_status: "invoked"`. A silently-degraded Codex is the H4 failure
@@ -591,7 +591,7 @@ The shell guard below makes the receipt a no-op when `.current-iter` is absent �
 !if [ -f "<WT>/.claude/.hm-iter-receipts/.current-iter" ]; then \
    ITER=$(cat "<WT>/.claude/.hm-iter-receipts/.current-iter" 2>/dev/null); \
    if [ -n "$ITER" ]; then \
-     uv run --with /home/noel/harness-maker python -m harness_maker.iter_receipts write \
+     uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.34.0 python -m harness_maker.iter_receipts write \
        --iter "$ITER" --stage plan --verdict <verdict> --root "<WT>"; \
    fi; \
  fi
@@ -711,7 +711,7 @@ Before any code edits, load memory in tier order (stops at first miss):
 
 
 ```bash
-!uv run --with /home/noel/harness-maker python -m harness_maker.worktree task-preflight <slug> "$(pwd)"
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.34.0 python -m harness_maker.worktree task-preflight <slug> "$(pwd)"
 ```
 
 
@@ -720,7 +720,7 @@ Before any code edits, load memory in tier order (stops at first miss):
 
 
 ```bash
-!uv run --with /home/noel/harness-maker python -m harness_maker.worktree task-refresh <slug> "$(pwd)"
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.34.0 python -m harness_maker.worktree task-refresh <slug> "$(pwd)"
 ```
 
 
@@ -930,7 +930,7 @@ when this PLAN phase authored bindable-mechanical-AC tests and the machine SPEC 
 
 
 ```bash
-!cd <WT> && uv run --with /home/noel/harness-maker python -m harness_maker.spec_mutation gate --yaml specs/SPEC-{slug}.machine.yaml --tier 1
+!cd <WT> && uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.34.0 python -m harness_maker.spec_mutation gate --yaml specs/SPEC-{slug}.machine.yaml --tier 1
 ```
 
 
@@ -975,7 +975,7 @@ The shell guard below makes the receipt a no-op when `.current-iter` is absent �
 !if [ -f "<WT>/.claude/.hm-iter-receipts/.current-iter" ]; then \
    ITER=$(cat "<WT>/.claude/.hm-iter-receipts/.current-iter" 2>/dev/null); \
    if [ -n "$ITER" ]; then \
-     uv run --with /home/noel/harness-maker python -m harness_maker.iter_receipts write \
+     uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.34.0 python -m harness_maker.iter_receipts write \
        --iter "$ITER" --stage execute --verdict <verdict> --root "<WT>"; \
    fi; \
  fi
@@ -1002,12 +1002,12 @@ Pick **exactly one** finalize command. Substitute `<WT>` with the literal absolu
 ```bash
 # All phases GREEN — stage-merge the branch back (NO commit) + cleanup the worktree.
 # /hm:wrapup will create the single user-facing commit (with proper message + Co-Authored-By).
-!uv run --with /home/noel/harness-maker python -m harness_maker.worktree finalize <WT> stage-only
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.34.0 python -m harness_maker.worktree finalize <WT> stage-only
 ```
 
 ```bash
 # Stage halted on a blocker — preserve the worktree for inspection:
-!uv run --with /home/noel/harness-maker python -m harness_maker.worktree finalize <WT> fail
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.34.0 python -m harness_maker.worktree finalize <WT> fail
 ```
 
 
@@ -1023,7 +1023,7 @@ of a `hm/<slug>` task worktree is empty → nothing recorded, by design.
 
 
 ```bash
-!uv run --with /home/noel/harness-maker python -m harness_maker.worktree owned-crumb-add "$(pwd)" <slug> "$(uv run --with /home/noel/harness-maker python -m harness_maker.worktree wt-uuid <WT>)"
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.34.0 python -m harness_maker.worktree owned-crumb-add "$(pwd)" <slug> "$(uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.34.0 python -m harness_maker.worktree wt-uuid <WT>)"
 ```
 
 
@@ -1039,7 +1039,7 @@ commit; otherwise the user's pre-existing WIP remains in the stash queue:
 
 
 ```bash
-!HM_OWNED_SESSION_UUIDS="$(uv run --with /home/noel/harness-maker python -m harness_maker.worktree owned-crumb-read "$(pwd)" <slug>)" uv run --with /home/noel/harness-maker python -m harness_maker.worktree post-commit-pop "$(pwd)"
+!HM_OWNED_SESSION_UUIDS="$(uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.34.0 python -m harness_maker.worktree owned-crumb-read "$(pwd)" <slug>)" uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.34.0 python -m harness_maker.worktree post-commit-pop "$(pwd)"
 ```
 
 
@@ -1134,8 +1134,8 @@ them to recognize known-good patterns and repeated failure modes:
 
 
 ```bash
-!uv run --with /home/noel/harness-maker python -m harness_maker.second_brain search '<changed area or task slug>' --type failure
-!uv run --with /home/noel/harness-maker python -m harness_maker.second_brain search '<changed area or task slug>' --type preference
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.34.0 python -m harness_maker.second_brain search '<changed area or task slug>' --type failure
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.34.0 python -m harness_maker.second_brain search '<changed area or task slug>' --type preference
 ```
 
 
@@ -1165,7 +1165,7 @@ Per-invocation overrides (workflow command flags):
 
 
 ```bash
-!uv run --with /home/noel/harness-maker python -m harness_maker.worktree task-preflight <slug> "$(pwd)"
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.34.0 python -m harness_maker.worktree task-preflight <slug> "$(pwd)"
 ```
 
 
@@ -1174,7 +1174,7 @@ Per-invocation overrides (workflow command flags):
 
 
 ```bash
-!uv run --with /home/noel/harness-maker python -m harness_maker.worktree task-refresh <slug> "$(pwd)"
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.34.0 python -m harness_maker.worktree task-refresh <slug> "$(pwd)"
 ```
 
 
@@ -1256,7 +1256,7 @@ anchoring-prone diffs):
    author / commit message redacted. Pipe the JSON context through the
    harness CLI rather than redacting in prose:
    ```bash
-   echo '<full_context_json>' | uv run --with /home/noel/harness-maker python -m harness_maker.two_pass_review redact
+   echo '<full_context_json>' | uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.34.0 python -m harness_maker.two_pass_review redact
    ```
    The CLI returns a JSON object with the same fields but anchoring values
    replaced by `[REDACTED]`.
@@ -1297,7 +1297,7 @@ Pass 2 instead of the raw Pass 1 list. Log `stats.dropped_n` for telemetry.
 4. Merge the two passes via the harness CLI:
    
    ```bash
-   echo '{"pass1": [...], "pass2": [...]}' | uv run --with /home/noel/harness-maker python -m harness_maker.two_pass_review merge
+   echo '{"pass1": [...], "pass2": [...]}' | uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.34.0 python -m harness_maker.two_pass_review merge
    ```
    
    Pass 2 is authoritative — Pass 1 findings absent from Pass 2 are
@@ -1314,7 +1314,7 @@ Pass 2 instead of the raw Pass 1 list. Log `stats.dropped_n` for telemetry.
   `HEAD` (the post-execute diff is staged, so a bare `git diff` would see nothing) and
   `--numstat` for the added-line count that drives the `boundary` signal:
   ```bash
-  files=$(git diff --name-only HEAD); added=$(git diff --numstat HEAD | awk '{s+=$1} END{print s+0}'); printf '%s\n' "$files" | uv run --with /home/noel/harness-maker python -m harness_maker.high_diff classify --added-lines "$added"
+  files=$(git diff --name-only HEAD); added=$(git diff --numstat HEAD | awk '{s+=$1} END{print s+0}'); printf '%s\n' "$files" | uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.34.0 python -m harness_maker.high_diff classify --added-lines "$added"
   ```
   Invoke when `is_high` (or `boundary` and your judgment, reusing the When-to-Run
   criteria, says high). Otherwise skip Codex this round (no third voter).
@@ -1353,7 +1353,7 @@ output file through the adapter (deterministic — it maps severity
 untrusted Codex content out of the shell). Always clean up the temp files:
 
 ```bash
-if [ "$exit" -eq 0 ]; then uv run --with /home/noel/harness-maker python -m harness_maker.codex_adapter adapt < "$out_tmp"; fi; rm -f "$prompt_tmp" "$out_tmp"
+if [ "$exit" -eq 0 ]; then uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.34.0 python -m harness_maker.codex_adapter adapt < "$out_tmp"; fi; rm -f "$prompt_tmp" "$out_tmp"
 ```
 
 **Skip relay (mandatory surfacing):** on a non-zero `codex exec` exit set
@@ -1363,7 +1363,7 @@ if [ "$exit" -eq 0 ]; then uv run --with /home/noel/harness-maker python -m harn
 — REVIEW security P1):
 
 ```bash
-reason="<one-line cause>"; uv run --with /home/noel/harness-maker python -m harness_maker.codex_ledger emit --slug "<slug>" --stage review --finding-ref "n/a" --disposition unresolved --codex-status skipped --skip-reason "$reason"
+reason="<one-line cause>"; uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.34.0 python -m harness_maker.codex_ledger emit --slug "<slug>" --stage review --finding-ref "n/a" --disposition unresolved --codex-status skipped --skip-reason "$reason"
 ```
 
 On success set `codex_status: "invoked"`. A silently-degraded Codex is the H4 failure
@@ -1398,13 +1398,15 @@ For surface-match candidates, compare the `reasoning` chains (OBSERVE → INFER 
 - **OBSERVE matches but CONCLUDE diverges** (e.g., one says "race condition", other says "null deref") → **weak consensus** (`[2/N weak]`) — keep both, flag for manual judgment.
 - **OBSERVE matches but reasoning is missing on one side** → demote to `manual-only`.
 
-#### Step 4c — Severity resolution (when consensus has differing severities)
+#### Step 4c — Severity of a consensus cluster (single-tier by construction)
 
-| Votes | Applied severity |
-|-------|------------------|
-| All agree | Agreed severity |
-| 2 agree, 1 differs | Majority severity |
-| All differ (one each) | Middle of the scale (P1 over P0/P2) |
+Step 4a admits only **same-tier** candidates, so every consensus cluster already
+shares one severity — apply that agreed severity. There is **no cross-tier
+resolution**: a P0 and a P1 on the same issue are NOT candidates (they stay
+independent, per "do not bridge tiers" above). Never synthesize a "middle"
+severity across tiers. Cross-tier same-issue findings that end up `manual-only`
+or `weak-consensus` at P0/P1 are surfaced by the Grade Gate's
+`human_review_needed` flag (ADR-001), not merged here.
 
 #### Step 4d — Tag every finding
 
@@ -1435,7 +1437,7 @@ Sections:
 3. **✅ Consensus Findings** — `consensus-passed`, by severity.
 4. **⚠️ Weak Consensus** — `weak-consensus`, by severity.
 5. **📝 Manual-Only Findings** — `manual-only`, by severity.
-6. **🤝 Disagreements** — when reasoning aligned but severity differed; show all reviewer takes.
+6. **🤝 Disagreements** — when reviewers assigned different severities to the same location (kept as independent findings, never bridged across tiers — see Step 4c); show all reviewer takes.
 
 <!-- @hm:user:procedure-extras -->
 <!-- Project-specific Round 1 steps (extra reviewers, custom heuristics). Preserved across harness-maker upgrades. -->
@@ -1466,15 +1468,35 @@ Order: A > B > C > D > F. Threshold met iff `grade ≥ grade_threshold`.
 
 ## Grade Gate
 
+**Unverified-severe scan (ADR-001 — run every round before the gate).** The grade
+counts only `consensus-passed` P0/P1, so real severe findings the consensus filter
+excluded do NOT lower the letter. Compute `unverified_severe` = TRUE iff any finding
+tagged `manual-only` OR `weak-consensus` has severity **P0 or P1** — a single-source
+specialist finding that failed cross-check is `manual-only`, so it is included. P2/P3
+never trigger the flag.
+
 After each round's report:
 
 ```
 IF grade ≥ grade_threshold:
-  → STOP. Final report = current. Status = APPROVED. Proceed to wrapup.
+  → Status = APPROVED. Final report = current.
+  → Set human_review_needed = unverified_severe.
+  → IF human_review_needed:
+       emit the loud callout:
+       "⚠️ Grade {grade} but {N} unverified severe finding(s) present
+        (manual-only / weak-consensus P0/P1) — human review required."
+       • Interactive / autopilot path: STOP for human review before wrapup.
+       • Loop mode: proceed — the flag is persisted in the committed
+         REVIEW-{slug}.md (a durable record the operator reads when reviewing
+         loop output). No per-iter halt and no active loop-close gate — the flag
+         has no runtime reader on the loop path (accepted limitation, ADR-003).
+         The letter cleared, so Gate 0 is still `pass`.
+     ELSE:
+       STOP. Proceed to wrapup.
 
 IF auto_fix disabled (config OR --no-auto-fix):
   → STOP. Report grade + remaining findings. Status = CHANGES_REQUESTED.
-  → Set human_review_needed=true if grade < threshold.
+  → Set human_review_needed=true if grade < threshold OR unverified_severe.
 
 IF iteration_count ≥ max_review_rounds:
   → STOP. Best grade + remaining. Status = CHANGES_REQUESTED.
@@ -1546,7 +1568,8 @@ Status: APPROVED | CHANGES_REQUESTED
 human_review_needed: {true|false}
 ```
 
-- `APPROVED` → ready for wrapup.
+- `APPROVED` **and `human_review_needed=false`** → ready for wrapup.
+- `APPROVED` **but `human_review_needed=true`** (unverified `manual-only`/`weak-consensus` P0/P1 present) → the letter cleared, but real severe findings were not consensus-verified. **Interactive / autopilot: STOP for human review before wrapup.** **Loop mode: proceed** — the flag is persisted in the committed REVIEW report only (no per-iter halt, no active loop-close reader — accepted limitation, ADR-003); the operator sees it when reviewing loop output.
 - `CHANGES_REQUESTED` (autoloop policy) → list remaining issues, set `human_review_needed=true`, **proceed to wrapup** (do NOT halt the loop on D/F — wrapup will surface the flag).
 
 ## Telemetry Emit (always, per round)
@@ -1560,7 +1583,7 @@ runs. Don't interpolate `wall_time_ms` into any other rendered template
 
 
 ```bash
-echo '<record_json>' | uv run --with /home/noel/harness-maker python -m harness_maker.review_telemetry emit
+echo '<record_json>' | uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.34.0 python -m harness_maker.review_telemetry emit
 ```
 
 
@@ -1574,7 +1597,7 @@ fields and negative counts.
 
 You have completed the stage. Emit a receipt so the autoloop driver's Gate 0 can detect missing stages at the next convergence check. Pick `<verdict>`:
 
-- **`pass`** — final grade ≥ `grade_threshold` (Status: APPROVED).
+- **`pass`** — final grade ≥ `grade_threshold` (Status: APPROVED). An APPROVED review with `human_review_needed=true` (unverified `manual-only`/`weak-consensus` P0/P1) still records `pass` — the grade cleared — but the flag is surfaced for human review (interactive STOPs; loop proceeds).
 - **`fail`** — final grade < `grade_threshold` after `max_review_rounds` (Status: CHANGES_REQUESTED, `human_review_needed=true`).
 - **`skipped`** — **DO NOT emit this value from a stage prompt.** Reserved for the autoloop driver's auto-retry escape hatch (ADR-005 of PLAN-loop-mid-stop-and-review-skip).
 
@@ -1585,7 +1608,7 @@ The shell guard below makes the receipt a no-op when `.current-iter` is absent �
 !if [ -f "<WT>/.claude/.hm-iter-receipts/.current-iter" ]; then \
    ITER=$(cat "<WT>/.claude/.hm-iter-receipts/.current-iter" 2>/dev/null); \
    if [ -n "$ITER" ]; then \
-     uv run --with /home/noel/harness-maker python -m harness_maker.iter_receipts write \
+     uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.34.0 python -m harness_maker.iter_receipts write \
        --iter "$ITER" --stage review --verdict <verdict> --root "<WT>"; \
    fi; \
  fi
@@ -1601,7 +1624,7 @@ The shell guard below makes the receipt a no-op when `.current-iter` is absent �
 
 - `work-docs/REVIEW-{slug}-{date}.md` with all findings, per-iteration records, and final grade summary.
 - File modifications applied during auto-fix (when enabled). **Not committed** — wrapup owns the commit.
-- `human_review_needed` flag when threshold not reached.
+- `human_review_needed` flag when threshold not reached, OR when unverified `manual-only`/`weak-consensus` P0/P1 findings are present at an APPROVED grade (ADR-001).
 
 ## Quality Bar
 
