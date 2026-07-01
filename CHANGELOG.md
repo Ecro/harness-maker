@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+### Changed — `/hm:review` surfaces unverified-severe findings without re-grading (PLAN-review-grade-criteria)
+- **Grade Gate surfacing (ADR-001)** — the grade *letter* and the grade table are unchanged
+  (non-breaking), but a review that scores ≥ threshold now sets `human_review_needed=true`
+  when any `manual-only` or `weak-consensus` finding is P0/P1. Closes the observed "Grade A
+  while real P1 findings exist (all `manual-only`)" hole.
+- **Path-differentiated halt (ADR-003)** — interactive/autopilot STOPs for human review on a
+  flagged-APPROVED; loop mode proceeds (the flag is persisted only in the committed
+  `REVIEW-*.md`; there is no active loop-close reader yet — named follow-up).
+- **Consensus 4a/4c hard-seal (ADR-002)** — 4a keeps same-tier candidacy, so the unreachable
+  cross-tier severity-resolution rows were removed from both `review.md.j2` and
+  `consensus-arbiter_body.md.j2`; "No tier bridging" retained; Hard Rules + user-extension
+  comment reconciled. No grade-letter behavior change.
+- **Enforcement** — new `tests/unit/test_render_review_surfacing.py` contract render test
+  (grade-table byte-invariance + no-unconditional-proceed + Gate 0 third-state + hard-seal),
+  a producer-gate since the grade/consensus are LLM-executed prose with no Python backstop.
+
 ### Added — self-describing command surface + misroute guard (PLAN-command-surface-registry)
 - **`command_registry.py`** — a single source of truth for the `python -m harness_maker[.<module>]`
   command surface (every module → its subcommands + a reverse index). The plugin can now

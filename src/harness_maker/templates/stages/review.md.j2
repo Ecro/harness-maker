@@ -294,13 +294,15 @@ For surface-match candidates, compare the `reasoning` chains (OBSERVE → INFER 
 - **OBSERVE matches but CONCLUDE diverges** (e.g., one says "race condition", other says "null deref") → **weak consensus** (`[2/N weak]`) — keep both, flag for manual judgment.
 - **OBSERVE matches but reasoning is missing on one side** → demote to `manual-only`.
 
-#### Step 4c — Severity resolution (when consensus has differing severities)
+#### Step 4c — Severity of a consensus cluster (single-tier by construction)
 
-| Votes | Applied severity |
-|-------|------------------|
-| All agree | Agreed severity |
-| 2 agree, 1 differs | Majority severity |
-| All differ (one each) | Middle of the scale (P1 over P0/P2) |
+Step 4a admits only **same-tier** candidates, so every consensus cluster already
+shares one severity — apply that agreed severity. There is **no cross-tier
+resolution**: a P0 and a P1 on the same issue are NOT candidates (they stay
+independent, per "do not bridge tiers" above). Never synthesize a "middle"
+severity across tiers. Cross-tier same-issue findings that end up `manual-only`
+or `weak-consensus` at P0/P1 are surfaced by the Grade Gate's
+`human_review_needed` flag (ADR-001), not merged here.
 
 #### Step 4d — Tag every finding
 
@@ -331,7 +333,7 @@ Sections:
 3. **✅ Consensus Findings** — `consensus-passed`, by severity.
 4. **⚠️ Weak Consensus** — `weak-consensus`, by severity.
 5. **📝 Manual-Only Findings** — `manual-only`, by severity.
-6. **🤝 Disagreements** — when reasoning aligned but severity differed; show all reviewer takes.
+6. **🤝 Disagreements** — when reviewers assigned different severities to the same location (kept as independent findings, never bridged across tiers — see Step 4c); show all reviewer takes.
 
 <!-- @hm:user:procedure-extras -->
 <!-- Project-specific Round 1 steps (extra reviewers, custom heuristics). Preserved across harness-maker upgrades. -->
@@ -364,15 +366,35 @@ Order: A > B > C > D > F. Threshold met iff `grade ≥ grade_threshold`.
 
 ## Grade Gate
 
+**Unverified-severe scan (ADR-001 — run every round before the gate).** The grade
+counts only `consensus-passed` P0/P1, so real severe findings the consensus filter
+excluded do NOT lower the letter. Compute `unverified_severe` = TRUE iff any finding
+tagged `manual-only` OR `weak-consensus` has severity **P0 or P1** — a single-source
+specialist finding that failed cross-check is `manual-only`, so it is included. P2/P3
+never trigger the flag.
+
 After each round's report:
 
 ```
 IF grade ≥ grade_threshold:
-  → STOP. Final report = current. Status = APPROVED. Proceed to wrapup.
+  → Status = APPROVED. Final report = current.
+  → Set human_review_needed = unverified_severe.
+  → IF human_review_needed:
+       emit the loud callout:
+       "⚠️ Grade {grade} but {N} unverified severe finding(s) present
+        (manual-only / weak-consensus P0/P1) — human review required."
+       • Interactive / autopilot path: STOP for human review before wrapup.
+       • Loop mode: proceed — the flag is persisted in the committed
+         REVIEW-{slug}.md (a durable record the operator reads when reviewing
+         loop output). No per-iter halt and no active loop-close gate — the flag
+         has no runtime reader on the loop path (accepted limitation, ADR-003).
+         The letter cleared, so Gate 0 is still `pass`.
+     ELSE:
+       STOP. Proceed to wrapup.
 
 IF auto_fix disabled (config OR --no-auto-fix):
   → STOP. Report grade + remaining findings. Status = CHANGES_REQUESTED.
-  → Set human_review_needed=true if grade < threshold.
+  → Set human_review_needed=true if grade < threshold OR unverified_severe.
 
 IF iteration_count ≥ max_review_rounds:
   → STOP. Best grade + remaining. Status = CHANGES_REQUESTED.
@@ -444,7 +466,8 @@ Status: APPROVED | CHANGES_REQUESTED
 human_review_needed: {true|false}
 ```
 
-- `APPROVED` → ready for wrapup.
+- `APPROVED` **and `human_review_needed=false`** → ready for wrapup.
+- `APPROVED` **but `human_review_needed=true`** (unverified `manual-only`/`weak-consensus` P0/P1 present) → the letter cleared, but real severe findings were not consensus-verified. **Interactive / autopilot: STOP for human review before wrapup.** **Loop mode: proceed** — the flag is persisted in the committed REVIEW report only (no per-iter halt, no active loop-close reader — accepted limitation, ADR-003); the operator sees it when reviewing loop output.
 - `CHANGES_REQUESTED` (autoloop policy) → list remaining issues, set `human_review_needed=true`, **proceed to wrapup** (do NOT halt the loop on D/F — wrapup will surface the flag).
 
 ## Telemetry Emit (always, per round)
@@ -472,7 +495,7 @@ Record fields:
 The CLI auto-stamps `ts` when omitted. Schema validation rejects unknown
 fields and negative counts.
 
-{% set gate0_heading = "## Emit Gate 0 receipt (ADR-001, ADR-005)" %}{% set gate0_stage = "review" %}{% set gate0_pass = "final grade ≥ `grade_threshold` (Status: APPROVED)." %}{% set gate0_fail = "final grade < `grade_threshold` after `max_review_rounds` (Status: CHANGES_REQUESTED, `human_review_needed=true`)." %}{% set gate0_standalone = true %}{% include "agents/_partials/gate0_receipt.md.j2" %}
+{% set gate0_heading = "## Emit Gate 0 receipt (ADR-001, ADR-005)" %}{% set gate0_stage = "review" %}{% set gate0_pass = "final grade ≥ `grade_threshold` (Status: APPROVED). An APPROVED review with `human_review_needed=true` (unverified `manual-only`/`weak-consensus` P0/P1) still records `pass` — the grade cleared — but the flag is surfaced for human review (interactive STOPs; loop proceeds)." %}{% set gate0_fail = "final grade < `grade_threshold` after `max_review_rounds` (Status: CHANGES_REQUESTED, `human_review_needed=true`)." %}{% set gate0_standalone = true %}{% include "agents/_partials/gate0_receipt.md.j2" %}
 
 ## Outputs
 
@@ -483,7 +506,7 @@ fields and negative counts.
 
 - `{{ config.work_docs.dir }}REVIEW-{slug}-{date}.md` with all findings, per-iteration records, and final grade summary.
 - File modifications applied during auto-fix (when enabled). **Not committed** — wrapup owns the commit.
-- `human_review_needed` flag when threshold not reached.
+- `human_review_needed` flag when threshold not reached, OR when unverified `manual-only`/`weak-consensus` P0/P1 findings are present at an APPROVED grade (ADR-001).
 
 ## Quality Bar
 

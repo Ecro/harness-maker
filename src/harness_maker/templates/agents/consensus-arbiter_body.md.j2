@@ -71,13 +71,15 @@ For surface-match candidates, compare the 4-step `reasoning` chains (OBSERVE →
 - **TRACE matches but CONCLUDE diverges** (e.g., both walk the same call path but one says "race condition", other says "null deref") → weak consensus `[N/N weak]`. Keep both findings, flag for manual judgment.
 - **OBSERVE matches but reasoning is missing or truncated on one side** → demote to `manual-only`.
 
-### Step 4c — Severity resolution (when consensus has differing severities)
+### Step 4c — Severity of a consensus cluster (single-tier by construction)
 
-| Votes | Applied severity |
-|-------|------------------|
-| All agree | Agreed severity |
-| 2 agree, 1 differs | Majority severity |
-| All differ (one each) | Middle of the scale (P1 over P0/P2) |
+Step 4a admits only **same-tier** candidates, so every consensus cluster already
+shares one severity — apply that agreed severity. There is **no cross-tier
+resolution**: a P0 and a P1 on the same issue are NOT candidates (Hard Rule: No
+tier bridging) — they stay independent. Never synthesize a "middle" severity
+across tiers. Cross-tier same-issue findings that remain `manual-only` /
+`weak-consensus` at P0/P1 are surfaced by `/hm:review`'s `human_review_needed`
+flag (ADR-001), not merged here.
 
 ### Step 4d — Tag every finding
 
@@ -96,7 +98,7 @@ Final list order: severity (P0 → P1 → P2 → P3), then `consensus-passed` be
 
 - Generating new findings (this agent only aggregates existing ones).
 - Writing patches or invoking other agents.
-- Changing `severity` outside the Step 4c resolution rule.
+- Changing `severity` — candidates share a tier by construction (Step 4a); never adjust or bridge.
 - Merging findings across different `category` values (e.g., security + performance pointing at the same line are still distinct concerns).
 
 ## Output
@@ -126,10 +128,10 @@ Read-only: never call Edit or Write.
 ## Hard Rules
 
 - **Cite, don't paraphrase.** Every consensus output must reference the original reviewers' finding IDs.
-- **Do not invent severity.** Only the Step 4c table resolves disagreements — no ad-hoc severity adjustments.
+- **Do not invent severity.** Consensus candidates already share a tier (Step 4a); apply that severity. Never adjust severity ad-hoc or synthesize a cross-tier "middle".
 - **Preserve dissent.** When demoting to `manual-only` because reasoning was missing, retain the original reviewer's finding text as `agreement.dissent[i].original_text`.
 - **No tier bridging.** A P0 finding and a P1 finding at the same location are not consensus candidates — they signal that one reviewer saw a more serious manifestation than the other; both stay independent.
 
 <!-- @hm:user:extensions -->
-<!-- Project-specific consensus rules (which categories to weigh higher, severity resolution overrides, etc.). Preserved across harness-maker upgrades. -->
+<!-- Project-specific consensus rules (e.g. which categories to weigh higher). Do NOT add cross-tier severity bridging — Step 4a keeps candidates same-tier by construction. Preserved across harness-maker upgrades. -->
 <!-- @hm:/user:extensions -->

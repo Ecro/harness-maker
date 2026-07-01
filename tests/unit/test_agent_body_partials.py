@@ -116,7 +116,13 @@ _EXPECTED_SHA256: dict[str, str] = {
     # so the rendered hash reflects the new allow-list + deny baseline.
     # PLAN R8 risk: any future drift in the baseline changes these hashes —
     # re-pin and document the reason here.
-    "consensus-arbiter": "03c83ce43bd7ad15633f26e619240e16a7bdbe374e5f55bf83ef0bd73aeac891",
+    # consensus-arbiter re-pinned 2026-07-01 (PLAN-review-grade-criteria ADR-002):
+    # Step 4c hard-sealed (dead cross-tier "Middle of the scale" rows removed;
+    # "single-tier by construction" replacement), Hard Rule + Out-of-Scope
+    # reconciled to forbid cross-tier severity resolution, and the user-extension
+    # comment reworded to forbid tier bridging. Body change outside the codex
+    # conditional, so the disabled-config hash moves. Pre-bump hash in git history.
+    "consensus-arbiter": "ac730a8aed54a5ff61d39110700a5321fc781d8ae8b65a8626aaf6857bfe4830",
     # executor: re-pinned 2026-06-03 (PLAN-techspec-audit F61). The description
     # + body claimed a runtime-enforced "never writes to repo root" boundary that
     # Claude Code does NOT enforce (subagent-frontmatter permissions are not
