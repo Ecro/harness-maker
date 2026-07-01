@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.34.0] - 2026-07-01
+
 ### Changed — `/hm:review` surfaces unverified-severe findings without re-grading (PLAN-review-grade-criteria)
 - **Grade Gate surfacing (ADR-001)** — the grade *letter* and the grade table are unchanged
   (non-breaking), but a review that scores ≥ threshold now sets `human_review_needed=true`
