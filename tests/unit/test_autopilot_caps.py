@@ -194,3 +194,26 @@ def test_step_cap_wins_over_time_cap(tmp_path: Path) -> None:
     d = autopilot_caps.evaluate_boundary(tmp_path, steps=5, step_cap=3, time_cap_min=30, now=now)
     assert d.proceed is False
     assert d.halt_kind == "step_cap"
+
+
+# ── misroute guardrail: `autopilot_caps on/off` → redirect to root CLI ─────────
+
+
+@pytest.mark.parametrize("verb", ["on", "off"])
+def test_toggle_verb_redirects_to_root_cli(verb: str, capsys: pytest.CaptureFixture[str]) -> None:
+    rc = autopilot_caps.main([verb, "--level", "auto_safe"])
+    assert rc == 2
+    err = capsys.readouterr().err
+    # Names the real command so the operator (or LLM) can copy it verbatim.
+    assert "python -m harness_maker autopilot" in err
+    assert f"autopilot {verb}" in err
+    # Passthrough of the trailing args so the corrected command is complete.
+    assert "--level auto_safe" in err
+    # Must NOT emit argparse's cryptic "invalid choice" for these verbs.
+    assert "invalid choice" not in err
+
+
+def test_boundary_subcommand_still_parses(tmp_path: Path) -> None:
+    # Guardrail must not shadow the real subcommands.
+    rc = autopilot_caps.main(["boundary", "--root", str(tmp_path), "--current", "plan"])
+    assert rc == 0
