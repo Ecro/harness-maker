@@ -15,8 +15,11 @@
   Typer `autopilot` form (which was the outlier the LLM misroute-copied). The Typer command
   is retained as a thin alias; both share one `resolve_toggle_config` validator so they can't drift.
 - **CI gates**: T-C1 (every rendered `python -m harness_maker…` invocation is registry-valid)
-  and T-C2 (registry ↔ source **bidirectional** parity for subparser modules + guard-wiring
-  per module) — a subcommand added in code but missing from the registry now fails CI.
+  and T-C2 (registry ↔ source **bidirectional** parity for **both** subparser AND
+  manual-dispatch modules + guard-wiring per module) — a subcommand added in code but missing
+  from the registry now fails CI, whichever dispatch style it uses.
+- Multi-owner misroute suggestions use the canonical root form for the Typer host
+  (`python -m harness_maker <cmd>`) and note that flags may differ per target.
 
 ## [0.33.1] - 2026-06-30
 

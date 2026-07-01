@@ -157,20 +157,92 @@ def test_tc2_subparser_registry_matches_source_bidirectionally() -> None:
     assert not mismatches, f"registry↔source subparser drift: {mismatches}"
 
 
-def test_tc2_manual_dispatch_registry_matches_source() -> None:
-    # Manual-dispatch subcommands mutate on bare invocation (worktree cleanup-all/drain/…),
-    # so we do NOT execute them (validator R2-C1). Instead confirm each registered token
-    # appears as a dispatch literal in the module source — the registry can't invent one.
-    missing: list[str] = []
+def _rel_for(key: str) -> str:
+    return (
+        "spec_inventory/__main__.py" if key == "spec_inventory" else f"{key.replace('.', '/')}.py"
+    )
+
+
+def _is_dispatch_operand(node: object) -> bool:
+    """True when `node` is the argv-dispatch expression a subcommand string is tested against.
+
+    Covers the shapes used by the manual-dispatch entries: a bare `sub`, an `argv[i]`/
+    `args[i]` subscript, and `sys.argv[i]`. Matching the operand (not just "any `== str`")
+    keeps unrelated string comparisons in the function body out of the extracted set.
+    """
+    import ast
+
+    if isinstance(node, ast.Name) and node.id in {"sub", "action"}:
+        return True
+    if isinstance(node, ast.Subscript):
+        base = node.value
+        if isinstance(base, ast.Name) and base.id in {"argv", "args"}:
+            return True
+        if isinstance(base, ast.Attribute) and base.attr == "argv":  # sys.argv[i]
+            return True
+    return False
+
+
+def _manual_dispatch_tokens(rel: str, entry: str) -> set[str]:
+    """Dispatch subcommand literals inside a manual-dispatch entry function (AST, scoped).
+
+    Extracts `<dispatch> ==/!= "<lit>"` comparison strings and `choices=[...]` list literals
+    from the entry function body only — so helper-function string comparisons elsewhere in
+    the module are not mistaken for subcommands.
+    """
+    import ast
+
+    src = (_SRC / rel).read_text(encoding="utf-8")
+    fn = next(
+        (n for n in ast.walk(ast.parse(src)) if isinstance(n, ast.FunctionDef) and n.name == entry),
+        None,
+    )
+    assert fn is not None, f"entry {entry} not found in {rel}"
+    toks: set[str] = set()
+    for node in ast.walk(fn):
+        if (
+            isinstance(node, ast.keyword)
+            and node.arg == "choices"
+            and isinstance(node.value, ast.List)
+        ):
+            toks |= {
+                e.value
+                for e in node.value.elts
+                if isinstance(e, ast.Constant) and isinstance(e.value, str)
+            }
+        if isinstance(node, ast.Compare) and all(
+            isinstance(op, ast.Eq | ast.NotEq) for op in node.ops
+        ):
+            operands = [node.left, *node.comparators]
+            strings = {
+                o.value
+                for o in operands
+                if isinstance(o, ast.Constant) and isinstance(o.value, str)
+            }
+            if strings and any(_is_dispatch_operand(o) for o in operands):
+                toks |= strings
+    return toks
+
+
+def test_tc2_manual_dispatch_registry_matches_source_bidirectionally() -> None:
+    # BIDIRECTIONAL parity for manual-dispatch modules (review R2 P2), mirroring the
+    # subparser gate: a real dispatch token OMITTED from the registry that collides with
+    # another module's verb would false-redirect at runtime, and the old one-directional
+    # (registry→source) check could not catch it. We do NOT execute these modules (worktree
+    # cleanup-all/drain mutate on bare invocation, validator R2-C1) — the tokens come from a
+    # scoped AST scan of the entry function's dispatch. A novel dispatch shape not covered by
+    # `_is_dispatch_operand` must be added there (same maintenance contract as the registry).
+    mismatches: dict[str, dict[str, list[str]]] = {}
     for key, spec in cr.MODULES.items():
         if spec.shape != "manual-dispatch":
             continue
-        import_path = f"src/harness_maker/{key.replace('.', '/')}.py"
-        src = (Path(__file__).parents[2] / import_path).read_text(encoding="utf-8")
-        for sub in spec.subcommands:
-            if f'"{sub}"' not in src:
-                missing.append(f"{key}.{sub}")
-    assert not missing, f"registry lists manual-dispatch subcommands absent from source: {missing}"
+        actual = _manual_dispatch_tokens(_rel_for(key), spec.entry)
+        if actual != set(spec.subcommands):
+            mismatches[key] = {
+                "registry_only": sorted(set(spec.subcommands) - actual),
+                "source_only": sorted(actual - set(spec.subcommands)),
+            }
+    assert not mismatches, f"registry↔source manual-dispatch drift: {mismatches}"
 
 
 # ── negative fixtures: prove the gates actually trip (non-vacuous) ──────────────

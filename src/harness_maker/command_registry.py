@@ -212,10 +212,25 @@ def misroute_guard(module: str, argv: list[str]) -> int | None:
     if not owners:
         return None  # unknown to the whole registry — fail open, let the module report it
     suffix = (" " + " ".join(argv[1:])) if argv[1:] else ""
+
+    def _fmt(owner: str) -> str:
+        # The Typer host is reached via the root form `python -m harness_maker <cmd>`
+        # (the documented, canonical invocation), not `python -m harness_maker.cli <cmd>`.
+        base = (
+            f"python -m harness_maker {tok}"
+            if owner == "cli"
+            else f"python -m harness_maker.{owner} {tok}"
+        )
+        return f"    {base}{suffix}"
+
     lines = [
         f"{module}: {tok!r} is not a subcommand of this module.",
         "Did you mean:",
-        *[f"    python -m harness_maker.{o} {tok}{suffix}" for o in owners],
+        *[_fmt(o) for o in owners],
     ]
+    # Multi-owner: the same verb exists in several modules whose flag surfaces differ, so the
+    # trailing args are only valid for the module they were typed against (review R2 P3).
+    if len(owners) > 1:
+        lines.append("(the same verb exists in several modules — flags may differ per target)")
     print("\n".join(lines), file=sys.stderr)
     return 2
