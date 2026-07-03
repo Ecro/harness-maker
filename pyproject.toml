@@ -63,6 +63,7 @@ dev = [
     "respx>=0.20",
     "mutmut>=2.4,<3",  # 3.x rewrote the CLI/config (dropped --paths-to-mutate); staying on 2.x — see PLAN-mutmut-3x-pin
     "pre-commit>=4.6.0",
+    "hypothesis>=6.100",  # property ACs (spec-tetrad ADR-001) — delivery_metrics AC-005/006
 ]
 
 [project.scripts]
@@ -88,4 +89,5 @@ testpaths = ["tests"]
 addopts = "-q"
 markers = [
     "advisory: ADVISORY test — per PLAN-install-cmd-cifence ADR-002, run as a separate CI step with `continue-on-error: true` so unrelated external-tool drift (codex CLI behavior, npm registry availability) cannot block CI. Use `-m advisory` to select; `-m \"not advisory\"` to exclude.",
+    "slow: long-running test (e.g. delivery-metrics 2000-commit perf gate) — BLOCKING in CI; deselect locally with `-m \"not slow\"` when iterating.",
 ]

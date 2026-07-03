@@ -37,7 +37,8 @@
 | `{{ cmd }}loop`      | Bounded autoloop with safety rails |
 | `{{ cmd }}uninstall` | Remove the harness |
 | `{{ cmd }}help`      | (this command) |
-
+{% if config.delivery_metrics.enabled %}| `{{ cmd }}metrics`   | Delivery metrics — CFR + churn trend, LLM interpretation |
+{% endif %}
 ## 🔁 Recommended workflow
 
 ```

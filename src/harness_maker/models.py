@@ -491,6 +491,101 @@ class CodexSecondOpinionConfig(BaseModel):
         return v
 
 
+_GIT_ARGV_FORBIDDEN = set("`$();|&\"'\n\r\\ \t")
+
+# git's extended-revision operators — rejected ONLY for values used in a
+# revision context (default_branch), NOT for tag_pattern. REVIEW security P1:
+# `default_branch` is interpolated into `refs/heads/<branch>` and reused as a
+# `git log` revision, so `master^{/regex}` is a valid revspec gadget (full-history
+# message scan → DoS, or redirect to an attacker-chosen commit). `tag_pattern`
+# goes to `git tag --list <pattern>` (fnmatch), where these chars are literals —
+# forbidding them globally would break legit monorepo schemes like `pkg@*`.
+_GIT_REVSPEC_OPERATORS = set("^~:@{}")
+
+
+def _validate_git_argv_value(v: str, *, field: str) -> str:
+    """Reject shapes that could act as git options or shell fragments.
+
+    delivery_metrics string fields flow into git argv (never a shell), so the
+    threat is option injection (leading ``-``), traversal, and defense-in-depth
+    against a later caller quoting mistake — same posture as
+    ``CodexSecondOpinionConfig.output_schema_path``. fnmatch glob chars
+    (``* ? [ ]``) stay allowed: they are the point of a tag pattern. Callers in a
+    *revision* context additionally pass ``forbid_revspec=True`` (see
+    ``_validate_default_branch``).
+    """
+    if not v:
+        raise ValueError(f"{field} must not be empty")
+    if v.startswith("-"):
+        raise ValueError(f"{field} must not start with '-' (git option injection): {v!r}")
+    if ".." in Path(v).parts:
+        raise ValueError(f"{field} must not contain '..' segments: {v!r}")
+    if any(c in _GIT_ARGV_FORBIDDEN for c in v):
+        raise ValueError(f"{field} contains shell-significant or whitespace characters: {v!r}")
+    return v
+
+
+def _validate_git_revision_value(v: str, *, field: str) -> str:
+    """Stricter validator for a value used as a git REVISION (not a glob).
+
+    Adds revspec-operator rejection on top of the argv checks — see
+    ``_GIT_REVSPEC_OPERATORS`` (REVIEW security P1).
+    """
+    v = _validate_git_argv_value(v, field=field)
+    if any(c in _GIT_REVSPEC_OPERATORS for c in v):
+        raise ValueError(f"{field} must not contain git revision operators (^~:@{{}}): {v!r}")
+    return v
+
+
+class DeliveryMetricsConfig(BaseModel):
+    """Opt-in local git delivery metrics (PLAN-cfr-churn-metrics ADR-003).
+
+    Default off. When ``enabled=True``, ``/hm:metrics`` is rendered and
+    ``python -m harness_maker.delivery_metrics`` computes CFR (rolling
+    ``cfr_window_days``; releases = ``tag_pattern`` tags, first-parent
+    task-land fallback) and post-merge churn (cohort-blame survival at the
+    ``churn_maturation_days`` boundary). Pure local git analysis — zero
+    network (PLAN-oss-readiness-audit ADR-005).
+    """
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    enabled: bool = False
+    tag_pattern: str = "v*"
+    default_branch: str | None = None
+    cfr_window_days: int = Field(default=28, ge=1)
+    # Two separate windows by design (plan-validator advisory): maturation is
+    # how long a commit must age before churn is judged; cohort is how wide a
+    # slice of matured commits one snapshot covers. A single "window_days"
+    # was misreadable as a trailing-14d cohort.
+    churn_maturation_days: int = Field(default=14, ge=1)
+    churn_cohort_days: int = Field(default=14, ge=1)
+    blame_file_cap: int = Field(default=500, ge=1)
+    paths: list[str] = Field(default_factory=list)
+
+    @field_validator("tag_pattern")
+    @classmethod
+    def _validate_tag_pattern(cls, v: str) -> str:
+        return _validate_git_argv_value(v, field="tag_pattern")
+
+    @field_validator("default_branch")
+    @classmethod
+    def _validate_default_branch(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        # Revision context — reject revspec operators too (REVIEW security P1).
+        return _validate_git_revision_value(v, field="default_branch")
+
+    @field_validator("paths")
+    @classmethod
+    def _validate_paths(cls, v: list[str]) -> list[str]:
+        for item in v:
+            _validate_git_argv_value(item, field="paths")
+            if Path(item).is_absolute():
+                raise ValueError(f"paths must be project-relative, got absolute: {item!r}")
+        return v
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Per-agent model routing (ADR-001/002/003 from PLAN-model-routing-multi-ide)
 # ──────────────────────────────────────────────────────────────────────────────
@@ -767,6 +862,10 @@ class HarnessConfig(BaseModel):
     codex_second_opinion: CodexSecondOpinionConfig = Field(
         default_factory=CodexSecondOpinionConfig,
     )
+    # Opt-in git delivery metrics (PLAN-cfr-churn-metrics ADR-003).
+    # default_factory keeps legacy harness.yaml loading; `enabled: false`
+    # renders no /hm:metrics command and performs zero writes (SPEC AC-008/009).
+    delivery_metrics: DeliveryMetricsConfig = Field(default_factory=DeliveryMetricsConfig)
     # ADR-011: schema_version bumped 1 → 2 for the agent_models/default_model
     # rename. ADR-004 silent migration handles existing v1 harness.yaml.
     schema_version: int = 2
@@ -954,6 +1053,9 @@ class InterviewAnswers(BaseModel):
     codex_second_opinion: CodexSecondOpinionConfig = Field(
         default_factory=CodexSecondOpinionConfig,
     )
+    # Mirror of HarnessConfig.delivery_metrics (PLAN-cfr-churn-metrics ADR-003)
+    # — same round-trip contract as feedback/codex_second_opinion above.
+    delivery_metrics: DeliveryMetricsConfig = Field(default_factory=DeliveryMetricsConfig)
 
     @field_validator("sibling_repos", mode="before")
     @classmethod

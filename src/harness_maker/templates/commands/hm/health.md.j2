@@ -107,7 +107,21 @@ Report the JSON as a Layer 1 ActionItem:
   session-start picker not used), or the boundary CLI is failing. Investigate before trusting
   that "the pipeline just stops" is the user's intent.
 {% endif %}
-## Per-item structured question (ADR-001 hard rule)
+{% if config.delivery_metrics and config.delivery_metrics.enabled %}<!-- @hm:delivery-metrics -->
+## Delivery-metrics narrative (1-2 lines, no score impact)
+
+```bash
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.delivery_metrics trend --root . --limit 1
+```
+
+Surface ONE narrative line from the newest snapshot: CFR as raw `failed/total`
+counts (+unit, or the `not_applicable` reason verbatim) and churn as
+`churned/added` LOC (+`partial` flag or its `not_applicable` reason), with the
+baseline deltas. Narrative-only by design — the readiness score is never
+affected (Goodhart guard, SPEC Non-Goal 3). Empty ledger → suggest running
+{% if is_codex %}`@hm-metrics`{% else %}`/hm:metrics`{% endif %} once.
+<!-- @hm:/delivery-metrics -->
+{% endif %}## Per-item structured question (ADR-001 hard rule)
 
 For each unresolved item across the two layers, present:
 - **structural**: file-level remediation suggestion (e.g. "add docs/adr/").

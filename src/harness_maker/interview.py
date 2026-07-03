@@ -34,6 +34,7 @@ from harness_maker.models import (
     CodexAgentSpec,
     CodexSecondOpinionConfig,
     Confidence,
+    DeliveryMetricsConfig,
     DevMode,
     FeedbackConfig,
     InterviewAnswers,
@@ -931,6 +932,16 @@ def answers_from_harness_yaml(yaml_path: Path) -> InterviewAnswers | None:
             csoo_clean["output_schema_path"] = output_schema_raw
         with contextlib.suppress(ValidationError):
             update["codex_second_opinion"] = CodexSecondOpinionConfig.model_validate(csoo_clean)
+    # PLAN-cfr-churn-metrics ADR-003 — same tolerant-fallback pattern as
+    # feedback/codex_second_opinion: missing key OR malformed block → silent
+    # default DeliveryMetricsConfig() (enabled=False). Recognized keys are
+    # filtered so unknown/forward-compat keys don't poison the whole load;
+    # a strict-invalid value (e.g. enabled: "yes") falls back to defaults.
+    dm_raw = data.get("delivery_metrics")
+    if isinstance(dm_raw, dict):
+        dm_clean = {k: v for k, v in dm_raw.items() if k in DeliveryMetricsConfig.model_fields}
+        with contextlib.suppress(ValidationError):
+            update["delivery_metrics"] = DeliveryMetricsConfig.model_validate(dm_clean)
     # ADR-002/004 silent migration: prefer the new `default_model` key; fall
     # back to the deprecated `recommended_model`. When ONLY the deprecated key
     # is present AND the file is schema_version<2, emit an advisory INFO log

@@ -1,0 +1,273 @@
+schema_version: 2
+spec_slug: cfr-churn-metrics
+parent_spec: null
+verification_tier: 2
+mutation_threshold: 70
+mutation_threshold_rationale: new Python module; T2 floor 70 per ADR-005 formula until
+  first measured baseline
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/delivery_metrics.py
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: CFR computed from release tags over rolling window on golden fixture
+  type: mechanical
+  test_ids:
+  - tests/unit/test_delivery_metrics_cfr.py::test_cfr_tagged_golden
+  executable_predicate: compute_cfr(golden_tagged_repo, window_days=28) == CfrResult(failed=1,
+    total=3, unit='tag')
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: expected values hand-computed from a scripted fixture history authored
+    independently of the implementation
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: Task-land fallback supplies CFR denominator when no tags exist
+  type: mechanical
+  test_ids:
+  - tests/unit/test_delivery_metrics_cfr.py::test_cfr_task_land_fallback
+  executable_predicate: compute_cfr(golden_untagged_repo, window_days=28).release_unit
+    == 'task-land'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: fixture repo scripted with known land count; expected denominator
+    derived from the script, not the code
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: Absent-case yields explicit not-applicable, never silent zero
+  type: mechanical
+  test_ids:
+  - tests/unit/test_delivery_metrics_cfr.py::test_cfr_absent_case_not_applicable
+  executable_predicate: compute_cfr(golden_empty_repo, window_days=28).status == 'not_applicable'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: empty-window fixture defines the absent case by construction; expected
+    status fixed by SPEC, not implementation
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: Churn counts LOC rewritten within 14 days, excluding whitespace-only changes
+  type: mechanical
+  test_ids:
+  - tests/unit/test_delivery_metrics_churn.py::test_churn_blame_survival_excludes_whitespace
+  executable_predicate: compute_churn(golden_churn_repo, window_days=14).churned_loc
+    == expected_churned_loc
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: fixture commits scripted with hand-counted rewritten vs whitespace-only
+    vs surviving lines; expected LOC counted by hand from the script
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: Metrics invariant to commits outside the measurement window
+  type: property
+  test_ids:
+  - tests/unit/test_delivery_metrics_properties.py::test_property_window_outside_invariance
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: metamorphic relation follows from the rolling-window metric definition;
+    holds for any correct implementation regardless of algorithm
+  oracle_independence_waiver: null
+  input_domain: synthetic git repositories with a fixed measurement window W
+  transformation: append arbitrary commits strictly older than the start of W
+  expected_relation: compute_cfr(repo, W) and compute_churn(repo, W) results are unchanged
+  preconditions:
+  - appended commits do not add or move release tags inside W
+  observable_output: CfrResult and ChurnResult value objects
+  generator_hint: vary count, age, and file overlap of the appended out-of-window
+    commits
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: CFR bounds hold and fix-only releases are excluded from denominator
+  type: property
+  test_ids:
+  - tests/unit/test_delivery_metrics_properties.py::test_property_cfr_bounds_and_fix_only_exclusion
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: bounds and denominator-exclusion invariants derive from the CFR
+    definition (distinct failed releases / non-fix-only releases), independent of
+    detection heuristics
+  oracle_independence_waiver: null
+  input_domain: synthetic release histories mixing normal, failed, and fix-only releases
+  transformation: classify releases and compute CFR over the window
+  expected_relation: 0 <= failed <= total; fix-only releases never appear in the denominator;
+    at most one failure attributed per release
+  preconditions: []
+  observable_output: CfrResult
+  generator_hint: vary release counts including zero failed and all-fix-only edge
+    mixes
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: Snapshot ledger appends and adjudication verdicts are reused
+  type: mechanical
+  test_ids:
+  - tests/unit/test_delivery_metrics_ledger_cli.py::test_ledger_append_and_adjudication_reuse
+  executable_predicate: adjudication_requests(second_metrics_run) == 0
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: reuse contract fixed by SPEC (unchanged history => zero new adjudications);
+    first-run verdicts injected as fixture ledger rows, not produced by the code under
+    test
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-008
+  title: Config defaults off and legacy harness.yaml loads without key
+  type: mechanical
+  test_ids:
+  - tests/unit/test_delivery_metrics_config.py::test_config_default_off_and_legacy_load
+  executable_predicate: DeliveryMetricsConfig().enabled is False
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: default value is a SPEC-fixed contract (opt-in decision, interview
+    R1); legacy fixture yaml predates the key by construction
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-009
+  title: Disabled feature performs zero writes
+  type: mechanical
+  test_ids:
+  - tests/unit/test_delivery_metrics_ledger_cli.py::test_cli_exit_2_when_harness_disables_feature
+  executable_predicate: not delivery_ledger_path(disabled_project).exists()
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: zero-side-effect contract observable from the filesystem alone;
+    disabled fixture project constructed independently of the implementation
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-010
+  title: Rendered command surfaces trend, raw counts, and LLM interpretation
+  type: mechanical
+  test_ids:
+  - tests/unit/test_render_delivery_metrics.py::test_metrics_command_blocks_when_enabled_and_absent_when_disabled
+  executable_predicate: all(marker in rendered_metrics_command for marker in required_metrics_markers)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: required marker list fixed in the SPEC/test (trend, failed/total
+    raw counts, baseline delta, LLM interpretation, health narrative), not extracted
+    from the template source
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null

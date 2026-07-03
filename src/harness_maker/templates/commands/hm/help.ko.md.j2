@@ -36,7 +36,8 @@
 | `{{ cmd }}loop`      | 안전 레일 있는 bounded autoloop |
 | `{{ cmd }}uninstall` | 하네스 제거 |
 | `{{ cmd }}help`      | (이 명령) |
-
+{% if config.delivery_metrics.enabled %}| `{{ cmd }}metrics`   | Delivery metrics — CFR + churn 추이, LLM 해석 |
+{% endif %}
 ## 🔁 추천 워크플로
 
 ```

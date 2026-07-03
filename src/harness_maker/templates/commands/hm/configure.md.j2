@@ -60,6 +60,14 @@ Options (multi-select):
 - **Second Brain** — configure Obsidian project memory. First install is
   read-first; this path can continue into advanced vault, allowlist, and
   writable-folder settings.
+- **Delivery metrics** — enable/disable `delivery_metrics.enabled` (opt-in,
+  default off). When on, `{% if is_codex %}@hm-metrics{% else %}/hm:metrics{% endif %}` renders and computes CFR + post-merge
+  churn from LOCAL git history (zero network); when off, the command is
+  removed from the surface and nothing is written. Trade-off: a per-project
+  delivery-quality trend to reflect on vs one more command + a git-analysis
+  pass when you run it. Advanced fields (`tag_pattern`, `default_branch`,
+  window sizes, `blame_file_cap`, `paths`) are edited directly in
+  `harness.yaml` and preserved on re-render.
 
 ### 3. Collect changes
 

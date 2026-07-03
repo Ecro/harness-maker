@@ -2,6 +2,30 @@
 
 ## [Unreleased]
 
+### Added — opt-in delivery metrics: CFR + post-merge churn (PLAN-cfr-churn-metrics)
+- **`harness.yaml.delivery_metrics.enabled: bool`** (default `false`, toggled via
+  `/hm:configure` or `/hm:make`). When on, a new `/hm:metrics` command computes
+  **CFR** (rolling 28-day change failure rate; releases = `tag_pattern` tags with a
+  first-parent task-land fallback) and **post-merge churn** (LOC rewritten within 14
+  days, blame-survival at the maturation boundary) from **local git history only —
+  zero network** (`tests/unit/test_no_network.py` invariant preserved).
+- **`/hm:metrics`** (ADR-002) renders only when enabled — disabled means the command
+  is *omitted* from the surface, not a rendered no-op. It runs a two-pass LLM
+  adjudication of ambiguous fix commits (candidates → adjudicate → compute; ADR-006),
+  renders a trend table with **raw `failed/total` counts** (never a bare percentage)
+  + baseline delta, then diagnoses *why* a number moved (revert linkage, adjudication
+  rows, top churned files) and proposes concrete harness-lever fixes. `/hm:health`
+  gains a 1-2 line narrative — **no readiness-score dimension, no gate** (Goodhart
+  guard, deliberate Non-Goal).
+- **Cross-time ledger** `.claude/observability/delivery-metrics.jsonl` (ADR-005) —
+  O_APPEND ≤4096-byte rows; LLM verdicts persisted + reused (keyed by
+  `commit_sha, release_ref, algo_version, config_hash`) so trends are stable across
+  runs. Absent-cases (no releases / immature churn cohort) surface an explicit
+  `not_applicable` reason — never a silent 0%.
+- **CLI** `python -m harness_maker.delivery_metrics {candidates,adjudicate,compute,trend}`
+  (ADR-007) — exit 0 ok / 2 disabled / 3 pending adjudications / 4 not a git repo;
+  args-list git calls with timeouts, no `shell=True`.
+
 ## [0.34.0] - 2026-07-01
 
 ### Changed — `/hm:review` surfaces unverified-severe findings without re-grading (PLAN-review-grade-criteria)

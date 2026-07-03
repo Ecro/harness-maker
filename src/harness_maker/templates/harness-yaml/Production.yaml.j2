@@ -103,6 +103,15 @@ codex_second_opinion:
   failure_policy: {{ (config.codex_second_opinion.failure_policy if config.codex_second_opinion else "warn-and-proceed") | tojson }}
   hermetic: {{ (config.codex_second_opinion.hermetic if config.codex_second_opinion else true) | string | lower }}
   output_schema_path: {{ (config.codex_second_opinion.output_schema_path if config.codex_second_opinion else ".claude/schemas/codex-finding.schema.json") | tojson }}
+delivery_metrics:
+  enabled: {{ (config.delivery_metrics.enabled if config.delivery_metrics else false) | string | lower }}
+  tag_pattern: {{ (config.delivery_metrics.tag_pattern if config.delivery_metrics else "v*") | tojson }}
+  default_branch: {{ (config.delivery_metrics.default_branch if config.delivery_metrics else none) | tojson }}
+  cfr_window_days: {{ (config.delivery_metrics.cfr_window_days if config.delivery_metrics else 28) }}
+  churn_maturation_days: {{ (config.delivery_metrics.churn_maturation_days if config.delivery_metrics else 14) }}
+  churn_cohort_days: {{ (config.delivery_metrics.churn_cohort_days if config.delivery_metrics else 14) }}
+  blame_file_cap: {{ (config.delivery_metrics.blame_file_cap if config.delivery_metrics else 500) }}
+  paths: {{ (config.delivery_metrics.paths if config.delivery_metrics else []) | tojson }}
 autonomy:
   level: {{ (config.autonomy.level if config.autonomy else "gated") | tojson }}
   pipeline: {{ (config.autonomy.pipeline if config.autonomy else ['research', 'spec', 'plan', 'execute', 'review', 'verify', 'wrapup']) | tojson }}
