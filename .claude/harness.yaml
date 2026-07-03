@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.34.0
+harness_maker_version: 0.36.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: harness-yaml/Production.yaml.j2
 provenance: official
-content_hash: 215cae6e84067586a2eaee1e4126925bbe104d592f91acb4ec6833fef031f812
+content_hash: 2db891003b4a5d637b8c15098c854b221996d2f274fc2413f7649be34a491a5e
 ---
 preset: Production
 locale: ko
@@ -154,6 +154,14 @@ codex_second_opinion:
   failure_policy: "warn-and-proceed"
   hermetic: true
   output_schema_path: ".claude/schemas/codex-finding.schema.json"
+delivery_metrics:
+  tag_pattern: "v*"
+  default_branch: null
+  cfr_window_days: 28
+  churn_maturation_days: 14
+  churn_cohort_days: 14
+  blame_file_cap: 500
+  paths: []
 autonomy:
   level: "auto_safe"
   pipeline: ["research", "spec", "plan", "execute", "review", "verify", "wrapup"]
