@@ -78,6 +78,9 @@ def test_when_feedback_enabled_marker_appears_exactly_once_in_atomic_commands() 
                 "loop",
                 "loop-p5-batch",
                 "health",
+                # /hm:metrics is a meta command with its own template (delivery
+                # metrics, 0.35.0) — not an atomic stage, carries no feedback block.
+                "metrics",
                 "uninstall",
                 "help",
             )

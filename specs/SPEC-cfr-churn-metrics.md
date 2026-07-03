@@ -96,7 +96,7 @@ AI-assisted development shifts quality failure into two lagging signals: release
 **Given** a harness rendered with `delivery_metrics.enabled: true`
 **When** the `/hm:metrics` command file and `/hm:health` command file are rendered
 **Then** the metrics command contains the trend-display, raw-counts (`failed/total`), baseline-delta, and LLM-interpretation instruction blocks, and the health command contains the delivery-metrics narrative block
-**And** rendering with `enabled: false` omits the `/hm:metrics` command entirely
+**And** rendering with `enabled: false` still renders `/hm:metrics` as an inert stub (points at `/hm:configure` to enable, invokes no module — compute stays opt-in) rather than omitting it, so the command is discoverable (ADR-002 amended, visibility follow-up)
 
 ## 🚫 Non-Goals
 

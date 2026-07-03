@@ -1,6 +1,6 @@
 preset: Production
 dev_mode: task-driven
-file_count: 62
+file_count: 63
 files:
 - path: ../CLAUDE.md
   template: claude-md/Production.en.md.j2
@@ -70,7 +70,7 @@ files:
   body_sha256: 7c3b9a4b8854b134897bfa5592b58e4f287d7c0f893256295d8d5bbdbd5efba8
 - path: commands/hm/help.md
   template: commands/hm/help.en.md.j2
-  body_sha256: 5e7b433d8bbb5cb80c0fd03fb6f5dc4cd25203f09ab1d46064628a0a79aee3e7
+  body_sha256: 147bd418ca049820c549efd17f9efe7289edd39f102084fcba1f06255000f76d
 - path: commands/hm/loop-p5-batch.md
   template: commands/hm/loop-p5-batch.md.j2
   body_sha256: 65e0e633e6e5d3dd5d314768352240afde4db90ae1f47aaa638010937c7cd854
@@ -80,6 +80,9 @@ files:
 - path: commands/hm/make.md
   template: commands/hm/make.md.j2
   body_sha256: 1863417d699be77b34bd78d80ff90f46e9d3a607c29939ee19200cb94eb7cd17
+- path: commands/hm/metrics.md
+  template: commands/hm/metrics.md.j2
+  body_sha256: a6f51a8f339dce5e77721025b9a540050076e02cfd4300e9ab735352b3346e0c
 - path: commands/hm/plan-exec-rev.md
   template: commands/hm/workflow_command.md.j2
   body_sha256: 318d3bea9ebc894abaed0133d5f1643a9047592968930e7ecc9836a1444b2e34

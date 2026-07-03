@@ -410,12 +410,6 @@ def _schema_files(codex_second_opinion_enabled: bool) -> list[FileSpec]:
     ]
 
 
-def _delivery_metrics_enabled(config_dump: dict[str, object] | None) -> bool:
-    """Gate for the /hm:metrics FileSpec (PLAN-cfr-churn-metrics ADR-002)."""
-    block = (config_dump or {}).get("delivery_metrics")
-    return isinstance(block, dict) and bool(block.get("enabled", False))
-
-
 def _base_files(
     preset: Preset,
     locale: str = "en",
@@ -450,14 +444,13 @@ def _base_files(
         ("commands/hm/loop.md.j2", "commands/hm/loop.md", {}),
         ("commands/hm/loop-p5-batch.md.j2", "commands/hm/loop-p5-batch.md", {}),
         ("commands/hm/health.md.j2", "commands/hm/health.md", {}),
-        # PLAN-cfr-churn-metrics ADR-002: /hm:metrics exists on the command
-        # surface ONLY when the feature is enabled — disabled means omitted,
-        # not a rendered no-op (opt-in contract visible at the surface itself).
-        *(
-            [("commands/hm/metrics.md.j2", "commands/hm/metrics.md", {})]
-            if _delivery_metrics_enabled(config_dump)
-            else []
-        ),
+        # PLAN-cfr-churn-metrics ADR-002 (amended — visibility follow-up):
+        # /hm:metrics is ALWAYS rendered so the command is discoverable, but
+        # the template branches on `delivery_metrics.enabled` — enabled = the
+        # full CFR+churn command, disabled = a short stub pointing at
+        # /hm:configure. COMPUTE stays opt-in (the CLI still exits 2 when the
+        # harness disables it); only the surface visibility changed.
+        ("commands/hm/metrics.md.j2", "commands/hm/metrics.md", {}),
         ("commands/hm/make.md.j2", "commands/hm/make.md", {}),
         ("commands/hm/configure.md.j2", "commands/hm/configure.md", {}),
         ("commands/hm/uninstall.md.j2", "commands/hm/uninstall.md", {}),

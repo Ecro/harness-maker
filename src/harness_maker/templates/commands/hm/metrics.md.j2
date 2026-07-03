@@ -1,5 +1,20 @@
 # {% if is_codex %}@hm-metrics{% else %}/hm:metrics{% endif %}
+{% if not config.delivery_metrics.enabled %}
+> **Delivery metrics are OFF for this project** (`delivery_metrics.enabled: false`).
+>
+> This command computes CFR (change failure rate) and post-merge churn from your
+> LOCAL git history — read-only, zero network, and it only runs when you invoke it.
+> It is opt-in so it never adds surprise work; nothing is measured or written until
+> you turn it on.
 
+## Enable it
+
+Run {% if is_codex %}`@hm-configure`{% else %}`/hm:configure`{% endif %} and pick **Delivery metrics** → enable, or set
+`delivery_metrics.enabled: true` in `.claude/harness.yaml` and re-render with
+{% if is_codex %}`@hm-make`{% else %}`/hm:make`{% endif %}. Then re-run this command for the full CFR + churn trend,
+an LLM interpretation of where quality is heading, and concrete improvement
+suggestions — judged against your project's own baseline, never as a gate or a score.
+{% else %}
 > Delivery-metrics trend + interpretation (PLAN-cfr-churn-metrics). Computes
 > CFR (rolling {{ config.delivery_metrics.cfr_window_days }}d change failure rate) and post-merge churn
 > ({{ config.delivery_metrics.churn_maturation_days }}d blame-survival) from LOCAL git history only — zero network.
@@ -106,7 +121,7 @@ specific releases/files found above — generic advice is noise.
 Stop after Step 4. Adjudication requires interactive judgment; autoloop must
 not synthesize verdicts (`--assume-routine` is the only headless path and is
 recorded in the snapshot as `pending_adjudications`).
-
+{% endif %}
 <!-- @hm:user:extensions -->
 <!-- Project-specific /hm:metrics hooks. Preserved across harness-maker upgrades. -->
 <!-- @hm:/user:extensions -->

@@ -1,6 +1,6 @@
 preset: Side
 dev_mode: task-driven
-file_count: 61
+file_count: 62
 files:
 - path: ../CLAUDE.md
   template: claude-md/Side.en.md.j2
@@ -67,7 +67,7 @@ files:
   body_sha256: 7c3b9a4b8854b134897bfa5592b58e4f287d7c0f893256295d8d5bbdbd5efba8
 - path: commands/hm/help.md
   template: commands/hm/help.en.md.j2
-  body_sha256: 9a0e95125abe3bdca9c081bb97723f1a56680da2df76c7f8589a0fc9639a4aae
+  body_sha256: 24cfb87ee9d15511133b3293d041f5b76424ba3d2891095c24ef7a9fb570aeac
 - path: commands/hm/loop-p5-batch.md
   template: commands/hm/loop-p5-batch.md.j2
   body_sha256: 65e0e633e6e5d3dd5d314768352240afde4db90ae1f47aaa638010937c7cd854
@@ -77,6 +77,9 @@ files:
 - path: commands/hm/make.md
   template: commands/hm/make.md.j2
   body_sha256: 1863417d699be77b34bd78d80ff90f46e9d3a607c29939ee19200cb94eb7cd17
+- path: commands/hm/metrics.md
+  template: commands/hm/metrics.md.j2
+  body_sha256: a6f51a8f339dce5e77721025b9a540050076e02cfd4300e9ab735352b3346e0c
 - path: commands/hm/plan-exec-rev-wrap.md
   template: commands/hm/workflow_command.md.j2
   body_sha256: fcf541202dd192f01b3c49231730cdd0caf083fc4ec3409b53788e4c49151684
