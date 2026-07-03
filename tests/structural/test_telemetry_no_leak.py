@@ -69,8 +69,8 @@ _OBSERVABILITY_ALLOWLIST: frozenset[str] = frozenset(
         "src/harness_maker/templates/stages/wrapup.md.j2",
         # PLAN-cfr-churn-metrics — /hm:metrics reads the local
         # `.claude/observability/delivery-metrics.jsonl` ledger for adjudication
-        # rows during trend diagnosis (in-band only, no socket). Gated on
-        # delivery_metrics.enabled (rendered only when the feature is on).
+        # rows during trend diagnosis (in-band only, no socket). Manual read-only
+        # command (0.36.0: no enable flag).
         "src/harness_maker/templates/commands/hm/metrics.md.j2",
     }
 )

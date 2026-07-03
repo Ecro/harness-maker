@@ -1,26 +1,12 @@
 # {% if is_codex %}@hm-metrics{% else %}/hm:metrics{% endif %}
-{% if not config.delivery_metrics.enabled %}
-> **Delivery metrics are OFF for this project** (`delivery_metrics.enabled: false`).
->
-> This command computes CFR (change failure rate) and post-merge churn from your
-> LOCAL git history — read-only, zero network, and it only runs when you invoke it.
-> It is opt-in so it never adds surprise work; nothing is measured or written until
-> you turn it on.
 
-## Enable it
-
-Run {% if is_codex %}`@hm-configure`{% else %}`/hm:configure`{% endif %} and pick **Delivery metrics** → enable, or set
-`delivery_metrics.enabled: true` in `.claude/harness.yaml` and re-render with
-{% if is_codex %}`@hm-make`{% else %}`/hm:make`{% endif %}. Then re-run this command for the full CFR + churn trend,
-an LLM interpretation of where quality is heading, and concrete improvement
-suggestions — judged against your project's own baseline, never as a gate or a score.
-{% else %}
 > Delivery-metrics trend + interpretation (PLAN-cfr-churn-metrics). Computes
 > CFR (rolling {{ config.delivery_metrics.cfr_window_days }}d change failure rate) and post-merge churn
 > ({{ config.delivery_metrics.churn_maturation_days }}d blame-survival) from LOCAL git history only — zero network.
-> The numbers are reflection input judged against this project's own baseline —
-> never a gate, never a score: optimizing the number instead of the work
-> destroys the signal (Goodhart; SPEC Non-Goals 3/4).
+> Manual, read-only, no on/off switch — it runs when you invoke it and does
+> nothing until then. The numbers are reflection input judged against this
+> project's own baseline — never a gate, never a score: optimizing the number
+> instead of the work destroys the signal (Goodhart; SPEC Non-Goals 3/4).
 
 ## Step 0 — Banner
 
@@ -68,8 +54,7 @@ Record each verdict (persisted + reused on every future run — stable trends):
 ```
 
 Exit 3 means candidates are still pending — return to Step 2 (never pass
-`--assume-routine` interactively; it exists for headless runs only). Exit 2
-means the feature is disabled in harness.yaml.
+`--assume-routine` interactively; it exists for headless runs only).
 
 ## Step 4 — Render the trend and interpret it
 
@@ -116,12 +101,18 @@ to harness levers this project actually has (examples: raise review depth or
 enable codex second opinion on review). Suggestions must reference the
 specific releases/files found above — generic advice is noise.
 
+> **Tuning** (optional): `delivery_metrics.tag_pattern` / `default_branch` /
+> `cfr_window_days` / `churn_maturation_days` / `churn_cohort_days` /
+> `blame_file_cap` / `paths` in `.claude/harness.yaml` adjust release detection,
+> windows, and monorepo path scoping. Defaults fit a single-package repo tagged
+> `v*`; edit them (or via {% if is_codex %}`@hm-configure`{% else %}`/hm:configure`{% endif %}) only when your repo differs.
+
 ## Autoloop behavior
 
 Stop after Step 4. Adjudication requires interactive judgment; autoloop must
 not synthesize verdicts (`--assume-routine` is the only headless path and is
 recorded in the snapshot as `pending_adjudications`).
-{% endif %}
+
 <!-- @hm:user:extensions -->
 <!-- Project-specific /hm:metrics hooks. Preserved across harness-maker upgrades. -->
 <!-- @hm:/user:extensions -->

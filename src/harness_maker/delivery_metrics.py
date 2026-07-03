@@ -977,12 +977,13 @@ class _AssumeRoutineStore:
 # ── CLI (ADR-006/007) ────────────────────────────────────────────────────────
 
 
-def _load_cli_config(root: Path) -> DeliveryMetricsConfig | None:
-    """None ⇒ feature disabled by the project harness (CLI exit 2, zero writes).
+def _load_cli_config(root: Path) -> DeliveryMetricsConfig:
+    """Load the per-project TUNING config; ALWAYS returns a config (0.36.0).
 
-    A root WITHOUT harness.yaml proceeds with defaults: direct module
-    invocation is explicit intent; the enable gate protects the rendered
-    command/hook surface (AC-009).
+    There is no enable/disable state anymore — ``/hm:metrics`` is a manual
+    read-only command that just runs. A missing / unreadable / mis-encoded
+    harness.yaml, or a block with only stale keys (e.g. a legacy ``enabled``),
+    all degrade to default tuning rather than refusing to run.
     """
     import yaml
 
@@ -994,21 +995,18 @@ def _load_cli_config(root: Path) -> DeliveryMetricsConfig | None:
     try:
         data = load_harness_yaml(harness_yaml)
     except (OSError, UnicodeDecodeError, yaml.YAMLError):
-        # REVIEW P2 (round 1 + re-review): narrowed from bare `except Exception`
-        # — a genuinely unreadable/corrupt/mis-encoded harness.yaml fails closed
-        # (disabled), but a programming error inside load_harness_yaml now
-        # propagates instead of masquerading as "feature disabled". UnicodeDecodeError
-        # (a ValueError, not OSError) is the non-UTF8-file case re-review caught.
-        return None
+        # Unreadable/corrupt/mis-encoded harness.yaml → default tuning (still runs).
+        return DeliveryMetricsConfig()
     raw = data.get("delivery_metrics")
-    cfg = DeliveryMetricsConfig()
     if isinstance(raw, dict):
+        # Filter to known fields so a legacy `enabled` (removed in 0.36.0) or any
+        # forward-compat key is dropped rather than tripping extra="forbid".
         clean = {k: v for k, v in raw.items() if k in DeliveryMetricsConfig.model_fields}
         try:
-            cfg = DeliveryMetricsConfig.model_validate(clean)
+            return DeliveryMetricsConfig.model_validate(clean)
         except ValidationError:
-            cfg = DeliveryMetricsConfig()
-    return cfg if cfg.enabled else None
+            return DeliveryMetricsConfig()
+    return DeliveryMetricsConfig()
 
 
 def _parse_now(value: str | None) -> datetime:
@@ -1200,9 +1198,6 @@ def main(argv: list[str] | None = None) -> int:
     args = _build_argparser().parse_args(argv)
     root = Path(args.root).resolve()
     cfg = _load_cli_config(root)
-    if cfg is None:
-        _print_json({"status": "disabled", "hint": "set delivery_metrics.enabled in harness.yaml"})
-        return 2
     try:
         if args.command == "trend":
             return _cmd_trend(root, args.limit)

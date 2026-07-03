@@ -538,19 +538,26 @@ def _validate_git_revision_value(v: str, *, field: str) -> str:
 
 
 class DeliveryMetricsConfig(BaseModel):
-    """Opt-in local git delivery metrics (PLAN-cfr-churn-metrics ADR-003).
+    """Local git delivery-metrics tuning (PLAN-cfr-churn-metrics ADR-003;
+    0.36.0 dropped the ``enabled`` flag — see below).
 
-    Default off. When ``enabled=True``, ``/hm:metrics`` is rendered and
-    ``python -m harness_maker.delivery_metrics`` computes CFR (rolling
-    ``cfr_window_days``; releases = ``tag_pattern`` tags, first-parent
-    task-land fallback) and post-merge churn (cohort-blame survival at the
-    ``churn_maturation_days`` boundary). Pure local git analysis — zero
-    network (PLAN-oss-readiness-audit ADR-005).
+    ``/hm:metrics`` is a manual, read-only, zero-network command (compute CFR
+    over ``cfr_window_days`` with releases = ``tag_pattern`` tags + first-parent
+    task-land fallback; post-merge churn via cohort-blame survival at the
+    ``churn_maturation_days`` boundary). Because it is inert until the user
+    invokes it, there is NO on/off switch — this block holds only the per-project
+    TUNING knobs, all with sensible defaults, that you touch when your repo's
+    release convention / monorepo scoping differs from the defaults.
+
+    Migration: a legacy harness.yaml carrying ``delivery_metrics.enabled`` still
+    loads — both readers (``interview.answers_from_harness_yaml`` and
+    ``delivery_metrics._load_cli_config``) filter unknown keys to the model's
+    fields before validating, so the removed key is silently dropped and the
+    tuning values are preserved.
     """
 
     model_config = ConfigDict(strict=True, extra="forbid")
 
-    enabled: bool = False
     tag_pattern: str = "v*"
     default_branch: str | None = None
     cfr_window_days: int = Field(default=28, ge=1)

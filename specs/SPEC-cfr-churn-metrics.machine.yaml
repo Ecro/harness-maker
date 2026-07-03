@@ -196,18 +196,18 @@ ac:
   judgment_subject_paths: []
   judgment_subject_hash: null
 - id: AC-008
-  title: Config defaults off and legacy harness.yaml loads without key
+  title: Config loads with defaults; legacy files (incl. removed enabled) load cleanly
   type: mechanical
   test_ids:
-  - tests/unit/test_delivery_metrics_config.py::test_config_default_off_and_legacy_load
-  executable_predicate: DeliveryMetricsConfig().enabled is False
+  - tests/unit/test_delivery_metrics_config.py::test_config_defaults_and_legacy_load
+  executable_predicate: DeliveryMetricsConfig().tag_pattern == 'v*'
   golden_table: []
   rubric_id: null
   note: ''
   pending_test: false
   oracle_source: golden
-  oracle_evidence: default value is a SPEC-fixed contract (opt-in decision, interview
-    R1); legacy fixture yaml predates the key by construction
+  oracle_evidence: default tuning is a SPEC-fixed contract; legacy fixture yaml (with
+    or without the removed enabled key) predates 0.36.0 by construction
   oracle_independence_waiver: null
   input_domain: null
   transformation: null
@@ -221,18 +221,18 @@ ac:
   judgment_subject_paths: []
   judgment_subject_hash: null
 - id: AC-009
-  title: Disabled feature performs zero writes
+  title: Non-writing subcommands never touch the ledger
   type: mechanical
   test_ids:
-  - tests/unit/test_delivery_metrics_ledger_cli.py::test_cli_exit_2_when_harness_disables_feature
-  executable_predicate: not delivery_ledger_path(disabled_project).exists()
+  - tests/unit/test_delivery_metrics_ledger_cli.py::test_read_only_subcommands_never_write
+  executable_predicate: not delivery_ledger_path(project_after_candidates_and_trend).exists()
   golden_table: []
   rubric_id: null
   note: ''
   pending_test: false
   oracle_source: golden
-  oracle_evidence: zero-side-effect contract observable from the filesystem alone;
-    disabled fixture project constructed independently of the implementation
+  oracle_evidence: read-only contract observable from the filesystem alone; the fixture
+    runs only candidates + trend (never compute/adjudicate) so no row can exist
   oracle_independence_waiver: null
   input_domain: null
   transformation: null

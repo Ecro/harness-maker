@@ -181,21 +181,36 @@ def test_git_subprocess_failure_maps_to_exit_4(
     assert '"status": "error"' in err
 
 
-def test_cli_exit_2_when_harness_disables_feature(
+def test_read_only_subcommands_never_write(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """AC-009 CLI guard: a project harness.yaml with delivery_metrics.enabled
-    false makes every subcommand a zero-write no-op with exit 2."""
+    """AC-009 (0.36.0 — no disabled state): the read-only subcommands
+    `candidates` and `trend` never append a ledger row; only `compute`
+    (and `adjudicate`) write. So the feature is inert until the user asks
+    for a snapshot — there is nothing to gate on."""
+    root = _ambiguous_repo(tmp_path)
+    assert main(["candidates", "--root", str(root), "--now", _NOW]) == 0
+    capsys.readouterr()
+    assert main(["trend", "--root", str(root)]) == 0
+    capsys.readouterr()
+    assert _ledger_rows(root) == []  # neither read-only command wrote anything
+
+
+def test_legacy_enabled_key_still_runs(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """A 0.35.0-era harness.yaml carrying `delivery_metrics.enabled: false` no
+    longer disables anything (the key was removed) — the command just runs,
+    the stale key is dropped, tuning is honored."""
     root = _ambiguous_repo(tmp_path)
     cfg_dir = root / ".claude"
     cfg_dir.mkdir(exist_ok=True)
     (cfg_dir / "harness.yaml").write_text(
-        "preset: Side\nlocale: en\ntargets: [claude-code]\ndelivery_metrics:\n  enabled: false\n",
+        "preset: Side\nlocale: en\ntargets: [claude-code]\ndelivery_metrics:\n"
+        "  enabled: false\n  tag_pattern: 'v*'\n",
         encoding="utf-8",
     )
-    assert main(["compute", "--root", str(root), "--now", _NOW]) == 2
-    capsys.readouterr()
-    assert _ledger_rows(root) == []
+    assert main(["compute", "--root", str(root), "--now", _NOW, "--assume-routine"]) == 0
+    snap = json.loads(capsys.readouterr().out)
+    assert snap["event"] == "snapshot"
 
 
 def test_trend_lists_snapshots_newest_first(

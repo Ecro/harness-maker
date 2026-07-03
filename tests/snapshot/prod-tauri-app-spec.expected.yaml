@@ -49,7 +49,7 @@ files:
   body_sha256: 52a9a8ba202f63b1ebe31bf723ce8efb272a31f0ef03da96472add487176573f
 - path: commands/hm/configure.md
   template: commands/hm/configure.md.j2
-  body_sha256: fa294a4d116c7fd0ec79c5532473f6cb9e1ce64ea3db5de267a34da7b702d51c
+  body_sha256: 71f896d8479069cd8f0818d07f0e4877433adc572fd490668b7830d65d1aefd2
 - path: commands/hm/exec-rev-ver-wrap.md
   template: commands/hm/workflow_command.md.j2
   body_sha256: d366fc616d722ecbe832321fb6444bbb211735a0f7059576e2bc3e5fe4d4a0b5
@@ -67,10 +67,10 @@ files:
   body_sha256: 3da2cbf3dc0da26d9a54614976756ec35d73ec258ae791c7e5785ed5b768495e
 - path: commands/hm/health.md
   template: commands/hm/health.md.j2
-  body_sha256: 7c3b9a4b8854b134897bfa5592b58e4f287d7c0f893256295d8d5bbdbd5efba8
+  body_sha256: 741831ce2da29caf15c66036e4ae5193fe7bd89f4a26cfb1274608058769401c
 - path: commands/hm/help.md
   template: commands/hm/help.en.md.j2
-  body_sha256: 147bd418ca049820c549efd17f9efe7289edd39f102084fcba1f06255000f76d
+  body_sha256: cb3fe9dc211c83e7f7dc78a0289108385efaa298d6aac70a51d85384d56da951
 - path: commands/hm/loop-p5-batch.md
   template: commands/hm/loop-p5-batch.md.j2
   body_sha256: 65e0e633e6e5d3dd5d314768352240afde4db90ae1f47aaa638010937c7cd854
@@ -82,7 +82,7 @@ files:
   body_sha256: 1863417d699be77b34bd78d80ff90f46e9d3a607c29939ee19200cb94eb7cd17
 - path: commands/hm/metrics.md
   template: commands/hm/metrics.md.j2
-  body_sha256: a6f51a8f339dce5e77721025b9a540050076e02cfd4300e9ab735352b3346e0c
+  body_sha256: 1c73b5a6765ad616ad120ef7338228a0601b3dc7911f2026e4a4c42c5d45df7c
 - path: commands/hm/plan-exec-rev.md
   template: commands/hm/workflow_command.md.j2
   body_sha256: d8db8ee3f65204c2adeb9fe478874a15a26faab4b0bb35526eca9df0b33047ea
@@ -112,7 +112,7 @@ files:
   body_sha256: 3c25bac47fd2690839ba344325427b1daff104618d43a75d1af3f378c0d17012
 - path: harness.yaml
   template: harness-yaml/Production.yaml.j2
-  body_sha256: f6854b5bdf4142f1d756e9c860ae0cc5b5da2e30b4785e8a82e77b8c368411e7
+  body_sha256: 1b395ce4b399ac00ead96a522c75f7c9a18d46e052f4eea73d6ccbc396bf82b7
 - path: hooks/hooks.json
   template: hooks/hooks.json.j2
   body_sha256: 3aa3a009ebcd7e2aa73ada8d7b9e2d9b5116fd64d2bf6f48323fb17d9c27e064

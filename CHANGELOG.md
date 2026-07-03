@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+## [0.36.0] - 2026-07-04
+
+### Changed — delivery metrics dropped the `enabled` flag; `/hm:metrics` is now purely manual
+- **`delivery_metrics.enabled` removed.** After 0.35.0 made the command always-visible, the
+  on/off flag only gated "show a command that refuses to run" — incoherent for a read-only,
+  zero-network command that is inert until you invoke it. `/hm:metrics` now **always renders
+  the full CFR + churn command** and just runs on demand; there is no disabled state and the
+  CLI no longer has an exit-2 "disabled" path. `/hm:health` **always** carries the 1-2 line
+  delivery-metrics narrative (its empty-ledger branch handles the never-run case at runtime).
+- **`delivery_metrics` config is now tuning-only** — `tag_pattern`, `default_branch`,
+  `cfr_window_days`, `churn_maturation_days`, `churn_cohort_days`, `blame_file_cap`, `paths`,
+  each with a default that fits a single-package repo tagged `v*`. Edit them (or via
+  `/hm:configure` → "Delivery metrics tuning") only when your release convention or monorepo
+  scoping differs.
+- **Migration is transparent.** A 0.35.0-era `harness.yaml` that still carries
+  `delivery_metrics.enabled` loads fine — both readers filter unknown keys to the model's
+  fields before validating, so the stale key is silently dropped and the sibling tuning is
+  preserved. Re-render with `/hm:make` to drop the key from the file.
+
 ## [0.35.0] - 2026-07-04
 
 ### Added — opt-in delivery metrics: CFR + post-merge churn (PLAN-cfr-churn-metrics)

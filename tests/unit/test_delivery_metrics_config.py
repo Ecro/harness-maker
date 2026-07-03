@@ -18,19 +18,43 @@ def _answers_from_yaml(text: str, tmp_path: Path) -> interview.InterviewAnswers 
     return interview.answers_from_harness_yaml(p)
 
 
-def test_config_default_off_and_legacy_load(tmp_path: Path) -> None:
-    """AC-008: default-constructed config is disabled; legacy harness.yaml
-    without the `delivery_metrics:` key loads without error and defaults off."""
-    assert DeliveryMetricsConfig().enabled is False
-    assert HarnessConfig().delivery_metrics.enabled is False
-    yaml_text = """
-        preset: Side
-        locale: en
-        targets: [claude-code]
-    """
-    answers = _answers_from_yaml(yaml_text, tmp_path)
+def test_config_defaults_and_legacy_load(tmp_path: Path) -> None:
+    """AC-008 (0.36.0): default tuning loads; a legacy harness.yaml WITHOUT the
+    block loads; a 0.35.0-era file WITH the now-removed `enabled` key loads and
+    the stale key is silently dropped while sibling tuning is preserved."""
+    assert DeliveryMetricsConfig().tag_pattern == "v*"
+    assert HarnessConfig().delivery_metrics.tag_pattern == "v*"
+    # No `enabled` field anymore (removed in 0.36.0 — manual, read-only command).
+    assert "enabled" not in DeliveryMetricsConfig.model_fields
+
+    # Legacy file: no delivery_metrics block at all.
+    answers = _answers_from_yaml("preset: Side\nlocale: en\ntargets: [claude-code]\n", tmp_path)
     assert answers is not None
-    assert answers.delivery_metrics.enabled is False
+    assert answers.delivery_metrics.tag_pattern == "v*"
+
+    # 0.35.0-era file: stale `enabled` key present alongside real tuning.
+    yaml_text = """
+        preset: Production
+        locale: ko
+        targets: [claude-code]
+        delivery_metrics:
+          enabled: true
+          tag_pattern: "release-*"
+          cfr_window_days: 56
+    """
+    migrated = _answers_from_yaml(yaml_text, tmp_path)
+    assert migrated is not None
+    # enabled dropped (not a field); tuning survives.
+    assert migrated.delivery_metrics.tag_pattern == "release-*"
+    assert migrated.delivery_metrics.cfr_window_days == 56
+    assert migrated.delivery_metrics.churn_maturation_days == 14  # unspecified → default
+
+
+def test_enabled_key_rejected_on_direct_construction() -> None:
+    """extra='forbid' + no `enabled` field: constructing with enabled raises
+    (both readers pre-filter unknown keys, so only a direct call hits this)."""
+    with pytest.raises(ValidationError):
+        DeliveryMetricsConfig(enabled=True)  # type: ignore[call-arg]
 
 
 def test_defaults_match_adr_003() -> None:
@@ -45,44 +69,39 @@ def test_defaults_match_adr_003() -> None:
     assert cfg.paths == []
 
 
-def test_enabled_round_trip(tmp_path: Path) -> None:
-    """Enabled block with custom fields survives answers_from_harness_yaml."""
+def test_tuning_round_trip(tmp_path: Path) -> None:
+    """Custom tuning survives answers_from_harness_yaml."""
     yaml_text = """
         preset: Production
         locale: ko
         targets: [claude-code]
         delivery_metrics:
-          enabled: true
           tag_pattern: "release-*"
           cfr_window_days: 56
+          paths: ["src/"]
     """
     answers = _answers_from_yaml(yaml_text, tmp_path)
     assert answers is not None
-    assert answers.delivery_metrics.enabled is True
     assert answers.delivery_metrics.tag_pattern == "release-*"
     assert answers.delivery_metrics.cfr_window_days == 56
-    # Unspecified fields keep defaults, not zeros.
-    assert answers.delivery_metrics.churn_maturation_days == 14
+    assert answers.delivery_metrics.paths == ["src/"]
+    assert answers.delivery_metrics.churn_maturation_days == 14  # default kept
 
 
 def test_malformed_block_falls_back(tmp_path: Path) -> None:
-    """Non-dict block / non-bool enabled → tolerant default; other fields parse.
-
-    Three constrained paths (same contract as test_feedback_malformed_value_falls_back):
-    (A) tolerant fallback → all asserts pass; (B) silent coerce "yes"→True → last
-    assert fails; (C) uncaught ValidationError poisons load → answers is None.
-    """
+    """A malformed tuning value / non-dict block → tolerant default; OTHER fields
+    of the same yaml still parse (schema-gap fallback, CLAUDE.md checkpoint 6)."""
     yaml_text = """
         preset: Side
         locale: en
         targets: [claude-code]
         delivery_metrics:
-          enabled: "yes"
+          cfr_window_days: "not-a-number"
     """
     answers = _answers_from_yaml(yaml_text, tmp_path)
     assert answers is not None
     assert answers.locale == "en"
-    assert answers.delivery_metrics.enabled is False
+    assert answers.delivery_metrics.cfr_window_days == 28  # tolerant default
 
     yaml_list = """
         preset: Side
@@ -92,7 +111,7 @@ def test_malformed_block_falls_back(tmp_path: Path) -> None:
     """
     answers2 = _answers_from_yaml(yaml_list, tmp_path)
     assert answers2 is not None
-    assert answers2.delivery_metrics.enabled is False
+    assert answers2.delivery_metrics.tag_pattern == "v*"
 
 
 @pytest.mark.parametrize(

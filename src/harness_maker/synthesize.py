@@ -444,12 +444,9 @@ def _base_files(
         ("commands/hm/loop.md.j2", "commands/hm/loop.md", {}),
         ("commands/hm/loop-p5-batch.md.j2", "commands/hm/loop-p5-batch.md", {}),
         ("commands/hm/health.md.j2", "commands/hm/health.md", {}),
-        # PLAN-cfr-churn-metrics ADR-002 (amended — visibility follow-up):
-        # /hm:metrics is ALWAYS rendered so the command is discoverable, but
-        # the template branches on `delivery_metrics.enabled` — enabled = the
-        # full CFR+churn command, disabled = a short stub pointing at
-        # /hm:configure. COMPUTE stays opt-in (the CLI still exits 2 when the
-        # harness disables it); only the surface visibility changed.
+        # PLAN-cfr-churn-metrics (0.36.0): /hm:metrics is a manual, read-only
+        # command with no on/off flag — always rendered as the full CFR+churn
+        # command. `delivery_metrics` config holds only per-project tuning knobs.
         ("commands/hm/metrics.md.j2", "commands/hm/metrics.md", {}),
         ("commands/hm/make.md.j2", "commands/hm/make.md", {}),
         ("commands/hm/configure.md.j2", "commands/hm/configure.md", {}),
@@ -727,8 +724,8 @@ def synthesize(
         # config.codex_second_opinion.{enabled,agents,...} is available in every
         # agent template's render context (ADR-007 Jinja-conditional pattern).
         codex_second_opinion=answers.codex_second_opinion,
-        # PLAN-cfr-churn-metrics ADR-003 — propagate so templates can gate
-        # /hm:metrics rendering + health narrative on delivery_metrics.enabled.
+        # PLAN-cfr-churn-metrics ADR-003 — propagate the per-project tuning so
+        # /hm:metrics + health templates can read window/tag/path knobs.
         delivery_metrics=answers.delivery_metrics,
     )
     config_dump = config.model_dump(mode="json")

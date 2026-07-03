@@ -79,24 +79,23 @@ AI-assisted development shifts quality failure into two lagging signals: release
 **Then** a new snapshot row is appended to `.claude/observability/delivery-metrics.jsonl`
 **And** the previously adjudicated commit is not re-judged (zero new adjudication requests)
 
-### AC-008: Config defaults off and legacy harness.yaml loads without key
+### AC-008: Config loads with defaults; legacy files (incl. removed `enabled`) load cleanly
 
-**Given** a `DeliveryMetricsConfig` constructed with no arguments, and a legacy `harness.yaml` lacking the `delivery_metrics:` key
-**When** the config is instantiated / the legacy file is loaded
-**Then** `enabled` is `False` in both cases and loading raises no error
+**Given** a `DeliveryMetricsConfig` constructed with no arguments, a legacy `harness.yaml` lacking the `delivery_metrics:` key, AND a 0.35.0-era `harness.yaml` whose block still carries the now-removed `enabled` key
+**When** each is instantiated / loaded through `answers_from_harness_yaml`
+**Then** all load without error with default tuning, and the stale `enabled` key is silently dropped (both readers filter to the model's fields before validating) while the sibling tuning values are preserved (0.36.0 removed the on/off flag; the feature is manual-only)
 
-### AC-009: Disabled feature performs zero writes
+### AC-009: Non-writing subcommands never touch the ledger
 
-**Given** a project with `delivery_metrics.enabled: false` (or the key absent)
-**When** any `/hm:` stage or health run executes
-**Then** no `delivery-metrics.jsonl` ledger file is created and no delivery-metrics computation is invoked
+**Given** a project on which `/hm:metrics candidates` and `/hm:metrics trend` are run
+**When** those read-only subcommands execute
+**Then** no `delivery-metrics.jsonl` row is written by them — only `compute` (and `adjudicate`) append, so the feature is inert until the user explicitly asks for a snapshot (there is no disabled state to gate on; `/hm:metrics` is manual and read-only by construction)
 
-### AC-010: Rendered command surfaces trend, raw counts, and LLM interpretation
+### AC-010: Rendered command always surfaces trend, raw counts, and LLM interpretation
 
-**Given** a harness rendered with `delivery_metrics.enabled: true`
+**Given** any rendered harness (there is no enable flag as of 0.36.0)
 **When** the `/hm:metrics` command file and `/hm:health` command file are rendered
-**Then** the metrics command contains the trend-display, raw-counts (`failed/total`), baseline-delta, and LLM-interpretation instruction blocks, and the health command contains the delivery-metrics narrative block
-**And** rendering with `enabled: false` still renders `/hm:metrics` as an inert stub (points at `/hm:configure` to enable, invokes no module — compute stays opt-in) rather than omitting it, so the command is discoverable (ADR-002 amended, visibility follow-up)
+**Then** the metrics command always contains the trend-display, raw-counts (`failed/total`), baseline-delta, and LLM-interpretation instruction blocks, and the health command always contains the delivery-metrics narrative block (its empty-ledger branch handles the never-run case at runtime)
 
 ## 🚫 Non-Goals
 
