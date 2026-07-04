@@ -758,6 +758,62 @@ def test_make_update_clear_and_remove_real_tmp_project(tmp_path: Path) -> None:
     assert not (claude / "commands" / "hm" / "make.md").exists()
 
 
+def test_make_update_exempts_runtime_mutated_kept_file_from_verify(tmp_path: Path) -> None:
+    """make() must not hard-fail verify on a reconcile-KEPT, runtime-mutated file.
+
+    Regression guard for the v0.32.0 CFR failure (remediated by v0.32.1). The
+    verify() unit test covers ``skip_hash_paths`` in isolation, but nothing
+    exercised cli.make's wiring — reconcile -> ``keep_paths`` ->
+    ``verify(skip_hash_paths=...)``. That untested integration boundary is
+    exactly where the original break shipped, so drive the real make path:
+
+      1. fresh make renders observability/dashboard.md with a content_hash;
+      2. rewrite its BODY in place (frontmatter/hash untouched), mirroring how
+         /hm:health overwrites the dashboard below our frontmatter;
+      3. make --update reconciles it as KEEP (runtime-modified) and must exit 0 —
+         the KEPT body is not ours to verify against the now-stale hash.
+
+    A direct verify() WITHOUT the exemption is asserted to still flag the file,
+    so the make-level exit 0 is genuine evidence the wiring exempted it (not a
+    file that trivially still matches its hash).
+    """
+    from harness_maker.verify import verify
+
+    fresh = runner.invoke(app, ["make", str(tmp_path), "--preset", "Side"])
+    assert fresh.exit_code == 0, f"fresh make failed:\n{fresh.output}"
+
+    claude = tmp_path / ".claude"
+    dashboard = claude / "observability" / "dashboard.md"
+    assert dashboard.is_file(), "fresh make must render observability/dashboard.md"
+
+    # Rewrite ONLY the body, leaving provenance frontmatter (content_hash) intact —
+    # exactly what /hm:health does when it overwrites the dashboard in place.
+    head, sep, _body = dashboard.read_text(encoding="utf-8").partition("\n---\n")
+    assert sep, "dashboard.md must carry provenance frontmatter"
+    sentinel = "runtime-mutated dashboard body — declared hash is now stale\n"
+    dashboard.write_text(head + sep + sentinel, encoding="utf-8")
+
+    # Control: the stale body genuinely trips the content_hash check when NOT exempt,
+    # so the make-level pass below is real evidence of the exemption (not a no-op).
+    unexempt = verify(claude)
+    assert any("observability/dashboard.md" in e for e in unexempt), (
+        f"stale-hash body must fail verify without the exemption; got: {unexempt}"
+    )
+
+    # The real make path: reconcile KEEPs it, cli.make passes it via skip_hash_paths.
+    update = runner.invoke(app, ["make", str(tmp_path), "--update"])
+    assert update.exit_code == 0, f"make must not hard-fail on KEPT file:\n{update.output}"
+    assert "VERIFY ERROR" not in update.output, (
+        f"KEPT runtime-mutated file must be exempt from verify; got:\n{update.output}"
+    )
+
+    # Prove the scenario actually exercised the skip path: reconcile KEPT the file,
+    # so the mutated body survived (a REPLACE would have re-rendered it away).
+    assert sentinel.strip() in dashboard.read_text(encoding="utf-8"), (
+        "reconcile must KEEP the runtime-mutated body (else the skip path is untested)"
+    )
+
+
 # ---------------------------------------------------------------------------
 # Phase 3 — configure-second-brain CLI subcommand (ADR-003)
 # ---------------------------------------------------------------------------
