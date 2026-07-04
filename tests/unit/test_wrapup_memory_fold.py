@@ -224,3 +224,49 @@ def test_wrapup_memory_fold_gated_on_feature_branch_flag(tmp_path: Path) -> None
     assert "Fold base memory into the squash commit" in on
     # flag-off: the fold step (and its command) must be entirely absent
     assert "commit-base-memory" not in off
+
+
+# ── recurrence-dedup render gate (PLAN-failure-memory-recurrence-dedup) ──────────
+
+
+def test_wrapup_renders_search_before_write_step(tmp_path: Path) -> None:
+    """ADR-001/006: Step 5.2 must render a numbered MUST search step over both tiers."""
+    text = _render_wrapup(tmp_path, flag_on=True)
+    # the search step invokes the retrieval helper (which loads BOTH failures + wiki)
+    assert "python -m harness_maker.memory_retrieve" in text
+    assert "search-before-write" in text
+    # the wiki anchor for oscillation is called out explicitly
+    assert "wiki.md" in text
+    assert "failures.md" in text
+    # under-merge bias is stated
+    assert "UNDER-MERGE" in text
+
+
+def test_wrapup_renders_dedup_receipt(tmp_path: Path) -> None:
+    """ADR-004: the discriminating dedup receipt (K proves execution) must render."""
+    text = _render_wrapup(tmp_path, flag_on=True)
+    assert "dedup: searched K existing failures, N considered, M reused" in text
+
+
+def test_wrapup_renders_occurrence_note_recurrence_path(tmp_path: Path) -> None:
+    """ADR-002: the recurrence write path passes --occurrence-note with the exact slug."""
+    text = _render_wrapup(tmp_path, flag_on=True)
+    assert "--occurrence-note" in text
+    # the exact-slug wiring is explicit: the recurrence invocation reuses the existing slug
+    assert "--slug <existing-slug>" in text
+
+
+def test_wrapup_renders_design_oscillation_qualifier(tmp_path: Path) -> None:
+    """ADR-005: design oscillation qualifies and records under a stable family slug."""
+    text = _render_wrapup(tmp_path, flag_on=True)
+    assert "design oscillation" in text
+    assert "stable-family-slug" in text
+
+
+def test_wrapup_renders_escalation_last_mile(tmp_path: Path) -> None:
+    """ADR-007: Step 5.3 is a numbered MUST that writes proposals + emits a receipt."""
+    text = _render_wrapup(tmp_path, flag_on=True)
+    assert "escalation: K entries at count>=3, P proposals written" in text
+    assert "pending-proposals.md" in text
+    # it must read as a MUST, not the old advisory phrasing
+    assert "escalation last mile" in text

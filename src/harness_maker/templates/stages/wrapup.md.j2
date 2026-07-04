@@ -348,36 +348,89 @@ Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.memory_
 
 #### 5.2 Failures
 
-For each new failure pattern that emerged this work unit, insert (or increment count) in `.claude/memory/failures.md` **via the locked memory CLI** (same H1 reason + marker discipline as 5.1 — **do NOT `Edit`/`Write` `failures.md` directly**). The CLI owns the `count:<N>` increment: same slug → count++ with the first-seen date preserved.
+> **5.2.0 — search-before-write (MUST — the count++ dedup depends on it).** The
+> `count:<N>` increment fires ONLY on an **exact slug match**, so a recurrence recorded
+> under a fresh slug freezes every count at 1 and the count≥3 escalation (5.3) never
+> fires. Before writing ANY failure this unit, search the existing memory for the same
+> root cause and reuse its slug. This is a numbered step, not advisory — skipping it is
+> the exact failure mode that made recurrence detection silently dead.
 
-Write the body paragraph to a fresh temp file **outside the repo** with the **Write tool** (unique `mktemp`-style path, never fixed/in-repo), then run the CLI and delete it:
+For each failure pattern that emerged this work unit:
+
+1. **Search first.** Run the retrieval helper over the existing tiers — it loads BOTH
+   `failures.md` AND `wiki.md`, so a design **reversal** can be matched against the prior
+   `[wiki:*]` decision it flips (the anchor for oscillation, below):
 
 {% if is_codex %}
 ```
-Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.memory_md upsert-failure --root . --slug <slug> --category <category> --body-file <tmpfile>")
+Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.memory_retrieve --topic \"<symptom / root cause>\" --k 6 --pre-k 30")
 ```
 {% else %}
 ```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.memory_md upsert-failure --root . --slug <slug> --category <category> --body-file <tmpfile>
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.memory_retrieve --topic "<symptom / root cause>" --k 6 --pre-k 30
 ```
 {% endif %}
 
-- **body** = symptom + cause + fix in one paragraph — the CLI builds the `## [fail:<category>] <slug> | <YYYY-MM-DD> | count:<N>` heading.
+2. **Judge with an UNDER-MERGE bias.** Reuse an existing `[fail:*]` slug ONLY when you
+   are confident it is the SAME root cause (not merely a similar symptom). When uncertain
+   → create a NEW entry. Never merge two distinct failures.
+
+3. **Write via the locked memory CLI** (same H1 reason + marker discipline as 5.1 —
+   **do NOT `Edit`/`Write` `failures.md` directly**). Write the body / note to a fresh
+   temp file **outside the repo** with the **Write tool** (unique `mktemp`-style path,
+   never fixed/in-repo), then run the CLI and delete it:
+
+{% if is_codex %}
+```
+# New failure (no confident match) — full paragraph via --body-file:
+Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.memory_md upsert-failure --root . --slug <slug> --category <category> --body-file <tmpfile>")
+# Recurrence (confident same-root-cause match) — reuse the EXACT slug + one-line note:
+Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.memory_md upsert-failure --root . --slug <existing-slug> --category <category> --occurrence-note \"<one line: what happened this time>\"")
+```
+{% else %}
+```bash
+# New failure (no confident match) — full paragraph via --body-file:
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.memory_md upsert-failure --root . --slug <slug> --category <category> --body-file <tmpfile>
+# Recurrence (confident same-root-cause match) — reuse the EXACT slug + one-line note:
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.memory_md upsert-failure --root . --slug <existing-slug> --category <category> --occurrence-note "<one line: what happened this time>"
+```
+{% endif %}
+
+4. **Emit the dedup receipt** (one line — a skipped search is otherwise invisible):
+
+   `dedup: searched K existing failures, N considered, M reused`
+
+   **K** = existing failure entries the search surfaced (K>0 proves the search ran),
+   **N** = failure patterns you evaluated this unit, **M** = how many reused an existing
+   slug (count++). Print it even when N=0.
+
+- **body** = symptom + cause + fix in one paragraph — the CLI builds the `## [fail:<category>] <slug> | <YYYY-MM-DD> | count:<N>` heading; recurrences add `- [<date>] <note>` bullets beneath it.
 - **category**: `import` | `test` | `render` | `hook` | `lint` | `type` | `runtime` | `design` | `other`.
-- **Qualifies as failure**: incorrect API usage, wrong syntax, convention misunderstanding, build failures, tool mistakes, workflow violations.
-- **Does NOT qualify**: user preference changes, expected errors, normal debugging cycles, design evolution.
-- **Check the exit code** (fail-closed on malformed tier file).
+- **Qualifies as failure**: incorrect API usage, wrong syntax, convention misunderstanding, build failures, tool mistakes, workflow violations, **and design oscillation** — reverting or re-litigating a prior decision (same file / config / marker flipped back). Record oscillation as `[fail:design] <stable-family-slug>` — a coarse, reusable family slug (e.g. `ssh-recovery-strategy`, `boot-marker-strategy`), NOT a one-off symptom slug — so repeated flips accumulate under ONE entry. Anchor the reversal against the prior `[wiki:*]` decision the step-1 search surfaced.
+- **Does NOT qualify**: user preference changes, expected errors, normal debugging cycles, forward-only design *evolution* (a first-time decision — only the **reversal** of a prior one counts as oscillation).
+- **Check the exit code** (fail-closed on a malformed tier file OR an empty `--occurrence-note`).
 
-#### 5.3 Failure-driven proposal
+#### 5.3 Failure-driven proposal (MUST — the escalation last mile)
 
-When a failure entry's `count >= 3`, write a skill / agent / rule proposal to `.claude/memory/pending-proposals.md`:
+This step is the OUTPUT the entire count++ machinery exists to produce (`pending-proposals.md`);
+leaving it advisory reproduces the same silent-skip that froze the counts. Run it every wrapup.
+
+1. Scan `.claude/memory/failures.md` for every entry now at `count >= 3`.
+2. For each such entry, write (or update) a proposal in `.claude/memory/pending-proposals.md`:
 
 ```markdown
 ## Proposal: {short-title} ({YYYY-MM-DD})
-**Triggered by:** [fail:<category>] <slug> (count: 3)
+**Triggered by:** [fail:<category>] <slug> (count: <N>)
 **Proposed mechanism:** {new skill | rule update | agent | hook}
-**Rationale:** {why an automated guard would have prevented this 3 times}
+**Rationale:** {why an automated guard would have prevented this <N> times}
 ```
+
+3. **Emit the escalation receipt** (one line):
+
+   `escalation: K entries at count>=3, P proposals written`
+
+   **K** = entries at `count>=3`, **P** = proposals written/updated. K=0 is the normal
+   case and must still be printed (so a regressed pipeline is visible).
 
 The user reviews proposals later and decides whether to ingest into the harness.
 

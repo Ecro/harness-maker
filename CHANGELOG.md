@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+### Fixed — failure-memory recurrence dedup now fires end-to-end
+- **`count++` dedup was structurally dead.** `memory_md._upsert` incremented a failure
+  entry's `count` only on an exact-slug match, but `/hm:wrapup` invented a fresh slug each
+  time with no read-back — so recurrences fragmented into `count:1` entries and the
+  `count>=3` escalation never fired (a consumer project had 19/19 at `count:1` and
+  `pending-proposals.md` never created). Three fixes: (1) `_upsert` now PRESERVES the
+  original body and APPENDS a dated occurrence bullet + `count++` on a match (was: replace),
+  via a new `--occurrence-note` flag; count++ and append are atomic (empty note →
+  fail-closed). (2) wrapup Step 5.2 gained a numbered MUST **search-before-write** step
+  (`memory_retrieve` over failures + wiki, under-merge bias) + a discriminating
+  `dedup: searched K … N considered … M reused` receipt. (3) Step 5.3 escalation is now a
+  numbered MUST + `escalation: K entries at count>=3, P proposals written` receipt. Design
+  oscillation (reverting a prior decision) now qualifies as `[fail:design]`.
+- All three creation paths route through one shared `_new_entry_body` / `_collapse_note`
+  writer so a seed can neither be evidence-empty nor inject a phantom `## […]` heading
+  (a review-caught guard-parity gap that spanned three branches).
+
 ## [0.36.0] - 2026-07-04
 
 ### Changed — delivery metrics dropped the `enabled` flag; `/hm:metrics` is now purely manual

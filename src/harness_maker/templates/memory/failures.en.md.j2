@@ -8,9 +8,12 @@
 > ```
 > ## [fail:<category>] <slug> | <YYYY-MM-DD> | count:<N>
 > <reproduction trigger + root cause + resolution in one paragraph>
+> - [<YYYY-MM-DD>] <one-line note for the 2nd occurrence>
+> - [<YYYY-MM-DD>] <one-line note for the 3rd occurrence>
 > ```
 > - `category`: import / test / render / hook / lint / type / runtime / design / other
-> - `count`: bump the heading only on repeats (never duplicate sections)
+> - `count`: bump the heading only on repeats — same slug → count++ (never duplicate sections). wrapup searches existing slugs first and reuses the matching one, so recurrences accumulate instead of fragmenting.
+> - Each repeat appends one dated occurrence bullet under the original body (first-seen date is kept in the heading), so a `count:N` entry carries N−1 occurrence lines of evidence.
 > - When count ≥ 3, wrapup adds an improvement proposal to `.claude/memory/pending-proposals.md`
 
 ---

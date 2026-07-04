@@ -148,6 +148,38 @@ def _parse_failure_meta(heading: str) -> tuple[str, int]:
         raise MemoryBlockError(f"non-integer count in failure heading: {heading!r}") from exc
 
 
+def _collapse_note(text: str) -> str:
+    """Collapse whitespace to a single line, re-checking for markers post-collapse.
+
+    A marker split across a newline (``<!-- @hm:user:entries\n-->``) slips past the raw
+    substring guard but reforms once ``split()``/join drops the newline — guard here too.
+    """
+    collapsed = " ".join(text.split())
+    if OPEN_MARKER in collapsed or CLOSE_MARKER in collapsed:
+        raise MemoryBlockError("occurrence note contains a marker string")
+    return collapsed
+
+
+def _new_entry_body(
+    *, is_failure: bool, body_lines: list[str], occurrence_note: str | None, today: str
+) -> list[str]:
+    """Body lines for a brand-new failure entry.
+
+    Seeds from ``occurrence_note`` when no ``--body-file`` was supplied — fail-closed on
+    an empty note and bullet-prefixed so a heading-shaped note can never inject a phantom
+    ``## [...]`` heading. Shared by the marker-absent and no-match creation paths so both
+    honor the same invariant (a ``count:N`` entry never outruns its recorded evidence).
+    """
+    if is_failure and occurrence_note is not None and not "".join(body_lines).strip():
+        occ_text = _collapse_note(occurrence_note)
+        if not occ_text:
+            raise MemoryBlockError(
+                "empty occurrence note on a new failure — refusing an evidence-less entry"
+            )
+        return [f"- [{today}] {occ_text}"]
+    return body_lines
+
+
 def _upsert(
     *,
     root: Path | str,
@@ -159,6 +191,7 @@ def _upsert(
     category: str,
     today: str,
     title: str,
+    occurrence_note: str | None = None,
 ) -> Path:
     if not _SLUG_RE.fullmatch(slug):
         raise MemoryBlockError(f"invalid slug {slug!r} (expected kebab-case, ≤40 chars)")
@@ -166,6 +199,10 @@ def _upsert(
         raise MemoryBlockError(f"invalid category {category!r} (expected [a-z0-9-])")
     if OPEN_MARKER in body or CLOSE_MARKER in body:
         raise MemoryBlockError("entry body contains a marker string")
+    if occurrence_note is not None and (
+        OPEN_MARKER in occurrence_note or CLOSE_MARKER in occurrence_note
+    ):
+        raise MemoryBlockError("occurrence note contains a marker string")
     body_lines = body.strip("\n").split("\n")
     if any(_HEADING_RE.match(ln) for ln in body_lines):
         # a heading-shaped body line becomes a phantom entry on the next upsert's
@@ -195,12 +232,18 @@ def _upsert(
                 f"[memory_md] WARN: {target_file} has no @hm:user:entries block — creating it\n"
             )
             heading = fail_heading(today, 1) if is_failure else wiki_heading()
+            seed_body = _new_entry_body(
+                is_failure=is_failure,
+                body_lines=body_lines,
+                occurrence_note=occurrence_note,
+                today=today,
+            )
             prefix = f"# {title} Index\n\n"
             new_text = (
                 prefix
                 + OPEN_MARKER
                 + "\n"
-                + "\n".join([heading, *body_lines])
+                + "\n".join([heading, *seed_body])
                 + "\n"
                 + CLOSE_MARKER
                 + "\n"
@@ -222,13 +265,36 @@ def _upsert(
             end = later[0] if later else close_idx
             if is_failure:
                 old_date, old_count = _parse_failure_meta(lines[start])
+                # occurrence-log (ADR-002): preserve the original body + prior
+                # bullets, append one dated occurrence, count++. Append and
+                # increment are atomic — an empty note is fail-closed so a
+                # count:N entry never outruns its recorded evidence.
+                source = occurrence_note if occurrence_note is not None else " ".join(body_lines)
+                occ_text = _collapse_note(source)
+                if not occ_text:
+                    raise MemoryBlockError(
+                        "empty occurrence note on a matched failure — refusing "
+                        "count++ without evidence"
+                    )
                 heading = fail_heading(old_date, old_count + 1)
+                existing_body = lines[start + 1 : end]
+                new_lines = (
+                    lines[:start]
+                    + [heading, *existing_body, f"- [{today}] {occ_text}"]
+                    + lines[end:]
+                )
             else:
                 heading = wiki_heading()
-            new_lines = lines[:start] + [heading, *body_lines] + lines[end:]
+                new_lines = lines[:start] + [heading, *body_lines] + lines[end:]
         else:
+            new_body = _new_entry_body(
+                is_failure=is_failure,
+                body_lines=body_lines,
+                occurrence_note=occurrence_note,
+                today=today,
+            )
             heading = fail_heading(today, 1) if is_failure else wiki_heading()
-            new_lines = lines[:close_idx] + [heading, *body_lines] + lines[close_idx:]
+            new_lines = lines[:close_idx] + [heading, *new_body] + lines[close_idx:]
 
         atomic_write(target_file, "\n".join(new_lines) + "\n")
     return target_file
@@ -253,9 +319,19 @@ def upsert_wiki(
 
 
 def upsert_failure(
-    root: Path | str, slug: str, category: str, body: str, *, today: str | None = None
+    root: Path | str,
+    slug: str,
+    category: str,
+    body: str,
+    *,
+    today: str | None = None,
+    occurrence_note: str | None = None,
 ) -> Path:
-    """Insert-or-count++ a failure entry by slug, inside the marker block, under the lock."""
+    """Insert-or-count++ a failure entry by slug, inside the marker block, under the lock.
+
+    On a matched slug the original body is preserved and ``occurrence_note`` (or, as a
+    safety net, the collapsed ``body``) is appended as a dated bullet — see ADR-002.
+    """
     today = today or _utcnow().strftime("%Y-%m-%d")
     return _upsert(
         root=root,
@@ -267,6 +343,7 @@ def upsert_failure(
         category=category,
         today=today,
         title="Failures",
+        occurrence_note=occurrence_note,
     )
 
 
@@ -306,6 +383,11 @@ def _build_parser() -> argparse.ArgumentParser:
     _common(f)
     f.add_argument("--slug", required=True)
     f.add_argument("--category", required=True)
+    f.add_argument(
+        "--occurrence-note",
+        default=None,
+        help="On a matched slug, append this one-line dated occurrence (count++).",
+    )
 
     return p
 
@@ -316,13 +398,23 @@ def main(argv: list[str] | None = None) -> int:
         return _guard
     args = _build_parser().parse_args(argv)
     try:
-        body = _read_body(args)
+        # For upsert-failure with --occurrence-note, the note is the payload — do
+        # NOT read stdin (that would block when no body/--body-file is supplied).
+        occ = getattr(args, "occurrence_note", None)
+        if occ is not None and (args.body is not None or args.body_file is not None):
+            # Mutually exclusive: silently dropping the richer body is a footgun.
+            raise MemoryBlockError(
+                "--occurrence-note is mutually exclusive with --body/--body-file"
+            )
+        body = "" if (args.cmd == "upsert-failure" and occ is not None) else _read_body(args)
         if args.cmd == "append-session":
             path = append_session(args.root, body, today=args.today)
         elif args.cmd == "upsert-wiki":
             path = upsert_wiki(args.root, args.slug, args.category, body, today=args.today)
         elif args.cmd == "upsert-failure":
-            path = upsert_failure(args.root, args.slug, args.category, body, today=args.today)
+            path = upsert_failure(
+                args.root, args.slug, args.category, body, today=args.today, occurrence_note=occ
+            )
         else:  # pragma: no cover — argparse enforces a valid subcommand
             return 2
     except (MemoryBlockError, OSError, ValueError) as exc:

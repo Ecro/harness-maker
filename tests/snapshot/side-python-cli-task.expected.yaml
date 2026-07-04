@@ -52,10 +52,10 @@ files:
   body_sha256: 71f896d8479069cd8f0818d07f0e4877433adc572fd490668b7830d65d1aefd2
 - path: commands/hm/exec-rev-ver-wrap.md
   template: commands/hm/workflow_command.md.j2
-  body_sha256: 42d4017f20f0f96b114c513cb5615d3366f8a5d28475b8972d760441441a5f33
+  body_sha256: c0271ce2a849dad6e564013f61144a3122f066014e3b3ee73e7b7929f59dfc33
 - path: commands/hm/exec-rev-wrap.md
   template: commands/hm/workflow_command.md.j2
-  body_sha256: 1ea60112aecd03ea3faef07649015ec4d8020f8e984e280c511b9714d16e5893
+  body_sha256: a431e36aa923f90587aaaab8725ed3fc55a2af438c0a9f6d605164fef5cb9262
 - path: commands/hm/exec-rev.md
   template: commands/hm/workflow_command.md.j2
   body_sha256: 8de3d6cf65f37adb43c2acc030bdb0bcf82fb317c08fb508ccdb22027d460849
@@ -82,7 +82,7 @@ files:
   body_sha256: 1c73b5a6765ad616ad120ef7338228a0601b3dc7911f2026e4a4c42c5d45df7c
 - path: commands/hm/plan-exec-rev-wrap.md
   template: commands/hm/workflow_command.md.j2
-  body_sha256: fcf541202dd192f01b3c49231730cdd0caf083fc4ec3409b53788e4c49151684
+  body_sha256: 683c5349a1656f75529cf9ddd411954b8cefbfe43bc0b5d39eed480b15adf884
 - path: commands/hm/plan-exec-rev.md
   template: commands/hm/workflow_command.md.j2
   body_sha256: 9d1fde8f569100f04b1641ccba1ee3350149dd6b3d72cf0c0de7588b6af18fa5
@@ -106,7 +106,7 @@ files:
   body_sha256: fe2525d64a79b282fb562cc1acd3191b693c38ef6a0bacd161bd4007ee35220b
 - path: commands/hm/wrapup.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: 17477905102bdaf8e713bc90c0e86ddb2dfcbabb6fca2a3285e53878d4a06229
+  body_sha256: 6f5a8567189e99b7a4ad2e5fdc5276374ad25e8e6266615237f2624fb760da2f
 - path: harness.yaml
   template: harness-yaml/Side.yaml.j2
   body_sha256: 9b65e4fa5116701263326269c1dfdc1ca74cc2bc22535830721f6c4d75710d44
@@ -115,7 +115,7 @@ files:
   body_sha256: 0ef930a5d5dd8f567c1848516b50f570b31fb895ffe4b54e40d882255da7513e
 - path: memory/failures.md
   template: memory/failures.en.md.j2
-  body_sha256: 9f2e56697242d3f8f846453a782e4f552265d1d2a63308a96717051d38ba376b
+  body_sha256: b146802f48337b5f0d9651ab9a4d735036bb3cefca8ff3ecfb9c63ee01c31e72
 - path: memory/session/README.md
   template: memory/session-readme.md.j2
   body_sha256: 4363ed627b31f0b3ffaa92d8b20f070f8c96039cd59056aea6133760d3d5dd4b
@@ -187,4 +187,4 @@ files:
   body_sha256: 0ae45189485669237712bb35bbbb3cd5701c5fa10c462d6f12c7f2306c944b6d
 - path: stages/wrapup.md
   template: stages/wrapup.md.j2
-  body_sha256: 38ea7fa636efe3e815048e04c644f87f04b3ed0df20a759407b04ac8d1caaf0c
+  body_sha256: f479260a30f8c9b6e404bbe8ea43b91a05cafd0fb00aa19b07f55e7fc60c38f1

@@ -142,6 +142,8 @@ def test_upsert_failure_same_slug_increments_count_and_preserves_first_date(
     assert text.count("] boom ") == 1
     assert "count:2" in text
     assert "boom | 2026-06-20 | count:2" in text  # first-seen date preserved
+    assert "v1." in text  # original body preserved (occurrence-log, not replace)
+    assert "- [2026-06-21] v2." in text  # --body-file-on-match collapses to a dated bullet
 
 
 # ── fail-closed set (ADR-001, validator W4/CX8) ──────────────────────────────
@@ -410,3 +412,244 @@ def test_subprocess_concurrent_upsert_failure_same_slug_count(tmp_path: Path, n:
     text = fail.read_text("utf-8")
     assert text.count("] boom ") == 1  # single entry, no duplicates
     assert f"count:{n}" in text  # every increment landed (no lost update)
+
+
+# ── occurrence-log accumulation (PLAN-failure-memory-recurrence-dedup ADR-002) ──
+
+
+def test_failure_occurrence_log_accumulates_across_repeats(tmp_path: Path) -> None:
+    # A matched slug PRESERVES the original body and APPENDS a dated occurrence
+    # bullet + count++, so a count:N entry carries the original + N-1 dated lines.
+    fail = tmp_path / ".claude" / "memory" / "failures.md"
+    _fresh_tier(fail, "Failures")
+    memory_md.upsert_failure(tmp_path, "boom", "design", "original cause.", today="2026-06-20")
+    memory_md.upsert_failure(
+        tmp_path, "boom", "design", "", today="2026-06-21", occurrence_note="second hit"
+    )
+    memory_md.upsert_failure(
+        tmp_path, "boom", "design", "", today="2026-06-22", occurrence_note="third hit"
+    )
+    memory_md.upsert_failure(
+        tmp_path, "boom", "design", "", today="2026-06-23", occurrence_note="fourth hit"
+    )
+    text = fail.read_text("utf-8")
+    assert text.count("] boom ") == 1  # single heading, no duplicates
+    assert "boom | 2026-06-20 | count:4" in text  # first-seen date preserved, count++
+    assert "original cause." in text  # original body retained
+    assert "- [2026-06-21] second hit" in text
+    assert "- [2026-06-22] third hit" in text
+    assert "- [2026-06-23] fourth hit" in text
+    # canonical layout: original body first, then bullets in chronological order
+    assert (
+        text.index("original cause.")
+        < text.index("second hit")
+        < text.index("third hit")
+        < text.index("fourth hit")
+    )
+
+
+def test_failure_empty_occurrence_note_is_fail_closed(tmp_path: Path) -> None:
+    # count++ and the bullet-append are atomic — an empty note on a match must
+    # NOT increment count without evidence.
+    fail = tmp_path / ".claude" / "memory" / "failures.md"
+    _fresh_tier(fail, "Failures")
+    memory_md.upsert_failure(tmp_path, "boom", "design", "cause.", today="2026-06-20")
+    with pytest.raises(memory_md.MemoryBlockError):
+        memory_md.upsert_failure(
+            tmp_path, "boom", "design", "   ", today="2026-06-21", occurrence_note="   "
+        )
+    text = fail.read_text("utf-8")
+    assert "count:1" in text  # unchanged — no increment
+    assert "count:2" not in text
+
+
+def test_failure_occurrence_note_with_heading_shaped_substring_is_safe(tmp_path: Path) -> None:
+    # A note containing a "## [fail:...]"-shaped substring must not become a
+    # phantom heading on the next upsert's _entry_headings scan (prefixed by "- ").
+    fail = tmp_path / ".claude" / "memory" / "failures.md"
+    _fresh_tier(fail, "Failures")
+    memory_md.upsert_failure(tmp_path, "boom", "design", "cause.", today="2026-06-20")
+    memory_md.upsert_failure(
+        tmp_path,
+        "boom",
+        "design",
+        "",
+        today="2026-06-21",
+        occurrence_note="## [fail:design] not-a-real-heading",
+    )
+    # a subsequent upsert still resolves exactly one heading (no phantom entry)
+    memory_md.upsert_failure(
+        tmp_path, "boom", "design", "", today="2026-06-22", occurrence_note="again"
+    )
+    text = fail.read_text("utf-8")
+    assert "boom | 2026-06-20 | count:3" in text
+    assert text.count("## [fail:design] boom ") == 1
+
+
+def test_failure_multiline_body_on_match_collapses_to_one_bullet(tmp_path: Path) -> None:
+    # A full multi-line paragraph passed on a matched slug (LLM misjudgment via
+    # --body-file) collapses into a single dated bullet — newlines never split it.
+    fail = tmp_path / ".claude" / "memory" / "failures.md"
+    _fresh_tier(fail, "Failures")
+    memory_md.upsert_failure(tmp_path, "boom", "design", "cause.", today="2026-06-20")
+    memory_md.upsert_failure(
+        tmp_path, "boom", "design", "line one\nline two\nline three", today="2026-06-21"
+    )
+    text = fail.read_text("utf-8")
+    assert "- [2026-06-21] line one line two line three" in text
+    assert "boom | 2026-06-20 | count:2" in text
+
+
+def test_cli_failure_empty_occurrence_note_returns_nonzero(tmp_path: Path) -> None:
+    # CLI mirror: an empty --occurrence-note on a matched slug exits non-zero.
+    fail = tmp_path / ".claude" / "memory" / "failures.md"
+    _fresh_tier(fail, "Failures")
+    memory_md.upsert_failure(tmp_path, "boom", "design", "cause.", today="2026-06-20")
+    p = _run_cli(
+        [
+            "upsert-failure",
+            "--root",
+            str(tmp_path),
+            "--slug",
+            "boom",
+            "--category",
+            "design",
+            "--today",
+            "2026-06-21",
+            "--occurrence-note",
+            "   ",
+        ]
+    )
+    _out, err = p.communicate(timeout=60)
+    assert p.returncode != 0, err.decode()
+    assert "count:2" not in fail.read_text("utf-8")
+
+
+def test_new_failure_from_occurrence_note_on_markerless_file_seeds_bullet(tmp_path: Path) -> None:
+    # REVIEW (Codex re-verify): the marker-absent (fresh/legacy file) creation path
+    # must honor the same occurrence-note seed contract as the marker-present path.
+    fail = tmp_path / ".claude" / "memory" / "failures.md"
+    # file does NOT exist → _locate_block(None) → marker-absent creation branch
+    memory_md.upsert_failure(
+        tmp_path, "fresh", "design", "", occurrence_note="seed", today="2026-06-20"
+    )
+    text = fail.read_text("utf-8")
+    assert "## [fail:design] fresh | 2026-06-20 | count:1" in text
+    assert "- [2026-06-20] seed" in text
+    # empty note on the markerless path is also fail-closed (no evidence-less entry)
+    fail.unlink()
+    with pytest.raises(memory_md.MemoryBlockError):
+        memory_md.upsert_failure(
+            tmp_path, "typo", "design", "", occurrence_note="  ", today="2026-06-21"
+        )
+
+
+# ── new-entry-via-occurrence-note safety-net branch (REVIEW: heading-injection) ──
+
+
+def test_new_failure_from_occurrence_note_seeds_a_dated_bullet(tmp_path: Path) -> None:
+    # A brand-new failure created from --occurrence-note alone seeds a dated BULLET
+    # body (not a raw line), so it is heading-immune and format-consistent.
+    fail = tmp_path / ".claude" / "memory" / "failures.md"
+    _fresh_tier(fail, "Failures")
+    memory_md.upsert_failure(
+        tmp_path, "fresh", "design", "", occurrence_note="seed note", today="2026-06-20"
+    )
+    text = fail.read_text("utf-8")
+    assert "## [fail:design] fresh | 2026-06-20 | count:1" in text
+    assert "- [2026-06-20] seed note" in text
+
+
+def test_new_failure_from_heading_shaped_occurrence_note_is_not_a_phantom_heading(
+    tmp_path: Path,
+) -> None:
+    # REVIEW (Codex + code-reviewer + test-reviewer): a heading-shaped note on a
+    # NON-matching slug must NOT become an unprefixed phantom heading. The seed is
+    # bullet-prefixed, so a subsequent upsert still resolves exactly one heading.
+    fail = tmp_path / ".claude" / "memory" / "failures.md"
+    _fresh_tier(fail, "Failures")
+    memory_md.upsert_failure(
+        tmp_path,
+        "fresh",
+        "design",
+        "",
+        occurrence_note="## [fail:other] injected",
+        today="2026-06-20",
+    )
+    # a second upsert on the same slug must not trip the duplicate-heading fail-closed
+    memory_md.upsert_failure(
+        tmp_path, "fresh", "design", "", occurrence_note="second", today="2026-06-21"
+    )
+    text = fail.read_text("utf-8")
+    # line-anchored count (matches _HEADING_RE's ^##): the bullet embeds "## [fail:"
+    # as a substring but does NOT start with it, so the parser sees one heading.
+    heading_lines = [ln for ln in text.splitlines() if ln.startswith("## [fail:")]
+    assert len(heading_lines) == 1  # exactly one real heading, no phantom
+    assert "fresh | 2026-06-20 | count:2" in text
+
+
+def test_new_failure_from_empty_occurrence_note_is_fail_closed(tmp_path: Path) -> None:
+    # REVIEW (code-reviewer #2): the fail-closed-on-empty invariant must hold on the
+    # new-entry path too — a whitespace note on a typo'd slug must NOT create an
+    # evidence-less count:1 entry.
+    fail = tmp_path / ".claude" / "memory" / "failures.md"
+    _fresh_tier(fail, "Failures")
+    with pytest.raises(memory_md.MemoryBlockError):
+        memory_md.upsert_failure(
+            tmp_path, "typo", "design", "", occurrence_note="   ", today="2026-06-20"
+        )
+    assert "typo" not in fail.read_text("utf-8")  # nothing written
+
+
+@pytest.mark.parametrize("marker", [memory_md.OPEN_MARKER, memory_md.CLOSE_MARKER])
+def test_occurrence_note_with_marker_is_rejected(tmp_path: Path, marker: str) -> None:
+    # REVIEW (test-reviewer): the occurrence_note marker guard was load-bearing but
+    # untested — a marker in the note would corrupt the @hm block.
+    fail = tmp_path / ".claude" / "memory" / "failures.md"
+    _fresh_tier(fail, "Failures")
+    memory_md.upsert_failure(tmp_path, "boom", "design", "cause.", today="2026-06-20")
+    with pytest.raises(memory_md.MemoryBlockError):
+        memory_md.upsert_failure(
+            tmp_path, "boom", "design", "", occurrence_note=f"sneaky {marker}", today="2026-06-21"
+        )
+
+
+def test_occurrence_note_with_newline_split_marker_is_rejected(tmp_path: Path) -> None:
+    # REVIEW (code-reviewer #2 P3): a marker split across a newline slips the raw
+    # substring guard but reforms after whitespace-collapse — _collapse_note re-checks.
+    fail = tmp_path / ".claude" / "memory" / "failures.md"
+    _fresh_tier(fail, "Failures")
+    memory_md.upsert_failure(tmp_path, "boom", "design", "cause.", today="2026-06-20")
+    split_marker = memory_md.OPEN_MARKER.replace(" -->", "\n-->")
+    with pytest.raises(memory_md.MemoryBlockError):
+        memory_md.upsert_failure(
+            tmp_path, "boom", "design", "", occurrence_note=split_marker, today="2026-06-21"
+        )
+
+
+def test_cli_occurrence_note_mutually_exclusive_with_body(tmp_path: Path) -> None:
+    # REVIEW (code-reviewer #1/#2 P3): passing both --occurrence-note and --body
+    # silently dropped the body; it now errors loudly.
+    fail = tmp_path / ".claude" / "memory" / "failures.md"
+    _fresh_tier(fail, "Failures")
+    memory_md.upsert_failure(tmp_path, "boom", "design", "cause.", today="2026-06-20")
+    p = _run_cli(
+        [
+            "upsert-failure",
+            "--root",
+            str(tmp_path),
+            "--slug",
+            "boom",
+            "--category",
+            "design",
+            "--today",
+            "2026-06-21",
+            "--occurrence-note",
+            "note",
+            "--body",
+            "paragraph",
+        ]
+    )
+    _out, err = p.communicate(timeout=60)
+    assert p.returncode != 0, err.decode()
+    assert "count:2" not in fail.read_text("utf-8")
