@@ -72,6 +72,35 @@ class TestParseEntries:
         assert entries[0].slug == "beta-slug"
         assert entries[0].date == "2026-05-02"
 
+    def test_parse_entries_tolerates_trailing_previous_count_field(self) -> None:
+        """A heading with an extra `| previous_count:N` field (written by the
+        failure-recurrence dedup path) must still parse — the entry was silently
+        dropped before (parse gap, not a recall gap). memory_md already tolerates it.
+        """
+        from harness_maker.memory_retrieve import parse_entries
+
+        text = _make_fail_file(
+            "## [fail:lint] ruff-format-check | 2026-05-20 | count:3 | previous_count:2\n"
+            "Body one paragraph.\n\n"
+        )
+        entries = parse_entries(text, tier="fail", source_path="/x/failures.md")
+        assert len(entries) == 1
+        assert entries[0].slug == "ruff-format-check"
+        assert entries[0].date == "2026-05-20"
+        assert entries[0].count == 3  # count still captured despite the trailing field
+        assert "Body one paragraph" in entries[0].body
+
+    def test_parse_entries_tolerates_multiple_trailing_fields(self) -> None:
+        """More than one extra trailing field is tolerated (future-proofing)."""
+        from harness_maker.memory_retrieve import parse_entries
+
+        text = _make_fail_file(
+            "## [fail:test] multi | 2026-05-02 | count:5 | previous_count:4 | note:x\nBody.\n\n"
+        )
+        entries = parse_entries(text, tier="fail", source_path="/x/failures.md")
+        assert len(entries) == 1
+        assert entries[0].count == 5
+
     def test_parse_entries_duplicate_slug_both_returned(self) -> None:
         """Parser is permissive — surfaces both with no dedupe, so the wrapup
         duplicate-section bug (failures.md snapshot-regen-inside-worktree) stays visible."""
@@ -87,6 +116,24 @@ class TestParseEntries:
         assert slugs == ["dup-slug", "dup-slug"]
         counts = sorted(e.count for e in entries if e.count is not None)
         assert counts == [4, 6]
+
+    def test_parse_entries_inline_marker_in_body_does_not_truncate(self) -> None:
+        """A body that QUOTES the close-marker string inline must NOT be mistaken
+        for the real (own-line) close marker. Before the line-anchored fix, a plain
+        substring find matched the first inline mention and silently dropped every
+        entry after it (the real `ruff-format` failures vanished this way).
+        """
+        from harness_maker.memory_retrieve import parse_entries
+
+        text = _make_fail_file(
+            "## [fail:render] describes-marker-bug | 2026-06-20 | count:3\n"
+            "A prior wrapup wrote OVER the `<!-- @hm:/user:entries -->` close-marker line.\n\n"
+            "## [fail:lint] later-entry-must-survive | 2026-05-20 | count:2\nBody.\n\n"
+        )
+        entries = parse_entries(text, tier="fail", source_path="/x/failures.md")
+        slugs = [e.slug for e in entries]
+        assert "describes-marker-bug" in slugs
+        assert "later-entry-must-survive" in slugs  # not dropped by the inline mention
 
     def test_parse_entries_malformed_heading_skipped(self) -> None:
         from harness_maker.memory_retrieve import parse_entries

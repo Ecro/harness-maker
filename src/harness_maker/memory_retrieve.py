@@ -35,13 +35,30 @@ _FENCE_CLOSE_NEUTRALIZED = "<\\/memory_candidates>"
 _OPEN_MARKER = "<!-- @hm:user:entries -->"
 _CLOSE_MARKER = "<!-- @hm:/user:entries -->"
 
+# Markers count ONLY when alone on their own line (trailing whitespace allowed).
+# Several failure bodies QUOTE the literal marker string inline while describing
+# past marker-deletion bugs; a plain substring `find` matched the first such inline
+# mention and truncated the block there, SILENTLY dropping every entry after it
+# (observed: the `ruff-format` failures at 137/174 vanished behind a body mention at
+# ~110). Open = first own-line marker; close = LAST own-line marker (the real closer
+# is always last). This is also strictly safer — inline body text can no longer
+# truncate the user-entries block.
+_OPEN_MARKER_RE = re.compile(r"(?m)^" + re.escape(_OPEN_MARKER) + r"[ \t]*$")
+_CLOSE_MARKER_RE = re.compile(r"(?m)^" + re.escape(_CLOSE_MARKER) + r"[ \t]*$")
+
 # Strict 2-hash heading. 3+ hash headings (format drift from 0.15.x) are
 # intentionally not parsed here — that is Approach A follow-up scope.
+# The trailing `(?:\s+\|\s+[^|]+)*` tolerates ANY extra pipe-delimited fields
+# after count — notably `| previous_count:N`, which the failure-recurrence dedup
+# path writes. Without it the whole heading failed to match and the entry was
+# SILENTLY dropped from the candidate pool (worse than a recall miss); memory_md's
+# own parser already tolerates it, so this restores parity. count is still captured.
 _HEADING_RE = re.compile(
     r"^##\s+\[(?P<tier>wiki|fail):(?P<category>[A-Za-z][A-Za-z0-9_-]*)\]\s+"
     r"(?P<slug>[A-Za-z0-9][A-Za-z0-9_-]*)\s+\|\s+"
     r"(?P<date>\d{4}-\d{2}-\d{2})"
     r"(?:\s+\|\s+count:(?P<count>\d+))?"
+    r"(?:\s+\|\s+[^|]+)*"
     r"\s*$"
 )
 
@@ -161,9 +178,13 @@ def parse_entries(text: str, *, tier: str, source_path: str) -> list[MemoryEntry
     Permissive — duplicate slugs are NOT deduplicated. Surfaces both so the
     wrapup duplicate-section bug stays visible (PLAN ADR-006).
     """
-    open_idx = text.find(_OPEN_MARKER)
-    close_idx = text.find(_CLOSE_MARKER)
-    if open_idx < 0 or close_idx < 0 or close_idx < open_idx:
+    open_m = _OPEN_MARKER_RE.search(text)
+    close_ms = list(_CLOSE_MARKER_RE.finditer(text))
+    if open_m is None or not close_ms:
+        return []
+    open_idx = open_m.start()
+    close_idx = close_ms[-1].start()
+    if close_idx < open_idx:
         return []
 
     block_text = text[open_idx + len(_OPEN_MARKER) : close_idx]
