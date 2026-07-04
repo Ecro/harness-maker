@@ -1,6 +1,6 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.36.0
+harness_maker_version: 0.37.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: memory/failures.ko.md.j2
 provenance: official
@@ -15,9 +15,12 @@ provenance: official
 > ```
 > ## [fail:<category>] <slug> | <YYYY-MM-DD> | count:<N>
 > <재현 조건 + 원인 + 해결책 한 단락>
+> - [<YYYY-MM-DD>] <2번째 발생 한 줄 노트>
+> - [<YYYY-MM-DD>] <3번째 발생 한 줄 노트>
 > ```
 > - `category`: import / test / render / hook / lint / type / runtime / design / other
-> - `count`: 동일 실수 반복 시 헤딩만 업데이트 (중복 섹션 금지)
+> - `count`: 동일 실수 반복 시 헤딩만 업데이트 — 같은 slug → count++ (중복 섹션 금지). wrapup 이 기존 slug 를 먼저 검색해 일치하는 것을 재사용하므로 재발이 분산되지 않고 누적됨.
+> - 반복마다 원본 본문 아래에 날짜별 발생 bullet 한 줄이 추가됨 (헤딩의 first-seen date 는 보존) — 따라서 `count:N` 엔트리는 N−1 개의 발생 근거 줄을 담음.
 > - count ≥ 3 이면 wrapup 이 `.claude/memory/pending-proposals.md` 에 개선 제안 추가
 
 ---
