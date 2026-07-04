@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.37.0] - 2026-07-04
+
 ### Fixed — failure-memory recurrence dedup now fires end-to-end
 - **`count++` dedup was structurally dead.** `memory_md._upsert` incremented a failure
   entry's `count` only on an exact-slug match, but `/hm:wrapup` invented a fresh slug each
