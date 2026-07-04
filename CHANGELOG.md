@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+### Added — `memory_retrieve` conservative stemmer raises lexical recall
+- **A failure logged under one wording now surfaces for a differently-worded topic.**
+  `memory_retrieve` scored by raw token-overlap, so inflectional variants (`snapshots` vs
+  `snapshot`, `files` vs `file`) shared zero tokens and a relevant entry could miss the
+  `pre_k=30` candidate set entirely. A conservative, deterministic, pure-Python stemmer
+  (`_stem` + `_normalize`) now normalizes **both** scoring sides; `score_entry`'s signature
+  and single-signal `matched/|topic|` formula are unchanged (it just scores over normalized
+  tokens). No new dependency, no trigram, no ML — recall comes from stemming alone.
+- **Conservatism is the precision guard.** One suffix strip (`-es`/`-s`/`-ing`/`-ed`) behind a
+  `_MIN_STEM_LEN=4` guard, first-match-wins; `-er`/`-tion` excluded (would over-collapse
+  `user→us`, `action→act`). A zero-normalized-overlap entry still scores 0 and is dropped by
+  the existing `s>0` filter — the dominance invariant holds automatically.
+- **`-es` is sibilant-aware** (cross-model REVIEW: Codex + code-reviewer): `-es` strips only
+  after a sibilant (`s`/`x`/`z`/`ch`/`sh`), else it falls through to `-s`. This closes the
+  common `<stem>e`+`s` plural class (`files→file`, `updates→update`, `nodes→node`,
+  `codes→code`, `matches→match`) that a naive `-es`-before-`-s` order foreclosed, while
+  keeping `boxes→box`/`dishes→dish` and correctly routing `-th`/`-ph`/`-gh` verbs
+  (`breathes→breathe`). Existing `test_memory_retrieve.py` stays green unchanged (additive).
+
 ## [0.37.0] - 2026-07-04
 
 ### Fixed — failure-memory recurrence dedup now fires end-to-end

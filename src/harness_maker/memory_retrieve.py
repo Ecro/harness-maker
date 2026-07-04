@@ -18,7 +18,7 @@ import argparse
 import html
 import re
 import sys
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -103,11 +103,56 @@ class MemoryEntry:
     line_offset: int
 
 
+# Conservative inflectional suffixes, tested in this fixed order. The FIRST
+# suffix the token ends with wins: strip it iff the remaining stem is still
+# ≥ _MIN_STEM_LEN chars, else return the token unchanged (no cascade to a
+# WEAKER suffix, no re-stem). -er and -tion are deliberately absent — they
+# over-collapse (user→us, action→act), the single precision risk in a
+# single-signal design (PLAN-memory-retrieve-lexical-recall ADR-003).
+_STEM_SUFFIXES = ("es", "s", "ing", "ed")
+_MIN_STEM_LEN = 4
+# `-es` is a genuine plural suffix only after a sibilant (boxes→box, dishes→dish,
+# matches→match); for an ordinary `<stem>e`+`s` plural (files, updates, nodes, codes)
+# the trailing `e` is part of the stem and only the `s` is inflectional. Without this
+# guard the `-es`-before-`-s` order forecloses those very common bridges (files stays
+# `files`, updates over-stems to `updat`) — a cross-model REVIEW finding (Codex +
+# code-reviewer, 2026-07-04). Falling through to `-s` recovers them while keeping every
+# existing fixture green. Enumerated explicitly (not a bare trailing `h`) so non-sibilant
+# `-th`/`-ph`/`-gh` + `es` words (bathes→bathe) fall through to `-s` instead of over-stemming.
+_ES_SIBILANTS = ("s", "x", "z", "ch", "sh")
+
+
+def _stem(token: str) -> str:
+    """Conservative deterministic stemmer — first-match-wins, min-length guarded.
+
+    Turns inflectional wording variants (snapshots↔snapshot, files↔file) into a
+    shared normalized token so the overlap score surfaces them; that is the whole
+    recall mechanism (ADR-002).
+    """
+    for suffix in _STEM_SUFFIXES:
+        if not token.endswith(suffix):
+            continue
+        # `-es` only fires as a plural after a sibilant; otherwise let `-s` strip
+        # just the trailing `s` (files→file, not files→fil-blocked→files).
+        if suffix == "es" and not token[:-2].endswith(_ES_SIBILANTS):
+            continue
+        stem = token[: -len(suffix)]
+        if len(stem) >= _MIN_STEM_LEN:
+            return stem
+        return token
+    return token
+
+
+def _normalize(tokens: Iterable[str]) -> frozenset[str]:
+    """Map the conservative stemmer over tokens — both scoring sides use this."""
+    return frozenset(_stem(t) for t in tokens)
+
+
 def topic_tokens(topic: str) -> frozenset[str]:
-    """Lowercase + stopword-strip topic tokens. Empty topic → empty frozenset."""
+    """Lowercase + stopword-strip + stem topic tokens. Empty topic → empty frozenset."""
     if not topic:
         return frozenset()
-    return frozenset(t.lower() for t in WORD_RE.findall(topic) if t.lower() not in _STOPWORDS)
+    return _normalize(t.lower() for t in WORD_RE.findall(topic) if t.lower() not in _STOPWORDS)
 
 
 def parse_entries(text: str, *, tier: str, source_path: str) -> list[MemoryEntry]:
@@ -172,7 +217,7 @@ def _entry_token_set(entry: MemoryEntry) -> frozenset[str]:
         entry.body,
     ]
     text = " ".join(parts).lower()
-    return frozenset(WORD_RE.findall(text))
+    return _normalize(WORD_RE.findall(text))
 
 
 def score_entry(entry: MemoryEntry, topic_tokens_set: frozenset[str]) -> float:
