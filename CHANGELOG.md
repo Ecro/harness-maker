@@ -2,6 +2,32 @@
 
 ## [Unreleased]
 
+## [0.37.1] - 2026-07-05
+
+### Added — opt-in `memory_md consolidate` for exact-slug duplicate merge
+- **`memory_md consolidate` merges exact-slug duplicate entries under the per-file flock.**
+  `memory_md`'s upsert fail-closes on `matches>1`, so a lingering exact-slug dup would crash
+  the next wrapup failure-write. `consolidate` folds dups (count = sum, earliest body
+  canonical, later bodies → dated occurrence bullets for failures / concatenated for wiki),
+  all-or-nothing on the marker fold, byte-identical no-op when there are none. Opt-in only —
+  the upsert `matches>1` raise is kept and wrapup never auto-runs it (ADR-003). A k-of-3
+  review (Claude ×2 + Codex) caught a P0 wiki data-loss (a shared bullet-splitter peeling
+  `- [date]` lines off wiki entries) — fixed by scoping the splitter to the failures tier.
+
+### Fixed — memory entries hidden by inline markers + `previous_count` headings
+- **`memory_retrieve` silently dropped a large share of `.claude/memory/{wiki,failures}.md`**
+  (163 → 283 parsed entries in this repo) for two compounding reasons. (1) `parse_entries`
+  located the close marker with a substring `find` = the FIRST `<!-- @hm:/user:entries -->`
+  occurrence; several failure bodies quote that literal marker string inline while describing
+  past marker-deletion bugs, so the block was truncated early and every entry after it (incl.
+  the `ruff-format` failure family) was dropped. Markers are now matched only when alone on
+  their own line (open = first, close = LAST own-line marker) — strictly safer, inline body
+  text can no longer truncate the block. (2) `_HEADING_RE` anchored `\s*$` right after the
+  optional `count` group, so a heading carrying a trailing `| previous_count:N` field (written
+  by the failure-recurrence dedup path) failed to match and the entry was dropped; the regex
+  now tolerates any trailing `| field` segments (count still captured), restoring parity with
+  `memory_md`'s tolerant parser. Reader-only change (`block_merge` untouched).
+
 ### Added — `memory_retrieve` conservative stemmer raises lexical recall
 - **A failure logged under one wording now surfaces for a differently-worded topic.**
   `memory_retrieve` scored by raw token-overlap, so inflectional variants (`snapshots` vs
