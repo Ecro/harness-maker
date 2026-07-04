@@ -54,7 +54,9 @@ MODULES: dict[str, ModuleSpec] = {
         "subparser",
         _s("write", "set-iter-marker", "patch-runtime", "read", "list", "verify"),
     ),
-    "memory_md": ModuleSpec("subparser", _s("append-session", "upsert-wiki", "upsert-failure")),
+    "memory_md": ModuleSpec(
+        "subparser", _s("append-session", "upsert-wiki", "upsert-failure", "consolidate")
+    ),
     "observability.verification_cache": ModuleSpec(
         "subparser", _s("key", "check", "mark-pass", "explain")
     ),

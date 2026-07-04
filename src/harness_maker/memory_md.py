@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import re
 import sys
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -160,6 +161,26 @@ def _collapse_note(text: str) -> str:
     return collapsed
 
 
+def _wiki_heading(category: str, slug: str, today: str) -> str:
+    """Module-level single source for a wiki heading (shared by upsert + consolidate)."""
+    return f"## [wiki:{category}] {slug} | {today}"
+
+
+def _fail_heading(category: str, slug: str, date: str, count: int) -> str:
+    """Module-level single source for a failure heading — MUST byte-match ``_FAILURE_META_RE``.
+
+    Hoisted out of ``_upsert``'s closure so consolidate re-emits headings from the
+    same builder; a drift here would break the next ``upsert-failure`` reparse.
+    """
+    return f"## [fail:{category}] {slug} | {date} | count:{count}"
+
+
+def _entry_span_end(heading_idxs: list[int], start: int, close_idx: int) -> int:
+    """End (exclusive) of the entry headed at ``start``: the next heading, else block close."""
+    later = sorted(i for i in heading_idxs if i > start)
+    return later[0] if later else close_idx
+
+
 def _new_entry_body(
     *, is_failure: bool, body_lines: list[str], occurrence_note: str | None, today: str
 ) -> list[str]:
@@ -209,12 +230,6 @@ def _upsert(
         # `_entry_headings` scan → silent truncation (wiki) or tier DoS (failures).
         raise MemoryBlockError("entry body contains an entry-heading line (`## [tier:slug] …`)")
 
-    def wiki_heading() -> str:
-        return f"## [wiki:{category}] {slug} | {today}"
-
-    def fail_heading(date: str, count: int) -> str:
-        return f"## [fail:{category}] {slug} | {date} | count:{count}"
-
     with exclusive_lock(lock_path):
         text = target_file.read_text(encoding="utf-8") if target_file.exists() else ""
         located = _locate_block(text)
@@ -231,7 +246,11 @@ def _upsert(
             sys.stderr.write(
                 f"[memory_md] WARN: {target_file} has no @hm:user:entries block — creating it\n"
             )
-            heading = fail_heading(today, 1) if is_failure else wiki_heading()
+            heading = (
+                _fail_heading(category, slug, today, 1)
+                if is_failure
+                else _wiki_heading(category, slug, today)
+            )
             seed_body = _new_entry_body(
                 is_failure=is_failure,
                 body_lines=body_lines,
@@ -261,8 +280,7 @@ def _upsert(
 
         if matches:
             start = matches[0]
-            later = sorted(idx for idx, _ in headings if idx > start)
-            end = later[0] if later else close_idx
+            end = _entry_span_end([idx for idx, _ in headings], start, close_idx)
             if is_failure:
                 old_date, old_count = _parse_failure_meta(lines[start])
                 # occurrence-log (ADR-002): preserve the original body + prior
@@ -276,7 +294,7 @@ def _upsert(
                         "empty occurrence note on a matched failure — refusing "
                         "count++ without evidence"
                     )
-                heading = fail_heading(old_date, old_count + 1)
+                heading = _fail_heading(category, slug, old_date, old_count + 1)
                 existing_body = lines[start + 1 : end]
                 new_lines = (
                     lines[:start]
@@ -284,7 +302,7 @@ def _upsert(
                     + lines[end:]
                 )
             else:
-                heading = wiki_heading()
+                heading = _wiki_heading(category, slug, today)
                 new_lines = lines[:start] + [heading, *body_lines] + lines[end:]
         else:
             new_body = _new_entry_body(
@@ -293,7 +311,11 @@ def _upsert(
                 occurrence_note=occurrence_note,
                 today=today,
             )
-            heading = fail_heading(today, 1) if is_failure else wiki_heading()
+            heading = (
+                _fail_heading(category, slug, today, 1)
+                if is_failure
+                else _wiki_heading(category, slug, today)
+            )
             new_lines = lines[:close_idx] + [heading, *new_body] + lines[close_idx:]
 
         atomic_write(target_file, "\n".join(new_lines) + "\n")
@@ -347,6 +369,249 @@ def upsert_failure(
     )
 
 
+# ── consolidate (exact-slug duplicate merge) ─────────────────────────────────
+
+_OCC_BULLET_RE = re.compile(r"^- \[(?P<date>\d{4}-\d{2}-\d{2})\]")
+_WIKI_DATE_RE = re.compile(r"\|\s*(?P<date>\d{4}-\d{2}-\d{2})\s*$")
+
+
+@dataclass(frozen=True)
+class _ParsedEntry:
+    idx: int
+    end: int
+    category: str
+    slug: str
+    date: str
+    count: int | None  # None for wiki
+    body: list[str]
+    bullets: list[str]
+
+
+@dataclass(frozen=True)
+class ConsolidateGroup:
+    """One merged exact-slug duplicate group — a report row."""
+
+    file: str
+    slug: str
+    n_entries: int
+    merged_count: int | None
+    first_seen: str
+
+
+def _strip_trailing_blank(span: list[str]) -> list[str]:
+    """Drop trailing blank separator lines (inter-entry spacing) from a span."""
+    end = len(span)
+    while end > 0 and span[end - 1].strip() == "":
+        end -= 1
+    return span[:end]
+
+
+def _split_body_bullets(span: list[str]) -> tuple[list[str], list[str]]:
+    """Split a FAILURE entry span into (canonical_body, occurrence_bullets).
+
+    Only a TRAILING contiguous run of ``- [YYYY-MM-DD] …`` lines counts as occurrence
+    bullets; everything before is body, kept verbatim — a plain ``- item`` list line
+    inside the body is NOT an occurrence bullet. Trailing blank separator lines are
+    dropped first so they never mask the bullet run. Wiki entries do NOT use this —
+    wiki has no occurrence-bullet convention, so its whole body (incl. any trailing
+    ``- [date]`` line) stays body (P0 fix: peeling bullets off a wiki entry that the
+    wiki merge never re-emits would silently drop those lines).
+    """
+    core = _strip_trailing_blank(span)
+    b = len(core)
+    while b > 0 and _OCC_BULLET_RE.match(core[b - 1]):
+        b -= 1
+    return core[:b], core[b:]
+
+
+def _parse_entries(
+    lines: list[str], open_idx: int, close_idx: int, *, is_failure: bool
+) -> list[_ParsedEntry]:
+    heads = [
+        (i, m)
+        for i in range(open_idx + 1, close_idx)
+        if (m := _HEADING_RE.match(lines[i])) is not None
+    ]
+    idxs = [i for i, _ in heads]
+    out: list[_ParsedEntry] = []
+    for i, m in heads:
+        end = _entry_span_end(idxs, i, close_idx)
+        span = lines[i + 1 : end]
+        date = ""
+        cnt: int | None = None
+        if is_failure:
+            body, bullets = _split_body_bullets(span)
+            # Tolerant: a legacy/hand-edited heading (e.g. a trailing `| previous_count:N`
+            # that fails `_FAILURE_META_RE`) is fine for a SINGLETON — it is copied
+            # verbatim and its count is never read. A dup-group member with unparseable
+            # meta is rejected in `_consolidate_file` (can't merge what we can't parse).
+            try:
+                date, cnt = _parse_failure_meta(lines[i])
+            except MemoryBlockError:
+                date, cnt = "", None
+        else:
+            # Wiki: no occurrence-bullet convention — the WHOLE body (including a
+            # trailing `- [date]` line) is body; bullets is always empty (P0 fix).
+            body, bullets = _strip_trailing_blank(span), []
+            dm = _WIKI_DATE_RE.search(lines[i])
+            date = dm.group("date") if dm else ""
+        out.append(_ParsedEntry(i, end, m.group("cat"), m.group("slug"), date, cnt, body, bullets))
+    return out
+
+
+def _bullet_sort_key(bullet: str) -> str:
+    m = _OCC_BULLET_RE.match(bullet)
+    return m.group("date") if m else ""
+
+
+def _merge_group(members: list[_ParsedEntry], *, is_failure: bool, today: str) -> list[str]:
+    """Merge one exact-slug group into a single entry's lines (heading + body + trailer)."""
+    # An undated member (empty date — only reachable for wiki; failures reject it) sorts
+    # LAST so a real-dated member becomes canonical and carries the real first-seen date.
+    members = sorted(members, key=lambda e: e.date or "9999-99-99")
+    canonical = members[0]
+    cats = {m.category for m in members}
+    if is_failure:
+        counts = [m.count if m.count is not None else 0 for m in members]
+        merged_count = sum(counts)
+        bullets: list[str] = []
+        for m in members:
+            bullets.extend(m.bullets)
+        for m in members[1:]:
+            folded = _collapse_note(" ".join(m.body))  # raises on a marker string → all-or-nothing
+            if folded:
+                bullets.append(f"- [{m.date}] {folded}")
+        note = (
+            f"consolidated {len(members)} duplicate entries "
+            f"(counts {'+'.join(str(c) for c in counts)} = {merged_count})"
+        )
+        if len(cats) > 1:
+            note += f"; mixed categories {sorted(cats)}, kept {canonical.category!r}"
+        bullets.append(f"- [{today}] {note}")
+        bullets.sort(key=_bullet_sort_key)  # stable → chronological
+        heading = _fail_heading(canonical.category, canonical.slug, canonical.date, merged_count)
+        return [heading, *canonical.body, *bullets, ""]
+
+    # wiki — no count, no bullets: concatenate later bodies into the canonical paragraph
+    body = list(canonical.body)
+    for m in members[1:]:
+        if any(ln.strip() for ln in m.body):
+            body.extend(["", *m.body])
+    if len(cats) > 1:
+        body.extend(
+            ["", f"(consolidated: mixed categories {sorted(cats)}, kept {canonical.category!r})"]
+        )
+    # `canonical.date or today`: a dateless wiki dup member would otherwise render a
+    # dangling `## [wiki:cat] slug | ` trailer (Codex/code-reviewer finding).
+    heading = _wiki_heading(canonical.category, canonical.slug, canonical.date or today)
+    return [heading, *body, ""]
+
+
+def _consolidate_file(
+    target_file: Path,
+    lock_path: Path,
+    *,
+    file_label: str,
+    is_failure: bool,
+    today: str,
+    dry_run: bool,
+) -> list[ConsolidateGroup]:
+    with exclusive_lock(lock_path):
+        if not target_file.exists():
+            return []
+        located = _locate_block(target_file.read_text(encoding="utf-8"))
+        if located is None:
+            return []
+        lines, open_idx, close_idx = located
+        entries = _parse_entries(lines, open_idx, close_idx, is_failure=is_failure)
+        order: list[str] = []
+        by_slug: dict[str, list[_ParsedEntry]] = {}
+        for e in entries:
+            by_slug.setdefault(e.slug, [])
+            if len(by_slug[e.slug]) == 0:
+                order.append(e.slug)
+            by_slug[e.slug].append(e)
+        dup_slugs = [s for s in order if len(by_slug[s]) > 1]
+        if not dup_slugs:
+            return []  # no exact dups → byte-identical no-op (never writes)
+
+        # A dup-group member must have clean, parseable meta to merge safely (a
+        # singleton with legacy meta is tolerated — it is copied verbatim, not merged).
+        if is_failure:
+            for s in dup_slugs:
+                bad = [m for m in by_slug[s] if m.count is None or not m.date]
+                if bad:
+                    raise MemoryBlockError(
+                        f"duplicate slug {s!r} has an unparseable failure heading "
+                        f"(line {bad[0].idx + 1}) — fix its `| <date> | count:<N>` meta first"
+                    )
+
+        # Rebuild the entries region: singleton spans verbatim, dup groups merged at
+        # the earliest member's position. _merge_group may raise (marker fold) BEFORE
+        # any write → all-or-nothing.
+        region: list[str] = list(lines[open_idx + 1 : entries[0].idx])
+        for slug in order:
+            members = by_slug[slug]
+            if len(members) == 1:
+                e = members[0]
+                region.extend(lines[e.idx : e.end])
+            else:
+                region.extend(_merge_group(members, is_failure=is_failure, today=today))
+        new_lines = lines[: open_idx + 1] + region + lines[close_idx:]
+
+        groups = [
+            ConsolidateGroup(
+                file=file_label,
+                slug=s,
+                n_entries=len(by_slug[s]),
+                merged_count=(sum((m.count or 0) for m in by_slug[s]) if is_failure else None),
+                # ignore undated (empty) members so first_seen matches the real canonical date
+                first_seen=min((m.date for m in by_slug[s] if m.date), default=""),
+            )
+            for s in dup_slugs
+        ]
+        if not dry_run:
+            atomic_write(target_file, "\n".join(new_lines) + "\n")
+        return groups
+
+
+def consolidate(
+    root: Path | str,
+    *,
+    which: str = "both",
+    dry_run: bool = False,
+    today: str | None = None,
+) -> list[ConsolidateGroup]:
+    """Merge exact-slug duplicate entries in the failures/wiki tiers under the lock.
+
+    Opt-in maintenance (never wrapup-auto). Failures: count=sum, earliest body
+    canonical, later bodies fold to dated occurrence bullets, all-or-nothing on a
+    marker-string fold. Wiki: bodies concatenate. The no-dup case never writes.
+
+    All-or-nothing is **per file**: with ``which="both"`` failures is processed
+    first, so an OSError on the wiki write (after failures already wrote) leaves
+    failures.md updated + wiki.md unchanged. Each file is individually consistent
+    (atomic_write); there is no cross-file transaction.
+    """
+    today = today or _utcnow().strftime("%Y-%m-%d")
+    md = _memory_dir(root)
+    targets: list[tuple[str, Path, Path, bool]] = []
+    if which in ("failures", "both"):
+        targets.append(("failures", md / "failures.md", failures_lock_path(root), True))
+    if which in ("wiki", "both"):
+        targets.append(("wiki", md / "wiki.md", wiki_lock_path(root), False))
+    if not targets:
+        raise MemoryBlockError(f"invalid --file {which!r} (expected failures|wiki|both)")
+    out: list[ConsolidateGroup] = []
+    for label, target, lock, is_fail in targets:
+        out.extend(
+            _consolidate_file(
+                target, lock, file_label=label, is_failure=is_fail, today=today, dry_run=dry_run
+            )
+        )
+    return out
+
+
 # ── CLI ──────────────────────────────────────────────────────────────────────
 
 
@@ -389,6 +654,14 @@ def _build_parser() -> argparse.ArgumentParser:
         help="On a matched slug, append this one-line dated occurrence (count++).",
     )
 
+    c = sub.add_parser(
+        "consolidate", help="Merge exact-slug duplicate entries (opt-in maintenance)."
+    )
+    c.add_argument("--root", default=".", type=Path)
+    c.add_argument("--file", choices=("failures", "wiki", "both"), default="both", dest="which")
+    c.add_argument("--today", default=None, help="YYYY-MM-DD (deterministic date).")
+    c.add_argument("--dry-run", action="store_true")
+
     return p
 
 
@@ -398,6 +671,21 @@ def main(argv: list[str] | None = None) -> int:
         return _guard
     args = _build_parser().parse_args(argv)
     try:
+        if args.cmd == "consolidate":
+            groups = consolidate(
+                args.root, which=args.which, dry_run=args.dry_run, today=args.today
+            )
+            for g in groups:
+                meta = f"count:{g.merged_count}, " if g.merged_count is not None else ""
+                sys.stdout.write(
+                    f"{g.file} {g.slug}: {g.n_entries} entries -> {meta}first-seen {g.first_seen}\n"
+                )
+            collapsed = sum(g.n_entries for g in groups) - len(groups)
+            tail = " (dry-run)" if args.dry_run else ""
+            sys.stdout.write(
+                f"consolidate: {len(groups)} group(s), {collapsed} entries collapsed{tail}\n"
+            )
+            return 0
         # For upsert-failure with --occurrence-note, the note is the payload — do
         # NOT read stdin (that would block when no body/--body-file is supplied).
         occ = getattr(args, "occurrence_note", None)
