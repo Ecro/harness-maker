@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.38.0] - 2026-07-09
+
 ### Added — multi-model cross-model second opinion (`second_opinion.models`)
 - **`harness.yaml.codex_second_opinion` generalized to `second_opinion` with
   `models: list[Literal["codex","antigravity"]]`** (PLAN-second-opinion-multi-model). Codex CLI
