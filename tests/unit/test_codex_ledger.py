@@ -1,4 +1,10 @@
-"""Phase 1 — Codex second-opinion calibration ledger (PLAN-crossmodel-codex-gaps ADR-005)."""
+"""Phase 1 — second-opinion calibration ledger (PLAN-crossmodel-codex-gaps ADR-005,
+generalized to multi-vendor by PLAN-second-opinion-multi-model ADR-005).
+
+Model-field default + legacy-forward-copy behavior are covered by the sibling
+``test_second_opinion_ledger.py`` — this file keeps the remaining record-shape,
+enum, CLI, and schema-parity assertions that file doesn't duplicate.
+"""
 
 from __future__ import annotations
 
@@ -18,7 +24,7 @@ def _valid_invoked() -> dict[str, object]:
         "stage": "review",
         "finding_ref": "src/foo.py:42",
         "disposition": "accepted",
-        "codex_status": "invoked",
+        "status": "invoked",
         "skip_reason": None,
         "oracle_result": None,
         "later_regression_link": None,
@@ -32,7 +38,7 @@ def _valid_skipped() -> dict[str, object]:
         "stage": "plan",
         "finding_ref": "n/a",
         "disposition": "unresolved",
-        "codex_status": "skipped",
+        "status": "skipped",
         "skip_reason": "codex exec Bash denied by sandbox",
         "oracle_result": None,
         "later_regression_link": None,
@@ -42,12 +48,12 @@ def _valid_skipped() -> dict[str, object]:
 def test_emit_appends_valid_row(tmp_path: Path) -> None:
     rec = codex_ledger.record_from_dict(_valid_invoked(), auto_timestamp=False)
     path = codex_ledger.emit(rec, project_root=tmp_path)
-    assert path.name == "codex-second-opinion.jsonl"
+    assert path.name == "second-opinion.jsonl"
     lines = path.read_text(encoding="utf-8").strip().splitlines()
     assert len(lines) == 1
     row = json.loads(lines[0])
     assert row["disposition"] == "accepted"
-    assert row["codex_status"] == "invoked"
+    assert row["status"] == "invoked"
     assert row["stage"] == "review"
 
 
@@ -55,13 +61,13 @@ def test_emit_is_append_only(tmp_path: Path) -> None:
     rec = codex_ledger.record_from_dict(_valid_invoked(), auto_timestamp=False)
     codex_ledger.emit(rec, project_root=tmp_path)
     codex_ledger.emit(rec, project_root=tmp_path)
-    path = tmp_path / ".claude" / "observability" / "codex-second-opinion.jsonl"
+    path = tmp_path / ".claude" / "observability" / "second-opinion.jsonl"
     assert len(path.read_text(encoding="utf-8").strip().splitlines()) == 2
 
 
-def test_codex_status_enum_rejects_unknown() -> None:
+def test_status_enum_rejects_unknown() -> None:
     bad = _valid_invoked()
-    bad["codex_status"] = "maybe"
+    bad["status"] = "maybe"
     with pytest.raises(ValidationError):
         codex_ledger.record_from_dict(bad, auto_timestamp=False)
 
@@ -92,7 +98,7 @@ def test_nullable_optionals_default_none() -> None:
         "stage": "review",
         "finding_ref": "a.py:1",
         "disposition": "rejected",
-        "codex_status": "invoked",
+        "status": "invoked",
     }
     rec = codex_ledger.record_from_dict(minimal, auto_timestamp=False)
     assert rec.skip_reason is None
@@ -122,11 +128,11 @@ def test_json_schema_matches_model_fields() -> None:
         / "harness_maker"
         / "templates"
         / "schemas"
-        / "codex-ledger.schema.json"
+        / "second-opinion-ledger.schema.json"
     )
     schema = json.loads(schema_path.read_text(encoding="utf-8"))
     schema_props = set(schema["properties"])
-    model_fields = set(codex_ledger.CodexSecondOpinionRecord.model_fields)
+    model_fields = set(codex_ledger.SecondOpinionRecord.model_fields)
     assert schema_props == model_fields
 
 
@@ -140,7 +146,7 @@ def test_cli_emit_roundtrip(
     rc = codex_ledger.main(["emit"])
     assert rc == 0
     out = capsys.readouterr().out.strip()
-    assert out.endswith("codex-second-opinion.jsonl")
+    assert out.endswith("second-opinion.jsonl")
 
 
 def test_cli_emit_from_args_is_injection_safe(
@@ -160,17 +166,17 @@ def test_cli_emit_from_args_is_injection_safe(
             "n/a",
             "--disposition",
             "unresolved",
-            "--codex-status",
+            "--status",
             "skipped",
             "--skip-reason",
             "codex exited; reason had a ' quote and ; semicolon",
         ]
     )
     assert rc == 0
-    path = tmp_path / ".claude" / "observability" / "codex-second-opinion.jsonl"
+    path = tmp_path / ".claude" / "observability" / "second-opinion.jsonl"
     row = json.loads(path.read_text(encoding="utf-8").strip())
     assert row["skip_reason"] == "codex exited; reason had a ' quote and ; semicolon"
-    assert row["codex_status"] == "skipped"
+    assert row["status"] == "skipped"
 
 
 def test_cli_emit_args_reject_bad_enum(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -185,7 +191,7 @@ def test_cli_emit_args_reject_bad_enum(monkeypatch: pytest.MonkeyPatch) -> None:
             "a",
             "--disposition",
             "accepted",
-            "--codex-status",
+            "--status",
             "invoked",
         ]
     )

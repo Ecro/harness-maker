@@ -437,34 +437,22 @@ class FeedbackConfig(BaseModel):
     enabled: bool = False
 
 
-class CodexSecondOpinionConfig(BaseModel):
-    """Claude→Codex second-LLM routing (PLAN-codex-second-llm-integration).
+SECOND_OPINION_MODELS = ("codex", "antigravity")
 
-    Default off. When ``enabled=True``, the allow-listed reviewer agents
-    (``agents``) receive a ``Bash(codex exec:*)`` permission line and a
-    rendered second-opinion section in their body. Calls are hermetic
-    (``--ignore-user-config --ignore-rules``) by default to keep second
-    opinions reproducible across machines (ADR-006).
 
-    PLAN-codex-mandatory-second-opinion: ``enabled=True`` makes the Codex
-    call *mandatory* for ``plan-validator`` (MAY→MUST) — it must invoke
-    Codex and reconcile every finding in its output. code-reviewer and
-    consensus-arbiter keep the opt-in MAY behavior for now (their array
-    output needs pipeline-preserving handling — deferred to a follow-up
-    PLAN). Failures degrade via ``failure_policy`` (ADR-003 —
-    warn-and-proceed, made loud for plan-validator: the skip is surfaced
-    rather than silent).
+class SecondOpinionCodexConfig(BaseModel):
+    """Codex-specific second-opinion knobs (PLAN-second-opinion-multi-model ADR-002).
+
+    ``hermetic`` maps to ``codex exec --ignore-user-config --ignore-rules`` (ADR-006
+    reproducibility). ``output_schema_path`` is the ``--output-schema`` argument. Both
+    are Codex-only — antigravity has no equivalent flags, so they live in this sub-block
+    rather than at the top level (avoids the silent-no-op footgun for antigravity).
     """
 
     model_config = ConfigDict(strict=True, extra="forbid")
 
-    enabled: bool = False
-    agents: list[str] = Field(
-        default_factory=lambda: ["code-reviewer", "consensus-arbiter", "plan-validator"],
-    )
-    failure_policy: Literal["warn-and-proceed"] = "warn-and-proceed"
     hermetic: bool = True
-    output_schema_path: str = ".claude/schemas/codex-finding.schema.json"
+    output_schema_path: str = ".claude/schemas/second-opinion-finding.schema.json"
 
     @field_validator("output_schema_path")
     @classmethod
@@ -491,6 +479,79 @@ class CodexSecondOpinionConfig(BaseModel):
         return v
 
 
+class SecondOpinionAntigravityConfig(BaseModel):
+    """Antigravity-specific second-opinion knobs (PLAN-second-opinion-multi-model ADR-002/007).
+
+    ``model`` is the ``agy --model`` argument — a free-text display name (e.g.
+    "Gemini 3.1 Pro (High)"), NOT a closed enum, because ``agy models`` returns unstable
+    display strings with no machine IDs (ADR-007). Interview-time resolution offers a live
+    list; render never re-shells (determinism). Validated only against shell-injection
+    metacharacters, not against a fixed list.
+    """
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    model: str = "Gemini 3.1 Pro (High)"
+
+    @field_validator("model")
+    @classmethod
+    def _validate_model(cls, v: str) -> str:
+        """Reject shell-significant characters — the value flows into the rendered
+        ``agy --model "<model>"`` Bash recipe (parens/spaces are legitimate; quotes,
+        command-substitution, and control chars are not)."""
+        if not v.strip():
+            raise ValueError("antigravity model must not be empty")
+        if any(c in v for c in "`$;|&\"'\n\r\\"):
+            raise ValueError(f"antigravity model contains shell-significant characters: {v!r}")
+        return v
+
+
+class SecondOpinionConfig(BaseModel):
+    """Multi-vendor cross-model second-opinion routing (PLAN-second-opinion-multi-model).
+
+    Supersedes the single-vendor ``codex_second_opinion`` block. ``models`` is the enabled
+    set (empty = feature off); when non-empty, the allow-listed reviewer agents (``agents``,
+    a GLOBAL allowlist applied identically to every enabled model — ADR-002) receive a
+    ``Bash(<cli>:*)`` permission line and a rendered second-opinion section per model.
+
+    Each enabled model runs under the mandatory matrix (Production = every validation/review;
+    Side = high-diff-gated) uniformly (ADR-003). Failures degrade via ``failure_policy``
+    (warn-and-proceed): a missing/removed CLI, a rate-limit/subscription error, a timeout, or
+    unparseable output all route to a ledger skip/failed row and the stage proceeds
+    (ADR-011 fail-closed adapter). Per-model knobs live in the ``codex`` / ``antigravity``
+    sub-blocks so vendor-specific flags never silently no-op on the other vendor.
+    """
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    models: list[Literal["codex", "antigravity"]] = Field(default_factory=list)
+    agents: list[str] = Field(
+        default_factory=lambda: ["code-reviewer", "consensus-arbiter", "plan-validator"],
+    )
+    failure_policy: Literal["warn-and-proceed"] = "warn-and-proceed"
+    codex: SecondOpinionCodexConfig = Field(default_factory=SecondOpinionCodexConfig)
+    antigravity: SecondOpinionAntigravityConfig = Field(
+        default_factory=SecondOpinionAntigravityConfig
+    )
+
+    @field_validator("models")
+    @classmethod
+    def _dedupe_models(cls, v: list[str]) -> list[str]:
+        """De-duplicate, order-preserving — a repeated model is a config typo, not two votes."""
+        seen: set[str] = set()
+        out: list[str] = []
+        for m in v:
+            if m not in seen:
+                seen.add(m)
+                out.append(m)
+        return out
+
+    @property
+    def enabled(self) -> bool:
+        """True when at least one second-opinion model is configured (feature on)."""
+        return bool(self.models)
+
+
 _GIT_ARGV_FORBIDDEN = set("`$();|&\"'\n\r\\ \t")
 
 # git's extended-revision operators — rejected ONLY for values used in a
@@ -509,7 +570,7 @@ def _validate_git_argv_value(v: str, *, field: str) -> str:
     delivery_metrics string fields flow into git argv (never a shell), so the
     threat is option injection (leading ``-``), traversal, and defense-in-depth
     against a later caller quoting mistake — same posture as
-    ``CodexSecondOpinionConfig.output_schema_path``. fnmatch glob chars
+    ``SecondOpinionCodexConfig.output_schema_path``. fnmatch glob chars
     (``* ? [ ]``) stay allowed: they are the point of a tag pattern. Callers in a
     *revision* context additionally pass ``forbid_revspec=True`` (see
     ``_validate_default_branch``).
@@ -863,19 +924,20 @@ class HarnessConfig(BaseModel):
     # default_factory keeps old harness.yaml without `feedback:` key loading;
     # `enabled: false` ⇒ dispatcher conditional is dead branch (zero IO).
     feedback: FeedbackConfig = Field(default_factory=FeedbackConfig)
-    # Codex as second-LLM (PLAN-codex-second-llm-integration ADRs-001/002/009).
-    # default_factory keeps legacy harness.yaml loading; `enabled: false` keeps
-    # Jinja conditionals in agent templates as dead branches (zero render impact).
-    codex_second_opinion: CodexSecondOpinionConfig = Field(
-        default_factory=CodexSecondOpinionConfig,
+    # Multi-vendor second opinions (PLAN-second-opinion-multi-model — supersedes the
+    # single-vendor codex_second_opinion block). default_factory keeps legacy harness.yaml
+    # loading; empty `models` keeps Jinja conditionals in templates as dead branches.
+    second_opinion: SecondOpinionConfig = Field(
+        default_factory=SecondOpinionConfig,
     )
     # Opt-in git delivery metrics (PLAN-cfr-churn-metrics ADR-003).
     # default_factory keeps legacy harness.yaml loading; `enabled: false`
     # renders no /hm:metrics command and performs zero writes (SPEC AC-008/009).
     delivery_metrics: DeliveryMetricsConfig = Field(default_factory=DeliveryMetricsConfig)
     # ADR-011: schema_version bumped 1 → 2 for the agent_models/default_model
-    # rename. ADR-004 silent migration handles existing v1 harness.yaml.
-    schema_version: int = 2
+    # rename. PLAN-second-opinion-multi-model ADR-001: bumped 2 → 3 for the
+    # codex_second_opinion → second_opinion rename (silent migration in interview.py).
+    schema_version: int = 3
     # 0.16.0: deep_gate redesigned as 5-term inequality (PLAN-deep-interview-question-criteria).
     # Default literal lives in `interview_deep_gate_defaults()` at module bottom —
     # also consumed by `harness_maker.interview._preset_extras` to avoid 3-way drift.
@@ -1044,7 +1106,7 @@ class InterviewAnswers(BaseModel):
             "main_loop": {"max_rounds": None},
         }
     )
-    schema_version: int = 2
+    schema_version: int = 3
     sibling_repos: list[str] = Field(default_factory=list)
     # Paths to additional documents that wrapup should update/manage.
     # User specifies via --wrapup-docs or /hm:configure. Examples:
@@ -1054,14 +1116,14 @@ class InterviewAnswers(BaseModel):
     # default_factory mirrors HarnessConfig default (enabled=false). Survives
     # answers_from_harness_yaml round-trip per CLAUDE.md checkpoint 6.
     feedback: FeedbackConfig = Field(default_factory=FeedbackConfig)
-    # Mirror of HarnessConfig.codex_second_opinion (PLAN-codex-second-llm-integration
-    # ADR-005 P-W2: validator P0#3 — InterviewAnswers extra='forbid' would reject
-    # the key without this declaration on round-trip).
-    codex_second_opinion: CodexSecondOpinionConfig = Field(
-        default_factory=CodexSecondOpinionConfig,
+    # Mirror of HarnessConfig.second_opinion (PLAN-second-opinion-multi-model —
+    # supersedes codex_second_opinion). InterviewAnswers extra='forbid' would reject
+    # the key without this declaration on round-trip.
+    second_opinion: SecondOpinionConfig = Field(
+        default_factory=SecondOpinionConfig,
     )
     # Mirror of HarnessConfig.delivery_metrics (PLAN-cfr-churn-metrics ADR-003)
-    # — same round-trip contract as feedback/codex_second_opinion above.
+    # — same round-trip contract as feedback/second_opinion above.
     delivery_metrics: DeliveryMetricsConfig = Field(default_factory=DeliveryMetricsConfig)
 
     @field_validator("sibling_repos", mode="before")

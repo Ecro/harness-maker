@@ -16,8 +16,8 @@ from harness_maker.render import DEFAULT_FREEZE_TIME, _is_schemas_json, render
 
 def test_is_schemas_json_predicate_matches_dot_claude_schemas() -> None:
     fe = FileEntry(
-        path=Path("schemas/codex-finding.schema.json"),
-        template="schemas/codex-finding.schema.json",
+        path=Path("schemas/second-opinion-finding.schema.json"),
+        template="schemas/second-opinion-finding.schema.json",
     )
     assert _is_schemas_json(fe) is True
 
@@ -49,8 +49,8 @@ def test_dispatch_routes_schemas_to_pure_json(tmp_path: Path) -> None:
     this test fails (frontmatter prefix appears).
     """
     fe = FileEntry(
-        path=Path("schemas/codex-finding.schema.json"),
-        template="schemas/codex-finding.schema.json",
+        path=Path("schemas/second-opinion-finding.schema.json"),
+        template="schemas/second-opinion-finding.schema.json",
     )
     bp = Blueprint(files=[fe])
     written = render(bp, tmp_path, freeze_time=DEFAULT_FREEZE_TIME)

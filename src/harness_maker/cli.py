@@ -191,6 +191,31 @@ def make(
         "--second-brain-project-id",
         help="kebab-case project id for Second Brain namespace isolation.",
     ),
+    second_opinion_models_override: str | None = typer.Option(
+        None,
+        "--second-opinion-models",
+        help=(
+            "Comma-separated cross-model second-opinion CLIs: 'codex', 'antigravity', "
+            "or 'codex,antigravity'. Empty string '' disables. Unknown model names are "
+            "an error; duplicates are de-duplicated. Omitted → leave existing value."
+        ),
+    ),
+    autonomy_level_override: str | None = typer.Option(
+        None,
+        "--autonomy-level",
+        help=(
+            "Autopilot auto-advance level: gated | auto_safe | full. Setting this alone "
+            "enables autopilot (persistence defaults off). Omitted → leave existing value."
+        ),
+    ),
+    autonomy_persistent_override: bool | None = typer.Option(
+        None,
+        "--autonomy-persistent/--no-autonomy-persistent",
+        help=(
+            "Re-arm the autopilot marker each session (persist across sessions). "
+            "Omitted → leave existing value."
+        ),
+    ),
     dry_run: bool = typer.Option(
         False,
         "--dry-run",
@@ -336,6 +361,9 @@ def make(
         sibling_repos_override=sibling_repos_override,
         second_brain_vault_path=second_brain_vault_path,
         second_brain_project_id=second_brain_project_id,
+        second_opinion_models_override=second_opinion_models_override,
+        autonomy_level_override=autonomy_level_override,
+        autonomy_persistent_override=autonomy_persistent_override,
     )
     if add_domain_name is not None:
         try:
@@ -1055,6 +1083,9 @@ def _apply_dimension_overrides(
     sibling_repos_override: str | None = None,
     second_brain_vault_path: str | None = None,
     second_brain_project_id: str | None = None,
+    second_opinion_models_override: str | None = None,
+    autonomy_level_override: str | None = None,
+    autonomy_persistent_override: bool | None = None,
 ) -> InterviewAnswers:
     """Apply per-dimension CLI overrides on top of the answers.
 
@@ -1159,6 +1190,15 @@ def _apply_dimension_overrides(
             folders=list(existing.folders),
         )
 
+    if second_opinion_models_override is not None:
+        update["second_opinion"] = _build_second_opinion_override(
+            second_opinion_models_override, answers.second_opinion
+        )
+    if autonomy_level_override is not None or autonomy_persistent_override is not None:
+        update["autonomy"] = _build_autonomy_override(
+            autonomy_level_override, autonomy_persistent_override, answers.autonomy
+        )
+
     if preset_override:
         try:
             new_preset = Preset(preset_override)
@@ -1210,6 +1250,83 @@ def _apply_dimension_overrides(
                 update={"reviewers": {**result.reviewers, "enabled": enabled}}
             )
     return result
+
+
+def _build_second_opinion_override(raw: str, existing: object) -> object:
+    """Build a SecondOpinionConfig from --second-opinion-models (ADR-009/010).
+
+    Empty string → models=[] (disabled). Unknown model name → typer.Exit(1). Duplicates are
+    de-duplicated. Per-model sub-configs + the reviewer allowlist are preserved from `existing`.
+    A selected model whose CLI is not on PATH triggers a loud, non-blocking warning (ADR-010).
+    """
+    import shutil
+
+    from harness_maker.models import SECOND_OPINION_MODELS, SecondOpinionConfig
+
+    requested = [m.strip() for m in raw.split(",") if m.strip()]
+    seen: set[str] = set()
+    models: list[str] = []
+    for m in requested:
+        if m not in SECOND_OPINION_MODELS:
+            valid = ", ".join(SECOND_OPINION_MODELS)
+            typer.echo(f"--second-opinion-models invalid: {m!r} (valid: {valid})", err=True)
+            raise typer.Exit(code=1)
+        if m not in seen:
+            seen.add(m)
+            models.append(m)
+    # Presence check (ADR-010) — warn-only, never blocks.
+    _cli_for = {"codex": "codex", "antigravity": "agy"}
+    for m in models:
+        if shutil.which(_cli_for[m]) is None:
+            typer.echo(
+                f"[warn] second-opinion model {m!r} enabled but its CLI "
+                f"({_cli_for[m]!r}) is not on PATH — it will degrade to a graceful "
+                f"skip at review/plan time until installed/authenticated.",
+                err=True,
+            )
+    # Preserve the existing agents allowlist + per-model sub-configs.
+    if isinstance(existing, SecondOpinionConfig):
+        return SecondOpinionConfig(
+            models=models,  # type: ignore[arg-type]
+            agents=list(existing.agents),
+            failure_policy=existing.failure_policy,
+            codex=existing.codex,
+            antigravity=existing.antigravity,
+        )
+    return SecondOpinionConfig(models=models)  # type: ignore[arg-type]
+
+
+def _build_autonomy_override(
+    level: str | None, persistent: bool | None, existing: object
+) -> object:
+    """Build an AutonomyConfig from --autonomy-level / --autonomy-persistent (ADR-009).
+
+    `--autonomy-level` alone enables autopilot (persistence defaults off unless explicitly set).
+    An invalid level → typer.Exit(1). Fields not overridden are preserved from `existing`.
+    """
+    from harness_maker.models import AutonomyConfig
+
+    valid_levels = ("gated", "auto_safe", "full")
+    if level is not None and level not in valid_levels:
+        typer.echo(
+            f"--autonomy-level invalid: {level!r} (valid: {', '.join(valid_levels)})",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+    base = existing if isinstance(existing, AutonomyConfig) else AutonomyConfig()
+    new_level = level if level is not None else base.level
+    new_persistent = persistent if persistent is not None else base.autopilot_persistent
+    # Preserve EVERY non-overridden field (review P1): `pipeline` is user-customizable and
+    # `extra_deny` is a security-relevant additive deny baseline — dropping either silently
+    # resets user config / subtracts a guard.
+    return AutonomyConfig(
+        level=new_level,  # type: ignore[arg-type]
+        pipeline=list(base.pipeline),
+        step_cap=base.step_cap,
+        time_cap_min=base.time_cap_min,
+        extra_deny=list(base.extra_deny),
+        autopilot_persistent=new_persistent,
+    )
 
 
 def _parse_ref_folders_flag(raw: str) -> list[object]:

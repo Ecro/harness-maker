@@ -507,43 +507,47 @@ After the gate PASSes (or user accepts ambiguity), continue to next round UNLESS
 ### Step 4 — Plan validation (`plan-validator` agent)
 
 After the internal plan is complete (interview done, draft synthesized), invoke the `plan-validator` agent to critique it before writing to disk:
-{% if config.codex_second_opinion.enabled %}
-**Step 4 (pre) — main-loop Codex second opinion (ADR-002/005, PLAN-codex-second-opinion-sandbox).**
-The **main loop** (this stage prompt) runs Codex — the `plan-validator` agent is tool-restricted
-(`Read, Grep, Glob`, no Bash) and cannot. The main loop runs `codex exec`, decides
-invoked-vs-skipped + the skip reason, adapts the findings, and **injects** them into the
-`plan-validator` Task() prompt below. The agent then *reconciles* the pre-injected findings and
-echoes the main-loop-supplied `codex_status` — it never runs Codex itself.
+{% if config.second_opinion.models %}
+**Step 4 (pre) — main-loop cross-model second opinion (ADR-002/005/011, PLAN-second-opinion-multi-model).**
+The **main loop** (this stage prompt) runs each enabled second-opinion model — the
+`plan-validator` agent is tool-restricted (`Read, Grep, Glob`, no Bash) and cannot. For every
+model in `second_opinion.models` ({{ config.second_opinion.models | join(', ') }}) the main loop
+runs the CLI, decides invoked-vs-skipped + the skip reason, adapts the findings, and **injects**
+them into the `plan-validator` Task() prompt below. The agent then *reconciles* the pre-injected
+findings and echoes the main-loop-supplied per-model status — it never runs any CLI itself.
 
-**Mandatory gate (ADR-002/003 matrix):**
+**Mandatory gate (ADR-003 matrix — applies uniformly to EVERY enabled model):**
 {% if config.preset == 'Production' -%}
-- Production preset → run Codex on **every** plan validation (no high-diff gate).
+- Production preset → run **every** enabled model on **every** plan validation (no high-diff gate).
 {%- else -%}
-- Side preset → run Codex only on a **high-diff** change. Classify the drafted PLAN's blast
-  radius first — note `HEAD` (staged work) and `--numstat` for the added-line count that drives
-  the `boundary` signal:
+- Side preset → run **every** enabled model only on a **high-diff** change. Classify the drafted
+  PLAN's blast radius first — note `HEAD` (staged work) and `--numstat` for the added-line count
+  that drives the `boundary` signal:
   ```bash
   files=$(git diff --name-only HEAD); added=$(git diff --numstat HEAD | awk '{s+=$1} END{print s+0}'); printf '%s\n' "$files" | uv run --with {{ harness_maker_src_path }} python -m harness_maker.high_diff classify --added-lines "$added"
   ```
-  Run Codex when `is_high` (or `boundary` and your judgment says high). Otherwise skip — inject
-  empty findings, `codex_status: "skipped"`, `codex_reconciliation: []`.
+  Run each model when `is_high` (or `boundary` and your judgment says high). Otherwise skip all —
+  inject empty findings and a `skipped` entry per model in `second_opinion_results`.
 {%- endif %}
 
-{% set codex_stage = "plan" %}{% include "agents/_partials/codex_exec_mainloop.md.j2" %}
+{% set second_opinion_stage = "plan" %}{% include "agents/_partials/second_opinion_dispatch.md.j2" %}
 
-**Ownership contract (ADR-005):**
+**Ownership contract (ADR-005/011):**
 
 | Owner | Responsibility |
 |-------|----------------|
-| Main loop (this prompt) | Run `codex exec`; decide invoked-vs-skipped + `codex_skip_reason`; adapt findings; inject findings + `codex_status` + `codex_skip_reason` into the validator Task() prompt. |
-| `plan-validator` agent | Reconcile the **pre-injected** findings (no Bash, no `codex exec`); emit `codex_status` (echo the main-loop value) + `codex_reconciliation` in its JSON. |
-| On skip | Injected findings empty → agent returns `codex_status: "skipped"`, `codex_reconciliation: []`. |
+| Main loop (this prompt) | Run each enabled model's CLI; decide invoked/skipped/failed + skip reason per model; adapt findings; inject findings + a per-model `second_opinion_results` entry into the validator Task() prompt. |
+| `plan-validator` agent | Reconcile the **pre-injected** findings (no Bash, no CLI); emit `second_opinion_results` (echo the main-loop per-model status) in its JSON. |
+| On skip/fail | Injected findings empty for that model → its `second_opinion_results` entry carries `status: skipped` (or `failed`) with an empty `reconciliation`. |
+
+Exactly one `second_opinion_results` entry per enabled model — success, skip, and failure paths
+all produce one entry (never zero, never duplicated).
 {% endif %}
 ```
 Task(
   subagent_type="plan-validator",
   description="Plan validator: {slug}",
-  prompt="<full draft PLAN body + Interview Transcript + ADRs>{% if config.codex_second_opinion.enabled %}\n\nCodex second opinion (main-loop supplied — codex_status: <invoked|skipped>, codex_skip_reason: <reason or n/a>):\n<adapted Codex findings JSON from the Step 4 (pre) adapter, or [] on skip>\n\nReconcile every injected Codex finding (disposition + reason); echo the supplied codex_status in your output.{% endif %}\n\nReturn JSON: {overall: APPROVED|NEEDS_REVISION|MAJOR_REVISION, critiques: [...]{% if config.codex_second_opinion.enabled %}, codex_status: invoked|skipped, codex_reconciliation: [...]{% endif %}}"
+  prompt="<full draft PLAN body + Interview Transcript + ADRs>{% if config.second_opinion.models %}\n\nCross-model second opinion (main-loop supplied — one entry per model in [{{ config.second_opinion.models | join(', ') }}], each with status invoked|skipped|failed + skip reason):\n<adapted findings JSON per model from the Step 4 (pre) adapter, or [] on skip/fail>\n\nReconcile every injected finding (disposition + reason); echo the supplied per-model status in your output.{% endif %}\n\nReturn JSON: {overall: APPROVED|NEEDS_REVISION|MAJOR_REVISION, critiques: [...]{% if config.second_opinion.models %}, second_opinion_results: [{model, status: invoked|skipped|failed, reconciliation: [...]}, ...]{% endif %}}"
 )
 ```
 
@@ -555,8 +559,8 @@ Resolution:
 > **If the validator agent itself fails to launch** (0 tool uses, model/launch error): retry the `Task(...)` call once with `model: "opus"` explicitly set (subagent frontmatter may be stale across a model upgrade). When you surface such a failure to the user, name the **tier** (`opus`/`sonnet`) — never a pinned concrete id like `claude-4-7-opus[1m]`; a pinned id in the message is itself the bug class this guidance exists to avoid. If it still cannot launch, self-review the PLAN in the validator's place and say so plainly.
 
 Each follow-up interview answer is appended to `## 🎙️ Interview Transcript` and promoted to ADR when Step D criteria apply.
-{% if config.codex_second_opinion.enabled %}
-> **Codex second-opinion relay (main loop owns the call — ADR-005).** The Step 4 (pre) main-loop step already ran (or skipped) Codex and injected the result into the validator; the agent only reconciles it. After reading the validator's returned JSON and **before** resolving the verdict, inspect its top-level `codex_status` (it echoes the main-loop value). If it is `"skipped"`, the Codex call could not complete — surface the `codex_skip_reason` you recorded in Step 4 (pre) to the user in your turn output (one line, e.g. `⚠️ Codex second opinion skipped: <reason> — verdict is Claude-only`). This is a loud notice, **not** a block: resolve the verdict regardless, since it is Claude-derived and valid without Codex.
+{% if config.second_opinion.models %}
+> **Cross-model second-opinion relay (main loop owns the call — ADR-005/011).** The Step 4 (pre) main-loop step already ran (or skipped) each enabled model and injected the results into the validator; the agent only reconciles them. After reading the validator's returned JSON and **before** resolving the verdict, inspect its `second_opinion_results` array (each entry echoes the main-loop per-model status). For every entry whose `status` is `"skipped"` or `"failed"`, the model's call could not complete — surface the reason you recorded in Step 4 (pre) to the user in your turn output (one line per model, e.g. `⚠️ Second opinion skipped (antigravity): <reason> — verdict is Claude-only for that model`). This is a loud notice, **not** a block: resolve the verdict regardless, since it is Claude-derived and valid without any second-opinion model.
 {% endif %}
 ### Step 5 — Write PLAN document
 

@@ -21,8 +21,8 @@ from harness_maker.render import (
     render,
 )
 
-_SCHEMA_REL = "schemas/codex-finding.schema.json"
-_SCHEMA_TEMPLATE = "schemas/codex-finding.schema.json"
+_SCHEMA_REL = "schemas/second-opinion-finding.schema.json"
+_SCHEMA_TEMPLATE = "schemas/second-opinion-finding.schema.json"
 
 # The pre-0.28.7 broken shape: confidence/file/line/evidence NOT in required.
 _STALE_SCHEMA = (

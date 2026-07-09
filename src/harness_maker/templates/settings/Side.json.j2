@@ -1,4 +1,4 @@
 {
-  "permissions": {"allow": ["Read", "Bash(uv:*)", "Bash(pytest:*)"{% if config.codex_second_opinion and config.codex_second_opinion.enabled %}, "Bash(codex exec:*)"{% endif %}], "deny": {% if config.permissions.deny_dangerous %}["Bash(rm:*)", "Bash(curl * | sh)", "Write(/etc/**)", "Write(~/.ssh/**)"]{% else %}[]{% endif %}},
+  "permissions": {"allow": ["Read", "Bash(uv:*)", "Bash(pytest:*)"{% if config.second_opinion and 'codex' in config.second_opinion.models %}, "Bash(codex exec:*)"{% endif %}{% if config.second_opinion and 'antigravity' in config.second_opinion.models %}, "Bash(agy --print --sandbox:*)"{% endif %}], "deny": {% if config.permissions.deny_dangerous %}["Bash(rm:*)", "Bash(curl * | sh)", "Write(/etc/**)", "Write(~/.ssh/**)"]{% else %}[]{% endif %}},
   "preset": "{{ preset }}"
 }

@@ -2,6 +2,39 @@
 
 ## [Unreleased]
 
+### Added — multi-model cross-model second opinion (`second_opinion.models`)
+- **`harness.yaml.codex_second_opinion` generalized to `second_opinion` with
+  `models: list[Literal["codex","antigravity"]]`** (PLAN-second-opinion-multi-model). Codex CLI
+  and Google's Antigravity CLI (`agy`) can each cast a real k-of-N consensus vote in `/hm:review`
+  and be reconciled in `/hm:plan` — independently or both at once. Existing installs with
+  `codex_second_opinion.enabled=true` migrate silently to `second_opinion.models=["codex"]`
+  (schema_version 2→3, one advisory log; both-keys-present → new key wins).
+- **Per-model config sub-blocks** (ADR-002): `second_opinion.{failure_policy, agents}` shared
+  (`agents` = a global allowlist applied to every enabled model); `second_opinion.codex.{hermetic,
+  output_schema_path}` and `second_opinion.antigravity.{model}` are per-model, so Codex-only flags
+  never silently no-op on Antigravity. The antigravity `model` pin is resolved from a live
+  `agy models` list at **interview time only** — render never shells out (determinism, ADR-007).
+- **K=2 consensus threshold stays fixed as the voter pool grows** (ADR-006): enabling more models
+  makes `consensus-passed` easier to reach (recall-favoring), not harder — zero change to
+  `conditional_router.scope_aware_consensus`, prose-only template generalization.
+- **Mandatory matrix applies uniformly to every enabled model** (ADR-003): Production runs every
+  enabled model on every review/plan; Side high-diff-gates each. Uniform cost accepted.
+- **Graceful degrade for a missing/removed/unauthenticated/rate-limited/timed-out CLI** (ADR-011):
+  all route to a warn-and-proceed ledger skip/failed row — never a block. Antigravity has no
+  `--output-schema`, so `codex_adapter.extract_antigravity_payload` fails closed (strips fences,
+  requires exactly one JSON payload) and every `agy` call is wrapped in `timeout` (a project-less
+  `agy --print` can hang — empirically probed in `tests/manual/ANTIGRAVITY_SANDBOX_PROBE.md`,
+  ADR-012, which also confirmed `agy --sandbox` cannot mutate the working tree).
+- **New make-time surface** (ADR-009/010): `/harness-maker:make` and `harness-maker make` gain
+  `--second-opinion-models` + `--autonomy-level` / `--autonomy-persistent` flags and two new
+  default-interview questions; a selected model whose CLI is absent from PATH triggers a
+  non-blocking warning.
+- **Ledger + schema renames**: `.claude/observability/codex-second-opinion.jsonl` →
+  `second-opinion.jsonl` (with a `model` field + one-time forward-copy of legacy rows);
+  `.claude/schemas/codex-finding.schema.json` → `second-opinion-finding.schema.json`. The
+  plan-stage output contract `codex_status`/`codex_reconciliation` → `second_opinion_results`
+  array (one entry per enabled model).
+
 ## [0.37.1] - 2026-07-05
 
 ### Added — opt-in `memory_md consolidate` for exact-slug duplicate merge

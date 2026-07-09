@@ -89,33 +89,32 @@ Return ONLY this JSON. No prose preamble. No markdown.
 - **Do not invent risks.** If a risk requires speculation about user intent, ask via the interview re-run path; do not flag it as `critical` on a hunch.
 - **One critique per distinct gap.** Do not re-list the same gap under multiple categories.
 - **Cite, don't paraphrase.** `section:` must point at a real heading or line in the draft you were given.
-{%- set _csoo = (config.get('codex_second_opinion') or {}) if config else {} %}
-{%- if _csoo.get('enabled') and name in _csoo.get('agents', []) %}
+{%- set _so = (config.get('second_opinion') or {}) if config else {} %}
+{%- if _so.get('models') and name in _so.get('agents', []) %}
 
-<!-- @hm:codex-reconcile -->
-## Codex second-opinion reconciliation (main loop supplies the findings — ADR-005, PLAN-codex-second-opinion-sandbox)
+<!-- @hm:second-opinion-reconcile -->
+## Cross-model second-opinion reconciliation (main loop supplies the findings — ADR-005/011, PLAN-second-opinion-multi-model)
 
-When `codex_second_opinion` is enabled the **main loop** (`/hm:plan` Step 4 (pre)) runs
-Codex, adapts the findings, and **injects** them into your prompt with a main-loop-supplied
-`codex_status` / `codex_skip_reason`. You do **NOT** run Codex yourself (you have no Bash) —
-you **reconcile** the pre-injected findings.
+When `second_opinion.models` is non-empty the **main loop** (`/hm:plan` Step 4 (pre)) runs
+each enabled model ({{ _so.get('models') | join(', ') }}), adapts the findings, and **injects**
+them into your prompt with a main-loop-supplied per-model status. You do **NOT** run any CLI
+yourself (you have no Bash) — you **reconcile** the pre-injected findings.
 
-**Output contract — this EXTENDS the `## Output JSON Schema` above.** When Codex is enabled
-your returned object **MUST** carry two **additional top-level** keys alongside
+**Output contract — this EXTENDS the `## Output JSON Schema` above.** When any second-opinion
+model is enabled your returned object **MUST** carry one **additional top-level** key alongside
 `overall_assessment`, `critiques`, and `clean_categories` (NOT nested inside `critiques`):
-- `codex_status`: echo the main-loop-supplied value (`"invoked"` or `"skipped"`).
-- `codex_reconciliation`: an array, one entry per injected Codex finding —
-  `{ "codex_finding_ref": "...", "disposition": "accepted" | "rejected" | "duplicate" | "unresolved", "reason": "..." }`.
-  Empty array `[]` when `codex_status` is `"skipped"`.
+- `second_opinion_results`: an array with **exactly one entry per enabled model**, each:
+  `{ "model": "codex" | "antigravity", "status": "invoked" | "skipped" | "failed", "reconciliation": [ { "finding_ref": "...", "disposition": "accepted" | "rejected" | "duplicate" | "unresolved", "reason": "..." }, ... ] }`.
+  A model's `reconciliation` is `[]` when its `status` is `"skipped"` or `"failed"`.
 
-**Anti-boilerplate floor** — every entry's `codex_finding_ref` MUST cite the specific
-injected Codex finding it dispositions: its `file:line` (when present) or a verbatim quote
-of the finding `message`. A bare `"rejected: n/a"` does NOT satisfy the contract. Your
-`overall_assessment` stays your own Claude-derived verdict (Codex is input you cannot
-silently discard, not a verdict source — ADR-005 of PLAN-codex-second-llm-integration).
+**Anti-boilerplate floor** — every reconciliation entry's `finding_ref` MUST cite the specific
+injected finding it dispositions: its `file:line` (when present) or a verbatim quote of the
+finding `message`. A bare `"rejected: n/a"` does NOT satisfy the contract. Your
+`overall_assessment` stays your own Claude-derived verdict (a second opinion is input you
+cannot silently discard, not a verdict source — ADR-005).
 
-**PIDA debate flow (ADR-004, PLAN-crossmodel-codex-gaps)** — do NOT self-adjudicate a Codex
-challenge silently. For each injected Codex finding:
+**PIDA debate flow (ADR-004, PLAN-crossmodel-codex-gaps)** — do NOT self-adjudicate a
+second-opinion finding silently. For each injected finding (any model):
 1. Form a **rebuttal**: `KEEP` (the finding stands — disposition `accepted`) or
    `REFUTE` (with concrete evidence — disposition `rejected`/`duplicate`).
 2. If a **test/oracle** can settle the disagreement, let it decide and record the oracle
@@ -125,8 +124,9 @@ challenge silently. For each injected Codex finding:
    visible-by-design and **never blocks** — `overall_assessment` is still your Claude verdict
    (warn-and-proceed). `/hm:plan` Step 4 shows `unresolved` entries to the user.
 
-**Failure policy** (warn-and-proceed): if the injected `codex_status` is `"skipped"`, set
-`codex_reconciliation: []` and proceed Claude-only — do **NOT** block the stage.
+**Failure policy** (warn-and-proceed): if an injected model's `status` is `"skipped"` or
+`"failed"`, set that model's `reconciliation: []` and proceed Claude-only — do **NOT** block
+the stage.
 {%- endif %}
 
 <!-- @hm:user:extensions -->

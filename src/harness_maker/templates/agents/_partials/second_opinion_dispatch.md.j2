@@ -1,0 +1,23 @@
+{#-
+  Multi-model second-opinion dispatch loop (PLAN-second-opinion-multi-model ADR-011).
+
+  Owns the `config.second_opinion.models` gating so an empty/absent config renders BYTE-ZERO
+  (failures.md [fail:design] absent-case rule) — the per-model partials never self-gate.
+  For each enabled model, includes the right per-model transport partial (codex / antigravity),
+  each of which emits its own invoke + adapt + graceful-skip recipe.
+
+  Callers set `second_opinion_stage` ("review" | "plan") and `is_codex` before the include.
+  The `{%- ... %}` whitespace control keeps the disabled render byte-zero.
+-#}
+{%- set _so = (config.get('second_opinion', {})) if config else {} -%}
+{%- set _models = _so.get('models', []) -%}
+{%- if _models %}
+{% for _m in _models %}
+#### Second opinion — model: `{{ _m }}`
+{% if _m == 'codex' %}{% include "agents/_partials/second_opinion_codex.md.j2" %}{% elif _m == 'antigravity' %}{% include "agents/_partials/second_opinion_antigravity.md.j2" %}{% endif %}
+{% endfor %}
+> **Per-model result contract.** Each enabled model above produces exactly one outcome:
+> `status: invoked` (findings adapted + folded in) or `status: skipped`/`failed` (graceful
+> degrade, ledger row written). A missing/unauthenticated/rate-limited CLI never blocks the
+> stage — it warns and proceeds. Record every model's outcome in `second_opinion_results`.
+{%- endif -%}

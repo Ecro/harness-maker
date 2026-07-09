@@ -27,16 +27,16 @@ from harness_maker import codex_adapter
     ],
 )
 def test_severity_map(codex_sev: str, expected: str) -> None:
-    assert codex_adapter.map_codex_severity(codex_sev) == expected
+    assert codex_adapter.map_severity(codex_sev) == expected
 
 
 def test_severity_map_is_case_insensitive() -> None:
-    assert codex_adapter.map_codex_severity("CRITICAL") == "P0"
+    assert codex_adapter.map_severity("CRITICAL") == "P0"
 
 
 def test_unknown_severity_raises() -> None:
-    with pytest.raises(ValueError, match="unknown codex severity"):
-        codex_adapter.map_codex_severity("blocker")
+    with pytest.raises(ValueError, match="unknown second-opinion severity"):
+        codex_adapter.map_severity("blocker")
 
 
 def test_adapt_precise_location() -> None:

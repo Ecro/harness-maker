@@ -267,6 +267,18 @@ alternatives, and a one-line trade-off. Then jump to Section 4.6.
    Maps to `--second-brain-vault-path` and `--second-brain-project-id`.
    Tell the user that `/hm:configure` can continue with deeper Second Brain
    setup after install, including write-capable allowlisted folders.
+13. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **Cross-model second opinion** —
+   "Enable a second-opinion model (Codex and/or Antigravity) to cast a real k-of-N consensus
+   vote in /hm:review and reconcile in /hm:plan? A missing/unauthenticated/rate-limited CLI
+   degrades gracefully (warn + skip)." Multi-select: `codex`, `antigravity`, or none.
+   Prereqs: `codex login` (codex), an authenticated `agy` (antigravity). Before dispatch,
+   `shutil.which` each selected model's CLI (`codex` / `agy`) and warn (non-blocking) if
+   absent. Maps to `--second-opinion-models` (comma-separated; empty disables).
+14. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **Autopilot** — "Auto-advance
+   the stage pipeline this session (stages advance past two-way-door boundaries but always
+   stop at the plan interview, a CHANGES_REQUESTED review, and the wrapup merge)?" Options:
+   `gated` (off, default) / `auto_safe` / `full`; if enabled, ask whether to persist across
+   sessions. Maps to `--autonomy-level` and `--autonomy-persistent` / `--no-autonomy-persistent`.
 
 #### 4.5 Preview structured question
 
@@ -468,6 +480,13 @@ in turn, then dispatch with all collected flags:
    stage-aware memory?" Ask for vault path (absolute or `~`-relative), or
    "none" to skip. If given: ask project_id (kebab-case, e.g. `my-app`).
    Maps to `--second-brain-vault-path` and `--second-brain-project-id`.
+13. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **Cross-model second opinion** —
+   multi-select `codex`, `antigravity`, or none. Graceful warn+skip on a missing/
+   unauthenticated/rate-limited CLI. `shutil.which` each selected CLI (`codex` / `agy`) and
+   warn (non-blocking) if absent. Maps to `--second-opinion-models` (comma-separated).
+14. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **Autopilot** — `gated` (off) /
+   `auto_safe` / `full`; if enabled, ask whether to persist across sessions. Maps to
+   `--autonomy-level` and `--autonomy-persistent` / `--no-autonomy-persistent`.
 
 Then dispatch with the collected values:
 
@@ -478,19 +497,23 @@ Then dispatch with the collected values:
   --focus "$FOCUS" --grade-threshold "$GRADE" --domains "$DOMAINS" \
   --mechanical-checks "$CHECKS" --recommended-model "$MODEL" --wrapup-docs "$WRAPUP_DOCS" \
   --ref-folders "$REF_FOLDERS" --sibling-repos "$SIBLING_REPOS" \
-  --second-brain-vault-path "$SB_VAULT_PATH" --second-brain-project-id "$SB_PROJECT_ID"
+  --second-brain-vault-path "$SB_VAULT_PATH" --second-brain-project-id "$SB_PROJECT_ID" \
+  --second-opinion-models "$SECOND_OPINION_MODELS" --autonomy-level "$AUTONOMY_LEVEL"
 # CLI_FALLBACK:
 !harness-maker make "$(pwd)" \
   --preset "$PRESET" --locale "$LOCALE" --dev-mode "$DEV_MODE" --targets "$TARGETS" \
   --focus "$FOCUS" --grade-threshold "$GRADE" --domains "$DOMAINS" \
   --mechanical-checks "$CHECKS" --recommended-model "$MODEL" --wrapup-docs "$WRAPUP_DOCS" \
   --ref-folders "$REF_FOLDERS" --sibling-repos "$SIBLING_REPOS" \
-  --second-brain-vault-path "$SB_VAULT_PATH" --second-brain-project-id "$SB_PROJECT_ID"
+  --second-brain-vault-path "$SB_VAULT_PATH" --second-brain-project-id "$SB_PROJECT_ID" \
+  --second-opinion-models "$SECOND_OPINION_MODELS" --autonomy-level "$AUTONOMY_LEVEL"
 ```
 
 Omit `--second-brain-vault-path` when the user chose "none"; omit
-`--second-brain-project-id` when the user left it blank. Omit all other
-flags for dimensions the user skipped or left at default.
+`--second-brain-project-id` when the user left it blank. Omit
+`--second-opinion-models` / `--autonomy-level` when the user left them at default.
+Add `--autonomy-persistent` (or `--no-autonomy-persistent`) only when the user made an
+explicit choice. Omit all other flags for dimensions the user skipped or left at default.
 
 Existing settings outside these dimensions (workflow naming, anti-rot
 config, etc.) are reused from `.claude/harness.yaml`. For a deeper reset
@@ -542,6 +565,7 @@ Pass empty string `""` for `--second-brain-vault-path` to disable. Omit
   --mechanical-checks "$CHECKS" --recommended-model "$MODEL" --wrapup-docs "$WRAPUP_DOCS" \
   --ref-folders "$REF_FOLDERS" --sibling-repos "$SIBLING_REPOS" \
   --second-brain-vault-path "$SB_VAULT_PATH" --second-brain-project-id "$SB_PROJECT_ID" \
+  --second-opinion-models "$SECOND_OPINION_MODELS" --autonomy-level "$AUTONOMY_LEVEL" \
   --autoloop
 # CLI_FALLBACK:
 !harness-maker make "$(pwd)" \
@@ -550,6 +574,7 @@ Pass empty string `""` for `--second-brain-vault-path` to disable. Omit
   --mechanical-checks "$CHECKS" --recommended-model "$MODEL" --wrapup-docs "$WRAPUP_DOCS" \
   --ref-folders "$REF_FOLDERS" --sibling-repos "$SIBLING_REPOS" \
   --second-brain-vault-path "$SB_VAULT_PATH" --second-brain-project-id "$SB_PROJECT_ID" \
+  --second-opinion-models "$SECOND_OPINION_MODELS" --autonomy-level "$AUTONOMY_LEVEL" \
   --autoloop
 ```
 

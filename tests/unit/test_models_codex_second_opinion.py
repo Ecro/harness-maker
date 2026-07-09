@@ -1,8 +1,11 @@
-"""Tests for CodexSecondOpinionConfig + HarnessConfig/InterviewAnswers integration.
+"""Tests for SecondOpinionConfig + HarnessConfig/InterviewAnswers integration.
 
-Phase 1 of PLAN-codex-second-llm-integration. ADR-002 defaults: enabled=False,
-agents=[code-reviewer, consensus-arbiter, plan-validator]. ADR-003 failure
-policy. ADR-006 hermetic. ADR-005 output_schema_path. Validator P0#3 fix:
+PLAN-second-opinion-multi-model: supersedes the single-vendor
+CodexSecondOpinionConfig (Phase 1 of PLAN-codex-second-llm-integration). ADR-002
+defaults: models=[] (feature off), agents=[code-reviewer, consensus-arbiter,
+plan-validator]. ADR-003 failure policy. ADR-006 hermetic (now nested under
+``codex``). ADR-005 output_schema_path (now nested under ``codex``, filename
+renamed to second-opinion-finding.schema.json). Validator P0#3 fix:
 InterviewAnswers also extends (extra='forbid' would reject otherwise).
 """
 
@@ -12,64 +15,83 @@ import pytest
 from pydantic import ValidationError
 
 from harness_maker.models import (
-    CodexSecondOpinionConfig,
     HarnessConfig,
     InterviewAnswers,
+    SecondOpinionConfig,
     Target,
 )
 
 
-def test_codex_second_opinion_config_defaults() -> None:
-    cfg = CodexSecondOpinionConfig()
+def test_second_opinion_config_defaults() -> None:
+    cfg = SecondOpinionConfig()
     assert cfg.enabled is False
+    assert cfg.models == []
     assert cfg.agents == ["code-reviewer", "consensus-arbiter", "plan-validator"]
     assert cfg.failure_policy == "warn-and-proceed"
-    assert cfg.hermetic is True
-    assert cfg.output_schema_path == ".claude/schemas/codex-finding.schema.json"
+    assert cfg.codex.hermetic is True
+    assert cfg.codex.output_schema_path == ".claude/schemas/second-opinion-finding.schema.json"
+    assert cfg.antigravity.model == "Gemini 3.1 Pro (High)"
 
 
-def test_codex_second_opinion_config_rejects_extra_fields() -> None:
+def test_second_opinion_config_rejects_extra_fields() -> None:
     with pytest.raises(ValidationError):
-        CodexSecondOpinionConfig(unknown_field="x")  # type: ignore[call-arg]
+        SecondOpinionConfig(unknown_field="x")  # type: ignore[call-arg]
 
 
-def test_harness_config_round_trip_with_codex_second_opinion() -> None:
+def test_harness_config_round_trip_with_second_opinion() -> None:
     cfg = HarnessConfig(
-        codex_second_opinion=CodexSecondOpinionConfig(enabled=True),
+        second_opinion=SecondOpinionConfig(models=["codex"]),
     )
     dumped = cfg.model_dump()
     restored = HarnessConfig.model_validate(dumped)
-    assert restored.codex_second_opinion.enabled is True
-    assert restored.codex_second_opinion.agents == [
+    assert restored.second_opinion.enabled is True
+    assert restored.second_opinion.models == ["codex"]
+    assert restored.second_opinion.agents == [
         "code-reviewer",
         "consensus-arbiter",
         "plan-validator",
     ]
 
 
-def test_harness_config_default_codex_second_opinion_disabled() -> None:
+def test_harness_config_default_second_opinion_disabled() -> None:
     cfg = HarnessConfig()
-    assert cfg.codex_second_opinion.enabled is False
+    assert cfg.second_opinion.enabled is False
+    assert cfg.second_opinion.models == []
 
 
-def test_interview_answers_round_trip_with_codex_second_opinion() -> None:
+def test_interview_answers_round_trip_with_second_opinion() -> None:
     answers = InterviewAnswers(
-        codex_second_opinion=CodexSecondOpinionConfig(enabled=True, hermetic=False),
+        second_opinion=SecondOpinionConfig(
+            models=["codex"],
+            codex={"hermetic": False},  # type: ignore[arg-type]
+        ),
     )
     dumped = answers.model_dump()
     restored = InterviewAnswers.model_validate(dumped)
-    assert restored.codex_second_opinion.enabled is True
-    assert restored.codex_second_opinion.hermetic is False
+    assert restored.second_opinion.enabled is True
+    assert restored.second_opinion.codex.hermetic is False
 
 
-def test_interview_answers_default_codex_second_opinion_disabled() -> None:
+def test_interview_answers_default_second_opinion_disabled() -> None:
     answers = InterviewAnswers()
-    assert answers.codex_second_opinion.enabled is False
+    assert answers.second_opinion.enabled is False
 
 
-def test_codex_second_opinion_failure_policy_literal_enforced() -> None:
+def test_second_opinion_failure_policy_literal_enforced() -> None:
     with pytest.raises(ValidationError):
-        CodexSecondOpinionConfig(failure_policy="bogus")  # type: ignore[arg-type]
+        SecondOpinionConfig(failure_policy="bogus")  # type: ignore[arg-type]
+
+
+def test_second_opinion_models_literal_enforced() -> None:
+    """Only 'codex'/'antigravity' are valid — an unknown model rejects at the type layer."""
+    with pytest.raises(ValidationError):
+        SecondOpinionConfig(models=["bogus"])  # type: ignore[list-item]
+
+
+def test_second_opinion_models_deduped_order_preserving() -> None:
+    """A repeated model is a config typo, not two votes — de-dupe, keep order."""
+    cfg = SecondOpinionConfig(models=["codex", "antigravity", "codex"])
+    assert cfg.models == ["codex", "antigravity"]
 
 
 def test_harness_config_legacy_yaml_without_key_loads_with_default() -> None:
@@ -87,4 +109,5 @@ def test_harness_config_legacy_yaml_without_key_loads_with_default() -> None:
         "targets": [Target.CLAUDE_CODE],
     }
     cfg = HarnessConfig.model_validate(legacy)
-    assert cfg.codex_second_opinion.enabled is False
+    assert cfg.second_opinion.enabled is False
+    assert cfg.second_opinion.models == []

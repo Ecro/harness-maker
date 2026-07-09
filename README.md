@@ -136,7 +136,7 @@ A short interview locks the dimensions that shape every downstream render. Re-ru
 | **Ref folders** | Path + glob pairs | Which external docs are searchable via `refdocs-search` skill |
 | **Sibling repos** | Relative paths | Which adjacent repos share the same harness session |
 | **Second Brain** | Obsidian vault path + project_id | Where cross-session memory writes |
-| **Codex second opinion** | `codex_second_opinion.enabled` | When true, `plan-validator` **must** invoke `codex exec` (mandatory; reconciles each Codex finding, loud warn-and-proceed on failure); `code-reviewer` / `consensus-arbiter` may invoke it (opt-in, pending a follow-up PLAN). Requires `codex` CLI + `codex login`; orthogonal to `targets` |
+| **Second opinion** | `second_opinion.models` | A list of cross-model reviewer CLIs — `codex` (Codex) and/or `antigravity` (`agy`), independently or both. Each enabled model casts a real k-of-N consensus vote in `/hm:review` and is reconciled in `/hm:plan`; a missing/unauthenticated/rate-limited CLI degrades gracefully (warn + skip, never blocks). Requires the corresponding CLI (`codex login` / an authenticated `agy`); orthogonal to `targets` |
 | **Recommended model** | `opus` default | The model frontmatter on every generated agent |
 
 > **Result:** `.claude/harness.yaml` — a single source of truth that survives upgrades.
@@ -618,8 +618,10 @@ autonomy:                    # autopilot / pipeline auto-advance — see the Aut
 permissions:
   deny_dangerous: false      # true → restore the destructive-pattern deny baseline (rm, curl|sh, /etc, ~/.ssh)
 
-codex_second_opinion:
-  enabled: false             # true → Codex CLI as a cross-model second reviewer (plan-validator, code-reviewer)
+second_opinion:
+  models: []                 # e.g. [codex], [antigravity], or [codex, antigravity] — cross-model second-opinion voters
+  # codex:       { hermetic: true, output_schema_path: .claude/schemas/second-opinion-finding.schema.json }
+  # antigravity: { model: "Gemini 3.1 Pro (High)" }   # free-text agy --model name (interview-time-pinned)
 
 anti_rot:
   enabled: true

@@ -1,0 +1,85 @@
+{#-
+  Per-model Antigravity (`agy`) invoke + adapt + skip-relay recipe
+  (PLAN-second-opinion-multi-model ADR-011).
+
+  Included by `second_opinion_dispatch.md.j2` inside the per-model loop; does NOT self-gate.
+  Callers set `second_opinion_stage` ("review" | "plan") and `is_codex` before the include.
+
+  Unlike Codex, `agy` has NO `--output-schema` (output shape is prompt-discipline only) and NO
+  `--ignore-user-config`/`--ignore-rules` hermetic flags. The Phase-1 sandbox write-probe
+  (tests/manual/ANTIGRAVITY_SANDBOX_PROBE.md) established that a project-less `agy --print
+  --sandbox` call does NOT expose file-editing tools and cannot mutate the working tree — so
+  NEVER pass `--project` / `--new-project` / `--add-dir` here. The probe also found a
+  file-request can HANG, so every call uses agy's NATIVE `--print-timeout` — a hang becomes a
+  non-zero exit routed to the same graceful skip path. The command begins with `agy` (not an
+  external `timeout` wrapper) so the scoped `Bash(agy --print --sandbox:*)` allow rule matches
+  it (review: an external `timeout`-prefixed command would not prefix-match the allow rule).
+-#}
+{%- set _agy = (config.get('second_opinion', {}).get('antigravity', {})) if config else {} -%}
+{%- set _stage = second_opinion_stage | default('review', true) %}
+{%- set _is_codex = is_codex if is_codex is defined else false %}
+{%- set _model = _agy.get('model', 'Gemini 3.1 Pro (High)') %}
+**Invoke (antigravity).** Run `agy` as a separate, sandbox-isolated step. Do NOT build the
+prompt inside the same shell line as the `agy` call.
+
+First create the temp files (ordinary sandboxed Bash):
+
+```bash
+prompt_tmp=$(mktemp); out_tmp=$(mktemp); printf 'prompt=%s\nout=%s\n' "$prompt_tmp" "$out_tmp"
+```
+
+Then write the diff + {{ _stage }} context to the prompt-file path **using the Write tool** —
+not a shell variable (verbatim bytes; adversarial diff text is never shell-expanded). The
+prompt MUST instruct `agy` to return ONLY a JSON object matching the second-opinion finding
+schema (agy has no CLI-level schema enforcement, so the instruction is the only shape signal).
+{% if not _is_codex %}
+> **Sandbox escape (ADR-003, Claude Code only).** The `agy` call needs outbound network,
+> which Claude Code's Bash sandbox blocks. Run THIS ONE Bash call with the Bash tool parameter
+> **`dangerouslyDisableSandbox: true`** — the `Bash(agy --print --sandbox:*)` settings `allow`
+> rule pre-approves the prompt (the command begins with `agy --print --sandbox` so the scoped
+> rule prefix-matches it), and `agy` stays contained by `--sandbox` + the project-less
+> invocation (no file tools exposed — see the Phase-1 probe). Do NOT disable the sandbox for
+> any other command.
+{%- else %}
+> **Codex runtime note.** The Claude-Code Bash-tool sandbox-escape parameter and the
+> `.claude/settings.json` allow rule do NOT apply on the Codex runtime — run the `agy` call
+> directly and approve it per your sandbox/approval policy.
+{%- endif %}
+Finally run `agy` as its **own** Bash call — the command MUST begin with `agy --print
+--sandbox` (so the scoped `Bash(agy --print --sandbox:*)` allow rule prefix-matches it) and use
+agy's **native** `--print-timeout` (a file-request can hang; the native timeout turns that into
+a non-zero exit → graceful skip). Do NOT wrap in external `timeout` (that would make the command
+begin with `timeout`, which the `agy`-scoped allow rule cannot match). Do NOT pass
+`--project` / `--new-project` / `--add-dir`:
+
+```bash
+agy --print --sandbox --print-timeout 120s --model "{{ _model }}" < "$prompt_tmp" > "$out_tmp"; echo "exit=$?"
+```
+
+**Adapt (status-guarded).** Only when the `agy` exit was 0, pipe the captured stdout through
+the adapter with `--model antigravity` (tolerant fail-closed parse — strips markdown fences,
+scans for exactly one JSON payload; maps severity `critical→P0 / high→P1 / medium→P2 /
+low,info→P3`, sets `source: "antigravity"`, sets `needs_relaxation: true` on null location).
+Always clean up the temp files:
+
+```bash
+if [ "$exit" -eq 0 ]; then uv run --with {{ harness_maker_src_path }} python -m harness_maker.codex_adapter adapt --model antigravity < "$out_tmp"; fi; rm -f "$prompt_tmp" "$out_tmp"
+```
+
+**Skip relay (graceful degrade — ANY non-zero exit OR unparseable output).** A non-zero exit
+means the second opinion could not complete — `agy` missing/removed (exit 127), unauthenticated,
+a rate-limit / subscription cap hit, or a print-timeout. Use `status: "skipped"` for these. A
+**zero** exit whose adapter run FAILS (the fail-closed parser could not find exactly one JSON
+payload) is a distinct case — use `status: "failed"` so the calibration ledger separates genuine
+parse-failures from availability skips. Substitute the matching value into `--status
+<skipped|failed>` below (do NOT hardcode `skipped` for the parse-failure case — that inflates the
+skip-rate and zeroes the failure-rate this telemetry exists to track). In every case surface a
+one-line reason (do NOT block — warn-and-proceed) and append a best-effort ledger row (each value
+a **separate `--flag`**):
+
+```bash
+reason="<one-line cause>"; uv run --with {{ harness_maker_src_path }} python -m harness_maker.codex_ledger emit --slug "<slug>" --stage {{ _stage }} --model antigravity --finding-ref "n/a" --disposition unresolved --status <skipped|failed> --skip-reason "$reason"
+```
+
+On success set `status: "invoked"` for antigravity. A silently-degraded second opinion is the
+H4 failure mode — the `/hm:health` smoke check is the positive backstop.

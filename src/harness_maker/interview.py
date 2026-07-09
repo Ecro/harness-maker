@@ -28,11 +28,11 @@ from pydantic import ValidationError
 from harness_maker.io_utils import denormalize_home_to_tilde, load_harness_yaml
 from harness_maker.models import (
     _MODEL_ID_PATTERN,
+    SECOND_OPINION_MODELS,
     AgentModelSpec,
     AtomicStage,
     AutonomyConfig,
     CodexAgentSpec,
-    CodexSecondOpinionConfig,
     Confidence,
     DeliveryMetricsConfig,
     DevMode,
@@ -45,6 +45,8 @@ from harness_maker.models import (
     RefFolder,
     SecondBrainConfig,
     SecondBrainFolder,
+    SecondOpinionAntigravityConfig,
+    SecondOpinionConfig,
     Target,
     auto_workflow_name,
     interview_deep_gate_defaults,
@@ -219,7 +221,7 @@ def interview(
     ref_folders = _ask_ref_folders()
     sibling_repos = _ask_sibling_repos()
     second_brain = _ask_second_brain()
-    codex_second_opinion = _ask_codex_second_opinion()
+    second_opinion = _ask_second_opinion()
     autonomy = _ask_autonomy()
     return _build_answers(
         locale=locale,
@@ -233,7 +235,7 @@ def interview(
         ref_folders=ref_folders,
         sibling_repos=sibling_repos,
         second_brain=second_brain,
-        codex_second_opinion=codex_second_opinion,
+        second_opinion=second_opinion,
         autonomy=autonomy,
     )
 
@@ -569,24 +571,98 @@ def _parse_stage_numbers(line: str) -> list[AtomicStage]:
     return out
 
 
-def _ask_codex_second_opinion() -> CodexSecondOpinionConfig:
-    """Ask whether to enable Codex CLI as a second-LLM reviewer (PLAN-codex-second-llm-integration).
+def _ask_second_opinion() -> SecondOpinionConfig:
+    """Ask which cross-model second-opinion CLIs to enable (PLAN-second-opinion-multi-model).
 
-    Default off (safe). When enabled, the 3 default reviewer agents
-    (code-reviewer, consensus-arbiter, plan-validator) get ``Bash(codex exec:*)``
-    permission + a rendered second-opinion section that invokes ``codex exec``
-    hermetic-by-default (ADR-006). Requires user to have run ``codex login``.
-    No follow-up sub-questions — advanced tuning happens via direct
-    ``harness.yaml.codex_second_opinion.*`` edits.
+    Default off (empty ``models``). ``codex`` and ``antigravity`` are independently
+    selectable (both at once is allowed). Each enabled model's reviewer agents get a
+    ``Bash(<cli>:*)`` permission + a rendered second-opinion section. Prerequisites:
+    ``codex login`` for codex, an authenticated ``agy`` for antigravity. When antigravity
+    is selected, the model pin is resolved from a live ``agy models`` list (interview-time
+    only, ADR-007) with a hardcoded fallback when ``agy`` is absent. Advanced tuning
+    happens via direct ``harness.yaml.second_opinion.*`` edits.
     """
-    print("\nCodex as second-LLM reviewer.")
-    print("  When enabled, plan-validator MUST invoke `codex exec` (mandatory")
-    print("  cross-model second opinion); code-reviewer / consensus-arbiter may")
-    print("  invoke it (opt-in for now). Prerequisite: run `codex login` first.")
-    answer = _input_or_empty("  Enable Codex second opinion? [y/N]: ").strip().lower()
-    if answer in {"y", "yes"}:
-        return CodexSecondOpinionConfig(enabled=True)
-    return CodexSecondOpinionConfig()
+    print("\nCross-model second opinion (Codex / Antigravity).")
+    print("  Enabled models cast a real k-of-N consensus vote in /hm:review and are")
+    print("  reconciled in /hm:plan. A missing/unauthenticated CLI degrades gracefully")
+    print("  (warn + skip). Prereqs: `codex login` (codex), authenticated `agy` (antigravity).")
+    raw = (
+        _input_or_empty("  Enable which models? [codex,antigravity or blank for none]: ")
+        .strip()
+        .lower()
+    )
+    selected = [m.strip() for m in raw.split(",") if m.strip()]
+    models = [m for m in selected if m in SECOND_OPINION_MODELS]
+    for unknown in (m for m in selected if m not in SECOND_OPINION_MODELS):
+        logger.warning("unknown second-opinion model %r — skipped", unknown)
+    if not models:
+        return SecondOpinionConfig()
+    kwargs: dict[str, object] = {"models": models}
+    if "antigravity" in models:
+        chosen = _ask_antigravity_model()
+        # Graceful-degrade (review security P2): a free-text or agy-supplied model name with
+        # shell-significant chars fails _validate_model — fall back to the default rather than
+        # crashing the whole interview with a ValidationError.
+        try:
+            kwargs["antigravity"] = SecondOpinionAntigravityConfig(model=chosen)
+        except ValidationError:
+            logger.warning(
+                "antigravity model %r rejected (shell-significant characters) — "
+                "using the default model instead.",
+                chosen,
+            )
+            kwargs["antigravity"] = SecondOpinionAntigravityConfig()
+    return SecondOpinionConfig.model_validate(kwargs)
+
+
+def _ask_antigravity_model() -> str:
+    """Resolve the antigravity model pin at INTERVIEW time only (ADR-007).
+
+    Offers a live ``agy models`` list when the binary is present; falls back to the
+    hardcoded default when ``agy`` is absent, times out, or errors. Render never re-shells
+    (the persisted free-text value is read directly) — keeping this shell-out out of the
+    render path preserves snapshot determinism.
+    """
+    default = SecondOpinionAntigravityConfig().model
+    options = _fetch_agy_models()
+    if not options:
+        print(f"  (agy not available — using default model '{default}')")
+        return default
+    print("  Available antigravity models:")
+    for i, name in enumerate(options, 1):
+        print(f"    {i}. {name}")
+    prompt = f"  Pick a model [1-{len(options)} or blank for '{default}']: "
+    choice = _input_or_empty(prompt).strip()
+    if not choice:
+        return default
+    with contextlib.suppress(ValueError):
+        idx = int(choice)
+        if 1 <= idx <= len(options):
+            return options[idx - 1]
+    # Free-text fallback — user typed a model name directly.
+    return choice
+
+
+def _fetch_agy_models() -> list[str]:
+    """Live ``agy models`` list (interview-time only). Empty list on any failure (ADR-007)."""
+    import shutil
+    import subprocess
+
+    if shutil.which("agy") is None:
+        return []
+    try:
+        result = subprocess.run(  # noqa: S603 — fixed argv, no shell, bounded timeout
+            ["agy", "models"],
+            capture_output=True,
+            text=True,
+            timeout=15,
+            check=False,
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        return []
+    if result.returncode != 0:
+        return []
+    return [line.strip() for line in result.stdout.splitlines() if line.strip()]
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -716,9 +792,9 @@ def _build_answers(
     second_brain: SecondBrainConfig | None = None,
     ref_folders: list[RefFolder] | None = None,
     sibling_repos: list[str] | None = None,
-    codex_second_opinion: CodexSecondOpinionConfig | None = None,
+    second_opinion: SecondOpinionConfig | None = None,
     autonomy: AutonomyConfig | None = None,
-    schema_version: int = 2,
+    schema_version: int = 3,
 ) -> InterviewAnswers:
     is_side = preset == Preset.SIDE
     return InterviewAnswers(
@@ -731,9 +807,7 @@ def _build_answers(
         ref_folders=list(ref_folders) if ref_folders else [],
         sibling_repos=list(sibling_repos) if sibling_repos else [],
         second_brain=second_brain if second_brain is not None else SecondBrainConfig(),
-        codex_second_opinion=(
-            codex_second_opinion if codex_second_opinion is not None else CodexSecondOpinionConfig()
-        ),
+        second_opinion=(second_opinion if second_opinion is not None else SecondOpinionConfig()),
         reviewers={
             "installed": list(_ALL_REVIEWERS),
             "enabled": list(_SIDE_ENABLED_REVIEWERS if is_side else _PROD_ENABLED_REVIEWERS),
@@ -747,6 +821,89 @@ def _build_answers(
         autonomy=autonomy if autonomy is not None else AutonomyConfig(),
         **_preset_extras(preset, schema_version=schema_version),
     )
+
+
+def _second_opinion_from_new_key(raw: dict[str, Any]) -> SecondOpinionConfig | None:
+    """Build a SecondOpinionConfig from a modern `second_opinion` block (ADR-002 shape).
+
+    Filters to recognized keys with per-field type guards, then defers final validation
+    to Pydantic (preserving default_factory for omitted fields). Returns None on a strict
+    validation failure so the caller falls back to the default.
+    """
+    clean: dict[str, object] = {}
+    models_raw = raw.get("models")
+    if isinstance(models_raw, list) and all(isinstance(m, str) for m in models_raw):
+        clean["models"] = list(models_raw)
+    agents_raw = raw.get("agents")
+    if isinstance(agents_raw, list) and all(isinstance(a, str) for a in agents_raw):
+        clean["agents"] = list(agents_raw)
+    # failure_policy is a single-value Literal today, but round-trip it so the reverse-mapper
+    # stays complete if the Literal ever grows (review P3).
+    fp_raw = raw.get("failure_policy")
+    if isinstance(fp_raw, str):
+        clean["failure_policy"] = fp_raw
+    for sub_key in ("codex", "antigravity"):
+        sub_raw = raw.get(sub_key)
+        if isinstance(sub_raw, dict):
+            # Sub-block validation happens inside SecondOpinionConfig.model_validate.
+            clean[sub_key] = dict(sub_raw)
+    try:
+        return SecondOpinionConfig.model_validate(clean)
+    except ValidationError:
+        return None
+
+
+def _second_opinion_from_legacy(raw: dict[str, Any]) -> SecondOpinionConfig | None:
+    """Migrate a legacy single-vendor `codex_second_opinion` block (ADR-001).
+
+    `enabled: true` → models=["codex"], carrying hermetic/output_schema_path into the
+    codex sub-block; `enabled: false`/absent → models=[]. Malformed → None (default).
+    """
+    enabled = raw.get("enabled")
+    models = ["codex"] if enabled is True else []
+    codex_kwargs: dict[str, object] = {}
+    hermetic_raw = raw.get("hermetic")
+    if isinstance(hermetic_raw, bool):
+        codex_kwargs["hermetic"] = hermetic_raw
+    # The legacy default output_schema_path pointed at the old filename; drop it on
+    # migration so the new default (renamed schema file) is used — a stale legacy path
+    # would point at a file the renderer no longer produces.
+    agents_raw = raw.get("agents")
+    kwargs: dict[str, object] = {"models": models}
+    if isinstance(agents_raw, list) and all(isinstance(a, str) for a in agents_raw):
+        kwargs["agents"] = list(agents_raw)
+    if codex_kwargs:
+        kwargs["codex"] = codex_kwargs
+    try:
+        return SecondOpinionConfig.model_validate(kwargs)
+    except ValidationError:
+        return None
+
+
+def _load_second_opinion(data: dict[str, Any]) -> SecondOpinionConfig | None:
+    """Precedence-aware second-opinion load (ADR-001).
+
+    New `second_opinion` key wins; a legacy `codex_second_opinion` block is used only when
+    the new key is absent. Both-present (or a stale legacy key at schema_version>=3) logs one
+    advisory and ignores the legacy block. Returns None when neither key is present (caller
+    keeps the default_factory).
+    """
+    new_raw = data.get("second_opinion")
+    legacy_raw = data.get("codex_second_opinion")
+    if isinstance(new_raw, dict):
+        if isinstance(legacy_raw, dict):
+            logger.info(
+                "harness.yaml has both 'second_opinion' and legacy 'codex_second_opinion' — "
+                "using 'second_opinion'; the legacy key is ignored (re-render to drop it)."
+            )
+        return _second_opinion_from_new_key(new_raw)
+    if isinstance(legacy_raw, dict):
+        logger.info(
+            "harness.yaml 'codex_second_opinion' is deprecated → migrated to 'second_opinion' "
+            "(re-render via /harness-maker:make to persist the new shape)."
+        )
+        return _second_opinion_from_legacy(legacy_raw)
+    return None
 
 
 def answers_from_harness_yaml(yaml_path: Path) -> InterviewAnswers | None:
@@ -908,32 +1065,15 @@ def answers_from_harness_yaml(yaml_path: Path) -> InterviewAnswers | None:
             # Future schema fields that fail strict validation: stay tolerant.
             with contextlib.suppress(ValidationError):
                 update["feedback"] = FeedbackConfig(enabled=feedback_enabled_raw)
-    # PLAN-codex-second-llm-integration — same tolerant-fallback pattern as
-    # feedback: missing key OR malformed block → silent default
-    # CodexSecondOpinionConfig() (enabled=False). Only the recognized fields
-    # round-trip; unknown keys are ignored (forward-compat).
-    csoo_raw = data.get("codex_second_opinion")
-    if isinstance(csoo_raw, dict):
-        # Filter to recognized keys with strict per-field validation; let
-        # Pydantic do the final validation via model_validate (preserves
-        # default_factory for omitted fields).
-        csoo_clean: dict[str, object] = {}
-        enabled_raw = csoo_raw.get("enabled")
-        if isinstance(enabled_raw, bool):
-            csoo_clean["enabled"] = enabled_raw
-        agents_raw = csoo_raw.get("agents")
-        if isinstance(agents_raw, list) and all(isinstance(a, str) for a in agents_raw):
-            csoo_clean["agents"] = list(agents_raw)
-        hermetic_raw = csoo_raw.get("hermetic")
-        if isinstance(hermetic_raw, bool):
-            csoo_clean["hermetic"] = hermetic_raw
-        output_schema_raw = csoo_raw.get("output_schema_path")
-        if isinstance(output_schema_raw, str):
-            csoo_clean["output_schema_path"] = output_schema_raw
-        with contextlib.suppress(ValidationError):
-            update["codex_second_opinion"] = CodexSecondOpinionConfig.model_validate(csoo_clean)
+    # PLAN-second-opinion-multi-model ADR-001 — precedence-aware load with one-time
+    # legacy migration. The NEW `second_opinion` key always wins; a legacy
+    # `codex_second_opinion` block is read only when `second_opinion` is absent, and
+    # its presence alongside (or after) the new key produces one advisory log line.
+    so_result = _load_second_opinion(data)
+    if so_result is not None:
+        update["second_opinion"] = so_result
     # PLAN-cfr-churn-metrics ADR-003 — same tolerant-fallback pattern as
-    # feedback/codex_second_opinion: missing key OR malformed block → silent
+    # feedback/second_opinion: missing key OR malformed block → silent
     # default DeliveryMetricsConfig() (enabled=False). Recognized keys are
     # filtered so unknown/forward-compat keys don't poison the whole load;
     # a strict-invalid value (e.g. enabled: "yes") falls back to defaults.

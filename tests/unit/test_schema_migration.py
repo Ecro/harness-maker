@@ -42,15 +42,15 @@ def _expected_deep_gate() -> dict[str, object]:
     }
 
 
-def test_side_defaults_new_fields_schema_v2(tmp_path: Path) -> None:
-    """New Side harness (schema v2) renders the 5-term inequality gate schema
+def test_side_defaults_new_fields_schema_v3(tmp_path: Path) -> None:
+    """New Side harness (schema v3) renders the 5-term inequality gate schema
     and the preset-specific main_loop cap (5)."""
     out = _render_preset(tmp_path, Preset.SIDE)
     import yaml
 
     docs = list(yaml.safe_load_all((out / "harness.yaml").read_text(encoding="utf-8")))
     hy = [d for d in docs if d and isinstance(d, dict) and "preset" in d][0]
-    assert hy["schema_version"] == 2
+    assert hy["schema_version"] == 3
     dg = hy["interview"]["deep_gate"]
     assert dg["eig_epsilon"] == 0.5
     assert dg["confidence_tau"] == 0.7
@@ -106,16 +106,17 @@ def test_prod_and_side_share_deep_gate_post_0_16_0() -> None:
 def test_schema_version_field_present_in_models() -> None:
     """Both HarnessConfig and InterviewAnswers should have schema_version.
 
-    HarnessConfig bumped 1 → 2 per ADR-011 (PLAN-model-routing-multi-ide) for
-    the agent_models + default_model rename; InterviewAnswers was already at 2.
+    HarnessConfig bumped 1 → 2 per ADR-011 (PLAN-model-routing-multi-ide) for the
+    agent_models + default_model rename, then 2 → 3 per PLAN-second-opinion-multi-model
+    ADR-001 for the codex_second_opinion → second_opinion rename; InterviewAnswers mirrors.
     """
     hc = HarnessConfig()
     assert hasattr(hc, "schema_version")
-    assert hc.schema_version == 2
+    assert hc.schema_version == 3
 
     ia = InterviewAnswers()
     assert hasattr(ia, "schema_version")
-    assert ia.schema_version == 2
+    assert ia.schema_version == 3
 
 
 def test_stage_template_reads_config_not_hardcoded(tmp_path: Path) -> None:

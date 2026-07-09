@@ -1,0 +1,74 @@
+{#-
+  Per-model Codex invoke + adapt + skip-relay recipe (PLAN-second-opinion-multi-model).
+
+  This partial renders the recipe for ONE model (codex). It is included by
+  `second_opinion_dispatch.md.j2` inside a per-model loop — the dispatch partial owns
+  the `config.second_opinion.models` gating, so this file does NOT self-gate. Callers
+  set `second_opinion_stage` ("review" | "plan") and `is_codex` (Codex-runtime flag)
+  before the include.
+
+  ADR-002/003 of PLAN-codex-second-opinion-sandbox (unchanged): the ORCHESTRATING MAIN
+  LOOP (the stage prompt), NOT a tool-restricted reviewer subagent, runs Codex. Two layers
+  escape Claude Code's Bash sandbox: (1) a settings.json `allow` rule (`Bash(codex exec:*)`)
+  pre-approves the permission prompt, and (2) the orchestrator runs that ONE Bash call with
+  the Bash tool parameter `dangerouslyDisableSandbox: true`. Codex stays hermetic via its own
+  `--sandbox read-only --ignore-user-config --ignore-rules` flags.
+-#}
+{%- set _codex = (config.get('second_opinion', {}).get('codex', {})) if config else {} -%}
+{%- set _stage = second_opinion_stage | default('review', true) %}
+{%- set _is_codex = is_codex if is_codex is defined else false %}
+**Invoke (codex).** Run Codex as a separate, sandbox-isolated step. Do NOT build the
+prompt inside the same shell line as the `codex exec` call.
+
+First create the temp files (ordinary sandboxed Bash) and note the two paths:
+
+```bash
+prompt_tmp=$(mktemp); out_tmp=$(mktemp); printf 'prompt=%s\nout=%s\n' "$prompt_tmp" "$out_tmp"
+```
+
+Then write the diff + {{ _stage }} context to the prompt-file path **using the
+Write tool** — not a shell variable. The Write tool stores the bytes verbatim, so
+command substitutions or backticks in adversarial diff text are never shell-expanded.
+{% if not _is_codex %}
+> **Sandbox escape (ADR-003, Claude Code only).** The `codex exec` call needs
+> outbound network, which Claude Code's Bash sandbox blocks. Run THIS ONE Bash call
+> with the Bash tool parameter **`dangerouslyDisableSandbox: true`** — the
+> `Bash(codex exec:*)` settings `allow` rule pre-approves the prompt, and Codex stays
+> contained by its own `--sandbox read-only` flags. Do NOT disable the sandbox for
+> any other command.
+{%- else %}
+> **Codex runtime note.** The Claude-Code Bash-tool sandbox-escape parameter and the
+> `.claude/settings.json` allow rule do NOT apply on the Codex runtime — run the
+> `codex exec` call directly and approve it per your Codex sandbox/approval policy.
+> Codex stays contained by its own `--sandbox read-only` flags either way.
+{%- endif %}
+Finally run `codex exec` as its **own** Bash call — the command MUST begin with
+`codex exec` so the `Bash(codex exec:*)` allow rule matches it:
+
+```bash
+codex exec --sandbox read-only {% if _codex.get('hermetic', true) %}--ignore-user-config --ignore-rules {% endif %}--output-schema {{ _codex.get('output_schema_path', '.claude/schemas/second-opinion-finding.schema.json') }} --output-last-message "$out_tmp" - < "$prompt_tmp"; echo "exit=$?"
+```
+
+**Adapt (status-guarded).** Only when the `codex exec` exit was 0, pipe the
+output file through the adapter (deterministic — it maps severity
+`critical→P0 / high→P1 / medium→P2 / low,info→P3`, sets `source: "codex"`, and sets
+`needs_relaxation: true` when `file`/`line` is null; reading from the file keeps
+untrusted Codex content out of the shell). Always clean up the temp files:
+
+```bash
+if [ "$exit" -eq 0 ]; then uv run --with {{ harness_maker_src_path }} python -m harness_maker.codex_adapter adapt --model codex < "$out_tmp"; fi; rm -f "$prompt_tmp" "$out_tmp"
+```
+
+**Skip relay (graceful degrade — ANY non-zero exit).** A non-zero `codex exec` exit means
+the second opinion could not complete — the CLI is missing/removed (exit 127), `codex login`
+expired, a rate-limit / subscription cap was hit, or the call errored. In every such case set
+`status: "skipped"` for `model: "codex"` + a one-line reason, surface it (do NOT block —
+warn-and-proceed), and append a best-effort ledger row. Pass each value as a **separate
+`--flag`** (never inline an untrusted cause into a shell-quoted JSON blob — REVIEW security P1):
+
+```bash
+reason="<one-line cause>"; uv run --with {{ harness_maker_src_path }} python -m harness_maker.codex_ledger emit --slug "<slug>" --stage {{ _stage }} --model codex --finding-ref "n/a" --disposition unresolved --status skipped --skip-reason "$reason"
+```
+
+On success set `status: "invoked"` for codex. A silently-degraded second opinion is the H4
+failure mode — the `/hm:health` smoke check is the positive backstop.

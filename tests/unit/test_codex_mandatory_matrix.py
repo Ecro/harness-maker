@@ -1,11 +1,16 @@
-"""Codex mandatory-matrix after the main-loop cutover (PLAN-codex-second-opinion-sandbox).
+"""Cross-model mandatory-matrix after the main-loop cutover (PLAN-codex-second-opinion-sandbox,
+generalized by PLAN-second-opinion-multi-model).
 
-ADR-002/003/005 moved the Codex exec + mandatory gate into the plan STAGE main loop;
-the plan-validator AGENT keeps only the non-exec reconciliation envelope.
+ADR-002/003/005 moved the exec + mandatory gate into the plan STAGE main loop; the
+plan-validator AGENT keeps only the non-exec reconciliation envelope. The mandatory-matrix
+prose has since been generalized (rename mapping) from single-vendor "Codex" wording to
+"every enabled model":
 
-  Production -> plan stage runs Codex on every validation (no high-diff gate).
-  Side       -> plan stage runs Codex only on a high-diff change (high_diff classify).
-  Both       -> plan-validator agent carries the codex_reconciliation envelope.
+  Production -> plan stage runs every enabled model on every validation (no high-diff gate).
+  Side       -> plan stage runs every enabled model only on a high-diff change (high_diff
+                classify).
+  Both       -> plan-validator agent carries the second_opinion_results reconciliation
+                envelope (supersedes the old scalar codex_reconciliation).
   Reviewers (code-reviewer, consensus-arbiter) carry NO exec recipe / envelope.
   Ledger emit lives in the review + plan STAGES, not the agents.
 """
@@ -15,10 +20,10 @@ from __future__ import annotations
 from pathlib import Path
 
 from harness_maker.models import (
-    CodexSecondOpinionConfig,
     InterviewAnswers,
     Preset,
     ProjectProfile,
+    SecondOpinionConfig,
     Target,
 )
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
@@ -31,7 +36,7 @@ def _render(tmp_path: Path, *, preset: Preset, enabled: bool) -> dict[str, str]:
         InterviewAnswers(
             preset=preset,
             targets=[Target.CLAUDE_CODE],
-            codex_second_opinion=CodexSecondOpinionConfig(enabled=enabled),
+            second_opinion=SecondOpinionConfig(models=["codex"] if enabled else []),
         ),
     )
     render(blueprint, tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
@@ -56,10 +61,10 @@ def _agent(files: dict[str, str], name: str) -> str:
 def test_production_plan_stage_always_mandatory(tmp_path: Path) -> None:
     files = _render(tmp_path, preset=Preset.PRODUCTION, enabled=True)
     plan = _plan_stage(files)
-    assert "run Codex on **every**" in plan
+    assert "run **every** enabled model on **every** plan validation" in plan
     assert "high_diff" not in plan  # Production = always; no high-diff gate
     # envelope still owned by the agent
-    assert "codex_reconciliation" in _agent(files, "plan-validator")
+    assert "second_opinion_results" in _agent(files, "plan-validator")
 
 
 def test_side_plan_stage_is_high_diff_gated(tmp_path: Path) -> None:
@@ -67,7 +72,7 @@ def test_side_plan_stage_is_high_diff_gated(tmp_path: Path) -> None:
     plan = _plan_stage(files)
     assert "high_diff classify" in plan
     assert "high-diff" in plan.lower()
-    assert "codex_reconciliation" in _agent(files, "plan-validator")
+    assert "second_opinion_results" in _agent(files, "plan-validator")
 
 
 def test_reviewers_carry_no_exec_or_envelope(tmp_path: Path) -> None:
@@ -75,8 +80,8 @@ def test_reviewers_carry_no_exec_or_envelope(tmp_path: Path) -> None:
     for name in ("code-reviewer", "consensus-arbiter"):
         body = _agent(files, name)
         assert "codex exec" not in body, f"{name} still carries a codex exec recipe"
-        assert "codex_reconciliation" not in body, f"reconciliation envelope leaked into {name}"
-        assert "@hm:codex-second-opinion" not in body
+        assert "second_opinion_results" not in body, f"reconciliation envelope leaked into {name}"
+        assert "@hm:second-opinion-reconcile" not in body
 
 
 def test_ledger_emit_lives_in_stages(tmp_path: Path) -> None:
@@ -94,12 +99,12 @@ def test_disabled_is_byte_zero(tmp_path: Path) -> None:
     assert "Step 4 (pre)" not in plan
     assert "dangerouslyDisableSandbox" not in plan
     pv = _agent(files, "plan-validator")
-    assert "@hm:codex-reconcile" not in pv
-    assert "codex_reconciliation" not in pv
+    assert "@hm:second-opinion-reconcile" not in pv
+    assert "second_opinion_results" not in pv
 
 
 def test_non_codex_agent_has_no_reconcile_block(tmp_path: Path) -> None:
     files = _render(tmp_path, preset=Preset.PRODUCTION, enabled=True)
     body = _agent(files, "security-auditor")
-    assert "@hm:codex-reconcile" not in body
-    assert "codex_reconciliation" not in body
+    assert "@hm:second-opinion-reconcile" not in body
+    assert "second_opinion_results" not in body

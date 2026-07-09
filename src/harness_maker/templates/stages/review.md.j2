@@ -243,26 +243,31 @@ extras at runtime bringing total > 1, re-enable Pass 1 + Pass 1.5 manually.
    Pass 2 is authoritative — Pass 1 findings absent from Pass 2 are
    invalidated by context and **dropped** (CP10 contract).
 5. The merged finding list is the input to the consensus filter (Step 4).
-{%- if config.codex_second_opinion and config.codex_second_opinion.enabled %}
-### Step 3.5 — Codex heterogeneous voter (ADR-001, PLAN-crossmodel-codex-gaps)
+{%- if config.second_opinion and config.second_opinion.models %}
+### Step 3.5 — Cross-model heterogeneous voters (ADR-001/006, PLAN-second-opinion-multi-model)
 
-`codex_second_opinion.enabled` is set, so Codex joins Step 4 as a **third voter**
-(2 Claude reviewers + 1 Codex → **k-of-3**), not an advisory side-channel.
+`second_opinion.models` is set ({{ config.second_opinion.models | join(', ') }}), so each
+enabled model joins Step 4 as a **full heterogeneous voter** — the voter pool grows to
+**N = (enabled Claude reviewers) + {{ config.second_opinion.models | length }}** voices, not an
+advisory side-channel. The consensus threshold stays **K = 2** (any 2 voices agreeing →
+`consensus-passed`, ADR-006): more models make agreement *easier* to reach (recall-favoring),
+never a rising bar.
 
-**Mandatory gate (ADR-002/003 matrix):**
-- Production preset → invoke Codex on **every** review.
-- Side preset → invoke Codex only on a **high-diff** change. Classify first — note
-  `HEAD` (the post-execute diff is staged, so a bare `git diff` would see nothing) and
+**Mandatory gate (ADR-003 matrix — applies uniformly to EVERY enabled model):**
+- Production preset → invoke **every** enabled model on **every** review.
+- Side preset → invoke **every** enabled model only on a **high-diff** change. Classify first —
+  note `HEAD` (the post-execute diff is staged, so a bare `git diff` would see nothing) and
   `--numstat` for the added-line count that drives the `boundary` signal:
   ```bash
   files=$(git diff --name-only HEAD); added=$(git diff --numstat HEAD | awk '{s+=$1} END{print s+0}'); printf '%s\n' "$files" | uv run --with {{ harness_maker_src_path }} python -m harness_maker.high_diff classify --added-lines "$added"
   ```
   Invoke when `is_high` (or `boundary` and your judgment, reusing the When-to-Run
-  criteria, says high). Otherwise skip Codex this round (no third voter).
+  criteria, says high). Otherwise skip all models this round (no extra voters).
 
-{% set codex_stage = "review" %}{% include "agents/_partials/codex_exec_mainloop.md.j2" %}
+{% set second_opinion_stage = "review" %}{% include "agents/_partials/second_opinion_dispatch.md.j2" %}
 
-Add the emitted adapted findings to the Step 4 input list as the third source.
+Add each model's emitted adapted findings to the Step 4 input list as additional sources
+(tagged `source: "<model>"`).
 {%- endif %}
 
 ### Step 4 — Consensus filter (surface + reasoning alignment)
@@ -276,15 +281,16 @@ Two findings are consensus *candidates* iff they satisfy BOTH:
 2. Same `severity` tier (P0 vs P0; P1 vs P1; do not bridge tiers).
 
 Pairs failing surface match are recorded as **independent** findings — preserve both.
-{%- if config.codex_second_opinion and config.codex_second_opinion.enabled %}
-**Codex null-location relaxation (ADR-001):** a finding with `source: "codex"` and
+{%- if config.second_opinion and config.second_opinion.models %}
+**Second-opinion null-location relaxation (ADR-001):** a finding whose `source` is one of
+the enabled models ({{ config.second_opinion.models | join(', ') }}) with
 `needs_relaxation: true` (null `file`/`line`) cannot satisfy predicate 1 as written.
 For these, substitute **symbol/message-similarity**: it is a candidate when its
 `summary`/message clearly refers to the same symbol or defect as a Claude finding
 (same function/class, or same described failure mode), with predicate 2 (severity
-tier) still required — the adapter already mapped Codex severities to P-tiers so the
-tiers are directly comparable. Without this relaxation a null-location Codex finding
-would always degrade to `manual-only`, making the third vote cosmetic.
+tier) still required — the adapter already mapped severities to P-tiers so the
+tiers are directly comparable. Without this relaxation a null-location second-opinion finding
+would always degrade to `manual-only`, making its vote cosmetic.
 {%- endif %}
 
 #### Step 4b — Reasoning alignment (verification)
@@ -347,11 +353,13 @@ Count **`consensus-passed`** findings only by severity:
 - `P1_count` = consensus-passed findings with severity P1.
 
 P2/P3, weak-consensus, and manual-only findings do NOT lower the grade.
-{%- if config.codex_second_opinion and config.codex_second_opinion.enabled %}
-> **k-of-3 with Codex:** the adapted Codex finding counts as one of the three voices.
-> A finding that reaches `consensus-passed` *because* the Codex vote supplied an
-> agreeing voice counts toward `P0_count`/`P1_count` exactly like any reviewer-sourced
-> consensus-passed finding — Codex is a peer, not a tiebreaker footnote.
+{%- if config.second_opinion and config.second_opinion.models %}
+> **K=2 with cross-model voters ({{ config.second_opinion.models | join(', ') }}):** each
+> adapted second-opinion finding counts as one of the N voices. A finding that reaches
+> `consensus-passed` *because* a second-opinion vote supplied an agreeing voice counts toward
+> `P0_count`/`P1_count` exactly like any reviewer-sourced consensus-passed finding — each model
+> is a peer, not a tiebreaker footnote. The threshold stays K=2 regardless of how many models
+> are enabled (ADR-006).
 {%- endif %}
 
 | P0 | P1 | Grade |

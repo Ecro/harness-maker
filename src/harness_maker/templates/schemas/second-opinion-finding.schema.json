@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Codex Second-Opinion Finding List",
+  "title": "Second-Opinion Finding List",
   "type": "object",
   "additionalProperties": false,
   "required": ["findings", "summary", "confidence"],

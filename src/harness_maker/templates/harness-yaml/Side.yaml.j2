@@ -97,12 +97,15 @@ security:
     spec_gate: warn
 feedback:
   enabled: {{ (config.feedback.enabled if config.feedback else false) | string | lower }}
-codex_second_opinion:
-  enabled: {{ (config.codex_second_opinion.enabled if config.codex_second_opinion else false) | string | lower }}
-  agents: {{ (config.codex_second_opinion.agents if config.codex_second_opinion else ['code-reviewer', 'consensus-arbiter', 'plan-validator']) | tojson }}
-  failure_policy: {{ (config.codex_second_opinion.failure_policy if config.codex_second_opinion else "warn-and-proceed") | tojson }}
-  hermetic: {{ (config.codex_second_opinion.hermetic if config.codex_second_opinion else true) | string | lower }}
-  output_schema_path: {{ (config.codex_second_opinion.output_schema_path if config.codex_second_opinion else ".claude/schemas/codex-finding.schema.json") | tojson }}
+second_opinion:
+  models: {{ (config.second_opinion.models if config.second_opinion else []) | tojson }}
+  agents: {{ (config.second_opinion.agents if config.second_opinion else ['code-reviewer', 'consensus-arbiter', 'plan-validator']) | tojson }}
+  failure_policy: {{ (config.second_opinion.failure_policy if config.second_opinion else "warn-and-proceed") | tojson }}
+  codex:
+    hermetic: {{ (config.second_opinion.codex.hermetic if config.second_opinion else true) | string | lower }}
+    output_schema_path: {{ (config.second_opinion.codex.output_schema_path if config.second_opinion else ".claude/schemas/second-opinion-finding.schema.json") | tojson }}
+  antigravity:
+    model: {{ (config.second_opinion.antigravity.model if config.second_opinion else "Gemini 3.1 Pro (High)") | tojson }}
 delivery_metrics:
   tag_pattern: {{ (config.delivery_metrics.tag_pattern if config.delivery_metrics else "v*") | tojson }}
   default_branch: {{ (config.delivery_metrics.default_branch if config.delivery_metrics else none) | tojson }}

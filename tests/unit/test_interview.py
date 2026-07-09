@@ -110,7 +110,7 @@ def test_interview_interactive_accepts_recommended(monkeypatch: pytest.MonkeyPat
     """Empty answers ⇒ accept recommended locale/preset/dev_mode/starter/defaults."""
     # locale, targets, preset, dev_mode, use-recommended?, default workflow,
     # consensus, caching, ref_folders (blank=skip), sibling_repos (blank=skip),
-    # vault_path (blank=skip), codex_second_opinion (blank=skip/default N).
+    # vault_path (blank=skip), second_opinion (blank=skip/default N).
     # next(inputs, "") fallback handles extra prompts gracefully.
     inputs: Iterator[str] = iter(["", "", "", "", "", "", "", "", "", "", ""])
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs, ""))

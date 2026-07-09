@@ -1,10 +1,11 @@
-"""Codex second-opinion calibration ledger — append-only JSONL (PLAN-crossmodel-codex-gaps ADR-005).
+"""Second-opinion calibration ledger — append-only JSONL (PLAN-crossmodel-codex-gaps ADR-005,
+generalized to multi-vendor by PLAN-second-opinion-multi-model ADR-005).
 
-Records every Codex second-opinion disposition (and every skip) so skip-rate and
-per-project precision can be tracked over time. v1 logs disposition + status only;
+Records every second-opinion disposition (and every skip/failure) so skip-rate and
+per-project precision can be tracked over time, per `model`. v1 logs disposition + status only;
 ``oracle_result`` / ``later_regression_link`` are nullable placeholders for a future
 precision-tracking PLAN. Unlike ``review_telemetry`` this is a single non-partitioned
-file — the ledger is a cross-time calibration record, not a per-day log.
+file — the ledger is a cross-time, cross-vendor calibration record, not a per-day log.
 """
 
 from __future__ import annotations
@@ -22,15 +23,17 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from harness_maker import command_registry
 
 DEFAULT_OBSERVABILITY_DIR = Path(".claude/observability")
-LEDGER_FILENAME = "codex-second-opinion.jsonl"
+LEDGER_FILENAME = "second-opinion.jsonl"
+_LEGACY_LEDGER_FILENAME = "codex-second-opinion.jsonl"
 
 
-class CodexSecondOpinionRecord(BaseModel):
-    """One ledger row per Codex finding disposition (or one skip row per skipped call).
+class SecondOpinionRecord(BaseModel):
+    """One ledger row per second-opinion finding disposition (or one skip/failure row).
 
-    ``codex_status`` / ``disposition`` / ``stage`` are closed enums so the skip-rate
-    aggregation stays parseable. ``skip_reason`` is null on the invoked path;
-    ``oracle_result`` / ``later_regression_link`` are deferred (always null in v1).
+    ``model`` / ``status`` / ``disposition`` / ``stage`` are closed enums so the
+    skip-rate aggregation stays parseable and cross-vendor comparable. ``skip_reason``
+    is null on the invoked path; ``oracle_result`` / ``later_regression_link`` are
+    deferred (always null in v1).
     """
 
     model_config = ConfigDict(strict=True, extra="forbid")
@@ -38,9 +41,10 @@ class CodexSecondOpinionRecord(BaseModel):
     ts: str = Field(max_length=64)
     slug: str = Field(max_length=200)
     stage: Literal["review", "plan"]
+    model: Literal["codex", "antigravity"] = "codex"
     finding_ref: str = Field(max_length=500)
     disposition: Literal["accepted", "rejected", "duplicate", "unresolved"]
-    codex_status: Literal["invoked", "skipped"]
+    status: Literal["invoked", "skipped", "failed"]
     skip_reason: str | None = Field(default=None, max_length=500)
     oracle_result: str | None = Field(default=None, max_length=200)
     later_regression_link: str | None = Field(default=None, max_length=500)
@@ -79,8 +83,47 @@ def _append_atomic_line(path: Path, line: str) -> None:
         os.close(fd)
 
 
+def _migrate_legacy_ledger(base_dir: Path) -> None:
+    """One-time forward-copy of the legacy single-vendor ledger (ADR-005).
+
+    If the legacy ``codex-second-opinion.jsonl`` exists and the new ``second-opinion.jsonl``
+    does not, copy every legacy row forward tagged ``model="codex"`` (the legacy file predates
+    the ``model`` field, so every row it contains is implicitly a Codex row). Idempotent: a
+    no-op once the new file exists, regardless of legacy content — this is a ONE-TIME migration,
+    never a repeated merge. Malformed legacy rows are skipped (best-effort; never raises).
+    """
+    legacy_path = base_dir / _LEGACY_LEDGER_FILENAME
+    new_path = base_dir / LEDGER_FILENAME
+    if new_path.exists() or not legacy_path.exists():
+        return
+    lines: list[str] = []
+    for raw_line in legacy_path.read_text(encoding="utf-8").splitlines():
+        if not raw_line.strip():
+            continue
+        try:
+            data = json.loads(raw_line)
+        except (json.JSONDecodeError, ValueError):
+            continue
+        if not isinstance(data, dict):
+            continue
+        data.setdefault("model", "codex")
+        # Legacy rows used `codex_status`; the new shape is `status`.
+        if "codex_status" in data and "status" not in data:
+            data["status"] = data.pop("codex_status")
+        try:
+            record = SecondOpinionRecord.model_validate(data)
+        except ValidationError:
+            continue
+        lines.append(json.dumps(record.model_dump(), ensure_ascii=False, sort_keys=True))
+    if not lines:
+        return
+    new_path.parent.mkdir(parents=True, exist_ok=True)
+    for line in lines:
+        _append_atomic_line(new_path, line)
+
+
 def emit(
-    record: CodexSecondOpinionRecord,
+    record: SecondOpinionRecord,
     *,
     project_root: Path | None = None,
     observability_dir: Path | None = None,
@@ -103,6 +146,7 @@ def emit(
             base_dir = resolved_base
         else:
             base_dir = resolved_root / base_dir
+    _migrate_legacy_ledger(base_dir)
     path = base_dir / LEDGER_FILENAME
     line = json.dumps(record.model_dump(), ensure_ascii=False, sort_keys=True)
     _append_atomic_line(path, line)
@@ -113,11 +157,11 @@ def record_from_dict(
     data: dict[str, Any],
     *,
     auto_timestamp: bool = True,
-) -> CodexSecondOpinionRecord:
+) -> SecondOpinionRecord:
     """Validate a raw dict against the ledger schema, optionally stamping ``ts``."""
     if auto_timestamp and "ts" not in data:
         data = {**data, "ts": _utc_now_iso()}
-    return CodexSecondOpinionRecord.model_validate(data)
+    return SecondOpinionRecord.model_validate(data)
 
 
 # -- CLI -----------------------------------------------------------------------
@@ -129,9 +173,10 @@ def record_from_dict(
 _ARG_FIELDS: tuple[str, ...] = (
     "slug",
     "stage",
+    "model",
     "finding-ref",
     "disposition",
-    "codex-status",
+    "status",
     "skip-reason",
     "oracle-result",
     "later-regression-link",
