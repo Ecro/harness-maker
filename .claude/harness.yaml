@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.38.0
+harness_maker_version: 0.38.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: harness-yaml/Production.yaml.j2
 provenance: official
-content_hash: ab2fb4ee5990c26183013231338da501ad20bc22e3bf88dafeb01a2e1ac742f6
+content_hash: 40198a7335daeffef2789a56f04e608a2ccd97102a2ae8c29e42c6361b64aa09
 ---
 preset: Production
 locale: ko
@@ -172,7 +172,3 @@ autonomy:
   time_cap_min: null
   extra_deny: []
   autopilot_persistent: true
-
-# @hm:user:extensions — top-level keys preserved across re-renders.
-# Add free-form blocks here (memory:, custom:, etc.); the renderer
-# leaves them alone unless a future template natively emits the key.
