@@ -93,7 +93,7 @@ without that voice and nobody notices.
 > parseable JSON payload via the tolerant adapter, NOT schema validity.
 
 ```bash
-!agy --print --sandbox --print-timeout 120s --model "{{ config.second_opinion.antigravity.model }}" <<< 'Return ONLY a JSON object: {"findings": [], "summary": "smoke", "confidence": null}' > /tmp/hm-agy-smoke.json; echo "exit=$?"; uv run --with {{ harness_maker_src_path }} python -m harness_maker.codex_adapter adapt --model antigravity < /tmp/hm-agy-smoke.json && echo "adapt=ok"; rm -f /tmp/hm-agy-smoke.json
+!agy --print --sandbox --print-timeout 240s --model "{{ config.second_opinion.antigravity.model }}" <<< 'Return ONLY a JSON object: {"findings": [], "summary": "smoke", "confidence": null}' > /tmp/hm-agy-smoke.json; echo "exit=$?"; uv run --with {{ harness_maker_src_path }} python -m harness_maker.codex_adapter adapt --model antigravity < /tmp/hm-agy-smoke.json && echo "adapt=ok"; rm -f /tmp/hm-agy-smoke.json
 ```
 
 - **pass** — exit 0 AND `adapt=ok` (the tolerant adapter found exactly one JSON payload).

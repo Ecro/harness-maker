@@ -32,7 +32,7 @@ def test_smoke_block_present_when_codex_enabled() -> None:
 def test_smoke_block_absent_when_disabled() -> None:
     out = _render_health(models=[])
     assert "codex exec" not in out
-    assert "agy --print --sandbox --print-timeout 120s" not in out
+    assert "agy --print --sandbox --print-timeout 240s" not in out
 
 
 def test_smoke_block_surfaces_explicit_pass_fail() -> None:
@@ -46,7 +46,7 @@ def test_smoke_block_surfaces_explicit_pass_fail() -> None:
 def test_antigravity_smoke_block_uses_timeout_wrapped_agy() -> None:
     """The antigravity smoke recipe must wrap `agy` in `timeout` (Phase-1 hang guard)."""
     out = _render_health(models=["antigravity"])
-    assert "agy --print --sandbox --print-timeout 120s" in out
+    assert "agy --print --sandbox --print-timeout 240s" in out
     assert "adapt --model antigravity" in out
     low = out.lower()
     assert "pass" in low

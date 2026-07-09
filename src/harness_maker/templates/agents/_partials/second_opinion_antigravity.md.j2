@@ -53,7 +53,7 @@ begin with `timeout`, which the `agy`-scoped allow rule cannot match). Do NOT pa
 `--project` / `--new-project` / `--add-dir`:
 
 ```bash
-agy --print --sandbox --print-timeout 120s --model "{{ _model }}" < "$prompt_tmp" > "$out_tmp"; echo "exit=$?"
+agy --print --sandbox --print-timeout 240s --model "{{ _model }}" < "$prompt_tmp" > "$out_tmp"; echo "exit=$?"
 ```
 
 **Adapt (status-guarded).** Only when the `agy` exit was 0, pipe the captured stdout through

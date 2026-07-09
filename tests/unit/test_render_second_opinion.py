@@ -90,8 +90,8 @@ def test_dispatch_partial_loops_both_models_in_review(tmp_path: Path) -> None:
     assert "model: `antigravity`" in review
     # antigravity recipe must use agy's native --print-timeout (Phase-1 hang guard) and begin
     # with `agy` so the scoped Bash(agy --print --sandbox:*) allow rule prefix-matches it (review)
-    assert "agy --print --sandbox --print-timeout 120s" in review
-    assert "timeout 120 agy" not in review  # NOT the external-timeout wrapper (allow-rule miss)
+    assert "agy --print --sandbox --print-timeout 240s" in review
+    assert "timeout 240 agy" not in review  # NOT the external-timeout wrapper (allow-rule miss)
 
 
 def test_plan_uses_second_opinion_results_contract(tmp_path: Path) -> None:
@@ -122,7 +122,7 @@ def test_render_never_shells_out_to_agy(monkeypatch: pytest.MonkeyPatch, tmp_pat
 def test_health_smoke_has_antigravity_block(tmp_path: Path) -> None:
     root = _render(["antigravity"], tmp_path)
     health = (root / "commands/hm/health.md").read_text()
-    assert "agy --print --sandbox --print-timeout 120s" in health
+    assert "agy --print --sandbox --print-timeout 240s" in health
     assert "adapt --model antigravity" in health
 
 
