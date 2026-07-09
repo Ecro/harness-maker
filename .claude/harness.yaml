@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.37.1
+harness_maker_version: 0.38.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: harness-yaml/Production.yaml.j2
 provenance: official
-content_hash: 2db891003b4a5d637b8c15098c854b221996d2f274fc2413f7649be34a491a5e
+content_hash: ab2fb4ee5990c26183013231338da501ad20bc22e3bf88dafeb01a2e1ac742f6
 ---
 preset: Production
 locale: ko
@@ -148,12 +148,15 @@ security:
     spec_gate: block
 feedback:
   enabled: false
-codex_second_opinion:
-  enabled: true
+second_opinion:
+  models: ["codex", "antigravity"]
   agents: ["code-reviewer", "consensus-arbiter", "plan-validator"]
   failure_policy: "warn-and-proceed"
-  hermetic: true
-  output_schema_path: ".claude/schemas/codex-finding.schema.json"
+  codex:
+    hermetic: true
+    output_schema_path: ".claude/schemas/second-opinion-finding.schema.json"
+  antigravity:
+    model: "Gemini 3.1 Pro (High)"
 delivery_metrics:
   tag_pattern: "v*"
   default_branch: null
@@ -169,3 +172,7 @@ autonomy:
   time_cap_min: null
   extra_deny: []
   autopilot_persistent: true
+
+# @hm:user:extensions — top-level keys preserved across re-renders.
+# Add free-form blocks here (memory:, custom:, etc.); the renderer
+# leaves them alone unless a future template natively emits the key.

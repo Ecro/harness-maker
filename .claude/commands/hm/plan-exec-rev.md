@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.37.1
+harness_maker_version: 0.38.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: 7923e25768d3760eed45444d77fdf13b4c3b4521f370103a0c7cc7b6e9d47e04
+content_hash: b7949c0b38279dc53fc555503feb207adf07405a1296b592200eb85749b31722
 ---
 > **Before you begin — outline your plan.** First check whether an autoloop is
 > active **for THIS session** (session-scoped — a loop in another session must
@@ -37,7 +37,7 @@ content_hash: 7923e25768d3760eed45444d77fdf13b4c3b4521f370103a0c7cc7b6e9d47e04
 > via `AskUserQuestion`: "Run the `research → spec → plan → execute → review → verify → wrapup` pipeline
 > on autopilot this session (stages auto-advance when no mandatory gate is pending), or
 > stay gated (stop after each stage)?" On **yes**, run
-> `uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.37.1 python -m harness_maker.autopilot on --level auto_safe --pipeline research,spec,plan,execute,review,verify,wrapup`
+> `uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.0 python -m harness_maker.autopilot on --level auto_safe --pipeline research,spec,plan,execute,review,verify,wrapup`
 > (writes the session marker). On **no**, proceed gated — do not re-prompt unless the user
 > asks. Once the marker exists, later stages skip this picker (the marker is the once-flag).
 >
@@ -103,7 +103,7 @@ Before drafting the plan, surface top-K wiki + failures entries relevant to the 
 
 
 ```bash
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.37.1 python -m harness_maker.memory_retrieve --topic "<topic>" --k 6 --pre-k 30
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.0 python -m harness_maker.memory_retrieve --topic "<topic>" --k 6 --pre-k 30
 ```
 
 
@@ -118,9 +118,9 @@ questions:
 
 
 ```bash
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.37.1 python -m harness_maker.second_brain search '<task slug or topic>' --type decision
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.37.1 python -m harness_maker.second_brain search '<task slug or topic>' --type preference
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.37.1 python -m harness_maker.second_brain search '<task slug or topic>' --type project
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.0 python -m harness_maker.second_brain search '<task slug or topic>' --type decision
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.0 python -m harness_maker.second_brain search '<task slug or topic>' --type preference
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.0 python -m harness_maker.second_brain search '<task slug or topic>' --type project
 ```
 
 
@@ -138,7 +138,7 @@ knowledge, write a typed `decision` or `preference` note through
 
 
 ```bash
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.37.1 python -m harness_maker.worktree task-preflight <slug> "$(pwd)"
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.0 python -m harness_maker.worktree task-preflight <slug> "$(pwd)"
 ```
 
 
@@ -147,7 +147,7 @@ knowledge, write a typed `decision` or `preference` note through
 
 
 ```bash
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.37.1 python -m harness_maker.worktree task-refresh <slug> "$(pwd)"
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.0 python -m harness_maker.worktree task-refresh <slug> "$(pwd)"
 ```
 
 
@@ -181,7 +181,7 @@ This seed is what the interview refines. Investigate code unknowns with Read/Gre
 Before Step 2, check whether `/hm:plan` is running inside an active `/hm:loop` iteration. **Detection is session-scoped** (PLAN-loop-marker-session-scoping) — it keys on THIS Claude session, so a loop running in *another* session never makes your standalone `/hm:plan` skip its interview. Locate the project root (strip any `/.worktrees/<wt-name>/` suffix from cwd, or `git -C . rev-parse --show-toplevel` then walk up out of `.worktrees/`), then run:
 
 ```bash
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.37.1 python -m harness_maker.worktree loop-mode-active "<PROJECT_ROOT>" --claude-session-id "$HM_SESSION_ID"
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.0 python -m harness_maker.worktree loop-mode-active "<PROJECT_ROOT>" --claude-session-id "$HM_SESSION_ID"
 ```
 
 - **Exit 0 (`active`)** → loop-mode: some `.claude/.hm-loop-*` marker's content header matches YOUR `session_id` (or a legacy global `.hm-loop-active` exists — degraded fallback). Do NOT engage the deep interview (loop body cannot block on `AskUserQuestion`). Scope the plan to the next master-PLAN phase only.
@@ -433,18 +433,22 @@ After the gate PASSes (or user accepts ambiguity), continue to next round UNLESS
 
 After the internal plan is complete (interview done, draft synthesized), invoke the `plan-validator` agent to critique it before writing to disk:
 
-**Step 4 (pre) — main-loop Codex second opinion (ADR-002/005, PLAN-codex-second-opinion-sandbox).**
-The **main loop** (this stage prompt) runs Codex — the `plan-validator` agent is tool-restricted
-(`Read, Grep, Glob`, no Bash) and cannot. The main loop runs `codex exec`, decides
-invoked-vs-skipped + the skip reason, adapts the findings, and **injects** them into the
-`plan-validator` Task() prompt below. The agent then *reconciles* the pre-injected findings and
-echoes the main-loop-supplied `codex_status` — it never runs Codex itself.
+**Step 4 (pre) — main-loop cross-model second opinion (ADR-002/005/011, PLAN-second-opinion-multi-model).**
+The **main loop** (this stage prompt) runs each enabled second-opinion model — the
+`plan-validator` agent is tool-restricted (`Read, Grep, Glob`, no Bash) and cannot. For every
+model in `second_opinion.models` (codex, antigravity) the main loop
+runs the CLI, decides invoked-vs-skipped + the skip reason, adapts the findings, and **injects**
+them into the `plan-validator` Task() prompt below. The agent then *reconciles* the pre-injected
+findings and echoes the main-loop-supplied per-model status — it never runs any CLI itself.
 
-**Mandatory gate (ADR-002/003 matrix):**
-- Production preset → run Codex on **every** plan validation (no high-diff gate).
+**Mandatory gate (ADR-003 matrix — applies uniformly to EVERY enabled model):**
+- Production preset → run **every** enabled model on **every** plan validation (no high-diff gate).
 
 
-**Invoke.** Run Codex as a separate, sandbox-isolated step. Do NOT build the
+
+#### Second opinion — model: `codex`
+
+**Invoke (codex).** Run Codex as a separate, sandbox-isolated step. Do NOT build the
 prompt inside the same shell line as the `codex exec` call.
 
 First create the temp files (ordinary sandboxed Bash) and note the two paths:
@@ -467,7 +471,7 @@ Finally run `codex exec` as its **own** Bash call — the command MUST begin wit
 `codex exec` so the `Bash(codex exec:*)` allow rule matches it:
 
 ```bash
-codex exec --sandbox read-only --ignore-user-config --ignore-rules --output-schema .claude/schemas/codex-finding.schema.json --output-last-message "$out_tmp" - < "$prompt_tmp"; echo "exit=$?"
+codex exec --sandbox read-only --ignore-user-config --ignore-rules --output-schema .claude/schemas/second-opinion-finding.schema.json --output-last-message "$out_tmp" - < "$prompt_tmp"; echo "exit=$?"
 ```
 
 **Adapt (status-guarded).** Only when the `codex exec` exit was 0, pipe the
@@ -477,35 +481,108 @@ output file through the adapter (deterministic — it maps severity
 untrusted Codex content out of the shell). Always clean up the temp files:
 
 ```bash
-if [ "$exit" -eq 0 ]; then uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.37.1 python -m harness_maker.codex_adapter adapt < "$out_tmp"; fi; rm -f "$prompt_tmp" "$out_tmp"
+if [ "$exit" -eq 0 ]; then uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.0 python -m harness_maker.codex_adapter adapt --model codex < "$out_tmp"; fi; rm -f "$prompt_tmp" "$out_tmp"
 ```
 
-**Skip relay (mandatory surfacing):** on a non-zero `codex exec` exit set
-`codex_status: "skipped"` + a one-line `codex_skip_reason`, surface it (do NOT block
-— warn-and-proceed), and append a best-effort ledger row. Pass each value as a
-**separate `--flag`** (never inline an untrusted cause into a shell-quoted JSON blob
-— REVIEW security P1):
+**Skip relay (graceful degrade — ANY non-zero exit).** A non-zero `codex exec` exit means
+the second opinion could not complete — the CLI is missing/removed (exit 127), `codex login`
+expired, a rate-limit / subscription cap was hit, or the call errored. In every such case set
+`status: "skipped"` for `model: "codex"` + a one-line reason, surface it (do NOT block —
+warn-and-proceed), and append a best-effort ledger row. Pass each value as a **separate
+`--flag`** (never inline an untrusted cause into a shell-quoted JSON blob — REVIEW security P1):
 
 ```bash
-reason="<one-line cause>"; uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.37.1 python -m harness_maker.codex_ledger emit --slug "<slug>" --stage plan --finding-ref "n/a" --disposition unresolved --codex-status skipped --skip-reason "$reason"
+reason="<one-line cause>"; uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.0 python -m harness_maker.codex_ledger emit --slug "<slug>" --stage plan --model codex --finding-ref "n/a" --disposition unresolved --status skipped --skip-reason "$reason"
 ```
 
-On success set `codex_status: "invoked"`. A silently-degraded Codex is the H4 failure
-mode — the `/hm:health` smoke check is the positive backstop.
+On success set `status: "invoked"` for codex. A silently-degraded second opinion is the H4
+failure mode — the `/hm:health` smoke check is the positive backstop.
 
-**Ownership contract (ADR-005):**
+
+#### Second opinion — model: `antigravity`
+
+**Invoke (antigravity).** Run `agy` as a separate, sandbox-isolated step. Do NOT build the
+prompt inside the same shell line as the `agy` call.
+
+First create the temp files (ordinary sandboxed Bash):
+
+```bash
+prompt_tmp=$(mktemp); out_tmp=$(mktemp); printf 'prompt=%s\nout=%s\n' "$prompt_tmp" "$out_tmp"
+```
+
+Then write the diff + plan context to the prompt-file path **using the Write tool** —
+not a shell variable (verbatim bytes; adversarial diff text is never shell-expanded). The
+prompt MUST instruct `agy` to return ONLY a JSON object matching the second-opinion finding
+schema (agy has no CLI-level schema enforcement, so the instruction is the only shape signal).
+
+> **Sandbox escape (ADR-003, Claude Code only).** The `agy` call needs outbound network,
+> which Claude Code's Bash sandbox blocks. Run THIS ONE Bash call with the Bash tool parameter
+> **`dangerouslyDisableSandbox: true`** — the `Bash(agy --print --sandbox:*)` settings `allow`
+> rule pre-approves the prompt (the command begins with `agy --print --sandbox` so the scoped
+> rule prefix-matches it), and `agy` stays contained by `--sandbox` + the project-less
+> invocation (no file tools exposed — see the Phase-1 probe). Do NOT disable the sandbox for
+> any other command.
+Finally run `agy` as its **own** Bash call — the command MUST begin with `agy --print
+--sandbox` (so the scoped `Bash(agy --print --sandbox:*)` allow rule prefix-matches it) and use
+agy's **native** `--print-timeout` (a file-request can hang; the native timeout turns that into
+a non-zero exit → graceful skip). Do NOT wrap in external `timeout` (that would make the command
+begin with `timeout`, which the `agy`-scoped allow rule cannot match). Do NOT pass
+`--project` / `--new-project` / `--add-dir`:
+
+```bash
+agy --print --sandbox --print-timeout 120s --model "Gemini 3.1 Pro (High)" < "$prompt_tmp" > "$out_tmp"; echo "exit=$?"
+```
+
+**Adapt (status-guarded).** Only when the `agy` exit was 0, pipe the captured stdout through
+the adapter with `--model antigravity` (tolerant fail-closed parse — strips markdown fences,
+scans for exactly one JSON payload; maps severity `critical→P0 / high→P1 / medium→P2 /
+low,info→P3`, sets `source: "antigravity"`, sets `needs_relaxation: true` on null location).
+Always clean up the temp files:
+
+```bash
+if [ "$exit" -eq 0 ]; then uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.0 python -m harness_maker.codex_adapter adapt --model antigravity < "$out_tmp"; fi; rm -f "$prompt_tmp" "$out_tmp"
+```
+
+**Skip relay (graceful degrade — ANY non-zero exit OR unparseable output).** A non-zero exit
+means the second opinion could not complete — `agy` missing/removed (exit 127), unauthenticated,
+a rate-limit / subscription cap hit, or a print-timeout. Use `status: "skipped"` for these. A
+**zero** exit whose adapter run FAILS (the fail-closed parser could not find exactly one JSON
+payload) is a distinct case — use `status: "failed"` so the calibration ledger separates genuine
+parse-failures from availability skips. Substitute the matching value into `--status
+<skipped|failed>` below (do NOT hardcode `skipped` for the parse-failure case — that inflates the
+skip-rate and zeroes the failure-rate this telemetry exists to track). In every case surface a
+one-line reason (do NOT block — warn-and-proceed) and append a best-effort ledger row (each value
+a **separate `--flag`**):
+
+```bash
+reason="<one-line cause>"; uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.0 python -m harness_maker.codex_ledger emit --slug "<slug>" --stage plan --model antigravity --finding-ref "n/a" --disposition unresolved --status <skipped|failed> --skip-reason "$reason"
+```
+
+On success set `status: "invoked"` for antigravity. A silently-degraded second opinion is the
+H4 failure mode — the `/hm:health` smoke check is the positive backstop.
+
+
+> **Per-model result contract.** Each enabled model above produces exactly one outcome:
+> `status: invoked` (findings adapted + folded in) or `status: skipped`/`failed` (graceful
+> degrade, ledger row written). A missing/unauthenticated/rate-limited CLI never blocks the
+> stage — it warns and proceeds. Record every model's outcome in `second_opinion_results`.
+
+**Ownership contract (ADR-005/011):**
 
 | Owner | Responsibility |
 |-------|----------------|
-| Main loop (this prompt) | Run `codex exec`; decide invoked-vs-skipped + `codex_skip_reason`; adapt findings; inject findings + `codex_status` + `codex_skip_reason` into the validator Task() prompt. |
-| `plan-validator` agent | Reconcile the **pre-injected** findings (no Bash, no `codex exec`); emit `codex_status` (echo the main-loop value) + `codex_reconciliation` in its JSON. |
-| On skip | Injected findings empty → agent returns `codex_status: "skipped"`, `codex_reconciliation: []`. |
+| Main loop (this prompt) | Run each enabled model's CLI; decide invoked/skipped/failed + skip reason per model; adapt findings; inject findings + a per-model `second_opinion_results` entry into the validator Task() prompt. |
+| `plan-validator` agent | Reconcile the **pre-injected** findings (no Bash, no CLI); emit `second_opinion_results` (echo the main-loop per-model status) in its JSON. |
+| On skip/fail | Injected findings empty for that model → its `second_opinion_results` entry carries `status: skipped` (or `failed`) with an empty `reconciliation`. |
+
+Exactly one `second_opinion_results` entry per enabled model — success, skip, and failure paths
+all produce one entry (never zero, never duplicated).
 
 ```
 Task(
   subagent_type="plan-validator",
   description="Plan validator: {slug}",
-  prompt="<full draft PLAN body + Interview Transcript + ADRs>\n\nCodex second opinion (main-loop supplied — codex_status: <invoked|skipped>, codex_skip_reason: <reason or n/a>):\n<adapted Codex findings JSON from the Step 4 (pre) adapter, or [] on skip>\n\nReconcile every injected Codex finding (disposition + reason); echo the supplied codex_status in your output.\n\nReturn JSON: {overall: APPROVED|NEEDS_REVISION|MAJOR_REVISION, critiques: [...], codex_status: invoked|skipped, codex_reconciliation: [...]}"
+  prompt="<full draft PLAN body + Interview Transcript + ADRs>\n\nCross-model second opinion (main-loop supplied — one entry per model in [codex, antigravity], each with status invoked|skipped|failed + skip reason):\n<adapted findings JSON per model from the Step 4 (pre) adapter, or [] on skip/fail>\n\nReconcile every injected finding (disposition + reason); echo the supplied per-model status in your output.\n\nReturn JSON: {overall: APPROVED|NEEDS_REVISION|MAJOR_REVISION, critiques: [...], second_opinion_results: [{model, status: invoked|skipped|failed, reconciliation: [...]}, ...]}"
 )
 ```
 
@@ -518,7 +595,7 @@ Resolution:
 
 Each follow-up interview answer is appended to `## 🎙️ Interview Transcript` and promoted to ADR when Step D criteria apply.
 
-> **Codex second-opinion relay (main loop owns the call — ADR-005).** The Step 4 (pre) main-loop step already ran (or skipped) Codex and injected the result into the validator; the agent only reconciles it. After reading the validator's returned JSON and **before** resolving the verdict, inspect its top-level `codex_status` (it echoes the main-loop value). If it is `"skipped"`, the Codex call could not complete — surface the `codex_skip_reason` you recorded in Step 4 (pre) to the user in your turn output (one line, e.g. `⚠️ Codex second opinion skipped: <reason> — verdict is Claude-only`). This is a loud notice, **not** a block: resolve the verdict regardless, since it is Claude-derived and valid without Codex.
+> **Cross-model second-opinion relay (main loop owns the call — ADR-005/011).** The Step 4 (pre) main-loop step already ran (or skipped) each enabled model and injected the results into the validator; the agent only reconciles them. After reading the validator's returned JSON and **before** resolving the verdict, inspect its `second_opinion_results` array (each entry echoes the main-loop per-model status). For every entry whose `status` is `"skipped"` or `"failed"`, the model's call could not complete — surface the reason you recorded in Step 4 (pre) to the user in your turn output (one line per model, e.g. `⚠️ Second opinion skipped (antigravity): <reason> — verdict is Claude-only for that model`). This is a loud notice, **not** a block: resolve the verdict regardless, since it is Claude-derived and valid without any second-opinion model.
 
 ### Step 5 — Write PLAN document
 
@@ -591,7 +668,7 @@ The shell guard below makes the receipt a no-op when `.current-iter` is absent �
 !if [ -f "<WT>/.claude/.hm-iter-receipts/.current-iter" ]; then \
    ITER=$(cat "<WT>/.claude/.hm-iter-receipts/.current-iter" 2>/dev/null); \
    if [ -n "$ITER" ]; then \
-     uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.37.1 python -m harness_maker.iter_receipts write \
+     uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.0 python -m harness_maker.iter_receipts write \
        --iter "$ITER" --stage plan --verdict <verdict> --root "<WT>"; \
    fi; \
  fi
@@ -711,7 +788,7 @@ Before any code edits, load memory in tier order (stops at first miss):
 
 
 ```bash
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.37.1 python -m harness_maker.worktree task-preflight <slug> "$(pwd)"
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.0 python -m harness_maker.worktree task-preflight <slug> "$(pwd)"
 ```
 
 
@@ -720,7 +797,7 @@ Before any code edits, load memory in tier order (stops at first miss):
 
 
 ```bash
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.37.1 python -m harness_maker.worktree task-refresh <slug> "$(pwd)"
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.0 python -m harness_maker.worktree task-refresh <slug> "$(pwd)"
 ```
 
 
@@ -930,7 +1007,7 @@ when this PLAN phase authored bindable-mechanical-AC tests and the machine SPEC 
 
 
 ```bash
-!cd <WT> && uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.37.1 python -m harness_maker.spec_mutation gate --yaml specs/SPEC-{slug}.machine.yaml --tier 1
+!cd <WT> && uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.0 python -m harness_maker.spec_mutation gate --yaml specs/SPEC-{slug}.machine.yaml --tier 1
 ```
 
 
@@ -975,7 +1052,7 @@ The shell guard below makes the receipt a no-op when `.current-iter` is absent �
 !if [ -f "<WT>/.claude/.hm-iter-receipts/.current-iter" ]; then \
    ITER=$(cat "<WT>/.claude/.hm-iter-receipts/.current-iter" 2>/dev/null); \
    if [ -n "$ITER" ]; then \
-     uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.37.1 python -m harness_maker.iter_receipts write \
+     uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.0 python -m harness_maker.iter_receipts write \
        --iter "$ITER" --stage execute --verdict <verdict> --root "<WT>"; \
    fi; \
  fi
@@ -1002,12 +1079,12 @@ Pick **exactly one** finalize command. Substitute `<WT>` with the literal absolu
 ```bash
 # All phases GREEN — stage-merge the branch back (NO commit) + cleanup the worktree.
 # /hm:wrapup will create the single user-facing commit (with proper message + Co-Authored-By).
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.37.1 python -m harness_maker.worktree finalize <WT> stage-only
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.0 python -m harness_maker.worktree finalize <WT> stage-only
 ```
 
 ```bash
 # Stage halted on a blocker — preserve the worktree for inspection:
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.37.1 python -m harness_maker.worktree finalize <WT> fail
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.0 python -m harness_maker.worktree finalize <WT> fail
 ```
 
 
@@ -1023,7 +1100,7 @@ of a `hm/<slug>` task worktree is empty → nothing recorded, by design.
 
 
 ```bash
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.37.1 python -m harness_maker.worktree owned-crumb-add "$(pwd)" <slug> "$(uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.37.1 python -m harness_maker.worktree wt-uuid <WT>)"
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.0 python -m harness_maker.worktree owned-crumb-add "$(pwd)" <slug> "$(uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.0 python -m harness_maker.worktree wt-uuid <WT>)"
 ```
 
 
@@ -1039,7 +1116,7 @@ commit; otherwise the user's pre-existing WIP remains in the stash queue:
 
 
 ```bash
-!HM_OWNED_SESSION_UUIDS="$(uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.37.1 python -m harness_maker.worktree owned-crumb-read "$(pwd)" <slug>)" uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.37.1 python -m harness_maker.worktree post-commit-pop "$(pwd)"
+!HM_OWNED_SESSION_UUIDS="$(uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.0 python -m harness_maker.worktree owned-crumb-read "$(pwd)" <slug>)" uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.0 python -m harness_maker.worktree post-commit-pop "$(pwd)"
 ```
 
 
@@ -1134,8 +1211,8 @@ them to recognize known-good patterns and repeated failure modes:
 
 
 ```bash
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.37.1 python -m harness_maker.second_brain search '<changed area or task slug>' --type failure
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.37.1 python -m harness_maker.second_brain search '<changed area or task slug>' --type preference
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.0 python -m harness_maker.second_brain search '<changed area or task slug>' --type failure
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.0 python -m harness_maker.second_brain search '<changed area or task slug>' --type preference
 ```
 
 
@@ -1165,7 +1242,7 @@ Per-invocation overrides (workflow command flags):
 
 
 ```bash
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.37.1 python -m harness_maker.worktree task-preflight <slug> "$(pwd)"
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.0 python -m harness_maker.worktree task-preflight <slug> "$(pwd)"
 ```
 
 
@@ -1174,7 +1251,7 @@ Per-invocation overrides (workflow command flags):
 
 
 ```bash
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.37.1 python -m harness_maker.worktree task-refresh <slug> "$(pwd)"
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.0 python -m harness_maker.worktree task-refresh <slug> "$(pwd)"
 ```
 
 
@@ -1256,7 +1333,7 @@ anchoring-prone diffs):
    author / commit message redacted. Pipe the JSON context through the
    harness CLI rather than redacting in prose:
    ```bash
-   echo '<full_context_json>' | uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.37.1 python -m harness_maker.two_pass_review redact
+   echo '<full_context_json>' | uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.0 python -m harness_maker.two_pass_review redact
    ```
    The CLI returns a JSON object with the same fields but anchoring values
    replaced by `[REDACTED]`.
@@ -1297,30 +1374,37 @@ Pass 2 instead of the raw Pass 1 list. Log `stats.dropped_n` for telemetry.
 4. Merge the two passes via the harness CLI:
    
    ```bash
-   echo '{"pass1": [...], "pass2": [...]}' | uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.37.1 python -m harness_maker.two_pass_review merge
+   echo '{"pass1": [...], "pass2": [...]}' | uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.0 python -m harness_maker.two_pass_review merge
    ```
    
    Pass 2 is authoritative — Pass 1 findings absent from Pass 2 are
    invalidated by context and **dropped** (CP10 contract).
 5. The merged finding list is the input to the consensus filter (Step 4).
-### Step 3.5 — Codex heterogeneous voter (ADR-001, PLAN-crossmodel-codex-gaps)
+### Step 3.5 — Cross-model heterogeneous voters (ADR-001/006, PLAN-second-opinion-multi-model)
 
-`codex_second_opinion.enabled` is set, so Codex joins Step 4 as a **third voter**
-(2 Claude reviewers + 1 Codex → **k-of-3**), not an advisory side-channel.
+`second_opinion.models` is set (codex, antigravity), so each
+enabled model joins Step 4 as a **full heterogeneous voter** — the voter pool grows to
+**N = (enabled Claude reviewers) + 2** voices, not an
+advisory side-channel. The consensus threshold stays **K = 2** (any 2 voices agreeing →
+`consensus-passed`, ADR-006): more models make agreement *easier* to reach (recall-favoring),
+never a rising bar.
 
-**Mandatory gate (ADR-002/003 matrix):**
-- Production preset → invoke Codex on **every** review.
-- Side preset → invoke Codex only on a **high-diff** change. Classify first — note
-  `HEAD` (the post-execute diff is staged, so a bare `git diff` would see nothing) and
+**Mandatory gate (ADR-003 matrix — applies uniformly to EVERY enabled model):**
+- Production preset → invoke **every** enabled model on **every** review.
+- Side preset → invoke **every** enabled model only on a **high-diff** change. Classify first —
+  note `HEAD` (the post-execute diff is staged, so a bare `git diff` would see nothing) and
   `--numstat` for the added-line count that drives the `boundary` signal:
   ```bash
-  files=$(git diff --name-only HEAD); added=$(git diff --numstat HEAD | awk '{s+=$1} END{print s+0}'); printf '%s\n' "$files" | uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.37.1 python -m harness_maker.high_diff classify --added-lines "$added"
+  files=$(git diff --name-only HEAD); added=$(git diff --numstat HEAD | awk '{s+=$1} END{print s+0}'); printf '%s\n' "$files" | uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.0 python -m harness_maker.high_diff classify --added-lines "$added"
   ```
   Invoke when `is_high` (or `boundary` and your judgment, reusing the When-to-Run
-  criteria, says high). Otherwise skip Codex this round (no third voter).
+  criteria, says high). Otherwise skip all models this round (no extra voters).
 
 
-**Invoke.** Run Codex as a separate, sandbox-isolated step. Do NOT build the
+
+#### Second opinion — model: `codex`
+
+**Invoke (codex).** Run Codex as a separate, sandbox-isolated step. Do NOT build the
 prompt inside the same shell line as the `codex exec` call.
 
 First create the temp files (ordinary sandboxed Bash) and note the two paths:
@@ -1343,7 +1427,7 @@ Finally run `codex exec` as its **own** Bash call — the command MUST begin wit
 `codex exec` so the `Bash(codex exec:*)` allow rule matches it:
 
 ```bash
-codex exec --sandbox read-only --ignore-user-config --ignore-rules --output-schema .claude/schemas/codex-finding.schema.json --output-last-message "$out_tmp" - < "$prompt_tmp"; echo "exit=$?"
+codex exec --sandbox read-only --ignore-user-config --ignore-rules --output-schema .claude/schemas/second-opinion-finding.schema.json --output-last-message "$out_tmp" - < "$prompt_tmp"; echo "exit=$?"
 ```
 
 **Adapt (status-guarded).** Only when the `codex exec` exit was 0, pipe the
@@ -1353,23 +1437,94 @@ output file through the adapter (deterministic — it maps severity
 untrusted Codex content out of the shell). Always clean up the temp files:
 
 ```bash
-if [ "$exit" -eq 0 ]; then uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.37.1 python -m harness_maker.codex_adapter adapt < "$out_tmp"; fi; rm -f "$prompt_tmp" "$out_tmp"
+if [ "$exit" -eq 0 ]; then uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.0 python -m harness_maker.codex_adapter adapt --model codex < "$out_tmp"; fi; rm -f "$prompt_tmp" "$out_tmp"
 ```
 
-**Skip relay (mandatory surfacing):** on a non-zero `codex exec` exit set
-`codex_status: "skipped"` + a one-line `codex_skip_reason`, surface it (do NOT block
-— warn-and-proceed), and append a best-effort ledger row. Pass each value as a
-**separate `--flag`** (never inline an untrusted cause into a shell-quoted JSON blob
-— REVIEW security P1):
+**Skip relay (graceful degrade — ANY non-zero exit).** A non-zero `codex exec` exit means
+the second opinion could not complete — the CLI is missing/removed (exit 127), `codex login`
+expired, a rate-limit / subscription cap was hit, or the call errored. In every such case set
+`status: "skipped"` for `model: "codex"` + a one-line reason, surface it (do NOT block —
+warn-and-proceed), and append a best-effort ledger row. Pass each value as a **separate
+`--flag`** (never inline an untrusted cause into a shell-quoted JSON blob — REVIEW security P1):
 
 ```bash
-reason="<one-line cause>"; uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.37.1 python -m harness_maker.codex_ledger emit --slug "<slug>" --stage review --finding-ref "n/a" --disposition unresolved --codex-status skipped --skip-reason "$reason"
+reason="<one-line cause>"; uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.0 python -m harness_maker.codex_ledger emit --slug "<slug>" --stage review --model codex --finding-ref "n/a" --disposition unresolved --status skipped --skip-reason "$reason"
 ```
 
-On success set `codex_status: "invoked"`. A silently-degraded Codex is the H4 failure
-mode — the `/hm:health` smoke check is the positive backstop.
+On success set `status: "invoked"` for codex. A silently-degraded second opinion is the H4
+failure mode — the `/hm:health` smoke check is the positive backstop.
 
-Add the emitted adapted findings to the Step 4 input list as the third source.
+
+#### Second opinion — model: `antigravity`
+
+**Invoke (antigravity).** Run `agy` as a separate, sandbox-isolated step. Do NOT build the
+prompt inside the same shell line as the `agy` call.
+
+First create the temp files (ordinary sandboxed Bash):
+
+```bash
+prompt_tmp=$(mktemp); out_tmp=$(mktemp); printf 'prompt=%s\nout=%s\n' "$prompt_tmp" "$out_tmp"
+```
+
+Then write the diff + review context to the prompt-file path **using the Write tool** —
+not a shell variable (verbatim bytes; adversarial diff text is never shell-expanded). The
+prompt MUST instruct `agy` to return ONLY a JSON object matching the second-opinion finding
+schema (agy has no CLI-level schema enforcement, so the instruction is the only shape signal).
+
+> **Sandbox escape (ADR-003, Claude Code only).** The `agy` call needs outbound network,
+> which Claude Code's Bash sandbox blocks. Run THIS ONE Bash call with the Bash tool parameter
+> **`dangerouslyDisableSandbox: true`** — the `Bash(agy --print --sandbox:*)` settings `allow`
+> rule pre-approves the prompt (the command begins with `agy --print --sandbox` so the scoped
+> rule prefix-matches it), and `agy` stays contained by `--sandbox` + the project-less
+> invocation (no file tools exposed — see the Phase-1 probe). Do NOT disable the sandbox for
+> any other command.
+Finally run `agy` as its **own** Bash call — the command MUST begin with `agy --print
+--sandbox` (so the scoped `Bash(agy --print --sandbox:*)` allow rule prefix-matches it) and use
+agy's **native** `--print-timeout` (a file-request can hang; the native timeout turns that into
+a non-zero exit → graceful skip). Do NOT wrap in external `timeout` (that would make the command
+begin with `timeout`, which the `agy`-scoped allow rule cannot match). Do NOT pass
+`--project` / `--new-project` / `--add-dir`:
+
+```bash
+agy --print --sandbox --print-timeout 120s --model "Gemini 3.1 Pro (High)" < "$prompt_tmp" > "$out_tmp"; echo "exit=$?"
+```
+
+**Adapt (status-guarded).** Only when the `agy` exit was 0, pipe the captured stdout through
+the adapter with `--model antigravity` (tolerant fail-closed parse — strips markdown fences,
+scans for exactly one JSON payload; maps severity `critical→P0 / high→P1 / medium→P2 /
+low,info→P3`, sets `source: "antigravity"`, sets `needs_relaxation: true` on null location).
+Always clean up the temp files:
+
+```bash
+if [ "$exit" -eq 0 ]; then uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.0 python -m harness_maker.codex_adapter adapt --model antigravity < "$out_tmp"; fi; rm -f "$prompt_tmp" "$out_tmp"
+```
+
+**Skip relay (graceful degrade — ANY non-zero exit OR unparseable output).** A non-zero exit
+means the second opinion could not complete — `agy` missing/removed (exit 127), unauthenticated,
+a rate-limit / subscription cap hit, or a print-timeout. Use `status: "skipped"` for these. A
+**zero** exit whose adapter run FAILS (the fail-closed parser could not find exactly one JSON
+payload) is a distinct case — use `status: "failed"` so the calibration ledger separates genuine
+parse-failures from availability skips. Substitute the matching value into `--status
+<skipped|failed>` below (do NOT hardcode `skipped` for the parse-failure case — that inflates the
+skip-rate and zeroes the failure-rate this telemetry exists to track). In every case surface a
+one-line reason (do NOT block — warn-and-proceed) and append a best-effort ledger row (each value
+a **separate `--flag`**):
+
+```bash
+reason="<one-line cause>"; uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.0 python -m harness_maker.codex_ledger emit --slug "<slug>" --stage review --model antigravity --finding-ref "n/a" --disposition unresolved --status <skipped|failed> --skip-reason "$reason"
+```
+
+On success set `status: "invoked"` for antigravity. A silently-degraded second opinion is the
+H4 failure mode — the `/hm:health` smoke check is the positive backstop.
+
+
+> **Per-model result contract.** Each enabled model above produces exactly one outcome:
+> `status: invoked` (findings adapted + folded in) or `status: skipped`/`failed` (graceful
+> degrade, ledger row written). A missing/unauthenticated/rate-limited CLI never blocks the
+> stage — it warns and proceeds. Record every model's outcome in `second_opinion_results`.
+
+Add each model's emitted adapted findings to the Step 4 input list as additional sources
+(tagged `source: "<model>"`).
 
 ### Step 4 — Consensus filter (surface + reasoning alignment)
 
@@ -1382,14 +1537,15 @@ Two findings are consensus *candidates* iff they satisfy BOTH:
 2. Same `severity` tier (P0 vs P0; P1 vs P1; do not bridge tiers).
 
 Pairs failing surface match are recorded as **independent** findings — preserve both.
-**Codex null-location relaxation (ADR-001):** a finding with `source: "codex"` and
+**Second-opinion null-location relaxation (ADR-001):** a finding whose `source` is one of
+the enabled models (codex, antigravity) with
 `needs_relaxation: true` (null `file`/`line`) cannot satisfy predicate 1 as written.
 For these, substitute **symbol/message-similarity**: it is a candidate when its
 `summary`/message clearly refers to the same symbol or defect as a Claude finding
 (same function/class, or same described failure mode), with predicate 2 (severity
-tier) still required — the adapter already mapped Codex severities to P-tiers so the
-tiers are directly comparable. Without this relaxation a null-location Codex finding
-would always degrade to `manual-only`, making the third vote cosmetic.
+tier) still required — the adapter already mapped severities to P-tiers so the
+tiers are directly comparable. Without this relaxation a null-location second-opinion finding
+would always degrade to `manual-only`, making its vote cosmetic.
 
 #### Step 4b — Reasoning alignment (verification)
 
@@ -1451,10 +1607,12 @@ Count **`consensus-passed`** findings only by severity:
 - `P1_count` = consensus-passed findings with severity P1.
 
 P2/P3, weak-consensus, and manual-only findings do NOT lower the grade.
-> **k-of-3 with Codex:** the adapted Codex finding counts as one of the three voices.
-> A finding that reaches `consensus-passed` *because* the Codex vote supplied an
-> agreeing voice counts toward `P0_count`/`P1_count` exactly like any reviewer-sourced
-> consensus-passed finding — Codex is a peer, not a tiebreaker footnote.
+> **K=2 with cross-model voters (codex, antigravity):** each
+> adapted second-opinion finding counts as one of the N voices. A finding that reaches
+> `consensus-passed` *because* a second-opinion vote supplied an agreeing voice counts toward
+> `P0_count`/`P1_count` exactly like any reviewer-sourced consensus-passed finding — each model
+> is a peer, not a tiebreaker footnote. The threshold stays K=2 regardless of how many models
+> are enabled (ADR-006).
 
 | P0 | P1 | Grade |
 |----|----|-------|
@@ -1583,7 +1741,7 @@ runs. Don't interpolate `wall_time_ms` into any other rendered template
 
 
 ```bash
-echo '<record_json>' | uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.37.1 python -m harness_maker.review_telemetry emit
+echo '<record_json>' | uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.0 python -m harness_maker.review_telemetry emit
 ```
 
 
@@ -1608,7 +1766,7 @@ The shell guard below makes the receipt a no-op when `.current-iter` is absent �
 !if [ -f "<WT>/.claude/.hm-iter-receipts/.current-iter" ]; then \
    ITER=$(cat "<WT>/.claude/.hm-iter-receipts/.current-iter" 2>/dev/null); \
    if [ -n "$ITER" ]; then \
-     uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.37.1 python -m harness_maker.iter_receipts write \
+     uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.0 python -m harness_maker.iter_receipts write \
        --iter "$ITER" --stage review --verdict <verdict> --root "<WT>"; \
    fi; \
  fi
