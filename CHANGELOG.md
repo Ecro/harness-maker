@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+## [0.38.1] - 2026-07-10
+
+### Fixed
+- **Antigravity second-opinion `--print-timeout` raised 120s → 240s**
+  (`_partials/second_opinion_antigravity.md.j2`, `health.md.j2`). A
+  high-reasoning-effort `Gemini 3.1 Pro (High)` review of a realistic
+  plan+diff prompt (~76 KB / 1580 lines) measured **~148s** wall-clock — over
+  the old 120s cap, so a legitimate second-opinion call was skipped as a false
+  timeout (the exact spurious-skip a user hit). 240s stays under `agy`'s own
+  300s default, preserving ADR-011's hang-bound intent. Test assertions
+  pinning the value updated.
+- **CLAUDE.md ADR-011 note corrected**: it described a nonexistent external
+  `timeout 120` wrapper + `exit 124`; the design uses `agy`'s native
+  `--print-timeout` (the external wrapper is banned so the scoped
+  `Bash(agy --print --sandbox:*)` allow-rule prefix-matches).
+
 ## [0.38.0] - 2026-07-09
 
 ### Added — multi-model cross-model second opinion (`second_opinion.models`)

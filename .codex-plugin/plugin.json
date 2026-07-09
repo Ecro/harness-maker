@@ -1,6 +1,6 @@
 {
   "name": "harness-maker",
-  "version": "0.38.0",
+  "version": "0.38.1",
   "description": "Per-project AI coding harness for Claude Code · Cursor · Codex. No native Codex marketplace install today — see README for working install paths.",
   "author": {
     "name": "noel"
