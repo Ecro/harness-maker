@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.39.0] - 2026-07-10
+
 ### Changed — session memory tier slimmed to compaction-checkpoint-only
 - **`.claude/memory/session/<date>.md` is now compaction-checkpoint-only** (ADR-001,
   PLAN-session-tier-slim). The wrapup Step 5.5 decision-journal writer is removed and
