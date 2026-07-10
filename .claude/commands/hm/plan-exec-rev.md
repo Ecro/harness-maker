@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.38.1
+harness_maker_version: 0.39.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: commands/hm/workflow_command.md.j2
 provenance: official
-content_hash: 400911fcf02311d19f604c672326b10f5509715b9acebb2bf35c5604471854fa
+content_hash: a7db86861d49623ddad26b8f4f5b6add18a5d514a9f2a58ae1dd8ccd6816b9a3
 ---
 > **Before you begin — outline your plan.** First check whether an autoloop is
 > active **for THIS session** (session-scoped — a loop in another session must
@@ -37,7 +37,7 @@ content_hash: 400911fcf02311d19f604c672326b10f5509715b9acebb2bf35c5604471854fa
 > via `AskUserQuestion`: "Run the `research → spec → plan → execute → review → verify → wrapup` pipeline
 > on autopilot this session (stages auto-advance when no mandatory gate is pending), or
 > stay gated (stop after each stage)?" On **yes**, run
-> `uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.1 python -m harness_maker.autopilot on --level auto_safe --pipeline research,spec,plan,execute,review,verify,wrapup`
+> `uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.39.0 python -m harness_maker.autopilot on --level auto_safe --pipeline research,spec,plan,execute,review,verify,wrapup`
 > (writes the session marker). On **no**, proceed gated — do not re-prompt unless the user
 > asks. Once the marker exists, later stages skip this picker (the marker is the once-flag).
 >
@@ -103,11 +103,11 @@ Before drafting the plan, surface top-K wiki + failures entries relevant to the 
 
 
 ```bash
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.1 python -m harness_maker.memory_retrieve --topic "<topic>" --k 6 --pre-k 30
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.39.0 python -m harness_maker.memory_retrieve --topic "<topic>" --k 6 --pre-k 30
 ```
 
 
-The helper prints a `<memory_candidates>` fence; the directive line after it instructs you to surface the top-6 semantically relevant entries inline. Hot tier — also read `.claude/memory/session/<today's date>.md` if it exists.
+The helper prints a `<memory_candidates>` fence; the directive line after it instructs you to surface the top-6 semantically relevant entries inline.
 
 ## Stage-Aware Second Brain
 
@@ -118,9 +118,9 @@ questions:
 
 
 ```bash
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.1 python -m harness_maker.second_brain search '<task slug or topic>' --type decision
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.1 python -m harness_maker.second_brain search '<task slug or topic>' --type preference
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.1 python -m harness_maker.second_brain search '<task slug or topic>' --type project
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.39.0 python -m harness_maker.second_brain search '<task slug or topic>' --type decision
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.39.0 python -m harness_maker.second_brain search '<task slug or topic>' --type preference
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.39.0 python -m harness_maker.second_brain search '<task slug or topic>' --type project
 ```
 
 
@@ -138,7 +138,7 @@ knowledge, write a typed `decision` or `preference` note through
 
 
 ```bash
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.1 python -m harness_maker.worktree task-preflight <slug> "$(pwd)"
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.39.0 python -m harness_maker.worktree task-preflight <slug> "$(pwd)"
 ```
 
 
@@ -147,7 +147,7 @@ knowledge, write a typed `decision` or `preference` note through
 
 
 ```bash
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.1 python -m harness_maker.worktree task-refresh <slug> "$(pwd)"
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.39.0 python -m harness_maker.worktree task-refresh <slug> "$(pwd)"
 ```
 
 
@@ -181,7 +181,7 @@ This seed is what the interview refines. Investigate code unknowns with Read/Gre
 Before Step 2, check whether `/hm:plan` is running inside an active `/hm:loop` iteration. **Detection is session-scoped** (PLAN-loop-marker-session-scoping) — it keys on THIS Claude session, so a loop running in *another* session never makes your standalone `/hm:plan` skip its interview. Locate the project root (strip any `/.worktrees/<wt-name>/` suffix from cwd, or `git -C . rev-parse --show-toplevel` then walk up out of `.worktrees/`), then run:
 
 ```bash
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.1 python -m harness_maker.worktree loop-mode-active "<PROJECT_ROOT>" --claude-session-id "$HM_SESSION_ID"
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.39.0 python -m harness_maker.worktree loop-mode-active "<PROJECT_ROOT>" --claude-session-id "$HM_SESSION_ID"
 ```
 
 - **Exit 0 (`active`)** → loop-mode: some `.claude/.hm-loop-*` marker's content header matches YOUR `session_id` (or a legacy global `.hm-loop-active` exists — degraded fallback). Do NOT engage the deep interview (loop body cannot block on `AskUserQuestion`). Scope the plan to the next master-PLAN phase only.
@@ -446,6 +446,19 @@ findings and echoes the main-loop-supplied per-model status — it never runs an
 
 
 
+> **⚡ Concurrency (≥2 models enabled).** The per-model recipes below are independent — each
+> writes its own temp files and is graceful-degraded separately. Do **not** run them one at a time.
+> Instead: (1) do the fast setup for **every** model first — the `mktemp` + the prompt-file `Write`
+> for each; (2) then dispatch **every** model's invoke call (`codex exec …` / `agy …`) in a **single
+> message as parallel Bash tool calls** — do not wait for one model's CLI to return before starting
+> the next. **Substitute each model's literal printed temp-file paths** (from its own `mktemp`
+> output) into its invoke call, NOT the shared `$prompt_tmp`/`$out_tmp` shell variables: each Bash
+> call is a fresh shell, and the per-model recipes reuse the same variable names, so a shared
+> variable would resolve to the wrong model's file. (3) adapt each model's output as it returns and
+> emit its `second_opinion_results` entry exactly as the per-model recipe specifies. Per-model
+> skip/failure handling + ledger rows are unchanged — each parallel call is tracked independently.
+
+
 #### Second opinion — model: `codex`
 
 **Invoke (codex).** Run Codex as a separate, sandbox-isolated step. Do NOT build the
@@ -481,7 +494,7 @@ output file through the adapter (deterministic — it maps severity
 untrusted Codex content out of the shell). Always clean up the temp files:
 
 ```bash
-if [ "$exit" -eq 0 ]; then uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.1 python -m harness_maker.codex_adapter adapt --model codex < "$out_tmp"; fi; rm -f "$prompt_tmp" "$out_tmp"
+if [ "$exit" -eq 0 ]; then uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.39.0 python -m harness_maker.codex_adapter adapt --model codex < "$out_tmp"; fi; rm -f "$prompt_tmp" "$out_tmp"
 ```
 
 **Skip relay (graceful degrade — ANY non-zero exit).** A non-zero `codex exec` exit means
@@ -492,7 +505,7 @@ warn-and-proceed), and append a best-effort ledger row. Pass each value as a **s
 `--flag`** (never inline an untrusted cause into a shell-quoted JSON blob — REVIEW security P1):
 
 ```bash
-reason="<one-line cause>"; uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.1 python -m harness_maker.codex_ledger emit --slug "<slug>" --stage plan --model codex --finding-ref "n/a" --disposition unresolved --status skipped --skip-reason "$reason"
+reason="<one-line cause>"; uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.39.0 python -m harness_maker.codex_ledger emit --slug "<slug>" --stage plan --model codex --finding-ref "n/a" --disposition unresolved --status skipped --skip-reason "$reason"
 ```
 
 On success set `status: "invoked"` for codex. A silently-degraded second opinion is the H4
@@ -540,7 +553,7 @@ low,info→P3`, sets `source: "antigravity"`, sets `needs_relaxation: true` on n
 Always clean up the temp files:
 
 ```bash
-if [ "$exit" -eq 0 ]; then uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.1 python -m harness_maker.codex_adapter adapt --model antigravity < "$out_tmp"; fi; rm -f "$prompt_tmp" "$out_tmp"
+if [ "$exit" -eq 0 ]; then uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.39.0 python -m harness_maker.codex_adapter adapt --model antigravity < "$out_tmp"; fi; rm -f "$prompt_tmp" "$out_tmp"
 ```
 
 **Skip relay (graceful degrade — ANY non-zero exit OR unparseable output).** A non-zero exit
@@ -555,7 +568,7 @@ one-line reason (do NOT block — warn-and-proceed) and append a best-effort led
 a **separate `--flag`**):
 
 ```bash
-reason="<one-line cause>"; uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.1 python -m harness_maker.codex_ledger emit --slug "<slug>" --stage plan --model antigravity --finding-ref "n/a" --disposition unresolved --status <skipped|failed> --skip-reason "$reason"
+reason="<one-line cause>"; uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.39.0 python -m harness_maker.codex_ledger emit --slug "<slug>" --stage plan --model antigravity --finding-ref "n/a" --disposition unresolved --status <skipped|failed> --skip-reason "$reason"
 ```
 
 On success set `status: "invoked"` for antigravity. A silently-degraded second opinion is the
@@ -668,7 +681,7 @@ The shell guard below makes the receipt a no-op when `.current-iter` is absent �
 !if [ -f "<WT>/.claude/.hm-iter-receipts/.current-iter" ]; then \
    ITER=$(cat "<WT>/.claude/.hm-iter-receipts/.current-iter" 2>/dev/null); \
    if [ -n "$ITER" ]; then \
-     uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.1 python -m harness_maker.iter_receipts write \
+     uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.39.0 python -m harness_maker.iter_receipts write \
        --iter "$ITER" --stage plan --verdict <verdict> --root "<WT>"; \
    fi; \
  fi
@@ -776,7 +789,7 @@ Apply the PLAN's phases to the codebase. When `tdd_active`, tests are written fr
 
 Before any code edits, load memory in tier order (stops at first miss):
 
-1. **Hot tier** — Read `.claude/memory/session/<today>.md` if it exists. A `checkpoint:compaction` entry means the prior session was interrupted mid-stage — check `.claude-progress.json` for partial state and resume from the last in-progress phase.
+1. **Hot tier (compaction checkpoint only)** — Read `.claude/memory/session/<today>.md` if it exists, but inspect **only** the `checkpoint:compaction` entry — it means the prior session was interrupted mid-stage, so check `.claude-progress.json` for partial state and resume from the last in-progress phase. Ignore any historical `[decision:*]` blocks: they are legacy and no longer maintained.
 2. **Warm tier** — Skim `.claude/memory/failures.md` first 60 lines; targeted: `rg -F "[fail:" .claude/memory/failures.md` for patterns relevant to the task.
 3. **Warm tier** — Skim `.claude/memory/wiki.md` first 40 lines for conventions in the implementation area.
 
@@ -788,7 +801,7 @@ Before any code edits, load memory in tier order (stops at first miss):
 
 
 ```bash
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.1 python -m harness_maker.worktree task-preflight <slug> "$(pwd)"
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.39.0 python -m harness_maker.worktree task-preflight <slug> "$(pwd)"
 ```
 
 
@@ -797,7 +810,7 @@ Before any code edits, load memory in tier order (stops at first miss):
 
 
 ```bash
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.1 python -m harness_maker.worktree task-refresh <slug> "$(pwd)"
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.39.0 python -m harness_maker.worktree task-refresh <slug> "$(pwd)"
 ```
 
 
@@ -873,7 +886,7 @@ If `research_doc:` resolves to an existing file with mtime < `mtime_warn_days` (
 - Read it; reuse `libs_fetched`, `sources` to skip duplicate context-fetching.
 - Cache HIT → no re-retrieval.
 
-If RESEARCH file is older than `mtime_warn_days`: warn the user, proceed with implementation, but log the staleness in the PLAN's session log.
+If RESEARCH file is older than `mtime_warn_days`: warn the user, proceed with implementation, but note the staleness in the PLAN.
 
 ### Step 3 — Per-PLAN-phase TDD machine
 
@@ -1007,7 +1020,7 @@ when this PLAN phase authored bindable-mechanical-AC tests and the machine SPEC 
 
 
 ```bash
-!cd <WT> && uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.1 python -m harness_maker.spec_mutation gate --yaml specs/SPEC-{slug}.machine.yaml --tier 1
+!cd <WT> && uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.39.0 python -m harness_maker.spec_mutation gate --yaml specs/SPEC-{slug}.machine.yaml --tier 1
 ```
 
 
@@ -1052,7 +1065,7 @@ The shell guard below makes the receipt a no-op when `.current-iter` is absent �
 !if [ -f "<WT>/.claude/.hm-iter-receipts/.current-iter" ]; then \
    ITER=$(cat "<WT>/.claude/.hm-iter-receipts/.current-iter" 2>/dev/null); \
    if [ -n "$ITER" ]; then \
-     uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.1 python -m harness_maker.iter_receipts write \
+     uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.39.0 python -m harness_maker.iter_receipts write \
        --iter "$ITER" --stage execute --verdict <verdict> --root "<WT>"; \
    fi; \
  fi
@@ -1079,12 +1092,12 @@ Pick **exactly one** finalize command. Substitute `<WT>` with the literal absolu
 ```bash
 # All phases GREEN — stage-merge the branch back (NO commit) + cleanup the worktree.
 # /hm:wrapup will create the single user-facing commit (with proper message + Co-Authored-By).
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.1 python -m harness_maker.worktree finalize <WT> stage-only
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.39.0 python -m harness_maker.worktree finalize <WT> stage-only
 ```
 
 ```bash
 # Stage halted on a blocker — preserve the worktree for inspection:
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.1 python -m harness_maker.worktree finalize <WT> fail
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.39.0 python -m harness_maker.worktree finalize <WT> fail
 ```
 
 
@@ -1100,7 +1113,7 @@ of a `hm/<slug>` task worktree is empty → nothing recorded, by design.
 
 
 ```bash
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.1 python -m harness_maker.worktree owned-crumb-add "$(pwd)" <slug> "$(uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.1 python -m harness_maker.worktree wt-uuid <WT>)"
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.39.0 python -m harness_maker.worktree owned-crumb-add "$(pwd)" <slug> "$(uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.39.0 python -m harness_maker.worktree wt-uuid <WT>)"
 ```
 
 
@@ -1116,7 +1129,7 @@ commit; otherwise the user's pre-existing WIP remains in the stash queue:
 
 
 ```bash
-!HM_OWNED_SESSION_UUIDS="$(uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.1 python -m harness_maker.worktree owned-crumb-read "$(pwd)" <slug>)" uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.1 python -m harness_maker.worktree post-commit-pop "$(pwd)"
+!HM_OWNED_SESSION_UUIDS="$(uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.39.0 python -m harness_maker.worktree owned-crumb-read "$(pwd)" <slug>)" uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.39.0 python -m harness_maker.worktree post-commit-pop "$(pwd)"
 ```
 
 
@@ -1199,9 +1212,8 @@ Find defects, design weaknesses, and risk hotspots **before** they reach `wrapup
 
 ## Session Context Loading
 
-1. **Hot tier** — Read `.claude/memory/session/<today>.md` if it exists. Prior session decisions may explain intentional design choices in the diff.
-2. **Warm tier** — Skim `.claude/memory/failures.md` for patterns matching the changed code area: `rg -F "[fail:" .claude/memory/failures.md`.
-3. **Warm tier** — Skim `.claude/memory/wiki.md` for relevant conventions. Known-good patterns should NOT trigger findings.
+1. **Warm tier** — Skim `.claude/memory/failures.md` for patterns matching the changed code area: `rg -F "[fail:" .claude/memory/failures.md`.
+2. **Warm tier** — Skim `.claude/memory/wiki.md` for relevant conventions. Known-good patterns should NOT trigger findings.
 
 ### Stage-Aware Second Brain
 
@@ -1211,8 +1223,8 @@ them to recognize known-good patterns and repeated failure modes:
 
 
 ```bash
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.1 python -m harness_maker.second_brain search '<changed area or task slug>' --type failure
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.1 python -m harness_maker.second_brain search '<changed area or task slug>' --type preference
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.39.0 python -m harness_maker.second_brain search '<changed area or task slug>' --type failure
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.39.0 python -m harness_maker.second_brain search '<changed area or task slug>' --type preference
 ```
 
 
@@ -1242,7 +1254,7 @@ Per-invocation overrides (workflow command flags):
 
 
 ```bash
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.1 python -m harness_maker.worktree task-preflight <slug> "$(pwd)"
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.39.0 python -m harness_maker.worktree task-preflight <slug> "$(pwd)"
 ```
 
 
@@ -1251,7 +1263,7 @@ Per-invocation overrides (workflow command flags):
 
 
 ```bash
-!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.1 python -m harness_maker.worktree task-refresh <slug> "$(pwd)"
+!uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.39.0 python -m harness_maker.worktree task-refresh <slug> "$(pwd)"
 ```
 
 
@@ -1333,7 +1345,7 @@ anchoring-prone diffs):
    author / commit message redacted. Pipe the JSON context through the
    harness CLI rather than redacting in prose:
    ```bash
-   echo '<full_context_json>' | uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.1 python -m harness_maker.two_pass_review redact
+   echo '<full_context_json>' | uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.39.0 python -m harness_maker.two_pass_review redact
    ```
    The CLI returns a JSON object with the same fields but anchoring values
    replaced by `[REDACTED]`.
@@ -1374,7 +1386,7 @@ Pass 2 instead of the raw Pass 1 list. Log `stats.dropped_n` for telemetry.
 4. Merge the two passes via the harness CLI:
    
    ```bash
-   echo '{"pass1": [...], "pass2": [...]}' | uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.1 python -m harness_maker.two_pass_review merge
+   echo '{"pass1": [...], "pass2": [...]}' | uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.39.0 python -m harness_maker.two_pass_review merge
    ```
    
    Pass 2 is authoritative — Pass 1 findings absent from Pass 2 are
@@ -1395,11 +1407,24 @@ never a rising bar.
   note `HEAD` (the post-execute diff is staged, so a bare `git diff` would see nothing) and
   `--numstat` for the added-line count that drives the `boundary` signal:
   ```bash
-  files=$(git diff --name-only HEAD); added=$(git diff --numstat HEAD | awk '{s+=$1} END{print s+0}'); printf '%s\n' "$files" | uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.1 python -m harness_maker.high_diff classify --added-lines "$added"
+  files=$(git diff --name-only HEAD); added=$(git diff --numstat HEAD | awk '{s+=$1} END{print s+0}'); printf '%s\n' "$files" | uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.39.0 python -m harness_maker.high_diff classify --added-lines "$added"
   ```
   Invoke when `is_high` (or `boundary` and your judgment, reusing the When-to-Run
   criteria, says high). Otherwise skip all models this round (no extra voters).
 
+
+
+> **⚡ Concurrency (≥2 models enabled).** The per-model recipes below are independent — each
+> writes its own temp files and is graceful-degraded separately. Do **not** run them one at a time.
+> Instead: (1) do the fast setup for **every** model first — the `mktemp` + the prompt-file `Write`
+> for each; (2) then dispatch **every** model's invoke call (`codex exec …` / `agy …`) in a **single
+> message as parallel Bash tool calls** — do not wait for one model's CLI to return before starting
+> the next. **Substitute each model's literal printed temp-file paths** (from its own `mktemp`
+> output) into its invoke call, NOT the shared `$prompt_tmp`/`$out_tmp` shell variables: each Bash
+> call is a fresh shell, and the per-model recipes reuse the same variable names, so a shared
+> variable would resolve to the wrong model's file. (3) adapt each model's output as it returns and
+> emit its `second_opinion_results` entry exactly as the per-model recipe specifies. Per-model
+> skip/failure handling + ledger rows are unchanged — each parallel call is tracked independently.
 
 
 #### Second opinion — model: `codex`
@@ -1437,7 +1462,7 @@ output file through the adapter (deterministic — it maps severity
 untrusted Codex content out of the shell). Always clean up the temp files:
 
 ```bash
-if [ "$exit" -eq 0 ]; then uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.1 python -m harness_maker.codex_adapter adapt --model codex < "$out_tmp"; fi; rm -f "$prompt_tmp" "$out_tmp"
+if [ "$exit" -eq 0 ]; then uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.39.0 python -m harness_maker.codex_adapter adapt --model codex < "$out_tmp"; fi; rm -f "$prompt_tmp" "$out_tmp"
 ```
 
 **Skip relay (graceful degrade — ANY non-zero exit).** A non-zero `codex exec` exit means
@@ -1448,7 +1473,7 @@ warn-and-proceed), and append a best-effort ledger row. Pass each value as a **s
 `--flag`** (never inline an untrusted cause into a shell-quoted JSON blob — REVIEW security P1):
 
 ```bash
-reason="<one-line cause>"; uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.1 python -m harness_maker.codex_ledger emit --slug "<slug>" --stage review --model codex --finding-ref "n/a" --disposition unresolved --status skipped --skip-reason "$reason"
+reason="<one-line cause>"; uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.39.0 python -m harness_maker.codex_ledger emit --slug "<slug>" --stage review --model codex --finding-ref "n/a" --disposition unresolved --status skipped --skip-reason "$reason"
 ```
 
 On success set `status: "invoked"` for codex. A silently-degraded second opinion is the H4
@@ -1496,7 +1521,7 @@ low,info→P3`, sets `source: "antigravity"`, sets `needs_relaxation: true` on n
 Always clean up the temp files:
 
 ```bash
-if [ "$exit" -eq 0 ]; then uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.1 python -m harness_maker.codex_adapter adapt --model antigravity < "$out_tmp"; fi; rm -f "$prompt_tmp" "$out_tmp"
+if [ "$exit" -eq 0 ]; then uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.39.0 python -m harness_maker.codex_adapter adapt --model antigravity < "$out_tmp"; fi; rm -f "$prompt_tmp" "$out_tmp"
 ```
 
 **Skip relay (graceful degrade — ANY non-zero exit OR unparseable output).** A non-zero exit
@@ -1511,7 +1536,7 @@ one-line reason (do NOT block — warn-and-proceed) and append a best-effort led
 a **separate `--flag`**):
 
 ```bash
-reason="<one-line cause>"; uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.1 python -m harness_maker.codex_ledger emit --slug "<slug>" --stage review --model antigravity --finding-ref "n/a" --disposition unresolved --status <skipped|failed> --skip-reason "$reason"
+reason="<one-line cause>"; uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.39.0 python -m harness_maker.codex_ledger emit --slug "<slug>" --stage review --model antigravity --finding-ref "n/a" --disposition unresolved --status <skipped|failed> --skip-reason "$reason"
 ```
 
 On success set `status: "invoked"` for antigravity. A silently-degraded second opinion is the
@@ -1741,7 +1766,7 @@ runs. Don't interpolate `wall_time_ms` into any other rendered template
 
 
 ```bash
-echo '<record_json>' | uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.1 python -m harness_maker.review_telemetry emit
+echo '<record_json>' | uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.39.0 python -m harness_maker.review_telemetry emit
 ```
 
 
@@ -1766,7 +1791,7 @@ The shell guard below makes the receipt a no-op when `.current-iter` is absent �
 !if [ -f "<WT>/.claude/.hm-iter-receipts/.current-iter" ]; then \
    ITER=$(cat "<WT>/.claude/.hm-iter-receipts/.current-iter" 2>/dev/null); \
    if [ -n "$ITER" ]; then \
-     uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.38.1 python -m harness_maker.iter_receipts write \
+     uv run --with /home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.39.0 python -m harness_maker.iter_receipts write \
        --iter "$ITER" --stage review --verdict <verdict> --root "<WT>"; \
    fi; \
  fi
@@ -1828,9 +1853,10 @@ Otherwise emit it as your final output, in the configured output language:
 
 Before executing any stage, load memory in tier order:
 
-1. **Hot tier** — Read `.claude/memory/session/<today>.md` if it exists.
-   Prior session decisions, `checkpoint:compaction` entries, and partial
-   state from interrupted sessions are here.
+1. **Hot tier (compaction checkpoint only)** — Read `.claude/memory/session/<today>.md`
+   if it exists, but inspect **only** the `checkpoint:compaction` entry (interrupted-session
+   resume + partial state). Ignore any historical `[decision:*]` blocks — they are legacy
+   and no longer maintained.
 2. **Warm tier** — Skim `.claude/memory/failures.md` for patterns relevant
    to the task: `rg -F "[fail:" .claude/memory/failures.md`.
 3. **Warm tier** — Skim `.claude/memory/wiki.md` first 40 lines for project
