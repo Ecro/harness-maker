@@ -108,3 +108,34 @@ def test_non_codex_agent_has_no_reconcile_block(tmp_path: Path) -> None:
     body = _agent(files, "security-auditor")
     assert "@hm:second-opinion-reconcile" not in body
     assert "second_opinion_results" not in body
+
+
+def _render_models(tmp_path: Path, *, models: list[str]) -> dict[str, str]:
+    blueprint = synthesize(
+        ProjectProfile(),
+        InterviewAnswers(
+            preset=Preset.PRODUCTION,
+            targets=[Target.CLAUDE_CODE],
+            second_opinion=SecondOpinionConfig(models=models),
+        ),
+    )
+    render(blueprint, tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
+    return {
+        str(f.relative_to(tmp_path)): f.read_text(encoding="utf-8") for f in tmp_path.rglob("*.md")
+    }
+
+
+def test_two_models_render_parallel_dispatch_directive(tmp_path: Path) -> None:
+    """session-tier-slim ADR-002: with >=2 second-opinion models, plan + review
+    instruct concurrent (parallel) dispatch of the per-model invoke calls."""
+    files = _render_models(tmp_path, models=["codex", "antigravity"])
+    for stage in (_plan_stage(files), _review_stage(files)):
+        assert stage.count("⚡ Concurrency") == 1, "expected 1 parallel-dispatch directive"
+        assert "parallel Bash tool calls" in stage
+
+
+def test_single_model_render_has_no_parallel_dispatch_directive(tmp_path: Path) -> None:
+    """1 model = nothing to parallelize; the directive must be absent."""
+    files = _render_models(tmp_path, models=["codex"])
+    for stage in (_plan_stage(files), _review_stage(files)):
+        assert "⚡ Concurrency" not in stage

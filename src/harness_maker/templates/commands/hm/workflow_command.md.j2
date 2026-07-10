@@ -14,9 +14,10 @@
 
 Before executing any stage, load memory in tier order:
 
-1. **Hot tier** — Read `.claude/memory/session/<today>.md` if it exists.
-   Prior session decisions, `checkpoint:compaction` entries, and partial
-   state from interrupted sessions are here.
+1. **Hot tier (compaction checkpoint only)** — Read `.claude/memory/session/<today>.md`
+   if it exists, but inspect **only** the `checkpoint:compaction` entry (interrupted-session
+   resume + partial state). Ignore any historical `[decision:*]` blocks — they are legacy
+   and no longer maintained.
 2. **Warm tier** — Skim `.claude/memory/failures.md` for patterns relevant
    to the task: `rg -F "[fail:" .claude/memory/failures.md`.
 3. **Warm tier** — Skim `.claude/memory/wiki.md` first 40 lines for project

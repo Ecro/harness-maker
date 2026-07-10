@@ -1,7 +1,7 @@
 """PLAN-multisession-fleet-reverify Phase 3 — wrapup memory-write render gate.
 
 H1 is closed only while the rendered wrapup routes its memory-tier writes through
-the locked `memory_md` CLI. This gate fails if a re-render reverts Step 5.1/5.2/5.5
+the locked `memory_md` CLI. This gate fails if a re-render reverts Step 5.1/5.2
 back to a direct `Edit`/`Write` on the tier files (which races concurrent fleet
 sessions and can drop the close marker).
 """
@@ -26,12 +26,23 @@ def wrapup_text(tmp_path_factory: pytest.TempPathFactory) -> str:
 
 @pytest.mark.parametrize(
     "subcommand",
-    ["memory_md upsert-wiki", "memory_md upsert-failure", "memory_md append-session"],
+    ["memory_md upsert-wiki", "memory_md upsert-failure"],
 )
 def test_memory_tiers_written_via_locked_cli(wrapup_text: str, subcommand: str) -> None:
     assert subcommand in wrapup_text, (
         f"wrapup must write the memory tier via `{subcommand}` (H1 lock); "
         "a direct Edit/Write reverts the fix"
+    )
+
+
+def test_wrapup_no_longer_writes_session_tier(wrapup_text: str) -> None:
+    """session-tier-slim ADR-001: the 5.5 session decision journal is removed.
+
+    The session tier is compaction-checkpoint-only now, written solely by the
+    `flush_session` hook — wrapup must NOT render an `append-session` call.
+    """
+    assert "append-session" not in wrapup_text, (
+        "wrapup must not write the session tier (checkpoint-only — flush_session owns it)"
     )
 
 

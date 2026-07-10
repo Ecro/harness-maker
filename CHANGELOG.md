@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+### Changed — session memory tier slimmed to compaction-checkpoint-only
+- **`.claude/memory/session/<date>.md` is now compaction-checkpoint-only** (ADR-001,
+  PLAN-session-tier-slim). The wrapup Step 5.5 decision-journal writer is removed and
+  `research`/`plan`/`review` no longer read the tier — the `[decision:...]` journal had no
+  machine consumer (it was excluded from `memory_retrieve`, which indexes only
+  `wiki.md`/`failures.md`; durable learnings already live there + in PLAN ADRs).
+  `execute`/`workflow_command` keep the `checkpoint:compaction` read for interrupted-session
+  resume and now explicitly ignore legacy `[decision:*]` blocks. `memory_md.append_session`
+  and the `flush_session` PreCompact hook are unchanged (the hook is the sole remaining
+  writer). README + `docs/HOW-IT-WORKS{,.ko}.md` swept to match.
+
+### Changed — concurrent multi-model second-opinion dispatch
+- **`second_opinion_dispatch.md.j2` now dispatches the per-model invoke calls in parallel**
+  (ADR-002) when ≥2 models are enabled: codex + antigravity run in a single message instead of
+  sequentially, roughly halving second-opinion wall-clock. 0/1-model render is byte-identical
+  (verified); the directive mandates each model's **literal** temp-file paths (not the shared
+  `$prompt_tmp`/`$out_tmp` shell vars) so the parallel path can't feed one model the other's file.
+
 ## [0.38.1] - 2026-07-10
 
 ### Fixed

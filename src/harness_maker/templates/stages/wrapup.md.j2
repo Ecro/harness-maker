@@ -31,7 +31,7 @@ Close the loop on a unit of work:
 ## Inputs
 
 - All artefacts from prior stages: SPEC, PLAN, REVIEW, code, tests.
-- `.claude/memory/wiki.md`, `.claude/memory/failures.md`, `.claude/memory/session/<today>.md`.
+- `.claude/memory/wiki.md`, `.claude/memory/failures.md`.
 - The currently-staged changes from `/hm:execute` Step 5 (`stage-only` mode).
 - TODO source if the project tracks tasks in a structured place (optional).
 
@@ -447,7 +447,7 @@ unit. If a file does not exist, create it with appropriate content.
 Update rules:
 - **CHANGELOG.md**: prepend an entry under `## [Unreleased]` (or today's date heading) summarizing the change.
 - **TODO.md / TODO**: check off completed items; remove if done.
-- **ADR-*.md / docs/decisions/**: no auto-edit — just note in the session log if an ADR should be revisited.
+- **ADR-*.md / docs/decisions/**: no auto-edit — just flag in your turn output if an ADR should be revisited.
 - **Other**: use judgment — append a dated entry or update existing sections as appropriate.
 {% else %}
 
@@ -456,46 +456,20 @@ should update (e.g. CHANGELOG.md, TODO.md), run `/hm:configure` and select
 **Wrapup documents**.
 {% endif %}
 
-#### 5.5 Session log
-
-Append today's decision entry to `.claude/memory/session/<YYYY-MM-DD>.md` **via the locked memory CLI** (H1: the `flush_session` compaction hook writes the same file under the same lock — **do NOT `Edit`/`Write` the session log directly**). The CLI creates the file with its header when absent and always targets the base repo.
-
-Write the full entry (heading + paragraph) to a fresh temp file **outside the repo** with the **Write tool** (unique `mktemp`-style path, never fixed/in-repo), then run the CLI and delete it:
-
-{% if is_codex %}
-```
-Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.memory_md append-session --root . --body-file <tmpfile>")
-```
-{% else %}
-```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.memory_md append-session --root . --body-file <tmpfile>
-```
-{% endif %}
-
-Entry shape:
-
-```markdown
-## [decision:<slug>] <what was decided> | <HH:MM> UTC | stage:wrapup
-<one paragraph: non-obvious constraint, key trade-off, or surprise from this work unit>
-```
-
-**Omit** when the work unit was trivial (typo fix, doc-only) — session log is for non-obvious decisions.
-
 #### 5.6 Second Brain promotion (cross-project durable knowledge)
 
 > Runs only when `.claude/harness.yaml` has `second_brain.enabled: true` — otherwise skip this sub-step.
 
-**MUST evaluate every wrapup** (ADR-001 of PLAN-second-brain-promotion — this replaces the old advisory note). The local `.claude/memory/` entries you just wrote in 5.1–5.5 are *project working memory*; the Obsidian Second Brain is the *curated cross-project durable* layer. Promote the subset worth keeping beyond this repo.
+**MUST evaluate every wrapup** (ADR-001 of PLAN-second-brain-promotion — this replaces the old advisory note). The local `.claude/memory/` entries you just wrote in 5.1–5.4 are *project working memory*; the Obsidian Second Brain is the *curated cross-project durable* layer. Promote the subset worth keeping beyond this repo.
 
 **Promotion filter (ADR-003):** for each candidate below, judge — *"is this valuable to other projects or my future self, beyond this repo?"* Promote ONLY the ones that pass. There is no count threshold and no obligation to promote anything — an honest "0 promoted" is correct for a trivial or purely repo-specific work unit.
 
 **Source → note_type mapping (ADR-002):**
 
-| Local source (from 5.1–5.5) | → promote as |
+| Local source (from 5.1–5.4) | → promote as |
 |---|---|
 | `failures.md` entry worth preserving cross-project | `failure` |
 | A PLAN ADR / durable architecture decision | `decision` |
-| `session/<date>.md` `[decision:...]` entry | `decision` |
 | A confirmed user / project preference | `preference` |
 | (optional) project context / external pointer / session summary | `project` / `reference` / `journal` |
 
@@ -513,14 +487,14 @@ Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.second_
 
 (Run from the repo root — `--root` is a top-level flag defaulting to `.`; pass `--root <path>` *before* the `promote` subcommand only if cwd is elsewhere.)
 
-- `--source-slug` MUST be the **stable** local identifier (the `failures.md` slug, the `[decision:...]` slug, or the ADR id) and **unique after kebab-normalization** so re-promotion stays idempotent and distinct sources don't collide.
+- `--source-slug` MUST be the **stable** local identifier (the `failures.md` slug or the ADR id) and **unique after kebab-normalization** so re-promotion stays idempotent and distinct sources don't collide.
 - Optional: `--link '[[Note]]'` (repeatable) for graph links; `--frontmatter-json '{...}'` for recommended per-type fields ONLY (e.g. `severity`, `status`). Identity/namespace keys (`type`, `title`, `tags`, `links`, `created`, `updated`, `project*`) are owned by `promote` and are ignored if supplied (it warns).
 
 **Graceful degrade:** if a promote call exits non-zero for **any** reason (vault unreachable, mount unavailable, folders empty, or the note_type not accepted by any writable folder), **print a warning, count it as not-promoted, and continue** — NEVER abort wrapup over a promotion failure.
 
 **Vault is a separate repo:** promoted notes land in the Obsidian vault, which has its own git + sync. Step 6/7 below stage and commit only `.claude/memory/` and the PLAN — promoted vault notes are **not** part of the wrapup commit.
 
-**Receipt (ADR-006):** end this step by printing exactly one line — `promotion evaluated: <N> candidates, <M> promoted`. **`N` = the number of distinct local entries you wrote or touched in 5.1–5.5 that map to a promotable note_type** (every `failures.md` entry, every `session [decision:...]`, every PLAN ADR, every confirmed preference) — it is NOT 0 if you wrote any such entry this unit. `M` = how many of those `N` you judged cross-project-durable and promoted. When `M < N`, add a one-line reason per skipped candidate. This is what makes silent under-promotion visible — do not collapse `N` to 0 to avoid the work.
+**Receipt (ADR-006):** end this step by printing exactly one line — `promotion evaluated: <N> candidates, <M> promoted`. **`N` = the number of distinct local entries you wrote or touched in 5.1–5.4 that map to a promotable note_type** (every `failures.md` entry, every PLAN ADR, every confirmed preference) — it is NOT 0 if you wrote any such entry this unit. `M` = how many of those `N` you judged cross-project-durable and promoted. When `M < N`, add a one-line reason per skipped candidate. This is what makes silent under-promotion visible — do not collapse `N` to 0 to avoid the work.
 
 ### Step 6 — Stage memory + PLAN updates
 
@@ -711,10 +685,9 @@ If the user asks to push during wrapup, that is fine — but never push without 
 > Never write artifacts under `work_docs/` (underscore) — that path is a
 > known LLM footgun.
 
-- **One** git commit including: implementation diff (from execute), wiki + failures + session log + PLAN status updates.
+- **One** git commit including: implementation diff (from execute), wiki + failures + PLAN status updates.
 - `.claude/memory/pending-drift.md` entries when drift was detected.
 - `.claude/memory/pending-proposals.md` entries when failure count crossed threshold.
-- Updated `.claude/memory/session/<today>.md` for non-trivial work units.
 
 ## Quality Bar
 
@@ -723,7 +696,6 @@ If the user asks to push during wrapup, that is fine — but never push without 
 - `Co-Authored-By: Claude` line present.
 - Wiki entries are searchable: `rg -F "[wiki:" .claude/memory/wiki.md` returns the new entry.
 - Failure entries deduplicate by slug (count++ in heading, not duplicate sections).
-- Session log captures non-obvious decisions; trivial work units do NOT add noise.
 - PLAN frontmatter `status: complete` and zero `- [ ]` remain in the body.
 - Final verification pass GREEN before commit.
 

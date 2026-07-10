@@ -65,15 +65,52 @@ def test_spec_template_drops_rg_key_terms_memory_pattern(stage_source: dict[str,
     )
 
 
-def test_session_log_hot_tier_preserved_in_research(stage_source: dict[str, str]) -> None:
-    """Research stage must keep the Hot tier session/<today>.md read.
+def test_session_hot_tier_dropped_in_research(stage_source: dict[str, str]) -> None:
+    """session-tier-slim ADR-001: research no longer reads the session tier.
 
-    Only warm tier (wiki + failures) moves to the new helper.
+    The decision journal is gone; only wiki + failures load (via the helper).
     """
     body = stage_source["research"]
-    assert ".claude/memory/session" in body, (
-        "research stage must keep Hot tier session-log read alongside the new helper"
+    assert ".claude/memory/session" not in body, (
+        "research stage must NOT read the session tier (checkpoint-only now — ADR-001)"
     )
+
+
+def test_session_hot_tier_dropped_in_plan_and_review() -> None:
+    """plan + review are decision-journal consumers → session read removed (ADR-001)."""
+    for stage in ("plan", "review"):
+        body = (_TEMPLATES_DIR / f"{stage}.md.j2").read_text(encoding="utf-8")
+        assert ".claude/memory/session" not in body, (
+            f"{stage} stage must NOT read the session tier (ADR-001)"
+        )
+
+
+def test_execute_keeps_checkpoint_and_ignores_legacy() -> None:
+    """execute is the checkpoint consumer → keeps the read but scopes it to
+    checkpoint:compaction and ignores legacy [decision:*] blocks (ADR-001, C3)."""
+    body = (_TEMPLATES_DIR / "execute.md.j2").read_text(encoding="utf-8")
+    assert "checkpoint:compaction" in body, "execute must keep the compaction-checkpoint read"
+    assert "legacy" in body, "execute must call the [decision:*] blocks legacy"
+    assert "[decision:*]" in body, (
+        "execute must instruct ignoring legacy [decision:*] blocks (K=2 second-opinion consensus)"
+    )
+
+
+def test_workflow_command_keeps_checkpoint_and_ignores_legacy() -> None:
+    """The fused-workflow shared preamble keeps checkpoint resume + ignores legacy decisions."""
+    path = (
+        _REPO_ROOT
+        / "src"
+        / "harness_maker"
+        / "templates"
+        / "commands"
+        / "hm"
+        / "workflow_command.md.j2"
+    )
+    body = path.read_text(encoding="utf-8")
+    assert "checkpoint:compaction" in body
+    assert "legacy" in body
+    assert "[decision:*]" in body
 
 
 def test_all_three_templates_use_is_codex_branch_for_invocation(

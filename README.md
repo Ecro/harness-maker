@@ -178,7 +178,7 @@ Hand-tune `agents/code-reviewer.md`. Add a custom skill. Edit a CLAUDE.md sectio
 **B. The harness learns your project.**
 - `.claude/memory/wiki.md` — patterns, conventions, gotchas. Each `/hm:wrapup` appends new entries.
 - `.claude/memory/failures.md` — recurring mistakes, deduplicated by slug + count.
-- `.claude/memory/session/<date>.md` — non-obvious decisions per workday.
+- `.claude/memory/session/<date>.md` — compaction checkpoints for resuming an interrupted session (written by the `flush_session` hook, not wrapup).
 - When any failure slug reaches **count ≥ 3**, wrapup writes a proposal to `pending-proposals.md` — a new skill, rule, or hook that would have prevented the recurrence. The user reviews and decides whether to ingest.
 
 **C. Defaults adapt to your overrides.**
@@ -423,7 +423,7 @@ Grouped by what they do for your project, not by component.
 ### 🌱 Self-evolving — *grows with your project*
 
 - **Block-merge preservation.** Hand-tune any agent, skill, CLAUDE.md section. Survives `--update` because content hashes per file plus `@hm:user:*` markers separate your edits from template-owned regions. `@hm:harness:*` inverted markers do the opposite for foreign config absorption.
-- **Three-tier memory accumulation.** `wiki.md` (patterns) · `failures.md` (recurring mistakes deduplicated by slug) · `session/<date>.md` (non-obvious decisions). Wrapup writes these automatically; every stage reads them automatically.
+- **Accumulating memory.** `wiki.md` (patterns) · `failures.md` (recurring mistakes deduplicated by slug) are written automatically by each `/hm:wrapup` and surfaced by later stages. `session/<date>.md` holds compaction checkpoints only — written by the `flush_session` hook for interrupted-session resume.
 - **Self-improving failure proposals.** When a `[fail:*]` slug recurs 3× across sessions, wrapup writes a proposal to `pending-proposals.md` — a new skill, rule, or hook that would have prevented the recurrence. You review and decide whether to ingest.
 - **ADR system as binding execute constraints.** Architecture Decision Records promoted during `/hm:plan` are hard constraints on `/hm:execute`. Conflicts surface as blockers, never silently proceed. Future sessions don't re-litigate settled decisions.
 - **Refdocs search.** Register architecture docs, API specs, design docs in `harness.yaml`. `refdocs-search` skill gives lossless full-text search — no chunking, no RAG index.

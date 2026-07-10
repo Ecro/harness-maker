@@ -508,7 +508,7 @@ SPEC 파일 있으면 완전히 읽어서:
 - `## 📋 In-Scope Scenarios` 추출 → Phase A 테스트 대상
 - `## ✅ Verification Criteria` 추출 → Phase B RED 게이트 명령
 
-RESEARCH 파일이 `mtime_warn_days` (기본 7일) 보다 오래됐으면: 경고 후 진행, 세션 로그에 staleness 기록.
+RESEARCH 파일이 `mtime_warn_days` (기본 7일) 보다 오래됐으면: 경고 후 진행, PLAN 에 staleness 기록.
 
 **Step 3 — PLAN 단계별 TDD 머신**
 
@@ -802,10 +802,9 @@ BLOCKED: check <N> (<이름>) — <이유>
 
 **Step 5 — 메모리 업데이트**
 
-세 메모리 파일 업데이트:
+두 메모리 파일 업데이트 (session 티어는 checkpoint 전용 — wrapup 이 아니라 `flush_session` hook 이 기록):
 - `.claude/memory/wiki.md` — 재사용 가능한 패턴/관례 추가
 - `.claude/memory/failures.md` — 이번 작업에서 발생한 실패와 해결책
-- `.claude/memory/session/<date>.md` — 세션 로그
 
 **Step 6 — 커밋 생성**
 
@@ -1811,7 +1810,7 @@ ref_folders:
 ├── wiki.md           ← 재사용 가능한 패턴, 관례, 교훈
 ├── failures.md       ← 실패 사례와 해결책 ([fail:] 태그)
 ├── session/
-│   └── <date>.md     ← 세션별 로그, checkpoint:compaction 항목
+│   └── <date>.md     ← compaction 체크포인트 (checkpoint:compaction 항목)
 └── escalations/
     └── escalation-{slug}-{date}.md  ← stuck 에이전트 에스컬레이션 노트
 ```
@@ -1915,7 +1914,7 @@ A: harness-maker 는 양쪽 모두에서 동일하게 동작합니다. `targets`
 harness-maker 는 3계층 메모리로 이 문제를 해결한다:
 
 ```
-Hot tier  → .claude/memory/session/<today>.md   (당일 세션 상태)
+Hot tier  → .claude/memory/session/<today>.md   (compaction 체크포인트 — execute 재개)
 Warm tier → .claude/memory/wiki.md              (재사용 패턴·관례)
           → .claude/memory/failures.md          (실패 사례 + 해결책)
 Cold tier → git log, work-docs/PLAN-*.md       (결정 이력)
@@ -1925,7 +1924,6 @@ Cold tier → git log, work-docs/PLAN-*.md       (결정 이력)
 
 - `wiki.md`: `[wiki:pattern]`, `[wiki:convention]` 등 카테고리 태그로 분류. `rg -F "[wiki:" wiki.md` 로 즉시 검색.
 - `failures.md`: `[fail:import]`, `[fail:hook]` 등. **같은 slug 는 중복 섹션 대신 count 를 증가**시킨다. `rg -F "[fail:" failures.md` 로 반복 패턴 추적.
-- `session/<date>.md`: 비자명한 결정·트레이드오프·놀라운 발견만 기록 (자명한 것은 노이즈).
 
 다음 세션의 execute 가 Warm tier 를 로드할 때는 `rg -F "[fail:" failures.md` 로 현재 작업 영역과 관련된 실패 패턴만 타깃 검색한다. 전체 파일을 읽지 않아도 된다.
 
@@ -2234,7 +2232,7 @@ harness-maker 는 **wrapup 이 단 하나의 커밋**을 생성한다:
 
 ```
 staged (execute 구현)
-+ memory updates (wiki + failures + session log)
++ memory updates (wiki + failures)
 + PLAN status update
 = 하나의 커밋
 ```

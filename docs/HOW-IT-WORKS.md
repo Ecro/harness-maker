@@ -520,7 +520,7 @@ If SPEC file exists, fully read it to extract:
 - `## 📋 In-Scope Scenarios` → Phase A test targets
 - `## ✅ Verification Criteria` → Phase B RED gate commands
 
-If RESEARCH file is older than `mtime_warn_days` (default 7 days): warn then proceed, record staleness in session log.
+If RESEARCH file is older than `mtime_warn_days` (default 7 days): warn then proceed, record staleness in the PLAN.
 
 **Step 3 — Per-PLAN-Stage TDD Machine**
 
@@ -814,10 +814,9 @@ Change `status:` in `PLAN-{slug}.md` from `planning` → `complete`.
 
 **Step 5 — Update Memory**
 
-Update three memory files:
+Update two memory files (the session tier is checkpoint-only, written by the `flush_session` hook — not wrapup):
 - `.claude/memory/wiki.md` — Add reusable patterns/conventions
 - `.claude/memory/failures.md` — Failures encountered in this work and their solutions
-- `.claude/memory/session/<date>.md` — Session log
 
 **Step 6 — Create Commit**
 
@@ -1915,7 +1914,7 @@ second_brain:
 ├── wiki.md           ← Reusable patterns, conventions, lessons
 ├── failures.md       ← Failure cases and solutions ([fail:] tags)
 ├── session/
-│   └── <date>.md     ← Per-session log, checkpoint:compaction entries
+│   └── <date>.md     ← Compaction checkpoints (checkpoint:compaction entries)
 └── escalations/
     └── escalation-{slug}-{date}.md  ← stuck agent escalation notes
 ```
@@ -2020,7 +2019,7 @@ A: `harness.yaml.targets` is the source of truth. Claude Code uses `.claude/`; C
 harness-maker solves this with a 3-tier memory:
 
 ```
-Hot tier  → .claude/memory/session/<today>.md   (current session state)
+Hot tier  → .claude/memory/session/<today>.md   (compaction checkpoint — execute resume)
 Warm tier → .claude/memory/wiki.md              (reusable patterns and conventions)
           → .claude/memory/failures.md          (failure cases + solutions)
 Cold tier → git log, work-docs/PLAN-*.md       (decision history)
@@ -2030,7 +2029,6 @@ Cold tier → git log, work-docs/PLAN-*.md       (decision history)
 
 - `wiki.md`: Classified with category tags like `[wiki:pattern]`, `[wiki:convention]`. Instantly searchable with `rg -F "[wiki:" wiki.md`.
 - `failures.md`: Tags like `[fail:import]`, `[fail:hook]`. **Same slug increments count instead of creating duplicate section**. Track repeated patterns with `rg -F "[fail:" failures.md`.
-- `session/<date>.md`: Records only non-obvious decisions, trade-offs, and surprising discoveries (obvious things are noise).
 
 When the next session's execute loads the Warm tier, it uses `rg -F "[fail:" failures.md` to target-search only failure patterns relevant to the current work area. No need to read the entire file.
 
@@ -2251,7 +2249,7 @@ First install keeps this setup read-first and points advanced write-capable conf
 
 Writes are intentionally full Markdown writes inside trusted allowlisted folders. To keep several projects from colliding in the same vault, any writable folder requires `second_brain.project_id`, and the writable folder path must include that project id as a path segment, such as `Projects/my-app`. Managed notes also warn when frontmatter omits the project namespace.
 
-**Promotion pipeline (how the vault actually fills)**: local `.claude/memory/` (wiki/failures/session) is the project working memory; the Second Brain is the *curated cross-project durable* layer. `/hm:wrapup` runs a required **Step 5.6** that evaluates the local entries it just wrote and promotes the cross-project-durable subset (`failures.md` → `failure`, PLAN ADRs and session `[decision:...]` → `decision`, confirmed preferences → `preference`) via `second_brain promote`. Promotion is idempotent — the deterministic `<type>-<slug>.md` filename plus an `hm_source` link-back means re-promoting the same source updates the note in place rather than duplicating. The step prints a `promotion evaluated: N candidates, M promoted` receipt so under-promotion is visible. Because promotion fires only at wrapup, finishing a work unit with `/hm:wrapup` (not a bare commit) is what keeps the vault current.
+**Promotion pipeline (how the vault actually fills)**: local `.claude/memory/` (wiki/failures/session) is the project working memory; the Second Brain is the *curated cross-project durable* layer. `/hm:wrapup` runs a required **Step 5.6** that evaluates the local entries it just wrote and promotes the cross-project-durable subset (`failures.md` → `failure`, PLAN ADRs → `decision`, confirmed preferences → `preference`) via `second_brain promote`. Promotion is idempotent — the deterministic `<type>-<slug>.md` filename plus an `hm_source` link-back means re-promoting the same source updates the note in place rather than duplicating. The step prints a `promotion evaluated: N candidates, M promoted` receipt so under-promotion is visible. Because promotion fires only at wrapup, finishing a work unit with `/hm:wrapup` (not a bare commit) is what keeps the vault current.
 
 ---
 
@@ -2353,7 +2351,7 @@ harness-maker has **wrapup create exactly one commit**:
 
 ```
 staged (execute implementation)
-+ memory updates (wiki + failures + session log)
++ memory updates (wiki + failures)
 + PLAN status update
 = one commit
 ```

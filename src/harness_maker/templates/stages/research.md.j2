@@ -58,10 +58,9 @@ Parse from the user's natural-language input:
 
 ## Session Context Loading
 
-Before starting, load memory in tier order (stops at first miss per tier):
+Before starting, load the warm memory tier:
 
-1. **Hot tier** — Read `.claude/memory/session/<today's date>.md` if it exists.
-2. **Warm tier** — Surface top-K wiki + failures entries relevant to the topic via the lexical-prefilter + Claude-rerank helper. Replace `<topic>` with the actual topic before running.
+1. **Warm tier** — Surface top-K wiki + failures entries relevant to the topic via the lexical-prefilter + Claude-rerank helper. Replace `<topic>` with the actual topic before running.
 
 {% if is_codex %}
 ```bash

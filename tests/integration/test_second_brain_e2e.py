@@ -283,6 +283,26 @@ def test_wrapup_renders_promote_step(tmp_path: Path) -> None:
         )
 
 
+def test_wrapup_promotion_drops_session_source(tmp_path: Path) -> None:
+    """session-tier-slim ADR-001: wrapup no longer lists session `[decision:...]`
+    as a Second-Brain promotion source or in the receipt N-count."""
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    vault = tmp_path / "obsidian-vault"
+    (vault / ".obsidian").mkdir(parents=True)
+
+    dotclaude = _render_harness(project_root, _baseline_answers(vault))
+    procedure_files = _wrapup_procedure_files(dotclaude)
+    assert procedure_files, "no rendered file carries the wrapup procedure body"
+
+    for path in procedure_files:
+        text = path.read_text(encoding="utf-8")
+        assert "second_brain promote" in text  # 5.6 promotion still present
+        assert "[decision:...]" not in text, (
+            f"{path} still references the removed session decision journal (ADR-001)"
+        )
+
+
 def test_render_promote_search_roundtrip(tmp_path: Path) -> None:
     """Full pipeline: render harness → promote_note → search finds the note."""
     project_root = tmp_path / "project"

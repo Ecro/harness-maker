@@ -12,6 +12,20 @@
 {%- set _so = (config.get('second_opinion', {})) if config else {} -%}
 {%- set _models = _so.get('models', []) -%}
 {%- if _models %}
+{%- if _models | length >= 2 %}
+
+> **⚡ Concurrency (≥2 models enabled).** The per-model recipes below are independent — each
+> writes its own temp files and is graceful-degraded separately. Do **not** run them one at a time.
+> Instead: (1) do the fast setup for **every** model first — the `mktemp` + the prompt-file `Write`
+> for each; (2) then dispatch **every** model's invoke call (`codex exec …` / `agy …`) in a **single
+> message as parallel Bash tool calls** — do not wait for one model's CLI to return before starting
+> the next. **Substitute each model's literal printed temp-file paths** (from its own `mktemp`
+> output) into its invoke call, NOT the shared `$prompt_tmp`/`$out_tmp` shell variables: each Bash
+> call is a fresh shell, and the per-model recipes reuse the same variable names, so a shared
+> variable would resolve to the wrong model's file. (3) adapt each model's output as it returns and
+> emit its `second_opinion_results` entry exactly as the per-model recipe specifies. Per-model
+> skip/failure handling + ledger rows are unchanged — each parallel call is tracked independently.
+{% endif %}
 {% for _m in _models %}
 #### Second opinion — model: `{{ _m }}`
 {% if _m == 'codex' %}{% include "agents/_partials/second_opinion_codex.md.j2" %}{% elif _m == 'antigravity' %}{% include "agents/_partials/second_opinion_antigravity.md.j2" %}{% endif %}

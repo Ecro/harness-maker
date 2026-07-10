@@ -35,9 +35,8 @@ Find defects, design weaknesses, and risk hotspots **before** they reach `wrapup
 
 ## Session Context Loading
 
-1. **Hot tier** — Read `.claude/memory/session/<today>.md` if it exists. Prior session decisions may explain intentional design choices in the diff.
-2. **Warm tier** — Skim `.claude/memory/failures.md` for patterns matching the changed code area: `rg -F "[fail:" .claude/memory/failures.md`.
-3. **Warm tier** — Skim `.claude/memory/wiki.md` for relevant conventions. Known-good patterns should NOT trigger findings.
+1. **Warm tier** — Skim `.claude/memory/failures.md` for patterns matching the changed code area: `rg -F "[fail:" .claude/memory/failures.md`.
+2. **Warm tier** — Skim `.claude/memory/wiki.md` for relevant conventions. Known-good patterns should NOT trigger findings.
 
 ### Stage-Aware Second Brain
 
