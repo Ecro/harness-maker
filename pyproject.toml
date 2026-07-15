@@ -41,10 +41,8 @@ dependencies = [
     "pydantic>=2",
     "anthropic",
     "httpx",
-    "feedparser",
     "typer",
     "rich",
-    "beautifulsoup4>=4.12",
 ]
 
 [project.urls]
