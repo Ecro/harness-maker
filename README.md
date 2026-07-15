@@ -16,7 +16,7 @@
 
 > Other harnesses give everyone the same starting point. harness-maker reads YOUR repo and builds YOUR harness.
 >
-> 📸 **[See it on two real projects →](docs/assets/showcase-diff.md)** — same maintainer, same Python stack, +5 agents and +15 multi-IDE files between Side and Production preset renders.
+> 📸 **[See it on two real projects →](docs/assets/showcase-diff.md)** — same maintainer, same Python base: the `codex` target adds +42 IDE-native files, while the `Side`→`Production` preset reshapes model tiers, reviewers, and gates across the *same* 14-agent set.
 
 **Per-project personalization** · Grade-gated · Self-evolving · Multi-IDE
 
@@ -132,7 +132,7 @@ A short interview locks the dimensions that shape every downstream render. Re-ru
 | **Targets** | `claude-code` · `cursor` · `codex` (multi-select) | Which IDE-native asset trees are rendered |
 | **Locale** | `en` · `ko` · any tag | Interview text + user-facing error messages |
 | **Workflows** | Fused sequences from atomic stages | Which `/hm:<name>` slash commands appear |
-| **Reviewers / skills** | Preset defaults + overrides | Which agents and skills install |
+| **Reviewers / skills** | Preset defaults + overrides | Which reviewers are active + agent model tiers (the full agent/skill set always installs) |
 | **Ref folders** | Path + glob pairs | Which external docs are searchable via `refdocs-search` skill |
 | **Sibling repos** | Relative paths | Which adjacent repos share the same harness session |
 | **Second Brain** | Obsidian vault path + project_id | Where cross-session memory writes |

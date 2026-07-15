@@ -2095,7 +2095,7 @@ This classification result constitutes 5% of the AI Readiness composite score (`
 `context-linter` enforces **per-preset line count limits** on all generated assets:
 
 ```
-Side preset:    CLAUDE.md ≤200 lines, agent ≤100 lines, skill ≤50 lines
+Side preset:    CLAUDE.md ≤200 lines, agent ≤150 lines, skill ≤100 lines
 Production:     CLAUDE.md ≤500 lines, agent ≤200 lines, skill ≤150 lines
 ```
 

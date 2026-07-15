@@ -1990,7 +1990,7 @@ PreCompact → flush_session → .claude/memory/session/<today>.md 에 상태 �
 `context-linter` 는 모든 생성 자산에 **preset 별 줄 수 한계**를 강제한다:
 
 ```
-Side preset:    CLAUDE.md ≤200줄, agent ≤100줄, skill ≤50줄
+Side preset:    CLAUDE.md ≤200줄, agent ≤150줄, skill ≤100줄
 Production:     CLAUDE.md ≤500줄, agent ≤200줄, skill ≤150줄
 ```
 

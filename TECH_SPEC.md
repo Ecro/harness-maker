@@ -368,8 +368,8 @@ When exceeded, the renderer emits a warning (override: `harness.yaml.context_lin
         │  │       ├── loop.md       → /hm:loop                 │
         │  │       ├── monitor.md    → /hm:monitor              │
         │  │       └── refresh.md    → /hm:refresh (anti-rot)   │
-        │  ├── skills/  (11 skills)                             │
-        │  ├── agents/  (9 agents)                              │
+        │  ├── skills/  (9 skills)                              │
+        │  ├── agents/  (14 agents)                             │
         │  ├── hooks/hooks.json (telemetry)                     │
         │  ├── .worktrees/  (gitignored)                        │
         │  └── observability/                                    │

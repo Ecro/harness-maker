@@ -124,7 +124,7 @@ action items).
 | **Targets** | `claude-code` · `cursor` · `codex` (다중 선택) | 어떤 IDE-native 자산 트리가 렌더되나 |
 | **Locale** | `en` · `ko` · 임의 태그 | 인터뷰 텍스트 + 사용자 대면 에러 메시지 |
 | **Workflows** | Atomic stage의 fused 시퀀스 | 어떤 `/hm:<name>` 슬래시 명령이 나타나나 |
-| **Reviewers / skills** | Preset default + 오버라이드 | 어떤 agent와 skill이 설치되나 |
+| **Reviewers / skills** | Preset default + 오버라이드 | 어떤 reviewer가 활성화되고 agent model tier가 어떻게 되나 (agent·skill 전량은 항상 설치) |
 | **Ref folders** | 경로 + glob 쌍 | `refdocs-search` skill로 검색 가능한 외부 문서 |
 | **Sibling repos** | 상대 경로 | 같은 하네스 세션을 공유할 인접 repo |
 | **Second Brain** | Obsidian vault 경로 + project_id | 세션 간 메모리가 쓰여지는 곳 |

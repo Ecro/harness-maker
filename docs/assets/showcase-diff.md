@@ -1,157 +1,156 @@
 # Showcase — same maintainer, two real projects, two structurally different harnesses
 
 > Live render evidence for the README headline.
-> Generated 2026-05-22 against `harness-maker @ v0.21.0`.
+> Generated 2026-07-15 against `harness-maker @ v0.39.0`.
+> Numbers below are fresh renders of each project's real `.claude/harness.yaml`
+> through the actual `synthesize → render` pipeline — reproducible, not hand-counted.
 
-This page captures what `harness-maker make` produces when you run it against two real public repositories owned by the same maintainer (`Ecro`):
+This page captures what `harness-maker make` produces when you run it against two real repositories owned by the same maintainer (`Ecro`):
 
-- **embedeval** — Python embedded-firmware LLM benchmark. Smaller scope, single-developer cadence → user picks **`Side` preset, `claude-code` target only**.
-- **harness-maker** (self) — Public OSS plugin, multi-IDE, public-facing → user picks **`Production` preset, `claude-code + cursor + codex` targets**.
+- **log_agent** — small Python log tool, single-developer cadence → user picked **`Side` preset, `claude-code` target only**.
+- **spoton** — firmware + app product, spec-driven, multi-model review → user picked **`Production` preset, `claude-code + codex` targets**.
 
-Same maintainer. Same stack (Python + `uv` + Pydantic + GitHub Actions). Different `.claude/` shape because the **preset and targets are different inputs**, not because we hand-tuned the output. The interview locked these choices once; every `harness-maker make` since reproduces them.
+Same maintainer, same base stack. Different `.claude/` shape because the **preset and targets are different inputs**, not because we hand-tuned the output. The interview locked these choices once; every `harness-maker make` since reproduces them.
+
+---
+
+## The two axes — and what each one actually changes
+
+harness-maker's output is a pure function of `(profile, harness.yaml)`. Two independent axes drive the diff between these projects, and they change **different things**:
+
+| Axis | What it changes | Between these two projects |
+|---|---|---|
+| **`targets`** (`claude-code` / `cursor` / `codex`) | The **file set** — which IDE-native assets get rendered | spoton adds the whole `codex` surface; log_agent stays `claude-code`-only |
+| **`preset`** (`Side` / `Production`) | The **content and behavior** of the *same* files — model tiers, dev_mode default, reviewer depth, gates, worktree model, context budgets | identical file *names*, different *values* inside them |
+
+The key correction over earlier drafts of this page: **preset does not add or remove agent/skill files.** `synthesize.py:101` is explicit — *"Every preset installs the full reviewer/skill inventory; activation is data, not file presence."* Both presets render the **identical 14-agent set**. The file-set diff you see below comes almost entirely from `targets`, not `preset`.
 
 ---
 
 ## Rendered file count
 
-| Surface | Side · embedeval | Production · harness-maker | Δ |
+| Surface | Side · log_agent | Production · spoton | Δ |
 |---|---:|---:|---|
-| `.claude/agents/*.md` | **8** | **13** | +5 |
-| `.claude/skills/*/SKILL.md` | 11 | 11 | 0 |
-| `.claude/commands/hm/*.md` | 17 | 17 | 0 |
+| `.claude/agents/*.md` | **14** | **14** | 0 |
+| `.claude/skills/*/SKILL.md` | 9 | 9 | 0 |
+| `.claude/commands/hm/*.md` | 20 | 20 | 0 |
 | `.claude/stages/*.md` | 7 | 7 | 0 |
 | `.claude/rubrics/*.yaml` | 4 | 4 | 0 |
-| `.codex/agents/*.toml` | — | **13** | +13 |
-| `.codex/config.toml` | — | 1 | +1 |
-| `.cursor/hooks.json` | — | 1 | +1 |
+| `.codex/agents/*.toml` | — | **14** | +14 |
+| `.agents/skills/*/SKILL.md` (codex dual-render) | — | **24** | +24 |
+| `.codex/*` config | — | 2 | +2 |
 | `AGENTS.md` (project root) | — | 1 | +1 |
-| **Total rendered files** | **54** | **99** | **+45** |
+| `.claude/schemas/second-opinion-*.json` | — | 1 | +1 |
+| **Total rendered files** | **62** | **104** | **+42** |
 
-The full file lists live in each project's `.claude/.harness-manifest.json`. Two axes drive the diff:
-
-1. **Preset (`Side` vs `Production`)** — adds 5 agents on the Production side.
-2. **Targets (`[claude-code]` vs `[claude-code, cursor, codex]`)** — adds 15 IDE-native files (13 Codex agent TOMLs + Codex config + Cursor hooks + AGENTS.md root file).
-
-Neither axis was guessed. Both came from the 10-dim interview the user answered once per project.
+The +42 is **not** a "Production ships more agents" effect. It is the `codex` target rendering an entire second IDE surface (14 agent TOMLs + 24 codex-path skill dual-renders + 2 `.codex/` config files + root `AGENTS.md`), plus one JSON schema pulled in because spoton enabled cross-model second opinion. Turn the `codex` target off and spoton's file *set* collapses to log_agent's.
 
 ---
 
-## Agent set — the preset-driven core difference
+## Agent set — identical across presets (this is the corrected claim)
 
-Side (embedeval) ships the reviewers + executor scaffolding that a solo experimental project actually uses:
-
-```
-.claude/agents/
-├── code-reviewer.md          ← primary reviewer
-├── code-verifier.md          ← Phase 1.5 verifier
-├── consensus-arbiter.md      ← reviewer consensus
-├── executor.md               ← stage orchestrator
-├── performance-reviewer.md   ← conditional-router activation
-├── security-auditor.md       ← 5-gate scanner driver
-├── security-reviewer.md      ← conditional-router activation
-└── ux-reviewer.md            ← conditional-router activation
-```
-
-Production (harness-maker self) adds **5 agents** that only make sense once a project is going public and has multi-session collaboration:
+Both projects render the **same 14 agents**. A fresh render of each real config confirms the symmetric difference is empty:
 
 ```
-.claude/agents/
-├── (8 above — Side core)
-├── autoloop-coder.md         ← autonomous /hm:loop coding agent
-├── concurrency-reviewer.md   ← race / lock / ISR review
-├── plan-validator.md         ← /hm:plan pre-write critique
-├── stuck.md                  ← escalation analyst when /hm:execute blocks
-└── test-reviewer.md          ← Phase A.5 test-quality gate
+.claude/agents/   (14 files, IDENTICAL set in Side and Production)
+├── autoloop-coder.md        ├── performance-reviewer.md
+├── code-reviewer.md         ├── plan-validator.md
+├── code-verifier.md         ├── security-auditor.md
+├── concurrency-reviewer.md  ├── security-reviewer.md
+├── consensus-arbiter.md     ├── stuck.md
+├── executor.md              ├── test-reviewer.md
+├── judgment-reviewer.md     └── ux-reviewer.md
 ```
 
-These are not "more is better" additions. Each one is **tied to a stage that exists on Production but not on Side**:
-- `plan-validator` runs only when `dev_mode: spec-driven` engages `/hm:plan` deep-interview output.
-- `test-reviewer` runs only when `dev_mode: spec-driven` engages Phase A.5.
-- `stuck` runs only when `/hm:execute` blocks and the workflow has a stuck-escalation step.
-- `concurrency-reviewer` runs only when the conditional router sees async / lock / ISR file paths.
-- `autoloop-coder` runs only when `/hm:loop` is used.
+`autoloop-coder`, `concurrency-reviewer`, `plan-validator`, `stuck`, and `test-reviewer` ship on **both** sides. The renderer installs the full inventory unconditionally (`synthesize._ALL_AGENTS`); the preset decides how those agents are *configured and activated*, not whether the file exists.
 
-Side disables these stages, so it does not render the agents. Production enables them, so it does.
+> **Caveat if you `ls` spoton directly:** spoton's on-disk `.claude/.harness-manifest.json` lists only 11 `.claude/agents/`. That is a **customization** artifact, not a preset one — the maintainer hand-edited `code-reviewer` / `concurrency-reviewer` / `performance-reviewer` (they lost their `generated_by:` frontmatter and were bumped to `model: opus`), so reconcile made them user-owned and dropped them from the *generated* manifest. A clean render of spoton's `harness.yaml` produces all 14.
 
 ---
 
-## Skill set — identical 11 skills both sides
+## What the **preset** actually changes (same files, different content)
 
-Both projects render the same 11 skills:
+This is where `Side` vs `Production` lives — inside the identical files:
 
-```
-agent-quality-rubric · ai-readiness-rubric · autoloop-driver
-conditional-router · context-linter · refdocs-search
-relevance-filter · research-crawler · security-scanner
-verify-before-completion · worktree-isolator
-```
+| Dimension | Side · log_agent | Production · spoton | Source |
+|---|---|---|---|
+| `dev_mode` default | `task-driven` | `spec-driven` (SPEC gate + plan-validator engage) | preset default |
+| Agent **model tier** | all `sonnet` | reasoning agents (`autoloop-coder`, `plan-validator`, `stuck`) → `opus/high`; reviewers → `sonnet/medium` | `presets.py` `_SIDE_MAP` / `_PRODUCTION_MAP` |
+| Reviewers enabled | `[code-reviewer]` (1) | `[code, security, performance, ux, concurrency]` (5) | `reviewers.enabled` |
+| Grade threshold | `B` | `A` | `reviewers.grade_threshold` |
+| Max review rounds | `2` | `3` | `reviewers.max_review_rounds` |
+| Worktree model | `feature_branch_workflow: false`, scope `[execute]` | `feature_branch_workflow: true`, scope `[execute, plan]` | `worktree.*` |
+| Cross-model 2nd opinion | none | `models: [codex, antigravity]` | `second_opinion` |
+| Context budgets (lint) | CLAUDE.md 200 / agent 150 / skill 100 | CLAUDE.md 500 / agent 200 / skill 150 | `context_lint.py` |
 
-These are **mechanism skills** (deterministic Python-backed helpers), not preset-tied. Every harness gets them. The preset shapes *which agents call them* and *which workflows fire them*, not the skill set itself.
+None of these are file-count differences — they are the *values the renderer writes into* `harness.yaml`, `settings.json`, each agent's `model:` frontmatter, and the stage/command bodies.
 
 ---
 
 ## What `harness.yaml` looks like for each
 
-The single source of truth that drives every render:
+The single source of truth that drives every render (real excerpts):
 
-**Side · embedeval** (excerpt):
+**Side · log_agent**
 ```yaml
 preset: Side
-locale: en
-dev_mode: task-driven       # no SPEC gate, no plan-validator
+locale: ko
+dev_mode: task-driven        # no SPEC gate
 targets:
-  - claude-code             # one IDE only
+  - claude-code              # one IDE → no .codex/, no AGENTS.md
 reviewers:
   enabled:
-    - code-reviewer         # 1 active reviewer
-  routing: conditional
-  grade_threshold: A        # Side still defaults to A
+    - code-reviewer          # 1 active reviewer
+  grade_threshold: B
+  max_review_rounds: 2
 worktree:
-  scope: [execute]          # plan does not run in worktree
+  scope: [execute]           # plan does not run in a worktree
+# no second_opinion block
 ```
 
-**Production · harness-maker self** (excerpt):
+**Production · spoton**
 ```yaml
 preset: Production
-locale: ko                  # maintainer's onboarding locale
-dev_mode: task-driven       # task-driven by maintainer's choice — not preset-forced
+locale: ko
+dev_mode: spec-driven        # SPEC gate + plan-validator engage
 targets:
-  - claude-code             # all three IDEs
-  - cursor
-  - codex
+  - claude-code
+  - codex                    # → 14 .codex/agents/*.toml + AGENTS.md + .agents/skills/*
 reviewers:
   enabled:
     - code-reviewer
-    - security-reviewer     # maintainer kept the set at 2 (preset default is 5)
-  routing: conditional
+    - security-reviewer
+    - performance-reviewer
+    - ux-reviewer
+    - concurrency-reviewer   # 5 active reviewers
   grade_threshold: A
   max_review_rounds: 3
 worktree:
-  scope: [execute, plan]    # plan also runs in worktree (Production default)
+  scope: [execute, plan]     # plan also runs in a worktree
+  feature_branch_workflow: true
+second_opinion:
+  models: [codex, antigravity]   # cross-model consensus, K=2
+  agents: [code-reviewer, consensus-arbiter, plan-validator]
 ```
 
-Note: harness-maker self uses `task-driven` not `spec-driven` — the maintainer overrode the preset default. The point of this showcase is not that *Production forces* certain settings, but that **the interview answers carry forward and produce different renders**. Even when `dev_mode` is the same in both, the preset still differs the agent set.
+Neither shape was guessed. Both came from the interview each maintainer answered once per project, and both re-render deterministically.
 
 ---
 
 ## How to reproduce this exact comparison
 
-The renders are deterministic given the same `harness.yaml`. To verify:
+The renders are a pure function of `harness.yaml`. To verify the file-set diff:
 
 ```bash
-# Render Side preset against any clean Python repo:
-harness-maker make /path/to/your-repo --autoloop --preset Side --targets claude-code
+# Fresh-render each project's real config into a temp dir and diff the file lists:
+harness-maker make /path/to/log_agent --preset Side    --targets claude-code
+harness-maker make /path/to/spoton    --preset Production --targets claude-code,codex
 
-# Render Production preset against any clean Python repo:
-harness-maker make /path/to/your-repo --autoloop --preset Production \
-  --targets claude-code,cursor,codex
-
-# Compare:
-diff <(jq -r '.files[]' /path/to/side-render/.claude/.harness-manifest.json | sort) \
-     <(jq -r '.files[]' /path/to/prod-render/.claude/.harness-manifest.json | sort)
+diff <(jq -r '.files[]' /path/to/log_agent/.claude/.harness-manifest.json | sort) \
+     <(jq -r '.files[]' /path/to/spoton/.claude/.harness-manifest.json   | sort)
 ```
 
-You will see the **+5 agents** and **+15 multi-IDE assets** as the structural diff. No keyword guessing, no hand-curated template — the profiler reads your repo's stack signals, the interview locks the 10 dimensions, and the render is a pure function of `(profile, harness.yaml)`.
+You will see the **+42 codex-target files** as the structural diff, and an **identical `.claude/agents/` set** on both sides. The preset difference is not in the file list at all — it is inside the files (`grep -H '^model:' */.claude/agents/*.md` shows `opus` only on Production's three reasoning agents).
 
 ---
 
@@ -159,11 +158,12 @@ You will see the **+5 agents** and **+15 multi-IDE assets** as the structural di
 
 > **"Other harnesses give everyone the same starting point. harness-maker reads YOUR repo and builds YOUR harness."**
 
-The headline is verifiable, not marketing copy:
-- Other harnesses (BMAD, SuperClaude, claude-flow, agent-os, spec-kit) ship a fixed bundle. Two projects using them get the same files.
-- harness-maker ships a **renderer**. Two projects get different files because their `harness.yaml` answers different questions.
+The headline holds — but the proof is two-part, not "Production has more files":
 
-The 45-file diff between these two real projects, owned by the same person, on the same Python stack, is the cheapest concrete proof of that claim.
+- **Targets** produces a genuinely different *file set*: spoton carries a full `.codex/` IDE surface + `AGENTS.md`; log_agent does not.
+- **Preset** produces a different *harness behavior* in the same files: opus reasoning agents vs all-sonnet, a 5-reviewer grade-A spec-driven gate vs a 1-reviewer grade-B task-driven flow, a per-task feature-branch worktree model vs a single-scope one, cross-model second opinion vs none.
+
+Other harnesses (BMAD, SuperClaude, claude-flow, agent-os, spec-kit) ship a fixed bundle — two projects get identical files *and* identical behavior. harness-maker ships a **renderer**: two projects owned by the same person, on the same base stack, get a different file set *and* different behavior because their `harness.yaml` answered different questions.
 
 ---
 
