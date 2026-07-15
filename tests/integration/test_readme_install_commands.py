@@ -20,10 +20,12 @@ verifies that:
    the explicit allowlist defined in ``_install_helpers.py``. BLOCKING.
    (Catches README drift: a new install command appearing without an
    allowlist update means the command is untested.)
-4. ``codex plugin marketplace add`` + ``codex plugin add`` continues to
-   FAIL as documented — if it ever starts passing, our README's
-   "no native Codex marketplace install" claim has become stale.
-   ADVISORY (xfail strict=False + shutil.which guard for missing
+4. ``codex plugin marketplace add`` + ``codex plugin add`` SUCCEEDS as
+   documented — recent Codex CLI (0.144.4) installs the plugin by cloning
+   the repo (older codex failed with "not found"). The README's caveat is
+   that this clone does not install the Python engine; if `plugin add`
+   ever flips back to failing, the "native install works" claim is stale.
+   ADVISORY (`@pytest.mark.advisory` + shutil.which guard for missing
    codex CLI).
 
 Gating policy per ``PLAN-install-cmd-cifence`` ADR-002 (Round 2 amend):
@@ -197,9 +199,19 @@ def test_readme_install_commands_in_allowlist() -> None:
 
 
 @pytest.mark.advisory
-def test_codex_marketplace_add_fails_as_documented(tmp_path: Path) -> None:
+def test_codex_marketplace_add_succeeds_as_documented(tmp_path: Path) -> None:
     """`codex plugin marketplace add <repo>` + `codex plugin add <plugin>`
-    continues to fail as documented.
+    installs the plugin, as documented.
+
+    Reality shift (2026-07, codex-cli 0.144.4): native `codex plugin add`
+    now SUCCEEDS — it clones the repo into the plugin cache. It does NOT
+    install the Python engine (`harness-maker` / `python -m harness_maker`),
+    which the README calls out as a caveat; this test guards the positive
+    claim (install works) and the install location, and leaves the
+    engine caveat to prose (a PATH check would false-fire wherever the
+    engine is already installed). Superseded the earlier
+    ``..._fails_as_documented`` assertion when codex added marketplace
+    support.
 
     Per ADR-001 Round 1 + ADR-002 Round 2 amend, this test is ADVISORY:
     it's a normal positive-assertion test (assertions hold when the
@@ -209,13 +221,6 @@ def test_codex_marketplace_add_fails_as_documented(tmp_path: Path) -> None:
     job's step that invokes this test. The custom ``@pytest.mark.advisory``
     is registered in ``pyproject.toml`` and lets CI run advisory vs
     blocking tests in separate steps (per ADR-002).
-
-    The earlier ``xfail(strict=False)`` approach was rejected (validator
-    P1-1 follow-up): xfail inverts the intuitive PASS/FAIL semantic —
-    a test that asserts the documented-broken behavior would be marked
-    XPASS (confusing) when assertions hold, and XFAIL (advisory pass)
-    when codex behavior changes. The ``advisory`` mark + workflow
-    continue-on-error keeps the test semantics straightforward.
     """
     codex_bin = shutil.which("codex")
     if codex_bin is None:
@@ -242,8 +247,9 @@ def test_codex_marketplace_add_fails_as_documented(tmp_path: Path) -> None:
         timeout=60,
         check=False,
     )
-    # Step 2: attempt to install the plugin from the registered marketplace.
-    # This MUST fail (today) because the repo ships no Codex `marketplace.json`.
+    # Step 2: install the plugin from the registered marketplace. Recent
+    # Codex CLI accepts the `.codex-plugin/plugin.json` manifest and clones
+    # the repo into the plugin cache (older codex failed with "not found").
     result = subprocess.run(  # noqa: S603
         [codex_bin, "plugin", "add", "harness-maker@harness-maker"],
         env=env,
@@ -252,15 +258,23 @@ def test_codex_marketplace_add_fails_as_documented(tmp_path: Path) -> None:
         timeout=60,
         check=False,
     )
-    # Assert: nonzero exit AND stderr contains the documented error pattern.
-    # If either condition flips (exit 0 OR stderr no longer matches), the
-    # README's "no native Codex install" claim is stale.
-    assert result.returncode != 0, (
-        f"`codex plugin add` UNEXPECTEDLY SUCCEEDED — README needs re-truthification.\n"
+    # Assert: `codex plugin add` SUCCEEDS. Recent Codex CLI (verified on
+    # 0.144.4) installs the plugin by cloning the repo into the plugin cache.
+    # If this flips back to nonzero, either codex regressed OR the README's
+    # "native plugin add installs the plugin" claim is stale — re-truthify.
+    assert result.returncode == 0, (
+        f"`codex plugin add` UNEXPECTEDLY FAILED — the README documents native "
+        f"install as working on recent Codex CLI. Either codex regressed or the "
+        f"README needs re-truthification.\n"
         f"stdout: {result.stdout!r}\nstderr: {result.stderr!r}"
     )
-    assert "not found in marketplace" in result.stderr.lower(), (
-        f"`codex plugin add` failed but with a different error than documented. "
-        f"README + ADR-001 may need update.\n"
-        f"stdout: {result.stdout!r}\nstderr: {result.stderr!r}"
+    # And it must leave the plugin cache where the README says it lands. The
+    # README's load-bearing CAVEAT — that this clone does NOT install the
+    # Python engine — is asserted only in prose (a PATH check would false-fire
+    # on any machine that already has `harness-maker` installed).
+    installed_root = codex_home / "plugins" / "cache" / "harness-maker"
+    assert installed_root.exists(), (
+        f"`codex plugin add` reported success but left no plugin cache at "
+        f"{installed_root} — README's install-location claim is stale.\n"
+        f"stdout: {result.stdout!r}"
     )

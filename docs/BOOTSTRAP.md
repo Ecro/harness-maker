@@ -49,7 +49,7 @@ up the plugin's skills, agents, and commands.
 
 ### Codex CLI
 
-**Codex CLI has no native marketplace install for harness-maker today.** Registering this repo as a Codex marketplace via `codex plugin marketplace add` accepts the marketplace root, but the follow-up `codex plugin add` then fails with `plugin 'harness-maker' was not found in marketplace 'harness-maker'` — the repo ships no Codex `marketplace.json`. Two working install paths instead:
+**Recent Codex CLI (verified on 0.144.4) installs this plugin natively** — `codex plugin marketplace add Ecro/harness-maker` then `codex plugin add harness-maker@harness-maker` succeeds, cloning the repo into `~/.codex/plugins/cache/`. But that clone does **not** install the Python engine (`harness-maker` / `python -m harness_maker`) that renders the harness — so native `plugin add` alone is not enough. Install the engine via one of the two paths below (a native `codex plugin add` is optional on top):
 
 **A. Claude Code marketplace (if Claude Code is on the same machine):**
 
