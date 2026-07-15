@@ -618,3 +618,157 @@ class TestPathTraversalEntryPoints:
             ]
         )
         assert rc == 1
+
+
+# ---------------------------------------------------------------------------
+# PLAN-spec-optional-task-driven ADR-001: task-driven-confident short-circuit
+# on the verify-oracle CLI commands (op-check, waiver-check) ONLY.
+# Fail-closed: relax IFF a confident dev_mode == "task-driven" read. Every other
+# input (spec-driven / missing / unreadable / malformed / wrong-root) hits the
+# unchanged enforce path. All marker/record commands stay pass-through so the
+# ADR-009 anti-loop machinery is untouched.
+# ---------------------------------------------------------------------------
+
+
+def _write_dev_mode_yaml(
+    root: Path, dev_mode_line: str | None, *, provenance: bool = False
+) -> None:
+    """Write <root>/.claude/harness.yaml with an optional dev_mode line."""
+    claude = root / ".claude"
+    claude.mkdir(parents=True, exist_ok=True)
+    body = "locale: en\n"
+    if dev_mode_line is not None:
+        body += dev_mode_line + "\n"
+    if provenance:
+        body = "generated_by: harness-maker\ncontent_hash: abc123\n---\n" + body
+    (claude / "harness.yaml").write_text(body, encoding="utf-8")
+
+
+def _op_check_argv(root: Path) -> list[str]:
+    # verdict=add + no specs/SPEC-foo.machine.yaml → operation NOT satisfied on the
+    # unchanged path (exit 1). Only the task-driven short-circuit forces exit 0.
+    return ["op-check", "--verdict", "add", "--target", "foo", "--root", str(root)]
+
+
+def _waiver_check_argv(root: Path) -> list[str]:
+    # no waiver file → not valid on the unchanged path (exit 1).
+    return ["waiver-check", "--root", str(root), "--slug", "foo"]
+
+
+def test_op_check_task_driven_short_circuits(tmp_path: Path, capsys) -> None:  # type: ignore[no-untyped-def]
+    from harness_maker.spec_need import main as spec_need_main
+
+    _write_dev_mode_yaml(tmp_path, "dev_mode: task-driven")
+    rc = spec_need_main(_op_check_argv(tmp_path))
+    assert rc == 0  # relaxed despite operation genuinely NOT satisfied
+    assert json.loads(capsys.readouterr().out.strip()) == {"satisfied": True}
+
+
+def test_op_check_task_driven_provenance_multidoc_short_circuits(tmp_path: Path, capsys) -> None:  # type: ignore[no-untyped-def]
+    from harness_maker.spec_need import main as spec_need_main
+
+    # Real harness.yaml is a multi-doc stream (provenance + body) — must still read.
+    _write_dev_mode_yaml(tmp_path, "dev_mode: task-driven", provenance=True)
+    rc = spec_need_main(_op_check_argv(tmp_path))
+    assert rc == 0
+    assert json.loads(capsys.readouterr().out.strip()) == {"satisfied": True}
+
+
+def test_op_check_spec_driven_unchanged(tmp_path: Path) -> None:
+    from harness_maker.spec_need import main as spec_need_main
+
+    _write_dev_mode_yaml(tmp_path, "dev_mode: spec-driven")
+    assert spec_need_main(_op_check_argv(tmp_path)) == 1  # enforce (not satisfied)
+
+
+def test_op_check_missing_dev_mode_key_unchanged(tmp_path: Path) -> None:
+    from harness_maker.spec_need import main as spec_need_main
+
+    _write_dev_mode_yaml(tmp_path, None)  # no dev_mode key
+    assert spec_need_main(_op_check_argv(tmp_path)) == 1  # fail-closed → enforce
+
+
+def test_op_check_missing_harness_yaml_unchanged(tmp_path: Path) -> None:
+    from harness_maker.spec_need import main as spec_need_main
+
+    assert spec_need_main(_op_check_argv(tmp_path)) == 1  # no yaml → enforce
+
+
+def test_op_check_malformed_yaml_unchanged(tmp_path: Path) -> None:
+    from harness_maker.spec_need import main as spec_need_main
+
+    claude = tmp_path / ".claude"
+    claude.mkdir(parents=True)
+    (claude / "harness.yaml").write_text("dev_mode: [unclosed\n a: b: c\n", encoding="utf-8")
+    assert spec_need_main(_op_check_argv(tmp_path)) == 1  # unreadable → enforce, no silent PASS
+
+
+def test_op_check_wrong_root_unchanged(tmp_path: Path) -> None:
+    from harness_maker.spec_need import main as spec_need_main
+
+    missing = tmp_path / "does-not-exist"
+    assert spec_need_main(_op_check_argv(missing)) == 1  # nonexistent root → enforce
+
+
+def test_waiver_check_task_driven_short_circuits(tmp_path: Path, capsys) -> None:  # type: ignore[no-untyped-def]
+    from harness_maker.spec_need import main as spec_need_main
+
+    _write_dev_mode_yaml(tmp_path, "dev_mode: task-driven")
+    rc = spec_need_main(_waiver_check_argv(tmp_path))
+    assert rc == 0  # relaxed despite no waiver file present
+    assert json.loads(capsys.readouterr().out.strip()) == {"valid": True}
+
+
+def test_waiver_check_spec_driven_unchanged(tmp_path: Path) -> None:
+    from harness_maker.spec_need import main as spec_need_main
+
+    _write_dev_mode_yaml(tmp_path, "dev_mode: spec-driven")
+    assert spec_need_main(_waiver_check_argv(tmp_path)) == 1  # enforce (no valid waiver)
+
+
+def test_marker_write_read_unchanged_under_task_driven(tmp_path: Path) -> None:
+    """Anti-loop preservation: marker commands are NOT short-circuited."""
+    from harness_maker.spec_need import main as spec_need_main
+
+    _write_dev_mode_yaml(tmp_path, "dev_mode: task-driven")
+    rc = spec_need_main(
+        [
+            "marker-write",
+            "--root",
+            str(tmp_path),
+            "--slug",
+            "foo",
+            "--verdict",
+            "add",
+            "--target",
+            "foo",
+            "--base-sha",
+            "sha",
+            "--changed-files-hash",
+            "hash",
+        ]
+    )
+    assert rc == 0
+    # The marker was actually written (machinery intact), not no-op'd.
+    assert read_marker(tmp_path, "foo") is not None
+
+
+def test_record_unchanged_under_task_driven(tmp_path: Path) -> None:
+    """Anti-loop preservation: record still writes the verdict ledger."""
+    from harness_maker.spec_need import main as spec_need_main
+
+    _write_dev_mode_yaml(tmp_path, "dev_mode: task-driven")
+    rc = spec_need_main(
+        [
+            "record",
+            "--verdict",
+            "add",
+            "--target",
+            "foo",
+            "--root",
+            str(tmp_path),
+        ]
+    )
+    assert rc == 0
+    ledger = tmp_path / ".claude" / "observability" / "spec-need-foo.jsonl"
+    assert ledger.is_file()  # side-effect happened; not neutralized

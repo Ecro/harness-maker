@@ -871,6 +871,15 @@ class HarnessConfig(BaseModel):
             return "en"
         return v
 
+    # Intentional asymmetry (ADR-002): the model default is the conservative
+    # SPEC_DRIVEN for bare construction, but the reverse mapper
+    # (interview.answers_from_harness_yaml) and the ADVISORY runtime gates
+    # (spec_gate/spec_drift/spec_quality) resolve an ABSENT/unknown dev_mode to
+    # task-driven, so a public-plugin config that loses its key never
+    # surprise-forces SPEC. Deliberate exception: the spec_need verify ORACLE gate
+    # is fail-CLOSED (absent/unreadable → enforce, never relaxed) — do NOT "align"
+    # it to this relaxed default. Render fallbacks that relied on this default now
+    # pin dev_mode explicitly (synthesize/workflow_fuse).
     dev_mode: DevMode = DevMode.SPEC_DRIVEN
     workflows: dict[str, list[AtomicStage]] = Field(
         default_factory=lambda: {
@@ -1045,6 +1054,15 @@ class InterviewAnswers(BaseModel):
             return "en"
         return v
 
+    # Intentional asymmetry (ADR-002): the model default is the conservative
+    # SPEC_DRIVEN for bare construction, but the reverse mapper
+    # (interview.answers_from_harness_yaml) and the ADVISORY runtime gates
+    # (spec_gate/spec_drift/spec_quality) resolve an ABSENT/unknown dev_mode to
+    # task-driven, so a public-plugin config that loses its key never
+    # surprise-forces SPEC. Deliberate exception: the spec_need verify ORACLE gate
+    # is fail-CLOSED (absent/unreadable → enforce, never relaxed) — do NOT "align"
+    # it to this relaxed default. Render fallbacks that relied on this default now
+    # pin dev_mode explicitly (synthesize/workflow_fuse).
     dev_mode: DevMode = DevMode.SPEC_DRIVEN
     domains: list[str] = Field(default_factory=list)
     ref_folders: list[RefFolder] = Field(default_factory=list)

@@ -1,6 +1,20 @@
 """SPEC requirement detection, verdict recording, waiver, and marker state machine.
 
 ADR-001/002/008/009 from PLAN-spec-requirement-gate.
+
+Task-driven runtime guard (PLAN-spec-optional-task-driven ADR-001): the CLI is
+invoked ONLY from spec-driven-rendered plan Step 1.7 / verify Check 6. If a
+harness flips ``dev_mode`` to task-driven WITHOUT re-rendering, those stale prose
+blocks still call this CLI. To keep task-driven from forcing SPEC, the
+verify-ORACLE commands (``op-check``, ``waiver-check``) short-circuit to
+satisfied/valid on a CONFIDENT ``dev_mode == "task-driven"`` read — verify Check 6
+reads the exit code, so this fully backstops verify. The relax is fail-CLOSED
+(only a confident task-driven read; missing/unreadable/malformed → enforce), the
+INVERSE of ``spec_gate.py``'s advisory fail-open, because this module IS the
+verify oracle. All marker/record commands stay pass-through so the ADR-009
+anti-loop machinery is untouched. plan Step 1.7's §1.7.2 enforcement is LLM-prose,
+unreachable at runtime — surfaced instead by the ``plan_verify_dev_mode_match``
+/hm:health signal (ADR-003); re-render is the real fix for stale plan prose.
 """
 
 from __future__ import annotations
@@ -15,8 +29,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
 
+import yaml
+
 from harness_maker import command_registry
-from harness_maker.io_utils import atomic_append, atomic_write
+from harness_maker.io_utils import atomic_append, atomic_write, load_harness_yaml
 
 logger = logging.getLogger(__name__)
 
@@ -450,6 +466,29 @@ def _cli_validate_slug(value: str, field: str = "slug") -> int:
         return 1
 
 
+def _read_dev_mode(root: Path) -> str | None:
+    """Return harness.yaml ``dev_mode``, or None when absent/unreadable.
+
+    WHY fail-closed (PLAN-spec-optional-task-driven ADR-001): spec_need is the
+    verify Check 6 *oracle*, so only a confident ``task-driven`` read may relax
+    the verify-oracle commands. A missing/unreadable/malformed config returns
+    None → the caller does NOT relax (enforce). This is the deliberate INVERSE
+    of ``spec_gate.py``'s advisory fail-OPEN, where relax-on-unreadable is safe.
+    """
+    yaml_path = root / ".claude" / "harness.yaml"
+    try:
+        cfg = load_harness_yaml(yaml_path)
+    except (OSError, UnicodeDecodeError, yaml.YAMLError):
+        return None
+    dev_mode = cfg.get("dev_mode") if isinstance(cfg, dict) else None
+    return dev_mode if isinstance(dev_mode, str) else None
+
+
+def _relax_for_task_driven(root: Path) -> bool:
+    """True iff a confident ``dev_mode == "task-driven"`` read (verify-oracle relax)."""
+    return _read_dev_mode(root) == "task-driven"
+
+
 def main(argv: list[str] | None = None) -> int:
     _guard = command_registry.guard_or_none("spec_need", argv)
     if _guard is not None:
@@ -476,6 +515,11 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.cmd == "op-check":
+        if _relax_for_task_driven(args.root):
+            # ADR-001: task-driven never requires a SPEC operation → satisfied.
+            # verify Check 6 reads the exit code, so exit 0 makes it PASS.
+            print(json.dumps({"satisfied": True}))
+            return 0
         if rc := _cli_validate_slug(args.target, "target"):
             return rc
         satisfied = operation_satisfied(args.verdict, args.target, args.root, args.changed_files)
@@ -503,6 +547,10 @@ def main(argv: list[str] | None = None) -> int:
             return 1
 
     if args.cmd == "waiver-check":
+        if _relax_for_task_driven(args.root):
+            # ADR-001: task-driven needs no waiver — the verify gate is relaxed.
+            print(json.dumps({"valid": True}))
+            return 0
         if rc := _cli_validate_slug(args.slug, "slug"):
             return rc
         valid = waiver_valid(args.root, args.slug, args.changed_files)

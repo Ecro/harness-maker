@@ -937,6 +937,9 @@ def answers_from_harness_yaml(yaml_path: Path) -> InterviewAnswers | None:
     except ValueError:
         return None
     try:
+        # ADR-002: an ABSENT dev_mode key resolves to task-driven (relaxed) — the
+        # intentional asymmetry vs the models.py default (SPEC_DRIVEN for bare
+        # construction). A config that lost its key must never surprise-force SPEC.
         dev_mode = DevMode(data.get("dev_mode", "task-driven"))
     except ValueError:
         dev_mode = DevMode.SPEC_DRIVEN if preset == Preset.PRODUCTION else DevMode.TASK_DRIVEN

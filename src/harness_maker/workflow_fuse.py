@@ -56,11 +56,13 @@ def fuse(
 
         env = _make_env()
 
-    from harness_maker.models import HarnessConfig
+    from harness_maker.models import DevMode, HarnessConfig
     from harness_maker.synthesize import _compute_install_ref
 
     if config_dump is None:
-        config_dump = HarnessConfig().model_dump(mode="json")
+        # ADR-002: pin dev_mode explicitly so the fallback render does not depend
+        # on the HarnessConfig class default.
+        config_dump = HarnessConfig(dev_mode=DevMode.SPEC_DRIVEN).model_dump(mode="json")
     install_ref = _compute_install_ref()
 
     parts: list[str] = [f"# /hm:{workflow_name}\n"]

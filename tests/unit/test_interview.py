@@ -734,3 +734,15 @@ def test_ask_second_brain_accepts_custom_folder_path(
 
     assert len(cfg.folders) == 1
     assert cfg.folders[0].path == "Projects/my-proj/notes"
+
+
+def test_absent_dev_mode_key_reverse_maps_to_task_driven(tmp_path: pathlib.Path) -> None:
+    """ADR-002 (PLAN-spec-optional-task-driven): a harness.yaml MISSING the
+    dev_mode key reverse-maps to task-driven — even for a Production preset — so a
+    config that lost its key never surprise-forces SPEC. Locks interview.py:940.
+    """
+    harness_yaml = tmp_path / "harness.yaml"
+    harness_yaml.write_text("locale: en\npreset: Production\ntargets:\n  - claude-code\n")
+    result = answers_from_harness_yaml(harness_yaml)
+    assert result is not None
+    assert result.dev_mode == DevMode.TASK_DRIVEN

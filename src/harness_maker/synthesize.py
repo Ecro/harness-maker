@@ -152,12 +152,15 @@ def _atomic_command_files(
     PRODUCTION_FILES constants and for any test paths that don't have answers.
     """
     out: list[FileSpec] = []
-    from harness_maker.models import HarnessConfig  # local import: avoid cycle
+    from harness_maker.models import DevMode, HarnessConfig  # local import: avoid cycle
     from harness_maker.render import _make_env  # local import: avoid cycle
 
     env = _make_env()
     if config_dump is None:
-        config_dump = HarnessConfig().model_dump(mode="json")
+        # ADR-002: pin dev_mode explicitly so the fallback render does not depend
+        # on the HarnessConfig class default (a future default flip must not
+        # silently drop Step 1.7 / Check 6 from these fallback renders).
+        config_dump = HarnessConfig(dev_mode=DevMode.SPEC_DRIVEN).model_dump(mode="json")
     install_ref = _compute_install_ref()
     for s in _ATOMIC_STAGES:
         tpl = env.get_template(f"stages/{s}.md.j2")
@@ -548,9 +551,10 @@ def _codex_target_files(
     from harness_maker.render import _make_env  # local import: avoid cycle
 
     if config_dump is None:
-        from harness_maker.models import HarnessConfig  # local import: avoid cycle
+        from harness_maker.models import DevMode, HarnessConfig  # local import: avoid cycle
 
-        config_dump = HarnessConfig().model_dump(mode="json")
+        # ADR-002: pin dev_mode — do not depend on the class default (see above).
+        config_dump = HarnessConfig(dev_mode=DevMode.SPEC_DRIVEN).model_dump(mode="json")
     env = _make_env()
     install_ref = _compute_install_ref()
     loop_body = env.get_template("commands/hm/loop.md.j2").render(
@@ -623,9 +627,10 @@ def _codex_stage_skills(*, config_dump: dict[str, object] | None = None) -> list
     from harness_maker.render import _make_env  # local import: avoid cycle
 
     if config_dump is None:
-        from harness_maker.models import HarnessConfig  # local import: avoid cycle
+        from harness_maker.models import DevMode, HarnessConfig  # local import: avoid cycle
 
-        config_dump = HarnessConfig().model_dump(mode="json")
+        # ADR-002: pin dev_mode — do not depend on the class default (see above).
+        config_dump = HarnessConfig(dev_mode=DevMode.SPEC_DRIVEN).model_dump(mode="json")
     env = _make_env()
     install_ref = _compute_install_ref()
     out: list[FileSpec] = []

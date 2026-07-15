@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+### Added — task-driven SPEC-relaxation hardened against flip-without-re-render
+- **`spec_need.py` runtime dev_mode self-guard** (PLAN-spec-optional-task-driven ADR-001):
+  `op-check`/`waiver-check` short-circuit to satisfied/valid ONLY on a confident
+  `dev_mode == "task-driven"` read, so a spec-driven→task-driven flip without re-render can no
+  longer force SPEC via a stale `verify` Check 6. Fail-CLOSED (missing/unreadable/malformed →
+  enforce) — the deliberate inverse of `spec_gate`'s advisory fail-open, since `spec_need` is the
+  verify oracle. `marker`/`record` commands stay pass-through (ADR-009 anti-loop untouched).
+- **`plan_verify_dev_mode_match` /hm:health signal** (ADR-003): surfaces a stale plan Step 1.7 /
+  verify Check 6 render (plan-side enforcement is LLM-prose, unreachable at runtime).
+- **Render-fallback dev_mode pins** (ADR-002): the 4 bare-`HarnessConfig()` render fallbacks pin
+  `dev_mode=SPEC_DRIVEN` so a future model-default flip can't silently drop Step 1.7/Check 6;
+  the model default (SPEC_DRIVEN) vs reverse-mapper (task-driven) asymmetry is now documented.
+
 ## [0.39.0] - 2026-07-10
 
 ### Changed — session memory tier slimmed to compaction-checkpoint-only

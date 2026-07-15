@@ -443,3 +443,32 @@ def test_codex_agent_toml_omits_model_field(name: str) -> None:
         f"Rendered .codex/agents/{name}.toml still contains a `model =` line "
         f"(ADR-001 violation). Full TOML:\n{rendered}"
     )
+
+
+def test_atomic_command_fallback_pins_spec_driven(monkeypatch: pytest.MonkeyPatch) -> None:
+    """ADR-002 (PLAN-spec-optional-task-driven): the no-config fallback in
+    _atomic_command_files must render spec-driven (Step 1.7 / spec_need present)
+    INDEPENDENT of the HarnessConfig class default.
+
+    To prove the explicit pin (synthesize.py `HarnessConfig(dev_mode=SPEC_DRIVEN)`)
+    is load-bearing — not coincidentally matching the class default — we flip the
+    class default to TASK_DRIVEN for this test. The fallback must STILL render
+    spec-driven; removing the pin (bare `HarnessConfig()`) would then yield
+    task-driven and drop `spec_need`, turning this test RED.
+    """
+    import harness_maker.models as models_mod
+    from harness_maker.models import DevMode, HarnessConfig
+
+    class _TaskDefaultConfig(HarnessConfig):
+        dev_mode: DevMode = DevMode.TASK_DRIVEN
+
+    # _atomic_command_files does a call-time `from harness_maker.models import
+    # HarnessConfig`, so patching the module attribute rebinds its local import.
+    monkeypatch.setattr(models_mod, "HarnessConfig", _TaskDefaultConfig)
+    assert _TaskDefaultConfig().dev_mode == DevMode.TASK_DRIVEN  # sanity: default flipped
+
+    from harness_maker.synthesize import _atomic_command_files
+
+    files = _atomic_command_files()  # no config_dump → fallback path
+    plan_body = next(ctx["stage_body"] for (_tpl, dest, ctx) in files if dest.endswith("plan.md"))
+    assert "spec_need" in plan_body  # only true because the pin passes dev_mode=SPEC_DRIVEN
