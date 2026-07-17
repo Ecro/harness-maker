@@ -20,8 +20,29 @@
 .agents/
 AGENTS.md
 
-# Session work documents (research, plans, loop context)
-work-docs/
+# Session work documents (loop context, batch state) — churn only.
+# Deliverables are NEGATED below: CLAUDE.md states "Deliverables (PLAN/REVIEW/
+# RESEARCH/SPEC, human memory tiers) are deliberately NOT ignored — wrapup
+# commits them", and 53 of them are tracked. This blanket rule (added 2026-05-29
+# in 45538b26, a `chore: re-render .claude` — apparently a side effect) contradicted
+# that: gitignore only affects UNTRACKED files, so the pre-existing 53 kept
+# committing normally while every NEW deliverable was silently dropped by wrapup's
+# `git add ... || true`. Under the per-task worktree model that is data loss, not
+# just churn: the deliverable exists ONLY in `.worktrees/<slug>/`, and `task-land`
+# deletes that worktree. Cost one PLAN + RESEARCH + REVIEW on 2026-07-17.
+# NOTE the trailing `*`, not `/`: git cannot re-include a file whose PARENT
+# DIRECTORY is excluded, so `work-docs/` + `!work-docs/PLAN-*.md` silently does
+# nothing (git never descends into an excluded dir). `work-docs/*` excludes the
+# CONTENTS, leaving the negations reachable. Verify any edit here with
+# `git check-ignore -v work-docs/PLAN-x.md` — it must print NOTHING.
+work-docs/*
+!work-docs/PLAN-*.md
+!work-docs/RESEARCH-*.md
+!work-docs/REVIEW-*.md
+!work-docs/SPEC-*.md
+!work-docs/CLOSE-*.md
+!work-docs/AUDIT-*.md
+!work-docs/plans/
 
 # Cache
 ~/.cache/harness-maker/
