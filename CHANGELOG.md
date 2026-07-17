@@ -2,6 +2,36 @@
 
 ## [Unreleased]
 
+## [0.40.2] — 2026-07-18
+
+### Added — Stage-3 blocking gates wired into settings.json (Phases 3+4)
+- **`permission_gate` + `autopilot_guard` on `PreToolUse`** now render into
+  `.claude/settings.json`, so the permission-surface and worktree gates actually fire in
+  Claude Code (they never did from the dead `.claude/hooks/hooks.json`). `permission_gate`
+  carries `--subordinate-to-deny-dangerous` (Claude-only); `spec_gate` fires on
+  `Write|Edit|MultiEdit` in spec-driven mode; every blocking gate carries `timeout: 10`.
+- **`autopilot_guard`'s permission-surface-write rule was rebuilt** (this is the parked
+  Grade-D attempt's P0, closed and re-verified by a security-reviewer + codex panel over 5
+  adversarial rounds). It was a write-verb blacklist that leaked `python -c` / `perl -i` /
+  `git checkout` writes to `settings.json` once wired live. It is now a read-only allowlist
+  plus resolved-target-path matching (shlex + cwd tracking + `PurePosixPath`) plus a
+  block-biased backstop: a Bash segment naming a `.claude`/`.cursor`/`.codex` token or a
+  config basename is blocked unless it is a clean read (no `less`, no command substitution,
+  no write-output flag). **This is defense-in-depth, not a hard boundary** — a textual guard
+  over arbitrary bash cannot catch a write whose path is not spelled in the segment
+  (indirection via a helper script, a `$VAR`/`$(…)`/base64-assembled path, or a symlink); the
+  worktree sandbox is the real boundary. `permission_gate` roots its `harness.yaml` lookup at
+  the payload/env project dir (not `Path.cwd()`), so a subdirectory cwd no longer silently
+  forces the fail-closed branch.
+
+### Removed — the dead `.claude/hooks/hooks.json` is retired (Phase 4)
+- The file Claude Code never read is no longer rendered. A byte-pristine stale copy is
+  deleted; a user-edited one is **preserved with a warning** — `reconcile._SWEEP_NEVER_DELETE`
+  keeps the orphan sweep from deleting it via a manifest-hash match, and
+  `cli._retire_stale_hooks_json` deletes only on an exact byte-match to a pristine no-merge
+  render. (This closes the parked attempt's other P0, where removing the render FileSpec alone
+  would have deleted user-authored hooks.)
+
 ## [0.40.1] — 2026-07-18
 
 ### Fixed
