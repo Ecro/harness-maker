@@ -7,7 +7,7 @@ files:
   body_sha256: cb730588026d70da6c42073100502a9ec87364e168d4571991faaeb9038429e4
 - path: agents/autoloop-coder.md
   template: agents/autoloop-coder.md.j2
-  body_sha256: 16c58ceb4e3c945b212076c47c74bd67ca0a869617796f99fe48ca0e12b3be40
+  body_sha256: 37c6a5d761e169c3247145c71d451f988c3bb1608ee01b29cbb876eec392f154
 - path: agents/code-reviewer.md
   template: agents/code-reviewer.md.j2
   body_sha256: cfcb1a627f588142cce7571487dbf32a7e9a7223a8effa82b810a41310d6628c
@@ -22,7 +22,7 @@ files:
   body_sha256: 2e43075af371e8f700fc1e34563ef63dc2ce98e1ba053c4928704664abd35b7e
 - path: agents/executor.md
   template: agents/executor.md.j2
-  body_sha256: 9895756d67fa33cca1349040e8bce9557d516d4060f04943a5a2d20a4b1e8919
+  body_sha256: 9bd45ffb954779361bdadd21c3c7077e9393be73129913e98e78abd30167a77b
 - path: agents/judgment-reviewer.md
   template: agents/judgment-reviewer.md.j2
   body_sha256: 9216a2c84e6d4365e76a45a3c2ee71fbf3717506fc171aa82dedce289f8d0985

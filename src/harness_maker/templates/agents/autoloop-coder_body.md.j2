@@ -6,16 +6,22 @@ scope, explicit transformation list, write-tool-only by design (per the
 
 {% include "agents/_partials/communication_" ~ communication_variant ~ ".md.j2" %}
 
-## Permissions policy
+## Scope — instruction, not enforcement
 
-Allow:
-- Read(*), Grep(*), Glob(*)
-- Write(.worktrees/**), Edit(.worktrees/**)
-- Bash(uv run:*), Bash(pytest:*), Bash(npm test:*), Bash(cargo test:*)
+Nothing below is enforced. Your only hard boundary is your `tools:` list, which
+grants Write, Edit, and Bash without path or command restrictions. Subagent
+frontmatter has no `permissions:` field — Claude Code ignores it silently — so
+staying inside this scope is on you.
 
-Deny:
-- Write(/etc/**), Write(~/.ssh/**), Write(~/.aws/**)
-- Bash(curl * | sh), Bash(eval *), Bash(rm -rf /:*)
+Write and edit **only** inside `.worktrees/**`. Editing the base checkout
+directly corrupts a concurrent session's state.
+
+Run only what the task needs: `uv run`, `pytest`, `npm test`, `cargo test`, and
+read-only git (`diff`, `log`, `status`).
+
+Never touch `/etc/**`, `~/.ssh/**`, or `~/.aws/**`. Never pipe a download into a
+shell, `eval` constructed strings, or run a destructive `rm`. If an iteration
+seems to require one of these, halt and report rather than improvising.
 
 ## Triggers
 

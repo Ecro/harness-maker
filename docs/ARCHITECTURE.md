@@ -252,7 +252,7 @@ Required in the `Production` preset; optional in `Side`.
 
 ### M9 — Worktree Isolation
 
-`worktree.py` integrates `git worktree`. By default `/hm:execute` (and optionally `/hm:plan` in `Production`) runs inside a fresh worktree under `.worktrees/<workflow>-<timestamp>/` at the project root. The LLM may only write inside that worktree — enforced by M12's executor agent permissions.
+`worktree.py` integrates `git worktree`. By default `/hm:execute` (and optionally `/hm:plan` in `Production`) runs inside a fresh worktree under `.worktrees/<workflow>-<timestamp>/` at the project root. Isolation is a **convention, not a sandbox**: the executor agent is instructed to write only inside that worktree (prompt-level guidance), but its `tools:` list grants unrestricted `Write`/`Edit`/`Bash`, so nothing actually stops it from writing elsewhere. See M12.
 
 `/hm:loop` allocates **one shared worktree per loop run** (not per iteration), reducing branch churn (0.5.5+). `sibling_repos` in `harness.yaml` lets the same isolation session create matching worktrees for related repositories, so cross-repo changes can be reviewed and merged as one logical unit. Cleanup uses prefix-match (`phase-*`, `autoloop-*`, `execute-*`) so harness-maker never removes worktrees created by Cursor or other tools in the same `.worktrees/` directory.
 
@@ -278,18 +278,41 @@ Implemented in `security_scanner.py`. Findings are written to `observability/sec
 
 ### M12 — Privilege Separation
 
-Reviewer agents and executor agents have **structurally different permissions** declared both in their YAML frontmatter (so Cursor 2.5+ enforces per-agent — parent → subagent permission inheritance is broken in Cursor) and in the project's `settings.json`:
+> **Corrected 2026-07-17 (0.40.0).** This section used to describe a YAML
+> `permissions:` block in agent frontmatter (allow/deny lists, including a
+> "Write+Edit pairing invariant") as the enforcement mechanism. It never
+> enforced anything: **subagent frontmatter has no `permissions:` field**,
+> so Claude Code silently ignored every one of those blocks. The blocks
+> were deleted from all agent templates rather than left as misleading
+> documentation.
 
-- **Reviewer** (`templates/agents/code-reviewer.md.j2` and 4 siblings):
-  - `allow: [Read(*), Grep(*), Glob(*), Bash(git diff:*), Bash(git log:*), Bash(git status:*)]` — read-only diff inspection.
-  - `deny: [Write(*), Edit(*), Bash(rm:*), Bash(curl:*), Bash(npm:*), Bash(eval *), Bash(python:*), Bash(node:*), Bash(sh:*), Bash(bash:*)]`. The interpreter denies (added 0.6.2 REVIEW M7) close a bypass where `Bash(rm:*)` deny was insufficient because `Bash(python -c "import os; os.system('rm …')")` was unblocked.
-- **Executor** (`templates/agents/executor.md.j2`):
-  - `allow: [Read(*), Write(.worktrees/**), Edit(.worktrees/**), Bash(uv run:*), Bash(pytest:*), Bash(npm test:*), Bash(cargo test:*), …]` — scoped to the active worktree plus standard test commands.
-  - `deny: [Write(/etc/**), Write(~/.ssh/**), Write(~/.aws/**), Edit(/etc/**), Edit(~/.ssh/**), Edit(~/.aws/**), Bash(curl * | sh), Bash(eval *), Bash(rm -rf /:*)]`. The Edit pairings (added 0.6.2 REVIEW M1) close an escalation path where `Write(/etc/sudoers)` was denied but `Edit(/etc/sudoers)` slipped through. **Invariant: any system path with a `Write` deny must have a matching `Edit` deny.**
+Reviewer agents and executor agents are separated by **`tools:`**, the only
+thing Claude Code actually binds per-agent:
 
-Frontmatter `permissions:` is also written as prose under `## Permissions policy` in the agent body for human-readable rationale; the structured fields are what the IDE enforces. Combined with M9, this gives a defense-in-depth model: even if a reviewer is prompt-injected into trying to write or shell out via interpreter, the permission system blocks it. Even if an executor is injected into writing outside the worktree, the path scope blocks it.
+- **Reviewer** (`templates/agents/code-reviewer.md.j2` and 4 siblings): `tools:` omits `Bash` entirely. This is the real boundary — there is no shell to invoke `rm`, `curl`, or an interpreter through, regardless of anything written in a `deny:` block. Adding `Bash` back would grant an unrestricted shell no frontmatter could narrow.
+- **Executor** (`templates/agents/executor.md.j2`): `tools:` includes `Read, Grep, Glob, Write, Edit, Bash` — unrestricted paths and an unrestricted shell. Staying inside `.worktrees/**` and avoiding system paths (`/etc/**`, `~/.ssh/**`, `~/.aws/**`) is **prompt-level guidance**, not a runtime restriction; nothing stops the agent from writing outside the worktree except the instruction saying not to. The old frontmatter `deny:` list (`Write(/etc/**)`, `Edit(/etc/**)`, `Bash(curl * | sh)`, …) never fired for a second reason even before the frontmatter-is-inert fact: `Write(<path>)` rule shapes aren't consulted by the file-permission check at all (only `Edit`/`Read` are), and `Bash(... | ...)` rules are matched per-subcommand after splitting on `&& || ; | &`, so a rule spanning a separator can never match.
 
-CLAUDE.md §Security/Permissions v1.6 carries the policy authoritatively; templates mirror that policy and CI snapshot tests guard against accidental drift.
+The only **real, enforced** permission boundary in harness-maker is the
+main session's `settings.json` `permissions.deny`, which is session-wide
+(applies identically to the main session and every agent — it cannot
+express "this agent may not run `rm`"). It is opt-in via
+`harness.yaml.permissions.deny_dangerous: true` and currently renders as:
+
+```json
+["Bash(rm:*)", "Edit(/etc/**)", "Edit(~/.ssh/**)", "Edit(~/.aws/**)"]
+```
+
+(`Write(/etc/**)` and `Bash(curl * | sh)` were dropped from this list —
+both were unmatchable shapes per `permission_syntax.is_matchable_rule`,
+guarded by `test_permission_syntax.py`. `curl | sh` detection is delegated
+to the `permission_gate` PreToolUse hook instead of a settings rule.)
+
+Per-agent command scoping is not expressible in frontmatter. When it's
+needed, the real options are a PreToolUse hook keyed on agent identity, or
+a sandbox — both defeated by `--dangerously-skip-permissions` /
+`bypassPermissions`.
+
+CLAUDE.md §Security/Permissions v1.6 carries this correction authoritatively.
 
 ### M13 — Provenance Frontmatter
 

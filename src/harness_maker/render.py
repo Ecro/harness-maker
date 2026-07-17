@@ -178,11 +178,51 @@ _SETTINGS_KEYS_OWNED_BY_HARNESS: frozenset[str] = frozenset(
 )
 
 # Permission sub-keys whose lists are unioned (template entries first, then
-# user-added entries). This preserves user-added denies/allows across
-# re-renders — e.g. dangerous-pattern denies added via /hm:health Layer 1
-# (Write(/etc/**), Write(~/.ssh/**), ...) survive when the template only
-# ships the minimal baseline (Bash(rm:*), Bash(curl:*)).
+# user-added entries). This preserves rules the user added themselves — via
+# /hm:health Layer 1 acceptance or by hand — across re-renders. A naive replace
+# would wipe them and silently downgrade the project's posture.
 _PERMISSIONS_LIST_KEYS: tuple[str, ...] = ("allow", "deny", "ask")
+
+# Every `permissions.deny` literal a harness-maker settings template has ever
+# rendered. APPEND-ONLY — never recycle an entry, and never add a literal the
+# templates did not ship (an entry here is unconditionally deleted from the
+# user's disk).
+#
+# Why this exists: the union above cannot tell a rule harness-maker rendered in
+# 0.12 from one the user typed, so our own history accreted forever. That is how
+# projects still carry `Write(/etc/**)` — dead syntax that warns at startup —
+# long after the template stopped shipping it. Dropping these before the union
+# rebuilds `deny` from `deny_dangerous` policy each render instead.
+#
+# An entry here is deleted from the user's settings.json unconditionally, so
+# membership is governed by TWO invariants, both enforced by tests:
+#
+#   1. We shipped it — `git log -S` finds it in templates/settings/ history.
+#      (ADR-004 listed nine literals from memory; four had never been in a
+#      settings template at all — they reach disk via /hm:health Layer 1
+#      acceptance or by hand. Pruning those would have deleted user content.)
+#   2. It provably enforces NOTHING — `permission_syntax.is_matchable_rule` is
+#      False for it.
+#
+# Invariant 2 is what makes this safe, and invariant 1 cannot substitute for it:
+# git history proves we shipped a string, NOT that the user did not also author
+# it. For dead syntax that distinction costs nothing — deleting a rule that
+# never fired removes zero protection and clears the startup warning it caused.
+# For a LIVE rule it is the difference between tidying and silent data loss.
+#
+# Hence `Bash(rm:*)` and `Bash(curl:*)` are deliberately absent even though we
+# shipped both: they are live, `deny_dangerous` defaults to False so the template
+# does not re-add them, and `permission_gate`'s PreToolUse hook — their intended
+# replacement — is not wired yet. A user who health-accepted `Bash(rm:*)` keeps it.
+_HARNESS_SHIPPED_DENY_LITERALS: frozenset[str] = frozenset(
+    {
+        # `|` is a command separator, so this never matches. Fails silently.
+        "Bash(curl * | sh)",
+        # The file-permission check consults Edit/Read only. Warns at startup.
+        "Write(/etc/**)",
+        "Write(~/.ssh/**)",
+    }
+)
 
 
 def _merge_permissions(
@@ -220,6 +260,15 @@ def _merge_permissions(
             and key not in existing_perms
         ):
             continue
+        # Drop our own accreted deny history before the union, so the list is
+        # rebuilt from policy rather than accumulating every literal we ever
+        # shipped. Exact full-string match only — a near-miss like
+        # "Bash(rm:*) # my note" is the user's content, not our history.
+        # `allow`/`ask` are untouched: an identical string there was never ours.
+        if key == "deny":
+            existing_list = [
+                item for item in existing_list if item not in _HARNESS_SHIPPED_DENY_LITERALS
+            ]
         seen: set[str] = set()
         merged_list: list[str] = []
         for item in (*new_list, *existing_list):

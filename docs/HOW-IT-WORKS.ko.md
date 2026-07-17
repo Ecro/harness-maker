@@ -49,7 +49,7 @@
     - 11.13 [안티-rot 시스템](#1113-안티-rot-시스템--하네스-자체가-낡지-않는다)
     - 11.14 [7차원 AI Readiness + 루브릭 YAML](#1114-7차원-ai-readiness--확장-가능한-루브릭-yaml)
     - 11.15 [워크트리 격리의 결정적 실행](#1115-워크트리-격리의-결정적deterministic-실행)
-    - 11.16 [권한 분리 Write+Edit 페어링](#1116-권한-분리-writeedit-페어링--우회-경로를-닫는다)
+    - 11.16 [무엇이 실제로 에이전트 경계를 강제하는가](#1116-무엇이-실제로-에이전트-경계를-강제하는가)
     - 11.17 [단일 커밋 계약 + WHY 중심 커밋 메시지](#1117-단일-커밋-계약--why-중심-커밋-메시지)
     - 11.18 [LLM-판단 우선 아키텍처](#1118-llm-판단-우선-아키텍처--규칙-기반을-피한다)
     - 11.19 [원자 파일 쓰기](#1119-원자-파일-쓰기--인터럽트에도-파일이-깨지지-않는다)
@@ -1386,10 +1386,11 @@ worktree:
 - `Read(*)`, `Grep(*)`, `Glob(*)` — 읽기 전체
 - `Write(.worktrees/**)`, `Edit(.worktrees/**)` — 워크트리 내 쓰기만
 
-**권한 (금지)**:
-- `Write(/etc/**)`, `Write(~/.ssh/**)`, `Write(~/.aws/**)` — 시스템/자격증명 경로
-- `Edit(/etc/**)`, `Edit(~/.ssh/**)`, `Edit(~/.aws/**)` — (Write 와 동일 경로 쌍 금지)
-- `Bash(curl * | sh)`, `Bash(eval *)`, `Bash(rm -rf /:*)` — 위험 명령
+**스코프 (지시 사항일 뿐 — 강제 아님)**: 에이전트는 `/etc/**`, `~/.ssh/**`,
+`~/.aws/**` 밖으로 나가지 말고 `curl | sh`, `eval`, 파괴적 `rm` 을 피하라고
+*지시받는다*. Subagent frontmatter 에는 `permissions:` 필드가 없어 Claude
+Code 는 그런 블록을 있어도 조용히 무시한다 — 진짜 경계는 에이전트의
+`tools:` 리스트다 (Write/Edit/Bash 가 경로 제한 없이 부여됨). §11.16 참고.
 
 **모델**: 기본 모델 (autoloop context 에서 opus 권장)
 
@@ -1459,7 +1460,8 @@ worktree:
 - `Bash(uv run:*)`, `Bash(pytest:*)`, `Bash(npm test:*)`, `Bash(cargo test:*)` — 테스트 실행
 - `Bash(git diff:*)`, `Bash(git log:*)`, `Bash(git status:*)` — git 읽기
 
-**금지**: 시스템 경로 쓰기, `curl * | sh`, `eval`, `rm -rf /:*`
+**하지 말라고 지시됨** (지시일 뿐, 강제 아님 — §11.16 참고): 시스템 경로 쓰기,
+`curl | sh`, `eval`, 파괴적 `rm`. 실제 경계는 에이전트의 `tools:` 리스트다.
 **모델**: sonnet
 
 ---
@@ -2203,24 +2205,38 @@ uv run python -m harness_maker.worktree create execute "$(pwd)"
 
 ---
 
-### 11.16 권한 분리 Write+Edit 페어링 — 우회 경로를 닫는다
+### 11.16 무엇이 실제로 에이전트 경계를 강제하는가
 
-**발견된 취약점 패턴 (REVIEW M1)**: `Write(/etc/**)` 만 deny 하면 `Edit(/etc/sudoers)` 로 같은 파일을 수정할 수 있다. Write deny 가 Edit 우회 경로를 열어준다.
+> **2026-07-17 정정 (0.40.0).** 이 섹션은 예전에 에이전트 `permissions:`
+> frontmatter 를 위한 "Write+Edit 페어링 불변식"을 문서화했다. 그 불변식은
+> 겉치레였다: **subagent frontmatter 에는 `permissions:` 필드가 없어서**
+> Claude Code 는 그런 블록을 전부 조용히 무시했다. 주석만 다는 대신 블록
+> 자체를 삭제했다 — 이미 이 문서를 읽은 독자 한 명을 오도한 뒤였다.
 
-harness-maker 는 **같은 경로에 Write 와 Edit 을 항상 페어로 deny**:
+서브에이전트를 실제로 묶는 것은 두 가지뿐이다:
 
-```yaml
-# 리뷰어 에이전트 권한
-permissions:
-  deny:
-    - Write(*)
-    - Edit(*)           ← Write 와 항상 페어
-    - Bash(python:*)    ← 인터프리터 호출도 차단 (REVIEW M7)
-    - Bash(sh:*)
-    - Bash(bash:*)      ← bash -c "$untrusted" 우회 차단
-```
+1. **`tools:`** — 에이전트가 갖지 않은 도구는 사용할 수 없다. 이것이 진짜
+   경계이며, read-only 리뷰어가 실제로 read-only 인 이유다: Bash 자체가
+   없으니 `python -c "..."` 로 우회할 방법이 없다. `Bash` 를 다시 넣으면
+   frontmatter 로는 좁힐 수 없는 무제한 쉘이 열린다.
+2. **`settings.json` 의 `permissions`** — 강제되긴 하지만 **세션 전체
+   단위**다: 메인 세션과 모든 에이전트에 동일하게 적용된다. "이 에이전트는
+   `rm` 을 실행할 수 없다" 같은 표현은 불가능하다.
 
-Executor 는 `.worktrees/**` 에만 Write/Edit 허용 — 시스템 경로는 같은 페어링 원칙으로 차단.
+에이전트별 명령 스코핑은 frontmatter 로 표현할 수 없다. 필요하다면 에이전트
+식별 기반 PreToolUse 훅이나 샌드박스가 유일한 방법이고, 둘 다
+`--dangerously-skip-permissions` / `bypassPermissions` 에서 무력화된다.
+
+**조용히 아무 효과도 없는 rule shape** (`permission_syntax.is_matchable_rule`
+가 oracle 이고, `test_permission_syntax.py` 가 회귀 시 빌드를 fail 시킨다):
+
+| Shape | 절대 매치되지 않는 이유 |
+|---|---|
+| `Write(<path>)`, `NotebookEdit(<path>)`, `Glob(<path>)` | 파일-권한 체크는 `Edit`/`Read` 만 참조한다 — `Edit(<path>)` 로 써야 한다 |
+| `Bash(curl * \| sh)` | Bash 규칙은 `&&`, `\|\|`, `;`, `\|`, `&` 로 split 한 뒤 서브커맨드 단위로 매치된다 — separator 를 넘나드는 규칙은 절대 매치될 수 없고, 아무 경고도 뜨지 않는다 |
+
+harness-maker 는 39개 릴리스 동안 이 셋을 그대로 배포했다. 그 위에 달린
+설명은 우회 경로를 닫는다고 주장했지만, 한 번도 실제로 작동한 적이 없었다.
 
 ---
 
@@ -2523,7 +2539,7 @@ PLAN 이행 여부는 체크박스 체크만으로는 판정할 수 없다. PLAN
 | 안티-rot 시스템 | 하네스 자체가 낡음 | research-crawler / pending.jsonl |
 | 7차원 AI Readiness | AI 준비도 단일 지표 | ai-readiness-rubric / rubrics/*.yaml |
 | 결정적 워크트리 격리 | IDE 환경 따라 격리 확률적 실패 | worktree CLI 직접 호출 |
-| Write+Edit 페어링 deny | Edit 이 Write deny 우회 | 에이전트 permissions 정책 |
+| `tools:` 기반 에이전트 경계 | frontmatter permissions 는 silent-ignore (가짜 경계) | agent `tools:` allowlist / 메인세션 settings.json deny |
 | 단일 커밋 + WHY 메시지 | git log 가 중간 상태로 오염 | wrapup Step 7 |
 | LLM 판단 우선 | regex/규칙의 false positive/negative | 전 시스템 |
 | 원자 파일 쓰기 | 인터럽트 시 파일 corruption | atomic_write 패턴 |

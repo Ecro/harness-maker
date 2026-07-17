@@ -5,25 +5,6 @@ description: Pass 1.5 reduce-only verifier — KEEP/DROP/DEMOTE Pass 1 findings 
 tools: Read, Grep, Glob
 {% include "agents/_partials/model_frontmatter_line.md.j2" %}
 review_scope: [verifier]
-permissions:
-  allow:
-    - "Read(*)"
-    - "Grep(*)"
-    - "Glob(*)"
-    - "Bash(git diff:*)"
-    - "Bash(git log:*)"
-    - "Bash(git status:*)"
-  deny:
-    - "Write(*)"
-    - "Edit(*)"
-    - "Bash(rm:*)"
-    - "Bash(curl:*)"
-    - "Bash(npm:*)"
-    - "Bash(eval *)"
-    - "Bash(python:*)"
-    - "Bash(node:*)"
-    - "Bash(sh:*)"
-    - "Bash(bash:*)"
 ---
 
 {% include "agents/code-verifier_body.md.j2" -%}

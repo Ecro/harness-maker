@@ -4,22 +4,6 @@ communication_variant: reframe
 description: Critiques a draft PLAN document for gaps, ambiguities, missing exit criteria, and feasibility risks before /hm:execute is invoked. Read-only.
 tools: Read, Grep, Glob
 {% include "agents/_partials/model_frontmatter_line.md.j2" %}
-permissions:
-  allow:
-    - "Read(*)"
-    - "Grep(*)"
-    - "Glob(*)"
-  deny:
-    - "Write(*)"
-    - "Edit(*)"
-    - "Bash(rm:*)"
-    - "Bash(curl:*)"
-    - "Bash(npm:*)"
-    - "Bash(eval *)"
-    - "Bash(python:*)"
-    - "Bash(node:*)"
-    - "Bash(sh:*)"
-    - "Bash(bash:*)"
 ---
 
 {% include "agents/plan-validator_body.md.j2" -%}

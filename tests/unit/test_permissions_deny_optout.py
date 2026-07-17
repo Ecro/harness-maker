@@ -39,12 +39,16 @@ def test_deny_empty_by_default() -> None:
 
 
 def test_deny_full_baseline_when_opted_in() -> None:
+    """The baseline is the four ENFORCEABLE rules (0.40.0).
+
+    This used to pin `Bash(curl * | sh)`, which never matched anything — the
+    test kept a dead rule alive for 39 releases. `curl|sh` is not expressible as
+    a permission rule at all; `permission_gate`'s PreToolUse hook owns it now
+    (ADR-003). See test_permission_syntax.py for the shape-level guard.
+    """
     for tpl in SETTINGS_TEMPLATES:
         deny = _render_deny(tpl, True)
-        assert "Bash(rm:*)" in deny
-        assert "Bash(curl * | sh)" in deny
-        assert any("/etc" in d for d in deny)
-        assert any(".ssh" in d for d in deny)
+        assert deny == ["Bash(rm:*)", "Edit(/etc/**)", "Edit(~/.ssh/**)", "Edit(~/.aws/**)"]
 
 
 def test_backcompat_old_harness_yaml_without_permissions_key() -> None:

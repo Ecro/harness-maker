@@ -1,13 +1,14 @@
 ---
 type: plan
 task_slug: permission-deny-and-hooks-wiring
-status: phase-2-complete
-phases_done: [1, 2]
+status: phases-1-2-5-6-7-8-complete
+phases_done: [1, 2, 5, 6, 7, 8]
 phases_parked: [3, 4]
-phases_pending: [5, 6, 7, 8, 9]
+phases_pending: [9]
 parked_branch: hm/phase34-parked
 created: 2026-07-17
 reconstructed: 2026-07-17
+phase_5678_landed: 2026-07-18
 tags: [harness-maker, plan, python, permissions, hooks, render, security]
 research_doc: "[[RESEARCH-permission-deny-and-hooks-wiring]]"
 interview_rounds: 5
@@ -642,6 +643,10 @@ harness-owned `hooks` key (**shipped**); `.claude/hooks/hooks.json` is retired (
 - **Rollback:** revert the Phase 4 commit.
 
 ### Phase 5 — Deny syntax + readiness realign
+- **Status:** DONE (2026-07-18, branch `hm/deny-syntax-fix`). `depends_on: [3]` was
+  reconsidered and released: the three dead rules removed here enforce **nothing**
+  today, so deleting them before Phase 3's gate is 0→0, not a reduction. The gate's
+  `curl|sh` responsibility (ADR-003) is documented as delegated, and lands with Phase 3.
 - **depends_on:** `[3]`
 - **parallel_group:** `serial-hooks`
 - **merge_hazards:** `templates/settings/*.j2` (Phases 1-3); `readiness.py` guardrails (Phase 4).
@@ -664,6 +669,21 @@ harness-owned `hooks` key (**shipped**); `.claude/hooks/hooks.json` is retired (
 - **Rollback:** revert the Phase 5 commit.
 
 ### Phase 6 — Prune harness-shipped literals (ADR-004)
+- **Status:** DONE (2026-07-18), **with ADR-004 corrected during execution.** The
+  reconstructed ADR-004 listed **9** literals to prune; a git-history oracle
+  (`git log -S<lit> -- templates/settings/`, authored as a test) proved **four had
+  never been in a settings template** — `Write(~/.aws/**)`, `Edit(/etc/**)`,
+  `Edit(~/.ssh/**)`, `Edit(~/.aws/**)`. Those reach a user's disk via /hm:health
+  Layer 1 acceptance or by hand, so pruning them would have been **silent deletion
+  of user-authored rules** — the exact data-loss class the plan exists to prevent.
+  The prune set is now **provably-dead AND provably-shipped**: `is_matchable_rule`
+  is False for it (safety invariant, runs everywhere) and git history proves we
+  emitted it. `Bash(rm:*)` and `Bash(curl:*)` are **held back** — both are live,
+  `deny_dangerous` defaults False so the template does not re-add them, and no oracle
+  can tell a rule we shipped from one the user also typed (harmless only for dead
+  syntax). Final set: `{Bash(curl * | sh), Write(/etc/**), Write(~/.ssh/**)}`.
+  The two test-reviewer rounds that caught this (hand-copied oracle → derived oracle →
+  the `Bash(rm:*)` hold-back violation) are why the set is 3, not 9.
 - **depends_on:** `[5]`
 - **parallel_group:** `serial-hooks`
 - **merge_hazards:** `_merge_permissions` (Phase 1 touches its caller).
@@ -682,6 +702,12 @@ harness-owned `hooks` key (**shipped**); `.claude/hooks/hooks.json` is retired (
 - **Rollback:** revert the Phase 6 commit.
 
 ### Phase 7 — Delete inert agent permissions + correct docs
+- **Status:** DONE (2026-07-18). Removed `permissions:` frontmatter from all 10 agent
+  templates; reworded executor/autoloop-coder prose to "Scope — instruction, not
+  enforcement"; corrected 8 doc surfaces + `.claude-verify.sh`'s `phase_10_reviewer_perms`
+  (was grepping for the deleted frontmatter — now asserts `tools:` has no Bash) and
+  `phase_10_executor_perms` (now checks body-level `.worktrees` guidance). Rebaselined
+  `test_agent_body_partials._EXPECTED_SHA256` (9 agents) + 8 synthesize snapshots.
 - **depends_on:** `[]`
 - **parallel_group:** `docs-cleanup`
 - **merge_hazards:** `tests/e2e/sandbox-plugin-test/.claude/agents/**` — shared with Phase 4.
@@ -701,6 +727,12 @@ harness-owned `hooks` key (**shipped**); `.claude/hooks/hooks.json` is retired (
 - **Rollback:** revert the Phase 7 commit.
 
 ### Phase 8 — Deny-syntax regression tests (shared constant)
+- **Status:** DONE (2026-07-18). The shared validator is `permission_syntax.is_matchable_rule`,
+  consumed by `test_permission_syntax.py` (renders both settings templates, asserts no
+  unmatchable rule) and `test_readiness_deny_lockstep.py` (every scored pattern is both
+  matchable and present in the rendered deny). **Exit criterion discharged empirically**:
+  the property test was run against `d895800b`'s templates and FAILED on `Bash(curl * | sh)`,
+  then passed after Phase 5 — it would have caught this before release.
 - **depends_on:** `[5, 6]`
 - **parallel_group:** `serial-hooks`
 - **merge_hazards:** `tests/unit/test_permissions_deny_optout.py` (Phases 5 + 9).

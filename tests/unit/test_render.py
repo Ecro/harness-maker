@@ -124,12 +124,14 @@ def test_render_settings_json_shallow_merges_existing(tmp_path: Path) -> None:
 
 
 def test_render_settings_json_unions_permissions_deny(tmp_path: Path) -> None:
-    """Permissions.deny user-added entries (e.g. Write(/etc/**)) must survive re-render.
+    """User-added deny rules survive re-render — EXCEPT our own dead-shipped literals.
 
-    Regression guard for the 0.15.1 /hm:health audit finding: users add
-    dangerous-pattern denies (Write(/etc/**), Write(~/.ssh/**), ...) to
-    settings.json after /hm:health Layer 1 accept. Pre-0.15.2 the next
-    re-render wiped them, silently downgrading the security posture.
+    The 0.15.2 contract preserved every user-added deny. 0.40.0 narrows it: a
+    literal harness-maker itself shipped and that provably enforces nothing
+    (`Write(/etc/**)`, `Bash(curl * | sh)`) is pruned on re-render, because it is
+    our accreted history and it was the reported startup warning. The user loses
+    nothing — the rule never fired. Rules that are the user's own — a custom path,
+    or a live `Edit(/etc/**)` we never shipped — must still survive.
     """
     import json
 
@@ -139,9 +141,9 @@ def test_render_settings_json_unions_permissions_deny(tmp_path: Path) -> None:
             {
                 "permissions": {
                     "deny": [
-                        "Write(/etc/**)",
-                        "Write(~/.ssh/**)",
-                        "Edit(/etc/**)",
+                        "Write(/etc/**)",  # our dead-shipped literal → pruned
+                        "Edit(/etc/**)",  # never shipped by settings → the user's
+                        "Bash(mycmd:*)",  # clearly the user's → survives
                     ],
                 },
             }
@@ -154,10 +156,9 @@ def test_render_settings_json_unions_permissions_deny(tmp_path: Path) -> None:
     render(bp, tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
     data = json.loads(settings_path.read_text(encoding="utf-8"))
     deny = data["permissions"]["deny"]
-    # All three user-added denies survived.
-    assert "Write(/etc/**)" in deny
-    assert "Write(~/.ssh/**)" in deny
-    assert "Edit(/etc/**)" in deny
+    assert "Write(/etc/**)" not in deny, "our dead-shipped literal must be pruned"
+    assert "Edit(/etc/**)" in deny, "a live rule we never shipped is the user's"
+    assert "Bash(mycmd:*)" in deny, "a user-custom rule must survive"
 
 
 def test_render_settings_json_unions_dedup_no_duplicates(tmp_path: Path) -> None:
@@ -165,9 +166,9 @@ def test_render_settings_json_unions_dedup_no_duplicates(tmp_path: Path) -> None
     import json
 
     settings_path = tmp_path / "settings.json"
-    # Side preset baseline ships Bash(rm:*) — user has the same plus a custom one.
+    # Bash(rm:*) is live and NOT pruned; Bash(mycmd:*) is the user's custom rule.
     settings_path.write_text(
-        json.dumps({"permissions": {"deny": ["Bash(rm:*)", "Write(/etc/**)"]}}),
+        json.dumps({"permissions": {"deny": ["Bash(rm:*)", "Bash(mycmd:*)"]}}),
         encoding="utf-8",
     )
     p = _profile()
@@ -176,10 +177,10 @@ def test_render_settings_json_unions_dedup_no_duplicates(tmp_path: Path) -> None
     render(bp, tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
     data = json.loads(settings_path.read_text(encoding="utf-8"))
     deny = data["permissions"]["deny"]
-    # No duplicate of the shared entry.
+    # No duplicate of a shared entry (whether or not the template re-adds it).
     assert deny.count("Bash(rm:*)") == 1
     # User-only entry survived.
-    assert "Write(/etc/**)" in deny
+    assert "Bash(mycmd:*)" in deny
 
 
 def test_render_settings_json_falls_back_when_existing_corrupt(tmp_path: Path) -> None:
@@ -730,46 +731,42 @@ def test_render_cursor_target_writes_targets_to_harness_yaml(tmp_path: Path) -> 
     assert "default_model: opus" in yaml_text  # ADR-002: version-agnostic alias floor
 
 
-def test_render_agents_have_structured_permissions_frontmatter(tmp_path: Path) -> None:
-    """0.6.2 P2: agent .md frontmatter MUST carry structured permissions.allow/deny.
+def test_render_agents_have_no_inert_permissions_frontmatter(tmp_path: Path) -> None:
+    """0.40.0 (Phase 7, ADR-002): agent .md frontmatter must NOT carry a
+    `permissions:` block.
 
-    Why: Cursor 2.5+ does not cascade parent agent permissions to spawned subagents.
-    A tool call evaluating to "ask" blocks indefinitely in autoloop. Structured
-    frontmatter permissions let Cursor enforce explicit allow/deny per agent.
-    Claude Code accepts unknown frontmatter fields permissively (verified vs
-    official feature-dev / pr-review-toolkit plugins which use no `permissions`).
+    Inverts the 0.6.2 test, whose premise — that Cursor / Claude Code enforce
+    per-agent frontmatter permissions — is false. Subagent frontmatter has no
+    `permissions:` field; Claude Code silently ignores it, so the block enforced
+    nothing while reading as a security boundary (it misled the incoming brief's
+    author with the docs open). The real boundary is `tools:`. If a `permissions:`
+    key reappears in rendered frontmatter, someone re-added inert theatre.
     """
     p = _profile()
     a = interview(p, autoloop_mode=True)
     bp = synthesize(p, a)
     render(bp, tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
 
-    # Reviewer agents share a common deny set
-    reviewer_names = [
+    names = [
         "code-reviewer",
         "security-reviewer",
         "performance-reviewer",
         "ux-reviewer",
         "concurrency-reviewer",
+        "executor",
+        "autoloop-coder",
     ]
-    for name in reviewer_names:
+    for name in names:
         agent_path = tmp_path / "agents" / f"{name}.md"
         assert agent_path.exists(), f"missing rendered agent: {name}"
         content = agent_path.read_text(encoding="utf-8")
-        assert "permissions:" in content, f"{name}: missing permissions block"
-        assert "allow:" in content, f"{name}: missing allow list"
-        assert "deny:" in content, f"{name}: missing deny list"
-        # Spot-check reviewer-specific values
-        assert "Read(*)" in content, f"{name}: missing Read(*) allow"
-        assert "Write(*)" in content, f"{name}: missing Write(*) deny"
-        assert "Bash(curl:*)" in content, f"{name}: missing curl deny"
-
-    # Executor has wider allow (worktree writes + test commands)
-    executor = (tmp_path / "agents" / "executor.md").read_text(encoding="utf-8")
-    assert "permissions:" in executor
-    assert "Write(.worktrees/**)" in executor
-    assert "Bash(uv run:*)" in executor
-    assert "Bash(eval *)" in executor  # deny side
+        frontmatter = content.split("---", 2)[1] if content.startswith("---") else ""
+        assert "permissions:" not in frontmatter, (
+            f"{name}: inert `permissions:` frontmatter is back — Claude Code ignores "
+            f"it; the real boundary is `tools:` (Phase 7, ADR-002)"
+        )
+        # The real boundary is still declared.
+        assert "tools:" in frontmatter, f"{name}: missing tools: — the actual boundary"
 
 
 def test_cursor_hooks_uses_lowercase_native_schema(tmp_path: Path) -> None:

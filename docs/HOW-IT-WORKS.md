@@ -50,7 +50,7 @@
     - 11.13 [Anti-Rot System — The Harness Itself Doesn't Go Stale](#1113-anti-rot-system--the-harness-itself-doesnt-go-stale)
     - 11.14 [7-Dimension AI Readiness + Extensible Rubric YAML](#1114-7-dimension-ai-readiness--extensible-rubric-yaml)
     - 11.15 [Deterministic Worktree Isolation](#1115-deterministic-worktree-isolation)
-    - 11.16 [Privilege Separation Write+Edit Pairing — Close the Bypass Path](#1116-privilege-separation-writeedit-pairing--close-the-bypass-path)
+    - 11.16 [What Actually Enforces an Agent Boundary](#1116-what-actually-enforces-an-agent-boundary)
     - 11.17 [Single-Commit Contract + WHY-Focused Commit Messages](#1117-single-commit-contract--why-focused-commit-messages)
     - 11.18 [LLM-First Architecture — Avoid Rule-Based Systems](#1118-llm-first-architecture--avoid-rule-based-systems)
     - 11.19 [Atomic File Writes — Files Don't Corrupt on Interrupt](#1119-atomic-file-writes--files-dont-corrupt-on-interrupt)
@@ -1478,10 +1478,11 @@ Agents are sub-agents with independent contexts. When the main Claude context in
 - `Read(*)`, `Grep(*)`, `Glob(*)` — full read access
 - `Write(.worktrees/**)`, `Edit(.worktrees/**)` — write only inside worktrees
 
-**Permissions (denied)**:
-- `Write(/etc/**)`, `Write(~/.ssh/**)`, `Write(~/.aws/**)` — system/credential paths
-- `Edit(/etc/**)`, `Edit(~/.ssh/**)`, `Edit(~/.aws/**)` — (same paths denied for Write as for Edit)
-- `Bash(curl * | sh)`, `Bash(eval *)`, `Bash(rm -rf /:*)` — dangerous commands
+**Scope (instruction only — NOT enforced)**: The agent is *told* to stay out of
+`/etc/**`, `~/.ssh/**`, `~/.aws/**` and to avoid `curl | sh`, `eval`, and
+destructive `rm`. Subagent frontmatter has no `permissions:` field, so Claude
+Code ignores any such block silently — the real boundary is the agent's `tools:`
+list (Write/Edit/Bash are granted without path restriction). See §11.16.
 
 **Model**: Default model (opus recommended in autoloop context)
 
@@ -1551,7 +1552,8 @@ Agents are sub-agents with independent contexts. When the main Claude context in
 - `Bash(uv run:*)`, `Bash(pytest:*)`, `Bash(npm test:*)`, `Bash(cargo test:*)` — test execution
 - `Bash(git diff:*)`, `Bash(git log:*)`, `Bash(git status:*)` — git read
 
-**Denied**: System path writes, `curl * | sh`, `eval`, `rm -rf /:*`
+**Told to avoid** (instruction, not enforced — see §11.16): system-path writes,
+`curl | sh`, `eval`, destructive `rm`. The binding limit is the agent's `tools:` list.
 **Model**: sonnet
 
 ---
@@ -2322,24 +2324,38 @@ Since each `!` block is an independent subshell, shell variables do not persist 
 
 ---
 
-### 11.16 Privilege Separation Write+Edit Pairing — Close the Bypass Path
+### 11.16 What Actually Enforces an Agent Boundary
 
-**Discovered vulnerability pattern (REVIEW M1)**: Denying only `Write(/etc/**)` still allows modification of the same file via `Edit(/etc/sudoers)`. A Write deny opens an Edit bypass path.
+> **Corrected 2026-07-17 (0.40.0).** This section used to document a "Write+Edit
+> pairing invariant" for agent `permissions:` frontmatter. That invariant was
+> cosmetic: **subagent frontmatter has no `permissions:` field**, so Claude Code
+> ignored every one of those blocks silently. The blocks have been deleted rather
+> than annotated — they had already misled one reader with the docs open.
 
-harness-maker **always denies Write and Edit as a pair for the same paths**:
+Only two things bind a subagent:
 
-```yaml
-# Reviewer agent permissions
-permissions:
-  deny:
-    - Write(*)
-    - Edit(*)           ← always paired with Write
-    - Bash(python:*)    ← interpreter calls also blocked (REVIEW M7)
-    - Bash(sh:*)
-    - Bash(bash:*)      ← blocks bash -c "$untrusted" bypass
-```
+1. **`tools:`** — a tool the agent does not have, it cannot use. This is the real
+   boundary, and it is why read-only reviewers are read-only: they have no Bash,
+   so `python -c "..."` is not available to bypass anything. Adding `Bash` back
+   grants an unrestricted shell no frontmatter can narrow.
+2. **`settings.json` `permissions`** — enforced, but **session-wide**: it applies
+   to the main session and every agent alike. It cannot express "this agent may
+   not run `rm`".
 
-Executor allows Write/Edit only in `.worktrees/**` — system paths are blocked by the same pairing principle.
+Per-agent command scoping is not expressible in frontmatter. When you need it,
+the options are a PreToolUse hook keyed on agent identity, or a sandbox. Both are
+defeated by `--dangerously-skip-permissions` / `bypassPermissions`.
+
+**Rule shapes that silently do nothing** (`permission_syntax.is_matchable_rule`
+is the oracle, and `test_permission_syntax.py` fails the build on a regression):
+
+| Shape | Why it never fires |
+|---|---|
+| `Write(<path>)`, `NotebookEdit(<path>)`, `Glob(<path>)` | the file-permission check consults `Edit`/`Read` only — write `Edit(<path>)` |
+| `Bash(curl * \| sh)` | Bash rules match per-subcommand after splitting on `&&`, `\|\|`, `;`, `\|`, `&` — a rule spanning a separator can never match, and warns about nothing |
+
+harness-maker shipped three of these for 39 releases. The prose above them
+claimed they closed a bypass; they had never run.
 
 ---
 
@@ -2649,7 +2665,7 @@ Even when tests pass, the AI Readiness composite score can drop by 5 or more poi
 | Anti-rot system | Harness itself goes stale | research-crawler / pending.jsonl |
 | 7-dimension AI Readiness | Single metric for AI readiness | ai-readiness-rubric / rubrics/*.yaml |
 | Deterministic worktree isolation | Isolation probabilistically fails by IDE | worktree CLI direct invocation |
-| Write+Edit pairing deny | Edit bypasses Write deny | Agent permissions policy |
+| `tools:`-based agent boundary | frontmatter permissions is silent-ignored (fake boundary) | agent `tools:` allowlist / main-session settings.json deny |
 | Single commit + WHY message | git log polluted with intermediate states | wrapup Step 7 |
 | LLM judgment first | regex/rules false positives/negatives | Entire system |
 | Atomic file writes | File corruption on interrupt | atomic_write pattern |

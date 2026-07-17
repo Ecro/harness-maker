@@ -58,13 +58,27 @@ _CONTEXT_LIMITS: dict[tuple[str, str], int] = {
     ("skill", "Production"): 150,
 }
 
-# Dangerous patterns that the deny list should cover.
+# Dangerous patterns the deny list should cover, when the user opts in.
+#
+# These must name rule shapes Claude Code actually MATCHES — the pre-0.40 list
+# scored `Write(/etc` and `curl` (as in `Bash(curl * | sh)`), both of which are
+# accepted-but-never-enforced, so this signal passed on a deny list that stopped
+# nothing. `permission_syntax.is_matchable_rule` is the shared oracle; the
+# template and this list are kept in lockstep by test_readiness_deny_lockstep.py,
+# which asserts every pattern below matches a rule the template really renders.
+#
+# `curl|sh` detection moved to `permission_gate`'s PreToolUse hook (ADR-003) —
+# no rule shape can express it, so it is deliberately not scored here.
 _DANGEROUS_DENY_PATTERNS = [
     "rm",  # rm -rf
-    "curl",  # curl | sh
-    "Write(/etc",  # write to root config
-    "Write(~/.ssh",  # write to ssh keys
+    "Edit(/etc",  # write to root config
+    "Edit(~/.ssh",  # write to ssh keys
+    "Edit(~/.aws",  # write to cloud credentials
 ]
+
+# Tolerate exactly one gap, derived from the list rather than hardcoded: a bare
+# `>= 3` silently becomes "all required" the moment the list shrinks to 3.
+_DENY_COVERAGE_MIN = len(_DANGEROUS_DENY_PATTERNS) - 1
 
 # ADR-006: signals that fail on fresh install for reasons /hm:make cannot
 # resolve in a single shot — either because the artefact only appears after
@@ -918,7 +932,7 @@ def _dim_guardrails(project_dir: Path) -> DimensionScore:
 
     deny_text = " ".join(str(p) for p in deny_list).lower()
     matched = [p for p in _DANGEROUS_DENY_PATTERNS if p.lower() in deny_text]
-    cov_ok = (not deny_opt_in) or len(matched) >= 3
+    cov_ok = (not deny_opt_in) or len(matched) >= _DENY_COVERAGE_MIN
     cov_evidence = (
         f"Deny patterns cover {len(matched)}/{len(_DANGEROUS_DENY_PATTERNS)} dangerous patterns"
         if matched

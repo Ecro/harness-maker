@@ -6,7 +6,7 @@
     is excluded because the plugin bundle already fires it (ADR-010).
 -#}
 {
-  "permissions": {"allow": ["Read", "Bash(uv:*)", "Bash(pytest:*)"{% if config.second_opinion and 'codex' in config.second_opinion.models %}, "Bash(codex exec:*)"{% endif %}{% if config.second_opinion and 'antigravity' in config.second_opinion.models %}, "Bash(agy --print --sandbox:*)"{% endif %}], "deny": {% if config.permissions.deny_dangerous %}["Bash(rm:*)", "Bash(curl * | sh)", "Write(/etc/**)", "Write(~/.ssh/**)"]{% else %}[]{% endif %}},
+  "permissions": {"allow": ["Read", "Bash(uv:*)", "Bash(pytest:*)"{% if config.second_opinion and 'codex' in config.second_opinion.models %}, "Bash(codex exec:*)"{% endif %}{% if config.second_opinion and 'antigravity' in config.second_opinion.models %}, "Bash(agy --print --sandbox:*)"{% endif %}], "deny": {% if config.permissions.deny_dangerous %}["Bash(rm:*)", "Edit(/etc/**)", "Edit(~/.ssh/**)", "Edit(~/.aws/**)"]{% else %}[]{% endif %}},
   "hooks": {
     "PostToolUse": [
       {

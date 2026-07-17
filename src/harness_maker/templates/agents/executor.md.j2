@@ -4,30 +4,6 @@ communication_variant: full
 description: Workflow executor with worktree-bounded write intent — targets .worktrees/ by convention (prompt-level guidance, not runtime-enforced)
 tools: Read, Grep, Glob, Write, Edit, Bash
 {% include "agents/_partials/model_frontmatter_line.md.j2" %}
-permissions:
-  allow:
-    - "Read(*)"
-    - "Grep(*)"
-    - "Glob(*)"
-    - "Write(.worktrees/**)"
-    - "Edit(.worktrees/**)"
-    - "Bash(uv run:*)"
-    - "Bash(pytest:*)"
-    - "Bash(npm test:*)"
-    - "Bash(cargo test:*)"
-    - "Bash(git diff:*)"
-    - "Bash(git log:*)"
-    - "Bash(git status:*)"
-  deny:
-    - "Write(/etc/**)"
-    - "Write(~/.ssh/**)"
-    - "Write(~/.aws/**)"
-    - "Edit(/etc/**)"
-    - "Edit(~/.ssh/**)"
-    - "Edit(~/.aws/**)"
-    - "Bash(curl * | sh)"
-    - "Bash(eval *)"
-    - "Bash(rm -rf /:*)"
 ---
 
 {% include "agents/executor_body.md.j2" -%}

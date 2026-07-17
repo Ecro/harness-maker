@@ -451,18 +451,27 @@ phase_10_render_lint()       { uv run pytest tests/unit/test_render.py -q -k "li
 phase_10_lint_skill()        { require_file src/harness_maker/templates/skills/context-linter/SKILL.md.j2; ok "phase_10_lint_skill"; }
 
 phase_10_reviewer_perms() {
-  for a in code-reviewer security-reviewer security-auditor performance-reviewer ux-reviewer concurrency-reviewer; do
+  # The real read-only boundary is the tools: line WITHOUT Bash — frontmatter
+  # permissions: is inert (Phase 7, ADR-002). A reviewer that grows a Bash tool
+  # gains an unrestricted shell no deny block could have narrowed.
+  for a in code-reviewer security-reviewer performance-reviewer ux-reviewer concurrency-reviewer; do
     require_file "src/harness_maker/templates/agents/$a.md.j2"
-    grep -E "Write|deny|Read.*Grep" "src/harness_maker/templates/agents/$a.md.j2" >/dev/null \
-      || fail "$a missing read-only permission constraint"
+    tools_line=$(grep -E "^tools:" "src/harness_maker/templates/agents/$a.md.j2") \
+      || fail "$a missing tools: line — the actual boundary"
+    printf '%s' "$tools_line" | grep -qw Bash \
+      && fail "$a has Bash in tools: — reviewers must be read-only"
+    printf '%s' "$tools_line" | grep -q "permissions:" \
+      && fail "$a has inert permissions: frontmatter — removed in Phase 7"
   done
   ok "phase_10_reviewer_perms"
 }
 
 phase_10_executor_perms() {
   require_file src/harness_maker/templates/agents/executor.md.j2
-  grep -q ".worktrees" src/harness_maker/templates/agents/executor.md.j2 \
-    || fail "executor missing .worktrees scope"
+  # `.worktrees` scoping is now prompt-level guidance in the body, not a deny
+  # block — assert the body still tells the agent to stay there.
+  grep -q ".worktrees" src/harness_maker/templates/agents/executor_body.md.j2 \
+    || fail "executor body missing .worktrees scope guidance"
   ok "phase_10_executor_perms"
 }
 

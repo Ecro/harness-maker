@@ -89,6 +89,15 @@ def _render_body(name: str) -> str:
 # 5 reviewer entries below are the post-Phase-C hashes; the remaining 7
 # agents keep their pre-refactor hashes.
 _EXPECTED_SHA256: dict[str, str] = {
+    # ALL hashes re-pinned 2026-07-17 (PLAN-permission-deny-and-hooks-wiring
+    # Phase 7, ADR-002): the `permissions:` frontmatter block was deleted from
+    # every agent template. Claude Code has no such subagent-frontmatter field —
+    # it was silently ignored, so the blocks enforced nothing while reading as a
+    # security boundary (they misled the incoming brief's author with the docs
+    # open). executor + autoloop-coder additionally lost their "Permissions
+    # policy" prose section, reworded to "Scope — instruction, not enforcement"
+    # so the agent is told the truth: only `tools:` binds it.
+    # Pre-bump hashes in git history.
     # Bumped 2026-05-31 (PLAN-agent-model-version-agnostic ADR-001): the
     # dispatcher `model:` line is now a shared partial rendering the Claude
     # ALIAS (`{{ claude_model }}`), SUPERSEDING the Phase-5 (2026-05-19 C-1)
@@ -103,9 +112,9 @@ _EXPECTED_SHA256: dict[str, str] = {
     # `_render_agent` uses a no-codex config, so these 3 revert to their
     # pre-0.28.5 hashes. The codex-ENABLED tools:Bash path is asserted in
     # test_render_codex_permission_injection.py. Pre-bump hashes in git history.
-    "autoloop-coder": "32d2c32d8235b41fee0f639604f0e2541fc11cb746cd4195922189e91a0927b1",
-    "code-reviewer": "b0913e8b525720af28b22a98b2ab61c67f5e4b7ca172e6d7f2b5a2ffb106137c",
-    "concurrency-reviewer": "9c7bbeec8a91be20886f9cea706039aaef6b9519d77504b26be66197ff6bdc50",
+    "autoloop-coder": "093210f0b4da3e0d0431c7fa4a0833f19f320d04ee349989fd8b5b5882483932",
+    "code-reviewer": "cd980f015d0774eca7a97ec721a3a317f53f781ddc6b8902d88704617e3ac2ef",
+    "concurrency-reviewer": "6e115a2b7798a0eca6047b4e4cdbc3bb78884ac16acf7e91e4be090cdb8563d0",
     # consensus-arbiter + plan-validator: hashes bumped 2026-05-24 per
     # PLAN-codex-second-llm-integration ADR-007 + review security fix.
     # Both agents previously had NO frontmatter permissions block; Phase 2
@@ -122,20 +131,20 @@ _EXPECTED_SHA256: dict[str, str] = {
     # reconciled to forbid cross-tier severity resolution, and the user-extension
     # comment reworded to forbid tier bridging. Body change outside the codex
     # conditional, so the disabled-config hash moves. Pre-bump hash in git history.
-    "consensus-arbiter": "ac730a8aed54a5ff61d39110700a5321fc781d8ae8b65a8626aaf6857bfe4830",
+    "consensus-arbiter": "c340a9c4fb8f043d8d33b785c1ee4e54f35f8b735e46baa87951c54b097051ba",
     # executor: re-pinned 2026-06-03 (PLAN-techspec-audit F61). The description
     # + body claimed a runtime-enforced "never writes to repo root" boundary that
     # Claude Code does NOT enforce (subagent-frontmatter permissions are not
     # enforced — see CLAUDE.md §보안/권한). Reworded to "by convention, prompt-
     # level guidance, not runtime-enforced". Pre-bump hash in git history.
-    "executor": "fe9f9120c7e7abea7ed36958d7a68b5cd2a31f1c9a24dc6361c9e6a10e941523",
-    "performance-reviewer": "7c36beda776925ea45fefd5176f0e359e9225eb8dbe949549216c6b9b1c6a228",
-    "plan-validator": "a06765191a94742d4ba35cb47ee80d703e87b6e2b29763209b482efd4ff4733d",
+    "executor": "0a4a5e34f5b7d985eab1b0b8b2ee79d898d3d95ddd4d68eea051536939e96874",
+    "performance-reviewer": "8735a961e59fd3475de4ff6e45b8f4e89fd4e1e0c808f4acaaf65504a3a62b9a",
+    "plan-validator": "2116a5ce4fb8053c0a8c921f2a1e2c022ea5099f488e8bc315a6a87b097ec36b",
     "security-auditor": "51a11902b9f56b9ebb0e0103e0d2047a64d1a218898d6cedc229a1a43fed2f53",
-    "security-reviewer": "af15f3f7606dd67a4f6cc0d4450df62ab8aa6a470978e65c7de9e77494d66555",
+    "security-reviewer": "33a672397c087866e001b875e99998f46920a0b15b024ce277f2a5b319f73d48",
     "stuck": "a62459d1205ed4fd67769ebb2f729a4de9b1d7b9ff5d770cc6ed767e63746fd0",
     "test-reviewer": "d102698d962884761172fa6a241c8a578cb7c038596905c141fd9f596b37cabb",
-    "ux-reviewer": "5481270e21d80bf6114d04f9fa601f1d1fb938386aa5d9a1563dad16145f4280",
+    "ux-reviewer": "b65045b2f2fafb1d3fb8fd2f16469a2c2977a28ef7ee9a1eb4f6529aa0ad0d96",
 }
 
 

@@ -2,6 +2,49 @@
 
 ## [Unreleased]
 
+### Fixed — permission deny rules that silently enforced nothing (the reported warning)
+- **Three of the four opt-in `deny` rules were dead syntax** (PLAN-permission-deny-and-hooks-wiring
+  Phases 5-8). `deny_dangerous: true` shipped `["Bash(rm:*)", "Bash(curl * | sh)",
+  "Write(/etc/**)", "Write(~/.ssh/**)"]`; only `Bash(rm:*)` ever matched. `Write(<path>)` is
+  not consulted by the file-permission check (it wants `Edit`/`Read`) and warns at startup;
+  `Bash(curl * | sh)` spans the `|` command separator, so it never matches and warns about
+  **nothing** — the silent one that survived 39 releases. The list is now
+  `["Bash(rm:*)", "Edit(/etc/**)", "Edit(~/.ssh/**)", "Edit(~/.aws/**)"]`, all matchable.
+  `curl|sh` detection is delegated to `permission_gate`'s PreToolUse hook (ADR-003), which no
+  settings-rule shape can express.
+- **`permission_syntax.is_matchable_rule`** is a new shared oracle for "can Claude Code ever
+  match this rule". `test_permission_syntax.py` fails the build if any rendered rule is
+  unmatchable — and it was verified to FAIL against the pre-fix templates, so it would have
+  caught this before release.
+- **`readiness.py`'s `deny_covers_dangerous` scored the dead rules as covered.** It matched
+  `Write(/etc` and `curl` (i.e. the unenforceable ones), so `/hm:health` reported a passing
+  score on a deny list that stopped nothing. The patterns are realigned to the matchable
+  shapes; the hardcoded `>= 3` threshold is re-derived from the list length so a future
+  shrink cannot silently become "all required"; a new lockstep test makes the "kept in sync"
+  comment true instead of aspirational.
+- **Re-rendering now prunes harness-shipped dead literals from an existing `settings.json`**
+  (`_HARNESS_SHIPPED_DENY_LITERALS`, Phase 6). The deny-list union preserved user-added rules
+  but also let every literal harness-maker itself ever shipped accrete forever — which is how
+  a project still carries `Write(/etc/**)` long after the template stopped shipping it. Only
+  **provably-dead** literals we can prove (via `git log -S`) we emitted are pruned; live rules
+  (`Bash(rm:*)`, `Bash(curl:*)`) are held back until their replacement hook is wired, because
+  no oracle can tell a rule we shipped from one the user also typed — a distinction that is
+  only harmless for dead syntax. ADR-004's original 9-literal inventory was corrected to 4
+  after the git-history oracle proved four of them had never been in a settings template.
+
+### Changed — agent `permissions:` frontmatter deleted (it was inert)
+- **Removed the `permissions:` block from all 10 agent templates** (Phase 7, ADR-002).
+  Subagent frontmatter has no `permissions:` field — Claude Code silently ignores it — so the
+  blocks enforced nothing while reading as a security boundary (they misled the incoming
+  brief's author with the docs open). The real boundary is the agent's `tools:` list. The
+  executor / autoloop-coder prose sections are reworded from "Permissions policy" to
+  "Scope — instruction, not enforcement" so the agent is told the truth. Eight doc surfaces
+  (HOW-IT-WORKS §11.16 + ko, ARCHITECTURE, CONTRIBUTING, TECH_SPEC, CLAUDE.md, cursor rules)
+  are corrected; the fictional "Write+Edit pairing invariant" is retired.
+- **CI checkout is now `fetch-depth: 0`** on the jobs that run pytest, so the `git log -S`
+  prune oracle runs instead of skipping on a shallow clone (it now fails loudly on a shallow
+  clone rather than passing vacuously).
+
 ### Fixed — `/hm:loop` can reach iteration 2 in Claude Code (Stage-2 hooks)
 - **`loop_gate` + `autopilot_guard` on the Stop event** now render into
   `.claude/settings.json` (PLAN-permission-deny-and-hooks-wiring Phase 2, ADR-006 Stage 2),

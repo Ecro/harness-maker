@@ -287,11 +287,14 @@ def _load_harness_body(yaml_path: Path) -> dict[str, Any]:
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+# The opted-in baseline as of 0.40.0 (Phase 5) — all four MATCHABLE. The old set
+# scored `Bash(curl * | sh)` / `Write(/etc/**)` / `Write(~/.ssh/**)`, three dead
+# shapes; `curl|sh` detection moved to the permission_gate PreToolUse hook.
 _REQUIRED_DENY_TOKENS: tuple[str, ...] = (
     "Bash(rm",  # rm
-    "Bash(curl",  # curl | sh
-    "Write(/etc",  # /etc
-    "Write(~/.ssh",  # ~/.ssh
+    "Edit(/etc",  # /etc
+    "Edit(~/.ssh",  # ~/.ssh
+    "Edit(~/.aws",  # ~/.aws
 )
 
 

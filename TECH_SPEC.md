@@ -281,15 +281,19 @@ harness-maker/
 - arxiv / GitHub / OSV.dev: unauthenticated, shared cache at `~/.cache/harness-maker/`
 - External calls use fixture mocks by default. Real calls only when INTEGRATION=1 env is set.
 
-### Security / Permissions (v1.6, revised REVIEW-2026-05-08)
-- **Reviewer agent** (code, security, perf, ux, concurrency, security-auditor, consensus-arbiter):
-  - allow: `[Read(*), Grep(*), Glob(*), Bash(git diff:*), Bash(git log:*), Bash(git status:*)]`
-  - deny: `[Write(*), Edit(*), Bash(rm:*), Bash(curl:*), Bash(npm:*), Bash(eval *), Bash(python:*), Bash(node:*), Bash(sh:*), Bash(bash:*)]`
-  - **Why interpreter denies** (0.6.2 REVIEW M7): blocking only `Bash(rm:*)` can be bypassed via `Bash(python -c "import os; os.system('rm …')")`. All interpreter invocations are denied.
-- **Executor agent** (autoloop-coder, executor):
-  - allow: `[Read(*), Grep(*), Glob(*), Write(.worktrees/**), Edit(.worktrees/**), Bash(uv run:*), Bash(pytest:*), Bash(npm test:*), Bash(cargo test:*), Bash(git diff:*), Bash(git log:*), Bash(git status:*)]`
-  - deny: `[Write(/etc/**), Write(~/.ssh/**), Write(~/.aws/**), Edit(/etc/**), Edit(~/.ssh/**), Edit(~/.aws/**), Bash(curl * | sh), Bash(eval *), Bash(rm -rf /:*)]`
-  - **Why Edit/Write pairing** (0.6.2 REVIEW M1): denying only `Write(/etc/**)` still allows `Edit(/etc/sudoers)` to modify the same file. All system paths require both Write and Edit to be denied as a pair.
+### Security / Permissions (v1.6, corrected 2026-07-17 — 0.40.0)
+
+> **Enforcement reality.** Agent `permissions: {allow, deny}` in YAML
+> frontmatter is **not a Claude Code field** — subagent frontmatter only
+> recognizes `name / description / tools / disallowedTools / model /
+> permissionMode / hooks / …`, so any `permissions:` block was silently
+> ignored. Those blocks have been **deleted** from all agent templates
+> rather than kept as misleading documentation.
+
+- **Reviewer agent** (code, security, perf, ux, concurrency, security-auditor, consensus-arbiter): the real boundary is `tools: Read, Grep, Glob` — `Bash` is absent from the tool list, so there is no shell to run `rm`/`curl`/`python -c "..."` through. This is enforced (a missing tool cannot be used); nothing in frontmatter narrows it further.
+- **Executor agent** (autoloop-coder, executor): `tools: Read, Grep, Glob, Write, Edit, Bash` — unrestricted paths and shell. Staying inside `.worktrees/**` and away from system paths is **prompt-level guidance** in the agent body, not a runtime restriction. The old `deny: [Write(/etc/**), ...]` list never fired even on its own terms: the file-permission check only consults `Edit`/`Read` rule shapes (bare `Write(<path>)` is never matched), and `Bash(curl * | sh)` is unmatchable because Bash rules are matched per-subcommand after splitting on `&& || ; | &`.
+- **The only real, enforced permission boundary** is the main session's `settings.json` `permissions.deny` — session-wide (applies identically to the main session and every agent; it cannot scope "this agent may not run `rm`"). Opt-in via `harness.yaml.permissions.deny_dangerous: true`, current rendered value: `["Bash(rm:*)", "Edit(/etc/**)", "Edit(~/.ssh/**)", "Edit(~/.aws/**)"]`. `Write(/etc/**)`/`Write(~/.ssh/**)`/`Write(~/.aws/**)`/`Bash(curl * | sh)` were dropped from this list — unmatchable shapes per `permission_syntax.is_matchable_rule` (`test_permission_syntax.py` guards regressions). `curl | sh` detection is delegated to the `permission_gate` PreToolUse hook instead.
+- Per-agent command scoping is not expressible in frontmatter. Real options: a PreToolUse hook keyed on agent identity, or a sandbox — both defeated by `--dangerously-skip-permissions` / `bypassPermissions`.
 - Security gates expanded from 5 to 7 in 0.7.1 (ADR-101): added hallucination gate (pure-filesystem, never imports — ADR-105) and production-name guard.
 - All generated files include frontmatter:
   ```yaml
@@ -542,11 +546,12 @@ class ConflictItem(BaseModel):
 **(M11) Context Lint (Phase 8)**
 - Length and importance check run immediately before Renderer apply. Violations emit a warning and automatically suggest a summary.
 
-**(M12) Privilege Separation (Phase 8, hardened 0.7.1)**
-- Agent YAML frontmatter `permissions: {allow, deny}` (addresses Cursor 2.5+ subagent permission-inheritance gap — parent-to-child cascade does not occur; permissions must be declared per-agent explicitly)
-- Reviewer: deny `[Write(*), Edit(*), Bash(rm|curl|npm|eval|python|node|sh|bash:*)]` — blocks interpreter-based bypass
-- Executor: allow `[Write(.worktrees/**), Edit(.worktrees/**), Bash(uv run|pytest|...)]`; deny system paths as Write **+ Edit pairs** `[Write(/etc/**), Edit(/etc/**), Write(~/.ssh/**), Edit(~/.ssh/**), Write(~/.aws/**), Edit(~/.aws/**)]`
-- Combined with Worktree isolation → dual-layer defense of isolation and separation
+**(M12) Privilege Separation (Phase 8, corrected 0.40.0)**
+- Agent YAML frontmatter has **no `permissions:` field**; Claude Code silently ignored the `{allow, deny}` blocks that used to live here, so they were deleted. The real, enforced boundary is `tools:`.
+- Reviewer: `tools: Read, Grep, Glob` — no `Bash`, so there is no shell to bypass through.
+- Executor: `tools: Read, Grep, Glob, Write, Edit, Bash` — unrestricted paths and shell. `.worktrees/**` scoping and avoiding system paths is prompt-level guidance, not runtime-enforced.
+- The one real permission boundary is the main session's `settings.json` `permissions.deny` (session-wide, opt-in via `harness.yaml.permissions.deny_dangerous`). Any rule added there must be a matchable shape — no bare `Write(<path>)`, no `Bash(... | ...)`.
+- Worktree isolation (M9) is a convention (prompt instruction), not a sandbox — it does not itself stop writes outside the worktree.
 
 **(M13) Provenance Frontmatter (Phase 8)**
 - All generated assets carry a frontmatter header (generated_by, harness_maker_version, content_hash, source_template, generated_at, provenance)
@@ -1199,16 +1204,16 @@ Note (ADR-107): The 0.7.1 tool_input whitelist and secret redaction in the telem
   - Commit: `feat(phase8): add context-linter skill template`
 
 - **Task 8.4: Privilege separation — Reviewer agents permissions**
-  - Do: Add read-only permissions to the frontmatter of `templates/agents/{code,security,security-auditor,performance,ux,concurrency}-reviewer.md.j2`. **Must verify the exact schema from the official Claude Code SubAgent spec (https://code.claude.com/docs/en/sub-agents + https://code.claude.com/docs/en/settings) before applying** — if SubAgent frontmatter only supports a `tools: [Read, Grep]` allowlist and does not support a deny list, enforce read-only via allowlist alone (excluding Write/Edit/Bash exec tools entirely). Apply consistently across all 6 reviewers.
+  - Do: Add read-only permissions to the frontmatter of `templates/agents/{code,security,security-auditor,performance,ux,concurrency}-reviewer.md.j2`. **Corrected 0.40.0**: the official Claude Code SubAgent spec confirms frontmatter has no `permissions:` field at all (only `tools:` / `disallowedTools:` / …), so there is no deny list to add — enforce read-only via the `tools:` allowlist alone (`Read, Grep, Glob`, excluding `Write`/`Edit`/`Bash` entirely). Apply consistently across all 6 reviewers.
   - Files: `templates/agents/{code,security,security-auditor,performance,ux,concurrency}-reviewer.md.j2`
-  - Done when: deny list present in rendered agent .md frontmatter
+  - Done when: `tools:` in rendered agent .md frontmatter omits Write/Edit/Bash
   - Verify: `bash .claude-verify.sh phase_8_reviewer_perms`
   - Commit: `feat(phase8): enforce read-only permissions on all reviewer agents`
 
 - **Task 8.5: Privilege separation — Executor agent**
-  - Do: `templates/agents/executor.md.j2` — write-capable but restricted to `.worktrees/**` only. `permissions.allow: [Read(*), Grep(*), Write(.worktrees/**), Edit(.worktrees/**), Bash(npm test:*), Bash(pytest:*), Bash(uv run:*), Bash(cargo test:*)]`, `deny: [Write(/etc/**), Write(~/.ssh/**), Write(~/.aws/**), Bash(curl * | sh), Bash(eval *), Bash(rm -rf /:*)]`. Same policy applies to autoloop-coder.md.j2.
+  - Do: `templates/agents/executor.md.j2` — `tools: Read, Grep, Glob, Write, Edit, Bash` (unrestricted; there is no frontmatter deny mechanism to scope it further). `.worktrees/**`-only writes and avoidance of system paths are documented as prompt-level guidance in the agent body, not enforced. Same policy applies to autoloop-coder.md.j2.
   - Files: `templates/agents/executor.md.j2`, `templates/agents/autoloop-coder.md.j2` (extended)
-  - Done when: permission policy verified after render
+  - Done when: agent body documents the worktree-write instruction; rendered `tools:` list matches spec
   - Verify: `bash .claude-verify.sh phase_8_executor_perms`
   - Commit: `feat(phase8): add executor agent with worktree-bounded write permissions`
 
@@ -1236,8 +1241,12 @@ from pathlib import Path
 for agent in ['code-reviewer','security-reviewer','security-auditor','performance-reviewer','ux-reviewer','concurrency-reviewer']:
     md = Path('tests/fixtures/prod-tauri-app/.claude/agents/' + agent + '.md').read_text()
     fm = yaml.safe_load(md.split('---')[1])
-    assert 'Write(*)' in fm['permissions']['deny'], agent + ' missing Write deny'
-    assert 'Edit(*)' in fm['permissions']['deny'], agent + ' missing Edit deny'
+    # Corrected 0.40.0: agent frontmatter has no permissions: field (Claude Code
+    # ignores it silently). The real boundary is tools: omitting Write/Edit/Bash.
+    tools = [t.strip() for t in fm['tools'].split(',')]
+    assert 'Write' not in tools, agent + ' must not have Write in tools'
+    assert 'Edit' not in tools, agent + ' must not have Edit in tools'
+    assert 'Bash' not in tools, agent + ' must not have Bash in tools'
 print('reviewer permission separation OK')
 "
 ```

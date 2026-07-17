@@ -5,25 +5,6 @@ description: Reviews changes for hot-path regressions, allocation hotspots, and 
 tools: Read, Grep, Glob
 {% include "agents/_partials/model_frontmatter_line.md.j2" %}
 review_scope: [performance]
-permissions:
-  allow:
-    - "Read(*)"
-    - "Grep(*)"
-    - "Glob(*)"
-    - "Bash(git diff:*)"
-    - "Bash(git log:*)"
-    - "Bash(git status:*)"
-  deny:
-    - "Write(*)"
-    - "Edit(*)"
-    - "Bash(rm:*)"
-    - "Bash(curl:*)"
-    - "Bash(npm:*)"
-    - "Bash(eval *)"
-    - "Bash(python:*)"
-    - "Bash(node:*)"
-    - "Bash(sh:*)"
-    - "Bash(bash:*)"
 ---
 
 {% include "agents/performance-reviewer_body.md.j2" -%}

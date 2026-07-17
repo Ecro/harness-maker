@@ -57,12 +57,21 @@ Seven atomic stages compose into named workflows:
 
 ## Permissions
 
-- **Reviewer agents** — read-only (`Read`, `Grep`, `Bash(git diff:*)`,
-  `Bash(git log:*)`). `Write` / `Edit` and external commands (curl, npm, rm)
-  are denied.
-- **Executor agent** — write allowed only inside `.worktrees/**`. Dangerous
-  commands (`curl * | sh`, `eval *`, `Write(/etc/**)`, `Write(~/.ssh/**)`)
-  are denied.
+- **Reviewer agents** — read-only by `tools:` (`Read`, `Grep`, `Glob`,
+  `Bash(git diff:*)`, `Bash(git log:*)`, `Bash(git status:*)`). `Bash` is
+  omitted from `tools:` entirely, so there is no shell to run write/exec
+  commands (curl, npm, rm, eval) through. Agent frontmatter has no
+  `permissions:` field — Claude Code ignores one if present, so `tools:`
+  is the only real per-agent boundary.
+- **Executor agent** — `tools:` includes `Write`, `Edit`, `Bash` without
+  path restriction. Staying inside `.worktrees/**` and avoiding system
+  paths (`/etc/**`, `~/.ssh/**`) is prompt-level guidance, not a runtime
+  restriction. The only enforced, real permission gate is the main
+  session's `settings.json` `permissions.deny` (opt-in via
+  `harness.yaml.permissions.deny_dangerous`), currently
+  `["Bash(rm:*)", "Edit(/etc/**)", "Edit(~/.ssh/**)", "Edit(~/.aws/**)"]` —
+  bare `Write(<path>)` and `Bash(... | ...)` shapes are never matched, so
+  they're excluded from that list.
 - All harness-generated files carry frontmatter with `generated_by`,
   `content_hash`, `source_template`, and `harness_maker_version`. Cursor-only
   assets (`.cursor/rules/*.mdc`, `.cursor/mcp.json`) omit these to avoid
