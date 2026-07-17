@@ -2,6 +2,42 @@
 
 ## [Unreleased]
 
+### Fixed — `/hm:loop` can reach iteration 2 in Claude Code (Stage-2 hooks)
+- **`loop_gate` + `autopilot_guard` on the Stop event** now render into
+  `.claude/settings.json` (PLAN-permission-deny-and-hooks-wiring Phase 2, ADR-006 Stage 2),
+  both passing `--mode stop-hook`. A Stop hook is what lets the autoloop block and continue;
+  without one it silently self-stops after iteration 1 — a symptom CLAUDE.md previously
+  attributed to a WSL2 `HM_SESSION_ID` failure.
+- **The staging axis is the EVENT, not the module** (REVIEW consensus P1 — codex +
+  code-reviewer). A first draft wired `autopilot_guard` wholesale into Stage 2 because
+  ADR-006 partitions by module name, but its PreToolUse path returns `allow=False`, so those
+  copies are Stage-3 blockers. One module, two stages: its Stop copy ships now, its
+  PreToolUse copies wait for Stage 3's live negative control.
+- **Stop timeout raised 5s → 10s.** The 5s was copied from a template that had never
+  executed in Claude Code; on timeout the hook is cancelled **fail-open**, so the loop
+  self-stops at iteration 1 — indistinguishable from the `HM_SESSION_ID` symptom above, which
+  is what would have kept it invisible.
+
+### Fixed — `/hm:health`'s hook signals judged a file nothing reads
+- **All four `readiness` guardrail hook signals now read `.claude/settings.json`**, not
+  `.claude/hooks/hooks.json` (which Claude Code never loads). Scoring the dead file let a
+  harness with no live hooks read healthy.
+- **Two of them failed OPEN** — written `(not hooks_path.exists()) or (…)`, on the theory
+  that `hooks_json_present` owned the absent case. `settings.json` always exists, so that
+  shape would pass unconditionally: a smoke alarm wired to always-quiet. An absent `hooks`
+  key does not mean "nothing to judge yet"; it means the harness has NO live hooks — exactly
+  what `sessionid_envfile_registered` exists to detect. Both now fail. Two existing tests had
+  pinned the fail-open as an explicit contract and are inverted, with the reason recorded
+  in-place.
+
+### Not shipped — Stage-3 blocking gates (parked)
+`permission_gate` / `worktree_gate` / `spec_gate` and `autopilot_guard`'s PreToolUse copies
+remain unwired in Claude Code, as before — no regression. An implementation was written,
+reviewed **Grade D on two consensus P0s**, and reverted before landing; it is parked on
+`hm/phase34-parked`. See `work-docs/REVIEW-permission-deny-and-hooks-wiring-phase34-2026-07-17.md`.
+`permission_gate` keeps its new `--subordinate-to-deny-dangerous` flag (ADR-007;
+security-reviewer found no defect) — inert until something renders it.
+
 ### Fixed — Claude Code project hooks now actually fire (they never had)
 - **`settings.json` carries the hooks** (PLAN-permission-deny-and-hooks-wiring Phase 1,
   ADR-006 Stage 1). Claude Code reads project hooks **only** from settings files — a plain

@@ -124,8 +124,10 @@ def test_context_quality_agent_missing_frontmatter(tmp_path: Path) -> None:
 
 def test_guardrails_with_full_setup(tmp_path: Path) -> None:
     claude = tmp_path / ".claude"
-    (claude / "hooks").mkdir(parents=True)
-    (claude / "hooks" / "hooks.json").write_text(
+    claude.mkdir(parents=True)
+    # Hooks live in settings.json — Claude Code never reads .claude/hooks/hooks.json
+    # (Phase 4 of PLAN-permission-deny-and-hooks-wiring).
+    (claude / "settings.json").write_text(
         json.dumps(
             {
                 "hooks": {
@@ -138,13 +140,6 @@ def test_guardrails_with_full_setup(tmp_path: Path) -> None:
                     "SessionStart": [],
                     "Stop": [],
                 },
-                "preset": "Side",
-            }
-        )
-    )
-    (claude / "settings.json").write_text(
-        json.dumps(
-            {
                 "permissions": {
                     "deny": [
                         "Bash(rm -rf:*)",
@@ -152,7 +147,7 @@ def test_guardrails_with_full_setup(tmp_path: Path) -> None:
                         "Write(/etc/**)",
                         "Write(~/.ssh/**)",
                     ]
-                }
+                },
             }
         )
     )

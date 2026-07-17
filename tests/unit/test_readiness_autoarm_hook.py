@@ -16,17 +16,20 @@ _SIG = "autopilot_autoarm_registered"
 
 
 def _write(project_dir: Path, *, persistent: bool, autoarm: bool) -> None:
+    """Hooks go in settings.json — Claude Code never reads .claude/hooks/hooks.json
+    (Phase 4 of PLAN-permission-deny-and-hooks-wiring)."""
     claude = project_dir / ".claude"
-    (claude / "hooks").mkdir(parents=True, exist_ok=True)
+    claude.mkdir(parents=True, exist_ok=True)
     cmds = ["uv run python -m harness_maker.hooks.sessionid_envfile"]
     if autoarm:
         cmds.append("uv run python -m harness_maker.hooks.autopilot_autoarm")
-    (claude / "hooks" / "hooks.json").write_text(
+    (claude / "settings.json").write_text(
         json.dumps(
             {
+                "permissions": {"allow": [], "deny": []},
                 "hooks": {
                     "SessionStart": [{"hooks": [{"type": "command", "command": c} for c in cmds]}]
-                }
+                },
             }
         ),
         encoding="utf-8",
@@ -65,9 +68,15 @@ def test_na_when_persistence_off(tmp_path: Path) -> None:
     assert sig.passed is True
 
 
-def test_na_when_persistent_but_no_hooks_json(tmp_path: Path) -> None:
-    # persistent: true but NO hooks.json at all → the hooks_json_present signal owns that
-    # case; this smoke must not double-penalize with a misleading "stale render" message.
+def test_fails_when_persistent_but_settings_has_no_hooks_at_all(tmp_path: Path) -> None:
+    """INVERTED at Phase 4 — this used to assert `passed is True`.
+
+    The old "don't double-penalize, `hooks_json_present` owns it" contract made the signal
+    fail OPEN; retiring hooks.json would have made it pass forever for every project. With
+    `autopilot_persistent: true` and no hooks, autopilot silently stops persisting across
+    sessions — exactly what this smoke exists to catch. `not _autopilot_persistent` remains
+    a genuine N/A; "no hooks at all" does not.
+    """
     claude = tmp_path / ".claude"
     claude.mkdir(parents=True, exist_ok=True)
     (claude / "harness.yaml").write_text(
@@ -76,4 +85,4 @@ def test_na_when_persistent_but_no_hooks_json(tmp_path: Path) -> None:
     )
     sig = _find(_dim_guardrails(tmp_path).signals, _SIG)
     assert sig is not None
-    assert sig.passed is True
+    assert sig.passed is False

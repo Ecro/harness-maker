@@ -78,11 +78,51 @@ def evaluate(
     return GateDecision(allow=False, matched_pattern=category, message=msg)
 
 
+_SUBORDINATE_FLAG = "--subordinate-to-deny-dangerous"
+
+
+def _deny_dangerous_enabled(project_dir: Path) -> bool:
+    """Is the gate switched on for this project? (ADR-007)
+
+    Fail CLOSED to today's behavior: an UNREADABLE config (absent file, parse error,
+    non-mapping) returns True, because unknown is not permission.
+
+    A *readable* config with no ``permissions`` key is a different case and returns
+    False — that is the documented default (``PermissionsConfig.deny_dangerous``, the
+    2026-05-31 solo-friendly opt-out). Conflating the two would silently re-impose
+    blocking on every harness that never set the key, i.e. most of them.
+    """
+    from harness_maker.io_utils import load_harness_yaml
+
+    try:
+        cfg = load_harness_yaml(project_dir / ".claude" / "harness.yaml")
+    except Exception:  # noqa: BLE001 — any read/parse failure is "unknown" ⇒ fail closed
+        return True
+    if not isinstance(cfg, dict):
+        return True
+    perms = cfg.get("permissions")
+    if perms is None:
+        return False  # readable + key absent ⇒ the documented default
+    if not isinstance(perms, dict):
+        return True  # present but malformed ⇒ unknown ⇒ fail closed
+    return bool(perms.get("deny_dangerous", False))
+
+
 def main() -> int:
     """Entry point: read hook JSON from stdin.
 
     PreToolUse (Claude Code/Cursor): exit 0 (allow) or 2 (block).
     PermissionRequest (Codex): always exit 0; emit JSON hookSpecificOutput to stdout.
+
+    ``--subordinate-to-deny-dangerous`` (ADR-007) makes the gate honor
+    ``harness.yaml permissions.deny_dangerous``. It is rendered ONLY by the Claude
+    settings template, because consumers are NOT distinguishable at runtime: Codex sends
+    the byte-identical ``hook_event_name: "PreToolUse"`` (tests/codex-compat/
+    hook_pre_tool_use_allow.json), so branching on the payload would subordinate Codex
+    too — the regression this exists to prevent. Distinguishing at the PRODUCER keeps the
+    Cursor and Codex invocations byte-unchanged, hence provably unregressed.
+
+    Flag ABSENT ⇒ unconditional, i.e. today's behavior. Do not change that default.
     """
     try:
         text = sys.stdin.read()
@@ -98,7 +138,10 @@ def main() -> int:
     tool_name = str(payload.get("tool_name") or "")
     raw_input = payload.get("tool_input")
     tool_input = raw_input if isinstance(raw_input, dict) else {}
-    decision = evaluate(tool_name, tool_input, Path.cwd())
+    project_dir = Path.cwd()
+    if _SUBORDINATE_FLAG in sys.argv and not _deny_dangerous_enabled(project_dir):
+        return 0
+    decision = evaluate(tool_name, tool_input, project_dir)
     if hook_event == "PermissionRequest":
         behavior = "allow" if decision.allow else "deny"
         print(

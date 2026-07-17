@@ -1,9 +1,11 @@
 ---
 type: plan
 task_slug: permission-deny-and-hooks-wiring
-status: phase-1-complete
-phases_done: [1]
-phases_pending: [2, 3, 4, 5, 6, 7, 8, 9]
+status: phase-2-complete
+phases_done: [1, 2]
+phases_parked: [3, 4]
+phases_pending: [5, 6, 7, 8, 9]
+parked_branch: hm/phase34-parked
 created: 2026-07-17
 reconstructed: 2026-07-17
 tags: [harness-maker, plan, python, permissions, hooks, render, security]
@@ -214,11 +216,32 @@ Code**. Three can **block tool calls**. **The first draft's inventory was wrong*
 from RESEARCH. A grep of the template yields **11 distinct modules**.
 **Decision:** Inventory is re-derived from `hooks.json.j2`, not from prose. Of the 11,
 `sessionstart_drift` is excluded (ADR-010), leaving **10 rendered into settings.json**:
-- **Stage 1 — non-blocking (5):** `telemetry`, `post_write_reminder`, `sessionid_envfile`,
-  `autopilot_autoarm`, `flush_session` — **LANDED (Phase 1, `575c7bba`)**
-- **Stage 2 — control-flow (2):** `loop_gate`, `autopilot_guard`
-- **Stage 3 — blocking (3):** `permission_gate`, `worktree_gate`, `spec_gate` (the last
-  still `dev_mode == "spec-driven"`-gated)
+**The axis is the EVENT, not the module** (revised at REVIEW round 1, consensus P1 — codex
++ code-reviewer). The first partition was by module name, which put `autopilot_guard`
+wholesale in Stage 2 — but its `_pretooluse` path returns `allow=False`
+(`autopilot_guard.py:330` → exit 2), so its **PreToolUse copies are Stage-3 blockers** while
+its **Stop copy is Stage 2**. One module, two stages.
+
+Why it matters: the PreToolUse path satisfies BOTH conjuncts of this ADR's own Stage-3
+criterion — "can block ordinary tool calls **and** has never executed in Claude Code" — and
+satisfies the second **harder than `permission_gate` does**: `permission_gate` is at least
+live in Cursor (`cursor/hooks.json.j2:33`) and Codex (`codex/hooks.json.j2:26,39`), whereas
+**`autopilot_guard` is wired in NO IDE today**. Wiring it here would be its first execution
+as a hook anywhere. "Only blocks under autopilot" does not rescue it either: with
+`autonomy.autopilot_persistent: true`, `autopilot_autoarm` re-arms a marker at **every**
+SessionStart, so for that population the block is unconditional in every session — and what
+they opted into was auto-advance, not "block my `git push`".
+
+Stop-blocking is a genuinely lower risk class: it cannot block a tool call, it is bounded by
+each module's `stop_hook_active` guard, and the worst case is one extra turn.
+
+- **Stage 1 — non-blocking (5 modules):** `telemetry`, `post_write_reminder`,
+  `sessionid_envfile`, `autopilot_autoarm`, `flush_session` — **LANDED (Phase 1, `575c7bba`)**
+- **Stage 2 — the Stop event only (2):** `loop_gate --mode stop-hook`,
+  `autopilot_guard --mode stop-hook`
+- **Stage 3 — anything that can block an ordinary tool call (4):** `permission_gate`,
+  `worktree_gate`, `spec_gate` (the last still `dev_mode == "spec-driven"`-gated), **and
+  `autopilot_guard`'s two PreToolUse copies**
 
 Each stage is verified in live use before the next.
 **Consequences:** ✅ a failure is attributable to one stage; ✅ Stage 1 delivers telemetry +
@@ -425,6 +448,31 @@ harness-owned `hooks` key (**shipped**); `.claude/hooks/hooks.json` is retired (
   `/harness-maker:make --update` renders from the **plugin cache (0.39.0)**, not this branch.
 
 ### Phase 2 — Stage-2 hooks (control-flow)
+- **Status: CODE DONE, exit criterion PARTIALLY discharged** (2026-07-17). Shipped: both
+  settings templates render the Stop group (`loop_gate --mode stop-hook` +
+  `autopilot_guard --mode stop-hook`, one matcher-less group) and the two PreToolUse groups
+  (`Bash` + `Write|Edit|MultiEdit`, each with `autopilot_guard`, no stop-mode). Test
+  partition split into `STAGE1_MODULES` / `STAGE2_MODULES` / `LATER_STAGE_MODULES`;
+  `test_render_settings_hooks.py` now 31 tests, test-reviewer PASS on attempt 2.
+  Automated half of the exit criterion GREEN; **the live half is NOT** — see below.
+  - **test-reviewer caught a real gap (attempt 1 FAIL):** the PreToolUse tests asserted
+    module presence but never the `matcher`, so shipping only ONE of the two groups would
+    have passed — the exact silent half-delivery ADR-006's staging exists to prevent. The
+    typo class is live in the source: `hooks.json.j2:44` renders spec_gate as `Write|Edit`,
+    dropping MultiEdit. Fixed by indexing PreToolUse **by matcher** (2 matchers × 2
+    templates = 4 cases), plus `len(groups) == 1` and `len(stop) == 1` — group shape IS
+    merge identity.
+  - **Phase 2→3 transition is guarded and already safe.** `test_merge_stage2_to_stage3_*`
+    prove `_strip_shipped_commands`' None-return drops the superseded `[autopilot_guard]`
+    group when Phase 3 grows it to `[permission_gate, autopilot_guard]` — no duplicate, no
+    lingering group, user commands preserved. Verified by the test-reviewer against
+    `render.py:781-821`. This is why removing the retire rule (ADR-008 rev2) does not break
+    the staged rollout.
+  - ⚠️ **Phase 3 MUST update `test_merge_stage2_to_stage3_*`'s fixture.** ADR-007 appends
+    `--subordinate-to-deny-dangerous` to the Claude `permission_gate` invocation, and
+    `_normalize_hm_managed_command` keys identity on module **plus trailing args** — the
+    bare `gate` fixture will stop matching what the template ships and the test will keep
+    passing while modelling a transition that no longer exists. Named in the docstring.
 - **depends_on:** `[1]` ✅ satisfied
 - **parallel_group:** `serial-hooks`
 - **merge_hazards:** `templates/settings/*.j2` — every hooks/deny phase touches these.
@@ -443,6 +491,59 @@ harness-owned `hooks` key (**shipped**); `.claude/hooks/hooks.json` is retired (
 - **Rollback:** revert the Phase 2 commit; Phase 1 stands.
 
 ### Phase 3 — Stage-3 hooks (blocking gates) + gate subordination (ADR-007)
+- **Status: 🅿️ PARKED — written, reviewed Grade D, REVERTED before landing** (2026-07-17).
+  The work is on branch **`hm/phase34-parked`** (`048ecbfb`). Read
+  `work-docs/REVIEW-permission-deny-and-hooks-wiring-phase34-2026-07-17.md` before touching
+  it. Two consensus P0s (security-reviewer + codex, independently):
+  1. **The `permission-surface-write` rewrite opened write bypasses.** Fixing the read
+     false-positive (`cat .claude/settings.json` was blocked) by requiring a write token
+     before the path let `python -c "open(...,'w')"`, `perl -i`, `git checkout -- <path>`,
+     `install`, `ex` through — all caught by the old bare-path regex. Wiring PreToolUse is
+     what makes the rule live, so this phase would have shipped a privilege escalation:
+     an autopilot-armed agent rewriting the file that gates it. **The fix is to invert the
+     strategy** — a narrow read-only allowlist, not a write-verb blacklist, which is
+     unbounded. Also `>|` splits at the pipe (`_SEGMENT_SPLIT`), separating token from path.
+  2. (see Phase 4 — the two landed together and were reverted together.)
+  What survives on the task branch: `permission_gate`'s `--subordinate-to-deny-dangerous` +
+  `_deny_dangerous_enabled` (security-reviewer attacked it and found NO defect; inert while
+  unwired). `test_codex_phase5` passed unmodified, so ADR-007's Cursor/Codex-unregressed
+  promise held. **`spec_gate`'s matcher should be `Write|Edit|MultiEdit`** when re-attempted:
+  the mirror of `hooks.json.j2:44`'s `Write|Edit` was justified by a FALSE premise (two
+  groups may share a matcher — identity keys on matcher + EVERY command), and the real cause
+  was an over-strict `assert len(groups) == 1` I wrote and then treated as a constraint.
+- **Prior status (superseded): CODE DONE, live negative control NOT discharged.** Shipped: both
+  settings templates render the two PreToolUse groups (`Bash` → `permission_gate
+  --subordinate-to-deny-dangerous` + `autopilot_guard`; `Write|Edit|MultiEdit` →
+  `worktree_gate` + `autopilot_guard`) plus the `dev_mode == "spec-driven"`-gated
+  `spec_gate` group; `permission_gate` gained `--subordinate-to-deny-dangerous` +
+  `_deny_dangerous_enabled`. Tests: 36 in `test_render_settings_hooks.py`, 7 new in
+  `test_permission_gate.py`, 2 new in `test_autopilot_guard.py`.
+  **`test_codex_phase5` passes unmodified** — ADR-007's core promise (zero Cursor/Codex
+  regression) verified, and `test_cursor_and_codex_permission_gate_stay_unsubordinated`
+  pins the other half (their templates must never gain the flag).
+  - **Fixed the Phase-2 REVIEW blocker first** (`permission-surface-write` matched READS):
+    the rule now requires a write/redirect token BEFORE the path, so `cat
+    .claude/settings.json` is allowed while `echo x > …` / `sed -i … ` / `tee …` are still
+    blocked. Ordering is load-bearing — `cat surface > /tmp/backup` must stay allowed (the
+    surface is the redirect's SOURCE). This had to land before wiring the PreToolUse
+    copies, which is what would have made the false positive live.
+  - **`_deny_dangerous_enabled` distinguishes "unreadable" from "key absent."** ADR-007
+    says fail closed; `PermissionsConfig.deny_dangerous` defaults to False. Conflating them
+    would silently re-impose blocking on every harness that never set the key — i.e. most.
+    Unreadable/malformed ⇒ block; readable-with-no-key ⇒ the documented default ⇒ allow.
+    All four paths pinned.
+  - **`spec_gate`'s matcher mirrors `hooks.json.j2:44` verbatim, including its missing
+    MultiEdit.** Not fixed here: `Write|Edit|MultiEdit` would collide with the
+    worktree_gate group (duplicate matcher == duplicate `_entry_identity` == the hook
+    registered twice), and widening its coverage is a behavior change this phase did not
+    scope. Filed as a follow-up.
+  - ⚠️ **The live negative control — Phase 3's entire reason for existing — is NOT
+    discharged.** Three gates that have never executed in Claude Code are now wired, and
+    the criterion that a normal worktree `Write` is *not* blocked can only be checked in a
+    new session. **Do not read "CODE DONE" as "safe."**
+  - ⚠️ **The provenance-based retire (ADR-008 rev2) is still NOT implemented**, so a
+    `dev_mode` flip away from spec-driven leaves a stale `spec_gate` group on disk
+    forever. This phase is what makes that reachable.
 - **depends_on:** `[2]`
 - **parallel_group:** `serial-hooks`
 - **merge_hazards:** settings templates; `gates/permission_gate.py`.
@@ -462,6 +563,58 @@ harness-owned `hooks` key (**shipped**); `.claude/hooks/hooks.json` is retired (
 - **Rollback:** revert the Phase 3 commit; Phases 1-2 stand.
 
 ### Phase 4 — Retire `.claude/hooks/hooks.json` (ADR-005)
+- **Status: 🅿️ PARTLY PARKED, PARTLY LANDED** (2026-07-17).
+  - ✅ **KEPT on the task branch (Phase 4a — no P0):** all four `readiness._dim_guardrails`
+    hook signals now read `settings.json`, and the two fail-open arms are closed. This is a
+    strict improvement and is correct whether or not `hooks.json` is still rendered — it
+    judges the file that actually governs behavior. Negative controls in
+    `tests/unit/test_readiness_hooks_from_settings.py`.
+  - 🅿️ **REVERTED (Phase 4b — consensus P0 #1):** the `hooks/hooks.json` FileSpec removal.
+    Parked on `hm/phase34-parked`. **Removing the FileSpec without ADR-005's other half
+    deletes user-authored hooks.** security-reviewer traced it: `sweep_orphans` builds
+    `expected` from `blueprint.files`, the path is no longer there → `_classify_orphan` →
+    the file has no frontmatter → `reconcile.py:564` matches the manifest hash →
+    `ours-clean` → `:653` unlinks. And `render.py:847-849` records the **MERGED** hash, so
+    a user's own preserved hook is exactly what makes the file match. Reported as a routine
+    sweep deletion — no `KEPT … manual review needed` warning. (`cli.py:443`'s backup is a
+    mitigation, not a fix.)
+    **Re-attempt = ONE commit** containing: `_SWEEP_NEVER_DELETE` consulted at
+    `reconcile.py:644` before `_classify_orphan`, the pristine-exact-match delete in
+    `cli.py`, AND the FileSpec removal. Never the FileSpec alone.
+- **Prior status (superseded): PARTIAL — the render side is done; the DISK-CLEANUP side is NOT.**
+  - ✅ Done: the `hooks/hooks.json` FileSpec is dropped from `synthesize._base_files`; all
+    four `readiness` guardrail signals read `settings.json`; the two fail-open signals are
+    closed; 8 snapshots regenerated (`file_count: 62 → 61`, the `hooks/hooks.json.j2` entry
+    gone, `settings.json` hash updated — nothing else moved); the coupling sites the PLAN
+    named are retargeted (`test_readiness{,_sessionid_hook,_autoarm_hook}.py`,
+    `test_render.py`'s dev-mode + Cursor dual-schema tests).
+  - ❌ **NOT done: the stale-file cleanup and the orphan-sweep exclusion** — ADR-005's
+    actual data-safety work. `cli.py` does not yet delete a pristine `hooks.json`, and the
+    path is not excluded from `reconcile`'s `ours-clean` sweep. **This is the P0 codex
+    found**: `render.py:745-747` records the MERGED file's hash in the render manifest and
+    `reconcile.py:563-565` classifies a manifest-matching file as `ours-clean` — so now
+    that the FileSpec is gone the file is an orphan the sweep may delete, **including a
+    copy holding user-authored hooks**. Deliberately not rushed at the end of a long
+    session. **Until it lands, a user's edited `hooks.json` is at risk on the next
+    reconcile** — this is the one item here that can lose data.
+  - **The fail-open fix did not work on the first attempt.** Porting
+    `(not hooks_path.exists()) or (…)` to `(not has_hooks) or (…)` preserved the same hole
+    under a new name: settings.json always exists, and post-Phase-4 an absent `hooks` key
+    does not mean "nothing to judge yet" — it means the harness has NO live hooks, which is
+    exactly the degradation the signal detects. Caught by the negative controls; a
+    score-based "does not regress" criterion could not have seen it, because the score is
+    unchanged precisely when the detector dies.
+  - **Two existing tests pinned the fail-open as an explicit contract**
+    (`test_signal_na_when_no_hooks_json`, `test_na_when_persistent_but_no_hooks_json`:
+    *"the hooks_json_present signal owns that case; this one must not double-penalize"*).
+    That held while hooks.json existed; Phase 4 removes its premise. Both inverted, reason
+    recorded in-place. Two signals on one root cause is the correct redundancy for a
+    detector CLAUDE.md calls the loud smoke against silent degradation.
+  - **Test-helper bug worth remembering:** `Signal`'s field is `id`, not `name`. A
+    `next(s for s in … if s.name == name)` lookup silently resolved to something else, so
+    every assertion read the FIRST signal regardless of which it asked for. It surfaced
+    only because the expected-PASS cases failed too — a suite of expected-FAILs would have
+    gone entirely green.
 - **depends_on:** `[3, 7]` — 7 included so the agent-fixture regeneration happens once.
 - **parallel_group:** `serial-hooks`
 - **merge_hazards:** `synthesize.py` FileSpec list; `readiness.py` guardrails (Phase 5 also

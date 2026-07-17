@@ -455,16 +455,27 @@ def _dim_guardrails(project_dir: Path) -> DimensionScore:
     signals: list[Signal] = []
     claude = project_dir / ".claude"
 
-    hooks_path = claude / "hooks" / "hooks.json"
+    # Claude Code reads project hooks ONLY from settings files — `.claude/hooks/hooks.json`
+    # is never loaded (PLAN-permission-deny-and-hooks-wiring; that path is plugin-bundle-only).
+    # These signals MUST read the file that actually governs behavior: scoring the dead file
+    # let a harness with no live hooks read healthy, which is the degradation
+    # `sessionid_envfile_registered` exists to detect.
+    hooks_path = claude / "settings.json"
     hooks_data = _read_json_with_optional_frontmatter(hooks_path) if hooks_path.exists() else None
+    # The absent case is now "settings.json has no `hooks` key" — a harness with NO hooks —
+    # NOT "the file is missing". The old signals were written `(not hooks_path.exists()) or …`,
+    # so retiring hooks.json would have made them pass forever, for every project
+    # (2026-06-08 "absent-case = feature black hole"). `has_hooks` replaces that shape.
+    has_hooks = isinstance(hooks_data, dict) and isinstance(hooks_data.get("hooks"), dict)
     hook_count = 0
     if isinstance(hooks_data, dict):
         # Rendered format: {"hooks": {"PostToolUse": [...]}, "preset": "..."}
         # Legacy flat format: {"PostToolUse": [...]}
-        hook_section = hooks_data.get("hooks")
-        if not isinstance(hook_section, dict):
-            hook_section = hooks_data
-        for events in hook_section.values():
+        # Only the `hooks` key counts. The old code fell back to treating the whole
+        # document as the hook section (a legacy flat hooks.json shape); against
+        # settings.json that would scan `permissions`/`preset` as if they were events.
+        hook_section = hooks_data.get("hooks") if has_hooks else {}
+        for events in hook_section.values():  # type: ignore[union-attr]
             if isinstance(events, list):
                 for h in events:
                     if isinstance(h, dict) and h.get("hooks"):
@@ -473,10 +484,15 @@ def _dim_guardrails(project_dir: Path) -> DimensionScore:
     signals.append(
         _signal(
             "hooks_json_present",
-            hooks_path.exists(),
+            has_hooks,
             25,
-            "hooks.json exists" if hooks_path.exists() else "hooks.json missing",
-            None if hooks_path.exists() else "Add .claude/hooks/hooks.json with at least telemetry",
+            "settings.json has a `hooks` key"
+            if has_hooks
+            else "settings.json has no `hooks` key — Claude Code loads no project hooks",
+            None
+            if has_hooks
+            else "Re-render with /harness-maker:make --update — hooks live in "
+            ".claude/settings.json, not .claude/hooks/hooks.json (which Claude Code never reads)",
         )
     )
     signals.append(
@@ -495,10 +511,22 @@ def _dim_guardrails(project_dir: Path) -> DimensionScore:
     # does NOT register the `sessionid_envfile` SessionStart hook silently degrades
     # /hm:loop session-scoping (HM_SESSION_ID never set → parallel loops fall back
     # to the session-blind global marker). N-A (passes) when hooks.json is absent —
-    # `hooks_json_present` owns that case; this signal only fires on a stale/broken
-    # render that HAS hooks.json but lost the hook.
-    sessionid_registered = (not hooks_path.exists()) or (
-        isinstance(hooks_data, dict) and "sessionid_envfile" in json.dumps(hooks_data)
+    # Phase 4 — there is NO fail-open arm here, deliberately.
+    #
+    # The old shape was `(not hooks_path.exists()) or (…)`: it passed when hooks.json was
+    # absent, on the theory that `hooks_json_present` owned that case and this signal
+    # should only judge a stale render. Retiring hooks.json would have turned that into
+    # "passes forever, for every project" — a smoke alarm wired to always-quiet
+    # (2026-06-08 "absent-case = feature black hole").
+    #
+    # Porting it to `not has_hooks` would preserve the same hole under a new name: after
+    # Phase 4 an absent `hooks` key does not mean "nothing to judge yet", it means the
+    # harness has NO live hooks — exactly the degradation this signal exists to detect.
+    # So: no hooks ⇒ the SessionStart hook is not registered ⇒ FAIL. Two signals firing on
+    # one root cause is the correct redundancy for a detector CLAUDE.md calls the loud
+    # smoke against silent degradation.
+    sessionid_registered = has_hooks and (
+        "sessionid_envfile" in json.dumps(hooks_data.get("hooks"))  # type: ignore[union-attr]
     )
     signals.append(
         _signal(
@@ -539,10 +567,10 @@ def _dim_guardrails(project_dir: Path) -> DimensionScore:
     # double-penalize a partial harness that never rendered hooks.json (mirrors the
     # `sessionid_envfile_registered` `not hooks_path.exists()` precedent). It fires only on a
     # stale render that HAS hooks.json but dropped the autoarm hook.
-    autoarm_ok = (
-        (not _autopilot_persistent)
-        or (not hooks_path.exists())
-        or (isinstance(hooks_data, dict) and "autopilot_autoarm" in json.dumps(hooks_data))
+    # `not _autopilot_persistent` is a genuine N/A — the hook is only load-bearing for that
+    # config — but "no hooks at all" is NOT (see sessionid_registered's note).
+    autoarm_ok = (not _autopilot_persistent) or (
+        has_hooks and "autopilot_autoarm" in json.dumps(hooks_data.get("hooks"))  # type: ignore[union-attr]
     )
     signals.append(
         _signal(

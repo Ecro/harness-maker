@@ -487,10 +487,21 @@ def test_render_hooks_json_valid_in_both_dev_modes(
     bp = synthesize(p, a)
     render(bp, target_dir, freeze_time=DEFAULT_FREEZE_TIME)
 
-    # Claude Code hooks
+    # hooks/hooks.json still renders (its retirement is parked — see
+    # REVIEW-permission-deny-and-hooks-wiring-phase34) and still carries the fragile
+    # `}{% if %},` spec_gate branch this test exists to lock.
     claude_text = (target_dir / "hooks" / "hooks.json").read_text(encoding="utf-8")
     claude = _json.loads(claude_text)  # raises on invalid JSON
     assert "PreToolUse" in claude["hooks"]
+
+    # settings.json is the file Claude Code actually loads, so its JSON validity matters
+    # MORE: a broken branch there costs the `permissions` block too. It has no dev_mode
+    # conditional yet (Stage 3, which owns the spec_gate branch, is not wired), so this
+    # asserts only what is true today — and must gain a `PreToolUse` assertion when
+    # Stage 3 lands.
+    settings = _json.loads((target_dir / "settings.json").read_text(encoding="utf-8"))
+    assert "permissions" in settings, "a broken hooks branch must not take permissions with it"
+    assert "Stop" in settings["hooks"], "Stage-2 Stop hook must render in both dev_modes"
 
     # Cursor hooks
     cursor_text = (project_root / ".cursor" / "hooks.json").read_text(encoding="utf-8")
@@ -800,11 +811,14 @@ def test_cursor_hooks_uses_lowercase_native_schema(tmp_path: Path) -> None:
         "tests/cursor-compat/results-2026-05-08.md."
     )
 
-    # Claude file must use the opposite schema (PascalCase + nested {hooks:[]})
-    claude_hooks_path = target / "hooks" / "hooks.json"
-    assert claude_hooks_path.exists()
-    claude_hooks = json.loads(claude_hooks_path.read_text(encoding="utf-8"))
-    claude_inner = claude_hooks.get("hooks", {})
+    # Claude's hooks must use the opposite schema (PascalCase + nested {hooks:[]}) — and
+    # they live in settings.json, not hooks/hooks.json, which Claude Code never reads
+    # (ADR-005 of PLAN-permission-deny-and-hooks-wiring). The dual-schema contrast is the
+    # point of this test and is unchanged; only Claude's location moved.
+    claude_settings_path = target / "settings.json"
+    assert claude_settings_path.exists()
+    claude_settings = json.loads(claude_settings_path.read_text(encoding="utf-8"))
+    claude_inner = claude_settings.get("hooks", {})
     assert "PreToolUse" in claude_inner or "PostToolUse" in claude_inner, (
         "Claude hooks.json must use PascalCase event keys"
     )

@@ -1,8 +1,9 @@
 {#- See settings/Production.json.j2's header for the full rationale. In short:
     Claude Code reads project hooks ONLY from settings files — a plain project's
     `.claude/hooks/hooks.json` is never loaded (that path is for a PLUGIN bundle).
-    Stage 1 = non-blocking hooks only (ADR-006); `sessionstart_drift` is excluded
-    because the plugin bundle already fires it (ADR-010).
+    Stage 1 (non-blocking) + Stage 2 (control-flow: loop_gate + autopilot_guard) are
+    shipped; Stage 3's BLOCKING gates land in Phase 3 (ADR-006). `sessionstart_drift`
+    is excluded because the plugin bundle already fires it (ADR-010).
 -#}
 {
   "permissions": {"allow": ["Read", "Bash(uv:*)", "Bash(pytest:*)"{% if config.second_opinion and 'codex' in config.second_opinion.models %}, "Bash(codex exec:*)"{% endif %}{% if config.second_opinion and 'antigravity' in config.second_opinion.models %}, "Bash(agy --print --sandbox:*)"{% endif %}], "deny": {% if config.permissions.deny_dangerous %}["Bash(rm:*)", "Bash(curl * | sh)", "Write(/etc/**)", "Write(~/.ssh/**)"]{% else %}[]{% endif %}},
@@ -18,6 +19,14 @@
         "matcher": "Write|Edit|MultiEdit",
         "hooks": [
           {"type": "command", "command": "uv run --with '{{ harness_maker_src_path }}' python -m harness_maker.hooks.post_write_reminder", "timeout": 5}
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {"type": "command", "command": "uv run --with '{{ harness_maker_src_path }}' python -m harness_maker.hooks.loop_gate --mode stop-hook", "timeout": 10},
+          {"type": "command", "command": "uv run --with '{{ harness_maker_src_path }}' python -m harness_maker.hooks.autopilot_guard --mode stop-hook", "timeout": 10}
         ]
       }
     ],
