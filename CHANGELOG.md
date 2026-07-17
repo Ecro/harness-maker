@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.40.0] — 2026-07-18
+
 ### Fixed — permission deny rules that silently enforced nothing (the reported warning)
 - **Three of the four opt-in `deny` rules were dead syntax** (PLAN-permission-deny-and-hooks-wiring
   Phases 5-8). `deny_dangerous: true` shipped `["Bash(rm:*)", "Bash(curl * | sh)",
