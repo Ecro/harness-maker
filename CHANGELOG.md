@@ -2,7 +2,18 @@
 
 ## [Unreleased]
 
-## [0.40.0] — 2026-07-18
+## [0.40.1] — 2026-07-18
+
+### Fixed
+- **`tests/structural/test_verifier_agent.py` inverted to match Phase 7.** The
+  0.40.0 tag's quality-gate caught a structural test still asserting the
+  code-verifier's now-deleted `permissions:` frontmatter (missed locally because
+  the run covered `tests/unit` + `tests/integration` but not `tests/structural`,
+  which CI's `pytest -x` includes). The test now asserts the real read-only
+  boundary — `tools:` ⊆ {Read, Grep, Glob}, no `permissions:` block. 0.40.0
+  published nothing (quality-gate is the first release job); 0.40.1 supersedes it.
+
+## [0.40.0] — 2026-07-18 (superseded by 0.40.1 — never published)
 
 ### Fixed — permission deny rules that silently enforced nothing (the reported warning)
 - **Three of the four opt-in `deny` rules were dead syntax** (PLAN-permission-deny-and-hooks-wiring

@@ -1,8 +1,14 @@
-"""Phase A1 structural gate: verifier agent permissions + reduce-only invariant.
+"""Phase A1 structural gate: verifier agent read-only boundary + reduce-only invariant.
 
 PLAN-llm-code-review-2026 ADR-002 requires the verifier role to be read-only
 and strictly reduce-only (no new findings introduced). These assertions run
 on the source template so the gate doesn't depend on rendering.
+
+The read-only boundary is the `tools:` list, NOT frontmatter `permissions:`.
+Subagent frontmatter has no `permissions:` field — Claude Code silently ignores
+it — so the block that used to be asserted here enforced nothing (0.40.0 Phase 7,
+ADR-002). A verifier with no Write/Edit/Bash tool cannot mutate or shell out,
+whatever a `deny:` block claimed.
 """
 
 from __future__ import annotations
@@ -15,26 +21,9 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 VERIFIER_FM = REPO_ROOT / "src/harness_maker/templates/agents/code-verifier.md.j2"
 VERIFIER_BODY = REPO_ROOT / "src/harness_maker/templates/agents/code-verifier_body.md.j2"
 
-# Mirror code-reviewer deny set — interpreter denies close the
-# `Bash(python -c "...")` escape per REVIEW M7 (CLAUDE.md §보안).
-REQUIRED_DENIES = {
-    "Write(*)",
-    "Edit(*)",
-    "Bash(rm:*)",
-    "Bash(curl:*)",
-    "Bash(npm:*)",
-    "Bash(eval *)",
-    "Bash(python:*)",
-    "Bash(node:*)",
-    "Bash(sh:*)",
-    "Bash(bash:*)",
-}
-
-REQUIRED_ALLOWS = {
-    "Read(*)",
-    "Grep(*)",
-    "Glob(*)",
-}
+# The ONLY tools a read-only verifier may declare. A Write/Edit/Bash grant here
+# is the real escalation — no inert `deny:` block can narrow it back.
+ALLOWED_TOOLS = {"Read", "Grep", "Glob"}
 
 
 def _parse_frontmatter(path: Path) -> dict[str, object]:
@@ -66,17 +55,21 @@ def test_verifier_template_exists() -> None:
 
 def test_verifier_frontmatter_is_read_only() -> None:
     fm = _parse_frontmatter(VERIFIER_FM)
-    perms = fm.get("permissions")
-    assert isinstance(perms, dict), "permissions block missing"
-    allow = set(perms.get("allow") or [])
-    deny = set(perms.get("deny") or [])
-    missing_denies = REQUIRED_DENIES - deny
-    assert not missing_denies, f"verifier missing required denies: {sorted(missing_denies)}"
-    missing_allows = REQUIRED_ALLOWS - allow
-    assert not missing_allows, f"verifier missing required allows: {sorted(missing_allows)}"
-    # No Write/Edit anywhere in allow — reduce-only is structural.
-    assert not any(p.startswith(("Write(", "Edit(")) for p in allow), (
-        "verifier allow set must not include any Write/Edit grant"
+    # Inert `permissions:` frontmatter must NOT be present (Phase 7, ADR-002) —
+    # its reappearance is re-added security theatre.
+    assert "permissions" not in fm, (
+        "code-verifier carries inert `permissions:` frontmatter — Claude Code "
+        "ignores it; the real boundary is `tools:`"
+    )
+    # The real read-only boundary: tools: is a subset of {Read, Grep, Glob}.
+    tools_raw = fm.get("tools")
+    assert isinstance(tools_raw, str), f"verifier missing tools: line, got {tools_raw!r}"
+    tools = {t.strip() for t in tools_raw.split(",") if t.strip()}
+    assert tools, "verifier tools: list is empty"
+    forbidden = tools - ALLOWED_TOOLS
+    assert not forbidden, (
+        f"verifier tools: grants {sorted(forbidden)} — a read-only verifier may "
+        f"only have {sorted(ALLOWED_TOOLS)}; Write/Edit/Bash is the escalation"
     )
 
 
