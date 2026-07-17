@@ -30,19 +30,25 @@
     SessionStart, so the block is unconditional for that population — and what they
     opted into was auto-advance, not "block my git push".
 
-    Stage 3 is NOT wired here yet — there is deliberately no `PreToolUse` key. A first
-    attempt was written and then REVERTED before landing: its review (Grade D) found two
-    consensus P0s. The work is parked on branch `hm/phase34-parked`; see
-    work-docs/REVIEW-permission-deny-and-hooks-wiring-phase34-2026-07-17.md before
-    re-attempting. In short: (1) retiring `.claude/hooks/hooks.json` needs ADR-005's sweep
-    exclusion + pristine-delete gate in the SAME commit, or reconcile deletes a hooks.json
-    holding user-authored hooks; (2) `autopilot_guard`'s `permission-surface-write` rule
-    needs a read-only ALLOWLIST, not a write-token blacklist — wiring PreToolUse is what
-    makes that rule live, and a blacklist leaks (`python -c`, `perl -i`, `git checkout --`).
-    When adding the groups, use matchers `Bash` and `Write|Edit|MultiEdit` byte-identical
-    to hooks.json.j2:30,37. hooks.json.j2:44 renders spec_gate as `Write|Edit` (no
-    MultiEdit) — that is a typo, not a contract; two groups may share a matcher (identity
-    keys on matcher + EVERY command), so `Write|Edit|MultiEdit` does not collide.
+    Stage 3 IS wired here now (Phase 3 redo, after the parked attempt's Grade-D review).
+    The `PreToolUse` key carries the blocking gates on matchers `Bash` and
+    `Write|Edit|MultiEdit`. Both P0s that sank the parked attempt are addressed in THIS
+    combined diff: (P0 #2) `autopilot_guard`'s `permission-surface-write` is now a read-only
+    ALLOWLIST plus resolved-target-path matching (shlex + cwd tracking + PurePosixPath
+    normalization), not a write-token blacklist, so wiring it live no longer leaks
+    `python -c` / `perl -i` / `git checkout --` or path-spelling (`cd .claude &&`, `//`,
+    `/./`, quoted, `git -C`) writes to settings.json. It is defense-in-depth, NOT a hard
+    boundary — a textual guard over arbitrary bash cannot catch obfuscated writes
+    (base64/heredoc/eval-constructed paths); the worktree sandbox is the real boundary.
+    (P0 #1) `.claude/hooks/hooks.json` is retired: its FileSpec is removed (synthesize.py)
+    and it no longer renders; a byte-pristine stale copy is deleted, a user-edited one
+    preserved (reconcile `_SWEEP_NEVER_DELETE` + cli pristine-exact-match).
+    spec_gate uses `Write|Edit|MultiEdit` (NOT hooks.json.j2:44's `Write|Edit` — that
+    dropped MultiEdit on a false premise: `_entry_identity` keys on matcher + EVERY
+    command, so spec_gate's group coexists with the worktree_gate group under the same
+    matcher). Every PreToolUse blocking gate carries `"timeout": 10`, matching its siblings.
+    permission_gate takes `--subordinate-to-deny-dangerous` (ADR-007) — Claude-only, so the
+    gate defers to this file's `permissions.deny` for the deny_dangerous opt-out.
 
     ADR-010: `sessionstart_drift` is deliberately absent — the plugin bundle
     (`hooks/hooks.json` at plugin root) already fires it; rendering it here too
@@ -71,6 +77,28 @@
           {"type": "command", "command": "uv run --with '{{ harness_maker_src_path }}' python -m harness_maker.hooks.post_write_reminder", "timeout": 5}
         ]
       }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {"type": "command", "command": "uv run --with '{{ harness_maker_src_path }}' python -m harness_maker.gates.permission_gate --subordinate-to-deny-dangerous", "timeout": 10},
+          {"type": "command", "command": "uv run --with '{{ harness_maker_src_path }}' python -m harness_maker.hooks.autopilot_guard", "timeout": 10}
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {"type": "command", "command": "uv run --with '{{ harness_maker_src_path }}' python -m harness_maker.gates.worktree_gate", "timeout": 10},
+          {"type": "command", "command": "uv run --with '{{ harness_maker_src_path }}' python -m harness_maker.hooks.autopilot_guard", "timeout": 10}
+        ]
+      }{% if config.dev_mode == "spec-driven" %},
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {"type": "command", "command": "uv run --with '{{ harness_maker_src_path }}' python -m harness_maker.gates.spec_gate", "timeout": 10}
+        ]
+      }{% endif %}
     ],
     "Stop": [
       {

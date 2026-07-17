@@ -1,14 +1,15 @@
 ---
 type: plan
 task_slug: permission-deny-and-hooks-wiring
-status: phases-1-2-5-6-7-8-complete
-phases_done: [1, 2, 5, 6, 7, 8]
-phases_parked: [3, 4]
+status: phases-1-8-complete
+phases_done: [1, 2, 3, 4, 5, 6, 7, 8]
+phases_parked: []
 phases_pending: [9]
 parked_branch: hm/phase34-parked
 created: 2026-07-17
 reconstructed: 2026-07-17
 phase_5678_landed: 2026-07-18
+phase_34_redone: 2026-07-18
 tags: [harness-maker, plan, python, permissions, hooks, render, security]
 research_doc: "[[RESEARCH-permission-deny-and-hooks-wiring]]"
 interview_rounds: 5
@@ -492,6 +493,27 @@ harness-owned `hooks` key (**shipped**); `.claude/hooks/hooks.json` is retired (
 - **Rollback:** revert the Phase 2 commit; Phase 1 stands.
 
 ### Phase 3 — Stage-3 hooks (blocking gates) + gate subordination (ADR-007)
+- **Status:** DONE (2026-07-18, redo after the parked Grade-D attempt). The parked attempt's
+  two consensus P0s are settled: (P0 #2) `autopilot_guard`'s `permission-surface-write` was
+  inverted from a write-verb blacklist to a **read-only allowlist + resolved-target-path**
+  matching (shlex + cwd tracking + `PurePosixPath` normalization) + a **general block-biased
+  backstop** (any segment naming a `.claude`/`.cursor`/`.codex` token or a config basename is
+  blocked unless it is a clean read with no command substitution / write-output flag). This
+  took **5 adversarial rounds** (security-reviewer + codex, K=2) to drive down — each round
+  codex found one more in-scope spelled-path class (`..`-laden cd, pushd/CDPATH/`--work-tree`/
+  exec-FD, command-substitution masking, `less -O`). The **true residual is documented and
+  accepted**: a write where the surface path is NOT spelled in the segment (indirection via a
+  helper script, a runtime-assembled/`$VAR`/base64 path, or a symlink) — no textual guard over
+  arbitrary bash can close it; per CLAUDE.md this guard is defense-in-depth, and the worktree
+  sandbox is the real boundary. (P1) `>|` normalized before segment split. (P2) `spec_gate`
+  uses `Write|Edit|MultiEdit` (the parked `_entry_identity`-collision premise was false); both
+  Stage-3 gates carry `timeout: 10`. **Path.cwd() disagreement settled in codex's favor** —
+  `permission_gate._resolve_project_dir` resolves via payload→env→cwd (a subdirectory cwd no
+  longer silently forces fail-closed).
+- **Accepted over-block** (defense-in-depth cost): under active autopilot the backstop blocks
+  `grep -i … .claude/settings.json` (`-i` collides with `--in-place`) and any non-read write
+  naming a `.claude` dir. The harness's own writes go through `python -m harness_maker.<mod>`
+  (no `.claude` in argv) so are unaffected; a false positive merely pauses for the human.
 - **Status: 🅿️ PARKED — written, reviewed Grade D, REVERTED before landing** (2026-07-17).
   The work is on branch **`hm/phase34-parked`** (`048ecbfb`). Read
   `work-docs/REVIEW-permission-deny-and-hooks-wiring-phase34-2026-07-17.md` before touching
@@ -564,6 +586,14 @@ harness-owned `hooks` key (**shipped**); `.claude/hooks/hooks.json` is retired (
 - **Rollback:** revert the Phase 3 commit; Phases 1-2 stand.
 
 ### Phase 4 — Retire `.claude/hooks/hooks.json` (ADR-005)
+- **Status:** DONE (2026-07-18). The parked P0 #1 (orphan-sweep deleting user-authored hooks)
+  is closed: `synthesize.py` drops the FileSpec, `reconcile._SWEEP_NEVER_DELETE` guards the
+  path before `_classify_orphan` can reach the manifest-hash `ours-clean` unlink, and
+  `cli._retire_stale_hooks_json` deletes the stale file ONLY on exact byte-match to a pristine
+  (no-merge) render — a user-edited copy is preserved + warned. security-reviewer gave it a
+  **clean bill after a genuine attack**; code-reviewer confirmed the byte pipeline
+  (`sort_keys=True` neutralizes merge-order nondeterminism). codex's MEDIUM TOCTOU
+  (read→unlink window) is accepted + documented (single-threaded make, dead file).
 - **Status: 🅿️ PARTLY PARKED, PARTLY LANDED** (2026-07-17).
   - ✅ **KEPT on the task branch (Phase 4a — no P0):** all four `readiness._dim_guardrails`
     hook signals now read `settings.json`, and the two fail-open arms are closed. This is a

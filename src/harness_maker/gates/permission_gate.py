@@ -13,12 +13,14 @@ that no project should need to opt out of.
 from __future__ import annotations
 
 import json
+import os
 import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from harness_maker import autopilot
 from harness_maker.i18n import resolve_locale, t
 from harness_maker.secscan.hook_injection import _DANGER_PATTERNS
 
@@ -81,6 +83,32 @@ def evaluate(
 _SUBORDINATE_FLAG = "--subordinate-to-deny-dangerous"
 
 
+def _resolve_project_dir(payload: dict[str, Any]) -> Path:
+    """Resolve the harness project root (where `.claude/harness.yaml` lives).
+
+    WHY not `Path.cwd()` (settles the REVIEW's codex-vs-security disagreement): a
+    PreToolUse hook's cwd is NOT guaranteed to be the project root. This codebase already
+    knows it — `autopilot_guard._resolve_root` exists precisely because "the hook
+    subprocess's cwd is often a `.worktrees/<wt>/` dir during an autonomous execute", and
+    a user can fire Bash from any subdirectory. Rooting the harness.yaml lookup at cwd
+    would miss the file in both cases and fall to the fail-closed branch → unconditional
+    blocking, silently defeating the `deny_dangerous` opt-out (codex's failure mode; it
+    is real). The PreToolUse payload carries `cwd` / `workspace.current_dir` and Claude
+    Code sets `$CLAUDE_PROJECT_DIR`; `resolve_marker_root` walks those up (and across
+    `.worktrees/`) to the base repo. `Path.cwd()` is the last-resort fallback only.
+    """
+    raw_ws = payload.get("workspace")
+    ws: dict[str, Any] = raw_ws if isinstance(raw_ws, dict) else {}
+    start = Path(
+        ws.get("current_dir")
+        or payload.get("cwd")
+        or os.environ.get("CLAUDE_PROJECT_DIR")
+        or os.environ.get("CURSOR_PROJECT_DIR")
+        or os.getcwd()
+    )
+    return autopilot.resolve_marker_root(start)
+
+
 def _deny_dangerous_enabled(project_dir: Path) -> bool:
     """Is the gate switched on for this project? (ADR-007)
 
@@ -138,7 +166,7 @@ def main() -> int:
     tool_name = str(payload.get("tool_name") or "")
     raw_input = payload.get("tool_input")
     tool_input = raw_input if isinstance(raw_input, dict) else {}
-    project_dir = Path.cwd()
+    project_dir = _resolve_project_dir(payload)
     if _SUBORDINATE_FLAG in sys.argv and not _deny_dangerous_enabled(project_dir):
         return 0
     decision = evaluate(tool_name, tool_input, project_dir)

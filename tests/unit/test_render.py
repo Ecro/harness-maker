@@ -488,21 +488,21 @@ def test_render_hooks_json_valid_in_both_dev_modes(
     bp = synthesize(p, a)
     render(bp, target_dir, freeze_time=DEFAULT_FREEZE_TIME)
 
-    # hooks/hooks.json still renders (its retirement is parked — see
-    # REVIEW-permission-deny-and-hooks-wiring-phase34) and still carries the fragile
-    # `}{% if %},` spec_gate branch this test exists to lock.
-    claude_text = (target_dir / "hooks" / "hooks.json").read_text(encoding="utf-8")
-    claude = _json.loads(claude_text)  # raises on invalid JSON
-    assert "PreToolUse" in claude["hooks"]
-
-    # settings.json is the file Claude Code actually loads, so its JSON validity matters
-    # MORE: a broken branch there costs the `permissions` block too. It has no dev_mode
-    # conditional yet (Stage 3, which owns the spec_gate branch, is not wired), so this
-    # asserts only what is true today — and must gain a `PreToolUse` assertion when
-    # Stage 3 lands.
+    # `.claude/hooks/hooks.json` is retired (ADR-005) — Claude Code never read it, so
+    # it is no longer rendered. settings.json is the file Claude Code actually loads, and
+    # it now carries the fragile `}{% if %},` spec_gate branch (Stage 3) this test locks:
+    # a broken branch there costs the `permissions` block too. json.loads() raises on
+    # invalid JSON in either dev_mode.
     settings = _json.loads((target_dir / "settings.json").read_text(encoding="utf-8"))
     assert "permissions" in settings, "a broken hooks branch must not take permissions with it"
+    assert "PreToolUse" in settings["hooks"], (
+        "Stage-3 PreToolUse gates (incl. the dev_mode-conditional spec_gate branch) "
+        "must render in both dev_modes"
+    )
     assert "Stop" in settings["hooks"], "Stage-2 Stop hook must render in both dev_modes"
+    assert not (target_dir / "hooks" / "hooks.json").exists(), (
+        "the retired .claude/hooks/hooks.json must no longer be rendered"
+    )
 
     # Cursor hooks
     cursor_text = (project_root / ".cursor" / "hooks.json").read_text(encoding="utf-8")

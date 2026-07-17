@@ -472,3 +472,18 @@ def test_atomic_command_fallback_pins_spec_driven(monkeypatch: pytest.MonkeyPatc
     files = _atomic_command_files()  # no config_dump → fallback path
     plan_body = next(ctx["stage_body"] for (_tpl, dest, ctx) in files if dest.endswith("plan.md"))
     assert "spec_need" in plan_body  # only true because the pin passes dev_mode=SPEC_DRIVEN
+
+
+def test_hooks_json_not_a_blueprint_filespec() -> None:
+    """Phase 4 / ADR-005 (PLAN-permission-deny-and-hooks-wiring): the retired
+    `.claude/hooks/hooks.json` is no longer rendered as a blueprint FileSpec.
+    Claude Code never read it; hooks now live in settings.json."""
+    for specs in (SIDE_FILES, PRODUCTION_FILES):
+        out_paths = {out_path for _tpl, out_path, _ctx in specs}
+        assert "hooks/hooks.json" not in out_paths
+
+    p = _profile()
+    a = interview(p, autoloop_mode=True)
+    bp = synthesize(p, a)
+    rendered_paths = {str(fe.path) for fe in bp.files}
+    assert "hooks/hooks.json" not in rendered_paths

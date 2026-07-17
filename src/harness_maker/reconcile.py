@@ -54,6 +54,15 @@ _TEMPLATE_DIR = Path(__file__).resolve().parent / "templates"
 _SWEEP_ROOTS: tuple[str, ...] = (".claude", ".cursor", ".codex", ".agents")
 _SWEEP_ROOT_FILES: tuple[str, ...] = ("AGENTS.md",)
 
+# Project-root-relative keys (as `_iter_disk_files` yields them) that the orphan
+# sweep must NEVER auto-delete via the manifest-hash match — deletion is delegated
+# to a purpose-built pristine-exact-match path (cli._retire_stale_hooks_json).
+# `.claude/hooks/hooks.json` is retired (Claude Code never read it) but a prior
+# `_merge_hooks_json` may have folded a user hook into it, and that MERGED hash is
+# what the render manifest records — so ours-clean would delete user work
+# (PLAN-permission-deny-and-hooks-wiring ADR-005, consensus P0).
+_SWEEP_NEVER_DELETE: frozenset[str] = frozenset({".claude/hooks/hooks.json"})
+
 
 def parse_frontmatter(path: Path) -> tuple[dict[str, object] | None, bytes]:
     """Parse leading YAML frontmatter; return (fm_dict | None, body_bytes)."""
@@ -642,6 +651,12 @@ def sweep_orphans(project_root: Path, blueprint: Blueprint) -> OrphanSweepReport
     for rel_path in _iter_disk_files(project_root):
         rel_key = str(rel_path).replace("\\", "/")
         if rel_key in expected:
+            continue
+        if rel_key in _SWEEP_NEVER_DELETE:
+            # ADR-005 P0 guard: never let the manifest-hash match reach the
+            # ours-clean unlink for these paths. Deletion is owned solely by the
+            # pristine-exact-match path (cli._retire_stale_hooks_json); the sweep
+            # leaves the file untouched so a user-merged hook can never be lost.
             continue
         classification, recorded_hash = _classify_orphan(
             project_root,

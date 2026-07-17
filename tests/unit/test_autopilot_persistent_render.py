@@ -54,9 +54,12 @@ def test_stage_command_keeps_cap_flags_when_bounded(tmp_path: Path) -> None:
     assert "--time-cap-min 300" in body
 
 
-def test_hooks_json_registers_autoarm(tmp_path: Path) -> None:
+def test_settings_json_registers_autoarm(tmp_path: Path) -> None:
+    # `.claude/hooks/hooks.json` is retired (ADR-005, PLAN-permission-deny-and-hooks-wiring):
+    # Claude Code reads project hooks ONLY from settings.json, where the SessionStart
+    # autoarm hook now lives.
     root = _render(tmp_path, AutonomyConfig(), [Target.CLAUDE_CODE])
-    body = (root / "hooks" / "hooks.json").read_text(encoding="utf-8")
+    body = (root / "settings.json").read_text(encoding="utf-8")
     assert "autopilot_autoarm" in body
 
 

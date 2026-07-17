@@ -459,7 +459,14 @@ def _base_files(
         *_skill_files(),
         *_agent_files(preset, agent_models, default_model),
         *_rubric_files(),
-        ("hooks/hooks.json.j2", "hooks/hooks.json", {}),
+        # `.claude/hooks/hooks.json` is NOT rendered (ADR-005 of
+        # PLAN-permission-deny-and-hooks-wiring). Claude Code reads project hooks ONLY
+        # from settings files; that path is valid for a PLUGIN bundle only, so everything
+        # rendered there was dead. Hooks now ship in settings.json's `hooks` key — see
+        # templates/settings/*.json.j2. `.cursor/hooks.json` and `.codex/hooks.json` are
+        # unaffected: their IDEs really do read them. A stale on-disk copy is retired by
+        # cli._retire_stale_hooks_json (pristine-exact-match only) + guarded from the
+        # orphan sweep by reconcile._SWEEP_NEVER_DELETE so user-merged hooks are never lost.
         ("observability/dashboard.md.j2", "observability/dashboard.md", {}),
     ]
 

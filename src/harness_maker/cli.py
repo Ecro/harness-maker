@@ -11,6 +11,7 @@ from typing import Any
 
 import typer
 import yaml
+from jinja2 import TemplateError
 from pydantic import ValidationError
 
 from harness_maker.add_domain import AddDomainError, add_domain, validate_domain_name
@@ -32,7 +33,7 @@ from harness_maker.modular_edit import add as modular_add
 from harness_maker.modular_edit import remove as modular_remove
 from harness_maker.profile import profile
 from harness_maker.reconcile import OrphanSweepReport, backup, reconcile, sweep_orphans
-from harness_maker.render import DEFAULT_FREEZE_TIME, render
+from harness_maker.render import DEFAULT_FREEZE_TIME, render, render_stale_hooks_json_bytes
 from harness_maker.synthesize import synthesize
 from harness_maker.telemetry import (
     compute_yaml_diff,
@@ -482,6 +483,11 @@ def make(
     # render so the manifest is up-to-date for the classifier.
     sweep_report = sweep_orphans(target, full_bp)
     _emit_orphan_sweep_report(sweep_report)
+    # ADR-005 (PLAN-permission-deny-and-hooks-wiring): retire the now-unrendered
+    # `.claude/hooks/hooks.json`, but ONLY when byte-pristine — the sole deletion
+    # path for it. A copy holding user-merged hooks is preserved + warned. The
+    # orphan sweep above is guarded (_SWEEP_NEVER_DELETE) and never deletes it.
+    _retire_stale_hooks_json(target, full_bp)
     _emit_reconcile_report(keep_count, merge_reports)
     # Exempt reconcile-KEPT files from the content_hash check: we deliberately
     # left their on-disk body in place, so the declared hash (describing the
@@ -1351,6 +1357,68 @@ def _parse_ref_folders_flag(raw: str) -> list[object]:
         if path_part:
             out.append(RefFolder(path=path_part, glob=glob))
     return out
+
+
+def _retire_stale_hooks_json(project_root: Path, blueprint: Blueprint) -> None:
+    """Retire `.claude/hooks/hooks.json` ONLY when it is byte-pristine (ADR-005).
+
+    The file is no longer rendered (Claude Code never read it), but a user may
+    have hand-wired a hook that `_merge_hooks_json` folded into it on a prior
+    `make --update` — that content is theirs. So delete it only when on-disk
+    bytes EXACTLY equal what the current template renders (⇒ zero user content);
+    otherwise preserve it and warn once so the hook can be migrated. This is the
+    ONLY sanctioned deletion path for this file — the orphan sweep is guarded by
+    `reconcile._SWEEP_NEVER_DELETE` and never touches it.
+    """
+    stale = project_root / ".claude" / "hooks" / "hooks.json"
+    if not stale.is_file():
+        return
+    context = next(
+        (fe.context for fe in blueprint.files if "harness_maker_src_path" in fe.context),
+        None,
+    )
+    if context is None:
+        # No shared render context to reconstruct the pristine bytes → fail-safe
+        # preserve (never delete when we cannot prove the file is user-free).
+        return
+    try:
+        pristine = render_stale_hooks_json_bytes(context)
+    except (ValueError, OSError, TemplateError) as exc:
+        typer.echo(
+            f"WARN: kept stale .claude/hooks/hooks.json — could not render the "
+            f"pristine template to compare ({exc}). Delete it manually once you "
+            f"have migrated any hooks to .claude/settings.json.",
+            err=True,
+        )
+        return
+    try:
+        on_disk = stale.read_bytes()
+    except OSError:
+        return
+    # Accepted limitation (codex second-opinion, MEDIUM): read→unlink is not
+    # atomic, so a concurrent writer between them could have the pristine bytes
+    # deleted after being edited. Not mitigated: `make` is a single-threaded
+    # local run and nothing else writes this dead file during it; the worst case
+    # is deleting a file that became non-pristine within a microsecond window,
+    # and the file is retired dead weight regardless. Locking is not worth it.
+    if on_disk == pristine:
+        stale.unlink()
+        typer.echo(
+            "  RETIRED: .claude/hooks/hooks.json (pristine; Claude Code never read it)",
+        )
+    else:
+        # Content differs from the current pristine render. Two innocent causes
+        # dominate over hand-wiring: the file was rendered by an OLDER template
+        # (different hook set), or a version bump changed the template output.
+        # So do not assert "hand-wired" — just flag it as non-pristine and leave
+        # the decision to the user. Safe direction: never auto-delete on doubt.
+        typer.echo(
+            "WARN: kept .claude/hooks/hooks.json — its bytes differ from the current "
+            "template (an older render, a version bump, or a hand-wired hook). Claude "
+            "Code never reads this file; if it holds a real hook, migrate it to "
+            ".claude/settings.json, then delete the file.",
+            err=True,
+        )
 
 
 def _emit_orphan_sweep_report(report: OrphanSweepReport) -> None:

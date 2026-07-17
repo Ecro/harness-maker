@@ -1,6 +1,6 @@
 preset: Production
 dev_mode: spec-driven
-file_count: 63
+file_count: 62
 files:
 - path: ../CLAUDE.md
   template: claude-md/Production.en.md.j2
@@ -113,9 +113,6 @@ files:
 - path: harness.yaml
   template: harness-yaml/Production.yaml.j2
   body_sha256: 2a8cbbad0334addf01477d88c538f13ee1882822743b68850e1ddeb4b1018cc4
-- path: hooks/hooks.json
-  template: hooks/hooks.json.j2
-  body_sha256: 3aa3a009ebcd7e2aa73ada8d7b9e2d9b5116fd64d2bf6f48323fb17d9c27e064
 - path: memory/failures.md
   template: memory/failures.en.md.j2
   body_sha256: 66df0bc5b3506d8f8b4b05c7a60690a6f8651a6493659a0b7545c2322aa7c73f
@@ -142,7 +139,7 @@ files:
   body_sha256: bd46a9af3e1a0912ef132227b7b509bbc3c1a14758c9fb620dd1392f2059899f
 - path: settings.json
   template: settings/Production.json.j2
-  body_sha256: eb9b556bb1f32834f7cbbb4334e35b4e7e2bcd81f36dea24541316148fa09167
+  body_sha256: 843ecc7713b4c7a1d0b5c77649c89f47bb13b98db39cd18ae14ee32c030cd6ff
 - path: skills/agent-quality-rubric/SKILL.md
   template: skills/agent-quality-rubric/SKILL.md.j2
   body_sha256: 47aeaa6729c0aac5bfecb437cb41204317c912542f650e89ff0a78c7d36ddeb0

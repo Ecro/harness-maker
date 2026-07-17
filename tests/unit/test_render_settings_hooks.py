@@ -26,7 +26,7 @@ from typing import Any
 
 import pytest
 
-from harness_maker.models import HarnessConfig
+from harness_maker.models import DevMode, HarnessConfig
 from harness_maker.render import (
     _SETTINGS_KEYS_OWNED_BY_HARNESS,
     _make_env,
@@ -56,28 +56,27 @@ STAGE2_MODULES = frozenset(
     }
 )
 
-SHIPPED_MODULES = STAGE1_MODULES | STAGE2_MODULES
-
-# ADR-006 Stage 3 — anything that can block an ORDINARY TOOL CALL. NOT wired.
-#
-# The staging axis is the EVENT, not the module (REVIEW round 1, consensus P1 — codex +
-# code-reviewer). `autopilot_guard` therefore straddles: its **Stop** copy is Stage 2
-# (above), its **PreToolUse** copies are Stage 3 (here), because `_pretooluse` returns
-# allow=False → exit 2. It satisfies both conjuncts of ADR-006's own Stage-3 criterion —
-# "can block ordinary tool calls AND has never executed in Claude Code" — and the second
-# one HARDER than `permission_gate`, which is at least live in Cursor and Codex.
-# `autopilot_guard` is wired in NO IDE today.
-#
-# A Stage-3 attempt WAS written and then reverted before landing: its review graded D on
-# two consensus P0s. Parked on `hm/phase34-parked`; read
-# work-docs/REVIEW-permission-deny-and-hooks-wiring-phase34-2026-07-17.md first.
-# Pinning their ABSENCE is what keeps the live negative control from being skipped.
-LATER_STAGE_MODULES = frozenset(
+# ADR-006 Stage 3 — the PreToolUse BLOCKING gates, now WIRED (Phase 3 redo). Present in
+# BOTH dev_modes. `autopilot_guard`'s PreToolUse copies also land here (it straddles: its
+# Stop copy is Stage 2 above), but it is already in STAGE2_MODULES, so it is not repeated.
+STAGE3_MODULES = frozenset(
     {
         "harness_maker.gates.permission_gate",
         "harness_maker.gates.worktree_gate",
-        "harness_maker.gates.spec_gate",
     }
+)
+
+# spec_gate is Stage 3 too, but spec-driven dev_mode ONLY (task-driven omits it — the
+# spec-gate has nothing to enforce without a SPEC). Tested dev_mode-aware, not in SHIPPED.
+SPEC_DRIVEN_ONLY_MODULE = "harness_maker.gates.spec_gate"
+
+SHIPPED_MODULES = STAGE1_MODULES | STAGE2_MODULES | STAGE3_MODULES
+
+# The Stage-3 PreToolUse blocking gates must carry an explicit timeout, matching siblings.
+_BLOCKING_GATE_MODULES = (
+    "harness_maker.gates.permission_gate",
+    "harness_maker.gates.worktree_gate",
+    "harness_maker.gates.spec_gate",
 )
 
 
@@ -128,11 +127,73 @@ def test_settings_hooks_carry_shipped_modules(template: str) -> None:
 
 
 @pytest.mark.parametrize("template", SETTINGS_TEMPLATES)
-def test_settings_hooks_exclude_later_stages(template: str) -> None:
-    """ADR-006: staging is only real if the later stages are provably absent."""
-    cmds = " ".join(_commands(_render(template)))
-    for mod in sorted(LATER_STAGE_MODULES):
-        assert mod not in cmds, f"{template}: {mod} is a Stage-3 blocking gate — not yet"
+@pytest.mark.parametrize("dev_mode", [DevMode.TASK_DRIVEN, DevMode.SPEC_DRIVEN])
+def test_settings_stage3_gates_wired_both_dev_modes(template: str, dev_mode: DevMode) -> None:
+    """Phase 3 redo: the Stage-3 PreToolUse blocking gates are wired, both dev_modes.
+
+    The parked attempt's ABSENCE assertion is inverted — permission_gate + worktree_gate
+    must now be present on PreToolUse in BOTH task-driven and spec-driven.
+    """
+    settings = _render(template, dev_mode=dev_mode)
+    assert json.dumps(settings)  # valid JSON in this dev_mode (mirrors production shape)
+    pre = settings["hooks"].get("PreToolUse")
+    assert pre, f"{template} ({dev_mode.value}): no PreToolUse — Stage 3 not wired"
+    cmds = " ".join(_commands(settings))
+    for mod in sorted(STAGE3_MODULES):
+        assert mod in cmds, f"{template} ({dev_mode.value}): Stage-3 gate {mod} missing"
+
+
+@pytest.mark.parametrize("template", SETTINGS_TEMPLATES)
+def test_settings_spec_gate_matcher_is_write_edit_multiedit(template: str) -> None:
+    """P2: spec_gate uses `Write|Edit|MultiEdit` (NOT the parked `Write|Edit`).
+
+    The dropped MultiEdit rested on a false premise — `_entry_identity` keys on matcher +
+    EVERY command, so spec_gate's group coexists with the worktree_gate group under the
+    SAME matcher. spec_gate is spec-driven ONLY; task-driven must omit it entirely.
+    """
+    spec = _render(template, dev_mode=DevMode.SPEC_DRIVEN)
+    matchers = [
+        e["matcher"]
+        for e in spec["hooks"]["PreToolUse"]
+        for h in e["hooks"]
+        if SPEC_DRIVEN_ONLY_MODULE in h["command"]
+    ]
+    assert matchers == ["Write|Edit|MultiEdit"], (
+        f"{template}: spec_gate matcher must be Write|Edit|MultiEdit, got {matchers}"
+    )
+
+    task = _render(template, dev_mode=DevMode.TASK_DRIVEN)
+    task_cmds = " ".join(_commands(task))
+    assert SPEC_DRIVEN_ONLY_MODULE not in task_cmds, (
+        f"{template}: spec_gate leaked into task-driven mode"
+    )
+
+
+@pytest.mark.parametrize("template", SETTINGS_TEMPLATES)
+@pytest.mark.parametrize("dev_mode", [DevMode.TASK_DRIVEN, DevMode.SPEC_DRIVEN])
+def test_settings_stage3_blocking_gates_carry_timeout(template: str, dev_mode: DevMode) -> None:
+    """P2 (also-open): the newly-wired blocking gates must carry `"timeout": 10`, like
+    their loop_gate / autopilot_guard siblings. The parked code shipped them without one.
+    """
+    pre = _render(template, dev_mode=dev_mode)["hooks"]["PreToolUse"]
+    for entry in pre:
+        for h in entry["hooks"]:
+            if any(mod in h["command"] for mod in _BLOCKING_GATE_MODULES):
+                assert h.get("timeout") == 10, (
+                    f"{template} ({dev_mode.value}): {h['command']} missing timeout: 10"
+                )
+
+
+@pytest.mark.parametrize("template", SETTINGS_TEMPLATES)
+def test_settings_permission_gate_is_subordinate(template: str) -> None:
+    """ADR-007: the Claude template's permission_gate takes --subordinate-to-deny-dangerous
+    so it defers to settings.json's deny for the deny_dangerous opt-out."""
+    cmds = _commands(_render(template))
+    gate = [c for c in cmds if "gates.permission_gate" in c]
+    assert gate, f"{template}: permission_gate not wired"
+    assert all("--subordinate-to-deny-dangerous" in c for c in gate), (
+        f"{template}: permission_gate must pass --subordinate-to-deny-dangerous; got {gate}"
+    )
 
 
 @pytest.mark.parametrize("template", SETTINGS_TEMPLATES)
@@ -355,16 +416,17 @@ def test_merge_stage2_to_stage3_group_growth_neither_duplicates_nor_loses() -> N
     If this breaks, every user upgrading across the Phase 2→3 boundary gets a duplicate
     PreToolUse hook. Pinned here, at the phase that creates the smaller group.
 
-    ⚠️ **Phase 3 must update this fixture.** ADR-007 appends
-    `--subordinate-to-deny-dangerous` to the Claude template's `permission_gate`
-    invocation, and `_normalize_hm_managed_command` keys identity on module **plus
-    trailing args** — so the bare `gate` string below stops matching what the template
-    actually ships, and this test keeps passing while modelling a transition that no
-    longer exists. Green-but-meaningless is the failure mode the PLAN's validator named:
-    "precise-and-wrong defeats review by looking verified."
+    Phase-3-updated fixture: ADR-007 appends `--subordinate-to-deny-dangerous` to the
+    Claude template's `permission_gate` invocation, and `_normalize_hm_managed_command`
+    keys identity on module **plus trailing args**, so `gate` below carries the flag to
+    model what the template actually ships (a bare string would test a transition that no
+    longer exists — the "precise-and-wrong" failure mode the PLAN's validator named).
     """
     guard = "uv run --with /p python -m harness_maker.hooks.autopilot_guard"
-    gate = "uv run --with /p python -m harness_maker.gates.permission_gate"
+    gate = (
+        "uv run --with /p python -m harness_maker.gates.permission_gate "
+        "--subordinate-to-deny-dangerous"
+    )
 
     phase2_on_disk = {"hooks": {"PreToolUse": [_nested("Bash", guard)]}}
     phase3_template = {"hooks": {"PreToolUse": [_nested("Bash", gate, guard)]}}

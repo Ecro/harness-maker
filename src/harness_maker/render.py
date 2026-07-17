@@ -950,6 +950,29 @@ def _render_hooks_json_merged(
     return out
 
 
+_STALE_HOOKS_JSON_TEMPLATE = "hooks/hooks.json.j2"
+
+
+def render_stale_hooks_json_bytes(context: dict[str, Any]) -> bytes:
+    """Pristine (no-merge) bytes of the retired `.claude/hooks/hooks.json`.
+
+    ADR-005 (PLAN-permission-deny-and-hooks-wiring): the file is no longer a
+    blueprint FileSpec, but cli must still recognise a byte-pristine (zero
+    user-content) copy on disk to retire it. Mirrors the exact byte pipeline
+    `_render_hooks_json_merged` uses for a FRESH render (template → json.loads →
+    `_format_settings_json`), deliberately WITHOUT the merge step so a file that
+    folded a user hook does not compare equal to itself.
+    """
+    env = _make_env()
+    template = env.get_template(_STALE_HOOKS_JSON_TEMPLATE)
+    rendered = template.render(**context)
+    data = json.loads(rendered)
+    if not isinstance(data, dict):
+        msg = f"Template {_STALE_HOOKS_JSON_TEMPLATE} must render a JSON object"
+        raise ValueError(msg)
+    return _format_settings_json(data)
+
+
 _VARIANT_KEY_RE = re.compile(r"^communication_variant:\s*([A-Za-z_-]+)\s*$", re.MULTILINE)
 
 

@@ -1,9 +1,11 @@
 {#- See settings/Production.json.j2's header for the full rationale. In short:
     Claude Code reads project hooks ONLY from settings files — a plain project's
     `.claude/hooks/hooks.json` is never loaded (that path is for a PLUGIN bundle).
-    Stage 1 (non-blocking) + Stage 2 (control-flow: loop_gate + autopilot_guard) are
-    shipped; Stage 3's BLOCKING gates land in Phase 3 (ADR-006). `sessionstart_drift`
-    is excluded because the plugin bundle already fires it (ADR-010).
+    Stage 1 (non-blocking) + Stage 2 (Stop) + Stage 3 (PreToolUse BLOCKING gates:
+    permission_gate, worktree_gate, spec_gate, autopilot_guard) are all shipped now
+    (Phase 3 redo). spec_gate uses `Write|Edit|MultiEdit`; every PreToolUse blocking gate
+    carries `"timeout": 10`; permission_gate is `--subordinate-to-deny-dangerous` (ADR-007).
+    `sessionstart_drift` is excluded because the plugin bundle already fires it (ADR-010).
 -#}
 {
   "permissions": {"allow": ["Read", "Bash(uv:*)", "Bash(pytest:*)"{% if config.second_opinion and 'codex' in config.second_opinion.models %}, "Bash(codex exec:*)"{% endif %}{% if config.second_opinion and 'antigravity' in config.second_opinion.models %}, "Bash(agy --print --sandbox:*)"{% endif %}], "deny": {% if config.permissions.deny_dangerous %}["Bash(rm:*)", "Edit(/etc/**)", "Edit(~/.ssh/**)", "Edit(~/.aws/**)"]{% else %}[]{% endif %}},
@@ -21,6 +23,28 @@
           {"type": "command", "command": "uv run --with '{{ harness_maker_src_path }}' python -m harness_maker.hooks.post_write_reminder", "timeout": 5}
         ]
       }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {"type": "command", "command": "uv run --with '{{ harness_maker_src_path }}' python -m harness_maker.gates.permission_gate --subordinate-to-deny-dangerous", "timeout": 10},
+          {"type": "command", "command": "uv run --with '{{ harness_maker_src_path }}' python -m harness_maker.hooks.autopilot_guard", "timeout": 10}
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {"type": "command", "command": "uv run --with '{{ harness_maker_src_path }}' python -m harness_maker.gates.worktree_gate", "timeout": 10},
+          {"type": "command", "command": "uv run --with '{{ harness_maker_src_path }}' python -m harness_maker.hooks.autopilot_guard", "timeout": 10}
+        ]
+      }{% if config.dev_mode == "spec-driven" %},
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {"type": "command", "command": "uv run --with '{{ harness_maker_src_path }}' python -m harness_maker.gates.spec_gate", "timeout": 10}
+        ]
+      }{% endif %}
     ],
     "Stop": [
       {

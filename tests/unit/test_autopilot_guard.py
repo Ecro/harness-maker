@@ -14,6 +14,8 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 
+import pytest
+
 from harness_maker import autopilot
 from harness_maker.hooks import autopilot_guard as guard
 from harness_maker.models import AtomicStage
@@ -121,13 +123,305 @@ def test_extra_deny_adds_a_pattern(tmp_path: Path) -> None:
 
 
 def test_baseline_constant_is_nonempty_code_fixed() -> None:
-    # Non-overridable: the baseline lives in code, not config. find/publish/
-    # permission-surface are regex; git AND rm are tokenized (_git_segment_hit /
-    # _segment_rm_escapes — rm moved off the prefix-char regex in REVIEW P1-2).
+    # Non-overridable: the baseline lives in code, not config. find/publish are regex in
+    # NEVER_AUTO_BASH; git, rm, AND the permission-surface are tokenized checks run ahead
+    # of it in _bash_hit (_git_segment_hit / _segment_rm_escapes / _permission_surface_write).
     cats = {c for c, _ in guard.NEVER_AUTO_BASH}
-    assert {"find-delete", "publish-or-deploy", "permission-surface-write"} <= cats
-    # rm escape enforcement is now a tokenized operand check, not a regex category.
+    assert {"find-delete", "publish-or-deploy"} <= cats
+    # rm escape enforcement is a tokenized operand check, not a regex category.
     assert guard._segment_rm_escapes("rm -rf /etc")
+    # permission-surface enforcement is a read-only ALLOWLIST (REVIEW P0 #2), not a
+    # write-verb regex category — it no longer lives in NEVER_AUTO_BASH.
+    assert "permission-surface-write" not in cats
+    assert guard._permission_surface_write("echo x > .claude/settings.json")
+
+
+# --- REVIEW Phase 3+4 P0 #2: permission-surface is a read-only ALLOWLIST -----------
+#
+# The Phase-2 rule required a write TOKEN before the path. That fixed a false positive
+# (blocking `cat settings.json`) but opened false NEGATIVES: any interpreter/verb NOT in
+# the token blacklist mutated the file freely. Phase 3 makes this rule LIVE on PreToolUse
+# for the first time, so the leak became a newly-reachable privilege escalation. The fix
+# inverts the strategy — block ANY segment naming the surface unless it matches a closed
+# read-only allowlist and the surface is not a redirect target.
+
+_SURFACE_WRITE_BYPASSES = [
+    "python -c \"open('.claude/settings.json','w').write('{}')\"",
+    "perl -i -pe 's/deny/allow/' .claude/settings.json",
+    "git checkout HEAD -- .claude/settings.json",
+    "git restore .claude/settings.json",
+    "install /dev/null .claude/settings.json",
+    "printf '{}' | ex -sc 'wq' .claude/settings.json",
+]
+
+
+@pytest.mark.parametrize("cmd", _SURFACE_WRITE_BYPASSES)
+def test_active_blocks_permission_surface_write_bypasses(tmp_path: Path, cmd: str) -> None:
+    # Each of the six commands the Phase-2 write-token rule ALLOWED must now be blocked.
+    _activate(tmp_path)
+    assert guard.evaluate("Bash", _bash(cmd), tmp_path).allow is False, cmd
+
+
+# --- REVIEW P0 (path identity): literal-substring bypasses of the surface rule ---------
+#
+# The read-only allowlist got the VERB axis right, but the rule only fired when a fixed
+# regex found the CONTIGUOUS substring `.claude/settings.json` in the raw command text.
+# Bash has many equivalent spellings of that path the literal missed; for each, the guard
+# returned "not a surface command" and ALLOWED the write to the file holding both
+# `permissions` and the `hooks` gating them. The fix RESOLVES the write target (cwd-tracked,
+# normalized) instead of matching text. All five must now be BLOCKED.
+
+_SURFACE_PATH_IDENTITY_BYPASSES = [
+    "cd .claude && printf '{}' > settings.json",  # bare basename after an unresolved cd
+    "printf '{}' > .claude//settings.json",  # // breaks the literal
+    "printf '{}' > .claude/./settings.json",  # /./ breaks the literal
+    "printf '{}' > .claude/'settings.json'",  # a quote mid-path breaks the literal
+    "git -C .claude checkout HEAD -- settings.json",  # -C sets dir; path is a split token
+]
+
+
+@pytest.mark.parametrize("cmd", _SURFACE_PATH_IDENTITY_BYPASSES)
+def test_active_blocks_surface_path_identity_bypasses(tmp_path: Path, cmd: str) -> None:
+    _activate(tmp_path)
+    assert guard.evaluate("Bash", _bash(cmd), tmp_path).allow is False, cmd
+
+
+def test_active_blocks_surface_cwd_and_basename_variants(tmp_path: Path) -> None:
+    # The cwd-tracking + basename resolution must cover every surface, not just settings.json.
+    _activate(tmp_path)
+    for cmd in (
+        "cd .claude && printf '{}' > settings.local.json",
+        "cd .claude/hooks && printf '{}' > hooks.json",
+        "cd .cursor && printf '{}' > hooks.json",
+        "cd .codex && printf '{}' > hooks.json",
+    ):
+        assert guard.evaluate("Bash", _bash(cmd), tmp_path).allow is False, cmd
+
+
+_NON_SURFACE_SETTINGS_WRITES = [
+    "printf '{}' > .vscode/settings.json",  # a different tool's config, not our surface
+    "printf '{}' > config/settings.json",
+    "printf '{}' > ./settings.json",  # a bare settings.json at the worktree root
+    "cd build && printf '{}' > settings.json",  # resolves to build/settings.json
+]
+
+
+@pytest.mark.parametrize("cmd", _NON_SURFACE_SETTINGS_WRITES)
+def test_active_allows_non_surface_settings_writes(tmp_path: Path, cmd: str) -> None:
+    # False-positive guard: a settings.json NOT under .claude/.cursor/.codex is a different
+    # tool's file. Resolving path identity (vs substring-matching the basename) lets these
+    # through — the surface-directory ancestor is what distinguishes ours from theirs.
+    _activate(tmp_path)
+    assert guard.evaluate("Bash", _bash(cmd), tmp_path).allow is True, cmd
+
+
+def test_active_blocks_dotdot_laden_cd_then_surface_write(tmp_path: Path) -> None:
+    # REVIEW P0 re-probe: `cd .claude/../.claude` folds lexically back to `.claude`, so the
+    # later bare `settings.json` writes the surface. `PurePosixPath` does not collapse `..`
+    # on its own — the cd-target normalizer must, or the tracker discards it as an escape
+    # and the write slips through.
+    _activate(tmp_path)
+    assert (
+        guard.evaluate(
+            "Bash", _bash("cd .claude/../.claude && printf x > settings.json"), tmp_path
+        ).allow
+        is False
+    )
+
+
+def test_active_blocks_uncertain_cd_then_bare_config_write(tmp_path: Path) -> None:
+    # Block-biased fallback: when the cd target is unresolvable ($-expansion, ~, absolute,
+    # command substitution), a later write to a bare config basename MIGHT land on .claude/,
+    # so it is blocked rather than allowed. Closes the class, not just one spelling.
+    _activate(tmp_path)
+    for cmd in (
+        "cd $SOMEDIR && printf x > settings.json",
+        'cd "$HOME/proj" && printf x > settings.local.json',
+        "cd $(pwd) && printf x > hooks.json",
+        "cd ~ && printf x > settings.json",
+    ):
+        assert guard.evaluate("Bash", _bash(cmd), tmp_path).allow is False, cmd
+
+
+def test_active_allows_uncertain_cd_then_nonconfig_write(tmp_path: Path) -> None:
+    # The uncertain-cwd block-bias is scoped to config basenames — an unresolvable cd
+    # followed by a plain-file write is NOT a surface write and stays allowed.
+    _activate(tmp_path)
+    for cmd in ("cd $SOMEDIR && printf x > out.txt", "cd ~ && printf x > notes.md"):
+        assert guard.evaluate("Bash", _bash(cmd), tmp_path).allow is True, cmd
+
+
+def test_active_allows_dotdot_cd_staying_in_worktree_nonsurface(tmp_path: Path) -> None:
+    # A `..` that folds to a concrete NON-surface dir stays allowed — `build/../dist` == `dist`.
+    _activate(tmp_path)
+    assert (
+        guard.evaluate(
+            "Bash", _bash("cd build/../dist && printf x > settings.json"), tmp_path
+        ).allow
+        is True
+    )
+
+
+def test_permission_surface_write_resolves_cwd(tmp_path: Path) -> None:
+    # Direct unit check of the resolver: a bare basename with a .claude cwd is a surface
+    # write; the same basename at the root (cwd ".") is not.
+    from pathlib import PurePosixPath
+
+    assert guard._permission_surface_write("printf '{}' > settings.json", PurePosixPath(".claude"))
+    assert not guard._permission_surface_write("printf '{}' > settings.json", PurePosixPath("."))
+
+
+# --- REVIEW P0 (whack-a-mole close): general surface-mention backstop -------------------
+#
+# A textual guard over bash can always be out-spelled by one more path form. Rather than
+# enumerate each, a general backstop blocks any NON-read segment that still names a surface
+# DIRECTORY (`.claude`/`.cursor`/`.codex` as a substring of any token). These four classes
+# each evaded the precise resolver but all spell the surface dir in the segment.
+
+_SURFACE_MENTION_BYPASSES = [
+    "pushd .claude && printf x > settings.json",  # pushd/popd dir stack untracked
+    "CDPATH=.claude cd hooks && printf x > hooks.json",  # CDPATH search-path resolution
+    "env CDPATH=.claude cd hooks && printf x > hooks.json",  # env-prefixed CDPATH
+    "git --work-tree=.claude checkout HEAD -- settings.json",  # --work-tree, not -C
+    "git -C . -C .claude checkout HEAD -- settings.json",  # second -C ignored by resolver
+    "git --git-dir=.claude/x checkout HEAD -- settings.json",  # --git-dir
+    "exec {fd}>.claude//settings.json",  # dynamic-FD redirect
+    "exec 3<>.claude//settings.json && printf x >&3",  # <> read-write redirect
+    "{ printf x; } > .claude//settings.json",  # brace-group redirect
+]
+
+
+@pytest.mark.parametrize("cmd", _SURFACE_MENTION_BYPASSES)
+def test_active_blocks_surface_mention_backstop(tmp_path: Path, cmd: str) -> None:
+    _activate(tmp_path)
+    assert guard.evaluate("Bash", _bash(cmd), tmp_path).allow is False, cmd
+
+
+_SURFACE_BACKSTOP_ALLOWS = [
+    "cat .claude/settings.json",  # clean read
+    "jq . .claude/settings.json",
+    "grep foo .claude/settings.json",
+    "git diff",  # no surface reference at all
+    "git log -p .claude/settings.json",  # read-only git subcommand
+    "cat .claude/settings.json > /tmp/backup",  # surface is the redirect SOURCE
+    "printf x > .vscode/settings.json",  # a different tool's file (no .claude dir)
+    "cd build/../dist && printf x > settings.json",  # resolves to dist/, concrete non-surface
+    "cd $VAR && printf x > out.txt",  # uncertain cwd but non-config write
+]
+
+
+@pytest.mark.parametrize("cmd", _SURFACE_BACKSTOP_ALLOWS)
+def test_active_backstop_keeps_clean_reads_and_non_surface_allowed(
+    tmp_path: Path, cmd: str
+) -> None:
+    # The backstop must NOT reintroduce the false positives the precise logic correctly
+    # allows — clean reads of the surface, and non-surface writes.
+    _activate(tmp_path)
+    assert guard.evaluate("Bash", _bash(cmd), tmp_path).allow is True, cmd
+
+
+# --- REVIEW P0 (final): command-substitution masking of the clean-read exception ---------
+#
+# A read-only LEADING command (`cat`) classifies the whole segment as a clean read, masking
+# a write hidden INSIDE a `$(...)` / backtick substitution. Since we cannot prove the
+# substituted command is read-only, a surface mention inside a segment carrying `$(`/backtick
+# voids the clean-read exception → block-biased.
+
+_SURFACE_CMDSUBST_BYPASSES = [
+    "cat $(truncate -s 0 .claude/settings.json) </dev/null",  # write masked by leading cat
+    "echo $(printf x > .claude/settings.json)",  # redirect-into-surface inside $()
+    "grep foo $(tee .claude/settings.json)",  # tee write inside $()
+    "cat `sed -i s/a/b/ .claude/settings.json`",  # backtick form
+    "cat $(ls .claude/settings.json)",  # technically a read, but block-biased (contrived)
+]
+
+
+@pytest.mark.parametrize("cmd", _SURFACE_CMDSUBST_BYPASSES)
+def test_active_blocks_surface_in_command_substitution(tmp_path: Path, cmd: str) -> None:
+    _activate(tmp_path)
+    assert guard.evaluate("Bash", _bash(cmd), tmp_path).allow is False, cmd
+
+
+_SURFACE_CMDSUBST_ALLOWS = [
+    "cat .claude/settings.json",  # no substitution → clean read
+    "jq . .claude/settings.json",
+    "grep foo .claude/settings.json",
+    "git diff",
+    "cat .claude/settings.json > /tmp/backup",  # surface is the redirect SOURCE
+    "echo $(date) > /tmp/x",  # substitution WITHOUT a surface mention → allowed
+]
+
+
+@pytest.mark.parametrize("cmd", _SURFACE_CMDSUBST_ALLOWS)
+def test_active_cmdsubst_keeps_clean_reads_allowed(tmp_path: Path, cmd: str) -> None:
+    # A substitution with no surface mention, and reads without substitution, stay allowed.
+    _activate(tmp_path)
+    assert guard.evaluate("Bash", _bash(cmd), tmp_path).allow is True, cmd
+
+
+def test_active_blocks_noclobber_override_redirect(tmp_path: Path) -> None:
+    # REVIEW P1: `>|` (bash noclobber override) split at the pipe, separating the redirect
+    # token from the surface path so neither segment matched. Normalizing `>|`→`>` before
+    # the segment split keeps the redirect target visible to the surface check.
+    _activate(tmp_path)
+    assert (
+        guard.evaluate("Bash", _bash("echo '{}' >| .claude/settings.json"), tmp_path).allow is False
+    )
+
+
+_SURFACE_READS = [
+    "cat .claude/settings.json",
+    "head -n 5 .claude/settings.json",
+    "tail -f .claude/settings.json",
+    "grep deny .claude/settings.json",
+    "jq . .claude/settings.json",
+    "git diff .claude/settings.json",
+    "git log -p .claude/settings.json",
+    "cat .claude/settings.json > /tmp/backup",  # surface is the redirect SOURCE, not target
+]
+
+
+@pytest.mark.parametrize("cmd", _SURFACE_READS)
+def test_active_allows_permission_surface_reads(tmp_path: Path, cmd: str) -> None:
+    # The read-only allowlist must stay green — the Phase-2 false positive (blocking a
+    # `cat`) is exactly what the inverted rule must NOT reintroduce.
+    _activate(tmp_path)
+    assert guard.evaluate("Bash", _bash(cmd), tmp_path).allow is True, cmd
+
+
+# --- REVIEW P0 (final): `less` write-flag + write-output-flag backstop -------------------
+#
+# `less -o`/`-O <file>` writes its output, so `less` is removed from the read-only allowlist
+# entirely (it is the only member with a write flag, and nobody needs it in an autonomous
+# chain). A write-capable output flag near any allowlisted command also voids the clean-read
+# exception, belt-and-suspenders against a future allowlist member with such a flag.
+
+_SURFACE_WRITE_FLAG_BLOCKS = [
+    "less -O .claude/settings.json /etc/hosts",  # -O writes the surface
+    "less -o .claude/settings.json x",  # -o writes the surface
+    "grep --output=.claude/settings.json foo",  # defensive: --output near a surface
+    "less .claude/settings.json",  # plain less now blocks too (deliberate conservative)
+]
+
+
+@pytest.mark.parametrize("cmd", _SURFACE_WRITE_FLAG_BLOCKS)
+def test_active_blocks_write_flag_near_surface(tmp_path: Path, cmd: str) -> None:
+    _activate(tmp_path)
+    assert guard.evaluate("Bash", _bash(cmd), tmp_path).allow is False, cmd
+
+
+_SURFACE_NONWRITE_FLAG_ALLOWS = [
+    "head -20 .claude/settings.json",  # numeric flag, not a write flag
+    "tail -5 .claude/settings.json",
+    "grep -n deny .claude/settings.json",  # -n line-number, not in-place
+]
+
+
+@pytest.mark.parametrize("cmd", _SURFACE_NONWRITE_FLAG_ALLOWS)
+def test_active_allows_nonwrite_flag_reads(tmp_path: Path, cmd: str) -> None:
+    # Read-only flags (`-20`/`-5`/`-n`) must NOT trip the write-output-flag void.
+    _activate(tmp_path)
+    assert guard.evaluate("Bash", _bash(cmd), tmp_path).allow is True, cmd
 
 
 # --- REVIEW P1-2 / P2-1 / P2-2: rm-escape bypasses closed ------------------------

@@ -3,9 +3,10 @@
 PLAN-test-fidelity-gap Phase 0. Verifies that the renderer-produced
 hooks.json files pass each IDE's expected parser shape:
 
-- `.claude/hooks/hooks.json` — Claude Code: PascalCase event keys
+- `.claude/settings.json` (hooks block) — Claude Code: PascalCase event keys
   (`PreToolUse`/`PostToolUse`/`Stop`/`PreCompact`) + nested
-  `{matcher?, hooks: [{type: "command", command, timeout?}]}` shape.
+  `{matcher?, hooks: [{type: "command", command, timeout?}]}` shape. (The old
+  `.claude/hooks/hooks.json` is retired — Claude Code never read it, ADR-005.)
 - `.cursor/hooks.json` — Cursor: lowercase camelCase event keys
   (`preToolUse`/`postToolUse`/`stop`/`preCompact`) + top-level
   `version: 1` + flat `{matcher?, command, timeout?}` shape.
@@ -53,18 +54,22 @@ INTEGRATION_GATE = pytest.mark.skipif(
 def test_claude_hooks_json_pascalcase_and_nested(
     rendered_harness_all_targets: Path,
 ) -> None:
-    """`.claude/hooks/hooks.json` matches Claude Code's expected schema.
+    """`.claude/settings.json`'s hooks block matches Claude Code's expected schema.
 
-    Asserts: parseable JSON; every event key is PascalCase from the
-    allow-list; every entry has the nested ``{matcher?, hooks: [...]}``
-    shape (NOT the flat Cursor shape).
+    `.claude/hooks/hooks.json` is retired (ADR-005) — Claude Code reads project
+    hooks ONLY from settings.json. The PascalCase-nested schema now lives there.
+    Asserts: parseable JSON; every event key is PascalCase from the allow-list;
+    every entry has the nested ``{matcher?, hooks: [...]}`` shape (NOT flat Cursor).
     """
-    path = rendered_harness_all_targets / ".claude" / "hooks" / "hooks.json"
+    path = rendered_harness_all_targets / ".claude" / "settings.json"
     assert path.is_file(), f"renderer did not produce {path}"
+    assert not (rendered_harness_all_targets / ".claude" / "hooks" / "hooks.json").is_file(), (
+        "the retired .claude/hooks/hooks.json must no longer be rendered"
+    )
 
     parsed = parse_claude_hooks_json(path.read_text(encoding="utf-8"))
-    # At least one event must be present — the template seeds PostToolUse +
-    # PreToolUse + PreCompact at minimum (verified in template body).
+    # At least one event must be present — settings seeds PostToolUse +
+    # PreToolUse + Stop + PreCompact at minimum.
     assert parsed["hooks"], "hooks dict must be non-empty"
 
 
@@ -94,9 +99,11 @@ def test_claude_and_cursor_hooks_are_byte_disjoint(
 
     Catches the silent-collapse failure mode where one render path is
     accidentally pointed at both targets — they'd produce identical bytes,
-    which would mean one IDE is reading the wrong schema.
+    which would mean one IDE is reading the wrong schema. Claude's hooks now
+    live in `.claude/settings.json` (the retired `.claude/hooks/hooks.json`
+    is no longer rendered, ADR-005); Cursor's stay in `.cursor/hooks.json`.
     """
-    claude_path = rendered_harness_all_targets / ".claude" / "hooks" / "hooks.json"
+    claude_path = rendered_harness_all_targets / ".claude" / "settings.json"
     cursor_path = rendered_harness_all_targets / ".cursor" / "hooks.json"
     assert claude_path.read_bytes() != cursor_path.read_bytes(), (
         "Claude + Cursor hooks files have identical bytes — dual-render contract "

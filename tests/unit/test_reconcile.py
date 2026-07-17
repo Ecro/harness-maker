@@ -639,3 +639,61 @@ def test_backup_after_full_render_preserves_cursor_user_modifications(tmp_path: 
     bdir = backup(target_dir)
     backup_mdc = bdir / ".cursor" / "rules" / "harness.mdc"
     assert backup_mdc.read_text(encoding="utf-8") == "# user override\n"
+
+
+# ── PLAN-permission-deny-and-hooks-wiring Phase 4 / ADR-005 ──────────────────
+# The retired `.claude/hooks/hooks.json` must never be auto-deleted by the
+# manifest-hash match — a user hook that a prior merge folded into the file has
+# its MERGED hash recorded in the manifest, so ours-clean would delete it.
+
+
+def test_sweep_never_deletes_hooks_json_with_user_hook(tmp_path: Path) -> None:
+    """P0 regression: user-authored hooks.json survives sweep even when its
+    merged hash is recorded in the manifest and the FileSpec is gone."""
+    import hashlib
+
+    from harness_maker.reconcile import _SWEEP_NEVER_DELETE, sweep_orphans
+
+    assert ".claude/hooks/hooks.json" in _SWEEP_NEVER_DELETE
+
+    project = tmp_path
+    hooks_dir = project / ".claude" / "hooks"
+    hooks_dir.mkdir(parents=True)
+    # Merged file: template hooks PLUS a hand-wired user hook, exactly the shape
+    # `_merge_hooks_json` produces on a prior `make --update`.
+    merged = (
+        "{\n"
+        '  "hooks": {\n'
+        '    "PostToolUse": [\n'
+        '      {"matcher": "*", "hooks": [{"type": "command", "command": "MY-USER-HOOK"}]}\n'
+        "    ]\n"
+        "  },\n"
+        '  "preset": "Side"\n'
+        "}\n"
+    )
+    hooks_json = hooks_dir / "hooks.json"
+    hooks_json.write_bytes(merged.encode("utf-8"))
+    merged_hash = hashlib.sha256(merged.encode("utf-8")).hexdigest()
+
+    # Manifest records the MERGED hash under the file's rel-key — the bug trigger.
+    manifest = project / ".claude" / ".hm-render-manifest.jsonl"
+    manifest.write_text(
+        json.dumps(
+            {
+                "content_hash": merged_hash,
+                "path": ".claude/hooks/hooks.json",
+                "timestamp": "2026-07-17T00:00:00+00:00",
+            },
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    # Blueprint WITHOUT the hooks FileSpec (Phase 4 removed it).
+    bp = Blueprint(files=[FileEntry(path=Path("settings.json"), template="settings/Side.json.j2")])
+    report = sweep_orphans(project, bp)
+
+    assert hooks_json.exists(), "user-authored hooks.json must survive the sweep"
+    assert "MY-USER-HOOK" in hooks_json.read_text(encoding="utf-8")
+    assert Path(".claude/hooks/hooks.json") not in report.deleted

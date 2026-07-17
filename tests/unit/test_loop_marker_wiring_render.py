@@ -32,8 +32,10 @@ def rendered_root(tmp_path_factory: pytest.TempPathFactory) -> Path:
 
 
 @pytest.fixture(scope="module")
-def hooks_json(rendered_root: Path) -> str:
-    return (rendered_root / "hooks" / "hooks.json").read_text(encoding="utf-8")
+def settings_json(rendered_root: Path) -> str:
+    # `.claude/hooks/hooks.json` is retired (ADR-005): Claude Code reads project hooks
+    # ONLY from settings.json, where the SessionStart sessionid_envfile hook now lives.
+    return (rendered_root / "settings.json").read_text(encoding="utf-8")
 
 
 @pytest.fixture(scope="module")
@@ -46,10 +48,10 @@ def plan_md(rendered_root: Path) -> str:
     return (rendered_root / "commands" / "hm" / "plan.md").read_text(encoding="utf-8")
 
 
-def test_sessionstart_hook_registered(hooks_json: str) -> None:
+def test_sessionstart_hook_registered(settings_json: str) -> None:
     """C1: the SessionStart hook that sets HM_SESSION_ID must be registered."""
-    assert "sessionid_envfile" in hooks_json, (
-        "hooks.json must register harness_maker.hooks.sessionid_envfile on "
+    assert "sessionid_envfile" in settings_json, (
+        "settings.json must register harness_maker.hooks.sessionid_envfile on "
         "SessionStart, else HM_SESSION_ID is never set and the feature is dead"
     )
 
