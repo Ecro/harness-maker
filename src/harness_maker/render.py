@@ -167,6 +167,13 @@ _SETTINGS_KEYS_OWNED_BY_HARNESS: frozenset[str] = frozenset(
         "statusLine",  # written by <=0.3.x; template no longer emits it
         "preset",
         "permissions",
+        # Claude Code reads project hooks ONLY from settings files — a plain
+        # project's `.claude/hooks/hooks.json` is never loaded (hooks.md's
+        # location table; that path is valid for a PLUGIN bundle only).
+        # Confirmed by controlled experiment 2026-07-17: the same commands fired
+        # from settings.json and not from `.claude/hooks/hooks.json`.
+        # Owned, but DEEP-merged — see `_shallow_merge_existing_json`.
+        "hooks",
     }
 )
 
@@ -232,9 +239,13 @@ def _shallow_merge_existing_json(
     Previously-owned harness-maker keys absent from new_data are removed so
     stale keys don't linger after a template drops them.
 
-    ``permissions`` is the one nested key with a documented deep-merge: list
-    sub-keys (allow/deny/ask) union via ``_merge_permissions`` so user-added
-    deny patterns survive re-render.
+    Two nested keys have a documented deep-merge:
+
+    * ``permissions`` — list sub-keys (allow/deny/ask) union via
+      ``_merge_permissions`` so user-added deny patterns survive re-render.
+    * ``hooks`` — per-event union via ``_merge_hooks_json`` (nested/Claude
+      schema) so user-authored hooks survive while retired harness hooks are
+      dropped. A shallow replace here would wipe every user hook on re-render.
     """
     existing: dict[str, Any] = {}
     if out.exists():
@@ -254,6 +265,14 @@ def _shallow_merge_existing_json(
     existing_perms = existing.get("permissions")
     if isinstance(new_perms, dict) and isinstance(existing_perms, dict):
         merged["permissions"] = _merge_permissions(existing_perms, new_perms)
+    new_hooks = new_data.get("hooks")
+    existing_hooks = existing.get("hooks")
+    if isinstance(new_hooks, dict) and isinstance(existing_hooks, dict):
+        merged["hooks"] = _merge_hooks_json(
+            {"hooks": existing_hooks},
+            {"hooks": new_hooks},
+            schema="nested",
+        )["hooks"]
     for key in _SETTINGS_KEYS_OWNED_BY_HARNESS:
         if key not in new_data:
             merged.pop(key, None)
@@ -618,6 +637,12 @@ def _normalize_hm_managed_command(cmd: str) -> str:
     return f"<HM>:{m.group('invocation')}"
 
 
+# Joins a matcher group's normalized commands into the identity tuple's command
+# slot. ASCII Unit Separator — cannot occur in a real shell command, so it can
+# never collide with command text.
+_IDENT_CMD_SEP = "\x1f"
+
+
 def _entry_identity(
     entry: Any,  # noqa: ANN401 — JSON entries are heterogeneous
     *,
@@ -626,9 +651,19 @@ def _entry_identity(
     """Compute a hooks.json entry's identity tuple for dedup; None on malformed.
 
     Returns:
-      - nested (Claude/Codex): ``(matcher_or_empty, normalized_command, hooks[0]['type'])``
+      - nested (Claude/Codex): ``(matcher_or_empty, <every normalized command in
+        the group, joined by _IDENT_CMD_SEP>, hooks[0]['type'])``
       - flat (Cursor): ``(matcher_or_empty, normalized_command, "")`` — third slot
         always empty so both schemas share a single tuple type for set ops.
+
+    **Why all commands, not just ``hooks[0]``** (ADR-008 of
+    PLAN-permission-deny-and-hooks-wiring): a matcher group holds N commands —
+    e.g. settings.json's Stage-1 SessionStart group carries both
+    ``sessionid_envfile`` and ``autopilot_autoarm``. Keying on the first command
+    alone made a group whose *later* commands differ look identical to the
+    shipped one, so the merge classified it as "already shipped" and replaced the
+    group wholesale. When a user had appended their own command to one of our
+    groups, that dropped the user's command with it — a silent data loss.
 
     The command portion is normalized via ``_normalize_hm_managed_command``
     so harness-maker-managed entries dedup correctly across cache-version
@@ -649,21 +684,60 @@ def _entry_identity(
         hooks_list = entry.get("hooks")
         if not isinstance(hooks_list, list) or not hooks_list:
             return None
+        norm_cmds: list[str] = []
+        for h in hooks_list:
+            if not isinstance(h, dict):
+                return None
+            cmd_val = h.get("command")
+            if not isinstance(cmd_val, str):
+                return None
+            norm_cmds.append(_normalize_hm_managed_command(cmd_val))
         first = hooks_list[0]
-        if not isinstance(first, dict):
-            return None
-        cmd_val = first.get("command")
-        if not isinstance(cmd_val, str):
-            return None
         type_val = first.get("type", "command")
         if not isinstance(type_val, str):
             return None
-        return (matcher_val, _normalize_hm_managed_command(cmd_val), type_val)
+        return (matcher_val, _IDENT_CMD_SEP.join(norm_cmds), type_val)
     # flat (Cursor)
     flat_cmd = entry.get("command")
     if not isinstance(flat_cmd, str):
         return None
     return (matcher_val, _normalize_hm_managed_command(flat_cmd), "")
+
+
+def _strip_shipped_commands(
+    entry: Any,  # noqa: ANN401 — JSON entries are heterogeneous
+    shipped_cmds: set[str],
+    *,
+    schema: Literal["nested", "flat"],
+) -> Any | None:  # noqa: ANN401
+    """Drop commands the template already ships from a preserved user entry.
+
+    Returns None when nothing would remain (the caller then omits the entry).
+
+    Only ``<HM>:``-normalized commands can match ``shipped_cmds``, so a user's own
+    command is never removed here. Flat (Cursor) entries hold a single command and
+    are returned unchanged — a flat entry whose only command is shipped already
+    dedups on the identity check before this runs.
+    """
+    if schema == "flat":
+        return entry
+    hooks_list = entry.get("hooks")
+    if not isinstance(hooks_list, list):
+        return entry
+    kept = [
+        h
+        for h in hooks_list
+        if not (
+            isinstance(h, dict)
+            and isinstance(h.get("command"), str)
+            and _normalize_hm_managed_command(h["command"]) in shipped_cmds
+        )
+    ]
+    if not kept:
+        return None
+    if len(kept) == len(hooks_list):
+        return entry
+    return {**entry, "hooks": kept}
 
 
 def _merge_hooks_json(
@@ -710,11 +784,39 @@ def _merge_hooks_json(
             if ident is not None:
                 shipped_identities.add(ident)
 
+        shipped_cmds: set[str] = set()
+        for e in new_entries:
+            ident = _entry_identity(e, schema=schema)
+            if ident is not None:
+                shipped_cmds.update(ident[1].split(_IDENT_CMD_SEP))
+
         user_entries: list[Any] = []
         for e in existing_entries:
             ident = _entry_identity(e, schema=schema)
-            if ident is not None and ident not in shipped_identities:
-                user_entries.append(e)
+            if ident is None or ident in shipped_identities:
+                continue
+            # NOTE — there is deliberately NO "retire" branch here (REVIEW round 1).
+            # A draft dropped any entry whose commands all normalize to `<HM>:`, on
+            # the theory that a harness hook absent from the template is retired.
+            # `<HM>:` marks our *namespace*, not our *authorship*: a user who
+            # hand-wires `python -m harness_maker.gates.permission_gate` — a module
+            # the staged rollout deliberately does not ship yet — would have it
+            # silently deleted. The staged rollout itself creates that population.
+            # The rule also bought nothing here: retirement only matters once a
+            # template STOPS shipping something, which no current template does.
+            # When it does (a dev_mode flip retiring spec_gate), gate it on positive
+            # provenance — a prior-render manifest — not on a forgeable prefix.
+            #
+            # A MIXED group (our command(s) + the user's) is theirs — preserve it.
+            # But appending it verbatim beside the shipped group would register our
+            # command TWICE for the same event, so it fires twice: exactly the
+            # duplication `_normalize_hm_managed_command` exists to prevent (the
+            # 2026-05-28 spoton triplication). Reachable in practice because Claude
+            # Code's `/hooks` UI appends into an existing matcher group. So keep the
+            # user's commands and drop only the ones the template already ships.
+            trimmed = _strip_shipped_commands(e, shipped_cmds, schema=schema)
+            if trimmed is not None:
+                user_entries.append(trimmed)
 
         merged_hooks[event] = list(new_entries) + user_entries
 

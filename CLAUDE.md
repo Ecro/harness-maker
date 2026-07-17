@@ -65,7 +65,9 @@ harness-maker 는 **triple plugin** — 세 marketplace 모두에 등록 가능:
 - `skills/<name>/SKILL.md` — Anthropic SKILL.md 표준, 양쪽 공유 (loose md 금지)
 - `agents/<name>.md` — sub-agent 정의, 양쪽 공유
 - `commands/<name>.md` — 슬래시 명령, 양쪽 공유
-- `hooks/hooks.json` — **Hook schema diverges by design**: Cursor IDE reads `.cursor/hooks.json` (lowercase camelCase + `version: 1`); Claude Code reads `.claude/hooks/hooks.json` (PascalCase + nested `{hooks:[],matcher:}`). Each IDE owns its own file with its own native schema. Verified empirically via kairos 0.5.7 metrics forensic 2026-05-08 (`tests/cursor-compat/results-2026-05-08.md`). Do NOT collapse to single source — Cursor 2.4+ hooks-compat docs apply to CLI only, IDE reads the dedicated `.cursor/` location.
+- `hooks/hooks.json` (at the **plugin root**) — the plugin bundle's own hooks. This is a real, documented Claude Code hook location and it is why `sessionstart_drift` works. Do NOT confuse it with the rendered `.claude/hooks/hooks.json` (see below).
+- **Hook schema diverges by design**: Cursor IDE reads `.cursor/hooks.json` (lowercase camelCase + `version: 1`); Codex reads `.codex/hooks.json`. Each IDE owns its own file with its own native schema. Verified empirically via kairos 0.5.7 metrics forensic 2026-05-08 (`tests/cursor-compat/results-2026-05-08.md`). Do NOT collapse to single source — Cursor 2.4+ hooks-compat docs apply to CLI only, IDE reads the dedicated `.cursor/` location.
+  > **⚠️ Corrected 2026-07-17.** This line used to say "**Claude Code reads `.claude/hooks/hooks.json`** (PascalCase + nested)". **False.** Claude Code reads project hooks **only** from settings files (`hooks.md`'s location table); `hooks/hooks.json` is a *plugin-bundle* path. Every hook harness-maker rendered to `.claude/hooks/hooks.json` was dead **in Claude Code** — Cursor and Codex were unaffected. The claim came from the 2026-05-08 forensic, which asked only "does Cursor read `.cursor/hooks.json`?" (yes) and never checked the Claude half; the untested half became this assertion. Refuted by controlled experiment on 2026-07-17 — see `[wiki:architecture] hooks-load-from-settings-not-hooksjson`. Claude hooks now render into `.claude/settings.json`'s `hooks` key (PLAN-permission-deny-and-hooks-wiring).
 - `rules/<name>.mdc` — Cursor 전용 (Claude Code 미사용)
 - `mcp.json` — MCP server 정의, 양쪽 공유
 - `lib/` — 내부 헬퍼
@@ -78,7 +80,8 @@ harness-maker 는 **triple plugin** — 세 marketplace 모두에 등록 가능:
 - `.claude/agents/<name>.md` — sub-agent (Cursor 도 native 로 읽음)
 - `.claude/skills/<name>/SKILL.md` — skill (양쪽 표준 호환)
 - `.claude/commands/hm/<name>.md` — `/hm:` 슬래시 명령
-- `.claude/hooks/hooks.json` — hook 정의 (Cursor IDE 인식은 Phase 1 검증)
+- `.claude/settings.json` — permissions + preset + **`hooks`** (Claude Code 가 프로젝트 hook 을 읽는 **유일한** 위치. harness-owned 이지만 deep-merge — 사용자 hook 보존)
+- `.claude/hooks/hooks.json` — ⚠️ **Claude Code 가 읽지 않음** (2026-07-17 실험으로 확정). 아직 렌더되지만 dead weight — 은퇴는 후속 phase. 새 hook 은 여기 추가하지 말 것.
 - `.claude/lib/`, `.claude/observability/`
 - `.worktrees/` (gitignored)
 

@@ -1,7 +1,64 @@
+{#- Claude Code reads project hooks ONLY from settings files. A plain project's
+    `.claude/hooks/hooks.json` is NOT a hook-config location — that path is valid
+    for a PLUGIN bundle only (hooks.md's location table). Confirmed by controlled
+    experiment 2026-07-17: the same commands fired from settings.json and not from
+    `.claude/hooks/hooks.json`, in the same session and repo.
+
+    ADR-006 staging (PLAN-permission-deny-and-hooks-wiring): Stage 1 ships the
+    NON-BLOCKING hooks only. Stage 2 (loop_gate, autopilot_guard) and Stage 3
+    (permission_gate, worktree_gate, spec_gate — all of which can block a tool
+    call and have never executed in Claude Code) land in later phases.
+
+    ADR-010: `sessionstart_drift` is deliberately absent — the plugin bundle
+    (`hooks/hooks.json` at plugin root) already fires it; rendering it here too
+    would double-register it for plugin users.
+
+    Schema is Claude's: PascalCase event keys + nested {matcher?, hooks:[...]}.
+    Cursor (.cursor/hooks.json) and Codex (.codex/hooks.json) own their own files
+    with their own schemas — do NOT collapse them into this one.
+-#}
 {
   "permissions": {
     "allow": ["Read", "Bash(uv:*)", "Bash(pytest:*)", "Bash(git:*)"{% if config.second_opinion and 'codex' in config.second_opinion.models %}, "Bash(codex exec:*)"{% endif %}{% if config.second_opinion and 'antigravity' in config.second_opinion.models %}, "Bash(agy --print --sandbox:*)"{% endif %}],
     "deny": {% if config.permissions.deny_dangerous %}["Bash(rm:*)", "Bash(curl * | sh)", "Write(/etc/**)", "Write(~/.ssh/**)"]{% else %}[]{% endif %}
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {"type": "command", "command": "uv run --with '{{ harness_maker_src_path }}' python -m harness_maker.telemetry", "timeout": 5}
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {"type": "command", "command": "uv run --with '{{ harness_maker_src_path }}' python -m harness_maker.hooks.post_write_reminder", "timeout": 5}
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "auto",
+        "hooks": [
+          {"type": "command", "command": "uv run --with '{{ harness_maker_src_path }}' python -m harness_maker.hooks.flush_session", "timeout": 30, "statusMessage": "Snapshotting autoloop progress..."}
+        ]
+      },
+      {
+        "matcher": "manual",
+        "hooks": [
+          {"type": "command", "command": "uv run --with '{{ harness_maker_src_path }}' python -m harness_maker.hooks.flush_session", "timeout": 30, "statusMessage": "Snapshotting autoloop progress..."}
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {"type": "command", "command": "uv run --with '{{ harness_maker_src_path }}' python -m harness_maker.hooks.sessionid_envfile"},
+          {"type": "command", "command": "uv run --with '{{ harness_maker_src_path }}' python -m harness_maker.hooks.autopilot_autoarm"}
+        ]
+      }
+    ]
   },
   "preset": "{{ preset }}"
 }

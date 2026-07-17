@@ -1,4 +1,48 @@
+{#- See settings/Production.json.j2's header for the full rationale. In short:
+    Claude Code reads project hooks ONLY from settings files — a plain project's
+    `.claude/hooks/hooks.json` is never loaded (that path is for a PLUGIN bundle).
+    Stage 1 = non-blocking hooks only (ADR-006); `sessionstart_drift` is excluded
+    because the plugin bundle already fires it (ADR-010).
+-#}
 {
   "permissions": {"allow": ["Read", "Bash(uv:*)", "Bash(pytest:*)"{% if config.second_opinion and 'codex' in config.second_opinion.models %}, "Bash(codex exec:*)"{% endif %}{% if config.second_opinion and 'antigravity' in config.second_opinion.models %}, "Bash(agy --print --sandbox:*)"{% endif %}], "deny": {% if config.permissions.deny_dangerous %}["Bash(rm:*)", "Bash(curl * | sh)", "Write(/etc/**)", "Write(~/.ssh/**)"]{% else %}[]{% endif %}},
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {"type": "command", "command": "uv run --with '{{ harness_maker_src_path }}' python -m harness_maker.telemetry", "timeout": 5}
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {"type": "command", "command": "uv run --with '{{ harness_maker_src_path }}' python -m harness_maker.hooks.post_write_reminder", "timeout": 5}
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "auto",
+        "hooks": [
+          {"type": "command", "command": "uv run --with '{{ harness_maker_src_path }}' python -m harness_maker.hooks.flush_session", "timeout": 30, "statusMessage": "Snapshotting autoloop progress..."}
+        ]
+      },
+      {
+        "matcher": "manual",
+        "hooks": [
+          {"type": "command", "command": "uv run --with '{{ harness_maker_src_path }}' python -m harness_maker.hooks.flush_session", "timeout": 30, "statusMessage": "Snapshotting autoloop progress..."}
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {"type": "command", "command": "uv run --with '{{ harness_maker_src_path }}' python -m harness_maker.hooks.sessionid_envfile"},
+          {"type": "command", "command": "uv run --with '{{ harness_maker_src_path }}' python -m harness_maker.hooks.autopilot_autoarm"}
+        ]
+      }
+    ]
+  },
   "preset": "{{ preset }}"
 }

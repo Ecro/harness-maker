@@ -2,6 +2,41 @@
 
 ## [Unreleased]
 
+### Fixed — Claude Code project hooks now actually fire (they never had)
+- **`settings.json` carries the hooks** (PLAN-permission-deny-and-hooks-wiring Phase 1,
+  ADR-006 Stage 1). Claude Code reads project hooks **only** from settings files — a plain
+  project's `.claude/hooks/hooks.json` is not a hook-config location (that path is valid for a
+  *plugin bundle* only). harness-maker had been rendering all 11 hook modules there, so in
+  **Claude Code** telemetry / `post_write_reminder` / `sessionid_envfile` / `autopilot_autoarm` /
+  `flush_session` / `loop_gate` / `autopilot_guard` / `permission_gate` / `worktree_gate` /
+  `spec_gate` never executed. `sessionstart_drift` was the sole survivor — the plugin bundle
+  ships it. **Cursor and Codex were unaffected**; their own hook files are live.
+  Confirmed by controlled experiment (2026-07-17): hand-adding two hooks to `settings.json` and
+  opening a new session flipped both `metrics-<today>.jsonl` and `HM_SESSION_ID` from a recorded
+  baseline, while the same commands in `.claude/hooks/hooks.json` fired nothing.
+  This phase ships the **5 non-blocking** hooks; the blocking gates are staged for later phases
+  (they can block tool calls and have never run in Claude Code). `.claude/hooks/hooks.json` is
+  still rendered — its retirement is a later phase.
+- **`hooks` is harness-owned but DEEP-merged** (ADR-008) — user-authored hooks in
+  `settings.json` survive re-render, mirroring the existing `permissions` deep-merge. A shallow
+  replace would have wiped them (CLAUDE.md checklist §1).
+- **`_entry_identity` keys on every command in a matcher group**, not just `hooks[0]` — a group
+  holds N commands (SessionStart carries 2), and the first-command-only key made a group whose
+  later commands differed look already-shipped, so it was replaced wholesale, taking any user
+  command inside it along.
+- **`_strip_shipped_commands`** — a preserved mixed (ours + user's) group keeps the user's
+  commands and drops only those the template already ships. Without it our command registers
+  twice and the hook fires twice: the 2026-05-28 spoton-triplication class.
+- **No retire/delete path**, deliberately: an earlier draft dropped entries whose commands all
+  normalized to the `<HM>:` harness namespace. Namespace ≠ authorship — the staged rollout does
+  not ship `loop_gate`/`permission_gate`/`spec_gate` yet, so a user who hand-wired one would have
+  had it silently deleted. Retirement will return with **positive provenance** when a template
+  actually stops shipping something.
+- **Quoted `{{ harness_maker_src_path }}`** in the rendered hook commands — an install path
+  containing a space (plausible on WSL2) would word-split and fail every hook at session start.
+- **Docs corrected**: CLAUDE.md's "Claude Code reads `.claude/hooks/hooks.json`" claim was true
+  only for the plugin bundle's own `hooks/hooks.json`.
+
 ### Added — task-driven SPEC-relaxation hardened against flip-without-re-render
 - **`spec_need.py` runtime dev_mode self-guard** (PLAN-spec-optional-task-driven ADR-001):
   `op-check`/`waiver-check` short-circuit to satisfied/valid ONLY on a confident
