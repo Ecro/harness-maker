@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.41.0] — 2026-07-18
+
 ### Added — `autonomy.guard_when` (interactive-scope for the autopilot guard)
 - **New `autonomy.guard_when: always | pipeline_only`** (default `always`, opt-in). Under
   persistent autopilot (`autopilot_persistent: true`) the `.hm-autopilot` marker is armed
