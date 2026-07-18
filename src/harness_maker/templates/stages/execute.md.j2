@@ -1,5 +1,9 @@
 # Stage: execute
 
+{%- if not is_codex and config.autonomy.guard_when == "pipeline_only" %}
+{% include "agents/_partials/stage_start_autopilot.md.j2" %}
+{%- endif %}
+
 > Atomic stage. TDD machine driven by PLAN. Phase A → A.5 → B → C → D, with worktree isolation and **NO commits** (wrapup owns commits).
 {% if workflow_context %}
 > Invoked as part of the **{{ workflow_context }}** workflow.

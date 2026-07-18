@@ -190,6 +190,42 @@ def _extra_deny(project_dir: Path) -> list[str]:
     return []
 
 
+def _guard_when(project_dir: Path) -> str:
+    """Best-effort read of harness.yaml ``autonomy.guard_when`` (``always``|``pipeline_only``).
+
+    Absent/malformed/unknown → ``always`` (PLAN-autopilot-guard-interactive-scope): the guard
+    stays ON, the SAFE current behavior. Only an explicit ``pipeline_only`` opts a session's
+    guard into dormancy when no pipeline is in flight — a missing key can never silently
+    disable the guard (absent-case = feature-black-hole guard)."""
+    path = project_dir / ".claude" / "harness.yaml"
+    if not path.is_file():
+        return "always"
+    with contextlib.suppress(Exception):
+        from harness_maker.io_utils import load_harness_yaml
+
+        data = load_harness_yaml(path)
+        if isinstance(data, dict):
+            raw = data.get("autonomy", {})
+            if isinstance(raw, dict) and raw.get("guard_when") == "pipeline_only":
+                return "pipeline_only"
+    return "always"
+
+
+def _guard_dormant_for_interactive(project_dir: Path, session_id: str | None = None) -> bool:
+    """True when ``guard_when: pipeline_only`` AND no pipeline is in flight this session.
+
+    Shared by the PreToolUse ``evaluate`` and the Stop-hook backstop so both stand down in the
+    exact same condition: the persistent marker is armed (checked by the caller) but this is a
+    plain interactive session (no ``.hm-pipeline-active`` crumb for THIS ``session_id`` and no
+    loop marker), where the guard would be pure friction. ``session_id`` is the caller's Claude
+    session_id (from the hook payload) so a prior/parallel session's crumb reads as foreign.
+    Under the default ``always`` this is always False (guard unchanged).
+    """
+    return _guard_when(project_dir) == "pipeline_only" and not autopilot.pipeline_active(
+        project_dir, session_id=session_id
+    )
+
+
 def _tokenize_segment(segment: str) -> tuple[list[str], bool]:
     """(tokens, malformed). On an unclosed quote, fall back to a coarse whitespace split
     and flag malformed — the caller block-biases a malformed rm rather than letting it
@@ -615,9 +651,19 @@ def _bash_hit(command: str, extra_deny: list[str]) -> str | None:
     return None
 
 
-def evaluate(tool_name: str, tool_input: dict[str, Any], project_dir: Path) -> GateDecision:
+def evaluate(
+    tool_name: str,
+    tool_input: dict[str, Any],
+    project_dir: Path,
+    *,
+    session_id: str | None = None,
+) -> GateDecision:
     """Allow everything unless autopilot is active AND the call is never-auto."""
     if autopilot.active_marker(project_dir) is None:
+        return GateDecision(allow=True, matched="", message="")
+    if _guard_dormant_for_interactive(project_dir, session_id):
+        # Persistent marker armed, but a plain interactive session (no pipeline in flight) under
+        # guard_when=pipeline_only. The human is present to approve — stand down.
         return GateDecision(allow=True, matched="", message="")
     if tool_name == _BASH:
         command = tool_input.get("command")
@@ -666,6 +712,16 @@ def _resolve_root(payload: dict[str, Any]) -> Path:
     return autopilot.resolve_marker_root(start)
 
 
+def _payload_session_id(payload: dict[str, Any]) -> str | None:
+    """The caller's Claude ``session_id`` from a hook payload (str or None).
+
+    Both PreToolUse and Stop payloads carry it (same field ``loop_gate`` reads). It is threaded
+    into ``pipeline_active`` so the pipeline-active crumb is matched per-session (follow-up #1);
+    a non-str/absent value → None → the crumb's degraded-side block-bias keeps the guard armed."""
+    sid = payload.get("session_id")
+    return sid if isinstance(sid, str) else None
+
+
 def _stophook_reason(payload: dict[str, Any]) -> str | None:
     """Stop-hook backstop (P3): return a block reason while autopilot is active, else None.
 
@@ -676,7 +732,12 @@ def _stophook_reason(payload: dict[str, Any]) -> str | None:
     """
     if payload.get("stop_hook_active"):
         return None
-    if autopilot.active_marker(_resolve_root(payload)) is None:
+    root = _resolve_root(payload)
+    if autopilot.active_marker(root) is None:
+        return None
+    if _guard_dormant_for_interactive(root, _payload_session_id(payload)):
+        # Interactive session under guard_when=pipeline_only — let the human stop the turn
+        # instead of nagging "pipeline in progress" every turn end.
         return None
     # Descriptive, NOT imperative: the prompt-driven chainer (P6) is what actually
     # advances stages; until it lands, a "continue to the next stage" command would be
@@ -699,7 +760,9 @@ def _pretooluse(payload: dict[str, Any]) -> int:
     tool_name = str(payload.get("tool_name") or "")
     raw_input = payload.get("tool_input")
     tool_input = raw_input if isinstance(raw_input, dict) else {}
-    decision = evaluate(tool_name, tool_input, _resolve_root(payload))
+    decision = evaluate(
+        tool_name, tool_input, _resolve_root(payload), session_id=_payload_session_id(payload)
+    )
     if decision.message:
         print(decision.message, file=sys.stderr)
     return 0 if decision.allow else 2

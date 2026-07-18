@@ -1,5 +1,9 @@
 # Stage: spec
 
+{%- if not is_codex and config.autonomy.guard_when == "pipeline_only" %}
+{% include "agents/_partials/stage_start_autopilot.md.j2" %}
+{%- endif %}
+
 > Atomic stage. Acceptance-criteria specification via 6-category interview. Owns **what / why / verification**. `plan` owns **how / risk / phasing**.
 {% if workflow_context %}
 > Invoked as part of the **{{ workflow_context }}** workflow.

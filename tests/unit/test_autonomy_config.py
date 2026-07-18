@@ -186,7 +186,7 @@ def test_synthesize_render_reload_roundtrip(tmp_path: Path) -> None:
     answers_in = InterviewAnswers(
         preset=Preset.PRODUCTION,
         targets=[Target.CLAUDE_CODE],
-        autonomy=AutonomyConfig(level="auto_safe", step_cap=15),
+        autonomy=AutonomyConfig(level="auto_safe", step_cap=15, guard_when="pipeline_only"),
     )
     bp = synthesize(ProjectProfile(), answers_in)
     render(bp, tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
@@ -198,9 +198,10 @@ def test_synthesize_render_reload_roundtrip(tmp_path: Path) -> None:
     assert "auto_safe" in body
     restored = answers_from_harness_yaml(yaml_path)
     assert restored is not None
-    # Verify ALL 5 fields survive synth→render→reload, not just 2 (Reviewer B P1).
+    # Verify ALL 6 fields survive synth→render→reload, not just 2 (Reviewer B P1).
     assert restored.autonomy.level == "auto_safe"
     assert restored.autonomy.step_cap == 15
     assert restored.autonomy.time_cap_min == 300
     assert restored.autonomy.pipeline == DEFAULT_PIPELINE
     assert restored.autonomy.extra_deny == []
+    assert restored.autonomy.guard_when == "pipeline_only"

@@ -39,8 +39,10 @@ def test_typer_host_has_subcommands_but_guard_exempt() -> None:
 
 def test_autopilot_guarded_by_subcommands_not_shape() -> None:
     # validator R2-W2: guard scope is bool(subcommands) (and not typer), so autopilot's
-    # {on, off} are guarded regardless of parser shape.
-    assert cr.MODULES["autopilot"].subcommands == frozenset({"on", "off"})
+    # {on, off, pipeline-active} are guarded regardless of parser shape. pipeline-active
+    # (PLAN-autopilot-guard-interactive-scope) is the leading guard_when=pipeline_only crumb
+    # write, invoked from the stage-start partial.
+    assert cr.MODULES["autopilot"].subcommands == frozenset({"on", "off", "pipeline-active"})
     assert cr.MODULES["autopilot"].guarded is True
 
 

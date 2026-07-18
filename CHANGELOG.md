@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+### Added — `autonomy.guard_when` (interactive-scope for the autopilot guard)
+- **New `autonomy.guard_when: always | pipeline_only`** (default `always`, opt-in). Under
+  persistent autopilot (`autopilot_persistent: true`) the `.hm-autopilot` marker is armed
+  every session, so the `always` guard blocks never-auto ops + nags on Stop even in plain
+  interactive chats where no pipeline is running — pure friction. `pipeline_only` keeps the
+  guard **dormant** until a real pipeline stage starts this session, signalled by a leading
+  `.claude/.hm-pipeline-active` crumb (stamped at stage start) or an active `.hm-loop-*`
+  marker. A missing/typo'd key falls back to `always` (fail-safe — never a silent
+  guard-disable).
+- The crumb carries the **per-session `HM_SESSION_ID`** (not the project-scoped session uuid),
+  and the guard matches its own `session_id` from the hook payload — so a prior/parallel
+  session's crumb reads as foreign → dormant, with no clear-on-arm and no parallel
+  interference. Degraded (no id / unreadable crumb / `.claude` glob error) block-biases to
+  guarded, never a silent disarm.
+- To enable: set `autonomy.guard_when: pipeline_only` in `harness.yaml` and re-render.
+
 ## [0.40.2] — 2026-07-18
 
 ### Added — Stage-3 blocking gates wired into settings.json (Phases 3+4)

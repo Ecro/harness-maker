@@ -110,6 +110,7 @@ _HARNESS_CHURN_DIRS: tuple[str, ...] = (
 _HARNESS_CHURN_FILES: tuple[str, ...] = (
     ".claude/.hm-session-uuid",
     ".claude/.hm-autopilot",
+    ".claude/.hm-pipeline-active",  # guard_when=pipeline_only leading crumb (session churn)
     ".claude/.hm-render-manifest.jsonl",
     ".claude/.hm-sessions.json",  # Phase 1 (ADR-004): session registry — operational churn
     "work-docs/p5-batch-state.yaml",

@@ -1,5 +1,9 @@
 # Stage: wrapup
 
+{%- if not is_codex and config.autonomy.guard_when == "pipeline_only" %}
+{% include "agents/_partials/stage_start_autopilot.md.j2" %}
+{%- endif %}
+
 > Atomic stage. **Single commit owner**: integrates execute's staged changes + memory + PLAN status updates into ONE user-facing commit with Co-Authored-By: Claude.
 {% if workflow_context %}
 > Invoked as part of the **{{ workflow_context }}** workflow.

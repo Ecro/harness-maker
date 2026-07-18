@@ -785,6 +785,17 @@ class AutonomyConfig(BaseModel):
     # re-arms a fresh ``.hm-autopilot`` marker each session from the committed level/pipeline,
     # so the 18h TTL never trips in practice. The committed ``false`` is the real off-switch.
     autopilot_persistent: bool = False
+    # PLAN-autopilot-guard-interactive-scope: WHEN the autopilot_guard is allowed to fire.
+    # ``always`` (default) = today's behavior — the guard blocks never-auto ops + prevents Stop
+    # whenever the ``.hm-autopilot`` marker is active. But ``autopilot_persistent`` arms that
+    # marker on EVERY session start, so under ``always`` the guard also fires in plain
+    # INTERACTIVE Q&A sessions (marker armed, no pipeline running) — pure friction, since the
+    # human is present to approve. ``pipeline_only`` keeps the guard dormant until a pipeline
+    # stage has actually started THIS session (a ``.hm-pipeline-active`` crumb, or an active
+    # ``.hm-loop-*`` loop marker) — real auto-advancing runs stay fully guarded, interactive
+    # sessions stay quiet. Absent-case (old harness.yaml without the key) → ``always`` = the
+    # SAFE current behavior (guard stays on), never a silent guard-disable.
+    guard_when: Literal["always", "pipeline_only"] = "always"
 
     @field_validator("pipeline")
     @classmethod

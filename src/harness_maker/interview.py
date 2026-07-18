@@ -706,11 +706,22 @@ def _ask_autonomy() -> AutonomyConfig:
         _input_or_empty("  Persist across sessions (re-arm each session)? [y/N]: ").strip().lower()
     )
     persistent = persist_raw in {"y", "yes"}
+    # guard_when only matters when the marker is armed in sessions the user did not explicitly
+    # start a pipeline in — i.e. under persistence. Offer the pipeline_only scope there so the
+    # guard stays dormant in plain interactive chats (PLAN-autopilot-guard-interactive-scope).
+    guard_when: Literal["always", "pipeline_only"] = "always"
+    if persistent:
+        print("  Persistent autopilot arms the guard EVERY session — including plain interactive")
+        print("  chats where no pipeline runs (the guard's blocks are then pure friction).")
+        gw_raw = _input_or_empty("  Guard scope [always/pipeline_only] (always): ").strip().lower()
+        if gw_raw == "pipeline_only":
+            guard_when = "pipeline_only"
     return AutonomyConfig(
         level=level,
         step_cap=_ask_cap("step cap (chained stages)"),
         time_cap_min=_ask_cap("time cap (minutes)"),
         autopilot_persistent=persistent,
+        guard_when=guard_when,
     )
 
 
