@@ -15,9 +15,12 @@ irreversible op. git detection is word-tokenized (not adjacency-regex) so option
 prefixes like `git -c k=v push` / `git -C dir push` cannot slip past (REVIEW P1).
 Permission-surface writes are matched by RESOLVING the write target's path identity
 (cwd-tracked, normalized), not by a literal substring, so equivalent spellings of the
-same file cannot slip past; a general backstop then blocks ANY non-read segment that still
-names a surface directory, closing the path-spelling class as a whole rather than one
-spelling at a time (REVIEW P0 — see `_resolved_surface_write` + `_surface_mention_backstop`).
+same file cannot slip past; a general backstop then blocks ANY non-read segment that names a
+surface FILE (a surface DIR *and* a surface basename in the same segment), closing the
+path-spelling class as a whole rather than one spelling at a time (REVIEW P0 — see
+`_resolved_surface_write` + `_surface_mention_backstop`). It deliberately does NOT block a
+surface DIR alone (`~/.claude/plugins/`, `.claude/agents`, …) — that false positive bricked
+autopilot's own `uv run --with ~/.claude/plugins/...` helpers and dead-locked the Stop hook.
 The only residual is a write that never spells the surface path in the segment at all
 (reached by a script/binary, a runtime-assembled path, or a symlink) — unclosable by a
 textual guard; the worktree sandbox is the real boundary there.
@@ -578,6 +581,21 @@ def _surface_mention_backstop(segment: str) -> bool:
     inspection can see it. The worktree sandbox is the real boundary there."""
     tokens, _malformed = _tokenize_segment(segment)
     if not any(any(d in tok for d in _SURFACE_DIRS) for tok in tokens):
+        return False
+    # A surface DIRECTORY alone is NOT a permission surface — the protected files are the three
+    # surface basenames (settings.json / settings.local.json / hooks.json). A segment that names
+    # a surface dir but NO surface basename references a NON-surface path: the `~/.claude/plugins/`
+    # plugin cache that EVERY `uv run --with <plugin>` harness self-invocation carries, or
+    # `.claude/agents` / `.claude/lib` / `.claude/observability`, etc. Blocking those bricked
+    # autopilot's OWN boundary/cap/receipt helpers (all invoked via `uv run --with ~/.claude/
+    # plugins/...`) and dead-locked with the Stop-hook backstop. Requiring the basename keeps
+    # every real surface write blocked — each genuine spelling in the resolver's residual set
+    # (pushd/CDPATH/--work-tree/dynamic-FD/brace-group/cmd-subst) still spells a surface basename
+    # somewhere in the segment, and shlex folds quote-splits so `.claude/'settings.json'` yields a
+    # `settings.json` token. The only forms this now lets past are runtime-assembled paths
+    # (`.claude/$s`, glob `.claude/set*.json`) — already this module's declared-unclosable residual
+    # where the worktree sandbox is the real boundary, not a textual guard.
+    if not any(any(b in tok for b in _SURFACE_BASENAMES) for tok in tokens):
         return False
     # A surface named inside a command substitution can mask a write behind a read-only
     # leading command — the clean-read exception is void when `$(`/backtick is present.

@@ -103,6 +103,51 @@ def test_active_does_not_block_harness_self_call(tmp_path: Path) -> None:
     assert guard.evaluate("Bash", _bash(cmd), tmp_path).allow is True
 
 
+# --- REGRESSION: the `~/.claude/plugins/` cache path is NOT a permission surface ---------
+#
+# The real invocation of every harness helper is `uv run --with <plugin-path> python -m …`,
+# where <plugin-path> is `~/.claude/plugins/cache/harness-maker/...`. That path contains the
+# substring `.claude`, so the surface-mention backstop's OLD dir-only match classified it as
+# `permission-surface-write` and blocked it. Under an active autopilot marker this bricked
+# autopilot's OWN boundary/cap/receipt helpers (`autopilot_caps`, `worktree create`, …) and
+# dead-locked with the Stop-hook backstop. The self-call test above missed it because it used
+# a bare `uv run python …` with no `--with <plugin-path>` (CLAUDE.md checkpoint #8 blind spot).
+_PLUGIN_PATH = "/home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.41.0"
+_HARNESS_PLUGIN_SELF_CALLS = [
+    # the exact command danta ran when autopilot tried to auto-advance the plan stage
+    f"cd /home/noel/danta; uv run --with {_PLUGIN_PATH} "
+    "python -m harness_maker.autopilot_caps gate-blocked --root . --stage plan 2>&1; "
+    'echo "exit=$?"',
+    f"uv run --with {_PLUGIN_PATH} python -m harness_maker.worktree create execute .",
+    "uv run --with ~/.claude/plugins/foo python -m harness_maker.x",
+    "uv run pytest .claude/lib/test_foo.py",  # non-surface .claude/ subpath, no basename
+    "uv run python -m harness_maker.render .claude/agents",  # dir + non-surface subdir
+]
+
+
+@pytest.mark.parametrize("cmd", _HARNESS_PLUGIN_SELF_CALLS)
+def test_active_allows_plugin_cache_path_self_calls(tmp_path: Path, cmd: str) -> None:
+    # A surface DIR substring with NO surface basename (settings.json/hooks.json) is not a
+    # surface write — these must run under an active autopilot marker.
+    _activate(tmp_path)
+    assert guard.evaluate("Bash", _bash(cmd), tmp_path).allow is True, cmd
+
+
+_PLUGIN_PATH_STILL_BLOCKED = [
+    # the plugin path must NOT become a bypass: a segment that ALSO writes a real surface
+    # file (basename present) still blocks, whichever command carries the plugin `--with`.
+    f"uv run --with {_PLUGIN_PATH} python -c x && printf y > .claude/settings.json",
+    f"uv run --with {_PLUGIN_PATH} sed -i s/a/b/ .claude/settings.json",
+    f"cd .claude && uv run --with {_PLUGIN_PATH} python -m x; printf y > hooks.json",
+]
+
+
+@pytest.mark.parametrize("cmd", _PLUGIN_PATH_STILL_BLOCKED)
+def test_active_still_blocks_surface_write_alongside_plugin_path(tmp_path: Path, cmd: str) -> None:
+    _activate(tmp_path)
+    assert guard.evaluate("Bash", _bash(cmd), tmp_path).allow is False, cmd
+
+
 def test_active_allows_in_project_write(tmp_path: Path) -> None:
     _activate(tmp_path)
     assert guard.evaluate("Write", {"file_path": "src/foo.py"}, tmp_path).allow is True

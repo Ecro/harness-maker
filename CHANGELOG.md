@@ -2,6 +2,31 @@
 
 ## [Unreleased]
 
+## [0.41.1] — 2026-07-18
+
+### Fixed — autopilot guard false-blocked the `~/.claude/plugins/` cache path (deadlock)
+- **`_surface_mention_backstop` treated any `.claude`/`.cursor`/`.codex` DIRECTORY substring
+  as a permission surface.** Every harness helper runs via
+  `uv run --with ~/.claude/plugins/cache/harness-maker/... python -m harness_maker.<module>`,
+  and that plugin-cache path contains `.claude`, so under an active `.hm-autopilot` marker the
+  guard blocked autopilot's OWN boundary/cap/receipt helpers (`autopilot_caps`,
+  `worktree create`, …) as `permission-surface-write`. Auto-advance could not verify its
+  runaway cap → fell back to STOP, while the Stop-hook backstop refused to terminate → deadlock.
+  The same over-match blocked any Bash naming a non-surface `.claude/` subpath (`.claude/agents`,
+  `.claude/lib`, `.claude/observability`).
+- **Fix**: the backstop now blocks only when a segment names a surface **file** — a surface dir
+  **and** a surface basename (`settings.json` / `settings.local.json` / `hooks.json`) in the same
+  segment. Every real surface write still spells a basename (the resolver's residual set —
+  pushd/CDPATH/`--work-tree`/dynamic-FD/brace-group/cmd-subst — all do), so no tested attack
+  vector regresses; only runtime-assembled paths (`.claude/$s`, glob `.claude/set*.json`) are let
+  past, which were already the module's declared-unclosable residual (worktree sandbox is the real
+  boundary there).
+- **Regression tests**: the exact `uv run --with ~/.claude/plugins/...` self-calls are now
+  asserted allowed under an active marker (the prior self-call test missed this — it used a bare
+  `uv run python …` with no `--with <plugin-path>`, CLAUDE.md checkpoint #8 integration blind spot),
+  and surface writes carrying the plugin path alongside `settings.json`/`hooks.json` are asserted
+  still blocked.
+
 ## [0.41.0] — 2026-07-18
 
 ### Added — `autonomy.guard_when` (interactive-scope for the autopilot guard)
