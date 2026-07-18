@@ -1,10 +1,10 @@
 ---
 type: plan
 task_slug: permission-deny-and-hooks-wiring
-status: phases-1-8-complete
-phases_done: [1, 2, 3, 4, 5, 6, 7, 8]
+status: complete
+phases_done: [1, 2, 3, 4, 5, 6, 7, 8, 9]
 phases_parked: []
-phases_pending: [9]
+phases_pending: []
 parked_branch: hm/phase34-parked
 created: 2026-07-17
 reconstructed: 2026-07-17
@@ -777,6 +777,22 @@ harness-owned `hooks` key (**shipped**); `.claude/hooks/hooks.json` is retired (
 - **Rollback:** revert the Phase 8 commit.
 
 ### Phase 9 — Consumption canary + de-pin the polluted tests (ADR-009)
+- **Status:** DONE (2026-07-18). `tests/e2e/test_hook_consumption_canary.py` runs the real
+  `claude` binary against a freshly-`make`-rendered harness, forces a Read tool call, and
+  asserts a `post_tool_use` telemetry entry appears via `_metrics_io.iter_recent_entries` —
+  proving the settings.json PostToolUse hook actually FIRES in Claude Code (not just renders).
+  **The exit criterion was discharged live, not skipped**: the paired discriminator
+  `test_hooks_in_dead_location_emit_nothing` demotes the hooks to the retired
+  `.claude/hooks/hooks.json` and confirms the SAME run emits NOTHING — so the canary FAILS on
+  the pre-Phase-1 layout and PASSES on the Phase-4 layout. Both assert the tool call
+  demonstrably happened (`FIRSTLINE` in claude's output) so neither passes vacuously. Verified
+  `2 passed in 17.49s` with `INTEGRATION=1` + the live binary. The circular-oracle limitation
+  is now documented in `tests/integration/_boundary_helpers.py` (schema-fidelity ≠ consumption;
+  points at the canary). The `test_boundary_hooks_json` location de-pin was already handled by
+  Phase 4 (it now asserts the retired file must NOT render).
+- **Note:** the fixture render replaces the PLAN's "copy the sandbox fixture" approach — the
+  sandbox `.claude/` is gitignored + generated, so a fresh checkout/CI has none to copy;
+  rendering via `make` is portable and self-contained.
 - **depends_on:** `[1, 4]` — the canary reads the **sandbox fixture's** `settings.json`, which
   Phase 4 regenerates. At `[1]` alone the fixture still carries the old hooks layout, so the
   canary would fail for a reason unrelated to Phase 1 and invite being weakened.

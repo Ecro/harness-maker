@@ -28,6 +28,17 @@ ADR-002 wants exercised — the ADR's "LIVE render" invariant is upheld
 here since ``cli.make`` internally calls ``synthesize`` + ``render``
 on every invocation.
 
+CIRCULAR-ORACLE LIMITATION (Phase 9, ADR-009): every parser here validates
+that a rendered file has the SHAPE its consumer expects — it does NOT
+validate that the consumer actually READS that file at that location. This
+is exactly how ``.claude/hooks/hooks.json`` stayed dead for 39 releases: the
+boundary tests parsed the same location the emitter wrote, so a hooks block
+in a location Claude Code never loads still "passed". Schema-fidelity ≠
+consumption. The one test that closes this gap is the live consumption canary
+``tests/e2e/test_hook_consumption_canary.py`` — it runs the real ``claude``
+binary and asserts a PostToolUse hook FIRES (a ``post_tool_use`` telemetry
+entry appears), which no static parser in this module can prove.
+
 Negative tests inject synthetic bad bytes directly and assert the parser
 raises — they do NOT depend on any production template carrying the
 violation. Lesson from ``[fail:test] boundary-test-no-sentinel`` (2026-05-09).
