@@ -171,5 +171,5 @@ autonomy:
   step_cap: null
   time_cap_min: null
   extra_deny: []
-  autopilot_persistent: true
+  autopilot_persistent: false
   guard_when: "always"

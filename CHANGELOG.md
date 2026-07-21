@@ -2,6 +2,26 @@
 
 ## [Unreleased]
 
+### Changed — retire the `autopilot_guard` hook from rendered `.claude/settings.json`
+- **`autopilot_guard` no longer renders on any event.** It was the source of the recurring
+  "Stop hook error: pipeline in progress — not terminating" (a stale `.hm-autopilot` marker
+  blocked session termination) and of `permission-surface-write` false-positive blocks on
+  read-only Bash. Removed from all three settings-template hook groups (PreToolUse Bash,
+  PreToolUse Write|Edit|MultiEdit, Stop) in `settings/{Production,Side}.json.j2`. Auto-advance
+  (opt-in) is unaffected — it is driven by `autopilot_caps` in the stage command prompts, not
+  the removed guard.
+- **Existing harnesses self-clean on re-render**: new append-only frozenset
+  `render._HARNESS_RETIRED_HOOK_INVOCATIONS`; `_strip_shipped_commands` drops retired
+  invocations from a preserved user entry during the settings.json 3-way merge, so a
+  template-only removal (which the union-merge would otherwise preserve forever as pseudo-user
+  content) actually reaches disk. Applies to all nested-schema merges (settings + `.codex/hooks.json`);
+  Cursor's flat schema is exempt. Invariant test: retired invocations must be absent from every
+  current nested hook template.
+- **This repo**: `autonomy.autopilot_persistent: false` (stops the per-session marker re-arm that
+  caused the recurring block); the dead local `.claude/hooks/hooks.json` (never read by Claude
+  Code) removed. The `hooks.json.j2` template is KEPT — it is the pristine-oracle for
+  `_retire_stale_hooks_json`, not dead weight.
+
 ## [0.42.0] — 2026-07-21
 
 ### Fixed — machine-specific absolute paths in committed hooks (team flip-flop)

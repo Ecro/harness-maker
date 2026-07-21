@@ -719,6 +719,36 @@ def _normalize_hm_managed_command(cmd: str) -> str:
     return f"<HM>:{m.group('invocation')}"
 
 
+# Normalized (`<HM>:`) invocations of hooks harness-maker ONCE shipped but has now
+# RETIRED from every settings template (PLAN-hook-inventory-efficiency-audit ADR-001).
+# `_strip_shipped_commands` drops these from a preserved user entry IN ADDITION to the
+# template's currently-shipped commands, so removing a hook from the template actually
+# removes it from every existing user's disk on the next re-render. The union-merge
+# alone would preserve it forever as pseudo-user content (see `_merge_hooks_json`'s
+# deliberate no-retire note) — this set is the ONLY thing that retires a live hook.
+#
+# APPEND-ONLY. Membership is bounded by ONE test-enforced invariant:
+#   - ABSENT from every current NESTED hook template (settings.json AND
+#     `.codex/hooks.json` — both routed through `_merge_hooks_json(schema="nested")`,
+#     so `_strip_shipped_commands` applies this set to ALL of them, not just settings)
+#     (`test_retired_invocations_absent_from_current_templates`) — never retire
+#     something a template still ships. (Cursor's `.cursor/hooks.json` is flat-schema
+#     and the strip skips flat entirely, so it is out of scope.)
+#
+# ⚠️ Unlike `_HARNESS_SHIPPED_DENY_LITERALS`, there is NO second "provably enforces
+# nothing" invariant here: these are LIVE hooks. Deletion safety rests ENTIRELY on the
+# accepted risk that no user hand-wired the exact internal module themselves — a
+# deliberate, documented risk acceptance, NOT the deny-literal's proof. This is the
+# narrow, curated form the REVIEW-round-1 comment in `_merge_hooks_json` demanded
+# (positive membership list, never a blanket `<HM>:`-prefix inference).
+_HARNESS_RETIRED_HOOK_INVOCATIONS: frozenset[str] = frozenset(
+    {
+        "<HM>:harness_maker.hooks.autopilot_guard",
+        "<HM>:harness_maker.hooks.autopilot_guard --mode stop-hook",
+    }
+)
+
+
 # Joins a matcher group's normalized commands into the identity tuple's command
 # slot. ASCII Unit Separator — cannot occur in a real shell command, so it can
 # never collide with command text.
@@ -792,27 +822,31 @@ def _strip_shipped_commands(
     *,
     schema: Literal["nested", "flat"],
 ) -> Any | None:  # noqa: ANN401
-    """Drop commands the template already ships from a preserved user entry.
+    """Drop commands the template already ships (or has RETIRED) from a preserved entry.
 
     Returns None when nothing would remain (the caller then omits the entry).
 
-    Only ``<HM>:``-normalized commands can match ``shipped_cmds``, so a user's own
-    command is never removed here. Flat (Cursor) entries hold a single command and
-    are returned unchanged — a flat entry whose only command is shipped already
-    dedups on the identity check before this runs.
+    Only ``<HM>:``-normalized commands can match ``shipped_cmds`` or
+    ``_HARNESS_RETIRED_HOOK_INVOCATIONS``, so a user's own command is never removed
+    here. Retired invocations (ADR-001 of PLAN-hook-inventory-efficiency-audit) are
+    dropped even though the current template no longer ships them — that is how a
+    hook removed from the template gets removed from an existing user's disk. Flat
+    (Cursor) entries hold a single command and are returned unchanged — the retired
+    hooks were only ever in `.claude/settings.json` (nested), never Cursor.
     """
     if schema == "flat":
         return entry
     hooks_list = entry.get("hooks")
     if not isinstance(hooks_list, list):
         return entry
+    to_strip = shipped_cmds | _HARNESS_RETIRED_HOOK_INVOCATIONS
     kept = [
         h
         for h in hooks_list
         if not (
             isinstance(h, dict)
             and isinstance(h.get("command"), str)
-            and _normalize_hm_managed_command(h["command"]) in shipped_cmds
+            and _normalize_hm_managed_command(h["command"]) in to_strip
         )
     ]
     if not kept:

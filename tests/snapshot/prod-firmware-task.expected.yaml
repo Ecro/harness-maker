@@ -139,7 +139,7 @@ files:
   body_sha256: bd46a9af3e1a0912ef132227b7b509bbc3c1a14758c9fb620dd1392f2059899f
 - path: settings.json
   template: settings/Production.json.j2
-  body_sha256: 84f9d0bbb4ffa88ccd1058f8f0edc6ca9492edb260ceade18ef9493d6c52cd78
+  body_sha256: 2a6c3bc223106f4ebce6da825f3afc11ed771c3ef0391ff52bca768bb3f8dcd5
 - path: skills/agent-quality-rubric/SKILL.md
   template: skills/agent-quality-rubric/SKILL.md.j2
   body_sha256: 6859c80cb9e1c7e217c62b4300017c3a7f6afd08422deb19fc720e36596da9e4

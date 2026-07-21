@@ -28,15 +28,13 @@
       {
         "matcher": "Bash",
         "hooks": [
-          {"type": "command", "command": "uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.gates.permission_gate --subordinate-to-deny-dangerous", "timeout": 10},
-          {"type": "command", "command": "uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.hooks.autopilot_guard", "timeout": 10}
+          {"type": "command", "command": "uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.gates.permission_gate --subordinate-to-deny-dangerous", "timeout": 10}
         ]
       },
       {
         "matcher": "Write|Edit|MultiEdit",
         "hooks": [
-          {"type": "command", "command": "uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.gates.worktree_gate", "timeout": 10},
-          {"type": "command", "command": "uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.hooks.autopilot_guard", "timeout": 10}
+          {"type": "command", "command": "uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.gates.worktree_gate", "timeout": 10}
         ]
       }{% if config.dev_mode == "spec-driven" %},
       {
@@ -49,8 +47,7 @@
     "Stop": [
       {
         "hooks": [
-          {"type": "command", "command": "uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.hooks.loop_gate --mode stop-hook", "timeout": 10},
-          {"type": "command", "command": "uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.hooks.autopilot_guard --mode stop-hook", "timeout": 10}
+          {"type": "command", "command": "uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.hooks.loop_gate --mode stop-hook", "timeout": 10}
         ]
       }
     ],

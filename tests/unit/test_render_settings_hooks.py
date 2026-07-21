@@ -28,6 +28,7 @@ import pytest
 
 from harness_maker.models import DevMode, HarnessConfig
 from harness_maker.render import (
+    _HARNESS_RETIRED_HOOK_INVOCATIONS,
     _SETTINGS_KEYS_OWNED_BY_HARNESS,
     _make_env,
     _merge_hooks_json,
@@ -49,16 +50,17 @@ STAGE1_MODULES = frozenset(
 # ADR-006 Stage 2 — control-flow (Phase 2), **Stop event only**. `loop_gate` is what
 # lets /hm:loop reach iteration 2. Stop-blocking cannot block a tool call and is
 # bounded by each module's stop_hook_active guard — worst case is one extra turn.
+# `autopilot_guard` was RETIRED here (PLAN-hook-inventory-efficiency-audit ADR-002):
+# it is no longer rendered on any event — see `_HARNESS_RETIRED_HOOK_INVOCATIONS`.
 STAGE2_MODULES = frozenset(
     {
         "harness_maker.hooks.loop_gate",
-        "harness_maker.hooks.autopilot_guard",
     }
 )
 
 # ADR-006 Stage 3 — the PreToolUse BLOCKING gates, now WIRED (Phase 3 redo). Present in
-# BOTH dev_modes. `autopilot_guard`'s PreToolUse copies also land here (it straddles: its
-# Stop copy is Stage 2 above), but it is already in STAGE2_MODULES, so it is not repeated.
+# BOTH dev_modes. (`autopilot_guard`'s former PreToolUse copies were retired per
+# PLAN-hook-inventory-efficiency-audit ADR-002 — no longer part of the shipped set.)
 STAGE3_MODULES = frozenset(
     {
         "harness_maker.gates.permission_gate",
@@ -197,27 +199,25 @@ def test_settings_permission_gate_is_subordinate(template: str) -> None:
 
 
 @pytest.mark.parametrize("template", SETTINGS_TEMPLATES)
-def test_settings_stop_hook_carries_loop_gate_and_autopilot_guard(template: str) -> None:
+def test_settings_stop_hook_carries_loop_gate_only(template: str) -> None:
     """Stage 2's point: a Stop hook is what lets `/hm:loop` reach iteration 2.
 
-    Both Stop entries must pass `--mode stop-hook` — the modules dispatch on it, and
-    a Stop hook wired without it would run the PreToolUse path at session end.
+    `autopilot_guard`'s Stop copy was RETIRED (PLAN-hook-inventory-efficiency-audit
+    ADR-002 — the Stop-block was the user's friction), so `loop_gate` is now the sole
+    Stop hook. It must still pass `--mode stop-hook` (the module dispatches on it).
     """
     stop = _render(template)["hooks"].get("Stop")
     assert stop, f"{template}: no Stop hook — loop_gate cannot block"
-    # ONE matcher-less group holding both commands, mirroring hooks.json.j2:83-98.
-    # Group shape IS merge identity (`_entry_identity` keys on every command in the
-    # group), so rendering two single-command groups would produce different
-    # identities than the source — and a later shape correction would leave a user's
-    # on-disk group unmatched.
     assert len(stop) == 1, f"{template}: Stop must be ONE group, got {len(stop)}"
     cmds = [h["command"] for e in stop for h in e["hooks"]]
-    for mod in ("harness_maker.hooks.loop_gate", "harness_maker.hooks.autopilot_guard"):
-        matching = [c for c in cmds if mod in c]
-        assert matching, f"{template}: Stop is missing {mod}"
-        assert all("--mode stop-hook" in c for c in matching), (
-            f"{template}: {mod} on Stop must pass --mode stop-hook; got {matching}"
-        )
+    loop = [c for c in cmds if "harness_maker.hooks.loop_gate" in c]
+    assert loop, f"{template}: Stop is missing loop_gate"
+    assert all("--mode stop-hook" in c for c in loop), (
+        f"{template}: loop_gate on Stop must pass --mode stop-hook; got {loop}"
+    )
+    assert not any("autopilot_guard" in c for c in cmds), (
+        f"{template}: autopilot_guard must be RETIRED from Stop; got {cmds}"
+    )
 
 
 @pytest.mark.parametrize("template", SETTINGS_TEMPLATES)
@@ -403,61 +403,135 @@ def test_merge_preserves_both_all_harness_and_mixed_groups_when_template_is_sile
     assert gate in cmds
 
 
-def test_merge_stage2_to_stage3_group_growth_neither_duplicates_nor_loses() -> None:
-    """The transition ADR-006's staging creates — and which nothing else covers.
+def test_merge_group_growth_neither_duplicates_nor_loses() -> None:
+    """A matcher group that GROWS across a re-render must dedup, not linger/duplicate.
 
-    Phase 2 renders PreToolUse/Bash as `[autopilot_guard]`. Phase 3 grows that SAME
-    matcher group to `[permission_gate, autopilot_guard]`. All-commands identity means
-    the two groups have DIFFERENT identities, so the on-disk one is not deduped by the
-    identity check — and there is no retire rule to drop it (ADR-008 rev2, deliberately).
-    `_strip_shipped_commands` is the only thing standing between this and either
-    `autopilot_guard` firing twice or the group lingering forever.
+    On-disk PreToolUse/Bash is `[worktree_gate]`; a later template grows that SAME
+    matcher group to `[permission_gate, worktree_gate]`. All-commands identity means the
+    two groups have DIFFERENT identities, so the on-disk one is not deduped by the
+    identity check — and there is no retire rule for these live hooks. `_strip_shipped_commands`
+    is the only thing standing between this and either a hook firing twice or the group
+    lingering forever. Both fixtures are STILL-SHIPPED hooks (the retired autopilot_guard
+    can no longer stand in here — see `test_merge_retires_autopilot_guard_when_template_drops_it`).
 
-    If this breaks, every user upgrading across the Phase 2→3 boundary gets a duplicate
-    PreToolUse hook. Pinned here, at the phase that creates the smaller group.
-
-    Phase-3-updated fixture: ADR-007 appends `--subordinate-to-deny-dangerous` to the
-    Claude template's `permission_gate` invocation, and `_normalize_hm_managed_command`
-    keys identity on module **plus trailing args**, so `gate` below carries the flag to
-    model what the template actually ships (a bare string would test a transition that no
-    longer exists — the "precise-and-wrong" failure mode the PLAN's validator named).
+    `_normalize_hm_managed_command` keys identity on module **plus trailing args**, so
+    `gate` carries `--subordinate-to-deny-dangerous` to model what the template ships.
     """
-    guard = "uv run --with /p python -m harness_maker.hooks.autopilot_guard"
+    grown = "uv run --with /p python -m harness_maker.gates.worktree_gate"
     gate = (
         "uv run --with /p python -m harness_maker.gates.permission_gate "
         "--subordinate-to-deny-dangerous"
     )
 
-    phase2_on_disk = {"hooks": {"PreToolUse": [_nested("Bash", guard)]}}
-    phase3_template = {"hooks": {"PreToolUse": [_nested("Bash", gate, guard)]}}
+    old_on_disk = {"hooks": {"PreToolUse": [_nested("Bash", grown)]}}
+    grown_template = {"hooks": {"PreToolUse": [_nested("Bash", gate, grown)]}}
 
-    merged = _merge_hooks_json(phase2_on_disk, phase3_template, schema="nested")
+    merged = _merge_hooks_json(old_on_disk, grown_template, schema="nested")
     cmds = [h["command"] for e in merged["hooks"]["PreToolUse"] for h in e["hooks"]]
-    assert cmds.count(guard) == 1, f"autopilot_guard duplicated across the stage bump: {cmds}"
+    assert cmds.count(grown) == 1, f"worktree_gate duplicated across the group growth: {cmds}"
     assert cmds.count(gate) == 1, f"permission_gate missing or duplicated: {cmds}"
     groups = merged["hooks"]["PreToolUse"]
-    assert len(groups) == 1, f"superseded Phase-2 group lingered beside the Phase-3 one: {groups}"
+    assert len(groups) == 1, f"superseded smaller group lingered beside the grown one: {groups}"
 
 
-def test_merge_stage_bump_keeps_a_user_command_in_the_grown_group() -> None:
-    """The same transition, with a user command appended into our group.
+def test_merge_group_growth_keeps_a_user_command_in_the_grown_group() -> None:
+    """The same group growth, with a user command appended into our group.
 
     Claude Code's `/hooks` UI appends into an existing matcher group, so a user who
-    added their own PreToolUse/Bash command under Phase 2 must keep it when Phase 3
-    grows the group — and must not collect a duplicate autopilot_guard either.
+    added their own PreToolUse/Bash command must keep it when the template grows the
+    group — and must not collect a duplicate of the still-shipped hook either.
     """
-    guard = "uv run --with /p python -m harness_maker.hooks.autopilot_guard"
+    grown = "uv run --with /p python -m harness_maker.gates.worktree_gate"
     gate = "uv run --with /p python -m harness_maker.gates.permission_gate"
     mine = "/usr/local/bin/my-audit.sh"
 
-    on_disk = {"hooks": {"PreToolUse": [_nested("Bash", guard, mine)]}}
-    phase3_template = {"hooks": {"PreToolUse": [_nested("Bash", gate, guard)]}}
+    on_disk = {"hooks": {"PreToolUse": [_nested("Bash", grown, mine)]}}
+    grown_template = {"hooks": {"PreToolUse": [_nested("Bash", gate, grown)]}}
 
-    merged = _merge_hooks_json(on_disk, phase3_template, schema="nested")
+    merged = _merge_hooks_json(on_disk, grown_template, schema="nested")
     cmds = [h["command"] for e in merged["hooks"]["PreToolUse"] for h in e["hooks"]]
-    assert mine in cmds, f"user command lost across the stage bump: {cmds}"
-    assert cmds.count(guard) == 1, f"autopilot_guard duplicated: {cmds}"
+    assert mine in cmds, f"user command lost across the group growth: {cmds}"
+    assert cmds.count(grown) == 1, f"worktree_gate duplicated: {cmds}"
     assert cmds.count(gate) == 1, f"permission_gate missing or duplicated: {cmds}"
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# Retirement (PLAN-hook-inventory-efficiency-audit ADR-001)
+# ──────────────────────────────────────────────────────────────────────────
+
+
+def test_merge_retires_autopilot_guard_when_template_drops_it() -> None:
+    """ADR-001: autopilot_guard is a RETIRED hook. A settings.json still carrying it
+    (as pseudo-user content after the template stops shipping it) must lose it on the
+    next merge, while its still-shipped sibling in the SAME group survives.
+
+    Without the retired-set strip, the union-merge preserves the guard forever — this
+    is the whole point of the mechanism (every existing harness self-cleans on re-render).
+    """
+    gate = (
+        "uv run --with /p python -m harness_maker.gates.permission_gate "
+        "--subordinate-to-deny-dangerous"
+    )
+    guard = "uv run --with /p python -m harness_maker.hooks.autopilot_guard"
+    on_disk = {"hooks": {"PreToolUse": [_nested("Bash", gate, guard)]}}
+    new = {"hooks": {"PreToolUse": [_nested("Bash", gate)]}}  # template no longer ships guard
+    merged = _merge_hooks_json(on_disk, new, schema="nested")
+    cmds = [h["command"] for e in merged["hooks"]["PreToolUse"] for h in e["hooks"]]
+    assert guard not in cmds, "retired autopilot_guard survived the merge"
+    assert cmds.count(gate) == 1, "still-shipped permission_gate must remain exactly once"
+
+
+def test_merge_retires_autopilot_guard_stop_mode() -> None:
+    """The Stop-mode invocation (`--mode stop-hook`) is a DISTINCT retired entry — its
+    normalized identity carries the trailing arg, so it needs its own set member."""
+    loop = "uv run --with /p python -m harness_maker.hooks.loop_gate --mode stop-hook"
+    guard = "uv run --with /p python -m harness_maker.hooks.autopilot_guard --mode stop-hook"
+    on_disk = {"hooks": {"Stop": [_nested("", loop, guard)]}}
+    new = {"hooks": {"Stop": [_nested("", loop)]}}
+    merged = _merge_hooks_json(on_disk, new, schema="nested")
+    cmds = [h["command"] for e in merged["hooks"]["Stop"] for h in e["hooks"]]
+    assert guard not in cmds, "retired autopilot_guard (stop-hook) survived the merge"
+    assert cmds.count(loop) == 1, "still-shipped loop_gate must remain exactly once"
+
+
+def test_merge_retirement_preserves_a_users_appended_command() -> None:
+    """Retiring the guard from a MIXED group must keep the user's own command.
+
+    `[permission_gate, autopilot_guard, user.sh]` → `[permission_gate, user.sh]`.
+    """
+    gate = "uv run --with /p python -m harness_maker.gates.permission_gate"
+    guard = "uv run --with /p python -m harness_maker.hooks.autopilot_guard"
+    mine = "/usr/local/bin/my-audit.sh"
+    on_disk = {"hooks": {"PreToolUse": [_nested("Bash", gate, guard, mine)]}}
+    new = {"hooks": {"PreToolUse": [_nested("Bash", gate)]}}
+    merged = _merge_hooks_json(on_disk, new, schema="nested")
+    cmds = [h["command"] for e in merged["hooks"]["PreToolUse"] for h in e["hooks"]]
+    assert guard not in cmds, "retired guard survived"
+    assert mine in cmds, "user's own command dropped alongside the retired guard"
+    assert cmds.count(gate) == 1
+
+
+@pytest.mark.parametrize("template", [*SETTINGS_TEMPLATES, "codex/hooks.json.j2"])
+def test_retired_invocations_absent_from_current_templates(template: str) -> None:
+    """ADR-001 safety invariant: NEVER retire something a template still ships.
+
+    This is the ONE invariant bounding `_HARNESS_RETIRED_HOOK_INVOCATIONS` membership
+    (unlike the deny-literal set, there is no "provably enforces nothing" second
+    invariant for a live hook). `_strip_shipped_commands` applies the retired set to
+    EVERY nested-schema merge — settings.json AND `.codex/hooks.json` (both routed
+    through `_merge_hooks_json(schema="nested")`) — so the invariant must hold for the
+    codex hook template too, not just settings (REVIEW P2, 2026-07-21). Cursor's
+    `.cursor/hooks.json` is FLAT-schema and the retirement path skips flat entirely, so
+    it needs no check here. Every retired invocation must be absent from every current
+    nested hook template's rendered output — in BOTH dev_modes.
+    """
+    for dev_mode in (DevMode.TASK_DRIVEN, DevMode.SPEC_DRIVEN):
+        cmds = " ".join(_commands(_render(template, dev_mode=dev_mode)))
+        for retired in _HARNESS_RETIRED_HOOK_INVOCATIONS:
+            invocation = retired.removeprefix("<HM>:")
+            assert f"python -m {invocation}" not in cmds, (
+                f"{template} ({dev_mode.value}) still ships a RETIRED invocation: {invocation}"
+            )
 
 
 def _flat(matcher: str, command: str) -> dict[str, Any]:
