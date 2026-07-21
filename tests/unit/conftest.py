@@ -43,13 +43,22 @@ def _pin_harness_maker_pkg_root(monkeypatch: pytest.MonkeyPatch) -> None:
     Since 0.15.1 the renderer reads ``direct_url.json`` directly instead of
     using ``_HARNESS_MAKER_PKG_ROOT``; pin both so snapshot determinism
     survives the dev's actual install state.
+
+    PLAN-portable-hook-paths: ``_compute_install_ref`` now returns a
+    ``$HOME``-substituted ref (``_portablize_ref``), so the pinned install ref is
+    the portable ``$HOME/harness-maker`` form — home-free and deterministic on any
+    runner, and it satisfies the render-time leak-check assert
+    (``render._assert_portable_install_ref``). ``_HARNESS_MAKER_PKG_ROOT`` stays
+    the absolute checkout path (only consumed by tests that ``monkeypatch.undo()``
+    and re-derive the portable form themselves).
     """
     main_path = os.environ.get(
         "HM_MAIN_CHECKOUT_PATH",
         "/home/noel/harness-maker",
     )
+    portable_ref = "$HOME/harness-maker"
     monkeypatch.setattr(synthesize, "_HARNESS_MAKER_PKG_ROOT", main_path)
-    monkeypatch.setattr(synthesize, "_compute_install_ref", lambda: main_path)
+    monkeypatch.setattr(synthesize, "_compute_install_ref", lambda: portable_ref)
 
 
 @pytest.fixture(autouse=True)

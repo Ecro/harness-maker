@@ -68,13 +68,13 @@
       {
         "matcher": "*",
         "hooks": [
-          {"type": "command", "command": "uv run --with '{{ harness_maker_src_path }}' python -m harness_maker.telemetry", "timeout": 5}
+          {"type": "command", "command": "uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.telemetry", "timeout": 5}
         ]
       },
       {
         "matcher": "Write|Edit|MultiEdit",
         "hooks": [
-          {"type": "command", "command": "uv run --with '{{ harness_maker_src_path }}' python -m harness_maker.hooks.post_write_reminder", "timeout": 5}
+          {"type": "command", "command": "uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.hooks.post_write_reminder", "timeout": 5}
         ]
       }
     ],
@@ -82,29 +82,29 @@
       {
         "matcher": "Bash",
         "hooks": [
-          {"type": "command", "command": "uv run --with '{{ harness_maker_src_path }}' python -m harness_maker.gates.permission_gate --subordinate-to-deny-dangerous", "timeout": 10},
-          {"type": "command", "command": "uv run --with '{{ harness_maker_src_path }}' python -m harness_maker.hooks.autopilot_guard", "timeout": 10}
+          {"type": "command", "command": "uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.gates.permission_gate --subordinate-to-deny-dangerous", "timeout": 10},
+          {"type": "command", "command": "uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.hooks.autopilot_guard", "timeout": 10}
         ]
       },
       {
         "matcher": "Write|Edit|MultiEdit",
         "hooks": [
-          {"type": "command", "command": "uv run --with '{{ harness_maker_src_path }}' python -m harness_maker.gates.worktree_gate", "timeout": 10},
-          {"type": "command", "command": "uv run --with '{{ harness_maker_src_path }}' python -m harness_maker.hooks.autopilot_guard", "timeout": 10}
+          {"type": "command", "command": "uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.gates.worktree_gate", "timeout": 10},
+          {"type": "command", "command": "uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.hooks.autopilot_guard", "timeout": 10}
         ]
       }{% if config.dev_mode == "spec-driven" %},
       {
         "matcher": "Write|Edit|MultiEdit",
         "hooks": [
-          {"type": "command", "command": "uv run --with '{{ harness_maker_src_path }}' python -m harness_maker.gates.spec_gate", "timeout": 10}
+          {"type": "command", "command": "uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.gates.spec_gate", "timeout": 10}
         ]
       }{% endif %}
     ],
     "Stop": [
       {
         "hooks": [
-          {"type": "command", "command": "uv run --with '{{ harness_maker_src_path }}' python -m harness_maker.hooks.loop_gate --mode stop-hook", "timeout": 10},
-          {"type": "command", "command": "uv run --with '{{ harness_maker_src_path }}' python -m harness_maker.hooks.autopilot_guard --mode stop-hook", "timeout": 10}
+          {"type": "command", "command": "uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.hooks.loop_gate --mode stop-hook", "timeout": 10},
+          {"type": "command", "command": "uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.hooks.autopilot_guard --mode stop-hook", "timeout": 10}
         ]
       }
     ],
@@ -112,21 +112,21 @@
       {
         "matcher": "auto",
         "hooks": [
-          {"type": "command", "command": "uv run --with '{{ harness_maker_src_path }}' python -m harness_maker.hooks.flush_session", "timeout": 30, "statusMessage": "Snapshotting autoloop progress..."}
+          {"type": "command", "command": "uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.hooks.flush_session", "timeout": 30, "statusMessage": "Snapshotting autoloop progress..."}
         ]
       },
       {
         "matcher": "manual",
         "hooks": [
-          {"type": "command", "command": "uv run --with '{{ harness_maker_src_path }}' python -m harness_maker.hooks.flush_session", "timeout": 30, "statusMessage": "Snapshotting autoloop progress..."}
+          {"type": "command", "command": "uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.hooks.flush_session", "timeout": 30, "statusMessage": "Snapshotting autoloop progress..."}
         ]
       }
     ],
     "SessionStart": [
       {
         "hooks": [
-          {"type": "command", "command": "uv run --with '{{ harness_maker_src_path }}' python -m harness_maker.hooks.sessionid_envfile"},
-          {"type": "command", "command": "uv run --with '{{ harness_maker_src_path }}' python -m harness_maker.hooks.autopilot_autoarm"}
+          {"type": "command", "command": "uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.hooks.sessionid_envfile"},
+          {"type": "command", "command": "uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.hooks.autopilot_autoarm"}
         ]
       }
     ]

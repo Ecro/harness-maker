@@ -12,6 +12,7 @@ Workflow command FileEntries are generated dynamically from
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
@@ -34,6 +35,30 @@ FileSpec = tuple[str, str, dict[str, Any]]
 # Computed once — points to the directory containing pyproject.toml.
 # Works both from the source repo and from the plugin cache.
 _HARNESS_MAKER_PKG_ROOT = str(Path(__file__).parent.parent.parent)
+
+
+def _portablize_ref(raw: str) -> str:
+    """Replace the render-machine home-dir prefix in ``raw`` with the literal ``$HOME``.
+
+    WHY (PLAN-portable-hook-paths, ADR-001/002): the raw install ref is a plugin-cache
+    ``file://`` path prefixed with the render-machine home (e.g.
+    ``/home/noel/.claude/plugins/cache/...``). Baked verbatim into committed hook /
+    command bodies it flip-flops across a team repo (each dev's home rewrites it on
+    re-render). Substituting ``$HOME`` keeps the local cache (no network, exact version)
+    while making the committed path machine-portable — the IDE's shell expands ``$HOME``
+    at run time.
+
+    Boundary-safe (R4): only a true path-segment match substitutes, so a sibling like
+    ``/home/noel-other`` is never corrupted into ``$HOME-other``. A PyPI name or any path
+    not under the render-machine home passes through unchanged (legitimately non-portable
+    system installs stay absolute).
+    """
+    home = str(Path.home())
+    if raw == home:
+        return "$HOME"
+    if raw.startswith(home + os.sep):
+        return "$HOME" + raw[len(home) :]
+    return raw
 
 
 def _compute_install_ref() -> str:
@@ -74,12 +99,16 @@ def _compute_install_ref() -> str:
     failed with "does not appear to be a Python project". Bug surfaced by
     /hm:health audit 2026-05-18.
     """
+    # `_portablize_ref` wraps EVERY return branch (ADR-002 / codex #4): the source-tree
+    # fallback, the decoded file:// path, and the parse-error fallback are all home-
+    # prefixed in practice. Wrapping the PyPI-name branch too is a harmless no-op
+    # (a distribution name is not a path under home).
     try:
         from importlib.metadata import distribution
 
         dist = distribution("harness-maker")
     except Exception:  # noqa: BLE001 — PackageNotFoundError or any import issue
-        return _HARNESS_MAKER_PKG_ROOT
+        return _portablize_ref(_HARNESS_MAKER_PKG_ROOT)
 
     try:
         import json
@@ -90,10 +119,10 @@ def _compute_install_ref() -> str:
             du = json.loads(raw)
             url = du.get("url", "")
             if isinstance(url, str) and url.startswith("file://"):
-                return unquote(urlparse(url).path)
+                return _portablize_ref(unquote(urlparse(url).path))
     except (json.JSONDecodeError, KeyError, TypeError, ValueError):
-        return _HARNESS_MAKER_PKG_ROOT
-    return "harness-maker"
+        return _portablize_ref(_HARNESS_MAKER_PKG_ROOT)
+    return _portablize_ref("harness-maker")
 
 
 _ATOMIC_STAGES: list[str] = [s.value for s in AtomicStage]

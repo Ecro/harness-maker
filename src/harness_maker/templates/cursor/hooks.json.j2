@@ -4,7 +4,9 @@
 
     Each IDE owns its own hooks file with its own schema:
       - Cursor reads .cursor/hooks.json (this file)
-      - Claude Code reads .claude/hooks/hooks.json (the other file)
+      - Claude Code reads project hooks ONLY from settings.json's `hooks` key
+        (confirmed 2026-07-17; `.claude/hooks/hooks.json` is a plugin-bundle path
+        Claude Code never reads for a plain project)
 
     Verified empirically via kairos 0.5.7 forensic on 2026-05-08:
     metrics.jsonl entries had `event: "stop"` (lowercase) + Cursor-only
@@ -26,35 +28,35 @@
     "preToolUse": [
       {
         "matcher": "Bash",
-        "command": "CLAUDE_PROJECT_DIR=\"${CLAUDE_PROJECT_DIR:-${CURSOR_PROJECT_DIR:-$PWD}}\" PATH=\"$HOME/.local/bin:$PATH\" uv run --with {{ harness_maker_src_path }} python -m harness_maker.hooks.loop_gate --mode pretooluse"
+        "command": "CLAUDE_PROJECT_DIR=\"${CLAUDE_PROJECT_DIR:-${CURSOR_PROJECT_DIR:-$PWD}}\" PATH=\"$HOME/.local/bin:$PATH\" uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.hooks.loop_gate --mode pretooluse"
       },
       {
         "matcher": "Bash",
-        "command": "CLAUDE_PROJECT_DIR=\"${CLAUDE_PROJECT_DIR:-${CURSOR_PROJECT_DIR:-$PWD}}\" PATH=\"$HOME/.local/bin:$PATH\" uv run --with {{ harness_maker_src_path }} python -m harness_maker.gates.permission_gate"
+        "command": "CLAUDE_PROJECT_DIR=\"${CLAUDE_PROJECT_DIR:-${CURSOR_PROJECT_DIR:-$PWD}}\" PATH=\"$HOME/.local/bin:$PATH\" uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.gates.permission_gate"
       },
       {
         "matcher": "Write|Edit|MultiEdit",
-        "command": "CLAUDE_PROJECT_DIR=\"${CLAUDE_PROJECT_DIR:-${CURSOR_PROJECT_DIR:-$PWD}}\" PATH=\"$HOME/.local/bin:$PATH\" uv run --with {{ harness_maker_src_path }} python -m harness_maker.gates.worktree_gate"
+        "command": "CLAUDE_PROJECT_DIR=\"${CLAUDE_PROJECT_DIR:-${CURSOR_PROJECT_DIR:-$PWD}}\" PATH=\"$HOME/.local/bin:$PATH\" uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.gates.worktree_gate"
       }{% if config.dev_mode == "spec-driven" %},
       {
         "matcher": "Write|Edit",
-        "command": "CLAUDE_PROJECT_DIR=\"${CLAUDE_PROJECT_DIR:-${CURSOR_PROJECT_DIR:-$PWD}}\" PATH=\"$HOME/.local/bin:$PATH\" uv run --with {{ harness_maker_src_path }} python -m harness_maker.gates.spec_gate"
+        "command": "CLAUDE_PROJECT_DIR=\"${CLAUDE_PROJECT_DIR:-${CURSOR_PROJECT_DIR:-$PWD}}\" PATH=\"$HOME/.local/bin:$PATH\" uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.gates.spec_gate"
       }{% endif %}
     ],
     "postToolUse": [
       {
         "matcher": "*",
-        "command": "CLAUDE_PROJECT_DIR=\"${CLAUDE_PROJECT_DIR:-${CURSOR_PROJECT_DIR:-$PWD}}\" PATH=\"$HOME/.local/bin:$PATH\" uv run --with {{ harness_maker_src_path }} python -m harness_maker.telemetry"
+        "command": "CLAUDE_PROJECT_DIR=\"${CLAUDE_PROJECT_DIR:-${CURSOR_PROJECT_DIR:-$PWD}}\" PATH=\"$HOME/.local/bin:$PATH\" uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.telemetry"
       }
     ],
     "stop": [
       {
-        "command": "CLAUDE_PROJECT_DIR=\"${CLAUDE_PROJECT_DIR:-${CURSOR_PROJECT_DIR:-$PWD}}\" PATH=\"$HOME/.local/bin:$PATH\" uv run --with {{ harness_maker_src_path }} python -m harness_maker.telemetry"
+        "command": "CLAUDE_PROJECT_DIR=\"${CLAUDE_PROJECT_DIR:-${CURSOR_PROJECT_DIR:-$PWD}}\" PATH=\"$HOME/.local/bin:$PATH\" uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.telemetry"
       }
     ],
     "preCompact": [
       {
-        "command": "CLAUDE_PROJECT_DIR=\"${CLAUDE_PROJECT_DIR:-${CURSOR_PROJECT_DIR:-$PWD}}\" PATH=\"$HOME/.local/bin:$PATH\" uv run --with {{ harness_maker_src_path }} python -m harness_maker.hooks.flush_session",
+        "command": "CLAUDE_PROJECT_DIR=\"${CLAUDE_PROJECT_DIR:-${CURSOR_PROJECT_DIR:-$PWD}}\" PATH=\"$HOME/.local/bin:$PATH\" uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.hooks.flush_session",
         "timeout": 30
       }
     ]

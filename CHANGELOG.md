@@ -2,6 +2,29 @@
 
 ## [Unreleased]
 
+## [0.42.0] — 2026-07-21
+
+### Fixed — machine-specific absolute paths in committed hooks (team flip-flop)
+- **`_compute_install_ref` baked an absolute, home-prefixed plugin-cache path**
+  (`/home/<user>/.claude/plugins/cache/harness-maker/harness-maker/<ver>`) into every rendered
+  hook command AND every slash-command / skill body. Teams that commit `.claude/settings.json`
+  saw it rewritten to each developer's home on every re-render / rebase — an infinite flip-flop
+  across a shared repo (found in a team repo at 0.41.1).
+- **Fix**: `synthesize._portablize_ref` replaces the render-machine home prefix with the literal
+  `$HOME` (boundary-safe — a sibling like `/home/user-other` is never corrupted; non-home
+  `/opt/...` installs and the PyPI name pass through). Wired into **every** `_compute_install_ref`
+  return branch, so hooks + command/skill bodies all become portable. The hook-JSON `--with`
+  argument is standardized on **double quotes** across all four live templates
+  (`settings/Production`, `settings/Side`, `cursor/hooks`, `codex/hooks`) so the IDE's shell
+  expands `$HOME` at run time — the path keeps pointing at the local plugin cache (no network,
+  exact version) but is now machine-portable.
+- **Guard**: `render._assert_portable_install_ref` fails the render if a home-prefixed ref ever
+  leaks into a hook again (substitution-correctness invariant; passes for `$HOME/...`, non-home,
+  and PyPI-name refs).
+- **Migration**: a plain re-render replaces the old absolute path with the portable form (hook
+  identity is path-agnostic) — see `docs/migration/portable-hook-paths.md`. Scope: POSIX-shell
+  runners (Linux / WSL / macOS); Windows `cmd`/PowerShell `$HOME` expansion is out of scope.
+
 ## [0.41.1] — 2026-07-18
 
 ### Fixed — autopilot guard false-blocked the `~/.claude/plugins/` cache path (deadlock)

@@ -118,7 +118,11 @@ if __name__ == "__main__":
     # 0.15.1: renderer reads direct_url.json instead of the constant; pin the
     # function too so snapshots stay byte-identical regardless of the dev's
     # actual install layout.
-    _synth._compute_install_ref = lambda: _pinned  # type: ignore[assignment]
+    # PLAN-portable-hook-paths: pin the PORTABLE ($HOME-substituted) form so
+    # snapshots are home-free and match production render (where _portablize_ref
+    # rewrites the home-prefixed cache path to $HOME/...), and so the render-time
+    # leak-check assert passes. Mirrors tests/unit/conftest.py's pin.
+    _synth._compute_install_ref = lambda: "$HOME/harness-maker"  # type: ignore[assignment]
     with tempfile.TemporaryDirectory() as fake_home:
         os.environ["HOME"] = fake_home
         with patch.object(Path, "home", lambda: Path(fake_home)):

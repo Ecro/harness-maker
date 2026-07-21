@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -45,9 +46,16 @@ def test_returns_local_path_when_not_installed(monkeypatch: pytest.MonkeyPatch) 
         "importlib.metadata.distribution",
         side_effect=Exception("not found"),
     ):
-        from harness_maker.synthesize import _HARNESS_MAKER_PKG_ROOT, _compute_install_ref
+        from harness_maker.synthesize import (
+            _HARNESS_MAKER_PKG_ROOT,
+            _compute_install_ref,
+            _portablize_ref,
+        )
 
-        assert _compute_install_ref() == _HARNESS_MAKER_PKG_ROOT
+        # The fallback is home-prefixed too, so it is portablized (ADR-002 wraps
+        # every branch); compare against the portablized form so the assertion is
+        # correct whether or not the checkout lives under the runner's home.
+        assert _compute_install_ref() == _portablize_ref(_HARNESS_MAKER_PKG_ROOT)
 
 
 def test_returns_package_name_for_non_file_url(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -77,9 +85,13 @@ def test_returns_local_path_when_direct_url_json_corrupted(monkeypatch: pytest.M
 
     dist = SimpleNamespace(read_text=_read)
     with patch("importlib.metadata.distribution", return_value=dist):
-        from harness_maker.synthesize import _HARNESS_MAKER_PKG_ROOT, _compute_install_ref
+        from harness_maker.synthesize import (
+            _HARNESS_MAKER_PKG_ROOT,
+            _compute_install_ref,
+            _portablize_ref,
+        )
 
-        assert _compute_install_ref() == _HARNESS_MAKER_PKG_ROOT
+        assert _compute_install_ref() == _portablize_ref(_HARNESS_MAKER_PKG_ROOT)
 
 
 def test_returns_url_path_for_non_editable_file_install(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -152,3 +164,88 @@ def test_console_scripts_entry_point_callable() -> None:
     from harness_maker.cli import main
 
     assert callable(main)
+
+
+# ── $HOME portability (PLAN-portable-hook-paths, ADR-001/002, R4/R5) ──────────
+# The raw install_ref (plugin-cache file:// path) is home-prefixed and machine-
+# specific; baked into committed hooks it flip-flops across a team repo. These
+# guard `_portablize_ref` (the substitution) + its wiring into every
+# `_compute_install_ref` return branch. Path.home() is always mocked so the
+# result never depends on the runner's real home.
+
+
+def test_portablize_home_subpath_substituted(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A ref UNDER the render-machine home → its home prefix becomes `$HOME`."""
+    monkeypatch.undo()
+    from harness_maker import synthesize
+
+    with patch.object(Path, "home", lambda: Path("/home/noel")):
+        got = synthesize._portablize_ref(
+            "/home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.42.0"
+        )
+    assert got == "$HOME/.claude/plugins/cache/harness-maker/harness-maker/0.42.0"
+
+
+def test_portablize_home_exact_substituted(monkeypatch: pytest.MonkeyPatch) -> None:
+    """raw == home exactly → `$HOME` (no trailing separator corruption)."""
+    monkeypatch.undo()
+    from harness_maker import synthesize
+
+    with patch.object(Path, "home", lambda: Path("/home/noel")):
+        assert synthesize._portablize_ref("/home/noel") == "$HOME"
+
+
+def test_portablize_sibling_prefix_not_substituted(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Boundary safety (R4): `/home/noel-other` must NOT match home `/home/noel`.
+
+    A bare str.startswith(home) would corrupt it to `$HOME-other`, which a shell
+    reads as the variable `HOME` followed by `-other`.
+    """
+    monkeypatch.undo()
+    from harness_maker import synthesize
+
+    with patch.object(Path, "home", lambda: Path("/home/noel")):
+        raw = "/home/noel-other/.claude/plugins/cache/hm/0.42.0"
+        assert synthesize._portablize_ref(raw) == raw
+
+
+def test_portablize_non_home_abs_unchanged(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A system-wide install NOT under home (`/opt/...`) stays absolute."""
+    monkeypatch.undo()
+    from harness_maker import synthesize
+
+    with patch.object(Path, "home", lambda: Path("/home/noel")):
+        assert synthesize._portablize_ref("/opt/hm/0.42.0") == "/opt/hm/0.42.0"
+
+
+def test_portablize_pypi_name_unchanged(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The PyPI distribution name is not a path → passes through untouched."""
+    monkeypatch.undo()
+    from harness_maker import synthesize
+
+    with patch.object(Path, "home", lambda: Path("/home/noel")):
+        assert synthesize._portablize_ref("harness-maker") == "harness-maker"
+
+
+def test_compute_install_ref_portablizes_file_url_under_home(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Integration: a file:// plugin-cache URL under home → `$HOME/...` (all branches wired)."""
+    monkeypatch.undo()
+    direct_url = json.dumps(
+        {
+            "dir_info": {"editable": False},
+            "url": "file:///home/noel/.claude/plugins/cache/harness-maker/harness-maker/0.42.0",
+        }
+    )
+    dist = SimpleNamespace(read_text=lambda name: direct_url if name == "direct_url.json" else None)
+    with (
+        patch("importlib.metadata.distribution", return_value=dist),
+        patch.object(Path, "home", lambda: Path("/home/noel")),
+    ):
+        from harness_maker.synthesize import _compute_install_ref
+
+        assert (
+            _compute_install_ref()
+            == "$HOME/.claude/plugins/cache/harness-maker/harness-maker/0.42.0"
+        )

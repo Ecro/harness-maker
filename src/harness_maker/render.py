@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import tomllib
 from datetime import UTC, datetime
@@ -115,6 +116,31 @@ def _build_provenance(
     }
 
 
+def _assert_portable_install_ref(ref: str | None) -> None:
+    """Render-time guard (ADR-005 of PLAN-portable-hook-paths).
+
+    The install ref baked into every hook command MUST NOT be, or start a path
+    segment under, the render-machine home. A home-prefixed ref means
+    ``synthesize._portablize_ref`` failed to substitute ``$HOME`` and a machine-
+    specific absolute path would be committed — re-igniting the team flip-flop
+    this work removed. A ``$HOME``-substituted ref, a non-home system install
+    (``/opt/...``), and a PyPI name all pass. No-op when the context carries no
+    ref (non-hook renders). This is the substitution-correctness invariant, not a
+    general portability claim — it holds identically in real render and under the
+    regen/conftest monkeypatch (both pin the already-``$HOME`` form).
+    """
+    if ref is None:
+        return
+    home = str(Path.home())
+    if ref == home or ref.startswith(home + os.sep):
+        msg = (
+            f"non-portable install ref leaked into a rendered hook: {ref!r} is under "
+            f"the render-machine home {home!r}. synthesize._portablize_ref should have "
+            f"replaced the home prefix with $HOME."
+        )
+        raise ValueError(msg)
+
+
 def _render_settings_json(
     fe: FileEntry,
     env: Environment,
@@ -138,6 +164,7 @@ def _render_settings_json(
     are lost on re-render. Workaround: keep custom permissions in
     ``.claude/settings.local.json`` (Claude Code merges that automatically).
     """
+    _assert_portable_install_ref(fe.context.get("harness_maker_src_path"))
     template = env.get_template(fe.template)
     rendered = template.render(**fe.context)
     try:
@@ -608,6 +635,12 @@ def _render_pure_json(
     template, and re-rendered every time. Frontmatter invariant gate explicitly
     excludes them.
     """
+    # A FRESH render (no existing file to merge) routes .cursor/hooks.json and
+    # .codex/hooks.json here — NOT through _render_hooks_json_merged — so the
+    # ADR-005 leak-check guard must fire here too, else 2 of 3 IDE hook surfaces
+    # bypass it on the common path. No-op for non-hook pure JSON (.cursor/mcp.json,
+    # schemas) — those contexts carry no `harness_maker_src_path`.
+    _assert_portable_install_ref(fe.context.get("harness_maker_src_path"))
     template = env.get_template(fe.template)
     rendered = template.render(**fe.context)
     try:
@@ -897,6 +930,7 @@ def _render_hooks_json_merged(
     ``sweep_orphans()`` classifies the merged file as "ours-clean" via the
     manifest match path (resolves validator pass-2 W8).
     """
+    _assert_portable_install_ref(fe.context.get("harness_maker_src_path"))
     template = env.get_template(fe.template)
     rendered = template.render(**fe.context)
     try:
