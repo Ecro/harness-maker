@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.42.0
+harness_maker_version: 0.42.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: harness-yaml/Production.yaml.j2
 provenance: official
-content_hash: b9e37f4d55173ae11af27bcde3daec6f647d0af2df7a9794ef4066118844922b
+content_hash: ed22ff8749cfd5b5c302f034259ae3dcc7da43c287c8270f4f49d4bf28a1872a
 ---
 preset: Production
 locale: ko
@@ -172,4 +172,3 @@ autonomy:
   time_cap_min: null
   extra_deny: []
   autopilot_persistent: false
-  guard_when: "always"

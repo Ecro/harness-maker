@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+## [0.42.1] — 2026-07-21
+
+### Removed — the `guard_when` axis + the `autopilot_guard` module
+- Follow-up to the guard retirement: fully removed the now-orphan machinery instead of
+  leaving it as dormant dead weight. Deleted `hooks/autopilot_guard.py`; removed the
+  `autonomy.guard_when` config axis end-to-end (the `AutonomyConfig` field, the interview
+  question, the harness.yaml emit on both presets) and the `.hm-pipeline-active` crumb
+  machinery only the guard consumed (`mark_pipeline_active` / `pipeline_active` / the
+  `pipeline-active` CLI verb); dropped the `stage_start_autopilot` partial + its render block
+  from all 7 stage templates; dropped the `command_registry` entries. Auto-advance is
+  untouched (it runs via `autopilot_caps`, never the guard). The retirement mechanism itself
+  (`render._HARNESS_RETIRED_HOOK_INVOCATIONS` + the `hooks.json.j2` pristine-oracle) STAYS —
+  existing harnesses still need the guard stripped from their settings.json on re-render.
+- **Retired-key migration**: an old harness.yaml still carries `guard_when`, and
+  `AutonomyConfig` forbids extras, so `_parse_autonomy` now drops the key before validation —
+  otherwise the whole autonomy block (level / caps / pipeline / persistent) would silently
+  reset to defaults on re-render.
+
 ### Changed — retire the `autopilot_guard` hook from rendered `.claude/settings.json`
 - **`autopilot_guard` no longer renders on any event.** It was the source of the recurring
   "Stop hook error: pipeline in progress — not terminating" (a stale `.hm-autopilot` marker
