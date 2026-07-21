@@ -45,32 +45,20 @@ def test_ask_autonomy_enabled_defaults_unlimited(monkeypatch: pytest.MonkeyPatch
 
 
 def test_ask_autonomy_persistent_and_finite_caps(monkeypatch: pytest.MonkeyPatch) -> None:
-    # enable, level=full, persist=y, guard scope=default(always), step=5, time=60.
-    # The guard-scope prompt is asked ONLY when persistent — its slot sits between persist and
-    # the caps (PLAN-autopilot-guard-interactive-scope).
-    _feed(monkeypatch, ["y", "full", "y", "", "5", "60"])
+    # enable, level=full, persist=y, step=5, time=60.
+    _feed(monkeypatch, ["y", "full", "y", "5", "60"])
     cfg = _ask_autonomy()
     assert cfg.level == "full"
     assert cfg.autopilot_persistent is True
-    assert cfg.guard_when == "always"
     assert cfg.step_cap == 5
     assert cfg.time_cap_min == 60
 
 
-def test_ask_autonomy_persistent_pipeline_only_guard(monkeypatch: pytest.MonkeyPatch) -> None:
-    # The guard-scope prompt (only offered under persistence) accepts pipeline_only.
-    _feed(monkeypatch, ["y", "auto_safe", "y", "pipeline_only", "", ""])
-    cfg = _ask_autonomy()
-    assert cfg.autopilot_persistent is True
-    assert cfg.guard_when == "pipeline_only"
-
-
-def test_ask_autonomy_non_persistent_skips_guard_prompt(monkeypatch: pytest.MonkeyPatch) -> None:
-    # Not persistent → no guard-scope prompt → the next answer is the step cap, not guard scope.
+def test_ask_autonomy_non_persistent(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Not persistent → enable, level(default), persist=n, step, time.
     _feed(monkeypatch, ["y", "", "", "7", "70"])
     cfg = _ask_autonomy()
     assert cfg.autopilot_persistent is False
-    assert cfg.guard_when == "always"
     assert cfg.step_cap == 7
 
 
@@ -119,23 +107,19 @@ def test_parse_autonomy_preserves_finite_caps(tmp_path: Path) -> None:
     assert answers.autonomy.autopilot_persistent is False
 
 
-def test_parse_autonomy_preserves_guard_when(tmp_path: Path) -> None:
+def test_parse_autonomy_drops_retired_guard_when(tmp_path: Path) -> None:
+    # guard_when was RETIRED; an old harness.yaml still carrying it must NOT reset the whole
+    # autonomy block to defaults (AutonomyConfig forbids extras) — the key is dropped and the
+    # rest of the config is preserved (retired-key migration).
     p = _write(
         tmp_path,
         "preset: Production\nlocale: en\ntargets: [claude-code]\n"
-        "autonomy:\n  level: auto_safe\n  guard_when: pipeline_only\n",
+        "autonomy:\n  level: full\n  step_cap: 9\n  autopilot_persistent: true\n"
+        "  guard_when: pipeline_only\n",
     )
     answers = answers_from_harness_yaml(p)
     assert answers is not None
-    assert answers.autonomy.guard_when == "pipeline_only"
-
-
-def test_parse_autonomy_absent_guard_when_defaults_always(tmp_path: Path) -> None:
-    # absent-case = feature-black-hole guard: no key → always (guard stays on).
-    p = _write(
-        tmp_path,
-        "preset: Production\nlocale: en\ntargets: [claude-code]\nautonomy:\n  level: auto_safe\n",
-    )
-    answers = answers_from_harness_yaml(p)
-    assert answers is not None
-    assert answers.autonomy.guard_when == "always"
+    assert answers.autonomy.level == "full"
+    assert answers.autonomy.step_cap == 9
+    assert answers.autonomy.autopilot_persistent is True
+    assert not hasattr(answers.autonomy, "guard_when")

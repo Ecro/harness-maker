@@ -127,7 +127,7 @@ MODULES: dict[str, ModuleSpec] = {
     # NEW (Phase 1): down-unified from the Typer `autopilot` toggle. It uses argparse with
     # a choices-positional, not `if sub ==`, but is deliberately classed manual-dispatch so
     # T-C2 source-scans it (its `on` mutates a marker) instead of bare-invoking it.
-    "autopilot": ModuleSpec("manual-dispatch", _s("on", "off", "pipeline-active")),
+    "autopilot": ModuleSpec("manual-dispatch", _s("on", "off")),
     # ── Typer host (guard-exempt; T-C1 validates these as `python -m harness_maker.cli X`
     #    and the root `python -m harness_maker X` form via TYPER_ALIASES) ──
     "cli": ModuleSpec(
@@ -158,7 +158,6 @@ MODULES: dict[str, ModuleSpec] = {
     "gates.spec_gate": ModuleSpec("flagonly"),
     "gates.worktree_gate": ModuleSpec("flagonly"),
     "hooks.autopilot_autoarm": ModuleSpec("flagonly"),
-    "hooks.autopilot_guard": ModuleSpec("flagonly"),
     "hooks.flush_session": ModuleSpec("flagonly"),
     "hooks.loop_gate": ModuleSpec("flagonly"),
     "hooks.post_write_reminder": ModuleSpec("flagonly"),

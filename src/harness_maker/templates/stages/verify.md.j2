@@ -1,9 +1,5 @@
 # Stage: verify
 
-{%- if not is_codex and config.autonomy.guard_when == "pipeline_only" %}
-{% include "agents/_partials/stage_start_autopilot.md.j2" %}
-{%- endif %}
-
 > Atomic stage. Pre-completion verification gate — {% if config.dev_mode == 'spec-driven' %}6{% else %}5{% endif %}-check stop sign before `wrapup`. Failures block by default; `--force` overrides explicitly.
 {% if workflow_context %}
 > Invoked as part of the **{{ workflow_context }}** workflow.

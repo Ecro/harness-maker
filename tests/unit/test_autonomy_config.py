@@ -186,7 +186,7 @@ def test_synthesize_render_reload_roundtrip(tmp_path: Path) -> None:
     answers_in = InterviewAnswers(
         preset=Preset.PRODUCTION,
         targets=[Target.CLAUDE_CODE],
-        autonomy=AutonomyConfig(level="auto_safe", step_cap=15, guard_when="pipeline_only"),
+        autonomy=AutonomyConfig(level="auto_safe", step_cap=15),
     )
     bp = synthesize(ProjectProfile(), answers_in)
     render(bp, tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
@@ -204,4 +204,3 @@ def test_synthesize_render_reload_roundtrip(tmp_path: Path) -> None:
     assert restored.autonomy.time_cap_min == 300
     assert restored.autonomy.pipeline == DEFAULT_PIPELINE
     assert restored.autonomy.extra_deny == []
-    assert restored.autonomy.guard_when == "pipeline_only"

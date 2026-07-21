@@ -6,7 +6,6 @@ import argparse
 import contextlib
 import json
 import logging
-import os
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -16,7 +15,6 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_valida
 
 from harness_maker import command_registry
 from harness_maker.io_utils import atomic_write
-from harness_maker.loop_marker import sanitize_session_id
 from harness_maker.models import AtomicStage, AutonomyConfig
 from harness_maker.worktree import (
     WORKTREE_DIR_NAME,
@@ -30,13 +28,6 @@ logger = logging.getLogger(__name__)
 # coverage + the churn-file dirt-filters apply (registered in
 # worktree._HARNESS_CHURN_FILES — see test_marker_is_in_churn_files).
 _MARKER_REL = ".claude/.hm-autopilot"
-
-# PLAN-autopilot-guard-interactive-scope: the leading "a pipeline stage has started THIS
-# session" crumb consulted by the guard under ``autonomy.guard_when: pipeline_only``. Written
-# at stage START by the stage-start partial (NOT the trailing auto-advance ledger, so the
-# FIRST stage — e.g. an execute-first workflow — is already covered), session-scoped by the
-# same project uuid the marker uses, and cleared wherever the marker is cleared (``clear()``).
-_PIPELINE_ACTIVE_REL = ".claude/.hm-pipeline-active"
 
 
 class AutopilotMarker(BaseModel):
@@ -181,89 +172,9 @@ def clear(project_root: Path) -> None:
     Resolves cwd→base so `autopilot off` (and the boundary's terminal cap-halt /
     pipeline-complete / merge-gate clears) deletes the ROOT marker, never a
     worktree-local copy (Codex HIGH-2).
-
-    Also clears the ``.hm-pipeline-active`` crumb (PLAN-autopilot-guard-interactive-scope):
-    every terminal point that ends the autopilot session (cap-halt, pipeline-complete,
-    merge-gate, ``autopilot off``) routes through here, so the crumb never outlives the run
-    that set it. Cross-session staleness is handled separately by the crumb's per-session id
-    (``pipeline_active`` treats a different session's crumb as foreign), so ``write()`` does
-    NOT clear on arm — a peer session's live crumb is left intact (REVIEW follow-up #1).
     """
     root = resolve_marker_root(project_root)
     marker_path(root).unlink(missing_ok=True)
-    (root / _PIPELINE_ACTIVE_REL).unlink(missing_ok=True)
-
-
-def pipeline_active_path(project_root: Path) -> Path:
-    """WHY: single source for the pipeline-active crumb location (worktree→base resolved)."""
-    return resolve_marker_root(project_root) / _PIPELINE_ACTIVE_REL
-
-
-def mark_pipeline_active(project_root: Path, *, session_id: str | None = None) -> None:
-    """Stamp the leading ``.hm-pipeline-active`` crumb for the CURRENT Claude session.
-
-    Called at stage START (the stage-start partial, via the ``pipeline-active`` CLI) so the
-    guard, under ``guard_when: pipeline_only``, can tell an actively-running pipeline from a
-    plain interactive session that merely has the persistent marker armed. Stores the
-    **per-session** id — ``HM_SESSION_ID``, the sanitized Claude session_id the
-    ``sessionid_envfile`` SessionStart hook exposes to command Bash (REVIEW follow-up #1). A
-    crumb left by a PRIOR or a PARALLEL session therefore bears a DIFFERENT id, so
-    ``pipeline_active`` treats it as foreign → dormant. This fixes the cross-session staleness
-    WITHOUT a clear-on-arm and makes concurrent same-project sessions non-interfering (a peer's
-    live crumb no longer needs deleting — its id simply does not match here). ``session_id`` is
-    injectable for tests; production reads ``HM_SESSION_ID`` from the env. When unavailable
-    (Cursor/Codex, or a WSL2 env-file miss) the crumb is stamped EMPTY — a degraded signal that
-    ``pipeline_active`` block-biases to guarded (safe over-guard, never a silent disarm). The
-    gitignore self-seed mirrors ``write()`` so the crumb is never committable.
-    """
-    root = resolve_marker_root(project_root)
-    raw = session_id if session_id is not None else os.environ.get("HM_SESSION_ID", "")
-    sid = sanitize_session_id(raw) if raw else ""
-    with contextlib.suppress(OSError):
-        _ensure_gitignore_entry(root, _PIPELINE_ACTIVE_REL)
-    atomic_write(root / _PIPELINE_ACTIVE_REL, sid)
-
-
-def pipeline_active(project_root: Path, *, session_id: str | None = None) -> bool:
-    """True when a pipeline is genuinely in flight THIS session (guard-arming signal).
-
-    Block-biased — for a guard-arming predicate ``True`` (guarded) is the SAFE direction; only a
-    crumb PROVABLY belonging to a different live session stands the guard down. Signals:
-
-      1. the ``.hm-pipeline-active`` crumb, matched by **session id** (REVIEW follow-up #1).
-         ``session_id`` is THIS caller's Claude session_id (the guard passes it from the hook
-         payload). The crumb arms the guard when its stored id EQUALS the caller's id (same
-         session), OR either side is DEGRADED (empty) — a stage stamped it but the session can't
-         be verified, so block-bias to guarded. Only a crumb bearing a DIFFERENT non-empty id is
-         a foreign/stale run → fall through. This makes a prior/parallel session's crumb
-         non-arming here (no clear-on-arm needed) while a live same-session pipeline stays
-         guarded, and it fixes the cross-session staleness the project-scoped uuid caused.
-      2. a loop marker (``.claude/.hm-loop-*`` or legacy ``.hm-loop-active``) — a ``/hm:loop`` run
-         touches it at loop start, BEFORE its first stage; existence (not session-match) is used
-         deliberately (over-guard toward "guarded" when any loop is live is safe).
-
-    Read failures fail toward guarded: an unreadable-but-present crumb → ``True``; a ``.claude``
-    glob error → ``True`` (never raise out of the hook, which Claude Code treats as allow — an
-    implicit fail-open). A cleanly-absent crumb with no loop marker → dormant (the intended
-    interactive state).
-    """
-    root = resolve_marker_root(project_root)
-    sid = sanitize_session_id(session_id) if session_id else ""
-    crumb = root / _PIPELINE_ACTIVE_REL
-    if crumb.is_file():
-        try:
-            content = crumb.read_text(encoding="utf-8").strip()
-        except OSError:
-            return True  # present but unreadable → block-bias to guarded
-        if not content or not sid or content == sid:
-            return True  # degraded (either side) or same-session match → guarded
-        # content and sid both non-empty and differ → foreign/stale session → fall through
-    if (root / ".hm-loop-active").exists():
-        return True
-    try:
-        return any((root / ".claude").glob(".hm-loop-*"))
-    except OSError:
-        return True  # a .claude read error must not crash the hook into an implicit allow
 
 
 def load(project_root: Path) -> AutopilotMarker | None:
@@ -398,7 +309,7 @@ def main(argv: list[str] | None = None) -> int:
     if guard is not None:
         return guard
     parser = argparse.ArgumentParser(add_help=False, prog="python -m harness_maker.autopilot")
-    parser.add_argument("action", choices=["on", "off", "pipeline-active"])
+    parser.add_argument("action", choices=["on", "off"])
     parser.add_argument("--level", default="auto_safe")
     parser.add_argument("--pipeline", default=None)
     parser.add_argument("--root", default=None)
@@ -407,15 +318,6 @@ def main(argv: list[str] | None = None) -> int:
     if args.action == "off":
         clear(root)
         print("autopilot: off (marker cleared)")
-        return 0
-    if args.action == "pipeline-active":
-        # Leading crumb write for guard_when=pipeline_only (PLAN-autopilot-guard-interactive-
-        # scope). Called from every stage START, but only consulted when a marker is armed
-        # (evaluate() short-circuits on no marker). A stamp with no marker armed is a harmless
-        # over-arm: it bears THIS session's id, so a later session reads it as foreign → dormant
-        # (REVIEW follow-up #1 — no clear-on-arm needed). Reads HM_SESSION_ID from the env; keep
-        # the CLI dumb + deterministic (no harness.yaml read here; the stage template gates it).
-        mark_pipeline_active(root)
         return 0
     try:
         level, stages = resolve_toggle_config(args.level, args.pipeline)

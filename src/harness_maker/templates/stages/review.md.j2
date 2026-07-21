@@ -1,9 +1,5 @@
 # Stage: review
 
-{%- if not is_codex and config.autonomy.guard_when == "pipeline_only" %}
-{% include "agents/_partials/stage_start_autopilot.md.j2" %}
-{%- endif %}
-
 > Atomic stage. Multi-perspective review with **surface-match + reasoning-alignment** consensus, grade gate, and auto-fix loop.
 {% if workflow_context %}
 > Invoked as part of the **{{ workflow_context }}** workflow.

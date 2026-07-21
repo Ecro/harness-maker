@@ -1,9 +1,5 @@
 # Stage: research
 
-{%- if not is_codex and config.autonomy.guard_when == "pipeline_only" %}
-{% include "agents/_partials/stage_start_autopilot.md.j2" %}
-{%- endif %}
-
 > Atomic stage. **Exploratory** — gather facts, surface alternatives. Decisions get locked in `plan`, not here.
 {% if workflow_context %}
 > Invoked as part of the **{{ workflow_context }}** workflow.

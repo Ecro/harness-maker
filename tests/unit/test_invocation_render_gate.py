@@ -170,7 +170,7 @@ def test_gate_passes_canonical_and_prose() -> None:
 # --- source-grep: runtime remediation strings must not prescribe the bare console form (W3) ---
 
 
-@pytest.mark.parametrize("module", ["hooks/autopilot_guard.py", "autopilot_caps.py"])
+@pytest.mark.parametrize("module", ["autopilot_caps.py"])
 def test_no_bare_console_remediation_in_runtime_source(module: str) -> None:
     src = Path(__file__).parents[2] / "src" / "harness_maker" / module
     text = src.read_text(encoding="utf-8")

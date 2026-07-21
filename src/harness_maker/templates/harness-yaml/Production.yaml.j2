@@ -121,4 +121,3 @@ autonomy:
   time_cap_min: {{ (config.autonomy.time_cap_min if config.autonomy else 300) | tojson }}
   extra_deny: {{ (config.autonomy.extra_deny if config.autonomy else []) | tojson }}
   autopilot_persistent: {{ (config.autonomy.autopilot_persistent if config.autonomy else false) | tojson }}
-  guard_when: {{ (config.autonomy.guard_when if config.autonomy else "always") | tojson }}

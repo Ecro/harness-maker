@@ -706,22 +706,11 @@ def _ask_autonomy() -> AutonomyConfig:
         _input_or_empty("  Persist across sessions (re-arm each session)? [y/N]: ").strip().lower()
     )
     persistent = persist_raw in {"y", "yes"}
-    # guard_when only matters when the marker is armed in sessions the user did not explicitly
-    # start a pipeline in — i.e. under persistence. Offer the pipeline_only scope there so the
-    # guard stays dormant in plain interactive chats (PLAN-autopilot-guard-interactive-scope).
-    guard_when: Literal["always", "pipeline_only"] = "always"
-    if persistent:
-        print("  Persistent autopilot arms the guard EVERY session — including plain interactive")
-        print("  chats where no pipeline runs (the guard's blocks are then pure friction).")
-        gw_raw = _input_or_empty("  Guard scope [always/pipeline_only] (always): ").strip().lower()
-        if gw_raw == "pipeline_only":
-            guard_when = "pipeline_only"
     return AutonomyConfig(
         level=level,
         step_cap=_ask_cap("step cap (chained stages)"),
         time_cap_min=_ask_cap("time cap (minutes)"),
         autopilot_persistent=persistent,
-        guard_when=guard_when,
     )
 
 
@@ -1415,6 +1404,12 @@ def _parse_autonomy(value: object) -> AutonomyConfig:
     if "autopilot_persistent" in value and not isinstance(value["autopilot_persistent"], bool):
         logger.warning("harness.yaml autonomy: non-bool autopilot_persistent ignored → false.")
         value = {k: val for k, val in value.items() if k != "autopilot_persistent"}
+    # `guard_when` was RETIRED (the autopilot_guard hook + its interactive-scope axis were
+    # removed). An existing harness.yaml still carries the key, but AutonomyConfig now forbids
+    # extras — drop it here so model_validate does not reject the WHOLE block and silently reset
+    # the user's level / caps / pipeline to defaults on re-render (retired-key migration).
+    if "guard_when" in value:
+        value = {k: val for k, val in value.items() if k != "guard_when"}
     try:
         return AutonomyConfig.model_validate(value, strict=False)
     except Exception as e:  # noqa: BLE001 — tolerant upgrade path like second_brain

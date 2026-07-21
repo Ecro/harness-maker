@@ -88,7 +88,7 @@ def _resolve_project_dir(payload: dict[str, Any]) -> Path:
 
     WHY not `Path.cwd()` (settles the REVIEW's codex-vs-security disagreement): a
     PreToolUse hook's cwd is NOT guaranteed to be the project root. This codebase already
-    knows it — `autopilot_guard._resolve_root` exists precisely because "the hook
+    knows it — `autopilot.resolve_marker_root` exists precisely because "the hook
     subprocess's cwd is often a `.worktrees/<wt>/` dir during an autonomous execute", and
     a user can fire Bash from any subdirectory. Rooting the harness.yaml lookup at cwd
     would miss the file in both cases and fall to the fail-closed branch → unconditional
