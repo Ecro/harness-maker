@@ -23,7 +23,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from harness_maker.cache_diagnostics import CacheDiagnosis, diagnose_cache
+from harness_maker.cache_diagnostics import CacheDiagnosis, diagnose_cache_for_project
 from harness_maker.communication_audit import audit_communication
 from harness_maker.improvement import ActionItem, ImprovementPlan, build_improvement_plan
 from harness_maker.llm_judge import (
@@ -62,8 +62,7 @@ def run_ai_readiness(
 ) -> ImprovementPlan:
     """Run the 3-layer pipeline and return a composite improvement plan."""
     readiness = compute_readiness(project_dir, preset)
-    metrics = project_dir / ".claude" / "observability" / "metrics.jsonl"
-    cache = diagnose_cache(metrics, model=model)
+    cache = diagnose_cache_for_project(project_dir, model=model)
 
     judge_results: list[JudgeResult] = []
     if not skip_llm:
@@ -89,8 +88,7 @@ def run_ai_readiness_structural(
     can reconstruct a full plan after Claude provides L2 verdicts inline.
     """
     readiness = compute_readiness(project_dir, preset)
-    metrics = project_dir / ".claude" / "observability" / "metrics.jsonl"
-    cache = diagnose_cache(metrics, model=model)
+    cache = diagnose_cache_for_project(project_dir, model=model)
     return {
         "readiness": readiness.model_dump(),
         "cache": cache.model_dump(),
@@ -128,8 +126,7 @@ def run_structural(
     layer.
     """
     readiness = compute_readiness(project_dir, preset)
-    metrics = project_dir / ".claude" / "observability" / "metrics.jsonl"
-    cache = diagnose_cache(metrics, model=model)
+    cache = diagnose_cache_for_project(project_dir, model=model)
 
     # Blend: 70% readiness (deterministic structural) + 5% cache; the
     # remaining 25% slot belongs to L2 (llm_judge) which lives in a

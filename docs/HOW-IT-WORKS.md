@@ -2653,7 +2653,7 @@ Even when tests pass, the AI Readiness composite score can drop by 5 or more poi
 | 3-tier memory | Knowledge lost between sessions | wiki.md / failures.md / session/ |
 | Failure → improvement loop | Repeating the same mistakes | wrapup count≥3 / pending-proposals |
 | PreCompact + checkpoint | Work lost during context compression | flush_session hook / .claude-progress.json |
-| Cache miss cause classification | Not knowing why it's expensive | Layer 3 cache_diagnostics |
+| Cache miss cause classification | Not knowing why it's expensive | Layer 3 cache_diagnostics (reads Claude Code session transcripts) |
 | Context Linter | Prompt bloat → cache inefficiency | context-linter skill |
 | Conditional Router | Unnecessary reviewers → token waste | conditional-router skill |
 | 2-pass redaction | Metadata anchoring | two_pass_review CLI (+47pp) |

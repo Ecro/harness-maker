@@ -36,6 +36,7 @@ from harness_maker.models import (
     Confidence,
     DeliveryMetricsConfig,
     DevMode,
+    EconomicsConfig,
     FeedbackConfig,
     InterviewAnswers,
     PermissionsConfig,
@@ -1085,6 +1086,14 @@ def answers_from_harness_yaml(yaml_path: Path) -> InterviewAnswers | None:
         dm_clean = {k: v for k, v in dm_raw.items() if k in DeliveryMetricsConfig.model_fields}
         with contextlib.suppress(ValidationError):
             update["delivery_metrics"] = DeliveryMetricsConfig.model_validate(dm_clean)
+    # PLAN-harness-economics-observability — identical tolerant-fallback shape: an
+    # absent or malformed block yields a default EconomicsConfig() rather than
+    # poisoning the whole load (checkpoint 6, bidirectional mapper).
+    econ_raw = data.get("economics")
+    if isinstance(econ_raw, dict):
+        econ_clean = {k: v for k, v in econ_raw.items() if k in EconomicsConfig.model_fields}
+        with contextlib.suppress(ValidationError):
+            update["economics"] = EconomicsConfig.model_validate(econ_clean)
     # ADR-002/004 silent migration: prefer the new `default_model` key; fall
     # back to the deprecated `recommended_model`. When ONLY the deprecated key
     # is present AND the file is schema_version<2, emit an advisory INFO log

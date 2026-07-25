@@ -606,7 +606,7 @@ final_acceptance() {
 
   # R3 Monitoring
   log "R3 Monitoring"
-  uv run python -c "from harness_maker.readiness import compute_readiness; from harness_maker.cache_diagnostics import diagnose_cache; from harness_maker.agent_quality import score_agent" \
+  uv run python -c "from harness_maker.readiness import compute_readiness; from harness_maker.cache_diagnostics import diagnose_cache_from_turns; from harness_maker.agent_quality import score_agent" \
     || fail "R3: monitoring modules missing"
 
   # R4 Workflow

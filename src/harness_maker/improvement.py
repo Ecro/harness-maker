@@ -181,7 +181,7 @@ def _extract_layer3_actions(cache: CacheDiagnosis) -> list[ActionItem]:
         ActionItem(
             priority="P1",
             dimension="cache_efficiency",
-            target=".claude/observability/metrics.jsonl",
+            target="~/.claude/projects/<this project>/*.jsonl (session transcripts)",
             summary=f"Cache hit rate {cache.hit_rate}% — primary cause: {cache.primary_failure}",
             detail=cache.evidence,
             suggestion=cache.remediation,

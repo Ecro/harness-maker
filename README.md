@@ -515,7 +515,7 @@ Fused workflows combine atomic stages into a single command. The interview gener
 | Command | Purpose |
 |---|---|
 | `/hm:loop "<goal>"` | Autoloop driver — `feature` or `improve` mode, time/iter-bounded |
-| `/hm:metrics` | Opt-in delivery metrics — CFR + post-merge churn from local git, trend + LLM diagnosis (rendered only when `delivery_metrics.enabled`) |
+| `/hm:metrics` | Reflection metrics, read-only and never a gate: CFR + post-merge churn from local git, **plus token economics** — where a workflow's spend goes, per stage, classified by function (produce / verify / rework / carry) from Claude Code's own session transcripts. Deliberately reports NO cost-per-deliverable ratio: any such ratio makes verification spend look like waste |
 | `/hm:ai-readiness` | 3-layer readiness score + P0/P1/P2 ranked actions |
 | `/hm:personalization-audit` | Composite-score rubric (Bronze/Silver/Gold/Platinum) from telemetry + harness.yaml + ProjectProfile. Reads `.claude/observability/adaptive/overrides.jsonl`; outputs ranked ActionItem list with evidence schema. ADR-011 (v0); calibration deferred to 30+ project sample. |
 | `/hm:refresh` | Anti-rot crawl — manual confirm required |

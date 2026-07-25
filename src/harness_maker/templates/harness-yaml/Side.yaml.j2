@@ -114,6 +114,13 @@ delivery_metrics:
   churn_cohort_days: {{ (config.delivery_metrics.churn_cohort_days if config.delivery_metrics else 14) }}
   blame_file_cap: {{ (config.delivery_metrics.blame_file_cap if config.delivery_metrics else 500) }}
   paths: {{ (config.delivery_metrics.paths if config.delivery_metrics else []) | tojson }}
+economics:
+  window_days: {{ (config.economics.window_days if config.economics else 30) }}
+  price_model: {{ (config.economics.price_model if config.economics else "opus") | tojson }}
+  adjacency_estimate: {{ (config.economics.adjacency_estimate if config.economics else true) | string | lower }}
+  adjacency_max_gap_min: {{ (config.economics.adjacency_max_gap_min if config.economics else 10.0) }}
+  adjacency_max_turns: {{ (config.economics.adjacency_max_turns if config.economics else 20) }}
+  idle_gap_cap_min: {{ (config.economics.idle_gap_cap_min if config.economics else 5.0) }}
 autonomy:
   level: {{ (config.autonomy.level if config.autonomy else "gated") | tojson }}
   pipeline: {{ (config.autonomy.pipeline if config.autonomy else ['research', 'spec', 'plan', 'execute', 'review', 'verify', 'wrapup']) | tojson }}

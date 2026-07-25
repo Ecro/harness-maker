@@ -42,14 +42,17 @@ All paths are inside your project root (or `CLAUDE_PROJECT_DIR` / `CURSOR_PROJEC
 
 ### `metrics-{YYYY-MM-DD}.jsonl` — `post_tool_use` event additional fields
 
+> **Retired in schema 2:** `input_tokens`, `output_tokens`, `cache_read_tokens`,
+> `cache_creation_tokens` and `cost_usd` are no longer written. The Claude Code
+> `PostToolUse` payload carries no `usage` object, so every one of them was
+> structurally zero on every line ever recorded. Token accounting now reads Claude
+> Code's own session transcripts (see `harness_maker.economics`); nothing new is
+> written to disk for it and nothing leaves the machine.
+
 | Field | Type | Description |
 |---|---|---|
 | `tool_name` | string | Name of the tool that just ran (e.g., `Read`, `Bash`) |
-| `input_tokens` | int | Input tokens reported by the model |
-| `output_tokens` | int | Output tokens |
-| `cache_read_tokens` | int | Tokens served from cache (cost-saving signal) |
-| `cache_creation_tokens` | int | Tokens written to cache |
-| `cost_usd` | float (optional) | Estimated cost in USD (rounded to 6 decimals) |
+| `metrics_schema_version` | int | Entry-shape version (`2` since the token-field retirement). An **absent** key means schema 1. |
 | `tool_input` | string (optional) | Whitelist-projected, value-redacted, 256-char-capped JSON serialization of the tool input. Path traversal–free per the 0.7.1 ADR-107 hardening. |
 
 ### `metrics-{YYYY-MM-DD}.jsonl` — `stop` event additional fields

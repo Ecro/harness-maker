@@ -17,10 +17,10 @@
     stop firing hooks. The dual-render is by design.
 
     The `postToolUse` hook (added 2026-05-08) mirrors Claude Code's
-    PostToolUse → telemetry wiring. Cursor does NOT surface token usage
-    in any hook event (confirmed by Cursor team), so cost_usd will be
-    null for entries from this hook — but tool_name + timestamp still
-    give a per-call timeline that the prior stop-only render lacked.
+    PostToolUse → telemetry wiring. Neither IDE surfaces token usage in
+    any hook event, so the entry carries no token or cost fields at all
+    (they were retired in metrics schema 2) — but tool_name + timestamp
+    still give a per-call timeline that the prior stop-only render lacked.
 -#}
 {
   "version": 1,

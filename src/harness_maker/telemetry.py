@@ -39,6 +39,15 @@ from pydantic import BaseModel, ConfigDict
 
 from harness_maker.io_utils import atomic_write
 
+# Version of the `metrics-*.jsonl` ENTRY shape. Distinct from `SCHEMA_VERSION`, which
+# versions OverrideRecord / `adaptive/overrides.jsonl` — bumping that one would make
+# `_read_overrides` silently drop every existing override row.
+# v2 (PLAN-harness-economics-observability ADR-005): the four token fields and
+# `cost_usd` were removed. The Claude Code PostToolUse payload carries no `usage`, so
+# they were structurally zero on every line ever written (0 non-zero in 2175 measured).
+# ABSENT KEY => schema 1 (pre-retirement); readers must apply that default.
+METRICS_SCHEMA_VERSION = 2
+
 COST_PER_MTK: dict[str, dict[str, float]] = {
     "opus": {"input": 15.0, "output": 75.0, "cache_read": 1.5, "cache_write": 18.75},
     "sonnet": {"input": 3.0, "output": 15.0, "cache_read": 0.3, "cache_write": 3.75},
@@ -96,28 +105,6 @@ def _project_tool_input(raw: dict[str, Any]) -> dict[str, Any]:
     return safe
 
 
-def _estimate_cost(entry: dict[str, Any], model: str = "") -> float | None:
-    """Estimate USD cost from token counts. Returns None if no token data."""
-    inp = entry.get("input_tokens", 0) or 0
-    out = entry.get("output_tokens", 0) or 0
-    cache_read = entry.get("cache_read_tokens", 0) or 0
-    cache_write = entry.get("cache_creation_tokens", 0) or 0
-    if inp == 0 and out == 0 and cache_read == 0 and cache_write == 0:
-        return None
-    m = model.lower()
-    rates = _DEFAULT_COST
-    for key, val in COST_PER_MTK.items():
-        if key in m:
-            rates = val
-            break
-    return (
-        inp * rates["input"]
-        + out * rates["output"]
-        + cache_read * rates["cache_read"]
-        + cache_write * rates["cache_write"]
-    ) / 1_000_000
-
-
 def _detect_event(data: dict[str, Any]) -> str:
     """Classify payload shape into a known event type.
 
@@ -140,18 +127,10 @@ def _build_entry(data: dict[str, Any]) -> dict[str, Any]:
         "span_id": uuid.uuid4().hex[:16],
         "trace_id": data.get("conversation_id") or uuid.uuid4().hex,
         "event": event,
+        "metrics_schema_version": METRICS_SCHEMA_VERSION,
     }
     if event == "post_tool_use":
-        raw_usage = data.get("usage")
-        usage: dict[str, Any] = raw_usage if isinstance(raw_usage, dict) else {}
         entry["tool_name"] = data.get("tool_name")
-        entry["input_tokens"] = usage.get("input_tokens", 0)
-        entry["output_tokens"] = usage.get("output_tokens", 0)
-        entry["cache_read_tokens"] = usage.get("cache_read_input_tokens", 0)
-        entry["cache_creation_tokens"] = usage.get("cache_creation_input_tokens", 0)
-        cost = _estimate_cost(entry, data.get("model", ""))
-        if cost is not None:
-            entry["cost_usd"] = round(cost, 6)
         # 0.7.1 (ADR-107): whitelist-project tool_input → known-good keys
         # with value-level secret redaction + 256-char cap. Replaces the
         # earlier 2 KiB string-slice that produced invalid JSON on overflow

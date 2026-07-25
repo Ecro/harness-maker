@@ -2527,7 +2527,7 @@ PLAN 이행 여부는 체크박스 체크만으로는 판정할 수 없다. PLAN
 | 3-tier 메모리 | 세션 간 지식 유실 | wiki.md / failures.md / session/ |
 | 실패→개선 루프 | 같은 실수 반복 | wrapup count≥3 / pending-proposals |
 | PreCompact + checkpoint | 컨텍스트 압축 시 작업 유실 | flush_session 훅 / .claude-progress.json |
-| 캐시 miss 원인 분류 | 왜 비싼지 모름 | Layer 3 cache_diagnostics |
+| 캐시 miss 원인 분류 | 왜 비싼지 모름 | Layer 3 cache_diagnostics (Claude Code 세션 트랜스크립트 기반) |
 | Context Linter | 프롬프트 bloat → 캐시 비효율 | context-linter 스킬 |
 | Conditional Router | 불필요한 리뷰어 → 토큰 낭비 | conditional-router 스킬 |
 | 2-pass 리댁션 | 메타데이터 앵커링 | two_pass_review CLI (+47pp) |

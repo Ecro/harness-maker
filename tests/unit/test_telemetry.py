@@ -71,9 +71,17 @@ def test_appends_jsonl_entry(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
     assert metrics.is_file()
     line = metrics.read_text().strip()
     entry = json.loads(line)
-    assert entry["input_tokens"] == 10
-    assert entry["output_tokens"] == 20
-    assert entry["cache_read_tokens"] == 5
+    # Schema 2 (ADR-005): the four token fields are retired — the PostToolUse
+    # payload never carried `usage`, so they were structurally zero on every line.
+    for retired in (
+        "input_tokens",
+        "output_tokens",
+        "cache_read_tokens",
+        "cache_creation_tokens",
+        "cost_usd",
+    ):
+        assert retired not in entry
+    assert entry["metrics_schema_version"] == 2
     assert entry["tool_name"] == "Bash"
     assert "timestamp" in entry
 
@@ -180,8 +188,8 @@ def test_post_tool_use_payload_writes_token_entry(
     )
     assert entry["event"] == "post_tool_use"
     assert entry["tool_name"] == "Bash"
-    assert entry["input_tokens"] == 100
-    assert entry["cache_read_tokens"] == 80
+    assert "input_tokens" not in entry
+    assert "cache_read_tokens" not in entry
     assert "status" not in entry
     assert "loop_count" not in entry
 
@@ -276,10 +284,15 @@ def test_trace_id_uses_conversation_id_when_available(
     assert entry["trace_id"] == "conv-xyz-123"
 
 
-def test_cost_usd_present_for_post_tool_use(
+def test_retired_token_fields_are_never_written(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Regression guard (ADR-005): the four token fields + cost_usd must not return.
+
+    Scoped to NEWLY-WRITTEN lines only — the rollback for this change is code-only, so
+    a reverted writer must not be contradicted by an assertion over historical lines.
+    """
     payload = {
         "workspace": {"current_dir": str(tmp_path)},
         "tool_name": "Bash",
@@ -290,11 +303,16 @@ def test_cost_usd_present_for_post_tool_use(
         },
     }
     _run_main_with_stdin(monkeypatch, json.dumps(payload))
-    entry = json.loads(
-        (_metrics_file(tmp_path)).read_text().strip(),
-    )
-    assert "cost_usd" in entry
-    assert entry["cost_usd"] > 0
+    entry = json.loads((_metrics_file(tmp_path)).read_text().strip())
+    for retired in (
+        "input_tokens",
+        "output_tokens",
+        "cache_read_tokens",
+        "cache_creation_tokens",
+        "cost_usd",
+    ):
+        assert retired not in entry
+    assert entry["metrics_schema_version"] == 2
 
 
 def test_cost_usd_absent_for_stop_event(
@@ -311,20 +329,11 @@ def test_cost_usd_absent_for_stop_event(
     assert "cost_usd" not in entry
 
 
-def test_estimate_cost_function() -> None:
-    from harness_maker.telemetry import _estimate_cost
+def test_estimate_cost_helper_is_retired() -> None:
+    """`_estimate_cost` priced the structurally-zero fields — it has no inputs left."""
+    import harness_maker.telemetry as t
 
-    entry = {
-        "input_tokens": 1_000_000,
-        "output_tokens": 0,
-        "cache_read_tokens": 0,
-        "cache_creation_tokens": 0,
-    }
-    cost = _estimate_cost(entry, "sonnet")
-    assert cost is not None
-    assert abs(cost - 3.0) < 0.01  # $3/MTK input for sonnet
-
-    assert _estimate_cost({}, "") is None
+    assert not hasattr(t, "_estimate_cost")
 
 
 # 0.7.1 ADR-102: stdin `cwd` field is now ignored entirely (path-traversal fix).

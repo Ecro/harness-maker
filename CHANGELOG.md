@@ -2,6 +2,43 @@
 
 ## [Unreleased]
 
+### Added — harness economics observability (`harness_maker.economics`)
+- New spend model built on **Claude Code's own session transcripts**
+  (`~/.claude/projects/<enc-cwd>/*.jsonl` + `<session>/subagents/*.jsonl`), which are the
+  only local artifact that actually carries token counts. Zero new instrumentation.
+- Every turn is classified by *function* on an ordered ladder
+  `REWORK > VERIFY > PRODUCE > OTHER` (exactly one label per turn), priced from its own
+  recorded model against a versioned price table, and aggregated per stage / agent /
+  category with a carry-cost overlay.
+- **No cost-per-deliverable ratio, anywhere.** Any cost ÷ delivery-count metric puts
+  verification spend in the numerator and nothing in the denominator, so a task that ran
+  three review rounds and hardened a defect would score as *less* economic than one that
+  skipped review. The data layer cannot express it (schema test); the `/hm:metrics` prose
+  layer is constrained by an instruction, which is documented as instruction — not
+  enforcement.
+- Surfaced as a new section on `/hm:metrics` (no new command, no on/off switch — the
+  reader is inert until invoked). Tuning lives in `harness.yaml`'s `economics:` block.
+- CLI: `python -m harness_maker.economics {report,stages,doctor}`.
+
+### Changed — Layer 3 `cache_efficiency` now reads real data
+- `cache_diagnostics.diagnose_cache_from_turns()` replaces the path-taking
+  `diagnose_cache()`, which is **deleted** rather than kept as a shim.
+- **Score discontinuity, knowingly accepted.** Layer 3 was previously *inert*, not wrong:
+  `cache_diagnostics` skipped all-zero telemetry entries before classification, so it
+  always returned `no_data` / neutral 50 and `improvement` emitted no action. Historical
+  `ai_readiness` composites are therefore not comparable across this boundary. The effect
+  is bounded — cache is 5 % of the blend — and the direction is upward-informative.
+
+### Removed — the always-zero telemetry token fields
+- `input_tokens`, `output_tokens`, `cache_read_tokens`, `cache_creation_tokens` and
+  `cost_usd` are no longer written to `metrics-*.jsonl`, and `_estimate_cost` is gone.
+  The Claude Code `PostToolUse` payload carries no `usage` object, so all five were
+  structurally zero on every line ever recorded (measured: 0 non-zero in 2 175 lines).
+- New `metrics_schema_version: 2` on each entry. **An absent key means schema 1** — the
+  ~2 175 existing lines are not retro-versioned, so the marker makes new lines
+  self-identifying without making the file uniform. The rollback for this change is
+  code-only; the regression guard asserts on newly-written lines only.
+
 ## [0.42.1] — 2026-07-21
 
 ### Removed — the `guard_when` axis + the `autopilot_guard` module

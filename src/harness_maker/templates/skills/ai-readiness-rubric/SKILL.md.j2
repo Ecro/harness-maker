@@ -31,7 +31,7 @@ folded into a single 0-100 score plus a ranked list of actionable items.
 |---|---|---|
 | 1 readiness | `harness_maker.readiness` | 7 deterministic dimensions: context_quality, guardrails, verification, workflow_clarity, memory_continuity, observability_setup, governance. Each dim decomposes into yes/no signals with weighted contribution. |
 | 2 llm_judge | `harness_maker.llm_judge` | Rubric YAMLs at `.claude/rubrics/*.yaml`. LLM evaluates each rubric pass/fail with evidence + tailored suggestion. P0/P1/P2 severity weights (3/2/1) drive per-file score. System prompt cached. |
-| 3 cache | `harness_maker.cache_diagnostics` | `metrics.jsonl` analysis. Classifies miss reasons: `min_threshold` (prefix < cache-write min), `invalidation` (prefix mutated), `ttl` (>5min gap), `first` (expected). |
+| 3 cache | `harness_maker.cache_diagnostics` | Claude Code **session transcript** analysis (`~/.claude/projects/**`) via `diagnose_cache_from_turns`. Classifies miss reasons: `min_threshold` (prefix < cache-write min), `invalidation` (prefix mutated), `ttl` (>5min gap), `first` (expected). |
 
 ## Composite
 

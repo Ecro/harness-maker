@@ -769,6 +769,9 @@ def synthesize(
         # PLAN-cfr-churn-metrics ADR-003 — propagate the per-project tuning so
         # /hm:metrics + health templates can read window/tag/path knobs.
         delivery_metrics=answers.delivery_metrics,
+        # PLAN-harness-economics-observability ADR-004 — propagate the economics tuning
+        # so /hm:metrics + health templates can read the window/estimator knobs.
+        economics=answers.economics,
     )
     config_dump = config.model_dump(mode="json")
 

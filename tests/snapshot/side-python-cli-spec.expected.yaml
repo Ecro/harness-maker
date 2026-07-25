@@ -64,7 +64,7 @@ files:
   body_sha256: 717f0f22138cf604681182d924a8c18f8554a4b03290ef24201727f13a439c9f
 - path: commands/hm/health.md
   template: commands/hm/health.md.j2
-  body_sha256: 1db42eb1507644cceda73b3c66b6942ca21d178808fb69e3c503a8abb0b26186
+  body_sha256: 96c2df8b57f8280bf8f148cfb3b96677948ceac412529f9cfc1c88490d15ff29
 - path: commands/hm/help.md
   template: commands/hm/help.en.md.j2
   body_sha256: 802ac164b59e8b509644280609d8e9798bbf42d5167425cb7e2e707cc10638e2
@@ -79,7 +79,7 @@ files:
   body_sha256: a50121d38e91468087c6ed01a1bc8b50f3e2314c90af8c486c15cb0a6c69c9a0
 - path: commands/hm/metrics.md
   template: commands/hm/metrics.md.j2
-  body_sha256: 9925b8febb6e8d58e55876cd49b3a6a7db3c3bd993da735dc61ddc70bffc02c6
+  body_sha256: e47f716496dbb36f7b61c52178dc4c1500cb975773575b2d54f5e7b0a487063e
 - path: commands/hm/plan-exec-rev-wrap.md
   template: commands/hm/workflow_command.md.j2
   body_sha256: 8fd3d8811d3d3df442fbbde9f5da0dfa6fc317363550fd0f67f8c6497e273ed7
@@ -109,7 +109,7 @@ files:
   body_sha256: 0f80e24372931d9543baba628fad66adf9315507e3965b27f3e0a93c185ea782
 - path: harness.yaml
   template: harness-yaml/Side.yaml.j2
-  body_sha256: f2b1068c3d8dcb004e8600bd987042840f8bc195ac21427e864ff21e1187c5fa
+  body_sha256: d9edff7bb4bbda930e3ac981b442333db7c07b07f4ef5e80cdc9d7e3d7106d07
 - path: memory/failures.md
   template: memory/failures.en.md.j2
   body_sha256: b146802f48337b5f0d9651ab9a4d735036bb3cefca8ff3ecfb9c63ee01c31e72
@@ -142,7 +142,7 @@ files:
   body_sha256: 6859c80cb9e1c7e217c62b4300017c3a7f6afd08422deb19fc720e36596da9e4
 - path: skills/ai-readiness-rubric/SKILL.md
   template: skills/ai-readiness-rubric/SKILL.md.j2
-  body_sha256: 752821a90419f28cf346ca5be6c3964a16807db4f82184875092ad75c8e1069e
+  body_sha256: 2dc98ff62bbac75332610a2a8ee375b5911432fbb6b093c7618c82a396c257cf
 - path: skills/autoloop-driver/SKILL.md
   template: skills/autoloop-driver/SKILL.md.j2
   body_sha256: 135e175ca2833377f3a6741f76aff2cdae22d82e0c953268eb5821666cc5dccf

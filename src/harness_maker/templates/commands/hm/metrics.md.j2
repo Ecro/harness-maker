@@ -107,9 +107,89 @@ specific releases/files found above — generic advice is noise.
 > windows, and monorepo path scoping. Defaults fit a single-package repo tagged
 > `v*`; edit them (or via {% if is_codex %}`@hm-configure`{% else %}`/hm:configure`{% endif %}) only when your repo differs.
 
+## Step 5 — Economics: where the tokens went
+
+Read-only, zero-network, local-only — same framing as the CFR/churn sections
+above: **reflection input, never a gate, never a score.** Compute the spend mix:
+
+```bash
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.economics report --root .
+```
+
+The JSON carries `report` (spend) and `ingestion` (how much of the transcript
+store was actually read).
+
+### 5a — Check the instrument before you read the numbers
+
+Look at `ingestion.coverage` FIRST. It is priced turns over in-window assistant
+lines. A value well below ~0.9 means the reader is only partly understanding the
+transcript format — every figure below is then an undercount, not a measurement.
+Report the coverage number alongside the totals; never present spend without it.
+Also surface `ingestion.dirs_scanned`, `files_failed`, and any
+`skipped_by_reason` entry that is unexpectedly large.
+
+### 5b — Render the mix
+
+Render a per-stage table, most expensive first:
+
+| stage | turns | $ (list-price equiv.) | carry | mean ctx/turn | PRODUCE / VERIFY / REWORK / OTHER |
+|---|---:|---:|---:|---:|---|
+
+- **`$` is a list-price EQUIVALENT, not a bill.** On a Claude Code subscription
+  the marginal cash cost is not list price. Use it as a *relative* signal between
+  stages and say so in the output.
+- **carry** = the share of a stage's cost that is cache-read, i.e. rent paid to
+  re-read context it already had. High carry + low PRODUCE is the classic
+  uneconomic shape.
+- Show the **`(unattributed)` bucket with its true total**, and the estimated
+  attribution as a SEPARATE, labelled column — never folded in. State
+  `estimator_coverage` so the reader knows how much of the bucket the estimate
+  claimed.
+- Append the fixed annotation: **external second-opinion model cost (codex /
+  antigravity) is NOT included** — those calls never enter the Claude transcript.
+- State `price_table_version` + `price_table_effective_date` so an old report
+  stays reproducible.
+
+<!-- @hm:economics:no-ratio -->
+> **Do NOT divide cost by any delivery count.** Not per commit, per test, per
+> SPEC AC, per review finding, per file, per task. Any such ratio puts the cost
+> of verification in the numerator and nothing in the denominator, so a task that
+> ran three review rounds and hardened a security defect scores as *less*
+> economic than one that skipped review. That is backwards, and optimising
+> against it deletes the layers this harness exists to provide.
+>
+> `VERIFY` spend is a **legitimate category**, never waste. Where `REWORK` is
+> elevated, say explicitly that review-driven fixes are counted as `PRODUCE`, not
+> `REWORK`, so the reader does not mistake hardening for churn.
+>
+> Cost-per-finding style **yield** is permitted ONLY across many runs, never for
+> a single task: one review that finds nothing is a valid negative result.
+<!-- @hm:/economics:no-ratio -->
+
+### 5c — Diagnose
+
+Name the one or two least economic stages and say WHY, using the columns:
+- high **carry** + low PRODUCE → the stage is paying rent on context it does not
+  use. Levers: run it earlier in the workflow, split the task, or delegate to a
+  subagent (subagent turns carry far less context than main-loop turns).
+- elevated **REWORK** → work is being redone without an intervening review.
+  Check `rework_coverage` first: a low value means REWORK is *unmeasurable* for
+  this data (turns with no resolvable task), not that it is zero.
+- large **OTHER** → reading and searching dominate. Levers: narrower context
+  loading, better retrieval.
+
+Close with 1–3 concrete levers tied to the stages actually named. Generic
+efficiency advice is noise.
+
+> **Tuning** (optional): `economics.{window_days, price_model,
+> adjacency_estimate, adjacency_max_gap_min, adjacency_max_turns,
+> idle_gap_cap_min}` in `.claude/harness.yaml`. `price_model` is a FALLBACK for
+> unrecognised model strings only — every turn is priced from its own recorded
+> model.
+
 ## Autoloop behavior
 
-Stop after Step 4. Adjudication requires interactive judgment; autoloop must
+Stop after Step 5. Adjudication requires interactive judgment; autoloop must
 not synthesize verdicts (`--assume-routine` is the only headless path and is
 recorded in the snapshot as `pending_adjudications`).
 

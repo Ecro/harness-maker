@@ -140,25 +140,50 @@ def test_run_handles_anthropic_client_unavailable(
     assert plan.layer_scores["llm_judge"] == 50  # neutral when L2 blocked
 
 
-def test_run_uses_metrics_for_cache_layer(tmp_path: Path) -> None:
-    """A populated metrics.jsonl drives the cache score above neutral."""
+def test_run_uses_session_transcripts_for_the_cache_layer(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Layer 3 now reads Claude Code session transcripts, not metrics.jsonl.
+
+    Before this change the layer was INERT: every telemetry line had all-zero token
+    fields, so `diagnose_cache` always returned `no_data`/50 and this test's
+    metrics.jsonl fixture was the ONLY place the layer ever saw real numbers.
+    """
+    from harness_maker import economics_source
+
     _seed_minimal_project(tmp_path)
-    obs = tmp_path / ".claude" / "observability"
-    obs.mkdir(parents=True)
-    entries = [
-        {
-            "timestamp": f"2026-05-01T00:0{i}:00+00:00",
-            "input_tokens": 100,
-            "cache_read_tokens": 5000,
-            "cache_creation_tokens": 0,
-        }
-        for i in range(10)
-    ]
-    (obs / "metrics.jsonl").write_text(
-        "\n".join(json.dumps(e) for e in entries) + "\n", encoding="utf-8"
+    store = tmp_path / "transcripts"
+    proj = store / economics_source.encode_project_dir(tmp_path)
+    proj.mkdir(parents=True)
+    proj.joinpath("s.jsonl").write_text(
+        "\n".join(
+            json.dumps(
+                {
+                    "type": "assistant",
+                    "sessionId": "s1",
+                    "timestamp": f"2026-05-01T00:0{i}:00+00:00",
+                    "cwd": str(tmp_path),
+                    "message": {
+                        "model": "claude-sonnet-5",
+                        "usage": {"input_tokens": 100, "cache_read_input_tokens": 5000},
+                    },
+                }
+            )
+            for i in range(10)
+        )
+        + "\n",
+        encoding="utf-8",
     )
+    monkeypatch.setattr(economics_source, "default_transcript_root", lambda: store)
     plan = run_ai_readiness(tmp_path, preset=Preset.SIDE, skip_llm=True)
     assert plan.layer_scores["cache"] == 100
+
+
+def test_cache_layer_is_neutral_when_no_transcripts_exist(tmp_path: Path) -> None:
+    """Fresh clone / CI / Cursor / Codex: no store -> neutral 50, never a penalty."""
+    _seed_minimal_project(tmp_path)
+    plan = run_ai_readiness(tmp_path, preset=Preset.SIDE, skip_llm=True)
+    assert plan.layer_scores["cache"] == 50
 
 
 # ── render_terminal_summary ────────────────────────────────────────────────

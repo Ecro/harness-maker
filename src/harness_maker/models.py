@@ -654,6 +654,26 @@ class DeliveryMetricsConfig(BaseModel):
         return v
 
 
+class EconomicsConfig(BaseModel):
+    """Per-project tuning for the transcript-backed economics report.
+
+    No ``enabled`` flag, deliberately — like ``/hm:metrics`` the reader is inert until
+    invoked, so an on/off switch would only add a way to be surprised (the same reason
+    0.36.0 removed ``delivery_metrics.enabled``). ``price_model`` is a FALLBACK for
+    unrecognised model strings only; every turn is priced from its own recorded model
+    (ADR-010).
+    """
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    window_days: int = 30
+    price_model: str = "opus"
+    adjacency_estimate: bool = True
+    adjacency_max_gap_min: float = 10.0
+    adjacency_max_turns: int = 20
+    idle_gap_cap_min: float = 5.0
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Per-agent model routing (ADR-001/002/003 from PLAN-model-routing-multi-ide)
 # ──────────────────────────────────────────────────────────────────────────────
@@ -943,6 +963,8 @@ class HarnessConfig(BaseModel):
     # default_factory keeps legacy harness.yaml loading; `enabled: false`
     # renders no /hm:metrics command and performs zero writes (SPEC AC-008/009).
     delivery_metrics: DeliveryMetricsConfig = Field(default_factory=DeliveryMetricsConfig)
+    # Transcript-backed economics tuning (PLAN-harness-economics-observability ADR-004).
+    economics: EconomicsConfig = Field(default_factory=EconomicsConfig)
     # ADR-011: schema_version bumped 1 → 2 for the agent_models/default_model
     # rename. PLAN-second-opinion-multi-model ADR-001: bumped 2 → 3 for the
     # codex_second_opinion → second_opinion rename (silent migration in interview.py).
@@ -1143,6 +1165,9 @@ class InterviewAnswers(BaseModel):
     # Mirror of HarnessConfig.delivery_metrics (PLAN-cfr-churn-metrics ADR-003)
     # — same round-trip contract as feedback/second_opinion above.
     delivery_metrics: DeliveryMetricsConfig = Field(default_factory=DeliveryMetricsConfig)
+    # Mirror of HarnessConfig.economics — without this declaration InterviewAnswers'
+    # extra='forbid' would reject the key on round-trip (checkpoint 6).
+    economics: EconomicsConfig = Field(default_factory=EconomicsConfig)
 
     @field_validator("sibling_repos", mode="before")
     @classmethod

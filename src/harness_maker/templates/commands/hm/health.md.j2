@@ -124,6 +124,28 @@ Report the JSON as a Layer 1 ActionItem:
   session-start picker not used), or the boundary CLI is failing. Investigate before trusting
   that "the pipeline just stops" is the user's intent.
 {% endif %}
+<!-- @hm:economics-doctor -->
+## Economics reader liveness (no score impact)
+
+A **positive** smoke: a reader that silently stopped understanding the transcript format
+looks exactly like "this project has no history". Measures the INSTRUMENT, never the spend
+— it must never carry a cost threshold, and it feeds no readiness dimension.
+
+```bash
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.economics doctor --root .
+```
+
+Report the JSON as a Layer 1 ActionItem:
+- `status: ok` → pass. Mention `turns_priced` + `coverage`; a coverage well under ~0.9
+  means partial format drift, so quote it even on a pass.
+- `status: n/a` → **pass, not a finding.** No transcript store exists for this project —
+  expected on a fresh clone, in CI, and under Cursor or Codex (neither writes Claude Code
+  session transcripts).
+- `status: fail` → **surface it.** Transcript files exist but zero turns priced: the
+  reader is silently degraded, most likely a transcript-format change. Every economics
+  figure is $0 until it is fixed.
+<!-- @hm:/economics-doctor -->
+
 <!-- @hm:delivery-metrics -->
 ## Delivery-metrics narrative (1-2 lines, no score impact)
 

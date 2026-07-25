@@ -12,13 +12,14 @@ Returns a CacheDiagnosis with score, primary failure mode, evidence, remediation
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
-from harness_maker._metrics_io import iter_recent_entries
+from harness_maker.economics import TurnRecord
 
 # Per Anthropic prompt-caching docs: minimum tokens that must accumulate before
 # a cache write happens. Below this, cache_creation_input_tokens silently == 0.
@@ -202,56 +203,67 @@ def _detect_ttl_regression(
     return False, ""
 
 
-def diagnose_cache(
-    metrics_path: Path,
-    model: str = "sonnet",
-    window: int = 50,
-) -> CacheDiagnosis:
-    """Analyze the last `window` post_tool_use entries to diagnose cache health.
+def _entry_from_turn(turn: TurnRecord) -> dict[str, Any]:
+    """Bridge a TurnRecord onto the entry shape `_classify_turn` reads.
 
-    ``metrics_path`` retains its 0.6.x signature for backward compat (legacy
-    callers still pass the single ``metrics.jsonl`` path). Internally we
-    delegate to :func:`harness_maker._metrics_io.iter_recent_entries` over
-    the parent directory so date-sharded ``metrics-YYYY-MM-DD.jsonl`` files
-    plus the legacy file are both consulted (ADR-103, 0.7.1).
+    Two traps live here. (1) The two cache-write TIERS must be summed into the single
+    `cache_creation_tokens` key — dropping them reclassifies every write turn as a
+    sub-threshold miss and emits the wrong remediation. (2) `_parse_timestamp` requires
+    an ISO **string**; `TurnRecord.ts` is a datetime, so a naive `model_dump()` bridge
+    silently disables the TTL branch.
     """
-    obs_dir = metrics_path.parent
-    if not obs_dir.is_dir():
-        return _no_data(
-            "No metrics directory yet — telemetry hook may not be installed or has not fired.",
-            "Run /hm:make to install the PostToolUse telemetry hook, "
-            "then use Claude Code for a few turns.",
-        )
+    u = turn.usage
+    return {
+        "timestamp": turn.ts.isoformat(),
+        "input_tokens": u.input_tokens,
+        "output_tokens": u.output_tokens,
+        "cache_read_tokens": u.cache_read_tokens,
+        "cache_creation_tokens": u.cache_write_5m_tokens + u.cache_write_1h_tokens,
+    }
 
-    # Walk newest-first via the shared reader. It already filters by event,
-    # skips malformed lines, and unifies dated + legacy files.
+
+def diagnose_cache_from_turns(
+    turns: Sequence[TurnRecord],
+    model: str = "sonnet",
+    window_turns: int = 50,
+) -> CacheDiagnosis:
+    """Diagnose cache health from transcript turns — the pure core.
+
+    `window_turns` is an explicit TURN COUNT. The retired `diagnose_cache` used one
+    `window` value for two different jobs (a `days=` file selector and an entry cap),
+    which made its effective window undefined.
+
+    The threshold comes from the window-level `model`, not per turn: the caller states
+    which model's cache thresholds apply, matching the retired signature.
+    """
     entries: list[dict[str, Any]] = []
-    for parsed in iter_recent_entries(obs_dir, days=window, event="post_tool_use"):
-        # 0.7.0 wiring: Cursor postToolUse entries also have event="post_tool_use"
-        # but Cursor does not surface usage data, so all token fields are 0 or
-        # null. Skip them — they convey tool-call timeline (handled elsewhere)
-        # but say nothing about cache health and would otherwise pollute
-        # hit-rate. ``or 0`` handles JSON null too.
-        if (
-            (parsed.get("input_tokens") or 0) == 0
-            and (parsed.get("output_tokens") or 0) == 0
-            and (parsed.get("cache_read_tokens") or 0) == 0
-            and (parsed.get("cache_creation_tokens") or 0) == 0
+    for turn in turns:
+        entry = _entry_from_turn(turn)
+        # A turn with no token signal at all says nothing about cache health. This is
+        # the same skip the old path applied — and, because the retired telemetry
+        # fields were structurally zero, it is why Layer 3 was inert rather than wrong.
+        if not any(
+            entry[k]
+            for k in (
+                "input_tokens",
+                "output_tokens",
+                "cache_read_tokens",
+                "cache_creation_tokens",
+            )
         ):
             continue
-        entries.append(parsed)
-        if len(entries) >= window:
-            break
-    entries.reverse()  # restore chronological order for TTL gap calculation
+        entries.append(entry)
+    # Keep the most recent `window_turns`, in chronological order — TTL gap math
+    # depends on the ordering.
+    if window_turns > 0:
+        entries = entries[-window_turns:]
 
     if not entries:
         return _no_data(
-            "metrics.jsonl exists but contains no token-bearing entries — "
-            "if running in Cursor IDE, this is expected (Cursor does not "
-            "surface token usage to hooks). Run from Claude Code for "
-            "cache-diagnostic data.",
-            "For Cursor users: cost data lives in cursor.com/settings → Usage. "
-            "For Claude Code: use it for a few turns to accumulate telemetry.",
+            "No token-bearing turns in the transcript window — if running in Cursor or "
+            "Codex this is expected (neither writes Claude Code session transcripts).",
+            "Use Claude Code for a few turns, then re-run. If transcripts exist but "
+            "nothing prices, run `python -m harness_maker.economics doctor`.",
         )
 
     threshold = _threshold_for_model(model)
@@ -311,3 +323,22 @@ def diagnose_cache(
         ttl_regression=ttl_reg,
         ttl_regression_detail=ttl_detail,
     )
+
+
+def diagnose_cache_for_project(
+    project_dir: Path,
+    model: str = "sonnet",
+    window_turns: int = 50,
+    transcript_root: Path | None = None,
+) -> CacheDiagnosis:
+    """Project-level adapter over the pure core (ADR-005).
+
+    The retired `diagnose_cache(metrics_path, ...)` is NOT kept as a compat shim: once
+    telemetry stops writing the token fields it would answer `no_data` unconditionally
+    and forever, which is a second phantom-data path in a change whose whole purpose is
+    deleting them.
+    """
+    from harness_maker.economics_source import load_turns
+
+    result = load_turns(project_dir, transcript_root=transcript_root)
+    return diagnose_cache_from_turns(result.turns, model=model, window_turns=window_turns)

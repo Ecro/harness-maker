@@ -90,3 +90,22 @@ def _isolate_foreign_config_cache(
     """
     tmp_cache: Path = tmp_path_factory.mktemp("hm_foreign_cache")
     monkeypatch.setattr(foreign_config, "_default_cache_dir", lambda: tmp_cache)
+
+
+@pytest.fixture(autouse=True)
+def _isolate_transcript_root(
+    tmp_path_factory: pytest.TempPathFactory,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Redirect economics_source.default_transcript_root() into per-test tmp_path.
+
+    CLAUDE.md checkpoint 7: HOME-reading code must be isolated. Layer 3
+    (cache_efficiency) now reads Claude Code session transcripts, so without this any
+    ai_readiness/improvement test would score against the developer's real
+    ``~/.claude/projects`` — non-deterministic, and different on CI. Tests that
+    exercise the reader pass ``transcript_root=`` explicitly.
+    """
+    from harness_maker import economics_source
+
+    tmp_root: Path = tmp_path_factory.mktemp("hm_transcripts")
+    monkeypatch.setattr(economics_source, "default_transcript_root", lambda: tmp_root)
