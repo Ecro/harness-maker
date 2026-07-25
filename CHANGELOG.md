@@ -78,6 +78,23 @@ Three review findings that were first recorded as deferred and then closed
   day-to-day friction, and the scoped rule exists so that removal cannot break the
   second opinion.
 
+### Fixed — wrapup's escalation output never reached git
+
+On the per-task feature-branch path (the Production default), `commit-base-memory`
+folds base-written memory into the squash commit — but its allowlist was derived from
+`memory_md`'s writer targets alone. The wrapup **stage** has a second writer: it
+hand-writes `pending-proposals.md` (Step 5.3, a MUST step) and `pending-drift.md`.
+Neither was folded, so both sat as base working-tree dirt after every `task-land` and
+never landed in a commit — invisible to a fresh clone or a collaborator.
+
+Nothing broke loudly, which is why it lasted: the create-guard forgives
+`.claude/memory/`, so no gate ever fired. The output the entire `count>=3` escalation
+machinery exists to produce simply never reached git.
+
+Both files are now in the fold pathspec, and the correspondence test derives its
+expectation from **both** writers — including a scan of the rendered wrapup stage — so
+a third memory output fails the suite until the fold covers it.
+
 ### Fixed — CI's codex pin had drifted from the test that depends on it
 
 The `install-cmd-regression` job's advisory step had been failing for **10 days**

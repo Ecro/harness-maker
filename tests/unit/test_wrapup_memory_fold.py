@@ -180,7 +180,7 @@ def test_fold_does_not_mislabel_tracked_unchanged_session(
 
 
 def test_tier_pathspec_corresponds_to_memory_md_writers() -> None:
-    """The fold allowlist must cover exactly memory_md's human-tier writer targets."""
+    """The fold allowlist must cover memory_md's human-tier writer targets."""
     from harness_maker import memory_md
 
     root = Path("/tmp/x")
@@ -191,6 +191,42 @@ def test_tier_pathspec_corresponds_to_memory_md_writers() -> None:
     assert wiki_rel in _HUMAN_MEMORY_TIER_PATHSPEC
     assert fail_rel in _HUMAN_MEMORY_TIER_PATHSPEC
     assert session_rel in _HUMAN_MEMORY_TIER_PATHSPEC
+
+
+def test_tier_pathspec_covers_every_memory_output_wrapup_writes() -> None:
+    """memory_md is not the only writer, and scoping the fold to it lost two files.
+
+    The wrapup STAGE writes `pending-proposals.md` (Step 5.3, a MUST step) and
+    `pending-drift.md` by hand — the LLM does, not `memory_md` — so an allowlist
+    derived from memory_md's targets silently excluded them. They stayed as base
+    working-tree dirt after every `task-land`, and because the create-guard forgives
+    `.claude/memory/`, nothing ever complained: the count>=3 escalation output simply
+    never reached git.
+
+    This derives the expectation from the rendered stage rather than a hand-written
+    list, so a third memory output fails here until the fold covers it.
+    """
+    import re
+
+    from harness_maker import worktree as wt
+
+    templates = Path(__file__).resolve().parents[2] / "src" / "harness_maker" / "templates"
+    stage = (templates / "stages" / "wrapup.md.j2").read_text(encoding="utf-8")
+    written = {
+        m.group(0)
+        for m in re.finditer(r"\.claude/memory/[A-Za-z0-9._/-]+\.md", stage)
+        # `<...>` placeholders and the session tier are covered by the prefix rule.
+        if not m.group(0).startswith(".claude/memory/session/")
+    }
+    assert {".claude/memory/pending-proposals.md", ".claude/memory/pending-drift.md"} <= written, (
+        f"extraction looks broken — got {sorted(written)}"
+    )
+
+    uncovered = sorted(p for p in written if not wt._is_human_memory_tier_path(p))
+    assert not uncovered, (
+        f"wrapup writes {uncovered} to the base repo but commit-base-memory will not "
+        f"fold them, so they never land in the squash commit"
+    )
 
 
 def _render_wrapup(tmp_path: Path, *, flag_on: bool) -> str:

@@ -4673,21 +4673,39 @@ def _cli_task_create(args: list[str]) -> int:
     return 0
 
 
-# The human memory tiers wrapup writes to the BASE repo (memory_md._base_root strips
+# The human memory outputs wrapup writes to the BASE repo (memory_md._base_root strips
 # the .worktrees/<slug> suffix). The machine tiers (semantic/episodic/profile) are churn
-# and deliberately excluded. Kept in correspondence with memory_md's writer targets by
-# test_wrapup_memory_fold.test_tier_pathspec_corresponds_to_memory_md_writers.
+# and deliberately excluded.
+#
+# There are TWO writers, and only one used to be represented here. `memory_md` writes
+# wiki/failures/session; the wrapup STAGE additionally writes `pending-proposals.md`
+# (Step 5.3, a MUST step) and `pending-drift.md` by hand. The old allowlist was derived
+# from memory_md's targets alone — and its correspondence test asserted only that — so
+# the two hand-written files were never folded into the squash and sat as base dirt
+# forever. Nothing broke loudly: the create-guard forgives `.claude/memory/`, so the
+# escalation output the whole count>=3 machinery exists to produce simply never reached
+# git, and never existed for a fresh clone or a collaborator.
+#
+# `test_wrapup_memory_fold.test_tier_pathspec_covers_every_memory_output_wrapup_writes`
+# now derives the expected set from BOTH writers, including a scan of the rendered
+# stage, so adding a third memory output fails until the fold covers it.
 _HUMAN_MEMORY_TIER_PATHSPEC: tuple[str, ...] = (
     ".claude/memory/wiki.md",
     ".claude/memory/failures.md",
+    ".claude/memory/pending-proposals.md",
+    ".claude/memory/pending-drift.md",
     ".claude/memory/session",
+)
+
+_HUMAN_MEMORY_TIER_FILES: frozenset[str] = frozenset(
+    p for p in _HUMAN_MEMORY_TIER_PATHSPEC if p.endswith(".md")
 )
 
 
 def _is_human_memory_tier_path(rel: str) -> bool:
     """WHY: scope the fold to the exact human tiers, never a machine-churn path."""
     rel = rel.strip()
-    if rel in (".claude/memory/wiki.md", ".claude/memory/failures.md"):
+    if rel in _HUMAN_MEMORY_TIER_FILES:
         return True
     return rel.startswith(".claude/memory/session/") and rel.endswith(".md")
 
