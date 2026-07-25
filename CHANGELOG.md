@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+## [0.43.0] — 2026-07-26
+
+> **Re-render to get any of this.** Every fix below that touches a rendered
+> asset — the second-opinion recipes, the permission rules, the wrapup stage —
+> reaches an existing harness only through `/harness-maker:make --update`. A
+> harness that is not re-rendered keeps the broken second opinion and the old
+> blanket `Bash(uv:*)` grant.
+>
+> **Behaviour change after re-rendering:** commands that used to be auto-approved
+> through `Bash(uv:*)` now prompt unless they match one of the scoped rules —
+> notably `uv run python -c "…"`, which `/hm:loop-p5-batch` uses.
+
 ### Fixed — the cross-model second opinion actually runs now
 
 > **If your codex second opinion has been reporting `status: skipped`, that was this bug,
