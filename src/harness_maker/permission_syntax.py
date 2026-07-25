@@ -62,3 +62,56 @@ def unmatchable_reason(rule: str) -> str | None:
 def is_matchable_rule(rule: str) -> bool:
     """Whether `rule` can ever fire. See `unmatchable_reason` for the why."""
     return unmatchable_reason(rule) is None
+
+
+def _wildcard_body(pattern: str) -> str:
+    """`*` matches any run of characters (spaces included); everything else is literal."""
+    return ".*".join(re.escape(part) for part in pattern.split("*"))
+
+
+def _arg_regex(arg: str) -> re.Pattern[str]:
+    """Compile a Bash rule argument to the matcher Claude Code documents.
+
+    The load-bearing subtlety is the WORD BOUNDARY: a trailing `` *`` (and `:*`, which
+    the docs define as an equivalent spelling) requires the prefix to be followed by a
+    space or end-of-string, while a trailing `*` with no space does not. So
+    `Bash(x -m pkg:*)` does NOT match `x -m pkg.sub …` — the next character is `.`, not
+    a space — but `Bash(x -m pkg*)` does. Getting this backwards yields a rule that is
+    accepted, warns about nothing, and silently matches no command.
+    """
+    if arg.endswith(":*"):
+        arg = arg[:-2] + " *"
+    if arg.endswith(" *"):
+        return re.compile(f"^{_wildcard_body(arg[:-2])}(?: .*)?$", re.DOTALL)
+    return re.compile(f"^{_wildcard_body(arg)}$", re.DOTALL)
+
+
+def rule_matches_command(rule: str, command: str) -> bool:
+    """Whether a single `Bash(...)` rule matches one already-split subcommand."""
+    m = _RULE_RE.match(rule.strip())
+    if m is None or m.group("tool") != "Bash":
+        return False
+    arg = m.group("arg")
+    if arg is None:  # bare `Bash` allows everything
+        return True
+    return _arg_regex(arg).search(command.strip()) is not None
+
+
+def split_subcommands(command: str) -> list[str]:
+    """Split on the separators Claude Code splits on before matching."""
+    parts = [command]
+    for sep in BASH_SEPARATORS:
+        parts = [piece for part in parts for piece in part.split(sep)]
+    return [p.strip() for p in parts if p.strip()]
+
+
+def command_allowed_by(command: str, rules: list[str]) -> bool:
+    """Whether EVERY subcommand of `command` is matched by at least one rule.
+
+    Mirrors the documented compound-command behaviour: a rule that matches the whole
+    string is not enough — each subcommand is matched independently.
+    """
+    subs = split_subcommands(command)
+    if not subs:
+        return False
+    return all(any(rule_matches_command(r, sub) for r in rules) for sub in subs)

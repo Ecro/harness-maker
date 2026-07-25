@@ -78,6 +78,38 @@ Three review findings that were first recorded as deferred and then closed
   day-to-day friction, and the scoped rule exists so that removal cannot break the
   second opinion.
 
+### Security — the blanket `Bash(uv:*)` allow rule is retired
+
+> **Re-render (`/harness-maker:make --update`) to pick this up** — an existing
+> `.claude/settings.json` keeps the old rule until you do.
+
+`uv run` executes its arguments as a command. Claude Code's permissions docs call
+out exactly this class for environment runners — a rule like `Bash(devbox run *)`
+"matches whatever comes after `run`, including `devbox run rm -rf .`" — so
+`Bash(uv:*)` was not merely a broad grant, it pre-approved **arbitrary commands**.
+This harness also instructs the orchestrator to run the second-opinion call with
+`dangerouslyDisableSandbox: true`, and that pairing was the actual exposure
+(REVIEW-2026-07-25 F6).
+
+Following the docs' own prescription — name the runner *and* the inner command,
+one rule per command — both presets now ship:
+
+- `Bash(uv run --with <harness-maker-path> python -m harness_maker*)` — every
+  harness self-call (36 modules, 221 rendered invocations)
+- `Bash(uv run pytest:*)`, `Bash(uv run ruff:*)`, `Bash(uv run mypy:*)`
+
+`uv run python -c "…"` is deliberately **not** granted; inline code is arbitrary
+execution and now prompts.
+
+**The trailing-wildcard form is load-bearing.** `X:*` is defined as equivalent to
+`X *`, which "enforces a word boundary, requiring the prefix to be followed by a
+space or end-of-string" — so `…python -m harness_maker:*` would **not** match
+`…python -m harness_maker.worktree …` and would have silently matched nothing. The
+no-space `harness_maker*` form is required. `is_matchable_rule` does not catch this
+class, so `permission_syntax` gained `rule_matches_command` / `command_allowed_by`
+implementing the documented semantics, plus a seam test that every harness module
+invoked from the templates is actually allowed by the rendered rules.
+
 ### Added — harness economics observability (`harness_maker.economics`)
 - New spend model built on **Claude Code's own session transcripts**
   (`~/.claude/projects/<enc-cwd>/*.jsonl` + `<session>/subagents/*.jsonl`), which are the

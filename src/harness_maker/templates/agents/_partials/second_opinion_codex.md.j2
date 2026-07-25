@@ -38,12 +38,11 @@ command substitutions or backticks in adversarial diff text are never shell-expa
 > pre-approves exactly this command, and Codex stays contained by its own
 > `--sandbox read-only` flags. Do NOT disable the sandbox for any other command.
 >
-> **That scoped rule is not yet the operative grant.** A blanket `Bash(uv:*)` also ships
-> and matches any `uv` line, so today it — not the scoped rule — is what actually
-> pre-approves this call. The scoped rule exists so that removing the blanket does not
-> break the second opinion. While the blanket is present, a sandbox escape is
-> pre-approved for *every* `uv` command, so disabling the sandbox anywhere else is
-> the whole risk: don't.
+> **The scoped rule is now the operative grant.** The blanket `Bash(uv:*)` it used to sit
+> behind has been retired: `uv run` executes its arguments as a command, so per Claude
+> Code's own permissions docs a `Bash(uv:*)` rule pre-approved *arbitrary* commands — and
+> pairing that with a sandbox escape was the actual exposure. The shipped rules now name
+> the runner **and** the inner command, one per command.
 >
 > The scoped `Bash(codex exec:*)` rule still ships, but it is a **debugging affordance** for
 > running `codex` by hand, not the gate on this call.

@@ -139,16 +139,28 @@ def test_scoped_invoker_allow_rule_absent_when_no_model_is_enabled(tmp_path: Pat
 def test_partials_do_not_claim_the_blanket_uv_rule_authorises_the_escape(
     tmp_path: Path,
 ) -> None:
-    """F6: the prose used to cite `Bash(uv:*)` as what pre-approves a sandbox escape.
+    """F6: the prose used to cite the blanket `Bash(uv:*)` as what pre-approves a
+    sandbox escape. Naming a blanket grant as the authority for an escape is what made
+    the pairing invisible.
 
-    Naming a blanket grant as the authority for an escape is what made the pairing
-    invisible. The rendered stage must cite the scoped rule — and must still disclose
-    that the blanket is what actually matches today, because a reader who believes the
-    scoped rule is the boundary would be wrong.
+    The invariant asserted here is **cross-artifact consistency**: the rule the prose
+    names must actually be shipped in the rendered settings. An earlier version of this
+    test pinned the sentence "not yet the operative grant" instead, and rewording that
+    sentence correctly — after the blanket was retired — turned it red. That is
+    `[fail:test] test-pins-retired-implementation-name`, recorded the same day and then
+    reproduced here; the assertion is now on the artifact relationship, which survives
+    any rewording that keeps the claim true.
     """
     root = _render(tmp_path, models=["codex", "antigravity"])
     body = (root / "commands" / "hm" / "review.md").read_text(encoding="utf-8")
+    settings = json.loads((root / "settings.json").read_text(encoding="utf-8"))
+    allow = settings["permissions"]["allow"]
+
+    # The prose abbreviates the long machine-specific path as `…`, so the tie is on the
+    # identifying tail (module + the trailing-wildcard form) rather than the full literal.
+    tail = "harness_maker.second_opinion_invoke:*)"
+
     assert "dangerouslyDisableSandbox" in body
-    assert "harness_maker.second_opinion_invoke:*)" in body, "scoped rule not cited"
-    assert "`Bash(uv:*)` settings\n> `allow` rule pre-approves the command" not in body
-    assert "not yet the operative grant" in body, "blanket's real authority not disclosed"
+    assert tail in body, "prose cites no scoped rule"
+    assert any(tail in r for r in allow), "prose cites a rule that is not shipped"
+    assert "Bash(uv:*)" not in allow, "the blanket grant is back in settings"
