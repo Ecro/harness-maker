@@ -90,15 +90,25 @@ jobs:
         # Pinned version (supply-chain hardening — REVIEW security P1-1,
         # 2026-05-23): unpinned `npm install -g @openai/codex` would execute
         # whatever resolves to `latest` on every PR build, including a
-        # compromised future version. Pin to the version exercised at
-        # PLAN-install-cmd-cifence execute time; updating this pin is a
-        # deliberate review-gated step.
+        # compromised future version. Pin to the version the advisory test's
+        # expectation was verified against; updating this pin is a deliberate
+        # review-gated step.
+        #
+        # Bumped 0.133.0 -> 0.144.4 on 2026-07-25. It had been stale since
+        # 2026-07-15, when the advisory test flipped to expecting `plugin add`
+        # to SUCCEED (codex >= 0.144.x clones the repo) while CI kept
+        # installing 0.133.0, where it still errors "not found in
+        # marketplace". Because the step is continue-on-error, CI stayed green
+        # for 10 days with the test failing underneath. The pin must stay in
+        # lockstep with `_install_helpers.CODEX_CLI_PINNED_VERSION`, which
+        # `test_ci_codex_pin_matches_the_verified_version` enforces as a
+        # BLOCKING check.
         # NO continue-on-error (REVIEW security P1-2): a failing install IS
         # a signal worth surfacing. The advisory test consuming this binary
         # has its own `shutil.which("codex")` skip-guard which handles the
         # "codex absent" case; that's a separate failure mode from "install
         # itself broke" (which we want to know about).
-        run: npm install -g @openai/codex@0.133.0
+        run: npm install -g @openai/codex@0.144.4
       - name: Run BLOCKING install-cmd tests
         # Positive PyPI install + Cursor git-clone + README lint allowlist.
         # `-m "not advisory"` excludes the codex negative test from this step.

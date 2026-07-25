@@ -40,6 +40,22 @@ EXPECTED_README_INSTALL_COMMANDS: frozenset[str] = frozenset(
 )
 
 
+# The Codex CLI version the advisory install test's expectation was actually
+# verified against. CI must install exactly this version, and
+# `test_ci_codex_pin_matches_the_verified_version` (BLOCKING, ordinary suite) enforces
+# that — because the two silently diverged for 10 days: the test flipped from
+# "…_fails_as_documented" to "…_succeeds_as_documented" on 2026-07-15 when codex
+# 0.144.4 started cloning the repo, while CI kept installing 0.133.0 from 2026-05-23,
+# where `plugin add` still errors "not found in marketplace". The step is
+# `continue-on-error: true` by design (ADR-002 — external CLI behaviour must not block
+# CI), so the mismatch surfaced only as a workflow annotation nobody opened.
+#
+# The external behaviour check stays advisory; this internal consistency check does
+# not. Re-verifying the test against a newer codex means bumping BOTH this constant
+# and the `npm install -g @openai/codex@…` pin in `.github/workflows/ci.yml`.
+CODEX_CLI_PINNED_VERSION = "0.144.4"
+
+
 # ──────────────────────────────────────────────────────────────────────────
 # Wheel build + uv-tool install simulation
 # ──────────────────────────────────────────────────────────────────────────

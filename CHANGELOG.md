@@ -78,6 +78,26 @@ Three review findings that were first recorded as deferred and then closed
   day-to-day friction, and the scoped rule exists so that removal cannot break the
   second opinion.
 
+### Fixed — CI's codex pin had drifted from the test that depends on it
+
+The `install-cmd-regression` job's advisory step had been failing for **10 days**
+while CI reported success. On 2026-07-15 the codex install expectation was
+re-truthified — `codex plugin add` now SUCCEEDS, because codex ≥ 0.144.x clones the
+repo — but CI kept installing the version pinned on 2026-05-23, `0.133.0`, where it
+still errors `plugin 'harness-maker' was not found in marketplace`. The step is
+`continue-on-error: true` by design (ADR-002: external CLI behaviour must not block
+CI), so the only trace was a workflow annotation.
+
+The pin is bumped to `0.144.4`, verified by running the advisory test against a local
+codex 0.144.4 (passes). More importantly, the pin and the expectation are now held in
+lockstep by `CODEX_CLI_PINNED_VERSION` plus a **blocking** check,
+`test_ci_codex_pin_matches_the_verified_version`, which needs neither the codex CLI
+nor `INSTALL_CMD_TEST` because it only compares two values this repo owns. The
+external-behaviour assertion stays advisory — that was ADR-002's actual choice; what
+had never been checked was our own internal consistency. The advisory failure message
+now also names the running vs. expected version, which is what would have made the
+original annotation readable.
+
 ### Fixed — the verification cache was permanently cold
 
 `/hm:verify` writes a pass marker so `/hm:wrapup` can skip re-running the suite. It

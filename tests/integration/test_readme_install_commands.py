@@ -38,6 +38,7 @@ skip (CI sets the env in the install-cmd-regression job).
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -45,6 +46,7 @@ from pathlib import Path
 import pytest
 
 from tests.integration._install_helpers import (
+    CODEX_CLI_PINNED_VERSION,
     EXPECTED_README_INSTALL_COMMANDS,
     build_local_wheel,
     extract_bash_install_commands,
@@ -262,10 +264,19 @@ def test_codex_marketplace_add_succeeds_as_documented(tmp_path: Path) -> None:
     # 0.144.4) installs the plugin by cloning the repo into the plugin cache.
     # If this flips back to nonzero, either codex regressed OR the README's
     # "native plugin add installs the plugin" claim is stale — re-truthify.
+    running = subprocess.run(  # noqa: S603
+        [codex_bin, "--version"], capture_output=True, text=True, timeout=30, check=False
+    ).stdout.strip()
     assert result.returncode == 0, (
         f"`codex plugin add` UNEXPECTEDLY FAILED — the README documents native "
-        f"install as working on recent Codex CLI. Either codex regressed or the "
-        f"README needs re-truthification.\n"
+        f"install as working on recent Codex CLI. Either codex regressed, the README "
+        f"needs re-truthification, or the CLI under test is older than the version "
+        f"this expectation was verified against.\n"
+        # Naming both versions up front: the 2026-07-15..25 failure was purely a
+        # version mismatch (CI pinned 0.133.0 against a 0.144.4 expectation) and the
+        # message gave the reader no way to see that from the annotation alone.
+        f"running: {running!r} | expectation verified against: "
+        f"{CODEX_CLI_PINNED_VERSION!r}\n"
         f"stdout: {result.stdout!r}\nstderr: {result.stderr!r}"
     )
     # And it must leave the plugin cache where the README says it lands. The
@@ -277,4 +288,36 @@ def test_codex_marketplace_add_succeeds_as_documented(tmp_path: Path) -> None:
         f"`codex plugin add` reported success but left no plugin cache at "
         f"{installed_root} — README's install-location claim is stale.\n"
         f"stdout: {result.stdout!r}"
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# BLOCKING: CI pin must match the version the advisory expectation was verified on
+# ──────────────────────────────────────────────────────────────────────────
+
+
+def test_ci_codex_pin_matches_the_verified_version() -> None:
+    """The advisory test's expectation and CI's codex pin drifted apart for 10 days.
+
+    On 2026-07-15 the expectation flipped to `plugin add` SUCCEEDING (codex >= 0.144.x
+    clones the repo); CI kept installing 0.133.0, pinned 2026-05-23, where it still
+    errors "not found in marketplace". The step is `continue-on-error: true` by design
+    (ADR-002: external CLI behaviour must not block CI), so CI stayed green with the
+    test failing underneath and the only trace was a workflow annotation.
+
+    This check is deliberately NOT advisory and needs no codex CLI or
+    `INSTALL_CMD_TEST`: it compares two values this repo owns, so it runs in the
+    ordinary suite and blocks. It leaves the external-behaviour assertion advisory,
+    which is what ADR-002 actually chose — the thing that was never checked at all was
+    our own internal consistency.
+    """
+    ci = _repo_root() / ".github" / "workflows" / "ci.yml"
+    pins = re.findall(r"@openai/codex@([0-9][^\s\'\"]*)", ci.read_text(encoding="utf-8"))
+
+    assert pins, f"no `npm install -g @openai/codex@<version>` pin found in {ci}"
+    assert len(set(pins)) == 1, f"conflicting codex pins in {ci}: {sorted(set(pins))}"
+    assert pins[0] == CODEX_CLI_PINNED_VERSION, (
+        f"{ci.name} pins codex {pins[0]!r} but the advisory expectation was verified "
+        f"against {CODEX_CLI_PINNED_VERSION!r}. Bump BOTH together, or the advisory "
+        f"test fails silently behind continue-on-error."
     )
