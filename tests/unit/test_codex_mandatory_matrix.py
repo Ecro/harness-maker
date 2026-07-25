@@ -86,8 +86,10 @@ def test_reviewers_carry_no_exec_or_envelope(tmp_path: Path) -> None:
 
 def test_ledger_emit_lives_in_stages(tmp_path: Path) -> None:
     files = _render(tmp_path, preset=Preset.PRODUCTION, enabled=True)
-    assert "codex_ledger emit" in _plan_stage(files)
-    assert "codex_ledger emit" in _review_stage(files)
+    # The invoker owns the ledger row now — the stage relays its JSON instead of
+    # emitting. What must stay true is that no AGENT carries the ledger call.
+    assert "second_opinion_invoke" in _plan_stage(files)
+    assert "second_opinion_invoke" in _review_stage(files)
     # not in the agents anymore
     for name in ("plan-validator", "code-reviewer", "consensus-arbiter"):
         assert "codex_ledger emit" not in _agent(files, name), f"ledger emit leaked into {name}"

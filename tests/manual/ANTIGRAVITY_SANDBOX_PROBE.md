@@ -7,14 +7,14 @@
 
 `agy` has no `--ignore-user-config`/`--ignore-rules` hermetic flags and no documented
 `--sandbox read-only` guarantee (unlike `codex exec`). Before the antigravity second-opinion
-transport partial ships, this probe answers: **can `agy --print --sandbox` (our planned
+transport partial ships, this probe answers: **can `agy --sandbox --print` (our planned
 invocation shape — no `--project`/`--new-project`/`--add-dir`) mutate the filesystem it's
 invoked from?**
 
 ## Method (3 adversarial variants, per ADR-012's hardened design)
 
 Each variant ran in a fresh throwaway temp directory. Command shape matches the planned
-recipe: `agy --print --sandbox --model "<model>" < prompt_file`, no project/workspace flags,
+recipe: `agy --sandbox --print "<prompt>" --model "<model>"`, no project/workspace flags,
 `dangerouslyDisableSandbox: true` at the Bash-tool layer only (same network-egress requirement
 as the Codex transport — Antigravity itself is a hosted-model CLI).
 

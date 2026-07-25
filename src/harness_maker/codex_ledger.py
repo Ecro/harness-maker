@@ -40,7 +40,7 @@ class SecondOpinionRecord(BaseModel):
 
     ts: str = Field(max_length=64)
     slug: str = Field(max_length=200)
-    stage: Literal["review", "plan"]
+    stage: Literal["review", "plan", "health"]
     model: Literal["codex", "antigravity"] = "codex"
     finding_ref: str = Field(max_length=500)
     disposition: Literal["accepted", "rejected", "duplicate", "unresolved"]

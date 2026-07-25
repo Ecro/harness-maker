@@ -333,11 +333,11 @@ Write the one-paragraph body to a fresh temp file **outside the repo** with the 
 
 {% if is_codex %}
 ```
-Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.memory_md upsert-wiki --root . --slug <slug> --category <category> --body-file <tmpfile>")
+Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.memory_md upsert-wiki --root . --slug '<slug>' --category '<category>' --body-file <tmpfile>")
 ```
 {% else %}
 ```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.memory_md upsert-wiki --root . --slug <slug> --category <category> --body-file <tmpfile>
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.memory_md upsert-wiki --root . --slug '<slug>' --category '<category>' --body-file <tmpfile>
 ```
 {% endif %}
 
@@ -383,16 +383,16 @@ Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.memory_
 {% if is_codex %}
 ```
 # New failure (no confident match) — full paragraph via --body-file:
-Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.memory_md upsert-failure --root . --slug <slug> --category <category> --body-file <tmpfile>")
+Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.memory_md upsert-failure --root . --slug '<slug>' --category '<category>' --body-file <tmpfile>")
 # Recurrence (confident same-root-cause match) — reuse the EXACT slug + one-line note:
-Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.memory_md upsert-failure --root . --slug <existing-slug> --category <category> --occurrence-note \"<one line: what happened this time>\"")
+Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.memory_md upsert-failure --root . --slug '<existing-slug>' --category '<category>' --occurrence-note '<one line: what happened this time>'")
 ```
 {% else %}
 ```bash
 # New failure (no confident match) — full paragraph via --body-file:
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.memory_md upsert-failure --root . --slug <slug> --category <category> --body-file <tmpfile>
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.memory_md upsert-failure --root . --slug '<slug>' --category '<category>' --body-file <tmpfile>
 # Recurrence (confident same-root-cause match) — reuse the EXACT slug + one-line note:
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.memory_md upsert-failure --root . --slug <existing-slug> --category <category> --occurrence-note "<one line: what happened this time>"
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.memory_md upsert-failure --root . --slug '<existing-slug>' --category '<category>' --occurrence-note '<one line: what happened this time>'
 ```
 {% endif %}
 
@@ -477,11 +477,11 @@ should update (e.g. CHANGELOG.md, TODO.md), run `/hm:configure` and select
 
 {% if is_codex %}
 ```
-Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.second_brain promote --type <decision|failure|preference|project|reference|journal> --source-slug <stable-local-slug> --title '<title>' --body-file <path>")
+Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.second_brain promote --type <decision|failure|preference|project|reference|journal> --source-slug '<stable-local-slug>' --title '<title>' --body-file <path>")
 ```
 {% else %}
 ```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.second_brain promote --type <decision|failure|preference|project|reference|journal> --source-slug <stable-local-slug> --title "<title>" --body-file <path>
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.second_brain promote --type <decision|failure|preference|project|reference|journal> --source-slug '<stable-local-slug>' --title '<title>' --body-file <path>
 ```
 {% endif %}
 

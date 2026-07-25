@@ -24,15 +24,16 @@ def _render_health(*, models: list[str], is_codex: bool = False) -> str:
 
 def test_smoke_block_present_when_codex_enabled() -> None:
     out = _render_health(models=["codex"])
-    assert "codex exec" in out
+    assert "second_opinion_invoke --model codex --smoke" in out
     assert "smoke" in out.lower()
-    assert "--sandbox read-only" in out
+    # The raw CLI flags moved into the invoker, where a golden-argv test pins them.
+    assert "codex exec --sandbox read-only" not in out
 
 
 def test_smoke_block_absent_when_disabled() -> None:
     out = _render_health(models=[])
     assert "codex exec" not in out
-    assert "agy --print --sandbox --print-timeout 240s" not in out
+    assert "second_opinion_invoke" not in out
 
 
 def test_smoke_block_surfaces_explicit_pass_fail() -> None:
@@ -43,11 +44,17 @@ def test_smoke_block_surfaces_explicit_pass_fail() -> None:
     assert "fail" in low
 
 
-def test_antigravity_smoke_block_uses_timeout_wrapped_agy() -> None:
-    """The antigravity smoke recipe must wrap `agy` in `timeout` (Phase-1 hang guard)."""
+def test_antigravity_smoke_block_calls_the_shared_invoker() -> None:
+    """The smoke must go through the SAME entrypoint as the stage recipe (ADR-005).
+
+    It used to render its own copy of the raw `agy` line. A copy can drift from the
+    original, and this one did: the recipe ran inside a worktree while the smoke ran at
+    the base, so the smoke validated a path the real invocation never took.
+    """
     out = _render_health(models=["antigravity"])
-    assert "agy --print --sandbox --print-timeout 240s" in out
-    assert "adapt --model antigravity" in out
+    assert "second_opinion_invoke --model antigravity --smoke" in out
+    assert "--stage health" in out
+    assert "agy --print --sandbox" not in out
     low = out.lower()
     assert "pass" in low
     assert "fail" in low

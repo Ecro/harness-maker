@@ -18,57 +18,71 @@
 {%- set _stage = second_opinion_stage | default('review', true) %}
 {%- set _is_codex = is_codex if is_codex is defined else false %}
 **Invoke (codex).** Run Codex as a separate, sandbox-isolated step. Do NOT build the
-prompt inside the same shell line as the `codex exec` call.
+prompt inside the same shell line as the invoker call.
 
-First create the temp files (ordinary sandboxed Bash) and note the two paths:
+First create the prompt temp file (ordinary sandboxed Bash) and note the printed path — the
+invoker now owns the output sink, so there is no second temp file to make:
 
 ```bash
-prompt_tmp=$(mktemp); out_tmp=$(mktemp); printf 'prompt=%s\nout=%s\n' "$prompt_tmp" "$out_tmp"
+prompt_tmp=$(mktemp); printf 'prompt=%s\n' "$prompt_tmp"
 ```
 
 Then write the diff + {{ _stage }} context to the prompt-file path **using the
 Write tool** — not a shell variable. The Write tool stores the bytes verbatim, so
 command substitutions or backticks in adversarial diff text are never shell-expanded.
 {% if not _is_codex %}
-> **Sandbox escape (ADR-003, Claude Code only).** The `codex exec` call needs
+> **Sandbox escape (ADR-003, Claude Code only).** The invoker's `codex exec` call needs
 > outbound network, which Claude Code's Bash sandbox blocks. Run THIS ONE Bash call
-> with the Bash tool parameter **`dangerouslyDisableSandbox: true`** — the
-> `Bash(codex exec:*)` settings `allow` rule pre-approves the prompt, and Codex stays
-> contained by its own `--sandbox read-only` flags. Do NOT disable the sandbox for
-> any other command.
+> with the Bash tool parameter **`dangerouslyDisableSandbox: true`** — the scoped
+> `Bash(uv run … -m harness_maker.second_opinion_invoke:*)` settings `allow` rule
+> pre-approves exactly this command, and Codex stays contained by its own
+> `--sandbox read-only` flags. Do NOT disable the sandbox for any other command.
+>
+> **That scoped rule is not yet the operative grant.** A blanket `Bash(uv:*)` also ships
+> and matches any `uv` line, so today it — not the scoped rule — is what actually
+> pre-approves this call. The scoped rule exists so that removing the blanket does not
+> break the second opinion. While the blanket is present, a sandbox escape is
+> pre-approved for *every* `uv` command, so disabling the sandbox anywhere else is
+> the whole risk: don't.
+>
+> The scoped `Bash(codex exec:*)` rule still ships, but it is a **debugging affordance** for
+> running `codex` by hand, not the gate on this call.
 {%- else %}
 > **Codex runtime note.** The Claude-Code Bash-tool sandbox-escape parameter and the
 > `.claude/settings.json` allow rule do NOT apply on the Codex runtime — run the
 > `codex exec` call directly and approve it per your Codex sandbox/approval policy.
 > Codex stays contained by its own `--sandbox read-only` flags either way.
 {%- endif %}
-Finally run `codex exec` as its **own** Bash call — the command MUST begin with
-`codex exec` so the `Bash(codex exec:*)` allow rule matches it:
+Finally run the invoker as its **own** Bash call. It owns argv construction, base-root and
+config resolution, prompt delivery, status classification, adaptation, and the ledger row:
 
 ```bash
-codex exec --sandbox read-only {% if _codex.get('hermetic', true) %}--ignore-user-config --ignore-rules {% endif %}--output-schema {{ _codex.get('output_schema_path', '.claude/schemas/second-opinion-finding.schema.json') }} --output-last-message "$out_tmp" - < "$prompt_tmp"; echo "exit=$?"
+uv run --with {{ harness_maker_src_path }} python -m harness_maker.second_opinion_invoke --model codex --prompt-file <the literal path printed above> --slug "<slug>" --stage {{ _stage }}
 ```
 
-**Adapt (status-guarded).** Only when the `codex exec` exit was 0, pipe the
-output file through the adapter (deterministic — it maps severity
-`critical→P0 / high→P1 / medium→P2 / low,info→P3`, sets `source: "codex"`, and sets
-`needs_relaxation: true` when `file`/`line` is null; reading from the file keeps
-untrusted Codex content out of the shell). Always clean up the temp files:
+> **Why this is not a raw `codex exec` line any more.** It was, and that shape produced four
+> distinct silent-skip bugs, none of which any test could catch — a rendered recipe has no
+> execution surface, so render tests can only grep its text. The most recent: `--output-schema`
+> was passed cwd-relative, and under the per-task worktree workflow every stage runs inside
+> `.worktrees/<slug>/`, which has no `.claude/schemas/`. `codex exec` exited 1 on the harness's
+> NORMAL Production path and the degrade recorded `skipped` — indistinguishable from "codex is
+> not installed". The invoker resolves that path against the base repo and is unit-tested from
+> both cwds. Do NOT inline the CLI here again.
+
+**Relay the result.** The invoker writes ONE JSON line to stdout:
+`{"model": "codex", "status": "invoked"|"skipped"|"failed", "findings": [...], "reason": ...}`.
+Fold `findings` into the Step 4 filter and copy `status`/`reason` into this model's
+`second_opinion_results` entry verbatim — do **not** re-derive either. `skipped` means the call
+could not run (CLI missing, timeout, non-zero exit, unusable config); `failed` means it ran and
+returned a payload the filter cannot consume. Both are warn-and-proceed: surface the `reason` in
+your turn output and continue. The exit code is always 0 on a graceful degrade, so a non-zero
+exit means the arguments were wrong, not the model.
+
+Clean up the prompt file when you are done:
 
 ```bash
-if [ "$exit" -eq 0 ]; then uv run --with {{ harness_maker_src_path }} python -m harness_maker.codex_adapter adapt --model codex < "$out_tmp"; fi; rm -f "$prompt_tmp" "$out_tmp"
+rm -f <the literal path printed above>
 ```
 
-**Skip relay (graceful degrade — ANY non-zero exit).** A non-zero `codex exec` exit means
-the second opinion could not complete — the CLI is missing/removed (exit 127), `codex login`
-expired, a rate-limit / subscription cap was hit, or the call errored. In every such case set
-`status: "skipped"` for `model: "codex"` + a one-line reason, surface it (do NOT block —
-warn-and-proceed), and append a best-effort ledger row. Pass each value as a **separate
-`--flag`** (never inline an untrusted cause into a shell-quoted JSON blob — REVIEW security P1):
-
-```bash
-reason="<one-line cause>"; uv run --with {{ harness_maker_src_path }} python -m harness_maker.codex_ledger emit --slug "<slug>" --stage {{ _stage }} --model codex --finding-ref "n/a" --disposition unresolved --status skipped --skip-reason "$reason"
-```
-
-On success set `status: "invoked"` for codex. A silently-degraded second opinion is the H4
-failure mode — the `/hm:health` smoke check is the positive backstop.
+A silently-degraded second opinion is the H4 failure mode — the `/hm:health` smoke, which now
+calls this same entrypoint, is the positive backstop.

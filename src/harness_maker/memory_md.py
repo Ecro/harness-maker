@@ -29,10 +29,29 @@ _HEADING_RE = re.compile(r"^##\s+\[(?P<tier>[^:\]]+):(?P<cat>[^\]]+)\]\s+(?P<slu
 _FAILURE_META_RE = re.compile(
     r"\|\s*(?P<date>\d{4}-\d{2}-\d{2})\s*\|\s*count:\s*(?P<count>\S+)\s*$"
 )
-# slug/category must round-trip through `_HEADING_RE` cleanly — a `]`, `|`, or
-# whitespace would make the heading un-reparseable (silent duplicate on the next
-# upsert instead of replace). Pin them to the documented kebab-case shape.
-_SLUG_RE = re.compile(r"[a-z0-9][a-z0-9-]{0,39}")
+# Two independent rules, deliberately NOT one pattern (ADR-004 of
+# PLAN-second-opinion-invocation-and-slug-cap).
+#
+# `_SLUG_SAFE_RE` is the correctness floor and applies to EVERY slug.
+#
+# It is an ALLOWLIST, not a deny-three-characters rule. The reparse constraints
+# alone (whitespace truncates `_HEADING_RE`'s `\S+`, `]` breaks the
+# `[tier:category]` bracket, `|` collides with the `| date | count:N` meta) would
+# be satisfied by `[^\s\]|]+` — but that admits `$`, backticks, `;`, `&`, and the
+# slug's consumer is NOT only this module: `wrapup.md.j2` renders
+# `--slug <existing-slug>` UNQUOTED inside a `!uv run …` Bash line, and
+# `failures.md` is a committed deliverable. A heading carrying a command
+# substitution with no whitespace would be grandfathered here and executed there
+# on the next recurrence. Verified against the live corpus: all 307 existing
+# wiki+failure slugs satisfy this allowlist, so tightening costs nothing.
+#
+# `_SLUG_NEW_RE` is the style rule and applies only to slugs that are NOT already
+# present as an entry heading. 45/123 failure and 49/185 wiki slugs predate the
+# cap, and two wiki slugs under it carry `_`/`.`; holding those to the new-slug
+# rule made `count++` and in-place replacement unreachable for them — the writer
+# refusing keys it wrote itself.
+_SLUG_SAFE_RE = re.compile(r"[A-Za-z0-9._-]+")
+_SLUG_NEW_RE = re.compile(r"[a-z0-9][a-z0-9-]{0,39}")
 _CATEGORY_RE = re.compile(r"[a-z0-9-]+")
 
 
@@ -139,6 +158,19 @@ def _entry_headings(lines: list[str], open_idx: int, close_idx: int) -> list[tup
     return out
 
 
+def _validate_new_slug(slug: str) -> None:
+    """Style rule for slugs not already present — see ``_SLUG_NEW_RE``.
+
+    Separate from the floor so the diagnosis distinguishes "this key is new and
+    does not meet the convention" from "this key would corrupt the file".
+    """
+    if not _SLUG_NEW_RE.fullmatch(slug):
+        raise MemoryBlockError(
+            f"new slug {slug!r} must be kebab-case and at most 40 chars "
+            "(entries already in the file are grandfathered; new ones are not)"
+        )
+
+
 def _parse_failure_meta(heading: str) -> tuple[str, int]:
     m = _FAILURE_META_RE.search(heading)
     if not m:
@@ -214,8 +246,14 @@ def _upsert(
     title: str,
     occurrence_note: str | None = None,
 ) -> Path:
-    if not _SLUG_RE.fullmatch(slug):
-        raise MemoryBlockError(f"invalid slug {slug!r} (expected kebab-case, ≤40 chars)")
+    # The floor runs here, outside the lock: it needs no file, and a slug that would
+    # corrupt the tier must never reach a read-modify-write. The style rule cannot
+    # run yet — it depends on whether this slug is already an entry heading.
+    if not _SLUG_SAFE_RE.fullmatch(slug):
+        raise MemoryBlockError(
+            f"slug {slug!r} contains a character outside [A-Za-z0-9._-] — refused for "
+            "every slug, grandfathered or not (heading reparse + unquoted shell sink)"
+        )
     if not _CATEGORY_RE.fullmatch(category):
         raise MemoryBlockError(f"invalid category {category!r} (expected [a-z0-9-])")
     if OPEN_MARKER in body or CLOSE_MARKER in body:
@@ -243,6 +281,9 @@ def _upsert(
                     f"{target_file} has content but no @hm:user:entries block — refusing "
                     "to split it; restore the markers manually"
                 )
+            # Nothing on disk yet, so the existing-heading set is empty by
+            # construction — every slug reaching here is new.
+            _validate_new_slug(slug)
             sys.stderr.write(
                 f"[memory_md] WARN: {target_file} has no @hm:user:entries block — creating it\n"
             )
@@ -272,6 +313,12 @@ def _upsert(
 
         lines, open_idx, close_idx = located
         headings = _entry_headings(lines, open_idx, close_idx)
+        # Presence is derived from the parsed HEADINGS, never from a substring scan
+        # of the file: memory bodies routinely quote other entries' slugs, and a
+        # `slug in text` test would grandfather a merely-mentioned key and write a
+        # brand-new over-cap entry.
+        if not any(s == slug for _, s in headings):
+            _validate_new_slug(slug)
         matches = [idx for idx, s in headings if s == slug]
         if len(matches) > 1:
             raise MemoryBlockError(

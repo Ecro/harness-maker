@@ -66,6 +66,8 @@ MODULES: dict[str, ModuleSpec] = {
         _s("search", "read", "write", "append", "promote", "patch", "validate"),
         entry="_cli",
     ),
+    # flagonly: no subcommand, so guard-exempt — the argparse layer owns its own errors.
+    "second_opinion_invoke": ModuleSpec("flagonly"),
     "spec_inventory": ModuleSpec(
         "subparser", _s("reverse-map", "verify-inventory", "sample-for-review", "generate-all")
     ),

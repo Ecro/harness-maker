@@ -30,7 +30,7 @@
 
 ## Proposal: ruff-format-in-execute-not-just-wrapup (2026-07-09)
 **Triggered by:** [fail:lint] wrapup-final-verify-skips-ruff-format-check (count: 3)
-**Proposed mechanism:** execute + review stage procedure note (run `ruff format` after edits, not only `ruff check`) OR a pre-commit format-fix hook
+**Proposed mechanism:** execute + review stage procedure note (run `ruff format` after edits, not only `ruff check`) OR a pre-commit format-fix hook. **Updated 2026-07-25 — this mechanism has a gap.** It assumes the failure mode is "format was never run". A second mode exists: format IS run and its exit code is discarded, because the command was piped (`ruff format --check … | tail -1` makes `$?` the tail's). Neither a procedure note nor a format-fix hook catches that. Add: gate commands must never be piped — redirect and record one `rc` per check (`cmd > f 2>&1; echo "rc=$?" >> f`). See `[fail:lint] gate-exit-code-lost-through-pipe`.
 **Rationale:** Observed again in PLAN-second-opinion-multi-model wrapup: `ruff check` passed clean at execute AND review, but `ruff format --check` at wrapup found 7 unformatted files (long-line reflows the auto-fixer left un-normalized). Because `ruff check` ≠ `ruff format`, code that passes every lint gate in execute/review can still fail the wrapup format gate, forcing a late reformat + re-verify. A note in execute.md.j2 / review.md.j2 Phase D to run `ruff format` (not just `ruff check`) after edits — or a PostToolUse format-on-write hook scoped to `*.py` — would keep the tree format-clean continuously and stop wrapup from being the first place format is checked.
 
 ## Proposal: snapshot-regen-count-11-escalate-to-mechanical (2026-07-17)

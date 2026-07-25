@@ -252,8 +252,12 @@ def test_wrapup_renders_occurrence_note_recurrence_path(tmp_path: Path) -> None:
     """ADR-002: the recurrence write path passes --occurrence-note with the exact slug."""
     text = _render_wrapup(tmp_path, flag_on=True)
     assert "--occurrence-note" in text
-    # the exact-slug wiring is explicit: the recurrence invocation reuses the existing slug
-    assert "--slug <existing-slug>" in text
+    # The exact-slug wiring is explicit: the recurrence invocation reuses the existing
+    # slug. Single-quoted since 2026-07-25 — the value is read out of `failures.md`, a
+    # committed file, and reaches an argv position in a rendered `!uv run …` line, so an
+    # unquoted `$(…)` in a heading would execute at bash parse time.
+    assert "--slug '<existing-slug>'" in text
+    assert "--slug <existing-slug>" not in text
 
 
 def test_wrapup_renders_design_oscillation_qualifier(tmp_path: Path) -> None:

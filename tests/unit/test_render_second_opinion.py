@@ -39,27 +39,27 @@ def test_both_models_render_both_allow_lines(tmp_path: Path) -> None:
     root = _render(["codex", "antigravity"], tmp_path)
     settings = (root / "settings.json").read_text()
     assert "Bash(codex exec:*)" in settings
-    assert "Bash(agy --print --sandbox:*)" in settings
+    assert "Bash(agy --sandbox --print:*)" in settings
 
 
 def test_codex_only_no_agy_allow(tmp_path: Path) -> None:
     root = _render(["codex"], tmp_path)
     settings = (root / "settings.json").read_text()
     assert "Bash(codex exec:*)" in settings
-    assert "Bash(agy --print --sandbox:*)" not in settings
+    assert "Bash(agy --sandbox --print:*)" not in settings
 
 
 def test_antigravity_only_no_codex_allow(tmp_path: Path) -> None:
     root = _render(["antigravity"], tmp_path)
     settings = (root / "settings.json").read_text()
-    assert "Bash(agy --print --sandbox:*)" in settings
+    assert "Bash(agy --sandbox --print:*)" in settings
     assert "Bash(codex exec:*)" not in settings
 
 
 def test_disabled_is_byte_zero_second_opinion(tmp_path: Path) -> None:
     root = _render([], tmp_path)
     settings = (root / "settings.json").read_text()
-    assert "Bash(agy --print --sandbox:*)" not in settings
+    assert "Bash(agy --sandbox --print:*)" not in settings
     assert "Bash(codex exec:*)" not in settings
     review = (root / "commands/hm/review.md").read_text()
     plan = (root / "commands/hm/plan.md").read_text()
@@ -88,10 +88,13 @@ def test_dispatch_partial_loops_both_models_in_review(tmp_path: Path) -> None:
     review = (root / "commands/hm/review.md").read_text()
     assert "model: `codex`" in review
     assert "model: `antigravity`" in review
-    # antigravity recipe must use agy's native --print-timeout (Phase-1 hang guard) and begin
-    # with `agy` so the scoped Bash(agy --print --sandbox:*) allow rule prefix-matches it (review)
-    assert "agy --print --sandbox --print-timeout 240s" in review
-    assert "timeout 240 agy" not in review  # NOT the external-timeout wrapper (allow-rule miss)
+    # Both recipes now call the invoker, which owns argv construction. The old rendered
+    # `agy --print --sandbox …` shape was never a working command — `--print` takes the
+    # prompt as its VALUE, so `--sandbox` became the prompt and stdin was never read.
+    assert "python -m harness_maker.second_opinion_invoke --model antigravity" in review
+    assert "python -m harness_maker.second_opinion_invoke --model codex" in review
+    assert "agy --print --sandbox --print-timeout" not in review
+    assert "timeout 240 agy" not in review  # NOT the external-timeout wrapper either
 
 
 def test_plan_uses_second_opinion_results_contract(tmp_path: Path) -> None:
@@ -122,11 +125,24 @@ def test_render_never_shells_out_to_agy(monkeypatch: pytest.MonkeyPatch, tmp_pat
 def test_health_smoke_has_antigravity_block(tmp_path: Path) -> None:
     root = _render(["antigravity"], tmp_path)
     health = (root / "commands/hm/health.md").read_text()
-    assert "agy --print --sandbox --print-timeout 240s" in health
-    assert "adapt --model antigravity" in health
+    # ADR-005: the smoke calls the SAME entrypoint as the stage recipe. The previous
+    # smoke was a hand-copied duplicate of the raw CLI line, and it drifted from the
+    # original in the one dimension that mattered — it ran at the base, where a
+    # cwd-relative schema path resolves — so it reported green against a dead vote.
+    assert "second_opinion_invoke --model antigravity --smoke" in health
+    assert "--stage health" in health
+    assert "agy --print --sandbox" not in health
 
 
-def test_custom_antigravity_model_flows_to_recipe(tmp_path: Path) -> None:
+def test_custom_antigravity_model_is_persisted_for_the_invoker(tmp_path: Path) -> None:
+    """The configured model reaches the CLI through harness.yaml, not through the recipe.
+
+    It used to be inlined as `--model "<value>"` in the rendered prose. Now the invoker
+    reads it from the BASE repo's harness.yaml at call time — which is what lets it
+    survive a worktree cwd that has no `.claude/` at all. So the render-side contract is
+    "the value is persisted", and `test_config_survives_a_worktree_cwd_with_no_claude_dir`
+    owns the other half: that the persisted value actually reaches the argv.
+    """
     ans = InterviewAnswers(
         preset=Preset.PRODUCTION,
         targets=[Target.CLAUDE_CODE],
@@ -137,5 +153,8 @@ def test_custom_antigravity_model_flows_to_recipe(tmp_path: Path) -> None:
     )
     bp = synthesize(ProjectProfile(), ans)
     render(bp, tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
+
+    harness_yaml = (tmp_path / "harness.yaml").read_text()
+    assert "Gemini 3.5 Flash (High)" in harness_yaml
     review = (tmp_path / "commands/hm/review.md").read_text()
-    assert '--model "Gemini 3.5 Flash (High)"' in review
+    assert "second_opinion_invoke --model antigravity" in review

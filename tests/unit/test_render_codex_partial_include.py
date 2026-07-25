@@ -49,13 +49,29 @@ def _stage(files: dict[str, str], name: str) -> str:
     return next(t for p, t in files.items() if p.endswith(f"stages/{name}.md"))
 
 
+def _has_command_line(text: str, needle: str) -> bool:
+    """True iff `needle` appears on a line a reader would EXECUTE (fenced or `!`-led)."""
+    in_fence = False
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("```"):
+            in_fence = not in_fence
+            continue
+        if (in_fence or stripped.startswith("!")) and needle in line:
+            return True
+    return False
+
+
 def test_recipe_present_in_review_and_plan_stages_when_enabled(tmp_path: Path) -> None:
     files = _render(tmp_path, models=["codex"])
     for stage in ("review", "plan"):
         body = _stage(files, stage)
-        assert "codex exec" in body, f"{stage} stage missing codex exec recipe"
+        assert "second_opinion_invoke --model codex" in body, f"{stage} stage missing invoker call"
         assert "dangerouslyDisableSandbox" in body, f"{stage} stage missing sandbox directive"
-        assert "codex_adapter" in body, f"{stage} stage missing adapter step"
+        # Scoped to COMMAND lines. A bare `"codex exec" not in body` would also forbid
+        # the prose explaining why the raw CLI was retired — and a gate that bans naming
+        # the bug deletes its own rationale.
+        assert not _has_command_line(body, "codex exec"), f"{stage} stage re-inlined the raw CLI"
 
 
 def test_recipe_absent_from_stages_when_disabled(tmp_path: Path) -> None:
@@ -104,8 +120,9 @@ def test_partial_stage_param_interpolated(tmp_path: Path) -> None:
     assert "--stage plan" in plan
     for out in (review, plan):
         assert "dangerouslyDisableSandbox" in out
-        assert "codex_adapter" in out
-        assert "codex_ledger" in out
+        assert "second_opinion_invoke" in out
+        # The ledger row moved INTO the invoker; the recipe relays its JSON instead.
+        assert "second_opinion_results" in out
 
 
 _CFG_ENABLED = {
@@ -144,15 +161,21 @@ def test_partial_gates_sandbox_directive_on_is_codex() -> None:
     assert "dangerouslyDisableSandbox" not in codex
     assert "Codex runtime note" in codex
     for out in (claude, codex):
-        assert "codex exec" in out
-        assert "codex_adapter" in out
+        assert "second_opinion_invoke" in out
 
 
-def test_partial_codex_exec_is_a_bare_command_for_allow_match() -> None:
-    """M1/M2 (REVIEW-2026-06-17): the sandbox-disabled call must be a BARE
-    `codex exec` command (its own fenced line beginning with `codex exec`) so the
-    `Bash(codex exec:*)` allow rule prefix-matches it headless; and the untrusted
-    diff must not sit in a double-quoted shell assignment (`$(...)` expansion).
+def test_partial_sandbox_disabled_call_is_a_bare_invoker_command() -> None:
+    """M1/M2 (REVIEW-2026-06-17), retargeted 2026-07-25.
+
+    The invariant is unchanged in substance: the call the orchestrator is told to run
+    with the sandbox disabled must be a BARE command (its own fenced line, no leading
+    `cd`/pipe/assignment) so a settings `allow` prefix rule can match it headless, and
+    the untrusted diff must never sit in a double-quoted shell assignment.
+
+    What changed is WHICH command that is. `codex exec` is no longer inlined — the
+    partial calls `harness_maker.second_opinion_invoke`, which owns argv construction.
+    Pinning `codex exec` here would now assert the shape this change deliberately
+    removed, which is why the test failed rather than the code.
     """
     import re
 
@@ -165,7 +188,7 @@ def test_partial_codex_exec_is_a_bare_command_for_allow_match() -> None:
         harness_maker_src_path="/cache/hm/0.0.0",
     )
     blocks = re.findall(r"```bash\n(.*?)\n```", out, re.DOTALL)
-    assert any(b.lstrip().startswith("codex exec") for b in blocks), (
-        f"no bare `codex exec` command block; blocks={[b[:40] for b in blocks]!r}"
+    assert any(b.lstrip().startswith("uv run") and "second_opinion_invoke" in b for b in blocks), (
+        f"no bare invoker command block; blocks={[b[:40] for b in blocks]!r}"
     )
     assert 'content="' not in out, "untrusted diff must not go in a double-quoted assignment"

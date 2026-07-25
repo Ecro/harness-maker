@@ -18,7 +18,7 @@
   "properties": {
     "ts": {"type": "string"},
     "slug": {"type": "string"},
-    "stage": {"type": "string", "enum": ["review", "plan"]},
+    "stage": {"type": "string", "enum": ["review", "plan", "health"]},
     "model": {"type": "string", "enum": ["codex", "antigravity"]},
     "finding_ref": {"type": "string"},
     "disposition": {

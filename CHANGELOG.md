@@ -2,6 +2,82 @@
 
 ## [Unreleased]
 
+### Fixed — the cross-model second opinion actually runs now
+
+> **If your codex second opinion has been reporting `status: skipped`, that was this bug,
+> not your CLI.** And if antigravity ever reported `invoked`, the vote was empty. Re-render
+> (`/harness-maker:make --update`) to pick up the fix — nothing else will tell you, because
+> a broken invocation and an uninstalled CLI produced the identical `skipped` status.
+
+Three defects, all silent by construction:
+
+- **codex was dead on the normal Production path.** The rendered recipe passed
+  `--output-schema` as a **cwd-relative** path. Under `worktree.feature_branch_workflow`
+  (the Production default) every `/hm:` stage runs inside `.worktrees/<slug>/`, which has
+  no `.claude/schemas/`. `codex exec` exited 1 and the graceful-degrade path recorded
+  `skipped`. Verified: the identical call with an absolute path returned 9 findings, three
+  of them real P1s no Claude reviewer had raised.
+- **every antigravity vote ever cast was vacuous.** `agy --print` takes the prompt as its
+  **value**, not as a boolean flag, so the rendered `agy --print --sandbox … < prompt_file`
+  made the literal string `--sandbox` the prompt — and `agy` never reads stdin in print mode
+  at all. Exit 0, a fluent reply, nothing looking broken. As a side effect the documented
+  sandbox write-probe (ADR-012) had been running without `--sandbox` in effect; the
+  corrected shape is strictly more restrictive, so no new exposure follows, but that
+  evidence is only now actually tested.
+- **`/hm:health`'s smoke could not have caught either.** It was a hand-copied duplicate of
+  the raw CLI lines and ran from the base repo, where the relative path resolves. It
+  reported green against a dead vote.
+
+Both invocations now live in `harness_maker.second_opinion_invoke`, a tested module that
+owns argv construction, base-root and config resolution, prompt delivery, status
+classification, and the ledger row; `/hm:health` calls the same entrypoint. A producer-gate
+test fails if any rendered command reintroduces the retired shapes.
+
+Two contract changes worth knowing about:
+
+- `second-opinion.jsonl` now carries **one row per invocation** (it used to hold only skip
+  rows), and rows land under the **base** repo rather than in the worktree copy that
+  `task-land` deletes. Compute skip-rate as `skipped / total` and exclude `stage: "health"`.
+- `SecondOpinionRecord.stage` and the shipped ledger schema both gained `"health"`.
+
+### Fixed — memory CLI refused slugs it had written itself
+
+`memory_md`'s slug validator capped keys at 40 kebab-case characters, but 45 of 123
+`failures.md` slugs and 49 of 185 `wiki.md` slugs already exceeded it (max 65), and two wiki
+slugs under the cap carry `_` or `.`. Those entries could never receive a `count++` or an
+in-place replacement, so the `count>=3` escalation was unreachable for 37 % of the failure
+corpus — and the operator's workaround (inventing a near-duplicate slug) *lowered* the very
+counts the dedup step exists to raise. Existing entries are now grandfathered against both
+the length cap and the character class; new slugs are still held to the full rule. Only
+whitespace, `]`, and `|` are refused unconditionally — those are the three characters that
+actually corrupt the tier file.
+
+### Hardened — second-opinion invoker: ownership, bounded read, scoped grant
+
+Three review findings that were first recorded as deferred and then closed
+(REVIEW-2026-07-25 F3/F4/F6):
+
+- **The invoker no longer deletes files it did not create.** Cleanup decided "is this
+  mine to unlink?" by asking whether the schema's parent directory *was* the temp dir —
+  a guess that answers yes about a **user's** schema whenever the repo itself lives under
+  `$TMPDIR`. `resolve_schema_path` now returns `(path, we_created_it)`; ownership is
+  recorded where it is actually known, at creation.
+- **The output cap now bounds the read, not just the retained string.** `read_text()[:N]`
+  materialises the whole model-authored file first, so the cap never did what its comment
+  claimed; the slice also counted *characters* against a *byte*-named limit, letting a
+  CJK payload roughly 3× over the cap through untouched. It now reads `cap+1` bytes and
+  fails closed with the cap named — the previous silent truncation only ever surfaced as
+  a JSON parse error that explained nothing.
+- **The sandbox escape no longer rests on a blanket grant in the prose.** A scoped
+  `Bash(uv run … -m harness_maker.second_opinion_invoke:*)` allow rule now ships whenever
+  any second-opinion model is enabled, and the rendered instruction cites it instead of
+  `Bash(uv:*)`. **This is preparatory, not yet protective:** the blanket `Bash(uv:*)` is
+  still shipped and still matches, so it — not the scoped rule — is what actually
+  pre-approves the call today. The rendered prose says so explicitly rather than implying
+  a boundary that isn't there. Removing the blanket is a separate decision with real
+  day-to-day friction, and the scoped rule exists so that removal cannot break the
+  second opinion.
+
 ### Added — harness economics observability (`harness_maker.economics`)
 - New spend model built on **Claude Code's own session transcripts**
   (`~/.claude/projects/<enc-cwd>/*.jsonl` + `<session>/subagents/*.jsonl`), which are the

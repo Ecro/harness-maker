@@ -262,6 +262,9 @@ _PROMOTE_RESERVED_KEYS = frozenset(
 )
 
 
+_SOURCE_SLUG_UNSAFE_RE = re.compile(r"['\r\n]")
+
+
 def _slugify(text: str) -> str:
     """Deterministic kebab slug for promotion filenames.
 
@@ -295,6 +298,18 @@ def promote_note(
     judgment of WHAT to promote and the note's prose. Re-promoting the same
     `(note_type, source_slug)` updates the existing note in place — never a dup.
     """
+    # `wrapup.md.j2` interpolates this value into a rendered `!uv run …` Bash line, and
+    # instructs the model to take it from `failures.md` — a committed file. The line is
+    # now SINGLE-quoted, which neutralises `$(…)`, backticks, `;` and `&`; the only
+    # remaining escape is a literal single quote (or a newline splitting the command).
+    # Reject exactly those. A full `[A-Za-z0-9._-]+` allowlist would be the wrong layer:
+    # this function's tested contract is that it accepts free text (`"ADR-001 Reverse
+    # Advisory"`) and lets `_slugify` neutralise it, including traversal.
+    if _SOURCE_SLUG_UNSAFE_RE.search(source_slug):
+        raise ValueError(
+            f"source_slug {source_slug!r} may not contain a single quote or a newline "
+            "(it is interpolated into a single-quoted shell argument by the wrapup recipe)"
+        )
     cfg = _load_config(harness_root)
     if not cfg.folders:
         raise SecondBrainError(_EMPTY_FOLDERS_REMEDIATION)

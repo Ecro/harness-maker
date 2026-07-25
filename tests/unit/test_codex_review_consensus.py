@@ -31,8 +31,7 @@ def _render_review(*, codex_enabled: bool, is_codex: bool = False) -> str:
 
 def test_codex_orchestration_present_when_enabled() -> None:
     out = _render_review(codex_enabled=True)
-    assert "codex_adapter" in out
-    assert "codex exec" in out
+    assert "second_opinion_invoke --model codex" in out
 
 
 def test_cross_model_heterogeneous_voter_present_when_enabled() -> None:
@@ -69,6 +68,6 @@ def test_skip_relay_present() -> None:
 
 def test_codex_blocks_absent_when_disabled() -> None:
     out = _render_review(codex_enabled=False)
-    assert "codex_adapter" not in out
+    assert "second_opinion_invoke" not in out
     assert "needs_relaxation" not in out
     assert "second_opinion_results" not in out

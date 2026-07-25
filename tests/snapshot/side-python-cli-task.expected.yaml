@@ -52,10 +52,10 @@ files:
   body_sha256: b21c93834343787e5dca94da2a9f5a41260ccf8c36fb0b6016c21edb747741e0
 - path: commands/hm/exec-rev-ver-wrap.md
   template: commands/hm/workflow_command.md.j2
-  body_sha256: 7852db1447d05170e2be001a01c6ce83447d6c80458120e0c2ff459312543b17
+  body_sha256: 705d7ae8920e5ca5ad32c9dd88fa7eeca84830f72d8dba7486c96ed5c7b087d9
 - path: commands/hm/exec-rev-wrap.md
   template: commands/hm/workflow_command.md.j2
-  body_sha256: 5e2d856d851c93482de033ce77038b47b39057e65654fb958a54cc1c68b93588
+  body_sha256: 11d67a58b89b41ba11dccf50e1842462b924064a364fa3229840c5cc43db44cd
 - path: commands/hm/exec-rev.md
   template: commands/hm/workflow_command.md.j2
   body_sha256: b02eaae06c817f8da32e484819da3436761385b5f401be4f9c7ad06c613bef38
@@ -82,7 +82,7 @@ files:
   body_sha256: e47f716496dbb36f7b61c52178dc4c1500cb975773575b2d54f5e7b0a487063e
 - path: commands/hm/plan-exec-rev-wrap.md
   template: commands/hm/workflow_command.md.j2
-  body_sha256: 22a464631bf6316bc6bd83a3b2edcf78ee4a0b7b5ebb497467ab2635c6505be5
+  body_sha256: c5152660b1c1ba9a16da2d18d528d6691503fa4e82ac580f001d386def58f27b
 - path: commands/hm/plan-exec-rev.md
   template: commands/hm/workflow_command.md.j2
   body_sha256: 4ed6228038af1135dedeb77b80a9c546296226ac4883ed63d2becef63267822d
@@ -106,7 +106,7 @@ files:
   body_sha256: d64f55cadf6ea852f71e1d1654774da40847805a70b735dfd378992637381ad7
 - path: commands/hm/wrapup.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: d4c5699fd5e8d0d9e93a775c02aa46b07c605c5d542afe204ae30b93d140ffbd
+  body_sha256: 20559f553c3c3fe24086069cdf39181e96c4beb6954b771f6a353572b545cdce
 - path: harness.yaml
   template: harness-yaml/Side.yaml.j2
   body_sha256: 24666e0df4385311c9cacf7af7e943a8f1b756501c12d1c97abd226243d4077b
@@ -184,4 +184,4 @@ files:
   body_sha256: d7837738f2c6922cd7aa8704fdcc399788dbb15edacd99fad73d8eb51949be8a
 - path: stages/wrapup.md
   template: stages/wrapup.md.j2
-  body_sha256: 9561062b915440932faf73c55d16121a1380be40db925be014c8e53af58f1ffe
+  body_sha256: 178e6e2bbfba5487124510c48821e1f1b9e44698d7612c7389d8ad817907a5eb

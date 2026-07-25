@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Literal, get_args, get_origin
 
 import pytest
 from pydantic import ValidationError
@@ -120,6 +121,15 @@ def test_emit_rejects_observability_dir_escaping_root(tmp_path: Path) -> None:
         codex_ledger.emit(rec, project_root=tmp_path, observability_dir=outside)
 
 
+def _literal_values(annotation: object) -> set[str]:
+    """The `Literal[...]` members of a field annotation, ignoring any `| None` union."""
+    out: set[str] = set()
+    for arg in (annotation, *get_args(annotation)):
+        if get_origin(arg) is Literal:
+            out.update(str(v) for v in get_args(arg))
+    return out
+
+
 def test_json_schema_matches_model_fields() -> None:
     """The rendered ledger schema property set must equal the pydantic model fields."""
     schema_path = (
@@ -134,6 +144,17 @@ def test_json_schema_matches_model_fields() -> None:
     schema_props = set(schema["properties"])
     model_fields = set(codex_ledger.SecondOpinionRecord.model_fields)
     assert schema_props == model_fields
+
+    # Names alone are invariant over the enum VALUES — a widened `Literal` against a
+    # stale enum passed this test while the shipped schema declared the rows the code
+    # writes invalid. That is exactly what happened when `stage` gained "health".
+    for name, field in codex_ledger.SecondOpinionRecord.model_fields.items():
+        literals = _literal_values(field.annotation)
+        if not literals:
+            continue
+        assert set(schema["properties"][name].get("enum", [])) == literals, (
+            f"{name}: schema enum drifted from the model Literal"
+        )
 
 
 def test_cli_emit_roundtrip(

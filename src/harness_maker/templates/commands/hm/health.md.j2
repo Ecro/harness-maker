@@ -67,42 +67,42 @@ warn-and-proceed failure policy makes a broken CLI (missing/removed binary, expi
 rate-limit / subscription cap, schema/flag drift) look identical to "model agreed / nothing to
 add". A silently-degraded model means every *mandatory* review/plan second opinion is running
 without that voice and nobody notices.
-{% if 'codex' in config.second_opinion.models %}
-### codex
+> **Same entrypoint as the stage recipe.** The smoke below calls
+> `harness_maker.second_opinion_invoke` — the *identical* code path `/hm:review` and `/hm:plan`
+> use. The previous smoke was a hand-copied duplicate of the raw CLI command, and it drifted from
+> the original in the one dimension that mattered: it ran from the base repo where a cwd-relative
+> `--output-schema` resolves, while the real recipe runs inside `.worktrees/<slug>/` where it does
+> not. It reported green for months against a dead codex vote.
+>
+> **What a green smoke does and does NOT prove.** `/hm:health` has no worktree preflight, so it
+> still runs at the base, where base-root resolution hits its identity case. A pass means the
+> shared invocation path works *from the base*; it does not exercise the worktree branch of
+> base-root or config resolution. That branch is carried by the unit tests and by the manual
+> from-inside-a-worktree check. Do not read a green `/hm:health` as proof the Production path
+> works — that inference is exactly what hid the last bug.
 
-> **Sandbox escape (ADR-003).** `codex exec` needs outbound network, which Claude Code's Bash
-> sandbox blocks. Run this smoke `codex exec` with the Bash tool parameter
-> **`dangerouslyDisableSandbox: true`** — otherwise the positive backstop is itself
-> sandbox-gated and would report a false skip. The command begins with `codex exec` (a bare
-> call) so the `Bash(codex exec:*)` allow rule matches and pre-approves it headless.
-
-```bash
-!codex exec --sandbox read-only {% if config.second_opinion.codex.hermetic %}--ignore-user-config --ignore-rules {% endif %}--output-schema .claude/schemas/second-opinion-finding.schema.json - <<< 'Return a finding list with an empty findings array, summary "smoke", confidence null.'; echo "exit=$?"
-```
-
-- **pass** — exit 0 AND the output sink is schema-valid JSON.
-- **fail** — non-zero exit (127 = removed, auth error, rate-limit), or schema rejection.
-{% endif %}{% if 'antigravity' in config.second_opinion.models %}
-### antigravity
-
-> **Sandbox escape (ADR-003).** `agy` needs outbound network. Run this smoke with the Bash
-> tool parameter **`dangerouslyDisableSandbox: true`**. Use agy's native `--print-timeout` (a
-> file-request can hang — Phase-1 probe); the command begins with `agy --print --sandbox` so the
-> scoped `Bash(agy --print --sandbox:*)` allow rule matches it (an external `timeout` wrapper
-> would not prefix-match). `agy` has no `--output-schema`, so the check asserts exit 0 + a single
-> parseable JSON payload via the tolerant adapter, NOT schema validity.
+> **Sandbox escape (ADR-003).** These calls need outbound network, which Claude Code's Bash
+> sandbox blocks. Run each with the Bash tool parameter **`dangerouslyDisableSandbox: true`** —
+> otherwise the positive backstop is itself sandbox-gated and reports a false skip.
+{% for model in config.second_opinion.models %}
+### {{ model }}
 
 ```bash
-!agy --print --sandbox --print-timeout 240s --model "{{ config.second_opinion.antigravity.model }}" <<< 'Return ONLY a JSON object: {"findings": [], "summary": "smoke", "confidence": null}' > /tmp/hm-agy-smoke.json; echo "exit=$?"; uv run --with {{ harness_maker_src_path }} python -m harness_maker.codex_adapter adapt --model antigravity < /tmp/hm-agy-smoke.json && echo "adapt=ok"; rm -f /tmp/hm-agy-smoke.json
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.second_opinion_invoke --model {{ model }} --smoke --slug health-smoke --stage health
 ```
 
-- **pass** — exit 0 AND `adapt=ok` (the tolerant adapter found exactly one JSON payload).
-- **fail** — non-zero exit (127 = removed, print-timeout, auth/rate-limit error), or the
-  adapter reported a parse failure.
-{% endif %}
+- **pass** — the JSON line reports `"status": "invoked"`.
+- **fail** — `"status": "skipped"` (CLI missing/removed, expired auth, rate-limit, timeout) or
+  `"status": "failed"` (it ran and returned a payload the Step 4 filter cannot consume). The
+  `reason` field names which.
+{% endfor %}
 Report each model's result explicitly as a Layer 1 ActionItem. Until a failing model is fixed,
 treat all "that model agreed" review/plan outcomes as untrusted (Claude-only for that voice).
-Cross-ref the ledger `.claude/observability/second-opinion.jsonl` per-model skip-rate.
+Cross-ref the ledger `.claude/observability/second-opinion.jsonl`: rows are now one per
+**invocation** (not one per skip, as before this change), so compute the skip-rate as
+`skipped / total` and **exclude `stage: "health"` rows** — smoke rows are structurally biased
+toward `invoked` (base cwd, trivial prompt) and would dilute the number every time a health audit
+runs.
 {% endif %}
 {% if config.autonomy.level != "gated" %}
 ## Autopilot auto-advance smoke check (PLAN-human-bottleneck-auto-advance P7, ADR-009)

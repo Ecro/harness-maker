@@ -4,10 +4,10 @@ PLAN-second-opinion-multi-model ADR-011 (generalizes PLAN-codex-second-opinion-s
 ADR-002/003/004): the main loop (stage prompt), not a tool-restricted reviewer
 subagent, runs `codex exec` / `agy`. So:
 - reviewer agents NEVER carry the `Bash` tool or a frontmatter `Bash(codex exec:*)` /
-  `Bash(agy --print --sandbox:*)` permission (enabled or disabled) — they revert to
+  `Bash(agy --sandbox --print:*)` permission (enabled or disabled) — they revert to
   `Read, Grep, Glob`.
 - the `Bash(codex exec:*)` allow rule moves to `settings.json`, gated on
-  `'codex' in config.second_opinion.models`; `Bash(agy --print --sandbox:*)` gated on
+  `'codex' in config.second_opinion.models`; `Bash(agy --sandbox --print:*)` gated on
   `'antigravity' in config.second_opinion.models`.
 """
 
@@ -28,7 +28,7 @@ from harness_maker.synthesize import synthesize
 
 _REVIEWERS = ("code-reviewer", "consensus-arbiter", "plan-validator")
 _CODEX_MARKER = "Bash(codex exec:*)"
-_AGY_MARKER = "Bash(agy --print --sandbox:*)"
+_AGY_MARKER = "Bash(agy --sandbox --print:*)"
 
 
 def _render(tmp_path: Path, *, models: list[str], preset: Preset = Preset.SIDE) -> Path:
@@ -104,3 +104,51 @@ def test_both_allow_rules_present_when_both_models_enabled(tmp_path: Path) -> No
     settings = json.loads((root / "settings.json").read_text(encoding="utf-8"))
     assert _CODEX_MARKER in settings["permissions"]["allow"]
     assert _AGY_MARKER in settings["permissions"]["allow"]
+
+
+# ── scoped invoker grant (REVIEW-2026-07-25 F6) ──────────────────────────────
+
+_INVOKER_PREFIX = "Bash(uv run --with "
+_INVOKER_SUFFIX = " python -m harness_maker.second_opinion_invoke:*)"
+
+
+def _invoker_rules(settings: dict[str, object]) -> list[str]:
+    allow = settings["permissions"]["allow"]  # type: ignore[index]
+    return [r for r in allow if _INVOKER_SUFFIX in r]  # type: ignore[union-attr]
+
+
+def test_scoped_invoker_allow_rule_ships_whenever_any_model_is_enabled(tmp_path: Path) -> None:
+    """F6: the sandbox-escape instruction must be able to name a rule that covers
+    exactly the invoker, so removing the blanket `Bash(uv:*)` cannot break the second
+    opinion. Gated on the model SET, not on any single model — an antigravity-only
+    harness runs the same invoker.
+    """
+    for models in (["codex"], ["antigravity"], ["codex", "antigravity"]):
+        root = _render(tmp_path / "-".join(models), models=models)
+        settings = json.loads((root / "settings.json").read_text(encoding="utf-8"))
+        rules = _invoker_rules(settings)
+        assert len(rules) == 1, f"models={models}: {rules}"
+        assert rules[0].startswith(_INVOKER_PREFIX), rules[0]
+
+
+def test_scoped_invoker_allow_rule_absent_when_no_model_is_enabled(tmp_path: Path) -> None:
+    root = _render(tmp_path, models=[])
+    assert _invoker_rules(json.loads((root / "settings.json").read_text(encoding="utf-8"))) == []
+
+
+def test_partials_do_not_claim_the_blanket_uv_rule_authorises_the_escape(
+    tmp_path: Path,
+) -> None:
+    """F6: the prose used to cite `Bash(uv:*)` as what pre-approves a sandbox escape.
+
+    Naming a blanket grant as the authority for an escape is what made the pairing
+    invisible. The rendered stage must cite the scoped rule — and must still disclose
+    that the blanket is what actually matches today, because a reader who believes the
+    scoped rule is the boundary would be wrong.
+    """
+    root = _render(tmp_path, models=["codex", "antigravity"])
+    body = (root / "commands" / "hm" / "review.md").read_text(encoding="utf-8")
+    assert "dangerouslyDisableSandbox" in body
+    assert "harness_maker.second_opinion_invoke:*)" in body, "scoped rule not cited"
+    assert "`Bash(uv:*)` settings\n> `allow` rule pre-approves the command" not in body
+    assert "not yet the operative grant" in body, "blanket's real authority not disclosed"
