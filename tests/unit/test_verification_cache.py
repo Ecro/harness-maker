@@ -229,3 +229,60 @@ def test_verification_cache_cli_check_and_mark(fake_project: Path, tmp_path: Pat
         assert main(["check", "--root", str(fake_project)]) == 1
         assert main(["mark-pass", "--root", str(fake_project), "--checks", "lint,pytest"]) == 0
         assert main(["check", "--root", str(fake_project)]) == 0
+
+
+# --- launcher-volatile env values (fail:design verification-cache-key-nondeterministic) ---
+
+_EPH = "/home/u/.cache/uv/builds-v0/.tmp"
+
+
+def _key_with(project: Path, **over: str) -> str:
+    """compute_relevant_skip_key under a patched environment."""
+    with patch.dict(os.environ, over, clear=False):
+        return compute_relevant_skip_key(project)
+
+
+def test_key_is_stable_across_ephemeral_launcher_envs(fake_project: Path) -> None:
+    """The defect: every rendered harness command runs via `uv run --with <pkg>`, which
+    builds a throwaway env per invocation under `~/.cache/uv/builds-v*/.tmpXXXXXX` and
+    exports it through PATH and VIRTUAL_ENV. Hashing those verbatim made the key change
+    on every call, so no marker could ever be fresh and `/hm:verify` + `/hm:wrapup` each
+    re-ran the full suite forever — indistinguishable from correct invalidation.
+    """
+    keys = {
+        _key_with(
+            fake_project,
+            PATH=f"{_EPH}{tag}/bin:/usr/bin:/bin",
+            VIRTUAL_ENV=f"{_EPH}{tag}",
+        )
+        for tag in ("AAAAAA", "BBBBBB", "CCCCCC")
+    }
+    assert len(keys) == 1, f"key still churns per invocation: {keys}"
+
+
+def test_a_real_path_change_still_invalidates(fake_project: Path) -> None:
+    """Scrubbing is value-level, not variable-level: PATH stays in the hash.
+
+    Ignoring PATH outright would have fixed the churn too, and would have been wrong —
+    a verification cache must over-invalidate rather than risk a false PASS.
+    """
+    base = _key_with(fake_project, PATH=f"{_EPH}A/bin:/usr/bin", VIRTUAL_ENV=f"{_EPH}A")
+    moved = _key_with(fake_project, PATH=f"{_EPH}A/bin:/opt/other/bin", VIRTUAL_ENV=f"{_EPH}A")
+    assert base != moved
+
+
+def test_an_unknown_new_env_var_still_invalidates(fake_project: Path) -> None:
+    """The inverted (blocklist) policy is preserved — `INTEGRATION=1` genuinely changes
+    which tests run, and no allowlist would have been guaranteed to name it."""
+    base = _key_with(fake_project, PATH=f"{_EPH}A/bin:/usr/bin")
+    flagged = _key_with(fake_project, PATH=f"{_EPH}A/bin:/usr/bin", INTEGRATION="1")
+    assert base != flagged
+
+
+def test_the_uv_archive_path_is_not_scrubbed(fake_project: Path) -> None:
+    """`archive-v*` encodes the identity of the installed package — real signal, unlike
+    `builds-v*`, which is recreated per invocation. Scrubbing both would silently stop
+    detecting a dependency swap."""
+    a = _key_with(fake_project, PATH="/home/u/.cache/uv/archive-v0/AAA/bin:/usr/bin")
+    b = _key_with(fake_project, PATH="/home/u/.cache/uv/archive-v0/BBB/bin:/usr/bin")
+    assert a != b

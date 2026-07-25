@@ -78,6 +78,28 @@ Three review findings that were first recorded as deferred and then closed
   day-to-day friction, and the scoped rule exists so that removal cannot break the
   second opinion.
 
+### Fixed — the verification cache was permanently cold
+
+`/hm:verify` writes a pass marker so `/hm:wrapup` can skip re-running the suite. It
+never once worked: the skip key hashed the environment, and every rendered harness
+command runs via `uv run --with <pkg>`, which builds a throwaway environment per
+invocation under `~/.cache/uv/builds-v*/.tmpXXXXXX` and exports it through `PATH`
+and `VIRTUAL_ENV`. Five consecutive key computations with an unchanged tree returned
+five different hashes, so both stages ran the full suite on every task — and a
+permanently-cold cache is indistinguishable from correct invalidation.
+
+Env **values** are now scrubbed of per-invocation launcher paths before hashing.
+Deliberately value-level, not variable-level: ignoring `PATH` outright would also
+have stopped the churn and would have been wrong, because a verification cache must
+over-invalidate rather than risk a false PASS. So a real `PATH` change still
+invalidates, an unknown new variable still invalidates (`INTEGRATION=1` genuinely
+changes which tests run, and no allowlist could be trusted to name it), and
+`archive-v*` is left intact because it encodes installed-package identity — only the
+`builds-v*` / `environments-v*` throwaway dirs and the system temp dir are scrubbed.
+
+Four regression tests pin those properties, including the stability fence the class
+needed: without the scrub the stability test sees three distinct keys, with it one.
+
 ### Security — the blanket `Bash(uv:*)` allow rule is retired
 
 > **Re-render (`/harness-maker:make --update`) to pick this up** — an existing

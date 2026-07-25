@@ -2,7 +2,14 @@
 
 Implements ADR-007: skip-key = sha256(project_root + HEAD sha + diff hash +
 uv.lock hash + pyproject.toml hash + tool versions + env hash). Uses inverted
-env policy: hash ALL env vars except a known-safe ignore set.
+env policy: hash ALL env vars except a known-safe ignore set — over-invalidate
+rather than risk a false PASS.
+
+Env VALUES are scrubbed of per-invocation launcher paths before hashing (see
+`_VOLATILE_VALUE_RE`). Without that the key changed on every call and no marker
+could ever be fresh, so the cache was permanently cold while looking healthy.
+Any change here must keep the key stable across two invocations of the same
+command — `test_key_is_stable_across_ephemeral_launcher_envs` is that fence.
 """
 
 from __future__ import annotations
@@ -12,6 +19,7 @@ import fnmatch
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -53,9 +61,42 @@ def _should_ignore_env(key: str) -> bool:
     return any(fnmatch.fnmatch(key, pat) for pat in _ENV_IGNORE_PATTERNS)
 
 
+# Path prefixes a launcher recreates on EVERY invocation. `uv run --with <pkg>` builds a
+# throwaway environment per call under `~/.cache/uv/builds-v*/.tmpXXXXXX` and exports it
+# through both PATH and VIRTUAL_ENV — and every rendered harness command is invoked that
+# way, so hashing those values verbatim made the key change on every single call. The
+# cache could never be fresh and `/hm:verify` + `/hm:wrapup` each re-ran the full suite
+# forever, which is indistinguishable from correct invalidation (see
+# `[fail:design] verification-cache-key-nondeterministic`).
+#
+# Scrubbed at the VALUE level rather than by ignoring the variable, for two reasons: a
+# genuine PATH / VIRTUAL_ENV change still invalidates (the inverted-policy safety
+# property is preserved — over-invalidate rather than risk a false PASS), and a future
+# launcher's throwaway directory is covered without having to name its variable.
+#
+# `archive-v*` is deliberately NOT scrubbed: that path encodes the identity of the
+# installed package, which is real signal.
+_VOLATILE_VALUE_RE = re.compile(
+    r"(?:[^\s:]*/\.cache/uv/(?:builds|environments)-v\d+"
+    rf"|{re.escape(tempfile.gettempdir())})"
+    r"/[^\s:]*"
+)
+
+
+def _scrub_volatile(value: str) -> str:
+    return _VOLATILE_VALUE_RE.sub("<volatile>", value)
+
+
 def _env_hash() -> str:
-    """Hash all env vars except the known-safe ignore set (inverted policy)."""
-    items = sorted((k, v) for k, v in os.environ.items() if not _should_ignore_env(k))
+    """Hash all env vars except the known-safe ignore set (inverted policy).
+
+    Values are scrubbed of per-invocation launcher paths first — see
+    `_VOLATILE_VALUE_RE`. Without that, the key is not stable across two invocations
+    of the same command and no marker can ever match.
+    """
+    items = sorted(
+        (k, _scrub_volatile(v)) for k, v in os.environ.items() if not _should_ignore_env(k)
+    )
     return hashlib.sha256(json.dumps(items).encode()).hexdigest()
 
 
