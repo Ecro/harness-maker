@@ -136,7 +136,7 @@ files:
   body_sha256: bd46a9af3e1a0912ef132227b7b509bbc3c1a14758c9fb620dd1392f2059899f
 - path: settings.json
   template: settings/Side.json.j2
-  body_sha256: 45bb3b9b5ddd1e13704f75242c3d5527fd713471adc3ec41eb62843f710b0cb4
+  body_sha256: d920cf0e644fdd9ef4b29661ab58f5c11cac02b4e0d3601d6e306dbf333a6c62
 - path: skills/agent-quality-rubric/SKILL.md
   template: skills/agent-quality-rubric/SKILL.md.j2
   body_sha256: 6859c80cb9e1c7e217c62b4300017c3a7f6afd08422deb19fc720e36596da9e4

@@ -64,8 +64,21 @@ def scan(settings_json: Path) -> list[Finding]:
                     file=rel,
                     line=0,
                     evidence=f"catch-all permission: {entry!r}",
+                    # NOT `Bash(uv:*)`, which this line used to suggest: `uv run`
+                    # executes its argument, so scoping to the runner alone still
+                    # grants every command. Scope the argument too — and note the
+                    # advice would have been undone anyway, since `_merge_permissions`
+                    # prunes that exact literal on the next render.
+                    #
+                    # The example is deliberately runner-FREE. `uv run pytest` imports the
+                    # working tree's `conftest.py` at collection; even `uv run ruff check`
+                    # syncs the project first, running its build backend. Any `uv run …`
+                    # example is therefore defeated by the runner and illustrates the
+                    # opposite of the sentence it appears in (REVIEW rounds 2 and 3).
                     fix=f"Replace {entry!r} with narrow tool-specific patterns "
-                    "(e.g., Bash(uv:*), Read(./src/**)).",
+                    "(e.g., Bash(ruff check:*), Read(./src/**)) — for a runner like "
+                    "uv/npx/docker, scoping the inner command is necessary but NOT "
+                    "sufficient: the runner still executes project code first.",
                 ),
             )
             continue

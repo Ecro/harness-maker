@@ -176,7 +176,7 @@ def _render_settings_json(
         msg = f"Template {fe.template} must render a JSON object (got {type(new_data).__name__})"
         raise ValueError(msg)
     out = resolve_output_path(target_dir, fe.path)
-    merged = _shallow_merge_existing_json(out, new_data)
+    merged = _shallow_merge_existing_json(out, new_data, dry_run=dry_run)
     body_bytes = _format_settings_json(merged)
     body_hash = hashlib.sha256(body_bytes).hexdigest()
     fe.body_sha256 = body_hash
@@ -251,10 +251,173 @@ _HARNESS_SHIPPED_DENY_LITERALS: frozenset[str] = frozenset(
     }
 )
 
+# Every `permissions.allow` literal a settings template once rendered and has since
+# STOPPED rendering, mapped to the one-line reason the user is shown when it is
+# removed from their disk. APPEND-ONLY, same as the deny set.
+#
+# ⚠️ These are LIVE rules — `is_matchable_rule` is True for both — so the deny set's
+# "provably enforces nothing" proof is NOT available here and must not be faked. The
+# safety argument is a different one, resting on the DIRECTION of the failure:
+#
+#   * Wrongly pruning a deny rule silently removes protection. Unrecoverable in the
+#     sense that nothing tells the user it happened.
+#   * Wrongly pruning an allow rule makes Claude Code *ask* before running the
+#     command. The failure direction is toward the prompt, which is the safe side,
+#     and it is self-announcing rather than silent.
+#
+# ⚠️ The "it only costs a prompt" half of that is INTERACTIVE-ONLY (REVIEW round 1,
+# 3 of 4 voters). In headless `claude -p` there is no prompt to answer, so the call
+# fails instead of asking; under `--dangerously-skip-permissions` / bypassPermissions
+# the prune is a no-op. Neither mode offers "don't ask again". What survives in every
+# mode is the weaker but sufficient half: a pruned allow rule never removes
+# protection, and never fails silently.
+#
+# That asymmetry is why an allow prune can be unconditional where a deny prune of a
+# live rule cannot. It is a risk ACCEPTANCE (the user may have typed the literal
+# themselves and now gets prompts), not a proof — and it is bought with a real
+# benefit: without it, 0.43.0's retirement of the blanket `Bash(uv:*)` applies to
+# new installs only, and every existing project keeps an arbitrary-command grant
+# forever. Membership is bounded by three test-enforced invariants:
+#
+#   1. We shipped it — `git log -S` finds it in templates/settings/ history.
+#   2. We no longer ship it — absent from every current rendered settings.json.
+#      (Pruning something still shipped is pure churn; the union re-adds it.)
+#   3. The prune never leaves a harness with LESS than a fresh install.
+#
+# ⚠️ Invariant 3 is STRUCTURAL, not test-enforced, and calling it the third bound was
+# an overstatement (REVIEW round 3, two independent voters). The union builds from
+# `(*new_list, *existing_list)` while the prune filters only `existing_list`, so every
+# rule the current template renders survives BY CONSTRUCTION — no test of it can fail,
+# and it therefore constrains nothing about which entries may join the tables above.
+# The bounds that actually bite are 1 and 2 plus the near-miss tests. Invariant 3 is
+# still worth stating because it is what caps the blast radius, but it is a property of
+# the merge's shape, not evidence about the prune set.
+#
+# ⚠️ Invariant 3 is one-directional ON PURPOSE. An earlier draft claimed the upgraded
+# list becomes byte-IDENTICAL to a fresh install's, and that is false in the field
+# (REVIEW round 1): the `uv run --with <src_path> …` rule embeds the plugin's VERSION
+# directory, so each `/plugin update` renders a new variant and unions the previous
+# one in forever. That is a real accretion bug, tracked separately — but it leaves the
+# user with MORE rules than a fresh install, never fewer, so it does not touch the
+# safety property this invariant exists to establish. Do not re-strengthen the claim
+# to equality without first pruning that version-pinned family.
+#
+# Invariant 3 is deliberately NOT "every harness-emitted command stays covered" —
+# that is false and must stay false. `uv run python -c "<arbitrary python>"` is
+# emitted by two templates and was covered only by the blanket grant; pre-approving
+# it again would re-open exactly the arbitrary-execution hole 0.43.0 closed. Those
+# prompt now, for new and upgraded installs alike.
+_HARNESS_SHIPPED_ALLOW_LITERALS: dict[str, str] = {
+    # `uv run <anything>` executes its argument, so this pre-approved every command.
+    "Bash(uv:*)": "blanket arbitrary-command grant, retired in 0.43.0 for scoped `uv run` rules",
+    # `agy --print --sandbox X` consumes `--sandbox` as the prompt VALUE, so this
+    # pre-approved the un-sandboxed spelling. Reordered to `--sandbox --print`.
+    "Bash(agy --print --sandbox:*)": "flag order that silently disabled agy's sandbox; "
+    "replaced by `Bash(agy --sandbox --print:*)`",
+}
+
+# Retired allow rules whose text EMBEDS the resolved install path, so no exact literal
+# can ever match what is on a user's disk. Each entry is (pattern, user-facing reason).
+#
+# ⚠️ A regex prune is strictly more dangerous than a literal one and needs its own
+# justification, so this list stays tiny and every pattern must be a shape the RENDERER
+# provably generates end-to-end — anchored at both ends, with the wildcard confined to
+# the interpolated slot. A prefix or substring pattern is never acceptable here (the
+# same rule the hook-retire set states).
+#
+# Why it had to exist: REVIEW round 2 found that tightening the module rule from
+# `harness_maker*` to `harness_maker.*` reached NEW INSTALLS ONLY. The old text carries
+# the user's own `harness_maker_src_path`, so the literal set could not name it, the
+# union preserved it, and an upgraded harness kept BOTH rules — leaving
+# `python -m harness_maker_evil` pre-approved by the stale one while a fresh install
+# denied it. That is the very "fix reaches new installs only" gap this whole change
+# exists to close, reintroduced one layer down.
+_HARNESS_SHIPPED_ALLOW_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
+    (
+        # The 0.43.0 spelling. Two things keep this off user content:
+        #   * `harness_maker\*` cannot match the current `harness_maker.*` form —
+        #     the character before `*` differs.
+        #   * the `--with` slot is NOT a free `.+`. It must name harness-maker
+        #     itself, which is the only thing `synthesize._compute_install_ref`
+        #     ever emits there ($HOME-substituted plugin cache path, a non-home
+        #     absolute install, or the bare PyPI name). A free `.+` deleted
+        #     `--with requests`, `--with .` and `--with /path/to/my/fork` — rules
+        #     only a USER can have written (REVIEW round 3, two models agreeing).
+        re.compile(r"^Bash\(uv run --with [^ ]*harness[-_]maker[^ ]* python -m harness_maker\*\)$"),
+        "unbounded module prefix — also matched `python -m harness_maker_evil`; "
+        "replaced by the `python -m harness_maker.*` form",
+    ),
+)
+
+
+def _retired_allow_reason(item: str) -> str | None:
+    """Why `item` is being dropped from `allow`, or None when it is not ours."""
+    literal = _HARNESS_SHIPPED_ALLOW_LITERALS.get(item)
+    if literal is not None:
+        return literal
+    for pattern, reason in _HARNESS_SHIPPED_ALLOW_PATTERNS:
+        if pattern.match(item):
+            return reason
+    return None
+
+
+def _is_harness_shipped(key: str, item: Any) -> bool:  # noqa: ANN401 — JSON is heterogeneous
+    """Whether `item` is history this harness rendered into `key` and no longer does.
+
+    The `isinstance` guard is load-bearing, not defensive noise: a malformed entry may
+    be a dict or list, and `unhashable in frozenset` raises TypeError — which used to
+    abort the whole render on one hand-edited settings.json.
+
+    `ask` is absent from both tables on purpose: no settings template has ever rendered
+    an `ask` entry, so every string there is the user's by construction.
+    """
+    if not isinstance(item, str):
+        return False
+    if key == "deny":
+        return item in _HARNESS_SHIPPED_DENY_LITERALS
+    if key == "allow":
+        return _retired_allow_reason(item) is not None
+    return False
+
+
+def _announce_allow_prune(pruned: list[str], *, dry_run: bool) -> None:
+    """Tell the user which allow rules vanished — the prompt they get next is otherwise
+    an unexplained regression, and the remedy is only obvious if they know why.
+
+    ``dry_run`` is defensive, NOT a fix for a reachable bug. `cli.py`'s ``--dry-run``
+    branch returns at its ``typer.Exit(0)`` before the only ``render()`` call site, so no
+    shipped command reaches the merge with ``dry_run=True`` today; only a direct API
+    caller does. Two rounds of review split on this, and I first "settled" it by running
+    ``render(dry_run=True)`` — which answers whether the *API* path prints, not whether
+    the *CLI* reaches it. Tracing `cli.py` is what actually settles it. The parameter
+    stays so that wiring a preview through `render()` later cannot silently start
+    announcing deletions that never happened.
+    """
+    import typer
+
+    verb = "would drop" if dry_run else "dropped"
+    tail = "" if dry_run else " — commands they covered now require approval"
+    typer.echo(
+        f"NOTE: {verb} {len(pruned)} harness-shipped `permissions.allow` rule(s) from "
+        f"settings.json{tail}:",
+        err=True,
+    )
+    for literal in pruned:
+        typer.echo(f"  - {literal} — {_retired_allow_reason(literal)}", err=True)
+    typer.echo(
+        "  Re-adding one of these to settings.json will NOT stick — the next re-render "
+        "drops it again. If you need the access, add a SCOPED rule instead "
+        "(e.g. `Bash(uv run ruff check:*)`), which is never pruned. In headless "
+        "`claude -p` an affected call fails rather than prompting.",
+        err=True,
+    )
+
 
 def _merge_permissions(
     existing_perms: dict[str, Any],
     new_perms: dict[str, Any],
+    *,
+    dry_run: bool = False,
 ) -> dict[str, Any]:
     """Deep-merge permissions: union list sub-keys; template wins on scalars.
 
@@ -287,15 +450,24 @@ def _merge_permissions(
             and key not in existing_perms
         ):
             continue
-        # Drop our own accreted deny history before the union, so the list is
-        # rebuilt from policy rather than accumulating every literal we ever
-        # shipped. Exact full-string match only — a near-miss like
-        # "Bash(rm:*) # my note" is the user's content, not our history.
-        # `allow`/`ask` are untouched: an identical string there was never ours.
-        if key == "deny":
-            existing_list = [
-                item for item in existing_list if item not in _HARNESS_SHIPPED_DENY_LITERALS
-            ]
+        # Drop our own accreted history before the union, so the list is rebuilt
+        # from the current template rather than accumulating every rule we ever
+        # shipped. `_is_harness_shipped` owns the exact-vs-pattern decision and the
+        # non-string guard; a near-miss like "Bash(rm:*) # my note" is the user's
+        # content, not our history.
+        if key in ("allow", "deny"):
+            # Only rules the current template does NOT re-add actually disappear;
+            # report those, so the notice never names a rule that is still there.
+            # dict.fromkeys keeps on-disk order while collapsing a repeated entry,
+            # which would otherwise inflate the count and print the same line twice.
+            dropped = list(
+                dict.fromkeys(
+                    i for i in existing_list if _is_harness_shipped(key, i) and i not in new_list
+                )
+            )
+            existing_list = [i for i in existing_list if not _is_harness_shipped(key, i)]
+            if dropped and key == "allow":
+                _announce_allow_prune(dropped, dry_run=dry_run)
         seen: set[str] = set()
         merged_list: list[str] = []
         for item in (*new_list, *existing_list):
@@ -309,6 +481,8 @@ def _merge_permissions(
 def _shallow_merge_existing_json(
     out: Path,
     new_data: dict[str, Any],
+    *,
+    dry_run: bool = False,
 ) -> dict[str, Any]:
     """Merge top-level keys: existing's unique keys + new_data (template wins).
 
@@ -340,7 +514,7 @@ def _shallow_merge_existing_json(
     new_perms = new_data.get("permissions")
     existing_perms = existing.get("permissions")
     if isinstance(new_perms, dict) and isinstance(existing_perms, dict):
-        merged["permissions"] = _merge_permissions(existing_perms, new_perms)
+        merged["permissions"] = _merge_permissions(existing_perms, new_perms, dry_run=dry_run)
     new_hooks = new_data.get("hooks")
     existing_hooks = existing.get("hooks")
     if isinstance(new_hooks, dict) and isinstance(existing_hooks, dict):

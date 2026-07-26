@@ -2,6 +2,118 @@
 
 ## [Unreleased]
 
+### Security — the blanket `Bash(uv:*)` retirement now reaches existing harnesses
+
+0.43.0 removed the blanket grant from the settings templates but could not remove
+it from anyone's disk: `_merge_permissions` unions `permissions.allow` with the
+existing file, so every literal harness-maker ever rendered survived re-render as
+pseudo-user content. The retirement applied to **new installs only** — an omission
+that shipped, and that the 0.43.0 release notes now carry a correction for.
+
+`/harness-maker:make --update` now drops two literals it once rendered and no
+longer does, and prints exactly which ones and why:
+
+| Dropped | Why |
+|---|---|
+| `Bash(uv:*)` | `uv run <anything>` executes its argument — an arbitrary-command grant. |
+| `Bash(agy --print --sandbox:*)` | `agy --print` takes the prompt as its *value*, so this pre-approved the spelling in which `--sandbox` never took effect. |
+
+**Why an allow rule may be pruned when a live deny rule may not.** The deny prune
+is gated on a proof — `permission_syntax.is_matchable_rule` is False, so deleting
+the rule removes nothing. Both literals above are live, so that proof is
+unavailable and is deliberately not faked. The argument is the direction of the
+failure instead: mis-pruning a deny rule silently removes protection, whereas
+mis-pruning an allow rule can only make Claude Code refuse to act silently-never.
+Three test-enforced invariants bound it: we shipped the literal, we no longer ship
+it, and the prune **never leaves a harness with less than a fresh install**.
+
+Two honest limits on that argument:
+
+- **"It only costs a prompt" is interactive-only.** In headless `claude -p` there is
+  no prompt to answer, so an affected call fails instead of asking; under
+  `--dangerously-skip-permissions` the prune is a no-op. Neither mode offers
+  "don't ask again".
+- **Re-adding a pruned literal to `settings.json` will not stick** — the next
+  re-render drops it again. Add a *scoped* rule instead (e.g. `Bash(uv run pytest:*)`);
+  scoped rules are never pruned. The notice says so rather than advising a
+  round-trip that silently undoes itself.
+
+**What actually prompts now that did not before.** Less than first documented. The
+`uv run python -c "…"` calls in `/hm:loop-p5-batch` and the `agent-quality-rubric`
+skill have **multi-line** bodies, and Bash rules are matched per-subcommand after
+splitting on newline — so those bodies never matched any rule, `Bash(uv:*)`
+included, and already prompted on every 0.43.0 install. What genuinely loses cover
+is `/harness-maker:make`'s own `uv run --directory "$plugin_dir" python -m
+harness_maker.cli …` dispatch. That prompt is kept deliberately: `--directory` /
+`--with` with a variable argument means the *package* is caller-chosen, so any rule
+covering it would pre-approve arbitrary code — the hole this is closing.
+
+### Security — the `python -m harness_maker*` allow rule gained a module boundary
+
+Pre-existing since 0.43.0, found while reviewing the prune. The scoped rule ended in
+`harness_maker*` with no trailing space, which in Claude Code's matcher is a prefix
+match with **no word boundary** — so it also pre-approved `python -m harness_maker_evil`,
+satisfiable by dropping a file in the working directory. Now `harness_maker.*`, which
+still covers every real dotted module (`harness_maker.worktree`,
+`harness_maker.observability.verification_cache`, …).
+
+Because that rule's text embeds *your* resolved install path, no exact literal could
+name it for pruning, so on the first attempt the boundary fix reached **new installs
+only** while an upgraded harness kept both rules and stayed exposed — the same gap the
+`Bash(uv:*)` prune exists to close, one layer down. `_merge_permissions` therefore also
+carries a small, doubly-anchored **pattern** prune for retired rules whose text contains
+an interpolated path. It is deliberately tiny and every pattern must full-match a shape
+the renderer provably generates; prefix or substring patterns are rejected by test.
+
+**Residuals, stated rather than implied.** Three review rounds (including two other
+models) pushed back on any wording that implied the arbitrary-execution hole is now
+*closed*. It is narrowed, not closed, and the shipped allow list still contains grants
+whose argument is caller-chosen. None of these is introduced here; they are recorded so
+the claim matches the code:
+
+- **`python -m` runs the working directory first.** A local `harness_maker/` package
+  shadows the installed one, so `harness_maker.<anything>` stays reachable under the
+  tightened rule. The boundary fix raises the bar (a bare `harness_maker_evil.py` no
+  longer suffices) but does not close shadowing. That needs `-P` / `PYTHONSAFEPATH=1`
+  on every rendered invocation — a separate change.
+- **`Bash(uv run pytest:*)` / `Bash(pytest:*)`** import the working tree's `conftest.py`
+  at collection, and *any* `uv run …` syncs the project first, running its build
+  backend. Scoping a runner's inner command is necessary but not sufficient.
+- **`Bash(git:*)`** covers shell-backed git aliases; **`Bash(codex exec:*)`** takes
+  caller-chosen arguments; **bare `Read`** pre-approves reading any path, including
+  `~/.ssh` and `.env`, and `secscan.permissions` flags `Read(*)` but not the strictly
+  broader no-arg form.
+- **The prompt's "don't ask again" writes to `.claude/settings.local.json`**, which
+  harness-maker neither prunes nor scans. A pruned grant can therefore be restored into
+  a file that is invisible to `/hm:health`. The notice deliberately does not advertise
+  this, but it is the likely outcome and is not currently auditable.
+- **`--dry-run` does not preview the deletions.** `/hm:make`'s Proceed/Cancel summary
+  reports NEW/REPLACE/KEEP/MERGE counts only, so the rules that will be dropped are
+  named after the fact, not before.
+
+### Changed — the prune notice is honest about headless runs
+
+The notice used to say affected commands "will now ask before running". Under
+`claude -p` there is no prompt to answer, so the call fails instead. It now says
+"require approval" and names the headless behaviour explicitly. The same qualification
+was added to the code comment that carries the safety argument.
+
+### Internal — `--dry-run` cannot announce a deletion it did not make
+
+`dry_run` is now threaded through the settings merge so the notice reads "would drop".
+This is **hardening, not a user-visible fix**: `cli.py`'s `--dry-run` branch exits
+before the only `render()` call site, so no shipped command could reach the merge in
+preview mode. Two review rounds split on this and the disagreement was settled by
+tracing `cli.py`, after an earlier check answered the wrong question (it exercised the
+API path, which was never in doubt, rather than the CLI path, which was).
+
+### Fixed — a malformed `permissions` entry no longer aborts the render
+
+A non-string entry (a nested object or array hand-edited into `permissions.allow` or
+`deny`) hit `unhashable in frozenset` and raised `TypeError`, failing the whole render.
+`_merge_permissions` documents that malformed entries are *dropped*; now they are.
+Latent in the deny prune since it shipped.
+
 ## [0.43.0] — 2026-07-26
 
 > **Re-render to get any of this.** Every fix below that touches a rendered
@@ -89,6 +201,8 @@ Three review findings that were first recorded as deferred and then closed
   a boundary that isn't there. Removing the blanket is a separate decision with real
   day-to-day friction, and the scoped rule exists so that removal cannot break the
   second opinion.
+  *(Superseded — see Unreleased: `--update` now prunes the blanket, so the scoped rule
+  is the operative grant on re-rendered harnesses too, not just new installs.)*
 
 ### Fixed — wrapup's escalation output never reached git
 
@@ -150,6 +264,12 @@ Four regression tests pin those properties, including the stability fence the cl
 needed: without the scrub the stability test sees three distinct keys, with it one.
 
 ### Security — the blanket `Bash(uv:*)` allow rule is retired (new installs only)
+
+> **✅ Superseded — see the Unreleased section at the top of this file.**
+> `/harness-maker:make --update` now prunes `Bash(uv:*)` and
+> `Bash(agy --print --sandbox:*)` automatically. The manual deletion described
+> below is no longer required, and the "not attempted here" note is no longer
+> current. The rest of this block is kept as the released record.
 
 > **⚠️ Re-rendering does NOT remove it. Corrected after release — the original
 > note here was wrong.** A fresh install gets the scoped rules and no blanket. An
