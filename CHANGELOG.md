@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+## [0.43.1] — 2026-07-26
+
+> **Everything below is render-gated. `/harness-maker:make --update` or nothing changes.**
+> The span emitter lives in the stage templates and the `Stop` / `PreCompact` hooks; the
+> `/hm:metrics` classification step lives in the command file; the delegation dispatch
+> lives in the wrapup/verify stages. An un-re-rendered harness keeps running the 0.43.0
+> commands and will report exactly what it reported before.
+>
+> This was demonstrated the hard way while shipping it: the wrapup that produced this
+> release ran entirely in the main loop, at ~455k context per turn, because this repo's
+> own `.claude/` was still the 0.43.0 render. The code ships one release ahead of the
+> harness that runs it.
+>
+> **And after re-rendering, delegation is still off** — `delegation.stages` defaults to
+> empty for one release (ADR-011). Opting in starts a soak, it does not flip a switch.
+
 ### Security — the blanket `Bash(uv:*)` retirement now reaches existing harnesses
 
 0.43.0 removed the blanket grant from the settings templates but could not remove
