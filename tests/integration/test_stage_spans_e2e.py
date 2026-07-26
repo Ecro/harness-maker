@@ -9,6 +9,8 @@ and every render grep, because neither observes a parse.
 
 from __future__ import annotations
 
+import io
+import json
 import subprocess
 from pathlib import Path
 
@@ -87,11 +89,19 @@ def test_cli_create_with_a_session_id_emits_one_loop_level_span(tmp_path: Path) 
     which is what distinguishes a loop from a standalone /hm:execute create.
     """
     repo = _repo(tmp_path)
-    rc = worktree.main(["create", "execute", str(repo), "--claude-session-id", "sess-1"])
+    rc = worktree.main(
+        [
+            "create",
+            "execute",
+            str(repo),
+            "--claude-session-id",
+            "aaaabbbb-1111-2222-3333-444455556666",
+        ]
+    )
     assert rc == 0
     events = _events(repo)
     assert [e.stage for e in events] == ["hm:loop"]
-    assert events[0].session_id == "sess-1"
+    assert events[0].session_id == "aaaabbbb-1111-2222-3333-444455556666"
 
 
 def test_cli_create_without_a_session_id_is_not_labelled_a_loop(tmp_path: Path) -> None:
@@ -172,10 +182,10 @@ def test_a_peer_sessions_span_end_does_not_truncate_a_live_span(
     concurrency, which is where this project has already shipped three incidents.
     """
     repo = _repo(tmp_path)
-    monkeypatch.setenv("HM_SESSION_ID", "session-A")
+    monkeypatch.setenv("HM_SESSION_ID", "11111111-2222-3333-4444-555555555555")
     assert worktree.main(["task-preflight", "feat-x", str(repo), "--stage", "hm:plan"]) == 0
 
-    monkeypatch.setenv("HM_SESSION_ID", "session-B")
+    monkeypatch.setenv("HM_SESSION_ID", "99999999-8888-7777-6666-555555555555")
     assert worktree.main(["span-end", str(repo)]) == 0
 
     assert [e.event for e in _events(repo)] == ["start"]  # B did not close A's span
@@ -226,3 +236,54 @@ def test_span_end_is_wired_into_settings_json_not_the_dead_hooks_json(
         cmds = [h["command"] for h in entry["hooks"]]
         assert any("worktree span-end" in c for c in cmds), (entry.get("matcher"), cmds)
         assert any("flush_session" in c for c in cmds), (entry.get("matcher"), cmds)
+
+
+def test_span_end_closes_the_span_when_only_stdin_carries_the_session_id(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The asymmetry every existing span-end test is blind to.
+
+    `span-end` ships ONLY as a Stop/PreCompact hook, and a hook's session id arrives on
+    **stdin** — `sessionid_envfile` says so verbatim, and the sibling Stop hook
+    `loop_gate` reads it from there. `HM_SESSION_ID` is the slash-command bridge and is
+    documented-empty on WSL2.
+
+    So the realistic shape is: the `start` (a slash-command Bash line) has the env var,
+    the `end` (a hook) has only stdin. Every other test in this file sets or clears the
+    env var identically for both, which is precisely why none of them could see that
+    reading env-only left the span open until a cap fired.
+    """
+    repo = _repo(tmp_path)
+    monkeypatch.setenv("HM_SESSION_ID", "11111111-2222-3333-4444-555555555555")
+    assert worktree.main(["task-preflight", "feat-x", str(repo), "--stage", "hm:plan"]) == 0
+
+    # The hook process: no env var, session id only on stdin.
+    monkeypatch.delenv("HM_SESSION_ID", raising=False)
+    monkeypatch.setattr(
+        "sys.stdin", io.StringIO(json.dumps({"session_id": "11111111-2222-3333-4444-555555555555"}))
+    )
+    assert worktree.main(["span-end", str(repo)]) == 0
+
+    events = _events(repo)
+    assert [(e.event, e.session_id) for e in events] == [
+        ("start", "11111111-2222-3333-4444-555555555555"),
+        ("end", "11111111-2222-3333-4444-555555555555"),
+    ]
+
+
+def test_a_hook_whose_stdin_names_a_peer_still_does_not_close_your_span(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Negative control for the stdin channel: reading stdin must not weaken the
+    session scoping that R2-03's first attempt was written to provide."""
+    repo = _repo(tmp_path)
+    monkeypatch.setenv("HM_SESSION_ID", "11111111-2222-3333-4444-555555555555")
+    assert worktree.main(["task-preflight", "feat-x", str(repo), "--stage", "hm:plan"]) == 0
+
+    monkeypatch.delenv("HM_SESSION_ID", raising=False)
+    monkeypatch.setattr(
+        "sys.stdin", io.StringIO(json.dumps({"session_id": "99999999-8888-7777-6666-555555555555"}))
+    )
+    assert worktree.main(["span-end", str(repo)]) == 0
+
+    assert [e.event for e in _events(repo)] == ["start"]

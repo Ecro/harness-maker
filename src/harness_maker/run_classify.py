@@ -24,7 +24,7 @@ from typing import Literal, Protocol
 from pydantic import BaseModel, ConfigDict
 
 from .second_opinion_invoke import resolve_base_root
-from .stage_spans import ReadDiagnostics
+from .stage_spans import ReadDiagnostics, SpanAttribution
 
 SCHEMA_VERSION = 1
 
@@ -310,7 +310,7 @@ def attribute_runs(
 
 
 def boundary_inputs(
-    turns: Sequence[TurnLike], spans: object
+    turns: Sequence[TurnLike], spans: SpanAttribution | None
 ) -> tuple[Sequence[str | None], frozenset[int]]:
     """The single place both entry points derive `find_boundaries` arguments.
 
@@ -320,8 +320,9 @@ def boundary_inputs(
     a key the report never asked for, silently discarded, and counted as a cache miss
     (review R2-02). Same shape as F-01: two entry points, one of them wrong.
     """
-    stages: Sequence[str | None] = getattr(spans, "stages", None) or ((None,) * len(turns))
-    return stages, frozenset(getattr(spans, "capped_indices", ()) or ())
+    if spans is None:
+        return (None,) * len(turns), frozenset()
+    return (spans.stages or ((None,) * len(turns))), frozenset(spans.capped_indices)
 
 
 # ------------------------------------------------------------------ CLI

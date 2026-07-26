@@ -294,3 +294,98 @@ Why the flag is set, concretely:
 `worktree._cli_span_end` together — they are the pair the concurrency argument runs
 through, they changed twice, and the second change was only needed because the first
 removed an accidental compensation nobody had documented.
+
+---
+
+## Round 3 — re-review of the Iteration-2 fixes (the gap this round existed to close)
+
+Both reviewers re-run against the landed code (`86556c6a` + `cc0fec7f`), each asked the
+same two questions: *does each fix close its finding*, and *did the fixes introduce
+anything new*.
+
+### Verdicts on the Iteration-2 fixes
+
+| id | code-reviewer | security-reviewer | resolution |
+|---|---|---|---|
+| R2-01 sentinel leak | CLOSED | — | CLOSED |
+| R2-02 diverging entry points | CLOSED (guard nominal) | — | CLOSED, guard replaced |
+| **R2-03 span-end session scoping** | **STILL OPEN** | CLOSED | **STILL OPEN** — see below |
+| R2-04 back-scan | CLOSED | — | CLOSED |
+| R2-05 journal enum | CLOSED | CLOSED | CLOSED |
+| R2-06 span selection | CLOSED | — | CLOSED |
+| R2-06 untrusted-data prose | — | **STILL OPEN** | fixed this round |
+| M-02 residual | CLOSED | CLOSED | CLOSED |
+| 0.43.2 frontmatter | CLOSED | CLOSED | CLOSED |
+
+### The one reviewer disagreement, and how it was settled
+
+security said R2-03 CLOSED; code said STILL OPEN. **code was right**, and the evidence
+is checkable rather than a matter of judgment:
+
+- `hooks/sessionid_envfile.py` states in its own docstring that *"The Stop-hook DOES
+  receive `session_id` on stdin, but the loop driver/marker writer (a slash command)
+  does not"* — the env-file exists to bridge the gap **for slash commands**.
+- `hooks/loop_gate.py:108`, the sibling Stop hook in the same settings block, reads
+  `session_id` from the stdin payload.
+- `span-end` ships **only** as a `Stop` / `PreCompact` hook, and never read stdin.
+
+So the Round-2 fix picked the wrong channel: with no `HM_SESSION_ID` in the hook
+process (its documented state on WSL2) the caller matches none of its own events,
+writes no `end`, and the span stays open to the cap — the unbounded over-attribution
+ADR-003 rejected start-only closure to avoid. Every existing test set or cleared the
+env var identically for start and end, so none could see the asymmetry.
+
+**A reviewer disagreement is a signal to go and check, not to average.** Taking the
+more optimistic verdict here would have shipped the defect with a CLOSED label on it.
+
+### New findings this round
+
+| id | sev | finding | disposition |
+|---|---|---|---|
+| N-01 | P1 | `span-end` reads the wrong channel (above) | fixed — stdin first, env second |
+| N-02 | P1 | `test_both_entry_points_derive_the_same_boundaries` **calls neither entry point** | guard replaced; a second test now drives list → record → report |
+| N-03 | P1 | `_configured_vault_folders` reads the raw dict, bypassing `SecondBrainConfig` validation and ignoring `write` — a read-only folder could satisfy a promotion claim | fixed — validated model, writable folders only. **Consensus: both reviewers, same tier** |
+| N-04 | P1 | `--worktree` accepted unvalidated, making `_confined`'s confinement root caller-controlled | fixed — must be the base or one of its `.worktrees/<slug>` |
+| N-05 | P1 | The new frontmatter gate never asserts `tools:`, the only enforced agent boundary | fixed — `tools:` presence plus a per-agent read-only boundary check |
+| N-06 | P2 | `--worktree` unquoted while sibling substitutions in the same file are single-quoted | fixed |
+| N-07 | P2 | untrusted-data prose omits command/tool output | fixed |
+| N-08 | P2 | `boundary_inputs(spans: object)` duck-types an available type | fixed |
+| N-09 | P2 | `_vault_slugs` docstring described the fallback its body had removed | fixed |
+| N-10 | P2 | id-less `span-end` fallback can close a peer id-less session's span | documented as a structural limit (no per-session key exists by definition) |
+| N-11 | P2 | two wrong cross-reference labels in new comments | fixed |
+
+### A defect the round-4 fixes introduced, caught by a test written in the same round
+
+The new stdin test failed: the **writer** stored the session id raw while the **reader**
+sanitized it. `sanitize_session_id`'s `_TAME_SESSION_ID` is `^[0-9a-fA-F-]{8,64}$`, so a
+real Claude session id (a UUID) passes through unchanged and the asymmetry is invisible
+in production — it only showed because the test fixture used `session-A`. Fixed by
+sanitizing at the single write point so both ends normalise identically; the fixtures
+were also changed to production-shaped UUIDs, which they should have been anyway.
+
+*Relying on the input happening to be tame is an assumption, not an invariant* — and it
+is the fourth time in this task that a guarantee held only because the data happened to
+cooperate.
+
+## Round 4 summary
+
+| Iteration | Fixes applied | New findings | Re-reviewed |
+|-----------|---------------|--------------|-------------|
+| 1 (init)  | — | 21 | — |
+| 2 | 14 | 6 | yes |
+| 3 | 7 | — | **no** (this was the gap) |
+| 4 | 11 | 1 (self-caught) | **not yet** |
+
+**Status: CHANGES_REQUESTED. `human_review_needed`: true.**
+
+The grade is still not claimed, and the reason is unchanged in shape: **Round 4's eleven
+fixes have not been re-reviewed.** Three consecutive fix rounds have each introduced at
+least one new defect (R2-01/R2-02 in round 2, the wrong channel in round 3, the
+sanitize asymmetry in round 4), so "a fix round is clean" remains an unsupported prior —
+now with three data points against it.
+
+What a human should look at first, unchanged and now sharper: **`stage_spans` +
+`worktree._cli_span_end` together.** That pair has been changed in three separate rounds,
+each change was needed because the previous one removed a compensation nobody had
+written down, and its correctness argument runs entirely through concurrency behaviour
+that no test in this repo exercises against a real second session.

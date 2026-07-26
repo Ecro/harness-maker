@@ -5015,6 +5015,40 @@ def _positionals(args: list[str], *, valued_flags: tuple[str, ...]) -> list[str]
     return out
 
 
+def _span_end_session_id() -> str | None:
+    """The caller's Claude session id, from the channel this command actually has.
+
+    `span-end` ships ONLY as a `Stop` / `PreCompact` hook (both settings templates),
+    and a hook's session id arrives on **stdin** — `hooks/sessionid_envfile.py` says so
+    in as many words ("The Stop-hook DOES receive `session_id` on stdin, but the loop
+    driver/marker writer (a slash command) does not"), and the sibling Stop hook
+    `hooks/loop_gate.py` reads it from there. `HM_SESSION_ID` is the *slash-command*
+    bridge, and it is documented-empty on WSL2.
+
+    Reading only the env var was therefore the wrong channel (review round 3): when the
+    hook process has no `HM_SESSION_ID` but the `start` carried one, the caller matches
+    none of its own events, writes no `end`, and the span stays open until a cap fires —
+    the unbounded over-attribution ADR-003 rejected start-only closure to avoid.
+
+    stdin first (authoritative for a hook), env second (a direct CLI invocation).
+    """
+    from .loop_marker import sanitize_session_id
+
+    try:
+        if not sys.stdin.isatty():
+            raw = sys.stdin.read()
+            if raw.strip():
+                payload = json.loads(raw)
+                if isinstance(payload, dict):
+                    sid = payload.get("session_id")
+                    if isinstance(sid, str) and sid.strip():
+                        return sanitize_session_id(sid) or None
+    except Exception:  # noqa: BLE001 - a hook must never fail on a malformed payload
+        pass
+    env = os.environ.get("HM_SESSION_ID")
+    return (sanitize_session_id(env) or None) if env else None
+
+
 def _cli_span_end(args: list[str]) -> int:
     """`worktree span-end [base_dir] [--stage <s>]` — close the open span.
 
@@ -5042,13 +5076,19 @@ def _cli_span_end(args: list[str]) -> int:
         # `_build_spans` was partitioned by session (F-02) nothing closed it at all —
         # the span stayed open until a cap fired, which is precisely the unbounded
         # over-attribution ADR-003 rejected start-only closure to avoid.
-        mine = os.environ.get("HM_SESSION_ID") or None
+        mine = _span_end_session_id()
         if mine:
             ours = [e for e in events if e.session_id == mine]
         else:
             # Degraded (no id of our own): fall back to the session-less events, which
             # is the same rule the loop marker uses — never let an id-bearing peer's
             # line decide for us, and never close an id-bearing peer's span.
+            #
+            # KNOWN LIMIT: two CONCURRENT id-less sessions share this bucket, so one
+            # can close the other's span. There is no per-session key to separate them
+            # (that is what having no id means), and the alternative — never closing an
+            # id-less span — leaves it open to the cap, which is worse. Structurally
+            # unavoidable, same as the loop marker's id-less case.
             ours = [e for e in events if e.session_id is None]
         if not ours or ours[-1].event == "end":
             return 0  # nothing of ours is open — see docstring

@@ -347,7 +347,7 @@ in-repo name; a predictable path collides under concurrent sessions and would le
 gate adopt a verdict from someone else's run. Then:
 
 ```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.wrapup_receipt --root . --stage verify --worktree <brief.worktree_root> --receipt-file <the temp path>
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.wrapup_receipt --root . --stage verify --worktree '<brief.worktree_root>' --receipt-file <the temp path>
 ```
 
 > **`--worktree` is not optional** — substitute the literal `worktree_root` the brief

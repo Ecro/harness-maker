@@ -859,24 +859,73 @@ def test_a_capped_turn_does_not_open_a_run() -> None:
     assert rc.find_boundaries(turns, capped={1}) == []
 
 
-def test_both_entry_points_derive_the_same_boundaries(tmp_path: Path) -> None:
-    """R2-02. `_cmd_boundaries` and `economics._collect` each built `find_boundaries`
-    arguments independently, and when capped-turn handling landed in only one of them
-    the two commands produced different boundary UUIDs — so a verdict the prose layer
-    recorded was looked up under a key the report never asked for, silently discarded,
-    and counted as a cache miss. Same shape as F-01, one layer up.
+def test_both_entry_points_derive_the_same_boundaries(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """R2-02, guarded by actually CALLING both entry points.
+
+    The first version of this test called `boundary_inputs` and `find_boundaries`
+    directly and asserted a property of the HELPER — while the defect it is named for
+    is divergence BETWEEN `_cmd_boundaries` and `economics._collect`. Inlining the old
+    independent derivation back into either caller left it green. In a task whose
+    recurring failure is "two entry points, one of them wrong", a guard that touches
+    neither entry point is the same mistake one level up.
     """
-    from harness_maker.stage_spans import SpanAttribution
+    store = _seed_store(tmp_path)
 
-    turns = [_turn(0, skill="hm:plan"), _turn(1), _turn(2), _turn(3)]
-    spans = SpanAttribution(stages=(None, None, None, None), capped_indices=(1,))
+    rc.main(["boundaries", "--root", str(tmp_path), "--transcript-root", str(store)])
+    cli_uuids = [b["uuid"] for b in json.loads(capsys.readouterr().out)["boundaries"]]
 
-    stages, capped = rc.boundary_inputs(turns, spans)
-    from_helper = rc.find_boundaries(turns, already_attributed=stages, capped=capped)
+    from harness_maker import economics
 
-    assert [b.uuid for b in from_helper] == ["u2"]
-    # And the helper tolerates a caller with no span attribution at all.
-    assert rc.boundary_inputs(turns, None)[1] == frozenset()
+    economics.main(["report", "--root", str(tmp_path), "--transcript-root", str(store)])
+    report = json.loads(capsys.readouterr().out)["report"]
+
+    # The report counts the boundaries it derived; the CLI lists the ones it derived.
+    # If the two derivations diverge, a verdict recorded against a CLI-listed uuid is
+    # looked up under a key the report never asks for — paid for, then discarded.
+    assert cli_uuids == ["t1"]
+    assert report["classification_boundaries"] == len(cli_uuids)
+    assert report["classification_cache_misses"] == len(cli_uuids)
+
+
+def test_recording_a_verdict_the_cli_listed_is_seen_by_the_report(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The end-to-end shape R2-02 actually broke: list → record → report.
+
+    Divergence is only observable when a verdict recorded against a CLI-listed uuid
+    fails to resolve in the report. Asserting the counts match is necessary; asserting
+    the judgment SURVIVES the round trip is what proves the keys are the same ones.
+    """
+    store = _seed_store(tmp_path)
+
+    rc.main(["boundaries", "--root", str(tmp_path), "--transcript-root", str(store)])
+    (row,) = json.loads(capsys.readouterr().out)["boundaries"]
+
+    rc.main(
+        [
+            "record",
+            "--root",
+            str(tmp_path),
+            "--boundary-uuid",
+            row["uuid"],
+            "--verdict",
+            "continuation",
+        ]
+    )
+    capsys.readouterr()
+
+    from harness_maker import economics
+
+    economics.main(["report", "--root", str(tmp_path), "--transcript-root", str(store)])
+    report = json.loads(capsys.readouterr().out)["report"]
+
+    assert report["classification_cache_misses"] == 0, (
+        "the report did not find the verdict the boundaries CLI told the operator to "
+        "record — the two entry points are keying on different boundaries"
+    )
+    assert report["turns_by_attribution_source"].get("inferred") == 2
 
 
 def test_a_run_split_by_a_peer_turn_still_finds_its_own_preceding_stage() -> None:

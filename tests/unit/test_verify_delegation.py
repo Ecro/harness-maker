@@ -338,4 +338,4 @@ def test_the_verify_reconcile_call_passes_the_worktree_root(tmp_path: Path) -> N
     `verify-record-missing` on every delegated run that actually worked."""
     body = " ".join(_verify(tmp_path, stages=["verify"]).split())
 
-    assert "--worktree <brief.worktree_root>" in body
+    assert "--worktree '<brief.worktree_root>'" in body

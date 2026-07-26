@@ -87,3 +87,60 @@ def test_agent_body_has_no_second_frontmatter_block(
         f"{name}: a second frontmatter block follows the provenance block — the source "
         "frontmatter failed to merge and Claude Code will never read those fields"
     )
+
+
+# `tools:` is the ONLY enforced agent boundary (CLAUDE.md §보안): frontmatter
+# `permissions:` is silently ignored by Claude Code, and an ABSENT `tools:` makes a
+# subagent inherit every tool the main thread has. So its loss is a security
+# regression, not a cosmetic one — and the two tests above pass a partial merge that
+# keeps `name`/`description` and drops it.
+_READ_ONLY_AGENTS = frozenset(
+    {
+        "code-reviewer",
+        "code-verifier",
+        "concurrency-reviewer",
+        "consensus-arbiter",
+        "judgment-reviewer",
+        "performance-reviewer",
+        "plan-validator",
+        "security-reviewer",
+        "stuck",
+        "test-reviewer",
+        "ux-reviewer",
+    }
+)
+
+
+@pytest.mark.parametrize("name", _ALL_AGENTS)
+def test_every_agent_declares_a_non_empty_tools_list(
+    name: str, rendered_agents: dict[str, str]
+) -> None:
+    block, _rest = _frontmatter(rendered_agents[name])
+    data = yaml.safe_load(block)
+
+    tools = data.get("tools")
+    assert isinstance(tools, str), (
+        f"{name}: no `tools:` in the merged frontmatter — an absent tools list makes the "
+        "subagent inherit every tool the main thread has"
+    )
+    assert tools.strip(), f"{name}: `tools:` is empty"
+
+
+@pytest.mark.parametrize("name", sorted(_READ_ONLY_AGENTS))
+def test_read_only_agents_are_not_granted_write_edit_or_bash(
+    name: str, rendered_agents: dict[str, str]
+) -> None:
+    """The boundary that is actually enforced, asserted per agent.
+
+    CLAUDE.md is explicit that a reviewer's real limit is the ABSENCE of Bash/Write/Edit
+    from `tools:` — the frontmatter `permissions:` block was deleted in 0.40.0 precisely
+    because it was never enforced. A silent widening here is invisible to every other
+    test in the suite.
+    """
+    block, _rest = _frontmatter(rendered_agents[name])
+    granted = {t.strip() for t in str(yaml.safe_load(block).get("tools", "")).split(",")}
+
+    assert not (granted & {"Write", "Edit", "Bash"}), (
+        f"{name} is a read-only agent but its rendered tools grant "
+        f"{sorted(granted & {'Write', 'Edit', 'Bash'})}"
+    )

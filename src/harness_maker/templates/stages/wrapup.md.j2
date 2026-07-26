@@ -82,7 +82,7 @@ reconciler would read another's reply and vouch for claims it never saw), and an
 leftover becomes untracked dirt for the next `worktree create` guard. Then:
 
 ```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.wrapup_receipt --root . --stage wrapup --worktree <brief.worktree_root> --receipt-file <the temp path>
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.wrapup_receipt --root . --stage wrapup --worktree '<brief.worktree_root>' --receipt-file <the temp path>
 ```
 
 > **`--worktree` is not optional** — substitute the literal `worktree_root` the brief

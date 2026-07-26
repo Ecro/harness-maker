@@ -247,5 +247,5 @@ def test_the_reconcile_call_passes_the_worktree_root(tmp_path: Path) -> None:
     """
     section = _flat(_wrapup(tmp_path, stages=["wrapup"]))
 
-    assert "--worktree <brief.worktree_root>" in section
+    assert "--worktree '<brief.worktree_root>'" in section
     assert "`--worktree` is not optional" in section

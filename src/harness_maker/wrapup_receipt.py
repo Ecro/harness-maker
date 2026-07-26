@@ -178,7 +178,7 @@ def _tier_slugs(base: Path, filename: str, kind: str) -> set[str]:
 # version took `stem.split("-", 1)[1]` for every `*.md` under the vault, so a user's own
 # `my-notes.md` registered slug `notes` and could satisfy a promotion claim by accident.
 def _vault_note_types() -> frozenset[str]:
-    """DERIVED from the enum, never hand-copied (review R2-02).
+    """DERIVED from the enum, never hand-copied (review round 3).
 
     The first version listed five of the six types by hand and omitted `journal` —
     which `wrapup.md.j2` Step 5.6 explicitly offers as a promotion type — so a truthful
@@ -193,12 +193,12 @@ def _vault_note_types() -> frozenset[str]:
 def _vault_slugs(vault_root: Path, folders: Sequence[str] | None = None) -> set[str]:
     """Slugs this harness could have promoted — nothing else in the vault counts.
 
-    `folders` narrows the walk to `second_brain.folders`, the allowlist a prior
-    security review introduced precisely to keep the harness out of the rest of a
-    personal Obsidian vault. Absent config falls back to the vault root, which is the
-    documented shape for a single-folder vault.
+    `folders` narrows the walk to the WRITABLE `second_brain.folders`, the allowlist a
+    prior security review introduced to keep the harness out of the rest of a personal
+    Obsidian vault. Absent config yields NO slugs — `promote_note` refuses to write in
+    that configuration, so nothing this harness produced can be there.
     """
-    # No folders configured → NO slugs, not "walk the whole vault" (review R2-04).
+    # No folders configured → NO slugs, not "walk the whole vault" (review round 3).
     # `promote_note` already refuses to write in that config, so nothing this harness
     # produced can be there; falling back to the vault root re-opened the unbounded
     # walk M-02 was raised about, and would let an unrelated personal note satisfy a
@@ -454,25 +454,35 @@ def _configured_vault(base: Path) -> Path | None:
 
 
 def _configured_vault_folders(base: Path) -> list[str] | None:
-    """`second_brain.folders` — the allowlist that keeps this walk out of the rest of a
-    personal Obsidian vault (review M-02)."""
+    """WRITABLE, validated `second_brain.folders` paths — nothing else can hold a promotion.
+
+    Two defects this replaces, both flagged by both reviewers in round 3:
+
+    - It read the raw dict, bypassing `SecondBrainConfig`'s own validator, which rejects
+      absolute, `~`- and `..`-bearing folder paths. `Path("/vault") / "/etc"` is `/etc`,
+      so a hostile or careless config aimed an unbounded `rglob` outside the vault.
+    - It ignored `write`. `promote_note` only ever writes into a folder with
+      `write: true`, so a slug found in a READ-ONLY reference folder is provably not
+      something this harness produced — yet it could satisfy a `promoted_slugs` claim.
+      The common shape (one narrow writable promotion folder plus a broad read-only
+      search folder) therefore re-opened the fabrication path at a smaller radius.
+    """
     path = base / ".claude" / "harness.yaml"
     if not path.is_file():
         return None
     try:
         from .io_utils import load_harness_yaml
+        from .models import SecondBrainConfig
 
         data = load_harness_yaml(path)
-    except Exception:  # noqa: BLE001
+        raw = data.get("second_brain") if isinstance(data, dict) else None
+        if not isinstance(raw, dict):
+            return None
+        cfg = SecondBrainConfig.model_validate(raw)
+    except Exception:  # noqa: BLE001 - a broken block must not block the wrapup
         return None
-    raw = data.get("second_brain") if isinstance(data, dict) else None
-    if not isinstance(raw, dict):
-        return None
-    folders = raw.get("folders")
-    if not isinstance(folders, list):
-        return None
-    out = [f.get("path") for f in folders if isinstance(f, dict) and isinstance(f.get("path"), str)]
-    return [p for p in out if p] or None
+    # Mirrors `promote_note`'s own selection: only a writable folder can be a target.
+    return [f.path for f in cfg.folders if f.write and f.path.strip()] or None
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -508,15 +518,36 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps({"status": "unparseable", "error": error}, indent=2))
         return 2
 
+    # `--worktree` becomes `_confined`'s confinement ROOT, and the value is substituted
+    # by the model out of the brief into a rendered shell line — so accepting it verbatim
+    # would make the F-04 path-escape guarantee depend on that substitution being
+    # faithful. `--worktree /` would make `_confined(Path("/"), "etc/hostname")` resolve
+    # a real file, emit no mismatch, and the verify template would then adopt the
+    # receipt's verdict. Confine it the same way `wrapup_brief.validate_brief` does.
+    requested = Path(ns.worktree).resolve() if ns.worktree else Path(ns.root).resolve()
+    if requested != base and requested.parent != (base / ".worktrees"):
+        print(
+            json.dumps(
+                {
+                    "status": "unparseable",
+                    "error": (
+                        f"--worktree {str(requested)!r} is neither the base repo nor one of "
+                        f"its .worktrees/<slug> checkouts"
+                    ),
+                },
+                indent=2,
+            )
+        )
+        return 2
+    doc_root = requested
+
     vault = Path(ns.vault).expanduser() if ns.vault else _configured_vault(base)
     result = reconcile(
         receipt,
         base_root=base,
         vault_root=vault,
         vault_folders=_configured_vault_folders(base),
-        # Default the document root to the invocation cwd: a delegated stage runs
-        # inside the task worktree, which is where it writes (review M-05).
-        worktree_root=Path(ns.worktree).resolve() if ns.worktree else Path(ns.root).resolve(),
+        worktree_root=doc_root,
         expected_stage=ns.stage,
     )
     print(

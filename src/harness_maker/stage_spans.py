@@ -116,7 +116,16 @@ def emit_event(
     now: datetime | None = None,
 ) -> Path:
     """Append one event. Atomic per `telemetry.py`'s O_APPEND + single-write pattern."""
+    from .loop_marker import sanitize_session_id
+
     base = resolve_base_root(cwd)
+    # Sanitize at the WRITE point so the ledger is uniformly sanitized and the reader
+    # can apply the same function to whichever channel it got its id from. Without this
+    # the writer stored a raw env value while `span-end` sanitized a raw stdin payload,
+    # and the two agreed only because a real Claude session id is a UUID (which
+    # `sanitize_session_id` passes through). Relying on the input happening to be tame
+    # is the assumption, not the invariant.
+    clean = sanitize_session_id(session_id) if session_id else None
     record = SpanEvent(
         schema_version=SCHEMA_VERSION,
         event=event,
@@ -126,7 +135,7 @@ def emit_event(
         git_branch=git_branch,
         task_slug=task_slug,
         ts=now or datetime.now(UTC),
-        session_id=session_id or None,
+        session_id=clean or None,
     )
     path = base / ".claude" / "observability" / "stage-spans.jsonl"
     path.parent.mkdir(parents=True, exist_ok=True)
