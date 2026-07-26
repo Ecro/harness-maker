@@ -149,10 +149,39 @@ changes which tests run, and no allowlist could be trusted to name it), and
 Four regression tests pin those properties, including the stability fence the class
 needed: without the scrub the stability test sees three distinct keys, with it one.
 
-### Security — the blanket `Bash(uv:*)` allow rule is retired
+### Security — the blanket `Bash(uv:*)` allow rule is retired (new installs only)
 
-> **Re-render (`/harness-maker:make --update`) to pick this up** — an existing
-> `.claude/settings.json` keeps the old rule until you do.
+> **⚠️ Re-rendering does NOT remove it. Corrected after release — the original
+> note here was wrong.** A fresh install gets the scoped rules and no blanket. An
+> existing `.claude/settings.json` **keeps `Bash(uv:*)`** through
+> `/harness-maker:make --update`, so the exposure below is still live for you
+> until you delete the line by hand.
+>
+> `permissions.allow` is merged as a **list union**, and only `deny` has a prune
+> for literals the harness itself shipped (`_HARNESS_SHIPPED_DENY_LITERALS`).
+> `allow` has none — `render.py`'s comment states the premise, *"an identical
+> string there was never ours"*, which stopped being true the moment a template
+> shipped `Bash(uv:*)`. So the retired rule is re-added on every render.
+>
+> Extending the prune to `allow` is **not** a one-line change: the deny prune is
+> safe because every literal in it provably enforces nothing, so deleting one
+> removes zero protection. `Bash(uv:*)` is a *live* rule, and the same code
+> comment already draws that line — *"for a LIVE rule it is the difference
+> between tidying and silent data loss."* A safe auto-removal needs its own
+> argument and is deliberately not attempted here.
+>
+> **Manual removal** — delete these two lines from `.claude/settings.json`
+> (the second is the pre-`0.43.0` argument order, superseded by
+> `Bash(agy --sandbox --print:*)`):
+>
+> ```json
+> "Bash(uv:*)",
+> "Bash(agy --print --sandbox:*)"
+> ```
+>
+> Everything the harness and a Python toolchain actually run stays covered by the
+> scoped rules below. What starts prompting is `uv run python -c "…"` (used by
+> `/hm:loop-p5-batch`) and ad-hoc `uv` commands — which is the point.
 
 `uv run` executes its arguments as a command. Claude Code's permissions docs call
 out exactly this class for environment runners — a rule like `Bash(devbox run *)`

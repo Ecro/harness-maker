@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.42.1
+harness_maker_version: 0.43.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: harness-yaml/Production.yaml.j2
 provenance: official
-content_hash: ed22ff8749cfd5b5c302f034259ae3dcc7da43c287c8270f4f49d4bf28a1872a
+content_hash: 1e4bc673dbf2a124822903d780a880f577b3c9c89af5bdf3d40b4e40ea14ab77
 ---
 preset: Production
 locale: ko
@@ -165,6 +165,13 @@ delivery_metrics:
   churn_cohort_days: 14
   blame_file_cap: 500
   paths: []
+economics:
+  window_days: 30
+  price_model: "opus"
+  adjacency_estimate: true
+  adjacency_max_gap_min: 10.0
+  adjacency_max_turns: 20
+  idle_gap_cap_min: 5.0
 autonomy:
   level: "auto_safe"
   pipeline: ["research", "spec", "plan", "execute", "review", "verify", "wrapup"]
