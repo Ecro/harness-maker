@@ -2,7 +2,31 @@
 
 ## [Unreleased]
 
+## [0.43.2] — 2026-07-26
+
+### Fixed — the `stage-delegate` agent shipped without a name or description
+
+0.43.1's release gate caught this before anything was published, so no 0.43.1
+artifacts exist. The new agent's `description:` read `Runs a whole /hm: stage
+body …` — an unquoted `: ` in a YAML value. The renderer merges an agent
+template's own frontmatter into the provenance block it prepends, and that merge
+parses the source frontmatter as YAML; the colon defeated it, so the fields were
+emitted as a **second** `---` block. Claude Code reads only the first block, so the
+agent shipped with no `name` and no `description` — broken as an agent, not merely
+untidy.
+
+Detection was at the end of the pipeline: the readiness signal that catches it
+(`agent_frontmatter_valid`) is computed by an `INTEGRATION=1`-gated test, which the
+default `pytest` run skips and which `ci.yml` deliberately excludes (it runs nightly
+and at tag time). A structural test now asserts, in the default suite, that every
+rendered agent exposes exactly one parseable frontmatter block carrying `name` and
+`description` — verified to fail against the broken artifact.
+
 ## [0.43.1] — 2026-07-26
+
+> **Superseded by 0.43.2 — nothing was published under this tag.** The release
+> workflow stopped at `quality-gate`, so `build`, `publish-pypi` and
+> `github-release` never ran. The tag is retained for audit.
 
 > **Everything below is render-gated. `/harness-maker:make --update` or nothing changes.**
 > The span emitter lives in the stage templates and the `Stop` / `PreCompact` hooks; the

@@ -325,7 +325,7 @@ _CODEX_AGENT_META: dict[str, str] = {
     "plan-validator": "Critiques a draft PLAN document for gaps, ambiguities, missing exit criteria, and feasibility risks before /hm:execute is invoked. Read-only.",  # noqa: E501
     "security-auditor": "Deep 5-gate security audit (secrets, permissions, hook injection, dependency CVEs, prompt injection) — read-only, returns structured findings JSON",  # noqa: E501
     "security-reviewer": "Reviews changes for secrets exposure, injection, auth flaws, and unsafe permission grants",  # noqa: E501
-    "stage-delegate": "Runs a whole /hm: stage body (wrapup, verify) from a validated brief and returns a machine receipt — reduces main-loop context carry",  # noqa: E501
+    "stage-delegate": "Runs a whole pipeline stage body (wrapup or verify) from a validated brief and returns a machine receipt, cutting main-loop context carry",  # noqa: E501
     "stuck": "Escalation analyst — invoked when /hm:execute, /hm:review, or /hm:plan blocks. Performs root-cause analysis, proposes 2-3 unblock paths, and writes a structured escalation note. Read-only.",  # noqa: E501
     "test-reviewer": "Phase A.5 gate for /hm:execute. Critiques RED-stage tests for SPEC alignment, banned-pattern violations, and assertion quality before Phase B (RED gate) runs. Read-only.",  # noqa: E501
     "ux-reviewer": "Reviews UI changes for accessibility, consistency, and interaction quality",
