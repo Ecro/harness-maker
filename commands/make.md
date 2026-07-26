@@ -61,7 +61,7 @@ then check whether the project already has a harness.
 # Step A — Claude Code plugin resolution (works when installed via /plugin).
 # Bootstrap through the newest cache path, then let `harness-maker locate`
 # apply the real priority rules: projectPath==cwd > user scope > installedAt.
-!cache_bootstrap=$(ls -1d "$HOME"/.claude/plugins/cache/harness-maker*/harness-maker/[0-9]*.[0-9]*.[0-9]* 2>/dev/null | awk -F/ '{print $NF, $0}' | sort -V | tail -1 | cut -d' ' -f2-)
+!cache_bootstrap=$(ls -1d "$HOME"/.claude/plugins/cache/harness-maker*/harness-maker/[0-9]*.[0-9]*.[0-9]* 2>/dev/null | while read -r p; do printf '%s %s\n' "${p##*/}" "$p"; done | sort -V | tail -1 | cut -d' ' -f2-)
 plugin_dir=""
 if [ -n "$cache_bootstrap" ]; then
     plugin_dir=$(uv run --with "$cache_bootstrap" python -m harness_maker.cli locate --plain 2>/dev/null || true)

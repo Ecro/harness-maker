@@ -258,7 +258,7 @@ never a rising bar.
   note `HEAD` (the post-execute diff is staged, so a bare `git diff` would see nothing) and
   `--numstat` for the added-line count that drives the `boundary` signal:
   ```bash
-  files=$(git diff --name-only HEAD); added=$(git diff --numstat HEAD | awk '{s+=$1} END{print s+0}'); printf '%s\n' "$files" | uv run --with {{ harness_maker_src_path }} python -m harness_maker.high_diff classify --added-lines "$added"
+  files=$(git diff --name-only HEAD); added=$(git diff --shortstat HEAD | grep -oE '[0-9]+ insertion' | grep -oE '[0-9]+' || echo 0); printf '%s\n' "$files" | uv run --with {{ harness_maker_src_path }} python -m harness_maker.high_diff classify --added-lines "$added"
   ```
   Invoke when `is_high` (or `boundary` and your judgment, reusing the When-to-Run
   criteria, says high). Otherwise skip all models this round (no extra voters).

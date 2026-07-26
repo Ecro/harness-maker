@@ -405,9 +405,16 @@ def normalize_for_snapshot(text: str) -> str:
 패턴: **policy flag (default = preserve user) + slash 명령에서
 `AskUserQuestion` 으로 의도 묻기**.
 
-### 2. 외부 소비자의 파서 정합성 확인
+### 2. 외부 소비자 정합성 확인 — 전처리 + parser
 우리가 렌더하는 파일은 우리가 아니라 **다른 도구가 읽음**. 그 도구의
-parser 가 받아들이는 형식을 따라야 함.
+parser 가 받아들이는 형식을 따라야 하고, **parser 앞단에서 내용을 바꾸는
+전처리기가 있는지도** 확인해야 한다.
+
+> **두 층은 탐지 방법이 다르다.** parser 문제는 파일을 읽으면 잡힌다
+> (`settings.json` 에 frontmatter 가 박혀 있다 — 보면 안다). **전처리 문제는
+> 파일을 읽어서는 절대 안 잡힌다** — 디스크의 내용은 옳고, 실행되는 내용만
+> 다르다. render-grep 테스트는 전부 통과한다. **실제 호출의 결과값을
+> 대조해야만** 보인다.
 - `settings.json` → Claude Code 가 pure JSON 으로 기대 (YAML frontmatter
   prefix 박으면 permissions 무시됨, 0.3.1 fix)
 - `hooks/hooks.json` → jq-parseable pure JSON
@@ -428,9 +435,27 @@ parser 가 받아들이는 형식을 따라야 함.
   `safe_load_all` 의 마지막 non-empty mapping 을 사용해야 한다.
   Reverse mapper: `interview.answers_from_harness_yaml`.
 
-새 파일 종류 추가 시: 그 파일을 누가 읽는지 + 그 reader 가 frontmatter
-허용하는지 먼저 확인. 안 되면 `_is_pure_text` / `_is_hooks_json` 같은
-디스패치 분기 추가.
+- **슬래시 명령 본문** (렌더된 `.claude/commands/hm/*.md` **와** 플러그인 자신의
+  `commands/*.md` 양쪽) → Claude Code 가 모델에게 넘기기 **전에** 인자를 치환한다.
+  `$0`–`$9` 는 인자로 대체되므로 셸/awk 의 위치 매개변수를 쓸 수 없다
+  (`$ARGUMENTS` 가 지원되는 방식). **2026-07-26 실측**: `/hm:make --update` 에서
+  디스크의 `awk '{print $NF, $0}'` 가 호출 시 `awk '{print $NF, --update}'` 가 되어
+  `HM=-8` → `uv run --with "-8"` 실패 → **하드코딩된 구버전 pin 으로 fallback**.
+  그 줄의 존재 이유가 정확히 그 stale-pin 함정을 피하는 것이었다. 같은 함정이
+  `/hm:review`·`/hm:plan` 의 `awk '{s+=$1}'` 에도 있었고, 그 값은
+  `high_diff classify --added-lines` 로 가서 **second-opinion 발동 여부**를
+  결정한다. 그리고 플러그인 자신의 `commands/make.md` — **신규 설치의 진입점** —
+  에도 같은 줄이 있었는데, 렌더된 명령만 스캔하던 첫 게이트가 놓쳤다.
+  게이트: `tests/structural/test_no_positional_params_in_commands.py`
+  (렌더 산출물 + 플러그인 자체 표면 양쪽).
+
+새 파일 종류 추가 시 두 가지를 확인한다:
+1. **누가 읽는지** + 그 reader 가 frontmatter 를 허용하는지. 안 되면
+   `_is_pure_text` / `_is_hooks_json` 같은 디스패치 분기 추가.
+2. **그 소비자가 읽기 전에 내용을 바꾸는지.** 바꾼다면 디스크의 파일을 검사하는
+   테스트로는 절대 잡을 수 없다 — 실제 호출을 한 번 돌려 결과값을 대조하는
+   테스트가 있어야 한다. 게이트를 만들 때는 **자기가 고치던 산출물에만 범위를
+   맞추지 말 것** — 같은 결함이 자기 수정을 피해 살아남는다 (위 `commands/make.md`).
 
 ### 3. 설정 precedence 의식
 Claude Code 는 `~/.claude/settings.json` (user) → `<project>/.claude/settings.json`

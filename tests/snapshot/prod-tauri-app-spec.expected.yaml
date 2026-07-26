@@ -70,7 +70,7 @@ files:
   body_sha256: 1c3c610e1bbfdeec671d114efff8a9188d61a0052e39a8045ab6a101da27302d
 - path: commands/hm/health.md
   template: commands/hm/health.md.j2
-  body_sha256: 96c2df8b57f8280bf8f148cfb3b96677948ceac412529f9cfc1c88490d15ff29
+  body_sha256: ffeabd5517b6852f6e1cef460a9a09498a4fe96f369419fec9335f436896c166
 - path: commands/hm/help.md
   template: commands/hm/help.en.md.j2
   body_sha256: cb3fe9dc211c83e7f7dc78a0289108385efaa298d6aac70a51d85384d56da951
@@ -82,7 +82,7 @@ files:
   body_sha256: 4170dd163c632caadb1d3be25a4b11a81291bedcce2449429e7c1accb69b4993
 - path: commands/hm/make.md
   template: commands/hm/make.md.j2
-  body_sha256: a50121d38e91468087c6ed01a1bc8b50f3e2314c90af8c486c15cb0a6c69c9a0
+  body_sha256: 810fdadb536aabe19e64291f00c4839e883ad63de0cc4e1f6e9279a9e63febeb
 - path: commands/hm/metrics.md
   template: commands/hm/metrics.md.j2
   body_sha256: bc716a86c331b79cdaef7a1990e6158161fc3c8c2f9e209b5b21e2349fed02df
