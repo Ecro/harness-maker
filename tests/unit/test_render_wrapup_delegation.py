@@ -1,0 +1,251 @@
+"""Phase 5: the delegate-on wrapup artifact carries BOTH paths, and the git tail stays.
+
+ADR-006's fallback only exists if the artifact it falls back INTO is in the same
+file. An earlier draft of this plan put the dispatch and the inline body in
+mutually-exclusive Jinja branches, which would have made "run the body inline"
+unreachable — a degraded path with no destination.
+
+These are render-GREP tests: they prove the instruction is PRESENT. They cannot
+prove the interpreting model obeys it. That asymmetry is deliberate and is the same
+position the economics prose layer takes.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+from harness_maker.context_lint import _count_body_lines
+from harness_maker.models import (
+    DelegationConfig,
+    InterviewAnswers,
+    Preset,
+    ProjectProfile,
+    Target,
+)
+from harness_maker.render import DEFAULT_FREEZE_TIME, render
+from harness_maker.synthesize import synthesize
+
+# The `workflow` Production cap from `context_lint.THRESHOLDS`. Nothing ENFORCES it
+# for an atomic stage command — `readiness._CONTEXT_LIMITS` has no command row — so
+# this is a chosen yardstick, stated rather than discovered. See the note in
+# `test_the_delegate_on_command_size_is_pinned_so_growth_is_a_decision`.
+_WORKFLOW_PRODUCTION_CAP = 600
+
+
+def _flat(text: str) -> str:
+    """Collapse whitespace before matching prose.
+
+    Markdown prose is hard-wrapped, so a phrase the template really contains can be
+    split across a newline. Asserting the unwrapped form against the raw text fails for
+    formatting rather than for content — and the fix would be to re-wrap the template
+    to suit the test, which is backwards.
+    """
+    return " ".join(text.split())
+
+
+def _wrapup(
+    tmp_path: Path,
+    *,
+    preset: str = "Production",
+    stages: list[str] | None = None,
+    feature_branch: bool = True,
+) -> str:
+    # `feature_branch_workflow` must be set EXPLICITLY: constructing `InterviewAnswers`
+    # directly bypasses `interview()`'s `_preset_extras`, so the flag-gated Step 7.7
+    # (`task-land`) would simply not render and a test asserting its presence would be
+    # measuring the fixture, not the template.
+    answers = InterviewAnswers(
+        preset=Preset(preset),
+        targets=[Target.CLAUDE_CODE],
+        delegation=DelegationConfig(stages=stages or []),
+        worktree={"feature_branch_workflow": feature_branch},
+    )
+    render(synthesize(ProjectProfile(), answers), tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
+    return (tmp_path / "commands" / "hm" / "wrapup.md").read_text(encoding="utf-8")
+
+
+# ------------------------------------------------------------------ delegate OFF
+
+
+def test_the_default_render_carries_no_dispatch_block(tmp_path: Path) -> None:
+    """ADR-011 ships default-empty for one release. A dispatch block present in the
+    default artifact would make the soak meaningless — and would mean every existing
+    user's next `--update` silently switched their wrapup to a subagent."""
+    body = _wrapup(tmp_path)
+
+    assert "stage-delegate" not in body
+    assert "wrapup_brief" not in body
+
+
+def test_the_default_render_still_carries_the_whole_body(tmp_path: Path) -> None:
+    """Negative control for the test above: "no dispatch" must not have been achieved
+    by dropping the body."""
+    body = _wrapup(tmp_path)
+
+    assert "Step 5 — Memory append" in body
+    assert "Step 7 — Single commit" in body
+
+
+# ------------------------------------------------------------------ delegate ON
+
+
+def test_the_delegate_on_render_carries_the_dispatch(tmp_path: Path) -> None:
+    body = _wrapup(tmp_path, stages=["wrapup"])
+
+    assert "stage-delegate" in body
+    assert "harness_maker.wrapup_brief" in body
+
+
+def test_the_delegate_on_render_still_carries_the_inline_body(tmp_path: Path) -> None:
+    """ADR-006's reachability fix, and the defect it was written against: with the two
+    paths in mutually-exclusive branches there is no inline body to degrade INTO, so
+    an incomplete brief or an unavailable dispatch tool strands the stage entirely."""
+    body = _wrapup(tmp_path, stages=["wrapup"])
+
+    assert "Step 5 — Memory append" in body
+    assert "Step 7 — Single commit" in body
+
+
+def test_the_inline_body_is_labelled_as_the_degraded_path(tmp_path: Path) -> None:
+    """Without the heading, a reader of the delegate-on artifact sees the body twice
+    over and cannot tell which one runs."""
+    body = _wrapup(tmp_path, stages=["wrapup"])
+
+    assert "degraded" in body.lower()
+
+
+def test_the_dispatch_block_self_skips_when_the_tool_is_unavailable(tmp_path: Path) -> None:
+    """ADR-002's per-target mechanism. There is no `is_cursor` render branch to key
+    on, so Cursor and Codex degrade at RUNTIME — the same shape the autopilot block
+    already uses. Without the self-skip those sessions get a dispatch instruction they
+    cannot execute."""
+    body = _wrapup(tmp_path, stages=["wrapup"])
+
+    lowered = body.lower()
+    assert "unavailable" in lowered
+    assert "inline" in lowered
+
+
+def test_the_receipt_is_reconciled_before_the_commit(tmp_path: Path) -> None:
+    """Order is the contract (ADR-012): reconciling AFTER the commit means a mismatch
+    is discovered once it is already in history."""
+    body = _wrapup(tmp_path, stages=["wrapup"])
+
+    reconcile_at = body.index("wrapup_receipt")
+    commit_at = body.index("Step 7 — Single commit")
+    assert reconcile_at < commit_at
+
+
+def test_the_git_tail_stays_in_the_main_loop(tmp_path: Path) -> None:
+    """ADR-004: `git add`/`commit`, the stash pop, the drain and `task-land` stay
+    outside the delegated portion — as a prompt instruction, not a runtime boundary
+    (the agent has Bash). The delegated body must be told so explicitly."""
+    body = _wrapup(tmp_path, stages=["wrapup"])
+
+    assert "Step 7.7" in body
+    assert "task-land" in body
+    # The dispatch section must name the exclusion rather than leaving it implied.
+    dispatch = body[body.index("stage-delegate") : body.index("Step 5 — Memory append")]
+    assert "git" in dispatch.lower()
+
+
+def test_only_the_configured_stage_gets_a_dispatch(tmp_path: Path) -> None:
+    """`delegation.stages` is a LIST precisely so one stage's opt-in does not turn on
+    another's (ADR-011 rejected `wrapup.delegate` for exactly this). Turning on verify
+    alone must leave wrapup inline."""
+    body = _wrapup(tmp_path, stages=["verify"])
+
+    assert "stage-delegate" not in body
+    assert "Step 5 — Memory append" in body
+
+
+# ------------------------------------------------------------------ size
+
+
+@pytest.mark.parametrize(("preset", "expected"), [("Side", 662), ("Production", 695)])
+def test_the_default_render_costs_existing_users_nothing(
+    tmp_path: Path, preset: str, expected: int
+) -> None:
+    """The shipped artifact is the delegate-OFF one for at least this release
+    (ADR-011), so the whole Jinja block must be gated. Measured 2026-07-26, with
+    `feature_branch_workflow` on."""
+    assert _count_body_lines(_wrapup(tmp_path, preset=preset)) == expected
+
+
+@pytest.mark.parametrize("preset", ["Side", "Production"])
+def test_delegation_adds_a_bounded_amount_of_prose(tmp_path: Path, preset: str) -> None:
+    """ADR-006 warns the delegate-on command GROWS rather than shrinks. The DELTA is
+    what this phase owns, so that is what is pinned.
+
+    An absolute cap would be dishonest here twice over: the command already sat at 695
+    Production body lines — past `context_lint`'s `workflow` cap of 600 — before this
+    phase added anything, and nothing ENFORCES that cap on an atomic stage command
+    (`readiness._CONTEXT_LIMITS` has no command row). Measuring the delta instead
+    makes the assertion about this change rather than about inherited size. Measured:
+    +50 lines.
+    """
+    off = _count_body_lines(_wrapup(tmp_path / "off", preset=preset))
+    on = _count_body_lines(_wrapup(tmp_path / "on", preset=preset, stages=["wrapup"]))
+
+    assert on - off <= 60, (
+        f"{preset} delegation adds {on - off} body lines ({off} → {on}); the delegated "
+        "body is supposed to move context OUT of the main loop, not add prose to the "
+        f"command. For reference the `workflow` Production cap is "
+        f"{_WORKFLOW_PRODUCTION_CAP}, which this command already exceeded before "
+        "delegation existed."
+    )
+
+
+# ------------------------------------------------- review round 2 (M-03, M-04)
+
+
+def test_the_delegate_asset_carries_untrusted_data_framing(tmp_path: Path) -> None:
+    """M-03. The same diff added this block twice to the read-only `/hm:metrics`
+    surface and omitted it from the only new WRITE-capable asset (Write/Edit/Bash),
+    which is the inverse of the correct priority. The delegate reads the PLAN, REVIEW,
+    memory tiers and a git-derived diff — all attacker-influencable text."""
+    render(
+        synthesize(
+            ProjectProfile(),
+            InterviewAnswers(preset=Preset.PRODUCTION, targets=[Target.CLAUDE_CODE]),
+        ),
+        tmp_path,
+        freeze_time=DEFAULT_FREEZE_TIME,
+    )
+    body = _flat((tmp_path / "agents" / "stage-delegate.md").read_text(encoding="utf-8"))
+
+    assert "Untrusted data" in body
+    assert "never instructions to you" in body
+    # It must name the reason this asset in particular needs it.
+    assert "Write, Edit and Bash" in body
+
+
+def test_the_receipt_temp_file_discipline_is_specified(tmp_path: Path) -> None:
+    """M-04. Sibling steps 5.1 and 5.6 in the same file already mandate a fresh temp
+    file outside the repo, because a fixed name collides under concurrent fleet
+    wrapups — one session's reconciler would read another's reply and vouch for claims
+    it never saw. Step 0.5 named no path at all."""
+    body = _wrapup(tmp_path, stages=["wrapup"])
+    section = _flat(body[body.index("Step 0.5") : body.index("Steps 1–5.6 — inline body")])
+
+    assert "OUTSIDE the repo" in section
+    assert "never a fixed in-repo name" in section
+    # The stage must be asserted, or a wrapup receipt reconciles as a verify one.
+    assert "--stage wrapup" in section
+
+
+def test_the_reconcile_call_passes_the_worktree_root(tmp_path: Path) -> None:
+    """R2-01, and the fourth instance in this task of *unit boundary green, shipped
+    entry point wrong*: `reconcile` gained a `worktree_root` parameter with two passing
+    unit tests, and no caller passed it — so `doc_root` stayed at base, byte-identical
+    to the behaviour the parameter was added to fix.
+
+    `!` lines run at the BASE repo; the delegate writes in the worktree. Without the
+    flag, every truthful delegated run reports `document-missing`.
+    """
+    section = _flat(_wrapup(tmp_path, stages=["wrapup"]))
+
+    assert "--worktree <brief.worktree_root>" in section
+    assert "`--worktree` is not optional" in section

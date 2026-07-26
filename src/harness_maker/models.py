@@ -672,6 +672,13 @@ class EconomicsConfig(BaseModel):
     adjacency_max_gap_min: float = 10.0
     adjacency_max_turns: int = 20
     idle_gap_cap_min: float = 5.0
+    # Forward span-ledger caps (ADR-003 of PLAN-economics-attribution-and-carry).
+    # Calibrated against this repo's measured unattributed-run distribution: 400 turns
+    # captures 96.1% with exactly one run over, and 240 min sits between p95 (179.1)
+    # and p99 (485.2), cutting 4 of 144 runs. Both must still be able to REJECT — an
+    # unbounded span hands unrelated conversation to whichever stage ran last.
+    span_max_turns: int = 400
+    span_max_min: float = 240.0
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -733,6 +740,44 @@ class AgentModelSpec(BaseModel):
 # ──────────────────────────────────────────────────────────────────────────────
 # Composite models
 # ──────────────────────────────────────────────────────────────────────────────
+
+
+DELEGATABLE_STAGES: tuple[str, ...] = ("wrapup", "verify")
+
+
+class DelegationConfig(BaseModel):
+    """Which stages run their body inside a subagent (ADR-011 of PLAN-economics-…).
+
+    A LIST, not per-stage booleans: ADR-011 rejected `wrapup.delegate` because Phase 6
+    used the same key to gate *verify* — a key named for one stage silently
+    controlling another. Empty means off, which is the shipped default for one
+    release; the soak exit condition lives in the ADR.
+
+    **Scope of the switch (review M-13):** emptying `stages` removes the *dispatch
+    block* from the rendered stage commands. The `stage-delegate` agent asset is
+    rendered unconditionally, like every other member of `_ALL_AGENTS` — nothing
+    invokes it when no dispatch block exists, so it is inert rather than off.
+
+    Names are normalised rather than validated into a `Literal`, deliberately: strict
+    validation would make a typo poison the whole tolerant-fallback block load and
+    silently revert every other key in it. `unknown_stages` keeps the typo REPORTABLE
+    instead — an opt-in that never fires is the absent-case black hole this project
+    has shipped eight times.
+    """
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    stages: list[str] = Field(default_factory=list)
+
+    @field_validator("stages", mode="after")
+    @classmethod
+    def _normalise(cls, v: list[str]) -> list[str]:
+        """A hand-edited `- Wrapup ` reads as "on" to the user and "off" to `in`."""
+        return [s.strip().lower() for s in v if s.strip()]
+
+    @property
+    def unknown_stages(self) -> tuple[str, ...]:
+        return tuple(s for s in self.stages if s not in DELEGATABLE_STAGES)
 
 
 class PermissionsConfig(BaseModel):
@@ -965,6 +1010,10 @@ class HarnessConfig(BaseModel):
     delivery_metrics: DeliveryMetricsConfig = Field(default_factory=DeliveryMetricsConfig)
     # Transcript-backed economics tuning (PLAN-harness-economics-observability ADR-004).
     economics: EconomicsConfig = Field(default_factory=EconomicsConfig)
+    # Whole-stage subagent delegation (PLAN-economics-attribution-and-carry ADR-011).
+    # default_factory keeps legacy harness.yaml loading; empty `stages` leaves every
+    # dispatch block a dead Jinja branch.
+    delegation: DelegationConfig = Field(default_factory=DelegationConfig)
     # ADR-011: schema_version bumped 1 → 2 for the agent_models/default_model
     # rename. PLAN-second-opinion-multi-model ADR-001: bumped 2 → 3 for the
     # codex_second_opinion → second_opinion rename (silent migration in interview.py).
@@ -1168,6 +1217,10 @@ class InterviewAnswers(BaseModel):
     # Mirror of HarnessConfig.economics — without this declaration InterviewAnswers'
     # extra='forbid' would reject the key on round-trip (checkpoint 6).
     economics: EconomicsConfig = Field(default_factory=EconomicsConfig)
+    # Mirror of HarnessConfig.delegation. ADR-011 designates `delegation.stages` as
+    # the ROLLBACK for a medium-likelihood/high-impact quality risk, so dropping it
+    # on `--update` would disarm the escape hatch itself.
+    delegation: DelegationConfig = Field(default_factory=DelegationConfig)
 
     @field_validator("sibling_repos", mode="before")
     @classmethod

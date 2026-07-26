@@ -100,7 +100,7 @@ If a command exits non-zero:
 ## Procedure — Round 1 (initial review)
 {%- if config.worktree is defined and config.worktree.get('feature_branch_workflow') %}
 
-{% include "agents/_partials/worktree_preflight.md.j2" %}
+{% set hm_stage = "review" %}{% include "agents/_partials/worktree_preflight.md.j2" %}
 {%- endif %}
 
 ### Step 1 — Reviewer set selection

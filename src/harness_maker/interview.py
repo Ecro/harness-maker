@@ -28,12 +28,14 @@ from pydantic import ValidationError
 from harness_maker.io_utils import denormalize_home_to_tilde, load_harness_yaml
 from harness_maker.models import (
     _MODEL_ID_PATTERN,
+    DELEGATABLE_STAGES,
     SECOND_OPINION_MODELS,
     AgentModelSpec,
     AtomicStage,
     AutonomyConfig,
     CodexAgentSpec,
     Confidence,
+    DelegationConfig,
     DeliveryMetricsConfig,
     DevMode,
     EconomicsConfig,
@@ -1094,6 +1096,24 @@ def answers_from_harness_yaml(yaml_path: Path) -> InterviewAnswers | None:
         econ_clean = {k: v for k, v in econ_raw.items() if k in EconomicsConfig.model_fields}
         with contextlib.suppress(ValidationError):
             update["economics"] = EconomicsConfig.model_validate(econ_clean)
+    # PLAN-economics-attribution-and-carry ADR-011 — same tolerant-fallback shape. This
+    # key is the ROLLBACK switch for delegation, so losing it here would leave a user
+    # whose wrapup quality degraded with no way back short of a patch release.
+    deleg_raw = data.get("delegation")
+    if isinstance(deleg_raw, dict):
+        deleg_clean = {k: v for k, v in deleg_raw.items() if k in DelegationConfig.model_fields}
+        with contextlib.suppress(ValidationError):
+            delegation = DelegationConfig.model_validate(deleg_clean)
+            update["delegation"] = delegation
+            if delegation.unknown_stages:
+                # A typo is not an error — it is an opt-in that never fires. Say so
+                # once rather than letting it read as "delegation is on".
+                logger.warning(
+                    "harness.yaml delegation.stages contains unrecognised name(s) %s — "
+                    "they will never match a stage (known: %s)",
+                    ", ".join(sorted(delegation.unknown_stages)),
+                    ", ".join(DELEGATABLE_STAGES),
+                )
     # ADR-002/004 silent migration: prefer the new `default_model` key; fall
     # back to the deprecated `recommended_model`. When ONLY the deprecated key
     # is present AND the file is schema_version<2, emit an advisory INFO log

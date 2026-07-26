@@ -75,7 +75,7 @@ knowledge, write a typed `decision` or `preference` note through
 ## Procedure
 {%- if config.worktree is defined and config.worktree.get('feature_branch_workflow') %}
 
-{% include "agents/_partials/worktree_preflight.md.j2" %}
+{% set hm_stage = "plan" %}{% include "agents/_partials/worktree_preflight.md.j2" %}
 {%- endif %}
 
 ### Step 0 — Skip heuristic (ALL 4 criteria must hold to skip the interview)

@@ -71,6 +71,7 @@ _PRODUCTION_MAP: dict[str, AgentModelSpec] = {
     # Reasoning-heavy
     "autoloop-coder": _spec("opus", "high"),
     "plan-validator": _spec("opus", "high"),
+    "stage-delegate": _spec("opus", "high"),
     "stuck": _spec("opus", "high"),
     # Reviewer / structured agents
     "code-reviewer": _spec("sonnet", "medium"),
@@ -93,6 +94,7 @@ _SIDE_MAP: dict[str, AgentModelSpec] = {
     # Reasoning agents (still need decent quality even in Side)
     "autoloop-coder": _spec("sonnet", "medium"),
     "plan-validator": _spec("sonnet", "medium"),
+    "stage-delegate": _spec("sonnet", "medium"),
     "stuck": _spec("sonnet", "medium"),
     # Reviewers downshift
     "code-reviewer": _spec("sonnet", "low"),

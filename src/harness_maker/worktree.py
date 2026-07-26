@@ -2394,7 +2394,13 @@ def _cli_create(args: list[str]) -> int:
     # Stop-hook can match it. Extract the flag + its value before the positional
     # count check. Absent → empty (back-compat; marker header empty).
     claude_session_id = ""
-    if "--claude-session-id" in args:
+    # ADR-008: the loop signal is flag PRESENCE, never value truthiness. loop.md.j2
+    # passes `--claude-session-id "$HM_SESSION_ID"` QUOTED, so on WSL2 — where
+    # CLAUDE.md records `$HM_SESSION_ID` as empty — the flag arrives with an EMPTY
+    # value. Selecting on the value would label every loop on the author's own
+    # platform `hm:execute`, silently defeating the loop attribution this exists for.
+    is_loop_create = "--claude-session-id" in args
+    if is_loop_create:
         idx = args.index("--claude-session-id")
         if idx + 1 >= len(args):
             print("create: --claude-session-id requires a value", file=sys.stderr)
@@ -2411,6 +2417,33 @@ def _cli_create(args: list[str]) -> int:
         return 2
     stage, base_str = args
     base = Path(base_str).resolve()
+
+    # ADR-008 loop coverage. `/hm:loop` orders its stages NOT to run task-preflight
+    # (loop.md.j2), so the per-stage emitter never fires inside a loop; this is the
+    # loop's own load-bearing call, so it carries the span instead.
+    #
+    # Emitted HERE — before the existing-worktree reuse return and before the scope
+    # check — because a span records that a stage STARTED, not that a worktree was
+    # created. `create` legitimately returns empty ("scope off, run in place") and
+    # that run still spends tokens; emitting after the early return would have left
+    # every no-isolation loop unattributed, which is the bucket this plan exists to
+    # shrink. One `create` invocation ⇒ exactly one span, which is also what makes
+    # it testable.
+    #
+    # Granularity is LOOP-level, not per-iteration: loop.md.j2 states "Per-loop (not
+    # per-iter)" and calls `create` once at the top, so one span covers the whole
+    # run and a long loop pushes the remainder into `capped_turns` — visible, but
+    # not attributed. Per-iteration spans would mean redesigning the loop's
+    # isolation (Non-Goal 1).
+    #
+    # `--claude-session-id` PRESENCE is the loop signal: CLAUDE.md records that ONLY
+    # loop.md.j2 passes it, so a standalone /hm:execute create is not a loop. The
+    # flag's VALUE is empty on WSL2 and must not be used to decide this.
+    _emit_stage_span(
+        base,
+        stage="hm:loop" if is_loop_create else f"hm:{stage}",
+        claude_session_id=claude_session_id or None,
+    )
 
     existing = _detect_existing_worktree(base)
     if existing is not None:
@@ -4127,7 +4160,13 @@ def _branch_drift(base: Path, branch: str) -> tuple[int, int]:
 
 
 def task_preflight(
-    base_dir: Path, slug: str, *, session_uuid: str, allow_shared: bool = False
+    base_dir: Path,
+    slug: str,
+    *,
+    session_uuid: str,
+    allow_shared: bool = False,
+    stage: str | None = None,
+    claude_session_id: str | None = None,
 ) -> tuple[Path, list[str]]:
     """Flag-on stage preflight (ADR-002/004/006): ensure the task worktree + warn.
 
@@ -4179,7 +4218,53 @@ def task_preflight(
                 f"[preflight] task branch {branch} is {behind} commit(s) behind "
                 f"{base_br}; auto-refresh declined — run `task-refresh {slug}` to rebase."
             )
+    # ADR-008: the span START is a SIDE EFFECT of this call, never a separate prose
+    # instruction — a prose line can be skipped silently, whereas a stage that skips
+    # preflight does not get its `<WT>` and degrades visibly. Emitted only AFTER the
+    # claim succeeds: a hard-failing preflight never ran a stage, and an open span
+    # from it would be closed only by next-start / session-end / the 400-turn cap,
+    # i.e. it could swallow up to 400 unrelated turns.
+    #
+    # `stage` is None for an un-re-rendered harness (no `--stage`). That writes an
+    # EMPTY stage on purpose: the reader maps it to `(unknown-stage)` and counts it,
+    # whereas normalising here would leave the absent-case counter at 0 forever.
+    _emit_stage_span(
+        base,
+        stage=stage,
+        git_branch=branch,
+        task_slug=slug,
+        claude_session_id=claude_session_id,
+    )
     return wt, warnings
+
+
+def _emit_stage_span(
+    base: Path,
+    *,
+    stage: str | None,
+    git_branch: str | None = None,
+    task_slug: str | None = None,
+    claude_session_id: str | None = None,
+) -> None:
+    """Never let telemetry break a stage: emission failure warns and proceeds.
+
+    `stage=None` writes an EMPTY stage on purpose — see ADR-008: the reader maps it
+    to `(unknown-stage)` and counts it, whereas normalising here would leave the
+    absent-case counter at 0 forever.
+    """
+    try:
+        from .stage_spans import emit_event
+
+        emit_event(
+            "start",
+            stage=stage or "",
+            cwd=base,
+            session_id=claude_session_id or os.environ.get("HM_SESSION_ID") or None,
+            git_branch=git_branch,
+            task_slug=task_slug,
+        )
+    except Exception as exc:  # pragma: no cover - defensive
+        print(f"[span] emission failed (non-fatal): {exc}", file=sys.stderr)
 
 
 def task_refresh(base_dir: Path, slug: str) -> int:
@@ -4905,21 +4990,101 @@ def _cli_task_land(args: list[str]) -> int:
     return task_land(base, slug, message=message, allow_drift_land=allow_drift_land)
 
 
+def _flag_value(args: list[str], flag: str) -> str | None:
+    """`--flag value` and `--flag=value`, both forms."""
+    for i, a in enumerate(args):
+        if a == flag and i + 1 < len(args):
+            return args[i + 1]
+        if a.startswith(f"{flag}="):
+            return a.split("=", 1)[1]
+    return None
+
+
+def _positionals(args: list[str], *, valued_flags: tuple[str, ...]) -> list[str]:
+    """Positionals with each valued flag's VALUE consumed, not mistaken for one."""
+    out: list[str] = []
+    skip = False
+    for a in args:
+        if skip:
+            skip = False
+            continue
+        if a.startswith("--"):
+            skip = a in valued_flags  # `--flag=value` carries its own value
+            continue
+        out.append(a)
+    return out
+
+
+def _cli_span_end(args: list[str]) -> int:
+    """`worktree span-end [base_dir] [--stage <s>]` — close the open span.
+
+    Wired to the Stop / PreCompact hooks, which is why it must be a no-op when no
+    span is open: those hooks fire on EVERY session, including ones that ran no
+    `/hm:` stage. A bare `end` written then would be paired by the reader against
+    whatever span preceded it — possibly from a different session entirely.
+
+    Claude-Code-only by construction: hooks live in `.claude/settings.json`, which
+    only Claude Code reads. On Cursor/Codex spans close by next-start or cap
+    (ADR-003), which is why those targets should expect a higher `capped_turns`.
+    """
+    stage = _flag_value(args, "--stage")
+    rest = _positionals(args, valued_flags=("--stage",))
+    base = Path(rest[0]).resolve() if rest else Path.cwd()
+    try:
+        from .stage_spans import emit_event, ledger_path, read_events
+
+        events, _ = read_events(ledger_path(base))
+        # Look at the last event OF THE CALLER'S SESSION, not the globally-last line
+        # (review R2-03). The ledger is SHARED, so with two sessions active any peer
+        # append made the old `events[-1]` tests fire and this session's `end` was
+        # never written. That used to be masked: the reader closed the globally-current
+        # span on any start, so a peer's start closed your span as a side effect. Once
+        # `_build_spans` was partitioned by session (F-02) nothing closed it at all —
+        # the span stayed open until a cap fired, which is precisely the unbounded
+        # over-attribution ADR-003 rejected start-only closure to avoid.
+        mine = os.environ.get("HM_SESSION_ID") or None
+        if mine:
+            ours = [e for e in events if e.session_id == mine]
+        else:
+            # Degraded (no id of our own): fall back to the session-less events, which
+            # is the same rule the loop marker uses — never let an id-bearing peer's
+            # line decide for us, and never close an id-bearing peer's span.
+            ours = [e for e in events if e.session_id is None]
+        if not ours or ours[-1].event == "end":
+            return 0  # nothing of ours is open — see docstring
+        emit_event("end", stage=stage or ours[-1].stage, cwd=base, session_id=mine)
+    except Exception as exc:  # pragma: no cover - defensive
+        print(f"[span] end emission failed (non-fatal): {exc}", file=sys.stderr)
+    return 0
+
+
 def _cli_task_preflight(args: list[str]) -> int:
-    """`python -m harness_maker.worktree task-preflight <slug> [base_dir]` (Phase 5).
+    """`python -m harness_maker.worktree task-preflight <slug> [base_dir] [--stage <s>]`.
 
     Prints the task worktree path to stdout (for `<WT>` capture) and any
     preflight warnings (active sessions, drift) to stderr."""
-    rest = [a for a in args if not a.startswith("--")]
+    stage = _flag_value(args, "--stage")
+    claude_sid = _flag_value(args, "--claude-session-id")
+    # Flag-AWARE positional split (ADR-008). The old `[a for a in args if not
+    # a.startswith("--")]` treated a flag's VALUE as a positional, so
+    # `task-preflight <slug> --stage hm:plan "$(pwd)"` resolved base_dir to
+    # Path("hm:plan") — creating the worktree under a directory named after the
+    # stage and writing the ledger to the wrong root.
+    rest = _positionals(args, valued_flags=("--stage", "--claude-session-id"))
     if not rest:
-        print("usage: task-preflight <slug> [base_dir]", file=sys.stderr)
+        print("usage: task-preflight <slug> [base_dir] [--stage <stage>]", file=sys.stderr)
         return 2
     slug = rest[0]
     base = Path(rest[1]).resolve() if len(rest) > 1 else Path.cwd()
     allow_shared = "--allow-shared-slug" in args
     try:
         wt, warnings = task_preflight(
-            base, slug, session_uuid=uuid.uuid4().hex[:12], allow_shared=allow_shared
+            base,
+            slug,
+            session_uuid=uuid.uuid4().hex[:12],
+            allow_shared=allow_shared,
+            stage=stage,
+            claude_session_id=claude_sid,
         )
     except SharedSlugError as exc:
         # ADR-001: a foreign LIVE session holds this task branch. Hard-fail with
@@ -5071,6 +5236,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cli_task_preflight(rest)
     if sub == "task-refresh":
         return _cli_task_refresh(rest)
+    if sub == "span-end":
+        return _cli_span_end(rest)
     if sub == "loop-mode-active":
         return _cli_loop_mode_active(rest)
     print(f"unknown subcommand: {sub}", file=sys.stderr)

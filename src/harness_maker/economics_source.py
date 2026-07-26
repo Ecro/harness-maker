@@ -238,7 +238,59 @@ def _transcript_files(directory: Path) -> list[Path]:
     return files
 
 
-def _turn_from_line(data: dict[str, Any], project_path: Path) -> TurnRecord | None:
+# Envelopes the harness injects as `type: "user"` lines that nobody typed. ADR-005
+# names the boundary classes explicitly; treating any of these as a user message would
+# mark every slash-command invocation and every finished background task a new run.
+_SYNTHETIC_USER_PREFIXES: tuple[str, ...] = (
+    "<command-message>",
+    "<command-name>",
+    "<command-args>",
+    "<local-command-",
+    "<task-notification",
+    "<system-reminder",
+    "<user-prompt-submit-hook>",
+    "<bash-input>",
+    "<bash-stdout",
+    "<bash-stderr",
+)
+
+
+def is_human_user_line(data: dict[str, Any]) -> bool:
+    """Did a person actually say something on this line?
+
+    The commonest `type: "user"` line by far is a tool_result being fed back — not a
+    boundary at all. `isMeta` carries the expanded slash-command template. What is
+    left is either a typed string or text blocks, minus the synthetic envelopes above.
+    """
+    if data.get("type") != "user" or data.get("isMeta"):
+        return False
+    content = (
+        (data.get("message") or {}).get("content")
+        if isinstance(data.get("message"), dict)
+        else None
+    )
+    if isinstance(content, str):
+        text = content
+    elif isinstance(content, list):
+        parts = [
+            b.get("text", "")
+            for b in content
+            if isinstance(b, dict) and b.get("type") == "text" and isinstance(b.get("text"), str)
+        ]
+        if not parts:
+            return False
+        text = "\n".join(parts)
+    else:
+        return False
+    stripped = text.lstrip()
+    if not stripped:
+        return False
+    return not stripped.startswith(_SYNTHETIC_USER_PREFIXES)
+
+
+def _turn_from_line(
+    data: dict[str, Any], project_path: Path, *, preceded_by_user: bool = False
+) -> TurnRecord | None:
     message = data.get("message")
     if not isinstance(message, dict):
         return None
@@ -262,6 +314,8 @@ def _turn_from_line(data: dict[str, Any], project_path: Path) -> TurnRecord | No
         written_paths=_written_paths(message.get("content"), project_path),
         cwd=cwd,
         git_branch=branch,
+        uuid=data.get("uuid") if isinstance(data.get("uuid"), str) else None,
+        preceded_by_user=preceded_by_user,
     )
 
 
@@ -299,6 +353,11 @@ def load_turns(
                 diag.files_failed += 1
                 continue
             diag.files_read += 1
+            # Reset per file: a trailing user message in one session must not mark the
+            # first turn of the next. Any line we cannot read clears it too — a
+            # fail-closed False routes the boundary to `unknown` (ADR-005) rather than
+            # to a guessed continuation.
+            pending_user = False
             with handle:
                 for raw_line in handle:
                     line = raw_line.strip()
@@ -307,17 +366,21 @@ def load_turns(
                     diag.lines_total += 1
                     if len(line) > _MAX_LINE_BYTES:
                         skipped["oversize_line"] += 1
+                        pending_user = False
                         continue
                     try:
                         data = json.loads(line)
                     except (ValueError, RecursionError):
                         skipped["json_error"] += 1
+                        pending_user = False
                         continue
                     if not isinstance(data, dict) or data.get("type") != "assistant":
                         skipped["not_assistant"] += 1
+                        pending_user = isinstance(data, dict) and is_human_user_line(data)
                         continue
                     diag.assistant_lines += 1
-                    turn = _turn_from_line(data, project_path)
+                    turn = _turn_from_line(data, project_path, preceded_by_user=pending_user)
+                    pending_user = False
                     if turn is None:
                         skipped["no_usage"] += 1
                         continue

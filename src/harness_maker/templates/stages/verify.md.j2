@@ -314,8 +314,64 @@ When `--force` is set, append the same record with `"force_override": true, "ove
 ## Procedure
 {%- if config.worktree is defined and config.worktree.get('feature_branch_workflow') %}
 
-{% include "agents/_partials/worktree_preflight.md.j2" %}
+{% set hm_stage = "verify" %}{% include "agents/_partials/worktree_preflight.md.j2" %}
 {%- endif %}
+{% if config.delegation is defined and 'verify' in config.delegation.stages %}
+### Step 0.5 — Delegate the checks to the `stage-delegate` subagent
+
+Running the checks does not need the session's accumulated context; it needs the
+brief. **The gate verdict does not move** — the delegate reports per-check verdicts,
+and the decision to STOP or proceed, plus this stage's exit code, stay here.
+
+**1. Derive and validate the brief.**
+
+```bash
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.wrapup_brief --root . --stage verify
+```
+
+`status: "degraded"` → print `verdict.reason`, run the checks inline below, skip the
+rest of this step. That is a supported path, not an error.
+
+**2. Dispatch — self-skipping.** If the subagent-dispatch tool is **unavailable** in
+this IDE (Cursor and Codex sessions), say so in one line and run the checks inline
+instead. Otherwise dispatch `stage-delegate` with the `brief` object verbatim plus
+the instruction: *run Checks 1..N below in order, stopping at the first FAIL, append
+the JSONL record, and return the receipt JSON; do not run git.*
+
+The receipt must carry `result`, one `checks[]` entry per check with a
+`PASS | FAIL | SKIP` verdict, and `record_path` for the JSONL record it appended.
+
+**3. Reconcile before acting on the verdict.** Write the agent's reply to a **fresh
+unique temp file OUTSIDE the repo** (`/tmp/hm-receipt-<slug>-$$.json`) — never a fixed
+in-repo name; a predictable path collides under concurrent sessions and would let this
+gate adopt a verdict from someone else's run. Then:
+
+```bash
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.wrapup_receipt --root . --stage verify --worktree <brief.worktree_root> --receipt-file <the temp path>
+```
+
+> **`--worktree` is not optional** — substitute the literal `worktree_root` the brief
+> printed. `!` lines run at the BASE repo while the delegate writes in the worktree, so
+> without it every truthful run reports `document-missing`.
+
+Delete the temp file once you have the verdict.
+
+- exit 0 → adopt the receipt's `result`, emit the text + RESULT line, and apply this
+  stage's normal STOP / exit-code rules.
+- exit 1 (`mismatch`) → **do not adopt the verdict.** Print every mismatch verbatim.
+  A `verify-result-inconsistent` mismatch means a PASS was reported over a failing
+  check; treat the run as FAIL. A `verify-record-missing` means the run left no
+  trace — rerun the checks inline.
+- exit 2 (`unparseable`) → no usable receipt; run the checks inline.
+
+Verify is a gate, so an unreconciled receipt is never a PASS.
+
+---
+
+### Checks — inline body (degraded — dispatch unavailable, brief incomplete, or receipt unusable)
+
+Run the checks yourself, below, **only** when Step 0.5 sent you here.
+{% endif %}
 
 1. Read inputs (PLAN, SPEC, dashboard, security findings).
 2. Run Check 1. If PASS, continue. If FAIL: emit text + JSON record + STOP (unless `--force`).

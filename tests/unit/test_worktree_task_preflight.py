@@ -11,11 +11,19 @@ capture) and warnings to stderr.
 from __future__ import annotations
 
 import subprocess
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
 
 from harness_maker import worktree
+from harness_maker.stage_spans import (
+    UNKNOWN_STAGE,
+    SpanEvent,
+    attribute_turns,
+    ledger_path,
+    read_events,
+)
 
 
 def _git(args: list[str], cwd: Path) -> str:
@@ -40,6 +48,99 @@ def _repo(tmp_path: Path) -> Path:
 
 def _branches(repo: Path) -> list[str]:
     return _git(["branch", "--format=%(refname:short)"], repo).split()
+
+
+# ── span emission (Phase 2 of PLAN-economics-attribution-and-carry) ──────────
+#
+# ADR-008: the span START is a SIDE EFFECT of this call, not a separate prose
+# instruction. That is the whole argument — a prose line can be skipped silently,
+# whereas a stage that skips preflight does not get its `<WT>` and visibly degrades.
+
+
+def _spans(repo: Path) -> list[SpanEvent]:
+    events, _ = read_events(ledger_path(repo))
+    return events
+
+
+class _T:
+    """Minimal turn for feeding the consumer — see the dangling-span test."""
+
+    def __init__(self, ts: datetime, session_id: str | None = "S1") -> None:
+        self.ts = ts
+        self.session_id = session_id
+
+
+def test_preflight_emits_a_start_span_carrying_the_supplied_stage(tmp_path: Path) -> None:
+    repo = _repo(tmp_path)
+    worktree.task_preflight(repo, "feat-x", session_uuid="u-1", stage="hm:wrapup")
+    events = _spans(repo)
+    assert [e.event for e in events] == ["start"]
+    assert events[0].stage == "hm:wrapup"
+    assert events[0].task_slug == "feat-x"
+
+
+def test_preflight_without_a_stage_emits_an_empty_stage_the_reader_counts(
+    tmp_path: Path,
+) -> None:
+    """An un-re-rendered harness omits `--stage`. Emitting NOTHING would make that
+    harness indistinguishable from one whose stage never ran. The round-trip through
+    the CONSUMER is what makes the empty string non-magic: normalising to the sentinel
+    at write time would leave `unknown_stage_emissions` reading 0 forever.
+    """
+    repo = _repo(tmp_path)
+    worktree.task_preflight(repo, "feat-x", session_uuid="u-1")
+    events = _spans(repo)
+    assert [e.stage for e in events] == [""]
+    res = attribute_turns(
+        [_T(events[0].ts + timedelta(seconds=1))], events, max_turns=400, max_min=240.0
+    )
+    assert res.unknown_stage_emissions == 1
+    assert res.stages == (UNKNOWN_STAGE,)
+
+
+def test_each_fused_stage_appends_its_own_span_to_the_base_ledger(tmp_path: Path) -> None:
+    """A fused workflow claims once per fused stage, so the ledger must ACCUMULATE
+    rather than be rewritten, and every record must name the base as its root.
+
+    Note on scope: an earlier version of this test passed the WORKTREE as `base_dir`
+    to vary "cwd inside a worktree". That call does not exist in production — the
+    rendered line is a Claude Code `!` command, which always runs at the project
+    root, so `$(pwd)` is the base on every stage including fused ones. (It also
+    fails outright, trying to nest `.worktrees/feat-x/.worktrees/feat-x`.) The
+    resolver's worktree behaviour is covered where it can actually be exercised:
+    `test_stage_spans.py::test_emit_from_inside_a_worktree_appends_to_the_base_ledger`
+    drives `emit_event` from a real linked worktree. Here the meaningful assertion is
+    on record CONTENT, not on file existence.
+    """
+    repo = _repo(tmp_path)
+    worktree.task_preflight(repo, "feat-x", session_uuid="u-1", stage="hm:execute")
+    worktree.task_preflight(repo, "feat-x", session_uuid="u-1", stage="hm:review")
+
+    events = _spans(repo)
+    assert [e.stage for e in events] == ["hm:execute", "hm:review"]
+    assert {e.base_root for e in events} == {str(repo.resolve())}
+    assert {e.event for e in events} == {"start"}
+
+
+def test_a_failed_preflight_never_attributes_later_turns_to_its_stage(
+    tmp_path: Path,
+) -> None:
+    """A span opened by a stage that never ran would be closed only by next-start,
+    session-end, or the 400-turn cap — i.e. it could swallow 400 unrelated turns.
+
+    Asserted through the CONSUMER rather than by counting records: emitting a start
+    and an immediate `end` on the failure path is an equally valid implementation,
+    and a record-count assertion would wrongly forbid it.
+    """
+    repo = _repo(tmp_path)
+    worktree.task_preflight(repo, "feat-x", session_uuid="u-1", stage="hm:plan")
+    with pytest.raises(worktree.SharedSlugError):
+        worktree.task_preflight(repo, "feat-x", session_uuid="u-2", stage="hm:review")
+
+    events = _spans(repo)
+    later = _T(events[0].ts + timedelta(minutes=5))
+    res = attribute_turns([later], events, max_turns=400, max_min=240.0)
+    assert res.stages == ("hm:plan",)
 
 
 # ── creation + idempotency ───────────────────────────────────────────────────

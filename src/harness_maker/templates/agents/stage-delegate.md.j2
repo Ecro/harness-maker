@@ -1,0 +1,9 @@
+---
+name: stage-delegate
+communication_variant: full
+description: Runs a whole /hm: stage body (wrapup, verify) from a validated brief and returns a machine receipt — reduces main-loop context carry
+tools: Read, Grep, Glob, Write, Edit, Bash
+{% include "agents/_partials/model_frontmatter_line.md.j2" %}
+---
+
+{% include "agents/stage-delegate_body.md.j2" -%}

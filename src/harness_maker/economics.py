@@ -12,6 +12,9 @@ from typing import TYPE_CHECKING, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from .run_classify import ClassificationAttribution
+from .stage_spans import SpanAttribution
+
 if TYPE_CHECKING:
     from harness_maker.economics_source import IngestionDiagnostics
     from harness_maker.models import EconomicsConfig
@@ -97,6 +100,12 @@ class TurnRecord(BaseModel):
     written_paths: tuple[str, ...] = ()
     cwd: str | None = None
     git_branch: str | None = None
+    # Retroactive-classification inputs (Phase 3). `uuid` is the verdict cache key;
+    # anything else (index, timestamp) shifts when the reporting window moves.
+    # `preceded_by_user` is the only trace of ADR-005's "boundary with no user
+    # message" case that survives the loader dropping every non-assistant line.
+    uuid: str | None = None
+    preceded_by_user: bool = False
 
     @property
     def scope(self) -> Scope:
@@ -186,6 +195,26 @@ class EconomicsReport(BaseModel):
 
     unknown_models: dict[str, int] = Field(default_factory=dict)
     fallback_priced_turns: int = 0
+
+    # ── attribution provenance (ADR-001/009 of PLAN-economics-attribution-and-carry)
+    # Source is a per-TURN property, so these are the conserved axis: every priced
+    # turn lands in exactly one bucket and the USD buckets sum to `total_usd`.
+    # `by_agent` deliberately stays a CROSS-CUT (a turn appears there *and* in
+    # `by_stage`), so no cross-population conservation is claimed — see ADR-009.
+    # All sums and counts; no cost-per-count quotient (ADR-002 of the prior work).
+    usd_by_attribution_source: dict[str, float] = Field(default_factory=dict)
+    turns_by_attribution_source: dict[str, int] = Field(default_factory=dict)
+    capped_turns: int = 0
+    capped_usd: float = 0.0
+    ambiguous_session_join: int = 0
+    unknown_stage_emissions: int = 0
+    ledger_ground_truth_disagreements: int = 0
+    # Retroactive classification health (ADR-005). Counts, never a quotient: a miss
+    # is judgment not yet made, an unknown is judgment that could not decide, and
+    # both leave the run in `(unattributed)` rather than on a guessed stage.
+    classification_boundaries: int = 0
+    classification_cache_misses: int = 0
+    classification_unknown: int = 0
 
 
 def ratio_field_kinds() -> dict[str, tuple[str, str]]:
@@ -394,6 +423,8 @@ def aggregate(
     bounds: AdjacencyBounds | None = None,
     idle_gap_cap_min: float = _DEFAULT_IDLE_GAP_CAP_MIN,
     fallback_model: str = "opus",
+    spans: SpanAttribution | None = None,
+    inferred: ClassificationAttribution | None = None,
 ) -> EconomicsReport:
     report = EconomicsReport()
     if not turns:
@@ -402,6 +433,27 @@ def aggregate(
     labels = classify_turns(turns)
     costs = [price_turn(t, fallback_model=fallback_model) for t in turns]
     estimates = estimate_attribution(turns, bounds)
+    # Length mismatch is a caller bug, and an unchecked one surfaced as an IndexError
+    # from deep inside the loop rather than as a description of what was wrong
+    # (review M-14).
+    for name, seq in (("spans", spans), ("inferred", inferred)):
+        if seq is not None and len(seq.stages) != len(turns):
+            msg = f"{name}.stages has {len(seq.stages)} entries for {len(turns)} turns"
+            raise ValueError(msg)
+    ledger_stages: Sequence[str | None] = (
+        spans.stages if spans is not None else (None,) * len(turns)
+    )
+    capped_set = set(spans.capped_indices) if spans is not None else set()
+    if spans is not None:
+        report.ambiguous_session_join = spans.ambiguous_session_join
+        report.unknown_stage_emissions = spans.unknown_stage_emissions
+    inferred_stages: Sequence[str | None] = (
+        inferred.stages if inferred is not None else (None,) * len(turns)
+    )
+    if inferred is not None:
+        report.classification_boundaries = inferred.boundaries
+        report.classification_cache_misses = inferred.cache_misses
+        report.classification_unknown = inferred.unknown
 
     unknown: Counter[str] = Counter()
     unattributed_usd = 0.0
@@ -409,13 +461,62 @@ def aggregate(
     writing_turns = 0
     resolvable_writing_turns = 0
 
-    for turn, cost, label, est in zip(turns, costs, labels, estimates, strict=True):
+    for idx, (turn, cost, label, est) in enumerate(
+        zip(turns, costs, labels, estimates, strict=True)
+    ):
         report.turns += 1
         report.total_usd += cost.total_usd
         report.cache_read_usd += cost.cache_read_usd
         report.work_usd += cost.cache_write_usd + cost.output_usd
 
-        _accumulate(report.by_stage.setdefault(turn.stage, StageTotals()), turn, cost, label)
+        # ADR-001 precedence ladder: direct > ledger > inferred > adjacency > none.
+        # Exactly one wins, so the source axis partitions the turns.
+        ledger_stage = ledger_stages[idx]
+        inferred_stage = inferred_stages[idx]
+        if idx in capped_set:
+            # ADR-003 makes the cap TERMINAL: turns past it stay unattributed. The cap
+            # leaves `ledger_stages[idx] = None`, which is indistinguishable from "no
+            # span claimed this turn", so `inferred` and `adjacency` would happily pick
+            # the turn up — and it would then be reported as BOTH capped and
+            # attributed (review F-03). Ground truth still wins: a turn carrying its
+            # own `attributionSkill` is not a guess, so the cap does not suppress it.
+            inferred_stage = None
+            est = None
+        if turn.attribution_skill is not None:
+            source = "direct"
+            resolved_stage = turn.attribution_skill
+            if ledger_stage is not None and ledger_stage != turn.attribution_skill:
+                # The ledger's health signal: 44.1% of turns carry ground truth, so a
+                # silently-broken emitter shows up here rather than nowhere.
+                report.ledger_ground_truth_disagreements += 1
+        elif ledger_stage is not None:
+            # ADR-009: a sidechain turn nests into the enclosing stage span. It still
+            # appears on `by_agent` below — that cross-cut is intentionally unchanged.
+            source = "ledger"
+            resolved_stage = ledger_stage
+        elif inferred_stage is not None:
+            # Retroactive, and labelled as such: the breakdown keeps the inferred
+            # population non-comparable with the measured one by construction.
+            source = "inferred"
+            resolved_stage = inferred_stage
+        elif est is not None:
+            source = "adjacency"
+            resolved_stage = UNATTRIBUTED
+        else:
+            source = "none"
+            resolved_stage = UNATTRIBUTED
+
+        report.turns_by_attribution_source[source] = (
+            report.turns_by_attribution_source.get(source, 0) + 1
+        )
+        report.usd_by_attribution_source[source] = (
+            report.usd_by_attribution_source.get(source, 0.0) + cost.total_usd
+        )
+        if idx in capped_set:
+            report.capped_turns += 1
+            report.capped_usd += cost.total_usd
+
+        _accumulate(report.by_stage.setdefault(resolved_stage, StageTotals()), turn, cost, label)
         if turn.attribution_agent:
             _accumulate(
                 report.by_agent.setdefault(turn.attribution_agent, StageTotals()), turn, cost, label
@@ -483,6 +584,14 @@ def _collect(
     now: datetime | None = None,
 ) -> tuple[EconomicsReport, IngestionDiagnostics, EconomicsConfig]:
     from harness_maker.economics_source import load_turns
+    from harness_maker.run_classify import (
+        attribute_runs,
+        boundary_inputs,
+        find_boundaries,
+        read_verdicts,
+        verdict_cache_path,
+    )
+    from harness_maker.stage_spans import attribute_turns, ledger_path, read_events
 
     cfg = _load_cli_config(root)
     result = load_turns(
@@ -496,11 +605,33 @@ def _collect(
         max_gap_min=cfg.adjacency_max_gap_min,
         max_turns=cfg.adjacency_max_turns,
     )
+    # Both attribution sources are read here rather than in `aggregate`, which stays
+    # pure. An absent ledger or an absent verdict cache is the normal case on a fresh
+    # clone: both readers return empty and the report falls back to adjacency exactly
+    # as it did before either existed.
+    events, _ledger_diag = read_events(ledger_path(root))
+    spans = attribute_turns(
+        result.turns, events, max_turns=cfg.span_max_turns, max_min=cfg.span_max_min
+    )
+    verdicts, _verdict_diag = read_verdicts(verdict_cache_path(root))
+    # Both entry points derive these through ONE helper (review R2-02): building them
+    # separately is how `boundaries` and `report` came to disagree about capped turns
+    # and therefore about boundary UUIDs, silently discarding recorded verdicts.
+    stages, capped = boundary_inputs(result.turns, spans)
+    inferred = attribute_runs(
+        result.turns,
+        find_boundaries(result.turns, already_attributed=stages, capped=capped),
+        verdicts,
+        max_turns=cfg.span_max_turns,
+        max_min=cfg.span_max_min,
+    )
     report = aggregate(
         result.turns,
         bounds=bounds,
         idle_gap_cap_min=cfg.idle_gap_cap_min,
         fallback_model=cfg.price_model,
+        spans=spans,
+        inferred=inferred,
     )
     return report, result.diagnostics, cfg
 

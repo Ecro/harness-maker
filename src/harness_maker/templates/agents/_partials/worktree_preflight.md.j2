@@ -11,11 +11,11 @@
 
 {% if is_codex %}
 ```
-Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree task-preflight <slug> \"$(pwd)\"")
+Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree task-preflight <slug> \"$(pwd)\" --stage hm:{{ hm_stage }}")
 ```
 {% else %}
 ```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree task-preflight <slug> "$(pwd)"
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree task-preflight <slug> "$(pwd)" --stage hm:{{ hm_stage }}
 ```
 {% endif %}
 

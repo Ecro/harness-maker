@@ -80,6 +80,62 @@ def test_flag_off_render_succeeds_on_absent_key(tmp_path: Path) -> None:
     assert files  # rendered something
 
 
+# ── span emission (Phase 2 of PLAN-economics-attribution-and-carry) ──────────
+#
+# ADR-008: the span START rides the preflight call the stage already MUST make, so
+# emission reliability is coupled to stage reliability. That coupling only holds if
+# EVERY wired stage passes its own `--stage`; a template that forgets it degrades to
+# the `(unknown-stage)` sentinel, which is the absent case ADR-003 defines.
+
+
+def test_every_wired_stage_passes_its_own_stage_name_after_the_base_positional(
+    tmp_path: Path,
+) -> None:
+    """Rejects three wrong implementations: a template that inherits the partial but
+    forgets `--stage`; one that hard-codes a single name for all seven (copy-paste);
+    and — the one a bare `--stage hm:X` grep would MISS — a flag placed BEFORE the
+    base positional. The shipped parser treats every non-`--` arg as positional, so
+    `task-preflight <slug> --stage hm:plan "$(pwd)"` makes `base_dir = Path("hm:plan")`.
+    Pinning the full invocation is what couples the rendered string to a correct parse.
+    """
+    files = _render(tmp_path, flag_on=True)
+    for stage in WIRED_STAGES:
+        body = _stage(files, stage)
+        assert f'task-preflight <slug> "$(pwd)" --stage hm:{stage}' in body, stage
+
+
+def test_flag_off_gives_execute_only_coverage_not_zero(tmp_path: Path) -> None:
+    """Non-Goal 2, as CORRECTED during Phase 2.
+
+    An earlier version asserted `"--stage hm:" not in body` for all seven stages and
+    called that "emits nothing". Two defects: (a) it was entailed by the sibling
+    `test_preflight_absent_in_all_stages_when_flag_off`, so it had no independent
+    failure mode; (b) the claim was false — flag-off `execute` renders
+    `worktree create execute`, which emits `hm:execute` (proven in
+    `tests/integration/test_stage_spans_e2e.py`). Asserting rendered PROSE could
+    never have caught that, because the emission is a side effect of the CLI.
+    """
+    files = _render(tmp_path, flag_on=False)
+    for stage in WIRED_STAGES:
+        assert "--stage hm:" not in _stage(files, stage), stage
+    # …but execute keeps a real emitter via its legacy isolation call.
+    assert "worktree create execute" in _stage(files, "execute")
+
+
+def test_fused_workflows_carry_the_stage_name_of_each_fused_stage(tmp_path: Path) -> None:
+    """A fused workflow concatenates stage fragments into ONE command file, so it must
+    emit one start per fused stage — not a single span for the whole run.
+
+    The default `fused_workflows` is only `exec-rev-wrap`, so an earlier version of
+    this test looked for `hm/plan-exec-rev.md`, which the fixture never renders: it
+    died on StopIteration before reaching any contract assertion.
+    """
+    files = _render(tmp_path, flag_on=True)
+    fused = next(t for p, t in files.items() if p.endswith("hm/exec-rev-wrap.md"))
+    for stage in ("execute", "review", "wrapup"):
+        assert f'task-preflight <slug> "$(pwd)" --stage hm:{stage}' in fused, stage
+
+
 # ── execute dual-path: flag flips ephemeral isolation ↔ task preflight ────────
 
 
@@ -107,7 +163,7 @@ _GOLDEN_PREFLIGHT = """### Task worktree preflight (feature-branch workflow)
 
 
 ```bash
-!uv run --with <SRC> python -m harness_maker.worktree task-preflight <slug> "$(pwd)"
+!uv run --with <SRC> python -m harness_maker.worktree task-preflight <slug> "$(pwd)" --stage hm:wrapup
 ```
 
 

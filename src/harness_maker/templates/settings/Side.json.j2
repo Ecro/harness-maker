@@ -47,7 +47,8 @@
     "Stop": [
       {
         "hooks": [
-          {"type": "command", "command": "uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.hooks.loop_gate --mode stop-hook", "timeout": 10}
+          {"type": "command", "command": "uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.hooks.loop_gate --mode stop-hook", "timeout": 10},
+          {"type": "command", "command": "uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.worktree span-end", "timeout": 10}
         ]
       }
     ],
@@ -55,13 +56,15 @@
       {
         "matcher": "auto",
         "hooks": [
-          {"type": "command", "command": "uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.hooks.flush_session", "timeout": 30, "statusMessage": "Snapshotting autoloop progress..."}
+          {"type": "command", "command": "uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.hooks.flush_session", "timeout": 30, "statusMessage": "Snapshotting autoloop progress..."},
+          {"type": "command", "command": "uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.worktree span-end", "timeout": 10}
         ]
       },
       {
         "matcher": "manual",
         "hooks": [
-          {"type": "command", "command": "uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.hooks.flush_session", "timeout": 30, "statusMessage": "Snapshotting autoloop progress..."}
+          {"type": "command", "command": "uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.hooks.flush_session", "timeout": 30, "statusMessage": "Snapshotting autoloop progress..."},
+          {"type": "command", "command": "uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.worktree span-end", "timeout": 10}
         ]
       }
     ],

@@ -42,3 +42,16 @@
 **Triggered by:** [fail:test] test-pins-retired-implementation-name (count: 3)
 **Proposed mechanism:** a mechanical check, not another prose reminder — the last two recurrences were both committed by someone who already knew the rule. Add a test-suite lint that flags any *negative* string assertion (`assert "<literal>" not in <x>`) whose literal appears nowhere else in `src/` or `templates/`. A negative pin on a string the tree no longer contains cannot fail, so it is dead weight masquerading as a guard. Emit it as a `ruff`-style custom check or a meta-test over `tests/**`.
 **Rationale:** Three occurrences, and the third landed *inside a test written to guard this exact family* — which is the strongest possible evidence that awareness is not the missing ingredient. Each time the sequence was identical: pin prose, later reword the prose correctly, and the assertion silently stops testing anything (a positive pin turns red and gets noticed; a negative pin turns permanently green and does not). The literal-vs-tree cross-reference is fully deterministic and repo-owned, so it needs no runtime and no external tool — the same shape as `test_ci_codex_pin_matches_the_verified_version`, which closed [fail:test] advisory-check-fails-unseen.
+
+## Proposal: RETIRE the three snapshot-regen proposals (2026-07-26)
+**Triggered by:** [fail:test] snapshot-regen-inside-worktree (count: 11) — **now superseded**
+**Proposed mechanism:** none — withdraw `snapshot-regen-order-guard`,
+`post-finalize-snapshot-regen-hook`, and `snapshot-regen-count-11-escalate-to-mechanical`.
+**Rationale:** all three propose guarding against regenerating snapshots inside a
+worktree, and that is no longer a defect. `tests/snapshot/regenerate.py:107-125` pins
+`_HARNESS_MAKER_PKG_ROOT` and `_compute_install_ref`, making the fixtures
+worktree-invariant by construction — verified empirically on 2026-07-26 by regenerating
+from a worktree four times and grepping every fixture for the worktree path (zero hits).
+Building a mechanical guard now would enforce the obsolete guidance, and that guidance is
+actively harmful: refusing to regenerate in the worktree is what forces a hand-merge of
+generated artifacts at land time. The count:11 history is left in place for audit.

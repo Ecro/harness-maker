@@ -58,6 +58,7 @@ MODULES: dict[str, ModuleSpec] = {
     "memory_md": ModuleSpec(
         "subparser", _s("append-session", "upsert-wiki", "upsert-failure", "consolidate")
     ),
+    "run_classify": ModuleSpec("subparser", _s("boundaries", "record")),
     "observability.verification_cache": ModuleSpec(
         "subparser", _s("key", "check", "mark-pass", "explain")
     ),
@@ -68,6 +69,8 @@ MODULES: dict[str, ModuleSpec] = {
     ),
     # flagonly: no subcommand, so guard-exempt — the argparse layer owns its own errors.
     "second_opinion_invoke": ModuleSpec("flagonly"),
+    "wrapup_brief": ModuleSpec("flagonly"),
+    "wrapup_receipt": ModuleSpec("flagonly"),
     "spec_inventory": ModuleSpec(
         "subparser", _s("reverse-map", "verify-inventory", "sample-for-review", "generate-all")
     ),
@@ -114,6 +117,7 @@ MODULES: dict[str, ModuleSpec] = {
             "owned-uuids",
             "post-commit-pop",
             "prune-branches",
+            "span-end",
             "task-create",
             "task-land",
             "task-preflight",

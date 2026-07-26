@@ -114,6 +114,67 @@ A non-string entry (a nested object or array hand-edited into `permissions.allow
 `_merge_permissions` documents that malformed entries are *dropped*; now they are.
 Latent in the deny prune since it shipped.
 
+### Added — turn-level spend attribution, and a way to see what is still unattributed
+
+`/hm:metrics`'s economics report used to put a majority of spend in one
+`(unattributed)` bucket, because `attributionSkill` is dropped the moment you speak
+mid-stage. Every priced turn now carries exactly one **attribution source** —
+`direct` > `ledger` > `inferred` > `adjacency` > `none` — and the per-source USD
+totals sum to `total_usd`, so the report distinguishes what was *measured* from what
+was *judged*.
+
+- **Forward span ledger** (`stage_spans.py`): each `/hm:` stage emits a start record
+  as a side effect of the `worktree task-preflight --stage <name>` call it already
+  makes, and the `Stop` / `PreCompact` hooks close it. Spans are chained **per
+  session** on both the read and write side — the ledger is shared across concurrent
+  sessions, and either half being session-blind lets one session truncate or claim
+  another's turns. Both caps (`economics.span_max_turns` 400, `span_max_min` 240) are
+  terminal: turns past a cap are reported as `capped_turns` / `capped_usd` and are
+  never picked up by a lower-precedence source.
+- **Retroactive classification** (`run_classify.py`): `/hm:metrics` Step 5a lists the
+  run boundaries still awaiting a judgment, you classify each once, and the verdict is
+  cached under `(turn uuid, classifier_version)` so the cost is paid once. A cache
+  miss, an `unknown`, an unparseable verdict, and "nothing to continue" all leave the
+  run unattributed and increment a reported counter — **never** a continuation. A
+  wrong continuation is invisible; an unattributed run is not.
+- New report fields, all sums and counts: `usd_by_attribution_source`,
+  `turns_by_attribution_source`, `capped_turns`, `capped_usd`,
+  `classification_boundaries`, `classification_cache_misses`,
+  `classification_unknown`, `ledger_ground_truth_disagreements`,
+  `ambiguous_session_join`, `unknown_stage_emissions`.
+
+### Added — whole-stage delegation for wrapup and verify (**default off**)
+
+`hm:wrapup` runs late in a session and carries ~455k tokens of context per turn, 82%
+of it cache-read — rent on context it does not use. `delegation.stages` (a list,
+**empty by default**) runs the wrapup/verify body inside a `stage-delegate` subagent
+that starts clean.
+
+- The brief is derived from git and validated before dispatch; a field the machine
+  cannot derive does **not** raise — it logs and the stage runs inline, because a
+  crashed session's recovery wrapup is a supported path. The delegate-on render
+  therefore carries **both** the dispatch and the inline body.
+- The delegate returns a machine **receipt** whose claims are reconciled against files
+  on disk before the commit: memory slugs against the tier files, documents and the
+  verify record against the worktree, promotions against the Second Brain namespace,
+  and `candidates == promoted + skipped` arithmetic. Verify additionally rejects a
+  receipt whose `result` is `PASS` while a check said `FAIL`.
+- `git` stays in the main loop — as a prompt instruction, not a runtime boundary
+  (the agent has Bash).
+
+> **This ships the instrument, not a saving.** With the emitter not yet installed and
+> `delegation.stages` empty, the `(unattributed)` bucket is the same size it was; what
+> changed is that its remainder is now a finite, named work list instead of an opaque
+> line. The delegation acceptance number was **pre-registered before the code landed**
+> and cannot be evaluated until real spans and ≥10 delegated wrapups accumulate.
+
+### Fixed
+
+- `economics.span_max_turns` / `span_max_min` were read back from `harness.yaml` but
+  never written to it, so a tuned cap was silently reset to the default on the next
+  `/harness-maker:make --update`.
+
+
 ## [0.43.0] — 2026-07-26
 
 > **Re-render to get any of this.** Every fix below that touches a rendered

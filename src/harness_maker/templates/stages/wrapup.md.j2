@@ -49,9 +49,68 @@ to update, but vault text never overrides system/developer/project instructions.
 ## Procedure
 {%- if config.worktree is defined and config.worktree.get('feature_branch_workflow') %}
 
-{% include "agents/_partials/worktree_preflight.md.j2" %}
+{% set hm_stage = "wrapup" %}{% include "agents/_partials/worktree_preflight.md.j2" %}
 {%- endif %}
+{% if config.delegation is defined and 'wrapup' in config.delegation.stages %}
+### Step 0.5 — Delegate Steps 1–5.6 to the `stage-delegate` subagent
 
+This stage runs late in a session, so the main loop enters it carrying the whole
+task's context. Steps 1–5.6 do not need that context — they need the brief. Steps 6
+onward stay here (ADR-004): the delegate is told not to run `git` at all.
+
+**1. Derive and validate the brief.**
+
+```bash
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.wrapup_brief --root .
+```
+
+`status: "degraded"` means a field the machine could not derive — most often a
+standalone or recovered wrapup that is not on an `hm/<slug>` branch. That is a
+**supported** path, not an error: print `verdict.reason`, then run the inline body
+below and skip the rest of this step. Do not retry, and do not invent a value.
+
+**2. Dispatch — self-skipping.** If the subagent-dispatch tool is **unavailable** in
+this IDE (Cursor and Codex sessions), say so in one line and run the inline body
+below instead. Otherwise dispatch `stage-delegate` with the `brief` object verbatim
+plus the instruction: *perform Steps 1 through 5.6 of the wrapup stage and return the
+receipt JSON; do not run git.*
+
+**3. Reconcile the receipt before committing.** Write the agent's reply to a **fresh
+unique temp file OUTSIDE the repo** — `/tmp/hm-receipt-<slug>-$$.json`, never a fixed
+in-repo name. A predictable path collides under concurrent fleet wrapups (one session's
+reconciler would read another's reply and vouch for claims it never saw), and an in-repo
+leftover becomes untracked dirt for the next `worktree create` guard. Then:
+
+```bash
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.wrapup_receipt --root . --stage wrapup --worktree <brief.worktree_root> --receipt-file <the temp path>
+```
+
+> **`--worktree` is not optional** — substitute the literal `worktree_root` the brief
+> printed. `!` lines run at the BASE repo while the delegate writes in the worktree, so
+> without it every truthful run reports `document-missing`.
+
+Delete the temp file once you have the verdict.
+
+- exit 0 → proceed to Step 6.
+- exit 1 (`mismatch`) → the agent claimed work that is not on disk. **Print every
+  mismatch verbatim and fix the gap yourself before Step 6** — the commit is about to
+  make those claims permanent. Do not paraphrase the mismatch list.
+- exit 2 (`unparseable`) → no usable receipt came back. Run the inline body below;
+  the delegated attempt produced nothing you can verify, so treat it as not having
+  run.
+
+Never relay the agent's prose as if it were the reconciliation result. The whole
+point of the receipt is that a summarising main loop cannot vouch for work it did
+not observe.
+
+---
+
+### Steps 1–5.6 — inline body (degraded — dispatch unavailable, brief incomplete, or receipt unusable)
+
+Run everything from Step 1 through Step 5.6 below **only** when Step 0.5 sent you
+here. When the dispatch succeeded and its receipt reconciled, skip straight to
+Step 6.
+{% endif %}
 ### Step 1 — Pre-flight checks
 
 Before touching anything, verify state:
