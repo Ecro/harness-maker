@@ -882,17 +882,33 @@ from window answer to per-turn fallback. No public CLI signature changes.
   `tests/fixtures/review_command_pre_change.md`,
   `tests/fixtures/review_command_fused_pre_change.md` and
   `tests/fixtures/plan_command_fused_pre_change.md` (new goldens);
-  `tests/render/test_render_review_read_budget.py`; **the re-rendered
-  `.claude/commands/hm/` commands that contain the review stage.**
+  `tests/render/test_render_review_read_budget.py`.
 - **Scope (out):** reviewer agent definitions, `conditional_router`, consensus
   math, `second_opinion` recipes.
-- **Rollback independence (validator-3 H4).** The re-render is in scope
-  **deliberately**. A template edit whose shipped artifact lands in Phase 4
-  instead would leave `.claude/commands/hm/*` stale between the two commits (with
-  `/hm:health`'s drift signal firing), and reverting Phase 3 after Phase 4 landed
-  would leave the bounded-read prose in the shipped commands while the template no
-  longer contains it. ADR-009's "revert this phase's own commit" is only true when
-  each phase owns its own artifacts.
+- **~~Rollback independence (validator-3 H4)~~ — CORRECTED 2026-07-27, during
+  Phase 3.** H4 argued the re-rendered `.claude/commands/hm/*` had to be in this
+  phase's scope, because otherwise "a template edit whose shipped artifact lands in
+  Phase 4 instead would leave `.claude/commands/hm/*` stale between the two commits
+  (with `/hm:health`'s drift signal firing)". **Both halves of that are false, and
+  the scope item is withdrawn:**
+  1. `.claude/commands/` is **not tracked by git** — `git ls-files .claude/commands/`
+     returns **0** files (the 47 tracked `.claude/` paths are `harness.yaml` plus the
+     memory tiers). An untracked file cannot land in Phase 4's commit, cannot be
+     stale *between* two commits, and cannot be restored by reverting either of them.
+     There is no versioned artifact for a phase to own.
+  2. The `sessionstart_drift` hook detects **version** drift (the stamped
+     `harness_maker_version` against the installed one), not content drift of a
+     rendered command, so a template edit alone does not fire it. `readiness.py`'s
+     render-drift guards are feature-specific (oracle-waiver, spec-need) and do not
+     cover reviewer prose.
+
+  What actually happens: this repo's own `.claude/` is a local working copy that
+  `/harness-maker:make --update` regenerates on demand, exactly as any consuming
+  project's is. Re-rendering it inside this phase would rewrite the whole harness in
+  the BASE repo as an uncommittable, un-revertable side effect — strictly worse than
+  leaving it to the user's own `--update`. **ADR-009's "revert this phase's own
+  commit" was never at risk here**; the template edit and its tests are both tracked
+  and both live in this commit.
 - **Exit criterion:** AC-008 asserted at **each of the four** dispatch sites
   across **all three** renders (atomic, fused, single-reviewer), including the
   outside-the-diff escalation scope, with the non-emptiness conjunct green;
