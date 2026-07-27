@@ -29,6 +29,12 @@ ALGO_VERSION = 1
 _RESPIN_WINDOW_SECONDS = 72 * 3600
 
 _GIT_TIMEOUT = 60
+
+# `JsonlAdjudicationStore.put` truncates `release_ref` to keep a row inside PIPE_BUF.
+# A ref longer than that would pass the candidate gate (which compares the full string)
+# and then be STORED under a different key — the exact write-under-one-key/read-under-
+# another failure this gate exists to close, reintroduced one layer down.
+_RELEASE_REF_MAX = 200
 _FIELD_SEP = "\x01"
 _RECORD_SEP = "\x02"
 
@@ -951,14 +957,14 @@ class JsonlAdjudicationStore:
         row = AdjudicationRow(
             ts=datetime.now(tz=UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
             commit_sha=commit_sha[:64],
-            release_ref=release_ref[:200],
+            release_ref=release_ref[:_RELEASE_REF_MAX],
             verdict=verdict,  # type: ignore[arg-type]
             reason=reason[:_REASON_MAX],
             algo_version=self._algo,
             config_hash=self._cfg_hash,
         )
         _append_atomic_line(self._path, json.dumps(row.model_dump(), ensure_ascii=False))
-        self._cache[(commit_sha[:64], release_ref[:200])] = verdict
+        self._cache[(commit_sha[:64], release_ref[:_RELEASE_REF_MAX])] = verdict
 
 
 class _AssumeRoutineStore:
@@ -1071,14 +1077,85 @@ def _cmd_candidates(root: Path, cfg: DeliveryMetricsConfig, now: datetime) -> in
     return 0
 
 
-def _cmd_adjudicate(root: Path, cfg: DeliveryMetricsConfig, args: argparse.Namespace) -> int:
+def _resolve_commit_sha(root: Path, ref: str) -> str:
+    """Normalise ``--commit`` to the FULL sha the verdict lookup is keyed by.
+
+    ``classify_cfr`` calls ``store.get(r.sha, …)`` with the 40-char sha it read out
+    of ``git log``, but ``adjudicate`` used to store whatever string the caller
+    typed. An abbreviated sha — the form ``git log --oneline`` hands you — was
+    therefore written to the ledger and then **never read**: ``compute`` kept
+    exiting 3 on a candidate that had already been judged. Both halves of that key
+    only meet here, so this is the one place the normalisation can live.
+    """
+    # `--end-of-options` states that the next token is DATA. Measured: it changes no
+    # outcome today — `--glob=refs/*^{commit}` already exits 1 with or without it,
+    # because the appended suffix makes every option form unresolvable. It is kept for
+    # what the suffix does not promise: the suffix neutralises today's option set by
+    # accident, the anchor neutralises tomorrow's by contract. Cost is a git >= 2.24
+    # floor (Nov 2019), which every Python 3.12 environment already clears.
+    out = _git(root, "rev-parse", "--verify", "--quiet", "--end-of-options", f"{ref}^{{commit}}")
+    sha = out.stdout.strip()
+    if out.returncode != 0 or not sha:
+        raise DeliveryMetricsError(f"--commit {ref!r} does not resolve to a commit in {root}")
+    return sha
+
+
+def _require_known_candidate(
+    root: Path,
+    cfg: DeliveryMetricsConfig,
+    store: JsonlAdjudicationStore,
+    *,
+    commit_sha: str,
+    release_ref: str,
+    now: datetime,
+) -> None:
+    """Reject a verdict whose key no pending candidate will ever look up.
+
+    A full sha fixes the half of the key the caller usually gets wrong, but a
+    mistyped ``--release`` lands the row in exactly the same dead end. Checking the
+    whole pair closes the class rather than the instance.
+    """
+    if store.get(commit_sha, release_ref) is not None:
+        return  # re-adjudication of a pair that is already in the ledger
+    _, candidates = compute_cfr_full(root, cfg.cfr_window_days, config=cfg, now=now, store=store)
+    if any(c.commit_sha == commit_sha and c.release_ref == release_ref for c in candidates):
+        return
+    pending = sorted(f"{c.commit_sha[:12]}→{c.release_ref}" for c in candidates) or ["(none)"]
+    raise DeliveryMetricsError(
+        f"{commit_sha[:12]}→{release_ref} is not a pending candidate, so the verdict "
+        f"would be recorded and never read. pending: {', '.join(pending)}. "
+        "Pass --force to record it anyway."
+    )
+
+
+def _cmd_adjudicate(
+    root: Path, cfg: DeliveryMetricsConfig, args: argparse.Namespace, now: datetime
+) -> int:
     store = JsonlAdjudicationStore(
         root / LEDGER_RELPATH, algo_version=ALGO_VERSION, config_hash=_config_hash(cfg)
     )
+    commit_sha = _resolve_commit_sha(root, args.commit)
+    if len(args.release) > _RELEASE_REF_MAX:
+        raise DeliveryMetricsError(
+            f"--release is {len(args.release)} chars; the ledger stores at most "
+            f"{_RELEASE_REF_MAX}, so the verdict would be written under a truncated "
+            "key and never read"
+        )
+    if not args.force:
+        _require_known_candidate(
+            root, cfg, store, commit_sha=commit_sha, release_ref=args.release, now=now
+        )
     store.put(
-        commit_sha=args.commit, release_ref=args.release, verdict=args.verdict, reason=args.reason
+        commit_sha=commit_sha, release_ref=args.release, verdict=args.verdict, reason=args.reason
     )
-    _print_json({"status": "recorded", "commit_sha": args.commit, "verdict": args.verdict})
+    _print_json(
+        {
+            "status": "recorded",
+            "commit_sha": commit_sha,
+            "release_ref": args.release,
+            "verdict": args.verdict,
+        }
+    )
     return 0
 
 
@@ -1172,6 +1249,12 @@ def _build_argparser() -> argparse.ArgumentParser:
     p_adj.add_argument("--release", required=True)
     p_adj.add_argument("--verdict", required=True, choices=["remediation", "routine"])
     p_adj.add_argument("--reason", required=True)
+    p_adj.add_argument("--now", default=None, help="ISO instant for window math (testing)")
+    p_adj.add_argument(
+        "--force",
+        action="store_true",
+        help="record even when the (commit, release) pair is not a pending candidate",
+    )
 
     p_comp = sub.add_parser("compute", help="compute CFR+churn and append a snapshot")
     add_common(p_comp)
@@ -1205,7 +1288,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "candidates":
             return _cmd_candidates(root, cfg, _parse_now(args.now))
         if args.command == "adjudicate":
-            return _cmd_adjudicate(root, cfg, args)
+            return _cmd_adjudicate(root, cfg, args, _parse_now(args.now))
         if args.command == "compute":
             return _cmd_compute(root, cfg, _parse_now(args.now), assume_routine=args.assume_routine)
     except DeliveryMetricsError as exc:

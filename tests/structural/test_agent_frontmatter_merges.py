@@ -126,6 +126,22 @@ def test_every_agent_declares_a_non_empty_tools_list(
     assert tools.strip(), f"{name}: `tools:` is empty"
 
 
+def _granted_tools(value: object) -> set[str]:
+    """Parse `tools:` in BOTH shapes YAML can produce, because the assertion below is
+    an intersection and an unparsed shape silently makes it empty.
+
+    `str(["Read", "Write"]).split(",")` yields `{"['Read'", " 'Write']"}` — no element
+    of which equals `"Write"` — so a `tools:` written as a YAML list made the read-only
+    check pass while Write and Bash were granted. Verified against the real parser
+    before this helper existed: the intersection was empty and the test was green.
+    """
+    if isinstance(value, str):
+        return {t.strip() for t in value.split(",") if t.strip()}
+    if isinstance(value, list):
+        return {str(t).strip() for t in value if str(t).strip()}
+    raise AssertionError(f"unhandled `tools:` shape {type(value).__name__}: {value!r}")
+
+
 @pytest.mark.parametrize("name", sorted(_READ_ONLY_AGENTS))
 def test_read_only_agents_are_not_granted_write_edit_or_bash(
     name: str, rendered_agents: dict[str, str]
@@ -138,7 +154,7 @@ def test_read_only_agents_are_not_granted_write_edit_or_bash(
     test in the suite.
     """
     block, _rest = _frontmatter(rendered_agents[name])
-    granted = {t.strip() for t in str(yaml.safe_load(block).get("tools", "")).split(",")}
+    granted = _granted_tools(yaml.safe_load(block).get("tools"))
 
     assert not (granted & {"Write", "Edit", "Bash"}), (
         f"{name} is a read-only agent but its rendered tools grant "

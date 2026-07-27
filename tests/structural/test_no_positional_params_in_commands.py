@@ -102,6 +102,38 @@ def test_the_plugins_own_commands_use_no_positional_parameter() -> None:
     )
 
 
+def test_no_command_or_stage_template_uses_a_positional_parameter() -> None:
+    """Scan the Jinja SOURCE, because the rendered scan only sees one config.
+
+    The render fixtures above build a single answer set, and `second_opinion.models`
+    defaults to `[]` — so the whole Step 3.5 block is `{% if %}`-ed out and never
+    reaches the rendered command. Measured: rendering Production/claude-code produces
+    ZERO commands containing that block's `high_diff classify` line. Two of the three
+    positional-parameter defects this module was written for lived in exactly that
+    block, and this gate would not have caught either of them; they were found by hand.
+
+    Scanning the templates is preset-, target- and conditional-independent: a `$N` in
+    any branch fails here regardless of which config would render it.
+    """
+    root = Path(__file__).resolve().parents[2] / "src" / "harness_maker" / "templates"
+    offenders: dict[str, list[str]] = {}
+    for directory in ("stages", "commands"):
+        for path in sorted((root / directory).rglob("*.j2")):
+            hits = [
+                line.strip()
+                for line in path.read_text(encoding="utf-8").splitlines()
+                if _POSITIONAL.search(line)
+            ]
+            if hits:
+                offenders[str(path.relative_to(root))] = hits
+
+    assert not offenders, (
+        "command/stage templates contain `$0`-`$9`. These render into slash-command "
+        "bodies, where the host substitutes the command's arguments before the model "
+        f"reads them — including inside branches this suite does not render:\n{offenders}"
+    )
+
+
 def test_the_make_bootstrap_resolves_a_version_not_a_positional(
     rendered_commands: dict[str, str],
 ) -> None:

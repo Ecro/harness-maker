@@ -16,6 +16,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+import yaml
+
 from harness_maker import wrapup_receipt as wr
 
 
@@ -694,3 +697,154 @@ def test_an_unconfigured_folder_list_refuses_every_promotion_claim(tmp_path: Pat
 
     assert result.ok is False
     assert [m.kind for m in result.mismatches] == ["promotion-missing"]
+
+
+# ---------------------------------------------- config-shape → verdict (round 5, P1)
+
+
+def _harness_yaml(base: Path, vault: Path, *, legacy_key: bool) -> None:
+    """A real `second_brain` block, optionally carrying the retired key.
+
+    `second_brain._load_config` pops `_DEPRECATED_FIELDS` before validating precisely
+    because consuming projects' on-disk harness.yaml still carry `trusted_allowlist`,
+    and `promote_note` therefore accepts and WRITES under such a config.
+    """
+    # The writable folder MUST contain `project_id` as a path segment, or
+    # `SecondBrainConfig`'s own validator rejects the block for that reason instead —
+    # which would make the legacy-key case indistinguishable from the clean one and
+    # this whole parametrisation vacuous. (It did, on the first draft of this test.)
+    block = {
+        "enabled": True,
+        "vault_path": str(vault),
+        "project_id": "demo",
+        "folders": [{"path": "demo/notes", "write": True}],
+    }
+    if legacy_key:
+        block["trusted_allowlist"] = ["anything"]
+    (base / ".claude").mkdir(parents=True, exist_ok=True)
+    (base / ".claude" / "harness.yaml").write_text(
+        yaml.safe_dump({"second_brain": block}), encoding="utf-8"
+    )
+
+
+@pytest.mark.parametrize("legacy_key", [False, True], ids=["clean-config", "legacy-key"])
+def test_a_truthful_promotion_is_never_reported_as_fabricated(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], legacy_key: bool
+) -> None:
+    """A config-SHAPE problem must not become an accusation that the agent lied.
+
+    `_configured_vault` reads the raw dict; `_configured_vault_folders` validates it
+    with `extra="forbid"`. When only the strict one failed, the vault looked configured
+    while the folder allowlist came back empty — so `_vault_slugs` returned nothing and
+    every truthful promotion reconciled as `promotion-missing`, telling the main loop
+    to go fix claims that were already on disk.
+
+    The `legacy-key` case is the one that regressed; `clean-config` is the positive
+    control that proves the assertion is not vacuous.
+    """
+    vault = tmp_path / "vault"
+    (vault / "demo" / "notes").mkdir(parents=True)
+    (vault / "demo" / "notes" / "decision-span-ledger.md").write_text("x\n", encoding="utf-8")
+    _harness_yaml(tmp_path, vault, legacy_key=legacy_key)
+    receipt = tmp_path / "r.json"
+    receipt.write_text(
+        json.dumps(
+            {
+                "schema_version": wr.SCHEMA_VERSION,
+                "stage": "wrapup",
+                "promotion_candidates": 1,
+                "promoted_slugs": ["span-ledger"],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    rc = wr.main(
+        [
+            "--root",
+            str(tmp_path),
+            "--stage",
+            "wrapup",
+            "--worktree",
+            str(tmp_path),
+            "--receipt-file",
+            str(receipt),
+        ]
+    )
+    payload = json.loads(capsys.readouterr().out)
+
+    assert rc == 0, payload
+    result = payload["result"]
+    assert payload["status"] == "ok"
+    kinds = [m["kind"] for m in result["mismatches"]]
+    assert "promotion-missing" not in kinds, payload
+    # Not merely "not accused" — VERIFIED. The fail-safe alone satisfies the assertions
+    # above by reporting the claim as `unverified`, so stopping there leaves the
+    # legacy-key strip untested. Measured: with the strip removed and only the
+    # fail-safe in place, the assertions above still passed and these two did not.
+    assert result["unverified"] == 0, payload
+    assert result["checked"] >= 1, payload
+    assert payload["vault_checked"] is not None, payload
+
+
+def test_an_unparseable_second_brain_block_reports_unverified_not_missing(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The fail-safe half, which the legacy-key test above does NOT cover.
+
+    Stripping the retired keys fixes the ONE shape we know about. Any other shape the
+    strict validator rejects — a forward-compat key, a folder that fails the
+    project-namespacing rule — still leaves `_configured_vault` returning a path while
+    `_configured_vault_folders` returns None, and the vault walk then finds nothing.
+    The verdict for "could not read the config" must be `unverified`, which vouches for
+    nothing, and never `promotion-missing`, which asserts the agent made the claim up.
+    """
+    vault = tmp_path / "vault"
+    (vault / "demo" / "notes").mkdir(parents=True)
+    (base_yaml := tmp_path / ".claude").mkdir(parents=True, exist_ok=True)
+    (base_yaml / "harness.yaml").write_text(
+        yaml.safe_dump(
+            {
+                "second_brain": {
+                    "enabled": True,
+                    "vault_path": str(vault),
+                    "project_id": "demo",
+                    "folders": [{"path": "demo/notes", "write": True}],
+                    "a_key_from_a_future_version": True,
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    receipt = tmp_path / "r.json"
+    receipt.write_text(
+        json.dumps(
+            {
+                "schema_version": wr.SCHEMA_VERSION,
+                "stage": "wrapup",
+                "promotion_candidates": 1,
+                "promoted_slugs": ["span-ledger"],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    rc = wr.main(
+        [
+            "--root",
+            str(tmp_path),
+            "--stage",
+            "wrapup",
+            "--worktree",
+            str(tmp_path),
+            "--receipt-file",
+            str(receipt),
+        ]
+    )
+    payload = json.loads(capsys.readouterr().out)
+    result = payload["result"]
+
+    assert rc == 0, payload
+    assert [m["kind"] for m in result["mismatches"]] == [], payload
+    assert result["unverified"] == 1, payload
+    assert payload["vault_checked"] is None, payload

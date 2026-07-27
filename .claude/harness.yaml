@@ -4,7 +4,7 @@ harness_maker_version: 0.43.2
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: harness-yaml/Production.yaml.j2
 provenance: official
-content_hash: 970e8bd98eb00e82a37c9a74001fc7c0674af4b8e3bb88cd3a063d4aba54550c
+content_hash: 5b145a473e5dce1437d35e537e1e10158bca5cacfe806a8915432414fea3b918
 ---
 preset: Production
 locale: ko
@@ -175,7 +175,7 @@ economics:
   span_max_turns: 400
   span_max_min: 240.0
 delegation:
-  stages: []
+  stages: ["wrapup"]
 autonomy:
   level: "auto_safe"
   pipeline: ["research", "spec", "plan", "execute", "review", "verify", "wrapup"]

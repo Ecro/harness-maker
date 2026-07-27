@@ -64,6 +64,8 @@ def test_ledger_append_and_adjudication_reuse(
                 "routine",
                 "--reason",
                 "scheduled cleanup, unrelated to the release",
+                "--now",
+                _NOW,
             ]
         )
         == 0
@@ -128,6 +130,8 @@ def test_adjudication_reason_truncated_row_under_pipe_buf(
     """ADR-005 byte-cap: an oversized reason is truncated deterministically and
     the serialized row stays <= 4096 bytes (single O_APPEND write)."""
     root = _ambiguous_repo(tmp_path)
+    assert main(["candidates", "--root", str(root), "--now", _NOW]) == 0
+    cand = json.loads(capsys.readouterr().out)["candidates"][0]
     long_reason = "x" * 5000
     assert (
         main(
@@ -136,13 +140,15 @@ def test_adjudication_reason_truncated_row_under_pipe_buf(
                 "--root",
                 str(root),
                 "--commit",
-                "a" * 40,
+                cand["commit_sha"],
                 "--release",
-                "v1.0.0",
+                cand["release_ref"],
                 "--verdict",
                 "remediation",
                 "--reason",
                 long_reason,
+                "--now",
+                _NOW,
             ]
         )
         == 0
@@ -259,3 +265,154 @@ def test_e2e_module_invocation_from_foreign_cwd(tmp_path: Path) -> None:
     assert proc.returncode == 0, proc.stderr
     payload = json.loads(proc.stdout)
     assert len(payload["candidates"]) == 1
+
+
+def _adjudicate(root: Path, commit: str, release: str, *extra: str) -> int:
+    return main(
+        [
+            "adjudicate",
+            "--root",
+            str(root),
+            "--commit",
+            commit,
+            "--release",
+            release,
+            "--verdict",
+            "remediation",
+            "--reason",
+            "repairs a regression the release shipped",
+            "--now",
+            _NOW,
+            *extra,
+        ]
+    )
+
+
+def test_abbreviated_commit_is_normalised_to_the_full_sha(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The verdict lookup is keyed by the FULL sha `git log` reports.
+
+    `adjudicate` used to store the caller's string verbatim, so the abbreviated
+    sha that `git log --oneline` hands you produced a row no candidate would ever
+    look up: the verdict was written, `compute` kept exiting 3 on the candidate it
+    had supposedly resolved, and nothing surfaced the mismatch. Asserting only
+    that the row exists passes in that broken world — the assertion has to be that
+    the SAME run then reaches `compute`.
+    """
+    root = _ambiguous_repo(tmp_path)
+    assert main(["candidates", "--root", str(root), "--now", _NOW]) == 0
+    cand = json.loads(capsys.readouterr().out)["candidates"][0]
+    full = str(cand["commit_sha"])
+
+    assert _adjudicate(root, full[:8], str(cand["release_ref"])) == 0
+    recorded = json.loads(capsys.readouterr().out)
+    assert recorded["commit_sha"] == full, "abbreviated sha stored verbatim"
+
+    rows = [r for r in _ledger_rows(root) if r["event"] == "adjudication"]
+    assert [r["commit_sha"] for r in rows] == [full]
+
+    # The behavioural half: the verdict is now actually READ.
+    assert main(["compute", "--root", str(root), "--now", _NOW]) == 0
+    snap = json.loads(capsys.readouterr().out)
+    assert snap["pending_adjudications"] == 0
+    assert snap["cfr"]["failed"] == 1
+
+
+def test_unresolvable_commit_is_rejected_not_recorded(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A sha that is not a commit in this repo can never be looked up.
+
+    Name the guard in the assertion: exit 4 alone is also what the candidate-pair gate
+    returns, so `rc == 4` passes with `_resolve_commit_sha` deleted.
+    """
+    root = _ambiguous_repo(tmp_path)
+    assert _adjudicate(root, "a" * 40, "v1.0.0") == 4
+    err = json.loads(capsys.readouterr().err)
+    assert err["status"] == "error"
+    assert "does not resolve to a commit" in err["error"], err
+    assert not [r for r in _ledger_rows(root) if r["event"] == "adjudication"]
+
+
+def test_an_overlong_release_ref_is_rejected_not_silently_truncated(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The ledger truncates `release_ref` to fit PIPE_BUF; the gate compares it whole.
+
+    A ref past that cap would clear the gate and then be STORED under a different key —
+    the same write-under-one-key/read-under-another failure this gate exists to close,
+    reintroduced one layer down.
+    """
+    root = _ambiguous_repo(tmp_path)
+    assert main(["candidates", "--root", str(root), "--now", _NOW]) == 0
+    cand = json.loads(capsys.readouterr().out)["candidates"][0]
+
+    assert _adjudicate(root, str(cand["commit_sha"]), "v" + "9" * 300) == 4
+    err = json.loads(capsys.readouterr().err)
+    assert "never read" in err["error"], err
+    assert not [r for r in _ledger_rows(root) if r["event"] == "adjudication"]
+
+
+def test_pair_that_is_not_a_pending_candidate_is_rejected(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A real sha with the wrong `--release` lands in the same dead end.
+
+    Normalising only the sha would close the instance and leave the class open.
+    """
+    root = _ambiguous_repo(tmp_path)
+    assert main(["candidates", "--root", str(root), "--now", _NOW]) == 0
+    cand = json.loads(capsys.readouterr().out)["candidates"][0]
+
+    assert _adjudicate(root, str(cand["commit_sha"]), "v9.9.9") == 4
+    err = json.loads(capsys.readouterr().err)
+    assert "never read" in err["error"]
+    assert not [r for r in _ledger_rows(root) if r["event"] == "adjudication"]
+
+    # ...and --force is the documented escape hatch, so the gate is not a wall.
+    assert _adjudicate(root, str(cand["commit_sha"]), "v9.9.9", "--force") == 0
+
+
+def test_re_adjudicating_an_already_recorded_pair_is_allowed(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Changing a verdict must not need --force: once recorded, the pair leaves
+    the pending list, so a naive membership check would lock the verdict in.
+
+    Discriminating detail: the FIRST adjudication is made with an abbreviated sha. That
+    forces the second call's `store.get` short-circuit to be reached via the normalised
+    key — with normalisation removed, the first row lands under the abbreviation, the
+    pair is neither recorded nor pending, and the second call is rejected. Passing a
+    full sha both times (as this test first did) succeeds against the pre-fix code too.
+    """
+    root = _ambiguous_repo(tmp_path)
+    assert main(["candidates", "--root", str(root), "--now", _NOW]) == 0
+    cand = json.loads(capsys.readouterr().out)["candidates"][0]
+    sha, ref = str(cand["commit_sha"]), str(cand["release_ref"])
+
+    assert _adjudicate(root, sha[:9], ref) == 0
+    capsys.readouterr()
+    assert (
+        main(
+            [
+                "adjudicate",
+                "--root",
+                str(root),
+                "--commit",
+                sha,
+                "--release",
+                ref,
+                "--verdict",
+                "routine",
+                "--reason",
+                "on reflection this was scheduled work",
+                "--now",
+                _NOW,
+            ]
+        )
+        == 0
+    )
+    capsys.readouterr()
+    assert main(["compute", "--root", str(root), "--now", _NOW]) == 0
+    assert json.loads(capsys.readouterr().out)["cfr"]["failed"] == 0

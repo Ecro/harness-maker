@@ -473,11 +473,18 @@ def _configured_vault_folders(base: Path) -> list[str] | None:
     try:
         from .io_utils import load_harness_yaml
         from .models import SecondBrainConfig
+        from .second_brain import _DEPRECATED_FIELDS
 
         data = load_harness_yaml(path)
         raw = data.get("second_brain") if isinstance(data, dict) else None
         if not isinstance(raw, dict):
             return None
+        # `second_brain` OWNS this block and drops its own retired keys before
+        # validating; `SecondBrainConfig` forbids extras, so validating the raw dict
+        # here rejected every harness.yaml still carrying `trusted_allowlist` — a
+        # config `promote_note` itself accepts and writes under. Read through the
+        # owning module's list so the two cannot drift apart again.
+        raw = {k: v for k, v in raw.items() if k not in _DEPRECATED_FIELDS}
         cfg = SecondBrainConfig.model_validate(raw)
     except Exception:  # noqa: BLE001 - a broken block must not block the wrapup
         return None
@@ -542,11 +549,21 @@ def main(argv: list[str] | None = None) -> int:
     doc_root = requested
 
     vault = Path(ns.vault).expanduser() if ns.vault else _configured_vault(base)
+    folders = _configured_vault_folders(base)
+    if vault is not None and folders is None:
+        # `_configured_vault` reads the raw dict; `_configured_vault_folders` validates.
+        # When only the strict one fails, the vault looks configured while the folder
+        # allowlist is empty, and `_vault_slugs` then returns nothing — so every
+        # truthful promotion is reported as `promotion-missing` and the main loop is
+        # told the delegate fabricated its claims. An unparseable config means the
+        # promotions are UNVERIFIABLE, which is what `vault_root=None` already means.
+        # Fail to "could not check", never to "you made it up".
+        vault = None
     result = reconcile(
         receipt,
         base_root=base,
         vault_root=vault,
-        vault_folders=_configured_vault_folders(base),
+        vault_folders=folders,
         worktree_root=doc_root,
         expected_stage=ns.stage,
     )

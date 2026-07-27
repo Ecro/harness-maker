@@ -2,6 +2,161 @@
 
 ## [Unreleased]
 
+## [0.43.3] — 2026-07-27
+
+### Fixed — a truthful Second Brain promotion could reconcile as fabricated
+
+`_configured_vault_folders` validated the raw `second_brain` block with
+`SecondBrainConfig` (`extra="forbid"`), while `second_brain._load_config` — the module
+that owns that block — pops its retired keys first, precisely because consuming
+projects' on-disk `harness.yaml` still carry `trusted_allowlist` and `promote_note`
+accepts and writes under such a config. Its sibling `_configured_vault` reads the raw
+dict without validating, so on those configs the vault looked present while the folder
+allowlist came back empty: `_vault_slugs` returned nothing and **every truthful
+promotion was reported as `promotion-missing`**, which tells the main loop the delegate
+invented its claims. A wrapup that genuinely promoted N notes exited 1 with N
+accusations.
+
+Two fixes, because they close different halves: the retired keys are now dropped
+through the owning module's own list (so the two cannot drift apart again), and when
+the strict parse fails for *any other* reason the vault degrades to `vault_root=None`
+— which reports the claims as `unverified`. A config-shape problem must fail to "could
+not check", never to "you made it up". Both halves are mutation-verified: each removal
+kills exactly one of the two new tests.
+
+Found by the round-5 review; independently reported by the code and security reviewers.
+
+### Fixed — slash-command bash lines used positional parameters the host overwrites
+
+Claude Code substitutes a slash command's arguments into the command body **before** the
+model reads it, and that substitution replaces `$0`–`$9`. The file on disk is not the
+line that runs, so no test that reads the file can see it — every render-grep passed
+throughout.
+
+Measured with `/hm:make --update`: `awk -F/ '{print $NF, $0}'` was invoked as
+`awk -F/ '{print $NF, --update}'`, `HM` became `-8`, `uv run --with "-8"` failed, and the
+line fell through to its hardcoded fallback pin — precisely the stale-pin bootstrap trap
+that line exists to escape. Running the command as handed over would have re-rendered
+this repo's harness with 0.43.0 templates.
+
+Four sites, three consequences: the plugin's own `commands/make.md` (the entry point for
+a fresh install), the rendered `/hm:make`, `/hm:review` + `/hm:plan` (where the clobbered
+value decides whether the Side preset invokes its second opinion at all), and a prose
+`$0` in `/hm:health`. The gate's first version had the same flaw as the code it guarded —
+it scanned only the RENDERED commands and missed `commands/make.md`, so the defect
+survived its own fix.
+
+CLAUDE.md checkpoint 2 is retitled from "파서 정합성" to "소비자 정합성 — 전처리 +
+parser": a parser problem is visible by reading the file, a preprocessing problem never
+is, and the checklist now also says not to scope a gate to the artifact you happened to
+be fixing.
+
+### Fixed — the round-3 findings the round-2 fixes left open
+
+Eleven findings — five P1, six P2 — from the re-review that round 2 never got. The one
+that mattered most was a reviewer **disagreement** rather than a finding: security called
+the `span-end` session scoping closed, code called it still open, and code was right on
+checkable evidence. `span-end` ships only as a Stop/PreCompact hook and a hook's session
+id arrives on **stdin**; reading `HM_SESSION_ID` instead meant a hook process without that
+env var — its documented state on WSL2 — matched none of its own events, wrote no `end`,
+and left the span open to the cap. Every existing test set the env var identically for
+start and end, so none could see the asymmetry. Averaging the two verdicts would have
+shipped the defect with a CLOSED label on it.
+
+### Fixed — the added-line count that gates the second opinion could read zero
+
+The positional-parameter fix above replaced `awk '{s+=$1}'` in `/hm:review` and `/hm:plan`
+with `git diff --shortstat | grep -oE '[0-9]+ insertion'`. That escapes the substitution
+trap but parses git's human-readable summary, whose strings go through gettext — so it
+traded a substitution channel for a locale channel on the same value, the one deciding
+whether the Side preset runs its second opinion at all. Both forms ship in this release,
+so users only ever see the third one.
+
+Measured before changing it: the plural form does match (`17 insertions(+)` yields
+`17`), and **none of the 18 git catalogs installed here translate the string**, so this
+was a fragility rather than a live defect — all three reviewers who raised it named a
+mechanism that does not currently fire. It is now back on `--numstat`, which is
+plumbing output and locale-invariant, summed with shell arithmetic instead of `awk`:
+no positional parameter, no locale dependence, and binary rows (`-`) are skipped rather
+than summed.
+
+### Fixed — `delivery_metrics adjudicate` recorded verdicts nothing would ever read
+
+`classify_cfr` looks a verdict up with the **full** sha it read out of `git log`,
+but `adjudicate` stored whatever string the caller typed. The abbreviated sha that
+`git log --oneline` hands you therefore produced a ledger row no candidate would
+ever match: the verdict was written, `compute` kept exiting 3 on the candidate that
+had supposedly just been resolved, and nothing in the output distinguished that from
+"you have not adjudicated it yet". Found by hitting it during `/hm:metrics`.
+
+`--commit` is now resolved through `git rev-parse --verify` (an unresolvable value
+is rejected instead of stored), and the `(commit, release)` pair is checked against
+the pending-candidate set — a mistyped `--release` lands in exactly the same dead
+end, so normalising only the sha would have closed the instance and left the class
+open. Re-adjudicating an already-recorded pair still works without `--force`, which
+is the documented escape for the window-edge case. `adjudicate` gained `--now` for
+the same window math the other subcommands already took.
+
+Same shape as this project's most-repeated defect — written but never read, with a
+green unit boundary above a wrong shipped entry point. The regression test asserts
+the behavioural half (the same run then reaches `compute`), because asserting only
+that the row exists passes in the broken world too.
+
+Two follow-ons from the round-5 review land here as well. An over-long `--release` is
+now rejected rather than accepted-then-truncated by the ledger writer — which would
+have re-created the very same dead key one layer down — and the 200-char cap that both
+sides must agree on is a single constant instead of two literals. `git rev-parse` is
+called through `--end-of-options`; measured, that anchor changes no outcome today
+(`--glob=refs/*^{commit}` already exits 1 without it, because the appended suffix makes
+every option form unresolvable), and it is kept for what the suffix does not promise —
+the suffix neutralises today's option set by accident, the anchor neutralises
+tomorrow's by contract. It costs a git >= 2.24 floor, first use in this codebase.
+
+### Fixed — three gates that passed in the world they were written to prevent
+
+All three were found by the round-5 review and each was **reproduced before being
+fixed**, because each one's failure mode is that it looks like coverage:
+
+- `test_read_only_agents_are_not_granted_write_edit_or_bash` parsed `tools:` as
+  `str(value).split(",")`. For a YAML **list** that yields `{"['Read'", " 'Write']"}`,
+  which intersects `{Write, Edit, Bash}` in nothing — so the check silently stopped
+  enforcing the only agent boundary Claude Code actually honours. Verified against the
+  real parser: `tools: [Read, Write, Bash]` passed the test.
+- `test_no_positional_params_in_commands` scanned only rendered commands, and its
+  fixture leaves `second_opinion.models` at `[]` — so the entire Step 3.5 block is
+  `{% if %}`-ed out and never reaches the render. Measured: zero rendered commands
+  contain that block. Two of the three `$N` defects this module exists for lived in
+  exactly that block and were found by hand, not by the gate. A preset-, target- and
+  branch-independent scan of the Jinja source is now the primary check.
+- `test_reconcile_cli_rejects_a_worktree_outside_the_base` asserted `rc != 0`. With the
+  confinement guard deleted the run returns 1/`mismatch` on any host lacking
+  `/etc/hostname`, so the verdict was decided by a file outside the repo. It now pins
+  `rc == 2` and the guard's own message.
+
+`test_re_adjudicating_an_already_recorded_pair_is_allowed` and
+`test_unresolvable_commit_is_rejected_not_recorded` had the same shape and were
+strengthened the same way; both are now mutation-verified to fail when the code they
+cover is removed.
+
+### Added — CLI-boundary tests for the two delegation entry points
+
+`test_wrapup_brief.py` and `test_wrapup_receipt.py` hold 68 tests between them and
+neither called `main()`. The rendered wrapup command derives the brief **inside the
+task worktree** and reconciles the receipt **from the base repo**, handing the
+worktree across that boundary as `--worktree '<brief.worktree_root>'`; every existing
+test supplies that argument from a Python variable, so nothing covered how the CLI
+parses, resolves, or confines it. Seven tests now drive `main(argv)` only — including
+the differential pair that proves `--worktree` is load-bearing rather than decorative.
+
+An eighth test closes the seam between the two halves that were each already covered:
+`test_render_wrapup_delegation` greps the rendered `!` line for literal flag text and
+the CLI tests drive `main(argv)` with hand-written literals, so a flag renamed on one
+side and not the other leaves both green while the shipped line dies at argparse with
+exit 2 — which the stage reads as "unparseable receipt" and routes to the inline body.
+It now extracts the flags from the rendered line and feeds exactly those to the parser.
+Its one blind spot is documented in the test: argparse accepts unambiguous prefixes, so
+a rename to a superstring (`--stage` → `--stage-name`) still passes.
+
 ## [0.43.2] — 2026-07-26
 
 ### Fixed — the `stage-delegate` agent shipped without a name or description

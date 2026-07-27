@@ -5,6 +5,8 @@ status: CHANGES_REQUESTED
 human_review_needed: true
 created: 2026-07-26
 reviewers_invoked: [code-reviewer, security-reviewer, codex, antigravity]
+rounds: 5
+last_round_reviewed: 5
 consensus_method: cross-check
 second_opinion_results:
   - model: codex
@@ -389,3 +391,134 @@ What a human should look at first, unchanged and now sharper: **`stage_spans` +
 each change was needed because the previous one removed a compensation nobody had
 written down, and its correctness argument runs entirely through concurrency behaviour
 that no test in this repo exercises against a real second session.
+
+---
+
+---
+
+## Round 5 — the re-review Round 4 never got (2026-07-27)
+
+**This IS a review.** Four independent voices ran against the previously unreviewed
+surface: the three fix commits landed after the `v0.43.1` tag (PART A), the
+uncommitted working tree (PART B), and one new untracked test file (PART C) — ~1,700
+diff lines total.
+
+| voter | kind | findings |
+|---|---|---|
+| `code-reviewer` | Claude, read-only | 3 P1, 3 P2 |
+| `security-reviewer` | Claude, read-only | 1 P1, 1 P2 |
+| `codex` | cross-model | 1 P1, 2 P2, 1 P3 |
+| `antigravity` | cross-model | 1 P0, 1 P1, 2 P2 |
+
+Voter pool N = 4, threshold K = 2 (ADR-006, fixed).
+
+### Consensus-passed (≥2 voices)
+
+| finding | voices | disposition |
+|---|---|---|
+| `--shortstat \| grep insertion` can read zero | code-reviewer P1, codex P1, antigravity P0 | **fixed** — but see the refutation below |
+| `_configured_vault_folders` strict-parse → truthful promotion reconciles as fabricated | code-reviewer P1, security-reviewer P1 | **fixed**, both halves mutation-verified |
+| positional-param gate scans one render config, misses branch-gated `$N` | code-reviewer P2, antigravity P2 | **fixed** — template-source scan added |
+
+### Single-source but REPRODUCED, therefore not "manual-only"
+
+A finding I could execute is a fact, not an opinion, so these were treated as
+consensus-equivalent:
+
+| finding | voice | reproduction |
+|---|---|---|
+| `test_read_only_agents_…` never enforces when `tools:` is a YAML list | antigravity P2 | ran the real parser: `tools: [Read, Write, Bash]` **passed** the read-only check |
+| `release_ref` >200 chars clears the gate then stores under a truncated key | codex P2 | read `put`: caches `release_ref[:200]`, gate compares the full string |
+| confinement guard's only test asserts `rc != 0` | code-reviewer P1 | guard deleted → returns 1/`mismatch` wherever `/etc/hostname` is absent |
+| `test_re_adjudicating_…` passes pre-fix | codex P3 | full sha both calls made the two key halves equal by construction |
+| `--commit` reaches a git ref position unanchored | security-reviewer P2 | `--end-of-options` added |
+
+### Raised and NOT adopted
+
+- **codex P2, window-boundary rejection.** A candidate listed seconds before a 28-day
+  boundary can be rejected by the gate moments later. Real, but `code-reviewer`
+  independently assessed the same code and declined to flag it: the failure is loud
+  and the error names `--force`. Threading a candidate token through `candidates` →
+  `adjudicate` buys a narrow race at the cost of a new persisted identity. Recorded,
+  not fixed.
+- **antigravity P2, "the gate ignores templates that render into `.claude/stages/`".**
+  There is no such render target; stage templates are fused into `commands/hm/*.md`.
+  The *consequence* it described was real for a different reason (the fixture's
+  `second_opinion.models: []`), and that is what was fixed.
+
+### Where the reviewers were wrong, and how that was established
+
+Three of four voices called the `--shortstat` line a live defect. **It is not**, and
+the mechanisms they named do not fire:
+
+- antigravity's P0 said the regex hardcodes the singular and so misses
+  `17 insertions(+)`. Measured: `grep -oE '[0-9]+ insertion'` extracts `17` — the
+  singular is a prefix of the plural.
+- codex and code-reviewer said git localises the summary via gettext. Measured across
+  **all 18 git catalogs installed here** (bg ca de el es fr id is it ko pl pt_PT ru sv
+  tr vi zh_CN zh_TW): every one returns the English msgid. Confirmed end-to-end —
+  `git status` under `ko_KR.UTF-8` prints Korean while `git diff --shortstat` stays
+  English.
+
+The line was still changed, because `--numstat` is strictly better (plumbing output,
+no locale surface, no positional parameter) and the change is one line. Severity as
+shipped: fragility, not defect. Taking three concurring voices at face value would
+have put a false "live P1" in the changelog.
+
+### Verification
+
+Every fix was mutation-checked — the code removed, the suite run, the killed test
+named:
+
+| mutant | test that died |
+|---|---|
+| sha normalisation removed | `test_abbreviated_commit_is_normalised_to_the_full_sha`, `test_unresolvable_commit_is_rejected_not_recorded`, `test_re_adjudicating_an_already_recorded_pair_is_allowed` |
+| `--worktree` confinement guard removed | `test_reconcile_cli_rejects_a_worktree_outside_the_base` |
+| retired-key strip removed | `test_a_truthful_promotion_is_never_reported_as_fabricated[legacy-key]` (and only that one — `[clean-config]` still passes, so the parametrisation is not vacuous) |
+| vault fail-safe removed | `test_an_unparseable_second_brain_block_reports_unverified_not_missing` |
+| `$1` injected into a stage template | `test_no_command_or_stage_template_uses_a_positional_parameter` |
+
+The first draft of the vault test failed this discipline: it asserted only "not accused
+of fabricating", which the fail-safe alone satisfies, so removing the retired-key strip
+killed nothing. It now asserts `unverified == 0` and `checked >= 1` — verified, not
+merely unaccused — and a second test covers the fail-safe on its own.
+
+### Applied after the fixes, from self-review of the fixes
+
+Three consecutive earlier rounds each introduced a defect while fixing one, so the
+round-5 changes were re-read against the same checklist that produced the findings:
+
+- **`--end-of-options` buys nothing measurable.** Probed both ways:
+  `git rev-parse --verify --quiet <anchor?> '--glob=refs/*^{commit}'` exits 1 with AND
+  without the anchor — the appended suffix already makes every option form
+  unresolvable. Kept, because the suffix neutralises today's option set by accident
+  while the anchor neutralises tomorrow's by contract, but the comment now says that
+  instead of implying a live block, and records the cost (first `--end-of-options` in
+  this codebase → a git >= 2.24 floor).
+- **The 200-char cap lived in two places.** `_RELEASE_REF_MAX` and `put`'s literal
+  `200` had to agree for the new gate to mean anything; they are now one constant,
+  defined beside the other module constants rather than 1,000 lines below its first
+  use.
+- **The flag-drift test found a real scoping bug in itself on first run**: it matched
+  `--with` from the `uv run` prefix. Now scoped to the text after the module name.
+  Its own blind spot (argparse prefix matching) is documented in the test rather than
+  left implied.
+
+### Still open
+
+- **The delegation soak has not started.** Verified: `wrapup_brief --root .` returns
+  `status: degraded, reason: HEAD is 'main'`, so a wrapup from the base repo takes the
+  inline path with the flag fully on. ADR-011's clock starts at the first wrapup that
+  runs inside a task worktree.
+- **This repo's own harness still carries the pre-fix line.** `.claude/` was rendered
+  from the installed 0.43.2 plugin, so `.claude/commands/hm/review.md:294` still holds
+  the `awk '{s+=$1}'` form. It corrects itself on the next release + `/hm:make --update`.
+- **`stage_spans` + `worktree._cli_span_end`** remains the first thing a human should
+  read — changed in three separate rounds, each time to restore a compensation nobody
+  had written down, with a correctness argument that runs through concurrency no test
+  here exercises against a real second session. Round 5 did not touch it, and
+  `code-reviewer` re-examined it this round without flagging a regression.
+
+**Status: CHANGES_REQUESTED cleared for the reviewed surface; `human_review_needed`
+stays `true` for `stage_spans`/`_cli_span_end`, which is a scope no automated round has
+been able to close.**
