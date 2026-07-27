@@ -4,7 +4,7 @@ file_count: 62
 files:
 - path: ../CLAUDE.md
   template: claude-md/Side.en.md.j2
-  body_sha256: cb730588026d70da6c42073100502a9ec87364e168d4571991faaeb9038429e4
+  body_sha256: b491c7e1706cde168954dcca15d959fb29cb5c43806630d839ef51c61f76d5a7
 - path: agents/autoloop-coder.md
   template: agents/autoloop-coder.md.j2
   body_sha256: 37c6a5d761e169c3247145c71d451f988c3bb1608ee01b29cbb876eec392f154

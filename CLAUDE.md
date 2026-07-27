@@ -213,8 +213,16 @@ Cursor / Codex 의 plugin marketplace 가 GitHub 에서 직접 fetch.
 - **Workflow** = 사용자 명명 fused stage 시퀀스 → 1 명령 1 turn
 - Renderer 가 stage prompt fragment 들을 합성해 단일 명령 파일 생성
 
+## Context discipline
+
+도구가 반환한 것은 세션이 끝날 때까지 컨텍스트에 남아 매 턴 다시 읽힙니다. 측정 결과 메인 루프가 지출의 87.9%를 carry 70.0%로 나르고, 아래 두 습관이 그 무게의 약 20%입니다 (`work-docs/RESEARCH-context-carry-economics-2026-07-28.md`). 둘 다 피하는 데 비용이 들지 않습니다.
+
+- **검색·조회 출력에 상한을 걸 것.** `rg` / `grep` / `find` / `ls` / `cat` / `head` 의 출력은 전량 컨텍스트로 들어옵니다 (16.0%). 호출 시점에 자릅니다 — Grep 도구의 `head_limit` 을 우선 쓰고, raw `rg` 는 `| head -50` 을 통과시킵니다. 상한을 늘리기 전에 패턴을 좁히십시오. 한 가지를 찾으려고 파일을 `cat` 하지 마십시오 — offset 을 준 Read 나 grep 을 쓰십시오.
+- **컨텍스트가 이미 가진 파일을 다시 보내지 말 것.** 기존 파일에 대한 `Write` 는 사전 `Read` 를 요구하므로, 전체 재작성은 본문을 두 번 넣습니다 (3.8%). **이미 읽은** 파일의 수정에는 `Edit` 을 쓰고, `Write` 는 새 파일과 내용 대부분이 실제로 바뀌는 재작성에만 씁니다. PLAN/SPEC/REVIEW 같은 큰 문서에서 차이가 가장 큽니다 — 재작성 한 번이 수만 자를 복제합니다.
+
+> 효과는 `uv run python -m harness_maker.economics composition --root .` 로 다시 재서 확인합니다. 이 지시는 hook 으로 강제되지 않으므로 그 재측정이 유일한 검증 수단입니다.
+
 ## 실행 주의
-- WSL2 NTFS 환경 인지 (vault 경로). Edit 대신 Write 강제 시점 있음.
 - Worktree base_dir 는 `.worktrees/` (Cursor 와 공유). 사용자 프로젝트의
   `.gitignore` 에 추가는 사용자 책임 — 본 repo 자체는 gitignore 됨.
 - `.claude/.hm-loop-active` 은 자동 gitignore 추가 (worktree.create 시

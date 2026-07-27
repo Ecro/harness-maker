@@ -1,0 +1,11 @@
+{"cwd":"/proj","message":{"role":"user","content":[{"type":"text","text":"do the thing"}]}}
+{"cwd":"/proj","message":{"role":"assistant","content":[{"type":"tool_use","id":"t1","name":"Read","input":{"file_path":"/proj/a.md"}}]}}
+{"cwd":"/proj","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":"AAAAAAAAAA"}]}}
+{"cwd":"/proj","message":{"role":"assistant","content":[{"type":"tool_use","id":"t2","name":"Write","input":{"file_path":"/proj/a.md","content":"BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"}}]}}
+{"cwd":"/proj","message":{"role":"assistant","content":[{"type":"tool_use","id":"t3","name":"Write","input":{"file_path":"/proj/new.md","content":"CCC"}}]}}
+{"cwd":"/proj","message":{"role":"assistant","content":[{"type":"tool_use","id":"t4","name":"Bash","input":{"command":"rg foo src/"}}]}}
+{"cwd":"/proj","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t4","content":"match1 match2"}]}}
+{"cwd":"/proj","message":{"role":"assistant","content":[{"type":"tool_use","id":"t5","name":"Bash","input":{"command":"cat notes.md"}}]}}
+{"cwd":"/proj","message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t5","content":"xxxx"}]}}
+{"cwd":"/elsewhere","message":{"role":"assistant","content":[{"type":"tool_use","id":"t6","name":"Write","input":{"file_path":"/elsewhere/z.md","content":"ZZZZZZZZZZZZZZZZZZZZ"}}]}}
+{"cwd":"/proj","message":{"role":"assistant","content":[{"type":"text","text":"done"}]}}

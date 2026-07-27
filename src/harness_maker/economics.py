@@ -807,6 +807,26 @@ def _cmd_stages(
     return 0
 
 
+def _cmd_composition(root: Path, transcript_root: Path | None) -> int:
+    """What the context is carrying, as opposed to what it cost (PLAN ADR-001/005).
+
+    Shares the reader's discovery + project-boundary rules rather than re-deriving them;
+    four scratchpad scripts each re-implemented transcript iteration and that is the
+    reproducibility hole this subcommand exists to close.
+    """
+    from harness_maker.context_composition import compose
+    from harness_maker.economics_source import (
+        default_transcript_root,
+        discover_transcript_dirs,
+        resolve_project_root,
+    )
+
+    resolved = transcript_root or default_transcript_root()
+    project = resolve_project_root(root)
+    _print_json(compose(discover_transcript_dirs(project, transcript_root=resolved), project))
+    return 0
+
+
 def _cmd_doctor(root: Path, transcript_root: Path | None) -> int:
     """Positive liveness smoke (ADR-009). Measures the READER, never the spend."""
     from harness_maker.economics_source import discover_transcript_dirs, load_turns
@@ -886,6 +906,9 @@ def _build_argparser() -> argparse.ArgumentParser:
     p_doctor = sub.add_parser("doctor", help="liveness smoke: is the reader still pricing?")
     add_common(p_doctor)
 
+    p_comp = sub.add_parser("composition", help="what the carried context is made of, as JSON")
+    add_common(p_comp)
+
     return parser
 
 
@@ -903,6 +926,8 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_report(root, transcript_root, args.days, now)
     if args.command == "stages":
         return _cmd_stages(root, transcript_root, args.days, now)
+    if args.command == "composition":
+        return _cmd_composition(root, transcript_root)
     return _cmd_doctor(root, transcript_root)
 
 
