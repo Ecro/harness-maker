@@ -221,6 +221,32 @@ class StageTotals(BaseModel):
         return self.cache_read_usd / self.total_usd if self.total_usd else 0.0
 
 
+class UnattributedBucket(BaseModel):
+    """One part of the `(unattributed)` partition. Counts and cost only, no quotient."""
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    turns: int = 0
+    usd: float = 0.0
+
+
+# ADR-013 requires the re-framing to be observable in the artifact rather than living
+# only in the PLAN. Emitted alongside the buckets, never instead of them.
+_UNATTRIBUTED_BREAKDOWN_NOTES: tuple[str, ...] = (
+    "`recoverable` means adjacency-resolvable within the configured window, or "
+    "carrying `preceded_by_user`. It is not a claim that these turns will be "
+    "recovered, and its complement is not a claim that the rest are unattributable "
+    "— a turn outside the window may still be attributed by a later classification "
+    "verdict (see `classification_cache_misses`).",
+    "A turn past the span cap is never `recoverable`: the cap is terminal, so "
+    "user-adjacency does not re-open it.",
+    "Cursor and Codex sessions write no Claude Code transcripts, so they are absent "
+    "from this population rather than a third bucket inside it.",
+    "`feature_branch_workflow: false` harnesses are a repository config, not a turn "
+    "attribute — the same kind of absence, not a bucket.",
+)
+
+
 class EconomicsReport(BaseModel):
     """Aggregate spend by function. Deliberately carries NO cost-divided-by-count field.
 
@@ -267,6 +293,11 @@ class EconomicsReport(BaseModel):
     # All sums and counts; no cost-per-count quotient (ADR-002 of the prior work).
     usd_by_attribution_source: dict[str, float] = Field(default_factory=dict)
     turns_by_attribution_source: dict[str, int] = Field(default_factory=dict)
+    # ADR-013. A decomposition OF `by_stage["(unattributed)"]`, so it conserves against
+    # that entry on both turns and USD — and it is absent entirely when that entry is,
+    # rather than reporting a partition of nothing.
+    unattributed_breakdown: dict[str, UnattributedBucket] = Field(default_factory=dict)
+    unattributed_breakdown_notes: list[str] = Field(default_factory=list)
     capped_turns: int = 0
     capped_usd: float = 0.0
     ambiguous_session_join: int = 0
@@ -585,6 +616,21 @@ def aggregate(
             report.capped_turns += 1
             report.capped_usd += cost.total_usd
 
+        if resolved_stage == UNATTRIBUTED:
+            # ADR-013: decompose on fields that EXIST on a turn. Gating on
+            # `resolved_stage` rather than on `source` is what makes conservation with
+            # `by_stage[UNATTRIBUTED]` structural instead of incidental — the same
+            # condition selects both populations.
+            #
+            # The cap already forced `est = None` above, so `idx not in capped_set`
+            # guards only the `preceded_by_user` arm. That arm needs the explicit
+            # guard: the cap is terminal, and user-adjacency must not re-open it.
+            recoverable = idx not in capped_set and (est is not None or turn.preceded_by_user)
+            key = "recoverable" if recoverable else "unrecoverable_in_window"
+            bucket = report.unattributed_breakdown.setdefault(key, UnattributedBucket())
+            bucket.turns += 1
+            bucket.usd += cost.total_usd
+
         _accumulate(report.by_stage.setdefault(resolved_stage, StageTotals()), turn, cost, label)
         if turn.attribution_agent:
             _accumulate(
@@ -616,6 +662,14 @@ def aggregate(
 
     report.unknown_models = dict(unknown)
     report.family_priced_models = dict(family_priced)
+    if UNATTRIBUTED in report.by_stage:
+        # A partition names all of its parts, including an empty one, and in a fixed
+        # order — but only once there is something to partition.
+        report.unattributed_breakdown = {
+            key: report.unattributed_breakdown.get(key, UnattributedBucket())
+            for key in ("recoverable", "unrecoverable_in_window")
+        }
+        report.unattributed_breakdown_notes = list(_UNATTRIBUTED_BREAKDOWN_NOTES)
     report.carry_ratio = report.cache_read_usd / report.total_usd if report.total_usd else 0.0
     report.estimator_coverage = estimated_usd / unattributed_usd if unattributed_usd else 0.0
     report.rework_coverage = resolvable_writing_turns / writing_turns if writing_turns else 0.0

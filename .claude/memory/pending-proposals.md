@@ -79,3 +79,15 @@ could not execute in either variant; a mutation receipt would have recorded
 same "prose guard failed N times → promote to mechanical" shape as
 `wrapup-close-marker-integrity-guard` and `dead-string-pin-guard`, and it is now the
 highest-leverage one: the entry is cited as prior work by the plans that then reproduce it.
+
+**Supporting evidence (2026-07-27, PLAN-token-economy-step-pruning Phase 2).** Not a new
+proposal — the same mechanism, observed again with a twist that argues for it more sharply.
+Phase 2 DID produce the ADR-010 receipt this proposal wants (7 mutants, 7 killed, 0
+survivors, re-run after BOTH review rounds), and **four of the seven mutants turned out to
+be held by exactly one test each** — precisely the fragile binding a machine-readable
+`{test_node, code_deleted, suite_rc_after_delete}` row would make queryable instead of
+leaving it as a sentence in a PLAN table. It also shows the proposal's ceiling: the receipt
+was green while review round 2 still found 7 defects, because four of those lived in prose
+(SPEC notes, PLAN frontmatter, an ADR's own enumeration) that no mutation check reads. So
+the gate is worth building for what it covers, and must not be sold as covering more —
+see `[fail:design] unverified-number-in-spec-justification`.

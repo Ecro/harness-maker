@@ -440,7 +440,8 @@ ac:
     and all(v["turns"] > 0 for v in report["unattributed_breakdown"].values()) and
     sum(v["turns"] for v in report["unattributed_breakdown"].values()) == report["by_stage"]["(unattributed)"]["turns"]
     and abs(sum(v["usd"] for v in report["unattributed_breakdown"].values()) - report["by_stage"]["(unattributed)"]["total_usd"])
-    < 1e-9 and report["unattributed_breakdown"]["recoverable"]["turns"] > report["turns_by_attribution_source"]["adjacency"]
+    <= 1e-9 * abs(report["by_stage"]["(unattributed)"]["total_usd"]) and report["unattributed_breakdown"]["recoverable"]["turns"]
+    > report["turns_by_attribution_source"]["adjacency"]
   golden_table: []
   rubric_id: null
   note: 'Conservation is the load-bearing half — a breakdown whose parts do not sum
@@ -456,9 +457,21 @@ ac:
     `preceded_by_user`, so its turn count must strictly exceed the already-shipped
     `turns_by_attribution_source["adjacency"]` count. This is the same shape the second-pass
     validator caught in AC-002; the fix is the same paired-arm remedy. USD conservation
-    is compared with a 1e-9 tolerance, not `==` — the two sides are differently-ordered
-    float accumulations and exact equality is flaky by construction (validator-3 M4).'
-  pending_test: true
+    is compared with a tolerance, not `==` — the two sides are differently-ordered
+    float accumulations and exact equality is flaky by construction (validator-3 M4).
+    That tolerance is RELATIVE (`<= 1e-9 * abs(total)`), not the absolute `< 1e-9`
+    this AC first carried (Phase 2 review, consensus-passed P2: code-reviewer + codex).
+    An absolute 1e-9 is simultaneously vacuous on the unit fixture (~$0.0175, where
+    1e-9 is ~2.9e8 ulps of slack) and unsafe on the live window (~6,242 unattributed
+    turns totalling ~$8,960, where the worst-case accumulated divergence n*eps*sum
+    is ~1.2e-8 — above the bound). The relative form is NOT a uniform strengthening,
+    and calling it one would be the same over-claim this review round caught in the
+    report notes: it is strictly TIGHTER at fixture scale (1.75e-11) and at a zero
+    total (only exact 0 passes, where the absolute form allowed 1e-9 of slop), and
+    deliberately LOOSER above ~$1 — 8.96e-6 at the live window. That looseness is
+    the point: the absolute bound there sat below the divergence float64 can actually
+    produce, so it asserted something no correct implementation can guarantee.'
+  pending_test: false
   oracle_source: property
   oracle_evidence: 'Conservation invariant: a partition of the unattributed bucket
     must sum to that bucket regardless of how many categories exist or how each turn
@@ -472,8 +485,9 @@ ac:
   oracle_independence_waiver: null
   input_domain: any economics report window containing at least one unattributed turn
   transformation: decompose the unattributed bucket into its categories
-  expected_relation: sum(parts) == unattributed_total, for every window and every
-    category set
+  expected_relation: abs(sum(parts) - unattributed_total) <= 1e-9 * abs(unattributed_total),
+    for every window and every category set. NOT `==` — the two sides are differently-ordered
+    float accumulations, so exact equality is flaky by construction (validator-3 M4).
   preconditions:
   - the window contains at least one unattributed turn
   - the fixture contains at least one unattributed turn with NO adjacency-resolvable

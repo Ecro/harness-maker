@@ -1,7 +1,7 @@
 ---
 type: plan
 task_slug: token-economy-step-pruning
-status: phase-1-complete  # Phase 1 (meter correction) shipped + reviewed 2026-07-27. Phases 2-4 NOT started.
+status: phase-2-complete  # Phases 1-2 implemented + reviewed + wrapped up 2026-07-27 (Phase 1 landed de9f3f58; Phase 2 green + Grade A, AC-010 written back). Phases 3-5 NOT started.
 created: 2026-07-27
 tags: [harness-maker, plan, python, token-economy, prompt-caching, observability, render]
 spec: "[[SPEC-token-economy-step-pruning]]"
@@ -298,11 +298,15 @@ oracle and stays out of scope.
 **Rejected:** Dropping AC-008; index-only with no budget (kept as R3 fallback).
 **Source:** Interview #8; antigravity P0; validator warning on file scope.
 
-### ADR-009: Four independent commits, low risk to high risk
-**Status:** Accepted (2026-07-27).
+### ADR-009: Independent commits, low risk to high risk
+**Status:** Accepted (2026-07-27); **extended to five commits** by the Phase 2
+review, which added [Phase 5](#phase-5--wire-the-unattributed-breakdown-into-the-metrics-prose).
+The title said "Four" and the enumeration was exhaustive, so an executor reading
+this ADR as the commit contract had no slot for the new phase.
 **Decision:** Commit 1 meter correction (pricing + thresholds + TTL + entry
 bridge), commit 2 unattributed decomposition, commit 3 reviewer read budget +
-invariance guard, commit 4 fused compaction. Each independently revertable;
+invariance guard, commit 4 fused compaction, commit 5 metrics prose wiring. Each
+independently revertable;
 each phase's rollback is **its own commit**, so the instruction holds regardless
 of landing order.
 **Consequences:** ✅ The meter is correct before anything is measured against
@@ -938,6 +942,34 @@ from window answer to per-turn fallback. No public CLI signature changes.
   instruction.
 - **Rollback:** revert this phase's own commit.
 
+### Phase 5 — Wire the unattributed breakdown into the metrics prose
+
+**Added 2026-07-27 by the Phase 2 review** (manual-only P2, `code-reviewer` Pass 2).
+Not a Phase 2 defect and deliberately NOT fixed there — see the rationale below.
+
+- `depends_on`: `[2]`
+- `parallel_group`: `serial-render`
+- `merge_hazards`: `templates/commands/hm/metrics.md.j2` is re-rendered into
+  `.claude/commands/hm/metrics.md`, which **Phase 4 also regenerates**. Land after
+  Phase 4, or accept that Phase 4's regeneration must carry this edit — a template
+  edit whose shipped artifact lands in the other commit is the stale-artifact hazard
+  Phase 3's `merge_hazards` already reasons about.
+- **Scope (in):** `templates/commands/hm/metrics.md.j2` Step 5d — add
+  `unattributed_breakdown` (both buckets, turns + USD) to the prescriptive
+  "Also surface, in one line each" list, and print `unattributed_breakdown_notes`
+  verbatim; the re-rendered `.claude/commands/hm/metrics.md`; a render-grep test.
+- **Scope (out):** `economics.py` (the fields already ship), Step 5a/5b.
+- **Why this is real.** Step 5b dumps the full report JSON into the model's context,
+  so the fields are **not** dead — the reader can see them. But Step 5d's list is
+  *prescriptive*, not illustrative: the enumerated fields are what gets rendered.
+  `metrics.md.j2` appeared **zero** times in this PLAN before this phase was added,
+  so as written no phase would ever have wired it. That is the global-CLAUDE.md
+  2026-06-08 absent-case pattern — a feature that activates on a surface nobody owns.
+- **Exit criterion:** a render-grep test fails when Step 5d's list loses either key;
+  the rendered `.claude/commands/hm/metrics.md` contains both.
+- **Risk:** `low`
+- **Rollback:** revert this phase's own commit.
+
 ## 🧪 Testing Strategy
 
 - **Unit** — `test_cache_diagnostics.py` (AC-001/002/004, asserted through
@@ -972,13 +1004,18 @@ from window answer to per-turn fallback. No public CLI signature changes.
 
 ## ✅ Success Criteria
 
-> **Execution status (wrapup 2026-07-27).** Only **Phase 1** (meter correction)
-> was implemented, reviewed (3 rounds, APPROVED) and landed. **Phases 2, 3 and 4
-> are NOT started.** The boxes below are ticked strictly for what is green in the
-> suite today; the Phase 2-4 criteria are left `[ ]` deliberately — ticking them
-> at wrapup would be exactly the "green gate ≠ correct" claim this plan's own
-> review round found eleven times. Their machine-SPEC ACs (AC-005..AC-010) remain
-> `pending_test: true`.
+> **Execution status (Phase 2 review, 2026-07-27).** **Phase 1** (meter correction)
+> was implemented, reviewed (3 rounds, APPROVED) and landed. **Phase 2**
+> (unattributed decomposition) is implemented, Phase D green, and reviewed
+> (2 rounds, Grade A). **Phases 3, 4 and 5 are NOT started.** The boxes below are
+> ticked strictly for what is green in the suite today; the Phase 3-5 criteria are
+> left `[ ]` deliberately — ticking them would be exactly the "green gate ≠ correct"
+> claim this plan's own review rounds found eleven times in Phase 1 and seven more
+> times in Phase 2 (every one of those seven was a defect introduced by the *fixes*
+> for round 1's findings). Their machine-SPEC ACs (AC-005..AC-009) remain
+> `pending_test: true`; AC-010's write-back **was performed** at wrapup Step 3.5
+> (2026-07-27) — the machine SPEC now stands at 5 of 10 ACs forward-bound
+> (AC-001..AC-004 from Phase 1, AC-010 from Phase 2) and 5 pending.
 
 - [x] AC-001 — per-model minimums, non-monotonic, **through the production path**
       (driven by `diagnose_cache_from_turns`, plus the mixed-window discriminator)
@@ -1002,15 +1039,41 @@ from window answer to per-turn fallback. No public CLI signature changes.
 - [ ] AC-009 — verification structure identical to both review goldens; validator
       invocation points identical to the **plan-bearing** golden, which has `>= 1`
       *(Phase 3 — not started)*
-- [ ] AC-010 — decomposes on the ADR-013 predicate; conserves turns **and** USD
-      (1e-9 tolerance); `recoverable` strictly exceeds the adjacency count
-      *(Phase 2 — not started)*
+- [x] AC-010 — decomposes on the ADR-013 predicate; conserves turns **and** USD
+      (**relative** `<= 1e-9 * abs(total)` tolerance — the absolute `< 1e-9` this AC
+      shipped with was vacuous at fixture scale and below the achievable float
+      divergence at live scale); `recoverable` strictly exceeds the adjacency count
+      *(Phase 2 — implemented, Phase D green, reviewed 2 rounds at Grade A;
+      `pending_test` flipped `false` in the machine SPEC at wrapup Step 3.5,
+      bound to `test_unattributed_decomposes_and_sums`)*
 - [ ] ADR-010 mutation check recorded for every AC *(recorded for the Phase 1 ACs
-      only; Phases 2-4 ACs have no tests yet)*
+      and for AC-010 — see the receipt below; Phases 3-4 ACs have no tests yet)*
 - [x] ADR-012 boundary rules 1 and 3 green under their named Phase 1 tests
 - [x] ADR-015 — machine SPEC predicates match their ADRs before execute
 - [ ] ADR-017 — no `##` section is removed from any render *(vacuously true so
       far; the obligation binds in Phase 4, which is not started)*
+
+## 🧬 ADR-010 mutation receipt — Phase 2 / AC-010
+
+Not the tier-gated `spec_mutation` run: the machine SPEC is `verification_tier: 2`,
+so that gate is out of scope on this hot path. This is ADR-010's own obligation —
+delete the code, name the test that dies — applied to every arm Phase 2 added.
+Seven mutants, seven killed, zero survivors. Four of them are held by **exactly one**
+test each, so deleting that test silently reopens the defect:
+
+| # | Mutant | Killed by |
+|---|---|---|
+| M1 | `recoverable = est is not None` (AC-010's named break) | `test_unattributed_decomposes_and_sums`, `test_recoverable_counts_user_adjacent_turns_not_only_adjacency_resolvable`, `test_both_buckets_carry_real_usd_so_an_all_zeros_breakdown_fails` |
+| M2 | `recoverable = False` (the `recoverable = 0` implementation) | same three |
+| M3 | buckets present but accumulating nothing (the all-zeros report) | the same three **+** `test_a_capped_turn_is_never_recoverable_even_when_user_adjacent` |
+| M4 | the terminal-cap guard dropped from the `preceded_by_user` arm | `test_a_capped_turn_is_never_recoverable_even_when_user_adjacent` **only** |
+| M5 | buckets shipped without `unattributed_breakdown_notes` | `test_notes_state_the_meaning_of_recoverable_and_the_population_absences` **only** |
+| M6 | both keys seeded unconditionally (a partition of nothing) | `test_an_empty_unattributed_population_emits_no_buckets_and_no_notes` **only** |
+| M7 | `turns[idx - 1].preceded_by_user` (off-by-one membership; counts stay 2/1) | `test_recoverable_counts_user_adjacent_turns_not_only_adjacency_resolvable` **only** |
+
+M7 is the one the Phase A.5 reviewer added: the first draft of that test asserted
+`recoverable.usd > unrecoverable.usd / 2`, which the off-by-one passes (0.0125 > 0.0025)
+while every count assertion in the file also passes. Exact per-bucket USD is what closes it.
 
 ## 🔍 Plan Validation
 

@@ -6,8 +6,9 @@
 
 `/hm:metrics` and `/hm:health` Layer 3 are the instrument the next optimization gets
 chosen on, and it was wrong in four independent, compounding ways. This is **Phase 1 of
-`PLAN-token-economy-step-pruning`** (meter correction); Phases 2-4 — unattributed
-decomposition, the reviewer read budget, and fused-command compaction — are not started.
+`PLAN-token-economy-step-pruning`** (meter correction). Phase 2 (unattributed
+decomposition) follows below; Phases 3-5 — the reviewer read budget, fused-command
+compaction, and wiring the breakdown into the `/hm:metrics` prose — are not started.
 
 **Pricing.** `resolve_model_family` matches `PRICE_TABLE` keys as substrings, so the bare
 `"opus"` row captured `claude-opus-5` and priced it at the pre-4.5 $15/$75 against a
@@ -48,6 +49,45 @@ visible, asserted through the serialized report the CLI emits rather than the in
 
 Three review rounds; 22 findings, 11 of them introduced by the previous round's own fixes,
 each of which had been green on lint, format, mypy and the full suite beforehand.
+
+### Added — `(unattributed)` spend is decomposed instead of opaque
+
+**Phase 2 of `PLAN-token-economy-step-pruning`.** `/hm:metrics` reported a single
+`(unattributed)` row in `by_stage` with no way to distinguish "this window could have
+attributed these turns and did not" from "nothing available in this window could have
+attributed them". The distinction is the whole actionability of the number: only the first
+kind is worth chasing.
+
+`EconomicsReport` gains `unattributed_breakdown: dict[str, UnattributedBucket]` and
+`unattributed_breakdown_notes`. The bucket splits on ADR-013's **observable** predicate —
+`idx not in capped_set and (est is not None or turn.preceded_by_user)` — into `recoverable`
+and `unrecoverable_in_window`, each carrying its own turn count and USD. *Observable* is
+load-bearing: the predicate reads only what the report already holds, so it cannot depend
+on a classification cache a later run may not reproduce. `recoverable` is deliberately
+wider than the adjacency-resolvable set, and the AC asserts that strict inequality — a
+breakdown that merely re-labelled the adjacency count would pass every conservation check
+while explaining nothing.
+
+Conservation is asserted rather than assumed: the parts sum to `by_stage["(unattributed)"]`
+in **both** turns and dollars (AC-010). The USD tolerance is **relative** —
+`<= 1e-9 * abs(total)` — because the absolute `1e-9` the AC shipped with is vacuous at
+fixture scale and sits below the divergence float64 can actually produce at the live
+window's magnitude, the two sides being differently-ordered accumulations over the same
+values. The trade, stated plainly rather than sold as a strengthening: relative is
+*tighter* at fixture scale (1.75e-11) and at a zero total, and roughly 8,960x *looser* at
+the live window — which is the point, since that is exactly where the absolute bound was
+unachievable.
+
+Seven mutants, seven killed, zero survivors — four of them held by exactly one test each,
+so deleting that test silently reopens the defect. Two review rounds at Grade A; round 2
+raised 7 findings and **all 7 were defects introduced by round 1's own fixes**, against
+green lint/format/mypy/pytest and a green mutation check throughout.
+
+Not yet surfaced in `/hm:metrics` Step 5d's prose. The fields do reach the reader — Step 5b
+dumps the full report JSON — but Step 5d's prescriptive "surface in one line each" list
+does not name them. Wiring it here would force a re-render of
+`.claude/commands/hm/metrics.md` that Phase 4 regenerates, so it is deferred to a new
+Phase 5 rather than left as an unowned gap.
 
 ## [0.43.3] — 2026-07-27
 
