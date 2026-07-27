@@ -1,15 +1,40 @@
 """Check-suite verification cache — skip lint/mypy/test when input is unchanged.
 
-Implements ADR-007: skip-key = sha256(project_root + HEAD sha + diff hash +
-uv.lock hash + pyproject.toml hash + tool versions + env hash). Uses inverted
-env policy: hash ALL env vars except a known-safe ignore set — over-invalidate
-rather than risk a false PASS.
+Implements ADR-007, except for the env component, whose inverted policy this file
+supersedes (2026-07-27 — see below). skip-key = sha256(project_root + HEAD sha + diff hash +
+uv.lock hash + pyproject.toml hash + tool versions + env hash).
 
-Env VALUES are scrubbed of per-invocation launcher paths before hashing (see
-`_VOLATILE_VALUE_RE`). Without that the key changed on every call and no marker
-could ever be fresh, so the cache was permanently cold while looking healthy.
-Any change here must keep the key stable across two invocations of the same
-command — `test_key_is_stable_across_ephemeral_launcher_envs` is that fence.
+**Env policy is an ALLOWLIST** (`_ENV_ALLOW` / `_ENV_ALLOW_PATTERNS`): only variables
+that can change what the checks CONCLUDE are hashed. This reverses the original
+inverted policy, whose stated goal — "over-invalidate rather than risk a false PASS" —
+turned out to be unachievable in this shape and to cost everything while buying
+nothing:
+
+  * Hashing the whole ambient environment made the key a property of the CONTEXT it
+    was computed in, not of the code. A subagent's Bash exports a different set than
+    the main loop's (measured 2026-07-27: 43 vars vs 42, differing in exactly one —
+    `CLAUDE_EFFORT`), so a marker written by `/hm:verify` could not be read by
+    `/hm:wrapup` and both re-ran the full suite forever.
+  * It also made the cache depend on `DISCORD_BOT_TOKEN`, `JENKINS_TOKEN`,
+    `PIPELINE_SLACK_WEBHOOK_URL`, `ZEPHYR_BASE`, `NVM_DIR` … — rotating a Slack
+    webhook invalidated the Python test cache.
+  * A permanently-cold cache is indistinguishable from a correctly-invalidated one,
+    which is why this survived two rounds. This is instance 2 of
+    `[fail:design] verification-cache-key-nondeterministic`; the allowlist is the
+    remedy that entry named a round earlier and that instance 1 declined to take.
+
+**Accepted cost of the flip:** a build-affecting variable nobody enumerated is not
+hashed, so a stale PASS is now possible where it previously was not. That risk is
+bounded by an enumerable set and is checked one-case-per-member by
+`test_every_build_affecting_var_still_invalidates`, which catches allowlist SHRINKAGE
+but cannot catch OMISSION. Adding a new env-driven toggle to this project means adding
+it to `_ENV_ALLOW`.
+
+Env VALUES are still scrubbed of per-invocation launcher paths (see
+`_VOLATILE_VALUE_RE`): `PATH` and `VIRTUAL_ENV` are allowlisted and both carry uv's
+throwaway build directory. Any change here must keep the key stable across two
+invocations of the same command — `test_key_is_stable_across_ephemeral_launcher_envs`
+and `test_the_key_is_identical_across_two_subprocess_invocations` are those fences.
 """
 
 from __future__ import annotations
@@ -29,36 +54,87 @@ from typing import Any
 
 from harness_maker import command_registry
 
-_ENV_IGNORE: frozenset[str] = frozenset(
+# ALLOWLIST (was a blocklist until 2026-07-27). Only variables that can change what
+# `pytest` / `ruff` / `mypy` CONCLUDE are hashed. Everything else — agent identity,
+# credentials, unrelated toolchains, desktop session plumbing — is excluded.
+_ENV_ALLOW: frozenset[str] = frozenset(
     {
-        "PWD",
-        "OLDPWD",
-        "_",
-        "SHLVL",
-        "TERM",
-        "TERM_PROGRAM",
-        "DISPLAY",
-        "WAYLAND_DISPLAY",
-        "EDITOR",
-        "VISUAL",
-        "PAGER",
-        "COLORFGBG",
-        "COLORTERM",
+        # interpreter + package resolution (the PYTHON* family is pattern-matched below)
+        "PATH",
+        "VIRTUAL_ENV",
+        "HOME",  # tool caches and config live under it
+        "TMPDIR",
+        # determinism / output shape
+        "TZ",
+        "LANG",
+        "SOURCE_DATE_EPOCH",
+        # test gating THIS repo actually reads. Enumerated from a grep of every
+        # `getenv`/`environ.get` in `tests/` and `src/` — each one below decides whether
+        # a test runs, or changes what it compares against:
+        #   HM_RUN_PARALLEL_SESSION  module-level skipif in the two
+        #                            tests/integration/test_*_parallel_session.py modules
+        #   INSTALL_CMD_TEST         module-level skipif in
+        #                            tests/integration/test_readme_install_commands.py
+        #   HM_MAIN_CHECKOUT_PATH    tests/unit/conftest.py pins `_HARNESS_MAKER_PKG_ROOT`
+        #                            with it, so it moves every snapshot comparison
+        #   HARNESS_MAKER_FREEZE     cli.py pins the render clock with it, same effect
+        # NOT a bare `HM_*` pattern: `HM_SESSION_ID` is per-Claude-session and would
+        # re-introduce exactly the churn this policy exists to remove.
+        # (`HYPOTHESIS_PROFILE` is deliberately NOT listed: the `HYPOTHESIS_*`
+        #  pattern already covers it, and a doubly-covered member cannot be
+        #  deletion-gated by the fence — one removal alone is a no-op.)
+        "CI",
+        "INTEGRATION",
+        "HM_RUN_PARALLEL_SESSION",
+        "HM_MAIN_CHECKOUT_PATH",
+        "INSTALL_CMD_TEST",
+        "HARNESS_MAKER_FREEZE",
     }
 )
 
-_ENV_IGNORE_PATTERNS: tuple[str, ...] = (
-    "SSH_*",
-    "WSL_*",
-    "WT_*",
-    "CLAUDE_CODE_*",
+_ENV_ALLOW_PATTERNS: tuple[str, ...] = (
+    "LC_*",
+    "PYTHON*",
+    "UV_*",
+    "RUFF_*",
+    "MYPY*",
+    "PYTEST_*",
+    "HYPOTHESIS_*",
+)
+
+# Carve-outs from the patterns above: matched by an allow pattern, but per-invocation
+# bookkeeping rather than configuration. Admitting any of these re-introduces the
+# permanently-cold cache this policy exists to fix.
+#   UV_RUN_RECURSION_DEPTH  increments on every nested `uv run`, and every rendered
+#                           harness command is invoked that way
+#   PYTEST_CURRENT_TEST     pytest rewrites it per test function
+#   PYTEST_XDIST_WORKER     differs per parallel worker
+_ENV_ALLOW_EXCEPTIONS: frozenset[str] = frozenset(
+    {
+        "UV_RUN_RECURSION_DEPTH",
+        "PYTEST_CURRENT_TEST",
+        "PYTEST_XDIST_WORKER",
+    }
 )
 
 
-def _should_ignore_env(key: str) -> bool:
-    if key in _ENV_IGNORE:
+def _is_hashed_env(key: str) -> bool:
+    """True when this variable can change a verification verdict (allowlist policy).
+
+    Inverted from the original blocklist on 2026-07-27. The blocklist hashed the whole
+    ambient environment, which made the key depend on the CONTEXT it was computed in
+    rather than on the code: a subagent's Bash exports a different set than the main
+    loop's (measured: 43 vars vs 42, differing only in `CLAUDE_EFFORT`), so a marker
+    written by `/hm:verify` was invisible to `/hm:wrapup` and both re-ran the full
+    suite forever. It also meant rotating a Slack webhook invalidated the Python test
+    cache. Second instance of `[fail:design] verification-cache-key-nondeterministic`;
+    the allowlist is the remedy that entry named.
+    """
+    if key in _ENV_ALLOW_EXCEPTIONS:
+        return False
+    if key in _ENV_ALLOW:
         return True
-    return any(fnmatch.fnmatch(key, pat) for pat in _ENV_IGNORE_PATTERNS)
+    return any(fnmatch.fnmatch(key, pat) for pat in _ENV_ALLOW_PATTERNS)
 
 
 # Path prefixes a launcher recreates on EVERY invocation. `uv run --with <pkg>` builds a
@@ -70,9 +146,12 @@ def _should_ignore_env(key: str) -> bool:
 # `[fail:design] verification-cache-key-nondeterministic`).
 #
 # Scrubbed at the VALUE level rather than by ignoring the variable, for two reasons: a
-# genuine PATH / VIRTUAL_ENV change still invalidates (the inverted-policy safety
-# property is preserved — over-invalidate rather than risk a false PASS), and a future
-# launcher's throwaway directory is covered without having to name its variable.
+# genuine PATH / VIRTUAL_ENV change still invalidates — both are allowlisted, so
+# dropping the variable instead of scrubbing its value would stop detecting a real
+# toolchain move — and a future launcher's throwaway directory is covered without
+# having to name its variable.
+# (This used to read "the inverted-policy safety property is preserved". That policy
+# was retired on 2026-07-27; the property that survives is the one stated above.)
 #
 # `archive-v*` is deliberately NOT scrubbed: that path encodes the identity of the
 # installed package, which is real signal.
@@ -88,15 +167,13 @@ def _scrub_volatile(value: str) -> str:
 
 
 def _env_hash() -> str:
-    """Hash all env vars except the known-safe ignore set (inverted policy).
+    """Hash only the allowlisted, build-affecting env vars — see `_is_hashed_env`.
 
-    Values are scrubbed of per-invocation launcher paths first — see
-    `_VOLATILE_VALUE_RE`. Without that, the key is not stable across two invocations
-    of the same command and no marker can ever match.
+    Values are still scrubbed of per-invocation launcher paths — `PATH` and
+    `VIRTUAL_ENV` are allowlisted and both carry uv's throwaway build directory, so
+    dropping the scrubber would restore the churn on its own.
     """
-    items = sorted(
-        (k, _scrub_volatile(v)) for k, v in os.environ.items() if not _should_ignore_env(k)
-    )
+    items = sorted((k, _scrub_volatile(v)) for k, v in os.environ.items() if _is_hashed_env(k))
     return hashlib.sha256(json.dumps(items).encode()).hexdigest()
 
 
@@ -139,7 +216,8 @@ def compute_skip_key(project_root: Path) -> str:
     """Compute the skip-key for a project's check suite.
 
     ADR-007: project_root_hash + HEAD sha + diff hash + uv.lock hash +
-    pyproject.toml hash + tool versions + env hash (inverted allowlist).
+    pyproject.toml hash + tool versions + env hash (ALLOWLIST — see the module
+    docstring; this supersedes ADR-007's inverted env sub-decision, 2026-07-27).
     """
     parts: list[str] = []
 

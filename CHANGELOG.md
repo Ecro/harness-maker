@@ -596,15 +596,54 @@ permanently-cold cache is indistinguishable from correct invalidation.
 
 Env **values** are now scrubbed of per-invocation launcher paths before hashing.
 Deliberately value-level, not variable-level: ignoring `PATH` outright would also
-have stopped the churn and would have been wrong, because a verification cache must
-over-invalidate rather than risk a false PASS. So a real `PATH` change still
-invalidates, an unknown new variable still invalidates (`INTEGRATION=1` genuinely
-changes which tests run, and no allowlist could be trusted to name it), and
-`archive-v*` is left intact because it encodes installed-package identity — only the
-`builds-v*` / `environments-v*` throwaway dirs and the system temp dir are scrubbed.
+have stopped the churn and would have been wrong, because a real `PATH` change must
+still invalidate. `archive-v*` is left intact because it encodes installed-package
+identity — only the `builds-v*` / `environments-v*` throwaway dirs and the system
+temp dir are scrubbed.
 
 Four regression tests pin those properties, including the stability fence the class
 needed: without the scrub the stability test sees three distinct keys, with it one.
+
+> This entry originally also claimed "an unknown new variable still invalidates …
+> no allowlist could be trusted to name it". That was the inverted env policy, and
+> the entry below retires it — the two were never released apart, but the sentence
+> is corrected here rather than left to contradict shipped behaviour.
+
+### Fixed — the verification cache was still cold, for a second reason
+
+The scrub above fixed the churn *within* one context. It did not fix the churn
+*across* contexts, and the cache still never returned a hit.
+
+The env component hashed **every** ambient variable except a small ignore set, so the
+key was a property of the process that computed it rather than of the code. Measured:
+the main loop's Bash hashed 43 variables and a subagent's hashed 42, differing in
+exactly one — `CLAUDE_EFFORT`. `/hm:verify` writes its marker from one context and
+`/hm:wrapup` reads from another, so the marker was structurally unreadable and both
+stages ran the full suite anyway. The same policy also made the cache depend on
+`DISCORD_BOT_TOKEN`, `JENKINS_TOKEN`, `PIPELINE_SLACK_WEBHOOK_URL`, `ZEPHYR_BASE` and
+`NVM_DIR`: rotating a Slack webhook invalidated the Python test cache.
+
+The env policy is now an **allowlist** — only variables that can change what
+`pytest` / `ruff` / `mypy` conclude are hashed (`PATH`, `VIRTUAL_ENV`, the `PYTHON*`
+family, `HOME`, `TZ`, `LANG`/`LC_*`, `SOURCE_DATE_EPOCH`, the `UV_*` / `RUFF_*` /
+`MYPY*` / `PYTEST_*` / `HYPOTHESIS_*` tool families, and this repo's own test gates
+`CI`, `INTEGRATION`, `HYPOTHESIS_PROFILE`, `HM_RUN_PARALLEL_SESSION`,
+`HM_MAIN_CHECKOUT_PATH`, `INSTALL_CMD_TEST`, `HARNESS_MAKER_FREEZE`). Three members of
+the allowed patterns are carved back out as per-invocation bookkeeping:
+`UV_RUN_RECURSION_DEPTH`, `PYTEST_CURRENT_TEST`, `PYTEST_XDIST_WORKER`.
+
+**This is a real trade-off, stated plainly:** the old policy could not produce a stale
+PASS from an unknown variable; the new one can, if a build-affecting variable is never
+enumerated. The old guarantee was worth nothing in practice — the cache never returned
+a single hit — but if you drive this project's checks from an env var of your own, add
+it to `_ENV_ALLOW`. A `HM_*` wildcard was considered and rejected: `HM_SESSION_ID` is
+per-session and would have re-introduced the exact churn being removed.
+
+The fence is one deletion-detecting case per allowlist member, asserted against
+`_env_hash()` rather than the composite key — an earlier draft asserted the composite
+and gated nothing, because `_tool_versions()` shells out with the patched environment
+inherited, so a sentinel moved the key through tool resolution instead. Verified by
+deleting each member in turn.
 
 ### Security — the blanket `Bash(uv:*)` allow rule is retired (new installs only)
 
