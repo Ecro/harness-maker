@@ -793,6 +793,38 @@ silently raising the constant to 120,045 in the same commit that discovered it w
 applying 119,000 to the fixture render, where it is vacuous.
 **Source:** Phase 4 measurement against `.claude/harness.yaml` at 8addbee0.
 
+### ADR-021: a render-grep assertion must be scoped to the thing it is about
+**Status:** Accepted (2026-07-27, Phase 5 execution — from the mutation receipt).
+**Context:** Phase 5's first receipt run killed 4 of 7 mutants. The three that survived
+were not all mutant defects; two were assertions that could not fail:
+
+| # | assertion | why it could not fail |
+|---|---|---|
+| M1 | `"unattributed_breakdown" in step_5d` | `unattributed_breakdown` is a **prefix of** `unattributed_breakdown_notes`. Delete the whole bullet and the notes reference alone still satisfies it. |
+| M7 | `"turns" in step_5d and re.search(r"\|usd\|\$", step_5d)` | the Step 5d slice already contains `capped_turns` and a `$` from *neighbouring bullets*. **This assertion passed before the template was edited at all** — it was written, observed green, and its greenness meant nothing. |
+
+Both are the same error: the assertion ranged over a **larger region than the thing it
+was about**, so unrelated neighbouring text satisfied it. The third survivor (M5) was a
+genuine mutant defect of the shape Phase 4's M6 already had — it replaced only the
+bullet's first line, leaving every other token inside the slice, so it measured the
+mutation script rather than the gate.
+**Decision:**
+- A render-grep assertion names the **narrowest region** that must contain the token: the
+  bullet, not the section; the section, not the file. Extract that region with its own
+  regex and give it its own non-vacuity control.
+- When one identifier is a **prefix of another** in the same document, match the
+  delimited form (here, the backticked `` `unattributed_breakdown` ``), never the bare
+  substring.
+- Every region-extractor gets a positive control asserting it is neither empty nor
+  runaway. `test_the_bullet_is_not_vacuous` additionally asserts the bullet regex
+  swallowed no sibling.
+**Consequences:**
+- ✅ Second receipt: 7 / 7 killed, 0 survivors.
+- ⚠️ **An assertion that is green before the change it is supposed to gate is not
+  evidence of anything**, and nothing but a mutation check will say so. That is now
+  twice in three phases (Phase 2's tautological notes assertion, this one).
+**Source:** Phase 5 mutation receipt, runs 1 and 2.
+
 ### ADR-020: two blocks ADR-016 never classified
 **Status:** Accepted (2026-07-27, Phase 4 execution).
 **Context:** [ADR-016](#adr-016)'s own consequence note says classifying "the blocks I am
@@ -1080,6 +1112,18 @@ Not a Phase 2 defect and deliberately NOT fixed there — see the rationale belo
   the rendered `.claude/commands/hm/metrics.md` contains both.
 - **Risk:** `low`
 - **Rollback:** revert this phase's own commit.
+- **Landed with an AC.** The phase as planned had a gate and no acceptance criterion,
+  which is the same shape as the defect it fixes — a surface nobody owns. **AC-011** was
+  added to both SPEC files and bound to
+  `test_render_metrics_unattributed.py::test_step_5d_names_both_unattributed_buckets`.
+- **Two of the six assertions were vacuous as first written**, and only the mutation
+  receipt said so ([ADR-021](#adr-021)). Both are scoping errors of the same family:
+  an assertion ranged over more text than the thing it was about.
+- **Phase 4 did not have to carry this edit after all.** The stated hazard was that
+  Phase 4 regenerates `commands/hm/metrics.md`, so a template edit landing later would
+  ship a stale artifact. It does not apply: `.claude/commands/` is untracked, nothing
+  about `metrics.md` is committed, and Phase 4's hoist does not touch this template —
+  `metrics.md` is not a fused command and has neither a preflight nor a Gate-0 block.
 
 ## 🧪 Testing Strategy
 

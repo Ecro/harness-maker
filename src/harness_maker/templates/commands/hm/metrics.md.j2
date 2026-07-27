@@ -196,6 +196,15 @@ a measurement and a story. Also surface, in one line each:
 
 - `capped_turns` / `capped_usd` — spend inside a span that ran past the configured
   cap. Real spend, deliberately not attributed. Not a bug; state the number.
+- `unattributed_breakdown` — the `(unattributed)` bucket split in two, each with its
+  own `turns` and `usd`. Give one line per key: `recoverable` (adjacency-resolvable
+  within the window, or carrying `preceded_by_user`) and `unrecoverable_in_window`.
+  **This partitions the bucket; it does not attribute it.** Report it beside the
+  bucket's true total, never folded into a stage's row — the two buckets sum to the
+  bucket, and that conservation is the only thing the split guarantees. Then print
+  every string in `unattributed_breakdown_notes` **verbatim**, without paraphrase:
+  they are the caveats on what the two names do and do not claim, and they are
+  authored in one place so that re-wording them here cannot drift.
 - `classification_cache_misses` / `classification_unknown` — boundaries with no
   judgment yet, and boundaries judged undecidable. Both leave spend in
   `(unattributed)`; a rising first number just means 5a has work left.

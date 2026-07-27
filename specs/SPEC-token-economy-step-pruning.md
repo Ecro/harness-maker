@@ -199,6 +199,28 @@ documented cause) and an **unrecoverable-in-window** part
 > the report rather than buckets in it. The buckets above are built on fields
 > that exist on `TurnRecord`.
 
+### AC-011: the metrics command renders the breakdown, not just computes it
+
+**Given** a Production render of `commands/hm/metrics.md`
+**When** Step 5d's prescriptive "Also surface, in one line each" list is read
+**Then** it names `unattributed_breakdown` and both bucket keys, asks for `turns`
+and `usd` per bucket, and instructs the reader to print
+`unattributed_breakdown_notes` **verbatim**
+**And** it does not restate the note prose inline, because those notes have exactly
+one author (`economics._UNATTRIBUTED_BREAKDOWN_NOTES`) and a paraphrase would go
+stale the first time that tuple is edited with nothing downstream to notice
+**And** it does not instruct the reader to fold the breakdown into the per-stage
+table — the split partitions `(unattributed)`, it does not attribute it (ADR-013)
+
+> **Why this is a separate criterion from AC-010.** AC-010 proves the buckets are
+> computed and conserve. It says nothing about whether anyone ever sees them.
+> Step 5b already dumps the whole report JSON into the model's context, so the
+> fields were never *dead* — but Step 5d's list is **prescriptive, not
+> illustrative**: what it enumerates is what reaches the user's output.
+> `metrics.md.j2` appeared **zero** times in the PLAN before Phase 5 was added,
+> so as written no phase would ever have wired it — the global-CLAUDE.md
+> 2026-06-08 absent-case pattern, a feature activating on a surface nobody owns.
+
 ## 🚫 Non-Goals
 
 - **Weakening any verification apparatus.** Pass 1 / Pass 1.5 / Pass 2, the

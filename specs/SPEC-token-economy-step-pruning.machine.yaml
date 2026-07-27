@@ -223,22 +223,22 @@ ac:
     <= 119000
   golden_table: []
   rubric_id: null
-  note: 'PHASE 4 MEASUREMENT CORRECTION (PLAN ADR-019): 121782 was measured BEFORE Phase 3,
-    which added ~1615 chars to this same command; the true pre-change count is 123397 and
-    the file on disk at .claude/commands/ is a stale pre-Phase-3 render. The gate therefore
-    measures TWO renders: a config-independent fixture render carries the per-file 1.02
-    ratchet and 0.80 floor, and a render from this repo''s own .claude/harness.yaml carries
-    the 119000 ceiling — that is the config ADR-014 measured, and applying 119000 to the
-    ~16%-smaller fixture render would have asserted nothing. Achieved 118960, a 40-char
-    margin; ADR-019 records ~120045 as the honest re-derivation and deliberately does not
-    apply it in the phase that found the problem. 121782 is the measured pre-change CHARACTER count of the rendered exec-rev-wrap-ver
-    command; the ceiling is 119000 per PLAN ADR-014 and a floor of 0.80x rejects a
-    gutted render. The scenario also requires a negative test proving an inflated
-    template fails. CEILING RAISED from 110000 (validator-3 C1/C2, ADR-017): the 8,738-char
-    "documentation-only" trim that made 110000 reachable was withdrawn after it was
-    shown to delete runtime-behavioural instructions from the fused render. Only the
-    hoist remains, so the honest projection is 116,076 and a ceiling below it would
-    be a target the plan cannot meet.'
+  note: 'PHASE 4 MEASUREMENT CORRECTION (PLAN ADR-019): 121782 was measured BEFORE
+    Phase 3, which added ~1615 chars to this same command; the true pre-change count
+    is 123397 and the file on disk at .claude/commands/ is a stale pre-Phase-3 render.
+    The gate therefore measures TWO renders: a config-independent fixture render carries
+    the per-file 1.02 ratchet and 0.80 floor, and a render from this repo''s own .claude/harness.yaml
+    carries the 119000 ceiling — that is the config ADR-014 measured, and applying
+    119000 to the ~16%-smaller fixture render would have asserted nothing. Achieved
+    118960, a 40-char margin; ADR-019 records ~120045 as the honest re-derivation
+    and deliberately does not apply it in the phase that found the problem. 121782
+    is the measured pre-change CHARACTER count of the rendered exec-rev-wrap-ver command;
+    the ceiling is 119000 per PLAN ADR-014 and a floor of 0.80x rejects a gutted render.
+    The scenario also requires a negative test proving an inflated template fails.
+    CEILING RAISED from 110000 (validator-3 C1/C2, ADR-017): the 8,738-char "documentation-only"
+    trim that made 110000 reachable was withdrawn after it was shown to delete runtime-behavioural
+    instructions from the fused render. Only the hoist remains, so the honest projection
+    is 116,076 and a ceiling below it would be a target the plan cannot meet.'
   pending_test: false
   oracle_source: golden
   oracle_evidence: The 121,782 baseline and the 119,000 ceiling are measurements taken
@@ -267,30 +267,29 @@ ac:
   - tests/structural/test_command_size_budget.py::test_shared_blocks_appear_once
   executable_predicate: shared_prose_fingerprints(fused_text_flag_on, "worktree_preflight")
     == 1 and shared_prose_fingerprints(fused_text_flag_on, "gate0_receipt") == 1 and
-    shared_prose_fingerprints(fused_text_flag_on, "stage_end_banner") == 1 and
-    stage_arg_values(fused_text_flag_on, "iter_receipts write") == {"execute", "review",
-    "wrapup", "verify"} and stage_arg_values(fused_text_flag_on, "task-preflight")
-    == {"hm:execute", "hm:review", "hm:wrapup", "hm:verify"} and shared_prose_fingerprints(fused_text_flag_off,
-    "worktree_preflight") == 0 and stage_arg_values(fused_text_flag_off, "iter_receipts
-    write") == {"execute", "review", "wrapup", "verify"}
+    shared_prose_fingerprints(fused_text_flag_on, "stage_end_banner") == 1 and stage_arg_values(fused_text_flag_on,
+    "iter_receipts write") == {"execute", "review", "wrapup", "verify"} and stage_arg_values(fused_text_flag_on,
+    "task-preflight") == {"hm:execute", "hm:review", "hm:wrapup", "hm:verify"} and
+    shared_prose_fingerprints(fused_text_flag_off, "worktree_preflight") == 0 and
+    stage_arg_values(fused_text_flag_off, "iter_receipts write") == {"execute", "review",
+    "wrapup", "verify"}
   golden_table: []
   rubric_id: null
   note: 'Per PLAN ADR-016 the three blocks are NOT duplicates: preflight 1,243 identical
     chars of 1,403; gate0_receipt 659 shared of a per-stage-varying 1,300-1,700; Communication
-    Protocol 28 of ~350 (measured; ADR-016 said 40) and therefore removed from this criterion.
-    A THIRD block joined the set during Phase 4 (PLAN ADR-020): the stage-summary skip rule,
-    4 copies of 286 identical chars. Its fingerprint is the clause the preamble and the
-    atomic block share verbatim, because the two word the rule differently. Without that arm
-    the mutation receipt showed the rule could be deleted from the preamble entirely with
-    every assertion green. One receipt per
-    stage IS the Gate 0 missing-stage mechanism, so the stage-arg arms assert the
-    four values are PRESENT. FLAG PRECONDITION (validator-3 C5): the preflight arm
-    is asserted only against a `feature_branch_workflow: true` render. The partial
-    is wrapped in the including stage''s flag gate, so a flag-off render contains
-    no preflight block at all and the arm would be false for a reason unrelated to
-    hoisting. ADR-006 additionally requires the hoist to carry that gate into `fuse()`;
-    the flag-off render is covered by the separate arm below, which asserts the block
-    is ABSENT.'
+    Protocol 28 of ~350 (measured; ADR-016 said 40) and therefore removed from this
+    criterion. A THIRD block joined the set during Phase 4 (PLAN ADR-020): the stage-summary
+    skip rule, 4 copies of 286 identical chars. Its fingerprint is the clause the
+    preamble and the atomic block share verbatim, because the two word the rule differently.
+    Without that arm the mutation receipt showed the rule could be deleted from the
+    preamble entirely with every assertion green. One receipt per stage IS the Gate
+    0 missing-stage mechanism, so the stage-arg arms assert the four values are PRESENT.
+    FLAG PRECONDITION (validator-3 C5): the preflight arm is asserted only against
+    a `feature_branch_workflow: true` render. The partial is wrapped in the including
+    stage''s flag gate, so a flag-off render contains no preflight block at all and
+    the arm would be false for a reason unrelated to hoisting. ADR-006 additionally
+    requires the hoist to carry that gate into `fuse()`; the flag-off render is covered
+    by the separate arm below, which asserts the block is ABSENT.'
   pending_test: false
   oracle_source: golden
   oracle_evidence: The pre-change occurrence counts (4, 4, 4) were measured with grep
@@ -508,6 +507,56 @@ ac:
     neighbour but preceded_by_user true, without which the positive arm cannot bite
   observable_output: the unattributed_breakdown mapping, the by_stage unattributed
     turn count, and turns_by_attribution_source["adjacency"]
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-011
+  title: the metrics command renders the breakdown, not just computes it
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_metrics_unattributed.py::test_step_5d_names_both_unattributed_buckets
+  executable_predicate: field_ref("unattributed_breakdown") in step_5d(metrics_render)
+    and all("`" + key + "`" in step_5d(metrics_render) for key in ("recoverable",
+    "unrecoverable_in_window")) and "`turns`" in breakdown_bullet(metrics_render)
+    and "`usd`" in breakdown_bullet(metrics_render) and "unattributed_breakdown_notes"
+    in step_5d(metrics_render) and all(note_opening not in step_5d(metrics_render)
+    for note_opening in note_openings(_UNATTRIBUTED_BREAKDOWN_NOTES))
+  golden_table: []
+  rubric_id: null
+  note: 'AC-010 proved the two buckets are computed and conserve; this one proves
+    the rendered command ASKS for them. Step 5b already dumps the whole report JSON
+    into the model''s context, so the fields were never dead — but Step 5d''s list
+    is prescriptive, not illustrative: what it enumerates is what reaches the user.
+    metrics.md.j2 appeared zero times in the PLAN before Phase 5 was added, so no
+    phase would ever have wired it (the global-CLAUDE.md 2026-06-08 absent-case pattern).
+    Two scoping rules are load-bearing and both come from the mutation receipt: (a)
+    `field_ref` matches the BACKTICKED field, because `unattributed_breakdown` is
+    a prefix of `unattributed_breakdown_notes` and a bare substring test is satisfied
+    by the notes field alone (M1); (b) the turns/usd arm is scoped to the BULLET,
+    not the Step 5d slice — the slice already contains `capped_turns` and a `$` from
+    neighbouring bullets, so the slice-wide form passed before anything was wired
+    (M7). The final arm is a drift guard: the notes have exactly one author, economics._UNATTRIBUTED_BREAKDOWN_NOTES,
+    and a template that paraphrased them would go stale the first time that tuple
+    is edited with nothing to notice.'
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: The reference is `economics._UNATTRIBUTED_BREAKDOWN_NOTES` and
+    the two literal bucket keys written by `diagnose_cache_from_turns`, both of which
+    exist in the production module independently of the template under test. The assertion
+    compares the rendered command against those, not against itself.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions:
+  - a Production render of commands/hm/metrics.md exists
+  - the Step 5d heading is present, without which the slice regex is stale and the
+    positive control fails rather than the assertions passing vacuously
+  observable_output: the rendered text of Step 5d and of the unattributed_breakdown
+    bullet
   generator_hint: null
   judgment_verdict: null
   judged_at: null
