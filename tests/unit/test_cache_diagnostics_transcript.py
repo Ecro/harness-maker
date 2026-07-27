@@ -128,22 +128,29 @@ def test_a_long_gap_is_classified_as_a_ttl_miss() -> None:
 # ---------------------------------------------------------------- threshold semantics
 
 
-def test_the_threshold_comes_from_the_window_model_not_the_turns_model() -> None:
-    """Straddles the two thresholds so the implementation must declare its semantics.
+def test_the_threshold_comes_from_the_turns_model_not_the_window_model() -> None:
+    """INVERTED by PLAN ADR-012 — this used to assert the window-level semantics.
 
-    2_000 input tokens is ABOVE opus's 1024 threshold and BELOW haiku's 4096. With the
-    window-level `model="opus"` the turn is NOT a sub-threshold miss; an implementation
-    that derived the threshold per-turn from `turn.model` would score it as one.
+    The retired version pinned the opposite outcome and said so explicitly: "an
+    implementation that derived the threshold per-turn from `turn.model` would score
+    it as one". That semantics is the defect, not the contract. The published minimum
+    is non-monotonic within a family (Opus 5 = 512, Opus 4.6 = 4096), so one threshold
+    per window cannot be correct for a mixed window; and every production caller passed
+    a hard-coded string, so the table was never applied to real data at all.
+
+    The fixture is unchanged and still straddles: 2_000 tokens is above a 1024 minimum
+    and below haiku's 4096. `model=` is now only a FALLBACK for turns with no model of
+    their own, so the turn's own `claude-haiku-4-5` wins and it IS a sub-threshold miss.
     """
     turns = [
         _turn(0, TokenUsage(input_tokens=2_000), model="claude-haiku-4-5-20251001"),
         *_hits(3, start=1),
     ]
-    d = diagnose_cache_from_turns(turns, model="opus")
+    d = diagnose_cache_from_turns(turns, model="claude-opus-4-8")
     assert d.sample_size == 4
     assert d.hit_rate == 75
-    assert d.counters["miss_min_threshold"] == 0
-    assert d.counters["miss_first"] == 1
+    assert d.counters["miss_min_threshold"] == 1
+    assert d.counters["miss_first"] == 0
 
 
 def test_a_turn_with_no_model_does_not_crash_the_window() -> None:

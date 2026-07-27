@@ -55,3 +55,27 @@ from a worktree four times and grepping every fixture for the worktree path (zer
 Building a mechanical guard now would enforce the obsolete guidance, and that guidance is
 actively harmful: refusing to regenerate in the worktree is what forces a hand-merge of
 generated artifacts at land time. The count:11 history is left in place for audit.
+
+## Proposal: mutation-check-receipt-per-new-gate (2026-07-27)
+**Triggered by:** [fail:test] assertion-invariant-over-named-dimension (count: 4)
+**Proposed mechanism:** a mechanical receipt, because prose has now failed four times —
+including once inside `PLAN-token-economy-step-pruning`, whose ADR-010 is *itself* the
+prose rule "mutation-check every gate". Proposal: extend the `/hm:execute` Phase D exit
+contract so that every test **added or modified** in the diff must be named in a
+machine-readable mutation receipt (`.claude/observability/mutation-receipts-<slug>.jsonl`,
+one row per test: `{test_node, code_deleted, suite_rc_after_delete}`), and have `/hm:review`
+Step 3 fail-closed when a diff adds a test node with no corresponding row. The check that
+makes it non-vacuous is `suite_rc_after_delete != 0` — a row claiming a deletion that
+left the suite green is exactly the invariant assertion this entry describes, and it
+becomes visible as data instead of as a claim in a commit message.
+**Rationale:** four recurrences, and the failure mode is stable across all of them: the
+assertion holds in the broken world because the fixture pair does not straddle the
+dimension the test is named after. The current guard is ADR-010's instruction to "name the
+wrong implementation the assertion rejects and verify it fails" recorded **in the commit
+message** — unverifiable, unqueryable, and skipped without a trace. The 2026-07-27
+instance had both fixture turns carrying cache-write tokens so the creation-gated branch
+could not execute in either variant; a mutation receipt would have recorded
+`suite_rc_after_delete = 0` for that test and the gate would have refused it. This is the
+same "prose guard failed N times → promote to mechanical" shape as
+`wrapup-close-marker-integrity-guard` and `dead-string-pin-guard`, and it is now the
+highest-leverage one: the entry is cited as prior work by the plans that then reproduce it.

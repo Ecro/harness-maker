@@ -2,6 +2,53 @@
 
 ## [Unreleased]
 
+### Fixed — the token-economy meter was ~3x wrong on Opus turns and never applied a per-model cache minimum
+
+`/hm:metrics` and `/hm:health` Layer 3 are the instrument the next optimization gets
+chosen on, and it was wrong in four independent, compounding ways. This is **Phase 1 of
+`PLAN-token-economy-step-pruning`** (meter correction); Phases 2-4 — unattributed
+decomposition, the reviewer read budget, and fused-command compaction — are not started.
+
+**Pricing.** `resolve_model_family` matches `PRICE_TABLE` keys as substrings, so the bare
+`"opus"` row captured `claude-opus-5` and priced it at the pre-4.5 $15/$75 against a
+published $5/$25 — a 3x overstatement on the 65.6% of this repo's measured spend that is
+Opus. Point-release keys (`opus-4-5` … `opus-5`, `sonnet-4-5`, `sonnet-5`, `haiku-4-5`)
+now shadow their family row, which is **retained at its legacy rate** so genuinely older
+ids still price correctly. `PRICE_TABLE_VERSION` moves to `"2"` and
+`PRICE_TABLE_EFFECTIVE_DATE` moves with it — the report emits both, and bumping only one
+ships a report that states the wrong date for when its rates took effect. Re-running a
+historical window therefore yields different dollars; the version label is the documented
+signal that it did.
+
+**Cache minimums.** `_threshold_for_model` returned on the *first* substring match and
+fell back to a hard-coded 1024, so an unrecognised model produced a confident
+`miss_min_threshold` verdict measured against a guess. It is now longest-match and returns
+`None` for an unknown id, which the classifier reports as `miss_unknown_model` — a fact,
+not a fault, with a remediation that says plainly that no action is available on the
+user's side rather than asking for an id the table deliberately will not accept.
+
+**TTL.** `_TTL_SECONDS` was hard-coded to 5 minutes, so every 1-hour-tier session was
+misread as a TTL miss. The applicable tier is now derived from the most recent prior
+cache-writing turn **in the same session**; where no prior write is attributable the 5m
+default applies and the evidence records that the tier was *assumed*, not observed.
+
+**The bridge that makes all three reachable.** None of the above would have been exercised
+by anything a user runs: `_entry_from_turn` dropped `TurnRecord.model` and `session_id` and
+summed the two cache-write tiers, and all three production callers passed a hard-coded
+`model="claude-sonnet-4-6"` window-wide. The entry now carries `model`, both write tiers
+and `session_id`; the threshold is resolved **per turn**, and
+`diagnose_cache_from_turns(model=…)` is demoted from "the window's answer" to "the fallback
+for turns with no model of their own" (the `cli.py --model` help text says so).
+
+**One new signal.** A model released *after* this table is written matches its family key,
+so the existing `unknown_models` / `fallback_priced_turns` fields never fire for it — it
+would be repriced at the legacy rate silently, which is the recurrence path of the headline
+defect. `report.family_priced_turns` / `family_priced_models` make a family-rate turn
+visible, asserted through the serialized report the CLI emits rather than the in-memory flag.
+
+Three review rounds; 22 findings, 11 of them introduced by the previous round's own fixes,
+each of which had been green on lint, format, mypy and the full suite beforehand.
+
 ## [0.43.3] — 2026-07-27
 
 ### Fixed — a truthful Second Brain promotion could reconcile as fabricated

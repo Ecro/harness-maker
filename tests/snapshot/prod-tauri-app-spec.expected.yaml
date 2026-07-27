@@ -148,7 +148,7 @@ files:
   body_sha256: 6859c80cb9e1c7e217c62b4300017c3a7f6afd08422deb19fc720e36596da9e4
 - path: skills/ai-readiness-rubric/SKILL.md
   template: skills/ai-readiness-rubric/SKILL.md.j2
-  body_sha256: 2dc98ff62bbac75332610a2a8ee375b5911432fbb6b093c7618c82a396c257cf
+  body_sha256: 3cf0ba0c9b171771c5c75c22a08c4b874acb0b108597e100e59c812584bd64d3
 - path: skills/autoloop-driver/SKILL.md
   template: skills/autoloop-driver/SKILL.md.j2
   body_sha256: 135e175ca2833377f3a6741f76aff2cdae22d82e0c953268eb5821666cc5dccf

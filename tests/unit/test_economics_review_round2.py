@@ -229,7 +229,13 @@ def test_price_model_knob_reaches_the_report(
     )
     report = _report(capsys, root, store)
     assert report["fallback_priced_turns"] == 1
-    assert report["total_usd"] == pytest.approx(1.25)  # haiku output rate, not opus 75.0
+    # Still 1.25. An intermediate revision briefly changed this to 5.0, which was the
+    # SYMPTOM of a defect review caught: the haiku FAMILY row had been overwritten with
+    # Haiku 4.5's rate instead of a `haiku-4-5` key being added. `price_model: haiku`
+    # names the family fallback — the row that prices ids the table does not recognise —
+    # and that row is the legacy 0.25/1.25. A user wanting the 4.5 rate sets
+    # `price_model: haiku-4-5`, which resolves through the same longest-match matcher.
+    assert report["total_usd"] == pytest.approx(1.25)  # haiku family rate, not opus 75.0
 
 
 def test_window_days_knob_reaches_the_report(

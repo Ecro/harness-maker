@@ -1519,7 +1519,10 @@ def health_cmd(
     model: str = typer.Option(
         "claude-sonnet-4-6",
         "--model",
-        help="Model hint for cache diagnostics threshold calculation.",
+        help=(
+            "Fallback model for cache diagnostics, used only for turns whose own "
+            "model is absent. Thresholds resolve per turn, not per window."
+        ),
     ),
     update_dashboard: bool = typer.Option(
         True,

@@ -125,8 +125,18 @@ def test_unresolvable_fallback_still_degrades_to_opus_rather_than_crashing() -> 
 
 
 def test_model_family_resolution_is_longest_match_not_dict_order() -> None:
-    assert resolve_model_family("claude-opus-5") == "opus"
-    assert resolve_model_family("CLAUDE-HAIKU-4-5") == "haiku"
+    """Updated by PLAN ADR-002 — the matcher is unchanged, the TABLE gained keys.
+
+    This asserted `claude-opus-5 -> "opus"`, which was only true because no
+    point-release key existed. Now that `opus-5` is a key, longest-match must prefer
+    it: that preference is the entire fix (`"opus"` capturing Opus 5 priced 30 days of
+    spend at 15/75 against a published 5/25). The `opus-4-1` case keeps the original
+    intent alive — an id with no point-release key still falls back to the family.
+    """
+    assert resolve_model_family("claude-opus-5") == "opus-5"
+    assert resolve_model_family("claude-opus-4-1") == "opus"
+    assert resolve_model_family("CLAUDE-HAIKU-4-5") == "haiku-4-5"  # case-insensitive
+    assert resolve_model_family("claude-haiku-3") == "haiku"
     assert resolve_model_family("nothing-here") is None
 
 

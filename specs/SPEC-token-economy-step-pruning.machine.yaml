@@ -1,0 +1,488 @@
+schema_version: 2
+spec_slug: token-economy-step-pruning
+parent_spec: null
+verification_tier: 2
+mutation_threshold: null
+mutation_threshold_rationale: tier 2 — the changed surfaces are a golden lookup table
+  (cache_diagnostics), a versioned price table (economics), and render-output assertions;
+  mutation adds little over the golden/differential oracles and mutmut over the ~2k-line
+  economics.py is too heavy for the execute hot path. Uses ADR-009 3-layer verification.
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/cache_diagnostics.py
+- src/harness_maker/economics.py
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: cache minimums resolve per model, preserving non-monotonicity
+  type: parametric
+  test_ids:
+  - tests/unit/test_cache_minimums_per_model.py::test_min_cacheable_is_per_model_and_non_monotonic
+  - tests/unit/test_cache_minimums_per_model.py::test_mixed_model_window_resolves_two_thresholds
+  executable_predicate: null
+  golden_table:
+  - input:
+      turn_model: claude-opus-5
+    expected: 512
+    edge: true
+    note: lowest published minimum; a family-prefix matcher cannot reach it
+  - input:
+      turn_model: claude-opus-4-8
+    expected: 1024
+    edge: false
+    note: ''
+  - input:
+      turn_model: claude-sonnet-5
+    expected: 1024
+    edge: false
+    note: ''
+  - input:
+      turn_model: claude-opus-4-7
+    expected: 2048
+    edge: false
+    note: ''
+  - input:
+      turn_model: claude-opus-4-6
+    expected: 4096
+    edge: true
+    note: same family as opus-5 but 8x the minimum — the non-monotonicity discriminator
+  - input:
+      turn_model: claude-haiku-4-5
+    expected: 4096
+    edge: false
+    note: ''
+  rubric_id: null
+  note: 'The opus row ordering 512 / 1024 / 2048 / 4096 across 5 / 4.8 / 4.7 / 4.6
+    is the discriminating case: any family-prefix matcher collapses it to one value
+    and fails. PRODUCTION-PATH BINDING (ADR-010 + ADR-012, validator-3 H1): each row
+    is driven through `diagnose_cache_from_turns` on single-turn windows whose TurnRecord.model
+    is `turn_model`, and the applied minimum is observed as a BOUNDARY on the `miss_min_threshold`
+    counter (a prefix of `expected - 1` must produce the verdict and a prefix of `expected`
+    must not) — NOT read from `_threshold_for_model` directly. A resolver-only test
+    passes while `_entry_from_turn` drops `model`, the defect ADR-012 exists to close.
+    The second test id is the discriminator: a window mixing an Opus-5 turn and an
+    Opus-4-6 turn must yield TWO different thresholds, which is impossible for any
+    implementation resolving one threshold per window.'
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: 'Values are transcribed from the published per-model minimum table
+    in the Anthropic prompt-caching documentation (shared/prompt-caching.md, "Minimum
+    cacheable prefix is model-dependent"), which is external to and predates this
+    implementation. No value is derived from the resolver under test. The shipped
+    `_MIN_CACHEABLE_PREFIX` carries one key beyond these six rows — `sonnet-4-6: 1024`,
+    from the same published table (Sonnet minimum 1024) — because `claude-sonnet-4-6`
+    is the hard-coded default in all three `ai_readiness.py` callers and an absent
+    key would degrade /hm:health''s default window to `miss_unknown_model`. It has
+    no golden row and no direct assertion: both AC-004 fixtures use a 6,000-token
+    prefix, so a mistyped value would ship green. That is an accepted residual — inventing
+    a seventh row without a distinct published citation would be the circular oracle
+    this SPEC forbids elsewhere.'
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: an unknown model never produces a guessed threshold verdict
+  type: mechanical
+  test_ids:
+  - tests/unit/test_cache_minimums_per_model.py::test_unknown_model_never_min_threshold
+  executable_predicate: diagnose_cache_from_turns(turns_with_model("claude-not-a-real-model-9",
+    prefix_tokens=100)).counters["miss_min_threshold"] == 0 and diagnose_cache_from_turns(turns_with_model("claude-opus-4-6",
+    prefix_tokens=2000)).counters["miss_min_threshold"] >= 1 and diagnose_cache_from_turns(turns_with_model("claude-opus-5",
+    prefix_tokens=700)).counters["miss_min_threshold"] == 0
+  golden_table: []
+  rubric_id: null
+  note: 'Guards the absent-case black hole named in CLAUDE.md — an unmatched model
+    must be reportable, not silently defaulted. Every prefix length is pinned so that
+    each arm rejects a NAMED broken implementation (validator-3 H1; the unpinned draft
+    was invariant over the defect it targeted). Arm 1 (unknown, 100): a fallback to
+    1024 makes 100 sub-threshold and emits the verdict — only a `None` threshold passes.
+    Arm 2 (opus-4-6, 2000): correct per-model 4096 emits the verdict; a 1024 fallback
+    does not, so the arm dies if the entry bridge drops `model`. Arm 3 (opus-5, 700):
+    correct per-model 512 emits nothing; a 1024 fallback emits the verdict. Arms 2
+    and 3 are opposite-signed on the same defect, so no single fallback value satisfies
+    both.'
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: 'Metamorphic invariant, independent of any threshold value: for
+    every model identifier absent from the known-minimums table, no prefix length
+    may yield a min-threshold verdict, because the verdict is undefined without a
+    known minimum. Holds regardless of what the table contains, so it cannot be satisfied
+    by reading the implementation''s constants.'
+  oracle_independence_waiver: null
+  input_domain: model identifiers not present in the known-minimums table, paired
+    with any non-negative prefix token count
+  transformation: classify the turn's cache failure mode
+  expected_relation: failure_mode != "miss_min_threshold" for all such inputs
+  preconditions:
+  - the model identifier is absent from the known-minimums table
+  observable_output: the classifier's failure_mode label
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: current-model pricing is correct and the report declares its table version
+  type: mechanical
+  test_ids:
+  - tests/unit/test_economics_pricing.py::test_opus5_rate_and_versioned_history
+  executable_predicate: price_for("claude-opus-5").input == 5.0 and price_for("claude-opus-5").output
+    == 25.0 and price_for("claude-opus-5").cache_read == 0.5 and price_for("claude-opus-5").cache_write_5m
+    == 6.25 and price_for("claude-opus-5").cache_write_1h == 10.0 and price_for("claude-haiku-4-5").input
+    == 1.0 and price_for("claude-haiku-4-5").output == 5.0 and price_for("claude-opus-4-5").input
+    == 5.0 and report_price_table_version() != PRE_CHANGE_PRICE_TABLE_VERSION and
+    report_price_table_effective_date() != PRE_CHANGE_PRICE_TABLE_EFFECTIVE_DATE
+  golden_table: []
+  rubric_id: null
+  note: 'Scope-corrected after both second-opinion models independently refuted the
+    original reproducibility clause: PRICE_TABLE_VERSION is a report label, not a
+    dispatch key, and reports are recomputed from transcripts, so no historical artifact
+    exists to preserve. The version arm now asserts the label CHANGED, which is what
+    the system can actually guarantee. THREE ARMS ADDED (validator-3 L1/L2/M5). The
+    haiku arm: ADR-002 corrects haiku from 0.25/1.25 to the published 1/5, and nothing
+    asserted it — the repricing this SPEC amended its Constraints row to permit was
+    itself unguarded. The opus-4-5 arm: ADR-002 keeps the `opus` key at the pre-4.5
+    15/75, so without a per-model key `claude-opus-4-5` sits on the wrong side of
+    the ADR''s own boundary. The effective-date arm: the report emits BOTH `price_table_version`
+    and `price_table_effective_date`; bumping only the version ships a report that
+    states the wrong date for when the rates took effect.'
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Rates are the published Anthropic list price for claude-opus-5
+    ($5 input / $25 output per MTok, shared/models.md), and the cache multipliers
+    are the documented 0.1x read / 1.25x 5m-write / 2x 1h-write from shared/prompt-caching.md.
+    Both are external published figures, not values read back from the table under
+    test.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: a 1-hour-TTL session is not misclassified as a TTL miss
+  type: mechanical
+  test_ids:
+  - tests/unit/test_cache_minimums_per_model.py::test_one_hour_ttl_not_miss_ttl
+  - tests/unit/test_cache_minimums_per_model.py::test_one_hour_tier_does_not_cross_session_boundary
+  executable_predicate: diagnose_cache_from_turns(session_with_prior_write(tier="1h",
+    gap_seconds=1800)).counters["miss_ttl"] == 0 and diagnose_cache_from_turns(session_with_prior_write(tier="5m",
+    gap_seconds=1800)).counters["miss_ttl"] == 1 and diagnose_cache_from_turns(prior_write_in_other_session(tier="1h",
+    gap_seconds=1800)).counters["miss_ttl"] == 1
+  golden_table: []
+  rubric_id: null
+  note: 'The paired assertion is deliberate — asserting only the 1h arm would pass
+    against a classifier that never emits miss_ttl at all. The third arm is the session-scoping
+    discriminator (validator-3 H2, ADR-012 boundary rule 2): `diagnose_cache_from_turns`
+    flattens every session into one chronological list, so an implementation taking
+    the chronologically previous entry regardless of `session_id` passes arms 1 and
+    2 and is wrong. Arm 3 places the 1h write in a DIFFERENT session; the tier must
+    not be inherited across that boundary, so the gap is a 5m-tier miss.'
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The two TTL tiers and their durations (5 minutes default, 1 hour
+    extended) are published in shared/prompt-caching.md; 30 minutes is chosen to sit
+    strictly between them, so the expected labels follow from the documented tier
+    boundaries rather than from the classifier's code.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: every rendered command is under a ratcheted size budget
+  type: mechanical
+  test_ids:
+  - tests/structural/test_command_size_budget.py::test_rendered_commands_within_budget
+  executable_predicate: all(floor_for(path) <= len(path.read_text()) <= budget_for(path)
+    for path in rendered_command_paths()) and budget_for(fused_workflow_path("exec-rev-wrap-ver"))
+    <= 119000
+  golden_table: []
+  rubric_id: null
+  note: '121782 is the measured pre-change CHARACTER count of the rendered exec-rev-wrap-ver
+    command; the ceiling is 119000 per PLAN ADR-014 and a floor of 0.80x rejects a
+    gutted render. The scenario also requires a negative test proving an inflated
+    template fails. CEILING RAISED from 110000 (validator-3 C1/C2, ADR-017): the 8,738-char
+    "documentation-only" trim that made 110000 reachable was withdrawn after it was
+    shown to delete runtime-behavioural instructions from the fused render. Only the
+    hoist remains, so the honest projection is 116,076 and a ceiling below it would
+    be a target the plan cannot meet.'
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The 121,782 baseline and the 119,000 ceiling are measurements taken
+    from the committed rendered artifact before any change, counted the same way the
+    gate counts (len(read_text()), characters). The removable set behind the ceiling
+    was measured block-by-block (5,706 chars of hoistable shared prose — preflight
+    3,729 + Gate 0 shared prose 1,977, Communication Protocol excluded per ADR-016)
+    and is recorded in PLAN ADR-014/ADR-016/ADR-017. All are observed prior states,
+    not values produced by the budget code under test.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: shared prose renders once, per-stage command lines render per stage
+  type: mechanical
+  test_ids:
+  - tests/structural/test_command_size_budget.py::test_shared_blocks_appear_once
+  executable_predicate: shared_prose_fingerprints(fused_text_flag_on, "worktree_preflight")
+    == 1 and shared_prose_fingerprints(fused_text_flag_on, "gate0_receipt") == 1 and
+    stage_arg_values(fused_text_flag_on, "iter_receipts write") == {"execute", "review",
+    "wrapup", "verify"} and stage_arg_values(fused_text_flag_on, "task-preflight")
+    == {"hm:execute", "hm:review", "hm:wrapup", "hm:verify"} and shared_prose_fingerprints(fused_text_flag_off,
+    "worktree_preflight") == 0 and stage_arg_values(fused_text_flag_off, "iter_receipts
+    write") == {"execute", "review", "wrapup", "verify"}
+  golden_table: []
+  rubric_id: null
+  note: 'Per PLAN ADR-016 the three blocks are NOT duplicates: preflight 1,243 identical
+    chars of 1,403; gate0_receipt 659 shared of a per-stage-varying 1,300-1,700; Communication
+    Protocol 40 of 349 and therefore removed from this criterion. One receipt per
+    stage IS the Gate 0 missing-stage mechanism, so the stage-arg arms assert the
+    four values are PRESENT. FLAG PRECONDITION (validator-3 C5): the preflight arm
+    is asserted only against a `feature_branch_workflow: true` render. The partial
+    is wrapped in the including stage''s flag gate, so a flag-off render contains
+    no preflight block at all and the arm would be false for a reason unrelated to
+    hoisting. ADR-006 additionally requires the hoist to carry that gate into `fuse()`;
+    the flag-off render is covered by the separate arm below, which asserts the block
+    is ABSENT.'
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The pre-change occurrence counts (4, 4, 4) were measured with grep
+    -c against the committed rendered artifact and are recorded in the RESEARCH document;
+    the post-change expectation of exactly 1 follows from the stated design (hoist
+    shared blocks to a single workflow preamble), not from the restructured template.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: compaction loses no instruction
+  type: mechanical
+  test_ids:
+  - tests/structural/test_command_size_budget.py::test_fused_loses_no_instruction
+  executable_predicate: all(step_headings(atomic_command(stage)) <= step_headings(fused_command(workflow))
+    and executable_lines(atomic_command(stage)) <= executable_lines(fused_command(workflow))
+    for stage in stages_of(workflow))
+  golden_table: []
+  rubric_id: null
+  note: Subset, not equality — a fused command legitimately adds workflow-level content
+    the atomic commands do not have.
+  pending_test: true
+  oracle_source: differential
+  oracle_evidence: 'The reference is the independently rendered atomic command for
+    each stage, produced by the same renderer from the same stage template but through
+    a different composition path (atomic_command.md.j2 rather than workflow_command.md.j2).
+    Compaction only edits the workflow path, so the atomic render is an unmodified
+    control: any instruction the fused output drops relative to it is a real loss,
+    not an artifact of the comparison.'
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-008
+  title: reviewer reads are bounded, elision is visible, escalation is always available
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_review_read_budget.py::test_bounded_read_with_escalation
+  executable_predicate: all(len(reviewer_dispatch_sites(render)) >= 1 for render in
+    reviewer_renders()) and len(reviewer_dispatch_sites(single_reviewer_review_render()))
+    >= 1 and all(has_bounded_read_default(site) and has_escalation_clause(site) and
+    requires_visible_elision_marker(site) and states_outside_diff_scope(site) and
+    not contains_unconditional_full_file_read(site) for render in reviewer_renders()
+    for site in reviewer_dispatch_sites(render))
+  golden_table: []
+  rubric_id: null
+  note: 'Known limitation, stated deliberately: this is a render-grep and therefore
+    proves only that the instruction is PRESENT, never that a reviewer obeys it (CLAUDE.md
+    checkpoint 2). Behavioural confirmation is Open Question 5 and is out of scope.
+    NON-VACUITY + COVERAGE (validator-3 C3, ADR-011 amended). Two defects are closed
+    here. (a) `all()` over an empty set is True, so a discovery function returning
+    nothing satisfied every arm; the leading non-emptiness conjuncts reject that.
+    (b) `reviewer_renders()` was (atomic, fused), both produced from THIS harness''s
+    multi-reviewer config, which structurally cannot emit the `{% else %}` branch
+    at review.md.j2:217 holding the fourth site `#### Direct review (single reviewer
+    — Pass 2 only)` (:223). It is now (atomic, fused, single-reviewer), the third
+    rendered with `reviewers.enabled` of length <= 1, and is named separately in the
+    second conjunct so an empty discovery on that render alone cannot hide. DISCOVERY
+    DEFINITION (was a named-but-undefined function): `reviewer_dispatch_sites(render)`
+    = every `####` heading block inside the reviewer-dispatch step whose body names
+    a reviewer agent to run. On the pre-change template that yields exactly 4 sites
+    — Pass 1 (:175), Pass 1.5 (:194), Pass 2 (:216), Direct review (:223) — of which
+    the first three are reachable only under multi-reviewer config and the fourth
+    only under single-reviewer. The anchor is a heading shape that exists BEFORE the
+    edit, so the count cannot be tuned by the change under test. Pass 1.5 dispatches
+    `code-verifier`, which today reads nothing of its own; the clause is required
+    there anyway rather than exempted, because an exemption is what made the earlier
+    enumeration vacuous and because the site gains a read the moment the verifier
+    does.'
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: 'The expected instruction shape (a bounded default plus an explicit
+    escalation clause) is specified by AC-008 in this SPEC and by the Constraints
+    table, both authored before the template edit. The negative arm pins the pre-change
+    string "Reads the diff with full context (use Read on changed files end-to-end,
+    not just the patch)." observed at review.md.j2:187-188, so the assertion is anchored
+    to an observed prior state rather than to the new template. The pin is matched
+    WHITESPACE-NORMALIZED: in the template the sentence is line-wrapped between "changed
+    files" and "end-to-end", and its verb is "Reads", not "Read". An earlier draft
+    pinned an unwrapped "Read the diff ..." that appears nowhere in the source, so
+    the negative arm could never match and therefore always passed (validator-3 M6).'
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-009
+  title: the verification apparatus is provably unchanged
+  type: mechanical
+  test_ids:
+  - tests/render/test_render_review_read_budget.py::test_verification_structure_unchanged
+  executable_predicate: all(reviewer_pass_count(after) == reviewer_pass_count(golden)
+    and enabled_reviewer_set(after) == enabled_reviewer_set(golden) and consensus_threshold(after)
+    == consensus_threshold(golden) and second_opinion_invocation_points(after) ==
+    second_opinion_invocation_points(golden) for after, golden in paired_review_renders_against_goldens())
+    and validator_invocation_points(rendered_plan_bearing_fused()) == validator_invocation_points(golden_plan_bearing_fused())
+    and len(validator_invocation_points(golden_plan_bearing_fused())) >= 1
+  golden_table: []
+  rubric_id: null
+  note: 'This AC exists to enforce the non-goal, not to add capability. It is the
+    guard that lets AC-008 change reviewer prose without anyone having to trust that
+    the change stayed narrow. THIRD GOLDEN ADDED (validator-3 H3): the `validator_invocation_points`
+    conjunct used to run only over the two REVIEW goldens. No review render contains
+    a `plan-validator` dispatch, so that conjunct compared the empty set to the empty
+    set in every possible world — including one where the dispatch was deleted. It
+    matters because the dispatch is real (plan.md Step 4, with both `second_opinion_invoke`
+    calls) and IS in Phase 4''s blast radius: Phase 4 regenerates every command under
+    `.claude/commands/hm/`, and the fused set includes plan-bearing workflows (`res-spec-plan`,
+    `plan-exec-rev`). The conjunct now runs against a plan-bearing fused golden, and
+    the trailing `>= 1` is the non-vacuity guard that fails if the golden itself ever
+    stops containing a dispatch.'
+  pending_test: true
+  oracle_source: differential
+  oracle_evidence: The reference is the pre-change rendered review command captured
+    from the committed artifact at the parent commit — a genuine second sample of
+    the same surface, produced before the edit existed. Comparing the new render against
+    it is an invariance check with an external control, so it cannot be satisfied
+    by the changed template describing itself.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-010
+  title: unattributed spend is decomposed, not opaque
+  type: mechanical
+  test_ids:
+  - tests/unit/test_economics_unattributed_breakdown.py::test_unattributed_decomposes_and_sums
+  executable_predicate: set(report["unattributed_breakdown"]) >= {"recoverable", "unrecoverable_in_window"}
+    and all(v["turns"] > 0 for v in report["unattributed_breakdown"].values()) and
+    sum(v["turns"] for v in report["unattributed_breakdown"].values()) == report["by_stage"]["(unattributed)"]["turns"]
+    and abs(sum(v["usd"] for v in report["unattributed_breakdown"].values()) - report["by_stage"]["(unattributed)"]["total_usd"])
+    < 1e-9 and report["unattributed_breakdown"]["recoverable"]["turns"] > report["turns_by_attribution_source"]["adjacency"]
+  golden_table: []
+  rubric_id: null
+  note: 'Conservation is the load-bearing half — a breakdown whose parts do not sum
+    to the whole would hide turns rather than explain them. POSITIVE ARM (validator-3
+    C4): the four conservation/presence conjuncts are jointly INVARIANT over the entire
+    novel half of ADR-013. `economics.py:502-507` sets `source = "adjacency"` iff
+    an estimate resolved and `"none"` otherwise, and both land in `by_stage["(unattributed)"]`,
+    so `recoverable = {turns where est is not None}` — i.e. ignoring `preceded_by_user`
+    altogether — yields both keys, both non-zero (430 adjacency / 5,812 none in the
+    live window), and exact conservation by construction. That is the named broken
+    implementation, and it passed every conjunct while implementing none of the ADR.
+    The final arm rejects it: `recoverable` is the UNION of adjacency-resolvable and
+    `preceded_by_user`, so its turn count must strictly exceed the already-shipped
+    `turns_by_attribution_source["adjacency"]` count. This is the same shape the second-pass
+    validator caught in AC-002; the fix is the same paired-arm remedy. USD conservation
+    is compared with a 1e-9 tolerance, not `==` — the two sides are differently-ordered
+    float accumulations and exact equality is flaky by construction (validator-3 M4).'
+  pending_test: true
+  oracle_source: property
+  oracle_evidence: 'Conservation invariant: a partition of the unattributed bucket
+    must sum to that bucket regardless of how many categories exist or how each turn
+    is classified. It is independent of the classifier''s rules, so a wrong classification
+    cannot satisfy it, and it holds for any future category the implementation adds.
+    The buckets are defined in PLAN ADR-013 over fields that exist on TurnRecord (adjacency
+    resolvability within the configured window, and preceded_by_user), and the decomposed
+    population is the by_stage "(unattributed)" bucket (sources adjacency + none),
+    not every turn with attribution_skill None. The three categories named in PLAN-economics-attribution-and-carry
+    were re-framed by ADR-013 as population absences rather than per-turn buckets.'
+  oracle_independence_waiver: null
+  input_domain: any economics report window containing at least one unattributed turn
+  transformation: decompose the unattributed bucket into its categories
+  expected_relation: sum(parts) == unattributed_total, for every window and every
+    category set
+  preconditions:
+  - the window contains at least one unattributed turn
+  - the fixture contains at least one unattributed turn with NO adjacency-resolvable
+    neighbour but preceded_by_user true, without which the positive arm cannot bite
+  observable_output: the unattributed_breakdown mapping, the by_stage unattributed
+    turn count, and turns_by_attribution_source["adjacency"]
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null

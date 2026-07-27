@@ -30,12 +30,23 @@ def test_threshold_sonnet_is_1024() -> None:
     assert _threshold_for_model("claude-sonnet-4-6") == 1024
 
 
-def test_threshold_opus_is_1024() -> None:
-    assert _threshold_for_model("claude-opus-4-7") == 1024
+def test_threshold_opus_4_7_is_2048() -> None:
+    """Retired the `== 1024` assertion: it encoded the family-prefix defect.
+
+    `_THRESHOLDS` answered 1024 for every Opus because `"opus"` matched first. The
+    published Opus 4.7 minimum is 2048, and this test asserted the bug (PLAN ADR-004).
+    """
+    assert _threshold_for_model("claude-opus-4-7") == 2048
 
 
-def test_threshold_unknown_falls_back_to_1024() -> None:
-    assert _threshold_for_model("gpt-4") == 1024
+def test_threshold_unknown_returns_none_not_a_guess() -> None:
+    """Retired the `falls_back_to_1024` assertion (PLAN ADR-004).
+
+    The 1024 default is what let an unknown model produce a confident
+    `miss_min_threshold` verdict measured against a number nobody published.
+    """
+    assert _threshold_for_model("gpt-4") is None
+    assert _threshold_for_model(None) is None
 
 
 # ── _score_from_hit_rate ────────────────────────────────────────────────────

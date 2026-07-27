@@ -19,10 +19,16 @@ if TYPE_CHECKING:
     from harness_maker.economics_source import IngestionDiagnostics
     from harness_maker.models import EconomicsConfig
 
-# ADR-010: pricing is per-turn from the turn's own model, against a VERSIONED table so
-# historical reports stay reproducible. USD per million tokens.
-PRICE_TABLE_VERSION = "1"
-PRICE_TABLE_EFFECTIVE_DATE = "2026-07-25"
+# ADR-010: pricing is per-turn from the turn's own model. USD per million tokens.
+#
+# The version is a LABEL emitted into the report, not a dispatch key: reports are
+# always recomputed from raw transcripts, so correcting a rate necessarily reprices
+# historical windows on re-run and no stored artifact exists to preserve. (An earlier
+# comment here claimed the table made "historical reports reproducible" — it never
+# did, and that claim is what made a wrong rate look safe to leave in place.) Both
+# labels move together: the version says WHICH table, the date says FROM WHEN.
+PRICE_TABLE_VERSION = "2"
+PRICE_TABLE_EFFECTIVE_DATE = "2026-07-27"
 
 SpendCategory = Literal["REWORK", "VERIFY", "PRODUCE", "OTHER"]
 Scope = Literal["main", "subagent"]
@@ -45,15 +51,60 @@ class ModelPrice(BaseModel):
 # The 1h tier is priced above the 5m tier. Keeping them separate matters because
 # cache_diagnostics actively advises users to enable the extended TTL for long
 # planning sessions — collapsing the tiers would understate exactly those users.
+#
+# Keys are matched as SUBSTRINGS of the lowered model id by `resolve_model_family`,
+# longest-match wins. Point-release keys therefore shadow their family key, which is
+# the whole point: `"opus"` alone captured `claude-opus-5` and priced 30 days of this
+# repo's spend at 15/75 against a published 5/25 — a 3x overstatement on 65.6% of the
+# bill. The family rows are RETAINED so a genuinely pre-4.5 id still resolves (and a
+# post-table release still prices rather than erroring).
+#
+# R8 — the recurrence path, and how it is now visible. A model released after this
+# table is written matches its FAMILY key, so `resolve_model_family` returns non-None,
+# `price_turn`'s `used_fallback = family is None` stays False, and the turn appears in
+# neither `report.unknown_models` nor `fallback_priced_turns`: `claude-opus-9` would be
+# priced at the pre-4.5 15/75 with no trace, bit for bit the recurrence of the bug this
+# table exists to fix. Those two fields only ever caught ids matching no key at all
+# (`gpt-*`). `report.family_priced_turns` / `family_priced_models` close that blind
+# spot (ADR-018). They change no rate — the family row still serves as the fallback,
+# which remains ADR-002's locked policy; what changes is that the fallback is now
+# observable. An earlier revision of this comment asserted the first two fields already
+# covered this, and asserting an untested safety net is how the original defect
+# survived — so the claim above is pinned by
+# `test_a_family_priced_turn_is_visible_in_the_report`, which asserts through the
+# aggregated report rather than the flag.
+_OPUS_4_5_PLUS = ModelPrice(
+    input=5.0, output=25.0, cache_read=0.5, cache_write_5m=6.25, cache_write_1h=10.0
+)
+_SONNET = ModelPrice(
+    input=3.0, output=15.0, cache_read=0.3, cache_write_5m=3.75, cache_write_1h=6.0
+)
+
 PRICE_TABLE: dict[str, ModelPrice] = {
+    # Pre-4.5 Opus. Deliberately left at the legacy rate — editing this row instead of
+    # adding point releases would leave genuine pre-4.5 turns priced 3x under.
     "opus": ModelPrice(
         input=15.0, output=75.0, cache_read=1.5, cache_write_5m=18.75, cache_write_1h=30.0
     ),
-    "sonnet": ModelPrice(
-        input=3.0, output=15.0, cache_read=0.3, cache_write_5m=3.75, cache_write_1h=6.0
-    ),
+    "opus-4-5": _OPUS_4_5_PLUS,
+    "opus-4-6": _OPUS_4_5_PLUS,
+    "opus-4-7": _OPUS_4_5_PLUS,
+    "opus-4-8": _OPUS_4_5_PLUS,
+    "opus-5": _OPUS_4_5_PLUS,
+    "sonnet": _SONNET,
+    "sonnet-4-5": _SONNET,
+    "sonnet-5": _SONNET,
+    # Pre-4.5 Haiku. The 0.25/1.25 this row carries is the Haiku 3 published rate — it
+    # is NOT a stale value to overwrite. An earlier draft of this change edited it in
+    # place to Haiku 4.5's 1/5, which repriced every older Haiku turn 4x: the same
+    # class of error this table exists to remove, introduced in the opposite direction
+    # and in violation of the rule stated 15 lines above. Point releases get keys; the
+    # family row keeps the legacy rate.
     "haiku": ModelPrice(
         input=0.25, output=1.25, cache_read=0.025, cache_write_5m=0.3, cache_write_1h=0.5
+    ),
+    "haiku-4-5": ModelPrice(
+        input=1.0, output=5.0, cache_read=0.1, cache_write_5m=1.25, cache_write_1h=2.0
     ),
 }
 
@@ -125,6 +176,12 @@ class TurnCost(BaseModel):
     cache_write_usd: float
     total_usd: float
     priced_with_fallback: bool
+    # Two DISTINCT signals, never collapse them. `priced_with_fallback` means the id
+    # matched no key at all (`gpt-4`) and took `fallback_model`. `priced_with_family_row`
+    # means it matched a BARE FAMILY row — the R8 recurrence path, where a model released
+    # after this table silently takes the family rate. Defaulted so existing constructors
+    # keep working.
+    priced_with_family_row: bool = False
 
 
 class AdjacencyBounds(BaseModel):
@@ -195,6 +252,12 @@ class EconomicsReport(BaseModel):
 
     unknown_models: dict[str, int] = Field(default_factory=dict)
     fallback_priced_turns: int = 0
+    # R8 visibility. A turn priced through a BARE FAMILY row is not "unknown" — it
+    # resolved — so it appears in neither field above. That silence is how `"opus"`
+    # captured `claude-opus-5` at 15/75 for 30 days. These two fields make the next
+    # occurrence loud; they change no rate.
+    family_priced_turns: int = 0
+    family_priced_models: dict[str, int] = Field(default_factory=dict)
 
     # ── attribution provenance (ADR-001/009 of PLAN-economics-attribution-and-carry)
     # Source is a per-TURN property, so these are the conserved axis: every priced
@@ -320,6 +383,10 @@ def price_turn(turn: TurnRecord, *, fallback_model: str = "opus") -> TurnCost:
     # 5x mispricing in a tool whose entire output is dollar figures.
     fallback_family = resolve_model_family(fallback_model) or fallback_model
     price = PRICE_TABLE.get(family or fallback_family) or PRICE_TABLE["opus"]
+    # Every point-release key carries a hyphen; the family rows do not. No version
+    # heuristic is needed — a newly released model always brings a version suffix, so
+    # "resolved to a bare family row" is exactly the R8 population.
+    family_priced = family is not None and "-" not in family
 
     u = turn.usage
     input_usd = u.input_tokens * price.input / 1e6
@@ -336,6 +403,7 @@ def price_turn(turn: TurnRecord, *, fallback_model: str = "opus") -> TurnCost:
         cache_write_usd=cache_write_usd,
         total_usd=input_usd + output_usd + cache_read_usd + cache_write_usd,
         priced_with_fallback=used_fallback,
+        priced_with_family_row=family_priced,
     )
 
 
@@ -456,6 +524,7 @@ def aggregate(
         report.classification_unknown = inferred.unknown
 
     unknown: Counter[str] = Counter()
+    family_priced: Counter[str] = Counter()
     unattributed_usd = 0.0
     estimated_usd = 0.0
     writing_turns = 0
@@ -528,6 +597,9 @@ def aggregate(
         if cost.priced_with_fallback:
             report.fallback_priced_turns += 1
             unknown[turn.model or "(none)"] += 1
+        if cost.priced_with_family_row:
+            report.family_priced_turns += 1
+            family_priced[turn.model or "(none)"] += 1
 
         if turn.attribution_skill is None:
             unattributed_usd += cost.total_usd
@@ -543,6 +615,7 @@ def aggregate(
                 resolvable_writing_turns += 1
 
     report.unknown_models = dict(unknown)
+    report.family_priced_models = dict(family_priced)
     report.carry_ratio = report.cache_read_usd / report.total_usd if report.total_usd else 0.0
     report.estimator_coverage = estimated_usd / unattributed_usd if unattributed_usd else 0.0
     report.rework_coverage = resolvable_writing_turns / writing_turns if writing_turns else 0.0

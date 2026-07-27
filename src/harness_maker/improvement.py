@@ -177,9 +177,20 @@ def _extract_layer2_actions(judge_results: Iterable[JudgeResult]) -> list[Action
 def _extract_layer3_actions(cache: CacheDiagnosis) -> list[ActionItem]:
     if cache.primary_failure is None or cache.primary_failure == "no_data":
         return []
+    # `miss_unknown_model` is a gap in OUR minimum-prefix table, not a cache problem the
+    # user introduced. Raising it at P1 puts a harness-maintenance item at the top of a
+    # user's action list next to genuine sub-threshold and TTL findings. Under ADR-019
+    # its remediation states that **no action is available on the user's side** at all —
+    # whether a minimum exists to record is a property of the model's published docs.
+    # An action item whose remediation is "nothing you can do" is by definition not P1.
+    # (This comment previously said the remediation was "upgrade, or report the id";
+    # ADR-019 deleted exactly that string because the table deliberately refuses to add
+    # rows it cannot cite, so the errand had no completion. The stale half survived the
+    # fix and was still standing as the justification for the line below it.)
+    priority = "P2" if cache.primary_failure == "miss_unknown_model" else "P1"
     return [
         ActionItem(
-            priority="P1",
+            priority=priority,
             dimension="cache_efficiency",
             target="~/.claude/projects/<this project>/*.jsonl (session transcripts)",
             summary=f"Cache hit rate {cache.hit_rate}% — primary cause: {cache.primary_failure}",
