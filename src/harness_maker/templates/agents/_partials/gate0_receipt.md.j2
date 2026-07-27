@@ -9,17 +9,29 @@
                          stages that do NOT engage isolation themselves).
       gate0_extra_note — optional; an extra sentence appended to the guard
                          paragraph (verify uses this for its Gate-0 loop note).
-    Inherits is_codex + harness_maker_src_path from the parent stage context. -#}
+    Inherits is_codex + harness_maker_src_path from the parent stage context.
+
+    PLAN-token-economy-step-pruning Phase 4: in a FUSED command the variant-free prose
+    (the `skipped` rule and the guard base) is hoisted to the workflow preamble and
+    rendered once. What stays per stage is what IS per stage: the heading, the pass/fail
+    criteria, the guard's own variant tails, and the `--stage <stage>` invocation. That
+    last one is NOT redundancy — one receipt per stage is the Gate-0 missing-stage
+    mechanism (ADR-016, risk R10); collapsing it would make the autoloop driver see
+    three stages missing on every iteration. The atomic branch renders byte-identically
+    to the pre-Phase-4 output. -#}
+{% import "agents/_partials/g0_macros.md.j2" as g0 -%}
 {{ gate0_heading }}
 
 You have completed the stage. Emit a receipt so the autoloop driver's Gate 0 can detect missing stages at the next convergence check. Pick `<verdict>`:
 
 - **`pass`** — {{ gate0_pass }}
 - **`fail`** — {{ gate0_fail }}
-- **`skipped`** — **DO NOT emit this value from a stage prompt.** Reserved for the autoloop driver's auto-retry escape hatch (ADR-005 of PLAN-loop-mid-stop-and-review-skip).
+{% if not workflow_context %}- **`skipped`** — **DO NOT emit this value from a stage prompt.** Reserved for the autoloop driver's auto-retry escape hatch (ADR-005 of PLAN-loop-mid-stop-and-review-skip).
 
-The shell guard below makes the receipt a no-op when `.current-iter` is absent — that file is written only by the autoloop driver at iter start. Standalone runs (no autoloop), no-isolation runs, and post-`/compact` restoration before iter 1 all skip the write naturally. This is by design — Gate 0 only reads receipts written under `iter-N` for N≥1.{% if gate0_standalone %} In standalone `/hm:{{ gate0_stage }}` (no fused execute stage to engage isolation), `<WT>` may be undefined; the guard's `[ -f ]` test on a literal `<WT>` path is also false, so no write fires.{% endif %}{% if gate0_extra_note is defined and gate0_extra_note %} {{ gate0_extra_note }}{% endif %}
-
+{{ g0.guard_base() }}{% if gate0_standalone %} {{ g0.standalone_note(gate0_stage) }}{% endif %}{% if gate0_extra_note is defined and gate0_extra_note %} {{ gate0_extra_note }}{% endif %}
+{% elif gate0_standalone or (gate0_extra_note is defined and gate0_extra_note) %}
+{% if gate0_standalone %}{{ g0.standalone_note(gate0_stage) }}{% endif %}{% if gate0_extra_note is defined and gate0_extra_note %}{% if gate0_standalone %} {% endif %}{{ gate0_extra_note }}{% endif %}
+{% endif %}
 {% if is_codex %}
 ```
 Bash("if [ -f \"<WT>/.claude/.hm-iter-receipts/.current-iter\" ]; then ITER=$(cat \"<WT>/.claude/.hm-iter-receipts/.current-iter\" 2>/dev/null); if [ -n \"$ITER\" ]; then uv run --with {{ harness_maker_src_path }} python -m harness_maker.iter_receipts write --iter \"$ITER\" --stage {{ gate0_stage }} --verdict <verdict> --root \"<WT>\"; fi; fi")

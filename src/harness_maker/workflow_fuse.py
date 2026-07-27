@@ -25,6 +25,25 @@ if TYPE_CHECKING:
     from jinja2 import Environment
 
 
+def _preamble(env: Environment, config_dump: dict[str, object], install_ref: str) -> str:
+    """The prose every stage fragment would otherwise repeat, rendered once.
+
+    Owns the `worktree.feature_branch_workflow` gate for the hoisted preflight prose.
+    In the atomic render that gate belongs to the including stage template; a preamble
+    has no including stage, so without this the flag-off render would carry preflight
+    instructions for a workflow that does not use worktrees (ADR-006(d)).
+    """
+    worktree = config_dump.get("worktree")
+    enabled = bool(worktree.get("feature_branch_workflow")) if isinstance(worktree, dict) else False
+    body = env.get_template("agents/_partials/fused_preamble.md.j2").render(
+        preflight_enabled=enabled,
+        harness_maker_src_path=install_ref,
+        is_codex=False,
+        config=config_dump,
+    )
+    return f"\n{body.rstrip()}\n"
+
+
 def fuse(
     stages: list[AtomicStage],
     workflow_name: str,
@@ -65,7 +84,12 @@ def fuse(
         config_dump = HarnessConfig(dev_mode=DevMode.SPEC_DRIVEN).model_dump(mode="json")
     install_ref = _compute_install_ref()
 
+    # No stages means no preamble: it exists only to carry prose the stages would
+    # otherwise repeat, and the documented contract is that an empty workflow renders
+    # the header alone.
     parts: list[str] = [f"# /hm:{workflow_name}\n"]
+    if stages:
+        parts.append(_preamble(env, config_dump, install_ref))
     for stage in stages:
         tpl = env.get_template(f"stages/{stage.value}.md.j2")
         body = tpl.render(

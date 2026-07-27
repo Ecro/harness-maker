@@ -1,0 +1,33 @@
+{#- Workflow preamble — the prose every `## Stage:` below would otherwise repeat.
+
+    Rendered ONCE per fused command by `workflow_fuse.fuse()`. Nothing here is new
+    text: each block is the same source the atomic render includes, reached through
+    the same partial/macro, with only the sentence subject adjusted for a position
+    above the stages rather than inside one (`in_preamble`). Per-stage content is
+    deliberately NOT here — the `--stage hm:<stage>` preflight call and the
+    `--stage <stage>` receipt call stay at their stages, because one per stage IS
+    the mechanism (ADR-016).
+
+    The `worktree.feature_branch_workflow` gate moved here with the prose: in the
+    atomic render the INCLUDING stage owns that gate, and a preamble has no including
+    stage (ADR-006(d)). `preflight_enabled` is resolved from the config in fuse(). -#}
+{% import "agents/_partials/g0_macros.md.j2" as g0 -%}
+## Workflow preamble — rules shared by every stage below
+
+Read this once. Each `## Stage:` section below assumes it and does not repeat it.
+{% if preflight_enabled %}
+### Task worktree preflight — shared rules
+
+{% set in_preamble = true %}{% include "agents/_partials/pf_intro.md.j2" %}
+{% include "agents/_partials/pf_tail.md.j2" %}
+{% endif %}
+### Gate 0 receipts — shared rules
+
+Every stage below that has an *Emit Gate 0 receipt* section emits one receipt, with its own `--stage` value. One receipt per stage is how Gate 0 detects a missing stage, so none of them is redundant. Two rules apply to all of them:
+
+- {{ g0.skipped_rule() }}
+- {{ g0.guard_base(where="in each of those sections") }}
+
+### Stage summary banners — shared rule
+
+Skip a stage's summary banner entirely if loop-mode is active for THIS session (a `.claude/.hm-loop-*` marker matches `$HM_SESSION_ID`, or a legacy `.hm-loop-active` exists — the autoloop uses machine receipts, not prose). Otherwise emit it in the configured output language.

@@ -1,4 +1,12 @@
 {#- Per-stage end-summary banner (PLAN-locale-and-command-observability ADR-004/006).
+    PLAN-token-economy-step-pruning Phase 4 (ADR-020): the loop-mode skip rule is prose
+    with no per-stage token, so in a FUSED command it is hoisted to the preamble and each
+    stage gets a one-line back-reference. `workflow_context is defined` because
+    tests/unit/test_autopilot_template_render.py renders this partial standalone, outside
+    any stage context, where a bare name raises under StrictUndefined. That note lives up
+    here rather than beside the conditional: a comment on its own line contributes its
+    trailing newline to the output, and a both-sides-trimmed comment eats the blank line
+    after the heading instead — either way every atomic render and snapshot hash moves.
     Appended to every stages/*.md.j2. The caller MUST set before {% include %}:
       summary_done     — one line: what this stage accomplished
       summary_artifact — primary output artifact path / description
@@ -54,11 +62,12 @@ Read the JSON:
 {% endif %}
 ## Stage summary — print before you STOP
 
-Skip this banner entirely if loop-mode is active for THIS session (a
+{% if not (workflow_context is defined and workflow_context) %}Skip this banner entirely if loop-mode is active for THIS session (a
 `.claude/.hm-loop-*` marker matches `$HM_SESSION_ID`, or a legacy
 `.hm-loop-active` exists — the autoloop uses machine receipts, not prose).
 Otherwise emit it as your final output, in the configured output language:
-
+{% else %}Subject to the loop-mode rule in the preamble, emit as your final output for this stage:
+{% endif %}
 <!-- @hm:banner:end -->
 > ✅ **Done:** {{ summary_done }}
 > 📁 **Artifacts:** {{ summary_artifact }}

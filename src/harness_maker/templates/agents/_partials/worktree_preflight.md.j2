@@ -4,11 +4,20 @@
     partial is only rendered when the flag is on — its own whitespace therefore
     never affects the flag-OFF snapshot fixtures. Inherits is_codex +
     harness_maker_src_path from the parent stage context. Substitute <slug> with
-    the task slug and treat the command's stdout as <WT>. -#}
+    the task slug and treat the command's stdout as <WT>.
+
+    PLAN-token-economy-step-pruning Phase 4: in a FUSED command the shared prose
+    (intro + tail) is hoisted to the workflow preamble and rendered once; each stage
+    keeps its heading and its own `--stage hm:<stage>` invocation, which is per-stage
+    by construction and IS the mechanism, not a duplicate. `workflow_context` already
+    discriminates fused from atomic (the workflow name in `workflow_fuse.fuse()`, ""
+    in `synthesize`), so no new flag was introduced. The atomic branch below renders
+    byte-identically to the pre-Phase-4 output — atomic renders are AC-007's
+    differential control and must not move. -#}
 ### Task worktree preflight (feature-branch workflow)
 
-`harness.yaml worktree.feature_branch_workflow` is **on**: this stage operates inside the persistent per-task worktree `.worktrees/<slug>/` on branch `hm/<slug>` — shared by every `/hm:` stage for this task — NOT an ephemeral `execute-<uuid>` worktree. Claim/refresh it and surface concurrent work + drift:
-
+{% if workflow_context %}Claim this stage's task worktree (preamble: **Task worktree preflight — shared rules**):
+{% else %}{% include "agents/_partials/pf_intro.md.j2" %}{% endif %}
 {% if is_codex %}
 ```
 Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree task-preflight <slug> \"$(pwd)\" --stage hm:{{ hm_stage }}")
@@ -18,18 +27,5 @@ Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktre
 !uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree task-preflight <slug> "$(pwd)" --stage hm:{{ hm_stage }}
 ```
 {% endif %}
-
-- **stdout** = the task worktree absolute path. **Treat that exact string as `<WT>`** for every Read/Write/Edit and every {% if is_codex %}`Bash("cd <WT> && …")`{% else %}`!cd <WT> && …`{% endif %} in this stage. Do NOT use a shell variable.
-- **stderr warnings**: `[preflight] … other active session(s)` = another session holds a task concurrently (informational, no action needed). `[preflight] … behind …` = the task branch drifted behind the base tip; to rebase it cleanly onto the base before working, run:
-
-{% if is_codex %}
-```
-Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree task-refresh <slug> \"$(pwd)\"")
-```
-{% else %}
-```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree task-refresh <slug> "$(pwd)"
-```
-{% endif %}
-
-  `task-refresh` rebases `hm/<slug>` onto the base tip (base HEAD, not a hardcoded `main`), preserving commits; a conflict aborts and leaves the branch untouched — resolve manually, then retry. Refuse to refresh a dirty worktree: commit or discard first.
+{% if not workflow_context %}
+{% include "agents/_partials/pf_tail.md.j2" %}{% endif -%}

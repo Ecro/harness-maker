@@ -1,0 +1,22 @@
+{#- Gate-0 sentences that appear in BOTH the per-stage block and the fused preamble.
+
+    Macros rather than `{% include %}`: an include carries its file's trailing newline
+    (the env sets keep_trailing_newline), which cannot appear mid-paragraph. A macro
+    body with `{%- -%}` trimming inserts exactly the sentence.
+
+    ADR-016 (validator-3 M3) is the reason this file exists at all. The guard paragraph
+    has three variants — base, base + standalone, base + extra note — so a naive
+    intersection hoist leaves the tails behind as orphan fragments continuing a sentence
+    that now lives 2,000 lines upstream. Hoisting the BASE and re-rendering each tail as
+    its own self-contained sentence is what keeps them readable in place. -#}
+{#- `where` exists because "below" is true beside the fence and false in a preamble
+    that sits ~2,000 lines above every fence. ADR-016's position-correctness rule. -#}
+{% macro guard_base(where="below") -%}
+The shell guard {{ where }} makes the receipt a no-op when `.current-iter` is absent — that file is written only by the autoloop driver at iter start. Standalone runs (no autoloop), no-isolation runs, and post-`/compact` restoration before iter 1 all skip the write naturally. This is by design — Gate 0 only reads receipts written under `iter-N` for N≥1.
+{%- endmacro %}
+{% macro standalone_note(stage) -%}
+In standalone `/hm:{{ stage }}` (no fused execute stage to engage isolation), `<WT>` may be undefined; the guard's `[ -f ]` test on a literal `<WT>` path is also false, so no write fires.
+{%- endmacro %}
+{% macro skipped_rule() -%}
+**`skipped` is never emitted from a stage prompt.** It is reserved for the autoloop driver's auto-retry escape hatch (ADR-005 of PLAN-loop-mid-stop-and-review-skip), so each stage's verdict list below offers only `pass` and `fail`.
+{%- endmacro %}

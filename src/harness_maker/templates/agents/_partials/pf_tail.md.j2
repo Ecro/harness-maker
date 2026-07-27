@@ -1,0 +1,17 @@
+{#- What the preflight command's output means, and the drift remedy. Stage-invariant:
+    `task-refresh` takes no --stage argument, so this whole chunk hoists. Single source
+    for the atomic block and the fused preamble. -#}
+- **stdout** = the task worktree absolute path. **Treat that exact string as `<WT>`** for every Read/Write/Edit and every {% if is_codex %}`Bash("cd <WT> && …")`{% else %}`!cd <WT> && …`{% endif %} in {% if in_preamble is defined and in_preamble %}that stage{% else %}this stage{% endif %}. Do NOT use a shell variable.
+- **stderr warnings**: `[preflight] … other active session(s)` = another session holds a task concurrently (informational, no action needed). `[preflight] … behind …` = the task branch drifted behind the base tip; to rebase it cleanly onto the base before working, run:
+
+{% if is_codex %}
+```
+Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree task-refresh <slug> \"$(pwd)\"")
+```
+{% else %}
+```bash
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree task-refresh <slug> "$(pwd)"
+```
+{% endif %}
+
+  `task-refresh` rebases `hm/<slug>` onto the base tip (base HEAD, not a hardcoded `main`), preserving commits; a conflict aborts and leaves the branch untouched — resolve manually, then retry. Refuse to refresh a dirty worktree: commit or discard first.

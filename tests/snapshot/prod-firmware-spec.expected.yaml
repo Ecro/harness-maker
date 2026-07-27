@@ -55,16 +55,16 @@ files:
   body_sha256: b21c93834343787e5dca94da2a9f5a41260ccf8c36fb0b6016c21edb747741e0
 - path: commands/hm/exec-rev-ver-wrap.md
   template: commands/hm/workflow_command.md.j2
-  body_sha256: 9db267cdca29e2bc867d09f7f2e4299fda82f2ce10b4635fe546260259b1d4fe
+  body_sha256: 41b756ae20527c982de61428011f92d05115f8fd681371d86b03c804d3d60e64
 - path: commands/hm/exec-rev-wrap-ver.md
   template: commands/hm/workflow_command.md.j2
-  body_sha256: d71ed121ea7763811a9692e472891eb6f2b1ca39026683ff071c579a8713d748
+  body_sha256: 9351e0b904a7f0eefe8585f74c414e23f70b34fd616972c9e8cce3a0a174d0dc
 - path: commands/hm/exec-rev-wrap.md
   template: commands/hm/workflow_command.md.j2
-  body_sha256: 136b1fd7f44bfd9df6cdbcc8060aaf4e1b00b59155a602da8741db0f5b4bd104
+  body_sha256: 6fc25c318ea933bdd82292e95c25480721493cc7b2638dfcc1f778d57dbb8be8
 - path: commands/hm/exec-rev.md
   template: commands/hm/workflow_command.md.j2
-  body_sha256: cf7c0f285f6d889f74ebde68bc25e333d2afe511bc9224f5658872bfe0ebe6e1
+  body_sha256: c6e5570554f70eaf73dd3220858a1944dd1cd05788694f79fddd0e85611f337e
 - path: commands/hm/execute.md
   template: commands/hm/atomic_command.md.j2
   body_sha256: 1c3c610e1bbfdeec671d114efff8a9188d61a0052e39a8045ab6a101da27302d
@@ -88,13 +88,13 @@ files:
   body_sha256: bc716a86c331b79cdaef7a1990e6158161fc3c8c2f9e209b5b21e2349fed02df
 - path: commands/hm/plan-exec-rev.md
   template: commands/hm/workflow_command.md.j2
-  body_sha256: e2e77359b0aedb8ca2bba06d37325446fdd089beaba58e9cd2fe9b9209c9fe23
+  body_sha256: fe0bedd535eaffd38c04436887936c535f338335292b7454de0764eeaf24e6db
 - path: commands/hm/plan.md
   template: commands/hm/atomic_command.md.j2
   body_sha256: c5191f2f96a5c82eeec92d8bc8c884c077bc53cb2dd6dfc64d6de2422b4286b6
 - path: commands/hm/res-spec-plan.md
   template: commands/hm/workflow_command.md.j2
-  body_sha256: 887edd6b3a77109cfc3a3f689f7d406888f42225d78da73f4033f3eae238eb65
+  body_sha256: f1412ee2955e404197183361f37f622818f5259ade7f67ca87838b54f26a2d6f
 - path: commands/hm/research.md
   template: commands/hm/atomic_command.md.j2
   body_sha256: e23c13a8e3f8e4c375582fb6ee29103e17084c230293c3de7b7db76c02665817

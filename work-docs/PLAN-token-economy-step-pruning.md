@@ -520,7 +520,11 @@ turn properties); leaving the predicate to execute (unreviewed split).
 
 ### ADR-014: The ratchet's value, unit, and command set — re-derived from measurement
 **Status:** Accepted (2026-07-27); arithmetic corrected by validator-2 N2;
-**value revised down** by validator-3 C1/C2 via [ADR-017](#adr-017).
+**value revised down** by validator-3 C1/C2 via [ADR-017](#adr-017);
+**the 121,782 baseline and therefore the 119,000 ceiling are superseded as measurements
+by [ADR-019](#adr-019)** — Phase 3 landed between this derivation and Phase 4's execution
+and added ~1,615 chars to the same command. The ceiling is still enforced at 119,000; it
+is simply no longer the number this derivation would produce today.
 **Context:** The first derivation claimed 3 blocks × 3 redundant copies ≈ 9,963
 chars ≈ ">= 10% off 121,782". Two errors: 121,782 − 9,963 = **111,819**, already
 above the 110,000 ceiling it set; and the 9,963 assumed the blocks were
@@ -744,6 +748,75 @@ claim from the comment and leaving the blind spot (the round-2 response — hone
 the gap, but the gap is the recurrence path of the headline defect).
 **Source:** Review round 3, code-reviewer P1 on the false safety-net claim.
 
+### ADR-019: ADR-014's 119,000 ceiling is stale — Phase 3 spent its headroom
+**Status:** Accepted (2026-07-27, Phase 4 execution — measurement, not judgement).
+**Context:** [ADR-014](#adr-014) derived `≤ 119,000` as `(121,782 − 5,706) × 1.02` from a
+render of `exec-rev-wrap-ver` taken before any phase of this plan landed. Phase 3 then
+added the reviewer read budget at four dispatch sites, and the same command re-rendered
+from the same config now measures **123,397** — the constant was derived against an
+artifact that no longer exists. Two further measurement corrections came out of the same
+pass:
+
+| Claim | ADR-014/016 said | Measured 2026-07-27 |
+|---|---:|---:|
+| pre-change `exec-rev-wrap-ver` | 121,782 | **123,397** (the 121,782 file on disk is a pre-Phase-3 render; `.claude/commands/` is untracked and only refreshed by `--update`) |
+| preflight identical prose | 1,243 | 1,241 |
+| Gate 0 identical prose | 659 | 657 line-aligned, **675** by semantic unit |
+| Communication Protocol shared | 40 | 28 |
+
+The line-aligned figure is also the wrong unit for Gate 0: some of its "identical" lines
+are *inside the runnable fenced command*, and a fenced command is one unit — you cannot
+hoist three of its four lines. Classifying by semantic unit is what the ADR-016 discipline
+actually requires.
+**Decision:**
+- The hoist is implemented as classified and the ceiling is **met, at 118,960 — a margin
+  of 40 characters.** That is not a budget; it is noise. The next sentence added to any of
+  the four stage templates fails `test_the_repo_render_is_under_the_adr014_ceiling` for a
+  reason that has nothing to do with compaction.
+- **The ceiling is not moved in this phase.** Re-deriving it is a decision, and a phase
+  that discovers its own gate is mis-set should not also be the phase that resets it.
+  Applying ADR-014's own stated rule to the current artifact gives
+  `(123,397 − 5,706) × 1.02 ≈ 120,045`; that is the recommended replacement, recorded here
+  rather than applied.
+- The 40-char margin was NOT bought by deleting shipped instructions ([ADR-017](#adr-017)).
+  Every trim taken to reach it was inside the preamble *this phase authored* — a duplicated
+  example command that every stage already shows, and a wordier back-reference.
+**Consequences:**
+- ✅ AC-005 passes against the artifact ADR-014 measured, not a smaller fixture render
+  where 119,000 would have been 16% of slack and would have asserted nothing.
+- ⚠️ The gate is brittle until the ceiling is re-derived. The test's docstring says so at
+  the point of failure, which is where the next person will read it.
+- ⚠️ Two renders are now measured: the fixture render carries the per-file 1.02 ratchet
+  (config-independent, stable), the repo-config render carries the ADR-014 ceiling.
+**Rejected:** Shaving stage prose to widen the margin (ADR-017's exact failure mode);
+silently raising the constant to 120,045 in the same commit that discovered it was wrong;
+applying 119,000 to the fixture render, where it is vacuous.
+**Source:** Phase 4 measurement against `.claude/harness.yaml` at 8addbee0.
+
+### ADR-020: two blocks ADR-016 never classified
+**Status:** Accepted (2026-07-27, Phase 4 execution).
+**Context:** [ADR-016](#adr-016)'s own consequence note says classifying "the blocks I am
+currently measuring" is not the rule. Enumerating *every* repeated paragraph in the fused
+render (11 of them, 6,600 redundant chars total) surfaced two the ADR never named:
+
+| Block | copies | chars/copy | identical | class |
+|---|---:|---:|---:|---|
+| stage-summary skip rule | 4 | 286 | **286** | **uniform rule — hoisted** |
+| reviewer read budget (Phase 3) | 2 | 1,181 | 1,181 | **per-site semantic — MUST NOT hoist** |
+
+**Decision:** The skip rule joins the hoist. The read budget does **not**, and this is the
+load-bearing half: it is the largest single repeat in the document and the most obvious
+compaction target, but AC-008 asserts it **at every reviewer dispatch site**, and risk R2
+names hoisting it as the way this phase silently regresses Phase 3. A block being large
+and identical is not the test; being *addressed to one site* is.
+
+The remaining 2-copy blocks (the `work-docs/` path note, the second-opinion H4 note) are
+left in place: hoisting a 2-copy block saves one copy and costs one copy of preamble, so
+the net is ~zero. Recorded so the omission is a decision rather than an oversight.
+**Consequences:** ✅ Phase 3's guards stay green. ⚠️ 1,181 chars of genuine repetition are
+deliberately kept.
+**Source:** Phase 4's full-candidate enumeration, which ADR-016 required and had not run.
+
 ### ADR-019: The unknown-minimum case reports a fact and stops there
 **Status:** Accepted (2026-07-27, review round 3).
 **Context:** Rounds 1-2 grew the `miss_unknown_model` handling into: a per-turn
@@ -928,13 +1001,22 @@ from window answer to per-turn fallback. No public CLI signature changes.
   or fuse work.
 - **Scope (in):** `src/harness_maker/workflow_fuse.py` (emit-once plumbing **plus
   the `worktree.feature_branch_workflow` gate** the hoist moves off the including
-  stage — [ADR-006](#adr-006)(d); the partials **already exist**, nothing is
-  extracted); the shared-prose / per-stage split inside
-  `_partials/worktree_preflight.md.j2` and `_partials/gate0_receipt.md.j2`,
-  including the position-correct rewrite of Gate 0's hoisted opening sentence
-  ([ADR-016](#adr-016)); `synthesize.py` only if the render context changes; all 7
-  `templates/stages/*.md.j2`; `tests/structural/test_command_size_budget.py`;
-  re-rendered `.claude/commands/hm/*`.
+  stage — [ADR-006](#adr-006)(d)); the shared-prose / per-stage split inside
+  `templates/agents/_partials/worktree_preflight.md.j2` and `…/gate0_receipt.md.j2`
+  (**path correction:** the partials live under `templates/agents/_partials/`, not
+  `templates/_partials/`), including the position-correct rewrite of Gate 0's hoisted
+  guard sentence ([ADR-016](#adr-016)); `templates/agents/_partials/stage_end_summary.md.j2`
+  ([ADR-020](#adr-020)); `tests/structural/test_command_size_budget.py` and its
+  install-ref `conftest.py`.
+- **Answered at execution — no new flag was needed.** The exit criterion asked whether
+  `workflow_context` already discriminates fused from atomic. It does:
+  `workflow_fuse.fuse()` passes the workflow name, `synthesize` passes `""`, and all 7
+  stage templates already branch on it. The partials inherit it, so the fused/atomic
+  split is a `{% if workflow_context %}` inside each partial.
+- **No stage template was edited, and no atomic render changed.** All 7 atomic commands
+  re-render **byte-identically** (verified by diff, not asserted) — they are AC-007's
+  differential control, so the whole change had to land inside the two partials plus the
+  new preamble.
 - **Scope (out):** stage Step content, `atomic_command.md.j2`, all three goldens,
   and — **withdrawn from this plan entirely** — the documentation-only trim of the
   fused render ([ADR-017](#adr-017)). No `##` section is dropped from any render.
@@ -954,6 +1036,19 @@ from window answer to per-turn fallback. No public CLI signature changes.
   render fails. Phase 4 first classifies every candidate block per
   [ADR-016](#adr-016), and checks whether `workflow_context` already discriminates
   fused from atomic.
+- **Measured outcome** (repo-config render, `.claude/harness.yaml` at 8addbee0):
+
+  | command | pre | post | Δ |
+  |---|---:|---:|---:|
+  | `exec-rev-wrap-ver` | 123,397 | **118,960** | −4,437 |
+  | `exec-rev-wrap` | 109,218 | 106,540 | −2,678 |
+  | `plan-exec-rev` | 108,923 | 106,246 | −2,677 |
+  | `res-spec-plan` | 89,067 | 86,391 | −2,676 |
+  | `exec-rev` | 68,410 | 67,492 | −918 |
+
+  The saving scales with stage count because the preamble is a fixed cost: at two stages
+  it nearly cancels the hoist. That is worth stating plainly — **fusing more stages is
+  what makes this pay**, and a 2-stage workflow gets almost nothing.
 - **Risk:** `medium-high` — largest surface, most able to silently drop an
   instruction.
 - **Rollback:** revert this phase's own commit.
