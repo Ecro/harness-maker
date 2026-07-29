@@ -59,11 +59,12 @@ _RATCHET: dict[str, tuple[int, int]] = {
 }
 
 # ADR-014's hand-set ceiling is measured against a DIFFERENT render: this repo's own
-# `.claude/harness.yaml` (second opinion + full reviewer set enabled), which is the
-# artifact the 121,782 baseline and the 119,000 figure came from. The fixture render
-# above is ~16% smaller, so applying 119,000 to it would assert nothing. Keeping the two
-# apart is what makes each bind — see `test_the_repo_render_is_under_the_adr014_ceiling`.
-_ADR014_CEILING = 119_000
+# `.claude/harness.yaml` (second opinion + full reviewer set enabled). The fixture render
+# above is ~16% smaller, so applying this figure to it would assert nothing. Keeping the
+# two apart is what makes each bind — see `test_the_repo_render_is_under_the_adr014_ceiling`.
+#
+# Re-based 2026-07-29 from 119,000 (PLAN-wrapup-context-carry Phase 3). Derivation below.
+_ADR014_CEILING = 122_000
 
 _WORKFLOWS: dict[str, tuple[str, ...]] = {
     "exec-rev-wrap-ver": ("execute", "review", "wrapup", "verify"),
@@ -218,14 +219,27 @@ def test_the_repo_render_is_under_the_adr014_ceiling(tmp_path: Path) -> None:
     121,782 baseline. Fail-closed if that file is missing: an absent config means the
     measurement cannot be made, which is not the same as passing.
 
-    **The margin here is 60 characters and that is a finding, not a comfort.** ADR-014
-    derived 119,000 as `(121,782 − 5,706) × 1.02` from a render taken BEFORE Phase 3
-    landed; Phase 3 then added ~1,615 characters to this same command (the reviewer read
-    budget, at four dispatch sites). Re-applying ADR-014's own rule to the current
-    artifact gives `(123,397 − 5,706) × 1.02 ≈ 120,045`. The constant is stale by roughly
-    the amount Phase 3 added, and the next sentence anyone adds to any of these four
-    stage templates will fail this test for a reason unrelated to compaction. Re-derive
-    it against a current measurement rather than shaving prose to fit.
+    **Re-based 2026-07-29, and the reason matters more than the number.** The previous
+    constant was 119,000, derived by ADR-014 as `(121,782 − 5,706) × 1.02` — a
+    pre-pruning render size minus what `PLAN-token-economy-step-pruning` removed, plus 2%
+    headroom. By 2026-07-28 that left **53 characters** of margin, and the prior version
+    of this docstring already flagged the constant as stale and asked for a re-derivation.
+
+    What forced it: `PLAN-wrapup-context-carry` AC-004 and AC-009 require two new `!`
+    lines in the wrapup stage (`--slug` on the brief, and the self-skip ledger row) that
+    total ~190 rendered characters. **No implementation of that SPEC fits under 119,000** —
+    not by trimming prose, because the mandatory command surface alone overruns the margin.
+    A ceiling that no correct implementation can satisfy stops being a budget and becomes
+    a prompt to weaken the test, so it was re-based rather than worked around.
+
+    Both of ADR-014's anchors (121,782 pre-pruning, 5,706 saved) are HISTORICAL — pruning
+    was a one-time prose reduction, not a render flag, so neither is re-measurable today.
+    What survives is the rule's shape: `post-pruning size × 1.02`. Measured here on
+    2026-07-29 the render is 119,765, giving 122,160; the constant is rounded DOWN to
+    122,000, which is the conservative direction (ADR-014 rounded its 118,398 *up*).
+
+    The margin is now ~2,200 characters. Treat that as the budget it is: growth beyond it
+    should be paid for by pruning, not by moving this number again.
     """
     cfg = Path(__file__).resolve().parents[2] / ".claude" / "harness.yaml"
     assert cfg.exists(), f"cannot measure the ADR-014 ceiling: {cfg} is missing"

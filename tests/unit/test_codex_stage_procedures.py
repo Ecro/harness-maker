@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import pytest
 
-from harness_maker.models import HarnessConfig
+from harness_maker.models import DELEGATABLE_STAGES, HarnessConfig
 from harness_maker.render import _make_env
 from harness_maker.synthesize import (
     _HARNESS_MAKER_PKG_ROOT,
@@ -142,6 +142,43 @@ def test_execute_codex_render_no_bang_prefix() -> None:
     rendered = _render_stage("execute", is_codex=True)
     assert "!uv run" not in rendered, (
         "Codex execute render must not use '!' prefix — Codex uses Bash() tool calls"
+    )
+
+
+@pytest.mark.parametrize("stage", DELEGATABLE_STAGES)
+def test_delegated_stage_codex_render_no_bang_prefix(stage: str) -> None:
+    """Parametrized over EVERY delegatable stage, not just the one being fixed.
+
+    The delegation block is behind a config guard, so the default render never sees it —
+    `execute`'s sibling test above passes on the default config and says nothing about
+    Step 0.5. The first version of this test set `delegation.stages = ["wrapup"]` and
+    asserted only the wrapup template, so the identical defect survived one stage over in
+    `verify.md.j2`, which is CLAUDE.md checkpoint 2's named trap: do not scope a gate to
+    the artifact you happened to be fixing.
+
+    The self-skip branch is the sharpest case: it exists *for* the IDEs with no dispatch
+    tool — Cursor and Codex — so rendering its command in the one form Codex cannot execute
+    means those harnesses never record it, and `delegation_fires` blames them for a
+    dispatch they were never able to make.
+    """
+    env = _make_env()
+    cfg = _make_default_config()
+    cfg["delegation"] = {"stages": [stage]}
+    rendered = env.get_template(f"stages/{stage}.md.j2").render(
+        stage=stage,
+        workflow_context="",
+        project_name="",
+        feature="",
+        config=cfg,
+        harness_maker_src_path=_HARNESS_MAKER_PKG_ROOT,
+        is_codex=True,
+    )
+    # Asserted first: a guard that silently elided the block would make the `!` check below
+    # pass by rendering nothing at all.
+    assert "wrapup_brief" in rendered
+    assert "wrapup_receipt" in rendered
+    assert "!uv run" not in rendered, (
+        f"Codex {stage} render must not use '!' prefix — Codex uses Bash() tool calls"
     )
 
 

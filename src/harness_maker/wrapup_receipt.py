@@ -22,6 +22,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
+from . import delegation_ledger
+
 SCHEMA_VERSION = 1
 
 # `## [wiki:architecture] some-slug | 2026-07-26` / `## [fail:test] s | d | count:1`
@@ -514,14 +516,34 @@ def main(argv: list[str] | None = None) -> int:
     ns = parser.parse_args(argv if argv is not None else sys.argv[1:])
 
     base = _base_root(Path(ns.root))
+    # Resolved BEFORE the two `return 2` paths below. `--worktree` is where the ledger's
+    # slug comes from, and both early exits are `unparseable` — the very rows the ledger
+    # exists to record. Resolving it late would land them slug-less.
+    requested = Path(ns.worktree).resolve() if ns.worktree else Path(ns.root).resolve()
+    slug = requested.name if requested != base else ""
+
+    def _record(status: str) -> None:
+        """This module runs iff a subagent replied — the rendered stage reaches it only
+        after the reply exists — so a row here means dispatch HAPPENED."""
+        # No `or "wrapup"` fallback: an absent `--stage` would stamp a VERIFY dispatch as
+        # a wrapup one, and the verdict is stage-scoped, so that row would vouch for a
+        # stage it never ran. `""` is excluded by the verdict's `== stage` filter, which is
+        # the fail-closed direction — a row that cannot say which stage it belongs to
+        # should not count for any of them.
+        delegation_ledger.append(
+            base, stage=ns.stage or "", slug=slug, kind="dispatch", status=status
+        )
+
     try:
         raw = Path(ns.receipt_file).read_text(encoding="utf-8", errors="replace")
     except OSError as exc:
+        _record("unparseable")
         print(json.dumps({"status": "unparseable", "error": str(exc)}, indent=2))
         return 2
 
     receipt, error = parse_receipt(raw)
     if receipt is None:
+        _record("unparseable")
         print(json.dumps({"status": "unparseable", "error": error}, indent=2))
         return 2
 
@@ -531,7 +553,6 @@ def main(argv: list[str] | None = None) -> int:
     # faithful. `--worktree /` would make `_confined(Path("/"), "etc/hostname")` resolve
     # a real file, emit no mismatch, and the verify template would then adopt the
     # receipt's verdict. Confine it the same way `wrapup_brief.validate_brief` does.
-    requested = Path(ns.worktree).resolve() if ns.worktree else Path(ns.root).resolve()
     if requested != base and requested.parent != (base / ".worktrees"):
         print(
             json.dumps(
@@ -545,6 +566,7 @@ def main(argv: list[str] | None = None) -> int:
                 indent=2,
             )
         )
+        _record("unparseable")
         return 2
     doc_root = requested
 
@@ -579,6 +601,7 @@ def main(argv: list[str] | None = None) -> int:
             sort_keys=True,
         )
     )
+    _record("dispatched" if result.ok else "mismatch")
     return 0 if result.ok else 1
 
 

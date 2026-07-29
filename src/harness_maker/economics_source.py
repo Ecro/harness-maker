@@ -21,9 +21,12 @@ from harness_maker.economics import TokenUsage, TurnRecord
 _WRITE_TOOLS = frozenset({"Write", "Edit", "MultiEdit", "NotebookEdit"})
 _PATH_KEYS = ("file_path", "path", "notebook_path")
 _WORKTREE_RE = re.compile(r"/\.worktrees/([^/]+)")
-# Bounds on untrusted transcript-derived values. The line cap keeps one adversarial
-# record from dominating memory; the key cap keeps such a value from becoming an
-# unbounded JSON map key in the report.
+# Bounds on untrusted transcript-derived values. The line cap bounds DOWNSTREAM
+# processing of one adversarial record — NOT resident memory: it is checked after the
+# line is already read (see the note at the check itself, which is the honest statement).
+# An earlier version of this comment claimed the memory bound the check cannot provide,
+# and the two comments contradicted each other in the same file.
+# The key cap keeps such a value from becoming an unbounded JSON map key in the report.
 _MAX_LINE_BYTES = 4 * 1024 * 1024
 _MAX_KEY_CHARS = 64
 
@@ -47,18 +50,30 @@ class IngestionDiagnostics(BaseModel):
     files_failed: int = 0
     lines_total: int = 0
     assistant_lines: int = 0
+    # Records dropped by grouping: sum over groups of (len(group) - 1), across ALL groups
+    # including those a later filter skips. A residual (`assistant_lines - turns`) would
+    # fold in `no_usage`/`foreign_cwd` skips and corrupt both this field and `coverage`.
+    duplicate_records_collapsed: int = 0
+    # `assistant_lines` in CALLS rather than records. Every other counter below is
+    # group-counted, so the coverage denominator has to be too — see `coverage`.
+    assistant_calls: int = 0
     turns_with_usage: int = 0
     skipped_by_reason: dict[str, int] = Field(default_factory=dict)
 
     @property
     def coverage(self) -> float:
-        """Priced turns over IN-WINDOW assistant lines — drops when a format change lands.
+        """Priced turns over IN-WINDOW assistant CALLS — drops when a format change lands.
 
-        Window-excluded lines are removed from the denominator: otherwise a narrow
+        Window-excluded entries are removed from the denominator: otherwise a narrow
         `--days` makes coverage collapse toward zero and the drift signal this exists
         to carry becomes indistinguishable from ordinary filtering.
+
+        Both terms are group-counted. `assistant_lines` is not: it is the raw record
+        count, and subtracting a group-counted `outside_window` from it would mix units —
+        collapsing divides the numerator by ~2.2 while leaving the denominator alone, so
+        coverage would sit near 0.45 forever and retire the very signal it exists to be.
         """
-        denominator = self.assistant_lines - self.skipped_by_reason.get("outside_window", 0)
+        denominator = self.assistant_calls - self.skipped_by_reason.get("outside_window", 0)
         return self.turns_with_usage / denominator if denominator > 0 else 0.0
 
 
@@ -316,6 +331,59 @@ def _turn_from_line(
         git_branch=branch,
         uuid=data.get("uuid") if isinstance(data.get("uuid"), str) else None,
         preceded_by_user=preceded_by_user,
+        message_id=message.get("id") if isinstance(message.get("id"), str) else None,
+    )
+
+
+def _collapse(group: list[TurnRecord]) -> TurnRecord:
+    """One API call's records into one turn — usage taken once, metadata unioned.
+
+    The records are NOT interchangeable. Each carries a different content block, so the
+    `tool_use` block — and therefore `written_paths` — lives in exactly one of them;
+    dropping it makes a turn that wrote files look like it wrote none, silently
+    re-labelling PRODUCE/REWORK as OTHER in the classifier the whole model rests on.
+    `uuid` is the retroactive-classification verdict cache key, so its winner must be
+    stable across runs or the cache invalidates on every report.
+
+    Measured on the frozen corpus (5,757 multi-record groups): every field except
+    `output_tokens` is identical within a group, and `output_tokens` differs in 1. The
+    rules below therefore agree with "take any record" on real data — they exist so the
+    answer is defined rather than accidental.
+    """
+    first = group[0]
+    if len(group) == 1:
+        return first
+    # Ties resolve to the LAST record: output_tokens grows as a response streams, so the
+    # final record carries the complete count.
+    best = first
+    for turn in group[1:]:
+        if turn.usage.output_tokens >= best.usage.output_tokens:
+            best = turn
+    paths: dict[str, None] = {}
+    for turn in group:
+        for path in turn.written_paths:
+            paths.setdefault(path, None)
+
+    def _first_set(attr: str) -> Any:
+        for turn in group:
+            value = getattr(turn, attr)
+            if value is not None:
+                return value
+        return None
+
+    # `uuid`, `ts`, `session_id`, `preceded_by_user`, `is_sidechain` and `message_id` come
+    # from `first` via the copy base — file order, so they are stable between runs.
+    return first.model_copy(
+        update={
+            "usage": best.usage,
+            "written_paths": tuple(paths),
+            "model": _first_set("model"),
+            "attribution_skill": _first_set("attribution_skill"),
+            "attribution_agent": _first_set("attribution_agent"),
+            "cwd": _first_set("cwd"),
+            "git_branch": _first_set("git_branch"),
+            "task_slug": _first_set("task_slug"),
+        }
     )
 
 
@@ -333,6 +401,7 @@ def load_turns(
     diag = IngestionDiagnostics()
     skipped: Counter[str] = Counter()
     turns: list[TurnRecord] = []
+    groups_seen = 0
 
     cutoff: datetime | None = None
     if days is not None:
@@ -358,13 +427,25 @@ def load_turns(
             # fail-closed False routes the boundary to `unknown` (ADR-005) rather than
             # to a guessed continuation.
             pending_user = False
+            # Grouping is per FILE, and it precedes the cwd/window filters. Per-file
+            # because main-loop and subagent records live in separate transcripts
+            # (`*/subagents/agent-*.jsonl`) and must never merge; before the filters so a
+            # group is atomic — it falls wholly inside or wholly outside the window
+            # rather than being split across the boundary.
+            file_groups: dict[str, list[TurnRecord]] = {}
+            group_order: list[str] = []
             with handle:
                 for raw_line in handle:
                     line = raw_line.strip()
                     if not line:
                         continue
                     diag.lines_total += 1
-                    if len(line) > _MAX_LINE_BYTES:
+                    # `.encode()` because the constant is named for BYTES and `line` is a
+                    # str: comparing characters let a multi-byte record run past the
+                    # documented bound by up to 4x. (The bound is still enforced after the
+                    # line is resident — a bounded read is a larger change and is recorded
+                    # as a known limitation rather than claimed.)
+                    if len(line.encode("utf-8", errors="ignore")) > _MAX_LINE_BYTES:
                         skipped["oversize_line"] += 1
                         pending_user = False
                         continue
@@ -384,15 +465,42 @@ def load_turns(
                     if turn is None:
                         skipped["no_usage"] += 1
                         continue
-                    if not is_own_cwd(turn.cwd, project_path):
-                        skipped["foreign_cwd"] += 1
-                        continue
-                    if cutoff is not None and turn.ts < cutoff:
-                        skipped["outside_window"] += 1
-                        continue
-                    turns.append(turn)
+                    # A record with no `message.id` is never grouped: it gets a key no
+                    # other record can share. An implementation that bucketed them under
+                    # one falsy key would collapse a whole legacy-format transcript into a
+                    # single turn — the absent-case failure this repo has shipped 8 times.
+                    key = turn.message_id or f"\0no-id\0{len(group_order)}"
+                    bucket = file_groups.get(key)
+                    if bucket is None:
+                        file_groups[key] = [turn]
+                        group_order.append(key)
+                    else:
+                        bucket.append(turn)
+
+            groups_seen += len(group_order)
+            for key in group_order:
+                group = file_groups[key]
+                # Counted across ALL groups, including those the filters below skip:
+                # `assistant_calls` must stay the true call count or the coverage
+                # denominator drifts by the skipped groups' duplicates.
+                diag.duplicate_records_collapsed += len(group) - 1
+                turn = _collapse(group)
+                if not is_own_cwd(turn.cwd, project_path):
+                    skipped["foreign_cwd"] += 1
+                    continue
+                if cutoff is not None and turn.ts < cutoff:
+                    skipped["outside_window"] += 1
+                    continue
+                turns.append(turn)
 
     turns.sort(key=lambda t: t.ts)
     diag.turns_with_usage = len(turns)
+    # Counted directly from the groups, plus the records that had no usage to group BY.
+    # The old form `assistant_lines - duplicate_records_collapsed` computes the same value
+    # — the two record-counted terms cancel, because `assistant_lines` is incremented only
+    # after the oversize / json-error / not-assistant skips — but it reads as a mix of
+    # units, and a reader has to reconstruct that proof to trust the denominator.
+    # `test_assistant_calls_equals_groups_plus_unpriceable` pins the identity.
+    diag.assistant_calls = groups_seen + skipped["no_usage"]
     diag.skipped_by_reason = dict(skipped)
     return IngestionResult(turns=turns, diagnostics=diag)

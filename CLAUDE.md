@@ -258,7 +258,7 @@ Cursor / Codex 의 plugin marketplace 가 GitHub 에서 직접 fetch.
 
 **LLM behavior contract** (ADR-008):
 - `[finalize] stash-pop conflict` signal: NEVER recommend `git stash drop` without `git stash show -p <ref>` diff preview to user.
-- Recovery procedure when stash conflict happens: `git reflog --all | grep "wip(execute)"` → cherry-pick chronological → resolve sandbox conflicts with `--ours`. Documented in `templates/commands/hm/wrapup.md.j2` Step 7.5 with `<!-- @hm:drop-policy:user-confirmed -->` marker block.
+- Recovery procedure when stash conflict happens: `git reflog --all | grep "wip(execute)"` → cherry-pick chronological → resolve sandbox conflicts with `--ours`. Documented in `src/harness_maker/templates/stages/wrapup.md.j2` Step 7.5 with `<!-- @hm:drop-policy:user-confirmed -->` marker block. (Corrected 2026-07-29 — this said `templates/commands/hm/wrapup.md.j2`, which does not exist. That directory does, so following the old path would have created a new inert file rather than erroring.)
 
 **Recovery from accidental drop** (precedent: 2026-05-23 morning's 4 dropped stashes recovered via `git reflog --all` cherry-pick — see session log 21:30 UTC). The finalize logic creates `wip(execute): capture uncommitted work` commits on the per-worktree branch BEFORE attempting cleanup; even if the stash is dropped, the WIP commit on the branch ref survives until gc.
 

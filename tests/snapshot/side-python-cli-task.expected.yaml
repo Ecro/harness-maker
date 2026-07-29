@@ -55,10 +55,10 @@ files:
   body_sha256: b21c93834343787e5dca94da2a9f5a41260ccf8c36fb0b6016c21edb747741e0
 - path: commands/hm/exec-rev-ver-wrap.md
   template: commands/hm/workflow_command.md.j2
-  body_sha256: 357a967c7d51020f4625d9ca3642dad6a4fef3d71a91f719018d41319d33e466
+  body_sha256: 02e67590f233f87f52ff6563530a91f8d3e2db36bd083754f1067fd26b070b9a
 - path: commands/hm/exec-rev-wrap.md
   template: commands/hm/workflow_command.md.j2
-  body_sha256: a9150a81392abad81935ab47e066966b891d8e1add42e281ef3463a11ca16ff2
+  body_sha256: 91bcd1e7adf787d8452a87960674a1491f246c59e9d28fea0f7ba4650f3b02bf
 - path: commands/hm/exec-rev.md
   template: commands/hm/workflow_command.md.j2
   body_sha256: 91bb70ec1d2c2782882f76704b339405de43adaf167cf6315d4c39d161b4c22c
@@ -82,10 +82,10 @@ files:
   body_sha256: 810fdadb536aabe19e64291f00c4839e883ad63de0cc4e1f6e9279a9e63febeb
 - path: commands/hm/metrics.md
   template: commands/hm/metrics.md.j2
-  body_sha256: ab3df3095e424161efc9eddc91098afcdbd735251dd0f44079a3e8f4a67fc222
+  body_sha256: 40017b6b14e4d2b2a5283792a9001d3eaeb3a0b6662c57d3641e78f210306032
 - path: commands/hm/plan-exec-rev-wrap.md
   template: commands/hm/workflow_command.md.j2
-  body_sha256: 011511408689f765a430346dd0b3049756725cd5a39a18e2f7142ede91fb4094
+  body_sha256: bcb33ce6203328f0125571a7a2c3578e54d76ecfe224730664049dfc4080633a
 - path: commands/hm/plan-exec-rev.md
   template: commands/hm/workflow_command.md.j2
   body_sha256: 3ef83e50945eeacda37d95fbf7868c63ad9e593f6c2d367a243d27f18b97c4ec
@@ -109,7 +109,7 @@ files:
   body_sha256: 4c2ae34eb3116e2eba3e03a44ff7c33ce8136f3f22f2a226f3a87559d30559d0
 - path: commands/hm/wrapup.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: 20559f553c3c3fe24086069cdf39181e96c4beb6954b771f6a353572b545cdce
+  body_sha256: 3a417a65a7ef9011935654aa13b2df4ec8c9c891aca0b2a5c199f8f36da10747
 - path: harness.yaml
   template: harness-yaml/Side.yaml.j2
   body_sha256: 40ed876fbcd20f7a1a6cdd79b56f2fbb51a5fef0a5670f05f80936af18f540e1
@@ -187,4 +187,4 @@ files:
   body_sha256: 55250de07b675aa591472cd3b9beeff4cc3b747ba0536cd4ee6966272ccf58fc
 - path: stages/wrapup.md
   template: stages/wrapup.md.j2
-  body_sha256: 178e6e2bbfba5487124510c48821e1f1b9e44698d7612c7389d8ad817907a5eb
+  body_sha256: ec58ff21c90216dce0bf1b26dbf855bd569a1b62331e836d96c9cf65e9ea2469

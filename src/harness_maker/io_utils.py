@@ -118,3 +118,51 @@ def load_harness_yaml(path: Path) -> dict[str, Any]:
             continue
         last_mapping = doc
     return last_mapping
+
+
+def append_atomic_line(path: Path, line: str) -> None:
+    """Append one line via O_APPEND — kernel-atomic for writes <= PIPE_BUF (4096 bytes).
+
+    The public home for a helper that four modules had each copied privately
+    (`codex_ledger`, `review_telemetry`, `autopilot_ledger`, `delivery_metrics`). Those
+    copies are left in place — rewiring them is a separate change — but a NEW caller
+    reaching across a module boundary for a `_`-prefixed name is how a fifth copy starts,
+    so new ledgers import this one.
+
+    Raises `ValueError` above PIPE_BUF rather than writing: past that size the kernel may
+    split the write, and a torn line interleaved with a concurrent writer's is dropped
+    silently by every JSONL reader in this repo. Callers that must not fail bound their
+    own fields first.
+
+    **The guarantee is narrower than "atomic".** PIPE_BUF is specified for pipes; for a
+    regular file, `O_APPEND` makes each individual `write()` land at an atomically-chosen
+    offset, but nothing makes a MULTI-write row contiguous. The four private copies this
+    replaces looped on a short write, which is precisely the case where a peer can append
+    between iterations and interleave. A short write is therefore treated as a failure
+    rather than retried: the row is lost (one observability line) instead of corrupting
+    its neighbour, which is the direction every reader here degrades safely in.
+    """
+    payload = line if line.endswith("\n") else line + "\n"
+    encoded = payload.encode("utf-8")
+    if len(encoded) > 4096:
+        raise ValueError(
+            f"ledger line {len(encoded)} bytes exceeds PIPE_BUF (4096); "
+            "trim field content to preserve append atomicity"
+        )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    # O_NOFOLLOW: a symlink committed at the ledger path would otherwise turn every
+    # append into a write to its target. Callers already treat a failed append as a
+    # dropped row, so the OSError degrades exactly like a full disk.
+    fd = os.open(str(path), os.O_WRONLY | os.O_APPEND | os.O_CREAT | os.O_NOFOLLOW, 0o644)
+    try:
+        written = os.write(fd, encoded)
+        if written != len(encoded):
+            # Do NOT loop: a second write() can land after a peer's append, splicing this
+            # row into theirs. Both lines then fail to parse and are silently dropped.
+            raise OSError(
+                f"short append: wrote {written} of {len(encoded)} bytes; "
+                "retrying would risk interleaving with a concurrent writer"
+            )
+        os.fsync(fd)
+    finally:
+        os.close(fd)

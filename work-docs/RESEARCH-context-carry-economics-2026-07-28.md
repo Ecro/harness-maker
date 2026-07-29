@@ -11,6 +11,42 @@ source: harness_maker.economics report over 23,536 local turns ($5,422 list-pric
 command surface grew 0.75%). This is the first use of that meter to aim the next work.
 Every number below is measured, not modelled.
 
+> **⚠️ Corrected 2026-07-29 — every turn count and every absolute dollar below is ~2.1×
+> too high. Every share, ratio, ctx/turn figure, and ordinal finding stands.**
+>
+> The meter counted **JSONL records, not API calls.** Claude Code writes one assistant
+> record per content block (`thinking` / `text` / `tool_use`) and stamps the **same**
+> `usage` on each, so `economics_source.load_turns` billed a single call two or three
+> times. Verified verbatim: `msg_011CdF1bxf4qyKS3RE7i9RQR` spans 3 records all carrying
+> `in=2 out=1663 cr=20352 cw=56171`.
+>
+> **What is wrong:** every `turns` column, and every `$`. **What is not:** shares (a ratio
+> of two equally-inflated terms), `ctx/turn` (a mean over identical values is that value),
+> and `context_composition`'s character shares (each content block appears in exactly one
+> record). So Findings 1–6 and the lever ranking are unaffected — only their price tags.
+>
+> **Magnitude, measured on the frozen corpus** (`~/.cache/harness-maker/frozen-corpus-2026-07-28`,
+> 48 files / 162 MB) with the shipped fix (`PLAN-wrapup-context-carry` Phase 1):
+>
+> | | before | after |
+> |---|---:|---:|
+> | assistant records → billed calls | 24,082 | **10,945** (13,137 collapsed) |
+> | main-loop billed calls | 18,429 | **8,682** |
+> | main-loop spend | $4,614 | **$2,150** |
+> | main-loop carry | 74.9% | **79.2%** |
+> | `hm:wrapup` spend / carry | $782 / $657 | **$339 / $294** |
+>
+> Carry *rises* as a share because collapsing removes duplicated non-cache-read cost from
+> the denominator faster than cache-read from the numerator.
+>
+> **Two caveats on reproducing this.** (1) The figures above come from
+> `tests/manual/oracle_dedupe_reference.py`, which prices every cache-creation token at
+> the 5-minute rate; the shipped `economics report` splits 5m/1h and therefore reports a
+> higher total (~$2,278) on the same corpus. The **call count (8,682) and carry dollars
+> ($1,704) agree exactly** — the difference is pricing, not collapse. (2) The shipped
+> report's `by_stage` mixes main-loop and subagent turns, while the per-stage tables in
+> this document are main-loop only; do not compare them row-for-row.
+
 ## Headline
 
 **Carry is a main-loop phenomenon. It is not a prompt-size phenomenon, and that is why

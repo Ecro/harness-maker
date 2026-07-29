@@ -1,0 +1,353 @@
+schema_version: 2
+spec_slug: wrapup-context-carry
+parent_spec: null
+verification_tier: 2
+mutation_threshold: 70
+mutation_threshold_rationale: tier 2 — unlike the prose-and-template surface of
+  SPEC-context-carry-discipline, the changed code here is arithmetic over a token
+  ledger (collapse a record group, divide a cost) where an off-by-one or a wrong
+  aggregation key is exactly the kind of mutant that survives a shape-only assertion.
+  70 rather than 85 because the module also holds I/O and path-boundary code that
+  mutmut cannot reach from these tests. Sampled, not on execute's hot path (T1 only).
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/economics_source.py
+spec_quality_score: 89
+spec_quality_score_at: '2026-07-28'
+ac:
+- id: AC-001
+  title: one API call contributes exactly one turn
+  type: mechanical
+  test_ids: []
+  executable_predicate: report(fixture_split_records).turns == 2 and report(fixture_split_records).cache_read_usd
+    == price_of(two_distinct_calls_cache_read)
+  golden_table: []
+  rubric_id: null
+  note: 'The fixture holds one 3-record group and one singleton, so the correct answer
+    (2) is distinguishable from both the pre-fix answer (4) and from a collapse that
+    merged everything into one. The second conjunct is the load-bearing arm: a naive
+    fix that keeps one row per group but SUMS the group''s usage would satisfy the
+    turn count and still bill cache_read three times, which is the whole defect. Numbers
+    are hand-derived from the fixture, not read back from the implementation.'
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The fixture is authored for the test with a hand-counted expected
+    turn count and a hand-computed cache_read cost from the PRICE_TABLE row; both
+    are prior values fixed before the implementation exists, not outputs of the code
+    under test.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions:
+  - the fixture contains at least one message.id spanning >1 assistant record with
+    identical usage, without which the collapse arm cannot bite
+  observable_output: the turn count and cache_read_usd of the computed report
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: the report states how many records it collapsed
+  type: mechanical
+  test_ids: []
+  executable_predicate: report(fixture_split_records).diagnostics.duplicate_records_collapsed
+    == 2 and report(fixture_no_splits).diagnostics.duplicate_records_collapsed == 0
+  golden_table: []
+  rubric_id: null
+  note: 'The zero-case is the half that matters and the half that is easy to omit.
+    A field that only appears when non-zero lets a report over a split-free corpus
+    look identical to a pre-fix report, which defeats the purpose of labelling the
+    change of unit. This is the repo''s recorded absent-case failure mode (failures.md
+    count 8): a feature that activates only on an optional condition never fires for
+    the inputs that predate it.'
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: Both expected counts (2 and 0) are derived by hand from two authored
+    fixtures whose record structure is fixed in the test tree; neither is obtained
+    by running the reporting code.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions:
+  - two fixtures exist, one with split records and one without
+  observable_output: the diagnostics section of the emitted report
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: collapsing preserves context per turn and divides carry
+  type: property
+  test_ids: []
+  executable_predicate: mean_context(collapse(group)) == context_of(group[0]) and
+    carry_usd(collapse(group)) * len(group) == carry_usd(group)
+  golden_table: []
+  rubric_id: null
+  note: 'A metamorphic relation, so it needs no reference output and cannot be satisfied
+    by reading the implementation. It also pins the exact claim this SPEC makes to
+    the reader — that the correction moves dollars but NOT mean_context_tokens — so
+    if a future change to the collapse breaks that invariant, the document and the
+    code fail together rather than drifting apart. Hypothesis ci profile per PLAN-spec-tetrad
+    ADR-002.'
+  pending_test: true
+  oracle_source: property
+  oracle_evidence: The relation holds by construction of the artifact regardless of
+    implementation — the split records carry byte-identical usage, so their mean over
+    any grouping is the shared value, and the cache_read total is exactly proportional
+    to the number of rows retained. No reference implementation and no golden value
+    is involved.
+  oracle_independence_waiver: null
+  input_domain: groups of 1..8 synthetic assistant records sharing one message.id,
+    with usage fields drawn from non-negative integers
+  transformation: collapse the group to a single row keyed on message.id
+  expected_relation: mean context tokens is invariant under collapse; cache_read cost
+    scales by exactly 1/len(group)
+  preconditions:
+  - every record in a group carries identical usage, which is the artifact's observed
+    shape
+  observable_output: mean_context_tokens and cache_read_usd before and after collapse
+  generator_hint: vary group size including the degenerate size 1, where collapse must
+    be the identity
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: the rendered command's brief invocation succeeds on the normal path
+  type: mechanical
+  test_ids: []
+  executable_predicate: run(rendered_brief_argv(), cwd=base_repo).stdout_json["status"]
+    == "ok" and run(rendered_brief_argv(), cwd=base_repo).stdout_json["brief"]["slug"]
+    == slug
+  golden_table: []
+  rubric_id: null
+  note: 'The argv MUST be extracted from the rendered .claude/commands/hm/wrapup.md
+    and executed, not re-typed in the test. This defect survived four months precisely
+    because every artifact on disk was individually correct — wrapup_brief.py does
+    what its docstring says, and the command file contains a well-formed command line;
+    only their composition is wrong. CLAUDE.md checkpoint 2 states the rule this AC
+    enforces: a consumer-side mismatch cannot be caught by inspecting files, only
+    by running the call and comparing the returned value. A real git worktree is required
+    — a mocked git would let the base-cwd bug pass.'
+  pending_test: true
+  oracle_source: differential
+  oracle_evidence: The two sides are independent artifacts — the argv comes from the
+    renderer's output and the expected slug comes from the git branch the test creates.
+    Neither is authored alongside the assertion, so a template regression changes one
+    side only.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions:
+  - a real temporary git repository with a task worktree checked out on hm/<slug>,
+    since the failure is a git-state resolution error and is invisible without one
+  observable_output: the JSON printed on stdout by the executed argv
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: no task branch still yields a graceful degrade
+  type: mechanical
+  test_ids: []
+  executable_predicate: all(run(argv, cwd=repo_on_main).returncode == 0 and run(argv,
+    cwd=repo_on_main).stdout_json["status"] == "degraded" and "slug" in run(argv, cwd=repo_on_main).stdout_json["verdict"]["missing"]
+    for argv in (rendered_brief_argv(slug="absent-task"), rendered_brief_argv_without_slug()))
+  golden_table: []
+  rubric_id: null
+  note: 'The negative arm of AC-004, and the reason the pair is not one AC. A fix that
+    simply resolved some worktree from any cwd would turn AC-004 green while silently
+    breaking the standalone and recovered wrapup, which wrapup_brief''s own docstring
+    calls a supported path and which returns exit 0 deliberately so the degrade is
+    not a halt. Asserting the exit code as well as the status is what stops a future
+    change from converting the degrade into an error. BOTH standalone shapes are required:
+    a slug naming a task with no worktree, and no slug argument at all. The second
+    is the backward-compatibility arm — an un-re-rendered harness keeps calling without
+    the flag, and ADR-001 promises that path is unchanged, so a predicate covering only
+    the first would let a regression there ship silently.'
+  pending_test: true
+  oracle_source: differential
+  oracle_evidence: The expected degrade shape is fixed by wrapup_brief's existing published
+    contract (exit 0, status degraded, missing names the underivable field), which
+    predates this change and is not authored with the assertion.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions:
+  - a real temporary git repository with HEAD on a non-task branch and no task worktree
+  observable_output: the exit code and the JSON printed on stdout
+  generator_hint: null
+  judgment_verdict: null
+  judgment_evidence: null
+  judged_at: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: every derivation writes exactly one ledger row
+  type: mechanical
+  test_ids: []
+  executable_predicate: len(ledger_rows(after_one_degrade)) == 1 and ledger_rows(after_one_degrade)[0]["reason"]
+    == verdict.reason and len(ledger_rows(after_two_degrades)) == 2 and len(ledger_rows(after_one_success))
+    == 1 and ledger_rows(after_one_success)[0]["status"] == "ok"
+  golden_table: []
+  rubric_id: null
+  note: 'Exactly one row, not at-least-one: a per-call row is what makes "16 runs,
+    2 fired" computable, and a writer that rewrites in place or appends per retry destroys
+    the denominator. The second-degrade arm is the append check. Reason equality rather
+    than truthiness stops a row that records the event but loses the diagnosis, which
+    would leave the ledger able to prove that degradation happened and unable to say
+    why — the state this defect was already in. The SUCCESS arm is the one a reviewer
+    found missing: with only degraded-path assertions, an implementation that logs
+    exclusively on failure passes every conjunct while writing no denominator at all,
+    and the dispatch rate then reads as 0/0 or silently omits the successful invocations
+    it is supposed to be divided by.'
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The expected row count after one and after two degrades is fixed
+    by the ledger's append-once-per-invocation contract stated in this SPEC before
+    the writer exists; the reason string is compared to the verdict the derivation
+    itself returned, which is produced by separate code from the ledger writer.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions:
+  - a temporary project root so the ledger path is isolated from the developer's own
+    observability directory
+  observable_output: the parsed rows of the delegation ledger file
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: health fails a configured-but-never-firing delegation
+  type: mechanical
+  test_ids: []
+  executable_predicate: signal(readiness(briefs_but_no_dispatch), "delegation_fires").passed is False and signal(readiness(no_ledger), "delegation_fires").passed is False and signal(readiness(all_briefs_degraded), "delegation_fires").passed is False and signal(readiness(unknown_dispatch_status), "delegation_fires").passed is False and len({signal(readiness(no_ledger), "delegation_fires").action, signal(readiness(briefs_but_no_dispatch), "delegation_fires").action, signal(readiness(all_briefs_degraded), "delegation_fires").action}) == 3 and signal(readiness(dispatch_unavailable_only), "delegation_fires").passed is True and signal(readiness(dispatched_long_ago_then_stopped), "delegation_fires").passed is False and signal(readiness(delegation_off), "delegation_fires").passed is True
+  golden_table: []
+  rubric_id: null
+  note: 'Seven fixture trees, and the signal reads a RECENCY WINDOW — the most recent 10 brief rows of EVERY status, ordered by parsed timestamp, and the same-stage dispatch rows at or after the oldest of them. Anchoring on brief-OK rows was itself the defect: the anchor then stops being written by the very regression being detected, so the floor freezes in the last healthy era and the verdict reads ok indefinitely. A brief whose timestamp will not parse is EXCLUDED from the window rather than sorted oldest — sorted oldest it becomes the floor and admits every dispatch in the file. The window is stage-scoped because the ledger is shared and `verify` briefs degrade structurally. The `dispatched_long_ago_then_stopped`
+    arm is why: the ledger is append-only, so a lifetime-existence rule ("has any dispatch
+    ever succeeded") goes green on the first success and stays green through every later
+    regression, which is precisely the blind spot this whole SPEC exists to close, rebuilt
+    one layer further in. A window also avoids row-to-row pairing, so concurrent sessions
+    interleaving rows cannot confuse it. The signal is defined over DISPATCH-observed rows, not
+    brief-derivation rows — one wired to derivability would go green the moment the
+    cwd seam is closed while the subagent might still never be dispatched, reinstalling
+    the four-month blind spot one level up. Both informational arms FAIL rather than
+    pass-with-an-action, because Signal.action has exactly one consumer (improvement._extract_layer1_actions)
+    and it is gated on `sig.passed` — a passing signal''s action renders nowhere, so
+    "pass with an action" would ship inert while this AC certified it green. Failing
+    is score-neutral here: _score_signals sums the weights of PASSED signals, and this
+    one ships at weight 0. The action-inequality conjunct is load-bearing: three failing arms that emit the same string are indistinguishable to the user whose remedies differ ("run wrapup once" vs "the brief is not derivable" vs "your dispatches are not happening"), and they point at three different places. The unavailable-only
+    arm keeps Cursor and Codex harnesses — where the stage self-skips the subagent
+    entirely — off a permanent red they cannot clear. The unconfigured arm matches
+    readiness''s existing treatment of permissions_deny_present as an intended config
+    choice rather than a finding.'
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The three expected verdicts follow from the signal contract fixed
+    in this SPEC's S7 table before the signal exists, and the N-A treatment is copied
+    from the pre-existing permissions_deny_present precedent in readiness.py rather
+    than invented alongside the test.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions:
+  - seven fixture project trees — brief rows with no dispatch rows; no ledger at all; dispatch rows that are all `unavailable`; a successful dispatch row followed by more than 10 later brief rows and no further dispatch; every recent brief `degraded`; a recent dispatch carrying an unrecognised status; and delegation unconfigured
+  observable_output: the passed flag and action string of the delegation signal in
+    the readiness result
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-009
+  title: the rendered self-skip branch writes its unavailable row
+  type: mechanical
+  test_ids: []
+  executable_predicate: run(rendered_selfskip_ledger_argv(), cwd=base_repo).returncode
+    == 0 and [r for r in ledger_rows(base_repo) if r["kind"] == "dispatch" and r["status"]
+    == "unavailable"] != []
+  golden_table: []
+  rubric_id: null
+  note: 'The self-skip branch is PROSE in a Jinja template — the one shape in this repo
+    where a thing can claim to record something and record nothing, with every render-grep
+    test green. AC-007 supplies pre-built ledger fixtures and AC-004 executes only the
+    brief line, so without this AC a Cursor or Codex harness could ship accumulating
+    brief rows and zero dispatch rows, and the health signal would then truthfully report
+    "dispatch is not happening" for a reason that is not the user''s fault and that the
+    unavailable arm was specifically built to prevent. The command must be EXTRACTED
+    from the render and executed, for the same reason AC-004 is: a test that writes
+    the command itself proves only that the ledger module works.'
+  pending_test: true
+  oracle_source: differential
+  oracle_evidence: The command under test comes from the renderer's output and the expected
+    row shape comes from ADR-005's schema, fixed before the template branch is written;
+    neither side of the comparison is authored alongside the assertion.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions:
+  - a hermetic render whose config names wrapup in delegation.stages, without which
+    the Jinja guard elides the whole block and there is no line to extract
+  observable_output: the exit code of the extracted command and the resulting ledger rows
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-008
+  title: the ingestion drift signal survives the change of unit
+  type: mechanical
+  test_ids: []
+  executable_predicate: ingest(fixture_split_records).diagnostics.coverage == 1.0 and
+    ingest(fixture_split_group_partly_out_of_window).diagnostics.coverage == 1.0
+  golden_table: []
+  rubric_id: null
+  note: 'coverage is priced turns over in-window assistant lines and is the repo''s
+    ingestion-drift detector (harness-economics-observability ADR-009). Collapsing divides
+    the numerator by ~2.2 and leaves the denominator alone, so an unrepaired coverage
+    falls to ~0.45 and stays there — permanently red, therefore permanently ignored,
+    which retires the signal by making it always-on. The second fixture is the load-bearing
+    one: today the denominator subtracts skipped_by_reason[outside_window] from assistant_lines,
+    and if one term becomes group-counted while the other stays record-counted the two
+    can no longer be subtracted. A partly-out-of-window split group is exactly where
+    that unit mismatch surfaces, and it is invisible to a fixture whose groups are all
+    in-window.'
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: 1.0 is coverage's pre-existing healthy value on this repo's own corpus,
+    measured under the record-counting rule before this change was designed; it is a
+    prior observed constant, not a value read back from the new implementation.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions:
+  - a fixture in which at least one split group straddles the reporting window boundary,
+    without which the record-vs-group unit mismatch cannot bite
+  observable_output: IngestionDiagnostics.coverage after a full ingestion
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null

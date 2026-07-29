@@ -19,8 +19,10 @@ from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict
 
+from . import delegation_ledger
 from .models import DELEGATABLE_STAGES, DelegationConfig
 from .second_opinion_invoke import resolve_base_root
+from .worktree import _valid_task_slug
 
 logger = logging.getLogger(__name__)
 
@@ -88,6 +90,15 @@ def validate_brief(brief: WrapupBrief) -> BriefVerdict:
         missing.append("stage")
         reasons.append(f"stage is {brief.stage!r}, expected one of {', '.join(DELEGATABLE_STAGES)}")
 
+    if not missing and not _valid_task_slug(brief.slug):
+        # The slug is DERIVED from a git branch name, which accepts far more than a slug
+        # does, and the rendered command has the model paste it into single-quoted `!`
+        # shell arguments at the base repo. `task-create`/`refresh`/`land` all enforce this
+        # already; reversing branch→slug was the one path that did not. A slug that fails
+        # here degrades to the inline body, which is the supported path — not an error.
+        missing.append("slug")
+        reasons.append(f"slug {brief.slug!r} is not a valid task slug")
+
     if not missing:
         base = Path(brief.base_root)
         worktree = Path(brief.worktree_root)
@@ -120,9 +131,20 @@ def _git(args: list[str], cwd: Path) -> str | None:
     """None on ANY failure — no git, not a repo, or a non-zero exit."""
     try:
         proc = subprocess.run(
-            ["git", *args], cwd=cwd, capture_output=True, text=True, timeout=30, check=False
+            ["git", *args],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            errors="replace",
+            timeout=30,
+            check=False,
         )
-    except (OSError, subprocess.SubprocessError):
+    except (OSError, subprocess.SubprocessError, UnicodeError):
+        # UnicodeError too: `rev-parse --abbrev-ref HEAD` returns raw branch bytes with
+        # no quoting, so a non-UTF-8 branch name would escape `derive_brief`'s
+        # "never raises" contract — and the crash lands BEFORE the ledger append, so the
+        # health signal would read `no-rows` and tell the user to run the wrapup they are
+        # already running. `errors="replace"` above makes this belt-and-braces.
         return None
     return proc.stdout if proc.returncode == 0 else None
 
@@ -154,7 +176,7 @@ def _changed_files(worktree: Path) -> tuple[str, ...]:
     return tuple(names)
 
 
-def _diff_stat(worktree: Path, changed: tuple[str, ...]) -> str:
+def _diff_stat(worktree: Path) -> str:
     """`git diff --stat HEAD` alone is misleading here.
 
     It reports TRACKED modifications only, and a wrapup's changes are typically new
@@ -172,9 +194,47 @@ def _diff_stat(worktree: Path, changed: tuple[str, ...]) -> str:
     return f"{tracked}\n{summary}" if tracked else summary
 
 
-def derive_brief(cwd: Path, *, stage: str = STAGE) -> tuple[WrapupBrief | None, BriefVerdict]:
+def _worktree_for_slug(base: Path, slug: str) -> Path | None:
+    """The checkout on `refs/heads/hm/<slug>`, located from the BASE repo.
+
+    Identity comes from the slug the stage was invoked with, not from whichever directory
+    a shell happened to start in. The rendered command runs this from a `!` line, and `!`
+    lines execute at the base repo — the seam that kept the gate `degraded` on the normal
+    Production path for four months.
+    """
+    out = _git(["worktree", "list", "--porcelain"], base)
+    if not out:
+        return None
+    current: Path | None = None
+    for line in out.splitlines():
+        if line.startswith("worktree "):
+            current = Path(line[len("worktree ") :].strip())
+        elif line.strip() == f"branch refs/heads/{TASK_BRANCH_PREFIX}{slug}" and current:
+            return current.resolve()
+    return None
+
+
+def derive_brief(
+    cwd: Path, *, stage: str = STAGE, slug: str | None = None
+) -> tuple[WrapupBrief | None, BriefVerdict]:
     """Everything the machine knows, derived. Never raises — ADR-006's degraded path."""
     cwd = Path(cwd).resolve()
+    if slug:
+        # `missing=("slug",)` on failure, NOT `worktree_root`: there is no worktree here
+        # to be wrong about, there is a slug that resolved to nothing — the same
+        # underivable field the cwd path reports. The `reason` separates the two.
+        base = resolve_base_root(cwd)
+        located = _worktree_for_slug(base, slug)
+        if located is None:
+            return None, BriefVerdict(
+                ok=False,
+                missing=("slug",),
+                reason=(
+                    f"no worktree on {TASK_BRANCH_PREFIX}{slug} under {base} — "
+                    "running the body inline"
+                ),
+            )
+        cwd = located
     toplevel = _git(["rev-parse", "--show-toplevel"], cwd)
     if not toplevel or not toplevel.strip():
         return None, BriefVerdict(
@@ -213,7 +273,7 @@ def derive_brief(cwd: Path, *, stage: str = STAGE) -> tuple[WrapupBrief | None, 
         worktree_root=str(worktree),
         locale=_locale(base),
         changed_files=changed,
-        diff_stat=_diff_stat(worktree, changed),
+        diff_stat=_diff_stat(worktree),
         plan_path=_doc("PLAN"),
         review_path=_doc("REVIEW"),
     )
@@ -237,9 +297,24 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m harness_maker.wrapup_brief")
     parser.add_argument("--root", default=".", help="cwd to derive from (a task worktree)")
     parser.add_argument("--stage", default=STAGE, help=f"one of {', '.join(DELEGATABLE_STAGES)}")
+    parser.add_argument(
+        "--slug",
+        default=None,
+        help="task slug; the worktree on hm/<slug> is located from the base repo",
+    )
     ns = parser.parse_args(argv if argv is not None else sys.argv[1:])
 
-    brief, verdict = derive_brief(Path(ns.root), stage=ns.stage)
+    brief, verdict = derive_brief(Path(ns.root), stage=ns.stage, slug=ns.slug)
+    # EVERY invocation, not just the failures: a rate needs a denominator, and a writer
+    # that logs only degraded calls makes the dispatch rate divide by nothing.
+    delegation_ledger.append(
+        resolve_base_root(Path(ns.root).resolve()),
+        stage=ns.stage,
+        slug=ns.slug or (brief.slug if brief is not None else ""),
+        kind="brief",
+        status="ok" if verdict.ok else "degraded",
+        reason=None if verdict.ok else verdict.reason,
+    )
     print(
         json.dumps(
             {

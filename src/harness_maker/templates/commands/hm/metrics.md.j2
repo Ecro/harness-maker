@@ -170,7 +170,12 @@ store was actually read).
 ### 5c — Check the instrument before you read the numbers
 
 Look at `ingestion.coverage` FIRST. It is priced turns over in-window assistant
-lines. A value well below ~0.9 means the reader is only partly understanding the
+**calls** — not over assistant lines. Claude Code writes one JSONL record per content
+block (`thinking` / `text` / `tool_use`) and stamps the same `usage` on each, so the
+reader groups a call's records into one turn; `duplicate_records_collapsed` reports how
+many records that removed. Both sides of the ratio therefore count calls, and a
+line-counted denominator would peg coverage near 0.45 forever.
+A value well below ~0.9 means the reader is only partly understanding the
 transcript format — every figure below is then an undercount, not a measurement.
 Report the coverage number alongside the totals; never present spend without it.
 Also surface `ingestion.dirs_scanned`, `files_failed`, and any

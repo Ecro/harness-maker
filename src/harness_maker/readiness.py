@@ -606,6 +606,125 @@ def _dim_guardrails(project_dir: Path) -> DimensionScore:
         )
     )
 
+    # Does the delegation that is CONFIGURED actually fire? (PLAN-wrapup-context-carry
+    # ADR-006.) `delegation.stages` named wrapup for four months while the dispatch
+    # happened in 2 of 16 measured runs, and nothing surfaced it: the brief was
+    # derivable, the render was correct, and every test was green. The ledger's dispatch
+    # rows are the only observation that distinguishes "configured" from "working".
+    #
+    # Weight 0, like the other advisory guardrail signals: `_score_signals` sums the
+    # weights of PASSED signals, so a failing weight-0 signal is score-neutral, and the
+    # dimension's "weights sum to 100" budget is untouched — adding a weighted signal
+    # would re-score every existing harness and read as a regression the user did not cause.
+    _delegation_stages: list[str] = []
+    # Defaults to the shipped default (True) so a harness.yaml that predates the key is not
+    # reported as structurally broken on the strength of an absent field.
+    _dl_feature_branch = True
+    _dl_hy = claude / "harness.yaml"
+    if _dl_hy.is_file():
+        try:
+            from harness_maker.io_utils import load_harness_yaml as _lhy_dl
+
+            _dl_cfg = _lhy_dl(_dl_hy)
+            _dl_block = _dl_cfg.get("delegation") if isinstance(_dl_cfg, dict) else None
+            if isinstance(_dl_block, dict) and isinstance(_dl_block.get("stages"), list):
+                _delegation_stages = [
+                    str(s).strip().lower() for s in _dl_block["stages"] if str(s).strip()
+                ]
+            _dl_wt = _dl_cfg.get("worktree") if isinstance(_dl_cfg, dict) else None
+            if isinstance(_dl_wt, dict) and "feature_branch_workflow" in _dl_wt:
+                _dl_feature_branch = _dl_wt.get("feature_branch_workflow") is not False
+        except Exception:  # noqa: BLE001 — degrade to N-A, never crash readiness
+            _delegation_stages = []
+
+    if "wrapup" not in _delegation_stages:
+        # The absent case, decided rather than fallen through: a harness that never opted
+        # in must not accrue an action item for a feature it does not use.
+        _dl_passed, _dl_evidence, _dl_action = (
+            True,
+            "delegation.stages does not name wrapup (N-A)",
+            None,
+        )
+    else:
+        from harness_maker import delegation_ledger as _dl
+
+        # Resolve the base FIRST — both writers do (`wrapup_brief` via `resolve_base_root`,
+        # `wrapup_receipt` via `memory_md._base_root`), because `.claude/observability/` is
+        # gitignored churn that exists only at the base while `harness.yaml` is tracked and
+        # therefore present in every worktree checkout. Reading the raw `project_dir` inside
+        # a worktree would pair "wrapup is delegated" with an absent ledger and report
+        # `no-rows` on a harness that is dispatching correctly — the same base-vs-worktree
+        # asymmetry this module was written to remove, re-introduced on the read side.
+        from harness_maker.memory_md import _base_root as _dl_base
+
+        # `stage=` is REQUIRED, not defaulted. `verify` is delegatable too, so a second
+        # signal added later that omitted it would silently report the wrapup verdict under
+        # a verify label — the failure mode this whole work unit is about. A required
+        # keyword costs nothing at one call site and makes the omission a type error.
+        _dl_verdict = _dl.dispatch_verdict(_dl.read_rows(_dl_base(project_dir)), stage="wrapup")
+        _dl_passed = _dl_verdict in ("ok", "unavailable-only")
+        if _dl_verdict == "no-rows":
+            # "no invocation with a readable timestamp", not "no invocation": the arm is
+            # also reached when rows exist but none of their timestamps parse, and calling
+            # that an empty ledger would send the reader looking for the wrong thing.
+            _dl_evidence = (
+                "wrapup delegation is configured but no invocation with a readable "
+                "timestamp is recorded yet"
+            )
+            # Distinct from the arm below BY DESIGN, and AC-007 asserts the inequality:
+            # "never run" and "runs but never dispatches" have different remedies, and the
+            # action string is the only surface a user ever sees.
+            _dl_action = (
+                "Run /hm:wrapup once so the delegation ledger "
+                "(.claude/observability/delegation.jsonl) gets its first rows"
+            )
+        elif _dl_verdict == "brief-degrading" and not _dl_feature_branch:
+            # `derive_brief` resolves a task branch (`hm/<slug>`); with the per-task
+            # feature-branch workflow off there is never one, so every brief degrades
+            # STRUCTURALLY and delegation cannot fire at all. Keep it failing — a silent
+            # pass would hide that the feature is dead — but name the remedy the user can
+            # actually perform. "The brief is not derivable" would be permanently true and
+            # permanently unactionable, which is the `absent-case = feature black hole`
+            # shape the `unavailable-only` arm already exists to avoid.
+            _dl_evidence = (
+                "delegation is configured but worktree.feature_branch_workflow is off — "
+                "the brief has no task branch to resolve, so it degrades on every run"
+            )
+            _dl_action = (
+                "Set worktree.feature_branch_workflow: true (delegation derives its brief "
+                "from an hm/<slug> task branch), or clear delegation.stages if this harness "
+                "is not using the per-task worktree model"
+            )
+        elif _dl_verdict == "brief-degrading":
+            # A THIRD distinct failing action, because the remedy is a different half of
+            # the seam: the dispatch is not "not happening", it is unreachable — Step 0.5
+            # degrades before it gets there. Telling this user to check their dispatch
+            # would point at the wrong place, which is how a signal stops being read.
+            _dl_evidence = (
+                "every recent wrapup brief degraded — Step 0.5 never reaches the dispatch"
+            )
+            _dl_action = (
+                "Run `python -m harness_maker.wrapup_brief --root . --slug <slug>` from the "
+                "BASE repo and read verdict.reason — the brief is not derivable, so the "
+                "delegated body is being skipped before any dispatch is attempted"
+            )
+        elif _dl_verdict == "no-dispatch":
+            _dl_evidence = (
+                "wrapup derived its brief but dispatched no subagent in the recent window"
+            )
+            _dl_action = (
+                "Step 0.5 of /hm:wrapup is deriving the brief and then not dispatching "
+                "stage-delegate — check that the brief reports status: ok and that the "
+                "dispatch is actually issued"
+            )
+        elif _dl_verdict == "unavailable-only":
+            _dl_evidence = "wrapup self-skips dispatch — this IDE has no subagent tool (N-A)"
+            _dl_action = None
+        else:
+            _dl_evidence = "wrapup delegation dispatched in the recent window"
+            _dl_action = None
+    signals.append(_signal("delegation_fires", _dl_passed, 0, _dl_evidence, _dl_action))
+
     # Render-drift guard (PLAN-wrapup-waiver-enforcement ADR-004/C5): the
     # task-driven oracle-waiver advisory (wrapup Step 3.6) is baked at render time
     # on the dev_mode branch. If harness.yaml's dev_mode was flipped without

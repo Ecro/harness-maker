@@ -184,7 +184,9 @@ def test_delegation_adds_a_bounded_amount_of_prose(tmp_path: Path, preset: str) 
     phase added anything, and nothing ENFORCES that cap on an atomic stage command
     (`readiness._CONTEXT_LIMITS` has no command row). Measuring the delta instead
     makes the assertion about this change rather than about inherited size. Measured:
-    +50 lines.
+    **+60 lines — the cap exactly.** Five review rounds of added prose were paid for by
+    compressing existing prose in the same block; there is no headroom left, so the next
+    addition must be paid for the same way rather than by raising the bound.
     """
     off = _count_body_lines(_wrapup(tmp_path / "off", preset=preset))
     on = _count_body_lines(_wrapup(tmp_path / "on", preset=preset, stages=["wrapup"]))
@@ -232,6 +234,11 @@ def test_the_receipt_temp_file_discipline_is_specified(tmp_path: Path) -> None:
 
     assert "OUTSIDE the repo" in section
     assert "never a fixed in-repo name" in section
+    # `mktemp`, not a constructed path. The prose used to name `/tmp/hm-receipt-<slug>-$$.json`
+    # and lean on `$$` for entropy — but `$$` is a LITERAL under the Write tool, not a PID, so
+    # the path collapsed to a slug-derived name a peer can predict or pre-plant a symlink at.
+    # The receipt is the artifact the anti-fabrication reconciliation depends on (CWE-377).
+    assert "mktemp" in section
     # The stage must be asserted, or a wrapup receipt reconciles as a verify one.
     assert "--stage wrapup" in section
 

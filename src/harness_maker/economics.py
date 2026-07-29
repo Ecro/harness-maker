@@ -157,6 +157,10 @@ class TurnRecord(BaseModel):
     # message" case that survives the loader dropping every non-assistant line.
     uuid: str | None = None
     preceded_by_user: bool = False
+    # The API call this record belongs to. Claude Code writes one record per content
+    # block (thinking / text / tool_use) and stamps the SAME usage on each, so counting
+    # records bills one call two or three times. `load_turns` groups on this.
+    message_id: str | None = None
 
     @property
     def scope(self) -> Scope:

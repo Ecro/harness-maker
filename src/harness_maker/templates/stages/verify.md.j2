@@ -325,9 +325,19 @@ and the decision to STOP or proceed, plus this stage's exit code, stay here.
 
 **1. Derive and validate the brief.**
 
-```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.wrapup_brief --root . --stage verify
+{% if is_codex -%}
 ```
+Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.wrapup_brief --root . --stage verify --slug '<slug>'")
+```
+{%- else -%}
+```bash
+!uv run --with {{ harness_maker_src_path }} python -m harness_maker.wrapup_brief --root . --stage verify --slug '<slug>'
+```
+{%- endif %}
+
+Substitute the literal task slug (the preflight's). **`--slug` is required and `--root .`
+is correct**: `!` runs at the BASE repo, so a cwd-derived brief sees `HEAD` = `main` and
+degrades on the NORMAL path — the identical defect wrapup carried for four months.
 
 `status: "degraded"` → print `verdict.reason`, run the checks inline below, skip the
 rest of this step. That is a supported path, not an error.
@@ -342,13 +352,20 @@ The receipt must carry `result`, one `checks[]` entry per check with a
 `PASS | FAIL | SKIP` verdict, and `record_path` for the JSONL record it appended.
 
 **3. Reconcile before acting on the verdict.** Write the agent's reply to a **fresh
-unique temp file OUTSIDE the repo** (`/tmp/hm-receipt-<slug>-$$.json`) — never a fixed
-in-repo name; a predictable path collides under concurrent sessions and would let this
-gate adopt a verdict from someone else's run. Then:
+unique temp file OUTSIDE the repo** — take the path from `mktemp -t hm-receipt.XXXXXXXX`,
+never a constructed name (`$$` is a literal under the Write tool, so a slug-derived name is
+effectively predictable, and `mktemp`'s `O_EXCL` create also defeats a pre-planted symlink).
+A predictable path lets this gate adopt a verdict from someone else's run. Then:
 
+{% if is_codex -%}
+```
+Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.wrapup_receipt --root . --stage verify --worktree '<brief.worktree_root>' --receipt-file <the temp path>")
+```
+{%- else -%}
 ```bash
 !uv run --with {{ harness_maker_src_path }} python -m harness_maker.wrapup_receipt --root . --stage verify --worktree '<brief.worktree_root>' --receipt-file <the temp path>
 ```
+{%- endif %}
 
 > **`--worktree` is not optional** — substitute the literal `worktree_root` the brief
 > printed. `!` lines run at the BASE repo while the delegate writes in the worktree, so

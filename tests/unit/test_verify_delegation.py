@@ -329,6 +329,14 @@ def test_the_verify_receipt_temp_file_discipline_is_specified(tmp_path: Path) ->
     )
 
     assert "OUTSIDE the repo" in section
+    # The verify half of the CWE-377 fix, pinned here because the wrapup half was pinned
+    # first and alone: the gate was scoped to the artifact being edited, so a revert of
+    # THIS file's prose to a constructed `/tmp/hm-receipt-<slug>-$$.json` left the whole
+    # suite green. `$$` is a literal under the Write tool, so that path is predictable by a
+    # peer session and pre-plantable as a symlink — and the receipt is the artifact verify's
+    # anti-fabrication reconciliation depends on. (CLAUDE.md checkpoint 2: do not scope a
+    # gate to the output you happened to be fixing.)
+    assert "mktemp" in section
     assert "--stage verify" in section
 
 
