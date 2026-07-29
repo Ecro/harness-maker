@@ -149,6 +149,7 @@ def build_test_hints(
 CLASS_SOURCE_WITH_HINTS = "source-with-hints"
 CLASS_SOURCE_WITHOUT_HINTS = "source-without-hints"
 CLASS_RENDER_AFFECTING = "render-affecting"
+CLASS_DOC_WITH_CONSUMERS = "doc-with-consumers"
 CLASS_INERT = "inert"
 
 #: The bounded set a template / fixture change selects instead of FULL. Curated, so
@@ -186,10 +187,51 @@ _RENDER_AFFECTING_PREFIXES = (
 #: falls to the default arm rather than being assumed harmless.
 _INERT_PREFIXES = (
     "work-docs/",
-    "docs/",
     ".claude/memory/",
 )
-_INERT_ROOT_FILES = ("README.md", "CHANGELOG.md", "LICENSE")
+_INERT_ROOT_FILES = ("CHANGELOG.md", "LICENSE")
+
+#: Paths that LOOK inert (markdown, docs, the README) but are **read and asserted on**
+#: by a suite. `docs/` and `README.md` were in the inert set until the review found
+#: their consumers, at which point editing `docs/HOW-IT-WORKS.md` selected zero tests
+#: and still reported `mode: targeted` — a result indistinguishable from "checked and
+#: clean".
+#:
+#: **Keys are EXACT paths, never prefixes.** A `docs/` prefix entry would claim that
+#: every file under `docs/` maps to these suites, which is the same over-broad promise
+#: in the other direction. Anything not listed here falls through to the default arm and
+#: forces FULL, so this map is an OPTIMISATION: being incomplete costs a full run and
+#: can never cost a missed test.
+_README_SUITES = (
+    "tests/integration/test_readme_one_prompt.py",
+    "tests/integration/test_readme_install_commands.py",
+    "tests/unit/test_readme_one_prompt_structure.py",
+    "tests/unit/test_docs_render_pipeline.py",
+)
+
+DOC_CONSUMING_SUITES: dict[str, tuple[str, ...]] = {
+    # `README.ko.md` was NOT in the old inert tuple while `README.md` was — an asymmetry
+    # the review read, correctly, as evidence the list had been assembled by hand.
+    "README.md": _README_SUITES,
+    "README.ko.md": _README_SUITES,
+    "docs/HOW-IT-WORKS.md": ("tests/unit/test_docs_render_pipeline.py",),
+    "docs/HOW-IT-WORKS.ko.md": ("tests/unit/test_docs_render_pipeline.py",),
+    "docs/BOOTSTRAP.md": ("tests/snapshot/test_bootstrap_doc.py",),
+    "docs/assets/showcase-diff.md": ("tests/integration/test_profile_reality_check.py",),
+}
+
+#: Changing the selector changes what EVERY other change selects, so a selection it
+#: derives for its own edit is not evidence about anything. `build_test_hints` returns
+#: this file as its own hint (the stem reads as a test module), that hint is then
+#: filtered out for not living under `tests/`, and the result was a `targeted` run with
+#: an empty node list — the strongest possible false green, on the one file that decides
+#: every other file's fate.
+SELECTOR_SOURCE = "src/harness_maker/test_dep_map.py"
+
+
+def doc_consumers(rel_path: str) -> tuple[str, ...]:
+    """Suites that read this exact doc path; `()` when none are declared."""
+    return DOC_CONSUMING_SUITES.get(rel_path.replace("\\", "/"), ())
 
 
 def classify_path(rel_path: str, project_root: Path) -> str:
@@ -206,6 +248,8 @@ def classify_path(rel_path: str, project_root: Path) -> str:
         norm = norm[2:]
     if norm.endswith(".j2") or any(norm.startswith(p) for p in _RENDER_AFFECTING_PREFIXES):
         return CLASS_RENDER_AFFECTING
+    if doc_consumers(norm):
+        return CLASS_DOC_WITH_CONSUMERS
     if norm in _INERT_ROOT_FILES or any(norm.startswith(p) for p in _INERT_PREFIXES):
         return CLASS_INERT
     if norm.endswith(".py"):
@@ -232,6 +276,21 @@ def select_tests(changed: list[str], project_root: Path) -> dict[str, Any]:
             "classified": {},
         }
     classified = {rel: classify_path(rel, project_root) for rel in changed}
+
+    # The selector's own source forces FULL before anything else is considered. A
+    # selection this file derives for a change to this file is circular: it is the thing
+    # under test deciding what tests to run on itself.
+    if any(r.replace("\\", "/").lstrip("./") == SELECTOR_SOURCE for r in changed):
+        return {
+            "mode": "full",
+            "node_ids": [],
+            "reason": (
+                f"full suite: {SELECTOR_SOURCE} changed — the selector cannot produce "
+                "evidence about its own change"
+            ),
+            "classified": classified,
+        }
+
     forcing = [r for r, c in classified.items() if c == CLASS_SOURCE_WITHOUT_HINTS]
     if forcing:
         return {
@@ -241,19 +300,53 @@ def select_tests(changed: list[str], project_root: Path) -> dict[str, Any]:
             "classified": classified,
         }
     node_ids: list[str] = []
+    empty_hint_sources: list[str] = []
     for rel, cls in classified.items():
         if cls == CLASS_RENDER_AFFECTING:
             node_ids.extend(RENDER_AFFECTING_SUITES)
+        elif cls == CLASS_DOC_WITH_CONSUMERS:
+            node_ids.extend(doc_consumers(rel))
         elif cls == CLASS_SOURCE_WITH_HINTS:
             # Filtered to `tests/`: `build_test_hints` can return the changed file
             # itself when its stem already looks like a test module (this repo has
             # `src/harness_maker/test_dep_map.py`), and handing a source file to
             # pytest as a node id is a collection error, not a narrower run.
             hinted = build_test_hints([project_root / rel], project_root).get(rel, [])
-            node_ids.extend(h for h in hinted if h.replace("\\", "/").startswith("tests/"))
+            kept = [h for h in hinted if h.replace("\\", "/").startswith("tests/")]
+            if not kept:
+                # Classified as having hints, but every one was filtered away. That is
+                # how the selector's own source produced an EMPTY targeted run; the
+                # general form is guarded here rather than relying on the specific case
+                # above to keep firing.
+                empty_hint_sources.append(rel)
+            node_ids.extend(kept)
+
+    if empty_hint_sources:
+        return {
+            "mode": "full",
+            "node_ids": [],
+            "reason": "full suite: every hint was filtered out for "
+            + ", ".join(sorted(empty_hint_sources)),
+            "classified": classified,
+        }
+
+    deduped = sorted(dict.fromkeys(node_ids))
+    if not deduped and not all(c == CLASS_INERT for c in classified.values()):
+        # Backstop: `targeted` with nothing to run is strictly weaker than today's
+        # behaviour AND reads as a pass. The ONE honest empty selection is an all-inert
+        # change — a PLAN edit genuinely has no tests to run — so that case is excluded
+        # by class rather than by the node list being empty, which is the condition a
+        # misclassification also satisfies.
+        return {
+            "mode": "full",
+            "node_ids": [],
+            "reason": "full suite: the selection was empty — refusing to report a "
+            "targeted run with nothing in it",
+            "classified": classified,
+        }
     return {
         "mode": "targeted",
-        "node_ids": sorted(dict.fromkeys(node_ids)),
+        "node_ids": deduped,
         "reason": "targeted selection",
         "classified": classified,
     }

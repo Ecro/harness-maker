@@ -22,7 +22,7 @@ drift_verdict:
 **Grade B** — 1 consensus-passed P1, fixed in-round. 0 consensus-passed P0.
 Full suite `rc=0`, `ruff check .`, `ruff format --check`, `mypy --strict src` (127 files) all green.
 
-**`human_review_needed: true`** — three `manual-only` P1 findings remain unfixed. The
+**`human_review_needed: true`** — ~~three `manual-only` P1 findings remain unfixed~~. **All three are now CLOSED (2026-07-29); see each finding below.** The
 letter cleared; the flag is what carries them.
 
 Scope reviewed: 57 tracked files + 12 untracked, +757/−470. Phases 0, 0.5, 0.75
@@ -85,7 +85,8 @@ extraction plus non-empty guards during this work. T-C1 was missed.
 Single-source; not auto-applied. All three are code-reviewer findings on Phase 4's
 classifier and on the rewrite's integration boundary.
 
-### P1-1 — `select_tests` returns zero tests for a real source module
+### P1-1 — `select_tests` returns zero tests for a real source module  
+**CLOSED 2026-07-29.** Two guards, because the specific case was an instance of a general one: `SELECTOR_SOURCE` forces FULL outright (a selection this file derives for a change to this file is circular), and any `source-with-hints` file whose hints are ALL filtered out also forces FULL. A third backstop rejects an empty `targeted` selection except when every path is inert — the one honest empty answer.
 `test_dep_map.py:252`. `source_to_test_candidates` short-circuits to `[source_path]` for
 any stem starting with `test_`/`conftest`; `select_tests` then filters hints to `tests/`,
 emptying the list — but the `SOURCE_WITH_HINTS` classification already bypassed the FULL
@@ -94,14 +95,16 @@ selects **nothing** and reports `mode: targeted`. Violates
 [ADR-008](PLAN-workflow-step-audit.md#adr-008)'s protected invariant. **Fix:** when the
 filtered list is empty, fall through to FULL naming the file.
 
-### P1-2 — `docs/` and `README.md` are classified inert, but suites assert their contents
+### P1-2 — `docs/` and `README.md` are classified inert, but suites assert their contents  
+**CLOSED 2026-07-29.** Both left the inert set. `DOC_CONSUMING_SUITES` maps the known docs (both READMEs, both HOW-IT-WORKS, BOOTSTRAP, showcase-diff) to their real suites with **exact** keys — a `docs/` prefix would make the same over-broad promise in the other direction. Anything unlisted falls to the default arm and forces FULL, so the map is an OPTIMISATION: incompleteness costs a full run, never a missed test. A source-scanning detector was tried and discarded — it flagged 24 suites, nearly all of which merely WRITE a fixture `README.md`, and a heuristic that noisy gets weakened until it is vacuous.
 `test_dep_map.py:187`. `test_bootstrap_doc.py` asserts tokens in `docs/BOOTSTRAP.md`;
 `test_readme_one_prompt.py` / `test_readme_install_commands.py` read the real READMEs.
 `README.ko.md` is **not** in the tuple and correctly falls to FULL — that asymmetry is
 itself evidence the list was assembled by hand. The same reasoning that correctly
 excluded `CLAUDE.md` was not carried to its two siblings.
 
-### P1-3 — no test executes the invocation form the rewrite ships
+### P1-3 — no test executes the invocation form the rewrite ships  
+**CLOSED 2026-07-29** by `tests/integration/test_hm_console_script_resolves.py` (`INTEGRATION=1`, runs `uv run --with <repo> hm …` from `/tmp`).
 `test_hm_entrypoint.py:45` runs `python -m harness_maker.hm …`;
 `test_wrapup_brief_rendered_argv.py:101` explicitly avoids the console script to dodge a
 PATH dependency. Nothing anywhere runs `uv run --with <ref> hm <mod>` — the form every

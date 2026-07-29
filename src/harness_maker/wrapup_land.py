@@ -15,6 +15,8 @@ operator decision point.
 from __future__ import annotations
 
 import argparse
+import contextlib
+import io
 import json
 import os
 import subprocess
@@ -267,8 +269,15 @@ def run(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
         receipt["steps"]["owned_crumb_clear"] = {"status": "kept-pop-failed"}
         return EXIT_FAILED, receipt
 
-    wt._cli_drain([str(base)])
-    receipt["steps"]["drain"] = {"status": "ran"}
+    # `_cli_drain` prints its summary to STDOUT, and stdout is the receipt's channel.
+    # Left unredirected it emits `worktree drain: removed 0 branch(es)…` ahead of the
+    # JSON, so `… | jq` and `json.load` both die on line 1 — on a receipt the stage
+    # prose tells the reader to parse. Captured into the receipt instead, where it is
+    # still visible and no longer corrupts the document that carries it.
+    drain_out = io.StringIO()
+    with contextlib.redirect_stdout(drain_out):
+        wt._cli_drain([str(base)])
+    receipt["steps"]["drain"] = {"status": "ran", "summary": drain_out.getvalue().strip()}
     return EXIT_OK, receipt
 
 

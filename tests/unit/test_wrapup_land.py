@@ -373,3 +373,44 @@ def test_main_prints_a_json_receipt(
     assert rc == 0
     assert payload["ok"] is True
     assert payload["steps"]["commit"]["status"] == "created"
+
+
+def test_the_receipt_is_parseable_json_even_though_drain_prints_to_stdout(
+    repo: Path,
+    task_worktree: Path,
+    message: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """The receipt's channel is stdout, and `_cli_drain` writes its summary there too.
+
+    Found by running this composite for real and piping it to `json.load`, which died on
+    line 1 — on a document the stage prose instructs the reader to parse. A render-grep
+    could not have caught it: the template text is correct, only the bytes on the wire
+    are wrong.
+    """
+
+    def _noisy_drain(_a: list[str]) -> int:
+        print("worktree drain: removed 0 branch(es), 0 marker(s), 0 stash-ref(s)")
+        return 0
+
+    monkeypatch.setattr(wt, "_cli_drain", _noisy_drain)
+    (task_worktree / "a.md").write_text("a\n", encoding="utf-8")
+    rc = wrapup_land.main(
+        [
+            "--worktree",
+            str(task_worktree),
+            "--base",
+            str(repo),
+            "--slug",
+            "slug",
+            "--message-file",
+            str(message),
+            "--optional",
+            "a.md",
+        ]
+    )
+    out = capsys.readouterr().out
+    payload = json.loads(out)  # would raise before the fix
+    assert rc == 0
+    assert "removed 0 branch(es)" in payload["steps"]["drain"]["summary"]
