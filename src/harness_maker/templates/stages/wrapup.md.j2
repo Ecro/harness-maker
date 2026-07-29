@@ -574,106 +574,60 @@ Bash("uv run --with {{ harness_maker_src_path }} hm second_brain promote --type 
 
 **Receipt (ADR-006):** end this step by printing exactly one line — `promotion evaluated: <N> candidates, <M> promoted`. **`N` = the number of distinct local entries you wrote or touched in 5.1–5.4 that map to a promotable note_type** (every `failures.md` entry, every PLAN ADR, every confirmed preference) — it is NOT 0 if you wrote any such entry this unit. `M` = how many of those `N` you judged cross-project-durable and promoted. When `M < N`, add a one-line reason per skipped candidate. This is what makes silent under-promotion visible — do not collapse `N` to 0 to avoid the work.
 
-### Step 6 — Stage memory + PLAN updates
+### Steps 6 → 7.6 — Stage, commit, pop, drain (ONE call)
 
-{%- set wt_prefix = "cd <WT> && " if (config.worktree is defined and config.worktree.get('feature_branch_workflow')) else "" %}
-{%- if wt_prefix %}
-> **Flag-on (per-task worktree):** Step 6 and Step 7 MUST run inside `<WT>` — the
-> `hm/<slug>` task worktree from the Step-0 preflight — so the staging + commit land
-> on the task branch that Step 7.7 squash-lands. Without `cd <WT>` they would run in
-> the base repo, where the index is empty → the commit is a no-op and the curated
-> message never reaches the branch (which also defeats Step 7.7's reuse of it). The
-> `cd <WT> &&` prefix below enforces this.
+{%- if config.worktree is defined and config.worktree.get('feature_branch_workflow') %}
+> **Flag-on (per-task worktree):** staging + commit MUST land inside `<WT>` — the
+> `hm/<slug>` task worktree from the Step-0 preflight — so they reach the task branch
+> that Step 7.7 squash-lands. In the base repo the index is empty → the commit is a
+> no-op and the curated message never reaches the branch (which also defeats Step 7.7's
+> reuse of it). `--worktree` and `--base` are separate explicit arguments below, and the
+> call **refuses** a `--worktree` that is not a worktree of `--base`, so the cwd of the
+> shell that runs it cannot silently retarget the commit.
 {% endif -%}
-```bash
-!{{ wt_prefix }}for p in .claude/memory/ {{ config.work_docs.dir }}PLAN-{slug}.md {{ config.work_docs.dir }}REVIEW-{slug}-*.md {{ config.work_docs.dir }}RESEARCH-{slug}.md {{ config.spec.dir }}SPEC-{slug}.md {{ config.spec.dir }}SPEC-{slug}.machine.yaml; do \
-  [ -e "$p" ] && git add "$p" 2>/dev/null || true; \
-done
-```
+First write the commit message to a file. `<type>(<scope>): <subject ≤72 chars>` on line
+one, then a body explaining **why**, not **what** — the diff already says what. **Type**
+(per CLAUDE.md convention): `feat | fix | chore | ci | test | docs | refactor`.
 
-> Stages the deliverables this task produced — PLAN, REVIEW, **and** RESEARCH +
-> SPEC — so they land in git instead of lingering as untracked dirt that blocks
-> the next session's `worktree create` (PLAN-worktree-base-artifact-pollution
-> ADR-004).
->
-> **Why a per-path loop, not one `git add a b c`:** a single multi-pathspec
-> `git add` is atomic — if ANY argument matches nothing (no SPEC for this slug,
-> a glob with zero hits) `git add` fatal-exits with `pathspec ... did not match`
-> and stages **nothing**, silently dropping the memory updates from the commit.
-> A blanket `2>/dev/null` makes that failure invisible. The loop adds each path
-> independently (`[ -e ]` guard + per-path `|| true`), so a missing or
-> gitignored path can never abort staging of the others. (Footgun observed
-> 2026-05-30: the old form dropped wiki + failures from a wrapup commit because
-> the slug had no `specs/SPEC-*` file.)
-
-(REVIEW-*.md is optional — only present when `/hm:review` ran.)
-
-### Step 7 — Single commit
-
-Write the commit message: `<type>(<scope>): <subject ≤72 chars>` followed by a body explaining **why**, not **what**. The diff already says what.
-
-```bash
-!{{ wt_prefix }}git commit -m "$(cat <<'EOF'
-<type>(<scope>): <subject>
-
-<body — explains why this change exists, what trade-off was accepted, and
-which constraint forced the chosen approach. Cite ADR-NNN or Interview-#N
-when the rationale lives in the PLAN.>
-
-Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
-EOF
-)"
-```
-
-**Type** (per CLAUDE.md `<type>(<scope>): <subject>` convention): `feat | fix | chore | ci | test | docs | refactor`.
-
-The commit captures: the staged execute changes + the memory updates + the PLAN status update — **all in one commit**.
-
-### Step 7.5 — Post-commit stash pop (stage-only handshake)
-
-If `/hm:execute` ran in stage-only mode AND the base repo had unrelated dirty work, finalize deferred the stash pop to this point so the user's WIP does not contaminate the commit. Run `post-commit-pop` to restore it (no-op when no ref file is present).
-
-**Per-session isolation (ADR-001, slug crumb):** source `HM_OWNED_SESSION_UUIDS` from
-the **slug-keyed crumb** that `/hm:execute` wrote for THIS task (`owned-crumb-read
-"$(pwd)" <slug>`), NOT the all-markers `owned-uuids` (which would restore a PEER's
-deferred stash — the contamination this closes). `post-commit-pop` then SKIPs any ref
-whose `session_uuid` is not in your own owned set; an **empty** set (no crumb — e.g.
-`feature_branch_workflow` has no deferred stash, or a pre-upgrade harness) safely
-preserves all `session_uuid`-bearing refs rather than popping them. Substitute `<slug>`
-(the task you are wrapping up). If the crumb is somehow absent but you DO know the
-`execute-<uuid>-<ts>` worktree you created this session, you may instead pass
-`$(... wt-uuid <that path>)`. The crumb is cleared after a successful pop.
+Then run **one** call. It performs Steps 6, 7, 7.5 and 7.6 — legacy-ref pre-scan, stage,
+commit, `post-commit-pop`, `owned-crumb-clear`, `drain` — and returns a JSON receipt.
+{%- if config.worktree is defined and config.worktree.get('feature_branch_workflow') %}
+Step 7.7 below is deliberately NOT in it: it is the only step that can lose work, so it
+keeps its own invocation and its own operator decision point (ADR-006).
+{% endif -%}
 
 {% if is_codex %}
 ```
-Bash("HM_OWNED_SESSION_UUIDS=\"$(uv run --with {{ harness_maker_src_path }} hm worktree owned-crumb-read \"$(pwd)\" <slug>)\" uv run --with {{ harness_maker_src_path }} hm worktree post-commit-pop \"$(pwd)\" && uv run --with {{ harness_maker_src_path }} hm worktree owned-crumb-clear \"$(pwd)\" <slug>")
+Bash("uv run --with {{ harness_maker_src_path }} hm wrapup_land --worktree <WT> --base <BASE> --slug <slug> --message-file <msg-tmpfile> --required {{ config.work_docs.dir }}PLAN-{slug}.md --optional .claude/memory/ --optional {{ config.work_docs.dir }}REVIEW-{slug}-*.md --optional {{ config.work_docs.dir }}RESEARCH-{slug}.md --optional {{ config.spec.dir }}SPEC-{slug}.md --optional {{ config.spec.dir }}SPEC-{slug}.machine.yaml")
 ```
 {% else %}
 ```bash
-!HM_OWNED_SESSION_UUIDS="$(uv run --with {{ harness_maker_src_path }} hm worktree owned-crumb-read "$(pwd)" <slug>)" uv run --with {{ harness_maker_src_path }} hm worktree post-commit-pop "$(pwd)" && uv run --with {{ harness_maker_src_path }} hm worktree owned-crumb-clear "$(pwd)" <slug>
+!uv run --with {{ harness_maker_src_path }} hm wrapup_land --worktree <WT> --base <BASE> --slug <slug> --message-file <msg-tmpfile> --required {{ config.work_docs.dir }}PLAN-{slug}.md --optional .claude/memory/ --optional {{ config.work_docs.dir }}REVIEW-{slug}-*.md --optional {{ config.work_docs.dir }}RESEARCH-{slug}.md --optional {{ config.spec.dir }}SPEC-{slug}.md --optional {{ config.spec.dir }}SPEC-{slug}.machine.yaml
 ```
 {% endif %}
 
-You **MAY** call {% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %} (autoloop exception) **ONLY IF** the literal substring `[finalize] stash-pop conflict` OR `[finalize] untracked-file collision` appears in `post-commit-pop`'s stderr. Any other non-zero exit: surface verbatim and halt, do NOT ask.
+**The manifest is typed (ADR-007), not a tolerate-everything loop.** An absent
+**optional** path records `absent-optional` and staging continues (REVIEW is absent
+whenever `/hm:review` did not run). An absent **required** path, or any `git add` failure
+on either kind, is a hard error carrying git's stderr verbatim. That is the difference
+that matters: the shell form this replaced hid a real failure and a missing file behind
+the same `2>/dev/null || true`, which is how wiki + failures silently left a wrapup
+commit on 2026-05-30.
 
-### Step 7.6 — Drain landed-branch backlog (ADR-009)
+**Read the receipt, do not assume.** `steps.stage[]` gives each path its disposition,
+`steps.index_before` / `index_after` make foreign staged content visible, and
+`steps.commit.status` is `created` or `already-present` — the latter means a prior run
+committed and failed later, so this run resumed instead of adding an empty duplicate.
 
-After the commit + stash pop, drain the worktree backlog. The gated,
-biased-to-preserve sweep that previously ran ONLY at `worktree create` now also
-runs here, so squash-merged branches and orphan markers stop accumulating (the
-"N branch(es) preserved" cry-wolf wall). It is non-interactive and never deletes
-unmerged work — preserved branches surface as a count only; run `prune-branches`
-to review them. Create-time reaping is retained (this is additive).
+**On abort.** `steps.legacy_ref_scan.status == "abort"` means live legacy
+finalize-stash refs (empty `session_uuid`) exist. Nothing was staged and nothing was
+committed — deliberately, so a retry does not accumulate commits. Those refs would be
+popped by `post-commit-pop`, dirtying the base, and the squash-land below self-aborts on
+a dirty base. Follow the printed remediation: **`git stash show -p <ref>` first** — never
+recommend `git stash drop` without showing the user that diff. `--allow-legacy-ref`
+bypasses the scan and accepts the deadlock risk.
 
-{% if is_codex %}
-```
-Bash("uv run --with {{ harness_maker_src_path }} hm worktree drain \"$(pwd)\"")
-```
-{% else %}
-```bash
-!uv run --with {{ harness_maker_src_path }} hm worktree drain "$(pwd)"
-```
-{% endif %}
+You **MAY** call {% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %} (autoloop exception) **ONLY IF** the literal substring `[finalize] stash-pop conflict` OR `[finalize] untracked-file collision` appears in stderr. Any other non-zero exit: surface verbatim and halt, do NOT ask.
 
 {%- if config.worktree is defined and config.worktree.get('feature_branch_workflow') %}
 ### Step 7.7 — Squash-land the task branch (ADR-003, flag-on; task worktree only)

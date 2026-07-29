@@ -89,14 +89,25 @@ _ADR014_CEILING = 122_000
 # measures this repo's `.claude/harness.yaml` (task-driven). Three arms, two configs —
 # stated here because the mismatch was once a live blind spot: spec-driven-only
 # instructions were absent from the instruction snapshot and invisible to this floor.
+# Re-baselined 2026-07-29 after Phases 2–5. Each entry moved for a named reason:
+#   execute  +20    Phase D's select-then-one-call prose costs slightly more than the
+#                   three lines it replaced — and removes one call (ADR-002's trade).
+#   research +449   the Claude-only `Explore` fan-out block. This one is TIGHT: it was
+#                   compressed twice to stay under the OLD ceiling (23,509) rather than
+#                   raise it, because ADR-011 forbids raising a ceiling to pass a phase.
+#   wrapup   −1976  Steps 6→7.6 collapsed into `wrapup_land`.
+#   spec     −211   Steps 4/4.5 collapsed into `spec_machine check --all`.
+#   plan/review/verify — untouched by this PLAN; they drifted down under the `hm`
+#                   rewrite (d98355d6) and stayed inside the 20% floor, so the table was
+#                   never re-baselined for them. Doing it here removes that slack.
 _ATOMIC_RATCHET: dict[str, int] = {
-    "execute": 26704,
-    "plan": 42076,
-    "research": 23049,
-    "review": 27779,
-    "spec": 27581,
-    "verify": 20878,
-    "wrapup": 40229,
+    "execute": 26724,
+    "plan": 41656,
+    "research": 23498,
+    "review": 27590,
+    "spec": 27370,
+    "verify": 20668,
+    "wrapup": 38253,
 }
 
 _WORKFLOWS: dict[str, tuple[str, ...]] = {

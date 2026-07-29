@@ -85,7 +85,7 @@ def test_the_default_render_still_carries_the_whole_body(tmp_path: Path) -> None
     body = _wrapup(tmp_path)
 
     assert "Step 5 — Memory append" in body
-    assert "Step 7 — Single commit" in body
+    assert "Steps 6 → 7.6 — Stage, commit, pop, drain" in body
 
 
 # ------------------------------------------------------------------ delegate ON
@@ -105,7 +105,7 @@ def test_the_delegate_on_render_still_carries_the_inline_body(tmp_path: Path) ->
     body = _wrapup(tmp_path, stages=["wrapup"])
 
     assert "Step 5 — Memory append" in body
-    assert "Step 7 — Single commit" in body
+    assert "Steps 6 → 7.6 — Stage, commit, pop, drain" in body
 
 
 def test_the_inline_body_is_labelled_as_the_degraded_path(tmp_path: Path) -> None:
@@ -134,7 +134,7 @@ def test_the_receipt_is_reconciled_before_the_commit(tmp_path: Path) -> None:
     body = _wrapup(tmp_path, stages=["wrapup"])
 
     reconcile_at = body.index("wrapup_receipt")
-    commit_at = body.index("Step 7 — Single commit")
+    commit_at = body.index("Steps 6 → 7.6 — Stage, commit, pop, drain")
     assert reconcile_at < commit_at
 
 
@@ -164,13 +164,17 @@ def test_only_the_configured_stage_gets_a_dispatch(tmp_path: Path) -> None:
 # ------------------------------------------------------------------ size
 
 
-@pytest.mark.parametrize(("preset", "expected"), [("Side", 662), ("Production", 695)])
+@pytest.mark.parametrize(("preset", "expected"), [("Side", 618), ("Production", 651)])
 def test_the_default_render_costs_existing_users_nothing(
     tmp_path: Path, preset: str, expected: int
 ) -> None:
     """The shipped artifact is the delegate-OFF one for at least this release
-    (ADR-011), so the whole Jinja block must be gated. Measured 2026-07-26, with
-    `feature_branch_workflow` on."""
+    (ADR-011), so the whole Jinja block must be gated.
+
+    Re-measured 2026-07-29 (was 662 / 695): PLAN-workflow-step-audit Phase 2 collapsed
+    Steps 6 → 7.6 into one `hm wrapup_land` call, removing 44 body lines. This constant
+    is an equality pin, so it moves only in the commit that moves the render — and it
+    moved DOWN here, which is the direction this phase promised."""
     assert _count_body_lines(_wrapup(tmp_path, preset=preset)) == expected
 
 

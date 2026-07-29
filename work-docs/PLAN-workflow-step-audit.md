@@ -845,15 +845,15 @@ that is not a git worktree of the expected repo is refused rather than defaulted
 |---|---|
 | 0 — freeze the baseline | **DONE** — A.5 PASS, artifacts committed |
 | 0.5 — floor arm + aggregate | **DONE** — A.5 PASS, 117 structural tests green |
-| **0.75 — `hm` console script** (added during execute) | **PARTIAL** — entrypoint landed + tested; the template rewrite is scoped but NOT applied. See [ADR-018](#adr-018) |
-| 1 — verify two-call composite | not started |
-| 2 — `wrapup_land` | not started |
-| 4 — `test_dep_map select` | **HALF DONE** — classifier landed; template half still blocked until Phase 0.75 completes |
-| 5 — research fan-out | not started |
-| 3 — `spec_machine check --all` | not started |
-| 6 — round-trip arm | not started |
-| 7 — re-measurement receipt | not started |
-| 8 — release sync | not started |
+| **0.75 — `hm` console script** (added during execute) | **DONE** — entrypoint + full template rewrite landed (`d98355d6`). See [ADR-018](#adr-018) |
+| 1 — verify two-call composite | **SKIPPED — user decision, 2026-07-29.** Ranks first on mandated calls (−6) and last on wall-clock: `verify` does not appear in BASELINE §2's table at all, and it is the most expensive phase to build (five checks that do not exist in `cli.py` today + five golden fixtures). **PR-1 is therefore un-evaluated, not failed** — see `RECEIPT-workflow-step-audit.md` §0 |
+| 2 — `wrapup_land` | **DONE** — module + 18-case unit matrix + template collapse. Criterion (j), the manual `/hm:wrapup` run, is outstanding |
+| 4 — `test_dep_map select` | **DONE** — classifier (earlier commit) + template half (Phase C per-file, Phase D select-then-one-call) |
+| 5 — research fan-out | **DONE, and dormant in this repo** — `targets` includes `cursor`, and Cursor reads the Claude command file, so the gate is `cursor not in targets`. Implemented and tested on both arms; renders nowhere here. See RECEIPT §2(b) |
+| 3 — `spec_machine check --all` | **DONE** — Steps 4 + 4.5 collapse to one call. Δ 0 by ADR-011's rule (those were never `!` lines) but two real turns removed |
+| 6 — round-trip arm | **DONE** — `tests/structural/test_roundtrip_budget.py`, exact equality, proven failing under all three mutations. Every ratchet re-baselined with a per-entry reason |
+| 7 — re-measurement receipt | **PARTIAL** — `RECEIPT-workflow-step-audit.md`. The surface measurement is complete; the four ADR-012 turn/wall-clock quantities are `n = 0` because no stage has run against the change yet, and the receipt says so rather than reporting zeros as results |
+| 8 — release sync | **DONE** — five files at `0.44.0` + CHANGELOG. The release invariant (no rendered template names an unregistered module) is already asserted by `test_command_surface_gate.py::test_tc1_every_template_invocation_is_registered` |
 
 **Resume contract.** Phases 0 and 0.5 are the *measurement apparatus and the ratchet*,
 which this PLAN deliberately ordered to land **before any cutting**. They are therefore a

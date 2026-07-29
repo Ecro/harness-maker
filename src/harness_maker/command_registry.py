@@ -72,6 +72,7 @@ MODULES: dict[str, ModuleSpec] = {
     "second_opinion_invoke": ModuleSpec("flagonly"),
     "test_dep_map": ModuleSpec("flagonly"),
     "wrapup_brief": ModuleSpec("flagonly"),
+    "wrapup_land": ModuleSpec("flagonly"),
     "wrapup_receipt": ModuleSpec("flagonly"),
     "spec_inventory": ModuleSpec(
         "subparser", _s("reverse-map", "verify-inventory", "sample-for-review", "generate-all")
@@ -86,6 +87,7 @@ MODULES: dict[str, ModuleSpec] = {
             "find-unbound",
             "mark-judged",
             "find-unjudged",
+            "check",
         ),
     ),
     "spec_mutation": ModuleSpec("subparser", _s("gate", "classify")),

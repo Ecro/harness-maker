@@ -49,9 +49,63 @@ from ._instruction_baseline import (
 
 # ── the allowlist ──────────────────────────────────────────────────────────────
 # phase label → `<command>@<dev_mode>` → the exact heading / `!` line it removes.
-# Empty at Phase 0.5 by construction: it is frozen BEFORE any cutting phase runs, so a
-# non-empty allowlist here would mean something was already deleted unguarded.
-_ALLOWED_REMOVALS: dict[str, dict[str, list[str]]] = {}
+# Frozen BEFORE any cutting phase runs, so every entry below names a phase that has
+# actually landed and the exact string it removed.
+_PHASE_4_EXECUTE_CHECKS = [
+    "!cd <WT> && <lint command>     # e.g., ruff check",
+    "!cd <WT> && <type command>     # e.g., mypy --strict",
+    "!cd <WT> && <test command>     # e.g., pytest tests/ -q",
+]
+
+_PHASE_3_SPEC_HEADINGS = [
+    "### Step 4 — Verify write + cross-validate dual-file contract",
+    "### Step 4.5 — Spec quality gate (ADR-006)",
+]
+
+_PHASE_2_WRAPUP_HEADINGS = [
+    "### Step 6 — Stage memory + PLAN updates",
+    "### Step 7 — Single commit",
+    "### Step 7.5 — Post-commit stash pop (stage-only handshake)",
+    "### Step 7.6 — Drain landed-branch backlog (ADR-009)",
+]
+
+# Recorded in the CANONICAL long form: `_instruction_baseline.canonicalize` folds
+# `hm <mod>` back to `python -m harness_maker.<mod>` so the d98355d6 rename is not read as
+# a mass deletion. An entry written in the `hm` spelling would silently never match.
+_HM = "uv run --with $HOME/harness-maker python -m harness_maker"
+_PHASE_2_WRAPUP_CALLS = [
+    f'!HM_OWNED_SESSION_UUIDS="$({_HM}.worktree owned-crumb-read "$(pwd)" <slug>)" '
+    f'{_HM}.worktree post-commit-pop "$(pwd)" && {_HM}.worktree owned-crumb-clear "$(pwd)" <slug>',
+    "!cd <WT> && for p in .claude/memory/ work-docs/PLAN-{slug}.md "
+    "work-docs/REVIEW-{slug}-*.md work-docs/RESEARCH-{slug}.md specs/SPEC-{slug}.md "
+    "specs/SPEC-{slug}.machine.yaml; do \\",
+    "!cd <WT> && git commit -m \"$(cat <<'EOF'",
+    f'!{_HM}.worktree drain "$(pwd)"',
+]
+
+_ALLOWED_REMOVALS: dict[str, dict[str, list[str]]] = {
+    # Phase D's three separate calls collapse into a select call plus one `&&`-chained
+    # check call. Listed against BOTH arms: Phase D is outside every `dev_mode` gate, so
+    # a cut that hit only one arm would be the bug this key shape exists to expose.
+    "phase-4-execute-phase-d": {
+        "execute@task-driven": list(_PHASE_4_EXECUTE_CHECKS),
+        "execute@spec-driven": list(_PHASE_4_EXECUTE_CHECKS),
+    },
+    # Steps 4 and 4.5 merge into one `spec_machine check --all` call under a combined
+    # heading. Their three fenced commands were never `!` lines, so the CALL saving here
+    # is real but invisible to the round-trip arm — only the headings move.
+    "phase-3-spec-check-all": {
+        "spec@task-driven": list(_PHASE_3_SPEC_HEADINGS),
+        "spec@spec-driven": list(_PHASE_3_SPEC_HEADINGS),
+    },
+    # Steps 6 → 7.6 become one `wrapup_land` call. Step 7.7 `task-land` and
+    # `commit-base-memory` are deliberately NOT here: ADR-006 keeps the only work-losing
+    # step as its own visible invocation, and their absence from this list is the check.
+    "phase-2-wrapup-land": {
+        "wrapup@task-driven": [*_PHASE_2_WRAPUP_HEADINGS, *_PHASE_2_WRAPUP_CALLS],
+        "wrapup@spec-driven": [*_PHASE_2_WRAPUP_HEADINGS, *_PHASE_2_WRAPUP_CALLS],
+    },
+}
 
 _KINDS = ("headings", "executables")
 _KEYS = tuple(entry_key(c, m) for c in ATOMIC_COMMANDS for m in AXES)

@@ -241,18 +241,25 @@ def test_wrapup_no_land_when_flag_off(tmp_path: Path) -> None:
 
 
 def test_wrapup_commit_runs_inside_worktree_when_flag_on(tmp_path: Path) -> None:
-    # REVIEW-2026-06-21 P3-3: flag-on Step 6 (git add) + Step 7 (git commit) must run
-    # inside <WT> (the hm/<slug> task worktree), else they execute in the base repo
-    # against an empty index → the commit is a no-op and the curated message never
-    # reaches the branch Step 7.7 squash-lands (which also defeats P2-3's message reuse).
+    # REVIEW-2026-06-21 P3-3: staging + commit must target <WT> (the hm/<slug> task
+    # worktree), else they execute in the base repo against an empty index → the commit
+    # is a no-op and the curated message never reaches the branch Step 7.7 squash-lands
+    # (which also defeats P2-3's message reuse).
+    #
+    # PLAN-workflow-step-audit Phase 2 changed the MECHANISM, not the property: the
+    # `cd <WT> &&` shell prefix became an explicit `--worktree <WT>` argument, and the
+    # composite refuses a `--worktree` that is not a worktree of `--base`. That is a
+    # stronger binding than the prefix — a prefix could be dropped and the call would
+    # still run, just in the wrong place.
     body = _stage(_render(tmp_path, flag_on=True), "wrapup")
-    assert "!cd <WT> && for p in" in body, "flag-on Step 6 (git add) must run inside <WT>"
-    assert "!cd <WT> && git commit" in body, "flag-on Step 7 (git commit) must run inside <WT>"
+    assert "hm wrapup_land --worktree <WT> --base <BASE>" in body, (
+        "flag-on staging + commit must bind <WT> explicitly"
+    )
 
 
 def test_wrapup_commit_runs_in_base_when_flag_off(tmp_path: Path) -> None:
-    # Flag-off keeps the legacy base-repo commit (no <WT> isolation) byte-for-byte.
+    # Flag-off has no task worktree, so the composite still takes both roots but there is
+    # no Step 7.7 to land onto — asserted by `test_wrapup_no_land_when_flag_off`.
     body = _stage(_render(tmp_path, flag_on=False), "wrapup")
-    assert "!for p in" in body, "flag-off Step 6 must keep the bare base-repo git add"
-    assert "!git commit -m" in body, "flag-off Step 7 must keep the bare base-repo git commit"
+    assert "hm wrapup_land --worktree" in body
     assert "cd <WT> && git commit" not in body, "flag-off must not inject <WT> into the commit"

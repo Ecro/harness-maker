@@ -310,26 +310,24 @@ to satisfy `spec_machine.cross_validate` rule 1. The title in `.md` and the
 `title:` field in `.machine.yaml` must be similar within fuzzy ratio 0.85
 (rule 2). At least one of `(test_ids != [])` OR `pending_test=true` per AC.
 
-### Step 4 — Verify write + cross-validate dual-file contract
+### Step 4 + 4.5 — Verify write, cross-validate, and score, in ONE call
 
-After writing both files, run:
-
-```bash
-uv run --with {{ harness_maker_src_path }} hm spec_machine validate {{ config.spec.dir }}SPEC-{slug}.machine.yaml
-```
-
-Then the 6-rule cross-validation:
+After writing both files, run **one** command. It performs the schema validate, the
+6-rule cross-validation, and the quality scoring of Step 4.5, and returns a single JSON
+object — the three separate calls this replaced cost three round-trips for verdicts that
+are always read together:
 
 ```bash
-python -c "
-from pathlib import Path
-from harness_maker.spec_machine import cross_validate
-errors = cross_validate(Path('{{ config.spec.dir }}SPEC-{slug}.md'),
-                        Path('{{ config.spec.dir }}SPEC-{slug}.machine.yaml'))
-for e in errors: print(e)
-exit(1 if errors else 0)
-"
+uv run --with {{ harness_maker_src_path }} hm spec_machine check --all \
+  --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml \
+  --md {{ config.spec.dir }}SPEC-{slug}.md \
+  --dev-mode {{ config.dev_mode }}
 ```
+
+Returns `{ok, validate: {ok, errors}, cross_validate: {ok, errors, by_rule}, quality:
+{overall, scores, weak_dimensions, blocked, dev_mode}}`. Exit 1 when validate or
+cross-validate has errors, or when `quality.blocked`. `by_rule` buckets the
+cross-validate errors under `rule-1`…`rule-6` plus `unattributed`.
 
 Cross-validate enforces (ADR-007):
 1. Every `ac.id` in .yaml has a matching `### AC-NNN` heading in .md.
@@ -347,25 +345,13 @@ Plus the legacy .md checks:
 
 If verification fails, retry write **once**. If still failing, surface error + path and stop.
 
-### Step 4.5 — Spec quality gate (ADR-006)
+### Step 4.5 — Spec quality gate (ADR-006) — read from the Step 4 payload
 
-Score the freshly-written SPEC against the rubric (5 dimensions, each 0-100):
-completeness, testability, unambiguity, consistency, scope_boundary.
-
-```bash
-jq -n --arg spec "$(cat {{ config.spec.dir }}SPEC-{slug}.md)" \
-      --arg machine "$(cat {{ config.spec.dir }}SPEC-{slug}.machine.yaml)" \
-      --arg mode "{{ config.dev_mode }}" \
-      '{spec_text: $spec, machine_yaml: $machine, dev_mode: $mode}' \
-  | uv run --with {{ harness_maker_src_path }} hm spec_quality eval
-```
-
-The `machine_yaml` field (ADR-006) enables the 3 machine dims —
-`machine_verifiability`, `mutation_coverage_set` (Python only),
-`non_python_intent_alignment` — to be scored. Without it only the 5 narrative
-dims are evaluated and the gate is less informative.
-
-Read the returned JSON `{overall, scores, weak_dimensions, blocked, dev_mode}`.
+The `quality` block of the call above already carries this — do **not** issue a second
+call. It scores the 5 narrative dimensions (completeness, testability, unambiguity,
+consistency, scope_boundary) plus, because `--yaml` was passed, the 3 machine dims
+`machine_verifiability`, `mutation_coverage_set` (Python only) and
+`non_python_intent_alignment` (ADR-006).
 
 | `dev_mode` | `blocked == true` (overall < 60 OR any dim < 40) | Action |
 |------------|--------------------------------------------------|--------|

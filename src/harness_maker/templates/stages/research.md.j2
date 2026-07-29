@@ -180,8 +180,23 @@ lenses under `## 🔍 Refinement Decisions` as "Discovery lens: ..."; if the
 section would otherwise be omitted, include only this short note.
 
 ### Phase 1 — Multi-source gathering
+{% if not is_codex and "cursor" not in config.targets %}
+
+**Fan out — all three in a SINGLE message, then read only the digests.** Their raw
+`grep`/`Read` output never enters this conversation; that is the saving.
+
+- `Task(subagent_type="Explore", …)` — **codebase**: classes 1, 7 below.
+- `Task(subagent_type="Explore", …)` — **internal record**: classes 2, 3 below.
+- `Task(subagent_type="Explore", …)` — **external**: classes 4, 5, 6 below.
+
+**Citation contract — put it in every dispatch prompt, reject a digest that breaks it.**
+Every claim needs its `file:line`/URL **and** the verbatim snippet behind it; without
+both it is the agent's priors, not the source. Open originals yourself only for the one
+or two claims that decide the recommendation.
+{% else %}
 
 Run these in parallel where the answers are independent. Total token budget ≤8k.
+{% endif %}
 
 1. **Codebase patterns** — `Grep` / `Glob` for related identifiers, prior implementations, similar features.
 2. **Prior-art search in memory** — already loaded above; pull relevant `[wiki:*]` and `[fail:*]` entries.

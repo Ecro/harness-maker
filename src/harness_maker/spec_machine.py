@@ -1224,6 +1224,77 @@ def _run_find_unjudged(args: argparse.Namespace) -> int:
     return 0
 
 
+#: `cross_validate` returns flat strings tagged `rule-N:`. Attribution is by that prefix,
+#: and anything untagged (today: the early `yaml load failed` return) lands in
+#: `unattributed` rather than being dropped — a per-rule view that silently discards an
+#: error would report six clean rules over a yaml that never loaded.
+_RULE_IDS = ("rule-1", "rule-2", "rule-3", "rule-4", "rule-5", "rule-6")
+
+
+def _attribute_cross_errors(errors: list[str]) -> dict[str, list[str]]:
+    buckets: dict[str, list[str]] = {r: [] for r in _RULE_IDS}
+    buckets["unattributed"] = []
+    for e in errors:
+        rule = next((r for r in _RULE_IDS if e.startswith(f"{r}:")), "unattributed")
+        buckets[rule].append(e)
+    return buckets
+
+
+def _run_check_all(args: argparse.Namespace) -> int:
+    """Steps 4 and 4.5 of the spec stage in one call — three round-trips become one.
+
+    Orchestration only ([ADR-003](work-docs/PLAN-workflow-step-audit.md)): every verdict
+    comes from `validate` / `cross_validate` / `evaluate_spec` unchanged, so this cannot
+    drift from the subcommands it replaces.
+    """
+    from harness_maker.spec_quality import evaluate_spec
+
+    payload: dict[str, Any] = {
+        "yaml_path": str(args.yaml_path),
+        "md_path": str(args.md_path),
+        "dev_mode": args.dev_mode,
+    }
+
+    try:
+        validate_errors = validate(load(args.yaml_path))
+    except Exception as e:  # noqa: BLE001 — an unloadable yaml is a reportable verdict
+        validate_errors = [f"yaml load failed: {type(e).__name__}: {e}"]
+    payload["validate"] = {"ok": not validate_errors, "errors": validate_errors}
+
+    cross_errors = cross_validate(args.md_path, args.yaml_path)
+    payload["cross_validate"] = {
+        "ok": not cross_errors,
+        "errors": cross_errors,
+        "by_rule": _attribute_cross_errors(cross_errors),
+    }
+
+    try:
+        quality = evaluate_spec(
+            args.md_path.read_text(encoding="utf-8"),
+            args.dev_mode,
+            machine_yaml=args.yaml_path.read_text(encoding="utf-8")
+            if args.yaml_path.exists()
+            else None,
+        )
+    except Exception as e:  # noqa: BLE001 — scoring must not mask the two gates above
+        payload["quality"] = {"error": f"{type(e).__name__}: {e}"}
+        quality_blocked = False
+    else:
+        payload["quality"] = {
+            "overall": quality.overall,
+            "scores": quality.scores,
+            "weak_dimensions": quality.weak_dimensions,
+            "blocked": quality.blocked,
+            "dev_mode": quality.dev_mode,
+        }
+        quality_blocked = quality.blocked
+
+    failed = bool(validate_errors) or bool(cross_errors) or quality_blocked
+    payload["ok"] = not failed
+    print(json.dumps(payload, indent=2, ensure_ascii=False))
+    return 1 if failed else 0
+
+
 def main(argv: list[str] | None = None) -> int:
     """Entry point for validate / cross-validate / mark-tested / waiver-check / find-unbound."""
     _guard = command_registry.guard_or_none("spec_machine", argv)
@@ -1288,7 +1359,19 @@ def main(argv: list[str] | None = None) -> int:
     p_unjudged.add_argument("--yaml", dest="yaml_path", type=Path, required=True)
     p_unjudged.add_argument("--root", dest="root", type=Path, default=Path.cwd())
 
+    p_check = sub.add_parser(
+        "check",
+        help="validate + cross-validate + quality score in ONE call (spec Step 4/4.5)",
+    )
+    p_check.add_argument("--all", dest="all_", action="store_true", required=True)
+    p_check.add_argument("--yaml", dest="yaml_path", type=Path, required=True)
+    p_check.add_argument("--md", dest="md_path", type=Path, required=True)
+    p_check.add_argument("--dev-mode", dest="dev_mode", default="task-driven")
+
     args = parser.parse_args(argv)
+
+    if args.cmd == "check":
+        return _run_check_all(args)
 
     if args.cmd == "waiver-check":
         return _run_waiver_check(args)

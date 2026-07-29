@@ -67,6 +67,7 @@ work-docs/*
 # PLAN-workflow-step-audit ADR-011 is that the baseline is never recomputed, and an
 # ignored file is recomputed by whoever regenerates it next.
 !work-docs/BASELINE-*.md
+!work-docs/RECEIPT-*.md
 !work-docs/plans/
 
 # Cache

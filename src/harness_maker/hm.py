@@ -59,6 +59,7 @@ _DISPATCHABLE: frozenset[str] = frozenset(
         "two_pass_review",
         "worktree",
         "wrapup_brief",
+        "wrapup_land",
         "wrapup_receipt",
     }
 )

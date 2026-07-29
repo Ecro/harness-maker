@@ -14,6 +14,7 @@ from pathlib import Path
 
 import pytest
 
+from harness_maker import wrapup_land
 from harness_maker.interview import interview
 from harness_maker.models import ProjectProfile
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
@@ -42,7 +43,17 @@ def _cmd(rendered: Path, name: str) -> str:
 def test_owned_session_uuids_sources_crumb_not_owned_uuids(rendered: Path, name: str) -> None:
     text = _cmd(rendered, name)
     owned_lines = _OWNED_LINE.findall(text)
-    assert owned_lines, f"{name} has no HM_OWNED_SESSION_UUIDS assignment"
+    if not owned_lines:
+        # `wrapup.md` stopped setting the env var when Steps 6→7.6 collapsed into
+        # `hm wrapup_land` (PLAN-workflow-step-audit Phase 2). The ownership set is now
+        # derived inside that module, so the guarded property MOVED — it did not go away,
+        # and this gate follows it rather than being relaxed. `test_wrapup_land_derives_…`
+        # below is the assertion that now carries it.
+        assert "hm wrapup_land" in text, (
+            f"{name} has no HM_OWNED_SESSION_UUIDS assignment and does not delegate to "
+            "wrapup_land — the ownership source is unaccounted for"
+        )
+        return
     for line in owned_lines:
         assert "owned-crumb-read" in line, (
             f"{name}: HM_OWNED_SESSION_UUIDS must source from owned-crumb-read "
@@ -52,6 +63,21 @@ def test_owned_session_uuids_sources_crumb_not_owned_uuids(rendered: Path, name:
             f"{name}: HM_OWNED_SESSION_UUIDS must NOT source from the all-markers "
             f"owned-uuids (ADR-005 contamination guard), got: {line!r}"
         )
+
+
+def test_wrapup_land_derives_the_ownership_set_from_the_crumb_not_all_markers() -> None:
+    """The template half of this gate moved into Python — so the gate moves with it.
+
+    `wrapup_land` is now the only wrapup-side caller of `post_commit_pop`. If it sourced
+    `_owned_session_uuids` (the all-markers reader) instead of `_owned_crumb_read`, the
+    3×-recurring cross-session contamination would be back with every render still green,
+    because no rendered command would mention `owned-uuids` at all.
+    """
+    src = Path(wrapup_land.__file__).read_text(encoding="utf-8")
+    assert "_owned_crumb_read(base, args.slug)" in src
+    assert "_owned_session_uuids" not in src, (
+        "wrapup_land must not source the all-markers ownership set (ADR-005 guard)"
+    )
 
 
 def test_execute_writes_owned_crumb_at_finalize(rendered: Path) -> None:

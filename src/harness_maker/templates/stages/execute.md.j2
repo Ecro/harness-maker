@@ -291,23 +291,21 @@ Write the implementation. No untested code paths — every public function added
 
 Constraints from PLAN's ADRs are binding: do NOT introduce a pattern that contradicts an ADR; surface as a Phase D blocker if the ADR turns out wrong.
 
-Compile / type-check after each edit; do not batch multiple edits before checking. Include compiler / lint output in your response when surfacing progress.
+Type-check once per FILE, when you finish that file — not after each edit. Include the output when surfacing progress.
 
 #### Phase D — Post-GREEN verification
 
-Run the project's full check suite:
+Select what to run, then run it as ONE call. `mode: full` → run everything and echo `reason` verbatim (fires when no test maps to a changed file, and for `pyproject.toml` / `uv.lock` / CI workflows / `harness.yaml` — selecting zero tests there would be weaker than today); `mode: targeted` → pass `node_ids`. `&&` short-circuits, so one call still surfaces the first failure:
 
 {% if is_codex %}
 ```
-Bash("cd <WT> && <lint command>")     # e.g., ruff check
-Bash("cd <WT> && <type command>")     # e.g., mypy --strict
-Bash("cd <WT> && <test command>")     # e.g., pytest tests/ -q
+Bash("cd <WT> && uv run --with {{ harness_maker_src_path }} hm test_dep_map --root . --changed-file <f1> …")
+Bash("cd <WT> && <lint> && <type> && <test> <nodes-or-empty>")
 ```
 {% else %}
 ```bash
-!cd <WT> && <lint command>     # e.g., ruff check
-!cd <WT> && <type command>     # e.g., mypy --strict
-!cd <WT> && <test command>     # e.g., pytest tests/ -q
+!cd <WT> && uv run --with {{ harness_maker_src_path }} hm test_dep_map --root . --changed-file <f1> …
+!cd <WT> && <lint> && <type> && <test> <nodes-or-empty>
 ```
 {% endif %}
 

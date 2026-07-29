@@ -2,6 +2,52 @@
 
 ## [Unreleased]
 
+### Changed — four pipeline stages collapse their fixed call sequences (`PLAN-workflow-step-audit`)
+
+Each `!` line in a rendered `/hm:` command is one main-loop turn at 200–430K context.
+Most of them carried no judgment — they ran deterministic checks whose only
+LLM-relevant output was the verdict. Four stages now issue one call where they issued
+several. Measured on this repo's own render: **297 → 283** mandated calls across the
+whole Claude surface, **−9,578 characters**; `wrapup` 32 → 29, `execute` 15 → 14, and
+the default fused `exec-rev-wrap-ver` 56 → 52.
+
+- **New `hm wrapup_land`** performs wrapup Steps 6 → 7.6 — legacy-ref pre-scan, stage,
+  commit, `post-commit-pop`, `owned-crumb-clear`, `drain` — as one call. Step 7.7
+  `task-land` deliberately stays its own visible invocation: it is the only step that
+  can lose work, and it keeps its own stderr and its own operator decision point.
+  - The staging manifest is **typed**: `--required` vs `--optional`. An absent optional
+    path records `absent-optional` and continues; an absent required path, or any
+    `git add` failure on either kind, is a hard error carrying git's stderr verbatim.
+    The shell loop this replaces hid both behind one `2>/dev/null || true` — which is
+    how wiki + failures silently left a wrapup commit on 2026-05-30.
+  - The **legacy-ref pre-scan runs before staging.** A finalize-stash ref with an empty
+    `session_uuid` is popped by `post-commit-pop` (it bypasses the ownership gate),
+    which dirties the base, and `task-land` self-aborts on a dirty base. The composite
+    now stops there having staged and committed nothing — so a retry cannot accumulate
+    commits — and prints a remediation that leads with `git stash show -p <ref>`.
+    `--allow-legacy-ref` bypasses it.
+  - Re-running after a failed pop **resumes**: the commit is detected as already present
+    rather than duplicated as an empty commit.
+- **New `hm spec_machine check --all`** returns validate + the six cross-validate rules
+  (bucketed per rule, with an explicit `unattributed` bucket so an untagged error is
+  never dropped) + the quality score in one JSON object. Spec Steps 4 and 4.5 were three
+  separate commands for verdicts that are always read together.
+- **`/hm:execute` Phase C** type-checks once per **file**, not after every edit — the
+  single most turn-expensive instruction in the pipeline. **Phase D** selects tests via
+  `hm test_dep_map` and then runs lint + type + test as one `&&`-chained call.
+- **`/hm:research` Phase 1 fans out** to three read-only `Explore` agents dispatched in
+  one message, each bound by a citation + verbatim-snippet contract. **Claude-only, and
+  only when `cursor` is not among `targets`** — `.cursor/commands/` is dead code, so
+  Cursor reads the Claude command file and would receive a dispatch it cannot resolve.
+  Cursor and Codex renders keep today's serial procedure unchanged.
+
+**Gates.** A new round-trip ratchet (`tests/structural/test_roundtrip_budget.py`) pins
+every command's call count at **exact equality** — the character floor is `measured*0.80`
+and one deleted `!` line is ~0.5% of a command, so it was structurally blind to exactly
+what this work spends. It is proven able to fail under three mutations: `&&`-chaining two
+calls, deleting one call, and moving a call between commands. The per-arm instruction
+baseline names every removed heading and call in the phase that removed it.
+
 ### Fixed — the token-economy meter was ~3x wrong on Opus turns and never applied a per-model cache minimum
 
 `/hm:metrics` and `/hm:health` Layer 3 are the instrument the next optimization gets

@@ -49,38 +49,51 @@ def _wrapup_template_path() -> Path:
     )
 
 
-# Step 6 stages deliverables via a per-path loop (`for p in <paths>; do
-# [ -e "$p" ] && git add "$p" …`) so one missing pathspec can't abort the rest.
-# We pin the path list out of the `for p in <paths>; do` header. The optional
-# `{{ wt_prefix }}` Jinja token (flag-on per-task worktree prepends a `cd <WT> &&`)
-# sits between `!` and `for`; tolerate it without capturing it into the path list.
-_WRAPUP_GIT_ADD_RE = re.compile(
-    r"^!(?:\{\{ wt_prefix \}\})?for p in (.+?); do\b",
-    re.MULTILINE,
-)
+# Steps 6 → 7.6 are now one `hm wrapup_land` call whose staging manifest is a typed list
+# of `--required` / `--optional` flags (PLAN-workflow-step-audit Phase 2, ADR-007). The
+# pinning obligation is unchanged — this integration test must replay the REAL production
+# path list, never a paraphrase — so only the shape it reads has moved, from a shell
+# `for p in <paths>` header to the flag list on the same `!` line.
+_WRAPUP_LAND_RE = re.compile(r"^!.*\bhm wrapup_land\b(.*)$", re.MULTILINE)
+_MANIFEST_FLAG_RE = re.compile(r"--(?:required|optional)\s+(\S+)")
 
 
 def _extract_wrapup_git_add_args() -> str:
-    """Read wrapup.md.j2 and return the Jinja-substituted git-add path list.
+    """Read wrapup.md.j2 and return the Jinja-substituted staging path list.
 
-    Substitutes ``{{ config.work_docs.dir }}`` → ``work-docs/`` and ``{slug}``
-    → a fixed test slug. Returns the space-separated path list. Raises if
-    the template shape drifts so the integration test never reads a
+    Substitutes ``{{ config.work_docs.dir }}`` → ``work-docs/``, ``{{ config.spec.dir }}``
+    → ``specs/`` and ``{slug}`` → a fixed test slug. Returns the space-separated path
+    list. Raises if the template shape drifts so the integration test never reads a
     paraphrased command.
     """
     body = _wrapup_template_path().read_text(encoding="utf-8")
-    match = _WRAPUP_GIT_ADD_RE.search(body)
+    match = _WRAPUP_LAND_RE.search(body)
     if not match:
         raise AssertionError(
-            "wrapup.md.j2 has no `!for p in … ; do … git add` Step 6 loop — template "
-            "drift broke integration-test pinning. Update _WRAPUP_GIT_ADD_RE or restore "
-            "the template line shape."
+            "wrapup.md.j2 has no `!… hm wrapup_land …` staging call — template drift "
+            "broke integration-test pinning. Update _WRAPUP_LAND_RE or restore the line "
+            "shape."
         )
-    return (
+    # Substitute BEFORE splitting: `{{ config.work_docs.dir }}` contains spaces, so a
+    # `\S+` capture on the raw line would stop at `{{` and yield a list of brace tokens.
+    flags = (
         match.group(1)
         .replace("{{ config.work_docs.dir }}", "work-docs/")
+        .replace("{{ config.spec.dir }}", "specs/")
         .replace("{slug}", "phase4-integration")
     )
+    paths = _MANIFEST_FLAG_RE.findall(flags)
+    if not paths:
+        raise AssertionError(
+            "the wrapup_land call carries no --required/--optional manifest — an empty "
+            "path list would make the replay below stage nothing and assert nothing."
+        )
+    if any("{" in p for p in paths):
+        raise AssertionError(
+            f"unsubstituted Jinja survived into the path list: {paths} — the replay would "
+            "stage brace tokens and the assertions below would be about nothing."
+        )
+    return " ".join(paths)
 
 
 @pytest.fixture
@@ -116,7 +129,7 @@ def integration_repo(tmp_path: Path) -> Path:
 
 
 def test_wrapup_template_git_add_line_extractable() -> None:
-    """Guard: the wrapup.md.j2 Step 6 `for p in … ; do … git add` loop must be regex-extractable.
+    """Guard: the wrapup.md.j2 staging manifest must be regex-extractable.
 
     If this fails, the template has drifted and the integration test below is
     no longer pinned to the real production command. Fix _WRAPUP_GIT_ADD_RE or
