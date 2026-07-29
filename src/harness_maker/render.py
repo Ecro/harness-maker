@@ -347,6 +347,21 @@ _HARNESS_SHIPPED_ALLOW_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
         "unbounded module prefix — also matched `python -m harness_maker_evil`; "
         "replaced by the `python -m harness_maker.*` form",
     ),
+    (
+        # Retired when the `hm` console script landed (PLAN-workflow-step-audit
+        # ADR-018): every rendered call site moved from `python -m harness_maker.<mod>`
+        # to `hm <mod>`, so the scoped second-opinion grant is now spelled
+        # `hm second_opinion_invoke:*`. Without this entry the long form accretes on
+        # every upgraded harness — a stale grant nobody re-approves and nobody removes.
+        # The `--with` slot carries the same must-name-harness-maker guard as above, so
+        # a user-written `--with /path/to/my/fork` rule is never pruned.
+        re.compile(
+            r"^Bash\(uv run --with [^ ]*harness[-_]maker[^ ]* "
+            r"python -m harness_maker\.second_opinion_invoke:\*\)$"
+        ),
+        "long-form module invocation — replaced by the `hm second_opinion_invoke:*` "
+        "form when the `hm` console script landed",
+    ),
 )
 
 

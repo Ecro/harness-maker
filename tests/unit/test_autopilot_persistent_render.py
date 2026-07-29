@@ -37,7 +37,7 @@ def test_stage_command_omits_cap_flags_when_unlimited(tmp_path: Path) -> None:
         [Target.CLAUDE_CODE],
     )
     body = (root / "commands" / "hm" / "execute.md").read_text(encoding="utf-8")
-    assert "harness_maker.autopilot_caps boundary" in body
+    assert "hm autopilot_caps boundary" in body
     assert "--current execute" in body
     assert "--step-cap" not in body
     assert "--time-cap-min" not in body

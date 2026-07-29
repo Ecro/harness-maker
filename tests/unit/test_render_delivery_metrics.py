@@ -33,10 +33,10 @@ def test_metrics_command_always_full(tmp_path: Path) -> None:
     disclaimer, untrusted-data framing — with no enable gate and no stub."""
     body = _file(_render(tmp_path), "commands/hm/metrics.md")
     required_metrics_markers = [
-        "harness_maker.delivery_metrics candidates",
-        "harness_maker.delivery_metrics adjudicate",
-        "harness_maker.delivery_metrics compute",
-        "harness_maker.delivery_metrics trend",
+        "hm delivery_metrics candidates",
+        "hm delivery_metrics adjudicate",
+        "hm delivery_metrics compute",
+        "hm delivery_metrics trend",
         "failed/total",  # raw counts, never percentage alone (SPEC Outcomes)
         "baseline delta",
         "Interpret the trend",  # LLM-interpretation instruction block (AC-010)
@@ -59,7 +59,7 @@ def test_health_narrative_always_present(tmp_path: Path) -> None:
     case at runtime (no render-time enable gate)."""
     health = _file(_render(tmp_path), "commands/hm/health.md")
     assert "@hm:delivery-metrics" in health
-    assert "harness_maker.delivery_metrics trend" in health
+    assert "hm delivery_metrics trend" in health
     assert "Empty ledger" in health  # the runtime never-run branch
 
 

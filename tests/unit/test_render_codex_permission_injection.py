@@ -109,7 +109,7 @@ def test_both_allow_rules_present_when_both_models_enabled(tmp_path: Path) -> No
 # ── scoped invoker grant (REVIEW-2026-07-25 F6) ──────────────────────────────
 
 _INVOKER_PREFIX = "Bash(uv run --with "
-_INVOKER_SUFFIX = " python -m harness_maker.second_opinion_invoke:*)"
+_INVOKER_SUFFIX = " hm second_opinion_invoke:*)"
 
 
 def _invoker_rules(settings: dict[str, object]) -> list[str]:
@@ -158,7 +158,7 @@ def test_partials_do_not_claim_the_blanket_uv_rule_authorises_the_escape(
 
     # The prose abbreviates the long machine-specific path as `…`, so the tie is on the
     # identifying tail (module + the trailing-wildcard form) rather than the full literal.
-    tail = "harness_maker.second_opinion_invoke:*)"
+    tail = "hm second_opinion_invoke:*)"
 
     assert "dangerouslyDisableSandbox" in body
     assert tail in body, "prose cites no scoped rule"

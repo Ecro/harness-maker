@@ -70,7 +70,7 @@ For each batch invocation:
 
    | Gate | Tool | Pass condition |
    |------|------|----------------|
-   | a. schema | `python -m harness_maker.spec_machine validate {yaml}` | exit 0 |
+   | a. schema | `hm spec_machine validate {yaml}` | exit 0 |
    | b. cross-validate (6-rule) | `spec_machine.cross_validate(md, yaml)` | empty error list |
    | c. spec_quality | `spec_quality.evaluate_spec(md, machine_yaml=yaml)` | `overall ≥ 85` (with new machine dims for Python; T2 floor lower for non-Python) |
    | d. mutation OR 3-layer | `spec_mutation.gate(report, tier)` for Python; ADR-009 layers for non-Python | tier-floor met |

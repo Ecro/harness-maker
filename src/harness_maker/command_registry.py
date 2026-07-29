@@ -48,6 +48,7 @@ MODULES: dict[str, ModuleSpec] = {
     "autopilot_caps": ModuleSpec("subparser", _s("boundary", "gate-blocked")),
     "autopilot_ledger": ModuleSpec("subparser", _s("smoke")),
     "codex_ledger": ModuleSpec("subparser", _s("emit")),
+    "delegation_ledger": ModuleSpec("subparser", _s("record")),
     "delivery_metrics": ModuleSpec("subparser", _s("candidates", "adjudicate", "compute", "trend")),
     "economics": ModuleSpec("subparser", _s("report", "stages", "doctor", "composition")),
     "high_diff": ModuleSpec("subparser", _s("classify")),
@@ -69,6 +70,7 @@ MODULES: dict[str, ModuleSpec] = {
     ),
     # flagonly: no subcommand, so guard-exempt — the argparse layer owns its own errors.
     "second_opinion_invoke": ModuleSpec("flagonly"),
+    "test_dep_map": ModuleSpec("flagonly"),
     "wrapup_brief": ModuleSpec("flagonly"),
     "wrapup_receipt": ModuleSpec("flagonly"),
     "spec_inventory": ModuleSpec(

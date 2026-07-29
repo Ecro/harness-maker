@@ -61,11 +61,11 @@ need only the brief. Steps 6 onward stay here (ADR-004); the delegate never runs
 
 {% if is_codex -%}
 ```
-Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.wrapup_brief --root . --slug '<slug>'")
+Bash("uv run --with {{ harness_maker_src_path }} hm wrapup_brief --root . --slug '<slug>'")
 ```
 {%- else -%}
 ```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.wrapup_brief --root . --slug '<slug>'
+!uv run --with {{ harness_maker_src_path }} hm wrapup_brief --root . --slug '<slug>'
 ```
 {%- endif %}
 
@@ -82,11 +82,11 @@ tool" stays distinguishable from "dispatch never fires" — then run the inline 
 
 {% if is_codex -%}
 ```
-Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.delegation_ledger record --root . --stage wrapup --slug '<slug>' --kind dispatch --status unavailable")
+Bash("uv run --with {{ harness_maker_src_path }} hm delegation_ledger record --root . --stage wrapup --slug '<slug>' --kind dispatch --status unavailable")
 ```
 {%- else -%}
 ```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.delegation_ledger record --root . --stage wrapup --slug '<slug>' --kind dispatch --status unavailable
+!uv run --with {{ harness_maker_src_path }} hm delegation_ledger record --root . --stage wrapup --slug '<slug>' --kind dispatch --status unavailable
 ```
 {%- endif %}
 
@@ -101,11 +101,11 @@ a slug-derived path is predictable, and `mktemp`'s `O_EXCL` also defeats a plant
 
 {% if is_codex -%}
 ```
-Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.wrapup_receipt --root . --stage wrapup --worktree '<brief.worktree_root>' --receipt-file <the temp path>")
+Bash("uv run --with {{ harness_maker_src_path }} hm wrapup_receipt --root . --stage wrapup --worktree '<brief.worktree_root>' --receipt-file <the temp path>")
 ```
 {%- else -%}
 ```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.wrapup_receipt --root . --stage wrapup --worktree '<brief.worktree_root>' --receipt-file <the temp path>
+!uv run --with {{ harness_maker_src_path }} hm wrapup_receipt --root . --stage wrapup --worktree '<brief.worktree_root>' --receipt-file <the temp path>
 ```
 {%- endif %}
 
@@ -149,11 +149,11 @@ source, tests, lockfiles, tool config, CI, and verification script changes.
 
 {% if is_codex %}
 ```
-Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.observability.verification_cache check --root . --mode relevant")
+Bash("uv run --with {{ harness_maker_src_path }} hm observability.verification_cache check --root . --mode relevant")
 ```
 {% else %}
 ```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.observability.verification_cache check --root . --mode relevant
+!uv run --with {{ harness_maker_src_path }} hm observability.verification_cache check --root . --mode relevant
 ```
 {% endif %}
 
@@ -192,11 +192,11 @@ After every selected suite command passes, write the marker:
 
 {% if is_codex %}
 ```
-Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.observability.verification_cache mark-pass --root . --mode relevant --checks lint,format,mypy,pytest")
+Bash("uv run --with {{ harness_maker_src_path }} hm observability.verification_cache mark-pass --root . --mode relevant --checks lint,format,mypy,pytest")
 ```
 {% else %}
 ```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.observability.verification_cache mark-pass --root . --mode relevant --checks lint,format,mypy,pytest
+!uv run --with {{ harness_maker_src_path }} hm observability.verification_cache mark-pass --root . --mode relevant --checks lint,format,mypy,pytest
 ```
 {% endif %}
 
@@ -231,11 +231,11 @@ GREEN, record the binding so the machine SPEC becomes a living document — flip
 
 {% if is_codex %}
 ```
-Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.spec_machine mark-tested --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml --md {{ config.spec.dir }}SPEC-{slug}.md --test-id AC-001=tests/path::test_name")
+Bash("uv run --with {{ harness_maker_src_path }} hm spec_machine mark-tested --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml --md {{ config.spec.dir }}SPEC-{slug}.md --test-id AC-001=tests/path::test_name")
 ```
 {% else %}
 ```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.spec_machine mark-tested \
+!uv run --with {{ harness_maker_src_path }} hm spec_machine mark-tested \
    --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml \
    --md {{ config.spec.dir }}SPEC-{slug}.md \
    --test-id AC-001=tests/path::test_name
@@ -274,11 +274,11 @@ authored tests live), matching Step 3.5's base-cwd contract:
 
 {% if is_codex %}
 ```
-Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.spec_machine find-unbound --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml --root .")
+Bash("uv run --with {{ harness_maker_src_path }} hm spec_machine find-unbound --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml --root .")
 ```
 {% else %}
 ```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.spec_machine find-unbound --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml --root .
+!uv run --with {{ harness_maker_src_path }} hm spec_machine find-unbound --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml --root .
 ```
 {% endif %}
 
@@ -292,7 +292,7 @@ Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.spec_ma
 {% else %}
 **Side preset — advisory only:** a closed-type AC that stayed pending after the
 write-back is surfaced in the per-type report above (visibility over friction), never
-a STOP. Run `python -m harness_maker.spec_machine find-unbound --yaml …` to list them.
+a STOP. Run `hm spec_machine find-unbound --yaml …` to list them.
 {% endif %}
 
 #### Judgment AC binding — independent rubric verdict (PLAN-judgment-ac-binding ADR-006)
@@ -315,11 +315,11 @@ write its `evidence_summary` to a file and pass it verbatim, never re-typing the
 
 {% if is_codex %}
 ```
-Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.spec_machine mark-judged --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml --ac AC-NNN --verdict <reviewer's pass|fail> --evidence-file <reviewer evidence_summary file> --root .")
+Bash("uv run --with {{ harness_maker_src_path }} hm spec_machine mark-judged --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml --ac AC-NNN --verdict <reviewer's pass|fail> --evidence-file <reviewer evidence_summary file> --root .")
 ```
 {% else %}
 ```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.spec_machine mark-judged \
+!uv run --with {{ harness_maker_src_path }} hm spec_machine mark-judged \
    --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml \
    --ac AC-NNN --verdict <reviewer's pass|fail> --evidence-file <evidence file> --root .
 ```
@@ -336,11 +336,11 @@ AC whose subject paths are absent (not yet on disk) is future-PLAN work, safe-sk
 
 {% if is_codex %}
 ```
-Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.spec_machine find-unjudged --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml --root .")
+Bash("uv run --with {{ harness_maker_src_path }} hm spec_machine find-unjudged --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml --root .")
 ```
 {% else %}
 ```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.spec_machine find-unjudged --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml --root .
+!uv run --with {{ harness_maker_src_path }} hm spec_machine find-unjudged --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml --root .
 ```
 {% endif %}
 
@@ -353,7 +353,7 @@ Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.spec_ma
 {% else %}
 **Side preset — advisory only:** a judgment AC without a current `pass` verdict is surfaced
 in the per-type report, never a STOP. Run
-`python -m harness_maker.spec_machine find-unjudged --yaml …` to list them.
+`hm spec_machine find-unjudged --yaml …` to list them.
 {% endif %}
 
 {% if config.dev_mode == 'task-driven' %}
@@ -369,11 +369,11 @@ friction. Run the tri-state check (it always exits 0):
 
 {% if is_codex %}
 ```
-Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.spec_machine waiver-check --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml --dev-mode task-driven --root .")
+Bash("uv run --with {{ harness_maker_src_path }} hm spec_machine waiver-check --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml --dev-mode task-driven --root .")
 ```
 {% else %}
 ```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.spec_machine waiver-check --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml --dev-mode task-driven --root .
+!uv run --with {{ harness_maker_src_path }} hm spec_machine waiver-check --yaml {{ config.spec.dir }}SPEC-{slug}.machine.yaml --dev-mode task-driven --root .
 ```
 {% endif %}
 
@@ -411,11 +411,11 @@ Write the one-paragraph body to a fresh temp file **outside the repo** with the 
 
 {% if is_codex %}
 ```
-Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.memory_md upsert-wiki --root . --slug '<slug>' --category '<category>' --body-file <tmpfile>")
+Bash("uv run --with {{ harness_maker_src_path }} hm memory_md upsert-wiki --root . --slug '<slug>' --category '<category>' --body-file <tmpfile>")
 ```
 {% else %}
 ```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.memory_md upsert-wiki --root . --slug '<slug>' --category '<category>' --body-file <tmpfile>
+!uv run --with {{ harness_maker_src_path }} hm memory_md upsert-wiki --root . --slug '<slug>' --category '<category>' --body-file <tmpfile>
 ```
 {% endif %}
 
@@ -441,11 +441,11 @@ For each failure pattern that emerged this work unit:
 
 {% if is_codex %}
 ```
-Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.memory_retrieve --topic \"<symptom / root cause>\" --k 6 --pre-k 30")
+Bash("uv run --with {{ harness_maker_src_path }} hm memory_retrieve --topic \"<symptom / root cause>\" --k 6 --pre-k 30")
 ```
 {% else %}
 ```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.memory_retrieve --topic "<symptom / root cause>" --k 6 --pre-k 30
+!uv run --with {{ harness_maker_src_path }} hm memory_retrieve --topic "<symptom / root cause>" --k 6 --pre-k 30
 ```
 {% endif %}
 
@@ -461,16 +461,16 @@ Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.memory_
 {% if is_codex %}
 ```
 # New failure (no confident match) — full paragraph via --body-file:
-Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.memory_md upsert-failure --root . --slug '<slug>' --category '<category>' --body-file <tmpfile>")
+Bash("uv run --with {{ harness_maker_src_path }} hm memory_md upsert-failure --root . --slug '<slug>' --category '<category>' --body-file <tmpfile>")
 # Recurrence (confident same-root-cause match) — reuse the EXACT slug + one-line note:
-Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.memory_md upsert-failure --root . --slug '<existing-slug>' --category '<category>' --occurrence-note '<one line: what happened this time>'")
+Bash("uv run --with {{ harness_maker_src_path }} hm memory_md upsert-failure --root . --slug '<existing-slug>' --category '<category>' --occurrence-note '<one line: what happened this time>'")
 ```
 {% else %}
 ```bash
 # New failure (no confident match) — full paragraph via --body-file:
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.memory_md upsert-failure --root . --slug '<slug>' --category '<category>' --body-file <tmpfile>
+!uv run --with {{ harness_maker_src_path }} hm memory_md upsert-failure --root . --slug '<slug>' --category '<category>' --body-file <tmpfile>
 # Recurrence (confident same-root-cause match) — reuse the EXACT slug + one-line note:
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.memory_md upsert-failure --root . --slug '<existing-slug>' --category '<category>' --occurrence-note '<one line: what happened this time>'
+!uv run --with {{ harness_maker_src_path }} hm memory_md upsert-failure --root . --slug '<existing-slug>' --category '<category>' --occurrence-note '<one line: what happened this time>'
 ```
 {% endif %}
 
@@ -555,11 +555,11 @@ should update (e.g. CHANGELOG.md, TODO.md), run `/hm:configure` and select
 
 {% if is_codex %}
 ```
-Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.second_brain promote --type <decision|failure|preference|project|reference|journal> --source-slug '<stable-local-slug>' --title '<title>' --body-file <path>")
+Bash("uv run --with {{ harness_maker_src_path }} hm second_brain promote --type <decision|failure|preference|project|reference|journal> --source-slug '<stable-local-slug>' --title '<title>' --body-file <path>")
 ```
 {% else %}
 ```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.second_brain promote --type <decision|failure|preference|project|reference|journal> --source-slug '<stable-local-slug>' --title '<title>' --body-file <path>
+!uv run --with {{ harness_maker_src_path }} hm second_brain promote --type <decision|failure|preference|project|reference|journal> --source-slug '<stable-local-slug>' --title '<title>' --body-file <path>
 ```
 {% endif %}
 
@@ -646,11 +646,11 @@ preserves all `session_uuid`-bearing refs rather than popping them. Substitute `
 
 {% if is_codex %}
 ```
-Bash("HM_OWNED_SESSION_UUIDS=\"$(uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree owned-crumb-read \"$(pwd)\" <slug>)\" uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree post-commit-pop \"$(pwd)\" && uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree owned-crumb-clear \"$(pwd)\" <slug>")
+Bash("HM_OWNED_SESSION_UUIDS=\"$(uv run --with {{ harness_maker_src_path }} hm worktree owned-crumb-read \"$(pwd)\" <slug>)\" uv run --with {{ harness_maker_src_path }} hm worktree post-commit-pop \"$(pwd)\" && uv run --with {{ harness_maker_src_path }} hm worktree owned-crumb-clear \"$(pwd)\" <slug>")
 ```
 {% else %}
 ```bash
-!HM_OWNED_SESSION_UUIDS="$(uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree owned-crumb-read "$(pwd)" <slug>)" uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree post-commit-pop "$(pwd)" && uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree owned-crumb-clear "$(pwd)" <slug>
+!HM_OWNED_SESSION_UUIDS="$(uv run --with {{ harness_maker_src_path }} hm worktree owned-crumb-read "$(pwd)" <slug>)" uv run --with {{ harness_maker_src_path }} hm worktree post-commit-pop "$(pwd)" && uv run --with {{ harness_maker_src_path }} hm worktree owned-crumb-clear "$(pwd)" <slug>
 ```
 {% endif %}
 
@@ -667,11 +667,11 @@ to review them. Create-time reaping is retained (this is additive).
 
 {% if is_codex %}
 ```
-Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree drain \"$(pwd)\"")
+Bash("uv run --with {{ harness_maker_src_path }} hm worktree drain \"$(pwd)\"")
 ```
 {% else %}
 ```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree drain "$(pwd)"
+!uv run --with {{ harness_maker_src_path }} hm worktree drain "$(pwd)"
 ```
 {% endif %}
 
@@ -700,11 +700,11 @@ runs from the **base repo** (the directory two levels above `<WT>` — i.e. stri
 
 {% if is_codex %}
 ```
-Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree task-land <SLUG> <BASE>")
+Bash("uv run --with {{ harness_maker_src_path }} hm worktree task-land <SLUG> <BASE>")
 ```
 {% else %}
 ```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree task-land <SLUG> <BASE>
+!uv run --with {{ harness_maker_src_path }} hm worktree task-land <SLUG> <BASE>
 ```
 {% endif %}
 
@@ -729,11 +729,11 @@ Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktre
 
 {% if is_codex %}
 ```
-Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree commit-base-memory <BASE> --expect-head <SQUASH_SHA>")
+Bash("uv run --with {{ harness_maker_src_path }} hm worktree commit-base-memory <BASE> --expect-head <SQUASH_SHA>")
 ```
 {% else %}
 ```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree commit-base-memory <BASE> --expect-head <SQUASH_SHA>
+!uv run --with {{ harness_maker_src_path }} hm worktree commit-base-memory <BASE> --expect-head <SQUASH_SHA>
 ```
 {% endif %}
 

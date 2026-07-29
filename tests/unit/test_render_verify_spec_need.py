@@ -6,8 +6,8 @@ Asserts that:
     is implicitly guaranteed by the render being 5-check).
 (b) spec-driven render = 6 checks: Check 6 PRESENT, count phrasing says "6",
     and NO stray "5-check"/"5 Checks" count phrasing remains.
-(c) seam: spec-driven prose contains both `python -m harness_maker.spec_need op-check`
-    and `python -m harness_maker.spec_need waiver-check` CLI calls.
+(c) seam: spec-driven prose contains both `hm spec_need op-check`
+    and `hm spec_need waiver-check` CLI calls.
 (d) Check 6 prose names `not-evaluated` as a FAIL condition and describes the
     clean N-A on absent PLAN frontmatter.
 
@@ -70,9 +70,9 @@ def test_task_driven_no_check_6_heading(task_driven_verify: str) -> None:
 
 
 def test_task_driven_no_spec_need_reference(task_driven_verify: str) -> None:
-    """(a) Task-driven render must NOT reference harness_maker.spec_need."""
-    assert "harness_maker.spec_need" not in task_driven_verify, (
-        "task-driven verify must not reference harness_maker.spec_need"
+    """(a) Task-driven render must NOT reference hm spec_need."""
+    assert "hm spec_need" not in task_driven_verify, (
+        "task-driven verify must not reference hm spec_need"
     )
 
 
@@ -181,17 +181,16 @@ def test_spec_driven_ordinal_check_5_still_present(spec_driven_verify: str) -> N
 
 def test_spec_driven_seam_op_check(spec_driven_verify: str) -> None:
     """(c) Spec-driven verify must contain the literal op-check CLI call."""
-    assert "python -m harness_maker.spec_need op-check" in spec_driven_verify, (
-        "spec-driven verify must call 'python -m harness_maker.spec_need op-check' "
+    assert "hm spec_need op-check" in spec_driven_verify, (
+        "spec-driven verify must call 'hm spec_need op-check' "
         "— proves module wiring (seam test per project memory lesson)"
     )
 
 
 def test_spec_driven_seam_waiver_check(spec_driven_verify: str) -> None:
     """(c) Spec-driven verify must contain the literal waiver-check CLI call."""
-    assert "python -m harness_maker.spec_need waiver-check" in spec_driven_verify, (
-        "spec-driven verify must call 'python -m harness_maker.spec_need waiver-check' "
-        "— proves module wiring"
+    assert "hm spec_need waiver-check" in spec_driven_verify, (
+        "spec-driven verify must call 'hm spec_need waiver-check' — proves module wiring"
     )
 
 
@@ -295,7 +294,7 @@ def test_spec_driven_check6_uses_root_wt(spec_driven_verify: str) -> None:
     # All spec_need calls in Check 6 must use --root <WT>
     import re as _re
 
-    single_line_pattern = _re.compile(r"harness_maker\.spec_need \S+ .*?--root (\S+)")
+    single_line_pattern = _re.compile(r"hm spec_need \S+ .*?--root (\S+)")
     matches = single_line_pattern.findall(section)
     assert matches, "No spec_need --root arguments found in Check 6"
     dot_roots = [m for m in matches if m.strip() in (".", "./", ".\\")]

@@ -27,7 +27,7 @@ If **Cancel**, stop.
 ### 2. Preview (dry-run)
 
 ```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.cli remove "$(pwd)" --dry-run
+!uv run --with {{ harness_maker_src_path }} hm cli remove "$(pwd)" --dry-run
 ```
 
 Show the user the file list.
@@ -38,10 +38,10 @@ Based on option selected:
 
 ```bash
 # Keep harness.yaml
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.cli remove "$(pwd)"
+!uv run --with {{ harness_maker_src_path }} hm cli remove "$(pwd)"
 
 # Remove everything
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.cli remove "$(pwd)" --remove-yaml
+!uv run --with {{ harness_maker_src_path }} hm cli remove "$(pwd)" --remove-yaml
 ```
 
 ### 4. Post-removal

@@ -99,7 +99,7 @@ For **Second Brain**: first inspect current state via the CLI subcommand
 time — they MUST delegate state inspection to the CLI per CLAUDE.md §4):
 
 ```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.cli \
+!uv run --with {{ harness_maker_src_path }} hm cli \
   configure-second-brain "$(pwd)" --check
 ```
 
@@ -121,7 +121,7 @@ which prompts to surface:
    non-skip answer, dispatch the folder add through the CLI:
 
    ```bash
-   !uv run --with {{ harness_maker_src_path }} python -m harness_maker.cli \
+   !uv run --with {{ harness_maker_src_path }} hm cli \
      configure-second-brain "$(pwd)" --add-folder "$SB_FOLDER"
    ```
 
@@ -145,7 +145,7 @@ which prompts to surface:
 Run the CLI with only the changed flags:
 
 ```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.cli make "$(pwd)" \
+!uv run --with {{ harness_maker_src_path }} hm cli make "$(pwd)" \
   --grade-threshold "$GRADE" --domains "$DOMAINS" --mechanical-checks "$CHECKS" \
   --default-model "$MODEL" --focus "$FOCUS" --wrapup-docs "$WRAPUP_DOCS" \
   --ref-folders "$REF_FOLDERS" --sibling-repos "$SIBLING_REPOS" \
@@ -174,7 +174,7 @@ For each detected foreign config:
 1. Call the Python helper to map the file to harness.yaml axes via Claude:
 
    ```bash
-   !uv run --with {{ harness_maker_src_path }} python -m harness_maker.cli \
+   !uv run --with {{ harness_maker_src_path }} hm cli \
      foreign-map "$(pwd)" --path "<foreign-path>"
    ```
 
@@ -188,7 +188,7 @@ For each detected foreign config:
    markers:
 
    ```bash
-   !uv run --with {{ harness_maker_src_path }} python -m harness_maker.cli \
+   !uv run --with {{ harness_maker_src_path }} hm cli \
      foreign-apply "$(pwd)" --path "<foreign-path>"
    ```
 

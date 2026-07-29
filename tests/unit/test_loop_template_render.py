@@ -97,7 +97,7 @@ def test_current_iter_marker_written_at_iter_start(loop_md: str) -> None:
 
 def test_gate0_invokes_iter_receipts_verify(loop_md: str) -> None:
     """Gate 0 mechanically checks per-stage receipts via the CLI."""
-    assert "harness_maker.iter_receipts verify" in loop_md, (
+    assert "hm iter_receipts verify" in loop_md, (
         "loop.md missing Gate 0 verification CLI call (iter_receipts verify)"
     )
 

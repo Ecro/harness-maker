@@ -75,11 +75,11 @@ Engage isolation if `harness.yaml.worktree.scope` includes `execute`. The `workt
 
 {% if is_codex %}
 ```
-Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree create execute \"$(pwd)\"")
+Bash("uv run --with {{ harness_maker_src_path }} hm worktree create execute \"$(pwd)\"")
 ```
 {% else %}
 ```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree create execute "$(pwd)"
+!uv run --with {{ harness_maker_src_path }} hm worktree create execute "$(pwd)"
 ```
 {% endif %}
 
@@ -95,11 +95,11 @@ Read **all non-empty output lines** — that is the contract for the rest of thi
 
 {% if is_codex %}
 ```
-Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree verify <WT>")
+Bash("uv run --with {{ harness_maker_src_path }} hm worktree verify <WT>")
 ```
 {% else %}
 ```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree verify <WT>
+!uv run --with {{ harness_maker_src_path }} hm worktree verify <WT>
 ```
 {% endif %}
 {%- endif %}
@@ -168,7 +168,7 @@ If `spec:` resolves to an existing file:
 **Machine SPEC (forward binding — PLAN-spec-test-accumulation):** if a sibling
 `specs/SPEC-{slug}.machine.yaml` also exists, load it and list the
 `type: mechanical` ACs whose `executable_predicate` is a parseable Python
-expression (the contract `python -m harness_maker.spec_machine validate` enforces).
+expression (the contract `hm spec_machine validate` enforces).
 Call this set the **bindable mechanical ACs** — Phase A authors a real
 predicate-bound test for each, and `/hm:wrapup` records the binding back. When
 the file is absent or has zero bindable mechanical ACs, Phase A uses the scenario
@@ -322,11 +322,11 @@ when this PLAN phase authored bindable-mechanical-AC tests and the machine SPEC 
 
 {% if is_codex %}
 ```
-Bash("cd <WT> && uv run --with {{ harness_maker_src_path }} python -m harness_maker.spec_mutation gate --yaml specs/SPEC-{slug}.machine.yaml --tier 1")
+Bash("cd <WT> && uv run --with {{ harness_maker_src_path }} hm spec_mutation gate --yaml specs/SPEC-{slug}.machine.yaml --tier 1")
 ```
 {% else %}
 ```bash
-!cd <WT> && uv run --with {{ harness_maker_src_path }} python -m harness_maker.spec_mutation gate --yaml specs/SPEC-{slug}.machine.yaml --tier 1
+!cd <WT> && uv run --with {{ harness_maker_src_path }} hm spec_mutation gate --yaml specs/SPEC-{slug}.machine.yaml --tier 1
 ```
 {% endif %}
 
@@ -378,23 +378,23 @@ Pick **exactly one** finalize command. Substitute `<WT>` with the literal absolu
 ```
 # All phases GREEN — stage-merge back (NO commit) + cleanup worktree.
 # @hm-wrapup will create the single user-facing commit.
-Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree finalize <WT> stage-only")
+Bash("uv run --with {{ harness_maker_src_path }} hm worktree finalize <WT> stage-only")
 ```
 
 ```
 # Stage halted on a blocker — preserve worktree for inspection:
-Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree finalize <WT> fail")
+Bash("uv run --with {{ harness_maker_src_path }} hm worktree finalize <WT> fail")
 ```
 {% else %}
 ```bash
 # All phases GREEN — stage-merge the branch back (NO commit) + cleanup the worktree.
 # /hm:wrapup will create the single user-facing commit (with proper message + Co-Authored-By).
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree finalize <WT> stage-only
+!uv run --with {{ harness_maker_src_path }} hm worktree finalize <WT> stage-only
 ```
 
 ```bash
 # Stage halted on a blocker — preserve the worktree for inspection:
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree finalize <WT> fail
+!uv run --with {{ harness_maker_src_path }} hm worktree finalize <WT> fail
 ```
 {% endif %}
 
@@ -410,11 +410,11 @@ of a `hm/<slug>` task worktree is empty → nothing recorded, by design.
 
 {% if is_codex %}
 ```
-Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree owned-crumb-add \"$(pwd)\" <slug> \"$(uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree wt-uuid <WT>)\"")
+Bash("uv run --with {{ harness_maker_src_path }} hm worktree owned-crumb-add \"$(pwd)\" <slug> \"$(uv run --with {{ harness_maker_src_path }} hm worktree wt-uuid <WT>)\"")
 ```
 {% else %}
 ```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree owned-crumb-add "$(pwd)" <slug> "$(uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree wt-uuid <WT>)"
+!uv run --with {{ harness_maker_src_path }} hm worktree owned-crumb-add "$(pwd)" <slug> "$(uv run --with {{ harness_maker_src_path }} hm worktree wt-uuid <WT>)"
 ```
 {% endif %}
 
@@ -430,11 +430,11 @@ commit; otherwise the user's pre-existing WIP remains in the stash queue:
 
 {% if is_codex %}
 ```
-Bash("HM_OWNED_SESSION_UUIDS=\"$(uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree owned-crumb-read \"$(pwd)\" <slug>)\" uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree post-commit-pop \"$(pwd)\"")
+Bash("HM_OWNED_SESSION_UUIDS=\"$(uv run --with {{ harness_maker_src_path }} hm worktree owned-crumb-read \"$(pwd)\" <slug>)\" uv run --with {{ harness_maker_src_path }} hm worktree post-commit-pop \"$(pwd)\"")
 ```
 {% else %}
 ```bash
-!HM_OWNED_SESSION_UUIDS="$(uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree owned-crumb-read "$(pwd)" <slug>)" uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree post-commit-pop "$(pwd)"
+!HM_OWNED_SESSION_UUIDS="$(uv run --with {{ harness_maker_src_path }} hm worktree owned-crumb-read "$(pwd)" <slug>)" uv run --with {{ harness_maker_src_path }} hm worktree post-commit-pop "$(pwd)"
 ```
 {% endif %}
 

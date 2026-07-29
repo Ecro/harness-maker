@@ -280,7 +280,7 @@ def _rendered_reconcile_line() -> str:
         freeze_time=DEFAULT_FREEZE_TIME,
     )
     body = (out / "commands" / "hm" / "wrapup.md").read_text(encoding="utf-8")
-    lines = [ln for ln in body.splitlines() if "harness_maker.wrapup_receipt" in ln]
+    lines = [ln for ln in body.splitlines() if "hm wrapup_receipt" in ln]
     assert len(lines) == 1, f"expected exactly one reconcile invocation, got {lines}"
     return lines[0]
 
@@ -315,7 +315,7 @@ def test_every_flag_the_template_passes_is_one_the_cli_accepts(
     # Scope to the text AFTER the module name: everything before it belongs to `uv`
     # (`uv run --with <path> python -m …`), and its flags are not this parser's.
     line = _rendered_reconcile_line()
-    _, sep, tail = line.partition("-m harness_maker.wrapup_receipt")
+    _, sep, tail = line.partition(" hm wrapup_receipt")
     assert sep, f"reconcile line does not invoke the module by name: {line}"
     flags = re.findall(r"(?<!\w)--[a-z][a-z-]*", tail)
     assert flags, f"no flags found after the module name in: {line}"

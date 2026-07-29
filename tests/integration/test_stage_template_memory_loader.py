@@ -34,9 +34,7 @@ def stage_source() -> dict[str, str]:
 
 def test_research_template_invokes_memory_retrieve(stage_source: dict[str, str]) -> None:
     body = stage_source["research"]
-    assert "harness_maker.memory_retrieve" in body, (
-        "research stage must invoke memory_retrieve helper"
-    )
+    assert "hm memory_retrieve" in body, "research stage must invoke memory_retrieve helper"
 
 
 def test_research_template_drops_first_60_lines_pattern(stage_source: dict[str, str]) -> None:
@@ -48,12 +46,12 @@ def test_research_template_drops_first_60_lines_pattern(stage_source: dict[str, 
 
 def test_plan_template_invokes_memory_retrieve(stage_source: dict[str, str]) -> None:
     body = stage_source["plan"]
-    assert "harness_maker.memory_retrieve" in body, "plan stage must invoke memory_retrieve helper"
+    assert "hm memory_retrieve" in body, "plan stage must invoke memory_retrieve helper"
 
 
 def test_spec_template_invokes_memory_retrieve(stage_source: dict[str, str]) -> None:
     body = stage_source["spec"]
-    assert "harness_maker.memory_retrieve" in body, "spec stage must invoke memory_retrieve helper"
+    assert "hm memory_retrieve" in body, "spec stage must invoke memory_retrieve helper"
 
 
 def test_spec_template_drops_rg_key_terms_memory_pattern(stage_source: dict[str, str]) -> None:
@@ -118,14 +116,14 @@ def test_all_three_templates_use_is_codex_branch_for_invocation(
 ) -> None:
     """All three templates must wrap the helper invocation in the is_codex branch
     so Codex gets `Bash("...")` form and Claude Code/Cursor get `!...` form
-    (matches existing harness_maker.second_brain pattern)."""
+    (matches existing hm second_brain pattern)."""
     for stage in ("research", "plan", "spec"):
         body = stage_source[stage]
         # Find the memory_retrieve invocation context. The block should sit
         # inside a `{% if is_codex %}` ... `{% endif %}` region.
         # Heuristic: find the substring and check that an `is_codex` token
         # appears within 200 chars before it.
-        idx = body.find("harness_maker.memory_retrieve")
+        idx = body.find("hm memory_retrieve")
         assert idx >= 0, f"{stage}: no memory_retrieve invocation"
         window = body[max(0, idx - 400) : idx]
         assert "is_codex" in window, (

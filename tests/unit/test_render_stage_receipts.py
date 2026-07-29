@@ -6,7 +6,7 @@ and asserts the receipt-emit Bash block is present in every rendered atomic
 stage command file.
 
 The block must:
-1. Reference `harness_maker.iter_receipts write` — the CLI under ADR-004.
+1. Reference `hm iter_receipts write` — the CLI under ADR-004.
 2. Pass `--stage <name>` with the correct stage identifier per file.
 3. Read `$ITER` from `.claude/.hm-iter-receipts/.current-iter` (driver-written
    per ADR-001) with a graceful fallback when the file is absent.
@@ -52,7 +52,7 @@ def test_stage_command_contains_receipt_emit(rendered_root: Path, stage: str) ->
     assert cmd_file.is_file(), f"missing rendered command file: {cmd_file}"
     body = cmd_file.read_text(encoding="utf-8")
     # Receipt CLI invocation must be present.
-    assert "harness_maker.iter_receipts write" in body, (
+    assert "hm iter_receipts write" in body, (
         f"{stage}.md is missing the iter_receipts CLI invocation"
     )
     # Stage name must be passed to --stage so the receipt path is correct.
@@ -76,7 +76,7 @@ def test_receipt_emit_positioned_before_outputs(rendered_root: Path, stage: str)
     """
     cmd_file = rendered_root / "commands" / "hm" / f"{stage}.md"
     body = cmd_file.read_text(encoding="utf-8")
-    receipt_idx = body.find("harness_maker.iter_receipts write")
+    receipt_idx = body.find("hm iter_receipts write")
     assert receipt_idx > 0, f"{stage}.md missing receipt-emit"
     outputs_idx = body.find("## Outputs")
     assert outputs_idx > 0, f"{stage}.md missing '## Outputs' anchor"
@@ -97,7 +97,7 @@ def test_receipt_block_warns_against_skipped_verdict(rendered_root: Path, stage:
     cmd_file = rendered_root / "commands" / "hm" / f"{stage}.md"
     body = cmd_file.read_text(encoding="utf-8")
     section_idx = body.find("Emit Gate 0 receipt")
-    receipt_idx = body.find("harness_maker.iter_receipts write")
+    receipt_idx = body.find("hm iter_receipts write")
     assert section_idx > 0, f"{stage}.md missing 'Emit Gate 0 receipt' section"
     assert receipt_idx > section_idx, (
         f"{stage}.md receipt CLI invocation must appear after the section heading"

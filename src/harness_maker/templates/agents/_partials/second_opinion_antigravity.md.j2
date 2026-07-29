@@ -42,7 +42,7 @@ not a shell variable (verbatim bytes; adversarial diff text is never shell-expan
 > **Sandbox escape (ADR-003, Claude Code only).** The invoker's `agy` call needs outbound
 > network, which Claude Code's Bash sandbox blocks. Run THIS ONE Bash call with the Bash tool
 > parameter **`dangerouslyDisableSandbox: true`** — the scoped
-> `Bash(uv run … -m harness_maker.second_opinion_invoke:*)` settings `allow` rule pre-approves
+> `Bash(uv run … hm second_opinion_invoke:*)` settings `allow` rule pre-approves
 > exactly this command, and `agy` stays contained by `--sandbox` + the project-less invocation
 > (no file tools exposed — see the Phase-1 probe). Do NOT disable the sandbox for any other
 > command.
@@ -66,7 +66,7 @@ config resolution, prompt truncation, the output contract, status classification
 and the ledger row:
 
 ```bash
-uv run --with {{ harness_maker_src_path }} python -m harness_maker.second_opinion_invoke --model antigravity --prompt-file <the literal path printed above> --slug "<slug>" --stage {{ _stage }}
+uv run --with {{ harness_maker_src_path }} hm second_opinion_invoke --model antigravity --prompt-file <the literal path printed above> --slug "<slug>" --stage {{ _stage }}
 ```
 
 > **Why this is not a raw `agy` line any more.** It was — `agy --print --sandbox … < prompt_file`

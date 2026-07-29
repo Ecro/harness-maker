@@ -1,0 +1,157 @@
+{
+  "aggregate_chars": {
+    "claude": 830393,
+    "codex": 311474
+  },
+  "counting_rule": "ADR-011: round_trips = count of ^! lines (claude variant) or 'Bash(' call sites (codex variant), plus all 'Task(' occurrences; fenced examples included. A consistent proxy, not a semantic count.",
+  "generated_by": "tests/structural/_surface_baseline.py",
+  "payload_digest": "5a5899fbec010cdc4eff0f38aa7d81334e68f5f546d9757c31c94a1513a4c372",
+  "render_sha": "3f7d587bff1931dbf4f78ce3760c68b326d66e01",
+  "schema_version": 1,
+  "surface": {
+    "claude": {
+      "configure": {
+        "chars": 9330,
+        "round_trips": 3
+      },
+      "exec-rev": {
+        "chars": 67492,
+        "round_trips": 17
+      },
+      "exec-rev-wrap": {
+        "chars": 106976,
+        "round_trips": 46
+      },
+      "exec-rev-wrap-ver": {
+        "chars": 119396,
+        "round_trips": 56
+      },
+      "execute": {
+        "chars": 28338,
+        "round_trips": 15
+      },
+      "health": {
+        "chars": 9844,
+        "round_trips": 7
+      },
+      "help": {
+        "chars": 2176,
+        "round_trips": 0
+      },
+      "loop": {
+        "chars": 52773,
+        "round_trips": 12
+      },
+      "loop-p5-batch": {
+        "chars": 4731,
+        "round_trips": 2
+      },
+      "make": {
+        "chars": 6641,
+        "round_trips": 1
+      },
+      "metrics": {
+        "chars": 15260,
+        "round_trips": 7
+      },
+      "plan": {
+        "chars": 46466,
+        "round_trips": 14
+      },
+      "plan-exec-rev": {
+        "chars": 106246,
+        "round_trips": 28
+      },
+      "res-spec-plan": {
+        "chars": 86391,
+        "round_trips": 20
+      },
+      "research": {
+        "chars": 24683,
+        "round_trips": 8
+      },
+      "review": {
+        "chars": 45555,
+        "round_trips": 7
+      },
+      "spec": {
+        "chars": 29215,
+        "round_trips": 6
+      },
+      "uninstall": {
+        "chars": 1692,
+        "round_trips": 3
+      },
+      "verify": {
+        "chars": 20001,
+        "round_trips": 13
+      },
+      "wrapup": {
+        "chars": 47187,
+        "round_trips": 32
+      }
+    },
+    "codex": {
+      "hm-exec-rev": {
+        "chars": 5143,
+        "round_trips": 0
+      },
+      "hm-exec-rev-wrap": {
+        "chars": 5473,
+        "round_trips": 0
+      },
+      "hm-exec-rev-wrap-ver": {
+        "chars": 5798,
+        "round_trips": 0
+      },
+      "hm-execute": {
+        "chars": 26149,
+        "round_trips": 14
+      },
+      "hm-help": {
+        "chars": 2467,
+        "round_trips": 0
+      },
+      "hm-loop": {
+        "chars": 51866,
+        "round_trips": 13
+      },
+      "hm-loop-p5-batch": {
+        "chars": 5272,
+        "round_trips": 0
+      },
+      "hm-plan": {
+        "chars": 42718,
+        "round_trips": 12
+      },
+      "hm-plan-exec-rev": {
+        "chars": 5465,
+        "round_trips": 0
+      },
+      "hm-res-spec-plan": {
+        "chars": 5461,
+        "round_trips": 0
+      },
+      "hm-research": {
+        "chars": 23052,
+        "round_trips": 7
+      },
+      "hm-review": {
+        "chars": 41936,
+        "round_trips": 9
+      },
+      "hm-spec": {
+        "chars": 27241,
+        "round_trips": 5
+      },
+      "hm-verify": {
+        "chars": 18148,
+        "round_trips": 12
+      },
+      "hm-wrapup": {
+        "chars": 45285,
+        "round_trips": 30
+      }
+    }
+  }
+}

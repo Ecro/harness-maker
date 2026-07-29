@@ -66,6 +66,39 @@ _RATCHET: dict[str, tuple[int, int]] = {
 # Re-based 2026-07-29 from 119,000 (PLAN-wrapup-context-carry Phase 3). Derivation below.
 _ADR014_CEILING = 122_000
 
+# ── the atomic arm (PLAN-workflow-step-audit Phase 0.5, ADR-011 assertion 2) ────
+# The table above holds five FUSED entries and no atomic ones, so until now nothing
+# measured the size of a single stage command — and every cutting phase of that PLAN
+# edits exactly those. Frozen against the PRE-change render, before any phase cuts.
+#
+# One int, not the `(pre_change, measured)` pair the fused entries carry: that pair's
+# `size < pre` arm encodes "this phase already shrank it", which is true of the fused
+# compaction that produced those numbers and false here — pre and post are the same
+# observation at freeze time, so the arm would fail by construction.
+#
+# Ceiling and floor follow ADR-014's ratio (`* 1.02` / `* 0.80`). Note what the floor
+# can and cannot do: at 20% slack it catches the render being GUTTED, never a single
+# instruction being deleted (~0.5% of any of these). That gap is why
+# `test_instruction_preservation.py` exists; do not read a green floor as evidence that
+# nothing was removed.
+#
+# WHICH RENDER: these numbers come from the `flag_on` fixture below, which is
+# `dev_mode: spec-driven` — `InterviewAnswers.dev_mode` defaults to `DevMode.SPEC_DRIVEN`
+# (`models.py:948`) and `_render()` never overrides it. The instruction baseline in
+# `_instruction_baseline.py` freezes BOTH dev_mode arms, and the aggregate arm below
+# measures this repo's `.claude/harness.yaml` (task-driven). Three arms, two configs —
+# stated here because the mismatch was once a live blind spot: spec-driven-only
+# instructions were absent from the instruction snapshot and invisible to this floor.
+_ATOMIC_RATCHET: dict[str, int] = {
+    "execute": 26704,
+    "plan": 42076,
+    "research": 23049,
+    "review": 27779,
+    "spec": 27581,
+    "verify": 20878,
+    "wrapup": 40229,
+}
+
 _WORKFLOWS: dict[str, tuple[str, ...]] = {
     "exec-rev-wrap-ver": ("execute", "review", "wrapup", "verify"),
     "exec-rev-wrap": ("execute", "review", "wrapup"),
@@ -78,7 +111,11 @@ _WORKFLOWS: dict[str, tuple[str, ...]] = {
 # The ONLY content `fuse()` intentionally drops. Kept as an equality target so a
 # second omission cannot hide behind it.
 _EXEMPT_HEADING = "## Auto-advance check (autopilot — Claude Code only)"
-_EXEMPT_EXEC = re.compile(r"harness_maker\.autopilot_caps ")
+# Matches BOTH spellings of the same call: the long `hm <mod>` form
+# and the `hm <mod>` console-script shorthand that replaced it. They dispatch through the
+# identical `runpy.run_module` path, so an exemption that recognised only one would have
+# reported the autopilot block as a NEW loss the moment the shorthand landed.
+_EXEMPT_EXEC = re.compile(r"(?:harness_maker\.|hm )autopilot_caps ")
 
 # ── fingerprints (AC-006) ──────────────────────────────────────────────────────
 # Each names a sentence from the block's BODY, never its heading, so a heading left
@@ -179,6 +216,10 @@ def test_the_fixtures_actually_rendered_commands(
     assert set(_RATCHET) <= set(flag_on), sorted(set(_RATCHET) - set(flag_on))
     assert set(_RATCHET) <= set(flag_off), sorted(set(_RATCHET) - set(flag_off))
     assert all(len(v) > 10_000 for k, v in flag_on.items() if k in _RATCHET)
+    # The atomic arm needs the same guard — without it every `_ATOMIC_RATCHET`
+    # assertion would KeyError-or-pass against a render that produced no stage commands.
+    assert set(_ATOMIC_RATCHET) <= set(flag_on), sorted(set(_ATOMIC_RATCHET) - set(flag_on))
+    assert all(len(flag_on[k]) > 10_000 for k in _ATOMIC_RATCHET)
 
 
 def test_no_rendered_command_bakes_a_machine_specific_absolute_path(
@@ -210,6 +251,74 @@ def test_rendered_commands_within_budget(flag_on: dict[str, str], name: str) -> 
     size = len(flag_on[name])
     assert floor <= size <= ceiling, f"{name}: {size} outside [{floor}, {ceiling}]"
     assert size < pre, f"{name}: {size} did not shrink from the pre-change {pre}"
+
+
+@pytest.mark.parametrize("name", sorted(_ATOMIC_RATCHET))
+def test_atomic_commands_within_budget(flag_on: dict[str, str], name: str) -> None:
+    """AC-005 extended to the seven atomic commands (PLAN-workflow-step-audit Phase 0.5).
+
+    Landing this BEFORE the cutting phases is the whole point: a floor introduced after
+    the cuts is measured from the already-reduced render, so the phases that actually
+    delete would have run unguarded — the withdrawn ADR-017 failure, repeated.
+    """
+    measured = _ATOMIC_RATCHET[name]
+    ceiling = int(measured * 1.02)
+    floor = int(measured * 0.80)
+    size = len(flag_on[name])
+    assert floor <= size <= ceiling, f"{name}: {size} outside [{floor}, {ceiling}]"
+
+
+def test_the_atomic_table_covers_every_atomic_command(flag_on: dict[str, str]) -> None:
+    """A command missing from the table is a command with no budget at all — the silent
+    way this arm narrows. Fused entries are excluded by name, not by omission."""
+    rendered_atomic = {n for n in flag_on if n not in _WORKFLOWS} - {
+        "configure",
+        "health",
+        "help",
+        "loop",
+        "loop-p5-batch",
+        "make",
+        "metrics",
+        "uninstall",
+    }
+    assert rendered_atomic == set(_ATOMIC_RATCHET), sorted(rendered_atomic ^ set(_ATOMIC_RATCHET))
+
+
+# ── ADR-011 assertion 3 — the aggregate shipped surface ────────────────────────
+
+
+def test_aggregate_shipped_surface_does_not_grow() -> None:
+    """The failure mode the per-command arms structurally cannot see.
+
+    The prior compaction effort removed 4,437 characters from one command while adding
+    3,765 to a heavily-invoked one: every per-command ceiling held and the shipped
+    surface still grew 0.75%. Only a total catches that, and it is measured against
+    Phase 0's frozen baseline through the SAME generator Phase 6 re-invokes.
+
+    Summed over the **frozen** command set, so a legitimate future addition — an eighth
+    command, a new target — adds an entry rather than forcing this constant to be
+    relaxed. Non-increase is the ratchet; the strict decrease this PLAN promises is
+    Phase 6's final re-verification, not this arm.
+
+    A reader of this test alone would conclude that a newly added command escapes the
+    total, and would be half right: it escapes *this* sum by design, and is caught by
+    `test_surface_baseline.py::test_baseline_shape_matches_the_generator`, which asserts
+    frozen-vs-measured command-set and variant-set equality. Adding a command means
+    regenerating the baseline, which is the explicit act that arm forces.
+    """
+    from ._surface_baseline import load_baseline, measure_surface
+
+    frozen = load_baseline()
+    current = measure_surface()
+    for variant, commands in frozen["surface"].items():
+        missing = set(commands) - set(current[variant])
+        assert not missing, f"{variant}: commands vanished from the render: {sorted(missing)}"
+        now = sum(current[variant][name]["chars"] for name in commands)
+        was = frozen["aggregate_chars"][variant]
+        assert now <= was, (
+            f"{variant}: shipped surface grew {now - was} chars over the Phase 0 baseline "
+            f"({was} → {now}). A per-command ceiling cannot see this."
+        )
 
 
 def test_the_repo_render_is_under_the_adr014_ceiling(tmp_path: Path) -> None:

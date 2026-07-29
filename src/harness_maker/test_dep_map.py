@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import ast
 from pathlib import Path
+from typing import Any
 
 
 def source_to_test_candidates(
@@ -128,3 +129,147 @@ def build_test_hints(
             for t in affected
         ]
     return hints
+
+
+# ── four-way selection (PLAN-workflow-step-audit ADR-008) ──────────────────────
+#
+# `build_test_hints` above skips every non-`.py` file, so the interview's locked rule
+# ("a changed file with no hint → FULL") degenerates to always-FULL in this repo, where
+# most changes are `.j2` templates, markdown and config. The classifier below keeps what
+# that rule protects — a source file no test maps to must never be silently untested —
+# and gives the other three shapes a bounded answer.
+#
+# The classifier is TOTAL. Anything matching none of the rules falls to the explicit
+# default arm below and forces FULL, loudly. That arm is not decoration: an earlier
+# draft defaulted only out-of-root paths, which left `pyproject.toml`, `uv.lock`,
+# `.github/workflows/*.yml` and `.claude/harness.yaml` selecting ZERO tests — an
+# always-FULL cost traded for a sometimes-NONE gap, which is strictly weaker than the
+# behaviour it replaced.
+
+CLASS_SOURCE_WITH_HINTS = "source-with-hints"
+CLASS_SOURCE_WITHOUT_HINTS = "source-without-hints"
+CLASS_RENDER_AFFECTING = "render-affecting"
+CLASS_INERT = "inert"
+
+#: The bounded set a template / fixture change selects instead of FULL. Curated, so
+#: `test_every_directory_under_tests_is_classified_by_the_constant` exists to fail when
+#: a new render-sensitive suite appears and is not added here.
+RENDER_AFFECTING_SUITES: tuple[str, ...] = (
+    "tests/render",
+    "tests/snapshot",
+    "tests/structural",
+)
+
+#: The other half of that detector — directories deliberately declared NOT
+#: render-affecting. Membership here is a claim someone made on purpose; absence from
+#: both tuples is an omission, and the detector cannot tell those apart without it.
+TESTS_DIRS_NOT_RENDER_AFFECTING: tuple[str, ...] = (
+    "tests/ablation",
+    "tests/codex-compat",
+    "tests/cursor-compat",
+    "tests/e2e",
+    "tests/fixtures",
+    "tests/integration",
+    "tests/manual",
+    "tests/unit",
+)
+
+_RENDER_AFFECTING_PREFIXES = (
+    "src/harness_maker/templates/",
+    "tests/snapshot/",
+    "tests/e2e/sandbox/",
+    "tests/e2e/sandbox-plugin-test/",
+)
+
+#: Markdown is inert only in these locations. A blanket "`.md` is inert" would make
+#: `CLAUDE.md` inert too, and the context-lint suite reads it — so everything else
+#: falls to the default arm rather than being assumed harmless.
+_INERT_PREFIXES = (
+    "work-docs/",
+    "docs/",
+    ".claude/memory/",
+)
+_INERT_ROOT_FILES = ("README.md", "CHANGELOG.md", "LICENSE")
+
+
+def classify_path(rel_path: str, project_root: Path) -> str:
+    """Total function: every input lands in exactly one of the four classes.
+
+    Classification is by PATH ONLY, never by `Path.exists()` — a deleted or renamed
+    file is gone from disk, and a classifier that stats it would misroute exactly the
+    change most likely to break something.
+    """
+    norm = rel_path.replace("\\", "/")
+    while norm.startswith("./"):
+        # NOT `lstrip("./")` — that strips a CHARACTER SET, so `.claude/memory/x.md`
+        # became `claude/memory/x.md` and missed every `.`-prefixed inert prefix.
+        norm = norm[2:]
+    if norm.endswith(".j2") or any(norm.startswith(p) for p in _RENDER_AFFECTING_PREFIXES):
+        return CLASS_RENDER_AFFECTING
+    if norm in _INERT_ROOT_FILES or any(norm.startswith(p) for p in _INERT_PREFIXES):
+        return CLASS_INERT
+    if norm.endswith(".py"):
+        src = project_root / norm
+        hints = build_test_hints([src], project_root)
+        return CLASS_SOURCE_WITH_HINTS if hints.get(norm) else CLASS_SOURCE_WITHOUT_HINTS
+    # default → FULL, loudly. See the note at the top of this section.
+    return CLASS_SOURCE_WITHOUT_HINTS
+
+
+def select_tests(changed: list[str], project_root: Path) -> dict[str, Any]:
+    """Return either a targeted node list or an explicit FULL with the reason.
+
+    Encoded in code rather than prose so the absent case is enforced rather than
+    described — an LLM reading "run the full suite when a file has no hint" has no
+    referent for "has no hint", and the prose form of this rule shipped as a no-op.
+    """
+    if not changed:
+        return {
+            "mode": "full",
+            "node_ids": [],
+            "reason": "no changed files were supplied — refusing to report a targeted "
+            "selection that is indistinguishable from 'everything is inert'",
+            "classified": {},
+        }
+    classified = {rel: classify_path(rel, project_root) for rel in changed}
+    forcing = [r for r, c in classified.items() if c == CLASS_SOURCE_WITHOUT_HINTS]
+    if forcing:
+        return {
+            "mode": "full",
+            "node_ids": [],
+            "reason": "full suite: no test maps to " + ", ".join(sorted(forcing)),
+            "classified": classified,
+        }
+    node_ids: list[str] = []
+    for rel, cls in classified.items():
+        if cls == CLASS_RENDER_AFFECTING:
+            node_ids.extend(RENDER_AFFECTING_SUITES)
+        elif cls == CLASS_SOURCE_WITH_HINTS:
+            # Filtered to `tests/`: `build_test_hints` can return the changed file
+            # itself when its stem already looks like a test module (this repo has
+            # `src/harness_maker/test_dep_map.py`), and handing a source file to
+            # pytest as a node id is a collection error, not a narrower run.
+            hinted = build_test_hints([project_root / rel], project_root).get(rel, [])
+            node_ids.extend(h for h in hinted if h.replace("\\", "/").startswith("tests/"))
+    return {
+        "mode": "targeted",
+        "node_ids": sorted(dict.fromkeys(node_ids)),
+        "reason": "targeted selection",
+        "classified": classified,
+    }
+
+
+def main(argv: list[str] | None = None) -> int:
+    import argparse
+    import json
+
+    ap = argparse.ArgumentParser(description="Classify changed files and select tests.")
+    ap.add_argument("--root", type=Path, default=Path.cwd())
+    ap.add_argument("--changed-file", action="append", default=[], dest="changed")
+    args = ap.parse_args(argv)
+    print(json.dumps(select_tests(args.changed, args.root.resolve()), indent=2, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":  # pragma: no cover
+    raise SystemExit(main())

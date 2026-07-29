@@ -95,7 +95,7 @@ def test_the_delegate_on_render_carries_the_dispatch(tmp_path: Path) -> None:
     body = _wrapup(tmp_path, stages=["wrapup"])
 
     assert "stage-delegate" in body
-    assert "harness_maker.wrapup_brief" in body
+    assert "hm wrapup_brief" in body
 
 
 def test_the_delegate_on_render_still_carries_the_inline_body(tmp_path: Path) -> None:

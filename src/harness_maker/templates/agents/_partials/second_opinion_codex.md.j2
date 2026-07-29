@@ -34,7 +34,7 @@ command substitutions or backticks in adversarial diff text are never shell-expa
 > **Sandbox escape (ADR-003, Claude Code only).** The invoker's `codex exec` call needs
 > outbound network, which Claude Code's Bash sandbox blocks. Run THIS ONE Bash call
 > with the Bash tool parameter **`dangerouslyDisableSandbox: true`** — the scoped
-> `Bash(uv run … -m harness_maker.second_opinion_invoke:*)` settings `allow` rule
+> `Bash(uv run … hm second_opinion_invoke:*)` settings `allow` rule
 > pre-approves exactly this command, and Codex stays contained by its own
 > `--sandbox read-only` flags. Do NOT disable the sandbox for any other command.
 >
@@ -56,7 +56,7 @@ Finally run the invoker as its **own** Bash call. It owns argv construction, bas
 config resolution, prompt delivery, status classification, adaptation, and the ledger row:
 
 ```bash
-uv run --with {{ harness_maker_src_path }} python -m harness_maker.second_opinion_invoke --model codex --prompt-file <the literal path printed above> --slug "<slug>" --stage {{ _stage }}
+uv run --with {{ harness_maker_src_path }} hm second_opinion_invoke --model codex --prompt-file <the literal path printed above> --slug "<slug>" --stage {{ _stage }}
 ```
 
 > **Why this is not a raw `codex exec` line any more.** It was, and that shape produced four

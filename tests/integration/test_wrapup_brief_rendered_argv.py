@@ -41,9 +41,7 @@ SLUG_TOKEN = "<slug>"
 
 # The module name is part of the match, so the brief line cannot be silently satisfied by
 # the adjacent `wrapup_receipt` line, which has the same prefix and a similar tail.
-_PREFIX = re.compile(
-    r"^uv run --with (?P<ref>\S+) python -m (?P<module>harness_maker\.\w+)\s*(?P<rest>.*)$"
-)
+_PREFIX = re.compile(r"^uv run --with (?P<ref>\S+) hm (?P<module>[\w.]+)\s*(?P<rest>.*)$")
 
 
 def _rendered_wrapup_command() -> str:
@@ -88,7 +86,7 @@ def _bang_line(module: str, *, containing: str = "") -> str:
     hits = [
         line[1:].strip()
         for line in body.splitlines()
-        if line.startswith("!") and f"-m {module}" in line and containing in line
+        if line.startswith("!") and f" hm {module} " in line and containing in line
     ]
     assert len(hits) == 1, f"expected exactly one rendered `!` line for {module}, got {hits}"
     return hits[0]
@@ -98,7 +96,11 @@ def _argv(line: str, module: str) -> list[str]:
     match = _PREFIX.match(line)
     assert match is not None, f"rendered line is not the expected invoker shape: {line!r}"
     assert match.group("module") == module
-    return [sys.executable, "-m", module, *shlex.split(match.group("rest"))]
+    # Executed through the DISPATCHER (`harness_maker.hm`), not through
+    # `harness_maker.<module>` directly and not through the `hm` console script. The
+    # dispatcher is the code path the rendered line actually takes, and reaching it via
+    # `-m` avoids depending on the script being on PATH in the test environment.
+    return [sys.executable, "-m", "harness_maker.hm", module, *shlex.split(match.group("rest"))]
 
 
 def _sub_slug(argv: list[str], slug: str) -> list[str]:
@@ -143,7 +145,7 @@ def test_ac_004_rendered_brief_argv_resolves_the_task_worktree_from_the_base(
 ) -> None:
     slug = "demo-task"
     _add_task_worktree(base_repo, slug)
-    argv = _argv(_bang_line("harness_maker.wrapup_brief"), "harness_maker.wrapup_brief")
+    argv = _argv(_bang_line("wrapup_brief"), "wrapup_brief")
 
     # Asserted BEFORE substitution: a template that resolved the seam by pointing `--root`
     # at the worktree would pass the status check below while re-introducing the very
@@ -169,7 +171,7 @@ def test_ac_005_no_task_branch_degrades_gracefully(base_repo: Path, shape: str) 
     A fix that made every cwd resolve to *something* would turn this degrade into a
     confident wrong answer, so `missing` is asserted by name rather than by truthiness.
     """
-    argv = _argv(_bang_line("harness_maker.wrapup_brief"), "harness_maker.wrapup_brief")
+    argv = _argv(_bang_line("wrapup_brief"), "wrapup_brief")
     if shape == "slug-names-nothing":
         argv = _sub_slug(argv, "absent-task")
     else:
@@ -194,8 +196,8 @@ def test_ac_009_rendered_self_skip_line_writes_an_unavailable_row(base_repo: Pat
     A fixture-built ledger proves the reader works and says nothing about whether the
     prose branch ever writes a row — which is the shape of the defect being fixed.
     """
-    line = _bang_line("harness_maker.delegation_ledger", containing="--status unavailable")
-    argv = _argv(line, "harness_maker.delegation_ledger")
+    line = _bang_line("delegation_ledger", containing="--status unavailable")
+    argv = _argv(line, "delegation_ledger")
     proc = _run(_sub_slug(argv, "demo-task"), cwd=base_repo)
     assert proc.returncode == 0, proc.stderr
 
@@ -219,8 +221,8 @@ def test_the_self_skip_row_lands_at_the_base_even_when_run_from_the_worktree(
     """
     slug = "demo-task"
     worktree = _add_task_worktree(base_repo, slug)
-    line = _bang_line("harness_maker.delegation_ledger", containing="--status unavailable")
-    proc = _run(_sub_slug(_argv(line, "harness_maker.delegation_ledger"), slug), cwd=worktree)
+    line = _bang_line("delegation_ledger", containing="--status unavailable")
+    proc = _run(_sub_slug(_argv(line, "delegation_ledger"), slug), cwd=worktree)
     assert proc.returncode == 0, proc.stderr
 
     assert (base_repo / ".claude" / "observability" / "delegation.jsonl").is_file()

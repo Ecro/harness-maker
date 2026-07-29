@@ -428,7 +428,7 @@ worktree would explode commit count.
 
 {% if is_codex %}
 ```
-Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree create execute \"$(pwd)\" --claude-session-id \"$HM_SESSION_ID\"")
+Bash("uv run --with {{ harness_maker_src_path }} hm worktree create execute \"$(pwd)\" --claude-session-id \"$HM_SESSION_ID\"")
 ```
 
 If the command fails (non-zero exit or git error):
@@ -436,7 +436,7 @@ If the command fails (non-zero exit or git error):
 - Set `<WT>` = the current working directory. Continue.
 {% else %}
 ```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree create execute "$(pwd)" --claude-session-id "$HM_SESSION_ID"
+!uv run --with {{ harness_maker_src_path }} hm worktree create execute "$(pwd)" --claude-session-id "$HM_SESSION_ID"
 ```
 {% endif %}
 
@@ -464,11 +464,11 @@ if any one fails:
 
 {% if is_codex %}
 ```
-Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree verify <WT>")
+Bash("uv run --with {{ harness_maker_src_path }} hm worktree verify <WT>")
 ```
 {% else %}
 ```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree verify <WT>
+!uv run --with {{ harness_maker_src_path }} hm worktree verify <WT>
 ```
 {% endif %}
 
@@ -765,11 +765,11 @@ For each iter (until convergence or any safety rail fires):
    and triggers fruitless retries.
 {% if is_codex %}
    ```
-   Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.iter_receipts set-iter-marker --iter <N> --root \"<WT>\"")
+   Bash("uv run --with {{ harness_maker_src_path }} hm iter_receipts set-iter-marker --iter <N> --root \"<WT>\"")
    ```
 {% else %}
    ```bash
-   !uv run --with {{ harness_maker_src_path }} python -m harness_maker.iter_receipts set-iter-marker --iter <N> --root "<WT>"
+   !uv run --with {{ harness_maker_src_path }} hm iter_receipts set-iter-marker --iter <N> --root "<WT>"
    ```
 {% endif %}
 
@@ -821,11 +821,11 @@ For each iter (until convergence or any safety rail fires):
    Run the verify CLI inside `<WT>`:
 {% if is_codex %}
    ```
-   Bash("cd \"<WT>\" && uv run --with {{ harness_maker_src_path }} python -m harness_maker.iter_receipts verify --iter <N> --expected <EXPECTED_STAGES> --root \"<WT>\"")
+   Bash("cd \"<WT>\" && uv run --with {{ harness_maker_src_path }} hm iter_receipts verify --iter <N> --expected <EXPECTED_STAGES> --root \"<WT>\"")
    ```
 {% else %}
    ```bash
-   !cd "<WT>" && uv run --with {{ harness_maker_src_path }} python -m harness_maker.iter_receipts verify \
+   !cd "<WT>" && uv run --with {{ harness_maker_src_path }} hm iter_receipts verify \
       --iter <N> --expected <EXPECTED_STAGES> --root "<WT>"
    ```
 {% endif %}
@@ -850,11 +850,11 @@ For each iter (until convergence or any safety rail fires):
       hand-edit the YAML (non-atomic rewrites corrupt the file on WSL2/NTFS):
 {% if is_codex %}
       ```
-      Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.iter_receipts patch-runtime --context work-docs/loop-context/<slug>.yaml --counter stage_retry_counts --key iter-<N>:<stage> --value <count>")
+      Bash("uv run --with {{ harness_maker_src_path }} hm iter_receipts patch-runtime --context work-docs/loop-context/<slug>.yaml --counter stage_retry_counts --key iter-<N>:<stage> --value <count>")
       ```
 {% else %}
       ```bash
-      !uv run --with {{ harness_maker_src_path }} python -m harness_maker.iter_receipts patch-runtime \
+      !uv run --with {{ harness_maker_src_path }} hm iter_receipts patch-runtime \
          --context work-docs/loop-context/<slug>.yaml \
          --counter stage_retry_counts --key "iter-<N>:<stage>" --value <count>
       ```
@@ -873,7 +873,7 @@ For each iter (until convergence or any safety rail fires):
       - **B. Skip with explicit `verdict: skipped` marker** — invoke the
         receipt CLI manually (the `--with` flag is required because
         `harness_maker` is not on the user project's default `uv` PATH):
-        `uv run --with {{ harness_maker_src_path }} python -m harness_maker.iter_receipts write --iter <N> --stage <stage> --verdict skipped --root "<WT>"`
+        `uv run --with {{ harness_maker_src_path }} hm iter_receipts write --iter <N> --stage <stage> --verdict skipped --root "<WT>"`
         then ALSO append a durable audit entry so `/hm:health` can detect
         systematic skip patterns (quote `<WT>` + create parent dir; single
         `printf` write of well under 4 KiB stays atomic via POSIX `O_APPEND`):
@@ -916,11 +916,11 @@ When the loop halts (convergence, safety rail, or hard error):
    file on WSL2/NTFS):
 {% if is_codex %}
    ```
-   Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.iter_receipts patch-runtime --context work-docs/loop-context/<slug>.yaml --counter stage_retry_counts --clear")
+   Bash("uv run --with {{ harness_maker_src_path }} hm iter_receipts patch-runtime --context work-docs/loop-context/<slug>.yaml --counter stage_retry_counts --clear")
    ```
 {% else %}
    ```bash
-   !uv run --with {{ harness_maker_src_path }} python -m harness_maker.iter_receipts patch-runtime \
+   !uv run --with {{ harness_maker_src_path }} hm iter_receipts patch-runtime \
       --context work-docs/loop-context/<slug>.yaml \
       --counter stage_retry_counts --clear
    ```
@@ -1016,11 +1016,11 @@ When the loop halts (convergence, safety rail, or hard error):
 
 {% if is_codex %}
    ```
-   Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree finalize <WT> <STATUS>")
+   Bash("uv run --with {{ harness_maker_src_path }} hm worktree finalize <WT> <STATUS>")
    ```
 {% else %}
    ```bash
-   !uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree finalize <WT> <STATUS>
+   !uv run --with {{ harness_maker_src_path }} hm worktree finalize <WT> <STATUS>
    ```
 {% endif %}
 

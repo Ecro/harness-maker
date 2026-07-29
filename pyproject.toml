@@ -66,6 +66,7 @@ dev = [
 
 [project.scripts]
 harness-maker = "harness_maker.cli:main"
+hm = "harness_maker.hm:main"
 
 [build-system]
 requires = ["uv_build>=0.5"]

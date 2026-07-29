@@ -41,7 +41,7 @@ def health_body(tmp_path_factory: pytest.TempPathFactory) -> str:
 def test_the_doctor_step_is_present(health_body: str) -> None:
     assert "@hm:economics-doctor" in health_body
     assert "@hm:/economics-doctor" in health_body
-    assert "harness_maker.economics doctor" in health_body
+    assert "hm economics doctor" in health_body
 
 
 @pytest.mark.parametrize("state", ["ok", "n/a", "fail"])

@@ -8,7 +8,7 @@
     `sessionstart_drift` is excluded because the plugin bundle already fires it (ADR-010).
 -#}
 {
-  "permissions": {"allow": ["Read", "Bash(uv run --with {{ harness_maker_src_path }} python -m harness_maker.*)", "Bash(uv run pytest:*)", "Bash(uv run ruff:*)", "Bash(uv run mypy:*)", "Bash(pytest:*)"{% if config.second_opinion and config.second_opinion.models %}, "Bash(uv run --with {{ harness_maker_src_path }} python -m harness_maker.second_opinion_invoke:*)"{% endif %}{% if config.second_opinion and 'codex' in config.second_opinion.models %}, "Bash(codex exec:*)"{% endif %}{% if config.second_opinion and 'antigravity' in config.second_opinion.models %}, "Bash(agy --sandbox --print:*)"{% endif %}], "deny": {% if config.permissions.deny_dangerous %}["Bash(rm:*)", "Edit(/etc/**)", "Edit(~/.ssh/**)", "Edit(~/.aws/**)"]{% else %}[]{% endif %}},
+  "permissions": {"allow": ["Read", "Bash(uv run --with {{ harness_maker_src_path }} python -m harness_maker.*)", "Bash(uv run --with {{ harness_maker_src_path }} hm *)", "Bash(uv run pytest:*)", "Bash(uv run ruff:*)", "Bash(uv run mypy:*)", "Bash(pytest:*)"{% if config.second_opinion and config.second_opinion.models %}, "Bash(uv run --with {{ harness_maker_src_path }} hm second_opinion_invoke:*)"{% endif %}{% if config.second_opinion and 'codex' in config.second_opinion.models %}, "Bash(codex exec:*)"{% endif %}{% if config.second_opinion and 'antigravity' in config.second_opinion.models %}, "Bash(agy --sandbox --print:*)"{% endif %}], "deny": {% if config.permissions.deny_dangerous %}["Bash(rm:*)", "Edit(/etc/**)", "Edit(~/.ssh/**)", "Edit(~/.aws/**)"]{% else %}[]{% endif %}},
   "hooks": {
     "PostToolUse": [
       {

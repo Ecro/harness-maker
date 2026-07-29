@@ -281,7 +281,7 @@ def test_stage_aware_second_brain_guidance(stage: str, terms: list[str]) -> None
     rendered = _render_stage(stage, is_codex=True).lower()
     for term in terms:
         assert term in rendered
-    assert "harness_maker.second_brain" in rendered
+    assert "hm second_brain" in rendered
     assert "untrusted reference" in rendered
 
 
@@ -340,9 +340,9 @@ def test_codex_execute_manual_post_commit_pop_uses_uuid_strict_mode() -> None:
     execute_spec = next(s for s in specs if "hm-execute" in s[1])
     body = execute_spec[2]["stage_body"]
     assert "HM_OWNED_SESSION_UUIDS" in body
-    assert "harness_maker.worktree owned-crumb-read" in body
-    assert "harness_maker.worktree owned-uuids" not in body
-    assert "harness_maker.worktree post-commit-pop" in body
+    assert "hm worktree owned-crumb-read" in body
+    assert "hm worktree owned-uuids" not in body
+    assert "hm worktree post-commit-pop" in body
 
 
 def test_codex_target_files_threads_config_dump_to_stage_skills() -> None:

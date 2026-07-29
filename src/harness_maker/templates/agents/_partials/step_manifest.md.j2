@@ -35,7 +35,7 @@
 > via `AskUserQuestion`: "Run the `{{ config.autonomy.pipeline | join(' → ') }}` pipeline
 > on autopilot this session (stages auto-advance when no mandatory gate is pending), or
 > stay gated (stop after each stage)?" On **yes**, run
-> `uv run --with {{ harness_maker_src_path }} python -m harness_maker.autopilot on --level {{ config.autonomy.level }} --pipeline {{ config.autonomy.pipeline | join(',') }}`
+> `uv run --with {{ harness_maker_src_path }} hm autopilot on --level {{ config.autonomy.level }} --pipeline {{ config.autonomy.pipeline | join(',') }}`
 > (writes the session marker). On **no**, proceed gated — do not re-prompt unless the user
 > asks. Once the marker exists, later stages skip this picker (the marker is the once-flag).
 >

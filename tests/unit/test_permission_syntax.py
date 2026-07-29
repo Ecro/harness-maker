@@ -159,19 +159,28 @@ def test_every_rendered_harness_self_call_is_actually_allowed() -> None:
     from pathlib import Path
 
     templates = Path(__file__).resolve().parents[2] / "src" / "harness_maker" / "templates"
-    modules = sorted(
+    # BOTH spellings, because the surface carries both on purpose: stage and command
+    # templates call `hm <mod>` (PLAN-workflow-step-audit ADR-018) while hooks and the
+    # `make` bootstrap keep `python -m harness_maker.<mod>` — the bootstrap because it
+    # resolves the install path that `--with` needs, so `hm` does not exist yet there.
+    # Extracting one form would have silently halved this seam's coverage.
+    invocations = sorted(
         {
             m.group(1)
             for f in templates.rglob("*.j2")
             for m in _re.finditer(
-                r"python -m (harness_maker\.[a-zA-Z_.]+)", f.read_text(encoding="utf-8")
+                r"(python -m harness_maker\.[a-zA-Z_.]+|(?<![\w./-])hm [a-z][\w.]*)",
+                f.read_text(encoding="utf-8"),
             )
         }
     )
-    assert len(modules) > 20, f"extraction looks broken: {modules}"
+    long_form = [i for i in invocations if i.startswith("python -m ")]
+    short_form = [i for i in invocations if i.startswith("hm ")]
+    assert len(long_form) > 10, f"long-form extraction looks broken: {long_form}"
+    assert len(short_form) > 10, f"short-form extraction looks broken: {short_form}"
 
     for tpl in SETTINGS_TEMPLATES:
         allow = _render_permissions(tpl, False)["allow"]
-        for mod in modules:
-            cmd = f"uv run --with {_SRC} python -m {mod} some-sub --flag v"
-            assert command_allowed_by(cmd, allow), f"{tpl} does not allow {mod}"
+        for inv in invocations:
+            cmd = f"uv run --with {_SRC} {inv} some-sub --flag v"
+            assert command_allowed_by(cmd, allow), f"{tpl} does not allow {inv}"

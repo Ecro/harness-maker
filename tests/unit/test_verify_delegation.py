@@ -281,7 +281,7 @@ def test_the_delegate_on_verify_render_carries_dispatch_and_inline_body(
     body = _verify(tmp_path, stages=["verify"])
 
     assert "stage-delegate" in body
-    assert "harness_maker.wrapup_brief --root . --stage verify" in body
+    assert "hm wrapup_brief --root . --stage verify" in body
 
     # `"Check 1 —" in body` alone is invariant over POSITION: the check definitions
     # sit near the top of the document, so it holds even if the degraded heading

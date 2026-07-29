@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal
 
+from . import command_registry
 from .io_utils import append_atomic_line
 
 LEDGER_FILENAME = "delegation.jsonl"
@@ -247,7 +248,14 @@ def main(argv: list[str] | None = None) -> int:
     A malformed invocation still exits non-zero through argparse; that is a template bug a
     render test catches, not a runtime condition. The *recording* itself never raises.
     """
-    parser = argparse.ArgumentParser(prog="python -m harness_maker.delegation_ledger")
+    # The uniform misroute hook, wired when this module was registered in
+    # `command_registry.MODULES`. Without it a verb owned by another module (`record`
+    # vs. e.g. `emit`) reaches argparse and dies with "invalid choice", which reads as a
+    # template typo rather than as a call routed to the wrong module.
+    guard = command_registry.guard_or_none("delegation_ledger", argv)
+    if guard is not None:
+        return guard
+    parser = argparse.ArgumentParser(prog="hm delegation_ledger")
     sub = parser.add_subparsers(dest="command", required=True)
     record = sub.add_parser("record", help="append one row at the base repo's ledger")
     record.add_argument("--root", default=".", help="any path inside the repo; base is resolved")

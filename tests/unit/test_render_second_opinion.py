@@ -91,8 +91,8 @@ def test_dispatch_partial_loops_both_models_in_review(tmp_path: Path) -> None:
     # Both recipes now call the invoker, which owns argv construction. The old rendered
     # `agy --print --sandbox …` shape was never a working command — `--print` takes the
     # prompt as its VALUE, so `--sandbox` became the prompt and stdin was never read.
-    assert "python -m harness_maker.second_opinion_invoke --model antigravity" in review
-    assert "python -m harness_maker.second_opinion_invoke --model codex" in review
+    assert "hm second_opinion_invoke --model antigravity" in review
+    assert "hm second_opinion_invoke --model codex" in review
     assert "agy --print --sandbox --print-timeout" not in review
     assert "timeout 240 agy" not in review  # NOT the external-timeout wrapper either
 

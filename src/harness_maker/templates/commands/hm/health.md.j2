@@ -34,7 +34,7 @@ flipping the ADR-012 kill-switch (`llm_inference_enabled: false`).
 ## Run
 
 ```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.cli health . --json-output .claude/observability/.health.tmp.json
+!uv run --with {{ harness_maker_src_path }} hm cli health . --json-output .claude/observability/.health.tmp.json
 ```
 
 Then read `.claude/observability/dashboard.md` to inspect the two sections.
@@ -48,11 +48,11 @@ and never deletes unmerged work — preserved branches surface as a count only.
 
 {% if is_codex %}
 ```
-Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree drain .")
+Bash("uv run --with {{ harness_maker_src_path }} hm worktree drain .")
 ```
 {% else %}
 ```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.worktree drain .
+!uv run --with {{ harness_maker_src_path }} hm worktree drain .
 ```
 {% endif %}
 
@@ -88,7 +88,7 @@ without that voice and nobody notices.
 ### {{ model }}
 
 ```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.second_opinion_invoke --model {{ model }} --smoke --slug health-smoke --stage health
+!uv run --with {{ harness_maker_src_path }} hm second_opinion_invoke --model {{ model }} --smoke --slug health-smoke --stage health
 ```
 
 - **pass** — the JSON line reports `"status": "invoked"`.
@@ -113,7 +113,7 @@ autopilot (a broken boundary CLI, a marker that never gets written, a chain that
 kill-switches) looks identical to "the user just never turned it on". Run the degradation probe:
 
 ```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.autopilot_ledger smoke --root . --level {{ config.autonomy.level }}
+!uv run --with {{ harness_maker_src_path }} hm autopilot_ledger smoke --root . --level {{ config.autonomy.level }}
 ```
 
 Report the JSON as a Layer 1 ActionItem:
@@ -132,7 +132,7 @@ looks exactly like "this project has no history". Measures the INSTRUMENT, never
 — it must never carry a cost threshold, and it feeds no readiness dimension.
 
 ```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.economics doctor --root .
+!uv run --with {{ harness_maker_src_path }} hm economics doctor --root .
 ```
 
 Report the JSON as a Layer 1 ActionItem:
@@ -150,7 +150,7 @@ Report the JSON as a Layer 1 ActionItem:
 ## Delivery-metrics narrative (1-2 lines, no score impact)
 
 ```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.delivery_metrics trend --root . --limit 1
+!uv run --with {{ harness_maker_src_path }} hm delivery_metrics trend --root . --limit 1
 ```
 
 Surface ONE narrative line from the newest snapshot: CFR as raw `failed/total`

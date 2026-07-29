@@ -40,7 +40,7 @@ def test_stage_command_has_autopilot_advance_block(rendered_root: Path, stage: s
     body = (rendered_root / "commands" / "hm" / f"{stage}.md").read_text(encoding="utf-8")
     assert "<!-- @hm:autopilot-advance -->" in body
     # the deterministic boundary CLI, scoped to THIS stage.
-    assert "harness_maker.autopilot_caps boundary" in body
+    assert "hm autopilot_caps boundary" in body
     assert f"--current {stage}" in body
 
 

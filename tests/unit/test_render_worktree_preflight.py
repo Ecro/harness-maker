@@ -163,7 +163,7 @@ _GOLDEN_PREFLIGHT = """### Task worktree preflight (feature-branch workflow)
 
 
 ```bash
-!uv run --with <SRC> python -m harness_maker.worktree task-preflight <slug> "$(pwd)" --stage hm:wrapup
+!uv run --with <SRC> hm worktree task-preflight <slug> "$(pwd)" --stage hm:wrapup
 ```
 
 
@@ -172,7 +172,7 @@ _GOLDEN_PREFLIGHT = """### Task worktree preflight (feature-branch workflow)
 
 
 ```bash
-!uv run --with <SRC> python -m harness_maker.worktree task-refresh <slug> "$(pwd)"
+!uv run --with <SRC> hm worktree task-refresh <slug> "$(pwd)"
 ```
 
 

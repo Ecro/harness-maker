@@ -41,7 +41,7 @@ def metrics_body(tmp_path_factory: pytest.TempPathFactory) -> str:
 @pytest.mark.parametrize(
     "needle",
     [
-        "harness_maker.economics report",
+        "hm economics report",
         "Economics: where the tokens went",
         "ingestion.coverage",
         "(unattributed)",
@@ -92,8 +92,8 @@ def test_the_existing_cfr_and_churn_sections_survive(metrics_body: str) -> None:
 @pytest.mark.parametrize(
     "needle",
     [
-        "harness_maker.run_classify boundaries",
-        "harness_maker.run_classify record",
+        "hm run_classify boundaries",
+        "hm run_classify record",
         "--boundary-uuid",
         "turns_by_attribution_source",
         "usd_by_attribution_source",
@@ -115,7 +115,7 @@ def test_the_classification_step_precedes_the_report_command(metrics_body: str) 
     the operator concludes the feature does not work."""
     boundaries_at = metrics_body.index("run_classify boundaries")
     record_at = metrics_body.index("run_classify record")
-    report_at = metrics_body.index("harness_maker.economics report")
+    report_at = metrics_body.index("hm economics report")
     assert boundaries_at < record_at < report_at
 
 

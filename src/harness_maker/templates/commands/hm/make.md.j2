@@ -47,7 +47,7 @@ does NOT render in a worktree: the CLI backs up to `.backup-<ts>/` and reconcile
 preserves your edits, so a read-only preview + confirm is all the safety needed.
 
 ```bash
-uv run --with "$HM" python -m harness_maker.cli make "$(pwd)" --update --dry-run
+uv run --with "$HM" hm cli make "$(pwd)" --update --dry-run
 ```
 
 Surface the NEW / REPLACE / KEEP / MERGE counts (KEEP = your edits preserved,
@@ -59,7 +59,7 @@ skip this step and apply directly.
 **Step 3 — apply.** Run the real re-render:
 
 ```bash
-uv run --with "$HM" python -m harness_maker.cli make "$(pwd)" --update
+uv run --with "$HM" hm cli make "$(pwd)" --update
 ```
 
 **Step 4 — narrate what changed.** Parse the `render-summary:` line
@@ -72,7 +72,7 @@ harness (**neutral** — present the two options as equals, with no recommended
 marker and no preference ordering). Run:
 
 ```bash
-uv run --with "$HM" python -m harness_maker.cli git-status "$(pwd)"
+uv run --with "$HM" hm cli git-status "$(pwd)"
 ```
 
 Read the JSON and branch on `is_git` / `decision_needed` / `offer_stage` /
@@ -94,7 +94,7 @@ Read the JSON and branch on `is_git` / `decision_needed` / `offer_stage` /
   - **Gitignore them** — the roots are added to `.gitignore` and kept local. On
     this choice run (fails loudly if the write does not take effect):
     ```bash
-    uv run --with "$HM" python -m harness_maker.cli git-ignore-roots "$(pwd)"
+    uv run --with "$HM" hm cli git-ignore-roots "$(pwd)"
     ```
 - **`offer_stage: true`** — already committing, and new harness files appeared on
   this re-render. Ask "Stage the new harness files into a commit?"; on yes,

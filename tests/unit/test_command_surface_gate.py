@@ -29,6 +29,13 @@ _SRC = Path(__file__).parents[2] / "src" / "harness_maker"
 # Matches `python -m harness_maker` optionally followed by `.<dotted.module>` and the next
 # whitespace-delimited token (the candidate subcommand).
 _INVOKE = re.compile(r"python -m harness_maker(\.[a-zA-Z0-9_.]+)?(?:\s+(\S+))?")
+# The `hm <module> <subcommand>` console-script spelling (PLAN-workflow-step-audit
+# ADR-018). Extracting only the long form was NOT harmless once the rewrite landed: it
+# moved ~230 invocations out of this gate, `finditer` yielded nothing for them, and
+# `assert not offenders` passed VACUOUSLY — the precise bug class the registry exists to
+# catch, reintroduced by the change that was supposed to be inert. Hooks, the `make`
+# bootstrap and the skills templates still emit the long form, so both patterns are live.
+_INVOKE_HM = re.compile(r"(?<![\w./-])hm ([a-z][\w.]*)(?:\s+(\S+))?")
 # A token we can validate: a plain subcommand word. Anything with shell/Jinja metachars
 # (flags, vars, redirects, quotes, backticks) is a runtime value we cannot statically check.
 _WORD = re.compile(r"^[a-z][a-z0-9-]*$")
@@ -50,16 +57,25 @@ def _iter_invocations(text: str):  # type: ignore[no-untyped-def]
         dotted, tok = m.group(1), m.group(2)
         module = dotted[1:] if dotted else None  # strip leading '.'
         yield module, tok
+    for m in _INVOKE_HM.finditer(text):
+        yield m.group(1), m.group(2)
 
 
 def test_tc1_every_template_invocation_is_registered(rendered: Path) -> None:
     offenders: dict[str, list[str]] = {}
+    seen = 0
     for pattern in ("*.md", "*.mdc", "*.toml"):
         for f in rendered.rglob(pattern):
             for module, tok in _iter_invocations(f.read_text(encoding="utf-8")):
+                seen += 1
                 bad = _classify_invocation(module, tok)
                 if bad:
                     offenders.setdefault(str(f.relative_to(rendered)), []).append(bad)
+    # Non-empty guard, and it is load-bearing: `assert not offenders` is satisfied by an
+    # extraction that finds NOTHING, which is exactly how this gate went quiet when the
+    # call sites changed spelling. A green gate must mean "checked and clean", never
+    # "looked and saw nothing".
+    assert seen > 100, f"extraction looks broken: only {seen} invocations found"
     detail = "\n".join(f"  {k}: {v}" for k, v in sorted(offenders.items()))
     assert not offenders, f"unregistered command-surface invocations in rendered output:\n{detail}"
 

@@ -63,8 +63,8 @@ def test_task_driven_omits_step_1_7_heading(task_driven_plan: str) -> None:
 
 def test_task_driven_omits_spec_need_cli(task_driven_plan: str) -> None:
     """(a) Task-driven render must not reference the spec_need CLI module."""
-    assert "harness_maker.spec_need" not in task_driven_plan, (
-        "task-driven plan.md must NOT reference harness_maker.spec_need — "
+    assert "hm spec_need" not in task_driven_plan, (
+        "task-driven plan.md must NOT reference hm spec_need — "
         "byte-unchanged path for task-driven users"
     )
 
@@ -107,57 +107,51 @@ def test_spec_driven_has_step_1_7_before_step_2(spec_driven_plan: str) -> None:
 
 def test_spec_driven_seam_prefilter(spec_driven_plan: str) -> None:
     """(c) Spec-driven prose must contain the literal prefilter CLI call."""
-    assert "python -m harness_maker.spec_need prefilter" in spec_driven_plan, (
-        "spec-driven plan.md must call 'python -m harness_maker.spec_need prefilter' "
+    assert "hm spec_need prefilter" in spec_driven_plan, (
+        "spec-driven plan.md must call 'hm spec_need prefilter' "
         "— proves module wiring (seam test per project memory lesson)"
     )
 
 
 def test_spec_driven_seam_marker_read(spec_driven_plan: str) -> None:
     """(c) Spec-driven prose must contain the literal marker-read CLI call."""
-    assert "python -m harness_maker.spec_need marker-read" in spec_driven_plan, (
-        "spec-driven plan.md must call 'python -m harness_maker.spec_need marker-read' "
-        "— proves module wiring"
+    assert "hm spec_need marker-read" in spec_driven_plan, (
+        "spec-driven plan.md must call 'hm spec_need marker-read' — proves module wiring"
     )
 
 
 def test_spec_driven_seam_op_check(spec_driven_plan: str) -> None:
     """(c) Spec-driven prose must contain the literal op-check CLI call."""
-    assert "python -m harness_maker.spec_need op-check" in spec_driven_plan, (
-        "spec-driven plan.md must call 'python -m harness_maker.spec_need op-check' "
-        "— proves module wiring"
+    assert "hm spec_need op-check" in spec_driven_plan, (
+        "spec-driven plan.md must call 'hm spec_need op-check' — proves module wiring"
     )
 
 
 def test_spec_driven_seam_marker_write(spec_driven_plan: str) -> None:
     """(c) Spec-driven prose must contain the literal marker-write CLI call."""
-    assert "python -m harness_maker.spec_need marker-write" in spec_driven_plan, (
-        "spec-driven plan.md must call 'python -m harness_maker.spec_need marker-write' "
-        "— proves module wiring"
+    assert "hm spec_need marker-write" in spec_driven_plan, (
+        "spec-driven plan.md must call 'hm spec_need marker-write' — proves module wiring"
     )
 
 
 def test_spec_driven_seam_marker_clear(spec_driven_plan: str) -> None:
     """(c) Spec-driven prose must contain the literal marker-clear CLI call."""
-    assert "python -m harness_maker.spec_need marker-clear" in spec_driven_plan, (
-        "spec-driven plan.md must call 'python -m harness_maker.spec_need marker-clear' "
-        "— proves module wiring"
+    assert "hm spec_need marker-clear" in spec_driven_plan, (
+        "spec-driven plan.md must call 'hm spec_need marker-clear' — proves module wiring"
     )
 
 
 def test_spec_driven_seam_record(spec_driven_plan: str) -> None:
     """(c) Spec-driven prose must contain the literal record CLI call."""
-    assert "python -m harness_maker.spec_need record" in spec_driven_plan, (
-        "spec-driven plan.md must call 'python -m harness_maker.spec_need record' "
-        "— proves module wiring"
+    assert "hm spec_need record" in spec_driven_plan, (
+        "spec-driven plan.md must call 'hm spec_need record' — proves module wiring"
     )
 
 
 def test_spec_driven_seam_waiver_set(spec_driven_plan: str) -> None:
     """(c) Spec-driven prose must contain the literal waiver-set CLI call."""
-    assert "python -m harness_maker.spec_need waiver-set" in spec_driven_plan, (
-        "spec-driven plan.md must call 'python -m harness_maker.spec_need waiver-set' "
-        "— proves module wiring"
+    assert "hm spec_need waiver-set" in spec_driven_plan, (
+        "spec-driven plan.md must call 'hm spec_need waiver-set' — proves module wiring"
     )
 
 
@@ -291,7 +285,7 @@ def test_spec_driven_spec_need_commands_use_root_wt(spec_driven_plan: str) -> No
     import re
 
     # Match single-line occurrences (the template has them on one line)
-    single_line_pattern = re.compile(r"harness_maker\.spec_need \S+ .*?--root (\S+)")
+    single_line_pattern = re.compile(r"hm spec_need \S+ .*?--root (\S+)")
     matches = single_line_pattern.findall(spec_driven_plan)
     # At minimum expect marker-read, marker-fresh, op-check, marker-clear,
     # record, marker-write, waiver-set to appear
@@ -305,8 +299,8 @@ def test_spec_driven_spec_need_commands_use_root_wt(spec_driven_plan: str) -> No
 
 def test_task_driven_spec_need_commands_absent(task_driven_plan: str) -> None:
     """FIX-6: task-driven render must have no spec_need --root argument at all."""
-    assert "--root" not in task_driven_plan or "harness_maker.spec_need" not in task_driven_plan, (
-        "task-driven plan must not reference harness_maker.spec_need commands — byte-unchanged path"
+    assert "--root" not in task_driven_plan or "hm spec_need" not in task_driven_plan, (
+        "task-driven plan must not reference hm spec_need commands — byte-unchanged path"
     )
 
 

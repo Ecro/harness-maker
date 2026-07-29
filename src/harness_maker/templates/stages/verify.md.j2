@@ -66,11 +66,11 @@ verification script changes.
 
 {% if is_codex %}
 ```
-Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.observability.verification_cache check --root . --mode relevant")
+Bash("uv run --with {{ harness_maker_src_path }} hm observability.verification_cache check --root . --mode relevant")
 ```
 {% else %}
 ```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.observability.verification_cache check --root . --mode relevant
+!uv run --with {{ harness_maker_src_path }} hm observability.verification_cache check --root . --mode relevant
 ```
 {% endif %}
 
@@ -110,11 +110,11 @@ After every selected suite command passes, write the marker:
 
 {% if is_codex %}
 ```
-Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.observability.verification_cache mark-pass --root . --mode relevant --checks lint,format,mypy,pytest")
+Bash("uv run --with {{ harness_maker_src_path }} hm observability.verification_cache mark-pass --root . --mode relevant --checks lint,format,mypy,pytest")
 ```
 {% else %}
 ```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.observability.verification_cache mark-pass --root . --mode relevant --checks lint,format,mypy,pytest
+!uv run --with {{ harness_maker_src_path }} hm observability.verification_cache mark-pass --root . --mode relevant --checks lint,format,mypy,pytest
 ```
 {% endif %}
 
@@ -164,11 +164,11 @@ Evaluation sequence when `spec_need_verdict` is one of the above values:
 **Step 6a — operation check:**
 {% if is_codex %}
 ```
-Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.spec_need op-check --verdict <spec_need_verdict> --target <spec_need_target> --root <WT> --changed-file <f1> --changed-file <f2> …")
+Bash("uv run --with {{ harness_maker_src_path }} hm spec_need op-check --verdict <spec_need_verdict> --target <spec_need_target> --root <WT> --changed-file <f1> --changed-file <f2> …")
 ```
 {% else %}
 ```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.spec_need op-check --verdict <spec_need_verdict> --target <spec_need_target> --root <WT> --changed-file <f1> --changed-file <f2> …
+!uv run --with {{ harness_maker_src_path }} hm spec_need op-check --verdict <spec_need_verdict> --target <spec_need_target> --root <WT> --changed-file <f1> --changed-file <f2> …
 ```
 {% endif %}
 
@@ -177,11 +177,11 @@ Exit 0 → operation satisfied → **PASS**. Proceed to next check.
 **Step 6b — waiver check** (only if Step 6a exits 1):
 {% if is_codex %}
 ```
-Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.spec_need waiver-check --root <WT> --slug <task_slug> --changed-file <f1> --changed-file <f2> …")
+Bash("uv run --with {{ harness_maker_src_path }} hm spec_need waiver-check --root <WT> --slug <task_slug> --changed-file <f1> --changed-file <f2> …")
 ```
 {% else %}
 ```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.spec_need waiver-check --root <WT> --slug <task_slug> --changed-file <f1> --changed-file <f2> …
+!uv run --with {{ harness_maker_src_path }} hm spec_need waiver-check --root <WT> --slug <task_slug> --changed-file <f1> --changed-file <f2> …
 ```
 {% endif %}
 
@@ -195,7 +195,7 @@ The required SPEC operation was not performed and no valid waiver exists.
 To resolve: author the SPEC via /hm:plan re-entry (/hm:plan <slug> — the
 resume-marker skips re-detection and routes directly to /hm:spec) or record
 a fresh, non-empty-rationale waiver with:
-  uv run --with {{ harness_maker_src_path }} python -m harness_maker.spec_need waiver-set --root <WT> --slug <slug> \
+  uv run --with {{ harness_maker_src_path }} hm spec_need waiver-set --root <WT> --slug <slug> \
     --verdict <verdict> --target <target> --rationale "<reason>" \
     --changed-file <f1> …
 Note: a stale waiver (diff changed since last waiver-set) is treated as NO waiver.
@@ -327,11 +327,11 @@ and the decision to STOP or proceed, plus this stage's exit code, stay here.
 
 {% if is_codex -%}
 ```
-Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.wrapup_brief --root . --stage verify --slug '<slug>'")
+Bash("uv run --with {{ harness_maker_src_path }} hm wrapup_brief --root . --stage verify --slug '<slug>'")
 ```
 {%- else -%}
 ```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.wrapup_brief --root . --stage verify --slug '<slug>'
+!uv run --with {{ harness_maker_src_path }} hm wrapup_brief --root . --stage verify --slug '<slug>'
 ```
 {%- endif %}
 
@@ -359,11 +359,11 @@ A predictable path lets this gate adopt a verdict from someone else's run. Then:
 
 {% if is_codex -%}
 ```
-Bash("uv run --with {{ harness_maker_src_path }} python -m harness_maker.wrapup_receipt --root . --stage verify --worktree '<brief.worktree_root>' --receipt-file <the temp path>")
+Bash("uv run --with {{ harness_maker_src_path }} hm wrapup_receipt --root . --stage verify --worktree '<brief.worktree_root>' --receipt-file <the temp path>")
 ```
 {%- else -%}
 ```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.wrapup_receipt --root . --stage verify --worktree '<brief.worktree_root>' --receipt-file <the temp path>
+!uv run --with {{ harness_maker_src_path }} hm wrapup_receipt --root . --stage verify --worktree '<brief.worktree_root>' --receipt-file <the temp path>
 ```
 {%- endif %}
 

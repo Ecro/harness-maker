@@ -63,6 +63,10 @@ work-docs/*
 !work-docs/SPEC-*.md
 !work-docs/CLOSE-*.md
 !work-docs/AUDIT-*.md
+# A frozen pre-change measurement is only useful if it is durable — the whole point of
+# PLAN-workflow-step-audit ADR-011 is that the baseline is never recomputed, and an
+# ignored file is recomputed by whoever regenerates it next.
+!work-docs/BASELINE-*.md
 !work-docs/plans/
 
 # Cache

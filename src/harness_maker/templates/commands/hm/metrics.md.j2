@@ -15,7 +15,7 @@ Print a one-line goal + the 4 steps below (skip in loop-mode, as usual).
 ## Step 1 — Collect pending adjudication candidates
 
 ```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.delivery_metrics candidates --root .
+!uv run --with {{ harness_maker_src_path }} hm delivery_metrics candidates --root .
 ```
 
 The JSON lists ambiguous fix commits (`candidates[]`) — commits the
@@ -44,13 +44,13 @@ the subject line alone (that is exactly what the heuristics already tried).
 Record each verdict (persisted + reused on every future run — stable trends):
 
 ```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.delivery_metrics adjudicate --root . --commit <sha> --release <ref> --verdict <remediation|routine> --reason "<one line>"
+!uv run --with {{ harness_maker_src_path }} hm delivery_metrics adjudicate --root . --commit <sha> --release <ref> --verdict <remediation|routine> --reason "<one line>"
 ```
 
 ## Step 3 — Compute the snapshot
 
 ```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.delivery_metrics compute --root .
+!uv run --with {{ harness_maker_src_path }} hm delivery_metrics compute --root .
 ```
 
 Exit 3 means candidates are still pending — return to Step 2 (never pass
@@ -59,7 +59,7 @@ Exit 3 means candidates are still pending — return to Step 2 (never pass
 ## Step 4 — Render the trend and interpret it
 
 ```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.delivery_metrics trend --root . --limit 12
+!uv run --with {{ harness_maker_src_path }} hm delivery_metrics trend --root . --limit 12
 ```
 
 Render a markdown table, newest first — ALWAYS raw counts, never a
@@ -120,7 +120,7 @@ boundaries** still awaiting a judgment — each one is the first turn of an
 unlabelled stretch:
 
 ```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.run_classify boundaries --root .
+!uv run --with {{ harness_maker_src_path }} hm run_classify boundaries --root .
 ```
 
 `pending` is the work list; `total_boundaries` is the denominator. An empty
@@ -155,13 +155,13 @@ Record each verdict (persisted and reused on every future run, so this cost is
 paid once per boundary):
 
 ```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.run_classify record --root . --boundary-uuid <uuid> --verdict <continuation|new|unknown> --reason "<one line>"
+!uv run --with {{ harness_maker_src_path }} hm run_classify record --root . --boundary-uuid <uuid> --verdict <continuation|new|unknown> --reason "<one line>"
 ```
 
 ### 5b — Compute the mix
 
 ```bash
-!uv run --with {{ harness_maker_src_path }} python -m harness_maker.economics report --root .
+!uv run --with {{ harness_maker_src_path }} hm economics report --root .
 ```
 
 The JSON carries `report` (spend) and `ingestion` (how much of the transcript

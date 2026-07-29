@@ -253,10 +253,7 @@ def test_wrapup_memory_fold_gated_on_feature_branch_flag(tmp_path: Path) -> None
     off = _render_wrapup(tmp_path / "off", flag_on=False)
     # flag-on: the exact full launcher + base arg + expect-head, inside the flag-on Step 7.7
     assert "uv run --with" in on
-    assert (
-        "python -m harness_maker.worktree commit-base-memory <BASE> --expect-head <SQUASH_SHA>"
-        in on
-    )
+    assert "hm worktree commit-base-memory <BASE> --expect-head <SQUASH_SHA>" in on
     assert "Fold base memory into the squash commit" in on
     # flag-off: the fold step (and its command) must be entirely absent
     assert "commit-base-memory" not in off
@@ -269,7 +266,7 @@ def test_wrapup_renders_search_before_write_step(tmp_path: Path) -> None:
     """ADR-001/006: Step 5.2 must render a numbered MUST search step over both tiers."""
     text = _render_wrapup(tmp_path, flag_on=True)
     # the search step invokes the retrieval helper (which loads BOTH failures + wiki)
-    assert "python -m harness_maker.memory_retrieve" in text
+    assert "hm memory_retrieve" in text
     assert "search-before-write" in text
     # the wiki anchor for oscillation is called out explicitly
     assert "wiki.md" in text
