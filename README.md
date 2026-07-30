@@ -20,6 +20,8 @@
 
 **Per-project personalization** · Grade-gated · Self-evolving · Multi-IDE
 
+Design notes and field reports live on [EdgeLog](https://edgelog.dev/), the maintainer's embedded and edge engineering blog: [how long harness engineering has](https://edgelog.dev/blog/harness-engineering-lifespan/).
+
 [Why](#why-harness-maker) ·
 [How it fits](#how-it-fits-your-project) ·
 [Quickstart](#quickstart) ·
