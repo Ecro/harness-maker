@@ -37,6 +37,7 @@ _DISPATCHABLE: frozenset[str] = frozenset(
     {
         "autopilot",
         "autopilot_caps",
+        "codex_adapter",
         "autopilot_ledger",
         "cli",
         "delegation_ledger",
@@ -50,7 +51,9 @@ _DISPATCHABLE: frozenset[str] = frozenset(
         "review_telemetry",
         "run_classify",
         "second_brain",
+        "refdocs_index",
         "second_opinion_invoke",
+        "second_opinion_oracle",
         "spec_machine",
         "spec_mutation",
         "spec_need",

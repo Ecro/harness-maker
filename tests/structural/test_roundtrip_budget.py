@@ -27,10 +27,16 @@ from ._surface_baseline import CLAUDE_VARIANT, CODEX_VARIANT, count_round_trips,
 # counted individually by the ADR-011 rule even though they leave in one message — see
 # the note in `test_the_fan_out_is_counted_as_three_though_it_costs_one_turn`.
 _CLAUDE_ROUND_TRIPS: dict[str, int] = {
+    # +1 on every review-bearing command (2026-07-30, PLAN-second-opinion-acceptance-gate):
+    # Step 3.4 gained ONE mandated call, `hm codex_adapter stamp-ids`. It exists because the
+    # step previously told an LLM to compute `sha256(...)[:16]` itself — which it cannot do, so
+    # Claude-side finding ids were invented per round and the merge-by-`id` contract keyed on
+    # values that changed every round. The call is the whole point of that fix; no call was
+    # removed. `review` 7→8, and the four fused commands that inline the review stage inherit it.
     "configure": 3,
-    "exec-rev": 16,
-    "exec-rev-wrap": 42,
-    "exec-rev-wrap-ver": 52,
+    "exec-rev": 17,
+    "exec-rev-wrap": 43,
+    "exec-rev-wrap-ver": 53,
     "execute": 14,
     "health": 7,
     "help": 0,
@@ -39,10 +45,10 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     "make": 1,
     "metrics": 7,
     "plan": 14,
-    "plan-exec-rev": 27,
+    "plan-exec-rev": 28,
     "res-spec-plan": 20,
     "research": 8,
-    "review": 7,
+    "review": 8,
     "spec": 6,
     "uninstall": 3,
     "verify": 13,

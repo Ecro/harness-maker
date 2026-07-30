@@ -2,10 +2,29 @@
 generalized to multi-vendor by PLAN-second-opinion-multi-model ADR-005).
 
 Records every second-opinion disposition (and every skip/failure) so skip-rate and
-per-project precision can be tracked over time, per `model`. v1 logs disposition + status only;
-``oracle_result`` / ``later_regression_link`` are nullable placeholders for a future
-precision-tracking PLAN. Unlike ``review_telemetry`` this is a single non-partitioned
-file — the ledger is a cross-time, cross-vendor calibration record, not a per-day log.
+per-project precision can be tracked over time, per `model`. Unlike ``review_telemetry``
+this is a single non-partitioned file — the ledger is a cross-time, cross-vendor calibration
+record, not a per-day log.
+
+**Two row kinds share this file. Filter before aggregating.**
+
+- ``finding_ref == "n/a"`` → a **per-invocation** row: one per second-opinion CLI call,
+  recording that the call happened and how it went. This is the denominator for skip-rate
+  (``skipped / total``, excluding ``stage == "health"`` rows — the smoke test runs a trivial
+  prompt from the base cwd and is structurally biased toward ``invoked``).
+- ``finding_ref != "n/a"`` → a **per-finding disposition** row: one per finding the review
+  stage's PIDA gate adjudicated, carrying the stable finding id, the disposition, and the
+  capped ``oracle_result`` rationale. This is the numerator/denominator pair for
+  acceptance-rate.
+
+Both kinds carry ``status: "invoked"``, so ``finding_ref`` is the ONLY discriminator. An
+aggregation that skips this filter counts every finding as another invocation and silently
+corrupts skip-rate — the same denominator hazard that already changed once under this file.
+
+``oracle_result`` was a nullable placeholder through v1 and is now **populated on per-finding
+rows** (PLAN-second-opinion-acceptance-gate ADR-005) with a ``cap_oracle_result``-capped
+verdict + evidence string. It stays ``None`` on per-invocation, skip and failure rows.
+``later_regression_link`` remains a nullable placeholder.
 """
 
 from __future__ import annotations
@@ -32,8 +51,9 @@ class SecondOpinionRecord(BaseModel):
 
     ``model`` / ``status`` / ``disposition`` / ``stage`` are closed enums so the
     skip-rate aggregation stays parseable and cross-vendor comparable. ``skip_reason``
-    is null on the invoked path; ``oracle_result`` / ``later_regression_link`` are
-    deferred (always null in v1).
+    is null on the invoked path. ``oracle_result`` carries the PIDA rationale on
+    per-finding rows (see the module docstring's two-row-kind note) and is null on every
+    other kind; ``later_regression_link`` is still deferred (always null).
     """
 
     model_config = ConfigDict(strict=True, extra="forbid")
@@ -53,6 +73,29 @@ class SecondOpinionRecord(BaseModel):
 def _utc_now_iso() -> str:
     """ISO 8601 second-resolution UTC stamp — deterministic for test override."""
     return datetime.now(tz=UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+ORACLE_RESULT_MAX = 200
+
+
+def cap_oracle_result(verdict: str, evidence: str | None) -> str:
+    """Build a ``oracle_result`` value that CANNOT lose its row to the length constraint.
+
+    WHY a cap rather than letting validation reject: on the invoker path row emission
+    swallows every exception by contract, so an over-length value does not raise — it
+    deletes the whole row with no diagnostic. Truncating first turns a silent loss into a
+    visible ellipsis. The marker is load-bearing: a silently-clipped rationale reads as
+    complete evidence to whoever audits the refutation later.
+    """
+    if not evidence:
+        return verdict[:ORACLE_RESULT_MAX]
+    prefix = f"{verdict}: "
+    if len(prefix) >= ORACLE_RESULT_MAX:
+        return prefix[:ORACLE_RESULT_MAX]
+    room = ORACLE_RESULT_MAX - len(prefix)
+    if len(evidence) <= room:
+        return prefix + evidence
+    return prefix + evidence[: room - 1] + "…"
 
 
 def _append_atomic_line(path: Path, line: str) -> None:

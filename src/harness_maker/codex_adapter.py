@@ -21,6 +21,7 @@ ambiguous candidates — the caller (the rendered Bash recipe) turns that failur
 
 from __future__ import annotations
 
+import hashlib
 import json
 import sys
 from typing import Any
@@ -47,6 +48,38 @@ def map_severity(severity: str) -> str:
         raise ValueError(f"unknown second-opinion severity: {severity!r}") from None
 
 
+def finding_id(source: str, file: str | None, line: int | None, message: str) -> str:
+    """Derive the immutable identity of a finding from its ORIGINAL location + message.
+
+    WHY this exists rather than keying on ``file:line:summary`` directly: all three move
+    when a fix round edits the code, and the id is the lifecycle key, the REVIEW frozen-set
+    join key, and the ledger ``finding_ref`` at once — so a shifting key would retire the
+    wrong record and mis-attribute a ledger row. Computing it once at adaptation freezes
+    it against every later mutation.
+    """
+    payload = json.dumps([source, file, line, message], separators=(",", ":"))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
+
+
+def _disambiguate(adapted: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Give colliding ids a batch-scoped occurrence suffix (ADR-002 rule 4).
+
+    A null-location finding has ``file``/``line`` both None, so its identity reduces to
+    (source, message) and two such findings from one model can collide. Merging them would
+    drop a lifecycle record and let one ``finding_ref`` carry two ledger rows, so the
+    suffix is mandatory — but it fires ONLY on a real collision, because applying it
+    unconditionally would make an id depend on its position in the batch.
+    """
+    seen: dict[str, int] = {}
+    for finding in adapted:
+        base = str(finding["id"])
+        count = seen.get(base, 0) + 1
+        seen[base] = count
+        if count > 1:
+            finding["id"] = f"{base}-{count}"
+    return adapted
+
+
 def adapt_codex_finding(finding: dict[str, Any]) -> dict[str, Any]:
     """Adapt one Codex finding into a reviewer-shaped finding for the Step 4 filter.
 
@@ -58,6 +91,7 @@ def adapt_codex_finding(finding: dict[str, Any]) -> dict[str, Any]:
     line = finding.get("line")
     message = finding.get("message", "")
     return {
+        "id": finding_id("codex", file, line, message),
         "severity": map_severity(finding["severity"]),
         "file": file,
         "line": line,
@@ -71,7 +105,7 @@ def adapt_codex_finding(finding: dict[str, Any]) -> dict[str, Any]:
 def adapt_finding_list(payload: dict[str, Any] | list[Any]) -> list[dict[str, Any]]:
     """Adapt a Codex output payload (``{findings:[...]}`` or a bare list) into reviewer findings."""
     findings = payload.get("findings", []) if isinstance(payload, dict) else payload
-    return [adapt_codex_finding(f) for f in findings]
+    return _disambiguate([adapt_codex_finding(f) for f in findings])
 
 
 def adapt_antigravity_finding(finding: dict[str, Any]) -> dict[str, Any]:
@@ -84,6 +118,7 @@ def adapt_antigravity_finding(finding: dict[str, Any]) -> dict[str, Any]:
     line = finding.get("line")
     message = finding.get("message", "")
     return {
+        "id": finding_id("antigravity", file, line, message),
         "severity": map_severity(finding["severity"]),
         "file": file,
         "line": line,
@@ -97,7 +132,7 @@ def adapt_antigravity_finding(finding: dict[str, Any]) -> dict[str, Any]:
 def adapt_antigravity_finding_list(payload: dict[str, Any] | list[Any]) -> list[dict[str, Any]]:
     """Adapt an Antigravity output payload into reviewer findings."""
     findings = payload.get("findings", []) if isinstance(payload, dict) else payload
-    return [adapt_antigravity_finding(f) for f in findings]
+    return _disambiguate([adapt_antigravity_finding(f) for f in findings])
 
 
 _SENTINEL: Any = object()
@@ -207,7 +242,53 @@ def _parse_model_flag(rest: list[str]) -> str | None:
     return None
 
 
-def main(argv: list[str] | None = None) -> int:
+def stamp_ids(payload: dict[str, Any] | list[Any]) -> dict[str, Any]:
+    """Stamp a stable ``id`` on every finding in a merged reviewer list.
+
+    WHY a CLI-reachable function and not prose: ``/hm:review`` Step 3.4 runs in an LLM turn,
+    which cannot evaluate SHA-256 and cannot reproduce ``json.dumps``'s exact separators. Told
+    to compute the hash itself it invents an id-shaped string, so the id changes every round
+    and the merge-by-``id`` rule silently degrades to the ``file:line:summary`` matching it was
+    written to replace. This is the invocable path that makes the instruction executable.
+
+    A finding that already carries an ``id`` keeps it — re-deriving on post-fix values is the
+    bug the whole identity contract exists to prevent.
+    """
+    if isinstance(payload, dict):
+        findings = payload.get("findings")
+        if findings is None:
+            # A dict WITHOUT `findings` is a bare record, not an empty batch. Returning []
+            # here would silently drop the caller's whole input.
+            findings = [payload]
+    else:
+        findings = payload
+
+    records = [dict(f) for f in findings if isinstance(f, dict)]
+    # Ids already present are authoritative and are NEVER re-suffixed: a carried-forward
+    # record keeps the id the round-2 merge joins on. `_disambiguate` cannot be reused here
+    # because it renames every occurrence after the first — including the carried one — and
+    # never checks its own result against ids already taken.
+    taken = {str(r["id"]) for r in records if r.get("id")}
+    for record in records:
+        if record.get("id"):
+            continue
+        base = finding_id(
+            str(record.get("reviewer") or record.get("source") or ""),
+            record.get("file"),
+            record.get("line"),
+            str(record.get("summary", "")),
+        )
+        candidate = base
+        n = 1
+        while candidate in taken:
+            n += 1
+            candidate = f"{base}-{n}"
+        taken.add(candidate)
+        record["id"] = candidate
+    return {"findings": records}
+
+
+def main(argv: list[str] | None = None, *, stdin_text: str | None = None) -> int:
     """CLI: ``python -m harness_maker.codex_adapter adapt [--model codex|antigravity]`` — reads
     the second-opinion output JSON on stdin (the ``--output-last-message`` file for Codex, or
     agy's captured stdout for Antigravity) and writes the adapted reviewer-finding list.
@@ -220,10 +301,22 @@ def main(argv: list[str] | None = None) -> int:
     if _guard is not None:
         return _guard
     args = list(sys.argv[1:]) if argv is None else list(argv)
+    if args and args[0] == "stamp-ids":
+        raw = sys.stdin.read() if stdin_text is None else stdin_text
+        if not raw.strip():
+            sys.stderr.write("stamp-ids: stdin is empty\n")
+            return 1
+        try:
+            parsed = json.loads(raw)
+        except (json.JSONDecodeError, ValueError) as exc:
+            sys.stderr.write(f"stamp-ids: stdin is not valid JSON: {exc}\n")
+            return 1
+        sys.stdout.write(json.dumps(stamp_ids(parsed), ensure_ascii=False) + "\n")
+        return 0
     if not args or args[0] != "adapt":
         sys.stderr.write(
-            "usage: python -m harness_maker.codex_adapter adapt "
-            "[--model codex|antigravity] < second-opinion-output.json\n"
+            "usage: python -m harness_maker.codex_adapter (adapt [--model codex|antigravity] "
+            "| stamp-ids) < input.json\n"
         )
         return 2
     model = _parse_model_flag(args[1:]) or "codex"

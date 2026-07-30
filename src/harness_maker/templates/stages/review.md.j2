@@ -296,6 +296,14 @@ extras at runtime bringing total > 1, re-enable Pass 1 + Pass 1.5 manually.
    Pass 2 is authoritative — Pass 1 findings absent from Pass 2 are
    invalidated by context and **dropped** (CP10 contract).
 5. The merged finding list is the input to the consensus filter (Step 4).
+
+### Step 3.4 — Stamp a stable `id` on every merged finding (SINGLE OWNER)
+
+`Write` the merged findings to a temp path (never argv — skill §1), then:
+
+```bash
+!cd <WT> && uv run --with {{ harness_maker_src_path }} hm codex_adapter stamp-ids < <the literal temp path>
+```
 {%- if config.second_opinion and config.second_opinion.models %}
 ### Step 3.5 — Cross-model heterogeneous voters (ADR-001/006, PLAN-second-opinion-multi-model)
 
@@ -305,6 +313,9 @@ enabled model joins Step 4 as a **full heterogeneous voter** — the voter pool 
 advisory side-channel. The consensus threshold stays **K = 2** (any 2 voices agreeing →
 `consensus-passed`, ADR-006): more models make agreement *easier* to reach (recall-favoring),
 never a rising bar.
+
+> **Each enabled model is invoked EXACTLY ONCE per `/hm:review` invocation** — round 1 only.
+> Later rounds re-read Section 7 and update statuses (skill §5).
 
 **Mandatory gate (ADR-003 matrix — applies uniformly to EVERY enabled model):**
 - Production preset → invoke **every** enabled model on **every** review.
@@ -319,8 +330,15 @@ never a rising bar.
 
 {% set second_opinion_stage = "review" %}{% include "agents/_partials/second_opinion_dispatch.md.j2" %}
 
-Add each model's emitted adapted findings to the Step 4 input list as additional sources
-(tagged `source: "<model>"`).
+Each model's findings arrive tagged `source: "<model>"` with the adapter's stable `id`. They
+do **not** enter Step 4 directly — Steps 3.6–3.7 stand between them and a vote.
+
+### Step 3.6 — PIDA refutation gate
+
+Cross-model findings are unfiltered until here. **Load the `second-opinion-gate` skill and
+follow §2–§4** — oracle gathering, the mode-B call, disposition effects, and the ledger write
+all live there, with the rubric in `code-verifier` mode B. Both are binding. Net effect:
+`accepted` → Step 4 voter; `rejected`/`duplicate` → dropped; `unresolved` → `manual-only`.
 {%- endif %}
 
 ### Step 4 — Consensus filter (surface + reasoning alignment)
@@ -348,10 +366,12 @@ would always degrade to `manual-only`, making its vote cosmetic.
 
 #### Step 4b — Reasoning alignment (verification)
 
-For surface-match candidates, compare the `reasoning` chains (OBSERVE → INFER → CONCLUDE):
+For surface-match candidates, compare the `reasoning` chains
+(OBSERVE → TRACE → INFER → CONCLUDE — the 4-step shape `_partials/reasoning.md.j2` mandates
+and `_partials/finding_schema.md.j2` specifies, so it is the shape reviewers actually emit):
 - **CONCLUDE clauses identify the same execution risk?** → **strong consensus** (`[2/N]` or `[N/N]`).
 - **OBSERVE matches but CONCLUDE diverges** (e.g., one says "race condition", other says "null deref") → **weak consensus** (`[2/N weak]`) — keep both, flag for manual judgment.
-- **OBSERVE matches but reasoning is missing on one side** → demote to `manual-only`.
+- **OBSERVE matches but reasoning is missing on one side** → demote to `manual-only`{% if config.second_opinion and config.second_opinion.models %}, **unless** that side is a Step 3.6 `accepted` cross-model finding — then read its `evidence` + `oracle_result` **as** the chain and apply the two bullets above to those (skill §3; without it the rule fires on every cross-model finding, since the vendor schema has no `reasoning`){% endif %}.
 
 #### Step 4c — Severity of a consensus cluster (single-tier by construction)
 
@@ -370,6 +390,12 @@ or `weak-consensus` at P0/P1 are surfaced by the Grade Gate's
 | `consensus-passed` | Survived surface + reasoning alignment with strong consensus | ✅ Yes |
 | `weak-consensus` | Surface match, reasoning diverges | ❌ No (manual) |
 | `manual-only` | Single source, or consensus failed | ❌ No (manual) |
+{%- if config.second_opinion and config.second_opinion.models %}
+
+Cross-model findings the Step 3.6 gate marked `unresolved` are `manual-only`, and are the
+**one documented exception** to the `unverified_severe` scan below (skill §3). A
+`scope-exempted` tag exists only on the unwired arbiter path, never here — Step 4 runs as prose.
+{%- endif %}
 
 ### Step 5 — Write REVIEW report
 
@@ -393,6 +419,12 @@ Sections:
 4. **⚠️ Weak Consensus** — `weak-consensus`, by severity.
 5. **📝 Manual-Only Findings** — `manual-only`, by severity.
 6. **🤝 Disagreements** — when reviewers assigned different severities to the same location (kept as independent findings, never bridged across tiers — see Step 4c); show all reviewer takes.
+{%- if config.second_opinion and config.second_opinion.models %}
+7. **🧊 Cross-model findings (frozen @ round 1)** — the loop's working state, not a summary:
+   rounds 2..N re-read it instead of re-invoking a model. Emit per **`second-opinion-gate`
+   skill §6** (field list, the three keys that must NOT appear, never-delete). **Required
+   whenever any model ran**, even if every finding was refuted.
+{%- endif %}
 
 <!-- @hm:user:procedure-extras -->
 <!-- Project-specific Round 1 steps (extra reviewers, custom heuristics). Preserved across harness-maker upgrades. -->
@@ -433,6 +465,13 @@ excluded do NOT lower the letter. Compute `unverified_severe` = TRUE iff any fin
 tagged `manual-only` OR `weak-consensus` has severity **P0 or P1** — a single-source
 specialist finding that failed cross-check is `manual-only`, so it is included. P2/P3
 never trigger the flag.
+{%- if config.second_opinion and config.second_opinion.models %}
+
+**One provenance carve-out (skill §3):** a finding whose `source` is an enabled second-opinion
+model ({{ config.second_opinion.models | join(', ') }}) **and** whose disposition is
+`unresolved` is excluded — it is recorded in Section 7 but does not set the flag. The only
+exclusion; everything else, including an `accepted` finding consensus later rejected, still sets it.
+{%- endif %}
 
 After each round's report:
 
@@ -467,6 +506,13 @@ ELSE:
 
 ## Auto-Fix Loop (rounds 2..max_review_rounds)
 
+### Round-state contract — **`second-opinion-gate` skill §5, binding even with second opinion off**
+
+`pending` votes; `resolved` (fix applied **and** verification passed) and `stale` do not. Only
+`pending`→`resolved`/`stale` is progress; back-transitions forbidden. **One** non-progressing
+round ends the loop (`no-progress`), **from round 2 only**. Re-spawned reviewers are **merged by
+`id`, never replaced wholesale**.
+
 Per iteration:
 
 1. **Select fixable findings** — only:
@@ -489,9 +535,18 @@ Per iteration:
 
    On failure: identify the last fix that touched the failing file → **revert** it (restore original snippet) and log `Fix #{N} reverted — caused build failure`. Continue with remaining fixes (do not abort the round).
 
-4. **Re-review (selective)** — re-spawn ONLY reviewers whose scope was touched by applied fixes. Launch all required re-reviewers in parallel in one Task batch when their scopes are independent. Reviewers that approved untouched files are NOT re-run. Multi-instance code-reviewer consensus (when configured) still uses the configured number of instances on modified files.
+4. **Re-review (selective)** — re-spawn ONLY reviewers whose scope was touched by applied fixes. Launch all required re-reviewers in parallel in one Task batch when their scopes are independent. Reviewers that approved untouched files are NOT re-run. Multi-instance code-reviewer consensus (when configured) still uses the configured number of instances on modified files. Merge their output per the round-state contract's rule 4 — **by `id`, never wholesale**.
+{%- if config.second_opinion and config.second_opinion.models %}
 
-5. **Recompute grade** using the new findings (Step 4 consensus filter again).
+   > **Do NOT re-invoke the second-opinion models** — each ran exactly once in round 1. Carry
+   > their findings forward from Section 7 and update statuses (skill §5). Re-invoking injects a
+   > fresh stochastic voter every round, so `Remaining`/`New` never drain and the loop exits on
+   > the cap instead of converging.
+{%- endif %}
+
+5. **Recompute grade** using the current voting set (Step 4 again, clusters rebuilt per the round-state contract).
+
+5b. **Evaluate the progress invariant.** No lifecycle transition this round → stop now with `CHANGES_REQUESTED` and exit reason `no-progress`.
 
 6. **Append iteration record** to the REVIEW report:
 
@@ -523,9 +578,15 @@ Append to the REVIEW report:
 
 Final grade: {final}
 Iterations used: {N} / {max_review_rounds}
+Exit reason: converged | no-progress | cap-exhausted | auto-fix-disabled
 Status: APPROVED | CHANGES_REQUESTED
 human_review_needed: {true|false}
 ```
+
+`Exit reason` records *why* the loop stopped: `converged` (grade met the threshold) ·
+`no-progress` (no lifecycle transition — nothing new could arrive) · `cap-exhausted` (rounds
+ran out **while still progressing** — the only exit that says a higher cap would have helped) ·
+`auto-fix-disabled`. Never report `cap-exhausted` for a `no-progress` stop.
 
 - `APPROVED` **and `human_review_needed=false`** → ready for wrapup.
 - `APPROVED` **but `human_review_needed=true`** (unverified `manual-only`/`weak-consensus` P0/P1 present) → the letter cleared, but real severe findings were not consensus-verified. **Interactive / autopilot: STOP for human review before wrapup.** **Loop mode: proceed** — the flag is persisted in the committed REVIEW report only (no per-iter halt, no active loop-close reader — accepted limitation, ADR-003); the operator sees it when reviewing loop output.

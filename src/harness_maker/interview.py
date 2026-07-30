@@ -158,6 +158,12 @@ _ALL_SKILLS: list[str] = [
     "security-scanner",
     "context-linter",
     "refdocs-search",
+    # Enabled in BOTH presets, not just Production. Its §2-§4 (the cross-model gate) only
+    # matter when `second_opinion.models` is non-empty, but §5 — the auto-fix loop's
+    # round-state contract — governs Claude findings too, and `review.md.j2` points at it
+    # from an UNGUARDED line. Omitting it from Side's enabled list would leave that pointer
+    # dangling in every Side harness.
+    "second-opinion-gate",
 ]
 
 _SIDE_ENABLED_REVIEWERS: list[str] = ["code-reviewer"]
@@ -167,6 +173,9 @@ _SIDE_ENABLED_SKILLS: list[str] = [
     "ai-readiness-rubric",
     "agent-quality-rubric",
     "refdocs-search",
+    # See the note in _ALL_SKILLS: §5 (the auto-fix round-state contract) is pointed at from
+    # an unguarded line in review.md.j2, so Side must enable it too or that pointer dangles.
+    "second-opinion-gate",
 ]
 _PROD_ENABLED_REVIEWERS: list[str] = [
     "code-reviewer",

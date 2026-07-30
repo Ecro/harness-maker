@@ -61,9 +61,15 @@ The scope-exempt path lets specialist findings reach the grade gate
 without forcing every reviewer to opine on every domain they are not
 qualified for.
 
-Use `harness_maker.conditional_router.scope_aware_consensus(findings,
-reviewer_scopes)` to compute the exemption set; do not reimplement the
-logic in prose here.
+Use `harness_maker.conditional_router.scope_aware_consensus(findings)` to
+compute the exemption set; do not reimplement the logic in prose here. The
+helper takes **one** argument — it reads `REVIEWER_SCOPES` from its own module,
+so there is no `reviewer_scopes` parameter to pass.
+
+> **Reachability note.** `/hm:review` does not invoke this agent — its Step 4 runs
+> as prose — so the `scope-exempted` tag below exists only on this path and does
+> not appear in the review stage's Step 4d table. Whether this agent gets wired in
+> or retired is an open decision; do not assume either from its presence here.
 
 ### Step 4b — Reasoning alignment (verification)
 

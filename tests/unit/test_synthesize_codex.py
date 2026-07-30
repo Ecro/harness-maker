@@ -60,7 +60,11 @@ def test_synthesize_codex_target_emits_skill_paths(tmp_path: Path) -> None:
     skill_paths = [str(f.path) for f in bp.files if str(f.path).startswith(".agents/skills/")]
     n_workflows = len(answers.fused_workflows)
     # existing + stages + workflows + loop + loop-p5-batch + help
-    expected = 9 + 7 + n_workflows + 1 + 1 + 1
+    # base 9 → 10 (2026-07-30, PLAN-second-opinion-acceptance-gate ADR-011): the
+    # `second-opinion-gate` skill holds the review stage's main-loop gate procedure, which
+    # cannot live inline — every fused command inlines the whole stage, so stage prose is
+    # paid ×5 against the shipped-surface ratchet.
+    expected = 10 + 7 + n_workflows + 1 + 1 + 1
     assert len(skill_paths) == expected, (
         f"Expected {expected} .agents/skills/ entries, got {len(skill_paths)}"
     )

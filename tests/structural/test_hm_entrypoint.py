@@ -77,6 +77,32 @@ def test_no_argument_is_an_error_not_a_silent_success(capsys: pytest.CaptureFixt
 # ── the allowlist covers what the templates actually call ─────────────────────
 
 
+def _skill_bodies() -> list[str]:
+    """Rendered `.claude/skills/*/SKILL.md` bodies — the surface `render_surface()` omits."""
+    from pathlib import Path
+    from tempfile import mkdtemp
+
+    from harness_maker.interview import interview
+    from harness_maker.models import Preset, ProjectProfile, SecondOpinionConfig
+    from harness_maker.render import DEFAULT_FREEZE_TIME, render
+    from harness_maker.synthesize import synthesize
+
+    profile = ProjectProfile(stack=["python"], scale="medium", lifecycle="active")
+    answers = interview(profile, autoloop_mode=True)
+    # Second opinion ON: some skill call sites render only under it, and a gate that cannot
+    # see them is the gap this helper exists to close.
+    answers.second_opinion = SecondOpinionConfig(models=["codex", "antigravity"])
+    bp = synthesize(profile, answers, preset=Preset.PRODUCTION)
+    out = Path(mkdtemp(prefix="hm-entrypoint-skills-"))
+    render(bp, out, freeze_time=DEFAULT_FREEZE_TIME)
+    bodies = [p.read_text(encoding="utf-8") for p in (out / "skills").glob("*/SKILL.md")]
+    # Non-emptiness is the whole guard. A path typo or a render change would silently return
+    # [] and the widened scan would go vacuous again — which is precisely how a skill-hosted
+    # call site escaped this gate in the first place.
+    assert bodies, "skill render produced no SKILL.md — the scan broke, not the allowlist"
+    return bodies
+
+
 @pytest.fixture(scope="module")
 def rendered() -> dict[str, dict[str, str]]:
     return render_surface()
@@ -96,6 +122,14 @@ def test_every_module_the_rendered_surface_calls_is_dispatchable(
         for text in commands.values():
             called.update(_MODULE_CALL.findall(text))
             called.update(_HM_CALL.findall(text))
+    # Skills too. `render_surface()` collects the COMMAND surface (plus the Codex
+    # `hm-<stage>` skills), so a call site hosted in a `.claude/skills/*/SKILL.md` escaped
+    # this gate entirely — which is how `second_opinion_oracle` shipped as a call nothing
+    # could run. A skill is prose an LLM executes exactly like a command is; if it names a
+    # module, `hm` has to accept it.
+    for skill_md in _skill_bodies():
+        called.update(_MODULE_CALL.findall(skill_md))
+        called.update(_HM_CALL.findall(skill_md))
     assert called, "found no harness_maker calls at all — the extraction broke, not the set"
     missing = called - set(_DISPATCHABLE)
     assert not missing, (

@@ -55,7 +55,11 @@ _RATCHET: dict[str, tuple[int, int]] = {
     "exec-rev-wrap": (86367, 83689),
     "plan-exec-rev": (88353, 85676),
     "res-spec-plan": (84639, 81963),
-    "exec-rev": (50596, 49678),
+    # exec-rev measured 49678 → 51259 (PLAN-second-opinion-acceptance-gate ADR-012). It inlines
+    # the review stage, so it inherits that stage's +1645 unguarded growth. The three other
+    # review-bearing entries absorbed the same delta inside their existing 2% headroom and were
+    # deliberately NOT re-frozen — re-basing an entry that still passes spends slack for nothing.
+    "exec-rev": (50596, 51259),
 }
 
 # ADR-014's hand-set ceiling is measured against a DIFFERENT render: this repo's own
@@ -100,11 +104,21 @@ _ADR014_CEILING = 122_000
 #   plan/review/verify — untouched by this PLAN; they drifted down under the `hm`
 #                   rewrite (d98355d6) and stayed inside the 20% floor, so the table was
 #                   never re-baselined for them. Doing it here removes that slack.
+#
+# review 27590 → 29235, PLAN-second-opinion-acceptance-gate ADR-012 (2026-07-30). This raise
+# EXPLICITLY OVERRIDES the ADR-011 prohibition quoted 12 lines above — read that ADR before
+# treating this entry as licence. In short: the compaction was done first (the gate procedure
+# moved to the `second-opinion-gate` skill, the agent's half to `code-verifier` mode B, four
+# compression passes: +12333 → +3547, −71%), and the +1645 that remains is UNGUARDED
+# correctness — Step 3.4's id stamping, the round-state pointer, Step 4b's 4-step reasoning fix
+# (it was comparing a chain shape reviewers never emit), and the exit reason. Compressing those
+# away deletes fixes rather than prose. Anyone raising this again is expected to show a
+# comparable compaction ratio first and to quote ADR-011 as ADR-012 does.
 _ATOMIC_RATCHET: dict[str, int] = {
     "execute": 26724,
     "plan": 41656,
     "research": 23498,
-    "review": 27590,
+    "review": 29235,
     "spec": 27370,
     "verify": 20668,
     "wrapup": 38253,
@@ -255,13 +269,28 @@ def test_no_rendered_command_bakes_a_machine_specific_absolute_path(
 
 @pytest.mark.parametrize("name", sorted(_RATCHET))
 def test_rendered_commands_within_budget(flag_on: dict[str, str], name: str) -> None:
-    """AC-005 — ceiling stops regrowth, floor stops the render being gutted to meet it."""
+    """AC-005 — ceiling stops regrowth, floor stops the render being gutted to meet it.
+
+    The `size < pre` arm asserts "the phase that froze this entry actually compacted it". It is
+    meaningful only while `measured < pre` — i.e. while the entry still records a compaction.
+    When an entry is re-frozen UPWARD (`measured >= pre`), that arm cannot pass by construction
+    and asserting it would demand a shrink the entry itself says did not happen. This is the
+    same distinction `_ATOMIC_RATCHET` already draws in prose ("pre and post are the same
+    observation at freeze time, so the arm would fail by construction") — here it is enforced in
+    code instead of avoided by using a different table shape.
+
+    **The ceiling and floor arms above still bind in both cases**, so an upward re-freeze is
+    ratcheted at its new level rather than unguarded. The only thing skipped is a claim that
+    would be false. PLAN-second-opinion-acceptance-gate ADR-012 is the first entry to take this
+    branch and explains why it was allowed to.
+    """
     pre, measured = _RATCHET[name]
     ceiling = int(measured * 1.02)
     floor = int(measured * 0.80)
     size = len(flag_on[name])
     assert floor <= size <= ceiling, f"{name}: {size} outside [{floor}, {ceiling}]"
-    assert size < pre, f"{name}: {size} did not shrink from the pre-change {pre}"
+    if measured < pre:
+        assert size < pre, f"{name}: {size} did not shrink from the pre-change {pre}"
 
 
 @pytest.mark.parametrize("name", sorted(_ATOMIC_RATCHET))

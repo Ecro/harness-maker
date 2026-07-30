@@ -91,3 +91,18 @@ was green while review round 2 still found 7 defects, because four of those live
 (SPEC notes, PLAN frontmatter, an ADR's own enumeration) that no mutation check reads. So
 the gate is worth building for what it covers, and must not be sold as covering more —
 see `[fail:design] unverified-number-in-spec-justification`.
+
+## Proposal: CI gate — every new CLI surface must be driven in its shipped form (2026-07-30)
+**Triggered by:** [fail:test] shipped-entry-point-not-exercised (count: 3)
+**Proposed mechanism:** structural test + CLAUDE.md checkpoint
+**Rationale:** Three separate work units have now shipped a change that was correct in the
+Python library and dead at the invocation the product runs — most recently two new entrypoints
+(`codex_adapter stamp-ids`, `second_opinion_oracle`) that every rendered call site invoked as
+`hm <module> …` while `hm._DISPATCHABLE` did not list them, so each exited 2. Unit tests called
+`main([...])` directly and were green throughout. An automated guard would have caught all three:
+extend `tests/structural/test_hm_entrypoint.py` from "every module the rendered surface calls is
+dispatchable" to "every module in `command_registry.MODULES` that any rendered artifact calls is
+BOTH dispatchable AND resolves through `hm` in a subprocess", and scan every rendered surface
+(commands, `.claude/skills/*/SKILL.md`, agent bodies) rather than commands alone — the skills half
+was added this round and immediately found a pre-existing miss (`refdocs_index`). The library/product
+seam is the recurring shape; the gate should live at the seam, not in the library.

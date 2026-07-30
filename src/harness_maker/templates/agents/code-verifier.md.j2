@@ -1,7 +1,7 @@
 ---
 name: code-verifier
 communication_variant: reframe
-description: Pass 1.5 reduce-only verifier — KEEP/DROP/DEMOTE Pass 1 findings against the redacted diff. MUST NOT introduce new findings.
+description: Reduce-only verifier — mode A (Pass 1.5) KEEP/DROP/DEMOTE Pass 1 findings against the redacted diff; mode B (cross-model PIDA) accepted/rejected/duplicate/unresolved for second-opinion findings against injected oracle output. MUST NOT introduce new findings.
 tools: Read, Grep, Glob
 {% include "agents/_partials/model_frontmatter_line.md.j2" %}
 review_scope: [verifier]

@@ -2,6 +2,47 @@
 
 ## [Unreleased]
 
+### Added — cross-model findings must now survive a refutation gate (`PLAN-second-opinion-acceptance-gate`)
+
+`/hm:review` lets `codex` and `antigravity` vote as peers in the K=2 consensus filter.
+Claude's own findings survived three passes before reaching that filter; the cross-model
+ones survived none — and with two Claude reviewers plus two models the voter pool is N=4
+with **half of it non-Claude**, so the two models agreeing reached consensus with zero
+Claude corroboration. A new **PIDA gate** (`code-verifier` mode B) now dispositions each
+cross-model finding `accepted` / `rejected` / `duplicate` / `unresolved`; only `accepted`
+becomes a voter. The verifier has no Bash, so the main loop gathers the oracle through a
+new `hm second_opinion_oracle` entrypoint that owns path filtering, budgeting and
+value-shaped redaction — the paths come from another model's output, and the filter for
+them is code rather than prose.
+
+### Fixed — the auto-fix loop could not converge, only exhaust its cap
+
+The loop never stated whether the external models are re-invoked per round. Read as
+"re-invoke", every round injected a fresh stochastic voter, so `Remaining` never drained
+and the run ended at `max_review_rounds` rather than by converging. Models are now invoked
+**exactly once per `/hm:review`**, and the loop carries their findings forward under a
+monotonic lifecycle (`pending` → `resolved`/`stale`, no re-open) with a one-round
+no-progress stop evaluated from round 2. Findings are matched across rounds by an immutable
+content-hash `id` (`hm codex_adapter stamp-ids`) instead of `file:line:summary`, which a fix
+moves — that mismatch is how a corroborating voice used to vanish and the grade improve with
+no code change behind it.
+
+### Fixed — `hm` refused two of its own entrypoints
+
+`hm` dispatches through an explicit allowlist and `codex_adapter`, `second_opinion_oracle`
+and `refdocs_index` were absent, so every rendered call site exited 2. The
+`test_hm_entrypoint` scan covered only the rendered *command* surface, so a call hosted in a
+`.claude/skills/*/SKILL.md` was invisible to it; the scan now covers skill bodies too, which
+is what surfaced `refdocs_index` — a call nothing could run that predates this work.
+
+### Note
+
+`PLAN-second-opinion-acceptance-gate` ADR-012 raises the shipped-surface budget, explicitly
+superseding `PLAN-workflow-step-audit` ADR-011's "never raise a ceiling to pass a phase"
+after a 76% compaction. Read that ADR before raising it again. The plan's two manual
+convergence scenarios were **not run**, so the termination fix is verified by construction
+and by tests, not empirically.
+
 ## [0.44.0] — 2026-07-30
 
 ### Changed — four pipeline stages collapse their fixed call sequences (`PLAN-workflow-step-audit`)

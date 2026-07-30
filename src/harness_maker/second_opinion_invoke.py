@@ -534,7 +534,104 @@ def _build_parser() -> argparse.ArgumentParser:
     return p
 
 
+def _build_disposition_parser() -> argparse.ArgumentParser:
+    """A SEPARATE parser, deliberately — not an argparse subcommand.
+
+    ``_build_parser`` has ``--model`` required and a required mutually-exclusive
+    ``--prompt-file | --smoke`` group, and four already-rendered call sites pass no
+    subcommand token. Converting to subparsers would break every one of them with
+    'invalid choice', so the new mode gets its own parser and ``main`` dispatches on the
+    flag's presence in argv.
+    """
+    p = argparse.ArgumentParser(prog="second_opinion_invoke --record-disposition")
+    p.add_argument("--record-disposition", action="store_true", required=True)
+    p.add_argument("--disposition-file", type=Path, required=True)
+    p.add_argument("--slug", required=True)
+    p.add_argument("--stage", required=True, choices=("review", "plan", "health"))
+    p.add_argument("--root", type=Path, default=None)
+    return p
+
+
+def _not_recorded(reason: str) -> int:
+    """Warn-and-proceed, but never a silent no-op (ADR-009).
+
+    An unwritten calibration row is not worth failing a review over, so this returns 0 —
+    but a review that recorded nothing must be distinguishable from one that recorded
+    everything, which is what the stderr line buys.
+    """
+    sys.stderr.write(f"[second-opinion] disposition rows NOT recorded: {_clip(reason)}\n")
+    return 0
+
+
+def _main_record_disposition(argv: list[str] | None) -> int:
+    args = _build_disposition_parser().parse_args(argv)
+    try:
+        raw = args.disposition_file.read_text(encoding="utf-8")
+        payload = json.loads(raw)
+        dispositions = payload["dispositions"]
+        if not isinstance(dispositions, list):
+            raise TypeError(f"dispositions must be a list, got {type(dispositions).__name__}")
+    except Exception as exc:
+        return _not_recorded(f"{type(exc).__name__}: {exc}")
+
+    try:
+        base_root = args.root or resolve_base_root(Path.cwd())
+    except Exception as exc:  # pragma: no cover - resolve_base_root already degrades
+        return _not_recorded(f"base root unresolved: {type(exc).__name__}: {exc}")
+
+    written = 0
+    failures: list[str] = []
+    for entry in dispositions:
+        # Shape-checked BEFORE the try, so the failure handler below can never be the thing
+        # that raises. `dispositions` is LLM-authored, so a bare string or a null element is
+        # an ordinary malformation — and an exception escaping here would break the exit-0
+        # contract on exactly the input the per-entry handling exists to tolerate.
+        if not isinstance(entry, dict):
+            failures.append(f"<non-object entry>: {type(entry).__name__}")
+            continue
+        try:
+            oracle = entry.get("oracle_result")
+            record = codex_ledger.record_from_dict(
+                {
+                    "slug": args.slug,
+                    "stage": args.stage,
+                    "model": entry["model"],
+                    "finding_ref": str(entry["id"]),
+                    "disposition": entry["disposition"],
+                    "status": "invoked",
+                    # Capped BEFORE validation: the field is max_length=200 and an
+                    # over-length value would raise, which the caller cannot see.
+                    #
+                    # Called UNCONDITIONALLY. The `if oracle else None` this replaces skipped
+                    # the helper whenever evidence was absent — but `cap_oracle_result` is
+                    # designed for exactly that case and returns the bare verdict, so the
+                    # short-circuit silently discarded the one thing the row could still say
+                    # about an evidence-less finding. Its documented no-evidence branch was
+                    # unreachable from its only caller.
+                    "oracle_result": codex_ledger.cap_oracle_result(
+                        str(entry["disposition"]), str(oracle) if oracle else None
+                    ),
+                }
+            )
+            codex_ledger.emit(record, project_root=base_root)
+            written += 1
+        except Exception as exc:
+            # Per-entry, NOT a batch abort. An earlier revision returned here, so one bad
+            # entry discarded every later VALID one while the rows already appended stayed
+            # committed — leaving a prefix indistinguishable from a complete batch and
+            # silently skewing the acceptance-rate denominator this ledger exists to produce.
+            failures.append(f"{entry.get('id', '<no-id>')}: {type(exc).__name__}: {exc}")
+    if failures:
+        return _not_recorded(
+            f"{written}/{len(dispositions)} rows recorded; "
+            f"{len(failures)} failed: {'; '.join(failures[:3])}"
+        )
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
+    if "--record-disposition" in (argv if argv is not None else sys.argv[1:]):
+        return _main_record_disposition(argv)
     args = _build_parser().parse_args(argv)
     if args.smoke:
         prompt = SMOKE_PROMPT

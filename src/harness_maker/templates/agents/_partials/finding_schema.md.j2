@@ -10,6 +10,13 @@ Common envelope (every finding):
 - `line`: 1-indexed line, or `0` for whole-file
 - `summary`: ≤ 80 chars; what is wrong
 - `suggestion`: ≤ 200 chars; concrete fix
+
+> **`id` — assigned by the harness, NOT emitted by you.** The review stage's Step 3 merge
+> point stamps every finding with a stable `id` derived from your reviewer name plus the
+> finding's first-seen `file`/`line`/`summary`. It is the key the auto-fix loop uses to
+> carry your finding across rounds, so **do not invent one** — an id you generate would
+> differ on every re-run and the loop would treat your finding as new each round. Emit the
+> fields above; the `id` appears downstream.
 {% if _v != "terse" %}
 - `reasoning`: 4-step Observe→Trace→Infer→Conclude (P0/P1 only)
 {% endif %}

@@ -134,4 +134,9 @@ def test_codex_target_files_total_skill_count() -> None:
     count 18 → 19.
     """
     out_paths = [out for _, out, _ in _codex_target_files({}) if out.startswith(".agents/skills/")]
-    assert len(out_paths) == 19, f"Expected 19 skill paths, got {len(out_paths)}"
+    # 19 → 20 (2026-07-30, PLAN-second-opinion-acceptance-gate ADR-011): the
+    # `second-opinion-gate` skill. This is the second of two enumeration constants the new
+    # skill moved — `[fail:test] enumeration-tests-not-updated-with-new-rendered-artifact`
+    # is exactly this family, so if a third one surfaces later, look for a count these two
+    # greps missed rather than assuming the render is wrong.
+    assert len(out_paths) == 20, f"Expected 20 skill paths, got {len(out_paths)}"

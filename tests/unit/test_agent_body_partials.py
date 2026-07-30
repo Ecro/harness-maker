@@ -89,6 +89,13 @@ def _render_body(name: str) -> str:
 # 5 reviewer entries below are the post-Phase-C hashes; the remaining 7
 # agents keep their pre-refactor hashes.
 _EXPECTED_SHA256: dict[str, str] = {
+    # Re-pinned 2026-07-30 (PLAN-second-opinion-acceptance-gate). SIX entries moved for TWO
+    # reasons, both intended: the five reviewers because `_partials/finding_schema.md.j2` gained
+    # the note that `id` is harness-assigned and must NOT be emitted by a reviewer (an
+    # LLM-generated id differs per run, which defeats the stability the id exists for), and
+    # `consensus-arbiter` because its 2-arg `scope_aware_consensus(findings, reviewer_scopes)`
+    # call was corrected to the real 1-arg signature. `code-verifier` gained a whole second mode
+    # in the same task and does NOT appear here — it carries no sha pin.
     # ALL hashes re-pinned 2026-07-17 (PLAN-permission-deny-and-hooks-wiring
     # Phase 7, ADR-002): the `permissions:` frontmatter block was deleted from
     # every agent template. Claude Code has no such subagent-frontmatter field —
@@ -113,8 +120,8 @@ _EXPECTED_SHA256: dict[str, str] = {
     # pre-0.28.5 hashes. The codex-ENABLED tools:Bash path is asserted in
     # test_render_codex_permission_injection.py. Pre-bump hashes in git history.
     "autoloop-coder": "093210f0b4da3e0d0431c7fa4a0833f19f320d04ee349989fd8b5b5882483932",
-    "code-reviewer": "cd980f015d0774eca7a97ec721a3a317f53f781ddc6b8902d88704617e3ac2ef",
-    "concurrency-reviewer": "6e115a2b7798a0eca6047b4e4cdbc3bb78884ac16acf7e91e4be090cdb8563d0",
+    "code-reviewer": "74b2b0bff2a42b417f7db8acc4cb9bb62ff75e687fbeffe40f48cd30be677cce",
+    "concurrency-reviewer": "290c9dd2c57c4a11015b1ac5cf65176b1b6a85586717e663980a818b4965d39a",
     # consensus-arbiter + plan-validator: hashes bumped 2026-05-24 per
     # PLAN-codex-second-llm-integration ADR-007 + review security fix.
     # Both agents previously had NO frontmatter permissions block; Phase 2
@@ -131,20 +138,20 @@ _EXPECTED_SHA256: dict[str, str] = {
     # reconciled to forbid cross-tier severity resolution, and the user-extension
     # comment reworded to forbid tier bridging. Body change outside the codex
     # conditional, so the disabled-config hash moves. Pre-bump hash in git history.
-    "consensus-arbiter": "c340a9c4fb8f043d8d33b785c1ee4e54f35f8b735e46baa87951c54b097051ba",
+    "consensus-arbiter": "f7497cebbbde53b777c264a596619c4f436534a0b471227f9baadcff779a67df",
     # executor: re-pinned 2026-06-03 (PLAN-techspec-audit F61). The description
     # + body claimed a runtime-enforced "never writes to repo root" boundary that
     # Claude Code does NOT enforce (subagent-frontmatter permissions are not
     # enforced — see CLAUDE.md §보안/권한). Reworded to "by convention, prompt-
     # level guidance, not runtime-enforced". Pre-bump hash in git history.
     "executor": "0a4a5e34f5b7d985eab1b0b8b2ee79d898d3d95ddd4d68eea051536939e96874",
-    "performance-reviewer": "8735a961e59fd3475de4ff6e45b8f4e89fd4e1e0c808f4acaaf65504a3a62b9a",
+    "performance-reviewer": "9b9f42a5f726d56df9ae1688ace1979b0eaa768cacc24b48c052659aec635e0c",
     "plan-validator": "2116a5ce4fb8053c0a8c921f2a1e2c022ea5099f488e8bc315a6a87b097ec36b",
     "security-auditor": "51a11902b9f56b9ebb0e0103e0d2047a64d1a218898d6cedc229a1a43fed2f53",
-    "security-reviewer": "33a672397c087866e001b875e99998f46920a0b15b024ce277f2a5b319f73d48",
+    "security-reviewer": "b5ea840e5af70d27ce283bca2513c12c2abc3ddfbf55a722a92dad4a48ed57f4",
     "stuck": "a62459d1205ed4fd67769ebb2f729a4de9b1d7b9ff5d770cc6ed767e63746fd0",
     "test-reviewer": "d102698d962884761172fa6a241c8a578cb7c038596905c141fd9f596b37cabb",
-    "ux-reviewer": "b65045b2f2fafb1d3fb8fd2f16469a2c2977a28ef7ee9a1eb4f6529aa0ad0d96",
+    "ux-reviewer": "7ce5bd89c61c7669ffeee85a0b6b528aa3ff9a52e77912bd646eb3a542754e42",
 }
 
 

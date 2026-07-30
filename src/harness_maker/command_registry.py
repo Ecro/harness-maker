@@ -130,7 +130,10 @@ MODULES: dict[str, ModuleSpec] = {
             "wt-uuid",
         ),
     ),
-    "codex_adapter": ModuleSpec("manual-dispatch", _s("adapt")),
+    "codex_adapter": ModuleSpec("manual-dispatch", _s("adapt", "stamp-ids")),
+    # Flag-only (no subcommand): it owns the path filtering that keeps external-model output
+    # off a pre-approved argv, so it must be reachable but has nothing to dispatch on.
+    "second_opinion_oracle": ModuleSpec("flagonly"),
     "review_telemetry": ModuleSpec("manual-dispatch", _s("emit")),
     "spec_quality": ModuleSpec("manual-dispatch", _s("eval")),
     "two_pass_review": ModuleSpec("manual-dispatch", _s("redact", "merge")),

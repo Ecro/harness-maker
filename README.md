@@ -142,7 +142,7 @@ A short interview locks the dimensions that shape every downstream render. Re-ru
 | **Ref folders** | Path + glob pairs | Which external docs are searchable via `refdocs-search` skill |
 | **Sibling repos** | Relative paths | Which adjacent repos share the same harness session |
 | **Second Brain** | Obsidian vault path + project_id | Where cross-session memory writes |
-| **Second opinion** | `second_opinion.models` | A list of cross-model reviewer CLIs — `codex` (Codex) and/or `antigravity` (`agy`), independently or both. Each enabled model casts a real k-of-N consensus vote in `/hm:review` and is reconciled in `/hm:plan`; a missing/unauthenticated/rate-limited CLI degrades gracefully (warn + skip, never blocks). Requires the corresponding CLI (`codex login` / an authenticated `agy`); orthogonal to `targets` |
+| **Second opinion** | `second_opinion.models` | A list of cross-model reviewer CLIs — `codex` (Codex) and/or `antigravity` (`agy`), independently or both. Each enabled model casts a real k-of-N consensus vote in `/hm:review` — but only after its findings survive a refutation gate (`code-verifier` mode B) that dispositions each one against injected test-oracle output; only `accepted` findings vote. Models are invoked **once per review**, not per auto-fix round. Reconciled in `/hm:plan`; a missing/unauthenticated/rate-limited CLI degrades gracefully (warn + skip, never blocks). Requires the corresponding CLI (`codex login` / an authenticated `agy`); orthogonal to `targets` |
 | **Recommended model** | `opus` default | The model frontmatter on every generated agent |
 
 > **Result:** `.claude/harness.yaml` — a single source of truth that survives upgrades.
