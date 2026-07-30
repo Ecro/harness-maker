@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.44.0] — 2026-07-30
+
 ### Changed — four pipeline stages collapse their fixed call sequences (`PLAN-workflow-step-audit`)
 
 Each `!` line in a rendered `/hm:` command is one main-loop turn at 200–430K context.
