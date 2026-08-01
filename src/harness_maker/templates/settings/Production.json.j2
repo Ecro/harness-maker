@@ -7,39 +7,32 @@
     ADR-006 staging (PLAN-permission-deny-and-hooks-wiring):
       Stage 1 (Phase 1) — non-blocking: telemetry, post_write_reminder,
         sessionid_envfile, autopilot_autoarm, flush_session.
-      Stage 2 (Phase 2) — control-flow, **Stop event only**: loop_gate +
-        autopilot_guard, both passing `--mode stop-hook` (the modules dispatch on
-        it). loop_gate on Stop is what lets /hm:loop reach iteration 2. Stop-blocking
+      Stage 2 (Phase 2) — control-flow, **Stop event only**: loop_gate, passing
+        `--mode stop-hook` (the module dispatches on it). loop_gate on Stop is what
+        lets /hm:loop reach iteration 2. Stop-blocking
         is a materially lower risk class than tool-call blocking: it cannot block a
         tool call, it is bounded by each module's stop_hook_active guard, and the
         worst case is one extra turn.
       Stage 3 (Phase 3) — everything that can block an ORDINARY TOOL CALL:
-        permission_gate, worktree_gate, spec_gate, **and autopilot_guard's PreToolUse
-        copies**. They land last, with a live negative control, and atomically with
-        ADR-007's `--subordinate-to-deny-dangerous` flag.
+        permission_gate, worktree_gate, spec_gate. They land last, with a live
+        negative control, and atomically with ADR-007's
+        `--subordinate-to-deny-dangerous` flag.
 
     The staging axis is the EVENT, not the module (REVIEW round 1, consensus P1 —
-    codex + code-reviewer). A first draft put autopilot_guard wholesale in Stage 2
-    because ADR-006 partitions by module name; but its PreToolUse path returns
-    allow=False (autopilot_guard.py:330 → exit 2), so it satisfies BOTH conjuncts of
-    ADR-006's own Stage-3 criterion — "can block ordinary tool calls AND has never
-    executed in Claude Code" — and satisfies the second HARDER than permission_gate,
-    which is at least live in Cursor and Codex. autopilot_guard is wired in NO IDE
-    today. "Only blocks under autopilot" does not save it either: with
-    `autonomy.autopilot_persistent: true`, autopilot_autoarm re-arms a marker at every
-    SessionStart, so the block is unconditional for that population — and what they
-    opted into was auto-advance, not "block my git push".
+    codex + code-reviewer).
+
+    NOTE (PLAN-autopilot-advance-noop Phase 4): this block used to reason at length about
+    where `autopilot_guard` belonged. That module was deleted in 539f05a9 and its
+    invocations are retired from every rendered surface; `render._HARNESS_RETIRED_HOOK_
+    INVOCATIONS` still strips it from an existing user's settings.json on re-render. Do
+    not reintroduce it here — a reference to a module that does not exist is worse than
+    no reference.
 
     Stage 3 IS wired here now (Phase 3 redo, after the parked attempt's Grade-D review).
     The `PreToolUse` key carries the blocking gates on matchers `Bash` and
-    `Write|Edit|MultiEdit`. Both P0s that sank the parked attempt are addressed in THIS
-    combined diff: (P0 #2) `autopilot_guard`'s `permission-surface-write` is now a read-only
-    ALLOWLIST plus resolved-target-path matching (shlex + cwd tracking + PurePosixPath
-    normalization), not a write-token blacklist, so wiring it live no longer leaks
-    `python -c` / `perl -i` / `git checkout --` or path-spelling (`cd .claude &&`, `//`,
-    `/./`, quoted, `git -C`) writes to settings.json. It is defense-in-depth, NOT a hard
-    boundary — a textual guard over arbitrary bash cannot catch obfuscated writes
-    (base64/heredoc/eval-constructed paths); the worktree sandbox is the real boundary.
+    `Write|Edit|MultiEdit`. Of the two P0s that sank the parked attempt, only #1 still has
+    a live subject — #2 concerned the now-deleted `autopilot_guard`'s permission-surface
+    write detection and died with the module.
     (P0 #1) `.claude/hooks/hooks.json` is retired: its FileSpec is removed (synthesize.py)
     and it no longer renders; a byte-pristine stale copy is deleted, a user-edited one
     preserved (reconcile `_SWEEP_NEVER_DELETE` + cli pristine-exact-match).

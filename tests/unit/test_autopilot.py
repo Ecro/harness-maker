@@ -155,6 +155,38 @@ def test_cli_on_then_off(tmp_path: Path) -> None:
     assert autopilot.load(tmp_path) is None
 
 
+def test_cli_shim_accepts_every_registered_action(tmp_path: Path) -> None:
+    """Parity gate. `harness-maker autopilot <a>` and `hm autopilot <a>` are one command
+    with two spellings; `resolve_toggle_config` is shared precisely so they cannot drift,
+    but the ACTION TABLE was not. `status` landed on the module entry and in the registry
+    while this shim still answered "unknown action", and the same change added `--force`
+    here — so the miss was not a whole-feature oversight, it was one of two edits. Nothing
+    caught it because no test ever invoked the shim with anything but on/off/garbage.
+
+    Derived from the registry rather than hard-coded, so a future action cannot land on one
+    surface only.
+    """
+    import json as _json
+
+    from typer.testing import CliRunner
+
+    from harness_maker import command_registry
+    from harness_maker.cli import app
+
+    runner = CliRunner()
+    actions = command_registry.MODULES["autopilot"].subcommands
+    assert "status" in actions, "registry no longer declares the action this gate exists for"
+    # `off` → `on` → `status`: alphabetical order happens to leave a live marker for the
+    # read, so `status` is exercised against a real one rather than the absent case.
+    for action in sorted(actions):
+        res = runner.invoke(app, ["autopilot", action, "--root", str(tmp_path)])
+        assert res.exit_code == 0, f"{action}: {res.output}"
+        assert "unknown action" not in res.output, f"{action}: {res.output}"
+    # And the payload is the module entry's, not a shim-local reimplementation.
+    res = runner.invoke(app, ["autopilot", "status", "--root", str(tmp_path)])
+    assert _json.loads(res.output) == autopilot.status(tmp_path)
+
+
 def test_cli_invalid_action_exits_2(tmp_path: Path) -> None:
     from typer.testing import CliRunner
 

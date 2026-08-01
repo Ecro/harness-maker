@@ -47,17 +47,27 @@ advance:
 (it enforces the Phase-5 runaway caps + kill switch, and on proceed records the advance it
 authorizes — so it must run only after Step 1 clears):
 
+If this stage has a slug, **append** it to the command below in single quotes — e.g.
+` --slug 'my-task'`. Never a shell expression or a bracketed placeholder. Omit it
+otherwise; the marker keeps the earlier stage's slug.
+
 !uv run --with {{ harness_maker_src_path }} hm autopilot_caps boundary --root . --current {{ summary_stage }}{% if config.autonomy.step_cap is not none %} --step-cap {{ config.autonomy.step_cap }}{% endif %}{% if config.autonomy.time_cap_min is not none %} --time-cap-min {{ config.autonomy.time_cap_min }}{% endif %}
 
 Read the JSON:
-- `proceed: false` → **STOP** (print the banner). `halt_kind` `step_cap`/`time_cap` = a
-  runaway cap fired (`halted_cap` logged, marker cleared); `kill_switch` = autopilot
-  off/expired; `merge_gate` = the next stage is human-gated (e.g. wrapup's merge/land —
-  the marker was cleared, so invoke `/hm:wrapup` manually when ready); `unknown_stage` =
-  `--current` not in the pipeline (marker preserved); `pipeline_complete: true` = the
-  pipeline finished and the marker was cleared.
-- `proceed: true` → **auto-advance**: invoke `Skill(hm:<next_stage from the JSON>)` to run
-  the next pipeline stage in THIS session instead of printing the STOP banner.
+- `proceed: false` → **STOP** (print the banner) — **except `bad_slug`**. `step_cap`/
+  `time_cap` = a runaway cap fired (`halted_cap` logged, marker cleared); `kill_switch` =
+  autopilot off/expired; `merge_gate` = the next stage is human-gated (e.g. wrapup's
+  merge/land — the marker was cleared, so invoke `/hm:wrapup` manually); `unknown_stage` =
+  `--current` not in the pipeline; `pipeline_complete: true` = the pipeline finished and
+  the marker was cleared.
+  **`bad_slug` is yours to undo**: the `--slug` you passed is invalid; nothing was
+  authorized. Do NOT print the banner — re-run with a corrected slug, or no flag.
+- `proceed: true` → **auto-advance**: invoke `Skill(hm:<next_stage from the JSON>)` with
+  the JSON's `task_slug` as its argument (omit when `null`), instead of the STOP banner.
+  **This supersedes this stage's earlier "Stage terminal … STOP"** — that governs the
+  gated path, and `proceed: true` IS the authorization it asks for. `task_slug_source:
+  "persisted"` means the slug came from an earlier stage — name it before invoking, so
+  another task's slug cannot advance silently.
 <!-- @hm:/autopilot-advance -->
 {% endif %}
 ## Stage summary — print before you STOP

@@ -2,7 +2,7 @@
     Claude Code reads project hooks ONLY from settings files — a plain project's
     `.claude/hooks/hooks.json` is never loaded (that path is for a PLUGIN bundle).
     Stage 1 (non-blocking) + Stage 2 (Stop) + Stage 3 (PreToolUse BLOCKING gates:
-    permission_gate, worktree_gate, spec_gate, autopilot_guard) are all shipped now
+    permission_gate, worktree_gate, spec_gate) are all shipped now
     (Phase 3 redo). spec_gate uses `Write|Edit|MultiEdit`; every PreToolUse blocking gate
     carries `"timeout": 10`; permission_gate is `--subordinate-to-deny-dangerous` (ADR-007).
     `sessionstart_drift` is excluded because the plugin bundle already fires it (ADR-010).

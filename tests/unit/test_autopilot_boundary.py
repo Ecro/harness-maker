@@ -82,9 +82,13 @@ def test_boundary_proceeds_and_records_advance(tmp_path: Path, capsys) -> None: 
     assert out["proceed"] is True
     assert out["next_stage"] == "spec"
     assert out["halt_kind"] is None
-    # the authorized advance was recorded → one advanced event now on the ledger,
-    # carrying the destination stage.
-    assert autopilot_ledger.count_events(tmp_path, "advanced") == 1
+    # The authorization was recorded — `advance_authorized`, NOT `advanced`
+    # (PLAN-autopilot-advance-noop ADR-004). The old event conflated permission with
+    # progress, which is why "announces but never advances" was invisible to this ledger.
+    # Entry is confirmed later, by the NEXT stage's own boundary call.
+    assert autopilot_ledger.count_events(tmp_path, "advance_authorized") == 1
+    assert autopilot_ledger.count_events(tmp_path, "advanced") == 0
+    assert autopilot_ledger.count_entries(tmp_path) == 0, "authorized ≠ entered"
     ledger = (tmp_path / ".claude" / "observability" / "auto-advance.jsonl").read_text()
     assert json.loads(ledger.splitlines()[-1])["to"] == "spec"
 

@@ -25,7 +25,16 @@ DEFAULT_OBSERVABILITY_DIR = Path(".claude/observability")
 LEDGER_FILENAME = "auto-advance.jsonl"
 
 # ADR-009: disjoint from iter_receipts.Verdict {"pass", "fail", "skipped"}.
-LedgerEvent = Literal["advanced", "gate_blocked", "halted_cap"]
+#
+# `advanced` is LEGACY and is never written again (PLAN-autopilot-advance-noop ADR-004).
+# It stayed in the vocabulary so historical rows remain readable. It was replaced because
+# the boundary CLI appended it BEFORE the model acted, so the ledger recorded every
+# authorization as a success — which is precisely why "announces the next stage but never
+# runs it" survived undetected. `advance_authorized` is the permission; `advance_entered`
+# is the proof the stage actually started.
+LedgerEvent = Literal[
+    "advanced", "advance_authorized", "advance_entered", "gate_blocked", "halted_cap"
+]
 # DERIVED from LedgerEvent (not a hand-maintained copy) so the typed signature and the
 # runtime guard cannot drift apart (REVIEW P2). The two module-level asserts make
 # ADR-009 a structural, import-time invariant — not a test-only guarantee.
@@ -176,6 +185,115 @@ def count_events(
                 continue
         total += 1
     return total
+
+
+def _rows_in_window(
+    project_root: Path,
+    *,
+    since: str | None,
+    observability_dir: Path | None = None,
+) -> list[dict[str, Any]]:
+    """Every parseable ledger row with ``ts >= since``, in append (chronological) order.
+
+    Same fail-safe posture as ``count_events``: a missing ledger or an unparseable line is
+    skipped rather than raised, and a row with a missing/garbage ts is kept IN-window
+    (block-biased — dropping it would under-count and delay the runaway cap).
+    """
+    path = ledger_path(project_root, observability_dir)
+    if not path.is_file():
+        return []
+    since_dt = _parse_iso(since) if since is not None else None
+    rows: list[dict[str, Any]] = []
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(record, dict):
+            continue
+        if since_dt is not None:
+            ts = record.get("ts")
+            ts_dt = _parse_iso(ts) if isinstance(ts, str) else None
+            if ts_dt is not None and ts_dt < since_dt:
+                continue
+        rows.append(record)
+    return rows
+
+
+def find_unconfirmed_authorization(
+    project_root: Path,
+    *,
+    to: str,
+    since: str | None,
+    observability_dir: Path | None = None,
+) -> dict[str, Any] | None:
+    """The earliest ``advance_authorized(to=…)`` in the window with no matching entry yet.
+
+    Greedy in-order pairing (ADR-005). A stage can be authorized and entered more than
+    once per session (review→execute→review), so pairing is oldest-authorization to
+    oldest-entry rather than by identity — no ids are introduced. An entry can only
+    confirm an authorization that PRECEDES it, which is what stops a stale entry from
+    swallowing a fresh authorization.
+    """
+    rows = _rows_in_window(project_root, since=since, observability_dir=observability_dir)
+    # Pair in APPEND order, in a single pass. The ledger is O_APPEND, so file order IS
+    # write order — an authoritative ordering that needs no timestamps. The first draft
+    # split the two event kinds apart and reconstructed order from `ts`, which made the
+    # pairing hostage to the clock: a rollback could let an entry recorded BEFORE an
+    # authorization pair with it, and a missing/garbage `ts` skipped the ordering check
+    # entirely. Timestamps are for the window filter and `elapsed_s`, nothing else.
+    pending: list[dict[str, Any]] = []
+    for row in rows:
+        if row.get("to") != to:
+            continue
+        event = row.get("event")
+        if event == "advance_authorized":
+            # Collapse consecutive authorizations with no entry between them. A re-run
+            # boundary (a corrected `--slug`, a retried stage) issues a second
+            # authorization for the same stage; banking both would let ONE real entry be
+            # followed by a second confirmable slot, so a later unrelated entry could
+            # consume it and the step cap would count work that never happened.
+            if not pending:
+                pending.append(row)
+        elif event == "advance_entered" and pending:
+            pending.pop(0)
+    return pending[0] if pending else None
+
+
+def count_entries(
+    project_root: Path,
+    *,
+    since: str | None = None,
+    observability_dir: Path | None = None,
+) -> int:
+    """Stages actually ENTERED in the window — the step-cap numerator (ADR-004).
+
+    Legacy `advanced` rows are counted only while they PRECEDE the first new-vocabulary row.
+    The new vocabulary is never written by old code and the legacy name is never written by
+    new code, so that boundary is exactly the upgrade point inside a mixed window (a marker
+    armed under the old code and still inside its 18h TTL when this ships).
+
+    The two ways to get this wrong pull in opposite directions, and only one of them is
+    safe. Dropping the legacy rows wholesale hands a partially-consumed session a FRESH
+    step budget — the chain then runs longer than configured. Counting a pre-upgrade
+    phantom (`advanced` written before the model acted, which is the defect this split
+    exists to fix) alongside its re-done new-vocabulary pair over-counts one advance by
+    one, so the cap fires one step early. The runaway cap must be block-biased toward
+    firing — `count_events` states the same rule for its own missing-ts case — so the sum
+    is correct and the wholesale drop is not.
+    """
+    rows = _rows_in_window(project_root, since=since, observability_dir=observability_dir)
+    new_vocabulary = ("advance_entered", "advance_authorized")
+    upgrade_point = len(rows)
+    for idx, row in enumerate(rows):
+        if row.get("event") in new_vocabulary:
+            upgrade_point = idx
+            break
+    entered = sum(1 for r in rows if r.get("event") == "advance_entered")
+    legacy_before_upgrade = sum(1 for r in rows[:upgrade_point] if r.get("event") == "advanced")
+    return entered + legacy_before_upgrade
 
 
 # The autonomy levels that actually arm auto-advance (gated = off; unknown = treated as

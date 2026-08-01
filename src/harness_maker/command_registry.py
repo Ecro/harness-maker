@@ -141,7 +141,9 @@ MODULES: dict[str, ModuleSpec] = {
     # NEW (Phase 1): down-unified from the Typer `autopilot` toggle. It uses argparse with
     # a choices-positional, not `if sub ==`, but is deliberately classed manual-dispatch so
     # T-C2 source-scans it (its `on` mutates a marker) instead of bare-invoking it.
-    "autopilot": ModuleSpec("manual-dispatch", _s("on", "off")),
+    # `status` (PLAN-autopilot-advance-noop ADR-002) is dot-form / `hm`-form only — the
+    # Typer alias at :161 stays a backward-compat on/off shim and does NOT gain it.
+    "autopilot": ModuleSpec("manual-dispatch", _s("on", "off", "status")),
     # ── Typer host (guard-exempt; T-C1 validates these as `python -m harness_maker.cli X`
     #    and the root `python -m harness_maker X` form via TYPER_ALIASES) ──
     "cli": ModuleSpec(

@@ -290,7 +290,7 @@ Stop and validate with the user. Surface this prompt:
 
 If the user opts for "dig deeper" — re-enter Phase 1 with narrowed scope (one approach in focus). Re-write the RESEARCH document; do NOT create a second file.
 
-**Stage terminal**: On success, output the RESEARCH document path and a one-line summary of the recommended direction, then **STOP**. Do not proceed to `/hm:spec`, `/hm:plan`, or any other stage without an explicit user command. This boundary must survive context compaction — the next stage is user-initiated.
+**Stage terminal**: On success, output the RESEARCH document path and a one-line summary of the recommended direction, then **STOP**. Do not proceed to `/hm:spec`, `/hm:plan`, or any other stage without an explicit user command. This boundary must survive context compaction — the next stage is user-initiated. Exception: an auto-advance check below returning `proceed: true` supersedes this.
 
 {% set gate0_heading = "## Emit Gate 0 receipt (ADR-001, ADR-005)" %}{% set gate0_stage = "research" %}{% set gate0_pass = "RESEARCH document written with all 7 required sections and at least the discovery lens recorded." %}{% set gate0_fail = "RESEARCH write failed, or the document is missing required sections (Recommended Direction, Approaches, Pitfalls, Open Questions, Sources, Related Docs)." %}{% set gate0_standalone = true %}{% include "agents/_partials/gate0_receipt.md.j2" %}
 

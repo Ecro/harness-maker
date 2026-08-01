@@ -20,7 +20,12 @@ from typing import Literal
 
 from harness_maker import autopilot, autopilot_ledger, command_registry
 
-HaltKind = Literal["kill_switch", "step_cap", "time_cap", "merge_gate", "unknown_stage"]
+# `bad_slug` is emitted only by `_cmd_boundary` (a rejected `--slug`), never by
+# `evaluate_boundary` — but it IS part of the JSON contract the stage prompt branches on,
+# so it belongs in the declared vocabulary. `out` is typed `dict[str, object]`, so mypy
+# would not have caught the divergence: exactly the enum-drift CLAUDE.md flags where a
+# name-only parity test is invariant to the values.
+HaltKind = Literal["kill_switch", "step_cap", "time_cap", "merge_gate", "unknown_stage", "bad_slug"]
 CapKind = Literal["step_cap", "time_cap"]
 
 # Stages the chain must NEVER auto-ENTER — it hands off to the human before them. The
@@ -133,6 +138,75 @@ def next_stage(pipeline: Sequence[str], current: str) -> str | None:
     return pipeline[nxt] if nxt < len(pipeline) else None
 
 
+def _confirm_entry(project_root: Path, *, stage: str, marker: autopilot.AutopilotMarker) -> bool:
+    """Retro-confirm that ``stage`` was actually entered (ADR-005). True when a row landed.
+
+    Nothing else can observe this. The stage itself does not know whether it was
+    auto-entered or user-invoked, and adding a dedicated call to seven prompts would tax
+    every manual run — so the stage's own boundary/gate-blocked call doubles as the proof
+    it started. A stage that dies mid-body reaches neither call and is correctly never
+    confirmed: that silence is the signal the ledger was missing.
+
+    ``elapsed_s`` rides along instead of a hard auto-vs-manual cutoff, so the threshold
+    stays a query answerable against every historical row rather than a constant baked in
+    here (ADR-009).
+    """
+    pending = autopilot_ledger.find_unconfirmed_authorization(
+        project_root, to=stage, since=marker.created_at
+    )
+    if pending is None:
+        return False
+    authorized_at = pending.get("ts")
+    elapsed_s = 0.0
+    if isinstance(authorized_at, str):
+        parsed = autopilot_ledger._parse_iso(authorized_at)
+        if parsed is not None:
+            elapsed_s = max(0.0, (datetime.now(UTC) - parsed).total_seconds())
+    autopilot_ledger.append_event(
+        project_root,
+        event="advance_entered",
+        fields={"to": stage, "elapsed_s": round(elapsed_s, 3)},
+    )
+    return True
+
+
+def _resolve_task_slug(
+    project_root: Path,
+    *,
+    marker: autopilot.AutopilotMarker,
+    flag_slug: str | None,
+    stage: str,
+) -> tuple[str | None, str | None]:
+    """The slug to hand the next stage, plus where it came from (ADR-003).
+
+    ``task_slug_source`` exists because the fallback must never be silent. This ADR
+    rejects slug *inference* on the grounds that "silently advancing the wrong task is
+    worse than not advancing" — and an unannounced inherited slug produces that same
+    outcome when a user starts a second task inside one armed session. Naming the source
+    lets the prompt say which slug it is about to use.
+    """
+    if flag_slug:
+        # Gate on the boolean. `set_task_slug` refuses a slug outside the allowlist, and
+        # returning it anyway would hand the rejected value to the very sinks the allowlist
+        # exists to protect: the JSON's `task_slug` becomes the `Skill(hm:<next> <slug>)`
+        # argument, and the next stage re-emits it into its own `--slug` shell line.
+        if autopilot.set_task_slug(project_root, slug=flag_slug, stage=stage):
+            return flag_slug, "flag"
+        # stderr, not logging: this module's CLI output is the JSON on stdout and callers do
+        # not configure logging, so a logger call here would be invisible.
+        print(f"[autopilot] --slug {flag_slug!r} failed validation", file=sys.stderr)
+        # DISTINCT sources, and both halt the boundary (see `_cmd_boundary`). Reporting the
+        # fall-through as plain "persisted" made the JSON byte-identical to the benign "no
+        # flag was passed" case, so the prompt could not tell that the slug it asked for was
+        # refused and a DIFFERENT task's slug substituted.
+        if marker.task_slug:
+            return marker.task_slug, "rejected-fallback"
+        return None, "rejected"
+    if marker.task_slug:
+        return marker.task_slug, "persisted"
+    return None, None
+
+
 def _cmd_boundary(args: argparse.Namespace) -> int:
     """The deterministic boundary check the P6 auto-branch runs before advancing.
 
@@ -154,6 +228,8 @@ def _cmd_boundary(args: argparse.Namespace) -> int:
         "steps": 0,
         "next_stage": None,
         "pipeline_complete": False,
+        "task_slug": None,
+        "task_slug_source": None,
     }
     marker = autopilot.active_marker(root)
     if marker is None:
@@ -161,10 +237,23 @@ def _cmd_boundary(args: argparse.Namespace) -> int:
         out["reason"] = "autopilot marker absent/foreign/stale — aborting chain at boundary"
         print(json.dumps(out))
         return 0
+    # AFTER the marker check, BEFORE the caps (ADR-005 placement). Running it first would
+    # jump the P2-5 invariant those early returns carry — a call with no live marker
+    # (autopilot off / foreign / stale) must append NOTHING, or every manual run pollutes
+    # the smoke denominator and the step-cap numerator. It is also incoherent: "within the
+    # current marker's window" presupposes a marker.
+    # Heartbeat: proves to the NEXT session that this one was alive here. Without it,
+    # ownership alone cannot distinguish a live peer from a marker abandoned mid-pipeline,
+    # and the guard wedges the project for the full TTL (round-4 P0).
+    autopilot.touch(root)
+    _confirm_entry(root, stage=args.current, marker=marker)
     # Unknown `--current` (typo / stage outside the pipeline) is checked FIRST — BEFORE the
     # caps — so a bad value can't trigger the marker-clearing cap path and silently kill the
     # session while falsely claiming a cap halt (REVIEW P3). Marker preserved; the user fixes
     # the typo and re-runs (the cap still applies on the corrected call).
+    # It is also BEFORE the slug resolution, which WRITES `task_slug_stage` to the marker:
+    # resolving first meant `--current bogus --slug s` stamped `bogus` as the supplying
+    # stage and then returned "marker preserved", which was no longer true.
     # marker.pipeline holds AtomicStage (str-enum) members; `in` uses str-equality so a plain
     # stage name like "research" matches (str(member) gives the enum repr — do NOT stringify).
     if args.current not in marker.pipeline:
@@ -172,7 +261,27 @@ def _cmd_boundary(args: argparse.Namespace) -> int:
         out["reason"] = f"current stage {args.current!r} not in the pipeline — marker preserved"
         print(json.dumps(out))
         return 0
-    steps = autopilot_ledger.count_events(root, "advanced", since=marker.created_at)
+    slug, slug_source = _resolve_task_slug(
+        root, marker=marker, flag_slug=args.slug, stage=args.current
+    )
+    out["task_slug"] = slug
+    out["task_slug_source"] = slug_source
+    if slug_source in ("rejected", "rejected-fallback"):
+        # Do NOT authorize. The prompt is told not to run on a substitute slug, so
+        # emitting `proceed: true` + an `advance_authorized` row here would either strand a
+        # pending authorization (model obeys) or advance the wrong task (model does not) —
+        # and a later retry's authorization would then be confirmed against THIS one by the
+        # greedy pairing. Halting is the only self-consistent answer.
+        out["halt_kind"] = "bad_slug"
+        out["reason"] = (
+            f"--slug {args.slug!r} failed validation — fix the slug and re-run; "
+            "no advance was authorized"
+        )
+        print(json.dumps(out))
+        return 0
+    # Counts stages ENTERED, not authorizations granted (ADR-004) — the cap must bound
+    # work actually performed.
+    steps = autopilot_ledger.count_entries(root, since=marker.created_at)
     out["steps"] = steps
     decision = evaluate_boundary(
         root, steps=steps, step_cap=args.step_cap, time_cap_min=args.time_cap_min
@@ -188,8 +297,9 @@ def _cmd_boundary(args: argparse.Namespace) -> int:
             record_cap_halt(root, halt_kind="time_cap", steps=steps)
         # P2-6 / P3: a runaway cap is a TERMINAL halt. Clear the marker so the session
         # ends cleanly — otherwise every later boundary call re-fires a duplicate
-        # halted_cap event AND the Stop-hook backstop keeps blocking termination until
-        # the 18h TTL. (kill_switch leaves no marker to clear.)
+        # halted_cap event. (kill_switch leaves no marker to clear.) The old rationale
+        # also cited a Stop-hook backstop; that module was deleted in 539f05a9 and its
+        # invocations are retired, so the duplicate-row reason is the only one left.
         if decision.halt_kind in ("step_cap", "time_cap"):
             autopilot.clear(root)
         print(json.dumps(out))
@@ -218,7 +328,10 @@ def _cmd_boundary(args: argparse.Namespace) -> int:
         )
         print(json.dumps(out))
         return 0
-    autopilot_ledger.append_event(root, event="advanced", fields={"to": nxt})
+    # AUTHORIZED, not entered — the next stage's own boundary/gate-blocked call confirms
+    # entry (ADR-004/005). Writing "advanced" here was the bug: it recorded permission as
+    # if it were progress.
+    autopilot_ledger.append_event(root, event="advance_authorized", fields={"to": nxt})
     out["proceed"] = True
     out["next_stage"] = nxt
     out["steps"] = steps + 1
@@ -243,6 +356,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     # PLAN-autopilot-config-surface ADR-002: optional → absent flag = None = unlimited. The
     # stage template omits the flag when the config cap is null, so an unlimited harness simply
     # does not pass it; a finite harness passes the rendered integer.
+    # ADR-003: the stage terminal supplies the slug it is working on; boundary persists it
+    # and hands it to the next stage's `Skill(hm:<stage> <slug>)` call.
+    b.add_argument("--slug", default=None)
     b.add_argument("--step-cap", type=int, default=None, dest="step_cap")
     b.add_argument("--time-cap-min", type=int, default=None, dest="time_cap_min")
     # gate-blocked (P7): the auto-branch records this when a mandatory gate holds the chain
@@ -262,8 +378,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         # Resolve cwd→base so the marker check and the ledger write target one root
         # (same asymmetry fix as _cmd_boundary — REVIEW P2).
         root = autopilot.resolve_marker_root(Path(args.root))
-        if autopilot.active_marker(root) is None:
+        marker = autopilot.active_marker(root)
+        if marker is None:
             return 0
+        autopilot.touch(root)
+        # A stage that reaches its gate DID start — so this call confirms entry too
+        # (ADR-005). Same placement rule as boundary: after the marker check, never before.
+        _confirm_entry(root, stage=args.stage, marker=marker)
         autopilot_ledger.append_event(root, event="gate_blocked", fields={"stage": args.stage})
         return 0
     return 0

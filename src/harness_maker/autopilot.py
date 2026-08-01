@@ -6,10 +6,12 @@ import argparse
 import contextlib
 import json
 import logging
+import os
+import re
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Literal, cast
+from typing import Any, Literal, cast
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
@@ -28,6 +30,39 @@ logger = logging.getLogger(__name__)
 # coverage + the churn-file dirt-filters apply (registered in
 # worktree._HARNESS_CHURN_FILES — see test_marker_is_in_churn_files).
 _MARKER_REL = ".claude/.hm-autopilot"
+
+# The per-SESSION key (PLAN-autopilot-advance-noop ADR-007). `session_uuid` below is
+# PROJECT-scoped, so within one project every session reads every other session's marker
+# as its own — autopilot silently INHERITED, the mirror of the silently-off bug. This is
+# the same id `loop_marker.py` keys on, exported by the `sessionid_envfile` SessionStart
+# hook.
+_SESSION_ID_ENV = "HM_SESSION_ID"
+
+# Same PATTERN as `worktree._TASK_SLUG_RE` — the slug this marker carries is the one the
+# task worktree is named for. Applied with `fullmatch` here, so this surface accepts a
+# strict subset of what worktree's `match` does (see `_task_slug_charset`).
+_TASK_SLUG_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+
+
+class MarkerOwnedByAnotherSessionError(RuntimeError):
+    """Raised by ``write`` when a LIVE marker belongs to a different session (ADR-010).
+
+    Without this, arming is an unconditional ``atomic_write``: session B's picker would
+    stamp its own identity over session A's live marker, and A's next boundary check would
+    judge that marker foreign → ``kill_switch`` → A's chain dies mid-pipeline with no
+    diagnostic. The GC restraint in ADR-008 alone never closed this path.
+    """
+
+
+def _env_session_id() -> str | None:
+    """The caller's Claude session id, or None when degraded/absent.
+
+    An empty/whitespace value is None, NOT "": a degraded environment (Cursor, Codex,
+    SessionStart-hook failure) must land in the both-idless fallback rather than matching
+    another degraded session's empty string.
+    """
+    raw = os.environ.get(_SESSION_ID_ENV, "").strip()
+    return raw or None
 
 
 class AutopilotMarker(BaseModel):
@@ -48,6 +83,45 @@ class AutopilotMarker(BaseModel):
     # (autopilot "on" but never advances) — reject it as a malformed marker instead.
     pipeline: list[AtomicStage] = Field(min_length=1)
     created_at: str
+    # All three default to None so a pre-upgrade marker still validates under
+    # `extra="forbid"` (CLAUDE.md absent-case rule). `task_slug` rides to the next stage's
+    # `Skill(hm:<stage> <slug>)` call — without it, argument-parsing stages start blank and
+    # stall, which reads to the user as "announced but did nothing" (ADR-003).
+    # `task_slug_stage` records which stage supplied it, so an inherited slug is
+    # attributable rather than silent.
+    task_slug: str | None = Field(default=None, max_length=128)
+    task_slug_stage: str | None = None
+    claude_session_id: str | None = None
+    # Heartbeat, refreshed by the OWNER at every autopilot CLI call (round-4 review).
+    # Ownership alone cannot tell a live peer from an abandoned marker: nothing clears the
+    # marker at session end (`clear` fires only on explicit `off` and the three terminal
+    # boundary paths), so a session that armed and closed mid-pipeline left a `fresh`
+    # marker that no one could take for the full 18h TTL — reinstating the silently-never-
+    # arms defect this whole change exists to remove. This does NOT authorize automatic
+    # takeover; it gives `status` a factual "last active N minutes ago" for the picker to
+    # put to the user, who is the only party that knows whether another session is open.
+    last_seen: str | None = None
+
+    @field_validator("task_slug")
+    @classmethod
+    def _task_slug_charset(cls, v: str | None) -> str | None:
+        # `task_slug` crosses TWO sinks: it is interpolated into the `!uv run … --slug …`
+        # line of a rendered slash command (a shell), and the boundary JSON hands it back
+        # as the argument of a `Skill(hm:<stage> <slug>)` instruction. Every comparable
+        # slug surface in this repo is allowlisted (`worktree._TASK_SLUG_RE`,
+        # `spec_need._SLUG_RE`, `memory_md`); this one was not, and it is the only one
+        # that also round-trips through a marker replayed by every later stage.
+        if v is None:
+            return None
+        # `fullmatch`, not `match`: `$` also matches BEFORE a trailing newline, so
+        # `match` would accept "ok\n" — and this value is interpolated into a shell
+        # command line. `worktree._TASK_SLUG_RE` uses `match`; this surface is
+        # deliberately the stricter of the two rather than bug-compatible with it.
+        if not _TASK_SLUG_RE.fullmatch(v) or ".." in v:
+            raise ValueError(
+                f"task_slug {v!r} must match {_TASK_SLUG_RE.pattern} and contain no '..'"
+            )
+        return v
 
     @field_validator("pipeline")
     @classmethod
@@ -139,20 +213,55 @@ def write(
     level: Literal["gated", "auto_safe", "full"],
     pipeline: list[AtomicStage],
     now: str | None = None,
+    force: bool = False,
+    claude_session_id: str | None = None,
 ) -> AutopilotMarker:
     """Persist the session autopilot answer, stamped with the current session UUID.
 
     ``now`` is injectable for deterministic tests (checkpoint 7); defaults to the
     current UTC time in ISO-8601.
+
+    ``force`` bypasses the ADR-010 ownership guard — for a user deliberately taking over
+    a crashed peer's still-fresh marker. Absent it, overwriting a LIVE foreign marker
+    raises rather than silently disarming that session.
+
+    ``claude_session_id`` overrides the ``HM_SESSION_ID`` lookup for callers that hold the
+    id but do not have it in their environment. The `autopilot_autoarm` SessionStart hook
+    is exactly that case and the reason this parameter exists: its sibling hook
+    `sessionid_envfile` publishes the id to ``$CLAUDE_ENV_FILE``, which Claude Code sources
+    into *later Bash subprocesses* — never into a sibling hook's own process. Without the
+    override, autoarm stamped ``claude_session_id: null``; the very session that armed it
+    then read that marker as foreign (one-directional rule), so `autopilot_persistent`
+    harnesses were wedged at `kill_switch` for the full TTL — and ADR-010's picker branch
+    refuses to re-arm over a foreign marker, so there was no in-band recovery.
     """
     # Resolve cwd→base FIRST so both the marker path and the session_uuid below are
     # keyed to the project root — a write from inside a worktree lands at the base
     # (where reads look), not the worktree-local path (ADR-003 symmetric write).
     project_root = resolve_marker_root(project_root)
+    effective_session_id = claude_session_id or _env_session_id()
+    if not force:
+        existing = load(project_root)
+        # `!= "stale"` — NOT `== "fresh"`. A `future` marker (clock rollback / NTP step / a
+        # differently-skewed host on a shared tree) is one `gc_stale_marker` refuses to
+        # delete precisely because it may be a peer's LIVE marker; letting `write` clobber
+        # what the GC protects is the same peer-disarm through the other door. `unparseable`
+        # is protected for the same reason and stays recoverable: `status` GCs it, and the
+        # raise names `--force`.
+        if (
+            existing is not None
+            and _freshness(existing.created_at) != "stale"
+            and not _is_own(existing, project_root, session_id=effective_session_id)
+        ):
+            raise MarkerOwnedByAnotherSessionError(
+                "a live .hm-autopilot marker belongs to another session — "
+                "not overwriting (pass --force to take it over)"
+            )
     marker = AutopilotMarker(
         session_uuid=_current_session_uuid(project_root),
         level=level,
         pipeline=list(pipeline),
+        claude_session_id=effective_session_id,
         # `is not None` (not `or`): an explicit "" is preserved rather than silently
         # swapped for the live clock — keeps the injected-time contract honest.
         created_at=now if now is not None else datetime.now(UTC).isoformat(),
@@ -208,6 +317,213 @@ def load(project_root: Path) -> AutopilotMarker | None:
 _MARKER_TTL_HOURS = 18
 
 
+Freshness = Literal["fresh", "stale", "future", "unparseable"]
+
+
+def _freshness(created_at: str, now: datetime | None = None) -> Freshness:
+    """Classify a marker's age. Single source for BOTH the reject and the delete rules.
+
+    They are deliberately different verdicts on the same axis (ADR-008): ``active_marker``
+    rejects anything not ``fresh`` — non-destructive, so a false positive costs nothing —
+    while ``gc_stale_marker`` deletes ONLY ``stale``. ``future`` (clock rollback / NTP step
+    / a differently-skewed host on a shared tree) must never be deletable: a peer's
+    freshly-armed marker can present a negative age, and destroying it is exactly the
+    silent disarm the GC restraint exists to prevent.
+    """
+    moment = now if now is not None else datetime.now(UTC)
+    try:
+        created = datetime.fromisoformat(created_at)
+    except (ValueError, TypeError, OverflowError):
+        return "unparseable"
+    if created.tzinfo is None:
+        created = created.replace(tzinfo=UTC)
+    try:
+        age_s = (moment - created).total_seconds()
+    except (OverflowError, OSError):  # pragma: no cover — pathological datetimes
+        return "unparseable"
+    if age_s < 0:
+        # A real clock skew is BOUNDED — an NTP step or a differently-skewed host is
+        # minutes to hours, not a year. Beyond one TTL of skew the marker is not credible
+        # clock jitter, and treating it as permanently-protected `future` left a foreign
+        # one neither collectable (GC preserves `future`) nor overwritable (the write guard
+        # protects everything non-`stale`) — an unbounded wedge with no in-band exit.
+        return "stale" if -age_s > _MARKER_TTL_HOURS * 3600 else "future"
+    return "stale" if age_s > _MARKER_TTL_HOURS * 3600 else "fresh"
+
+
+def _is_own(marker: AutopilotMarker, project_root: Path, *, session_id: str | None = None) -> bool:
+    """Session ownership — ONE-DIRECTIONAL (ADR-007).
+
+    Ids are compared whenever **either** side has one; the project-scoped uuid fallback
+    applies only when **neither** does. A symmetric "compare only when both are present"
+    rule would let an id-bearing session inherit a fieldless legacy marker — the direction
+    `loop_marker` explicitly forbids ("honored only when the caller has no id of its own").
+
+    ``session_id`` is the caller's EFFECTIVE id, for a caller that holds its id but does not
+    have it in the environment — the `autopilot_autoarm` SessionStart hook, which receives
+    it on stdin while `HM_SESSION_ID` reaches only later Bash. Without it that caller
+    resolves as id-less and is foreign to every id-bearing marker, including the one it
+    wrote itself moments earlier. `force` is NOT the answer to that: it would disable the
+    guard for genuinely foreign markers too, so a second session opening in the same project
+    would silently steal the first's marker at every SessionStart — the exact peer-disarm
+    ADR-010 exists to prevent.
+    """
+    env_id = session_id or _env_session_id()
+    marker_id = marker.claude_session_id or None
+    if env_id is not None or marker_id is not None:
+        return env_id is not None and marker_id is not None and env_id == marker_id
+    return marker.session_uuid == _current_session_uuid(project_root)
+
+
+def gc_stale_marker(project_root: Path) -> bool:
+    """Delete the marker iff it is TTL-stale (or unparseable). Returns True when deleted.
+
+    Kept OUT of ``active_marker`` on purpose: that predicate is documented pure and
+    ``evaluate_boundary`` depends on it. GC is called from ``status`` and the picker path
+    only — never from ``boundary``.
+
+    Two restraints, both load-bearing:
+      * **foreignness is not a criterion, in either direction.** After ADR-007 "foreign"
+        means "another LIVE session", so deleting what ``active_marker`` rejects would
+        disarm a peer. Equally, refusing to delete anything foreign would make a crashed
+        peer's marker uncollectable forever — reinstating the stale-file-suppresses-arming
+        defect this whole change removes.
+      * **re-read before unlink.** A replacement written between the judgement and the
+        unlink must survive, so the delete is gated on byte identity rather than on the
+        judgement alone. This **narrows, and does not close,** the window: the re-read and
+        the `unlink` are still two operations on a pathname, so a replacement landing
+        between them is removed. Closing it needs an inode-level swap primitive this does
+        not have; the residual race requires two sessions inside the same microseconds,
+        and the loser re-arms via the picker.
+
+    ``OSError`` from the unlink propagates — ``status`` decides how to report it.
+    """
+    root = resolve_marker_root(project_root)
+    path = marker_path(root)
+    try:
+        raw = path.read_bytes()
+    except OSError:
+        return False
+    try:
+        marker = AutopilotMarker.model_validate(json.loads(raw.decode("utf-8")), strict=False)
+    except (UnicodeDecodeError, json.JSONDecodeError, ValidationError):
+        deletable = True  # a marker nothing can parse cannot belong to a live session
+    else:
+        # "unparseable" is a garbage `created_at` on an otherwise-valid marker. It must be
+        # collectable: `active_marker` already rejects it, so leaving it on disk wedges the
+        # project forever — the picker sees `foreign`/non-armed and, per ADR-010, refuses to
+        # arm over it. "future" is the ONLY non-fresh state that stays (clock skew must not
+        # let anyone delete a peer's live marker).
+        deletable = _freshness(marker.created_at) in ("stale", "unparseable")
+    if not deletable:
+        return False
+    try:
+        if path.read_bytes() != raw:
+            logger.warning(".hm-autopilot: marker changed during GC — not deleting.")
+            return False
+    except OSError:
+        return False
+    path.unlink()
+    return True
+
+
+def idle_minutes(marker: AutopilotMarker, *, now: datetime | None = None) -> float | None:
+    """Minutes since the owner last touched the marker; None when it cannot be known.
+
+    Falls back to ``created_at`` so a marker written before this field existed still yields
+    a number rather than an unknown.
+
+    A stamp in the FUTURE returns None, not 0.0. Clamping it to zero reported "active right
+    now" for a clock-skewed marker — and the picker puts this number to the user as the fact
+    that settles whether to take the marker over, so a skewed peer marker (which is also
+    protected from GC and from overwrite while the skew is under one TTL) would keep the
+    project gated for the full window on a number that is not evidence of anything.
+    """
+    stamp = marker.last_seen or marker.created_at
+    moment = now if now is not None else datetime.now(UTC)
+    try:
+        seen = datetime.fromisoformat(stamp)
+    except (ValueError, TypeError, OverflowError):
+        return None
+    if seen.tzinfo is None:
+        seen = seen.replace(tzinfo=UTC)
+    elapsed = (moment - seen).total_seconds() / 60.0
+    return None if elapsed < 0 else elapsed
+
+
+def _write_if_unchanged(root: Path, *, before: bytes | None, updated: AutopilotMarker) -> bool:
+    """Write ``updated`` only if the marker file still holds ``before``. False otherwise.
+
+    Byte identity, NOT a `created_at` comparison. Neither `touch` nor `set_task_slug`
+    mutates `created_at` — `touch` changes `last_seen`, `set_task_slug` changes
+    `task_slug` — so a `created_at` check passes for every SAME-OWNER collision and each
+    writer silently reverts the other's field. That population is real: `_is_own` falls
+    back to the project-scoped `session_uuid` whenever neither side has a session id, so
+    every id-less session (Cursor, Codex, a WSL2 env-file failure) co-owns one marker.
+    Reverting a just-written `task_slug` points the next stage at another task; reverting
+    `last_seen` inflates `idle_minutes`, the number the picker uses to authorize a
+    takeover. `gc_stale_marker` already used byte identity for the same reason.
+    """
+    path = marker_path(root)
+    try:
+        if path.read_bytes() != before:
+            logger.warning(".hm-autopilot: marker changed during update — skipping write.")
+            return False
+        atomic_write(path, updated.model_dump_json())
+    except OSError:
+        return False
+    return True
+
+
+def touch(project_root: Path, *, now: str | None = None) -> bool:
+    """Refresh ``last_seen`` iff this session owns the ACTIVE marker. Best-effort.
+
+    Gated on ``active_marker`` so a peer can never advance someone else's heartbeat and
+    keep their marker looking live. Any write failure is swallowed: a missed heartbeat
+    degrades the takeover prompt's wording, it must never break a stage.
+    """
+    root = resolve_marker_root(project_root)
+    try:
+        before: bytes | None = marker_path(root).read_bytes()
+    except OSError:
+        return False
+    marker = active_marker(root)
+    if marker is None:
+        return False
+    stamped = marker.model_copy(
+        update={"last_seen": now if now is not None else datetime.now(UTC).isoformat()}
+    )
+    return _write_if_unchanged(root, before=before, updated=stamped)
+
+
+def set_task_slug(project_root: Path, *, slug: str, stage: str) -> bool:
+    """Persist the task slug onto the ACTIVE marker. False when this session owns none.
+
+    Gated on ``active_marker`` rather than ``load`` so a foreign marker is never
+    slug-written — that read-modify-write is the only remaining marker-clobber window
+    (R9), and refusing outright closes it for every non-owner.
+    """
+    root = resolve_marker_root(project_root)
+    try:
+        before: bytes | None = marker_path(root).read_bytes()
+    except OSError:
+        return False
+    marker = active_marker(root)
+    if marker is None:
+        return False
+    try:
+        # `model_copy(update=...)` does NOT re-run validators, so the charset allowlist on
+        # `task_slug` would be bypassed on this path — the one that actually persists a
+        # model-supplied value. Re-validate explicitly.
+        updated = AutopilotMarker.model_validate(
+            {**marker.model_dump(), "task_slug": slug, "task_slug_stage": stage}, strict=False
+        )
+    except ValidationError:
+        logger.warning(".hm-autopilot: rejected task_slug %r — marker left unchanged.", slug)
+        return False
+    return _write_if_unchanged(root, before=before, updated=updated)
+
+
 def active_marker(project_root: Path, *, now: datetime | None = None) -> AutopilotMarker | None:
     """Return the marker ONLY when it belongs to the current session AND is fresh.
 
@@ -227,22 +543,15 @@ def active_marker(project_root: Path, *, now: datetime | None = None) -> Autopil
     marker = load(project_root)
     if marker is None:
         return None
-    if marker.session_uuid != _current_session_uuid(project_root):
-        logger.warning(".hm-autopilot: marker session_uuid mismatch (foreign) — ignoring.")
+    if not _is_own(marker, project_root):
+        logger.warning(".hm-autopilot: marker belongs to another session (foreign) — ignoring.")
         return None
-    moment = now if now is not None else datetime.now(UTC)
-    try:
-        created = datetime.fromisoformat(marker.created_at)
-        if created.tzinfo is None:
-            created = created.replace(tzinfo=UTC)
-        age_s = (moment - created).total_seconds()
-    except (ValueError, TypeError, OverflowError):
-        logger.warning(".hm-autopilot: unparseable created_at — treating as stale.")
-        return None
-    # Reject BOTH a too-old marker (crash leftover) AND a future-dated one (clock skew
-    # or a crafted created_at that would otherwise keep autopilot armed forever — a
-    # negative age slips past a one-sided `> TTL` check). REVIEW round-2 P2.
-    if age_s < 0 or age_s > _MARKER_TTL_HOURS * 3600:
+    # Rejects everything that is not `fresh` — a too-old marker (crash leftover) AND a
+    # future-dated one (clock skew, or a crafted created_at that would otherwise keep
+    # autopilot armed forever — a negative age slips past a one-sided `> TTL` check).
+    # REVIEW round-2 P2. Rejection is non-destructive; only `stale` is ever deletable
+    # (gc_stale_marker).
+    if _freshness(marker.created_at, now) != "fresh":
         logger.warning(".hm-autopilot: marker outside the freshness window — ignoring.")
         return None
     return marker
@@ -271,6 +580,84 @@ def effective_level(project_root: Path, *, yaml_level: str) -> str:
         logger.warning(".hm-autopilot: unknown yaml autonomy.level %r → gated.", yaml_level)
         return "gated"
     return yaml_level
+
+
+def status(project_root: Path) -> dict[str, Any]:
+    """The deterministic answer to "is autopilot active?" (ADR-002).
+
+    This exists because the picker had no way to ask. Its arm condition — "if no marker
+    is active yet" — had only `on`/`off` behind it, so the model fell back to checking
+    whether the FILE exists; a stale marker then suppressed arming indefinitely, since
+    nothing ever deleted it. That is the dominant path by which autopilot goes dark.
+
+    `reason` is load-bearing, not diagnostic: `active: false` alone would send the picker
+    down the arming branch for a foreign marker and clobber a live peer (ADR-010).
+
+    GC runs FIRST so a crashed peer's stale marker is collected even though it is foreign;
+    its failure is suppressed and reported — an uncaught OSError would leave the picker
+    with no JSON to branch on, re-entering the exact guess-at-the-file failure this
+    command removes.
+    """
+    root = resolve_marker_root(project_root)
+    out: dict[str, Any] = {
+        "active": False,
+        "reason": "absent",
+        "level": None,
+        "pipeline": None,
+        "task_slug": None,
+        "session_scoped": False,
+        "idle_minutes": None,
+    }
+    if not marker_path(root).is_file():
+        return out
+    try:
+        if gc_stale_marker(root):
+            out["reason"] = "stale (gc'd)"
+            return out
+    except OSError as exc:
+        out["reason"] = f"gc-failed: {exc.errno if exc.errno is not None else '?'}"
+        return out
+    marker = load(root)
+    if marker is None:
+        # Unparseable survived GC only if the file vanished underneath us.
+        out["reason"] = "absent"
+        return out
+    if not _is_own(marker, root):
+        # A caller with NO id of its own cannot tell "a peer owns this" from "this is mine
+        # and I lost my id". Those need opposite advice, so they get different labels.
+        #
+        # The id-less case is a real, documented environment, not a corner: on WSL2 the
+        # `sessionid_envfile` publish to `$CLAUDE_ENV_FILE` can fail, and then the
+        # SessionStart hook still receives the id on stdin (so the marker IS stamped) while
+        # this session's Bash has none. Reporting that as `foreign` tells the picker a live
+        # peer owns the user's own marker — and ADR-010's branch then refuses to arm, so
+        # autopilot stays dark for the full TTL with no in-band recovery. That is the same
+        # advance-noop class this whole change exists to remove, relocated.
+        out["reason"] = (
+            "degraded-idless"
+            if _env_session_id() is None and marker.claude_session_id is not None
+            else "foreign"
+        )
+        # Neither reason authorizes a takeover on its own — this is how long the owner has
+        # been silent, so the picker can state a FACT and let the user (the only party who
+        # knows whether another session is open) decide. Round 4 found the alternative:
+        # prose asserting "probably yours" told the agent to `--force` over what may be a
+        # live peer.
+        out["idle_minutes"] = idle_minutes(marker)
+        return out
+    fresh = _freshness(marker.created_at)
+    if fresh != "fresh":
+        out["reason"] = "future-dated" if fresh == "future" else "stale (gc'd)"
+        return out
+    out.update(
+        active=True,
+        reason="armed",
+        level=marker.level,
+        pipeline=[s.value for s in marker.pipeline],
+        task_slug=marker.task_slug,
+        session_scoped=_env_session_id() is not None and marker.claude_session_id is not None,
+    )
+    return out
 
 
 def resolve_toggle_config(
@@ -309,12 +696,18 @@ def main(argv: list[str] | None = None) -> int:
     if guard is not None:
         return guard
     parser = argparse.ArgumentParser(add_help=False, prog="python -m harness_maker.autopilot")
-    parser.add_argument("action", choices=["on", "off"])
+    parser.add_argument("action", choices=["on", "off", "status"])
     parser.add_argument("--level", default="auto_safe")
     parser.add_argument("--pipeline", default=None)
     parser.add_argument("--root", default=None)
+    # ADR-010: taking over a live peer's marker must be deliberate, never a side effect
+    # of the picker offering to arm.
+    parser.add_argument("--force", action="store_true")
     args = parser.parse_args(raw)
     root = Path(args.root) if args.root else Path.cwd()
+    if args.action == "status":
+        print(json.dumps(status(root)))
+        return 0
     if args.action == "off":
         clear(root)
         print("autopilot: off (marker cleared)")
@@ -325,7 +718,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"autopilot: {exc}", file=sys.stderr)
         return 2
     try:
-        marker = write(root, level=level, pipeline=stages)
+        marker = write(root, level=level, pipeline=stages, force=args.force)
+    except MarkerOwnedByAnotherSessionError as exc:
+        print(f"autopilot: {exc}", file=sys.stderr)
+        return 3
     except ValidationError as exc:
         print(f"autopilot: invalid config ({exc})", file=sys.stderr)
         return 2

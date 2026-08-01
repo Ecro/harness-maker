@@ -2197,7 +2197,10 @@ health = health_cmd
 
 @app.command("autopilot")
 def autopilot_cmd(
-    action: str = typer.Argument(..., help="'on' enables autopilot this session; 'off' disables."),
+    action: str = typer.Argument(
+        ...,
+        help="'on' enables autopilot this session; 'off' disables; 'status' prints the JSON.",
+    ),
     level: str = typer.Option(
         "auto_safe",
         "--level",
@@ -2213,6 +2216,11 @@ def autopilot_cmd(
         "--root",
         help="Project root containing .claude/. Defaults to cwd.",
     ),
+    force: bool = typer.Option(
+        False,
+        "--force",
+        help="Take over a live marker owned by another session (ADR-010).",
+    ),
 ) -> None:
     """Toggle the per-session `.hm-autopilot` marker (PLAN-human-bottleneck-auto-advance).
 
@@ -2224,12 +2232,22 @@ def autopilot_cmd(
 
     root = root or Path.cwd()
 
+    if action == "status":
+        # Same payload as `hm autopilot status` — the two surfaces are one command with two
+        # spellings, and this one shipped without `status` while gaining `--force` in the
+        # same change. `resolve_toggle_config` exists precisely so they cannot drift; the
+        # action table needed the same treatment. (Note the side effect: `status` GCs a
+        # TTL-stale marker, so this is not a pure read on either surface.)
+        typer.echo(json.dumps(autopilot.status(root)))
+        return
     if action == "off":
         autopilot.clear(root)
         typer.echo("autopilot: off (marker cleared)")
         return
     if action != "on":
-        typer.echo(f"autopilot: unknown action {action!r} (expected 'on' or 'off')", err=True)
+        typer.echo(
+            f"autopilot: unknown action {action!r} (expected 'on', 'off' or 'status')", err=True
+        )
         raise typer.Exit(2)
 
     # Validate every input BEFORE touching the marker via the SHARED helper (ADR-003) so
@@ -2241,7 +2259,14 @@ def autopilot_cmd(
         typer.echo(f"autopilot: {exc}", err=True)
         raise typer.Exit(2) from None
     try:
-        marker = autopilot.write(root, level=level_v, pipeline=stages)
+        marker = autopilot.write(root, level=level_v, pipeline=stages, force=force)
+    except autopilot.MarkerOwnedByAnotherSessionError as exc:
+        # Mirrors `autopilot.main`'s exit 3. `write` grew this raise for ADR-010 and only
+        # one of its two callers was updated — this shim is the documented `harness-maker
+        # autopilot on` surface, so the gap surfaced as a raw traceback with no --force
+        # escape.
+        typer.echo(f"autopilot: {exc}", err=True)
+        raise typer.Exit(3) from None
     except ValidationError as exc:
         typer.echo(f"autopilot: invalid config ({exc})", err=True)
         raise typer.Exit(2) from None

@@ -114,13 +114,28 @@ _ADR014_CEILING = 122_000
 # (it was comparing a chain shape reviewers never emit), and the exit reason. Compressing those
 # away deletes fixes rather than prose. Anyone raising this again is expected to show a
 # comparable compaction ratio first and to quote ADR-011 as ADR-012 does.
+# execute/research/spec/verify raised, PLAN-autopilot-advance-noop Phase 4 (2026-07-31).
+# Same bar as ADR-012 above: compaction FIRST, then the residue.
+#   Raw additions were +524/+726/+822/+822 across six stages. Two compaction passes
+#   (picker rewritten from a paragraph to a branch list, slug + precedence prose halved,
+#   terminal clause 137→81 chars) absorbed plan and review ENTIRELY — both are back under
+#   their unchanged ceilings — and cut the rest to +15/+162/+84/+218.
+#   What remains is unguarded correctness, not prose. Each item is a distinct way the
+#   feature was silently dead: the picker asking `autopilot status` instead of guessing
+#   from the marker FILE (a stale file read as "already armed", so autopilot never turned
+#   on); its `foreign` branch (without it, arming clobbers a live peer's marker and their
+#   chain dies at the next boundary with a bare kill_switch); `--slug` on the boundary
+#   call plus the literal-slug warning (an argument-less `Skill()` stalls every
+#   argument-parsing stage); and the two-sided precedence clause (the terminal STOP reads
+#   earlier and stronger than the auto-advance block, so a model resolving the conflict
+#   conservatively stops — the reported bug). Compressing any of these deletes the fix.
 _ATOMIC_RATCHET: dict[str, int] = {
-    "execute": 26724,
+    "execute": 27273,
     "plan": 41656,
-    "research": 23498,
+    "research": 24129,
     "review": 29235,
-    "spec": 27370,
-    "verify": 20668,
+    "spec": 28001,
+    "verify": 21299,
     "wrapup": 38253,
 }
 

@@ -57,8 +57,8 @@ actively harmful: refusing to regenerate in the worktree is what forces a hand-m
 generated artifacts at land time. The count:11 history is left in place for audit.
 
 ## Proposal: mutation-check-receipt-per-new-gate (2026-07-27)
-**Triggered by:** [fail:test] assertion-invariant-over-named-dimension (count: 4)
-**Proposed mechanism:** a mechanical receipt, because prose has now failed four times —
+**Triggered by:** [fail:test] assertion-invariant-over-named-dimension (count: 5)
+**Proposed mechanism:** a mechanical receipt, because prose has now failed five times —
 including once inside `PLAN-token-economy-step-pruning`, whose ADR-010 is *itself* the
 prose rule "mutation-check every gate". Proposal: extend the `/hm:execute` Phase D exit
 contract so that every test **added or modified** in the diff must be named in a
@@ -68,6 +68,13 @@ Step 3 fail-closed when a diff adds a test node with no corresponding row. The c
 makes it non-vacuous is `suite_rc_after_delete != 0` — a row claiming a deletion that
 left the suite green is exactly the invariant assertion this entry describes, and it
 becomes visible as data instead of as a claim in a commit message.
+
+**2026-08-01 (count 5, PLAN-autopilot-advance-noop):** the fifth instance is the strongest
+argument yet for the mechanical form, because the gate in question was written *by the same
+change that shipped the defect it was meant to catch*, survived two review rounds green, and
+its docstring correctly described the failure mode it was not testing. A mutation receipt
+would have caught it in one line: deleting the `--slug` append instruction leaves
+`assert "--slug" in partial` passing, so `suite_rc_after_delete == 0`.
 **Rationale:** four recurrences, and the failure mode is stable across all of them: the
 assertion holds in the broken world because the fixture pair does not straddle the
 dimension the test is named after. The current guard is ADR-010's instruction to "name the

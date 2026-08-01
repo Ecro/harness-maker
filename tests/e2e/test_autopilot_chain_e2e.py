@@ -62,8 +62,17 @@ def test_full_pipeline_chain_advances_then_stops_before_wrapup(tmp_path: Path, c
     assert gate["halt_kind"] == "merge_gate"
     assert gate["next_stage"] == "wrapup"
     assert autopilot_ledger.count_events(tmp_path, "gate_blocked") == 1
-    # one `advanced` per real advance (research..review → verify), none into wrapup.
-    assert autopilot_ledger.count_events(tmp_path, "advanced") == len(advancing)
+    # One AUTHORIZATION per boundary that proceeded (research..review → verify), none into
+    # wrapup. The legacy `advanced` event is retired: it was written before the model acted,
+    # so it recorded permission as progress and could not distinguish "announced but
+    # stalled" from a real advance (PLAN-autopilot-advance-noop ADR-004).
+    assert autopilot_ledger.count_events(tmp_path, "advance_authorized") == len(advancing)
+    assert autopilot_ledger.count_events(tmp_path, "advanced") == 0
+    # Each stage's own boundary call retro-confirms the entry its predecessor authorized.
+    # `research` was never authorized (it started the chain) so its call confirms nothing,
+    # but `verify`'s gate call confirms the last one — the two counts coincide at
+    # len(advancing) rather than differing by one.
+    assert autopilot_ledger.count_events(tmp_path, "advance_entered") == len(advancing)
     # the session ended at the merge gate — wrapup is never auto-run.
     assert autopilot.load(tmp_path) is None
 

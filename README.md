@@ -548,9 +548,16 @@ pipeline whenever no human decision is actually required.
   harnesses keep their committed caps on `--update`; only a fresh interview defaults to
   unlimited. Removing the `.hm-autopilot` marker (`harness-maker autopilot off`) is an instant
   kill switch honored at the next boundary.
-- **Auditable**: every advance / gate-stop / cap-halt is recorded to
-  `.claude/observability/auto-advance.jsonl`; `/hm:health` surfaces an "armed but never
-  fired" degradation signal.
+- **Check the state, don't guess it**: `harness-maker autopilot status` (or `hm autopilot
+  status`) prints JSON — `active`, plus a `reason` that distinguishes "never armed" from
+  "expired", "owned by another session", and "this session can't read its own id". The
+  marker is keyed to the session that armed it, so arming refuses to overwrite a live
+  peer's marker unless you pass `--force`.
+- **Auditable**: the ledger `.claude/observability/auto-advance.jsonl` separates
+  `advance_authorized` (the boundary granted the advance) from `advance_entered` (the next
+  stage actually started), so a chain that announces a stage and then stalls leaves a
+  visible gap rather than a clean record. Gate-stops and cap-halts are recorded too, and
+  `/hm:health` surfaces an "armed but never fired" degradation signal.
 - **Claude Code only** today — the auto-advance branch is excluded from the **Codex**
   render entirely, and is a runtime **no-op under Cursor** (it needs the Claude-only `Skill`
   tool + the `.hm-autopilot` marker, so a Cursor session just falls through to the STOP).

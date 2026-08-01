@@ -2,6 +2,35 @@
 
 ## [Unreleased]
 
+### Fixed — autopilot announced the next stage and never ran it (`PLAN-autopilot-advance-noop`)
+
+Four defects compounded, and the ledger one is why the other three stayed invisible: the
+boundary check appended its `advanced` row **before** the model acted, so permission was
+recorded as progress. The step cap counted authorizations, and "announced but did nothing"
+was indistinguishable from a real advance in every row ever written. The vocabulary is now
+split — `advance_authorized` when the boundary grants it, `advance_entered` when the next
+stage's own call retro-confirms it — so a chain that stalls leaves a visible gap instead of
+a clean record.
+
+The other three: the autopilot **picker** had no command to ask whether autopilot was
+already on, so it decided from whether the marker *file* existed — and nothing ever
+collected a stale one, which meant a two-day-old marker suppressed arming indefinitely.
+`hm autopilot status` now answers deterministically (with a load-bearing `reason`, and a
+TTL-only GC that never deletes a `future`-dated marker, which may be a peer's under a
+clock skew). The **task slug** did not ride to the next stage, so argument-parsing stages
+started blank. And four stage bodies carried an unconditional "Stage terminal … STOP" that
+a model resolving the conflict conservatively obeyed over the auto-advance block below it;
+both sides now name each other.
+
+The marker is also session-scoped now (`session_uuid` is *project*-scoped, so within one
+project every session read every other session's marker as its own), and arming refuses to
+overwrite a live peer's marker without `--force`.
+
+Known limitations, recorded rather than hidden: the stage-end auto-advance block still
+states a marker precondition it has no command to evaluate at that point, and a
+pre-upgrade marker reads as `foreign` for up to its 18h TTL. Both are documented in
+`work-docs/REVIEW-autopilot-advance-noop-2026-07-31.md` (round 7, F31/F34).
+
 ### Added — cross-model findings must now survive a refutation gate (`PLAN-second-opinion-acceptance-gate`)
 
 `/hm:review` lets `codex` and `antigravity` vote as peers in the K=2 consensus filter.

@@ -164,7 +164,7 @@ def test_only_the_configured_stage_gets_a_dispatch(tmp_path: Path) -> None:
 # ------------------------------------------------------------------ size
 
 
-@pytest.mark.parametrize(("preset", "expected"), [("Side", 618), ("Production", 651)])
+@pytest.mark.parametrize(("preset", "expected"), [("Side", 628), ("Production", 661)])
 def test_the_default_render_costs_existing_users_nothing(
     tmp_path: Path, preset: str, expected: int
 ) -> None:
@@ -174,7 +174,19 @@ def test_the_default_render_costs_existing_users_nothing(
     Re-measured 2026-07-29 (was 662 / 695): PLAN-workflow-step-audit Phase 2 collapsed
     Steps 6 → 7.6 into one `hm wrapup_land` call, removing 44 body lines. This constant
     is an equality pin, so it moves only in the commit that moves the render — and it
-    moved DOWN here, which is the direction this phase promised."""
+    moved DOWN here, which is the direction this phase promised.
+
+    Re-measured 2026-07-31 (was 618 / 651): +10. PLAN-autopilot-advance-noop rewrote the two
+    SHARED partials — the picker now asks `hm autopilot status` instead of guessing from
+    the marker file, and the auto-advance block passes `--slug`/`task_slug` — and every
+    stage includes them, wrapup among them. +2 of the +10 are the review's own findings: a
+    `degraded-idless` picker branch (without it, a WSL2 session is told a peer owns its own
+    marker and never re-arms) and the `rejected*` slug sources; +3 more came from round 5,
+    which removed the pre-rendered `--slug '<slug>'` placeholder (it fails the allowlist,
+    and a bad slug now HALTS, so a model copying the shipped line would stop the chain at
+    every stage) and added the `bad_slug` recovery clause. Wrapup's own body is
+    untouched: it is human-gated (`_HUMAN_GATED_STAGES`), so the chain never auto-enters it
+    and its terminal STOP needed no exception clause."""
     assert _count_body_lines(_wrapup(tmp_path, preset=preset)) == expected
 
 

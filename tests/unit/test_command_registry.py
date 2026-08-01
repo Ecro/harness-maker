@@ -39,8 +39,10 @@ def test_typer_host_has_subcommands_but_guard_exempt() -> None:
 
 def test_autopilot_guarded_by_subcommands_not_shape() -> None:
     # validator R2-W2: guard scope is bool(subcommands) (and not typer), so autopilot's
-    # {on, off} are guarded regardless of parser shape.
-    assert cr.MODULES["autopilot"].subcommands == frozenset({"on", "off"})
+    # subcommands are guarded regardless of parser shape. `status` joined in
+    # PLAN-autopilot-advance-noop ADR-002 — it MUST be registered or misroute_guard
+    # rejects it before argparse ever sees it.
+    assert cr.MODULES["autopilot"].subcommands == frozenset({"on", "off", "status"})
     assert cr.MODULES["autopilot"].guarded is True
 
 

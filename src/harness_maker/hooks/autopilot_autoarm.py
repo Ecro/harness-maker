@@ -16,6 +16,7 @@ SessionStart is worse than a degraded fallback.
 
 from __future__ import annotations
 
+import json
 import logging
 import sys
 from pathlib import Path
@@ -23,15 +24,24 @@ from typing import Literal
 
 from harness_maker import autopilot
 from harness_maker.io_utils import load_harness_yaml
+from harness_maker.loop_marker import sanitize_session_id
 from harness_maker.models import AtomicStage, AutonomyConfig
 
 logger = logging.getLogger(__name__)
 
 
-def arm_if_persistent(project_root: Path, *, now: str | None = None) -> bool:
+def arm_if_persistent(
+    project_root: Path, *, now: str | None = None, claude_session_id: str | None = None
+) -> bool:
     """Re-arm the marker iff ``autonomy.autopilot_persistent`` is true and the level is armable.
 
     Returns True iff a fresh marker was written. ANY failure → False, no raise (fail-safe).
+
+    ``claude_session_id`` MUST be threaded through from the SessionStart payload. This hook
+    runs as a sibling of `sessionid_envfile`, which publishes the id to ``$CLAUDE_ENV_FILE``
+    for *later Bash subprocesses* — so ``HM_SESSION_ID`` is absent from THIS process. Left to
+    the env lookup, the marker is stamped id-less and the arming session itself then reads it
+    as foreign, wedging autopilot for the whole TTL with no in-band recovery.
     """
     yaml_path = project_root / ".claude" / "harness.yaml"
     try:
@@ -62,17 +72,53 @@ def arm_if_persistent(project_root: Path, *, now: str | None = None) -> bool:
             pipeline = [AtomicStage(stage) for stage in pipeline_raw]
         else:
             pipeline = list(AutonomyConfig().pipeline)
-        autopilot.write(project_root, level=armed_level, pipeline=pipeline, now=now)
+        autopilot.write(
+            project_root,
+            level=armed_level,
+            pipeline=pipeline,
+            now=now,
+            claude_session_id=claude_session_id,
+        )
+    except autopilot.MarkerOwnedByAnotherSessionError:
+        # A LIVE peer session owns the marker. Do not arm and do not force: forcing here
+        # would make every SessionStart steal a concurrent session's marker, killing its
+        # chain at the next boundary with a bare `kill_switch`. Logged distinctly from the
+        # generic fail-safe below so this shows up as a decision rather than a malfunction.
+        # WARNING, not INFO: nothing in this package configures logging, so the root
+        # logger sits at WARNING and `logging.lastResort` also fires only at WARNING+.
+        # An INFO record here would be discarded outright — strictly LESS visible than
+        # the generic fail-safe below, which is the opposite of "logged distinctly".
+        logger.warning(".hm-autopilot autoarm: marker owned by a live peer session — not arming.")
+        return False
     except Exception:
         logger.warning(".hm-autopilot autoarm: re-arm failed — skipping (fail-safe).")
         return False
     return True
 
 
+def _session_id_from_stdin() -> str | None:
+    """Sanitized ``session_id`` off the SessionStart payload; None on anything unusable.
+
+    Mirrors `sessionid_envfile.run`'s read — the payload is this hook's only source for the
+    id, since the env var that sibling publishes lands in later Bash, not here.
+    """
+    try:
+        raw_text = sys.stdin.read() if not sys.stdin.isatty() else ""
+        data = json.loads(raw_text) if raw_text.strip() else {}
+    except Exception:
+        return None
+    if not isinstance(data, dict):
+        return None
+    raw = data.get("session_id")
+    if not isinstance(raw, str):
+        return None
+    return sanitize_session_id(raw) or None
+
+
 def main() -> int:
     """SessionStart entrypoint — always exit 0 (a hook must never block session start)."""
     try:
-        arm_if_persistent(Path.cwd())
+        arm_if_persistent(Path.cwd(), claude_session_id=_session_id_from_stdin())
     except Exception:
         logger.warning(".hm-autopilot autoarm: unexpected error — ignored (fail-safe).")
     return 0

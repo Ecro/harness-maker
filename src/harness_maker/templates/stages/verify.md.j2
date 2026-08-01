@@ -395,7 +395,7 @@ Run the checks yourself, below, **only** when Step 0.5 sent you here.
 3. Repeat for Checks 2-{% if config.dev_mode == 'spec-driven' %}6{% else %}5{% endif %}.
 4. Emit final RESULT line + JSON record.
 5. When `--force` is set with FAILing checks: emit text + JSON record with override flag + reason, then return PASS exit code (let the workflow proceed). Wrapup will surface the override in the commit body footer.
-6. **Stage terminal**: Emit the RESULT line and **STOP**. Do not proceed to `/hm:wrapup` or any other stage without an explicit user command — unless this stage was invoked as part of a fused workflow (e.g., `exec-rev-ver-wrap`), in which case the fused workflow owns the transition.
+6. **Stage terminal**: Emit the RESULT line and **STOP**. Do not proceed to `/hm:wrapup` or any other stage without an explicit user command — unless this stage was invoked as part of a fused workflow (e.g., `exec-rev-ver-wrap`), in which case the fused workflow owns the transition. Exception: an auto-advance check below returning `proceed: true` supersedes this.
 
 ## Outputs
 

@@ -30,22 +30,32 @@
 <!-- @hm:autopilot-picker -->
 > **Autopilot session start (Claude Code only).** This harness is configured for
 > autonomy (`autonomy.level: {{ config.autonomy.level }}`). If loop-mode is active for
-> this session (see above), SKIP this. Otherwise, if **no** `.hm-autopilot` marker is active yet (first eligible
-> stage of the session), offer the user — ONCE — to enable auto-advance for this session
-> via `AskUserQuestion`: "Run the `{{ config.autonomy.pipeline | join(' → ') }}` pipeline
-> on autopilot this session (stages auto-advance when no mandatory gate is pending), or
-> stay gated (stop after each stage)?" On **yes**, run
-> `uv run --with {{ harness_maker_src_path }} hm autopilot on --level {{ config.autonomy.level }} --pipeline {{ config.autonomy.pipeline | join(',') }}`
-> (writes the session marker). On **no**, proceed gated — do not re-prompt unless the user
-> asks. Once the marker exists, later stages skip this picker (the marker is the once-flag).
+> this session (see above), SKIP this. Otherwise, at the first eligible stage, ask the CLI
+> whether autopilot is already active — **never decide this from whether the marker file
+> exists.** Nothing collects a stale marker, so file-existence reads as "already armed"
+> and autopilot silently never turns on; that is the usual reason it looks dead.
 >
-> **Persistence (why autopilot may not auto-arm):** the `.hm-autopilot` marker is
-> session-scoped (18h TTL) and lives at the **project root** — every `/hm:` command
-> resolves it from the base repo even when run inside a `.worktrees/<slug>/` worktree, so
-> a stage's auto-advance check sees the same marker the picker wrote. To auto-arm **every**
-> session without this prompt, commit `autonomy.autopilot_persistent: true` (with
-> `level: auto_safe` or `full`) — a SessionStart hook then re-arms a fresh marker each
-> session. With the committed default `autopilot_persistent: false`, autopilot is
-> per-session: re-enable it here (or via the picker) each session.
+> `uv run --with {{ harness_maker_src_path }} hm autopilot status --root .`
+>
+> Branch on **both** fields of the JSON (it always exits 0):
+> - `active: true` → armed already. Skip the picker; do not re-arm.
+> - `reason: "foreign"` or `"degraded-idless"` → the marker belongs to a different session
+>   id (or this session cannot read its own — a known WSL2 hook failure). **You cannot tell
+>   an active peer from a marker abandoned mid-pipeline**, so do not guess and do not
+>   `--force` on your own initiative. State the fact — `idle_minutes` is how long the owner
+>   has been silent; `null` = unknown (skewed clock), proving nothing — then ask the
+>   user: *is another Claude session open in this project?* Only on **no**, re-run the arm
+>   command below with `--force`. On yes, stay gated.
+> - anything else → offer ONCE via `AskUserQuestion`: "Run the
+>   `{{ config.autonomy.pipeline | join(' → ') }}` pipeline on autopilot this session
+>   (stages auto-advance when no mandatory gate is pending), or stay gated?" On **yes**:
+>   `uv run --with {{ harness_maker_src_path }} hm autopilot on --level {{ config.autonomy.level }} --pipeline {{ config.autonomy.pipeline | join(',') }}`
+>   On **no**, proceed gated — do not re-prompt unless the user asks.
+>
+> **Persistence:** the marker lives at the **project root** (so a stage inside
+> `.worktrees/<slug>/` sees the one the picker wrote), is keyed to this session, and
+> expires after 18h. `session_scoped: false` = the session id was unavailable (Cursor,
+> Codex, hook failure) and a peer in this project may share it. Commit
+> `autonomy.autopilot_persistent: true` to auto-arm every session; the default is `false`.
 <!-- @hm:/autopilot-picker -->
 {% endif %}
