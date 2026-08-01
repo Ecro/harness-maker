@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.45.0] — 2026-08-01
 
 ### Changed — the review auto-fix loop re-derives the model before it batches fixes (`PLAN-review-round-inflation`)
 
@@ -66,6 +66,7 @@ Known limitations, recorded rather than hidden: the stage-end auto-advance block
 states a marker precondition it has no command to evaluate at that point, and a
 pre-upgrade marker reads as `foreign` for up to its 18h TTL. Both are documented in
 `work-docs/REVIEW-autopilot-advance-noop-2026-07-31.md` (round 7, F31/F34).
+
 ### Fixed — the "run only affected tests" selector never resolved the repo's dominant import style (`PLAN-dep-map-alias-imports`)
 
 `test_dep_map.find_importers` matched module names by **substring** and never read
