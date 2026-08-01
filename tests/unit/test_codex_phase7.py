@@ -139,4 +139,9 @@ def test_codex_target_files_total_skill_count() -> None:
     # skill moved — `[fail:test] enumeration-tests-not-updated-with-new-rendered-artifact`
     # is exactly this family, so if a third one surfaces later, look for a count these two
     # greps missed rather than assuming the render is wrong.
-    assert len(out_paths) == 20, f"Expected 20 skill paths, got {len(out_paths)}"
+    #
+    # 20 → 21 (2026-08-01, PLAN-dep-map-alias-imports ADR-005): the
+    # `targeted-test-selection` skill. Same two constants moved again
+    # (`synthesize._ALL_SKILLS` and this one), plus `interview._ALL_SKILLS` /
+    # `_SIDE_ENABLED_SKILLS` for the enabled lists.
+    assert len(out_paths) == 21, f"Expected 21 skill paths, got {len(out_paths)}"

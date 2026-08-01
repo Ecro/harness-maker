@@ -1,0 +1,126 @@
+"""PLAN-dep-map-alias-imports Phase 4 — the review auto-fix verify step is dep-map driven.
+
+The artifact set is DISCOVERED, never enumerated. Two hand-derivations of it were wrong
+before this file existed:
+
+  * A grep of the committed render was truncated by `| head -10` and reported 5 of 7.
+  * The corrected derivation ("`_WORKFLOWS` + the atomic command + `.claude/stages/`")
+    misses `exec-rev-ver-wrap`, a fused workflow absent from that table, and misses the
+    codex skill entirely — `render()` writes codex artifacts to `root/.agents`, OUTSIDE
+    the directory it is handed, so a scan of the render root finds nothing there.
+
+The count itself is config-dependent (7 for this repo's own harness.yaml, 8 for the
+default Production profile), so a magic number would be wrong too. What is asserted
+instead is that all four FAMILIES are represented and that every discovered artifact
+satisfies the property.
+"""
+
+from __future__ import annotations
+
+from functools import cache
+from pathlib import Path
+from tempfile import mkdtemp
+
+from harness_maker.interview import interview
+from harness_maker.models import Preset, ProjectProfile, Target
+from harness_maker.render import DEFAULT_FREEZE_TIME, render
+from harness_maker.synthesize import synthesize
+
+#: The review stage's auto-fix loop. Present in every render that inlines the stage.
+_LOOP_HEADING = "## Auto-Fix Loop"
+#: Bounds of the verify step inside that loop.
+_STEP_START = "3. **Verify build**"
+_STEP_END = "4. **Re-review"
+
+_SKILL = "targeted-test-selection"
+
+
+@cache
+def _render_root() -> Path:
+    """Render Production for claude + codex once for the module.
+
+    Populated from inside a test so `conftest.py`'s autouse install-ref pin is active
+    (`[fail:test] snapshot-regen-inside-worktree` instance 13).
+    """
+    profile = ProjectProfile(stack=["python"], scale="medium", lifecycle="active")
+    answers = interview(profile, autoloop_mode=True)
+    answers.targets = [Target.CLAUDE_CODE, Target.CODEX]
+    bp = synthesize(profile, answers, preset=Preset.PRODUCTION)
+    root = Path(mkdtemp(prefix="hm-review-verify-"))
+    render(bp, root / ".claude", freeze_time=DEFAULT_FREEZE_TIME)
+    return root
+
+
+def _review_bearing_artifacts() -> dict[str, str]:
+    """Every rendered document that inlines the review stage, discovered by content."""
+    root = _render_root()
+    return {
+        str(path.relative_to(root)): text
+        for path in sorted(root.rglob("*.md"))
+        if _LOOP_HEADING in (text := path.read_text(encoding="utf-8"))
+    }
+
+
+def _verify_step(body: str) -> str:
+    start = body.index(_STEP_START)
+    return body[start : body.index(_STEP_END, start)]
+
+
+def test_discovery_covers_all_four_artifact_families() -> None:
+    """Rejects a derivation that silently narrows.
+
+    A count assertion would be config-dependent (this repo renders 7, the default
+    Production profile renders 8). The families are not: an atomic command, the
+    `.claude/stages/` body, the codex skill, and at least one fused workflow must each be
+    represented, and the codex family is the one a claude-only render fixture cannot see.
+    """
+    found = _review_bearing_artifacts()
+    assert ".claude/commands/hm/review.md" in found
+    assert ".claude/stages/review.md" in found
+    assert ".agents/skills/hm-review/SKILL.md" in found
+    fused = [p for p in found if p.startswith(".claude/commands/hm/") and "-" in Path(p).stem]
+    assert len(fused) >= 2, f"expected several fused workflows, got {fused}"
+
+
+def test_every_review_bearing_artifact_routes_verification_through_the_skill() -> None:
+    """The property, asserted over the discovered set rather than a listed one."""
+    offenders = {
+        path: step
+        for path, body in _review_bearing_artifacts().items()
+        if _SKILL not in (step := _verify_step(body))
+    }
+    assert offenders == {}, f"verify step does not reference {_SKILL}: {sorted(offenders)}"
+
+
+def test_no_review_bearing_artifact_runs_the_suite_unconditionally() -> None:
+    """`uv run pytest -x` in the auto-fix verify step is the whole defect being removed."""
+    offenders = [
+        path
+        for path, body in _review_bearing_artifacts().items()
+        if "uv run pytest -x" in _verify_step(body)
+    ]
+    assert offenders == [], f"unconditional full-suite run survives in: {offenders}"
+
+
+def test_the_verify_step_slice_is_non_empty_everywhere() -> None:
+    """Guards the two assertions above against vacuity.
+
+    `_verify_step` raises if either bound is missing, but a bound that drifted to a
+    position yielding an empty slice would make `not in` trivially true and both checks
+    would pass over nothing.
+    """
+    for path, body in _review_bearing_artifacts().items():
+        assert len(_verify_step(body)) > 50, f"verify-step slice is degenerate in {path}"
+
+
+def test_the_out_of_scope_wrapup_full_run_survives() -> None:
+    """The ban is scoped to the review verify step, not a blanket ban on `pytest -x`.
+
+    `exec-rev-wrap-ver` also inlines the WRAPUP stage, which owns its own
+    `uv run pytest -x`. That one is deliberately out of scope. Without this assertion a
+    change that stripped every `pytest -x` from the whole render would pass the check
+    above while breaking a different stage.
+    """
+    body = _review_bearing_artifacts()[".claude/commands/hm/exec-rev-wrap-ver.md"]
+    assert "uv run pytest -x" in body, "wrapup's own full-suite run was removed"
+    assert "uv run pytest -x" not in _verify_step(body)

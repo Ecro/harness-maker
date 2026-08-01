@@ -528,7 +528,7 @@ Per iteration:
    - Skip when target lines overlap a fix applied this round (same file, line ±5): log `skipped — overlap with Fix #{prev}`.
 
 3. **Verify build** — run the project's standard verification:
-   - Python: `uv run pytest -x`, `uv run ruff check`, `uv run mypy --strict`.
+   - Python: follow the `targeted-test-selection` skill (§1-§4).
    - Rust: `cargo check`, `cargo test`.
    - Node: `pnpm build`, `pnpm test`.
    - Or invoke `/hm:verify` if the harness has it.

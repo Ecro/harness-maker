@@ -30,6 +30,47 @@ Known limitations, recorded rather than hidden: the stage-end auto-advance block
 states a marker precondition it has no command to evaluate at that point, and a
 pre-upgrade marker reads as `foreign` for up to its 18h TTL. Both are documented in
 `work-docs/REVIEW-autopilot-advance-noop-2026-07-31.md` (round 7, F31/F34).
+### Fixed — the "run only affected tests" selector never resolved the repo's dominant import style (`PLAN-dep-map-alias-imports`)
+
+`test_dep_map.find_importers` matched module names by **substring** and never read
+`ast.ImportFrom.names`, so `from harness_maker import autopilot_ledger` — 121 such lines
+under `tests/` — resolved to **zero** importers. Every alias-only module fell through to
+`source-without-hints` and forced a full-suite run, while the substring rule separately
+produced false positives (`cache` matched `detection_cache`, `verify` matched
+`plan_verify`). The optimisation had been dead for those modules for its whole life and
+looked merely conservative, because a missed match and a genuinely-unimported module
+produce the same observable.
+
+Matching is now **fully-qualified dotted-name resolution**: `import a.b.c`, `from P import
+n` (module-vs-symbol decided by a disk probe anchored at the source root, not the package
+root), relative imports resolved through `node.level` against the *importer's* own package,
+and `from P import *`. `harness_maker.profile` and `harness_maker.memory.profile` no longer
+select each other. Added alongside it: a **1-hop reverse source-dependency walk** so an edit
+to `readiness.py` still reaches `ai_readiness`'s tests, `conftest.py` as a first-class
+consumer mapped to its **directory** (an autouse fixture's blast radius), and module-scoped
+memoization keyed by `(path, mtime)` — required, not an optimisation, because an N-file
+change produces 2N one-element selector invocations. Measured: max reverse fan-out 33%
+(`io_utils`, gate 50%), single-file hub 3.5 s and a 22-file run 4.4 s (gates 15 s / 30 s).
+
+The import root is derived from the **project** (src-layout vs flat), never from
+`__init__.py` presence — that walk is right for regular packages and silently wrong for
+namespace packages in every layout, naming `src/acme/widgets/mod.py` as `widgets.mod`. A
+candidate root that is itself importable is a package, not a root. The reverse scan is
+bounded (vendored/VCS trees excluded, 2000-file cap that announces itself on stderr rather
+than narrowing in silence): 3137 candidate files here, 2609 of them under
+`.venv/site-packages`, down to 528.
+
+### Added — `targeted-test-selection` skill owns the select-then-run recipe
+
+`/hm:review`'s auto-fix loop ran `uv run pytest -x` unconditionally on **every** fix round.
+Its verify step now follows the new skill, which computes the changed set as the NUL-
+delimited union of tracked and untracked paths, invokes the selector inside the stage's own
+worktree, states the empty-changed-set branch explicitly (still invoke; honour `mode: full`),
+and keeps `ruff check` / `mypy --strict` unconditional. The recipe lives in a skill rather
+than inline because the binding size gate is `test_aggregate_shipped_surface_does_not_grow`
+— a strict non-increase with **zero** headroom — and the 64-character reference that replaces
+the 77-character command makes the shipped surface strictly *decrease* (claude −65, codex
+−13) with `surface_baseline.json` and `instruction_baseline.json` untouched.
 
 ### Added — cross-model findings must now survive a refutation gate (`PLAN-second-opinion-acceptance-gate`)
 

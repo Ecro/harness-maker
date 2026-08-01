@@ -64,7 +64,13 @@ def test_synthesize_codex_target_emits_skill_paths(tmp_path: Path) -> None:
     # `second-opinion-gate` skill holds the review stage's main-loop gate procedure, which
     # cannot live inline — every fused command inlines the whole stage, so stage prose is
     # paid ×5 against the shipped-surface ratchet.
-    expected = 10 + 7 + n_workflows + 1 + 1 + 1
+    # base 10 → 11 (2026-08-01, PLAN-dep-map-alias-imports ADR-005): the
+    # `targeted-test-selection` skill, for the same reason — the review verify recipe is
+    # paid ×5 inline against the same ratchet. THIRD enumeration constant this skill
+    # moved, after `synthesize._ALL_SKILLS` and `test_codex_phase7`'s count; the two
+    # greps that found those missed this one because it is an arithmetic literal, not a
+    # total. `[fail:test] enumeration-tests-not-updated-with-new-rendered-artifact`.
+    expected = 11 + 7 + n_workflows + 1 + 1 + 1
     assert len(skill_paths) == expected, (
         f"Expected {expected} .agents/skills/ entries, got {len(skill_paths)}"
     )

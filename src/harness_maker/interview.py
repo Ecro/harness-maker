@@ -164,6 +164,10 @@ _ALL_SKILLS: list[str] = [
     # from an UNGUARDED line. Omitting it from Side's enabled list would leave that pointer
     # dangling in every Side harness.
     "second-opinion-gate",
+    # Same unguarded-pointer situation as `second-opinion-gate`: review.md.j2's auto-fix
+    # verify step names this skill with no `{% if %}` around it, and /hm:execute Phase D
+    # runs the same selector. Enabled in BOTH presets for that reason.
+    "targeted-test-selection",
 ]
 
 _SIDE_ENABLED_REVIEWERS: list[str] = ["code-reviewer"]
@@ -176,6 +180,8 @@ _SIDE_ENABLED_SKILLS: list[str] = [
     # See the note in _ALL_SKILLS: §5 (the auto-fix round-state contract) is pointed at from
     # an unguarded line in review.md.j2, so Side must enable it too or that pointer dangles.
     "second-opinion-gate",
+    # Same reason — review.md.j2's verify step points here unguarded.
+    "targeted-test-selection",
 ]
 _PROD_ENABLED_REVIEWERS: list[str] = [
     "code-reviewer",

@@ -418,7 +418,7 @@ Grouped by what they do for your project, not by component.
 
 ### 🛡️ Trust — *grade-gated work*
 
-- **Grade-based auto-fix loop.** `/hm:review` doesn't just report. It applies consensus-passed fixes → re-reviews (selectively, only reviewers whose scope was touched) → regrades, until grade ≥ threshold (default A) or `max_review_rounds` is exhausted. Weak-consensus and manual-only findings are never auto-applied.
+- **Grade-based auto-fix loop.** `/hm:review` doesn't just report. It applies consensus-passed fixes → re-reviews (selectively, only reviewers whose scope was touched) → regrades, until grade ≥ threshold (default A) or `max_review_rounds` is exhausted. Weak-consensus and manual-only findings are never auto-applied. Each round's verify step selects tests by import graph (the `targeted-test-selection` skill) instead of re-running the whole suite; an unresolvable changed set still falls back to `mode: full`, so the safety property is the fallback, not the optimisation.
 - **Mechanical pre-checks before any LLM token.** Lint clean + tests green are enforced **before** reviewers spawn. First non-zero exit emits `## MECHANICAL_BLOCK: <cmd> exit=<N>` and halts. `--no-auto-fix` does not skip this gate.
 - **Conditional reviewer routing.** `.env` change → security-reviewer. `/perf/` → performance-reviewer. `.tsx` → ux-reviewer. Async/locking → concurrency-reviewer. 10× cheaper than fanning out to every reviewer on every diff.
 - **2-pass redaction (+47pp precision).** Pass 1 strips PR metadata so findings can't anchor on author/title. Pass 2 restores full context — reviewers must validate or drop each Pass 1 finding. Ablation-measured precision gain on anchoring-prone diffs.

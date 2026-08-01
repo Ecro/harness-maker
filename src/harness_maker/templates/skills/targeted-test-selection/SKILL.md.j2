@@ -1,0 +1,104 @@
+---
+name: {{ name }}
+description: Procedure for turning a set of changed files into the tests that actually cover them, instead of running the whole suite. Followed by /hm:review's auto-fix loop on every fix round; mirrors what /hm:execute Phase D does inline.
+---
+
+# {{ name }}
+
+Select what to run, then run it. The selector is `harness_maker.test_dep_map`; it returns
+either a bounded node list or an explicit FULL with a reason, and it is **never** silent.
+
+**Why this is a skill and not inline stage prose.** `review.md.j2` is inlined by four fused
+commands, and `test_aggregate_shipped_surface_does_not_grow` asserts a STRICT non-increase
+over the summed shipped surface against a baseline frozen at HEAD — headroom is zero, and
+this recipe is several hundred characters. Every part of it below is a part an inline
+character budget would have cut, and each one is a silent skip when missing. Skills are
+outside that sum, so the recipe can be explicit here.
+
+## 1. Compute the changed set
+
+Two commands, unioned. Both are **NUL-delimited** — `--name-only` alone octal-escapes and
+quotes any path with a space, a newline or a non-ASCII character, and this repo ships
+Korean-named assets. A mangled path is not a file: it classifies as `source-without-hints`
+(uselessly conservative) or, under a matching prefix, `inert` (unsafe).
+
+```bash
+git diff -z --name-only HEAD          # tracked: staged AND unstaged
+git ls-files -z --others --exclude-standard   # untracked
+```
+
+Split each on NUL and take the union. **The untracked half is not optional**: an auto-fix
+that creates a new module or a new test file is invisible without it, and the selection
+then verifies a fix it never saw.
+
+## 2. Select
+
+Run this inside **the task worktree** you were given — not the base repo. `git diff`,
+`git ls-files` and `--root .` all resolve against the working directory, so a base-repo
+invocation returns the base's state and selects tests for changes that are not there.
+
+```bash
+cd <the task worktree> && uv run --with {{ harness_maker_src_path }} hm test_dep_map --root . --changed-file='<f1>' --changed-file='<f2>' …
+```
+
+**Both details of that argument form are load-bearing, and §1's care is wasted without
+them.** Use the `=`-attached spelling: a legal git path may begin with `-`, and the
+separate-token form makes argparse read it as an option, so the command exits 2 and
+prints no JSON at all. Wrap every path in single quotes: the union from §1 can contain
+spaces, newlines and shell metacharacters — that is exactly what `-z` preserves — and an
+unquoted path splits into several argv entries or, worse, into a second command. If a
+path contains a single quote, drop the argv form and re-run the selection with no
+`--changed-file` at all, honouring the `mode: full` that comes back.
+
+The `uv run --with` prefix is required — a bare `hm` may not resolve, and the failure mode
+of a missing entrypoint inside prose is an LLM quietly skipping the step.
+
+## 3. Empty changed set → still invoke
+
+If the union from §1 is empty, run the command from §2 anyway, with **zero**
+`--changed-file` arguments, and honour the `mode: full` it returns.
+
+The selector already refuses to report a targeted selection for an empty input — but that
+guard only fires if the CLI is actually called. The natural reading of "compute the set,
+then run with it" is to skip the step when the set is empty, which runs no tests at all
+and reports success. That is the absent-case failure this project has recorded before: a
+feature that activates on an optional input must define what happens when the input is
+missing.
+
+## 4. Run
+
+The command prints JSON:
+
+- **`mode: targeted`** → run the test command with `node_ids` appended.
+- **`mode: full`** → run the whole suite, and **echo `reason` verbatim** in your output.
+  The reason names which changed file had no test mapped to it, or that the selector's own
+  source changed (a selection it derives for its own change is circular evidence).
+- **Anything else — non-zero exit, no output, or output that is not JSON** → run the
+  **whole suite** and echo the command's stderr verbatim. A failed selection is not an
+  empty selection. This arm exists because the two above presuppose the process
+  succeeded, and a verify step that silently runs nothing reads exactly like a pass.
+
+Lint and type checks stay **unconditional** — they are repo-wide, cheap, and have no
+selection concept:
+
+```bash
+uv run ruff check
+uv run mypy --strict
+```
+
+Pick the toolchain that matches the project. This selector is Python-only: for Rust
+(`cargo test`) or Node (`pnpm test`) there is no dep-map, so run the project's normal
+suite and skip §1–§3 entirely.
+
+## 5. What the selection does and does not promise
+
+- It resolves imports by **fully qualified module name**, so `from pkg import a, b` binds
+  both names and `cache` never matches `detection_cache`.
+- It walks **one hop** of reverse source dependencies: editing a module also selects the
+  tests of the modules that import it directly, but not their importers in turn.
+- A `conftest.py` that imports the changed module contributes its whole **directory** —
+  an autouse fixture really does apply tree-wide.
+- **Not covered**: dynamic references (`importlib.import_module("pkg.x")`, string
+  monkeypatch targets) are invisible to an AST scan, and two-hop breakage is out of scope
+  by design. A file the selector cannot map forces FULL rather than being skipped, so the
+  failure direction is extra tests, never missing ones.

@@ -155,6 +155,7 @@ _ALL_SKILLS: list[str] = [
     "refdocs-search",
     "second-opinion-gate",
     "security-scanner",
+    "targeted-test-selection",
     "verify-before-completion",
     "worktree-isolator",
 ]

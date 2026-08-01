@@ -201,7 +201,8 @@ harness-maker/
 │   │   ├── autoloop-driver/SKILL.md.j2
 │   │   ├── worktree-isolator/SKILL.md.j2
 │   │   ├── security-scanner/SKILL.md.j2
-│   │   └── context-linter/SKILL.md.j2
+│   │   ├── context-linter/SKILL.md.j2
+│   │   └── targeted-test-selection/SKILL.md.j2   # select-then-run recipe (review auto-fix verify)
 │   ├── agents/                          # → user .claude/agents/
 │   │   ├── code-reviewer.md.j2
 │   │   ├── security-reviewer.md.j2

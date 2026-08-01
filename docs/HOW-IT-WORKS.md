@@ -1354,7 +1354,30 @@ High-severity findings → block wrapup/verify
 
 ---
 
-### 7.10 verify-before-completion
+### 7.10 targeted-test-selection
+
+**Role**: Owns the select-then-run recipe for a verify step that would otherwise run the
+whole suite. Computes the changed set as the NUL-delimited union of `git diff -z
+--name-only HEAD` and `git ls-files -z --others --exclude-standard`, feeds it to
+`hm test_dep_map` **inside the stage's own worktree**, then runs either the returned
+`node_ids` (`mode: targeted`) or the full suite (`mode: full`, echoing `reason`). An empty
+changed set still invokes the selector with zero `--changed-file` arguments — skipping the
+call would run no tests and report success. `ruff check` and `mypy --strict` stay
+unconditional: repo-wide, cheap, no selection concept.
+
+**Called from**:
+- Step 3 of the `/hm:review` auto-fix loop's verify step (replacing an unconditional
+  `uv run pytest -x` on every fix round)
+
+The recipe lives in a skill rather than inline because
+`test_aggregate_shipped_surface_does_not_grow` is a strict non-increase over the summed
+command + codex-skill surface with zero headroom; skills outside the `hm-*` glob are not
+counted, and the short reference that replaces the long command makes the aggregate
+strictly decrease.
+
+---
+
+### 7.11 verify-before-completion
 
 **Role**: A mandatory gate that executes 6 checkpoints before wrapup or at the end of each loop iteration.
 
@@ -1367,7 +1390,7 @@ See [Section 3.6](#36-hmverify--completion-verification) for 6-checkpoint detail
 
 ---
 
-### 7.11 worktree-isolator
+### 7.12 worktree-isolator
 
 **Role**: Creates and manages worktrees for stages that require isolation, such as `/hm:execute`.
 
