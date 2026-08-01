@@ -164,6 +164,46 @@ cd <the task worktree> && uv run --with {{ harness_maker_src_path }} hm second_o
 
 ## 5. Round-state contract (auto-fix loop, rounds 2..N)
 
+**Round order — pinned end to end.** Merge the previous round's re-review output by `id` → stamp
+`id`s on new findings → determine `caused_by` → group and evaluate the trigger → batch re-derive
+on a fire → select fixes → apply → verify build, reverting on failure → selective re-review →
+recompute grade → progress invariant → append the iteration record. Determining `caused_by`
+**before** the trigger is what makes arm (b) reachable at all: computed at record-append time it
+would arrive after fix selection, and a lone regression finding would take the fast path —
+reproducing the chain the batch step exists to stop. Verify and re-review stay INSIDE the round —
+a break reverted only next round means a full round built on a broken tree.
+
+**Two-arm batch trigger.** Re-derive the underlying model before editing when **either**
+(a) ≥2 of this round's findings share a subsystem / state model, **or** (b) any finding **new
+this round** carries a non-null `caused_by`. Otherwise patch per finding as before — a lone,
+unattributed finding keeps the fast path, which is the majority case and must not get slower.
+
+`caused_by` is stamped **once**, at a finding's first appearance, and never recomputed. That is
+well-defined across a `stale`-then-re-report because `codex_adapter.finding_id` hashes
+`[source, file, line, message]` and freezes it: a re-report at a shifted location is a different
+`id` (genuinely new — arm (b) may fire), and one at an unchanged location keeps its `id` (not
+new — no re-fire, because nothing regressed). Arm (b)'s domain is findings new this round, not
+the merged voter state; evaluating it over the merge would make it true from round 3 onward.
+
+**Per-group block.** On a fire, emit for each group before editing: `group_key` (default: the
+dominant file-path stem shared by the group, free text allowed with the derived prefix recorded
+alongside), `covered_finding_ids`, the model's dimensions enumerated, and the single consolidated
+edit. Patching the reported cell without re-deriving the table is what produced 9 of 30 findings
+in the case this contract comes from.
+
+**`caused_by` grammar.** It shares the iteration record's `Status` cell with a different enum, so
+the encoding is literal: `Applied · caused_by=#7` / `· caused_by=none` / `· caused_by=unknown`,
+and the same `· caused_by=` suffix on `Skipped — overlap` and `Reverted — build failure`. Without
+one grammar, rounds encode it differently, arm (b) misses attributions, and the counters disagree
+with the rows they are derived from — with nothing able to detect it.
+
+**Counters.** The REVIEW Final Summary reports `unreviewed_fix_count` (fixes applied in the
+terminal round, which the loop never re-reviewed), `regression_attributed_n` and
+`attribution_unknown_n`. Count the last two over **distinct finding `id`s**, not iteration-record
+rows: a reverted or overlap-skipped fix leaves its finding `pending`, so it emits another row
+next round carrying the same `caused_by`. They gate nothing — they exist so an `A` grade is not
+read as "settled".
+
 **Lifecycle.** `pending` (**votes**) · `resolved` (a fix targeting it was applied **and** that
 round's verification passed) · `stale` (target gone from the diff). The last two do not vote.
 **"A fix touched it" is not enough for `resolved`** — the loop reverts a build-breaking fix, and

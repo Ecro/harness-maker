@@ -3,7 +3,7 @@
 PLAN-llm-code-review-2026 ADR-006 specifies a per-session JSONL line keyed
 to `.claude/observability/review-{YYYY-MM-DD}.jsonl`. Append uses POSIX
 `O_APPEND` so writes ≤ PIPE_BUF (4096 bytes) are kernel-atomic — sufficient
-for the 14-field record. Concurrent reviewers (autoloop + Cursor sharing
+for the 19-field record. Concurrent reviewers (autoloop + Cursor sharing
 ``.worktrees/``) thereby serialize at the kernel level without explicit
 locking.
 """
@@ -28,10 +28,17 @@ DEFAULT_OBSERVABILITY_DIR = Path(".claude/observability")
 class ReviewTelemetryRecord(BaseModel):
     """One row appended per `/hm:review` invocation.
 
-    Numeric fields default to 0 (not None) so downstream aggregations can sum
-    without null-coalescing. ``fixture_label`` and the two ``verifier_false_*``
-    counts are null on real runs (only labeled-fixture runs compute them).
-    ``fallback`` is set only when the verifier model was unavailable.
+    The **round-level** numeric fields default to 0 (not None) so downstream
+    aggregations can sum without null-coalescing. ``fixture_label`` and the two
+    ``verifier_false_*`` counts are null on real runs (only labeled-fixture runs
+    compute them). ``fallback`` is set only when the verifier model was
+    unavailable.
+
+    The four **measure-C** fields at the bottom deliberately break that default
+    (PLAN-review-round-inflation ADR-006/ADR-009): they are ``| None`` so that
+    "this harness version never measured it" stays distinguishable from
+    "measured zero". Defaulting them to 0 would erase exactly the distinction
+    they exist to carry, into append-only rows where a wrong value is permanent.
     """
 
     model_config = ConfigDict(strict=True, extra="forbid")
@@ -54,6 +61,17 @@ class ReviewTelemetryRecord(BaseModel):
     build_break_count: int = Field(ge=0)
     auto_fix_reverted_n: int = Field(ge=0)
     fallback: str | None = Field(default=None, max_length=64)
+
+    # ── measure C (PLAN-review-round-inflation ADR-006 / ADR-009) ────────────
+    # `terminal` discriminates the three wire states, because telemetry emits
+    # one row per round while these counters are end-of-review quantities:
+    #   null  → this harness version never measured (pre-change row)
+    #   false → a non-terminal round; the counters below are null
+    #   true  → the single terminal row; the counters below carry integers
+    terminal: bool | None = None
+    unreviewed_fix_count: int | None = Field(default=None, ge=0)
+    regression_attributed_n: int | None = Field(default=None, ge=0)
+    attribution_unknown_n: int | None = Field(default=None, ge=0)
 
 
 def _utc_now_iso() -> str:

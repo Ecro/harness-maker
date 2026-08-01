@@ -97,6 +97,19 @@ All paths are inside your project root (or `CLAUDE_PROJECT_DIR` / `CURSOR_PROJEC
 | `auto_fix_reverted_n` | int | How many auto-fixes were reverted because of build break |
 | `fallback` | string \| null | Set only when the verifier model was unavailable and a fallback path ran |
 
+<!-- @hm:privacy:review-telemetry-measure-c -->
+
+Measure C (PLAN-review-round-inflation). These four are `null` rather than `0` when unmeasured, so a row written by a harness version that predates them stays distinguishable from one that measured zero:
+
+| Field | Type | Description |
+|---|---|---|
+| `terminal` | bool \| null | Discriminator: `null` = never measured, `false` = a non-terminal round, `true` = the single end-of-review row that carries the three counters below |
+| `unreviewed_fix_count` | int \| null | Fixes applied in the terminal round, which the loop never re-reviewed |
+| `regression_attributed_n` | int \| null | Distinct findings attributed to a previous round's fix |
+| `attribution_unknown_n` | int \| null | Distinct findings whose origin could not be attributed either way |
+
+<!-- @hm:/privacy:review-telemetry-measure-c -->
+
 ### `silent-intent-miss-{slug}.jsonl` — `IntentMissEvent`
 
 | Field | Type | Description |

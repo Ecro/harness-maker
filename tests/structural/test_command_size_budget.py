@@ -129,11 +129,33 @@ _ADR014_CEILING = 122_000
 #   argument-parsing stage); and the two-sided precedence clause (the terminal STOP reads
 #   earlier and stronger than the auto-advance block, so a model resolving the conflict
 #   conservatively stops — the reported bug). Compressing any of these deletes the fix.
+# review raised 29235 → 29848, PLAN-review-round-inflation Phase 3 (2026-08-01).
+# Same bar as ADR-012 and the Phase-4 entry above: compaction FIRST, then the residue.
+#   Raw additions were +774. Three passes cut them to +613: the §5 load imperative and the
+#   step-2 pointer tightened (−88), and the `caused_by` grammar moved into §5 — where a rule
+#   belongs under this PLAN's ADR-005 — leaving exemplar rows in the stage (−73).
+#   30009 → 29921 → 29848 against the old 29819 ceiling. Trimming stopped there: closing the
+#   last 29 chars means cutting meaning, and shaving wording after the logic is settled is the
+#   unreviewed-compaction failure this very PLAN names as a defect source (the reference case
+#   inverted a negation that way, and no gate caught it).
+#   What remains is unguarded correctness. The two DELETED blocks were restatements of
+#   `second-opinion-gate` §5 (ADR-005 — the duplicate contract that drifted); the additions are
+#   the §5 load imperative that replaces them and must be UNCONDITIONAL, the two-arm trigger's
+#   firing condition at its point of use, `caused_by` in the iteration record (without it
+#   ADR-001 arm (b) has nothing to read and measure A misses exactly the lone regressions it
+#   targets), the Final Summary counters, and the four measure-C fields on the emit roster
+#   (absent there, the schema accepts them and nothing ever sends them — this project's
+#   recorded absent-case failure).
+#   Why this ceiling moves while the AGGREGATE ratchet passes at claude −615 / codex −123:
+#   the larger of the two deletions is inside `{% if config.second_opinion.models %}`, so it
+#   frees nothing in the models-off render this fixture builds, while every addition is
+#   unconditional. That asymmetry is recorded in the PLAN's ADR-008 and R10 as an accepted
+#   consequence for `models: []` harnesses; this line is that consequence reaching a gate.
 _ATOMIC_RATCHET: dict[str, int] = {
     "execute": 27273,
     "plan": 41656,
     "research": 24129,
-    "review": 29235,
+    "review": 29848,
     "spec": 28001,
     "verify": 21299,
     "wrapup": 38253,

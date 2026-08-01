@@ -39,7 +39,7 @@
 **Rationale:** 11 recurrences is the highest count in the tier and the escalation last-mile visibly stalled — proposals exist but stop at count:5, so nobody re-read them as the count tripled. This is the canonical "prose guard failed N times → promote to mechanical" case, and the count itself is the evidence. Recording the update here so the staleness is visible rather than frozen at the count where the last proposal happened to be written.
 
 ## Proposal: dead-string-pin-guard (2026-07-26)
-**Triggered by:** [fail:test] test-pins-retired-implementation-name (count: 3)
+**Triggered by:** [fail:test] test-pins-retired-implementation-name (count: 4 as of 2026-08-01; this proposal was written at count: 3) — **scope needs widening**: two of the three fresh 2026-08-01 instances are *positive* pins, not negative ones (a phrase spanning a line wrap, and step-number literals like `"3. **Verify build**"` that broke on a correct renumber), so the negative-assertion lint below would not have caught them. Add a second, cheaper rule to the same check: flag any string literal in `tests/**` that contains a leading step number (`^\d+\. `) or that spans what is a line wrap in the source artifact — both are prose accidents, never contracts.
 **Proposed mechanism:** a mechanical check, not another prose reminder — the last two recurrences were both committed by someone who already knew the rule. Add a test-suite lint that flags any *negative* string assertion (`assert "<literal>" not in <x>`) whose literal appears nowhere else in `src/` or `templates/`. A negative pin on a string the tree no longer contains cannot fail, so it is dead weight masquerading as a guard. Emit it as a `ruff`-style custom check or a meta-test over `tests/**`.
 **Rationale:** Three occurrences, and the third landed *inside a test written to guard this exact family* — which is the strongest possible evidence that awareness is not the missing ingredient. Each time the sequence was identical: pin prose, later reword the prose correctly, and the assertion silently stops testing anything (a positive pin turns red and gets noticed; a negative pin turns permanently green and does not). The literal-vs-tree cross-reference is fully deterministic and repo-owned, so it needs no runtime and no external tool — the same shape as `test_ci_codex_pin_matches_the_verified_version`, which closed [fail:test] advisory-check-fails-unseen.
 
@@ -57,7 +57,7 @@ actively harmful: refusing to regenerate in the worktree is what forces a hand-m
 generated artifacts at land time. The count:11 history is left in place for audit.
 
 ## Proposal: mutation-check-receipt-per-new-gate (2026-07-27)
-**Triggered by:** [fail:test] assertion-invariant-over-named-dimension (count: 5)
+**Triggered by:** [fail:test] assertion-invariant-over-named-dimension (count: 6 as of 2026-08-01; this proposal was written at count: 5) — the sixth instance is the strongest argument yet for the mechanical receipt: a test asserting the telemetry record rejects unknown keys was green **both before and after** the field it was written for existed, satisfied all along by `extra=forbid`. A "name the wrong implementation this assertion rejects" receipt would have had no answer to write.
 **Proposed mechanism:** a mechanical receipt, because prose has now failed five times —
 including once inside `PLAN-token-economy-step-pruning`, whose ADR-010 is *itself* the
 prose rule "mutation-check every gate". Proposal: extend the `/hm:execute` Phase D exit

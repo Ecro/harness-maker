@@ -2,6 +2,42 @@
 
 ## [Unreleased]
 
+### Changed — the review auto-fix loop re-derives the model before it batches fixes (`PLAN-review-round-inflation`)
+
+The loop patched one finding at a time and never re-derived the state model behind them, so
+each round's fixes reproduced defects at roughly a 1:1 rate: on the task this came from, 9 of
+30 findings were defects introduced by a previous round's own fix, and the loop ran to 6
+rounds. Two measures ship.
+
+**A two-arm batch trigger.** Before editing, a round re-derives the underlying model when
+**either** ≥2 of its findings share a subsystem / state model, **or** any finding new that
+round carries a non-null `caused_by` (it is attributed to a prior round's fix). On a fire the
+round emits a per-group block — `group_key` with its derived prefix, `covered_finding_ids`,
+the model's dimensions — and makes one consolidated edit. A lone, unattributed finding keeps
+the immediate-patch path, which is the majority case and deliberately gets no slower.
+
+Two ordering facts are load-bearing rather than stylistic, and both were caught in review
+before shipping. `caused_by` must be determined **before** the trigger is evaluated; computed
+at iteration-record-append time it arrives after fix selection, and arm (b) can never fire.
+And arm (b)'s domain is findings **new this round**, not the merged voter state — evaluated
+over the merge it would be true from round 3 onward. `caused_by` is stamped once at a
+finding's first appearance and shares the iteration record's `Status` cell with a different
+enum, so its encoding is now one literal grammar (`Applied · caused_by=#7`,
+`· caused_by=none`, `· caused_by=unknown`).
+
+**Three reporting-only counters plus a `terminal` discriminator.** The Final Summary reports
+`unreviewed_fix_count` (fixes applied in the terminal round, which the loop never
+re-reviewed), `regression_attributed_n` and `attribution_unknown_n`, counted over distinct
+finding `id`s rather than iteration-record rows. They gate nothing and change no grade — they
+exist so an `A` is not read as "settled". All four fields are typed `| None` on
+`ReviewTelemetryRecord`, so a harness that predates them reports "never measured" instead of
+being indistinguishable from a clean run.
+
+**Where the rules live.** The round-state contract has one normative owner, the
+`second-opinion-gate` skill's §5; `review.md.j2` carries an unconditional load imperative
+(it renders even under `second_opinion.models: []`) plus the mechanical surface, and no
+restatement. No config key, no grade-table change, no `human_review_needed` change.
+
 ### Fixed — autopilot announced the next stage and never ran it (`PLAN-autopilot-advance-noop`)
 
 Four defects compounded, and the ledger one is why the other three stayed invisible: the

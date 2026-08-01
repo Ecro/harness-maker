@@ -29,8 +29,13 @@ from harness_maker.synthesize import synthesize
 #: The review stage's auto-fix loop. Present in every render that inlines the stage.
 _LOOP_HEADING = "## Auto-Fix Loop"
 #: Bounds of the verify step inside that loop.
-_STEP_START = "3. **Verify build**"
-_STEP_END = "4. **Re-review"
+# Anchored on the step NAMES, not their numbers. PLAN-review-round-inflation renumbered
+# the Auto-Fix Loop (attribution and the trigger moved ahead of fix selection) and these
+# constants — pinned as "3. …" / "4. …" — broke on a change that never touched the verify
+# step's content, only its address. That is `[fail:test]
+# test-pins-retired-implementation-name`, which this repo has hit before.
+_STEP_START = "**Verify build**"
+_STEP_END = "**Re-review"
 
 _SKILL = "targeted-test-selection"
 

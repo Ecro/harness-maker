@@ -506,28 +506,31 @@ ELSE:
 
 ## Auto-Fix Loop (rounds 2..max_review_rounds)
 
-### Round-state contract — **`second-opinion-gate` skill §5, binding even with second opinion off**
+### Round-state contract
 
-`pending` votes; `resolved` (fix applied **and** verification passed) and `stale` do not. Only
-`pending`→`resolved`/`stale` is progress; back-transitions forbidden. **One** non-progressing
-round ends the loop (`no-progress`), **from round 2 only**. Re-spawned reviewers are **merged by
-`id`, never replaced wholesale**.
+**Load `second-opinion-gate` §5 and follow it** — round order, lifecycle, progress, exit,
+merge-by-`id`, the two-arm trigger. Binding with second opinion off; the only copy.
 
 Per iteration:
 
-1. **Select fixable findings** — only:
+1. **Merge and attribute.** Merge the previous round's re-review by `id`, stamp `id`s on new
+   findings, then determine each one's `caused_by` from the previous round's fix log.
+
+2. **Group.** On a §5 trigger fire, emit its per-group block and make ONE consolidated edit.
+
+3. **Select fixable findings** — only:
    - Severity P0, P1, or P2 (skip P3 unless current grade is D or F).
    - Tag = `consensus-passed`.
    - Has a concrete `suggestion` with replacement code (skip vague advice).
 
-2. **Apply fixes in priority order** (P0 → P1 → P2):
+4. **Apply** in priority order (P0 → P1 → P2):
    - Read the file at `{file}:{line}`.
    - Verify current code still matches the finding's `evidence` snippet (prior fixes may have shifted lines).
    - Apply the suggested fix via `Edit`.
    - Log: `[Fix #{N}] {severity} {summary} in {file}:{line}`.
    - Skip when target lines overlap a fix applied this round (same file, line ±5): log `skipped — overlap with Fix #{prev}`.
 
-3. **Verify build** — run the project's standard verification:
+5. **Verify build** — run the project's standard verification:
    - Python: follow the `targeted-test-selection` skill (§1-§4).
    - Rust: `cargo check`, `cargo test`.
    - Node: `pnpm build`, `pnpm test`.
@@ -535,34 +538,26 @@ Per iteration:
 
    On failure: identify the last fix that touched the failing file → **revert** it (restore original snippet) and log `Fix #{N} reverted — caused build failure`. Continue with remaining fixes (do not abort the round).
 
-4. **Re-review (selective)** — re-spawn ONLY reviewers whose scope was touched by applied fixes. Launch all required re-reviewers in parallel in one Task batch when their scopes are independent. Reviewers that approved untouched files are NOT re-run. Multi-instance code-reviewer consensus (when configured) still uses the configured number of instances on modified files. Merge their output per the round-state contract's rule 4 — **by `id`, never wholesale**.
-{%- if config.second_opinion and config.second_opinion.models %}
+6. **Re-review (selective)** — re-spawn ONLY reviewers whose scope was touched by applied fixes. Launch all required re-reviewers in parallel in one Task batch when their scopes are independent. Reviewers that approved untouched files are NOT re-run. Multi-instance code-reviewer consensus (when configured) still uses the configured number of instances on modified files. **`unreviewed_fix_count` = applied fixes whose file no re-spawned reviewer covers.**
 
-   > **Do NOT re-invoke the second-opinion models** — each ran exactly once in round 1. Carry
-   > their findings forward from Section 7 and update statuses (skill §5). Re-invoking injects a
-   > fresh stochastic voter every round, so `Remaining`/`New` never drain and the loop exits on
-   > the cap instead of converging.
-{%- endif %}
+7. **Recompute grade** using the current voting set (Step 4 again, clusters rebuilt per the round-state contract).
 
-5. **Recompute grade** using the current voting set (Step 4 again, clusters rebuilt per the round-state contract).
+7b. **Evaluate the progress invariant.** No lifecycle transition this round → stop now with `CHANGES_REQUESTED` and exit reason `no-progress`.
 
-5b. **Evaluate the progress invariant.** No lifecycle transition this round → stop now with `CHANGES_REQUESTED` and exit reason `no-progress`.
-
-6. **Append iteration record** to the REVIEW report:
+8. **Append iteration record** to the REVIEW report:
 
    ```markdown
    ### Iteration {N} (Grade: {prev} → {new})
    Fixes applied: {count}
    | # | Severity | Summary | File | Status |
    |---|----------|---------|------|--------|
-   | 1 | P0 | ... | ... | Applied |
-   | 2 | P1 | ... | ... | Skipped — overlap |
-   | 3 | P1 | ... | ... | Reverted — build failure |
+   | 1 | P0 | ... | ... | Applied · caused_by=#7 |
+   | 2 | P1 | ... | ... | Skipped — overlap · caused_by=none |
 
    Remaining: {count} | New issues introduced: {count}
    ```
 
-7. Return to the Grade Gate with the updated grade and incremented `iteration_count`.
+9. Return to the Grade Gate with the updated grade and incremented `iteration_count`.
 
 ## Final Summary (always)
 
@@ -581,6 +576,7 @@ Iterations used: {N} / {max_review_rounds}
 Exit reason: converged | no-progress | cap-exhausted | auto-fix-disabled
 Status: APPROVED | CHANGES_REQUESTED
 human_review_needed: {true|false}
+Counters (see §5): unreviewed {u} · prior-fix {r} · unattributed {a}
 ```
 
 `Exit reason` records *why* the loop stopped: `converged` (grade met the threshold) ·
@@ -596,10 +592,12 @@ ran out **while still progressing** — the only exit that says a higher cap wou
 
 After each round's REVIEW report write, append one line to
 `.claude/observability/review-{YYYY-MM-DD}.jsonl` via the harness CLI.
-14-field schema (PLAN-llm-code-review-2026 ADR-006); numeric fields default
-to 0, `fixture_label` / `verifier_false_*` / `fallback` are null on real
-runs. Don't interpolate `wall_time_ms` into any other rendered template
-(determinism leakage — see `test_telemetry_no_leak`).
+Round-level numeric fields default to 0; `fixture_label` / `verifier_false_*` /
+`fallback` are null on real runs. **Every round row: `terminal: false`,
+counters null. The row for the round the loop exits at: `terminal: true`, all
+three counters integers.** Never send 0 for what you did not measure. Don't
+interpolate `wall_time_ms` into any other rendered template (determinism
+leakage — see `test_telemetry_no_leak`).
 
 {% if is_codex %}
 ```bash
@@ -612,7 +610,7 @@ echo '<record_json>' | uv run --with {{ harness_maker_src_path }} hm review_tele
 {% endif %}
 
 Record fields:
-`{ts, slug, round, pass1_n, verifier_kept_n, verifier_dropped_n, verifier_false_drop_n, verifier_false_keep_n, fixture_label, pass2_kept_n, consensus_passed_n, wall_time_ms, build_break_count, auto_fix_reverted_n, fallback}`.
+`{ts, slug, round, pass1_n, verifier_kept_n, verifier_dropped_n, verifier_false_drop_n, verifier_false_keep_n, fixture_label, pass2_kept_n, consensus_passed_n, wall_time_ms, build_break_count, auto_fix_reverted_n, fallback, terminal, unreviewed_fix_count, regression_attributed_n, attribution_unknown_n}`.
 
 The CLI auto-stamps `ts` when omitted. Schema validation rejects unknown
 fields and negative counts.

@@ -17,3 +17,13 @@ ac:
   - tests/unit/test_review_telemetry.py::test_cli_emit_writes_to_observability_dir
   executable_predicate: '# placeholder — refine in /hm:spec review-telemetry'
   pending_test: false
+- id: AC-002
+  title: Measure-C counters distinguish "never measured" from "measured zero"
+  type: mechanical
+  test_ids:
+  - tests/unit/test_review_telemetry.py::test_pre_change_row_validates_with_the_new_fields_absent
+  - tests/unit/test_review_telemetry.py::test_the_three_wire_states_are_distinguishable
+  - tests/unit/test_review_telemetry.py::test_unmeasured_counters_stay_null_on_disk
+  executable_predicate: 'rec.terminal is None and rec.unreviewed_fix_count is None and rec.regression_attributed_n
+    is None and rec.attribution_unknown_n is None'
+  pending_test: false

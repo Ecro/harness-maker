@@ -12,6 +12,7 @@ Workflow command FileEntries are generated dynamically from
 
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
 from typing import Any
@@ -28,6 +29,13 @@ from harness_maker.models import (
     Target,
 )
 from harness_maker.workflow_fuse import fuse
+
+logger = logging.getLogger(__name__)
+
+#: `review.md.j2` points at this skill's §5 from an UNGUARDED line, so the
+#: auto-fix loop's round-state contract is only reachable if the skill is
+#: enabled — in every harness, `second_opinion.models` empty or not.
+ROUND_STATE_SKILL = "second-opinion-gate"
 
 # Each tuple: (template path under templates/, output path under .claude/, context supplement)
 FileSpec = tuple[str, str, dict[str, Any]]
@@ -814,9 +822,25 @@ def synthesize(
 
     # Skills inventory + enabled list aren't part of HarnessConfig today, but
     # templates need them; expose via per-file context.
+    # PLAN-review-round-inflation ADR-005. Both presets force-enable this skill
+    # (`interview.py`), but `skills.enabled` is user-editable and the pointer at
+    # its §5 renders unguarded — so a harness that trimmed it would ship a
+    # pointer aimed at a document it never loads, and the loop's termination
+    # contract would be reachable only by chance. Auto-add and say so; never
+    # abort (CLAUDE.md checkpoint #1 — a raise here turns `--update` into a total
+    # render failure for that user with no migration path).
+    enabled_skills = list(answers.skills.get("enabled", []))
+    if ROUND_STATE_SKILL not in enabled_skills:
+        enabled_skills.append(ROUND_STATE_SKILL)
+        logger.warning(
+            "%s was not in skills.enabled; re-adding it. review.md.j2 points at its §5 "
+            "(the auto-fix loop's round-state contract) from a line that renders in every "
+            "harness, so disabling the skill leaves that pointer dangling.",
+            ROUND_STATE_SKILL,
+        )
     skills_dump = {
         "installed": answers.skills.get("installed", []),
-        "enabled": answers.skills.get("enabled", []),
+        "enabled": enabled_skills,
     }
     install_ref = _compute_install_ref()
     # PLAN-auto-feedback-2026-05 ADR-005: in-band LLM feedback dispatcher

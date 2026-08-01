@@ -200,3 +200,58 @@ def test_privacy_doc_feedback_module_block_documents_top_level_fields() -> None:
     )
     missing = [f for f in expected if f"`{f}`" not in block]
     assert not missing, f"FeedbackDraft fields missing from marker block: {missing}"
+
+
+# ── PLAN-review-round-inflation — measure-C marker block ─────────────────────
+#
+# `terminal` is a generic English word. The document-wide backtick harvest in
+# `_collect_all_documented_field_names` would be satisfied by any future
+# occurrence of `` `terminal` `` anywhere in PRIVACY.md, silently making the
+# schema gate vacuous for the discriminator field — the same false-pass shape
+# the feedback-module block above exists to prevent (validator C3).
+
+_MEASURE_C_MARKER_RE = re.compile(
+    r"<!-- @hm:privacy:review-telemetry-measure-c -->(.*?)"
+    r"<!-- @hm:/privacy:review-telemetry-measure-c -->",
+    re.DOTALL,
+)
+
+_MEASURE_C_FIELDS = (
+    "terminal",
+    "unreviewed_fix_count",
+    "regression_attributed_n",
+    "attribution_unknown_n",
+)
+
+
+def _extract_measure_c_block(text: str) -> str:
+    m = _MEASURE_C_MARKER_RE.search(text)
+    if not m:
+        pytest.fail(
+            "PRIVACY.md missing @hm:privacy:review-telemetry-measure-c marker block. "
+            "PLAN-review-round-inflation ADR-006 requires the four measure-C fields "
+            "to be documented inside an anchored block, not merely somewhere in the file."
+        )
+    return m.group(1)
+
+
+def test_privacy_doc_measure_c_fields_are_documented_inside_their_block() -> None:
+    block = _extract_measure_c_block(PRIVACY_DOC.read_text(encoding="utf-8"))
+    missing = [f for f in _MEASURE_C_FIELDS if f"`{f}`" not in block]
+    assert not missing, (
+        f"measure-C fields {missing} not documented inside the "
+        "@hm:privacy:review-telemetry-measure-c marker block."
+    )
+
+
+def test_privacy_doc_measure_c_block_states_the_null_semantics() -> None:
+    """ADR-006's whole point is that null != 0. A reader of PRIVACY.md must be
+    able to tell an unmeasured row from a measured-zero one, so the block has to
+    say so — a bare field table would document the names and lose the contract."""
+    block = _extract_measure_c_block(PRIVACY_DOC.read_text(encoding="utf-8"))
+    lowered = block.lower()
+    assert "null" in lowered, "measure-C block must name the null state"
+    assert "0" in block, "measure-C block must contrast null against 0"
+    assert "never measured" in lowered or "unmeasured" in lowered, (
+        "measure-C block must name the absent case explicitly"
+    )

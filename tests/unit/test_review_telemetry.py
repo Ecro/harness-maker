@@ -1,7 +1,8 @@
 """Phase A4 — review telemetry emitter unit tests.
 
-ADR-006 contract:
-- 14 fields (3 nullable, 1 fallback marker).
+ADR-006 contract (PLAN-llm-code-review-2026), extended by PLAN-review-round-inflation
+ADR-006/ADR-009 with measure C's three counters plus the `terminal` discriminator:
+- 19 fields, 8 nullable. Null never means zero — see the wire-state test below.
 - Append-only JSONL via O_APPEND for kernel-atomic line writes.
 - Concurrent reviewers (autoloop + Cursor) must not interleave lines.
 - Daily-rotated file path under .claude/observability/review-{YYYY-MM-DD}.jsonl.
@@ -220,3 +221,129 @@ def test_cli_emit_rejects_unknown_subcommand(tmp_path: Path) -> None:
     proc = _run_cli("", "noop", cwd=tmp_path)
     assert proc.returncode == 2
     assert "usage" in proc.stderr
+
+
+# ── PLAN-review-round-inflation ADR-006 / ADR-009 ────────────────────────────
+#
+# Four optional fields carry measure C. They are `| None`, never `int = 0`,
+# because "this harness version never measured it" must stay distinguishable
+# from "measured zero" — the absent-case failure CLAUDE.md records as this
+# project's most-recurring class. `terminal` is the discriminator that makes
+# the non-terminal rounds' nulls readable (ADR-009): telemetry emits one row
+# per round, but the three counters are end-of-review quantities.
+
+
+def test_pre_change_row_validates_with_the_new_fields_absent() -> None:
+    """A row written by a harness that predates measure C must still validate.
+
+    `_BASE_FIELDS` is literally that shape — it was the whole record before
+    this change.
+    """
+    rec = ReviewTelemetryRecord(**_BASE_FIELDS)
+    assert rec.unreviewed_fix_count is None
+    assert rec.regression_attributed_n is None
+    assert rec.attribution_unknown_n is None
+    assert rec.terminal is None
+
+
+def test_absent_counters_are_none_not_zero() -> None:
+    """ADR-006: 0 means measured-zero. Defaulting to 0 would erase the
+    distinction that the field exists to preserve."""
+    rec = ReviewTelemetryRecord(**_BASE_FIELDS)
+    for value in (
+        rec.unreviewed_fix_count,
+        rec.regression_attributed_n,
+        rec.attribution_unknown_n,
+    ):
+        assert value is None
+        assert value != 0  # guards a future `int = 0` regression
+
+
+def test_the_three_wire_states_are_distinguishable() -> None:
+    """ADR-009. `emit` serializes `model_dump()` unconditionally, so optional
+    fields are always present on the wire as explicit null — key presence can
+    therefore never discriminate. `terminal` is what does."""
+    unmeasured = ReviewTelemetryRecord(**_BASE_FIELDS).model_dump()
+    non_terminal = ReviewTelemetryRecord(**{**_BASE_FIELDS, "terminal": False}).model_dump()
+    terminal = ReviewTelemetryRecord(
+        **{
+            **_BASE_FIELDS,
+            "terminal": True,
+            "unreviewed_fix_count": 3,
+            "regression_attributed_n": 2,
+            "attribution_unknown_n": 0,
+        }
+    ).model_dump()
+
+    counters = ("unreviewed_fix_count", "regression_attributed_n", "attribution_unknown_n")
+
+    # The discriminator separates the three states.
+    assert unmeasured["terminal"] is None
+    assert non_terminal["terminal"] is False
+    assert terminal["terminal"] is True
+
+    # The counters must be null ON THE WIRE for both non-measuring states — not
+    # merely present. An implementation that coerces null→0 during serialization
+    # (a field_serializer, a model_dump override, a dump-path default) would pass
+    # every attribute-level test in this file while destroying ADR-006's
+    # distinction in the append-only rows, where a wrong value is permanent.
+    for field in counters:
+        assert unmeasured[field] is None, f"{field} must stay null for an unmeasured row"
+        assert non_terminal[field] is None, f"{field} must stay null on a non-terminal round"
+
+    # An aggregation filters on `terminal is True` and gets only measured rows.
+    measured = [r for r in (unmeasured, non_terminal, terminal) if r["terminal"] is True]
+    assert measured == [terminal]
+    assert measured[0]["attribution_unknown_n"] == 0  # measured zero survives
+
+
+def test_counters_accept_zero_and_reject_negative() -> None:
+    """The accept-0 arm is load-bearing: without it this test passes before the
+    fields exist at all (`extra=forbid` raises for an unknown key), so it would
+    be green in both directions and could not see the `ge=0` constraint."""
+    for field in (
+        "unreviewed_fix_count",
+        "regression_attributed_n",
+        "attribution_unknown_n",
+    ):
+        accepted = ReviewTelemetryRecord(**{**_BASE_FIELDS, field: 0})
+        assert getattr(accepted, field) == 0
+        with pytest.raises(ValidationError) as exc:
+            ReviewTelemetryRecord(**{**_BASE_FIELDS, field: -1})
+        assert "greater_than_equal" in str(exc.value)
+
+
+def test_terminal_row_survives_the_round_trip(tmp_path: Path) -> None:
+    """The counters must be readable back off disk, not just constructible."""
+    rec = ReviewTelemetryRecord(
+        **{
+            **_BASE_FIELDS,
+            "terminal": True,
+            "unreviewed_fix_count": 6,
+            "regression_attributed_n": 4,
+            "attribution_unknown_n": 1,
+        }
+    )
+    path = emit(rec, project_root=tmp_path, observability_dir=Path("obs"))
+    row = json.loads(path.read_text(encoding="utf-8").strip())
+    assert row["terminal"] is True
+    assert row["unreviewed_fix_count"] == 6
+    assert row["regression_attributed_n"] == 4
+    assert row["attribution_unknown_n"] == 1
+
+
+def test_unmeasured_counters_stay_null_on_disk(tmp_path: Path) -> None:
+    """The wire-state test reads `model_dump()`, which is today's emit path
+    (`review_telemetry.py:144`). This one reads the FILE, so a future switch to
+    `model_dump_json()` with a `when_used="json"` serializer — or a
+    `json.dumps(default=…)` — cannot coerce null→0 into the permanent
+    append-only rows while every in-memory assertion stays green."""
+    path = emit(
+        ReviewTelemetryRecord(**_BASE_FIELDS),
+        project_root=tmp_path,
+        observability_dir=Path("obs"),
+    )
+    row = json.loads(path.read_text(encoding="utf-8").strip())
+    assert row["terminal"] is None
+    for field in ("unreviewed_fix_count", "regression_attributed_n", "attribution_unknown_n"):
+        assert row[field] is None, f"{field} was coerced away from null on disk"

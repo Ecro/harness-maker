@@ -1366,8 +1366,11 @@ call would run no tests and report success. `ruff check` and `mypy --strict` sta
 unconditional: repo-wide, cheap, no selection concept.
 
 **Called from**:
-- Step 3 of the `/hm:review` auto-fix loop's verify step (replacing an unconditional
-  `uv run pytest -x` on every fix round)
+- The `/hm:review` auto-fix loop's **verify build** step (replacing an unconditional
+  `uv run pytest -x` on every fix round). Deliberately named, not numbered — the round
+  loop's step numbers move (`PLAN-review-round-inflation` inserted a grouping step and
+  shifted verify from 3 to 5), and pinning the number is the
+  `[fail:test] test-pins-retired-implementation-name` family.
 
 The recipe lives in a skill rather than inline because
 `test_aggregate_shipped_surface_does_not_grow` is a strict non-increase over the summed

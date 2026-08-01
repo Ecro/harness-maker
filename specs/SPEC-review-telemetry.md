@@ -30,6 +30,17 @@ Consumers of review-telemetry can rely on the AC below holding under the SPEC's 
 **When** the contract surface of review-telemetry is exercised
 **Then** AC (mechanical) holds per its predicate / table / rubric
 
+### AC-002: Measure-C counters distinguish "never measured" from "measured zero"
+
+**Given** a `ReviewTelemetryRecord` built without the measure-C fields (the shape every row
+written before PLAN-review-round-inflation has)
+**When** it is validated and emitted
+**Then** `terminal`, `unreviewed_fix_count`, `regression_attributed_n` and
+`attribution_unknown_n` are `None` in the model **and** `null` on disk — never `0` — so an
+aggregation can tell an unmeasured row from a measured-zero one; a row with `terminal: true`
+carries integers, and a non-terminal round carries `terminal: false` with the three counters
+`null`.
+
 ## 🚫 Non-Goals
 
 - Cross-feature integration (covered by sibling SPECs)
@@ -46,6 +57,7 @@ Consumers of review-telemetry can rely on the AC below holding under the SPEC's 
 | Scenario | Verification mode | Test reference |
 |---|---|---|
 | AC-001 | unit (predicate) | tests/unit/test_review_telemetry.py::test_cli_emit_rejects_malformed_input, tests/unit/test_review_telemetry.py::test_cli_emit_rejects_unknown_subcommand, tests/unit/test_review_telemetry.py::test_cli_emit_writes_to_observability_dir |
+| AC-002 | unit (predicate) | tests/unit/test_review_telemetry.py::test_pre_change_row_validates_with_the_new_fields_absent, tests/unit/test_review_telemetry.py::test_the_three_wire_states_are_distinguishable, tests/unit/test_review_telemetry.py::test_unmeasured_counters_stay_null_on_disk |
 
 ## ❓ Open Questions
 
