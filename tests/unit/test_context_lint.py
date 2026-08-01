@@ -49,12 +49,25 @@ def test_frontmatter_excluded_from_count(tmp_path: Path) -> None:
     assert lint(f, "skill", Preset.SIDE) == []
 
 
-def test_production_thresholds_are_higher(tmp_path: Path) -> None:
-    # 175-line agent: over Side(150), under Production(200) ✓
-    body = "\n".join(["line"] * 175) + "\n"
-    f = _write(tmp_path / "agent.md", body)
-    assert len(lint(f, "agent", Preset.SIDE)) == 1
-    assert lint(f, "agent", Preset.PRODUCTION) == []
+def test_production_thresholds_are_not_lower(tmp_path: Path) -> None:
+    """Production is never stricter than Side, for every asset type.
+
+    `agent` and `skill` are deliberately EQUAL across presets since 0.45.0 — a
+    normative contract in an agent body costs the same either way — so the
+    invariant is ≥, not >. CLAUDE.md still differentiates, and the concrete case
+    below keeps that exercised rather than asserted only in the table.
+    """
+    for asset in {a for a, _ in THRESHOLDS}:
+        side = THRESHOLDS.get((asset, Preset.SIDE.value))
+        prod = THRESHOLDS.get((asset, Preset.PRODUCTION.value))
+        if side is not None and prod is not None:
+            assert prod >= side, f"{asset}: Production({prod}) stricter than Side({side})"
+
+    # 300-line CLAUDE.md: over Side(200), under Production(500) ✓
+    body = "\n".join(["line"] * 300) + "\n"
+    f = _write(tmp_path / "CLAUDE.md", body)
+    assert len(lint(f, "CLAUDE.md", Preset.SIDE)) == 1
+    assert lint(f, "CLAUDE.md", Preset.PRODUCTION) == []
 
 
 def test_workflow_threshold(tmp_path: Path) -> None:
@@ -77,12 +90,14 @@ def test_unknown_asset_type_no_limit(tmp_path: Path) -> None:
 
 
 def test_warning_message_includes_path_and_excess(tmp_path: Path) -> None:
-    body = "\n".join(["line"] * 130) + "\n"
+    limit = THRESHOLDS[("skill", Preset.SIDE.value)]
+    count = limit + 30
+    body = "\n".join(["line"] * count) + "\n"
     f = _write(tmp_path / "S.md", body)
     warnings = lint(f, "skill", Preset.SIDE)
     assert str(f) in warnings[0]
-    assert "130" in warnings[0]
-    assert "100" in warnings[0]
+    assert str(count) in warnings[0]
+    assert str(limit) in warnings[0]
 
 
 # ── Phase 1: window % hard-cap ──────────────────────────────────────────

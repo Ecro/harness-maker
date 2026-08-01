@@ -1266,8 +1266,8 @@ code-reviewer is always included. Others are added based on pattern matching.
 | Asset Type | Side Preset | Production Preset |
 |-----------|------------|------------------|
 | CLAUDE.md | ≤200 lines | ≤500 lines |
-| Agent prompt | ≤100 lines | ≤200 lines |
-| Skill SKILL.md | ≤50 lines | ≤150 lines |
+| Agent prompt | ≤300 lines | ≤300 lines |
+| Skill SKILL.md | ≤300 lines | ≤300 lines |
 | Workflow | ≤300 lines | ≤600 lines |
 | `.cursor/rules/*.mdc` | ≤500 lines (Cursor recommended) | ≤500 lines |
 
@@ -2123,8 +2123,8 @@ This classification result constitutes 5% of the AI Readiness composite score (`
 `context-linter` enforces **per-preset line count limits** on all generated assets:
 
 ```
-Side preset:    CLAUDE.md ≤200 lines, agent ≤150 lines, skill ≤100 lines
-Production:     CLAUDE.md ≤500 lines, agent ≤200 lines, skill ≤150 lines
+Side preset:    CLAUDE.md ≤200 lines, agent ≤300 lines, skill ≤300 lines
+Production:     CLAUDE.md ≤500 lines, agent ≤300 lines, skill ≤300 lines
 ```
 
 When limit exceeded: suggest "lines to trim + use external document links instead of inline".

@@ -30,10 +30,14 @@ THRESHOLDS: dict[tuple[str, str], int] = {
     # AGENTS.md is the Codex equivalent of CLAUDE.md — same parity thresholds.
     ("AGENTS.md", Preset.SIDE.value): 200,
     ("AGENTS.md", Preset.PRODUCTION.value): 500,
-    ("agent", Preset.SIDE.value): 150,
-    ("agent", Preset.PRODUCTION.value): 200,
-    ("skill", Preset.SIDE.value): 100,
-    ("skill", Preset.PRODUCTION.value): 150,
+    # Raised to 300 in 0.45.0. The acceptance-gate work put normative contracts in
+    # two assets (`code-verifier` mode B at 267 lines, `second-opinion-gate` §5 at
+    # 281) that cannot be compressed without weakening the contract; the previous
+    # 200/150 caps predate assets carrying a spec rather than a role description.
+    ("agent", Preset.SIDE.value): 300,
+    ("agent", Preset.PRODUCTION.value): 300,
+    ("skill", Preset.SIDE.value): 300,
+    ("skill", Preset.PRODUCTION.value): 300,
     ("workflow", Preset.SIDE.value): 300,
     ("workflow", Preset.PRODUCTION.value): 600,
 }

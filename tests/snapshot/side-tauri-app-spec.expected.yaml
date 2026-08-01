@@ -133,7 +133,7 @@ files:
   body_sha256: 3c5e35fb0ab1ccf6bf90f5e8152b5743c868d7f92f35361fa549bbea7607105b
 - path: rubrics/skill.yaml
   template: rubrics/skill.yaml.j2
-  body_sha256: 9cc468bab52bad6f3b85b2bfb4374eeaa2bc4bc3571a30582dd7f42ce9979f64
+  body_sha256: 03a7f5c424652cb4a76e2078092bc0771e655e7760b4009aca7600eeb09dc6b9
 - path: rubrics/workflow.yaml
   template: rubrics/workflow.yaml.j2
   body_sha256: bd46a9af3e1a0912ef132227b7b509bbc3c1a14758c9fb620dd1392f2059899f

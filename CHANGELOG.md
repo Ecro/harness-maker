@@ -1,6 +1,25 @@
 # Changelog
 
-## [0.45.0] — 2026-08-01
+## [0.45.1] — 2026-08-01
+
+### Changed — agent and skill context-lint caps raised to a flat 300 lines
+
+The acceptance-gate work put normative contracts into two assets — `code-verifier`
+(mode B, 267 rendered lines) and the new `second-opinion-gate` skill (§5, 281) — that
+the 200/150 Production caps predate. Both `agents_within_limit` and `skills_within_limit`
+began failing on a **fresh install**, dropping `context_quality` 100 → 60 and the
+Production composite 72 → 66, below the floor `test_fresh_install_readiness` pins. That
+test is `INTEGRATION=1`-gated and does not run in `ci.yml`, so the drop landed green and
+surfaced only at the 0.45.0 release gate.
+
+The caps are now 300 for both `agent` and `skill` across both presets, in both tables
+that carry them (`context_lint.THRESHOLDS`, `readiness._CONTEXT_LIMITS`) plus CLAUDE.md,
+`docs/HOW-IT-WORKS.md` and the skill rubric. Production is equal to Side rather than
+higher for these two rows — a contract in an agent body costs the same either way — so
+the preset invariant asserted in `test_context_lint` is now ≥ rather than >, with
+CLAUDE.md (200/500) keeping the strict-differentiation case exercised.
+
+## [0.45.0] — 2026-08-01 [failed release]
 
 ### Changed — the review auto-fix loop re-derives the model before it batches fixes (`PLAN-review-round-inflation`)
 

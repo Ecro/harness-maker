@@ -48,14 +48,15 @@ WEIGHTS_PROD: dict[str, float] = {
 
 # CLAUDE.md / agent / skill body line caps (per preset). Matches the canonical
 # CLAUDE.md Context Lint section and context_lint.THRESHOLDS (aligned 0.28.x —
-# context_lint's Side rows were raised from 100/50 to 150/100 to agree).
+# context_lint's Side rows were raised from 100/50 to 150/100 to agree; agent and
+# skill rows raised to a flat 300 in 0.45.0, see context_lint.THRESHOLDS).
 _CONTEXT_LIMITS: dict[tuple[str, str], int] = {
     ("CLAUDE.md", "Side"): 200,
     ("CLAUDE.md", "Production"): 500,
-    ("agent", "Side"): 150,
-    ("agent", "Production"): 200,
-    ("skill", "Side"): 100,
-    ("skill", "Production"): 150,
+    ("agent", "Side"): 300,
+    ("agent", "Production"): 300,
+    ("skill", "Side"): 300,
+    ("skill", "Production"): 300,
 }
 
 # Dangerous patterns the deny list should cover, when the user opts in.
