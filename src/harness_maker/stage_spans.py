@@ -178,10 +178,15 @@ def _build_spans(events: Sequence[SpanEvent]) -> tuple[list[_Span], int]:
     first implementation — made any session's `start` close whatever span happened to
     be open, so session A's span ended the moment session B began one; A's Stop hook
     then declined to write its own `end` (it is session-scoped), leaving A's span
-    permanently short. With `HM_SESSION_ID` absent (a documented WSL2 failure) B's span
-    carries `session_id=None`, `_match` reports it degraded, and B's stage claims A's
-    turns outright. Concurrent sessions are a supported workflow here and adjacent
-    machinery has already had three contamination incidents (review F-02).
+    permanently short. With `HM_SESSION_ID` absent B's span carries `session_id=None`,
+    `_match` reports it degraded, and B's stage claims A's turns outright. That absence is
+    NOT a WSL2 quirk, as this once said: `sessionid_envfile` writes the id into
+    `$CLAUDE_ENV_FILE`, which Claude Code sources as an UNEXPORTED shell variable, so
+    `os.environ` never carries it in ANY subprocess on ANY platform. Every span emitted
+    without an explicit `--claude-session-id` is session-less, universally
+    (PLAN-sessionid-env-propagation ADR-003/007). Concurrent sessions are a supported
+    workflow here and adjacent machinery has already had three contamination incidents
+    (review F-02).
 
     Session-less events chain among themselves under the `None` key: they cannot be
     told apart, which is precisely what `ambiguous_session_join` reports.

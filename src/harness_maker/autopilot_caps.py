@@ -52,6 +52,7 @@ def evaluate_boundary(
     step_cap: int | None,
     time_cap_min: int | None,
     now: datetime | None = None,
+    session_id: str | None = None,
 ) -> BoundaryDecision:
     """Decide whether the chain may advance past this boundary (PURE — no side effects).
 
@@ -64,7 +65,7 @@ def evaluate_boundary(
     unlimited removes only the runaway backstop, never the user's abort (marker removal).
     """
     moment = now if now is not None else datetime.now(UTC)
-    marker = autopilot.active_marker(project_root, now=moment)
+    marker = autopilot.active_marker(project_root, now=moment, session_id=session_id)
     if marker is None:
         return BoundaryDecision(
             proceed=False,
@@ -176,6 +177,7 @@ def _resolve_task_slug(
     marker: autopilot.AutopilotMarker,
     flag_slug: str | None,
     stage: str,
+    session_id: str | None = None,
 ) -> tuple[str | None, str | None]:
     """The slug to hand the next stage, plus where it came from (ADR-003).
 
@@ -190,7 +192,9 @@ def _resolve_task_slug(
         # returning it anyway would hand the rejected value to the very sinks the allowlist
         # exists to protect: the JSON's `task_slug` becomes the `Skill(hm:<next> <slug>)`
         # argument, and the next stage re-emits it into its own `--slug` shell line.
-        if autopilot.set_task_slug(project_root, slug=flag_slug, stage=stage):
+        if autopilot.set_task_slug(
+            project_root, slug=flag_slug, stage=stage, session_id=session_id
+        ):
             return flag_slug, "flag"
         # stderr, not logging: this module's CLI output is the JSON on stdout and callers do
         # not configure logging, so a logger call here would be invisible.
@@ -231,7 +235,7 @@ def _cmd_boundary(args: argparse.Namespace) -> int:
         "task_slug": None,
         "task_slug_source": None,
     }
-    marker = autopilot.active_marker(root)
+    marker = autopilot.active_marker(root, session_id=args.session_id)
     if marker is None:
         out["halt_kind"] = "kill_switch"
         out["reason"] = "autopilot marker absent/foreign/stale — aborting chain at boundary"
@@ -245,7 +249,7 @@ def _cmd_boundary(args: argparse.Namespace) -> int:
     # Heartbeat: proves to the NEXT session that this one was alive here. Without it,
     # ownership alone cannot distinguish a live peer from a marker abandoned mid-pipeline,
     # and the guard wedges the project for the full TTL (round-4 P0).
-    autopilot.touch(root)
+    autopilot.touch(root, session_id=args.session_id)
     _confirm_entry(root, stage=args.current, marker=marker)
     # Unknown `--current` (typo / stage outside the pipeline) is checked FIRST — BEFORE the
     # caps — so a bad value can't trigger the marker-clearing cap path and silently kill the
@@ -262,7 +266,7 @@ def _cmd_boundary(args: argparse.Namespace) -> int:
         print(json.dumps(out))
         return 0
     slug, slug_source = _resolve_task_slug(
-        root, marker=marker, flag_slug=args.slug, stage=args.current
+        root, marker=marker, flag_slug=args.slug, stage=args.current, session_id=args.session_id
     )
     out["task_slug"] = slug
     out["task_slug_source"] = slug_source
@@ -284,7 +288,11 @@ def _cmd_boundary(args: argparse.Namespace) -> int:
     steps = autopilot_ledger.count_entries(root, since=marker.created_at)
     out["steps"] = steps
     decision = evaluate_boundary(
-        root, steps=steps, step_cap=args.step_cap, time_cap_min=args.time_cap_min
+        root,
+        steps=steps,
+        step_cap=args.step_cap,
+        time_cap_min=args.time_cap_min,
+        session_id=args.session_id,
     )
     if not decision.proceed:
         out["halt_kind"] = decision.halt_kind
@@ -359,6 +367,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     # ADR-003: the stage terminal supplies the slug it is working on; boundary persists it
     # and hands it to the next stage's `Skill(hm:<stage> <slug>)` call.
     b.add_argument("--slug", default=None)
+    # PLAN-sessionid-env-propagation ADR-005. NOT optional in practice: the marker
+    # writer stamps an id, and `_is_own` compares whenever EITHER side has one, so an
+    # id-less reader resolves an id-bearing marker as foreign -> kill_switch. Empty
+    # string means id-less (Cursor/Codex/degraded), which is the pre-existing behaviour.
+    b.add_argument("--session-id", default=None, dest="session_id")
     b.add_argument("--step-cap", type=int, default=None, dest="step_cap")
     b.add_argument("--time-cap-min", type=int, default=None, dest="time_cap_min")
     # gate-blocked (P7): the auto-branch records this when a mandatory gate holds the chain
@@ -366,6 +379,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     g = sub.add_parser("gate-blocked", add_help=False)
     g.add_argument("--root", default=".")
     g.add_argument("--stage", required=True)
+    g.add_argument("--session-id", default=None, dest="session_id")
     # parse_args (not parse_known_args) so a stray/misspelled flag errors loud rather than
     # being silently swallowed (REVIEW P3).
     args = parser.parse_args(argv)
@@ -378,10 +392,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         # Resolve cwd→base so the marker check and the ledger write target one root
         # (same asymmetry fix as _cmd_boundary — REVIEW P2).
         root = autopilot.resolve_marker_root(Path(args.root))
-        marker = autopilot.active_marker(root)
+        marker = autopilot.active_marker(root, session_id=args.session_id)
         if marker is None:
             return 0
-        autopilot.touch(root)
+        autopilot.touch(root, session_id=args.session_id)
         # A stage that reaches its gate DID start — so this call confirms entry too
         # (ADR-005). Same placement rule as boundary: after the marker check, never before.
         _confirm_entry(root, stage=args.stage, marker=marker)

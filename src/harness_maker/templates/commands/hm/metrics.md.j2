@@ -216,8 +216,10 @@ a measurement and a story. Also surface, in one line each:
 - `ledger_ground_truth_disagreements` — the emitter's health signal. Any non-zero
   value means a span claimed a turn that recorded a *different* stage; say so.
 - `unknown_stage_emissions` / `ambiguous_session_join` — emissions from a harness
-  rendered before `--stage` existed, and joins made without a session id
-  (`$HM_SESSION_ID` is empty on WSL2). Both are stated limits, not errors.
+  rendered before `--stage` existed, and joins made without a session id. The second is
+  broader than it used to read here: `HM_SESSION_ID` is an UNEXPORTED shell variable, so
+  `os.environ` never sees it in any subprocess on any platform — a span is session-less
+  unless its command passed the id explicitly. Both are stated limits, not errors.
 
 Then render a per-stage table, most expensive first:
 

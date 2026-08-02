@@ -119,3 +119,8 @@ tests/e2e/sandbox-plugin-test/
 tests/fixtures/*/CLAUDE.md
 .claude/loop-specs/
 work-docs/loop-context/
+
+# ephemeral probe dirs written by tests/integration/test_env_isolation.py (cleaned in a
+# finally block, and swept at import time; ignored here so a leftover is not git dirt.
+# NOTE: gitignore cannot hide it from the run-time directory gate — the sweep does that.)
+tests/_env_isolation_probe_*/

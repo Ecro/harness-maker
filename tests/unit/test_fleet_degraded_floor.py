@@ -106,9 +106,15 @@ def test_readiness_live_message_describes_self_stop(
     tmp_path: Path, claude_session_unset: None
 ) -> None:
     """sessionid_envfile_live's failing message must describe the self-stop
-    symptom, not the inaccurate 'peers block each other's Stop'."""
+    symptom, not the inaccurate 'peers block each other's Stop'.
+
+    `session_id=""` is the state this signal now occupies (PLAN-sessionid-env-propagation
+    ADR-001/004): the caller wired the probe and the value was genuinely absent. Passing
+    nothing would land in the `probe_wired` branch — a stale render, not a degraded
+    session — which is a different signal with a different message.
+    """
     _write_min_harness(tmp_path)
-    sig = _find(_dim_guardrails(tmp_path).signals, "sessionid_envfile_live")
+    sig = _find(_dim_guardrails(tmp_path, session_id="").signals, "sessionid_envfile_live")
     assert sig is not None, "expected a live signal when CLAUDECODE set"
     assert not sig.passed, "live signal must fail when HM_SESSION_ID unset"
     detail = f"{sig.evidence} {sig.action or ''}".lower()

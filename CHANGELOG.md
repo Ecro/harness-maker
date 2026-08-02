@@ -1,6 +1,76 @@
 # Changelog
 
-## [0.45.1] — 2026-08-01
+## [0.46.0] — 2026-08-02
+
+### Fixed — `HM_SESSION_ID` is set but never exported, so every Python consumer read it as absent (`PLAN-sessionid-env-propagation`)
+
+`hooks/sessionid_envfile.py` writes `HM_SESSION_ID=<v>` into `$CLAUDE_ENV_FILE`, and Claude
+Code sources that into the Bash-tool shell as a **shell variable it does not export**.
+`echo "$HM_SESSION_ID"` therefore works while `os.environ.get("HM_SESSION_ID")` is `None` in
+every subprocess, on every platform. The two consumer classes had silently diverged: the
+rendered commands that interpolate `"$HM_SESSION_ID"` were fine, and everything written in
+Python was reading a variable that could not be there.
+
+Four consequences, all live:
+
+- `readiness.sessionid_envfile_live` is `hard_gate=True`, so it floored the `guardrails`
+  dimension to **0 in every real Claude Code session** — measured here, Production composite
+  55 → 81 once fixed — while printing a diagnosis ("a /hm:loop here self-stops after one
+  iteration") that was not true of the session it was printed in.
+- `autopilot` markers were never session-scoped. For `autonomy.autopilot_persistent: true`
+  harnesses this was worse than degraded: the SessionStart hook stamps an id from its stdin
+  payload, and `_is_own` compares ids whenever **either** side has one, so the id-less
+  reader judged the session's own marker foreign → `kill_switch`. Autopilot was already off
+  for those harnesses.
+- `tests/integration/test_fresh_install_readiness.py` read the developer's live session and
+  failed from inside one (Side 53 < 66, Production 46 < 72) while passing under
+  `env -u CLAUDECODE` — so the release procedure's "run this locally" step was
+  unconditionally red depending on which shell the operator used.
+- Every stage span emitted without an explicit `--claude-session-id` was session-less, so
+  `ambiguous_session_join` was structurally elevated **universally**, not "on WSL2" as the
+  docs said.
+
+The id now travels as an explicit argument from the only context that can see it: the
+slash-command shell. `compute_readiness`, all three `ai_readiness` entry points, `cli health`,
+`autopilot.status`/`active_marker`, `autopilot_caps.evaluate_boundary` and both its
+subcommands take `session_id`; the `os.environ` read survives only as a fallback for a host
+that does export it.
+
+Review found the first cut had wired the marker's **writer** and five of its **readers** were
+still resolving id-less, which is not a partial improvement — `_is_own` compares ids whenever
+**either** side has one, so an id-stamped marker is foreign to every un-wired reader and
+autopilot goes off rather than degrading. The five now thread `session_id` too:
+`autopilot.touch`, `autopilot.set_task_slug`, `autopilot.effective_level`,
+`autopilot_caps.evaluate_boundary`, and the Typer `hm autopilot` surface in `cli.py` (which
+had only been wired on the `argparse` `python -m` entry point).
+
+On the readiness path the argument is **tri-state and must stay so**: absent = the probe was
+never wired (a stale render — a new weight-0 `sessionid_envfile_probe_wired` signal says so
+out loud, rather than going quiet the way the 2026-06-21 `runtime-env-gate-dead-on-arrival`
+fix did); empty = wired and genuinely degraded (still hard-gated); non-empty = healthy.
+Weight 0 is the honest value, not a hedge — `guardrails`'s signal weights sum to 145 against
+a cap of 100, so any failure of weight ≤ 45 moves the score by exactly zero, and declaring
+15 would have shown a cost that is provably not charged. On the autopilot path `""` and
+absent deliberately mean the same thing, because the rendered call sites pass the flag
+unconditionally and Cursor/Codex legitimately deliver an empty value.
+
+The autopilot half had to land atomically. Wiring the writer without the 14 rendered reader
+call sites does not degrade autopilot, it turns it off; a unit test now pins that, and a
+render-grep fails if any of the fourteen loses the flag.
+
+### Fixed — test isolation, and a narrative that had the mechanism backwards
+
+`tests/conftest.py` now owns the `CLAUDECODE` / `CLAUDE_ENV_FILE` / `HM_SESSION_ID` pin that
+only `tests/unit/` had, with a declared `@pytest.mark.live_env` opt-out. Its gate runs an
+inner pytest with all three variables set and asserts the inner run is green, plus a
+meta-check that defeats the pin and asserts the probe goes red — a bare `os.environ is None`
+assertion passes vacuously in CI with no conftest at all.
+
+Six sites said the variable is "empty on WSL2". The correction is split by execution
+context, because that claim is **right** for the shell-context guards in `loop.md.j2` — they
+fire in Cursor/Codex and on a genuine hook failure, and their `[ -z "$HM_SESSION_ID" ]`
+predicates are unchanged here — and wrong only where Python reads the environment. Treating
+all six the same would have rewritten a correct guard to say its case cannot occur.
 
 ### Changed — agent and skill context-lint caps raised to a flat 300 lines
 

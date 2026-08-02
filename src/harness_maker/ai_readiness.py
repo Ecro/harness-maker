@@ -59,9 +59,10 @@ def run_ai_readiness(
     skip_llm: bool = False,
     judge_client: JudgeClient | None = None,
     model: str = "claude-sonnet-4-6",
+    session_id: str | None = None,
 ) -> ImprovementPlan:
     """Run the 3-layer pipeline and return a composite improvement plan."""
-    readiness = compute_readiness(project_dir, preset)
+    readiness = compute_readiness(project_dir, preset, session_id=session_id)
     cache = diagnose_cache_for_project(project_dir, model=model)
 
     judge_results: list[JudgeResult] = []
@@ -81,13 +82,14 @@ def run_ai_readiness_structural(
     *,
     preset: Preset,
     model: str = "claude-sonnet-4-6",
+    session_id: str | None = None,
 ) -> dict[str, Any]:
     """Run L1+L3 only and return a JSON-serializable dict.
 
     The dict is written by ``--json-output`` so that ``ai-readiness-finalize``
     can reconstruct a full plan after Claude provides L2 verdicts inline.
     """
-    readiness = compute_readiness(project_dir, preset)
+    readiness = compute_readiness(project_dir, preset, session_id=session_id)
     cache = diagnose_cache_for_project(project_dir, model=model)
     return {
         "readiness": readiness.model_dump(),
@@ -101,6 +103,7 @@ def run_structural(
     *,
     preset: Preset,
     model: str = "claude-sonnet-4-6",
+    session_id: str | None = None,
 ) -> dict[str, Any]:
     """Compute the ``structural`` field for the /hm:health dashboard (0.13.0).
 
@@ -125,7 +128,7 @@ def run_structural(
     check so the dashboard reader can show a count without re-running the
     layer.
     """
-    readiness = compute_readiness(project_dir, preset)
+    readiness = compute_readiness(project_dir, preset, session_id=session_id)
     cache = diagnose_cache_for_project(project_dir, model=model)
 
     # Blend: 70% readiness (deterministic structural) + 5% cache; the

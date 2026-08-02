@@ -163,7 +163,7 @@ _GOLDEN_PREFLIGHT = """### Task worktree preflight (feature-branch workflow)
 
 
 ```bash
-!uv run --with <SRC> hm worktree task-preflight <slug> "$(pwd)" --stage hm:wrapup
+!uv run --with <SRC> hm worktree task-preflight <slug> "$(pwd)" --stage hm:wrapup --claude-session-id "$HM_SESSION_ID"
 ```
 
 

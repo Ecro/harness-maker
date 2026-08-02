@@ -34,7 +34,7 @@ flipping the ADR-012 kill-switch (`llm_inference_enabled: false`).
 ## Run
 
 ```bash
-!uv run --with {{ harness_maker_src_path }} hm cli health . --json-output .claude/observability/.health.tmp.json
+!uv run --with {{ harness_maker_src_path }} hm cli health . --session-id "$HM_SESSION_ID" --json-output .claude/observability/.health.tmp.json
 ```
 
 Then read `.claude/observability/dashboard.md` to inspect the two sections.

@@ -20,11 +20,11 @@
 {% else %}{% include "agents/_partials/pf_intro.md.j2" %}{% endif %}
 {% if is_codex %}
 ```
-Bash("uv run --with {{ harness_maker_src_path }} hm worktree task-preflight <slug> \"$(pwd)\" --stage hm:{{ hm_stage }}")
+Bash("uv run --with {{ harness_maker_src_path }} hm worktree task-preflight <slug> \"$(pwd)\" --stage hm:{{ hm_stage }} --claude-session-id \"$HM_SESSION_ID\"")
 ```
 {% else %}
 ```bash
-!uv run --with {{ harness_maker_src_path }} hm worktree task-preflight <slug> "$(pwd)" --stage hm:{{ hm_stage }}
+!uv run --with {{ harness_maker_src_path }} hm worktree task-preflight <slug> "$(pwd)" --stage hm:{{ hm_stage }} --claude-session-id "$HM_SESSION_ID"
 ```
 {% endif %}
 {% if not workflow_context %}

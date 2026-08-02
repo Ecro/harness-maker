@@ -1,6 +1,6 @@
 [project]
 name = "harness-maker"
-version = "0.45.1"
+version = "0.46.0"
 description = "Per-project AI coding harness for Claude Code · Cursor · Codex. Profiler + 10-dim interview build a different harness for every project."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -89,4 +89,5 @@ addopts = "-q"
 markers = [
     "advisory: ADVISORY test — per PLAN-install-cmd-cifence ADR-002, run as a separate CI step with `continue-on-error: true` so unrelated external-tool drift (codex CLI behavior, npm registry availability) cannot block CI. Use `-m advisory` to select; `-m \"not advisory\"` to exclude.",
     "slow: long-running test (e.g. delivery-metrics 2000-commit perf gate) — BLOCKING in CI; deselect locally with `-m \"not slow\"` when iterating.",
+    "live_env: opt OUT of the root conftest's Claude-session env pin (CLAUDECODE / CLAUDE_ENV_FILE / HM_SESSION_ID). Only for tests whose subject IS the ambient environment; everything else must stay deterministic regardless of whether pytest runs inside a Claude Code session.",
 ]

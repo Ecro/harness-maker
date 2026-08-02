@@ -1538,6 +1538,18 @@ def health_cmd(
             "the slash template edits dashboard.md in place after this run."
         ),
     ),
+    session_id: str | None = typer.Option(
+        None,
+        "--session-id",
+        help=(
+            "This Claude session's id, forwarded by the rendered command as "
+            '--session-id "$HM_SESSION_ID". TRI-STATE: omitted = the probe was never '
+            "wired (a stale render); empty = wired and the value was genuinely absent "
+            "(a degraded session); non-empty = healthy. The value cannot be read from "
+            "the environment — the SessionStart hook sets it as an unexported shell "
+            "variable, so os.environ never sees it."
+        ),
+    ),
 ) -> None:
     """Run the two /hm:health layers and write the unified dashboard.
 
@@ -1560,7 +1572,7 @@ def health_cmd(
         import json
 
         scores = {
-            "structural": run_structural(target, preset=preset, model=model),
+            "structural": run_structural(target, preset=preset, model=model, session_id=session_id),
         }
         json_output.parent.mkdir(parents=True, exist_ok=True)
         json_output.write_text(json.dumps(scores, indent=2), encoding="utf-8")
@@ -1571,7 +1583,7 @@ def health_cmd(
         )
         return
 
-    structural = run_structural(target, preset=preset, model=model)
+    structural = run_structural(target, preset=preset, model=model, session_id=session_id)
     personalization_plan = run_audit(target)
     personalization = _personalization_section_from_plan(personalization_plan)
 
@@ -2221,6 +2233,15 @@ def autopilot_cmd(
         "--force",
         help="Take over a live marker owned by another session (ADR-010).",
     ),
+    session_id: str | None = typer.Option(
+        None,
+        "--session-id",
+        help=(
+            'Claude session id, normally "$HM_SESSION_ID". Must be passed explicitly: '
+            "the SessionStart hook writes it UNEXPORTED, so os.environ never carries it "
+            "(PLAN-sessionid-env-propagation ADR-001)."
+        ),
+    ),
 ) -> None:
     """Toggle the per-session `.hm-autopilot` marker (PLAN-human-bottleneck-auto-advance).
 
@@ -2238,7 +2259,7 @@ def autopilot_cmd(
         # same change. `resolve_toggle_config` exists precisely so they cannot drift; the
         # action table needed the same treatment. (Note the side effect: `status` GCs a
         # TTL-stale marker, so this is not a pure read on either surface.)
-        typer.echo(json.dumps(autopilot.status(root)))
+        typer.echo(json.dumps(autopilot.status(root, session_id=session_id)))
         return
     if action == "off":
         autopilot.clear(root)
@@ -2259,7 +2280,13 @@ def autopilot_cmd(
         typer.echo(f"autopilot: {exc}", err=True)
         raise typer.Exit(2) from None
     try:
-        marker = autopilot.write(root, level=level_v, pipeline=stages, force=force)
+        marker = autopilot.write(
+            root,
+            level=level_v,
+            pipeline=stages,
+            force=force,
+            claude_session_id=session_id or None,
+        )
     except autopilot.MarkerOwnedByAnotherSessionError as exc:
         # Mirrors `autopilot.main`'s exit 3. `write` grew this raise for ADR-010 and only
         # one of its two callers was updated — this shim is the documented `harness-maker

@@ -28,12 +28,11 @@
 ## Auto-advance check (autopilot — Claude Code only)
 
 Before the STOP banner below, check whether this session runs under **autopilot** (live
-auto-advance, ADR-005). This is **Claude-Code-only**: it needs the `.hm-autopilot` marker
-(armed by the autopilot picker) and the `Skill` tool. **If the `Skill` tool is unavailable
-(any non-Claude-Code IDE such as Cursor) OR no `.hm-autopilot` marker is active OR
-loop-mode is active for THIS session (a `.claude/.hm-loop-*` marker matches
-`$HM_SESSION_ID`, or a legacy `.hm-loop-active` exists), this section is a NO-OP** —
-fall straight through to the STOP banner (do not run any command below).
+auto-advance, ADR-005) — **Claude-Code-only**: it needs the `.hm-autopilot` marker (armed
+by the picker) and the `Skill` tool. **This section is a NO-OP** — fall straight through
+to the STOP banner, running nothing below — **if any of: no `Skill` tool (Cursor/Codex),
+no active marker, or loop-mode is on for THIS session (a `.claude/.hm-loop-*` marker
+matches `$HM_SESSION_ID`, or a legacy `.hm-loop-active` exists).**
 
 **Step 1 — mandatory gate FIRST (absent-case = STOP).** Evaluate THIS stage's gate
 *before* anything else: {{ summary_autopilot_gate | default("No gate defined — treat as STOP (absent-case guard).") }}
@@ -41,7 +40,7 @@ If the gate is pending/unresolved → record it on the ledger, then **STOP** (pr
 banner). Do NOT run the boundary check — a stage that stops at its gate must not record an
 advance:
 
-!uv run --with {{ harness_maker_src_path }} hm autopilot_caps gate-blocked --root . --stage {{ summary_stage }}
+!uv run --with {{ harness_maker_src_path }} hm autopilot_caps gate-blocked --root . --stage {{ summary_stage }} --session-id "$HM_SESSION_ID"
 
 **Step 2 — boundary check (ONLY when the gate is clear).** Run the deterministic check
 (it enforces the Phase-5 runaway caps + kill switch, and on proceed records the advance it
@@ -51,7 +50,7 @@ If this stage has a slug, **append** it to the command below in single quotes �
 ` --slug 'my-task'`. Never a shell expression or a bracketed placeholder. Omit it
 otherwise; the marker keeps the earlier stage's slug.
 
-!uv run --with {{ harness_maker_src_path }} hm autopilot_caps boundary --root . --current {{ summary_stage }}{% if config.autonomy.step_cap is not none %} --step-cap {{ config.autonomy.step_cap }}{% endif %}{% if config.autonomy.time_cap_min is not none %} --time-cap-min {{ config.autonomy.time_cap_min }}{% endif %}
+!uv run --with {{ harness_maker_src_path }} hm autopilot_caps boundary --root . --current {{ summary_stage }} --session-id "$HM_SESSION_ID"{% if config.autonomy.step_cap is not none %} --step-cap {{ config.autonomy.step_cap }}{% endif %}{% if config.autonomy.time_cap_min is not none %} --time-cap-min {{ config.autonomy.time_cap_min }}{% endif %}
 
 Read the JSON:
 - `proceed: false` → **STOP** (print the banner) — **except `bad_slug`**. `step_cap`/

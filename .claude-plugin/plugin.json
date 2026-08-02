@@ -1,6 +1,6 @@
 {
   "name": "harness-maker",
-  "version": "0.45.1",
+  "version": "0.46.0",
   "description": "Per-project AI coding harness for Claude Code · Cursor · Codex. Profiler + 10-dim interview build a different harness for every project.",
   "author": {
     "name": "noel"

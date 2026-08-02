@@ -83,7 +83,43 @@ _PHASE_2_WRAPUP_CALLS = [
     f'!{_HM}.worktree drain "$(pwd)"',
 ]
 
+# PLAN-sessionid-env-propagation Phase 2 (ADR-005). Both autopilot_caps lines gain
+# `--session-id "$HM_SESSION_ID"`, so the old spellings disappear from all seven stages on
+# both arms. Nothing is CUT here — every call still exists, one flag longer. The lines are
+# built from `ATOMIC_COMMANDS` rather than written out fourteen times because a hand-typed
+# list would let one stage be silently omitted, and an omitted stage is precisely the
+# partial landing ADR-005 declares forbidden: a reader that cannot identify itself sees an
+# id-bearing marker as foreign, which is `kill_switch`, which is autopilot off.
+_PHASE_2_SESSIONID = {
+    entry_key(command, mode): [
+        f"!uv run --with $HOME/harness-maker python -m harness_maker.autopilot_caps "
+        f"boundary --root . --current {command}",
+        f"!uv run --with $HOME/harness-maker python -m harness_maker.autopilot_caps "
+        f"gate-blocked --root . --stage {command}",
+    ]
+    for command in ATOMIC_COMMANDS
+    for mode in AXES
+}
+
+# PLAN-sessionid-env-propagation Phase 5 (ADR-007). `task-preflight` gains
+# `--claude-session-id "$HM_SESSION_ID"` so a span carries a session id. It rides HERE and
+# NOT on `worktree create`: `worktree.py:2402` reads that flag's PRESENCE as the
+# loop-vs-standalone discriminator, so adding it to a `create` call would stamp standalone
+# spans `hm:loop` and write a marker header the Stop-hook content-matches — blocking a
+# standalone `/hm:execute` from ever stopping (risk R9). The negative guard for that lives
+# in tests/render/test_render_sessionid_wiring.py.
+_PHASE_5_SPAN_SESSIONID = {
+    entry_key(command, mode): [
+        f"!uv run --with $HOME/harness-maker python -m harness_maker.worktree "
+        f'task-preflight <slug> "$(pwd)" --stage hm:{command}',
+    ]
+    for command in ATOMIC_COMMANDS
+    for mode in AXES
+}
+
 _ALLOWED_REMOVALS: dict[str, dict[str, list[str]]] = {
+    "phase-2-sessionid-env-propagation": _PHASE_2_SESSIONID,
+    "phase-5-sessionid-span": _PHASE_5_SPAN_SESSIONID,
     # Phase D's three separate calls collapse into a select call plus one `&&`-chained
     # check call. Listed against BOTH arms: Phase D is outside every `dev_mode` gate, so
     # a cut that hit only one arm would be the bug this key shape exists to expose.

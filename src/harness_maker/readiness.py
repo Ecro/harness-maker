@@ -465,8 +465,15 @@ def _dim_context_quality(project_dir: Path, preset: Preset) -> DimensionScore:
     return DimensionScore(name="context_quality", score=_score_signals(signals), signals=signals)
 
 
-def _dim_guardrails(project_dir: Path) -> DimensionScore:
-    """Hooks defined + permissions deny list density."""
+def _dim_guardrails(project_dir: Path, *, session_id: str | None = None) -> DimensionScore:
+    """Hooks defined + permissions deny list density.
+
+    ``session_id`` is TRI-STATE and the three states must stay distinguishable
+    (PLAN-sessionid-env-propagation ADR-001): ``None`` = the caller never wired the
+    probe, ``""`` = the caller wired it and the value was genuinely absent, non-empty =
+    healthy. Collapsing ``None`` into ``""`` re-creates the defect this parameter exists
+    to remove.
+    """
     signals: list[Signal] = []
     claude = project_dir / ".claude"
 
@@ -997,38 +1004,63 @@ def _dim_guardrails(project_dir: Path) -> DimensionScore:
     #
     # CRITICAL: only emit when we are actually inside a Claude Code session, keyed
     # on `CLAUDECODE` — verified (REVIEW follow-up env probe) to be the session
-    # marker Claude Code DOES export to slash-command Bash subprocesses. The
-    # original `CLAUDE_ENV_FILE` is exposed only to HOOKS, NOT to the command env,
-    # so gating on it left the probe permanently N-A (a silent-dead signal — the
-    # exact failure this check exists to catch). In a real session HM_SESSION_ID is
-    # sourced from the SessionStart env-file when the hook fired; absent (degraded)
-    # it is unset → caught. Outside a session (unit tests, CI, `make` audit,
-    # Cursor/Codex) CLAUDECODE is unset → N-A, so the hard-gate never floors a
-    # static disk-scan context.
+    # marker Claude Code DOES export to slash-command Bash subprocesses. Outside a
+    # session (unit tests, CI, `make` audit, Cursor/Codex) CLAUDECODE is unset → N-A,
+    # so the hard-gate never floors a static disk-scan context.
+    #
+    # The VALUE cannot come from `os.environ` (ADR-001). `sessionid_envfile` writes
+    # `HM_SESSION_ID=<v>` into `$CLAUDE_ENV_FILE`, which Claude Code sources into the
+    # Bash-tool shell as an UNEXPORTED shell variable: `echo "$HM_SESSION_ID"` works,
+    # `os.environ.get("HM_SESSION_ID")` is None in every subprocess. Reading the env
+    # here therefore failed unconditionally and hard-gated this dimension to 0 in every
+    # real session. The slash command passes the value in instead; the env read survives
+    # only as a fallback for a host that does export it.
     claude_target = (not targets_cfg) or "claude-code" in targets_cfg
     in_session = bool(os.environ.get("CLAUDECODE"))
     if claude_target and in_session:
-        live_ok = bool(os.environ.get("HM_SESSION_ID"))
-        signals.append(
-            _signal(
-                "sessionid_envfile_live",
-                live_ok,
-                0,  # hard-gate, not additive — gating is via hard_gate, not weight
-                "HM_SESSION_ID is set (SessionStart env-file plumbing live)"
-                if live_ok
-                else "HM_SESSION_ID unset at runtime — SessionStart env-file plumbing "
-                "is not firing; a /hm:loop here self-stops after one iteration (the "
-                "Stop-hook has your session_id from stdin but the marker header is "
-                "empty, so content-match fails and the loop is allowed to stop) "
-                "while the static hooks.json check may still read green",
-                None
-                if live_ok
-                else "Ensure the SessionStart sessionid_envfile hook fires and "
-                "CLAUDE_ENV_FILE is honored; re-render with /hm:make --update and "
-                "restart the session",
-                hard_gate=True,
+        resolved = session_id if session_id is not None else os.environ.get("HM_SESSION_ID")
+        if resolved is None:
+            # The caller never wired the probe — a render predating `--session-id`.
+            # Weight 0 is the honest value, not a hedge: this dimension's signal weights
+            # sum to 145 against a cap of 100, so ANY failure of weight <= 45 moves the
+            # score by exactly zero. Declaring 15 would read as a cost that provably is
+            # not charged. The `action` is load-bearing — `improvement.py` drops signals
+            # with `action is None` before priority is computed, and that is the only
+            # channel carrying the remedy (ADR-004).
+            signals.append(
+                _signal(
+                    "sessionid_envfile_probe_wired",
+                    False,
+                    0,
+                    "the live session-id probe was not wired: this command did not pass "
+                    "--session-id, so whether the SessionStart plumbing works is unknown "
+                    "(a stale render, not a degraded session)",
+                    "Re-render the harness with /harness-maker:make --update so "
+                    '/hm:health passes --session-id "$HM_SESSION_ID"',
+                )
             )
-        )
+        else:
+            live_ok = bool(resolved)
+            signals.append(
+                _signal(
+                    "sessionid_envfile_live",
+                    live_ok,
+                    0,  # hard-gate, not additive — gating is via hard_gate, not weight
+                    "HM_SESSION_ID is set (SessionStart env-file plumbing live)"
+                    if live_ok
+                    else "HM_SESSION_ID unset at runtime — SessionStart env-file plumbing "
+                    "is not firing; a /hm:loop here self-stops after one iteration (the "
+                    "Stop-hook has your session_id from stdin but the marker header is "
+                    "empty, so content-match fails and the loop is allowed to stop) "
+                    "while the static hooks.json check may still read green",
+                    None
+                    if live_ok
+                    else "Ensure the SessionStart sessionid_envfile hook fires and "
+                    "CLAUDE_ENV_FILE is honored; re-render with /hm:make --update and "
+                    "restart the session",
+                    hard_gate=True,
+                )
+            )
 
     deny_present_ok = (not deny_opt_in) or len(deny_list) > 0
     signals.append(
@@ -1720,17 +1752,23 @@ def _count_user_md_files(claude_dir: Path) -> int:
 # ── public API ──────────────────────────────────────────────────────────────
 
 
-def compute_readiness(project_dir: Path, preset: Preset) -> ReadinessResult:
+def compute_readiness(
+    project_dir: Path, preset: Preset, *, session_id: str | None = None
+) -> ReadinessResult:
     """Compute Layer-1 readiness across 7 deterministic dimensions.
 
     Layer 3 (cache_efficiency) and Layer 2 (LLM-judged content quality) are
     folded in by the orchestrator at /hm:ai-readiness, not here.
+
+    ``session_id`` is forwarded verbatim to ``_dim_guardrails`` — see its tri-state
+    contract. Keyword-only and optional, so existing callers land in the ``None``
+    branch rather than silently claiming a healthy probe.
     """
     weights = WEIGHTS_SIDE if preset == Preset.SIDE else WEIGHTS_PROD
 
     dims: dict[str, DimensionScore] = {
         "context_quality": _dim_context_quality(project_dir, preset),
-        "guardrails": _dim_guardrails(project_dir),
+        "guardrails": _dim_guardrails(project_dir, session_id=session_id),
         "verification": _dim_verification(project_dir),
         "workflow_clarity": _dim_workflow_clarity(project_dir),
         "memory_continuity": _dim_memory_continuity(project_dir),

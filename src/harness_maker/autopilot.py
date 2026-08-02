@@ -475,19 +475,24 @@ def _write_if_unchanged(root: Path, *, before: bytes | None, updated: AutopilotM
     return True
 
 
-def touch(project_root: Path, *, now: str | None = None) -> bool:
+def touch(project_root: Path, *, now: str | None = None, session_id: str | None = None) -> bool:
     """Refresh ``last_seen`` iff this session owns the ACTIVE marker. Best-effort.
 
     Gated on ``active_marker`` so a peer can never advance someone else's heartbeat and
     keep their marker looking live. Any write failure is swallowed: a missed heartbeat
     degrades the takeover prompt's wording, it must never break a stage.
+
+    ``session_id`` must be threaded from the caller for the same reason every other
+    marker reader takes it (ADR-001): once the picker stamps an id, an id-less resolve
+    here is foreign to the marker this very session wrote, so the heartbeat becomes a
+    permanent silent no-op and a live owner looks abandoned to the takeover prompt.
     """
     root = resolve_marker_root(project_root)
     try:
         before: bytes | None = marker_path(root).read_bytes()
     except OSError:
         return False
-    marker = active_marker(root)
+    marker = active_marker(root, session_id=session_id)
     if marker is None:
         return False
     stamped = marker.model_copy(
@@ -496,19 +501,25 @@ def touch(project_root: Path, *, now: str | None = None) -> bool:
     return _write_if_unchanged(root, before=before, updated=stamped)
 
 
-def set_task_slug(project_root: Path, *, slug: str, stage: str) -> bool:
+def set_task_slug(
+    project_root: Path, *, slug: str, stage: str, session_id: str | None = None
+) -> bool:
     """Persist the task slug onto the ACTIVE marker. False when this session owns none.
 
     Gated on ``active_marker`` rather than ``load`` so a foreign marker is never
     slug-written — that read-modify-write is the only remaining marker-clobber window
     (R9), and refusing outright closes it for every non-owner.
+
+    ``session_id`` is threaded for the ADR-001 reason: an id-less resolve against an
+    id-stamped marker returns None here, and the caller turns that False into a
+    ``bad_slug`` halt naming a slug that in fact passed validation.
     """
     root = resolve_marker_root(project_root)
     try:
         before: bytes | None = marker_path(root).read_bytes()
     except OSError:
         return False
-    marker = active_marker(root)
+    marker = active_marker(root, session_id=session_id)
     if marker is None:
         return False
     try:
@@ -524,7 +535,9 @@ def set_task_slug(project_root: Path, *, slug: str, stage: str) -> bool:
     return _write_if_unchanged(root, before=before, updated=updated)
 
 
-def active_marker(project_root: Path, *, now: datetime | None = None) -> AutopilotMarker | None:
+def active_marker(
+    project_root: Path, *, now: datetime | None = None, session_id: str | None = None
+) -> AutopilotMarker | None:
     """Return the marker ONLY when it belongs to the current session AND is fresh.
 
     A foreign/stale ``session_uuid`` (left by a crashed or different session) → None;
@@ -543,7 +556,7 @@ def active_marker(project_root: Path, *, now: datetime | None = None) -> Autopil
     marker = load(project_root)
     if marker is None:
         return None
-    if not _is_own(marker, project_root):
+    if not _is_own(marker, project_root, session_id=session_id or None):
         logger.warning(".hm-autopilot: marker belongs to another session (foreign) — ignoring.")
         return None
     # Rejects everything that is not `fresh` — a too-old marker (crash leftover) AND a
@@ -560,7 +573,7 @@ def active_marker(project_root: Path, *, now: datetime | None = None) -> Autopil
 _VALID_LEVELS = frozenset({"gated", "auto_safe", "full"})
 
 
-def effective_level(project_root: Path, *, yaml_level: str) -> str:
+def effective_level(project_root: Path, *, yaml_level: str, session_id: str | None = None) -> str:
     """Precedence resolver (ADR-006): an active session marker wins over harness.yaml.
 
     ADR-006's three logical surfaces collapse to two mechanisms: the session-start
@@ -573,7 +586,7 @@ def effective_level(project_root: Path, *, yaml_level: str) -> str:
     known levels (typo, empty, pre-feature default) is itself unsafe to honor, so it
     is clamped to ``"gated"`` (fail-safe; absent-case = feature black hole guard).
     """
-    marker = active_marker(project_root)
+    marker = active_marker(project_root, session_id=session_id)
     if marker is not None:
         return marker.level
     if yaml_level not in _VALID_LEVELS:
@@ -582,8 +595,16 @@ def effective_level(project_root: Path, *, yaml_level: str) -> str:
     return yaml_level
 
 
-def status(project_root: Path) -> dict[str, Any]:
+def status(project_root: Path, *, session_id: str | None = None) -> dict[str, Any]:
     """The deterministic answer to "is autopilot active?" (ADR-002).
+
+    ``session_id`` is this caller's own id, supplied explicitly because it CANNOT be read
+    from the environment: `sessionid_envfile` writes `HM_SESSION_ID` into
+    `$CLAUDE_ENV_FILE`, which Claude Code sources as an unexported shell variable, so
+    `os.environ` never sees it (PLAN-sessionid-env-propagation ADR-001/005). Empty string
+    means id-less here — unlike the readiness tri-state, this path deliberately collapses
+    `""` and `None`, because the rendered call sites pass the flag unconditionally and
+    Cursor/Codex/degraded sessions legitimately deliver an empty value.
 
     This exists because the picker had no way to ask. Its arm condition — "if no marker
     is active yet" — had only `on`/`off` behind it, so the model fell back to checking
@@ -599,6 +620,7 @@ def status(project_root: Path) -> dict[str, Any]:
     command removes.
     """
     root = resolve_marker_root(project_root)
+    effective_id = session_id or _env_session_id()
     out: dict[str, Any] = {
         "active": False,
         "reason": "absent",
@@ -622,7 +644,7 @@ def status(project_root: Path) -> dict[str, Any]:
         # Unparseable survived GC only if the file vanished underneath us.
         out["reason"] = "absent"
         return out
-    if not _is_own(marker, root):
+    if not _is_own(marker, root, session_id=effective_id):
         # A caller with NO id of its own cannot tell "a peer owns this" from "this is mine
         # and I lost my id". Those need opposite advice, so they get different labels.
         #
@@ -635,7 +657,7 @@ def status(project_root: Path) -> dict[str, Any]:
         # advance-noop class this whole change exists to remove, relocated.
         out["reason"] = (
             "degraded-idless"
-            if _env_session_id() is None and marker.claude_session_id is not None
+            if effective_id is None and marker.claude_session_id is not None
             else "foreign"
         )
         # Neither reason authorizes a takeover on its own — this is how long the owner has
@@ -655,7 +677,7 @@ def status(project_root: Path) -> dict[str, Any]:
         level=marker.level,
         pipeline=[s.value for s in marker.pipeline],
         task_slug=marker.task_slug,
-        session_scoped=_env_session_id() is not None and marker.claude_session_id is not None,
+        session_scoped=effective_id is not None and marker.claude_session_id is not None,
     )
     return out
 
@@ -703,10 +725,15 @@ def main(argv: list[str] | None = None) -> int:
     # ADR-010: taking over a live peer's marker must be deliberate, never a side effect
     # of the picker offering to arm.
     parser.add_argument("--force", action="store_true")
+    # PLAN-sessionid-env-propagation ADR-005: the id cannot be read from the process
+    # environment (the SessionStart hook publishes it as an UNEXPORTED shell variable),
+    # so the rendered picker passes it explicitly. Writer and readers must agree — a
+    # marker stamped with an id that the boundary readers cannot match is kill_switch.
+    parser.add_argument("--session-id", default=None, dest="session_id")
     args = parser.parse_args(raw)
     root = Path(args.root) if args.root else Path.cwd()
     if args.action == "status":
-        print(json.dumps(status(root)))
+        print(json.dumps(status(root, session_id=args.session_id)))
         return 0
     if args.action == "off":
         clear(root)
@@ -718,7 +745,13 @@ def main(argv: list[str] | None = None) -> int:
         print(f"autopilot: {exc}", file=sys.stderr)
         return 2
     try:
-        marker = write(root, level=level, pipeline=stages, force=args.force)
+        marker = write(
+            root,
+            level=level,
+            pipeline=stages,
+            force=args.force,
+            claude_session_id=args.session_id or None,
+        )
     except MarkerOwnedByAnotherSessionError as exc:
         print(f"autopilot: {exc}", file=sys.stderr)
         return 3

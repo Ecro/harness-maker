@@ -18,16 +18,10 @@ def _bypass_worktree_guard(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("HARNESS_MAKER_BYPASS_WORKTREE_GUARD", "1")
 
 
-@pytest.fixture(autouse=True)
-def _isolate_session_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Pin CLAUDECODE / CLAUDE_ENV_FILE / HM_SESSION_ID out of the env by default
-    so the readiness live-probe (ADR-004) is deterministic regardless of whether
-    pytest itself runs inside a Claude Code session (which sets CLAUDECODE and
-    would otherwise leak it into the static disk-scan and floor the dimension).
-    Tests that exercise the live probe set them explicitly via monkeypatch."""
-    monkeypatch.delenv("CLAUDECODE", raising=False)
-    monkeypatch.delenv("CLAUDE_ENV_FILE", raising=False)
-    monkeypatch.delenv("HM_SESSION_ID", raising=False)
+# The CLAUDECODE / CLAUDE_ENV_FILE / HM_SESSION_ID pin that used to live here moved to
+# `tests/conftest.py` (PLAN-sessionid-env-propagation ADR-002) so integration, e2e, render
+# and structural inherit it too — this directory was the only one protected, which is how
+# `test_fresh_install_readiness` came to depend on which shell the operator ran it from.
 
 
 @pytest.fixture(autouse=True)

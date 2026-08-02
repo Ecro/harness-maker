@@ -88,7 +88,11 @@ def test_live_signal_fails_and_floors_on_claude_code_unset(
     monkeypatch.delenv("HM_SESSION_ID", raising=False)
     _write_hooks(tmp_path)
     _write_targets(tmp_path, ["claude-code"])
-    dim = _dim_guardrails(tmp_path)
+    # `session_id=""` is the state this signal occupies since
+    # PLAN-sessionid-env-propagation ADR-001: the caller WIRED the probe and the value
+    # was genuinely absent. Omitting the argument now means "probe never wired" — a
+    # stale render, which is `sessionid_envfile_probe_wired` and deliberately not gated.
+    dim = _dim_guardrails(tmp_path, session_id="")
     sig = _find(dim.signals, _SIG)
     assert sig is not None
     assert sig.passed is False
@@ -144,7 +148,7 @@ def test_live_signal_defaults_to_claude_code_when_no_targets(
     monkeypatch.delenv("HM_SESSION_ID", raising=False)
     _write_hooks(tmp_path)
     (tmp_path / ".claude").mkdir(parents=True, exist_ok=True)  # no harness.yaml
-    dim = _dim_guardrails(tmp_path)
+    dim = _dim_guardrails(tmp_path, session_id="")  # wired + genuinely absent (ADR-001)
     sig = _find(dim.signals, _SIG)
     assert sig is not None
     assert sig.passed is False

@@ -2395,10 +2395,17 @@ def _cli_create(args: list[str]) -> int:
     # count check. Absent → empty (back-compat; marker header empty).
     claude_session_id = ""
     # ADR-008: the loop signal is flag PRESENCE, never value truthiness. loop.md.j2
-    # passes `--claude-session-id "$HM_SESSION_ID"` QUOTED, so on WSL2 — where
-    # CLAUDE.md records `$HM_SESSION_ID` as empty — the flag arrives with an EMPTY
-    # value. Selecting on the value would label every loop on the author's own
-    # platform `hm:execute`, silently defeating the loop attribution this exists for.
+    # passes `--claude-session-id "$HM_SESSION_ID"` QUOTED, and in a degraded environment
+    # (Cursor, Codex, or a SessionStart-hook failure — NOT "WSL2", which is what this
+    # comment used to claim) the flag arrives with an EMPTY value. Selecting on the value
+    # would label every such loop `hm:execute`, silently defeating the loop attribution
+    # this exists for.
+    #
+    # PRESENCE-overloading is therefore load-bearing and CONSTRAINS callers: no other
+    # `worktree create` call site may pass this flag, or its spans get stamped `hm:loop`
+    # and its marker gains a session header the Stop-hook will content-match — blocking a
+    # standalone `/hm:execute` from ever stopping (PLAN-sessionid-env-propagation ADR-007,
+    # risk R9; guarded by tests/render/test_render_sessionid_wiring.py).
     is_loop_create = "--claude-session-id" in args
     if is_loop_create:
         idx = args.index("--claude-session-id")
@@ -2438,7 +2445,8 @@ def _cli_create(args: list[str]) -> int:
     #
     # `--claude-session-id` PRESENCE is the loop signal: CLAUDE.md records that ONLY
     # loop.md.j2 passes it, so a standalone /hm:execute create is not a loop. The
-    # flag's VALUE is empty on WSL2 and must not be used to decide this.
+    # flag's VALUE is empty in any degraded environment (Cursor / Codex / a genuine
+    # SessionStart-hook failure) and must not be used to decide this.
     _emit_stage_span(
         base,
         stage="hm:loop" if is_loop_create else f"hm:{stage}",
@@ -5023,7 +5031,9 @@ def _span_end_session_id() -> str | None:
     in as many words ("The Stop-hook DOES receive `session_id` on stdin, but the loop
     driver/marker writer (a slash command) does not"), and the sibling Stop hook
     `hooks/loop_gate.py` reads it from there. `HM_SESSION_ID` is the *slash-command*
-    bridge, and it is documented-empty on WSL2.
+    bridge and it is **unexported**, so a Python hook process never sees it at all —
+    on any platform, not merely "empty on WSL2" as this once said
+    (PLAN-sessionid-env-propagation ADR-003).
 
     Reading only the env var was therefore the wrong channel (review round 3): when the
     hook process has no `HM_SESSION_ID` but the `start` carried one, the caller matches

@@ -35,7 +35,7 @@
 > exists.** Nothing collects a stale marker, so file-existence reads as "already armed"
 > and autopilot silently never turns on; that is the usual reason it looks dead.
 >
-> `uv run --with {{ harness_maker_src_path }} hm autopilot status --root .`
+> `uv run --with {{ harness_maker_src_path }} hm autopilot status --root . --session-id "$HM_SESSION_ID"`
 >
 > Branch on **both** fields of the JSON (it always exits 0):
 > - `active: true` → armed already. Skip the picker; do not re-arm.
@@ -49,7 +49,7 @@
 > - anything else → offer ONCE via `AskUserQuestion`: "Run the
 >   `{{ config.autonomy.pipeline | join(' → ') }}` pipeline on autopilot this session
 >   (stages auto-advance when no mandatory gate is pending), or stay gated?" On **yes**:
->   `uv run --with {{ harness_maker_src_path }} hm autopilot on --level {{ config.autonomy.level }} --pipeline {{ config.autonomy.pipeline | join(',') }}`
+>   `uv run --with {{ harness_maker_src_path }} hm autopilot on --level {{ config.autonomy.level }} --pipeline {{ config.autonomy.pipeline | join(',') }} --session-id "$HM_SESSION_ID"`
 >   On **no**, proceed gated — do not re-prompt unless the user asks.
 >
 > **Persistence:** the marker lives at the **project root** (so a stage inside
