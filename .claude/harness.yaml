@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.44.0
+harness_maker_version: 0.45.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: harness-yaml/Production.yaml.j2
 provenance: official
-content_hash: 5b145a473e5dce1437d35e537e1e10158bca5cacfe806a8915432414fea3b918
+content_hash: 8e7044e6ff01daa7b2dbed7c35dc82ff07aa83b70fe033a70e6c625c80d7137e
 ---
 preset: Production
 locale: ko
@@ -119,6 +119,8 @@ skills:
     - security-scanner
     - context-linter
     - refdocs-search
+    - second-opinion-gate
+    - targeted-test-selection
   enabled:
     - verify-before-completion
     - autoloop-driver
@@ -131,6 +133,7 @@ skills:
     - context-linter
     - research-crawler
     - refdocs-search
+    - second-opinion-gate
 
 worktree:
   scope: [execute, plan]
