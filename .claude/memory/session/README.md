@@ -1,6 +1,6 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.46.0
+harness_maker_version: 0.47.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: memory/session-readme.md.j2
 provenance: official
@@ -33,7 +33,7 @@ Context compaction fired. Progress snapshotted to `<checkpoint-ref>`.
 
 ## 로딩 정책
 
-`/hm:execute` (및 fused workflow) 시작 시에만 로딩:
+`/hm:execute` 시작 시에만 로딩:
 1. **Hot tier (checkpoint only)** — 오늘 날짜 세션 로그에서 `checkpoint:compaction`
    엔트리만 확인 (interrupted-session 재개용). legacy `[decision:*]` 블록은 무시.
 

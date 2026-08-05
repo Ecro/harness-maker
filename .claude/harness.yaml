@@ -1,17 +1,16 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.46.0
+harness_maker_version: 0.47.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: harness-yaml/Production.yaml.j2
 provenance: official
-content_hash: 8e7044e6ff01daa7b2dbed7c35dc82ff07aa83b70fe033a70e6c625c80d7137e
+content_hash: 69e676af3ffbf087e3d3bd0d0788cc331049c18ef8f507ff246374df82bd4dd5
 ---
 preset: Production
 locale: ko
 targets: [claude-code, cursor, codex]
 default_model: opus
 dev_mode: task-driven
-default_workflow: exec-rev-wrap-ver
 caching: agent-aware
 schema_version: 1
 interview:
@@ -59,33 +58,6 @@ wrapup_docs:
   - "CHANGELOG.md"
   - "docs/ARCHITECTURE.md"
   - "docs/HOW-IT-WORKS.md"
-
-workflows:
-
-  exec-rev:
-    - execute
-    - review
-
-  exec-rev-wrap:
-    - execute
-    - review
-    - wrapup
-
-  exec-rev-wrap-ver:
-    - execute
-    - review
-    - wrapup
-    - verify
-
-  plan-exec-rev:
-    - plan
-    - execute
-    - review
-
-  res-spec-plan:
-    - research
-    - spec
-    - plan
 
 reviewers:
   consensus: cross-check

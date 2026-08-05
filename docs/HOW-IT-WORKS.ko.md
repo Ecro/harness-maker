@@ -19,11 +19,7 @@
    - 3.5 [/hm:review — 코드 리뷰](#35-hmreview--코드-리뷰)
    - 3.6 [/hm:verify — 완료 검증](#36-hmverify--완료-검증)
    - 3.7 [/hm:wrapup — 커밋 마무리](#37-hmwrapup--커밋-마무리)
-4. [퓨전 명령](#4-퓨전-명령)
-   - 4.1 [/hm:res-spec-plan](#41-hmres-spec-plan)
-   - 4.2 [/hm:exec-rev](#42-hmexec-rev)
-   - 4.3 [/hm:exec-rev-wrap](#43-hmexec-rev-wrap)
-   - 4.4 [/hm:exec-rev-wrap-ver](#44-hmexec-rev-wrap-ver)
+4. [퓨전 명령](#4-퓨전-명령) <!-- @hm:axis-removed -->
 5. [/hm:loop — 자동 반복 루프](#5-hmloop--자동-반복-루프)
 6. [특수 명령](#6-특수-명령)
    - 6.1 [/hm:refresh — 안티-rot 업데이트](#61-hmrefresh--안티-rot-업데이트)
@@ -80,7 +76,8 @@ harness-maker 는 **Claude Code 와 Cursor 양쪽 IDE** 에서 동작하는 듀�
 ### 설계 원칙
 
 - **LLM 판단 우선**: 패턴 매칭보다 LLM 이 문맥을 읽고 직접 판단
-- **원자성**: 각 단계는 독립 실행 가능. 단계 간 결합은 퓨전 명령이 담당
+- **원자성**: 각 단계는 독립 실행 가능. 단계 간 결합은
+  `/hm:loop --per-iter-stages` 또는 autopilot 이 담당
 - **워크트리 격리**: 구현 변경은 `.worktrees/<name>-<ts>/` 안에서만 발생 — 메인 브랜치 보호
 - **커밋은 wrapup 이 한 번만**: 여러 단계를 거쳐도 커밋은 wrapup 이 단 한 번 생성
 - **외부 전송 없음**: 모든 텔레메트리는 100% 로컬
@@ -829,66 +826,11 @@ EOF
 
 ---
 
-## 4. 퓨전 명령
+## 4. 퓨전 명령 <!-- @hm:axis-removed -->
 
-퓨전 명령은 여러 원자 단계를 하나의 명령으로 묶은 것이다. 단계들이 순서대로 실행되며, 중간에 실패하면 해당 단계에서 중단된다.
-
----
-
-### 4.1 /hm:res-spec-plan
-
-`research + spec + plan` 세 단계를 순차 실행.
-
-실행 순서:
-1. `/hm:research {slug}` 실행 → `RESEARCH-{slug}.md` 생성
-2. `/hm:spec {slug}` 실행 (RESEARCH 를 입력으로) → `SPEC-{slug}.md` 생성
-3. `/hm:plan {slug}` 실행 (SPEC 을 입력으로) → `PLAN-{slug}.md` 생성
-
-harness.yaml 설정에 따라 각 단계의 기본값이 결정된다.
-
-용도: 완전히 새로운 기능 개발 시작 시 탐색-조건-계획 세 단계를 한 번에 완료.
-
----
-
-### 4.2 /hm:exec-rev
-
-`execute + review` 두 단계를 순차 실행.
-
-실행 순서:
-1. `/hm:execute {slug}` 실행 → 워크트리에 구현, staged 상태로 유지
-2. `/hm:review {slug}` 실행 → 리뷰 결과 + 자동 수정
-
-**wrapup 없음**: 변경 사항이 staged 로 남음. 추가 작업이나 검토 후 별도로 `/hm:wrapup` 실행.
-
----
-
-### 4.3 /hm:exec-rev-wrap
-
-`execute + review + wrapup` 세 단계를 순차 실행.
-
-실행 순서:
-1. `/hm:execute {slug}`
-2. `/hm:review {slug}`
-3. `/hm:wrapup {slug}`
-
-리뷰가 `grade_threshold` (기본 A) 달성 시 자동으로 커밋까지 완료.
-리뷰 등급 미달 시에도 wrapup 은 진행됨 — `human_review_needed=true` 플래그를 세팅하고 커밋. 사용자가 이후 플래그를 확인하여 수동 검토 수행.
-
----
-
-### 4.4 /hm:exec-rev-wrap-ver
-
-`execute + review + wrapup + verify` 네 단계를 순차 실행.
-
-실행 순서:
-1. `/hm:execute {slug}`
-2. `/hm:review {slug}`
-3. `/hm:wrapup {slug}`
-4. `/hm:verify {slug}` ← wrapup **이후에** 실행 (커밋 후 최종 확인)
-
-wrapup 까지 완료한 후 verify 가 실패하면: 커밋은 이미 됐으므로 사용자에게 수정 필요 사항 보고.
-
-가장 포괄적인 퓨전 명령. 새로운 기능을 완전히 안전하게 배포할 때 사용.
+퓨전 명령은 없습니다. 7개 원자 단계는 `/hm:loop` (`--per-iter-stages`, 기본 <!-- @hm:axis-removed -->
+`execute,review`) 또는 autopilot 의 `autonomy.pipeline` 으로 연결합니다.
+융합 워크플로 축은 0.47.0 에서 제거됐습니다 — PLAN-harness-diet ADR-001/002/014 참조. <!-- @hm:axis-removed -->
 
 ---
 
@@ -1880,7 +1822,7 @@ ref_folders:
 
 **Q: 커밋이 여러 개 생기지 않나요?**
 
-A: 아닙니다. `execute`, `review` 단계는 커밋하지 않습니다. `wrapup` 이 단 하나의 커밋을 생성합니다. 퓨전 명령 (`exec-rev-wrap`) 사용 시에도 마찬가지.
+A: 아닙니다. `execute`, `review` 단계는 커밋하지 않습니다. `wrapup` 이 단 하나의 커밋을 생성합니다. `/hm:loop` 로 여러 단계를 이어 돌려도 마찬가지.
 
 **Q: 워크트리가 너무 많이 쌓이면?**
 

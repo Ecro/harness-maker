@@ -75,7 +75,8 @@ harness-maker is a multi-target harness generator for **Claude Code, Cursor IDE,
 ### Design principles
 
 - **LLM judgment first**: LLM reads context and makes direct judgments rather than using pattern matching
-- **Atomicity**: Each stage can be run independently. Coupling between stages is handled by fusion commands
+- **Atomicity**: Each stage can be run independently. Coupling between stages is handled by
+  `/hm:loop --per-iter-stages` or autopilot
 - **Worktree isolation**: Implementation changes happen only inside `.worktrees/<name>-<ts>/` — protecting the main branch
 - **Commit only in wrapup**: Even after multiple stages, a commit is created exactly once in wrapup
 - **No external transmission**: All telemetry is 100% local
@@ -839,9 +840,9 @@ Commit types: `feat | fix | chore | ci | test | docs | refactor`
 
 ## 4. Fusion Commands
 
-There is no fusion command. The seven atomic stages are chained by `/hm:loop`
+There is no fusion command. The seven atomic stages are chained by `/hm:loop` <!-- @hm:axis-removed -->
 (`--per-iter-stages`, default `execute,review`) or by autopilot's `autonomy.pipeline`.
-The fused-workflow axis was removed in 0.47.0 — see PLAN-harness-diet ADR-001/002/014.
+The fused-workflow axis was removed in 0.47.0 — see PLAN-harness-diet ADR-001/002/014. <!-- @hm:axis-removed -->
 
 ---
 

@@ -506,7 +506,7 @@ After install, the rendered harness exposes commands under `/hm:*`:
 
 ### Chaining stages
 
-There is no fused-workflow command. Two mechanisms chain the atomic stages:
+There is no fused-workflow command. Two mechanisms chain the atomic stages: <!-- @hm:axis-removed -->
 
 | Mechanism | What it does |
 |---|---|

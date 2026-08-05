@@ -248,9 +248,15 @@ def test_a_retired_key_is_not_re_injected_on_re_render(tmp_path: Path) -> None:
 # exact English phrase, so a Korean rendering slipped past the ban while a reworded
 # English sentence could accidentally satisfy the allow. The allow is now an explicit
 # marker a human must type — an escape hatch cannot be entered by accident.
+# TWO vocabularies, not one. The feature is "fused workflow" in the config and the code, but
+# the prose docs call the same thing a "fusion command" / "퓨전 명령" — and the first version
+# of this pattern banned only the former. Result: `docs/HOW-IT-WORKS{,.ko}.md` kept asserting
+# "coupling between stages is handled by fusion commands" through the entire removal, and the
+# Korean file kept a whole section 4 documenting the four deleted commands, while this gate
+# stayed green. Ban both spellings in both languages.
 _PROSE_BAN = re.compile(
-    r"fused workflow|fused-workflow|융합 워크플로|@hm-exec-rev|/hm:exec-rev"
-    r"|`exec-rev|`plan-exec-rev|`res-spec-plan"
+    r"fused workflow|fused-workflow|융합 워크플로|fusion command|퓨전 명령"
+    r"|@hm-exec-rev|/hm:exec-rev|`exec-rev|`plan-exec-rev|`res-spec-plan"
 )
 _AXIS_REMOVED_MARKER = "<!-- @hm:axis-removed -->"
 
@@ -263,6 +269,36 @@ def _prose_offenders(paths: list[Path], root: Path) -> list[str]:
         for n, line in enumerate(p.read_text(encoding="utf-8").splitlines(), 1)
         if _PROSE_BAN.search(line) and _AXIS_REMOVED_MARKER not in line
     ]
+
+
+def test_no_repo_doc_advertises_a_fused_workflow() -> None:
+    """The gate's scope was the SHIPPED render surface; the repo's own docs were outside it.
+
+    That omission is the same shape as the two the reviews already caught this task — a gate
+    aimed at the artifact being fixed, letting the identical defect survive next to it. The
+    templates were swept clean while `docs/HOW-IT-WORKS.ko.md` still carried section 4.1-4.4
+    describing `/hm:res-spec-plan`, `/hm:exec-rev`, `/hm:exec-rev-wrap` and
+    `/hm:exec-rev-wrap-ver` as live commands, and both language versions still told the reader
+    that stages are coupled by fusion commands.
+
+    CHANGELOG and `work-docs/` are excluded on purpose: a changelog and a landed PLAN/REVIEW
+    are HISTORICAL records, and an entry that describes what a past release removed has to be
+    allowed to name it. `TECH_SPEC.md` keeps its build-phase history for the same reason and
+    annotates the live claims in place, so it is excluded too. Everything a reader treats as
+    a description of the CURRENT system is in scope.
+
+    A line that announces the removal is exempted by the explicit `<!-- @hm:axis-removed -->`
+    marker — a human has to type it, so a future rewording cannot satisfy the exemption by
+    accident.
+    """
+    docs = [_REPO / "README.md", _REPO / "README.ko.md"]
+    docs += sorted(
+        d for d in (_REPO / "docs").rglob("*.md") if "adr" not in d.relative_to(_REPO).parts
+    )
+    paths = [d for d in docs if d.is_file()]
+    # Non-vacuity: a mistyped root would make this pass over an empty list forever.
+    assert len(paths) >= 5, [str(p) for p in paths]
+    assert _prose_offenders(paths, _REPO) == []
 
 
 def test_no_shipped_template_advertises_a_fused_workflow() -> None:
