@@ -28,6 +28,26 @@
 **Proposed mechanism:** a MECHANICAL post-write guard (prose instruction has now failed 3×). Two complementary options: (a) a `PostToolUse` Write/Edit hook (or a wrapup Step 6 pre-stage assertion) that, when the touched path is `.claude/memory/{wiki,failures}.md`, runs `grep -c "@hm:/user:entries" <file>` and HARD-FAILS the wrapup if the count is 0 (close marker deleted) — the cheapest possible regression catch, byte-deterministic, no integration suite needed; (b) make `harness_maker.memory_retrieve.parse_entries` emit a `stderr` warning naming the file when the close marker is absent, so the corruption is loud at every retrieval instead of a silent zero-result.
 **Rationale:** Three recurrences (2026-05-17 content-after-marker, 2026-05-20 marker-deleted, 2026-06-20 marker-overwritten) all share one root: a wrapup append touching the close-marker line. The standing fix added prose ("name the marker, insert ABOVE it") + a verification-suite note, but under autopilot/dogfooding pressure the LLM still overwrote the marker. The failure is invisible until an INTEGRATION-tier test runs, and was mis-triaged as a brittle test before being root-caused — costing a full phase of delay. A 1-line `grep -c` assertion at wrapup time would have caught all three at the moment of damage. This is the canonical "prose guard failed N times → promote to mechanical guard" case.
 
+## Proposal: re-review-the-fix-not-just-the-suite (2026-08-05)
+**Triggered by:** [fail:test] fix-introduced-defect-passes-all-gates (count: 3)
+**Proposed mechanism:** make the review stage's auto-fix loop re-review the FIX DELTA, not
+only re-run the suite. Round N applies fixes; round N+1 currently recomputes a grade from a
+green suite, which is exactly the signal that cannot see a fix-introduced defect — the suite
+was green before the fixes too.
+**Rationale:** three occurrences now, all the same shape: the fixes for round-1 findings
+introduce fresh defects that every automated gate passes. The 2026-08-05 instance produced
+five — a half-updated en/ko pair, a comment contradicting the test docstring written beside
+it, a dual-target edit that reached only one target, stray whitespace in a shipped artifact,
+and a newly-added gate that was itself too narrow (English-only). All five were found by
+re-spawning a reviewer on the delta with the prior findings and the applied fixes named
+explicitly; none were found by the suite. The cheap version is a required round-N+1 dispatch
+scoped to the changed files with the round-N finding list attached, asking only "did any fix
+introduce a new defect, and is each new test sound?" — not a full re-review. Note the
+recurrence was invisible until 2026-08-05 because this entry's heading carried a
+`previous_count` field the writer rejects; see [[fail:design prev-count-heading-freezes-counter]].
+Two of the five defects were in a gate added by the same round, which suggests the prompt
+should ask specifically about newly-added tests.
+
 ## Proposal: ruff-format-in-execute-not-just-wrapup (2026-07-09)
 **Triggered by:** [fail:lint] wrapup-final-verify-skips-ruff-format-check (count: 3)
 **Proposed mechanism:** execute + review stage procedure note (run `ruff format` after edits, not only `ruff check`) OR a pre-commit format-fix hook. **Updated 2026-07-25 — this mechanism has a gap.** It assumes the failure mode is "format was never run". A second mode exists: format IS run and its exit code is discarded, because the command was piped (`ruff format --check … | tail -1` makes `$?` the tail's). Neither a procedure note nor a format-fix hook catches that. Add: gate commands must never be piped — redirect and record one `rc` per check (`cmd > f 2>&1; echo "rc=$?" >> f`). See `[fail:lint] gate-exit-code-lost-through-pipe`.
