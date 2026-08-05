@@ -1,6 +1,6 @@
 preset: Production
 dev_mode: spec-driven
-file_count: 58
+file_count: 59
 files:
 - path: ../CLAUDE.md
   template: claude-md/Production.en.md.j2
@@ -13,7 +13,7 @@ files:
   body_sha256: 543fd34c42ce62e8fc263b8e38d236a0963fca32912409db97f62d257381c6fb
 - path: agents/code-verifier.md
   template: agents/code-verifier.md.j2
-  body_sha256: e8de8817f2607bc054f60c8e0c9c87e85ba6df09df1c130a4ac4bbe4589207e8
+  body_sha256: ec6bd066a156ac4efbccba2c494ac5dbe37827672ce96a79546f932174e13769
 - path: agents/concurrency-reviewer.md
   template: agents/concurrency-reviewer.md.j2
   body_sha256: 4cc2d2903a2c921bf2b8c4892ba38dd5a0ffaa40c8fb8943abdcf19417d4bd24
@@ -55,7 +55,7 @@ files:
   body_sha256: 0f4a159cefd5aa268d8033c94dc4fbf862b981059431f107eb2edc61c47c7646
 - path: commands/hm/execute.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: e4e1d1b6dfbc2e5b7cdc445c906368fd3002ef40242d793b25b841cc12c82593
+  body_sha256: 1dea08f921fa3ba5368ab77259825dd82cde01fa48a917d65f9e801b32922c65
 - path: commands/hm/health.md
   template: commands/hm/health.md.j2
   body_sha256: 5341eed7a1302c4df8fdfaa8ef2ceedb72fce0e7d35e537e52254c9560708e35
@@ -76,13 +76,13 @@ files:
   body_sha256: b6749fc52ac4b05518c0198200d63ab859a9d92eefa7edf202dcd425b7df9703
 - path: commands/hm/plan.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: 3c6725da4cc5b79455277cdfdfd84f085d04edcba204ebdd4fcb23b1ccbdf156
+  body_sha256: ac849803aa391bc9776dd6aa1b7f9cf609f47a8fc881360c9a2f0f33f53ab393
 - path: commands/hm/research.md
   template: commands/hm/atomic_command.md.j2
   body_sha256: e557fb7918774ce3b3c4fc843efa7aa2f5121fcf5a3a6213f9fb54190d92bf4f
 - path: commands/hm/review.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: eed492b452e9c75df1e4b220003987d95256880b49c6b2df5534d2f33234459d
+  body_sha256: 05012b2f8572f675352f20a21a0df946ede995793bf9924e8c76b60cb13019c9
 - path: commands/hm/spec.md
   template: commands/hm/atomic_command.md.j2
   body_sha256: d3533ffb76f35f296a70b0f5d0f0077ca950f3c711f79c243a274803b2c56e59
@@ -116,6 +116,9 @@ files:
 - path: rubrics/claude_md.yaml
   template: rubrics/claude_md.yaml.j2
   body_sha256: 3c5e35fb0ab1ccf6bf90f5e8152b5743c868d7f92f35361fa549bbea7607105b
+- path: rubrics/repair_guard_force.yaml
+  template: rubrics/repair_guard_force.yaml.j2
+  body_sha256: d998d6b94a24137d715f768abba8f75887fa95eee6c035ed59954a9a1af0a44a
 - path: rubrics/skill.yaml
   template: rubrics/skill.yaml.j2
   body_sha256: 03a7f5c424652cb4a76e2078092bc0771e655e7760b4009aca7600eeb09dc6b9
@@ -157,16 +160,16 @@ files:
   body_sha256: 9045e80a49734a51375ffdf609e9472c5db50a1bfc318242b01afabdf3df98c5
 - path: stages/execute.md
   template: stages/execute.md.j2
-  body_sha256: 0450150301c568dc30b97c85f597039f928b9e7682d8abb37cc7ed9a36bbdc3d
+  body_sha256: e14f1f975f1f22b3638e14d8fbc9768c4f7afa1fe8a604e5bc532f6f5f8bd48a
 - path: stages/plan.md
   template: stages/plan.md.j2
-  body_sha256: d28a6ed063be1bfe5efa867387169ec607076b71a1dbce64bcf4cfd600fe87f0
+  body_sha256: 4864efe15664c5bb54871a39db73c5c7ee5d434fda05ca2bd1847681e4832355
 - path: stages/research.md
   template: stages/research.md.j2
   body_sha256: 2dcb37686f16256bc1edb4f4c09d821f58acf18bcdb330fb2a6ad6734e0988e2
 - path: stages/review.md
   template: stages/review.md.j2
-  body_sha256: bea6867239032656f02762a12b46bf7b6267bd8a7754835e4272eee4b3469689
+  body_sha256: ba6a74fbd363eddcf7fd8e97c59e0149f56d2114ab971596229ce7ddd265e552
 - path: stages/spec.md
   template: stages/spec.md.j2
   body_sha256: c1a86410a3d66c16c66017a3c0553ae074cda04a2813629851e84b7cef65a84d

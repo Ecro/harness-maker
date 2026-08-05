@@ -85,8 +85,8 @@ All paths are inside your project root (or `CLAUDE_PROJECT_DIR` / `CURSOR_PROJEC
 | `slug` | string | Task slug (max 200 chars) |
 | `round` | int | Review iteration number (≥ 1) |
 | `pass1_n` | int | Total findings from Pass 1 (redacted-context review) |
-| `verifier_kept_n` | int | Pass 1.5 verifier KEEPs |
-| `verifier_dropped_n` | int | Pass 1.5 verifier DROPs |
+| `verifier_kept_n` | int \| null | Pass 1.5 verifier KEEPs. **null** since ADR-001 removed the dispatch — null means the verifier did not run, which is a different fact from "ran and kept nothing". Rows written before the removal keep their integers. |
+| `verifier_dropped_n` | int \| null | Pass 1.5 verifier DROPs. Same nullability, and both fields are both-or-neither. |
 | `verifier_false_drop_n` | int \| null | Labeled-fixture only — verifier dropped a real bug |
 | `verifier_false_keep_n` | int \| null | Labeled-fixture only — verifier kept a false positive |
 | `fixture_label` | string \| null | Labeled-fixture identifier (null on real runs) |

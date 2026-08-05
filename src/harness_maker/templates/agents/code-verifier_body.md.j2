@@ -22,9 +22,15 @@ list to the subset that holds up against the evidence you were given — the
 OBSERVE → TRACE → INFER → CONCLUDE reasoning chain in mode A, the diff plus the
 injected oracle in mode B.
 
-**If the invoking prompt does not name a mode, assume mode A.** A missing mode label
-must never silently turn a Pass 1.5 run into a PIDA run: mode B restores metadata that
-mode A deliberately redacts, so guessing wrong destroys the anti-anchoring contract.
+**If the invoking prompt does not name a mode, assume mode B, and say so in your output.**
+Mode A was the Pass 1.5 verifier step, and that dispatch no longer exists — `/hm:review`
+removed it (ADR-001 of PLAN-workflow-loop-efficiency), so **mode B is now the only live
+caller**. The default used to be mode A, which after the removal would have made an
+unlabelled invocation run the redaction-era rubric against restored-metadata input: mode B
+restores exactly what mode A deliberately redacts, so the stale default was itself the
+anti-anchoring violation it was written to prevent. Mode A is retained below because the
+rubric is still correct if something ever injects redacted findings again — but nothing
+ships that does, so it must be requested explicitly.
 
 ## Hard Invariant (do NOT violate)
 

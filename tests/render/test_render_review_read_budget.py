@@ -408,17 +408,45 @@ def test_the_agent_body_precedence_is_stated_at_every_site() -> None:
             )
 
 
+# The anchor MOVED once, deliberately: ADR-001 of PLAN-workflow-loop-efficiency removed
+# the Pass 1.5 `code-verifier` dispatch, so a multi-reviewer render carries 2 sites where
+# it used to carry 3. The goldens are frozen pre-change artifacts and are NOT re-captured
+# — re-freezing them would delete the read-budget anchor rather than migrate it
+# (`ratchet-rebaselined-by-its-own-subject`, count:2 in failures.md). Instead the new
+# value is pinned as a named constant and the removal is attributed by heading below, so
+# reaching 2 by deleting Pass 2 instead still fails.
+_PASS_COUNT_PRE_ADR001 = 3
+_PASS_COUNT_POST_ADR001 = 2
+_PASS_REMOVED_BY_ADR001 = "#### Pass 1.5"
+
+
+def _site_headings(render_text: str) -> tuple[str, ...]:
+    return tuple(site.splitlines()[0] for site in reviewer_dispatch_sites(render_text))
+
+
 def test_the_site_count_matches_the_pre_change_anchor() -> None:
     """Non-emptiness is a floor; this pins the exact shape the discovery is anchored on.
 
-    Measured on the goldens BEFORE the edit: 3 sites per multi-reviewer render. If the
-    edit had to add or move a `####` block to make AC-008 pass, that would show up here
-    rather than being absorbed silently.
+    Measured on the goldens BEFORE the read-budget edit: 3 sites per multi-reviewer
+    render. If that edit had to add or move a `####` block to make AC-008 pass, it would
+    show up here rather than being absorbed silently — that guard is unchanged.
+
+    The current expectation is 2 because ADR-001 removed exactly one site. The identity
+    assertions below are what make this a migration and not a rebaseline: the count alone
+    is satisfiable by removing the wrong pass.
     """
-    for render_text in reviewer_renders():
-        assert reviewer_pass_count(render_text) == 3
     for golden in (golden_atomic(),):
-        assert reviewer_pass_count(golden) == 3
+        assert reviewer_pass_count(golden) == _PASS_COUNT_PRE_ADR001
+
+    for render_text in reviewer_renders():
+        assert reviewer_pass_count(render_text) == _PASS_COUNT_POST_ADR001
+        headings = _site_headings(render_text)
+        # The one that left is Pass 1.5 — and only it.
+        assert not any(h.startswith(_PASS_REMOVED_BY_ADR001) for h in headings)
+        golden_headings = _site_headings(golden_atomic())
+        assert [h for h in golden_headings if not h.startswith(_PASS_REMOVED_BY_ADR001)] == list(
+            headings
+        ), f"a site other than Pass 1.5 moved: {golden_headings} -> {headings}"
 
 
 def test_the_predicates_discriminate_against_the_pre_change_render() -> None:
@@ -447,10 +475,20 @@ def test_the_predicates_discriminate_against_the_pre_change_render() -> None:
 
 
 def test_verification_structure_unchanged() -> None:
-    """AC-009's executable predicate — the diff changed reviewer prose and nothing else."""
+    """AC-009's executable predicate — the diff changed reviewer prose and nothing else.
+
+    ⚠️ In-file AC-009 (the read-budget SPEC's) — NOT the AC-009 of
+    SPEC-workflow-loop-efficiency, which is the cross-model hoist. Same id, different SPEC.
+
+    The `reviewer_pass_count` conjunct was dropped from this invariance set and re-pinned
+    in `test_the_site_count_matches_the_pre_change_anchor` above, because ADR-001 of
+    PLAN-workflow-loop-efficiency moved it on purpose (3 -> 2, Pass 1.5 removed). The
+    other three conjuncts are UNCHANGED and still compare against the frozen goldens —
+    they were verified still-equal at migration time, so the hoist (ADR-011) is confirmed
+    to reorder prose without touching the invoker set, the reviewer set, or K.
+    """
     assert all(
-        reviewer_pass_count(after) == reviewer_pass_count(golden)
-        and enabled_reviewer_set(after) == enabled_reviewer_set(golden)
+        enabled_reviewer_set(after) == enabled_reviewer_set(golden)
         and consensus_threshold(after) == consensus_threshold(golden)
         and second_opinion_invocation_points(after) == second_opinion_invocation_points(golden)
         for after, golden in paired_review_renders_against_goldens()

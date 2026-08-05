@@ -117,6 +117,10 @@ _PHASE_5_SPAN_SESSIONID = {
     for mode in AXES
 }
 
+_PHASE_1_PASS15_HEADINGS = [
+    "#### Pass 1.5 — verifier (active, ADR-008)",
+]
+
 _ALLOWED_REMOVALS: dict[str, dict[str, list[str]]] = {
     "phase-2-sessionid-env-propagation": _PHASE_2_SESSIONID,
     "phase-5-sessionid-span": _PHASE_5_SPAN_SESSIONID,
@@ -140,6 +144,20 @@ _ALLOWED_REMOVALS: dict[str, dict[str, list[str]]] = {
     "phase-2-wrapup-land": {
         "wrapup@task-driven": [*_PHASE_2_WRAPUP_HEADINGS, *_PHASE_2_WRAPUP_CALLS],
         "wrapup@spec-driven": [*_PHASE_2_WRAPUP_HEADINGS, *_PHASE_2_WRAPUP_CALLS],
+    },
+    # ADR-001 of PLAN-workflow-loop-efficiency deletes the Pass 1.5 `code-verifier`
+    # dispatch — a full serialized agent round-trip on the critical path of every review
+    # round, for a 1.9% finding reduction (5 of 261 across 41 archived reviews).
+    #
+    # Only the HEADING is listed. The dispatch was a `Task(...)` block, never a `!` line,
+    # so the executables arm is untouched and must stay untouched: if this removal ever
+    # starts showing up there too, something else went with it.
+    #
+    # Listed against BOTH arms because the Pass 1.5 block sits outside every `dev_mode`
+    # gate — a cut that reached only one arm would be the bug this key shape exposes.
+    "phase-1-workflow-loop-efficiency-pass15": {
+        "review@task-driven": list(_PHASE_1_PASS15_HEADINGS),
+        "review@spec-driven": list(_PHASE_1_PASS15_HEADINGS),
     },
 }
 

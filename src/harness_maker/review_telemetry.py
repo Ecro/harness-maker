@@ -17,7 +17,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from harness_maker import command_registry
 
@@ -28,11 +28,16 @@ DEFAULT_OBSERVABILITY_DIR = Path(".claude/observability")
 class ReviewTelemetryRecord(BaseModel):
     """One row appended per `/hm:review` invocation.
 
-    The **round-level** numeric fields default to 0 (not None) so downstream
+    Most **round-level** numeric fields default to 0 (not None) so downstream
     aggregations can sum without null-coalescing. ``fixture_label`` and the two
     ``verifier_false_*`` counts are null on real runs (only labeled-fixture runs
     compute them). ``fallback`` is set only when the verifier model was
     unavailable.
+
+    ``verifier_kept_n`` / ``verifier_dropped_n`` are the exception among the
+    round-level counts: they became ``| None`` when the Pass 1.5 dispatch was
+    removed, for the same reason as the measure-C fields below. Aggregations over
+    a mixed-era ledger must null-coalesce these two.
 
     The four **measure-C** fields at the bottom deliberately break that default
     (PLAN-review-round-inflation ADR-006/ADR-009): they are ``| None`` so that
@@ -50,8 +55,13 @@ class ReviewTelemetryRecord(BaseModel):
     slug: str = Field(max_length=200)
     round: int = Field(ge=1)
     pass1_n: int = Field(ge=0)
-    verifier_kept_n: int = Field(ge=0)
-    verifier_dropped_n: int = Field(ge=0)
+    # Nullable since ADR-001 of PLAN-workflow-loop-efficiency removed the Pass 1.5
+    # dispatch. `0` would read as "the verifier ran and dropped nothing", which is
+    # the same row-kind conflation already shipped once in second-opinion.jsonl —
+    # and these rows are append-only, so a wrong value is permanent. Rows written
+    # before the removal keep their integers and still parse.
+    verifier_kept_n: int | None = Field(default=None, ge=0)
+    verifier_dropped_n: int | None = Field(default=None, ge=0)
     verifier_false_drop_n: int | None = None
     verifier_false_keep_n: int | None = None
     fixture_label: str | None = Field(default=None, max_length=200)
@@ -72,6 +82,22 @@ class ReviewTelemetryRecord(BaseModel):
     unreviewed_fix_count: int | None = Field(default=None, ge=0)
     regression_attributed_n: int | None = Field(default=None, ge=0)
     attribution_unknown_n: int | None = Field(default=None, ge=0)
+
+    @model_validator(mode="after")
+    def _verifier_counts_are_both_or_neither(self) -> ReviewTelemetryRecord:
+        """Nullability must not newly admit a shape the integers made impossible.
+
+        The pair is one observation: either the Pass 1.5 verifier ran (both counts) or
+        it does not exist (neither). One set and one absent has no reading, and these
+        rows are append-only — an incoherent row cannot be repaired after the fact.
+        """
+        if (self.verifier_kept_n is None) != (self.verifier_dropped_n is None):
+            msg = (
+                "verifier_kept_n and verifier_dropped_n are both-or-neither: "
+                f"got kept={self.verifier_kept_n!r}, dropped={self.verifier_dropped_n!r}"
+            )
+            raise ValueError(msg)
+        return self
 
 
 def _utc_now_iso() -> str:

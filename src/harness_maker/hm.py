@@ -47,6 +47,7 @@ _DISPATCHABLE: frozenset[str] = frozenset(
         "iter_receipts",
         "memory_md",
         "memory_retrieve",
+        "stage_agent_ledger",
         "observability.verification_cache",
         "review_telemetry",
         "run_classify",

@@ -244,6 +244,28 @@ def _confined(base: Path, rel: str) -> Path | None:
         return None
 
 
+def format_mismatch_reason(mismatches: Sequence[Mismatch], *, correlator: str) -> str:
+    """The diagnosis a `mismatch` row carries (ADR-005 / P4a).
+
+    Both existing `mismatch` rows in this repo's ledger carry `reason: null`, and the null
+    is **structural** — the two `delegation_ledger.append()` call sites simply never passed
+    one. So no diagnosis exists for either occurrence, and the follow-up work had to open
+    with "we do not know why". This function is the whole of P4a: the next occurrence
+    arrives already diagnosable.
+
+    Two things are deliberate. **Kinds come first**, before any free-text detail: the kind
+    set is the part an aggregation can group on, and `delegation_ledger._fit` truncates the
+    reason from the RIGHT, so anything that must survive truncation has to precede anything
+    that might be long. **The correlator is included** even though `stage` and `slug` are
+    already columns — neither identifies a single invocation, and two mismatches on the same
+    slug in one session are otherwise indistinguishable rows.
+    """
+    kinds = ",".join(sorted({m.kind for m in mismatches})) or "none"
+    head = f"kinds={kinds} n={len(mismatches)} run={correlator}"
+    details = "; ".join(f"{m.kind}: {m.detail}" for m in mismatches)
+    return f"{head} | {details}" if details else head
+
+
 def reconcile(
     receipt: WrapupReceipt,
     *,
@@ -522,7 +544,9 @@ def main(argv: list[str] | None = None) -> int:
     requested = Path(ns.worktree).resolve() if ns.worktree else Path(ns.root).resolve()
     slug = requested.name if requested != base else ""
 
-    def _record(status: str) -> None:
+    correlator = Path(ns.receipt_file).name
+
+    def _record(status: str, reason: str | None = None) -> None:
         """This module runs iff a subagent replied — the rendered stage reaches it only
         after the reply exists — so a row here means dispatch HAPPENED."""
         # No `or "wrapup"` fallback: an absent `--stage` would stamp a VERIFY dispatch as
@@ -531,19 +555,27 @@ def main(argv: list[str] | None = None) -> int:
         # the fail-closed direction — a row that cannot say which stage it belongs to
         # should not count for any of them.
         delegation_ledger.append(
-            base, stage=ns.stage or "", slug=slug, kind="dispatch", status=status
+            base,
+            stage=ns.stage or "",
+            slug=slug,
+            kind="dispatch",
+            status=status,
+            reason=reason,
         )
 
     try:
         raw = Path(ns.receipt_file).read_text(encoding="utf-8", errors="replace")
     except OSError as exc:
-        _record("unparseable")
+        # Same reason as the mismatch row below: an `unparseable` with no diagnosis makes
+        # "the receipt file was unreadable" indistinguishable from "the reply was garbage",
+        # and those have different remedies.
+        _record("unparseable", reason=f"kinds=receipt-unreadable n=1 run={correlator} | {exc}")
         print(json.dumps({"status": "unparseable", "error": str(exc)}, indent=2))
         return 2
 
     receipt, error = parse_receipt(raw)
     if receipt is None:
-        _record("unparseable")
+        _record("unparseable", reason=f"kinds=receipt-unparseable n=1 run={correlator} | {error}")
         print(json.dumps({"status": "unparseable", "error": error}, indent=2))
         return 2
 
@@ -566,7 +598,13 @@ def main(argv: list[str] | None = None) -> int:
                 indent=2,
             )
         )
-        _record("unparseable")
+        _record(
+            "unparseable",
+            reason=(
+                f"kinds=worktree-not-confined n=1 run={correlator} | "
+                f"--worktree {str(requested)!r} is outside base and .worktrees/"
+            ),
+        )
         return 2
     doc_root = requested
 
@@ -601,7 +639,12 @@ def main(argv: list[str] | None = None) -> int:
             sort_keys=True,
         )
     )
-    _record("dispatched" if result.ok else "mismatch")
+    _record(
+        "dispatched" if result.ok else "mismatch",
+        reason=None
+        if result.ok
+        else format_mismatch_reason(result.mismatches, correlator=correlator),
+    )
     return 0 if result.ok else 1
 
 

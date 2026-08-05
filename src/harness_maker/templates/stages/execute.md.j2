@@ -266,6 +266,32 @@ Resolution:
 - `overall_assessment: PASS` → proceed to Phase B.
 - `overall_assessment: FAIL` → for each entry in `blocking_issues[]`, rewrite the offending test (the `passing_tests[]` list is FROZEN — do not re-author them). For each `scenarios_missing[]`, author a new test. **Re-invoke test-reviewer** until PASS. Retry budget: **2 attempts**. After 2 FAILs in a row, surface the latest verdict and stop — escalate to user.
 
+**Record every attempt (ADR-004).** One row per dispatch — including each retry, and
+including the case where the dispatch never ran. This gate has ~42 lifetime dispatches and
+**zero** ledger rows, so the question "is A.5 worth its barrier?" currently has no data at
+all. Run this immediately after each attempt resolves, with `<run-id>` stable across the
+retries of one Phase A.5 (use the task slug plus the phase number):
+
+{% if is_codex %}
+```
+Bash("cd <WT> && uv run --with {{ harness_maker_src_path }} hm stage_agent_ledger emit --run-id <run-id> --agent test-reviewer --stage execute --slug {slug} --pass <attempt-number> --verdict <PASS|FAIL> --terminal --duration-ms <elapsed> --barrier-index <segment>")
+```
+{% else %}
+```bash
+!cd <WT> && uv run --with {{ harness_maker_src_path }} hm stage_agent_ledger emit --run-id <run-id> --agent test-reviewer --stage execute --slug {slug} --pass <attempt-number> --verdict <PASS|FAIL> --terminal --duration-ms <elapsed> --barrier-index <segment>
+```
+{% endif %}
+
+- Omit `--terminal` on an attempt that will be retried; pass it on the one that ends the gate.
+- If the dispatch **failed to launch or was skipped**, emit `--verdict dispatch-failed` or
+  `--verdict dispatch-skipped` with `--reason "<why>"` and `--terminal`. The CLI rejects
+  those verdicts without a reason — a sentinel row with a null reason is undiagnosable, which
+  is the exact state `delegation_ledger` is in today.
+- `--duration-ms` is wall-clock for the dispatch. **Omit it if you did not measure it** —
+  do not pass `0`. Zero reads as "measured, instantly", and these rows are append-only.
+- `--barrier-index` is which serial segment of the stage this dispatch sat in (A.5 is its own
+  barrier, so `1` unless the stage layout changed).
+
 #### Phase B — RED gate (skipped when `tdd_active == false`)
 
 Run the test command from SPEC's `## ✅ Verification Criteria` table (or the PLAN phase's exit criterion if SPEC absent):
@@ -338,6 +364,43 @@ prints a skip notice and passes (non-gating) — that is intended, not a failure
 > in the denominator, so kill-rate cannot be inflated by relabeling). The
 > excluded-equivalent count is shown next to the score and exclusion-set GROWTH
 > warns — never silently shrink the denominator to pass.
+
+#### Phase D.5 — Newly-reachable window (ADR-003; runs only after a repair)
+
+**Trigger:** this PLAN phase changed code in order to **fix a defect** — a bug, a review
+finding, a failing test, a regression. Pure new-feature work skips this; say so in one line
+and move on. When in doubt, run it: the cost is a paragraph.
+
+Green gates do not measure your fix. They measure the coverage that existed *before* it.
+`[fail:code] fix-introduced-defect-passes-all-gates` is at **count:4** in this repo —
+ratios 11/22, 7/7, 5, 11/14, each on a four-gate run that was **entirely green**, one of
+them alongside a 7/7 mutation check. Every one of those repairs shipped a second defect
+through the same suite that had just approved the first. The remedy has been written in
+memory for months and was a step in no stage template; this is that step.
+
+Answer all three. Write them into the PLAN phase's notes — this is a **written** artifact,
+not a reflection:
+
+1. **What input window does this repair newly make reachable?** Before the fix, some inputs
+   never reached the repaired code, or reached it and were rejected early. The fix changed
+   that boundary. Name the window concretely — a value range, a state, a call order, an
+   absent field, a length, a concurrency interleaving. "The bug no longer happens" is not a
+   window; it is the absence of one.
+2. **Which test enters that window, and is it in this same commit?** Name the test by node
+   id. It must exercise the newly-reachable window itself, not merely re-assert the original
+   symptom. A test that only proves the reported bug is gone leaves the window it opened
+   untested — that is the shape of all four recurrences.
+3. **If you cannot name one: STOP and say so explicitly.** Do not advance the phase on the
+   strength of a green Phase D. Either add the test now, or file the gap as a blocker with
+   the window from (1) named in it, so the next reader inherits the window rather than
+   rediscovering it. Silence here is the failure mode; an explicit "no fixture, here is why"
+   is an acceptable outcome that a reviewer can act on.
+
+> **Absent-case (the repo's most-recurring class, count:8).** If the repair activates on an
+> optional field or a value that predates the change, the newly-reachable window includes
+> the case where that input is **absent**. State the absent-case behaviour — default,
+> migration, or explicit skip — and cover it. A fixture that only exercises the present case
+> means the fix never fires for the data that motivated it.
 
 ### Step 4 — Stage exit (NO commit — wrapup owns commits)
 

@@ -163,6 +163,19 @@ drift_verdict:
 When no drift is detected, emit `result: clean` with empty lists. This record is the single source of truth for drift status — wrapup and verify read it without re-running the analysis.
 
 ### Step 3 — Parallel reviewer invocation (2-pass redaction)
+{%- if config.second_opinion and config.second_opinion.models %}
+
+> ⚡ **Launch the cross-model voters NOW, concurrently with Pass 1 (ADR-011).** Do not wait
+> for Pass 2. Each model's input is the **diff** — nothing in the cross-model path consumes
+> Pass 1 or Pass 2 output, and its findings join at the Step 4 fold either way. Running it
+> after Pass 2, as this stage used to, made it a fourth serial barrier for no reason;
+> `agy` alone carries a 240 s timeout.
+>
+> Go to **Step 3.5 now**, run its preset gate and every enabled model's invoker call, and
+> leave them running while you do Pass 1 and Pass 2 here. Collect the results when you
+> reach Step 3.5's position in the text. Step 3.6 (PIDA) still runs **after** them —
+> it genuinely consumes their findings.
+{%- endif %}
 
 {% if (config.reviewers.enabled | default([])) | length > 1 %}
 Run reviewers in **two sequential passes** to neutralize metadata anchoring
@@ -204,55 +217,18 @@ anchoring-prone diffs):
 > definition.** That bullet still appears in six reviewer bodies and predates this
 > instruction; where the two conflict, the budget wins.
 
-#### Pass 1.5 — verifier (active, ADR-008)
-
-After collecting Pass 1 findings, invoke the `code-verifier` agent to reduce
-false positives before Pass 2 restores metadata. The verifier sees the same
-redacted context as Pass 1 and makes KEEP / DROP / DEMOTE decisions on each
-finding.
-
-> **Read budget — bounded by default, escalation always available.** Start from the
-> diff plus up to **400** lines of surrounding context per changed file — enough to see
-> the enclosing function and the file-local invariants around it. Callers usually live
-> in *other* files; reaching them is an escalation, and it is expected rather than
-> exceptional. That is a default, **not a ceiling**: escalate to the rest of a file, or
-> to files **outside the diff**, whenever the finding you are chasing needs it. Never
-> stop at the budget when the answer is past it — an unfounded finding costs more than
-> a longer read. Record every escalation and every elision in that finding's
-> `reasoning.observe`, which is the carrier: name the extra file you opened, and when
-> you stop short of a file's end mark it there with the literal
-> `[elided: <path> L<from>-<to>]` (the range you did NOT read), so a bounded read is
-> distinguishable from a complete one.
->
-> **This budget overrides the `Read changed files end-to-end` bullet in your own agent
-> definition.** That bullet still appears in six reviewer bodies and predates this
-> instruction; where the two conflict, the budget wins.
->
-> The verifier's rubric is diff-only, but it holds `Read` / `Grep` / `Glob` — a rubric
-> is not a capability — so the budget binds any read it does take. Stated here rather
-> than exempted: an exemption is exactly what made the earlier site enumeration vacuous.
-
-{% if is_codex %}
-```
-# Launch the code-verifier agent with Pass 1 findings + redacted context
-Task("code-verifier: reduce Pass 1 findings",
-     "You are the Pass 1.5 verifier. Input:\n\npass1_findings: <pass1_findings_json>\n\npass1_context: <redacted_diff_context>\n\nApply the KEEP/DROP/DEMOTE rubric from your agent definition and return the output JSON.")
-```
-{% else %}
-Launch the `code-verifier` agent via Task with:
-- `pass1_findings`: the collected Pass 1 findings JSON
-- `pass1_context`: the same redacted diff context from Pass 1
-
-The verifier returns `{kept, dropped, stats}`. Use `kept` as the input to
-Pass 2 instead of the raw Pass 1 list. Log `stats.dropped_n` for telemetry.
-{% endif %}
+> **No verifier step runs between the passes (ADR-001).** The Pass 1.5 `code-verifier`
+> dispatch was removed. It dropped 5 of 261 findings (1.9%) across 41 reviews, and — the
+> operative reason — it was a full serialized agent round-trip on the critical path of
+> every review round while nothing else ran. **Pass 2 consumes the raw Pass 1 findings
+> list.** The `code-verifier` agent itself is unchanged{% if config.second_opinion and config.second_opinion.models %} and still live for cross-model PIDA **mode B** at Step 3.6{% endif %}; do not re-add a mode A dispatch here.
 
 #### Pass 2 — contextual verdict (full metadata restored)
 {% else %}
-{# Single reviewer — skip Pass 1 + Pass 1.5 (ADR-009: no cross-reviewer bias source) #}
+{# Single reviewer — skip Pass 1 (ADR-009: no cross-reviewer bias source) #}
 With a single enabled reviewer, the 2-pass redaction protocol is skipped
 (no cross-reviewer anchoring bias to mitigate). If `--with-reviewers=` adds
-extras at runtime bringing total > 1, re-enable Pass 1 + Pass 1.5 manually.
+extras at runtime bringing total > 1, re-enable Pass 1 manually.
 
 #### Direct review (single reviewer — Pass 2 only)
 {% endif %}
@@ -275,7 +251,8 @@ extras at runtime bringing total > 1, re-enable Pass 1 + Pass 1.5 manually.
 > instruction; where the two conflict, the budget wins.
 
 3. Re-run the same reviewer set with the **full** context (metadata
-   restored) and the **Pass 1.5 verified findings** list. Launch these reviewer
+   restored) and the **raw Pass 1 findings** list — unfiltered, since no verifier
+   step runs between the passes (ADR-001). Launch these reviewer
    calls in parallel, using one Task call per reviewer (or per reviewer × file
    cluster when safe). Each reviewer validates each finding against the
    metadata, drops any that the context proves spurious, and adjusts severity
@@ -301,6 +278,49 @@ extras at runtime bringing total > 1, re-enable Pass 1 + Pass 1.5 manually.
 ```bash
 !cd <WT> && uv run --with {{ harness_maker_src_path }} hm codex_adapter stamp-ids < <the literal temp path>
 ```
+
+**Then persist the round's finding payload (ADR-006 part 2).** Run this **exactly once per
+round**, against the merged temp file you already wrote, with the literal reviewer label
+`merged`:
+
+> ⚠️ **Do NOT run this once per reviewer against this file.** An earlier version said to,
+> and it was wrong in a way that quietly poisons the corpus: the temp file here holds the
+> **merged, post-Pass-2** list, so N invocations produce N byte-identical files differing
+> only in the reviewer label — each one claiming to be that reviewer's payload. A replay
+> keyed on `reviewer` would then measure the merge output N times instead of N reviewers.
+> Fabricated attribution is worse than no attribution, because nothing downstream can tell.
+>
+> **True per-reviewer payloads need a per-reviewer source**, which exists only at Pass 1 /
+> Pass 2 — before the merge. Persisting them is a **known gap**: capturing each reviewer's
+> raw reply to its own file is a change to the dispatch steps above, not to this one. Until
+> that lands, the corpus holds one honest merged payload per round rather than N dishonest
+> per-reviewer ones. Replay of the consensus stage is possible; replay of the reviewer stage
+> is not yet.
+
+{% if is_codex %}
+```
+Bash("cd <WT> && uv run --with {{ harness_maker_src_path }} hm stage_agent_ledger persist-payload --file <the literal temp path> --slug {slug} --run-id <run-id> --round <N> --reviewer merged")
+```
+{% else %}
+```bash
+!cd <WT> && uv run --with {{ harness_maker_src_path }} hm stage_agent_ledger persist-payload --file <the literal temp path> --slug {slug} --run-id <run-id> --round <N> --reviewer merged
+```
+{% endif %}
+
+> **`<run-id>` must be a real value you choose, not the literal text.** Use a fresh UTC
+> stamp at the start of THIS `/hm:review` invocation (e.g. `20260805T2210Z`) and keep it
+> **stable across every round** of this review — the round number is already a separate
+> part of the filename. Leaving `<run-id>` un-substituted is not a cosmetic slip: it
+> sanitises to a constant, so every review of this slug writes the same filename and
+> **silently destroys the previous review's payload**, quietly emptying the corpus this
+> step exists to build.
+>
+> **This buys nothing today and everything afterwards.** The detection check for pipeline
+> changes has failed twice, the second time because no per-reviewer finding payload has ever
+> been persisted anywhere in this repo — REVIEW documents are post-consensus narrative and
+> `review-*.jsonl` holds only counts, so there was no artifact to replay against. Every round
+> that skips this line is a round no future pipeline change can be tested on. It writes to the
+> **base** root, so it survives `task-land`.
 {%- if config.second_opinion and config.second_opinion.models %}
 ### Step 3.5 — Cross-model heterogeneous voters (ADR-001/006, PLAN-second-opinion-multi-model)
 
@@ -590,7 +610,11 @@ ran out **while still progressing** — the only exit that says a higher cap wou
 After each round's REVIEW report write, append one line to
 `.claude/observability/review-{YYYY-MM-DD}.jsonl` via the harness CLI.
 Round-level numeric fields default to 0; `fixture_label` / `verifier_false_*` /
-`fallback` are null on real runs. **Every round row: `terminal: false`,
+`fallback` are null on real runs. **The `verifier_kept_n` / `verifier_dropped_n`
+fields are now null too** — Pass 1.5 no longer runs (ADR-001), and emitting `0`
+would be indistinguishable from "the verifier ran and dropped nothing", silently
+poisoning the very rate a later analysis reads. Omit them, or send `null`; never
+`0`. **Every round row: `terminal: false`,
 counters null. The row for the round the loop exits at: `terminal: true`, all
 three counters integers.** Never send 0 for what you did not measure. Don't
 interpolate `wall_time_ms` into any other rendered template (determinism

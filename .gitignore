@@ -68,6 +68,13 @@ work-docs/*
 # ignored file is recomputed by whoever regenerates it next.
 !work-docs/BASELINE-*.md
 !work-docs/RECEIPT-*.md
+# Same durability argument as BASELINE-*: a pre-registered measurement and a coverage
+# matrix are worthless if the next person regenerates them. ABLATION-* carries the
+# pre-registration block that makes the un-gated honesty waiver survivable (ADR-007) —
+# ignoring it would leave the "written BEFORE the run" claim with nothing behind it.
+# MATRIX-* is the stage-2 input for the keep/retire decisions.
+!work-docs/ABLATION-*.md
+!work-docs/MATRIX-*.md
 !work-docs/plans/
 
 # Cache

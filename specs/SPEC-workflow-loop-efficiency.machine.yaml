@@ -1,0 +1,330 @@
+schema_version: 2
+spec_slug: workflow-loop-efficiency
+parent_spec: null
+verification_tier: 2
+mutation_threshold: null
+mutation_threshold_rationale: Tier 2. Most of this change is rendered prose (stage
+  templates) and append-only ledger writers; mutation adequacy is a poor fit for both.
+  ADR-009's 3-layer default applies to the two Python writers instead of a numeric
+  gate.
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/delegation_ledger.py
+- src/harness_maker/wrapup_receipt.py
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: rendered review surface contains no Pass 1.5 verifier dispatch
+  type: mechanical
+  test_ids:
+  - tests/structural/test_review_pass15_removed.py::test_ac_001_no_pass15_verifier_in_rendered_review
+  executable_predicate: count_pass15_verifier_dispatches(rendered_commands) == 0
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Expected value is the absence decided in S1 of this SPEC, not a
+    value read back from the renderer. The complement is asserted in the same test
+    (the code-verifier agent still renders, because cross-model PIDA mode B keeps
+    using it), so a wholesale deletion cannot satisfy the predicate.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: execute Phase D requires naming the newly-reachable input window
+  type: mechanical
+  test_ids:
+  - tests/structural/test_phase_d_reachable_window.py::test_ac_002_phase_d_names_newly_reachable_window
+  executable_predicate: phase_d_requires_reachable_window(render_all_targets()) is
+    True
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The required step's wording is fixed by remedy (a) of the count:4
+    memory entry [fail:test fix-introduced-defect-passes-all-gates], which predates
+    this change and was written from four independent incidents — not derived from
+    the template being tested. Asserted across all three targets so a single-target
+    edit fails.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: plan-validator writes one ledger row per dispatch pass
+  type: mechanical
+  test_ids:
+  - tests/unit/test_stage_agent_ledger.py::test_ac_003_validator_ledger_row_per_pass
+  executable_predicate: validator_ledger_rows(slug) == validator_dispatch_count(slug)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The one-row-per-dispatch contract is stated in S3 of this SPEC
+    and the row schema is fixed here, so the expected count comes from the specification
+    rather than from the writer. The two-pass case is asserted explicitly because
+    "did pass 2 change the verdict" is the question the ledger exists to answer, and
+    a single-row implementation would satisfy a naive existence check.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: test-reviewer Phase A.5 writes one ledger row per attempt
+  type: mechanical
+  test_ids:
+  - tests/unit/test_stage_agent_ledger.py::test_ac_004_phase_a5_ledger_row_per_attempt
+  executable_predicate: phase_a5_ledger_rows(slug) == phase_a5_dispatch_count(slug)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: 'Same provenance as AC-003: S4 fixes the contract and the row schema.
+    The retry case (Phase A.5 allows 2 attempts) is asserted, since the FAIL rate
+    this ledger exists to measure is exactly the multi-attempt path.'
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: Pass 2 ablation artifact records both arms and a reproduction verdict
+  type: mechanical
+  test_ids:
+  - tests/unit/test_ablation_artifact.py::test_ac_005_ablation_artifact_shape
+  executable_predicate: set(ablation_artifact().keys()) >= {'diffs', 'pass1_only',
+    'pass1_plus_pass2', 'delta', 'reproduced'}
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: 'The artifact schema is fixed by S5 of this SPEC before the ablation
+    is run, so the shape cannot be back-fitted to whatever the run produced. KNOWN
+    GAP, recorded as Open Question 2: this checks the artifact''s shape, never that
+    the ablation was run honestly. No mechanical oracle can close that gap; see the
+    waiver.'
+  oracle_independence_waiver: task-driven. "The measurement was performed honestly"
+    has no non-circular mechanical oracle. Accepted for stage 1 because the artifact
+    drives no deletion — Pass 2 stays in the pipeline regardless of the result (S5,
+    Non-Goals), so a bad measurement costs a re-run rather than a shipped regression.
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: wrapup delegate mismatch is covered by a failing-then-passing regression
+    test
+  type: mechanical
+  test_ids:
+  - tests/unit/test_delegation_reason_capture.py::test_a_real_mismatch_writes_a_row_with_a_non_null_reason
+  executable_predicate: reconcile_mismatch(pre_change_receipt_path) != reconcile_mismatch(post_change_receipt_path)
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: differential
+  oracle_evidence: The reference arm is the pre-change reconciliation path, and the
+    input is the condition reconstructed from the two recorded `mismatch` rows in
+    .claude/observability/delegation.jsonl — an artifact that predates this work.
+    The expected behaviour therefore comes from observed production failures compared
+    against a prior implementation, not from the repaired code.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: redundancy matrix covers every command, skill, and agent
+  type: mechanical
+  test_ids:
+  - tests/structural/test_redundancy_matrix.py::test_ac_007_redundancy_matrix_covers_surface
+  executable_predicate: matrix_subjects() == rendered_commands() | rendered_skills()
+    | rendered_agents()
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Set equality against the rendered surface enumerated independently
+    of the matrix, so the matrix cannot define its own denominator — the failure mode
+    that made three earlier gates in this repo vacuous. Coverage only; the keep/retire
+    judgment in each row is explicitly NOT gated (Open Question 2 class).
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-009
+  title: the rendered review stage launches the cross-model voters concurrently with
+    Pass 1
+  type: mechanical
+  test_ids:
+  - tests/structural/test_crossmodel_hoist.py::test_ac_009_crossmodel_launches_with_pass1
+  executable_predicate: all(crossmodel_launch_offset(t) < pass2_offset(t) for t in
+    render_all_targets().values())
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: 'The expected ordering comes from S8 of this SPEC and from a property
+    of the template verified before the change: the cross-model path''s input is `git
+    diff`, so it has no data dependency on Pass 1 or Pass 2. The predicate compares
+    rendered positions rather than asserting a phrase, so a reworded instruction that
+    still runs late fails. The complement is asserted in the same test — PIDA must
+    still follow the cross-model results, so "hoist everything" cannot satisfy it.'
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-008
+  title: the four mechanical gates stay green and the surface ratchet moves deliberately
+  type: mechanical
+  test_ids:
+  - tests/structural/test_baseline_delta_attribution.py::test_every_changed_key_has_an_attribution_row
+  executable_predicate: surface_baseline_matches(rendered_surface(), load_baseline())
+    is True
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The baseline is a committed snapshot taken before this change;
+    a silent surface movement fails without anyone asserting a number. Provenance
+    is the prior commit, not this work.
+  oracle_independence_waiver: 'task-driven, and the weakest oracle in this SPEC by
+    design. The user selected the `golden` option knowing detection is only PROXIED
+    here: ruff / ruff-format / mypy / pytest green is evidence about the suite''s
+    coverage, not about the change. This repo has that refuted on record four times
+    — [fail:test fix-introduced-defect-passes-all-gates] count:4, most recently 11
+    of 14 findings being defects introduced by its own fixes on a green four-gate
+    run, once alongside a 7/7 mutation check. Accepted as recorded; Open Question
+    1 asks /hm:plan whether to add a cheap non-circular replay check on top.'
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-010
+  title: the Phase D.5 repair guard carries operative force
+  type: judgment
+  test_ids: []
+  executable_predicate: null
+  golden_table: []
+  rubric_id: repair_guard_force
+  note: ''
+  pending_test: false
+  oracle_source: rubric
+  oracle_evidence: 'ADR-003 requires proof that the step DEMANDS something rather
+    than merely reading like guidance, and it explicitly rejected a sentence-grep
+    because ''a fixed sentence is satisfiable by a sentence with no operative force''.
+    Two mechanical mutation controls were attempted and both were circular: deleting
+    the grepped literal, and replacing it with a paraphrase, turn the predicate red
+    for the same construction-level reason. Operative force is semantic, so the oracle
+    is an INDEPENDENT reviewer against the named rubric repair_guard_force, whose
+    criteria were written from the four recorded recurrences of [fail:code] fix-introduced-defect-passes-all-gates,
+    not from the step being judged. The builder does not supply the verdict; judgment-reviewer
+    does, and mark-judged stores a subject hash so a later edit to the step invalidates
+    the pass.'
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: pass
+  judged_at: '2026-08-05'
+  judgment_evidence: 'All six criteria pass on the Phase D.5 section of src/harness_maker/templates/stages/execute.md.j2
+    (lines 368-403). demands_a_written_artifact: :381-382 names the destination and
+    marks it "a **written** artifact, not a reflection". rejects_the_empty_answer:
+    :387-388 supplies the concrete non-answer "''The bug no longer happens'' is not
+    a window; it is the absence of one", with a second at :390-392. carries_a_blocking_consequence:
+    :393-397 gives the unanswerable case a terminal instruction — "STOP and say so
+    explicitly. Do not advance the phase on the strength of a green Phase D" — with
+    the only alternative being a blocker that must name the window from (1), and "Silence
+    here is the failure mode" closing the no-op path; this is a stop, not an encouragement.
+    distinguishes_the_new_risk_from_the_old_symptom: :390-392 states outright that
+    a test proving only the reported bug is gone is insufficient. is_scoped_so_it_does_not_fire_on_everything:
+    :368-372 gives trigger (a repair), skip case (pure new-feature work, with a one-line
+    receipt) and the unclear-case rule ("When in doubt, run it"). covers_the_absent_input_case:
+    :399-403 requires the absent-case behaviour be stated as default/migration/explicit
+    skip and covered, warning that a present-case-only fixture means the fix never
+    fires. No criterion rests on heading text alone; each is grounded in an operative
+    sentence in the body.'
+  judgment_subject_paths:
+  - src/harness_maker/templates/stages/execute.md.j2
+  judgment_subject_hash: eed04b69ba6526f1ec6d2500b7d45c64d3b3758541c797e0cd9804c4c051897a

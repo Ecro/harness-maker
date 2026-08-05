@@ -37,17 +37,19 @@ def test_review_includes_pass1_when_multi(tmp_path: Path) -> None:
     assert "Pass 1 — rubric-only" in review
 
 
-def test_review_skips_verifier_when_single_reviewer(tmp_path: Path) -> None:
-    """Side preset (1 reviewer) should skip Pass 1.5 verifier block (C2 validator)."""
-    out = _render_preset(tmp_path, Preset.SIDE)
-    review = (out / "stages" / "review.md").read_text(encoding="utf-8")
-    assert "Pass 1.5 — verifier" not in review
-    assert "code-verifier" not in review
+def test_no_verifier_block_under_either_preset(tmp_path: Path) -> None:
+    """ADR-001 removed the Pass 1.5 dispatch on BOTH arms — it is no longer preset-dependent.
 
+    This replaces a pair of tests that asserted "Side skips the verifier / Production
+    includes it". After the removal the Production one still passed, because
+    `assert "Pass 1.5" in review` matched the *removal notice* — documentation about the
+    deletion satisfying a test that the thing exists. The Side one still passed too, for the
+    unrelated reason that the single-reviewer branch never rendered the notice.
 
-def test_review_includes_verifier_when_multi_and_a8_active(tmp_path: Path) -> None:
-    """Production (multi-reviewer) should include Pass 1.5 verifier (A8 active)."""
-    out = _render_preset(tmp_path, Preset.PRODUCTION)
-    review = (out / "stages" / "review.md").read_text(encoding="utf-8")
-    assert "Pass 1.5" in review
-    assert "code-verifier" in review
+    Anchored on the heading, not the words: `"Pass 1.5 — verifier"` is the block's own
+    `####` title and appears nowhere in the prose that explains its removal.
+    """
+    for preset in (Preset.SIDE, Preset.PRODUCTION):
+        out = _render_preset(tmp_path / preset.value, preset)
+        review = (out / "stages" / "review.md").read_text(encoding="utf-8")
+        assert "#### Pass 1.5 — verifier" not in review, f"{preset.value}: the block is back"

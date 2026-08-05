@@ -156,11 +156,28 @@ from .conftest import pin_install_ref
 # the pre-diet 1,173,667. A NEW harness pays the picker; that trade is ADR-010's, recorded
 # rather than absorbed. `autopilot_persistent: true` (also now default) arguably makes the
 # picker redundant, but no ADR decided that and the render gate is unchanged.
+# Re-baselined 2026-08-05 by PLAN-workflow-loop-efficiency **P7**, which is the phase that
+# OWNS this table (ADR-010). No earlier phase touched it, deliberately: a phase that
+# re-baselines the ratchet it tripped is `ratchet-rebaselined-by-its-own-subject` (count:2),
+# and the whole guard then measures nothing. Every delta below is attributed to the phase
+# that caused it in `work-docs/BASELINE-DELTA-P7.md`, and a structural test fails if a
+# changed key has no attribution row there.
+#
+#   execute 29820 → 33774  (+3954: P2 Phase D.5 step, P3 A.5 ledger emit)
+#   plan    44827 → 46008  (+1181: P3 validator ledger emit)
+#   review  32502 → 34760  (+2258: P3 payload persistence net of P1's Pass 1.5 removal,
+#                           plus the review-round F2 correction — the persistence call was
+#                           writing N identical copies of the merged list under N reviewer
+#                           labels, and the block that stops that recurring is prose)
+#
+# Read the aggregate row in the delta document before treating this as routine: this is a
+# cost-REDUCTION plan that raised the shipped surface, and the raise only pays for itself if
+# stage 2 reads the ledgers these calls fill and deletes something.
 _ATOMIC_RATCHET: dict[str, int] = {
-    "execute": 29820,
-    "plan": 44827,
+    "execute": 33774,
+    "plan": 46008,
     "research": 26673,
-    "review": 32502,
+    "review": 34760,
     "spec": 30537,
     "verify": 23796,
     "wrapup": 41345,

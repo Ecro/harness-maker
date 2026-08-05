@@ -555,6 +555,29 @@ Resolution:
 
 > **If the validator agent itself fails to launch** (0 tool uses, model/launch error): retry the `Task(...)` call once with `model: "opus"` explicitly set (subagent frontmatter may be stale across a model upgrade). When you surface such a failure to the user, name the **tier** (`opus`/`sonnet`) — never a pinned concrete id like `claude-4-7-opus[1m]`; a pinned id in the message is itself the bug class this guidance exists to avoid. If it still cannot launch, self-review the PLAN in the validator's place and say so plainly.
 
+**Record every validator pass (ADR-004).** One row per dispatch, including the second pass
+of a MAJOR_REVISION and including a dispatch that never ran. This validator has ~34
+lifetime dispatches and **zero** ledger rows, so "does the second pass ever change the
+verdict?" — the question that decides whether this loop can be cut — has no data behind it.
+Use the same `<run-id>` for both passes of one PLAN; that shared id is what makes the
+pass-1-vs-pass-2 comparison possible at all:
+
+{% if is_codex %}
+```
+Bash("uv run --with {{ harness_maker_src_path }} hm stage_agent_ledger emit --run-id <run-id> --agent plan-validator --stage plan --slug {slug} --pass <1|2> --verdict <APPROVED|NEEDS_REVISION|MAJOR_REVISION> --terminal --duration-ms <elapsed> --barrier-index <segment>")
+```
+{% else %}
+```bash
+!uv run --with {{ harness_maker_src_path }} hm stage_agent_ledger emit --run-id <run-id> --agent plan-validator --stage plan --slug {slug} --pass <1|2> --verdict <APPROVED|NEEDS_REVISION|MAJOR_REVISION> --terminal --duration-ms <elapsed> --barrier-index <segment>
+```
+{% endif %}
+
+- Omit `--terminal` on pass 1 when a pass 2 will follow; pass it on the pass that ends Step 4.
+- The launch-failure path immediately above is a **row too**: `--verdict dispatch-failed
+  --reason "<launch error>" --terminal`. Self-reviewing in the validator's place without a
+  row makes an unavailable validator indistinguishable from an approving one.
+- **Omit `--duration-ms` if you did not measure it** — never pass `0`.
+
 Each follow-up interview answer is appended to `## 🎙️ Interview Transcript` and promoted to ADR when Step D criteria apply.
 {% if config.second_opinion.models %}
 > **Cross-model second-opinion relay (main loop owns the call — ADR-005/011).** The Step 4 (pre) main-loop step already ran (or skipped) each enabled model and injected the results into the validator; the agent only reconciles them. After reading the validator's returned JSON and **before** resolving the verdict, inspect its `second_opinion_results` array (each entry echoes the main-loop per-model status). For every entry whose `status` is `"skipped"` or `"failed"`, the model's call could not complete — surface the reason you recorded in Step 4 (pre) to the user in your turn output (one line per model, e.g. `⚠️ Second opinion skipped (antigravity): <reason> — verdict is Claude-only for that model`). This is a loud notice, **not** a block: resolve the verdict regardless, since it is Claude-derived and valid without any second-opinion model.

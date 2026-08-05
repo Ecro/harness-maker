@@ -388,7 +388,7 @@ def _agent_files(
 _CODEX_AGENT_META: dict[str, str] = {
     "autoloop-coder": "Implementation agent for autoloop iterations — bounded scope, write-tool-only, no open-ended exploration; worktree-bounded writes",  # noqa: E501
     "code-reviewer": "Reviews code changes for correctness, readability, maintainability, and basic security/performance hygiene",  # noqa: E501
-    "code-verifier": "Reduce-only verifier — mode A (Pass 1.5) KEEP/DROP/DEMOTE Pass 1 findings against the redacted diff; mode B (cross-model PIDA) accepted/rejected/duplicate/unresolved for second-opinion findings against injected oracle output. MUST NOT introduce new findings.",  # noqa: E501
+    "code-verifier": "Reduce-only verifier. Mode B (cross-model PIDA) is the only live caller and the default: accepted/rejected/duplicate/unresolved for second-opinion findings against injected oracle output. Mode A (the Pass 1.5 KEEP/DROP/DEMOTE reduction) is retained but no longer dispatched — its call site was removed. MUST NOT introduce new findings.",  # noqa: E501
     "concurrency-reviewer": "Reviews changes for race conditions, deadlocks, ISR safety, and async correctness",  # noqa: E501
     "consensus-arbiter": "Aggregates findings from multiple reviewer agents via surface match + reasoning alignment + severity resolution; tags every finding consensus-passed | weak-consensus | manual-only",  # noqa: E501
     "executor": "Workflow executor with worktree-bounded write permissions — only writes to .worktrees/, never to repo root",  # noqa: E501
@@ -463,7 +463,11 @@ def _skill_files() -> list[FileSpec]:
     ]
 
 
-_ALL_RUBRICS: list[str] = ["claude_md", "agent_prompt", "skill"]
+# `repair_guard_force` judges the rendered Phase D.5 repair guard. It ships to every
+# harness because that step does — and because "does this step carry operative force"
+# is a semantic question, which is exactly what a literal-grep structural test cannot
+# answer (two attempts at a mechanical mutation control were circular; ADR-003).
+_ALL_RUBRICS: list[str] = ["claude_md", "agent_prompt", "skill", "repair_guard_force"]
 
 
 def _rubric_files() -> list[FileSpec]:

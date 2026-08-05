@@ -1,12 +1,12 @@
 {
   "aggregate_chars": {
-    "claude": 354283,
-    "codex": 288826
+    "claude": 361396,
+    "codex": 295916
   },
   "counting_rule": "ADR-011: round_trips = count of ^! lines (claude variant) or 'Bash(' call sites (codex variant), plus all 'Task(' occurrences; fenced examples included. A consistent proxy, not a semantic count.",
   "generated_by": "tests/structural/_surface_baseline.py",
-  "payload_digest": "8edeb8e09ad45f7aebaa60e40164edffc585f18d793678b7198f4b9874642313",
-  "render_sha": "7dc511f5b5de1ff22831efc6c3b41502383f2b5b",
+  "payload_digest": "bba4440fbb299f2414f65211412f7dc081cc48fee4b77b5ee95e57d5b6637bcd",
+  "render_sha": "30743877b5de45d09f05e1c8fcf33620ad5a8758",
   "schema_version": 1,
   "surface": {
     "claude": {
@@ -15,8 +15,8 @@
         "round_trips": 3
       },
       "execute": {
-        "chars": 29820,
-        "round_trips": 14
+        "chars": 33774,
+        "round_trips": 15
       },
       "health": {
         "chars": 9815,
@@ -43,16 +43,16 @@
         "round_trips": 7
       },
       "plan": {
-        "chars": 47723,
-        "round_trips": 14
+        "chars": 48904,
+        "round_trips": 15
       },
       "research": {
         "chars": 26058,
         "round_trips": 8
       },
       "review": {
-        "chars": 50379,
-        "round_trips": 8
+        "chars": 52357,
+        "round_trips": 9
       },
       "spec": {
         "chars": 30537,
@@ -73,8 +73,8 @@
     },
     "codex": {
       "hm-execute": {
-        "chars": 26869,
-        "round_trips": 13
+        "chars": 30826,
+        "round_trips": 14
       },
       "hm-help": {
         "chars": 2110,
@@ -89,15 +89,15 @@
         "round_trips": 0
       },
       "hm-plan": {
-        "chars": 43244,
-        "round_trips": 12
+        "chars": 44428,
+        "round_trips": 13
       },
       "hm-research": {
         "chars": 23664,
         "round_trips": 7
       },
       "hm-review": {
-        "chars": 46047,
+        "chars": 47996,
         "round_trips": 9
       },
       "hm-spec": {

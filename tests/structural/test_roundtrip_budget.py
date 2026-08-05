@@ -34,17 +34,25 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # values that changed every round. The call is the whole point of that fix; no call was
     # removed. `review` 7→8. (The four fused commands that also inherited it were deleted
     # with the fused axis — PLAN-harness-diet ADR-001.)
+    # +1 on `execute`, `plan` and `review` (2026-08-05, PLAN-workflow-loop-efficiency P3):
+    # each gained exactly ONE mandated call, and each is a ledger write, not a check:
+    #   execute Phase A.5 → `hm stage_agent_ledger emit`   (test-reviewer verdict per attempt)
+    #   plan    Step 4    → `hm stage_agent_ledger emit`   (validator verdict per pass)
+    #   review  Step 3.4  → `hm stage_agent_ledger persist-payload` (ADR-006 part 2 corpus)
+    # No call was removed. `execute` 14→15, `plan` 14→15, `review` 8→9, total 127→130.
+    # These three calls are the entire reason stage 2 will have a denominator; the round-trip
+    # cost is the price of that, and it is charged per stage invocation, not per round.
     "configure": 3,
-    "execute": 14,
+    "execute": 15,
     "health": 7,
     "help": 0,
     "loop": 12,
     "loop-p5-batch": 2,
     "make": 1,
     "metrics": 7,
-    "plan": 14,
+    "plan": 15,
     "research": 8,
-    "review": 8,
+    "review": 9,
     "spec": 6,
     "uninstall": 3,
     "verify": 13,
