@@ -172,7 +172,17 @@ def test_only_the_configured_stage_gets_a_dispatch(tmp_path: Path) -> None:
 # from. With no fused workflows those lines can never render, so they were deleted.
 # Both moves SHRINK the render — this ratchet is being tightened, not loosened, and the
 # direction is why the constant is allowed to move at all.
-@pytest.mark.parametrize(("preset", "expected"), [("Side", 625), ("Production", 658)])
+# 625 → 658 / 658 → 691 (PLAN-harness-diet ADR-010): the FIRST upward move of this
+# constant, so it does not get the "direction justifies it" pass the two above rely on.
+# Attribution was measured, not inferred: the delta is +33 in both presets, and the
+# session-start autopilot picker block is 31 non-blank lines plus its two blank separators.
+# The picker renders under `config.autonomy.level != "gated"`; ADR-010 flipped the class
+# DEFAULT to `auto_safe`, so a block that was previously gated OUT of the default render is
+# now in it. Nothing about the delegation feature changed — `stage-delegate` is still absent
+# from the body, which the assertion above checks independently of this count.
+# NOTE for the next reader: the new Side value (658) is numerically the OLD Production value.
+# That is a coincidence of a uniform +33, not a mis-edited parametrize.
+@pytest.mark.parametrize(("preset", "expected"), [("Side", 658), ("Production", 691)])
 def test_the_default_render_costs_existing_users_nothing(
     tmp_path: Path, preset: str, expected: int
 ) -> None:

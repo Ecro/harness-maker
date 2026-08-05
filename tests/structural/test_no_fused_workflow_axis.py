@@ -184,10 +184,16 @@ def test_retired_top_level_keys_are_declared() -> None:  # ADR-012
 def test_a_retired_key_is_not_re_injected_on_re_render(tmp_path: Path) -> None:
     """The BEHAVIOUR, not the constant.
 
-    Asserting only that the constant contains the two names leaves the wiring untested:
-    delete the ``and k not in _RETIRED_TOP_LEVEL_KEYS`` clause from
-    ``_preserve_yaml_user_keys`` and that assertion still passes while every existing
-    install regrows ``workflows:`` on its next re-render.
+    Asserting only that the constant contains the two names leaves the wiring untested.
+
+    **Superseded mechanism (2026-08-05, PLAN-harness-diet Phase 2).** This docstring used
+    to say "delete the ``and k not in _RETIRED_TOP_LEVEL_KEYS`` clause and this still
+    passes" — which was the reason this test existed. It is no longer true of that clause:
+    ``load_harness_yaml`` now strips retired keys on every read, so ``_preserve_yaml_user_keys``
+    never sees one and the clause is unreachable. Deleting it leaves this test GREEN
+    (verified). What this test now guards is the LOADER-level strip, which is the layer that
+    actually enforces the behaviour. The unreachable render-side clause is reached
+    deliberately by ``tests/unit/test_retired_key_migration.py``.
 
     Scope correction (review, 2026-08-05): the original rationale claimed the regrown key
     would then fail ``HarnessConfig``'s ``extra="forbid"`` on the next load. **No such path

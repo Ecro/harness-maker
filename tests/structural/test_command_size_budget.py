@@ -137,14 +137,33 @@ from .conftest import pin_install_ref
 #   frees nothing in the models-off render this fixture builds, while every addition is
 #   unconditional. That asymmetry is recorded in the PLAN's ADR-008 and R10 as an accepted
 #   consequence for `models: []` harnesses; this line is that consequence reaching a gate.
+# Re-frozen 2026-08-05 (PLAN-harness-diet Phases 3+4). +2,497..+3,171 chars per command,
+# +19,041 total. Attribution was measured, not assumed:
+#   ~+2,400 of each  ADR-010 flipped the `AutonomyConfig.level` DEFAULT from `gated` to
+#                    `auto_safe`, and the session-start autopilot picker renders under
+#                    `config.autonomy.level != "gated"`. This fixture builds a DEFAULT
+#                    config, so the block that was previously gated OUT is now in every
+#                    stage command. The picker IS what auto-arming means — this is the
+#                    feature arriving at a gate, not prompt bloat.
+#     ~+136 of each  ADR-016's frontmatter `description:` line.
+# This is the ONE place in this PLAN where a size constant moves UP. It does not touch this
+# repo's own surface: `.claude/harness.yaml` was already `auto_safe`, so the aggregate
+# ratchet moved +1,616 claude / +41 codex — the descriptions plus the new `| autopilot |`
+# row in `help.*.md.j2`, which also reaches the Codex skill render (an earlier note here
+# said "+1,571 (the descriptions)" and "codex +0"; both were wrong, and the codex figure
+# was wrong in KIND — it claimed the change did not touch that target at all). The shipped
+# surface is still ~45% below
+# the pre-diet 1,173,667. A NEW harness pays the picker; that trade is ADR-010's, recorded
+# rather than absorbed. `autopilot_persistent: true` (also now default) arguably makes the
+# picker redundant, but no ADR decided that and the render gate is unchanged.
 _ATOMIC_RATCHET: dict[str, int] = {
-    "execute": 27273,
-    "plan": 41656,
-    "research": 24129,
-    "review": 29848,
-    "spec": 28001,
-    "verify": 21299,
-    "wrapup": 38253,
+    "execute": 29820,
+    "plan": 44827,
+    "research": 26673,
+    "review": 32502,
+    "spec": 30537,
+    "verify": 23796,
+    "wrapup": 41345,
 }
 
 

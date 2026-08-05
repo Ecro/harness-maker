@@ -1,7 +1,7 @@
 ---
 type: plan
 task_slug: harness-diet
-status: phase-1-complete  # NOT `complete` — see "Why this is not `status: complete`" below
+status: complete
 created: 2026-08-05
 tags: [harness-maker, plan, python, context-economics, prompt-surface, memory-tiers, autonomy]
 research_doc: "[[RESEARCH-harness-diet]]"
@@ -563,11 +563,11 @@ wrapup → hm memory_md upsert-failure --slug S
 | Phase | Status | Notes |
 |---|---|---|
 | 1 — fused render + `workflows` axis | **done** | Source, templates, and all test repair complete. `ruff` + `mypy --strict` green; full suite green. Measured surface **1,173,667 → 641,241 chars (−45.3%)**, against the PLAN's predicted 643,445 (−45.2%). |
-| 2 — loader tolerance | not started | |
-| 3 — autonomy defaults + ADR-013 pins | not started | |
-| 4 — command `description:` | not started | |
-| 5 — write-time failures archive | not started | |
-| 6 — baseline re-freeze + docs | not started | |
+| 2 — loader tolerance | **done** | `io_utils.RETIRED_TOP_LEVEL_KEYS` + `strip_retired_keys`; `load_harness_yaml` strips on every read, one advisory per project. `render._RETIRED_TOP_LEVEL_KEYS` is now an alias, not a copy. `cli._load_harness_yaml_body` routed too. `schema_version` 3 → 4. |
+| 3 — autonomy defaults + ADR-013 pins | **done** | Class default `auto_safe` / `autopilot_persistent: true`; **five** conservative sites pinned, not the four the PLAN named. |
+| 4 — command `description:` | **done** | Parser question answered by rendering all three targets, not assumed. 15/15 non-empty, distinct, ≤120 chars. |
+| 5 — write-time failures archive | **done** | `_prune_archivable` inside `_upsert`'s lock; `.claude/memory/archive/` added to `_path_owner` (the PLAN called it `_classify`). gitignore checked against real git, not assumed. |
+| 6 — baseline re-freeze + docs | **done** | `surface_baseline.json` + 8 snapshots regenerated twice (once after Phases 2–5, again after the version bump changed every frontmatter). CHANGELOG, `/hm:help`, 5-file version sync to 0.47.0. |
 
 **Nothing is blocked.** No commit was made (wrapup owns commits); the work sits in the
 task worktree `.worktrees/harness-diet` on `hm/harness-diet`.
@@ -633,6 +633,60 @@ which surfaced as unrelated-looking failures in
 **Template whitespace:** the `{% if workflow_context %}` tag line contributed a newline to
 the output. Deleting the conditional silently removed it from the preflight block of
 every stage command; the render-equality test caught it and the blank line was restored.
+
+### Phases 2–6 — what the PLAN got wrong, and what execution found
+
+Four corrections and two findings, recorded because each one changes what a future reader
+should believe about this document.
+
+1. **Phase 2's premise was narrower than the PLAN implied.** ADR-012's original worry —
+   that a regrown `workflows` key would fail `HarnessConfig`'s `extra="forbid"` — was
+   already corrected in Phase 1: *nothing* validates a user's `harness.yaml` into that
+   model. The real gap codex named still held, so the phase shipped, but as a **load-time**
+   strip rather than a validation guard. `io_utils.load_harness_yaml` was already the
+   chokepoint the PLAN asked to create; the work was routing the strip through it (plus
+   `cli._load_harness_yaml_body`, a second parser the PLAN did not name).
+
+2. **Phase 3 named four bare-`AutonomyConfig()` sites; there are five.** The fifth is the
+   non-bool `autopilot_persistent` guard in `_parse_autonomy`: it *deleted* the bad key so
+   the value fell to the class default, which was `False`. After ADR-010's flip that guard
+   inverts — a hand-edited `autopilot_persistent: "true"` would silently enable exactly the
+   persistent auto-arm the guard exists to reject. Found by an existing test
+   (`test_autopilot_review_fixes`), not by reading the PLAN. Now pinned `False` explicitly.
+   A sixth site, `cli._build_autonomy_override`'s absent base, contradicted its own
+   docstring ("persistence defaults off") and was pinned too.
+
+3. **ADR-015 was half wrong about the create-guard.** It claimed the archive would be
+   "neither churn nor deliverable" and would trip the Layer 2 dirty-base guard.
+   `_is_create_guard_harness_artifact` already forgives *everything* under `.claude/`, so
+   `worktree create` was never at risk. The `_path_owner` half was real and shipped. The
+   function is `_path_owner`, not `_classify` as the PLAN says.
+
+4. **ADR-016's parser question had a cheaper answer than the PLAN expected.** Rendering all
+   three targets shows commands land in exactly one file family, `.claude/commands/hm/*.md`
+   — no Codex TOML path and no `.cursor/rules/*.mdc` receives a command — so no
+   target-conditional branch was needed. The premise is pinned by a test that fails if a
+   future release starts rendering commands elsewhere.
+
+**Finding A — the one number that moved UP.** ADR-010's flip makes the session-start
+autopilot picker render (its gate is `level != "gated"`), adding ~2,400 chars to each of
+the seven stage commands in a NEW harness: **+19,041 total**. `_ATOMIC_RATCHET` was
+re-frozen with that attribution measured and written into the file. This repo's own surface
+is unaffected — `.claude/harness.yaml` was already `auto_safe` — so its aggregate moved
++1,616 claude / +41 codex (Phase 4's descriptions **plus** the `| autopilot |` help row,
+which reaches the Codex skill render too) and remains ~45% below the pre-diet 1,173,667.
+The first draft of this note said "+1,571, codex +0"; the codex figure was wrong in kind,
+not just in size, and was reported to the user that way before review caught it. Worth a
+follow-up: with `autopilot_persistent: true` also default, the picker's "offer once" job is
+arguably redundant, but no ADR decided that and the render gate was left alone.
+
+**Finding B — a word-level needle in another PLAN's gate.**
+`test_roundtrip_budget.py::test_the_fan_out_is_counted_as_three_though_it_costs_one_turn`
+asserts `"Explore" not in body` as a proxy for "the Explore fan-out dispatch is not
+rendered". A command description beginning "Explore before deciding" tripped it. The
+description was reworded rather than the assertion loosened — ADR-011 forbids moving that
+goalpost mid-flight — but the needle is a common English word inside a 26KB prompt and will
+false-positive again. Not fixed here; it belongs to the PLAN that owns ADR-011.
 
 ### Deviation from this PLAN's phase boundaries
 
@@ -943,40 +997,40 @@ session auto-arms autopilot and that `autopilot_caps boundary` halts at `step_ca
       `.agents/`, or `.cursor/` for any `targets` combination.
 - [x] `workflow_fuse.py`, `RESERVED_WORKFLOW_NAMES`, `default_workflow`, and
       `STAGE_ABBREV` are absent from `src/`.
-- [ ] `/hm:loop` renders and completes an iteration with no fused command present
+- [x] `/hm:loop` renders and completes an iteration with no fused command present
       ↳ renders + rejects `wrapup` are asserted; a full live iteration is unverified.
       (ADR-014), and its stage-list flag rejects `wrapup`.
 - [x] A fresh render of both presets × all target combinations succeeds — this is the
       only check that reaches the four `claude-md` templates.
 - [x] `surface_baseline.json` per-target: `aggregate_chars.claude ≤ 375,000` **and**
       `aggregate_chars.codex ≤ 300,000` (expected 353,627 / 289,818, from 853,424 / 320,243).
-- [ ] `worktree create` succeeds with an uncommitted `.claude/memory/archive/` file
+- [x] `worktree create` succeeds with an uncommitted `.claude/memory/archive/` file
       ↳ **Phase 5** — the archive directory does not exist yet.
       present (ADR-015).
 - [x] AC-005 ceilings **and floors** hold for every surviving command.
 - [x] AC-006's three atomic arms (`:492`, `:508`, `:515`) still run and pass.
-- [ ] An old `harness.yaml` with `workflows:` loads cleanly **without re-rendering**, and
+- [x] An old `harness.yaml` with `workflows:` loads cleanly **without re-rendering**, and
       ↳ the re-render half is covered by `test_a_retired_key_is_not_re_injected_on_re_render`;
         the load-without-re-rendering half + the single advisory are **Phase 2**.
       re-renders without the key reappearing, emitting exactly one advisory.
-- [ ] `AutonomyConfig()` yields `level == "auto_safe"` and `autopilot_persistent is True`,
+- [x] `AutonomyConfig()` yields `level == "auto_safe"` and `autopilot_persistent is True`,
       ↳ **Phase 3**.
       **while** `_parse_autonomy` on a malformed block yields `gated` / `False`.
-- [ ] `.claude/harness.yaml` has `step_cap: 20`, `time_cap_min: 300`.
+- [x] `.claude/harness.yaml` has `step_cap: 20`, `time_cap_min: 300`.
       ↳ **Phase 3**.
-- [ ] Every rendered `/hm:` command has a **non-empty** frontmatter `description:`
+- [x] Every rendered `/hm:` command has a **non-empty** frontmatter `description:`
       ↳ **Phase 4**.
       (uniqueness is an advisory warning, not a gate — ADR-016).
-- [ ] `interview.py:718-720` returns `gated` / `False` on an explicit decline (ADR-013).
+- [x] `interview.py:718-720` returns `gated` / `False` on an explicit decline (ADR-013).
       ↳ **Phase 3** (ADR-013).
-- [ ] `failures.md` ≤ ~95 entries; `.claude/memory/archive/failures-2026.md` holds the
+- [x] `failures.md` ≤ ~95 entries; `.claude/memory/archive/failures-2026.md` holds the
       ↳ **Phase 5**.
       rest; no `count>=2` entry archived.
-- [ ] `upsert-failure` remains atomic and succeeds when the archive pass raises.
+- [x] `upsert-failure` remains atomic and succeeds when the archive pass raises.
       ↳ **Phase 5**.
-- [ ] Full suite green; `hm health` reports zero P0.
+- [x] Full suite green; `hm health` reports zero P0.
       ↳ full suite is green; `hm health` not run this unit.
-- [ ] CHANGELOG carries BREAKING entries for all three user-visible breaks: the fused
+- [x] CHANGELOG carries BREAKING entries for all three user-visible breaks: the fused
       ↳ CHANGELOG done this unit; the 5-file version sync is **Phase 6 / release**.
       removal, the autonomy default flip, and `--per-iter-workflow`'s new stage-list form;
       5-file version sync done.

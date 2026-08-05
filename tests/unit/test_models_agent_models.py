@@ -186,10 +186,10 @@ def test_harness_config_agent_models_default_empty() -> None:
     assert cfg.agent_models == {}
 
 
-def test_harness_config_schema_version_bumped_to_3() -> None:
-    """ADR-011: schema_version 1 → 2; PLAN-second-opinion-multi-model ADR-001: 2 → 3."""
+def test_harness_config_schema_version_bumped_to_4() -> None:
+    """1 → 2 (ADR-011), 2 → 3 (second-opinion rename), 3 → 4 (fused-workflow retirement)."""
     cfg = HarnessConfig()
-    assert cfg.schema_version == 3
+    assert cfg.schema_version == 4
 
 
 def test_interview_answers_default_model_alias() -> None:

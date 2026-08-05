@@ -44,6 +44,7 @@ stage 연결은 `{{ cmd }}loop` 또는 autopilot 이 담당합니다 — 융합 
 | preset | `{{ config.preset }}` |
 | locale | `{{ config.locale }}` |
 | targets | `{{ config.targets | join(", ") }}` |
+| autopilot | `{{ config.autonomy.level }}`{% if config.autonomy.autopilot_persistent %}, 매 세션 자동 재무장{% endif %} |
 
 {% if "cursor" in config.targets -%}
 > **Cursor:** `/hm:*` 명령이 동일하게 동작. Subagent · skill 은 `.claude/` 에서 공유.

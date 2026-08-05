@@ -3983,6 +3983,11 @@ def _path_owner(relpath: str) -> str:
         _is_deliverable_path(norm)
         or norm in (".claude/memory/wiki.md", ".claude/memory/failures.md")
         or norm.startswith(".claude/memory/session/")
+        # PLAN-harness-diet ADR-015: the failures archive is the same tier as the file it
+        # is evicted from, so it must land in the squash rather than read as user dirt.
+        # Anchored DIRECTORY prefix, never a substring — this classifier's narrowness is a
+        # documented safety invariant.
+        or norm.startswith(".claude/memory/archive/")
     ):
         return "deliverable"
     return "user"
@@ -4782,12 +4787,18 @@ def _cli_task_create(args: list[str]) -> int:
 # `test_wrapup_memory_fold.test_tier_pathspec_covers_every_memory_output_wrapup_writes`
 # now derives the expected set from BOTH writers, including a scan of the rendered
 # stage, so adding a third memory output fails until the fold covers it.
+# PLAN-harness-diet ADR-005: `upsert-failure`'s archive pass is a THIRD memory writer, and
+# it is the one whose omission is worst — an eviction removes entries from the tracked
+# `failures.md` and writes them to `archive/`, so a fold that skips `archive/` turns
+# "archive, never delete" into a delete with no replacement committed. Exactly the failure
+# the comment above records for pending-proposals/pending-drift, one tier further down.
 _HUMAN_MEMORY_TIER_PATHSPEC: tuple[str, ...] = (
     ".claude/memory/wiki.md",
     ".claude/memory/failures.md",
     ".claude/memory/pending-proposals.md",
     ".claude/memory/pending-drift.md",
     ".claude/memory/session",
+    ".claude/memory/archive",
 )
 
 _HUMAN_MEMORY_TIER_FILES: frozenset[str] = frozenset(
@@ -4799,6 +4810,8 @@ def _is_human_memory_tier_path(rel: str) -> bool:
     """WHY: scope the fold to the exact human tiers, never a machine-churn path."""
     rel = rel.strip()
     if rel in _HUMAN_MEMORY_TIER_FILES:
+        return True
+    if rel.startswith(".claude/memory/archive/") and rel.endswith(".md"):
         return True
     return rel.startswith(".claude/memory/session/") and rel.endswith(".md")
 

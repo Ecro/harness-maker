@@ -434,7 +434,7 @@ class HarnessConfig(BaseModel):
     """harness.yaml schema."""
     locale: Locale = Locale.KO
     preset: Preset = Preset.SIDE
-    workflows: dict[str, list[AtomicStage]]
+    workflows: dict[str, list[AtomicStage]]  # RETIRED in 0.47.0 — key removed; stripped at load
     execution: dict  # { default: "step" | "autoloop" }
     reviewers: dict  # { list, consensus, routing }
     caching: str  # aggressive | conservative | adaptive | off
@@ -488,7 +488,7 @@ class ConflictItem(BaseModel):
 **(M3) Stage Engine — seven atomic stages (Phase 5; fusion retired in 0.47.0)**
 - 7 atomic stages → each automatically exposed as `/hm:<stage>`
 - Workflow = user-named stage sequence → Renderer synthesizes fragments → single `/hm:<name>` command
-- Defined under `harness.yaml.workflows` key; additional workflows can be added by re-running `/harness-maker:make`
+- Defined under `harness.yaml.workflows` key; additional workflows can be added by re-running `/harness-maker:make` — **RETIRED in 0.47.0**: both keys are removed and `io_utils.load_harness_yaml` strips them at load; chain stages with `/hm:loop --per-iter-stages` or autopilot
 - `/hm:research` calibrates search lenses before gathering; broad trend and roadmap prompts must run the user-workflow/product opportunity lens before academic, benchmark, or architecture-only searches.
 
 **(M4) Anti-rot (Phase 4)**
@@ -578,8 +578,8 @@ class ConflictItem(BaseModel):
 | Consensus | cross-check | cross-check |
 | Routing | conditional | conditional |
 | Caching | aggressive | aggressive |
-| Recommended workflow seeds | dev=[plan,execute,review,wrapup] + quick=[execute] | above + careful=[research,spec,plan,execute,review,wrapup,verify] + audit=[review] |
-| default_workflow | dev | dev |
+| Recommended workflow seeds | *(retired 0.47.0)* | *(retired 0.47.0)* |
+| default_workflow | *(retired 0.47.0)* | *(retired 0.47.0)* |
 | Model preset_default | sonnet | sonnet |
 | Autoloop allowed | true | true |
 | Memory | failures.md + wiki.md | failures.md + wiki.md |

@@ -527,18 +527,26 @@ There is no fused-workflow command. Two mechanisms chain the atomic stages:
 
 ## Autopilot (pipeline auto-advance)
 
-By default the workflow **stops after every stage** so you stay in the loop. When that
-hand-off becomes a bottleneck, opt into **autopilot**: stages auto-advance through the
-pipeline whenever no human decision is actually required.
+**Autopilot** advances the pipeline through stages where no human decision is actually
+required, and stops at the ones where it is.
 
-- **Off by default** (`autonomy.level: gated`). The make interview asks about autopilot
-  directly (enable? level? persist? caps?), or opt in per-session with
-  `harness-maker autopilot on` (which arms `auto_safe` by default — pass `--level full`
-  for the wider policy), via the session-start picker, or by setting `autonomy.level` in
-  `harness.yaml`.
-- **Persist across sessions**: set `autonomy.autopilot_persistent: true` and a SessionStart
-  hook re-arms the marker every session — no more `harness-maker autopilot on` each time. The
-  committed `false` (default) is the explicit off-switch.
+- **On by default since 0.47.0 for non-interactive installs** (`autonomy.level: auto_safe`,
+  `autopilot_persistent: true`) — that is the common case, since a `/harness-maker:make`
+  invoked as a slash command has no tty and takes the defaults silently.
+- **The interactive interview still asks, and still defaults to off.** `Enable autopilot
+  auto-advance? [y/N]` — a bare Enter is a non-answer, not consent, so it pins `gated`, and
+  an explicit "no" is never overridden by the promoted default. Answer `y` to arm it.
+- **Existing projects are NOT switched, and `--update` does not switch them either.**
+  Every `harness.yaml` a previous version rendered already spells out its `autonomy:` block,
+  and a re-render round-trips those values verbatim — so the flip reaches **new installs
+  only**. To adopt it on an existing project, edit `.claude/harness.yaml`, or run this
+  from the repo root:
+
+  ```bash
+  harness-maker make . --update --autonomy-level auto_safe --autonomy-persistent
+  ```
+- **To turn it off**, set `autonomy.level: gated` and `autopilot_persistent: false` in
+  `harness.yaml`. Per-session control is `harness-maker autopilot on|off`.
 - **Mandatory human gates always stop the chain** — a `/hm:plan` architecture interview,
   a `/hm:review` `CHANGES_REQUESTED`, the `/hm:wrapup` commit/push, or a `/hm:verify`
   failure. These safety gates are non-negotiable at every level (`full` does **not**
@@ -626,10 +634,10 @@ worktree:
   feature_branch_workflow: true  # per-task persistent branch + worktree (Production default)
 
 autonomy:                    # autopilot / pipeline auto-advance — see the Autopilot section
-  level: gated               # gated | auto_safe | full (off by default)
-  autopilot_persistent: false  # true → SessionStart re-arms the marker each session
-  step_cap: null             # positive int | null = unlimited (mandatory gates are the real bound)
-  time_cap_min: null         # positive int | null = unlimited
+  level: auto_safe           # gated | auto_safe | full (auto_safe is the 0.47.0+ default)
+  autopilot_persistent: true   # SessionStart re-arms the marker each session
+  step_cap: 20               # positive int | null = unlimited (mandatory gates are the real bound)
+  time_cap_min: 300          # positive int | null = unlimited
 
 permissions:
   deny_dangerous: false      # true → restore the destructive-pattern deny baseline (rm, curl|sh, /etc, ~/.ssh)

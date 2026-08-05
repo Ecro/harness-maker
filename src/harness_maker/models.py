@@ -776,9 +776,16 @@ class AutonomyConfig(BaseModel):
     """Pipeline auto-advance policy (PLAN-human-bottleneck-auto-advance).
 
     ADR-002: ``level`` decides how far the workflow auto-advances past inter-stage
-    STOP boundaries. Default ``gated`` (today's behavior). An old harness.yaml
-    without an ``autonomy`` key loads as ``gated`` via the default-factory — the
-    absent-case = feature-black-hole guard. ``auto_safe`` advances the two-way-door
+    STOP boundaries. PLAN-harness-diet ADR-010 promoted the class default from ``gated``
+    to ``auto_safe`` (and ``autopilot_persistent`` to ``True``), so a NEWLY rendered
+    harness auto-arms. **That flip does not reach an existing project by loading**:
+    ADR-013 pins ``interview._parse_autonomy``'s absent and malformed branches, the
+    interview's explicit-decline branch, and ``cli._build_autonomy_override``'s absent
+    base to ``gated`` / ``False``. A config error, a missing block, or a user's "no" must
+    never escalate autonomy; the promotion arrives through ``/harness-maker:make
+    --update``. Do NOT "simplify" those four sites back to ``AutonomyConfig()`` —
+    ``tests/unit/test_autonomy_defaults.py`` asserts the divergence on purpose.
+    ``auto_safe`` advances the two-way-door
     boundaries but ALWAYS stops at the plan architecture interview, a review
     CHANGES_REQUESTED grade-gate, and the wrapup merge/push. ``full`` currently behaves
     IDENTICALLY to ``auto_safe`` — the mandatory safety gates are non-negotiable and are
@@ -798,7 +805,7 @@ class AutonomyConfig(BaseModel):
 
     model_config = ConfigDict(strict=True, extra="forbid")
 
-    level: Literal["gated", "auto_safe", "full"] = "gated"
+    level: Literal["gated", "auto_safe", "full"] = "auto_safe"
     pipeline: list[AtomicStage] = Field(
         default_factory=lambda: [
             AtomicStage.RESEARCH,
@@ -822,7 +829,7 @@ class AutonomyConfig(BaseModel):
     # ADR-003: when True, a SessionStart hook (``harness_maker.hooks.autopilot_autoarm``)
     # re-arms a fresh ``.hm-autopilot`` marker each session from the committed level/pipeline,
     # so the 18h TTL never trips in practice. The committed ``false`` is the real off-switch.
-    autopilot_persistent: bool = False
+    autopilot_persistent: bool = True
 
     @field_validator("pipeline")
     @classmethod
@@ -978,7 +985,11 @@ class HarnessConfig(BaseModel):
     # ADR-011: schema_version bumped 1 → 2 for the agent_models/default_model
     # rename. PLAN-second-opinion-multi-model ADR-001: bumped 2 → 3 for the
     # codex_second_opinion → second_opinion rename (silent migration in interview.py).
-    schema_version: int = 3
+    # PLAN-harness-diet ADR-002/012: bumped 3 -> 4 for the retired fused-workflow axis
+    # (`workflows` / `default_workflow`). This records WHEN a file was written; it does
+    # not gate the migration -- `io_utils.strip_retired_keys` keys on key PRESENCE, so a
+    # hand-edited file with no version, or one left at 3, still migrates.
+    schema_version: int = 4
     # 0.16.0: deep_gate redesigned as 5-term inequality (PLAN-deep-interview-question-criteria).
     # Default literal lives in `interview_deep_gate_defaults()` at module bottom —
     # also consumed by `harness_maker.interview._preset_extras` to avoid 3-way drift.
@@ -1144,7 +1155,7 @@ class InterviewAnswers(BaseModel):
             "main_loop": {"max_rounds": None},
         }
     )
-    schema_version: int = 3
+    schema_version: int = 4
     sibling_repos: list[str] = Field(default_factory=list)
     # Paths to additional documents that wrapup should update/manage.
     # User specifies via --wrapup-docs or /hm:configure. Examples:

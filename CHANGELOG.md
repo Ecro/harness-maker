@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.47.0] — 2026-08-05
 
 ### BREAKING — the fused-workflow axis is removed (`PLAN-harness-diet` Phase 1, ADR-001/002/014)
 
@@ -47,6 +47,80 @@ Python caller passed it; noted for anyone driving the module directly.
   guards the filesystem sink.
 - The interactive interview asks **two fewer questions**. Automation that pipes positional
   answers to `harness-maker` must drop the two workflow answers.
+
+### BREAKING — autopilot is on by default for new and re-rendered harnesses (`PLAN-harness-diet` Phase 3, ADR-010/013)
+
+`AutonomyConfig`'s class default moves from `level: gated` / `autopilot_persistent: false`
+to **`level: auto_safe` / `autopilot_persistent: true`**. A harness rendered from now on
+auto-advances past two-way-door stage boundaries and re-arms every session — on the
+**non-interactive** install path, which is the common one (a slash-command
+`/harness-maker:make` has no tty and takes defaults silently). The interactive interview
+still prompts `[y/N]` and still treats a bare Enter as gated: a non-answer is not consent. The mandatory
+gates are unchanged and non-negotiable: the plan architecture interview, a
+`CHANGES_REQUESTED` review grade, and the wrapup merge/land still stop.
+
+**This does not reach an existing project by loading.** Four fallbacks are pinned to
+`gated` / `false` so a package upgrade, a config typo, or a user's "no" can never escalate
+autonomy: `_parse_autonomy`'s absent and malformed branches, the interview's explicit
+decline, and `cli._build_autonomy_override`'s absent base. A fifth site was found while
+enumerating them — a non-bool `autopilot_persistent` (`"true"`, `1`, `"yes"`) used to be
+*deleted* so it fell to the then-safe class default; it is now pinned `false` explicitly,
+or the guard against silent auto-arm would have inverted into the thing it guards.
+
+**An existing harness does NOT adopt the new default at all — including on `--update`.**
+An earlier draft of this entry claimed a re-render delivers it. It does not, and the
+mechanism is worth stating because this repo's own memory already records the resulting
+confusion ("re-render ≠ model switch"): every `harness.yaml` any previous version rendered
+already contains all six `autonomy:` fields explicitly, `answers_from_harness_yaml`
+round-trips them, and the preset template's `else "auto_safe"` arm is unreachable whenever
+`config.autonomy` is present — which it always is. So `--update` re-emits your existing
+`level`, whatever it is.
+
+To adopt the promotion on an existing project, edit `.claude/harness.yaml` directly, or run
+`harness-maker make . --update --autonomy-level auto_safe --autonomy-persistent` from the
+repo root. The flip reaches **new installs only**.
+
+(A draft of this entry named a `configure` subcommand. There is no such subcommand; the
+autonomy flags live on `make`. `tests/structural/test_documented_commands_exist.py` now
+fails the build when a shipped doc tells a user to run a command Typer does not accept.)
+
+Two escalation routes that DID exist in the first draft of this work and are fixed here:
+a `--preset` switch rebuilt answers without carrying `autonomy` forward, silently rewriting
+an explicit `level: gated` into persistent auto-advance; and an `autonomy:` block that is
+present but omits a field used to inherit the promoted class default, so
+`autonomy: {autopilot_persistent: false}` still became `auto_safe`. A **present** block is
+now read as the user's stated intent: any field it omits falls back to the conservative
+value, not the class default.
+
+*Cost:* the session-start autopilot picker renders under `level != "gated"`, so each of the
+seven stage commands in a NEW harness grows ~2,400 characters (+19,041 total). Harnesses
+already on `auto_safe` are unaffected.
+
+### Added
+
+- **Retired `harness.yaml` keys are now dropped at LOAD time** (Phase 2, ADR-012 follow-up).
+  ADR-012 shipped the drop-list inside the renderer, which only runs on
+  `/harness-maker:make`; an already-installed project that upgrades the package without
+  re-rendering never reached it. `io_utils.load_harness_yaml` — the loader every config
+  entry point already shares — now strips `RETIRED_TOP_LEVEL_KEYS` and logs **one advisory
+  per project**, not per load. `schema_version` 3 → 4 records when a file was written; the
+  migration itself keys on key presence, so a file left at 3 still migrates.
+- **Every rendered `/hm:` command carries a frontmatter `description:`** (Phase 4,
+  ADR-016). Without one, Claude Code and Cursor fall back to the first body line, and 14 of
+  15 commands showed the identical string in the tool listing. ADR-016's per-target parser
+  question was answered by rendering all three targets rather than assumed: commands render
+  to `.claude/commands/hm/*.md` only — never to Codex TOML or Cursor `.mdc` — so the field
+  is unconditional. Cost ~1,571 characters.
+- **`upsert-failure` archives stale one-off entries at write time** (Phase 5, ADR-005/006).
+  An entry that is `count:1` **and** older than 90 days moves to
+  `.claude/memory/archive/failures-<YYYY>.md`; `count>=2` is exempt at any age, because
+  recurrence — not age — is what makes an entry worth keeping. Archived, never deleted, and
+  committed alongside. The pass runs inside the same lock and transaction as the write, so
+  the growth point and the eviction point are the same call; an archive failure skips the
+  eviction entirely rather than half-applying it, and never fails the write. A heading whose
+  date matches the shape but not the calendar (`2026-99-99`) is preserved with a warning and
+  does not abort the pass for the entries after it. `.claude/memory/archive/` is classified
+  as a deliverable so an uncommitted archive file cannot block `worktree create`.
 
 ## [0.46.0] — 2026-08-02
 

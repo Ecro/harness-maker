@@ -66,7 +66,14 @@ def test_second_opinion_preserves_existing_subconfigs() -> None:
 
 
 def test_autonomy_level_alone_enables() -> None:
-    cfg = _build_autonomy_override("auto_safe", None, AutonomyConfig())
+    """`--autonomy-level` alone must not turn persistence ON for a non-persistent project.
+
+    The `existing` here is pinned gated/False on purpose: a bare `AutonomyConfig()` now
+    MEANS "already persistent", so passing one would assert preservation, not the flag's
+    documented "persistence defaults off unless explicitly set" contract.
+    """
+    existing = AutonomyConfig(level="gated", autopilot_persistent=False)
+    cfg = _build_autonomy_override("auto_safe", None, existing)
     assert isinstance(cfg, AutonomyConfig)
     assert cfg.level == "auto_safe"
     assert cfg.autopilot_persistent is False

@@ -1,73 +1,73 @@
 {
   "aggregate_chars": {
-    "claude": 352667,
-    "codex": 288785
+    "claude": 354283,
+    "codex": 288826
   },
   "counting_rule": "ADR-011: round_trips = count of ^! lines (claude variant) or 'Bash(' call sites (codex variant), plus all 'Task(' occurrences; fenced examples included. A consistent proxy, not a semantic count.",
   "generated_by": "tests/structural/_surface_baseline.py",
-  "payload_digest": "ff50460aeff5d1b9b24968a1f8314b18bd6a4c2f1e901feb87357a114faa0ee9",
-  "render_sha": "8ffff80d89b650a112d574aac9ce70679b9e72c1",
+  "payload_digest": "8edeb8e09ad45f7aebaa60e40164edffc585f18d793678b7198f4b9874642313",
+  "render_sha": "7dc511f5b5de1ff22831efc6c3b41502383f2b5b",
   "schema_version": 1,
   "surface": {
     "claude": {
       "configure": {
-        "chars": 9249,
+        "chars": 9330,
         "round_trips": 3
       },
       "execute": {
-        "chars": 29688,
+        "chars": 29820,
         "round_trips": 14
       },
       "health": {
-        "chars": 9727,
+        "chars": 9815,
         "round_trips": 7
       },
       "help": {
-        "chars": 1778,
+        "chars": 1883,
         "round_trips": 0
       },
       "loop": {
-        "chars": 52177,
+        "chars": 52269,
         "round_trips": 12
       },
       "loop-p5-batch": {
-        "chars": 4710,
+        "chars": 4794,
         "round_trips": 2
       },
       "make": {
-        "chars": 6557,
+        "chars": 6626,
         "round_trips": 1
       },
       "metrics": {
-        "chars": 15313,
+        "chars": 15416,
         "round_trips": 7
       },
       "plan": {
-        "chars": 47587,
+        "chars": 47723,
         "round_trips": 14
       },
       "research": {
-        "chars": 25918,
+        "chars": 26058,
         "round_trips": 8
       },
       "review": {
-        "chars": 50261,
+        "chars": 50379,
         "round_trips": 8
       },
       "spec": {
-        "chars": 30405,
+        "chars": 30537,
         "round_trips": 6
       },
       "uninstall": {
-        "chars": 1629,
+        "chars": 1700,
         "round_trips": 3
       },
       "verify": {
-        "chars": 21216,
+        "chars": 21348,
         "round_trips": 13
       },
       "wrapup": {
-        "chars": 46452,
+        "chars": 46585,
         "round_trips": 29
       }
     },
@@ -77,7 +77,7 @@
         "round_trips": 13
       },
       "hm-help": {
-        "chars": 2069,
+        "chars": 2110,
         "round_trips": 0
       },
       "hm-loop": {

@@ -17,11 +17,12 @@ from pydantic import ValidationError
 from harness_maker.add_domain import AddDomainError, add_domain, validate_domain_name
 from harness_maker.block_merge import MergeReport
 from harness_maker.codex_user_config import bootstrap_user_codex_profiles
-from harness_maker.interview import answers_from_harness_yaml, interview
+from harness_maker.interview import _parse_autonomy, answers_from_harness_yaml, interview
 from harness_maker.io_utils import atomic_write, denormalize_home_to_tilde
 from harness_maker.locate import compare_version
 from harness_maker.locate import resolve as resolve_plugin
 from harness_maker.models import (
+    AutonomyConfig,
     Blueprint,
     InterviewAnswers,
     Preset,
@@ -319,6 +320,10 @@ def make(
     # so locale / dev_mode / custom workflows / reviewer-enablement survive
     # without re-prompting. --reinterview forces fresh prompts; --autoloop
     # only kicks in for first-time installs (no harness.yaml yet).
+    # Defined on BOTH branches: the `--reinterview` autonomy re-apply below reads it, and a
+    # name assigned only inside the `else` would be a latent NameError the moment that block
+    # stops being reachable exclusively via `reused is None`.
+    effective_autoloop = autoloop or (not sys.stdin.isatty())
     reused = None if reinterview else answers_from_harness_yaml(existing_yaml)
     if reused is not None:
         a = reused
@@ -327,7 +332,6 @@ def make(
         # Fresh install + non-tty stdin (e.g., invoked via Claude Code slash
         # command, where AskUserQuestion isn't piped through) → auto-flip to
         # autoloop defaults instead of hanging on the interactive prompt.
-        effective_autoloop = autoloop or (not sys.stdin.isatty())
         if effective_autoloop and not autoloop:
             typer.echo("non-tty stdin detected; using --autoloop defaults")
         a = interview(p, autoloop_mode=effective_autoloop)
@@ -387,6 +391,33 @@ def make(
             a.worktree["feature_branch_workflow"] = _disk_flag
         else:
             a.worktree.pop("feature_branch_workflow", None)
+        # `--reinterview` skips `answers_from_harness_yaml`, so `_parse_autonomy` never runs;
+        # combined with the non-tty auto-flip to `autoloop_mode` above, an EXISTING project
+        # that set `level: gated` / `autopilot_persistent: false` — the off-switch the README
+        # documents — would be rebuilt from the promoted class default and then auto-armed
+        # every session by the SessionStart hook.
+        #
+        # GATED, unlike the `feature_branch_workflow` re-apply above, and the difference is
+        # the point: that flag is never interview-asked, so re-applying it unconditionally
+        # loses nothing. Autonomy IS asked. An unconditional re-apply here ran AFTER
+        # `_ask_autonomy` and AFTER `_apply_dimension_overrides`, so it silently discarded
+        # both a fresh interview answer and an explicit `--autonomy-level` — inverting
+        # `--reinterview`'s own "ask me fresh" contract. Fire only when nobody was asked and
+        # no flag was given.
+        _asked = not effective_autoloop
+        _flagged = autonomy_level_override is not None or autonomy_persistent_override is not None
+        if not _asked and not _flagged:
+            _disk_autonomy = pre_yaml_body.get("autonomy")
+            if isinstance(_disk_autonomy, dict):
+                a = a.model_copy(update={"autonomy": _parse_autonomy(_disk_autonomy)})
+            else:
+                # Absent block on an EXISTING harness is the absent-case escalation
+                # `_parse_autonomy` is explicitly pinned against: a project rendered before
+                # the `autonomy:` key existed (or one whose block was hand-deleted) never
+                # expressed a preference, and a silent re-render must not answer for it.
+                a = a.model_copy(
+                    update={"autonomy": AutonomyConfig(level="gated", autopilot_persistent=False)}
+                )
     # Migrate a never-migrated, worktree-enabled harness to the feature-branch model
     # ONLY on a clean live-state probe — else keep the old model + loud-warn, so the
     # new in-worktree path never strands old preserved state. Gated on: existing
@@ -926,7 +957,11 @@ def _load_harness_yaml_body(yaml_path: Path) -> dict[str, Any]:
     except yaml.YAMLError:
         return {}
     if isinstance(parsed, dict):
-        return parsed
+        # Same migration the shared loader applies, so the pre/post diff does not report a
+        # retired key as a user-visible removal on the first re-render after an upgrade.
+        from harness_maker.io_utils import strip_retired_keys
+
+        return strip_retired_keys(parsed, source=yaml_path)
     return {}
 
 
@@ -1220,6 +1255,16 @@ def _apply_dimension_overrides(
             # worktree-enabled preset, so no reachable `false` opt-out is lost. If a
             # third worktree-enabled preset is added, route this path through the
             # round-trip strip + enablement_preflight, or it becomes a P1 opt-out loss.
+            # `autonomy=` is NOT optional here. Omitting it lands on `_build_answers`'s bare
+            # `AutonomyConfig()`, whose class default is now `auto_safe` /
+            # `autopilot_persistent: True` (PLAN-harness-diet ADR-010) — so a preset switch
+            # would REWRITE a harness.yaml that explicitly says `level: gated` /
+            # `autopilot_persistent: false` (the documented off-switch) into persistent
+            # auto-advance, and the SessionStart autoarm hook would then arm it every
+            # session. `update` restores autonomy only when `--autonomy-level` /
+            # `--autonomy-persistent` was passed, so without this the loss is silent.
+            # Same class as the `feature_branch_workflow` hazard the note above records;
+            # ADR-010's flip is what turned it from benign into an escalation.
             rebuilt = _build_answers(
                 locale=answers.locale,
                 targets=list(answers.targets),
@@ -1227,6 +1272,7 @@ def _apply_dimension_overrides(
                 dev_mode=answers.dev_mode,
                 consensus=answers.consensus,
                 caching=answers.caching,
+                autonomy=answers.autonomy,
             )
             result = rebuilt.model_copy(update=update)
             if focus_override:
@@ -1317,7 +1363,14 @@ def _build_autonomy_override(
             err=True,
         )
         raise typer.Exit(code=1)
-    base = existing if isinstance(existing, AutonomyConfig) else AutonomyConfig()
+    # Pinned gated (ADR-013 class): this branch is the "project has no valid autonomy
+    # block" fallback, and the docstring above promises persistence defaults OFF. A bare
+    # construction would inherit the promoted class default and break that promise.
+    base = (
+        existing
+        if isinstance(existing, AutonomyConfig)
+        else AutonomyConfig(level="gated", autopilot_persistent=False)
+    )
     new_level = level if level is not None else base.level
     new_persistent = persistent if persistent is not None else base.autopilot_persistent
     # Preserve EVERY non-overridden field (review P1): `pipeline` is user-customizable and

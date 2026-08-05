@@ -104,6 +104,10 @@ def test_parse_autonomy_preserves_finite_caps(tmp_path: Path) -> None:
     assert answers is not None
     assert answers.autonomy.step_cap == 12
     assert answers.autonomy.time_cap_min == 90
+    # A PRESENT block that omits `autopilot_persistent` keeps the conservative value: the
+    # block is the user's stated intent, so an omitted field is not a request for the
+    # promoted class default. (This assertion briefly read `is True` mid-task, when ADR-013
+    # still let partial blocks inherit the flip; two second-opinion models overturned that.)
     assert answers.autonomy.autopilot_persistent is False
 
 

@@ -68,8 +68,13 @@ def test_cli_autopilot_on_uses_canonical_pipeline(tmp_path: Path) -> None:
 # --- model defaults / validation -------------------------------------------------
 
 
-def test_autonomy_default_is_gated() -> None:
-    assert AutonomyConfig().level == "gated"
+def test_autonomy_default_is_auto_safe() -> None:
+    """PLAN-harness-diet ADR-010 promoted the CLASS default; ADR-013 pins the fallbacks.
+
+    The conservative sites that must NOT follow this value are asserted in
+    tests/unit/test_autonomy_defaults.py.
+    """
+    assert AutonomyConfig().level == "auto_safe"
 
 
 def test_autonomy_default_pipeline_is_seven_stage_incl_verify() -> None:
@@ -87,9 +92,14 @@ def test_autonomy_has_caps_and_extra_deny_defaults() -> None:
     assert cfg.extra_deny == []
 
 
-def test_harness_config_absent_autonomy_defaults_to_gated() -> None:
+def test_harness_config_absent_autonomy_delivers_the_promoted_default() -> None:
+    """A bare HarnessConfig is a DELIVERY site (synthesis), not a user-config load.
+
+    Nothing validates a user's harness.yaml into this model, so inheriting the promoted
+    default here cannot escalate an existing project.
+    """
     cfg = HarnessConfig(preset=Preset.PRODUCTION)
-    assert cfg.autonomy.level == "gated"
+    assert cfg.autonomy.level == "auto_safe"
     assert cfg.autonomy.pipeline == DEFAULT_PIPELINE
 
 

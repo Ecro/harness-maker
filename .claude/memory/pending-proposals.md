@@ -29,7 +29,7 @@
 **Rationale:** Three recurrences (2026-05-17 content-after-marker, 2026-05-20 marker-deleted, 2026-06-20 marker-overwritten) all share one root: a wrapup append touching the close-marker line. The standing fix added prose ("name the marker, insert ABOVE it") + a verification-suite note, but under autopilot/dogfooding pressure the LLM still overwrote the marker. The failure is invisible until an INTEGRATION-tier test runs, and was mis-triaged as a brittle test before being root-caused — costing a full phase of delay. A 1-line `grep -c` assertion at wrapup time would have caught all three at the moment of damage. This is the canonical "prose guard failed N times → promote to mechanical guard" case.
 
 ## Proposal: re-review-the-fix-not-just-the-suite (2026-08-05)
-**Triggered by:** [fail:test] fix-introduced-defect-passes-all-gates (count: 3)
+**Triggered by:** [fail:test] fix-introduced-defect-passes-all-gates (count: 4 as of 2026-08-05; this proposal was written at count: 3) — the fourth instance is PLAN-harness-diet Phases 2-6: 14 findings over four rounds, 11 of them introduced by this task's own fixes, seven while fixing the other four. It also sharpens the proposal: three of the eleven were a single class-default flip re-fixed four times, so the receipt should demand an ENUMERATION (the grep and its full result set) whenever a fix changes a shared default or a shared allowlist, not just a re-review of the diff.
 **Proposed mechanism:** make the review stage's auto-fix loop re-review the FIX DELTA, not
 only re-run the suite. Round N applies fixes; round N+1 currently recomputes a grade from a
 green suite, which is exactly the signal that cannot see a fix-introduced defect — the suite
@@ -134,3 +134,35 @@ BOTH dispatchable AND resolves through `hm` in a subprocess", and scan every ren
 (commands, `.claude/skills/*/SKILL.md`, agent bodies) rather than commands alone — the skills half
 was added this round and immediately found a pre-existing miss (`refdocs_index`). The library/product
 seam is the recurring shape; the gate should live at the seam, not in the library.
+
+## Proposal: format-check in every local verify entry point, derived not enumerated (2026-08-05)
+**Triggered by:** [fail:lint] ruff-format-not-in-local-verify-pass (count: 3)
+**Proposed mechanism:** template change + structural test
+**Rationale:** This entry sits at count 3 with no proposal of its own, while its sibling
+`[fail:lint] wrapup-final-verify-skips-ruff-format-check` (also count 3) has one
+(`ruff-format-in-execute-not-just-wrapup`, 2026-07-09). Two entries at the escalation
+threshold describing the same missing command in two different stages is the argument for
+stopping the per-stage patching: every rendered surface that tells the model to "run the
+checks" should derive that command list from ONE place, so adding `ruff format --check`
+once reaches execute, verify and wrapup together. Proposed guard: a structural test that
+collects every rendered instruction block naming `ruff check` and asserts the same block
+also names `ruff format --check` — cheap, byte-deterministic, and it fails loudly the next
+time a new stage copies the four-gate list by hand and drops one.
+
+## Proposal: a new gate must state its population, and a test must prove the population is complete (2026-08-05)
+**Triggered by:** [fail:test] gate-scoped-to-the-artifact-being-fixed (count: 3)
+**Proposed mechanism:** review-stage checklist item + non-vacuity assertion convention
+**Rationale:** Three instances now, and the third recurred inside the very round whose
+CLAUDE.md text records the second. The shape is always the same: a guard is written while
+fixing artifact X, its collection step is shaped by X, and the identical defect survives in
+the sibling artifacts the collection never reached — most recently a documented-command gate
+that scanned only shell-TAGGED fences and therefore could not see README's untagged
+paste-into-Claude bootstrap block, which is the install entry point, and a memory-fold
+correspondence test that derived its expected pathspec from the rendered wrapup TEMPLATE and
+so was structurally blind to a writer invoked from Python. Prose discipline has now failed
+three times, so the proposal is mechanical: (a) every new gate must expose its collected
+population as a value (a list of paths/fences/writers), (b) the gate's own test must assert
+that population is non-empty AND contains at least one member the author did not touch in the
+triggering fix, and (c) `/hm:review` gains a checklist line — "for each new gate, name the
+sibling artifact class it does NOT cover" — because a gate whose blind spot is written down
+is a known limitation instead of a silent recurrence.

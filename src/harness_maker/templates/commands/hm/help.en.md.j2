@@ -45,6 +45,7 @@ Stages are chained by `{{ cmd }}loop` or by autopilot — there is no fused work
 | preset | `{{ config.preset }}` |
 | locale | `{{ config.locale }}` |
 | targets | `{{ config.targets | join(", ") }}` |
+| autopilot | `{{ config.autonomy.level }}`{% if config.autonomy.autopilot_persistent %}, re-armed every session{% endif %} |
 
 {% if "cursor" in config.targets -%}
 > **Cursor:** `/hm:*` commands work identically. Subagents and skills are read from `.claude/`.

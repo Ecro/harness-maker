@@ -40,7 +40,7 @@ from jinja2 import Environment, FileSystemLoader, StrictUndefined
 from harness_maker import __version__
 from harness_maker.block_merge import MergeReport
 from harness_maker.block_merge import merge as block_merge
-from harness_maker.io_utils import atomic_append, atomic_write
+from harness_maker.io_utils import RETIRED_TOP_LEVEL_KEYS, atomic_append, atomic_write
 from harness_maker.models import Blueprint, FileEntry
 
 # Module constants — templates ship inside the harness_maker package so they're
@@ -1343,17 +1343,22 @@ def _render_text_file(
     return out
 
 
-# Top-level harness.yaml keys this project used to emit and has since RETIRED.
-# They must be dropped rather than preserved: `_preserve_yaml_user_keys` classifies
-# "in the existing file but not in the new render" as a user addition, so without this
-# list an existing harness.yaml carrying `workflows:` would be re-appended on every
-# re-render, forever, under an "@hm:user:extensions" banner that tells the user the key is
-# theirs. (An earlier version of this comment claimed the regrown key would then fail
+# Retired top-level harness.yaml keys. The list itself lives in `io_utils` (single source
+# of truth — see the comment there); this alias keeps the render-side reference readable.
+#
+# `_preserve_yaml_user_keys` below reads through `load_harness_yaml`, which now strips these
+# keys, so its own filter is **currently unreachable** — verified by deleting the clause and
+# watching the behaviour test still pass. It is kept as a second layer because that function
+# classifies "in the existing file but not in the new render" as a user addition, and it is
+# the layer that must refuse to re-append a retired key under an "@hm:user:extensions"
+# banner telling the user it is theirs; a future refactor that stops routing through the
+# loader would otherwise regrow the key with no gate. Because the clause is unreachable on
+# the live path, `test_retired_key_migration.py` reaches it by stubbing the loader — do not
+# delete either the clause or that test without deleting both.
+# (An earlier version of this comment claimed a regrown key would fail
 # `HarnessConfig`'s `extra="forbid"` on the next load. It would not — nothing validates a
 # user's harness.yaml into that model; `answers_from_harness_yaml` reads selected keys.)
-# This is the top-level twin of the `guard_when` drop in `interview._parse_autonomy`
-# (retired-key migration); ship any future key removal through here.
-_RETIRED_TOP_LEVEL_KEYS: frozenset[str] = frozenset({"workflows", "default_workflow"})
+_RETIRED_TOP_LEVEL_KEYS = RETIRED_TOP_LEVEL_KEYS
 
 
 def _preserve_yaml_user_keys(out: Path, new_body: str) -> str:

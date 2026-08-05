@@ -48,7 +48,9 @@ def test_autonomy_config_field_default_stays_bounded() -> None:
     cfg = AutonomyConfig()
     assert cfg.step_cap == 20
     assert cfg.time_cap_min == 300
-    assert cfg.autopilot_persistent is False
+    # ADR-010 promoted persistence; the CAPS are what this test guards, and they stay
+    # bounded. Persistence divergence lives in tests/unit/test_autonomy_defaults.py.
+    assert cfg.autopilot_persistent is True
 
 
 @pytest.mark.parametrize("bad", [0, -1, -100])

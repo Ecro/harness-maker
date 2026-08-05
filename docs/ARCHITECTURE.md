@@ -176,9 +176,9 @@ There are exactly **7 atomic stages**: `research`, `spec`, `plan`, `execute`, `r
 
 The `research` fragment includes a discovery-lens calibration step so broad trend or roadmap prompts inspect user workflows and adjacent artifacts before narrowing into academic, benchmark, or implementation-only sources.
 
-**Workflows** are user-named sequences of stages. The synthesizer emits a workflow seed per preset (e.g. `dev = [plan, execute, review, wrapup]`). The `workflow_fuse.py` module concatenates the relevant stage fragments into a single command file rendered to `.claude/commands/hm/<workflow>.md`. Re-running `/harness-maker:make` extends `harness.yaml.workflows` and re-fuses.
+**Fused workflows were retired in 0.47.0** (`PLAN-harness-diet` ADR-001/002). Until then, user-named stage sequences under `harness.yaml.workflows` were concatenated by `workflow_fuse.py` into a single `/hm:<workflow>` command; that module, the `workflows` / `default_workflow` keys and the five rendered fused commands are all gone. They were 58.6% of the shipped Claude command surface with zero recorded invocations.
 
-This decouples "what the workflow does" from "how the user calls it" — the same atomic stages back every workflow.
+Stages are chained instead by `/hm:loop --per-iter-stages execute,review` or by autopilot's `autonomy.pipeline`. `io_utils.load_harness_yaml` strips the two retired keys at LOAD time (one advisory per project), so an old config keeps working without a re-render.
 
 ### M4 — Anti-rot Pipeline
 
@@ -441,11 +441,11 @@ The two presets bracket the design space. Most projects pick one and tune 1-3 di
 | Consensus | cross-check | cross-check |
 | Routing | conditional (M6) | conditional (M6) |
 | Caching | aggressive | aggressive |
-| Workflow seeds | `dev=[plan,execute,review,wrapup]` + `quick=[execute]` | `dev` + `quick` + `careful=[research,spec,plan,execute,review,wrapup,verify]` + `audit=[review]` |
-| Default workflow | `dev` | `dev` |
+| Workflow seeds | *(retired in 0.47.0)* | *(retired in 0.47.0)* |
+| Default workflow | *(retired in 0.47.0)* | *(retired in 0.47.0)* |
 | Model preset_default | sonnet | sonnet |
 | Autoloop allowed | true | true |
-| Memory files | `failures.md`, `wiki.md` | `failures.md`, `wiki.md` |
+| Memory files | `failures.md`, `wiki.md`, `pending-proposals.md`, `pending-drift.md`, `session/`, `archive/` | same |
 | Anti-rot threshold | adaptive (start 0.7) | adaptive (start 0.7) |
 | Anti-rot auto-apply | false (always manual) | false (always manual) |
 | Hooks | statusline + telemetry | statusline + telemetry |
@@ -453,7 +453,7 @@ The two presets bracket the design space. Most projects pick one and tune 1-3 di
 | Worktree scope (M9) | `[execute]` | `[execute, plan]` |
 | `adaptive.disable_telemetry` (M18) | `false` (opt-out) | `false` (opt-out) |
 
-The two presets share most defaults intentionally — the gap is concentrated in the multi-reviewer set, the additional `careful`/`audit` workflows, and the mandatory verify gate. This keeps the surface area small for users graduating from `Side` to `Production`.
+The two presets share most defaults intentionally — the gap is concentrated in the multi-reviewer set and the mandatory verify gate (the `careful`/`audit` workflow seeds that used to widen it went away with the fused axis in 0.47.0). This keeps the surface area small for users graduating from `Side` to `Production`.
 
 Telemetry (M18) is default-on for both presets per ADR-005: the audit is only useful with data, so opt-out is set rather than opt-in. No preset variation. The flag flips it off project-wide; there is no per-event consent.
 

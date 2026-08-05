@@ -544,7 +544,11 @@ def _ask_autonomy() -> AutonomyConfig:
     print("  stop at the plan interview, a CHANGES_REQUESTED review, and the wrapup merge.")
     answer = _input_or_empty("  Enable autopilot auto-advance? [y/N]: ").strip().lower()
     if answer not in {"y", "yes"}:
-        return AutonomyConfig()
+        # ADR-013: pinned, NOT a bare `AutonomyConfig()`. The class default is `auto_safe` /
+        # persistent, so inheriting it here would convert an EXPLICIT refusal into the very
+        # behaviour the user just declined — worse than the malformed-config case below,
+        # because here the user was asked.
+        return AutonomyConfig(level="gated", autopilot_persistent=False)
     level_raw = _input_or_empty("  Level [auto_safe/full] (auto_safe): ").strip().lower()
     level: Literal["gated", "auto_safe", "full"] = "full" if level_raw == "full" else "auto_safe"
     persist_raw = (
@@ -637,7 +641,7 @@ def _build_answers(
     sibling_repos: list[str] | None = None,
     second_opinion: SecondOpinionConfig | None = None,
     autonomy: AutonomyConfig | None = None,
-    schema_version: int = 3,
+    schema_version: int = 4,
 ) -> InterviewAnswers:
     is_side = preset == Preset.SIDE
     return InterviewAnswers(
@@ -1225,7 +1229,10 @@ def _parse_autonomy(value: object) -> AutonomyConfig:
     the ``level`` Literal still rejects unknown values (→ caught → gated fallback).
     """
     if not isinstance(value, dict):
-        return AutonomyConfig()
+        # ADR-013: pinned gated. A harness.yaml with no `autonomy:` block must not be
+        # escalated by a package upgrade alone; the promoted default reaches users through
+        # a re-render (`/harness-maker:make --update`), never through a silent load.
+        return AutonomyConfig(level="gated", autopilot_persistent=False)
     # `strict=False` is needed for the yaml stage strings → AtomicStage pipeline coercion, but
     # it would ALSO coerce a hand-edited non-bool `autopilot_persistent` ("true" / "yes" / 1)
     # into a real bool — which the autoarm hook's strict `is True` check was designed to reject,
@@ -1234,18 +1241,38 @@ def _parse_autonomy(value: object) -> AutonomyConfig:
     # contract [[two-readers-of-one-config-must-agree-on-strictness]] (Codex review P2).
     if "autopilot_persistent" in value and not isinstance(value["autopilot_persistent"], bool):
         logger.warning("harness.yaml autonomy: non-bool autopilot_persistent ignored → false.")
-        value = {k: val for k, val in value.items() if k != "autopilot_persistent"}
+        # Pin False rather than DELETING the key. Deletion used to be equivalent because the
+        # class default was False; ADR-010 flipped it to True, which turned this guard inside
+        # out — a hand-edited `autopilot_persistent: "true"` would have silently enabled the
+        # persistent auto-arm this branch exists to reject. (Fifth conservative site; the
+        # PLAN named four. Caught by test_autopilot_review_fixes, not by review.)
+        value = {**value, "autopilot_persistent": False}
     # `guard_when` was RETIRED (the autopilot_guard hook + its interactive-scope axis were
     # removed). An existing harness.yaml still carries the key, but AutonomyConfig now forbids
     # extras — drop it here so model_validate does not reject the WHOLE block and silently reset
     # the user's level / caps / pipeline to defaults on re-render (retired-key migration).
     if "guard_when" in value:
         value = {k: val for k, val in value.items() if k != "guard_when"}
+    # A PRESENT block is the user's stated intent, so a field it OMITS must fall back to the
+    # conservative value, not to the promoted class default. ADR-013 originally declined this
+    # predicate as over-reach; two independent second-opinion models and a docs trace
+    # overturned that on new evidence: because every previously-rendered harness.yaml spells
+    # out all six autonomy fields and is round-tripped verbatim, a partial block is the ONLY
+    # way the flip can reach an existing project — and it reaches it in the worst shape.
+    # `autonomy: {autopilot_persistent: false}` inheriting `level: auto_safe` overrides an
+    # explicit refusal; `autonomy: {step_cap: 20}` auto-arms someone who only set a limit.
+    # The two omitted fields are exactly the two ADR-010 flipped; every other field keeps its
+    # ordinary class default, so this is scoped to the flip, not a general strictness change.
+    # Build a copy: the branches above copy only conditionally, so `value` may still be the
+    # caller's own dict from the parsed yaml, and mutating it in place would be a side effect
+    # on data the caller still holds.
+    value = {"level": "gated", "autopilot_persistent": False, **value}
     try:
         return AutonomyConfig.model_validate(value, strict=False)
     except Exception as e:  # noqa: BLE001 — tolerant upgrade path like second_brain
         logger.warning("harness.yaml autonomy: invalid config ignored (%s).", e)
-        return AutonomyConfig()
+        # ADR-013: pinned gated — one bad enum must never be the thing that arms autopilot.
+        return AutonomyConfig(level="gated", autopilot_persistent=False)
 
 
 def _string_or(value: object, fallback: str | None) -> str:

@@ -365,8 +365,141 @@ def _upsert(
             )
             new_lines = lines[:close_idx] + [heading, *new_body] + lines[close_idx:]
 
+        if is_failure:
+            # ADR-006: the eviction pass fires here, inside the same lock and the same
+            # read-modify-write as the write that grew the file. It is a SIDE EFFECT and
+            # must never fail the write — any archive problem leaves `new_lines` untouched
+            # and the upsert lands exactly as it would have without this pass.
+            # `_locate_block` runs OUTSIDE the try on purpose. It is a marker-integrity
+            # check on the text we are about to write, not archive I/O: if the spliced
+            # result lost or duplicated a marker, that is corruption and must fail closed
+            # rather than be reported as "archive pass skipped". Only the archive itself is
+            # tolerated below.
+            relocated = _locate_block("\n".join(new_lines))
+            try:
+                if relocated is not None:
+                    pruned_lines, p_open, p_close = relocated
+                    pruned = _prune_archivable(root, pruned_lines, p_open, p_close, today)
+                    if pruned is not None:
+                        new_lines = pruned
+            except Exception as exc:  # noqa: BLE001 — never fail the user's write
+                sys.stderr.write(f"[memory_md] WARN: failures archive pass skipped ({exc})\n")
         atomic_write(target_file, "\n".join(new_lines) + "\n")
     return target_file
+
+
+# ── Write-time failures archive (PLAN-harness-diet ADR-005/006) ──────────────
+
+_ARCHIVE_AGE_DAYS = 90
+
+
+def archive_path(root: Path | str, year: int) -> Path:
+    """`.claude/memory/archive/failures-<YYYY>.md` — tracked, committed alongside (ADR-005)."""
+    # `:04d`, not bare `{year}`: the heading regex accepts `0001-01-01`, which strptime
+    # parses fine and would otherwise produce `failures-1.md` rather than the documented
+    # `failures-<YYYY>.md`. The int conversion already rules out traversal.
+    return _memory_dir(root) / "archive" / f"failures-{year:04d}.md"
+
+
+def _archivable(heading: str, today: str) -> int | None:
+    """Year to file this entry under, or None to keep it.
+
+    Keep on ANY doubt. The heading regex matches the SHAPE `YYYY-MM-DD`, so `2026-99-99`
+    reaches this function and fails calendar parsing — that is preserve+warn, not archive,
+    and it must not abort the pass for the entries after it.
+    """
+    m = _FAILURE_META_RE.search(heading)
+    if not m:
+        return None
+    try:
+        count = int(m.group("count"))
+    except ValueError:
+        return None
+    if count != 1:  # ADR-005: recurrence is the signal; count>=2 is exempt at any age.
+        return None
+    try:
+        entry_date = datetime.strptime(m.group("date"), "%Y-%m-%d").replace(tzinfo=UTC)
+        now = datetime.strptime(today, "%Y-%m-%d").replace(tzinfo=UTC)
+    except ValueError:
+        sys.stderr.write(
+            f"[memory_md] WARN: unparseable date in failure heading, entry preserved: {heading!r}\n"
+        )
+        return None
+    if (now - entry_date).days <= _ARCHIVE_AGE_DAYS:
+        return None
+    return entry_date.year
+
+
+def _append_archive(root: Path | str, year: int, entry_lines: list[str]) -> None:
+    """Append entries to the year's archive file, creating it with a header.
+
+    Separate function so a test can force the failure path — the caller's contract is that
+    an exception here skips the eviction entirely rather than half-applying it.
+    """
+    path = archive_path(root, year)
+    if path.exists():
+        existing = path.read_text(encoding="utf-8").rstrip("\n") + "\n"
+    else:
+        existing = (
+            f"# Failure Archive {year}\n\n"
+            "> Entries evicted from `.claude/memory/failures.md` by `upsert-failure`:\n"
+            f"> `count:1` and older than {_ARCHIVE_AGE_DAYS} days at eviction time.\n"
+            "> Archived, never deleted — a `count>=2` entry is exempt at any age.\n\n"
+        )
+    atomic_write(path, existing + "\n".join(entry_lines) + "\n")
+
+
+def _prune_archivable(
+    root: Path | str, lines: list[str], open_idx: int, close_idx: int, today: str
+) -> list[str] | None:
+    """Move aged one-off entries out of ``lines`` into the archive; None when nothing moved.
+
+    Runs inside the caller's lock, on the caller's post-upsert in-memory state, so the
+    growth point and the eviction point are one transaction (ADR-006). The archive write
+    happens BEFORE the pruned text is returned: an entry leaves `failures.md` only once it
+    is durably in the archive, so a crash between the two duplicates an entry rather than
+    losing it.
+    """
+    headings = _entry_headings(lines, open_idx, close_idx)
+    heading_idxs = [idx for idx, _ in headings]
+    by_year: dict[int, list[str]] = {}
+    drop: set[int] = set()
+    year_of_index: dict[int, int] = {}
+    for idx, _slug in headings:
+        year = _archivable(lines[idx], today)
+        if year is None:
+            continue
+        end = _entry_span_end(heading_idxs, idx, close_idx)
+        by_year.setdefault(year, []).extend(lines[idx:end])
+        drop.update(range(idx, end))
+        for i in range(idx, end):
+            year_of_index[i] = year
+    if not drop:
+        return None
+    # Per-year isolation. An earlier version archived every year and only then returned the
+    # pruned lines, so a failure on the SECOND year unwound past the first year's already-
+    # durable `atomic_write`; the caller then kept the unpruned text, leaving those entries
+    # in BOTH files. They stay `count:1` and aged, so the next upsert archives them again —
+    # a persistent fault on one year made unbounded duplication the steady state, not a
+    # one-shot crash artifact. Dropping only the years that actually landed makes the
+    # partial case partial-but-correct instead of all-or-nothing-but-wrong.
+    landed: set[int] = set()
+    for year, entry_lines in sorted(by_year.items()):
+        try:
+            _append_archive(root, year, entry_lines)
+        except Exception as exc:  # noqa: BLE001 — one bad year must not strand the others
+            sys.stderr.write(
+                f"[memory_md] WARN: archive write for {year} failed ({exc}); "
+                f"its entries stay in failures.md\n"
+            )
+            continue
+        landed.add(year)
+    if not landed:
+        return None
+    keep_drop = {i for i in drop if year_of_index[i] in landed}
+    if not keep_drop:
+        return None
+    return [ln for i, ln in enumerate(lines) if i not in keep_drop]
 
 
 def upsert_wiki(

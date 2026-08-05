@@ -2,12 +2,36 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import tempfile
 from pathlib import Path
 from typing import Any
 
 import yaml
+
+logger = logging.getLogger(__name__)
+
+# Top-level `harness.yaml` keys this project used to emit and has since RETIRED.
+#
+# This is the single source of truth for retired-key migration — `render` imports it rather
+# than keeping a parallel copy, so removing a future key edits exactly one constant
+# (PLAN-harness-diet ADR-012).
+#
+# Two layers consume it, and both are load-bearing:
+#   1. `load_harness_yaml` (below) strips them from every read. This is the layer that
+#      reaches an ALREADY-INSTALLED project: a package upgrade alone never runs the
+#      renderer, so a render-time-only drop leaves the keys in place indefinitely.
+#   2. `render._preserve_yaml_user_keys` filters them again, because it classifies
+#      "present in the existing file, absent from the new render" as a user addition and
+#      would otherwise re-append the key under a banner claiming it is the user's.
+RETIRED_TOP_LEVEL_KEYS: frozenset[str] = frozenset({"workflows", "default_workflow"})
+
+# Projects already advised about their retired keys, keyed by resolved path.
+# The advisory is per-project rather than per-load because a single CLI invocation reads
+# harness.yaml many times (verify, worktree, second_brain, render, ...) and one migration
+# notice repeated a dozen times reads as an error.
+_ADVISED_RETIRED_KEY_PATHS: set[str] = set()
 
 
 def denormalize_home_to_tilde(path_str: str) -> str:
@@ -104,6 +128,10 @@ def load_harness_yaml(path: Path) -> dict[str, Any]:
     YAML that yields only non-mapping documents. Raises ``FileNotFoundError``
     when the file is absent and ``yaml.YAMLError`` when the content is
     structurally invalid.
+
+    Retired top-level keys (``RETIRED_TOP_LEVEL_KEYS``) are stripped here so that
+    every config entry point inherits the migration — including the ones an
+    already-installed project hits after a package upgrade, which never re-render.
     """
     text = path.read_text(encoding="utf-8")
     last_mapping: dict[str, Any] = {}
@@ -117,7 +145,38 @@ def load_harness_yaml(path: Path) -> dict[str, Any]:
         if doc.get("generated_by") == "harness-maker":
             continue
         last_mapping = doc
-    return last_mapping
+    return strip_retired_keys(last_mapping, source=path)
+
+
+def strip_retired_keys(data: dict[str, Any], *, source: Path | None = None) -> dict[str, Any]:
+    """Drop retired top-level keys, advising once per project.
+
+    Exposed separately from ``load_harness_yaml`` because not every config entry point
+    goes through the multi-doc loader — ``cli._load_harness_yaml_body`` parses the body
+    itself for the make-time telemetry diff and must see the same post-migration shape,
+    or it reports a phantom "user key removed" on every upgrade.
+
+    Returns the input unchanged (same object) when no retired key is present, so the
+    common path allocates nothing.
+    """
+    present = sorted(k for k in data if k in RETIRED_TOP_LEVEL_KEYS)
+    if not present:
+        return data
+    key = str(source.resolve()) if source is not None else ""
+    if key not in _ADVISED_RETIRED_KEY_PATHS:
+        _ADVISED_RETIRED_KEY_PATHS.add(key)
+        # WARNING, not INFO: nothing in this package configures logging, so the root logger
+        # sits at WARNING and `logging.lastResort` also fires only at WARNING+. An INFO
+        # record is discarded outright — the advisory would never reach a single real user,
+        # and the once-per-project memo below would be guarding a message nobody sees.
+        # `hooks/autopilot_autoarm.py` records the same reasoning at its own log site.
+        logger.warning(
+            "harness.yaml carries retired key(s) %s — the fused-workflow axis was removed in "
+            "0.47.0; they are ignored. Re-render via /harness-maker:make to drop them from "
+            "disk. Chain stages with `/hm:loop --per-iter-stages` or autopilot instead.",
+            ", ".join(present),
+        )
+    return {k: v for k, v in data.items() if k not in RETIRED_TOP_LEVEL_KEYS}
 
 
 def append_atomic_line(path: Path, line: str) -> None:

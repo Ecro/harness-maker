@@ -1884,12 +1884,14 @@ second_brain:
 ├── failures.md       ← Failure cases and solutions ([fail:] tags)
 ├── session/
 │   └── <date>.md     ← Compaction checkpoints (checkpoint:compaction entries)
+├── archive/
+│   └── failures-<YYYY>.md  ← evicted stale count:1 entries (0.47.0+; archived, never deleted)
 └── escalations/
     └── escalation-{slug}-{date}.md  ← stuck agent escalation notes
 ```
 
 - **wiki.md**: Patterns to reference in future similar tasks. Auto-appended by wrapup.
-- **failures.md**: Search with `rg -F "[fail:" .claude/memory/failures.md`. Used for warmup during execute.
+- **failures.md**: Search with `rg -F "[fail:" .claude/memory/failures.md`. Used for warmup during execute. Since 0.47.0 `upsert-failure` evicts entries that are `count:1` **and** older than 90 days into `archive/failures-<YYYY>.md` at write time; `count>=2` is exempt at any age, because recurrence — not age — is what makes an entry worth keeping.
 - **session/\<date\>.md**: Auto-saved by PreCompact hook. Resume interrupted sessions via `checkpoint:compaction` entries.
 
 ---

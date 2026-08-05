@@ -220,6 +220,71 @@ def _atomic_command_files(
     return out
 
 
+# ADR-016 — one-line `description:` per rendered `/hm:` command.
+#
+# Without it Claude Code and Cursor fall back to the command's first body line, which for
+# 14 of the 15 commands is the identical banner block; the tool listing showed one string
+# fifteen times. Keyed by the rendered path so the atomic-stage commands (generated in a
+# loop) and the standalone ones share one table.
+#
+# Per-target parser question (ADR-016 requires it ANSWERED, not assumed): commands render
+# to `.claude/commands/hm/*.md` only — never to `.codex/agents/*.toml` (agents) or
+# `.cursor/rules/*.mdc` (rules) — and `description` is a documented frontmatter key for
+# both readers of that path. So the field is unconditional.
+# `tests/structural/test_command_descriptions.py` pins that premise and fails if a future
+# release starts rendering commands to another target's path.
+#
+# Each line is drawn from the command's own summary, condensed. Keep them DISTINCT — the
+# whole reason the field exists is that they were not.
+_COMMAND_DESCRIPTIONS: dict[str, str] = {
+    "commands/hm/research.md": (
+        "Survey the ground before deciding: facts, prior art and alternatives into a RESEARCH doc."
+    ),
+    "commands/hm/spec.md": (
+        "Lock what and why — acceptance criteria via a 6-category interview into a SPEC doc."
+    ),
+    "commands/hm/plan.md": (
+        "Lock how and in what order — deep interview, ADRs and validated phases into a PLAN doc."
+    ),
+    "commands/hm/execute.md": (
+        "Implement a PLAN's phases TDD-first in an isolated worktree. Stages, never commits."
+    ),
+    "commands/hm/review.md": (
+        "Multi-reviewer consensus review with a grade gate and an auto-fix loop."
+    ),
+    "commands/hm/verify.md": (
+        "Pre-completion stop sign — deterministic regression, structure and security checks."
+    ),
+    "commands/hm/wrapup.md": (
+        "Close the unit of work: final verification, memory capture, and the single commit."
+    ),
+    "commands/hm/loop.md": (
+        "Run a bounded autoloop over a master PLAN, iterating stages until convergence."
+    ),
+    "commands/hm/loop-p5-batch.md": (
+        "Bulk-author SPECs for a large PLAN's Phase 5 in prompt-driven batches."
+    ),
+    "commands/hm/health.md": (
+        "Two-layer harness audit — structural integrity plus personalization drift."
+    ),
+    "commands/hm/metrics.md": (
+        "Delivery-metrics trend — change-failure rate and post-merge churn, with interpretation."
+    ),
+    "commands/hm/make.md": "Re-render this project's harness after a plugin update.",
+    "commands/hm/configure.md": (
+        "Change one harness dimension without re-running the full interview."
+    ),
+    "commands/hm/uninstall.md": "Remove harness-maker's generated files from this project.",
+    "commands/hm/help.md": "List the /hm: commands and what each one is for.",
+}
+
+
+def _command_frontmatter(out_path: str) -> dict[str, Any]:
+    """ADR-016 description for a rendered command; empty for every other file kind."""
+    description = _COMMAND_DESCRIPTIONS.get(out_path)
+    return {"description": description} if description else {}
+
+
 # Reviewer agents that include the partials in templates/agents/_partials/.
 # `reviewer_kind` switches the schema partial on a per-reviewer basis so each
 # agent emits its own specialty fields (category, race_kind, wcag_ref, …).
@@ -818,7 +883,7 @@ def synthesize(
                 # Codex skill bodies are pre-rendered in _codex_stage_skills().
                 "is_codex": ctx.get("is_codex", False),
             },
-            frontmatter={},
+            frontmatter=_command_frontmatter(out_path),
         )
         for tpl, out_path, ctx in file_specs
     ]

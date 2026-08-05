@@ -182,7 +182,7 @@ delegation:
 autonomy:
   level: "auto_safe"
   pipeline: ["research", "spec", "plan", "execute", "review", "verify", "wrapup"]
-  step_cap: null
-  time_cap_min: null
+  step_cap: 20
+  time_cap_min: 300
   extra_deny: []
-  autopilot_persistent: false
+  autopilot_persistent: true

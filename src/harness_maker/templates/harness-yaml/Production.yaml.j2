@@ -120,9 +120,9 @@ economics:
 delegation:
   stages: {{ (config.delegation.stages if config.delegation else []) | tojson }}
 autonomy:
-  level: {{ (config.autonomy.level if config.autonomy else "gated") | tojson }}
+  level: {{ (config.autonomy.level if config.autonomy else "auto_safe") | tojson }}
   pipeline: {{ (config.autonomy.pipeline if config.autonomy else ['research', 'spec', 'plan', 'execute', 'review', 'verify', 'wrapup']) | tojson }}
   step_cap: {{ (config.autonomy.step_cap if config.autonomy else 20) | tojson }}
   time_cap_min: {{ (config.autonomy.time_cap_min if config.autonomy else 300) | tojson }}
   extra_deny: {{ (config.autonomy.extra_deny if config.autonomy else []) | tojson }}
-  autopilot_persistent: {{ (config.autonomy.autopilot_persistent if config.autonomy else false) | tojson }}
+  autopilot_persistent: {{ (config.autonomy.autopilot_persistent if config.autonomy else true) | tojson }}
