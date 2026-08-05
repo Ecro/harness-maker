@@ -4,10 +4,9 @@ Per the new architecture every preset installs the FULL skill + agent inventory.
 The harness.yaml `reviewers.enabled` and `skills.enabled` lists govern default
 activation; users opt into more reviewers per-task via inline command flags.
 
-Workflow command FileEntries are generated dynamically from
-`answers.fused_workflows` (a typed `dict[name, list[AtomicStage]]`). The
-`workflow_fuse.fuse(...)` helper produces the per-workflow body that the
-`workflow_command.md.j2` template wraps.
+Only the seven atomic stage commands are emitted — the fused-workflow axis was
+removed (PLAN-harness-diet ADR-001/002); `/hm:loop` and autopilot chain stages
+instead.
 """
 
 from __future__ import annotations
@@ -28,7 +27,6 @@ from harness_maker.models import (
     ProjectProfile,
     Target,
 )
-from harness_maker.workflow_fuse import fuse
 
 logger = logging.getLogger(__name__)
 
@@ -174,7 +172,7 @@ def _stage_files() -> list[FileSpec]:
         (
             f"stages/{s}.md.j2",
             f"stages/{s}.md",
-            {"stage": s, "workflow_context": "", "project_name": "", "feature": ""},
+            {"stage": s, "project_name": "", "feature": ""},
         )
         for s in _ATOMIC_STAGES
     ]
@@ -205,7 +203,6 @@ def _atomic_command_files(
     for s in _ATOMIC_STAGES:
         tpl = env.get_template(f"stages/{s}.md.j2")
         body = tpl.render(
-            workflow_context="",
             stage=s,
             project_name="",
             feature="",
@@ -401,7 +398,7 @@ def _skill_files() -> list[FileSpec]:
     ]
 
 
-_ALL_RUBRICS: list[str] = ["claude_md", "agent_prompt", "skill", "workflow"]
+_ALL_RUBRICS: list[str] = ["claude_md", "agent_prompt", "skill"]
 
 
 def _rubric_files() -> list[FileSpec]:
@@ -520,29 +517,6 @@ SIDE_FILES: list[FileSpec] = _base_files(Preset.SIDE)
 PRODUCTION_FILES: list[FileSpec] = _base_files(Preset.PRODUCTION)
 
 
-def _workflow_command_files(
-    fused_workflows: dict[str, list[AtomicStage]],
-    config_dump: dict[str, object] | None = None,
-) -> list[FileSpec]:
-    """Build a FileSpec per workflow with the fused body in context.
-
-    `config_dump` propagates to ``fuse()`` so each stage fragment inside the
-    fused workflow body sees the user's real locale + interview thresholds
-    (sibling fix to ``_atomic_command_files``).
-    """
-    out: list[FileSpec] = []
-    for name, stages in fused_workflows.items():
-        body = fuse(stages, name, config_dump=config_dump)
-        out.append(
-            (
-                "commands/hm/workflow_command.md.j2",
-                f"commands/hm/{name}.md",
-                {"workflow_name": name, "fused_body": body},
-            ),
-        )
-    return out
-
-
 def _cursor_target_files() -> list[FileSpec]:
     """Cursor target 전용 자산 — ``targets`` 에 cursor 포함 시에만 추가.
 
@@ -580,7 +554,6 @@ def _cursor_target_files() -> list[FileSpec]:
 
 
 def _codex_target_files(
-    fused_workflows: dict[str, list[AtomicStage]],
     *,
     config_dump: dict[str, object] | None = None,
     preset: Preset = Preset.SIDE,
@@ -641,7 +614,6 @@ def _codex_target_files(
         *_codex_agent_files(preset, agent_models, default_model),
         *_codex_skill_files(),
         *_codex_stage_skills(config_dump=config_dump),
-        *_codex_workflow_skills(fused_workflows),
         (
             "codex/loop_skill.md.j2",
             ".agents/skills/hm-loop/SKILL.md",
@@ -686,7 +658,6 @@ def _codex_stage_skills(*, config_dump: dict[str, object] | None = None) -> list
     for s in _ATOMIC_STAGES:
         tpl = env.get_template(f"stages/{s}.md.j2")
         body = tpl.render(
-            workflow_context="",
             stage=s,
             project_name="",
             feature="",
@@ -704,20 +675,6 @@ def _codex_stage_skills(*, config_dump: dict[str, object] | None = None) -> list
     return out
 
 
-def _codex_workflow_skills(
-    fused_workflows: dict[str, list[AtomicStage]],
-) -> list[FileSpec]:
-    """Fused workflow SKILL.md files — one per workflow (e.g. exec-rev, exec-rev-wrap-ver)."""
-    return [
-        (
-            "codex/workflow_skill.md.j2",
-            f".agents/skills/hm-{name}/SKILL.md",
-            {"workflow_name": name, "stages": [s.value for s in stages]},
-        )
-        for name, stages in fused_workflows.items()
-    ]
-
-
 def synthesize(
     profile: ProjectProfile,
     answers: InterviewAnswers,
@@ -726,7 +683,6 @@ def synthesize(
     """Map preset+answers to a deterministic Blueprint.
 
     `preset` argument is honored if given; otherwise `answers.preset` wins.
-    Workflow command FileEntries are generated from `answers.fused_workflows`.
     """
     effective_preset = preset or answers.preset
 
@@ -741,8 +697,6 @@ def synthesize(
         agent_models=dict(answers.agent_models),
         preset=effective_preset,
         dev_mode=answers.dev_mode,
-        workflows=dict(answers.fused_workflows),
-        default_workflow=answers.default_workflow,
         caching=answers.caching,
         autoloop=answers.autoloop,
         memory=answers.memory,
@@ -801,7 +755,6 @@ def synthesize(
 
     file_specs: list[FileSpec] = [
         *base_specs,
-        *_workflow_command_files(answers.fused_workflows, config_dump=config_dump),
         # PLAN-second-opinion-multi-model ADR-004 — schema only when a model is configured.
         *_schema_files(answers.second_opinion.enabled),
     ]
@@ -812,7 +765,6 @@ def synthesize(
     if Target.CODEX in answers.targets:
         file_specs.extend(
             _codex_target_files(
-                answers.fused_workflows,
                 config_dump=config_dump,
                 preset=effective_preset,
                 agent_models=dict(answers.agent_models),

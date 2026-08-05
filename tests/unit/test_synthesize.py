@@ -46,7 +46,7 @@ def test_synthesize_side_returns_blueprint() -> None:
     assert isinstance(bp, Blueprint)
     assert bp.config.preset == Preset.SIDE
     # Total = static base + N fused workflow command files
-    assert len(bp.files) == len(SIDE_FILES) + len(a.fused_workflows)
+    assert len(bp.files) == len(SIDE_FILES)
     for f in bp.files:
         assert isinstance(f, FileEntry)
         assert f.template
@@ -59,7 +59,7 @@ def test_synthesize_production_via_explicit_preset() -> None:
     a = interview(p, autoloop_mode=True)
     bp = synthesize(p, a, preset=Preset.PRODUCTION)
     assert bp.config.preset == Preset.PRODUCTION
-    assert len(bp.files) == len(PRODUCTION_FILES) + len(a.fused_workflows)
+    assert len(bp.files) == len(PRODUCTION_FILES)
 
 
 def test_synthesize_uses_answers_preset_when_unset() -> None:
@@ -98,7 +98,7 @@ def test_synthesize_fused_workflow_command_count() -> None:
     # /hm:help added in 0.19.4 (PLAN-help-command).
     # /hm:loop-p5-batch extracted from /hm:loop body (PLAN-latency-worktree-step-preview ADR-006).
     # /hm:metrics always rendered in 0.35.0 (ADR-002 amended — stub when disabled).
-    expected = 7 + 8 + len(a.fused_workflows)
+    expected = 7 + 8
     assert len(cmd_paths) == expected
 
 
@@ -251,7 +251,7 @@ def test_synthesize_codex_target_files_importable() -> None:
     """_codex_target_files() is importable and returns a list (stub)."""
     from harness_maker.synthesize import _codex_target_files
 
-    result = _codex_target_files({})
+    result = _codex_target_files()
     assert isinstance(result, list)
 
 
@@ -355,42 +355,6 @@ def test_synthesize_ko_locale_propagates_into_atomic_command_body(tmp_path: Path
         line for line in plan_text.splitlines() if "`en`" in line and "en→English" not in line
     ]
     assert not en_directives, f"unexpected en directives in plan.md: {en_directives}"
-
-
-def test_synthesize_ko_locale_propagates_into_workflow_command_body(tmp_path: Path) -> None:
-    """Sibling regression: ``_workflow_command_files`` must pass config_dump to fuse().
-
-    Pre-fix, fused workflow bodies (e.g. ``/hm:exec-rev-wrap-ver``) had each
-    stage fragment rendered with default ``HarnessConfig()`` → locale baked
-    to ``en`` regardless of ``answers.locale``.
-    """
-    from harness_maker.render import render
-
-    p = _profile()
-    a = interview(p, autoloop_mode=True).model_copy(update={"locale": "ko"})
-    bp = synthesize(p, a)
-    render(bp, tmp_path)
-
-    # Pick the first fused workflow that includes a stage with a live-interview
-    # locale directive (plan / research / spec). execute / review / wrapup
-    # don't talk to the user during their run, so they don't reference
-    # config.locale and are not a useful probe for this bug.
-    from harness_maker.models import AtomicStage
-
-    locale_carrying = {AtomicStage.PLAN, AtomicStage.RESEARCH, AtomicStage.SPEC}
-    candidates = [
-        name
-        for name, stages in a.fused_workflows.items()
-        if any(s in locale_carrying for s in stages)
-    ]
-    assert candidates, "fixture missing a workflow that includes plan/research/spec"
-    workflow_name = candidates[0]
-    workflow_path = tmp_path / "commands/hm" / f"{workflow_name}.md"
-    assert workflow_path.exists(), f"workflow command missing: {workflow_path}"
-    text = workflow_path.read_text()
-    assert "`ko`" in text, "workflow command body did not propagate locale"
-    bad = [line for line in text.splitlines() if "`en`" in line and "en→English" not in line]
-    assert not bad, f"unexpected en directives in workflow body: {bad}"
 
 
 def test_localized_template_files_exist_on_disk() -> None:

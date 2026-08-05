@@ -19,14 +19,6 @@
 | `{{ cmd }}wrapup`   | Single commit, CHANGELOG, doc updates |
 | `{{ cmd }}verify`   | Independent pre-wrapup invariant checks |
 
-### Fused workflows ({{ config.workflows | length }})
-
-| Command | Sequence |
-|---|---|
-{% for name, stages in config.workflows.items() -%}
-| `{{ cmd }}{{ name }}`{% if name == config.default_workflow %} ⭐ (your default){% endif %} | {{ stages | join(" → ") }} |
-{% endfor %}
-
 ### Meta
 
 | Command | Purpose |
@@ -42,11 +34,9 @@
 
 ```
   research ─► spec ─► plan ─► execute ─► review ─► verify ─► wrapup
-                                  │
-                                  └─► legacy workflows may run verify after wrapup
 ```
 
-**Your default:** `{{ cmd }}{{ config.default_workflow }}` ⭐
+Stages are chained by `{{ cmd }}loop` or by autopilot — there is no fused workflow command. <!-- @hm:axis-removed -->
 
 ## ⚙️ Your current settings
 
@@ -55,7 +45,6 @@
 | preset | `{{ config.preset }}` |
 | locale | `{{ config.locale }}` |
 | targets | `{{ config.targets | join(", ") }}` |
-| default workflow | `{{ config.default_workflow }}` |
 
 {% if "cursor" in config.targets -%}
 > **Cursor:** `/hm:*` commands work identically. Subagents and skills are read from `.claude/`.
@@ -66,6 +55,6 @@
 
 ## 💡 Next steps
 
-- New to this harness?  →  run `{{ cmd }}{{ config.default_workflow }}`
+- New to this harness?  →  run `{{ cmd }}research`, then follow the stage order above
 - Change a setting?     →  run `{{ cmd }}configure`
 - Audit harness health? →  run `{{ cmd }}health`

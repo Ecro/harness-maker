@@ -20,10 +20,6 @@
    - 3.6 [/hm:verify — Completion Verification](#36-hmverify--completion-verification)
    - 3.7 [/hm:wrapup — Commit Finalization](#37-hmwrapup--commit-finalization)
 4. [Fusion Commands](#4-fusion-commands)
-   - 4.1 [/hm:res-spec-plan](#41-hmres-spec-plan)
-   - 4.2 [/hm:exec-rev](#42-hmexec-rev)
-   - 4.3 [/hm:exec-rev-wrap](#43-hmexec-rev-wrap)
-   - 4.4 [/hm:exec-rev-wrap-ver](#44-hmexec-rev-wrap-ver)
 5. [/hm:loop — Automated Iteration Loop](#5-hmloop--automated-iteration-loop)
 6. [Special Commands](#6-special-commands)
    - 6.1 [/hm:refresh — Anti-Rot Updates](#61-hmrefresh--anti-rot-updates)
@@ -843,64 +839,9 @@ Commit types: `feat | fix | chore | ci | test | docs | refactor`
 
 ## 4. Fusion Commands
 
-Fusion commands bundle multiple atomic stages into a single command. Stages execute in order, and if an intermediate stage fails, the command halts at that stage.
-
----
-
-### 4.1 /hm:res-spec-plan
-
-Sequentially executes `research + spec + plan` three stages.
-
-Execution order:
-1. Run `/hm:research {slug}` → creates `RESEARCH-{slug}.md`
-2. Run `/hm:spec {slug}` (using RESEARCH as input) → creates `SPEC-{slug}.md`
-3. Run `/hm:plan {slug}` (using SPEC as input) → creates `PLAN-{slug}.md`
-
-Default values for each stage are determined by harness.yaml settings.
-
-Use case: Complete all three exploration-criteria-planning stages at once when starting a completely new feature.
-
----
-
-### 4.2 /hm:exec-rev
-
-Sequentially executes `execute + review` two stages.
-
-Execution order:
-1. Run `/hm:execute {slug}` → implement in worktree, kept in staged state
-2. Run `/hm:review {slug}` → review results + automatic fixes
-
-**No wrapup**: Changes remain staged. Run `/hm:wrapup` separately after additional work or review.
-
----
-
-### 4.3 /hm:exec-rev-wrap
-
-Sequentially executes `execute + review + wrapup` three stages.
-
-Execution order:
-1. `/hm:execute {slug}`
-2. `/hm:review {slug}`
-3. `/hm:wrapup {slug}`
-
-When review achieves `grade_threshold` (default A), automatically completes all the way to commit.
-If review grade falls short, wrapup still proceeds — sets `human_review_needed=true` flag and commits. User reviews the flag afterward for manual inspection.
-
----
-
-### 4.4 /hm:exec-rev-wrap-ver
-
-Sequentially executes `execute + review + wrapup + verify` four stages.
-
-Execution order:
-1. `/hm:execute {slug}`
-2. `/hm:review {slug}`
-3. `/hm:wrapup {slug}`
-4. `/hm:verify {slug}` ← runs **after** wrapup (final check after commit)
-
-If verify fails after wrapup completes: commit has already been made, so report necessary fixes to user.
-
-The most comprehensive fusion command. Use when safely deploying a new feature end-to-end.
+There is no fusion command. The seven atomic stages are chained by `/hm:loop`
+(`--per-iter-stages`, default `execute,review`) or by autopilot's `autonomy.pipeline`.
+The fused-workflow axis was removed in 0.47.0 — see PLAN-harness-diet ADR-001/002/014.
 
 ---
 
@@ -942,7 +883,7 @@ Loop start
    │
    ├─ Load context (previous iteration results, current state)
    ├─ Set goal for this iteration
-   ├─ Run exec-rev (base workflow)
+   ├─ Run the per-iter stages (default: execute → review)
    ├─ Run verify-before-completion skill
    ├─ Run 4-gate convergence check
    └─ If convergence streak >= 2 → end loop / If not → next iteration
@@ -2011,7 +1952,7 @@ On failure (fail):
 
 **Q: Don't multiple commits get created?**
 
-A: No. The `execute` and `review` stages do not commit. `wrapup` creates exactly one commit. The same applies when using fusion commands (`exec-rev-wrap`).
+A: No. The `execute` and `review` stages do not commit. `wrapup` creates exactly one commit. The same applies under `/hm:loop`, which defers wrapup to loop close.
 
 **Q: What if worktrees accumulate too many?**
 

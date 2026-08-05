@@ -8,7 +8,7 @@ either:
 
 Two modes (LoopMode):
 - `feature` (default): pick next un-completed Feature → invoke executor →
-  update state → check convergence. The executor is the configured fused
+  update state → check convergence. The executor runs the atomic stage
   workflow. Convergence is predicate-based.
 - `improve`: continuous improvement cycle (review → fix → test → review) until
   LLM judges stopping criteria met. No feature list; context captured via a
@@ -477,7 +477,6 @@ def run(  # noqa: PLR0913
     max_iter: int = 50,
     failed_streak_cap: int = 5,
     dry_run: bool = False,
-    workflow: str = "exec-rev-wrap",  # noqa: ARG001 — opaque, passed by /hm:loop
     convergence: str | None = None,
     executor: ExecutorCallable | None = None,
 ) -> AutoloopState:

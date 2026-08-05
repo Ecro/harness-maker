@@ -99,7 +99,7 @@ def test_codex_stage_skills_no_dollar_arguments() -> None:
 
 def test_codex_target_files_loop_skill_has_loop_body() -> None:
     """_codex_target_files() must include loop_body in hm-loop/SKILL.md context."""
-    specs = _codex_target_files({})
+    specs = _codex_target_files()
     loop_spec = next((s for s in specs if s[1] == ".agents/skills/hm-loop/SKILL.md"), None)
     assert loop_spec is not None, "hm-loop/SKILL.md not found in _codex_target_files()"
     ctx = loop_spec[2]
@@ -109,7 +109,7 @@ def test_codex_target_files_loop_skill_has_loop_body() -> None:
 
 def test_codex_loop_skill_has_interview_content() -> None:
     """hm-loop loop_body must contain adaptive interview content."""
-    specs = _codex_target_files({})
+    specs = _codex_target_files()
     loop_spec = next(s for s in specs if s[1] == ".agents/skills/hm-loop/SKILL.md")
     loop_body = loop_spec[2].get("loop_body", "")
     assert "interview" in loop_body.lower() or "adaptive" in loop_body.lower(), (
@@ -349,7 +349,7 @@ def test_codex_target_files_threads_config_dump_to_stage_skills() -> None:
     """config_dump passed to _codex_target_files() must reach the stage skill bodies."""
     custom_config = _make_default_config()
     custom_config["work_docs"] = {"dir": "my-work/"}
-    specs = _codex_target_files({}, config_dump=custom_config)
+    specs = _codex_target_files(config_dump=custom_config)
     execute_skill = next(s for s in specs if s[1] == ".agents/skills/hm-execute/SKILL.md")
     body = execute_skill[2]["stage_body"]
     assert "my-work/" in body, (

@@ -299,7 +299,6 @@ phase_6_stages() {
   ok "phase_6_stages"
 }
 
-phase_6_fuse()      { uv run pytest tests/unit/test_workflow_fuse.py -q || fail "fuse"; ok "phase_6_fuse"; }
 phase_6_router()    { uv run pytest tests/unit/test_conditional_router.py -q || fail "router"; ok "phase_6_router"; }
 phase_6_modular()   { uv run pytest tests/unit/test_modular_edit.py -q || fail "modular"; ok "phase_6_modular"; }
 
@@ -328,7 +327,6 @@ phase_6_workflow_interview() { uv run pytest tests/unit/test_interview.py -q || 
 
 phase_6() {
   phase_6_stages
-  phase_6_fuse
   phase_6_router
   phase_6_modular
   phase_6_workflow_interview
@@ -614,7 +612,6 @@ final_acceptance() {
   for s in research spec plan execute review wrapup verify; do
     require_file "src/harness_maker/templates/stages/$s.md.j2"
   done
-  uv run python -c "from harness_maker.workflow_fuse import fuse" || fail "R4: fuse missing"
 
   # R5 Autoloop
   log "R5 Autoloop"
@@ -633,7 +630,7 @@ final_acceptance() {
   uv run python -c "
 from harness_maker import (
     profile, interview, synthesize, reconcile, render, verify, modular_edit,
-    workflow_fuse, conditional_router, autoloop_driver, worktree, security_scanner,
+    conditional_router, autoloop_driver, worktree, security_scanner,
     context_lint, provenance, readiness, agent_quality
 )
 " || fail "M1-M13: missing mechanism module"

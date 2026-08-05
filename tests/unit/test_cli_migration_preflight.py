@@ -18,7 +18,7 @@ from typer.testing import CliRunner
 
 from harness_maker.cli import app
 from harness_maker.interview import _build_answers
-from harness_maker.models import AtomicStage, DevMode, Preset, Target
+from harness_maker.models import DevMode, Preset, Target
 
 runner = CliRunner()
 
@@ -44,10 +44,6 @@ def _answers(*, preset: Preset, worktree: dict[str, Any]):  # type: ignore[no-un
         targets=[Target.CLAUDE_CODE],
         preset=preset,
         dev_mode=DevMode.TASK_DRIVEN,
-        fused_workflows={
-            "exec-rev-wrap": [AtomicStage.EXECUTE, AtomicStage.REVIEW, AtomicStage.WRAPUP]
-        },
-        default_workflow="exec-rev-wrap",
     )
     # Simulate the answers_from_harness_yaml round-trip result (the on-disk worktree).
     return base.model_copy(update={"worktree": dict(worktree)})

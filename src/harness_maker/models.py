@@ -86,24 +86,6 @@ class AtomicStage(str, Enum):  # noqa: UP042
     VERIFY = "verify"
 
 
-# Slash-command-friendly abbreviations used to derive transparent fused workflow
-# names like `exec-rev-wrap`. Joined with `-` so each stage stays visible.
-STAGE_ABBREV: dict[AtomicStage, str] = {
-    AtomicStage.RESEARCH: "res",
-    AtomicStage.SPEC: "spec",
-    AtomicStage.PLAN: "plan",
-    AtomicStage.EXECUTE: "exec",
-    AtomicStage.REVIEW: "rev",
-    AtomicStage.WRAPUP: "wrap",
-    AtomicStage.VERIFY: "ver",
-}
-
-
-def auto_workflow_name(stages: list[AtomicStage]) -> str:
-    """Build a transparent slash-friendly name from stage abbreviations."""
-    return "-".join(STAGE_ABBREV[s] for s in stages)
-
-
 def _empty_install_enabled() -> dict[str, list[str]]:
     """Default factory: typed empty {installed: [], enabled: []}."""
     return {"installed": [], "enabled": []}
@@ -176,15 +158,6 @@ class ProjectProfile(BaseModel):
                     f"foreign_ai_configs must contain relative paths; got absolute: {p!r}"
                 )
         return v
-
-
-class WorkflowDef(BaseModel):
-    """User-named workflow consisting of a sequence of atomic stages."""
-
-    model_config = ConfigDict(strict=True, extra="forbid")
-
-    name: str = Field(pattern=r"^[a-z][a-z0-9-]{0,30}$", max_length=31)
-    stages: list[AtomicStage]
 
 
 class FileEntry(BaseModel):
@@ -946,18 +919,6 @@ class HarnessConfig(BaseModel):
     # it to this relaxed default. Render fallbacks that relied on this default now
     # pin dev_mode explicitly (synthesize/workflow_fuse).
     dev_mode: DevMode = DevMode.SPEC_DRIVEN
-    workflows: dict[str, list[AtomicStage]] = Field(
-        default_factory=lambda: {
-            "dev": [
-                AtomicStage.RESEARCH,
-                AtomicStage.PLAN,
-                AtomicStage.EXECUTE,
-                AtomicStage.REVIEW,
-                AtomicStage.WRAPUP,
-            ],
-        },
-    )
-    default_workflow: str = "dev"
     execution: dict[str, Any] = Field(default_factory=dict)
     reviewers: dict[str, Any] = Field(default_factory=dict)
     caching: str = "agent-aware"
@@ -1146,18 +1107,6 @@ class InterviewAnswers(BaseModel):
     # through answers_from_harness_yaml → synthesize (else level/pipeline/caps are
     # silently dropped on re-render — same contract as permissions above).
     autonomy: AutonomyConfig = Field(default_factory=AutonomyConfig)
-    # Map of user-named workflow → ordered atomic stages. Names are typically
-    # auto-derived via STAGE_ABBREV (e.g. `exec-rev-wrap`) but user can override.
-    fused_workflows: dict[str, list[AtomicStage]] = Field(
-        default_factory=lambda: {
-            "exec-rev-wrap": [
-                AtomicStage.EXECUTE,
-                AtomicStage.REVIEW,
-                AtomicStage.WRAPUP,
-            ],
-        },
-    )
-    default_workflow: str = "exec-rev-wrap"
     # All reviewers/skills are installed regardless of preset; `enabled` lists
     # govern which ones the harness activates by default. Per-task override is
     # via inline flags on the workflow command (e.g. --with-reviewers=...).
@@ -1232,16 +1181,6 @@ class InterviewAnswers(BaseModel):
             if isinstance(p, str) and (Path(p).is_absolute() or p.startswith("~")):
                 raise ValueError(f"sibling_repos must contain relative paths; got absolute: {p!r}")
         return v
-
-    @model_validator(mode="after")
-    def _default_workflow_in_fused(self) -> InterviewAnswers:
-        if self.default_workflow not in self.fused_workflows:
-            msg = (
-                f"default_workflow={self.default_workflow!r} not in "
-                f"fused_workflows={sorted(self.fused_workflows)}"
-            )
-            raise ValueError(msg)
-        return self
 
     @computed_field  # type: ignore[prop-decorator]
     @property

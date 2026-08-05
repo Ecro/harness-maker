@@ -127,7 +127,6 @@ action items).
 | **Dev mode** | `task-driven` · `spec-driven` | SPEC stage가 필수인지 여부; plan stage가 execute로 chain 되는지 |
 | **Targets** | `claude-code` · `cursor` · `codex` (다중 선택) | 어떤 IDE-native 자산 트리가 렌더되나 |
 | **Locale** | `en` · `ko` · 임의 태그 | 인터뷰 텍스트 + 사용자 대면 에러 메시지 |
-| **Workflows** | Atomic stage의 fused 시퀀스 | 어떤 `/hm:<name>` 슬래시 명령이 나타나나 |
 | **Reviewers / skills** | Preset default + 오버라이드 | 어떤 reviewer가 활성화되고 agent model tier가 어떻게 되나 (agent·skill 전량은 항상 설치) |
 | **Ref folders** | 경로 + glob 쌍 | `refdocs-search` skill로 검색 가능한 외부 문서 |
 | **Sibling repos** | 상대 경로 | 같은 하네스 세션을 공유할 인접 repo |
@@ -406,7 +405,7 @@ harness-maker make . --promote NAME    # ad-hoc 자산을 하네스로 승격
 
 ### 🔁 워크플로 프리미티브 — *나머지 툴체인*
 
-- **권장 순서.** 사소하지 않은 변경은 7-stage 시퀀스를 순서대로 따르는 것을 권장합니다 — `/hm:research` → `/hm:spec` → `/hm:plan` → `/hm:execute` → `/hm:review` → `/hm:wrapup` → `/hm:verify`. 각 stage의 출력이 다음 stage로 이어지며, `/hm:execute`로 바로 건너뛰면 SPEC 게이트·consensus 리뷰·verify 체크를 잃습니다. fused workflow는 이 시퀀스를 더 적은 hand-off로 한 명령에 묶습니다.
+- **권장 순서.** 사소하지 않은 변경은 7-stage 시퀀스를 순서대로 따르는 것을 권장합니다 — `/hm:research` → `/hm:spec` → `/hm:plan` → `/hm:execute` → `/hm:review` → `/hm:wrapup` → `/hm:verify`. 각 stage의 출력이 다음 stage로 이어지며, `/hm:execute`로 바로 건너뛰면 SPEC 게이트·consensus 리뷰·verify 체크를 잃습니다. stage 사이 hand-off 없이 이어가려면 `/hm:loop`(경계 있는 autoloop) 또는 autopilot 을 사용하세요.
 - **구현 전 깊은 인터뷰.** `/hm:spec`이 6-카테고리 인터뷰 (Intent → Outcomes → In-Scope Scenarios → Non-Goals → Constraints → Verification)를 완전성 점수화하여 실행. `/hm:plan`이 9-카테고리 인터뷰 (scope → architecture → contract → risk → testing → phasing → dependencies → failure handling → observability)를 impact 순서로 실행. 모든 settled 결정이 binding ADR로 promote.
 - **적응형 인터뷰 + 4-게이트 수렴 autoloop.** `/hm:loop`이 time-and-iteration-bounded 루프 실행. `autoloop-driver`가 goal을 읽고 누락된 것만 질문, loop intensity + exit checklist lock, 그 후 mechanical check + LLM judgment + regression 비교 + 2-iter convergence streak가 완료 수락 전 모두 필요.
 - **3-tier 컨텍스트 로딩 + compaction 복구.** Hot tier (오늘 session) · Warm tier (failures + wiki 첫 60/40줄) · Cold tier (git log / PLAN on demand). `PreCompact` hook이 context compaction 전에 session flush; 다음 turn이 마커를 감지하고 마지막 in-progress phase에서 resume.

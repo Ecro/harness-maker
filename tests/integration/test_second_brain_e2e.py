@@ -18,7 +18,6 @@ import pytest
 
 from harness_maker.interview import _build_answers
 from harness_maker.models import (
-    AtomicStage,
     DevMode,
     Preset,
     SecondBrainConfig,
@@ -44,14 +43,6 @@ def _baseline_answers(vault_path: Path, project_id: str = "harness-maker"):  # n
         targets=[Target.CLAUDE_CODE],
         preset=Preset.SIDE,
         dev_mode=DevMode.TASK_DRIVEN,
-        fused_workflows={
-            "exec-rev-wrap": [
-                AtomicStage.EXECUTE,
-                AtomicStage.REVIEW,
-                AtomicStage.WRAPUP,
-            ],
-        },
-        default_workflow="exec-rev-wrap",
         second_brain=SecondBrainConfig(
             enabled=True,
             project_id=project_id,

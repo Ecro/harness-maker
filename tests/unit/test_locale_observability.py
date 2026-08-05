@@ -11,10 +11,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from harness_maker.models import AtomicStage, HarnessConfig
+from harness_maker.models import HarnessConfig
 from harness_maker.readiness import DimensionScore, Signal
 from harness_maker.render import _make_env
-from harness_maker.workflow_fuse import fuse
 
 OL_MARKER = "<!-- @hm:output_language -->"
 START_MARKER = "<!-- @hm:banner:start -->"
@@ -53,9 +52,6 @@ def _wrapper_ctx(locale: str = "ko", **over: object) -> dict[str, object]:
     ctx: dict[str, object] = {
         "stage": "research",
         "stage_body": "# Stage: research\n\nbody\n",
-        "workflow_name": "exec-rev",
-        "stages": ["execute", "review"],
-        "fused_body": "# /hm:exec-rev\n\nfused\n",
         "config": _config(locale),
         "preset": "Side",
         "is_codex": False,
@@ -108,18 +104,8 @@ def test_agents_md_carries_locale_directive() -> None:
     assert "English" in out
 
 
-def test_workflow_command_carries_locale_directive() -> None:
-    out = _render("commands/hm/workflow_command.md.j2", _wrapper_ctx())
-    assert OL_MARKER in out
-
-
 def test_codex_stage_skill_carries_locale_directive() -> None:
     out = _render("codex/stage_skill.md.j2", _wrapper_ctx())
-    assert OL_MARKER in out
-
-
-def test_codex_workflow_skill_carries_locale_directive() -> None:
-    out = _render("codex/workflow_skill.md.j2", _wrapper_ctx())
     assert OL_MARKER in out
 
 
@@ -139,14 +125,13 @@ def test_unknown_locale_keeps_english_fallback_mapping() -> None:
 
 
 def test_start_banner_present_in_wrappers() -> None:
-    for tpl in (
-        "commands/hm/atomic_command.md.j2",
-        "commands/hm/workflow_command.md.j2",
-    ):
-        out = _render(tpl, _wrapper_ctx())
-        assert START_MARKER in out, tpl
-        assert "🎯" in out, tpl
-        assert "📋" in out, tpl
+    # `workflow_command.md.j2` was the second wrapper; it died with the fused axis
+    # (PLAN-harness-diet ADR-001), leaving the atomic command as the only one.
+    tpl = "commands/hm/atomic_command.md.j2"
+    out = _render(tpl, _wrapper_ctx())
+    assert START_MARKER in out, tpl
+    assert "🎯" in out, tpl
+    assert "📋" in out, tpl
 
 
 def test_start_banner_keeps_autoloop_skip() -> None:
@@ -188,27 +173,6 @@ def test_codex_stage_skill_emits_exactly_one_end_banner() -> None:
     assert "📁" in out
 
 
-def test_codex_workflow_skill_carries_no_end_banner() -> None:
-    # ADR-006/W1 negative half: the Codex fused workflow_skill DELEGATES to
-    # hm-{stage} skills, so it carries ZERO banners — assert the observable
-    # emoji triad is absent, not merely the comment marker (a never-present
-    # token would make the marker-only check a tautology).
-    out = _render("codex/workflow_skill.md.j2", _wrapper_ctx())
-    assert END_MARKER not in out
-    assert "📁" not in out
-    assert "➡️" not in out
-
-
-def test_fused_workflow_emits_one_end_banner_per_stage() -> None:
-    # ADR-006: Claude/Cursor fused = N banners via concatenation. Drive the real
-    # fusion path and count the next-step emoji (➡️ appears nowhere else today).
-    stages = [AtomicStage("execute"), AtomicStage("review"), AtomicStage("wrapup")]
-    config_dump = HarnessConfig(locale="ko").model_dump(mode="json")
-    fused = fuse(stages, "exec-rev-wrap", config_dump=config_dump)
-    assert fused.count("➡️") == len(stages)
-    assert fused.count(END_MARKER) == len(stages)
-
-
 # --- /hm:health enforcement sub-checks (ADR-002) ---------------------------
 
 
@@ -247,9 +211,10 @@ def test_health_flags_silent_miss(tmp_path: Path) -> None:
 
 
 def test_health_excludes_hyphenated_meta_command(tmp_path: Path) -> None:
-    # REVIEW P1: loop-p5-batch is a meta command (always installed, has a hyphen so
-    # the `fused` classifier sweeps it in) that legitimately carries no banners. It
-    # must NOT make the all-must-match audit false-fail.
+    # REVIEW P1: loop-p5-batch is a meta command (always installed) that legitimately
+    # carries no banners. The old `fused` classifier ("-" in stem) swept it in; that
+    # classifier died with the axis, but the meta denylist stays — it is what keeps the
+    # all-must-match audit from false-failing, and it must survive the axis removal.
     from harness_maker.readiness import _dim_workflow_clarity
 
     _write_cmd(tmp_path, "research", f"{OL_MARKER}\n{START_MARKER}\n{END_MARKER}\n")

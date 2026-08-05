@@ -26,12 +26,10 @@ You have completed the stage. Emit a receipt so the autoloop driver's Gate 0 can
 
 - **`pass`** — {{ gate0_pass }}
 - **`fail`** — {{ gate0_fail }}
-{% if not workflow_context %}- **`skipped`** — **DO NOT emit this value from a stage prompt.** Reserved for the autoloop driver's auto-retry escape hatch (ADR-005 of PLAN-loop-mid-stop-and-review-skip).
+- **`skipped`** — **DO NOT emit this value from a stage prompt.** Reserved for the autoloop driver's auto-retry escape hatch (ADR-005 of PLAN-loop-mid-stop-and-review-skip).
 
 {{ g0.guard_base() }}{% if gate0_standalone %} {{ g0.standalone_note(gate0_stage) }}{% endif %}{% if gate0_extra_note is defined and gate0_extra_note %} {{ gate0_extra_note }}{% endif %}
-{% elif gate0_standalone or (gate0_extra_note is defined and gate0_extra_note) %}
-{% if gate0_standalone %}{{ g0.standalone_note(gate0_stage) }}{% endif %}{% if gate0_extra_note is defined and gate0_extra_note %}{% if gate0_standalone %} {% endif %}{{ gate0_extra_note }}{% endif %}
-{% endif %}
+
 {% if is_codex %}
 ```
 Bash("if [ -f \"<WT>/.claude/.hm-iter-receipts/.current-iter\" ]; then ITER=$(cat \"<WT>/.claude/.hm-iter-receipts/.current-iter\" 2>/dev/null); if [ -n \"$ITER\" ]; then uv run --with {{ harness_maker_src_path }} hm iter_receipts write --iter \"$ITER\" --stage {{ gate0_stage }} --verdict <verdict> --root \"<WT>\"; fi; fi")

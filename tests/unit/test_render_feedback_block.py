@@ -85,7 +85,6 @@ def test_when_feedback_enabled_marker_appears_exactly_once_in_atomic_commands() 
                 "help",
             )
         )
-        and not p.endswith("/exec-rev-wrap.md")  # workflow-fused (default in Side preset)
     }
     assert atomic_files, "no atomic /hm:* commands in blueprint"
     for path, body in atomic_files.items():
@@ -93,21 +92,6 @@ def test_when_feedback_enabled_marker_appears_exactly_once_in_atomic_commands() 
             f"{path}: expected 1 marker, got {body.count('@hm:feedback:dispatcher-block')}"
         )
         assert "@hm:/feedback:dispatcher-block" in body
-
-
-def test_when_feedback_enabled_marker_appears_in_workflow_commands() -> None:
-    """Phase 4 validator-W2 fix: fused_workflow MUST be in the rendered set.
-    Side preset's default `exec-rev-wrap` workflow guarantees at least one."""
-    rendered = _render_blueprint(feedback_enabled=True)
-    workflow_files = {p: b for p, b in rendered.items() if p.endswith("/exec-rev-wrap.md")}
-    assert workflow_files, "Side preset must render at least one fused workflow command"
-    for path, body in workflow_files.items():
-        assert body.count("@hm:feedback:dispatcher-block") == 1, (
-            f"{path}: expected 1 marker, got {body.count('@hm:feedback:dispatcher-block')}"
-        )
-
-
-# ── StrictUndefined regression — feedback_enabled MUST be in context ─────────
 
 
 def test_atomic_command_raises_when_feedback_enabled_missing() -> None:

@@ -211,7 +211,7 @@ Cursor / Codex 의 plugin marketplace 가 GitHub 에서 직접 fetch.
 
 ## Workflow (autoloop CODER 가 알아야 할 점)
 - **Atomic stage**: 7개 (research/spec/plan/execute/review/wrapup/verify)
-- **Workflow** = 사용자 명명 fused stage 시퀀스 → 1 명령 1 turn
+- **Stage 연결** = `/hm:loop --per-iter-stages` 또는 autopilot. 융합 명령 축은 0.47.0 에서 제거됨 (PLAN-harness-diet ADR-001/002).
 - Renderer 가 stage prompt fragment 들을 합성해 단일 명령 파일 생성
 
 ## Context discipline

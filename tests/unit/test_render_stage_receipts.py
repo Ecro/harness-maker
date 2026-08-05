@@ -1,6 +1,6 @@
 """Tests for PLAN-loop-mid-stop-and-review-skip Phase 2.
 
-Each fused-workflow stage (execute / review / wrapup / plan / spec / research)
+Each atomic stage command (execute / review / wrapup / plan / spec / research)
 must emit a Gate 0 receipt at stage close. This test renders the full harness
 and asserts the receipt-emit Bash block is present in every rendered atomic
 stage command file.
@@ -106,20 +106,3 @@ def test_receipt_block_warns_against_skipped_verdict(rendered_root: Path, stage:
     assert "skipped" in section, (
         f"{stage}.md receipt-emit section must warn against emitting verdict=skipped"
     )
-
-
-def test_fused_workflow_inherits_receipts(rendered_root: Path) -> None:
-    """exec-rev fuses execute+review — both receipt blocks must appear.
-
-    Without this, an iter that runs exec-rev would only emit one receipt and
-    Gate 0 would never see both stages — the original 2026-05-22 silent-skip
-    failure mode is preserved.
-    """
-    cmd_file = rendered_root / "commands" / "hm" / "exec-rev.md"
-    assert cmd_file.is_file(), (
-        "exec-rev fused workflow must exist in the default harness — the loop's "
-        "default per-iter workflow needs it (loop.md.j2 step 6)"
-    )
-    body = cmd_file.read_text(encoding="utf-8")
-    assert "--stage execute" in body
-    assert "--stage review" in body

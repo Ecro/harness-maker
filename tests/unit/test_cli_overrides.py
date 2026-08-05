@@ -7,7 +7,7 @@ import typer
 
 from harness_maker.cli import _apply_dimension_overrides
 from harness_maker.interview import _build_answers
-from harness_maker.models import AtomicStage, DevMode, Preset, Target
+from harness_maker.models import DevMode, Preset, Target
 
 
 def _baseline_side() -> object:
@@ -16,14 +16,6 @@ def _baseline_side() -> object:
         targets=[Target.CLAUDE_CODE],
         preset=Preset.SIDE,
         dev_mode=DevMode.TASK_DRIVEN,
-        fused_workflows={
-            "exec-rev-wrap": [
-                AtomicStage.EXECUTE,
-                AtomicStage.REVIEW,
-                AtomicStage.WRAPUP,
-            ],
-        },
-        default_workflow="exec-rev-wrap",
     )
 
 
@@ -94,7 +86,7 @@ def test_preset_override_rederives_extras() -> None:
     # carry-overs
     assert out.locale == "en"
     assert out.dev_mode == DevMode.TASK_DRIVEN
-    assert out.fused_workflows == a.fused_workflows
+    assert out.consensus == a.consensus
 
 
 def test_preset_override_invalid_aborts() -> None:

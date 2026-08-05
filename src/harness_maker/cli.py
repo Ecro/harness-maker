@@ -1225,8 +1225,6 @@ def _apply_dimension_overrides(
                 targets=list(answers.targets),
                 preset=new_preset,
                 dev_mode=answers.dev_mode,
-                fused_workflows=answers.fused_workflows,
-                default_workflow=answers.default_workflow,
                 consensus=answers.consensus,
                 caching=answers.caching,
             )

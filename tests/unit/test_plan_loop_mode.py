@@ -1,16 +1,13 @@
-"""Tests for PLAN-loop-mid-stop-and-review-skip Phase 4.
+"""Loop-mode branch of ``plan.md.j2`` (PLAN-loop-mid-stop-and-review-skip Phase 4).
 
-Phase 4 ships:
-1. ``plan-exec-rev`` (3-stage: plan + execute + review) added to the fused
-   workflow registry — distinct from the existing ``plan-exec-rev-wrap``
-   (4-stage, includes wrapup) which is bad for per-iter loop use.
-2. Loop-mode branch in ``plan.md.j2`` — when ``.hm-loop-active`` marker is
-   present, skip Step 2 (SPEC inheritance) and Step 3 (deep interview);
-   write per-iter scoped plan to ``<WT>/work-docs/PLAN-{slug}-iter{N}.md``
-   with frontmatter linking back to the master PLAN.
-3. ``loop.md.j2``'s Phase 3 EXPECTED_STAGES table now includes
-   ``plan-exec-rev → plan,execute,review`` (re-added — Phase 3 review removed
-   it because the registry entry didn't exist yet).
+When the ``.hm-loop-active`` marker is present, plan skips Step 2 (SPEC inheritance)
+and Step 3 (deep interview) and writes a per-iter scoped plan to
+``<WT>/work-docs/PLAN-{slug}-iter{N}.md`` with frontmatter linking back to the master.
+
+Phase 4's other half — the ``plan-exec-rev`` fused-registry entry and its rendered
+command file — was deleted with the fused-workflow axis (PLAN-harness-diet ADR-001/002).
+Per-iter stage selection now lives in ``loop.md.j2``'s ``--per-iter-stages`` (ADR-014),
+covered by ``tests/structural/test_no_fused_workflow_axis.py`` and the loop render tests.
 """
 
 from __future__ import annotations
@@ -19,51 +16,14 @@ from pathlib import Path
 
 import pytest
 
-from harness_maker.interview import (
-    _PRODUCTION_STARTER,
-    _SIDE_STARTER,
-    interview,
-)
-from harness_maker.models import AtomicStage, ProjectProfile
+from harness_maker.interview import interview
+from harness_maker.models import ProjectProfile
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
 
 
 def _profile() -> ProjectProfile:
     return ProjectProfile(stack=["python"], scale="small", lifecycle="dormant")
-
-
-# ── fused workflow registry ─────────────────────────────────────────────────
-
-
-def test_plan_exec_rev_registered_in_side_starter() -> None:
-    """SIDE preset must offer plan-exec-rev (3-stage) for loop per-iter planning."""
-    assert "plan-exec-rev" in _SIDE_STARTER, (
-        "plan-exec-rev (3-stage) must be in _SIDE_STARTER registry — "
-        "loop-mode plan refinement needs it"
-    )
-    stages = _SIDE_STARTER["plan-exec-rev"]
-    assert stages == [AtomicStage.PLAN, AtomicStage.EXECUTE, AtomicStage.REVIEW], (
-        f"plan-exec-rev must be [PLAN, EXECUTE, REVIEW] only (no wrapup); got {stages}"
-    )
-
-
-def test_plan_exec_rev_registered_in_production_starter() -> None:
-    assert "plan-exec-rev" in _PRODUCTION_STARTER, (
-        "plan-exec-rev (3-stage) must be in _PRODUCTION_STARTER registry"
-    )
-    stages = _PRODUCTION_STARTER["plan-exec-rev"]
-    assert stages == [AtomicStage.PLAN, AtomicStage.EXECUTE, AtomicStage.REVIEW]
-
-
-def test_plan_exec_rev_wrap_still_exists_in_side() -> None:
-    """plan-exec-rev (3-stage) is ADDITIONAL — the existing 4-stage variant must remain in SIDE."""
-    # Note: pre-existing inconsistency — _PRODUCTION_STARTER never had
-    # plan-exec-rev-wrap; out of Phase 4 scope to add it.
-    assert "plan-exec-rev-wrap" in _SIDE_STARTER
-
-
-# ── rendered fused workflow command file ────────────────────────────────────
 
 
 @pytest.fixture(scope="module")
@@ -74,23 +34,6 @@ def rendered_root(tmp_path_factory: pytest.TempPathFactory) -> Path:
     bp = synthesize(p, a)
     render(bp, out, freeze_time=DEFAULT_FREEZE_TIME)
     return out
-
-
-def test_plan_exec_rev_command_file_rendered(rendered_root: Path) -> None:
-    cmd = rendered_root / "commands" / "hm" / "plan-exec-rev.md"
-    assert cmd.is_file(), (
-        "plan-exec-rev.md fused workflow command file must be rendered "
-        "when the registry has the entry"
-    )
-    body = cmd.read_text(encoding="utf-8")
-    # Must fuse all 3 stages — receipt blocks (Phase 2) for each stage appear.
-    assert "--stage plan" in body
-    assert "--stage execute" in body
-    assert "--stage review" in body
-    # Must NOT include wrapup (the 4-stage variant is plan-exec-rev-wrap).
-    assert "--stage wrapup" not in body, (
-        "plan-exec-rev must not include wrapup stage — that's plan-exec-rev-wrap"
-    )
 
 
 # ── plan.md loop-mode branch ────────────────────────────────────────────────
@@ -161,19 +104,30 @@ def test_plan_template_loop_mode_reads_current_iter(plan_md: str) -> None:
     )
 
 
-# ── loop.md EXPECTED_STAGES table re-includes plan-exec-rev ─────────────────
+# ── loop.md per-iter stage selection (ADR-014) ──────────────────────────────
 
 
-def test_loop_md_expected_stages_includes_plan_exec_rev(rendered_root: Path) -> None:
-    """Now that plan-exec-rev exists in the registry, loop.md's Gate 0 table must list it.
+def test_loop_md_gate0_derives_expected_stages_from_the_stage_list(rendered_root: Path) -> None:
+    """Gate 0 must read EXPECTED_STAGES off `STAGES`, not off a fused command file.
 
-    Phase 3 review removed it because the registry didn't have it; Phase 4 adds
-    the registry entry, so the table must be re-amended.
+    The old table mapped each fused name to its stage sequence. With the axis gone
+    (ADR-001/002) there is no file to derive from, and ADR-014 makes `STAGES` — the
+    list validated at loop start — the single source. That closes the drift the table
+    made possible: expected set and invoked set are now the same object.
     """
     loop_md = (rendered_root / "commands" / "hm" / "loop.md").read_text(encoding="utf-8")
     gate0_idx = loop_md.find("Gate 0 — Receipt verification")
+    assert gate0_idx > 0, "loop.md missing the Gate 0 heading"
     section = loop_md[gate0_idx : gate0_idx + 5000]
-    assert "`plan-exec-rev`" in section, (
-        "Gate 0 EXPECTED_STAGES table must list plan-exec-rev → plan,execute,review "
-        "now that the registry has the entry (Phase 4 amendment to Phase 3's P0 fix)"
+    assert "`EXPECTED_STAGES` **is** `STAGES`" in section
+    assert "plan-exec-rev" not in loop_md, "a fused workflow name survived in loop.md"
+
+
+def test_loop_md_rejects_wrapup_as_a_per_iter_stage(rendered_root: Path) -> None:
+    """ADR-014 consequence: loop close owns wrapup; a per-iter wrapup commits every iter."""
+    loop_md = (rendered_root / "commands" / "hm" / "loop.md").read_text(encoding="utf-8")
+    assert "--per-iter-stages" in loop_md
+    assert "--per-iter-workflow" not in loop_md.split("Breaking (PLAN-harness-diet")[-1][200:], (
+        "the retired flag may only appear in the migration note"
     )
+    assert "`wrapup` is rejected" in loop_md or "'wrapup' is not allowed per iter" in loop_md

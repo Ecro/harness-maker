@@ -121,7 +121,6 @@ harness-maker/
 │       ├── render.py                    # Jinja2 render + frontmatter attachment
 │       ├── verify.py                    # smoke (yaml lint, hooks parse, frontmatter)
 │       ├── modular_edit.py              # --add / --remove
-│       ├── workflow_fuse.py             # atomic stages → fused workflow command
 │       ├── telemetry.py                 # post-tool-use hook
 │       ├── context_lint.py              # length + importance lint
 │       ├── provenance.py                # frontmatter attachment and validation
@@ -187,7 +186,6 @@ harness-maker/
 │   ├── commands/                        # → user .claude/commands/hm/
 │   │   └── hm/
 │   │       ├── atomic_command.md.j2     # renders each of the 7 atomics
-│   │       ├── workflow_command.md.j2   # renders each fused workflow
 │   │       ├── loop.md.j2               # /hm:loop
 │   │       ├── monitor.md.j2            # /hm:monitor
 │   │       └── refresh.md.j2            # /hm:refresh
@@ -321,7 +319,6 @@ harness-maker/
 | CLAUDE.md | 200 lines | 500 lines |
 | agent prompt | 100 lines | 200 lines |
 | skill SKILL.md | 50 lines | 150 lines |
-| workflow command (fused) | 300 lines | 600 lines |
 
 When exceeded, the renderer emits a warning (override: `harness.yaml.context_lint.strict: false`).
 
@@ -429,7 +426,7 @@ class ProjectProfile(BaseModel):
     vault_member: bool
 
 class WorkflowDef(BaseModel):
-    """User-named workflow (fused stages)."""
+    """RETIRED in 0.47.0 — the fused-workflow axis was removed (PLAN-harness-diet)."""
     name: str = Field(pattern=r"^[a-z][a-z0-9-]*$")
     stages: list[AtomicStage]
 
@@ -438,7 +435,6 @@ class HarnessConfig(BaseModel):
     locale: Locale = Locale.KO
     preset: Preset = Preset.SIDE
     workflows: dict[str, list[AtomicStage]]
-    default_workflow: str
     execution: dict  # { default: "step" | "autoloop" }
     reviewers: dict  # { list, consensus, routing }
     caching: str  # aggressive | conservative | adaptive | off
@@ -489,7 +485,7 @@ class ConflictItem(BaseModel):
 - Hash match = ours (safe to overwrite); hash absent/mismatch = user or third-party origin (preserve)
 - Backup → `.claude/.backup-<date>/` → ADD-only apply
 
-**(M3) Workflow Engine — atomic + fused (Phase 5)**
+**(M3) Stage Engine — seven atomic stages (Phase 5; fusion retired in 0.47.0)**
 - 7 atomic stages → each automatically exposed as `/hm:<stage>`
 - Workflow = user-named stage sequence → Renderer synthesizes fragments → single `/hm:<name>` command
 - Defined under `harness.yaml.workflows` key; additional workflows can be added by re-running `/harness-maker:make`
@@ -516,9 +512,9 @@ class ConflictItem(BaseModel):
 **(M7) Autoloop driver (Phase 6)**
 - `/hm:loop "<goal>" [--mode feature|improve] [--time 8h] [--max-iter 30] [--per-iter-workflow X] [--dry-run]`
 - **feature mode** (default): goal/spec-driven, coverage-driven adaptive interview → iterates until convergence
-- **improve mode** (0.4.7+): quality-target / `--target`-path driven; repeats exec-rev cycles until the convergence predicate is satisfied
+- **improve mode** (0.4.7+): quality-target / `--target`-path driven; repeats the per-iter stage cycle until the convergence predicate is satisfied
 - Token budget is unlimited; only time and iteration count are limited
-- **Single worktree per loop** (0.5.5+): one worktree is created at loop start and shared across all iterations; per-iter-workflow defaults to exec-rev (wrapup runs once at loop close). ADR-106: worktree acquisition uses a re-entrant flock to prevent concurrent loop invocations from racing on the same worktree path.
+- **Single worktree per loop** (0.5.5+): one worktree is created at loop start and shared across all iterations; `--per-iter-stages` defaults to `execute,review` (wrapup runs once at loop close). ADR-106: worktree acquisition uses a re-entrant flock to prevent concurrent loop invocations from racing on the same worktree path.
 - User ping every 5 iterations; 3 consecutive failures → stop
 
 **(M8) Verify-before-completion gate (Phase 6)**
@@ -927,7 +923,7 @@ uv run pytest tests/unit/crawler/ tests/unit/test_relevance.py -v \
 
 ### Phase 6: Workflow Engine + Conditional Router + Modular Installer
 
-**Objective:** 7 atomic stages + user-named fused workflows rendered into the user harness. Conditional Router selects reviewers based on the change area. `--add` / `--remove` modular installation working.
+**Objective (historical — the fused half was retired in 0.47.0):** 7 atomic stages + user-named fused workflows rendered into the user harness. Conditional Router selects reviewers based on the change area. `--add` / `--remove` modular installation working.
 
 **Research targets (autoloop Stage 1 auto-fetch):**
 - Claude Code skill spec (SKILL.md frontmatter): https://code.claude.com/docs/en/skills
@@ -1389,7 +1385,7 @@ uv run ruff check src/ tests/ \
 - [ ] **R1 Locale-first**: Invoking `cli make --interactive` in an empty sandbox, Q1 (Korean/English) must be the first question. The `locale` key is saved to `.claude/harness.yaml`.
 - [ ] **R2 Anti-rot**: All 4 source crawlers are callable. The relevance filter adaptive threshold operates correctly. `/hm:refresh` proceeds through the propose step and then waits for manual confirm (auto-apply absolutely prohibited).
 - [ ] **R3 Monitoring**: `/hm:ai-readiness` report shows all three metrics: efficiency%, Health, and fresh (days since refresh). `dashboard.md` includes a Health 6-dim section and an Agent quality drill-down (Platinum/Gold/Silver/Bronze) section. Zero external transmission of `metrics.jsonl`.
-- [ ] **R4 Workflow**: 7 atomic stages (`/hm:research` ... `/hm:verify`) auto-exposed. N user-named fused workflows (`/hm:dev`, `/hm:careful`) callable as a single command. Both atomic and fused workflows operate correctly.
+- [ ] **R4 Stages**: 7 atomic stages (`/hm:research` ... `/hm:verify`) auto-exposed and operating correctly. ~~N user-named fused workflows callable as a single command~~ — **RETIRED in 0.47.0** (PLAN-harness-diet ADR-001/002); stage chaining is `/hm:loop --per-iter-stages` or autopilot.
 - [ ] **R5 Autoloop**: Invoking `/hm:loop "<goal>"` causes the driver to iterate autonomously with unlimited tokens, defaulting to 8h/30 iterations. Dry-run mode works. Iter-5 ping and 3-fail stop operate correctly.
 - [ ] **R6 Per-project preset**: 2 presets (Side/Production) interview flow → 10+ dimension overrides → saved to `harness.yaml`. All 4 fixtures match expected blueprints.
 
@@ -1397,7 +1393,7 @@ uv run ruff check src/ tests/ \
 
 - [ ] (M1) Profiler → Interviewer → Synthesizer → Renderer pipeline passes 4 fixtures
 - [ ] (M2) Reconciler performs hash-based automatic classification and creates a backup directory
-- [ ] (M3) Workflow Engine renders both atomic and fused workflows
+- [ ] (M3) Stage Engine renders the 7 atomic stage commands (fused rendering retired in 0.47.0)
 - [ ] (M4) Anti-rot 4 sources callable + adaptive threshold adapts
 - [ ] (M5) 3 real-time metrics + Health 6-dim + Agent quality drill-down
 - [ ] (M6) Conditional Router auto-selects reviewer based on `changed_files`
@@ -1599,7 +1595,7 @@ Detailed change history is absorbed into all ADR + Risk + Goal decisions in this
 - **v1.0**: M1-M4 retired, 2 presets (Side/Production), 3 metrics consolidated, single meta command, 12-week phases
 - **v1.1**: Meta-tool / runtime separation (all day-to-day commands moved to user harness)
 - **v1.2**: /hm: prefix
-- **v1.3**: Workflow abstraction (atomic + fused) + Model tier configuration
+- **v1.3**: Workflow abstraction (atomic + fused — fused retired in 0.47.0) + Model tier configuration
 - **v1.4**: Worktree isolation + 5 Security Gates (influenced by Archon/ECC)
 - **v1.5**: Agent quality drill-down (sub-rubric of Health)
 - **v1.6**: Context lint + Privilege separation + Provenance frontmatter (arxiv 2602.11988 / 2603.13424 / 2604.03081)
@@ -1625,7 +1621,7 @@ Detailed change history is absorbed into all ADR + Risk + Goal decisions in this
 | Autoloop | One-line goal → autonomous iteration cycle until convergence (default: 8h/30 iterations) |
 | Efficiency / Health / fresh | 3 core metrics (cache hit% / readiness 0-100 / days since last refresh) |
 | Atomic stage | 7 built-in stages (`research`, `spec`, `plan`, `execute`, `review`, `wrapup`, `verify`), each as `/hm:<stage>` |
-| Workflow (fused) | A user-named stage sequence. Renderer synthesizes fragments → 1 command, 1 turn |
+| Workflow (fused) | **RETIRED 0.47.0.** Was: a user-named stage sequence synthesized into 1 command. Chaining is now `/hm:loop --per-iter-stages` or autopilot. |
 | Conditional Routing | Selects reviewer based on the region of changed files |
 | Verify-before-completion | Automatic gate immediately before `/hm:wrapup` |
 | Modular installer | Per-unit installation outside of preset (`make --add reviewer:security`) |

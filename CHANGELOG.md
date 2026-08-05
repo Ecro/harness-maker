@@ -1,5 +1,53 @@
 # Changelog
 
+## [Unreleased]
+
+### BREAKING — the fused-workflow axis is removed (`PLAN-harness-diet` Phase 1, ADR-001/002/014)
+
+Three user-visible breaks. Read all three before upgrading.
+
+**1. The fused workflow commands are gone.** `/hm:exec-rev`, `/hm:exec-rev-wrap`,
+`/hm:exec-rev-ver-wrap`, `/hm:exec-rev-wrap-ver`, `/hm:plan-exec-rev`,
+`/hm:plan-exec-rev-wrap` and `/hm:res-spec-plan` no longer render on any target, and the
+`workflows` / `default_workflow` keys are removed from `harness.yaml`. An existing config
+carrying them keeps loading (nothing validates those keys), and `/harness-maker:make
+--update` drops them rather than re-appending them. `reconcile.sweep_orphans` deletes the
+stale command files; a file you edited yourself is kept with a warning and logged to
+`.claude/observability/orphans-<date>.jsonl`.
+
+*Why:* the five rendered fused commands were 58.6% of the shipped Claude command surface
+and had **zero** recorded invocations across this project's full economics history, while
+autopilot had already performed 40 stage advances. Total shipped prompt surface drops
+**1,173,667 → 641,452 characters (−45.3%)**.
+
+*Migration:* chain stages with `/hm:loop --per-iter-stages execute,review` or by arming
+autopilot.
+
+**2. `--per-iter-workflow` is replaced by `--per-iter-stages`.** The value is now a
+comma-separated list of atomic stage names, not a fused command name. `wrapup` is rejected
+in that list — loop-close owns it, and running it per iteration would commit and merge on
+every iteration. On Codex the same knob is `stages: <a,b,...>`.
+
+Old: `--per-iter-workflow exec-rev` → New: `--per-iter-stages execute,review`
+Old: `--per-iter-workflow plan-exec-rev` → New: `--per-iter-stages plan,execute,review`
+
+**3. `autoloop_driver.run()` lost its `workflow` keyword.** It was unused (`ARG001`) and no
+Python caller passed it; noted for anyone driving the module directly.
+
+### Changed
+
+- `readiness.py`'s `workflow_clarity` dimension: `fused_workflow_present` (weight 30) is
+  replaced by `atomic_stages_complete`, and `harness_workflows_defined` (weight 20) is
+  removed. Leaving either in place would have made them permanently unpassable phantom
+  penalties. The dimension still reaches 100 (weights sum to 110), but the slack for one
+  failing signal narrows from 30 to 10.
+- `src/harness_maker/validators.py` is deleted — the module existed only to police workflow
+  names, and its sole consumer was the removed interview step. Path-safety for stage names
+  is unaffected: `iter_receipts._validate_stage` holds the anchored allowlist that actually
+  guards the filesystem sink.
+- The interactive interview asks **two fewer questions**. Automation that pipes positional
+  answers to `harness-maker` must drop the two workflow answers.
+
 ## [0.46.0] — 2026-08-02
 
 ### Fixed — `HM_SESSION_ID` is set but never exported, so every Python consumer read it as absent (`PLAN-sessionid-env-propagation`)

@@ -123,7 +123,7 @@ def test_codex_agent_files_correct_output_paths() -> None:
 
 def test_codex_target_files_includes_all_agent_tomls() -> None:
     """_codex_target_files() must include all 12 .codex/agents/*.toml paths."""
-    out_paths = {out for _, out, _ in _codex_target_files({})}
+    out_paths = {out for _, out, _ in _codex_target_files()}
     for name in _ALL_AGENTS:
         assert f".codex/agents/{name}.toml" in out_paths, (
             f"_codex_target_files missing agent {name!r}"

@@ -1,9 +1,6 @@
 # Stage: execute
 
 > Atomic stage. TDD machine driven by PLAN. Phase A → A.5 → B → C → D, with worktree isolation and **NO commits** (wrapup owns commits).
-{% if workflow_context %}
-> Invoked as part of the **{{ workflow_context }}** workflow.
-{% endif %}
 
 ## Communication Protocol
 
@@ -416,7 +413,7 @@ Bash("uv run --with {{ harness_maker_src_path }} hm worktree owned-crumb-add \"$
 ```
 {% endif %}
 
-**Workflows without wrapup** (e.g., `/hm:exec-rev`): if you exit a fused workflow at this stage without wrapup running afterward, the staged changes remain uncommitted on the base branch. Either run `/hm:wrapup` to commit them, or commit manually:
+**Sequences without wrapup** (e.g. `/hm:loop --per-iter-stages execute,review`): if you exit at this stage without wrapup running afterward, the staged changes remain uncommitted on the base branch. Either run `/hm:wrapup` to commit them, or commit manually:
 
 ```bash
 git commit -m "<your message>"

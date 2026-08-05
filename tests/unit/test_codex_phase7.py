@@ -109,7 +109,7 @@ def test_codex_stage_skills_output_paths() -> None:
 
 def test_codex_target_files_includes_existing_skills() -> None:
     """_codex_target_files() must include all 9 existing skills at .agents/skills/."""
-    out_paths = {out for _, out, _ in _codex_target_files({})}
+    out_paths = {out for _, out, _ in _codex_target_files()}
     for skill in _ALL_SKILLS:
         assert f".agents/skills/{skill}/SKILL.md" in out_paths, (
             f"_codex_target_files missing existing skill {skill!r}"
@@ -118,7 +118,7 @@ def test_codex_target_files_includes_existing_skills() -> None:
 
 def test_codex_target_files_includes_stage_skills() -> None:
     """_codex_target_files() must include all 7 stage skills at .agents/skills/hm-<stage>/."""
-    out_paths = {out for _, out, _ in _codex_target_files({})}
+    out_paths = {out for _, out, _ in _codex_target_files()}
     for stage in _STAGES:
         assert f".agents/skills/hm-{stage}/SKILL.md" in out_paths, (
             f"_codex_target_files missing stage skill hm-{stage!r}"
@@ -126,14 +126,14 @@ def test_codex_target_files_includes_stage_skills() -> None:
 
 
 def test_codex_target_files_total_skill_count() -> None:
-    """_codex_target_files({}) emits 9 base + 7 stage + 1 loop + 1 loop-p5-batch + 1 help = 19.
+    """_codex_target_files() emits 9 base + 7 stage + 1 loop + 1 loop-p5-batch + 1 help = 19.
 
     ADR-0007 (0.22.3) removed 2 skills (research-crawler + relevance-filter)
     when scrapping the external_risks layer; base count dropped 11 → 9.
     loop-p5-batch skill added (PLAN-latency-worktree-step-preview ADR-006);
     count 18 → 19.
     """
-    out_paths = [out for _, out, _ in _codex_target_files({}) if out.startswith(".agents/skills/")]
+    out_paths = [out for _, out, _ in _codex_target_files() if out.startswith(".agents/skills/")]
     # 19 → 20 (2026-07-30, PLAN-second-opinion-acceptance-gate ADR-011): the
     # `second-opinion-gate` skill. This is the second of two enumeration constants the new
     # skill moved — `[fail:test] enumeration-tests-not-updated-with-new-rendered-artifact`

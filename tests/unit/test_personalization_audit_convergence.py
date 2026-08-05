@@ -47,15 +47,14 @@ def test_load_preset_defaults_side_memory_shape() -> None:
 def test_load_preset_defaults_seeds_preset_specific_axes() -> None:
     """Regression (F22): the baseline must reflect interview preset seeding, not
     bare InterviewAnswers field defaults. A Production install has
-    consensus=cross-check / default_workflow=exec-rev-ver-wrap; Side has
-    single / exec-rev-wrap. The audit compared against the wrong baseline before."""
+    consensus=cross-check; Side has single. The audit compared against the wrong
+    baseline before. (The `default_workflow` half of this check went with the fused
+    axis — PLAN-harness-diet ADR-002.)"""
     prod = pa._load_preset_defaults("production")
     assert prod["reviewers"]["consensus"] == "cross-check"
-    assert prod["default_workflow"] == "exec-rev-ver-wrap"
 
     side = pa._load_preset_defaults("side")
     assert side["reviewers"]["consensus"] == "single"
-    assert side["default_workflow"] == "exec-rev-wrap"
 
 
 # ── _walk_axis_path ────────────────────────────────────────────────────────

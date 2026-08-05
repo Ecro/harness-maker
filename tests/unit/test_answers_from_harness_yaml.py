@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from harness_maker.interview import answers_from_harness_yaml
-from harness_maker.models import AtomicStage, DevMode, Preset, Target
+from harness_maker.models import DevMode, Preset, Target
 
 
 def _write_yaml(tmp_path: Path, body: str) -> Path:
@@ -87,21 +87,13 @@ def test_returns_none_when_yaml_invalid(tmp_path: Path) -> None:
 def test_preserves_locale_and_dev_mode(tmp_path: Path) -> None:
     target = _write_yaml(
         tmp_path,
-        "preset: Side\nlocale: ko\ndev_mode: task-driven\n"
-        "default_workflow: exec-rev-wrap\ncaching: agent-aware\n"
-        "workflows:\n  exec-rev-wrap:\n    - execute\n    - review\n    - wrapup\n",
+        "preset: Side\nlocale: ko\ndev_mode: task-driven\ncaching: agent-aware\n",
     )
     answers = answers_from_harness_yaml(target)
     assert answers is not None
     assert answers.locale == "ko"
     assert answers.dev_mode == DevMode.TASK_DRIVEN
     assert answers.preset == Preset.SIDE
-    assert answers.default_workflow == "exec-rev-wrap"
-    assert answers.fused_workflows["exec-rev-wrap"] == [
-        AtomicStage.EXECUTE,
-        AtomicStage.REVIEW,
-        AtomicStage.WRAPUP,
-    ]
 
 
 def test_preserves_review_knobs(tmp_path: Path) -> None:
@@ -135,9 +127,7 @@ def test_legacy_yaml_without_review_knobs_uses_defaults(tmp_path: Path) -> None:
     """
     target = _write_yaml(
         tmp_path,
-        "preset: Side\nlocale: en\ndev_mode: task-driven\n"
-        "default_workflow: exec-rev-wrap\n"
-        "workflows:\n  exec-rev-wrap:\n    - execute\n    - review\n",
+        "preset: Side\nlocale: en\ndev_mode: task-driven\n",
     )
     answers = answers_from_harness_yaml(target)
     assert answers is not None
@@ -150,45 +140,6 @@ def test_unknown_preset_returns_none(tmp_path: Path) -> None:
     """Schema drift on `preset` is fatal — caller falls back to interview."""
     target = _write_yaml(tmp_path, "preset: Experimental\n")
     assert answers_from_harness_yaml(target) is None
-
-
-def test_invalid_workflow_stages_skipped(tmp_path: Path) -> None:
-    """Unknown stage names in a workflow are dropped, not propagated."""
-    target = _write_yaml(
-        tmp_path,
-        "preset: Side\nlocale: en\ndev_mode: task-driven\n"
-        "default_workflow: exec-rev-wrap\n"
-        "workflows:\n  exec-rev-wrap:\n    - execute\n    - imaginary\n    - wrapup\n",
-    )
-    answers = answers_from_harness_yaml(target)
-    assert answers is not None
-    assert answers.fused_workflows["exec-rev-wrap"] == [
-        AtomicStage.EXECUTE,
-        AtomicStage.WRAPUP,
-    ]
-
-
-def test_default_workflow_falls_back_when_missing_from_workflows(tmp_path: Path) -> None:
-    """If `default_workflow` names a key not present in `workflows`, fall
-    back to the first workflow rather than failing model validation.
-    """
-    target = _write_yaml(
-        tmp_path,
-        "preset: Side\nlocale: en\ndev_mode: task-driven\n"
-        "default_workflow: imaginary\n"
-        "workflows:\n  exec-rev-wrap:\n    - execute\n    - review\n    - wrapup\n",
-    )
-    answers = answers_from_harness_yaml(target)
-    assert answers is not None
-    assert answers.default_workflow == "exec-rev-wrap"
-
-
-def test_handles_missing_workflows_block(tmp_path: Path) -> None:
-    target = _write_yaml(tmp_path, "preset: Side\nlocale: en\ndev_mode: task-driven\n")
-    answers = answers_from_harness_yaml(target)
-    assert answers is not None
-    # Falls back to preset starter set; default_workflow must exist among them.
-    assert answers.default_workflow in answers.fused_workflows
 
 
 def test_preserves_project_domains(tmp_path: Path) -> None:

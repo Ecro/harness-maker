@@ -58,7 +58,6 @@ def test_synthesize_codex_target_emits_skill_paths(tmp_path: Path) -> None:
     answers = _make_answers(tmp_path, ["codex"])
     bp = synthesize(profile(tmp_path), answers)
     skill_paths = [str(f.path) for f in bp.files if str(f.path).startswith(".agents/skills/")]
-    n_workflows = len(answers.fused_workflows)
     # existing + stages + workflows + loop + loop-p5-batch + help
     # base 9 → 10 (2026-07-30, PLAN-second-opinion-acceptance-gate ADR-011): the
     # `second-opinion-gate` skill holds the review stage's main-loop gate procedure, which
@@ -70,7 +69,7 @@ def test_synthesize_codex_target_emits_skill_paths(tmp_path: Path) -> None:
     # moved, after `synthesize._ALL_SKILLS` and `test_codex_phase7`'s count; the two
     # greps that found those missed this one because it is an arithmetic literal, not a
     # total. `[fail:test] enumeration-tests-not-updated-with-new-rendered-artifact`.
-    expected = 11 + 7 + n_workflows + 1 + 1 + 1
+    expected = 11 + 7 + 1 + 1 + 1
     assert len(skill_paths) == expected, (
         f"Expected {expected} .agents/skills/ entries, got {len(skill_paths)}"
     )

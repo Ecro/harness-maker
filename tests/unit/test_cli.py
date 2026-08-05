@@ -15,17 +15,13 @@ runner = CliRunner()
 
 def _minimal_answers():
     from harness_maker.interview import _build_answers
-    from harness_maker.models import AtomicStage, DevMode, Preset, Target
+    from harness_maker.models import DevMode, Preset, Target
 
     return _build_answers(
         locale="en",
         targets=[Target.CLAUDE_CODE],
         preset=Preset.SIDE,
         dev_mode=DevMode.TASK_DRIVEN,
-        fused_workflows={
-            "exec-rev-wrap": [AtomicStage.EXECUTE, AtomicStage.REVIEW, AtomicStage.WRAPUP]
-        },
-        default_workflow="exec-rev-wrap",
     )
 
 

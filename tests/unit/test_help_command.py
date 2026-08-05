@@ -63,13 +63,6 @@ def test_e_codex_target_renders_skill_and_section(tmp_path: Path) -> None:
     assert ".agents/skills/hm-help/SKILL.md" in _paths_for(ans, tmp_path)
 
 
-def test_f_default_workflow_marker_interpolated_exactly(tmp_path: Path) -> None:
-    ans = InterviewAnswers(locale="en", targets=[Target.CLAUDE_CODE])
-    body = _render_help(ans, tmp_path)
-    expected = f"/hm:{ans.default_workflow}` ⭐"
-    assert expected in body, f"expected substring not found: {expected!r}"
-
-
 def test_codex_skill_body_uses_at_hm_prefix(tmp_path: Path) -> None:
     """Codex SKILL.md is pre-rendered with is_codex=True — must use @hm-* stubs."""
     ans = InterviewAnswers(locale="ko", targets=[Target.CLAUDE_CODE, Target.CODEX])

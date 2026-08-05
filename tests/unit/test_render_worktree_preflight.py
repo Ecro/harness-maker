@@ -122,23 +122,6 @@ def test_flag_off_gives_execute_only_coverage_not_zero(tmp_path: Path) -> None:
     assert "worktree create execute" in _stage(files, "execute")
 
 
-def test_fused_workflows_carry_the_stage_name_of_each_fused_stage(tmp_path: Path) -> None:
-    """A fused workflow concatenates stage fragments into ONE command file, so it must
-    emit one start per fused stage — not a single span for the whole run.
-
-    The default `fused_workflows` is only `exec-rev-wrap`, so an earlier version of
-    this test looked for `hm/plan-exec-rev.md`, which the fixture never renders: it
-    died on StopIteration before reaching any contract assertion.
-    """
-    files = _render(tmp_path, flag_on=True)
-    fused = next(t for p, t in files.items() if p.endswith("hm/exec-rev-wrap.md"))
-    for stage in ("execute", "review", "wrapup"):
-        assert f'task-preflight <slug> "$(pwd)" --stage hm:{stage}' in fused, stage
-
-
-# ── execute dual-path: flag flips ephemeral isolation ↔ task preflight ────────
-
-
 def test_execute_dualpath_flag_on_uses_preflight(tmp_path: Path) -> None:
     files = _render(tmp_path, flag_on=True)
     body = _stage(files, "execute")
@@ -197,15 +180,6 @@ def test_preflight_block_matches_golden(tmp_path: Path) -> None:
 def _fused_execute_commands(files: dict[str, str]) -> dict[str, str]:
     """Rendered fused `/hm:` command files whose body fuses the execute stage."""
     return {p: t for p, t in files.items() if "commands/hm/" in p and "## Stage: execute" in t}
-
-
-def test_fused_workflows_inherit_preflight_when_flag_on(tmp_path: Path) -> None:
-    files = _render(tmp_path, flag_on=True)
-    fused = _fused_execute_commands(files)
-    assert fused, "expected at least one fused command embedding the execute stage"
-    for path, body in fused.items():
-        assert "Task worktree preflight" in body, path
-        assert "worktree task-preflight <slug>" in body, path
 
 
 def test_fused_workflows_omit_preflight_when_flag_off(tmp_path: Path) -> None:

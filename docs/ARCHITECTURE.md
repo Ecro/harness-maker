@@ -72,7 +72,6 @@ Three design commitments shape every decision below:
         │  commands/hm/                                       │
         │    research|spec|plan|execute|review|wrapup|verify  │
         │      ◀── M3 atomic stages                           │
-        │    <user-named>.md  ◀── M3 fused workflows          │
         │    loop.md          ◀── M7 autoloop driver          │
         │    ai-readiness.md  ◀── M5 scored readiness report   │
         │    refresh.md       ◀── M4 anti-rot, manual confirm │
@@ -171,7 +170,7 @@ When `.claude/` already exists, the Renderer doesn't write blindly. The `Reconci
 5. Backs up the entire `.claude/` to `.backup-<date>/` before applying anything.
 6. Apply is **ADD-only** — no in-place mutation, no deletes from disk (deletes happen via the backup-and-rewrite pattern).
 
-### M3 — Workflow Engine (Atomic + Fused)
+### M3 — Stage Engine (seven atomic stages)
 
 There are exactly **7 atomic stages**: `research`, `spec`, `plan`, `execute`, `review`, `wrapup`, `verify`. Each is a Jinja2 fragment under `templates/stages/<stage>.md.j2` and is **always** exposed as `/hm:<stage>`.
 
@@ -231,7 +230,7 @@ Two modes:
 Each iteration:
 
 1. Allocates a per-loop worktree at loop start (M9); reuses it for all iterations (0.5.5+).
-2. Runs the chosen per-iteration workflow (default: `exec-rev`). Wrapup runs once at loop close, not per iteration.
+2. Runs the chosen per-iteration stage list (default: `execute,review`). Wrapup runs once at loop close, not per iteration.
 3. Runs the 4-gate convergence check: mechanical commands, per-criterion LLM judgment, regression comparison, and a persisted two-iteration streak.
 4. Calls `/hm:verify` (M8) before completion.
 5. Cleans up on success; preserves on failure.
@@ -360,7 +359,7 @@ harness-maker renders the same workflow model for Claude Code, Cursor IDE, and O
 - `.codex/config.toml` — Codex config with agent registrations.
 - `.codex/agents/<name>.toml` — Codex-native agent definitions generated from the same reviewer/executor inventory.
 - `.codex/hooks.json` — Codex hook schema, including `PermissionRequest` handling and Codex file-edit tool matchers.
-- `.agents/skills/<name>/SKILL.md` — existing harness skills, seven atomic stage skills, fused workflow skills, and the loop skill in Codex's discovery layout.
+- `.agents/skills/<name>/SKILL.md` — existing harness skills, seven atomic stage skills, and the loop skill in Codex's discovery layout.
 
 Codex TOML files intentionally carry no provenance frontmatter because TOML parsers reject markdown preambles. The Reconciler treats `.codex/*.toml` as replaceable generated config, while `AGENTS.md` is block-merge aware.
 

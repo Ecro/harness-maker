@@ -19,11 +19,11 @@ TPL = REPO_ROOT / "src/harness_maker/templates"
 PARTIAL_REL = "agents/_partials/step_manifest.md.j2"
 PARTIAL = TPL / PARTIAL_REL
 
+# The two fused wrappers (`workflow_command.md.j2`, `codex/workflow_skill.md.j2`) were
+# deleted with the fused axis (PLAN-harness-diet ADR-001), leaving one wrapper per target.
 WRAPPERS = (
     "commands/hm/atomic_command.md.j2",
-    "commands/hm/workflow_command.md.j2",
     "codex/stage_skill.md.j2",
-    "codex/workflow_skill.md.j2",
 )
 
 

@@ -107,20 +107,3 @@ def test_autopilot_block_behaviorally_absent_for_codex() -> None:
     # emits NO auto-advance branch; the Claude render (is_codex=False) does.
     assert "@hm:autopilot-advance" not in _render_partial(is_codex=True)
     assert "@hm:autopilot-advance" in _render_partial(is_codex=False)
-
-
-def test_autopilot_block_suppressed_in_fused_render() -> None:
-    # P1-3: a fused fragment (autopilot_advance_enabled=False) carries NO live auto-advance
-    # block even for Claude — else an armed fused run would escalate past the invoked stages.
-    assert "@hm:autopilot-advance" not in _render_partial(is_codex=False, advance_enabled=False)
-
-
-def test_fuse_emits_no_autopilot_advance_block() -> None:
-    # P1-3 end-to-end: workflow_fuse.fuse() threads autopilot_advance_enabled=False, so the
-    # fused command body is free of the boundary CLI + Skill auto-invoke branch.
-    from harness_maker.models import AtomicStage
-    from harness_maker.workflow_fuse import fuse
-
-    body = fuse([AtomicStage.EXECUTE, AtomicStage.REVIEW], "exec-rev")
-    assert "@hm:autopilot-advance" not in body
-    assert "autopilot_caps boundary" not in body

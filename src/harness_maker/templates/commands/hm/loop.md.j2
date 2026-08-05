@@ -49,21 +49,22 @@ Parse from the user's natural-language input:
 - "mode: feature" or "mode: improve" → explicit mode
 - "time: Nh" → wall-clock limit
 - "max-iter: N" → iteration cap
-- "workflow: <name>" → per-iter workflow override
+- "stages: <a,b,...>" → per-iter atomic stage list (default `execute,review`; `wrapup` rejected)
 {% else %}
 ```
 /hm:loop <goal>
 /hm:loop --spec <path> [--mode feature|improve] [--target <path>]
-         [--time 8h] [--max-iter 50] [--per-iter-workflow exec-rev]
+         [--time 8h] [--max-iter 50] [--per-iter-stages execute,review]
          [--convergence <predicate>] [--dry-run]
 ```
 {% endif %}
 
-> **Breaking from pre-0.5.5**: per-iter workflow defaults to `exec-rev`
-> (was `exec-rev-wrap*`). Wrapup runs **once** at loop close instead of
-> per iter. The whole loop runs inside one `.worktrees/execute-<ts>/`
-> worktree (improve and feature mode both). To restore the old per-iter
-> wrap behavior pass `--per-iter-workflow exec-rev-wrap` explicitly.
+> **Breaking (PLAN-harness-diet ADR-014)**: the fused-workflow axis was removed, so <!-- @hm:axis-removed -->
+> `--per-iter-workflow <fused-name>` is gone. Use `--per-iter-stages <a,b,...>`, a
+> comma-separated list of atomic stages. Default: `execute,review`. Wrapup runs
+> **once** at loop close, never per iter — `wrapup` in the list is rejected. The whole
+> loop runs inside one `.worktrees/execute-<ts>/` worktree (improve and feature mode
+> both).
 
 {% if not is_codex %}
 ## Arguments
@@ -81,16 +82,17 @@ Parse from the user's natural-language input:
 - `--time <Nh>` — max wall-clock duration (default `8h`).
 - `--max-iter <N>` — max iterations (default `50`).
 - `--failed-streak-cap <N>` — max consecutive failures before halting (default `5`). Raise when features are expected to fail multiple times before succeeding.
-- `--per-iter-workflow <name>` (alias `--workflow`) — fused workflow each
-  iter invokes. Default: `exec-rev` (execute + review only — wrapup is
-  deferred to loop close to avoid commit-per-iter). Recommended overrides:
-  `plan-exec-rev` for big features needing per-iter planning. Must exist
-  in `.claude/commands/hm/`.
+- `--per-iter-stages <a,b,...>` — the atomic stages each iter runs, in order.
+  Default: `execute,review` (wrapup is deferred to loop close to avoid a
+  commit per iter). Recommended override: `plan,execute,review` for big
+  features needing per-iter planning. Every name must be an atomic stage with a
+  rendered `.claude/commands/hm/<stage>.md`; **`wrapup` is rejected** — loop close
+  owns it, and running it per iter would commit and merge on every iteration.
 - `--convergence <predicate>` — overrides the spec's predicate. Allowed:
   `all-features-completed` (default), `any-feature-completed`,
   `min-2-features`, `min-5-features`, `first-iter`, `stopping-criteria`.
 - `--dry-run` — single iteration; mark all features completed without
-  invoking the workflow.
+  invoking the stages.
 {% endif %}
 
 ---
@@ -101,7 +103,7 @@ Parse from the user's natural-language input:
 
 {% if is_codex %}
 Parse from the user's natural-language input: extract goal text, spec path, mode,
-time limit, iteration cap, and workflow name as described in the Usage section above.
+time limit, iteration cap, and per-iter stage list as described in the Usage section above.
 {% else %}
 Extract all flags. Remaining tokens form the free-form `<goal>`.
 {% endif %}
@@ -612,41 +614,43 @@ half-merged state)"`. The model rationalized self-pause when context grew
 instead of running `/compact` per the procedure below. This rail makes
 the prohibition negatively explicit so the rationalization path is closed.
 
-#### Per-iter workflow selection
+#### Per-iter stage selection
 
-Each iter invokes one fused workflow command:
+Each iter runs a short sequence of **atomic stage commands**, one after another —
+there is no fused command to invoke (ADR-014).
 
-- **Default**: `exec-rev` (execute + review). Wrapup is **deferred to
-  loop close** (step 7) — running wrapup per iter would commit + merge
-  on every iter, defeating the per-loop worktree.
-- **`--per-iter-workflow plan-exec-rev`**: include plan stage per iter.
+- **Default**: `execute,review`. Wrapup is **deferred to loop close** (step 7);
+  running it per iter would commit + merge on every iter, defeating the per-loop
+  worktree.
+- **`--per-iter-stages plan,execute,review`** (Codex: `stages: plan,execute,review`):
+  include the plan stage per iter.
   Recommended for big features where each iter needs fresh planning.
-- **`--per-iter-workflow <other>`**: explicit override. The configured
-  default workflow (`{{ config.default_workflow }}`) is used only if the
-  user explicitly passes `--per-iter-workflow {{ config.default_workflow }}`
-  — otherwise prefer the leaner `exec-rev`.
+- **`--per-iter-stages <other>`** (Codex: `stages: <other>`): explicit override,
+  comma-separated atomic stage names.
 
-Choose once at loop start, store as `WORKFLOW`.
+Choose once at loop start, store the ordered list as `STAGES`.
 
-#### Workflow file validation (before iter 1)
+#### Stage list validation (before iter 1)
 
-The chosen `WORKFLOW` must exist as `.claude/commands/hm/<WORKFLOW>.md`.
-The default `exec-rev` is rendered only if `exec-rev` is in the harness's
-`fused_workflows` map — custom harnesses may have stripped it. If the
-file is missing, **halt** with this user-facing error:
+Every name in `STAGES` must be one of the seven atomic stages —
+`research, spec, plan, execute, review, wrapup, verify` — and must exist as
+`.claude/commands/hm/<stage>.md`. `wrapup` is rejected outright. If validation
+fails, **halt** with this user-facing error:
 
 ```
-loop halted — per-iter workflow '<WORKFLOW>' not found at
-.claude/commands/hm/<WORKFLOW>.md.
+loop halted — invalid stage list '<STAGES>'
+(--per-iter-stages, or `stages:` on Codex).
 
-Either:
-  • re-run with --per-iter-workflow <one of {{ config.workflows.keys() | list | join(', ') }}>
-  • or re-render the harness with `exec-rev` in fused_workflows
-    (run /harness-maker:make → "Update")
+  • unknown or missing stage: <name> (expected .claude/commands/hm/<name>.md)
+  • or: 'wrapup' is not allowed per iter — loop close owns it
+
+Re-run with a comma-separated list of atomic stages, e.g.
+  --per-iter-stages execute,review
+  --per-iter-stages plan,execute,review
 ```
 
-Do NOT silently fall back to a different workflow — that masks
-intent and could iterate over the wrong stages.
+Do NOT silently drop or substitute a stage — that masks intent and could iterate
+over the wrong stages.
 
 #### Iteration body (same for feature and improve mode)
 
@@ -783,13 +787,13 @@ For each iter (until convergence or any safety rail fires):
    > error cancels the entire batch (`Cancelled: parallel tool call … errored`).
    > A non-zero exit here (`root … is not an existing directory`) means `<WT>`
    > drifted — re-verify before continuing.
-4. **Invoke per-iter workflow**: read
-   `.claude/commands/hm/<WORKFLOW>.md` and execute **every stage it
-   defines, in order, without skipping any**. Operate inside `<WT>`:
+4. **Invoke per-iter stages**: for each stage in `STAGES`, in order, read
+   `.claude/commands/hm/<stage>.md` and execute **every step it defines,
+   without skipping any**, before moving to the next stage. Operate inside `<WT>`:
    substitute the absolute worktree path for every Read/Write/Edit call;
    tests / lints / type checks run via `cd <WT> && <cmd>`. Stage "When
    to Run" skip conditions apply only to standalone invocation, not
-   under loop dispatch. **The workflow/stage file begins with a step-manifest
+   under loop dispatch. **Each stage file begins with a step-manifest
    preamble (ADR-003) telling the model to print its intended steps — as the
    loop driver you MUST IGNORE that preamble and NEVER print the manifest: the
    loop runs silently, and you read the file inline into your own context so no
@@ -798,26 +802,15 @@ For each iter (until convergence or any safety rail fires):
 
 4.5. **Gate 0 — Receipt verification** (ADR-001 + ADR-005 of PLAN-loop-mid-stop-and-review-skip).
 
-   The autoloop driver MUST verify every expected stage of `<WORKFLOW>` emitted
+   The autoloop driver MUST verify every stage in `STAGES` emitted
    a receipt with `verdict == "pass"`. This is the mechanical defense against
    the 2026-05-22 silent-review-skip failure mode (`[wiki:gotcha]
    loop-body-skipping-review-stage`). Gate 0 runs every iter regardless of
    mode (feature or improve).
 
-   Derive `EXPECTED_STAGES` from `<WORKFLOW>`. The six canonical entries match
-   the fused workflow registry in `interview.py:_SIDE_STARTER` /
-   `_PRODUCTION_STARTER`:
-   - `exec-rev` → `execute,review`
-   - `exec-rev-wrap` → `execute,review,wrapup`
-   - `exec-rev-ver-wrap` → `execute,review,verify,wrapup` *(canonical production default)*
-   - `exec-rev-wrap-ver` → `execute,review,wrapup,verify` *(legacy/post-commit audit)*
-   - `plan-exec-rev` → `plan,execute,review` *(3-stage variant for loop per-iter planning — wrapup stripped because loop-close owns it; ADR-002 of PLAN-loop-mid-stop-and-review-skip)*
-   - `plan-exec-rev-wrap` → `plan,execute,review,wrapup` *(4-stage variant — SIDE preset only, not for per-iter loop use)*
-   - `res-spec-plan` → `research,spec,plan`
-   - any other fused workflow → read the workflow command file
-     `.claude/commands/hm/<WORKFLOW>.md` and extract the stage list from its
-     fused-stage `## Stage:` headers (one per stage, top-down order). Treat
-     the resulting comma-joined list as `EXPECTED_STAGES`.
+   `EXPECTED_STAGES` **is** `STAGES` — the ordered list validated at loop start.
+   There is no fused-command file to derive it from any more (ADR-014), so there is
+   also no way for the expected set and the invoked set to drift apart.
 
    Run the verify CLI inside `<WT>`:
 {% if is_codex %}
@@ -863,7 +856,7 @@ For each iter (until convergence or any safety rail fires):
    3. If `stage_retry_counts[K] <= 2`:
       Re-invoke that stage's prompt only — read
       `.claude/commands/hm/<stage>.md` and execute it. Do NOT re-invoke the
-      full `<WORKFLOW>`. After the stage re-runs, return to step 4.5 and
+      whole `STAGES` sequence. After the stage re-runs, return to step 4.5 and
       re-verify Gate 0.
    4. If `stage_retry_counts[K] >= 3`:
       Escalate via {% if is_codex %}`request_user_input` (or ask in your response){% else %}`AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code){% endif %}.

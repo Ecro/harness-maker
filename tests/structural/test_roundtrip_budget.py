@@ -32,11 +32,9 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # step previously told an LLM to compute `sha256(...)[:16]` itself — which it cannot do, so
     # Claude-side finding ids were invented per round and the merge-by-`id` contract keyed on
     # values that changed every round. The call is the whole point of that fix; no call was
-    # removed. `review` 7→8, and the four fused commands that inline the review stage inherit it.
+    # removed. `review` 7→8. (The four fused commands that also inherited it were deleted
+    # with the fused axis — PLAN-harness-diet ADR-001.)
     "configure": 3,
-    "exec-rev": 17,
-    "exec-rev-wrap": 43,
-    "exec-rev-wrap-ver": 53,
     "execute": 14,
     "health": 7,
     "help": 0,
@@ -45,8 +43,6 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     "make": 1,
     "metrics": 7,
     "plan": 14,
-    "plan-exec-rev": 28,
-    "res-spec-plan": 20,
     "research": 8,
     "review": 8,
     "spec": 6,

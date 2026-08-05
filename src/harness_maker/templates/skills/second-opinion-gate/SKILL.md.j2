@@ -7,8 +7,8 @@ description: Procedure /hm:review follows for the auto-fix loop's round-state co
 
 The procedure `/hm:review` follows to admit, refute and carry cross-model findings.
 
-**Why this is a skill and not inline stage prose.** Every fused command (`exec-rev`,
-`exec-rev-wrap`, `exec-rev-wrap-ver`, `plan-exec-rev`) *inlines the whole review stage*, so a
+**Why this is a skill and not inline stage prose.** `/hm:loop` re-reads the whole review
+stage on every iteration that lists `review` in `--per-iter-stages`, so a
 character added to that stage is paid five times in the shipped command surface — which the
 repo's `test_command_size_budget` / `test_aggregate_shipped_surface_does_not_grow` arms
 deliberately refuse. A skill is loaded on demand and is not fanned out. The rules below are

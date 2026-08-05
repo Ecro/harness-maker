@@ -1343,6 +1343,19 @@ def _render_text_file(
     return out
 
 
+# Top-level harness.yaml keys this project used to emit and has since RETIRED.
+# They must be dropped rather than preserved: `_preserve_yaml_user_keys` classifies
+# "in the existing file but not in the new render" as a user addition, so without this
+# list an existing harness.yaml carrying `workflows:` would be re-appended on every
+# re-render, forever, under an "@hm:user:extensions" banner that tells the user the key is
+# theirs. (An earlier version of this comment claimed the regrown key would then fail
+# `HarnessConfig`'s `extra="forbid"` on the next load. It would not — nothing validates a
+# user's harness.yaml into that model; `answers_from_harness_yaml` reads selected keys.)
+# This is the top-level twin of the `guard_when` drop in `interview._parse_autonomy`
+# (retired-key migration); ship any future key removal through here.
+_RETIRED_TOP_LEVEL_KEYS: frozenset[str] = frozenset({"workflows", "default_workflow"})
+
+
 def _preserve_yaml_user_keys(out: Path, new_body: str) -> str:
     """Append top-level YAML keys from the existing file that the new render omits.
 
@@ -1385,7 +1398,7 @@ def _preserve_yaml_user_keys(out: Path, new_body: str) -> str:
         return new_body
     if not isinstance(new_data, dict):
         return new_body
-    user_only = [k for k in existing_data if k not in new_data]
+    user_only = [k for k in existing_data if k not in new_data and k not in _RETIRED_TOP_LEVEL_KEYS]
     if not user_only:
         return new_body
     blocks: list[str] = [

@@ -114,14 +114,21 @@ def test_codex_agents_md_has_block_markers() -> None:
     )
 
 
-def test_codex_agents_md_mentions_workflow() -> None:
-    """AGENTS.md must mention the default workflow for Codex users."""
+def test_codex_agents_md_names_the_stage_chaining_entry_point() -> None:
+    """AGENTS.md must tell a Codex user how to chain stages.
+
+    Was: "must mention the default workflow" (asserted `exec-rev-wrap`). The fused axis
+    is gone (PLAN-harness-diet ADR-001), so that string was removed along with a table
+    advertising four `@hm-exec-rev*` skills that no longer render — a review round-1 P1.
+    Deleting the assertion outright would drop the guard that AGENTS.md documents ANY
+    chaining entry point, so it is re-pointed at the surviving one rather than removed.
+    """
     env = _make_env()
     tpl = env.get_template("codex/AGENTS.md.j2")
     rendered = tpl.render(config=_BASE_CONFIG, preset="Production")
-    assert "exec-rev-wrap" in rendered, (
-        "AGENTS.md does not reference the configured default_workflow"
-    )
+    assert "@hm-loop" in rendered, "AGENTS.md no longer names the stage-chaining entry point"
+    for gone in ("@hm-exec-rev", "Fused workflows"):
+        assert gone not in rendered, f"AGENTS.md still advertises the deleted axis: {gone}"
 
 
 # ── reconcile: AGENTS.md special-casing ───────────────────────────────────────
@@ -133,7 +140,7 @@ def test_reconcile_agents_md_both_when_new(tmp_path: Path) -> None:
     AGENTS.md resolves to target_dir.parent (project root), so existing_dir must
     be the .claude/ subdir so the path routing mirrors production use.
     """
-    specs = _codex_target_files({})
+    specs = _codex_target_files()
     agents_md_specs = [(t, o, c) for t, o, c in specs if o == "AGENTS.md"]
     assert agents_md_specs, "_codex_target_files must include AGENTS.md (prerequisite S7)"
     claude_dir = tmp_path / ".claude"
@@ -185,14 +192,14 @@ def test_reconcile_agents_md_merge_block_reason(tmp_path: Path) -> None:
 
 def test_codex_target_files_includes_config_toml() -> None:
     """_codex_target_files() must include .codex/config.toml entry."""
-    specs = _codex_target_files({})
+    specs = _codex_target_files()
     out_paths = [out for _, out, _ in specs]
     assert ".codex/config.toml" in out_paths
 
 
 def test_codex_target_files_includes_agents_md() -> None:
     """_codex_target_files() must include AGENTS.md entry."""
-    specs = _codex_target_files({})
+    specs = _codex_target_files()
     out_paths = [out for _, out, _ in specs]
     assert "AGENTS.md" in out_paths
 
@@ -200,7 +207,7 @@ def test_codex_target_files_includes_agents_md() -> None:
 def test_codex_target_files_template_names_exist() -> None:
     """Templates referenced in _codex_target_files() must be loadable by Jinja2 env."""
     env = _make_env()
-    for tpl_path, _, _ in _codex_target_files({}):
+    for tpl_path, _, _ in _codex_target_files():
         env.get_template(tpl_path)  # raises TemplateNotFound if missing
 
 
@@ -222,7 +229,7 @@ def test_codex_config_toml_agents_section_renders_string_descriptions() -> None:
     """
     from harness_maker.synthesize import _CODEX_AGENT_META
 
-    specs = _codex_target_files({})
+    specs = _codex_target_files()
     config_spec = next(
         (ctx for tpl, out, ctx in specs if out == ".codex/config.toml"),
         None,

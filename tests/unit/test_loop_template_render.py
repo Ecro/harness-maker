@@ -121,14 +121,14 @@ def test_gate0_documents_auto_retry_cap(loop_md: str) -> None:
 def test_gate0_appears_before_state_update(loop_md: str) -> None:
     """Gate 0 must fire AFTER workflow invocation but BEFORE 'Update state'."""
     gate0_idx = loop_md.find("Gate 0 — Receipt verification")
-    workflow_idx = loop_md.find("Invoke per-iter workflow")
+    workflow_idx = loop_md.find("Invoke per-iter stages")
     # Anchor on the step-5 header (markdown bold) not the Gate 4 prose mention.
     update_idx = loop_md.find("5. **Update state**")
-    assert workflow_idx > 0, "loop.md missing 'Invoke per-iter workflow' step"
+    assert workflow_idx > 0, "loop.md missing 'Invoke per-iter stages' step"
     assert update_idx > 0, "loop.md missing 'Update state' step"
     assert gate0_idx > 0, "loop.md missing 'Gate 0' step"
     assert workflow_idx < gate0_idx < update_idx, (
-        f"Gate 0 must be between Invoke per-iter workflow (idx={workflow_idx}) "
+        f"Gate 0 must be between Invoke per-iter stages (idx={workflow_idx}) "
         f"and Update state (idx={update_idx}); got Gate 0 idx={gate0_idx}"
     )
 

@@ -299,8 +299,6 @@ def _load_preset_defaults(preset_name: str) -> dict[str, Any]:
     from harness_maker.interview import (
         _build_answers,
         _consensus_for,
-        _default_for,
-        _starter_for,
     )
     from harness_maker.models import DevMode, Preset, Target
     from harness_maker.render import TEMPLATE_DIR
@@ -314,18 +312,15 @@ def _load_preset_defaults(preset_name: str) -> dict[str, Any]:
         msg = f"unknown preset {preset_name!r}; valid: {valid}"
         raise ValueError(msg) from exc
     # Why preset-seeded (not bare InterviewAnswers): the real /hm:make path seeds
-    # consensus / default_workflow / fused_workflows from the preset via these
-    # interview helpers. A bare InterviewAnswers(preset=...) used the stock
-    # field defaults (consensus=single, default_workflow=exec-rev-wrap), so the
-    # Production baseline diverged from what a Production install actually has
-    # (cross-check / exec-rev-ver-wrap) and convergence was misjudged (F22).
+    # `consensus` from the preset via `_consensus_for`. A bare
+    # InterviewAnswers(preset=...) used the stock field default (consensus=single),
+    # so the Production baseline diverged from what a Production install actually
+    # has (cross-check) and convergence was misjudged (F22).
     answers = _build_answers(
         locale="en",
         targets=[Target.CLAUDE_CODE],
         preset=preset,
         dev_mode=DevMode.SPEC_DRIVEN,
-        fused_workflows=_starter_for(preset),
-        default_workflow=_default_for(preset),
         consensus=_consensus_for(preset),
     )
     blueprint = synthesize(ProjectProfile(), answers, preset)

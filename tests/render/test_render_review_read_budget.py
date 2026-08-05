@@ -70,22 +70,21 @@ def atomic_review_render() -> str:
     return _command(Preset.PRODUCTION, "review.md")
 
 
-def fused_review_render() -> str:
-    return _command(Preset.PRODUCTION, "exec-rev-wrap-ver.md")
-
-
 def single_reviewer_review_render() -> str:
     """The `{% else %}` branch at review.md.j2:217 — structurally unreachable under a
     multi-reviewer config, which is why the fourth dispatch site went unguarded."""
     return _command(Preset.SIDE, "review.md")
 
 
-def rendered_plan_bearing_fused() -> str:
-    return _command(Preset.PRODUCTION, "plan-exec-rev.md")
+def rendered_plan_command() -> str:
+    """Was `plan-exec-rev.md`; re-pointed to the atomic plan command when the fused axis
+    was deleted (PLAN-harness-diet ADR-001). The fused body inlined this same stage, so
+    the validator-invocation invariance it guards is unchanged."""
+    return _command(Preset.PRODUCTION, "plan.md")
 
 
 def reviewer_renders() -> tuple[str, ...]:
-    return (atomic_review_render(), fused_review_render())
+    return (atomic_review_render(),)
 
 
 def _golden(name: str) -> str:
@@ -348,10 +347,9 @@ def validator_invocation_points(render_text: str) -> tuple[str, ...]:
 
 
 def paired_review_renders_against_goldens() -> tuple[tuple[str, str], ...]:
-    return (
-        (atomic_review_render(), golden_atomic()),
-        (fused_review_render(), golden_fused()),
-    )
+    # The fused pair went with the fused axis (ADR-001); the atomic pair is the whole
+    # comparison now. `golden_fused()` is still read by the goldens-exist arm below.
+    return ((atomic_review_render(), golden_atomic()),)
 
 
 # ------------------------------------------------------------------ AC-008
@@ -419,7 +417,7 @@ def test_the_site_count_matches_the_pre_change_anchor() -> None:
     """
     for render_text in reviewer_renders():
         assert reviewer_pass_count(render_text) == 3
-    for golden in (golden_atomic(), golden_fused()):
+    for golden in (golden_atomic(),):
         assert reviewer_pass_count(golden) == 3
 
 
@@ -430,7 +428,7 @@ def test_the_predicates_discriminate_against_the_pre_change_render() -> None:
     while gating nothing. The negative predicate is checked in the opposite direction on
     the one site that carried the pinned sentence.
     """
-    for golden in (golden_atomic(), golden_fused()):
+    for golden in (golden_atomic(),):
         sites = reviewer_dispatch_sites(golden)
         assert sites
         for predicate in _POSITIVE_PREDICATES:
@@ -457,7 +455,7 @@ def test_verification_structure_unchanged() -> None:
         and second_opinion_invocation_points(after) == second_opinion_invocation_points(golden)
         for after, golden in paired_review_renders_against_goldens()
     )
-    after_validator = validator_invocation_points(rendered_plan_bearing_fused())
+    after_validator = validator_invocation_points(rendered_plan_command())
     golden_validator = validator_invocation_points(golden_plan_bearing_fused())
     assert after_validator == golden_validator
     assert len(golden_validator) >= 1
@@ -472,7 +470,7 @@ def test_the_invariance_guards_are_not_vacuous() -> None:
     three conjuncts have no such guard in the predicate, so they get one here.
     `second_opinion_invocation_points` is the reason `_SECOND_OPINION_MODELS` is non-empty.
     """
-    for golden in (golden_atomic(), golden_fused()):
+    for golden in (golden_atomic(),):
         assert reviewer_pass_count(golden) >= 1
         assert enabled_reviewer_set(golden)
         assert consensus_threshold(golden)

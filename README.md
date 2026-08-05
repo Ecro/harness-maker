@@ -137,7 +137,6 @@ A short interview locks the dimensions that shape every downstream render. Re-ru
 | **Dev mode** | `task-driven` · `spec-driven` | Whether SPEC stage is mandatory; whether plan stages chain into execute |
 | **Targets** | `claude-code` · `cursor` · `codex` (multi-select) | Which IDE-native asset trees are rendered |
 | **Locale** | `en` · `ko` · any tag | Interview text + user-facing error messages |
-| **Workflows** | Fused sequences from atomic stages | Which `/hm:<name>` slash commands appear |
 | **Reviewers / skills** | Preset defaults + overrides | Which reviewers are active + agent model tiers (the full agent/skill set always installs) |
 | **Ref folders** | Path + glob pairs | Which external docs are searchable via `refdocs-search` skill |
 | **Sibling repos** | Relative paths | Which adjacent repos share the same harness session |
@@ -503,16 +502,16 @@ After install, the rendered harness exposes commands under `/hm:*`:
 | `/hm:wrapup` | Clean, document, commit |
 | `/hm:verify` | 6-check gate before completion |
 
-> **Recommended:** for any non-trivial change, follow the full 7-stage sequence in order — `/hm:research` → `/hm:spec` → `/hm:plan` → `/hm:execute` → `/hm:review` → `/hm:wrapup` → `/hm:verify`. Each stage's output feeds the next; jumping straight to `/hm:execute` forfeits the SPEC gate, consensus review, and verify checks that make the harness trustworthy. The fused workflows below bundle the common subsequences into a single command when you want fewer hand-offs.
+> **Recommended:** for any non-trivial change, follow the full 7-stage sequence in order — `/hm:research` → `/hm:spec` → `/hm:plan` → `/hm:execute` → `/hm:review` → `/hm:wrapup` → `/hm:verify`. Each stage's output feeds the next; jumping straight to `/hm:execute` forfeits the SPEC gate, consensus review, and verify checks that make the harness trustworthy. To chain stages without a hand-off between each, use `/hm:loop` (bounded autoloop) or arm autopilot.
 
-### Fused workflows (preset-generated, user-renameable)
+### Chaining stages
 
-Fused workflows combine atomic stages into a single command. The interview generates a starter set; you can add, remove, or rename them in `harness.yaml`.
+There is no fused-workflow command. Two mechanisms chain the atomic stages:
 
-| Preset | Default fused workflows |
+| Mechanism | What it does |
 |---|---|
-| **Side** | `/hm:plan-exec-rev` · `/hm:exec-rev` · `/hm:exec-rev-wrap` _(default)_ |
-| **Production** | `/hm:exec-rev-wrap-ver` _(default)_ · `/hm:exec-rev-wrap` · `/hm:plan-exec-rev` · `/hm:exec-rev` · `/hm:res-spec-plan` |
+| `/hm:loop` | Bounded autoloop. `--per-iter-stages execute,review` (default) sets the per-iteration sequence; `wrapup` is rejected there because loop-close owns it. |
+| Autopilot | Auto-advances the configured `autonomy.pipeline` past two-way-door boundaries, always stopping at the plan interview, a CHANGES_REQUESTED review, and the wrapup merge. Claude Code only. |
 
 ### Utility commands
 

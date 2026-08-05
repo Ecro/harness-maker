@@ -1,9 +1,6 @@
 # Stage: wrapup
 
 > Atomic stage. **Single commit owner**: integrates execute's staged changes + memory + PLAN status updates into ONE user-facing commit with Co-Authored-By: Claude.
-{% if workflow_context %}
-> Invoked as part of the **{{ workflow_context }}** workflow.
-{% endif %}
 
 ## Communication Protocol
 
@@ -26,7 +23,7 @@ Close the loop on a unit of work:
 - Before pushing to a shared branch.
 - Whenever a logical work unit completes (feature flag flipped, ticket closed, demo-ready).
 
-> When invoked as part of a fused workflow, always run — do not skip based on the conditions above.
+> When dispatched by `/hm:loop` or by autopilot, always run — do not skip based on the conditions above.
 
 ## Inputs
 

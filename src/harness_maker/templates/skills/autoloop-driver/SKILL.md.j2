@@ -10,7 +10,7 @@ the autoloop driver. No Python module is imported at runtime.
 
 ## Two Modes
 
-- **`feature`** (default): one discrete feature per iteration. Executor = configured fused workflow; convergence = named predicate.
+- **`feature`** (default): one discrete feature per iteration. Executor = the configured `--per-iter-stages` sequence; convergence = named predicate.
 - **`improve`**: continuous quality loop (review → fix → test → re-review) until LLM judges stopping criteria met. No feature list.
 
 Mode detection order: explicit `--mode` flag → spec `mode` field → keyword

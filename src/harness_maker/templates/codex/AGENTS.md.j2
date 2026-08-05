@@ -5,7 +5,7 @@
 
 ## Workflow overview
 
-harness-maker provides 7 atomic stages and fused workflows.
+harness-maker provides 7 atomic stages.
 Invoke a stage by mentioning the skill name (e.g. `@hm-execute task-slug`).
 
 ### Atomic stages
@@ -24,18 +24,7 @@ Invoke a stage by mentioning the skill name (e.g. `@hm-execute task-slug`).
 
 | Skill | Purpose |
 |-------|---------|
-| `@hm-loop` | Bounded autoloop: interview → iterate workflow → wrapup |
-
-### Fused workflows (stages chained in one turn)
-
-| Skill | Chain |
-|-------|-------|
-| `@hm-exec-rev` | execute → review |
-| `@hm-exec-rev-wrap` | execute → review → wrapup |
-| `@hm-exec-rev-ver-wrap` | execute → review → verify → wrapup |
-| `@hm-exec-rev-wrap-ver` | legacy/post-commit audit: execute → review → wrapup → verify |
-
-Default fused workflow: `@hm-{{ config.default_workflow }}`.
+| `@hm-loop` | Bounded autoloop: interview → iterate the configured atomic stages → wrapup |
 
 ## Configuration
 

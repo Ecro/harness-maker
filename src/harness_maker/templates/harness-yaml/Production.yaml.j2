@@ -3,7 +3,6 @@ locale: {{ config.locale }}
 targets: [{{ config.targets | join(', ') }}]
 default_model: {{ config.default_model }}
 dev_mode: {{ config.dev_mode }}
-default_workflow: {{ config.default_workflow }}
 caching: {{ config.caching }}
 schema_version: {{ config.schema_version }}
 interview:
@@ -53,11 +52,6 @@ sibling_repos:
 wrapup_docs:
 {% for d in config.wrapup_docs %}  - {{ d | tojson }}
 {% endfor %}
-workflows:
-{% for name, stages in config.workflows.items() %}
-  {{ name }}:
-{% for s in stages %}    - {{ s }}
-{% endfor %}{% endfor %}
 reviewers:
   consensus: {{ config.reviewers.consensus }}
   verbosity: {{ config.reviewers.verbosity }}

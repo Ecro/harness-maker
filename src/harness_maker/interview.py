@@ -6,12 +6,11 @@ Question order:
     2. preset (Side / Production) — recommended based on profile.
     3. dev_mode (spec-driven / task-driven) — independent of preset; default
        per preset (Side→task-driven, Production→spec-driven). Any cross OK.
-    4. fused workflows + default workflow.
     5. consensus + caching (preset defaults shown).
 
 Skills and agents are always installed in full; the `enabled` lists in the
 returned answers govern default activation. Users can override per-task with
-inline flags on the workflow command (documented in workflow_command.md.j2).
+inline flags on the stage commands.
 """
 
 from __future__ import annotations
@@ -31,7 +30,6 @@ from harness_maker.models import (
     DELEGATABLE_STAGES,
     SECOND_OPINION_MODELS,
     AgentModelSpec,
-    AtomicStage,
     AutonomyConfig,
     CodexAgentSpec,
     Confidence,
@@ -51,10 +49,8 @@ from harness_maker.models import (
     SecondOpinionAntigravityConfig,
     SecondOpinionConfig,
     Target,
-    auto_workflow_name,
     interview_deep_gate_defaults,
 )
-from harness_maker.validators import validate_workflow_name
 
 logger = logging.getLogger(__name__)
 
@@ -63,77 +59,6 @@ _BUILTIN_LOCALES: tuple[str, ...] = ("en", "ko")
 _DEFAULT_LOCALE = "en"
 
 # Stages displayed 1-indexed in the interview.
-_STAGES: list[AtomicStage] = list(AtomicStage)
-
-# Recommended starter workflow set per preset. Users can accept (Y) or define
-# custom (n).
-_SIDE_STARTER: dict[str, list[AtomicStage]] = {
-    "exec-rev": [AtomicStage.EXECUTE, AtomicStage.REVIEW],
-    "exec-rev-wrap": [
-        AtomicStage.EXECUTE,
-        AtomicStage.REVIEW,
-        AtomicStage.WRAPUP,
-    ],
-    "exec-rev-ver-wrap": [
-        AtomicStage.EXECUTE,
-        AtomicStage.REVIEW,
-        AtomicStage.VERIFY,
-        AtomicStage.WRAPUP,
-    ],
-    # 3-stage variant for /hm:loop per-iter use: wrapup belongs to loop-close,
-    # never per-iter, so this strips wrapup vs plan-exec-rev-wrap below.
-    # PLAN-loop-mid-stop-and-review-skip ADR-002.
-    "plan-exec-rev": [
-        AtomicStage.PLAN,
-        AtomicStage.EXECUTE,
-        AtomicStage.REVIEW,
-    ],
-    "plan-exec-rev-wrap": [
-        AtomicStage.PLAN,
-        AtomicStage.EXECUTE,
-        AtomicStage.REVIEW,
-        AtomicStage.WRAPUP,
-    ],
-}
-_SIDE_DEFAULT = "exec-rev-wrap"
-
-# Production preset deliberately OMITS plan-exec-rev-wrap (4-stage with wrapup).
-# Production loop use expects plan-exec-rev (3-stage); loop-close owns wrapup
-# (see loop.md.j2 step 7 + ADR-002 of PLAN-loop-mid-stop-and-review-skip).
-# The 4-stage variant exists only in SIDE as a non-loop linear workflow option.
-_PRODUCTION_STARTER: dict[str, list[AtomicStage]] = {
-    "exec-rev": [AtomicStage.EXECUTE, AtomicStage.REVIEW],
-    "exec-rev-wrap": [
-        AtomicStage.EXECUTE,
-        AtomicStage.REVIEW,
-        AtomicStage.WRAPUP,
-    ],
-    "exec-rev-ver-wrap": [
-        AtomicStage.EXECUTE,
-        AtomicStage.REVIEW,
-        AtomicStage.VERIFY,
-        AtomicStage.WRAPUP,
-    ],
-    "exec-rev-wrap-ver": [
-        AtomicStage.EXECUTE,
-        AtomicStage.REVIEW,
-        AtomicStage.WRAPUP,
-        AtomicStage.VERIFY,
-    ],
-    # 3-stage variant for /hm:loop per-iter use (no wrapup — owned by loop-close).
-    # PLAN-loop-mid-stop-and-review-skip ADR-002.
-    "plan-exec-rev": [
-        AtomicStage.PLAN,
-        AtomicStage.EXECUTE,
-        AtomicStage.REVIEW,
-    ],
-    "res-spec-plan": [
-        AtomicStage.RESEARCH,
-        AtomicStage.SPEC,
-        AtomicStage.PLAN,
-    ],
-}
-_PRODUCTION_DEFAULT = "exec-rev-ver-wrap"
 
 # Inventory of all reviewers/skills the synthesizer installs. The `enabled`
 # subset depends on preset.
@@ -222,8 +147,6 @@ def interview(
             targets=[Target.CLAUDE_CODE],
             preset=recommended,
             dev_mode=_recommend_dev_mode(recommended),
-            fused_workflows=_starter_for(recommended),
-            default_workflow=_default_for(recommended),
         )
 
     print(
@@ -233,7 +156,6 @@ def interview(
     targets = _ask_targets()
     preset = _ask_preset(recommended)
     dev_mode = _ask_dev_mode(preset)
-    fused, default_name = _ask_fused_workflows(preset)
     consensus = _ask_with_default("consensus", _consensus_for(preset))
     caching = _ask_with_default("caching", "agent-aware")
     ref_folders = _ask_ref_folders()
@@ -246,8 +168,6 @@ def interview(
         targets=targets,
         preset=preset,
         dev_mode=dev_mode,
-        fused_workflows=fused,
-        default_workflow=default_name,
         consensus=consensus,
         caching=caching,
         ref_folders=ref_folders,
@@ -391,83 +311,8 @@ def _ask_preset(recommended: Preset) -> Preset:
     return recommended
 
 
-def _starter_for(preset: Preset) -> dict[str, list[AtomicStage]]:
-    src = _SIDE_STARTER if preset == Preset.SIDE else _PRODUCTION_STARTER
-    return {k: list(v) for k, v in src.items()}
-
-
-def _default_for(preset: Preset) -> str:
-    return _SIDE_DEFAULT if preset == Preset.SIDE else _PRODUCTION_DEFAULT
-
-
 def _consensus_for(preset: Preset) -> str:
     return "single" if preset == Preset.SIDE else "cross-check"
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Fused workflows
-# ──────────────────────────────────────────────────────────────────────────────
-
-
-def _ask_fused_workflows(
-    preset: Preset,
-) -> tuple[dict[str, list[AtomicStage]], str]:
-    """Show stages + recommended starter; let user accept or define custom."""
-    print("\nAtomic stages:")
-    for i, s in enumerate(_STAGES, start=1):
-        print(f"  {i}. {s.value}")
-
-    starter = _starter_for(preset)
-    print(f"\nRecommended starter set ({preset.value}):")
-    for name, stages in starter.items():
-        nums = ",".join(str(_STAGES.index(s) + 1) for s in stages)
-        joined = ", ".join(s.value for s in stages)
-        print(f"  /hm:{name}  ({nums}) → {joined}")
-
-    use_default = _input_or_empty("Use recommended? [Y/n]: ").strip().lower()
-    chosen = starter if use_default in ("", "y", "yes") else (_ask_custom_workflows() or starter)
-
-    default_seed = _default_for(preset) if chosen is starter else next(iter(chosen))
-    default_name = _ask_with_default("default workflow", default_seed)
-    if default_name not in chosen:
-        print(f"  (unknown workflow {default_name!r}; falling back to {default_seed})")
-        default_name = default_seed
-    return chosen, default_name
-
-
-def _ask_custom_workflows() -> dict[str, list[AtomicStage]] | None:
-    """Loop: read stage numbers + optional name override until 'done'."""
-    print("\nDefine fused workflows. Type 'done' when finished.")
-    custom: dict[str, list[AtomicStage]] = {}
-    while True:
-        idx = len(custom) + 1
-        line = _input_or_empty(
-            f"  Workflow #{idx} stages (e.g. 4,5,6 or 'done'): ",
-        ).strip()
-        if line.lower() == "done":
-            if not custom:
-                print("  No workflows defined; falling back to recommended set.")
-                return None
-            return custom
-        try:
-            stages = _parse_stage_numbers(line)
-        except ValueError as e:
-            print(f"  Invalid: {e}")
-            continue
-        if not stages:
-            print("  No stages selected; try again.")
-            continue
-        suggested = auto_workflow_name(stages)
-        name = _input_or_empty(f"  Name [{suggested}]: ").strip() or suggested
-        try:
-            validate_workflow_name(name)
-        except ValueError as e:
-            print(f"  {e}")
-            continue
-        if name in custom:
-            print(f"  Name {name!r} already used; pick another.")
-            continue
-        custom[name] = stages
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -569,24 +414,6 @@ def _ask_second_brain() -> SecondBrainConfig:
         project_id=project_id_raw,
         folders=folders,
     )
-
-
-def _parse_stage_numbers(line: str) -> list[AtomicStage]:
-    out: list[AtomicStage] = []
-    for tok in line.split(","):
-        s = tok.strip()
-        if not s:
-            continue
-        try:
-            n = int(s)
-        except ValueError as e:
-            msg = f"not a number: {s!r}"
-            raise ValueError(msg) from e
-        if not 1 <= n <= len(_STAGES):
-            msg = f"out of range (1-{len(_STAGES)}): {n}"
-            raise ValueError(msg)
-        out.append(_STAGES[n - 1])
-    return out
 
 
 def _ask_second_opinion() -> SecondOpinionConfig:
@@ -803,8 +630,6 @@ def _build_answers(
     targets: list[Target],
     preset: Preset,
     dev_mode: DevMode,
-    fused_workflows: dict[str, list[AtomicStage]],
-    default_workflow: str,
     consensus: str | None = None,
     caching: str | None = None,
     second_brain: SecondBrainConfig | None = None,
@@ -820,8 +645,6 @@ def _build_answers(
         targets=list(targets),
         preset=preset,
         dev_mode=dev_mode,
-        fused_workflows=fused_workflows,
-        default_workflow=default_workflow,
         ref_folders=list(ref_folders) if ref_folders else [],
         sibling_repos=list(sibling_repos) if sibling_repos else [],
         second_brain=second_brain if second_brain is not None else SecondBrainConfig(),
@@ -962,11 +785,6 @@ def answers_from_harness_yaml(yaml_path: Path) -> InterviewAnswers | None:
     except ValueError:
         dev_mode = DevMode.SPEC_DRIVEN if preset == Preset.PRODUCTION else DevMode.TASK_DRIVEN
 
-    fused_workflows = _parse_workflows(data.get("workflows"), preset)
-    default_workflow = _string_or(data.get("default_workflow"), next(iter(fused_workflows)))
-    if default_workflow not in fused_workflows:
-        default_workflow = next(iter(fused_workflows))
-
     targets = _parse_targets(data.get("targets"))
 
     sv_raw = data.get("schema_version")
@@ -1001,8 +819,6 @@ def answers_from_harness_yaml(yaml_path: Path) -> InterviewAnswers | None:
         targets=targets,
         preset=preset,
         dev_mode=dev_mode,
-        fused_workflows=fused_workflows,
-        default_workflow=default_workflow,
         consensus=_string_or(_dig(data, "reviewers", "consensus"), None),
         caching=_string_or(data.get("caching"), None),
         schema_version=schema_version,
@@ -1365,35 +1181,6 @@ def _parse_targets(raw: object) -> list[Target]:
         )
         return [Target.CLAUDE_CODE]
     return out
-
-
-def _parse_workflows(
-    workflows: object,
-    preset: Preset,
-) -> dict[str, list[AtomicStage]]:
-    """Parse the YAML ``workflows`` block into the typed shape.
-
-    Falls back to the preset's starter set when the block is missing or
-    every entry rejects validation.
-    """
-    fallback = dict(_SIDE_STARTER if preset == Preset.SIDE else _PRODUCTION_STARTER)
-    if not isinstance(workflows, dict) or not workflows:
-        return fallback
-    out: dict[str, list[AtomicStage]] = {}
-    for name, raw_stages in workflows.items():
-        if not isinstance(name, str) or not isinstance(raw_stages, list):
-            continue
-        stages: list[AtomicStage] = []
-        for s in raw_stages:
-            if not isinstance(s, str):
-                continue
-            try:
-                stages.append(AtomicStage(s))
-            except ValueError:
-                continue
-        if stages:
-            out[name] = stages
-    return out or fallback
 
 
 def _parse_ref_folders(value: object) -> list[RefFolder]:

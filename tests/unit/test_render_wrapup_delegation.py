@@ -166,9 +166,13 @@ def test_only_the_configured_stage_gets_a_dispatch(tmp_path: Path) -> None:
 
 # 628 → 627 / 661 → 660 (PLAN-sessionid-env-propagation Phase 5): the `stage_end_summary`
 # NO-OP paragraph was compacted by one line to pay for the `--session-id` flags rather than
-# raise a per-command ceiling (ADR-011). The render got SMALLER, so this ratchet is being
-# tightened, not loosened — the direction matters and is why the constant moved.
-@pytest.mark.parametrize(("preset", "expected"), [("Side", 627), ("Production", 660)])
+# raise a per-command ceiling (ADR-011).
+# 627 → 625 / 660 → 658 (PLAN-harness-diet ADR-001): each stage template carried a
+# two-line `{% if workflow_context %}` header naming the fused workflow it was invoked
+# from. With no fused workflows those lines can never render, so they were deleted.
+# Both moves SHRINK the render — this ratchet is being tightened, not loosened, and the
+# direction is why the constant is allowed to move at all.
+@pytest.mark.parametrize(("preset", "expected"), [("Side", 625), ("Production", 658)])
 def test_the_default_render_costs_existing_users_nothing(
     tmp_path: Path, preset: str, expected: int
 ) -> None:

@@ -102,7 +102,7 @@ determines the dispatch shape in section 5.
 ### 3. If `STATE=re-render` — show current settings + ask intent
 
 Read `.claude/harness.yaml` body (skip frontmatter) and surface to the user:
-- preset, locale, dev_mode, default_workflow
+- preset, locale, dev_mode
 - harness_maker_version (so they see how stale)
 - count of enabled reviewers/skills
 
@@ -285,7 +285,7 @@ alternatives, and a one-line trade-off. Then jump to Section 4.6.
 Before dispatch, show a preview:
 
 > **Will install/update harness files.** Key capabilities and safety receipt:
-> - {count} slash commands ({workflow_names})
+> - {count} slash commands ({command_names})
 > - {reviewer_count} reviewers active
 > - {skill_count} skills enabled
 > - Mechanical checks: {checks or "(none)"}

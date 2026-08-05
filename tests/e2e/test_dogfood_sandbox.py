@@ -31,7 +31,6 @@ REQUIRED_COMMANDS = [
     "review",
     "wrapup",
     "verify",
-    "exec-rev",
     "loop",
     "health",
 ]
@@ -222,8 +221,11 @@ def test_reconcile_preserves_user_edits() -> None:
     """User-modified files must survive a second `make` (KEEP decision)."""
     _ensure_sandbox_applied()
 
-    target_file = CLAUDE / "commands" / "hm" / "exec-rev.md"
-    assert target_file.is_file(), "expected baseline exec-rev.md from initial make"
+    # Subject was `exec-rev.md` until the fused axis was deleted (PLAN-harness-diet
+    # ADR-001). Any rendered command exercises the same reconcile KEEP path; `research.md`
+    # is the smallest one that always ships.
+    target_file = CLAUDE / "commands" / "hm" / "research.md"
+    assert target_file.is_file(), "expected baseline research.md from initial make"
 
     sentinel = "\n<!-- USER EDIT: phase11 reconcile sentinel -->\n"
     original = target_file.read_text(encoding="utf-8")
@@ -258,13 +260,13 @@ def test_reconcile_preserves_user_edits() -> None:
         assert "content_hash mismatch" in cp.stderr, (
             f"unexpected failure mode: rc={cp.returncode} stderr={cp.stderr}"
         )
-        assert "exec-rev.md" in cp.stderr, (
-            f"verify error did not name exec-rev.md: stderr={cp.stderr}"
+        assert "research.md" in cp.stderr, (
+            f"verify error did not name research.md: stderr={cp.stderr}"
         )
 
     after = target_file.read_text(encoding="utf-8")
     assert sentinel in after, (
-        "user-edited exec-rev.md was overwritten — reconcile KEEP decision missed"
+        "user-edited research.md was overwritten — reconcile KEEP decision missed"
     )
 
 

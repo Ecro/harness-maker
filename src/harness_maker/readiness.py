@@ -1242,7 +1242,7 @@ def _dim_verification(project_dir: Path) -> DimensionScore:
 
 
 def _dim_workflow_clarity(project_dir: Path) -> DimensionScore:
-    """Commands, fused workflows, harness.yaml workflow definitions."""
+    """Rendered /hm: command surface: presence, completeness, locale + banner wiring."""
     signals: list[Signal] = []
     cmd_dir = project_dir / ".claude" / "commands" / "hm"
     commands = list(cmd_dir.glob("*.md")) if cmd_dir.is_dir() else []
@@ -1256,20 +1256,22 @@ def _dim_workflow_clarity(project_dir: Path) -> DimensionScore:
         )
     )
 
-    # Atomic stage commands have hyphen-free names; fused workflows have multi-stage names.
+    # The fused-workflow axis was removed (PLAN-harness-diet ADR-001/002). Its
+    # `fused_workflow_present` signal is NOT simply deleted — a weight-30 signal that
+    # can never pass again is a permanent phantom penalty. The successor asks the
+    # question that still has an answer: is every atomic stage actually installed?
     atomic_stages = {"research", "spec", "plan", "execute", "review", "wrapup", "verify"}
-    fused = [c for c in commands if c.stem not in atomic_stages and "-" in c.stem]
+    present = {c.stem for c in commands} & atomic_stages
+    missing = sorted(atomic_stages - present)
     signals.append(
         _signal(
-            "fused_workflow_present",
-            bool(fused),
+            "atomic_stages_complete",
+            not missing,
             30,
-            f"{len(fused)} fused workflow(s): " + ", ".join(c.stem for c in fused[:3])
-            if fused
-            else "No fused workflows defined",
-            None
-            if fused
-            else "Define fused workflows in harness.yaml (e.g., exec-rev, exec-rev-wrap)",
+            f"All {len(atomic_stages)} atomic stage commands present"
+            if not missing
+            else f"Missing atomic stage command(s): {', '.join(missing)}",
+            None if not missing else "Run /harness-maker:make --update to re-render them",
         )
     )
 
@@ -1294,16 +1296,14 @@ def _dim_workflow_clarity(project_dir: Path) -> DimensionScore:
     )
 
     # PLAN-locale-and-command-observability ADR-002/005: presence-audit that the
-    # locale directive + start/end summary banners landed in the rendered stage +
-    # fused-workflow commands (the wrappers that carry them). Meta commands
-    # (make/help/loop/loop-p5-batch/…) use their own templates and rely on the
-    # persistent CLAUDE.md/AGENTS.md anchor instead, so they MUST be excluded — note
-    # loop-p5-batch has a hyphen, so the `fused` classifier (`"-" in stem`) sweeps it
-    # in; without the meta denylist both signals false-fail on every install. REVIEW P1.
+    # locale directive + start/end summary banners landed in the rendered stage
+    # commands. Meta commands (make/help/loop/loop-p5-batch/…) use their own templates
+    # and rely on the persistent CLAUDE.md/AGENTS.md anchor instead, so they MUST be
+    # excluded, or both signals false-fail on every install (REVIEW P1). The old
+    # `fused` classifier ("-" in stem) is gone with the axis; `atomic_stages` alone is
+    # now the whole population, which also removes the loop-p5-batch false-sweep.
     meta_cmds = {"make", "help", "health", "configure", "uninstall", "loop", "loop-p5-batch"}
-    stage_fused = [
-        c for c in commands if (c.stem in atomic_stages or c in fused) and c.stem not in meta_cmds
-    ]
+    stage_fused = [c for c in commands if c.stem in atomic_stages and c.stem not in meta_cmds]
     _bodies = {c: _read_text(c) for c in stage_fused}
     loc_hits = sum(1 for t in _bodies.values() if "<!-- @hm:output_language -->" in t)
     loc_ok = (not stage_fused) or loc_hits == len(stage_fused)
@@ -1336,23 +1336,6 @@ def _dim_workflow_clarity(project_dir: Path) -> DimensionScore:
             if ban_ok
             else "Re-render via /hm:make — commands missing a start or end summary banner "
             "(step_manifest or stage_end_summary partial silently dropped)",
-        )
-    )
-
-    harness = project_dir / ".claude" / "harness.yaml"
-    has_workflows = False
-    if harness.is_file():
-        text = _read_text(harness)
-        has_workflows = "workflows:" in text and "default_workflow:" in text
-    signals.append(
-        _signal(
-            "harness_workflows_defined",
-            has_workflows,
-            20,
-            "harness.yaml defines workflows + default_workflow"
-            if has_workflows
-            else "harness.yaml missing workflow definitions",
-            None if has_workflows else "Add `workflows:` and `default_workflow:` to harness.yaml",
         )
     )
 

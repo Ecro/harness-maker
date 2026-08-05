@@ -221,27 +221,26 @@ def test_verification_no_stack_no_tests(tmp_path: Path) -> None:
 def test_workflow_clarity_full_setup(tmp_path: Path) -> None:
     cmd_dir = tmp_path / ".claude" / "commands" / "hm"
     cmd_dir.mkdir(parents=True)
-    (cmd_dir / "research.md").write_text("---\ncontent_hash: abc\n---\n# /hm:research\n")
-    (cmd_dir / "exec-rev.md").write_text("---\ncontent_hash: def\n---\n# /hm:exec-rev\n")
-    harness = tmp_path / ".claude" / "harness.yaml"
-    harness.write_text("workflows:\n  dev: [research, plan]\ndefault_workflow: dev\n")
+    # atomic_stages_complete needs ALL seven, not just one (it replaced the old
+    # fused_workflow_present signal — PLAN-harness-diet ADR-002).
+    for stage in ("research", "spec", "plan", "execute", "review", "wrapup", "verify"):
+        (cmd_dir / f"{stage}.md").write_text(f"---\ncontent_hash: abc\n---\n# /hm:{stage}\n")
     res = compute_readiness(tmp_path, Preset.SIDE)
     w = res.dimensions["workflow_clarity"]
     sigs = {s.id: s for s in w.signals}
     assert sigs["commands_present"].passed
-    assert sigs["fused_workflow_present"].passed
+    assert sigs["atomic_stages_complete"].passed
     assert sigs["commands_have_provenance"].passed
-    assert sigs["harness_workflows_defined"].passed
 
 
-def test_workflow_clarity_no_fused_workflow(tmp_path: Path) -> None:
+def test_workflow_clarity_incomplete_atomic_stages(tmp_path: Path) -> None:
     cmd_dir = tmp_path / ".claude" / "commands" / "hm"
     cmd_dir.mkdir(parents=True)
     (cmd_dir / "plan.md").write_text("# /hm:plan\n")
     res = compute_readiness(tmp_path, Preset.SIDE)
     sigs = {s.id: s for s in res.dimensions["workflow_clarity"].signals}
     assert sigs["commands_present"].passed
-    assert not sigs["fused_workflow_present"].passed
+    assert not sigs["atomic_stages_complete"].passed
 
 
 # ── memory_continuity ───────────────────────────────────────────────────────

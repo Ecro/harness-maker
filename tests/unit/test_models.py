@@ -28,7 +28,6 @@ from harness_maker.models import (
     SecondBrainFolder,
     SecondBrainNoteType,
     Target,
-    WorkflowDef,
 )
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -99,9 +98,6 @@ def test_harness_config_defaults() -> None:
     assert cfg.locale == "en"
     assert cfg.preset == Preset.SIDE
     assert cfg.dev_mode == DevMode.SPEC_DRIVEN
-    assert cfg.default_workflow == "dev"
-    assert "dev" in cfg.workflows
-    assert AtomicStage.EXECUTE in cfg.workflows["dev"]
     assert cfg.execution == {}
     assert cfg.caching == "agent-aware"
     assert cfg.project == {"domains": []}
@@ -119,7 +115,6 @@ def test_harness_config_round_trip_json() -> None:
         locale="en",
         preset=Preset.PRODUCTION,
         dev_mode=DevMode.TASK_DRIVEN,
-        workflows={"dev": [AtomicStage.EXECUTE]},
         execution={"default": "step"},
     )
     raw_json = cfg.model_dump_json()
@@ -293,32 +288,6 @@ def test_second_brain_write_folder_must_include_project_id_segment() -> None:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# WorkflowDef
-# ──────────────────────────────────────────────────────────────────────────────
-
-
-def test_workflow_def_valid_name() -> None:
-    wf = WorkflowDef(name="dev", stages=[AtomicStage.EXECUTE])
-    assert wf.name == "dev"
-    assert wf.stages == [AtomicStage.EXECUTE]
-
-
-def test_workflow_def_uppercase_name_raises() -> None:
-    with pytest.raises(ValidationError):
-        WorkflowDef(name="Bad-Name", stages=[AtomicStage.EXECUTE])
-
-
-def test_workflow_def_underscore_name_raises() -> None:
-    with pytest.raises(ValidationError):
-        WorkflowDef(name="a_b", stages=[AtomicStage.EXECUTE])
-
-
-def test_workflow_def_starts_with_digit_raises() -> None:
-    with pytest.raises(ValidationError):
-        WorkflowDef(name="1dev", stages=[AtomicStage.EXECUTE])
-
-
-# ──────────────────────────────────────────────────────────────────────────────
 # Blueprint + FileEntry
 # ──────────────────────────────────────────────────────────────────────────────
 
@@ -386,8 +355,6 @@ def test_interview_answers_defaults() -> None:
     assert ans.targets == [Target.CLAUDE_CODE]
     assert ans.preset.value == "Side"
     assert ans.dev_mode == DevMode.SPEC_DRIVEN
-    assert "exec-rev-wrap" in ans.fused_workflows
-    assert ans.default_workflow == "exec-rev-wrap"
     assert ans.reviewers == {"installed": [], "enabled": []}
     assert ans.skills == {"installed": [], "enabled": []}
     assert ans.consensus == "single"

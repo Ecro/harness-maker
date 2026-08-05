@@ -1,9 +1,6 @@
 # Stage: review
 
 > Atomic stage. Multi-perspective review with **surface-match + reasoning-alignment** consensus, grade gate, and auto-fix loop.
-{% if workflow_context %}
-> Invoked as part of the **{{ workflow_context }}** workflow.
-{% endif %}
 
 ## Communication Protocol
 
@@ -25,7 +22,7 @@ Find defects, design weaknesses, and risk hotspots **before** they reach `wrapup
   - New public APIs are added.
 - Skipped for: docs-only, single-file fixes, config-only — unless overridden.
 
-> When invoked as part of a fused workflow, the skip conditions above do **NOT** apply — always run.
+> When dispatched by `/hm:loop` or by autopilot, the skip conditions above do **NOT** apply — always run.
 
 ## Inputs
 

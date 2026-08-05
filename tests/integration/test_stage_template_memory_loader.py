@@ -94,23 +94,6 @@ def test_execute_keeps_checkpoint_and_ignores_legacy() -> None:
     )
 
 
-def test_workflow_command_keeps_checkpoint_and_ignores_legacy() -> None:
-    """The fused-workflow shared preamble keeps checkpoint resume + ignores legacy decisions."""
-    path = (
-        _REPO_ROOT
-        / "src"
-        / "harness_maker"
-        / "templates"
-        / "commands"
-        / "hm"
-        / "workflow_command.md.j2"
-    )
-    body = path.read_text(encoding="utf-8")
-    assert "checkpoint:compaction" in body
-    assert "legacy" in body
-    assert "[decision:*]" in body
-
-
 def test_all_three_templates_use_is_codex_branch_for_invocation(
     stage_source: dict[str, str],
 ) -> None:

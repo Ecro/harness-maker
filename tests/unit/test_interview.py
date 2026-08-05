@@ -9,7 +9,6 @@ import pytest
 
 from harness_maker.interview import _ask_second_brain, answers_from_harness_yaml, interview
 from harness_maker.models import (
-    AtomicStage,
     Confidence,
     DevMode,
     InterviewAnswers,
@@ -38,13 +37,6 @@ def test_interview_autoloop_returns_typed_answers() -> None:
     assert isinstance(result, InterviewAnswers)
     assert result.locale == "en"
     assert result.preset == Preset.SIDE
-    # Side starter set: exec-rev, exec-rev-wrap, plan-exec-rev (3-stage,
-    # PLAN-loop-mid-stop-and-review-skip ADR-002), plan-exec-rev-wrap (4-stage).
-    assert "exec-rev" in result.fused_workflows
-    assert "exec-rev-wrap" in result.fused_workflows
-    assert "plan-exec-rev" in result.fused_workflows
-    assert "plan-exec-rev-wrap" in result.fused_workflows
-    assert result.default_workflow == "exec-rev-wrap"
     assert result.consensus
     assert result.caching
     assert result.models
@@ -108,8 +100,8 @@ def test_interview_installs_all_reviewers_and_skills() -> None:
 
 def test_interview_interactive_accepts_recommended(monkeypatch: pytest.MonkeyPatch) -> None:
     """Empty answers ⇒ accept recommended locale/preset/dev_mode/starter/defaults."""
-    # locale, targets, preset, dev_mode, use-recommended?, default workflow,
-    # consensus, caching, ref_folders (blank=skip), sibling_repos (blank=skip),
+    # locale, targets, preset, dev_mode, consensus, caching,
+    # ref_folders (blank=skip), sibling_repos (blank=skip),
     # vault_path (blank=skip), second_opinion (blank=skip/default N).
     # next(inputs, "") fallback handles extra prompts gracefully.
     inputs: Iterator[str] = iter(["", "", "", "", "", "", "", "", "", "", ""])
@@ -119,7 +111,6 @@ def test_interview_interactive_accepts_recommended(monkeypatch: pytest.MonkeyPat
     assert result.targets == [Target.CLAUDE_CODE]
     assert result.preset == Preset.SIDE
     assert result.dev_mode == DevMode.TASK_DRIVEN  # Side default
-    assert result.default_workflow == "exec-rev-wrap"
     assert result.ref_folders == []
 
 
@@ -157,70 +148,12 @@ def test_interview_dev_mode_explicit_override_to_task_on_production(
     assert result.dev_mode == DevMode.TASK_DRIVEN
 
 
-def test_interview_interactive_overrides_default(monkeypatch: pytest.MonkeyPatch) -> None:
-    """User picks a different default workflow from the starter set."""
-    inputs: Iterator[str] = iter(["", "", "", "", "", "exec-rev", "", "", "", "", ""])
-    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs, ""))
-    result = interview(_profile(), autoloop_mode=False)
-    assert result.default_workflow == "exec-rev"
-
-
-def test_interview_interactive_custom_workflows(monkeypatch: pytest.MonkeyPatch) -> None:
-    """User declines recommended set and defines a custom workflow."""
-    # locale, targets, preset, dev_mode, use-rec?, stages-#1, name-#1, stages-#2 (done),
-    # default, consensus, caching, ref_folders, sibling_repos, vault_path
-    inputs: Iterator[str] = iter(
-        ["", "", "", "", "n", "4,5", "", "done", "", "", "", "", "", ""],
-    )
-    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs, ""))
-    result = interview(_profile(), autoloop_mode=False)
-    assert result.fused_workflows == {
-        "exec-rev": [AtomicStage.EXECUTE, AtomicStage.REVIEW],
-    }
-    assert result.default_workflow == "exec-rev"
-
-
-def test_interview_interactive_custom_named_override(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """User overrides the auto-generated workflow name."""
-    inputs: Iterator[str] = iter(
-        ["", "", "", "", "n", "4,5,6", "ship", "done", "", "", "", "", "", ""],
-    )
-    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs, ""))
-    result = interview(_profile(), autoloop_mode=False)
-    assert "ship" in result.fused_workflows
-    assert result.fused_workflows["ship"] == [
-        AtomicStage.EXECUTE,
-        AtomicStage.REVIEW,
-        AtomicStage.WRAPUP,
-    ]
-
-
 def test_interview_preset_override_to_production(monkeypatch: pytest.MonkeyPatch) -> None:
     """User on a small-experiment profile picks Production explicitly."""
     inputs: Iterator[str] = iter(["", "", "Production", "", "", "", "", "", "", "", ""])
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs, ""))
     result = interview(_profile(), autoloop_mode=False)
     assert result.preset == Preset.PRODUCTION
-    assert result.default_workflow == "exec-rev-ver-wrap"
-
-
-def test_interview_custom_workflow_rejects_reserved(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Cannot name a custom workflow with a reserved word; user re-prompted."""
-    # locale, targets, preset, dev_mode, use-rec?, stages-#1, name=plan (reserved → re-prompt),
-    # stages-#1 again (3,4), name (auto), done, default, consensus, caching,
-    # ref_folders, sibling_repos, vault_path
-    inputs: Iterator[str] = iter(
-        ["", "", "", "", "n", "4,5", "plan", "3,4", "", "done", "", "", "", "", "", ""],
-    )
-    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs, ""))
-    result = interview(_profile(), autoloop_mode=False)
-    # The reserved-name attempt was rejected; only the second valid entry remains.
-    assert "plan" not in result.fused_workflows
-    assert "plan-exec" in result.fused_workflows
 
 
 def test_interview_ref_folders_multiple_with_glob_override(
@@ -228,9 +161,10 @@ def test_interview_ref_folders_multiple_with_glob_override(
 ) -> None:
     """User registers two folders, one with a custom glob."""
     # locale, targets .. caching, ref_folder #1, ref_folder #2 (path;glob), blank=stop,
-    # sibling_repos, vault_path
+    # sibling_repos, vault_path. Two fewer leading blanks than before the
+    # fused-workflow axis was removed: `_ask_fused_workflows` consumed two prompts.
     inputs: Iterator[str] = iter(
-        ["", "", "", "", "", "", "", "", "./docs", "../shared ; **/*.md", "", "", ""],
+        ["", "", "", "", "", "", "./docs", "../shared ; **/*.md", "", "", ""],
     )
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs, ""))
     result = interview(_profile(), autoloop_mode=False)

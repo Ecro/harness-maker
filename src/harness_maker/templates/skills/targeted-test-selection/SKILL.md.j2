@@ -8,7 +8,7 @@ description: Procedure for turning a set of changed files into the tests that ac
 Select what to run, then run it. The selector is `harness_maker.test_dep_map`; it returns
 either a bounded node list or an explicit FULL with a reason, and it is **never** silent.
 
-**Why this is a skill and not inline stage prose.** `review.md.j2` is inlined by four fused
+**Why this is a skill and not inline stage prose.** `review.md.j2` is re-read by every loop
 commands, and `test_aggregate_shipped_surface_does_not_grow` asserts a STRICT non-increase
 over the summed shipped surface against a baseline frozen at HEAD — headroom is zero, and
 this recipe is several hundred characters. Every part of it below is a part an inline
