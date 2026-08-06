@@ -255,5 +255,6 @@ new flow exits cleanly when `--require-version` is satisfied.
 
 - [`PLAN-locate-cli-version-gate.md`](../work-docs/PLAN-locate-cli-version-gate.md)
   — the design history (ADRs explain why JSON-default, why no separate `check`
-  subcommand, why this doc instead of a `/hm:bootstrap` slash command).
+  subcommand, why this doc instead of an `hm:bootstrap` slash command — written without a
+  leading slash because no such command exists or is planned).
 - [`CHANGELOG.md`](../CHANGELOG.md) — `locate` shipped in `0.20.0`.

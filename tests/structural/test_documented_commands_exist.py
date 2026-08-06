@@ -152,18 +152,28 @@ def _rendered_hm_commands() -> set[str]:
 
 
 def _plugin_command_docs() -> list[Path]:
-    """`commands/**` plus the READMEs — the two surfaces a user is pointed at to RUN things.
+    """Every shipped surface that names a slash command: `commands/**`, both READMEs, `docs/**`.
 
-    `docs/**` is deliberately still out. Measured 2026-08-06 it carries ~40 references to
-    retired commands, and `docs/HOW-IT-WORKS.md` gives three of them (`hm:refresh`,
-    `hm:ai-readiness`, `hm:personalization-audit`) whole numbered sections. Resolving those
-    is a documentation rewrite that has to decide what replaced each capability, not a
-    rename — so folding it in here would make this arm un-greenable for reasons unrelated to
-    the surfaces that execute. Tracked as a follow-up in
-    `work-docs/PLAN-onboarding-interview-ux.md` Phase 8.
+    `docs/adr/**` is excluded on the same reasoning the subcommand arm uses for older
+    CHANGELOG sections: an ADR records what was decided at the time, and a command it names
+    may since have been retired. Gating those would force rewriting history to satisfy a test.
+
+    Everything else is in. The `docs/**` half was deferred once — it carried ~40 references
+    to retired commands and `HOW-IT-WORKS.md` gave three of them whole numbered sections —
+    and the deferral is now paid off: `hm:ai-readiness` and `hm:personalization-audit` became
+    `/hm:health`'s two layers, and `hm:refresh` was DELETED by ADR-0007 rather than renamed,
+    so its section was removed instead of rewritten.
+
+    Retired names still appear in prose that explains they no longer exist. Those are written
+    WITHOUT the leading slash (`hm:refresh`, not `/hm:refresh`) — the slash is what makes a
+    token an invocation, so dropping it is the honest spelling for a command that is gone, and
+    it is what keeps this arm green without an exception list.
     """
     docs = sorted((_ROOT / "commands").rglob("*.md"))
     docs += [p for p in (_ROOT / "README.md", _ROOT / "README.ko.md") if p.is_file()]
+    docs += sorted(
+        d for d in (_ROOT / "docs").rglob("*.md") if "adr" not in d.relative_to(_ROOT).parts
+    )
     return docs
 
 

@@ -99,7 +99,7 @@ Three design commitments shape every decision below:
                   (autoloop: M7 + M8 verify-before-completion)
                                  │
                                  ▼
-                  weekly /hm:refresh — M4 anti-rot crawl
+                  (anti-rot crawl removed — ADR-0007)
                   → structured question (always manual)
 ```
 
@@ -109,7 +109,7 @@ The diagram above covers the original render pipeline. Three flows added in 0.12
 
 1. **Detection cache flow (M15)**: `profile.profile()` calls `detection_cache.load_or_run()`, which checks cache freshness against manifest-mtime with a 24h ceiling (per `detection_cache.CACHED_MANIFESTS`). On cache miss, the full detection runs and `detection_cache.write()` persists the result to `~/.cache/harness-maker/profile-<repo-hash>.json`. The cached `ProjectProfile` is what feeds the Interviewer + M16 recommendation registry.
 2. **Foreign config import flow (M17)**: `foreign_config.detect()` scans the project root for 6 known foreign-AI-tool configs (cursor rules, claude.md, agents.md, continue, aider, copilot). `foreign_config.llm_map()` calls Anthropic with a sha256-keyed 24h cache and proposes a mapping to harness.yaml axes. The slash command UI in `interview.py` confirms with the user before `foreign_config.apply()` returns a `ChangeSet`. The caller writes via `atomic_write`. Re-renders use `@hm:harness:*` inverted block markers so user content outside the harness-managed region is preserved byte-for-byte (see `docs/reference/block-merge-spec.md`).
-3. **Adaptive telemetry flow (M18 + M19)**: `harness_yaml_override` events are captured at two sites — (a) `/hm:configure` exit (primary; computes pre/post yaml diff via `telemetry.compute_yaml_diff()` so uncommitted edits are caught), and (b) the SessionStart drift hook (secondary; git diff since the last recorded `ts`). Both call `telemetry.emit_override()`, which deduplicates on `(ts, axis_path, after)` and appends to `.claude/observability/adaptive/overrides.jsonl`. `/hm:personalization-audit` reads that file plus the current harness.yaml plus the ProjectProfile cache and runs `personalization_audit.run_audit()`, which returns a composite-score `PersonalizationPlan` with ranked `PersonalizationActionItem` list (per ADR-011 rubric).
+3. **Adaptive telemetry flow (M18 + M19)**: `harness_yaml_override` events are captured at two sites — (a) `/hm:configure` exit (primary; computes pre/post yaml diff via `telemetry.compute_yaml_diff()` so uncommitted edits are caught), and (b) the SessionStart drift hook (secondary; git diff since the last recorded `ts`). Both call `telemetry.emit_override()`, which deduplicates on `(ts, axis_path, after)` and appends to `.claude/observability/adaptive/overrides.jsonl`. `/hm:health`'s personalization layer reads that file plus the current harness.yaml plus the ProjectProfile cache and runs `personalization_audit.run_audit()`, which returns a composite-score `PersonalizationPlan` with ranked `PersonalizationActionItem` list (per ADR-011 rubric).
 
 ### Worktree artifact janitor
 
@@ -188,21 +188,21 @@ Three stages:
 
 1. **Crawl** (weekly): four sources — Anthropic blog/changelog, GitHub releases (`anthropics/claude-code` by default), arxiv (cs.SE / cs.CL / cs.CR), OSV.dev. Implemented under `src/harness_maker/crawler/`. Raw output to `observability/refresh/raw-<date>.jsonl`.
 2. **Filter** (`relevance.py`): LLM scores each item for project-relevance. Threshold starts at 0.7 and adapts ±0.05 based on the recent accept/reject ratio.
-3. **Propose** (`templates/commands/hm/refresh.md.j2`): `/hm:refresh` opens a structured question per surviving item — accept, reject, or defer. **Manual confirm is non-negotiable**: there is no `--auto-apply` path.
+3. **Propose**: this step no longer exists. ADR-0007 deleted the crawl, the relevance filter, and `refresh.md.j2` after a production run rejected 11 of 12 surfaced items. The manual-confirm rule it enforced is preserved wherever proposals still reach a user (`/hm:health`'s action items).
 
 This means harness-maker stays current without ever silently changing the user's runtime.
 
 ### M5 — Monitoring (3 Metrics)
 
-Three metrics are computed and surfaced in the `/hm:ai-readiness` report:
+Three metrics are computed and surfaced in the `/hm:health` report:
 
 - **Efficiency** — cache hit % per turn. Computed from telemetry hook output (PostToolUse) with a hybrid schema that works across Claude Code and Cursor IDE (0.5.4+). 0.7.1 (ADR-103) rotates the on-disk file daily as `metrics-YYYY-MM-DD.jsonl`; readers walk dated shards newest-first via `_metrics_io.iter_recent_entries` and fall back to the legacy `metrics.jsonl` for pre-0.7.1 entries.
 - **Health** — 0-100 score across 6 dimensions: docs, tests, CI, observability, security, governance. Implemented in `readiness.py`. Drills down into `agent_quality.py`, which assigns each agent a Platinum/Gold/Silver/Bronze rating against a fixed rubric. A "ceremony penalty" deducts points when an agent has high-process / low-output behavior.
-- **fresh** — days since the last `/hm:refresh` accepted at least one proposal.
+- **fresh** — retired with the crawl (ADR-0007); no longer computed.
 
 A **SessionStart drift reminder** hook (`hooks/sessionstart_drift.py`) fires on every session open and warns if the running harness-maker version differs from the version that rendered the harness — alerting users to re-render after a plugin update (0.5.6+).
 
-The detector (`relevance.detect_version_drift`) compares `harness.yaml.harness_maker_version` (the **stamped** version, formerly named `installed` — renamed in 0.6.2 REVIEW M2 to remove a semantic inversion) against `relevance.latest_installed_version()`, which scans `~/.claude/plugins/cache/harness-maker-local/harness-maker/<v>/` for the highest semver-parseable directory name. **Why scan the cache instead of using the imported `__version__`** (0.6.2 P6): `/hm:refresh` is rendered as a Jinja template that runs with `uv run --with /path/to/<render-time-version>`, pinning its in-process `__version__` to the version that *rendered* the slash command. The SessionStart hook runs against the live plugin so its `__version__` is current. The two import paths therefore see different `__version__` values; calling the same `detect_version_drift` would return different verdicts. Routing both through `latest_installed_version()` (an external truth source) makes them agree. The function is `@functools.cache`-decorated for sub-100ms session-start latency, with a top-K cap (10) on the cache scan to bound worst-case syscalls on long-lived installs.
+The detector (`relevance.detect_version_drift`) compares `harness.yaml.harness_maker_version` (the **stamped** version, formerly named `installed` — renamed in 0.6.2 REVIEW M2 to remove a semantic inversion) against `relevance.latest_installed_version()`, which scans `~/.claude/plugins/cache/harness-maker-local/harness-maker/<v>/` for the highest semver-parseable directory name. **Why scan the cache instead of using the imported `__version__`** (0.6.2 P6): a rendered slash command runs with `uv run --with /path/to/<render-time-version>`, pinning its in-process `__version__` to the version that *rendered* it. The SessionStart hook runs against the live plugin so its `__version__` is current. The two import paths therefore see different `__version__` values; calling the same `detect_version_drift` would return different verdicts. Routing both through `latest_installed_version()` (an external truth source) makes them agree. The function is `@functools.cache`-decorated for sub-100ms session-start latency, with a top-K cap (10) on the cache scan to bound worst-case syscalls on long-lived installs.
 
 All telemetry stays local — `metrics-YYYY-MM-DD.jsonl` is never transmitted. 0.7.1 (ADR-107) added a `tool_input` whitelist for the persisted entries: only `path`, `file_path`, `command`, `target`, `database`, `url`, `query` survive; values are scanned for known-secret prefixes (`sk-`, `ghp_`, `AKIA`, `Bearer …`) and redacted *before* a 256-char cap to ensure a partial-token tail cannot survive truncation. The cwd resolution chain is env-var-first (`CLAUDE_PROJECT_DIR` → `CURSOR_PROJECT_DIR` → typed `workspace.current_dir` → `os.getcwd()`); the bare stdin `cwd` field is intentionally NOT consulted, since prior to 0.7.1 a poisoned PostToolUse payload could redirect metrics writes via that field (ADR-102).
 
@@ -332,7 +332,7 @@ provenance: synthesized
 Three loops depend on this:
 
 - **Reconciler** (M2) reads `content_hash` to decide ours vs theirs.
-- **`/hm:refresh`** (M4) compares hashes to detect user edits and refuses to silently overwrite.
+- **`reconcile`** (invoked by `/harness-maker:make`) compares hashes to detect user edits and refuses to silently overwrite.
 - **`phase_<N>_invariants`** check in `.claude-verify.sh` walks every generated file and asserts the first line is `---` — the invariant that makes the other two loops sound.
 
 ### M14 — Multi-Target Rendering (Claude Code, Cursor, Codex)
@@ -373,7 +373,7 @@ Codex TOML files intentionally carry no provenance frontmatter because TOML pars
 
 `harness_maker.profile.profile()` detects 12+ language stacks via `STACK_MANIFESTS` + `STACK_GLOB_MANIFESTS`. It parses python / node / rust dependency files for known frameworks. The detector also picks up `package_manager` (`uv` / `poetry` / `pip` / `pipenv` / `npm` / `pnpm` / `yarn` / `bun` / `cargo`) and `ci_provider` (`github-actions` / `gitlab-ci` / `circleci` / `jenkins` / `travis`). The result populates `ProjectProfile` and feeds the M16 recommendation registry.
 
-Caching: results are stored at `~/.cache/harness-maker/profile-<repo-hash>.json` with manifest-mtime invalidation + a 24h ceiling, both governed by `detection_cache.CACHED_MANIFESTS`. The cache makes back-to-back `/hm:configure` runs cheap and keeps `/hm:personalization-audit` from re-walking the source tree.
+Caching: results are stored at `~/.cache/harness-maker/profile-<repo-hash>.json` with manifest-mtime invalidation + a 24h ceiling, both governed by `detection_cache.CACHED_MANIFESTS`. The cache makes back-to-back `/hm:configure` runs cheap and keeps `/hm:health`'s personalization layer from re-walking the source tree.
 
 Installed-CLI detection is deliberately **outside** this cache. `harness-maker detect-tools --json` (0.49.0) resolves `codex` / `agy` / `cursor` on `PATH` on every call and is not a `ProjectProfile` field: installing a CLI touches no project manifest, so manifest-mtime invalidation would never fire and a cached answer could report a tool installed minutes ago as absent. `installed` means the binary resolves; authentication is never probed.
 
@@ -419,7 +419,7 @@ Storage: `.claude/observability/adaptive/overrides.jsonl` via `atomic_write`. Op
 
 ### M19 — Personalization Audit
 
-`/hm:personalization-audit` computes a composite score from telemetry + harness.yaml + ProjectProfile cache, per ADR-011 locked formulas in `rubrics/personalization.yaml v0`:
+`/hm:health`'s personalization layer computes a composite score from telemetry + harness.yaml + ProjectProfile cache, per ADR-011 locked formulas in `rubrics/personalization.yaml v0`:
 
 ```
 composite = L1 conversion × 0.4 + L2 stability × 0.3 + L3 cadence × 0.3

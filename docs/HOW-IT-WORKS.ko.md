@@ -22,9 +22,8 @@
 4. [퓨전 명령](#4-퓨전-명령) <!-- @hm:axis-removed -->
 5. [/hm:loop — 자동 반복 루프](#5-hmloop--자동-반복-루프)
 6. [특수 명령](#6-특수-명령)
-   - 6.1 [/hm:refresh — 안티-rot 업데이트](#61-hmrefresh--안티-rot-업데이트)
-   - 6.2 [/hm:ai-readiness — AI 준비도 분석](#62-hmai-readiness--ai-준비도-분석)
-   - 6.3 [/hm:personalization-audit — Composite-score 루브릭](#63-hmpersonalization-audit--composite-score-루브릭)
+   - 6.1 [/hm:health — structural 레이어](#61-hmhealth--structural-레이어)
+   - 6.2 [/hm:health — personalization 레이어](#62-hmhealth--personalization-레이어)
 7. [스킬 참조](#7-스킬-참조)
 8. [에이전트 참조](#8-에이전트-참조)
 9. [훅 상세](#9-훅-상세)
@@ -167,7 +166,7 @@ src/harness_maker/
 ├── recommendation.py          ← M16: Confidence 버킷 기반 추천 레지스트리
 ├── detection_cache.py         ← M15: manifest-mtime + 24h 상한 프로필 캐시
 ├── foreign_config.py          ← M17: foreign AI config 감지 + LLM 매핑 + 적용
-├── personalization_audit.py   ← M19: composite-score 루브릭 러너 (/hm:personalization-audit)
+├── personalization_audit.py   ← M19: composite-score 루브릭 러너 (/hm:health personalization 레이어)
 └── rubrics/
     └── personalization.yaml   ← ADR-011 v0 루브릭 (locked 공식 + tier 경계)
 ```
@@ -762,7 +761,7 @@ BLOCKED: check <N> (<이름>) — <이유>
 - PLAN 미이행 → 미완료 항목 목록 표시
 - 스모크 실패 → 실패 테스트 재실행
 - 헬스 점수 하락 → 6차원 breakdown 표시
-- 펜딩 refresh → `/hm:refresh` 실행 안내
+- stale 자산 드리프트 → `/harness-maker:make` 재렌더 안내
 - 보안 high → 발견 목록 표시
 - 머지 충돌 → 충돌 경로 표시
 
@@ -908,60 +907,24 @@ EOF
 
 ## 6. 특수 명령
 
----
-
-### 6.1 /hm:refresh — 안티-rot 업데이트
-
-**목적**: 하네스 자체가 낡지 않도록 Anthropic 공식 변경사항, 보안 취약점, 관련 연구를 주기적으로 크롤링한다.
-
-#### 실행 절차
-
-**Step 1 — 4개 소스 크롤링 (`research-crawler` 스킬)**
-
-`harness_maker.crawler` 모듈의 4개 크롤러가 모두 실행:
-
-| 소스 | 크롤 대상 |
-|------|---------|
-| Anthropic 블로그/changelog | 새 기능, API 변경, 모델 업데이트 |
-| GitHub 릴리스 | `anthropics/claude-code` + 참조 레포들의 새 릴리스 |
-| arxiv (cs.SE/cs.CL/cs.CR) | 관련 연구 논문 |
-| OSV.dev CVE 피드 | `uv.lock` 의 의존성 보안 취약점 |
-
-부분 실패 시 graceful degradation: 실패한 소스는 빈 결과로 처리 + stderr 경고.
-결과는 `.claude/observability/refresh/raw-{date}.jsonl` 에 저장.
-
-**Step 2 — Stale 자산 스캔**
-
-현재 하네스의 모든 자산 (commands, skills, agents) 을 스캔하여:
-- 오래된 패턴 사용 여부
-- 새 버전에서 제거된 API 사용 여부
-- 보안 정책 위반 여부
-
-**Step 3 — 버전 드리프트 체크**
-
-현재 harness-maker 버전과 최신 릴리스 비교.
-
-**Step 4 — 관련성 필터링 (`relevance-filter` 스킬)**
-
-크롤된 항목을 LLM 이 0~1.0 으로 점수화:
-- 0.7 이상만 제안 목록에 포함
-- 수락/거절 비율에 따라 임계값 자동 조정
-
-**Step 5 — 제안 문서 작성**
-
-`work-docs/proposed-{date}.md` 에 제안 목록 저장.
-
-**Step 6 — 사용자 확인 (구조화 질문)**
-
-각 제안에 대해 개별 확인:
-- "적용", "연기", "무시" 중 선택
-- **자동 적용 없음** — 모든 변경은 사용자 명시적 승인 필요
-
-24시간 이내 `raw-{date}.jsonl` 이 이미 있으면 크롤 건너뜀 (중복 방지).
+> **아래 세 명령은 더 이상 별도 이름으로 존재하지 않습니다.** ADR-0006 이
+> `hm:ai-readiness`·`hm:refresh`·`hm:personalization-audit` 를 `/hm:health` 하나로
+> 통합했고, ADR-0007 이 그 명령을 다시 **2개 레이어**로 축소했습니다.
+>
+> - `hm:ai-readiness` → `/hm:health` 의 **structural** 레이어 (§6.1). 루브릭 러너
+>   `ai_readiness.py` 는 그대로입니다.
+> - `hm:personalization-audit` → `/hm:health` 의 **personalization** 레이어 (§6.2).
+>   `personalization_audit.py` 는 그대로입니다.
+> - `hm:refresh` (안티-rot 크롤) → **이름이 바뀐 게 아니라 삭제**됐습니다. 프로덕션
+>   실행에서 12건 중 11건이 기각되며 91% 노이즈로 판명된 뒤, ADR-0007 이 crawler
+>   모듈·relevance 필터·stale-asset 코드·명령 템플릿을 전부 제거했습니다. 가치가 있던
+>   유일한 소스인 OSV CVE 탐지만 `secscan/dependency_cves.py` 로 독립 생존해
+>   `/hm:verify` Check 4 가 소비합니다. 크롤에 대응하는 후속 명령은 없습니다 — 그래서
+>   이 절은 재작성이 아니라 삭제됐습니다.
 
 ---
 
-### 6.2 /hm:ai-readiness — AI 준비도 분석
+### 6.1 /hm:health — structural 레이어
 
 **목적**: 현재 코드베이스가 AI-assisted 개발에 얼마나 적합한지 3레이어 루브릭으로 평가하고, 개선 로드맵을 제시한다.
 
@@ -1030,7 +993,7 @@ Layer 2: 각 루브릭 YAML 을 순서대로 LLM 이 평가.
 
 ---
 
-### 6.3 /hm:personalization-audit — Composite-score 루브릭
+### 6.2 /hm:health — personalization 레이어
 
 **목적**: 누적된 텔레메트리 (M18 overrides) + 현재 `harness.yaml` + 캐싱된 `ProjectProfile` 로부터 personalization fit 점수를 계산하고, *어떤* harness 축이 실제 워크플로우와 어긋나 있는지 순위가 매겨진 액션 아이템 목록으로 제시한다.
 
@@ -1138,13 +1101,13 @@ v0 루브릭은 잠정적. 30+ 프로젝트가 audit 실행을 누적한 후 등
 3. Composite 점수 계산
 4. Bronze → anti-rot 펜딩 큐 등록
 
-**트리거**: `/hm:ai-readiness`, `/hm:refresh` 의 stale-asset 스캔
+**트리거**: `/hm:health` (structural 레이어)
 
 ---
 
 ### 7.2 ai-readiness-rubric
 
-**역할**: `/hm:ai-readiness` 명령의 3레이어 루브릭 실행 핵심. `run_ai_readiness()` 함수 진입점.
+**역할**: `/hm:health` structural 레이어의 3레이어 루브릭 실행 핵심. `run_ai_readiness()` 함수 진입점.
 
 **입력**: `Path` (프로젝트 루트), `Preset` (Side/Production)
 **출력**: `ImprovementPlan` (scores + priority improvements + loop suggestions)
@@ -1198,7 +1161,7 @@ code-reviewer 는 항상 포함. 나머지는 패턴 매칭에 따라 추가.
 | 워크플로우 | ≤300줄 | ≤600줄 |
 | `.cursor/rules/*.mdc` | ≤500줄 (Cursor 권장) | ≤500줄 |
 
-한계 초과 시: renderer 가 경고 발생. `/hm:ai-readiness` 와 `/hm:refresh` 스캔 시 자동 감지.
+한계 초과 시: renderer 가 경고 발생. `/hm:health` 의 structural 스캔에서 자동 감지.
 
 ---
 
@@ -1229,7 +1192,7 @@ PDF 의 경우 multimodal Read 로 페이지별 직접 처리.
 - 거절 비율이 높으면 임계값 -0.05 (더 관대하게)
 - 범위: 0.5 ~ 0.9
 
-**사용 위치**: `/hm:research` (Phase 2), `/hm:refresh` (Step 4)
+**사용 위치**: `/hm:research` (Phase 2)
 
 ---
 
@@ -1249,7 +1212,7 @@ osv_dev.crawl(packages=osv_dev.parse_uv_lock("uv.lock"))
 - 모든 4개 소스가 실행됨 (하나 실패해도 나머지 계속)
 - 24시간 이내 raw 파일 있으면 크롤 생략
 - 오프라인 상태 시: 조용히 건너뜀 + stderr 경고
-- **직접 변경 없음** — raw 데이터만 저장, 실제 적용은 `/hm:refresh` 가 담당
+- **직접 변경 없음** — raw 데이터만 저장. 이를 적용하던 `hm:refresh` 는 ADR-0007 에서 제거됐고, OSV CVE 경로만 살아남아 `/hm:verify` Check 4 가 읽는다
 
 **출력**: `.claude/observability/refresh/raw-{date}.jsonl`
 
@@ -1700,7 +1663,7 @@ hooks.json 은 security-auditor 의 **게이트 3** 검사 대상:
 - `eval "$..."` 인젝션
 - 사용자 쓰기 가능 파일 → stdout → LLM 인젝션 경로
 
-훅 코드 수정 시 항상 `/hm:audit` 또는 security-scanner 스킬로 검토 권장.
+훅 코드 수정 시 항상 security-scanner 스킬 (또는 `/hm:verify` Check 4) 로 검토 권장.
 
 ---
 
@@ -1797,7 +1760,7 @@ ref_folders:
 실패 시 (fail):
   └─ 워크트리 보존 (.worktrees/execute-<ts>/ 남아있음)
   └─ 수동 트리아지 가능
-  └─ /hm:refresh 또는 weekly cleanup 이 24h 이상 stale 삭제
+  └─ `worktree create` 의 prune_stale 이 고아 워크트리를 삭제
 ```
 
 ---
@@ -1825,7 +1788,7 @@ A: 아닙니다. `execute`, `review` 단계는 커밋하지 않습니다. `wrapu
 
 **Q: 워크트리가 너무 많이 쌓이면?**
 
-A: `/hm:refresh` 실행 시 24시간 이상 stale 워크트리를 청소합니다. 자동 루프 블로커 발생 시에는 `worktree.cleanup_all(force=True)` 로 즉시 정리.
+A: `worktree create` 시점의 `prune_stale` 이 고아 워크트리·마커를 청소합니다. 자동 루프 블로커 발생 시에는 `worktree.cleanup_all(force=True)` 로 즉시 정리.
 
 **Q: `--no-tdd` 를 언제 써야 하나요?**
 
@@ -2127,7 +2090,7 @@ rubrics:
     action: Add one-line docstring explaining WHY, not WHAT
 ```
 
-`.claude/rubrics/` 에 YAML 파일을 추가하면 다음 `/hm:ai-readiness` 에서 자동으로 적용. **프로젝트별 품질 기준을 코드로 표현** — 사람이 직접 체크하지 않아도 된다.
+`.claude/rubrics/` 에 YAML 파일을 추가하면 다음 `/hm:health` 에서 자동으로 적용. **프로젝트별 품질 기준을 코드로 표현** — 사람이 직접 체크하지 않아도 된다.
 
 ---
 
@@ -2259,7 +2222,7 @@ WSL2/NTFS 환경에서 Edit 도구가 파일을 corrupt 할 수 있는 알려진
 |--------|---------|
 | `verify-before-completion` Check 3 | health baseline vs 현재 점수 비교 |
 | `ai-readiness-rubric` Layer 3 | cache miss 원인 분류 |
-| `/hm:ai-readiness` 대시보드 | observability_setup 차원 점수 |
+| `/hm:health` 대시보드 | observability_setup 차원 점수 |
 
 **외부로 전송되지 않는다**. CI 환경, private 레포, air-gapped 시스템 모두 동일하게 작동.
 
@@ -2447,7 +2410,7 @@ PLAN 저장 전, "Accept?", "OK?", "Verify?", "Should we?" 같은 표현을 스�
 | 1 | PLAN 이행 | **LLM 이 diff 와 PLAN 항목을 직접 대조** | 미이행 항목 목록 표시 |
 | 2 | 회귀/스모크 | `.claude-verify.sh` 실행 | 실패 테스트 출력 |
 | 3 | 헬스 점수 -5 이내 | `compute_readiness()` vs 베이스라인 | 6차원 breakdown |
-| 4 | 안티-rot 펜딩 해소 | `pending.jsonl` 미처리 항목 확인 | `/hm:refresh` 실행 안내 |
+| 4 | 하네스 신선도 | `harness.yaml.harness_maker_version` 을 설치된 플러그인과 대조 | `/harness-maker:make` 재렌더 안내 |
 | 5 | high-severity 보안 없음 | `findings.jsonl` count 확인 | 발견 목록 표시 |
 | 6 | 워크트리 merge-safe | `git diff --check` + 충돌 마커 확인 | 충돌 경로 표시 |
 

@@ -33,7 +33,7 @@ harness-maker/
 │   ├── recommendation.py     # M16: Confidence-bucketed recommendation registry (Phase 1/4/8 of PLAN-personalization-depth-2026-05)
 │   ├── detection_cache.py    # M15: profile cache with manifest-mtime + 24h ceiling invalidation
 │   ├── foreign_config.py     # M17: foreign AI config detection + LLM mapping + apply with @hm:harness:* markers
-│   ├── personalization_audit.py # M19: /hm:personalization-audit rubric runner per ADR-011
+│   ├── personalization_audit.py # M19: /hm:health personalization-layer rubric runner per ADR-011
 │   ├── rubrics/
 │   │   └── personalization.yaml # locked v0 rubric (L1/L2/L3 formulas + tier boundaries)
 │   └── i18n.py               # locale-first messaging

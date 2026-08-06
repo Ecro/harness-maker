@@ -22,9 +22,8 @@
 4. [Fusion Commands](#4-fusion-commands)
 5. [/hm:loop — Automated Iteration Loop](#5-hmloop--automated-iteration-loop)
 6. [Special Commands](#6-special-commands)
-   - 6.1 [/hm:refresh — Anti-Rot Updates](#61-hmrefresh--anti-rot-updates)
-   - 6.2 [/hm:ai-readiness — AI Readiness Analysis](#62-hmai-readiness--ai-readiness-analysis)
-   - 6.3 [/hm:personalization-audit — Composite-score rubric](#63-hmpersonalization-audit--composite-score-rubric)
+   - 6.1 [/hm:health — structural layer](#61-hmhealth--structural-layer)
+   - 6.2 [/hm:health — personalization layer](#62-hmhealth--personalization-layer)
 7. [Skills Reference](#7-skills-reference)
 8. [Agent Reference](#8-agent-reference)
 9. [Hook Details](#9-hook-details)
@@ -166,7 +165,7 @@ src/harness_maker/
 ├── recommendation.py          ← M16: Confidence-bucketed recommendation registry
 ├── detection_cache.py         ← M15: profile cache with manifest-mtime + 24h ceiling
 ├── foreign_config.py          ← M17: foreign AI config detect + LLM map + apply
-├── personalization_audit.py   ← M19: composite-score rubric runner (/hm:personalization-audit)
+├── personalization_audit.py   ← M19: composite-score rubric runner (/hm:health personalization layer)
 └── rubrics/
     └── personalization.yaml   ← ADR-011 v0 rubric (locked formulas + tier boundaries)
 ```
@@ -774,7 +773,7 @@ Remediation hints for each blocking check:
 - PLAN unfulfilled → Display list of incomplete items
 - Smoke failure → Re-run failing tests
 - Health score drop → Display 6-dimension breakdown
-- Pending refresh → Guide to run `/hm:refresh`
+- Stale-asset drift → guide the user to re-render with `/harness-maker:make`
 - Security high → Display findings list
 - Merge conflict → Display conflicting paths
 
@@ -923,60 +922,25 @@ Loop start
 
 ## 6. Special Commands
 
----
-
-### 6.1 /hm:refresh — Anti-Rot Updates
-
-**Purpose**: Periodically crawl official Anthropic changes, security vulnerabilities, and relevant research to prevent the harness itself from going stale.
-
-#### Execution Procedure
-
-**Step 1 — Crawl 4 Sources (`research-crawler` skill)**
-
-All 4 crawlers in the `harness_maker.crawler` module are executed:
-
-| Source | Crawl Target |
-|--------|-------------|
-| Anthropic blog/changelog | New features, API changes, model updates |
-| GitHub releases | New releases from `anthropics/claude-code` + referenced repos |
-| arxiv (cs.SE/cs.CL/cs.CR) | Related research papers |
-| OSV.dev CVE feed | Security vulnerabilities in `uv.lock` dependencies |
-
-Graceful degradation on partial failure: failed sources produce empty results + stderr warning.
-Results saved to `.claude/observability/refresh/raw-{date}.jsonl`.
-
-**Step 2 — Scan for Stale Assets**
-
-Scan all current harness assets (commands, skills, agents) to check for:
-- Use of outdated patterns
-- Use of APIs removed in newer versions
-- Security policy violations
-
-**Step 3 — Version Drift Check**
-
-Compare current harness-maker version against the latest release.
-
-**Step 4 — Relevance Filtering (`relevance-filter` skill)**
-
-LLM scores crawled items from 0–1.0:
-- Only items at 0.7 or above are included in the proposal list
-- Threshold automatically adjusts based on accept/reject ratio
-
-**Step 5 — Write Proposal Document**
-
-Save proposal list to `work-docs/proposed-{date}.md`.
-
-**Step 6 — User Confirmation (structured question)**
-
-Individual confirmation for each proposal:
-- Choose from "apply", "defer", or "ignore"
-- **No automatic application** — all changes require explicit user approval
-
-If `raw-{date}.jsonl` already exists within the last 24 hours, skip the crawl (deduplication).
+> **These three commands no longer exist as separate names.** ADR-0006 consolidated
+> `hm:ai-readiness`, `hm:refresh`, and `hm:personalization-audit` into a single
+> `/hm:health`, and ADR-0007 then collapsed that command to **two** layers.
+>
+> - `hm:ai-readiness` → `/hm:health`'s **structural** layer (§6.1). The rubric runner
+>   `ai_readiness.py` is unchanged.
+> - `hm:personalization-audit` → `/hm:health`'s **personalization** layer (§6.2).
+>   `personalization_audit.py` is unchanged.
+> - `hm:refresh` (anti-rot crawl) → **removed outright**, not renamed. ADR-0007 deleted
+>   the crawler modules, the relevance filter, the stale-asset code, and the command
+>   template after a production run surfaced 12 items of which 11 were rejected — 91%
+>   noise. The one source worth keeping, OSV CVE detection, survives independently as
+>   `secscan/dependency_cves.py`, consumed by `/hm:verify` Check 4. There is no
+>   replacement command for the crawl; the section that described it was deleted rather
+>   than rewritten, because the feature is gone.
 
 ---
 
-### 6.2 /hm:ai-readiness — AI Readiness Analysis
+### 6.1 /hm:health — structural layer
 
 **Purpose**: Evaluate how suitable the current codebase is for AI-assisted development using a 3-layer rubric, and present an improvement roadmap.
 
@@ -1045,7 +1009,7 @@ Propose a `/hm:loop` command for each AI-fixable item.
 
 ---
 
-### 6.3 /hm:personalization-audit — Composite-score rubric
+### 6.2 /hm:health — personalization layer
 
 **Purpose**: Compute a personalization fit score from accumulated telemetry (M18 overrides) + the current harness.yaml + the cached ProjectProfile, then emit a ranked list of action items so the user can see *which* harness axes are mis-tuned to their actual workflow.
 
@@ -1153,13 +1117,13 @@ Skills are reusable capability modules invoked by commands. Unlike agents, they 
 3. Composite score calculation
 4. Bronze → register in anti-rot pending queue
 
-**Triggers**: `/hm:ai-readiness`, stale-asset scan in `/hm:refresh`
+**Triggers**: `/hm:health` (structural layer)
 
 ---
 
 ### 7.2 ai-readiness-rubric
 
-**Role**: Core skill executing the 3-layer rubric for the `/hm:ai-readiness` command. Entry point via `run_ai_readiness()` function.
+**Role**: Core skill executing the 3-layer rubric for `/hm:health`'s structural layer. Entry point via `run_ai_readiness()` function.
 
 **Input**: `Path` (project root), `Preset` (Side/Production)
 **Output**: `ImprovementPlan` (scores + priority improvements + loop suggestions)
@@ -1213,7 +1177,7 @@ code-reviewer is always included. Others are added based on pattern matching.
 | Workflow | ≤300 lines | ≤600 lines |
 | `.cursor/rules/*.mdc` | ≤500 lines (Cursor recommended) | ≤500 lines |
 
-When limit exceeded: renderer emits a warning. Automatically detected during `/hm:ai-readiness` and `/hm:refresh` scans.
+When limit exceeded: renderer emits a warning. Automatically detected during `/hm:health`'s structural scan.
 
 ---
 
@@ -1244,7 +1208,7 @@ For PDFs, process page-by-page with multimodal Read.
 - If reject rate is high → threshold -0.05 (more lenient, miss less)
 - Range: 0.5 ~ 0.9
 
-**Used in**: `/hm:research` (Phase 2), `/hm:refresh` (Step 4)
+**Used in**: `/hm:research` (Phase 2)
 
 ---
 
@@ -1264,7 +1228,7 @@ osv_dev.crawl(packages=osv_dev.parse_uv_lock("uv.lock"))
 - All 4 sources are executed (if one fails, the rest continue)
 - Skip crawl if raw file exists within 24 hours
 - Offline state: silently skip + stderr warning
-- **No direct changes** — only saves raw data; actual application handled by `/hm:refresh`
+- **No direct changes** — only saves raw data. The consumer that applied it (`hm:refresh`) was removed by ADR-0007; only the OSV CVE path survives, read by `/hm:verify` Check 4
 
 **Output**: `.claude/observability/refresh/raw-{date}.jsonl`
 
@@ -1818,7 +1782,7 @@ hooks.json is a target of security-auditor's **gate 3** inspection:
 - Injection via `eval "$..."`
 - User-writable file → stdout → LLM injection path
 
-Always recommended to review with `/hm:audit` or security-scanner skill when modifying hook code.
+Always recommended to review with the security-scanner skill (or `/hm:verify` Check 4) when modifying hook code.
 
 ---
 
@@ -1930,7 +1894,7 @@ On success (stage-only):
 On failure (fail):
   └─ Worktree preserved (.worktrees/execute-<ts>/ remains)
   └─ Manual triage possible
-  └─ /hm:refresh or weekly cleanup deletes stale worktrees older than 24h
+  └─ `worktree create` runs prune_stale, which deletes orphaned worktrees
 ```
 
 ---
@@ -2274,7 +2238,7 @@ rubrics:
     action: Add one-line docstring explaining WHY, not WHAT
 ```
 
-Add a YAML file to `.claude/rubrics/` and it's automatically applied in the next `/hm:ai-readiness`. **Express project-specific quality standards as code** — no need for humans to check manually.
+Add a YAML file to `.claude/rubrics/` and it's automatically applied in the next `/hm:health`. **Express project-specific quality standards as code** — no need for humans to check manually.
 
 ---
 
@@ -2406,7 +2370,7 @@ This data is reused for multiple purposes:
 |---------|---------|
 | `verify-before-completion` Check 3 | Health baseline vs current score comparison |
 | `ai-readiness-rubric` Layer 3 | Cache miss cause classification |
-| `/hm:ai-readiness` dashboard | observability_setup dimension score |
+| `/hm:health` dashboard | observability_setup dimension score |
 
 **Not transmitted externally**. Works identically in CI environments, private repos, and air-gapped systems.
 
@@ -2601,7 +2565,7 @@ The `stuck` agent reads the full PLAN + SPEC + REVIEW + latest 3 reviewer output
 | 1 | PLAN fulfillment | **LLM directly cross-references diff against PLAN items** | Display list of unfulfilled items |
 | 2 | Regression/smoke | Run `.claude-verify.sh` | Output failing tests |
 | 3 | Health score within -5 | `compute_readiness()` vs baseline | 6-dimension breakdown |
-| 4 | Anti-rot pending resolved | Check `pending.jsonl` for unprocessed items | Guide to run `/hm:refresh` |
+| 4 | Harness freshness | Compare `harness.yaml.harness_maker_version` against the installed plugin | Guide to re-render with `/harness-maker:make` |
 | 5 | No high-severity security | Check `findings.jsonl` count | Display findings list |
 | 6 | Worktree merge-safe | `git diff --check` + conflict marker check | Display conflicting paths |
 
