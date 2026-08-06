@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.48.0] — 2026-08-06
 
 ### BREAKING — the worktree axis collapses to `worktree.enabled` (`PLAN-worktree-side-defaults`)
 
@@ -37,6 +37,48 @@ emitting the finalize/stash recovery instructions.
 an OFF render. Their `worktree create` is already a runtime no-op there and the
 templates say so; removing the prose means rewriting `<WT>` threading through the whole
 iteration body, which is deliberately left as separate work.
+
+### BREAKING — `/hm:loop` and `/hm:loop-p5-batch` render no worktree surface when isolation is off
+
+Companion to the axis collapse above. With `worktree.enabled: false` the loop templates
+used to walk the reader through creating, verifying and finalizing a worktree that would
+never exist — the calls were runtime no-ops, so the path worked, but the instructions
+described machinery that was not running. Section 5 now branches: ON is unchanged, OFF
+gets a short block that names the cost (deliverables accumulate uncommitted on the
+current branch) instead of pretending isolation is happening.
+
+The Stop-hook guard deliberately sits OUTSIDE that branch — both modes need it. An OFF
+loop that never writes `.hm-loop-active` cannot be gated by the Stop-hook and
+self-stops after one iteration.
+
+### Fixed
+
+- **Deliverable write instructions now name their own target.** `Write to
+  \`work-docs/PLAN-{slug}.md\`` relied on the preflight preamble's generic "treat that
+  string as `<WT>`" sentence to land in the worktree. All four stages (`spec`,
+  `research`, `plan`, `review`) now render `<WT>/…` under isolation and `./…` without
+  it, so a reader following the concrete line cannot dirty the base under isolation ON.
+- **`/hm:wrapup`'s receipt reconciler no longer false-fails on every truthful run.**
+  `documents_updated` resolved only against the worktree, while the human memory tiers
+  are written to the base repo by design — so a correct wrapup was reported as claiming
+  a file that does not exist. Both roots are consulted; a claim in neither is still a
+  mismatch.
+- **`/hm:health` gained a worktree signal.** `worktree_axis_current` (advisory,
+  weight 0) fails when the isolation value resolves through a RETIRED key — i.e. the
+  harness has not been re-rendered and is running on a compatibility fallback — or when
+  the value is malformed. On/off itself is a config choice and never a finding.
+- **`worktree-isolator`'s skill description was rendering as `---`.** A colon followed
+  by a space in a YAML plain scalar is invalid, so `yaml.safe_load` failed on the source
+  frontmatter and the renderer silently left the block in the body. A new structural
+  test parses every source template's frontmatter.
+- Documentation corrections: `harness.yaml.worktree.cleanup` never existed (no template
+  renders it, no code reads it — cleanup is decided by finalize's status argument), and
+  the fused-workflow removal left a second vocabulary behind in the docs.
+
+### Changed
+
+- `/hm:review` drops its Pass 1.5 verifier dispatch and instruments the undecidable
+  steps instead (stage 1 of the workflow-loop-efficiency work).
 
 ## [0.47.0] — 2026-08-05
 
