@@ -183,6 +183,33 @@ from .conftest import pin_install_ref
 # Read the aggregate row in the delta document before treating this as routine: this is a
 # cost-REDUCTION plan that raised the shipped surface, and the raise only pays for itself if
 # stage 2 reads the ledgers these calls fill and deletes something.
+#
+# aggregate claude raised 361582 → 362186 (+604), PLAN-onboarding-interview-ux Phase 6
+# (2026-08-06). Same bar as ADR-012 and the `configure +210` entry above: compaction FIRST.
+# NOTE the artifact — this raise lives in `tests/structural/surface_baseline.json`, not in
+# this file. `configure` and `health` have NO per-command ceiling at all (they are excluded
+# by `test_the_atomic_table_covers_every_atomic_command`), so the JSON is the only binding
+# number, and it moves as four coupled fields: the two `chars` entries, the aggregate (which
+# `test_the_committed_numbers_are_not_zeros` asserts equals the per-command sum), and a
+# recomputed `payload_digest`. `build_baseline()` was not used — `assert_sha_is_durable`
+# refuses to run from a task branch.
+#   Raw addition +1162; three passes cut it to +604 (−48%). What was cut: a dangling
+#   `Default model` fragment, `Delivery metrics tuning` 7→5 lines, four repeated
+#   "omit `--x` … pass `\"\"` to clear" sentences collapsed to one rule, and two numbered
+#   single-question sub-blocks turned back into prose. Full per-pass accounting in
+#   `work-docs/BASELINE-onboarding-offset-ledger.md`.
+#   codex delta is 0, structurally: `configure.md.j2` / `health.md.j2` render into
+#   `_base_files` only and have no counterpart in `_codex_target_files`.
+#   The residue is unguarded correctness: `/hm:configure` previously named NEITHER
+#   `second_opinion` nor `autonomy` nor `locale`, so a harness installed with any of them
+#   off could only be changed by hand-editing `harness.yaml` — "there is no supported way to
+#   change this" is the same defect the `configure +210` raise cited, arriving again. The
+#   dispatch appendix states omit-preserves vs `""`-clears, which is a data-loss boundary,
+#   not prose.
+#   The `/hm:health` advisory is INVISIBLE here (+1 char, a newline): it renders under
+#   `{% if not config.second_opinion.models %}` and this repo's harness has models set. Its
+#   correctness is gated by `tests/unit/test_render_configure_health_second_opinion.py`
+#   instead — do not read a green aggregate as evidence that block works.
 _ATOMIC_RATCHET: dict[str, int] = {
     "execute": 33774,
     "plan": 46008,

@@ -104,6 +104,27 @@ Cross-ref the ledger `.claude/observability/second-opinion.jsonl`: rows are now 
 toward `invoked` (base cwd, trivial prompt) and would dilute the number every time a health audit
 runs.
 {% endif %}
+{% if not (config.second_opinion and config.second_opinion.models) %}
+## Cross-model second opinion is OFF — is a CLI sitting unused?
+
+The smoke check above only exists once `second_opinion.models` is non-empty, so the common
+state "the CLI is installed but the harness never asks it anything" was silent for its whole
+lifetime. This is the inverse check. It must probe at RUN time — a render-time answer would
+freeze at install and go stale the moment a CLI is added.
+
+```bash
+!uv run --with {{ harness_maker_src_path }} hm cli detect-tools --json
+```
+
+If the command is missing, exits non-zero, or its output does not parse: print nothing and
+move on. This is advisory — `/hm:health` must never fail or block on it.
+
+If `codex` or `antigravity` reports `installed: true`, surface ONE Layer 1 advisory:
+the CLI is on PATH but casts no vote, and `{% if is_codex %}@hm-configure{% else %}/hm:configure{% endif %}`
+→ "Cross-model second opinion" enables it. Say `installed` means the binary resolves —
+authentication is not checked here. If neither is installed, print nothing: a user without
+these tools does not need to be told about them on every audit.
+{% endif %}
 {% if config.autonomy.level != "gated" %}
 ## Autopilot auto-advance smoke check (PLAN-human-bottleneck-auto-advance P7, ADR-009)
 

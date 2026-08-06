@@ -159,6 +159,7 @@ MODULES: dict[str, ModuleSpec] = {
             "security-scan",
             "remove",
             "profile",
+            "detect-tools",
             "verify",
             "configure-second-brain",
             "autopilot",

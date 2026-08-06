@@ -160,6 +160,24 @@ most common reason existing 0.4.x/0.5.0 users return to this command:
 
 Parse the JSON output. Extract: `stack`, `scale`, `lifecycle`, `detected_checks`.
 
+Then scan for optional external CLIs. This is a **separate, uncached** command on purpose:
+`profile` is served from a 24h cache invalidated only by project-manifest mtime, and
+installing a CLI touches no project manifest — a cached answer would report a tool installed
+five minutes ago as absent.
+
+```bash
+# claude-code / cursor:
+!uv run --directory "$plugin_dir" python -m harness_maker.cli detect-tools --json
+# CLI_FALLBACK:
+!harness-maker detect-tools --json
+```
+
+Output shape: `{"codex": {"installed": bool}, "antigravity": {"installed": bool},
+"cursor": {"installed": bool}}`. Store as `$DETECTED`. `installed` means **the binary is on
+PATH — it does not mean the user is authenticated** (`codex login` / an authenticated `agy`);
+never phrase it as "ready". If the command is missing or its output does not parse, treat
+every tool as absent and continue — detection is an enhancement, never a gate.
+
 #### 4.2 Compute smart defaults
 
 Based on the profile, derive:
@@ -192,6 +210,27 @@ Use `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code):
 >   increase confidence and may increase review work; this flow explains the
 >   trade-off without predicting exact review time.
 >
+> **Detected on this machine:** {list each tool in `$DETECTED` with installed / not installed,
+> and add: "installed = binary on PATH; authentication not verified"}. Omit this block
+> entirely when nothing was detected.
+>
+> **Set for you — not asked on this path.** These take the values below unless you pick
+> "Adjust a few things" or "Full setup". Render every row; they are what makes the fast path
+> fast, and a user who never sees them cannot know they exist:
+>
+> | Axis | Value here | Change it later with |
+> |---|---|---|
+> | `targets` | {targets} | Adjust / `/hm:configure` |
+> | `dev_mode` | {dev_mode} — from the preset | Adjust / `/hm:configure` |
+> | `worktree.enabled` | {true for Production, false for Side} — decides whether every `/hm:` stage runs in `.worktrees/<slug>/` on branch `hm/<slug>` | `/hm:configure` |
+> | `second_opinion.models` | {[] unless the question below is answered} | Adjust / `/hm:configure` |
+> | `autonomy.level` / persistence | **`auto_safe` / persistent `true`** — stages auto-advance past two-way-door boundaries, and a SessionStart hook re-arms this every session. Mandatory gates (plan interview, CHANGES_REQUESTED review, wrapup merge) always stop. | Adjust / `/hm:configure` |
+> | `ref_folders` | (none) | Adjust / `/hm:configure` |
+> | `sibling_repos` | (none) | Adjust / `/hm:configure` |
+> | `second_brain` | disabled | Adjust / `/hm:configure` |
+> | `wrapup_docs` | (none) | Adjust / `/hm:configure` |
+> | `permissions.deny_dangerous` | `false` — the destructive-command deny baseline is NOT applied | hand-edit `.claude/harness.yaml` (`/hm:configure` has no permissions dimension) |
+>
 > **Safety receipt preview:**
 > - Generated roots may include `.claude/`, `.cursor/`, `.codex/`,
 >   `.agents/skills/`, and `AGENTS.md`, depending on selected targets.
@@ -206,19 +245,53 @@ Use `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code):
 >   settings.json / AGENTS.md / harness.yaml).
 >
 > Options:
-> - **Looks right** — install with these settings
+> - **Looks right** — install with these settings. Asks nothing further, *except* one
+>   question when a second-opinion CLI was detected above.
 > - **Adjust a few things** — change specific dimensions
 > - **Full setup** — answer all questions (locale, preset, dev_mode, targets, focus, grade, domains, model, wrapup docs, ref_folders, sibling_repos)
 
 #### 4.4 Branch on confirm response
 
-**"Looks right"** → Jump to Section 4.6 (Preview) with smart defaults.
+**"Looks right"** → branch on `$DETECTED` from section 4.1. **Two paths, and only two:**
+
+- **Nothing detected** (`codex` and `antigravity` both absent) → ask nothing. Jump straight
+  to Section 4.6 (Preview) with smart defaults.
+- **`codex` and/or `antigravity` detected** → ask **exactly one** question with `AskQuestion`
+  (Cursor) / `AskUserQuestion` (Claude Code), then jump to Section 4.6:
+
+  > A cross-model second opinion is available — {name the detected CLIs}. Enabled models cast
+  > a real consensus vote in `/hm:review` and are reconciled in `/hm:plan`.
+  >
+  > **This sends the diff under review to that third-party CLI.** It is the only part of this
+  > harness that transmits project content off your machine — everything else is local-only.
+  >
+  > Cost: one CLI call per enabled model, on every review and every plan validation under the
+  > Production preset; under Side, only when the change is high-diff. Not one call total.
+  >
+  > A missing, unauthenticated, or rate-limited CLI degrades to a warning and a skip, never a
+  > failure. (Detected = the binary is on PATH; whether `codex login` / `agy` auth is current
+  > has not been checked.)
+  >
+  > Options: enable the detected model(s) / enable none — decide later in `/hm:configure`.
+
+  Set `$SECOND_OPINION_MODELS` to the comma-joined selection and pass it as
+  `--second-opinion-models` in Section 4.6's dispatch. Leave the flag off when the user
+  declines.
+
+  This is the **only** question the fast path may ask (one, capped). A detected `cursor` is
+  reported in the §4.3 summary and never asked about — `targets` is changed under "Adjust a
+  few things".
 
 **"Adjust a few things"** → Use `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code) to ask which dimension(s)
 to change (multi-select: preset, locale, dev_mode, targets, grade_threshold,
-mechanical_checks, wrapup_docs, ref_folders, sibling_repos, second_brain). For each selected
+mechanical_checks, wrapup_docs, ref_folders, sibling_repos, second_brain, second_opinion,
+autonomy). For each selected
 dimension, show an `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code) with the current smart default,
 alternatives, and a one-line trade-off. Then jump to Section 4.6.
+
+`second_opinion` and `autonomy` belong on that list because this is the **only** in-`make`
+path for a user whose CLI was not detected — the common case of installing one a week after
+the harness. They map to `--second-opinion-models` and `--autonomy-level`.
 
 **"Full setup"** → Ask all dimensions in order:
 
@@ -277,7 +350,7 @@ alternatives, and a one-line trade-off. Then jump to Section 4.6.
 14. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **Autopilot** — "Auto-advance
    the stage pipeline this session (stages advance past two-way-door boundaries but always
    stop at the plan interview, a CHANGES_REQUESTED review, and the wrapup merge)?" Options:
-   `gated` (off, default) / `auto_safe` / `full`; if enabled, ask whether to persist across
+   `gated` (off) / `auto_safe` (**the default a fresh install renders**) / `full`; ask whether to persist across
    sessions. Maps to `--autonomy-level` and `--autonomy-persistent` / `--no-autonomy-persistent`.
 
 #### 4.5 Preview structured question
@@ -596,11 +669,18 @@ After dispatch, summarize what changed:
 
 Then show a **quick-start** guide:
 
-> **Harness installed!** Here's what to try first:
-> - Run `/hm:execute <task>` to implement a feature with TDD
-> - Run `/hm:ai-readiness` to see your project's AI-readiness score
-> - Run `/hm:configure` to adjust settings later
-> - Run `/hm:make` after a plugin update for a quick re-render
+> **Harness installed.** Verify it first, then try it:
+>
+> **1. Verify — run `/hm:health`.** It is installed correctly when:
+> - the `/hm:` commands are listed (if the slash menu is empty, restart the IDE session —
+>   commands are discovered at session start),
+> - the structural layer reports no missing or stale assets,
+> - any advisory lines it prints are about *optional* settings, not missing files.
+>
+> **2. Then try:**
+> - `/hm:execute <task>` — implement something with TDD
+> - `/hm:configure` — change any setting later, including ones this install did not ask about
+> - `/hm:make` — re-render after a plugin update
 
 If something's unclear, prompt the user with `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code) rather than
 guessing.

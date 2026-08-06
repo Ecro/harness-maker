@@ -519,9 +519,7 @@ There is no fused-workflow command. Two mechanisms chain the atomic stages: <!--
 |---|---|
 | `/hm:loop "<goal>"` | Autoloop driver — `feature` or `improve` mode, time/iter-bounded |
 | `/hm:metrics` | Reflection metrics, read-only and never a gate: CFR + post-merge churn from local git, **plus token economics** — where a workflow's spend goes, per stage, classified by function (produce / verify / rework / carry) from Claude Code's own session transcripts. Deliberately reports NO cost-per-deliverable ratio: any such ratio makes verification spend look like waste |
-| `/hm:ai-readiness` | 3-layer readiness score + P0/P1/P2 ranked actions |
-| `/hm:personalization-audit` | Composite-score rubric (Bronze/Silver/Gold/Platinum) from telemetry + harness.yaml + ProjectProfile. Reads `.claude/observability/adaptive/overrides.jsonl`; outputs ranked ActionItem list with evidence schema. ADR-011 (v0); calibration deferred to 30+ project sample. |
-| `/hm:refresh` | Anti-rot crawl — manual confirm required |
+| `/hm:health` | Two-layer harness audit. Absorbed the former `hm:ai-readiness` (3-layer readiness score + P0/P1/P2 ranked actions), `hm:personalization-audit` (composite Bronze/Silver/Gold/Platinum rubric from telemetry + harness.yaml + ProjectProfile), and `hm:refresh` (anti-rot crawl, manual confirm required) — written without a leading slash because they are no longer commands; see `docs/adr/0006-three-layer-health-audit.md`. Those three names no longer exist as commands. |
 
 ---
 
@@ -789,9 +787,9 @@ All observability is 100% local — nothing is transmitted externally.
 | `.claude/observability/refresh/raw-*.jsonl` | Anti-rot crawl evidence (accepted / rejected items) |
 | `.claude/observability/security/findings-*.jsonl` | 7-gate security scan findings |
 | `.claude/observability/adaptive/overrides.jsonl` | `harness_yaml_override` events with `schema_version: 1`, dual capture sites (`/hm:configure` exit primary + SessionStart secondary), dedup-keyed |
-| `.claude/observability/adaptive/last-audit.txt` | Last `/hm:personalization-audit` run timestamp |
+| `.claude/observability/adaptive/last-audit.txt` | Last personalization-audit run timestamp (that layer now runs inside `/hm:health`) |
 
-Run `/hm:ai-readiness` to regenerate the dashboard on demand.
+Run `/hm:health` to regenerate the dashboard on demand.
 
 ---
 
@@ -828,7 +826,7 @@ harness-maker is on `0.x` and stays there until enough projects depend on it tha
 
 **Frozen surfaces** — these will not break in any 0.x.minor without a deprecation cycle:
 
-- **Slash command names**: `/hm:make`, `/hm:research`, `/hm:plan`, `/hm:execute`, `/hm:review`, `/hm:wrapup`, `/hm:verify`, `/hm:health`, `/hm:loop`, `/hm:configure`, `/hm:personalization-audit`, `/harness-maker:make`.
+- **Slash command names**: `/hm:make`, `/hm:research`, `/hm:plan`, `/hm:execute`, `/hm:review`, `/hm:wrapup`, `/hm:verify`, `/hm:health`, `/hm:loop`, `/hm:configure`, `/harness-maker:make`.
 - **`harness.yaml` top-level keys**: `targets`, `preset`, `dev_mode`, `locale`, `reviewers`, `skills`, `agents`, `worktree`, `anti_rot`, `observability`, `ref_folders`, `second_brain`, `recommended_model`.
 - **Plugin manifest schemas**: `.claude-plugin/plugin.json`, `.cursor-plugin/plugin.json`, `.codex-plugin/plugin.json` — fields covered by each marketplace's published spec.
 - **Local-only telemetry guarantee** — see [`PRIVACY.md`](PRIVACY.md). A documented-vs-actual mismatch is treated as a P0 bug.
@@ -854,7 +852,7 @@ No. Every generated file carries a `content_hash` in its provenance frontmatter.
 `Side` is lean: 1 reviewer (code), verify-before-completion optional, worktree isolation off. `Production` is thorough: 5 reviewers, verify required, worktree isolation on, security on high-finding = block. Isolation is a single `worktree.enabled` boolean either preset can override (`--worktree` / `--no-worktree`, or `/hm:configure`). Both share the same anti-rot and caching defaults.
 
 **Q: Does anti-rot ever auto-apply?**
-Never. Every anti-rot item surfaces via a structured question (`AskQuestion` in Cursor, `AskUserQuestion` in Claude Code) in `/hm:refresh`. There is no `--auto-apply` flag and no plan to add one. The rationale: a wrong patch is worse than a stale harness.
+Never. Every anti-rot item surfaces via a structured question (`AskQuestion` in Cursor, `AskUserQuestion` in Claude Code) in `/hm:health`'s anti-rot layer. There is no `--auto-apply` flag and no plan to add one. The rationale: a wrong patch is worse than a stale harness.
 
 **Q: Can I use only Claude Code? Only Cursor? Only Codex?**
 Yes. `targets` is a multi-select at the interview. Claude Code uses `.claude/`; Cursor reuses most `.claude/` assets and adds `.cursor/`; Codex adds `AGENTS.md`, `.codex/`, and `.agents/skills/`.
@@ -899,7 +897,7 @@ harness-maker 0.12.0 introduces three tracks of personalization depth:
 
 - **Adaptive (Track B start)** —
   `harness.yaml.adaptive.disable_telemetry: false` (opt-out per
-  ADR-005) enables override telemetry. `/hm:personalization-audit`
+  ADR-005) enables override telemetry. The personalization-audit layer
   scores your harness composite (0–100; Bronze < 40 < Silver < 65 <
   Gold < 85 ≤ Platinum) and surfaces ranked action items with
   evidence. SessionStart drift hint fires after 30 overrides or 14
@@ -917,7 +915,7 @@ All adaptive features run **100% locally** — no network calls
 **Done (0.12.0–0.12.1):**
 - Track A (Detection Depth): 12+ stacks/frameworks/pkg-mgr/CI
 - Track D (Foreign AI Config Migration): 6 config types, single-source re-render, `@hm:harness:*` markers, 0.11.x migration
-- Track B-start (Adaptive): override telemetry, `/hm:personalization-audit`, SessionStart drift surface
+- Track B-start (Adaptive): override telemetry, the personalization-audit rubric, SessionStart drift surface
 
 **Next (0.13.0 — Track B completion + Cursor opt-out):**
 - Track B-extra: B2 permission-frequency capture + B3 reviewer-signal aggregation
@@ -932,7 +930,7 @@ All adaptive features run **100% locally** — no network calls
 - C5 per-developer overlay in shared harness
 
 **Deferred-by-data:**
-- Rubric v0 calibration after 30+ projects accumulate `/hm:personalization-audit` runs (passive trigger)
+- Rubric v0 calibration after 30+ projects accumulate personalization-audit runs (passive trigger)
 
 **Standing items:**
 - PyPI publish — remove the editable-from-clone requirement.

@@ -217,3 +217,27 @@ task branch is squash-landed and deleted, so that SHA would not survive. The reb
 P7 therefore left a baseline that accounted for this task but not P7's, and the honest
 sequence is land → re-freeze from base → amend. Recorded because the refusal reads like a
 tool failure the first time you hit it, and it is not.
+
+---
+
+## Appended 2026-08-06 — PLAN-onboarding-interview-ux Phase 6
+
+Ownership note: this document is owned by P7 (ADR-010), and the
+`ratchet-rebaselined-by-its-own-subject` rule is why. This section is appended for the same
+reason the `worktree-side-defaults` section above was — the gate below requires a row for
+every key that moves, and a moved key with no row is exactly the stale attribution the gate
+exists to prevent.
+
+### `aggregate_chars`
+
+| Key | From | To | Phase | Cause |
+|---|---|---|---|---|
+| `claude` | 361 582 | **362 419** | onboarding-interview-ux P6 + review round 2 | +837 total. +604 for the `/hm:configure` recovery entries (three compaction passes); +158 more from the review round-2 fixes below, after a fourth pass cut them from +233 (−32%) |
+| `codex` | 295 582 | 295 582 | — | unchanged, structurally: `configure.md.j2` / `health.md.j2` render into `_base_files` only and have no counterpart in `_codex_target_files` |
+
+### `surface.claude`
+
+| Key | chars | Cause |
+|---|---|---|
+| `configure` | 9 910 → 10 746 (**+836**) | `/hm:configure` previously named neither `second_opinion`, nor `autonomy`, nor `locale`, so an axis silently defaulted at install could only be changed by hand-editing `harness.yaml`. Same defect class as the `+580` row above — "there is no supported way to change this" — plus a dispatch appendix stating omit-preserves vs `""`-clears, which is a data-loss boundary. Raw addition was +1 162; three passes cut it to +604 (−48%). Full accounting in `work-docs/BASELINE-onboarding-offset-ledger.md`. Review rounds 2-3 added +233 more: the `uv run --with` resolution prefix the bare `hm cli detect-tools` call was missing (it would have been `command not found` in the default install shape), its graceful-degrade clause, a corrected cost statement (one call per model on every review AND plan, not one total), and a data-egress disclosure — the diff leaves the machine, which the consent prompt did not say. Each is a confirmed review finding, not prose. |
+| `health` | 9 815 → 9 816 (**+1**) | A newline, not content. The installed-but-disabled advisory renders under `{% if not config.second_opinion.models %}` and this repo's harness has models set, so the block is absent from the measured surface. Its correctness is gated by `tests/unit/test_render_configure_health_second_opinion.py` — a green aggregate proves nothing about it. |

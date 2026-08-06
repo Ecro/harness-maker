@@ -78,7 +78,7 @@ actively harmful: refusing to regenerate in the worktree is what forces a hand-m
 generated artifacts at land time. The count:11 history is left in place for audit.
 
 ## Proposal: mutation-check-receipt-per-new-gate (2026-07-27)
-**Triggered by:** [fail:test] assertion-invariant-over-named-dimension (count: 6 as of 2026-08-01; this proposal was written at count: 5) — the sixth instance is the strongest argument yet for the mechanical receipt: a test asserting the telemetry record rejects unknown keys was green **both before and after** the field it was written for existed, satisfied all along by `extra=forbid`. A "name the wrong implementation this assertion rejects" receipt would have had no answer to write.
+**Triggered by:** [fail:test] assertion-invariant-over-named-dimension (count: 8 as of 2026-08-06; this proposal was written at count: 5) — the sixth instance is the strongest argument yet for the mechanical receipt: a test asserting the telemetry record rejects unknown keys was green **both before and after** the field it was written for existed, satisfied all along by `extra=forbid`. A "name the wrong implementation this assertion rejects" receipt would have had no answer to write.
 **Proposed mechanism:** a mechanical receipt, because prose has now failed five times —
 including once inside `PLAN-token-economy-step-pruning`, whose ADR-010 is *itself* the
 prose rule "mutation-check every gate". Proposal: extend the `/hm:execute` Phase D exit
@@ -191,3 +191,47 @@ remediation string, name the state that makes the suggested action unsafe, and s
 is either impossible or named in the message." The concurrency-reviewer caught this instance by
 reading the guard's inputs rather than its text, which is the review posture the checklist line
 is trying to make routine.
+
+## Proposal: a cache key may not fingerprint its own launcher (2026-08-06)
+**Triggered by:** [fail:design] verification-cache-key-nondeterministic (count: 3)
+**Proposed mechanism:** derive the verification key from repo state only, and make the
+launcher-independence property a test rather than a scrubbing rule.
+**Rationale:** Three instances, each one surviving the previous fix, and each time the symptom
+is invisible because a permanently-cold cache looks exactly like a correctly-invalidated one.
+Instance 1 scrubbed volatile VALUES out of `PATH`/`VIRTUAL_ENV`; instance 2 flipped the env
+policy from blocklist to allowlist and added a two-subprocess stability test; instance 3,
+measured during this wrapup, shows the key is still a function of the `uv run --with` ARGUMENT.
+From one shell with an unchanged tree: `--with .` -> `fd7f934e...`, `--with /home/noel/harness-maker`
+-> `3fd66ab5...` (the marker `/hm:verify` had just written), plain `uv run python -m ...` ->
+`863e854c...`. The cause is that `PATH` carries `~/.cache/uv/archive-v0/<hash>/bin` and
+`archive-v*` is deliberately NOT scrubbed — the comment says that path "encodes the identity of
+the installed package, which is real signal", and it does, but it is ALSO a function of how the
+caller spelled the dependency. The existing stability test cannot see this: it spawns two
+subprocesses in the same invocation shape, and the shapes are what differ. The unifying
+root-cause sentence this entry has carried since instance 1 is still unaddressed — a key that
+fingerprints the ambient environment is invalidated by the launcher — so the proposal is to stop
+fingerprinting the environment at all: hash repo state (root, HEAD, relevant diff, lockfiles) and
+the TOOL VERSIONS already collected (`python`/`ruff`/`mypy`/`pytest --version`, which capture the
+build-affecting facts the env vars were proxying for), and drop `_env_hash` entirely. Test to add
+alongside: compute the key under three different launcher shapes and assert one value — the
+property no previous fix stated.
+
+## Proposal: a success message must be emitted from the same branch as the effect (2026-08-06)
+**Triggered by:** [fail:lint] gate-exit-code-lost-through-pipe (count: 3), with
+[fail:tooling] silent-no-op-patch-reports-success (count: 1) as the same-session sibling.
+**Proposed mechanism:** ban unconditional success output in harness-authored scripts and in
+one-off patch scripts; require per-check `rc` capture and a per-mutation match count.
+**Rationale:** The entry's third instance is not a pipe at all — a background `pytest` run's
+completion NOTIFICATION reported exit 0 while the run's own recorded `rc` was 1, which is the
+fourth time this environment has done that. In the same session a `str.replace` patch script
+printed "patched" after matching nothing (a two-space indent mismatch), so a P1 security fix was
+recorded as Applied while the file was unchanged; it was caught two rounds later by a reviewer
+re-reading the file. The two mechanisms differ — one discards a real verdict, the other never
+produces one — but the operational rule is identical and cheap: **the string that says it worked
+must be produced by the branch that did the work.** Concretely: (a) never pipe or redirect a gate
+away from its `rc`; write `rc=$?` per check into the output file and read that file, never the
+harness's exit-code notification; (b) any substitution must assert `new != old` or count matches
+and print the count, and `Edit` (which errors on no-match) is preferred to any hand-rolled
+replace; (c) `/hm:review` and `/hm:execute` should treat "reported Applied" as unverified until
+the artifact is re-read — this round's REVIEW iteration table already carries a `Status` column
+that would have shown the no-op if the re-read were routine rather than incidental.

@@ -477,7 +477,7 @@ class ConflictItem(BaseModel):
 
 **(M1) Profiler → Interviewer → Synthesizer → Renderer pipeline (Phase 2)**
 1. Profiler detects stack / scale / lifecycle / existing_dotclaude / spec_only
-2. Interviewer presents preset recommendation + 10+ dimension override questions (workflow naming, reviewers, models, autoloop, anti-rot, worktree, security, context_lint, memory, caching). Additional axes: `targets` (claude-code / cursor / both), `recommended_model` (default: claude-opus-4-7). Locale default is English (DEFAULT_LOCALE="en"); Korean messages are built-in; unsupported locales fall back to en silently.
+2. Interviewer presents preset recommendation + 10+ dimension override questions (workflow naming, reviewers, models, autoloop, anti-rot, worktree, security, context_lint, memory). `consensus` and `caching` were retired from the interview in 0.49.0 — no Python and no stage template branches on either, so the questions changed nothing; the schema fields and their preset defaults remain, so no migration is involved. Additional axes: `targets` (claude-code / cursor / both), `recommended_model` (default: claude-opus-4-7). Locale default is English (DEFAULT_LOCALE="en"); Korean messages are built-in; unsupported locales fall back to en silently.
 3. Synthesizer performs deterministic mapping → Blueprint
 4. Renderer attaches Jinja2 + provenance frontmatter and writes to .claude/ (when M14 is active, also writes to .cursor/)
 

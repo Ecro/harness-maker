@@ -1,5 +1,78 @@
 # Changelog
 
+## [0.49.0] — 2026-08-06
+
+### The first interview stops hiding what it decides for you (`PLAN-onboarding-interview-ux`)
+
+The fresh-install fast path set **10 of 14** configuration axes without asking and showed
+**5**. Nothing anywhere detected installed tooling, so the harness could never say "codex is
+installed — want a second-opinion vote?" — the reported symptom, and the consequence of a
+capability that did not exist rather than one that was mis-wired.
+
+**New: `harness-maker detect-tools --json`.** Reports whether `codex` / `agy` / `cursor`
+resolve on PATH. Deliberately **not** a `ProjectProfile` field: that is served from a 24h
+cache invalidated only by project-manifest mtime, and installing a CLI touches no manifest —
+a cached answer would report a tool installed minutes ago as absent, silently. `installed`
+means the binary exists; authentication is never probed, and every string built from it says
+so.
+
+**The fast path now discloses and, once, offers.** `/harness-maker:make`'s summary gains a
+"Set for you — not asked on this path" table covering every axis it fixes silently, including
+`worktree.enabled` (which decides whether every later `/hm:` stage runs in `.worktrees/<slug>/`)
+and `permissions.deny_dangerous`. When a second-opinion CLI is detected — and only then — it
+asks **exactly one** question. When nothing is detected it asks nothing, as before.
+
+**Turning an axis on later is now possible.** `/hm:configure` gained `second_opinion`,
+`autonomy`, and `locale`; "Adjust a few things" gained the first two. Before this, an axis
+silently disabled at install could only be changed by hand-editing `harness.yaml`.
+
+**`/hm:health` now reports the inverse case.** Its second-opinion smoke was gated on the axis
+already being ON, so "the CLI is installed but nothing ever asks it" was silent for the
+feature's whole lifetime. An advisory now fires when a model CLI is present and
+`second_opinion.models` is empty — non-blocking, and silent when neither CLI exists.
+
+**Removed two questions that changed nothing.** `consensus` and `caching` were asked with no
+explanation of their valid values, and no Python and no stage template branches on either.
+The questions are gone; the fields, the `harness.yaml` keys, and their preset defaults stay,
+so no migration is needed. Known residual: `templates/stages/review.md.j2` still presents
+`consensus` to the reviewing model as a behavioural default while the threshold is hard-coded
+at K=2 — recorded, not fixed here.
+
+**Fixed: the post-install quick-start named a command that does not exist.** `/hm:ai-readiness`
+was absorbed into `/hm:health` by `docs/adr/0006`, and the quick-start — the first thing a new
+user reads — still pointed at it. The quick-start now leads with `/hm:health` as an explicit
+verification step with named success criteria. The existing documented-commands gate could not
+have caught this: it scanned only `harness-maker <subcommand>` inside `README`/`CHANGELOG`/`docs`,
+so a slash name in `commands/` was outside it on both axes. That gate now covers `/hm:<name>`
+and the Codex `@hm-<name>` spelling across `commands/**` and both READMEs. `docs/**` is
+knowingly still uncovered — it carries ~40 references to retired commands, three of which have
+whole sections in `HOW-IT-WORKS.md`; that is a documentation rewrite, tracked as a follow-up.
+
+**Corrected during review — the disclosure table was false about the axis that matters most.**
+As first written it stated `autonomy.level: gated` (off) while a fresh install renders
+`auto_safe` with `autopilot_persistent: true`, re-armed by a SessionStart hook every session: a
+user on the default path was told auto-advance was off while the harness shipped it on. Two
+reviewers caught it independently and it was confirmed by rendering a real fresh install. The
+row now states the real values, names the SessionStart re-arm, and names the mandatory gates
+that still stop; the same false claim in the Full-setup question was corrected too. The
+structural gate could not have caught it — it asserted that `autonomy|autopilot` was *present*
+in the summary, not that the disclosed value was *true*. The replacement arm reads
+`AutonomyConfig()` and asserts the row states the default the class actually carries.
+
+Three further review-round corrections: the `permissions.deny_dangerous` row pointed at
+`/hm:configure`, which has no permissions dimension at all (it now says to hand-edit
+`.claude/harness.yaml` and states the absence); the second-opinion consent prompt did not
+disclose that the diff leaves the machine, which is the one exception to this project's
+local-only telemetry posture; and the cost line said "one extra CLI call per review" when it is
+one per enabled model on every review *and* every plan validation — Production every time, Side
+only on high-diff. `/hm:configure`'s `detect-tools` call also gained the `uv run --with` prefix
+every other call in that file carries, in a fenced block, after the inline form turned out not
+to autorun.
+
+Known and accepted: `tests/structural/surface_baseline.json`'s `render_sha` names the previous
+freeze point, because `assert_sha_is_durable` refuses to write a task-branch SHA — recorded
+rather than papered over.
+
 ## [0.48.0] — 2026-08-06
 
 ### BREAKING — the worktree axis collapses to `worktree.enabled` (`PLAN-worktree-side-defaults`)

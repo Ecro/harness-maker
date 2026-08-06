@@ -100,7 +100,7 @@ def test_interview_installs_all_reviewers_and_skills() -> None:
 
 def test_interview_interactive_accepts_recommended(monkeypatch: pytest.MonkeyPatch) -> None:
     """Empty answers ⇒ accept recommended locale/preset/dev_mode/starter/defaults."""
-    # locale, targets, preset, dev_mode, consensus, caching,
+    # locale, targets, preset, dev_mode, worktree,
     # ref_folders (blank=skip), sibling_repos (blank=skip),
     # vault_path (blank=skip), second_opinion (blank=skip/default N).
     # next(inputs, "") fallback handles extra prompts gracefully.
@@ -128,7 +128,7 @@ def test_interview_dev_mode_explicit_override_to_spec_driven(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Side+spec-driven cross is allowed (independent of preset)."""
-    # locale, targets, preset, dev_mode=spec, use-rec?, default, consensus, caching,
+    # locale, targets, preset, dev_mode=spec, worktree,
     # ref_folders, sibling_repos, vault_path
     inputs: Iterator[str] = iter(["", "", "", "spec", "", "", "", "", "", "", ""])
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs, ""))
@@ -160,11 +160,11 @@ def test_interview_ref_folders_multiple_with_glob_override(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """User registers two folders, one with a custom glob."""
-    # locale, targets, preset, dev_mode, worktree, consensus, caching, ref_folder #1,
-    # ref_folder #2 (path;glob), blank=stop, sibling_repos, vault_path. One more
-    # leading blank than before `_ask_worktree` was added (PLAN-worktree-side-defaults).
+    # locale, targets, preset, dev_mode, worktree, ref_folder #1, ref_folder #2 (path;glob),
+    # blank=stop, sibling_repos, vault_path. Two fewer leading blanks than before: ADR-003
+    # of PLAN-onboarding-interview-ux removed the consensus and caching questions.
     inputs: Iterator[str] = iter(
-        ["", "", "", "", "", "", "", "./docs", "../shared ; **/*.md", "", "", ""],
+        ["", "", "", "", "", "./docs", "../shared ; **/*.md", "", "", ""],
     )
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs, ""))
     result = interview(_profile(), autoloop_mode=False)

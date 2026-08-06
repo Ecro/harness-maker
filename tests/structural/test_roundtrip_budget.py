@@ -42,7 +42,17 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # No call was removed. `execute` 14→15, `plan` 14→15, `review` 8→9, total 127→130.
     # These three calls are the entire reason stage 2 will have a denominator; the round-trip
     # cost is the price of that, and it is charged per stage invocation, not per round.
-    "configure": 3,
+    #
+    # configure 3→4, total 130→131 (PLAN-onboarding-interview-ux, 2026-08-06). ONE call added,
+    # none removed: `hm cli detect-tools --json` in the new "Cross-model second opinion"
+    # dimension. It is a check, not a ledger write, and it is conditional in spirit but not in
+    # render — the dimension only asks after showing which CLIs are on PATH, and detection
+    # cannot be cached (installing a CLI invalidates nothing `profile()` watches, ADR-001), so
+    # there is no cheaper shape. `health` is unchanged at 7 even though it gained the same call:
+    # that one renders under `{% if not config.second_opinion.models %}` and this fixture's
+    # harness has models set, so it is absent from the measured body. Do not "fix" that
+    # asymmetry by making health's call unconditional — the gate is the point.
+    "configure": 4,
     "execute": 15,
     "health": 7,
     "help": 0,

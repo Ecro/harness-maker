@@ -375,6 +375,8 @@ Codex TOML files intentionally carry no provenance frontmatter because TOML pars
 
 Caching: results are stored at `~/.cache/harness-maker/profile-<repo-hash>.json` with manifest-mtime invalidation + a 24h ceiling, both governed by `detection_cache.CACHED_MANIFESTS`. The cache makes back-to-back `/hm:configure` runs cheap and keeps `/hm:personalization-audit` from re-walking the source tree.
 
+Installed-CLI detection is deliberately **outside** this cache. `harness-maker detect-tools --json` (0.49.0) resolves `codex` / `agy` / `cursor` on `PATH` on every call and is not a `ProjectProfile` field: installing a CLI touches no project manifest, so manifest-mtime invalidation would never fire and a cached answer could report a tool installed minutes ago as absent. `installed` means the binary resolves; authentication is never probed.
+
 **Key files**: `src/harness_maker/profile.py`, `src/harness_maker/detection_cache.py`.
 
 ### M16 — Recommendation Framework

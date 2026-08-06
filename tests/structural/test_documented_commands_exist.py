@@ -111,6 +111,101 @@ def _registered_commands() -> set[str]:
     return names
 
 
+# ── Slash-command surface ──────────────────────────────────────────────────────
+#
+# The arm above covers `harness-maker <subcommand>` in docs. It covers neither of the two
+# axes on which `/hm:ai-readiness` survived in `commands/make.md:601` — the quick-start line
+# a user reads FIRST after a fresh install, naming a command retired into `/hm:health` by
+# docs/adr/0006. It is a slash name, not a Typer subcommand, and it lives in `commands/`,
+# which `_shipped_docs()` never looks at.
+#
+# That is this file's own recorded failure class, repeated: a gate scoped to the artifact
+# being fixed lets the identical defect survive next door. So this arm reads the plugin's
+# live command surface and both spellings — `/hm:<name>` (Claude Code, Cursor) and
+# `@hm-<name>` (Codex), which the templates emit from one `{% if is_codex %}` branch.
+#
+# SCOPE, deliberate: `commands/**/*.md` only, NOT `_shipped_docs()`. Measured 2026-08-06,
+# the docs surface carries 12+ names that no longer render — the retired fused workflows
+# (`exec-rev*`, `plan-exec-rev*`, `res-spec-plan`) plus `audit`, `bootstrap`, `refresh`,
+# `trends`, `personalization-audit`. Gating those is a docs-cleanup project; folding it in
+# here would make this arm un-greenable for reasons unrelated to the surface that executes.
+# `commands/` is where an agent reads its instructions, which is why it is gated first.
+_HM_SLASH = re.compile(r"(?:/hm:|@hm-)([a-z][a-z0-9-]*)")
+
+
+def _rendered_hm_commands() -> set[str]:
+    """Names that actually render, from the template registry — not from a checkout.
+
+    NOT `.claude/commands/**`: that is a generated artifact whose contents depend on the
+    local harness.yaml (targets, preset), so a test reading it measures this machine.
+    """
+    from harness_maker.models import AtomicStage
+
+    names = {s.value for s in AtomicStage}
+    templates = _ROOT / "src" / "harness_maker" / "templates" / "commands" / "hm"
+    for path in templates.glob("*.md.j2"):
+        stem = path.name.removesuffix(".md.j2")
+        if stem == "atomic_command":
+            continue  # the generator for the AtomicStage names already added above
+        names.add(stem.split(".", 1)[0])  # help.en / help.ko both spell `help`
+    return names
+
+
+def _plugin_command_docs() -> list[Path]:
+    """`commands/**` plus the READMEs — the two surfaces a user is pointed at to RUN things.
+
+    `docs/**` is deliberately still out. Measured 2026-08-06 it carries ~40 references to
+    retired commands, and `docs/HOW-IT-WORKS.md` gives three of them (`hm:refresh`,
+    `hm:ai-readiness`, `hm:personalization-audit`) whole numbered sections. Resolving those
+    is a documentation rewrite that has to decide what replaced each capability, not a
+    rename — so folding it in here would make this arm un-greenable for reasons unrelated to
+    the surfaces that execute. Tracked as a follow-up in
+    `work-docs/PLAN-onboarding-interview-ux.md` Phase 8.
+    """
+    docs = sorted((_ROOT / "commands").rglob("*.md"))
+    docs += [p for p in (_ROOT / "README.md", _ROOT / "README.ko.md") if p.is_file()]
+    return docs
+
+
+def test_the_rendered_command_list_is_non_empty() -> None:
+    """Non-vacuity, mirroring `test_the_command_list_is_non_empty` for the slash arm.
+
+    An empty set makes the assertion below accept every name, including the one this arm
+    exists to reject.
+    """
+    commands = _rendered_hm_commands()
+    assert len(commands) >= 10, commands
+    for expected in ("health", "configure", "execute", "wrapup"):
+        assert expected in commands, (expected, sorted(commands))
+
+
+def test_the_slash_scanner_rejects_a_name_that_does_not_render() -> None:
+    """Negative control: the scanner must reject, not merely observe.
+
+    Without this, a scanner that silently found nothing would pass every real assertion.
+    """
+    registered = _rendered_hm_commands()
+    found = set(_HM_SLASH.findall("see `/hm:health` and `@hm-wrapup` and `/hm:does-not-exist`"))
+    assert {"health", "wrapup"} <= found, found
+    assert sorted(w for w in found if w not in registered) == ["does-not-exist"]
+
+
+def test_every_hm_command_named_in_the_plugin_surface_renders() -> None:
+    docs = _plugin_command_docs()
+    assert docs, "no plugin command markdown found — the scanner would be vacuous"
+    registered = _rendered_hm_commands()
+    bad: dict[str, list[str]] = {}
+    for path in docs:
+        text = path.read_text(encoding="utf-8")
+        missing = sorted({w for w in _HM_SLASH.findall(text) if w not in registered})
+        if missing:
+            bad[str(path.relative_to(_ROOT))] = missing
+    assert bad == {}, (
+        f"plugin command surface names commands that do not render: {bad}. "
+        f"Rendered: {sorted(registered)}"
+    )
+
+
 def test_the_command_list_is_non_empty() -> None:
     """Non-vacuity: if the introspection breaks, every assertion below passes on an empty set.
 

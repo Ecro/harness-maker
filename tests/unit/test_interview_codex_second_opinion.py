@@ -28,8 +28,9 @@ def test_interview_empty_input_defaults_second_opinion_disabled(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Pressing Enter at every prompt yields models=[] (safe default)."""
-    # 13 empty answers: 11 pre-existing + second_opinion + the autopilot-enable question.
-    inputs: Iterator[str] = iter([""] * 12)
+    # 10 empty answers. Two fewer than before: ADR-003 removed the consensus and
+    # caching questions (PLAN-onboarding-interview-ux Phase 4).
+    inputs: Iterator[str] = iter([""] * 10)
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
     result = interview(_profile(), autoloop_mode=False)
     assert result.second_opinion.enabled is False
@@ -40,8 +41,8 @@ def test_interview_codex_answer_enables_second_opinion(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """User typing 'codex' as the second-opinion answer selects only codex."""
-    # 11 empty + 'codex' for the second-opinion question, then '' for autopilot.
-    inputs: Iterator[str] = iter([""] * 10 + ["codex", ""])
+    # 8 empty + 'codex' for the second-opinion question, then '' for autopilot.
+    inputs: Iterator[str] = iter([""] * 8 + ["codex", ""])
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
     result = interview(_profile(), autoloop_mode=False)
     assert result.second_opinion.enabled is True
@@ -61,8 +62,8 @@ def test_interview_multi_model_answer_enables_both(
     both-at-once allowed). No `agy` on the test host -> the antigravity model
     prompt falls back to the hardcoded default without consuming extra input."""
     monkeypatch.setattr("harness_maker.interview._fetch_agy_models", lambda: [])
-    # 11 empty + 'codex,antigravity' for the second-opinion question, then '' for autopilot.
-    inputs: Iterator[str] = iter([""] * 10 + ["codex,antigravity", ""])
+    # 8 empty + 'codex,antigravity' for the second-opinion question, then '' for autopilot.
+    inputs: Iterator[str] = iter([""] * 8 + ["codex,antigravity", ""])
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
     result = interview(_profile(), autoloop_mode=False)
     assert result.second_opinion.enabled is True
@@ -79,8 +80,8 @@ def test_interview_antigravity_answer_prompts_for_model_pick(
         "harness_maker.interview._fetch_agy_models",
         lambda: ["Model A", "Model B"],
     )
-    # 11 empty + 'antigravity' (enable) + '2' (pick Model B) + '' (autopilot).
-    inputs: Iterator[str] = iter([""] * 10 + ["antigravity", "2", ""])
+    # 8 empty + 'antigravity' (enable) + '2' (pick Model B) + '' (autopilot).
+    inputs: Iterator[str] = iter([""] * 8 + ["antigravity", "2", ""])
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
     result = interview(_profile(), autoloop_mode=False)
     assert result.second_opinion.enabled is True
@@ -88,13 +89,23 @@ def test_interview_antigravity_answer_prompts_for_model_pick(
     assert result.second_opinion.antigravity.model == "Model B"
 
 
-def test_interview_unknown_model_token_is_skipped(
+def test_interview_unknown_model_token_is_re_asked(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """An unrecognized token in the comma-separated answer is dropped with a
-    warning, not raised — only the recognized 'codex' survives."""
-    inputs: Iterator[str] = iter([""] * 10 + ["codex,bogus", ""])
-    monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
+    """Behaviour CHANGED in PLAN-onboarding-interview-ux Phase 4 (P1-7).
+
+    This used to assert that `codex,bogus` silently yielded `["codex"]` — the unknown token
+    dropped behind a `logger.warning` the user never sees. That made a typo
+    indistinguishable from a deliberate choice, so the answer is now re-asked. Kept (rather
+    than deleted) so the old contract is visibly superseded instead of vanishing;
+    `tests/unit/test_interview_second_opinion_prompt.py` owns the full new contract.
+    """
+    replies = iter(["codex,bogus", "codex"])
+
+    def _input(prompt: str) -> str:
+        return next(replies, "") if "enable which models" in prompt.lower() else ""
+
+    monkeypatch.setattr("builtins.input", _input)
     result = interview(_profile(), autoloop_mode=False)
     assert result.second_opinion.models == ["codex"]
 

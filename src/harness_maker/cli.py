@@ -2038,6 +2038,31 @@ def profile_cmd(
             typer.echo("detected_checks: (none)")
 
 
+@app.command("detect-tools")
+def detect_tools_cmd(
+    json_output: bool = typer.Option(
+        False,
+        "--json",
+        help="Output as JSON (one line).",
+    ),
+) -> None:
+    """Report which optional external CLIs are on PATH (never cached).
+
+    Consumed by the fresh-install flow so it can OFFER a detected second-opinion model
+    rather than only warning after the user already picked one.
+    """
+    from harness_maker.tool_detect import _BINARIES, INSTALLED_MEANS, detect_tools
+
+    found = detect_tools()
+    if json_output:
+        typer.echo(json.dumps(found, separators=(",", ":")))
+        return
+    for key, state in found.items():
+        mark = "yes" if state["installed"] else "no "
+        typer.echo(f"{key} ({_BINARIES[key]}): {mark}")
+    typer.echo(f"note: 'yes' means {INSTALLED_MEANS}.")
+
+
 @app.command("verify")
 def verify_stage_cmd(
     target: Path = typer.Argument(  # noqa: B008

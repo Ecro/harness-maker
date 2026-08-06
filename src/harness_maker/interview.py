@@ -6,7 +6,12 @@ Question order:
     2. preset (Side / Production) — recommended based on profile.
     3. dev_mode (spec-driven / task-driven) — independent of preset; default
        per preset (Side→task-driven, Production→spec-driven). Any cross OK.
-    5. consensus + caching (preset defaults shown).
+    4. worktree isolation, ref_folders, sibling_repos, Second Brain,
+       cross-model second opinion, autopilot.
+
+``consensus`` and ``caching`` are NOT asked (ADR-003 of PLAN-onboarding-interview-ux):
+neither value is read by any code path or stage template, so the question was friction
+with no effect. Both take their preset defaults; the fields and harness.yaml keys remain.
 
 Skills and agents are always installed in full; the `enabled` lists in the
 returned answers govern default activation. Users can override per-task with
@@ -158,8 +163,12 @@ def interview(
     preset = _ask_preset(recommended)
     dev_mode = _ask_dev_mode(preset)
     worktree_enabled = _ask_worktree(preset)
-    consensus = _ask_with_default("consensus", _consensus_for(preset))
-    caching = _ask_with_default("caching", "agent-aware")
+    # ADR-003 of PLAN-onboarding-interview-ux: `consensus` / `caching` were asked here with
+    # no explanation of their valid values, and neither changes any behaviour — nothing in
+    # Python and no stage template branches on them. The fields and harness.yaml keys stay;
+    # only the questions go. They now take their preset defaults.
+    consensus = _consensus_for(preset)
+    caching = "agent-aware"
     ref_folders = _ask_ref_folders()
     sibling_repos = _ask_sibling_repos()
     second_brain = _ask_second_brain()
@@ -451,19 +460,20 @@ def _ask_second_opinion() -> SecondOpinionConfig:
     only, ADR-007) with a hardcoded fallback when ``agy`` is absent. Advanced tuning
     happens via direct ``harness.yaml.second_opinion.*`` edits.
     """
+    from harness_maker.tool_detect import _BINARIES, INSTALLED_MEANS, detect_tools
+
     print("\nCross-model second opinion (Codex / Antigravity).")
     print("  Enabled models cast a real k-of-N consensus vote in /hm:review and are")
     print("  reconciled in /hm:plan. A missing/unauthenticated CLI degrades gracefully")
     print("  (warn + skip). Prereqs: `codex login` (codex), authenticated `agy` (antigravity).")
-    raw = (
-        _input_or_empty("  Enable which models? [codex,antigravity or blank for none]: ")
-        .strip()
-        .lower()
-    )
-    selected = [m.strip() for m in raw.split(",") if m.strip()]
-    models = [m for m in selected if m in SECOND_OPINION_MODELS]
-    for unknown in (m for m in selected if m not in SECOND_OPINION_MODELS):
-        logger.warning("unknown second-opinion model %r — skipped", unknown)
+    found = detect_tools()
+    print("  Detected on this machine:")
+    for name in SECOND_OPINION_MODELS:
+        state = "installed" if found.get(name, {}).get("installed") else "not installed"
+        print(f"    {name:<12} ({_BINARIES[name]}) — {state}")
+    print(f"  ('installed' = {INSTALLED_MEANS}.)")
+    print("    1) codex    2) antigravity    3) both    4) none")
+    models = _read_second_opinion_models()
     if not models:
         return SecondOpinionConfig()
     kwargs: dict[str, object] = {"models": models}
@@ -482,6 +492,40 @@ def _ask_second_opinion() -> SecondOpinionConfig:
             )
             kwargs["antigravity"] = SecondOpinionAntigravityConfig()
     return SecondOpinionConfig.model_validate(kwargs)
+
+
+_MAX_SECOND_OPINION_ATTEMPTS = 3
+
+_NUMBERED_SECOND_OPINION: dict[str, list[str]] = {
+    "1": ["codex"],
+    "2": ["antigravity"],
+    "3": ["codex", "antigravity"],
+    "4": [],
+}
+
+
+def _read_second_opinion_models() -> list[str]:
+    """Numbered choice, with the legacy comma list still accepted.
+
+    Re-asks on an unrecognised entry instead of dropping it behind a `logger.warning` the
+    user never sees — a swallowed typo is indistinguishable from declining. Bounded, so an
+    unattended stdin terminates at the safe default rather than spinning.
+    """
+    prompt = "  Enable which models? [1-4, or a comma list like 'codex,antigravity'] (none): "
+    for attempt in range(1, _MAX_SECOND_OPINION_ATTEMPTS + 1):
+        raw = _input_or_empty(prompt).strip().lower()
+        if not raw or raw == "none":
+            return []
+        if raw in _NUMBERED_SECOND_OPINION:
+            return list(_NUMBERED_SECOND_OPINION[raw])
+        selected = [m.strip() for m in raw.split(",") if m.strip()]
+        unknown = [m for m in selected if m not in SECOND_OPINION_MODELS]
+        if selected and not unknown:
+            return selected
+        if attempt < _MAX_SECOND_OPINION_ATTEMPTS:
+            print(f"  not recognised: {', '.join(unknown) or raw!r} — pick 1-4 or a model name.")
+    print("  no valid selection after 3 tries — leaving the second opinion off.")
+    return []
 
 
 def _ask_antigravity_model() -> str:
