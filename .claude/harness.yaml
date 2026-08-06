@@ -4,7 +4,7 @@ harness_maker_version: 0.47.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: harness-yaml/Production.yaml.j2
 provenance: official
-content_hash: 69e676af3ffbf087e3d3bd0d0788cc331049c18ef8f507ff246374df82bd4dd5
+content_hash: 4a757280290a3653dfb6699b10247d4188b4081d9f43f7ca9caa7977002acfe4
 ---
 preset: Production
 locale: ko
@@ -108,9 +108,7 @@ skills:
     - second-opinion-gate
 
 worktree:
-  scope: [execute, plan]
-  branch_prefix: hm-
-  feature_branch_workflow: true
+  enabled: true
 memory:
   enabled: true
   dir: .claude/memory

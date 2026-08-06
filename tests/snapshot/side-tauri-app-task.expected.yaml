@@ -157,7 +157,7 @@ files:
   body_sha256: 6540b967e2f157338e372b18804c8eeea094d0e6a7897a8d19d787d10d3062b0
 - path: skills/worktree-isolator/SKILL.md
   template: skills/worktree-isolator/SKILL.md.j2
-  body_sha256: 3c67d4f118836f6c7ded5eaec634979d90cd4213972e8eb777a305404108edf4
+  body_sha256: b3ce34ea25321280d309fe3188fd757e1665aad75a95aa76ecd942bdcc128b47
 - path: stages/execute.md
   template: stages/execute.md.j2
   body_sha256: a39108b93f6de4f20265f93c28b62ac71c9ea0977bccbe121b5891fe2c7ddf47

@@ -6,7 +6,7 @@
   "counting_rule": "ADR-011: round_trips = count of ^! lines (claude variant) or 'Bash(' call sites (codex variant), plus all 'Task(' occurrences; fenced examples included. A consistent proxy, not a semantic count.",
   "generated_by": "tests/structural/_surface_baseline.py",
   "payload_digest": "d0c732388275e10454925c87d4f81095c0f690a7c8866e66f02c19685bf453d8",
-  "render_sha": "2ff7fb5166399859f551dc4c21ddf9f004368278",
+  "render_sha": "f0f8bf45b7d4e71e3db866774e38209d2a326447",
   "schema_version": 1,
   "surface": {
     "claude": {
