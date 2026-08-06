@@ -20,7 +20,16 @@
 
 **Per-project personalization** · Grade-gated · Self-evolving · Multi-IDE
 
-Design notes and field reports live on [EdgeLog](https://edgelog.dev/), the maintainer's embedded and edge engineering blog: [how long harness engineering has](https://edgelog.dev/blog/harness-engineering-lifespan/).
+Design notes and field reports live on [EdgeLog][edgelog], the maintainer's embedded and edge engineering blog. Start with [how long harness engineering has][lifespan].
+
+<!-- Reference-style on purpose. Inline links put the URL next to a closing
+     paren, and crawlers that read this file raw (not the rendered page) grab
+     the punctuation too, then request /blog/<slug>/). That 404 drew 4 users
+     and 6 pageviews in the 2026-08 window. Reference definitions end at a
+     newline, so there is nothing to over-grab. -->
+
+[edgelog]: https://edgelog.dev/
+[lifespan]: https://edgelog.dev/blog/harness-engineering-lifespan/
 
 [Why](#why-harness-maker) ·
 [How it fits](#how-it-fits-your-project) ·
