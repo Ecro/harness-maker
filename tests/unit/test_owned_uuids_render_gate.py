@@ -27,11 +27,12 @@ _OWNED_LINE = re.compile(r"HM_OWNED_SESSION_UUIDS=.*?(?:\n|$)")
 def rendered(tmp_path_factory: pytest.TempPathFactory) -> Path:
     out = tmp_path_factory.mktemp("rendered-owned-gate")
     p = ProjectProfile(stack=["python"], scale="small", lifecycle="dormant")
-    render(
-        synthesize(p, interview(p, autoloop_mode=True)),
-        out,
-        freeze_time=DEFAULT_FREEZE_TIME,
-    )
+    # Isolation ON: the ownership crumb only exists because a worktree finalize
+    # deferred a stash. Under `worktree.enabled: false` there is no worktree, no
+    # deferred stash, and correctly no crumb (PLAN-worktree-side-defaults ADR-005) —
+    # rendering the recommended preset would silently test the wrong configuration.
+    answers = interview(p, autoloop_mode=True).model_copy(update={"worktree": {"enabled": True}})
+    render(synthesize(p, answers), out, freeze_time=DEFAULT_FREEZE_TIME)
     return out
 
 

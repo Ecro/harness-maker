@@ -79,7 +79,7 @@ This is where `Side` vs `Production` lives — inside the identical files:
 | Reviewers enabled | `[code-reviewer]` (1) | `[code, security, performance, ux, concurrency]` (5) | `reviewers.enabled` |
 | Grade threshold | `B` | `A` | `reviewers.grade_threshold` |
 | Max review rounds | `2` | `3` | `reviewers.max_review_rounds` |
-| Worktree model | `feature_branch_workflow: false`, scope `[execute]` | `feature_branch_workflow: true`, scope `[execute, plan]` | `worktree.*` |
+| Worktree isolation | `enabled: false` (work on the current branch) | `enabled: true` (every stage in a per-task worktree) | `worktree.enabled` |
 | Cross-model 2nd opinion | none | `models: [codex, antigravity]` | `second_opinion` |
 | Context budgets (lint) | CLAUDE.md 200 / agent 150 / skill 100 | CLAUDE.md 500 / agent 200 / skill 150 | `context_lint.py` |
 
@@ -126,8 +126,7 @@ reviewers:
   grade_threshold: A
   max_review_rounds: 3
 worktree:
-  scope: [execute, plan]     # plan also runs in a worktree
-  feature_branch_workflow: true
+  enabled: true              # every /hm: stage runs in a per-task worktree
 second_opinion:
   models: [codex, antigravity]   # cross-model consensus, K=2
   agents: [code-reviewer, consensus-arbiter, plan-validator]

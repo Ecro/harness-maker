@@ -31,6 +31,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import NamedTuple
 
 import yaml
 
@@ -1015,6 +1016,140 @@ def enablement_preflight(
             f"make — pending: {', '.join(blockers)}"
         )
     return True, None
+
+
+def disable_preflight(
+    target: Path, *, sibling_bases: list[Path] | None = None
+) -> tuple[bool, str | None]:
+    """Symmetric counterpart of :func:`enablement_preflight` — may isolation be
+    turned OFF right now? (PLAN-worktree-side-defaults ADR-003.)
+
+    Returns ``(may_disable, refusal)``. The upgrade direction had a clean-live-state
+    probe from the start; the downgrade direction had none, so a `--preset Side`
+    flip moved a project with live `hm/<slug>` worktrees back onto the legacy model
+    with zero output. That is the precondition class of the count:3
+    `worktree-finalize-pulls-orphan-wip-into-main` contamination — and once the OFF
+    render also stops emitting the finalize/stash recovery instructions, the
+    stranded state has no documented way back.
+
+    Blockers are the same residue set the enablement probe uses, minus the
+    user-dirt probe: ordinary uncommitted work is not a reason to refuse a config
+    change, whereas a live task worktree / pending finalize stash / live loop marker
+    is. Filesystem + read-only git only; never MUTATES anything.
+    """
+    bases: list[tuple[Path, str]] = [(target, "")]
+    bases += [(sib, f" [sibling {sib.name}]") for sib in sibling_bases or []]
+    blockers: list[str] = []
+    live_foreign = False
+    for base, label in bases:
+        blockers += _old_model_residue_blockers(base, label)
+        wt_blockers, saw_live = _task_worktree_blockers(base, label)
+        blockers += wt_blockers
+        live_foreign = live_foreign or saw_live
+        blockers += _unlanded_task_branch_blockers(base, label)
+    if blockers:
+        # The remedy is liveness-aware on purpose: `task-land` on a worktree another
+        # session is actively writing in squashes its half-finished branch into base and
+        # deletes the directory underneath it — the contamination class this guard was
+        # added to prevent, triggered by the guard's own advice.
+        remedy = (
+            "One or more of these belong to a LIVE session (see the (LIVE …) tags). "
+            "Stop that session or wait for it — do NOT `task-land` a worktree another "
+            "session is writing in."
+            if live_foreign
+            else "Land or discard it first (`/hm:wrapup`, or `hm worktree task-land <slug>`)."
+        )
+        return False, (
+            "refusing to disable worktree isolation — in-flight work would be "
+            f"stranded: {', '.join(blockers)}\n"
+            f"{remedy} Then re-run."
+        )
+    return True, None
+
+
+def _task_worktree_blockers(base: Path, label: str) -> tuple[list[str], bool]:
+    """Per-task worktrees (`hm/<slug>`) in ``base``, plus whether any looked LIVE.
+
+    Fail-CLOSED, unlike `_is_task_worktree`'s own fail-open contract: that predicate
+    exists for the finalize dispatch, where "not a task worktree" routes to the legacy
+    path. Here the same False would mean "nothing to strand, go ahead and disable", so a
+    directory whose branch cannot be read — a detached HEAD mid-`task-refresh` rebase,
+    a git error, a permission problem — is reported as an INDETERMINATE blocker rather
+    than waved through. Mirrors `_git_dirt_blocker`'s defer-on-failure stance.
+    """
+    wt_root = base / WORKTREE_DIR_NAME
+    try:
+        if not wt_root.is_dir():
+            return [], False
+        entries = sorted(wt_root.iterdir())
+    except OSError as exc:
+        return [
+            f"cannot enumerate {wt_root}{label} ({type(exc).__name__}) — assuming in flight"
+        ], False
+
+    live_rows = {row.worktree: row for row in _read_sessions(base) if _pid_alive(row.pid)}
+    out: list[str] = []
+    saw_live = False
+    for d in entries:
+        try:
+            if not d.is_dir() or not (d / ".git").exists():
+                continue
+            branch = _current_branch(d)
+        except (OSError, RuntimeError) as exc:
+            out.append(
+                f"task worktree {d.name}{label} — branch unresolvable ({type(exc).__name__})"
+            )
+            continue
+        if branch == "HEAD":
+            out.append(f"task worktree {d.name}{label} — detached HEAD (mid-rebase?)")
+            continue
+        if not branch.startswith(_TASK_BRANCH_PREFIX):
+            continue
+        row = live_rows.get(str(d)) or live_rows.get(str(d.resolve()))
+        if row is not None:
+            saw_live = True
+            out.append(f"task worktree {d.name}{label} (LIVE — pid {row.pid})")
+        else:
+            out.append(f"task worktree {d.name}{label}")
+    return out, saw_live
+
+
+def _unlanded_task_branch_blockers(base: Path, label: str) -> list[str]:
+    """`hm/*` branches with no landed marker, even when the worktree dir is gone.
+
+    In the per-task model the durable unit of work is the BRANCH — `cleanup` removes the
+    directory but never the branch, so a crash or a manual `git worktree remove` leaves
+    branch-only state that a directory-only probe cannot see.
+    """
+    try:
+        cp = _run(
+            [
+                "git",
+                "for-each-ref",
+                "--format=%(refname:short)",
+                f"refs/heads/{_TASK_BRANCH_PREFIX}*",
+            ],
+            cwd=base,
+        )
+    except RuntimeError:
+        return []
+    out: list[str] = []
+    for branch in cp.stdout.split():
+        if not _landed_marker_matches_tip(base, branch):
+            out.append(f"unlanded branch {branch}{label}")
+    return out
+
+
+def _landed_marker_matches_tip(base: Path, branch: str) -> bool:
+    """True when `refs/hm-landed/v1/<branch>` records this branch's current tip."""
+    try:
+        marker = _run(
+            ["git", "rev-parse", f"{_LANDED_REF_PREFIX}{branch}"], cwd=base
+        ).stdout.strip()
+        tip = _run(["git", "rev-parse", branch], cwd=base).stdout.strip()
+    except RuntimeError:
+        return False
+    return bool(marker) and marker == tip
 
 
 def _list_pending_stash_refs(claude_dir: Path) -> list[str]:
@@ -2301,19 +2436,6 @@ def cleanup_all(base_dir: Path, force: bool = False) -> int:
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-def _scope_includes(harness_yaml: Path, stage: str) -> bool:
-    """Read harness.yaml; return True iff worktree.scope includes the stage."""
-    try:
-        data = load_harness_yaml(harness_yaml)
-    except (OSError, yaml.YAMLError):
-        return False
-    wt = data.get("worktree")
-    if not isinstance(wt, dict):
-        return False
-    scope = wt.get("scope")
-    return isinstance(scope, list) and stage in scope
-
-
 _SIBLING_SENTINEL = "SIBLING_WORKTREE_PATHS"
 _EXECUTE_MD_REL = Path(".claude") / "commands" / "hm" / "execute.md"
 
@@ -2526,7 +2648,14 @@ def _cli_create(args: list[str]) -> int:
         return 1
 
     yaml_path = base / ".claude" / "harness.yaml"
-    if not _scope_includes(yaml_path, stage):
+    # PLAN-worktree-side-defaults R11: this gate used to read the retired
+    # `worktree.scope` directly. The moment the preset templates stopped rendering
+    # `scope`, that read returned False on a freshly-rendered **ON** harness, this
+    # printed an empty line, and every rendered command reads empty output as "no
+    # isolation; operate in cwd" — a total, silent isolation loss that no render or
+    # unit test in the suite would have caught. Route through the single reader; the
+    # `stage` argument survives so a legacy `scope` harness keeps per-stage behavior.
+    if not worktree_enabled(base, stage=stage):
         print("")
         return 0
 
@@ -2964,7 +3093,25 @@ def _cli_finalize(args: list[str]) -> int:
     # new path captures pending work as branch commits and NEVER tears the
     # persistent worktree down, for `fail` too (validator critical: a clean
     # persistent WT must survive a blocked stage; teardown is Phase-4 land).
-    if _feature_branch_workflow_enabled(project_root) and _is_task_worktree(wt):
+    if _is_task_worktree(wt):
+        if not worktree_enabled(project_root):
+            # A persistent `hm/<slug>` worktree exists but the harness now says isolation
+            # is OFF. Falling through to the legacy path would squash-merge an unlanded
+            # task branch into base HEAD and then `git worktree remove --force` the
+            # directory — the count:3 `worktree-finalize-pulls-orphan-wip-into-main`
+            # shape, reachable by a hand-edit that bypasses `disable_preflight`. Refuse.
+            try:
+                slug = _current_branch(wt).removeprefix("hm/")
+            except RuntimeError:
+                slug = wt.name
+            print(
+                f"[finalize] refusing: {wt} is a task worktree on `hm/{slug}` but "
+                "harness.yaml says worktree.enabled is off.\n"
+                f"  Land it first:  hm worktree task-land {slug}\n"
+                "  Or re-enable:   harness-maker make . --worktree",
+                file=sys.stderr,
+            )
+            return 1
         return _finalize_commit_not_stash(all_wts)
 
     if status == "fail":
@@ -3632,12 +3779,118 @@ def _reset_flag_warning_state() -> None:
     _FLAG_WARNED = False
 
 
-def _feature_branch_workflow_enabled(base_dir: Path) -> bool:
-    """Read harness.yaml worktree.feature_branch_workflow (ADR-008).
+class WorktreeResolution(NamedTuple):
+    """Outcome of the three-generation `worktree:` block resolution.
 
-    Conservative absent-key fallback: a harness.yaml lacking the key (never
-    re-rendered) returns False (old model) and warns exactly once per process,
-    mirroring the `targets` absent-key precedent (CLAUDE.md #6).
+    ``value is None`` means *nothing was present* (rung 4) — the caller picks the
+    default. Any other rung yields a real bool, so a present-but-malformed key
+    resolves fail-closed rather than falling through to a stale lower rung.
+    """
+
+    value: bool | None
+    rung: int
+    diagnostic: str | None
+
+
+def resolve_worktree_enabled(block: object, *, stage: str | None = "execute") -> WorktreeResolution:
+    """Resolve a parsed ``worktree:`` block to the isolation boolean.
+
+    PLAN-worktree-side-defaults ADR-007. First key present wins, newest generation
+    first. Two rules exist because their absence was a shipped hazard:
+
+    1. A present-but-non-boolean value **terminates** the lookup fail-closed. Under
+       fall-through, ``enabled: "false"`` next to a stale ``feature_branch_workflow:
+       true`` would silently turn isolation *on* against the apparent opt-out.
+    2. A present ``scope`` terminates too. Falling through on ``scope: []`` would
+       contradict first-key-present-wins — and ``scope: []`` is precisely the
+       hand-edit a user makes when trying to disable.
+
+    ``stage=None`` means "is isolation on for ANY stage" — the question a *guard* asks.
+    It matters only at rung 3: a legacy `scope: ["plan"]` harness has live isolation, but
+    resolving it against the default `"execute"` returns False, which would let the
+    disable guard conclude there is nothing to strand.
+
+    Callers that only need a bool should use :func:`worktree_enabled`.
+    """
+    if block is None:
+        return WorktreeResolution(None, 0, None)
+    if not isinstance(block, dict):
+        # A PRESENT but malformed block (`worktree: false`, `worktree: "off"`) is a
+        # visible opt-out, not an absence. Treating it as absent let a non-interactive
+        # Production re-render run the enablement probe and write `enabled: true` over
+        # it — the same fail-closed rule the per-key branches below implement.
+        # rung 1, NOT 0: rung 0 means "nothing present", which is the migration's signal
+        # to run that probe.
+        return WorktreeResolution(
+            False,
+            1,
+            f"worktree is {block!r}, not a mapping — treating isolation as OFF. Fix harness.yaml.",
+        )
+
+    for rung, key in ((1, "enabled"), (2, "feature_branch_workflow")):
+        if key not in block:
+            continue
+        val = block[key]
+        if not isinstance(val, bool):
+            return WorktreeResolution(
+                False,
+                rung,
+                f"worktree.{key} is {val!r}, not a boolean — refusing to guess. "
+                "Fix harness.yaml (isolation is treated as OFF until you do).",
+            )
+        if rung == 1:
+            legacy = _legacy_disagreement(block, val, stage=stage)
+            return WorktreeResolution(val, 1, legacy)
+        return WorktreeResolution(val, 2, None)
+
+    if "scope" in block:
+        scope = block["scope"]
+        if not isinstance(scope, list):
+            return WorktreeResolution(
+                False,
+                3,
+                f"worktree.scope is {scope!r}, not a list — treating isolation as OFF.",
+            )
+        on = bool(scope) if stage is None else (stage in scope)
+        return WorktreeResolution(on, 3, None)
+
+    return WorktreeResolution(None, 0, None)
+
+
+def _legacy_disagreement(block: dict[str, object], value: bool, *, stage: str | None) -> str | None:
+    """Warn when a retired key contradicts `enabled` (ADR-007).
+
+    `enabled` still wins — it is the newest explicit decision — but a silent flip
+    is exactly the name-reuse hazard the second opinion flagged, so make it visible.
+    """
+    legacy = block.get("feature_branch_workflow")
+    if isinstance(legacy, bool) and legacy != value:
+        return (
+            f"worktree.enabled is {value} but the retired "
+            f"worktree.feature_branch_workflow says {legacy}; using enabled. "
+            "Delete the retired key."
+        )
+    scope = block.get("scope")
+    if not isinstance(scope, list):
+        return None
+    _scope_on = bool(scope) if stage is None else (stage in scope)
+    if _scope_on != value:
+        return (
+            f"worktree.enabled is {value} but the retired worktree.scope "
+            f"({scope!r}) implies {not value}; using enabled. Delete the retired key."
+        )
+    return None
+
+
+def worktree_enabled(base_dir: Path, *, stage: str = "execute") -> bool:
+    """Read harness.yaml and resolve the worktree-isolation boolean.
+
+    THE single runtime reader (PLAN-worktree-side-defaults ADR-001/007). Every
+    behavior-bearing consumer routes through this — a second reader that diverges
+    means `/hm:health` can report a different mode than the one executing.
+
+    ``stage`` is consulted only by the legacy `scope` rung, so an un-re-rendered
+    harness keeps its per-stage behavior; rung 1 and 2 are stage-blind by design.
     """
     global _FLAG_WARNED
     yaml_path = base_dir / _LOOP_MARKER_DIR / "harness.yaml"
@@ -3645,23 +3898,29 @@ def _feature_branch_workflow_enabled(base_dir: Path) -> bool:
         data = load_harness_yaml(yaml_path)
     except (OSError, yaml.YAMLError):
         return False
-    wt = data.get("worktree")
-    val = wt.get("feature_branch_workflow") if isinstance(wt, dict) else None
-    # Absent OR non-bool → conservative old-model. A hand-edited non-bool (e.g. the
-    # string "false") must NOT read as enabled — `bool("false")` is True — so mirror
-    # the interview-layer bool-strictness (REVIEW code P2: the runtime reader and
-    # `answers_from_harness_yaml` must agree on the same on-disk bytes).
-    if not isinstance(val, bool):
+    res = resolve_worktree_enabled(data.get("worktree"), stage=stage)
+    if res.diagnostic:
+        print(f"[worktree] {res.diagnostic}", file=sys.stderr)
+    if res.value is None:
         if not _FLAG_WARNED:
             print(
-                "[worktree] harness.yaml worktree.feature_branch_workflow absent or "
-                "non-boolean → defaulting to the old (non-feature-branch) model. "
-                "Re-render with `/harness-maker:make` to opt in.",
+                "[worktree] harness.yaml has no worktree.enabled key → defaulting to "
+                "isolation OFF. Re-render with `/harness-maker:make` to set it.",
                 file=sys.stderr,
             )
             _FLAG_WARNED = True
         return False
-    return val
+    return res.value
+
+
+def _feature_branch_workflow_enabled(base_dir: Path) -> bool:
+    """Deprecated alias for :func:`worktree_enabled` (PLAN-worktree-side-defaults).
+
+    Retained for one release so an out-of-tree caller does not break; do NOT add
+    new call sites — the structural test in
+    ``tests/unit/test_worktree_reader_singleton.py`` enforces that.
+    """
+    return worktree_enabled(base_dir)
 
 
 # ── Phase 1 (ADR-004): session registry .claude/.hm-sessions.json ─────────────

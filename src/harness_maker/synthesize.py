@@ -246,9 +246,7 @@ _COMMAND_DESCRIPTIONS: dict[str, str] = {
     "commands/hm/plan.md": (
         "Lock how and in what order — deep interview, ADRs and validated phases into a PLAN doc."
     ),
-    "commands/hm/execute.md": (
-        "Implement a PLAN's phases TDD-first in an isolated worktree. Stages, never commits."
-    ),
+    "commands/hm/execute.md": ("Implement a PLAN's phases TDD-first. Stages, never commits."),
     "commands/hm/review.md": (
         "Multi-reviewer consensus review with a grade gate and an auto-fix loop."
     ),
@@ -744,6 +742,26 @@ def _codex_stage_skills(*, config_dump: dict[str, object] | None = None) -> list
     return out
 
 
+def _normalize_worktree(answers: InterviewAnswers) -> dict[str, Any]:
+    """Collapse any generation of `worktree` answers to the one live key.
+
+    PLAN-worktree-side-defaults ADR-001/007. THE normalization point: templates
+    read `config.worktree['enabled']` and nothing else, so an answers dict built
+    before this change (`{"feature_branch_workflow": True}`, `{"scope": [...]}`,
+    or bare `{}`) must still resolve rather than render `StrictUndefined`. Uses the
+    same resolver as the runtime reader so the two cannot disagree; a fully absent
+    block falls back to the preset default.
+    """
+    from harness_maker.interview import _preset_extras
+    from harness_maker.worktree import resolve_worktree_enabled
+
+    res = resolve_worktree_enabled(answers.worktree)
+    if res.value is None:
+        default = _preset_extras(answers.preset)["worktree"]["enabled"]
+        return {"enabled": bool(default)}
+    return {"enabled": res.value}
+
+
 def synthesize(
     profile: ProjectProfile,
     answers: InterviewAnswers,
@@ -770,7 +788,7 @@ def synthesize(
         autoloop=answers.autoloop,
         memory=answers.memory,
         anti_rot=answers.anti_rot,
-        worktree=answers.worktree,
+        worktree=_normalize_worktree(answers),
         security=answers.security,
         permissions=answers.permissions,
         autonomy=answers.autonomy,

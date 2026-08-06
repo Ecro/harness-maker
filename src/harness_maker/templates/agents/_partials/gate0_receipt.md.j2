@@ -20,6 +20,13 @@
     three stages missing on every iteration. The atomic branch renders byte-identically
     to the pre-Phase-4 output. -#}
 {% import "agents/_partials/g0_macros.md.j2" as g0 -%}
+{#- PLAN-worktree-side-defaults: `<WT>` only exists under isolation. With
+    `worktree.enabled: false` the guard's `[ -f "<WT>/…" ]` is a literal path that can
+    never exist, so the receipt would silently never fire and the autoloop driver's
+    Gate 0 would see every stage missing on every iteration. Point the root at cwd
+    instead — the guard still no-ops on a standalone run because `.current-iter` is
+    written only by the driver. -#}
+{% set g0_root = "<WT>" if (config.worktree is defined and config.worktree.get('enabled')) else "." -%}
 {{ gate0_heading }}
 
 You have completed the stage. Emit a receipt so the autoloop driver's Gate 0 can detect missing stages at the next convergence check. Pick `<verdict>`:
@@ -32,15 +39,15 @@ You have completed the stage. Emit a receipt so the autoloop driver's Gate 0 can
 
 {% if is_codex %}
 ```
-Bash("if [ -f \"<WT>/.claude/.hm-iter-receipts/.current-iter\" ]; then ITER=$(cat \"<WT>/.claude/.hm-iter-receipts/.current-iter\" 2>/dev/null); if [ -n \"$ITER\" ]; then uv run --with {{ harness_maker_src_path }} hm iter_receipts write --iter \"$ITER\" --stage {{ gate0_stage }} --verdict <verdict> --root \"<WT>\"; fi; fi")
+Bash("if [ -f \"{{ g0_root }}/.claude/.hm-iter-receipts/.current-iter\" ]; then ITER=$(cat \"{{ g0_root }}/.claude/.hm-iter-receipts/.current-iter\" 2>/dev/null); if [ -n \"$ITER\" ]; then uv run --with {{ harness_maker_src_path }} hm iter_receipts write --iter \"$ITER\" --stage {{ gate0_stage }} --verdict <verdict> --root \"{{ g0_root }}\"; fi; fi")
 ```
 {% else %}
 ```bash
-!if [ -f "<WT>/.claude/.hm-iter-receipts/.current-iter" ]; then \
-   ITER=$(cat "<WT>/.claude/.hm-iter-receipts/.current-iter" 2>/dev/null); \
+!if [ -f "{{ g0_root }}/.claude/.hm-iter-receipts/.current-iter" ]; then \
+   ITER=$(cat "{{ g0_root }}/.claude/.hm-iter-receipts/.current-iter" 2>/dev/null); \
    if [ -n "$ITER" ]; then \
      uv run --with {{ harness_maker_src_path }} hm iter_receipts write \
-       --iter "$ITER" --stage {{ gate0_stage }} --verdict <verdict> --root "<WT>"; \
+       --iter "$ITER" --stage {{ gate0_stage }} --verdict <verdict> --root "{{ g0_root }}"; \
    fi; \
  fi
 ```

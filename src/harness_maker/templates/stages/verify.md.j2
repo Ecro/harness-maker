@@ -1,3 +1,4 @@
+{% set wt_on = config.worktree is defined and config.worktree.get('enabled') %}{% set WTR = '<WT>' if wt_on else '.' -%}
 # Stage: verify
 
 > Atomic stage. Pre-completion verification gate — {% if config.dev_mode == 'spec-driven' %}6{% else %}5{% endif %}-check stop sign before `wrapup`. Failures block by default; `--force` overrides explicitly.
@@ -161,11 +162,11 @@ Evaluation sequence when `spec_need_verdict` is one of the above values:
 **Step 6a — operation check:**
 {% if is_codex %}
 ```
-Bash("uv run --with {{ harness_maker_src_path }} hm spec_need op-check --verdict <spec_need_verdict> --target <spec_need_target> --root <WT> --changed-file <f1> --changed-file <f2> …")
+Bash("uv run --with {{ harness_maker_src_path }} hm spec_need op-check --verdict <spec_need_verdict> --target <spec_need_target> --root {{ WTR }} --changed-file <f1> --changed-file <f2> …")
 ```
 {% else %}
 ```bash
-!uv run --with {{ harness_maker_src_path }} hm spec_need op-check --verdict <spec_need_verdict> --target <spec_need_target> --root <WT> --changed-file <f1> --changed-file <f2> …
+!uv run --with {{ harness_maker_src_path }} hm spec_need op-check --verdict <spec_need_verdict> --target <spec_need_target> --root {{ WTR }} --changed-file <f1> --changed-file <f2> …
 ```
 {% endif %}
 
@@ -174,11 +175,11 @@ Exit 0 → operation satisfied → **PASS**. Proceed to next check.
 **Step 6b — waiver check** (only if Step 6a exits 1):
 {% if is_codex %}
 ```
-Bash("uv run --with {{ harness_maker_src_path }} hm spec_need waiver-check --root <WT> --slug <task_slug> --changed-file <f1> --changed-file <f2> …")
+Bash("uv run --with {{ harness_maker_src_path }} hm spec_need waiver-check --root {{ WTR }} --slug <task_slug> --changed-file <f1> --changed-file <f2> …")
 ```
 {% else %}
 ```bash
-!uv run --with {{ harness_maker_src_path }} hm spec_need waiver-check --root <WT> --slug <task_slug> --changed-file <f1> --changed-file <f2> …
+!uv run --with {{ harness_maker_src_path }} hm spec_need waiver-check --root {{ WTR }} --slug <task_slug> --changed-file <f1> --changed-file <f2> …
 ```
 {% endif %}
 
@@ -192,7 +193,7 @@ The required SPEC operation was not performed and no valid waiver exists.
 To resolve: author the SPEC via /hm:plan re-entry (/hm:plan <slug> — the
 resume-marker skips re-detection and routes directly to /hm:spec) or record
 a fresh, non-empty-rationale waiver with:
-  uv run --with {{ harness_maker_src_path }} hm spec_need waiver-set --root <WT> --slug <slug> \
+  uv run --with {{ harness_maker_src_path }} hm spec_need waiver-set --root {{ WTR }} --slug <slug> \
     --verdict <verdict> --target <target> --rationale "<reason>" \
     --changed-file <f1> …
 Note: a stale waiver (diff changed since last waiver-set) is treated as NO waiver.
@@ -309,7 +310,7 @@ For no-baseline PASS, the corresponding check record carries `"result": "PASS"` 
 When `--force` is set, append the same record with `"force_override": true, "override_reason": "<text>"`.
 
 ## Procedure
-{%- if config.worktree is defined and config.worktree.get('feature_branch_workflow') %}
+{%- if config.worktree is defined and config.worktree.get('enabled') %}
 
 {% set hm_stage = "verify" %}{% include "agents/_partials/worktree_preflight.md.j2" %}
 {%- endif %}

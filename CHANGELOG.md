@@ -1,5 +1,43 @@
 # Changelog
 
+## [Unreleased]
+
+### BREAKING — the worktree axis collapses to `worktree.enabled` (`PLAN-worktree-side-defaults`)
+
+`harness.yaml`'s `worktree:` block shipped four keys and **one** had runtime effect.
+`worktree.enabled` was never rendered and never read; `branch_prefix` was documented as
+"reserved" and never implemented; `scope`'s `plan` element had no call site. Worse,
+`scope` and `branch_prefix` were **hardcoded template literals**, so a hand-edit was
+silently reverted on every re-render — and the Side preset answered "isolation off"
+while rendering `scope: [execute]`, which turned execute isolation **on**.
+
+**The block is now one key.** `worktree.enabled: true|false` — ON runs every `/hm:`
+stage inside a per-task worktree on `hm/<slug>` and has `/hm:wrapup` squash-land it;
+OFF creates no worktree anywhere. `scope`, `branch_prefix` and
+`feature_branch_workflow` are retired.
+
+**Migration is automatic and behavior-preserving where it can be.** On re-render:
+an explicit `feature_branch_workflow` bool is preserved exactly and silently; a
+`scope`-only block is genuinely lossy (the old axis could express *execute-only*
+isolation, the boolean cannot) so an interactive re-render asks and a scripted one
+writes `false` with a loud notice naming the `--worktree` remedy; `scope: []` or a
+`scope` without `execute` is read as an explicit off. An un-re-rendered harness keeps
+working — the runtime reader still resolves both legacy generations.
+
+**It is now selectable.** A new interview question, a `/hm:configure` dimension, and
+`--worktree` / `--no-worktree`. Precedence is CLI flag > disk > preset default, and a
+`--preset` switch no longer clobbers an explicit value.
+
+**Turning isolation off is refused while it would strand work** — live `hm/*` task
+worktrees, pending finalize stashes or live loop markers in the primary base or any
+sibling abort the change with the branches named, because the OFF render also stops
+emitting the finalize/stash recovery instructions.
+
+**Known limitation:** `/hm:loop` and `/hm:loop-p5-batch` still carry worktree prose in
+an OFF render. Their `worktree create` is already a runtime no-op there and the
+templates say so; removing the prose means rewriting `<WT>` threading through the whole
+iteration body, which is deliberately left as separate work.
+
 ## [0.47.0] — 2026-08-05
 
 ### BREAKING — the fused-workflow axis is removed (`PLAN-harness-diet` Phase 1, ADR-001/002/014)

@@ -1,12 +1,12 @@
 ---
 name: {{ name }}
-description: Isolate /hm:execute changes inside a disposable git worktree. Read harness.yaml.worktree.scope to decide whether to engage; on success merge back and clean up; on failure preserve the worktree for inspection.
+description: Isolate /hm: stage changes inside a git worktree. Read harness.yaml.worktree.enabled to decide whether to engage; on success merge back and clean up; on failure preserve the worktree for inspection.
 ---
 
 # {{ name }}
 
-Disposable worktree isolation for `/hm:execute` (and any stage listed in
-`harness.yaml.worktree.scope`). Wraps `harness_maker.worktree` lifecycle
+Worktree isolation for `/hm:` stages, gated by `harness.yaml.worktree.enabled`
+(the retired per-stage `worktree.scope` key no longer exists). Wraps `harness_maker.worktree` lifecycle
 primitives so all file mutations land in `.worktrees/<workflow>-<ts>/` rather
 than the live working tree.
 
@@ -14,31 +14,28 @@ than the live working tree.
 ## When to invoke vs skip
 
 **Invoke when:**
-- `/hm:execute` starts AND `harness.yaml.worktree.scope` includes `execute`.
-- `/hm:plan` starts AND `worktree.scope` includes `plan` (Production preset default).
+- Any `/hm:` stage starts AND `harness.yaml.worktree.enabled` is true.
 - `/hm:loop` allocates the per-loop worktree at iteration start.
 
 **Skip when:**
-- `worktree.scope` does not include the current stage (skill becomes a no-op).
+- `worktree.enabled` is false (skill becomes a no-op — nothing is isolated).
 - Already inside `.worktrees/<name>/` (idempotent — worktree CLI returns the existing path).
 - User passed an explicit `--no-worktree` override (when the harness exposes one).
 ## Triggers
 
 - `/hm:execute` invocation
-- Any `/hm:<stage>` whose name appears in `harness.yaml.worktree.scope`
+- Any `/hm:<stage>` when `harness.yaml.worktree.enabled` is true
 - Autoloop iteration boundaries (each iter gets its own worktree)
 
 ## Behavior
 
 CLI-owned flow, executed deterministically by the orchestrator:
 
-1. **/hm:execute invoked → read `harness.yaml.worktree.scope`.**
-   Parse the `worktree.scope` list (e.g. `[execute]` for Side, `[execute, plan]`
-   for Production). If the current stage name is absent, skip isolation and run
-   the stage in-place — this preserves the lightweight default for stages where
-   isolation costs more than it saves.
+1. **/hm: stage invoked → read `harness.yaml.worktree.enabled`.**
+   One boolean, all stages or none. False → skip isolation, run in-place;
+   deliverable docs then sit uncommitted until `/hm:wrapup` commits them.
 
-2. **If "execute" (or current stage) in scope → call the worktree CLI.**
+2. **If `worktree.enabled` is true → call the worktree CLI.**
 
    CLI (used by stage skills directly):
    ```
@@ -98,9 +95,11 @@ CLI-owned flow, executed deterministically by the orchestrator:
 
 ```yaml
 worktree:
-  scope: [execute]            # which /hm:<stage> commands trigger isolation
-  branch_prefix: hm-          # reserved for Phase 9 (currently informational)
+  enabled: true               # isolate every /hm: stage (false = none)
 ```
+
+Change it with `/hm:configure` or the `--worktree` / `--no-worktree` make flag. OFF
+is refused while task worktrees or finalize stashes are in flight.
 
 <!-- @hm:user:extensions -->
 <!-- Project-specific worktree rules (extra cleanup commands, branch naming, etc.). Preserved across harness-maker upgrades. -->

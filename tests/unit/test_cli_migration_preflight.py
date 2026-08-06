@@ -49,12 +49,16 @@ def _answers(*, preset: Preset, worktree: dict[str, Any]):  # type: ignore[no-un
     return base.model_copy(update={"worktree": dict(worktree)})
 
 
-def _harness_dir(tmp_path: Path) -> Path:
+def _harness_dir(tmp_path: Path, *, worktree_block: str = "") -> Path:
+    """An existing harness on disk. `worktree_block` is raw YAML appended under a
+    `worktree:` key — the migration reads the FILE (the answers dict is derived from
+    it), so an "explicit opt-out" fixture has to live here, not only in the answers."""
     claude = tmp_path / ".claude"
     claude.mkdir(parents=True, exist_ok=True)
-    (claude / "harness.yaml").write_text(
-        "---\nharness_maker_version: 0.1.0\n---\npreset: Production\n", encoding="utf-8"
-    )
+    body = "---\nharness_maker_version: 0.1.0\n---\npreset: Production\n"
+    if worktree_block:
+        body += "worktree:\n" + worktree_block
+    (claude / "harness.yaml").write_text(body, encoding="utf-8")
     return tmp_path
 
 
@@ -107,7 +111,7 @@ def test_clean_keyabsent_flips_and_no_mutating_git(tmp_path: Path) -> None:
         target, _answers(preset=Preset.PRODUCTION, worktree={"enabled": True})
     )
     assert result.exit_code == 0, result.output
-    assert a.worktree.get("feature_branch_workflow") is True
+    assert a.worktree == {"enabled": True}
     for call in git_calls:
         verb = call[1] if len(call) > 1 else ""
         assert verb not in _MUTATING_GIT, f"migrate path mutated git: {call}"
@@ -122,7 +126,7 @@ def test_pending_stash_defers(tmp_path: Path) -> None:
     a, _g, result = _run_make_update(
         target, _answers(preset=Preset.PRODUCTION, worktree={"enabled": True})
     )
-    assert "feature_branch_workflow" not in a.worktree  # NOT flipped
+    assert a.worktree == {"enabled": False}  # NOT flipped
     assert "deferred" in result.output
 
 
@@ -132,7 +136,7 @@ def test_pending_loop_marker_defers(tmp_path: Path) -> None:
     a, _g, result = _run_make_update(
         target, _answers(preset=Preset.PRODUCTION, worktree={"enabled": True})
     )
-    assert "feature_branch_workflow" not in a.worktree
+    assert a.worktree == {"enabled": False}
     assert "deferred" in result.output
 
 
@@ -142,7 +146,7 @@ def test_pending_inflight_worktree_defers(tmp_path: Path) -> None:
     a, _g, result = _run_make_update(
         target, _answers(preset=Preset.PRODUCTION, worktree={"enabled": True})
     )
-    assert "feature_branch_workflow" not in a.worktree
+    assert a.worktree == {"enabled": False}
     assert "deferred" in result.output
 
 
@@ -150,29 +154,55 @@ def test_pending_inflight_worktree_defers(tmp_path: Path) -> None:
 
 
 def test_explicit_false_opt_out_not_flipped(tmp_path: Path) -> None:
-    target = _harness_dir(tmp_path)
+    target = _harness_dir(tmp_path, worktree_block="  feature_branch_workflow: false\n")
     a, _g, result = _run_make_update(
-        target,
-        _answers(
-            preset=Preset.PRODUCTION, worktree={"enabled": True, "feature_branch_workflow": False}
-        ),
+        target, _answers(preset=Preset.PRODUCTION, worktree={"enabled": False})
     )
     assert result.exit_code == 0, result.output
-    assert a.worktree.get("feature_branch_workflow") is False  # opt-out preserved
+    assert a.worktree == {"enabled": False}  # opt-out preserved
 
 
 def test_explicit_true_not_reprobed(tmp_path: Path) -> None:
-    target = _harness_dir(tmp_path)
+    target = _harness_dir(tmp_path, worktree_block="  feature_branch_workflow: true\n")
     # plant a pending state: if the preflight wrongly re-ran it would warn — it must NOT.
     (target / ".claude" / ".hm-loop-execute-q").write_text("x\n")
     a, _g, result = _run_make_update(
-        target,
-        _answers(
-            preset=Preset.PRODUCTION, worktree={"enabled": True, "feature_branch_workflow": True}
-        ),
+        target, _answers(preset=Preset.PRODUCTION, worktree={"enabled": True})
     )
-    assert a.worktree.get("feature_branch_workflow") is True
+    assert a.worktree == {"enabled": True}
     assert "deferred" not in result.output  # already migrated → no re-probe
+
+
+def test_legacy_explicit_true_survives_a_scripted_update(tmp_path: Path) -> None:
+    """ADR-006 rung-2, the P0 both second-opinion models found.
+
+    A legacy Production harness carries `feature_branch_workflow: true` and no
+    `enabled`. A scripted (non-interactive) `--update` must preserve it exactly —
+    writing `false` here silently disables every deployed Production harness and
+    re-exposes it to the main-branch pollution the feature exists to prevent.
+    """
+    target = _harness_dir(
+        tmp_path, worktree_block="  scope: [execute, plan]\n  feature_branch_workflow: true\n"
+    )
+    a, _g, result = _run_make_update(
+        target, _answers(preset=Preset.PRODUCTION, worktree={"enabled": True})
+    )
+    assert result.exit_code == 0, result.output
+    assert a.worktree == {"enabled": True}
+    assert "NOTE:" not in result.output  # lossless → no behavior-change notice
+
+
+def test_legacy_scope_only_defaults_off_loudly_when_non_interactive(tmp_path: Path) -> None:
+    """ADR-006 rung-3: `scope: [execute]` meant execute-ONLY isolation, which the
+    single switch cannot express. Non-interactive picks OFF — but says so."""
+    target = _harness_dir(tmp_path, worktree_block="  scope: [execute]\n  branch_prefix: hm-\n")
+    a, _g, result = _run_make_update(
+        target, _answers(preset=Preset.PRODUCTION, worktree={"enabled": True})
+    )
+    assert result.exit_code == 0, result.output
+    assert a.worktree == {"enabled": False}
+    assert "no longer isolates" in result.output
+    assert "--worktree" in result.output
 
 
 # ── Side (worktree disabled) is never migrated ───────────────────────────────
@@ -197,13 +227,12 @@ def test_reinterview_preserves_explicit_false_opt_out(tmp_path: Path) -> None:
     claude.mkdir(parents=True)
     (claude / "harness.yaml").write_text(
         "---\nharness_maker_version: 0.1.0\n---\n"
-        "preset: Production\nworktree:\n  enabled: true\n  feature_branch_workflow: false\n",
+        "preset: Production\nworktree:\n  scope: [execute, plan]\n"
+        "  feature_branch_workflow: false\n",
         encoding="utf-8",
     )
     # interview() returns Production answers carrying the preset default (True).
-    answers = _answers(
-        preset=Preset.PRODUCTION, worktree={"enabled": True, "feature_branch_workflow": True}
-    )
+    answers = _answers(preset=Preset.PRODUCTION, worktree={"enabled": True})
     a, _g, result = _run_make_update(tmp_path, answers, reinterview=True)
     assert result.exit_code == 0, result.output
-    assert a.worktree.get("feature_branch_workflow") is False  # opt-out preserved
+    assert a.worktree == {"enabled": False}  # opt-out preserved

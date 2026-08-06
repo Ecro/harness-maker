@@ -629,9 +629,10 @@ reviewers:
     - uv run pytest tests/unit -x -q
 
 worktree:
-  scope: [execute, plan]     # which stages run in a fresh worktree
-  cleanup: on_success        # on_success | always | never
-  feature_branch_workflow: true  # per-task persistent branch + worktree (Production default)
+  enabled: true  # isolate every /hm: stage in a per-task worktree (Production default)
+                 # the whole axis is this one boolean. ON = every stage runs in
+                 # .worktrees/<slug>/ on hm/<slug>, squash-landed by /hm:wrapup.
+                 # OFF = no stage creates a worktree.
 
 autonomy:                    # autopilot / pipeline auto-advance — see the Autopilot section
   level: auto_safe           # gated | auto_safe | full (auto_safe is the 0.47.0+ default)
@@ -850,7 +851,7 @@ The hooks (`permission_gate`, `worktree_gate`, `telemetry`) call `uv run python 
 No. Every generated file carries a `content_hash` in its provenance frontmatter. Re-render compares the new template's hash against the file on disk. If they differ — meaning you edited the file — it keeps yours. See [Reconcile rules](#reconcile-rules-re-rendering-an-existing-harness).
 
 **Q: What's the difference between `Side` and `Production`?**
-`Side` is lean: 1 reviewer (code), verify-before-completion optional, worktree scope `[execute]`. `Production` is thorough: 5 reviewers, verify required, worktree scope `[execute, plan]`, security on high-finding = block. Both share the same anti-rot and caching defaults.
+`Side` is lean: 1 reviewer (code), verify-before-completion optional, worktree isolation off. `Production` is thorough: 5 reviewers, verify required, worktree isolation on, security on high-finding = block. Isolation is a single `worktree.enabled` boolean either preset can override (`--worktree` / `--no-worktree`, or `/hm:configure`). Both share the same anti-rot and caching defaults.
 
 **Q: Does anti-rot ever auto-apply?**
 Never. Every anti-rot item surfaces via a structured question (`AskQuestion` in Cursor, `AskUserQuestion` in Claude Code) in `/hm:refresh`. There is no `--auto-apply` flag and no plan to add one. The rationale: a wrong patch is worse than a stale harness.

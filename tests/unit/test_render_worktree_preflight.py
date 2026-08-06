@@ -1,6 +1,6 @@
 """Phase 5 (ADR-002/004/006): flag-on worktree preflight wiring across stages.
 
-When `worktree.feature_branch_workflow` is on, every `/hm:` stage template renders
+When `worktree.enabled` is on, every `/hm:` stage template renders
 the shared `worktree_preflight` partial (a `task-preflight` claim + `<WT>` entry +
 drift/`task-refresh` surface). When off (the default, key-absent under
 StrictUndefined), no stage renders it — and the 8 preset×dev_mode snapshot
@@ -23,7 +23,7 @@ WIRED_STAGES = ("execute", "plan", "review", "wrapup", "verify", "research", "sp
 
 
 def _render(tmp_path: Path, *, flag_on: bool) -> dict[str, str]:
-    worktree = {"feature_branch_workflow": True} if flag_on else {}
+    worktree = {"enabled": flag_on}
     blueprint = synthesize_blueprint(worktree)
     render(blueprint, tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
     return {
@@ -104,22 +104,22 @@ def test_every_wired_stage_passes_its_own_stage_name_after_the_base_positional(
         assert f'task-preflight <slug> "$(pwd)" --stage hm:{stage}' in body, stage
 
 
-def test_flag_off_gives_execute_only_coverage_not_zero(tmp_path: Path) -> None:
-    """Non-Goal 2, as CORRECTED during Phase 2.
+def test_flag_off_gives_zero_stage_coverage(tmp_path: Path) -> None:
+    """Non-Goal 2, re-corrected by PLAN-worktree-side-defaults ADR-005.
 
-    An earlier version asserted `"--stage hm:" not in body` for all seven stages and
-    called that "emits nothing". Two defects: (a) it was entailed by the sibling
-    `test_preflight_absent_in_all_stages_when_flag_off`, so it had no independent
-    failure mode; (b) the claim was false — flag-off `execute` renders
-    `worktree create execute`, which emits `hm:execute` (proven in
-    `tests/integration/test_stage_spans_e2e.py`). Asserting rendered PROSE could
-    never have caught that, because the emission is a side effect of the CLI.
+    History worth keeping: an early version asserted "emits nothing" for all seven
+    stages and was WRONG, because flag-off `execute` still rendered
+    `worktree create execute`, which emits an `hm:execute` span. The correction added
+    the "…but execute keeps a real emitter" clause.
+
+    ADR-005 makes the original claim true for the first time: OFF now means no stage
+    creates a worktree, so there is no emitter left. The clause is removed, not because
+    the earlier correction was wrong, but because the behavior it described is gone.
     """
     files = _render(tmp_path, flag_on=False)
     for stage in WIRED_STAGES:
         assert "--stage hm:" not in _stage(files, stage), stage
-    # …but execute keeps a real emitter via its legacy isolation call.
-    assert "worktree create execute" in _stage(files, "execute")
+    assert "worktree create execute" not in _stage(files, "execute")
 
 
 def test_execute_dualpath_flag_on_uses_preflight(tmp_path: Path) -> None:
@@ -130,19 +130,22 @@ def test_execute_dualpath_flag_on_uses_preflight(tmp_path: Path) -> None:
     assert "worktree create execute" not in body
 
 
-def test_execute_dualpath_flag_off_uses_legacy_isolation(tmp_path: Path) -> None:
+def test_execute_flag_off_has_no_isolation_path_at_all(tmp_path: Path) -> None:
+    """ADR-005 replaced the dual path with a single gate: OFF renders neither the
+    legacy `Step 0 — Worktree isolation` block nor the preflight."""
     files = _render(tmp_path, flag_on=False)
     body = _stage(files, "execute")
-    assert "Step 0 — Worktree isolation" in body
-    assert "worktree create execute" in body
+    assert "Step 0 — Worktree isolation" not in body
+    assert "worktree create execute" not in body
     assert "task-preflight" not in body
+    assert "Step 5 — Worktree finalize" not in body
 
 
 # ── flag-ON determinism: full golden block (validator W2) ─────────────────────
 
 _GOLDEN_PREFLIGHT = """### Task worktree preflight (feature-branch workflow)
 
-`harness.yaml worktree.feature_branch_workflow` is **on**: this stage operates inside the persistent per-task worktree `.worktrees/<slug>/` on branch `hm/<slug>` — shared by every `/hm:` stage for this task — NOT an ephemeral `execute-<uuid>` worktree. Claim/refresh it and surface concurrent work + drift:
+`harness.yaml worktree.enabled` is **on**: this stage operates inside the persistent per-task worktree `.worktrees/<slug>/` on branch `hm/<slug>` — shared by every `/hm:` stage for this task — NOT an ephemeral `execute-<uuid>` worktree. Claim/refresh it and surface concurrent work + drift:
 
 
 ```bash

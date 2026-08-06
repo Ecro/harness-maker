@@ -1,6 +1,6 @@
 {#- Phase 5 (ADR-002/004/006): flag-on per-task worktree preflight.
     Shared across every /hm: stage template. The INCLUDING stage owns the
-    `worktree.feature_branch_workflow` gate (a `{%- if … %}` wrapper) so this
+    `worktree.enabled` gate (a `{%- if … %}` wrapper) so this
     partial is only rendered when the flag is on — its own whitespace therefore
     never affects the flag-OFF snapshot fixtures. Inherits is_codex +
     harness_maker_src_path from the parent stage context. Substitute <slug> with

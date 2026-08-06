@@ -160,11 +160,11 @@ def test_interview_ref_folders_multiple_with_glob_override(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """User registers two folders, one with a custom glob."""
-    # locale, targets .. caching, ref_folder #1, ref_folder #2 (path;glob), blank=stop,
-    # sibling_repos, vault_path. Two fewer leading blanks than before the
-    # fused-workflow axis was removed: `_ask_fused_workflows` consumed two prompts.
+    # locale, targets, preset, dev_mode, worktree, consensus, caching, ref_folder #1,
+    # ref_folder #2 (path;glob), blank=stop, sibling_repos, vault_path. One more
+    # leading blank than before `_ask_worktree` was added (PLAN-worktree-side-defaults).
     inputs: Iterator[str] = iter(
-        ["", "", "", "", "", "", "./docs", "../shared ; **/*.md", "", "", ""],
+        ["", "", "", "", "", "", "", "./docs", "../shared ; **/*.md", "", "", ""],
     )
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs, ""))
     result = interview(_profile(), autoloop_mode=False)

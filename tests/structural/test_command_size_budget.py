@@ -100,6 +100,16 @@ from .conftest import pin_install_ref
 # (it was comparing a chain shape reviewers never emit), and the exit reason. Compressing those
 # away deletes fixes rather than prose. Anyone raising this again is expected to show a
 # comparable compaction ratio first and to quote ADR-011 as ADR-012 does.
+# configure raised +210 aggregate, PLAN-worktree-side-defaults (2026-08-06). Same bar as
+# ADR-012/Phase-4 above: compaction FIRST. Raw addition was +534 (the `/hm:configure`
+# worktree dimension + its dispatch note + the rewritten `worktree-isolator` skill). Two
+# passes cut it to +210 (−61%): the dimension went from seven lines to four, the dispatch
+# note from five to three, and the skill's config section lost its restated rationale.
+# The residue is not prose — it is the ONLY discoverable way to change the axis, and
+# "there is no supported way to change this" is the defect this PLAN exists to fix. The
+# offsetting deletions (execute's flag-off Step 0 block, `branch_prefix` from the skill)
+# do not show up here because the baseline renders this repo's own harness, which is
+# isolation-ON.
 # execute/research/spec/verify raised, PLAN-autopilot-advance-noop Phase 4 (2026-07-31).
 # Same bar as ADR-012 above: compaction FIRST, then the residue.
 #   Raw additions were +524/+726/+822/+822 across six stages. Two compaction passes

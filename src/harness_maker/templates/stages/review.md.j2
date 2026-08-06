@@ -1,3 +1,4 @@
+{% set wt_on = config.worktree is defined and config.worktree.get('enabled') %}{% set WTR = '<WT>' if wt_on else '.' -%}
 # Stage: review
 
 > Atomic stage. Multi-perspective review with **surface-match + reasoning-alignment** consensus, grade gate, and auto-fix loop.
@@ -95,7 +96,7 @@ If a command exits non-zero:
 
 {% endif %}
 ## Procedure — Round 1 (initial review)
-{%- if config.worktree is defined and config.worktree.get('feature_branch_workflow') %}
+{%- if config.worktree is defined and config.worktree.get('enabled') %}
 
 {% set hm_stage = "review" %}{% include "agents/_partials/worktree_preflight.md.j2" %}
 {%- endif %}
@@ -276,7 +277,7 @@ extras at runtime bringing total > 1, re-enable Pass 1 manually.
 `Write` the merged findings to a temp path (never argv — skill §1), then:
 
 ```bash
-!cd <WT> && uv run --with {{ harness_maker_src_path }} hm codex_adapter stamp-ids < <the literal temp path>
+!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm codex_adapter stamp-ids < <the literal temp path>
 ```
 
 **Then persist the round's finding payload (ADR-006 part 2).** Run this **exactly once per
@@ -299,11 +300,11 @@ round**, against the merged temp file you already wrote, with the literal review
 
 {% if is_codex %}
 ```
-Bash("cd <WT> && uv run --with {{ harness_maker_src_path }} hm stage_agent_ledger persist-payload --file <the literal temp path> --slug {slug} --run-id <run-id> --round <N> --reviewer merged")
+Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm stage_agent_ledger persist-payload --file <the literal temp path> --slug {slug} --run-id <run-id> --round <N> --reviewer merged")
 ```
 {% else %}
 ```bash
-!cd <WT> && uv run --with {{ harness_maker_src_path }} hm stage_agent_ledger persist-payload --file <the literal temp path> --slug {slug} --run-id <run-id> --round <N> --reviewer merged
+!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm stage_agent_ledger persist-payload --file <the literal temp path> --slug {slug} --run-id <run-id> --round <N> --reviewer merged
 ```
 {% endif %}
 

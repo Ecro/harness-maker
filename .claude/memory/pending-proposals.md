@@ -166,3 +166,28 @@ that population is non-empty AND contains at least one member the author did not
 triggering fix, and (c) `/hm:review` gains a checklist line — "for each new gate, name the
 sibling artifact class it does NOT cover" — because a gate whose blind spot is written down
 is a known limitation instead of a silent recurrence.
+
+## Proposal: a guard's remedy must be computed from the state the guard already inspected (2026-08-06)
+**Triggered by:** [fail:design] remediation-instructs-refused-action (count: 3)
+**Proposed mechanism:** construction convention for refusal messages + a review-stage checklist line
+**Rationale:** Three instances, and the third is a strict escalation of the first two. Where the
+earlier ones instructed an action the module merely refuses (a cache-diagnostics remediation
+telling users to report a model id the table was just narrowed to reject), this one instructed
+an action the module exists to PREVENT: the new `worktree.enabled` disable guard blocks a
+true->false flip while a task worktree is live, and then told the user to `task-land <slug>` —
+which, when that worktree belongs to a live peer session, is exactly the count:3
+`worktree-finalize-pulls-orphan-wip-into-main` contamination the guard is protecting against.
+The common mechanism is that the remedy string is authored as prose, from the single-session
+case the author has in mind, while the disqualifying fact is already sitting in a variable the
+guard just read — the registry row, the model table, the flag's presence. Prose review does not
+catch it because the imperative is correct in the case the reader also has in mind. The proposal
+is therefore structural rather than another "write better messages" note: (a) a refusal message
+must be BUILT from the same inspected state that produced the refusal, not written alongside it
+— if the guard consulted the registry to decide, the message renders the registry facts
+(ownership, liveness, pid) it consulted; (b) every remedy must be checked against the guard's
+own predicate, i.e. "if the user does exactly this, does the condition I am refusing on become
+safe, or merely absent?"; (c) `/hm:review` gains a checklist line — "for each refusal or
+remediation string, name the state that makes the suggested action unsafe, and show that state
+is either impossible or named in the message." The concurrency-reviewer caught this instance by
+reading the guard's inputs rather than its text, which is the review posture the checklist line
+is trying to make routine.

@@ -28,8 +28,8 @@ Invoke a stage by mentioning the skill name (e.g. `@hm-execute task-slug`).
 
 ## Configuration
 
-- `harness.yaml` — worktree scope, loop settings, reviewer list
-- Worktree isolation: `{{ config.worktree.scope | join(', ') if config.worktree is defined and config.worktree.scope is defined else 'execute' }}`
+- `harness.yaml` — worktree isolation, loop settings, reviewer list
+- Worktree isolation: {{ 'enabled' if config.worktree is defined and config.worktree.get('enabled') else 'disabled' }}
 - Reviewers: {{ config.reviewers.verbosity | default('standard') }} verbosity
 
 ## Quality bar

@@ -625,9 +625,9 @@ def _dim_guardrails(project_dir: Path, *, session_id: str | None = None) -> Dime
     # dimension's "weights sum to 100" budget is untouched — adding a weighted signal
     # would re-score every existing harness and read as a regression the user did not cause.
     _delegation_stages: list[str] = []
-    # Defaults to the shipped default (True) so a harness.yaml that predates the key is not
-    # reported as structurally broken on the strength of an absent field.
-    _dl_feature_branch = True
+    # Absent key resolves OFF, matching `worktree_enabled` — a different default here
+    # would let /hm:health report a mode the execution path does not take.
+    _dl_feature_branch = False
     _dl_hy = claude / "harness.yaml"
     if _dl_hy.is_file():
         try:
@@ -639,9 +639,16 @@ def _dim_guardrails(project_dir: Path, *, session_id: str | None = None) -> Dime
                 _delegation_stages = [
                     str(s).strip().lower() for s in _dl_block["stages"] if str(s).strip()
                 ]
-            _dl_wt = _dl_cfg.get("worktree") if isinstance(_dl_cfg, dict) else None
-            if isinstance(_dl_wt, dict) and "feature_branch_workflow" in _dl_wt:
-                _dl_feature_branch = _dl_wt.get("feature_branch_workflow") is not False
+            # PLAN-worktree-side-defaults: route through THE single reader. A second
+            # direct read is how /hm:health ends up reporting a mode different from
+            # the one actually executing.
+            from harness_maker.worktree import resolve_worktree_enabled
+
+            _dl_res = resolve_worktree_enabled(
+                _dl_cfg.get("worktree") if isinstance(_dl_cfg, dict) else None
+            )
+            if _dl_res.value is not None:
+                _dl_feature_branch = _dl_res.value
         except Exception:  # noqa: BLE001 — degrade to N-A, never crash readiness
             _delegation_stages = []
 
@@ -695,11 +702,11 @@ def _dim_guardrails(project_dir: Path, *, session_id: str | None = None) -> Dime
             # permanently unactionable, which is the `absent-case = feature black hole`
             # shape the `unavailable-only` arm already exists to avoid.
             _dl_evidence = (
-                "delegation is configured but worktree.feature_branch_workflow is off — "
+                "delegation is configured but worktree.enabled is off — "
                 "the brief has no task branch to resolve, so it degrades on every run"
             )
             _dl_action = (
-                "Set worktree.feature_branch_workflow: true (delegation derives its brief "
+                "Set worktree.enabled: true (delegation derives its brief "
                 "from an hm/<slug> task branch), or clear delegation.stages if this harness "
                 "is not using the per-task worktree model"
             )

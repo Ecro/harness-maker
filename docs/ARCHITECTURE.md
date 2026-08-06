@@ -252,7 +252,7 @@ Required in the `Production` preset; optional in `Side`.
 
 ### M9 — Worktree Isolation
 
-`worktree.py` integrates `git worktree`. By default `/hm:execute` (and optionally `/hm:plan` in `Production`) runs inside a fresh worktree under `.worktrees/<workflow>-<timestamp>/` at the project root. Isolation is a **convention, not a sandbox**: the executor agent is instructed to write only inside that worktree (prompt-level guidance), but its `tools:` list grants unrestricted `Write`/`Edit`/`Bash`, so nothing actually stops it from writing elsewhere. See M12.
+`worktree.py` integrates `git worktree`. Isolation is a single boolean, `harness.yaml`'s `worktree.enabled` (0.48.0 — `scope`, `branch_prefix` and `feature_branch_workflow` were retired by `PLAN-worktree-side-defaults`): ON means **every** `/hm:` stage runs inside the persistent per-task worktree `.worktrees/<slug>/` on branch `hm/<slug>`, which `/hm:wrapup` squash-lands; OFF means no stage creates a worktree and all work happens on the current branch. There is no per-stage scope — the axis proved to be one decision, and the three keys that appeared to subdivide it had no runtime effect. Isolation is a **convention, not a sandbox**: the executor agent is instructed to write only inside that worktree (prompt-level guidance), but its `tools:` list grants unrestricted `Write`/`Edit`/`Bash`, so nothing actually stops it from writing elsewhere. See M12.
 
 `/hm:loop` allocates **one shared worktree per loop run** (not per iteration), reducing branch churn (0.5.5+). `sibling_repos` in `harness.yaml` lets the same isolation session create matching worktrees for related repositories, so cross-repo changes can be reviewed and merged as one logical unit. Cleanup uses prefix-match (`phase-*`, `autoloop-*`, `execute-*`) so harness-maker never removes worktrees created by Cursor or other tools in the same `.worktrees/` directory.
 
@@ -450,7 +450,7 @@ The two presets bracket the design space. Most projects pick one and tune 1-3 di
 | Anti-rot auto-apply | false (always manual) | false (always manual) |
 | Hooks | statusline + telemetry | statusline + telemetry |
 | Verify-before-completion (M8) | optional | **required** |
-| Worktree scope (M9) | `[execute]` | `[execute, plan]` |
+| Worktree isolation (M9) | `enabled: false` | `enabled: true` |
 | `adaptive.disable_telemetry` (M18) | `false` (opt-out) | `false` (opt-out) |
 
 The two presets share most defaults intentionally — the gap is concentrated in the multi-reviewer set and the mandatory verify gate (the `careful`/`audit` workflow seeds that used to widen it went away with the fused axis in 0.47.0). This keeps the surface area small for users graduating from `Side` to `Production`.

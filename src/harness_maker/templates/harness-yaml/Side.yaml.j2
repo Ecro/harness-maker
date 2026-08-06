@@ -74,11 +74,7 @@ skills:
 {% for s in skills.enabled %}    - {{ s }}
 {% endfor %}
 worktree:
-  scope: [execute]
-  branch_prefix: hm-
-{%- if 'feature_branch_workflow' in config.worktree %}
-  feature_branch_workflow: {{ config.worktree['feature_branch_workflow'] | tojson }}
-{%- endif %}
+  enabled: {{ config.worktree['enabled'] | tojson }}
 memory:
   enabled: true
   dir: .claude/memory

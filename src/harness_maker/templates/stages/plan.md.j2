@@ -1,3 +1,4 @@
+{% set wt_on = config.worktree is defined and config.worktree.get('enabled') %}{% set WTR = '<WT>' if wt_on else '.' -%}
 # Stage: plan
 
 > Atomic stage. Implementation planning via deep interactive interview, ADR promotion, and validator-checked phase decomposition.
@@ -70,7 +71,7 @@ knowledge, write a typed `decision` or `preference` note through
 `harness_maker.second_brain`; never edit the vault directly.
 
 ## Procedure
-{%- if config.worktree is defined and config.worktree.get('feature_branch_workflow') %}
+{%- if config.worktree is defined and config.worktree.get('enabled') %}
 
 {% set hm_stage = "plan" %}{% include "agents/_partials/worktree_preflight.md.j2" %}
 {%- endif %}
@@ -110,10 +111,10 @@ Before Step 2, check whether `/hm:plan` is running inside an active `/hm:loop` i
 
 **Loop-mode procedure (when `loop-mode-active` exited 0):**
 
-1. Derive `<N>` from `<WT>/.claude/.hm-iter-receipts/.current-iter` (driver-written at iter start per Phase 3 contract). If the marker file is absent for some reason, fall through to standard mode — the loop driver is in an inconsistent state and the interview is the safer choice.
+1. Derive `<N>` from `{{ WTR }}/.claude/.hm-iter-receipts/.current-iter` (driver-written at iter start per Phase 3 contract). If the marker file is absent for some reason, fall through to standard mode — the loop driver is in an inconsistent state and the interview is the safer choice.
 2. Read the master `work-docs/PLAN-{slug}.md`. Find the next phase whose status is NOT `DONE` (look for `## Phase N` headers and their `Status:` lines). Call this `<M>`.
 3. **Skip Steps 2 and 3 entirely** (no SPEC inheritance check, no deep interview). The master PLAN's ADRs and phase scope are the source of truth.
-4. Write a per-iter scoped plan to `<WT>/work-docs/PLAN-{slug}-iter{N}.md` with this frontmatter:
+4. Write a per-iter scoped plan to `{{ WTR }}/work-docs/PLAN-{slug}-iter{N}.md` with this frontmatter:
 
    ```yaml
    ---
@@ -143,7 +144,7 @@ Before Step 2, check whether `/hm:plan` is running inside an active `/hm:loop` i
 
 5. Skip directly to Step 4 (plan-validator). Validator runs against the per-iter PLAN, not the master PLAN.
 
-6. **Cleanup boundary**: per-iter PLAN files (`PLAN-{slug}-iter*.md`) accumulate inside `<WT>/work-docs/`. They are squash-merged at loop close (ADR-008) and the squash commit on the parent branch carries them as artifacts. No standalone cleanup is needed — the worktree's lifecycle owns it.
+6. **Cleanup boundary**: per-iter PLAN files (`PLAN-{slug}-iter*.md`) accumulate inside `{{ WTR }}/work-docs/`. They are squash-merged at loop close (ADR-008) and the squash commit on the parent branch carries them as artifacts. No standalone cleanup is needed — the worktree's lifecycle owns it.
 
 If `loop-mode-active` exited 1 (not loop-mode for this session) → proceed to Step 2 as normal.
 
@@ -157,17 +158,17 @@ If `loop-mode-active` exited 1 (not loop-mode for this session) → proceed to S
 Before running any detection, check for a durable resume marker from a previous invocation:
 
 ```bash
-!uv run --with {{ harness_maker_src_path }} hm spec_need marker-read --root <WT> --slug {slug}
+!uv run --with {{ harness_maker_src_path }} hm spec_need marker-read --root {{ WTR }} --slug {slug}
 ```
 
-(`<WT>` is the absolute worktree path from the preflight step above — use it as `--root` for ALL `spec_need` commands in this step so the marker, ledger, and waiver files are co-located with the files being hashed, preventing stale-read on new/add-case files under `feature_branch_workflow`.)
+({% if wt_on %}`<WT>` is the absolute worktree path from the preflight step above — use it as{% else %}`.` is this project's root — use it as{% endif %} `--root` for ALL `spec_need` commands in this step so the marker, ledger, and waiver files are co-located with the files being hashed, preventing stale-read on new/add-case files under `worktree.enabled`.)
 
 **If the marker is `null` (absent):** fall through to detection (§1.7.1).
 
 **If a marker exists** for this slug, immediately run freshness check:
 
 ```bash
-!uv run --with {{ harness_maker_src_path }} hm spec_need marker-fresh --root <WT> --slug {slug} --changed-files-hash <HASH>
+!uv run --with {{ harness_maker_src_path }} hm spec_need marker-fresh --root {{ WTR }} --slug {slug} --changed-files-hash <HASH>
 ```
 
 Where `<HASH>` is the SHA256 of the sorted changed-file list (compute `git diff --name-only $(git merge-base HEAD <base>)` → sort → hash; this same `changed_files_hash` recipe is used at both the marker-write site in §1.7.2 and here, ensuring one-shot freshness is reliable). **You are resuming from an inline `/hm:spec` dispatch — SKIP re-detection entirely** (this is the one-shot anti-loop guarantee; do not run §1.7.1):
@@ -175,13 +176,13 @@ Where `<HASH>` is the SHA256 of the sorted changed-file list (compute `git diff 
 - **Exit 0 (FRESH — hash matches current diff):** run `op-check` for the marker's stored verdict/target:
 
   ```bash
-  !uv run --with {{ harness_maker_src_path }} hm spec_need op-check --verdict <marker.verdict> --target <marker.target> --root <WT> --changed-file <f1> --changed-file <f2> …
+  !uv run --with {{ harness_maker_src_path }} hm spec_need op-check --verdict <marker.verdict> --target <marker.target> --root {{ WTR }} --changed-file <f1> --changed-file <f2> …
   ```
 
   - **Exit 0 (operation satisfied):** SPEC has been authored. Run `marker-clear`, then proceed to Step 2 with the new SPEC in place. The resume path enters Step 2's Case A/B/C logic normally.
 
     ```bash
-    !uv run --with {{ harness_maker_src_path }} hm spec_need marker-clear --root <WT> --slug {slug}
+    !uv run --with {{ harness_maker_src_path }} hm spec_need marker-clear --root {{ WTR }} --slug {slug}
     ```
 
   - **Exit 1 (NOT satisfied — SPEC was not authored or wrong target):** Surface to the user: **"SPEC still not authored for `<marker.target>` (verdict: `<marker.verdict>`). The `/hm:spec` step did not complete or targeted a different slug."** Offer two options — **[Retry: run `/hm:spec <marker.target>` again]** or **[Waive with reason]**. **NEVER auto-re-invoke `/hm:spec` here** — this is the hard anti-loop guard: surface-never-re-invoke. If user chooses [Waive], follow the waiver flow in §1.7.3 **and then clear the marker** (see below) and proceed.
@@ -189,7 +190,7 @@ Where `<HASH>` is the SHA256 of the sorted changed-file list (compute `git diff 
     **[Waive] sub-path in re-entry:** after running `waiver-set` per §1.7.3, ALSO clear the resume marker so the next `/hm:plan` invocation does not re-enter this re-entry path and loop:
 
     ```bash
-    !uv run --with {{ harness_maker_src_path }} hm spec_need marker-clear --root <WT> --slug {slug}
+    !uv run --with {{ harness_maker_src_path }} hm spec_need marker-clear --root {{ WTR }} --slug {slug}
     ```
 
     Without this clear, the marker persists, the next `/hm:plan` hits the fresh marker again, op-check fails, and the waiver prompt repeats forever. The satisfied-branch already clears; the waive-branch must mirror it.
@@ -197,7 +198,7 @@ Where `<HASH>` is the SHA256 of the sorted changed-file list (compute `git diff 
 - **Exit 1 (STALE — hash mismatch, diff moved on):** The diff has changed since the marker was written; the marker is no longer valid for the current work. Clear it and fall through to fresh detection:
 
   ```bash
-  !uv run --with {{ harness_maker_src_path }} hm spec_need marker-clear --root <WT> --slug {slug}
+  !uv run --with {{ harness_maker_src_path }} hm spec_need marker-clear --root {{ WTR }} --slug {slug}
   ```
 
   Proceed to §1.7.1 as if no marker existed.
@@ -240,7 +241,7 @@ Verdict semantics:
 Record the verdict:
 
 ```bash
-!uv run --with {{ harness_maker_src_path }} hm spec_need record --verdict <verdict> --target <target> --root <WT> --rationale "<rationale>"
+!uv run --with {{ harness_maker_src_path }} hm spec_need record --verdict <verdict> --target <target> --root {{ WTR }} --rationale "<rationale>"
 ```
 
 Where `<target>` is the task slug (or the SPEC slug for `change`/`delete`).
@@ -284,7 +285,7 @@ If user chooses **[Author now]:**
 
 1. Write the resume marker:
    ```bash
-   !uv run --with {{ harness_maker_src_path }} hm spec_need marker-write --root <WT> --slug {slug} --verdict <verdict> --target <target> --base-sha <sha> --changed-files-hash <hash>
+   !uv run --with {{ harness_maker_src_path }} hm spec_need marker-write --root {{ WTR }} --slug {slug} --verdict <verdict> --target <target> --base-sha <sha> --changed-files-hash <hash>
    ```
 2. Dispatch `/hm:spec` for the target:
 {% if is_codex %}
@@ -299,7 +300,7 @@ If user chooses **[Waive with reason]:**
 
 Require a non-empty rationale (reject blank/whitespace). Write the hash-bound waiver receipt:
 ```bash
-!uv run --with {{ harness_maker_src_path }} hm spec_need waiver-set --root <WT> --slug {slug} --verdict <verdict> --target <target> --rationale "<user-provided reason>" --changed-file <f1> --changed-file <f2> …
+!uv run --with {{ harness_maker_src_path }} hm spec_need waiver-set --root {{ WTR }} --slug {slug} --verdict <verdict> --target <target> --rationale "<user-provided reason>" --changed-file <f1> --changed-file <f2> …
 ```
 
 Proceed to Step 2. The waiver is bound to the current diff hash and expires when the diff changes.

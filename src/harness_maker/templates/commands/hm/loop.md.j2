@@ -423,7 +423,7 @@ for final go-ahead before starting the loop.
 
 ### 5. Engage worktree (loop top — once, before any iter)
 
-If `harness.yaml.worktree.scope` includes `execute`, create one worktree
+If `harness.yaml.worktree.enabled` is on, create one worktree
 that wraps the **entire loop**. Per-loop (not per-iter) — improve and
 feature mode both default to one squash-merge at convergence. Per-iter
 worktree would explode commit count.
@@ -444,8 +444,8 @@ If the command fails (non-zero exit or git error):
 
 Read **all non-empty output lines** the command prints. Three cases:
 
-- **Empty output** → `worktree.scope` does not include `execute`. No
-  isolation; operate in `cwd`. Skip the finalize step at the end.
+- **Empty output** → `worktree.enabled` is off. No isolation; operate in
+  `cwd`. Skip the finalize step at the end.
 - **One absolute path** like `/path/to/repo/.worktrees/execute-20260507T0010Z`
   → single-repo isolation. **Treat that exact string as `<WT>` for every
   subsequent operation in this loop**: every Read/Write/Edit call, every

@@ -95,7 +95,7 @@ harness-maker is a multi-target harness generator for **Claude Code, Cursor IDE,
 ┌──────────────────────────────────────────────────────────────────────┐
 │                  harness.yaml (Single Source of Truth)               │
 │   locale, preset (Side/Production), dev_mode, targets (claude/cursor/codex) │
-│   worktree.scope, max_review_rounds, preferred_model, ...            │
+│   worktree.enabled, max_review_rounds, preferred_model, ...         │
 └──────────┬───────────────────────────────────────┬───────────────────┘
            │                                       │
            ▼                                       ▼
@@ -497,7 +497,7 @@ uv run python -m harness_maker.worktree create execute "$(pwd)"
 
 Output branches:
 - **Absolute path** (`/path/to/.worktrees/execute-20260509T0402Z`) → Isolation active. Use this path (`<WT>`) for all subsequent file access
-- **Empty output** → `worktree.scope` does not include `execute`. Work in current directory without isolation
+- **Empty output** → `worktree.enabled` is false. Work in current directory without isolation
 
 > **Note**: Each `!` block is an independent subshell, so shell variables do not persist. `<WT>` must be substituted with the literal absolute path each time.
 
@@ -1341,7 +1341,7 @@ See [Section 3.6](#36-hmverify--completion-verification) for 6-checkpoint detail
 
 **4-step flow**:
 
-1. **Check `harness.yaml.worktree.scope`**: Run isolation if current stage is in scope
+1. **Check `harness.yaml.worktree.enabled`**: one boolean — isolate every /hm: stage, or none
 2. **Call `worktree.create()`**: Create a new worktree at `.worktrees/<stage>-<UTC-ts>/`
 3. **Execute workflow**: All agent Write/Edit operations happen only inside the worktree
 4. **Exit handling**:
@@ -1353,8 +1353,7 @@ See [Section 3.6](#36-hmverify--completion-verification) for 6-checkpoint detail
 **Configuration**:
 ```yaml
 worktree:
-  scope: [execute]        # list of stages to isolate
-  branch_prefix: hm-      # branch name prefix
+  enabled: true           # true = isolate every /hm: stage, false = isolate none
 ```
 
 ---
@@ -1743,7 +1742,7 @@ harness_maker.gates.permission_gate
 harness_maker.gates.worktree_gate
 ```
 
-- Verify that the file write target is inside the worktree (when current stage is in `worktree.scope`)
+- Verify that the file write target is inside the worktree (when `worktree.enabled` is true)
 - Detect and warn about attempts to write outside the worktree
 - Prevent accidental direct edits to main branch files
 
@@ -1844,8 +1843,8 @@ dev_mode: spec-driven    # spec-driven | task-driven
 
 # Worktree isolation
 worktree:
-  scope: [execute]       # Side preset default. Production preset: [execute, plan]
-  cleanup: on_success    # on_success | always | never
+  enabled: false         # Side preset default. Production preset: true
+                         # the only key on this axis: isolate every stage, or none
 
 # Review settings
 max_review_rounds: 3     # Maximum iterations of the auto-fix loop

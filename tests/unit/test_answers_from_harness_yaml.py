@@ -24,58 +24,94 @@ def test_returns_none_when_file_missing(tmp_path: Path) -> None:
     assert answers_from_harness_yaml(tmp_path / "nope.yaml") is None
 
 
-# ── Phase 6 (ADR-008): worktree round-trip so the migration reads on-disk truth ──
+# ── PLAN-worktree-side-defaults: the block normalizes to the one live key ────
+#
+# These fixtures use the shapes that actually exist on disk. The pre-collapse
+# renderer never wrote `worktree.enabled`, so a legacy harness carries `scope`
+# (+ optionally `feature_branch_workflow`) and nothing else.
 
 
-def test_worktree_feature_branch_flag_true_round_trips(tmp_path: Path) -> None:
+def test_legacy_feature_branch_flag_true_normalizes_to_enabled(tmp_path: Path) -> None:
     target = _write_yaml(
         tmp_path,
         "preset: Production\ndev_mode: task-driven\n"
-        "worktree:\n  enabled: true\n  feature_branch_workflow: true\n",
+        "worktree:\n  scope: [execute, plan]\n  branch_prefix: hm-\n"
+        "  feature_branch_workflow: true\n",
     )
     answers = answers_from_harness_yaml(target)
     assert answers is not None
-    assert answers.worktree.get("feature_branch_workflow") is True
+    assert answers.worktree == {"enabled": True}
 
 
-def test_worktree_feature_branch_flag_false_opt_out_preserved(tmp_path: Path) -> None:
-    # An explicit `false` is a user opt-out — it MUST survive re-render (not be
-    # clobbered by the preset default).
+def test_legacy_feature_branch_flag_false_opt_out_preserved(tmp_path: Path) -> None:
+    # An explicit `false` is a user opt-out — it MUST survive re-render, now as
+    # `enabled: false`, and must NOT be overridden by the legacy `scope` below it.
     target = _write_yaml(
         tmp_path,
         "preset: Production\ndev_mode: task-driven\n"
-        "worktree:\n  enabled: true\n  feature_branch_workflow: false\n",
+        "worktree:\n  scope: [execute, plan]\n  feature_branch_workflow: false\n",
     )
     answers = answers_from_harness_yaml(target)
     assert answers is not None
-    assert answers.worktree.get("feature_branch_workflow") is False
+    assert answers.worktree == {"enabled": False}
 
 
-def test_worktree_flag_absent_stays_absent(tmp_path: Path) -> None:
-    # A never-migrated harness (no flag key) must NOT inherit a preset default —
-    # absence is the migration signal the enablement preflight keys on.
+def test_legacy_scope_only_resolves_from_scope(tmp_path: Path) -> None:
+    # The oldest generation: no flag at all. `scope` containing `execute` meant
+    # execute isolation was ON, so that is what the block resolves to.
     target = _write_yaml(
         tmp_path,
-        "preset: Production\ndev_mode: task-driven\nworktree:\n  enabled: true\n",
+        "preset: Side\ndev_mode: task-driven\n"
+        "worktree:\n  scope: [execute]\n  branch_prefix: hm-\n",
     )
     answers = answers_from_harness_yaml(target)
     assert answers is not None
-    assert "feature_branch_workflow" not in answers.worktree
-    assert answers.worktree.get("enabled") is True  # other keys still round-trip
+    assert answers.worktree == {"enabled": True}
 
 
-def test_worktree_flag_nonbool_stripped(tmp_path: Path) -> None:
-    # A hand-edited non-bool (e.g. the string "false") is truthy to the Jinja gate
-    # — it must NOT survive as an explicit decision; strip it so the migration
-    # preflight decides safely (REVIEW code+Codex P2).
+def test_legacy_empty_scope_is_an_off_decision_not_an_absence(tmp_path: Path) -> None:
+    # `scope: []` is precisely the hand-edit a user makes trying to disable. A
+    # present key must terminate the chain rather than fall through to the preset
+    # default, which for Production would silently flip it back ON.
+    target = _write_yaml(
+        tmp_path,
+        "preset: Production\ndev_mode: task-driven\nworktree:\n  scope: []\n",
+    )
+    answers = answers_from_harness_yaml(target)
+    assert answers is not None
+    assert answers.worktree == {"enabled": False}
+
+
+def test_retired_keys_do_not_survive_the_round_trip(tmp_path: Path) -> None:
     target = _write_yaml(
         tmp_path,
         "preset: Production\ndev_mode: task-driven\n"
-        'worktree:\n  enabled: true\n  feature_branch_workflow: "false"\n',
+        "worktree:\n  scope: [execute]\n  branch_prefix: hm-\n  feature_branch_workflow: true\n",
     )
     answers = answers_from_harness_yaml(target)
     assert answers is not None
-    assert "feature_branch_workflow" not in answers.worktree
+    assert set(answers.worktree) == {"enabled"}
+
+
+def test_nonbool_enabled_is_fail_closed_not_a_fallthrough(tmp_path: Path) -> None:
+    # A hand-edited non-bool is truthy to `bool(...)`. It must resolve fail-closed
+    # and must NOT fall through to the stale legacy key below it — that would turn
+    # isolation ON against the apparent opt-out.
+    target = _write_yaml(
+        tmp_path,
+        "preset: Production\ndev_mode: task-driven\n"
+        'worktree:\n  enabled: "false"\n  feature_branch_workflow: true\n',
+    )
+    answers = answers_from_harness_yaml(target)
+    assert answers is not None
+    assert answers.worktree == {"enabled": False}
+
+
+def test_absent_block_falls_back_to_the_preset_default(tmp_path: Path) -> None:
+    target = _write_yaml(tmp_path, "preset: Production\ndev_mode: task-driven\n")
+    answers = answers_from_harness_yaml(target)
+    assert answers is not None
+    assert answers.worktree == {"enabled": True}
 
 
 def test_returns_none_when_yaml_invalid(tmp_path: Path) -> None:

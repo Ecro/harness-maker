@@ -635,7 +635,7 @@ def test_cli_create_emits_empty_when_no_harness_yaml(
 def test_cli_create_handles_malformed_harness_yaml(
     repo: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Malformed YAML → _scope_includes catches YAMLError → returns False →
+    """Malformed YAML → worktree_enabled catches YAMLError → returns False →
     CLI emits empty + exit 0. Never crashes the slash command."""
     (repo / ".claude").mkdir()
     (repo / ".claude" / "harness.yaml").write_text(

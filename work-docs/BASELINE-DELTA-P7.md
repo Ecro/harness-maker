@@ -64,6 +64,8 @@ Every key that moved in `surface_baseline.json`, with the phase that moved it.
 |---|---|---|---|---|
 | `claude` | 354 283 | 361 396 | P1+P2+P3+review-round | sum of the per-command rows below |
 | `codex` | 288 826 | 295 916 | P1+P2+P3+review-round | same, codex variant |
+| `claude` | 361 396 | **361 600** | worktree-side-defaults | +204 — see the appended section |
+| `codex` | 295 916 | **295 602** | worktree-side-defaults | −314 — see the appended section |
 
 ### `surface.claude`
 
@@ -173,3 +175,45 @@ reads as coverage.
 precisely because the first PLAN draft proposed a preemptive fix and two independent
 cross-model reviewers flagged it as `fix-introduced-defect-passes-all-gates` (count:4).
 Recording them as unmet is the design working, not the design failing.
+
+
+---
+
+## Appendix — `worktree-side-defaults` (landed 2026-08-06, after P7)
+
+This doc's `owns:` covers `surface_baseline.json`, so a later task that moves a key has to
+land its rows here rather than start a second attribution file. Two changes now stack on
+the same baseline; the rows above are P7's, the rows below are this task's, and the
+aggregate row shows both hops.
+
+**Net: claude +204, codex −314.** The only real addition is the `/hm:configure` worktree
+dimension. Everything else is the `feature_branch_workflow` → `enabled` gate rename, which
+is shorter, plus two lines that stopped rendering.
+
+| Key | chars | Cause |
+|---|---|---|
+| `configure` | 9 330 → 9 910 (**+580**) | The new "Worktree isolation" dimension + its dispatch note. Compacted twice before landing (raw +534 → +210 on the earlier freeze); the residue is the ONLY discoverable way to change the axis, and "there is no supported way to change this" is the defect the task exists to fix. |
+| `loop-p5-batch` | 4 794 → 4 834 (+40) | One clause noting `worktree create` is a no-op when `worktree.enabled` is off. |
+| `execute` | 33 774 → 33 691 (−83) | Gate rename, minus the flag-off Step 0 block and one quality-bar line that no longer render when isolation is off. |
+| `plan` / `research` / `review` / `spec` | each −68 | Gate rename only (`config.worktree.get('feature_branch_workflow')` → `…get('enabled')`). |
+| `loop` | −29 | Prose rename. |
+| `verify` / `wrapup` | each −16 | Gate rename. |
+| `hm-execute` | 30 826 → 30 805 (−21) | Codex variant of `execute`. |
+| `hm-plan` | 44 428 → 44 360 (−68) | Codex variant of `plan`. |
+| `hm-review` | 47 996 → 47 928 (−68) | Codex variant of `review`. |
+| `hm-research` | 23 664 → 23 596 (−68) | Codex variant of `research`. |
+| `hm-spec` | 27 808 → 27 740 (−68) | Codex variant of `spec`. |
+| `hm-loop` | 51 179 → 51 150 (−29) | Codex variant of `loop`. |
+| `hm-loop-p5-batch` | 5 251 → 5 291 (+40) | Codex variant of `loop-p5-batch`. |
+| `hm-verify` | 18 740 → 18 724 (−16) | Codex variant of `verify`. |
+| `hm-wrapup` | 43 914 → 43 898 (−16) | Codex variant of `wrapup`. |
+
+Codex nets **−314** because it has no `configure` command — it gets the rename shrink
+without the one real addition.
+
+**Why the freeze had to happen after the land, not on the task branch.**
+`_surface_baseline.py` refuses to freeze at a SHA that is not an ancestor of `main` — a
+task branch is squash-landed and deleted, so that SHA would not survive. The rebase onto
+P7 therefore left a baseline that accounted for this task but not P7's, and the honest
+sequence is land → re-freeze from base → amend. Recorded because the refusal reads like a
+tool failure the first time you hit it, and it is not.

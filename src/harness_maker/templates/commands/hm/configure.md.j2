@@ -23,6 +23,7 @@ Read `.claude/harness.yaml` body (skip frontmatter) and surface:
 - ref_folders (paths + globs if any)
 - sibling_repos (relative paths if any)
 - second_brain: enabled, vault_path, project_id (if configured)
+- worktree isolation (`worktree.enabled`)
 
 ### 2. Ask what to change
 
@@ -41,6 +42,10 @@ Options (multi-select):
 - **IDE targets** — claude-code, cursor, codex, or combinations. Trade-off:
   extra targets render extra roots and dropping a target does not delete old
   target-specific files.
+- **Worktree isolation** — `worktree.enabled`. ON: every `/hm:` stage runs in a
+  per-task worktree on `hm/<slug>`, wrapup squash-lands it, your branch stays clean.
+  Trade-off: OFF is simpler but deliverable docs sit uncommitted until wrapup. OFF is
+  refused while task worktrees or finalize stashes are in flight — land them first.
 - **Domains** — add/remove domain packs. Trade-off: stronger project-specific
   reviewer context vs more prompt surface.
 - **Mechanical checks** — add/edit/clear pre-review commands. Trade-off:
@@ -151,6 +156,10 @@ Run the CLI with only the changed flags:
   --ref-folders "$REF_FOLDERS" --sibling-repos "$SIBLING_REPOS" \
   --second-brain-vault-path "$SB_VAULT_PATH" --second-brain-project-id "$SB_PROJECT_ID"
 ```
+
+Worktree isolation is a flag pair: append exactly one of `--worktree` /
+`--no-worktree`, only when changed. A refused `--no-worktree` exits non-zero listing
+the branches — surface it verbatim and stop.
 
 Omit flags for dimensions that weren't changed. Omit `--ref-folders` when
 Reference folders wasn't selected; pass empty string `""` to clear all entries.

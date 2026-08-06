@@ -96,7 +96,7 @@ harness-maker 는 **Claude Code 와 Cursor 양쪽 IDE** 에서 동작하는 듀�
 ┌──────────────────────────────────────────────────────────────────────┐
 │                      harness.yaml (단일 진실 원천)                    │
 │   locale, preset (Side/Production), dev_mode, targets (claude/cursor) │
-│   worktree.scope, max_review_rounds, preferred_model, ...            │
+│   worktree.enabled, max_review_rounds, preferred_model, ...         │
 └──────────┬───────────────────────────────────────┬───────────────────┘
            │                                       │
            ▼                                       ▼
@@ -485,7 +485,7 @@ uv run python -m harness_maker.worktree create execute "$(pwd)"
 
 출력 분기:
 - **절대 경로** (`/path/to/.worktrees/execute-20260509T0402Z`) → 격리 활성화. 이 경로(`<WT>`)를 이후 모든 파일 접근에 사용
-- **빈 출력** → `worktree.scope` 에 `execute` 미포함. 격리 없이 현재 디렉토리에서 작업
+- **빈 출력** → `worktree.enabled` 가 false. 격리 없이 현재 디렉토리에서 작업
 
 > **주의**: 각 `!` 블록은 독립 서브셸이므로 셸 변수가 유지되지 않는다. `<WT>` 는 리터럴 절대 경로로 매번 대체해야 한다.
 
@@ -1298,7 +1298,7 @@ high-severity findings → wrapup/verify 블로킹
 
 **4단계 흐름**:
 
-1. **`harness.yaml.worktree.scope` 확인**: 현재 단계가 scope 에 있으면 격리 실행
+1. **`harness.yaml.worktree.enabled` 확인**: boolean 하나 — 모든 /hm: 단계를 격리하거나 전혀 안 함
 2. **`worktree.create()` 호출**: `.worktrees/<stage>-<UTC-ts>/` 에 새 워크트리 생성
 3. **워크플로우 실행**: 에이전트의 모든 Write/Edit 이 워크트리 안에서만 발생
 4. **종료 처리**:
@@ -1310,8 +1310,7 @@ high-severity findings → wrapup/verify 블로킹
 **설정**:
 ```yaml
 worktree:
-  scope: [execute]        # 격리 대상 단계 목록
-  branch_prefix: hm-      # 브랜치 이름 접두어
+  enabled: true           # true = 모든 /hm: 단계 격리, false = 전혀 격리 안 함
 ```
 
 ---
@@ -1625,7 +1624,7 @@ harness_maker.gates.permission_gate
 harness_maker.gates.worktree_gate
 ```
 
-- 파일 쓰기 목표가 워크트리 안인지 확인 (`worktree.scope` 에 현재 단계 포함 시)
+- 파일 쓰기 목표가 워크트리 안인지 확인 (`worktree.enabled` 가 true 일 때)
 - 워크트리 바깥에 쓰려는 시도를 감지하고 경고
 - 실수로 메인 브랜치의 파일을 직접 편집하는 것 방지
 
@@ -1726,8 +1725,8 @@ dev_mode: spec-driven    # spec-driven | task-driven
 
 # 워크트리 격리
 worktree:
-  scope: [execute]       # Side preset 기본값. Production preset 은 [execute, plan]
-  cleanup: on_success    # on_success | always | never
+  enabled: false         # Side preset 기본값. Production preset 은 true
+                         # 이 축의 유일한 키: 모든 단계를 격리하거나 전혀 안 하거나
 
 # 리뷰 설정
 max_review_rounds: 3     # 자동 수정 루프 최대 횟수

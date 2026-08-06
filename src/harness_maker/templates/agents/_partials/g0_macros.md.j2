@@ -15,7 +15,7 @@
 The shell guard {{ where }} makes the receipt a no-op when `.current-iter` is absent — that file is written only by the autoloop driver at iter start. Standalone runs (no autoloop), no-isolation runs, and post-`/compact` restoration before iter 1 all skip the write naturally. This is by design — Gate 0 only reads receipts written under `iter-N` for N≥1.
 {%- endmacro %}
 {% macro standalone_note(stage) -%}
-In standalone `/hm:{{ stage }}` (no fused execute stage to engage isolation), `<WT>` may be undefined; the guard's `[ -f ]` test on a literal `<WT>` path is also false, so no write fires.
+In a standalone `/hm:{{ stage }}` the driver has not written `.current-iter`, so the guard's `[ -f ]` test is false and no write fires.
 {%- endmacro %}
 {% macro skipped_rule() -%}
 **`skipped` is never emitted from a stage prompt.** It is reserved for the autoloop driver's auto-retry escape hatch (ADR-005 of PLAN-loop-mid-stop-and-review-skip), so each stage's verdict list below offers only `pass` and `fail`.

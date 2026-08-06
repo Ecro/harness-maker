@@ -17,7 +17,12 @@ from pydantic import ValidationError
 from harness_maker.add_domain import AddDomainError, add_domain, validate_domain_name
 from harness_maker.block_merge import MergeReport
 from harness_maker.codex_user_config import bootstrap_user_codex_profiles
-from harness_maker.interview import _parse_autonomy, answers_from_harness_yaml, interview
+from harness_maker.interview import (
+    _input_or_empty,
+    _parse_autonomy,
+    answers_from_harness_yaml,
+    interview,
+)
 from harness_maker.io_utils import atomic_write, denormalize_home_to_tilde
 from harness_maker.locate import compare_version
 from harness_maker.locate import resolve as resolve_plugin
@@ -218,6 +223,16 @@ def make(
             "Omitted → leave existing value."
         ),
     ),
+    worktree_override: bool | None = typer.Option(
+        None,
+        "--worktree/--no-worktree",
+        help=(
+            "Run every /hm: stage inside a per-task worktree on branch hm/<slug> "
+            "(on) or on the current branch (off). Omitted → keep the existing "
+            "value, or the preset default on a fresh install. Turning it OFF is "
+            "refused while in-flight task worktrees would be stranded."
+        ),
+    ),
     dry_run: bool = typer.Option(
         False,
         "--dry-run",
@@ -369,6 +384,7 @@ def make(
         second_opinion_models_override=second_opinion_models_override,
         autonomy_level_override=autonomy_level_override,
         autonomy_persistent_override=autonomy_persistent_override,
+        worktree_override=worktree_override,
     )
     if add_domain_name is not None:
         try:
@@ -385,12 +401,12 @@ def make(
     # bool; if on-disk is absent, drop the preset default so key-ABSENT becomes the
     # migration signal handled by the preflight below.
     if reinterview and existing_yaml.is_file():
-        _disk_wt = pre_yaml_body.get("worktree")
-        _disk_flag = _disk_wt.get("feature_branch_workflow") if isinstance(_disk_wt, dict) else None
-        if isinstance(_disk_flag, bool):
-            a.worktree["feature_branch_workflow"] = _disk_flag
-        else:
-            a.worktree.pop("feature_branch_workflow", None)
+        # (worktree is deliberately NOT re-applied here — `_apply_worktree_enabled` is
+        # the single place that reads the on-disk decision. Re-applying it here ran AFTER
+        # `_apply_dimension_overrides` and AFTER the interview, so it silently discarded
+        # both `--worktree/--no-worktree` and the fresh `_ask_worktree` answer, inverting
+        # the documented CLI-flag > disk > preset-default precedence on exactly the
+        # existing harnesses the migration targets.)
         # `--reinterview` skips `answers_from_harness_yaml`, so `_parse_autonomy` never runs;
         # combined with the non-tty auto-flip to `autoloop_mode` above, an EXISTING project
         # that set `level: gated` / `autopilot_persistent: false` — the off-switch the README
@@ -418,32 +434,23 @@ def make(
                 a = a.model_copy(
                     update={"autonomy": AutonomyConfig(level="gated", autopilot_persistent=False)}
                 )
-    # Migrate a never-migrated, worktree-enabled harness to the feature-branch model
-    # ONLY on a clean live-state probe — else keep the old model + loud-warn, so the
-    # new in-worktree path never strands old preserved state. Gated on: existing
-    # harness re-render (reused OR reinterview) + worktree.enabled (the flag is inert
-    # without isolation; Phase-5's gate would mis-render the preflight on a no-worktree
-    # harness) + key-ABSENT (an explicit true/false is a decision — respected). The
-    # preflight also sweeps sibling repos (multi-repo strand gap, REVIEW security P1).
-    # Config mutation only; no git is mutated on this path.
-    if (
-        (reused is not None or reinterview)
-        and bool(a.worktree.get("enabled"))
-        and "feature_branch_workflow" not in a.worktree
-    ):
-        from harness_maker.worktree import _load_sibling_dirs, enablement_preflight
-
-        # Reuse the canonical sibling resolver (REVIEW security P2 / code P3): it
-        # `.resolve()`s, gates each on a real `.git` (drops traversal/non-repo
-        # entries), and reads from the same on-disk source the pop path uses — so
-        # the preflight and `post-commit-pop` can't drift on sibling discovery.
-        sibling_bases = _load_sibling_dirs(existing_yaml, target)
-        should_flip, preflight_warning = enablement_preflight(target, sibling_bases=sibling_bases)
-        if should_flip:
-            a.worktree["feature_branch_workflow"] = True
-            typer.echo("migrated to the feature-branch worktree workflow (clean live-state)")
-        elif preflight_warning is not None:
-            typer.echo(preflight_warning, err=True)
+    # PLAN-worktree-side-defaults ADR-003/006: THE choke point. Every path that can
+    # change the isolation value — preset flip, --worktree/--no-worktree, the
+    # interview answer, /hm:configure's dispatched flags, and the migration below —
+    # converges here, immediately before synthesize. Guarding one producer and not
+    # the others is the P0 both second-opinion models found: ADR-005 removes the
+    # rendered finalize/stash recovery instructions from an OFF harness, so any
+    # unguarded true->false leaves live task worktrees with no documented way back.
+    a = _apply_worktree_enabled(
+        a,
+        target=target,
+        existing_yaml=existing_yaml,
+        pre_yaml_body=pre_yaml_body,
+        is_existing=(reused is not None or reinterview),
+        interactive=not effective_autoloop,
+        flag_given=worktree_override is not None,
+        asked=(reused is None and not effective_autoloop),
+    )
     bp = synthesize(p, a)
     # full_bp holds the unfiltered blueprint for orphan-sweep: KEEP'd files
     # are still expected on disk (the user owns them now), so we must NOT
@@ -1107,6 +1114,124 @@ def _emit_post_make_readiness(target: Path, preset: Preset, *, is_fresh: bool = 
     typer.echo("  • Walk the action list above; fix P0 items first.")
 
 
+def _apply_worktree_enabled(
+    answers: InterviewAnswers,
+    *,
+    target: Path,
+    existing_yaml: Path,
+    pre_yaml_body: dict[str, Any],
+    is_existing: bool,
+    interactive: bool,
+    flag_given: bool = False,
+    asked: bool = False,
+) -> InterviewAnswers:
+    """THE single writer of `worktree.enabled` (PLAN-worktree-side-defaults).
+
+    Owns two things that must not be split apart:
+
+    * **ADR-006 migration** — an existing harness whose block predates the collapse.
+      Split by how much the legacy block actually says: an explicit
+      `feature_branch_workflow` bool is a prior decision and is preserved exactly
+      and silently (overwriting it with `false` on a scripted `--update` is what
+      would silently disable every legacy Production harness); a `scope`-only block
+      is genuinely lossy — the old axis could express *execute-only* isolation and
+      the new boolean cannot — so it asks when it can and defaults OFF loudly when
+      it cannot.
+    * **ADR-003 disable guard** — any effective true→false transition is refused
+      when live in-flight work would be stranded, whatever produced it.
+    """
+    from harness_maker.worktree import (
+        _load_sibling_dirs,
+        disable_preflight,
+        enablement_preflight,
+        resolve_worktree_enabled,
+    )
+
+    desired = bool(answers.worktree.get("enabled"))
+    # `stage=None` — the guard asks "is isolation live for ANY stage?". The default
+    # `"execute"` would read a legacy `scope: ["plan"]` harness as OFF and skip the
+    # guard entirely, stranding the very worktrees `/hm:plan` created.
+    _eff = resolve_worktree_enabled(pre_yaml_body.get("worktree"), stage=None)
+    effective = bool(_eff.value) if is_existing else False
+
+    # Precedence, resolved in ONE place: an explicit `--worktree/--no-worktree`
+    # (`flag_given`) or a fresh interview answer (`asked`) is a decision made THIS run
+    # and outranks everything on disk. Only a silent re-render (`--update`,
+    # `--autoloop`) falls through to the disk value — and then rung 1 wins over the
+    # preset default, which is what "CLI flag > disk > preset default" means.
+    if is_existing and not (flag_given or asked):
+        disk = resolve_worktree_enabled(pre_yaml_body.get("worktree"))
+        if disk.rung == 1:
+            # An explicit on-disk value is never re-derived from a preset default —
+            # not even on a `--preset` switch. The preset default applies to a fresh
+            # install; after that the file is the source of truth.
+            desired = bool(disk.value)
+        elif disk.rung == 2:
+            # Lossless: an explicit prior decision. Never ask, never override.
+            desired = bool(disk.value)
+        elif disk.rung == 3:
+            legacy_on = bool(disk.value)
+            if interactive:
+                desired = _ask_keep_legacy_isolation(legacy_on)
+            else:
+                desired = False
+                if legacy_on:
+                    typer.echo(
+                        "[worktree] migrated the retired `scope` key → "
+                        "`worktree.enabled: false`.\n"
+                        "  NOTE: /hm:execute no longer isolates in a worktree. The old "
+                        "`scope: [execute]` meant execute-only isolation, which the new "
+                        "single switch cannot express.\n"
+                        "  Re-enable (isolates ALL stages) with: "
+                        "harness-maker make . --worktree",
+                        err=True,
+                    )
+        elif disk.rung == 0 and bool(answers.worktree.get("enabled")):
+            # Nothing on disk at all + the preset wants isolation: this is the
+            # original ADR-008 enablement path — flip only on a clean live-state
+            # probe, else stay off and warn.
+            sibling_bases = _load_sibling_dirs(existing_yaml, target)
+            should_flip, warning = enablement_preflight(target, sibling_bases=sibling_bases)
+            desired = bool(should_flip)
+            if should_flip:
+                typer.echo("migrated to the feature-branch worktree workflow (clean live-state)")
+            elif warning is not None:
+                typer.echo(warning, err=True)
+
+    if effective and not desired:
+        sibling_bases = _load_sibling_dirs(existing_yaml, target)
+        may_disable, refusal = disable_preflight(target, sibling_bases=sibling_bases)
+        if not may_disable:
+            typer.echo(refusal or "refusing to disable worktree isolation", err=True)
+            raise typer.Exit(code=1)
+
+    return answers.model_copy(update={"worktree": {"enabled": desired}})
+
+
+def _ask_keep_legacy_isolation(legacy_on: bool) -> bool:
+    """Interactive half of the ADR-006 `scope`-only branch.
+
+    Deliberately a plain prompt, not `AskUserQuestion`: this runs inside the CLI,
+    where stdin is the only channel (CLAUDE.md checkpoint #4). Defaults to keeping
+    whatever the legacy block was doing — a migration should not change behavior by
+    pressing Enter.
+    """
+    state = "on" if legacy_on else "off"
+    answer = (
+        _input_or_empty(
+            f"Existing harness uses the retired `worktree.scope` key (isolation is {state} "
+            "for /hm:execute only).\n"
+            "  The replacement switch is all-stages-or-nothing. Keep isolation? "
+            f"[{'Y/n' if legacy_on else 'y/N'}] "
+        )
+        .strip()
+        .lower()
+    )
+    if not answer:
+        return legacy_on
+    return answer in {"y", "yes"}
+
+
 def _apply_dimension_overrides(
     answers: InterviewAnswers,
     *,
@@ -1127,6 +1252,7 @@ def _apply_dimension_overrides(
     second_opinion_models_override: str | None = None,
     autonomy_level_override: str | None = None,
     autonomy_persistent_override: bool | None = None,
+    worktree_override: bool | None = None,
 ) -> InterviewAnswers:
     """Apply per-dimension CLI overrides on top of the answers.
 
@@ -1143,6 +1269,14 @@ def _apply_dimension_overrides(
     from harness_maker.models import DevMode, Preset, Target
 
     update: dict[str, object] = {}
+    # PLAN-worktree-side-defaults ADR-002/007. Only the explicit flag is seeded here;
+    # disk-vs-preset-default precedence is resolved by `_apply_worktree_enabled`, which
+    # is the one place that can see the on-disk value. An earlier version tried to infer
+    # "was this explicit?" by comparing against the current preset's default — a value
+    # equal to the default is indistinguishable from a defaulted one, so an explicit
+    # choice that happened to match was silently re-derived on a `--preset` switch.
+    if worktree_override is not None:
+        update["worktree"] = {"enabled": worktree_override}
     if locale_override:
         update["locale"] = locale_override
     if dev_mode_override:

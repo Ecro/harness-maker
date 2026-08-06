@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import sys
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Literal, TextIO
@@ -156,6 +157,7 @@ def interview(
     targets = _ask_targets()
     preset = _ask_preset(recommended)
     dev_mode = _ask_dev_mode(preset)
+    worktree_enabled = _ask_worktree(preset)
     consensus = _ask_with_default("consensus", _consensus_for(preset))
     caching = _ask_with_default("caching", "agent-aware")
     ref_folders = _ask_ref_folders()
@@ -175,7 +177,29 @@ def interview(
         second_brain=second_brain,
         second_opinion=second_opinion,
         autonomy=autonomy,
+        worktree_enabled=worktree_enabled,
     )
+
+
+def _ask_worktree(preset: Preset) -> bool:
+    """PLAN-worktree-side-defaults ADR-002: the axis is now user-selectable.
+
+    Names the cost of OFF explicitly (ADR-004) rather than leaving the user to
+    discover it as a dirty working tree — that discovery is what prompted this work.
+    """
+    default = bool(_preset_extras(preset)["worktree"]["enabled"])
+    print(
+        "\nWorktree isolation — run every /hm: stage inside a per-task worktree on "
+        "branch hm/<slug>?\n"
+        "  on  : your working branch stays clean; /hm:wrapup squash-lands the task\n"
+        "  off : simpler, but PLAN/RESEARCH/SPEC/REVIEW documents accumulate "
+        "uncommitted on your current branch until wrapup commits them"
+    )
+    raw = _input_or_empty(f"Enable worktree isolation? [{'Y/n' if default else 'y/N'}] ")
+    answer = raw.strip().lower()
+    if not answer:
+        return default
+    return answer in {"y", "yes", "true", "on"}
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -641,9 +665,13 @@ def _build_answers(
     sibling_repos: list[str] | None = None,
     second_opinion: SecondOpinionConfig | None = None,
     autonomy: AutonomyConfig | None = None,
+    worktree_enabled: bool | None = None,
     schema_version: int = 4,
 ) -> InterviewAnswers:
     is_side = preset == Preset.SIDE
+    extras = _preset_extras(preset, schema_version=schema_version)
+    if worktree_enabled is not None:
+        extras = {**extras, "worktree": {"enabled": worktree_enabled}}
     return InterviewAnswers(
         locale=locale,
         targets=list(targets),
@@ -664,7 +692,7 @@ def _build_answers(
         consensus=consensus or _consensus_for(preset),
         caching=caching or "agent-aware",
         autonomy=autonomy if autonomy is not None else AutonomyConfig(),
-        **_preset_extras(preset, schema_version=schema_version),
+        **extras,
     )
 
 
@@ -858,24 +886,29 @@ def answers_from_harness_yaml(yaml_path: Path) -> InterviewAnswers | None:
         else PermissionsConfig()
     )
 
-    # Round-trip the on-disk `worktree` block (Phase 6 / ADR-008, validator C1):
-    # without this, `worktree` is rebuilt from `_preset_extras` and synthesize
-    # overwrites the file's block on every re-render, clobbering an explicit
-    # `feature_branch_workflow` opt-out. Overlay the on-disk values onto the preset
-    # default, BUT strip the preset's NEW `feature_branch_workflow` default unless
-    # the on-disk file set it explicitly — so an existing (never-migrated) harness
-    # stays key-ABSENT (the make-time enablement preflight then decides), and only
-    # fresh installs (which skip this reverse-mapper) get the new default.
+    # Round-trip the on-disk `worktree` block (PLAN-worktree-side-defaults ADR-001).
+    # Without this, `worktree` is rebuilt from `_preset_extras` and synthesize
+    # overwrites the file's block on every re-render, clobbering an explicit opt-out
+    # — the V3 defect, in its original `scope` form.
+    #
+    # The block is NORMALIZED to the single live key here rather than merged: the
+    # retired `scope`/`branch_prefix` must not survive into a re-render, and the
+    # legacy generations are resolved by the SAME function the runtime reader uses
+    # (`worktree.resolve_worktree_enabled`) so the two can never disagree about the
+    # same on-disk bytes. `None` (nothing present) keeps the preset default; the
+    # make-time migration owns the louder handling of that case.
+    from harness_maker.worktree import resolve_worktree_enabled
+
     disk_worktree = data.get("worktree")
     disk_worktree = disk_worktree if isinstance(disk_worktree, dict) else {}
-    merged_worktree: dict[str, Any] = {**base.worktree, **disk_worktree}
-    # Treat the flag as an explicit user decision ONLY when it is a real bool
-    # (REVIEW code+Codex P2): a hand-edited non-bool like `feature_branch_workflow:
-    # "false"` is truthy to both the Jinja gate and `bool(...)`, so a string opt-out
-    # would wrongly read as enabled. Strip any non-bool → key-absent → the make-time
-    # preflight decides safely.
-    if not isinstance(disk_worktree.get("feature_branch_workflow"), bool):
-        merged_worktree.pop("feature_branch_workflow", None)
+    _res = resolve_worktree_enabled(disk_worktree)
+    if _res.diagnostic:
+        # Surface it: the re-render OVERWRITES the offending value, so a silent
+        # resolution destroys a hand-edit and never says why.
+        print(f"[worktree] {_res.diagnostic}", file=sys.stderr)
+    merged_worktree: dict[str, Any] = {
+        "enabled": bool(base.worktree.get("enabled")) if _res.value is None else _res.value
+    }
 
     update: dict[str, Any] = {
         "worktree": merged_worktree,
@@ -1335,12 +1368,11 @@ def _preset_extras(preset: Preset, *, schema_version: int = 2) -> dict[str, Any]
         "autoloop": {"allowed": True, "default_max_iter": 5},
         "memory": {"per_repo": True},
         "anti_rot": {"enabled": True, "sources": 4},
-        # Phase 6 (ADR-008): the per-task feature-branch model is the default for
-        # newly-rendered Production harnesses. NOT added to Side ({enabled: False}
-        # above) — the flag is inert without worktree isolation, and the Phase-5
-        # stage gate keys purely on `feature_branch_workflow`, so adding it to a
-        # no-worktree preset would wrongly render the preflight.
-        "worktree": {"enabled": True, "feature_branch_workflow": True},
+        # PLAN-worktree-side-defaults ADR-001/002/007: one live key. Production
+        # defaults to isolation ON (all seven stages in the per-task worktree);
+        # Side defaults OFF above. Both are overridable — see `_ask_worktree`,
+        # `--worktree/--no-worktree`, and the /hm:configure dimension.
+        "worktree": {"enabled": True},
         "security": {
             "gates": [
                 "secrets",

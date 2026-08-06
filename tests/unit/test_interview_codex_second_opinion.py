@@ -29,7 +29,7 @@ def test_interview_empty_input_defaults_second_opinion_disabled(
 ) -> None:
     """Pressing Enter at every prompt yields models=[] (safe default)."""
     # 13 empty answers: 11 pre-existing + second_opinion + the autopilot-enable question.
-    inputs: Iterator[str] = iter([""] * 11)
+    inputs: Iterator[str] = iter([""] * 12)
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
     result = interview(_profile(), autoloop_mode=False)
     assert result.second_opinion.enabled is False
@@ -41,7 +41,7 @@ def test_interview_codex_answer_enables_second_opinion(
 ) -> None:
     """User typing 'codex' as the second-opinion answer selects only codex."""
     # 11 empty + 'codex' for the second-opinion question, then '' for autopilot.
-    inputs: Iterator[str] = iter([""] * 9 + ["codex", ""])
+    inputs: Iterator[str] = iter([""] * 10 + ["codex", ""])
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
     result = interview(_profile(), autoloop_mode=False)
     assert result.second_opinion.enabled is True
@@ -62,7 +62,7 @@ def test_interview_multi_model_answer_enables_both(
     prompt falls back to the hardcoded default without consuming extra input."""
     monkeypatch.setattr("harness_maker.interview._fetch_agy_models", lambda: [])
     # 11 empty + 'codex,antigravity' for the second-opinion question, then '' for autopilot.
-    inputs: Iterator[str] = iter([""] * 9 + ["codex,antigravity", ""])
+    inputs: Iterator[str] = iter([""] * 10 + ["codex,antigravity", ""])
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
     result = interview(_profile(), autoloop_mode=False)
     assert result.second_opinion.enabled is True
@@ -80,7 +80,7 @@ def test_interview_antigravity_answer_prompts_for_model_pick(
         lambda: ["Model A", "Model B"],
     )
     # 11 empty + 'antigravity' (enable) + '2' (pick Model B) + '' (autopilot).
-    inputs: Iterator[str] = iter([""] * 9 + ["antigravity", "2", ""])
+    inputs: Iterator[str] = iter([""] * 10 + ["antigravity", "2", ""])
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
     result = interview(_profile(), autoloop_mode=False)
     assert result.second_opinion.enabled is True
@@ -93,7 +93,7 @@ def test_interview_unknown_model_token_is_skipped(
 ) -> None:
     """An unrecognized token in the comma-separated answer is dropped with a
     warning, not raised — only the recognized 'codex' survives."""
-    inputs: Iterator[str] = iter([""] * 9 + ["codex,bogus", ""])
+    inputs: Iterator[str] = iter([""] * 10 + ["codex,bogus", ""])
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
     result = interview(_profile(), autoloop_mode=False)
     assert result.second_opinion.models == ["codex"]

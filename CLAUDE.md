@@ -233,7 +233,13 @@ Cursor / Codex 의 plugin marketplace 가 GitHub 에서 직접 fetch.
 
 ## Multi-session worktree (PLAN-worktree-cross-session-data-loss-defense + PLAN-multisession-worktree-concurrency)
 
-두 모델이 `harness.yaml worktree.feature_branch_workflow` 플래그로 직교 공존한다 (default **True**=Production / **False**=Side). 옛 harness 에 키 부재 시 old-model + 경고 1회 (CLAUDE.md #6). flag-off 경로는 migration soak 끝날 때까지 GREEN 유지.
+두 모델이 **`harness.yaml worktree.enabled`** 플래그로 직교 공존한다 (default **True**=Production / **False**=Side). 옛 `feature_branch_workflow` / `scope` / `branch_prefix` 는 **0.48.0 에서 은퇴**됐다 (PLAN-worktree-side-defaults ADR-001/007) — 4개 노브 중 3개가 런타임 효과 0 이었고, `scope`/`branch_prefix` 는 템플릿 리터럴이라 손편집이 재렌더마다 조용히 되돌려졌다.
+
+- **단일 리더**: `worktree.worktree_enabled(base)` 하나뿐. 3세대 fallback (`enabled` → 레거시 `feature_branch_workflow` → 레거시 `scope` 에 `execute` 포함 → 부재=False+경고 1회), first-key-present-wins. **present-but-malformed 는 fail-closed 로 체인을 종료**한다 (하위 stale 키로 fall-through 하면 `enabled: "false"` 옆의 `feature_branch_workflow: true` 가 격리를 *켜버린다*). `tests/unit/test_worktree_reader_singleton.py` 가 두 번째 리더 추가를 구조적으로 차단한다 — `/hm:health` 가 실제 실행 모드와 다른 걸 보고하는 게 그 실패 모드다.
+- **단일 writer**: `cli._apply_worktree_enabled` 가 유일하게 `answers.worktree["enabled"]` 를 쓴다. preset flip / `--worktree`·`--no-worktree` / 인터뷰 답변 / `/hm:configure` / 마이그레이션 — 다섯 producer 가 전부 여기로 수렴한다. **true→false 전환은 `disable_preflight` 가 살아있는 task worktree·pending stash·loop marker 를 발견하면 거부**한다 (ADR-003). ADR-005 가 OFF 렌더에서 finalize/stash 복구 지침을 지우므로, 가드 없는 disable 은 복구 경로가 없는 고아 상태를 만든다.
+- **마이그레이션** (ADR-006): 명시 `feature_branch_workflow` bool 은 **정확히 보존** (scripted `--update` 가 레거시 Production 을 조용히 끄는 걸 막는다); `scope`-only 는 표현 불가라 대화형이면 묻고 아니면 `false`+큰 소리 공지; `scope` 있는데 `execute` 없으면 (`scope: []` = 사용자가 disable 하려던 손편집) `false`.
+- **OFF 의 의미** (ADR-005): 어떤 스테이지도 worktree 를 만들지 않는다. `execute.md` 의 Step 0·Step 5, `worktree-isolator` 스킬이 미렌더. **알려진 이탈**: `loop.md`/`loop-p5-batch.md` 는 OFF 에서 prose 가 남는다 (런타임은 이미 no-op — `create` 가 빈 줄을 출력하고 템플릿이 그걸 "cwd 에서 진행"으로 명시). `<WT>` 를 반복 본문 전체에서 걷어내는 건 autoloop 회귀 위험이 큰 별개 작업.
+- **OFF 의 비용** (ADR-004): PLAN/RESEARCH/SPEC/REVIEW 가 wrapup 이 커밋할 때까지 현재 브랜치에 uncommitted 로 쌓인다. 자동 커밋은 의도적으로 안 한다 — 공유 base 커밋은 count:3 오염 클래스다.
 
 ### Per-task feature-branch model (flag ON, ADR-001~010 LOCKED)
 
@@ -362,7 +368,7 @@ def mock_anthropic_client(monkeypatch):
 Integration test 는 `tests/integration/` 에 두고 `pytest.mark.skipif(not os.getenv("INTEGRATION"))` 가드.
 
 ### Worktree cleanup 정책
-- 정상 종료: `harness.yaml.worktree.cleanup` 따름 (default `on_success`)
+- 정상 종료: `harness.yaml.worktree.cleanup` 따름 (default `on_success`). **주의**: 이 키는 어떤 preset 템플릿도 렌더한 적이 없는 문서상의 유령 노브다 (PLAN-worktree-side-defaults 에서 확인, 범위 밖으로 남김) — 설정 가능한 것처럼 읽지 말 것.
 - **autoloop iter / phase blocker 발생 시 강제 cleanup**: `worktree.cleanup_all(force=True)` 호출 → halt 전 모든 `.worktrees/*` 제거 (디스크 누적 방지). 단, `--debug-worktree` 플래그 시 보존.
 - stale-artifact janitor: `prune_stale(base)` 가 **`worktree create` 시점에만** 실행된다 (`_cli_create`, `--debug-worktree` 시 skip). orphan `.hm-loop-*` 마커, dangling `.worktrees/*`, 그리고 finalize-stash ref 를 정리한다. ref drain 정책: stash object 가 이미 사라진(gc/drop) ref 는 즉시 제거(복원할 내용 없음), 살아있지만 내용이 HEAD 에 없는 ref 는 preserve+warn (PLAN-worktree-base-artifact-pollution ADR-005). **24h/주기 기반 hook 은 없다** — 예전 문서의 "weekly `/hm:health` cleanup" 주장은 코드에 존재한 적 없는 오류였다.
 - orphan-branch sweep + **landed-marker** (PLAN-worktree-deliverable-blocks-create ADR-003/004): finalize 성공 시 `refs/hm-landed/v1/<branch>` 에 worktree 브랜치 tip SHA 를 기록한다 (`_write_landed_marker`, cleanup 직전·clean/dirty base 양쪽). `prune_stale` 의 브랜치 sweep 은 marker SHA == 현재 tip 이면 (worktree dir 부재 시) **content 재비교 없이** 삭제 — 후속 HEAD 편집에도 안전하고, 이름 충돌로 재생성된 동명 브랜치는 tip 이 달라 marker 불일치 → preserve-biased content-gate 로 빠진다. marker 없는 legacy 브랜치는 기존 `_branch_content_in_head` fallback. **모든 삭제 경로(marker-sweep, content-gate, `--force`)가 같은 op 에서 marker ref 도 삭제**하고, branch 없는 orphan `refs/hm-landed/v1/*` 는 prune 시 reap → ref 누적 0. create 시 preserved-branch 경고 벽은 **1줄 요약**으로 collapse (`_print_prune_warnings`).

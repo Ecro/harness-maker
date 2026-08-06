@@ -57,48 +57,11 @@ Before any code edits, load memory in tier order (stops at first miss):
 2. **Warm tier** — Skim `.claude/memory/failures.md` first 60 lines; targeted: `rg -F "[fail:" .claude/memory/failures.md` for patterns relevant to the task.
 3. **Warm tier** — Skim `.claude/memory/wiki.md` first 40 lines for conventions in the implementation area.
 
+{% set wt_on = config.worktree is defined and config.worktree.get('enabled') %}{% set cdwt = 'cd <WT> && ' if wt_on else '' %}
 ## Procedure
 
-{% if config.worktree is defined and config.worktree.get('feature_branch_workflow') -%}
+{% if wt_on -%}
 {% set hm_stage = "execute" %}{% include "agents/_partials/worktree_preflight.md.j2" -%}
-{% else -%}
-### Step 0 — Worktree isolation (deterministic — do NOT rely on skill auto-discovery)
-
-<!-- # SIBLING_WORKTREE_PATHS -->
-
-Engage isolation if `harness.yaml.worktree.scope` includes `execute`. The `worktree-isolator` skill is documentation-only — its trigger-based dispatch is probabilistic in Cursor IDE and can silently skip, leaving safety-critical edits on the main branch. **Invoke the worktree CLI directly** so isolation is deterministic across both IDEs.
-
-**Idempotent under `/hm:loop`**: when this stage runs as part of a loop iteration, the loop has already engaged a per-loop worktree at step 5. The `worktree create` CLI detects we're already inside `.worktrees/<name>/` and returns that path — no nested worktrees, just reuse.
-
-{% if is_codex %}
-```
-Bash("uv run --with {{ harness_maker_src_path }} hm worktree create execute \"$(pwd)\"")
-```
-{% else %}
-```bash
-!uv run --with {{ harness_maker_src_path }} hm worktree create execute "$(pwd)"
-```
-{% endif %}
-
-Read **all non-empty output lines** — that is the contract for the rest of this stage. Three cases:
-
-- **Empty output** → `worktree.scope` does not include `execute`. No isolation; operate in `cwd`. Skip the finalize step at end.
-- **One absolute path** like `/path/to/project/.worktrees/execute-20260506T1830Z` → single-repo isolation. **Treat that exact string as `<WT>` for the rest of this stage.** You (Claude) MUST substitute the literal absolute path everywhere `<WT>` appears below — **do NOT use a shell variable**{% if not is_codex %}: each `!` block is a fresh subshell{% endif %}.
-  - Every Read/Write/Edit call uses absolute paths starting with `<WT>/`.
-  - Tests / lints / type checks: {% if is_codex %}`Bash("cd <WT> && <cmd>")`{% else %}`!cd <WT> && <cmd>`{% endif %}.
-- **Multiple lines** → multi-repo isolation. Line 1 = primary repo worktree (`<WT>`). Lines 2+ = sibling repo worktrees (`<WT-sibling-N>`). Use `<WT>` for primary-repo edits and `<WT-sibling-N>` for sibling-repo edits — the per-session gate marker covers all of them.
-
-**Verify before use (anti-drift gate).** Run `worktree verify <WT>` on the path you just read; `verify` confirms it is a real **linked** git worktree root (a non-zero exit means phantom, not-a-worktree, a subdir, or the main repo root — all signs of `<WT>` drift). On non-zero, **HALT** and re-run `worktree create` rather than operating on an unverified path. Never substitute a fabricated path or a `$WT` shell variable. The real dirname format is `execute-<uuid12>-<timestamp>`.
-
-{% if is_codex %}
-```
-Bash("uv run --with {{ harness_maker_src_path }} hm worktree verify <WT>")
-```
-{% else %}
-```bash
-!uv run --with {{ harness_maker_src_path }} hm worktree verify <WT>
-```
-{% endif %}
 {%- endif %}
 
 ### Step 1 — Load PLAN + flag parsing
@@ -274,11 +237,11 @@ retries of one Phase A.5 (use the task slug plus the phase number):
 
 {% if is_codex %}
 ```
-Bash("cd <WT> && uv run --with {{ harness_maker_src_path }} hm stage_agent_ledger emit --run-id <run-id> --agent test-reviewer --stage execute --slug {slug} --pass <attempt-number> --verdict <PASS|FAIL> --terminal --duration-ms <elapsed> --barrier-index <segment>")
+Bash("{{ cdwt }}uv run --with {{ harness_maker_src_path }} hm stage_agent_ledger emit --run-id <run-id> --agent test-reviewer --stage execute --slug {slug} --pass <attempt-number> --verdict <PASS|FAIL> --terminal --duration-ms <elapsed> --barrier-index <segment>")
 ```
 {% else %}
 ```bash
-!cd <WT> && uv run --with {{ harness_maker_src_path }} hm stage_agent_ledger emit --run-id <run-id> --agent test-reviewer --stage execute --slug {slug} --pass <attempt-number> --verdict <PASS|FAIL> --terminal --duration-ms <elapsed> --barrier-index <segment>
+!{{ cdwt }}uv run --with {{ harness_maker_src_path }} hm stage_agent_ledger emit --run-id <run-id> --agent test-reviewer --stage execute --slug {slug} --pass <attempt-number> --verdict <PASS|FAIL> --terminal --duration-ms <elapsed> --barrier-index <segment>
 ```
 {% endif %}
 
@@ -298,11 +261,11 @@ Run the test command from SPEC's `## ✅ Verification Criteria` table (or the PL
 
 {% if is_codex %}
 ```
-Bash("cd <WT> && <test_command>")
+Bash("{{ cdwt }}<test_command>")
 ```
 {% else %}
 ```bash
-!cd <WT> && <test_command>
+!{{ cdwt }}<test_command>
 ```
 {% endif %}
 
@@ -322,13 +285,13 @@ Select what to run, then run it as ONE call. `mode: full` → run everything and
 
 {% if is_codex %}
 ```
-Bash("cd <WT> && uv run --with {{ harness_maker_src_path }} hm test_dep_map --root . --changed-file <f1> …")
-Bash("cd <WT> && <lint> && <type> && <test> <nodes-or-empty>")
+Bash("{{ cdwt }}uv run --with {{ harness_maker_src_path }} hm test_dep_map --root . --changed-file <f1> …")
+Bash("{{ cdwt }}<lint> && <type> && <test> <nodes-or-empty>")
 ```
 {% else %}
 ```bash
-!cd <WT> && uv run --with {{ harness_maker_src_path }} hm test_dep_map --root . --changed-file <f1> …
-!cd <WT> && <lint> && <type> && <test> <nodes-or-empty>
+!{{ cdwt }}uv run --with {{ harness_maker_src_path }} hm test_dep_map --root . --changed-file <f1> …
+!{{ cdwt }}<lint> && <type> && <test> <nodes-or-empty>
 ```
 {% endif %}
 
@@ -343,11 +306,11 @@ when this PLAN phase authored bindable-mechanical-AC tests and the machine SPEC 
 
 {% if is_codex %}
 ```
-Bash("cd <WT> && uv run --with {{ harness_maker_src_path }} hm spec_mutation gate --yaml specs/SPEC-{slug}.machine.yaml --tier 1")
+Bash("{{ cdwt }}uv run --with {{ harness_maker_src_path }} hm spec_mutation gate --yaml specs/SPEC-{slug}.machine.yaml --tier 1")
 ```
 {% else %}
 ```bash
-!cd <WT> && uv run --with {{ harness_maker_src_path }} hm spec_mutation gate --yaml specs/SPEC-{slug}.machine.yaml --tier 1
+!{{ cdwt }}uv run --with {{ harness_maker_src_path }} hm spec_mutation gate --yaml specs/SPEC-{slug}.machine.yaml --tier 1
 ```
 {% endif %}
 
@@ -416,6 +379,7 @@ If a PLAN phase blocks (Phase A.5 retry exhausted, Phase D unfixable, or ADR con
 
 {% set gate0_heading = "### Step 4.5 — Emit Gate 0 receipt (ADR-001, ADR-005)" %}{% set gate0_stage = "execute" %}{% set gate0_pass = "Step 4 exited cleanly (all Phase D checks GREEN, no blocker filed)." %}{% set gate0_fail = "Step 4 raised a blocker (Phase D unfixable, ADR conflict, test-reviewer FAIL retry exhausted)." %}{% set gate0_standalone = false %}{% include "agents/_partials/gate0_receipt.md.j2" %}
 
+{% if wt_on -%}
 ### Step 5 — Worktree finalize
 
 Normal flow blocks a dirty base repo during Step 0 `worktree create`. Finalize
@@ -463,7 +427,7 @@ finalize that deferred a stash, record THIS session's worktree uuid into a slug-
 crumb so `/hm:wrapup`'s `post-commit-pop` restores **only your own** deferred stash
 (machine-derived, works even in a fresh/recovered wrapup window). Substitute `<slug>`
 (this `/hm:execute` arg) and `<WT>` (your `execute-<uuid>-<ts>` worktree from Step 0).
-On the `feature_branch_workflow` (flag-on) path there is no deferred stash → `wt-uuid`
+On the `worktree.enabled` (flag-on) path there is no deferred stash → `wt-uuid`
 of a `hm/<slug>` task worktree is empty → nothing recorded, by design.
 
 {% if is_codex %}
@@ -496,6 +460,8 @@ Bash("HM_OWNED_SESSION_UUIDS=\"$(uv run --with {{ harness_maker_src_path }} hm w
 ```
 {% endif %}
 
+{%- endif %}
+
 ## Outputs
 
 - Code + tests **staged but not committed** (commit happens in `/hm:wrapup`).
@@ -509,13 +475,14 @@ Bash("HM_OWNED_SESSION_UUIDS=\"$(uv run --with {{ harness_maker_src_path }} hm w
 - Phase A.5 test-reviewer returned PASS (or `--no-tdd` was set).
 - No diff outside the PLAN's stated scope — surprise edits are flagged.
 - No `git commit` invoked from this stage. (Verify: `git log` shows no new commit relative to stage start.)
-- Worktree finalized exactly once: success or fail.
+{% if wt_on %}- Worktree finalized exactly once: success or fail.
+{% endif %}
 
 {% set summary_done = "PLAN phases implemented to GREEN; changes staged, no commit" -%}
 {% set summary_artifact = "staged worktree changes + updated PLAN phase status" -%}
 {% set summary_next = "`/hm:review {slug}` or `/hm:wrapup` (STOP — user-initiated)" -%}
 {% set summary_stage = "execute" -%}
-{% set summary_autopilot_gate = "No mandatory gate — execute may auto-advance (the worktree finalize already ran)." -%}
+{% set summary_autopilot_gate = "No mandatory gate — execute may auto-advance." -%}
 {% include "agents/_partials/stage_end_summary.md.j2" %}
 
 <!-- @hm:user:extra-quality-checks -->

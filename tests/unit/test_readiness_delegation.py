@@ -42,8 +42,16 @@ def _project(tmp_path: Path, *, stages: list[str]) -> Path:
     root = tmp_path / "proj"
     (root / ".claude" / "observability").mkdir(parents=True)
     stage_lines = "\n".join(f"    - {s}" for s in stages) or "    []"
+    # `worktree.enabled: true` is written EXPLICITLY. It used to be omitted, relying on
+    # readiness defaulting an absent key to True — but the single reader
+    # (`worktree.worktree_enabled`) defaults an absent key to False, and readiness now
+    # agrees with it (PLAN-worktree-side-defaults). A fixture that depends on the two
+    # disagreeing is exactly the drift that made `/hm:health` able to report a mode the
+    # execution path does not take.
     (root / ".claude" / "harness.yaml").write_text(
-        "delegation:\n  stages:\n" + (stage_lines if stages else "    []") + "\n",
+        "delegation:\n  stages:\n"
+        + (stage_lines if stages else "    []")
+        + "\nworktree:\n  enabled: true\n",
         encoding="utf-8",
     )
     return root
@@ -142,7 +150,7 @@ def test_flag_off_gets_an_action_it_can_actually_perform(tmp_path: Path) -> None
     root = tmp_path / "off" / "proj"
     (root / ".claude" / "observability").mkdir(parents=True)
     (root / ".claude" / "harness.yaml").write_text(
-        "delegation:\n  stages:\n    - wrapup\nworktree:\n  feature_branch_workflow: false\n",
+        "delegation:\n  stages:\n    - wrapup\nworktree:\n  enabled: false\n",
         encoding="utf-8",
     )
     _rows(
@@ -160,7 +168,7 @@ def test_flag_off_gets_an_action_it_can_actually_perform(tmp_path: Path) -> None
     )
     sig = _signal(root)
     assert sig.passed is False
-    assert "feature_branch_workflow" in (sig.action or "")
+    assert "worktree.enabled" in (sig.action or "")
 
     # And the same ledger under the default (flag-on) config gets the OTHER action.
     on = _project(tmp_path / "on", stages=["wrapup"])

@@ -444,7 +444,9 @@ class HarnessConfig(BaseModel):
     anti_rot: dict  # { threshold, auto_apply, schedule }
     dashboard: dict  # { path }
     models: dict  # { preset_default, stages, agents }
-    worktree: dict  # { enabled, base_dir, cleanup, scope, merge_strategy }
+    worktree: dict  # { enabled }  — 0.48.0: the only live key. scope/branch_prefix/
+                    #   feature_branch_workflow retired (PLAN-worktree-side-defaults);
+                    #   base_dir/cleanup/merge_strategy are documented but never rendered.
     security: dict  # { enabled, scan_on, checks, on_finding }
     context_lint: dict  # { strict }
 

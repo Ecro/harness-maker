@@ -335,8 +335,16 @@ def test_codex_stage_skills_uses_passed_config_dump() -> None:
 def test_codex_execute_manual_post_commit_pop_uses_uuid_strict_mode() -> None:
     """Manual no-wrapup restore must keep the cross-session stash guard, now sourced
     per-session from the slug crumb (PLAN-layer3-per-session-ownership) instead of the
-    all-markers owned-uuids."""
-    specs = _codex_stage_skills(config_dump=_make_default_config())
+    all-markers owned-uuids.
+
+    Rendered with isolation ON: under `worktree.enabled: false` there is no worktree to
+    finalize and no deferred stash to restore, so the whole block is correctly absent
+    (PLAN-worktree-side-defaults ADR-005). A bare `HarnessConfig()` has `worktree: {}`,
+    which reads as OFF — real renders never see that, because `synthesize` normalizes.
+    """
+    cfg = _make_default_config()
+    cfg["worktree"] = {"enabled": True}
+    specs = _codex_stage_skills(config_dump=cfg)
     execute_spec = next(s for s in specs if "hm-execute" in s[1])
     body = execute_spec[2]["stage_body"]
     assert "HM_OWNED_SESSION_UUIDS" in body

@@ -40,14 +40,27 @@ def _reg(repo: Path, task: str, branch: str, wt: str, uuid: str) -> None:
 
 def test_flag_absent_returns_false_and_warns_once(tmp_path: Path, capsys) -> None:
     repo = _repo(tmp_path)
-    (repo / ".claude" / "harness.yaml").write_text("worktree:\n  scope: [execute]\n")
+    # No key of ANY generation — the only shape that reaches the absent-case warning.
+    # (`scope: [execute]` is no longer "absent": it is a legacy rung the reader honors,
+    # which is what keeps an un-re-rendered harness working.)
+    (repo / ".claude" / "harness.yaml").write_text("preset: Production\n")
     worktree._reset_flag_warning_state()  # test hook: clear the once-per-process guard
 
-    assert worktree._feature_branch_workflow_enabled(repo) is False
-    assert worktree._feature_branch_workflow_enabled(repo) is False  # second call
+    assert worktree.worktree_enabled(repo) is False
+    assert worktree.worktree_enabled(repo) is False  # second call
 
     warnings = capsys.readouterr().err
-    assert warnings.count("feature_branch_workflow") == 1  # warned exactly once
+    assert warnings.count("no worktree.enabled key") == 1  # warned exactly once
+
+
+def test_legacy_scope_is_honoured_not_treated_as_absent(tmp_path: Path, capsys) -> None:
+    """An un-re-rendered harness keeps working: `scope: [execute]` meant isolation was
+    on for execute, so the reader resolves True rather than warning about an absent key."""
+    repo = _repo(tmp_path)
+    (repo / ".claude" / "harness.yaml").write_text("worktree:\n  scope: [execute]\n")
+    worktree._reset_flag_warning_state()
+    assert worktree.worktree_enabled(repo) is True
+    assert capsys.readouterr().err == ""
 
 
 def test_flag_true_round_trips(tmp_path: Path) -> None:

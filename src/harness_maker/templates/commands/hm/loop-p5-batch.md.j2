@@ -11,7 +11,7 @@ command to handle batching here.
 > **Worktree precondition.** When reached via `/hm:loop p5-batch-N`, the loop
 > already engaged `<WT>` at its step 5 and commits at loop close (step 7). When
 > this command is invoked **directly**, no loop steps ran — engage a worktree
-> first (`worktree create execute "$(pwd)"`) or operate in cwd, and commit via
+> first (`worktree create execute "$(pwd)"`, a no-op when `worktree.enabled` is off) or operate in cwd, and commit via
 > `/hm:wrapup`.
 {% if is_codex %}
 > **Codex:** the shell blocks below use Claude-CLI `!`-prefix syntax. Execute
