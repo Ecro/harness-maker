@@ -84,25 +84,28 @@ without that voice and nobody notices.
 > **Sandbox escape (ADR-003).** These calls need outbound network, which Claude Code's Bash
 > sandbox blocks. Run each with the Bash tool parameter **`dangerouslyDisableSandbox: true`** —
 > otherwise the positive backstop is itself sandbox-gated and reports a false skip.
+
+Reading each JSON line below — **pass** is `"status": "invoked"`; **fail** is `"skipped"` (CLI
+missing/removed, expired auth, rate-limit, timeout) or `"failed"` (it ran and returned a payload
+the Step 4 filter cannot consume). The `reason` field names which.
 {% for model in config.second_opinion.models %}
 ### {{ model }}
 
 ```bash
 !uv run --with {{ harness_maker_src_path }} hm second_opinion_invoke --model {{ model }} --smoke --slug health-smoke --stage health
 ```
-
-- **pass** — the JSON line reports `"status": "invoked"`.
-- **fail** — `"status": "skipped"` (CLI missing/removed, expired auth, rate-limit, timeout) or
-  `"status": "failed"` (it ran and returned a payload the Step 4 filter cannot consume). The
-  `reason` field names which.
 {% endfor %}
-Report each model's result explicitly as a Layer 1 ActionItem. Until a failing model is fixed,
-treat all "that model agreed" review/plan outcomes as untrusted (Claude-only for that voice).
-Cross-ref the ledger `.claude/observability/second-opinion.jsonl`: rows are now one per
-**invocation** (not one per skip, as before this change), so compute the skip-rate as
-`skipped / total` and **exclude `stage: "health"` rows** — smoke rows are structurally biased
-toward `invoked` (base cwd, trivial prompt) and would dilute the number every time a health audit
-runs.
+Cross-ref the ledger `.claude/observability/second-opinion.jsonl`: rows are one per
+**invocation**. Keep `finding_ref == "n/a"` (disposition rows inflate the denominator), drop
+`stage: "health"` rows (smoke is biased toward `invoked`), then report
+**`(skipped + failed) / total` per model** as its own Layer 1 ActionItem.
+
+`failed` means that voice was missing from the review exactly as if skipped, so counting
+`skipped` alone reports a fraction of the loss; and a healthy model dilutes a broken one.
+2026-08-06: `skipped/total` read 10.3% against a true 20.7% — one model's whole loss sat in
+`failed`, and the aggregate described neither model (2.4% / 37.8%). A green smoke beside a
+double-digit rate is the signature failure: read that model's `skip_reason` (it names the
+fail-closed rule) and treat its "agreed" outcomes as untrusted until diagnosed.
 {% endif %}
 {% if not (config.second_opinion and config.second_opinion.models) %}
 ## Cross-model second opinion is OFF — is a CLI sitting unused?

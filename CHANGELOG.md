@@ -1,5 +1,40 @@
 # Changelog
 
+## [0.49.1] — 2026-08-06
+
+### A second-opinion model can die in a way the health audit was told not to count
+
+A `/hm:health` run on this repo passed both smoke checks, then the ledger showed one model
+missing from **17 of its 45** real stage calls. Two separate defects kept that invisible.
+
+**The shipped aggregation formula counted half the failures.** `/hm:health` told operators to
+compute the skip-rate as `skipped / total`. A `failed` row — the CLI ran and returned a payload
+the Step 4 filter cannot consume — is degradation just as total as a skip: that model's voice is
+absent from the review either way. On this repo the shipped formula read **10.3%** where the
+true rate was **20.7%**, and one model's entire loss sat in `failed` rows the formula never
+looked at. The formula was also aggregated across models, so a healthy one masked a broken one
+— the same audit read 20.7% overall against per-model rates of **2.4%** and **37.8%**, a number
+describing neither. `/hm:health` now reports `(skipped + failed) / total` **per model**, and the
+same correction lands in `codex_ledger`'s row contract and in `CLAUDE.md`.
+
+This one had been half-caught: `REVIEW-second-opinion-multi-model-2026-07-09` finding #5 fixed
+the *recording* side so parse failures log as `failed` rather than `skipped`. The aggregation
+that reads those rows was never updated, so the field was written faithfully and summed by
+nobody.
+
+**A discarded diagnostic made the surviving failures un-triageable.** `extract_antigravity_payload`
+fails closed on four distinct rules (size cap, candidate count ≠ 1, truncated primary structure,
+non-object), and the invoker's payload-acquisition handler kept only `type(exc).__name__` — all
+four read as `"ValueError"`. The codex channel had been given a dedicated return for exactly
+this reason; the antigravity channel never was, so the defect survived beside its own fix. Two
+ledger rows show `agy` returning a well-formed `severity: critical` finding that was discarded
+as unreadable, with nothing recording which rule rejected it. The reason string now carries the
+rule.
+
+Diagnosis only: the two discarded findings are not recovered, and whether the cause is parser
+strictness or `agy` truncating its own output stays open until failures accrue under the new
+string.
+
 ## [0.49.0] — 2026-08-06
 
 ### The first interview stops hiding what it decides for you (`PLAN-onboarding-interview-ux`)

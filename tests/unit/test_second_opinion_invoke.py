@@ -686,6 +686,44 @@ def test_failed_reason_carries_what_the_cli_actually_said(
     assert "permission" in r["reason"]
 
 
+def test_failed_reason_names_which_fail_closed_rule_rejected_the_payload(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # `extract_antigravity_payload` has FOUR distinct fail-closed rules, and the branch-5
+    # handler used to keep only `type(exc).__name__` — so all four read as "ValueError".
+    # Observed 2026-07-31 / 2026-08-01: agy returned a well-formed `severity: critical`
+    # finding, it was discarded, and the ledger could not say which rule rejected it. Two
+    # complete objects with no single anchored candidate trips the count rule.
+    _run_with(
+        monkeypatch,
+        lambda argv, **kw: _FakeCompleted(0, stdout='prose {"findings": []} {"findings": []}'),
+    )
+
+    r = soi.invoke(model="antigravity", prompt="p", slug="s", stage="review", base_root=repo)
+
+    assert r["status"] == "failed"
+    # The rule, not merely the exception type.
+    assert "exactly one JSON payload" in r["reason"]
+    assert "found 2" in r["reason"]
+
+
+def test_failed_reason_keeps_the_cli_excerpt_alongside_the_rule(
+    repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The added diagnosis must not crowd out the excerpt: both are needed to tell a
+    # parser over-strictness apart from agy truncating its own output. The budget also
+    # has to stay under `skip_reason`'s max_length=500, which DROPS the row rather than
+    # truncating it — a silent no-op on the branch whose whole purpose is diagnosis.
+    said = "SENTINEL_HEAD " + "x" * 400 + " SENTINEL_TAIL"
+    _run_with(monkeypatch, lambda argv, **kw: _FakeCompleted(0, stdout=said))
+
+    r = soi.invoke(model="antigravity", prompt="p", slug="s", stage="review", base_root=repo)
+
+    assert r["status"] == "failed"
+    assert "SENTINEL_HEAD" in r["reason"]
+    assert len(r["reason"]) <= 500
+
+
 def test_schema_path_escaping_the_repo_is_skipped(repo: Path) -> None:
     # `models.py` rejects absolute paths and `..` segments — but that validator never
     # runs here, because `load_config` reads raw YAML.

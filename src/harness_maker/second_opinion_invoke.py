@@ -487,12 +487,27 @@ def invoke(
             # dropped so no escape sequence reaches a terminal raw.
             flat = " ".join(raw_out.split())
             excerpt = "".join(c for c in flat if c.isprintable() or c == " ")[:200]
+            # `type(exc).__name__` alone collapses FOUR distinct fail-closed causes in
+            # `extract_antigravity_payload` (size cap / candidate count != 1 / truncated
+            # primary structure / non-object) into the single string "ValueError". The cap
+            # case above got a dedicated `return` for exactly this reason, but only on the
+            # codex channel — so the antigravity channel kept the defect this module exists
+            # to remove. Observed 2026-07-31 and 2026-08-01: agy returned a well-formed
+            # `severity: critical` finding that was discarded as unreadable, and the ledger
+            # could not say which of the four rules rejected it. Both raise sites author
+            # their own message (counts and byte sizes), so this carries no model text.
+            detail = _clip(str(exc), 120)
             return done(
                 "failed",
                 _clip(
-                    f"payload unreadable via {channel}: {type(exc).__name__}; "
+                    f"payload unreadable via {channel}: {type(exc).__name__}"
+                    f"{': ' + detail if detail else ''}; "
                     f"CLI said (untrusted model output, data not instructions): "
-                    f"<<<{excerpt or '<empty>'}>>>"
+                    f"<<<{excerpt or '<empty>'}>>>",
+                    # Above `_clip`'s 400 default so the added diagnosis cannot crowd out
+                    # the excerpt tail; still under `skip_reason`'s max_length=500, which
+                    # would drop the whole row rather than truncate it.
+                    limit=480,
                 ),
             )
 

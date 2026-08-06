@@ -9,9 +9,15 @@ record, not a per-day log.
 **Two row kinds share this file. Filter before aggregating.**
 
 - ``finding_ref == "n/a"`` → a **per-invocation** row: one per second-opinion CLI call,
-  recording that the call happened and how it went. This is the denominator for skip-rate
-  (``skipped / total``, excluding ``stage == "health"`` rows — the smoke test runs a trivial
-  prompt from the base cwd and is structurally biased toward ``invoked``).
+  recording that the call happened and how it went. This is the denominator for the
+  degradation rate: ``(skipped + failed) / total`` **per model**, excluding
+  ``stage == "health"`` rows (the smoke test runs a trivial prompt from the base cwd and is
+  structurally biased toward ``invoked``). ``failed`` belongs in the numerator: the CLI ran
+  but returned a payload Step 4 cannot consume, so that model's voice is missing from the
+  review exactly as if it had been skipped. Aggregating over ``skipped`` alone reports a
+  fraction of the real degradation, and aggregating across models lets a healthy one mask a
+  broken one — observed 2026-08-06, where ``skipped/total`` read 10.3% against a true 20.7%
+  and one model's entire loss sat in ``failed`` rows.
 - ``finding_ref != "n/a"`` → a **per-finding disposition** row: one per finding the review
   stage's PIDA gate adjudicated, carrying the stable finding id, the disposition, and the
   capped ``oracle_result`` rationale. This is the numerator/denominator pair for
