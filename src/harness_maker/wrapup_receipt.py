@@ -324,17 +324,28 @@ def reconcile(
 
     for rel in receipt.documents_updated:
         checked += 1
-        target = _confined(doc_root, rel)
-        if target is None:
+        # Resolve against BOTH roots. `doc_root` (the worktree) holds the deliverables
+        # and the gitignored observability churn; `base` holds the human memory tiers,
+        # because `memory_md` writes them there by design — the comment above says so,
+        # but the lookup used to consult only `doc_root`. The result was that EVERY
+        # truthful wrapup reported `.claude/memory/session/<today>.md` as
+        # `document-missing`: a structural false positive on the normal path, which is
+        # the fastest way to teach an operator to skim past a reconciliation failure.
+        candidates = [_confined(root, rel) for root in (doc_root, base)]
+        if all(c is None for c in candidates):
             mismatches.append(
                 Mismatch(
                     kind="document-escapes-root",
                     detail=f"{rel!r} is absolute or escapes the repository root",
                 )
             )
-        elif not target.is_file():
+        elif not any(c is not None and c.is_file() for c in candidates):
+            where = "worktree or base" if doc_root != base else "repository"
             mismatches.append(
-                Mismatch(kind="document-missing", detail=f"{rel!r} claimed but does not exist")
+                Mismatch(
+                    kind="document-missing",
+                    detail=f"{rel!r} claimed but does not exist in the {where}",
+                )
             )
 
     # The anti-fabrication check: a summarising main loop inventing a plausible

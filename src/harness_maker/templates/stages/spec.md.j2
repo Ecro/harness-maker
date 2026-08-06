@@ -1,3 +1,4 @@
+{% set wt_on = config.worktree is defined and config.worktree.get('enabled') %}{% set WTR = '<WT>' if wt_on else '.' -%}
 # Stage: spec
 
 > Atomic stage. Acceptance-criteria specification via 6-category interview. Owns **what / why / verification**. `plan` owns **how / risk / phasing**.
@@ -196,7 +197,7 @@ SPEC's substantive decisions (e.g., "what counts as done for Scenario 2?", "fail
 
 ### Step 3 — Write SPEC document
 
-Write to `{{ config.spec.dir }}SPEC-{slug}.md`.
+Write to `{{ WTR }}/{{ config.spec.dir }}SPEC-{slug}.md`.
 
 **Required frontmatter:**
 

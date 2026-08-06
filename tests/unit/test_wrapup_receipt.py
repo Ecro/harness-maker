@@ -848,3 +848,65 @@ def test_an_unparseable_second_brain_block_reports_unverified_not_missing(
     assert [m["kind"] for m in result["mismatches"]] == [], payload
     assert result["unverified"] == 1, payload
     assert payload["vault_checked"] is None, payload
+
+
+# ------------------------------------------------ the base/worktree document seam
+
+
+def _worktree_of(base: Path) -> Path:
+    """A worktree-shaped sibling under `<base>/.worktrees/<slug>/`."""
+    wt = base / ".worktrees" / "demo"
+    (wt / ".claude" / "memory").mkdir(parents=True)
+    return wt
+
+
+def test_a_memory_tier_document_written_at_base_is_not_a_mismatch(tmp_path: Path) -> None:
+    """The structural false positive this seam produced on EVERY truthful wrapup.
+
+    `memory_md` writes the human memory tiers to the BASE repo by design — the stage
+    even folds them into the squash commit afterwards — but the reconciler resolved
+    `documents_updated` only against the worktree. So a delegate that correctly wrote
+    `.claude/memory/session/<today>.md` was reported as claiming a file that does not
+    exist. A reconciliation that cries wolf on the normal path is one an operator
+    learns to skim.
+    """
+    _memory(tmp_path)
+    wt = _worktree_of(tmp_path)
+    (tmp_path / ".claude" / "memory" / "session").mkdir(parents=True, exist_ok=True)
+    (tmp_path / ".claude" / "memory" / "session" / "2026-08-06.md").write_text("x", "utf-8")
+
+    result = wr.reconcile(
+        _receipt(documents_updated=(".claude/memory/session/2026-08-06.md",)),
+        base_root=tmp_path,
+        worktree_root=wt,
+    )
+    assert not result.mismatches, result.mismatches
+
+
+def test_a_deliverable_written_in_the_worktree_is_still_found(tmp_path: Path) -> None:
+    """The other half — widening to two roots must not stop checking the worktree."""
+    _memory(tmp_path)
+    wt = _worktree_of(tmp_path)
+    (wt / "work-docs").mkdir(parents=True)
+    (wt / "work-docs" / "PLAN-x.md").write_text("x", "utf-8")
+
+    result = wr.reconcile(
+        _receipt(documents_updated=("work-docs/PLAN-x.md",)),
+        base_root=tmp_path,
+        worktree_root=wt,
+    )
+    assert not result.mismatches, result.mismatches
+
+
+def test_a_document_in_neither_root_is_still_a_mismatch(tmp_path: Path) -> None:
+    """Two roots, not no roots: a fabricated claim must still be caught, and the
+    message must say where it was looked for."""
+    _memory(tmp_path)
+    wt = _worktree_of(tmp_path)
+    result = wr.reconcile(
+        _receipt(documents_updated=("work-docs/never-written.md",)),
+        base_root=tmp_path,
+        worktree_root=wt,
+    )
+    assert [m.kind for m in result.mismatches] == ["document-missing"]
+    assert "worktree or base" in result.mismatches[0].detail

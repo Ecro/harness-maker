@@ -76,16 +76,16 @@ files:
   body_sha256: b6749fc52ac4b05518c0198200d63ab859a9d92eefa7edf202dcd425b7df9703
 - path: commands/hm/plan.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: b6f14b6bd7adcbe42617f72f5ea881d9f906523c4c38d27ab0f12002ba380c87
+  body_sha256: 26485e6b096ca346c1ca80b2031878313278040640c9c0fdcbc989d305b8be31
 - path: commands/hm/research.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: 99969ed42719a39007e669c0b349968561637409d564b9cd67a5c360242989ea
+  body_sha256: 41d3d5f48dd6c71b0979e69f3486402277a112340c653f95bb8fb8091fd2be1a
 - path: commands/hm/review.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: 9ef88cd234e4af4610e511598596d39efb88e6c43229cd2640264d30c8b5d538
+  body_sha256: c57d47f1d6b459e8fa4effee3de85df3778bb33194b7ac43e20a50e936115b01
 - path: commands/hm/spec.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: 2cf673df5dc82e47ab971d5908eea2346cfb0b897889e2689f3dd9dce7b8d0a2
+  body_sha256: 6e9d893d44a8478a9d19a116fb6310436dfbbbcd957e4c7483e530a0dfff6b25
 - path: commands/hm/uninstall.md
   template: commands/hm/uninstall.md.j2
   body_sha256: 86a9b22c2d05bb4c25d11d38a50fb331dda627fe91c0348f95acee03f3be15a1
@@ -163,16 +163,16 @@ files:
   body_sha256: 5fc2498efe65aa754e7bc9751c143a82d6a7632a268ef04b1369477ab70d8b8d
 - path: stages/plan.md
   template: stages/plan.md.j2
-  body_sha256: 1e6810a7cb22176c526ce403c82751d3b818e3ddae37974a1d7bd265e3c72c92
+  body_sha256: 8239dbd46f5e774446a8721cb72b67d52e0e63603b36487d7358e11fdf62d31a
 - path: stages/research.md
   template: stages/research.md.j2
-  body_sha256: 65eec7605ff3345eb20544db06e06c2c9340e582c4eb198e351c24ff8fda6b9a
+  body_sha256: 943551d7ebb02bab8b4db1943ff409f67d735e4f7481446ea34065baa8fed59c
 - path: stages/review.md
   template: stages/review.md.j2
-  body_sha256: 2b1faad190ee4397c9e0be271d09a7dd3081795c6c2878c7c2c17a89c599dda6
+  body_sha256: d8899beb5d3c317fe9cdbbc3d4eadae0e7d3f5f28d51a9b8aa5917c4b494778c
 - path: stages/spec.md
   template: stages/spec.md.j2
-  body_sha256: 561ab7b196e01fa5aeba697caa13afd0d86a945274ba306216c69222da410496
+  body_sha256: 1b9b83022bd217552386b30c8a4fdf475f0f443f910f0320f10b3777321cd7e4
 - path: stages/verify.md
   template: stages/verify.md.j2
   body_sha256: 942ab007eeda7059339f1d5de5a4dda313ab0cea49490f671cce5a0d1502f06d

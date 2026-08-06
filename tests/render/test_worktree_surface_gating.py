@@ -190,3 +190,36 @@ def test_on_loop_marker_stays_session_scoped(tmp_path: Path) -> None:
     session-blind degraded path and block peers' termination."""
     text = (_render(tmp_path, enabled=True) / "loop.md").read_text(encoding="utf-8")
     assert '[ "<WT>" = "$(pwd)" ]' in text
+
+
+# ── RESEARCH V8: the deliverable write instruction must name its own target ──
+
+_DELIVERABLE_DIRS = {
+    "spec": "specs/",
+    "research": "work-docs/",
+    "plan": "work-docs/",
+    "review": "work-docs/",
+}
+_DELIVERABLE_WRITES = {
+    "spec": "SPEC-{slug}.md",
+    "research": "RESEARCH-{slug}.md",
+    "plan": "PLAN-{slug}.md",
+    "review": "REVIEW-{slug}-{date}.md",
+}
+
+
+@pytest.mark.parametrize(("stage", "doc"), sorted(_DELIVERABLE_WRITES.items()))
+def test_deliverable_write_instruction_is_rooted(tmp_path: Path, stage: str, doc: str) -> None:
+    """RESEARCH V8. The concrete instruction used to read `Write to \\`work-docs/PLAN…\\``
+    with no root, and ONLY the preflight preamble's generic "treat that string as `<WT>`"
+    sentence routed it into the worktree. That is prompt reliability, not determinism —
+    a reader who follows the concrete line writes the deliverable to the base tree even
+    with isolation ON, which is a second, independent way to dirty the base.
+
+    Asserted on both modes so the fix cannot be "hardcode `<WT>`", which would render a
+    nonexistent path into every OFF harness.
+    """
+    on = (_render(tmp_path / "on", enabled=True) / f"{stage}.md").read_text(encoding="utf-8")
+    off = (_render(tmp_path / "off", enabled=False) / f"{stage}.md").read_text(encoding="utf-8")
+    assert f"<WT>/{_DELIVERABLE_DIRS[stage]}{doc}" in on, f"{stage}: ON target not rooted at <WT>"
+    assert f"./{_DELIVERABLE_DIRS[stage]}{doc}" in off, f"{stage}: OFF target not rooted at ."

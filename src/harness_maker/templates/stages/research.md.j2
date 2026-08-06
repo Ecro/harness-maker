@@ -1,3 +1,4 @@
+{% set wt_on = config.worktree is defined and config.worktree.get('enabled') %}{% set WTR = '<WT>' if wt_on else '.' -%}
 # Stage: research
 
 > Atomic stage. **Exploratory** — gather facts, surface alternatives. Decisions get locked in `plan`, not here.
@@ -239,7 +240,7 @@ Then synthesize:
 
 ### Phase 3 — Write RESEARCH document
 
-Write to `{{ config.work_docs.dir }}RESEARCH-{slug}.md`. `/hm:plan` Step 2 reads this file via PLAN frontmatter `research_doc:` and skips its own retrieval — this is the single biggest token saver in the workflow.
+Write to `{{ WTR }}/{{ config.work_docs.dir }}RESEARCH-{slug}.md`. `/hm:plan` Step 2 reads this file via PLAN frontmatter `research_doc:` and skips its own retrieval — this is the single biggest token saver in the workflow.
 
 **Required frontmatter:**
 

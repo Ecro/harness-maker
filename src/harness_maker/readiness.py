@@ -740,6 +740,60 @@ def _dim_guardrails(project_dir: Path, *, session_id: str | None = None) -> Dime
             _dl_action = None
     signals.append(_signal("delegation_fires", _dl_passed, 0, _dl_evidence, _dl_action))
 
+    # Worktree-axis currency (PLAN-worktree-side-defaults; RESEARCH V6 found /hm:health
+    # carried ZERO worktree signals in either preset). Advisory, weight=0 — the axis is
+    # a config CHOICE, so neither value is a finding. What IS a finding is resolving
+    # through a LEGACY rung: that means the harness has not been re-rendered since the
+    # collapse, so it is running on a compatibility fallback whose only other surface is
+    # a one-shot stderr line nobody reads twice.
+    _wt_hy = claude / "harness.yaml"
+    if _wt_hy.is_file():
+        from harness_maker.worktree import resolve_worktree_enabled
+
+        try:
+            _wt_res = resolve_worktree_enabled(_lhy_dl(_wt_hy).get("worktree"))
+        except Exception:  # noqa: BLE001 — degrade to N-A, never crash readiness
+            _wt_res = None
+        if _wt_res is not None:
+            if _wt_res.diagnostic:
+                signals.append(
+                    _signal(
+                        "worktree_axis_current",
+                        False,
+                        0,
+                        f"worktree axis resolves with a diagnostic: {_wt_res.diagnostic}",
+                        "Fix the worktree block in harness.yaml — a malformed or "
+                        "self-contradicting value resolves fail-closed to OFF.",
+                    )
+                )
+            elif _wt_res.rung in (2, 3):
+                _legacy = _wt_res.source_key
+                signals.append(
+                    _signal(
+                        "worktree_axis_current",
+                        False,
+                        0,
+                        f"worktree isolation is resolving through the retired "
+                        f"`{_legacy}` key (isolation is "
+                        f"{'on' if _wt_res.value else 'off'}) — this harness predates "
+                        "the single-key collapse",
+                        "Re-render with `/harness-maker:make --update` to migrate to "
+                        "`worktree.enabled`. The migration preserves an explicit "
+                        "`feature_branch_workflow` exactly; a `scope`-only block is "
+                        "lossy and will ask (or default OFF loudly).",
+                    )
+                )
+            elif _wt_res.rung == 1:
+                signals.append(
+                    _signal(
+                        "worktree_axis_current",
+                        True,
+                        0,
+                        f"worktree.enabled: {str(_wt_res.value).lower()}",
+                        None,
+                    )
+                )
+
     # Render-drift guard (PLAN-wrapup-waiver-enforcement ADR-004/C5): the
     # task-driven oracle-waiver advisory (wrapup Step 3.6) is baked at render time
     # on the dev_mode branch. If harness.yaml's dev_mode was flipped without

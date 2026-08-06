@@ -121,7 +121,10 @@ def test_absent_file_and_malformed_yaml_resolve_off_without_crashing(tmp_path: P
 # tripwire; the retired *list* keys are covered by the receiver-aware check below.
 _RETIRED_KEYS = {"feature_branch_workflow"}
 _RETIRED_SUBSCRIPT_KEYS = {"feature_branch_workflow", "scope", "branch_prefix"}
-_ALLOWED_READERS = {"resolve_worktree_enabled", "_legacy_disagreement"}
+# The three functions permitted to name a retired key. `source_key` is the rung↔name
+# mapping itself — consumers that need to NAME the key (a /hm:health message) ask it
+# rather than hardcoding, so the mapping has exactly one home.
+_ALLOWED_READERS = {"resolve_worktree_enabled", "_legacy_disagreement", "source_key"}
 
 
 def _string_constants(node: ast.AST) -> set[str]:
@@ -235,3 +238,15 @@ def test_stage_none_asks_whether_isolation_is_live_for_any_stage() -> None:
     # rungs 1 and 2 are stage-blind already, so `stage=None` changes nothing there
     assert resolve_worktree_enabled({"enabled": True}, stage=None).value is True
     assert resolve_worktree_enabled({"feature_branch_workflow": False}, stage=None).value is False
+
+
+def test_source_key_is_the_only_rung_to_name_mapping() -> None:
+    """The allowlist above grants `source_key` the right to name retired keys, so this
+    pins that it actually IS the mapping — otherwise the exemption would be a hole any
+    future edit to that function could widen."""
+    from harness_maker.worktree import WorktreeResolution
+
+    assert WorktreeResolution(True, 1, None).source_key == "enabled"
+    assert WorktreeResolution(True, 2, None).source_key == "feature_branch_workflow"
+    assert WorktreeResolution(True, 3, None).source_key == "scope"
+    assert WorktreeResolution(None, 0, None).source_key is None

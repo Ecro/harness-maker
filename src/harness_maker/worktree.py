@@ -3791,6 +3791,17 @@ class WorktreeResolution(NamedTuple):
     rung: int
     diagnostic: str | None
 
+    @property
+    def source_key(self) -> str | None:
+        """The key this resolution came from, or None when nothing was present.
+
+        Lives here so a consumer that needs to NAME the retired key (a health message,
+        say) does not have to hardcode it — a second copy of the rung↔key mapping is
+        the same duplication the single-reader invariant exists to prevent, and
+        `test_only_the_resolver_reads_the_retired_keys` enforces that.
+        """
+        return {1: "enabled", 2: "feature_branch_workflow", 3: "scope"}.get(self.rung)
+
 
 def resolve_worktree_enabled(block: object, *, stage: str | None = "execute") -> WorktreeResolution:
     """Resolve a parsed ``worktree:`` block to the isolation boolean.
