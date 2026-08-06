@@ -27,11 +27,12 @@ from harness_maker.synthesize import synthesize
 def loop_md(tmp_path_factory: pytest.TempPathFactory) -> str:
     out = tmp_path_factory.mktemp("rendered-floor")
     p = ProjectProfile(stack=["python"], scale="small", lifecycle="dormant")
-    render(
-        synthesize(p, interview(p, autoloop_mode=True)),
-        out,
-        freeze_time=DEFAULT_FREEZE_TIME,
-    )
+    # Isolation ON: the worktree-create call, the session-id flag and the per-session
+    # marker only exist under `worktree.enabled: true` (PLAN-worktree-side-defaults
+    # ADR-005). The recommended preset for this profile is Side, which is now OFF, so
+    # rendering it would test the wrong configuration.
+    answers = interview(p, autoloop_mode=True).model_copy(update={"worktree": {"enabled": True}})
+    render(synthesize(p, answers), out, freeze_time=DEFAULT_FREEZE_TIME)
     return (out / "commands" / "hm" / "loop.md").read_text(encoding="utf-8")
 
 

@@ -28,7 +28,11 @@ def _profile() -> ProjectProfile:
 def rendered_root(tmp_path_factory: pytest.TempPathFactory) -> Path:
     out = tmp_path_factory.mktemp("rendered-loop")
     p = _profile()
-    a = interview(p, autoloop_mode=True)
+    # Isolation ON: the loop-close wrapup override, `task-preflight`/`task-land` skip
+    # instructions and the finalize step only render under `worktree.enabled: true`
+    # (PLAN-worktree-side-defaults ADR-005). This profile recommends Side, which now
+    # defaults OFF, so the recommended answers would test the wrong configuration.
+    a = interview(p, autoloop_mode=True).model_copy(update={"worktree": {"enabled": True}})
     bp = synthesize(p, a)
     render(bp, out, freeze_time=DEFAULT_FREEZE_TIME)
     return out

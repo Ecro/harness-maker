@@ -64,10 +64,10 @@ files:
   body_sha256: 530ab6bf2275a879292e2571a474d9b7c042efcd822a4ba567bbbe473c44373f
 - path: commands/hm/loop-p5-batch.md
   template: commands/hm/loop-p5-batch.md.j2
-  body_sha256: ae5b6d76d322a0bac0f94f5816da7067fb9723bd7913e2127c5971ecc02afe57
+  body_sha256: 280eb19ef60faaa3a4a97e2d0c74aa8013ebae06b68e48b0573438474fa6e8cf
 - path: commands/hm/loop.md
   template: commands/hm/loop.md.j2
-  body_sha256: e8bed32bc9385bc2dff9e3098e298dad6163e0db0bf9638f75e88a1668c91671
+  body_sha256: 5366dec67a7e22b8ae75d977577abb343d93a1688041da0400ee03da7c5a09c1
 - path: commands/hm/make.md
   template: commands/hm/make.md.j2
   body_sha256: 17faf8d5bf172a04d563c0962cac7caf2b49ff2c0bfad3f3345e4348eaa6d23d

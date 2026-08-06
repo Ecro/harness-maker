@@ -25,7 +25,11 @@ def _profile() -> ProjectProfile:
 def rendered_root(tmp_path_factory: pytest.TempPathFactory) -> Path:
     out = tmp_path_factory.mktemp("rendered-wiring")
     p = _profile()
-    a = interview(p, autoloop_mode=True)
+    # Isolation ON: the worktree-create call, the session-id flag and the per-session
+    # marker only exist under `worktree.enabled: true` (PLAN-worktree-side-defaults
+    # ADR-005). The recommended preset for this profile is Side, which is now OFF, so
+    # rendering it would test the wrong configuration.
+    a = interview(p, autoloop_mode=True).model_copy(update={"worktree": {"enabled": True}})
     bp = synthesize(p, a)
     render(bp, out, freeze_time=DEFAULT_FREEZE_TIME)
     return out

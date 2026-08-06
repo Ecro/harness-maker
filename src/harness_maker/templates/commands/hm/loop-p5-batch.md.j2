@@ -1,3 +1,4 @@
+{% set wt_on = config.worktree is defined and config.worktree.get('enabled') -%}
 # {% if is_codex %}@hm-loop-p5-batch{% else %}/hm:loop-p5-batch{% endif %} — prompt-driven SPEC bulk authoring (PLAN-total-spec-coverage ADR-013 R2)
 
 Extracted from the standard `/hm:loop` body (ADR-006 of
@@ -8,10 +9,12 @@ standard loop dispatches here when `<goal>` begins with `p5-batch`
 through `autoloop_driver.run()` — ADR-013 R2 explicitly requires the slash
 command to handle batching here.
 
-> **Worktree precondition.** When reached via `/hm:loop p5-batch-N`, the loop
+{% if wt_on %}> **Worktree precondition.** When reached via `/hm:loop p5-batch-N`, the loop
 > already engaged `<WT>` at its step 5 and commits at loop close (step 7). When
 > this command is invoked **directly**, no loop steps ran — engage a worktree
-> first (`worktree create execute "$(pwd)"`, a no-op when `worktree.enabled` is off) or operate in cwd, and commit via
+> first (`worktree create execute "$(pwd)"`) or operate in cwd, and commit via{% else %}> **No isolation.** `worktree.enabled` is off, so nothing is engaged here and
+> nothing is finalized. Batch edits land in this working tree and stay uncommitted
+> until wrapup commits them — the same contract as every other stage. Commit via{% endif %}
 > `/hm:wrapup`.
 {% if is_codex %}
 > **Codex:** the shell blocks below use Claude-CLI `!`-prefix syntax. Execute
@@ -106,7 +109,9 @@ The P5 loop converges when:
 
 ### Worktree
 
-P5 batches run inside the **same worktree** engaged at step 5 of the
+{% if wt_on %}P5 batches run inside the **same worktree** engaged at step 5 of the
 standard loop — no nested worktree. Each batch's edits land in `<WT>`;
 the squash-merge at loop close (step 7) commits the full P5 run as one
-commit (per the standard wrapup contract).
+commit (per the standard wrapup contract).{% else %}P5 batches run in this working tree — isolation is off, so there is no worktree
+and no squash-merge at loop close. Every batch's edits accumulate here and are
+committed once by wrapup (per the standard wrapup contract).{% endif %}

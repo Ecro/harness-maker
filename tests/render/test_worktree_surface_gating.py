@@ -39,15 +39,17 @@ def _render(tmp_path: Path, *, enabled: bool, targets: list[Target] | None = Non
 # ── OFF: no worktree vocabulary anywhere ─────────────────────────────────────
 
 
-# Deviation from ADR-005, recorded rather than silently narrowed: `loop.md` /
-# `loop-p5-batch.md` still carry worktree prose under OFF. Their `worktree create
-# execute` is already a runtime no-op there (it prints empty, and the template
-# itself says "Empty output → `worktree.enabled` is off … operate in `cwd`"), so the
-# OFF path is functionally correct; removing the prose means rewriting the `<WT>`
-# threading through the entire iteration body, which is a separate change with real
-# autoloop regression risk. `health.md` is a diagnostic that documents the machinery
-# by design.
-_SURFACE_EXEMPT = {"loop.md", "loop-p5-batch.md", "health.md"}
+# `health.md` is the one exemption and it is deliberate: it is a DIAGNOSTIC command whose
+# job is to describe the worktree machinery to the operator, so naming `worktree create`
+# there is content, not a live instruction.
+#
+# `loop.md` / `loop-p5-batch.md` used to be exempt too — ADR-005 named them but the
+# `<WT>` threading through the whole iteration body made the removal look riskier than
+# the prose was worth. It was done afterwards: section 5 branches, the command sites take
+# `{{ cdwt }}`/`{{ WTR }}`, and prose takes `{{ WTP }}`. The exemption is gone, which is
+# the point — an "accepted limitation" that keeps its test exemption is indistinguishable
+# from one nobody ever revisits.
+_SURFACE_EXEMPT = {"health.md"}
 
 
 def test_off_render_has_no_worktree_surface(tmp_path: Path) -> None:
@@ -149,3 +151,42 @@ def test_on_render_recovery_sequence_restores_a_deferred_stash(tmp_path: Path) -
     restored = "user wip" in (repo / "keep.txt").read_text()
     stash_kept = bool(re.search(r"hm-test", _git(["stash", "list"], repo)))
     assert restored or stash_kept, "the WIP was neither restored nor preserved"
+
+
+def test_on_loop_keeps_its_isolation_machinery(tmp_path: Path) -> None:
+    """The mirror of the OFF assertion. Stripping `<WT>` from the loop under OFF is only
+    correct if the ON render still creates, verifies and finalizes — a `{% if %}` that
+    swallowed both sides would pass the OFF test alone."""
+    text = (_render(tmp_path, enabled=True) / "loop.md").read_text(encoding="utf-8")
+    for needle in (
+        "worktree create execute",
+        "worktree verify",
+        "worktree finalize",
+        "cd <WT> &&",
+    ):
+        assert needle in text, needle
+
+
+def test_off_loop_still_self_gates_and_names_the_cost(tmp_path: Path) -> None:
+    """Removing the worktree prose must not remove the Stop-hook marker the loop needs to
+    self-gate, nor silently drop the fact that deliverables now accumulate in place.
+
+    Assert the COMMAND, not the word. The first version of this test grepped for
+    `hm-loop-active` and passed while the OFF render contained only a sentence *claiming*
+    the marker is written — the `touch` had been swallowed by the ON-only branch, so an
+    OFF loop would have self-stopped after iteration 1. That is the same
+    grep-passes-while-behavior-is-broken shape this module's docstring is about.
+    """
+    text = (_render(tmp_path, enabled=False) / "loop.md").read_text(encoding="utf-8")
+    assert "touch .hm-loop-active" in text, "the OFF loop never writes its own marker"
+    # …and the condition guarding it must be trivially true without a worktree path
+    assert '[ "$(pwd)" = "$(pwd)" ]' in text
+    assert "uncommitted" in text
+
+
+def test_on_loop_marker_stays_session_scoped(tmp_path: Path) -> None:
+    """The mirror: with isolation on, the guard must still compare the WORKTREE path to
+    cwd — collapsing both branches to `$(pwd)` would make every ON loop take the
+    session-blind degraded path and block peers' termination."""
+    text = (_render(tmp_path, enabled=True) / "loop.md").read_text(encoding="utf-8")
+    assert '[ "<WT>" = "$(pwd)" ]' in text

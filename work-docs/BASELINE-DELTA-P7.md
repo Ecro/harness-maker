@@ -64,8 +64,8 @@ Every key that moved in `surface_baseline.json`, with the phase that moved it.
 |---|---|---|---|---|
 | `claude` | 354 283 | 361 396 | P1+P2+P3+review-round | sum of the per-command rows below |
 | `codex` | 288 826 | 295 916 | P1+P2+P3+review-round | same, codex variant |
-| `claude` | 361 396 | **361 600** | worktree-side-defaults | +204 — see the appended section |
-| `codex` | 295 916 | **295 602** | worktree-side-defaults | −314 — see the appended section |
+| `claude` | 361 396 | **361 562** | worktree-side-defaults | +166 — see the appended section |
+| `codex` | 295 916 | **295 562** | worktree-side-defaults | −354 — see the appended section |
 
 ### `surface.claude`
 
@@ -186,17 +186,18 @@ land its rows here rather than start a second attribution file. Two changes now 
 the same baseline; the rows above are P7's, the rows below are this task's, and the
 aggregate row shows both hops.
 
-**Net: claude +204, codex −314.** The only real addition is the `/hm:configure` worktree
+**Net: claude +166, codex −354.** The only real addition is the `/hm:configure` worktree
 dimension. Everything else is the `feature_branch_workflow` → `enabled` gate rename, which
 is shorter, plus two lines that stopped rendering.
 
 | Key | chars | Cause |
 |---|---|---|
 | `configure` | 9 330 → 9 910 (**+580**) | The new "Worktree isolation" dimension + its dispatch note. Compacted twice before landing (raw +534 → +210 on the earlier freeze); the residue is the ONLY discoverable way to change the axis, and "there is no supported way to change this" is the defect the task exists to fix. |
-| `loop-p5-batch` | 4 794 → 4 834 (+40) | One clause noting `worktree create` is a no-op when `worktree.enabled` is off. |
 | `execute` | 33 774 → 33 691 (−83) | Gate rename, minus the flag-off Step 0 block and one quality-bar line that no longer render when isolation is off. |
 | `plan` / `research` / `review` / `spec` | each −68 | Gate rename only (`config.worktree.get('feature_branch_workflow')` → `…get('enabled')`). |
-| `loop` | −29 | Prose rename. |
+| `loop-p5-batch` | 4 834 → 4 794 (**net 0 vs P7**) | Moves twice. `f0f8bf45` added a +40 parenthetical ("a no-op when `worktree.enabled` is off"); this change replaces it with a real `{% if wt_on %}` branch, so the ON render returns to its P7 size. The row exists because the key moved against the COMMITTED baseline (−40), even though it is unchanged against P7 — the attribution gate compares to what is on disk, which is the right thing for it to do. |
+| `hm-loop-p5-batch` | 5 291 → 5 251 (**net 0 vs P7**) | Codex variant, same two hops. |
+| `loop` | 52 269 → 52 242 (−27) | Section 5 branches ON/OFF, command sites take `{{ cdwt }}`/`{{ WTR }}`, prose takes `{{ WTP }}`. The OFF branch replaces the create/verify/finalize machinery with a shorter block, so the ON-side text it removes slightly outweighs what the OFF text adds. |
 | `verify` / `wrapup` | each −16 | Gate rename. |
 | `hm-execute` | 30 826 → 30 805 (−21) | Codex variant of `execute`. |
 | `hm-plan` | 44 428 → 44 360 (−68) | Codex variant of `plan`. |
@@ -204,11 +205,10 @@ is shorter, plus two lines that stopped rendering.
 | `hm-research` | 23 664 → 23 596 (−68) | Codex variant of `research`. |
 | `hm-spec` | 27 808 → 27 740 (−68) | Codex variant of `spec`. |
 | `hm-loop` | 51 179 → 51 150 (−29) | Codex variant of `loop`. |
-| `hm-loop-p5-batch` | 5 251 → 5 291 (+40) | Codex variant of `loop-p5-batch`. |
 | `hm-verify` | 18 740 → 18 724 (−16) | Codex variant of `verify`. |
 | `hm-wrapup` | 43 914 → 43 898 (−16) | Codex variant of `wrapup`. |
 
-Codex nets **−314** because it has no `configure` command — it gets the rename shrink
+Codex nets **−354** because it has no `configure` command — it gets the rename shrink
 without the one real addition.
 
 **Why the freeze had to happen after the land, not on the task branch.**

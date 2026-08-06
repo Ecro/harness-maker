@@ -1,3 +1,4 @@
+{% set wt_on = config.worktree is defined and config.worktree.get('enabled') %}{% set WTR = '<WT>' if wt_on else '.' %}{% set cdwt = 'cd <WT> && ' if wt_on else '' %}{% set WTP = '`<WT>`' if wt_on else 'the project root' -%}
 # {% if is_codex %}@hm-loop{% else %}/hm:loop{% endif %}
 
 > Start a bounded autoloop. Claude conducts a coverage-driven adaptive
@@ -421,6 +422,7 @@ for final go-ahead before starting the loop.
 
 ---
 
+{% if wt_on -%}
 ### 5. Engage worktree (loop top — once, before any iter)
 
 If `harness.yaml.worktree.enabled` is on, create one worktree
@@ -490,17 +492,38 @@ Bash("uv run --with {{ harness_maker_src_path }} hm worktree verify <WT>")
 > create→verify→marker prelude; only parallelize work already inside a
 > verified `<WT>`.
 
+{%- else -%}
+### 5. Isolation is off (`worktree.enabled: false`)
+
+No worktree is created and none is finalized at loop close. Every path below that
+would name a worktree names this project's root instead — run the loop where you
+already are, and do not invent a `.worktrees/` path.
+
+One consequence to hold: the loop's deliverables and code changes accumulate
+**uncommitted on the current branch** until wrapup commits them. That is the cost of
+`worktree.enabled: false`, not a failure — but it means a mid-loop `git status` is
+expected to be dirty, and an unrelated concurrent session shares that working tree.
+
+{% if not is_codex %}The Stop-hook loop marker is still written (`.hm-loop-active` at
+the project root) so `/hm:loop` still self-gates; without isolation it is the
+session-blind legacy marker, so **parallel loops in this project are NOT isolated**.
+{% endif %}
+{%- endif %}
+
+#### 5.1 Stop-hook guard (both isolation modes)
+
 After confirming the worktree path (or deciding to operate in cwd), **activate
 the Stop-hook guard — session-scoped**. The guard now keys on THIS Claude
 session, so parallel loops in other sessions are never affected
 (PLAN-loop-marker-session-scoping):
 
-- **Normal path (worktree isolation engaged AND `$HM_SESSION_ID` is set):**
+{% if wt_on %}- **Normal path (worktree isolation engaged AND `$HM_SESSION_ID` is set):**
   `worktree create --claude-session-id "$HM_SESSION_ID"` already wrote this
   session's per-session marker, whose content header carries your `session_id`.
   The Stop-hook matches that header against your own `session_id`, so the loop is
   already guarded. **Do NOT touch the global `.hm-loop-active`** — it is
   session-blind and would block other sessions' termination.
+{% endif %}
 - **Degraded path (`$HM_SESSION_ID` empty — no SessionStart env-file, or
   Cursor/Codex — OR no isolation):** there is no session-scoped marker, so fall
   back to the global marker. **Two distinct symptoms** (PLAN-fleet-10-20-parallel-safety
@@ -512,19 +535,18 @@ session, so parallel loops in other sessions are never affected
   global marker is the only guard and **parallel loops are NOT isolated**. The
   guard warns with the symptom that actually applies:
 
-Substitute `<WT>` with the literal worktree path from the create step (or, when
-no isolation engaged, your cwd). The guard touches the global marker when EITHER
+{% if wt_on %}Substitute `<WT>` with the literal worktree path from the create step.{% else %}Isolation is off, so the first test is already true and the global marker is always written — that is the only guard available without per-worktree markers.{% endif %} The guard touches the global marker when EITHER
 `$HM_SESSION_ID` is empty (no content header to match) OR there is no isolation
-(`<WT>` equals your cwd → no per-session content marker exists) — both are the
+({{ WTP }} equals your cwd → no per-session content marker exists) — both are the
 degraded path; otherwise the per-session content marker already guards you:
 
 {% if is_codex %}
 ```
-Bash("if [ -z \"$HM_SESSION_ID\" ] || [ \"<WT>\" = \"$(pwd)\" ]; then touch .hm-loop-active; if [ -n \"$CLAUDECODE\" ] && [ -z \"$HM_SESSION_ID\" ]; then echo '⚠️ [loop] DEGRADED (HM_SESSION_ID unset in this shell — SessionStart env-file hook did not fire): this loop will STOP after one iteration. The Stop-hook has your session_id from stdin but the marker header is empty, so content-match fails and the loop is allowed to stop. Peers are NOT affected. Remedy: run /hm:health, fix the SessionStart env-file plumbing, or drive iterations manually.'; else echo '[loop] degraded marker (no isolation or non-Claude IDE) — parallel loops are NOT isolated'; fi; fi")
+Bash("if [ -z \"$HM_SESSION_ID\" ] || [ \"{{ '<WT>' if wt_on else '$(pwd)' }}\" = \"$(pwd)\" ]; then touch .hm-loop-active; if [ -n \"$CLAUDECODE\" ] && [ -z \"$HM_SESSION_ID\" ]; then echo '⚠️ [loop] DEGRADED (HM_SESSION_ID unset in this shell — SessionStart env-file hook did not fire): this loop will STOP after one iteration. The Stop-hook has your session_id from stdin but the marker header is empty, so content-match fails and the loop is allowed to stop. Peers are NOT affected. Remedy: run /hm:health, fix the SessionStart env-file plumbing, or drive iterations manually.'; else echo '[loop] degraded marker (no isolation or non-Claude IDE) — parallel loops are NOT isolated'; fi; fi")
 ```
 {% else %}
 ```bash
-!if [ -z "$HM_SESSION_ID" ] || [ "<WT>" = "$(pwd)" ]; then touch .hm-loop-active; if [ -n "$CLAUDECODE" ] && [ -z "$HM_SESSION_ID" ]; then echo '⚠️ [loop] DEGRADED (HM_SESSION_ID unset in this shell — SessionStart env-file hook did not fire): this loop will STOP after one iteration. The Stop-hook has your session_id from stdin but the marker header is empty, so content-match fails and the loop is allowed to stop. Peers are NOT affected (a valid-id session ignores the global marker). Remedy: run /hm:health to confirm, fix the SessionStart env-file plumbing, or drive iterations manually.'; else echo '[loop] degraded marker (no isolation or non-Claude IDE) — parallel loops are NOT isolated'; fi; fi
+!if [ -z "$HM_SESSION_ID" ] || [ "{{ '<WT>' if wt_on else '$(pwd)' }}" = "$(pwd)" ]; then touch .hm-loop-active; if [ -n "$CLAUDECODE" ] && [ -z "$HM_SESSION_ID" ]; then echo '⚠️ [loop] DEGRADED (HM_SESSION_ID unset in this shell — SessionStart env-file hook did not fire): this loop will STOP after one iteration. The Stop-hook has your session_id from stdin but the marker header is empty, so content-match fails and the loop is allowed to stop. Peers are NOT affected (a valid-id session ignores the global marker). Remedy: run /hm:health to confirm, fix the SessionStart env-file plumbing, or drive iterations manually.'; else echo '[loop] degraded marker (no isolation or non-Claude IDE) — parallel loops are NOT isolated'; fi; fi
 ```
 {% endif %}
 
@@ -539,7 +561,7 @@ The marker(s) are gitignored by the harness worktree setup.
 > `rm .hm-loop-active` then re-run `/hm:loop --spec <spec-path>` with the
 > remaining features.
 
-Per-iter standalone `/hm:execute` (e.g. inside an invoked workflow's
+{% if wt_on %}Per-iter standalone `/hm:execute` (e.g. inside an invoked workflow's
 execute stage) calls `worktree create` again — its idempotency check
 detects we're already inside `.worktrees/<name>/` and returns the
 existing path. No nested worktrees.
@@ -550,7 +572,8 @@ outside `<WT>` while a loop is active. This is technical insurance for
 the prompt-driven `<WT>` substitution; LLM drift across long contexts
 gets caught instead of silently corrupting main. **Bash-driven writes
 (`>`, `sed -i`, `python -c "open(...)"`) are NOT gated** — for shell
-ops always `cd <WT>` first so the cwd stays inside isolation.
+ops always `cd <WT>` first so the cwd stays inside isolation.{% endif %}
+
 
 ### 6. Run the autoloop — UNIFIED iteration body
 
@@ -703,14 +726,14 @@ For each iter (until convergence or any safety rail fires):
    is not converged.
 
    **Gate 1 — Mechanical** (skip items where `cmd=""`):
-   For each `ExitCriterion` where `cmd != ""`, run the command inside `<WT>`:
+   For each `ExitCriterion` where `cmd != ""`, run the command inside {{ WTP }}:
 {% if is_codex %}
    ```
-   Bash("cd <WT> && <criterion.cmd>")
+   Bash("{{ cdwt }}<criterion.cmd>")
    ```
 {% else %}
    ```bash
-   !cd <WT> && <criterion.cmd>
+   !{{ cdwt }}<criterion.cmd>
    ```
 {% endif %}
    - Exit 0 → criterion passes.
@@ -720,7 +743,7 @@ For each iter (until convergence or any safety rail fires):
 
    **Gate 2 — LLM individual evaluation** (runs regardless of cmd):
    For each `ExitCriterion` in the checklist, evaluate whether its `label`
-   is satisfied given the current state of `<WT>` (read relevant files,
+   is satisfied given the current state of {{ WTP }} (read relevant files,
    test output, review grade). Evaluate **each criterion independently**
    — do not aggregate or average. For each:
    - "Clearly satisfied" → passes. Reset `criterion_ambiguity_counts[label]` to 0.
@@ -770,11 +793,11 @@ For each iter (until convergence or any safety rail fires):
    and triggers fruitless retries.
 {% if is_codex %}
    ```
-   Bash("uv run --with {{ harness_maker_src_path }} hm iter_receipts set-iter-marker --iter <N> --root \"<WT>\"")
+   Bash("uv run --with {{ harness_maker_src_path }} hm iter_receipts set-iter-marker --iter <N> --root \"{{ WTR }}\"")
    ```
 {% else %}
    ```bash
-   !uv run --with {{ harness_maker_src_path }} hm iter_receipts set-iter-marker --iter <N> --root "<WT>"
+   !uv run --with {{ harness_maker_src_path }} hm iter_receipts set-iter-marker --iter <N> --root "{{ WTR }}"
    ```
 {% endif %}
 
@@ -783,15 +806,15 @@ For each iter (until convergence or any safety rail fires):
    > ⚠️ **Serial, not batched (same rule as Step 5's gate).** Emit this marker
    > write as its **own** turn and confirm exit 0 before Step 4 dispatches any
    > stage. Do NOT batch the marker write + receipt writes + stage `Task(...)`
-   > calls into one parallel tool-call turn: if `<WT>` is wrong, one `cd <WT>`
+   > calls into one parallel tool-call turn: if {{ WTP }} is wrong, one `cd`
    > error cancels the entire batch (`Cancelled: parallel tool call … errored`).
-   > A non-zero exit here (`root … is not an existing directory`) means `<WT>`
+   > A non-zero exit here (`root … is not an existing directory`) means {{ WTP }}
    > drifted — re-verify before continuing.
 4. **Invoke per-iter stages**: for each stage in `STAGES`, in order, read
    `.claude/commands/hm/<stage>.md` and execute **every step it defines,
-   without skipping any**, before moving to the next stage. Operate inside `<WT>`:
+   without skipping any**, before moving to the next stage. Operate inside {{ WTP }}:
    substitute the absolute worktree path for every Read/Write/Edit call;
-   tests / lints / type checks run via `cd <WT> && <cmd>`. Stage "When
+   tests / lints / type checks run via {% if wt_on %}`cd <WT> && <cmd>`{% else %}`<cmd>` in place{% endif %}. Stage "When
    to Run" skip conditions apply only to standalone invocation, not
    under loop dispatch. **Each stage file begins with a step-manifest
    preamble (ADR-003) telling the model to print its intended steps — as the
@@ -812,15 +835,15 @@ For each iter (until convergence or any safety rail fires):
    There is no fused-command file to derive it from any more (ADR-014), so there is
    also no way for the expected set and the invoked set to drift apart.
 
-   Run the verify CLI inside `<WT>`:
+   Run the verify CLI inside {{ WTP }}:
 {% if is_codex %}
    ```
-   Bash("cd \"<WT>\" && uv run --with {{ harness_maker_src_path }} hm iter_receipts verify --iter <N> --expected <EXPECTED_STAGES> --root \"<WT>\"")
+   Bash("{{ cdwt }}uv run --with {{ harness_maker_src_path }} hm iter_receipts verify --iter <N> --expected <EXPECTED_STAGES> --root \"{{ WTR }}\"")
    ```
 {% else %}
    ```bash
-   !cd "<WT>" && uv run --with {{ harness_maker_src_path }} hm iter_receipts verify \
-      --iter <N> --expected <EXPECTED_STAGES> --root "<WT>"
+   !{{ cdwt }}uv run --with {{ harness_maker_src_path }} hm iter_receipts verify \
+      --iter <N> --expected <EXPECTED_STAGES> --root "{{ WTR }}"
    ```
 {% endif %}
 
@@ -867,11 +890,11 @@ For each iter (until convergence or any safety rail fires):
       - **B. Skip with explicit `verdict: skipped` marker** — invoke the
         receipt CLI manually (the `--with` flag is required because
         `harness_maker` is not on the user project's default `uv` PATH):
-        `uv run --with {{ harness_maker_src_path }} hm iter_receipts write --iter <N> --stage <stage> --verdict skipped --root "<WT>"`
+        `uv run --with {{ harness_maker_src_path }} hm iter_receipts write --iter <N> --stage <stage> --verdict skipped --root "{{ WTR }}"`
         then ALSO append a durable audit entry so `/hm:health` can detect
-        systematic skip patterns (quote `<WT>` + create parent dir; single
+        systematic skip patterns (quote the root + create parent dir; single
         `printf` write of well under 4 KiB stays atomic via POSIX `O_APPEND`):
-        `mkdir -p "<WT>/.claude/observability" && printf '{"ts":"%s","slug":"<slug>","iter":<N>,"stage":"<stage>","reason":"gate0-cap-exhausted"}\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "<WT>/.claude/observability/gate0-skips.jsonl"`
+        `mkdir -p "{{ WTR }}/.claude/observability" && printf '{"ts":"%s","slug":"<slug>","iter":<N>,"stage":"<stage>","reason":"gate0-cap-exhausted"}\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "{{ WTR }}/.claude/observability/gate0-skips.jsonl"`
         After both writes, **jump directly to step 5 — specifically "5. Update state" (the per-iter step inside this section 6 — NOT outer Step 5 "Engage worktree") — do NOT return to step 4.5**. The
         operator has explicitly acknowledged the hole; re-verifying would
         deadlock because Gate 0 treats `skipped` as failure. Set
@@ -928,7 +951,7 @@ When the loop halts (convergence, safety rail, or hard error):
    rail halts skip the gate entirely):
 
    When `converged = True`, evaluate all items in `exit_criteria_checklist`
-   one final time against the current state of `<WT>`:
+   one final time against the current state of {{ WTP }}:
 
    - **`required: false` items** that fail → emit a warning line per item,
      continue. Do NOT flip `converged` to `False`.
@@ -977,6 +1000,7 @@ When the loop halts (convergence, safety rail, or hard error):
    ```
 {% endif %}
 
+{% if wt_on -%}
 3. **Run wrapup ONCE — reusing THIS loop's `<WT>`, never a fresh task worktree**:
    read `.claude/commands/hm/wrapup.md` and execute the wrapup stage (commits,
    SESSION-md if `--session`, memory append to `wiki.md` / `failures.md`).
@@ -992,6 +1016,14 @@ When the loop halts (convergence, safety rail, or hard error):
      wrapup's `task-land` here would either double-land disjoint work or strand an
      orphan `hm/<slug>` branch (the two `<WT>` definitions must not diverge).
 
+{%- else -%}
+3. **Run wrapup ONCE**:
+
+   Isolation is off, so there is no worktree to reuse and no task branch to reconcile —
+   wrapup runs in this project root like every other stage did. Invoke `/hm:wrapup` once
+   for the whole loop, not per iteration.
+
+{%- endif %}
 4. **Decide finalize status — explicit rule, not judgment**:
 
    | Halt reason | Finalize status | Why |
@@ -1006,6 +1038,7 @@ When the loop halts (convergence, safety rail, or hard error):
    user explicitly bounded the run; un-merged worktree is more useful
    than a half-baked squash that contaminates main.
 
+{% if wt_on -%}
 5. **Finalize worktree** (only if engaged in step 5):
 
 {% if is_codex %}
@@ -1026,6 +1059,11 @@ When the loop halts (convergence, safety rail, or hard error):
    list in step 6 and instruct the user to resolve manually with
    `cd <WT> && git status && git merge --abort` or similar.
 
+{%- else -%}
+5. **No worktree to finalize** — isolation is off, so step 5 created nothing. The
+   loop's changes are already in this working tree; wrapup owns the commit.
+
+{%- endif %}
 6. **Emit final report** (next section).
 
 ---

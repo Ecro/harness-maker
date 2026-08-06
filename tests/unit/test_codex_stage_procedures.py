@@ -41,9 +41,13 @@ def _render_stage(stage: str, *, is_codex: bool = False) -> str:
     )
 
 
-def _render_loop(*, is_codex: bool = False) -> str:
+def _render_loop(*, is_codex: bool = False, worktree_enabled: bool = True) -> str:
+    """Defaults to isolation ON — the worktree create/verify/fallback machinery only
+    renders there (PLAN-worktree-side-defaults ADR-005), and a bare `HarnessConfig()`
+    has `worktree: {}`, which reads as OFF."""
     env = _make_env()
     cfg = _make_default_config()
+    cfg["worktree"] = {"enabled": worktree_enabled}
     return env.get_template("commands/hm/loop.md.j2").render(
         harness_maker_src_path=_HARNESS_MAKER_PKG_ROOT,
         is_codex=is_codex,
