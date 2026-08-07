@@ -345,3 +345,72 @@ def test_the_generator_measured_both_target_variants(
     assert set(measured) == {CLAUDE_VARIANT, CODEX_VARIANT}
     assert len(measured[CLAUDE_VARIANT]) >= 15, "Claude render produced too few commands"
     assert len(measured[CODEX_VARIANT]) >= 10, "Codex render produced too few stage skills"
+
+
+# ── staleness arms (PLAN follow-up: a template change that never re-froze) ─────
+#
+# Landing a template edit without regenerating leaves the baseline describing a render
+# that no longer exists. It happened TWICE inside one task: `configure.round_trips` moved
+# 3 → 4 with `chars` byte-identical, and a concurrent commit's edit to
+# `agents/_partials/step_manifest.md.j2` moved fourteen rows. Both were discovered only
+# because an unrelated regeneration swept them in, and the delta document then had to
+# explain movements its own task had not caused.
+#
+# Exact equality is NOT the fix — it was rejected deliberately (see
+# `test_the_standalone_generator_agrees_with_the_baseline_in_shape_and_direction`) because
+# a shrink is legitimate and equality would force a re-freeze after every cut, converting
+# the ratchet into a freeze. These two arms close the specific holes instead.
+
+
+def test_round_trip_counts_match_the_live_render(
+    frozen: dict[str, object], measured: dict[str, dict[str, dict[str, int]]]
+) -> None:
+    """`round_trips` is NOT a ratchet, so it is compared exactly.
+
+    `chars` has a direction (down is the goal), which is why only growth is asserted there.
+    A round-trip count has no such intent — a mandated call is added or removed on purpose,
+    never "improved" — so any divergence means the baseline stopped describing the render.
+
+    This is the arm that would have caught `configure` 3 → 4 at the commit that caused it:
+    `chars` was byte-identical, so every existing arm passed while the baseline aged.
+    """
+    surface = frozen["surface"]
+    assert isinstance(surface, dict)
+    drifted = [
+        f"{variant}/{name}: baseline {surface[variant][name]['round_trips']} "
+        f"vs render {entry['round_trips']}"
+        for variant, commands in measured.items()
+        for name, entry in commands.items()
+        if name in surface.get(variant, {})
+        and surface[variant][name]["round_trips"] != entry["round_trips"]
+    ]
+    assert not drifted, (
+        "round-trip counts drifted from the committed baseline:\n  "
+        + "\n  ".join(drifted)
+        + "\n\nRegenerate with `python tests/structural/_surface_baseline.py` in the SAME "
+        "commit that changed the template, and attribute the movement in a "
+        "work-docs/BASELINE-DELTA-*.md row."
+    )
+
+
+def test_a_large_shrink_means_the_baseline_went_stale(
+    frozen: dict[str, object], measured: dict[str, dict[str, dict[str, int]]]
+) -> None:
+    """A floor under the aggregate. Cuts stay legal; an un-refrozen baseline does not.
+
+    Growth is already caught. Shrink is allowed on purpose — but every un-refrozen cut
+    leaves SLACK between the frozen number and the real one, and a later growth can then
+    hide inside it. `_ATOMIC_RATCHET` already bounds each command from both sides
+    (×0.80 floor, ×1.02 ceiling); the aggregate had a ceiling and no floor.
+
+    5% is chosen to sit above render noise and below any cut worth landing without a
+    re-freeze — the P1 removal in this PLAN's own history was ~480 chars, about 0.13%.
+    """
+    for variant, commands in measured.items():
+        now = sum(entry["chars"] for entry in commands.values())
+        was = frozen["aggregate_chars"][variant]  # type: ignore[index]
+        assert now >= was * 0.95, (
+            f"{variant}: the render is {was - now} chars ({(1 - now / was):.1%}) below the "
+            f"frozen baseline ({was} → {now}). A cut that large should be frozen and "
+            "attributed in the same commit, not left as slack a later growth can hide in."
+        )
