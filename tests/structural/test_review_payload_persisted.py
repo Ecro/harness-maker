@@ -17,6 +17,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 _REPO = Path(__file__).resolve().parents[2]
 _OBS = _REPO / ".claude" / "observability"
 _PAYLOADS = _OBS / "review-payloads"
@@ -61,8 +63,26 @@ def _has_payload(slug: str, round_n: int) -> bool:
 
 
 def test_the_telemetry_is_readable() -> None:
-    """Positive control — every assertion below is vacuous over an empty ledger."""
-    assert len(_telemetry_rounds()) >= 1, "no review telemetry rows found"
+    """Positive control, and the record of this gate's real scope.
+
+    It asserted `>= 1` row and went red in CI on the first run, correctly: `review-*.jsonl`
+    is churn and therefore gitignored, so a fresh clone has NO rows and there is nothing to
+    correlate. **This gate cannot bind in CI** — it binds on the machine that holds the
+    ledger, which is also the machine where a review runs and where the skip happens. That
+    is a real limit, not a formality, and it is stated here rather than hidden behind a
+    quiet skip.
+
+    (Third instance in one day of `[fail:test] local-state-hides-fresh-clone-failure`, and
+    the second AFTER that entry was written — checking locally is not evidence for any check
+    that reads repository or observability state.)
+    """
+    rows = _telemetry_rounds()
+    if not rows:
+        pytest.skip(
+            "no review telemetry in this checkout — the ledger is gitignored churn, so this "
+            "gate only binds where reviews actually run (never in CI)"
+        )
+    assert rows
 
 
 def test_every_round_since_the_step_landed_persisted_its_payload() -> None:
