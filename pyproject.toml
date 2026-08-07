@@ -1,6 +1,6 @@
 [project]
 name = "harness-maker"
-version = "0.49.1"
+version = "0.50.0"
 description = "Per-project AI coding harness for Claude Code · Cursor · Codex. Profiler + 10-dim interview build a different harness for every project."
 readme = "README.md"
 requires-python = ">=3.12"

@@ -1,6 +1,17 @@
 # Changelog
 
-## [Unreleased]
+## [0.50.0] — 2026-08-08
+
+### "Deliverable" has one definition instead of three
+
+It was written out separately in `.gitignore`'s negations, in `worktree._DELIVERABLE_RE`,
+and in `wrapup.md.j2`'s staging flags — ten prefixes, four, and five. Each disagreement had
+its own symptom: a file nobody can commit, one the create-guard refuses to forgive so
+`/hm:execute` cannot start, and one `wrapup_land` omits while reporting success. The third
+had already bitten: ABLATION and MATRIX were committable and forgiven but absent from the
+manifest. `DELIVERABLE_PREFIXES` is now the single definition and the other two derive from
+it, in Python rather than in the template — a manifest fixed only in the template leaves
+every un-re-rendered harness still dropping files.
 
 ### `wrapup_land` commits the work, not just the paperwork
 
