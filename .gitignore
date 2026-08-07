@@ -33,6 +33,32 @@
 .claude/memory/profile/
 .claude/memory/*.lock
 
+# Replay corpus (ADR-006 part 2 of PLAN-workflow-loop-efficiency) — the ONLY
+# thing under observability/ that is committed.
+#
+# The detection check for pipeline changes was declared unimplementable three
+# times, the last time because no per-reviewer finding payload had ever been
+# persisted anywhere. Persisting it into a gitignored path would have repeated
+# the mistake in a quieter form: a replay corpus that exists only on the machine
+# that produced it cannot verify anyone else's pipeline change, or a change made
+# after a fresh clone. Committing it is what makes it an artifact rather than a
+# scratch file.
+#
+# `.claude/observability/` is written LITERALLY here, ahead of the negation, on
+# purpose: `worktree._HARNESS_CHURN_DIRS` contains that exact string and
+# `_ensure_gitignore_entries` appends any pattern it does not find as an exact
+# line. Appended text lands at EOF, after the negation, and git resolves by
+# last-match — so an implicit-only exclusion would be re-added below this block
+# on the next `worktree create` and would silently re-ignore the corpus. With
+# the literal line present, that appender finds it and skips.
+#
+# Verify BOTH directions after any edit here:
+#   git check-ignore -v .claude/observability/review-payloads/x/y.json   -> NOTHING
+#   git check-ignore -v .claude/observability/review-2026-01-01.jsonl    -> ignored
+!.claude/observability/
+.claude/observability/*
+!.claude/observability/review-payloads/
+
 # Cursor IDE workspace
 .cursor/
 
