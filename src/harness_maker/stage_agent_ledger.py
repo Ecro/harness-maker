@@ -18,14 +18,34 @@ them.
 **Pre-registered aggregation (ADR-004).** Recorded here so the ledger is not a denominator
 with no numerator — `observability-field-with-no-consumer` is a named failure in this repo:
 
-- Validator: ``P(verdict changes | pass 2 ran)`` = rows with ``pass_or_attempt == 2`` whose
-  ``verdict`` differs from the same ``run_id``'s pass-1 row, over all ``pass_or_attempt == 2``
-  rows. A low ratio is the evidence for deleting the second pass.
+- Validator: ``P(verdict changes | a later pass ran)`` = rows with ``pass_or_attempt >= 2``
+  whose ``verdict`` differs from the same ``run_id``'s pass-1 row, over all
+  ``pass_or_attempt >= 2`` rows. A low ratio is the evidence for deleting the second pass.
 - Phase A.5: ``P(FAIL)`` = rows with ``verdict == "FAIL"`` over all Phase A.5 rows. A low
   ratio is the evidence for deleting the gate.
 
 Both aggregations must filter on ``agent``/``stage`` first, and must exclude the two
 dispatch sentinels below — a dispatch that never ran is not an outcome.
+
+**AMENDMENT, 2026-08-07 — recorded because a silent amendment defeats pre-registration.**
+The validator rule originally read ``pass_or_attempt == 2``, an equality that assumed the
+documented cap ("re-run validator once only") held. The first six rows contained a run
+(``msms-20260807-1``) with a THIRD pass — three genuine dispatches 15.1 and 4.9 minutes
+apart, not a mislabeled row — so the equality was silently dropping the case most likely to
+carry a changed verdict: passes 1 and 2 had already agreed, and only pass 3 could
+disagree with them.
+
+Two things make this amendment auditable rather than result-fitting:
+1. **Direction.** Widening to ``>= 2`` grows the denominator, so it makes "the later pass
+   never changes the verdict" HARDER to demonstrate. It raises the bar for the deletion this
+   metric feeds, rather than lowering it.
+2. **Disclosure.** It was made after observing the pass-3 row, and that is stated here
+   rather than inferred from a diff. The observed data at amendment time was 0/2 under the
+   old rule and 0/3 under the new one — the amendment did not change the conclusion, only
+   the population it is drawn from.
+
+The equality also produced one real reporting error before it was caught: an aggregation was
+reported as "0/3" while the registered rule specified a denominator of 2.
 """
 
 from __future__ import annotations
@@ -194,6 +214,75 @@ def row_from_dict(data: dict[str, Any], *, auto_timestamp: bool = True) -> Stage
     if auto_timestamp and "ts" not in data:
         data = {**data, "ts": _utc_now_iso()}
     return StageAgentRow.model_validate(data)
+
+
+# ── cross-row coherence (F-B) ─────────────────────────────────────────────────
+
+
+class RunCoherence(BaseModel):
+    """What a single (agent, run_id) group looks like, and whether it is readable.
+
+    The row validator cannot express any of this: it sees one row, and every defect here is
+    a relationship BETWEEN rows. That is not a gap that can be closed by tightening the
+    schema — it has to be checked where rows are read back.
+    """
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    agent: str
+    run_id: str
+    passes: tuple[int, ...]
+    terminal_count: int
+    problems: tuple[str, ...]
+
+    @property
+    def ok(self) -> bool:
+        return not self.problems
+
+
+def check_run_coherence(rows: list[dict[str, Any]]) -> list[RunCoherence]:
+    """Group rows by (agent, run_id) and report the incoherent groups.
+
+    **Run this before any aggregation.** A run with two `terminal` rows has no single "the
+    dispatch that ended it", so any read keyed on terminal picks one arbitrarily and reports
+    a number nobody can reproduce. That is not hypothetical: `msms-20260807-1` shipped with
+    passes 1/2/3 and terminal on both 2 and 3, in the first six rows this ledger ever held.
+
+    Sentinel rows (`dispatch-skipped` / `dispatch-failed`) are excluded from the pass-sequence
+    checks — a dispatch that never ran has no place in the sequence — but they still count
+    toward `terminal_count`, because they genuinely do end the run.
+    """
+    groups: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    for row in rows:
+        groups.setdefault((str(row.get("agent")), str(row.get("run_id"))), []).append(row)
+
+    out: list[RunCoherence] = []
+    for (agent, run_id), rs in sorted(groups.items()):
+        real = [r for r in rs if r.get("verdict") not in DISPATCH_SENTINELS]
+        passes = tuple(sorted(int(r["pass_or_attempt"]) for r in real))
+        terminal_count = sum(1 for r in rs if r.get("terminal"))
+        problems: list[str] = []
+        if terminal_count > 1:
+            problems.append(
+                f"{terminal_count} terminal rows — no single row ends this run, so any "
+                "aggregation keyed on `terminal` is reading an arbitrary one"
+            )
+        if terminal_count == 0 and rs:
+            problems.append("no terminal row — the run has no recorded end")
+        if len(set(passes)) != len(passes):
+            problems.append(f"duplicate pass numbers {passes} — a retry overwrote its own slot")
+        if passes and passes != tuple(range(1, len(passes) + 1)):
+            problems.append(f"pass numbers are not 1..N: {passes}")
+        out.append(
+            RunCoherence(
+                agent=agent,
+                run_id=run_id,
+                passes=passes,
+                terminal_count=terminal_count,
+                problems=tuple(problems),
+            )
+        )
+    return out
 
 
 # ── payload persistence (ADR-006 part 2) ──────────────────────────────────────

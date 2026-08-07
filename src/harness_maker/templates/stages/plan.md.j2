@@ -565,15 +565,24 @@ pass-1-vs-pass-2 comparison possible at all:
 
 {% if is_codex %}
 ```
-Bash("uv run --with {{ harness_maker_src_path }} hm stage_agent_ledger emit --run-id <run-id> --agent plan-validator --stage plan --slug {slug} --pass <1|2> --verdict <APPROVED|NEEDS_REVISION|MAJOR_REVISION> --terminal --duration-ms <elapsed> --barrier-index <segment>")
+Bash("uv run --with {{ harness_maker_src_path }} hm stage_agent_ledger emit --run-id <run-id> --agent plan-validator --stage plan --slug {slug} --pass <N> --verdict <APPROVED|NEEDS_REVISION|MAJOR_REVISION> --terminal --duration-ms <elapsed> --barrier-index <segment>")
 ```
 {% else %}
 ```bash
-!uv run --with {{ harness_maker_src_path }} hm stage_agent_ledger emit --run-id <run-id> --agent plan-validator --stage plan --slug {slug} --pass <1|2> --verdict <APPROVED|NEEDS_REVISION|MAJOR_REVISION> --terminal --duration-ms <elapsed> --barrier-index <segment>
+!uv run --with {{ harness_maker_src_path }} hm stage_agent_ledger emit --run-id <run-id> --agent plan-validator --stage plan --slug {slug} --pass <N> --verdict <APPROVED|NEEDS_REVISION|MAJOR_REVISION> --terminal --duration-ms <elapsed> --barrier-index <segment>
 ```
 {% endif %}
 
 - Omit `--terminal` on pass 1 when a pass 2 will follow; pass it on the pass that ends Step 4.
+  **Exactly one row per `<run-id>` may carry `--terminal`.** Two terminal rows leave the run
+  with no single ending, so any aggregation keyed on it reads an arbitrary one — that has
+  already happened once (`msms-20260807-1`, passes 1/2/3 with terminal on 2 and 3).
+- **The cap is 2 passes** (`re-run validator once only`, above). If a pass 3 or beyond
+  happens anyway — the operator asked for it, or the cap was overrun — still record it, and
+  add `--reason '<why this pass exceeded the cap>'`. Without that the ledger cannot tell an
+  operator-requested extra pass from a stage that ignored its own limit, and those have
+  opposite remedies. Never drop the row to keep the data tidy: an unrecorded pass is a
+  serial barrier the latency figures do not charge anyone for.
 - The launch-failure path immediately above is a **row too**: `--verdict dispatch-failed
   --reason "<launch error>" --terminal`. Self-reviewing in the validator's place without a
   row makes an unavailable validator indistinguishable from an approving one.

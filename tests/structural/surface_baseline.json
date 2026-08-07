@@ -1,18 +1,18 @@
 {
   "aggregate_chars": {
-    "claude": 362419,
-    "codex": 295582
+    "claude": 363193,
+    "codex": 296356
   },
   "counting_rule": "ADR-011: round_trips = count of ^! lines (claude variant) or 'Bash(' call sites (codex variant), plus all 'Task(' occurrences; fenced examples included. A consistent proxy, not a semantic count.",
   "generated_by": "tests/structural/_surface_baseline.py",
-  "payload_digest": "e72e073b4ef3e2fc9be51c4530c52a75fdde62bfbf55b1004c04cb22677cb831",
-  "render_sha": "bc970c2af8ff2c42b8e9e2b8f509fa03f30a3ad9",
+  "payload_digest": "40fe9987dc7425483a58cb175ff43d121ec5abc2e2e16dead3a6b0222fa967c7",
+  "render_sha": "60feb75228869172f76257351d44edd09992a2fd",
   "schema_version": 1,
   "surface": {
     "claude": {
       "configure": {
         "chars": 10746,
-        "round_trips": 3
+        "round_trips": 4
       },
       "execute": {
         "chars": 33691,
@@ -43,7 +43,7 @@
         "round_trips": 7
       },
       "plan": {
-        "chars": 48841,
+        "chars": 49615,
         "round_trips": 15
       },
       "research": {
@@ -89,7 +89,7 @@
         "round_trips": 0
       },
       "hm-plan": {
-        "chars": 44365,
+        "chars": 45139,
         "round_trips": 13
       },
       "hm-research": {

@@ -144,3 +144,38 @@ def test_both_stages_share_one_ledger_file() -> None:
             assert not re.search(r"hm \w*_ledger emit", text.replace("stage_agent_ledger", "")), (
                 f"{name}: a second ledger writer appeared alongside the shared one"
             )
+
+
+# ── F-C: the cap and the over-cap path are stated, not merely implied ─────────
+
+
+def test_the_validator_pass_cap_is_stated_in_the_guidance() -> None:
+    """`--pass <1|2>` encoded the cap in a placeholder and nothing enforced it.
+
+    A third pass then ran (`msms-20260807-1`) with no instruction covering it, and the
+    pre-registered aggregation — an equality on `== 2` — silently dropped the row.
+    """
+    for name, text in artifacts_for("plan").items():
+        assert "The cap is 2 passes" in text, f"{name}: the pass cap is not stated"
+        assert "--pass <1|2>" not in text, (
+            f"{name}: the placeholder still implies the cap instead of the guidance stating it"
+        )
+
+
+def test_an_over_cap_pass_must_still_be_recorded_with_a_reason() -> None:
+    """Dropping the row to keep the data tidy is the tempting wrong answer.
+
+    An unrecorded pass is a serial barrier the latency figures charge to nobody, and without
+    a reason the ledger cannot separate "the operator asked" from "the stage overran its own
+    limit" — opposite remedies.
+    """
+    for name, text in artifacts_for("plan").items():
+        assert re.search(r"still record it.*--reason", text, re.S), f"{name}: no over-cap rule"
+        assert "Never drop the row" in text, f"{name}: dropping the row is not forbidden"
+
+
+def test_exactly_one_terminal_row_per_run_is_stated() -> None:
+    for name, text in artifacts_for("plan").items():
+        assert re.search(r"[Ee]xactly one row per .* may carry `--terminal`", text), (
+            f"{name}: the one-terminal-per-run invariant is not stated"
+        )

@@ -20,6 +20,7 @@ from harness_maker.stage_agent_ledger import (
     DISPATCH_SKIPPED,
     LEDGER_FILENAME,
     StageAgentRow,
+    check_run_coherence,
     emit,
     ledger_path,
     persist_payload,
@@ -318,3 +319,94 @@ def test_ac_004_phase_a5_ledger_row_per_attempt(tmp_path: Path) -> None:
         tmp_path, agent="test-reviewer", stage="execute", verdicts=["FAIL", "FAIL", "PASS"]
     )
     assert phase_a5_ledger_rows(tmp_path) == count
+
+
+# ── F-B: cross-row coherence ──────────────────────────────────────────────────
+#
+# Every defect here is a relationship BETWEEN rows, which `StageAgentRow`'s validator
+# structurally cannot see — it is handed one row. Closing this at the schema is impossible,
+# so it is closed where rows are read back, and these tests pin that it discriminates.
+
+
+def test_a_run_with_two_terminal_rows_is_reported(tmp_path: Path) -> None:
+    """The real defect: `msms-20260807-1` shipped passes 1/2/3 with terminal on 2 AND 3.
+
+    Any aggregation keyed on "the row that ended the run" then picks one arbitrarily and
+    reports a figure nobody can reproduce.
+    """
+    rows = [
+        {**_BASE, "run_id": "r", "pass_or_attempt": 1, "terminal": False},
+        {**_BASE, "run_id": "r", "pass_or_attempt": 2, "terminal": True},
+        {**_BASE, "run_id": "r", "pass_or_attempt": 3, "terminal": True},
+    ]
+    (c,) = check_run_coherence(rows)
+    assert not c.ok
+    assert c.terminal_count == 2
+    assert any("terminal" in p for p in c.problems)
+    assert c.passes == (1, 2, 3)
+
+
+def test_a_well_formed_run_is_clean() -> None:
+    """The discriminating half — a checker that flags everything gates nothing."""
+    rows = [
+        {**_BASE, "run_id": "r", "pass_or_attempt": 1, "terminal": False},
+        {**_BASE, "run_id": "r", "pass_or_attempt": 2, "terminal": True},
+    ]
+    (c,) = check_run_coherence(rows)
+    assert c.ok, c.problems
+
+
+def test_a_run_with_no_terminal_row_is_reported() -> None:
+    """An unfinished run is not a finished one; silence must not read as completion."""
+    (c,) = check_run_coherence([{**_BASE, "run_id": "r", "pass_or_attempt": 1, "terminal": False}])
+    assert any("no terminal row" in p for p in c.problems)
+
+
+def test_gaps_and_duplicates_in_the_pass_sequence_are_reported() -> None:
+    gap = check_run_coherence(
+        [
+            {**_BASE, "run_id": "g", "pass_or_attempt": 1, "terminal": False},
+            {**_BASE, "run_id": "g", "pass_or_attempt": 3, "terminal": True},
+        ]
+    )[0]
+    assert any("not 1..N" in p for p in gap.problems)
+
+    dup = check_run_coherence(
+        [
+            {**_BASE, "run_id": "d", "pass_or_attempt": 1, "terminal": False},
+            {**_BASE, "run_id": "d", "pass_or_attempt": 1, "terminal": True},
+        ]
+    )[0]
+    assert any("duplicate" in p for p in dup.problems)
+
+
+def test_a_sentinel_row_does_not_break_the_pass_sequence() -> None:
+    """A dispatch that never ran has no place in the sequence, but it does end the run.
+
+    Counting it as a pass would report a spurious gap on every run whose validator failed
+    to launch — turning the coherence check into noise exactly when it matters.
+    """
+    rows = [
+        {**_BASE, "run_id": "s", "pass_or_attempt": 1, "terminal": False},
+        {
+            **_BASE,
+            "run_id": "s",
+            "pass_or_attempt": 2,
+            "verdict": DISPATCH_FAILED,
+            "reason": "launch error",
+            "terminal": True,
+        },
+    ]
+    (c,) = check_run_coherence(rows)
+    assert c.passes == (1,)
+    assert c.terminal_count == 1
+    assert c.ok, c.problems
+
+
+def test_runs_are_grouped_by_agent_as_well_as_run_id() -> None:
+    """`agent` is a discriminator, not decoration — two agents can share a run_id."""
+    rows = [
+        {**_BASE, "agent": "plan-validator", "run_id": "x", "terminal": True},
+        {**_BASE, "agent": "test-reviewer", "stage": "execute", "run_id": "x", "terminal": True},
+    ]
+    assert len(check_run_coherence(rows)) == 2

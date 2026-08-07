@@ -28,7 +28,25 @@ import pytest
 
 _REPO = Path(__file__).resolve().parents[2]
 _BASELINE = _REPO / "tests" / "structural" / "surface_baseline.json"
-_DELTA_DOC = _REPO / "work-docs" / "BASELINE-DELTA-P7.md"
+_DELTA_DIR = _REPO / "work-docs"
+
+
+def _delta_docs() -> list[Path]:
+    """Every baseline-delta document, not one hardcoded path.
+
+    The first version pinned `BASELINE-DELTA-P7.md` — a PER-TASK artifact. The very next
+    task to move the baseline (`validator-pass-cap-telemetry`) was then told to edit the
+    PREVIOUS task's document, which is both wrong and the kind of instruction people follow.
+    The invariant is "the current baseline is attributed SOMEWHERE", so each task writes its
+    own document and this scans them all. A stale document cannot satisfy it by accident:
+    the aggregate is an exact figure that moves with every surface change.
+    """
+    return sorted(_DELTA_DIR.glob("BASELINE-DELTA-*.md"))
+
+
+def _delta_text() -> str:
+    return "\n".join(p.read_text(encoding="utf-8") for p in _delta_docs())
+
 
 #: Keys whose movement is mechanical (they change whenever anything else does) and whose
 #: attribution row is therefore generic. Named explicitly rather than skipped by pattern, so
@@ -105,7 +123,7 @@ def changed_keys() -> list[str]:
 
 
 def test_the_delta_document_exists() -> None:
-    assert _DELTA_DOC.is_file(), "P7 moved baselines with no attribution document"
+    assert _delta_docs(), "baselines moved with no attribution document anywhere"
 
 
 def test_the_comparison_is_actually_running() -> None:
@@ -147,7 +165,7 @@ def test_every_changed_key_has_an_attribution_row() -> None:
     """P7 exit criterion 2, and the whole point of this file."""
     if _committed_baseline() is None:
         pytest.skip("baseline not readable from HEAD")
-    doc = _DELTA_DOC.read_text(encoding="utf-8")
+    doc = _delta_text()
     unattributed = []
     for key in changed_keys():
         leaf = key.rsplit(".", 1)[-1]
@@ -168,7 +186,7 @@ def test_every_changed_key_has_an_attribution_row() -> None:
 
 def test_the_document_names_the_owning_phase_and_the_reason_for_ownership() -> None:
     """A future reader must learn WHY only P7 may touch these, or they will touch them."""
-    doc = _DELTA_DOC.read_text(encoding="utf-8")
+    doc = _delta_text()
     assert "ADR-010" in doc
     assert "ratchet-rebaselined-by-its-own-subject" in doc
 
@@ -180,7 +198,7 @@ def test_the_document_states_the_direction_of_the_aggregate() -> None:
     that lists the numbers without saying that is technically complete and practically
     misleading.
     """
-    doc = _DELTA_DOC.read_text(encoding="utf-8")
+    doc = _delta_text()
     assert "larger" in doc.lower() or "wrong way" in doc.lower()
 
 
@@ -194,7 +212,7 @@ def test_the_documented_aggregate_matches_the_actual_baseline() -> None:
     it is closed here rather than noted.
     """
     actual = json.loads(_BASELINE.read_text(encoding="utf-8"))["aggregate_chars"]
-    doc = _DELTA_DOC.read_text(encoding="utf-8")
+    doc = _delta_text()
     for variant, value in actual.items():
         # The doc writes numbers with thin spaces for readability (361 396).
         grouped = f"{value:,}".replace(",", " ")
