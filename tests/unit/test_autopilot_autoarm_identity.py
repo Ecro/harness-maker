@@ -41,8 +41,39 @@ def _harness(root: Path, *, persistent: bool = True, level: str = "auto_safe") -
     )
 
 
-def _raw(root: Path) -> dict[str, object]:
-    return json.loads(autopilot.marker_path(root).read_text(encoding="utf-8"))
+def _raw(root: Path, session_id: str | None = None) -> dict[str, object]:
+    # PLAN-multisession-marker-scoping ADR-001: the marker file is keyed by session, so a
+    # test that arms with an explicit id must read back with the SAME id. `None` keeps the
+    # env-fallback behavior the `HM_SESSION_ID`-setting tests below rely on.
+    path = autopilot.marker_path(root, session_id=session_id)
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _plant_foreign(root: Path, *, at: str | None, owner: str, created_at: str) -> bytes:
+    """Put a marker whose CONTENT owner disagrees with the file the caller `at` will read.
+
+    Since ADR-001 keyed the filename by session, two live sessions no longer meet on one
+    file — so the ownership guards below (`write` refusing a live foreign marker, `touch`
+    refusing a peer's heartbeat, `status` reporting `foreign`) can only be reached by a
+    marker whose header disagrees with its own path: a hand-edit, a half-finished format
+    migration, or a hostile drop. Those are exactly the inputs that must fail SAFE, so the
+    guards are still worth pinning — just no longer via a two-session fixture.
+    """
+    from harness_maker.worktree import _current_session_uuid
+
+    path = autopilot.marker_path(root, session_id=at)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    raw = json.dumps(
+        {
+            "session_uuid": _current_session_uuid(root),
+            "level": "auto_safe",
+            "pipeline": [s.value for s in PIPELINE],
+            "created_at": created_at,
+            "claude_session_id": owner,
+        }
+    ).encode("utf-8")
+    path.write_bytes(raw)
+    return raw
 
 
 # --- round-1 P0: the hook must stamp the id it was handed -----------------------
@@ -56,7 +87,7 @@ def test_autoarm_stamps_the_supplied_session_id(
     monkeypatch.delenv("HM_SESSION_ID", raising=False)
     _harness(tmp_path)
     assert autopilot_autoarm.arm_if_persistent(tmp_path, claude_session_id="sess-A") is True
-    assert _raw(tmp_path)["claude_session_id"] == "sess-A"
+    assert _raw(tmp_path, "sess-A")["claude_session_id"] == "sess-A"
 
 
 def test_the_arming_session_owns_what_autoarm_wrote(
@@ -83,17 +114,20 @@ def test_autoarm_does_not_overwrite_a_live_peer_marker(
 ) -> None:
     """Two sessions opening in one project seconds apart is the documented normal mode.
 
-    The first fix passed `force=True`, which skipped the ADR-010 guard entirely — so
-    session B's SessionStart replaced session A's live marker and A's next boundary died
-    at `kill_switch`.
+    History: the first fix passed `force=True`, skipping the ADR-010 guard, so session B's
+    SessionStart replaced A's live marker and A died at `kill_switch`. The second shape —
+    refusing to arm B at all — protected A by leaving B dark for the whole TTL.
+    PLAN-multisession-marker-scoping ADR-001 removes the contention instead of adjudicating
+    it: B writes its OWN file. The property under test is unchanged — **A's marker is byte-
+    identical afterwards** — but B must now also come up armed.
     """
     monkeypatch.delenv("HM_SESSION_ID", raising=False)
     _harness(tmp_path)
     autopilot_autoarm.arm_if_persistent(tmp_path, claude_session_id="sess-A")
-    before = autopilot.marker_path(tmp_path).read_bytes()
+    before = autopilot.marker_path(tmp_path, session_id="sess-A").read_bytes()
 
-    assert autopilot_autoarm.arm_if_persistent(tmp_path, claude_session_id="sess-B") is False
-    assert autopilot.marker_path(tmp_path).read_bytes() == before
+    assert autopilot_autoarm.arm_if_persistent(tmp_path, claude_session_id="sess-B") is True
+    assert autopilot.marker_path(tmp_path, session_id="sess-A").read_bytes() == before
 
     monkeypatch.setenv("HM_SESSION_ID", "sess-A")
     assert autopilot.active_marker(tmp_path) is not None, "peer A must still be armed"
@@ -104,18 +138,23 @@ def test_autoarm_re_arms_its_own_marker(tmp_path: Path, monkeypatch: pytest.Monk
     monkeypatch.delenv("HM_SESSION_ID", raising=False)
     _harness(tmp_path)
     autopilot_autoarm.arm_if_persistent(tmp_path, claude_session_id="sess-A")
-    old = _raw(tmp_path)["created_at"]
+    old = _raw(tmp_path, "sess-A")["created_at"]
     later = (datetime.now(UTC) + timedelta(seconds=5)).isoformat()
     assert (
         autopilot_autoarm.arm_if_persistent(tmp_path, claude_session_id="sess-A", now=later) is True
     )
-    assert _raw(tmp_path)["created_at"] != old
+    assert _raw(tmp_path, "sess-A")["created_at"] != old
 
 
 def test_autoarm_replaces_a_stale_peer_marker(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A crashed peer's EXPIRED marker must not wedge a new session out."""
+    """A crashed peer's EXPIRED marker must not wedge a new session out.
+
+    Under ADR-001 the peer's file is a different path, so B is unblocked structurally; the
+    assertion that still has teeth is that B's OWN marker carries B's id (a takeover that
+    left the dead session's id stamped would make B foreign to its own marker).
+    """
     monkeypatch.delenv("HM_SESSION_ID", raising=False)
     _harness(tmp_path)
     autopilot_autoarm.arm_if_persistent(
@@ -124,7 +163,7 @@ def test_autoarm_replaces_a_stale_peer_marker(
         now=(datetime.now(UTC) - timedelta(hours=19)).isoformat(),
     )
     assert autopilot_autoarm.arm_if_persistent(tmp_path, claude_session_id="sess-B") is True
-    assert _raw(tmp_path)["claude_session_id"] == "sess-B"
+    assert _raw(tmp_path, "sess-B")["claude_session_id"] == "sess-B"
 
 
 def test_session_id_from_stdin_rejects_a_non_string(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -152,9 +191,9 @@ def test_set_task_slug_rejects_a_bad_slug_and_leaves_the_marker_intact(
     monkeypatch.setenv("HM_SESSION_ID", "sess-A")
     (tmp_path / ".claude").mkdir(parents=True, exist_ok=True)
     autopilot.write(tmp_path, level="auto_safe", pipeline=PIPELINE)
-    before = autopilot.marker_path(tmp_path).read_bytes()
+    before = autopilot.marker_path(tmp_path, session_id=None).read_bytes()
     assert autopilot.set_task_slug(tmp_path, slug=bad, stage="research") is False
-    assert autopilot.marker_path(tmp_path).read_bytes() == before
+    assert autopilot.marker_path(tmp_path, session_id=None).read_bytes() == before
 
 
 def test_boundary_never_echoes_a_rejected_slug(
@@ -209,7 +248,7 @@ def test_gc_collects_a_marker_with_an_unparseable_created_at(
     so leaving it on disk wedges the project: the picker sees a non-armed marker and,
     per ADR-010, will not arm over it."""
     monkeypatch.setenv("HM_SESSION_ID", "sess-A")
-    p = autopilot.marker_path(tmp_path)
+    p = autopilot.marker_path(tmp_path, session_id=None)
     p.parent.mkdir(parents=True, exist_ok=True)
     from harness_maker.worktree import _current_session_uuid
 
@@ -225,9 +264,9 @@ def test_gc_collects_a_marker_with_an_unparseable_created_at(
         ),
         encoding="utf-8",
     )
-    assert autopilot.load(tmp_path) is not None, "it must actually validate"
+    assert autopilot.load(tmp_path, session_id=None) is not None, "it must actually validate"
     assert autopilot.active_marker(tmp_path) is None
-    assert autopilot.gc_stale_marker(tmp_path) is True
+    assert autopilot.gc_stale_marker(tmp_path, session_id=None) is True
     assert not p.exists()
 
 
@@ -251,12 +290,15 @@ def test_status_distinguishes_degraded_idless_from_a_real_peer(
     assert out["active"] is False
     assert out["reason"] == "degraded-idless"
 
-    # A session that DOES have an id, facing someone else's marker, is still plain foreign.
+    # A session that DOES have an id is no longer gated by a peer's marker at all: since
+    # ADR-001 its own path is free, so it reports `absent` and the picker arms it. Reading
+    # `foreign` here — the pre-ADR-001 answer — is what made the second session in a project
+    # un-armable, which is the defect PLAN-multisession-marker-scoping opens with.
     monkeypatch.setenv("HM_SESSION_ID", "sess-B")
     buf2 = io.StringIO()
     with contextlib.redirect_stdout(buf2):
         autopilot.main(["status", "--root", str(tmp_path)])
-    assert json.loads(buf2.getvalue().strip())["reason"] == "foreign"
+    assert json.loads(buf2.getvalue().strip())["reason"] == "absent"
 
 
 def test_write_refuses_to_clobber_a_future_dated_peer_marker(
@@ -265,19 +307,16 @@ def test_write_refuses_to_clobber_a_future_dated_peer_marker(
     """`gc_stale_marker` refuses to delete a `future` marker because it may be a peer's LIVE
     one; a `write` guard that only covered `fresh` let the same marker be overwritten
     instead — the same peer-disarm through the other door."""
-    monkeypatch.setenv("HM_SESSION_ID", "sess-PEER")
-    (tmp_path / ".claude").mkdir(parents=True, exist_ok=True)
-    autopilot.write(
-        tmp_path,
-        level="auto_safe",
-        pipeline=PIPELINE,
-        now=(datetime.now(UTC) + timedelta(hours=5)).isoformat(),
-    )
-    before = autopilot.marker_path(tmp_path).read_bytes()
     monkeypatch.setenv("HM_SESSION_ID", "sess-MINE")
+    before = _plant_foreign(
+        tmp_path,
+        at="sess-MINE",
+        owner="sess-PEER",
+        created_at=(datetime.now(UTC) + timedelta(hours=5)).isoformat(),
+    )
     with pytest.raises(autopilot.MarkerOwnedByAnotherSessionError):
         autopilot.write(tmp_path, level="auto_safe", pipeline=PIPELINE)
-    assert autopilot.marker_path(tmp_path).read_bytes() == before
+    assert autopilot.marker_path(tmp_path, session_id=None).read_bytes() == before
 
 
 def test_task_slug_rejects_a_trailing_newline(
@@ -344,12 +383,12 @@ def test_heartbeat_is_refreshed_by_the_owner_and_surfaced(
         pipeline=PIPELINE,
         now=(datetime.now(UTC) - timedelta(hours=3)).isoformat(),
     )
-    marker = autopilot.load(tmp_path)
+    marker = autopilot.load(tmp_path, session_id=None)
     assert marker is not None
     assert autopilot.idle_minutes(marker) > 170  # falls back to created_at
 
     assert autopilot.touch(tmp_path) is True
-    refreshed = autopilot.load(tmp_path)
+    refreshed = autopilot.load(tmp_path, session_id=None)
     assert refreshed is not None
     assert autopilot.idle_minutes(refreshed) < 1
 
@@ -358,27 +397,24 @@ def test_a_peer_cannot_refresh_someone_elses_heartbeat(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Otherwise a peer could keep a dead marker looking live forever."""
-    monkeypatch.setenv("HM_SESSION_ID", "sess-A")
-    (tmp_path / ".claude").mkdir(parents=True, exist_ok=True)
-    autopilot.write(tmp_path, level="auto_safe", pipeline=PIPELINE)
-    before = autopilot.marker_path(tmp_path).read_bytes()
     monkeypatch.setenv("HM_SESSION_ID", "sess-B")
+    before = _plant_foreign(
+        tmp_path, at="sess-B", owner="sess-A", created_at=datetime.now(UTC).isoformat()
+    )
     assert autopilot.touch(tmp_path) is False
-    assert autopilot.marker_path(tmp_path).read_bytes() == before
+    assert autopilot.marker_path(tmp_path, session_id=None).read_bytes() == before
 
 
 def test_status_reports_idle_minutes_for_a_foreign_marker(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv("HM_SESSION_ID", "sess-PEER")
-    (tmp_path / ".claude").mkdir(parents=True, exist_ok=True)
-    autopilot.write(
-        tmp_path,
-        level="auto_safe",
-        pipeline=PIPELINE,
-        now=(datetime.now(UTC) - timedelta(hours=2)).isoformat(),
-    )
     monkeypatch.setenv("HM_SESSION_ID", "sess-MINE")
+    _plant_foreign(
+        tmp_path,
+        at="sess-MINE",
+        owner="sess-PEER",
+        created_at=(datetime.now(UTC) - timedelta(hours=2)).isoformat(),
+    )
     buf = io.StringIO()
     with contextlib.redirect_stdout(buf):
         autopilot.main(["status", "--root", str(tmp_path)])
@@ -392,34 +428,30 @@ def test_an_implausibly_future_dated_marker_becomes_collectable(
 ) -> None:
     """Real clock skew is bounded. Beyond one TTL of it, a foreign marker was neither
     GC-able (GC preserves `future`) nor overwritable (the guard protects non-`stale`)."""
-    monkeypatch.setenv("HM_SESSION_ID", "sess-PEER")
-    (tmp_path / ".claude").mkdir(parents=True, exist_ok=True)
-    autopilot.write(
-        tmp_path,
-        level="auto_safe",
-        pipeline=PIPELINE,
-        now=(datetime.now(UTC) + timedelta(days=30)).isoformat(),
-    )
     monkeypatch.setenv("HM_SESSION_ID", "sess-MINE")
-    assert autopilot.gc_stale_marker(tmp_path) is True
-    assert not autopilot.marker_path(tmp_path).exists()
+    _plant_foreign(
+        tmp_path,
+        at="sess-MINE",
+        owner="sess-PEER",
+        created_at=(datetime.now(UTC) + timedelta(days=30)).isoformat(),
+    )
+    assert autopilot.gc_stale_marker(tmp_path, session_id=None) is True
+    assert not autopilot.marker_path(tmp_path, session_id=None).exists()
 
 
 def test_modest_clock_skew_is_still_protected(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """The bound must not undo the protection it was carved out of."""
-    monkeypatch.setenv("HM_SESSION_ID", "sess-PEER")
-    (tmp_path / ".claude").mkdir(parents=True, exist_ok=True)
-    autopilot.write(
-        tmp_path,
-        level="auto_safe",
-        pipeline=PIPELINE,
-        now=(datetime.now(UTC) + timedelta(hours=2)).isoformat(),
-    )
     monkeypatch.setenv("HM_SESSION_ID", "sess-MINE")
-    assert autopilot.gc_stale_marker(tmp_path) is False
-    assert autopilot.marker_path(tmp_path).exists()
+    _plant_foreign(
+        tmp_path,
+        at="sess-MINE",
+        owner="sess-PEER",
+        created_at=(datetime.now(UTC) + timedelta(hours=2)).isoformat(),
+    )
+    assert autopilot.gc_stale_marker(tmp_path, session_id=None) is False
+    assert autopilot.marker_path(tmp_path, session_id=None).exists()
 
 
 def test_a_rejected_slug_halts_instead_of_authorizing(
@@ -488,7 +520,7 @@ def test_heartbeat_survives_the_slug_write_on_the_same_boundary_call(
         autopilot_caps.main(
             ["boundary", "--root", str(tmp_path), "--current", "research", "--slug", "good-slug"]
         )
-    after = autopilot.load(tmp_path)
+    after = autopilot.load(tmp_path, session_id=None)
     assert after is not None
     assert after.task_slug == "good-slug"
     idle = autopilot.idle_minutes(after)
@@ -499,7 +531,12 @@ def test_heartbeat_survives_the_slug_write_on_the_same_boundary_call(
 def test_touch_refuses_when_the_marker_changed_underneath(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A deliberate `--force` takeover landing mid-touch must not be reverted."""
+    """A deliberate `--force` takeover landing mid-touch must not be reverted.
+
+    Post-ADR-001 a takeover is by definition a write to the SAME path — a peer arming its
+    own key is not a takeover and cannot race this at all — so the interleaved writer plants
+    its bytes at sess-A's own marker rather than arming as sess-B.
+    """
     monkeypatch.setenv("HM_SESSION_ID", "sess-A")
     (tmp_path / ".claude").mkdir(parents=True, exist_ok=True)
     autopilot.write(tmp_path, level="auto_safe", pipeline=PIPELINE)
@@ -511,16 +548,18 @@ def test_touch_refuses_when_the_marker_changed_underneath(
         out = real(root, **kw)
         calls["n"] += 1
         if calls["n"] == 1:
-            monkeypatch.setenv("HM_SESSION_ID", "sess-B")
-            autopilot.write(tmp_path, level="full", pipeline=PIPELINE, force=True)
-            monkeypatch.setenv("HM_SESSION_ID", "sess-A")
+            path = autopilot.marker_path(tmp_path, session_id="sess-A")
+            data = json.loads(path.read_text(encoding="utf-8"))
+            data["claude_session_id"] = "sess-B"
+            data["level"] = "full"
+            path.write_text(json.dumps(data), encoding="utf-8")
         return out
 
     monkeypatch.setattr(autopilot, "active_marker", _takeover_after_first_read)
     autopilot.touch(tmp_path)
     monkeypatch.setattr(autopilot, "active_marker", real)
 
-    raw = _raw(tmp_path)
+    raw = _raw(tmp_path, "sess-A")
     assert raw["claude_session_id"] == "sess-B", "the takeover must stand"
     assert raw["level"] == "full"
 
@@ -530,7 +569,7 @@ def test_idle_minutes_is_unknown_not_zero_for_a_future_stamp(tmp_path: Path) -> 
     picker puts that number to the user as the fact that decides a takeover."""
     from harness_maker.worktree import _current_session_uuid
 
-    p = autopilot.marker_path(tmp_path)
+    p = autopilot.marker_path(tmp_path, session_id=None)
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(
         json.dumps(
@@ -543,7 +582,7 @@ def test_idle_minutes_is_unknown_not_zero_for_a_future_stamp(tmp_path: Path) -> 
         ),
         encoding="utf-8",
     )
-    marker = autopilot.load(tmp_path)
+    marker = autopilot.load(tmp_path, session_id=None)
     assert marker is not None
     assert autopilot.idle_minutes(marker) is None
 
@@ -591,18 +630,21 @@ def test_same_owner_writes_do_not_clobber_each_other(
     assert autopilot.set_task_slug(tmp_path, slug="task-one", stage="research") is True
 
     # Simulate the interleave: capture a PRE-slug snapshot, then try to write it back.
-    stale = autopilot.load(tmp_path)
+    stale = autopilot.load(tmp_path, session_id=None)
     assert stale is not None
-    stale_bytes = autopilot.marker_path(tmp_path).read_bytes()
+    stale_bytes = autopilot.marker_path(tmp_path, session_id=None).read_bytes()
     autopilot.touch(tmp_path)  # a co-owner's heartbeat lands
     # The pre-touch snapshot must no longer be writable.
     assert (
         autopilot._write_if_unchanged(
-            tmp_path, before=stale_bytes, updated=stale.model_copy(update={"task_slug": None})
+            tmp_path,
+            before=stale_bytes,
+            updated=stale.model_copy(update={"task_slug": None}),
+            session_id=None,
         )
         is False
     )
-    after = autopilot.load(tmp_path)
+    after = autopilot.load(tmp_path, session_id=None)
     assert after is not None
     assert after.task_slug == "task-one", "the slug was reverted by a stale snapshot"
 
@@ -622,7 +664,7 @@ def test_unknown_stage_does_not_stamp_the_marker(
             ["boundary", "--root", str(tmp_path), "--current", "bogus", "--slug", "my-task"]
         )
     assert json.loads(buf.getvalue().strip())["halt_kind"] == "unknown_stage"
-    after = autopilot.load(tmp_path)
+    after = autopilot.load(tmp_path, session_id=None)
     assert after is not None
     # The heartbeat DOES refresh — a typo'd `--current` is still proof the session is
     # alive, and `touch` runs before any stage validation. What must not happen is the

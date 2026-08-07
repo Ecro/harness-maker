@@ -1,0 +1,16 @@
+{
+  "_comment": "Captured live 2026-08-07 from a real Write in Claude Code (PLAN-multisession-marker-scoping ADR-005). A temporary dump was inserted into worktree_gate.main(), a Write issued, the payload recorded, and the dump reverted. Two facts this pins that code-reading got wrong twice ([fail:design] runtime-env-gate-dead-on-arrival, count:2): the caller's identity arrives as a top-level `session_id`, and there is NO `workspace` key — so a gate keyed on `workspace.current_dir` resolves nothing. Values below are redacted placeholders; the KEY SET is the contract.",
+  "cwd": "/home/user/project/.worktrees/my-task",
+  "effort": "medium",
+  "hook_event_name": "PreToolUse",
+  "permission_mode": "acceptEdits",
+  "prompt_id": "00000000-0000-0000-0000-000000000000",
+  "session_id": "11111111-2222-3333-4444-555555555555",
+  "tool_input": {
+    "file_path": "/home/user/project/src/example.py",
+    "content": "x = 1\n"
+  },
+  "tool_name": "Write",
+  "tool_use_id": "toolu_0000000000000000",
+  "transcript_path": "/home/user/.claude/projects/-home-user-project/session.jsonl"
+}

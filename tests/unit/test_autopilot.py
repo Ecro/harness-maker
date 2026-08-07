@@ -28,7 +28,7 @@ DEFAULT_PIPELINE = [
 
 def _raw_write(root: Path, text: str) -> None:
     """Write arbitrary bytes to the marker path (for corrupt/foreign cases)."""
-    p = autopilot.marker_path(root)
+    p = autopilot.marker_path(root, session_id=None)
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(text, encoding="utf-8")
 
@@ -43,7 +43,7 @@ def test_write_then_load_roundtrips(tmp_path: Path) -> None:
     assert m.level == "auto_safe"
     assert m.pipeline == DEFAULT_PIPELINE
     assert m.created_at == "2026-06-20T00:00:00+00:00"
-    loaded = autopilot.load(tmp_path)
+    loaded = autopilot.load(tmp_path, session_id=None)
     assert loaded is not None
     assert loaded.level == "auto_safe"
     assert loaded.session_uuid == _current_session_uuid(tmp_path)
@@ -51,21 +51,21 @@ def test_write_then_load_roundtrips(tmp_path: Path) -> None:
 
 def test_clear_removes_marker_idempotently(tmp_path: Path) -> None:
     autopilot.write(tmp_path, level="full", pipeline=DEFAULT_PIPELINE)
-    autopilot.clear(tmp_path)
-    assert autopilot.load(tmp_path) is None
-    autopilot.clear(tmp_path)  # second clear must not raise
+    autopilot.clear(tmp_path, session_id=None)
+    assert autopilot.load(tmp_path, session_id=None) is None
+    autopilot.clear(tmp_path, session_id=None)  # second clear must not raise
 
 
 # --- fail-safe matrix (all → inactive / None) -----------------------------------
 
 
 def test_load_absent_returns_none(tmp_path: Path) -> None:
-    assert autopilot.load(tmp_path) is None
+    assert autopilot.load(tmp_path, session_id=None) is None
 
 
 def test_load_corrupt_json_returns_none(tmp_path: Path) -> None:
     _raw_write(tmp_path, "{ this is not json")
-    assert autopilot.load(tmp_path) is None
+    assert autopilot.load(tmp_path, session_id=None) is None
 
 
 def test_load_invalid_schema_returns_none(tmp_path: Path) -> None:
@@ -73,7 +73,7 @@ def test_load_invalid_schema_returns_none(tmp_path: Path) -> None:
         tmp_path,
         json.dumps({"session_uuid": "abc", "level": "yolo", "pipeline": [], "created_at": "x"}),
     )
-    assert autopilot.load(tmp_path) is None
+    assert autopilot.load(tmp_path, session_id=None) is None
 
 
 def test_active_marker_matches_current_session(tmp_path: Path) -> None:
@@ -135,7 +135,15 @@ def test_effective_level_foreign_marker_falls_back_to_yaml(tmp_path: Path, monke
 def test_marker_is_in_churn_files() -> None:
     # ADR-006 + PLAN-worktree-base-artifact-pollution: the marker must be gitignored
     # and recognized by both dirt-filters, or a committed marker footguns collaborators.
-    assert ".claude/.hm-autopilot" in _HARNESS_CHURN_FILES
+    # PLAN-multisession-marker-scoping ADR-011: the marker is now one file per session,
+    # so the exact-match churn-FILE literal matched none of them and moved to the
+    # prefix-matched artifact tuple (the one the finalize dirt-filter actually reads),
+    # with a `*` glob for .gitignore.
+    from harness_maker.worktree import _HARNESS_ARTIFACT_PREFIXES, _HARNESS_GITIGNORE_PATTERNS
+
+    assert ".claude/.hm-autopilot" not in _HARNESS_CHURN_FILES
+    assert ".claude/.hm-autopilot" in _HARNESS_ARTIFACT_PREFIXES
+    assert ".claude/.hm-autopilot*" in _HARNESS_GITIGNORE_PATTERNS
 
 
 # --- CLI boundary (checkpoint 8: user-boundary code needs a real-invocation test) ---
@@ -152,7 +160,7 @@ def test_cli_on_then_off(tmp_path: Path) -> None:
     assert autopilot.active_marker(tmp_path) is not None
     off = runner.invoke(app, ["autopilot", "off", "--root", str(tmp_path)])
     assert off.exit_code == 0, off.output
-    assert autopilot.load(tmp_path) is None
+    assert autopilot.load(tmp_path, session_id=None) is None
 
 
 def test_cli_shim_accepts_every_registered_action(tmp_path: Path) -> None:
@@ -203,7 +211,7 @@ def test_cli_invalid_level_exits_2(tmp_path: Path) -> None:
 
     res = CliRunner().invoke(app, ["autopilot", "on", "--level", "yolo", "--root", str(tmp_path)])
     assert res.exit_code == 2
-    assert autopilot.load(tmp_path) is None
+    assert autopilot.load(tmp_path, session_id=None) is None
 
 
 # --- review-driven hardening (Phase 2 round 1 findings) --------------------------
@@ -212,7 +220,7 @@ def test_cli_invalid_level_exits_2(tmp_path: Path) -> None:
 def test_load_empty_file_returns_none(tmp_path: Path) -> None:
     # Partial-write survivor (WSL2/NTFS): zero-byte marker → JSONDecodeError → None.
     _raw_write(tmp_path, "")
-    assert autopilot.load(tmp_path) is None
+    assert autopilot.load(tmp_path, session_id=None) is None
 
 
 def test_load_extra_key_rejected(tmp_path: Path) -> None:
@@ -229,7 +237,7 @@ def test_load_extra_key_rejected(tmp_path: Path) -> None:
             }
         ),
     )
-    assert autopilot.load(tmp_path) is None
+    assert autopilot.load(tmp_path, session_id=None) is None
 
 
 def test_load_empty_pipeline_rejected(tmp_path: Path) -> None:
@@ -245,7 +253,7 @@ def test_load_empty_pipeline_rejected(tmp_path: Path) -> None:
             }
         ),
     )
-    assert autopilot.load(tmp_path) is None
+    assert autopilot.load(tmp_path, session_id=None) is None
 
 
 def test_effective_level_garbage_yaml_clamps_to_gated(tmp_path: Path) -> None:
@@ -287,7 +295,7 @@ def test_cli_invalid_pipeline_exits_2(tmp_path: Path) -> None:
         app, ["autopilot", "on", "--pipeline", "research,bogus", "--root", str(tmp_path)]
     )
     assert res.exit_code == 2
-    assert autopilot.load(tmp_path) is None
+    assert autopilot.load(tmp_path, session_id=None) is None
 
 
 def test_cli_failed_on_preserves_prior_marker(tmp_path: Path) -> None:

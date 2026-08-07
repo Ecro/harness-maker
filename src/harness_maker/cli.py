@@ -2472,8 +2472,16 @@ def autopilot_cmd(
         typer.echo(json.dumps(autopilot.status(root, session_id=session_id)))
         return
     if action == "off":
-        autopilot.clear(root)
-        typer.echo("autopilot: off (marker cleared)")
+        # Shared with the dot-form entry so the two spellings cannot drift: `off` now
+        # REFUSES to report success when it cleared nothing and other keyed markers are
+        # still armed (review round 1, SR-1 — the documented kill switch had become a
+        # silent no-op for exactly the invocation the README documents).
+        def _emit(message: str, err: bool) -> None:
+            typer.echo(message, err=err)
+
+        rc = autopilot._cli_off(root, session_id=session_id or None, emit=_emit)
+        if rc:
+            raise typer.Exit(rc)
         return
     if action != "on":
         typer.echo(

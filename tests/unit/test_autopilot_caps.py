@@ -75,7 +75,7 @@ def test_marker_removal_aborts_at_boundary(tmp_path: Path) -> None:
 def test_cleared_marker_aborts(tmp_path: Path) -> None:
     now = datetime(2026, 6, 20, 12, 0, tzinfo=UTC)
     _arm(tmp_path, created=now)
-    autopilot.clear(tmp_path)  # user kill switch
+    autopilot.clear(tmp_path, session_id=None)  # user kill switch
     d = autopilot_caps.evaluate_boundary(tmp_path, steps=0, step_cap=20, time_cap_min=60, now=now)
     assert d.proceed is False
     assert d.halt_kind == "kill_switch"

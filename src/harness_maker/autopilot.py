@@ -9,13 +9,14 @@ import logging
 import os
 import re
 import sys
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal, cast
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
-from harness_maker import command_registry
+from harness_maker import command_registry, loop_marker
 from harness_maker.io_utils import atomic_write
 from harness_maker.models import AtomicStage, AutonomyConfig
 from harness_maker.worktree import (
@@ -26,10 +27,29 @@ from harness_maker.worktree import (
 
 logger = logging.getLogger(__name__)
 
-# Grouped with `.claude/.hm-session-uuid` so the existing `.claude/` gitignore
-# coverage + the churn-file dirt-filters apply (registered in
-# worktree._HARNESS_CHURN_FILES — see test_marker_is_in_churn_files).
-_MARKER_REL = ".claude/.hm-autopilot"
+# PLAN-multisession-marker-scoping ADR-001: the marker is ONE FILE PER SESSION, keyed by
+# the sanitized `claude_session_id` — the same key `loop_marker.py` uses. A single shared
+# path made two concurrent sessions structurally unable to both be armed, and escalated
+# that to the user as a question ("is another session open?") whose honest answer on the
+# normal path is always yes.
+#
+# ADR-011: the dirt-filter + gitignore coverage moved from an EXACT literal in
+# `worktree._HARNESS_CHURN_FILES` to a PREFIX in `_HARNESS_ARTIFACT_PREFIXES` plus a
+# `.claude/.hm-autopilot*` gitignore glob — a per-session filename matches neither of the
+# old exact entries, and without the prefix every live marker becomes user dirt that
+# `worktree finalize` sweeps into the finalize stash (a silent disarm).
+_MARKER_DIR = ".claude"
+_MARKER_BASENAME = ".hm-autopilot"
+# ADR-002: id-less callers (Cursor, Codex, a failed SessionStart hook) share ONE marker,
+# under a name DISTINCT from the legacy path below — ADR-003 unlinks the legacy path, and
+# reusing that name as the fallback would delete a live degraded session's marker.
+_DEGRADED_BASENAME = f"{_MARKER_BASENAME}-degraded"
+# ADR-003: the pre-upgrade single-file path. Read once, taken over, then unlinked under a
+# compare-and-swap. Nothing else may read it.
+_LEGACY_MARKER_REL = f"{_MARKER_DIR}/{_MARKER_BASENAME}"
+# NB: no hyphen before the `*` — `.hm-autopilot-*` would stop covering the bare legacy
+# name, which stays alive until every project has taken it over.
+_MARKER_GITIGNORE_GLOB = f"{_MARKER_DIR}/{_MARKER_BASENAME}*"
 
 # The per-SESSION key (PLAN-autopilot-advance-noop ADR-007). `session_uuid` below is
 # PROJECT-scoped, so within one project every session reads every other session's marker
@@ -137,9 +157,24 @@ class AutopilotMarker(BaseModel):
         return v
 
 
-def marker_path(project_root: Path) -> Path:
-    """WHY: single source for the marker location so callers never hardcode it."""
-    return project_root / _MARKER_REL
+def marker_path(project_root: Path, *, session_id: str | None) -> Path:
+    """The calling session's marker file — single source, so callers never hardcode it.
+
+    ``session_id`` is keyword-only and REQUIRED (no default) on purpose. A default would
+    silently resolve a missed reader to the degraded fallback, which in a real Claude Code
+    session means "autopilot is off" with no diagnostic — the exact shape of
+    `[fail:design] new-marker-content-field-must-update-every-reader` (count:3). Passing
+    ``None`` explicitly is the id-less case; forgetting to pass anything is a TypeError.
+
+    The env lookup is kept as a fallback for a host that DOES export ``HM_SESSION_ID``
+    (Claude Code does not — it is an unexported shell variable), matching every other
+    reader in this module.
+    """
+    key = loop_marker.sanitize_session_id(session_id or _env_session_id() or "")
+    # `sanitize_session_id` hashes anything that is not a tame hex/UUID id, so a session
+    # literally named "degraded" is hashed and cannot collide with the fallback name.
+    name = f"{_MARKER_BASENAME}-{key}" if key else _DEGRADED_BASENAME
+    return project_root / _MARKER_DIR / name
 
 
 def _is_harness_root(p: Path) -> bool:
@@ -164,11 +199,9 @@ def _is_marker_root(p: Path) -> bool:
     accept so a read resolves to wherever the marker actually lives. The ``.worktrees``
     strip uses the stricter ``_is_harness_root`` instead (see ``resolve_marker_root``).
     """
-    return (
-        (p / _MARKER_REL).exists()
-        or (p / ".claude" / "harness.yaml").is_file()
-        or (p / ".git").exists()
-    )
+    claude_dir = p / _MARKER_DIR
+    has_marker = claude_dir.is_dir() and any(claude_dir.glob(f"{_MARKER_BASENAME}*"))
+    return has_marker or (p / ".claude" / "harness.yaml").is_file() or (p / ".git").exists()
 
 
 def resolve_marker_root(start: Path) -> Path:
@@ -241,7 +274,7 @@ def write(
     project_root = resolve_marker_root(project_root)
     effective_session_id = claude_session_id or _env_session_id()
     if not force:
-        existing = load(project_root)
+        existing = load(project_root, session_id=effective_session_id)
         # `!= "stale"` — NOT `== "fresh"`. A `future` marker (clock rollback / NTP step / a
         # differently-skewed host on a shared tree) is one `gc_stale_marker` refuses to
         # delete precisely because it may be a peer's LIVE marker; letting `write` clobber
@@ -270,29 +303,109 @@ def write(
     # committable even if `make` / `worktree create` (the other seed sites) never ran in
     # this project. Best-effort — a gitignore failure must not block arming autopilot.
     with contextlib.suppress(OSError):
-        _ensure_gitignore_entry(project_root, _MARKER_REL)
-    atomic_write(marker_path(project_root), marker.model_dump_json())
+        # The GLOB, not the resolved filename: one .gitignore line covers every session's
+        # marker plus the legacy path, and the file is unbounded in count (ADR-011).
+        _ensure_gitignore_entry(project_root, _MARKER_GITIGNORE_GLOB)
+    atomic_write(
+        marker_path(project_root, session_id=effective_session_id), marker.model_dump_json()
+    )
     return marker
 
 
-def clear(project_root: Path) -> None:
-    """Remove the marker; idempotent (no error when absent).
+def other_keyed_markers(project_root: Path, *, session_id: str | None) -> list[str]:
+    """Marker filenames in this project that `clear(session_id=...)` would NOT remove.
+
+    Exists for one caller: the operator-facing `autopilot off`. ADR-013 scopes a session's
+    unlink authority to its own key, which is right for peer isolation and wrong for a
+    human typing the documented kill switch — that invocation has no `--session-id` (and
+    `HM_SESSION_ID` is a shell variable `os.environ` never sees), so it resolves to the
+    degraded key, unlinks nothing, and used to print success while the armed marker kept
+    auto-advancing for the full TTL. Reporting requires knowing what was left behind.
+    """
+    claude_dir = project_root / _MARKER_DIR
+    if not claude_dir.is_dir():
+        return []
+    keep = marker_path(project_root, session_id=session_id).name
+    return sorted(
+        p.name for p in claude_dir.glob(f"{_MARKER_BASENAME}*") if p.is_file() and p.name != keep
+    )
+
+
+def clear(project_root: Path, *, session_id: str | None) -> bool:
+    """Remove THIS session's marker; idempotent. True iff a file was actually removed.
+
+    The return value is load-bearing for `autopilot off`: an unconditional "marker cleared"
+    over a no-op is how a documented kill switch becomes a lie.
 
     Resolves cwd→base so `autopilot off` (and the boundary's terminal cap-halt /
     pipeline-complete / merge-gate clears) deletes the ROOT marker, never a
     worktree-local copy (Codex HIGH-2).
+
+    ADR-013: a session may unlink only its OWN key. Clearing by glob would make every
+    session an unlink authority over every peer's marker — reversing, through the GC
+    door, the isolation ADR-001 exists to create.
     """
     root = resolve_marker_root(project_root)
-    marker_path(root).unlink(missing_ok=True)
+    path = marker_path(root, session_id=session_id)
+    existed = path.is_file()
+    path.unlink(missing_ok=True)
+    return existed
 
 
-def load(project_root: Path) -> AutopilotMarker | None:
+def _takeover_legacy(project_root: Path, *, session_id: str | None) -> None:
+    """One-shot ADR-003 migration of the pre-upgrade single-file marker.
+
+    If this session has no per-session marker yet but the legacy `.claude/.hm-autopilot`
+    exists and evaluates as OURS under today's rules, rewrite it at the per-session path
+    and unlink the legacy file — but only if its bytes are unchanged since the read
+    (compare-and-swap). Without the CAS a peer's replacement landing between the
+    judgement and the unlink is destroyed; `gc_stale_marker`'s docstring records that
+    this narrows and does not close the window, and the same is true here. The residual
+    loss is one marker, recoverable by re-arming.
+
+    Anything unexpected — unreadable, unparseable, foreign — leaves the legacy file
+    alone. The compat branch is therefore self-erasing for the owner and inert for
+    everyone else.
+    """
+    root = resolve_marker_root(project_root)
+    target = marker_path(root, session_id=session_id)
+    if target.exists():
+        return
+    legacy = root / _LEGACY_MARKER_REL
+    try:
+        raw = legacy.read_bytes()
+    except OSError:
+        return
+    try:
+        marker = AutopilotMarker.model_validate(json.loads(raw.decode("utf-8")), strict=False)
+    except (UnicodeDecodeError, json.JSONDecodeError, ValidationError):
+        return
+    if not _is_own(marker, root, session_id=session_id or _env_session_id()):
+        return
+    try:
+        atomic_write(target, marker.model_dump_json())
+        if legacy.read_bytes() == raw:
+            legacy.unlink(missing_ok=True)
+        else:
+            logger.warning(".hm-autopilot: legacy marker changed during takeover — kept.")
+    except OSError:
+        return
+
+
+def load(project_root: Path, *, session_id: str | None) -> AutopilotMarker | None:
     """Return the parsed marker, or None when absent / corrupt / schema-invalid.
 
     Fail-safe: ANY read or validation failure resolves to None (the caller treats
     None as gated). Does NOT check session ownership — see ``active_marker``.
+
+    NOT pure: it runs the one-shot ADR-003 legacy takeover first. This is the single
+    choke point every read path passes through, so putting the migration anywhere else
+    means some entry point silently reports "not armed" for a project that IS armed
+    under the old filename.
     """
-    path = marker_path(resolve_marker_root(project_root))
+    root = resolve_marker_root(project_root)
+    _takeover_legacy(root, session_id=session_id)
+    path = marker_path(root, session_id=session_id)
     if not path.is_file():
         return None
     try:
@@ -375,8 +488,8 @@ def _is_own(marker: AutopilotMarker, project_root: Path, *, session_id: str | No
     return marker.session_uuid == _current_session_uuid(project_root)
 
 
-def gc_stale_marker(project_root: Path) -> bool:
-    """Delete the marker iff it is TTL-stale (or unparseable). Returns True when deleted.
+def gc_stale_marker(project_root: Path, *, session_id: str | None) -> bool:
+    """Delete THIS SESSION's marker iff it is TTL-stale (or unparseable). True when deleted.
 
     Kept OUT of ``active_marker`` on purpose: that predicate is documented pure and
     ``evaluate_boundary`` depends on it. GC is called from ``status`` and the picker path
@@ -396,10 +509,17 @@ def gc_stale_marker(project_root: Path) -> bool:
         not have; the residual race requires two sessions inside the same microseconds,
         and the loser re-arms via the picker.
 
+    ADR-013 narrows the scope to the caller's own key. The two restraints below were
+    argued for ONE shared file; applied over a glob they would authorize deleting a
+    peer's marker, which is precisely what per-session files exist to prevent. Nothing
+    here globs, so a crashed peer's marker survives THIS call and is simply inert — the
+    operator sweep `gc_expired_markers` (via `worktree.prune_stale`) collects it once
+    TTL-expired, which is what keeps `.claude/` from growing a file per session forever.
+
     ``OSError`` from the unlink propagates — ``status`` decides how to report it.
     """
     root = resolve_marker_root(project_root)
-    path = marker_path(root)
+    path = marker_path(root, session_id=session_id)
     try:
         raw = path.read_bytes()
     except OSError:
@@ -427,6 +547,66 @@ def gc_stale_marker(project_root: Path) -> bool:
     return True
 
 
+def _some_id_bearing_marker(root: Path) -> AutopilotMarker | None:
+    """Any parseable per-session marker carrying a session id. Diagnostic only.
+
+    The ONE place that reads across marker files. It never writes and never unlinks
+    (ADR-013 forbids the latter), and its single consumer is ``status``'s
+    ``degraded-idless`` label — nothing branches on it, so a wrong answer costs a word
+    in a diagnostic, not a decision.
+    """
+    claude_dir = root / _MARKER_DIR
+    if not claude_dir.is_dir():
+        return None
+    for path in sorted(claude_dir.glob(f"{_MARKER_BASENAME}*")):
+        try:
+            marker = AutopilotMarker.model_validate(
+                json.loads(path.read_text(encoding="utf-8")), strict=False
+            )
+        except (OSError, json.JSONDecodeError, ValidationError):
+            continue
+        if marker.claude_session_id:
+            return marker
+    return None
+
+
+def gc_expired_markers(project_root: Path) -> list[str]:
+    """Operator sweep: delete every TTL-EXPIRED autopilot marker. Returns the names removed.
+
+    ADR-001 turned one file into N and gave each one a self-only reaper (`gc_stale_marker`,
+    ADR-013), which collects a marker only when its OWN session next runs a command — and a
+    crashed session never does. Nothing else globbed, so `.claude/` grew a file per session
+    forever (review round 1, SR-3; `gc_stale_marker`'s docstring claiming a peer's marker
+    "survives to its TTL" described a sweep that did not exist).
+
+    ADR-013 scopes a **session's** unlink authority, not the operator's: `prune_stale` is
+    already the session-blind sweep that owns `.hm-loop-*` and `.hm-task-*`, and this joins
+    them. **TTL-expired only** — `stale`, never `fresh` and never `future`, so a live peer's
+    marker and a clock-skewed one are both untouchable, which is the property ADR-013's
+    restraint actually protects.
+    """
+    claude_dir = project_root / _MARKER_DIR
+    if not claude_dir.is_dir():
+        return []
+    removed: list[str] = []
+    for path in sorted(claude_dir.glob(f"{_MARKER_BASENAME}*")):
+        try:
+            raw = path.read_bytes()
+            marker = AutopilotMarker.model_validate(json.loads(raw.decode("utf-8")), strict=False)
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValidationError):
+            continue  # unparseable: the OWNER's gc_stale_marker collects it; never guess here
+        if _freshness(marker.created_at) != "stale":
+            continue
+        try:
+            if path.read_bytes() != raw:  # CAS, same reason as gc_stale_marker
+                continue
+            path.unlink()
+        except OSError:
+            continue
+        removed.append(path.name)
+    return removed
+
+
 def idle_minutes(marker: AutopilotMarker, *, now: datetime | None = None) -> float | None:
     """Minutes since the owner last touched the marker; None when it cannot be known.
 
@@ -451,7 +631,9 @@ def idle_minutes(marker: AutopilotMarker, *, now: datetime | None = None) -> flo
     return None if elapsed < 0 else elapsed
 
 
-def _write_if_unchanged(root: Path, *, before: bytes | None, updated: AutopilotMarker) -> bool:
+def _write_if_unchanged(
+    root: Path, *, before: bytes | None, updated: AutopilotMarker, session_id: str | None
+) -> bool:
     """Write ``updated`` only if the marker file still holds ``before``. False otherwise.
 
     Byte identity, NOT a `created_at` comparison. Neither `touch` nor `set_task_slug`
@@ -464,7 +646,7 @@ def _write_if_unchanged(root: Path, *, before: bytes | None, updated: AutopilotM
     `last_seen` inflates `idle_minutes`, the number the picker uses to authorize a
     takeover. `gc_stale_marker` already used byte identity for the same reason.
     """
-    path = marker_path(root)
+    path = marker_path(root, session_id=session_id)
     try:
         if path.read_bytes() != before:
             logger.warning(".hm-autopilot: marker changed during update — skipping write.")
@@ -488,8 +670,11 @@ def touch(project_root: Path, *, now: str | None = None, session_id: str | None 
     permanent silent no-op and a live owner looks abandoned to the takeover prompt.
     """
     root = resolve_marker_root(project_root)
+    # Before the read: an ADR-003 project's only marker is still at the legacy path, so
+    # without the migration `before` is None and the heartbeat is a permanent no-op.
+    _takeover_legacy(root, session_id=session_id)
     try:
-        before: bytes | None = marker_path(root).read_bytes()
+        before: bytes | None = marker_path(root, session_id=session_id).read_bytes()
     except OSError:
         return False
     marker = active_marker(root, session_id=session_id)
@@ -498,7 +683,7 @@ def touch(project_root: Path, *, now: str | None = None, session_id: str | None 
     stamped = marker.model_copy(
         update={"last_seen": now if now is not None else datetime.now(UTC).isoformat()}
     )
-    return _write_if_unchanged(root, before=before, updated=stamped)
+    return _write_if_unchanged(root, before=before, updated=stamped, session_id=session_id)
 
 
 def set_task_slug(
@@ -515,8 +700,9 @@ def set_task_slug(
     ``bad_slug`` halt naming a slug that in fact passed validation.
     """
     root = resolve_marker_root(project_root)
+    _takeover_legacy(root, session_id=session_id)
     try:
-        before: bytes | None = marker_path(root).read_bytes()
+        before: bytes | None = marker_path(root, session_id=session_id).read_bytes()
     except OSError:
         return False
     marker = active_marker(root, session_id=session_id)
@@ -532,7 +718,7 @@ def set_task_slug(
     except ValidationError:
         logger.warning(".hm-autopilot: rejected task_slug %r — marker left unchanged.", slug)
         return False
-    return _write_if_unchanged(root, before=before, updated=updated)
+    return _write_if_unchanged(root, before=before, updated=updated, session_id=session_id)
 
 
 def active_marker(
@@ -553,7 +739,7 @@ def active_marker(
     # the base root — a worktree's own uuid differs, so an unresolved compare would
     # foreign-reject the base marker (ADR-003).
     project_root = resolve_marker_root(project_root)
-    marker = load(project_root)
+    marker = load(project_root, session_id=session_id)
     if marker is None:
         return None
     if not _is_own(marker, project_root, session_id=session_id or None):
@@ -630,16 +816,32 @@ def status(project_root: Path, *, session_id: str | None = None) -> dict[str, An
         "session_scoped": False,
         "idle_minutes": None,
     }
-    if not marker_path(root).is_file():
+    # BEFORE the existence check: an ADR-003 project's marker is still at the legacy
+    # path, and reporting "absent" there would send the picker down the arming branch
+    # for a project that is already armed.
+    _takeover_legacy(root, session_id=effective_id)
+    if not marker_path(root, session_id=effective_id).is_file():
+        # ADR-001 made "some OTHER session's marker exists" a non-event for an id-bearing
+        # caller: its own path is free, so it arms. But an id-LESS caller cannot tell
+        # "nobody armed" from "I armed, and then lost my id" — the documented WSL2 shape
+        # where `sessionid_envfile` fails while the SessionStart hook still stamps the id
+        # it read from stdin. Report that distinctly (read-only; ADR-013 restricts
+        # unlinking, not looking) so the degraded environment is diagnosable instead of
+        # silently arming a second, parallel marker with no explanation.
+        if effective_id is None:
+            peer = _some_id_bearing_marker(root)
+            if peer is not None:
+                out["reason"] = "degraded-idless"
+                out["idle_minutes"] = idle_minutes(peer)
         return out
     try:
-        if gc_stale_marker(root):
+        if gc_stale_marker(root, session_id=effective_id):
             out["reason"] = "stale (gc'd)"
             return out
     except OSError as exc:
         out["reason"] = f"gc-failed: {exc.errno if exc.errno is not None else '?'}"
         return out
-    marker = load(root)
+    marker = load(root, session_id=effective_id)
     if marker is None:
         # Unparseable survived GC only if the file vanished underneath us.
         out["reason"] = "absent"
@@ -680,6 +882,61 @@ def status(project_root: Path, *, session_id: str | None = None) -> dict[str, An
         session_scoped=effective_id is not None and marker.claude_session_id is not None,
     )
     return out
+
+
+def _cli_off(
+    project_root: Path, *, session_id: str | None, emit: Callable[[str, bool], None]
+) -> int:
+    """Shared `autopilot off` behavior for BOTH entry points. Returns the exit code.
+
+    Shared for the same reason `resolve_toggle_config` is: the Typer alias and the dot-form
+    are one command with two spellings, and the last time only one was updated the other
+    surfaced a raw traceback.
+
+    **`off` DISARMS THE PROJECT, not just the caller's key.** ADR-013 scopes a *session's*
+    unlink authority so no peer can silently disarm another; an operator typing the README's
+    kill switch is not a peer. Two rounds of review landed on this: keying `off` to the
+    caller made it a silent no-op on its only documented invocation (there is no
+    `--session-id` in the README, and `HM_SESSION_ID` is a shell variable `os.environ` never
+    sees), and merely reporting that honestly still left the chain auto-advancing for the
+    full 18h TTL with manual file deletion as the only working disarm. A kill switch that
+    cannot kill is the defect; telling the truth about it is not the fix.
+
+    With `--session-id`, only that session's marker is removed — the scoped form stays
+    available for a stage that means "disarm ME".
+    """
+    removed = (
+        [marker_path(project_root, session_id=session_id).name]
+        if clear(project_root, session_id=session_id)
+        else []
+    )
+    root = resolve_marker_root(project_root)
+    if session_id is None:
+        # Operator sweep: every remaining keyed marker in this project, TTL or not.
+        for name in other_keyed_markers(root, session_id=session_id):
+            try:
+                (root / _MARKER_DIR / name).unlink(missing_ok=True)
+            except OSError as exc:
+                emit(f"autopilot: could not remove {name}: {exc}", True)
+                return 4
+            removed.append(name)
+    if removed:
+        emit(
+            f"autopilot: off ({len(removed)} marker(s) cleared: {', '.join(sorted(removed))})",
+            False,
+        )
+        return 0
+    stranded = other_keyed_markers(root, session_id=session_id)
+    if not stranded:
+        emit("autopilot: off (no marker was armed)", False)
+        return 0
+    # Only reachable with an explicit --session-id that owns nothing while peers are armed.
+    emit(
+        f"autopilot: this session owns no marker; {len(stranded)} other marker(s) are still "
+        f"armed: {', '.join(stranded)}. Re-run without --session-id to disarm the project.",
+        True,
+    )
+    return 4
 
 
 def resolve_toggle_config(
@@ -736,9 +993,11 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(status(root, session_id=args.session_id)))
         return 0
     if args.action == "off":
-        clear(root)
-        print("autopilot: off (marker cleared)")
-        return 0
+
+        def _emit(message: str, err: bool) -> None:
+            print(message, file=sys.stderr if err else sys.stdout)
+
+        return _cli_off(root, session_id=args.session_id, emit=_emit)
     try:
         level, stages = resolve_toggle_config(args.level, args.pipeline)
     except ValueError as exc:

@@ -1706,9 +1706,21 @@ harness_maker.gates.permission_gate
 harness_maker.gates.worktree_gate
 ```
 
-- Verify that the file write target is inside the worktree (when `worktree.enabled` is true)
-- Detect and warn about attempts to write outside the worktree
-- Prevent accidental direct edits to main branch files
+- **Protects peers, does not confine you.** Blocks a write **iff** the target is inside
+  **another live session's** worktree. The base repo, `/tmp`, and everything outside the repo
+  are allowed — writing outside your own worktree is *not* blocked.
+- Reads per-session markers (`.claude/.hm-loop-*`, `.claude/.hm-task-<worktree>`) and sorts
+  them three ways: **mine** (ignored), **peer** (non-empty, different `session_id` → block),
+  and **unattributable** (empty header → ignored entirely; every standalone `/hm:execute`
+  worktree writes one of these, and treating them as peers would block those sessions from
+  their own work). If a path is in both your set and a peer's, **own membership wins**.
+- **Fails open**: a PreToolUse payload with no `session_id` is allowed *before* any marker is
+  read. Enforcement here was prompt-level only before this gate existed, so fail-open is a
+  floor being added, not a wall being removed.
+- Resolves the **base repo root first** — a `/hm:` stage's `cwd` is the worktree, and rooting
+  there finds no `.claude/` markers at all, which would silently enforce nothing.
+- **Accepted trade-off**: a drifting agent is no longer confined to its own worktree.
+  Self-confinement is recoverable later as an opt-in.
 
 ---
 

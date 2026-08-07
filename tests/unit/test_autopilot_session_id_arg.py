@@ -233,7 +233,7 @@ def test_the_boundary_cli_proceeds_end_to_end_with_a_stamped_marker(
     assert out["task_slug"] == "my-task"
     assert out["task_slug_source"] == "flag"
 
-    after = autopilot.load(tmp_path)
+    after = autopilot.load(tmp_path, session_id=_SID)
     assert after is not None
     assert after.last_seen != stale, (
         "the boundary's heartbeat did not advance — `touch` resolved id-less, so a live "
@@ -267,7 +267,7 @@ def test_the_gate_blocked_cli_records_with_a_stamped_marker(tmp_path: Path) -> N
         f"returned before the ledger write; rows={rows}"
     )
 
-    after = autopilot.load(tmp_path)
+    after = autopilot.load(tmp_path, session_id=_SID)
     assert after is not None
     assert after.last_seen != stale, "the gate-blocked branch's heartbeat did not advance"
 

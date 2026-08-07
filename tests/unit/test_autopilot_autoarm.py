@@ -43,7 +43,7 @@ def test_arms_when_persistent_and_auto_safe(tmp_path: Path) -> None:
     # load() (not active_marker) — the frozen created_at is intentionally outside the live
     # freshness window; the truth-table assertion is only that a marker with the right level
     # was WRITTEN. Freshness/TTL behavior is covered by autopilot.py's own tests.
-    marker = autopilot.load(tmp_path)
+    marker = autopilot.load(tmp_path, session_id=None)
     assert marker is not None
     assert marker.level == "auto_safe"
 
@@ -51,7 +51,7 @@ def test_arms_when_persistent_and_auto_safe(tmp_path: Path) -> None:
 def test_arms_when_persistent_and_full(tmp_path: Path) -> None:
     _write_harness(tmp_path, _AUTO_SAFE.replace("auto_safe", "full"))
     assert autopilot_autoarm.arm_if_persistent(tmp_path, now=_FROZEN) is True
-    marker = autopilot.load(tmp_path)
+    marker = autopilot.load(tmp_path, session_id=None)
     assert marker is not None
     assert marker.level == "full"
 
@@ -61,14 +61,14 @@ def test_no_arm_when_persistent_false(tmp_path: Path) -> None:
         tmp_path, _AUTO_SAFE.replace("autopilot_persistent: true", "autopilot_persistent: false")
     )
     assert autopilot_autoarm.arm_if_persistent(tmp_path, now=_FROZEN) is False
-    assert autopilot.load(tmp_path) is None
+    assert autopilot.load(tmp_path, session_id=None) is None
 
 
 def test_no_arm_when_gated(tmp_path: Path) -> None:
     # persistent true but gated → no-op (gated never auto-advances).
     _write_harness(tmp_path, _AUTO_SAFE.replace("level: auto_safe", "level: gated"))
     assert autopilot_autoarm.arm_if_persistent(tmp_path, now=_FROZEN) is False
-    assert autopilot.load(tmp_path) is None
+    assert autopilot.load(tmp_path, session_id=None) is None
 
 
 def test_missing_harness_yaml_no_raise(tmp_path: Path) -> None:
@@ -89,7 +89,7 @@ def test_invalid_pipeline_stage_is_fail_safe(tmp_path: Path) -> None:
         ),
     )
     assert autopilot_autoarm.arm_if_persistent(tmp_path, now=_FROZEN) is False
-    assert autopilot.load(tmp_path) is None
+    assert autopilot.load(tmp_path, session_id=None) is None
 
 
 def test_write_failure_is_fail_safe(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -106,9 +106,9 @@ def test_write_failure_is_fail_safe(tmp_path: Path, monkeypatch: pytest.MonkeyPa
 def test_rearm_refreshes_created_at(tmp_path: Path) -> None:
     _write_harness(tmp_path, _AUTO_SAFE)
     autopilot_autoarm.arm_if_persistent(tmp_path, now="2026-06-25T08:00:00+00:00")
-    first = autopilot.load(tmp_path)
+    first = autopilot.load(tmp_path, session_id=None)
     autopilot_autoarm.arm_if_persistent(tmp_path, now="2026-06-25T20:00:00+00:00")
-    second = autopilot.load(tmp_path)
+    second = autopilot.load(tmp_path, session_id=None)
     assert first is not None
     assert second is not None
     assert second.created_at != first.created_at

@@ -78,6 +78,22 @@ _LOOP_MARKER_DIR = Path(".claude")
 _LOOP_MARKER_PREFIX = ".hm-loop-"
 _LOOP_MARKER_GITIGNORE_PATTERN = ".claude/.hm-loop-*"
 
+# PLAN-multisession-marker-scoping ADR-010: TASK worktree markers, a SEPARATE family.
+# Reusing `.hm-loop-` would be the obvious implementation and is a trap: `loop_gate`
+# (Stop hook) refuses to let a session stop while a `.hm-loop-*` marker content-matches
+# its `session_id`, so a task marker under that prefix would make EVERY `/hm:plan` and
+# `/hm:execute` session unable to stop — and `_owned_session_uuids`, the queue-guard's
+# `_count_pending_stashes`, and `_session_worktrees` would all ingest task worktrees as
+# loop worktrees.
+#
+# Keyed by WORKTREE name (not by session — a session routinely holds two task worktrees,
+# plan on one slug while execute runs on another), with the session id in the CONTENT
+# header, exactly mirroring `.hm-loop-{wt_name}`. That key choice is what makes every
+# lifecycle transition a whole-file create or unlink rather than a line-edit of a file
+# that may belong to a peer.
+_TASK_MARKER_PREFIX = ".hm-task-"
+_TASK_MARKER_GITIGNORE_PATTERN = ".claude/.hm-task-*"
+
 # PLAN-worktree-base-artifact-pollution ADR-002/ADR-003: single source of
 # truth for harness-generated CHURN paths. The gitignore set AND both
 # dirt-filters derive from these tuples so they cannot drift. These are
@@ -110,7 +126,10 @@ _HARNESS_CHURN_DIRS: tuple[str, ...] = (
 # every tool call) is NOT configurable, so the core fix holds regardless.
 _HARNESS_CHURN_FILES: tuple[str, ...] = (
     ".claude/.hm-session-uuid",
-    ".claude/.hm-autopilot",
+    # `.claude/.hm-autopilot` was here until PLAN-multisession-marker-scoping ADR-011.
+    # The marker is now one file PER SESSION, so an exact literal matches none of them —
+    # it moved to `_HARNESS_ARTIFACT_PREFIXES` (prefix-matched, and the tuple the FINALIZE
+    # dirt-filter actually reads) plus a gitignore glob below.
     ".claude/.hm-render-manifest.jsonl",
     ".claude/.hm-sessions.json",  # Phase 1 (ADR-004): session registry — operational churn
     "work-docs/p5-batch-state.yaml",
@@ -120,7 +139,14 @@ _HARNESS_CHURN_FILES: tuple[str, ...] = (
 # handles them via the corresponding prefix in `_HARNESS_ARTIFACT_PREFIXES` instead.
 # PLAN-spec-requirement-gate ADR-009: `.hm-spec-need-{slug}` markers are slug-keyed
 # and therefore cannot be an exact-file or dir-prefix entry.
-_HARNESS_CHURN_GLOBS: tuple[str, ...] = (".claude/.hm-spec-need-*",)
+# PLAN-multisession-marker-scoping ADR-011: `.hm-autopilot*` has NO hyphen before the
+# `*` on purpose — `.hm-autopilot-*` would stop ignoring the bare legacy
+# `.claude/.hm-autopilot`, which ADR-003 keeps alive until each project takes it over.
+_HARNESS_CHURN_GLOBS: tuple[str, ...] = (
+    ".claude/.hm-spec-need-*",
+    ".claude/.hm-autopilot*",
+    _TASK_MARKER_GITIGNORE_PATTERN,
+)
 # Patterns appended to the user's .gitignore (ADR-002) — dirs + exact files + globs.
 # The Phase 2 sync test asserts this equals the dir+file+glob union so the gitignore
 # set and the dirt-filters can never drift.
@@ -555,6 +581,15 @@ _HARNESS_ARTIFACT_PREFIXES = (
     # an exact-match churn-file entry. Registered here so a present marker does
     # NOT trip the dirty-base guard or get stashed at finalize.
     ".claude/.hm-spec-need-",
+    # PLAN-multisession-marker-scoping ADR-011. The FINALIZE filter reads this tuple and
+    # NEVER the globs, so without this entry every live per-session autopilot marker is
+    # user dirt that `worktree finalize` sweeps into the finalize stash — silently
+    # disarming autopilot and growing the queue Layer 1 guards. Prefix, not exact: the
+    # filenames are session-keyed and unbounded. Covers the bare legacy name too.
+    ".claude/.hm-autopilot",
+    # PLAN-multisession-marker-scoping ADR-010/011: task markers, same reasoning — the
+    # finalize dirt-filter reads this tuple and never the globs.
+    ".claude/.hm-task-",
 )
 
 
@@ -2302,6 +2337,25 @@ def prune_stale(base_dir: Path, *, dry_run: bool = False) -> PruneReport:
             report.removed_markers.append(marker)
             if not dry_run:
                 marker.unlink(missing_ok=True)
+        # ADR-013: the task family needs its OWN sweep. This loop globbed
+        # `_LOOP_MARKER_PREFIX` only, so an earlier revision's claim that orphan task
+        # markers are "reaped by prune_stale" was false — a SIGKILL or a manual
+        # `git worktree remove` would leave one behind forever, and the gate would keep
+        # honouring it against a path that no longer exists.
+        for marker in sorted(claude_dir.glob(f"{_TASK_MARKER_PREFIX}*")):
+            if not _is_orphan_task_marker(marker):
+                continue
+            report.removed_markers.append(marker)
+            if not dry_run:
+                marker.unlink(missing_ok=True)
+        # Autopilot markers are TTL-based, not path-based, so they need their own predicate
+        # (review round 1, SR-3). Deferred import: `autopilot` imports THIS module at module
+        # scope, so a top-level import here would be a cycle.
+        if not dry_run:
+            from harness_maker.autopilot import gc_expired_markers
+
+            for name in gc_expired_markers(base):
+                report.removed_markers.append(claude_dir / name)
 
     for wt in _scan_dangling_worktrees(base):
         report.removed_worktrees.append(wt)
@@ -2422,6 +2476,12 @@ def cleanup_all(base_dir: Path, force: bool = False) -> int:
         try:
             _run(args, cwd=base)
             removed += 1
+            # ADR-013: `cleanup_all` is session-BLIND by design — a deliberate operator
+            # sweep over every worktree — and is therefore the one caller permitted to
+            # unlink a peer-owned task marker. Safe only because ADR-010 keys the filename
+            # by WORKTREE: this is a whole-file unlink of the marker for the worktree we
+            # just removed, never a partial rewrite of a file a peer also uses.
+            _clear_task_marker(base, wt.name)
         except RuntimeError:
             # Continue with the rest; a single dirty worktree shouldn't block
             # the autoloop blocker recovery path.
@@ -2720,6 +2780,115 @@ def _write_loop_marker(
     content = format_marker_content(claude_session_id, wt_paths)
     atomic_write(marker, content)
     _ensure_gitignore_entry(project_root, _LOOP_MARKER_GITIGNORE_PATTERN)
+
+
+def _task_marker_path(project_root: Path, wt_name: str) -> Path:
+    """The task marker for ONE worktree (PLAN-multisession-marker-scoping ADR-010)."""
+    return project_root / _LOOP_MARKER_DIR / f"{_TASK_MARKER_PREFIX}{wt_name}"
+
+
+def _write_task_marker(
+    project_root: Path,
+    wt_name: str,
+    wt_path: Path,
+    claude_session_id: str | None,
+    *,
+    allow_shared: bool = False,
+) -> None:
+    """Record which session owns this task worktree — or record nothing.
+
+    ADR-008: an id-less caller writes NO marker (not a shared fallback). An
+    unattributable task marker could only ever produce false peer-blocks, and ADR-006
+    already leaves id-less callers unenforced, so the fallback would be all cost.
+
+    Content is byte-identical in SHAPE to a loop marker (`claude_session_id:` header then
+    absolute paths) so `loop_marker.parse_marker_paths` stays the single parser — the
+    `new-marker-content-field-must-update-every-reader` rule. The path line is REQUIRED,
+    not decorative: ADR-004's peer test needs it, and an orphan sweep keyed on "the path
+    is gone" cannot classify a header-only marker at all.
+
+    **An id-less claim writes nothing AND deletes nothing (review rounds 1-2).** Round 2
+    tried unlinking here, to stop a prior owner's marker from blocking a degraded session
+    (CR-1). Both reviewers then found that this hands the LEAST authenticated caller the
+    MOST destructive authority: `claim_task_branch`'s liveness is pid-based, and ADR-008
+    records that pid as the exited CLI subprocess, so a live peer reads dead and the unlink
+    strips its protection while its worktree is still there — exactly what
+    `_clear_task_marker`'s own docstring forbids. The lockout CR-1 described is real, but
+    marker mutation was the wrong lever for it: "may I write here" is the GATE's question,
+    and `worktree_gate` now answers it with self-membership from the caller's cwd. A
+    worktree you are standing in is never a peer's, whatever its marker says.
+    """
+    if not claude_session_id:
+        return
+    from harness_maker.io_utils import atomic_write
+    from harness_maker.loop_marker import (
+        format_marker_content,
+        parse_marker_session_id,
+        sanitize_session_id,
+    )
+
+    # Takeover is NOT unconditional (review round 1, CR-2 + SR-2). ADR-013 authorises
+    # takeover-on-claim as RECOVERY for a marker that cannot expire — it never considered a
+    # LIVE peer. The only upstream restraint is `claim_task_branch`'s pid liveness, and
+    # ADR-008's own Context says that pid is the exited CLI subprocess, so a live peer's row
+    # reads dead and `SharedSlugError` does not fire. Seizing the header there evicts the
+    # peer at its next write, and the block message tells it to re-run preflight — the same
+    # seizure in reverse, i.e. a flip-flop. `allow_shared` is the explicit "I mean it" signal.
+    #
+    # Round 2 caveat, and the reason this is safe to keep: refusing the claim used to LOCK
+    # OUT the refused session, because the gate read the stale header as a peer's. Resuming
+    # a task tomorrow is a new session id, so that was the ordinary path, not an edge — a
+    # permanent, self-perpetuating work stoppage whose printed remedy was this very no-op.
+    # The gate's cwd self-membership removes that consequence: a refused claim now means
+    # only "the marker keeps the old attribution", never "you cannot work here".
+    existing = _task_marker_path(project_root, wt_name)
+    if not allow_shared:
+        try:
+            owner = parse_marker_session_id(existing.read_text(encoding="utf-8"))
+        except OSError:
+            owner = ""
+        # Compare SANITIZED forms: `format_marker_content` sanitizes on the way in, so a raw
+        # id would never equal its own stored header and every refresh would read as foreign.
+        if owner and owner != sanitize_session_id(claude_session_id):
+            print(
+                f"[task-marker] {existing.name} is held by session {owner}; not taking it "
+                f"over. Pass --allow-shared-slug to claim it deliberately.",
+                file=sys.stderr,
+            )
+            return
+
+    atomic_write(
+        _task_marker_path(project_root, wt_name),
+        format_marker_content(claude_session_id, [wt_path]),
+    )
+    _ensure_gitignore_entry(project_root, _TASK_MARKER_GITIGNORE_PATTERN)
+
+
+def _clear_task_marker(project_root: Path, wt_name: str) -> None:
+    """Unlink one worktree's task marker; idempotent.
+
+    ADR-013: permitted ONLY jointly with removal of the worktree the filename names, by
+    whichever session removed it. Deleting a task marker while its worktree still exists
+    is forbidden to everyone — that is how a peer would be silently unprotected.
+    """
+    _task_marker_path(project_root, wt_name).unlink(missing_ok=True)
+
+
+def _is_orphan_task_marker(marker: Path) -> bool:
+    """A task marker is orphaned iff it names a worktree directory that is gone.
+
+    Deliberately NOT `_is_orphan_marker`: that predicate's second clause consults
+    `_marker_has_pending_stash`, a loop/finalize-stash concept with no task-worktree
+    meaning, and would keep every task marker alive on a condition that can never apply.
+    """
+    try:
+        text = marker.read_text(encoding="utf-8")
+    except OSError:
+        return False
+    from harness_maker.loop_marker import parse_marker_paths
+
+    refs = [Path(p) for p in parse_marker_paths(text)]
+    return bool(refs) and not any(p.exists() for p in refs)
 
 
 def _clear_loop_marker(project_root: Path, wt_name: str) -> None:
@@ -4361,6 +4530,8 @@ def task_create(
     session_uuid: str,
     include: list[str] | None = None,
     allow_shared: bool = False,
+    claude_session_id: str | None = None,
+    claim_marker: bool = False,
 ) -> Path:
     """Create (or idempotently reuse) the persistent per-task worktree (ADR-002/006).
 
@@ -4370,6 +4541,15 @@ def task_create(
     repeated call returns the existing worktree and re-establishes the registry row
     (self-healing the absent-case after `reclaim_stale` — REVIEW Phase 2 P1), with
     no duplicate branch or row. Flag-gating is the CALLER's job (Phase 5).
+
+    ``claude_session_id`` (PLAN-multisession-marker-scoping ADR-008) is what names the
+    task marker. Without it this call still produces a registry-backed worktree with NO
+    enforceable marker — the registry cannot stand in, because its ``pid`` is the exited
+    CLI subprocess and liveness is "pid alive AND worktree on disk", so its rows are
+    structurally non-live almost immediately. Re-invoking WITH an id REFRESHES the marker,
+    which is ADR-013's takeover-on-claim: task markers carry no timestamp and therefore
+    cannot expire, so a crashed session's persistent worktree would otherwise stay marked
+    forever and lock the restarted session out of its own work.
     """
     if not _valid_task_slug(slug):
         raise ValueError(
@@ -4414,6 +4594,14 @@ def task_create(
         # create race) must not strand the claim — roll back our own row only.
         release_session(base, session_uuid=session_uuid)
         raise
+    # AFTER the worktree exists: a create that rolled back must leave no marker (ADR-008's
+    # transition table — "create rollback → leave the marker" applies only to a marker that
+    # was already there for a worktree that still exists).
+    # `claim_marker`, NOT `allow_shared` — the two are DIFFERENT authorities and routing
+    # both through one flag was a review finding in its own right: `--allow-shared-slug`
+    # means "two sessions may share this branch", and letting it silently also mean "seize
+    # the marker" makes the flag that means SHARE produce mutual exclusion.
+    _write_task_marker(base, wt.name, wt, claude_session_id, allow_shared=claim_marker)
     return wt
 
 
@@ -4482,7 +4670,41 @@ def task_preflight(
         warnings.append(
             f"[preflight] {len(other_tasks)} other active session(s): {', '.join(other_tasks)}"
         )
-    wt = task_create(base, slug, session_uuid=session_uuid, allow_shared=allow_shared)
+    # ADR-013 takeover-on-claim: this call already claims/reclaims the registry row for the
+    # slug, and passing the id through makes it additionally rewrite the task marker with
+    # the CLAIMING session's id. A restarted session therefore owns its marker again in one
+    # step, and ADR-004's own-membership-wins precedence covers the window before it.
+    # `claim_marker=True`: reaching this line means `claim_task_branch` ACCEPTED the claim,
+    # and that acceptance is the authorisation (review round 4). Preflight is how a session
+    # says "this task is mine now" — a resumed task has a rotated session id every time, so
+    # refusing to re-stamp the header there locked the resuming session out of its own
+    # worktree, which is the ordinary path rather than an edge.
+    #
+    # ⚠️ THIS RE-ADMITS THE ROUND-1 CR-2 EVICTION, AND IT IS **NOT** BOUNDED. An earlier
+    # version of this comment claimed `claim_task_branch` bounds it — that a seizure needs a
+    # peer the registry believes dead. Two round-4 reviewers refuted it: `task_preflight`
+    # runs `reclaim_stale` FIRST, and a row's pid is the pid of the one-shot
+    # `!uv run … task-preflight` subprocess, which has already exited. So the row is dropped,
+    # `_foreign_live_rows` is empty, and EVERY second session that preflights an existing
+    # slug seizes the header — silently. `test_a_live_peer_still_blocks_the_claim_at_the_
+    # registry` passes only because pytest is the registering process; it asserts a
+    # precondition the shipped path never satisfies.
+    #
+    # Accepted for now because the alternative is worse: refusing the claim locked a RESUMING
+    # session (a rotated id every day — the ordinary path) out of its own worktree, with the
+    # printed remedy being the very no-op that caused it. Seizure at least leaves the prior
+    # owner a working recovery. Closing this properly needs a liveness signal that survives
+    # the CLI (a heartbeat file, or marker mtime) — a design decision, not a patch. Until
+    # then two CONCURRENT sessions on one slug will evict each other; `task_preflight` already
+    # warns about that case at the registry level and this makes the consequence sharper.
+    wt = task_create(
+        base,
+        slug,
+        session_uuid=session_uuid,
+        allow_shared=allow_shared,
+        claude_session_id=claude_session_id,
+        claim_marker=True,
+    )
     behind, _ahead = _branch_drift(base, branch)
     if behind > 0:
         # ADR-002: try to auto-resolve drift before merely warning. Refresh is
@@ -4801,6 +5023,9 @@ def task_land(
 
     def _converge_landed() -> None:
         _delete_landed_marker(base, branch)
+        # ADR-008: `task-land` already-landed (idempotent re-run) → unlink if present, no
+        # error. This path is only reached with the worktree gone.
+        _clear_task_marker(base, wt.name)
         _registry_mutate(base, _drop_own_row)
 
     if not _branch_exists(base, branch):
@@ -4988,6 +5213,10 @@ def task_land(
                         file=sys.stderr,
                     )
                     return 1
+            # ADR-008/013: unlink the task marker only AFTER the worktree it names is
+            # gone. A failed removal above returns before this, leaving a marker whose
+            # path still resolves — still protecting a worktree that still exists.
+            _clear_task_marker(base, wt.name)
             try:
                 _run(["git", "branch", "-D", branch], cwd=base)
             except RuntimeError as e:
@@ -5024,16 +5253,31 @@ def task_land(
 
 
 def _cli_task_create(args: list[str]) -> int:
-    """`python -m harness_maker.worktree task-create <slug> [base_dir]` (ADR-002/006)."""
-    rest = [a for a in args if not a.startswith("--")]
+    """`python -m harness_maker.worktree task-create <slug> [base_dir]` (ADR-002/006).
+
+    The positional split is flag-AWARE (PLAN-multisession-marker-scoping ADR-008). The old
+    `[a for a in args if not a.startswith("--")]` left a flag's VALUE in `rest`, so
+    `task-create <slug> --claude-session-id abc123` silently resolved the base repo to
+    `./abc123` — no error, with the marker, the registry and the gitignore all following
+    the wrong base. Same argv-substitution class this repo has already shipped twice.
+    """
+    claude_sid = _flag_value(args, "--claude-session-id")
+    rest = _positionals(args, valued_flags=("--claude-session-id",))
     if not rest:
-        print("usage: task-create <slug> [base_dir]", file=sys.stderr)
+        print("usage: task-create <slug> [base_dir] [--claude-session-id <id>]", file=sys.stderr)
         return 2
     slug = rest[0]
     base = Path(rest[1]).resolve() if len(rest) > 1 else Path.cwd()
     allow_shared = "--allow-shared-slug" in args
     try:
-        wt = task_create(base, slug, session_uuid=uuid.uuid4().hex[:12], allow_shared=allow_shared)
+        wt = task_create(
+            base,
+            slug,
+            session_uuid=uuid.uuid4().hex[:12],
+            allow_shared=allow_shared,
+            claude_session_id=claude_sid,
+            claim_marker=allow_shared,
+        )
     except SharedSlugError as exc:
         print(f"[task-create] {exc}", file=sys.stderr)
         return 1

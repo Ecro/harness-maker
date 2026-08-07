@@ -309,13 +309,13 @@ def _cmd_boundary(args: argparse.Namespace) -> int:
         # also cited a Stop-hook backstop; that module was deleted in 539f05a9 and its
         # invocations are retired, so the duplicate-row reason is the only one left.
         if decision.halt_kind in ("step_cap", "time_cap"):
-            autopilot.clear(root)
+            autopilot.clear(root, session_id=args.session_id)
         print(json.dumps(out))
         return 0
     nxt = next_stage(marker.pipeline, args.current)
     if nxt is None:
         # `current` IS the last stage → end the session (ADR-006).
-        autopilot.clear(root)
+        autopilot.clear(root, session_id=args.session_id)
         out["pipeline_complete"] = True
         out["reason"] = "pipeline complete — autopilot session finished"
         print(json.dumps(out))
@@ -327,7 +327,7 @@ def _cmd_boundary(args: argparse.Namespace) -> int:
         # then invokes `/hm:wrapup` deliberately. This is what enforces ADR-002's
         # "always stop at the wrapup merge/push" at the auto-advance layer.
         autopilot_ledger.append_event(root, event="gate_blocked", fields={"stage": nxt})
-        autopilot.clear(root)
+        autopilot.clear(root, session_id=args.session_id)
         out["halt_kind"] = "merge_gate"
         out["next_stage"] = nxt
         out["reason"] = (

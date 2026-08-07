@@ -1,5 +1,68 @@
 # Changelog
 
+## [Unreleased]
+
+### Two sessions in one project stopped fighting over one file
+
+Running two Claude sessions in the same repo is the normal case, and the harness was hostile
+to it in two opposite directions at once — both of them marker-scoping defects.
+
+**Autopilot could not be armed twice.** `.claude/.hm-autopilot` was a single path, so the
+second session's arm hit `MarkerOwnedByAnotherSessionError` and the picker escalated it to the
+user as *"is another Claude session open?"* — a question whose honest answer on that path is
+always yes, which meant the prompt was pure noise and the second session stayed dark. Worse,
+`autopilot_persistent: true` harnesses arm from a SessionStart hook with no picker in front of
+it, and that hook's refusal branch simply declined, silently, for the full 18h TTL. The marker
+is now **one file per session**, keyed by the sanitized `claude_session_id`; id-less callers
+(Cursor, Codex, a failed SessionStart hook) share an explicitly-named
+`.hm-autopilot-degraded`, and the pre-upgrade single file is taken over once and unlinked
+under a compare-and-swap, so armed state survives the upgrade without a permanent dual-format
+reader.
+
+**The write gate fired for the model nobody uses and was silent for the one everybody does.**
+`worktree_gate` unioned every `.hm-loop-*` marker's paths and blocked anything outside that
+union — session-blind, so a leftover marker from a *dead* session blocked an unrelated peer's
+every `Write`, `/tmp` included. Meanwhile the per-task worktree model (the default under
+`worktree.enabled: true`) wrote no marker at all, so it had **zero** write enforcement;
+isolation there was prompt-level only. The gate's rule is now the one that was actually
+wanted: **block a write iff the target is inside another live session's worktree.** The base
+repo, `/tmp`, and everything outside the repo are allowed, task worktrees get a marker of
+their own (`.claude/.hm-task-<worktree>`, deliberately NOT under the `.hm-loop-` prefix, which
+would have made every `/hm:plan` and `/hm:execute` session unable to stop), and a payload with
+no `session_id` fails open before any marker is read.
+
+Two consequences worth stating plainly. A **drifting agent is no longer confined to its own
+worktree** — the gate's original purpose is partly traded away for a rule that is well-defined
+for a session with no worktree; self-confinement is recoverable later as an opt-in. And an
+**empty-header marker now constrains nobody**: every standalone `/hm:execute` worktree writes
+one, so treating it as a peer would have blocked those sessions from their own work.
+
+The recurring failure this work had to survive is enumeration: `[fail:design]
+new-marker-content-field-must-update-every-reader` is at count:3, and all three previous
+mitigations were hand-written lists that were themselves wrong — the third instance was found
+inside the PLAN that cites the class. The guard is no longer a list. It is an import-graph
+test that walks the source, finds every module importing `harness_maker.autopilot`, and fails
+if any marker-API call omits a session key.
+
+**Known limitation — this shipped with a P1 open, deliberately recorded rather than hidden.**
+Review closed at grade **B**, status **CHANGES_REQUESTED**, `human_review_needed: true`
+(`work-docs/REVIEW-multisession-marker-scoping-2026-08-07.md`). The marker takeover that
+`task-preflight` performs is **unbounded in production**: its only restraint is registry pid
+liveness, and the recorded pid is the already-exited `uv run` subprocess, so `reclaim_stale`
+reads every foreign row as dead, `_foreign_live_rows` is always empty, and `SharedSlugError`
+never fires. **Two concurrent sessions on the same slug therefore evict each other** — B's
+preflight flips the marker header, A's next write inside its own worktree is blocked, and the
+block message tells A to re-run preflight, which seizes it back. A flip-flop, not a
+resolution. There is no fix available at the marker layer: the task marker carries no
+timestamp, so expiry is unavailable, and the system has no liveness signal that outlives its
+own CLI. Also open: a degraded (empty `$HM_SESSION_ID`) resume is still locked out
+(manual-only), plus three P2s. Concurrent work on **distinct** slugs — the common case — is
+unaffected; two sessions sharing one slug is the hazard.
+
+Four review rounds were needed, and three of them produced fixes that introduced a defect
+worse than the one they closed, each on a fully green `pytest` + `ruff` + `mypy --strict` run
+(`[fail:test] fix-introduced-defect-passes-all-gates`, now count:5).
+
 ## [0.49.1] — 2026-08-06
 
 ### A second-opinion model can die in a way the health audit was told not to count

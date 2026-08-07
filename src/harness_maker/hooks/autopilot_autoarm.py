@@ -80,15 +80,26 @@ def arm_if_persistent(
             claude_session_id=claude_session_id,
         )
     except autopilot.MarkerOwnedByAnotherSessionError:
-        # A LIVE peer session owns the marker. Do not arm and do not force: forcing here
-        # would make every SessionStart steal a concurrent session's marker, killing its
-        # chain at the next boundary with a bare `kill_switch`. Logged distinctly from the
-        # generic fail-safe below so this shows up as a decision rather than a malfunction.
+        # PLAN-multisession-marker-scoping ADR-009: since ADR-001 keyed the marker
+        # FILENAME by session, an id-bearing session writes to a path no peer can occupy,
+        # so this branch no longer fires for it — and that matters, because this is the
+        # SessionStart auto-arm path for every `autopilot_persistent: true` harness, i.e.
+        # exactly where two sessions previously fought over one file and the second was
+        # silently left un-armed for the whole TTL.
+        #
+        # What remains reachable is the ADR-002 degraded fallback: two id-less callers
+        # (Cursor, Codex, a failed `sessionid_envfile` hook) legitimately share
+        # `.hm-autopilot-degraded`, and there is no per-session key to separate them. Do
+        # not force — forcing would disarm the live peer that owns it.
+        #
         # WARNING, not INFO: nothing in this package configures logging, so the root
         # logger sits at WARNING and `logging.lastResort` also fires only at WARNING+.
         # An INFO record here would be discarded outright — strictly LESS visible than
         # the generic fail-safe below, which is the opposite of "logged distinctly".
-        logger.warning(".hm-autopilot autoarm: marker owned by a live peer session — not arming.")
+        logger.warning(
+            ".hm-autopilot autoarm: the shared degraded marker is held by another "
+            "id-less session — not arming (no session id available to key one)."
+        )
         return False
     except Exception:
         logger.warning(".hm-autopilot autoarm: re-arm failed — skipping (fail-safe).")

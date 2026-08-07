@@ -29,7 +29,21 @@
 **Rationale:** Three recurrences (2026-05-17 content-after-marker, 2026-05-20 marker-deleted, 2026-06-20 marker-overwritten) all share one root: a wrapup append touching the close-marker line. The standing fix added prose ("name the marker, insert ABOVE it") + a verification-suite note, but under autopilot/dogfooding pressure the LLM still overwrote the marker. The failure is invisible until an INTEGRATION-tier test runs, and was mis-triaged as a brittle test before being root-caused — costing a full phase of delay. A 1-line `grep -c` assertion at wrapup time would have caught all three at the moment of damage. This is the canonical "prose guard failed N times → promote to mechanical guard" case.
 
 ## Proposal: re-review-the-fix-not-just-the-suite (2026-08-05)
-**Triggered by:** [fail:test] fix-introduced-defect-passes-all-gates (count: 4 as of 2026-08-05; this proposal was written at count: 3) — the fourth instance is PLAN-harness-diet Phases 2-6: 14 findings over four rounds, 11 of them introduced by this task's own fixes, seven while fixing the other four. It also sharpens the proposal: three of the eleven were a single class-default flip re-fixed four times, so the receipt should demand an ENUMERATION (the grep and its full result set) whenever a fix changes a shared default or a shared allowlist, not just a re-review of the diff.
+**Updated 2026-08-07 — count:5, and the mechanism this proposal describes was RUNNING.**
+PLAN-multisession-marker-scoping ran four review rounds and **three of the four rounds' fixes each
+introduced a defect worse than the one they closed**, every time on a green four-gate run. The
+round-N+1 delta re-review proposed below did happen — that is how the new defects were found — so
+the finding is that re-review **detects** this class but does not **stop** it: the task still
+closed at grade B / CHANGES_REQUESTED with a consensus-passed P1 open, because each round's repair
+was aimed at a rule (who may take over a marker) for which no correct rule existed. Two additions
+this instance argues for: (a) the round-N+1 prompt should ask whether any **existing assertion was
+edited or loosened** as part of the fix, not only whether new defects appeared — see the new
+[[fail:test] assertion-amended-to-match-the-fix]]; (b) when round 3 is still repairing the same
+mechanism, the loop should be required to escalate to "is this mechanism constructible at all?"
+rather than schedule round 4 — here the answer was no (no liveness signal outlives the CLI:
+[[fail:design claim-record-used-as-access-control-list]]), and one round spent asking would have
+been cheaper than two spent patching.
+**Triggered by:** [fail:test] fix-introduced-defect-passes-all-gates (count: 5 as of 2026-08-07; this proposal was written at count: 3) — the fourth instance is PLAN-harness-diet Phases 2-6: 14 findings over four rounds, 11 of them introduced by this task's own fixes, seven while fixing the other four. It also sharpens the proposal: three of the eleven were a single class-default flip re-fixed four times, so the receipt should demand an ENUMERATION (the grep and its full result set) whenever a fix changes a shared default or a shared allowlist, not just a re-review of the diff.
 **Proposed mechanism:** make the review stage's auto-fix loop re-review the FIX DELTA, not
 only re-run the suite. Round N applies fixes; round N+1 currently recomputes a grade from a
 green suite, which is exactly the signal that cannot see a fix-introduced defect — the suite

@@ -32,30 +32,30 @@
 > autonomy (`autonomy.level: {{ config.autonomy.level }}`). If loop-mode is active for
 > this session (see above), SKIP this. Otherwise, at the first eligible stage, ask the CLI
 > whether autopilot is already active — **never decide this from whether the marker file
-> exists.** Nothing collects a stale marker, so file-existence reads as "already armed"
-> and autopilot silently never turns on; that is the usual reason it looks dead.
+> exists.** Nothing collects a stale one, so file-existence reads as "already armed" and
+> autopilot silently never turns on — the usual reason it looks dead.
 >
 > `uv run --with {{ harness_maker_src_path }} hm autopilot status --root . --session-id "$HM_SESSION_ID"`
 >
 > Branch on **both** fields of the JSON (it always exits 0):
 > - `active: true` → armed already. Skip the picker; do not re-arm.
-> - `reason: "foreign"` or `"degraded-idless"` → the marker belongs to a different session
->   id (or this session cannot read its own — a known WSL2 hook failure). **You cannot tell
->   an active peer from a marker abandoned mid-pipeline**, so do not guess and do not
->   `--force` on your own initiative. State the fact — `idle_minutes` is how long the owner
->   has been silent; `null` = unknown (skewed clock), proving nothing — then ask the
->   user: *is another Claude session open in this project?* Only on **no**, re-run the arm
->   command below with `--force`. On yes, stay gated.
+> - `reason: "foreign"` → **rare** (one file per session): the file at YOUR key holds someone
+>   else's id. **You cannot tell an active peer from one abandoned mid-pipeline**, so do not
+>   guess and never `--force` on your own initiative. State it — `idle_minutes` is the owner's
+>   silence, `null` = unknown — then ask: *is another Claude session open in this project?*
+>   Only on **no**, re-run the arm command with `--force`. On yes, stay gated.
+> - `reason: "degraded-idless"` → you have no id, a peer's does (WSL2 hook failure).
+>   Arming is safe; say so, then take the default branch.
 > - anything else → offer ONCE via `AskUserQuestion`: "Run the
 >   `{{ config.autonomy.pipeline | join(' → ') }}` pipeline on autopilot this session
 >   (stages auto-advance when no mandatory gate is pending), or stay gated?" On **yes**:
 >   `uv run --with {{ harness_maker_src_path }} hm autopilot on --level {{ config.autonomy.level }} --pipeline {{ config.autonomy.pipeline | join(',') }} --session-id "$HM_SESSION_ID"`
 >   On **no**, proceed gated — do not re-prompt unless the user asks.
 >
-> **Persistence:** the marker lives at the **project root** (so a stage inside
-> `.worktrees/<slug>/` sees the one the picker wrote), is keyed to this session, and
-> expires after 18h. `session_scoped: false` = the session id was unavailable (Cursor,
-> Codex, hook failure) and a peer in this project may share it. Commit
+> **Persistence:** the marker lives at the **project root** (a stage inside
+> `.worktrees/<slug>/` sees it), is **one file per session** (`.hm-autopilot-<id>`, so two
+> can be armed), and expires after 18h. `session_scoped: false` = no id (Cursor, Codex,
+> hook failure) → you share `.hm-autopilot-degraded`. Commit
 > `autonomy.autopilot_persistent: true` to auto-arm every session; the default is `false`.
 <!-- @hm:/autopilot-picker -->
 {% endif %}

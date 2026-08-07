@@ -54,7 +54,7 @@ def test_autoarm_fail_safe_on_duplicate_pipeline(tmp_path: Path) -> None:
     )
     # AutopilotMarker rejects the duplicate → autopilot.write raises → hook fail-safe-skips.
     assert autopilot_autoarm.arm_if_persistent(tmp_path, now="2026-06-25T12:00:00+00:00") is False
-    assert autopilot.load(tmp_path) is None
+    assert autopilot.load(tmp_path, session_id=None) is None
 
 
 # ── P2: non-bool autopilot_persistent is NOT coerced to True on re-render ──────

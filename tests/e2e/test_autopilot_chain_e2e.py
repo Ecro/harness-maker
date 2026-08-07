@@ -74,7 +74,7 @@ def test_full_pipeline_chain_advances_then_stops_before_wrapup(tmp_path: Path, c
     # len(advancing) rather than differing by one.
     assert autopilot_ledger.count_events(tmp_path, "advance_entered") == len(advancing)
     # the session ended at the merge gate — wrapup is never auto-run.
-    assert autopilot.load(tmp_path) is None
+    assert autopilot.load(tmp_path, session_id=None) is None
 
 
 def test_chain_halts_at_step_cap(tmp_path: Path, capsys) -> None:  # noqa: ANN001

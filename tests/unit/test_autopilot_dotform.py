@@ -41,16 +41,16 @@ def test_dotform_on_writes_then_off_clears(tmp_path: Path) -> None:
         ["on", "--level", "auto_safe", "--pipeline", "research,plan", "--root", str(tmp_path)]
     )
     assert rc == 0
-    assert autopilot.load(tmp_path) is not None
+    assert autopilot.load(tmp_path, session_id=None) is not None
     rc = autopilot.main(["off", "--root", str(tmp_path)])
     assert rc == 0
-    assert autopilot.load(tmp_path) is None
+    assert autopilot.load(tmp_path, session_id=None) is None
 
 
 def test_dotform_bad_level_returns_2_no_partial_marker(tmp_path: Path) -> None:
     rc = autopilot.main(["on", "--level", "turbo", "--root", str(tmp_path)])
     assert rc == 2
-    assert autopilot.load(tmp_path) is None
+    assert autopilot.load(tmp_path, session_id=None) is None
 
 
 def test_dotform_misroute_guard_redirects(capsys: pytest.CaptureFixture[str]) -> None:
@@ -73,7 +73,7 @@ def test_cli_alias_and_dotform_reject_bad_level_identically(tmp_path: Path) -> N
     )
     assert result.exit_code == 2
     assert "invalid --level" in result.output
-    assert autopilot.load(tmp_path) is None
+    assert autopilot.load(tmp_path, session_id=None) is None
 
     assert autopilot.main(["on", "--level", "turbo", "--root", str(tmp_path)]) == 2
-    assert autopilot.load(tmp_path) is None
+    assert autopilot.load(tmp_path, session_id=None) is None

@@ -70,8 +70,12 @@ def test_write_from_worktree_lands_at_base(tmp_path: Path) -> None:
     wt = _worktree(base, "myslug")
     now = datetime.now(UTC).isoformat()
     autopilot.write(wt, level="auto_safe", pipeline=_PIPE, now=now)
-    assert autopilot.marker_path(base).exists(), "marker must be written at the base root"
-    assert not autopilot.marker_path(wt).exists(), "no worktree-local marker may be written"
+    assert autopilot.marker_path(base, session_id=None).exists(), (
+        "marker must be written at the base root"
+    )
+    assert not autopilot.marker_path(wt, session_id=None).exists(), (
+        "no worktree-local marker may be written"
+    )
 
 
 def test_read_from_worktree_finds_base_marker(tmp_path: Path) -> None:
@@ -96,9 +100,9 @@ def test_clear_from_worktree_removes_base_marker(tmp_path: Path) -> None:
         pipeline=[AtomicStage("research")],
         now=datetime.now(UTC).isoformat(),
     )
-    assert autopilot.marker_path(base).exists()
-    autopilot.clear(wt)
-    assert not autopilot.marker_path(base).exists(), (
+    assert autopilot.marker_path(base, session_id=None).exists()
+    autopilot.clear(wt, session_id=None)
+    assert not autopilot.marker_path(base, session_id=None).exists(), (
         "clear from worktree must remove the base marker"
     )
 

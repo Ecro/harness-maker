@@ -55,7 +55,7 @@ files:
   body_sha256: aeb98f0224b85ad55e13648dc96fe1fc1ba3a4d995452f34b14098c35ace06d5
 - path: commands/hm/execute.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: d8ca2f15e1d0d7ebf74c79d2b9bee6123708396586678737be83a8037ebb603f
+  body_sha256: ce7d4c5e207a5b956b6ff3b5f79d70baf06f852895b1b1db706ddbcb65ee1ab1
 - path: commands/hm/health.md
   template: commands/hm/health.md.j2
   body_sha256: 6f16a4af50c2af801d462efc3ed8ed1cda114c99b4ada98eb6a3b47c495e0f88
@@ -76,25 +76,25 @@ files:
   body_sha256: b6749fc52ac4b05518c0198200d63ab859a9d92eefa7edf202dcd425b7df9703
 - path: commands/hm/plan.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: 7f1e84320f1d766cb076ffb4babae0ac18cab16cc233c2a1e8d809521cdeaa06
+  body_sha256: 09c808fe4c7d9752fcbc3adb4deaab1f6640fa9e763c7605d6dffb09cb368ed3
 - path: commands/hm/research.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: 1332e0380281449cad34849d74a04d72bf6bd36fc786eb46b4ca6e8acc71ff54
+  body_sha256: cd6929e5044114048e505e1a41783a7ae577d044b1b534db9cfdf410d87224e0
 - path: commands/hm/review.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: cd1c3bd3cd9144c12fe2a2f636c61c4b324c553f99bdf7d4200b52dbc0f9ea5e
+  body_sha256: 209330fada1f56a6ff43a2ad0069dff6c498195b9121e4a8b9d81998d5a79684
 - path: commands/hm/spec.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: 98fbe7211360d43649f83264ffbba179e375e5d74ff7ab796dfdb653297f8fd3
+  body_sha256: e075ce25bb1d48e5d795d75d0af5b2d71b7b792eab35eb1763bdd3666b4429fc
 - path: commands/hm/uninstall.md
   template: commands/hm/uninstall.md.j2
   body_sha256: 86a9b22c2d05bb4c25d11d38a50fb331dda627fe91c0348f95acee03f3be15a1
 - path: commands/hm/verify.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: 01bd46325f645b2e5f5eacac6906af77be45dbbdf1c777c1bf710a2b6d0fab62
+  body_sha256: 5b748e6438c5c2455223c0b5baf79895db2bb5e021172e308b6a040a7da3df76
 - path: commands/hm/wrapup.md
   template: commands/hm/atomic_command.md.j2
-  body_sha256: 7c26de234bf8f61da4574e935d2471e5efe57d78c342816994484c8f68d45b5f
+  body_sha256: 866bba13b9be19aa38e67afeba0e18f91dc39935221b9b86207dc3640ab3e907
 - path: harness.yaml
   template: harness-yaml/Side.yaml.j2
   body_sha256: c4cf7c84e5b44589dffb4ff553e60cbf5af2b1ac5aa58fd04141d6c21136cc9e

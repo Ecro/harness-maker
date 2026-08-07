@@ -30,12 +30,19 @@ def _iso(delta_hours: float = 0.0) -> str:
     return (datetime.now(UTC) + timedelta(hours=delta_hours)).isoformat()
 
 
-def _read_raw(root: Path) -> dict[str, object]:
-    return json.loads(autopilot.marker_path(root).read_text(encoding="utf-8"))
+def _read_raw(root: Path, session_id: str | None = None) -> dict[str, object]:
+    return json.loads(
+        autopilot.marker_path(root, session_id=session_id).read_text(encoding="utf-8")
+    )
 
 
-def _write_raw(root: Path, payload: dict[str, object]) -> None:
-    p = autopilot.marker_path(root)
+def _write_raw(root: Path, payload: dict[str, object], session_id: str | None = None) -> None:
+    # PLAN-multisession-marker-scoping ADR-001: the marker file is keyed by session. A
+    # fixture that plants a PEER-owned marker must plant it at the path the caller under
+    # test will actually read — post-ADR-001 two live sessions never meet on one file, so
+    # the ownership guards are only reachable via a marker whose header disagrees with its
+    # own filename (a hand-edit, or a half-finished format migration). Those must fail SAFE.
+    p = autopilot.marker_path(root, session_id=session_id)
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text(json.dumps(payload), encoding="utf-8")
 
@@ -107,7 +114,11 @@ def test_idless_session_does_not_inherit_id_bearing_marker(
     one-directional rule ever existing (A.5 false-RED finding). Asserting that the SAME
     marker IS accepted by its owner forces the field to be declared first.
     """
-    _write_raw(tmp_path, _marker_payload(tmp_path, claude_session_id="sess-A"))
+    # ADR-001: the negative half reads the degraded file, the positive control reads
+    # sess-A's own file — two paths now, so the same payload is planted at both.
+    payload = _marker_payload(tmp_path, claude_session_id="sess-A")
+    _write_raw(tmp_path, payload, None)
+    _write_raw(tmp_path, payload, "sess-A")
 
     monkeypatch.delenv("HM_SESSION_ID", raising=False)
     assert autopilot.active_marker(tmp_path) is None
@@ -153,17 +164,17 @@ def test_gc_deletes_ttl_stale(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     _write_raw(
         tmp_path, _marker_payload(tmp_path, claude_session_id="sess-A", created_at=_iso(-19))
     )
-    assert autopilot.gc_stale_marker(tmp_path) is True
-    assert not autopilot.marker_path(tmp_path).exists()
+    assert autopilot.gc_stale_marker(tmp_path, session_id=None) is True
+    assert not autopilot.marker_path(tmp_path, session_id=None).exists()
 
 
 def test_gc_preserves_foreign_but_fresh(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """THE load-bearing assertion (ADR-008): foreign == another LIVE session."""
-    _write_raw(tmp_path, _marker_payload(tmp_path, claude_session_id="sess-PEER"))
     monkeypatch.setenv("HM_SESSION_ID", "sess-MINE")
+    _write_raw(tmp_path, _marker_payload(tmp_path, claude_session_id="sess-PEER"), "sess-MINE")
     assert autopilot.active_marker(tmp_path) is None  # rejected...
-    assert autopilot.gc_stale_marker(tmp_path) is False  # ...but NOT deleted
-    assert autopilot.marker_path(tmp_path).exists()
+    assert autopilot.gc_stale_marker(tmp_path, session_id=None) is False  # ...but NOT deleted
+    assert autopilot.marker_path(tmp_path, session_id=None).exists()
 
 
 def test_gc_preserves_future_dated(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -171,21 +182,21 @@ def test_gc_preserves_future_dated(tmp_path: Path, monkeypatch: pytest.MonkeyPat
     monkeypatch.setenv("HM_SESSION_ID", "sess-A")
     _write_raw(tmp_path, _marker_payload(tmp_path, claude_session_id="sess-A", created_at=_iso(+5)))
     assert autopilot.active_marker(tmp_path) is None
-    assert autopilot.gc_stale_marker(tmp_path) is False
-    assert autopilot.marker_path(tmp_path).exists()
+    assert autopilot.gc_stale_marker(tmp_path, session_id=None) is False
+    assert autopilot.marker_path(tmp_path, session_id=None).exists()
 
 
 def test_gc_deletes_unparseable(tmp_path: Path) -> None:
-    p = autopilot.marker_path(tmp_path)
+    p = autopilot.marker_path(tmp_path, session_id=None)
     p.parent.mkdir(parents=True, exist_ok=True)
     p.write_text("{not json", encoding="utf-8")
-    assert autopilot.gc_stale_marker(tmp_path) is True
+    assert autopilot.gc_stale_marker(tmp_path, session_id=None) is True
     assert not p.exists()
 
 
 def test_gc_absent_is_noop(tmp_path: Path) -> None:
     (tmp_path / ".claude").mkdir(parents=True, exist_ok=True)
-    assert autopilot.gc_stale_marker(tmp_path) is False
+    assert autopilot.gc_stale_marker(tmp_path, session_id=None) is False
 
 
 def test_gc_deletes_foreign_and_stale(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -196,12 +207,14 @@ def test_gc_deletes_foreign_and_stale(tmp_path: Path, monkeypatch: pytest.Monkey
     peer's marker then becomes uncollectable forever — reinstating the very
     stale-file-suppresses-arming defect ADR-002 exists to remove.
     """
-    _write_raw(
-        tmp_path, _marker_payload(tmp_path, claude_session_id="sess-PEER", created_at=_iso(-19))
-    )
     monkeypatch.setenv("HM_SESSION_ID", "sess-MINE")
-    assert autopilot.gc_stale_marker(tmp_path) is True
-    assert not autopilot.marker_path(tmp_path).exists()
+    _write_raw(
+        tmp_path,
+        _marker_payload(tmp_path, claude_session_id="sess-PEER", created_at=_iso(-19)),
+        "sess-MINE",
+    )
+    assert autopilot.gc_stale_marker(tmp_path, session_id=None) is True
+    assert not autopilot.marker_path(tmp_path, session_id=None).exists()
 
 
 def test_gc_preserves_a_replacement_written_after_the_judgement(
@@ -225,7 +238,7 @@ def test_gc_preserves_a_replacement_written_after_the_judgement(
     stale_peer = _marker_payload(tmp_path, claude_session_id="sess-PEER", created_at=_iso(-20))
     _write_raw(tmp_path, stale_own)
 
-    marker = autopilot.marker_path(tmp_path)
+    marker = autopilot.marker_path(tmp_path, session_id=None)
     original = {"read_text": Path.read_text, "read_bytes": Path.read_bytes}
     state = {"swapped": False, "reads": 0}
 
@@ -247,7 +260,7 @@ def test_gc_preserves_a_replacement_written_after_the_judgement(
     with monkeypatch.context() as mp:
         mp.setattr(Path, "read_text", _make("read_text"))
         mp.setattr(Path, "read_bytes", _make("read_bytes"))
-        result = autopilot.gc_stale_marker(tmp_path)
+        result = autopilot.gc_stale_marker(tmp_path, session_id=None)
 
     assert result is False, "a marker whose bytes changed mid-operation must not be deleted"
     assert marker.exists()
@@ -261,12 +274,12 @@ def test_gc_preserves_a_replacement_written_after_the_judgement(
 def test_write_refuses_to_overwrite_live_foreign_marker(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    _write_raw(tmp_path, _marker_payload(tmp_path, claude_session_id="sess-PEER"))
-    before = autopilot.marker_path(tmp_path).read_bytes()
     monkeypatch.setenv("HM_SESSION_ID", "sess-MINE")
+    _write_raw(tmp_path, _marker_payload(tmp_path, claude_session_id="sess-PEER"), "sess-MINE")
+    before = autopilot.marker_path(tmp_path, session_id=None).read_bytes()
     with pytest.raises(autopilot.MarkerOwnedByAnotherSessionError):
         autopilot.write(tmp_path, level="auto_safe", pipeline=DEFAULT_PIPELINE)
-    assert autopilot.marker_path(tmp_path).read_bytes() == before
+    assert autopilot.marker_path(tmp_path, session_id=None).read_bytes() == before
 
 
 def test_write_force_overwrites_live_foreign_marker(
@@ -312,17 +325,17 @@ def test_set_task_slug_refuses_when_marker_not_active(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """R9 mitigation: never slug-write a marker this session does not own."""
-    _write_raw(tmp_path, _marker_payload(tmp_path, claude_session_id="sess-PEER"))
-    before = autopilot.marker_path(tmp_path).read_bytes()
     monkeypatch.setenv("HM_SESSION_ID", "sess-MINE")
+    _write_raw(tmp_path, _marker_payload(tmp_path, claude_session_id="sess-PEER"), "sess-MINE")
+    before = autopilot.marker_path(tmp_path, session_id=None).read_bytes()
     assert autopilot.set_task_slug(tmp_path, slug="my-task", stage="research") is False
-    assert autopilot.marker_path(tmp_path).read_bytes() == before
+    assert autopilot.marker_path(tmp_path, session_id=None).read_bytes() == before
 
 
 def test_legacy_marker_without_new_keys_still_loads(tmp_path: Path) -> None:
     """Absent-case guard (CLAUDE.md): the three new fields are optional."""
     _write_raw(tmp_path, _marker_payload(tmp_path))
-    m = autopilot.load(tmp_path)
+    m = autopilot.load(tmp_path, session_id=None)
     assert m is not None
     assert m.task_slug is None
     assert m.task_slug_stage is None
@@ -373,17 +386,17 @@ def test_status_stale_reports_gc_and_deletes(
     out = _status(tmp_path)
     assert out["active"] is False
     assert out["reason"] == "stale (gc'd)"
-    assert not autopilot.marker_path(tmp_path).exists()
+    assert not autopilot.marker_path(tmp_path, session_id=None).exists()
 
 
 def test_status_foreign_preserves_marker(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """The picker branches on this `reason` — ADR-010. `active:false` alone would arm."""
-    _write_raw(tmp_path, _marker_payload(tmp_path, claude_session_id="sess-PEER"))
     monkeypatch.setenv("HM_SESSION_ID", "sess-MINE")
+    _write_raw(tmp_path, _marker_payload(tmp_path, claude_session_id="sess-PEER"), "sess-MINE")
     out = _status(tmp_path)
     assert out["active"] is False
     assert out["reason"] == "foreign"
-    assert autopilot.marker_path(tmp_path).exists()
+    assert autopilot.marker_path(tmp_path, session_id=None).exists()
 
 
 def test_status_future_dated_preserves_marker(
@@ -396,7 +409,7 @@ def test_status_future_dated_preserves_marker(
     # future-dated but still armed would send the picker down the wrong branch.
     assert out["active"] is False
     assert out["reason"] == "future-dated"
-    assert autopilot.marker_path(tmp_path).exists()
+    assert autopilot.marker_path(tmp_path, session_id=None).exists()
 
 
 def test_status_survives_gc_failure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -436,15 +449,15 @@ def test_status_echoes_persisted_task_slug(tmp_path: Path, monkeypatch: pytest.M
 def test_on_against_live_foreign_marker_exits_nonzero(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    _write_raw(tmp_path, _marker_payload(tmp_path, claude_session_id="sess-PEER"))
-    before = autopilot.marker_path(tmp_path).read_bytes()
     monkeypatch.setenv("HM_SESSION_ID", "sess-MINE")
+    _write_raw(tmp_path, _marker_payload(tmp_path, claude_session_id="sess-PEER"), "sess-MINE")
+    before = autopilot.marker_path(tmp_path, session_id=None).read_bytes()
     rc = autopilot.main(["on", "--root", str(tmp_path)])
     assert rc != 0
     # The contract is "prints a diagnostic", not any particular wording — pinning an
     # invented string would break a green suite on a harmless reword.
     assert capsys.readouterr().err.strip() != ""
-    assert autopilot.marker_path(tmp_path).read_bytes() == before
+    assert autopilot.marker_path(tmp_path, session_id=None).read_bytes() == before
 
 
 def test_on_force_flag_takes_over(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

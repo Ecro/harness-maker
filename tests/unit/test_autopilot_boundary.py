@@ -131,7 +131,7 @@ def test_boundary_time_cap_halt(tmp_path: Path, capsys) -> None:  # noqa: ANN001
     # CLI uses the live clock; an old marker (created 90min ago, within 18h TTL) trips
     # a 30min time cap.
     created_old = datetime.now(UTC) - timedelta(minutes=90)
-    autopilot.clear(tmp_path)
+    autopilot.clear(tmp_path, session_id=None)
     _arm(tmp_path, created=created_old)
     rc = autopilot_caps.main(
         [
@@ -194,7 +194,7 @@ def test_boundary_unknown_current_preserves_marker(tmp_path: Path, capsys) -> No
     assert out["proceed"] is False
     assert out["halt_kind"] == "unknown_stage"
     assert out["pipeline_complete"] is False
-    assert autopilot.load(tmp_path) is not None  # marker NOT cleared
+    assert autopilot.load(tmp_path, session_id=None) is not None  # marker NOT cleared
 
 
 def test_boundary_stops_before_wrapup_merge_gate(tmp_path: Path, capsys) -> None:  # noqa: ANN001
@@ -214,7 +214,9 @@ def test_boundary_stops_before_wrapup_merge_gate(tmp_path: Path, capsys) -> None
     assert out["proceed"] is False
     assert out["halt_kind"] == "merge_gate"
     assert out["next_stage"] == "wrapup"
-    assert autopilot.load(tmp_path) is None  # marker cleared → backstop stands down
+    assert (
+        autopilot.load(tmp_path, session_id=None) is None
+    )  # marker cleared → backstop stands down
     assert autopilot_ledger.count_events(tmp_path, "gate_blocked") == 1
     assert autopilot_ledger.count_events(tmp_path, "advanced") == 0
 
@@ -232,7 +234,7 @@ def test_boundary_step_cap_clears_marker(tmp_path: Path, capsys) -> None:  # noq
     )  # fmt: skip
     assert rc == 0
     assert json.loads(capsys.readouterr().out)["halt_kind"] == "step_cap"
-    assert autopilot.load(tmp_path) is None  # cleared
+    assert autopilot.load(tmp_path, session_id=None) is None  # cleared
     # a second call now sees kill_switch (no marker) → NO new halted_cap.
     autopilot_caps.main(
         ["boundary", "--root", str(tmp_path), "--current", "research",
@@ -276,4 +278,4 @@ def test_boundary_pipeline_complete_clears_marker(tmp_path: Path, capsys) -> Non
     assert out["pipeline_complete"] is True
     assert out["next_stage"] is None
     # final stage clears the marker (ADR-006).
-    assert autopilot.load(tmp_path) is None
+    assert autopilot.load(tmp_path, session_id=None) is None

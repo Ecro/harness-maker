@@ -562,8 +562,10 @@ required, and stops at the ones where it is.
   that runs too long. Each accepts a positive integer **or `null` = unlimited** (the new
   interview default, since the mandatory gates above bound the pipeline regardless). Existing
   harnesses keep their committed caps on `--update`; only a fresh interview defaults to
-  unlimited. Removing the `.hm-autopilot` marker (`harness-maker autopilot off`) is an instant
-  kill switch honored at the next boundary.
+  unlimited. Removing the marker (`harness-maker autopilot off`) is an instant
+  kill switch honored at the next boundary. The marker is **one file per session**
+  (`.claude/.hm-autopilot-<id>`), so `off` with no `--session-id` disarms **every** session
+  in this project; pass `--session-id "$HM_SESSION_ID"` to disarm only your own.
 - **Check the state, don't guess it**: `harness-maker autopilot status` (or `hm autopilot
   status`) prints JSON — `active`, plus a `reason` that distinguishes "never armed" from
   "expired", "owned by another session", and "this session can't read its own id". The
@@ -576,7 +578,8 @@ required, and stops at the ones where it is.
   `/hm:health` surfaces an "armed but never fired" degradation signal.
 - **Claude Code only** today — the auto-advance branch is excluded from the **Codex**
   render entirely, and is a runtime **no-op under Cursor** (it needs the Claude-only `Skill`
-  tool + the `.hm-autopilot` marker, so a Cursor session just falls through to the STOP).
+  tool + a per-session autopilot marker — a Cursor session has no `session_id`, so it lands on
+  the shared `.claude/.hm-autopilot-degraded` file and just falls through to the STOP).
 
 ---
 

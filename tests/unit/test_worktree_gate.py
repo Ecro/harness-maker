@@ -1,8 +1,19 @@
-"""worktree_gate hook tests — block Write/Edit/MultiEdit outside active <WT>.
+"""worktree_gate — peer protection, session scoping, absolute fail-open.
 
-The gate's contract: when `.claude/.hm-loop-active` marker exists and tool
-target is OUTSIDE the recorded worktree, exit 2 (block). All other paths
-(no marker, target inside WT, non-write tool) exit 0.
+PLAN-multisession-marker-scoping Phase 3. This file replaced the self-confinement suite:
+the old rule ("inside the repo, outside my marker union → block") had no empty-union case,
+so a session with no worktree was either blocked from the entire repo or, bypassed, free to
+write into peers' worktrees. It was also session-blind, which is how a DEAD session's
+leftover marker came to block an unrelated peer's every `Write`, `/tmp` included.
+
+The invariant now (ADR-004): block iff the target is inside another LIVE session's
+worktree. Everything else — the base repo, `/tmp`, an unattributable worktree — is allowed.
+
+Two tests here pin the cases whose omission would be a work stoppage rather than a missed
+block: `test_empty_header_marker_never_blocks_anyone` (every standalone `/hm:execute`
+worktree writes one) and `test_own_membership_wins_over_a_peer_claim` (routine after a
+restart). A third, `test_gate_invoked_from_inside_a_worktree_still_finds_base_markers`,
+pins ADR-005 — rooting at the payload `cwd` makes the gate enforce nothing, silently.
 """
 
 from __future__ import annotations
@@ -13,419 +24,284 @@ from pathlib import Path
 
 import pytest
 
+from harness_maker import loop_marker
 from harness_maker.gates import worktree_gate
 
+MINE = "aaaa1111cafe"
+PEER = "bbbb2222cafe"
 
-def _run(monkeypatch: pytest.MonkeyPatch, payload: dict[str, object]) -> int:
+_FIXTURE = Path(__file__).parents[1] / "fixtures" / "pretooluse_payload_write.json"
+
+
+def _project(tmp_path: Path) -> Path:
+    repo = tmp_path / "repo"
+    (repo / ".claude").mkdir(parents=True)
+    (repo / ".claude" / "harness.yaml").write_text("preset: Side\n", encoding="utf-8")
+    return repo
+
+
+def _worktree(repo: Path, name: str, owner: str, *, family: str = "loop") -> Path:
+    wt = repo / ".worktrees" / name
+    wt.mkdir(parents=True, exist_ok=True)
+    prefix = ".hm-loop-" if family == "loop" else ".hm-task-"
+    (repo / ".claude" / f"{prefix}{name}").write_text(
+        loop_marker.format_marker_content(owner, [wt]), encoding="utf-8"
+    )
+    return wt
+
+
+def _run(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    cwd: Path,
+    target: Path,
+    session_id: str | None = MINE,
+    tool: str = "Write",
+) -> int:
+    payload: dict[str, object] = {
+        "tool_name": tool,
+        "cwd": str(cwd),
+        "tool_input": {"file_path": str(target)},
+    }
+    if session_id is not None:
+        payload["session_id"] = session_id
     monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(payload)))
     return worktree_gate.main()
 
 
-def _write_marker(project_root: Path, wt_path: Path) -> None:
-    marker = project_root / ".claude" / ".hm-loop-active"
-    marker.parent.mkdir(parents=True, exist_ok=True)
-    marker.write_text(str(wt_path) + "\n", encoding="utf-8")
+# --- ADR-004: the one thing that blocks --------------------------------------------
 
 
-# ── allow paths ─────────────────────────────────────────────────────────────
-
-
-def test_no_marker_means_no_active_loop_so_allow(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+@pytest.mark.parametrize("tool", ["Write", "Edit", "MultiEdit"])
+def test_write_into_a_peers_worktree_is_blocked(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tool: str
 ) -> None:
-    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(tmp_path))
-    rc = _run(
-        monkeypatch,
-        {"tool_name": "Write", "tool_input": {"file_path": str(tmp_path / "src/foo.py")}},
+    """Every member of `_GUARDED_TOOLS`. Pinning only `Write` let the most likely edit to
+    that frozenset — dropping `Edit`/`MultiEdit` — keep the suite green while disabling the
+    gate for the tool that produces most file mutations, and the failure mode is `allow`."""
+    repo = _project(tmp_path)
+    peer_wt = _worktree(repo, "their-task", PEER)
+    assert _run(monkeypatch, cwd=repo, target=peer_wt / "src" / "f.py", tool=tool) == 2
+    assert str(peer_wt) in capsys.readouterr().err
+
+
+def test_a_peers_task_worktree_is_protected_too(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """ADR-008: before the task family existed, the per-task model — the DEFAULT under
+    `worktree.enabled: true` — had zero enforcement here."""
+    repo = _project(tmp_path)
+    peer_wt = _worktree(repo, "their-task", PEER, family="task")
+    assert _run(monkeypatch, cwd=repo, target=peer_wt / "src" / "f.py") == 2
+
+
+# --- ADR-004: everything that must NOT block ---------------------------------------
+
+
+def test_base_repo_write_is_allowed_while_a_peer_holds_a_worktree(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A session with no worktree of its own was blocked from the whole repo by the old
+    union rule. That is the symptom this PLAN opens with."""
+    repo = _project(tmp_path)
+    _worktree(repo, "their-task", PEER)
+    assert _run(monkeypatch, cwd=repo, target=repo / "src" / "f.py") == 0
+
+
+def test_tmp_is_never_blocked(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """`wrapup.md.j2` writes a wiki body to a `mktemp -t` path — blocking `/tmp` breaks
+    the harness's own procedure (interview #1)."""
+    repo = _project(tmp_path)
+    _worktree(repo, "their-task", PEER)
+    assert _run(monkeypatch, cwd=repo, target=tmp_path / "scratch" / "note.md") == 0
+
+
+def test_my_own_worktree_is_never_blocked(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    repo = _project(tmp_path)
+    _worktree(repo, "their-task", PEER)
+    my_wt = _worktree(repo, "my-task", MINE)
+    assert _run(monkeypatch, cwd=my_wt, target=my_wt / "src" / "f.py") == 0
+
+
+def test_own_membership_wins_over_a_peer_claim(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """One path listed by BOTH a loop marker (peer) and a task marker (mine).
+
+    Round 3 review: the previous version of this test wrote a `.hm-loop-*` AND a
+    `.hm-task-*` for the same TASK worktree, which no writer produces — `task_create` writes
+    only `.hm-task-*`. It passed on a fabricated state, so the criterion it names was never
+    exercised. The producible shape is a loop worktree that a task marker also claims, which
+    is where own-membership genuinely arbitrates.
+    """
+    repo = _project(tmp_path)
+    shared = _worktree(repo, "execute-abc", PEER)  # loop marker, peer-owned
+    (repo / ".claude" / ".hm-task-execute-abc").write_text(
+        loop_marker.format_marker_content(MINE, [shared]), encoding="utf-8"
     )
-    assert rc == 0
+    assert _run(monkeypatch, cwd=repo, target=shared / "src" / "f.py") == 0
 
 
-def test_target_inside_active_worktree_is_allowed(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+def test_a_symlinked_cwd_still_grants_self_membership(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Active marker + Write to a path INSIDE the worktree → allow."""
-    project = tmp_path / "repo"
-    project.mkdir()
-    wt = project / ".worktrees" / "execute-x"
-    wt.mkdir(parents=True)
-    _write_marker(project, wt)
-    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(project))
-    rc = _run(
-        monkeypatch,
-        {"tool_name": "Edit", "tool_input": {"file_path": str(wt / "src/foo.py")}},
+    """`is_relative_to` is lexical, and marker paths are `.resolve()`d. Comparing an
+    unresolved cwd against them denied membership through a symlink and blocked a session
+    from its own worktree — silently, with no diagnostic."""
+    repo = _project(tmp_path)
+    wt = _worktree(repo, "their-task", PEER)
+    link = tmp_path / "linked"
+    link.symlink_to(repo, target_is_directory=True)
+    assert _run(monkeypatch, cwd=link / ".worktrees" / "their-task", target=wt / "f.py") == 0
+
+
+def test_empty_header_marker_never_blocks_anyone(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The third bucket (ADR-004). Only `loop.md.j2` passes `--claude-session-id`, so EVERY
+    standalone `/hm:execute` worktree marker has an empty header. Under a two-way
+    mine/peer partition those sessions are blocked from their own worktree — a total work
+    stoppage, not a missed block."""
+    repo = _project(tmp_path)
+    anon_wt = _worktree(repo, "execute-abc", "")
+    assert _run(monkeypatch, cwd=anon_wt, target=anon_wt / "src" / "f.py") == 0
+    assert _run(monkeypatch, cwd=repo, target=anon_wt / "src" / "f.py", session_id=PEER) == 0
+
+
+def test_a_marker_whose_worktree_is_gone_protects_nothing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo = _project(tmp_path)
+    ghost = repo / ".worktrees" / "ghost"
+    (repo / ".claude" / ".hm-task-ghost").write_text(
+        loop_marker.format_marker_content(PEER, [ghost]), encoding="utf-8"
     )
-    assert rc == 0
+    assert _run(monkeypatch, cwd=repo, target=ghost / "src" / "f.py") == 0
 
 
-def test_non_write_tool_is_allowed(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+def test_non_write_tools_are_not_guarded(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    repo = _project(tmp_path)
+    peer_wt = _worktree(repo, "their-task", PEER)
+    assert _run(monkeypatch, cwd=repo, target=peer_wt / "f.py", tool="Read") == 0
+    assert _run(monkeypatch, cwd=repo, target=peer_wt / "f.py", tool="Bash") == 0
+
+
+# --- ADR-006: fail open, absolutely -------------------------------------------------
+
+
+def test_no_session_id_allows_even_into_a_peers_worktree(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Read / Bash / Grep are not in _GUARDED_TOOLS — pass through."""
-    project = tmp_path / "repo"
-    project.mkdir()
-    wt = project / ".worktrees" / "execute-x"
-    wt.mkdir(parents=True)
-    _write_marker(project, wt)
-    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(project))
-    for tool in ("Read", "Bash", "Grep", "Glob", "Task"):
-        rc = _run(
-            monkeypatch,
-            {"tool_name": tool, "tool_input": {"file_path": str(project / "src/foo.py")}},
-        )
-        assert rc == 0, f"tool={tool} should pass through"
+    """Cursor / Codex / any host that sends no id. Failing CLOSED would block every Write
+    in those environments while any marker is live."""
+    repo = _project(tmp_path)
+    peer_wt = _worktree(repo, "their-task", PEER)
+    assert _run(monkeypatch, cwd=repo, target=peer_wt / "f.py", session_id=None) == 0
 
 
-def test_stale_marker_pointing_to_missing_dir_is_treated_as_no_active(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+def test_a_non_string_session_id_is_treated_as_absent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Marker points to a path that no longer exists (e.g. crashed loop) →
-    treat as if no marker; don't lock the user out."""
-    project = tmp_path / "repo"
-    project.mkdir()
-    _write_marker(project, project / ".worktrees" / "deleted-name")
-    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(project))
-    rc = _run(
-        monkeypatch,
-        {"tool_name": "Write", "tool_input": {"file_path": str(project / "src/foo.py")}},
+    repo = _project(tmp_path)
+    peer_wt = _worktree(repo, "their-task", PEER)
+    monkeypatch.setattr(
+        "sys.stdin",
+        io.StringIO(
+            json.dumps(
+                {
+                    "tool_name": "Write",
+                    "cwd": str(repo),
+                    "session_id": 17,
+                    "tool_input": {"file_path": str(peer_wt / "f.py")},
+                }
+            )
+        ),
     )
-    assert rc == 0
-
-
-def test_empty_marker_file_treated_as_no_active(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Whitespace-only marker → no active loop."""
-    project = tmp_path / "repo"
-    project.mkdir()
-    marker = project / ".claude" / ".hm-loop-active"
-    marker.parent.mkdir(parents=True)
-    marker.write_text("   \n", encoding="utf-8")
-    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(project))
-    rc = _run(
-        monkeypatch,
-        {"tool_name": "Write", "tool_input": {"file_path": str(project / "x.py")}},
-    )
-    assert rc == 0
-
-
-def test_malformed_stdin_does_not_crash(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Garbage stdin → exit 0 (defensive — never block on hook bug)."""
-    monkeypatch.setattr("sys.stdin", io.StringIO("not json {{{"))
     assert worktree_gate.main() == 0
 
 
-def test_missing_tool_input_passes_through(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Active marker but tool_input missing file_path → allow (defensive)."""
-    project = tmp_path / "repo"
-    project.mkdir()
-    wt = project / ".worktrees" / "execute-x"
-    wt.mkdir(parents=True)
-    _write_marker(project, wt)
-    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(project))
-    rc = _run(monkeypatch, {"tool_name": "Write", "tool_input": {}})
-    assert rc == 0
+def test_malformed_stdin_allows(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("sys.stdin", io.StringIO("not json"))
+    assert worktree_gate.main() == 0
 
 
-# ── block paths ─────────────────────────────────────────────────────────────
-
-
-def test_write_to_main_while_loop_active_is_blocked(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    """Active marker + Write to main repo (outside <WT>) → exit 2 + stderr."""
-    project = tmp_path / "repo"
-    project.mkdir()
-    wt = project / ".worktrees" / "execute-x"
-    wt.mkdir(parents=True)
-    _write_marker(project, wt)
-    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(project))
-    rc = _run(
-        monkeypatch,
-        {
-            "tool_name": "Write",
-            "tool_input": {"file_path": str(project / "src/foo.py")},
-        },
+def test_missing_tool_input_allows(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    repo = _project(tmp_path)
+    _worktree(repo, "their-task", PEER)
+    monkeypatch.setattr(
+        "sys.stdin",
+        io.StringIO(json.dumps({"tool_name": "Write", "cwd": str(repo), "session_id": MINE})),
     )
-    assert rc == 2
-    err = capsys.readouterr().err
-    assert "blocked" in err
-    assert str(wt) in err
-    assert "finalize" in err  # hint at how to recover
+    assert worktree_gate.main() == 0
 
 
-def test_edit_to_sibling_worktree_blocked(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
+# --- ADR-005: base-root resolution and the payload contract -------------------------
+
+
+def test_gate_invoked_from_inside_a_worktree_still_finds_base_markers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Two worktrees: marker points to wt-A; Edit targets wt-B (different
-    branch). wt-B is NOT under wt-A → blocked, even though both are
-    .worktrees/. Prevents loops from cross-contaminating."""
-    project = tmp_path / "repo"
-    project.mkdir()
-    wt_a = project / ".worktrees" / "execute-a"
-    wt_a.mkdir(parents=True)
-    wt_b = project / ".worktrees" / "execute-b"
-    wt_b.mkdir(parents=True)
-    _write_marker(project, wt_a)
-    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(project))
-    rc = _run(
-        monkeypatch,
-        {"tool_name": "Edit", "tool_input": {"file_path": str(wt_b / "x.py")}},
+    """`cwd` IS the worktree for every `/hm:` stage under `worktree.enabled: true`. Rooting
+    there finds no `.claude/` at all and the gate enforces nothing — silently."""
+    repo = _project(tmp_path)
+    peer_wt = _worktree(repo, "their-task", PEER)
+    my_wt = _worktree(repo, "my-task", MINE)
+    assert _run(monkeypatch, cwd=my_wt, target=peer_wt / "src" / "f.py") == 2
+
+
+# `_strip_worktree`'s own branches live in tests/structural/test_gate_base_root_parity.py,
+# which owns them together with the `autopilot.resolve_marker_root` parity assertions —
+# one place to update when the resolution rule changes.
+
+
+def test_captured_payload_still_carries_the_fields_the_gate_reads() -> None:
+    """The live-probe fixture (ADR-005). An upstream payload change degrades this gate
+    SILENTLY — it would simply stop identifying anyone and fail open forever — so the key
+    set is asserted rather than assumed."""
+    payload = json.loads(_FIXTURE.read_text(encoding="utf-8"))
+    assert isinstance(payload["session_id"], str)
+    assert isinstance(payload["cwd"], str)
+    assert payload["tool_name"] == "Write"
+    assert isinstance(payload["tool_input"]["file_path"], str)
+    assert "workspace" not in payload, (
+        "the probe recorded NO `workspace` key; a gate keyed on workspace.current_dir "
+        "resolves nothing in Claude Code"
     )
-    assert rc == 2
-    assert str(wt_a) in capsys.readouterr().err
 
 
-def test_multiedit_is_guarded(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+def test_gate_reads_the_captured_payload_end_to_end(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """MultiEdit is in _GUARDED_TOOLS — same enforcement as Write/Edit."""
-    project = tmp_path / "repo"
-    project.mkdir()
-    wt = project / ".worktrees" / "execute-x"
-    wt.mkdir(parents=True)
-    _write_marker(project, wt)
-    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(project))
-    rc = _run(
-        monkeypatch,
-        {
-            "tool_name": "MultiEdit",
-            "tool_input": {"file_path": str(project / "main.py")},
-        },
-    )
-    assert rc == 2
+    """Drive `main()` with the real shape, not a hand-built dict — the helpers never see
+    the fields the payload actually carries."""
+    payload = json.loads(_FIXTURE.read_text(encoding="utf-8"))
+    repo = _project(tmp_path)
+    peer_wt = _worktree(repo, "their-task", PEER)
+    payload["cwd"] = str(repo / ".worktrees" / "my-task")
+    (repo / ".worktrees" / "my-task").mkdir(parents=True, exist_ok=True)
+    payload["session_id"] = MINE
+    payload["tool_input"]["file_path"] = str(peer_wt / "src" / "f.py")
+    monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps(payload)))
+    assert worktree_gate.main() == 2
 
 
-def test_relative_path_resolved_against_project_root(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+def test_a_relative_target_resolves_against_the_tool_cwd_not_the_stripped_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Relative file_path → resolved against project root, not cwd of hook
-    subprocess. Without this, a hook spawned from $HOME with a relative
-    path would silently treat outside-WT writes as inside-WT."""
-    project = tmp_path / "repo"
-    project.mkdir()
-    wt = project / ".worktrees" / "execute-x"
-    wt.mkdir(parents=True)
-    _write_marker(project, wt)
-    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(project))
-    monkeypatch.chdir("/")  # ensure cwd is NOT project
-    rc = _run(
-        monkeypatch,
-        {"tool_name": "Write", "tool_input": {"file_path": "src/foo.py"}},
-    )
-    # Resolves to project/src/foo.py → outside wt → blocked
-    assert rc == 2
+    """CX-1 (codex). `_project_root` strips a worktree cwd to the base; resolving a relative
+    `file_path` against THAT turns `../their-task/f.py` — which really lands in a peer's
+    worktree — into a path outside the repo, and the gate allows it."""
+    repo = _project(tmp_path)
+    _worktree(repo, "their-task", PEER)
+    my_wt = _worktree(repo, "my-task", MINE)
+    assert _run(monkeypatch, cwd=my_wt, target=Path("../their-task/src/f.py")) == 2
 
 
-# ── env-var fallback chain ───────────────────────────────────────────────────
-
-
-def test_cursor_project_dir_used_when_claude_unset(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+def test_an_absolute_target_is_unaffected_by_the_cwd_split(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Mirror telemetry.py's resolution order: CURSOR_PROJECT_DIR is
-    consulted when CLAUDE_PROJECT_DIR is unset."""
-    project = tmp_path / "repo"
-    project.mkdir()
-    wt = project / ".worktrees" / "execute-x"
-    wt.mkdir(parents=True)
-    _write_marker(project, wt)
-    monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
-    monkeypatch.setenv("CURSOR_PROJECT_DIR", str(project))
-    rc = _run(
-        monkeypatch,
-        {"tool_name": "Write", "tool_input": {"file_path": str(project / "x.py")}},
-    )
-    assert rc == 2  # outside WT, blocked
-
-
-def test_stdin_workspace_current_dir_wins_over_env(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Round H BLOCK 1 fix: payload.workspace.current_dir takes priority
-    over env vars and cwd. Without this, multi-window IDE scenarios where
-    env vars are stripped or wrong silently bypass the gate."""
-    project_a = tmp_path / "repo-a"
-    project_a.mkdir()
-    project_b = tmp_path / "repo-b"
-    project_b.mkdir()
-    wt_a = project_a / ".worktrees" / "execute-x"
-    wt_a.mkdir(parents=True)
-    _write_marker(project_a, wt_a)
-    # env points to project-b (wrong project), but stdin says project-a
-    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(project_b))
-    monkeypatch.chdir("/")
-    rc = _run(
-        monkeypatch,
-        {
-            "tool_name": "Write",
-            "tool_input": {"file_path": str(project_a / "x.py")},
-            "workspace": {"current_dir": str(project_a)},
-        },
-    )
-    # Gate consults stdin → resolves project-a → reads project-a's marker →
-    # target outside wt_a → blocks.
-    assert rc == 2
-
-
-def test_stdin_cwd_field_used_when_workspace_absent(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Cursor's payload uses ``cwd`` (not nested under workspace). Order:
-    workspace.current_dir → cwd → env → os.getcwd()."""
-    project = tmp_path / "repo"
-    project.mkdir()
-    wt = project / ".worktrees" / "execute-x"
-    wt.mkdir(parents=True)
-    _write_marker(project, wt)
-    monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
-    monkeypatch.delenv("CURSOR_PROJECT_DIR", raising=False)
-    monkeypatch.chdir("/")
-    rc = _run(
-        monkeypatch,
-        {
-            "tool_name": "Write",
-            "tool_input": {"file_path": str(project / "x.py")},
-            "cwd": str(project),
-        },
-    )
-    assert rc == 2
-
-
-def _write_session_marker(project_root: Path, wt_name: str, wt_paths: list[Path]) -> None:
-    """Write a per-session ADR-006 marker (.hm-loop-{wt_name})."""
-    marker = project_root / ".claude" / f".hm-loop-{wt_name}"
-    marker.parent.mkdir(parents=True, exist_ok=True)
-    marker.write_text("\n".join(str(p) for p in wt_paths) + "\n", encoding="utf-8")
-
-
-def test_per_session_marker_write_inside_any_active_wt_allowed(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Two parallel sessions (ADR-006 per-session markers); write to session-b's
-    worktree → allowed because it's inside one of the active WTs."""
-    project = tmp_path / "repo"
-    project.mkdir()
-    wt_a = project / ".worktrees" / "execute-session-a"
-    wt_a.mkdir(parents=True)
-    wt_b = project / ".worktrees" / "execute-session-b"
-    wt_b.mkdir(parents=True)
-    _write_session_marker(project, "execute-session-a", [wt_a])
-    _write_session_marker(project, "execute-session-b", [wt_b])
-    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(project))
-    rc = _run(
-        monkeypatch,
-        {"tool_name": "Write", "tool_input": {"file_path": str(wt_b / "src/foo.py")}},
-    )
-    assert rc == 0
-
-
-def test_multi_session_write_outside_all_wts_blocked(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    """Two active sessions; write to main repo (outside both WTs) → blocked."""
-    project = tmp_path / "repo"
-    project.mkdir()
-    wt_a = project / ".worktrees" / "execute-session-a"
-    wt_a.mkdir(parents=True)
-    wt_b = project / ".worktrees" / "execute-session-b"
-    wt_b.mkdir(parents=True)
-    _write_session_marker(project, "execute-session-a", [wt_a])
-    _write_session_marker(project, "execute-session-b", [wt_b])
-    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(project))
-    rc = _run(
-        monkeypatch,
-        {"tool_name": "Write", "tool_input": {"file_path": str(project / "src/foo.py")}},
-    )
-    assert rc == 2
-    err = capsys.readouterr().err
-    assert "blocked" in err
-
-
-def test_sibling_wt_in_session_marker_allowed(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Single per-session marker lists primary + sibling WT paths.
-    Write to sibling WT → allowed (multi-repo session, ADR-006)."""
-    project = tmp_path / "repo"
-    project.mkdir()
-    sibling = tmp_path / "sibling-repo"
-    sibling.mkdir()
-    primary_wt = project / ".worktrees" / "execute-ts"
-    primary_wt.mkdir(parents=True)
-    sibling_wt = sibling / ".worktrees" / "execute-ts-sibling"
-    sibling_wt.mkdir(parents=True)
-    _write_session_marker(project, "execute-ts", [primary_wt, sibling_wt])
-    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(project))
-    rc = _run(
-        monkeypatch,
-        {"tool_name": "Write", "tool_input": {"file_path": str(sibling_wt / "bar.ts")}},
-    )
-    assert rc == 0
-
-
-def test_legacy_hm_loop_active_backward_compat(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Legacy .hm-loop-active filename matches .hm-loop-* glob — backward compat.
-    Allow inside WT, block outside."""
-    project = tmp_path / "repo"
-    project.mkdir()
-    wt = project / ".worktrees" / "execute-x"
-    wt.mkdir(parents=True)
-    _write_marker(project, wt)  # writes .hm-loop-active
-    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(project))
-    inside = {"tool_name": "Write", "tool_input": {"file_path": str(wt / "x.py")}}
-    outside = {"tool_name": "Write", "tool_input": {"file_path": str(project / "x.py")}}
-    assert _run(monkeypatch, inside) == 0
-    assert _run(monkeypatch, outside) == 2
-
-
-def test_symlinked_target_outside_wt_is_blocked(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Round H NIT 10: a symlink inside the WT pointing at a main-repo
-    file must NOT bypass the gate. _target_path calls Path.resolve() which
-    follows symlinks; resolved target lives outside WT → blocked."""
-    project = tmp_path / "repo"
-    project.mkdir()
-    main_file = project / "src" / "main.py"
-    main_file.parent.mkdir()
-    main_file.write_text("# main\n")
-    wt = project / ".worktrees" / "execute-x"
-    wt.mkdir(parents=True)
-    # Symlink inside WT points at main_file
-    smuggle = wt / "smuggle.py"
-    smuggle.symlink_to(main_file)
-    _write_marker(project, wt)
-    monkeypatch.setenv("CLAUDE_PROJECT_DIR", str(project))
-    rc = _run(
-        monkeypatch,
-        {"tool_name": "Write", "tool_input": {"file_path": str(smuggle)}},
-    )
-    assert rc == 2  # symlink resolves to main_file, outside WT → blocked
+    repo = _project(tmp_path)
+    peer_wt = _worktree(repo, "their-task", PEER)
+    my_wt = _worktree(repo, "my-task", MINE)
+    assert _run(monkeypatch, cwd=my_wt, target=peer_wt / "src" / "f.py") == 2
+    assert _run(monkeypatch, cwd=my_wt, target=my_wt / "src" / "f.py") == 0

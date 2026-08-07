@@ -175,7 +175,9 @@ def test_merge_gate_still_stops_before_wrapup(tmp_path: Path) -> None:
     out = _boundary(tmp_path, "verify", "--slug", "s")
     assert out["proceed"] is False
     assert out["halt_kind"] == "merge_gate"
-    assert autopilot.load(tmp_path) is None, "marker cleared so the Stop-hook stands down"
+    assert autopilot.load(tmp_path, session_id=None) is None, (
+        "marker cleared so the Stop-hook stands down"
+    )
 
 
 def test_pipeline_complete_clears_marker(tmp_path: Path) -> None:
@@ -183,12 +185,12 @@ def test_pipeline_complete_clears_marker(tmp_path: Path) -> None:
     autopilot.write(tmp_path, level="auto_safe", pipeline=[AtomicStage.RESEARCH])
     out = _boundary(tmp_path, "research", "--slug", "s")
     assert out["pipeline_complete"] is True
-    assert autopilot.load(tmp_path) is None
+    assert autopilot.load(tmp_path, session_id=None) is None
 
 
 def test_unknown_stage_preserves_marker_and_writes_nothing(tmp_path: Path) -> None:
     _arm(tmp_path)
     out = _boundary(tmp_path, "bogus")
     assert out["halt_kind"] == "unknown_stage"
-    assert autopilot.load(tmp_path) is not None
+    assert autopilot.load(tmp_path, session_id=None) is not None
     assert _events(tmp_path) == []
