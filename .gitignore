@@ -55,6 +55,13 @@
 # Verify BOTH directions after any edit here:
 #   git check-ignore -v .claude/observability/review-payloads/x/y.json   -> NOTHING
 #   git check-ignore -v .claude/observability/review-2026-01-01.jsonl    -> ignored
+# The literal `.claude/observability/` MUST appear as its own line, and must then be
+# immediately re-included. `_ensure_gitignore_entries` skips a pattern only on an EXACT
+# line match; without the literal it re-derives the pattern as un-covered and appends it at
+# EOF, where git's last-match rule beats the negation and re-ignores the corpus. Verified
+# the hard way: a manual run of the appender reported no change, and the real test caught
+# it appending anyway — so assert with the test, not with a one-off invocation.
+.claude/observability/
 !.claude/observability/
 .claude/observability/*
 !.claude/observability/review-payloads/
