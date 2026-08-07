@@ -565,26 +565,39 @@ pass-1-vs-pass-2 comparison possible at all:
 
 {% if is_codex %}
 ```
-Bash("uv run --with {{ harness_maker_src_path }} hm stage_agent_ledger emit --run-id <run-id> --agent plan-validator --stage plan --slug {slug} --pass <N> --verdict <APPROVED|NEEDS_REVISION|MAJOR_REVISION> --terminal --duration-ms <elapsed> --barrier-index <segment>")
+Bash("uv run --with {{ harness_maker_src_path }} hm stage_agent_ledger emit --run-id '<run-id>' --agent plan-validator --stage plan --slug '{slug}' --pass <N> --verdict '<APPROVED|NEEDS_REVISION|MAJOR_REVISION>' --terminal --duration-ms '<elapsed>' --barrier-index '<segment>'")
 ```
 {% else %}
 ```bash
-!uv run --with {{ harness_maker_src_path }} hm stage_agent_ledger emit --run-id <run-id> --agent plan-validator --stage plan --slug {slug} --pass <N> --verdict <APPROVED|NEEDS_REVISION|MAJOR_REVISION> --terminal --duration-ms <elapsed> --barrier-index <segment>
+!uv run --with {{ harness_maker_src_path }} hm stage_agent_ledger emit --run-id '<run-id>' --agent plan-validator --stage plan --slug '{slug}' --pass <N> --verdict '<APPROVED|NEEDS_REVISION|MAJOR_REVISION>' --terminal --duration-ms '<elapsed>' --barrier-index '<segment>'
 ```
 {% endif %}
 
 - Omit `--terminal` on pass 1 when a pass 2 will follow; pass it on the pass that ends Step 4.
-  **Exactly one row per `<run-id>` may carry `--terminal`.** Two terminal rows leave the run
-  with no single ending, so any aggregation keyed on it reads an arbitrary one — that has
-  already happened once (`msms-20260807-1`, passes 1/2/3 with terminal on 2 and 3).
+  **Exactly one row per `(agent, stage, slug, run-id)` may carry `--terminal`** — the run
+  identity is all four, not `<run-id>` alone, so another stage emitting its own terminal row
+  for the same id is fine and must not make you drop yours. Two terminal rows in ONE group
+  leave that run with no single ending, so any aggregation keyed on it reads an arbitrary
+  one — that has already happened (`msms-20260807-1`, passes 1/2/3, terminal on 2 and 3).
+  Check with `hm stage_agent_ledger coherence`; it exits non-zero on any incoherent run.
 - **The cap is 2 passes** (`re-run validator once only`, above). If a pass 3 or beyond
   happens anyway — the operator asked for it, or the cap was overrun — still record it, and
-  add `--reason '<why this pass exceeded the cap>'`. Without that the ledger cannot tell an
+  add `--reason '<why this pass exceeded the cap>'` — **single quotes, and strip every
+  apostrophe, backtick and `$` from the text first.** A double-quoted reason leaves `$(...)`
+  and backticks live, and one apostrophe in a single-quoted reason closes the quote and
+  splices the rest of your sentence into the command as arguments. Keep it short and plain.
+  Without the reason the ledger cannot tell an
   operator-requested extra pass from a stage that ignored its own limit, and those have
   opposite remedies. Never drop the row to keep the data tidy: an unrecorded pass is a
   serial barrier the latency figures do not charge anyone for.
 - The launch-failure path immediately above is a **row too**: `--verdict dispatch-failed
-  --reason "<launch error>" --terminal`. Self-reviewing in the validator's place without a
+  --reason '<launch error, quotes and backticks stripped>'`. **Do NOT add `--terminal` when
+  you are about to retry** — the retry is the pass that ends Step 4 and carries it. A
+  terminal sentinel plus a terminal retry is two terminal rows in one group, which is the
+  incoherence `coherence` reports; the schema deliberately no longer forces it. Add
+  `--terminal` only when you give up without retrying. **This reason is the dangerous one**:
+  the launch-error text is tool output you did not author, so paste it through the same
+  stripping — never into double quotes. Self-reviewing in the validator's place without a
   row makes an unavailable validator indistinguishable from an approving one.
 - **Omit `--duration-ms` if you did not measure it** — never pass `0`.
 

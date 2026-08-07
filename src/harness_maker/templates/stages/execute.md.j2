@@ -237,17 +237,22 @@ retries of one Phase A.5 (use the task slug plus the phase number):
 
 {% if is_codex %}
 ```
-Bash("{{ cdwt }}uv run --with {{ harness_maker_src_path }} hm stage_agent_ledger emit --run-id <run-id> --agent test-reviewer --stage execute --slug {slug} --pass <attempt-number> --verdict <PASS|FAIL> --terminal --duration-ms <elapsed> --barrier-index <segment>")
+Bash("{{ cdwt }}uv run --with {{ harness_maker_src_path }} hm stage_agent_ledger emit --run-id '<run-id>' --agent test-reviewer --stage execute --slug '{slug}' --pass <attempt-number> --verdict '<PASS|FAIL>' --terminal --duration-ms '<elapsed>' --barrier-index '<segment>'")
 ```
 {% else %}
 ```bash
-!{{ cdwt }}uv run --with {{ harness_maker_src_path }} hm stage_agent_ledger emit --run-id <run-id> --agent test-reviewer --stage execute --slug {slug} --pass <attempt-number> --verdict <PASS|FAIL> --terminal --duration-ms <elapsed> --barrier-index <segment>
+!{{ cdwt }}uv run --with {{ harness_maker_src_path }} hm stage_agent_ledger emit --run-id '<run-id>' --agent test-reviewer --stage execute --slug '{slug}' --pass <attempt-number> --verdict '<PASS|FAIL>' --terminal --duration-ms '<elapsed>' --barrier-index '<segment>'
 ```
 {% endif %}
 
 - Omit `--terminal` on an attempt that will be retried; pass it on the one that ends the gate.
 - If the dispatch **failed to launch or was skipped**, emit `--verdict dispatch-failed` or
-  `--verdict dispatch-skipped` with `--reason "<why>"` and `--terminal`. The CLI rejects
+  `--verdict dispatch-skipped` with `--reason '<why>'` — **single quotes, and strip
+  apostrophes / backticks / `$` from the text first**; a double-quoted reason leaves `$(...)`
+  live and the text is often tool output you did not author. **`--terminal` follows the same
+  rule as any other attempt** (the bullet above): omit it when a retry will follow, since the
+  retry is what ends the gate. A terminal sentinel plus a terminal retry is two terminal rows
+  in one group. `dispatch-skipped` with no retry does end the run, so it keeps `--terminal`. The CLI rejects
   those verdicts without a reason — a sentinel row with a null reason is undiagnosable, which
   is the exact state `delegation_ledger` is in today.
 - `--duration-ms` is wall-clock for the dispatch. **Omit it if you did not measure it** —

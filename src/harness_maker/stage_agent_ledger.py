@@ -35,14 +35,24 @@ apart, not a mislabeled row — so the equality was silently dropping the case m
 carry a changed verdict: passes 1 and 2 had already agreed, and only pass 3 could
 disagree with them.
 
-Two things make this amendment auditable rather than result-fitting:
-1. **Direction.** Widening to ``>= 2`` grows the denominator, so it makes "the later pass
-   never changes the verdict" HARDER to demonstrate. It raises the bar for the deletion this
-   metric feeds, rather than lowering it.
+**The justification is correctness, and the protection is disclosure — nothing else.**
+An earlier version of this note claimed the amendment was "conservative" because a larger
+denominator makes "the later pass never changes the verdict" harder to demonstrate. **That
+was false, and false in the direction that flattered the amendment.** The row admitted by
+the widening was already known to AGREE with pass 1, so 0/2 became 0/3: the observed rate
+is unchanged and its upper confidence bound is tighter, which makes the deletion case
+*stronger*, not weaker. Widening a population only raises the bar when the added rows are
+numerator-eligible in expectation, and that had already been ruled out by inspection.
+Review caught this; it is recorded rather than quietly corrected, because a pre-registration
+whose audit trail contains a flattering falsehood is worse than one with no argument at all.
+
+What actually justifies it:
+1. **The equality was wrong about the world.** It silently discarded real observations, so
+   it did not measure the question it was registered to answer. That is a defect, not a
+   preference, and correcting it does not depend on which way the numbers then move.
 2. **Disclosure.** It was made after observing the pass-3 row, and that is stated here
-   rather than inferred from a diff. The observed data at amendment time was 0/2 under the
-   old rule and 0/3 under the new one — the amendment did not change the conclusion, only
-   the population it is drawn from.
+   rather than inferred from a diff. The reader can therefore discount it appropriately —
+   which is the only real protection available once a rule is amended post-hoc.
 
 The equality also produced one real reporting error before it was caught: an aggregation was
 reported as "0/3" while the registered rule specified a denominator of 2.
@@ -112,27 +122,25 @@ class StageAgentRow(BaseModel):
     barrier_index: int | None = Field(default=None, ge=0)
 
     @model_validator(mode="after")
-    def _a_sentinel_dispatch_is_terminal_and_explained(self) -> StageAgentRow:
-        """A dispatch that never ran must say why, and cannot be a non-final attempt.
+    def _a_sentinel_dispatch_is_explained(self) -> StageAgentRow:
+        """A dispatch that never ran must say why.
 
         Without this, `dispatch-failed` rows accumulate with `reason: null` — which is
         exactly the state `delegation_ledger` is in today (both mismatch rows carry a
         structural null, so no diagnosis exists and P4a had to be created to add one).
         Catching it at the schema is cheaper than a phase.
+
+        **`terminal` is NOT forced here, and an earlier version forcing it was wrong.**
+        It reasoned that "a dispatch that produced no outcome cannot be a non-final
+        attempt" — but a launch failure is precisely the case the caller retries, and
+        `plan.md.j2` explicitly instructs a retry after one. Forcing `terminal=True` made
+        the mandated shape (`pass 1 dispatch-failed`, `pass 2 succeeds`) record TWO
+        terminal rows, which `check_run_coherence` then had to flag. The schema was
+        manufacturing the incoherence the checker reported.
         """
-        if self.verdict in DISPATCH_SENTINELS:
-            if not self.reason:
-                msg = (
-                    f"verdict {self.verdict!r} requires a reason "
-                    "naming why the dispatch did not run"
-                )
-                raise ValueError(msg)
-            if not self.terminal:
-                msg = (
-                    f"verdict {self.verdict!r} cannot be non-terminal — "
-                    "the dispatch produced no outcome"
-                )
-                raise ValueError(msg)
+        if self.verdict in DISPATCH_SENTINELS and not self.reason:
+            msg = f"verdict {self.verdict!r} requires a reason naming why the dispatch did not run"
+            raise ValueError(msg)
         return self
 
 
@@ -230,56 +238,111 @@ class RunCoherence(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
 
     agent: str
+    stage: str
+    slug: str
     run_id: str
     passes: tuple[int, ...]
     terminal_count: int
     problems: tuple[str, ...]
+    incomplete: bool = False
 
     @property
     def ok(self) -> bool:
+        """`incomplete` deliberately does NOT make a run not-ok — see `check_run_coherence`."""
         return not self.problems
 
 
 def check_run_coherence(rows: list[dict[str, Any]]) -> list[RunCoherence]:
-    """Group rows by (agent, run_id) and report the incoherent groups.
+    """Group rows by (agent, stage, slug, run_id) and report the incoherent groups.
 
-    **Run this before any aggregation.** A run with two `terminal` rows has no single "the
-    dispatch that ended it", so any read keyed on terminal picks one arbitrarily and reports
-    a number nobody can reproduce. That is not hypothetical: `msms-20260807-1` shipped with
-    passes 1/2/3 and terminal on both 2 and 3, in the first six rows this ledger ever held.
+    **Run this before any aggregation** — `hm stage_agent_ledger coherence` is the CLI.
+    A run with two `terminal` rows has no single "the dispatch that ended it", so any read
+    keyed on terminal picks one arbitrarily and reports a number nobody can reproduce.
+    That is not hypothetical: `msms-20260807-1` shipped with passes 1/2/3 and terminal on
+    both 2 and 3, in the first six rows this ledger ever held.
 
-    Sentinel rows (`dispatch-skipped` / `dispatch-failed`) are excluded from the pass-sequence
-    checks — a dispatch that never ran has no place in the sequence — but they still count
-    toward `terminal_count`, because they genuinely do end the run.
+    **The key is all four fields, not `(agent, run_id)`.** `run_id` is chosen by the model
+    and nothing enforces global uniqueness, so an id reused across stages or slugs merged
+    independent runs and produced fabricated "duplicate pass" / "multiple terminal"
+    reports — a checker inventing the defects it exists to find.
+
+    **Sentinel rows COUNT as passes.** An earlier version excluded them, reasoning that a
+    dispatch which never ran has no place in the sequence. The opposite is true: a launch
+    failure occupies an attempt number, and the retry the guidance mandates is the *next*
+    one — so excluding it turned the mandated `[failed, retried]` shape into the gap
+    `(2,)` and flagged it. They are attempts; only their outcome is missing.
+
+    Never raises on bad input: rows come from a shared append-only file that concurrent
+    sessions write and a human can hand-edit, and one unreadable line must not void the
+    report for every other run.
     """
-    groups: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    groups: dict[tuple[str, str, str, str], list[dict[str, Any]]] = {}
+    unreadable: dict[tuple[str, str, str, str], int] = {}
     for row in rows:
-        groups.setdefault((str(row.get("agent")), str(row.get("run_id"))), []).append(row)
+        if not isinstance(row, dict):
+            continue
+        key = (
+            str(row.get("agent")),
+            str(row.get("stage")),
+            str(row.get("slug")),
+            str(row.get("run_id")),
+        )
+        groups.setdefault(key, []).append(row)
 
     out: list[RunCoherence] = []
-    for (agent, run_id), rs in sorted(groups.items()):
-        real = [r for r in rs if r.get("verdict") not in DISPATCH_SENTINELS]
-        passes = tuple(sorted(int(r["pass_or_attempt"]) for r in real))
-        terminal_count = sum(1 for r in rs if r.get("terminal"))
+    for key, rs in sorted(groups.items()):
+        agent, stage, slug, run_id = key
+        passes: list[int] = []
+        bad = 0
+        for r in rs:
+            raw = r.get("pass_or_attempt")
+            if isinstance(raw, bool) or not isinstance(raw, int | str):
+                bad += 1
+                continue
+            try:
+                passes.append(int(raw))
+            except (TypeError, ValueError):
+                bad += 1
+        unreadable[key] = bad
+        # `terminal` is compared to True rather than tested for truthiness: the string
+        # "false" is truthy, and these rows arrive from JSON a human may have edited.
+        terminal_rows = [r for r in rs if r.get("terminal") is True]
+        ordered = tuple(sorted(passes))
+
         problems: list[str] = []
-        if terminal_count > 1:
+        if bad:
+            problems.append(f"{bad} row(s) have an unreadable `pass_or_attempt`")
+        if len(terminal_rows) > 1:
             problems.append(
-                f"{terminal_count} terminal rows — no single row ends this run, so any "
+                f"{len(terminal_rows)} terminal rows — no single row ends this run, so any "
                 "aggregation keyed on `terminal` is reading an arbitrary one"
             )
-        if terminal_count == 0 and rs:
-            problems.append("no terminal row — the run has no recorded end")
-        if len(set(passes)) != len(passes):
-            problems.append(f"duplicate pass numbers {passes} — a retry overwrote its own slot")
-        if passes and passes != tuple(range(1, len(passes) + 1)):
-            problems.append(f"pass numbers are not 1..N: {passes}")
+        # NOT a `problem`: a run still in flight has no terminal row yet, and this repo
+        # runs many sessions at once. Reporting it as a defect would make the CLI exit 1
+        # whenever a peer is mid-run — the boy-who-cried-wolf failure that gets a gate
+        # ignored. Surfaced as `incomplete` instead, which the CLI prints but does not fail on.
+        incomplete = not terminal_rows
+        if len(set(ordered)) != len(ordered):
+            problems.append(f"duplicate pass numbers {ordered} — a retry overwrote its own slot")
+        if ordered and ordered != tuple(range(1, len(ordered) + 1)):
+            problems.append(f"pass numbers are not 1..N: {ordered}")
+        if len(terminal_rows) == 1 and ordered:
+            last = terminal_rows[0].get("pass_or_attempt")
+            if isinstance(last, int) and not isinstance(last, bool) and last < max(ordered):
+                problems.append(
+                    f"the terminal row is pass {last} but the run continues to {max(ordered)}"
+                )
+
         out.append(
             RunCoherence(
                 agent=agent,
+                stage=stage,
+                slug=slug,
                 run_id=run_id,
-                passes=passes,
-                terminal_count=terminal_count,
+                passes=ordered,
+                terminal_count=len(terminal_rows),
                 problems=tuple(problems),
+                incomplete=incomplete,
             )
         )
     return out
@@ -383,6 +446,12 @@ def _build_parser() -> argparse.ArgumentParser:
     e.add_argument("--duration-ms", type=int, default=None)
     e.add_argument("--barrier-index", type=int, default=None)
 
+    # F5: without this the checker had NO caller — no CLI, no rendered guidance, only
+    # tests. A checker nobody can run is `observability-field-with-no-consumer` one layer
+    # up, which is the exact failure this module's docstring names.
+    c = sub.add_parser("coherence")
+    c.add_argument("--quiet", action="store_true", help="print only incoherent runs")
+
     p = sub.add_parser("persist-payload")
     p.add_argument("--file", required=True, help="path to the reviewer's raw payload")
     p.add_argument("--slug", required=True)
@@ -421,6 +490,45 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         sys.stdout.write(str(emit(row, base_root=base_root)) + "\n")
         return 0
+
+    if args.command == "coherence":
+        path = ledger_path(base_root)
+        if not path.is_file():
+            sys.stdout.write(f"coherence: no ledger at {path}\n")
+            return 0
+        rows: list[dict[str, Any]] = []
+        malformed = 0
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if not line.strip():
+                continue
+            try:
+                parsed = json.loads(line)
+            except ValueError:
+                malformed += 1
+                sys.stdout.write("coherence: BAD <unparseable line>\n")
+                continue
+            if isinstance(parsed, dict):
+                rows.append(parsed)
+            else:
+                # Dropping this silently was the first version's bug: a JSON array or scalar
+                # on its own line vanished from both the report and the exit code.
+                malformed += 1
+                sys.stdout.write(f"coherence: BAD <non-object line: {type(parsed).__name__}>\n")
+        results = check_run_coherence(rows)
+        bad = [r for r in results if not r.ok]
+        for r in results if not args.quiet else bad:
+            flag = "BAD" if not r.ok else ("... " if r.incomplete else "OK ")
+            sys.stdout.write(f"{flag} {r.agent} {r.stage} {r.slug} {r.run_id} passes={r.passes}\n")
+            for problem in r.problems:
+                sys.stdout.write(f"      -> {problem}\n")
+            if r.incomplete:
+                sys.stdout.write("      -> in flight (no terminal row yet) — not a defect\n")
+        inflight = sum(1 for r in results if r.incomplete and r.ok)
+        sys.stdout.write(
+            f"coherence: {len(results) - len(bad)} ok ({inflight} in flight), "
+            f"{len(bad)} incoherent, {malformed} malformed line(s)\n"
+        )
+        return 1 if bad or malformed else 0
 
     source = Path(args.file)
     if not source.is_file():

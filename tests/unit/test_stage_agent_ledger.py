@@ -115,10 +115,17 @@ def test_a_sentinel_row_without_a_reason_is_rejected(sentinel: str) -> None:
 
 
 @pytest.mark.parametrize("sentinel", [DISPATCH_SKIPPED, DISPATCH_FAILED])
-def test_a_sentinel_row_cannot_be_non_terminal(sentinel: str) -> None:
-    """A dispatch that produced no outcome cannot be "attempt 1 of a continuing sequence"."""
-    with pytest.raises(ValidationError):
-        row_from_dict({**_BASE, "verdict": sentinel, "reason": "x", "terminal": False})
+def test_a_sentinel_row_may_be_non_terminal_because_retries_exist(sentinel: str) -> None:
+    """The inverse of what this test asserted until review.
+
+    It required every sentinel to be terminal, reasoning that a dispatch producing no
+    outcome cannot be a continuing attempt. But a launch failure is exactly what the plan
+    stage tells the model to RETRY, so the mandated shape is `pass 1 failed` then `pass 2
+    succeeds` — and forcing the first row terminal manufactured a two-terminal run that
+    `check_run_coherence` then reported. The schema was creating the incoherence.
+    """
+    row = row_from_dict({**_BASE, "verdict": sentinel, "reason": "launch error", "terminal": False})
+    assert row.terminal is False
 
 
 def test_the_sentinels_cannot_collide_with_an_agent_verdict() -> None:
@@ -356,10 +363,18 @@ def test_a_well_formed_run_is_clean() -> None:
     assert c.ok, c.problems
 
 
-def test_a_run_with_no_terminal_row_is_reported() -> None:
-    """An unfinished run is not a finished one; silence must not read as completion."""
+def test_an_unfinished_run_is_surfaced_without_being_called_a_defect() -> None:
+    """Superseded semantics, kept as the explicit record of the change.
+
+    This asserted that a missing terminal row is a `problem`. It is not: an in-flight run
+    legitimately has none, and with many concurrent sessions that made `coherence` exit 1
+    almost always. It is now `incomplete` — printed, never silent, but not a defect.
+    Silence would still be wrong; calling it a defect was just a different wrong.
+    """
     (c,) = check_run_coherence([{**_BASE, "run_id": "r", "pass_or_attempt": 1, "terminal": False}])
-    assert any("no terminal row" in p for p in c.problems)
+    assert c.incomplete is True
+    assert not any("no terminal row" in p for p in c.problems)
+    assert c.ok
 
 
 def test_gaps_and_duplicates_in_the_pass_sequence_are_reported() -> None:
@@ -380,11 +395,132 @@ def test_gaps_and_duplicates_in_the_pass_sequence_are_reported() -> None:
     assert any("duplicate" in p for p in dup.problems)
 
 
-def test_a_sentinel_row_does_not_break_the_pass_sequence() -> None:
-    """A dispatch that never ran has no place in the sequence, but it does end the run.
+def test_the_mandated_retry_after_a_launch_failure_is_clean() -> None:
+    """The shape `plan.md.j2` MANDATES, and the one the checker used to flag twice.
 
-    Counting it as a pass would report a spurious gap on every run whose validator failed
-    to launch — turning the coherence check into noise exactly when it matters.
+    `[pass 1 dispatch-failed (non-terminal), pass 2 real (terminal)]` — sentinels occupy an
+    attempt number, so the sequence is (1, 2) and exactly one row ends the run. The earlier
+    version excluded sentinels from `passes`, producing the gap `(2,)`, AND counted the
+    schema-forced terminal, producing two — two false defects on the only dispatch shape the
+    same commit's guidance tells the model to produce.
+    """
+    rows = [
+        {
+            **_BASE,
+            "run_id": "retry",
+            "pass_or_attempt": 1,
+            "verdict": DISPATCH_FAILED,
+            "reason": "launch error",
+            "terminal": False,
+        },
+        {**_BASE, "run_id": "retry", "pass_or_attempt": 2, "verdict": "APPROVED", "terminal": True},
+    ]
+    (c,) = check_run_coherence(rows)
+    assert c.passes == (1, 2)
+    assert c.terminal_count == 1
+    assert c.ok, c.problems
+
+
+def test_runs_are_separated_by_stage_and_slug_not_run_id_alone() -> None:
+    """`run_id` is model-chosen and globally unique only by convention.
+
+    Grouping on `(agent, run_id)` merged independent runs that happened to reuse an id,
+    fabricating "duplicate pass numbers" and "multiple terminal rows" — a checker inventing
+    the defects it exists to find.
+    """
+    shared = {"agent": "plan-validator", "run_id": "same-id", "pass_or_attempt": 1}
+    rows = [
+        {**_BASE, **shared, "stage": "plan", "slug": "task-a", "terminal": True},
+        {**_BASE, **shared, "stage": "plan", "slug": "task-b", "terminal": True},
+    ]
+    results = check_run_coherence(rows)
+    assert len(results) == 2, "two independent runs were merged into one"
+    assert all(c.ok for c in results), [c.problems for c in results]
+
+
+@pytest.mark.parametrize(
+    "bad_value",
+    [None, "2x", [], {}, True],
+)
+def test_a_malformed_pass_number_is_reported_not_raised(bad_value: object) -> None:
+    """Assert the problem is REPORTED, not merely that nothing raised.
+
+    The first version asserted `results` was truthy — which holds for ANY non-empty input,
+    because one `RunCoherence` is emitted per key regardless. It would have stayed green if
+    the defensive coercion were deleted outright, so the newly-added guard had no coverage.
+    `True` is in the list because `isinstance(True, int)` and an unguarded `int()` accepts it.
+    """
+    row = {
+        "agent": "a",
+        "stage": "s",
+        "slug": "x",
+        "run_id": "r",
+        "terminal": True,
+        "pass_or_attempt": bad_value,
+    }
+    (c,) = check_run_coherence([row])
+    assert any("unreadable" in p for p in c.problems), c.problems
+
+
+def test_a_missing_pass_number_is_reported_not_raised() -> None:
+    """The key was subscripted, not `.get`, so its absence raised KeyError and voided the scan."""
+    (c,) = check_run_coherence([{"agent": "a", "stage": "s", "slug": "x", "run_id": "r"}])
+    assert any("unreadable" in p for p in c.problems), c.problems
+
+
+def test_one_bad_row_does_not_hide_a_real_defect_in_another_run() -> None:
+    """The actual consequence of raising: every OTHER run goes unreported.
+
+    Rows come from a shared file that concurrent sessions append to, so a single torn line
+    used to convert the checker from "reports problems" to "reports nothing".
+    """
+    rows = [
+        {"agent": "a", "stage": "s", "slug": "x", "run_id": "bad", "pass_or_attempt": None},
+        {**_BASE, "run_id": "real", "pass_or_attempt": 1, "terminal": True},
+        {**_BASE, "run_id": "real", "pass_or_attempt": 2, "terminal": True},
+    ]
+    by_run = {c.run_id: c for c in check_run_coherence(rows)}
+    assert any("terminal" in p for p in by_run["real"].problems), "the real defect was hidden"
+
+
+def test_an_in_flight_run_is_not_a_defect() -> None:
+    """A run with no terminal row yet is unfinished, not incoherent.
+
+    This repo runs many sessions at once; failing on a peer's mid-run would make `coherence`
+    exit 1 almost always, and a gate that always fires is a gate that gets ignored.
+    """
+    (c,) = check_run_coherence(
+        [{**_BASE, "run_id": "live", "pass_or_attempt": 1, "terminal": False}]
+    )
+    assert c.incomplete is True
+    assert c.ok, c.problems
+
+
+def test_a_terminal_row_before_the_last_pass_is_reported() -> None:
+    """A run that continues past its own recorded end is not coherent."""
+    rows = [
+        {**_BASE, "run_id": "t", "pass_or_attempt": 1, "terminal": True},
+        {**_BASE, "run_id": "t", "pass_or_attempt": 2, "terminal": False},
+    ]
+    (c,) = check_run_coherence(rows)
+    assert any("continues to" in p for p in c.problems), c.problems
+
+
+def test_a_string_false_does_not_count_as_terminal() -> None:
+    """`terminal` is compared to True, not tested for truthiness — "false" is truthy."""
+    (c,) = check_run_coherence(
+        [{**_BASE, "run_id": "s", "pass_or_attempt": 1, "terminal": "false"}]
+    )
+    assert c.terminal_count == 0
+
+
+def test_a_sentinel_row_counts_as_an_attempt() -> None:
+    """The reasoning here was backwards until review.
+
+    It said counting a sentinel as a pass "would report a spurious gap on every run whose
+    validator failed to launch". The opposite: a launch failure OCCUPIES attempt 1, so
+    excluding it is what creates the gap — the retry lands at pass 2 and the sequence reads
+    `(2,)`. Sentinels are attempts; only their outcome is missing.
     """
     rows = [
         {**_BASE, "run_id": "s", "pass_or_attempt": 1, "terminal": False},
@@ -398,7 +534,7 @@ def test_a_sentinel_row_does_not_break_the_pass_sequence() -> None:
         },
     ]
     (c,) = check_run_coherence(rows)
-    assert c.passes == (1,)
+    assert c.passes == (1, 2), "the sentinel was dropped from the sequence, creating a gap"
     assert c.terminal_count == 1
     assert c.ok, c.problems
 

@@ -212,7 +212,11 @@ from .conftest import pin_install_ref
 #   instead — do not read a green aggregate as evidence that block works.
 _ATOMIC_RATCHET: dict[str, int] = {
     "execute": 33774,
-    "plan": 46008,
+    # 46008 → 47503 (validator-pass-cap-telemetry + its review round): the pass cap, the
+    # corrected per-(agent,stage,slug,run-id) terminal invariant, the `coherence` pointer,
+    # and the shell-quoting rules for the free-text `--reason`. Attributed in
+    # work-docs/BASELINE-DELTA-validator-pass-cap.md.
+    "plan": 47503,
     "research": 26673,
     "review": 34760,
     "spec": 30537,

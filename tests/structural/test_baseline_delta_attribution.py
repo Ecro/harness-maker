@@ -44,7 +44,33 @@ def _delta_docs() -> list[Path]:
     return sorted(_DELTA_DIR.glob("BASELINE-DELTA-*.md"))
 
 
+def _current_delta_doc() -> Path | None:
+    """The document describing the CURRENT baseline — identified by its own figures.
+
+    Concatenating every delta document (the first fix for the per-task-pin bug) traded one
+    error for a worse one: four of six assertions became corpus-wide, so the stale P7
+    document satisfied `ADR-010`, the ratchet name, the direction word and every
+    per-key attribution row on behalf of a new document that contained none of them. The
+    file's own docstring claimed "a stale document cannot satisfy it by accident" — true
+    only of the aggregate, which was the one assertion that still read the baseline.
+
+    So: glob for DISCOVERY, then pin the per-document assertions to the one doc that
+    carries the current aggregate. A stale doc cannot be selected, because the aggregate
+    moves on every surface change.
+    """
+    actual = json.loads(_BASELINE.read_text(encoding="utf-8"))["aggregate_chars"]
+    wanted = [f"{v:,}".replace(",", " ") for v in actual.values()] + [
+        str(v) for v in actual.values()
+    ]
+    for doc in _delta_docs():
+        text = doc.read_text(encoding="utf-8")
+        if all(any(w in text for w in wanted[i :: len(actual)]) for i in range(len(actual))):
+            return doc
+    return None
+
+
 def _delta_text() -> str:
+    """Every document — for the DISCOVERY-shaped checks only (does any doc exist)."""
     return "\n".join(p.read_text(encoding="utf-8") for p in _delta_docs())
 
 
@@ -165,7 +191,12 @@ def test_every_changed_key_has_an_attribution_row() -> None:
     """P7 exit criterion 2, and the whole point of this file."""
     if _committed_baseline() is None:
         pytest.skip("baseline not readable from HEAD")
-    doc = _delta_text()
+    current = _current_delta_doc()
+    assert current is not None, (
+        "no BASELINE-DELTA-*.md carries the current aggregate — this task moved the "
+        "baseline and did not write its own attribution document"
+    )
+    doc = current.read_text(encoding="utf-8")
     unattributed = []
     for key in changed_keys():
         leaf = key.rsplit(".", 1)[-1]
@@ -178,7 +209,7 @@ def test_every_changed_key_has_an_attribution_row() -> None:
         if parent and f"`{parent}`" not in doc:
             unattributed.append(key)
     assert not unattributed, (
-        "baseline keys moved with no row in BASELINE-DELTA-P7.md: "
+        f"baseline keys moved with no row in {current.name}: "
         + ", ".join(unattributed)
         + " — add the row in the same commit that moved them (ADR-010)"
     )
@@ -186,7 +217,9 @@ def test_every_changed_key_has_an_attribution_row() -> None:
 
 def test_the_document_names_the_owning_phase_and_the_reason_for_ownership() -> None:
     """A future reader must learn WHY only P7 may touch these, or they will touch them."""
-    doc = _delta_text()
+    current = _current_delta_doc()
+    assert current is not None, "no delta document matches the current baseline"
+    doc = current.read_text(encoding="utf-8")
     assert "ADR-010" in doc
     assert "ratchet-rebaselined-by-its-own-subject" in doc
 
@@ -198,7 +231,9 @@ def test_the_document_states_the_direction_of_the_aggregate() -> None:
     that lists the numbers without saying that is technically complete and practically
     misleading.
     """
-    doc = _delta_text()
+    current = _current_delta_doc()
+    assert current is not None, "no delta document matches the current baseline"
+    doc = current.read_text(encoding="utf-8")
     assert "larger" in doc.lower() or "wrong way" in doc.lower()
 
 
@@ -212,11 +247,13 @@ def test_the_documented_aggregate_matches_the_actual_baseline() -> None:
     it is closed here rather than noted.
     """
     actual = json.loads(_BASELINE.read_text(encoding="utf-8"))["aggregate_chars"]
-    doc = _delta_text()
+    current = _current_delta_doc()
+    assert current is not None, (
+        f"no single BASELINE-DELTA-*.md carries the current aggregate {actual} — either the "
+        "attribution went stale, or two documents each carry half of it, which is the "
+        "corpus-wide vacuity this check was rewritten to stop"
+    )
+    doc = current.read_text(encoding="utf-8")
     for variant, value in actual.items():
-        # The doc writes numbers with thin spaces for readability (361 396).
         grouped = f"{value:,}".replace(",", " ")
-        assert grouped in doc or str(value) in doc, (
-            f"aggregate_chars.{variant} is {value} in the baseline but that figure appears "
-            f"nowhere in BASELINE-DELTA-P7.md — the attribution went stale"
-        )
+        assert grouped in doc or str(value) in doc, f"{current.name}: missing {variant}={value}"
