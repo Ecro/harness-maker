@@ -201,6 +201,32 @@ def _head_subject(worktree: Path) -> str:
 # ── the composite ─────────────────────────────────────────────────────────────
 
 
+def derive_deliverable_globs(slug: str, worktree: Path | None = None) -> list[str]:
+    """Every deliverable shape for `slug`, from the single source in `worktree`.
+
+    `DELIVERABLE_PREFIXES` is the one definition; `.gitignore`'s negations and
+    `worktree._DELIVERABLE_RE` derive from it too, and a structural test asserts the three
+    agree. Adding a document type means adding it there and nowhere else.
+
+    **`worktree` filters to shapes that actually exist, and passing it is the normal call.**
+    Without it, every wrapup receipt gains a dozen always-absent rows for document types the
+    task never produced — and the stage tells the operator to READ that receipt. A receipt
+    padded with noise trains people to skim it, which costs more than the rows are worth.
+    Absent optionals are not information here: they are the definition of optional.
+
+    Accepted limitation, identical to `_DELIVERABLE_RE`'s: a non-default `work_docs.dir` or
+    `spec.dir` is not covered. The caller still passes its own `--optional` paths and those
+    are unioned in, so a customised layout keeps working exactly as before.
+    """
+    from harness_maker.worktree import DELIVERABLE_PREFIXES
+
+    globs = [f"work-docs/{prefix}-*{slug}*.md" for prefix in DELIVERABLE_PREFIXES]
+    globs += [f"specs/SPEC-{slug}.md", f"specs/SPEC-{slug}.machine.yaml"]
+    if worktree is None:
+        return globs
+    return [g for g in globs if list(worktree.glob(g))]
+
+
 def run(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
     receipt: dict[str, Any] = {"steps": {}}
 
@@ -226,7 +252,13 @@ def run(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
         raise LandAbortError(f"--message-file is empty: {args.message_file}")
 
     receipt["steps"]["index_before"] = _staged_paths(worktree)
-    dispositions = stage_manifest(worktree, args.required, args.optional)
+    # The caller's `--optional` list is a hand-maintained set in rendered prose, and it
+    # drifted: ABLATION / MATRIX / BASELINE-DELTA were committable and forgiven by the
+    # create-guard but absent from the manifest, so `wrapup_land` omitted them while
+    # reporting success. Deriving the globs HERE — not in the template — means an
+    # un-re-rendered harness gets the fix too; a prose recipe has no execution surface.
+    optional = list(args.optional) + derive_deliverable_globs(args.slug, worktree)
+    dispositions = stage_manifest(worktree, args.required, optional)
     receipt["steps"]["stage"] = dispositions
 
     staged = _staged_paths(worktree)

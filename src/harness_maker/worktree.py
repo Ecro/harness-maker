@@ -166,8 +166,34 @@ _HARNESS_GITIGNORE_PATTERNS: tuple[str, ...] = (
 # `[^/]+` (not `.+`) so the match is a FLAT file — a nested user dir like
 # `work-docs/PLAN-experiments/notes.md` must NOT be forgiven (anti-over-match;
 # `/hm:plan` only ever writes deliverables flat, so no real coverage is lost).
+#: THE deliverable prefix set — one definition, three consumers.
+#:
+#: The same concept was written out separately in `.gitignore`'s negations, in the regex
+#: below, and in `wrapup.md.j2`'s staging flags, and the three had already drifted: the
+#: gitignore knew ten prefixes, the regex four, the manifest five. Each disagreement has its
+#: own symptom — a deliverable that is not committable, one the create-guard refuses to
+#: forgive, and one `wrapup_land` silently omits while reporting success. The last is the
+#: worst, because the wrapup receipt says the work landed.
+#:
+#: `tests/structural/test_deliverable_single_source.py` asserts all three agree.
+#: **Adding a document type means adding it HERE and nowhere else.**
+DELIVERABLE_PREFIXES: tuple[str, ...] = (
+    "PLAN",
+    "RESEARCH",
+    "SPEC",
+    "REVIEW",
+    "CLOSE",
+    "AUDIT",
+    "BASELINE",
+    "RECEIPT",
+    "ABLATION",
+    "MATRIX",
+)
+
+# `[^/]+` (not `.+`) so the match is a FLAT file — a nested user dir like
+# `work-docs/PLAN-experiments/notes.md` must NOT be forgiven.
 _DELIVERABLE_RE = re.compile(
-    r"^(?:work-docs/(?:PLAN|RESEARCH|SPEC|REVIEW)-[^/]+\.md|specs/SPEC-[^/]+\.md)$"
+    r"^(?:work-docs/(?:" + "|".join(DELIVERABLE_PREFIXES) + r")-[^/]+\.md|specs/SPEC-[^/]+\.md)$"
 )
 
 
