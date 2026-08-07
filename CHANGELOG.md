@@ -1,5 +1,30 @@
 # Changelog
 
+## [Unreleased]
+
+### `/hm:execute` stopped telling you to finalize a worktree `task-land` owns
+
+Two worktree models render under the same `worktree.enabled` flag, and Step 5 was written for
+the older one. The stage opened with the per-task `task-preflight` and then instructed
+`worktree finalize <WT> stage-only` — a merge into base, on an `hm/<slug>` worktree whose land
+belongs to `task-land` — while citing a "Step 0 `worktree create`" the rendered document no
+longer contains. The instruction is CORRECT under `/hm:loop`, whose `<WT>` is an
+`execute-<uuid>` worktree staged back to base each iteration, so the two cannot be separated
+at render time. Step 5 now reads `git -C <WT> rev-parse --abbrev-ref HEAD` at runtime and
+skips itself on `hm/*` — the same discriminator `/hm:wrapup` Step 7.7 already uses.
+
+Writing that up surfaced a second `<WT>`. Under loop dispatch the driver runs every step of
+each stage file, and `task-preflight` **creates** `.worktrees/<slug>/` and declares that path
+`<WT>` as well. Follow the loop's and the task worktree is an orphan; follow the stage's and
+the iteration's work lands on `hm/<slug>` while loop-close finalizes the empty ephemeral one —
+stranded, with every exit code 0. The loop already gave `/hm:wrapup` an override for exactly
+this; the per-iter stages now get it too. No incident was observed, so the possibility is
+established and the frequency is not.
+
+Both are the same recurrence — `[fail:design] handoff-assumes-a-skipped-step`, now at count:3
+with the previous release's `wrapup_land` fix as its second instance. The escalation proposal
+is filed.
+
 ## [0.50.0] — 2026-08-08
 
 ### "Deliverable" has one definition instead of three

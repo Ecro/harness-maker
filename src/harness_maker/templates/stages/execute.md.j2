@@ -385,21 +385,26 @@ If a PLAN phase blocks (Phase A.5 retry exhausted, Phase D unfixable, or ADR con
 {% set gate0_heading = "### Step 4.5 — Emit Gate 0 receipt (ADR-001, ADR-005)" %}{% set gate0_stage = "execute" %}{% set gate0_pass = "Step 4 exited cleanly (all Phase D checks GREEN, no blocker filed)." %}{% set gate0_fail = "Step 4 raised a blocker (Phase D unfixable, ADR conflict, test-reviewer FAIL retry exhausted)." %}{% set gate0_standalone = false %}{% include "agents/_partials/gate0_receipt.md.j2" %}
 
 {% if wt_on -%}
-### Step 5 — Worktree finalize
+### Step 5 — Worktree finalize (ephemeral `/hm:loop` worktrees ONLY)
 
-Normal flow blocks a dirty base repo during Step 0 `worktree create`. Finalize
-auto-stashes base dirt only when the user explicitly bypassed that guard with
-`--allow-dirty-base` or when new base dirt appeared after create. Before
-invoking finalize, run `git status --porcelain` in the **base** repo (parent
-of `<WT>`'s `.worktrees/`). If non-empty, surface to the user,
-informationally (no question — finalize proceeds):
+**Does this step apply?** Two worktree models reach it; finalize belongs to one. Read
+`git -C <WT> rev-parse --abbrev-ref HEAD`. On **`hm/*`** — a per-task worktree from Step 0's
+preflight — **SKIP the rest of Step 5**: the work stays in `<WT>`, wrapup commits it there and
+`task-land` squashes it onto base, so finalizing would merge behind `task-land`'s back (the
+same reason loop tells wrapup to skip Step 7.7). Otherwise `<WT>` is an `execute-<uuid>`
+worktree `/hm:loop` created — continue, staging this iteration back to base.
 
-> "다음 파일이 base 에 dirty 상태로 있어 finalize 가 자동 stash 후 복원합니다: {file list}
-> **알림:** staged 파일은 unstaged 상태로 복원됩니다 — 필요시 다시 `git add` 하세요."
+Finalize auto-stashes base dirt only when the user bypassed the create guard with
+`--allow-dirty-base` or new dirt appeared after create. Before invoking it, run
+`git status --porcelain` in the **base** repo (parent of `<WT>`'s `.worktrees/`). If
+non-empty, surface it informationally (no question — finalize proceeds):
 
-You **MAY** call {% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %} (autoloop exception) **ONLY IF** the literal substring `[finalize] stash-pop conflict` OR `[finalize] untracked-file collision` appears in finalize's stderr. Any other failure: halt with stderr message, do NOT ask.
+> "다음 파일이 base 에 dirty 상태라 finalize 가 자동 stash 후 복원합니다: {file list}
+> **알림:** staged 파일은 unstaged 로 복원됩니다 — 필요시 다시 `git add` 하세요."
 
-Pick **exactly one** finalize command. Substitute `<WT>` with the literal absolute path from Step 0.
+You **MAY** call {% if is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %} (autoloop exception) **ONLY IF** `[finalize] stash-pop conflict` OR `[finalize] untracked-file collision` appears in finalize's stderr. Any other failure: halt with the stderr message, do NOT ask.
+
+Pick **exactly one** finalize command. Substitute `<WT>` with the absolute path from Step 0.
 
 {% if is_codex %}
 ```
@@ -428,12 +433,10 @@ Bash("uv run --with {{ harness_maker_src_path }} hm worktree finalize <WT> fail"
 If Step 0 printed empty (no isolation engaged), skip both — there is nothing to finalize.
 
 **Record the owned uuid for wrapup's pop (ADR-001, slug crumb).** After a stage-only
-finalize that deferred a stash, record THIS session's worktree uuid into a slug-keyed
-crumb so `/hm:wrapup`'s `post-commit-pop` restores **only your own** deferred stash
-(machine-derived, works even in a fresh/recovered wrapup window). Substitute `<slug>`
-(this `/hm:execute` arg) and `<WT>` (your `execute-<uuid>-<ts>` worktree from Step 0).
-On the `worktree.enabled` (flag-on) path there is no deferred stash → `wt-uuid`
-of a `hm/<slug>` task worktree is empty → nothing recorded, by design.
+finalize that deferred a stash, record THIS session's worktree uuid into a slug-keyed crumb
+so `/hm:wrapup`'s `post-commit-pop` restores **only your own** deferred stash (machine-derived,
+so a fresh or recovered wrapup still works). Substitute `<slug>` (this `/hm:execute` arg) and
+`<WT>` (the `execute-<uuid>-<ts>` worktree you just finalized).
 
 {% if is_codex %}
 ```
@@ -445,7 +448,7 @@ Bash("uv run --with {{ harness_maker_src_path }} hm worktree owned-crumb-add \"$
 ```
 {% endif %}
 
-**Sequences without wrapup** (e.g. `/hm:loop --per-iter-stages execute,review`): if you exit at this stage without wrapup running afterward, the staged changes remain uncommitted on the base branch. Either run `/hm:wrapup` to commit them, or commit manually:
+**Sequences without wrapup** (e.g. `/hm:loop --per-iter-stages execute,review`): exiting here with no wrapup afterwards leaves the staged changes uncommitted on the base branch. Run `/hm:wrapup`, or commit manually:
 
 ```bash
 git commit -m "<your message>"
@@ -480,7 +483,7 @@ Bash("HM_OWNED_SESSION_UUIDS=\"$(uv run --with {{ harness_maker_src_path }} hm w
 - Phase A.5 test-reviewer returned PASS (or `--no-tdd` was set).
 - No diff outside the PLAN's stated scope — surprise edits are flagged.
 - No `git commit` invoked from this stage. (Verify: `git log` shows no new commit relative to stage start.)
-{% if wt_on %}- Worktree finalized exactly once: success or fail.
+{% if wt_on %}- An `execute-<uuid>` worktree finalized exactly once: success or fail. An `hm/<slug>` task worktree finalized ZERO times — wrapup commits it and `task-land` lands it.
 {% endif %}
 
 {% set summary_done = "PLAN phases implemented to GREEN; changes staged, no commit" -%}

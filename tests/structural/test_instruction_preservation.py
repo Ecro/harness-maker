@@ -121,7 +121,19 @@ _PHASE_1_PASS15_HEADINGS = [
     "#### Pass 1.5 — verifier (active, ADR-008)",
 ]
 
+#: The heading is RENAMED, not deleted: "### Step 5 — Worktree finalize" becomes
+#: "### Step 5 — Worktree finalize (ephemeral `/hm:loop` worktrees ONLY)". The scope now in
+#: the title is the fix — the step told every isolated `/hm:execute` to finalize a per-task
+#: worktree that `task-land` owns, and it is correct only for the loop's `execute-<uuid>`.
+#: Listed against BOTH arms because Step 5 sits outside every `dev_mode` gate, so a rename
+#: reaching only one arm would be the bug this key shape exposes.
+_STEP5_SCOPED_HEADING = ["### Step 5 — Worktree finalize"]
+
 _ALLOWED_REMOVALS: dict[str, dict[str, list[str]]] = {
+    "execute-step5-model-mismatch": {
+        "execute@task-driven": list(_STEP5_SCOPED_HEADING),
+        "execute@spec-driven": list(_STEP5_SCOPED_HEADING),
+    },
     "phase-2-sessionid-env-propagation": _PHASE_2_SESSIONID,
     "phase-5-sessionid-span": _PHASE_5_SPAN_SESSIONID,
     # Phase D's three separate calls collapse into a select call plus one `&&`-chained

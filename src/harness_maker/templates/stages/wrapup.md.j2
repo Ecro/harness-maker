@@ -617,10 +617,20 @@ that matters: the shell form this replaced hid a real failure and a missing file
 the same `2>/dev/null || true`, which is how wiki + failures silently left a wrapup
 commit on 2026-05-30.
 
+**The manifest names DELIVERABLES, not the whole commit.** A final `kind: "worktree-sweep"`
+row stages everything else in the task worktree — the manifest never named `src/**`, because
+it was written for the ephemeral model where execute's `finalize stage-only` had already
+filled the index. The per-task model has no finalize, so `wrapup_land` twice committed the
+PLAN alone while reporting success. The row reads `staged` in a task worktree and
+`skipped-not-isolated` when `--worktree` IS `--base` (a shared branch, where sweeping would
+pull in unrelated work).
+
 **Read the receipt, do not assume.** `steps.stage[]` gives each path its disposition,
 `steps.index_before` / `index_after` make foreign staged content visible, and
 `steps.commit.status` is `created` or `already-present` — the latter means a prior run
 committed and failed later, so this run resumed instead of adding an empty duplicate.
+**Check `index_after` holds your code**, not just deliverables: both times this failed, the
+receipt said `ok: true`.
 
 **On abort.** `steps.legacy_ref_scan.status == "abort"` means live legacy
 finalize-stash refs (empty `session_uuid`) exist. Nothing was staged and nothing was

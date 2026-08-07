@@ -223,3 +223,72 @@ def test_deliverable_write_instruction_is_rooted(tmp_path: Path, stage: str, doc
     off = (_render(tmp_path / "off", enabled=False) / f"{stage}.md").read_text(encoding="utf-8")
     assert f"<WT>/{_DELIVERABLE_DIRS[stage]}{doc}" in on, f"{stage}: ON target not rooted at <WT>"
     assert f"./{_DELIVERABLE_DIRS[stage]}{doc}" in off, f"{stage}: OFF target not rooted at ."
+
+
+# ── the finalize instruction is scoped to the model it belongs to ─────────────
+
+
+def test_execute_step5_gates_finalize_on_the_worktree_model(tmp_path: Path) -> None:
+    """Step 5's `finalize` must not reach a per-task worktree.
+
+    The rendered `/hm:execute` opens with the per-task `task-preflight` and then told the
+    operator to run `worktree finalize <WT> stage-only` — a LEGACY-model instruction that
+    merges into base, which is `task-land`'s job. Both blocks render under the same `wt_on`,
+    so the separation cannot be made at render time: `<WT>` is an `execute-<uuid>` worktree
+    under `/hm:loop` (where finalize is correct) and an `hm/<slug>` task worktree otherwise.
+    The gate is therefore a RUNTIME branch read, and this asserts it is present and precedes
+    the finalize call it guards.
+    """
+    body = (_render(tmp_path, enabled=True) / "execute.md").read_text(encoding="utf-8")
+
+    gate_at = body.find("rev-parse --abbrev-ref HEAD")
+    finalize_at = body.find("worktree finalize <WT> stage-only")
+    assert gate_at != -1, "Step 5 has no runtime branch check — finalize is unscoped again"
+    assert finalize_at != -1, "the finalize call vanished; this test would then assert nothing"
+    assert gate_at < finalize_at, "the branch check must come BEFORE the finalize it guards"
+    # The skip must name the branch shape, not merely 'a task worktree' — the operator has
+    # to be able to evaluate it, and `hm/` is the same discriminator wrapup Step 7.7 uses.
+    assert "`hm/*`" in body[gate_at - 400 : finalize_at]
+
+
+def test_execute_step5_no_longer_cites_a_step_that_does_not_exist(tmp_path: Path) -> None:
+    """`/hm:execute` stopped creating ephemeral worktrees; the prose kept citing that step.
+
+    A reader following "Step 0 `worktree create`" finds `task-preflight` there instead, which
+    is how the mismatch stayed invisible: every sentence was locally plausible.
+    """
+    body = (_render(tmp_path, enabled=True) / "execute.md").read_text(encoding="utf-8")
+
+    assert "Step 0 `worktree create`" not in body
+    assert "`execute-<uuid>-<ts>` worktree from Step 0" not in body
+    assert "task-preflight" in body, "Step 0 is the preflight — the fixture rendered wrong"
+
+
+def test_loop_tells_per_iter_stages_to_skip_their_own_preflight(tmp_path: Path) -> None:
+    """One `<WT>` per iteration, or the iteration's work can be stranded.
+
+    The loop creates an `execute-<uuid>` worktree and calls it `<WT>`; every stage file
+    opens with `task-preflight`, which CREATES `.worktrees/<slug>/` and declares that path
+    `<WT>` as well. The driver reads the stage inline, so both instructions sit in one
+    context. Resolving toward the stage puts the iteration's work on `hm/<slug>` while
+    loop-close finalizes the empty ephemeral worktree — lost to convergence, with every
+    exit code 0. The loop already gives wrapup this exact override; this asserts the
+    per-iter stages get it too.
+    """
+    loop = (_render(tmp_path, enabled=True) / "loop.md").read_text(encoding="utf-8")
+
+    dispatch_at = loop.find("Invoke per-iter stages")
+    assert dispatch_at != -1, "the per-iter dispatch step vanished"
+    # Scoped to the dispatch step: the wrapup override further down says the same words,
+    # so an unscoped `in loop` would pass on a document that never told the STAGES.
+    section = loop[dispatch_at : dispatch_at + 1200]
+    assert "task-preflight" in section, "the dispatch step does not mention the preflight"
+    assert "skip" in section.lower()
+
+
+def test_the_loop_still_forbids_skipping_the_rest_of_a_stage(tmp_path: Path) -> None:
+    """The control. The override is ONE exception; a driver that reads it as licence to
+    skip steps generally would silently drop Gate 0 receipts, finalize, and Phase D."""
+    loop = (_render(tmp_path, enabled=True) / "loop.md").read_text(encoding="utf-8")
+
+    assert "without skipping any" in loop

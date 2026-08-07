@@ -172,3 +172,29 @@ and print the count, and `Edit` (which errors on no-match) is preferred to any h
 replace; (c) `/hm:review` and `/hm:execute` should treat "reported Applied" as unverified until
 the artifact is re-read — this round's REVIEW iteration table already carries a `Status` column
 that would have shown the no-op if the re-read were routine rather than incidental.
+
+## Proposal: a second execution model must gate every instruction that names the first (2026-08-08)
+**Triggered by:** [fail:design] handoff-assumes-a-skipped-step (count: 3)
+**Proposed mechanism:** structural test (render-grep over the shipped surface)
+**Rationale:** The per-task worktree model was added alongside the ephemeral one and BOTH
+render under the same `worktree.enabled` flag. Three instances followed, all the same shape —
+an instruction written for the ephemeral model surviving unconditionally into the per-task
+one. (1) `wrapup_land` assumed `finalize stage-only` had staged the code; it had not, and the
+implementation was omitted from its own commit twice. (2) `execute.md` Step 5 still INSTRUCTED
+that finalize, on a worktree `task-land` owns. (3) The loop told per-iter stages to run every
+step, so `task-preflight` created a second `<WT>` and the iteration's work could strand on
+`hm/<slug>` while loop-close finalized an empty worktree.
+
+Each was fixed by hand, at the site, after it bit. What no one did was ask the general
+question: *which other instructions name a command that only one model uses?* That list is
+mechanically derivable. `worktree create`, `finalize`, `post-commit-pop` and `owned-crumb-add`
+belong to the ephemeral model; `task-preflight`, `task-refresh`, `task-land` belong to the
+per-task one. A structural test could assert that every rendered occurrence of either set sits
+under a runtime discriminator (the `hm/*` branch check) or an explicit per-model override, and
+fail on a bare one.
+
+**Caveat the implementer should settle first:** a render-grep cannot tell a live instruction
+from an explanatory mention — `/hm:health` names `worktree create` as content, and the loop's
+own prose describes both models on purpose. That is the same exemption problem that made the
+`dead-string-pin` rule's arm (a) unshippable at 19 false positives, so measure the false
+positives against the tree BEFORE building the gate, and drop it if the ratio repeats.

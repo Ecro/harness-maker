@@ -211,7 +211,21 @@ from .conftest import pin_install_ref
 #   correctness is gated by `tests/unit/test_render_configure_health_second_opinion.py`
 #   instead — do not read a green aggregate as evidence that block works.
 _ATOMIC_RATCHET: dict[str, int] = {
-    "execute": 33774,
+    # 33774 → 34533 (execute-step5-model-mismatch, 2026-08-08). Same bar as ADR-012 and the
+    # entries above: compaction FIRST, then the residue. Raw addition was +954; two passes cut
+    # it to +424 (−55%) — the new gate lost its dual codex/non-codex code fence for an inline
+    # command, the dirty-base paragraph and the crumb note were tightened now that both are
+    # provably loop-only, and the "sequences without wrapup" prose was halved.
+    # The residue is not prose. Step 5 instructed `worktree finalize <WT> stage-only` while the
+    # stage's own Step 0 is the per-task `task-preflight` — both render under the same `wt_on`,
+    # so on every isolated `/hm:execute` the document told the operator to merge into base a
+    # worktree that `task-land` owns, citing a "Step 0 `worktree create`" the rendered file no
+    # longer contains. The finalize is CORRECT under `/hm:loop`, whose `<WT>` is an
+    # `execute-<uuid>`, so a render-time gate cannot separate them: the residue is a runtime
+    # read of `rev-parse --abbrev-ref HEAD` that skips Step 5 on `hm/*` — the discriminator
+    # wrapup Step 7.7 already uses. Compressing it away restores a destructive instruction.
+    # Attributed in work-docs/BASELINE-DELTA-execute-step5-model-mismatch.md.
+    "execute": 34533,
     # 46008 → 47503 (validator-pass-cap-telemetry + its review round): the pass cap, the
     # corrected per-(agent,stage,slug,run-id) terminal invariant, the `coherence` pointer,
     # and the shell-quoting rules for the free-text `--reason`. Attributed in

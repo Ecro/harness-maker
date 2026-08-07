@@ -561,10 +561,10 @@ The marker(s) are gitignored by the harness worktree setup.
 > `rm .hm-loop-active` then re-run `/hm:loop --spec <spec-path>` with the
 > remaining features.
 
-{% if wt_on %}Per-iter standalone `/hm:execute` (e.g. inside an invoked workflow's
-execute stage) calls `worktree create` again — its idempotency check
-detects we're already inside `.worktrees/<name>/` and returns the
-existing path. No nested worktrees.
+{% if wt_on %}`/hm:execute` no longer calls `worktree create` — its Step 0 is the
+per-task `task-preflight`. Under loop dispatch you have already created the
+`execute-<uuid>` worktree and that one is `<WT>` for every stage; execute's own
+Step 5 branch-check keeps its `finalize` scoped to it, and skips on `hm/*`.
 
 **Enforcement layer**: `worktree_gate` (a PreToolUse hook installed by
 `/harness-maker:make`) blocks Write/Edit/MultiEdit calls whose target is
@@ -812,7 +812,14 @@ For each iter (until convergence or any safety rail fires):
    > drifted — re-verify before continuing.
 4. **Invoke per-iter stages**: for each stage in `STAGES`, in order, read
    `.claude/commands/hm/<stage>.md` and execute **every step it defines,
-   without skipping any**, before moving to the next stage. Operate inside {{ WTP }}:
+   without skipping any**{% if wt_on %} — with ONE exception: **skip each stage's own worktree
+   preflight / Step 0. Do NOT run `task-preflight`.** `<WT>` is the `execute-<uuid>` worktree
+   you created above, and a stage's preflight would create a SECOND one at
+   `.worktrees/<slug>/` and declare ITS path `<WT>` too. Two definitions in one iteration
+   resolve either way: follow yours and the task worktree is an orphan; follow the stage's
+   and the work lands on `hm/<slug>` while loop-close finalizes the empty ephemeral one —
+   stranded, and invisible to convergence. This is the same override step 5 already gives
+   wrapup{% endif %}, before moving to the next stage. Operate inside {{ WTP }}:
    substitute the absolute worktree path for every Read/Write/Edit call;
    tests / lints / type checks run via {% if wt_on %}`cd <WT> && <cmd>`{% else %}`<cmd>` in place{% endif %}. Stage "When
    to Run" skip conditions apply only to standalone invocation, not
