@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.50.1] — 2026-08-08
 
 ### `/hm:execute` stopped telling you to finalize a worktree `task-land` owns
 
