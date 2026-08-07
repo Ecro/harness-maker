@@ -40,6 +40,17 @@ _KNOWN_MISSING: dict[tuple[str, int], str] = {
         "from them now would put a SECOND post-hoc entry in a corpus whose value depends on "
         "entries being captures. Recorded as missing instead."
     ),
+    **{
+        ("mechanical-guards-from-backlog", n): (
+            "all three rounds ran the merge and the id-stamp but never the Step 3.4 "
+            "persist-payload line; the merged temp files were deleted with the rounds, so "
+            "nothing survives to persist. Reconstructing from the REVIEW narrative would "
+            "produce a post-hoc entry, which this corpus explicitly does not want. This "
+            "gate landed on main WHILE that review was running and caught it on the "
+            "rebase — the first time the step's absence was visible to anything."
+        )
+        for n in (1, 2, 3)
+    },
 }
 
 

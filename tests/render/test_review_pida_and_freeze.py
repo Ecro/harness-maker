@@ -20,6 +20,7 @@ has fired three times in this repo on assertions that pinned wording a correct r
 
 from __future__ import annotations
 
+import re
 from functools import cache
 from pathlib import Path
 from tempfile import mkdtemp
@@ -421,12 +422,22 @@ def test_the_batch_trigger_is_reachable_and_ordered_before_fix_selection() -> No
     # attribute (1) → group/trigger (2) → select (3). A prose clause was what the
     # first cut asserted, and prose is what drifted from the numbered list in the
     # first place (code-reviewer + codex, review round 1).
+    # The ordinal's SHAPE is pinned and its VALUE is not. `"1. **Merge and attribute.**"`
+    # broke on a correct renumber ([fail:test] test-pins-retired-implementation-name,
+    # count:4); a bare `.find("**Merge and attribute.**")` then dropped the one thing this
+    # test is about — that the order is carried by the NUMBERED list rather than by prose.
+    # `^\d+\. ` keeps that and survives renumbering.
+    def _step(body: str, title: str) -> int:
+        m = re.search(rf"^\d+\. {re.escape(title)}", body, re.M)
+        return m.start() if m else -1
+
     for body in (review_on(), review_off()):
-        attribute_at = body.find("1. **Merge and attribute.**")
-        group_at = body.find("2. **Group.**")
-        select_at = body.find("3. **Select fixable findings**")
+        attribute_at = _step(body, "**Merge and attribute.**")
+        group_at = _step(body, "**Group.**")
+        select_at = _step(body, "**Select fixable findings**")
         assert -1 not in (attribute_at, group_at, select_at), (
-            "the Auto-Fix Loop's numbered steps 1-3 are not where the contract says"
+            "the Auto-Fix Loop's steps are no longer a NUMBERED list where the contract "
+            "says: merge-and-attribute / group / select-fixable"
         )
         assert attribute_at < group_at < select_at, (
             "attribution/trigger no longer precede fix selection — arm (b) is unreachable"

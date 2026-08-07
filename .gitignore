@@ -26,6 +26,13 @@
 .claude/*
 !.claude/harness.yaml
 !.claude/memory/
+# Mutation receipts are EVIDENCE, not churn — the re-include for them lives with the
+# observability block further down, NOT here. It was here first, and a concurrent branch
+# added its own `.claude/observability/*` block BELOW it; git resolves by LAST match, so
+# the negation above that block was dead on arrival while `git check-ignore` still
+# answered "not ignored" — because the file was already tracked and check-ignore skips
+# tracked paths. `--no-index` is what showed the truth. Two correct edits merging into a
+# silently wrong file is the hazard this whole directory's comments are about.
 # …but memory churn (LLM working tiers + runtime locks) stays ignored even though
 # memory/ is re-included:
 .claude/memory/semantic/
@@ -65,6 +72,11 @@
 !.claude/observability/
 .claude/observability/*
 !.claude/observability/review-payloads/
+# Mutation receipts (PLAN-mechanical-guards-from-backlog) — same argument as the corpus
+# above, and it MUST stay below `.claude/observability/*` for the same last-match reason.
+# Verify with `--no-index`; without it, an already-tracked ledger reports "not ignored"
+# no matter what the rules say.
+!.claude/observability/mutation-receipts.jsonl
 
 # Cursor IDE workspace
 .cursor/

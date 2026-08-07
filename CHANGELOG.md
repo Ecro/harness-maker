@@ -2,6 +2,46 @@
 
 ## [Unreleased]
 
+### The failure backlog got a consumer, and four guards got built
+
+`.claude/memory/pending-proposals.md` held 17 proposals, the oldest three months old. The
+escalation machinery detects recurrence correctly, writes the recommendation, and **nothing
+ever read it** — so recurrences kept accumulating against guards nobody built. Four of them
+are now mechanical.
+
+`test_no_golden_bakes_a_machine_path.py` rejects a machine-specific absolute path in any
+committed golden, population derived by glob so a golden added tomorrow is covered. It first
+shipped guarding only the *property* (no `/home|/Users|/root`) on the argument that
+`.worktrees` was a mere symptom — and that made it **largely vacuous over the count:13 failure
+it was written for**, because `synthesize._portablize_ref` rewrites the render machine's home
+to a literal `$HOME` before the golden is written, so a worktree capture emits
+`$HOME/…/.worktrees/<slug>` and the property rule exempts `$HOME` by design. Both rules now
+ship; neither covers the other.
+
+`test_no_dead_string_pins.py` bans a leading step ordinal in a test literal — a number is
+prose and dies on a correct renumber. A second rule proposed alongside it was implemented,
+run against the tree, and **rejected**: it flagged 19 legitimate anti-regression guards
+against 1 true instance. That reasoning is recorded in the file instead of deleted.
+
+`test_cli_surfaces_are_driven.py` requires every `hm` subcommand to be executed somewhere in
+its shipped spelling, by AST over six executing shapes. Its allowlist is no longer trusted
+prose: three consecutive rounds of hand-written "this one has no driver" reasons contained
+false entries, so a deliberately over-generous second detector now re-checks every entry —
+which is what found the last one, after a strict detector, two reviewers, a cross-model voter
+and the written reason had all passed over it.
+
+`hm mutation_receipt` records, per new gate, the source line to delete and the test that dies
+when you do — and `test_new_gates_file_a_mutation_receipt.py` is the consumer that makes it
+bite: a new `tests/structural/` gate cannot land without a row. It mechanises the obligation,
+not the proof; nothing re-runs the mutation, so a false receipt is still possible and an
+absent one is not. All six receipts were earned by deleting the line and observing an
+assertion failure — a collection error was rejected as evidence, since any line kills a module
+that way and such a receipt carries no information.
+
+Worth stating plainly, because it is the round's most reusable finding: **every one of these
+guards shipped carrying a defect of the class it was built to catch, on a fully green suite,
+and every time it was a reviewer or an executable probe that found it — never the suite.**
+
 ### Two sessions in one project stopped fighting over one file
 
 Running two Claude sessions in the same repo is the normal case, and the harness was hostile

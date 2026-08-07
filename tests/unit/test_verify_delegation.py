@@ -12,6 +12,7 @@ summarising main loop relaying "all green" while a check said FAIL.
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 from pathlib import Path
 
@@ -29,6 +30,22 @@ from harness_maker.models import (
 )
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
+
+
+def _numbered_step_at(body: str, title: str) -> int:
+    """Offset of `<n>. <title>` at the start of a line, for ANY n.
+
+    Pinning the literal `"1. Read inputs…"` broke on a correct renumber ([fail:test]
+    test-pins-retired-implementation-name, count:4) and is now blocked by
+    `tests/structural/test_no_dead_string_pins.py`. Dropping the ordinal outright was the
+    first response and it was WEAKER than what it replaced: a bare `.index(title)` matches a
+    prose mention of the same phrase anywhere earlier in the document, which is exactly the
+    ambiguity the ordinal was resolving. So the ordinal's SHAPE is pinned and its VALUE is
+    not — this still fails if the step stops being a numbered step at all.
+    """
+    m = re.search(rf"^\d+\. {re.escape(title)}", body, re.M)
+    assert m, f"no numbered step titled {title!r}"
+    return m.start()
 
 
 def _git(args: list[str], cwd: Path) -> None:
@@ -288,7 +305,7 @@ def test_the_delegate_on_verify_render_carries_dispatch_and_inline_body(
     # points at nothing. What matters is that the heading is followed by the numbered
     # procedure it claims to introduce.
     degraded_at = body.lower().index("degraded")
-    procedure_at = body.index("1. Read inputs (PLAN, SPEC")
+    procedure_at = _numbered_step_at(body, "Read inputs (PLAN, SPEC")
     assert degraded_at < procedure_at
 
 
@@ -306,7 +323,7 @@ def test_the_verify_gate_verdict_stays_with_the_main_loop(tmp_path: Path) -> Non
     # Scoped to the dispatch section: `"STOP" in body` is satisfied by the
     # pre-existing "STOP on first FAIL" header and would hold even if the dispatch
     # handed the gate decision to the subagent.
-    section = body[body.index("Step 0.5") : body.index("1. Read inputs (PLAN, SPEC")]
+    section = body[body.index("Step 0.5") : _numbered_step_at(body, "Read inputs (PLAN, SPEC")]
     assert "wrapup_receipt" in section
     assert "STOP" in section
     assert "never a PASS" in section
@@ -325,7 +342,7 @@ def test_the_verify_receipt_temp_file_discipline_is_specified(tmp_path: Path) ->
     session's reply from a collidable path would adopt someone else's result."""
     body = _verify(tmp_path, stages=["verify"])
     section = " ".join(
-        body[body.index("Step 0.5") : body.index("1. Read inputs (PLAN, SPEC")].split()
+        body[body.index("Step 0.5") : _numbered_step_at(body, "Read inputs (PLAN, SPEC")].split()
     )
 
     assert "OUTSIDE the repo" in section

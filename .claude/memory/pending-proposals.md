@@ -3,15 +3,19 @@
 > Improvement proposals triggered by failure entries with count ≥ 3.
 > Review and decide whether to ingest into the harness.
 
-## Proposal: snapshot-regen-order-guard (2026-05-10)
-**Triggered by:** [fail:test] snapshot-regen-inside-worktree (count: 3)
-**Proposed mechanism:** rule update in CLAUDE.md + execute stage procedure note
-**Rationale:** The regen-before-finalize failure has happened 3 times: once in the worktree itself, once after squash-merge with stale paths, and once in deep-interview-llm-delegation where regen ran before worktree finalize. The correct order (finalize → regen → full pytest) is buried in the execute stage procedure. Adding an explicit ordered checklist note to execute.md.j2 (Phase 6/7 sequence for snapshot tests) would prevent this class of error automatically in every future exec-rev loop. Consider also adding a pre-regen assert that checks `git diff --name-only HEAD | grep 'templates/.*\.j2'` to confirm the template changes are present in main before regen runs.
+## RESOLVED 2026-08-07 — shipped as mechanical guards
 
-## Proposal: post-finalize-snapshot-regen-hook (2026-05-17)
-**Triggered by:** [fail:test] snapshot-regen-inside-worktree (count: 5)
-**Proposed mechanism:** new step in `harness_maker.worktree finalize` CLI — when finalize-stage-only runs and the merged diff includes any `templates/**/*.j2` path, automatically invoke `tests/snapshot/regenerate.py` from the main repo root before returning and stage the regenerated `tests/snapshot/*.expected.yaml` files alongside.
-**Rationale:** The 2026-05-10 proposal added documentation but did not automate the regen step. count:5 means humans still forget the sequence even with the doc. Automating inside the worktree CLI makes regen byte-deterministic with respect to main's filesystem path. Implementation: after `git checkout <wt-branch> -- .` in finalize-stage-only, check `git diff --staged --name-only | grep -q 'templates/.*\.j2$'`; if yes, `subprocess.run([sys.executable, 'tests/snapshot/regenerate.py'], cwd=main_repo, check=True, timeout=120)`, then `git add tests/snapshot/*.expected.yaml`.
+The proposals below were implemented by PLAN-mechanical-guards-from-backlog and are removed
+from the queue. Each guard carries a mutation receipt in
+`.claude/observability/mutation-receipts.jsonl` naming the line to delete and the test that
+dies with it.
+
+| Retired proposal(s) | Shipped as |
+|---|---|
+| `snapshot-regen-order-guard`, `post-finalize-snapshot-regen-hook`, `snapshot-regen-count-11-escalate-to-mechanical`, and their RETIRE note | `tests/structural/test_no_golden_bakes_a_machine_path.py` — guards the PROPERTY (no machine-specific absolute path in any committed golden) **and** the `.worktrees` symptom the three prior proposals all targeted. Shipped property-only first, and that was **largely vacuous over count:13**: `synthesize._portablize_ref` rewrites the render machine's home to a literal `$HOME` before the golden is written, so a worktree capture emits `$HOME/…/.worktrees/<slug>` — which the property rule deliberately exempts. The three prior proposals were right that `.worktrees` is the discriminator; the correction was to keep both rules, since neither covers the other. |
+| `dead-string-pin-guard` | `tests/structural/test_no_dead_string_pins.py` — **partially**. Its rule (b) (step-number pins) shipped and found 7 real offenders. **Its rule (a) was implemented, run, and REJECTED**: it flagged 19 legitimate anti-regression guards, because a negative pin's literal being absent from `src/` is the correct state for one, not a defect. The reasoning is recorded in that file so the rule is not re-proposed. |
+| `CI gate — every new CLI surface must be driven in its shipped form` | `tests/structural/test_cli_surfaces_are_driven.py` — found `delegation_ledger` undriven; a driver test was added rather than an allowlist entry |
+| `mutation-check-receipt-per-new-gate` | `hm mutation_receipt record` + `tests/structural/test_new_gates_file_a_mutation_receipt.py` — the **consumer**, without which the CLI was registered and inert (three reviewers and a cross-model voter said so in one round, correctly). A new `tests/structural/` gate now cannot land without a row; pre-existing gates sit on a shrink-only debt list. Six receipts, each earned by deleting the line and observing an **assertion** failure — a collection error was rejected as proof, since any line kills a module that way. Mechanises the OBLIGATION, not the proof: a false receipt is still possible, an absent one is not (module docstring states the limit rather than selling past it). |
 
 ## Proposal: orphan-worktree-prune-on-create (2026-05-17)
 **Triggered by:** [fail:design] worktree-finalize-pulls-orphan-wip-into-main (count: 3 as of 2026-08-01, was 1 when this proposal was written; cost-per-incident is high — 139-file scope explosion + ~30 min cleanup)
@@ -67,87 +71,6 @@ should ask specifically about newly-added tests.
 **Proposed mechanism:** execute + review stage procedure note (run `ruff format` after edits, not only `ruff check`) OR a pre-commit format-fix hook. **Updated 2026-07-25 — this mechanism has a gap.** It assumes the failure mode is "format was never run". A second mode exists: format IS run and its exit code is discarded, because the command was piped (`ruff format --check … | tail -1` makes `$?` the tail's). Neither a procedure note nor a format-fix hook catches that. Add: gate commands must never be piped — redirect and record one `rc` per check (`cmd > f 2>&1; echo "rc=$?" >> f`). See `[fail:lint] gate-exit-code-lost-through-pipe`.
 **Updated 2026-08-05 — the predicted failure happened, in the predicted place.** PLAN-harness-diet Phase 1: `/hm:execute` Phase D ran `ruff check` clean and never ran `ruff format --check`; the review's P0 found 7 files would reformat, gated by CI in `ci.yml:42`, `release.yml:50` and `nightly.yml:40` **before pytest**. This proposal named that exact gap on 2026-07-09 and has not been ingested, so the recurrence is a measure of the proposal backlog, not of new information. `[fail:lint] ruff-format-not-in-local-verify-pass` is now count:3 as well — the two sibling slugs describe one root cause and should be merged when this ships. Cheapest sufficient fix remains one line in `execute.md.j2` Phase D: add `uv run ruff format --check .` beside the existing `ruff check`, since the LLM mirrors the visible command list.
 **Rationale:** Observed again in PLAN-second-opinion-multi-model wrapup: `ruff check` passed clean at execute AND review, but `ruff format --check` at wrapup found 7 unformatted files (long-line reflows the auto-fixer left un-normalized). Because `ruff check` ≠ `ruff format`, code that passes every lint gate in execute/review can still fail the wrapup format gate, forcing a late reformat + re-verify. A note in execute.md.j2 / review.md.j2 Phase D to run `ruff format` (not just `ruff check`) after edits — or a PostToolUse format-on-write hook scoped to `*.py` — would keep the tree format-clean continuously and stop wrapup from being the first place format is checked.
-
-## Proposal: snapshot-regen-count-11-escalate-to-mechanical (2026-07-17)
-**Triggered by:** [fail:test] snapshot-regen-inside-worktree (count: 13 as of 2026-08-01; this proposal was written at count: 11)
-**Proposed mechanism:** the two existing proposals for this entry were written at count:3 and count:5; it is now at **count:13** and neither prevention shipped. The 2026-08-01 dep-map task is a data point FOR the mechanical guard: `hm cli make --update` already refuses to run from inside `.worktrees/`, that rail held, and the phase's self-harness re-render was deferred rather than bypassed. Promote to a mechanical guard: make `tests/snapshot/regenerate.py` refuse to run when `git rev-parse --show-toplevel` resolves inside a `.worktrees/` path (hard exit + one-line remedy), rather than relying on a prose reminder.
-**Rationale:** 11 recurrences is the highest count in the tier and the escalation last-mile visibly stalled — proposals exist but stop at count:5, so nobody re-read them as the count tripled. This is the canonical "prose guard failed N times → promote to mechanical" case, and the count itself is the evidence. Recording the update here so the staleness is visible rather than frozen at the count where the last proposal happened to be written.
-
-## Proposal: dead-string-pin-guard (2026-07-26)
-**Triggered by:** [fail:test] test-pins-retired-implementation-name (count: 4 as of 2026-08-01; this proposal was written at count: 3) — **scope needs widening**: two of the three fresh 2026-08-01 instances are *positive* pins, not negative ones (a phrase spanning a line wrap, and step-number literals like `"3. **Verify build**"` that broke on a correct renumber), so the negative-assertion lint below would not have caught them. Add a second, cheaper rule to the same check: flag any string literal in `tests/**` that contains a leading step number (`^\d+\. `) or that spans what is a line wrap in the source artifact — both are prose accidents, never contracts.
-**Proposed mechanism:** a mechanical check, not another prose reminder — the last two recurrences were both committed by someone who already knew the rule. Add a test-suite lint that flags any *negative* string assertion (`assert "<literal>" not in <x>`) whose literal appears nowhere else in `src/` or `templates/`. A negative pin on a string the tree no longer contains cannot fail, so it is dead weight masquerading as a guard. Emit it as a `ruff`-style custom check or a meta-test over `tests/**`.
-**Rationale:** Three occurrences, and the third landed *inside a test written to guard this exact family* — which is the strongest possible evidence that awareness is not the missing ingredient. Each time the sequence was identical: pin prose, later reword the prose correctly, and the assertion silently stops testing anything (a positive pin turns red and gets noticed; a negative pin turns permanently green and does not). The literal-vs-tree cross-reference is fully deterministic and repo-owned, so it needs no runtime and no external tool — the same shape as `test_ci_codex_pin_matches_the_verified_version`, which closed [fail:test] advisory-check-fails-unseen.
-
-## Proposal: RETIRE the three snapshot-regen proposals (2026-07-26)
-**Triggered by:** [fail:test] snapshot-regen-inside-worktree (count: 11) — **now superseded**
-**Proposed mechanism:** none — withdraw `snapshot-regen-order-guard`,
-`post-finalize-snapshot-regen-hook`, and `snapshot-regen-count-11-escalate-to-mechanical`.
-**Rationale:** all three propose guarding against regenerating snapshots inside a
-worktree, and that is no longer a defect. `tests/snapshot/regenerate.py:107-125` pins
-`_HARNESS_MAKER_PKG_ROOT` and `_compute_install_ref`, making the fixtures
-worktree-invariant by construction — verified empirically on 2026-07-26 by regenerating
-from a worktree four times and grepping every fixture for the worktree path (zero hits).
-Building a mechanical guard now would enforce the obsolete guidance, and that guidance is
-actively harmful: refusing to regenerate in the worktree is what forces a hand-merge of
-generated artifacts at land time. The count:11 history is left in place for audit.
-
-## Proposal: mutation-check-receipt-per-new-gate (2026-07-27)
-**Triggered by:** [fail:test] assertion-invariant-over-named-dimension (count: 8 as of 2026-08-06; this proposal was written at count: 5) — the sixth instance is the strongest argument yet for the mechanical receipt: a test asserting the telemetry record rejects unknown keys was green **both before and after** the field it was written for existed, satisfied all along by `extra=forbid`. A "name the wrong implementation this assertion rejects" receipt would have had no answer to write.
-**Proposed mechanism:** a mechanical receipt, because prose has now failed five times —
-including once inside `PLAN-token-economy-step-pruning`, whose ADR-010 is *itself* the
-prose rule "mutation-check every gate". Proposal: extend the `/hm:execute` Phase D exit
-contract so that every test **added or modified** in the diff must be named in a
-machine-readable mutation receipt (`.claude/observability/mutation-receipts-<slug>.jsonl`,
-one row per test: `{test_node, code_deleted, suite_rc_after_delete}`), and have `/hm:review`
-Step 3 fail-closed when a diff adds a test node with no corresponding row. The check that
-makes it non-vacuous is `suite_rc_after_delete != 0` — a row claiming a deletion that
-left the suite green is exactly the invariant assertion this entry describes, and it
-becomes visible as data instead of as a claim in a commit message.
-
-**2026-08-01 (count 5, PLAN-autopilot-advance-noop):** the fifth instance is the strongest
-argument yet for the mechanical form, because the gate in question was written *by the same
-change that shipped the defect it was meant to catch*, survived two review rounds green, and
-its docstring correctly described the failure mode it was not testing. A mutation receipt
-would have caught it in one line: deleting the `--slug` append instruction leaves
-`assert "--slug" in partial` passing, so `suite_rc_after_delete == 0`.
-**Rationale:** four recurrences, and the failure mode is stable across all of them: the
-assertion holds in the broken world because the fixture pair does not straddle the
-dimension the test is named after. The current guard is ADR-010's instruction to "name the
-wrong implementation the assertion rejects and verify it fails" recorded **in the commit
-message** — unverifiable, unqueryable, and skipped without a trace. The 2026-07-27
-instance had both fixture turns carrying cache-write tokens so the creation-gated branch
-could not execute in either variant; a mutation receipt would have recorded
-`suite_rc_after_delete = 0` for that test and the gate would have refused it. This is the
-same "prose guard failed N times → promote to mechanical" shape as
-`wrapup-close-marker-integrity-guard` and `dead-string-pin-guard`, and it is now the
-highest-leverage one: the entry is cited as prior work by the plans that then reproduce it.
-
-**Supporting evidence (2026-07-27, PLAN-token-economy-step-pruning Phase 2).** Not a new
-proposal — the same mechanism, observed again with a twist that argues for it more sharply.
-Phase 2 DID produce the ADR-010 receipt this proposal wants (7 mutants, 7 killed, 0
-survivors, re-run after BOTH review rounds), and **four of the seven mutants turned out to
-be held by exactly one test each** — precisely the fragile binding a machine-readable
-`{test_node, code_deleted, suite_rc_after_delete}` row would make queryable instead of
-leaving it as a sentence in a PLAN table. It also shows the proposal's ceiling: the receipt
-was green while review round 2 still found 7 defects, because four of those lived in prose
-(SPEC notes, PLAN frontmatter, an ADR's own enumeration) that no mutation check reads. So
-the gate is worth building for what it covers, and must not be sold as covering more —
-see `[fail:design] unverified-number-in-spec-justification`.
-
-## Proposal: CI gate — every new CLI surface must be driven in its shipped form (2026-07-30)
-**Triggered by:** [fail:test] shipped-entry-point-not-exercised (count: 3)
-**Proposed mechanism:** structural test + CLAUDE.md checkpoint
-**Rationale:** Three separate work units have now shipped a change that was correct in the
-Python library and dead at the invocation the product runs — most recently two new entrypoints
-(`codex_adapter stamp-ids`, `second_opinion_oracle`) that every rendered call site invoked as
-`hm <module> …` while `hm._DISPATCHABLE` did not list them, so each exited 2. Unit tests called
-`main([...])` directly and were green throughout. An automated guard would have caught all three:
-extend `tests/structural/test_hm_entrypoint.py` from "every module the rendered surface calls is
-dispatchable" to "every module in `command_registry.MODULES` that any rendered artifact calls is
-BOTH dispatchable AND resolves through `hm` in a subprocess", and scan every rendered surface
-(commands, `.claude/skills/*/SKILL.md`, agent bodies) rather than commands alone — the skills half
-was added this round and immediately found a pre-existing miss (`refdocs_index`). The library/product
-seam is the recurring shape; the gate should live at the seam, not in the library.
 
 ## Proposal: format-check in every local verify entry point, derived not enumerated (2026-08-05)
 **Triggered by:** [fail:lint] ruff-format-not-in-local-verify-pass (count: 3)

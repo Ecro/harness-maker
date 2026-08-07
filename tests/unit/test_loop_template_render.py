@@ -10,6 +10,7 @@ visible to the autoloop driver LLM at runtime.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -126,8 +127,13 @@ def test_gate0_appears_before_state_update(loop_md: str) -> None:
     """Gate 0 must fire AFTER workflow invocation but BEFORE 'Update state'."""
     gate0_idx = loop_md.find("Gate 0 — Receipt verification")
     workflow_idx = loop_md.find("Invoke per-iter stages")
-    # Anchor on the step-5 header (markdown bold) not the Gate 4 prose mention.
-    update_idx = loop_md.find("5. **Update state**")
+    # Pin the ordinal's SHAPE, not its value. `"5. **Update state**"` broke on a correct
+    # renumber ([fail:test] test-pins-retired-implementation-name, count:4); dropping the
+    # number entirely was the first fix and it was weaker still — `find("**Update state**")`
+    # would happily land on the Gate 4 prose mention, which is the ambiguity the ordinal was
+    # there to resolve. `^\d+\. ` keeps the disambiguation and survives renumbering.
+    m = re.search(r"^\d+\. \*\*Update state\*\*", loop_md, re.M)
+    update_idx = m.start() if m else -1
     assert workflow_idx > 0, "loop.md missing 'Invoke per-iter stages' step"
     assert update_idx > 0, "loop.md missing 'Update state' step"
     assert gate0_idx > 0, "loop.md missing 'Gate 0' step"
