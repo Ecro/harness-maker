@@ -188,6 +188,40 @@ def stage_manifest(
     return dispositions
 
 
+def stage_isolated_worktree(worktree: Path, base: Path) -> dict[str, str]:
+    """In an ISOLATED checkout, stage everything — the manifest alone loses the code.
+
+    The manifest is a list of DELIVERABLE shapes (PLAN, REVIEW, SPEC, memory). It never
+    named `src/**` or `tests/**`, because it was written for the ephemeral-worktree model
+    where `/hm:execute` Step 5 ran `worktree finalize <WT> stage-only` and the index already
+    held the implementation. **The per-task feature-branch model has no finalize** — the code
+    simply sits in `.worktrees/<slug>/`, unstaged, and `wrapup_land` committed the PLAN, the
+    memory and nothing else while returning `ok: true` and `commit.status: created`.
+
+    Observed twice, both times caught only by reading `git show --stat` by hand: a 41-file
+    implementation left out of its own wrapup commit, and then a 6-file one in the very task
+    that documented the first. A success receipt for a commit missing the work is worse than
+    a failure — the operator is told to READ the receipt, and the receipt says it worked.
+
+    **Gated on `worktree != base`, and that gate is load-bearing.** With isolation OFF the
+    two are the same directory: a shared branch carrying whatever else the user has in
+    flight, where `git add -A` would sweep unrelated work into a wrapup commit. Inside a task
+    worktree the opposite holds — the checkout exists to hold exactly one task, concurrent
+    sessions each have their own, and harness churn is gitignored, so everything present IS
+    the work being wrapped up.
+    """
+    if worktree == base:
+        return {
+            "path": ".",
+            "kind": "worktree-sweep",
+            "disposition": "skipped-not-isolated",
+        }
+    r = _git(worktree, "add", "-A", "--", ".")
+    if r.returncode != 0:
+        raise LandAbortError(f"git add -A failed in the task worktree: {r.stderr.strip()}")
+    return {"path": ".", "kind": "worktree-sweep", "disposition": "staged"}
+
+
 def _staged_paths(worktree: Path) -> list[str]:
     r = _git(worktree, "diff", "--cached", "--name-only")
     return [ln for ln in r.stdout.splitlines() if ln.strip()]
@@ -259,6 +293,15 @@ def run(args: argparse.Namespace) -> tuple[int, dict[str, Any]]:
     # un-re-rendered harness gets the fix too; a prose recipe has no execution surface.
     optional = list(args.optional) + derive_deliverable_globs(args.slug, worktree)
     dispositions = stage_manifest(worktree, args.required, optional)
+    # The manifest runs FIRST and keeps its typed dispositions: a required deliverable that
+    # is absent must still abort by name, and `git add -A` would never notice it missing.
+    # The sweep then picks up the implementation the manifest cannot describe.
+    if args.manifest_only:
+        dispositions.append(
+            {"path": ".", "kind": "worktree-sweep", "disposition": "skipped-manifest-only"}
+        )
+    else:
+        dispositions.append(stage_isolated_worktree(worktree, base))
     receipt["steps"]["stage"] = dispositions
 
     staged = _staged_paths(worktree)
@@ -325,6 +368,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--required", action="append", default=[], help="repeatable")
     parser.add_argument("--optional", action="append", default=[], help="repeatable")
     parser.add_argument("--allow-legacy-ref", dest="allow_legacy_ref", action="store_true")
+    parser.add_argument(
+        "--manifest-only",
+        dest="manifest_only",
+        action="store_true",
+        help=(
+            "stage ONLY the --required/--optional paths, not the rest of the task worktree. "
+            "The old behaviour; it silently omitted the implementation from its own commit."
+        ),
+    )
     args = parser.parse_args(argv)
 
     try:

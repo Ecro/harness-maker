@@ -2,6 +2,27 @@
 
 ## [Unreleased]
 
+### `wrapup_land` commits the work, not just the paperwork
+
+Its staging manifest names DELIVERABLES — PLAN, REVIEW, SPEC, memory — and never named
+`src/**`, because it was written for the ephemeral-worktree model where `/hm:execute`
+Step 5's `worktree finalize <WT> stage-only` had already filled the index. The per-task
+feature-branch model has no finalize (running `stage-only` there would merge into base and
+collide with `task-land`, which owns the merge), so nothing staged the implementation and
+the composite committed the deliverables alone while returning `ok: true` and
+`commit.status: created`. It happened twice — a 45-file change and then a 6-file one — and
+both times the only way to see it was `git show --stat`.
+
+A `worktree-sweep` step now stages the rest of the task worktree. It runs **after** the
+manifest, because `git add -A` cannot notice that a required deliverable is missing, and it
+is gated on `--worktree != --base`: with isolation off those are the same directory, a
+shared branch that may hold unrelated in-flight work. `--manifest-only` restores the old
+behaviour.
+
+Still open, and worth knowing: the rendered `/hm:execute` opens with the per-task
+`task-preflight` and then Step 5 still instructs the legacy `finalize <WT> stage-only`.
+This change removes the cost of not running it; the template's model mismatch is separate.
+
 ### The failure backlog got a consumer, and four guards got built
 
 `.claude/memory/pending-proposals.md` held 17 proposals, the oldest three months old. The

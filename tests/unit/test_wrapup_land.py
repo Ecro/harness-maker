@@ -62,6 +62,11 @@ def _args(wt_path: Path, base_path: Path, msg: Path, **kw: Any) -> argparse.Name
         "required": [],
         "optional": [],
         "allow_legacy_ref": False,
+        # Explicit, not `getattr(args, …, False)` in `run()`: a defaulted-absent flag would
+        # make "the caller never wired it" and "the caller asked for the old behaviour" the
+        # same state, and the old behaviour is the bug ([fail:design] absent-case-is-a-
+        # feature-black-hole). A missed call site should be an AttributeError, loudly.
+        "manifest_only": False,
     }
     defaults.update(kw)
     return argparse.Namespace(**defaults)
@@ -138,7 +143,14 @@ def test_an_absent_optional_path_records_absent_optional_and_staging_continues(
     rc, receipt = wrapup_land.run(
         _args(task_worktree, repo, message, optional=["gone.md", "kept.md"])
     )
-    by_path = {d["path"]: d["disposition"] for d in receipt["steps"]["stage"]}
+    # Scoped to the MANIFEST rows on purpose. The worktree-sweep row is a different kind
+    # and belongs to its own tests below; folding it in here would turn an exact assertion
+    # about the manifest into a loose one about everything.
+    by_path = {
+        d["path"]: d["disposition"]
+        for d in receipt["steps"]["stage"]
+        if d["kind"] != "worktree-sweep"
+    }
     assert by_path == {"gone.md": "absent-optional", "kept.md": "staged"}
     assert rc == wrapup_land.EXIT_OK
 
@@ -414,3 +426,94 @@ def test_the_receipt_is_parseable_json_even_though_drain_prints_to_stdout(
     payload = json.loads(out)  # would raise before the fix
     assert rc == 0
     assert "removed 0 branch(es)" in payload["steps"]["drain"]["summary"]
+
+
+# ── the implementation must reach its own commit ──────────────────────────────
+
+
+def _committed_files(root: Path) -> set[str]:
+    r = _git(root, "show", "--name-only", "--pretty=format:", "HEAD")
+    return {ln.strip() for ln in r.stdout.splitlines() if ln.strip()}
+
+
+def test_code_in_the_task_worktree_reaches_the_commit(
+    repo: Path, task_worktree: Path, message: Path
+) -> None:
+    """The bug, stated as a test: the manifest names deliverables, never `src/**`.
+
+    Written after it shipped TWICE — a 41-file implementation and then a 6-file one, both
+    omitted from their own wrapup commit while the receipt reported `ok: true` and
+    `commit.status: created`. Nothing here was hypothetical.
+    """
+    (task_worktree / "work-docs").mkdir()
+    (task_worktree / "work-docs" / "PLAN-slug.md").write_text("plan\n", encoding="utf-8")
+    (task_worktree / "src").mkdir()
+    (task_worktree / "src" / "impl.py").write_text("x = 1\n", encoding="utf-8")  # NEW file
+    (task_worktree / "README.md").write_text("edited\n", encoding="utf-8")  # MODIFIED file
+
+    rc, receipt = wrapup_land.run(
+        _args(task_worktree, repo, message, required=["work-docs/PLAN-slug.md"])
+    )
+
+    assert rc == 0, receipt
+    committed = _committed_files(task_worktree)
+    assert "src/impl.py" in committed, "a new source file was left out of its own commit"
+    assert "README.md" in committed, "a modified tracked file was left out"
+    assert "work-docs/PLAN-slug.md" in committed
+
+
+def test_manifest_only_is_the_old_behaviour(repo: Path, task_worktree: Path, message: Path) -> None:
+    """The escape hatch, and the control that proves the sweep is what carries the test
+    above — without it that test would pass on a manifest that happened to match."""
+    (task_worktree / "work-docs").mkdir()
+    (task_worktree / "work-docs" / "PLAN-slug.md").write_text("plan\n", encoding="utf-8")
+    (task_worktree / "src").mkdir()
+    (task_worktree / "src" / "impl.py").write_text("x = 1\n", encoding="utf-8")
+
+    rc, _ = wrapup_land.run(
+        _args(
+            task_worktree,
+            repo,
+            message,
+            required=["work-docs/PLAN-slug.md"],
+            manifest_only=True,
+        )
+    )
+
+    assert rc == 0
+    assert "src/impl.py" not in _committed_files(task_worktree)
+
+
+def test_a_shared_working_tree_is_never_swept(repo: Path, message: Path) -> None:
+    """Isolation OFF: `--worktree` IS `--base`, a shared branch that may carry other work.
+
+    Sweeping there would pull a colleague's — or the user's own — unrelated in-flight edits
+    into a wrapup commit, which is the contamination class this repo has a five-layer
+    defence against. The gate is `worktree != base`, and this is its demonstration.
+    """
+    (repo / "work-docs").mkdir()
+    (repo / "work-docs" / "PLAN-slug.md").write_text("plan\n", encoding="utf-8")
+    (repo / "unrelated-wip.py").write_text("not mine\n", encoding="utf-8")
+
+    rc, receipt = wrapup_land.run(_args(repo, repo, message, required=["work-docs/PLAN-slug.md"]))
+
+    assert rc == 0, receipt
+    assert "unrelated-wip.py" not in _committed_files(repo)
+    sweep = [d for d in receipt["steps"]["stage"] if d["kind"] == "worktree-sweep"]
+    assert sweep, "the sweep row is missing — the gate cannot be read from the receipt"
+    assert sweep[0]["disposition"] == "skipped-not-isolated"
+
+
+def test_a_missing_required_path_still_aborts_before_the_sweep(
+    repo: Path, task_worktree: Path, message: Path
+) -> None:
+    """Order matters: `git add -A` cannot notice that a REQUIRED deliverable is absent.
+
+    If the sweep ran first, a wrapup missing its PLAN would commit successfully instead of
+    aborting by name — the typed manifest's whole purpose, quietly dissolved by the fix.
+    """
+    (task_worktree / "src").mkdir()
+    (task_worktree / "src" / "impl.py").write_text("x = 1\n", encoding="utf-8")
+
+    with pytest.raises(LandAbortError, match="required path is absent"):
+        wrapup_land.run(_args(task_worktree, repo, message, required=["work-docs/PLAN-slug.md"]))
