@@ -66,6 +66,7 @@ import json
 import os
 import re
 import sys
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -425,6 +426,107 @@ def persist_payload(
     return dest
 
 
+# ── reconcile: is the ledger corroborated by the transcript? ──────────────────
+
+
+class ReconcileResult(BaseModel):
+    """One project's ledger count set against what its transcript actually shows."""
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    ledger_dispatches: int
+    turn_groups: int
+    agrees: bool
+    reason: str | None = None
+
+
+def sidechain_turn_groups(turns: Sequence[Any]) -> int:
+    """Count maximal contiguous runs of sidechain turns in a globally-interleaved timeline.
+
+    **This is NOT a dispatch count, and must not be read as one.** ``load_turns`` performs one
+    global sort across every discovered directory, session and worktree sibling, so contiguity
+    carries no dispatch-boundary semantics. It is wrong in **both** directions:
+
+    - **Undercount.** Reviewers are dispatched as a parallel batch in one message, and the main
+      loop emits no turn until the batch returns — so N concurrent subagents form ONE run.
+      This does NOT currently corrupt the recorded population: the only rendered emit sites are
+      ``plan.md.j2`` (``--agent plan-validator``) and ``execute.md.j2`` (``--agent
+      test-reviewer``), both single dispatches separated by main-chain turns. An earlier version
+      of this note claimed ``code-reviewer`` was a recorded agent and therefore batched into the
+      denominator; ``rg -o -- '--agent [a-z-]+' src/harness_maker/templates`` refutes that — the
+      few ``code-reviewer`` rows in the corpus did not come from a rendered site. Adding a
+      batched emit site later WOULD make this bite.
+    - **Overcount.** A peer session working the same project contributes main-scope turns into
+      the same sorted list, splitting one real dispatch into several runs.
+
+    It is used anyway because it is *reproducible*: the ``{(session_id, stage)}`` key the first
+    draft used was computed by hand in a shell one-liner and merged every dispatch of one agent
+    in one session. Neither key is a dispatch count; this one at least has a definition a test
+    can pin. ``reconcile_counts`` is deliberately built to survive that — see its docstring.
+
+    ``Sequence[Any]`` rather than ``Sequence[TurnRecord]``: the tests pass a two-attribute fake
+    so this stays independent of the transcript reader, and importing ``TurnRecord`` here would
+    pull ``economics`` into a module the CLI deliberately imports lazily.
+    """
+    ordered = sorted(turns, key=lambda t: t.ts)
+    groups = 0
+    in_run = False
+    for turn in ordered:
+        if turn.scope == "subagent":
+            if not in_run:
+                groups += 1
+                in_run = True
+        else:
+            in_run = False
+    return groups
+
+
+def reconcile_counts(
+    rows: Sequence[dict[str, Any]], *, subagent_turn_groups: int
+) -> ReconcileResult:
+    """Compare recorded dispatches against observed ones, flagging only what is decidable.
+
+    ``ledger <= groups`` is the EXPECTED relation, not loss: the ledger records only the
+    gated dispatches its stages emit (today ``plan-validator`` and ``test-reviewer``), never
+    every subagent. Two
+    shapes are therefore flagged, and only two — the ones a pair of scalars can actually
+    carry. **Partial loss is invisible to this predicate** (3 recorded of 40 real reads as
+    agreement, and no inequality over these two numbers can tell that from "3 gated dispatches
+    plus 37 other subagents"). Restricting the denominator to the three recorded agent names
+    would convert ``<=`` into ``==`` and make partial loss visible; that is deliberately not
+    done here, and the blindness is recorded in the wiki entry so a ``ledger-trustworthy: yes``
+    is not read as more than it is.
+
+    Dispatch sentinels are excluded: a dispatch that never ran cannot have left a turn-group,
+    so counting it would invert the test and report a run of launch failures as loss.
+    """
+    dispatches = sum(1 for row in rows if row.get("verdict") not in DISPATCH_SENTINELS)
+    if dispatches == 0 and subagent_turn_groups > 0:
+        return ReconcileResult(
+            ledger_dispatches=0,
+            turn_groups=subagent_turn_groups,
+            agrees=False,
+            reason=(
+                f"{subagent_turn_groups} subagent dispatch(es) observed in the transcript "
+                "but the ledger recorded none"
+            ),
+        )
+    if dispatches > subagent_turn_groups:
+        return ReconcileResult(
+            ledger_dispatches=dispatches,
+            turn_groups=subagent_turn_groups,
+            agrees=False,
+            reason=(
+                f"ledger recorded {dispatches} dispatch(es) but only "
+                f"{subagent_turn_groups} were observed — transcript loss, a double-terminal "
+                "run inflating the count, or fabrication"
+            ),
+        )
+    return ReconcileResult(
+        ledger_dispatches=dispatches, turn_groups=subagent_turn_groups, agrees=True
+    )
+
+
 # ── CLI ───────────────────────────────────────────────────────────────────────
 
 
@@ -451,6 +553,15 @@ def _build_parser() -> argparse.ArgumentParser:
     # up, which is the exact failure this module's docstring names.
     c = sub.add_parser("coherence")
     c.add_argument("--quiet", action="store_true", help="print only incoherent runs")
+
+    r = sub.add_parser(
+        "reconcile",
+        help=(
+            "DIAGNOSTIC ONLY — exit 0 agrees, 2 disagrees (can be expected + permanent), "
+            "1 tool failure. Never wire this into a gate (PLAN A2)"
+        ),
+    )
+    r.add_argument("--root", default=".")
 
     p = sub.add_parser("persist-payload")
     p.add_argument("--file", required=True, help="path to the reviewer's raw payload")
@@ -529,6 +640,58 @@ def main(argv: list[str] | None = None) -> int:
             f"{len(bad)} incoherent, {malformed} malformed line(s)\n"
         )
         return 1 if bad or malformed else 0
+
+    if args.command == "reconcile":
+        from harness_maker.economics_source import load_turns
+
+        project = Path(args.root).resolve()
+        if not project.is_dir():
+            # A typo'd root would otherwise discover nothing, find no ledger, and print a
+            # confident `agrees=yes` — the same silent-zero shape the encoder fix removed.
+            sys.stderr.write(f"[stage-agents] reconcile: no such directory: {project}\n")
+            return 1
+        ingestion = load_turns(project, days=None)
+        groups = sidechain_turn_groups(ingestion.turns)
+        path = ledger_path(resolve_base_root(project))
+        rows_r: list[dict[str, Any]] = []
+        malformed_r = 0
+        if path.is_file():
+            for line in path.read_text(encoding="utf-8").splitlines():
+                if not line.strip():
+                    continue
+                try:
+                    parsed_r = json.loads(line)
+                except (ValueError, RecursionError):
+                    # Counted and printed, never silently dropped: the `coherence` branch above
+                    # already learned this — a dropped row lowers `dispatches`, and lowering it
+                    # can only move the verdict TOWARD agreement, so silence here flatters the
+                    # answer. `RecursionError` matches `economics_source`'s reader; the ledger
+                    # is concurrently appended, so torn lines are expected, not hypothetical.
+                    malformed_r += 1
+                    continue
+                if isinstance(parsed_r, dict):
+                    rows_r.append(parsed_r)
+                else:
+                    malformed_r += 1
+        result = reconcile_counts(rows_r, subagent_turn_groups=groups)
+        sys.stdout.write(
+            f"{project.name}: ledger_dispatches={result.ledger_dispatches} "
+            f"sidechain_turn_groups={result.turn_groups} "
+            f"(dirs_scanned={ingestion.diagnostics.dirs_scanned}, turns={len(ingestion.turns)}, "
+            f"malformed_rows={malformed_r}) "
+            f"agrees={'yes' if result.agrees else 'NO'}\n"
+        )
+        if result.reason:
+            sys.stdout.write(f"      -> {result.reason}\n")
+        if malformed_r:
+            sys.stdout.write(
+                f"      -> {malformed_r} malformed ledger line(s) excluded from the count\n"
+            )
+        # Diagnostic-only, and the exit code says which kind of outcome this was: 0 = agrees,
+        # 2 = a disagreement (which can be an EXPECTED, permanent state — spoton has not run a
+        # gated stage since its emit was rendered). `1` stays reserved for tool failure above,
+        # so an operator or an `&&` chain can tell "the fleet disagrees" from "the tool broke".
+        return 0 if result.agrees else 2
 
     source = Path(args.file)
     if not source.is_file():

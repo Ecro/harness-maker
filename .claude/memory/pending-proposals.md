@@ -198,3 +198,54 @@ from an explanatory mention — `/hm:health` names `worktree create` as content,
 own prose describes both models on purpose. That is the same exemption problem that made the
 `dead-string-pin` rule's arm (a) unshippable at 19 false positives, so measure the false
 positives against the tree BEFORE building the gate, and drop it if the ratio repeats.
+
+---
+
+## Proposal: a whole-file substring assertion may not stand in for a per-item claim (2026-08-08)
+**Triggered by:** [fail:test] assertion-invariant-over-named-dimension (count: 10 — the
+highest-count entry with no proposal of any kind, and the only one that grew this round).
+**Proposed mechanism:** AST structural test over `tests/`, with a measured false-positive
+count reported before it is enabled.
+
+The tenth instance (antigravity-second-opinion-timeout) is the cheapest possible illustration:
+a guard named for the presence of specific agy-envelope fixture LINES asserted
+`"<literal>" in text` over the whole file. Deleting a real fixture line left it green, because
+five unrelated occurrences of the same literal kept the substring true. The mutation-receipt
+gate caught it; reading the assertion did not, and would not have — in isolation the line
+looks exactly right.
+
+The shape is mechanically detectable and does not need judgment about intent: an assertion
+whose operator is a **whole-file / whole-blob containment test** (`in text`, `in content`,
+`assert x in path.read_text()`) inside a test whose name or docstring claims something
+**per-item or counted** (`each`, `every`, `all`, `_count`, `n_`, a plural noun). Such an
+assertion can only fail when the LAST occurrence disappears, so its sensitivity is 1/N where
+N is the number of occurrences — and N is invisible at the assertion site. The remedy is
+already known and used elsewhere in this repo: parse the artifact and assert on the parsed
+objects (count and field values), or assert on the specific line's full form, not on a
+fragment that other lines also contain.
+
+**Caveat the implementer must settle first, and the reason this is a proposal and not a
+patch:** `"literal" in text` is *correct* for the large class of anti-regression pins where the
+claim genuinely is "this string exists somewhere". Arm (a) of the `dead-string-pin` rule was
+implemented, run, and rejected at 19 false positives for exactly this reason, and this rule
+lives in the same neighbourhood. So the order of work is fixed: write the detector, run it
+over `tests/` **first**, and publish the hit list with a hand-classification of true vs false
+before writing a single line of enforcement. If the ratio resembles the `dead-string-pin`
+result, record the measurement and close the proposal rather than shipping a gate the repo
+will learn to suppress. A cheaper fallback that needs no classification: extend the
+mutation-receipt obligation — a receipt for a containment-style assertion must name the
+occurrence COUNT it observed, which makes 1/N sensitivity visible at authoring time without
+forbidding anything.
+
+---
+
+## Backlog note (2026-08-08) — count ≥ 3 entries with no proposal
+
+Recorded so the gap is visible rather than re-discovered. This round produced no first-hand
+evidence about either, so no mechanism is proposed for them here; whoever next trips one
+should write the proposal from that instance rather than from this line.
+
+| Slug | Count | Status |
+|---|---|---|
+| `[fail:test] test-pins-retired-implementation-name` | 4 | no proposal |
+| `[fail:test] shipped-entry-point-not-exercised` | 4 | no proposal (the RESOLVED table's `test_cli_surfaces_are_driven.py` covers CLI surfaces only, not the general class) |

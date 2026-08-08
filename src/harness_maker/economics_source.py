@@ -104,10 +104,25 @@ def resolve_project_root(path: Path) -> Path:
 def encode_project_dir(path: Path) -> str:
     """Claude Code encodes the LAUNCH cwd into the project directory name.
 
-    Both `/` and `.` become `-`, so `/repo/proj/.worktrees/demo` is
+    `/`, `.` and `_` all become `-`, so `/repo/proj/.worktrees/demo` is
     `-repo-proj--worktrees-demo` — the double dash is the `/.` pair, not a separator.
+
+    The `_` arm was missing until 2026-08-08, and its absence was silent: every project whose
+    path contains an underscore matched no directory, so the reader returned zero turns and the
+    report said `$0` rather than erroring. `/home/noel/strange_chess` hid $1,637 of real spend
+    that way. Verified against five underscore-path projects, all hyphen-encoded on disk with no
+    underscore-encoded sibling.
+
+    **What the widening does and does not guarantee.** It enlarges the collision set: `/x/a_b`
+    and `/x/a-b` now encode alike, so a foreign project's directory can be discovered. The
+    per-turn `is_own_cwd` check below drops those turns — **but only the ones that carry a
+    `cwd`**. `is_own_cwd` returns True for `cwd is None` by design (older transcript lines), so
+    a collision plus a `cwd`-less line does admit a foreign turn. Current-format lines all carry
+    `cwd`, and the output is a local aggregate, which is why this is a stated limit rather than
+    a blocker — but the earlier wording here claimed the boundary was unconditional, and it is
+    not. `test_cwd_filter_is_the_real_boundary_when_two_paths_encode_alike` pins both branches.
     """
-    return re.sub(r"[/.]", "-", str(path))
+    return re.sub(r"[/._]", "-", str(path))
 
 
 def discover_transcript_dirs(project_path: Path, *, transcript_root: Path) -> list[Path]:

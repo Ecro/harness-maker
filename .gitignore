@@ -120,6 +120,12 @@ work-docs/*
 # MATRIX-* is the stage-2 input for the keep/retire decisions.
 !work-docs/ABLATION-*.md
 !work-docs/MATRIX-*.md
+# EXPERIMENT-* is the same class as ABLATION-*: a pre-registration whose entire value is
+# that it was written and FROZEN before any run. An ignored one is re-authored by whoever
+# needs it next, at which point "the decision rule was set in advance" has nothing behind
+# it — and a rule amended after seeing data is the failure `stage_agent_ledger`'s docstring
+# already had to disclose once.
+!work-docs/EXPERIMENT-*.md
 !work-docs/plans/
 
 # Cache

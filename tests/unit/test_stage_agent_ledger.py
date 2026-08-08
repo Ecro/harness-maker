@@ -10,6 +10,7 @@ approved, and that is the shape that would let stage 2 delete a gate for the wro
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
@@ -23,8 +24,11 @@ from harness_maker.stage_agent_ledger import (
     check_run_coherence,
     emit,
     ledger_path,
+    main,
     persist_payload,
+    reconcile_counts,
     row_from_dict,
+    sidechain_turn_groups,
 )
 
 _BASE = {
@@ -36,6 +40,14 @@ _BASE = {
     "verdict": "APPROVED",
     "terminal": True,
 }
+
+
+@dataclass(frozen=True)
+class _FakeTurn:
+    """Only the two attributes `sidechain_turn_groups` reads — no transcript fixture needed."""
+
+    scope: str
+    ts: int
 
 
 def _rows(path: Path) -> list[dict[str, object]]:
@@ -546,3 +558,188 @@ def test_runs_are_grouped_by_agent_as_well_as_run_id() -> None:
         {**_BASE, "agent": "test-reviewer", "stage": "execute", "run_id": "x", "terminal": True},
     ]
     assert len(check_run_coherence(rows)) == 2
+
+
+# ── reconcile: is the ledger corroborated by the transcript? (PLAN A2) ────────
+
+
+def test_reconcile_agrees_when_the_ledger_is_a_subset_of_observed_dispatches() -> None:
+    """strange_chess's shipped shape: 37 recorded against 616 observed runs.
+
+    The ledger records only `plan-validator` / `test-reviewer` / `code-reviewer`, never every
+    subagent, so `ledger <= groups` is the EXPECTED relation — not evidence of loss. The
+    39/45 pair an earlier draft cited here was retracted (see the wiki entry); the numbers
+    below are illustrative of the SHAPE and are not claimed as an observation.
+    """
+    result = reconcile_counts(
+        [{**_BASE, "verdict": "MAJOR_REVISION"} for _ in range(39)], subagent_turn_groups=45
+    )
+
+    assert result.ledger_dispatches == 39
+    assert result.turn_groups == 45
+    assert result.agrees is True
+    assert result.reason is None
+
+
+def test_reconcile_flags_subagents_that_ran_while_the_ledger_recorded_nothing() -> None:
+    """spoton's shipped shape: zero ledger rows against a live corpus (1036 runs).
+
+    This is the only disagreement the reconciler surfaces on its own — every other
+    `ledger < groups` case is expected. **The flag is not a defect claim:** spoton's zero has
+    a recorded, benign cause (its harness re-rendered after its last gated stage ran, so the
+    emit did not exist yet), and the disagreement will persist until that project next runs
+    one. That is why the CLI exits 2 rather than 1 and must never gate.
+
+    The literal below is illustrative of the SHAPE, not an observation — 57 was the retracted
+    hand-rolled figure; the shipped run count is 1036. Only `dispatches == 0` drives this branch.
+    """
+    result = reconcile_counts([], subagent_turn_groups=57)
+
+    assert result.ledger_dispatches == 0
+    assert result.agrees is False
+    assert result.reason is not None
+    assert "57" in result.reason
+
+
+def test_reconcile_flags_recording_more_dispatches_than_were_observed() -> None:
+    """Recording more than ran is impossible on a healthy corpus — loss or fabrication."""
+    result = reconcile_counts([dict(_BASE) for _ in range(5)], subagent_turn_groups=2)
+
+    # Assert the structural fields, not only the message: "2" matches inside "12", "25" and
+    # any timestamp, so a substring check alone carries weight it cannot bear.
+    assert result.ledger_dispatches == 5
+    assert result.turn_groups == 2
+    assert result.agrees is False
+    assert result.reason is not None
+
+
+def test_reconcile_excludes_dispatch_sentinels_from_the_dispatch_count() -> None:
+    """A dispatch that never ran cannot have left a turn-group, so counting it inverts the test.
+
+    With sentinels counted, a run of launch failures would read as "ledger > observed" and be
+    reported as loss — the opposite of what those rows mean.
+    """
+    rows = [
+        dict(_BASE),
+        {**_BASE, "verdict": DISPATCH_FAILED, "reason": "launch error"},
+        {**_BASE, "verdict": DISPATCH_SKIPPED, "reason": "gate off"},
+    ]
+
+    result = reconcile_counts(rows, subagent_turn_groups=1)
+
+    assert result.ledger_dispatches == 1
+    assert result.agrees is True
+
+
+def test_reconcile_agrees_on_an_empty_corpus() -> None:
+    """No ledger rows AND no subagent turns is a project that has not run a gated stage."""
+    assert reconcile_counts([], subagent_turn_groups=0).agrees is True
+
+
+def test_turn_groups_counts_contiguous_sidechain_runs_not_turns() -> None:
+    """The denominator has to be DERIVED, and the derivation is where a fabricated number hides.
+
+    A dispatch is one contiguous run of sidechain turns, so the two candidate keys must be
+    told apart: adjacent sidechain turns are ONE dispatch, and two runs separated by a
+    main-chain turn are TWO. Grouping by `(session_id, stage)` instead — which is how the
+    first draft's figures were computed, by hand, in a shell one-liner — silently merges every
+    dispatch of one agent in one session into a single group.
+    """
+    scopes = ["main", "subagent", "subagent", "main", "subagent", "main"]
+    turns = [_FakeTurn(scope=s, ts=i) for i, s in enumerate(scopes)]
+
+    assert sidechain_turn_groups(turns) == 2
+
+
+def test_turn_groups_is_zero_without_sidechain_turns() -> None:
+    assert sidechain_turn_groups([_FakeTurn(scope="main", ts=i) for i in range(3)]) == 0
+
+
+def test_turn_groups_orders_by_timestamp_before_grouping() -> None:
+    """Transcript order is not guaranteed; two runs must not merge because input was shuffled."""
+    turns = [
+        _FakeTurn(scope="subagent", ts=0),
+        _FakeTurn(scope="subagent", ts=4),
+        _FakeTurn(scope="main", ts=2),
+    ]
+
+    assert sidechain_turn_groups(turns) == 2
+
+
+def test_turn_groups_merges_concurrent_dispatches_into_one_run() -> None:
+    """The undercount is pinned, not discovered later: N parallel subagents read as ONE run.
+
+    Reviewers are dispatched as a batch in a single message and the main loop emits no turn
+    until the batch returns, so their sidechain turns are contiguous in timestamp order. This
+    is the direction the docstring's "NOT a dispatch count" warning is about, and `code-reviewer`
+    — one of the three agents the ledger records — is dispatched exactly this way.
+    """
+    turns = [_FakeTurn(scope="subagent", ts=i) for i in range(6)]
+
+    assert sidechain_turn_groups(turns) == 1
+
+
+# ── the reconcile CLI branch itself (round-3 review: it shipped untested) ─────
+
+
+def _fake_ingestion(scopes: list[str]) -> object:
+    class _Diag:
+        dirs_scanned = 1
+
+    class _Ing:
+        turns = [_FakeTurn(scope=s, ts=i) for i, s in enumerate(scopes)]
+        diagnostics = _Diag()
+
+    return _Ing()
+
+
+def test_reconcile_cli_rejects_a_nonexistent_root(capsys: pytest.CaptureFixture[str]) -> None:
+    """A typo'd root must not print a confident `agrees=yes` — that is the silent-zero shape."""
+    assert main(["reconcile", "--root", "/definitely/not/here"]) == 1
+    assert "no such directory" in capsys.readouterr().err
+
+
+def test_reconcile_cli_exits_2_for_a_disagreement_not_1(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """`1` is reserved for tool failure, so an operator can tell the two apart.
+
+    spoton's disagreement is expected and permanent; conflating it with a broken command is
+    what makes a diagnostic un-runnable in an `&&` chain.
+    """
+    monkeypatch.setattr(
+        "harness_maker.economics_source.load_turns",
+        lambda *a, **k: _fake_ingestion(["main", "subagent"]),
+    )
+    monkeypatch.setattr("harness_maker.stage_agent_ledger.resolve_base_root", lambda p: tmp_path)
+
+    assert main(["reconcile", "--root", str(tmp_path)]) == 2
+    out = capsys.readouterr().out
+    assert "agrees=NO" in out
+    assert "dirs_scanned=1" in out
+
+
+def test_reconcile_cli_counts_and_reports_torn_ledger_lines(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A dropped row lowers `dispatches`, which can only move the verdict toward agreement.
+
+    Silence there flatters the answer, so the count must reach stdout — the `coherence` branch
+    already learned this and its comment records it as "the first version's bug".
+    """
+    ledger = ledger_path(tmp_path)
+    ledger.parent.mkdir(parents=True, exist_ok=True)
+    ledger.write_text(
+        json.dumps({**_BASE, "ts": "2026-08-08T00:00:00Z"}) + "\n{ torn\n[1,2]\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "harness_maker.economics_source.load_turns",
+        lambda *a, **k: _fake_ingestion(["subagent", "main", "subagent"]),
+    )
+    monkeypatch.setattr("harness_maker.stage_agent_ledger.resolve_base_root", lambda p: tmp_path)
+
+    assert main(["reconcile", "--root", str(tmp_path)]) == 0
+    out = capsys.readouterr().out
+    assert "malformed_rows=2" in out
+    assert "2 malformed ledger line(s) excluded" in out

@@ -30,6 +30,14 @@ _STEP_LANDED = "2026-08-05"
 #: (slug, round) pairs that ran on or after the cutoff WITHOUT persisting. Each needs a
 #: reason. Adding an entry is the visible cost of skipping the step; removing one is free.
 _KNOWN_MISSING: dict[tuple[str, int], str] = {
+    ("workflow-time-token-savings", 3): (
+        "Step 3.4's persist-payload was never run for any round of this review — the merged "
+        "findings existed only in the orchestrator's context, so there is no capture to write. "
+        "Reconstructing one from REVIEW-workflow-time-token-savings-2026-08-09.md would be a "
+        "post-hoc entry in a corpus whose value is that its entries are captures, which this "
+        "test's own message forbids. Recorded as missing. The round-3 findings themselves are "
+        "in that REVIEW document; what is lost is the replayable per-round payload."
+    ),
     ("workflow-loop-efficiency", 3): (
         "ran on the installed harness whose rendered review stage predated the persist "
         "line — the step was in source but not in the command that executed"

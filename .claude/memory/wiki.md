@@ -787,4 +787,68 @@ Two things worth carrying beyond this fix. First, the receipt's `index_after` is
 Writing that up exposed a second `<WT>`. Under loop dispatch the driver reads each stage file inline and runs *every* step, Step 0 included, and `task-preflight` **creates** `.worktrees/<slug>/` when absent and declares that path `<WT>` too. Two definitions in one iteration resolve either way: follow the loop's and the task worktree is an orphan (friction, mostly reaped by `prune_stale`); follow the stage's and the iteration's work lands on `hm/<slug>` while loop-close finalizes the **empty** ephemeral worktree — stranded and invisible to convergence, with every exit code 0. The loop already carried this override for wrapup; the per-iter stages now get it too. No incident was observed — `hm/*` branches and `.worktrees/` were checked and held only the current task — so the possibility is established and the frequency is unknown.
 
 Two things generalise. **The per-task model was added without auditing the model-specific instructions on either side of a handoff** — this is `[fail:design] handoff-assumes-a-skipped-step` at count:3, and its three instances are one root cause: `wrapup_land` assumed a finalize that must not run, `execute.md` instructed the finalize that must not run, and the loop let a preflight run that must not. **And the audit has to cover instructions a stage ISSUES, not only assumptions it MAKES** — the entry's own prevention line said "audit every 'X was already done' assumption", which by construction could not have caught instances 2 or 3. The escalation proposal for a mechanical version is in `pending-proposals.md`, with the false-positive caveat that killed a similar render-grep rule.
+## [wiki:gotcha] project-dir-encoding-hid-a-whole-project | 2026-08-08
+PLAN-workflow-time-token-savings Phase A1. `economics_source.encode_project_dir` mirrors how Claude Code names transcript directories from the launch cwd, and its regex was `[/.]` when the real encoding also folds `_`. The failure was **silent and total**: any project whose path contains an underscore matched no directory on disk, so `load_turns` returned zero turns and every economics report printed `$0` — indistinguishable from a project with no spend. `/home/noel/strange_chess` hid **$1,637** of real spend for the lifetime of the meter, and the RESEARCH document that measured $11,022 across four projects was reading three. The fix is one character (`re.sub(r"[/._]", "-", ...)`, `economics_source.py:125`), verified against five underscore-path projects, all hyphen-encoded on disk with no underscore-encoded sibling.
+
+**The widening enlarges the collision set, and the guard against that is conditional — this is the part to remember.** `/x/a_b` and `/x/a-b` now encode identically, so a foreign project's transcript directory becomes discoverable. The per-turn filter `is_own_cwd` (`economics_source.py:160`) drops foreign turns, **but only those that carry a `cwd`**: it returns `True` for `cwd is None` by design, to keep older transcript lines. So a collision plus one legacy `cwd`-less line does admit a foreign turn. That limit is stated rather than closed, because making `is_own_cwd` fail-closed would drop legacy no-cwd turns in `load_turns` **and** `context_composition` — a strictly larger change than the meter fix. `test_cwd_filter_is_the_real_boundary_when_two_paths_encode_alike` pins both branches and will fail loudly if anyone flips the default. The first draft of that docstring asserted the boundary was unconditional; it was refuted in review and is now the entry's cautionary half.
+
+**Two consequences for anyone reading economics output.** (1) Numbers produced before 2026-08-08 for an underscore-path project are zeroes, not measurements — re-run rather than compare. (2) The diagnostic `hm stage_agent_ledger reconcile --root <p>` exists to make ledger-vs-transcript agreement re-derivable instead of narrated; it is **diagnostic-only**, and its non-zero exit must never be wired into a gate (see [[stage-agent-ledger-reconciled-against-transcripts]] for the reconciliation table and the `ledger-trustworthy: yes` verdict).
+## [wiki:architecture] antigravity-structured-output-and-tier | 2026-08-08
+`agy` (Antigravity CLI) **does** have a structured-output mode — `--output-format json --json-schema <abs path>`, where `--json-schema` is only honoured when `--output-format json` is also passed. Six sites in this repo asserted the opposite ("antigravity has no CLI-level enforcement") purely because the flag is not spelled `--output-schema` the way Codex spells it; that one-word difference is what produced 9 parse-failure rows in `.claude/observability/second-opinion.jsonl`. Enforcement is **best-effort, not guaranteed**: a reply with `status: SUCCESS` was observed with the `structured_output` key entirely absent, so the tolerant fence-stripping extractor stays a **mandatory fallback, not dead code**. Payload acquisition is therefore a 6-way table, not a happy path: stdout unparseable as JSON → `failed`; envelope `status` not `SUCCESS` → `skipped`; `structured_output` present and schema-valid → used directly; present but invalid → **fail closed** (`failed`, with no fall-through to the extractor, so a malformed enforced payload can never be silently re-parsed into a different answer); absent → run the extractor over the `response` string; `response` empty or not a `str` → `failed`. Separately, the shipped default model moved from `Gemini 3.1 Pro (High)` to `Gemini 3.6 Flash (High)`: on one measured 41 KB review prompt the old tier ran 4 m 04 s and returned zero bytes against the 240 s cap, while the new tier returns 3–4 findings in 27–28 s — the model tier, not the timeout value, was the binding constraint. **A residual remains and is NOT fixed**: agy intermittently returns `status: SUCCESS` in ~7 s with an empty `response` and no `structured_output` (3 of 7 large-prompt calls). This change does not stop that; it only makes it legible as a named `failed` reason instead of an anonymous parser complaint.
+## [wiki:observability] stage-agent-ledger-reconciled-against-transcripts (2026-08-08)
+
+PLAN-workflow-time-token-savings Phase A2. Two apparent ledger anomalies; both resolved, and one
+of them was a **measurement error in the research that raised it**.
+
+Reconciliation against `load_turns`, all-time window, after the Phase A1 encoder fix, as
+printed by `hm stage_agent_ledger reconcile --root <p>`:
+
+| project | preset | ledger dispatches | subagent turns | sidechain turn-groups | agrees |
+|---|---|---|---|---|---|
+| strange_chess | Side | 37 | 1704 | 616 | yes |
+| harness-maker | (self) | 13 | 4160 | 855 | yes |
+| edgelog | Side | 4 | 615 | 150 | yes |
+| spoton | **Production** | **0** | 6153 | 1036 | **NO** |
+
+**The turn-group column changed meaning once, and the first version of this entry had the
+hand-rolled one.** An earlier draft reported 45/85/30/57, computed in a shell one-liner as
+`{(session_id, stage)}` — which merges every dispatch of one agent in one session into a single
+group and therefore **under-counts**. The shipped `sidechain_turn_groups` counts maximal
+contiguous runs of sidechain turns in timestamp order — and it is wrong in BOTH directions, not just one: a parallel dispatch batch merges N
+dispatches into a single run (undercount), while a peer session's main-chain turns split one
+dispatch across several (overcount). Neither key is "number of dispatches"; the tested one is at
+least reproducible and pinned
+(`test_turn_groups_counts_contiguous_sidechain_runs_not_turns` discriminates the two keys
+directly). The verdict below is unchanged under **either** key, because spoton's shape is
+zero-vs-nonzero and no grouping choice moves a zero. `ledger_dispatches` also shifted (39→37,
+12→13): sentinels are now excluded, and this PLAN's own validator passes added rows.
+
+**strange_chess's "39 dispatches vs 0 sidechain turns" was never real.** The `0` came from an
+ad-hoc hardlinked transcript directory built by hand to work around the underscore-encoder bug
+(`-home-noel-strange_chess`), not from the real corpus. Against the real transcript root the
+project has 1704 subagent turns over 616 runs, so 37 ledger rows is corroborated and properly
+smaller — the ledger records only `plan-validator` / `test-reviewer` / `code-reviewer`, not every
+subagent. **The lesson is about the fixture, not the ledger: a hand-built stand-in for a broken
+reader is itself unvalidated, and a finding drawn from it inherits that.** RESEARCH Open
+Question 2 is retracted in place.
+
+**spoton's zero is real and has a positive mechanism.** The emit IS rendered
+(`grep -c 'stage_agent_ledger emit'` = 1 in both `plan.md` and `execute.md`, version 0.50.1).
+spoton re-rendered to 0.50.1 on **2026-08-08 19:27** (`261843e`); its most recent `/hm:plan` and
+`/hm:execute` ran on **2026-08-01/02**, a week before the emit existed there. Zero rows is
+therefore "no observations yet", not a silent no-op — the `absent-case = feature black hole`
+hypothesis is **refuted** for this instance.
+
+**ledger-trustworthy: yes** — with one caveat that changes how the numbers may be used. Every
+row in the population comes from a **Side-preset** project. The pre-registered rates
+(`P(validator verdict changes | later pass)` = 2/9 = 22.2%; `P(Phase A.5 FAIL)` = 9/24 = 37.5%)
+are therefore Side-only, and Production is absent for a scheduling reason rather than a defect.
+Both verdicts point the same way (**keep** both steps), and a preset with *more* review pressure
+is unlikely to push either rate toward zero, so the conclusion holds — but a future aggregation
+must not describe these as cross-preset.
+
+`reconcile` exists to make this re-derivable rather than narrated: it is **diagnostic-only** and
+its non-zero exit must never be wired into a gate, because spoton's disagreement is expected to
+persist until that project next runs a gated stage.
+
 <!-- @hm:/user:entries -->

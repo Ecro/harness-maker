@@ -188,6 +188,7 @@ DELIVERABLE_PREFIXES: tuple[str, ...] = (
     "RECEIPT",
     "ABLATION",
     "MATRIX",
+    "EXPERIMENT",
 )
 
 # `[^/]+` (not `.+`) so the match is a FLAT file — a nested user dir like

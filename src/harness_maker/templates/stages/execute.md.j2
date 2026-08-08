@@ -230,10 +230,9 @@ Resolution:
 - `overall_assessment: FAIL` → for each entry in `blocking_issues[]`, rewrite the offending test (the `passing_tests[]` list is FROZEN — do not re-author them). For each `scenarios_missing[]`, author a new test. **Re-invoke test-reviewer** until PASS. Retry budget: **2 attempts**. After 2 FAILs in a row, surface the latest verdict and stop — escalate to user.
 
 **Record every attempt (ADR-004).** One row per dispatch — including each retry, and
-including the case where the dispatch never ran. This gate has ~42 lifetime dispatches and
-**zero** ledger rows, so the question "is A.5 worth its barrier?" currently has no data at
-all. Run this immediately after each attempt resolves, with `<run-id>` stable across the
-retries of one Phase A.5 (use the task slug plus the phase number):
+including the case where the dispatch never ran. Run this immediately after each attempt
+resolves, with `<run-id>` stable across the retries of one Phase A.5 (use the task slug plus
+the phase number):
 
 {% if is_codex %}
 ```

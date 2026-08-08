@@ -6,6 +6,7 @@ parameter pointing at the checked-in fixture store (CLAUDE.md checkpoint 7).
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -39,10 +40,113 @@ def loaded() -> IngestionResult:
         (Path("/repo/proj"), "-repo-proj"),
         (Path("/home/noel/harness-maker"), "-home-noel-harness-maker"),
         (Path("/repo/proj/.worktrees/demo"), "-repo-proj--worktrees-demo"),
+        # PLAN-workflow-time-token-savings A1: Claude Code maps `_` to `-` as well.
+        # Verified against five underscore-path projects, all hyphen-encoded on disk.
+        (Path("/a/b/c_d"), "-a-b-c-d"),
+        (Path("/home/noel/strange_chess"), "-home-noel-strange-chess"),
     ],
 )
-def test_encode_project_dir_maps_slash_and_dot_to_dash(path: Path, expected: str) -> None:
+def test_encode_project_dir_maps_slash_dot_and_underscore_to_dash(
+    path: Path, expected: str
+) -> None:
     assert encode_project_dir(path) == expected
+
+
+def _write_turn(directory: Path, name: str, cwd: str) -> None:
+    """One priced assistant turn whose `cwd` decides which project owns it."""
+    directory.mkdir(parents=True, exist_ok=True)
+    line = json.dumps(
+        {
+            "type": "assistant",
+            "sessionId": name,
+            "timestamp": "2026-08-08T12:00:00.000Z",
+            "cwd": cwd,
+            "isSidechain": False,
+            "message": {
+                "id": f"msg_{name}",
+                "model": "claude-opus-5",
+                "usage": {"input_tokens": 2, "output_tokens": 3},
+                "content": [{"type": "text", "text": "hi"}],
+            },
+        }
+    )
+    (directory / f"{name}.jsonl").write_text(line + "\n", encoding="utf-8")
+
+
+def test_discovery_finds_an_underscore_bearing_project_path(tmp_path: Path) -> None:
+    """The existing cases all used `_`-free absolute paths — which is why this shipped broken.
+
+    `economics stages --root /home/noel/strange_chess` reported `$0 / 0 turns` for $1,637 of
+    real spend, because the encoder left the underscore alone and matched no directory.
+    """
+    root = tmp_path / "projects"
+    _write_turn(root / "-x-my-proj", "sess", "/x/my_proj")
+
+    found = discover_transcript_dirs(Path("/x/my_proj"), transcript_root=root)
+
+    assert [p.name for p in found] == ["-x-my-proj"]
+
+
+def test_cwd_filter_is_the_real_boundary_when_two_paths_encode_alike(tmp_path: Path) -> None:
+    """`/x/a_b` and `/x/a-b` collide after encoding; `is_own_cwd` is what separates them.
+
+    Widening the encoder admits a foreign DIRECTORY, and `load_turns` re-checks every turn's
+    `cwd` — so no foreign turn **that carries a `cwd`** survives. That qualifier is load-bearing:
+    `test_a_cwd_less_foreign_turn_survives_the_collision_boundary` below shows a `cwd`-less line
+    IS admitted. An earlier version of this docstring made the claim unconditional and three
+    reviewers refuted it. This test pins the carrying-cwd branch; that one pins the other.
+    """
+    root = tmp_path / "projects"
+    _write_turn(root / "-x-a-b", "sess", "/x/a-b")
+
+    assert encode_project_dir(Path("/x/a_b")) == encode_project_dir(Path("/x/a-b"))
+
+    foreign = load_turns(Path("/x/a_b"), transcript_root=root)
+    # Name the mechanism rather than deducing it from an empty list: the colliding directory
+    # WAS discovered, and the turn was dropped by the per-turn cwd check. Asserting only
+    # `turns == []` would stay green if a later change made discovery stop returning the
+    # directory at all — retiring the guard this test exists to pin.
+    assert foreign.diagnostics.dirs_scanned == 1
+    assert foreign.diagnostics.skipped_by_reason.get("foreign_cwd") == 1
+    assert foreign.turns == []
+
+    assert len(load_turns(Path("/x/a-b"), transcript_root=root).turns) == 1
+
+
+def test_a_cwd_less_foreign_turn_survives_the_collision_boundary(tmp_path: Path) -> None:
+    """The boundary is fail-OPEN on absent `cwd`, so the collision CAN admit a foreign turn.
+
+    `is_own_cwd` returns True when `cwd is None` — deliberately, for older transcript lines
+    that predate the field. Widening the encoder enlarged the collision set, so this branch
+    became reachable where it previously never fired. Pinned as an accepted limit rather than
+    left to a docstring: an earlier version of `encode_project_dir`'s docstring claimed the
+    widening "cannot admit foreign turns", and three reviewers refuted it against this branch.
+    Change this test's expectation only alongside a deliberate decision to make `is_own_cwd`
+    fail-closed — which would drop legacy no-cwd turns everywhere, not just here.
+    """
+    root = tmp_path / "projects"
+    directory = root / "-x-a-b"
+    directory.mkdir(parents=True)
+    line = json.dumps(
+        {
+            "type": "assistant",
+            "sessionId": "legacy",
+            "timestamp": "2026-08-08T12:00:00.000Z",
+            "message": {
+                "id": "msg_legacy",
+                "model": "claude-opus-5",
+                "usage": {"input_tokens": 2, "output_tokens": 3},
+                "content": [{"type": "text", "text": "hi"}],
+            },
+        }
+    )
+    (directory / "legacy.jsonl").write_text(line + "\n", encoding="utf-8")
+
+    admitted = load_turns(Path("/x/a_b"), transcript_root=root)
+
+    assert admitted.diagnostics.dirs_scanned == 1
+    assert admitted.diagnostics.skipped_by_reason.get("foreign_cwd") is None
+    assert len(admitted.turns) == 1
 
 
 def test_discovery_finds_the_base_dir_and_its_worktree_encoded_siblings() -> None:

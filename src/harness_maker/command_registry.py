@@ -50,7 +50,9 @@ MODULES: dict[str, ModuleSpec] = {
     "codex_ledger": ModuleSpec("subparser", _s("emit")),
     "delegation_ledger": ModuleSpec("subparser", _s("record")),
     "mutation_receipt": ModuleSpec("subparser", _s("record")),
-    "stage_agent_ledger": ModuleSpec("subparser", _s("emit", "persist-payload", "coherence")),
+    "stage_agent_ledger": ModuleSpec(
+        "subparser", _s("emit", "persist-payload", "coherence", "reconcile")
+    ),
     "delivery_metrics": ModuleSpec("subparser", _s("candidates", "adjudicate", "compute", "trend")),
     "economics": ModuleSpec("subparser", _s("report", "stages", "doctor", "composition")),
     "high_diff": ModuleSpec("subparser", _s("classify")),

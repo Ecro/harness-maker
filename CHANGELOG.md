@@ -1,5 +1,48 @@
 # Changelog
 
+## [Unreleased]
+
+### The economics meter reported `$0` for any project whose path contains `_`
+
+`economics_source.encode_project_dir` mirrors how Claude Code names a transcript directory from
+the launch cwd. The real encoding folds `/`, `.` **and `_`** to `-`; ours folded only `/` and `.`.
+The consequence was silent and total — an underscore-path project matched no directory, so
+`load_turns` returned zero turns and every economics report printed `$0`, which is
+indistinguishable from a project that has spent nothing. `/home/noel/strange_chess` hid **$1,637**
+of real spend for the meter's whole lifetime, and the research that measured $11,022 across four
+projects was in fact reading three. Fixed by widening the regex to `[/._]`, verified against five
+underscore-path projects.
+
+The widening enlarges the collision set — `/x/a_b` and `/x/a-b` now encode alike — and the guard
+against that is **conditional, not absolute**. The per-turn `is_own_cwd` filter drops foreign
+turns, but it returns `True` for `cwd is None` to keep older transcript lines, so a collision plus
+one legacy `cwd`-less line does admit a foreign turn. That is a stated limit rather than a
+blocker: current-format lines all carry `cwd`, the output is a local aggregate, and making the
+filter fail-closed would drop legacy turns in `load_turns` **and** `context_composition`.
+`test_cwd_filter_is_the_real_boundary_when_two_paths_encode_alike` pins both branches.
+
+**Numbers produced for an underscore-path project before this fix are zeroes, not measurements.**
+Re-run rather than compare.
+
+### New diagnostic: `hm stage_agent_ledger reconcile`
+
+Reconciles the stage-agent ledger's recorded dispatches against the transcripts, so
+ledger-vs-transcript agreement is re-derivable instead of narrated. It is **diagnostic-only** and
+its non-zero exit must never be wired into a gate — a project that has not run a gated stage since
+its ledger was installed is expected to disagree, and that is a documented state, not a defect.
+The reader now counts malformed and non-dict lines and reports them, because a silent drop moves
+the verdict toward agreement; `RecursionError` is caught alongside `ValueError`, matching
+`economics_source`'s reader. Exit convention is stated in `--help`: `0` agree, `2` disagree, `1`
+tool failure.
+
+Running it over four projects retracted two figures the research had headlined. The reported
+"39 dispatches vs 0 sidechain turns" for strange_chess came from a transcript directory assembled
+by hand to work around the encoder bug above; the real corpus reconciles at 37 dispatches against
+1704 subagent turns. A separate "subagent share" figure had been computed in a shell one-liner
+keyed on `{(session_id, stage)}`, which merges every dispatch of one agent in one session. Both
+are retracted in place. Verdict recorded: `ledger-trustworthy: yes`, with spoton's `0` disagreement
+explained by its not having run a gated stage since installation.
+
 ## [0.50.1] — 2026-08-08
 
 ### `/hm:execute` stopped telling you to finalize a worktree `task-land` owns

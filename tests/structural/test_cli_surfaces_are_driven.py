@@ -51,7 +51,6 @@ _ALLOWED_UNDRIVEN: dict[str, str] = {
     "refdocs_index": "module-level tests only; entry point never run",
     "second_brain": "driven only by a stderr-text assertion in test_command_registry, not a call",
     "spec_quality": "module-level tests only; entry point never run",
-    "stage_agent_ledger": "module-level tests only; entry point never run",
     "two_pass_review": "module-level tests only; entry point never run",
 }
 
