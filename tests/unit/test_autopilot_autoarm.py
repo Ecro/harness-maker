@@ -53,7 +53,8 @@ def test_arms_when_persistent_and_full(tmp_path: Path) -> None:
     assert autopilot_autoarm.arm_if_persistent(tmp_path, now=_FROZEN) is True
     marker = autopilot.load(tmp_path, session_id=None)
     assert marker is not None
-    assert marker.level == "full"
+    # Demoted, not promoted — the legacy word never meant wider advance (REVIEW P6).
+    assert marker.level == "auto_safe"
 
 
 def test_no_arm_when_persistent_false(tmp_path: Path) -> None:

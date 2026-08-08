@@ -48,7 +48,10 @@ def test_stage_command_has_autopilot_advance_block(rendered_root: Path, stage: s
 def test_gated_stages_carry_their_mandatory_gate(rendered_root: Path, stage: str) -> None:
     body = (rendered_root / "commands" / "hm" / f"{stage}.md").read_text(encoding="utf-8")
     needles = {
-        "plan": "architectural AskUserQuestion round is pending",
+        # B3 reworded this gate when it became a judgment gate routed to the boundary. The
+        # needle tracks the surviving invariant — an unresolved architecture round is what
+        # the gate is about — not the old sentence.
+        "plan": "unresolved architectural AskUserQuestion round",
         "review": "CHANGES_REQUESTED",
         "wrapup": "auto-advance never pushes",
         "verify": "verification check FAILED",

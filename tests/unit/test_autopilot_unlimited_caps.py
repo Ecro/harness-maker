@@ -139,7 +139,20 @@ def test_unlimited_run_terminates_within_pipeline_length(
     current = "research"
     terminated = False
     for _ in range(len(stages) + 1):
-        autopilot_caps.main(["boundary", "--root", str(tmp_path), "--current", current])
+        # `--judgment-gate clear` because this test walks a CLEAN pipeline: B3 made the flag
+        # fail-closed, so an omitted flag halts at plan and review by design, and this loop
+        # is asserting termination-by-pipeline-length, not gate behaviour.
+        autopilot_caps.main(
+            [
+                "boundary",
+                "--root",
+                str(tmp_path),
+                "--current",
+                current,
+                "--judgment-gate",
+                "clear",
+            ]
+        )
         out = json.loads(capsys.readouterr().out)
         if not out["proceed"]:
             # merge_gate (wrapup) or kill_switch (marker cleared) — terminal.

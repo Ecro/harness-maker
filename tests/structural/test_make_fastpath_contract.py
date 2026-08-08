@@ -35,6 +35,7 @@ _DISCLOSED_AXES: frozenset[str] = frozenset(
     {
         "second_opinion",
         "autonomy",
+        "instrumentation",
         "worktree",
         "targets",
         "dev_mode",

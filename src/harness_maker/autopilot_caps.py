@@ -25,7 +25,15 @@ from harness_maker import autopilot, autopilot_ledger, command_registry
 # so it belongs in the declared vocabulary. `out` is typed `dict[str, object]`, so mypy
 # would not have caught the divergence: exactly the enum-drift CLAUDE.md flags where a
 # name-only parity test is invariant to the values.
-HaltKind = Literal["kill_switch", "step_cap", "time_cap", "merge_gate", "unknown_stage", "bad_slug"]
+HaltKind = Literal[
+    "kill_switch",
+    "step_cap",
+    "time_cap",
+    "merge_gate",
+    "judgment_gate",
+    "unknown_stage",
+    "bad_slug",
+]
 CapKind = Literal["step_cap", "time_cap"]
 
 # Stages the chain must NEVER auto-ENTER — it hands off to the human before them. The
@@ -34,6 +42,15 @@ CapKind = Literal["step_cap", "time_cap"]
 # it (REVIEW P1-1, user-chosen "stop before wrapup" fix). Reaching one of these as the
 # NEXT stage stops the chain, records a gate_blocked event, and clears the marker.
 _HUMAN_GATED_STAGES: frozenset[str] = frozenset({"wrapup"})
+
+# ADR-009. Keyed on the stage that JUST RAN and owns the judgment — never on the
+# (source, next) pair. A user-customised `autonomy.pipeline` changes which stage follows
+# plan or review while leaving the judgment exactly where it was, so pair-keying would
+# silently stop gating for those users: the absent-case = feature black hole shape.
+#
+# `_HUMAN_GATED_STAGES` stays next-stage-keyed. It guards a one-way door (wrapup lands to
+# main), so what matters there is what is about to be ENTERED, not what just finished.
+_JUDGMENT_GATED_STAGES: frozenset[str] = frozenset({"plan", "review"})
 
 
 @dataclass(frozen=True)
@@ -234,6 +251,10 @@ def _cmd_boundary(args: argparse.Namespace) -> int:
         "pipeline_complete": False,
         "task_slug": None,
         "task_slug_source": None,
+        # Present on every response so a consumer can branch on the value rather than on
+        # the key existing — an absent key and a false one read the same in prose.
+        "judgment_auto_answered": False,
+        "judgment_directive": None,
     }
     marker = autopilot.active_marker(root, session_id=args.session_id)
     if marker is None:
@@ -312,6 +333,40 @@ def _cmd_boundary(args: argparse.Namespace) -> int:
             autopilot.clear(root, session_id=args.session_id)
         print(json.dumps(out))
         return 0
+    # ADR-009 — the judgment gate. Placed AFTER the caps and BEFORE the human gate: the caps
+    # are terminal and must win, while the land gate must remain reachable on the next call
+    # (this halt preserves the marker, so it will be).
+    if args.current in _JUDGMENT_GATED_STAGES and args.judgment_gate != "clear":
+        # Fail-closed on absent: `--judgment-gate` defaults to "pending", so a stage that
+        # forgets to pass it stops. Fail-open here would be indistinguishable from a stage
+        # that has no gate at all, which is the entire failure this flag exists to make
+        # visible.
+        if marker.level != "auto_full":
+            # NOT terminal, and NOT a marker clear. `merge_gate` below clears the marker
+            # because landing ends the session; copying that here would end the autopilot
+            # session at the first plan stage — and starve `smoke_check` of the very rows
+            # that let `/hm:health` tell "stopping correctly" from "never fires".
+            autopilot_ledger.append_event(
+                root, event="gate_blocked", fields={"stage": args.current}
+            )
+            out["halt_kind"] = "judgment_gate"
+            out["reason"] = (
+                f"stage {args.current!r} has an unresolved judgment gate and the level is "
+                f"{marker.level!r} — autopilot stopped; resolve it and re-run. "
+                "Marker preserved."
+            )
+            print(json.dumps(out))
+            return 0
+        # auto_full: answer rather than stop. The directive is the whole point of the level —
+        # the answer must be RECORDED where a human will find it, or this is an unlogged
+        # skip of a human decision.
+        out["judgment_auto_answered"] = True
+        out["judgment_directive"] = (
+            f"level auto_full: proceeding past {args.current!r}'s judgment gate. Record the "
+            "answer you took — for `plan`, write the recommended option into the PLAN's "
+            "Interview Transcript; for `review`, write the passed-over finding ids into the "
+            "REVIEW document. An unrecorded auto-answer is an unauditable skip."
+        )
     nxt = next_stage(marker.pipeline, args.current)
     if nxt is None:
         # `current` IS the last stage → end the session (ADR-006).
@@ -372,6 +427,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     # id-less reader resolves an id-bearing marker as foreign -> kill_switch. Empty
     # string means id-less (Cursor/Codex/degraded), which is the pre-existing behaviour.
     b.add_argument("--session-id", default=None, dest="session_id")
+    # ADR-009: `default="pending"` IS the fail-closed rule. Do not make this required —
+    # an argparse error on the six non-judgment stages would break every existing caller,
+    # and do not default it to "clear", which would let a forgotten flag advance past an
+    # unresolved human decision without a trace.
+    b.add_argument(
+        "--judgment-gate",
+        default="pending",
+        choices=("pending", "clear"),
+        dest="judgment_gate",
+    )
     b.add_argument("--step-cap", type=int, default=None, dest="step_cap")
     b.add_argument("--time-cap-min", type=int, default=None, dest="time_cap_min")
     # gate-blocked (P7): the auto-branch records this when a mandatory gate holds the chain

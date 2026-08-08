@@ -8,8 +8,10 @@ pipeline, so the TTL is reset every session and never trips in practice — whil
 marker's clear-on-terminal-halt + ownership semantics. The committed ``false`` is the real
 off-switch (PLAN-autopilot-config-surface ADR-003).
 
-Re-arm truth table: persistent-false → no arm; ``gated`` level → no-op (gated never
-auto-advances); ``auto_safe``/``full`` → arm. Fail-safe: a missing/malformed harness.yaml, an
+Re-arm truth table: persistent-false → no arm; ``gated`` → no-op (gated never auto-advances);
+``ask`` → no arm (the picker owns that session); any level in ``models.ARMED_LEVELS`` — today
+``auto_safe`` and ``auto_full``, plus the legacy ``full`` spelling — → arm. Fail-safe: a
+missing/malformed harness.yaml, an
 invalid pipeline, or a write failure is a silent no-op (never raises) — a hook that blocks
 SessionStart is worse than a degraded fallback.
 """
@@ -20,12 +22,16 @@ import json
 import logging
 import sys
 from pathlib import Path
-from typing import Literal
 
 from harness_maker import autopilot
 from harness_maker.io_utils import load_harness_yaml
 from harness_maker.loop_marker import sanitize_session_id
-from harness_maker.models import AtomicStage, AutonomyConfig
+from harness_maker.models import (
+    ARMED_LEVELS,
+    LEGACY_LEVEL_ALIASES,
+    AtomicStage,
+    AutonomyConfig,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -56,15 +62,13 @@ def arm_if_persistent(
     # `is True` (not truthy): a hand-edited "true" string or 1 must NOT arm — only a real bool.
     if autonomy.get("autopilot_persistent") is not True:
         return False
-    # Narrow to the Literal via ``==`` (mypy-strict-friendly). ``gated``/unknown → no-op: a
-    # gated marker never auto-advances, so arming it only adds marker noise.
-    level = autonomy.get("level")
-    armed_level: Literal["gated", "auto_safe", "full"]
-    if level == "auto_safe":
-        armed_level = "auto_safe"
-    elif level == "full":
-        armed_level = "full"
-    else:
+    # The ladder this replaced enumerated the arming levels by hand, so `auto_full` — the
+    # flagship level — would have fallen through its `else: return False` and silently never
+    # armed. `_ARMED_LEVELS` is derived from `OPERATIONAL_LEVELS`, so a new level arms by
+    # existing. `ask` is absent from that tuple by construction: the picker owns that session
+    # (ADR-003), and arming a marker here would answer a question that was meant to be asked.
+    level = LEGACY_LEVEL_ALIASES.get(str(autonomy.get("level")), autonomy.get("level"))
+    if level not in ARMED_LEVELS:
         return False
     pipeline_raw = autonomy.get("pipeline")
     try:
@@ -74,7 +78,7 @@ def arm_if_persistent(
             pipeline = list(AutonomyConfig().pipeline)
         autopilot.write(
             project_root,
-            level=armed_level,
+            level=level,
             pipeline=pipeline,
             now=now,
             claude_session_id=claude_session_id,

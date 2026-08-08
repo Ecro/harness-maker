@@ -128,7 +128,14 @@ the CLI is on PATH but casts no vote, and `{% if is_codex %}@hm-configure{% else
 authentication is not checked here. If neither is installed, print nothing: a user without
 these tools does not need to be told about them on every audit.
 {% endif %}
-{% if config.autonomy.level != "gated" %}
+{% if config.autonomy.level == "ask" %}
+## Autopilot auto-advance smoke check — not applicable
+
+`autonomy.level` is `ask`, so the level is chosen per session and is not knowable at
+render time. The smoke check takes a concrete `--level`, and interpolating a meta-level
+into it would make the probe fail on an argument error and report that as a degraded
+harness (ADR-007). Report one line: autopilot smoke skipped — level resolved per session.
+{% elif config.autonomy.level != "gated" %}
 ## Autopilot auto-advance smoke check (PLAN-human-bottleneck-auto-advance P7, ADR-009)
 
 `autonomy.level` is `{{ config.autonomy.level }}` (not `gated`), so autopilot CAN

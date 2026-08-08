@@ -224,11 +224,12 @@ Use `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code):
 > | `dev_mode` | {dev_mode} — from the preset | Adjust / `/hm:configure` |
 > | `worktree.enabled` | {true for Production, false for Side} — decides whether every `/hm:` stage runs in `.worktrees/<slug>/` on branch `hm/<slug>` | `/hm:configure` |
 > | `second_opinion.models` | {[] unless the question below is answered} | Adjust / `/hm:configure` |
-> | `autonomy.level` / persistence | **`auto_safe` / persistent `true`** — stages auto-advance past two-way-door boundaries, and a SessionStart hook re-arms this every session. Mandatory gates (plan interview, CHANGES_REQUESTED review, wrapup merge) always stop. | Adjust / `/hm:configure` |
+> | `autonomy.level` / persistence | **`ask` / persistent `true`** — the level is decided per session: at the first stage of each session the picker offers `auto_safe` (advance the two-way doors), `auto_full` (also answer the plan interview and an APPROVED review's `human_review_needed`), or gated. A CHANGES_REQUESTED review and the wrapup land stop at **every** level. | Adjust / `/hm:configure` |
 > | `ref_folders` | (none) | Adjust / `/hm:configure` |
 > | `sibling_repos` | (none) | Adjust / `/hm:configure` |
 > | `second_brain` | disabled | Adjust / `/hm:configure` |
 > | `wrapup_docs` | (none) | Adjust / `/hm:configure` |
+> | `instrumentation.stage_agent_ledger` | `false` on a fresh install (an existing harness that predates the key keeps it ON) — records one LOCAL row per plan-validator / test-reviewer dispatch and keeps each review round's finding payload, so harness-maker can tell whether its own gates earn their latency. Nothing is transmitted. Turning it off also removes this project from that cross-project measurement. | Full setup / hand-edit `.claude/harness.yaml` |
 > | `permissions.deny_dangerous` | `false` — the destructive-command deny baseline is NOT applied | hand-edit `.claude/harness.yaml` (`/hm:configure` has no permissions dimension) |
 >
 > **Safety receipt preview:**

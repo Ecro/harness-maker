@@ -297,7 +297,9 @@ def test_write_overwrites_own_and_stale_markers_without_force(
     monkeypatch.setenv("HM_SESSION_ID", "sess-A")
     autopilot.write(tmp_path, level="auto_safe", pipeline=DEFAULT_PIPELINE)
     autopilot.write(tmp_path, level="full", pipeline=DEFAULT_PIPELINE)  # own → allowed
-    assert _read_raw(tmp_path)["level"] == "full"
+    # The marker records the NORMALIZED level, so an older writer's `full` and a current
+    # `auto_safe` are the same on disk — which is what makes the legacy marker loadable.
+    assert _read_raw(tmp_path)["level"] == "auto_safe"
 
     _write_raw(
         tmp_path, _marker_payload(tmp_path, claude_session_id="sess-PEER", created_at=_iso(-19))

@@ -229,6 +229,7 @@ Resolution:
 - `overall_assessment: PASS` → proceed to Phase B.
 - `overall_assessment: FAIL` → for each entry in `blocking_issues[]`, rewrite the offending test (the `passing_tests[]` list is FROZEN — do not re-author them). For each `scenarios_missing[]`, author a new test. **Re-invoke test-reviewer** until PASS. Retry budget: **2 attempts**. After 2 FAILs in a row, surface the latest verdict and stop — escalate to user.
 
+{% if (config.instrumentation.stage_agent_ledger if config.instrumentation else true) %}
 **Record every attempt (ADR-004).** One row per dispatch — including each retry, and
 including the case where the dispatch never ran. Run this immediately after each attempt
 resolves, with `<run-id>` stable across the retries of one Phase A.5 (use the task slug plus
@@ -258,6 +259,7 @@ Bash("{{ cdwt }}uv run --with {{ harness_maker_src_path }} hm stage_agent_ledger
   do not pass `0`. Zero reads as "measured, instantly", and these rows are append-only.
 - `--barrier-index` is which serial segment of the stage this dispatch sat in (A.5 is its own
   barrier, so `1` unless the stage layout changed).
+{% endif %}
 
 #### Phase B — RED gate (skipped when `tdd_active == false`)
 

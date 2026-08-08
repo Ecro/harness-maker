@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from enum import Enum
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, get_args
 
 from pydantic import (
     AliasChoices,
@@ -781,6 +781,97 @@ class PermissionsConfig(BaseModel):
     deny_dangerous: bool = False
 
 
+# ──────────────────────────────────────────────────────────────────────────────
+# Autonomy levels — the ONLY two places these strings may be spelled out
+# ──────────────────────────────────────────────────────────────────────────────
+# `tests/structural/test_autonomy_level_literals.py` DISCOVERS every other restatement by
+# walking the AST of `src/`, and allowlists exactly these two nodes. That is deliberate:
+# the levels were previously restated in nine places across six modules, and each fix
+# shipped a hand-list of "the places to update" that was wrong by the next change. A list
+# in a docstring cannot fail; the discovery test can.
+#
+# `gated` / `auto_safe` / `auto_full` are OPERATIONAL — a marker can hold them and the
+# boundary resolver can act on them. `ask` is a **yaml-only** value meaning "the picker
+# asks this session"; it is deliberately absent from `OperationalLevel` so every runtime
+# surface (`autopilot on --level`, the ledger's `--level`, `cli --autonomy-level`) rejects
+# it rather than writing an unactionable marker.
+OperationalLevel = Literal["gated", "auto_safe", "auto_full"]
+AutonomyLevel = Literal["gated", "auto_safe", "auto_full", "ask"]
+
+# Derived, never restated — argparse `choices`, `cli.valid_levels` and
+# `autopilot_ledger._ARMED_LEVELS` all come from here.
+OPERATIONAL_LEVELS: tuple[OperationalLevel, ...] = get_args(OperationalLevel)
+
+# The two levels with behaviour of their own, named so that code branching on them does not
+# have to spell them out. A function that mentions both — `effective_level` does — otherwise
+# reads to the discovery guard as an enumeration, and the honest fix is to stop enumerating
+# rather than to pad the guard's allowlist.
+ASK_LEVEL: Literal["ask"] = "ask"
+GATED_LEVEL: OperationalLevel = "gated"
+
+# The levels that actually arm auto-advance. Derived by subtraction so a level added to
+# `OperationalLevel` arms by existing rather than by someone remembering this line.
+ARMED_LEVELS: frozenset[str] = frozenset(OPERATIONAL_LEVELS) - {"gated"}
+
+# `full` was the pre-0.51 name for what is now `auto_safe`. It NEVER had wider-advance
+# semantics — REVIEW P6 established that the mandatory gates are honoured at every level —
+# so the honest migration is a demotion to the level it actually behaved as, not a
+# promotion into the new `auto_full`. A committed `level: full` therefore keeps its exact
+# behaviour; `--update` surfaces the rename.
+LEGACY_LEVEL_ALIASES: dict[str, OperationalLevel] = {"full": "auto_safe"}
+
+
+def normalize_level(value: object) -> object:
+    """The single normalization owner — used by BOTH models that carry a level.
+
+    `AutonomyConfig` reads harness.yaml; `autopilot._Marker` reads an on-disk marker written
+    by an older version. A marker still saying `full` must keep working: without this, every
+    live `autopilot_persistent` session would have its marker fail strict validation and be
+    dropped, which reads as "autopilot is off" with no diagnostic — the silent-degradation
+    shape this repo keeps re-learning. Non-strings and unknown values pass through untouched
+    so the Literal, not this function, owns rejection.
+    """
+    if isinstance(value, str) and value in LEGACY_LEVEL_ALIASES:
+        return LEGACY_LEVEL_ALIASES[value]
+    return value
+
+
+class InstrumentationConfig(BaseModel):
+    """harness-maker's own development telemetry, separated from the user's (ADR-011).
+
+    ``stage_agent_ledger`` gates the ``stage_agent_ledger emit`` rows in the plan and
+    execute stages and the ``persist-payload`` capture in review. Those exist to answer
+    *harness-maker's* questions — is a validator second pass worth its barrier, can a
+    review round be replayed — not the consuming project's. When it is off, the prose is
+    not rendered at all: a rendered instruction the project has no reason to follow is
+    context the model pays for on every stage.
+
+    **The class default and the absent-key resolution differ on purpose** (ADR-011), and the
+    difference is the whole design:
+
+    * A **freshly rendered** harness defaults to ``False``. A third-party install should not
+      carry prose whose consumer is this repo; it opts in.
+    * An **absent key in an existing harness.yaml** resolves to ``True``
+      (``interview._parse_instrumentation``, logged once). Those harnesses predate the key and
+      are the fleet already producing rows; a re-render must not silently stop them.
+
+    Reading those as a contradiction is the easy mistake: they answer different questions —
+    "what does a new project get?" and "what did an existing project already have?".
+
+    ⚠️ Turning it off removes the project from the cross-project denominator, and that
+    denominator is load-bearing: harness-maker's own six rows said "delete the
+    plan-validator second pass" (0/3) while the pooled four-project population said keep
+    it (2/9). The interview option text states this at the point of choice.
+
+    NOT gated by this axis: ``/hm:health``, ``/hm:metrics`` and ``delivery_metrics`` —
+    those are the user's own observability and answer the user's own questions.
+    """
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    stage_agent_ledger: bool = False
+
+
 class AutonomyConfig(BaseModel):
     """Pipeline auto-advance policy (PLAN-human-bottleneck-auto-advance).
 
@@ -814,7 +905,16 @@ class AutonomyConfig(BaseModel):
 
     model_config = ConfigDict(strict=True, extra="forbid")
 
-    level: Literal["gated", "auto_safe", "full"] = "auto_safe"
+    # `ask` is the DEFAULT for a freshly rendered harness (user decision, 2026-08-09). The
+    # level a project wants is not a property of the project — it is a property of the piece
+    # of work in front of you, and a committed `auto_safe` answers that question once, in
+    # advance, for every session. `ask` moves it to the moment it can actually be answered.
+    #
+    # This does NOT reach an existing project by loading: `interview._parse_autonomy` pins an
+    # absent or malformed block to `gated`, and an explicit decline stays `gated` too
+    # (ADR-013). A default that asks is still a change in autonomy, so it arrives through
+    # `/harness-maker:make --update`, like every other promotion here.
+    level: AutonomyLevel = "ask"
     pipeline: list[AtomicStage] = Field(
         default_factory=lambda: [
             AtomicStage.RESEARCH,
@@ -839,6 +939,16 @@ class AutonomyConfig(BaseModel):
     # re-arms a fresh ``.hm-autopilot`` marker each session from the committed level/pipeline,
     # so the 18h TTL never trips in practice. The committed ``false`` is the real off-switch.
     autopilot_persistent: bool = True
+
+    @field_validator("level", mode="before")
+    @classmethod
+    def _normalize_legacy_level(cls, v: object) -> object:
+        # The SINGLE normalization owner. Every other layer (the marker model, the CLI, the
+        # autoarm hook, the ledger) reaches the level through a config or a validated
+        # argument, so putting the alias map anywhere else means putting it in several
+        # places — which is how the `full`/`auto_safe` divergence REVIEW P6 corrected got
+        # in. `mode="before"` so the Literal never sees the legacy spelling at all.
+        return normalize_level(v)
 
     @field_validator("pipeline")
     @classmethod
@@ -952,6 +1062,10 @@ class HarnessConfig(BaseModel):
     # Pipeline auto-advance policy. Old harness.yaml without this key → default
     # (level=gated) per AutonomyConfig — the absent-case = feature black hole guard.
     autonomy: AutonomyConfig = Field(default_factory=AutonomyConfig)
+    # harness-maker's own development telemetry (ADR-011). Absent key → True, the
+    # maintainer-preserving value: a project already contributing rows must not stop
+    # contributing because it was re-rendered.
+    instrumentation: InstrumentationConfig = Field(default_factory=InstrumentationConfig)
     context_lint: dict[str, Any] = Field(default_factory=dict)
     project: dict[str, Any] = Field(default_factory=lambda: {"domains": []})
     spec: dict[str, Any] = Field(default_factory=lambda: {"dir": "specs/"})
@@ -1127,6 +1241,9 @@ class InterviewAnswers(BaseModel):
     # through answers_from_harness_yaml → synthesize (else level/pipeline/caps are
     # silently dropped on re-render — same contract as permissions above).
     autonomy: AutonomyConfig = Field(default_factory=AutonomyConfig)
+    # Mirror of HarnessConfig.instrumentation (ADR-011) — without this declaration
+    # InterviewAnswers' extra='forbid' would reject the key on round-trip (checkpoint 6).
+    instrumentation: InstrumentationConfig = Field(default_factory=InstrumentationConfig)
     # All reviewers/skills are installed regardless of preset; `enabled` lists
     # govern which ones the harness activates by default. Per-task override is
     # via inline flags on the workflow command (e.g. --with-reviewers=...).

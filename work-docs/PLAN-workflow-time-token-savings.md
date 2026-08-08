@@ -461,6 +461,38 @@ Production third-party install would still be instrumented); keep shipping to ev
 status quo the user challenged); strip it entirely (would have produced the wrong verdict here).
 **Source:** Interview #7
 
+### ADR-012: `ask` is the DEFAULT autonomy level for a freshly rendered harness
+**Status:** Accepted (2026-08-09, user instruction mid-execute — supersedes the `auto_safe`
+class default that PLAN-harness-diet ADR-010 introduced)
+**Context:** B4 was scoped to *offer* `ask` as one of four values, with `auto_safe` remaining the
+default a fresh harness commits. The user's instruction was direct: the default must be `ask`.
+The argument for it is that the right level is not a property of the project — it is a property
+of the piece of work in front of you. A committed `auto_safe` answers that question once, months
+in advance, for every session; `ask` moves the answer to the only moment it can be given with the
+work in view. It also makes the picker — which already exists and is already the documented way
+autopilot is armed — the normal path rather than a fallback.
+**Decision:** `AutonomyConfig.level` defaults to `ask`; both `harness-yaml` templates fall back to
+`ask`; `_ask_autonomy` offers all four with `ask` as the offered default; `commands/make.md`'s
+disclosure row states it.
+**What does NOT change, and this is the load-bearing part:**
+- `interview._parse_autonomy` still pins an **absent or malformed** block to `gated`
+  (ADR-013 of PLAN-autopilot-config-surface). A default that asks is still an autonomy change, so
+  it reaches an existing project through `/harness-maker:make --update`, never through a load.
+- An **explicit decline** in the interview still pins `gated` / `autopilot_persistent: false`.
+  Inheriting the class default there would now put the question back to a user who just answered
+  it — a sharper version of the same bug ADR-013 wrote that branch for.
+**Consequences:**
+- ✅ The level is chosen with the work visible, and `auto_full` becomes reachable without editing
+  yaml.
+- ⚠️ Every session of a fresh harness now sees a picker question it did not see before. That is
+  the intended trade, but it is a per-session interruption where there used to be none, and
+  `autopilot_persistent` cannot pre-answer it (ADR-003: the picker owns an `ask` session).
+- ⚠️ `/hm:health`'s autopilot smoke has no concrete `--level` under `ask` and is skipped with a
+  stated one-line note (ADR-007). A project on `ask` therefore loses that silent-degradation
+  probe — accepted, because interpolating a meta-level would make the probe fail on an argument
+  error and report a healthy harness as degraded.
+**Source:** User instruction, 2026-08-09
+
 ## 🏗️ Technical Design
 
 ### Current state
@@ -801,7 +833,7 @@ harness.yaml level: ask
   print NOTHING") is wrong for this git version — the working `PLAN-*` rule prints its negation
   and exits 0 exactly as the new one does. `git status` is the operative check.
 
-### Phase A5 — The `instrumentation` axis (ADR-011) — NOT STARTED, deferred by scope
+### Phase A5 — The `instrumentation` axis (ADR-011) — **DONE**
 - **depends_on:** `[A3]` — A3 decides which instrumentation prose survives at all; gating prose
   that A3 is about to delete would be wasted work
 - **parallel_group:** `serial-a5`
@@ -829,12 +861,19 @@ harness.yaml level: ask
 - **Risk:** medium — two render paths through the stage templates this PLAN is otherwise
   shrinking, and a default that shapes all future measurement
 - **Rollback point:** post-A3 HEAD
-- **Status: NOT STARTED.** Recorded here rather than implemented: it arrived mid-execute as
-  Interview #7, and it is config + render + interview work — the same shape as Track B, not the
-  small mechanical Track A this session was scoped to. Deferring it is a scope decision, not an
-  oversight; A3 below is unchanged and lands without it.
+- **Status: DONE.** `models.InstrumentationConfig` + the `HarnessConfig` / `InterviewAnswers`
+  pair, `_parse_instrumentation` (absent → ON, logged), `_ask_instrumentation`, the gate in all
+  three stage templates, both `harness-yaml` templates, `commands/make.md`'s disclosure row, and
+  eight tests. **The two defaults differ and both criteria are met:** a freshly rendered harness
+  gets `false` (ADR-011's "a third-party install defaults to off"), so the surface baseline
+  decreases by −7,238 / −7,247 with the BASELINE-DELTA row attributing it; an existing
+  harness.yaml with no `instrumentation` key resolves to `true` with a one-time log, so the four
+  projects already contributing rows keep contributing. An earlier pass of this phase read
+  criterion (3) as governing the class default too and shipped ON everywhere — which would have
+  satisfied the round-trip criteria while leaving every third-party install paying for this
+  repo's telemetry, i.e. the exact thing the axis exists to stop.
 
-### Phase B1 — One constant, one normalization owner, the AST discovery guard
+### Phase B1 — One constant, one normalization owner, the AST discovery guard — **DONE**
 - **depends_on:** `[]` (lands after A4 per the global order)
 - **parallel_group:** `serial-b1`
 - **merge_hazards:** none, but **the phase begins with a discovery pass**: `rg '"auto_safe"' src/`,
@@ -875,7 +914,7 @@ harness.yaml level: ask
 - **Risk:** medium
 - **Rollback point:** pre-B1 HEAD. **Reverting B1 requires reverting B2, B3, B4 and B5 first.**
 
-### Phase B2 — `ask` resolution
+### Phase B2 — `ask` resolution — **DONE**
 - **depends_on:** `[B1]`
 - **parallel_group:** `serial-b2`
 - **merge_hazards:** none
@@ -890,7 +929,7 @@ harness.yaml level: ask
 - **Risk:** medium
 - **Rollback point:** post-B1 HEAD. Reverting B2 requires reverting B4's picker branch.
 
-### Phase B3 — Judgment gates: source-stage-keyed, fail-closed, and split at review
+### Phase B3 — Judgment gates: source-stage-keyed, fail-closed, and split at review — **DONE**
 - **depends_on:** `[B1]`
 - **parallel_group:** `serial-b3`
 - **merge_hazards:** `templates/stages/plan.md.j2` — shared with **A3, which lands first**.
@@ -944,7 +983,7 @@ harness.yaml level: ask
   same operation**, or the interview keeps offering `auto_full` with `auto_safe` semantics —
   reinstating the divergence REVIEW P6 corrected once.
 
-### Phase B4 — Interview, picker, and every rendered `--level` surface
+### Phase B4 — Interview, picker, and every rendered `--level` surface — **DONE**
 - **depends_on:** `[B1, B2, B3]` — B2 supplies the `ask-pending` reason the picker branches on; B3
   owns the same partial
 - **parallel_group:** `serial-b4`
@@ -973,7 +1012,7 @@ harness.yaml level: ask
 - **Risk:** medium — criteria 3 and 4 are shipped-breakage guards
 - **Rollback point:** post-B3 HEAD
 
-### Phase B5 — Close the PLAN: a net-surface test that can fail, and the full suite
+### Phase B5 — Close the PLAN: a net-surface test that can fail, and the full suite — **DONE (red, waived)**
 - **depends_on:** `[A3, B4]` — the last-landing phase; the one declared cross-track edge (ADR-006)
 - **parallel_group:** `serial-b5`
 - **merge_hazards:** `tests/structural/surface_baseline.json` — **B5 is last**
@@ -993,6 +1032,16 @@ harness.yaml level: ask
   bullet, which previously had none.
 - **Risk:** low mechanically; the phase most likely to legitimately land red or `xfail`
 - **Rollback point:** post-B4 HEAD. Reverting B5 reverts an assertion and a record.
+- **Status: DONE, and the assertion is RED.** `tests/structural/test_plan_net_surface.py` reads
+  §0's pre-PLAN literal out of the BASELINE-DELTA document (so the asserted number and the
+  recorded number cannot drift) and compares it to the frozen baseline. `claude` is
+  **+1,057** (366,439 → 367,496); `codex` is **−357** and passes. The `xfail` carries the
+  ADR-008.4 waiver naming B3 as the cause and stating why compressing further is refused:
+  the next candidate was `auto_full`'s auto-answer recording instruction, which ADR-010 lists
+  as its only compensating control. `strict=False` because the codex variant genuinely passes.
+  `surface_baseline.json` WAS re-frozen (at base SHA `bdaa0ae0`, durable) so day-to-day
+  ratcheting resumes — but the PLAN-level assertion is deliberately NOT re-based, which is the
+  difference between this and `ratchet-rebaselined-by-its-own-subject`.
 
 ## 🧪 Testing Strategy
 

@@ -25,7 +25,7 @@ import logging
 import sys
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Literal, TextIO
+from typing import Any, TextIO
 
 import yaml
 from pydantic import ValidationError
@@ -33,10 +33,14 @@ from pydantic import ValidationError
 from harness_maker.io_utils import denormalize_home_to_tilde, load_harness_yaml
 from harness_maker.models import (
     _MODEL_ID_PATTERN,
+    ASK_LEVEL,
     DELEGATABLE_STAGES,
+    LEGACY_LEVEL_ALIASES,
+    OPERATIONAL_LEVELS,
     SECOND_OPINION_MODELS,
     AgentModelSpec,
     AutonomyConfig,
+    AutonomyLevel,
     CodexAgentSpec,
     Confidence,
     DelegationConfig,
@@ -44,6 +48,7 @@ from harness_maker.models import (
     DevMode,
     EconomicsConfig,
     FeedbackConfig,
+    InstrumentationConfig,
     InterviewAnswers,
     PermissionsConfig,
     Preset,
@@ -174,6 +179,7 @@ def interview(
     second_brain = _ask_second_brain()
     second_opinion = _ask_second_opinion()
     autonomy = _ask_autonomy()
+    instrumentation = _ask_instrumentation()
     return _build_answers(
         locale=locale,
         targets=targets,
@@ -186,6 +192,7 @@ def interview(
         second_brain=second_brain,
         second_opinion=second_opinion,
         autonomy=autonomy,
+        instrumentation=instrumentation,
         worktree_enabled=worktree_enabled,
     )
 
@@ -599,26 +606,62 @@ def _ask_cap(label: str) -> int | None:
     return value if value > 0 else None
 
 
+def _ask_instrumentation() -> InstrumentationConfig:
+    """Ask whether to keep harness-maker's own development telemetry (ADR-011).
+
+    The option text names the cost of "no" — leaving the cross-project denominator —
+    because that trade has to be visible at the point of choice, not only in a PLAN. It
+    is not a hypothetical: harness-maker's own six rows said "delete the plan-validator
+    second pass" (0/3) while the four-project pool said keep it (2/9).
+    """
+    print("\nharness-maker development telemetry (stage_agent_ledger).")
+    print("  Records one local row per plan-validator / test-reviewer dispatch and keeps")
+    print("  each review round's finding payload, so harness-maker can tell whether its")
+    print("  own gates earn their latency. 100% local — nothing is transmitted.")
+    print("  Declining removes this project from that cross-project measurement, and the")
+    print("  pooled population has already reversed a verdict a single project got wrong.")
+    print("  A third-party install has no use for it and defaults to OFF; the maintainer's")
+    print("  own projects are the ones that answer yes.")
+    answer = _input_or_empty("  Turn it on? [y/N]: ").strip().lower()
+    return InstrumentationConfig(stage_agent_ledger=answer in {"y", "yes"})
+
+
 def _ask_autonomy() -> AutonomyConfig:
     """Ask whether to enable autopilot auto-advance + its level / persistence / caps.
 
-    PLAN-autopilot-config-surface ADR-001/002/003. Default OFF (``gated`` — today's behavior).
-    When enabled, ``unlimited`` is the offered cap default (the real safety boundary is the
-    mandatory plan/review/wrapup gates, not the caps); ``autopilot_persistent`` re-arms the
-    marker each session so the user need not re-enable it every time.
+    PLAN-autopilot-config-surface ADR-001/002/003. An explicit decline is pinned ``gated``;
+    otherwise the offered default is ``ask`` (user decision, 2026-08-09), which defers the
+    level to the session that has to live with it. ``unlimited`` is the offered cap default
+    (the real safety boundary is the mandatory plan/review/wrapup gates, not the caps);
+    ``autopilot_persistent`` re-arms the marker each session.
     """
     print("\nAutopilot (pipeline auto-advance).")
     print("  When enabled, /hm: stages auto-advance past two-way-door boundaries but ALWAYS")
-    print("  stop at the plan interview, a CHANGES_REQUESTED review, and the wrapup merge.")
-    answer = _input_or_empty("  Enable autopilot auto-advance? [y/N]: ").strip().lower()
-    if answer not in {"y", "yes"}:
-        # ADR-013: pinned, NOT a bare `AutonomyConfig()`. The class default is `auto_safe` /
-        # persistent, so inheriting it here would convert an EXPLICIT refusal into the very
-        # behaviour the user just declined — worse than the malformed-config case below,
-        # because here the user was asked.
+    print("  stop at a CHANGES_REQUESTED review and at the wrapup land — no level clears those.")
+    answer = _input_or_empty("  Enable autopilot auto-advance? [Y/n]: ").strip().lower()
+    if answer in {"n", "no"}:
+        # ADR-013: pinned, NOT a bare `AutonomyConfig()`. The class default now ASKS, so
+        # inheriting it here would put the question back to a user who just answered it —
+        # worse than the malformed-config case below, because here they were asked.
         return AutonomyConfig(level="gated", autopilot_persistent=False)
-    level_raw = _input_or_empty("  Level [auto_safe/full] (auto_safe): ").strip().lower()
-    level: Literal["gated", "auto_safe", "full"] = "full" if level_raw == "full" else "auto_safe"
+    print("  Levels:")
+    print("    ask        — decide per session (default). The picker offers the three below")
+    print("                 at the first stage of each session, so the choice is made when")
+    print("                 you can see the work rather than once, months in advance.")
+    print("    auto_safe  — advance the two-way doors; stop at the plan architecture")
+    print("                 interview, a CHANGES_REQUESTED review, and the wrapup land.")
+    print("    auto_full  — also answer the plan interview with the recommended option, and")
+    print("                 an APPROVED review's human_review_needed flag. Still stops at a")
+    print("                 failed grade and at the land.")
+    print("    gated      — never auto-advance.")
+    level_raw = _input_or_empty("  Level [ask/auto_safe/auto_full/gated] (ask): ").strip().lower()
+    # An unrecognised answer takes the DEFAULT rather than erroring: this is onboarding, and a
+    # typo must not arm something wider than the user asked for. `full` is the retired spelling
+    # and is demoted by the alias table — mapping through it instead of spelling the levels out
+    # also keeps this site clear of the enumeration guard.
+    level: AutonomyLevel = LEGACY_LEVEL_ALIASES.get(level_raw, AutonomyConfig().level)
+    if level_raw in OPERATIONAL_LEVELS or level_raw == ASK_LEVEL:
+        level = level_raw
     persist_raw = (
         _input_or_empty("  Persist across sessions (re-arm each session)? [y/N]: ").strip().lower()
     )
@@ -709,6 +752,7 @@ def _build_answers(
     sibling_repos: list[str] | None = None,
     second_opinion: SecondOpinionConfig | None = None,
     autonomy: AutonomyConfig | None = None,
+    instrumentation: InstrumentationConfig | None = None,
     worktree_enabled: bool | None = None,
     schema_version: int = 4,
 ) -> InterviewAnswers:
@@ -736,6 +780,9 @@ def _build_answers(
         consensus=consensus or _consensus_for(preset),
         caching=caching or "agent-aware",
         autonomy=autonomy if autonomy is not None else AutonomyConfig(),
+        instrumentation=(
+            instrumentation if instrumentation is not None else InstrumentationConfig()
+        ),
         **extras,
     )
 
@@ -961,6 +1008,7 @@ def answers_from_harness_yaml(yaml_path: Path) -> InterviewAnswers | None:
         "second_brain": second_brain,
         "permissions": permissions,
         "autonomy": _parse_autonomy(data.get("autonomy")),
+        "instrumentation": _parse_instrumentation(data.get("instrumentation")),
         "sibling_repos": sibling_repos,
         "wrapup_docs": wrapup_docs,
         "reviewers": {
@@ -1296,6 +1344,32 @@ def _parse_second_brain(value: object) -> SecondBrainConfig:
         return SecondBrainConfig()
 
 
+def _parse_instrumentation(value: object) -> InstrumentationConfig:
+    """Absent block → ON, said out loud once (ADR-011).
+
+    The maintainer-preserving direction is the OPPOSITE of the autonomy block above.
+    There, an absent block must not silently escalate a user's autonomy. Here, an absent
+    block must not silently STOP a project that is already contributing ledger rows — a
+    re-render that quietly emptied the cross-project denominator is the failure this
+    default exists to prevent, and that denominator has already reversed one verdict.
+    """
+    if not isinstance(value, dict):
+        logger.info(
+            "harness.yaml has no `instrumentation:` block — keeping harness-maker's "
+            "stage_agent_ledger rows ON (a re-render must not silently stop a project "
+            "from contributing). Opt out with `instrumentation.stage_agent_ledger: false`."
+        )
+        return InstrumentationConfig(stage_agent_ledger=True)
+    raw = value.get("stage_agent_ledger")
+    if not isinstance(raw, bool):
+        if raw is not None:
+            logger.warning(
+                "harness.yaml instrumentation: non-bool stage_agent_ledger ignored → true."
+            )
+        return InstrumentationConfig(stage_agent_ledger=True)
+    return InstrumentationConfig(stage_agent_ledger=raw)
+
+
 def _parse_autonomy(value: object) -> AutonomyConfig:
     """Reverse-map harness.yaml ``autonomy:`` block to typed config.
 
@@ -1330,6 +1404,20 @@ def _parse_autonomy(value: object) -> AutonomyConfig:
     # the user's level / caps / pipeline to defaults on re-render (retired-key migration).
     if "guard_when" in value:
         value = {k: val for k, val in value.items() if k != "guard_when"}
+    raw_level = value.get("level")
+    if isinstance(raw_level, str) and raw_level in LEGACY_LEVEL_ALIASES:
+        # The `--update` advisory. The re-render WRITES the new spelling, so without a line
+        # here the user's committed value changes under them with no notice — and `full` is
+        # the one value whose new name (`auto_full`) means something different from what it
+        # migrates to (`auto_safe`), which is exactly the confusion worth pre-empting.
+        logger.warning(
+            "harness.yaml autonomy.level: %r is the pre-0.51 name for %r and is being "
+            "migrated to it — NOT to the widest of the operational levels (%s), which is a "
+            "policy you have not opted into. Re-render writes the new spelling.",
+            raw_level,
+            LEGACY_LEVEL_ALIASES[raw_level],
+            "|".join(OPERATIONAL_LEVELS),
+        )
     # A PRESENT block is the user's stated intent, so a field it OMITS must fall back to the
     # conservative value, not to the promoted class default. ADR-013 originally declined this
     # predicate as over-reach; two independent second-opinion models and a docs trace
@@ -1349,7 +1437,17 @@ def _parse_autonomy(value: object) -> AutonomyConfig:
     except Exception as e:  # noqa: BLE001 — tolerant upgrade path like second_brain
         logger.warning("harness.yaml autonomy: invalid config ignored (%s).", e)
         # ADR-013: pinned gated — one bad enum must never be the thing that arms autopilot.
-        return AutonomyConfig(level="gated", autopilot_persistent=False)
+        # But demote the LEVEL, not the whole block: an unknown level used to take the user's
+        # caps, pipeline and extra_deny down with it, so a single typo silently reset a
+        # security-relevant additive deny baseline. Retry with the level forced conservative
+        # and every sibling intact; only a block that is broken beyond the level falls all the
+        # way through.
+        try:
+            return AutonomyConfig.model_validate(
+                {**value, "level": "gated", "autopilot_persistent": False}, strict=False
+            )
+        except Exception:  # noqa: BLE001 — same tolerant contract
+            return AutonomyConfig(level="gated", autopilot_persistent=False)
 
 
 def _string_or(value: object, fallback: str | None) -> str:

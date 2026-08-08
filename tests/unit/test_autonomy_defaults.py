@@ -30,7 +30,7 @@ from harness_maker.models import AutonomyConfig
 def test_the_class_default_is_promoted() -> None:
     """ADR-010: a new harness auto-arms without the user re-enabling it every session."""
     cfg = AutonomyConfig()
-    assert cfg.level == "auto_safe"
+    assert cfg.level == "ask"  # ADR-012: the class default now ASKS per session.
     assert cfg.autopilot_persistent is True
 
 
@@ -65,7 +65,7 @@ def test_a_present_block_is_read_as_stated_intent_not_as_a_delivery_site() -> No
     # Scoped to the two flipped fields only — an explicit value still wins, and an unrelated
     # field is untouched, so this is not a general strictness change.
     explicit = _parse_autonomy({"level": "full", "autopilot_persistent": True, "step_cap": 7})
-    assert explicit.level == "full"
+    assert explicit.level == "auto_safe"  # B1/ADR-001: demoted on load, never escalated.
     assert explicit.autopilot_persistent is True
     assert explicit.step_cap == 7
 
@@ -91,7 +91,9 @@ def test_an_explicit_decline_stays_gated(monkeypatch: pytest.MonkeyPatch) -> Non
 
 def test_accepting_the_interview_prompt_still_arms(monkeypatch: pytest.MonkeyPatch) -> None:
     """Positive control — without it, the decline test passes on a broken prompt."""
-    replies = iter(["y", "", "y", "", ""])
+    # Level answered EXPLICITLY: the offered default is now `ask` (ADR-012), and an empty
+    # level answer here would assert the default rather than that accepting the prompt arms.
+    replies = iter(["y", "auto_safe", "y", "", ""])
     monkeypatch.setattr("harness_maker.interview._input_or_empty", lambda _p: next(replies, ""))
     cfg = _ask_autonomy()
     assert cfg.level == "auto_safe"
@@ -146,7 +148,7 @@ def test_both_presets_render_the_promoted_default(tmp_path: Path, preset_name: s
     out = _render_preset(tmp_path, Preset(preset_name))
     docs: list[Any] = list(yaml.safe_load_all((out / "harness.yaml").read_text(encoding="utf-8")))
     body = [d for d in docs if d and isinstance(d, dict) and "preset" in d][0]
-    assert body["autonomy"]["level"] == "auto_safe"
+    assert body["autonomy"]["level"] == "ask"  # ADR-012: the class default now ASKS per session.
     assert body["autonomy"]["autopilot_persistent"] is True
     assert body["autonomy"]["step_cap"] == 20
     assert body["autonomy"]["time_cap_min"] == 300
@@ -239,7 +241,9 @@ def test_reinterview_does_not_clobber_an_explicit_autonomy_flag(tmp_path: Path) 
     project = _make_project(tmp_path, "autonomy:\n  level: gated\n  autopilot_persistent: false\n")
     body = _run_make(project, "--reinterview", "--autonomy-level", "full")
     autonomy = body[body.find("autonomy:") :][:200]
-    assert "full" in autonomy, autonomy
+    # `--autonomy-level full` is accepted and written as its current name rather than
+    # rejected: a scripted --update carrying an old level must not fail the make.
+    assert "auto_safe" in autonomy, autonomy
 
 
 def test_reinterview_on_a_harness_with_no_autonomy_block_stays_gated(tmp_path: Path) -> None:

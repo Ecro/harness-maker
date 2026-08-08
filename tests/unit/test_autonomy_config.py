@@ -74,7 +74,7 @@ def test_autonomy_default_is_auto_safe() -> None:
     The conservative sites that must NOT follow this value are asserted in
     tests/unit/test_autonomy_defaults.py.
     """
-    assert AutonomyConfig().level == "auto_safe"
+    assert AutonomyConfig().level == "ask"  # ADR-012: the class default now ASKS per session.
 
 
 def test_autonomy_default_pipeline_is_seven_stage_incl_verify() -> None:
@@ -99,7 +99,7 @@ def test_harness_config_absent_autonomy_delivers_the_promoted_default() -> None:
     default here cannot escalate an existing project.
     """
     cfg = HarnessConfig(preset=Preset.PRODUCTION)
-    assert cfg.autonomy.level == "auto_safe"
+    assert cfg.autonomy.level == "ask"  # ADR-012: the class default now ASKS per session.
     assert cfg.autonomy.pipeline == DEFAULT_PIPELINE
 
 

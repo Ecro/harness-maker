@@ -280,6 +280,7 @@ extras at runtime bringing total > 1, re-enable Pass 1 manually.
 !{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm codex_adapter stamp-ids < <the literal temp path>
 ```
 
+{% if (config.instrumentation.stage_agent_ledger if config.instrumentation else true) %}
 **Then persist the round's finding payload (ADR-006 part 2).** Run this **exactly once per
 round**, against the merged temp file you already wrote, with the literal reviewer label
 `merged`:
@@ -322,6 +323,7 @@ Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_pat
 > `review-*.jsonl` holds only counts, so there was no artifact to replay against. Every round
 > that skips this line is a round no future pipeline change can be tested on. It writes to the
 > **base** root, so it survives `task-land`.
+{% endif %}
 {%- if config.second_opinion and config.second_opinion.models %}
 ### Step 3.5 — Cross-model heterogeneous voters (ADR-001/006, PLAN-second-opinion-multi-model)
 
@@ -663,7 +665,14 @@ fields and negative counts.
 {% set summary_artifact = "work-docs/REVIEW-{slug}.md" -%}
 {% set summary_next = "address findings then re-review, or `/hm:wrapup` (STOP — user-initiated)" -%}
 {% set summary_stage = "review" -%}
-{% set summary_autopilot_gate = "If the REVIEW Status is CHANGES_REQUESTED (grade < threshold) or human_review_needed is true, STOP — never auto-advance past unresolved findings." -%}
+{#- ADR-010: two predicates, and they are NOT the same kind of thing. The grade is a
+    quality THRESHOLD — a failed review has nothing to auto-answer, and clearing it would
+    reverse the invariant recorded at models.py (a wide-autonomy session must never skip a
+    CHANGES_REQUESTED review). `human_review_needed` on an APPROVED review is a judgment:
+    unverified manual-only findings that a human is being asked to look at. Only the second
+    is level-conditional, so the string spells the split out rather than leaving Step 1 to
+    infer it. -#}
+{% set summary_autopilot_gate = "Two predicates, treated differently. (1) CHANGES_REQUESTED (grade < threshold) → STOP at EVERY level, auto_full included: a failed threshold is not a question. Never pass it to the boundary. (2) Else human_review_needed on an APPROVED review → the judgment gate: pass --judgment-gate pending and let the level decide; at auto_full record the passed-over finding ids in the REVIEW document." -%}
 {% include "agents/_partials/stage_end_summary.md.j2" %}
 
 <!-- @hm:user:extra-quality-checks -->

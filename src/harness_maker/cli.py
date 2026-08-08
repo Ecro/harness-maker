@@ -1488,9 +1488,12 @@ def _build_autonomy_override(
     `--autonomy-level` alone enables autopilot (persistence defaults off unless explicitly set).
     An invalid level → typer.Exit(1). Fields not overridden are preserved from `existing`.
     """
-    from harness_maker.models import AutonomyConfig
+    from harness_maker.models import OPERATIONAL_LEVELS, AutonomyConfig, normalize_level
 
-    valid_levels = ("gated", "auto_safe", "full")
+    valid_levels = OPERATIONAL_LEVELS
+    # Accept the legacy spelling and demote it rather than erroring: a scripted
+    # `--update` carrying an old harness's level must not fail the whole make.
+    level = None if level is None else str(normalize_level(level))
     if level is not None and level not in valid_levels:
         typer.echo(
             f"--autonomy-level invalid: {level!r} (valid: {', '.join(valid_levels)})",
@@ -1511,7 +1514,7 @@ def _build_autonomy_override(
     # `extra_deny` is a security-relevant additive deny baseline — dropping either silently
     # resets user config / subtracts a guard.
     return AutonomyConfig(
-        level=new_level,  # type: ignore[arg-type]
+        level=new_level,
         pipeline=list(base.pipeline),
         step_cap=base.step_cap,
         time_cap_min=base.time_cap_min,
@@ -2426,7 +2429,7 @@ def autopilot_cmd(
     level: str = typer.Option(
         "auto_safe",
         "--level",
-        help="Autonomy level when turning on: gated | auto_safe | full.",
+        help="Autonomy level when turning on: gated | auto_safe | auto_full.",
     ),
     pipeline: str | None = typer.Option(
         None,

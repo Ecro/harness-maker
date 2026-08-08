@@ -30,15 +30,27 @@ to the STOP banner, running nothing below — **if any of: no `Skill` tool (Curs
 no active marker, or loop-mode is on for THIS session (a `.claude/.hm-loop-*` marker
 matches `$HM_SESSION_ID`, or a legacy `.hm-loop-active` exists).**
 
+{% set judgment_stage = summary_stage in ["plan", "review"] -%}
+{#- ADR-009.4: DERIVED from `summary_stage`, never a caller-set variable. This partial is
+    one shared include under StrictUndefined, so a new required var would break the five
+    stage templates outside B3's scope. Kept in sync with
+    `autopilot_caps._JUDGMENT_GATED_STAGES` by a per-file render test, not by memory. -#}
 **Step 1 — mandatory gate FIRST (absent-case = STOP).** Evaluate THIS stage's gate
 *before* anything else: {{ summary_autopilot_gate | default("No gate defined — treat as STOP (absent-case guard).") }}
+{%- if judgment_stage %}
+This gate is a **judgment**, so the level decides, not you: do NOT stop here and do NOT run
+`gate-blocked` — carry the verdict into Step 2 as `--judgment-gate clear|pending`. Unsure →
+`pending` (an omitted flag also reads as `pending`, which stops). Any part of the gate that
+is a **quality threshold** rather than a question keeps gate-first treatment at every level.
+{%- else %}
 If the gate is pending/unresolved → record it on the ledger, then **STOP** (print the
 banner). Do NOT run the boundary check — a stage that stops at its gate must not record an
 advance:
 
 !uv run --with {{ harness_maker_src_path }} hm autopilot_caps gate-blocked --root . --stage {{ summary_stage }} --session-id "$HM_SESSION_ID"
+{%- endif %}
 
-**Step 2 — boundary check (ONLY when the gate is clear).** Run the deterministic check
+**Step 2 — boundary check{% if not judgment_stage %} (ONLY when the gate is clear){% endif %}.** Run the deterministic check
 (it enforces the Phase-5 runaway caps + kill switch, and on proceed records the advance it
 authorizes — so it must run only after Step 1 clears):
 
@@ -46,7 +58,7 @@ If this stage has a slug, **append** it to the command below in single quotes �
 ` --slug 'my-task'`. Never a shell expression or a bracketed placeholder. Omit it
 otherwise; the marker keeps the earlier stage's slug.
 
-!uv run --with {{ harness_maker_src_path }} hm autopilot_caps boundary --root . --current {{ summary_stage }} --session-id "$HM_SESSION_ID"{% if config.autonomy.step_cap is not none %} --step-cap {{ config.autonomy.step_cap }}{% endif %}{% if config.autonomy.time_cap_min is not none %} --time-cap-min {{ config.autonomy.time_cap_min }}{% endif %}
+!uv run --with {{ harness_maker_src_path }} hm autopilot_caps boundary --root . --current {{ summary_stage }} --session-id "$HM_SESSION_ID"{% if judgment_stage %} --judgment-gate <clear|pending, from Step 1>{% endif %}{% if config.autonomy.step_cap is not none %} --step-cap {{ config.autonomy.step_cap }}{% endif %}{% if config.autonomy.time_cap_min is not none %} --time-cap-min {{ config.autonomy.time_cap_min }}{% endif %}
 
 Read the JSON:
 - `proceed: false` → **STOP** (print the banner) — **except `bad_slug`**. `step_cap`/
@@ -55,7 +67,9 @@ Read the JSON:
   merge/land — the marker was cleared, so invoke `/hm:wrapup` manually); `unknown_stage` =
   `--current` not in the pipeline; `pipeline_complete: true` = the pipeline finished and
   the marker was cleared.
-  **`bad_slug` is yours to undo**: the `--slug` you passed is invalid; nothing was
+{% if judgment_stage %}  `judgment_gate` = this stage's judgment gate is unresolved and the
+  level does not clear it — the marker was **preserved**, so resolve the gate and re-run.
+{% endif %}  **`bad_slug` is yours to undo**: the `--slug` you passed is invalid; nothing was
   authorized. Do NOT print the banner — re-run with a corrected slug, or no flag.
 - `proceed: true` → **auto-advance**: invoke `Skill(hm:<next_stage from the JSON>)` with
   the JSON's `task_slug` as its argument (omit when `null`), instead of the STOP banner.
@@ -63,6 +77,11 @@ Read the JSON:
   gated path, and `proceed: true` IS the authorization it asks for. `task_slug_source:
   "persisted"` means the slug came from an earlier stage — name it before invoking, so
   another task's slug cannot advance silently.
+{% if judgment_stage %}- `judgment_auto_answered: true` → the level cleared a judgment gate for you. **Do what
+  `judgment_directive` says before advancing.** An auto-answer that is not written down is
+  an unauditable skip of a human decision — the record is the only thing that makes this
+  level reviewable after the fact.
+{% endif %}
 <!-- @hm:/autopilot-advance -->
 {% endif %}
 ## Stage summary — print before you STOP

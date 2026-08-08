@@ -2,6 +2,52 @@
 
 ## [Unreleased]
 
+### The autonomy level is now chosen per session, and harness-maker stopped shipping its own telemetry to everyone
+
+Two axes, one release. `autonomy.level` gains `auto_full` and `ask`, and **`ask` is the default
+for a fresh harness** — the right level is a property of the work in front of you, not of the
+project, and a committed `auto_safe` answers that question once, months in advance, for every
+session. `instrumentation.stage_agent_ledger` gains an off switch that a third-party install
+gets by default.
+
+**`auto_full` is narrower than its name.** It clears exactly two things: the plan stage's
+architecture interview, and `human_review_needed` on an **APPROVED** review. It does **not**
+clear a `CHANGES_REQUESTED` grade and it does not clear the wrapup land — those stop at every
+level, `auto_full` included. A failed quality threshold is not a question with a recommended
+answer, and advancing past one would reverse an invariant this repo has already corrected once.
+Every gate it does clear must record what it answered: the recommended option into the PLAN's
+Interview Transcript, the passed-over finding ids into the REVIEW document. An unrecorded
+auto-answer is an unauditable skip of a human decision.
+
+**The legacy `full` demotes to `auto_safe`, never to `auto_full`.** `full` was only ever the old
+*name* for `auto_safe` — the mandatory gates were honoured at every level — so promoting it
+would hand existing projects an autonomy they never asked for. Three readers normalize through
+one table: an un-re-rendered `harness.yaml`, a live marker written by an older version, and
+`autopilot on --level full` from a stale rendered picker. Two of those three were found by
+existing tests during this work, and both failed *silently*: the level fell into the
+unknown-value clamp and read as `gated`, i.e. autopilot quietly off.
+
+**The level strings now live in exactly two places, and an AST test finds any third.** They were
+restated in nine spots across six modules — including an if/elif ladder ending in
+`else: return False`, which would have made `auto_full` silently never arm. Every previous fix
+of this class shipped a better hand-list and every hand-list was wrong by the next change; the
+guard discovers rather than remembers, and a meta-test proves it fails on a re-added ladder.
+
+**`instrumentation` separates development telemetry from the product.** The
+`stage_agent_ledger emit` rows and the review payload capture answer *harness-maker's* questions,
+not the consuming project's, and they were rendered into every harness. A fresh install now
+defaults them off (≈7,200 chars of prose it has no consumer for); an existing `harness.yaml` with
+no `instrumentation` key resolves **on**, because those are the projects already producing rows
+and a re-render must not silently stop them. Turning it off also leaves the cross-project
+denominator, and the interview says so at the point of choice — that denominator is not
+decoration: harness-maker's own six rows said "delete the plan-validator second pass" while the
+pooled four-project population said keep it.
+
+**This release is net-positive on harness-maker's own surface (+1,057 chars) and net-negative for
+everyone else (≈−6,200).** The overrun is carried as a visible `xfail` with a waiver rather than
+absorbed into a re-frozen baseline.
+
+
 ### antigravity had a structured-output mode the whole time; we were looking for the wrong flag name
 
 `agy` enforces output shape with `--output-format json --json-schema <path>`. Codex spells the

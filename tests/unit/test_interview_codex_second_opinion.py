@@ -30,7 +30,7 @@ def test_interview_empty_input_defaults_second_opinion_disabled(
     """Pressing Enter at every prompt yields models=[] (safe default)."""
     # 10 empty answers. Two fewer than before: ADR-003 removed the consensus and
     # caching questions (PLAN-onboarding-interview-ux Phase 4).
-    inputs: Iterator[str] = iter([""] * 10)
+    inputs: Iterator[str] = iter([""] * 15)
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
     result = interview(_profile(), autoloop_mode=False)
     assert result.second_opinion.enabled is False
@@ -42,7 +42,7 @@ def test_interview_codex_answer_enables_second_opinion(
 ) -> None:
     """User typing 'codex' as the second-opinion answer selects only codex."""
     # 8 empty + 'codex' for the second-opinion question, then '' for autopilot.
-    inputs: Iterator[str] = iter([""] * 8 + ["codex", ""])
+    inputs: Iterator[str] = iter([""] * 8 + ["codex"] + [""] * 6)
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
     result = interview(_profile(), autoloop_mode=False)
     assert result.second_opinion.enabled is True
@@ -63,7 +63,7 @@ def test_interview_multi_model_answer_enables_both(
     prompt falls back to the hardcoded default without consuming extra input."""
     monkeypatch.setattr("harness_maker.interview._fetch_agy_models", lambda: [])
     # 8 empty + 'codex,antigravity' for the second-opinion question, then '' for autopilot.
-    inputs: Iterator[str] = iter([""] * 8 + ["codex,antigravity", ""])
+    inputs: Iterator[str] = iter([""] * 8 + ["codex,antigravity"] + [""] * 6)
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
     result = interview(_profile(), autoloop_mode=False)
     assert result.second_opinion.enabled is True
@@ -81,7 +81,7 @@ def test_interview_antigravity_answer_prompts_for_model_pick(
         lambda: ["Model A", "Model B"],
     )
     # 8 empty + 'antigravity' (enable) + '2' (pick Model B) + '' (autopilot).
-    inputs: Iterator[str] = iter([""] * 8 + ["antigravity", "2", ""])
+    inputs: Iterator[str] = iter([""] * 8 + ["antigravity", "2"] + [""] * 6)
     monkeypatch.setattr("builtins.input", lambda _prompt: next(inputs))
     result = interview(_profile(), autoloop_mode=False)
     assert result.second_opinion.enabled is True

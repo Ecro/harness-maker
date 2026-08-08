@@ -35,10 +35,10 @@ def test_ask_autonomy_disabled_returns_gated(monkeypatch: pytest.MonkeyPatch) ->
 
 
 def test_ask_autonomy_enabled_defaults_unlimited(monkeypatch: pytest.MonkeyPatch) -> None:
-    # enable=y, level=default(auto_safe), persistent=default(n), step+time=default(unlimited)
+    # enable=y, level=default(ask, ADR-012), persistent=default(n), caps=default(unlimited)
     _feed(monkeypatch, ["y", "", "", "", ""])
     cfg = _ask_autonomy()
-    assert cfg.level == "auto_safe"
+    assert cfg.level == "ask"
     assert cfg.autopilot_persistent is False
     assert cfg.step_cap is None
     assert cfg.time_cap_min is None
@@ -48,7 +48,7 @@ def test_ask_autonomy_persistent_and_finite_caps(monkeypatch: pytest.MonkeyPatch
     # enable, level=full, persist=y, step=5, time=60.
     _feed(monkeypatch, ["y", "full", "y", "5", "60"])
     cfg = _ask_autonomy()
-    assert cfg.level == "full"
+    assert cfg.level == "auto_safe"  # B1: `full` demotes to `auto_safe` (ADR-001)
     assert cfg.autopilot_persistent is True
     assert cfg.step_cap == 5
     assert cfg.time_cap_min == 60
@@ -123,7 +123,7 @@ def test_parse_autonomy_drops_retired_guard_when(tmp_path: Path) -> None:
     )
     answers = answers_from_harness_yaml(p)
     assert answers is not None
-    assert answers.autonomy.level == "full"
+    assert answers.autonomy.level == "auto_safe"  # B1: demoted on load (ADR-001)
     assert answers.autonomy.step_cap == 9
     assert answers.autonomy.autopilot_persistent is True
     assert not hasattr(answers.autonomy, "guard_when")

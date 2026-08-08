@@ -82,7 +82,9 @@ def test_autonomy_level_alone_enables() -> None:
 def test_autonomy_persistent_pair() -> None:
     cfg = _build_autonomy_override("full", True, AutonomyConfig())
     assert isinstance(cfg, AutonomyConfig)
-    assert cfg.level == "full"
+    # B1/ADR-001: `full` is the pre-0.51 name for `auto_safe` and is demoted, never promoted
+    # to the new `auto_full`. Loading must not escalate autonomy.
+    assert cfg.level == "auto_safe"
     assert cfg.autopilot_persistent is True
 
 

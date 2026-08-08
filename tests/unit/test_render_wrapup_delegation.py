@@ -191,7 +191,14 @@ def test_only_the_configured_stage_gets_a_dispatch(tmp_path: Path) -> None:
 # reverted in `a3cd8c16` to avoid moving this pin, and restored here on the explicit rule that
 # a ceiling gives way to correctness — with the reasoning recorded rather than the number
 # quietly bumped. The delegation assertion above is independent of this count, as before.
-@pytest.mark.parametrize(("preset", "expected"), [("Side", 668), ("Production", 701)])
+# 668 → 674 / 701 → 707 (PLAN-workflow-time-token-savings B3/B4, uniform +6, same two
+# shared partials in both presets): `stage_end_summary` gained the judgment-gate
+# discriminator and `step_manifest` the `ask-pending` picker branch. wrapup owns NEITHER
+# gate — it is a human-gated land, not a judgment — so what it inlines is the `{% else %}`
+# side plus the picker's new branch. Bumped rather than compressed because the branches
+# are what make `auto_full` and `ask` real; the aggregate cost is attributed in
+# work-docs/BASELINE-DELTA-workflow-time-token-savings.md.
+@pytest.mark.parametrize(("preset", "expected"), [("Side", 674), ("Production", 707)])
 def test_the_default_render_costs_existing_users_nothing(
     tmp_path: Path, preset: str, expected: int
 ) -> None:

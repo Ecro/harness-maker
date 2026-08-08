@@ -21,7 +21,7 @@ from tempfile import mkdtemp
 import pytest
 
 from harness_maker.interview import interview
-from harness_maker.models import Preset, ProjectProfile, Target
+from harness_maker.models import InstrumentationConfig, Preset, ProjectProfile, Target
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.stage_agent_ledger import DISPATCH_FAILED, DISPATCH_SKIPPED
 from harness_maker.synthesize import synthesize
@@ -47,6 +47,12 @@ def _render_root() -> Path:
     profile = ProjectProfile(stack=["python"], scale="medium", lifecycle="active")
     answers = interview(profile, autoloop_mode=True)
     answers.targets = [Target.CLAUDE_CODE, Target.CURSOR, Target.CODEX]
+    # ADR-011 made the ledger an opt-in axis that defaults OFF for a fresh install, so the
+    # DEFAULT render legitimately carries none of the wiring this file exists to check. Pin
+    # the axis ON here: the question is "when it is asked for, is it wired on every target?",
+    # not "is it on by default?". Leaving it default would have turned all eleven assertions
+    # green over an empty corpus — the exact vacuity the module docstring warns about.
+    answers.instrumentation = InstrumentationConfig(stage_agent_ledger=True)
     bp = synthesize(profile, answers, preset=Preset.PRODUCTION)
     root = Path(mkdtemp(prefix="hm-ledger-wiring-"))
     render(bp, root / ".claude", freeze_time=DEFAULT_FREEZE_TIME)

@@ -235,7 +235,12 @@ _ATOMIC_RATCHET: dict[str, int] = {
     "review": 34760,
     "spec": 30537,
     "verify": 23796,
-    "wrapup": 41345,
+    # 41345 → 42452 (PLAN-workflow-time-token-savings B3/B4): the shared
+    # `stage_end_summary` partial gained the judgment-gate discriminator and
+    # `step_manifest` gained the `ask-pending` picker branch, both of which every stage
+    # command inlines. wrapup is the largest command, so it is the one that crossed its
+    # ceiling first. Attributed in work-docs/BASELINE-DELTA-workflow-time-token-savings.md.
+    "wrapup": 42452,
 }
 
 

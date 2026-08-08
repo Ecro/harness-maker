@@ -792,6 +792,7 @@ def synthesize(
         security=answers.security,
         permissions=answers.permissions,
         autonomy=answers.autonomy,
+        instrumentation=answers.instrumentation,
         context_lint=answers.context_lint,
         models=answers.models,
         reviewers={

@@ -172,7 +172,7 @@ def test_legacy_takeover_never_clobbers_an_existing_per_session_marker(tmp_path:
     autopilot._takeover_legacy(root, session_id=SESS_A)
     marker = autopilot.load(root, session_id=SESS_A)
     assert marker is not None
-    assert marker.level == "full"
+    assert marker.level == "auto_safe"  # B1: `full` demotes to `auto_safe` (ADR-001)
 
 
 # --- ADR-013: self-only GC ----------------------------------------------------

@@ -35,6 +35,12 @@ def _boundary(root: Path, current: str, capsys) -> dict:  # noqa: ANN001
             "50",
             "--time-cap-min",
             "600",
+            # B3 made `--judgment-gate` fail-closed, and `plan`/`review` own judgment gates.
+            # This test walks a CLEAN chain to the land gate, so the judgment verdict a real
+            # stage would compute is declared clear here; the gate's own matrix lives in
+            # tests/unit/test_autopilot_judgment_gate.py.
+            "--judgment-gate",
+            "clear",
         ]
     )
     assert rc == 0

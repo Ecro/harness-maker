@@ -110,7 +110,10 @@ def test_effective_level_active_marker_wins(tmp_path: Path) -> None:
 
 
 def test_effective_level_falls_back_to_yaml_when_no_marker(tmp_path: Path) -> None:
-    assert autopilot.effective_level(tmp_path, yaml_level="full") == "full"
+    # A harness.yaml that has not been re-rendered still says `full`; it must resolve to the
+    # level it always behaved as, NOT fall into the unknown-level clamp (which would read as
+    # autopilot-off for every un-updated project).
+    assert autopilot.effective_level(tmp_path, yaml_level="full") == "auto_safe"
 
 
 def test_effective_level_foreign_marker_falls_back_to_yaml(tmp_path: Path, monkeypatch) -> None:  # noqa: ANN001

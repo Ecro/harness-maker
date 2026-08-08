@@ -548,3 +548,28 @@ The k-of-N consensus filter matches findings within a severity tier, so a defect
 ## [fail:test] verifier-rederives-root-writer-owns | 2026-08-08 | count:1
 A test resolved its read root differently from the writer it was checking, and therefore reported an artifact MISSING that had been written correctly. `tests/structural/test_review_payload_persisted.py` read second-opinion payloads relative to the worktree, while `stage_agent_ledger persist-payload` writes them to the BASE repo **on purpose** — base-rooting is the fix for the `codex_ledger` row-loss class, where a worktree-rooted write is destroyed by `task-land`. So the writer was right, the reader was wrong, and the failure presented as "the payload was never persisted" — an accusation against the production path, from the one place that was supposed to confirm it. The aggravating detail: the same file's own `_ledger()` helper carries a docstring documenting exactly this base-vs-worktree trap for the telemetry half, one line above the code that fell into it for the payload half. Proximity to the correct explanation is not protection; the docstring reads as background about a different artifact unless you are already looking for this bug. Root-cause class: **a verifier that re-derives a root the producer already owns.** Any check of "was X written?" has two independent root resolutions, and only the producer's is exercised in production — the reader's is exercised only by the test itself, so a mismatch produces a confident false negative that no other gate contradicts. Prevention: a test that asserts on a persisted artifact must obtain its path from the **same resolver the writer used** (import `_base_root` / `resolve_marker_root` / the CLI's own `--root` echo), never by joining onto the test's cwd or `Path(__file__)`. When a module already documents a root asymmetry anywhere in the file, treat that as a checklist item for every other artifact the module touches, not as a note about one of them. Cheap detector: make the test print the absolute path it probed on failure — a red test whose message names a `.worktrees/` path for a base-owned artifact diagnoses itself in one line. Siblings: `[fail:design] wrapup-memory-base-seam` and `[fail:design] marker-ledger-root-asymmetry` are the same boundary on the WRITE side (a write or `git add` rooted opposite its target, silently staging or splitting nothing); this one is the read side, where the boundary error becomes a false report about someone else's correct work.
 <!-- @hm:/user:entries -->
+
+## [fail:design] adr-decision-text-read-past-when-a-criterion-looked-authoritative | 2026-08-09 | count:1
+**증상.** A5(instrumentation 축)를 구현하면서 신규 렌더 기본값을 **ON** 으로 깔았다. ADR-011 의 Decision 은 `a third-party install defaults to off` 라고 명시돼 있었다.
+
+**원인.** Phase 의 exit criterion (3) — "an absent key resolves to the maintainer-preserving value" — 을 읽고, 그것이 클래스 기본값까지 지배한다고 해석했다. 두 문장은 **서로 다른 질문**에 답한다: "새 프로젝트는 무엇을 받나" vs "기존 프로젝트는 이미 무엇을 갖고 있었나". exit criterion 이 더 구체적이고 테스트 가능해 보였기 때문에 ADR 산문보다 권위 있다고 취급했다.
+
+**왜 위험한가.** 그 상태로도 모든 exit criterion 이 초록이었다 — round-trip 도, absent-case 도, render-grep 도. 축이 존재하는 이유(서드파티가 이 repo 의 텔레메트리를 나르지 않게 하는 것)만 달성되지 않았고, 그걸 잡아주는 테스트는 없었다. 기능은 출하되고 목적은 출하되지 않는 형태.
+
+**다음에.** exit criterion 과 ADR Decision 이 겹치는 축을 구현할 때는 **Decision 문장을 먼저 인용해 적고** criterion 이 그것의 어느 부분을 검사하는지 매핑할 것. criterion 이 Decision 을 전부 덮지 않는 것은 정상이며, 덮지 않는 부분이 바로 테스트가 없는 부분이다. 이번에는 `test_the_class_default_is_off_for_a_fresh_install` 로 그 구멍을 메웠다.
+
+## [fail:test] existing-tests-found-the-silent-half-the-new-matrix-missed | 2026-08-09 | count:1
+**증상.** B1 의 9개 exit criterion 을 전부 만족하는 매트릭스 테스트(14개)를 새로 쓰고 통과시킨 뒤 전체 스위트를 돌렸더니, **기존** 테스트가 두 개의 실제 결함을 잡았다: `effective_level(yaml_level="full")` 이 `gated` 로 clamp 되고, `autopilot on --level full` 이 에러로 arm 실패.
+
+**원인.** 새 매트릭스는 PLAN 이 열거한 criterion 을 따라 썼고, criterion 은 **config 계층과 marker 계층**의 정규화만 요구했다. `effective_level` 과 `resolve_toggle_config` 는 legacy 값을 받는 세 번째·네 번째 reader 였는데 목록에 없었다. 둘 다 실패 모드가 **조용함** — 예외가 아니라 "autopilot 이 꺼진 것처럼 보임".
+
+**왜 위험한가.** 새 테스트가 전부 초록이면 "검증됐다"고 읽기 쉽다. 실제로는 PLAN 이 상상한 표면만 검증됐다.
+
+**다음에.** 값 어휘(enum/Literal)를 바꿀 때는 새 테스트를 쓰기 전에 **그 값을 소비하는 모든 reader 를 `rg` 로 열거**하고, PLAN 의 criterion 목록과 대조해 차집합을 명시적으로 처리할 것. 그리고 새 매트릭스가 초록이어도 **전체 스위트를 돌리기 전까지는 완료로 보고하지 말 것** — 이번에 완료 보고 직전이었다.
+
+## [fail:design] compression-target-collides-with-the-control-it-compresses | 2026-08-09 | count:1
+**증상.** 비용 절감 PLAN 인데 자체 표면이 +1,942자 늘었다. 산문을 두 번 압축해 +1,057 까지 줄였고, 세 번째 압축 후보는 `auto_full` 이 판단 게이트를 자동 응답했을 때 **그것을 기록하라**는 지시였다.
+
+**원인.** 표면 크기 ratchet 은 문자 수만 보고, 그 문자가 보상 통제인지 서술인지 구분하지 못한다. 압축 압력은 가장 긴 문단을 향하는데, 안전 지시는 길다 (조건 + 이유 + 어디에 쓸지).
+
+**다음에.** ratchet 이 빨간 상태에서 압축할 때, 삭제 후보가 **어떤 ADR 의 "Consequences ⚠️" 에 등장하는지** 먼저 확인할 것. 등장하면 압축 금지 대상이고, ratchet 은 waiver 로 넘긴다 (ADR-008.4 형태: 문서화된 `xfail`, baseline 재동결 금지). 이번엔 그렇게 했다 — `test_plan_net_surface.py` 가 waiver 를 달고 빨갛게 남아 있다.

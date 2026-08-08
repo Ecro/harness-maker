@@ -20,6 +20,7 @@ from typing import Any, Literal, get_args
 
 from harness_maker import command_registry
 from harness_maker.iter_receipts import Verdict
+from harness_maker.models import ARMED_LEVELS, OPERATIONAL_LEVELS
 
 DEFAULT_OBSERVABILITY_DIR = Path(".claude/observability")
 LEDGER_FILENAME = "auto-advance.jsonl"
@@ -298,7 +299,7 @@ def count_entries(
 
 # The autonomy levels that actually arm auto-advance (gated = off; unknown = treated as
 # off, matching autopilot.effective_level's clamp-unknown-to-gated fail-safe).
-_ARMED_LEVELS: frozenset[str] = frozenset({"auto_safe", "full"})
+_ARMED_LEVELS: frozenset[str] = ARMED_LEVELS
 
 
 def _total_entries(project_root: Path, observability_dir: Path | None = None) -> int:
@@ -350,7 +351,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     s = sub.add_parser("smoke", add_help=False)
     s.add_argument("--root", default=".")
     # choices so a misspelled level errors loud (REVIEW P2); smoke_check also clamps unknown.
-    s.add_argument("--level", required=True, choices=("gated", "auto_safe", "full"))
+    s.add_argument("--level", required=True, choices=OPERATIONAL_LEVELS)
     args = parser.parse_args(argv)
     if args.cmd == "smoke":
         print(json.dumps(smoke_check(Path(args.root), yaml_level=args.level)))

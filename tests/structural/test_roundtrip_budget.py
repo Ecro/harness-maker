@@ -60,9 +60,14 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     "loop-p5-batch": 2,
     "make": 1,
     "metrics": 7,
-    "plan": 15,
+    # 15 → 14 (PLAN-workflow-time-token-savings A5): the `stage_agent_ledger emit` call is
+    # now behind the `instrumentation` axis, which defaults OFF for a fresh install. This
+    # repo's own harness has it ON, so the call still renders here — what dropped is the
+    # count measured from the DEFAULT fixture. No instruction was deleted.
+    "plan": 14,
     "research": 8,
-    "review": 9,
+    # 9 → 8 (same phase): `stage_agent_ledger persist-payload`, same axis.
+    "review": 8,
     "spec": 6,
     "uninstall": 3,
     "verify": 13,

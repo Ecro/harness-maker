@@ -190,7 +190,7 @@ def test_effective_level_honours_the_marker_only_when_wired(tmp_path: Path) -> N
     autopilot.write(tmp_path, level="full", pipeline=_PIPELINE, claude_session_id=_SID)
 
     assert autopilot.effective_level(tmp_path, yaml_level="gated") == "gated"
-    assert autopilot.effective_level(tmp_path, yaml_level="gated", session_id=_SID) == "full"
+    assert autopilot.effective_level(tmp_path, yaml_level="gated", session_id=_SID) == "auto_safe"
 
 
 def test_the_boundary_cli_proceeds_end_to_end_with_a_stamped_marker(
@@ -224,6 +224,10 @@ def test_the_boundary_cli_proceeds_end_to_end_with_a_stamped_marker(
             "my-task",
             "--session-id",
             _SID,
+            # B3 made the flag fail-closed and `plan` owns a judgment gate; this test is
+            # about session-id wiring, so the gate is declared clear.
+            "--judgment-gate",
+            "clear",
         ]
     )
     assert rc == 0

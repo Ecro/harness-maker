@@ -12,13 +12,21 @@ import sys
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Literal, cast
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from harness_maker import command_registry, loop_marker
 from harness_maker.io_utils import atomic_write
-from harness_maker.models import AtomicStage, AutonomyConfig
+from harness_maker.models import (
+    ASK_LEVEL,
+    GATED_LEVEL,
+    OPERATIONAL_LEVELS,
+    AtomicStage,
+    AutonomyConfig,
+    OperationalLevel,
+    normalize_level,
+)
 from harness_maker.worktree import (
     WORKTREE_DIR_NAME,
     _current_session_uuid,
@@ -98,7 +106,14 @@ class AutopilotMarker(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
 
     session_uuid: str = Field(pattern=r"^[0-9a-f]{12}$")
-    level: Literal["gated", "auto_safe", "full"]
+    level: OperationalLevel
+
+    _normalize = field_validator("level", mode="before")(
+        # An older harness wrote `full` into a live marker. Reuse the config-layer owner
+        # rather than re-implementing: two normalizers that disagree is how `full` and
+        # `auto_safe` diverged in the first place.
+        classmethod(lambda cls, v: normalize_level(v))
+    )
     # min_length=1: an empty pipeline is a silent no-op for the Phase 3+ stop-hook
     # (autopilot "on" but never advances) — reject it as a malformed marker instead.
     pipeline: list[AtomicStage] = Field(min_length=1)
@@ -243,7 +258,7 @@ def resolve_marker_root(start: Path) -> Path:
 def write(
     project_root: Path,
     *,
-    level: Literal["gated", "auto_safe", "full"],
+    level: OperationalLevel,
     pipeline: list[AtomicStage],
     now: str | None = None,
     force: bool = False,
@@ -756,7 +771,7 @@ def active_marker(
     return marker
 
 
-_VALID_LEVELS = frozenset({"gated", "auto_safe", "full"})
+_VALID_LEVELS = frozenset(OPERATIONAL_LEVELS)
 
 
 def effective_level(project_root: Path, *, yaml_level: str, session_id: str | None = None) -> str:
@@ -772,16 +787,71 @@ def effective_level(project_root: Path, *, yaml_level: str, session_id: str | No
     known levels (typo, empty, pre-feature default) is itself unsafe to honor, so it
     is clamped to ``"gated"`` (fail-safe; absent-case = feature black hole guard).
     """
+    # Normalize FIRST. `_VALID_LEVELS` no longer contains the legacy spelling, so an
+    # un-re-rendered harness.yaml saying `full` would otherwise fall into the unknown-level
+    # clamp and read as `gated` — autopilot silently off for every project that has not
+    # re-rendered. Caught by an existing test, not by this PLAN's own matrix.
+    yaml_level = str(normalize_level(yaml_level))
     marker = active_marker(project_root, session_id=session_id)
     if marker is not None:
+        # Including when the yaml says `ask`: the marker IS the answer to that question, so
+        # once one exists there is nothing left to ask. `ask` can therefore never be returned
+        # alongside a live marker.
         return marker.level
+    if yaml_level == ASK_LEVEL:
+        # NOT the unknown-level clamp below. `ask` is a deliberate, valid committed value
+        # meaning "the picker asks this session"; collapsing it to `gated` here would make the
+        # level indistinguishable from a refusal, and the picker would never be offered — the
+        # feature would ship and never fire, which is this repo's count:8 failure class.
+        return ASK_LEVEL
     if yaml_level not in _VALID_LEVELS:
         logger.warning(".hm-autopilot: unknown yaml autonomy.level %r → gated.", yaml_level)
-        return "gated"
+        return GATED_LEVEL
     return yaml_level
 
 
 def status(project_root: Path, *, session_id: str | None = None) -> dict[str, Any]:
+    """Marker status, plus the one committed-config fact the picker cannot infer.
+
+    `ask` lives in harness.yaml, not in the marker, so a marker-only reader reports `absent`
+    for it — indistinguishable from "autopilot was never configured". The picker branches on
+    `reason`, so those two would take the same path and the `ask` level would never present
+    its question. That is why this reads the yaml at all.
+    """
+    # Resolve cwd→base FIRST. A `/hm:` stage's cwd is its task worktree, and reading the
+    # yaml from there would consult a different file than the one the marker layer resolves
+    # against. Both ends must agree about which project they are describing — the recurring
+    # base-root class in this repo (`worktree_gate`, `codex_ledger`) is exactly this.
+    root = resolve_marker_root(project_root)
+    out = _status_from_marker(root, session_id=session_id)
+    if out["active"] or out["reason"] not in {"absent", "stale (gc'd)"}:
+        # A foreign / degraded / future-dated marker has its own advice; overwriting it with
+        # `ask-pending` would send the picker to the arming branch over a live peer (ADR-010).
+        return out
+    if _committed_level(root) == ASK_LEVEL:
+        out["reason"] = "ask-pending"
+        out["level"] = ASK_LEVEL
+    return out
+
+
+def _committed_level(project_root: Path) -> str | None:
+    """harness.yaml's `autonomy.level`, or None on anything unreadable (fail-safe)."""
+    from harness_maker.io_utils import load_harness_yaml
+
+    try:
+        cfg = load_harness_yaml(project_root / ".claude" / "harness.yaml")
+    except Exception:  # noqa: BLE001 — status must never raise; the picker branches on its JSON
+        return None
+    if not isinstance(cfg, dict):
+        return None
+    autonomy = cfg.get("autonomy")
+    if not isinstance(autonomy, dict):
+        return None
+    level = autonomy.get("level")
+    return level if isinstance(level, str) else None
+
+
+def _status_from_marker(project_root: Path, *, session_id: str | None = None) -> dict[str, Any]:
     """The deterministic answer to "is autopilot active?" (ADR-002).
 
     ``session_id`` is this caller's own id, supplied explicitly because it CANNOT be read
@@ -941,15 +1011,19 @@ def _cli_off(
 
 def resolve_toggle_config(
     level: str, pipeline: str | None
-) -> tuple[Literal["gated", "auto_safe", "full"], list[AtomicStage]]:
+) -> tuple[OperationalLevel, list[AtomicStage]]:
     """Validate `--level` + `--pipeline` for an autopilot 'on'; raise ValueError on bad input.
 
     Shared by the Typer alias (`cli.autopilot_cmd`) and the dot-form entry (`main`) so the
     two entry points can never drift (PLAN-command-surface-registry ADR-003). Validates all
     inputs BEFORE any marker write so a failed 'on' leaves no partial/stale marker.
     """
-    if level not in ("gated", "auto_safe", "full"):
-        raise ValueError(f"invalid --level {level!r} (gated|auto_safe|full)")
+    # Same normalization as the config layer: a rendered picker in an un-updated harness
+    # interpolates its committed level into `autopilot on --level <it>`, so rejecting the
+    # legacy spelling here means that project can never arm.
+    level = str(normalize_level(level))
+    if level not in OPERATIONAL_LEVELS:
+        raise ValueError(f"invalid --level {level!r} ({'|'.join(OPERATIONAL_LEVELS)})")
     if pipeline is None:
         # Canonical default (research…review, VERIFY, WRAPUP) — NOT list(AtomicStage), whose
         # enum order puts WRAPUP before VERIFY. Single source of truth.
@@ -959,7 +1033,7 @@ def resolve_toggle_config(
             stages = [AtomicStage(s.strip()) for s in pipeline.split(",") if s.strip()]
         except ValueError as exc:
             raise ValueError(f"invalid --pipeline ({exc})") from None
-    return cast("Literal['gated', 'auto_safe', 'full']", level), stages
+    return level, stages
 
 
 def main(argv: list[str] | None = None) -> int:

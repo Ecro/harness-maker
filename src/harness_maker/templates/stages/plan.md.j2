@@ -556,6 +556,7 @@ Resolution:
 
 > **If the validator agent itself fails to launch** (0 tool uses, model/launch error): retry the `Task(...)` call once with `model: "opus"` explicitly set (subagent frontmatter may be stale across a model upgrade). When you surface such a failure to the user, name the **tier** (`opus`/`sonnet`) — never a pinned concrete id like `claude-4-7-opus[1m]`; a pinned id in the message is itself the bug class this guidance exists to avoid. If it still cannot launch, self-review the PLAN in the validator's place and say so plainly.
 
+{% if (config.instrumentation.stage_agent_ledger if config.instrumentation else true) %}
 **Record every validator pass (ADR-004).** One row per dispatch, including the second pass
 of a MAJOR_REVISION and including a dispatch that never ran. Use the same `<run-id>` for every
 pass of one PLAN — that shared id is what makes the pass-to-pass comparison possible:
@@ -597,6 +598,7 @@ Bash("uv run --with {{ harness_maker_src_path }} hm stage_agent_ledger emit --ru
   stripping — never into double quotes. Self-reviewing in the validator's place without a
   row makes an unavailable validator indistinguishable from an approving one.
 - **Omit `--duration-ms` if you did not measure it** — never pass `0`.
+{% endif %}
 
 Each follow-up interview answer is appended to `## 🎙️ Interview Transcript` and promoted to ADR when Step D criteria apply.
 {% if config.second_opinion.models %}
@@ -687,7 +689,7 @@ If verification fails, retry write **once**. If still failing, surface the path 
 {% set summary_artifact = "work-docs/PLAN-{slug}.md" -%}
 {% set summary_next = "`/hm:execute {slug}` (STOP — user-initiated)" -%}
 {% set summary_stage = "plan" -%}
-{% set summary_autopilot_gate = "If any architectural AskUserQuestion round is pending/unresolved (the deep interview did not complete), STOP — auto-advance must never skip a human architecture decision." -%}
+{% set summary_autopilot_gate = "The architecture interview is this stage's judgment gate. Any unresolved architectural AskUserQuestion round → --judgment-gate pending; otherwise clear. At auto_full a pending gate is answered with the recommended option, which you MUST write into the PLAN's Interview Transcript before advancing." -%}
 {% include "agents/_partials/stage_end_summary.md.j2" %}
 
 <!-- @hm:user:extra-quality-checks -->
