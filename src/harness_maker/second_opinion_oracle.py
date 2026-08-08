@@ -3,7 +3,10 @@
 The `/hm:review` gate needs a test oracle, and the verifier that consumes it has no Bash. The
 gathering therefore happens in the main loop — but the paths it runs the checks on come from
 an EXTERNAL model's `file` field, which carries no schema constraint (`validate_payload`
-inspects only `severity` and `message`, and antigravity has no CLI-level schema at all).
+inspects only `severity` and `message`, and antigravity's CLI-level schema is
+best-effort — `--json-schema` exists, but `structured_output` can be absent on a
+SUCCESS reply, so a `file` value can still arrive unconstrained). The control below
+stands on that: sanitise the path regardless of which model produced it.
 
 An earlier revision did the gathering in rendered PROSE that substituted those paths straight
 into ``uv run pytest <paths>``. The shipped settings pre-approve ``Bash(uv run pytest:*)`` as a

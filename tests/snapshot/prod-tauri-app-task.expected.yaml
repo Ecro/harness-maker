@@ -97,7 +97,7 @@ files:
   body_sha256: bd5f2c26985ee51da85600c8bc6f42eeb905909f4a7b6ac5d2e8d8101602cfcf
 - path: harness.yaml
   template: harness-yaml/Production.yaml.j2
-  body_sha256: 8205ad45ef1d49912f86f5f151cb4f8f64affb64e1c085bb570e4a7b27b29284
+  body_sha256: cbdfeffa5bcd5ffc33415ac641abef35900ca900682b4250c1f39eb7321d019e
 - path: memory/failures.md
   template: memory/failures.en.md.j2
   body_sha256: 66df0bc5b3506d8f8b4b05c7a60690a6f8651a6493659a0b7545c2322aa7c73f
@@ -145,7 +145,7 @@ files:
   body_sha256: cc7d9e2c7dbc02ded11f10bf3acdc9132aba55794452d933a8397d90fe8c8380
 - path: skills/second-opinion-gate/SKILL.md
   template: skills/second-opinion-gate/SKILL.md.j2
-  body_sha256: 74463750b6cee2807bde05c183dea43a066346e2d83a8383c2a7349e63385dfb
+  body_sha256: 329327cea335c730fbd27c95379806b65fc7d5d34e5aa4fcf6dee2c2d9d15d03
 - path: skills/security-scanner/SKILL.md
   template: skills/security-scanner/SKILL.md.j2
   body_sha256: ac99c8d300753b1ff960e8d68412843e9f997cdf9df9410f882ecd7daaed5478

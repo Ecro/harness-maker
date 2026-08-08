@@ -68,7 +68,7 @@ def test_interview_multi_model_answer_enables_both(
     result = interview(_profile(), autoloop_mode=False)
     assert result.second_opinion.enabled is True
     assert result.second_opinion.models == ["codex", "antigravity"]
-    assert result.second_opinion.antigravity.model == "Gemini 3.1 Pro (High)"
+    assert result.second_opinion.antigravity.model == "Gemini 3.6 Flash (High)"
 
 
 def test_interview_antigravity_answer_prompts_for_model_pick(

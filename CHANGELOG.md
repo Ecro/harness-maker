@@ -2,6 +2,58 @@
 
 ## [Unreleased]
 
+### antigravity had a structured-output mode the whole time; we were looking for the wrong flag name
+
+`agy` enforces output shape with `--output-format json --json-schema <path>`. Codex spells the
+same idea `--output-schema`, that spelling is what got searched for, it was absent, and "agy has
+no CLI-level enforcement" was written down — then copied to six places, including `models.py`
+and this repo's own CLAUDE.md. The invoker consequently parsed free-form stdout for every
+antigravity call, which is where 9 of the parse-failure rows in
+`.claude/observability/second-opinion.jsonl` came from. Probed on 2026-08-08: the two flags are
+one unit — pass `--json-schema` alone and agy exits non-zero with *"--json-schema can only be
+used when --output-format is 'json' or 'stream-json'"*.
+
+**Enforcement is best-effort, and the tolerant extractor is therefore a required fallback, not
+dead code.** A reply with `status: SUCCESS` was observed with the `structured_output` key simply
+absent. Payload acquisition is now an explicit 6-way table rather than a happy path: stdout that
+is not JSON → `failed`; `status` other than `SUCCESS` → `skipped`; a schema-valid
+`structured_output` → used as-is; an invalid one → **fail closed**, with no fall-through to the
+extractor, so a malformed enforced payload can never be quietly re-parsed into some other answer;
+absent → tolerant extraction over `response`; an empty or non-`str` `response` → `failed`.
+
+### The shipped antigravity default is now a Flash tier
+
+`Gemini 3.1 Pro (High)` could not finish a real review inside the budget. On one measured 41 KB
+review prompt it ran 4m04s and returned zero bytes against agy's own 240s cap;
+`Gemini 3.6 Flash (High)` returns 3–4 findings in 27–28s. The model tier, not the timeout value,
+was the binding constraint — so the cap is unchanged and the default moved, at all five shipped
+sites plus the README. `tests/structural/test_no_stale_antigravity_default.py` keeps the retired
+string from coming back.
+
+Per-invocation ledger rows now carry `duration_s`, and a call that spends more than 25% of the
+240s budget prints a budget-proximity advisory. The threshold is a Python function
+(`second_opinion_invoke.exceeds_budget_fraction`) with boundary tests; the health template only
+relays what it returns.
+
+### Residual — not fixed, now merely legible
+
+agy intermittently answers `status: SUCCESS` in about 7s with an empty `response` and no
+`structured_output` (3 of 7 large-prompt calls during this work). Nothing here prevents that.
+What changed is that it surfaces as a named `failed` reason instead of an anonymous parser
+complaint, so the ledger can count it.
+
+### Two gates that were green about things they could not see
+
+ADR-006's exit criterion asserted zero `rg` hits for the stale "no enforcement" claim and
+returned zero while three sites survived — one reworded (`models.py`: "antigravity has no
+equivalent flags"), one wrapped across a line break, which a line-oriented `rg` cannot match by
+construction. And `tests/structural/test_review_payload_persisted.py` read payloads from the
+worktree while `stage_agent_ledger persist-payload` writes to the base repo deliberately, so a
+payload that had been written was reported missing — with the same file's own `_ledger()`
+docstring documenting exactly that trap one line above. Both are recorded:
+`[fail:design] prose-refactor-removal-sweep-gaps` (count:2) and the new
+`[fail:test] verifier-rederives-root-writer-owns`.
+
 ### The economics meter reported `$0` for any project whose path contains `_`
 
 `economics_source.encode_project_dir` mirrors how Claude Code names a transcript directory from

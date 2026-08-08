@@ -74,7 +74,8 @@ oracle is less evidence, never a reason to fail the review.
 
 **Why this is not a shell line with `<paths>` substituted in.** Those paths come from an
 external model's `file` field, which has no schema constraint (`validate_payload` checks only
-`severity` and `message`, and antigravity has no CLI-level schema at all), and the shipped
+`severity` and `message`, and antigravity's `--json-schema` enforcement is
+best-effort — `structured_output` can be absent on a SUCCESS reply), and the shipped
 settings pre-approve `Bash(uv run pytest:*)` as a **prefix** rule — arbitrary trailing arguments,
 no prompt. A value beginning with `-` is then consumed as an **option**, not a path, with no
 shell metacharacter needed (`pytest --basetemp=<dir>` removes that directory). Putting the

@@ -129,7 +129,7 @@ second_opinion:
     hermetic: true
     output_schema_path: ".claude/schemas/second-opinion-finding.schema.json"
   antigravity:
-    model: "Gemini 3.1 Pro (High)"
+    model: "Gemini 3.6 Flash (High)"
 delivery_metrics:
   tag_pattern: "v*"
   default_branch: null

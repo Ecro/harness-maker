@@ -418,7 +418,8 @@ class SecondOpinionCodexConfig(BaseModel):
 
     ``hermetic`` maps to ``codex exec --ignore-user-config --ignore-rules`` (ADR-006
     reproducibility). ``output_schema_path`` is the ``--output-schema`` argument. Both
-    are Codex-only — antigravity has no equivalent flags, so they live in this sub-block
+    are Codex-only — antigravity takes its schema through `--json-schema` (behind
+    `--output-format json`) and has no hermetic equivalent, so these live in this sub-block
     rather than at the top level (avoids the silent-no-op footgun for antigravity).
     """
 
@@ -456,15 +457,23 @@ class SecondOpinionAntigravityConfig(BaseModel):
     """Antigravity-specific second-opinion knobs (PLAN-second-opinion-multi-model ADR-002/007).
 
     ``model`` is the ``agy --model`` argument — a free-text display name (e.g.
-    "Gemini 3.1 Pro (High)"), NOT a closed enum, because ``agy models`` returns unstable
+    "Gemini 3.6 Flash (High)"), NOT a closed enum, because ``agy models`` returns unstable
     display strings with no machine IDs (ADR-007). Interview-time resolution offers a live
     list; render never re-shells (determinism). Validated only against shell-injection
     metacharacters, not against a fixed list.
+
+    The default is a **Flash** tier, not a Pro one (PLAN-antigravity-second-opinion-timeout
+    ADR-001). Measured 2026-08-08 on one 41KB review prompt: the retired Pro high-effort
+    tier ran 4m04s and hit agy's 240s ``--print-timeout`` with zero output bytes, while
+    this default returned 3-4 findings in 27-28s across three runs. A voter that times out
+    contributes nothing, so tier depth is not a trade here. (The retired literal is spelled
+    out nowhere in ``src/`` on purpose — ``tests/structural/test_no_stale_antigravity_default.py``
+    asserts a zero-hit scan, which is what makes that criterion machine-decidable.)
     """
 
     model_config = ConfigDict(strict=True, extra="forbid")
 
-    model: str = "Gemini 3.1 Pro (High)"
+    model: str = "Gemini 3.6 Flash (High)"
 
     @field_validator("model")
     @classmethod

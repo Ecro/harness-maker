@@ -1,8 +1,73 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Second-Opinion Calibration Ledger Row",
-  "type": "object",
   "additionalProperties": false,
+  "properties": {
+    "disposition": {
+      "enum": [
+        "accepted",
+        "rejected",
+        "duplicate",
+        "unresolved"
+      ],
+      "type": "string"
+    },
+    "duration_s": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "finding_ref": {
+      "type": "string"
+    },
+    "later_regression_link": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "model": {
+      "enum": [
+        "codex",
+        "antigravity"
+      ],
+      "type": "string"
+    },
+    "oracle_result": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "skip_reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "slug": {
+      "type": "string"
+    },
+    "stage": {
+      "enum": [
+        "review",
+        "plan",
+        "health"
+      ],
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "invoked",
+        "skipped",
+        "failed"
+      ],
+      "type": "string"
+    },
+    "ts": {
+      "type": "string"
+    }
+  },
   "required": [
     "ts",
     "slug",
@@ -15,19 +80,6 @@
     "oracle_result",
     "later_regression_link"
   ],
-  "properties": {
-    "ts": {"type": "string"},
-    "slug": {"type": "string"},
-    "stage": {"type": "string", "enum": ["review", "plan", "health"]},
-    "model": {"type": "string", "enum": ["codex", "antigravity"]},
-    "finding_ref": {"type": "string"},
-    "disposition": {
-      "type": "string",
-      "enum": ["accepted", "rejected", "duplicate", "unresolved"]
-    },
-    "status": {"type": "string", "enum": ["invoked", "skipped", "failed"]},
-    "skip_reason": {"type": ["string", "null"]},
-    "oracle_result": {"type": ["string", "null"]},
-    "later_regression_link": {"type": ["string", "null"]}
-  }
+  "title": "Second-Opinion Calibration Ledger Row",
+  "type": "object"
 }

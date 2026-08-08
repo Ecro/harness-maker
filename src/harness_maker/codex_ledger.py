@@ -74,6 +74,12 @@ class SecondOpinionRecord(BaseModel):
     skip_reason: str | None = Field(default=None, max_length=500)
     oracle_result: str | None = Field(default=None, max_length=200)
     later_regression_link: str | None = Field(default=None, max_length=500)
+    # Wall-clock seconds for ONE invocation, measured by the invoker around
+    # `subprocess.run` — not read from a model's own envelope, so codex and every
+    # exception branch are covered by the same code. `None` on per-finding disposition
+    # rows (they measure nothing) and on rows written before this field existed, which
+    # is why it must NOT appear in the shipped schema's `required` list.
+    duration_s: float | None = None
 
 
 def _utc_now_iso() -> str:

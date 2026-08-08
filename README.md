@@ -656,7 +656,7 @@ permissions:
 second_opinion:
   models: []                 # e.g. [codex], [antigravity], or [codex, antigravity] — cross-model second-opinion voters
   # codex:       { hermetic: true, output_schema_path: .claude/schemas/second-opinion-finding.schema.json }
-  # antigravity: { model: "Gemini 3.1 Pro (High)" }   # free-text agy --model name (interview-time-pinned)
+  # antigravity: { model: "Gemini 3.6 Flash (High)" }   # free-text agy --model name (interview-time-pinned)
 
 anti_rot:
   enabled: true

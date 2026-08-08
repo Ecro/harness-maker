@@ -20,8 +20,27 @@ from pathlib import Path
 import pytest
 
 _REPO = Path(__file__).resolve().parents[2]
+# Telemetry and payloads have DIFFERENT writers with DIFFERENT roots, and this gate
+# correlates the two — so each side must be read the way its own writer files it.
+# `review_telemetry emit` writes cwd-relative (this checkout); `stage_agent_ledger
+# persist-payload` writes to the base repo on purpose, so rows survive `task-land`.
 _OBS = _REPO / ".claude" / "observability"
-_PAYLOADS = _OBS / "review-payloads"
+
+
+def _payloads_dir() -> Path:
+    """Resolved the WRITER's way — the base repo, not this checkout.
+
+    `stage_agent_ledger persist-payload` files at the base root deliberately, so rows
+    survive `task-land`. Rooting the reader at `_REPO` instead meant that running from a
+    task worktree the gate looked in `<worktree>/.claude/observability/review-payloads`,
+    which does not exist, and reported "no persisted payload" for a round whose payload
+    had just been written one level up. That is the exact failure `_ledger()`'s docstring
+    below describes for the telemetry half — fixed there, missed here, one line apart.
+    """
+    from harness_maker.mutation_receipt import _base_root
+
+    return _base_root(_REPO) / ".claude" / "observability" / "review-payloads"
+
 
 #: The persist step landed in the source templates on this date. Rounds before it could not
 #: have complied — the instruction did not exist — so they are an era, not an exemption.
@@ -41,6 +60,13 @@ _KNOWN_MISSING: dict[tuple[str, int], str] = {
     ("workflow-loop-efficiency", 3): (
         "ran on the installed harness whose rendered review stage predated the persist "
         "line — the step was in source but not in the command that executed"
+    ),
+    ("antigravity-second-opinion-timeout", 1): (
+        "the orchestrator ran the merge and the consensus filter but skipped the Step 3.4 "
+        "persist-payload line; this gate is what surfaced the omission, one round later. "
+        "The round-1 findings survive in REVIEW-antigravity-second-opinion-timeout-2026-08-08.md, "
+        "but writing them out now would be a reconstruction from narrative, not a capture — "
+        "the one thing this gate's own message forbids. Recorded as missing instead."
     ),
     ("validator-pass-cap-telemetry", 2): (
         "the auto-fix round was run and the persist step was skipped. Its findings are in "
@@ -78,7 +104,7 @@ def _telemetry_rounds() -> list[tuple[str, int, str]]:
 
 
 def _has_payload(slug: str, round_n: int) -> bool:
-    return any(_PAYLOADS.glob(f"{slug}/*-round{round_n}-*.json"))
+    return any(_payloads_dir().glob(f"{slug}/*-round{round_n}-*.json"))
 
 
 def test_the_telemetry_is_readable() -> None:

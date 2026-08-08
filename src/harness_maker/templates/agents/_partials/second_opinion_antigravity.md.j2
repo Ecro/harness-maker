@@ -5,10 +5,13 @@
   Included by `second_opinion_dispatch.md.j2` inside the per-model loop; does NOT self-gate.
   Callers set `second_opinion_stage` ("review" | "plan") and `is_codex` before the include.
 
-  Unlike Codex, `agy` has NO `--output-schema` (output shape is prompt-discipline only) and NO
+  Unlike Codex, `agy` spells its schema flag `--json-schema` and gates it behind
+  `--output-format json` (probed 2026-08-08; the invoker passes both). Enforcement is
+  best-effort — `structured_output` was seen ABSENT on a `status: SUCCESS` reply —
+  so the prompt-discipline contract stays as the fallback's shape signal. `agy` has NO
   `--ignore-user-config`/`--ignore-rules` hermetic flags. The Phase-1 sandbox write-probe
-  (tests/manual/ANTIGRAVITY_SANDBOX_PROBE.md) established that a project-less `agy --print
-  --sandbox` call does NOT expose file-editing tools and cannot mutate the working tree — so
+  (tests/manual/ANTIGRAVITY_SANDBOX_PROBE.md), RE-RUN 2026-07-25 in the corrected flag order,
+  established that a project-less `agy --sandbox --print` call does NOT expose file-editing tools and cannot mutate the working tree — so
   NEVER pass `--project` / `--new-project` / `--add-dir` here. The probe also found a
   file-request can HANG, so every call uses agy's NATIVE `--print-timeout` — a hang becomes a
   non-zero exit routed to the same graceful skip path. The command begins with `agy` (not an
@@ -19,7 +22,7 @@
 {%- set _agy = (config.get('second_opinion', {}).get('antigravity', {})) if config else {} -%}
 {%- set _stage = second_opinion_stage | default('review', true) %}
 {%- set _is_codex = is_codex if is_codex is defined else false %}
-{%- set _model = _agy.get('model', 'Gemini 3.1 Pro (High)') %}
+{%- set _model = _agy.get('model', 'Gemini 3.6 Flash (High)') %}
 **Invoke (antigravity).** Run `agy` as a separate, sandbox-isolated step. Do NOT build the
 prompt inside the same shell line as the invoker call.
 
@@ -32,8 +35,8 @@ prompt_tmp=$(mktemp); printf 'prompt=%s\n' "$prompt_tmp"
 Then write the diff + {{ _stage }} context to the prompt-file path **using the Write tool** —
 not a shell variable (verbatim bytes; adversarial diff text is never shell-expanded).
 
-> **Do NOT add output-shape instructions to this prompt.** `agy` has no `--output-schema`, so
-> that instruction is the only shape signal — and the invoker now owns it, appending
+> **Do NOT add output-shape instructions here.** agy's `--json-schema` is best-effort, so a
+> prompt contract is still needed — the invoker owns it, appending
 > `AGY_OUTPUT_CONTRACT` to **every** agy prompt. One owner means no producer/consumer pair to
 > drift, and it means the contract survives truncation: a large diff is head-truncated to a
 > reserved byte budget and the contract is re-appended after, so the shape signal cannot be the
@@ -74,7 +77,8 @@ uv run --with {{ harness_maker_src_path }} hm second_opinion_invoke --model anti
 > boolean flag, so `--sandbox` became the prompt and stdin was never read; `agy` does not read
 > stdin in print mode at all. Every antigravity vote this harness ever cast was a reply to the
 > literal string `--sandbox`, at exit 0, looking entirely healthy. The invoker builds
-> `agy --sandbox --print "<prompt>" --print-timeout 240s --model "…"` and pins that whole argv
+> `agy --sandbox --print "<p>" --output-format json --json-schema <pkg>
+> --print-timeout 240s --model "…"` and pins that argv
 > with a golden test. Do NOT inline the CLI here again.
 
 **Relay the result.** The invoker writes ONE JSON line to stdout:
@@ -83,7 +87,7 @@ Fold `findings` into the Step 4 filter and copy `status`/`reason` into this mode
 `second_opinion_results` entry verbatim — do **not** re-derive either. The `skipped` vs `failed`
 split is the one the ledger's calibration depends on and it is now decided in tested code:
 `skipped` = the call could not run, `failed` = it ran and returned a payload the filter cannot
-consume (agy has no CLI-level schema enforcement, so a prose reply lands here). Both are
+consume (enforcement is best-effort, so prose can land here). Both are
 warn-and-proceed. The exit code is always 0 on a graceful degrade.
 
 Clean up the prompt file when you are done:

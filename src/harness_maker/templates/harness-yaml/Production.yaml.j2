@@ -95,7 +95,7 @@ second_opinion:
     hermetic: {{ (config.second_opinion.codex.hermetic if config.second_opinion else true) | string | lower }}
     output_schema_path: {{ (config.second_opinion.codex.output_schema_path if config.second_opinion else ".claude/schemas/second-opinion-finding.schema.json") | tojson }}
   antigravity:
-    model: {{ (config.second_opinion.antigravity.model if config.second_opinion else "Gemini 3.1 Pro (High)") | tojson }}
+    model: {{ (config.second_opinion.antigravity.model if config.second_opinion else "Gemini 3.6 Flash (High)") | tojson }}
 delivery_metrics:
   tag_pattern: {{ (config.delivery_metrics.tag_pattern if config.delivery_metrics else "v*") | tojson }}
   default_branch: {{ (config.delivery_metrics.default_branch if config.delivery_metrics else none) | tojson }}

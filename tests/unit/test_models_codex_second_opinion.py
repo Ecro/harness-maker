@@ -30,7 +30,7 @@ def test_second_opinion_config_defaults() -> None:
     assert cfg.failure_policy == "warn-and-proceed"
     assert cfg.codex.hermetic is True
     assert cfg.codex.output_schema_path == ".claude/schemas/second-opinion-finding.schema.json"
-    assert cfg.antigravity.model == "Gemini 3.1 Pro (High)"
+    assert cfg.antigravity.model == "Gemini 3.6 Flash (High)"
 
 
 def test_second_opinion_config_rejects_extra_fields() -> None:

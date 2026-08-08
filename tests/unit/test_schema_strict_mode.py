@@ -97,12 +97,69 @@ def strict_mode_violations(schema: dict[str, Any]) -> list[str]:
     return violations
 
 
-def _schema_files() -> list[Path]:
+#: Schemas actually passed to a strict structured-output API. The invariant below is a
+#: constraint of OpenAI/Codex strict mode (`codex exec --output-schema`), NOT of
+#: JSON-Schema, so it applies exactly to the files that reach that API — today, the one
+#: `resolve_schema_path` / `_packaged_schema` hand to `codex exec`, and which
+#: `build_agy_argv` now also passes to `agy --json-schema`.
+#:
+#: Adding a NEW output-schema means adding it here; `test_every_schema_is_classified`
+#: fails on any unclassified file so the omission cannot be silent.
+_OUTPUT_SCHEMAS: frozenset[str] = frozenset({"second-opinion-finding.schema.json"})
+
+#: Schemas that describe data the harness WRITES rather than data a model must return.
+#: They are never handed to a structured-output API, so strict mode's
+#: every-property-in-`required` rule does not apply — and applying it anyway forces the
+#: schema to contradict its own history: `duration_s` is absent from every ledger row
+#: written before that field existed, and `required` demands presence even for a nullable
+#: type (PLAN-antigravity-second-opinion-timeout ADR-007).
+_DESCRIPTIVE_SCHEMAS: frozenset[str] = frozenset({"second-opinion-ledger.schema.json"})
+
+
+def _all_schema_files() -> list[Path]:
     return sorted(_SCHEMAS_DIR.glob("*.json"))
 
 
+def _schema_files() -> list[Path]:
+    return [p for p in _all_schema_files() if p.name in _OUTPUT_SCHEMAS]
+
+
 def test_schemas_dir_has_at_least_one_schema() -> None:
-    assert _schema_files(), f"no schema files under {_SCHEMAS_DIR}"
+    assert _schema_files(), f"no strict-mode schema files under {_SCHEMAS_DIR}"
+
+
+def test_every_schema_is_classified() -> None:
+    """No schema may sit outside both buckets.
+
+    Narrowing the guard's population is only safe if the narrowing is asserted. An
+    unclassified new file would otherwise inherit the exclusion by default — which is
+    how a guard quietly stops guarding.
+    """
+    unclassified = sorted(
+        p.name for p in _all_schema_files() if p.name not in _OUTPUT_SCHEMAS | _DESCRIPTIVE_SCHEMAS
+    )
+    assert not unclassified, (
+        f"schemas classified as neither output nor descriptive: {unclassified}. "
+        "An output-schema (one passed to `codex exec --output-schema` or "
+        "`agy --json-schema`) belongs in _OUTPUT_SCHEMAS and must satisfy strict mode."
+    )
+
+
+def test_the_ledger_schema_is_excluded_on_purpose() -> None:
+    """The exclusion is a decision, not an oversight — and it is load-bearing.
+
+    If someone "fixes" the ledger schema by listing every property in `required`, the
+    shipped contract declares the harness's own 112 pre-existing rows invalid. Nothing
+    validates them at runtime, so the harm is a documented falsehood rather than a
+    crash — precisely the class ADR-006 of this same PLAN exists to clean up.
+    """
+    ledger = _SCHEMAS_DIR / "second-opinion-ledger.schema.json"
+    assert ledger.exists()
+    assert ledger.name in _DESCRIPTIVE_SCHEMAS
+    assert ledger not in _schema_files()
+    schema = json.loads(ledger.read_text(encoding="utf-8"))
+    assert "duration_s" in schema["properties"]
+    assert "duration_s" not in schema["required"]
 
 
 @pytest.mark.parametrize("schema_path", _schema_files(), ids=lambda p: p.name)

@@ -158,3 +158,34 @@ def test_custom_antigravity_model_is_persisted_for_the_invoker(tmp_path: Path) -
     assert "Gemini 3.5 Flash (High)" in harness_yaml
     review = (tmp_path / "commands/hm/review.md").read_text()
     assert "second_opinion_invoke --model antigravity" in review
+
+
+def test_fresh_install_harness_yaml_pins_the_flash_default(tmp_path: Path) -> None:
+    """The ABSENT case: no `second_opinion` block at all — the fresh-install path.
+
+    Absent-case coverage per CLAUDE.md's `[fail:design]` rule (count:8): every other
+    test in this file passes an EXPLICIT `SecondOpinionConfig`, so none of them covers
+    what a brand-new harness actually gets.
+
+    Note what this test established, against ADR-003's original reasoning: the two
+    `harness-yaml/*.yaml.j2` literals are NOT the fresh-install path. `second_opinion`
+    is a non-Optional field with a default, so `config.second_opinion` is never falsy on
+    a synthesized blueprint and those `else` branches are unreachable. A fresh install
+    inherits the Python default in `models.py`. The template literals were still worth
+    correcting — a stale literal is a documentation lie that the next reader will trust —
+    but they were never load-bearing, and this test asserts the path that IS.
+    """
+    ans = InterviewAnswers(
+        preset=Preset.PRODUCTION,
+        targets=[Target.CLAUDE_CODE],
+    )
+    assert ans.second_opinion.antigravity.model == "Gemini 3.6 Flash (High)", (
+        "the default-constructed config is the fresh-install path"
+    )
+
+    bp = synthesize(ProjectProfile(), ans)
+    render(bp, tmp_path, freeze_time=DEFAULT_FREEZE_TIME)
+
+    harness_yaml = (tmp_path / "harness.yaml").read_text()
+    assert "Gemini 3.6 Flash (High)" in harness_yaml
+    assert "Gemini 3.1 Pro (High)" not in harness_yaml
