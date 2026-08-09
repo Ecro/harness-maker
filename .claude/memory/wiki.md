@@ -851,7 +851,7 @@ must not describe these as cross-preset.
 its non-zero exit must never be wired into a gate, because spoton's disagreement is expected to
 persist until that project next runs a gated stage.
 
-<!-- @hm:/user:entries -->
+
 ## [wiki:architecture] autonomy-levels-live-in-two-places-and-a-test-finds-the-third | 2026-08-09
 PLAN-workflow-time-token-savings B1/B2/B4. The autonomy level vocabulary is `gated | auto_safe | auto_full` (operational, a marker can hold them) plus `ask` (**yaml-only**, meaning "the session-start picker chooses"). `ask` is the **default for a freshly rendered harness** (ADR-012) — the right level is a property of the work, not of the project.
 
@@ -887,3 +887,5 @@ PLAN-workflow-time-token-savings B3 (ADR-009/010). `stage_end_summary.md.j2` Ste
 **A `gated` marker never advances** (`kill_switch`, marker preserved — arming gated is how a session records "asked, declined"). `boundary` used to read `marker.level` only to decide *how* to advance; it now decides *whether* first.
 
 **`gate_auto_answered` is written when the judgment is ANSWERED**, with `advanced` as a field — not only on the advancing path. Two reviewers proposed opposite placements; the row's question is "was a human judgment cleared?", and suppressing it on a run that then stopped at the land gate made that run byte-identical to a `clear`-gate `auto_safe` run, which is the indistinguishability the row exists to remove.
+
+<!-- @hm:/user:entries -->

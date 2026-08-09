@@ -1,0 +1,6 @@
+{"findings": [
+ {"id": "r2-fenced-excerpt", "severity": "P1", "file": "src/harness_maker/second_opinion_invoke.py", "summary": "case-2 branch emitted unfenced, unstripped model text", "status": "fixed-round-2", "source": "security-reviewer"},
+ {"id": "r2-advisory-stage", "severity": "P1", "file": "src/harness_maker/second_opinion_invoke.py", "summary": "budget advisory asserted 'trivial smoke' on review/plan stages", "status": "fixed-round-2", "source": "code-reviewer"},
+ {"id": "r2-never-raise", "severity": "P1", "file": "src/harness_maker/second_opinion_invoke.py", "summary": "root resolution sat outside the never-raise guard", "status": "fixed-round-2", "source": "codex"},
+ {"id": "r2-prompt-path", "severity": "P1", "file": "src/harness_maker/second_opinion_invoke.py", "summary": "prompt-unreadable path bypassed _result and the ledger", "status": "fixed-round-2", "source": "codex"}
+]}
