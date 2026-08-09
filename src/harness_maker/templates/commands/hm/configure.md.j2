@@ -74,9 +74,12 @@ Options (multi-select):
 !uv run --with {{ harness_maker_src_path }} hm cli detect-tools --json
 ```
 
-- **Autopilot** — `autonomy.level`: `gated` (off) / `auto_safe` / `full`, and whether it
-  persists across sessions. Trade-off: fewer stops, but stages pass two-way doors. The plan
-  interview, a CHANGES_REQUESTED review, and the wrapup merge always stop regardless.
+- **Autopilot** — `autonomy.level`: `ask` (choose per session — the default) / `gated` (off) / `auto_safe` / `auto_full`, and whether it
+  persists across sessions. Trade-off: fewer stops, but stages pass two-way doors. A
+  CHANGES_REQUESTED review and the wrapup merge stop at **every** level. The plan
+  architecture interview stops at `gated`/`auto_safe`; `auto_full` answers it with the
+  recommended option and records that in the PLAN — say so, it is the difference between
+  the two auto levels.
 - **Locale** — the `locale` tag (en / ko / …), for this conversation and the re-render.
   Unknown tags fall back to English.
 - **Delivery metrics tuning** — `{% if is_codex %}@hm-metrics{% else %}/hm:metrics{% endif %}`

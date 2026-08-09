@@ -885,15 +885,23 @@ class AutonomyConfig(BaseModel):
     never escalate autonomy; the promotion arrives through ``/harness-maker:make
     --update``. Do NOT "simplify" those four sites back to ``AutonomyConfig()`` —
     ``tests/unit/test_autonomy_defaults.py`` asserts the divergence on purpose.
-    ``auto_safe`` advances the two-way-door
-    boundaries but ALWAYS stops at the plan architecture interview, a review
-    CHANGES_REQUESTED grade-gate, and the wrapup merge/push. ``full`` currently behaves
-    IDENTICALLY to ``auto_safe`` — the mandatory safety gates are non-negotiable and are
-    honored at every level (a `full` session must never auto-push or skip a
-    CHANGES_REQUESTED review). ``full`` is reserved for a future wider-advance policy; it
-    is NOT a gate-bypass. (REVIEW P6: the P6 stage-terminal applies the gates
-    unconditionally, so the earlier "full ~= /hm:loop bypass" wording was a code/doc
-    divergence — corrected here.)
+    ``auto_safe`` advances the two-way-door boundaries but stops at the plan architecture
+    interview, a CHANGES_REQUESTED grade gate, and the wrapup merge/push. ``auto_full``
+    additionally answers **exactly two** judgment gates — the plan interview, and
+    ``human_review_needed`` on an APPROVED review — recording what it answered. It does NOT
+    clear a CHANGES_REQUESTED grade and does NOT clear the wrapup land.
+
+    **Half of that is code and half is still prose, and the split is worth knowing.** The code
+    refuses to clear `--judgment-gate blocked` at any level, and refuses an absent verdict
+    outright — that part cannot drift. Deciding that a failed grade IS `blocked` remains a
+    template instruction in `review.md.j2` / `plan.md.j2`, so a model that misclassifies can
+    still send `pending`. The enforceable half was added because a wholly prose-only control
+    passes its own grep while the behaviour is absent; the classification step is the residue
+    and the `clear < pending < blocked` tiebreak is what biases it safe.
+
+    ``full`` is the RETIRED spelling of ``auto_safe`` and is demoted to it by
+    ``LEGACY_LEVEL_ALIASES`` — never promoted to ``auto_full``. Loading a config must not
+    escalate autonomy.
 
     ADR-003: the destructive never-auto deny baseline is code/template-fixed and is
     intentionally NOT a field here — only ``extra_deny`` (additive) is user-settable,

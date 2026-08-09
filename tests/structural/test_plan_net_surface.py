@@ -56,15 +56,19 @@ def test_the_delta_document_still_carries_its_anchor() -> None:
     strict=False,
     reason=(
         "PLAN-workflow-time-token-savings ends NET-POSITIVE on this repo's own surface: "
-        "claude 366439 → 367496 (+1057). The waiver, per ADR-008.4: B3's judgment-gate branch "
+        "claude 366439 → 371066 (+4627). The waiver, per ADR-008.4: B3's judgment-gate branch "
         "and ADR-010's split review gate are what make `auto_full` a real level rather than an "
         "alias, and compressing them further would delete the auto-answer recording "
         "instruction that is `auto_full`'s only compensating control. A3 (−351) and A5 "
         "(−7238, but only for a harness that opts OUT — this repo is the fleet and stays in) "
-        "are the reductions available. A THIRD-PARTY install nets roughly −6200; the maintainer "
-        "pays +1057 to keep the denominator. `codex` passes (299602 → 299245). See §1 of "
+        "are the reductions available. A THIRD-PARTY install nets roughly −2600; the maintainer "
+        "pays +4627 to keep the denominator — +3570 of it the four review rounds, moving ADR-010's "
+        "grade half out of prose after both P0s it hid were reproduced. `codex` passes "
+        "(299602 → 300082, now also positive). See §1 of "
         "work-docs/BASELINE-DELTA-workflow-time-token-savings.md. "
-        "strict=False because the codex variant legitimately passes."
+        "strict=False was kept after codex turned positive in round 4: the two variants "
+        "no longer disagree, but an XPASS must not be reported as a failure if one of "
+        "them shrinks again."
     ),
 )
 @pytest.mark.parametrize("variant", ["claude", "codex"])

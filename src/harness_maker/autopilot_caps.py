@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Literal
 
 from harness_maker import autopilot, autopilot_ledger, command_registry
+from harness_maker.models import GATED_LEVEL
 
 # `bad_slug` is emitted only by `_cmd_boundary` (a rejected `--slug`), never by
 # `evaluate_boundary` — but it IS part of the JSON contract the stage prompt branches on,
@@ -262,6 +263,26 @@ def _cmd_boundary(args: argparse.Namespace) -> int:
         out["reason"] = "autopilot marker absent/foreign/stale — aborting chain at boundary"
         print(json.dumps(out))
         return 0
+    if marker.level == GATED_LEVEL:
+        # `gated` means "never auto-advance", and nothing here used to check it: every other
+        # branch reads the level only to decide HOW to advance. That was unreachable while
+        # the picker rendered only for non-gated harnesses and armed with the committed
+        # level — B4 made it reachable by offering `gated` as a pick and instructing "arm
+        # with the PICKED level", i.e. on the default (`ask`) path. Fail closed, and do NOT
+        # clear the marker: arming gated is how a session records "asked, declined", and
+        # clearing it would make the picker ask again every stage.
+        # `kill_switch` is the honest halt kind (the rendered prose glosses it as "autopilot
+        # off/expired", which is what gated means), but the ROW matters: without it a session
+        # that was offered autopilot and declined is indistinguishable on the ledger from one
+        # where the marker expired, and `smoke_check` reads exactly these rows.
+        autopilot_ledger.append_event(root, event="gate_blocked", fields={"stage": args.current})
+        out["halt_kind"] = "kill_switch"
+        out["reason"] = (
+            "autopilot level is 'gated' — auto-advance is off for this session. "
+            "Marker preserved (it records the declined offer)."
+        )
+        print(json.dumps(out))
+        return 0
     # AFTER the marker check, BEFORE the caps (ADR-005 placement). Running it first would
     # jump the P2-5 invariant those early returns carry — a call with no live marker
     # (autopilot off / foreign / stale) must append NOTHING, or every manual run pollutes
@@ -333,15 +354,33 @@ def _cmd_boundary(args: argparse.Namespace) -> int:
             autopilot.clear(root, session_id=args.session_id)
         print(json.dumps(out))
         return 0
+    # `blocked` is a caller ASSERTION that a quality threshold failed, so it is honoured on
+    # ANY stage, not only the two that own a judgment gate. Today no other stage's template
+    # sends it, so this is future-proofing rather than a fail-open being closed — but the
+    # asymmetry is the point: the value whose entire purpose is to stop must never be a
+    # silent no-op, and a stage gaining a threshold gate should not also have to be added to
+    # `_JUDGMENT_GATED_STAGES` before its `blocked` is honoured.
+    if args.judgment_gate == "blocked":
+        autopilot_ledger.append_event(root, event="gate_blocked", fields={"stage": args.current})
+        out["halt_kind"] = "judgment_gate"
+        out["reason"] = (
+            f"stage {args.current} reported a BLOCKED gate — a quality threshold, not a "
+            "judgment. No level clears it, auto_full included. Fix the underlying failure "
+            "and re-run. Marker preserved."
+        )
+        print(json.dumps(out))
+        return 0
     # ADR-009 — the judgment gate. Placed AFTER the caps and BEFORE the human gate: the caps
     # are terminal and must win, while the land gate must remain reachable on the next call
     # (this halt preserves the marker, so it will be).
     if args.current in _JUDGMENT_GATED_STAGES and args.judgment_gate != "clear":
-        # Fail-closed on absent: `--judgment-gate` defaults to "pending", so a stage that
-        # forgets to pass it stops. Fail-open here would be indistinguishable from a stage
-        # that has no gate at all, which is the entire failure this flag exists to make
-        # visible.
-        if marker.level != "auto_full":
+        # ABSENT (None) is NOT `pending`, and conflating them was a P0 in the first attempt at
+        # this fix. `pending` is a caller SAYING "a judgment is unresolved" — a claim
+        # `auto_full` is licensed to answer. Absence is the caller saying nothing at all: a
+        # forgotten flag, or a harness rendered before this flag existed. Defaulting absence
+        # to `pending` therefore reopened the exact hole at the exact level where it is most
+        # dangerous, because `auto_full` cleared it. Absence is un-clearable at EVERY level.
+        if args.judgment_gate is None or marker.level != "auto_full":
             # NOT terminal, and NOT a marker clear. `merge_gate` below clears the marker
             # because landing ends the session; copying that here would end the autopilot
             # session at the first plan stage — and starve `smoke_check` of the very rows
@@ -350,19 +389,47 @@ def _cmd_boundary(args: argparse.Namespace) -> int:
                 root, event="gate_blocked", fields={"stage": args.current}
             )
             out["halt_kind"] = "judgment_gate"
-            out["reason"] = (
-                f"stage {args.current!r} has an unresolved judgment gate and the level is "
-                f"{marker.level!r} — autopilot stopped; resolve it and re-run. "
-                "Marker preserved."
-            )
+            if args.judgment_gate is None:
+                out["reason"] = (
+                    f"stage {args.current} passed no --judgment-gate verdict, which is "
+                    "un-clearable at every level including auto_full. Most likely you "
+                    "omitted the append your Step 1 asked for: re-run this command with "
+                    "exactly one of --judgment-gate clear|pending|blocked. Only if your "
+                    "rendered stage never mentions --judgment-gate at all is this a stale "
+                    "render — then, and only then, /harness-maker:make --update. "
+                    "Marker preserved."
+                )
+            else:
+                out["reason"] = (
+                    f"stage {args.current} has an unresolved judgment gate and the level is "
+                    f"{marker.level} — autopilot stopped; resolve it and re-run. "
+                    "Marker preserved."
+                )
             print(json.dumps(out))
             return 0
         # auto_full: answer rather than stop. The directive is the whole point of the level —
         # the answer must be RECORDED where a human will find it, or this is an unlogged
         # skip of a human decision.
         out["judgment_auto_answered"] = True
+        # Written HERE, at the moment the judgment is answered — not later, on the advancing
+        # path only. Round 2 filed "the row fires on runs that then stop at the land gate";
+        # round 3 filed the inverse, that suppressing it makes such a run byte-identical on
+        # the ledger to a `clear`-gate `auto_safe` run. Round 3 wins: the row's question is
+        # "was a human judgment cleared?", and the answer is yes regardless of what the chain
+        # did next. The outcome is a FIELD, so both questions stay answerable.
+        autopilot_ledger.append_event(
+            root,
+            event="gate_auto_answered",
+            fields={
+                "stage": args.current,
+                "level": marker.level,
+                "advanced": next_stage(marker.pipeline, args.current)
+                not in (None, *_HUMAN_GATED_STAGES),
+            },
+        )
         out["judgment_directive"] = (
-            f"level auto_full: proceeding past {args.current!r}'s judgment gate. Record the "
+            f"level auto_full: the {args.current} judgment gate was ANSWERED for you rather than "
+            "stopped at — read `proceed`/`halt_kind` for what the chain then did. Record the "
             "answer you took — for `plan`, write the recommended option into the PLAN's "
             "Interview Transcript; for `review`, write the passed-over finding ids into the "
             "REVIEW document. An unrecorded auto-answer is an unauditable skip."
@@ -427,14 +494,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     # id-less reader resolves an id-bearing marker as foreign -> kill_switch. Empty
     # string means id-less (Cursor/Codex/degraded), which is the pre-existing behaviour.
     b.add_argument("--session-id", default=None, dest="session_id")
-    # ADR-009: `default="pending"` IS the fail-closed rule. Do not make this required —
-    # an argparse error on the six non-judgment stages would break every existing caller,
-    # and do not default it to "clear", which would let a forgotten flag advance past an
-    # unresolved human decision without a trace.
+    # ADR-009: `default=None` — a SENTINEL, deliberately not `"pending"`. Absence means the
+    # caller said nothing (a forgotten flag, or a harness rendered before this flag existed);
+    # `pending` means the caller said "a judgment is unresolved", which `auto_full` may
+    # answer. Defaulting absence to `pending` made the two indistinguishable and reopened the
+    # P0 this flag exists to close, at the one level where it matters. Not `required=True`
+    # either: an argparse error on the six non-judgment stages would break every caller.
     b.add_argument(
         "--judgment-gate",
-        default="pending",
-        choices=("pending", "clear"),
+        default=None,
+        choices=("pending", "clear", "blocked"),
         dest="judgment_gate",
     )
     b.add_argument("--step-cap", type=int, default=None, dest="step_cap")

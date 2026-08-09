@@ -232,7 +232,14 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # work-docs/BASELINE-DELTA-validator-pass-cap.md.
     "plan": 47503,
     "research": 26673,
-    "review": 34760,
+    # 34760 → 35828 (review round 4): the `CHANGES_REQUESTED` resolution bullet gained an
+    # autopilot carve-out, and the APPROVED+human_review_needed bullet was split so the
+    # interactive and autopilot paths stop saying the same thing. Both were live
+    # contradictions with the enforceable gate — nothing in code can tell a failed grade
+    # from a passing one, so this prose IS ADR-010's guarantee on the review side and
+    # cannot be compressed away. Attributed in
+    # work-docs/BASELINE-DELTA-workflow-time-token-savings.md.
+    "review": 35828,
     "spec": 30537,
     "verify": 23796,
     # 41345 → 42452 (PLAN-workflow-time-token-savings B3/B4): the shared

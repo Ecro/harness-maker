@@ -43,9 +43,29 @@ denominator, and the interview says so at the point of choice — that denominat
 decoration: harness-maker's own six rows said "delete the plan-validator second pass" while the
 pooled four-project population said keep it.
 
-**This release is net-positive on harness-maker's own surface (+1,057 chars) and net-negative for
-everyone else (≈−6,200).** The overrun is carried as a visible `xfail` with a waiver rather than
-absorbed into a re-frozen baseline.
+**Three fail-opens in the autonomy gate were found by review, after this work had already
+landed once.** They are fixed, and the way they got in is worth more than the fixes:
+
+1. `auto_full` advanced past a **CHANGES_REQUESTED review**. ADR-010 declares that gate
+   un-clearable at every level, and the enforcement was one sentence in a template — the
+   prose-only shape that same PLAN's Interview #5 had explicitly rejected. A two-valued
+   `--judgment-gate` could not carry a three-way distinction, so a failed grade and an open
+   question arrived identically. There is now a third value, `blocked`, that no level clears.
+2. A **`gated` marker auto-advanced**. `boundary` read the level only to decide *how* to
+   advance, never *whether*. The hole predates this release; what this release added was the
+   reachability — the new session picker offers "gated" and says "arm with the picked level".
+3. The first fix for (1) **reopened it**: the flag defaulted to `pending`, and `pending` is the
+   one value `auto_full` clears, so an omitted verdict was auto-answered. Fail-closed is a
+   distinction, not a default value. Absence is now its own case and halts everywhere.
+
+Each was reproduced by running the command before it was fixed. None was found by the change's
+own test matrix, and one of the tests written for that matrix had **parametrized the bug as
+expected behaviour** — asserting that a `gated` level advances on a clear gate.
+
+**This release is net-positive on harness-maker's own surface (+3,460 chars) and net-negative
+for everyone else (≈−3,800).** The overrun is carried as a visible `xfail` with a waiver rather
+than absorbed into a re-frozen baseline; roughly two thirds of it is the review moving ADR-010's
+grade half out of prose and into an enforceable flag.
 
 
 ### antigravity had a structured-output mode the whole time; we were looking for the wrong flag name

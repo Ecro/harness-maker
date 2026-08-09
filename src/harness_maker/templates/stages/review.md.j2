@@ -503,7 +503,11 @@ IF grade ≥ grade_threshold:
        emit the loud callout:
        "⚠️ Grade {grade} but {N} unverified severe finding(s) present
         (manual-only / weak-consensus P0/P1) — human review required."
-       • Interactive / autopilot path: STOP for human review before wrapup.
+       • Interactive path: STOP for human review before wrapup.
+       • Autopilot path: this is the JUDGMENT half of the gate — carry it to Step 2 as
+         `--judgment-gate pending`. `gated`/`auto_safe` stop, exactly as before;
+         `auto_full` clears it and records the passed-over finding ids. Do NOT stop
+         here on your own: the level decides.
        • Loop mode: proceed — the flag is persisted in the committed
          REVIEW-{slug}.md (a durable record the operator reads when reviewing
          loop output). No per-iter halt and no active loop-close gate — the flag
@@ -605,8 +609,17 @@ ran out **while still progressing** — the only exit that says a higher cap wou
 `auto-fix-disabled`. Never report `cap-exhausted` for a `no-progress` stop.
 
 - `APPROVED` **and `human_review_needed=false`** → ready for wrapup.
-- `APPROVED` **but `human_review_needed=true`** (unverified `manual-only`/`weak-consensus` P0/P1 present) → the letter cleared, but real severe findings were not consensus-verified. **Interactive / autopilot: STOP for human review before wrapup.** **Loop mode: proceed** — the flag is persisted in the committed REVIEW report only (no per-iter halt, no active loop-close reader — accepted limitation, ADR-003); the operator sees it when reviewing loop output.
-- `CHANGES_REQUESTED` (autoloop policy) → list remaining issues, set `human_review_needed=true`, **proceed to wrapup** (do NOT halt the loop on D/F — wrapup will surface the flag).
+- `APPROVED` **but `human_review_needed=true`** (unverified `manual-only`/`weak-consensus` P0/P1 present) → the letter cleared, but real severe findings were not consensus-verified. **Interactive: STOP for human review before wrapup. Autopilot: `--judgment-gate pending` —
+`gated`/`auto_safe` stop, `auto_full` clears it and records the passed-over finding ids
+(the one behaviour that distinguishes the two auto levels on the review side).**
+**Loop mode: proceed** — the flag is persisted in the committed REVIEW report only (no per-iter halt, no active loop-close reader — accepted limitation, ADR-003); the operator sees it when reviewing loop output.
+- `CHANGES_REQUESTED` **(autoloop policy ONLY)** → list remaining issues, set
+  `human_review_needed=true`, **proceed to wrapup** (do NOT halt the loop on D/F — wrapup
+  will surface the flag).
+  **Under autopilot this bullet does not apply.** A failed grade is the `blocked` verdict
+  of the Step 1 gate and must never be reported as `clear` or `pending`. Nothing in code
+  can tell a failed grade from a passing one — the boundary acts only on the value you
+  type — so this line is the whole of ADR-010's guarantee on the review side.
 
 ## Telemetry Emit (always, per round)
 
@@ -672,7 +685,7 @@ fields and negative counts.
     unverified manual-only findings that a human is being asked to look at. Only the second
     is level-conditional, so the string spells the split out rather than leaving Step 1 to
     infer it. -#}
-{% set summary_autopilot_gate = "Two predicates, treated differently. (1) CHANGES_REQUESTED (grade < threshold) → STOP at EVERY level, auto_full included: a failed threshold is not a question. Never pass it to the boundary. (2) Else human_review_needed on an APPROVED review → the judgment gate: pass --judgment-gate pending and let the level decide; at auto_full record the passed-over finding ids in the REVIEW document." -%}
+{% set summary_autopilot_gate = "Two predicates, and the flag value is what separates them. (1) CHANGES_REQUESTED (grade < threshold) → pass --judgment-gate blocked: that halts at EVERY level, auto_full included, and records the stop. A failed threshold is not a question, so never send pending for it. (2) Else human_review_needed on an APPROVED review → pass --judgment-gate pending: that is the judgment half, and auto_full may clear it, recording the passed-over finding ids in the REVIEW document. (3) Neither → clear." -%}
 {% include "agents/_partials/stage_end_summary.md.j2" %}
 
 <!-- @hm:user:extra-quality-checks -->

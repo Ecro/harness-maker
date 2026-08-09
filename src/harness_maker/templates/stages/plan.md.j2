@@ -689,7 +689,7 @@ If verification fails, retry write **once**. If still failing, surface the path 
 {% set summary_artifact = "work-docs/PLAN-{slug}.md" -%}
 {% set summary_next = "`/hm:execute {slug}` (STOP — user-initiated)" -%}
 {% set summary_stage = "plan" -%}
-{% set summary_autopilot_gate = "The architecture interview is this stage's judgment gate. Any unresolved architectural AskUserQuestion round → --judgment-gate pending; otherwise clear. At auto_full a pending gate is answered with the recommended option, which you MUST write into the PLAN's Interview Transcript before advancing." -%}
+{% set summary_autopilot_gate = "Two predicates, and the flag value separates them. (1) If the validator returned MAJOR_REVISION on its SECOND pass and the Step 4 A/B question is UNANSWERED, or the user chose B (abort), pass --judgment-gate blocked. No level clears it, auto_full included: a plan the validator twice called critically flawed must not be accepted as risk with NO HUMAN PRESENT. If the user chose A (proceed with the critiques as accepted risk) the threshold IS resolved — that is recorded as validator_outcome: MAJOR_REVISION_RESOLVED, a human WAS present, and the verdict is clear. Keying blocked on the bare historical fact would make the halt permanent and its remedy impossible. (2) Else, any unresolved architectural AskUserQuestion round → --judgment-gate pending: that is the judgment half, and at auto_full it is answered with the recommended option, which you MUST write into the PLAN's Interview Transcript before advancing. (3) Neither → clear." -%}
 {% include "agents/_partials/stage_end_summary.md.j2" %}
 
 <!-- @hm:user:extra-quality-checks -->

@@ -71,9 +71,18 @@ def test_the_review_grade_predicate_is_not_level_conditional(commands: Path) -> 
     """ADR-010's hard half: a failed grade stops at auto_full too."""
     text = _text(commands, "review")
     assert "CHANGES_REQUESTED" in text
-    assert "STOP at EVERY level" in text, (
+    assert "halts at EVERY level" in text, (
         "the grade predicate must state that no level clears it — if it moved inside a "
         "level-conditional branch, this PLAN reversed a recorded invariant"
+    )
+    # The REVIEW-SPECIFIC sentence, not the bare flag name. The shared partial lists all
+    # three values and renders into plan.md too, so `"--judgment-gate blocked" in text` was
+    # satisfied by prose that says nothing about the grade — a test passing for the wrong
+    # reason, which is worse than none.
+    assert "CHANGES_REQUESTED (grade < threshold) → pass --judgment-gate blocked" in text, (
+        "the grade half must be carried by the flag value the CODE refuses to clear, and "
+        "review's own gate string must be what names it; a sentence saying 'stop at every "
+        "level' with no mechanism behind it is the prose-only enforcement Interview #5 rejected"
     )
 
 
@@ -88,3 +97,16 @@ def test_the_review_judgment_half_routes_to_the_boundary(commands: Path) -> None
 
 def test_plan_records_its_auto_answer(commands: Path) -> None:
     assert "Interview Transcript" in _text(commands, "plan")
+
+
+def test_the_plan_threshold_half_is_named_by_plans_own_gate(commands: Path) -> None:
+    """The mirror of the review assertion, and for the same reason.
+
+    plan's gate string mapped *every* unresolved round to `pending`, so a plan the validator
+    twice called critically flawed was auto-answered at `auto_full` — the plan-stage analogue
+    of the review P0. Assert the plan-SPECIFIC sentence: the shared partial lists all three
+    values in every stage, so a bare `"blocked" in text` passes with this sentence deleted.
+    """
+    text = _text(commands, "plan")
+    assert "MAJOR_REVISION on its SECOND pass" in text
+    assert "No level clears it, auto_full included" in text

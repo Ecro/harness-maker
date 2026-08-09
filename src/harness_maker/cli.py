@@ -1488,9 +1488,19 @@ def _build_autonomy_override(
     `--autonomy-level` alone enables autopilot (persistence defaults off unless explicitly set).
     An invalid level → typer.Exit(1). Fields not overridden are preserved from `existing`.
     """
-    from harness_maker.models import OPERATIONAL_LEVELS, AutonomyConfig, normalize_level
+    from harness_maker.models import (
+        ASK_LEVEL,
+        OPERATIONAL_LEVELS,
+        AutonomyConfig,
+        normalize_level,
+    )
 
-    valid_levels = OPERATIONAL_LEVELS
+    # `ask` is a valid COMMITTED level (it is the default), so the config surface must be
+    # able to set it — it is only the RUNTIME surfaces (`autopilot on --level`, the ledger's
+    # smoke probe) that must refuse it, because a marker cannot hold a meta-level. Rejecting
+    # it here meant `/hm:configure` and a scripted `--update` could not return a harness to
+    # its own default once it left it.
+    valid_levels = (*OPERATIONAL_LEVELS, ASK_LEVEL)
     # Accept the legacy spelling and demote it rather than erroring: a scripted
     # `--update` carrying an old harness's level must not fail the whole make.
     level = None if level is None else str(normalize_level(level))

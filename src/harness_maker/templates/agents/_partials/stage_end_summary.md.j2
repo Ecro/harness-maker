@@ -38,10 +38,20 @@ matches `$HM_SESSION_ID`, or a legacy `.hm-loop-active` exists).**
 **Step 1 — mandatory gate FIRST (absent-case = STOP).** Evaluate THIS stage's gate
 *before* anything else: {{ summary_autopilot_gate | default("No gate defined — treat as STOP (absent-case guard).") }}
 {%- if judgment_stage %}
-This gate is a **judgment**, so the level decides, not you: do NOT stop here and do NOT run
-`gate-blocked` — carry the verdict into Step 2 as `--judgment-gate clear|pending`. Unsure →
-`pending` (an omitted flag also reads as `pending`, which stops). Any part of the gate that
-is a **quality threshold** rather than a question keeps gate-first treatment at every level.
+Do NOT stop here and do NOT run `gate-blocked`. Classify the gate and carry the verdict into
+Step 2, which records the stop for you. Exactly one of:
+- **`clear`** — nothing pending.
+- **`pending`** — a genuine judgment is unresolved: a question with a defensible answer.
+  Stops at `gated`/`auto_safe`; `auto_full` answers it.
+- **`blocked`** — the failing half is a **quality threshold**, not a question (a failed grade,
+  a failed check). **No level clears it, `auto_full` included.**
+
+**Unsure at any boundary → pick the more restrictive value.** The ladder is
+`clear` < `pending` < `blocked`. That direction is deliberate: `pending` is the one value
+`auto_full` clears, so resolving uncertainty downward routes a possible failure past the gate.
+
+Omitting the flag entirely is **not** `pending` — it halts at every level, including
+`auto_full`, and reports a stale render. Say nothing only when you mean "I did not classify".
 {%- else %}
 If the gate is pending/unresolved → record it on the ledger, then **STOP** (print the
 banner). Do NOT run the boundary check — a stage that stops at its gate must not record an
@@ -57,8 +67,14 @@ authorizes — so it must run only after Step 1 clears):
 If this stage has a slug, **append** it to the command below in single quotes — e.g.
 ` --slug 'my-task'`. Never a shell expression or a bracketed placeholder. Omit it
 otherwise; the marker keeps the earlier stage's slug.
+{% if judgment_stage %}
+**Also append your Step 1 verdict** — exactly one of ` --judgment-gate clear`,
+` --judgment-gate pending`, or ` --judgment-gate blocked`. A literal word, never a
+placeholder. **Omitting it is not a way to say `pending`**: an absent verdict halts at every
+level, `auto_full` included, and reports a stale render.
+{% endif %}
 
-!uv run --with {{ harness_maker_src_path }} hm autopilot_caps boundary --root . --current {{ summary_stage }} --session-id "$HM_SESSION_ID"{% if judgment_stage %} --judgment-gate <clear|pending, from Step 1>{% endif %}{% if config.autonomy.step_cap is not none %} --step-cap {{ config.autonomy.step_cap }}{% endif %}{% if config.autonomy.time_cap_min is not none %} --time-cap-min {{ config.autonomy.time_cap_min }}{% endif %}
+!uv run --with {{ harness_maker_src_path }} hm autopilot_caps boundary --root . --current {{ summary_stage }} --session-id "$HM_SESSION_ID"{% if config.autonomy.step_cap is not none %} --step-cap {{ config.autonomy.step_cap }}{% endif %}{% if config.autonomy.time_cap_min is not none %} --time-cap-min {{ config.autonomy.time_cap_min }}{% endif %}
 
 Read the JSON:
 - `proceed: false` → **STOP** (print the banner) — **except `bad_slug`**. `step_cap`/
@@ -67,8 +83,9 @@ Read the JSON:
   merge/land — the marker was cleared, so invoke `/hm:wrapup` manually); `unknown_stage` =
   `--current` not in the pipeline; `pipeline_complete: true` = the pipeline finished and
   the marker was cleared.
-{% if judgment_stage %}  `judgment_gate` = this stage's judgment gate is unresolved and the
-  level does not clear it — the marker was **preserved**, so resolve the gate and re-run.
+{% if judgment_stage %}  `judgment_gate` = the gate was `pending` at a level that does not
+  clear it, or `blocked` (which no level clears). The marker was **preserved** and the stop
+  was recorded; resolve the gate and re-run.
 {% endif %}  **`bad_slug` is yours to undo**: the `--slug` you passed is invalid; nothing was
   authorized. Do NOT print the banner — re-run with a corrected slug, or no flag.
 - `proceed: true` → **auto-advance**: invoke `Skill(hm:<next_stage from the JSON>)` with

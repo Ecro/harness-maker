@@ -198,7 +198,11 @@ def test_only_the_configured_stage_gets_a_dispatch(tmp_path: Path) -> None:
 # side plus the picker's new branch. Bumped rather than compressed because the branches
 # are what make `auto_full` and `ask` real; the aggregate cost is attributed in
 # work-docs/BASELINE-DELTA-workflow-time-token-savings.md.
-@pytest.mark.parametrize(("preset", "expected"), [("Side", 674), ("Production", 707)])
+# 674 → 675 / 707 → 708 (+1, review round 2): the judgment branch gained the third gate
+# value `blocked`, and the boundary command lost its bracketed placeholder in favour of an
+# append instruction. wrapup owns no judgment gate, so it inlines only the `{% else %}`
+# side; the +1 is the shared restructure.
+@pytest.mark.parametrize(("preset", "expected"), [("Side", 675), ("Production", 708)])
 def test_the_default_render_costs_existing_users_nothing(
     tmp_path: Path, preset: str, expected: int
 ) -> None:

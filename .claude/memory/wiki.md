@@ -870,3 +870,20 @@ PLAN-workflow-time-token-savings B3 (ADR-009/010). `stage_end_summary.md.j2` Ste
 - **The Step 1/Step 2 discriminator is DERIVED from `summary_stage`** inside the shared partial. A caller-set Jinja variable would break the five stage templates outside the phase's scope under StrictUndefined.
 
 **The blast radius showed up as promised**: three pre-existing tests (two unit, one e2e) went red because they call `boundary` without the flag on a clean chain. That is the fail-closed default working, not a regression — they now pass `--judgment-gate clear` with the reason recorded.
+## [wiki:architecture] the-judgment-gate-has-three-values-and-absence-is-a-fourth-case | 2026-08-09
+`autopilot_caps boundary --judgment-gate` takes `clear | pending | blocked`, and **an absent flag is a distinct fourth case** — not a synonym for any of them. Getting this wrong produced two separate P0s in one review, so the semantics are worth stating exactly:
+
+| value | meaning | who clears it |
+|---|---|---|
+| `clear` | nothing pending | every level |
+| `pending` | the caller ASSERTS an open judgment — a question with a defensible answer | `auto_full` only |
+| `blocked` | the caller ASSERTS a failed quality threshold (a grade, a check) | **no level**, `auto_full` included |
+| *(absent)* | the caller classified nothing | **no level** — halts and reports a stale render |
+
+**`blocked` is honoured on EVERY stage**, not just `{plan, review}`: it is an assertion that something failed, and scoping it to the judgment stages made it a silent no-op on the other six.
+
+**Why absence must not map to `pending`.** The first fix for the CHANGES_REQUESTED P0 set `default="pending"` and called that fail-closed. But `pending` is precisely the value `auto_full` is licensed to clear, so an omitted flag — a forgotten append, or a harness rendered before the flag existed — reopened the hole at the one level where it matters, and the stale-render diagnostic added in the same change sat in a branch `auto_full` could never reach. **Fail-closed is a distinction, not a default value.** Both round-2 reviewers found this independently.
+
+**A `gated` marker never advances** (`kill_switch`, marker preserved — arming gated is how a session records "asked, declined"). `boundary` used to read `marker.level` only to decide *how* to advance; it now decides *whether* first.
+
+**`gate_auto_answered` is written when the judgment is ANSWERED**, with `advanced` as a field — not only on the advancing path. Two reviewers proposed opposite placements; the row's question is "was a human judgment cleared?", and suppressing it on a run that then stopped at the land gate made that run byte-identical to a `clear`-gate `auto_safe` run, which is the indistinguishability the row exists to remove.

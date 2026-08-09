@@ -165,7 +165,62 @@ Neither branch may close with the debt unrecorded.
 
 ## 3. Closing row (Phase B5)
 
-**Net: `claude` +1,057 (366,439 → 367,496); `codex` −357 (299,602 → 299,245).**
+### Review round 2 — the P0 fixes cost surface, and that is the right trade
+
+| key | before | after | Δ | why |
+|---|---|---|---|---|
+| `aggregate_chars.claude` | 367496 | 368766 | **+1270** | the third gate value `blocked` (ADR-010's hard half moved from prose into an enforceable flag), the append-instruction that replaced a bracketed placeholder inside a shell command, and the stale-render diagnostic in the halt reason |
+| `aggregate_chars.codex` | 299245 | 299245 | 0 | the codex skills inline the same partial and net out |
+| `configure` (claude) | — | — | grew | `/hm:configure` offered `gated / auto_safe / full` and asserted that the plan interview "always stops regardless" — the level list was stale and the safety claim is false at `auto_full`. Both reviewers and the codex voter flagged it independently. |
+
+Two P0s came out of `/hm:review`, both reproduced by direct execution before any fix:
+`auto_full` advanced past a CHANGES_REQUESTED review (the separation between a quality
+threshold and a judgment existed only in a template sentence), and a `gated` marker
+auto-advanced (`boundary` never read the level; B4's picker made that reachable). **Both are
+now enforced in Python.** The prose that replaced them is longer than the prose that failed,
+and that is the correct direction: Interview #5 of ADR-009 rejected prose-only enforcement
+precisely because a grep-asserted control passes while the behaviour is absent.
+
+### Review round 3 — the fix's own fix
+
+| key | before | after | Δ | why |
+|---|---|---|---|---|
+| `aggregate_chars.claude` | 368766 | 369899 | **+1133** | absence made distinct from `pending` (a sentinel default plus its own diagnostic), `blocked` honoured on every stage, plan's gate string given the threshold half it lacked, and the "unsure →" tiebreak moved from the clearable value to the safe one |
+
+Round 2's own fix had a P0 in it, and **both round-2 reviewers found it independently**: the
+flag still defaulted to `pending`, so an OMITTED verdict at `auto_full` was auto-answered —
+reopening the round-1 hole at the one level where it matters, with the stale-render diagnostic
+sitting in a branch `auto_full` could never reach. `pending` is now a claim the caller makes;
+absence is the caller saying nothing, and it halts everywhere.
+
+The round's own re-review then found four more, one of them the contradicting sentence in the
+block that builds the command ("omitting it reads as `pending`" — the opposite of what the code
+now does, placed where the model reads it last). Those are included in the figure above.
+
+### Review round 4 — the round the user asked for, and it was not empty
+
+| key | before | after | Δ |
+|---|---|---|---|
+| `aggregate_chars.claude` | 369899 | 371066 | **+1167** |
+| `aggregate_chars.codex` | 299245 | 300082 | **+837** |
+
+The config cap (`max_review_rounds: 3`) was spent after round 3, and round 3's fix was
+therefore the only one never re-reviewed — in a layer that had broken on **every** previous
+fix. The user asked for one more round rather than landing on that. It found seven more,
+including two the code could not have caught:
+
+- `review.md.j2`'s `CHANGES_REQUESTED` bullet still said "proceed to wrapup". Nothing in code
+  can tell a failed grade from a passing one — the boundary acts only on the value the model
+  types — so that sentence was a live route back to the round-1 P0.
+- `plan.md.j2`'s new `blocked` predicate keyed on the immutable fact "the second pass returned
+  MAJOR_REVISION", which stays true after the user explicitly accepts the risk. The halt would
+  have been permanent and its own prescribed remedy impossible.
+- `ruff format --check` would have failed CI on a line added in round 3. `ruff check` passes on
+  it; only the formatter gate catches it, and it had not been run.
+
+**Net: `claude` +4627 (366439 → 371066); `codex` +480 (299602 → 300082).** The `codex` variant
+crosses from negative to positive here — the PLAN is now net-positive on **both** surfaces, and
+the closing figure should not be read as if one of them still paid for the other.
 
 `tests/structural/test_plan_net_surface.py` carries the ADR-008.4 waiver as an `xfail`, so the
 overrun stays red in every CI run rather than being absorbed into a re-frozen number. It is

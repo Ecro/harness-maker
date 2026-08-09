@@ -34,7 +34,16 @@ LEDGER_FILENAME = "auto-advance.jsonl"
 # runs it" survived undetected. `advance_authorized` is the permission; `advance_entered`
 # is the proof the stage actually started.
 LedgerEvent = Literal[
-    "advanced", "advance_authorized", "advance_entered", "gate_blocked", "halted_cap"
+    "advanced",
+    "advance_authorized",
+    "advance_entered",
+    "gate_blocked",
+    # The auto_full counterpart of `gate_blocked`: a human judgment point the level cleared
+    # instead of stopping at. Without it an auto_full pass over the plan interview is
+    # byte-identical on the ledger to an ordinary auto_safe advance, so no audit can count
+    # how many human decisions the widest level skipped.
+    "gate_auto_answered",
+    "halted_cap",
 ]
 # DERIVED from LedgerEvent (not a hand-maintained copy) so the typed signature and the
 # runtime guard cannot drift apart (REVIEW P2). The two module-level asserts make
