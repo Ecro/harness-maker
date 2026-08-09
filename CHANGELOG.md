@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.51.0] — 2026-08-09
+
 ### The autonomy level is now chosen per session, and harness-maker stopped shipping its own telemetry to everyone
 
 Two axes, one release. `autonomy.level` gains `auto_full` and `ask`, and **`ask` is the default
