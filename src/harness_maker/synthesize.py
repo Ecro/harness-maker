@@ -821,6 +821,10 @@ def synthesize(
         # config.second_opinion.{models,agents,codex,antigravity} is available in every
         # agent template's render context (ADR-002/011 Jinja-loop pattern).
         second_opinion=answers.second_opinion,
+        # Root-level toolchains (ADR-002) — without this the rendered harness.yaml never
+        # carries the key, so the reverse mapper reads it back as unconfigured and every
+        # re-render silently discards it.
+        toolchains=list(answers.toolchains),
         # PLAN-cfr-churn-metrics ADR-003 — propagate the per-project tuning so
         # /hm:metrics + health templates can read window/tag/path knobs.
         delivery_metrics=answers.delivery_metrics,

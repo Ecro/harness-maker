@@ -5,9 +5,10 @@ from __future__ import annotations
 import re
 from enum import Enum
 from pathlib import Path
-from typing import Any, Literal, get_args
+from typing import Annotated, Any, Literal, get_args
 
 from pydantic import (
+    AfterValidator,
     AliasChoices,
     BaseModel,
     ConfigDict,
@@ -971,6 +972,86 @@ class AutonomyConfig(BaseModel):
         return v
 
 
+class ToolchainCommands(BaseModel):
+    """The per-role check commands of one toolchain.
+
+    Roles exist so a later consumer can take a subset — ``targeted-test-selection`` needs
+    ``test`` alone where the oracle wants all three. A flat list cannot express that.
+    """
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    test: str | None = None
+    lint: str | None = None
+    types: str | None = None
+
+    def declared(self) -> list[tuple[str, str]]:
+        """(role, template) pairs in a fixed role order — the order blocks are emitted in."""
+        return [
+            (role, value)
+            for role, value in (("test", self.test), ("lint", self.lint), ("types", self.types))
+            if value
+        ]
+
+
+class ToolchainConfig(BaseModel):
+    """One toolchain: which files it understands, and how to check them.
+
+    Grouped rather than two flat sibling lists because flat lists cross-apply in a
+    polyglot repo — a diff touching ``foo.py`` and ``bar.tsx`` would run ``pytest`` on the
+    ``.tsx`` file, which is the defect this whole feature repairs.
+    """
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    name: str
+    extensions: list[str] = Field(default_factory=list)
+    commands: ToolchainCommands = Field(default_factory=ToolchainCommands)
+
+    @property
+    def is_inert(self) -> bool:
+        """An entry that matches nothing, or matches but can run nothing.
+
+        Inert entries claim no path. The alternative — treating a commandless entry as
+        "covered" — emits a labelled block carrying a finding id and no evidence, which is
+        exactly the false-``accepted`` shape the extension gate exists to remove.
+        """
+        return not self.extensions or not self.commands.declared()
+
+    @field_validator("extensions")
+    @classmethod
+    def _normalise_extensions(cls, v: list[str]) -> list[str]:
+        """Lowercase and dot-prefix, so `.TSX` and `tsx` both match `Path.suffix`."""
+        out: list[str] = []
+        for raw in v:
+            ext = raw.strip().lower()
+            if not ext:
+                continue
+            if not ext.startswith("."):
+                ext = f".{ext}"
+            if ext not in out:
+                out.append(ext)
+        return out
+
+
+def _reject_overlapping_extensions(v: list[ToolchainConfig]) -> list[ToolchainConfig]:
+    """Disjointness is a property of the LIST — a per-entry model cannot see its siblings.
+
+    Overlap makes "which group owns this path" ambiguous, and any tie-break we picked would
+    silently run one toolchain's commands on another's files.
+    """
+    seen: dict[str, str] = {}
+    for entry in v:
+        for ext in entry.extensions:
+            if ext in seen:
+                raise ValueError(
+                    f"toolchains extensions overlap: {ext!r} is claimed by both "
+                    f"{seen[ext]!r} and {entry.name!r}"
+                )
+            seen[ext] = entry.name
+    return v
+
+
 class HarnessConfig(BaseModel):
     """harness.yaml schema — single source of truth for a project's harness."""
 
@@ -1100,6 +1181,13 @@ class HarnessConfig(BaseModel):
     # Multi-vendor second opinions (PLAN-second-opinion-multi-model — supersedes the
     # single-vendor codex_second_opinion block). default_factory keeps legacy harness.yaml
     # loading; empty `models` keeps Jinja conditionals in templates as dead branches.
+    # Project toolchains — root-level, NOT under second_opinion. The toolchain identity is
+    # a project fact eight other rendered surfaces also hardcode (verify/wrapup/loop/…);
+    # nesting it under one consumer would make this its third encoding and force a key
+    # migration when those follow. Empty list = off (ADR-002/006 of the polyglot-oracle PLAN).
+    toolchains: Annotated[list[ToolchainConfig], AfterValidator(_reject_overlapping_extensions)] = (
+        Field(default_factory=list)
+    )
     second_opinion: SecondOpinionConfig = Field(
         default_factory=SecondOpinionConfig,
     )
@@ -1302,6 +1390,13 @@ class InterviewAnswers(BaseModel):
     # Mirror of HarnessConfig.second_opinion (PLAN-second-opinion-multi-model —
     # supersedes codex_second_opinion). InterviewAnswers extra='forbid' would reject
     # the key without this declaration on round-trip.
+    # Project toolchains — root-level, NOT under second_opinion. The toolchain identity is
+    # a project fact eight other rendered surfaces also hardcode (verify/wrapup/loop/…);
+    # nesting it under one consumer would make this its third encoding and force a key
+    # migration when those follow. Empty list = off (ADR-002/006 of the polyglot-oracle PLAN).
+    toolchains: Annotated[list[ToolchainConfig], AfterValidator(_reject_overlapping_extensions)] = (
+        Field(default_factory=list)
+    )
     second_opinion: SecondOpinionConfig = Field(
         default_factory=SecondOpinionConfig,
     )

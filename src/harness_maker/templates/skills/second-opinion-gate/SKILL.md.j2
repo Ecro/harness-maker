@@ -82,13 +82,28 @@ shell metacharacter needed (`pytest --basetemp=<dir>` removes that directory). P
 filter in prose would have left the taint path in code and only the defence in prose.
 
 What the gatherer enforces, so you do not have to:
+<!-- @hm:oracle-command-surface -->
 
+0. **Toolchain gating** — the commands come from the project's root-level `toolchains` block
+   in `harness.yaml`, read from the **base** repo (a worktree may gitignore `.claude/`). A path
+   whose file type no entry claims gets **zero** commands run and is listed in the no-oracle
+   tail with its extension. Running a tool that cannot parse the subject does not produce a
+   degraded oracle, it produces a fabricated one — output that reads to the mode-B rubric as
+   either a false `accepted` or, once truncated, a silent `unresolved`. With no `toolchains`
+   key at all, `.py`/`.pyi` keep the historical Python checks and every other extension gets
+   nothing; a **malformed** block is fail-closed (no oracle) rather than falling back.
 1. **Path filtering** — rejects option-shaped (`-…`), absolute, `..`-traversing and
-   metacharacter-bearing paths, and anything outside `git diff --name-only HEAD`.
+   metacharacter-bearing paths, and anything outside `git diff --name-only HEAD`. Command
+   templates are tokenised **before** `{path}` is substituted, so a path containing a space
+   stays one argv element.
 2. **Budget** ≤ 4000 characters total, ≤ 1500 per command.
 3. **Visible truncation** — `[… truncated N chars …]`, so a fragment announces itself.
-4. **Association** — every block is labelled with the finding `id` it was gathered for; findings
-   that got none are listed explicitly as `unresolved` territory, not refutation.
+4. **Association** — every per-path block is labelled with the finding `id` it was gathered for
+   and the toolchain that produced it; findings that got none are listed explicitly as
+   `unresolved` territory, not refutation, **grouped by cause** (unusable path vs uncovered
+   file type — those have opposite remedies). Output from a repo-scoped command is emitted as
+   an **unlabelled** project-wide block on purpose: a repo-wide failure can come from anywhere
+   in the tree, so labelling it with every covered id would manufacture corroboration.
 5. **Redaction** — value-shaped (not keyword-shaped): API/GitHub/AWS keys, `Bearer` values,
    credentialed URLs, bare JWTs, and whole PEM blocks via a stateful mode. ANSI stripped.
    (`hm two_pass_review redact` is **not** this control — it rewrites PR metadata fields in a

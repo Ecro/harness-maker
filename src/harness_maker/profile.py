@@ -10,7 +10,12 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
-from harness_maker.models import Confidence, ProjectProfile
+from harness_maker.models import (
+    Confidence,
+    ProjectProfile,
+    ToolchainCommands,
+    ToolchainConfig,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -179,6 +184,144 @@ def _glob_match_root(project_dir: Path, pattern: str) -> bool:
         return next(project_dir.glob(pattern), None) is not None
     except OSError:
         return False
+
+
+def detect_toolchains(project_dir: Path) -> list[ToolchainConfig]:
+    """Toolchain groups for `harness.yaml.toolchains`, seeded at make time (ADR-007).
+
+    Detection supplies **stack identity and package-manager choice only**; the command
+    templates come from the static table below. Reusing `_detect_mechanical_checks`' strings
+    was the obvious design and it is wrong: every command it emits is repo-wide with no path
+    argument (`uv run ruff check .`, `cargo test`, `{runner} run {key}`). Under the oracle's
+    `{path}` contract a template without the placeholder runs once per gather and its output
+    is emitted UNLABELLED — so a harness seeded that way yields zero per-finding evidence, for
+    Python as much as for Node, while the coverage warning stays silent because the command
+    set is non-empty and the paths are covered.
+
+    Node uses `npx --no-install <bin>`, never `<runner> <bin>`. `_detect_mechanical_checks`
+    falls back to `npm` when neither a pnpm nor a yarn lockfile is present — the most common
+    Node repo — and `npm vitest run x` is not a valid command (npm exposes no such subcommand;
+    binaries need `npx` / `npm exec --`). It would exit non-zero without ever parsing the
+    subject and, because it carries `{path}`, be emitted id-labelled: fabricated evidence, the
+    exact shape the extension gate exists to remove. `--no-install` additionally stops a
+    missing package from being fetched from the network mid-review.
+
+    Each Node role is gated on its tool appearing in `devDependencies`. Seeding already parses
+    `package.json`, so this is nearly free and converts a guess into a fact: a repo on `jest`
+    or `biome` gets **no entry for that role** rather than a wrong command. An absent role
+    routes to `no_oracle` with a visible reason — honest degradation; a wrong command is not.
+    """
+    groups: list[ToolchainConfig] = []
+
+    # Python roles are gated on EVIDENCE, exactly as the Node roles are. Seeding on
+    # `pyproject.toml` presence alone is the false positive `_detect_mechanical_checks`'
+    # own docstring already records as measured harm: "psf/requests reality-check showed
+    # `uv run ruff check .` emitted on a repo that uses neither uv nor configures ruff".
+    # On a poetry/pip/hatch repo an ungated `uv run …` yields FileNotFoundError or a sync
+    # error at non-zero exit — which the verifier rubric correctly reads as an ABSENT
+    # oracle, so every finding degrades to `unresolved` while the coverage warning stays
+    # silent, because labelled blocks ARE being produced. They just contain no evidence.
+    pyproject = project_dir / "pyproject.toml"
+    if pyproject.exists():
+        try:
+            py_content = pyproject.read_text(encoding="utf-8")
+        except OSError:
+            py_content = ""
+        # `uv run` only makes sense when the project is actually uv-managed.
+        uses_uv = (project_dir / "uv.lock").exists() or "[tool.uv]" in py_content
+        prefix = "uv run " if uses_uv else ""
+        py_commands = ToolchainCommands(
+            test=f"{prefix}pytest -q {{path}}"
+            if ("[tool.pytest.ini_options]" in py_content or "[tool.pytest." in py_content)
+            else None,
+            lint=f"{prefix}ruff check {{path}}"
+            if ("[tool.ruff]" in py_content or "[tool.ruff." in py_content)
+            else None,
+            types=f"{prefix}mypy {{path}}" if "[tool.mypy]" in py_content else None,
+        )
+        if py_commands.declared():
+            groups.append(
+                ToolchainConfig(name="python", extensions=[".py", ".pyi"], commands=py_commands)
+            )
+
+    pkgjson = project_dir / "package.json"
+    if pkgjson.exists():
+        try:
+            data = json.loads(pkgjson.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            data = {}
+        # devDependencies ONLY, matching the documented policy. Unioning production
+        # `dependencies` made a runtime package named `typescript` / `eslint` / `vitest`
+        # read as an explicitly configured development check and seed a command for it.
+        dev = data.get("devDependencies", {}) if isinstance(data, dict) else {}
+        present = set(dev) if isinstance(dev, dict) else set()
+        commands = ToolchainCommands(
+            test="npx --no-install vitest run {path}" if "vitest" in present else None,
+            lint="npx --no-install eslint {path}" if "eslint" in present else None,
+            types="npx --no-install tsc --noEmit" if "typescript" in present else None,
+        )
+        if commands.declared():
+            groups.append(
+                ToolchainConfig(
+                    name="node",
+                    extensions=[".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"],
+                    commands=commands,
+                )
+            )
+
+    if (project_dir / "Cargo.toml").exists():
+        # cargo takes a name filter, not a path, so these are legitimately repo-wide. A Rust
+        # project therefore gets unlabelled project-wide context and no per-finding evidence —
+        # a stated limitation, not a defect. The alternative is a fabricated `cargo test
+        # <path>`, which is the bug under repair. The AC-011 warning fires on this shape
+        # precisely because its trigger is an output property, not a config property.
+        groups.append(
+            ToolchainConfig(
+                name="rust",
+                extensions=[".rs"],
+                commands=ToolchainCommands(test="cargo test", lint="cargo clippy"),
+            )
+        )
+
+    return groups
+
+
+def toolchains_key_present(project_dir: Path) -> bool:
+    """Whether `harness.yaml` carries a `toolchains` key at all, however malformed.
+
+    `answers_from_harness_yaml` cannot answer this: it drops an unusable value and returns the
+    field's default, so "the user wrote something we could not parse" and "the user wrote
+    nothing" arrive identically. That collapse is what let seeding overwrite a hand-edited
+    block — the user-state destruction CLAUDE.md checkpoint 1 exists to prevent, and it also
+    defeated the oracle's fail-closed-on-unusable contract across a single re-render.
+    """
+    path = project_dir / ".claude" / "harness.yaml"
+    if not path.exists():
+        return False
+    try:
+        from harness_maker.io_utils import load_harness_yaml
+
+        return "toolchains" in load_harness_yaml(path)
+    except Exception:  # noqa: BLE001 — an unreadable file is not evidence of absence
+        return True
+
+
+def seed_toolchains(existing: list[ToolchainConfig], project_dir: Path) -> list[ToolchainConfig]:
+    """Fill-if-empty (ADR-007). A user-authored value is never touched — valid OR not.
+
+    Matches CLAUDE.md checkpoint 1 (default = preserve user state) and how
+    `reviewers.mechanical_checks` already survives re-render. Detection yielding nothing leaves
+    the key absent rather than writing an empty list, so the absent-case default (ADR-006)
+    stays distinguishable from a deliberate empty one.
+
+    An empty `existing` is NOT sufficient evidence of absence, which is why the key-presence
+    probe is here: a malformed block parses to `[]` on the way in, so seeding over it would
+    replace the user's text with detected defaults and silently resume running checks they
+    never configured.
+    """
+    if existing or toolchains_key_present(project_dir):
+        return list(existing)
+    return detect_toolchains(project_dir)
 
 
 def _detect_mechanical_checks(project_dir: Path) -> list[str]:

@@ -2,6 +2,49 @@
 
 ## [Unreleased]
 
+### The review oracle stopped fabricating evidence about files it cannot read
+
+`second_opinion_oracle` used to hardcode `uv run pytest` / `ruff check` / `mypy --strict` and
+issue all three against every path a cross-model finding named — in every project, whatever the
+file was. On a stack those tools do not understand that is not a weaker oracle, it is a false
+one. Measured on four lines of `.tsx`: `ruff` emits 3809 bytes of Python syntax errors at
+`exit=1`, indistinguishable from a real lint failure; `pytest` exits 4; `mypy` exits 2. Three
+non-zero results that never parsed the subject, injected into `code-verifier` mode B as the
+evidence it dispositions findings against — landing either as a false `accepted`, or, once the
+1500-char per-command budget truncates the noise, as a silent `unresolved`.
+
+**What runs is now declared, not assumed.** A new root-level `toolchains` key in `harness.yaml`
+groups commands per toolchain under `test` / `lint` / `types` role keys, each with the file
+extensions it can parse. A path no toolchain covers spawns **zero** subprocesses and its finding
+goes to the no-oracle tail with a visible reason. Refusing to run is the feature: an absent
+oracle that says so is worth more than a present one that is wrong.
+
+**The key is at the root, not under `second_opinion`.** Eight other rendered surfaces already
+hardcode the same Python triple. Nesting the declaration under the one consumer that needs it
+today would make this the third encoding of a single project fact and force a key migration the
+moment `verify` or `wrapup` follow.
+
+**`{path}` decides the shape of the evidence.** A command containing the placeholder runs per
+path and its output is emitted labelled against the finding id; a command without it runs once
+per gather and is emitted repo-wide, carrying no id. That distinction is why the seeded defaults
+could not reuse `reviewers.mechanical_checks`' strings — every one of them is repo-wide, so a
+harness seeded that way would produce zero per-finding evidence while the coverage warning stayed
+silent.
+
+**Seeding is fill-if-empty and never touches a user-authored value** — valid or not. Detection
+supplies stack identity and package-manager choice only; roles are gated on evidence
+(`devDependencies` for Node, a uv lockfile or `[tool.uv]` before any `uv run` prefix), so a repo
+on `jest` or on poetry gets **no entry** for that role rather than a wrong command. An absent key
+and a malformed one are now distinguished at the seeding boundary — previously the reverse mapper
+collapsed both to "empty" and seeding overwrote hand-authored config.
+
+**Security:** `argv[0]` is now config-derived, which turns a permitted `harness.yaml` write into
+program execution behind an already-approved Bash prefix. A fail-closed runner allowlist gates
+which programs may occupy that position; `shell` is never true, and the subject path is
+substituted as its own argv element so no file name can become a separate token.
+
+A `.py` path in a project with no `toolchains` key is byte-identical to the previous behaviour.
+
 ## [0.51.0] — 2026-08-09
 
 ### The autonomy level is now chosen per session, and harness-maker stopped shipping its own telemetry to everyone

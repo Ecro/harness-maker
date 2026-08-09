@@ -44,6 +44,10 @@ _DISCLOSED_AXES: frozenset[str] = frozenset(
         "second_brain",
         "wrapup_docs",
         "permissions",
+        # Seeded from manifest detection at make time, never asked. It decides which file
+        # types the review oracle will run checks on at all, so a user who never learns it
+        # exists cannot tell an honestly-empty oracle from a broken one.
+        "toolchains",
     }
 )
 

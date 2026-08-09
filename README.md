@@ -653,6 +653,21 @@ autonomy:                    # autopilot / pipeline auto-advance — see the Aut
 permissions:
   deny_dangerous: false      # true → restore the destructive-pattern deny baseline (rm, curl|sh, /etc, ~/.ssh)
 
+toolchains:                  # what the review oracle may run, and on which files (seeded at make
+                             # time from detection; fill-if-empty — a hand-authored value is never
+                             # overwritten, valid or not). Omit the key entirely to fall back to
+                             # the built-in extension table.
+  - name: python
+    extensions: ['.py', '.pyi']
+    commands:
+      test: "uv run pytest -q {path}"
+      lint: "uv run ruff check {path}"
+      types: "uv run mypy --strict {path}"
+  # A command containing {path} runs per path and its output is labelled against the finding id;
+  # one without it runs once per gather and is emitted repo-wide with no id. A path no toolchain
+  # covers spawns NO subprocess — its finding degrades to `no_oracle` with a visible reason,
+  # instead of collecting exit codes from tools that never parsed the file.
+
 second_opinion:
   models: []                 # e.g. [codex], [antigravity], or [codex, antigravity] — cross-model second-opinion voters
   # codex:       { hermetic: true, output_schema_path: .claude/schemas/second-opinion-finding.schema.json }

@@ -1,0 +1,443 @@
+schema_version: 2
+spec_slug: second-opinion-oracle-polyglot
+parent_spec: null
+verification_tier: 2
+mutation_threshold: 70
+mutation_threshold_rationale: T2 review-gate support code. The module's risk is fabricated
+  evidence reaching an adjudication gate, not arithmetic correctness; 70 keeps the
+  mutation run honest without demanding coverage of the redaction/truncation helpers
+  this SPEC does not touch.
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/second_opinion_oracle.py
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: Toolchain that cannot parse a file runs nothing
+  type: property
+  test_ids:
+  - tests/unit/test_oracle_toolchain_gate.py::test_uncovered_extension_spawns_no_subprocess
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: 'Metamorphic: for any extension outside the resolved toolchain''s
+    registered set, the observed subprocess count is 0. The relation is stated over
+    the tool-invocation boundary (a patched subprocess.run), not over any value the
+    implementation computes, so an implementation cannot satisfy it by construction
+    without actually skipping.'
+  oracle_independence_waiver: null
+  input_domain: in-diff paths whose extension is absent from the resolved toolchain's
+    registered extension set (.tsx, .rs, .go, .md, extensionless)
+  transformation: call gather() with a finding naming that path
+  expected_relation: subprocess_run_call_count == 0 AND finding_id in no_oracle_tail
+    AND finding_id not in any emitted block label
+  preconditions:
+  - the path passes safe_paths (in-diff, no metacharacters, relative)
+  observable_output: emitted oracle text plus the recorded subprocess invocation list
+  generator_hint: parametrise over an extension list including an extensionless path
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: Existing Python harnesses are unchanged
+  type: mechanical
+  test_ids:
+  - tests/unit/test_oracle_toolchain_gate.py::test_python_path_output_unchanged_from_baseline
+  executable_predicate: gather(findings, root) == baseline_gather_output
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: Reference implementation is the pre-change gather() at the parent
+    commit, exercised through the same patched subprocess boundary. The expected bytes
+    are produced by code that predates this work and had no knowledge of the extension
+    gate, so agreement cannot be manufactured by the new implementation.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: Commands come from the top-level `toolchains` declaration
+  type: mechanical
+  test_ids:
+  - tests/unit/test_oracle_toolchain_gate.py::test_declared_commands_are_the_only_commands_run
+  executable_predicate: executed_commands == declared_commands
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The golden is the declared list itself, authored in the test fixture's
+    harness.yaml before gather() runs. Its provenance is the test input, not the implementation's
+    output, so the assertion is an equality against a value the implementation never
+    chose.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: '{path} presence decides per-path versus repo-wide'
+  type: parametric
+  test_ids:
+  - tests/unit/test_oracle_toolchain_gate.py::test_path_placeholder_decides_per_path_vs_repo_wide
+  executable_predicate: null
+  golden_table:
+  - input:
+      commands:
+      - a {path}
+      - b
+      paths:
+      - x.py
+      - y.py
+    expected:
+    - a x.py
+    - a y.py
+    - b
+    edge: false
+    note: ''
+  - input:
+      commands:
+      - b
+      paths:
+      - x.py
+      - y.py
+    expected:
+    - b
+    edge: false
+    note: ''
+  - input:
+      commands:
+      - a {path}
+      paths:
+      - x.py
+    expected:
+    - a x.py
+    edge: false
+    note: ''
+  - input:
+      commands: []
+      paths:
+      - x.py
+    expected: []
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The expected_invocations column is derived from the placeholder
+    contract stated in the SPEC constraints table, written before the implementation
+    exists. Each row is hand-enumerated from that contract rather than recorded from
+    a run, so a wrong implementation cannot regenerate it.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: Absent-key default is extension-conditional
+  type: parametric
+  test_ids:
+  - tests/unit/test_oracle_toolchain_gate.py::test_absent_key_defaults_by_extension
+  executable_predicate: null
+  golden_table:
+  - input:
+      path: src/mod.py
+    expected: python-triple
+    edge: false
+    note: ''
+  - input:
+      path: src/mod.pyi
+    expected: python-triple
+    edge: false
+    note: ''
+  - input:
+      path: src/App.tsx
+    expected: no-oracle
+    edge: false
+    note: ''
+  - input:
+      path: README.md
+    expected: no-oracle
+    edge: false
+    note: ''
+  - input:
+      path: Makefile
+    expected: no-oracle
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The table encodes the absent-case rule decided in the SPEC interview
+    (round 1) and recorded in Refinement Decisions. It is a specification artifact
+    predating the code; the two-way split (.py/.pyi keep today's behavior, everything
+    else is silent) is the decision itself, not an observation of it.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: Substitution never precedes sanitisation
+  type: property
+  test_ids:
+  - tests/unit/test_oracle_toolchain_gate.py::test_unsafe_file_value_never_reaches_argv
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: 'Invariant over the argv boundary: every element of every executed
+    command is either a literal from the declared command string or a member of safe_paths''
+    return value. Asserted against the recorded argv lists, so it holds regardless
+    of how the implementation orders substitution internally, and a substitute-then-filter
+    ordering violates it observably.'
+  oracle_independence_waiver: null
+  input_domain: 'adversarial file values: option-shaped (--basetemp=/x), absolute
+    (/etc/passwd), traversing (../../x), metacharacter-bearing (a;rm -rf b), in-repo-but-off-diff,
+    and a legal in-diff path CONTAINING A SPACE (_UNSAFE_CHARS does not reject it);
+    crossed with command templates bearing repeated and embedded placeholders (--file={path},
+    {path}.snap)'
+  transformation: call gather() with a {path}-bearing declared command
+  expected_relation: for every argv element e in every recorded invocation, e in literal_tokens(declared)
+    or e in safe_paths(candidates, changed_files); AND every recorded invocation's
+    cwd equals the --root worktree, never the base root; AND every {path} occurrence
+    in every token is substituted with no re-split, so a space-containing path stays
+    ONE argv element
+  preconditions:
+  - subprocess is invoked with a list, never a string, and shell is never True
+  - templates are shlex.split BEFORE substitution, never after
+  observable_output: the recorded argv lists and the recorded cwd of each invocation
+  generator_hint: reuse the adversarial values already fixtured for safe_paths tests
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: make-time seeding fills only an empty slot
+  type: mechanical
+  test_ids:
+  - tests/unit/test_toolchain_seeding.py::test_user_authored_value_is_preserved_verbatim
+  executable_predicate: seeded_value == user_value or user_value == []
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Fixtures pin three input states authored in the test (key absent,
+    key empty, key user-authored) and the expected post-render value for each. The
+    user-authored string is an arbitrary sentinel no detector could produce, so preservation
+    is distinguishable from coincidental regeneration.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-008
+  title: No surface asserts a hardcoded Python triple
+  type: property
+  test_ids:
+  - tests/structural/test_no_hardcoded_toolchain_claim.py::test_no_anchored_surface_asserts_a_fixed_command_set
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: Invariant over an enumerated population rather than a grep for
+    one phrase. The population is built by discovery (every template and module describing
+    the oracle command set) and the test asserts it is non-empty before asserting
+    the predicate, so a discovery bug fails loudly instead of passing vacuously. This
+    directly answers [fail:design] prose-refactor-removal-sweep-gaps, where a zero-hit
+    rg criterion returned green over three surviving sites.
+  oracle_independence_waiver: null
+  input_domain: the enumerated surface set — second_opinion_oracle.py, code-verifier_body.md.j2,
+    second-opinion-gate/SKILL.md.j2, targeted-test-selection/SKILL.md.j2
+  transformation: read each surface and scan for the hardcoded-triple assertion
+  expected_relation: len(surfaces) > 0 and all(not asserts_python_triple(s) for s
+    in surfaces)
+  preconditions:
+  - the scan is multiline, since one historical instance spanned a line break
+  observable_output: per-surface boolean plus the population size
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-009
+  title: A path receives only its own group's commands
+  type: property
+  test_ids:
+  - tests/unit/test_oracle_toolchain_gate.py::test_path_receives_only_its_own_toolchain_commands
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: 'Metamorphic over the argv boundary: for every recorded invocation,
+    the path argument''s extension is in the same toolchain entry that supplied the
+    command template. Stated as a cross-product invariant over a mixed-language path
+    set, so a flat-list implementation that runs every command on every covered path
+    violates it on the very first pair — which is exactly the defect two independent
+    second-opinion models found in the flat design.'
+  oracle_independence_waiver: null
+  input_domain: a toolchains list of >= 2 entries with disjoint extension sets, and
+    an in-diff path set containing at least one path per entry
+  transformation: call gather() over the mixed path set
+  expected_relation: for every recorded invocation (template, path), extension_of(path)
+    in entry_of(template).extensions
+  preconditions:
+  - the entries' extension sets are disjoint (overlap is rejected at load time)
+  observable_output: the recorded (template, path) invocation pairs
+  generator_hint: parametrise over python+node and python+rust pairings
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-010
+  title: Repo-wide commands are unlabelled context, not per-finding evidence
+  type: mechanical
+  test_ids:
+  - tests/unit/test_oracle_toolchain_gate.py::test_repo_wide_block_carries_no_finding_id
+  executable_predicate: repo_wide_block.labels == []
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The expected absence of labels comes from the consumer's existing
+    rule, quoted in code-verifier_body.md.j2 - "An unlabelled block is not evidence
+    for anything." The assertion is pinned to that pre-existing consumer contract,
+    authored before this work, rather than to whatever the new emitter happens to
+    produce.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-011
+  title: Total loss of coverage is visible to the user
+  type: mechanical
+  test_ids:
+  - tests/unit/test_oracle_toolchain_gate.py::test_zero_labelled_block_emits_exactly_one_stderr_warning
+  executable_predicate: stderr_warning_count == 1 and stdout == unaffected_stdout
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: 'Exactly-one and cause-differentiated is the golden, not at-least-one:
+    a per-path warning would flood a large diff and a zero-warning run is the silent
+    degradation this AC exists to remove. Both bounds are asserted against captured
+    stderr, and the stdout equality is compared to the no-warning run''s stdout so
+    the signal cannot leak into the injected payload. The trigger is asserted as an
+    OUTPUT property (no id-labelled block emitted) rather than a config property,
+    because an all-repo-wide but non-empty config satisfies every config-shaped predicate
+    while producing zero per-finding evidence - the seeded-Rust case.'
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-012
+  title: A malformed or inert toolchain declaration degrades, never raises
+  type: property
+  test_ids:
+  - tests/unit/test_oracle_toolchain_gate.py::test_malformed_toolchains_degrades_without_raising
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: 'Invariant over an adversarial config domain rather than one hand-picked
+    malformation: for every ill-formed toolchains value, gather() returns normally
+    and emits no id-labelled block. The relation is stated over the function boundary
+    and the emitted text, so it cannot be satisfied by catching the one exception
+    the implementer happened to think of - a new malformation shape that escapes still
+    fails the property.'
+  oracle_independence_waiver: null
+  input_domain: 'ill-formed toolchains values: non-list, non-mapping entry, overlapping
+    extension sets, entry with empty commands, entry with empty extensions, unknown
+    role key; PLUS the two config-READ failures that raise outside any ValidationError
+    handler - a harness.yaml that is unparseable YAML, and a base-root resolution
+    that raises'
+  transformation: call gather() with each value present at the base-root harness.yaml
+  expected_relation: gather() returns a str for every input, NO exception of ANY type
+    escapes resolve_toolchains(), and no emitted block carries a finding id
+  preconditions:
+  - main() guards only the findings-file parse today, so the guard must live in gather()
+  - the contract is "no exception of any type", not "validation errors are caught"
+  observable_output: the return value, the raised-exception set, and the emitted block
+    labels
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null

@@ -13,7 +13,7 @@ files:
   body_sha256: 543fd34c42ce62e8fc263b8e38d236a0963fca32912409db97f62d257381c6fb
 - path: agents/code-verifier.md
   template: agents/code-verifier.md.j2
-  body_sha256: ec6bd066a156ac4efbccba2c494ac5dbe37827672ce96a79546f932174e13769
+  body_sha256: e4068a0dd153fc341559dc9f26061d8e0ff78ce8924e779260ffab03ac95cb38
 - path: agents/concurrency-reviewer.md
   template: agents/concurrency-reviewer.md.j2
   body_sha256: 4cc2d2903a2c921bf2b8c4892ba38dd5a0ffaa40c8fb8943abdcf19417d4bd24
@@ -145,7 +145,7 @@ files:
   body_sha256: cc7d9e2c7dbc02ded11f10bf3acdc9132aba55794452d933a8397d90fe8c8380
 - path: skills/second-opinion-gate/SKILL.md
   template: skills/second-opinion-gate/SKILL.md.j2
-  body_sha256: 329327cea335c730fbd27c95379806b65fc7d5d34e5aa4fcf6dee2c2d9d15d03
+  body_sha256: ba45185913cf70ea0b3fbb803a880b7076c7b22d10def5fb252c52cae3959f5c
 - path: skills/security-scanner/SKILL.md
   template: skills/security-scanner/SKILL.md.j2
   body_sha256: ac99c8d300753b1ff960e8d68412843e9f997cdf9df9410f882ecd7daaed5478

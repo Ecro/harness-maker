@@ -160,7 +160,10 @@ def test_cli_emits_labelled_blocks_and_drops_unsafe_paths(
     from harness_maker import second_opinion_oracle as mod
 
     monkeypatch.setattr(mod, "_changed_files", lambda _root: {"src/a.py"})
-    monkeypatch.setattr(mod, "_run_checks", lambda paths, root: f"ran on {sorted(paths)}")
+    # `_run_checks` was the pre-polyglot seam and is gone; `_run_argv` is the real one.
+    # Patching a function nothing calls would leave this test green over any behaviour.
+    monkeypatch.setattr(mod, "_load_toolchains", lambda _root: [])
+    monkeypatch.setattr(mod, "_run_argv", lambda argv, root: f"ran {argv[2]}")
 
     payload = tmp_path / "f.json"
     payload.write_text(
@@ -194,11 +197,13 @@ def test_two_findings_on_one_path_produce_one_block(tmp_path: Path, monkeypatch,
     the mode-B rubric may only adjudicate a finding whose id labels the block."""
     from harness_maker import second_opinion_oracle as mod
 
-    calls: list[list[str]] = []
+    calls: list[str] = []
     monkeypatch.setattr(mod, "_changed_files", lambda _root: {"src/a.py"})
-    monkeypatch.setattr(
-        mod, "_run_checks", lambda paths, root: calls.append(list(paths)) or "checked"
-    )
+    monkeypatch.setattr(mod, "_load_toolchains", lambda _root: [])
+    # Seam moved from `_run_checks` (removed with the hardcoded triple) to `_run_argv`. The
+    # property this pins is unchanged: ONE block per path, naming BOTH ids. Counting argv
+    # calls would count 3 (one per role), so count the distinct paths they carry.
+    monkeypatch.setattr(mod, "_run_argv", lambda argv, root: calls.append(argv[-1]) or "checked")
 
     payload = tmp_path / "f.json"
     payload.write_text(
@@ -209,7 +214,8 @@ def test_two_findings_on_one_path_produce_one_block(tmp_path: Path, monkeypatch,
     )
     assert mod.main(["--findings-file", str(payload), "--root", str(tmp_path)]) == 0
     out = capsys.readouterr().out
-    assert len(calls) == 1, f"checks ran per-finding instead of per-path: {calls}"
+    assert set(calls) == {"src/a.py"}, f"checks ran on unexpected paths: {calls}"
+    assert len(calls) == 3, f"expected the 3 default roles on one path, got {calls}"
     assert out.count("### oracle for") == 1
     assert "one" in out
     assert "two" in out

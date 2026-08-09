@@ -239,6 +239,45 @@ forbidding anything.
 
 ---
 
+## Proposal: a gate may not discover its own population from the string it forbids (2026-08-10)
+
+**Triggered by:** [fail:test] gate-passes-because-its-subject-vanished (count: 3)
+
+**Proposed mechanism:** a structural test over `tests/structural/` plus an authoring rule.
+
+**Rationale:** the third instance (PLAN-second-opinion-oracle-polyglot) was not an accident
+of migration like the first two — it was self-defeating *by construction*. The parity gate
+asserted that no anchored surface still claims a fixed `pytest`/`ruff`/`mypy` command set, and
+it built the list of surfaces to check by grepping for that same hardcoded triple. The moment
+the fix landed the discovery predicate matched nothing, the per-surface loop iterated zero
+times, and the gate would have reported PASS forever over a surface set nobody was auditing.
+It can only be red in the world that existed before the fix. That is the same vacuous-population
+shape as the two earlier instances, and it is now the class — not the incident — that keeps
+recurring, so the entry's existing prescription ("add a non-vacuity assertion") is necessary but
+has demonstrably not been enough to make authors notice at writing time.
+
+Two candidate mechanisms, cheapest first:
+
+(a) **Non-vacuity as a structural obligation, machine-checked.** A test over `tests/structural/`
+that flags any test function which builds a collection by scanning files (`rglob` / `read_text` +
+`in` / `re.search`) and then loops over it, without an `assert <collection>` / `assert len(...)`
+before the loop. Byte-deterministic, no new runtime surface. Expected false-positive rate is the
+open question — measure it over the existing suite and publish the hit list before enforcing, per
+the precedent set by the `dead-string-pin` proposal above.
+
+(b) **The authoring rule the instance actually proves:** a gate's POPULATION and its PREDICATE must
+come from independent sources. The population is an enumeration (the rendered surface list, a
+fixture manifest, a glob over a directory that exists in a clean checkout); the predicate is what
+you assert about each member. When the same string supplies both, the gate's strength is inversely
+proportional to the fix's success. This is a one-line addition to the mutation-receipt obligation:
+a receipt for any scan-style gate must state the population SIZE it observed, which makes a
+zero-size population visible at authoring time without forbidding any construction.
+
+Recommend (b) first — it costs nothing and generalises — with (a) gated on the false-positive
+measurement.
+
+---
+
 ## Backlog note (2026-08-08) — count ≥ 3 entries with no proposal
 
 Recorded so the gap is visible rather than re-discovered. This round produced no first-hand
@@ -249,3 +288,4 @@ should write the proposal from that instance rather than from this line.
 |---|---|---|
 | `[fail:test] test-pins-retired-implementation-name` | 4 | no proposal |
 | `[fail:test] shipped-entry-point-not-exercised` | 4 | no proposal (the RESOLVED table's `test_cli_surfaces_are_driven.py` covers CLI surfaces only, not the general class) |
+| `[fail:test] snapshot-regen-inside-worktree` | 13 | no proposal — added 2026-08-10. Highest count in the file and it was missing from this table entirely, which is its own signal. No first-hand instance this round, so no mechanism is proposed here; the obvious candidate (refuse `regenerate.py` when cwd is under `.worktrees/`) should be written by whoever next trips it |

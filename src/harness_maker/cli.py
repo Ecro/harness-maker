@@ -386,6 +386,13 @@ def make(
         autonomy_persistent_override=autonomy_persistent_override,
         worktree_override=worktree_override,
     )
+    # Seed `toolchains` from manifest detection, fill-if-empty (ADR-007). Placed AFTER the
+    # override pass so a `--preset` rebuild cannot discard what we just seeded, and so a
+    # user-authored value round-tripped from harness.yaml wins — `seed_toolchains` returns the
+    # existing list untouched whenever it is non-empty.
+    from harness_maker.profile import seed_toolchains
+
+    a = a.model_copy(update={"toolchains": seed_toolchains(list(a.toolchains), target)})
     if add_domain_name is not None:
         try:
             validate_domain_name(add_domain_name)
@@ -1407,6 +1414,13 @@ def _apply_dimension_overrides(
                 consensus=answers.consensus,
                 caching=answers.caching,
                 autonomy=answers.autonomy,
+                # `toolchains=` is NOT optional here, for the same reason `autonomy=` is not:
+                # this rebuild takes a field allowlist, so any root field it does not name is
+                # reset to its default. `update` restores it only when a flag explicitly
+                # carried it — which no flag does — so without this line a `--preset` switch
+                # silently drops the user's (or the seeder's) toolchains and the oracle falls
+                # back to ADR-006's Python default with no diagnostic.
+                toolchains=list(answers.toolchains),
             )
             result = rebuilt.model_copy(update=update)
             if focus_override:

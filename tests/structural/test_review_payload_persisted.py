@@ -49,6 +49,22 @@ _STEP_LANDED = "2026-08-05"
 #: (slug, round) pairs that ran on or after the cutoff WITHOUT persisting. Each needs a
 #: reason. Adding an entry is the visible cost of skipping the step; removing one is free.
 _KNOWN_MISSING: dict[tuple[str, int], str] = {
+    ("second-opinion-oracle-polyglot", 1): (
+        "the orchestrator ran Pass 1, the cross-model voters and the consensus filter but "
+        "skipped Step 3.4 entirely — neither `codex_adapter stamp-ids` nor persist-payload. "
+        "The merged findings existed only in the orchestrator's context and were never written "
+        "to a temp file, so there is no capture. Reconstructing one from "
+        "REVIEW-second-opinion-oracle-polyglot-2026-08-10.md would be a post-hoc narrative "
+        "entry in a corpus whose entire value is that its entries are captures — the one thing "
+        "this gate's own message forbids. Recorded as missing. The findings themselves, their "
+        "consensus tags and the codex ids survive in that REVIEW document; what is lost is the "
+        "replayable per-round payload. This is the third consecutive slug to miss the same "
+        "line, which is evidence about the step's placement, not about three orchestrators."
+    ),
+    ("second-opinion-oracle-polyglot", 2): (
+        "same run as round 1 above — round 2 was the auto-fix iteration, whose findings list is "
+        "the round-1 list minus what the fixes resolved. No separate capture was taken."
+    ),
     ("workflow-time-token-savings", 3): (
         "Step 3.4's persist-payload was never run for any round of this review — the merged "
         "findings existed only in the orchestrator's context, so there is no capture to write. "

@@ -231,6 +231,7 @@ Use `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code):
 > | `wrapup_docs` | (none) | Adjust / `/hm:configure` |
 > | `instrumentation.stage_agent_ledger` | `false` on a fresh install (an existing harness that predates the key keeps it ON) — records one LOCAL row per plan-validator / test-reviewer dispatch and keeps each review round's finding payload, so harness-maker can tell whether its own gates earn their latency. Nothing is transmitted. Turning it off also removes this project from that cross-project measurement. | Full setup / hand-edit `.claude/harness.yaml` |
 > | `permissions.deny_dangerous` | `false` — the destructive-command deny baseline is NOT applied | hand-edit `.claude/harness.yaml` (`/hm:configure` has no permissions dimension) |
+> | `toolchains` | {seeded from your manifests: python / node / rust, or empty when none is recognised} — which file types each check command understands. The cross-model review oracle runs a toolchain's checks **only** on the file types it declares, and runs nothing at all on the rest, so a project it cannot recognise gets an honestly-empty oracle rather than another language's tools. Only filled when the key is absent or empty; anything you write is kept. | hand-edit `.claude/harness.yaml` |
 >
 > **Safety receipt preview:**
 > - Generated roots may include `.claude/`, `.cursor/`, `.codex/`,

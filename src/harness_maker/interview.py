@@ -60,6 +60,7 @@ from harness_maker.models import (
     SecondOpinionAntigravityConfig,
     SecondOpinionConfig,
     Target,
+    ToolchainConfig,
     interview_deep_gate_defaults,
 )
 
@@ -754,6 +755,7 @@ def _build_answers(
     autonomy: AutonomyConfig | None = None,
     instrumentation: InstrumentationConfig | None = None,
     worktree_enabled: bool | None = None,
+    toolchains: list[ToolchainConfig] | None = None,
     schema_version: int = 4,
 ) -> InterviewAnswers:
     is_side = preset == Preset.SIDE
@@ -769,6 +771,7 @@ def _build_answers(
         sibling_repos=list(sibling_repos) if sibling_repos else [],
         second_brain=second_brain if second_brain is not None else SecondBrainConfig(),
         second_opinion=(second_opinion if second_opinion is not None else SecondOpinionConfig()),
+        toolchains=list(toolchains) if toolchains else [],
         reviewers={
             "installed": list(_ALL_REVIEWERS),
             "enabled": list(_SIDE_ENABLED_REVIEWERS if is_side else _PROD_ENABLED_REVIEWERS),
@@ -1202,6 +1205,24 @@ def answers_from_harness_yaml(yaml_path: Path) -> InterviewAnswers | None:
             )
         if clean_mc:
             update["mechanical_checks"] = clean_mc
+
+    # toolchains — root-level (ADR-002). User-maintained OR make-time-seeded; either way it
+    # must survive re-render, same contract as mechanical_checks above. Absent key → empty
+    # list, which the oracle reads as "fall back to the historical Python triple for .py
+    # paths and emit no oracle for anything else" (ADR-006). A malformed value is dropped
+    # LOUDLY rather than silently: a silent drop reads identically to "not configured", and
+    # the whole point of this key is that the not-configured state is now visible.
+    raw_tc = data.get("toolchains")
+    if raw_tc is not None and not isinstance(raw_tc, list):
+        logger.warning(
+            "harness.yaml toolchains: expected a list, got %s — ignored.",
+            type(raw_tc).__name__,
+        )
+    elif isinstance(raw_tc, list) and raw_tc:
+        try:
+            update["toolchains"] = [ToolchainConfig.model_validate(e) for e in raw_tc]
+        except Exception as exc:  # noqa: BLE001 — any shape error degrades to "unconfigured"
+            logger.warning("harness.yaml toolchains: unusable (%s) — ignored.", exc)
 
     # MCP servers — user adds these manually to harness.yaml; preserve on re-render.
     # REVIEW M5/M8 (2026-05-08): validate inner dict shape (command:str, args:list[str],

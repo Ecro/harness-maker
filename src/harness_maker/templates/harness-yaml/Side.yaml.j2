@@ -52,6 +52,16 @@ sibling_repos:
 wrapup_docs:
 {% for d in config.wrapup_docs %}  - {{ d | tojson }}
 {% endfor %}
+{%- if config.toolchains %}
+toolchains:
+{% for t in config.toolchains %}  - name: {{ t.name | tojson }}
+    extensions:{% if not t.extensions %} []{% endif %}
+{% for e in t.extensions %}      - {{ e | tojson }}
+{% endfor %}    commands:{% if not (t.commands.test or t.commands.lint or t.commands.types) %} {}{% endif %}
+{% if t.commands.test %}      test: {{ t.commands.test | tojson }}
+{% endif %}{% if t.commands.lint %}      lint: {{ t.commands.lint | tojson }}
+{% endif %}{% if t.commands.types %}      types: {{ t.commands.types | tojson }}
+{% endif %}{% endfor %}{%- endif %}
 reviewers:
   consensus: {{ config.reviewers.consensus }}
   verbosity: {{ config.reviewers.verbosity }}
