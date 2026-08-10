@@ -328,20 +328,26 @@ stay comparable across the change, so the before/after cost question remains ans
 **Rejected alternatives:** one row per lens with a per-lens discriminator (richer, but changes the
 row grammar and the `--terminal` rule for one stage only).
 
-### ADR-008: Instrumentation-gated prompt text is not charged to the surface budget
+### ADR-008: The ratchet is a measuring instrument, not a design constraint
 **Status:** Accepted (2026-08-10, via interview #8 — supersedes ADR-004's "the block fits or it
-does not ship")
+does not ship"). **Rationale CORRECTED 2026-08-11 after the fact — see the correction block at the
+end of this ADR. The decision stands; the reason first recorded for it did not apply to this
+change.** The original title was "Instrumentation-gated prompt text is not charged to the surface
+budget", which described a principle this task never actually invoked.
 **Context:** Phase 1 measured `min(S1,S2,S3) = 0` — both aggregate arms sat *exactly* on their
 frozen values, so the lens block could not ship as a net addition without cutting ~2.1k characters
 of instruction from `execute.md.j2`, a file already compacted three times.
-**Decision:** Prompt text rendered behind the `instrumentation` axis (the `stage_agent_ledger`
-recipes and their guidance bullets) is **measuring apparatus, not shipped instruction**, and is
-not charged to the ratchet. The axis defaults **OFF** for a fresh install, so most users never
-render it — but the baseline is measured against *this repo's own* `harness.yaml`, where it is
-**ON**, so today it is fully charged. Re-baseline deliberately instead of trimming.
+**Decision:** Do not contort the block to fit the ratchet; re-baseline deliberately and accept the
+shipped-surface growth. The ratchet is a measuring instrument we own, not a constraint the design
+must satisfy — trimming a finished change to fit it is the move that produced two of the four P0s
+in the parent task.
+
+*(The reason originally recorded here — "prompt text behind the `instrumentation` axis is measuring
+apparatus and is not charged to the ratchet" — is a real principle, but this change added none of
+that text. See the correction block below. It is left visible rather than deleted, because the
+error is instructive: a true rule applied to a case it does not cover reads as a justification.)*
 **Consequences:**
-- ✅ Measuring ourselves stops competing with the thing being measured. The alternative — deleting
-  real instruction to afford telemetry — is strictly worse.
+- ✅ A finished change is never trimmed to fit a number we control — the P0 generator is removed.
 - ✅ Compaction was still applied where it was free (shared brief stated once; per-dispatch ledger
   bullets collapsed to per-round). Raw addition ~1.5k → landed **+789**.
 - ⚠️ The ratchet is now looser by that amount until the measurement is changed to exclude
@@ -352,6 +358,29 @@ render it — but the baseline is measured against *this repo's own* `harness.ya
 that "compressing it away restores a destructive instruction", and one such compaction in this very
 session broke a shipped test — the `do not pass \`0\`` line-wrap); a parameterised single `Task(`
 template (~500 chars and 2 round-trips cheaper — **reverted**, see below).
+
+**CORRECTION (2026-08-11) — the growth was NOT instrumentation.** Measured after the fact by
+rendering `execute` with the axis ON and OFF, before and after this change (Production,
+claude-only fixture):
+
+| | before | after | Δ |
+|---|---:|---:|---:|
+| `execute` total (instrumentation ON) | 36034 | 40609 | **+4575** |
+| ├ shipped instruction (axis OFF) | 34171 | 38953 | **+4782** |
+| └ instrumentation block | 1863 | 1656 | **−207** |
+
+The instrumentation block **shrank**. Every character this change added is **shipped instruction** —
+prose a user's `/hm:execute` reads on every invocation. The "instrument vs. product" argument is a
+true general principle that had **zero purchase on this case**, and stating it here made the
+re-baseline read as *"the growth was only measurement"*, which is false.
+
+What actually justifies the re-baseline is narrower and should be read as the operative reason:
+**the user decided the ratchet is an instrument rather than a design constraint, and directed that
+the block not be contorted to fit it.** The shipped-surface growth was therefore **accepted**, not
+explained away — the zero slack was a real constraint and this change really did grow the surface.
+
+The ⚠️ debt above is unchanged and better founded: excluding instrumentation from the measurement
+is still the right fix to the *measurement*, but it would not have absorbed this change.
 
 **One compaction was tried and reverted, and it is the ADR's own cautionary tale.** A single
 `Task(` template with a `<lens>` placeholder rendered three dispatches conceptually while costing

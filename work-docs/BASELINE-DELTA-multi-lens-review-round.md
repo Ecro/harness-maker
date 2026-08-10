@@ -94,18 +94,41 @@ The aggregate arms (`test_aggregate_shipped_surface_does_not_grow`) sat at **exa
 in both variants — 371066/371066 and 300082/300082 — so this change could not ship as a net
 addition without cutting ~2.1k characters of instruction from elsewhere in `execute.md.j2`.
 
-That offset was attempted and abandoned on a deliberate decision (2026-08-10): **prompt text
-gated behind the `instrumentation` axis is measuring apparatus, not shipped instruction, and
-should not compete with the thing it measures.** The axis defaults **OFF** for a fresh install,
-so most users never render those blocks — yet the baseline is measured against *this repo's own*
-`harness.yaml`, where it is **ON**, so today the ledger recipes and their guidance bullets are
-fully charged to the ratchet. The clean fix is to measure the surface with the axis OFF (or
-subtract those blocks); until that lands, an instrumentation-driven red is an artifact of the
-measurement, not a design failure to fix by trimming.
+That offset was attempted and abandoned on a deliberate decision (2026-08-10). **The reason first
+recorded here was wrong for this change, and the correction is the point of this section.**
+
+The original wording said: *prompt text gated behind the `instrumentation` axis is measuring
+apparatus, not shipped instruction, and should not compete with the thing it measures* — the axis
+defaults OFF for a fresh install, yet the baseline is measured against this repo's own
+`harness.yaml` where it is ON, so the ledger recipes are fully charged to the ratchet.
+
+**That principle is sound and it does not apply here.** Measured after the fact by rendering
+`execute` with the axis ON and OFF, before and after this change (Production, claude-only fixture):
+
+| | before | after | Δ |
+|---|---:|---:|---:|
+| `execute` total (instrumentation ON) | 36034 | 40609 | **+4575** |
+| ├ shipped instruction (axis OFF) | 34171 | 38953 | **+4782** |
+| └ instrumentation block | 1863 | 1656 | **−207** |
+
+The instrumentation block **shrank** — the per-dispatch ledger bullets collapsed to per-round ones.
+**Every character this change added is shipped instruction**: prose a user's `/hm:execute` reads on
+every invocation. Nothing here was measuring apparatus, so the "instrument vs. product" argument
+had zero purchase on this case. A true general principle was applied to a case it did not cover,
+and the result read as *"the growth was only instrumentation"*, which is false.
+
+**The actual reason the ratchet was re-baselined:** the user decided (2026-08-10) that the ratchet
+is a measuring instrument rather than a design constraint, and directed that the block not be
+contorted to fit it. Under that decision the shipped-surface growth was **accepted**, not
+explained away. The zero slack was a real constraint and this change really did grow the shipped
+surface — by ~4.8k in `execute` alone, +6149 across the repo's own render.
+
+The standing debt in the last section is unchanged and, if anything, now better founded: excluding
+instrumentation from the measurement remains the right fix to the *measurement*, but it would not
+have absorbed this change.
 
 Compaction was still applied where it cost nothing — the shared reviewer brief is stated once
-instead of three times, and the per-dispatch ledger bullets collapsed to per-round ones. Raw
-addition ~1.5k; landed +789 on the per-command arm.
+instead of three times, and the per-dispatch ledger bullets collapsed to per-round ones.
 
 **One compaction was tried and reverted.** A single parameterised `Task(` template with a
 `<lens>` placeholder cost ~500 fewer characters *and* zero round-trips. It was reverted: the
