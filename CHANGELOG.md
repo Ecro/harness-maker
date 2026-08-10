@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.51.1] — 2026-08-11
+
 ### The review oracle stopped fabricating evidence about files it cannot read
 
 `second_opinion_oracle` used to hardcode `uv run pytest` / `ruff check` / `mypy --strict` and
