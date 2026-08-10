@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.51.0
+harness_maker_version: 0.51.1
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: harness-yaml/Production.yaml.j2
 provenance: official
-content_hash: 1ce7d28bb70919d3bacd6dd0082fa9e7f41bc3a59efba571723ddbc7634d64a0
+content_hash: b0e6dfe1eab303306ba63b04eb1d1d6daf370caacb062abbfb4914b0817d6b7f
 ---
 preset: Production
 locale: ko
@@ -58,6 +58,16 @@ wrapup_docs:
   - "CHANGELOG.md"
   - "docs/ARCHITECTURE.md"
   - "docs/HOW-IT-WORKS.md"
+
+toolchains:
+  - name: "python"
+    extensions:
+      - ".py"
+      - ".pyi"
+    commands:
+      test: "uv run pytest -q {path}"
+      lint: "uv run ruff check {path}"
+      types: "uv run mypy {path}"
 
 reviewers:
   consensus: cross-check
