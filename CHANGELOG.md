@@ -44,6 +44,42 @@ which programs may occupy that position; `shell` is never true, and the subject 
 substituted as its own argv element so no file name can become a separate token.
 
 A `.py` path in a project with no `toolchains` key is byte-identical to the previous behaviour.
+### Phase A.5 asks three questions at once instead of the same question twice
+
+`/hm:execute`'s test-quality gate was the only gate in the harness with a single voter and
+serial retries. It now dispatches **three lens-scoped `test-reviewer` calls in one message** —
+`red-correctness` (does each test fail, and for the intended reason?), `discrimination` (would
+this assertion also pass against a plausibly wrong implementation?), `coverage` (does the set
+cover the criterion, with no missing scenario and no duplicate?) — and retries by **round**
+rather than by attempt.
+
+The lenses turned out to be disjoint detectors, not redundant voters. Measured on the same
+diff: a serially-retried single reviewer surfaced one failure category per round (2 findings,
+then 3); the three concurrent lenses surfaced 9 and 12, with **zero overlap between the two
+blocking lenses**. The old serial retry was re-asking the question that had already been
+answered.
+
+**The merge is explicit, because a lens passing its own rubric must not end the round.**
+`overall_assessment` is recomputed from the merged carriers and never taken from a lens's own
+header — a lens that reports a defect while stamping PASS is parseable, and trusting the header
+would silently drop the defect it just reported. `blocking_issues[]` unions and dedupes on
+`test_file:test_function:category` while carrying the union of the `line`s: line-keyed dedupe
+almost never merges two lenses that anchored one defect on different lines, and line-blind
+dedupe drops one of two genuinely different bad assertions in the same function.
+`passing_tests[]` is demoted to advisory — the `passing_tests[]` **freeze is gone**, because
+bare function names with no `test_file` cannot identify a test.
+
+Repairs have three arms, one per carrier (rewrite / author / retarget-or-delete), and one
+re-dispatch rule: **if you repaired anything, re-dispatch all three lenses.** Not a per-lens
+trigger list — an earlier draft tried that and its "supplied a blocking_issues entry even if it
+returned PASS" clause was unreachable by construction, since the agent's own PASS requires zero
+blocking issues. Worst case is 3 + 3 = 6 dispatches, the ceiling the budget already assumed.
+
+Two seam fixes rode along, both found because the defect ran through them:
+`templates/agents/test-reviewer_body.md.j2`'s Hard Rule routed out-of-lens findings into a
+`suggestions` field **the JSON schema does not define** — so a reviewer that found a defect
+emitted nothing and returned PASS — and `stuck_body.md.j2` still described the budget in
+"attempts". `docs/HOW-IT-WORKS.md` §8.11 / §11.23 are updated to match.
 
 ## [0.51.0] — 2026-08-09
 

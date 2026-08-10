@@ -149,8 +149,26 @@ _EXPECTED_SHA256: dict[str, str] = {
     "plan-validator": "2116a5ce4fb8053c0a8c921f2a1e2c022ea5099f488e8bc315a6a87b097ec36b",
     "security-auditor": "51a11902b9f56b9ebb0e0103e0d2047a64d1a218898d6cedc229a1a43fed2f53",
     "security-reviewer": "b5ea840e5af70d27ce283bca2513c12c2abc3ddfbf55a722a92dad4a48ed57f4",
-    "stuck": "a62459d1205ed4fd67769ebb2f729a4de9b1d7b9ff5d770cc6ed767e63746fd0",
-    "test-reviewer": "d102698d962884761172fa6a241c8a578cb7c038596905c141fd9f596b37cabb",
+    # stuck re-pinned 2026-08-10 (PLAN-multi-lens-review-round, review round 4). `stuck` is the
+    # agent A.5 escalates to, and its incoming brief still described the budget as "2 attempts"
+    # after the stage renamed the unit to rounds — three lens dispatches now share one round, so
+    # the old wording named a unit the stage no longer uses. Its "last 3 reviewer outputs"
+    # heuristic also silently changed meaning: three outputs are now ONE round, not three, so the
+    # brief says to read across rounds when history is needed. Found by review, out of the diff.
+    # Body change outside the codex conditional. Pre-bump hash in git history.
+    "stuck": "8b215345161581a4eb138a48ae5604d9381e50bad4c40504e57b4e7a3cfe2864",
+    # test-reviewer re-pinned 2026-08-10 (PLAN-multi-lens-review-round, review round 2). Two
+    # rules changed, both because Phase A.5 now runs three lens-scoped instances of this agent:
+    # (a) `passing_tests[]` was declared FROZEN, which conflicted with the caller's merge rule —
+    # the intersection of three lenses' bare function names cannot identify a test, so the list
+    # is now advisory and the retry's scope is `blocking_issues[]` + `scenarios_missing[]`;
+    # (b) the banned-patterns Hard Rule said an out-of-category violation should "downgrade to a
+    # `suggestion`", but the mandated JSON has NO suggestions field — so such a finding was
+    # DELETED and `overall_assessment` then read PASS over a defect the reviewer had found. It
+    # now routes to a field the schema has (scenarios_missing / per_scenario.quality=FAIL /
+    # the closest banned pattern). Body change outside the codex conditional. Pre-bump hash in
+    # git history.
+    "test-reviewer": "e998c3dbb245e32155dcbf114a494f4a628e45e628e2511206ea0f19ffffd19b",
     "ux-reviewer": "7ce5bd89c61c7669ffeee85a0b6b528aa3ff9a52e77912bd646eb3a542754e42",
 }
 

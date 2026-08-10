@@ -84,6 +84,22 @@ _KNOWN_MISSING: dict[tuple[str, int], str] = {
         "but writing them out now would be a reconstruction from narrative, not a capture — "
         "the one thing this gate's own message forbids. Recorded as missing instead."
     ),
+    **{
+        ("multi-lens-review-round", n): (
+            "round 1 persisted; the auto-fix rounds 2-4 ran the merge and the fixes but never "
+            "the Step 3.4 persist-payload line. The findings themselves survive in "
+            "REVIEW-multi-lens-review-round-2026-08-10.md (13 in round 3, with per-round "
+            "attribution of which were fix-induced), but the merged payloads lived only in the "
+            "orchestrator's context and are gone — writing them out now would be a "
+            "reconstruction from narrative, which this gate's own message forbids. Recorded as "
+            "missing. NOTE the shape: the step is written once, under 'Round 1', and rounds 2..N "
+            "are described elsewhere as re-reading frozen state — so the orchestrator reads the "
+            "persist line as a round-1 step. That is the fifth instance of this exact omission "
+            "in this allowlist, which makes it a template defect rather than five operator "
+            "lapses; tracked as [fail:process] per-round-step-runs-only-in-round-1."
+        )
+        for n in (2, 3, 4)
+    },
     ("validator-pass-cap-telemetry", 2): (
         "the auto-fix round was run and the persist step was skipped. Its findings are in "
         "REVIEW-validator-pass-cap-telemetry-2026-08-07.md, but reconstructing a payload "

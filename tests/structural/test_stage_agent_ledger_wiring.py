@@ -87,18 +87,66 @@ def test_each_stage_is_discovered_on_all_three_targets(stage: str) -> None:
     ("stage", "agent"), [("plan", "plan-validator"), ("execute", "test-reviewer")]
 )
 def test_every_dispatch_site_is_accompanied_by_an_emit_line(stage: str, agent: str) -> None:
-    """Exit 2 + exit 3. The expected count comes from the DISPATCH sites, not the emits."""
+    """Exit 2 + exit 3. The expected count comes from the DISPATCH sites, not the emits.
+
+    **`execute` counts ROUNDS, not dispatches** (PLAN-multi-lens-review-round ADR-007).
+    Phase A.5 fans out to one `test-reviewer` per lens in a single message, and all three
+    share one round: per-dispatch rows would collide on `(agent, stage, run-id, pass)` and
+    leave `--terminal` unowned, which is the incoherence `coherence` reports. So the unit
+    of the stage-2 denominator for A.5 is the round, and one emit line is correct.
+
+    The independent source is not discarded — it is re-pointed. A hole would now be a round
+    with no emit line, so the guard for `execute` is that the fan-out is accompanied by an
+    emit line AND that the template says out loud which unit it is counting. Without that
+    second half this degrades to the `_EMIT.search` presence check this file's own history
+    records as insufficient.
+    """
+    rounds_not_dispatches = stage == "execute"
     for name, text in artifacts_for(stage).items():
-        expected = len(_DISPATCH_SITE[agent].findall(text))
-        assert expected >= 1, f"{name}: no {agent} dispatch site — the independent source is empty"
+        sites = len(_DISPATCH_SITE[agent].findall(text))
+        assert sites >= 1, f"{name}: no {agent} dispatch site — the independent source is empty"
+        # The independent source for a round-counted stage is the number of fan-out BLOCKS, not
+        # the constant 1: hard-coding 1 would let a second, genuinely separate test-reviewer
+        # round be added later with no emit line at all — the regression this guard exists for.
+        #
+        # A block is a FENCED region, not a run of adjacent lines. Line adjacency was tried and
+        # is actively harmful: a blank line or a comment between the three Task( calls — a
+        # formatting-only change that leaves the fan-out one message — would count 3 rounds and
+        # demand 3 emit lines, and satisfying that produces exactly the per-dispatch rows
+        # colliding on (agent, stage, run-id, pass) that ADR-007 forbids. A test must not be
+        # able to drive the template into the state it guards against.
+        lines = text.splitlines()
+        fence_of: list[int] = []
+        depth = 0
+        for ln in lines:
+            if ln.startswith("```"):
+                depth += 1
+            fence_of.append(depth)
+        at = [i for i, ln in enumerate(lines) if _DISPATCH_SITE[agent].search(ln)]
+        rounds = len({fence_of[i] for i in at})
         # Compare the COUNTS, not mere presence. An earlier version computed `expected` and
         # then asserted only `_EMIT.search(...)`, so a second dispatch site added with no
         # ledger write still passed — the independent source was gathered and discarded.
         emits = len(_EMIT.findall(text))
+        expected = rounds if rounds_not_dispatches else sites
         assert emits >= expected, (
-            f"{name}: {expected} {agent} dispatch site(s) but only {emits} emit line(s) — "
-            "a dispatch with no ledger write is a hole in the stage-2 denominator"
+            f"{name}: {sites} {agent} dispatch site(s) in {rounds} fan-out block(s), unit="
+            f"{'round' if rounds_not_dispatches else 'dispatch'}, expected >= {expected} emit "
+            f"line(s) but found {emits} — an unrecorded {agent} run is a hole in the "
+            "stage-2 denominator"
         )
+        if rounds_not_dispatches:
+            # Locus, not presence: the phrase must sit between the last dispatch line and the
+            # emit line it governs. Searched over the whole document it goes inert the moment
+            # the words appear anywhere — including in this very sentence, were it prose.
+            window = "\n".join(lines[at[-1] :])
+            head = window[: window.index("stage_agent_ledger emit")]
+            assert "One row per **round**" in head, (
+                f"{name}: A.5 fans out to {sites} dispatches but the emit guidance between the "
+                "last dispatch and the emit line does not state that the row is per-ROUND — a "
+                "reader would emit one row per lens, colliding on (agent, stage, run-id, pass) "
+                "with no --terminal owner"
+            )
         assert f"--agent {agent}" in text, f"{name}: emit line does not name {agent}"
         assert f"--stage {stage}" in text, f"{name}: emit line does not name stage {stage}"
 

@@ -449,13 +449,20 @@ def sidechain_turn_groups(turns: Sequence[Any]) -> int:
 
     - **Undercount.** Reviewers are dispatched as a parallel batch in one message, and the main
       loop emits no turn until the batch returns — so N concurrent subagents form ONE run.
-      This does NOT currently corrupt the recorded population: the only rendered emit sites are
-      ``plan.md.j2`` (``--agent plan-validator``) and ``execute.md.j2`` (``--agent
-      test-reviewer``), both single dispatches separated by main-chain turns. An earlier version
-      of this note claimed ``code-reviewer`` was a recorded agent and therefore batched into the
-      denominator; ``rg -o -- '--agent [a-z-]+' src/harness_maker/templates`` refutes that — the
-      few ``code-reviewer`` rows in the corpus did not come from a rendered site. Adding a
-      batched emit site later WOULD make this bite.
+      This does NOT currently corrupt the recorded population, but the reason CHANGED in
+      2026-08 and the old reason is no longer true. The rendered emit sites are ``plan.md.j2``
+      (``--agent plan-validator``) and ``execute.md.j2`` (``--agent test-reviewer``). The plan
+      site is still a single dispatch. **The A.5 site is now BATCHED** — three lens-scoped
+      ``test-reviewer`` calls in one message (PLAN-multi-lens-review-round) — so it is exactly
+      the "batched emit site" this note used to say did not exist yet. The arithmetic survives
+      only because ADR-007 emits **one row per ROUND, after the merge**: three subagents form one
+      turn group and produce one row, so rows and runs still agree 1:1. What no longer holds is
+      "a row means a dispatch" — for A.5 a row means a round of three. Tightening the ``<=`` at
+      the reconcile step to ``==`` would therefore break on A.5 rows, and any future per-lens
+      emit would restore the undercount for real. An earlier version of this note also claimed
+      ``code-reviewer`` was a recorded agent batched into the denominator; ``rg -o -- '--agent
+      [a-z-]+' src/harness_maker/templates`` refutes that — the few ``code-reviewer`` rows in the
+      corpus did not come from a rendered site.
     - **Overcount.** A peer session working the same project contributes main-scope turns into
       the same sorted list, splitting one real dispatch into several runs.
 

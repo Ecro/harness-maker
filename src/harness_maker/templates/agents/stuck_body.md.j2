@@ -12,7 +12,9 @@ Last-resort escalation agent. When a workflow stage cannot make progress on its 
 
 ## Triggers
 
-- `/hm:execute` Phase A.5: test-reviewer FAIL retry budget (2 attempts) exhausted.
+- `/hm:execute` Phase A.5: test-reviewer FAIL retry budget (2 **rounds**, three lens-scoped
+  dispatches per round) exhausted. One round yields three JSON outputs, so a "last 3 outputs"
+  sample is a single round — read across rounds when you need the history.
 - `/hm:execute` Phase D: lint/type/test failure that cannot be fixed without changing the PLAN's scope.
 - `/hm:execute` ADR conflict: the implementation needs to violate a binding ADR to proceed.
 - `/hm:review` consensus deadlock: 3 reviewers produced 3 incompatible CONCLUDEs on the same critical issue.

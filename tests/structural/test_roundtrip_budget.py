@@ -53,7 +53,17 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # harness has models set, so it is absent from the measured body. Do not "fix" that
     # asymmetry by making health's call unconditional — the gate is the point.
     "configure": 4,
-    "execute": 15,
+    # 15 → 17 (multi-lens-review-round, 2026-08-10). TWO calls added, none removed: Phase A.5
+    # now dispatches one `test-reviewer` per lens — red-correctness, discrimination, coverage —
+    # in a SINGLE message, and ADR-011's rule counts every `Task(` individually even though the
+    # three leave in one turn. Identical over-count to the `research` fan-out, for the identical
+    # reason — see `test_the_fan_out_is_counted_as_three_though_it_costs_one_turn`.
+    # The ledger did NOT gain a call: ADR-007 emits one row per ROUND, after the merge, so the
+    # three dispatches share one `emit`. Measured basis: a serially-retried single reviewer
+    # surfaces one failure category per round (2 then 3 findings), three concurrent lenses
+    # surfaced 9 and 12 with ZERO overlap between the two blocking lenses.
+    # Attributed in work-docs/BASELINE-DELTA-multi-lens-review-round.md.
+    "execute": 17,
     "health": 7,
     "help": 0,
     "loop": 12,

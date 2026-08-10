@@ -47,7 +47,7 @@ mechanism, the loop should be required to escalate to "is this mechanism constru
 rather than schedule round 4 — here the answer was no (no liveness signal outlives the CLI:
 [[fail:design claim-record-used-as-access-control-list]]), and one round spent asking would have
 been cheaper than two spent patching.
-**Triggered by:** [fail:test] fix-introduced-defect-passes-all-gates (count: 5 as of 2026-08-07; this proposal was written at count: 3) — the fourth instance is PLAN-harness-diet Phases 2-6: 14 findings over four rounds, 11 of them introduced by this task's own fixes, seven while fixing the other four. It also sharpens the proposal: three of the eleven were a single class-default flip re-fixed four times, so the receipt should demand an ENUMERATION (the grep and its full result set) whenever a fix changes a shared default or a shared allowlist, not just a re-review of the diff.
+**Triggered by:** [fail:test] fix-introduced-defect-passes-all-gates (count: 7 as of 2026-08-10; this proposal was written at count: 3) — the seventh instance (multi-lens-review-round) extends the proposal's SCOPE, not just its count: five of that unit's six compounding rounds happened during **planning**, where there is no fix delta and no suite to re-review — each PLAN revision introduced the next round's P0 at the same rate the code rounds did. A mechanism aimed only at the review auto-fix loop therefore addresses at most half of this entry's mass; the plan-validator loop needs the mirror obligation (when a PLAN revision is itself a repair, re-derive the truth table of any condition it adds, and re-read the whole rule rather than the edited sentence). The fourth instance is PLAN-harness-diet Phases 2-6: 14 findings over four rounds, 11 of them introduced by this task's own fixes, seven while fixing the other four. It also sharpens the proposal: three of the eleven were a single class-default flip re-fixed four times, so the receipt should demand an ENUMERATION (the grep and its full result set) whenever a fix changes a shared default or a shared allowlist, not just a re-review of the diff.
 **Proposed mechanism:** make the review stage's auto-fix loop re-review the FIX DELTA, not
 only re-run the suite. Round N applies fixes; round N+1 currently recomputes a grade from a
 green suite, which is exactly the signal that cannot see a fix-introduced defect — the suite
@@ -241,7 +241,7 @@ forbidding anything.
 
 ## Proposal: a gate may not discover its own population from the string it forbids (2026-08-10)
 
-**Triggered by:** [fail:test] gate-passes-because-its-subject-vanished (count: 3)
+**Triggered by:** [fail:test] gate-passes-because-its-subject-vanished (count: 4 as of 2026-08-10; this proposal was written at count: 3) — the fourth instance (multi-lens-review-round) widens the target: it was not a committed gate at all but an interactive leak-check, `grep`ping `tests/snapshot/fixtures/` (a directory that does not exist) and reporting `count=0`, which was read as evidence of no leak. The real fixtures are `tests/snapshot/*.expected.yaml`. A structural test cannot reach an ad-hoc grep, so the mechanism below should be paired with an authoring rule for interactive verification: a zero is only evidence once the pattern has been shown to match something.
 
 **Proposed mechanism:** a structural test over `tests/structural/` plus an authoring rule.
 
@@ -289,3 +289,56 @@ should write the proposal from that instance rather than from this line.
 | `[fail:test] test-pins-retired-implementation-name` | 4 | no proposal |
 | `[fail:test] shipped-entry-point-not-exercised` | 4 | no proposal (the RESOLVED table's `test_cli_surfaces_are_driven.py` covers CLI surfaces only, not the general class) |
 | `[fail:test] snapshot-regen-inside-worktree` | 13 | no proposal — added 2026-08-10. Highest count in the file and it was missing from this table entirely, which is its own signal. No first-hand instance this round, so no mechanism is proposed here; the obvious candidate (refuse `regenerate.py` when cwd is under `.worktrees/`) should be written by whoever next trips it |
+
+> Table cleared 2026-08-10 (multi-lens-review-round) for the two entries that reached count 3
+> this round with first-hand evidence — proposals for them follow below.
+
+---
+
+## Proposal: count distinct voters per manual-only finding and print it (2026-08-10)
+
+**Triggered by:** [fail:design] severity-tier-split-drops-unanimity (count: 3)
+
+**Proposed mechanism:** rule update to `/hm:review` Step 4 — a printed line, not a change to
+the consensus rule.
+
+**Rationale:** the consensus filter keys on `(issue, severity)` while the thing it measures is
+corroboration on `(issue)`, and severity is the noisiest field a reviewer emits. Adding voters
+therefore makes agreement HARDER, inverting the recall-favouring intent of adding cross-model
+voters at all. Third instance, and the sharpest measurement so far: in this round's 3-voice pool,
+**six** defects each carried two independent voices and all six landed `manual-only` because the
+voices scored them in different tiers. Consensus counted **1 of 23** findings, so the grade
+printed **B** while a confirmed P0 sat in the report. Note what did NOT fail — `human_review_needed`
+was `true` and the findings were all in the document; the letter grade is what under-reported.
+That is why the cheap fix is the right first move and why it should ship before anyone touches
+the matching rule: after Step 4, count distinct voters per `manual-only` finding and surface any
+with `>= K` voters as an explicit warning line. It changes no verdict, cannot regress the filter,
+and would have made all six visible in one line. The two structural remedies this entry already
+records (match on issue identity and take the max/median severity; or a `unanimous-substance,
+split-severity` bucket promoted at the lowest reported tier) remain the real fix, but each moves
+the grade and needs its own PLAN. Do not do them in a review round.
+
+---
+
+## Proposal: forbid a bare `cd` prefix in stage-rendered Bash (2026-08-10)
+
+**Triggered by:** [fail:runtime] cwd-inherited-from-worktree-into-main-commands (count: 3)
+
+**Proposed mechanism:** a structural render-grep over the rendered `.claude/commands/hm/*.md`
+plus a stage-prompt authoring rule.
+
+**Rationale:** Claude Code's Bash cwd persists across calls, so one `cd <abs> && …` silently
+rebases every later relative command in the session. All three instances share the property that
+makes this class expensive: **the misfire succeeds**. The base repo and a task worktree share
+almost all of their content, so the wrong-cwd command returns a plausible answer rather than an
+error — an empty `git diff` reading as "this phase changed nothing" (2026-07-27), and now, worst
+of the three, a full verification suite reporting `pytest_rc=0` **against the unmodified tree**
+while the worktree's actual changes went ungraded. A green suite is the single most trusted signal
+in the workflow and it was measured on the wrong working copy; it was caught only when a later
+command failed file-not-found on a worktree-only test. The mechanism: (1) render-grep asserting no
+rendered stage command contains a bare `cd <path> &&` prefix, requiring `git -C <path>` for git and
+an explicit absolute path (or a `( cd … )` subshell) for everything else — `-C` and a subshell
+cannot leak into the next call; (2) an authoring rule that any step whose verdict is an exit code
+(`pytest`, `ruff`, `mypy`) must name its target path absolutely, so the rc is attributable to a
+checkout by inspection. Cheap detector if (1) is too broad to land at once: have the verification
+step echo `pwd` beside the rc, so an rc is never recorded without the tree it graded.

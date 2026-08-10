@@ -533,17 +533,34 @@ Write test files based on SPEC In-Scope Scenarios:
 
 #### Phase A.5 — test-reviewer Gate (skipped if `tdd_active=false`)
 
-Pass the written test files to the `test-reviewer` agent:
+Dispatch **three** `test-reviewer` calls **in one message**, one per lens:
 
 ```
-Task(subagent_type="test-reviewer", prompt="<SPEC body + Phase A test file paths>")
+Task(subagent_type="test-reviewer", prompt="<brief>\n\nYour lens: red-correctness — …")
+Task(subagent_type="test-reviewer", prompt="<brief>\n\nYour lens: discrimination — …")
+Task(subagent_type="test-reviewer", prompt="<brief>\n\nYour lens: coverage — …")
 ```
 
-Result handling:
-- `overall_assessment: PASS` → Proceed to Phase B
-- `overall_assessment: FAIL` → Rewrite tests from `blocking_issues[]` (`passing_tests[]` frozen)
-  → Re-invoke test-reviewer → **Maximum 2 retries**
-  → 2 consecutive FAILs: display latest results and escalate to user
+The lenses are disjoint detectors, not redundant voters: measured against a serially-retried
+single reviewer that surfaced one failure category per round, the three concurrent lenses
+surfaced 9 and 12 findings with **zero overlap between the two blocking lenses**.
+
+Result handling — **merge all three before judging**; a lens passing its own rubric does not
+end the round:
+- `overall_assessment` is **recomputed**, never taken from a lens's own header: PASS iff every
+  lens dispatched in THIS round returned PASS *and* the merged carriers are clean. Any FAIL,
+  dead dispatch or unparseable JSON → round FAIL.
+- `blocking_issues[]` — union, deduped on `test_file:test_function:category`, carrying the
+  union of the `line`s. **Authoritative**: the repair rewrites exactly these.
+- `scenarios_missing[]` — union by scenario id. `per_scenario[]` — worst `quality`, union
+  `covered_by`. `passing_tests[]` — intersection, **advisory, it decides nothing** (bare
+  function names cannot identify a test; there is no `passing_tests[]` freeze).
+- Round FAIL → three repair arms, one per carrier: rewrite the functions in `blocking_issues[]`,
+  author one test per `scenarios_missing[]`, retarget-or-delete for a `per_scenario[]` FAIL with
+  no matching blocking entry. **If you repaired anything, re-dispatch all three lenses** (plus,
+  unchanged, any lens whose dispatch died).
+- Budget is **2 rounds**, not 2 attempts — no verdict carries between rounds. After 2 failing
+  rounds: surface the merged verdict and escalate to user.
 
 #### Phase B — RED Gate (skipped if `tdd_active=false`)
 
@@ -1598,6 +1615,10 @@ list (Write/Edit/Bash are granted without path restriction). See §11.16.
 ### 8.11 test-reviewer
 
 **Role**: Phase A.5 gate in `/hm:execute`. Validates the quality of test files written in Phase A.
+Dispatched **three times concurrently**, once per lens (`red-correctness`, `discrimination`,
+`coverage`); each call is accountable for its own lens but must still report a defect it notices
+outside that lens — **in a carrier the schema below actually has**, never dropped and never
+routed to a field that does not exist.
 
 **3 review criteria**:
 
@@ -2525,13 +2546,19 @@ When the `test-reviewer` agent detects any of these patterns, it issues a `FAIL`
 | Failure suppression | `try...except: pass` | Test ignores errors |
 | Private state assertion | `._internal_state == x` | Coupled to implementation details |
 
-#### passing_tests[] Freeze + RED-correctness
+#### passing_tests[] is advisory + RED-correctness
 
-Tests that `test-reviewer` judges as `PASS` are recorded in `passing_tests[]` and **cannot be rewritten in subsequent retries** — modifying already-verified tests would make the quality standard meaningless.
+`passing_tests[]` is merged as an intersection across the three lenses and is **advisory — it
+decides nothing.** There is no freeze: its entries are bare function names with no `test_file`,
+so they cannot identify a test, while `blocking_issues[]` entries can. The authoritative carrier
+is `blocking_issues[]`, and a repair re-dispatches all three lenses precisely because a rewrite
+changes a file the other two had already judged — no verdict, PASS included, carries between
+rounds.
 
 After modifying tests, Phase B (RED gate) verifies that they actually FAIL. If they accidentally PASS (false-RED), return to Phase A for rewriting — tests that pass even without implementation are meaningless.
 
-Retry budget: **2 attempts**. If 2 consecutive FAILs, escalate to the `stuck` agent.
+Retry budget: **2 rounds** (each round = three concurrent lens dispatches; worst case 3 + 3 = 6
+dispatches). If 2 consecutive FAILing rounds, escalate to the `stuck` agent.
 
 ---
 
@@ -2545,7 +2572,7 @@ Retry budget: **2 attempts**. If 2 consecutive FAILs, escalate to the `stuck` ag
 
 | Situation | Details |
 |-----------|---------|
-| Phase A.5 retry budget exhausted | test-reviewer 2 consecutive FAILs |
+| Phase A.5 retry budget exhausted | 2 consecutive FAILing multi-lens rounds |
 | Phase D cannot be fixed | Failure that cannot be resolved without changing PLAN scope |
 | ADR conflict | Implementation can only proceed by violating an ADR |
 | Review deadlock | 3 reviewers have conflicting CONCLUDE on the same issue |
@@ -2617,7 +2644,7 @@ Even when tests pass, the AI Readiness composite score can drop by 5 or more poi
 | 100% local telemetry | Concerns about external transmission | PostToolUse hook / metrics.jsonl |
 | Deep Interview (spec/plan) | Implementation from assumptions → later rework | 6-category/9-category + ADR promotion + plan-validator |
 | loop adaptive interview + convergence | Open requests diverge or lose context | autoloop-driver / autoloop-coder / stopping_criteria |
-| TDD Phase A.5 test quality gate | Tautology tests create false-GREEN and proceed to implementation | test-reviewer / 8-banned-patterns / passing_tests[] freeze |
+| TDD Phase A.5 test quality gate | Tautology tests create false-GREEN and proceed to implementation | test-reviewer ×3 lenses / 8-banned-patterns / merged blocking_issues[] |
 | stuck escalation agent | Cause identification and resolution path exploration is user's burden when blocked | stuck / escalation-{slug}-{date}.md |
 | 6-checkpoint verify gate | Tests passing ≠ done (PLAN fulfillment, health metrics, security unchecked) | verify-before-completion / Check1 LLM cross-reference / Check3 health regression |
 

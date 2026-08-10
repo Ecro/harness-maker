@@ -225,7 +225,62 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # read of `rev-parse --abbrev-ref HEAD` that skips Step 5 on `hm/*` — the discriminator
     # wrapup Step 7.7 already uses. Compressing it away restores a destructive instruction.
     # Attributed in work-docs/BASELINE-DELTA-execute-step5-model-mismatch.md.
-    "execute": 34533,
+    # 34533 → 35322 (multi-lens-review-round, 2026-08-10). +789. Phase A.5 went from one
+    # `test-reviewer` dispatch to three lens-scoped ones in a single message, and gained the
+    # merge algebra those three outputs need — PASS iff all three, union of `blocking_issues`
+    # deduped on `test_file:test_function:category`, worst-quality `per_scenario`, and
+    # `passing_tests` demoted to advisory because it carries bare function names with no
+    # `test_file` and so cannot identify the test a rewrite would freeze.
+    #
+    # The compaction-first bar is met by SUBSTITUTION, not by prose trimming: the shared
+    # reviewer brief is stated once and the three dispatch lines reference it, and the old
+    # per-dispatch ledger bullets collapsed to per-round ones (ADR-007). Raw addition was
+    # ~1.5k; what landed is +789.
+    #
+    # The residue is not compressible without deleting instruction. Three lenses need three
+    # dispatch lines — a single parameterised `Task(` template with a `<lens>` placeholder was
+    # tried first, cost ~500 fewer chars AND zero round-trips, and was REVERTED: the repo's own
+    # fan-out precedent (`research.md.j2`) uses three literal lines, and choosing the cheaper
+    # form because it was cheaper is the exact move that produced two of the four P0s in
+    # `opus5-selfreview-vs-harness-gates`. Attributed in
+    # work-docs/BASELINE-DELTA-multi-lens-review-round.md.
+    #
+    # 35322 → 37048 (+1726, same task, review round 2). Not new feature surface — every
+    # character is a defect fix a 3-voice review found in the round-1 text, and each one closes
+    # a hole that a render test could not see:
+    #   • the round-2 PASS rule was UNSATISFIABLE ("all three PASS" + "re-dispatch only failing
+    #     lenses" + "no verdict carries" — three verdicts cannot exist in round 2), so A.5 either
+    #     never cleared a retry or silently carried a stale verdict;
+    #   • a dead dispatch had no repair path, leaving a FAIL round with nothing to act on;
+    #   • the brief told lenses to report out-of-lens defects into a `suggestions` field the
+    #     schema does not have, so they were discarded and the lens returned PASS — which
+    #     defeated the measured justification for the fan-out itself;
+    #   • the dedupe key lacked `line`, collapsing two distinct bad assertions in one function.
+    # Attributed in the same BASELINE-DELTA document.
+    #
+    # 37048 → 38197 (+1149, same task, review round 3). Again defect repair only, zero new
+    # round-trips. The round-2 FIXES created three of these: the merge trusted a lens's
+    # self-reported PASS while the new brief openly allows a lens to report a defect (so an
+    # inconsistent-but-parseable reply passed the gate) — it now RECOMPUTES from the merged
+    # fields; routing duplicates to `per_scenario.quality=FAIL` made a blocking state with no
+    # repair action, burning the budget on identical rounds — a third repair arm now retargets
+    # or deletes the offending test; and a test AUTHORED for `scenarios_missing[]` was reviewed
+    # only by the coverage lens that asked for it, never by red-correctness or discrimination —
+    # authoring now re-dispatches all three.
+    #
+    # 38197 → 39343 (+1146, same task, review round 4 — the last). Defect repair, zero new
+    # round-trips. Round 3's own fixes produced the biggest one: the re-dispatch rule had grown
+    # to four clauses and clause (c) — "supplied a blocking_issues entry even if it returned
+    # PASS" — was UNREACHABLE, because the agent's PASS requires zero blocking_issues, so such a
+    # lens had already returned FAIL. Meanwhile the hole it was written for (a REWRITE means the
+    # other two lenses never see the changed file) stayed open, since the authoring clause only
+    # fired on authored tests. All four clauses collapsed to one: **repair anything → re-dispatch
+    # all three**, which also removes the standing contradiction with "no verdict carries".
+    # Also: the dedupe key stopped being line-keyed (two lenses anchor one defect on different
+    # lines, so it almost never merged) and now carries a line LIST; `per_scenario` FAIL with an
+    # empty `covered_by` routes to the authoring arm instead of naming a test that does not
+    # exist; and a truncated sentence — "Ask what those newly made reachable." — was completed.
+    "execute": 39343,
     # 46008 → 47503 (validator-pass-cap-telemetry + its review round): the pass cap, the
     # corrected per-(agent,stage,slug,run-id) terminal invariant, the `coherence` pointer,
     # and the shell-quoting rules for the free-text `--reason`. Attributed in
