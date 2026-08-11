@@ -1045,11 +1045,22 @@ def _strip_shipped_commands(
     return {**entry, "hooks": kept}
 
 
+# Codex's hooks parser is strict: it accepts exactly these two top-level keys and
+# rejects the WHOLE file on anything else ("unknown field `preset`, expected
+# `description` or `hooks`"), so every hook in it goes dead. harness-maker shipped a
+# `preset` provenance stamp here until 0.51.1 — the merge below has to prune it back
+# out of a user's on-disk file, because top-level merge is existing-survives-when-
+# template-is-silent and simply dropping it from the template would leave the stale
+# key (and the broken file) in place forever.
+_CODEX_HOOKS_ALLOWED_TOP_LEVEL = frozenset({"description", "hooks"})
+
+
 def _merge_hooks_json(
     existing: dict[str, Any],
     new_data: dict[str, Any],
     *,
     schema: Literal["nested", "flat"],
+    allowed_top_level: frozenset[str] | None = None,
 ) -> dict[str, Any]:
     """Schema-aware in-place 3-way merge of hooks.json (ADR-003/006).
 
@@ -1060,9 +1071,12 @@ def _merge_hooks_json(
     Events present in existing but not in new_data (user-added events for
     custom hook surfaces) are preserved verbatim.
 
-    Top-level non-``hooks`` keys (e.g., Cursor's ``"version": 1``, our
-    ``"preset"`` stamp) follow template-wins-on-conflict, existing-survives-
-    when-absent — same shape as ``_shallow_merge_existing_json``.
+    Top-level non-``hooks`` keys (e.g., Cursor's ``"version": 1``) follow
+    template-wins-on-conflict, existing-survives-when-absent — same shape as
+    ``_shallow_merge_existing_json``. ``allowed_top_level`` overrides that for a
+    consumer whose parser rejects unknown keys (Codex): keys outside the set are
+    pruned from BOTH sides with a stderr warning, because existing-survives means
+    a stale harness-shipped key would otherwise never leave the user's disk.
     """
     existing_hooks = existing.get("hooks", {})
     new_hooks = new_data.get("hooks", {})
@@ -1070,6 +1084,22 @@ def _merge_hooks_json(
     if not isinstance(existing_hooks, dict) or not isinstance(new_hooks, dict):
         # Malformed shape on either side — fall back to template overwrite.
         return new_data
+
+    if allowed_top_level is not None:
+        dropped = sorted(set(existing) - allowed_top_level)
+        if dropped:
+            import typer
+
+            typer.echo(
+                "WARN: dropping top-level key(s) "
+                + ", ".join(repr(k) for k in dropped)
+                + " from .codex/hooks.json — Codex accepts only "
+                + ", ".join(repr(k) for k in sorted(allowed_top_level))
+                + " and rejects the whole file otherwise.",
+                err=True,
+            )
+        existing = {k: v for k, v in existing.items() if k in allowed_top_level}
+        new_data = {k: v for k, v in new_data.items() if k in allowed_top_level}
 
     merged_hooks: dict[str, list[Any]] = {}
     all_events = set(existing_hooks.keys()) | set(new_hooks.keys())
@@ -1167,6 +1197,9 @@ def _render_hooks_json_merged(
 
     out = resolve_output_path(target_dir, fe.path)
     schema: Literal["nested", "flat"] = "flat" if str(fe.path) == ".cursor/hooks.json" else "nested"
+    allowed_top_level = (
+        _CODEX_HOOKS_ALLOWED_TOP_LEVEL if str(fe.path) == ".codex/hooks.json" else None
+    )
 
     merged_data: dict[str, Any] = new_data
     if out.exists():
@@ -1188,7 +1221,12 @@ def _render_hooks_json_merged(
             )
         else:
             if isinstance(existing_data, dict):
-                merged_data = _merge_hooks_json(existing_data, new_data, schema=schema)
+                merged_data = _merge_hooks_json(
+                    existing_data,
+                    new_data,
+                    schema=schema,
+                    allowed_top_level=allowed_top_level,
+                )
             else:
                 import typer
 

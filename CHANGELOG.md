@@ -2,6 +2,36 @@
 
 ## [Unreleased]
 
+### Every hook in `.codex/hooks.json` was dead, and Codex was the one saying so
+
+Codex's hooks parser accepts exactly two top-level keys, `description` and `hooks`, and rejects
+the **whole file** on anything else. `codex/hooks.json.j2` shipped a third — a `"preset"`
+provenance stamp copied from the Claude template, where an ignored extra key is harmless. So
+every Codex-target harness got:
+
+```
+failed to parse hooks config .codex/hooks.json: unknown field `preset`,
+expected `description` or `hooks` at line 86 column 10
+```
+
+and every hook in the file — telemetry, the PermissionRequest gate, `flush_session` on Stop —
+never fired. The render tests never caught it because they asserted on what the file *contains*
+(`"hooks" in data`, the right events, the right version pin), never on what it must *not*.
+
+Two changes, because the template fix alone would not have reached anyone:
+
+- **Template** — the `preset` key is gone from `codex/hooks.json.j2`, with the constraint written
+  at the top of the file so the next metadata key does not go in the same place.
+- **Merge** — `_merge_hooks_json` takes an `allowed_top_level` set, and `.codex/hooks.json` passes
+  one. Top-level merge is *existing-survives-when-the-template-is-silent*, so a user's on-disk
+  `"preset": "Side"` would have outlived the template fix through every future `/harness-maker:make`.
+  Keys outside the set are now pruned from both sides with a stderr warning. User hook entries are
+  untouched — the prune is top-level only, and it is opt-in per consumer, so Cursor's `"version": 1`
+  still survives.
+
+Existing Codex harnesses are fixed by re-rendering (`/harness-maker:make --update`); the merge
+prune is what makes that re-render actually repair the file.
+
 ## [0.51.1] — 2026-08-11
 
 ### The review oracle stopped fabricating evidence about files it cannot read

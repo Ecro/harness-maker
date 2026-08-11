@@ -59,3 +59,16 @@ def test_codex_hooks_json_has_required_events() -> None:
     assert "PreToolUse" in data["hooks"] or "PermissionRequest" in data["hooks"], (
         "hooks.json missing PreToolUse or PermissionRequest"
     )
+
+
+def test_codex_hooks_json_has_no_unknown_top_level_keys() -> None:
+    """Codex's parser accepts only `description` and `hooks` at the top level.
+
+    Regression: harness-maker shipped a `preset` provenance stamp here through
+    0.51.1, and Codex rejected the whole file — "unknown field `preset`, expected
+    `description` or `hooks`" — leaving every hook in it dead.
+    """
+    rendered = _render_codex_hooks_json("/some/path/0.0.0")
+    data = json.loads(rendered)
+    unknown = sorted(set(data) - {"description", "hooks"})
+    assert not unknown, f"unknown top-level key(s) in .codex/hooks.json: {unknown}"

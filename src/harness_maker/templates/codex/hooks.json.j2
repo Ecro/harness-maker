@@ -2,6 +2,10 @@
     (Codex-exclusive, ADR-006) + flush_session wired to Stop (no PreCompact, ADR-004) +
     worktree_gate omitted (kernel sandbox handles isolation, ADR-005).
     apply_patch is Codex's file-edit tool; use in matchers alongside Write|Edit.
+    Codex's parser is strict: the only accepted top-level keys are `description`
+    and `hooks`. Anything else (a `preset` provenance key, say) makes Codex reject
+    the whole file — "unknown field `preset`, expected `description` or `hooks`" —
+    and every hook here goes dead. Do NOT add metadata keys at the top level.
 -#}
 {
   "hooks": {
@@ -70,6 +74,5 @@
         ]
       }
     ]
-  },
-  "preset": "{{ preset }}"
+  }
 }

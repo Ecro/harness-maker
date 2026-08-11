@@ -28,6 +28,7 @@ import pytest
 
 from harness_maker.models import DevMode, HarnessConfig
 from harness_maker.render import (
+    _CODEX_HOOKS_ALLOWED_TOP_LEVEL,
     _HARNESS_RETIRED_HOOK_INVOCATIONS,
     _SETTINGS_KEYS_OWNED_BY_HARNESS,
     _make_env,
@@ -564,6 +565,42 @@ def test_merge_flat_empty_command_is_preserved() -> None:
     new: dict[str, Any] = {"hooks": {"preToolUse": []}}
     merged = _merge_hooks_json(existing, new, schema="flat")
     assert len(merged["hooks"]["preToolUse"]) == 1
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# Codex strict top-level schema
+# ──────────────────────────────────────────────────────────────────────────
+
+
+def test_merge_prunes_stale_preset_key_for_codex() -> None:
+    """Codex rejects the WHOLE file on an unknown top-level key.
+
+    harness-maker shipped `"preset"` into `.codex/hooks.json` through 0.51.1, so
+    Codex reported "unknown field preset, expected description or hooks"
+    and every hook in it was dead. Dropping the key from the template is NOT
+    enough — top-level merge is existing-survives-when-template-is-silent, so the
+    stale key on the user's disk would outlive the template fix forever.
+    """
+    hm = "uv run --with /p python -m harness_maker.telemetry"
+    existing = {
+        "preset": "Side",
+        "hooks": {"PostToolUse": [_nested("*", hm), _nested("*", "/usr/local/bin/mine.sh")]},
+    }
+    new = {"hooks": {"PostToolUse": [_nested("*", hm)]}}
+    merged = _merge_hooks_json(
+        existing, new, schema="nested", allowed_top_level=_CODEX_HOOKS_ALLOWED_TOP_LEVEL
+    )
+    assert set(merged) <= {"description", "hooks"}, f"unknown top-level key survived: {set(merged)}"
+    cmds = [h["command"] for e in merged["hooks"]["PostToolUse"] for h in e["hooks"]]
+    assert "/usr/local/bin/mine.sh" in cmds, "pruning must not cost the user their hooks"
+
+
+def test_merge_keeps_top_level_keys_when_no_allowlist_given() -> None:
+    """The prune is opt-in per consumer — Cursor's `"version": 1` must still survive."""
+    existing = {"version": 1, "hooks": {"postToolUse": [_flat("*", "/usr/local/bin/mine.sh")]}}
+    new: dict[str, Any] = {"hooks": {"postToolUse": []}}
+    merged = _merge_hooks_json(existing, new, schema="flat")
+    assert merged["version"] == 1
 
 
 # ──────────────────────────────────────────────────────────────────────────
