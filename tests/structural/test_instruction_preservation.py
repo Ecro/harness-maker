@@ -129,7 +129,29 @@ _PHASE_1_PASS15_HEADINGS = [
 #: reaching only one arm would be the bug this key shape exposes.
 _STEP5_SCOPED_HEADING = ["### Step 5 — Worktree finalize"]
 
+#: PLAN-plan-interview-comprehension ADR-007 / ADR-008. Both are REPLACEMENTS, not cuts,
+#: and both are conditional on `interview.comprehension.depth`: at `minimal` the original
+#: text renders unchanged (that is what AC-003's byte-identity asserts), and at
+#: `standard`/`deep` the depth branch swaps it. The baseline renders this repo's own
+#: harness.yaml, which carries no `comprehension` key and therefore resolves to `standard`
+#: (ADR-006's accepted retrofit), so the baseline sees the replaced form.
+#:
+#: ADR-008 — `plan.md.j2` Step A said "visualization OPTIONAL" while the round-state block
+#: says required-when-changed. Two contradicting instructions in one command leave the
+#: model to pick, nondeterministically; the branch replaces the sentence rather than
+#: stacking a second one.
+#: ADR-007 — `spec.md.j2` §2.3 ALREADY rendered a round preamble. The shared partial
+#: SUBSUMES it; without this the command would carry two round-state instructions.
+_COMPREHENSION_PLAN_HEADING = ("#### Step A — Render current plan state (visualization OPTIONAL)",)
+_COMPREHENSION_SPEC_HEADING = ("## SPEC Interview Round {N}",)
+
 _ALLOWED_REMOVALS: dict[str, dict[str, list[str]]] = {
+    "plan-interview-comprehension": {
+        "plan@task-driven": list(_COMPREHENSION_PLAN_HEADING),
+        "plan@spec-driven": list(_COMPREHENSION_PLAN_HEADING),
+        "spec@task-driven": list(_COMPREHENSION_SPEC_HEADING),
+        "spec@spec-driven": list(_COMPREHENSION_SPEC_HEADING),
+    },
     "execute-step5-model-mismatch": {
         "execute@task-driven": list(_STEP5_SCOPED_HEADING),
         "execute@spec-driven": list(_STEP5_SCOPED_HEADING),

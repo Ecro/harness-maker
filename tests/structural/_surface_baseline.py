@@ -90,8 +90,16 @@ def pinned_install_ref() -> Iterator[None]:
         _synthesize_mod._compute_install_ref = original_compute
 
 
-def render_surface() -> dict[str, dict[str, str]]:
-    """Render this repo's harness in-process and return the two variants' command bodies."""
+def render_surface(depth_override: str | None = None) -> dict[str, dict[str, str]]:
+    """Render this repo's harness in-process and return the two variants' command bodies.
+
+    ``depth_override`` sets ``interview.comprehension.depth`` for this render only. It
+    exists so AC-003's ``minimal`` comparison goes through **this** function rather than a
+    parallel render path: the install-ref pin, the frozen timestamp and the config source
+    are what make two renders comparable, and a second implementation of them would drift.
+    ``None`` (the default) leaves the config untouched, so ``measure_surface`` and every
+    existing caller are unaffected.
+    """
     if not HARNESS_YAML.exists():
         raise FileNotFoundError(
             f"cannot measure the shipped surface: {HARNESS_YAML} is missing. "
@@ -100,9 +108,16 @@ def render_surface() -> dict[str, dict[str, str]]:
         )
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
+        answers = answers_from_harness_yaml(HARNESS_YAML)
+        if depth_override is not None:
+            interview = dict(answers.interview)
+            comprehension = dict(interview.get("comprehension", {}))
+            comprehension["depth"] = depth_override
+            interview["comprehension"] = comprehension
+            answers = answers.model_copy(update={"interview": interview})
         with pinned_install_ref():
             render(
-                synthesize(ProjectProfile(), answers_from_harness_yaml(HARNESS_YAML)),
+                synthesize(ProjectProfile(), answers),
                 root / ".claude",
                 freeze_time=DEFAULT_FREEZE_TIME,
             )

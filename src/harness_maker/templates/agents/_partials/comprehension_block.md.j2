@@ -1,0 +1,81 @@
+{%- set _depth = (config.interview.get('comprehension') or {}).get('depth', 'standard') -%}
+{%- set _stage = stage | default('plan') -%}
+{%- if block == 'brief' and _depth != 'minimal' %}
+
+<!-- @hm:comprehension:brief -->
+### Design brief — show this BEFORE the first interview round
+
+{% if _stage == 'plan' -%}
+Step 1 already built this picture and its heading says it is not shown. Show it now, in
+`{{ config.locale }}`, **before Step 3.0** — an approved SPEC takes the Case-A path that skips
+Step 3 entirely, and that is the common entry.
+
+1. **Goal** — one paragraph: what changes for the user.
+2. **Shape** — components, boundaries, data flow. Bullets or a small ASCII sketch; never Mermaid
+   (raw fence in a terminal).
+3. **Phase skeleton** — one line per phase.
+4. **Ambiguities, ranked by blast radius** — for EACH, say which you are doing: *asking this
+   round*, or *defaulting to X because Y*. An unseen default is indistinguishable from an
+   oversight.
+{%- else -%}
+`/hm:spec` has no architecture draft — its Step 1 is knowledge retrieval — so disclose what this
+stage holds, in `{{ config.locale }}`, before the first category:
+
+1. **Inherited scope** — what RESEARCH and any prior SPEC settled, so the user sees what is not
+   being re-litigated.
+2. **AC skeleton** — the criteria you can already draft, marked provisional.
+3. **Category status** — of the six, which are answered, which are open, and which you will
+   default rather than ask, with the default and its reason.
+{%- endif %}
+
+One screen. This is the overview layer; detail arrives per question, on demand.
+{%- endif -%}
+{%- if block == 'round_state' and _depth != 'minimal' %}
+
+<!-- @hm:comprehension:round_state -->
+**Round state — required when anything changed.** Open every round after the first with:
+
+```
+## Interview Round {N}
+
+**Decisions locked in so far:**
+- ✅ {decision} (→ ADR-XXX)
+
+**Changed since last round:**
+{the delta only — not a re-dump}
+
+**Ambiguity to resolve this round:** {one specific thing}
+**Why it matters:** {one-sentence impact of getting it wrong}
+```
+
+- **"Changed"** = a component, boundary, phase, or locked decision moved. Wording edits do not.
+- **Round 1 has no base** — emit the full state, not a delta.
+- **The final round emits a delta if one exists**, so the last thing seen is what the last
+  answer moved.
+- Nothing changed? Omit the block, but say "no change since last round" — an absence should be a
+  statement, not an oversight.
+{%- endif -%}
+{%- if block == 'decision_depth' and _depth == 'deep' %}
+
+<!-- @hm:comprehension:decision_depth -->
+**Per-question envelope.** Budget goes to context, NOT to more questions — the 5-term gate still
+governs which get asked. For each question you do ask:
+
+| Field | Content |
+|---|---|
+| Decides | what this question settles, in one line |
+| Rewrites | which downstream sections each option changes |
+| Recommended | your default **and why** — an option with no recommendation is a coin flip you handed the user |
+| Reversibility | what it costs to undo this later: minutes, a phase, or a migration |
+{%- endif -%}
+{%- if block == 'teach_back' and _depth == 'deep' %}
+
+<!-- @hm:comprehension:teach_back -->
+**Closing readback.** Before the interview ends, restate the locked design in the user's framing
+— what is being built, in what order, which alternatives were rejected and why.
+
+**Output only**: it requires **no response** and creates **no gate**. Do not wait, do not block,
+do not read silence as approval or refusal. The next step proceeds as it would have.
+
+Skip it when nothing was locked — the Step 0 skip fired, a loop-mode iteration, or a halt.
+{%- endif -%}

@@ -34,6 +34,8 @@ from harness_maker.io_utils import denormalize_home_to_tilde, load_harness_yaml
 from harness_maker.models import (
     _MODEL_ID_PATTERN,
     ASK_LEVEL,
+    COMPREHENSION_DEPTHS,
+    DEFAULT_COMPREHENSION_DEPTH,
     DELEGATABLE_STAGES,
     LEGACY_LEVEL_ALIASES,
     OPERATIONAL_LEVELS,
@@ -61,6 +63,7 @@ from harness_maker.models import (
     SecondOpinionConfig,
     Target,
     ToolchainConfig,
+    interview_comprehension_defaults,
     interview_deep_gate_defaults,
 )
 
@@ -756,12 +759,22 @@ def _build_answers(
     instrumentation: InstrumentationConfig | None = None,
     worktree_enabled: bool | None = None,
     toolchains: list[ToolchainConfig] | None = None,
+    comprehension_depth: str | None = None,
     schema_version: int = 4,
 ) -> InterviewAnswers:
     is_side = preset == Preset.SIDE
     extras = _preset_extras(preset, schema_version=schema_version)
     if worktree_enabled is not None:
         extras = {**extras, "worktree": {"enabled": worktree_enabled}}
+    # This rebuild takes a field ALLOWLIST, so any root field the caller does not name is
+    # reset to the new preset's default. `interview` is such a field, so without this a
+    # `--preset` switch silently rewrites an explicit `depth: deep` back to the default —
+    # `[fail:design] promoted-default-reaches-bare-callers`, the class where the missed
+    # sites are invisible to grep because they name nothing.
+    if comprehension_depth is not None:
+        interview = {**extras["interview"]}
+        interview["comprehension"] = {"depth": comprehension_depth}
+        extras = {**extras, "interview": interview}
     return InterviewAnswers(
         locale=locale,
         targets=list(targets),
@@ -1299,7 +1312,66 @@ def answers_from_harness_yaml(yaml_path: Path) -> InterviewAnswers | None:
                     type(user_value).__name__,
                 )
 
+    # PLAN-plan-interview-comprehension ADR-002: the SECOND read-side overlay.
+    #
+    # `_preset_extras` rebuilds the whole `interview` block, so a key added there alone is
+    # silently reset to the preset default on every `--update` — the failure mode that
+    # reverted hand-edited `scope`/`branch_prefix` before 0.48.0. ADR-012 froze eps/tau/cap
+    # as code constants, which is exactly why there is no generic round-trip to inherit.
+    #
+    # A THIRD addition here should become a generic mechanism instead of a third hand-wired
+    # overlay.
+    _comprehension_raw = _dig(data, "interview", "comprehension")
+    new_interview = dict(update.get("interview", base.interview))
+    new_interview["comprehension"] = _parse_comprehension(_comprehension_raw, yaml_path)
+    update["interview"] = new_interview
+
     return base.model_copy(update=update)
+
+
+def _parse_comprehension(raw: object, yaml_path: object) -> dict[str, Any]:
+    """Resolve ``interview.comprehension`` — fail-open, never raising (ADR-004/006).
+
+    Absent, malformed, or unknown all land on the default. ADR-006 makes that an accepted
+    retrofit rather than a preservation bug: an existing harness gains the disclosure on
+    its next re-render and opts back out with ``depth: minimal``.
+
+    Fail-OPEN rather than fail-closed on purpose. Falling back to ``minimal`` would let one
+    typo silently disable the feature, which is this repo's most-recurring failure class
+    (absent-case = feature black hole, count:8). Raising would be worse still — no other
+    key in ``harness.yaml`` kills the load.
+    """
+    resolved = interview_comprehension_defaults()
+    if raw is None:
+        return resolved
+    if not isinstance(raw, dict):
+        logger.warning(
+            "harness.yaml %s: interview.comprehension must be a mapping (got %s); "
+            "using depth: %s. The value will be rewritten on the next re-render.",
+            str(yaml_path),
+            type(raw).__name__,
+            DEFAULT_COMPREHENSION_DEPTH,
+        )
+        return resolved
+    if "depth" not in raw:
+        return resolved
+    depth = raw["depth"]
+    if isinstance(depth, str) and depth in COMPREHENSION_DEPTHS:
+        resolved["depth"] = depth
+        return resolved
+    # The warning is the ONLY notice the user ever gets: normalization happens here, the
+    # harness-yaml emitters re-emit from the normalized config, so the typo is overwritten
+    # on the next `--update` and this branch can never be reached again. Say so.
+    logger.warning(
+        "harness.yaml %s: interview.comprehension.depth %r is not one of %s; "
+        "using depth: %s. The invalid value will be overwritten (rewritten) in "
+        "harness.yaml on the next re-render, so this warning fires only once.",
+        str(yaml_path),
+        depth,
+        ", ".join(COMPREHENSION_DEPTHS),
+        DEFAULT_COMPREHENSION_DEPTH,
+    )
+    return resolved
 
 
 def _parse_targets(raw: object) -> list[Target]:
@@ -1522,6 +1594,7 @@ def _preset_extras(preset: Preset, *, schema_version: int = 2) -> dict[str, Any]
             "interview": {
                 "deep_gate": interview_deep_gate_defaults(),
                 "main_loop": main_loop,
+                "comprehension": interview_comprehension_defaults(),
             },
             "max_review_rounds": review_rounds,
             "schema_version": schema_version,
@@ -1549,6 +1622,7 @@ def _preset_extras(preset: Preset, *, schema_version: int = 2) -> dict[str, Any]
         "interview": {
             "deep_gate": interview_deep_gate_defaults(),
             "main_loop": {"max_rounds": None},
+            "comprehension": interview_comprehension_defaults(),
         },
         "schema_version": schema_version,
     }

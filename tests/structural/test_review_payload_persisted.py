@@ -49,6 +49,25 @@ _STEP_LANDED = "2026-08-05"
 #: (slug, round) pairs that ran on or after the cutoff WITHOUT persisting. Each needs a
 #: reason. Adding an entry is the visible cost of skipping the step; removing one is free.
 _KNOWN_MISSING: dict[tuple[str, int], str] = {
+    ("plan-interview-comprehension", 2): (
+        "round 1 of this slug WAS re-captured rather than waived: the original /hm:review "
+        "skipped Step 3.4 entirely, and when this gate surfaced it at wrapup the operator "
+        "chose to re-run the review properly, so "
+        "20260813T0700Z-round1-merged.json is a genuine capture (it found a P0 the first "
+        "pass had missed — the golden's own durability check was pinned to `merge-base`, "
+        "which returns HEAD once the branch lands, so it would have gone red on the very "
+        "commit that shipped it). Round 2 cannot be recovered the same way and is recorded "
+        "as missing: the re-run converged in a single round, because the round-2 findings "
+        "had already been fixed. Manufacturing a second round purely to produce a file "
+        "would be a round run for the gate rather than for the code — the exact non-capture "
+        "this corpus exists to exclude. The round-2 findings, their tags and dispositions "
+        "survive in REVIEW-plan-interview-comprehension-2026-08-13.md; what is lost is the "
+        "replayable payload. This is the sixth slug to miss this line, and the fourth in a "
+        "row; the entries above already conclude that is evidence about the step's "
+        "placement rather than about the orchestrators — this one adds that a round-1-only "
+        "recovery is possible while a later-round one is not, which is an argument for "
+        "persisting at merge time rather than as a numbered step the round can skip."
+    ),
     ("second-opinion-oracle-polyglot", 1): (
         "the orchestrator ran Pass 1, the cross-model voters and the consensus filter but "
         "skipped Step 3.4 entirely — neither `codex_adapter stamp-ids` nor persist-payload. "

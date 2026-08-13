@@ -285,7 +285,19 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # corrected per-(agent,stage,slug,run-id) terminal invariant, the `coherence` pointer,
     # and the shell-quoting rules for the free-text `--reason`. Attributed in
     # work-docs/BASELINE-DELTA-validator-pass-cap.md.
-    "plan": 47503,
+    # 47503 → 48595 (PLAN-plan-interview-comprehension): the shared disclosure partial, at
+    # this repo's own effective `depth: standard`. Compaction FIRST per the bar the entries
+    # around this one set — raw was +1923, a compaction pass cut it to +1547, and the review
+    # round took it to +1092 (−43% from raw). That last −455 is not compaction: the round
+    # found that ADR-008 gated only Step A's heading, so the ORIGINAL round-preamble block
+    # still rendered alongside the partial's and `/hm:plan` shipped two contradicting
+    # preambles at the default depth. Gating it deleted the duplicate. The residue is the
+    # feature: the design brief (which discloses the Step 1 draft the heading itself calls
+    # unshown) plus the round-state delta contract.
+    # A third-party harness at `depth: minimal` pays ZERO — that is AC-003, asserted by
+    # SHA-256 against a pre-change golden, not by character count. Attributed in
+    # work-docs/BASELINE-DELTA-plan-interview-comprehension.md.
+    "plan": 48595,
     "research": 26673,
     # 34760 → 35828 (review round 4): the `CHANGES_REQUESTED` resolution bullet gained an
     # autopilot carve-out, and the APPROVED+human_review_needed bullet was split so the
@@ -295,7 +307,13 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # cannot be compressed away. Attributed in
     # work-docs/BASELINE-DELTA-workflow-time-token-savings.md.
     "review": 35828,
-    "spec": 30537,
+    # 30537 → 32114 (PLAN-plan-interview-comprehension): the same partial, invoked with
+    # `stage='spec'`. Raw +1778, compacted to +1577. The brief's SUBJECT differs by stage
+    # (ADR-007) because `/hm:spec` has no architecture draft to disclose — identical text
+    # would instruct it to show an artifact it never produces. §2.3's existing round
+    # preamble is SUBSUMED rather than stacked, so the round-state half is close to a swap.
+    # Attributed in work-docs/BASELINE-DELTA-plan-interview-comprehension.md.
+    "spec": 32114,
     "verify": 23796,
     # 41345 → 42452 (PLAN-workflow-time-token-savings B3/B4): the shared
     # `stage_end_summary` partial gained the judgment-gate discriminator and

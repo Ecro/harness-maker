@@ -20,6 +20,11 @@ interview:
       llm_inference_enabled: {{ config.interview.deep_gate.common_ground.llm_inference_enabled | lower }}
   main_loop:
     max_rounds: {{ config.interview.main_loop.max_rounds | default('null', true) }}
+  comprehension:
+    # PLAN-plan-interview-comprehension: minimal | standard | deep.
+    # `.get()` not bare attribute access — a hand-built `interview` dict (several tests
+    # construct one) has no `comprehension` key and bare access raises UndefinedError.
+    depth: {{ (config.interview.get('comprehension') or {}).get('depth', 'standard') }}
 project:
   domains: [{{ config.project.domains | join(", ") }}]
 spec:

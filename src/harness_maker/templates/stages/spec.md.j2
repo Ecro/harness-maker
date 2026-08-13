@@ -85,6 +85,10 @@ Same UX rules as `/hm:plan`:
 - From Round 2 onward, include **"SPEC is sufficiently clear — end interview"** on one foundational question per round.
 - Visualization OPTIONAL — prose / bullets preferred, ASCII for topology, Mermaid only in the final document (never in live terminal).
 
+{%- with block = 'brief', stage = 'spec' %}
+{%- include "agents/_partials/comprehension_block.md.j2" %}
+{%- endwith %}
+
 #### 2.1 Six interview categories (in this order)
 
 Skip a category when sufficiently answered by prior research, prior SPEC, or earlier rounds. Batch multiple independent questions per round when possible.
@@ -182,7 +186,8 @@ Ranking among passing candidates is by EIG descending.
 SPEC's substantive decisions (e.g., "what counts as done for Scenario 2?", "fail-closed vs fail-open?") feed `/hm:plan`'s ADRs downstream — they live in the SPEC's `## ❓ Open Questions` section with the resolution. **SPEC does NOT have its own ADR section.** Promotion to ADR happens in `plan`.
 
 #### 2.3 Round preamble
-
+{% set _cd = (config.interview.get('comprehension') or {}).get('depth', 'standard') -%}
+{% if _cd == 'minimal' %}
 ```
 ## SPEC Interview Round {N}
 
@@ -194,6 +199,17 @@ SPEC's substantive decisions (e.g., "what counts as done for Scenario 2?", "fail
 **This round's category:** {Non-Goals / Constraints / Verification}
 **Why it matters:** {one-sentence cost of getting this wrong}
 ```
+{%- else -%}
+{%- with block = 'round_state', stage = 'spec' %}
+{%- include "agents/_partials/comprehension_block.md.j2" %}
+{%- endwith %}
+{%- with block = 'decision_depth', stage = 'spec' %}
+{%- include "agents/_partials/comprehension_block.md.j2" %}
+{%- endwith %}
+{%- with block = 'teach_back', stage = 'spec' %}
+{%- include "agents/_partials/comprehension_block.md.j2" %}
+{%- endwith %}
+{%- endif %}
 
 ### Step 3 — Write SPEC document
 

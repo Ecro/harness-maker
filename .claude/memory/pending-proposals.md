@@ -202,8 +202,17 @@ positives against the tree BEFORE building the gate, and drop it if the ratio re
 ---
 
 ## Proposal: a whole-file substring assertion may not stand in for a per-item claim (2026-08-08)
-**Triggered by:** [fail:test] assertion-invariant-over-named-dimension (count: 10 — the
-highest-count entry with no proposal of any kind, and the only one that grew this round).
+**Triggered by:** [fail:test] assertion-invariant-over-named-dimension (count: 11 as of
+2026-08-13; this proposal was written at count: 10, when it was the highest-count entry with
+no proposal of any kind). The eleventh instance (plan-interview-comprehension) is NOT the
+containment shape this proposal targets, and that is the useful part: all three of its
+sub-instances were assertions that named the right subject and asserted the wrong FIELD —
+a CLI test that walked the buggy line and checked only `depth` (the one field the bug leaves
+alone), a fixture that stubbed two different sources to the SAME object so the two branches
+became indistinguishable, and a per-stage assertion carrying only one stage's arm. An AST
+detector for whole-blob containment would have found none of them. What did find all three
+was reverting each fix and watching its test fail, which argues the cheaper fallback below
+(extend the mutation-receipt obligation) covers more of this entry's mass than the gate does.
 **Proposed mechanism:** AST structural test over `tests/`, with a measured false-positive
 count reported before it is enabled.
 
@@ -342,3 +351,37 @@ cannot leak into the next call; (2) an authoring rule that any step whose verdic
 (`pytest`, `ruff`, `mypy`) must name its target path absolutely, so the rc is attributable to a
 checkout by inspection. Cheap detector if (1) is too broad to land at once: have the verification
 step echo `pwd` beside the rc, so an rc is never recorded without the tree it graded.
+
+---
+
+## Proposal: a fix must be tested in the position where it does not obviously apply (2026-08-13)
+
+**Triggered by:** [fail:design] fix-introduces-the-defect-class-it-closes (count: 3)
+
+**Proposed mechanism:** an authoring rule in the review auto-fix loop + a receipt field.
+
+**Rationale:** three rounds in a row this class produced the same shape — the fix's own
+verification passes, and the break lands on the OTHER side of the condition the fix added.
+The 2026-08-13 pair is the clearest statement of it yet. Fix 1 gated on the PRESENCE of
+`--preset` while the compensating carrier ran only on an actual preset SWITCH, so the
+equal-preset path lost its carrier entirely: exit 0, no diagnostic, the user's value silently
+dropped. Fix 2 re-applied a value unconditionally on a stated ordering that was INVERTED —
+the override pass runs at the top of `make`, not after the block the comment claimed — so the
+explicit flag was overwritten by disk. Neither was reachable by the existing tests *by
+construction*: every `--preset` case in that file throws `Side` at a `Production` fixture, so
+the equal-preset branch had no fixture that could enter it, and no test had ever passed
+`--comprehension-depth` alongside `--reinterview`.
+
+That is the mechanizable part. A fix that adds or narrows a condition partitions the input
+space into two sides, and the existing suite is, almost by definition, sampled from the side
+that motivated the fix. So the obligation should be stated as a partition, not as "add a
+test": **name the condition the fix introduced, name both of its branches, and point at a
+test that enters each — in the same commit.** When one branch has no test that can reach it,
+that is the finding, before review sees the diff.
+
+Pairs with, and is cheaper than, the mechanism proposed under
+`fix-introduced-defect-passes-all-gates`: that one asks for a re-review of the fix delta;
+this one asks for one sentence and one fixture, and it is checkable by reading the fix alone.
+The receipt line the auto-fix loop already prints is the natural carrier — add
+`branches: <condition> → [test_a | UNREACHABLE]` and an UNREACHABLE is visible without any
+new gate.

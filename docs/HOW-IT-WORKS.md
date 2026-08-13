@@ -2444,6 +2444,29 @@ The PLAN interview decides "how to build it". Question categories proceed in **r
 8. Failure handling — retry, circuit-break, fallback
 9. Observability — log level, metric names, alert thresholds
 
+#### What the Interview Shows You While It Asks — `interview.comprehension.depth`
+
+Both interviews build more than they show. `/hm:plan` Step 1 drafts the goal, a
+component/data-flow sketch, a phase skeleton, and the ambiguities ranked by blast radius —
+under a heading that says *"NOT shown to user"* — and then asks its architecture questions
+without any of that on screen. `harness.yaml`'s `interview.comprehension.depth` decides how
+much of that existing material is disclosed:
+
+| `depth` | What the interview emits |
+|---|---|
+| `minimal` | nothing — byte-identical to the pre-0.52 commands |
+| `standard` (default) | a **brief** before the questions (for `/hm:spec`: inherited scope, AC skeleton, which of the 6 categories remain open) + a **round-state** delta whenever the design picture changes between rounds |
+| `deep` | + per question, what it decides · what it rewrites downstream · the recommended default and why · reversibility cost; then a closing **read-back** of what was locked (output only — no response asked, no gate) |
+
+Nothing new is generated: this re-routes output the stages already produce. Both stages
+include one shared partial, so the enabled block set cannot drift between them.
+
+**Existing projects are retrofitted.** A `harness.yaml` with no `comprehension` key acquires
+`standard` on its next `/harness-maker:make --update`, and its `/hm:plan` and `/hm:spec` grow
+accordingly. Opt out with `/hm:configure` → Interview comprehension → `minimal`
+(or `harness-maker make . --comprehension-depth minimal`), which restores the previous
+output exactly. An unrecognized value warns and is rewritten to `standard`.
+
 #### ADR Auto-Promotion — If Any of 5 Criteria Are Met
 
 When an interview answer meets any of the following, that decision is automatically promoted to an **Architecture Decision Record**:

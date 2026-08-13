@@ -1216,6 +1216,7 @@ class HarnessConfig(BaseModel):
         default_factory=lambda: {
             "deep_gate": interview_deep_gate_defaults(),
             "main_loop": {"max_rounds": None},
+            "comprehension": interview_comprehension_defaults(),
         }
     )
 
@@ -1375,6 +1376,7 @@ class InterviewAnswers(BaseModel):
         default_factory=lambda: {
             "deep_gate": interview_deep_gate_defaults(),
             "main_loop": {"max_rounds": None},
+            "comprehension": interview_comprehension_defaults(),
         }
     )
     schema_version: int = 4
@@ -1451,3 +1453,27 @@ def interview_deep_gate_defaults() -> dict[str, Any]:
             "llm_inference_enabled": True,
         },
     }
+
+
+#: The ordinal's legal values, low to high. Ordering is meaningful — a level enables
+#: everything the level below it does — so a future level appends rather than migrates.
+COMPREHENSION_DEPTHS: tuple[str, ...] = ("minimal", "standard", "deep")
+
+#: New installs disclose the whole picture but not per-decision depth (SPEC interview
+#: Round 2). ADR-006: an existing `harness.yaml` with no `comprehension` key resolves here
+#: too — an accepted retrofit, opted out of with `depth: minimal`.
+DEFAULT_COMPREHENSION_DEPTH = "standard"
+
+
+def interview_comprehension_defaults() -> dict[str, Any]:
+    """Disclosure-depth defaults (PLAN-plan-interview-comprehension ADR-001).
+
+    Consumed by the same four suppliers as ``interview_deep_gate_defaults``:
+      - ``HarnessConfig.interview`` default_factory
+      - ``InterviewAnswers.interview`` default_factory
+      - ``harness_maker.interview._preset_extras`` (Side + Production branches)
+
+    A fresh dict per call — a shared literal would let one construction's edit leak into
+    every later one, and both factories construct freely.
+    """
+    return {"depth": DEFAULT_COMPREHENSION_DEPTH}

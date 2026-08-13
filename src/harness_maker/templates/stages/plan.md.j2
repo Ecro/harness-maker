@@ -325,6 +325,10 @@ If `{{ config.spec.dir }}SPEC-{slug}.md` exists:
    **Case C — no SPEC file:**
    Run the full Step 3 interview from scratch.
 
+{%- with block = 'brief', stage = 'plan' %}
+{%- include "agents/_partials/comprehension_block.md.j2" %}
+{%- endwith %}
+
 #### Step 3.0 — Brief lock-in confirmation (Case A only)
 
 When SPEC is fully approved, the only remaining `/hm:plan` question is: **"Given this SPEC, are you ready for phase decomposition, or is there a how-question (architecture / phasing / library choice) you want to lock down first?"** {% if is_codex %}Use the `request_user_input` tool to present structured options to the user. If the tool is unavailable, ask in your response.{% else %}Use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code) to present structured options to the user.{% endif %} Options:
@@ -349,15 +353,24 @@ This single confirmation prevents the "I just answered every SPEC question — w
 
 Each round runs Steps A–E.
 
+{% set _cd = (config.interview.get('comprehension') or {}).get('depth', 'standard') -%}
+{% if _cd == 'minimal' -%}
 #### Step A — Render current plan state (visualization OPTIONAL)
 
 Visualization is NOT mandatory. Use only when it genuinely speeds comprehension. Format priority (most readable first):
+{%- else -%}
+#### Step A — Render current plan state
+
+Render it whenever anything changed — see the round-state contract below, which **replaces** the
+older "visualization is optional" guidance for this depth. Format priority (most readable first):
+{%- endif %}
 
 1. **Prose / bullet summary** — default.
 2. **Compact table** — when comparing alternatives across dimensions.
 3. **ASCII boxes / arrows / trees** — when topology helps.
 4. **Mermaid** — AVOID in live interview (renders as raw fenced code in terminal). OK in the final PLAN document.
 
+{% if _cd == 'minimal' -%}
 Round preamble structure:
 
 ```
@@ -375,6 +388,13 @@ Round preamble structure:
 ```
 
 If nothing topologically changed since last round, skip the "current plan state" block.
+{%- endif %}
+{%- with block = 'round_state', stage = 'plan' %}
+{%- include "agents/_partials/comprehension_block.md.j2" %}
+{%- endwith %}
+{%- with block = 'decision_depth', stage = 'plan' %}
+{%- include "agents/_partials/comprehension_block.md.j2" %}
+{%- endwith %}
 
 #### Step B — {% if is_codex %}`request_user_input` (in `{{ config.locale }}`){% else %}`AskQuestion` / `AskUserQuestion` (in `{{ config.locale }}`){% endif %}
 
@@ -499,6 +519,10 @@ per ADR-010 — see Phase 7 coverage_classifier). Ranking is by EIG descending.
 After the gate PASSes (or user accepts ambiguity), continue to next round UNLESS:
 - User chose "Plan is sufficiently clear — end interview", OR
 - Zero high/medium-impact ambiguities remain in the internal draft.
+
+{%- with block = 'teach_back', stage = 'plan' %}
+{%- include "agents/_partials/comprehension_block.md.j2" %}
+{%- endwith %}
 
 **No deferred decisions via checklist.** Before ending, scan the draft for "Accept?", "OK?", "Verify?", "Should we?", "Is this correct?" phrasings — each one is a missed round. The PLAN has no `## REVIEW CHECKLIST` section; all judgments live in the Interview Transcript or ADRs.
 

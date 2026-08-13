@@ -223,6 +223,14 @@ def make(
             "Omitted → leave existing value."
         ),
     ),
+    comprehension_depth_override: str | None = typer.Option(
+        None,
+        "--comprehension-depth",
+        help=(
+            "Interview disclosure depth: minimal | standard | deep. Controls how much of "
+            "the plan/spec interview's design picture is shown. Omitted → leave existing value."
+        ),
+    ),
     worktree_override: bool | None = typer.Option(
         None,
         "--worktree/--no-worktree",
@@ -384,6 +392,7 @@ def make(
         second_opinion_models_override=second_opinion_models_override,
         autonomy_level_override=autonomy_level_override,
         autonomy_persistent_override=autonomy_persistent_override,
+        comprehension_depth_override=comprehension_depth_override,
         worktree_override=worktree_override,
     )
     # Seed `toolchains` from manifest detection, fill-if-empty (ADR-007). Placed AFTER the
@@ -441,6 +450,34 @@ def make(
                 a = a.model_copy(
                     update={"autonomy": AutonomyConfig(level="gated", autopilot_persistent=False)}
                 )
+    # PLAN-plan-interview-comprehension ADR-002, `--reinterview` arm. `--reinterview` sets
+    # `reused = None`, so `answers_from_harness_yaml` — and with it the read-side overlay
+    # that ADR-002 exists to provide — never runs, and `interview()` cannot re-ask because
+    # ADR-003 deliberately adds no install-time question. Without this the block is
+    # `_preset_extras`'s `standard` and the emitter writes it back over the user's file:
+    # a `depth: minimal` opt-out (the zero-cost escape ADR-005 leans on) is destroyed and a
+    # `deep` user is silently downgraded, with no diagnostic. UNCONDITIONAL, unlike the
+    # `autonomy` repair above: depth is never interview-asked, so there is no fresh answer
+    # to discard. GATED ON THE FLAG, like the neighbouring `autonomy` repair: an earlier
+    # version was unconditional on the premise that `_apply_dimension_overrides` runs
+    # afterwards and the flag would still win. **That premise was inverted** — the override
+    # pass is called at the top of `make` (line ~376), well BEFORE this block, so an
+    # unconditional re-apply overwrote `--comprehension-depth` with the disk value, and with
+    # `standard` when the file had no key at all. The flag was not merely ignored; its
+    # opposite was persisted.
+    if reinterview and existing_yaml.is_file() and comprehension_depth_override is None:
+        from harness_maker.interview import _dig, _parse_comprehension
+
+        a = a.model_copy(
+            update={
+                "interview": {
+                    **a.interview,
+                    "comprehension": _parse_comprehension(
+                        _dig(pre_yaml_body, "interview", "comprehension"), existing_yaml
+                    ),
+                }
+            }
+        )
     # PLAN-worktree-side-defaults ADR-003/006: THE choke point. Every path that can
     # change the isolation value — preset flip, --worktree/--no-worktree, the
     # interview answer, /hm:configure's dispatched flags, and the migration below —
@@ -1259,6 +1296,7 @@ def _apply_dimension_overrides(
     second_opinion_models_override: str | None = None,
     autonomy_level_override: str | None = None,
     autonomy_persistent_override: bool | None = None,
+    comprehension_depth_override: str | None = None,
     worktree_override: bool | None = None,
 ) -> InterviewAnswers:
     """Apply per-dimension CLI overrides on top of the answers.
@@ -1380,6 +1418,36 @@ def _apply_dimension_overrides(
         update["autonomy"] = _build_autonomy_override(
             autonomy_level_override, autonomy_persistent_override, answers.autonomy
         )
+    # ADR-003/004. Unlike the READ path, an explicit flag is refused rather than
+    # normalized: a flag is a deliberate act with a human present, so substituting a
+    # different value would leave the user believing they set what they typed.
+    effective_depth = _resolve_comprehension_depth(comprehension_depth_override, answers)
+    # Gate on the ACTUAL switch, not on the flag's presence. The compensating path —
+    # `_build_answers(comprehension_depth=…)` — sits inside `if new_preset != answers.preset`,
+    # so suppressing the seed whenever `--preset` merely APPEARS left
+    # `--preset Production --comprehension-depth deep` on an already-Production harness with
+    # no carrier at all: exit 0, no diagnostic, old depth persisted. `commands/make.md`
+    # dispatches `--preset "$PRESET"` unconditionally with the collected (usually unchanged)
+    # value, so that is the ordinary path, not a corner. An invalid literal falls through as
+    # "not switching" — it exits non-zero a few lines below, and suppressing the seed for a
+    # value that never lands would only widen this same hole.
+    _switching_preset = False
+    if preset_override:
+        try:
+            _switching_preset = Preset(preset_override) != answers.preset
+        except ValueError:
+            _switching_preset = False
+    if comprehension_depth_override is not None and not _switching_preset:
+        # Only on the NON-preset-switch path. `update` is applied with `model_copy` AFTER
+        # the `_build_answers` rebuild below, so seeding the whole OLD `interview` dict here
+        # would win over the rebuilt one and re-import the previous preset's
+        # `main_loop.max_rounds` into the new preset (Side ⇒ 5, Production ⇒ None) — which
+        # `harness-yaml/*.j2` emits and `plan.md.j2` branches on ("up to 5 rounds" vs
+        # "unlimited rounds"). On the preset-switch path the depth travels through
+        # `_build_answers(comprehension_depth=…)` instead, which mutates only that key.
+        interview = dict(answers.interview)
+        interview["comprehension"] = {"depth": effective_depth}
+        update["interview"] = interview
 
     if preset_override:
         try:
@@ -1421,6 +1489,12 @@ def _apply_dimension_overrides(
                 # silently drops the user's (or the seeder's) toolchains and the oracle falls
                 # back to ADR-006's Python default with no diagnostic.
                 toolchains=list(answers.toolchains),
+                # `comprehension_depth=` is NOT optional here, for the same reason
+                # `autonomy=` and `toolchains=` are not: this rebuild takes a field
+                # allowlist, so `interview` is otherwise reset to the new preset's default
+                # and a user who chose `depth: deep` is silently rewritten by an unrelated
+                # `--preset` switch. `update` restores it only when the flag carried it.
+                comprehension_depth=effective_depth,
             )
             result = rebuilt.model_copy(update=update)
             if focus_override:
@@ -1492,6 +1566,33 @@ def _build_second_opinion_override(raw: str, existing: object) -> object:
             antigravity=existing.antigravity,
         )
     return SecondOpinionConfig(models=models)  # type: ignore[arg-type]
+
+
+def _resolve_comprehension_depth(override: str | None, answers: InterviewAnswers) -> str:
+    """CLI flag > harness.yaml > default, with the flag refused rather than normalized.
+
+    ADR-004's fail-open belongs to the READ path, where a typo in a config file must not
+    brick every command. A flag is different: it is typed deliberately with a human
+    present, so silently substituting `standard` for `verbose` would leave the user
+    believing they had set what they typed. Exit non-zero and name the valid set.
+    """
+    from harness_maker.models import COMPREHENSION_DEPTHS, DEFAULT_COMPREHENSION_DEPTH
+
+    if override is not None:
+        if override not in COMPREHENSION_DEPTHS:
+            typer.echo(
+                f"--comprehension-depth invalid: {override!r} "
+                f"(valid: {', '.join(COMPREHENSION_DEPTHS)})",
+                err=True,
+            )
+            raise typer.Exit(code=1)
+        return override
+    existing = answers.interview.get("comprehension")
+    if isinstance(existing, dict):
+        current = existing.get("depth")
+        if isinstance(current, str) and current in COMPREHENSION_DEPTHS:
+            return current
+    return DEFAULT_COMPREHENSION_DEPTH
 
 
 def _build_autonomy_override(

@@ -80,6 +80,16 @@ Options (multi-select):
   architecture interview stops at `gated`/`auto_safe`; `auto_full` answers it with the
   recommended option and records that in the PLAN — say so, it is the difference between
   the two auto levels.
+- **Interview comprehension** — `interview.comprehension.depth`: `minimal` (today's terse
+  interview) / `standard` (the default — the plan/spec interview opens with a design brief and
+  reports what changed each round) / `deep` (adds a per-question envelope — what it decides, what
+  it rewrites, the recommended default and why, the cost to undo — plus a closing readback of the
+  locked design). Trade-off: more to read per round, in exchange for seeing the whole design and
+  the reasoning behind each choice. It spends the budget on **context per question, not more
+  questions** — `interview.deep_gate` is untouched. Dispatch with
+  `--comprehension-depth "$COMPREHENSION_DEPTH"` — quoted like every sibling flag, because
+  a free-text "Other" answer substituted into an unquoted position is evaluated by the
+  shell *before* the CLI's allowlist ever sees it. An out-of-set value exits non-zero.
 - **Locale** — the `locale` tag (en / ko / …), for this conversation and the re-render.
   Unknown tags fall back to English.
 - **Delivery metrics tuning** — `{% if is_codex %}@hm-metrics{% else %}/hm:metrics{% endif %}`
@@ -174,7 +184,9 @@ Worktree isolation is a flag pair: append exactly one of `--worktree` /
 `--no-worktree`, only when changed. A refused `--no-worktree` exits non-zero listing
 the branches — surface it verbatim and stop.
 
-Append when changed: `--locale "$LOCALE"`; `--second-opinion-models "$SO_MODELS"` (comma
+Append when changed: `--comprehension-depth "$COMPREHENSION_DEPTH"` (one of `minimal` /
+`standard` / `deep` — an out-of-set value exits non-zero rather than being corrected, so
+pass the literal the user chose, quoted); `--locale "$LOCALE"`; `--second-opinion-models "$SO_MODELS"` (comma
 list, `""` disables — per-model sub-blocks like `codex.hermetic` survive either way);
 `--autonomy-level "$AUTONOMY"` (`gated` turns auto-advance off while preserving persistence
 and caps) plus `--autonomy-persistent` / `--no-autonomy-persistent` only on an explicit

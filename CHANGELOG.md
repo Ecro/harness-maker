@@ -2,6 +2,50 @@
 
 ## [Unreleased]
 
+### The plan interview already knew the whole design — it just wasn't telling you
+
+`/hm:plan` Step 1 builds the goal, the component sketch, the phase skeleton and the
+blast-radius-ranked ambiguities *before* it asks anything, under a heading that literally reads
+**"NOT shown to user"**. Step A's round-state block was optional and therefore usually skipped.
+So you answered architecture questions through a keyhole — not because the picture didn't exist,
+but because nothing routed it to the screen.
+
+New `harness.yaml` key, one ordinal rather than four switches:
+
+```yaml
+interview:
+  comprehension:
+    depth: standard   # minimal | standard | deep
+```
+
+- `minimal` — the previous behavior, byte-for-byte.
+- `standard` — a **brief** before the questions, plus a **round-state** delta whenever the design
+  picture changes between rounds.
+- `deep` — adds, per question, what it decides · what it rewrites downstream · the recommended
+  default and why · reversibility cost, then a closing **read-back**. Output only: it asks for no
+  response and gates nothing.
+
+`/hm:spec` gets the same treatment from the same partial, with its own subject (inherited scope,
+AC skeleton, which of the six categories are still open) — it has no internal design draft to
+disclose, and its existing "Decisions locked in so far" preamble is *replaced*, not duplicated.
+
+**Existing projects are retrofitted, on purpose.** A `harness.yaml` with no `comprehension` key
+acquires `standard` on its next `/harness-maker:make --update`, so `/hm:plan` and `/hm:spec` grow
+(claude +3 190 chars, codex +2 474 across both commands; attributed per command in
+`work-docs/BASELINE-DELTA-plan-interview-comprehension.md`). There is no fresh-install-vs-existing
+signal to branch on, and leaving the feature dark for everyone who already has the plugin would
+have made it reachable only by reading a changelog.
+
+**Opting out costs nothing, and that is a tested claim, not a promise.** `/hm:configure` gained an
+"Interview comprehension" dimension, and `harness-maker make . --comprehension-depth minimal`
+persists it. At `minimal` both commands render to the same SHA-256 as a golden captured *before*
+any template in this change was touched — the ratchet baseline could not be that oracle, since it
+is regenerated at the new default.
+
+An unrecognized value (`verbose`, `full`) warns naming the file and the value, then proceeds as
+`standard`; the warning states that the typo will be rewritten on the next render, because it will
+be, and that sentence is the only notice you get.
+
 ### Every hook in `.codex/hooks.json` was dead, and Codex was the one saying so
 
 Codex's hooks parser accepts exactly two top-level keys, `description` and `hooks`, and rejects
