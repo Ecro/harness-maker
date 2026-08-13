@@ -90,8 +90,15 @@ Every changed key gets a row. Two of the three command rows are this task; the t
 | `surface.codex.hm-plan` | 46 044 | 47 255 | +1 211 | **this task** — same partial, codex variant |
 | `surface.codex.hm-spec` | 27 734 | 28 932 | +1 198 | **this task** |
 | `surface.codex.hm-execute` | 37 660 | 37 270 | −390 | **not this task** — pre-existing drift |
-| `render_sha` | `bdf533a0` | `01922911` | — | mechanical — moves on every regeneration |
-| `payload_digest` | (old) | (new) | — | mechanical — moves on every regeneration |
+| `render_sha` | `bdf533a0` | `0e5c4fcf` | — | mechanical — moves on every regeneration |
+| `payload_digest` | `af874f0a…` | `afb2c82e…` | — | mechanical — moves on every regeneration |
+
+Per-command subjects, named bare so the attribution is on the **command** rather than on a
+dotted path: claude `plan`, `spec`, `configure`, `execute`; codex `hm-plan`, `hm-spec`,
+`hm-execute`. (The gate matches the backticked bare name — an earlier draft backticked only
+the full `surface.<variant>.<command>` key, so the codex rows attributed nothing and the
+claude rows passed only by coincidence, because §4 happened to mention `plan` and `spec`
+on their own.)
 
 **The `execute` rows are not mine and saying so is the point.** The baseline was frozen at
 `bdf533a0`; HEAD is `01922911`. `execute.md.j2` changed in between (the Phase A.5 three-lens
@@ -137,6 +144,10 @@ against all four entry arms, because a cut that hit only one arm would be the bu
 keying exists to expose.
 
 ## 5. Ordering
+
+**Phase 3b ran** at the landed commit `0e5c4fcf`. The regenerated aggregates are
+**380 334** (claude) / **308 250** (codex) — identical to §1, so the pre-land measurement was
+correct and no figure had to be revised after the fact.
 
 The figures above were written **after** the final template edit and measured with
 `python tests/structural/_surface_baseline.py --print`, which renders without writing. The

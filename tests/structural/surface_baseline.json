@@ -1,21 +1,21 @@
 {
   "aggregate_chars": {
-    "claude": 377215,
-    "codex": 306231
+    "claude": 380334,
+    "codex": 308250
   },
   "counting_rule": "ADR-011: round_trips = count of ^! lines (claude variant) or 'Bash(' call sites (codex variant), plus all 'Task(' occurrences; fenced examples included. A consistent proxy, not a semantic count.",
   "generated_by": "tests/structural/_surface_baseline.py",
-  "payload_digest": "af874f0a493a329b10b0c6855a6884fecaeb94797137007a9aa219d20cd9025b",
-  "render_sha": "bdf533a00d269bb15abcefb348f433985384a685",
+  "payload_digest": "afb2c82e4987208c6ea05955a798153f03e5e83dfdb57f2215f559b2b076d935",
+  "render_sha": "0e5c4fcf513c76d49de4078cc4888fcf0779c3e0",
   "schema_version": 1,
   "surface": {
     "claude": {
       "configure": {
-        "chars": 10982,
+        "chars": 12082,
         "round_trips": 4
       },
       "execute": {
-        "chars": 40548,
+        "chars": 40158,
         "round_trips": 17
       },
       "health": {
@@ -43,7 +43,7 @@
         "round_trips": 7
       },
       "plan": {
-        "chars": 52705,
+        "chars": 53916,
         "round_trips": 14
       },
       "research": {
@@ -55,7 +55,7 @@
         "round_trips": 8
       },
       "spec": {
-        "chars": 30465,
+        "chars": 31663,
         "round_trips": 6
       },
       "uninstall": {
@@ -73,7 +73,7 @@
     },
     "codex": {
       "hm-execute": {
-        "chars": 37660,
+        "chars": 37270,
         "round_trips": 16
       },
       "hm-help": {
@@ -89,7 +89,7 @@
         "round_trips": 0
       },
       "hm-plan": {
-        "chars": 46044,
+        "chars": 47255,
         "round_trips": 13
       },
       "hm-research": {
@@ -101,7 +101,7 @@
         "round_trips": 9
       },
       "hm-spec": {
-        "chars": 27734,
+        "chars": 28932,
         "round_trips": 5
       },
       "hm-verify": {
