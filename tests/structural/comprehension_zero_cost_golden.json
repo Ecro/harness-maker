@@ -1,16 +1,16 @@
 {
   "digests": {
     "claude": {
-      "plan": "08b6e849d622d0402c6ceddc5297ca7f9f38f583f3d805d4a4ca4203f1e4bf12",
-      "spec": "98abf958b0743ff20b31b4c98be84d892713a6160a11905f2f864f2db191ad35"
+      "plan": "02f5cbb76be50c9c83ffcb044a1781cb7d3db1c6a21874aa3e1d4174fe7527e0",
+      "spec": "ed41d801551a40bbbfdd49150a3315650bb95b8efdfd4c3c41496b53d8b6f15a"
     },
     "codex": {
-      "hm-plan": "f65b9d7b3da03786169ece4d2a33c679df96411d4e05f06cfeb10f2391417fad",
-      "hm-spec": "fe9cf10c5c836d45abb2a771cee2bbe081fdcf1834816f9a92ef3a39eea247da"
+      "hm-plan": "9197f40dc849669ee3e0583b345849b3aeefdc74fe0152ef9f5da193c2280eb5",
+      "hm-spec": "9fa801bf3452d84e81be166a13ff3441fd88cf0da545a204f9b575c0c9b454af"
     }
   },
   "generated_by": "tests/structural/_comprehension_golden.py",
-  "note": "AC-003 oracle. Captured before any template edit; never regenerate from this task. Compare a depth='minimal' render against these digests.",
+  "note": "AC-003 oracle. Digests are of the render at `source_sha` (pre-change templates) with `harness_maker_version:` MASKED, so a release bump cannot invalidate them. Re-derived from a git worktree at that SHA, never from the current templates \u2014 regenerating from current templates would make AC-003 compare minimal to itself.",
   "schema_version": 1,
   "source_sha": "01922911cb23e91a3083ed0afc5cd986984e14c1"
 }

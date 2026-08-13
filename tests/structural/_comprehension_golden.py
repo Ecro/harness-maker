@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -43,14 +44,33 @@ TRACKED_COMMANDS: dict[str, tuple[str, ...]] = {
 }
 
 
+#: Provenance frontmatter that legitimately moves without the body changing. `content_hash`
+#: is derived from the body, so it tracks what AC-003 actually cares about and is NOT masked.
+_PROVENANCE = re.compile(r"^harness_maker_version:.*$", re.M)
+
+
 def digest(text: str) -> str:
-    """SHA-256, not ``len()``.
+    """SHA-256 of the render with the version line masked.
 
     Equal character counts do not prove byte identity — two renders can differ in
     whitespace, in a swapped line, or in encoding while measuring the same length. AC-003
     says byte-identical and must be asserted that way.
+
+    **The version line is masked, and that is the point of this docstring.** The first
+    version of this golden hashed the raw render, which embeds
+    `harness_maker_version:` in every command's provenance frontmatter — so the oracle broke
+    on the next release bump, and broke it in the most misleading way available: `0.51.1`
+    and `0.51.2` are the same LENGTH, so the render was byte-different at identical size and
+    the failure read "the opt-out is not free" when nothing about the opt-out had changed.
+    That is the same defect class a reviewer caught in this file's durability check — a pin
+    on a quantity that moves for reasons unrelated to the claim — fixed there and left here.
+
+    AC-003's claim is "the depth branch adds nothing at `minimal`", not "this file never
+    changes". Masking the version asserts the claim; hashing it asserted the release number.
     """
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+    return hashlib.sha256(
+        _PROVENANCE.sub("harness_maker_version: <MASKED>", text).encode()
+    ).hexdigest()
 
 
 def merge_base_sha() -> str:
