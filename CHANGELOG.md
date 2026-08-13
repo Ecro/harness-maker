@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.51.3] — 2026-08-13
+
+### Fixed
+
+- The AC-003 zero-cost golden hashed the raw render, which embeds `harness_maker_version:`
+  in provenance frontmatter — so the 0.51.2 bump broke its own quality-gate with
+  "the opt-out is not free" when nothing about the opt-out had changed. `digest()` now masks
+  the version line; digests were re-derived from the pre-change templates at the golden's own
+  `source_sha`. **0.51.2 was tagged but never published** — the gate blocked build/publish.
+
 ## [0.51.2] — 2026-08-13
 
 ### The plan interview already knew the whole design — it just wasn't telling you
