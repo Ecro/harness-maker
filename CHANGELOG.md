@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.51.2] — 2026-08-13
 
 ### The plan interview already knew the whole design — it just wasn't telling you
 
