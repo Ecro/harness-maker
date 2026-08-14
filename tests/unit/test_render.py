@@ -513,9 +513,19 @@ def test_render_hooks_json_valid_in_both_dev_modes(
 def test_render_cursor_hooks_json_includes_spec_gate_when_spec_driven(
     tmp_path: Path,
 ) -> None:
-    """Symmetric to the task-driven test: dev_mode=spec-driven includes the
-    Write|Edit spec_gate matcher in the cursor preToolUse list. Both gates
-    receive the PATH wrap from the template."""
+    """Symmetric to the task-driven test: dev_mode=spec-driven includes spec_gate in
+    the cursor preToolUse list, under `Write|Edit|MultiEdit`. Both gates receive the
+    PATH wrap from the template.
+
+    **This assertion was inverted 2026-08-14** (PLAN-render-degrades-live-harness). It
+    used to pin `Write|Edit` here, matching the Cursor template — while both settings
+    templates used `Write|Edit|MultiEdit`, so a Cursor user's MultiEdit writes were
+    never spec-gated. A `Production.json.j2` comment even described the divergence as
+    intentional. It was not: it was the earlier mistake, corrected on one side only,
+    and this test held the uncorrected side in place. `.cursor/hooks.json` is in
+    neither the surface baseline nor any snapshot, so this was the only thing pinning
+    that matcher at all.
+    """
     import json as _json
 
     from harness_maker.models import DevMode, Target
@@ -535,15 +545,18 @@ def test_render_cursor_hooks_json_includes_spec_gate_when_spec_driven(
         (project_root / ".cursor" / "hooks.json").read_text(encoding="utf-8"),
     )
     pre_tool_use = parsed["hooks"]["preToolUse"]
-    # Bash×2 (loop_gate + permission_gate) + Write|Edit|MultiEdit (worktree_gate)
-    # + Write|Edit (spec_gate)
+    # Bash×2 (loop_gate + permission_gate) + Write|Edit|MultiEdit ×2
+    # (worktree_gate + spec_gate)
     assert len(pre_tool_use) == 4
     matchers = [h["matcher"] for h in pre_tool_use]
     assert matchers.count("Bash") == 2
-    assert "Write|Edit|MultiEdit" in matchers
-    assert "Write|Edit" in matchers
-    spec_gate_hook = next(h for h in pre_tool_use if h["matcher"] == "Write|Edit")
-    assert "spec_gate" in spec_gate_hook["command"]
+    assert matchers.count("Write|Edit|MultiEdit") == 2
+    assert "Write|Edit" not in matchers, (
+        "the bare Write|Edit matcher is the bug: it leaves MultiEdit ungated on Cursor "
+        "while both settings templates gate it"
+    )
+    spec_gate_hook = next(h for h in pre_tool_use if "spec_gate" in h["command"])
+    assert spec_gate_hook["matcher"] == "Write|Edit|MultiEdit"
     assert spec_gate_hook["command"].startswith(
         'CLAUDE_PROJECT_DIR="${CLAUDE_PROJECT_DIR:-${CURSOR_PROJECT_DIR:-$PWD}}" '
         'PATH="$HOME/.local/bin:$PATH"',

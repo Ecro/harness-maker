@@ -36,10 +36,14 @@
     (P0 #1) `.claude/hooks/hooks.json` is retired: its FileSpec is removed (synthesize.py)
     and it no longer renders; a byte-pristine stale copy is deleted, a user-edited one
     preserved (reconcile `_SWEEP_NEVER_DELETE` + cli pristine-exact-match).
-    spec_gate uses `Write|Edit|MultiEdit` (NOT hooks.json.j2:44's `Write|Edit` — that
-    dropped MultiEdit on a false premise: `_entry_identity` keys on matcher + EVERY
-    command, so spec_gate's group coexists with the worktree_gate group under the same
-    matcher). Every PreToolUse blocking gate carries `"timeout": 10`, matching its siblings.
+    spec_gate uses `Write|Edit|MultiEdit`. The `Write|Edit` this comment used to contrast
+    it against dropped MultiEdit on a false premise (`_entry_identity` keys on matcher +
+    EVERY command, so spec_gate's group coexists with the worktree_gate group under the
+    same matcher) — and the Cursor template still carried that mistake, which meant a
+    Cursor user's MultiEdit writes were not spec-gated at all. Aligned 2026-08-14
+    (PLAN-render-degrades-live-harness); the two files must now agree, and the divergence
+    this comment described no longer exists.
+    Every PreToolUse blocking gate carries `"timeout": 10`, matching its siblings.
     permission_gate takes `--subordinate-to-deny-dangerous` (ADR-007) — Claude-only, so the
     gate defers to this file's `permissions.deny` for the deny_dangerous opt-out.
 

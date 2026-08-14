@@ -1005,11 +1005,262 @@ def _entry_identity(
     return (matcher_val, _normalize_hm_managed_command(flat_cmd), "")
 
 
+def _is_mixed_group(hooks_list: list[Any]) -> bool:
+    """Does this nested entry hold at least one command we do not manage?
+
+    The ADR-003 ownership signal. `_normalize_hm_managed_command` folds our commands
+    to a `<HM>:` form and round-trips everything else unchanged, so a command that
+    survives normalization verbatim is not ours.
+    """
+    return any(
+        isinstance(h, dict)
+        and isinstance(h.get("command"), str)
+        and _normalize_hm_managed_command(h["command"]) == h["command"]
+        for h in hooks_list
+    )
+
+
+def _harness_commands_in(entry: Any) -> set[str]:  # noqa: ANN401 — heterogeneous JSON
+    """Normalized harness commands a preserved user entry still carries."""
+    hooks_list = entry.get("hooks") if isinstance(entry, dict) else None
+    if not isinstance(hooks_list, list):
+        return set()
+    out: set[str] = set()
+    for h in hooks_list:
+        if isinstance(h, dict) and isinstance(h.get("command"), str):
+            norm = _normalize_hm_managed_command(h["command"])
+            if norm != h["command"]:
+                out.add(norm)
+    return out
+
+
+def _entry_commands(entry: Any, *, schema: Literal["nested", "flat"]) -> list[str]:  # noqa: ANN401
+    """Every command string an entry carries, in order — both schemas."""
+    if not isinstance(entry, dict):
+        return []
+    if schema == "flat":
+        cmd = entry.get("command")
+        return [cmd] if isinstance(cmd, str) else []
+    hooks_list = entry.get("hooks")
+    if not isinstance(hooks_list, list):
+        return []
+    return [
+        h["command"]
+        for h in hooks_list
+        if isinstance(h, dict) and isinstance(h.get("command"), str)
+    ]
+
+
+def _harness_commands_of(entry: Any, *, schema: Literal["nested", "flat"]) -> set[str]:  # noqa: ANN401
+    """Normalized harness commands an entry carries — schema-agnostic.
+
+    A flat (Cursor) entry holds its single command at the entry level, so
+    `_harness_commands_in`, which reads `hooks[]`, finds nothing there. Routing both
+    schemas through one reader is what let ADR-011 and ADR-014 extend to Cursor.
+    """
+    if schema == "nested":
+        return _harness_commands_in(entry)
+    return {
+        norm
+        for cmd in _entry_commands(entry, schema=schema)
+        if (norm := _normalize_hm_managed_command(cmd)) != cmd
+    }
+
+
+#: The `--with <value>` token of a `uv run` invocation, quoted or bare. ADR-014 swaps
+#: exactly this span and nothing else.
+_WITH_REF_RE = re.compile(r"--with\s+(?:\"[^\"]*\"|'[^']*'|\S+)")
+
+
+def _command_module(cmd: str) -> str | None:
+    """The `harness_maker.<module>` a command runs, ignoring its arguments.
+
+    `_normalize_hm_managed_command` folds module AND trailing args into one identity,
+    which is right for dedup — two invocations with different flags are different hooks
+    — but wrong as the key for a ref refresh: a user who appended `--exempt projects/`
+    would never match the template's argument-free form and would keep a dead `--with`
+    forever. Refresh keys on the module; identity still keys on the whole thing.
+    """
+    m = _HM_MANAGED_CMD_RE.search(cmd)
+    return m.group("invocation").split()[0] if m else None
+
+
+def _refresh_ref(cmd: str, shipped_refs: dict[str, str]) -> str:
+    """Return `cmd` with its install ref brought up to the template's, or unchanged."""
+    module = _command_module(cmd)
+    token = shipped_refs.get(module) if module else None
+    return _splice_install_ref(cmd, token) if token else cmd
+
+
+def _splice_install_ref(cmd: str, ref_token: str) -> str:
+    """Swap the `--with <value>` token, preserving everything else in the command.
+
+    ADR-014. Replacing the WHOLE command with the template's text — what ADR-007 did
+    first — discards two things the user meant: a prefix before `python -m` (an env
+    assignment, a PATH shim; every Cursor command has one) and any trailing arguments.
+    Only the ref is stale, so only the ref is replaced.
+    """
+    if _WITH_REF_RE.search(cmd) is None:
+        return cmd
+    return _WITH_REF_RE.sub(lambda _: ref_token, cmd, count=1)
+
+
+def _drop_commands_from_entry(
+    entry: Any,  # noqa: ANN401 — heterogeneous JSON
+    drop: set[str],
+    *,
+    schema: Literal["nested", "flat"] = "nested",
+) -> Any | None:  # noqa: ANN401
+    """Command-level removal (ADR-004), preserving siblings, order and metadata.
+
+    Entry-level removal would take co-located commands the user never scoped —
+    `permission_gate` and `worktree_gate` share `spec_gate`'s group.
+
+    ADR-015: a flat (Cursor) entry holds ONE command at the entry level, so command-level
+    and entry-level removal coincide there. ADR-009 had withdrawn flat suppression because
+    the only choice available was delete-or-not; ADR-011 added a third action (subtract),
+    which is what makes it safe to re-enter this path.
+    """
+    if schema == "flat":
+        cmd = entry.get("command") if isinstance(entry, dict) else None
+        if isinstance(cmd, str) and _command_module(cmd) in drop:
+            return None
+        return entry
+    hooks_list = entry.get("hooks") if isinstance(entry, dict) else None
+    if not isinstance(hooks_list, list):
+        return entry
+    kept = [
+        h
+        for h in hooks_list
+        if not (
+            isinstance(h, dict)
+            and isinstance(h.get("command"), str)
+            and _command_module(h["command"]) in drop
+        )
+    ]
+    if not kept:
+        return None
+    if len(kept) == len(hooks_list):
+        return entry
+    return {**entry, "hooks": kept}
+
+
+def _matcher_terms(matcher: str) -> frozenset[str] | None:
+    """A tool-name alternation as a set, or None when the matcher is not one.
+
+    Claude Code matches a hook's `matcher` against the TOOL NAME, and every matcher this
+    harness ships is either such an alternation (`Write|Edit|MultiEdit`, `Bash`, `auto`)
+    or the wildcard `*`. `*` and any regex-shaped matcher return None, which routes the
+    caller to the conservative branch rather than to a subtraction it cannot justify.
+    """
+    if not matcher:
+        return None
+    parts = matcher.split("|")
+    if not all(p and p.replace("_", "").isalnum() for p in parts):
+        return None
+    return frozenset(parts)
+
+
+def _residual_matcher(template_matcher: str, user_matchers: set[str]) -> str | None:
+    """What the template must still cover after the user's matchers take their share.
+
+    Returns `""` when the user covers everything (the template entry gives the command
+    up entirely), the original matcher when the two are disjoint (nothing to do), a
+    narrowed alternation in between, and None when either side is not decidable.
+    Template term ORDER is preserved — the residual is the template's own string with
+    the covered terms removed, not a re-sorted set.
+    """
+    t_terms = _matcher_terms(template_matcher)
+    if t_terms is None:
+        return None
+    covered: set[str] = set()
+    for um in user_matchers:
+        u_terms = _matcher_terms(um)
+        if u_terms is None:
+            return None
+        covered |= u_terms
+    return "|".join(p for p in template_matcher.split("|") if p not in covered)
+
+
+def _residual_entries(
+    entry: Any,  # noqa: ANN401
+    residual: list[tuple[str, str]],
+    *,
+    schema: Literal["nested", "flat"] = "nested",
+) -> list[Any]:
+    """Re-emit each residual command as its own entry under the narrowed matcher.
+
+    The hook dict is carried over verbatim so `timeout` / `statusMessage` survive; only
+    the entry's `matcher` changes. Commands sharing one residual matcher are grouped.
+    """
+    if not residual:
+        return []
+    if schema == "flat":
+        # One command per entry, so the residual is the same entry under a new matcher.
+        cmd = entry.get("command") if isinstance(entry, dict) else None
+        if not isinstance(cmd, str):
+            return []
+        module = _command_module(cmd)
+        return [{**entry, "matcher": rest} for c, rest in residual if c == module]
+    hooks_list = entry.get("hooks") if isinstance(entry, dict) else None
+    if not isinstance(hooks_list, list):
+        return []
+    by_matcher: dict[str, list[Any]] = {}
+    for h in hooks_list:
+        if not (isinstance(h, dict) and isinstance(h.get("command"), str)):
+            continue
+        module = _command_module(h["command"])
+        for cmd, rest in residual:
+            if cmd == module:
+                by_matcher.setdefault(rest, []).append(h)
+    return [{**entry, "matcher": rest, "hooks": hooks} for rest, hooks in by_matcher.items()]
+
+
+def _warn_live_double_fires(
+    *,
+    event: str,
+    new_entries: list[Any],
+    per_entry_drop: list[set[str]],
+    user_scoped: dict[str, set[str]],
+    schema: Literal["nested", "flat"] = "nested",
+) -> None:
+    """Warn per (command, template matcher, user matcher) that can BOTH fire.
+
+    Keying this per-command — "warn when no entry gave the command up" — was too narrow:
+    a command suppressed on one template entry and left on another is a real double-fire
+    that stayed silent. Two matchers can both fire when their tool-name sets intersect,
+    or when either is not decidable (a regex or `*`), in which case overlap is assumed.
+    """
+    live: list[tuple[str, str, str]] = []
+    for e, drop in zip(new_entries, per_entry_drop, strict=True):
+        tm = e.get("matcher", "") if isinstance(e, dict) else ""
+        tm = tm if isinstance(tm, str) else ""
+        modules = {m for c in _entry_commands(e, schema=schema) if (m := _command_module(c))}
+        for cmd in sorted(modules - drop):
+            for um in sorted(user_scoped.get(cmd, set())):
+                t_terms, u_terms = _matcher_terms(tm), _matcher_terms(um)
+                if t_terms is None or u_terms is None or (t_terms & u_terms):
+                    live.append((cmd, tm, um))
+    if not live:
+        return
+    import typer  # local, matching this module's existing lazy-import convention
+
+    for cmd, tm, um in live:
+        typer.echo(
+            f"WARN: {event}: {cmd!r} is registered twice — the template ships it under "
+            f"matcher {tm!r} and your own entry carries it under {um!r}, which can match "
+            "the same tool. It will fire twice. Scope it under the template's matcher, or "
+            "remove it from your entry, to silence this.",
+            err=True,
+        )
+
+
 def _strip_shipped_commands(
     entry: Any,  # noqa: ANN401 — JSON entries are heterogeneous
     shipped_cmds: set[str],
     *,
     schema: Literal["nested", "flat"],
+    shipped_refs: dict[str, str] | None = None,
 ) -> Any | None:  # noqa: ANN401
     """Drop commands the template already ships (or has RETIRED) from a preserved entry.
 
@@ -1019,16 +1270,37 @@ def _strip_shipped_commands(
     ``_HARNESS_RETIRED_HOOK_INVOCATIONS``, so a user's own command is never removed
     here. Retired invocations (ADR-001 of PLAN-hook-inventory-efficiency-audit) are
     dropped even though the current template no longer ships them — that is how a
-    hook removed from the template gets removed from an existing user's disk. Flat
-    (Cursor) entries hold a single command and are returned unchanged — the retired
-    hooks were only ever in `.claude/settings.json` (nested), never Cursor.
+    hook removed from the template gets removed from an existing user's disk. A flat
+    (Cursor) entry is never STRIPPED — the retired hooks were only ever in
+    `.claude/settings.json` (nested) — but ADR-015 does refresh its install ref, because
+    a preserved flat entry carrying a pruned plugin-cache path is a dead blocking gate
+    on exactly the same terms as the nested one.
     """
     if schema == "flat":
-        return entry
+        cmd = entry.get("command") if isinstance(entry, dict) else None
+        if not (isinstance(cmd, str) and shipped_refs):
+            return entry
+        fresh = _refresh_ref(cmd, shipped_refs)
+        return entry if fresh == cmd else {**entry, "command": fresh}
     hooks_list = entry.get("hooks")
     if not isinstance(hooks_list, list):
         return entry
-    to_strip = shipped_cmds | _HARNESS_RETIRED_HOOK_INVOCATIONS
+    # PLAN-render-degrades-live-harness ADR-003/005. A MIXED group — one holding at
+    # least one command that is not harness-managed — is evidence the user owns this
+    # entry, so our commands stay inside their scoping. A PURE-harness group is
+    # indistinguishable from our own older entry (there is no provenance at merge
+    # time), and preserving it would silently revert the gate to the previous
+    # release's matcher, so it keeps being stripped.
+    #
+    # ADR-005: retirement is UNCONDITIONAL. A retired command has no template matcher
+    # to reason about, and membership in the retired set is curated — the one place
+    # where provenance is positive by construction.
+    mixed = _is_mixed_group(hooks_list)
+    to_strip = (
+        set(_HARNESS_RETIRED_HOOK_INVOCATIONS)
+        if mixed
+        else (shipped_cmds | _HARNESS_RETIRED_HOOK_INVOCATIONS)
+    )
     kept = [
         h
         for h in hooks_list
@@ -1040,9 +1312,28 @@ def _strip_shipped_commands(
     ]
     if not kept:
         return None
-    if len(kept) == len(hooks_list):
+    # ADR-007. A preserved harness command is kept under the USER's matcher but with the
+    # TEMPLATE's current text. `_normalize_hm_managed_command` elides the
+    # `uv run --with <path>` prefix for identity, so without this the user's copy — which
+    # may name a plugin-cache dir a later `/plugin update` pruned — wins over the freshly
+    # validated one and the suppression below deletes the only working copy. That froze a
+    # dead blocking gate permanently: re-render reproduced the same output byte for byte,
+    # so nothing could repair it. It is the failure ADR-003's own Context predicted.
+    refreshed = kept
+    if mixed and shipped_refs:
+        refreshed = [
+            {**h, "command": fresh}
+            if (
+                isinstance(h, dict)
+                and isinstance(h.get("command"), str)
+                and (fresh := _refresh_ref(h["command"], shipped_refs)) != h["command"]
+            )
+            else h
+            for h in kept
+        ]
+    if refreshed == hooks_list:
         return entry
-    return {**entry, "hooks": kept}
+    return {**entry, "hooks": refreshed}
 
 
 # Codex's hooks parser is strict: it accepts exactly these two top-level keys and
@@ -1125,6 +1416,33 @@ def _merge_hooks_json(
             if ident is not None:
                 shipped_cmds.update(ident[1].split(_IDENT_CMD_SEP))
 
+        # ADR-007/008/014. The template side, indexed two ways. `shipped_refs` maps a
+        # harness MODULE to the `--with <ref>` token this render produced for it — the
+        # value a preserved user copy is refreshed to. Keyed on the module, not the full
+        # normalized identity, so a command the user gave extra arguments still refreshes
+        # (ADR-014). `shipped_matchers` maps the normalized identity to the matcher(s) it
+        # ships under, which is what makes suppression matcher-aware, not event-global.
+        shipped_refs: dict[str, str] = {}
+        shipped_matchers: dict[str, set[str]] = {}
+        shipped_modules: set[str] = set()
+        for e in new_entries:
+            if not isinstance(e, dict):
+                continue
+            matcher = e.get("matcher", "")
+            matcher = matcher if isinstance(matcher, str) else ""
+            for raw in _entry_commands(e, schema=schema):
+                norm = _normalize_hm_managed_command(raw)
+                if norm == raw:  # not ours
+                    continue
+                module = _command_module(raw)
+                if module is None:
+                    continue
+                shipped_modules.add(module)
+                shipped_matchers.setdefault(module, set()).add(matcher)
+                ref = _WITH_REF_RE.search(raw)
+                if ref:
+                    shipped_refs.setdefault(module, ref.group(0))
+
         user_entries: list[Any] = []
         for e in existing_entries:
             ident = _entry_identity(e, schema=schema)
@@ -1149,11 +1467,100 @@ def _merge_hooks_json(
             # 2026-05-28 spoton triplication). Reachable in practice because Claude
             # Code's `/hooks` UI appends into an existing matcher group. So keep the
             # user's commands and drop only the ones the template already ships.
-            trimmed = _strip_shipped_commands(e, shipped_cmds, schema=schema)
+            trimmed = _strip_shipped_commands(
+                e, shipped_cmds, schema=schema, shipped_refs=shipped_refs
+            )
             if trimmed is not None:
                 user_entries.append(trimmed)
 
-        merged_hooks[event] = list(new_entries) + user_entries
+        # ADR-004. Whatever a preserved user group still carries of ours must NOT also
+        # ship from the template: Claude Code runs EVERY matching hook, so it would
+        # fire twice and the user's narrower matcher would buy nothing — the defect
+        # would survive its own fix. Command-level, so siblings keep shipping.
+        #
+        # ADR-008 amends WHICH template entry gives the command up. ADR-009 had removed the
+        # flat arm — a flat entry holds one command, so there is no mixed-group evidence and
+        # the only signal left was the matcher difference ADR-003 rejected. **ADR-015
+        # restores it**, because ADR-011 supplied a third action: subtract. Withdrawal was
+        # the right call when the choice was delete-or-not; it is not once the residual can
+        # be shipped. Cursor's duplicate was never harmless either — the preserved entry
+        # keeps a pruned `--with` (a dead blocking gate) and `telemetry` on `postToolUse *`
+        # appends a row per call, so the duplicate doubles the ledger's denominator.
+        emitted_template: list[Any] = list(new_entries)
+        if new_entries or user_entries:
+            # ADR-016. Keyed on the MODULE, not the normalized identity. The reported
+            # incident is a user who scoped `spec_gate` with an ARGUMENT — `--exempt
+            # projects/` — not with a matcher (a Claude Code matcher matches tool names, so
+            # a path exemption cannot be expressed in one at all). Trailing args are part of
+            # the identity, so an identity-keyed rule never saw their variant as "ours", the
+            # template's bare copy kept shipping beside it, and both fired: the exemption
+            # bought nothing. That is the sentence this PLAN was opened with.
+            #
+            # Safe because no single event ships one module twice with different arguments
+            # (verified across both settings templates × both dev_modes and cursor's), so
+            # module and identity coincide on the template side today.
+            user_scoped: dict[str, set[str]] = {}
+            for e in user_entries:
+                m = e.get("matcher", "") if isinstance(e, dict) else ""
+                m = m if isinstance(m, str) else ""
+                for cmd in _entry_commands(e, schema=schema):
+                    module = _command_module(cmd)
+                    if module and module in shipped_modules:
+                        user_scoped.setdefault(module, set()).add(m)
+
+            per_entry_drop: list[set[str]] = []
+            # index → [(cmd, residual_matcher)] to re-emit beside that entry (ADR-011).
+            per_entry_residual: list[list[tuple[str, str]]] = []
+            for e in new_entries:
+                tm = e.get("matcher", "") if isinstance(e, dict) else ""
+                tm = tm if isinstance(tm, str) else ""
+                drop: set[str] = set()
+                residual: list[tuple[str, str]] = []
+                for cmd, user_matchers in user_scoped.items():
+                    ships_under = shipped_matchers.get(cmd, set())
+                    if tm in user_matchers:
+                        drop.add(cmd)  # branch 1 — the /hooks-UI shape: matchers coincide
+                        continue
+                    if len(ships_under) != 1 or tm not in ships_under:
+                        continue  # branch 3 — several template homes; see the warning below
+                    # ADR-011. The user's matcher differs and the command has ONE template
+                    # home. Branch 2 used to drop it outright, which is the matcher-difference
+                    # inference ADR-003 rejected and ADR-009 withdrew on the flat path: a user
+                    # whose /hooks group carries a PREVIOUS release's matcher would pin the
+                    # gate to it forever, so widening `Write|Edit` to `Write|Edit|MultiEdit`
+                    # left MultiEdit permanently ungated with no diagnostic. Instead, subtract
+                    # what the user now covers and keep shipping the remainder.
+                    rest = _residual_matcher(tm, user_matchers)
+                    if rest is None:
+                        continue  # not decidable (regex/`*` form) — branch 3
+                    if rest == "":
+                        drop.add(cmd)  # the user covers everything this entry did
+                    elif rest != tm:
+                        drop.add(cmd)
+                        residual.append((cmd, rest))
+                    # rest == tm → the two matchers are disjoint, so there is no double-fire
+                    # and nothing to do.
+                per_entry_drop.append(drop)
+                per_entry_residual.append(residual)
+
+            _warn_live_double_fires(
+                event=event,
+                new_entries=new_entries,
+                per_entry_drop=per_entry_drop,
+                user_scoped=user_scoped,
+                schema=schema,
+            )
+
+            if any(per_entry_drop):
+                rebuilt: list[Any] = []
+                for e, d, res in zip(new_entries, per_entry_drop, per_entry_residual, strict=True):
+                    trimmed = _drop_commands_from_entry(e, d, schema=schema) if d else e
+                    if trimmed is not None:
+                        rebuilt.append(trimmed)
+                    rebuilt.extend(_residual_entries(e, res, schema=schema))
+                emitted_template = rebuilt
+
+        merged_hooks[event] = emitted_template + user_entries
 
     # Top-level: template wins on overlap; existing survives where template
     # is silent. ``hooks`` is overwritten with the merged dict explicitly.

@@ -1,5 +1,34 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **A re-render could disarm a live harness, and the damage was self-sealing.** The `--with <ref>`
+  baked into every rendered hook could point at a pruned plugin-cache directory. Hooks are
+  *blocking* `PreToolUse` gates, so an unresolvable ref did not degrade to a warning — it cost the
+  project the `Edit` tool, including the edits that would have repaired the ref. Resolvability is
+  now checked **before** `_portablize_ref`, never after: once wrapped, the value is a literal
+  `$HOME/…` that Python never expands, so a post-wrap check reports "missing" for *every* install
+  and sends the entire fleet to the fallback. The fallback pins a plain PEP 440 release — a
+  `.dev0` / `+local` pin resolves to nothing, which is the same dead gate with a different value.
+- **Hook merge no longer silently un-scopes a user's hook.** A user entry carrying a harness
+  command used to have that command stripped while the template re-added its own bare copy.
+  Ownership is now decided by mixed-group evidence, never by a matcher difference — a matcher
+  difference is ambiguous between "the user re-scoped this" and "harness-maker changed its own
+  matcher between releases", and keying on it pins the gate to the previous release's matcher.
+  Suppression **subtracts** instead of deleting: the template ships the residual matcher, so
+  template coverage and user scoping both survive.
+- **Suppression is keyed on the module, not the whole command.** A Claude Code hook `matcher`
+  matches *tool names*, so a path exemption cannot be expressed in a matcher at all — the reported
+  incident's "scope wrapper" was an argument (`spec_gate --exempt projects/`). Trailing arguments
+  are part of the normalized identity, so the identity-keyed rule never recognised that variant as
+  ours and the template's bare copy kept firing beside it.
+- **Cursor users' `MultiEdit` writes were never spec-gated.** `cursor/hooks.json.j2` shipped
+  `spec_gate` under `Write|Edit` while both settings templates used `Write|Edit|MultiEdit`, and a
+  `Production.json.j2` comment described the divergence as intentional. Aligned, comment corrected,
+  and an IDE-parity gate added so the three surfaces cannot drift apart again.
+
 ## [0.51.3] — 2026-08-13
 
 ### Fixed

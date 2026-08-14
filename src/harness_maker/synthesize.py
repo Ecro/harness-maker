@@ -13,8 +13,11 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 from pathlib import Path
 from typing import Any
+
+import typer
 
 from harness_maker.models import (
     AgentModelSpec,
@@ -67,6 +70,114 @@ def _portablize_ref(raw: str) -> str:
     return raw
 
 
+#: One warning per process. `_compute_install_ref` is called from four sites, so an
+#: undeduplicated warning fires four times per `make` and reads like four defects.
+_INSTALL_REF_WARNED: set[str] = set()
+
+
+def _reset_install_ref_warning() -> None:
+    """Test seam — the dedup set is process-global by design."""
+    _INSTALL_REF_WARNED.clear()
+
+
+#: Suffixes `uv run --with <file>` installs directly. A wheel/sdist install records the
+#: ARCHIVE in `direct_url.json` (PEP 610), not a project directory, so the project-dir
+#: predicate alone rejected an install class that worked (ADR-010a).
+_INSTALLABLE_ARCHIVE_SUFFIXES = (".whl", ".tar.gz", ".tar.bz2", ".tar.xz", ".zip")
+
+
+def _is_resolvable_project(path: str) -> bool:
+    """Can `uv run --with <path>` actually resolve this?
+
+    Existence is NOT the predicate. `_compute_install_ref`'s own docstring records
+    the 0.15.0 incident where an EXISTING uv-archive ``lib/python3.12`` directory was
+    baked and every hook then failed with "does not appear to be a Python project".
+    An ``exists()``-only guard would not have caught this repo's single documented
+    instance of the class it is meant to prevent.
+
+    ADR-010a: two shapes resolve — a project **directory** (has ``pyproject.toml``) and an
+    installable **archive** file. Suffix-based, not content-validating: the render cannot
+    install the archive to find out, and a corrupt wheel is not the failure mode here.
+    """
+    try:
+        p = Path(path)
+        if (p / "pyproject.toml").is_file():
+            return True
+        return p.is_file() and p.name.endswith(_INSTALLABLE_ARCHIVE_SUFFIXES)
+    except OSError:
+        return False
+
+
+def _warn_unresolvable_install_ref(path: str) -> None:
+    if path in _INSTALL_REF_WARNED:
+        return
+    _INSTALL_REF_WARNED.add(path)
+    typer.echo(
+        f"WARN: install ref {path!r} is not resolvable (not a project directory and not "
+        "an installable archive) — rendered hooks would fail to execute, and they are "
+        "blocking PreToolUse gates, so the project would lose Edit. Falling back to "
+        "the published distribution.",
+        err=True,
+    )
+
+
+#: A plain PEP 440 release, the only shape safe to pin: `1`, `1.2`, `1.2.3`, `1.2.3.post1`.
+#: Anything with a pre-release (`a`/`b`/`rc`), a `.dev` segment or a `+local` segment names a
+#: build no index serves, and pinning it renders a gate nothing can resolve (ADR-010b).
+#: A regex rather than `packaging.version` on purpose — `packaging` is not in this project's
+#: `dependencies` and is only ever present transitively, so an import here would work on the
+#: maintainer's machine and fail on a user's.
+_PLAIN_RELEASE_RE = re.compile(r"^\d+(?:\.\d+)*(?:\.post\d+)?$")
+
+
+def _pinned_distribution_ref(dist: object) -> str:
+    """Version-pinned so the hooks run the same gate code as the templates beside them.
+
+    A bare ``harness-maker`` lets a harness rendered by this release execute a future
+    release's ``spec_gate``. The bare form is the fallback for a version we cannot pin:
+    absent (a harness predating the 0.15.3 PyPI publication) or not a plain release
+    (a dev/local build — ADR-010b).
+    """
+    version = getattr(dist, "version", None)
+    if isinstance(version, str) and _PLAIN_RELEASE_RE.match(version):
+        return f"harness-maker=={version}"
+    detail = (
+        f"version {version!r} is a local/pre-release build no index serves"
+        if isinstance(version, str) and version
+        else "no distribution version is available"
+    )
+    # Same dedup set, same reason: `_compute_install_ref` runs at four call sites, so an
+    # undeduplicated warning reads as four defects. The first cut routed only the path
+    # warning through it and left this one firing 4x — the exact readability failure the
+    # set exists to prevent, reintroduced beside the code stating the rationale.
+    key = f"version:{version!r}"
+    if key not in _INSTALL_REF_WARNED:
+        _INSTALL_REF_WARNED.add(key)
+        typer.echo(
+            f"WARN: {detail} — falling back to the unpinned 'harness-maker'. Rendered hooks "
+            "may resolve a different release than these templates, which beats a pin that "
+            "resolves to nothing and leaves every blocking gate dead.",
+            err=True,
+        )
+    return "harness-maker"
+
+
+def _pkg_root_ref(dist: object | None) -> str:
+    """The source-tree fallback, held to the SAME resolvability bar as the `file://` one.
+
+    ADR-007 refreshes a preserved user hook to the template's command text on the premise
+    that the template's ref is validated. It was validated on the `file://` branch only —
+    these two returns handed back `_HARNESS_MAKER_PKG_ROOT` unchecked, and that is exactly
+    the 0.15.0 archive shape (`…/lib/python3.12`, no `pyproject.toml`) this function's own
+    docstring records. In that state the refresh would overwrite a user's still-working
+    invocation with a dead one, so the premise has to be made true rather than assumed.
+    """
+    if _is_resolvable_project(_HARNESS_MAKER_PKG_ROOT):
+        return _portablize_ref(_HARNESS_MAKER_PKG_ROOT)
+    _warn_unresolvable_install_ref(_HARNESS_MAKER_PKG_ROOT)
+    return _pinned_distribution_ref(dist) if dist is not None else "harness-maker"
+
+
 def _compute_install_ref() -> str:
     """Return the source path/name to embed in rendered ``uv run --with <ref>`` calls.
 
@@ -114,7 +225,7 @@ def _compute_install_ref() -> str:
 
         dist = distribution("harness-maker")
     except Exception:  # noqa: BLE001 — PackageNotFoundError or any import issue
-        return _portablize_ref(_HARNESS_MAKER_PKG_ROOT)
+        return _pkg_root_ref(None)
 
     try:
         import json
@@ -125,9 +236,18 @@ def _compute_install_ref() -> str:
             du = json.loads(raw)
             url = du.get("url", "")
             if isinstance(url, str) and url.startswith("file://"):
-                return _portablize_ref(unquote(urlparse(url).path))
+                decoded = unquote(urlparse(url).path)
+                # PLAN-render-degrades-live-harness ADR-001. Checked HERE — on the
+                # decoded path, BEFORE `_portablize_ref`. After wrapping, the value is
+                # the literal `$HOME/...`, which Python does not expand, so the
+                # predicate would be False for EVERY valid home-cache install and the
+                # whole fleet would render the fallback — worse than the defect.
+                if _is_resolvable_project(decoded):
+                    return _portablize_ref(decoded)
+                _warn_unresolvable_install_ref(decoded)
+                return _pinned_distribution_ref(dist)
     except (json.JSONDecodeError, KeyError, TypeError, ValueError):
-        return _portablize_ref(_HARNESS_MAKER_PKG_ROOT)
+        return _pkg_root_ref(dist)
     return _portablize_ref("harness-maker")
 
 
