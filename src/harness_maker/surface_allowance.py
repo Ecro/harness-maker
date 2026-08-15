@@ -34,6 +34,7 @@ class Allowance:
     reason: str
     delta_doc: str
     commands: dict[str, int] = field(default_factory=dict)
+    round_trips: dict[str, int] = field(default_factory=dict)
 
 
 def _require(block: dict[str, object], key: str, path: Path) -> object:
@@ -70,21 +71,28 @@ def _parse(block: object, path: Path) -> Allowance:
             "does not exist next to the PLAN"
         )
 
-    raw_commands = block.get("commands", {})
-    if not isinstance(raw_commands, dict):
-        raise AllowanceError(f"{path.name}: surface_allowance.commands must be a mapping")
-    commands: dict[str, int] = {}
-    for name, value in raw_commands.items():
-        if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
-            raise AllowanceError(
-                f"{path.name}: surface_allowance.commands[{name!r}] "
-                f"must be a positive int, got {value!r}"
-            )
-        commands[str(name)] = value
+    def _positive_int_map(key: str) -> dict[str, int]:
+        raw = block.get(key, {})
+        if not isinstance(raw, dict):
+            raise AllowanceError(f"{path.name}: surface_allowance.{key} must be a mapping")
+        out: dict[str, int] = {}
+        for name, value in raw.items():
+            if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+                raise AllowanceError(
+                    f"{path.name}: surface_allowance.{key}[{name!r}] "
+                    f"must be a positive int, got {value!r}"
+                )
+            out[str(name)] = value
+        return out
 
     slug = str(block.get("slug") or path.stem.removeprefix("PLAN-"))
     return Allowance(
-        slug=slug, chars=chars, reason=str(reason), delta_doc=str(delta_doc), commands=commands
+        slug=slug,
+        chars=chars,
+        reason=str(reason),
+        delta_doc=str(delta_doc),
+        commands=_positive_int_map("commands"),
+        round_trips=_positive_int_map("round_trips"),
     )
 
 
@@ -124,3 +132,22 @@ def aggregate_headroom(root: Path) -> int:
 def command_headroom(root: Path, command: str) -> int:
     """Characters a single rendered command may exceed its per-command ceiling by."""
     return sum(a.commands.get(command, 0) for a in load_active_allowances(root))
+
+
+def round_trip_headroom(root: Path, command: str) -> int:
+    """Extra mandated calls an in-flight PLAN may add to one command.
+
+    Round trips are compared **exactly** rather than ratcheted — a mandated call is added or
+    removed on purpose, never "improved" — so an in-flight PLAN that deliberately adds dispatches
+    has to declare how many, in the same frontmatter block that funds its characters. Without
+    this the only way to go green is regenerating `surface_baseline.json`, which rewrites the
+    frozen `chars` in the same file and destroys the ratchet as a side effect of a description
+    update.
+
+    The key is the baseline's own command name, **per variant** (`review` and `hm-review` are
+    separate declarations). They are not interchangeable: the counting rule differs by variant —
+    `^!` lines for claude, `Bash(` call sites for codex — and the template branches on `is_codex`,
+    so one edit legitimately adds a different number of calls to each. Folding them onto one key
+    would let a real drift in one variant hide behind the other's declaration.
+    """
+    return sum(a.round_trips.get(command, 0) for a in load_active_allowances(root))

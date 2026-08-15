@@ -54,7 +54,10 @@ from .conftest import pin_install_ref
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 
-from harness_maker.surface_allowance import aggregate_headroom  # noqa: E402
+from harness_maker.surface_allowance import (  # noqa: E402
+    aggregate_headroom,
+    round_trip_headroom,
+)
 
 _SHA = re.compile(r"^[0-9a-f]{40}$")
 
@@ -386,13 +389,18 @@ def test_round_trip_counts_match_the_live_render(
     """
     surface = frozen["surface"]
     assert isinstance(surface, dict)
+    # An in-flight PLAN may declare the calls it deliberately adds (ADR-010's
+    # `surface_allowance.round_trips`). Without that escape the only way to go green here is
+    # regenerating the baseline — which rewrites the frozen `chars` in the same file, so a
+    # description update would silently destroy the ratchet it sits next to.
     drifted = [
         f"{variant}/{name}: baseline {surface[variant][name]['round_trips']} "
         f"vs render {entry['round_trips']}"
         for variant, commands in measured.items()
         for name, entry in commands.items()
         if name in surface.get(variant, {})
-        and surface[variant][name]["round_trips"] != entry["round_trips"]
+        and surface[variant][name]["round_trips"] + round_trip_headroom(_REPO_ROOT, name)
+        != entry["round_trips"]
     ]
     assert not drifted, (
         "round-trip counts drifted from the committed baseline:\n  "

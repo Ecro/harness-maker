@@ -37,7 +37,7 @@ from typing import Any, Literal
 import yaml
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
-from harness_maker import __version__
+from harness_maker import __version__, template_globals
 from harness_maker.block_merge import MergeReport
 from harness_maker.block_merge import merge as block_merge
 from harness_maker.io_utils import RETIRED_TOP_LEVEL_KEYS, atomic_append, atomic_write
@@ -58,7 +58,7 @@ RENDER_MANIFEST_COMPACT_LINE_THRESHOLD = 2000
 
 
 def _make_env() -> Environment:
-    return Environment(
+    env = Environment(
         loader=FileSystemLoader(str(TEMPLATE_DIR)),
         keep_trailing_newline=True,
         trim_blocks=False,
@@ -66,6 +66,7 @@ def _make_env() -> Environment:
         undefined=StrictUndefined,
         autoescape=False,
     )
+    return template_globals.install(env)
 
 
 def _normalize_body(text: str) -> bytes:

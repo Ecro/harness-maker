@@ -69,7 +69,7 @@ def test_legacy_row_without_any_new_field_still_parses() -> None:
 
 
 def test_lenses_exercised_requires_confirm_pass_ran() -> None:
-    errors = _rejected_by_a_rule(**_row(terminal=True, lenses_exercised=["correctness"]))
+    errors = _rejected_by_a_rule(**_row(terminal=True, lenses_exercised=["robustness"]))
     assert _mentions(errors, "confirm_pass_ran"), errors
 
 
@@ -182,7 +182,7 @@ def test_s9_terminal_row_records_the_pass_as_not_run() -> None:
 def test_non_terminal_round_row_carries_coverage_but_no_confirmation_count() -> None:
     """Coverage is per-round; the confirmation pass happens once, at the end."""
     record = ReviewTelemetryRecord(
-        **_row(terminal=False, lenses_exercised=["correctness"], confirm_pass_ran=False)
+        **_row(terminal=False, lenses_exercised=["robustness"], confirm_pass_ran=False)
     )
     assert record.terminal is False
     assert record.confirm_pass_new_severe_n is None

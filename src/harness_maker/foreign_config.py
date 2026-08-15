@@ -425,11 +425,15 @@ def _render_template(template_name: str, ctx: dict[str, Any]) -> str:
     """
     from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
-    env = Environment(
-        loader=FileSystemLoader(str(_templates_dir())),
-        undefined=StrictUndefined,
-        keep_trailing_newline=True,
-        autoescape=False,
+    from harness_maker import template_globals
+
+    env = template_globals.install(
+        Environment(
+            loader=FileSystemLoader(str(_templates_dir())),
+            undefined=StrictUndefined,
+            keep_trailing_newline=True,
+            autoescape=False,
+        )
     )
     template = env.get_template(template_name)
     return template.render(**ctx)

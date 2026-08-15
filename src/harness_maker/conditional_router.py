@@ -20,20 +20,116 @@ from pathlib import Path
 
 from harness_maker.llm_judge import JudgeClient
 
-#: The declared failure space (SPEC AC-001). Exactly five, fixed. Every consumer — the
-#: coverage CLI, the rendered gate, the report — reads this one constant, so a lens cannot
-#: be half-added.
+#: The discovery axis, adopted verbatim from the source experiment's structured arm
+#: (PLAN-review-loop-empirics ADR-001). Textbook code-review order; the measured fan-out gain
+#: concentrated in `robustness` and `naming`, which the old axis had no owner for.
 #:
-#: These are failure-mode-shaped, not agent-shaped: `REVIEWER_SCOPES` below is the older
-#: agent axis and is deliberately NOT the same set. Two of these five have no reviewer agent
-#: at all, which is the gap the declaration exists to make visible.
-MANDATORY_LENSES: tuple[str, ...] = (
-    "correctness",
-    "failure",
-    "concurrency",
-    "security",
-    "tests",
+#: The prior five (`correctness`, `failure`, `concurrency`, `security`, `tests`) are NOT carried
+#: alongside these: `correctness` and `failure` are RETIRED, replaced by `functionality` and
+#: `robustness`. The Phase 0 pilot measured `correctness` at zero exclusive finding-groups across
+#: three diffs — every finding it produced, `functionality` produced too — so the substitution is
+#: evidenced rather than assumed. The mandatory set is nine, never eleven.
+CORE_LENSES: tuple[str, ...] = (
+    "design",
+    "functionality",
+    "complexity",
+    "robustness",
+    "naming",
+    "consistency",
 )
+
+#: The domain lenses that ride alongside the axis. The source experiment's target had no auth and
+#: no threads so it needed none of these; harness-maker renders for firmware and BLE repositories
+#: that do. Mandatory on Production, conditionally routed on Side — the cost adjustment lands on
+#: the preset axis rather than on coverage.
+DOMAIN_LENSES: tuple[str, ...] = ("security", "concurrency", "tests")
+
+#: Every lens name any preset can dispatch. Availability is preset-independent (SPEC AC-002):
+#: presets differ in which lenses are *mandatory*, never in which exist.
+ALL_LENSES: tuple[str, ...] = CORE_LENSES + DOMAIN_LENSES
+
+#: Production's mandatory set, and the name every existing consumer imports. Kept as an alias so
+#: `review_telemetry`'s known-lens validation accepts the full vocabulary regardless of preset —
+#: a Side harness that routes in `security` still emits a legitimate `security` result.
+MANDATORY_LENSES: tuple[str, ...] = ALL_LENSES
+
+
+def mandatory_lenses(preset: str = "Production") -> tuple[str, ...]:
+    """The lenses a preset must exercise before a review can be approved.
+
+    Unknown presets resolve to Production. Erring toward *more* mandatory coverage is the
+    fail-closed direction: the failure mode this set exists to catch is a dispatch that never
+    happened, and a typo'd preset silently dropping three lenses would produce exactly the
+    clean bill of health the coverage gate is built to prevent.
+    """
+    return CORE_LENSES if str(preset) == "Side" else ALL_LENSES
+
+
+#: How each lens is dispatched: the subagent that carries it, and the one-line brief that tells
+#: it which axis it owns. The six core categories share `code-reviewer` and are distinguished ONLY
+#: by this line, which is why the brief is data here rather than prose in the template — six
+#: dispatches to one agent name are otherwise indistinguishable in the rendered command.
+LENS_DISPATCH: dict[str, tuple[str, str]] = {
+    "design": (
+        "code-reviewer",
+        "design — boundaries, coupling, whether this is the right shape for the problem.",
+    ),
+    "functionality": (
+        "code-reviewer",
+        "functionality — does it do what the SPEC and the invariants say, on every path?",
+    ),
+    "complexity": (
+        "code-reviewer",
+        "complexity — could this be simpler? Unnecessary indirection, dead generality.",
+    ),
+    "robustness": (
+        "code-reviewer",
+        "robustness — edge cases, partial writes, restart, resource exhaustion, recovery.",
+    ),
+    "naming": (
+        "code-reviewer",
+        "naming — do the names say what the things are? Misleading names are defects.",
+    ),
+    "consistency": (
+        "code-reviewer",
+        "consistency — does this match the conventions of the code around it?",
+    ),
+    "security": (
+        "security-reviewer",
+        "security — external input, authz, secrets, injection.",
+    ),
+    "concurrency": (
+        "concurrency-reviewer",
+        "concurrency — races, deadlock, resource lifetime, cancellation.",
+    ),
+    "tests": (
+        "test-reviewer",
+        "tests — oracle strength, discrimination, would these tests pass a wrong implementation?",
+    ),
+}
+
+
+def lens_dispatch(preset: str = "Production") -> list[dict[str, str]]:
+    """The preset's dispatch table, in a shape a template can loop over.
+
+    Both dispatch sites — round 1 and the confirmation pass — call this, so the two lists cannot
+    drift apart. Parity is not a convention here: a confirmation pass missing a lens the coverage
+    CLI requires makes every review permanently unapprovable (SPEC AC-015).
+    """
+    return [
+        {"lens": lens, "agent": LENS_DISPATCH[lens][0], "brief": LENS_DISPATCH[lens][1]}
+        for lens in mandatory_lenses(preset)
+    ]
+
+
+def routable_lenses(preset: str = "Production") -> tuple[str, ...]:
+    """Lenses the conditional router may drop for a preset — empty on Production.
+
+    Side gets the domain lenses back as routable, which is the whole preset split: a Side
+    project touching no auth and no threads pays six dispatches, not nine.
+    """
+    return DOMAIN_LENSES if str(preset) == "Side" else ()
+
 
 #: Reviewers outside the declared space. `route_reviewers` may add or drop THESE and nothing
 #: else — a mandatory lens is never routed away, because SPEC AC-003 makes incomplete

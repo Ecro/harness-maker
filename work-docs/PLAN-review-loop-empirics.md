@@ -10,10 +10,13 @@ interview_rounds: 23
 adrs: 10
 validator_outcome: MAJOR_REVISION_RESOLVED
 surface_allowance:
-  chars: 732
+  chars: 9074
   commands:
-    review: 732
-  reason: "Two review.md.j2 clauses that cannot be cut: the contract-fixed brief rule and the test-edit ban whose carve-out keeps the mandatory tests lens repairable (ADR-006)."
+    review: 7189
+  round_trips:
+    review: 17
+    hm-review: 13
+  reason: "Phase 1's two uncuttable brief clauses (732), plus Phases 2-4: nine lens dispatches instead of five at BOTH sites, Step C2 rendering its own dispatch list because six lenses now share one agent and are told apart only by their brief line, and Step 4 calling hm review_consensus instead of describing the arithmetic (ADR-008)."
   delta_doc: BASELINE-DELTA-review-loop-empirics.md
 summary: "Adopt the six-category axis, give each lens a vote, gate re-review on churn."
 ---
@@ -410,6 +413,16 @@ next to the PLAN. **`surface_baseline.json` is restored to its pre-Phase-1 value
   read-budget block that looked like verbatim duplication is per-dispatch-site and test-enforced.
   Funding growth by guessing which prose is load-bearing is not a policy.
 - A wall-clock expiry — fails an in-flight PLAN for elapsed time, not for content.
+**Amendment (2026-08-16, during Phase 2):** the allowance also covers **`round_trips`**, per
+variant (`surface_allowance.round_trips: {review: 17, hm-review: 13}`). Round trips are compared
+*exactly* — a mandated call is added or removed on purpose, never "improved" — so they have no
+ratchet, and the only way to go green after adding a call was regenerating
+`surface_baseline.json`, which rewrites the frozen `chars` in the same file. A **description**
+update would therefore have destroyed the **ratchet** next to it as a silent side effect, which is
+this ADR's own failure class arriving through a different door. The keys are per-variant because
+the counting rule is (`^!` lines vs `Bash(` call sites, and the template branches on `is_codex`);
+folding them would let a real drift in one variant hide behind the other's number. This narrows
+the second ⚠️ above: `chars` stays one number for every variant, `round_trips` does not.
 **Source:** Interview #23; the `pending-proposals.md` proposal of 2026-08-15
 
 ## 🏗️ Technical Design
@@ -457,15 +470,18 @@ ADR-007 and it is not backward compatible with a harness that expected `manual-o
 
 ## 📝 Implementation Plan
 
-> **State at 2026-08-15 wrapup: Phases 0 and 1 are DONE and committed. Phases 2–7 have not
-> started.** The PLAN frontmatter deliberately still reads `status: planning` — wrapup's Step 4
-> asks for `status: complete`, and writing that over six unimplemented phases would mislead both a
-> future reader and a resuming `/hm:execute`. The Success Criteria checkboxes are left unticked
-> for the same reason: most are not met yet.
+> **State at 2026-08-16: Phases 0, 1, 2, 3 and 4 are DONE and committed. Phases 5–7 have not
+> started.** Phases 2/3/4 landed as a single unit, which T-04 requires: Phase 2 alone is
+> releasable and strictly worse than the status quo, because the fan-out findings it produces
+> would be `manual-only` — ungraded, unfixable, and setting `human_review_needed` on every
+> Production review. The PLAN frontmatter still reads `status: planning` — wrapup's Step 4 asks
+> for `status: complete`, and writing that over three unimplemented phases would mislead both a
+> future reader and a resuming `/hm:execute`. Unticked Success Criteria mean not-yet-met, not
+> forgotten.
 >
-> **Two decisions are still open and gate Phase 2** — R11 (a single justified surface allowance
-> for the whole PLAN vs. cutting existing prose to fund it) and, informed by Phase 0's audit,
-> whether to prune `correctness`, which had zero exclusive yield across all three pilot diffs.
+> **Both Phase-2 blockers are closed.** R11 was resolved by ADR-010's `surface_allowance`, and
+> the `correctness` question by audit §4's correction: pruning it recovers nothing, because it
+> was never among the nine — it is one of the *current five* the axis change retires.
 
 > `parallel_group` values prefixed `serial-` run in **listed phase order**; the label marks shared
 > file ownership, not concurrency.
@@ -511,6 +527,7 @@ ADR-007 and it is not backward compatible with a harness that expected `manual-o
 - **Rollback:** pre-change.
 
 ### Phase 2 — The nine-lens axis on both dispatch sites
+- **Status:** DONE (2026-08-16, shipped with Phases 2–4 as one unit). `conditional_router.{CORE_LENSES,DOMAIN_LENSES,mandatory_lenses,lens_dispatch,routable_lenses}`; `lens_coverage --preset`; the axis injected into Jinja as a global so template and CLI cannot disagree; `tests/unit/test_render_lens_axis.py`.
 - **depends_on:** `[1]` · **parallel_group:** `serial-review-tpl` · **merge_hazards:** `review.md.j2`, `lens_coverage.py`, `conditional_router`
 - **Scope.** In: round-1 dispatch list with per-lens briefs, **Step C2 dispatch list and result
   paths**, `lens_coverage.py` preset-aware set, Side-only conditional routing of the three domain
@@ -520,6 +537,7 @@ ADR-007 and it is not backward compatible with a harness that expected `manual-o
 - **Rollback:** Phase 1.
 
 ### Phase 3 — Lens provenance, the consensus module, and per-lens sovereignty
+- **Status:** DONE (2026-08-16, shipped with Phases 2–4 as one unit). `src/harness_maker/review_consensus.py` + `hm review_consensus {tag,grade,plan,record}`; per-finding `lens` stamp at both write sites; Step 4d/Grade Computation now call the CLI and `review.md.j2`'s "Step 4 runs as prose" is retired.
 - **depends_on:** `[2]` · **parallel_group:** `serial-review-tpl` · **merge_hazards:** `review.md.j2` Step 3 + Step 4, `conditional_router`
 - **Scope (ADR-008).** In: (a) stamp `lens: <name>` on **every finding** as each lens's result file
   is written — metadata only, never an input to `finding_id`; (b) new
@@ -533,6 +551,7 @@ ADR-007 and it is not backward compatible with a harness that expected `manual-o
 - **Rollback:** Phase 2.
 
 ### Phase 4 — Dispositions, authority, and the grade rule
+- **Status:** DONE (2026-08-16, shipped with Phases 2–4 as one unit). Step 4e (round-record writer), `validate_disposition` / `grade_effect` / `build_round_record`, `codex_ledger.{load_ledger,disposition_rows,rejection_rate}`, and the `second-opinion-gate` §5 orthogonality note.
 - **depends_on:** `[3]` · **parallel_group:** `serial-review-tpl` · **merge_hazards:** `review.md.j2`, `codex_ledger.py`, `second-opinion-gate` §5
 - **Scope.** In: round-record-writer disposition assignment, one shared schema + validator, the
   authority rules including `no-contract`, the AC-cited grade exclusion, ledger rows, and the §5 note

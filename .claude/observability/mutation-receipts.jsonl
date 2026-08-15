@@ -18,3 +18,4 @@
 {"deletes": "src/harness_maker/templates/stages/execute.md.j2:237", "gate": "tests/structural/test_multi_lens_a5.py::test_each_lens_owns_exactly_one_dispatch", "slug": "multi-lens-review-round", "ts": "2026-08-09T22:00:03Z"}
 {"deletes": "src/harness_maker/templates/stages/plan.md.j2:2", "gate": "tests/structural/test_comprehension_zero_cost_golden.py::test_the_golden_matches_a_pre_change_render_while_the_partial_is_absent", "slug": null, "ts": "2026-08-13T04:29:59Z"}
 {"deletes": "src/harness_maker/templates/agents/_partials/comprehension_block.md.j2:5", "gate": "tests/structural/test_comprehension_render_gate.py::test_standard_renders_brief_and_round_state_only", "slug": null, "ts": "2026-08-13T05:01:28Z"}
+{"deletes": "src/harness_maker/template_globals.py:37", "gate": "tests/structural/test_template_globals_installed.py::test_the_installer_actually_binds_every_declared_global", "slug": null, "ts": "2026-08-15T17:47:53Z"}

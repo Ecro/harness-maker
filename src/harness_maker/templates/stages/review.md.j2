@@ -1,4 +1,5 @@
 {% set wt_on = config.worktree is defined and config.worktree.get('enabled') %}{% set WTR = '<WT>' if wt_on else '.' -%}
+{% set lenses = lens_dispatch(config.preset) %}{% set lens_names = mandatory_lenses(config.preset) -%}
 # Stage: review
 
 > Atomic stage. Multi-perspective review with **surface-match + reasoning-alignment** consensus, grade gate, and auto-fix loop.
@@ -103,13 +104,14 @@ If a command exits non-zero:
 
 ### Step 1 — Reviewer set selection
 
-**The declared failure space** — `correctness`, `failure`, `concurrency`, `security`, `tests` —
-is exercised every round. These are failure modes, not agent names; two have no dedicated
-reviewer agent, which is the gap the declaration makes visible.
+**The discovery axis** — {% for l in lens_names %}`{{ l }}`{{ ", " if not loop.last }}{% endfor %} —
+is exercised every round. These are review categories, not agent names; six share one agent and are
+told apart only by the lens line in their brief. Distinct categories find distinct defects: that is
+why one lens's finding stands on its own (Step 4).
 
 - Start from `harness.yaml.reviewers.enabled`.
 - `routing: always-all` → invoke every enabled reviewer in parallel.
-- `routing: conditional` → use Conditional Router (M6) on the changed-file paths. It may drop **only** `ux-reviewer` / `performance-reviewer`; a mandatory lens is never routed away, because incomplete coverage blocks approval and a routed-away lens would make every conditional review permanently unapprovable.
+- `routing: conditional` → use Conditional Router (M6) on the changed-file paths. It may drop **only** `ux-reviewer` / `performance-reviewer`{% if routable_lenses(config.preset) %} and, on this Side harness, the domain lenses {% for l in routable_lenses(config.preset) %}`{{ l }}`{{ ", " if not loop.last }}{% endfor %} — which are mandatory on Production and routable here{% endif %}; a mandatory lens is never routed away, because incomplete coverage blocks approval and a routed-away lens would make every conditional review permanently unapprovable.
 - Add any extras from `--with-reviewers=<csv>`.
 - Resolve `review_base` once, here in round 1, storing it at `refs/hm-freeze/v1/<slug>-base`:
 
@@ -177,17 +179,13 @@ When no drift is detected, emit `result: clean` with empty lists. This record is
 
 ### Step 3 — Parallel reviewer invocation (2-pass redaction)
 
-**Dispatch the five mandatory lenses in ONE message, in round 1** — one `Task(` per lens, same
-message, so they run concurrently. Two lenses have no dedicated agent and go to `code-reviewer`
-with the lens named in the brief.
+**Dispatch the {{ lens_names | length }} mandatory lenses in ONE message, in round 1** — one `Task(`
+per lens, same message, so they run concurrently. Six lenses share `code-reviewer` and are
+distinguished only by the lens line, so send that line verbatim.
 
 ```
-Task(subagent_type="code-reviewer",        description="lens correctness: {slug}", prompt="<brief>\n\nYour lens: correctness — does the change do what the SPEC and the invariants say?")
-Task(subagent_type="code-reviewer",        description="lens failure: {slug}",     prompt="<brief>\n\nYour lens: failure — recovery, persistence, partial-write and restart behaviour.")
-Task(subagent_type="concurrency-reviewer", description="lens concurrency: {slug}", prompt="<brief>\n\nYour lens: concurrency — races, deadlock, resource lifetime, cancellation.")
-Task(subagent_type="security-reviewer",    description="lens security: {slug}",    prompt="<brief>\n\nYour lens: security — external input, authz, secrets, injection.")
-Task(subagent_type="test-reviewer",        description="lens tests: {slug}",       prompt="<brief>\n\nYour lens: tests — oracle strength, discrimination, would these tests pass a wrong implementation?")
-```
+{% for d in lenses %}Task(subagent_type="{{ d.agent }}", description="lens {{ d.lens }}: {slug}", prompt="<brief>\n\nYour lens: {{ d.brief }}")
+{% endfor %}```
 
 **Put in `<brief>`, so it reaches every lens: the public contract is fixed and out of scope** — no
 proposal to change an exported signature, wire format or file format; the design *behind* it is
@@ -198,22 +196,24 @@ first 8 chars of `git rev-parse HEAD` plus the round-1 timestamp is fine. Every 
 carries it and every coverage call is given it.
 
 > Why: the results directory is keyed by slug and round, so re-running `/hm:review` on the same
-> slug lands in the **same** directory. Without the run id, a previous invocation's five files
-> vouch for five lenses in an invocation where only one returned — `blocks_approval: false`,
+> slug lands in the **same** directory. Without the run id, a previous invocation's files
+> vouch for every lens in an invocation where only one returned — `blocks_approval: false`,
 > four dead lenses reported as exercised. Measured. The round keying separates a pass from a
 > round; it does not separate one invocation from the next.
 
 **You write the result files; the lens agents do not.** For each dispatch that **returns**, write
 its findings JSON to the per-round results directory, adding a `"lens"` key naming the lens and
-the `"run_id"` you minted:
+the `"run_id"` you minted — **and stamp the same `"lens"` value on every finding inside it**.
+
+> The per-finding stamp is what makes ADR-007's rule decidable. Six lenses dispatch to
+> `code-reviewer`, so `reviewer`/`source` collapses them to one voter name; without a per-finding
+> `lens`, Step 4 cannot tell one lens speaking once from one lens speaking six times, and the
+> solo-lens vote becomes undecidable from the data it sees. `lens` is **metadata only** — it is
+> never an input to `codex_adapter finding_id`, so the round-to-round merge key is unchanged.
 
 ```
-.claude/observability/.hm-lens-results/<slug>/<round>/correctness.json
-.claude/observability/.hm-lens-results/<slug>/<round>/failure.json
-.claude/observability/.hm-lens-results/<slug>/<round>/concurrency.json
-.claude/observability/.hm-lens-results/<slug>/<round>/security.json
-.claude/observability/.hm-lens-results/<slug>/<round>/tests.json
-```
+{% for l in lens_names %}.claude/observability/.hm-lens-results/<slug>/<round>/{{ l }}.json
+{% endfor %}```
 
 A dispatch that **returns nothing produces no file** — dead agent, unparseable output, refusal,
 all the same. That absence is the signal; never write a placeholder to record the failure, and
@@ -224,7 +224,7 @@ Then compute coverage. The CLI is the **sole producer** of the verdict — do no
 own judgement about which lenses ran:
 
 ```bash
-!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round <round> --run-id <run-id>
+!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round <round> --run-id <run-id> --preset {{ config.preset }}
 ```
 
 It prints `{"exercised": [...], "missing": [...], "blocks_approval": <bool>}`. Carry all three
@@ -470,16 +470,91 @@ or `weak-consensus` at P0/P1 are surfaced by the Grade Gate's
 
 #### Step 4d — Tag every finding
 
+**The CLI decides the tag; you supply the voices.** Give each finding a `voices` array — one entry per source that raised it, `{"source": "<lens or
+model name>", "kind": "lens"|"cross-model"}` — plus `reasoning_diverges: true` when Step 4b found
+matching OBSERVE with diverging CONCLUDE. Write the array to a temp path, then:
+
+```bash
+!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_consensus tag --file <the literal temp path>
+```
+
+It returns each finding with a `tag`. **Use its answer**; do not re-derive one.
+
 | Tag | Condition | Auto-fix eligible? |
 |-----|-----------|--------------------|
-| `consensus-passed` | Survived surface + reasoning alignment with strong consensus | ✅ Yes |
-| `weak-consensus` | Surface match, reasoning diverges | ❌ No (manual) |
-| `manual-only` | Single source, or consensus failed | ❌ No (manual) |
+| `consensus-passed` | ≥1 **reviewer-lens** voice, or ≥2 **cross-model** voices | ✅ Yes |
+| `weak-consensus` | ≥2 **cross-model** voices whose reasoning diverges | ❌ No (manual) |
+| `manual-only` | A single cross-model voice, alone | ❌ No (manual) |
+
+> **One lens votes alone (ADR-007).** The fan-out gain consists by definition of findings exactly
+> one category raised, so demanding a second lens would spend the dispatches and discard their
+> whole distinctive output. Distinct lenses examine distinct axes: expecting `security` to second
+> a `naming` finding is a category error, not a quality bar. Cross-model voters keep K=2 — they
+> read the same diff on the same axis, and they carry no `suggestion`, so a solo cross-model vote
+> would block grade A with no repair path.
+>
+> The table is **monotonic in voices**: a second voice never yields a worse tag than the first
+> earned alone. Diverging reasoning demotes only a cross-model *pair*, whose pass depends on the
+> two agreeing — it cannot demote a lens finding, or two lenses describing one defect differently
+> would score below either of them alone.
+>
+> False-positive suppression is therefore **gone from this step**. Step 4e's disposition is its
+> replacement; do not reintroduce a second-voice requirement here to compensate.
 {%- if config.second_opinion and config.second_opinion.models %}
 
 Cross-model findings the Step 3.6 gate marked `unresolved` are `manual-only`, and are the
-**one documented exception** to the `unverified_severe` scan below (skill §3). A
-`scope-exempted` tag exists only on the unwired arbiter path, never here — Step 4 runs as prose.
+**one documented exception** to the `unverified_severe` scan below (skill §3). Leave their voices
+out of the array rather than tagging them by hand. A `scope-exempted` tag exists only on the
+unwired arbiter path, never here.
+{%- endif %}
+
+#### Step 4e — Assign a disposition to EVERY finding (ADR-002)
+
+You are the round-record writer, so this runs on **every** path — including a round with no fix
+step and an `auto_fix`-disabled run. Give each finding a `disposition` and, when rejecting, an
+`authority`:
+
+| Disposition | Means | `authority` |
+|---|---|---|
+| `accepted` | Real; will be fixed or carried | — |
+| `rejected` | Not a defect | **required**: a SPEC AC id (`AC-004`) or `docstring:<path>:<symbol>` |
+| `duplicate` | Same defect as another `id` this round | — |
+| `unresolved` | Cannot adjudicate; no contract to judge against | `no-contract` |
+
+```bash
+!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_consensus record --file <the literal temp path>
+```
+
+Exit 1 lists the findings it had to downgrade — a missing or unrecordable disposition becomes
+`unresolved` / `no-contract`, which counts toward the grade and raises `human_review_needed`.
+Fix the listed entries rather than proceeding on the downgrade: it is the fail-safe, not the
+intent.
+
+**Only an AC-cited rejection clears the grade.** A docstring-cited rejection still counts and
+sets `human_review_needed`, because CLAUDE.md makes docstrings optional and the fixer writes
+them — a docstring is not independent of the thing under review the way a SPEC criterion is. A
+disposition is **not** a lifecycle transition: the `pending`/`resolved`/`stale` lattice in
+`second-opinion-gate` §5 is orthogonal and unaffected.
+
+> On a task-driven harness with no SPEC there are no AC ids, so **no rejection can clear the
+> grade** and every false positive lands on `human_review_needed`. That is the acknowledged cost
+> of the solo-lens vote in the SPEC-less case, not a bug to route around.
+{%- if config.second_opinion and config.second_opinion.models %}
+
+Ledger the dispositions of the **cross-model** findings only — one row each, through the
+invoker's disposition path (never `codex_ledger emit`, which writes to `cwd`). Write a file
+shaped `{"dispositions": [{"model": "<codex|antigravity>", "id": "<finding id>", "disposition":
+"<enum>", "oracle_result": "<evidence>"}]}`:
+
+```bash
+!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm second_opinion_invoke --record-disposition --disposition-file <the literal temp path> --slug <slug> --stage review
+```
+
+> **Reviewer-lens dispositions do NOT go here.** The ledger's `model` is a closed enum of
+> second-opinion vendors, so there is no value that would name a Claude lens, and inventing one
+> would put reviewer rows in the denominator of a cross-model acceptance rate. Their record is
+> the round record — Step 8's iteration table — which is what AC-006's completeness invariant
+> reads.
 {%- endif %}
 
 ### Step 5 — Write REVIEW report
@@ -517,12 +592,18 @@ Sections:
 
 ## Grade Computation (after every round)
 
-Count **`consensus-passed`** findings only by severity:
+The same CLI computes it, from the tagged and dispositioned findings:
 
-- `P0_count` = consensus-passed findings with severity P0.
-- `P1_count` = consensus-passed findings with severity P1.
+```bash
+!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_consensus grade --file <the literal temp path>
+```
 
-P2/P3, weak-consensus, and manual-only findings do NOT lower the grade.
+It prints `{"grade": "<letter>", "counts": {...}, "human_review_needed": <bool>}`. The rule it
+applies — stated here so a mismatch is visible, not so you can compute it yourself:
+
+- `P0_count` / `P1_count` = **`consensus-passed`** findings at that severity **whose disposition
+  counts** (everything except `duplicate` and an AC-cited `rejected`).
+- P2/P3, `weak-consensus` and `manual-only` findings do NOT lower the grade.
 {%- if config.second_opinion and config.second_opinion.models %}
 > **K=2 with cross-model voters ({{ config.second_opinion.models | join(', ') }}):** each
 > adapted second-opinion finding counts as one of the N voices. A finding that reaches
@@ -620,7 +701,7 @@ coverage is cumulative over a review rather than per round: the auto-fix loop re
 the reviewers a fix touched, so this round's directory legitimately holds one or two files.
 
 ```bash
-!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round 1 --round 2 --round <this round> --run-id <run-id>
+!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round 1 --round 2 --round <this round> --run-id <run-id> --preset {{ config.preset }}
 ```
 
 > The union is computed by the CLI, not by you. Round 2 of this change's own review rejected
@@ -699,7 +780,7 @@ whole declared failure space over an artifact that cannot move underneath it.
 
 Run it **only** on the APPROVED path. A review stopping for `max_review_rounds`, for the
 no-progress invariant, or with `auto_fix` disabled has not approved anything, so there is nothing
-to confirm — dispatching five lenses there spends the budget to re-confirm a failure. Record it
+to confirm — dispatching the whole axis there spends the budget to re-confirm a failure. Record it
 as `confirm_pass_ran: false`, which is a different fact from a pass that ran and found nothing.
 
 ### Step C1 — Freeze the artifact
@@ -722,7 +803,7 @@ owns commits and nothing is committed yet.
 Round 1 wrote `refs/hm-freeze/v1/<slug>-base`. Re-resolving here would recompute against a HEAD
 that has moved during the review, so the span would drift.
 
-### Step C2 — Dispatch all five lenses over `review_base..<freeze commit>`
+### Step C2 — Dispatch all {{ lens_names | length }} lenses over `review_base..<freeze commit>`
 
 The diff under review is `review_base..<freeze commit>` — **the whole review**, not the repair
 round. Diffing from `HEAD` reinstates the scope-selective re-review this pass replaces: it would
@@ -734,15 +815,17 @@ segment, never a round number. A pass is not a round; reusing a round's director
 that failed during the pass be counted as exercised from that round's stale file.
 
 ```
-.claude/observability/.hm-lens-results/<slug>/<pass-id>/correctness.json
-.claude/observability/.hm-lens-results/<slug>/<pass-id>/failure.json
-.claude/observability/.hm-lens-results/<slug>/<pass-id>/concurrency.json
-.claude/observability/.hm-lens-results/<slug>/<pass-id>/security.json
-.claude/observability/.hm-lens-results/<slug>/<pass-id>/tests.json
+{% for l in lens_names %}.claude/observability/.hm-lens-results/<slug>/<pass-id>/{{ l }}.json
+{% endfor %}```
+
+The dispatch list is the round-1 list, unchanged — same agents, same lens lines:
+
 ```
+{% for d in lenses %}Task(subagent_type="{{ d.agent }}", description="lens {{ d.lens }}: {slug}", prompt="<brief>\n\nYour lens: {{ d.brief }}")
+{% endfor %}```
 
 ```bash
-!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round <pass-id> --run-id <run-id>
+!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round <pass-id> --run-id <run-id> --preset {{ config.preset }}
 ```
 
 **Apply no fixes in this pass.** It is an observation, and a pass that edits what it is measuring
@@ -768,7 +851,7 @@ IF blocks_approval == true:
     died returns nothing, and nothing is not evidence of a clean artifact.
 
 ELSE IF zero new consensus-passed findings at P0 or P1:
-  → STOP. Status = APPROVED. All five lenses exercised AND no new severe finding.
+  → STOP. Status = APPROVED. Every mandatory lens exercised AND no new severe finding.
 
 ELSE IF auto_fix is disabled (config OR --no-auto-fix):
   → STOP. Status = CHANGES_REQUESTED, human_review_needed = true.

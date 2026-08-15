@@ -23,12 +23,15 @@ def _write_result(d: Path, lens: str, *, body: object | None = None, run_id: str
     (d / f"{lens}.json").write_text(json.dumps(payload), encoding="utf-8")
 
 
-def test_ac001_exactly_five_mandatory_lenses() -> None:
-    assert len(MANDATORY_LENSES) == 5
-    assert len(set(MANDATORY_LENSES)) == 5
+def test_ac001_nine_mandatory_lenses_on_production() -> None:
+    """Nine, not eleven — `correctness` and `failure` are retired, not carried alongside."""
+    assert len(MANDATORY_LENSES) == 9
+    assert len(set(MANDATORY_LENSES)) == 9
+    assert "correctness" not in MANDATORY_LENSES
+    assert "failure" not in MANDATORY_LENSES
 
 
-def test_all_five_present_does_not_block(tmp_path: Path) -> None:
+def test_every_mandatory_lens_present_does_not_block(tmp_path: Path) -> None:
     for lens in MANDATORY_LENSES:
         _write_result(tmp_path, lens)
     verdict = coverage_verdict(tmp_path, RUN)
@@ -57,16 +60,16 @@ def test_mislabelled_file_is_not_exercised(tmp_path: Path) -> None:
     """A file whose `lens` field disagrees with its name cannot vouch for either lens."""
     for lens in MANDATORY_LENSES:
         _write_result(tmp_path, lens)
-    _write_result(tmp_path, "tests", body={"lens": "correctness", "findings": []})
+    _write_result(tmp_path, "tests", body={"lens": "robustness", "findings": []})
     assert coverage_verdict(tmp_path, RUN)["missing"] == ["tests"]
 
 
 def test_unknown_lens_file_cannot_pad_coverage(tmp_path: Path) -> None:
     for lens in MANDATORY_LENSES:
-        if lens != "failure":
+        if lens != "robustness":
             _write_result(tmp_path, lens)
     _write_result(tmp_path, "performance")
-    assert coverage_verdict(tmp_path, RUN)["missing"] == ["failure"]
+    assert coverage_verdict(tmp_path, RUN)["missing"] == ["robustness"]
 
 
 def test_empty_directory_blocks(tmp_path: Path) -> None:
@@ -82,9 +85,9 @@ def test_absent_directory_blocks(tmp_path: Path) -> None:
 def test_a_confirmation_pass_never_inherits_a_round_directory(tmp_path: Path) -> None:
     """The defect this keying exists to prevent: a silent false approval.
 
-    Round 3 exercised all five. The first confirmation pass then loses one lens to a dispatch
-    failure. If the pass shared round 3's directory the stale file would vouch for the lens
-    that never ran, and `blocks_approval` would come back False — the coverage mechanism
+    Round 3 exercised every mandatory lens. The first confirmation pass then loses one lens to
+    a dispatch failure. If the pass shared round 3's directory the stale file would vouch for
+    the lens that never ran, and `blocks_approval` would come back False — the coverage mechanism
     itself certifying coverage it does not have.
     """
     results = tmp_path / "results"
@@ -92,7 +95,7 @@ def test_a_confirmation_pass_never_inherits_a_round_directory(tmp_path: Path) ->
         _write_result(round_dir(results, "slug", "3"), lens)
 
     for lens in MANDATORY_LENSES:
-        if lens != "failure":
+        if lens != "robustness":
             _write_result(round_dir(results, "slug", "confirm-1"), lens)
 
     assert coverage_verdict(round_dir(results, "slug", "3"), RUN)["blocks_approval"] is False
@@ -161,9 +164,9 @@ def test_reachable_through_the_hm_dispatcher(tmp_path: Path) -> None:
 def test_f2_a_prior_invocation_cannot_vouch_for_a_dead_lens(tmp_path: Path) -> None:
     """The demonstrated hole: `<round>` keying does not separate invocation from invocation.
 
-    Measured 2026-08-15 before the fix. `/hm:review` runs on a slug and all five lenses return,
-    writing five files under `<slug>/1/`. The operator re-runs `/hm:review` on the same slug;
-    round 1 lands in the SAME directory, and this time only `correctness` returns. Nothing
+    Measured 2026-08-15 before the fix. `/hm:review` runs on a slug and every lens returns,
+    writing one file each under `<slug>/1/`. The operator re-runs `/hm:review` on the same slug;
+    round 1 lands in the SAME directory, and this time only `robustness` returns. Nothing
     clears the directory, so the verdict was `blocks_approval: false` with four dead lenses
     reported as exercised — the exact silent false approval `round_dir`'s own docstring claims
     the keying prevents.
@@ -172,11 +175,11 @@ def test_f2_a_prior_invocation_cannot_vouch_for_a_dead_lens(tmp_path: Path) -> N
         _write_result(tmp_path, lens, run_id="invocation-1")
 
     # Invocation 2: one lens returns; the other four files are last time's.
-    _write_result(tmp_path, "correctness", run_id="invocation-2")
+    _write_result(tmp_path, "robustness", run_id="invocation-2")
 
     verdict = coverage_verdict(tmp_path, "invocation-2")
-    assert verdict["exercised"] == ["correctness"]
-    assert verdict["missing"] == ["failure", "concurrency", "security", "tests"]
+    assert verdict["exercised"] == ["robustness"]
+    assert verdict["missing"] == [lens for lens in MANDATORY_LENSES if lens != "robustness"]
     assert verdict["blocks_approval"] is True
 
 

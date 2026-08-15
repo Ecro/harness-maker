@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 from harness_maker import command_registry
-from harness_maker.conditional_router import MANDATORY_LENSES
+from harness_maker.conditional_router import ALL_LENSES, mandatory_lenses
 
 
 def exercised_lenses(round_dir: Path, run_id: str) -> set[str]:
@@ -17,7 +17,7 @@ def exercised_lenses(round_dir: Path, run_id: str) -> set[str]:
     Fail-closed **as to liveness** (SPEC AC-011, which was demoted from the stronger claim):
     a lens is exercised only if its result file is
     present, is valid JSON, and carries a ``lens`` field matching both its filename stem and a
-    known mandatory lens. Absent, unreadable, malformed, mislabelled and unknown-lens files all
+    known lens name. Absent, unreadable, malformed, mislabelled and unknown-lens files all
     fall out of the set rather than into it.
 
     The distinction matters because the failure this gate exists to catch — a dispatch that
@@ -34,7 +34,12 @@ def exercised_lenses(round_dir: Path, run_id: str) -> set[str]:
     from a round, not one invocation from the next. A file whose ``run_id`` is absent or
     belongs to another invocation is therefore not evidence about this one.
     """
-    known = set(MANDATORY_LENSES)
+    # The full vocabulary, NOT the preset's mandatory set. A Side harness whose router pulled
+    # `security` in produced a legitimate result file, and scoping this to the mandatory set
+    # would discard it — `exercised` would under-report and `review_telemetry.lenses_exercised`
+    # would lose a lens that actually ran. What the preset decides is what is REQUIRED, which
+    # is `coverage_verdict`'s job; it is not a filter on what counts as a real result.
+    known = set(ALL_LENSES)
     found: set[str] = set()
     if not round_dir.is_dir():
         return found
@@ -56,7 +61,9 @@ def exercised_lenses(round_dir: Path, run_id: str) -> set[str]:
     return found
 
 
-def coverage_verdict(round_dirs: Path | list[Path], run_id: str) -> dict[str, object]:
+def coverage_verdict(
+    round_dirs: Path | list[Path], run_id: str, preset: str = "Production"
+) -> dict[str, object]:
     """The sole producer of the coverage verdict the rendered gate consumes.
 
     Takes the UNION across every round directory of one `/hm:review`. Coverage is cumulative
@@ -71,14 +78,16 @@ def coverage_verdict(round_dirs: Path | list[Path], run_id: str) -> dict[str, ob
     substituting its own judgement for that field. The instruction and the tool disagreed.
     """
     dirs = [round_dirs] if isinstance(round_dirs, Path) else list(round_dirs)
+    required = mandatory_lenses(preset)
     exercised: set[str] = set()
     for d in dirs:
         exercised |= exercised_lenses(d, run_id)
-    missing = [lens for lens in MANDATORY_LENSES if lens not in exercised]
+    missing = [lens for lens in required if lens not in exercised]
     return {
-        "exercised": [lens for lens in MANDATORY_LENSES if lens in exercised],
+        "exercised": [lens for lens in ALL_LENSES if lens in exercised],
         "missing": missing,
         "blocks_approval": bool(missing),
+        "preset": str(preset),
     }
 
 
@@ -118,7 +127,7 @@ def main(argv: list[str] | None = None) -> int:
         sys.stderr.write(
             "usage: hm lens_coverage check --results-dir <dir> --slug <slug> --round <n> "
             "[--round <n> …] "
-            "--run-id <id>\n"
+            "--run-id <id> [--preset Side|Production]\n"
         )
         return 2
 
@@ -142,6 +151,15 @@ def main(argv: list[str] | None = None) -> int:
         dest="run_id",
         help="this /hm:review invocation's id; a result file from another invocation is ignored",
     )
+    parser.add_argument(
+        "--preset",
+        default="Production",
+        help=(
+            "the harness preset. Production requires all nine lenses; Side requires the six "
+            "core categories and lets the router decide the three domain lenses. An unknown "
+            "value resolves to Production — more mandatory coverage is the fail-closed side."
+        ),
+    )
     try:
         opts = parser.parse_args(args[1:])
     except SystemExit:
@@ -154,7 +172,7 @@ def main(argv: list[str] | None = None) -> int:
         # at all, while the template calls this the sole producer of the verdict.
         sys.stderr.write(f"lens_coverage: {exc}\n")
         return 2
-    verdict = coverage_verdict(dirs, opts.run_id)
+    verdict = coverage_verdict(dirs, opts.run_id, opts.preset)
     sys.stdout.write(json.dumps(verdict, sort_keys=True) + "\n")
     return 0
 

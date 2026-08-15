@@ -109,7 +109,19 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # 20 → 22 (round-2 review repairs): the auto-fix loop's coverage re-check became its own
     # rendered call (it now needs a repeatable `--round`), and `hm freeze reap` releases the
     # frozen refs at the terminal state — nothing else reaps them under the Side preset.
-    "review": 22,
+    # 22 → 39 (2026-08-16, PLAN-review-loop-empirics Phases 2–4). Seventeen calls, all
+    # deliberate, none removable:
+    #   +4  round 1 dispatches nine lenses instead of five (Side renders six of the nine; the
+    #       count is taken from the Production render, where all nine are mandatory).
+    #   +9  Step C2 now renders its OWN dispatch list instead of saying "exactly as round 1
+    #       does". Under the old axis that back-reference was adequate because each lens had a
+    #       self-describing agent; six of the nine now share `code-reviewer` and are told apart
+    #       ONLY by their brief line, so a pass that never states the briefs cannot be run.
+    #   +4  `hm review_consensus {tag,record,grade}` and the disposition ledger write — Step 4
+    #       stopped being prose (ADR-008), and prose has no executable surface to test.
+    # The ADR-011 rule counts each `Task(` individually even though all nine leave in one
+    # message, so the dispatch half of this is a cost in the metric, not in turns.
+    "review": 39,
     "spec": 6,
     "uninstall": 3,
     "verify": 13,

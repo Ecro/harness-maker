@@ -69,7 +69,7 @@ toolchains:
 {% endif %}{% endfor %}{%- endif %}
 reviewers:
   # Routing narrows the OPTIONAL reviewers (ux-reviewer, performance-reviewer) only.
-  # The five mandatory lenses — correctness, failure, concurrency, security, tests —
+  # The mandatory lenses — {% for l in mandatory_lenses(config.preset) %}{{ l }}{{ ', ' if not loop.last }}{% endfor %} —
   # are exercised every round regardless of `routing`; incomplete coverage blocks
   # approval, so a routed-away mandatory lens would make every review unapprovable.
   consensus: {{ config.reviewers.consensus }}

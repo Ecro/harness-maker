@@ -14,6 +14,7 @@ import yaml
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 from pydantic import BaseModel, ConfigDict
 
+from harness_maker import template_globals
 from harness_maker.detection_cache import load_or_run
 from harness_maker.io_utils import atomic_write
 from harness_maker.models import AdaptiveConfig, Confidence, ProjectProfile
@@ -326,11 +327,13 @@ def _load_preset_defaults(preset_name: str) -> dict[str, Any]:
     blueprint = synthesize(ProjectProfile(), answers, preset)
     config_dump = blueprint.config.model_dump(mode="json")
 
-    env = Environment(
-        loader=FileSystemLoader(str(TEMPLATE_DIR)),
-        undefined=StrictUndefined,
-        autoescape=False,
-        keep_trailing_newline=True,
+    env = template_globals.install(
+        Environment(
+            loader=FileSystemLoader(str(TEMPLATE_DIR)),
+            undefined=StrictUndefined,
+            autoescape=False,
+            keep_trailing_newline=True,
+        )
     )
     template_name = f"harness-yaml/{preset.value}.yaml.j2"
     rendered = env.get_template(template_name).render(

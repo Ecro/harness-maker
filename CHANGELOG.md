@@ -2,7 +2,49 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **The review discovery axis is replaced (BREAKING for review behaviour — Phases 2–4 of
+  PLAN-review-loop-empirics).** The five incidental lenses give way to the six categories the
+  source experiment measured — `design`, `functionality`, `complexity`, `robustness`, `naming`,
+  `consistency` — with `security`, `concurrency` and `tests` riding alongside: mandatory on
+  Production, routable by the conditional router on Side. **`correctness` and `failure` are
+  retired, not carried alongside**; the mandatory set is nine on Production and six on Side, never
+  eleven. Round 1 and the confirmation pass render from one call (`conditional_router.lens_dispatch`,
+  exported into Jinja as a global), so the two lists cannot drift — and `hm lens_coverage check`
+  now takes `--preset`, because a coverage CLI demanding nine of a six-lens Side review makes
+  every Side review permanently unapprovable.
+- **A single reviewer lens now carries a full vote (ADR-007).** The fan-out gain consists by
+  definition of findings exactly one category raised; under the old cross-lens K=2 those became
+  `manual-only` — ungraded and unfixable — so adopting the axis without this would have paid the
+  whole cost and discarded the whole yield. K=2 is retained where corroboration is meaningful:
+  repeated instances of one lens, and cross-model voters, who read the same diff on the same axis
+  and carry no `suggestion` to repair with. **This removes the system's only false-positive
+  filter**, which is why it ships in the same release as the disposition gate below and not before.
+- **Consensus tagging and grade computation moved out of prose.** New
+  `src/harness_maker/review_consensus.py` (`tag_finding` / `compute_grade` / `grade_from_findings`
+  / `validate_disposition` / `grade_effect` / `build_round_record` / `rereview_plan`) behind
+  `hm review_consensus {tag,grade,plan,record}`; `review.md.j2` Step 4 calls it and its "Step 4
+  runs as prose" statement is retired. A render-grep proves an instruction is present, never that
+  the tag it produces is correct — and after ADR-007 the tag is the whole control.
+
 ### Added
+
+- **Every finding carries a disposition, from a producer that sees them all (ADR-002).** The
+  round-record writer assigns `accepted` / `rejected` / `duplicate` / `unresolved` on every path,
+  including a round with no fix step and an `auto_fix`-disabled run — the fix-selection step,
+  where the first draft put it, sees only fix-eligible findings. A rejection requires an
+  authority: a SPEC AC id, else a docstring citation, else it is recorded `unresolved` with
+  `no-contract`. **Only an AC-cited rejection clears the grade**; a docstring-cited one still
+  counts and sets `human_review_needed`, because CLAUDE.md makes docstrings optional and the
+  fixer writes them. On a SPEC-less harness no rejection can clear the grade — the acknowledged
+  cost of the solo-lens vote, not a bug to route around. `codex_ledger` gains `load_ledger` /
+  `disposition_rows` / `rejection_rate`, which filter on `finding_ref` because both row kinds
+  carry `status: "invoked"` and aggregating without that filter has corrupted a rate here before.
+- **Per-finding `lens` provenance.** Six lenses dispatch to `code-reviewer`, so `reviewer`/`source`
+  collapses them to one voter name and the solo-lens rule is undecidable from the data Step 4
+  sees. `lens` is metadata only and is **not** an input to `codex_adapter.finding_id`, so the
+  round-to-round merge key and every ledger `finding_ref` are unchanged.
 
 - **Re-review churn gate (config surface only — Phase 1 of PLAN-review-loop-empirics).** Two new
   optional `harness.yaml` keys, `reviewers.rereview_churn_gate` (bool, default `true`) and

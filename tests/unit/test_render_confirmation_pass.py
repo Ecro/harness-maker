@@ -23,7 +23,7 @@ from pathlib import Path
 
 import pytest
 
-from harness_maker.conditional_router import MANDATORY_LENSES
+from harness_maker.conditional_router import mandatory_lenses
 from harness_maker.interview import interview
 from harness_maker.models import ProjectProfile
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
@@ -135,7 +135,7 @@ def test_each_input_combination_names_its_outcome(confirm_block: str, phrase: st
 
     Zero-new-severe-with-incomplete-coverage matched **no** branch in an earlier draft: S4's
     conjunct fails, S5's dirty trigger does not fire, and S9's not-run path does not apply
-    because the pass did run. The pass dispatches five lenses and a dispatch failure is
+    because the pass did run. The pass dispatches the mandatory set and a dispatch failure is
     medium-likelihood, so the state is reachable.
     """
     assert phrase in confirm_block.lower()
@@ -213,9 +213,14 @@ def test_the_pass_re_reads_the_frozen_cross_model_set(confirm_block: str) -> Non
     )
 
 
-@pytest.mark.parametrize("lens", MANDATORY_LENSES)
+@pytest.mark.parametrize("lens", mandatory_lenses("Side"))
 def test_the_pass_dispatches_every_mandatory_lens(confirm_block: str, lens: str) -> None:
-    """A confirmation pass over a subset would confirm a subset."""
+    """A confirmation pass over a subset would confirm a subset.
+
+    This fixture renders the Side preset, so the mandatory set is the six core categories; the
+    three domain lenses are routable here and mandatory on Production. Parity between round 1
+    and this pass — for either preset — is `test_render_lens_axis.py`'s subject.
+    """
     assert f"{lens}.json" in confirm_block
 
 

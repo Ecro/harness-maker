@@ -219,6 +219,73 @@ def record_from_dict(
     return SecondOpinionRecord.model_validate(data)
 
 
+PER_INVOCATION_REF = "n/a"
+#: Mirrors the `disposition` Literal above. Kept next to the aggregation so a new enum value
+#: shows up in the counts rather than being silently dropped into no bucket.
+DISPOSITION_VALUES: frozenset[str] = frozenset({"accepted", "rejected", "duplicate", "unresolved"})
+
+
+def load_ledger(path: Path | str) -> list[dict[str, Any]]:
+    """Every parseable row, in file order. An absent file is an empty ledger, not an error.
+
+    Unparseable lines are skipped rather than raising: the file is append-only from several
+    writers, so a torn final line during a concurrent write must not make the whole history
+    unreadable. Anything that does parse is returned as-is — filtering is the caller's job, and
+    the two row kinds share this file.
+    """
+    p = Path(path)
+    if not p.is_file():
+        return []
+    rows: list[dict[str, Any]] = []
+    for line in p.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            row = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(row, dict):
+            rows.append(row)
+    return rows
+
+
+def disposition_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The per-finding rows only.
+
+    `finding_ref` is the ONLY discriminator — both kinds carry `status: "invoked"` — and the
+    filter is the whole point of this helper existing rather than each caller writing the
+    comparison itself. Getting it wrong does not raise; it counts every finding as another
+    invocation and silently moves a rate, which is how this file's denominator changed once
+    already.
+    """
+    return [r for r in rows if r.get("finding_ref", PER_INVOCATION_REF) != PER_INVOCATION_REF]
+
+
+def rejection_rate(rows: list[dict[str, Any]]) -> float:
+    """Rejected share of adjudicated findings. `0.0` when nothing has been adjudicated.
+
+    Zero rather than a division error: an empty ledger means the gate has not run, and a
+    caller reading a rate should see "none rejected", not a traceback in the middle of a
+    review.
+    """
+    findings = disposition_rows(rows)
+    if not findings:
+        return 0.0
+    rejected = sum(1 for r in findings if r.get("disposition") == "rejected")
+    return rejected / len(findings)
+
+
+def disposition_counts(rows: list[dict[str, Any]]) -> dict[str, int]:
+    """Per-disposition tally over the per-finding rows, with every enum value present."""
+    counts = dict.fromkeys(sorted(DISPOSITION_VALUES), 0)
+    for row in disposition_rows(rows):
+        value = str(row.get("disposition", ""))
+        if value in counts:
+            counts[value] += 1
+    return counts
+
+
 # -- CLI -----------------------------------------------------------------------
 
 # Arg-based fields (REVIEW security P1): the rendered recipe passes each value as a

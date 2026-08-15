@@ -15,6 +15,7 @@ from harness_maker.surface_allowance import (
     aggregate_headroom,
     command_headroom,
     load_active_allowances,
+    round_trip_headroom,
 )
 
 _DELTA = "BASELINE-DELTA-demo.md"
@@ -35,6 +36,7 @@ def _plan(root: Path, slug: str, *, status: str, block: str | None) -> Path:
 
 _VALID = (
     "surface_allowance:\n  chars: 732\n  commands:\n    review: 700\n"
+    "  round_trips:\n    review: 3\n    hm-review: 2\n"
     f'  reason: "two clauses that cannot be cut"\n  delta_doc: {_DELTA}\n'
 )
 
@@ -124,3 +126,31 @@ def test_a_missing_delta_doc_is_rejected(tmp_path: Path) -> None:
     (tmp_path / "work-docs" / _DELTA).unlink()
     with pytest.raises(AllowanceError, match="does not exist"):
         aggregate_headroom(tmp_path)
+
+
+def test_declared_round_trips_are_granted_per_variant(tmp_path: Path) -> None:
+    """`review` and `hm-review` are separate declarations, never one folded key.
+
+    The counting rule differs by variant and the template branches on `is_codex`, so one edit
+    legitimately adds a different number of calls to each. A shared key would let a real drift
+    in one variant hide behind the other's number.
+    """
+    _plan(tmp_path, "demo", status="planning", block=_VALID)
+    assert round_trip_headroom(tmp_path, "review") == 3
+    assert round_trip_headroom(tmp_path, "hm-review") == 2
+    assert round_trip_headroom(tmp_path, "wrapup") == 0
+
+
+def test_round_trips_expire_with_the_plan(tmp_path: Path) -> None:
+    _plan(tmp_path, "demo", status="complete", block=_VALID)
+    assert round_trip_headroom(tmp_path, "review") == 0
+
+
+def test_a_malformed_round_trip_entry_is_loud(tmp_path: Path) -> None:
+    block = (
+        f'surface_allowance:\n  chars: 10\n  reason: "r"\n  delta_doc: {_DELTA}\n'
+        "  round_trips:\n    review: 0\n"
+    )
+    _plan(tmp_path, "demo", status="planning", block=block)
+    with pytest.raises(AllowanceError, match=re.escape("round_trips['review']")):
+        round_trip_headroom(tmp_path, "review")

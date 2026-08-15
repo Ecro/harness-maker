@@ -180,6 +180,13 @@ cd <the task worktree> && uv run --with {{ harness_maker_src_path }} hm second_o
 
 ## 5. Round-state contract (auto-fix loop, rounds 2..N)
 
+> **A disposition is not a lifecycle transition.** The four PIDA values
+> (`accepted`/`rejected`/`duplicate`/`unresolved`) and this section's lattice
+> (`pending`→`resolved`/`stale`) are **orthogonal** and neither implies the other. `/hm:review`
+> Step 4e now assigns a disposition to every finding on every path, so the two vocabularies are
+> both present on the same record; treating a `rejected` as a `resolved` would let the progress
+> invariant read a re-classification as work done and keep a stalled loop running.
+
 **Round order — pinned end to end.** Merge the previous round's re-review output by `id` → stamp
 `id`s on new findings → determine `caused_by` → group and evaluate the trigger → batch re-derive
 on a fire → select fixes → apply → verify build, reverting on failure → selective re-review →

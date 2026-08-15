@@ -57,13 +57,19 @@ from pathlib import Path
 
 import pytest
 
-from harness_maker.conditional_router import MANDATORY_LENSES, OPTIONAL_REVIEWERS
+from harness_maker.conditional_router import OPTIONAL_REVIEWERS, mandatory_lenses
 from harness_maker.interview import interview
-from harness_maker.models import ProjectProfile
+from harness_maker.models import Preset, ProjectProfile
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
 
 RESULTS_ROOT = ".claude/observability/.hm-lens-results"
+
+#: `_render` below builds the default profile, which is a Side harness, so the mandatory set is
+#: the six core categories — the three domain lenses are routable there and mandatory only on
+#: Production. Reading it from the same function the renderer calls keeps this file from
+#: re-typing the axis; `tests/unit/test_render_lens_axis.py` covers both presets.
+MANDATORY_LENSES = mandatory_lenses(Preset.SIDE.value)
 
 
 def _render(tmp_path: Path, grade_threshold: str = "A") -> Path:
