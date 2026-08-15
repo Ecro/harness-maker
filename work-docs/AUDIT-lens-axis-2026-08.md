@@ -113,11 +113,25 @@ plus +8 at the confirmation pass. **The change is a cost increase defended on co
 
 ## §4 — Prune candidates
 
-- **`correctness` — prune it.** Zero exclusive groups across all three diffs. Its one real
-  contribution (the `toolchains: []`-means-off contract violation on `8137bd8e`) was also found by
-  `functionality`. It is subsumed by `functionality`, which additionally found three groups
-  `correctness` missed. **This turns the axis change from 5 → 9 lenses into 5 → 8**, recovering one
-  of the eight added dispatches.
+- **`correctness` — retire it, and note the correction.** Zero exclusive groups across all three
+  diffs. Its one real contribution (the `toolchains: []`-means-off contract violation on
+  `8137bd8e`) was also found by `functionality`, which additionally found three groups
+  `correctness` missed. So the data says: `functionality` subsumes it, and the axis change is right
+  to drop it.
+
+  > **Correction (2026-08-16).** This bullet originally read "*this turns the axis change from
+  > 5 → 9 lenses into 5 → 8, recovering one of the eight added dispatches*". **That is wrong and
+  > the claim was reported to the operator before it was caught.** `correctness` is not in the
+  > nine — the target set is design · functionality · complexity · robustness · naming ·
+  > consistency · security · concurrency · tests. It is one of the *current* five, which the axis
+  > change retires along with `failure` (subsumed by `robustness`). Pruning it therefore recovers
+  > **nothing**: nine stays nine, and §3's dispatch figures are unaffected. What the finding
+  > actually licenses is narrower and still worth having — it is positive evidence that the
+  > substitution is sound, and it makes explicit a decision an implementer could otherwise have
+  > taken the other way by carrying all eleven lenses forward.
+
+  The only candidate that would actually reduce the nine is `concurrency` (one exclusive group),
+  and the bullet below argues against it.
 - **`concurrency` — keep, with the caveat recorded.** One exclusive group in three diffs and NONE on
   two. That is weak on its face, but the one group it found is a genuine multi-session defect (a
   gated-level early return skipping `touch()`, so a peer's takeover picker reads a live session as

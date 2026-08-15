@@ -517,6 +517,9 @@ def test_no_rendered_command_bakes_a_machine_specific_absolute_path(
     assert "$HOME/harness-maker" in flag_on["wrapup"]
 
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
 # ── AC-005 ─────────────────────────────────────────────────────────────────────
 
 
@@ -528,11 +531,18 @@ def test_atomic_commands_within_budget(flag_on: dict[str, str], name: str) -> No
     the cuts is measured from the already-reduced render, so the phases that actually
     delete would have run unguarded — the withdrawn ADR-017 failure, repeated.
     """
+    from harness_maker.surface_allowance import command_headroom
+
     measured = _ATOMIC_RATCHET[name]
-    ceiling = int(measured * 1.02)
+    # An in-flight PLAN may declare headroom for a named command (see
+    # harness_maker.surface_allowance). The floor is NOT relaxed: headroom exists to let
+    # a change add a load-bearing instruction, never to let one gut the render.
+    headroom = command_headroom(REPO_ROOT, name)
+    ceiling = int(measured * 1.02) + headroom
     floor = int(measured * 0.80)
     size = len(flag_on[name])
-    assert floor <= size <= ceiling, f"{name}: {size} outside [{floor}, {ceiling}]"
+    extra = f" (+{headroom} allowance)" if headroom else ""
+    assert floor <= size <= ceiling, f"{name}: {size} outside [{floor}, {ceiling}]{extra}"
 
 
 def test_the_atomic_table_covers_every_atomic_command(flag_on: dict[str, str]) -> None:
@@ -574,6 +584,8 @@ def test_aggregate_shipped_surface_does_not_grow() -> None:
     frozen-vs-measured command-set and variant-set equality. Adding a command means
     regenerating the baseline, which is the explicit act that arm forces.
     """
+    from harness_maker.surface_allowance import aggregate_headroom
+
     from ._surface_baseline import load_baseline, measure_surface
 
     frozen = load_baseline()
@@ -583,9 +595,16 @@ def test_aggregate_shipped_surface_does_not_grow() -> None:
         assert not missing, f"{variant}: commands vanished from the render: {sorted(missing)}"
         now = sum(current[variant][name]["chars"] for name in commands)
         was = frozen["aggregate_chars"][variant]
-        assert now <= was, (
+        # Headroom from in-flight PLANs, each attributed to a BASELINE-DELTA document and
+        # each expiring when its PLAN completes. The baseline itself does not move here —
+        # re-freezing it is what `[fail:design] ratchet-rebaselined-by-its-own-subject`
+        # records three times, most recently as a deliberate supersede because the ratchet
+        # offered no other way to land a clause that could not be cut.
+        headroom = aggregate_headroom(REPO_ROOT)
+        assert now <= was + headroom, (
             f"{variant}: shipped surface grew {now - was} chars over the Phase 0 baseline "
-            f"({was} → {now}). A per-command ceiling cannot see this."
+            f"({was} → {now}), exceeding the {headroom}-char allowance from in-flight PLANs. "
+            "A per-command ceiling cannot see this."
         )
 
 

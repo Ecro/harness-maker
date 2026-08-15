@@ -1,5 +1,18 @@
 # BASELINE-DELTA — review-loop-empirics (Phase 1)
 
+> **SUPERSEDED IN PART, 2026-08-16 — the re-freeze this document attributed has been UNDONE.**
+> `surface_baseline.json` is back at its pre-Phase-1 values (`claude` 398 138, `codex` 326 030).
+> The same +732 chars are now covered by a **`surface_allowance` block in the PLAN's frontmatter**
+> (ADR-010), which the two aggregate guards and the per-command ceiling read and which **expires
+> when the PLAN reaches `status: complete`**. This document remains the `delta_doc` the allowance
+> points at — the mechanism refuses an allowance whose attribution is missing — so §1–§3 below
+> still describe what grew and why. Only §0's "after" column and §3's framing are historical:
+> the baseline did not move, and the count:3 occurrence of
+> `[fail:design] ratchet-rebaselined-by-its-own-subject` was reverted rather than accepted.
+>
+> Read §3 anyway. It is the argument that produced the allowance.
+
+
 Attribution for the `tests/structural/surface_baseline.json` re-freeze made by
 [[PLAN-review-loop-empirics]] Phase 1. Written in the same commit that moved the baseline
 (ADR-010).

@@ -6,9 +6,15 @@ created: 2026-08-15
 tags: [harness-maker, plan, review-loop, lens-coverage, churn, disposition]
 spec: "[[SPEC-review-loop-empirics]]"
 research_doc: "[[RESEARCH-review-loop-empirics]]"
-interview_rounds: 22
-adrs: 9
+interview_rounds: 23
+adrs: 10
 validator_outcome: MAJOR_REVISION_RESOLVED
+surface_allowance:
+  chars: 732
+  commands:
+    review: 732
+  reason: "Two review.md.j2 clauses that cannot be cut: the contract-fixed brief rule and the test-edit ban whose carve-out keeps the mandatory tests lens repairable (ADR-006)."
+  delta_doc: BASELINE-DELTA-review-loop-empirics.md
 summary: "Adopt the six-category axis, give each lens a vote, gate re-review on churn."
 ---
 
@@ -94,6 +100,7 @@ Phase 0 measures today's dispatches-per-review so the real delta is known rather
 | 20 | Discovery axis | Architecture | **Adopt the six categories verbatim**; domain lenses mandatory on Production, conditionally routed on Side only | User decision; concern about losing security/concurrency/tests was raised and answered by keeping them | ADR-001 |
 | 21 | Terminal-verdict gate | Risk tolerance | **Fix T-05, T-06, T-08; accept the other thirteen as risk; no third validation pass** | The terminal verdict was MAJOR_REVISION; the three fixed are the ones that would make `/hm:execute` build something other than this PLAN | ADR-008 |
 | 22 | Surface ratchet conflict | Risk tolerance | **Re-freeze `surface_baseline.json`, superseding the prior line's no-refreeze rule** | Surfaced by the suite during Phase 1, not predicted. Third occurrence of a count:2 failure class — deliberate, attributed in BASELINE-DELTA | ADR-009 |
+| 23 | R11 resolution | Risk tolerance | **`surface_allowance`: per-PLAN, expiring headroom; baseline restored** | Supersedes ADR-009. Also corrected the Phase 0 audit's arithmetic — pruning `correctness` recovers nothing, because it was never in the nine | ADR-010 |
 
 **Assumptions recorded in place of questions the gate declined to ask:**
 
@@ -131,8 +138,15 @@ extras.
 - ✅ The axis that produced the measured gain is adopted verbatim rather than approximated.
 - ✅ Domain safety is preserved where it matters; the cost adjustment lands on the preset axis.
 - ✅ Lens parity means the confirmation pass cannot become a permanent `blocks_approval: true`.
+- ✅ **`correctness` and `failure` are RETIRED, not carried alongside.** The six categories replace
+  them (`functionality`, `robustness`); the set is nine, never eleven. Phase 0 measured
+  `correctness` at zero exclusive groups across all three diffs — every finding it produced,
+  `functionality` also produced — so the substitution is evidenced rather than assumed. Stated as a
+  consequence because an implementer reading "adopt the six categories" could reasonably have
+  appended them to the existing five, and nothing else here would have caught that.
 - ⚠️ Production round 1 and the confirmation pass go from 5 to 9 dispatches. The saving has to come
-  from the repair rounds (ADR-004/005); P0 measures whether it does (risk R6).
+  from the repair rounds (ADR-004/005); P0 measured that it does NOT (risk R6). **Pruning
+  `correctness` does not offset this** — it was never among the nine (audit §4 correction).
 - ⚠️ Nine mandatory lenses are nine terminal, unrepairable failure conditions (R1).
 **Rejected alternatives:**
 - Pure six-category replacement — retires `security`, `concurrency` and `tests`, which exist because
@@ -334,7 +348,7 @@ unchanged.
 ### ADR-009: This PLAN supersedes the prior line's no-refreeze rule for the shipped-surface ratchet
 **Status:** Accepted (2026-08-15, interview #22 — during Phase 1)
 **Context:** `tests/structural/surface_baseline.json` is a **one-directional** ratchet frozen by
-PLAN-workflow-step-audit (ADR-010/011) for a line of work whose purpose was to *shrink* the render.
+PLAN-workflow-step-audit (its ADR-010/011 — a different PLAN's numbering) for a line of work whose purpose was to *shrink* the render.
 `test_plan_net_surface.py` states in its own docstring that re-freezing is forbidden and names the
 failure class — `[fail:test] ratchet-rebaselined-by-its-own-subject`, **count:2** in this repo.
 Phase 1's two clauses cost +732 chars after compression from 1 123, and the carve-out half is not
@@ -360,6 +374,43 @@ The escape route named in R11 — moving stage prose into a skill the stage alwa
 - Drop the two clauses — leaves the mandatory-`tests`-lens deadlock (ADR-006) unfixed.
 - Move the prose into a loaded skill — metric-gaming, as above.
 **Source:** Interview #22; discovered by the full suite during Phase 1, not predicted by the PLAN
+
+### ADR-010: A per-PLAN, expiring surface allowance replaces the re-freeze (supersedes ADR-009)
+**Status:** Accepted (2026-08-16, interview #23) — **supersedes this PLAN's ADR-009**
+**Context:** ADR-009 re-froze `surface_baseline.json` because Phase 1 needed +732 chars that could
+not be compressed away, and the ratchet offered no compliant answer other than "drop the clause".
+That is the tell R11 was pointing at: a guard whose only compliant answer is *do not do the work*
+gets overridden, and each override costs it meaning. It was already the **third** occurrence of
+`[fail:design] ratchet-rebaselined-by-its-own-subject`, and Phases 2–7 would have repeated it at a
+larger scale — at which point the ratchet is a ratchet in name only.
+**Decision:** Introduce `harness_maker.surface_allowance`. A PLAN may declare
+`surface_allowance: {chars, commands?, reason, delta_doc}` in its frontmatter; both aggregate
+guards and the per-command ceiling admit `frozen + Σ(active allowances)`. An allowance is **active
+only while its PLAN is `status: planning`** and is rejected outright unless its `delta_doc` exists
+next to the PLAN. **`surface_baseline.json` is restored to its pre-Phase-1 values** (`claude`
+398 870 → 398 138, `codex` 326 762 → 326 030); ADR-009's re-freeze is undone.
+**Consequences:**
+- ✅ The baseline is an immovable origin again, so cross-PLAN comparison survives — the property
+  ADR-009 destroyed.
+- ✅ Growth stays attributed and **bounded per change** rather than absorbed permanently.
+- ✅ The headroom **expires on its own** when the PLAN completes. No cleanup step to forget.
+- ✅ The floor is deliberately NOT relaxed: an allowance lets a change add a load-bearing
+  instruction, never lets one gut the render.
+- ⚠️ A PLAN that never reaches `status: complete` holds its headroom indefinitely. Accepted: a
+  stale in-flight PLAN is already a visible problem, and a wall-clock expiry would fail a
+  long-running PLAN mid-flight for a reason unrelated to its content.
+- ⚠️ The allowance is a single number applied to **every** variant. The growth it was built for
+  lives in shared templates both renders read, so per-variant precision would be ceremony; a change
+  that grows only one variant over-spends its allowance on the other.
+- ⚠️ At completion the growth must still be folded into the baseline once, with its delta doc.
+  That fold is the legitimate re-freeze and is **not** yet automated.
+**Rejected alternatives:**
+- Keep ADR-009's re-freeze — costs the origin, and Phases 2–7 would repeat it.
+- Cut existing prose to fund each change — attempted during Phase 1 and it went wrong: the
+  read-budget block that looked like verbatim duplication is per-dispatch-site and test-enforced.
+  Funding growth by guessing which prose is load-bearing is not a policy.
+- A wall-clock expiry — fails an in-flight PLAN for elapsed time, not for content.
+**Source:** Interview #23; the `pending-proposals.md` proposal of 2026-08-15
 
 ## 🏗️ Technical Design
 

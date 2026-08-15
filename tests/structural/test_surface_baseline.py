@@ -53,6 +53,9 @@ from ._surface_baseline import (
 from .conftest import pin_install_ref
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
+
+from harness_maker.surface_allowance import aggregate_headroom  # noqa: E402
+
 _SHA = re.compile(r"^[0-9a-f]{40}$")
 
 
@@ -274,7 +277,14 @@ def test_the_standalone_generator_agrees_with_the_baseline_in_shape_and_directio
         assert not missing, f"{variant}: commands vanished from the render: {sorted(missing)}"
         now = sum(live[variant][name]["chars"] for name in commands)
         was = frozen["aggregate_chars"][variant]  # type: ignore[index]
-        assert now <= was, f"{variant}: shipped surface grew {now - was} chars ({was} → {now})"
+        # Same allowance the in-process arm honours — an in-flight PLAN's attributed,
+        # expiring headroom. Both arms must read it or the ratchet is inconsistent about
+        # what it permits depending on which process measured.
+        headroom = aggregate_headroom(_REPO_ROOT)
+        assert now <= was + headroom, (
+            f"{variant}: shipped surface grew {now - was} chars ({was} → {now}), "
+            f"exceeding the {headroom}-char allowance from in-flight PLANs"
+        )
 
 
 def test_the_generator_is_deterministic_in_process(

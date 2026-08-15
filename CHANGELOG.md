@@ -20,12 +20,15 @@
 
 ### Changed
 
-- **`tests/structural/surface_baseline.json` re-frozen** (`claude` 398 138 → 398 870, `codex`
-  326 030 → 326 762; +732 on `review.md.j2`, which both renders read). This supersedes the prior
-  line's no-refreeze rule and is the third occurrence of
-  `[fail:design] ratchet-rebaselined-by-its-own-subject` — the first deliberate one. Attribution,
-  direction and cost are in `work-docs/BASELINE-DELTA-review-loop-empirics.md`; a proposal for an
-  escape that is not a re-freeze is in `pending-proposals.md`.
+- **The shipped-surface ratchet gained a per-PLAN, expiring allowance** (`surface_allowance` in
+  PLAN frontmatter, read by `harness_maker.surface_allowance`). Both aggregate guards and the
+  per-command ceiling now admit `frozen + Σ(active allowances)`; an allowance counts only while its
+  PLAN is `status: planning` and is rejected unless its `delta_doc` exists. The floor is not
+  relaxed. **`surface_baseline.json` is unchanged** — a same-day re-freeze (`claude` 398 138 →
+  398 870) was reverted and the +732 chars re-expressed as an allowance, so the baseline stays an
+  immovable origin and cross-PLAN comparison survives. This is the replacement
+  `[fail:design] ratchet-rebaselined-by-its-own-subject` asked for in its own prevention clause
+  after a third occurrence. Rationale in `work-docs/BASELINE-DELTA-review-loop-empirics.md`.
 
 - **`/hm:review` exits on risk closure, not issue exhaustion.** The stage used to stop when a
   round produced no more findings — over a *moving* artifact, since the auto-fix loop re-reviews
