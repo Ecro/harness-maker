@@ -77,6 +77,11 @@ reviewers:
   auto_fix: {{ config.reviewers.auto_fix | lower }}
   grade_threshold: {{ config.reviewers.grade_threshold }}
   max_review_rounds: {{ config.reviewers.max_review_rounds }}
+  # Repair-round re-review gate: below this fraction of a touched file's LOC the
+  # round skips its re-review and records the measured ratio as the reason.
+  # Set the gate false to restore the pre-gate behaviour in one line.
+  rereview_churn_gate: {{ config.reviewers.rereview_churn_gate | lower }}
+  rereview_churn_ratio: {{ config.reviewers.rereview_churn_ratio }}
 {% if config.reviewers.mechanical_checks %}
   mechanical_checks:
 {% for c in config.reviewers.mechanical_checks %}    - {{ c | tojson }}

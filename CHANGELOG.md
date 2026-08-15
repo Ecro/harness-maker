@@ -4,6 +4,29 @@
 
 ### Added
 
+- **Re-review churn gate (config surface only — Phase 1 of PLAN-review-loop-empirics).** Two new
+  optional `harness.yaml` keys, `reviewers.rereview_churn_gate` (bool, default `true`) and
+  `reviewers.rereview_churn_ratio` (float, default `0.20`). An absent key resolves to the
+  documented default; a malformed one is a hard error where the value is *used*
+  (`review_churn.ChurnConfigError`) and a loud `logger.warning` on the re-render path, which is a
+  migration path and must stay re-renderable. Nothing consumes the gate yet — the repair-round
+  branch it feeds lands in a later phase — so this release changes no review behaviour.
+- **Two prompt clauses in the rendered `/hm:review`.** Every lens brief now states that the public
+  contract is fixed and out of scope, so a reviewer stops proposing API changes we did not ask
+  about. The auto-fix loop is told it may run tests but must not edit one to resolve a finding
+  whose target is not that test — **with the carve-out that a finding whose own target IS the test
+  may be fixed**, because `tests` is a mandatory lens and an unqualified ban would leave its
+  findings permanently `pending`, which is one non-progressing round and an unapprovable review.
+
+### Changed
+
+- **`tests/structural/surface_baseline.json` re-frozen** (`claude` 398 138 → 398 870, `codex`
+  326 030 → 326 762; +732 on `review.md.j2`, which both renders read). This supersedes the prior
+  line's no-refreeze rule and is the third occurrence of
+  `[fail:design] ratchet-rebaselined-by-its-own-subject` — the first deliberate one. Attribution,
+  direction and cost are in `work-docs/BASELINE-DELTA-review-loop-empirics.md`; a proposal for an
+  escape that is not a re-freeze is in `pending-proposals.md`.
+
 - **`/hm:review` exits on risk closure, not issue exhaustion.** The stage used to stop when a
   round produced no more findings — over a *moving* artifact, since the auto-fix loop re-reviews
   only touched scopes, so the last round's fixes always exited unreviewed. It now declares a

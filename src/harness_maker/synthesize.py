@@ -923,6 +923,8 @@ def synthesize(
             "auto_fix": answers.auto_fix,
             "grade_threshold": answers.grade_threshold,
             "max_review_rounds": answers.max_review_rounds,
+            "rereview_churn_gate": answers.rereview_churn_gate,
+            "rereview_churn_ratio": answers.rereview_churn_ratio,
             "mechanical_checks": list(answers.mechanical_checks),
         },
         project={"domains": list(answers.domains)},

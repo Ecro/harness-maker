@@ -189,6 +189,10 @@ Task(subagent_type="security-reviewer",    description="lens security: {slug}", 
 Task(subagent_type="test-reviewer",        description="lens tests: {slug}",       prompt="<brief>\n\nYour lens: tests — oracle strength, discrimination, would these tests pass a wrong implementation?")
 ```
 
+**Put in `<brief>`, so it reaches every lens: the public contract is fixed and out of scope** — no
+proposal to change an exported signature, wire format or file format; the design *behind* it is
+fair game. Without that line a reviewer proposes API changes, which is the question we asked.
+
 **Mint a run id once, at the start of this `/hm:review`.** Any short unique token works — the
 first 8 chars of `git rev-parse HEAD` plus the round-1 timestamp is fine. Every result file
 carries it and every coverage call is given it.
@@ -644,6 +648,13 @@ Per iteration:
    - Has a concrete `suggestion` with replacement code (skip vague advice).
 
 4. **Apply** in priority order (P0 → P1 → P2):
+
+   > **Run the tests, never edit one to make a finding go away.** You **must not edit a test file
+   > to resolve a finding whose target is not that test** — that weakens the oracle. But **a
+   > finding whose own target is the test may be fixed**: `tests` is a mandatory lens and raises
+   > findings repairable only by writing a test, so an unqualified ban leaves them `pending` → one
+   > non-progressing round → an unapprovable review.
+
    - Read the file at `{file}:{line}`.
    - Verify current code still matches the finding's `evidence` snippet (prior fixes may have shifted lines).
    - Apply the suggested fix via `Edit`.

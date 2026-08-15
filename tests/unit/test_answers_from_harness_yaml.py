@@ -537,3 +537,64 @@ def test_mcp_servers_args_and_env_optional(tmp_path: Path) -> None:
     a = answers_from_harness_yaml(target)
     assert a is not None
     assert a.mcp_servers == {"minimal": {"command": "simple-bin"}}
+
+
+def test_churn_gate_round_trips_through_the_reverse_mapper(tmp_path: Path) -> None:
+    """A user who turned the gate off must not get it back on from a re-render.
+
+    Round-trip coverage for the two keys, mirroring the grade_threshold /
+    max_review_rounds pattern above. Review found the reverse-mapper branch shipped
+    with no test at all, which is the one place a wrong key name or a wrong guard
+    would silently discard the user's setting.
+    """
+    target = _write_yaml(
+        tmp_path,
+        "preset: Side\nlocale: en\ndev_mode: task-driven\n"
+        "reviewers:\n"
+        "  enabled:\n    - code-reviewer\n"
+        "  rereview_churn_gate: false\n"
+        "  rereview_churn_ratio: 0.35\n",
+    )
+    answers = answers_from_harness_yaml(target)
+    assert answers is not None
+    assert answers.rereview_churn_gate is False
+    assert answers.rereview_churn_ratio == 0.35
+
+
+def test_legacy_yaml_without_churn_keys_uses_defaults(tmp_path: Path) -> None:
+    """The absent case — a harness.yaml predating the feature keeps working."""
+    target = _write_yaml(
+        tmp_path,
+        "preset: Side\nlocale: en\ndev_mode: task-driven\n",
+    )
+    answers = answers_from_harness_yaml(target)
+    assert answers is not None
+    assert answers.rereview_churn_gate is True
+    assert answers.rereview_churn_ratio == 0.20
+
+
+def test_malformed_churn_values_warn_and_fall_back_rather_than_dropping_silently(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Malformed must be LOUD here and fatal at the point of use.
+
+    Raising in the reverse mapper would make a typo un-re-renderable; the sibling
+    `mechanical_checks` / `toolchains` handlers both warn-and-drop. The hard error is
+    `review_churn`'s, where the value is actually consumed.
+    """
+    target = _write_yaml(
+        tmp_path,
+        "preset: Side\nlocale: en\ndev_mode: task-driven\n"
+        "reviewers:\n"
+        "  enabled:\n    - code-reviewer\n"
+        '  rereview_churn_gate: "yes"\n'
+        "  rereview_churn_ratio: 1.5\n",
+    )
+    with caplog.at_level(logging.WARNING):
+        answers = answers_from_harness_yaml(target)
+    assert answers is not None
+    assert answers.rereview_churn_gate is True
+    assert answers.rereview_churn_ratio == 0.20
+    warnings = " ".join(r.getMessage() for r in caplog.records)
+    assert "rereview_churn_gate" in warnings
+    assert "rereview_churn_ratio" in warnings

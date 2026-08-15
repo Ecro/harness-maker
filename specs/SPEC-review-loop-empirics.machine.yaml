@@ -1,0 +1,416 @@
+schema_version: 2
+spec_slug: review-loop-empirics
+parent_spec: null
+verification_tier: 2
+mutation_threshold: 70
+mutation_threshold_rationale: "Tier 2: consensus scoping, disposition/grade interaction and ratio aggregation are the defect-bearing surfaces; render-grep ACs are not mutation-sensitive and drag the ratio down."
+last_mutation_run: null
+paths_to_mutate:
+  - src/harness_maker/review_consensus.py
+  - src/harness_maker/lens_coverage.py
+  - src/harness_maker/codex_adapter.py
+  - src/harness_maker/codex_ledger.py
+  - src/harness_maker/review_telemetry.py
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+  - id: AC-001
+    title: "Round 1 renders the six-category axis plus the preset's domain lenses"
+    type: mechanical
+    test_ids: []
+    executable_predicate: "rendered_lens_set(preset) == expected_lens_set(preset)"
+    golden_table: []
+    rubric_id: null
+    pending_test: true
+    oracle_source: golden
+    oracle_evidence: "expected_lens_set is pinned from the six categories named in the source experiment plus the preset rule agreed in interview round 5; it predates and is independent of the renderer."
+    oracle_independence_waiver: null
+    input_domain: null
+    transformation: null
+    expected_relation: null
+    preconditions: []
+    observable_output: null
+    generator_hint: null
+
+  - id: AC-002
+    title: "Side and Production differ only in mandatory-ness, not in availability"
+    type: property
+    test_ids: []
+    executable_predicate: null
+    golden_table: []
+    rubric_id: null
+    pending_test: true
+    oracle_source: property
+    oracle_evidence: "Subset containment holds for any preset pair by construction of the preset axis; a renderer emitting a Side-only lens violates it with no fixture to compare against."
+    oracle_independence_waiver: null
+    input_domain: "any (preset, lens-set) pair produced by the preset map"
+    transformation: "compute the mandatory lens set for Side and for Production"
+    expected_relation: "set(side_mandatory) <= set(production_mandatory)"
+    preconditions:
+      - "both presets render without error"
+    observable_output: "two lens-name sets"
+    generator_hint: null
+
+  - id: AC-003
+    title: "A missing mandatory lens blocks approval"
+    type: mechanical
+    test_ids: []
+    executable_predicate: "lens_coverage_check(missing=['naming'])['blocks_approval'] is True"
+    golden_table: []
+    rubric_id: null
+    pending_test: true
+    oracle_source: differential
+    oracle_evidence: "Compared against the identical call for a legacy lens ('security'); the oracle is already-shipped behaviour, not an expectation authored alongside the change."
+    oracle_independence_waiver: null
+    input_domain: null
+    transformation: null
+    expected_relation: null
+    preconditions: []
+    observable_output: null
+    generator_hint: null
+
+  - id: AC-004
+    title: "A single reviewer lens votes alone; cross-model voters keep K=2"
+    type: parametric
+    test_ids: []
+    executable_predicate: null
+    golden_table:
+      - input: {voices: [{source: "robustness", kind: "lens"}]}
+        expected: "consensus-passed"
+      - input: {voices: [{source: "naming", kind: "lens"}, {source: "design", kind: "lens"}]}
+        expected: "consensus-passed"
+      - input: {voices: [{source: "codex", kind: "cross-model"}]}
+        expected: "manual-only"
+      - input: {voices: [{source: "codex", kind: "cross-model"}, {source: "antigravity", kind: "cross-model"}]}
+        expected: "consensus-passed"
+      - input: {voices: [{source: "codex", kind: "cross-model"}, {source: "security", kind: "lens"}]}
+        expected: "consensus-passed"
+    rubric_id: null
+    pending_test: true
+    oracle_source: golden
+    oracle_evidence: "Rows encode the round-5 decision that distinct lenses cannot corroborate one another while identical-axis voters can; the cross-model rows preserve the shipped K=2 behaviour, so the oracle for those is existing conduct."
+    oracle_independence_waiver: null
+    input_domain: null
+    transformation: null
+    expected_relation: null
+    preconditions: []
+    observable_output: null
+    generator_hint: null
+
+  - id: AC-005
+    title: "P2 findings never move the grade"
+    type: mechanical
+    test_ids: []
+    executable_predicate: "review_consensus.compute_grade(p0_count=0, p1_count=0, p2_count=7) == 'A'"
+    golden_table: []
+    rubric_id: null
+    pending_test: true
+    oracle_source: golden
+    oracle_evidence: "The expected letter comes from the grade table already published in review.md.j2, which predates this change and is not edited by it."
+    oracle_independence_waiver: null
+    input_domain: null
+    transformation: null
+    expected_relation: null
+    preconditions: []
+    observable_output: null
+    generator_hint: null
+
+  - id: AC-006
+    title: "Every finding carries exactly one disposition, from a producer that sees them all"
+    type: property
+    test_ids: []
+    executable_predicate: null
+    golden_table: []
+    rubric_id: null
+    pending_test: true
+    oracle_source: property
+    oracle_evidence: "A counting invariant over the emitted record: satisfiable only by the record being complete, and it holds for every finding list regardless of source, severity, tag or whether a fix step ran."
+    oracle_independence_waiver: null
+    input_domain: "any round record, including rounds with no fix step and auto_fix-disabled runs, with findings of any severity, tag and source"
+    transformation: "emit the round record, then read back its findings and dispositions"
+    expected_relation: "len(findings) == len([f for f in findings if f.disposition in {'accepted','rejected','duplicate','unresolved'}])"
+    preconditions:
+      - "the round completed rather than aborting mid-dispatch"
+    observable_output: "the emitted round record"
+    generator_hint: null
+
+  - id: AC-007
+    title: "A rejection carries an authority, with a defined fallback"
+    type: parametric
+    test_ids: []
+    executable_predicate: null
+    golden_table:
+      - input: {disposition: "rejected", authority: null}
+        expected: "invalid"
+      - input: {disposition: "rejected", authority: "AC-004"}
+        expected: "valid"
+      - input: {disposition: "rejected", authority: "docstring:src/x.py:parse"}
+        expected: "valid"
+      - input: {disposition: "rejected", authority: "no-contract"}
+        expected: "invalid"
+      - input: {disposition: "unresolved", authority: "no-contract"}
+        expected: "valid"
+    rubric_id: null
+    pending_test: true
+    oracle_source: golden
+    oracle_evidence: "Rows encode S8 as agreed in interview round 1 and amended after validation; the no-contract rows exist because task-driven harnesses have no SPEC and CLAUDE.md makes docstrings optional."
+    oracle_independence_waiver: null
+    input_domain: null
+    transformation: null
+    expected_relation: null
+    preconditions: []
+    observable_output: null
+    generator_hint: null
+
+  - id: AC-008
+    title: "Only an AC-cited rejection is excluded from the grade"
+    type: parametric
+    test_ids: []
+    executable_predicate: null
+    golden_table:
+      - input: {severity: "P0", disposition: "rejected", authority: "AC-004"}
+        expected: {counted: false, human_review_needed: false}
+      - input: {severity: "P0", disposition: "rejected", authority: "docstring:src/x.py:parse"}
+        expected: {counted: true, human_review_needed: true}
+      - input: {severity: "P1", disposition: "rejected", authority: "docstring:src/y.py:send"}
+        expected: {counted: true, human_review_needed: true}
+      - input: {severity: "P0", disposition: "accepted", authority: null}
+        expected: {counted: true, human_review_needed: false}
+    rubric_id: null
+    pending_test: true
+    oracle_source: golden
+    oracle_evidence: "The split is the round-5 decision that only an independent contract may clear a finding; the accepted-P0 row is the pre-change behaviour, so a change in the grade path fails against shipped conduct."
+    oracle_independence_waiver: null
+    input_domain: null
+    transformation: null
+    expected_relation: null
+    preconditions: []
+    observable_output: null
+    generator_hint: null
+
+  - id: AC-009
+    title: "Dispositions are ledgered and aggregable without double-counting"
+    type: mechanical
+    test_ids: []
+    executable_predicate: "rejection_rate(load_ledger(fixture_path)) == 0.25"
+    golden_table: []
+    rubric_id: null
+    pending_test: true
+    oracle_source: golden
+    oracle_evidence: "The fixture ledger is hand-authored with 4 disposition rows and 2 per-invocation rows; 0.25 is computed by hand, mirroring the finding_ref discriminator documented in CLAUDE.md."
+    oracle_independence_waiver: null
+    input_domain: null
+    transformation: null
+    expected_relation: null
+    preconditions: []
+    observable_output: null
+    generator_hint: null
+
+  - id: AC-010
+    title: "Below-threshold churn skips the re-review, with the reason recorded"
+    type: parametric
+    test_ids: []
+    executable_predicate: null
+    golden_table:
+      - input: {churn_ratio: 0.00, threshold: 0.20}
+        expected: {dispatches: 0, reason_contains: "0.00 < 0.20"}
+      - input: {churn_ratio: 0.05, threshold: 0.20}
+        expected: {dispatches: 0, reason_contains: "0.05 < 0.20"}
+      - input: {churn_ratio: 0.20, threshold: 0.20}
+        expected: {dispatches: 1, reason_contains: "0.20 >= 0.20"}
+      - input: {churn_ratio: 0.35, threshold: 0.20}
+        expected: {dispatches: 1, reason_contains: "0.35 >= 0.20"}
+    rubric_id: null
+    pending_test: true
+    oracle_source: golden
+    oracle_evidence: "Boundary rows (equal-to-threshold inclusive) come from the threshold semantics fixed in interview round 3, not from the implementation's comparison operator."
+    oracle_independence_waiver: null
+    input_domain: null
+    transformation: null
+    expected_relation: null
+    preconditions: []
+    observable_output: null
+    generator_hint: null
+
+  - id: AC-011
+    title: "At or above threshold, exactly one structured reviewer is dispatched"
+    type: mechanical
+    test_ids: []
+    executable_predicate: "len(review_consensus.rereview_plan(churn_ratio=0.35, threshold=0.20)) == 1"
+    golden_table: []
+    rubric_id: null
+    pending_test: true
+    oracle_source: golden
+    oracle_evidence: "The count 1 follows from AC-004: a single lens now carries a full vote, so the K=2 argument that forced two dispatches no longer applies. Fixed by the round-5 decision before implementation."
+    oracle_independence_waiver: null
+    input_domain: null
+    transformation: null
+    expected_relation: null
+    preconditions: []
+    observable_output: null
+    generator_hint: null
+
+  - id: AC-012
+    title: "The churn threshold resolves from config with a documented default"
+    type: parametric
+    test_ids: []
+    executable_predicate: null
+    golden_table:
+      - input: {config: "absent"}
+        expected: 0.20
+      - input: {config: "0.35"}
+        expected: 0.35
+      - input: {config: "0"}
+        expected: 0.0
+      - input: {config: "abc"}
+        expected: "load-time error"
+      - input: {config: "1.5"}
+        expected: "load-time error"
+    rubric_id: null
+    pending_test: true
+    oracle_source: golden
+    oracle_evidence: "The absent-key row exists because CLAUDE.md's 2026-06-08 learned correction requires an explicit absent-case test for any feature activating on an optional field."
+    oracle_independence_waiver: null
+    input_domain: null
+    transformation: null
+    expected_relation: null
+    preconditions: []
+    observable_output: null
+    generator_hint: null
+
+  - id: AC-013
+    title: "The churn ratio is well-defined over pinned endpoints and degenerate files"
+    type: parametric
+    test_ids: []
+    executable_predicate: null
+    golden_table:
+      - input: {files: [{path: "new.py", kind: "created", added: 40, deleted: 0, post_loc: 40}]}
+        expected: 1.0
+      - input: {files: [{path: "gone.py", kind: "deleted", added: 0, deleted: 90, post_loc: 0}]}
+        expected: "excluded-from-denominator"
+      - input: {files: [{path: "img.png", kind: "binary", added: null, deleted: null, post_loc: null}]}
+        expected: "excluded-and-recorded"
+      - input: {files: [{path: "big.py", kind: "modified", added: 5, deleted: 0, post_loc: 5000}, {path: "small.py", kind: "modified", added: 30, deleted: 30, post_loc: 30}]}
+        expected: 1.0
+      - input: {files: [{path: "moved.py", kind: "renamed", added: 10, deleted: 2, post_loc: 60}]}
+        expected: 0.2
+    rubric_id: null
+    pending_test: true
+    oracle_source: golden
+    oracle_evidence: "Each expected value is computed by hand from S12's rules; the max-across-files row exists specifically because aggregate averaging masked it, which is the defect review found."
+    oracle_independence_waiver: null
+    input_domain: null
+    transformation: null
+    expected_relation: null
+    preconditions: []
+    observable_output: null
+    generator_hint: null
+
+  - id: AC-014
+    title: "A stalled loop records the churn ratio on no-progress"
+    type: mechanical
+    test_ids: []
+    executable_predicate: "exit_record(transitions=0, churn_ratio=0.0)['exit_reason'] == 'no-progress'"
+    golden_table: []
+    rubric_id: null
+    pending_test: true
+    oracle_source: differential
+    oracle_evidence: "Compared against the pre-change exit assignment for the same input: the value and its precedence must be unchanged, so any new exit reason or reordering fails against shipped behaviour."
+    oracle_independence_waiver: null
+    input_domain: null
+    transformation: null
+    expected_relation: null
+    preconditions: []
+    observable_output: null
+    generator_hint: null
+
+  - id: AC-015
+    title: "The confirmation pass uses the same mandatory lens set as round 1"
+    type: property
+    test_ids: []
+    executable_predicate: null
+    golden_table: []
+    rubric_id: null
+    pending_test: true
+    oracle_source: property
+    oracle_evidence: "Set equality between two independently rendered dispatch lists holds for every preset and every lens-set configuration; it cannot be satisfied by hard-coding either list."
+    oracle_independence_waiver: null
+    input_domain: "any preset and any configured lens set"
+    transformation: "render the round-1 dispatch and the confirmation-pass dispatch"
+    expected_relation: "set(round1_mandatory_lenses) == set(confirmation_pass_lenses)"
+    preconditions:
+      - "the harness renders without error"
+    observable_output: "two lens-name sets"
+    generator_hint: null
+
+  - id: AC-016
+    title: "An oscillating hunk raises a manual-only P1 spec_gap"
+    type: mechanical
+    test_ids: []
+    executable_predicate: "detect_oscillation(three_round_fixture())[0].tag == 'manual-only'"
+    golden_table: []
+    rubric_id: null
+    pending_test: true
+    oracle_source: golden
+    oracle_evidence: "The fixture reproduces the documented R3-removes / R4-restores sequence with the oscillating hunk chosen by hand; the manual-only tag is required so the finding cannot make grade A unreachable, which is the defect review found."
+    oracle_independence_waiver: null
+    input_domain: null
+    transformation: null
+    expected_relation: null
+    preconditions: []
+    observable_output: null
+    generator_hint: null
+
+  - id: AC-017
+    title: "The briefs carry both clauses and the test ban carves out test-targeted findings"
+    type: mechanical
+    test_ids: []
+    executable_predicate: "contract_clause_present(rendered_review_md()) and test_edit_carve_out_present(rendered_review_md())"
+    golden_table: []
+    rubric_id: null
+    pending_test: true
+    oracle_source: golden
+    oracle_evidence: "Both clauses are required verbatim by S16; the assertion reads the rendered artifact a consumer sees, not the template variable that produced it. The carve-out exists because the mandatory tests lens would otherwise be unrepairable."
+    oracle_independence_waiver: null
+    input_domain: null
+    transformation: null
+    expected_relation: null
+    preconditions: []
+    observable_output: null
+    generator_hint: null
+
+  - id: AC-018
+    title: "The axis pilot records per-lens exclusive yield and prune candidates"
+    type: mechanical
+    test_ids: []
+    executable_predicate: "audit_report_has_per_lens_yield(audit_path) is True"
+    golden_table: []
+    rubric_id: null
+    pending_test: true
+    oracle_source: golden
+    oracle_evidence: "The required field list (per-lens exclusive groups, severities, dispatch counts, prune candidates) is fixed by S17, written before the pilot runs so its outcome cannot bias the check."
+    oracle_independence_waiver: null
+    input_domain: null
+    transformation: null
+    expected_relation: null
+    preconditions: []
+    observable_output: null
+    generator_hint: null
+
+  - id: AC-019
+    title: "hm health treats a disabled gate as not_applicable"
+    type: mechanical
+    test_ids: []
+    executable_predicate: "churn_gate_signal(enabled=False).not_applicable is True"
+    golden_table: []
+    rubric_id: null
+    pending_test: true
+    oracle_source: differential
+    oracle_evidence: "Compared against the shipped permissions.deny_dangerous opt-out signal, which already encodes the not_applicable / passed=True / no-penalty shape; the oracle is existing behaviour."
+    oracle_independence_waiver: null
+    input_domain: null
+    transformation: null
+    expected_relation: null
+    preconditions: []
+    observable_output: null
+    generator_hint: null

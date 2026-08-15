@@ -30,6 +30,7 @@ from typing import Any, TextIO
 import yaml
 from pydantic import ValidationError
 
+from harness_maker import review_churn
 from harness_maker.io_utils import denormalize_home_to_tilde, load_harness_yaml
 from harness_maker.models import (
     _MODEL_ID_PATTERN,
@@ -1196,6 +1197,26 @@ def answers_from_harness_yaml(yaml_path: Path) -> InterviewAnswers | None:
         update["grade_threshold"] = grade_threshold
     if isinstance(max_review_rounds, int):
         update["max_review_rounds"] = max_review_rounds
+
+    # Churn gate — a WELL-FORMED user setting must not be silently restored by a re-render
+    # (checkpoint 6: what we write, we read back). Absent key -> field default.
+    #
+    # Malformed is the case review found: an earlier version dropped it into `update` silently,
+    # so a typo'd ratio came back as 0.20 with no diagnostic — the very "restored by a re-render"
+    # outcome the line above says cannot happen. Route both keys through the strict resolvers so
+    # ONE definition of "valid" exists, and warn rather than raise: this is the migration path,
+    # and `mechanical_checks` / `toolchains` two blocks below both warn-and-drop. The hard error
+    # lives where the value is USED (`review_churn` raises), which is where fail-closed belongs.
+    for _key, _resolver in (
+        ("rereview_churn_gate", review_churn.churn_gate_enabled),
+        ("rereview_churn_ratio", review_churn.resolve_churn_threshold),
+    ):
+        if _key not in reviewers_data:
+            continue
+        try:
+            update[_key] = _resolver(reviewers_data)
+        except review_churn.ChurnConfigError as e:
+            logger.warning("%s — falling back to the default", e)
 
     # mechanical_checks — user adds shell commands manually; preserve on re-render.
     # Empty-string entries are filtered with a warning (likely typos in yaml list).
