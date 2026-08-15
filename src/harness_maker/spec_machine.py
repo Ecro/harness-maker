@@ -16,6 +16,7 @@ import hashlib
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 from datetime import UTC, datetime
@@ -195,6 +196,57 @@ class SpecMachine(BaseModel):
     mutation_threshold_rationale: str = ""
     last_mutation_run: str | None = None  # ISO date
     paths_to_mutate: list[str] = Field(default_factory=list)
+    #: Test command mutmut runs per mutant. Absent → mutmut's default, which is the WHOLE test
+    #: suite; on any repo whose suite is slower than wall_budget/mutant_count that guarantees a
+    #: timeout and an all-zero report (measured here: one mutant exhausted the 600 s cap). Scope
+    #: it to the tests that cover `paths_to_mutate`. Optional, so existing SPECs keep parsing —
+    #: but a T1/T2 SPEC without it is very unlikely to produce a measurement.
+    mutation_runner: str | None = None
+
+    @field_validator("mutation_runner")
+    @classmethod
+    def _runner_is_a_test_command(cls, value: str | None) -> str | None:
+        """This string is EXECUTED, so it is validated where it enters, not where it runs.
+
+        mutmut hands `--runner` to `subprocess.Popen(cmd, shell=True)` on Windows and to
+        `shlex.split(cmd)` elsewhere — once per mutant. The value arrives from a repo YAML
+        that a `git pull`, a contributor, or a planning model can write, and it never appears
+        in the operator's Bash approval prompt: the approved string is the benign
+        `uv run … hm spec_mutation gate …` wrapper.
+
+        **What this does and does not buy** — corrected in round 2, because the first version
+        of this docstring claimed the allowlist stopped a *hostile* field and it does not.
+        `python -c "__import__('os').system('…')"` contains no banned character, `shlex.split`s
+        cleanly, and its head is `python`; `uv run --with <pkg> …` installs and runs arbitrary
+        code. Against a hostile repo YAML the check is worth nothing.
+
+        What it does buy: it blocks an accidental value (`bash foo.sh`, a typo'd path) and it
+        blocks metacharacter chaining on the Windows `shell=True` branch. **Treat a repo YAML
+        as trusted input** — a repo hostile enough to plant this can also plant `conftest.py`.
+        Saying otherwise is the cosmetic-control-read-as-a-boundary class this repo records.
+        """
+        if value is None:
+            return value
+        forbidden = set(";|&$><`\n\r")
+        hit = forbidden & set(value)
+        if hit:
+            msg = f"mutation_runner may not contain shell metacharacters {sorted(hit)}"
+            raise ValueError(msg)
+        try:
+            tokens = shlex.split(value)
+        except ValueError as exc:
+            msg = f"mutation_runner is not a parseable command: {exc}"
+            raise ValueError(msg) from exc
+        if not tokens:
+            msg = "mutation_runner is empty"
+            raise ValueError(msg)
+        allowed = {"pytest", "python", "python3", "uv"}
+        head = Path(tokens[0]).name
+        if head not in allowed:
+            msg = f"mutation_runner must start with one of {sorted(allowed)}, got {head!r}"
+            raise ValueError(msg)
+        return value
+
     spec_quality_score: int | None = None
     spec_quality_score_at: str | None = None
     ac: list[AcceptanceCriterion] = Field(default_factory=list)

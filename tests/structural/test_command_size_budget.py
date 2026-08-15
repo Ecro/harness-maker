@@ -280,7 +280,22 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # lines, so it almost never merged) and now carries a line LIST; `per_scenario` FAIL with an
     # empty `covered_by` routes to the authoring arm instead of naming a test that does not
     # exist; and a truncated sentence — "Ask what those newly made reachable." — was completed.
-    "execute": 39343,
+    #
+    # 39343 → 41222 (+1879, PLAN-ai-review-exit-criteria F1): `Phase A.4 — false-RED screen`,
+    # a numbered phase between A and A.5. Not new instruction so much as RE-ORDERED enforcement:
+    # Phase B has always screened for accidental passes, and always after the three-lens
+    # dispatch was already paid for. Eleven A.5 findings across two tasks were the single
+    # sentence "this test passes before the implementation exists"; each cost a reviewer round
+    # that one pytest run decides.
+    #
+    # The residue is two clauses that cannot be dropped without turning the screen into a worse
+    # rule than the one it replaces. (a) A passing test may be LEGITIMATE — a negative invariant
+    # is vacuously true until the construct it forbids exists — so the screen names both
+    # dispositions; "all tests must fail" would teach authors to delete the invariant. (b) "Do
+    # not infer the counts": the round-5 brief in this very task stated `24 failed, 3 passed`
+    # against a true 25/2 read off a progress string, and sent all three lenses hunting a test
+    # that did not exist. Attributed in work-docs/BASELINE-DELTA-ai-review-exit-criteria.md.
+    "execute": 41222,
     # 46008 → 47503 (validator-pass-cap-telemetry + its review round): the pass cap, the
     # corrected per-(agent,stage,slug,run-id) terminal invariant, the `coherence` pointer,
     # and the shell-quoting rules for the free-text `--reason`. Attributed in
@@ -297,7 +312,20 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # A third-party harness at `depth: minimal` pays ZERO — that is AC-003, asserted by
     # SHA-256 against a pre-change golden, not by character count. Attributed in
     # work-docs/BASELINE-DELTA-plan-interview-comprehension.md.
-    "plan": 48595,
+    #
+    # 48595 → 51130 (+2535, Phase 6 / AC-010): Step 4.5, terminal whole-document re-validation.
+    # Zero new round-trips — it re-uses the pass the two-pass cap already allows.
+    #
+    # The characters carry a measurement and a prohibition, and both are load-bearing. The
+    # measurement: 12 recorded plan-validator episodes, none ever clean, and one PLAN records
+    # that pass 2's criticals were CREATED by the pass-1 fixes — which is the argument for
+    # re-reading the whole document rather than the revised sections. The prohibition: this
+    # pass is terminal and the cap is not raised, because the same data shows a third pass buys
+    # findings rather than release. Without the numbers the instruction reads as bureaucracy
+    # and the executing model treats it as optional; that is the failure mode this repo records
+    # for costly mandatory steps. Attributed in
+    # work-docs/BASELINE-DELTA-ai-review-exit-criteria.md.
+    "plan": 51130,
     "research": 26673,
     # 34760 → 35828 (review round 4): the `CHANGES_REQUESTED` resolution bullet gained an
     # autopilot carve-out, and the APPROVED+human_review_needed bullet was split so the
@@ -306,7 +334,47 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # from a passing one, so this prose IS ADR-010's guarantee on the review side and
     # cannot be compressed away. Attributed in
     # work-docs/BASELINE-DELTA-workflow-time-token-savings.md.
-    "review": 35828,
+    #
+    # 35828 → 40700 (+4872, PLAN-ai-review-exit-criteria Phase 4). The largest review-stage
+    # raise in this table. It is one feature, not an accretion: the stage stops exiting on
+    # "no more findings" and starts exiting on a declared failure space having been covered.
+    # The characters are the five-lens dispatch fence, the per-lens result contract, the
+    # coverage CLI call and its verdict keys, the approval condition's second conjunct, the
+    # AC-013 blocker, and the auto-fix re-dispatch rule.
+    #
+    # Compaction ran FIRST, per the bar the entries above set: raw was +5158, a pass cut it to
+    # +4872 (−286) by deleting a Step-1 paragraph that Step 3 restated and tightening three
+    # sentences. That is a small return, and the reason is worth recording — most of this
+    # delta is not prose but STRUCTURE that render tests bind to: five literal `Task(` lines
+    # and five literal `<lens>.json` paths, which cannot collapse to a placeholder without
+    # making the per-lens assertions unrenderable and the concurrency claim a serial loop.
+    # Attributed in work-docs/BASELINE-DELTA-ai-review-exit-criteria.md.
+    #
+    # 40700 → 46525 (+5825, Phase 5): the confirmation pass. This is criterion ⑤ — N clean
+    # passes on a FROZEN diff — and it is the half that makes ④ mean anything: covering the
+    # declared failure space over an artifact that moves under you is coverage of nothing in
+    # particular. The stage's prior exit re-reviewed only touched scopes, so the last round's
+    # fixes always left unreviewed, and fixes introduce defects at close to 1:1.
+    #
+    # The characters are the freeze/read-base calls, the `review_base..<freeze>` span rule, the
+    # per-pass results contract, and a SIX-ARM outcome block. That block is where the bytes are
+    # and it does not compress: the arms are (incomplete coverage) × (clean) × (auto_fix off) ×
+    # (first pass) × (second pass), and this SPEC's own S4a exists because an earlier draft
+    # collapsed two of them and produced a state that matched NO branch — zero-new-severe with
+    # incomplete coverage. Merging arms to save characters is how that hole was made.
+    # Attributed in work-docs/BASELINE-DELTA-ai-review-exit-criteria.md.
+    #
+    # 46525 → 47652 (+1127, round-2 review repairs). Not new feature surface — three defects
+    # the review found, each of which needed the instruction to change:
+    #   • the five freeze/coverage calls ran in the BASE repo (no `cd <WT>`), so the
+    #     confirmation pass froze a tree containing none of the fixes and approved;
+    #   • the coverage check now takes `--round` once per round, because a per-round reading
+    #     made a healthy review permanently unapprovable — and the first repair said "take the
+    #     union yourself", which the gate forbids, so the CLI computes it instead;
+    #   • the frozen refs are released at the terminal state, because `prune_stale`'s sweep
+    #     needs a live task slug and the Side preset never has one.
+    # Attributed in work-docs/BASELINE-DELTA-ai-review-exit-criteria.md.
+    "review": 47652,
     # 30537 → 32114 (PLAN-plan-interview-comprehension): the same partial, invoked with
     # `stage='spec'`. Raw +1778, compacted to +1577. The brief's SUBJECT differs by stage
     # (ADR-007) because `/hm:spec` has no architecture draft to disclose — identical text

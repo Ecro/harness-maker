@@ -139,6 +139,9 @@ MODULES: dict[str, ModuleSpec] = {
     # off a pre-approved argv, so it must be reachable but has nothing to dispatch on.
     "second_opinion_oracle": ModuleSpec("flagonly"),
     "review_telemetry": ModuleSpec("manual-dispatch", _s("emit")),
+    "lens_coverage": ModuleSpec("manual-dispatch", _s("check")),
+    "verifier_discrimination": ModuleSpec("manual-dispatch", _s("report", "rounds", "agents")),
+    "freeze": ModuleSpec("manual-dispatch", _s("resolve-base", "commit", "read-base", "reap")),
     "spec_quality": ModuleSpec("manual-dispatch", _s("eval")),
     "two_pass_review": ModuleSpec("manual-dispatch", _s("redact", "merge")),
     "refdocs_index": ModuleSpec("manual-dispatch", _s("build"), entry="_cli"),

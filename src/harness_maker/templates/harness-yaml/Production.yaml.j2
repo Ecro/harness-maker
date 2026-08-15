@@ -68,6 +68,10 @@ toolchains:
 {% endif %}{% if t.commands.types %}      types: {{ t.commands.types | tojson }}
 {% endif %}{% endfor %}{%- endif %}
 reviewers:
+  # Routing narrows the OPTIONAL reviewers (ux-reviewer, performance-reviewer) only.
+  # The five mandatory lenses — correctness, failure, concurrency, security, tests —
+  # are exercised every round regardless of `routing`; incomplete coverage blocks
+  # approval, so a routed-away mandatory lens would make every review unapprovable.
   consensus: {{ config.reviewers.consensus }}
   verbosity: {{ config.reviewers.verbosity }}
   auto_fix: {{ config.reviewers.auto_fix | lower }}

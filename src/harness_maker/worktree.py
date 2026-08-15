@@ -1906,6 +1906,10 @@ class PruneReport:
     # PLAN-worktree-deliverable-blocks-create ADR-004: orphan landed-marker refs
     # (branch gone) reaped this pass — so refs/hm-landed/* can't accumulate.
     removed_landed_markers: list[str] = field(default_factory=list)
+    #: PLAN-ai-review-exit-criteria Phase 3: `refs/hm-freeze/v1/*` written by `/hm:review`'s
+    #: freeze and review_base store. Nothing else deletes them, so without this sweep every
+    #: review leaves two permanent refs behind and `git for-each-ref` grows without bound.
+    removed_freeze_refs: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
 
 
@@ -2488,7 +2492,119 @@ def prune_stale(base_dir: Path, *, dry_run: bool = False) -> PruneReport:
                 )
                 report.preserved_stash_refs.append((ref_file, hint))
                 report.warnings.append(hint)
+
+    _reap_freeze_refs(base, report, dry_run=dry_run)
     return report
+
+
+#: Refs written by `/hm:review` — the per-pass freeze commits and the `review_base` store.
+_FREEZE_REF_PREFIX = "refs/hm-freeze/v1/"
+
+
+#: A freeze ref younger than this is presumed live even when its slug looks dead. A review
+#: sitting between round 1 and its confirmation pass owns no branch to prove liveness with, and
+#: `prune_stale` runs from `worktree create`, `task-land` and `drain` — so without a grace
+#: window a peer session's `/hm:health` could delete a live review's `review_base`.
+FREEZE_REF_GRACE_S: float = 6 * 60 * 60
+
+
+def _freeze_ref_age_seconds(base: Path, ref: str, name: str) -> float | None:
+    """How long ago this freeze ref was WRITTEN, or None when that cannot be established.
+
+    Round 2, found by both reviewers independently: the first version read
+    `git log -1 --format=%ct <ref>`, i.e. the committer date of the commit the ref points at.
+    That is right for `<slug>-confirm-*` — those point at freshly built freeze commits — and
+    **wrong for `<slug>-base`**, which points at a merge-base that is typically days or months
+    old. So the ref the confirmation pass depends on was born past any grace window, and the
+    window protected only the refs that were never at risk.
+
+    A regression test built on refs pointing at a just-created HEAD cannot see this: it passes
+    on a property production never has. That is why the base branch reads a written stamp.
+    """
+    if name.endswith("-base"):
+        slug = name[: -len("-base")]
+        stamp = base / ".claude" / "observability" / ".hm-freeze" / f"{slug}.stamp"
+        try:
+            return time.time() - stamp.stat().st_mtime
+        except OSError:
+            # No stamp → written by an older version, or unreadable. Presume live: an unknown
+            # age is not evidence of death, and this ref is the expensive one to get wrong.
+            return None
+    try:
+        cp = _run(["git", "log", "-1", "--format=%ct", ref], cwd=base)
+    except RuntimeError:
+        return None
+    raw = cp.stdout.strip()
+    if not raw.isdigit():
+        return None
+    return time.time() - float(raw)
+
+
+def _reap_freeze_refs(base: Path, report: PruneReport, *, dry_run: bool) -> None:
+    """Delete freeze refs whose task branch is gone.
+
+    A freeze ref is scoped to one `/hm:review` on one task slug, and the task's branch
+    (`hm/<slug>`) is deleted by `task-land`. So a ref whose slug has no live branch and no live
+    worktree describes a task that is finished — the commit it names is unreachable from any
+    branch and its only effect is to keep the whole frozen tree alive in the object store.
+
+    **Conservative on purpose.** A slug whose branch still exists is left alone even if the
+    review looks complete: a confirmation pass reads `<slug>-base` rounds after it is written
+    (SPEC AC-004), and reaping a base mid-review would make the pass silently re-resolve against
+    a drifting HEAD. When in doubt this leaves a ref; the failure mode of over-reaping is a
+    wrong review, the failure mode of under-reaping is a few stale refs.
+    """
+    try:
+        cp = _run(["git", "for-each-ref", "--format=%(refname)", _FREEZE_REF_PREFIX], cwd=base)
+    except RuntimeError:
+        return
+
+    live_slugs: set[str] = set()
+    try:
+        branches = _run(
+            ["git", "for-each-ref", "--format=%(refname:short)", "refs/heads/hm/"], cwd=base
+        )
+        live_slugs = {
+            line.strip()[len("hm/") :] for line in branches.stdout.splitlines() if line.strip()
+        }
+    except RuntimeError:
+        # Cannot enumerate branches → cannot prove a slug is finished → reap nothing.
+        return
+
+    worktrees = base / ".worktrees"
+    if worktrees.is_dir():
+        live_slugs |= {d.name for d in worktrees.iterdir() if d.is_dir()}
+
+    # **Two reviewers, independently: an empty live set proves nothing.** With
+    # `worktree.enabled: false` (the Side default) there is no `hm/*` branch and no
+    # `.worktrees/`; under `/hm:loop` the worktree is `execute-<uuid>`, which never matches a
+    # task slug. In both, `live_slugs` is empty and EVERY freeze ref looked dead — including
+    # the `<slug>-base` of a review sitting between round 1 and its confirmation pass. Since
+    # `prune_stale` runs from `worktree create`, `task-land` AND `drain` (which `/hm:health`
+    # calls unconditionally), a peer session could delete a live review's base and force it to
+    # restart from round 1. Reaping nothing loses a few stale refs; reaping wrongly destroys
+    # the exit criterion mid-review.
+    if not live_slugs:
+        return
+
+    for line in cp.stdout.splitlines():
+        ref = line.strip()
+        if not ref.startswith(_FREEZE_REF_PREFIX):
+            continue
+        name = ref[len(_FREEZE_REF_PREFIX) :]
+        # `<slug>-base` / `<slug>-confirm-1`; the slug is everything before the last suffix
+        # group, and slugs may contain hyphens, so match against the known live set instead
+        # of splitting — a split would mis-attribute `a-b-base` to slug `a`.
+        if any(name == f"{slug}-base" or name.startswith(f"{slug}-confirm") for slug in live_slugs):
+            continue
+        age = _freeze_ref_age_seconds(base, ref, name)
+        if age is None or age < FREEZE_REF_GRACE_S:
+            # Unknown age is treated as young: an unreadable ref is not evidence of death.
+            continue
+        report.removed_freeze_refs.append(ref)
+        if not dry_run:
+            with contextlib.suppress(RuntimeError):
+                _run(["git", "update-ref", "-d", ref], cwd=base)
 
 
 def cleanup_all(base_dir: Path, force: bool = False) -> int:

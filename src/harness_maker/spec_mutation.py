@@ -6,6 +6,28 @@ threshold = max(measured_baseline + 5pp, tier_floor) where tier_floor ∈
 Subprocess timeouts are mandatory per CLAUDE.md. ``shell=True`` is forbidden.
 The fallback rule (60-min budget → sampled 200-mutant mode) is exposed via
 ``run_mutation(sampled=True)``.
+
+mutation_runner_faults
+----------------------
+**Until 2026-08-15 this gate could not pass for any SPEC in this repository, and its failure
+mode was a plausible number.** Three faults were live at once, each masking the next:
+
+1. **Parse.** ``_COUNTERS_RE`` scanned for the words ``killed:``/``survived:``. mutmut 2.x
+   writes an emoji-only progress line (``🎉 42  ⏰ 0  🤔 0  🙁 13  🔇 0``), so a healthy run
+   parsed as all-zeros. See ``_EMOJI_COUNTERS``.
+2. **Runner scope.** No ``--runner`` was passed, so mutmut ran the whole ``tests/`` tree per
+   mutant — ~6 min here against a 600 s cap, i.e. the first mutant always timed out.
+3. **Silent zero.** Both of the above produce an all-zero report, and ``score`` returns 0.0 for
+   it because the denominator is empty. The gate printed ``score 0% < threshold 85%`` — the
+   same string a genuine total wipeout produces. See ``MutationReport.ran``.
+
+Fault 3 is why the other two survived: every SPEC author read a real-looking measurement and
+wrote rationale around it (this repo has at least two such rationale blocks). The lesson worth
+keeping is not "parse emoji" — it is that a wrapper which cannot distinguish *no observation*
+from *a bad observation* will report the second when it means the first, indefinitely.
+
+First real measurement after the fix: ``lens_coverage.py`` 55 mutants, 42 killed, 13 survived
+— **76%**, below the T1 floor of 85%.
 """
 
 from __future__ import annotations
@@ -45,6 +67,17 @@ class MutationReport:
     skipped: int
     sampled: bool
     raw_output: str
+    #: True when the wall budget cut the run short. The counts are then a PREFIX of the run,
+    #: not a result. Before the emoji parser landed this was invisible — partial output parsed
+    #: to all-zeros and looked like the non-run case; now it parses to a real-looking number,
+    #: which is strictly worse unless the truncation travels with it.
+    truncated: bool = False
+    #: Set ONLY by the `FileNotFoundError` branch. The absent-mutmut skip used to be a
+    #: substring test for "command not found" against the whole captured output — and once
+    #: `--runner` began injecting a user-supplied test command, that command's own
+    #: `pytest: command not found` turned a broken-but-running gate into a silent non-gating
+    #: skip. A guard named "the tool is absent" must be set where absence is observed.
+    tool_missing: bool = False
 
     @property
     def total(self) -> int:
@@ -55,6 +88,21 @@ class MutationReport:
         """Killed fraction; survivors degrade the score."""
         denom = self.killed + self.survived + self.timeout
         return self.killed / denom if denom else 0.0
+
+    @property
+    def ran(self) -> bool:
+        """True when mutmut actually checked at least one mutant.
+
+        **The distinction this exists to draw:** an all-zero report is NOT a score of 0%. It
+        means no mutant was ever evaluated — a crashed runner, a timeout, an unparseable
+        output format — and `score` returns 0.0 for it only because the denominator is empty.
+
+        That collision hid three separate faults in this wrapper for the lifetime of the tier-1
+        gate (see `mutation_runner_faults` in the module docstring): every SPEC's gate reported
+        `score 0% < threshold 85%` and every reader took it for "the tests are weak". Callers
+        must branch on `ran` BEFORE reading `score`.
+        """
+        return (self.killed + self.survived + self.timeout + self.suspicious + self.skipped) > 0
 
 
 def threshold_for(tier: VerificationTier, baseline: float | None) -> int | None:
@@ -83,6 +131,23 @@ def gate(
     threshold = threshold_for(tier, baseline)
     if threshold is None:
         return True, f"T{tier} is informational (no gate)"
+    if not report.ran:
+        # Fail LOUD, not at 0%. A non-run and a total wipeout are the same number and opposite
+        # facts, and reporting the number let three runner faults ship behind a red gate that
+        # read as a legitimate measurement.
+        return False, (
+            "mutmut checked ZERO mutants — this is a broken run, not a score of 0%. "
+            "Inspect MutationReport.raw_output: the usual causes are a runner that cannot "
+            "import the package, a wall-budget timeout because the runner is the whole test "
+            "suite, or an output format this wrapper cannot parse"
+        )
+    if report.truncated:
+        checked = report.killed + report.survived + report.timeout + report.suspicious
+        return False, (
+            f"partial run — the wall budget expired after {checked} mutant(s); the counts are a "
+            "prefix of the run, not a score of the whole path set. Narrow `mutation_runner`, "
+            "split `paths_to_mutate`, or re-run with --sampled"
+        )
     score_pct = int(round(report.score * 100))
     if score_pct >= threshold:
         return True, f"score {score_pct}% >= threshold {threshold}%"
@@ -148,11 +213,20 @@ def measure_baseline(
     sample_budget: int = DEFAULT_SAMPLE_MUTANT_BUDGET,
     sampled: bool = False,
     timeout_seconds: int | None = None,
+    runner: str | None = None,
 ) -> MutationReport:
     """Invoke mutmut and parse its output into a MutationReport.
 
     Designed to be cancellable: if real wall-clock exceeds the budget, caller
     can re-invoke with ``sampled=True`` per ADR-005 fallback rule.
+
+    ``runner`` is the test command mutmut runs **per mutant**. Passing one is not an
+    optimisation — on any repository whose full suite is slower than
+    ``wall_budget / mutant_count`` it is the difference between a measurement and a
+    guaranteed timeout. Measured here 2026-08-15: mutmut's default runner is the whole
+    ``tests/`` tree (~6 min in this repo), so ONE mutant exhausted the 600 s cap and the gate
+    returned all-zeros for every SPEC. Scoped to the tests that cover the mutated file, the
+    same 55 mutants finish in under 550 s.
     """
     if not paths_to_mutate:
         return MutationReport(
@@ -169,10 +243,14 @@ def measure_baseline(
     if unsupported is not None:
         return _parse_mutmut_output(unsupported, tuple(paths_to_mutate), sampled=sampled)
     args = ["mutmut", "run", "--paths-to-mutate", ",".join(paths_to_mutate)]
+    if runner:
+        args.extend(["--runner", runner])
     if sampled:
         args.extend(["--use-coverage"])  # narrow the universe
     # Compute timeout: wall budget in seconds, capped 600 per Bash policy
     deadline = timeout_seconds if timeout_seconds is not None else min(wall_budget_min * 60, 600)
+    truncated = False
+    tool_missing = False
     try:
         proc = subprocess.run(
             args,
@@ -185,6 +263,7 @@ def measure_baseline(
         raw = proc.stdout + "\n" + proc.stderr
     except FileNotFoundError:
         raw = "mutmut: command not found (run `uv sync --group dev`)"
+        tool_missing = True
     except subprocess.TimeoutExpired as exc:
         # Preserve partial stdout/stderr so a partial mutation result still
         # parses into MutationReport — otherwise a slow run produces a 0%
@@ -205,14 +284,41 @@ def measure_baseline(
             + (partial_stderr or "")
             + f"\n# mutmut timeout after {exc.timeout}s; consider sampled=True"
         )
+        truncated = True
 
-    return _parse_mutmut_output(raw, tuple(paths_to_mutate), sampled=sampled)
+    return _parse_mutmut_output(
+        raw, tuple(paths_to_mutate), sampled=sampled, truncated=truncated, tool_missing=tool_missing
+    )
 
 
 _COUNTERS_RE = re.compile(r"(killed|survived|timeout|suspicious|skipped)[:\s]+(\d+)", re.IGNORECASE)
 
+#: mutmut 2.x's progress line is EMOJI-ONLY — it never writes the English words above:
+#:
+#:     ⠋ 55/55  🎉 42  ⏰ 0  🤔 0  🙁 13  🔇 0
+#:
+#: `_COUNTERS_RE` therefore matched nothing on a perfectly healthy run, and the report parsed
+#: as all-zeros. Measured 2026-08-15 against mutmut 2.5 on `lens_coverage.py`: 55 mutants,
+#: 42 killed, 13 survived — reported by this wrapper as `score 0%`. The legend that names each
+#: emoji is printed once at the top of the run, so the symbols are the stable contract, not a
+#: cosmetic detail.
+_EMOJI_COUNTERS: tuple[tuple[str, str], ...] = (
+    ("\N{PARTY POPPER}", "killed"),
+    ("\N{ALARM CLOCK}", "timeout"),
+    ("\N{THINKING FACE}", "suspicious"),
+    ("\N{SLIGHTLY FROWNING FACE}", "survived"),
+    ("\N{SPEAKER WITH CANCELLATION STROKE}", "skipped"),
+)
 
-def _parse_mutmut_output(raw: str, paths: tuple[str, ...], *, sampled: bool) -> MutationReport:
+
+def _parse_mutmut_output(
+    raw: str,
+    paths: tuple[str, ...],
+    *,
+    sampled: bool,
+    truncated: bool = False,
+    tool_missing: bool = False,
+) -> MutationReport:
     """Best-effort parse of mutmut's varying output formats.
 
     Future mutmut versions may emit JSON; switch to ``mutmut results --json``
@@ -228,6 +334,19 @@ def _parse_mutmut_output(raw: str, paths: tuple[str, ...], *, sampled: bool) -> 
     for m in _COUNTERS_RE.finditer(raw):
         key = m.group(1).lower()
         counts[key] = int(m.group(2))
+
+    # mutmut 2.x: emoji progress line, rewritten in place with \r. Take the LAST occurrence of
+    # each symbol — earlier ones are intermediate progress, and the final line is the result.
+    # Runs after the word-form scan so a future JSON/worded output wins if both are present.
+    if not any(counts.values()):
+        # Only when the word-form scan found NOTHING. The comment above always claimed a
+        # worded/JSON output wins if both are present; an unconditional assignment made the
+        # emoji win instead, so a `\r`-rewritten progress snapshot could replace authoritative
+        # totals.
+        for symbol, key in _EMOJI_COUNTERS:
+            matches = re.findall(rf"{re.escape(symbol)}\s*(\d+)", raw)
+            if matches:
+                counts[key] = int(matches[-1])
     return MutationReport(
         paths=paths,
         killed=counts["killed"],
@@ -237,6 +356,8 @@ def _parse_mutmut_output(raw: str, paths: tuple[str, ...], *, sampled: bool) -> 
         skipped=counts["skipped"],
         sampled=sampled,
         raw_output=raw,
+        truncated=truncated,
+        tool_missing=tool_missing,
     )
 
 
@@ -574,6 +695,16 @@ def main(argv: list[str] | None = None) -> int:
     )
     p_gate.add_argument("--sampled", action="store_true", help="200-mutant sampled mode")
     p_gate.add_argument("--cwd", type=Path, default=Path.cwd())
+    p_gate.add_argument(
+        "--runner",
+        default=None,
+        help=(
+            "test command mutmut runs per mutant, e.g. "
+            "'python -m pytest -x -q tests/unit/test_foo.py'. Without it mutmut runs the WHOLE "
+            "suite per mutant, which on this repo exceeds the wall budget on the first mutant "
+            "and yields a zero report that reads as score 0%%."
+        ),
+    )
 
     p_cls = sub.add_parser(
         "classify",
@@ -622,8 +753,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"mutation gate: {machine.spec_slug} has no paths_to_mutate (nothing to gate)")
         return 0
 
-    report = measure_baseline(paths, cwd=args.cwd, sampled=args.sampled)
-    if _MUTMUT_ABSENT in report.raw_output:
+    # --runner beats the SPEC's own field, so a one-off diagnostic run needs no file edit.
+    runner = args.runner or machine.mutation_runner
+    report = measure_baseline(paths, cwd=args.cwd, sampled=args.sampled, runner=runner)
+    if report.tool_missing:
         print(
             "mutation gate: mutmut not installed — skipping (non-gating). "
             "Run `uv sync --group dev` to enable.",
@@ -638,6 +771,18 @@ def main(argv: list[str] | None = None) -> int:
             file=sys.stderr,
         )
         return 0
+
+    if report.truncated or not report.ran:
+        # mutmut edits the source in place and restores it when it finishes. A run that did NOT
+        # finish can leave a mutant on disk — measured 2026-08-15, an interrupted run left
+        # `if __name__ != "__main__"` in review_telemetry.py, which made importing the module
+        # call sys.exit() and would have been committed unnoticed. Warn with the paths named;
+        # do not auto-revert, because these files are the user's working tree.
+        print(
+            "mutation gate: this run did not complete — mutmut may have left a MUTATED source "
+            "on disk. Verify before committing:\n  " + "\n  ".join(paths),
+            file=sys.stderr,
+        )
 
     passes, reason = gate(report, tier)  # baseline=None → tier floor (ADR-005)
     stream = sys.stdout if passes else sys.stderr

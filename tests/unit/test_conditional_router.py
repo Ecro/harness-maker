@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from harness_maker.conditional_router import (
+    OPTIONAL_REVIEWERS,
     _parse_router_response,
     _strip_markdown_fence,
     route_reviewers,
@@ -125,10 +126,20 @@ def test_conditional_async_triggers_concurrency() -> None:
     assert "concurrency-reviewer" in result
 
 
-def test_conditional_no_match_still_includes_code_reviewer() -> None:
+def test_conditional_no_match_keeps_every_non_optional_reviewer() -> None:
+    """SPEC AC-002: conditional routing narrows the OPTIONAL reviewers and nothing else.
+
+    Before this SPEC a no-match diff collapsed to `["code-reviewer"]`, dropping the security
+    and concurrency specialists. Two of the five mandatory lenses ride on those agents, and
+    incomplete lens coverage now blocks approval (AC-003) — so a conditional review that
+    routed them away would have been permanently unapprovable.
+    """
     files = [Path("docs/README.md")]
     result = route_reviewers(files, ALL_REVIEWERS, routing="conditional")
-    assert result == ["code-reviewer"]
+    assert result == [r for r in ALL_REVIEWERS if r not in OPTIONAL_REVIEWERS]
+    assert not (set(result) & OPTIONAL_REVIEWERS), (
+        "an optional reviewer survived a diff that matches no routing rule"
+    )
 
 
 def test_conditional_multi_match_combines() -> None:
@@ -166,12 +177,20 @@ def test_conditional_preserves_preset_ordering() -> None:
         "concurrency-reviewer",
     ]
     result = route_reviewers(files, preset, routing="conditional")
-    assert result == ["code-reviewer", "security-reviewer", "performance-reviewer"]
+    # concurrency-reviewer is non-optional, so AC-002 keeps it even though no rule matched it;
+    # ux-reviewer is optional and no rule matched, so it is dropped. Order follows the preset.
+    assert result == [
+        "code-reviewer",
+        "security-reviewer",
+        "performance-reviewer",
+        "concurrency-reviewer",
+    ]
 
 
-def test_conditional_empty_files_falls_back_to_code_reviewer() -> None:
+def test_conditional_empty_files_keeps_every_non_optional_reviewer() -> None:
+    """An empty diff matches no rule, so it takes the same AC-002 path as a no-match diff."""
     result = route_reviewers([], ALL_REVIEWERS, routing="conditional")
-    assert result == ["code-reviewer"]
+    assert result == [r for r in ALL_REVIEWERS if r not in OPTIONAL_REVIEWERS]
 
 
 # ── route_with_llm ─────────────────────────────────────────────────────────

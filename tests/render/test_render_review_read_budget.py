@@ -488,11 +488,40 @@ def test_verification_structure_unchanged() -> None:
     to reorder prose without touching the invoker set, the reviewer set, or K.
     """
     assert all(
-        enabled_reviewer_set(after) == enabled_reviewer_set(golden)
-        and consensus_threshold(after) == consensus_threshold(golden)
+        consensus_threshold(after) == consensus_threshold(golden)
         and second_opinion_invocation_points(after) == second_opinion_invocation_points(golden)
         for after, golden in paired_review_renders_against_goldens()
     )
+
+
+def test_the_reviewer_set_grew_by_exactly_the_mandatory_lens_agents() -> None:
+    """`enabled_reviewer_set` was dropped from the invariance set above — on purpose.
+
+    SPEC-ai-review-exit-criteria AC-002 dispatches five mandatory lenses in round 1, and three
+    of them name a specialist agent (`concurrency-reviewer`, `security-reviewer`) or the
+    optional pair that Step 1 must state routing may drop (`ux-reviewer`,
+    `performance-reviewer`). So the extractor now finds reviewer names the golden does not
+    carry. That is the change, not a side effect of it.
+
+    Re-pinned explicitly rather than rebaselined, exactly as `reviewer_pass_count` was when
+    ADR-001 moved it: the count alone is satisfiable by adding the WRONG agent, so the delta
+    is asserted by identity. Nothing may leave the set.
+    """
+    added = {
+        "concurrency-reviewer",
+        "performance-reviewer",
+        "security-reviewer",
+        "ux-reviewer",
+    }
+    for after, golden in paired_review_renders_against_goldens():
+        before = enabled_reviewer_set(golden)
+        assert before <= enabled_reviewer_set(after), (
+            "a reviewer present before this SPEC left the rendered review stage"
+        )
+        assert enabled_reviewer_set(after) - before == added, (
+            "the reviewer set moved by something other than the mandatory-lens agents: "
+            f"{sorted(enabled_reviewer_set(after) - before)}"
+        )
     after_validator = validator_invocation_points(rendered_plan_command())
     golden_validator = validator_invocation_points(golden_plan_bearing_fused())
     assert after_validator == golden_validator

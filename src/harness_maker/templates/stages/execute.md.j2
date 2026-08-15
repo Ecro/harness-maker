@@ -1,6 +1,6 @@
 # Stage: execute
 
-> Atomic stage. TDD machine driven by PLAN. Phase A → A.5 → B → C → D, with worktree isolation and **NO commits** (wrapup owns commits).
+> Atomic stage. TDD machine driven by PLAN. Phase A → A.4 → A.5 → B → C → D, with worktree isolation and **NO commits** (wrapup owns commits).
 
 ## Communication Protocol
 
@@ -27,7 +27,7 @@ Parse from the user's natural-language input:
 ```
 
 - `<slug>` — task identifier matching `{{ config.work_docs.dir }}PLAN-{slug}.md`. Required.
-- `--no-tdd` — skip Phase A (test authoring), Phase A.5 (test-reviewer gate), and Phase B (RED gate). Phase C still loads SPEC reference. Use when:
+- `--no-tdd` — skip Phase A (test authoring), Phase A.4 (false-RED screen), Phase A.5 (test-reviewer gate), and Phase B (RED gate). Phase C still loads SPEC reference. Use when:
 {% endif %}
 {% if not is_codex %}
   - Pure refactor (no behavior change — existing tests already cover).
@@ -142,7 +142,7 @@ If RESEARCH file is older than `mtime_warn_days`: warn the user, proceed with im
 
 ### Step 3 — Per-PLAN-phase TDD machine
 
-For each phase in PLAN's `## 📝 Implementation Plan`, run Phases A → A.5 → B → C → D in order:
+For each phase in PLAN's `## 📝 Implementation Plan`, run Phases A → A.4 → A.5 → B → C → D in order:
 
 #### Phase A — Author tests (skipped when `tdd_active == false`)
 
@@ -213,6 +213,42 @@ All tests MUST be RED initially — they import / depend on functions that do no
 exist or are stubs. The implementation is written in Phase C. When no SPEC and no
 machine SPEC exist, author tests from the PLAN phase's exit-criterion instead.
 
+#### Phase A.4 — false-RED screen (skipped when `tdd_active == false`)
+
+**Run the tests before you dispatch anyone.** Whether a test passes against the unmodified
+subject is *mechanically decidable*, and the reviewer gate is the most expensive way in this
+stage to decide it. Measured across two tasks: eleven Phase A.5 findings were the single
+sentence "this test passes before the implementation exists" — five tautologies satisfied by a
+model's `extra="forbid"` guard, six anchors satisfied by prose the template already shipped.
+Each cost a reviewer round that could have been one pytest run.
+
+{% if is_codex %}
+```
+Bash("{{ cdwt }}<test_command>")
+```
+{% else %}
+```bash
+!{{ cdwt }}<test_command>
+```
+{% endif %}
+
+Read the summary line and record **the exact counts** — `N failed, M passed` — plus the node id
+of every passing test. Do not infer the numbers from a progress string; a miscounted brief sends
+all three lenses hunting a test that does not exist.
+
+Then, for each passing test, take exactly one of two actions:
+
+1. **Fix it.** It asserts something the shipped subject already satisfies, so it can never go red
+   for the defect it names. This is the default and the common case.
+2. **Justify it, in the test file.** A *negative* invariant ("the brief does not tell the agent
+   to write its own result file") is vacuously true while the construct it forbids does not
+   exist. That is legitimate — but only when it goes red the moment the wrong implementation
+   appears **and** a RED positive sibling forces that construct into existence. Name both in the
+   module docstring. A passing test with no such sibling is case 1.
+
+**Do not proceed to A.5 with an unexplained pass.** Carry the justified list into the brief so
+the lenses adjudicate the *justification* rather than rediscovering the test.
+
 #### Phase A.5 — test-reviewer gate (skipped when `tdd_active == false`)
 
 Dispatch **three** `test-reviewer` calls **in one message**, one per lens. One reviewer retried
@@ -226,8 +262,12 @@ all present from the start.
 | `coverage` | Does the set cover the criterion — no missing scenario, no duplicate? |
 
 `<brief>` below is the same for all three: `<SPEC body + bindable mechanical AC list (id +
-predicate, when present) + Phase A test file paths + test_framework name>\n\nThe AC list lets you
-adjudicate the scenario∪AC union for duplication / coverage holes. Two other lenses run
+predicate, when present) + Phase A test file paths + test_framework name + the Phase A.4 counts
+(`N failed, M passed`) and, for each passing test, its node id and the justification you
+recorded>\n\nThe AC list lets you adjudicate the scenario∪AC union for duplication / coverage
+holes. The A.4 line is a MEASUREMENT, not an estimate — quote the counts you actually read, and
+say so if a lens should verify them, because a wrong count sends every lens after a test that
+does not exist. Two other lenses run
 concurrently. You are ACCOUNTABLE for the lens named below.\n\nA defect you notice OUTSIDE your
 lens must still be reported — never dropped — but it has to travel in a field the schema actually
 has, because there is no suggestions field and your Hard Rules forbid inventing a category. Route
@@ -332,7 +372,11 @@ Bash("{{ cdwt }}<test_command>")
 ```
 {% endif %}
 
-Expected result: tests FAIL for the right reasons (missing implementation, not syntax errors / import errors / framework misconfiguration). Verify by reading the failure output. If the test passes by accident → return to Phase A and rewrite (false-RED is a Phase A.5 escape).
+Expected result: tests FAIL for the right reasons (missing implementation, not syntax errors / import errors / framework misconfiguration). Verify by reading the failure output.
+
+Phase A.4 already screened for accidental passes, so this gate is about the *reason* each test
+fails, not the count. A pass appearing here that A.4 did not record and justify means the test
+set changed during A.5 — treat it as a new false-RED and return to Phase A.
 
 #### Phase C — Implementation to GREEN
 

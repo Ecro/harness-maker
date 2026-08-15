@@ -20,6 +20,27 @@ from pathlib import Path
 
 from harness_maker.llm_judge import JudgeClient
 
+#: The declared failure space (SPEC AC-001). Exactly five, fixed. Every consumer — the
+#: coverage CLI, the rendered gate, the report — reads this one constant, so a lens cannot
+#: be half-added.
+#:
+#: These are failure-mode-shaped, not agent-shaped: `REVIEWER_SCOPES` below is the older
+#: agent axis and is deliberately NOT the same set. Two of these five have no reviewer agent
+#: at all, which is the gap the declaration exists to make visible.
+MANDATORY_LENSES: tuple[str, ...] = (
+    "correctness",
+    "failure",
+    "concurrency",
+    "security",
+    "tests",
+)
+
+#: Reviewers outside the declared space. `route_reviewers` may add or drop THESE and nothing
+#: else — a mandatory lens is never routed away, because SPEC AC-003 makes incomplete
+#: coverage block approval and a routed-away lens would make every conditional review
+#: unapprovable. Mirrored in the harness.yaml reviewer-routing comment (AC-002).
+OPTIONAL_REVIEWERS: frozenset[str] = frozenset({"ux-reviewer", "performance-reviewer"})
+
 REVIEWER_SCOPES: dict[str, list[str]] = {
     "code-reviewer": ["code", "design", "correctness"],
     "security-reviewer": ["security", "auth", "permissions", "secrets", "injection"],
@@ -130,6 +151,12 @@ def route_reviewers(
         for substrings, reviewer in _RULES:
             if any(s in path for s in substrings):
                 selected.add(reviewer)
+
+    # SPEC AC-002: conditional routing narrows the OPTIONAL reviewers and nothing else.
+    # A reviewer outside OPTIONAL_REVIEWERS is kept whether or not a path rule matched it,
+    # because the declared failure space must be exercised every round and a routed-away
+    # lens would make every conditional review permanently unapprovable (AC-003).
+    selected |= {r for r in preset_reviewers if r not in OPTIONAL_REVIEWERS}
 
     # Filter through preset_reviewers to preserve preset ordering and to
     # honour the user's choice (don't invoke a reviewer the preset omits).

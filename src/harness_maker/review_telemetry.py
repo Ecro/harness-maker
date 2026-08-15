@@ -17,9 +17,17 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 
 from harness_maker import command_registry
+from harness_maker.conditional_router import MANDATORY_LENSES
 
 # Default location relative to project root — overridable via parameter.
 DEFAULT_OBSERVABILITY_DIR = Path(".claude/observability")
@@ -82,6 +90,52 @@ class ReviewTelemetryRecord(BaseModel):
     unreviewed_fix_count: int | None = Field(default=None, ge=0)
     regression_attributed_n: int | None = Field(default=None, ge=0)
     attribution_unknown_n: int | None = Field(default=None, ge=0)
+
+    # ── declared failure space + confirmation pass (SPEC AC-005 / AC-012) ────
+    # `lenses_exercised` doubles as the version discriminator: this harness version never
+    # writes it as null (an all-lenses-failed round writes `[]`), so a row carrying it is a
+    # post-change row and must be fully readable. Null survives only for legacy rows.
+    lenses_exercised: list[str] | None = None
+    confirm_pass_ran: bool | None = None
+    confirm_pass_new_severe_n: int | None = Field(default=None, ge=0)
+
+    @field_validator("lenses_exercised")
+    @classmethod
+    def _lenses_are_known(cls, value: list[str] | None) -> list[str] | None:
+        """An unrecognised lens name has no reading — this field is the approval gate's input."""
+        if value is None:
+            return value
+        unknown = [lens for lens in value if lens not in MANDATORY_LENSES]
+        if unknown:
+            msg = f"lenses_exercised contains unknown lens name(s): {unknown}"
+            raise ValueError(msg)
+        return value
+
+    @model_validator(mode="after")
+    def _confirmation_record_is_readable(self) -> ReviewTelemetryRecord:
+        """The three rules of AC-012 — deliberately NOT "both-or-neither".
+
+        Both-or-neither over (ran, count) admitted two unreadable rows: one with all three
+        fields absent, byte-identical to a legacy row even when it was this version reporting
+        total coverage failure; and `ran=False` beside a numeric count, which has no meaning.
+        These rows are append-only, so an unreadable one is permanent.
+        """
+        if self.lenses_exercised is not None and self.confirm_pass_ran is None:
+            msg = "a row carrying lenses_exercised must also carry confirm_pass_ran"
+            raise ValueError(msg)
+        if self.confirm_pass_ran is not None and self.lenses_exercised is None:
+            msg = (
+                "a row carrying confirm_pass_ran must also carry lenses_exercised "
+                "(use [] when every lens dispatch failed; null means legacy)"
+            )
+            raise ValueError(msg)
+        if self.confirm_pass_ran is True and self.confirm_pass_new_severe_n is None:
+            msg = "confirm_pass_new_severe_n is required when confirm_pass_ran is true"
+            raise ValueError(msg)
+        if self.confirm_pass_ran is not True and self.confirm_pass_new_severe_n is not None:
+            msg = "confirm_pass_new_severe_n must be null unless confirm_pass_ran is true"
+            raise ValueError(msg)
+        return self
 
     @model_validator(mode="after")
     def _verifier_counts_are_both_or_neither(self) -> ReviewTelemetryRecord:

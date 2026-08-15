@@ -107,6 +107,9 @@ Measure C (PLAN-review-round-inflation). These four are `null` rather than `0` w
 | `unreviewed_fix_count` | int \| null | Fixes applied in the terminal round, which the loop never re-reviewed |
 | `regression_attributed_n` | int \| null | Distinct findings attributed to a previous round's fix |
 | `attribution_unknown_n` | int \| null | Distinct findings whose origin could not be attributed either way |
+| `lenses_exercised` | list[str] \| null | Which of the five mandatory review lenses delivered a result this round. Lens **ids** only (`correctness`, `failure`, `concurrency`, `security`, `tests`) — never finding text. `[]` means every dispatch failed; `null` means a harness version that predates the field |
+| `confirm_pass_ran` | bool \| null | Whether a confirmation pass ran over the frozen diff |
+| `confirm_pass_new_severe_n` | int \| null | Count of new severe findings the confirmation pass surfaced. Present only when `confirm_pass_ran` is true |
 
 <!-- @hm:/privacy:review-telemetry-measure-c -->
 

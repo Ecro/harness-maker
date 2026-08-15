@@ -103,10 +103,22 @@ If a command exits non-zero:
 
 ### Step 1 — Reviewer set selection
 
+**The declared failure space** — `correctness`, `failure`, `concurrency`, `security`, `tests` —
+is exercised every round. These are failure modes, not agent names; two have no dedicated
+reviewer agent, which is the gap the declaration makes visible.
+
 - Start from `harness.yaml.reviewers.enabled`.
 - `routing: always-all` → invoke every enabled reviewer in parallel.
-- `routing: conditional` → use Conditional Router (M6) on the changed-file paths to pick the subset.
+- `routing: conditional` → use Conditional Router (M6) on the changed-file paths. It may drop **only** `ux-reviewer` / `performance-reviewer`; a mandatory lens is never routed away, because incomplete coverage blocks approval and a routed-away lens would make every conditional review permanently unapprovable.
 - Add any extras from `--with-reviewers=<csv>`.
+- Resolve `review_base` once, here in round 1, storing it at `refs/hm-freeze/v1/<slug>-base`:
+
+  ```bash
+  !{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm freeze resolve-base --slug <slug>
+  ```
+
+  Later rounds and both confirmation passes **read** that ref; re-resolving it makes the base a
+  free variable that drifts as commits land.
 - For large diffs with independent file clusters, optionally split the same
   reviewer type across clusters only when clusters have disjoint file ownership
   and no shared contract/generated-file dependency. Preserve the legacy
@@ -164,6 +176,55 @@ drift_verdict:
 When no drift is detected, emit `result: clean` with empty lists. This record is the single source of truth for drift status — wrapup and verify read it without re-running the analysis.
 
 ### Step 3 — Parallel reviewer invocation (2-pass redaction)
+
+**Dispatch the five mandatory lenses in ONE message, in round 1** — one `Task(` per lens, same
+message, so they run concurrently. Two lenses have no dedicated agent and go to `code-reviewer`
+with the lens named in the brief.
+
+```
+Task(subagent_type="code-reviewer",        description="lens correctness: {slug}", prompt="<brief>\n\nYour lens: correctness — does the change do what the SPEC and the invariants say?")
+Task(subagent_type="code-reviewer",        description="lens failure: {slug}",     prompt="<brief>\n\nYour lens: failure — recovery, persistence, partial-write and restart behaviour.")
+Task(subagent_type="concurrency-reviewer", description="lens concurrency: {slug}", prompt="<brief>\n\nYour lens: concurrency — races, deadlock, resource lifetime, cancellation.")
+Task(subagent_type="security-reviewer",    description="lens security: {slug}",    prompt="<brief>\n\nYour lens: security — external input, authz, secrets, injection.")
+Task(subagent_type="test-reviewer",        description="lens tests: {slug}",       prompt="<brief>\n\nYour lens: tests — oracle strength, discrimination, would these tests pass a wrong implementation?")
+```
+
+**Mint a run id once, at the start of this `/hm:review`.** Any short unique token works — the
+first 8 chars of `git rev-parse HEAD` plus the round-1 timestamp is fine. Every result file
+carries it and every coverage call is given it.
+
+> Why: the results directory is keyed by slug and round, so re-running `/hm:review` on the same
+> slug lands in the **same** directory. Without the run id, a previous invocation's five files
+> vouch for five lenses in an invocation where only one returned — `blocks_approval: false`,
+> four dead lenses reported as exercised. Measured. The round keying separates a pass from a
+> round; it does not separate one invocation from the next.
+
+**You write the result files; the lens agents do not.** For each dispatch that **returns**, write
+its findings JSON to the per-round results directory, adding a `"lens"` key naming the lens and
+the `"run_id"` you minted:
+
+```
+.claude/observability/.hm-lens-results/<slug>/<round>/correctness.json
+.claude/observability/.hm-lens-results/<slug>/<round>/failure.json
+.claude/observability/.hm-lens-results/<slug>/<round>/concurrency.json
+.claude/observability/.hm-lens-results/<slug>/<round>/security.json
+.claude/observability/.hm-lens-results/<slug>/<round>/tests.json
+```
+
+A dispatch that **returns nothing produces no file** — dead agent, unparseable output, refusal,
+all the same. That absence is the signal; never write a placeholder to record the failure, and
+never tell a lens agent to write its own file. The directory is keyed by `<round>`, so a result from
+an earlier round can never vouch for a lens that did not run in this one.
+
+Then compute coverage. The CLI is the **sole producer** of the verdict — do not substitute your
+own judgement about which lenses ran:
+
+```bash
+!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round <round> --run-id <run-id>
+```
+
+It prints `{"exercised": [...], "missing": [...], "blocks_approval": <bool>}`. Carry all three
+into the Grade Gate.
 {%- if config.second_opinion and config.second_opinion.models %}
 
 > ⚡ **Launch the cross-model voters NOW, concurrently with Pass 1 (ADR-011).** Do not wait
@@ -496,7 +557,7 @@ exclusion; everything else, including an `accepted` finding consensus later reje
 After each round's report:
 
 ```
-IF grade ≥ grade_threshold:
+IF grade ≥ grade_threshold AND blocks_approval == false:
   → Status = APPROVED. Final report = current.
   → Set human_review_needed = unverified_severe.
   → IF human_review_needed:
@@ -520,6 +581,10 @@ IF auto_fix disabled (config OR --no-auto-fix):
   → STOP. Report grade + remaining findings. Status = CHANGES_REQUESTED.
   → Set human_review_needed=true if grade < threshold OR unverified_severe.
 
+IF iteration_count ≥ max_review_rounds AND blocks_approval == true:
+  → STOP. Status = CHANGES_REQUESTED. Emit the coverage blocker (below), not a finding.
+  → Set human_review_needed=true.
+
 IF iteration_count ≥ max_review_rounds:
   → STOP. Best grade + remaining. Status = CHANGES_REQUESTED.
   → Set human_review_needed=true.
@@ -528,7 +593,38 @@ ELSE:
   → Enter the auto-fix loop below.
 ```
 
+**Coverage blocker (AC-013).** Whenever `hm lens_coverage check` reports `blocks_approval: true`,
+the report must name every lens in that command's `missing` list — a blocker the operator cannot attribute is not
+actionable. When the round budget runs out with coverage still incomplete, emit this **once per
+unexercised lens**, in the gate's own summary and **distinct** from the findings list:
+
+> ⛔ **coverage blocker** — lens `{lens}` did not deliver a result in {n} attempts.
+
+It is a delivery failure, not a defect in the code under review. Rendering it as an ordinary
+finding sends the auto-fix loop churning on it and it never reaches the operator as terminal.
+
 ## Auto-Fix Loop (rounds 2..max_review_rounds)
+
+### Re-dispatch what is missing; ask for coverage over EVERY round
+
+Re-dispatch the lenses the previous check named in `missing` — read that list from the CLI's
+output, never from your own recollection of which dispatch failed — and write their results
+into this round's directory.
+
+Then re-run the check **passing `--round` once per round of this review so far**, because
+coverage is cumulative over a review rather than per round: the auto-fix loop re-spawns only
+the reviewers a fix touched, so this round's directory legitimately holds one or two files.
+
+```bash
+!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round 1 --round 2 --round <this round> --run-id <run-id>
+```
+
+> The union is computed by the CLI, not by you. Round 2 of this change's own review rejected
+> the earlier wording, which told you to take the union yourself: the Grade Gate branches on
+> the CLI's `blocks_approval` field, and this stage separately forbids substituting your own
+> judgement for it — so a prose union asked you to override a field you may not override. With
+> a single `--round`, a round that re-dispatched one lens reported the other four missing and
+> the review could never be approved.
 
 ### Round-state contract
 
@@ -582,6 +678,137 @@ Per iteration:
    ```
 
 9. Return to the Grade Gate with the updated grade and incremented `iteration_count`.
+
+## Confirmation Pass (only when the gate would APPROVE)
+
+The grade gate's exit is *issue exhaustion* over a moving target: the auto-fix loop re-reviews
+only touched scopes, so the **last round's fixes always exit unreviewed** — and fixes introduce
+defects at close to 1:1. This pass replaces that exit with *risk closure*: one clean sweep of the
+whole declared failure space over an artifact that cannot move underneath it.
+
+Run it **only** on the APPROVED path. A review stopping for `max_review_rounds`, for the
+no-progress invariant, or with `auto_fix` disabled has not approved anything, so there is nothing
+to confirm — dispatching five lenses there spends the budget to re-confirm a failure. Record it
+as `confirm_pass_ran: false`, which is a different fact from a pass that ran and found nothing.
+
+### Step C1 — Freeze the artifact
+
+```bash
+!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm freeze commit --slug <slug> --pass <confirm-1|confirm-2>
+```
+
+It writes `refs/hm-freeze/v1/<slug>-<pass-id>` from a **temporary index**, so the frozen tree is
+the working tree — including the uncommitted fixes the gate is about to approve. A ref naming
+`HEAD` would freeze the artifact without the content this pass exists to look at, because wrapup
+owns commits and nothing is committed yet.
+
+**Read `review_base` from its store; do not re-resolve it.**
+
+```bash
+!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm freeze read-base --slug <slug>
+```
+
+Round 1 wrote `refs/hm-freeze/v1/<slug>-base`. Re-resolving here would recompute against a HEAD
+that has moved during the review, so the span would drift.
+
+### Step C2 — Dispatch all five lenses over `review_base..<freeze commit>`
+
+The diff under review is `review_base..<freeze commit>` — **the whole review**, not the repair
+round. Diffing from `HEAD` reinstates the scope-selective re-review this pass replaces: it would
+examine exactly the last round's fixes and nothing else.
+
+Dispatch the mandatory set in ONE message, exactly as round 1 does, and write each **returned**
+dispatch to the pass's own results directory — `confirm-1` / `confirm-2` as the `<round>`
+segment, never a round number. A pass is not a round; reusing a round's directory lets a lens
+that failed during the pass be counted as exercised from that round's stale file.
+
+```
+.claude/observability/.hm-lens-results/<slug>/<pass-id>/correctness.json
+.claude/observability/.hm-lens-results/<slug>/<pass-id>/failure.json
+.claude/observability/.hm-lens-results/<slug>/<pass-id>/concurrency.json
+.claude/observability/.hm-lens-results/<slug>/<pass-id>/security.json
+.claude/observability/.hm-lens-results/<slug>/<pass-id>/tests.json
+```
+
+```bash
+!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round <pass-id> --run-id <run-id>
+```
+
+**Apply no fixes in this pass.** It is an observation, and a pass that edits what it is measuring
+has measured nothing.
+
+{% if config.second_opinion and config.second_opinion.models %}**Cross-model voters are re-read, never re-invoked.** Re-read the REVIEW report's
+`## 🧊 Cross-model findings (frozen @ round 1)` section. The models voted once, at round 1; a
+second invocation here would give them a second vote on the same review.
+{% endif %}
+### Step C3 — Outcome
+
+A **new finding** is one whose `id` is absent from the union of every prior round's
+`consensus-passed` set in this `/hm:review`. Mechanical, from the REVIEW report's per-round
+records — this pass runs lenses that never ran earlier, so it necessarily returns findings that
+are not regressions, and "new" decided by you is the self-report class the coverage CLI exists to
+close.
+
+```
+IF blocks_approval == true:
+  → STOP. Status = CHANGES_REQUESTED. Emit the coverage blocker, per lens.
+  → No repair round is consumed — there is nothing to repair.
+  → This holds even when the pass returned ZERO new severe findings: a pass whose lenses
+    died returns nothing, and nothing is not evidence of a clean artifact.
+
+ELSE IF zero new consensus-passed findings at P0 or P1:
+  → STOP. Status = APPROVED. All five lenses exercised AND no new severe finding.
+
+ELSE IF auto_fix is disabled (config OR --no-auto-fix):
+  → STOP. Status = CHANGES_REQUESTED, human_review_needed = true.
+  → No repair round, and no second pass: with auto_fix off this pass is READ-ONLY,
+    whatever the grade and whatever order the arms above were evaluated in.
+
+ELSE IF this was confirm-1:
+  → Enter ONE repair round. It is budgeted separately and does NOT increment
+    iteration_count, so it cannot consume a review round or trip max_review_rounds.
+  → Then freeze again as confirm-2 and dispatch one more pass.
+
+ELSE:                                   # confirm-2 was dirty
+  → STOP. Status = CHANGES_REQUESTED, human_review_needed = true.
+  → Name the surviving findings in the REVIEW report.
+  → No third confirmation pass is ever dispatched in one /hm:review.
+  → Loop mode: emit the Gate 0 receipt with `verdict: fail` and stop. The loop driver
+    owns retry and escalation; this stage reports rather than escalating.
+```
+
+Record `confirm_pass_ran: true` and `confirm_pass_new_severe_n: <count>` on the terminal
+telemetry row.
+
+**Then release the frozen refs.** They pin a commit whose tree holds every untracked
+non-ignored file present at pass time, reachable from a local ref and so immune to gc; nothing
+else reliably reaps them (`prune_stale`'s sweep needs a live task slug, and the Side preset has
+none). Run this once the review has reached its terminal state:
+
+```bash
+!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm freeze reap --slug <slug>
+```
+{% if (config.instrumentation.stage_agent_ledger if config.instrumentation else true) %}
+**Record each confirmation pass as its own ledger episode.** One row per pass, `--pass 1` for
+`confirm-1` and `--pass 2` for `confirm-2`, `--verdict PASS` when the pass approved and `FAIL`
+otherwise, `--terminal` only on the pass that ends the stage.
+
+{% if is_codex %}
+```
+Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm stage_agent_ledger emit --run-id '<run-id>' --agent confirmation-pass --stage review --slug '{slug}' --pass <1|2> --verdict '<PASS|FAIL>' --duration-ms '<elapsed>'")
+```
+{% else %}
+```bash
+!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm stage_agent_ledger emit --run-id '<run-id>' --agent confirmation-pass --stage review --slug '{slug}' --pass <1|2> --verdict '<PASS|FAIL>' --duration-ms '<elapsed>'
+```
+{% endif %}
+
+Why a row at all: the two-pass bound here is the **only** cap in this harness with no recorded
+episodes, so nothing can yet say whether the second pass earns its cost. The reviewer and
+validator caps both have rows, and reading them settled questions no argument could — the
+reviewer gate releases 5 of 9 episodes, the validator 0 of 12, and those two numbers call for
+opposite responses. This cap deserves the same treatment rather than a guess.
+{% endif %}
 
 ## Final Summary (always)
 
@@ -647,7 +874,12 @@ echo '<record_json>' | uv run --with {{ harness_maker_src_path }} hm review_tele
 {% endif %}
 
 Record fields:
-`{ts, slug, round, pass1_n, verifier_kept_n, verifier_dropped_n, verifier_false_drop_n, verifier_false_keep_n, fixture_label, pass2_kept_n, consensus_passed_n, wall_time_ms, build_break_count, auto_fix_reverted_n, fallback, terminal, unreviewed_fix_count, regression_attributed_n, attribution_unknown_n}`.
+`{ts, slug, round, pass1_n, verifier_kept_n, verifier_dropped_n, verifier_false_drop_n, verifier_false_keep_n, fixture_label, pass2_kept_n, consensus_passed_n, wall_time_ms, build_break_count, auto_fix_reverted_n, fallback, terminal, unreviewed_fix_count, regression_attributed_n, attribution_unknown_n, lenses_exercised,
+confirm_pass_ran, confirm_pass_new_severe_n}`.
+
+`lenses_exercised` is the coverage CLI's `exercised` array for this round — `[]` when every
+dispatch failed, never null (null means a pre-change row). `confirm_pass_ran` is required
+alongside it, and `confirm_pass_new_severe_n` is required when — and only when — it is true.
 
 The CLI auto-stamps `ts` when omitted. Schema validation rejects unknown
 fields and negative counts.

@@ -2,7 +2,54 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`/hm:review` exits on risk closure, not issue exhaustion.** The stage used to stop when a
+  round produced no more findings — over a *moving* artifact, since the auto-fix loop re-reviews
+  only touched scopes, so the last round's fixes always exited unreviewed. It now declares a
+  five-lens failure space (`correctness`, `failure`, `concurrency`, `security`, `tests`),
+  dispatches all five every round, and computes coverage with a called CLI
+  (`hm lens_coverage check`) from result files the main loop — never the lens agent — writes.
+  Approval requires `grade ≥ grade_threshold` **and** `blocks_approval == false`, so no threshold
+  setting can bypass incomplete coverage. On the approval path a confirmation pass reviews a
+  **frozen** commit (`hm freeze`, a temporary index seeded from `HEAD`) diffed from a
+  `review_base` stored at round 1, bounded at one repair round and two passes.
+
+  Two limits are stated rather than papered over: the coverage CLI verifies **liveness** — that a
+  result file exists, parses and self-identifies — and cannot observe that any reviewing
+  occurred; and coverage is cumulative across a review's rounds, so `check` takes `--round` once
+  per round and computes the union itself.
+
+- **`/hm:execute` gained `Phase A.4`, a false-RED screen** that runs the tests *before* the
+  three-lens reviewer dispatch. Eleven findings across two tasks were the single sentence "this
+  test passes before the implementation exists" — decidable by one pytest run, each previously
+  costing a reviewer round. It does not demand that every test fail: a negative invariant is
+  vacuously true until the construct it forbids exists, so a passing test is either fixed or
+  justified in the test file against a named RED sibling.
+
+- **`/hm:plan` re-validates the whole document once, terminally** (`validator_outcome:
+  MAJOR_REVISION_TERMINAL`), on both revision paths. Measured over 12 recorded validator
+  episodes: none ever reached a clean verdict, their blocking findings were verified against
+  source, and one PLAN records that pass 2's criticals were *created by* the pass-1 fixes. So the
+  last revision is the one nothing looks at, and a re-validation that waited for clean would
+  never release.
+
+- **`hm verifier_discrimination`** reads the ledgers this harness already writes and reports what
+  can honestly be computed about the judges: per-model invocation loss, the share of disputes the
+  verifier could not decide, and per-gate release rates. It deliberately does **not** emit a
+  false-acceptance rate — that needs labelled ground truth, and an approximation would be
+  indistinguishable from the real thing at the call site.
+
 ### Fixed
+
+- **The tier-1 mutation gate could not pass for any SPEC, and failed as a plausible number.**
+  Three faults were live at once: `_COUNTERS_RE` scanned for words while mutmut 2.x emits an
+  emoji-only progress line; no `--runner` was passed, so mutmut ran the whole suite per mutant
+  against a 600 s cap; and `score` returns 0.0 for an empty denominator, so a **non-run and a
+  total wipeout printed the same string**. That third one is why the other two survived — every
+  SPEC author read `score 0% < threshold 85%` as a measurement and wrote rationale around it.
+  A fourth was created by fixing the first: with the parser working, a *truncated* run parsed to
+  a real-looking number and was reported as the whole path set's score.
 
 - **A re-render could disarm a live harness, and the damage was self-sealing.** The `--with <ref>`
   baked into every rendered hook could point at a pruned plugin-cache directory. Hooks are

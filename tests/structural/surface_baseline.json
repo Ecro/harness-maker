@@ -1,12 +1,12 @@
 {
   "aggregate_chars": {
-    "claude": 380334,
-    "codex": 308250
+    "claude": 398138,
+    "codex": 326030
   },
   "counting_rule": "ADR-011: round_trips = count of ^! lines (claude variant) or 'Bash(' call sites (codex variant), plus all 'Task(' occurrences; fenced examples included. A consistent proxy, not a semantic count.",
   "generated_by": "tests/structural/_surface_baseline.py",
-  "payload_digest": "afb2c82e4987208c6ea05955a798153f03e5e83dfdb57f2215f559b2b076d935",
-  "render_sha": "0e5c4fcf513c76d49de4078cc4888fcf0779c3e0",
+  "payload_digest": "d0c52f53a5334028b43d4753dd08a0c0fa02b032c3232f49a73592e2a0c6d02d",
+  "render_sha": "64c7dbea08b2e07491e96eca36caff36312e62e1",
   "schema_version": 1,
   "surface": {
     "claude": {
@@ -15,8 +15,8 @@
         "round_trips": 4
       },
       "execute": {
-        "chars": 40158,
-        "round_trips": 17
+        "chars": 42427,
+        "round_trips": 18
       },
       "health": {
         "chars": 9772,
@@ -43,7 +43,7 @@
         "round_trips": 7
       },
       "plan": {
-        "chars": 53916,
+        "chars": 56451,
         "round_trips": 14
       },
       "research": {
@@ -51,8 +51,8 @@
         "round_trips": 8
       },
       "review": {
-        "chars": 54876,
-        "round_trips": 8
+        "chars": 67876,
+        "round_trips": 22
       },
       "spec": {
         "chars": 31663,
@@ -73,8 +73,8 @@
     },
     "codex": {
       "hm-execute": {
-        "chars": 37270,
-        "round_trips": 16
+        "chars": 39512,
+        "round_trips": 17
       },
       "hm-help": {
         "chars": 2110,
@@ -89,7 +89,7 @@
         "round_trips": 0
       },
       "hm-plan": {
-        "chars": 47255,
+        "chars": 49790,
         "round_trips": 13
       },
       "hm-research": {
@@ -97,8 +97,8 @@
         "round_trips": 7
       },
       "hm-review": {
-        "chars": 48755,
-        "round_trips": 9
+        "chars": 61758,
+        "round_trips": 16
       },
       "hm-spec": {
         "chars": 28932,

@@ -182,3 +182,13 @@ work-docs/loop-context/
 # finally block, and swept at import time; ignored here so a leftover is not git dirt.
 # NOTE: gitignore cannot hide it from the run-time directory gate — the sweep does that.)
 tests/_env_isolation_probe_*/
+
+# mutmut / coverage working-tree artifacts (PLAN-ai-review-exit-criteria F5).
+# `mutmut run` needs a `.coverage` file and leaves a `<module>.py.bak` beside every file it
+# mutates. An interrupted run leaves both behind — and, once, a MUTATED source: a killed run
+# left `if __name__ != "__main__"` in review_telemetry.py, which made importing the module
+# call sys.exit(). Ignoring the two artifacts keeps them out of commits; the mutated-source
+# hazard is NOT covered by gitignore, so after any interrupted `mutmut run`, `git diff` the
+# `paths_to_mutate` before committing.
+.coverage
+*.py.bak

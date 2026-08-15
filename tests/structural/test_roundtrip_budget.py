@@ -63,7 +63,10 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # surfaces one failure category per round (2 then 3 findings), three concurrent lenses
     # surfaced 9 and 12 with ZERO overlap between the two blocking lenses.
     # Attributed in work-docs/BASELINE-DELTA-multi-lens-review-round.md.
-    "execute": 17,
+    # 17 → 18 (PLAN-ai-review-exit-criteria F1): Phase A.4 runs the test command once, before
+    # the A.5 dispatch. It is the cheapest round-trip in this table and it removes reviewer
+    # rounds — eleven findings across two tasks were decidable by exactly this call.
+    "execute": 18,
     "health": 7,
     "help": 0,
     "loop": 12,
@@ -77,7 +80,36 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     "plan": 14,
     "research": 8,
     # 9 → 8 (same phase): `stage_agent_ledger persist-payload`, same axis.
-    "review": 8,
+    #
+    # 8 → 16 (PLAN-ai-review-exit-criteria Phase 4). The largest single-stage round-trip rise
+    # in this table, and all of it is the declared failure space becoming real: five `Task(`
+    # lens dispatches in round 1 (+5), `hm freeze resolve-base` once at round 1 (+1), and
+    # `hm lens_coverage check` (+2 — once after the round-1 dispatch, once in the auto-fix
+    # loop after re-dispatching whatever the CLI's `missing` list named).
+    #
+    # The five are NOT compressible to one parameterised call. A single `Task(` with a
+    # `<lens>` placeholder was considered and rejected for the same reason the Phase A.5
+    # fan-out rejected it (see `execute` in the size table): the lenses run CONCURRENTLY in
+    # one message, which is the property AC-002 asserts, and a loop over one template is a
+    # serial reading. Merging them would also make `<lens>.json` unrenderable per lens, which
+    # is what the coverage CLI reads.
+    #
+    # The two CLI calls replace a judgement, not a cheaper call: before this, nothing computed
+    # which lenses had run — the executing model reported its own attendance. That is the
+    # self-report hole AC-011 exists to close, so the round-trips buy the gate its input.
+    # 16 → 19 (Phase 5): the confirmation pass adds `hm freeze commit` (+1), `hm freeze
+    # read-base` (+1) and one more `hm lens_coverage check` over the pass's own results (+1).
+    # `read-base` is a round-trip that exists to PREVENT a computation: re-resolving the base
+    # here would silently use one that drifted with the commits landed during the review.
+    # 19 → 20: the confirmation pass emits its own `stage_agent_ledger` row (F4). It is the
+    # only cap in the harness with no recorded episodes, so its two-pass bound can currently
+    # be defended only by assertion — the reviewer and validator caps both have rows, and
+    # reading them settled questions no argument could (5-of-9 release vs 0-of-12, calling for
+    # opposite responses). Behind the `instrumentation` axis, which defaults OFF.
+    # 20 → 22 (round-2 review repairs): the auto-fix loop's coverage re-check became its own
+    # rendered call (it now needs a repeatable `--round`), and `hm freeze reap` releases the
+    # frozen refs at the terminal state — nothing else reaps them under the Side preset.
+    "review": 22,
     "spec": 6,
     "uninstall": 3,
     "verify": 13,

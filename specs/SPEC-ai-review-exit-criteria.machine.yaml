@@ -1,0 +1,289 @@
+schema_version: 2
+spec_slug: ai-review-exit-criteria
+parent_spec: null
+verification_tier: 2
+mutation_threshold: 85
+mutation_threshold_rationale: "85 because that is what the T1 gate actually enforces. Measured, not assumed: with this field set to 70 the gate still enforced 85, so `mutation_threshold` is descriptive on the T1 path, not operative. (The accompanying 'score 0%' was NOT evidence of anything about the tests — it was a broken wrapper run; see mutation_runner_faults in spec_mutation. Corrected 2026-08-15.) Set to the enforced value rather than left disagreeing with it — a knob whose value the runtime ignores is the recurring dead-config class this repository records. The gate covers every Python verifier this SPEC ships (AC-015); the Jinja templates are unreachable by mutation and are covered by the RED gate instead (follow-up F1)."
+last_mutation_run: null
+mutation_runner: "python -m pytest -x -q -p no:cacheprovider tests/unit/test_lens_coverage.py tests/unit/test_freeze_commit.py tests/unit/test_review_telemetry_confirm.py tests/unit/test_conditional_router.py"
+paths_to_mutate:
+  - src/harness_maker/lens_coverage.py
+  - src/harness_maker/freeze.py
+  - src/harness_maker/review_telemetry.py
+  - src/harness_maker/conditional_router.py
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+  - id: AC-001
+    title: "The five mandatory lenses are enumerable in code"
+    type: mechanical
+    test_ids: []
+    executable_predicate: "len(MANDATORY_LENSES) == 5"
+    golden_table: []
+    rubric_id: null
+    pending_test: true
+    oracle_source: golden
+    oracle_evidence: "The count of five is fixed by this SPEC's declared failure space before the constant is written, so the assertion is not read back out of the code it checks."
+    oracle_independence_waiver: null
+    input_domain: null
+    transformation: null
+    expected_relation: null
+    preconditions: []
+    observable_output: null
+    generator_hint: null
+
+  - id: AC-002
+    title: "Round 1 dispatches every mandatory lens"
+    type: mechanical
+    test_ids: []
+    executable_predicate: "all(lens in rendered_review_command for lens in MANDATORY_LENSES)"
+    golden_table: []
+    rubric_id: null
+    pending_test: true
+    oracle_source: golden
+    oracle_evidence: "The expected lens names come from the AC-001 constant, whose contents this SPEC fixes; the render is checked against that independent list rather than against itself."
+    oracle_independence_waiver: null
+    input_domain: null
+    transformation: null
+    expected_relation: null
+    preconditions: []
+    observable_output: null
+    generator_hint: null
+
+  - id: AC-014
+    title: "A confirmation pass with incomplete coverage never approves"
+    type: property
+    test_ids: []
+    executable_predicate: null
+    golden_table: []
+    rubric_id: null
+    pending_test: true
+    oracle_source: property
+    oracle_evidence: "Approval-withholding under incomplete coverage must hold for every finding count including zero; the zero case is precisely the one that matched no outcome branch, so a fixture over nonzero counts would have passed while the gap stood."
+    oracle_independence_waiver: null
+    input_domain: "any new-severe finding count including zero, paired with any strict subset of MANDATORY_LENSES as the confirmation pass's exercised set"
+    transformation: "evaluate the confirmation pass's outcome branch"
+    expected_relation: "outcome == 'CHANGES_REQUESTED'"
+    preconditions:
+      - "a confirmation pass ran"
+    observable_output: "terminal outcome"
+    generator_hint: null
+
+  - id: AC-013
+    title: "Coverage that cannot be completed within the round budget terminates visibly"
+    type: mechanical
+    test_ids: []
+    executable_predicate: "'did not deliver a result' in rendered_review_command"
+    golden_table: []
+    rubric_id: null
+    pending_test: true
+    oracle_source: golden
+    oracle_evidence: "The blocker wording is fixed by this SPEC's S2a before the template is written, so the assertion is not read back out of the artifact it checks."
+    oracle_independence_waiver: null
+    input_domain: null
+    transformation: null
+    expected_relation: null
+    preconditions: []
+    observable_output: null
+    generator_hint: null
+
+  - id: AC-003
+    title: "Incomplete coverage blocks approval at every threshold"
+    type: property
+    test_ids: []
+    executable_predicate: null
+    golden_table: []
+    rubric_id: null
+    pending_test: true
+    oracle_source: property
+    oracle_evidence: "Approval-withholding is a metamorphic relation over the whole space of (P0 count, P1 count, threshold): no assignment may approve while coverage is incomplete. The first draft asserted this only at threshold A, and a golden fixture at that threshold would have passed while the mechanism was inert at B and C."
+    oracle_independence_waiver: null
+    input_domain: "any P0/P1 count pair, any grade_threshold in {A, B, C}, and any strict subset of MANDATORY_LENSES as the exercised set"
+    transformation: "evaluate the approval condition in the rendered gate (NOT via the coverage CLI, which is threshold-blind)"
+    expected_relation: "approved is False"
+    preconditions:
+      - "the exercised lens set is a strict subset of MANDATORY_LENSES"
+    observable_output: "approval boolean"
+    generator_hint: null
+
+  - id: AC-004
+    title: "The freeze is faithful, and the pass diffs from review_base"
+    type: mechanical
+    test_ids: []
+    executable_predicate: "frozen_tree_hash == working_tree_hash and freeze_commit_parent == review_base and review_base != head_sha"
+    golden_table: []
+    rubric_id: null
+    pending_test: true
+    oracle_source: golden
+    oracle_evidence: "Tree-hash equality is a differential comparison against the working tree the pass claims to review — an object git computes, not a string this SPEC or the template supplies. A render grep alone cannot observe which commit a ref names, which is how the earlier draft could have frozen HEAD and passed."
+    oracle_independence_waiver: null
+    input_domain: null
+    transformation: null
+    expected_relation: null
+    preconditions: []
+    observable_output: null
+    generator_hint: null
+
+  - id: AC-005
+    title: "Telemetry carries a three-state confirmation and coverage record"
+    type: property
+    test_ids: []
+    executable_predicate: null
+    golden_table: []
+    rubric_id: null
+    pending_test: true
+    oracle_source: property
+    oracle_evidence: "Both-or-neither is an invariant of the record rather than of any implementation of it, and it is the same relation already validated for verifier_kept_n/verifier_dropped_n — so the relation predates the code under test."
+    oracle_independence_waiver: null
+    input_domain: "any assignment of confirm_pass_ran and confirm_pass_new_severe_n drawn from {null, valid value}"
+    transformation: "construct a ReviewTelemetryRecord with terminal=true"
+    expected_relation: "(confirm_pass_ran is None) == (confirm_pass_new_severe_n is None)"
+    preconditions:
+      - "terminal is true"
+    observable_output: "constructed record, or ValidationError"
+    generator_hint: null
+
+  - id: AC-006
+    title: "Confirmation re-entry is bounded at one"
+    type: property
+    test_ids: []
+    executable_predicate: null
+    golden_table: []
+    rubric_id: null
+    pending_test: true
+    oracle_source: property
+    oracle_evidence: "The bound holds over the whole input space of confirmation outcomes, so no fixture choice can satisfy it accidentally the way a single recorded run could."
+    oracle_independence_waiver: null
+    input_domain: "any sequence of confirmation-pass outcomes (clean or dirty) for one /hm:review"
+    transformation: "run the stage's terminal branch to completion"
+    expected_relation: "confirmation_pass_count <= 2"
+    preconditions:
+      - "the auto-fix loop produced a grade that would clear grade_threshold at least once"
+    observable_output: "count of dispatched confirmation passes"
+    generator_hint: null
+
+  - id: AC-007
+    title: "A dirty pass without auto-fix, and a dirty second pass, both terminate"
+    type: mechanical
+    test_ids: []
+    executable_predicate: "'no repair round' in rendered_review_command and rendered_review_command.count('CHANGES_REQUESTED') >= 1"
+    golden_table: []
+    rubric_id: null
+    pending_test: true
+    oracle_source: golden
+    oracle_evidence: "CHANGES_REQUESTED is an existing terminal status fixed by the shipped grade gate before this change; the assertion reuses that prior contract rather than a value read out of the new template."
+    oracle_independence_waiver: null
+    input_domain: null
+    transformation: null
+    expected_relation: null
+    preconditions: []
+    observable_output: null
+    generator_hint: null
+
+  - id: AC-008
+    title: "Loop mode fails the receipt rather than persisting silently"
+    type: mechanical
+    test_ids: []
+    executable_predicate: "'verdict: fail' in rendered_review_command"
+    golden_table: []
+    rubric_id: null
+    pending_test: true
+    oracle_source: golden
+    oracle_evidence: "The receipt vocabulary (pass/fail/skipped) is fixed by the shipped Gate 0 contract, independent of this change; the assertion names a value that contract already defines."
+    oracle_independence_waiver: null
+    input_domain: null
+    transformation: null
+    expected_relation: null
+    preconditions: []
+    observable_output: null
+    generator_hint: null
+
+  - id: AC-009
+    title: "The confirmation pass does not re-invoke the second-opinion CLIs"
+    type: mechanical
+    test_ids: []
+    executable_predicate: "'second_opinion_invoke' not in confirmation_pass_block"
+    golden_table: []
+    rubric_id: null
+    pending_test: true
+    oracle_source: golden
+    oracle_evidence: "The absent symbol is the shipped invoker's own module name, fixed by the vote-freeze contract long before this change; the single verification mode is a render assertion over the confirmation-pass block, with a ledger-row comparison optional and INTEGRATION-guarded. Earlier drafts named three incompatible modes, so whichever was built left two written criteria unmet."
+    oracle_independence_waiver: null
+    input_domain: null
+    transformation: null
+    expected_relation: null
+    preconditions: []
+    observable_output: null
+    generator_hint: null
+
+  - id: AC-011
+    title: "Coverage liveness is computed by a called CLI from main-loop-written results"
+    type: property
+    test_ids: []
+    executable_predicate: null
+    golden_table: []
+    rubric_id: null
+    pending_test: true
+    oracle_source: property
+    oracle_evidence: "Fail-closed construction is a relation over the whole space of result-file sets: for any set, the exercised set equals the ids actually present and parsing. No fixture can make an absent file count as present, which is what a self-reported list allowed. The writer is the main loop, so a read-only lens subagent cannot forge its own attendance."
+    oracle_independence_waiver: null
+    input_domain: "any set of result files written by the main loop, including empty, partial, duplicated, unparseable, unknown-lens, run-id-less and foreign-run-id entries"
+    transformation: "run `hm lens_coverage check --results-dir <dir> --run-id <id>` and parse its JSON — the entrypoint the template calls, not the in-process helper"
+    expected_relation: "cli_output['blocks_approval'] == (set(cli_output['exercised']) != set(MANDATORY_LENSES))"
+    preconditions: []
+    observable_output: "set of lens ids"
+    generator_hint: null
+
+  - id: AC-015
+    title: "The Python verifiers are themselves verified by defect injection"
+    type: mechanical
+    test_ids: []
+    executable_predicate: "surviving_mutants == 0"
+    golden_table: []
+    rubric_id: null
+    pending_test: true
+    oracle_source: differential
+    oracle_evidence: "The oracle is the mutated program, not a value this SPEC supplies: each mutant is an independently generated wrong implementation, and the assertion is that the existing tests distinguish it from the real one. That is the same instrument Building to the Test uses as a no-op ablation to check each verdict, and it cannot be satisfied by reading the code under test."
+    oracle_independence_waiver: null
+    input_domain: null
+    transformation: null
+    expected_relation: null
+    preconditions: []
+    observable_output: null
+    generator_hint: null
+
+  - id: AC-012
+    title: "The telemetry validator makes new rows self-identifying"
+    type: property
+    test_ids: []
+    executable_predicate: null
+    golden_table: []
+    rubric_id: null
+    pending_test: true
+    oracle_source: property
+    oracle_evidence: "The rule is an invariant of the record's readability, not of any implementation: a row must be unambiguously attributable to a version. The both-or-neither relation alone admitted an all-absent new row identical to a legacy row, which is why the relation had to be strengthened rather than fixtured."
+    oracle_independence_waiver: null
+    input_domain: "any assignment of lenses_exercised, confirm_pass_ran and confirm_pass_new_severe_n drawn from {null, valid value}"
+    transformation: "construct a ReviewTelemetryRecord"
+    expected_relation: "(lenses_exercised is None or confirm_pass_ran is not None) and ((confirm_pass_new_severe_n is None) == (confirm_pass_ran is not True))"
+    preconditions: []
+    observable_output: "constructed record, or ValidationError"
+    generator_hint: null
+
+  - id: AC-010
+    title: "plan-validator re-validates once, terminally, with a named outcome and readers"
+    type: mechanical
+    test_ids: []
+    executable_predicate: "'MAJOR_REVISION_TERMINAL' in rendered_plan_command and rendered_plan_command.count('whole PLAN') >= 2"
+    golden_table: []
+    rubric_id: null
+    pending_test: true
+    oracle_source: golden
+    oracle_evidence: "The requirement of two occurrences follows from this SPEC's S10 naming both the NEEDS_REVISION and MAJOR_REVISION paths, fixed before the template is edited."
+    oracle_independence_waiver: null
+    input_domain: null
+    transformation: null
+    expected_relation: null
+    preconditions: []
+    observable_output: null
+    generator_hint: null

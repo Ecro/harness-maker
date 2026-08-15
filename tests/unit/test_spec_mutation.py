@@ -18,6 +18,7 @@ from harness_maker.spec_mutation import (
     GrowthVerdict,
     MutantDescriptor,
     MutationReport,
+    _parse_mutmut_output,
     adjusted_score,
     baseline_to_json,
     classify_survivor,
@@ -385,7 +386,9 @@ def _write_machine(tmp_path: Path, *, paths: list[str], tier: int = 1) -> Path:
     return p
 
 
-def _report(killed: int, survived: int, *, raw: str = "") -> MutationReport:
+def _report(
+    killed: int, survived: int, *, raw: str = "", tool_missing: bool = False
+) -> MutationReport:
     return MutationReport(
         paths=("src/x.py",),
         killed=killed,
@@ -395,6 +398,7 @@ def _report(killed: int, survived: int, *, raw: str = "") -> MutationReport:
         skipped=0,
         sampled=False,
         raw_output=raw or f"killed: {killed} survived: {survived}",
+        tool_missing=tool_missing,
     )
 
 
@@ -423,12 +427,19 @@ def test_cli_gate_fails_when_score_below_floor(
 def test_cli_gate_degrades_when_mutmut_absent(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """mutmut not installed → non-gating (exit 0) with a skip notice."""
+    """mutmut not installed → non-gating (exit 0) with a skip notice.
+
+    Updated by the round-1 review: the skip now keys on `tool_missing`, set only where absence
+    is observed (the `FileNotFoundError` branch), not on a substring of the captured output.
+    The sibling test below is the reason.
+    """
     import harness_maker.spec_mutation as sm
 
     yp = _write_machine(tmp_path, paths=["src/x.py"])
     monkeypatch.setattr(
-        sm, "measure_baseline", lambda *a, **k: _report(0, 0, raw="mutmut: command not found")
+        sm,
+        "measure_baseline",
+        lambda *a, **k: _report(0, 0, raw="mutmut: command not found", tool_missing=True),
     )
     rc = sm.main(["gate", "--yaml", str(yp), "--tier", "1"])
     assert rc == 0
@@ -757,3 +768,205 @@ def test_cli_classify_growth_warns_against_prior_baseline(
     out = capsys.readouterr().out
     assert "growth" in out.lower() or "grew" in out.lower()
     assert rc in (0, 3)
+
+
+# ── F5: the three faults that made the tier-1 gate unpassable for every SPEC ──
+#
+# All three were live simultaneously and each masked the next. Diagnosed 2026-08-15 against
+# mutmut 2.5; every number below is measured, not constructed.
+
+#: A verbatim tail of a real `mutmut run` on `src/harness_maker/lens_coverage.py`, scoped to
+#: `tests/unit/test_lens_coverage.py`. 55 mutants: 42 killed, 13 survived. Kept as a literal
+#: rather than a hand-written approximation, because the fault was that the wrapper could not
+#: read THIS format — a paraphrase would have been readable and would have tested nothing.
+_REAL_MUTMUT_TAIL = (
+    "Legend for output:\n"
+    "\N{PARTY POPPER} Killed mutants.   The goal is for everything to end up in this bucket.\n"
+    "\N{ALARM CLOCK} Timeout.          Test suite took 10 times as long as the baseline.\n"
+    "\N{THINKING FACE} Suspicious.       Tests took a long time, but not long enough.\n"
+    "\N{SLIGHTLY FROWNING FACE} Survived.         This means your tests need to be expanded.\n"
+    "\N{SPEAKER WITH CANCELLATION STROKE} Skipped.          Skipped.\n"
+    "\n2. Checking mutants\n"
+    "\r\N{BRAILLE PATTERN DOTS-24} 12/55  \N{PARTY POPPER} 9  \N{ALARM CLOCK} 0  "
+    "\N{THINKING FACE} 0  \N{SLIGHTLY FROWNING FACE} 3  "
+    "\N{SPEAKER WITH CANCELLATION STROKE} 0"
+    "\r\N{BRAILLE PATTERN DOTS-24} 55/55  \N{PARTY POPPER} 42  \N{ALARM CLOCK} 0  "
+    "\N{THINKING FACE} 0  \N{SLIGHTLY FROWNING FACE} 13  "
+    "\N{SPEAKER WITH CANCELLATION STROKE} 0"
+)
+
+
+def test_fault1_the_emoji_progress_line_is_parsed() -> None:
+    """mutmut 2.x never writes the words `killed:`/`survived:` — only the legend's emoji.
+
+    The old `_COUNTERS_RE` scanned for the English words, so a healthy 42/13 run parsed as
+    all-zeros and the gate reported `score 0%`. That is what every tier-1 SPEC in this repo has
+    been showing.
+    """
+    report = _parse_mutmut_output(
+        _REAL_MUTMUT_TAIL, ("src/harness_maker/lens_coverage.py",), sampled=False
+    )
+    assert (report.killed, report.survived) == (42, 13)
+    assert report.timeout == report.suspicious == report.skipped == 0
+    assert round(report.score * 100) == 76
+
+
+def test_fault1_the_last_progress_line_wins_not_the_first() -> None:
+    """The line is rewritten in place with `\\r`; an early frame is progress, not a result.
+
+    Taking the first match would have reported 9/3 (16 mutants in) as the final tally — a
+    plausible-looking number that is simply the wrong moment.
+    """
+    report = _parse_mutmut_output(_REAL_MUTMUT_TAIL, ("x",), sampled=False)
+    assert report.killed != 9, "an intermediate progress frame was read as the final count"
+    assert report.killed == 42
+
+
+def test_fault3_a_zero_report_is_not_a_score_of_zero() -> None:
+    """The collision that hid the other two faults for the lifetime of the gate.
+
+    A crashed runner, a timeout, and an unparseable format all produce an all-zero report, and
+    `score` returns 0.0 for it only because the denominator is empty. Reported as `score 0% <
+    threshold 85%` it is indistinguishable from "every mutant survived" — so three broken runs
+    read as a legitimate measurement of weak tests.
+    """
+    crashed = _parse_mutmut_output(
+        "# mutmut timeout after 600s; consider sampled=True", ("x",), sampled=False
+    )
+    assert not crashed.ran
+    passes, reason = gate(crashed, 1)
+    assert not passes
+    assert "ZERO mutants" in reason
+    assert "score 0%" not in reason, (
+        "the broken-run branch still reports a score, which is the collision it exists to break"
+    )
+
+
+def test_fault3_a_real_wipeout_still_reports_a_score() -> None:
+    """The counterpart: 0 killed with mutants CHECKED is a genuine measurement, not a crash."""
+    wipeout = _parse_mutmut_output(
+        "\N{PARTY POPPER} 0  \N{ALARM CLOCK} 0  \N{THINKING FACE} 0  "
+        "\N{SLIGHTLY FROWNING FACE} 55  \N{SPEAKER WITH CANCELLATION STROKE} 0",
+        ("x",),
+        sampled=False,
+    )
+    assert wipeout.ran
+    passes, reason = gate(wipeout, 1)
+    assert not passes
+    assert "score 0%" in reason, "a true wipeout must still be reported as a score"
+
+
+def test_fault2_the_runner_is_passed_through_to_mutmut(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Without `--runner`, mutmut runs the WHOLE suite per mutant.
+
+    In this repo that is ~6 min, so the first mutant exhausts the 600 s cap and the run yields
+    the all-zero report of fault 3. The flag is not a speed knob — it is what makes a
+    measurement possible at all.
+    """
+    seen: dict[str, list[str]] = {}
+
+    def _fake_run(args: list[str], **kwargs: Any) -> Any:
+        seen["args"] = args
+        return subprocess.CompletedProcess(args, 0, stdout=_REAL_MUTMUT_TAIL, stderr="")
+
+    monkeypatch.setattr("harness_maker.spec_mutation._detect_unsupported_mutmut", lambda cwd: None)
+    monkeypatch.setattr(subprocess, "run", _fake_run)
+
+    measure_baseline(["src/x.py"], cwd=Path("."), runner="python -m pytest -q tests/unit/test_x.py")
+    assert "--runner" in seen["args"]
+    assert (
+        seen["args"][seen["args"].index("--runner") + 1]
+        == "python -m pytest -q tests/unit/test_x.py"
+    )
+
+    seen.clear()
+    measure_baseline(["src/x.py"], cwd=Path("."))
+    assert "--runner" not in seen["args"], "a runner was invented when the caller passed none"
+
+
+def test_fault4_a_truncated_run_is_not_a_score_either() -> None:
+    """A fault the emoji fix CREATED, caught by re-reading the timeout branch after landing it.
+
+    The timeout handler deliberately preserves partial stdout (REVIEW C-P1-E). Before the emoji
+    parser that partial output parsed to all-zeros, so a truncated run was indistinguishable
+    from a non-run — bad, but at least it did not lie about a number. With the parser working,
+    the same partial output yields a real-looking score that the gate would have reported as
+    the result for the whole path set.
+
+    Measured: the four-file gate run reported 46%, and the wall budget is 600 s for four files.
+    Whether that 46% was complete or a prefix could not be told apart from the output, which is
+    exactly the collision `ran` exists to break, one level up.
+    """
+    partial = _parse_mutmut_output(
+        "\N{PARTY POPPER} 12  \N{ALARM CLOCK} 0  \N{THINKING FACE} 0  "
+        "\N{SLIGHTLY FROWNING FACE} 14  \N{SPEAKER WITH CANCELLATION STROKE} 0"
+        "\n# mutmut timeout after 600s; consider sampled=True",
+        ("a.py", "b.py"),
+        sampled=False,
+        truncated=True,
+    )
+    assert partial.ran, "the prefix DID check mutants — this is not the non-run case"
+    passes, reason = gate(partial, 1)
+    assert not passes
+    assert "partial run" in reason
+    assert "26 mutant" in reason, "the operator needs to know how far it got"
+    assert "%" not in reason, "a prefix must not be reported as a percentage of the whole path set"
+
+
+def test_fault4_a_complete_run_is_not_flagged_as_partial() -> None:
+    """The counterpart — the guard must not make every real measurement unreportable."""
+    complete = _parse_mutmut_output(
+        "\N{PARTY POPPER} 42  \N{ALARM CLOCK} 0  \N{THINKING FACE} 0  "
+        "\N{SLIGHTLY FROWNING FACE} 13  \N{SPEAKER WITH CANCELLATION STROKE} 0",
+        ("x.py",),
+        sampled=False,
+    )
+    assert not complete.truncated
+    passes, reason = gate(complete, 1)
+    assert not passes  # 76% < 85%
+    assert "score 76%" in reason
+
+
+def test_fault4_the_timeout_path_marks_the_report(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The flag must be set where the truncation happens, not inferred by a caller."""
+
+    def _timeout(args: list[str], **kwargs: Any) -> Any:
+        raise subprocess.TimeoutExpired(
+            cmd=args,
+            timeout=600,
+            output="\N{PARTY POPPER} 5  \N{SLIGHTLY FROWNING FACE} 1",
+        )
+
+    monkeypatch.setattr("harness_maker.spec_mutation._detect_unsupported_mutmut", lambda cwd: None)
+    monkeypatch.setattr(subprocess, "run", _timeout)
+    report = measure_baseline(["src/x.py"], cwd=Path("."))
+    assert report.truncated, "a wall-budget timeout produced a report that claims to be complete"
+
+
+def test_a_runner_saying_command_not_found_does_not_look_like_absent_mutmut(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Round-1 review P1. The skip was a substring test against arbitrary subprocess output.
+
+    `--runner` injects a user-supplied test command that mutmut executes per mutant, and its
+    stderr flows into the captured blob. A runner naming a binary absent from PATH put
+    `pytest: command not found` there — so a mutmut that was present, running, and failing
+    every mutant made the gate exit 0 announcing mutmut was not installed. `report.ran`,
+    `truncated` and the score were never consulted, because the substring check preceded them.
+
+    The same *no-observation-reported-as-an-observation* class the module docstring exists to
+    end, one layer up from where it was fixed.
+    """
+    import harness_maker.spec_mutation as sm
+
+    yp = _write_machine(tmp_path, paths=["src/x.py"])
+    monkeypatch.setattr(
+        sm,
+        "measure_baseline",
+        lambda *a, **k: _report(0, 0, raw="pytest: command not found\n", tool_missing=False),
+    )
+    rc = sm.main(["gate", "--yaml", str(yp), "--tier", "1"])
+    assert rc == 1, "a broken run was reported as an absent tool"
+    err = capsys.readouterr().err
+    assert "not installed" not in err
+    assert "ZERO mutants" in err

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from ._comprehension_golden import TRACKED_COMMANDS, digest, load_golden
+from ._comprehension_golden import TRACKED_COMMANDS
 from ._surface_baseline import CLAUDE_VARIANT, render_surface
 
 BRIEF = "<!-- @hm:comprehension:brief -->"
@@ -92,20 +92,50 @@ def test_the_levels_are_ordered_not_merely_distinct(
 def test_minimal_renders_nothing_and_costs_zero_bytes(
     rendered: dict[str, dict[str, dict[str, str]]],
 ) -> None:
-    """The only mechanical evidence that a third-party opt-out install pays nothing.
+    """The mechanical evidence that a third-party opt-out install pays nothing.
 
-    SHA-256, not `len()`: equal character counts do not prove byte identity, and the whole
-    hazard here is a stray newline left behind by a false Jinja branch.
+    **Narrowed 2026-08-15, and the narrowing matters.** This asserted that the whole `plan` and
+    `spec` documents were byte-identical to a frozen pre-change digest. That is a strictly
+    stronger claim than AC-003 makes, and the extra strength is not a safety margin — it froze
+    two shipped templates permanently. Any later, unrelated edit to `plan.md.j2` fails it, and
+    the only ways out are to abandon the edit or to regenerate the oracle, which
+    `test_comprehension_zero_cost_golden` correctly forbids. The first stage edit to arrive
+    after the comprehension work landed (AC-010, terminal re-validation) hit exactly that wall.
+
+    The claim AC-003 actually makes is that **the partial contributes zero bytes at minimal**.
+    That is now checked at the partial itself (`..._emits_the_empty_string_at_minimal` below),
+    which is a same-commit oracle: it needs no frozen snapshot, catches the real hazard — a
+    stray newline left by a false Jinja branch — precisely rather than incidentally, and stays
+    true however the enclosing document evolves.
+
+    What survives here is the enclosing-document half: at minimal none of the partial's markers
+    reach the render.
     """
-    recorded = load_golden()["digests"]
-    assert isinstance(recorded, dict)
     for variant, names in TRACKED_COMMANDS.items():
         for name in names:
             text = rendered["minimal"][variant][name]
             assert not _markers(text), f"{variant}/{name}: minimal emitted {_markers(text)}"
-            assert digest(text) == recorded[variant][name], (
-                f"{variant}/{name}: depth=minimal is not byte-identical to the pre-change "
-                "render — the opt-out is not free"
+
+
+def test_the_partial_emits_the_empty_string_at_minimal() -> None:
+    """AC-003's real content, checked where the bytes are produced.
+
+    Marker-absence alone would pass a partial that emitted a bare newline — the exact hazard
+    the original SHA comparison existed to catch. Rendering the partial standalone at
+    `minimal` and requiring `""` catches it directly, and cannot be broken by an edit
+    elsewhere in `plan.md.j2`.
+    """
+    from harness_maker.render import _make_env
+
+    env = _make_env()
+    tmpl = env.get_template("agents/_partials/comprehension_block.md.j2")
+    config = {"interview": {"comprehension": {"depth": "minimal"}}, "locale": "en"}
+    for stage in _STAGES:
+        for block in ("brief", "round_state", "decision_depth", "teach_back"):
+            out = tmpl.render(config=config, block=block, stage=stage)
+            assert out == "", (
+                f"{stage}/{block}: the comprehension partial emits bytes at depth=minimal, "
+                f"so the opt-out is not free: {out!r}"
             )
 
 

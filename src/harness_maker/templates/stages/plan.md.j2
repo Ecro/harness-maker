@@ -580,6 +580,52 @@ Resolution:
 
 > **If the validator agent itself fails to launch** (0 tool uses, model/launch error): retry the `Task(...)` call once with `model: "opus"` explicitly set (subagent frontmatter may be stale across a model upgrade). When you surface such a failure to the user, name the **tier** (`opus`/`sonnet`) — never a pinned concrete id like `claude-4-7-opus[1m]`; a pinned id in the message is itself the bug class this guidance exists to avoid. If it still cannot launch, self-review the PLAN in the validator's place and say so plainly.
 
+### Step 4.5 — Terminal re-validation of the whole PLAN
+
+**Whichever revision path you took — `NEEDS_REVISION` or `MAJOR_REVISION` — the last revision is
+the one nothing has looked at.** Re-validate the **whole PLAN** in one pass after writing it, not
+only the sections you changed.
+
+Measured on this repository's own `stage-agents.jsonl`: 12 plan-validator episodes, **none ever
+reached a clean verdict**, and the recorded critiques show why — the blocking findings were
+verified against source and held, and one PLAN records outright that pass 2's three criticals
+were *created by the pass-1 fixes*. Revisions are where new criticals come from, so reading only
+the revised sections misses precisely the cross-section contradictions a revision introduces.
+
+`NEEDS_REVISION` is the easy path to skip here because it is "warnings only" — but a
+warning-driven revision edits the document just as much, and the defect does not care what
+prompted the edit.
+
+**This pass is TERMINAL. Its findings are recorded and never revised.** That is forced by the
+same measurement: the loop does not converge, so a re-validation that waits for a clean verdict
+would never release. It runs **within the existing two-pass cap** — do not add a third pass;
+every recorded three-pass episode also ended `MAJOR_REVISION`, so a further pass buys findings,
+not release.
+
+Write the surviving findings into `## 🔍 Plan Validation`, and when any of them still block, set
+the PLAN frontmatter to:
+
+```yaml
+validator_outcome: MAJOR_REVISION_TERMINAL
+```
+
+A distinct name from `MAJOR_REVISION` on purpose: that one means "revise", this one means "a
+second pass ran and these survived it". Collapsing them makes an unrevised PLAN and a
+twice-validated one indistinguishable to every later reader.
+
+**Its two readers do opposite things — keep them separate.**
+
+- **`/hm:execute` proceeds.** It treats the recorded findings as **known risks** carried into
+  implementation. It must not halt: the terminal outcome is the normal ending of a loop that does
+  not converge, and blocking on it would stop every task.
+
+- **Loop mode has no human to hand risks to**, so instead the stage emits its Gate 0 receipt with
+  `verdict: fail` and lets the loop driver own retry and escalation.
+
+Emit the ledger row for this pass exactly as below — the terminal outcome lives in the PLAN
+frontmatter, and `--verdict` keeps its existing three values. A new enum value would need every
+ledger reader updated, and the one that gets missed is the failure mode.
+
 {% if (config.instrumentation.stage_agent_ledger if config.instrumentation else true) %}
 **Record every validator pass (ADR-004).** One row per dispatch, including the second pass
 of a MAJOR_REVISION and including a dispatch that never ran. Use the same `<run-id>` for every
@@ -645,7 +691,7 @@ spec: "[[SPEC-{slug}]]"  # OR omit when no SPEC exists
 research_doc: "[[RESEARCH-{slug}]]"  # OR omit when /hm:research did not run
 interview_rounds: {N}
 adrs: {M}
-validator_outcome: APPROVED | NEEDS_REVISION_RESOLVED | MAJOR_REVISION_RESOLVED
+validator_outcome: APPROVED | NEEDS_REVISION_RESOLVED | MAJOR_REVISION_RESOLVED | MAJOR_REVISION_TERMINAL
 summary: "{≤100 char one-line TL;DR}"
 {% if config.dev_mode == 'spec-driven' %}spec_need_verdict: <add|change|delete|none|not-evaluated>  # from Step 1.7 verdict; record "none" on confident no-op
 spec_need_target: <slug>  # the task slug or SPEC slug for change/delete{% endif %}
