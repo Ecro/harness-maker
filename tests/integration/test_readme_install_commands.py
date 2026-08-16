@@ -41,6 +41,8 @@ import os
 import re
 import shutil
 import subprocess
+import time
+import uuid
 from pathlib import Path
 
 import pytest
@@ -233,9 +235,33 @@ def test_codex_marketplace_add_succeeds_as_documented(tmp_path: Path) -> None:
             "same way to exercise this test."
         )
     repo = _repo_root()
-    # Use an isolated CODEX_HOME so the test does not pollute the developer's
-    # ~/.codex/ state (marketplace registrations persist there).
-    codex_home = tmp_path / "codex-home"
+    # Isolated CODEX_HOME so the test does not pollute the developer's ~/.codex/ state
+    # (marketplace registrations persist there) — but NOT under `tmp_path`.
+    #
+    # codex-cli 0.147.0 refuses to create its helper binaries when CODEX_HOME sits under
+    # the system temp dir ("Refusing to create helper binaries under temporary dir /tmp"),
+    # and `plugin add` then fails with `failed to read plugin source directory`. pytest's
+    # `tmp_path` is exactly `/tmp/pytest-of-<user>/…`, so this test began failing on the
+    # 0.144.4 -> 0.147.0 upgrade for a reason that has nothing to do with the README claim
+    # it guards: the same two commands succeed against 0.147.0 from a non-temp CODEX_HOME
+    # (verified by hand, 2026-08-16).
+    #
+    # `~/.cache` is the same place this project already keeps its GitHub API cache, and a
+    # uuid4 leaf keeps parallel workers from sharing one codex home.
+    cache_root = Path.home() / ".cache" / "harness-maker" / "test-codex-home"
+    cache_root.mkdir(parents=True, exist_ok=True)
+    # Sweep at CREATE time rather than deleting at the end: a failing run's codex home is
+    # the evidence for diagnosing it, and a `finally` that removes it would delete exactly
+    # the state a reader needs. Bounded accumulation instead — anything older than a day is
+    # from a prior run and nobody is reading it.
+    cutoff = time.time() - 86_400
+    for stale in cache_root.iterdir():
+        try:
+            if stale.stat().st_mtime < cutoff:
+                shutil.rmtree(stale, ignore_errors=True)
+        except OSError:  # pragma: no cover — racing another worker's sweep
+            continue
+    codex_home = cache_root / uuid.uuid4().hex
     codex_home.mkdir()
     env = os.environ.copy()
     env["CODEX_HOME"] = str(codex_home)

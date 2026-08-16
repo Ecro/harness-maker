@@ -332,7 +332,13 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # one PLAN whose pass-2 criticals were created by the pass-1 fixes). Attributed in
     # work-docs/BASELINE-DELTA-plan-validator-transfer.md.
     "plan": 53564,
-    "research": 26673,
+    # 26673 -> 27248 (+575, 0.52.1). The autopilot picker renders into EVERY stage, so a
+    # four-word correction there costs a little on all of them. It is the fix that
+    # unblocks autopilot on Codex entirely: the block was headed "(Claude Code only)",
+    # so a Codex session read its own rendered skill and stood down — while the CLI it
+    # would have called armed fine the whole time. Arming writes a marker and works in
+    # any runtime; only end-of-stage auto-advance needs the `Skill` tool.
+    "research": 27248,
     # 34760 → 35828 (review round 4): the `CHANGES_REQUESTED` resolution bullet gained an
     # autopilot carve-out, and the APPROVED+human_review_needed bullet was split so the
     # interactive and autopilot paths stop saying the same thing. Both were live

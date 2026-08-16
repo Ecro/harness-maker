@@ -28,9 +28,9 @@
 {% if is_codex is defined and not is_codex and config.autonomy.level != "gated" %}
 
 <!-- @hm:autopilot-picker -->
-> **Autopilot session start (Claude Code only).** This harness is configured for
-> autonomy (`autonomy.level: {{ config.autonomy.level }}`). If loop-mode is active for
-> this session (see above), SKIP this. Otherwise, at the first eligible stage, ask the CLI
+> **Autopilot session start.** This harness is configured for autonomy (`autonomy.level: {{ config.autonomy.level }}`).
+> **Arming works in any runtime**; only end-of-stage auto-advance needs Claude Code's `Skill`
+> tool. If loop-mode is active for this session (see above), SKIP this. Otherwise, at the first eligible stage, ask the CLI
 > whether autopilot is already active — **never decide this from whether the marker file
 > exists.** Nothing collects a stale one, so file-existence reads as "already armed" and
 > autopilot silently never turns on — the usual reason it looks dead.
@@ -44,8 +44,8 @@
 >   guess and never `--force` on your own initiative. State it — `idle_minutes` is the owner's
 >   silence, `null` = unknown — then ask: *is another Claude session open in this project?*
 >   Only on **no**, re-run the arm command with `--force`. On yes, stay gated.
-> - `reason: "degraded-idless"` → you have no id, a peer's does (WSL2 hook failure).
->   Arming is safe; say so, then take the default branch.
+> - `reason: "degraded-idless"` → no id of your own: **NORMAL state, not a failure** in Cursor/Codex (`$CLAUDE_ENV_FILE` is Claude-Code-only), a hook failure in Claude Code.
+>   Arm either way — unset expands to `""` and arms the shared degraded marker.
 {%- if config.autonomy.level == "ask" %}
 > - `reason: "ask-pending"` → the normal path here (`level: ask`). Offer three options via
 >   `AskUserQuestion` for the `{{ config.autonomy.pipeline | join(' → ') }}` pipeline:

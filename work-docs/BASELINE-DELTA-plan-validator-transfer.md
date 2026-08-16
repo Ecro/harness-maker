@@ -7,8 +7,8 @@ this is the attribution document ADR-010 requires).
 
 | Key | Was | Now | Δ |
 |---|---|---|---|
-| `aggregate_chars.claude` | 411 452 | **415 621** | +4 169 |
-| `aggregate_chars.codex` | 339 400 | **343 593** | +4 193 |
+| `aggregate_chars.claude` | 411 452 | **416 951** | +5 499 |
+| `aggregate_chars.codex` | 339 400 | **344 923** | +5 523 |
 | `plan` (claude) `chars` | 56 451 | **58 885** | +2 434 |
 | `plan` (claude) `round_trips` | 14 | **18** | +4 |
 | `hm-plan` (codex) `chars` | 49 790 | **52 252** | +2 462 |
@@ -83,3 +83,40 @@ The ratchet's subject is the prompt surface, and the failure mode is
 `ratchet-rebaselined-by-its-own-subject`: the task that grows the surface is also the task
 holding the pen, so "regenerate the baseline" is always the cheapest way to go green and it
 erases the evidence in the same stroke. This row is the price of the regeneration.
+
+
+## 0.52.1 — the autopilot picker, corrected for every runtime
+
+**+190 chars on each of the seven stages, in both variants** — 1 330 aggregate. Uniform
+because the picker is one partial rendered into every stage:
+
+| claude | codex |
+|---|---|
+| `execute` `plan` `research` | `hm-execute` `hm-plan` `hm-research` |
+| `review` `spec` `verify` `wrapup` | `hm-review` `hm-spec` `hm-verify` `hm-wrapup` |
+
+Four words caused it. The block was headed **"Autopilot session start (Claude Code only)"**, so
+a Codex session read its own rendered skill, concluded autopilot did not apply to it, and stood
+down — while `hm autopilot on --session-id ""` armed the shared degraded marker perfectly well
+the whole time (verified by hand). Nothing was missing; the label was wrong.
+
+It was wrong because it collapsed two different capabilities:
+
+- **Arming** writes a marker file. Runtime-independent.
+- **Auto-advance** invokes the next stage through the `Skill` tool, which Cursor and Codex do
+  not have. That one really is Claude-Code-only, and its own block still says so.
+
+The `degraded-idless` branch had the same shape: it attributed the id-less state solely to a
+WSL2 SessionStart failure, so a Codex reader hitting the **normal** case was told it was broken
+— and broken is a reason to stop rather than arm. It now names Cursor/Codex as the normal case
+(`$CLAUDE_ENV_FILE` is Claude-Code-only) and says to arm either way.
+
+**Direction: larger**, and this one is not a trade — it is a correction. The first draft cost
+3 808 chars; compressing it to the facts that change a reader's decision brought it to 1 372.
+
+Guarded by `tests/unit/test_render_autopilot_picker_runtimes.py`, which asserts the label is
+gone, that BOTH halves of the distinction are stated (dropping the label alone would trade one
+wrong reading for the opposite one), and that auto-advance stays Claude-Code-only.
+
+Per ADR-010 and `ratchet-rebaselined-by-its-own-subject`, this row is the price of the
+regeneration.

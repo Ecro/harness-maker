@@ -1,0 +1,73 @@
+---
+generated_by: harness-maker
+harness_maker_version: 0.52.1
+generated_at: '2026-01-01T00:00:00+00:00'
+source_template: rubrics/repair_guard_force.yaml.j2
+provenance: official
+content_hash: d998d6b94a24137d715f768abba8f75887fa95eee6c035ed59954a9a1af0a44a
+---
+dimension: repair_guard_force
+target: .claude/commands/hm/execute.md (the Phase D.5 newly-reachable-window step)
+rubrics:
+  - id: demands_a_written_artifact
+    description: >
+      Does the step require the author to WRITE something down (into the PLAN or an
+      equivalent durable place), as opposed to merely reflect or "consider"? A guard whose
+      output is a thought leaves nothing for a reviewer to check, and nothing that survives
+      the session. Judge the step's actual wording, not its heading.
+    severity: P0
+    action: >
+      Make the step name a destination for the answers and require them to be recorded
+      there, e.g. "Write these into the PLAN phase's notes".
+
+  - id: rejects_the_empty_answer
+    description: >
+      Does the step define what does NOT count as a valid answer? The failure mode this
+      guard exists to stop is a repair whose author writes "fixed the bug" and moves on.
+      A step that accepts any sentence has no force regardless of how it is phrased.
+    severity: P0
+    action: >
+      State at least one concrete non-answer and why it fails, so the author can tell a
+      real answer from a restatement of the symptom.
+
+  - id: carries_a_blocking_consequence
+    description: >
+      Does the step say what happens when the author CANNOT answer — and is that
+      consequence a stop rather than a suggestion? "Consider pausing" and "STOP; do not
+      advance the phase" read similarly and behave completely differently. This is the
+      criterion a literal grep cannot evaluate, which is why this rubric exists.
+    severity: P0
+    action: >
+      Give the unanswerable case an explicit terminal instruction (stop, or file a blocker
+      naming the gap), not an encouragement.
+
+  - id: distinguishes_the_new_risk_from_the_old_symptom
+    description: >
+      Does the step make clear that re-asserting the ORIGINAL bug is insufficient — that
+      the fixture must enter the input window the repair newly opened? Every recorded
+      recurrence of this defect class had a test for the reported bug and none for the
+      window the fix created.
+    severity: P1
+    action: >
+      Say explicitly that a test which only proves the reported bug is gone does not
+      satisfy the step.
+
+  - id: is_scoped_so_it_does_not_fire_on_everything
+    description: >
+      Does the step say when it applies and when it does not? A guard that fires on every
+      phase, including pure new-feature work, gets routed around — and a routed-around
+      guard has less force than one that is never written.
+    severity: P1
+    action: >
+      Name the trigger (a repair) and the skip case (non-repair work), and say what to do
+      when it is unclear.
+
+  - id: covers_the_absent_input_case
+    description: >
+      When a repair activates on an optional or newly-added input, does the step require
+      the ABSENT case to be addressed — default, migration, or explicit skip? This is the
+      most-recurring failure family in this repo's memory, and it intersects this guard
+      directly.
+    severity: P1
+    action: >
+      Require the absent-case behaviour to be stated and covered, not just the present case.

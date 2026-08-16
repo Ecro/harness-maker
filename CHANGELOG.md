@@ -2,6 +2,44 @@
 
 ## [Unreleased]
 
+## [0.52.1] - 2026-08-16
+
+### Fixed
+
+- **Autopilot no longer reads as unavailable in Codex.** The picker block was headed
+  *"Autopilot session start (Claude Code only)"*, so a Codex session read its own rendered
+  skill, concluded autopilot did not apply, and stood down — while `hm autopilot on
+  --session-id ""` armed the shared degraded marker perfectly well the whole time. **Nothing
+  was missing; the label was wrong**, because it collapsed two different capabilities:
+  *arming* writes a marker file and is runtime-independent, while *auto-advance* invokes the
+  next stage through the `Skill` tool and genuinely is Claude-Code-only (its own block still
+  says so). The `degraded-idless` branch had the same defect — it blamed a WSL2 SessionStart
+  failure, so a Codex reader hitting the **normal** case was told it was broken, and broken is
+  a reason to stop rather than arm. It now names Cursor/Codex as the normal case
+  (`$CLAUDE_ENV_FILE` is Claude-Code-only) and says to arm either way, accepting
+  `session_scoped: false`. Guarded by a render test that asserts BOTH halves of the
+  distinction survive — dropping the label alone would trade one wrong reading for its
+  opposite, leaving a Codex session waiting for stages to chain themselves.
+
+- **The install-command advisory test no longer fails on a codex-CLI upgrade.** codex-cli
+  0.147.0 refuses to create its helper binaries when `CODEX_HOME` sits under the system temp
+  dir, and `plugin add` then fails with `failed to read plugin source directory`. pytest's
+  `tmp_path` is exactly `/tmp/pytest-of-<user>/…`, so the test broke on the 0.144.4 → 0.147.0
+  upgrade for a reason unrelated to the README claim it guards. **The claim was re-verified by
+  hand against 0.147.0 and still holds** — `codex plugin marketplace add` + `codex plugin add`
+  install the plugin — so the README is unchanged and the test's codex home moved to
+  `~/.cache/harness-maker/test-codex-home/<uuid>`, swept by age at create time rather than
+  deleted in a `finally` (a failing run's codex home is the evidence for diagnosing it).
+
+### Changed
+
+- **`hm test_runners plan` now tells you to mirror the project's CI test selection.** A project
+  that runs some tests in a separate continue-on-error step marks them (`-m advisory`,
+  `-m external`, …); the recipe previously said to run the suite, so following it reported
+  third-party drift as a failure in your own change. Found by doing exactly that: the 0.52.0
+  work ran plain `pytest -q` all day, and a codex-CLI upgrade between two runs turned an
+  advisory test red in a run that was verifying something else entirely.
+
 ## [0.52.0] - 2026-08-16
 
 ### Added

@@ -1,0 +1,161 @@
+---
+generated_by: harness-maker
+harness_maker_version: 0.52.1
+generated_at: '2026-01-01T00:00:00+00:00'
+source_template: harness-yaml/Side.yaml.j2
+provenance: official
+content_hash: 170974efe8882cdc750c87a723d80e752fc1c051e3b6da0f9d8496c01a13aae5
+---
+preset: Side
+locale: en
+targets: [claude-code, codex]
+default_model: opus
+dev_mode: task-driven
+caching: agent-aware
+schema_version: 4
+interview:
+  deep_gate:
+    # 0.16.0: 5-term inequality gate (PLAN-deep-interview-question-criteria).
+    eig_epsilon: 0.5
+    confidence_tau: 0.7
+    open_ended_cap_by_locale:
+      en: 2
+      ko: 1
+      ja: 1
+      default: 1
+    common_ground:
+      llm_inference_threshold: 0.95
+      llm_inference_enabled: true
+  main_loop:
+    max_rounds: 5
+  comprehension:
+    # PLAN-plan-interview-comprehension: minimal | standard | deep.
+    # `.get()` not bare attribute access — a hand-built `interview` dict (several tests
+    # construct one) has no `comprehension` key and bare access raises UndefinedError.
+    depth: standard
+project:
+  domains: []
+spec:
+  dir: specs/
+work_docs:
+  dir: work-docs/
+ref_folders:
+
+second_brain:
+  enabled: false
+  backend: "filesystem"
+  project_id: ""
+  vault_path: ""
+  required_frontmatter: ["type", "created", "updated", "tags", "links"]
+
+  folders: []
+
+sibling_repos:
+
+wrapup_docs:
+
+reviewers:
+  # Routing narrows the OPTIONAL reviewers (ux-reviewer, performance-reviewer) and, on
+  # Side, the three domain lenses (security, concurrency, tests), which are mandatory on Production.
+  # The mandatory lenses — design, functionality, robustness, consistency —
+  # are exercised every round regardless of `routing`; incomplete coverage blocks
+  # approval, so a routed-away mandatory lens would make every review unapprovable.
+  consensus: single
+  verbosity: standard
+  auto_fix: true
+  grade_threshold: A
+  max_review_rounds: 2
+  # Repair-round re-review gate: below this fraction of a touched file's LOC the
+  # round skips its re-review and records the measured ratio as the reason.
+  # Set the gate false to restore the pre-gate behaviour in one line.
+  rereview_churn_gate: true
+  rereview_churn_ratio: 0.2
+
+  installed:
+    - code-reviewer
+    - security-reviewer
+    - security-auditor
+    - performance-reviewer
+    - ux-reviewer
+    - concurrency-reviewer
+    - consensus-arbiter
+    - executor
+    - autoloop-coder
+  enabled:
+    - code-reviewer
+
+skills:
+  installed:
+    - verify-before-completion
+    - autoloop-driver
+    - ai-readiness-rubric
+    - agent-quality-rubric
+    - conditional-router
+    - worktree-isolator
+    - security-scanner
+    - context-linter
+    - refdocs-search
+    - second-opinion-gate
+    - targeted-test-selection
+  enabled:
+    - verify-before-completion
+    - autoloop-driver
+    - ai-readiness-rubric
+    - agent-quality-rubric
+    - refdocs-search
+    - second-opinion-gate
+    - targeted-test-selection
+
+worktree:
+  enabled: false
+memory:
+  enabled: true
+  dir: .claude/memory
+  files: [failures.md, wiki.md]
+security:
+  on_finding:
+    high: warn
+    medium: log
+  gates:
+    spec_gate: warn
+feedback:
+  enabled: false
+second_opinion:
+  models: []
+  agents: ["code-reviewer", "consensus-arbiter", "plan-validator"]
+  failure_policy: "warn-and-proceed"
+  codex:
+    hermetic: true
+    output_schema_path: ".claude/schemas/second-opinion-finding.schema.json"
+  antigravity:
+    model: "Gemini 3.6 Flash (High)"
+delivery_metrics:
+  tag_pattern: "v*"
+  default_branch: null
+  cfr_window_days: 28
+  churn_maturation_days: 14
+  churn_cohort_days: 14
+  blame_file_cap: 500
+  paths: []
+economics:
+  window_days: 30
+  price_model: "opus"
+  adjacency_estimate: true
+  adjacency_max_gap_min: 10.0
+  adjacency_max_turns: 20
+  idle_gap_cap_min: 5.0
+  span_max_turns: 400
+  span_max_min: 240.0
+delegation:
+  stages: []
+autonomy:
+  level: "ask"
+  pipeline: ["research", "spec", "plan", "execute", "review", "verify", "wrapup"]
+  step_cap: 20
+  time_cap_min: 300
+  extra_deny: []
+  autopilot_persistent: true
+instrumentation:
+  # harness-maker's own development telemetry. false = this project stops emitting
+  # stage_agent_ledger rows AND leaves the cross-project denominator.
+  stage_agent_ledger: false

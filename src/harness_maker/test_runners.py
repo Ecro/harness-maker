@@ -135,6 +135,11 @@ RUNNERS: dict[str, Runner] = {
             "`--dist load` spreads them and those tests then race each other.",
             "Do NOT put `-n` in `addopts`. A suite that is only ever run in parallel hides "
             "order- and isolation-dependent failures from the serial run CI may still do.",
+            "Exclude what CI excludes. A project that runs some tests in a separate "
+            "continue-on-error step marks them (`-m advisory`, `-m external`, …); running "
+            "the unfiltered suite locally then reports THIRD-PARTY drift as a failure in "
+            "your own change. Read the project's CI selection and mirror it — for this "
+            'harness that is `-m "not advisory"`.',
         ),
     ),
     "cargo-nextest": Runner(
