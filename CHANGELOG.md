@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.52.0] - 2026-08-16
+
 ### Added
 
 - **`hm test_runners plan` — how to run a project's tests fast, without assuming Python.**
@@ -41,34 +43,6 @@
   limit reports the same ending for both and hides the one that means the revision step is not
   working on this document.
 
-### Fixed
-
-- **Model-authored JSON no longer reaches a shell (command injection).** `hm two_pass_review
-  redact|merge` and `hm review_telemetry emit` take `--file <path>`; the rendered stage writes
-  the JSON and passes the path. They were invoked as `echo '<json>' | …`, where one apostrophe
-  in a diff line ends the quoting and the rest of that line runs — and both inputs are
-  attacker-reachable: `redact`'s is the diff itself, `merge`'s is reviewer prose about it.
-  The churn measurement shipped earlier this release had just made it concrete by putting a
-  **filename out of the diff** (`churn_max_path`) into the telemetry record.
-- **A task slug can no longer traverse out of the freeze store.** `freeze.validate_slug` guards
-  the ref builders and the stamp path. git rejects `..` in a refname on its own, so the refs
-  looked safe in isolation — but `review_base_stamp` is a plain filesystem join and would have
-  written outside `.claude/observability/.hm-freeze/`. A leading `-` is the other half: it
-  turns the ref into an option for the git plumbing command that receives it.
-- **The one-time second-opinion ledger migration is claimed, not merely checked.**
-  `_migrate_legacy_ledger` took an `O_EXCL` claim before copying. Two sessions over one repo is
-  the normal case for this harness, both could pass the `exists()` check before either wrote,
-  and the file is append-only — a doubled migration permanently doubles every rate computed
-  from it. Reproduced with two real processes: 6 rows instead of 3.
-- **A previous `/hm:review` can no longer vouch for a lens that died in this one.** The lens
-  results directory is keyed by `<run-id>` as well as `<round>`. The run id was already checked
-  inside each file, but the writer of that content is a model; the path segment holds whatever
-  the model wrote.
-
-## [0.52.0] - 2026-08-16
-
-### Added
-
 - **Per-round fix churn is measured (PLAN-review-loop-empirics Phase 5, record only).**
   `hm review_churn measure --pre <ref> --post <ref>` reports, for one repair round, the
   fraction of the most-churned file that round rewrote. Three properties decide whether the
@@ -107,7 +81,156 @@
   **It never moves the grade** — a review whose only real problem is that nobody wrote down
   which behaviour was wanted must still be able to reach A.
 
+
+- **Every finding carries a disposition, from a producer that sees them all (ADR-002).** The
+  round-record writer assigns `accepted` / `rejected` / `duplicate` / `unresolved` on every path,
+  including a round with no fix step and an `auto_fix`-disabled run — the fix-selection step,
+  where the first draft put it, sees only fix-eligible findings. A rejection requires an
+  authority: a SPEC AC id, else a docstring citation, else it is recorded `unresolved` with
+  `no-contract`. **Only an AC-cited rejection clears the grade**; a docstring-cited one still
+  counts and sets `human_review_needed`, because CLAUDE.md makes docstrings optional and the
+  fixer writes them. On a SPEC-less harness no rejection can clear the grade — the acknowledged
+  cost of the solo-lens vote, not a bug to route around. `codex_ledger` gains `load_ledger` /
+  `disposition_rows` / `rejection_rate`, which filter on `finding_ref` because both row kinds
+  carry `status: "invoked"` and aggregating without that filter has corrupted a rate here before.
+- **Per-finding `lens` provenance.** Six lenses dispatch to `code-reviewer`, so `reviewer`/`source`
+  collapses them to one voter name and the solo-lens rule is undecidable from the data Step 4
+  sees. `lens` is metadata only and is **not** an input to `codex_adapter.finding_id`, so the
+  round-to-round merge key and every ledger `finding_ref` are unchanged.
+
+- **Re-review churn gate (config surface only — Phase 1 of PLAN-review-loop-empirics).** Two new
+  optional `harness.yaml` keys, `reviewers.rereview_churn_gate` (bool, default `true`) and
+  `reviewers.rereview_churn_ratio` (float, default `0.20`). An absent key resolves to the
+  documented default; a malformed one is a hard error where the value is *used*
+  (`review_churn.ChurnConfigError`) and a loud `logger.warning` on the re-render path, which is a
+  migration path and must stay re-renderable. Nothing consumes the gate yet — the repair-round
+  branch it feeds lands in a later phase — so this release changes no review behaviour.
+- **Two prompt clauses in the rendered `/hm:review`.** Every lens brief now states that the public
+  contract is fixed and out of scope, so a reviewer stops proposing API changes we did not ask
+  about. The auto-fix loop is told it may run tests but must not edit one to resolve a finding
+  whose target is not that test — **with the carve-out that a finding whose own target IS the test
+  may be fixed**, because `tests` is a mandatory lens and an unqualified ban would leave its
+  findings permanently `pending`, which is one non-progressing round and an unapprovable review.
+
+### Changed
+
+- **`hm review_consensus` is one stateless verb.** `tag` / `record` / `grade` chained by rewriting
+  the findings file so each could see the previous one's column; `finalize` reads once, applies
+  the same three rules, and prints one payload. The chaining was the defect generator, not an
+  incidental cost — two review rounds found, in it: `tag --file <any JSON object>` silently
+  destroying that file, the envelope dropped on write-back, no containment check on a
+  model-substituted path (unlike every sibling writer here), `record` going green on a blind
+  retry, and an order dependence the template could only express as prose naming one path three
+  times. None of those are reachable from a function that reads and returns. The rules are
+  unchanged: same tag table, same disposition column, same grade, same AC verification — what is
+  removed is the statefulness, not a check. The rendered stage makes one call instead of three
+  (round trips 35 → 33), and a render guard fails if any of the retired verbs reappears.
+
+- **The lens axis is seven, not nine.** The source experiment's six categories are merged to
+  four — `complexity` into `design`, `naming` into `consistency` — on redundancy measured by the
+  nine-lens run over this change's own diff: `consistency` 80 % of its findings also raised by
+  another lens, `design` 50 %, `complexity` 40 %, against **0 %** for `security`, `concurrency`
+  and `tests`, which are untouched. Both of `complexity`'s overlaps were with `design` and its
+  exclusive findings were all shape questions; `consistency` and `naming` both work by reading
+  two places and comparing. Production round 1 and the confirmation pass go 9 → 7 dispatches.
+  Caveat recorded in ADR-001's amendment: one diff, one run per lens.
+  The mandatory set is **seven on Production and four on Side**; all seven are dispatched on both,
+  because a conditional router can only drop what was dispatched.
+
+- **The review discovery axis is replaced (BREAKING for review behaviour — Phases 2–4 of
+  PLAN-review-loop-empirics).** The five incidental lenses give way to the six categories the
+  source experiment measured — `design`, `functionality`, `complexity`, `robustness`, `naming`,
+  `consistency` — with `security`, `concurrency` and `tests` riding alongside: mandatory on
+  Production, routable by the conditional router on Side. **`correctness` and `failure` are
+  retired, not carried alongside**; the mandatory set is nine on Production and six on Side, never
+  eleven. Round 1 and the confirmation pass render from one call (`conditional_router.lens_dispatch`,
+  exported into Jinja as a global), so the two lists cannot drift — and `hm lens_coverage check`
+  now takes `--preset`, because a coverage CLI demanding nine of a six-lens Side review makes
+  every Side review permanently unapprovable.
+- **A single reviewer lens now carries a full vote (ADR-007).** The fan-out gain consists by
+  definition of findings exactly one category raised; under the old cross-lens K=2 those became
+  `manual-only` — ungraded and unfixable — so adopting the axis without this would have paid the
+  whole cost and discarded the whole yield. K=2 is retained where corroboration is meaningful:
+  repeated instances of one lens, and cross-model voters, who read the same diff on the same axis
+  and carry no `suggestion` to repair with. **This removes the system's only false-positive
+  filter**, which is why it ships in the same release as the disposition gate below and not before.
+- **Consensus tagging and grade computation moved out of prose.** New
+  `src/harness_maker/review_consensus.py` (`tag_finding` / `compute_grade` / `grade_from_findings`
+  / `validate_disposition` / `grade_effect` / `build_round_record` / `rereview_plan`) behind
+  `hm review_consensus {tag,grade,plan,record}`; `review.md.j2` Step 4 calls it and its "Step 4
+  runs as prose" statement is retired. A render-grep proves an instruction is present, never that
+  the tag it produces is correct — and after ADR-007 the tag is the whole control.
+
+
+- **The shipped-surface ratchet gained a per-PLAN, expiring allowance** (`surface_allowance` in
+  PLAN frontmatter, read by `harness_maker.surface_allowance`). Both aggregate guards and the
+  per-command ceiling now admit `frozen + Σ(active allowances)`; an allowance counts only while its
+  PLAN is `status: planning` and is rejected unless its `delta_doc` exists. The floor is not
+  relaxed. **`surface_baseline.json` is unchanged** — a same-day re-freeze (`claude` 398 138 →
+  398 870) was reverted and the +732 chars re-expressed as an allowance, so the baseline stays an
+  immovable origin and cross-PLAN comparison survives. This is the replacement
+  `[fail:design] ratchet-rebaselined-by-its-own-subject` asked for in its own prevention clause
+  after a third occurrence. Rationale in `work-docs/BASELINE-DELTA-review-loop-empirics.md`.
+
+- **`/hm:review` exits on risk closure, not issue exhaustion.** The stage used to stop when a
+  round produced no more findings — over a *moving* artifact, since the auto-fix loop re-reviews
+  only touched scopes, so the last round's fixes always exited unreviewed. It now declares a
+  five-lens failure space (`correctness`, `failure`, `concurrency`, `security`, `tests`),
+  dispatches all five every round, and computes coverage with a called CLI
+  (`hm lens_coverage check`) from result files the main loop — never the lens agent — writes.
+  Approval requires `grade ≥ grade_threshold` **and** `blocks_approval == false`, so no threshold
+  setting can bypass incomplete coverage. On the approval path a confirmation pass reviews a
+  **frozen** commit (`hm freeze`, a temporary index seeded from `HEAD`) diffed from a
+  `review_base` stored at round 1, bounded at one repair round and two passes.
+
+  Two limits are stated rather than papered over: the coverage CLI verifies **liveness** — that a
+  result file exists, parses and self-identifies — and cannot observe that any reviewing
+  occurred; and coverage is cumulative across a review's rounds, so `check` takes `--round` once
+  per round and computes the union itself.
+
+- **`/hm:execute` gained `Phase A.4`, a false-RED screen** that runs the tests *before* the
+  three-lens reviewer dispatch. Eleven findings across two tasks were the single sentence "this
+  test passes before the implementation exists" — decidable by one pytest run, each previously
+  costing a reviewer round. It does not demand that every test fail: a negative invariant is
+  vacuously true until the construct it forbids exists, so a passing test is either fixed or
+  justified in the test file against a named RED sibling.
+
+- **`/hm:plan` re-validates the whole document once, terminally** (`validator_outcome:
+  MAJOR_REVISION_TERMINAL`), on both revision paths. Measured over 12 recorded validator
+  episodes: none ever reached a clean verdict, their blocking findings were verified against
+  source, and one PLAN records that pass 2's criticals were *created by* the pass-1 fixes. So the
+  last revision is the one nothing looks at, and a re-validation that waited for clean would
+  never release.
+
+- **`hm verifier_discrimination`** reads the ledgers this harness already writes and reports what
+  can honestly be computed about the judges: per-model invocation loss, the share of disputes the
+  verifier could not decide, and per-gate release rates. It deliberately does **not** emit a
+  false-acceptance rate — that needs labelled ground truth, and an approximation would be
+  indistinguishable from the real thing at the call site.
+
 ### Fixed
+
+- **Model-authored JSON no longer reaches a shell (command injection).** `hm two_pass_review
+  redact|merge` and `hm review_telemetry emit` take `--file <path>`; the rendered stage writes
+  the JSON and passes the path. They were invoked as `echo '<json>' | …`, where one apostrophe
+  in a diff line ends the quoting and the rest of that line runs — and both inputs are
+  attacker-reachable: `redact`'s is the diff itself, `merge`'s is reviewer prose about it.
+  The churn measurement shipped earlier this release had just made it concrete by putting a
+  **filename out of the diff** (`churn_max_path`) into the telemetry record.
+- **A task slug can no longer traverse out of the freeze store.** `freeze.validate_slug` guards
+  the ref builders and the stamp path. git rejects `..` in a refname on its own, so the refs
+  looked safe in isolation — but `review_base_stamp` is a plain filesystem join and would have
+  written outside `.claude/observability/.hm-freeze/`. A leading `-` is the other half: it
+  turns the ref into an option for the git plumbing command that receives it.
+- **The one-time second-opinion ledger migration is claimed, not merely checked.**
+  `_migrate_legacy_ledger` took an `O_EXCL` claim before copying. Two sessions over one repo is
+  the normal case for this harness, both could pass the `exists()` check before either wrote,
+  and the file is append-only — a doubled migration permanently doubles every rate computed
+  from it. Reproduced with two real processes: 6 rows instead of 3.
+- **A previous `/hm:review` can no longer vouch for a lens that died in this one.** The lens
+  results directory is keyed by `<run-id>` as well as `<round>`. The run id was already checked
+  inside each file, but the writer of that content is a model; the path segment holds whatever
+  the model wrote.
 
 - **Review round 2 (the repair's own review) — three P0s the round-1 repair introduced.**
   `tag --file X` **destroyed X**: `_load` turned any JSON object without a `findings` key into an
@@ -187,136 +310,6 @@
   completeness invariant by not existing); `MANDATORY_LENSES` is renamed `KNOWN_LENSES` (it is a
   vocabulary, not any preset's requirement) with a documented deprecated alias.
 
-### Changed
-
-- **`hm review_consensus` is one stateless verb.** `tag` / `record` / `grade` chained by rewriting
-  the findings file so each could see the previous one's column; `finalize` reads once, applies
-  the same three rules, and prints one payload. The chaining was the defect generator, not an
-  incidental cost — two review rounds found, in it: `tag --file <any JSON object>` silently
-  destroying that file, the envelope dropped on write-back, no containment check on a
-  model-substituted path (unlike every sibling writer here), `record` going green on a blind
-  retry, and an order dependence the template could only express as prose naming one path three
-  times. None of those are reachable from a function that reads and returns. The rules are
-  unchanged: same tag table, same disposition column, same grade, same AC verification — what is
-  removed is the statefulness, not a check. The rendered stage makes one call instead of three
-  (round trips 35 → 33), and a render guard fails if any of the retired verbs reappears.
-
-- **The lens axis is seven, not nine.** The source experiment's six categories are merged to
-  four — `complexity` into `design`, `naming` into `consistency` — on redundancy measured by the
-  nine-lens run over this change's own diff: `consistency` 80 % of its findings also raised by
-  another lens, `design` 50 %, `complexity` 40 %, against **0 %** for `security`, `concurrency`
-  and `tests`, which are untouched. Both of `complexity`'s overlaps were with `design` and its
-  exclusive findings were all shape questions; `consistency` and `naming` both work by reading
-  two places and comparing. Production round 1 and the confirmation pass go 9 → 7 dispatches.
-  Caveat recorded in ADR-001's amendment: one diff, one run per lens.
-  The mandatory set is **seven on Production and four on Side**; all seven are dispatched on both,
-  because a conditional router can only drop what was dispatched.
-
-- **The review discovery axis is replaced (BREAKING for review behaviour — Phases 2–4 of
-  PLAN-review-loop-empirics).** The five incidental lenses give way to the six categories the
-  source experiment measured — `design`, `functionality`, `complexity`, `robustness`, `naming`,
-  `consistency` — with `security`, `concurrency` and `tests` riding alongside: mandatory on
-  Production, routable by the conditional router on Side. **`correctness` and `failure` are
-  retired, not carried alongside**; the mandatory set is nine on Production and six on Side, never
-  eleven. Round 1 and the confirmation pass render from one call (`conditional_router.lens_dispatch`,
-  exported into Jinja as a global), so the two lists cannot drift — and `hm lens_coverage check`
-  now takes `--preset`, because a coverage CLI demanding nine of a six-lens Side review makes
-  every Side review permanently unapprovable.
-- **A single reviewer lens now carries a full vote (ADR-007).** The fan-out gain consists by
-  definition of findings exactly one category raised; under the old cross-lens K=2 those became
-  `manual-only` — ungraded and unfixable — so adopting the axis without this would have paid the
-  whole cost and discarded the whole yield. K=2 is retained where corroboration is meaningful:
-  repeated instances of one lens, and cross-model voters, who read the same diff on the same axis
-  and carry no `suggestion` to repair with. **This removes the system's only false-positive
-  filter**, which is why it ships in the same release as the disposition gate below and not before.
-- **Consensus tagging and grade computation moved out of prose.** New
-  `src/harness_maker/review_consensus.py` (`tag_finding` / `compute_grade` / `grade_from_findings`
-  / `validate_disposition` / `grade_effect` / `build_round_record` / `rereview_plan`) behind
-  `hm review_consensus {tag,grade,plan,record}`; `review.md.j2` Step 4 calls it and its "Step 4
-  runs as prose" statement is retired. A render-grep proves an instruction is present, never that
-  the tag it produces is correct — and after ADR-007 the tag is the whole control.
-
-### Added
-
-- **Every finding carries a disposition, from a producer that sees them all (ADR-002).** The
-  round-record writer assigns `accepted` / `rejected` / `duplicate` / `unresolved` on every path,
-  including a round with no fix step and an `auto_fix`-disabled run — the fix-selection step,
-  where the first draft put it, sees only fix-eligible findings. A rejection requires an
-  authority: a SPEC AC id, else a docstring citation, else it is recorded `unresolved` with
-  `no-contract`. **Only an AC-cited rejection clears the grade**; a docstring-cited one still
-  counts and sets `human_review_needed`, because CLAUDE.md makes docstrings optional and the
-  fixer writes them. On a SPEC-less harness no rejection can clear the grade — the acknowledged
-  cost of the solo-lens vote, not a bug to route around. `codex_ledger` gains `load_ledger` /
-  `disposition_rows` / `rejection_rate`, which filter on `finding_ref` because both row kinds
-  carry `status: "invoked"` and aggregating without that filter has corrupted a rate here before.
-- **Per-finding `lens` provenance.** Six lenses dispatch to `code-reviewer`, so `reviewer`/`source`
-  collapses them to one voter name and the solo-lens rule is undecidable from the data Step 4
-  sees. `lens` is metadata only and is **not** an input to `codex_adapter.finding_id`, so the
-  round-to-round merge key and every ledger `finding_ref` are unchanged.
-
-- **Re-review churn gate (config surface only — Phase 1 of PLAN-review-loop-empirics).** Two new
-  optional `harness.yaml` keys, `reviewers.rereview_churn_gate` (bool, default `true`) and
-  `reviewers.rereview_churn_ratio` (float, default `0.20`). An absent key resolves to the
-  documented default; a malformed one is a hard error where the value is *used*
-  (`review_churn.ChurnConfigError`) and a loud `logger.warning` on the re-render path, which is a
-  migration path and must stay re-renderable. Nothing consumes the gate yet — the repair-round
-  branch it feeds lands in a later phase — so this release changes no review behaviour.
-- **Two prompt clauses in the rendered `/hm:review`.** Every lens brief now states that the public
-  contract is fixed and out of scope, so a reviewer stops proposing API changes we did not ask
-  about. The auto-fix loop is told it may run tests but must not edit one to resolve a finding
-  whose target is not that test — **with the carve-out that a finding whose own target IS the test
-  may be fixed**, because `tests` is a mandatory lens and an unqualified ban would leave its
-  findings permanently `pending`, which is one non-progressing round and an unapprovable review.
-
-### Changed
-
-- **The shipped-surface ratchet gained a per-PLAN, expiring allowance** (`surface_allowance` in
-  PLAN frontmatter, read by `harness_maker.surface_allowance`). Both aggregate guards and the
-  per-command ceiling now admit `frozen + Σ(active allowances)`; an allowance counts only while its
-  PLAN is `status: planning` and is rejected unless its `delta_doc` exists. The floor is not
-  relaxed. **`surface_baseline.json` is unchanged** — a same-day re-freeze (`claude` 398 138 →
-  398 870) was reverted and the +732 chars re-expressed as an allowance, so the baseline stays an
-  immovable origin and cross-PLAN comparison survives. This is the replacement
-  `[fail:design] ratchet-rebaselined-by-its-own-subject` asked for in its own prevention clause
-  after a third occurrence. Rationale in `work-docs/BASELINE-DELTA-review-loop-empirics.md`.
-
-- **`/hm:review` exits on risk closure, not issue exhaustion.** The stage used to stop when a
-  round produced no more findings — over a *moving* artifact, since the auto-fix loop re-reviews
-  only touched scopes, so the last round's fixes always exited unreviewed. It now declares a
-  five-lens failure space (`correctness`, `failure`, `concurrency`, `security`, `tests`),
-  dispatches all five every round, and computes coverage with a called CLI
-  (`hm lens_coverage check`) from result files the main loop — never the lens agent — writes.
-  Approval requires `grade ≥ grade_threshold` **and** `blocks_approval == false`, so no threshold
-  setting can bypass incomplete coverage. On the approval path a confirmation pass reviews a
-  **frozen** commit (`hm freeze`, a temporary index seeded from `HEAD`) diffed from a
-  `review_base` stored at round 1, bounded at one repair round and two passes.
-
-  Two limits are stated rather than papered over: the coverage CLI verifies **liveness** — that a
-  result file exists, parses and self-identifies — and cannot observe that any reviewing
-  occurred; and coverage is cumulative across a review's rounds, so `check` takes `--round` once
-  per round and computes the union itself.
-
-- **`/hm:execute` gained `Phase A.4`, a false-RED screen** that runs the tests *before* the
-  three-lens reviewer dispatch. Eleven findings across two tasks were the single sentence "this
-  test passes before the implementation exists" — decidable by one pytest run, each previously
-  costing a reviewer round. It does not demand that every test fail: a negative invariant is
-  vacuously true until the construct it forbids exists, so a passing test is either fixed or
-  justified in the test file against a named RED sibling.
-
-- **`/hm:plan` re-validates the whole document once, terminally** (`validator_outcome:
-  MAJOR_REVISION_TERMINAL`), on both revision paths. Measured over 12 recorded validator
-  episodes: none ever reached a clean verdict, their blocking findings were verified against
-  source, and one PLAN records that pass 2's criticals were *created by* the pass-1 fixes. So the
-  last revision is the one nothing looks at, and a re-validation that waited for clean would
-  never release.
-
-- **`hm verifier_discrimination`** reads the ledgers this harness already writes and reports what
-  can honestly be computed about the judges: per-model invocation loss, the share of disputes the
-  verifier could not decide, and per-gate release rates. It deliberately does **not** emit a
-  false-acceptance rate — that needs labelled ground truth, and an approximation would be
-  indistinguishable from the real thing at the call site.
-
-### Fixed
 
 - **Review round 2 (the repair's own review) — three P0s the round-1 repair introduced.**
   `tag --file X` **destroyed X**: `_load` turned any JSON object without a `findings` key into an
