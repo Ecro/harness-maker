@@ -575,8 +575,46 @@ Task(
 
 Resolution:
 - **APPROVED** → write PLAN, proceed to Step 5.
-- **NEEDS_REVISION** (warnings only) → run one follow-up interview round per warning. Options: A. revise plan / B. accept as risk (record in ADR) / C. reject / Other. Then write PLAN.
-- **MAJOR_REVISION** (critical issues) → run follow-up rounds for each critical critique. After resolution, **re-run validator once only** (no infinite loop). If second pass still MAJOR_REVISION, ask user: A. proceed with remaining critiques as accepted-risk / B. abort planning.
+- **NEEDS_REVISION** / **MAJOR_REVISION** → the follow-up rounds are **planned by CLI, not
+  one-per-critique.** `Write` the validator's `critiques` array to a temp path (the whole
+  `{overall, critiques}` object is accepted), then:
+
+{% if is_codex %}```bash
+Bash("uv run --with {{ harness_maker_src_path }} hm plan_rounds plan --file <the literal temp path> <--previous PASS-1's path, from pass 2 on> <--churn-ratio R when Step 4.4 measured it>")
+```{% else %}```bash
+!uv run --with {{ harness_maker_src_path }} hm plan_rounds plan --file <the literal temp path> <--previous PASS-1's path, from pass 2 on> <--churn-ratio R when Step 4.4 measured it>
+```{% endif %}
+
+  Run one follow-up round for each entry in `rounds` — options A. revise plan / B. accept as
+  risk (record in ADR) / C. reject / Other — and **none for any entry in `skipped`**; carry each
+  skipped entry's `reason` into `## 🔍 Plan Validation` so the queue never shrinks silently.
+  Two rules do the cutting, and they are the loop's, not new judgement:
+  - a critique the previous pass raised and this pass raised again is `unresolved` — the
+    revision did not answer it, and asking again is the round that produced nothing;
+  - once the PLAN has churned past the threshold, the critiques still queued were raised
+    against a document that no longer exists, so they are `stale` and Step 4.5's terminal pass
+    re-derives whichever still hold.
+
+  After the rounds, **re-run the validator once only** (no infinite loop). If the second pass
+  is still MAJOR_REVISION, ask the user: A. proceed with remaining critiques as accepted-risk /
+  B. abort planning.
+
+#### Step 4.4 — Measure how much the revision rewrote (optional, enables the stale rule)
+
+Pin the PLAN before the first follow-up round and after the last, then measure. Skipping this
+is safe and costs only the stale rule: **an unmeasured ratio runs every round**, which is the
+behaviour that shipped before this step existed.
+
+{% if is_codex %}```bash
+Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_churn pin --slug {slug} --label plan-p<N>-pre")
+Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_churn pin --slug {slug} --label plan-p<N>-post && uv run --with {{ harness_maker_src_path }} hm review_churn measure --pre refs/hm-churn/v1/{slug}-plan-p<N>-pre --post refs/hm-churn/v1/{slug}-plan-p<N>-post")
+```{% else %}```bash
+!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_churn pin --slug {slug} --label plan-p<N>-pre
+!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_churn pin --slug {slug} --label plan-p<N>-post && uv run --with {{ harness_maker_src_path }} hm review_churn measure --pre refs/hm-churn/v1/{slug}-plan-p<N>-pre --post refs/hm-churn/v1/{slug}-plan-p<N>-post
+```{% endif %}
+
+Use the ratio for `work-docs/PLAN-{slug}.md` from `measured`, not the aggregate — the aggregate
+is the maximum across every touched file, and a revision round may legitimately touch others.
 
 > **If the validator agent itself fails to launch** (0 tool uses, model/launch error): retry the `Task(...)` call once with `model: "opus"` explicitly set (subagent frontmatter may be stale across a model upgrade). When you surface such a failure to the user, name the **tier** (`opus`/`sonnet`) — never a pinned concrete id like `claude-4-7-opus[1m]`; a pinned id in the message is itself the bug class this guidance exists to avoid. If it still cannot launch, self-review the PLAN in the validator's place and say so plainly.
 
@@ -612,6 +650,20 @@ validator_outcome: MAJOR_REVISION_TERMINAL
 A distinct name from `MAJOR_REVISION` on purpose: that one means "revise", this one means "a
 second pass ran and these survived it". Collapsing them makes an unrevised PLAN and a
 twice-validated one indistinguishable to every later reader.
+
+**Also record WHY the loop ended**, which the two-pass cap alone cannot say:
+
+{% if is_codex %}```bash
+Bash("uv run --with {{ harness_maker_src_path }} hm plan_rounds outcome --file <pass 2's critiques> --previous <pass 1's critiques>")
+```{% else %}```bash
+!uv run --with {{ harness_maker_src_path }} hm plan_rounds outcome --file <pass 2's critiques> --previous <pass 1's critiques>
+```{% endif %}
+
+`no-progress` means pass 2 resolved nothing and found nothing new — the revision step is not
+working on this document, and the next reader should attack the PLAN's structure rather than
+its critiques. `progress` means the cap stopped a loop that was still moving. Reporting the cap
+for both, which is what a bare two-pass limit does, hides the first entirely. Put the outcome
+and both counts in `## 🔍 Plan Validation`.
 
 **Its two readers do opposite things — keep them separate.**
 
