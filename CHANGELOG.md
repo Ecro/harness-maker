@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.52.4] - 2026-08-17
+
 ### Fixed
 
 - **Codex-target output named tools the Codex runtime does not have.** Four Codex stage skills
@@ -42,7 +44,11 @@
   for both arms, which was harmless only while Codex output still carried `Task(`; left alone it
   would have scored `hm-review`'s fourteen-dispatch fan-out at zero from this change onward.
 - `tests/unit/test_invocation_render_gate.py` rendered Codex assets outside the tree it walked,
-  so it had never scanned them despite its docstring. Re-rooted; it now covers 37 Codex files.
+  so it had never scanned them despite its docstring. Re-rooted; it now covers 37 Codex files. A
+  non-empty precondition now pins that: without one the same rooting mistake reads as a pass
+  again, which is how it went unnoticed.
+- The structural gate's injected-regression control derives its payloads from the detector
+  tuple, so a detector entry with no payload fails the test instead of shipping unexercised.
 
 ## [0.52.3] - 2026-08-16
 
