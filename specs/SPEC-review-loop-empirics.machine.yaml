@@ -287,6 +287,7 @@ ac:
       severity: P0
       disposition: rejected
       authority: AC-004
+      authority_verified: true
     expected:
       counted: false
       human_review_needed: false
@@ -295,7 +296,18 @@ ac:
   - input:
       severity: P0
       disposition: rejected
+      authority: AC-004
+      authority_verified: false
+    expected:
+      counted: true
+      human_review_needed: true
+    edge: false
+    note: 'AC-SHAPED but never verified. AC-999 parses exactly like AC-004.'
+  - input:
+      severity: P0
+      disposition: rejected
       authority: docstring:src/x.py:parse
+      authority_verified: false
     expected:
       counted: true
       human_review_needed: true
@@ -305,6 +317,7 @@ ac:
       severity: P1
       disposition: rejected
       authority: docstring:src/y.py:send
+      authority_verified: false
     expected:
       counted: true
       human_review_needed: true
@@ -314,6 +327,7 @@ ac:
       severity: P0
       disposition: accepted
       authority: null
+      authority_verified: false
     expected:
       counted: true
       human_review_needed: false
@@ -325,7 +339,10 @@ ac:
   oracle_source: golden
   oracle_evidence: The split is the round-5 decision that only an independent contract
     may clear a finding; the accepted-P0 row is the pre-change behaviour, so a change
-    in the grade path fails against shipped conduct.
+    in the grade path fails against shipped conduct. TIGHTENED 2026-08-16 after review
+    round 2 — `authority_verified` is now part of the input, because `AC-999` parses
+    exactly like `AC-004` and a rejection citing an id that exists in no SPEC cleared
+    a P0. `record --spec` stamps the flag; row 2 is the new one and is the whole point.
   oracle_independence_waiver: null
   input_domain: null
   transformation: null

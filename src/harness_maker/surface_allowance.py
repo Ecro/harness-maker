@@ -36,6 +36,7 @@ class Allowance:
     """One in-flight PLAN's headroom."""
 
     slug: str
+    status: str
     chars: int
     reason: str
     delta_doc: str
@@ -49,7 +50,7 @@ def _require(block: dict[str, object], key: str, path: Path) -> object:
     return block[key]
 
 
-def _parse(block: object, path: Path) -> Allowance:
+def _parse(block: object, path: Path, status: str = "planning") -> Allowance:
     if not isinstance(block, dict):
         raise AllowanceError(
             f"{path.name}: surface_allowance must be a mapping, got {type(block).__name__}"
@@ -94,6 +95,7 @@ def _parse(block: object, path: Path) -> Allowance:
     slug = str(block.get("slug") or path.stem.removeprefix("PLAN-"))
     return Allowance(
         slug=slug,
+        status=status,
         chars=chars,
         reason=str(reason),
         delta_doc=str(delta_doc),
@@ -124,9 +126,10 @@ def load_active_allowances(root: Path) -> list[Allowance]:
             continue
         if not isinstance(meta, dict) or "surface_allowance" not in meta:
             continue
-        if str(meta.get("status", "")).strip() not in _ACTIVE_STATUSES:
+        status = str(meta.get("status", "")).strip()
+        if status not in _ACTIVE_STATUSES:
             continue
-        found.append(_parse(meta["surface_allowance"], path))
+        found.append(_parse(meta["surface_allowance"], path, status))
     return found
 
 
@@ -144,8 +147,13 @@ def _sole_active(root: Path) -> list[Allowance]:
     re-freeze) rather than silently borrowing.
     """
     active = load_active_allowances(root)
-    if len(active) > 1:
-        slugs = ", ".join(a.slug for a in active)
+    # A `blocked` PLAN keeps its own headroom (it is maximally in-flight) but never contributes to
+    # the >1 refusal: `blocked` has no expiry, so one PLAN halted for an ADR and never resumed
+    # would otherwise break four structural gates forever, for an author who touched neither PLAN
+    # — and the error would tell them to go edit somebody else's halted document.
+    contending = [a for a in active if a.status != "blocked"]
+    if len(contending) > 1:
+        slugs = ", ".join(a.slug for a in contending)
         raise AllowanceError(
             f"{len(active)} in-flight PLANs declare a surface_allowance ({slugs}). Headroom is "
             "not attributable across PLANs — one PLAN's growth would be funded by another's "

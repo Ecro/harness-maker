@@ -197,25 +197,45 @@ def test_an_unknown_disposition_is_rejected() -> None:
 # ── AC-008: only an AC-cited rejection clears the grade ─────────────────────
 
 AC008_ROWS = [
-    ("P0", "rejected", "AC-004", {"counted": False, "human_review_needed": False}),
-    ("P0", "rejected", "docstring:src/x.py:parse", {"counted": True, "human_review_needed": True}),
-    ("P1", "rejected", "docstring:src/y.py:send", {"counted": True, "human_review_needed": True}),
-    ("P0", "accepted", None, {"counted": True, "human_review_needed": False}),
+    ("P0", "rejected", "AC-004", True, {"counted": False, "human_review_needed": False}),
+    # Round 2 added this row, and it is the whole point: AC-SHAPED but never verified.
+    ("P0", "rejected", "AC-004", False, {"counted": True, "human_review_needed": True}),
+    (
+        "P0",
+        "rejected",
+        "docstring:src/x.py:parse",
+        False,
+        {"counted": True, "human_review_needed": True},
+    ),
+    (
+        "P1",
+        "rejected",
+        "docstring:src/y.py:send",
+        False,
+        {"counted": True, "human_review_needed": True},
+    ),
+    ("P0", "accepted", None, False, {"counted": True, "human_review_needed": False}),
 ]
 
 
-@pytest.mark.parametrize(("severity", "disposition", "authority", "expected"), AC008_ROWS)
+@pytest.mark.parametrize(
+    ("severity", "disposition", "authority", "verified", "expected"), AC008_ROWS
+)
 def test_only_ac_cited_rejection_clears_grade(
-    severity: str, disposition: str, authority: str | None, expected: dict[str, bool]
+    severity: str,
+    disposition: str,
+    authority: str | None,
+    verified: bool,
+    expected: dict[str, bool],
 ) -> None:
-    assert grade_effect(severity, disposition, authority) == expected
+    assert grade_effect(severity, disposition, authority, authority_verified=verified) == expected
 
 
 def test_an_ac_cited_rejection_actually_moves_the_letter() -> None:
     """The escape hatch has to reach the grade, not just the effect dict."""
     p0 = {"severity": "P0", "tag": "consensus-passed", "disposition": "accepted"}
     assert grade_from_findings([p0])["grade"] == "D"
-    cleared = {**p0, "disposition": "rejected", "authority": "AC-004"}
+    cleared = {**p0, "disposition": "rejected", "authority": "AC-004", "authority_verified": True}
     assert grade_from_findings([cleared])["grade"] == "A"
     assert grade_from_findings([cleared])["human_review_needed"] is False
 
@@ -467,9 +487,10 @@ def test_an_unverifiable_ac_citation_cannot_clear_a_p0(tmp_path: Path) -> None:
             ),
             encoding="utf-8",
         )
-        proc = _hm("grade", "--file", str(f), "--spec", str(spec))
+        rec = _hm("record", "--file", str(f), "--spec", str(spec))
+        proc = _hm("grade", "--file", str(f))
         out = json.loads(proc.stdout)
-        out["_exit"] = proc.returncode
+        out["_exit"] = rec.returncode
         return out
 
     phantom = grade_with("AC-999")
@@ -577,6 +598,7 @@ def test_build_round_record_preserves_a_valid_disposition() -> None:
                 "tag": "consensus-passed",
                 "disposition": "rejected",
                 "authority": "AC-004",
+                "authority_verified": True,
             }
         ]
     )
@@ -685,10 +707,96 @@ def test_an_unusable_spec_degrades_rather_than_aborting_the_grade(
         encoding="utf-8",
     )
 
-    proc = _hm("grade", "--file", str(f), "--spec", str(spec))
+    rec = _hm("record", "--file", str(f), "--spec", str(spec))
+    assert rec.stdout, "record printed no payload at all"
+    assert json.loads(rec.stdout)["errors"], "an unusable SPEC must be reported, not swallowed"
+    assert rec.returncode == 1
 
+    proc = _hm("grade", "--file", str(f))
     assert proc.stdout, "grade printed no payload at all"
-    out = json.loads(proc.stdout)
-    assert out["grade"] == "D", "an unverifiable AC citation must not clear the P0"
-    assert out["errors"]
-    assert proc.returncode == 1
+    assert json.loads(proc.stdout)["grade"] == "D", "an unverifiable citation must not clear"
+
+
+# ── Round 2 P1s: the repairs' own follow-ups ─────────────────────────────────
+
+
+def test_ac_verification_survives_into_the_file(tmp_path: Path) -> None:
+    """`grade` used to verify in memory and throw the verdict away.
+
+    It downgraded an unverifiable `AC-999`, counted the finding, printed the error and exited —
+    while the file, the disposition ledger and the REVIEW report all still said `rejected`. The
+    documented remedy ("fix the listed entries and re-run") could not terminate, because nothing
+    the CLI did changed the file.
+    """
+    spec = tmp_path / "s.machine.yaml"
+    spec.write_text("ac:\n  - id: AC-004\n    title: t\n", encoding="utf-8")
+    f = tmp_path / "f.json"
+
+    def run(authority: str) -> dict[str, object]:
+        f.write_text(
+            json.dumps(
+                [
+                    {
+                        "id": "a",
+                        "severity": "P0",
+                        "voices": [_lens("design")],
+                        "disposition": "rejected",
+                        "authority": authority,
+                    }
+                ]
+            ),
+            encoding="utf-8",
+        )
+        _hm("tag", "--file", str(f))
+        _hm("record", "--file", str(f), "--spec", str(spec))
+        on_disk = json.loads(f.read_text(encoding="utf-8"))[0]
+        return {"disk": on_disk, "grade": json.loads(_hm("grade", "--file", str(f)).stdout)}
+
+    real = run("AC-004")
+    assert real["disk"]["authority_verified"] is True  # type: ignore[index]
+    assert real["grade"]["grade"] == "A"  # type: ignore[index]
+
+    phantom = run("AC-999")
+    assert phantom["disk"]["disposition"] == "unresolved"  # type: ignore[index]
+    assert phantom["disk"]["authority_verified"] is False  # type: ignore[index]
+    assert phantom["grade"]["grade"] == "D"  # type: ignore[index]
+
+
+def test_grade_alone_cannot_honour_an_unverified_ac_citation(tmp_path: Path) -> None:
+    """Order-independence. Verification is a recorded fact, not a step you can skip past."""
+    f = tmp_path / "f.json"
+    f.write_text(
+        json.dumps(
+            [
+                {
+                    "id": "a",
+                    "severity": "P0",
+                    "tag": "consensus-passed",
+                    "disposition": "rejected",
+                    "authority": "AC-004",
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+    assert json.loads(_hm("grade", "--file", str(f)).stdout)["grade"] == "D"
+
+
+def test_record_keeps_reporting_a_gap_it_already_papered_over(tmp_path: Path) -> None:
+    """`record` wrote the downgrade and THEN exited 1, so a blind re-run went green.
+
+    A non-zero exit is the standard cue to retry, and the retry read back
+    `unresolved`/`no-contract`, found it valid, and reported nothing — turning a hard, itemised
+    failure into a clean pass with the gap intact.
+    """
+    f = tmp_path / "f.json"
+    f.write_text(
+        json.dumps([{"id": "a", "severity": "P0", "tag": "manual-only"}]), encoding="utf-8"
+    )
+
+    first = _hm("record", "--file", str(f))
+    second = _hm("record", "--file", str(f))
+
+    assert first.returncode == 1
+    assert second.returncode == 1, "a blind re-run erased the diagnostic"
+    assert json.loads(second.stdout)["errors"]

@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from harness_maker import command_registry
+from harness_maker.codex_ledger import DISPOSITION_VALUES
 from harness_maker.io_utils import atomic_write
 
 Tag = Literal["consensus-passed", "weak-consensus", "manual-only"]
@@ -32,9 +33,11 @@ Tag = Literal["consensus-passed", "weak-consensus", "manual-only"]
 _TAGS: frozenset[str] = frozenset({"consensus-passed", "weak-consensus", "manual-only"})
 Disposition = Literal["accepted", "rejected", "duplicate", "unresolved"]
 
-#: The four PIDA values. Shared with the cross-model gate so the rejection rate cannot silently
-#: split between two producers writing two different vocabularies.
-DISPOSITIONS: frozenset[str] = frozenset({"accepted", "rejected", "duplicate", "unresolved"})
+#: The four PIDA values, IMPORTED from the ledger rather than restated. The previous comment
+#: claimed this was "shared with the cross-model gate so the rejection rate cannot silently split
+#: between two producers" while being a third independent literal — a comment asserting a single
+#: source of truth is what stops the next reader from checking whether there is one.
+DISPOSITIONS: frozenset[str] = DISPOSITION_VALUES
 
 #: The authority a finding may be rejected against, and the one that means "there was none".
 #: `no-contract` is not an authority — it is the recorded absence of one, which is why it is
@@ -50,7 +53,7 @@ _SEVERITIES: tuple[str, ...] = ("P0", "P1", "P2", "P3")
 
 #: Severities that can move the grade or raise the human-review flag. P2/P3 never do — that is
 #: the pre-change behaviour, and it is what makes a nine-lens fan-out affordable at all: the
-#: low-importance half of the new axis lands at P2 and is recorded rather than blocking.
+#: low-importance half of the axis lands at P2 and is recorded rather than blocking.
 _SEVERE: frozenset[str] = frozenset({"P0", "P1"})
 
 
@@ -67,7 +70,7 @@ class Voice:
     """One vote on one finding.
 
     ``kind`` is the whole point. Two reviewer lenses examine two different axes, so expecting
-    `security` to second a `naming` finding is a category error rather than a quality bar; two
+    `security` to second a `consistency` finding is a category error rather than a quality bar; two
     cross-model voters examine the *same* axis on the same diff, so their agreement is real
     corroboration. The tag table below is that distinction and nothing else.
     """
@@ -94,7 +97,7 @@ def tag_finding(voices: list[object], *, reasoning_diverges: bool = False) -> Ta
     """Apply ADR-007's tag table.
 
     One reviewer-lens voice is sovereign: the fan-out gain consists *by definition* of findings
-    exactly one category raised, so demoting them to `manual-only` would spend nine dispatches
+    exactly one category raised, so demoting them to `manual-only` would spend every dispatch
     and discard their entire distinctive output. Cross-model voters keep K=2 — they carry no
     `suggestion`, so a solo cross-model vote would block grade A with no repair path.
 
@@ -173,7 +176,13 @@ def validate_disposition(disposition: object, authority: object = None) -> bool:
     return True
 
 
-def grade_effect(severity: str, disposition: object, authority: object = None) -> dict[str, bool]:
+def grade_effect(
+    severity: str,
+    disposition: object,
+    authority: object = None,
+    *,
+    authority_verified: bool = False,
+) -> dict[str, bool]:
     """Whether a finding counts toward the grade, and whether it needs a human.
 
     Only an **AC-cited** rejection clears the grade. A docstring-cited one still counts and sets
@@ -186,7 +195,10 @@ def grade_effect(severity: str, disposition: object, authority: object = None) -
     if disposition == "duplicate":
         return {"counted": False, "human_review_needed": False}
     if disposition == "rejected":
-        if _authority_kind(authority) == "ac":
+        # An AC citation clears the grade only once `record --spec` VERIFIED that the id exists.
+        # Shape alone is not a contract — `AC-999` parses exactly like `AC-004` — and the check
+        # has to survive `grade` being run on its own.
+        if _authority_kind(authority) == "ac" and authority_verified:
             return {"counted": False, "human_review_needed": False}
         return {"counted": True, "human_review_needed": severe}
     if disposition == "unresolved":
@@ -222,15 +234,28 @@ def build_round_record(findings: list[dict[str, Any]]) -> RoundRecord:
         item = dict(raw)
         disposition = item.get("disposition")
         authority = item.get("authority")
+        if item.get("hm_downgraded"):
+            # Re-report a gap this verb already papered over. `record` writes the downgrade and
+            # THEN exits 1, so a second run read `unresolved`/`no-contract`, found it valid, and
+            # exited 0 with an empty error list — the cheapest response to a red exit code turned
+            # the instruction green with the gap intact.
+            errors.append(
+                f"{item.get('id', i)}: still carries a downgraded disposition from an earlier "
+                "round — the original disposition was never supplied"
+            )
+            out.append(item)
+            continue
         if disposition is None:
             errors.append(f"{item.get('id', i)}: no disposition — recorded unresolved")
             item["disposition"], item["authority"] = "unresolved", NO_CONTRACT
+            item["hm_downgraded"] = True
         elif not validate_disposition(disposition, authority):
             errors.append(
                 f"{item.get('id', i)}: {disposition!r} with authority {authority!r} is not "
                 "recordable — downgraded to unresolved"
             )
             item["disposition"], item["authority"] = "unresolved", NO_CONTRACT
+            item["hm_downgraded"] = True
         else:
             item["authority"] = authority
         out.append(item)
@@ -298,7 +323,12 @@ def grade_from_findings(findings: list[dict[str, Any]]) -> dict[str, Any]:
             counts[severity] += 1
             human_review_needed = True
             continue
-        effect = grade_effect(severity, raw.get("disposition"), raw.get("authority"))
+        effect = grade_effect(
+            severity,
+            raw.get("disposition"),
+            raw.get("authority"),
+            authority_verified=bool(raw.get("authority_verified", False)),
+        )
         if effect["human_review_needed"] and tag == "consensus-passed":
             human_review_needed = True
         if tag in {"manual-only", "weak-consensus"} and severity in _SEVERE:
@@ -362,13 +392,15 @@ def rereview_plan(churn_ratio: float, threshold: float) -> list[Dispatch]:
 _USAGE = (
     "usage: hm review_consensus <tag|grade|plan|record> …\n"
     "  tag     --file <f> [--out <f>]  stamp a `tag` on each finding from its `voices`\n"
-    "  record  --file <f> [--out <f>]  assign the disposition column; exit 1 on any gap\n"
-    "  grade   --file <f> [--spec <machine.yaml>]  grade + counts + human_review_needed\n"
+    "  record  --file <f> [--out <f>] [--spec <machine.yaml>]  disposition column + AC\n"
+    "                                   citation verification; exit 1 on any gap\n"
+    "  grade   --file <f>              grade + counts + human_review_needed (read-only)\n"
     "  plan    --churn-ratio <r> --threshold <t>\n"
     "\n"
     "  --out defaults to --file: `tag` and `record` rewrite the file IN PLACE, so the three\n"
     "  verbs chain over one path without the caller having to merge stdout back by hand.\n"
-    "  --spec turns AC-cited rejections into VERIFIED ones; without it none can clear the grade.\n"
+    "  --spec turns AC-cited rejections into VERIFIED ones, stamping `authority_verified` so the\n"
+    "  verdict survives into the file `grade` reads; without it none can clear the grade.\n"
 )
 
 
@@ -408,25 +440,37 @@ def _known_ac_ids(spec_path: str | None) -> tuple[frozenset[str] | None, list[st
 
 
 def _verify_ac_citations(findings: list[dict[str, Any]], known: frozenset[str] | None) -> list[str]:
-    """Downgrade any rejection whose AC id cannot be verified, IN PLACE, and report it.
+    """Stamp `authority_verified` on every rejection, and report the ones that fail.
 
-    Fail-closed in both directions. With no SPEC (`known is None`) nothing can be verified, so no
-    AC-cited rejection clears — a task-driven harness has no AC ids anyway, which ADR-002 records
-    as the accepted cost. With a SPEC, an id outside it is downgraded to `unresolved`, which
-    counts toward the grade and raises the human-review flag.
+    The verdict is RECORDED, not recomputed by whoever happens to ask. `grade` used to do this
+    itself and then discard the result: it downgraded an unverifiable `AC-999` in memory, counted
+    the finding, printed the error and exited — leaving the file, the disposition ledger and the
+    REVIEW report all still saying `rejected` / `AC-999`. The documented remedy ("fix the listed
+    entries and re-run") could not terminate, because nothing the CLI did changed the file.
+
+    Recording it also makes the check ORDER-INDEPENDENT. `grade` clears a rejection only when the
+    finding carries `authority_verified: true`, so running `grade` on its own — with `record`
+    never having verified anything — cannot launder a P0 through an AC id that exists nowhere.
+
+    Fail-closed both ways: with no usable SPEC (`known is None`) nothing can be verified, so
+    nothing clears; with one, an id outside it becomes `unresolved` / `no-contract`, which counts
+    toward the grade and raises the human-review flag.
     """
     errors: list[str] = []
     for i, f in enumerate(findings):
         if f.get("disposition") != "rejected":
+            f.pop("authority_verified", None)
             continue
         authority = f.get("authority")
         if _authority_kind(authority) != "ac":
+            # A docstring citation is valid but never clears the grade, so there is no id to check.
+            f["authority_verified"] = False
             continue
         ident = str(authority).split()[0].upper()
         if known is None:
             errors.append(
-                f"{f.get('id', i)}: rejected against {ident} but no --spec was given, so the "
-                "citation cannot be verified — recorded unresolved"
+                f"{f.get('id', i)}: rejected against {ident} but no usable machine SPEC was "
+                "given, so the citation cannot be verified — recorded unresolved"
             )
         elif ident not in known:
             errors.append(
@@ -434,8 +478,10 @@ def _verify_ac_citations(findings: list[dict[str, Any]], known: frozenset[str] |
                 "declare — recorded unresolved"
             )
         else:
+            f["authority_verified"] = True
             continue
         f["disposition"], f["authority"] = "unresolved", NO_CONTRACT
+        f["authority_verified"] = False
     return errors
 
 
@@ -548,13 +594,15 @@ def main(argv: list[str] | None = None) -> int:
                 payload = {"findings": tagged}
                 _write_findings(opts.out or opts.file, tagged, envelope)
             elif verb == "grade":
-                known, spec_errors = _known_ac_ids(opts.spec)
-                errors = spec_errors + _verify_ac_citations(findings, known)
                 payload = grade_from_findings(findings)
-                payload["errors"] = errors + list(payload.get("errors", []))
             else:
+                known, spec_errors = _known_ac_ids(opts.spec)
                 record = build_round_record(findings)
-                payload = {"findings": record.findings, "errors": record.errors}
+                ac_errors = _verify_ac_citations(record.findings, known)
+                payload = {
+                    "findings": record.findings,
+                    "errors": spec_errors + ac_errors + record.errors,
+                }
                 _write_findings(opts.out or opts.file, record.findings, envelope)
     except (ConsensusError, OSError, ValueError) as exc:
         sys.stderr.write(f"review_consensus: {exc}\n")

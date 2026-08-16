@@ -59,7 +59,7 @@ import pytest
 
 from harness_maker.conditional_router import OPTIONAL_REVIEWERS, mandatory_lenses
 from harness_maker.interview import interview
-from harness_maker.models import Preset, ProjectProfile
+from harness_maker.models import Preset, ProjectProfile, Target
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
 
@@ -582,10 +582,43 @@ def test_the_telemetry_emit_field_list_carries_the_new_fields(
     assert field in telemetry_block
 
 
+#: Every `hm` module whose paths are worktree-relative, so an invocation of it that runs at the
+#: base repo operates on the wrong tree. Membership is the point of the test below; a module added
+#: here with no prefix in the template fails immediately.
+_WORKTREE_RELATIVE_MODULES = ("freeze", "lens_coverage", "review_consensus", "stage_agent_ledger")
+
+
+def _render_both_variants(tmp_path_factory: pytest.TempPathFactory) -> dict[str, str]:
+    """The claude command AND the codex skill, rendered with worktree ON.
+
+    Both, because the codex half is where the previous guard was blind: its offender predicate
+    already had a `Bash("uv run` arm, and that arm was dead code because the test only ever read
+    `commands/hm/review.md`, where `is_codex` is false. Six calls shipped unprefixed on the codex
+    target under exactly that blind spot.
+
+    Worktree ON, because the prefix renders as the empty string when it is off — a test written
+    against the default fixture is green against the broken template.
+    """
+    p = ProjectProfile(stack=["python"], scale="small", lifecycle="dormant")
+    a = interview(p, autoloop_mode=True)
+    a.worktree["enabled"] = True
+    a.targets = [Target.CLAUDE_CODE, Target.CODEX]
+    out = tmp_path_factory.mktemp("wt-on")
+    render(synthesize(p, a), out, freeze_time=DEFAULT_FREEZE_TIME)
+    return {
+        "claude": (out / "commands" / "hm" / "review.md").read_text(encoding="utf-8"),
+        "codex": (out / ".." / ".agents" / "skills" / "hm-review" / "SKILL.md")
+        .resolve()
+        .read_text(encoding="utf-8")
+        if (out / ".." / ".agents" / "skills" / "hm-review" / "SKILL.md").exists()
+        else "",
+    }
+
+
 def test_every_new_cli_call_runs_in_the_worktree(
     tmp_path_factory: pytest.TempPathFactory,
 ) -> None:
-    """Round-1 review P0. Five calls shipped without the `cd <WT> &&` prefix its siblings carry.
+    """Round-1 review P0, and its round-2 recurrence on the other target.
 
     Under `worktree.enabled: true` (the Production default) the review and its auto-fix edits
     happen inside `.worktrees/<slug>/`, while slash-command Bash starts at the project root.
@@ -595,26 +628,71 @@ def test_every_new_cli_call_runs_in_the_worktree(
     and the gate returned APPROVED. The fail-open this whole mechanism was built to close,
     reintroduced at the plumbing layer.
 
-    Not one of this file's other tests could see it: they all assert what a command SAYS, and
-    the defect was where it RUNS.
+    Not one of this file's other tests could see it: they all assert what a command SAYS, and the
+    defect was where it RUNS.
     """
-    # Rendered with worktree ON — the configuration where the defect exists. The module's
-    # default fixture is worktree-OFF, where the prefix correctly renders as the empty string,
-    # so a test written against it would be green against the broken template.
-    p = ProjectProfile(stack=["python"], scale="small", lifecycle="dormant")
-    a = interview(p, autoloop_mode=True)
-    a.worktree["enabled"] = True
-    out = tmp_path_factory.mktemp("wt-on")
-    render(synthesize(p, a), out, freeze_time=DEFAULT_FREEZE_TIME)
-    body = (out / "commands" / "hm" / "review.md").read_text(encoding="utf-8")
-
+    bodies = _render_both_variants(tmp_path_factory)
     offenders = [
-        line.strip()
+        f"{variant}: {line.strip()}"
+        for variant, body in bodies.items()
         for line in body.splitlines()
-        if ("hm freeze " in line or "hm lens_coverage " in line)
+        if any(f"hm {m} " in line for m in _WORKTREE_RELATIVE_MODULES)
         and ("!uv run" in line or 'Bash("uv run' in line)
     ]
     assert not offenders, (
-        "a freeze/coverage invocation runs without the worktree prefix, so it operates on the "
-        f"base repo instead of the tree under review: {offenders}"
+        "an invocation runs without the worktree prefix, so it operates on the base repo "
+        f"instead of the tree under review: {offenders}"
     )
+
+
+def test_the_codex_variant_is_actually_scanned(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> None:
+    """Non-vacuity guard for the arm above.
+
+    The previous version of that test carried a `Bash("uv run` predicate it could never exercise,
+    so it read as covering both targets while covering one. If the codex body is empty or carries
+    no invocations, the offender scan above is silently half-blind again.
+    """
+    bodies = _render_both_variants(tmp_path_factory)
+    assert bodies["codex"], "the codex skill did not render, so the codex arm scans nothing"
+    assert 'Bash("' in bodies["codex"]
+
+
+# ── The seam that let round 1's P0 ship green: nothing bound the CLI to the render ──
+
+
+@pytest.mark.parametrize("verb", ["tag", "record", "grade"])
+def test_the_rendered_stage_invokes_each_review_consensus_verb(
+    tmp_path_factory: pytest.TempPathFactory, verb: str
+) -> None:
+    """`review_consensus` exists to be CALLED by the stage; nothing asserted that it is.
+
+    This is the root cause of the round-1 P0 rather than one of its symptoms. Deleting all three
+    calls and reverting Step 4 to prose failed exactly one test — a round-trip COUNT — whose
+    message invites re-baselining the number, and a count is satisfied by any four calls. The
+    module's own docstring states the contract as "the arithmetic lives here and the stage calls
+    it"; the first half was thoroughly tested and the second half was not tested at all.
+    """
+    bodies = _render_both_variants(tmp_path_factory)
+    for variant, body in bodies.items():
+        calls = [ln for ln in body.splitlines() if f"hm review_consensus {verb} " in ln]
+        assert calls, f"{variant}: the rendered stage never invokes `review_consensus {verb}`"
+        assert all("--file " in ln for ln in calls), f"{variant}: {verb} invoked without --file"
+
+
+def test_only_record_carries_the_spec_flag(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> None:
+    """`--spec` verifies AC citations, and verification is recorded by the disposition owner.
+
+    It sat on `grade` first, which recomputed the verdict and then discarded it — the file, the
+    ledger and the REVIEW report all kept saying `rejected` while the letter disagreed, and the
+    documented "fix and re-run" loop could not terminate. `record` owns the disposition column and
+    already persists, so the flag belongs there and `grade` stays read-only.
+    """
+    bodies = _render_both_variants(tmp_path_factory)
+    for variant, body in bodies.items():
+        for ln in body.splitlines():
+            if "hm review_consensus grade " in ln:
+                assert "--spec" not in ln, f"{variant}: grade must not take --spec: {ln.strip()}"

@@ -105,7 +105,7 @@ If a command exits non-zero:
 ### Step 1 — Reviewer set selection
 
 **The discovery axis** — {% for l in lens_names %}`{{ l }}`{{ ", " if not loop.last }}{% endfor %} —
-is exercised every round. These are review categories, not agent names; six share one agent and are
+is exercised every round. These are review categories, not agent names; the core ones share a single agent and are
 told apart only by the lens line in their brief. Distinct categories find distinct defects: that is
 why one lens's finding stands on its own (Step 4).
 
@@ -179,8 +179,8 @@ When no drift is detected, emit `result: clean` with empty lists. This record is
 
 ### Step 3 — Parallel reviewer invocation (2-pass redaction)
 
-**Dispatch the {{ lens_names | length }} mandatory lenses in ONE message, in round 1** — one `Task(`
-per lens, same message, so they run concurrently. Six lenses share `code-reviewer` and are
+**Dispatch the {{ lenses | length }} lenses in ONE message, in round 1** — one `Task(`
+per lens, same message, so they run concurrently. The core lenses share `code-reviewer` and are
 distinguished only by the lens line, so send that line verbatim.
 
 ```
@@ -205,14 +205,14 @@ carries it and every coverage call is given it.
 its findings JSON to the per-round results directory, adding a `"lens"` key naming the lens and
 the `"run_id"` you minted — **and stamp the same `"lens"` value on every finding inside it**.
 
-> The per-finding stamp is what makes ADR-007's rule decidable. Six lenses dispatch to
+> The per-finding stamp is what makes ADR-007's rule decidable. The core lenses all dispatch to
 > `code-reviewer`, so `reviewer`/`source` collapses them to one voter name; without a per-finding
-> `lens`, Step 4 cannot tell one lens speaking once from one lens speaking six times, and the
+> `lens`, Step 4 cannot tell one lens speaking once from one lens speaking several times, and the
 > solo-lens vote becomes undecidable from the data it sees. `lens` is **metadata only** — it is
 > never an input to `codex_adapter finding_id`, so the round-to-round merge key is unchanged.
 
 ```
-{% for l in lens_names %}.claude/observability/.hm-lens-results/<slug>/<round>/{{ l }}.json
+{% for l in lenses | map(attribute='lens') %}.claude/observability/.hm-lens-results/<slug>/<round>/{{ l }}.json
 {% endfor %}```
 
 A dispatch that **returns nothing produces no file** — dead agent, unparseable output, refusal,
@@ -224,7 +224,7 @@ Then compute coverage. The CLI is the **sole producer** of the verdict — do no
 own judgement about which lenses ran:
 
 {% if is_codex %}```bash
-Bash("uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round <round> --run-id <run-id> --preset {{ config.preset }}")
+Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round <round> --run-id <run-id> --preset {{ config.preset }}")
 ```{% else %}```bash
 !{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round <round> --run-id <run-id> --preset {{ config.preset }}
 ```{% endif %}
@@ -477,7 +477,7 @@ model name>", "kind": "lens"|"cross-model"}` — plus `reasoning_diverges: true`
 matching OBSERVE with diverging CONCLUDE. Write the array to a temp path, then:
 
 {% if is_codex %}```bash
-Bash("uv run --with {{ harness_maker_src_path }} hm review_consensus tag --file <the literal temp path>")
+Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_consensus tag --file <the literal temp path>")
 ```{% else %}```bash
 !{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_consensus tag --file <the literal temp path>
 ```{% endif %}
@@ -497,7 +497,7 @@ over any number of P0s. Measured 2026-08-16.)
 > **One lens votes alone (ADR-007).** The fan-out gain consists by definition of findings exactly
 > one category raised, so demanding a second lens would spend the dispatches and discard their
 > whole distinctive output. Distinct lenses examine distinct axes: expecting `security` to second
-> a `naming` finding is a category error, not a quality bar. Cross-model voters keep K=2 — they
+> a `consistency` finding is a category error, not a quality bar. Cross-model voters keep K=2 — they
 > read the same diff on the same axis, and they carry no `suggestion`, so a solo cross-model vote
 > would block grade A with no repair path.
 >
@@ -530,9 +530,9 @@ step and an `auto_fix`-disabled run. Give each finding a `disposition` and, when
 | `unresolved` | Cannot adjudicate; no contract to judge against | `no-contract` |
 
 {% if is_codex %}```bash
-Bash("uv run --with {{ harness_maker_src_path }} hm review_consensus record --file <the literal temp path>")
+Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_consensus record --file <the literal temp path>{% if config.dev_mode == 'spec-driven' %} --spec {{ config.spec.dir }}SPEC-{slug}.machine.yaml{% endif %}")
 ```{% else %}```bash
-!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_consensus record --file <the literal temp path>
+!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_consensus record --file <the literal temp path>{% if config.dev_mode == 'spec-driven' %} --spec {{ config.spec.dir }}SPEC-{slug}.machine.yaml{% endif %}
 ```{% endif %}
 
 It rewrites the file in place, as `tag` does. Exit 1 lists the findings it had to downgrade — a
@@ -606,9 +606,9 @@ Sections:
 The same CLI computes it, from the tagged and dispositioned findings:
 
 {% if is_codex %}```bash
-Bash("uv run --with {{ harness_maker_src_path }} hm review_consensus grade --file <the literal temp path>{% if config.dev_mode == 'spec-driven' %} --spec {{ config.spec.dir }}SPEC-{slug}.machine.yaml{% endif %}")
+Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_consensus grade --file <the literal temp path>")
 ```{% else %}```bash
-!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_consensus grade --file <the literal temp path>{% if config.dev_mode == 'spec-driven' %} --spec {{ config.spec.dir }}SPEC-{slug}.machine.yaml{% endif %}
+!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_consensus grade --file <the literal temp path>
 ```{% endif %}
 
 It prints `{"grade": …, "counts": …, "human_review_needed": …, "errors": [...]}` and **exits 1
@@ -726,7 +726,7 @@ coverage is cumulative over a review rather than per round: the auto-fix loop re
 the reviewers a fix touched, so this round's directory legitimately holds one or two files.
 
 {% if is_codex %}```bash
-Bash("uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round 1 --round 2 <one --round per further round so far> --round <this round> --run-id <run-id> --preset {{ config.preset }}")
+Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round 1 --round 2 <one --round per further round so far> --round <this round> --run-id <run-id> --preset {{ config.preset }}")
 ```{% else %}```bash
 !{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round 1 --round 2 <one --round per further round so far> --round <this round> --run-id <run-id> --preset {{ config.preset }}
 ```{% endif %}
@@ -830,7 +830,7 @@ owns commits and nothing is committed yet.
 Round 1 wrote `refs/hm-freeze/v1/<slug>-base`. Re-resolving here would recompute against a HEAD
 that has moved during the review, so the span would drift.
 
-### Step C2 — Dispatch all {{ lens_names | length }} lenses over `review_base..<freeze commit>`
+### Step C2 — Dispatch all {{ lenses | length }} lenses over `review_base..<freeze commit>`
 
 The diff under review is `review_base..<freeze commit>` — **the whole review**, not the repair
 round. Diffing from `HEAD` reinstates the scope-selective re-review this pass replaces: it would
@@ -842,7 +842,7 @@ segment, never a round number. A pass is not a round; reusing a round's director
 that failed during the pass be counted as exercised from that round's stale file.
 
 ```
-{% for l in lens_names %}.claude/observability/.hm-lens-results/<slug>/<pass-id>/{{ l }}.json
+{% for l in lenses | map(attribute='lens') %}.claude/observability/.hm-lens-results/<slug>/<pass-id>/{{ l }}.json
 {% endfor %}```
 
 The dispatch list is the round-1 list, unchanged — same agents, same lens lines:
@@ -852,7 +852,7 @@ The dispatch list is the round-1 list, unchanged — same agents, same lens line
 {% endfor %}```
 
 {% if is_codex %}```bash
-Bash("uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round <pass-id> --run-id <run-id> --preset {{ config.preset }}")
+Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round <pass-id> --run-id <run-id> --preset {{ config.preset }}")
 ```{% else %}```bash
 !{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round <pass-id> --run-id <run-id> --preset {{ config.preset }}
 ```{% endif %}

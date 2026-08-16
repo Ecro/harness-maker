@@ -4,6 +4,42 @@
 
 ### Fixed
 
+- **Review round 2 (the repair's own review) — three P0s the round-1 repair introduced.**
+  `tag --file X` **destroyed X**: `_load` turned any JSON object without a `findings` key into an
+  empty batch, and the new in-place write persisted that over the file at exit 0, after which
+  `grade` returned `A` over the wreckage. The fail-open had also **moved one field over** — the
+  `tag` column was closed while `severity` stayed on a bare membership test, so `critical` or
+  lowercase `p0` incremented nothing and three consensus-passed findings graded `A` with zero
+  errors. And `grade --spec` **aborted the verb** on every harness without a machine SPEC, while
+  the `known is None` branch written for exactly that case was unreachable from the only call site
+  that ships. Severity is now a closed vocabulary, an unusable SPEC degrades instead of raising,
+  and a JSON object with no `findings` key is refused rather than emptied — with the envelope
+  (`round`, `run_id`) preserved across the write-back.
+- **AC verification is a recorded fact, not a transient one.** `grade` verified citations in
+  memory and discarded the result, so the file, the disposition ledger and the REVIEW report all
+  kept saying `rejected` while the letter disagreed — and the documented "fix the listed entries
+  and re-run" loop could not terminate. Verification moved to `record --spec`, which owns the
+  disposition column and already persists, and is stamped as `authority_verified`. That also makes
+  it order-independent: `grade` run on its own can no longer honour an unverified citation.
+  **AC-008's golden table is tightened accordingly** — an AC-*shaped* citation that was never
+  verified no longer clears the grade.
+- **Six codex-target calls ran in the base tree.** The `is_codex` branches added for the inert-`!`
+  fix dropped the `cd <WT> &&` prefix their claude twins carry. The guard test that should have
+  caught it already had a `Bash("uv run` arm — dead code, because it only ever read the claude
+  render. It now renders and scans both variants.
+- **The rendered stage is now bound to the CLI it depends on.** Nothing asserted that
+  `review.md.j2` invokes `review_consensus` at all; deleting all three calls failed only a
+  round-trip *count*, whose message invites re-baselining the number. This was round 1's root
+  cause and it survived round 1's repair.
+- **Side's prose contradicted its own dispatch list** — "dispatch the 4 mandatory lenses" above
+  seven `Task(` lines, with result paths for only four, which is how the Side dispatch fix could
+  be defeated by the text that consumes it.
+- `record` was non-idempotent in the hiding direction (a blind re-run turned exit 1 into exit 0
+  with the gap intact); a `blocked` PLAN no longer contends in the >1-allowance refusal, so one
+  halted PLAN cannot break four structural gates for an unrelated author; `DISPOSITIONS` is
+  imported from `codex_ledger` instead of being a third literal claiming to be shared; and six
+  post-merge lens counts were stale.
+
 - **`hm review_consensus grade` failed OPEN — three consensus-passed P0 findings graded `A`.**
   Found by the first live run of the nine-lens axis, dispatched against the commit that
   introduced it, and reproduced by execution. `tag` and `record` printed to stdout only while
@@ -56,6 +92,8 @@
   exclusive findings were all shape questions; `consistency` and `naming` both work by reading
   two places and comparing. Production round 1 and the confirmation pass go 9 → 7 dispatches.
   Caveat recorded in ADR-001's amendment: one diff, one run per lens.
+  The mandatory set is **seven on Production and four on Side**; all seven are dispatched on both,
+  because a conditional router can only drop what was dispatched.
 
 - **The review discovery axis is replaced (BREAKING for review behaviour — Phases 2–4 of
   PLAN-review-loop-empirics).** The five incidental lenses give way to the six categories the
@@ -163,6 +201,42 @@
 
 ### Fixed
 
+- **Review round 2 (the repair's own review) — three P0s the round-1 repair introduced.**
+  `tag --file X` **destroyed X**: `_load` turned any JSON object without a `findings` key into an
+  empty batch, and the new in-place write persisted that over the file at exit 0, after which
+  `grade` returned `A` over the wreckage. The fail-open had also **moved one field over** — the
+  `tag` column was closed while `severity` stayed on a bare membership test, so `critical` or
+  lowercase `p0` incremented nothing and three consensus-passed findings graded `A` with zero
+  errors. And `grade --spec` **aborted the verb** on every harness without a machine SPEC, while
+  the `known is None` branch written for exactly that case was unreachable from the only call site
+  that ships. Severity is now a closed vocabulary, an unusable SPEC degrades instead of raising,
+  and a JSON object with no `findings` key is refused rather than emptied — with the envelope
+  (`round`, `run_id`) preserved across the write-back.
+- **AC verification is a recorded fact, not a transient one.** `grade` verified citations in
+  memory and discarded the result, so the file, the disposition ledger and the REVIEW report all
+  kept saying `rejected` while the letter disagreed — and the documented "fix the listed entries
+  and re-run" loop could not terminate. Verification moved to `record --spec`, which owns the
+  disposition column and already persists, and is stamped as `authority_verified`. That also makes
+  it order-independent: `grade` run on its own can no longer honour an unverified citation.
+  **AC-008's golden table is tightened accordingly** — an AC-*shaped* citation that was never
+  verified no longer clears the grade.
+- **Six codex-target calls ran in the base tree.** The `is_codex` branches added for the inert-`!`
+  fix dropped the `cd <WT> &&` prefix their claude twins carry. The guard test that should have
+  caught it already had a `Bash("uv run` arm — dead code, because it only ever read the claude
+  render. It now renders and scans both variants.
+- **The rendered stage is now bound to the CLI it depends on.** Nothing asserted that
+  `review.md.j2` invokes `review_consensus` at all; deleting all three calls failed only a
+  round-trip *count*, whose message invites re-baselining the number. This was round 1's root
+  cause and it survived round 1's repair.
+- **Side's prose contradicted its own dispatch list** — "dispatch the 4 mandatory lenses" above
+  seven `Task(` lines, with result paths for only four, which is how the Side dispatch fix could
+  be defeated by the text that consumes it.
+- `record` was non-idempotent in the hiding direction (a blind re-run turned exit 1 into exit 0
+  with the gap intact); a `blocked` PLAN no longer contends in the >1-allowance refusal, so one
+  halted PLAN cannot break four structural gates for an unrelated author; `DISPOSITIONS` is
+  imported from `codex_ledger` instead of being a third literal claiming to be shared; and six
+  post-merge lens counts were stale.
+
 - **The tier-1 mutation gate could not pass for any SPEC, and failed as a plausible number.**
   Three faults were live at once: `_COUNTERS_RE` scanned for words while mutmut 2.x emits an
   emoji-only progress line; no `--runner` was passed, so mutmut ran the whole suite per mutant
@@ -200,6 +274,42 @@
 ## [0.51.3] — 2026-08-13
 
 ### Fixed
+
+- **Review round 2 (the repair's own review) — three P0s the round-1 repair introduced.**
+  `tag --file X` **destroyed X**: `_load` turned any JSON object without a `findings` key into an
+  empty batch, and the new in-place write persisted that over the file at exit 0, after which
+  `grade` returned `A` over the wreckage. The fail-open had also **moved one field over** — the
+  `tag` column was closed while `severity` stayed on a bare membership test, so `critical` or
+  lowercase `p0` incremented nothing and three consensus-passed findings graded `A` with zero
+  errors. And `grade --spec` **aborted the verb** on every harness without a machine SPEC, while
+  the `known is None` branch written for exactly that case was unreachable from the only call site
+  that ships. Severity is now a closed vocabulary, an unusable SPEC degrades instead of raising,
+  and a JSON object with no `findings` key is refused rather than emptied — with the envelope
+  (`round`, `run_id`) preserved across the write-back.
+- **AC verification is a recorded fact, not a transient one.** `grade` verified citations in
+  memory and discarded the result, so the file, the disposition ledger and the REVIEW report all
+  kept saying `rejected` while the letter disagreed — and the documented "fix the listed entries
+  and re-run" loop could not terminate. Verification moved to `record --spec`, which owns the
+  disposition column and already persists, and is stamped as `authority_verified`. That also makes
+  it order-independent: `grade` run on its own can no longer honour an unverified citation.
+  **AC-008's golden table is tightened accordingly** — an AC-*shaped* citation that was never
+  verified no longer clears the grade.
+- **Six codex-target calls ran in the base tree.** The `is_codex` branches added for the inert-`!`
+  fix dropped the `cd <WT> &&` prefix their claude twins carry. The guard test that should have
+  caught it already had a `Bash("uv run` arm — dead code, because it only ever read the claude
+  render. It now renders and scans both variants.
+- **The rendered stage is now bound to the CLI it depends on.** Nothing asserted that
+  `review.md.j2` invokes `review_consensus` at all; deleting all three calls failed only a
+  round-trip *count*, whose message invites re-baselining the number. This was round 1's root
+  cause and it survived round 1's repair.
+- **Side's prose contradicted its own dispatch list** — "dispatch the 4 mandatory lenses" above
+  seven `Task(` lines, with result paths for only four, which is how the Side dispatch fix could
+  be defeated by the text that consumes it.
+- `record` was non-idempotent in the hiding direction (a blind re-run turned exit 1 into exit 0
+  with the gap intact); a `blocked` PLAN no longer contends in the >1-allowance refusal, so one
+  halted PLAN cannot break four structural gates for an unrelated author; `DISPOSITIONS` is
+  imported from `codex_ledger` instead of being a third literal claiming to be shared; and six
+  post-merge lens counts were stale.
 
 - The AC-003 zero-cost golden hashed the raw render, which embeds `harness_maker_version:`
   in provenance frontmatter — so the 0.51.2 bump broke its own quality-gate with
@@ -845,6 +955,42 @@ loop that never writes `.hm-loop-active` cannot be gated by the Stop-hook and
 self-stops after one iteration.
 
 ### Fixed
+
+- **Review round 2 (the repair's own review) — three P0s the round-1 repair introduced.**
+  `tag --file X` **destroyed X**: `_load` turned any JSON object without a `findings` key into an
+  empty batch, and the new in-place write persisted that over the file at exit 0, after which
+  `grade` returned `A` over the wreckage. The fail-open had also **moved one field over** — the
+  `tag` column was closed while `severity` stayed on a bare membership test, so `critical` or
+  lowercase `p0` incremented nothing and three consensus-passed findings graded `A` with zero
+  errors. And `grade --spec` **aborted the verb** on every harness without a machine SPEC, while
+  the `known is None` branch written for exactly that case was unreachable from the only call site
+  that ships. Severity is now a closed vocabulary, an unusable SPEC degrades instead of raising,
+  and a JSON object with no `findings` key is refused rather than emptied — with the envelope
+  (`round`, `run_id`) preserved across the write-back.
+- **AC verification is a recorded fact, not a transient one.** `grade` verified citations in
+  memory and discarded the result, so the file, the disposition ledger and the REVIEW report all
+  kept saying `rejected` while the letter disagreed — and the documented "fix the listed entries
+  and re-run" loop could not terminate. Verification moved to `record --spec`, which owns the
+  disposition column and already persists, and is stamped as `authority_verified`. That also makes
+  it order-independent: `grade` run on its own can no longer honour an unverified citation.
+  **AC-008's golden table is tightened accordingly** — an AC-*shaped* citation that was never
+  verified no longer clears the grade.
+- **Six codex-target calls ran in the base tree.** The `is_codex` branches added for the inert-`!`
+  fix dropped the `cd <WT> &&` prefix their claude twins carry. The guard test that should have
+  caught it already had a `Bash("uv run` arm — dead code, because it only ever read the claude
+  render. It now renders and scans both variants.
+- **The rendered stage is now bound to the CLI it depends on.** Nothing asserted that
+  `review.md.j2` invokes `review_consensus` at all; deleting all three calls failed only a
+  round-trip *count*, whose message invites re-baselining the number. This was round 1's root
+  cause and it survived round 1's repair.
+- **Side's prose contradicted its own dispatch list** — "dispatch the 4 mandatory lenses" above
+  seven `Task(` lines, with result paths for only four, which is how the Side dispatch fix could
+  be defeated by the text that consumes it.
+- `record` was non-idempotent in the hiding direction (a blind re-run turned exit 1 into exit 0
+  with the gap intact); a `blocked` PLAN no longer contends in the >1-allowance refusal, so one
+  halted PLAN cannot break four structural gates for an unrelated author; `DISPOSITIONS` is
+  imported from `codex_ledger` instead of being a third literal claiming to be shared; and six
+  post-merge lens counts were stale.
 
 - **Deliverable write instructions now name their own target.** `Write to
   \`work-docs/PLAN-{slug}.md\`` relied on the preflight preamble's generic "treat that
@@ -1732,6 +1878,42 @@ that starts clean.
 
 ### Fixed
 
+- **Review round 2 (the repair's own review) — three P0s the round-1 repair introduced.**
+  `tag --file X` **destroyed X**: `_load` turned any JSON object without a `findings` key into an
+  empty batch, and the new in-place write persisted that over the file at exit 0, after which
+  `grade` returned `A` over the wreckage. The fail-open had also **moved one field over** — the
+  `tag` column was closed while `severity` stayed on a bare membership test, so `critical` or
+  lowercase `p0` incremented nothing and three consensus-passed findings graded `A` with zero
+  errors. And `grade --spec` **aborted the verb** on every harness without a machine SPEC, while
+  the `known is None` branch written for exactly that case was unreachable from the only call site
+  that ships. Severity is now a closed vocabulary, an unusable SPEC degrades instead of raising,
+  and a JSON object with no `findings` key is refused rather than emptied — with the envelope
+  (`round`, `run_id`) preserved across the write-back.
+- **AC verification is a recorded fact, not a transient one.** `grade` verified citations in
+  memory and discarded the result, so the file, the disposition ledger and the REVIEW report all
+  kept saying `rejected` while the letter disagreed — and the documented "fix the listed entries
+  and re-run" loop could not terminate. Verification moved to `record --spec`, which owns the
+  disposition column and already persists, and is stamped as `authority_verified`. That also makes
+  it order-independent: `grade` run on its own can no longer honour an unverified citation.
+  **AC-008's golden table is tightened accordingly** — an AC-*shaped* citation that was never
+  verified no longer clears the grade.
+- **Six codex-target calls ran in the base tree.** The `is_codex` branches added for the inert-`!`
+  fix dropped the `cd <WT> &&` prefix their claude twins carry. The guard test that should have
+  caught it already had a `Bash("uv run` arm — dead code, because it only ever read the claude
+  render. It now renders and scans both variants.
+- **The rendered stage is now bound to the CLI it depends on.** Nothing asserted that
+  `review.md.j2` invokes `review_consensus` at all; deleting all three calls failed only a
+  round-trip *count*, whose message invites re-baselining the number. This was round 1's root
+  cause and it survived round 1's repair.
+- **Side's prose contradicted its own dispatch list** — "dispatch the 4 mandatory lenses" above
+  seven `Task(` lines, with result paths for only four, which is how the Side dispatch fix could
+  be defeated by the text that consumes it.
+- `record` was non-idempotent in the hiding direction (a blind re-run turned exit 1 into exit 0
+  with the gap intact); a `blocked` PLAN no longer contends in the >1-allowance refusal, so one
+  halted PLAN cannot break four structural gates for an unrelated author; `DISPOSITIONS` is
+  imported from `codex_ledger` instead of being a third literal claiming to be shared; and six
+  post-merge lens counts were stale.
+
 - `economics.span_max_turns` / `span_max_min` were read back from `harness.yaml` but
   never written to it, so a tuned cap was silently reset to the default on the next
   `/harness-maker:make --update`.
@@ -2166,6 +2348,42 @@ invoked from the templates is actually allowed by the rendered rules.
 ## [0.40.1] — 2026-07-18
 
 ### Fixed
+
+- **Review round 2 (the repair's own review) — three P0s the round-1 repair introduced.**
+  `tag --file X` **destroyed X**: `_load` turned any JSON object without a `findings` key into an
+  empty batch, and the new in-place write persisted that over the file at exit 0, after which
+  `grade` returned `A` over the wreckage. The fail-open had also **moved one field over** — the
+  `tag` column was closed while `severity` stayed on a bare membership test, so `critical` or
+  lowercase `p0` incremented nothing and three consensus-passed findings graded `A` with zero
+  errors. And `grade --spec` **aborted the verb** on every harness without a machine SPEC, while
+  the `known is None` branch written for exactly that case was unreachable from the only call site
+  that ships. Severity is now a closed vocabulary, an unusable SPEC degrades instead of raising,
+  and a JSON object with no `findings` key is refused rather than emptied — with the envelope
+  (`round`, `run_id`) preserved across the write-back.
+- **AC verification is a recorded fact, not a transient one.** `grade` verified citations in
+  memory and discarded the result, so the file, the disposition ledger and the REVIEW report all
+  kept saying `rejected` while the letter disagreed — and the documented "fix the listed entries
+  and re-run" loop could not terminate. Verification moved to `record --spec`, which owns the
+  disposition column and already persists, and is stamped as `authority_verified`. That also makes
+  it order-independent: `grade` run on its own can no longer honour an unverified citation.
+  **AC-008's golden table is tightened accordingly** — an AC-*shaped* citation that was never
+  verified no longer clears the grade.
+- **Six codex-target calls ran in the base tree.** The `is_codex` branches added for the inert-`!`
+  fix dropped the `cd <WT> &&` prefix their claude twins carry. The guard test that should have
+  caught it already had a `Bash("uv run` arm — dead code, because it only ever read the claude
+  render. It now renders and scans both variants.
+- **The rendered stage is now bound to the CLI it depends on.** Nothing asserted that
+  `review.md.j2` invokes `review_consensus` at all; deleting all three calls failed only a
+  round-trip *count*, whose message invites re-baselining the number. This was round 1's root
+  cause and it survived round 1's repair.
+- **Side's prose contradicted its own dispatch list** — "dispatch the 4 mandatory lenses" above
+  seven `Task(` lines, with result paths for only four, which is how the Side dispatch fix could
+  be defeated by the text that consumes it.
+- `record` was non-idempotent in the hiding direction (a blind re-run turned exit 1 into exit 0
+  with the gap intact); a `blocked` PLAN no longer contends in the >1-allowance refusal, so one
+  halted PLAN cannot break four structural gates for an unrelated author; `DISPOSITIONS` is
+  imported from `codex_ledger` instead of being a third literal claiming to be shared; and six
+  post-merge lens counts were stale.
 - **`tests/structural/test_verifier_agent.py` inverted to match Phase 7.** The
   0.40.0 tag's quality-gate caught a structural test still asserting the
   code-verifier's now-deleted `permissions:` frontmatter (missed locally because
@@ -2326,6 +2544,42 @@ security-reviewer found no defect) — inert until something renders it.
 ## [0.38.1] - 2026-07-10
 
 ### Fixed
+
+- **Review round 2 (the repair's own review) — three P0s the round-1 repair introduced.**
+  `tag --file X` **destroyed X**: `_load` turned any JSON object without a `findings` key into an
+  empty batch, and the new in-place write persisted that over the file at exit 0, after which
+  `grade` returned `A` over the wreckage. The fail-open had also **moved one field over** — the
+  `tag` column was closed while `severity` stayed on a bare membership test, so `critical` or
+  lowercase `p0` incremented nothing and three consensus-passed findings graded `A` with zero
+  errors. And `grade --spec` **aborted the verb** on every harness without a machine SPEC, while
+  the `known is None` branch written for exactly that case was unreachable from the only call site
+  that ships. Severity is now a closed vocabulary, an unusable SPEC degrades instead of raising,
+  and a JSON object with no `findings` key is refused rather than emptied — with the envelope
+  (`round`, `run_id`) preserved across the write-back.
+- **AC verification is a recorded fact, not a transient one.** `grade` verified citations in
+  memory and discarded the result, so the file, the disposition ledger and the REVIEW report all
+  kept saying `rejected` while the letter disagreed — and the documented "fix the listed entries
+  and re-run" loop could not terminate. Verification moved to `record --spec`, which owns the
+  disposition column and already persists, and is stamped as `authority_verified`. That also makes
+  it order-independent: `grade` run on its own can no longer honour an unverified citation.
+  **AC-008's golden table is tightened accordingly** — an AC-*shaped* citation that was never
+  verified no longer clears the grade.
+- **Six codex-target calls ran in the base tree.** The `is_codex` branches added for the inert-`!`
+  fix dropped the `cd <WT> &&` prefix their claude twins carry. The guard test that should have
+  caught it already had a `Bash("uv run` arm — dead code, because it only ever read the claude
+  render. It now renders and scans both variants.
+- **The rendered stage is now bound to the CLI it depends on.** Nothing asserted that
+  `review.md.j2` invokes `review_consensus` at all; deleting all three calls failed only a
+  round-trip *count*, whose message invites re-baselining the number. This was round 1's root
+  cause and it survived round 1's repair.
+- **Side's prose contradicted its own dispatch list** — "dispatch the 4 mandatory lenses" above
+  seven `Task(` lines, with result paths for only four, which is how the Side dispatch fix could
+  be defeated by the text that consumes it.
+- `record` was non-idempotent in the hiding direction (a blind re-run turned exit 1 into exit 0
+  with the gap intact); a `blocked` PLAN no longer contends in the >1-allowance refusal, so one
+  halted PLAN cannot break four structural gates for an unrelated author; `DISPOSITIONS` is
+  imported from `codex_ledger` instead of being a third literal claiming to be shared; and six
+  post-merge lens counts were stale.
 - **Antigravity second-opinion `--print-timeout` raised 120s → 240s**
   (`_partials/second_opinion_antigravity.md.j2`, `health.md.j2`). A
   high-reasoning-effort `Gemini 3.1 Pro (High)` review of a realistic
@@ -4177,6 +4431,42 @@ CI-only patch. No runtime change.
 
 ### Fixed
 
+- **Review round 2 (the repair's own review) — three P0s the round-1 repair introduced.**
+  `tag --file X` **destroyed X**: `_load` turned any JSON object without a `findings` key into an
+  empty batch, and the new in-place write persisted that over the file at exit 0, after which
+  `grade` returned `A` over the wreckage. The fail-open had also **moved one field over** — the
+  `tag` column was closed while `severity` stayed on a bare membership test, so `critical` or
+  lowercase `p0` incremented nothing and three consensus-passed findings graded `A` with zero
+  errors. And `grade --spec` **aborted the verb** on every harness without a machine SPEC, while
+  the `known is None` branch written for exactly that case was unreachable from the only call site
+  that ships. Severity is now a closed vocabulary, an unusable SPEC degrades instead of raising,
+  and a JSON object with no `findings` key is refused rather than emptied — with the envelope
+  (`round`, `run_id`) preserved across the write-back.
+- **AC verification is a recorded fact, not a transient one.** `grade` verified citations in
+  memory and discarded the result, so the file, the disposition ledger and the REVIEW report all
+  kept saying `rejected` while the letter disagreed — and the documented "fix the listed entries
+  and re-run" loop could not terminate. Verification moved to `record --spec`, which owns the
+  disposition column and already persists, and is stamped as `authority_verified`. That also makes
+  it order-independent: `grade` run on its own can no longer honour an unverified citation.
+  **AC-008's golden table is tightened accordingly** — an AC-*shaped* citation that was never
+  verified no longer clears the grade.
+- **Six codex-target calls ran in the base tree.** The `is_codex` branches added for the inert-`!`
+  fix dropped the `cd <WT> &&` prefix their claude twins carry. The guard test that should have
+  caught it already had a `Bash("uv run` arm — dead code, because it only ever read the claude
+  render. It now renders and scans both variants.
+- **The rendered stage is now bound to the CLI it depends on.** Nothing asserted that
+  `review.md.j2` invokes `review_consensus` at all; deleting all three calls failed only a
+  round-trip *count*, whose message invites re-baselining the number. This was round 1's root
+  cause and it survived round 1's repair.
+- **Side's prose contradicted its own dispatch list** — "dispatch the 4 mandatory lenses" above
+  seven `Task(` lines, with result paths for only four, which is how the Side dispatch fix could
+  be defeated by the text that consumes it.
+- `record` was non-idempotent in the hiding direction (a blind re-run turned exit 1 into exit 0
+  with the gap intact); a `blocked` PLAN no longer contends in the >1-allowance refusal, so one
+  halted PLAN cannot break four structural gates for an unrelated author; `DISPOSITIONS` is
+  imported from `codex_ledger` instead of being a third literal claiming to be shared; and six
+  post-merge lens counts were stale.
+
 - Removed two unused `import yaml` lines added to `tests/unit/test_render.py`
   in 0.15.2 (`F401`).
 - Re-formatted a long-assertion message in `tests/unit/test_install_ref.py`
@@ -4194,6 +4484,42 @@ Two patches to the renderer's reconcile path. Both address user-edit
 durability across `/hm:make` invocations.
 
 ### Fixed
+
+- **Review round 2 (the repair's own review) — three P0s the round-1 repair introduced.**
+  `tag --file X` **destroyed X**: `_load` turned any JSON object without a `findings` key into an
+  empty batch, and the new in-place write persisted that over the file at exit 0, after which
+  `grade` returned `A` over the wreckage. The fail-open had also **moved one field over** — the
+  `tag` column was closed while `severity` stayed on a bare membership test, so `critical` or
+  lowercase `p0` incremented nothing and three consensus-passed findings graded `A` with zero
+  errors. And `grade --spec` **aborted the verb** on every harness without a machine SPEC, while
+  the `known is None` branch written for exactly that case was unreachable from the only call site
+  that ships. Severity is now a closed vocabulary, an unusable SPEC degrades instead of raising,
+  and a JSON object with no `findings` key is refused rather than emptied — with the envelope
+  (`round`, `run_id`) preserved across the write-back.
+- **AC verification is a recorded fact, not a transient one.** `grade` verified citations in
+  memory and discarded the result, so the file, the disposition ledger and the REVIEW report all
+  kept saying `rejected` while the letter disagreed — and the documented "fix the listed entries
+  and re-run" loop could not terminate. Verification moved to `record --spec`, which owns the
+  disposition column and already persists, and is stamped as `authority_verified`. That also makes
+  it order-independent: `grade` run on its own can no longer honour an unverified citation.
+  **AC-008's golden table is tightened accordingly** — an AC-*shaped* citation that was never
+  verified no longer clears the grade.
+- **Six codex-target calls ran in the base tree.** The `is_codex` branches added for the inert-`!`
+  fix dropped the `cd <WT> &&` prefix their claude twins carry. The guard test that should have
+  caught it already had a `Bash("uv run` arm — dead code, because it only ever read the claude
+  render. It now renders and scans both variants.
+- **The rendered stage is now bound to the CLI it depends on.** Nothing asserted that
+  `review.md.j2` invokes `review_consensus` at all; deleting all three calls failed only a
+  round-trip *count*, whose message invites re-baselining the number. This was round 1's root
+  cause and it survived round 1's repair.
+- **Side's prose contradicted its own dispatch list** — "dispatch the 4 mandatory lenses" above
+  seven `Task(` lines, with result paths for only four, which is how the Side dispatch fix could
+  be defeated by the text that consumes it.
+- `record` was non-idempotent in the hiding direction (a blind re-run turned exit 1 into exit 0
+  with the gap intact); a `blocked` PLAN no longer contends in the >1-allowance refusal, so one
+  halted PLAN cannot break four structural gates for an unrelated author; `DISPOSITIONS` is
+  imported from `codex_ledger` instead of being a third literal claiming to be shared; and six
+  post-merge lens counts were stale.
 
 - **`settings.json` `permissions.{allow,deny,ask}` now deep-merge as a
   union** (template entries first, then user-added entries appended,
@@ -4227,6 +4553,42 @@ durability across `/hm:make` invocations.
 ## 0.15.1 — fix uv archive cache path bug in renderer (2026-05-18)
 
 ### Fixed
+
+- **Review round 2 (the repair's own review) — three P0s the round-1 repair introduced.**
+  `tag --file X` **destroyed X**: `_load` turned any JSON object without a `findings` key into an
+  empty batch, and the new in-place write persisted that over the file at exit 0, after which
+  `grade` returned `A` over the wreckage. The fail-open had also **moved one field over** — the
+  `tag` column was closed while `severity` stayed on a bare membership test, so `critical` or
+  lowercase `p0` incremented nothing and three consensus-passed findings graded `A` with zero
+  errors. And `grade --spec` **aborted the verb** on every harness without a machine SPEC, while
+  the `known is None` branch written for exactly that case was unreachable from the only call site
+  that ships. Severity is now a closed vocabulary, an unusable SPEC degrades instead of raising,
+  and a JSON object with no `findings` key is refused rather than emptied — with the envelope
+  (`round`, `run_id`) preserved across the write-back.
+- **AC verification is a recorded fact, not a transient one.** `grade` verified citations in
+  memory and discarded the result, so the file, the disposition ledger and the REVIEW report all
+  kept saying `rejected` while the letter disagreed — and the documented "fix the listed entries
+  and re-run" loop could not terminate. Verification moved to `record --spec`, which owns the
+  disposition column and already persists, and is stamped as `authority_verified`. That also makes
+  it order-independent: `grade` run on its own can no longer honour an unverified citation.
+  **AC-008's golden table is tightened accordingly** — an AC-*shaped* citation that was never
+  verified no longer clears the grade.
+- **Six codex-target calls ran in the base tree.** The `is_codex` branches added for the inert-`!`
+  fix dropped the `cd <WT> &&` prefix their claude twins carry. The guard test that should have
+  caught it already had a `Bash("uv run` arm — dead code, because it only ever read the claude
+  render. It now renders and scans both variants.
+- **The rendered stage is now bound to the CLI it depends on.** Nothing asserted that
+  `review.md.j2` invokes `review_consensus` at all; deleting all three calls failed only a
+  round-trip *count*, whose message invites re-baselining the number. This was round 1's root
+  cause and it survived round 1's repair.
+- **Side's prose contradicted its own dispatch list** — "dispatch the 4 mandatory lenses" above
+  seven `Task(` lines, with result paths for only four, which is how the Side dispatch fix could
+  be defeated by the text that consumes it.
+- `record` was non-idempotent in the hiding direction (a blind re-run turned exit 1 into exit 0
+  with the gap intact); a `blocked` PLAN no longer contends in the >1-allowance refusal, so one
+  halted PLAN cannot break four structural gates for an unrelated author; `DISPOSITIONS` is
+  imported from `codex_ledger` instead of being a third literal claiming to be shared; and six
+  post-merge lens counts were stale.
 
 - **`_compute_install_ref` returned a broken path when invoked from a uv
   archive cache** — when `uv run --with /plugin/cache/<version>` archived
@@ -4297,6 +4659,42 @@ per-agent model pinning. 13 ADRs locked in PLAN-model-routing-multi-ide.md.
   → `default_model:` rename.
 
 ### Fixed
+
+- **Review round 2 (the repair's own review) — three P0s the round-1 repair introduced.**
+  `tag --file X` **destroyed X**: `_load` turned any JSON object without a `findings` key into an
+  empty batch, and the new in-place write persisted that over the file at exit 0, after which
+  `grade` returned `A` over the wreckage. The fail-open had also **moved one field over** — the
+  `tag` column was closed while `severity` stayed on a bare membership test, so `critical` or
+  lowercase `p0` incremented nothing and three consensus-passed findings graded `A` with zero
+  errors. And `grade --spec` **aborted the verb** on every harness without a machine SPEC, while
+  the `known is None` branch written for exactly that case was unreachable from the only call site
+  that ships. Severity is now a closed vocabulary, an unusable SPEC degrades instead of raising,
+  and a JSON object with no `findings` key is refused rather than emptied — with the envelope
+  (`round`, `run_id`) preserved across the write-back.
+- **AC verification is a recorded fact, not a transient one.** `grade` verified citations in
+  memory and discarded the result, so the file, the disposition ledger and the REVIEW report all
+  kept saying `rejected` while the letter disagreed — and the documented "fix the listed entries
+  and re-run" loop could not terminate. Verification moved to `record --spec`, which owns the
+  disposition column and already persists, and is stamped as `authority_verified`. That also makes
+  it order-independent: `grade` run on its own can no longer honour an unverified citation.
+  **AC-008's golden table is tightened accordingly** — an AC-*shaped* citation that was never
+  verified no longer clears the grade.
+- **Six codex-target calls ran in the base tree.** The `is_codex` branches added for the inert-`!`
+  fix dropped the `cd <WT> &&` prefix their claude twins carry. The guard test that should have
+  caught it already had a `Bash("uv run` arm — dead code, because it only ever read the claude
+  render. It now renders and scans both variants.
+- **The rendered stage is now bound to the CLI it depends on.** Nothing asserted that
+  `review.md.j2` invokes `review_consensus` at all; deleting all three calls failed only a
+  round-trip *count*, whose message invites re-baselining the number. This was round 1's root
+  cause and it survived round 1's repair.
+- **Side's prose contradicted its own dispatch list** — "dispatch the 4 mandatory lenses" above
+  seven `Task(` lines, with result paths for only four, which is how the Side dispatch fix could
+  be defeated by the text that consumes it.
+- `record` was non-idempotent in the hiding direction (a blind re-run turned exit 1 into exit 0
+  with the gap intact); a `blocked` PLAN no longer contends in the >1-allowance refusal, so one
+  halted PLAN cannot break four structural gates for an unrelated author; `DISPOSITIONS` is
+  imported from `codex_ledger` instead of being a third literal claiming to be shared; and six
+  post-merge lens counts were stale.
 
 - Pydantic dual-key handling for AliasChoices + `extra="forbid"` —
   `model_validator(mode="before")` silently drops `recommended_model` when
@@ -4640,6 +5038,42 @@ Second Brain write failure (PLAN-second-brain-write-failure).
 - TECH_SPEC.md `## 7. Personalization Architecture (0.12.0)` section — mirrors README.md update with deeper ADR cross-refs (PLAN-personalization-depth-2026-05).
 
 ### Fixed
+
+- **Review round 2 (the repair's own review) — three P0s the round-1 repair introduced.**
+  `tag --file X` **destroyed X**: `_load` turned any JSON object without a `findings` key into an
+  empty batch, and the new in-place write persisted that over the file at exit 0, after which
+  `grade` returned `A` over the wreckage. The fail-open had also **moved one field over** — the
+  `tag` column was closed while `severity` stayed on a bare membership test, so `critical` or
+  lowercase `p0` incremented nothing and three consensus-passed findings graded `A` with zero
+  errors. And `grade --spec` **aborted the verb** on every harness without a machine SPEC, while
+  the `known is None` branch written for exactly that case was unreachable from the only call site
+  that ships. Severity is now a closed vocabulary, an unusable SPEC degrades instead of raising,
+  and a JSON object with no `findings` key is refused rather than emptied — with the envelope
+  (`round`, `run_id`) preserved across the write-back.
+- **AC verification is a recorded fact, not a transient one.** `grade` verified citations in
+  memory and discarded the result, so the file, the disposition ledger and the REVIEW report all
+  kept saying `rejected` while the letter disagreed — and the documented "fix the listed entries
+  and re-run" loop could not terminate. Verification moved to `record --spec`, which owns the
+  disposition column and already persists, and is stamped as `authority_verified`. That also makes
+  it order-independent: `grade` run on its own can no longer honour an unverified citation.
+  **AC-008's golden table is tightened accordingly** — an AC-*shaped* citation that was never
+  verified no longer clears the grade.
+- **Six codex-target calls ran in the base tree.** The `is_codex` branches added for the inert-`!`
+  fix dropped the `cd <WT> &&` prefix their claude twins carry. The guard test that should have
+  caught it already had a `Bash("uv run` arm — dead code, because it only ever read the claude
+  render. It now renders and scans both variants.
+- **The rendered stage is now bound to the CLI it depends on.** Nothing asserted that
+  `review.md.j2` invokes `review_consensus` at all; deleting all three calls failed only a
+  round-trip *count*, whose message invites re-baselining the number. This was round 1's root
+  cause and it survived round 1's repair.
+- **Side's prose contradicted its own dispatch list** — "dispatch the 4 mandatory lenses" above
+  seven `Task(` lines, with result paths for only four, which is how the Side dispatch fix could
+  be defeated by the text that consumes it.
+- `record` was non-idempotent in the hiding direction (a blind re-run turned exit 1 into exit 0
+  with the gap intact); a `blocked` PLAN no longer contends in the >1-allowance refusal, so one
+  halted PLAN cannot break four structural gates for an unrelated author; `DISPOSITIONS` is
+  imported from `codex_ledger` instead of being a third literal claiming to be shared; and six
+  post-merge lens counts were stale.
 - `detection_cache.CACHED_MANIFESTS` now includes literal filenames from `STACK_GLOB_MANIFESTS` (`stack.yaml`, `package.yaml`). Haskell projects' profile cache correctly invalidates on these manifests' mtime bump; previously stale until 24h ceiling. Glob patterns (`*.csproj`, `*.sln`, `*.cabal`) remain on 24h-ceiling-only path — they cannot be stat'd. (Closes Phase 3 known limitation from 0.12.0.)
 - Snapshot fixtures regenerated — 0.12.0 release shipped with 8 failing `test_synthesize_snapshot.py` tests (`commands/hm/ai-readiness.md.j2` hash drift after Phase 10/12 template additions). 0.12.1 closes that quality gap.
 
@@ -4723,6 +5157,42 @@ Second Brain write failure (PLAN-second-brain-write-failure).
   multiple fixes).
 
 ### Fixed
+
+- **Review round 2 (the repair's own review) — three P0s the round-1 repair introduced.**
+  `tag --file X` **destroyed X**: `_load` turned any JSON object without a `findings` key into an
+  empty batch, and the new in-place write persisted that over the file at exit 0, after which
+  `grade` returned `A` over the wreckage. The fail-open had also **moved one field over** — the
+  `tag` column was closed while `severity` stayed on a bare membership test, so `critical` or
+  lowercase `p0` incremented nothing and three consensus-passed findings graded `A` with zero
+  errors. And `grade --spec` **aborted the verb** on every harness without a machine SPEC, while
+  the `known is None` branch written for exactly that case was unreachable from the only call site
+  that ships. Severity is now a closed vocabulary, an unusable SPEC degrades instead of raising,
+  and a JSON object with no `findings` key is refused rather than emptied — with the envelope
+  (`round`, `run_id`) preserved across the write-back.
+- **AC verification is a recorded fact, not a transient one.** `grade` verified citations in
+  memory and discarded the result, so the file, the disposition ledger and the REVIEW report all
+  kept saying `rejected` while the letter disagreed — and the documented "fix the listed entries
+  and re-run" loop could not terminate. Verification moved to `record --spec`, which owns the
+  disposition column and already persists, and is stamped as `authority_verified`. That also makes
+  it order-independent: `grade` run on its own can no longer honour an unverified citation.
+  **AC-008's golden table is tightened accordingly** — an AC-*shaped* citation that was never
+  verified no longer clears the grade.
+- **Six codex-target calls ran in the base tree.** The `is_codex` branches added for the inert-`!`
+  fix dropped the `cd <WT> &&` prefix their claude twins carry. The guard test that should have
+  caught it already had a `Bash("uv run` arm — dead code, because it only ever read the claude
+  render. It now renders and scans both variants.
+- **The rendered stage is now bound to the CLI it depends on.** Nothing asserted that
+  `review.md.j2` invokes `review_consensus` at all; deleting all three calls failed only a
+  round-trip *count*, whose message invites re-baselining the number. This was round 1's root
+  cause and it survived round 1's repair.
+- **Side's prose contradicted its own dispatch list** — "dispatch the 4 mandatory lenses" above
+  seven `Task(` lines, with result paths for only four, which is how the Side dispatch fix could
+  be defeated by the text that consumes it.
+- `record` was non-idempotent in the hiding direction (a blind re-run turned exit 1 into exit 0
+  with the gap intact); a `blocked` PLAN no longer contends in the >1-allowance refusal, so one
+  halted PLAN cannot break four structural gates for an unrelated author; `DISPOSITIONS` is
+  imported from `codex_ledger` instead of being a third literal claiming to be shared; and six
+  post-merge lens counts were stale.
 - `io_utils.atomic_write` — `os.replace` now wrapped in try/except with
   `tmp_path.unlink(missing_ok=True)` cleanup on failure (was leaking
   temp files on WSL2/NTFS EXDEV — Phase 2 review caught pre-existing
@@ -4807,6 +5277,42 @@ Phase C completes the multi-phase agentic-review effort.
   stage orchestrator rather than by an auto-invoked CLI.
 
 ### Fixed
+
+- **Review round 2 (the repair's own review) — three P0s the round-1 repair introduced.**
+  `tag --file X` **destroyed X**: `_load` turned any JSON object without a `findings` key into an
+  empty batch, and the new in-place write persisted that over the file at exit 0, after which
+  `grade` returned `A` over the wreckage. The fail-open had also **moved one field over** — the
+  `tag` column was closed while `severity` stayed on a bare membership test, so `critical` or
+  lowercase `p0` incremented nothing and three consensus-passed findings graded `A` with zero
+  errors. And `grade --spec` **aborted the verb** on every harness without a machine SPEC, while
+  the `known is None` branch written for exactly that case was unreachable from the only call site
+  that ships. Severity is now a closed vocabulary, an unusable SPEC degrades instead of raising,
+  and a JSON object with no `findings` key is refused rather than emptied — with the envelope
+  (`round`, `run_id`) preserved across the write-back.
+- **AC verification is a recorded fact, not a transient one.** `grade` verified citations in
+  memory and discarded the result, so the file, the disposition ledger and the REVIEW report all
+  kept saying `rejected` while the letter disagreed — and the documented "fix the listed entries
+  and re-run" loop could not terminate. Verification moved to `record --spec`, which owns the
+  disposition column and already persists, and is stamped as `authority_verified`. That also makes
+  it order-independent: `grade` run on its own can no longer honour an unverified citation.
+  **AC-008's golden table is tightened accordingly** — an AC-*shaped* citation that was never
+  verified no longer clears the grade.
+- **Six codex-target calls ran in the base tree.** The `is_codex` branches added for the inert-`!`
+  fix dropped the `cd <WT> &&` prefix their claude twins carry. The guard test that should have
+  caught it already had a `Bash("uv run` arm — dead code, because it only ever read the claude
+  render. It now renders and scans both variants.
+- **The rendered stage is now bound to the CLI it depends on.** Nothing asserted that
+  `review.md.j2` invokes `review_consensus` at all; deleting all three calls failed only a
+  round-trip *count*, whose message invites re-baselining the number. This was round 1's root
+  cause and it survived round 1's repair.
+- **Side's prose contradicted its own dispatch list** — "dispatch the 4 mandatory lenses" above
+  seven `Task(` lines, with result paths for only four, which is how the Side dispatch fix could
+  be defeated by the text that consumes it.
+- `record` was non-idempotent in the hiding direction (a blind re-run turned exit 1 into exit 0
+  with the gap intact); a `blocked` PLAN no longer contends in the >1-allowance refusal, so one
+  halted PLAN cannot break four structural gates for an unrelated author; `DISPOSITIONS` is
+  imported from `codex_ledger` instead of being a third literal claiming to be shared; and six
+  post-merge lens counts were stale.
 - `CHANGELOG.md` 0.10.0 "14-field schema" → "15-field schema"
   (release-0-10-0 REVIEW M1; matches the actual `ReviewTelemetryRecord`
   field count).
@@ -4879,6 +5385,42 @@ discovery-lens, and Codex model-omit fixes.
   benchmarks, or architecture-only sources.
 
 ### Fixed
+
+- **Review round 2 (the repair's own review) — three P0s the round-1 repair introduced.**
+  `tag --file X` **destroyed X**: `_load` turned any JSON object without a `findings` key into an
+  empty batch, and the new in-place write persisted that over the file at exit 0, after which
+  `grade` returned `A` over the wreckage. The fail-open had also **moved one field over** — the
+  `tag` column was closed while `severity` stayed on a bare membership test, so `critical` or
+  lowercase `p0` incremented nothing and three consensus-passed findings graded `A` with zero
+  errors. And `grade --spec` **aborted the verb** on every harness without a machine SPEC, while
+  the `known is None` branch written for exactly that case was unreachable from the only call site
+  that ships. Severity is now a closed vocabulary, an unusable SPEC degrades instead of raising,
+  and a JSON object with no `findings` key is refused rather than emptied — with the envelope
+  (`round`, `run_id`) preserved across the write-back.
+- **AC verification is a recorded fact, not a transient one.** `grade` verified citations in
+  memory and discarded the result, so the file, the disposition ledger and the REVIEW report all
+  kept saying `rejected` while the letter disagreed — and the documented "fix the listed entries
+  and re-run" loop could not terminate. Verification moved to `record --spec`, which owns the
+  disposition column and already persists, and is stamped as `authority_verified`. That also makes
+  it order-independent: `grade` run on its own can no longer honour an unverified citation.
+  **AC-008's golden table is tightened accordingly** — an AC-*shaped* citation that was never
+  verified no longer clears the grade.
+- **Six codex-target calls ran in the base tree.** The `is_codex` branches added for the inert-`!`
+  fix dropped the `cd <WT> &&` prefix their claude twins carry. The guard test that should have
+  caught it already had a `Bash("uv run` arm — dead code, because it only ever read the claude
+  render. It now renders and scans both variants.
+- **The rendered stage is now bound to the CLI it depends on.** Nothing asserted that
+  `review.md.j2` invokes `review_consensus` at all; deleting all three calls failed only a
+  round-trip *count*, whose message invites re-baselining the number. This was round 1's root
+  cause and it survived round 1's repair.
+- **Side's prose contradicted its own dispatch list** — "dispatch the 4 mandatory lenses" above
+  seven `Task(` lines, with result paths for only four, which is how the Side dispatch fix could
+  be defeated by the text that consumes it.
+- `record` was non-idempotent in the hiding direction (a blind re-run turned exit 1 into exit 0
+  with the gap intact); a `blocked` PLAN no longer contends in the >1-allowance refusal, so one
+  halted PLAN cannot break four structural gates for an unrelated author; `DISPOSITIONS` is
+  imported from `codex_ledger` instead of being a third literal claiming to be shared; and six
+  post-merge lens counts were stale.
 - Omit per-agent `model = ...` line from rendered `.codex/agents/*.toml`.
   The hardcoded `o4` / `o4-mini` strings were rejected on ChatGPT-tier Codex
   CLI subscriptions with HTTP 400 `invalid_request_error`, causing reviewer
@@ -4901,6 +5443,42 @@ discovery-lens, and Codex model-omit fixes.
 Patch release after the Codex target rollout.
 
 ### Fixed
+
+- **Review round 2 (the repair's own review) — three P0s the round-1 repair introduced.**
+  `tag --file X` **destroyed X**: `_load` turned any JSON object without a `findings` key into an
+  empty batch, and the new in-place write persisted that over the file at exit 0, after which
+  `grade` returned `A` over the wreckage. The fail-open had also **moved one field over** — the
+  `tag` column was closed while `severity` stayed on a bare membership test, so `critical` or
+  lowercase `p0` incremented nothing and three consensus-passed findings graded `A` with zero
+  errors. And `grade --spec` **aborted the verb** on every harness without a machine SPEC, while
+  the `known is None` branch written for exactly that case was unreachable from the only call site
+  that ships. Severity is now a closed vocabulary, an unusable SPEC degrades instead of raising,
+  and a JSON object with no `findings` key is refused rather than emptied — with the envelope
+  (`round`, `run_id`) preserved across the write-back.
+- **AC verification is a recorded fact, not a transient one.** `grade` verified citations in
+  memory and discarded the result, so the file, the disposition ledger and the REVIEW report all
+  kept saying `rejected` while the letter disagreed — and the documented "fix the listed entries
+  and re-run" loop could not terminate. Verification moved to `record --spec`, which owns the
+  disposition column and already persists, and is stamped as `authority_verified`. That also makes
+  it order-independent: `grade` run on its own can no longer honour an unverified citation.
+  **AC-008's golden table is tightened accordingly** — an AC-*shaped* citation that was never
+  verified no longer clears the grade.
+- **Six codex-target calls ran in the base tree.** The `is_codex` branches added for the inert-`!`
+  fix dropped the `cd <WT> &&` prefix their claude twins carry. The guard test that should have
+  caught it already had a `Bash("uv run` arm — dead code, because it only ever read the claude
+  render. It now renders and scans both variants.
+- **The rendered stage is now bound to the CLI it depends on.** Nothing asserted that
+  `review.md.j2` invokes `review_consensus` at all; deleting all three calls failed only a
+  round-trip *count*, whose message invites re-baselining the number. This was round 1's root
+  cause and it survived round 1's repair.
+- **Side's prose contradicted its own dispatch list** — "dispatch the 4 mandatory lenses" above
+  seven `Task(` lines, with result paths for only four, which is how the Side dispatch fix could
+  be defeated by the text that consumes it.
+- `record` was non-idempotent in the hiding direction (a blind re-run turned exit 1 into exit 0
+  with the gap intact); a `blocked` PLAN no longer contends in the >1-allowance refusal, so one
+  halted PLAN cannot break four structural gates for an unrelated author; `DISPOSITIONS` is
+  imported from `codex_ledger` instead of being a third literal claiming to be shared; and six
+  post-merge lens counts were stale.
 - Fixed conditional-router skill frontmatter so YAML descriptions containing
   colons do not create a double-frontmatter parse failure.
 - Synchronized sandbox renders and snapshot baselines after the 0.9.3 bump.
@@ -4908,6 +5486,42 @@ Patch release after the Codex target rollout.
 ## 0.9.2 — 2026-05-10
 
 ### Fixed
+
+- **Review round 2 (the repair's own review) — three P0s the round-1 repair introduced.**
+  `tag --file X` **destroyed X**: `_load` turned any JSON object without a `findings` key into an
+  empty batch, and the new in-place write persisted that over the file at exit 0, after which
+  `grade` returned `A` over the wreckage. The fail-open had also **moved one field over** — the
+  `tag` column was closed while `severity` stayed on a bare membership test, so `critical` or
+  lowercase `p0` incremented nothing and three consensus-passed findings graded `A` with zero
+  errors. And `grade --spec` **aborted the verb** on every harness without a machine SPEC, while
+  the `known is None` branch written for exactly that case was unreachable from the only call site
+  that ships. Severity is now a closed vocabulary, an unusable SPEC degrades instead of raising,
+  and a JSON object with no `findings` key is refused rather than emptied — with the envelope
+  (`round`, `run_id`) preserved across the write-back.
+- **AC verification is a recorded fact, not a transient one.** `grade` verified citations in
+  memory and discarded the result, so the file, the disposition ledger and the REVIEW report all
+  kept saying `rejected` while the letter disagreed — and the documented "fix the listed entries
+  and re-run" loop could not terminate. Verification moved to `record --spec`, which owns the
+  disposition column and already persists, and is stamped as `authority_verified`. That also makes
+  it order-independent: `grade` run on its own can no longer honour an unverified citation.
+  **AC-008's golden table is tightened accordingly** — an AC-*shaped* citation that was never
+  verified no longer clears the grade.
+- **Six codex-target calls ran in the base tree.** The `is_codex` branches added for the inert-`!`
+  fix dropped the `cd <WT> &&` prefix their claude twins carry. The guard test that should have
+  caught it already had a `Bash("uv run` arm — dead code, because it only ever read the claude
+  render. It now renders and scans both variants.
+- **The rendered stage is now bound to the CLI it depends on.** Nothing asserted that
+  `review.md.j2` invokes `review_consensus` at all; deleting all three calls failed only a
+  round-trip *count*, whose message invites re-baselining the number. This was round 1's root
+  cause and it survived round 1's repair.
+- **Side's prose contradicted its own dispatch list** — "dispatch the 4 mandatory lenses" above
+  seven `Task(` lines, with result paths for only four, which is how the Side dispatch fix could
+  be defeated by the text that consumes it.
+- `record` was non-idempotent in the hiding direction (a blind re-run turned exit 1 into exit 0
+  with the gap intact); a `blocked` PLAN no longer contends in the >1-allowance refusal, so one
+  halted PLAN cannot break four structural gates for an unrelated author; `DISPOSITIONS` is
+  imported from `codex_ledger` instead of being a third literal claiming to be shared; and six
+  post-merge lens counts were stale.
 - Fixed Codex `config_file` rendering so paths do not accidentally include a
   duplicated `.codex/` segment.
 

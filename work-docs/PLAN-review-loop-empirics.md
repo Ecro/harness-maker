@@ -12,7 +12,7 @@ validator_outcome: MAJOR_REVISION_RESOLVED
 surface_allowance:
   chars: 9940
   commands:
-    review: 8270
+    review: 8298
   round_trips:
     review: 13
     hm-review: 15

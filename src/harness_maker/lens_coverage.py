@@ -155,9 +155,10 @@ def main(argv: list[str] | None = None) -> int:
         "--preset",
         default="Production",
         help=(
-            "the harness preset. Production requires all nine lenses; Side requires the six "
+            "the harness preset. Production requires all seven lenses; Side requires the four "
             "core categories and lets the router decide the three domain lenses. An unknown "
-            "value resolves to Production — more mandatory coverage is the fail-closed side."
+            "value resolves to Production — more mandatory coverage is the fail-closed side. "
+            "`--round` also accepts a confirmation-pass id (confirm-1 / confirm-2)."
         ),
     )
     try:

@@ -203,3 +203,69 @@ between two runs of one reviewer, so a re-run would redraw some groups; `consist
    the CLI's value verbatim.
 6. **A render test that binds the three `review_consensus` calls**, in the shape
    `test_the_coverage_call_carries_its_full_flag_set` already uses for `lens_coverage`.
+
+
+---
+
+# Round 2 — reviewing the repair (`ab161e08..41fba995`)
+
+**Grade: F.** Six lenses + codex on the fix commit. **All three P0s were created by round 1's
+fixes** — the ~1:1 rate this repo records for repair rounds, and the same pattern `plan.md.j2`
+already documents for `plan-validator` ("pass 2's criticals were created by pass 1's fixes").
+This is the second independent observation of that mechanism.
+
+## P0 (all three reproduced by execution, all three fixed)
+
+| # | Defect | Voices |
+|---|---|---|
+| 1 | **`tag --file X` DESTROYED X.** `_load` did `.get("findings", [])`, so any JSON object without a `findings` key became an empty batch — and round 1's new in-place write persisted that over the file at exit 0. A following `grade` returned `A` over the wreckage. | security |
+| 2 | **The fail-open moved one field over.** Round 1 closed the `tag` column and left `severity` on a bare `if severity in counts`, so `critical`/`p0` incremented nothing: three consensus-passed findings graded `A`, zero errors, exit 0. On the field that decides the letter. | robustness |
+| 3 | **`grade --spec` aborted the verb** on every harness without a machine SPEC (exit 2, no payload). `_verify_ac_citations`'s `known is None` branch was written for exactly that case and was **unreachable from the only call site that ships**. | design, robustness, security, functionality, tests, consistency, codex |
+
+## P1 (all fixed in the follow-up sweep)
+
+- **`grade` verified in memory and threw the verdict away** — file, ledger and REVIEW report kept
+  saying `rejected` while the letter disagreed, so the documented "fix and re-run" loop **could
+  not terminate**. Verification moved to `record` (the disposition owner, which already persists)
+  and is now stamped as `authority_verified`, which also makes it **order-independent**: `grade`
+  run alone can no longer honour an unverified citation.
+- **Six codex branches dropped `cd <WT> &&`** → base tree instead of the tree under review.
+- **Side prose said "dispatch 4" above 7 `Task(` lines**, with result paths for only 4 — the
+  Side fix was defeated by the text that consumes it.
+- **No render test bound the three `review_consensus` calls.** This was round 1's root cause and
+  it survived round 1's repair. Deleting all three failed only a round-trip *count*, whose message
+  invites re-baselining the number.
+- **`record` was non-idempotent in the hiding direction** — a blind re-run turned exit 1 into
+  exit 0 with the gap intact. Downgrades now carry `hm_downgraded` and are re-reported.
+- **`blocked` × the >1-allowance refusal**: one PLAN halted for an ADR and never resumed would
+  break four structural gates forever, for an author who touched neither PLAN.
+- **`DISPOSITIONS` was a third independent literal** whose comment asserted it was shared.
+- Stale post-merge counts in six places.
+
+## Contract change
+
+**AC-008's golden table was TIGHTENED, not weakened.** `authority_verified` is now part of the
+input and a fifth row was added: an AC-*shaped* citation that was never verified no longer clears
+the grade. `AC-999` parses exactly like `AC-004`; only the SPEC can tell them apart.
+
+## What was NOT done, and why it matters
+
+The alternative on the table was **collapsing `tag`/`record`/`grade` into one stateless verb**.
+The in-place write is what generated most of round 2's findings — file destruction, envelope loss,
+missing containment, non-idempotency, order-dependence — and a single read-and-report verb removes
+that class rather than guarding each instance. Narrow repair was chosen instead, so the class
+remains and these stay open:
+
+- `_write_findings` applies **no containment check** on a model-substituted path, unlike every
+  sibling writer in this repo (`stage_agent_ledger`, `lens_coverage`, `review_telemetry`).
+- `two_pass_review merge` still inlines model-authored findings into a shell-quoted `echo`, one
+  step before the change that exists to stop exactly that — command injection from a hostile diff.
+- `--out` has no rendered caller; the `plan` verb and `rereview_plan` are still callerless.
+- The out-of-diff P1s from round 1 are untouched: `freeze.py` slug traversal,
+  `codex_ledger` migration TOCTOU, `lens_coverage`'s `run_id` missing from the results **path**.
+
+## Cross-model
+
+**codex** — `invoked`, 5 findings, all real; sole voice on the file-destruction P0's sibling and on
+the `--spec`/`cd <WT>` pair. **antigravity** — `failed` (empty response) on round 1 at both 151 KB
+and 40 KB; not re-invoked for round 2.

@@ -98,8 +98,8 @@ def mandatory_lenses(preset: str = "Production") -> tuple[str, ...]:
 
 
 #: How each lens is dispatched: the subagent that carries it, and the one-line brief that tells
-#: it which axis it owns. The six core categories share `code-reviewer` and are distinguished ONLY
-#: by this line, which is why the brief is data here rather than prose in the template — six
+#: it which axis it owns. The core categories share `code-reviewer` and are distinguished ONLY
+#: by this line, which is why the brief is data here rather than prose in the template — several
 #: dispatches to one agent name are otherwise indistinguishable in the rendered command.
 LENS_DISPATCH: dict[str, tuple[str, str]] = {
     "design": (
@@ -163,8 +163,9 @@ def lens_dispatch(preset: str = "Production") -> list[dict[str, str]]:
 def routable_lenses(preset: str = "Production") -> tuple[str, ...]:
     """Lenses the conditional router may drop for a preset — empty on Production.
 
-    Side gets the domain lenses back as routable, which is the whole preset split: a Side
-    project touching no auth and no threads pays six dispatches, not nine.
+    Side gets the domain lenses back as routable, which is the whole preset split: a Side project
+    touching no auth and no threads still DISPATCHES all seven (a router can only drop what was
+    dispatched) but only the four core lenses are REQUIRED for approval.
     """
     return DOMAIN_LENSES if str(preset) == "Side" else ()
 
