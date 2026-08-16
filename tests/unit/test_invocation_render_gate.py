@@ -135,11 +135,24 @@ def rendered_cursor_codex(tmp_path_factory: pytest.TempPathFactory) -> Path:
 
 def test_no_broken_invocation_in_cursor_codex_targets(rendered_cursor_codex: Path) -> None:
     offenders: dict[str, list[str]] = {}
+    scanned: list[str] = []
     for pattern in ("*.md", "*.mdc", "*.toml"):
         for f in rendered_cursor_codex.rglob(pattern):
+            rel = str(f.relative_to(rendered_cursor_codex))
+            scanned.append(rel)
             bad = _executable_broken_lines(f.read_text(encoding="utf-8"))
             if bad:
-                offenders[str(f.relative_to(rendered_cursor_codex))] = bad
+                offenders[rel] = bad
+    # NON-EMPTY PRECONDITION. Until 2026-08-17 this fixture rendered the Codex tree to
+    # `target_dir.parent` — outside the directory it then walked — so it scanned ZERO Codex
+    # files while its docstring claimed to cover them, and reported clean for years. Asserting
+    # the surface exists is what makes the re-rooting durable: without it the same mistake
+    # reads as a pass again. `not offenders` alone is also true of nothing at all.
+    codex_seen = [p for p in scanned if p.startswith((".codex/", ".agents/")) or p == "AGENTS.md"]
+    assert codex_seen, (
+        "no Codex-destined asset was scanned — this gate is vacuous. Either the render root "
+        "moved back above the walked tree, or the `targets` axis stopped producing them."
+    )
     assert not offenders, (
         "broken executable harness_maker invocations in cursor/codex assets:\n"
         + "\n".join(f"  {k}: {v}" for k, v in offenders.items())

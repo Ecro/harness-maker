@@ -80,6 +80,15 @@ def _shipped_instruction(root: Path) -> tuple[str, str]:
     assert "WAIT for every one" in intro, (
         "the shipped intent block lost its join contract, or this slice stopped capturing it"
     )
+    # Bound the OTHER direction too. Ending at the fence fixed under-capture, but it makes
+    # over-capture silent: insert any paragraph between `dispatch_intro()` and the fence and it
+    # is swallowed into the live prompt while the assert above still passes. The intent block is
+    # ~900 chars; a ceiling turns a future insertion into a failure instead of a quiet change of
+    # what this test actually sends.
+    assert len(intro) < 1500, (
+        f"intent slice captured {len(intro)} chars — something now sits between the intent "
+        "block and the fence, so the live prompt is no longer just the shipped intent"
+    )
     call = f'spawn_agent(agent_type="{agent}", message="Reply with exactly {_SENTINEL}")'
     return intro, call
 

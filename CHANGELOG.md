@@ -4,9 +4,10 @@
 
 ### Fixed
 
-- **Codex-target output named tools the Codex runtime does not have.** Every rendered Codex
-  stage skill carried Claude Code's `Task(subagent_type=…)` dispatch syntax verbatim — 18
-  occurrences per preset across 9 files, `hm-review` alone 14. Codex has no `Task` tool, so
+- **Codex-target output named tools the Codex runtime does not have.** Four Codex stage skills
+  (`hm-execute`, `hm-plan`, `hm-review`, `hm-wrapup`) carried Claude Code's
+  `Task(subagent_type=…)` dispatch syntax verbatim — 18 occurrences per preset across 9 files,
+  `hm-review` alone 14. The other six carry no dispatch at all. Codex has no `Task` tool, so
   every sub-agent dispatch on that target was an instruction the runtime could not execute,
   and it failed **silently**: the model improvised. Observed in a real harness as a Codex
   `/hm:review` that wrote zero lens result files, leaving `hm lens_coverage check` reporting

@@ -70,8 +70,10 @@ _ALLOWLIST: dict[str, str] = {
 
 #: Two enabled reviewers, because `review.md.j2`'s Pass-1 section is gated on
 #: `reviewers.enabled | length > 1` and the default answers enable ZERO. That block told Codex
-#: to use "a single message with multiple Task tool uses" and this gate could not see it —
-#: not because the line was branched, but because no matrix row rendered it. THIS repo's own
+#: to use "a single message with multiple Task tool uses" and this gate could not see it.
+#: TWO things were true at once and both fixes were needed: `"Task tool"` was not in
+#: `_CLAUDE_ONLY` (so even a row that rendered the block would have reported clean), AND no
+#: matrix row rendered the block. Removing either fix restores the blindness. THIS repo's own
 #: harness runs with two reviewers enabled, so the unrenderable-by-default block is the one
 #: that actually ships here.
 _TWO_REVIEWERS = {
@@ -225,14 +227,25 @@ def test_the_gate_fails_on_an_injected_regression() -> None:
     Injects each Claude-only form into a real Codex body and asserts the detector reports it —
     exercising `_violations` itself rather than a re-implementation of it.
     """
+    # The payloads are DERIVED from `_CLAUDE_ONLY`, not a parallel hardcoded list. A literal
+    # list silently stops covering the tuple the moment an entry is added: `"Task tool"` was
+    # added to close a measured leak and a hardcoded 3-payload loop exercised it with nothing,
+    # so deleting or mis-spelling that entry would have left the whole module green.
+    payloads = {
+        "Task(": 'Task(subagent_type="code-reviewer", description="d", prompt="p")',
+        "Task tool": "run them in a single message with multiple Task tool uses",
+        "AskUserQuestion": "offer via `AskUserQuestion`",
+        "Skill(": "invoke `Skill(hm:execute)`",
+    }
+    assert set(payloads) == set(_CLAUDE_ONLY), (
+        "every _CLAUDE_ONLY entry needs an injection payload — an undetected entry is a "
+        f"detector nothing exercises: {set(_CLAUDE_ONLY) ^ set(payloads)}"
+    )
+
     bodies = _codex_bodies(Preset.SIDE, [Target.CODEX], DevMode.TASK_DRIVEN)
     assert not _violations(bodies)
     target = sorted(bodies)[0]
-    for tool, injected in (
-        ("Task(", 'Task(subagent_type="code-reviewer", description="d", prompt="p")'),
-        ("AskUserQuestion", "offer via `AskUserQuestion`"),
-        ("Skill(", "invoke `Skill(hm:execute)`"),
-    ):
+    for tool, injected in payloads.items():
         mutated = dict(bodies)
         mutated[target] = bodies[target] + "\n" + injected + "\n"
         found = _violations(mutated)

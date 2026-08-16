@@ -760,14 +760,23 @@ Codex `/hm:review` now approves; it proves the instruction it depends on is exec
 
 ## ✅ Success Criteria
 
-- [x] No Codex-rendered output contains `Task(`, `Skill(` or `AskUserQuestion`.
+- [x] No Codex-rendered output contains `Task(`, `Task tool` or `Skill(`, and the only
+      `AskUserQuestion` is the single allowlisted line that names BOTH runtimes
+      (`autoloop-driver/SKILL.md:36`, one per preset). **Not an absolute** — that line's whole
+      value is naming the mapping, and a reader treating the criterion literally could "fix"
+      the artifact by deleting it.
 - [x] A rendered Codex `hm-review` skill contains fourteen `spawn_agent` dispatches (7 lenses ×
-      2 dispatch blocks, `review.md.j2:187` and `:907`) whose core lens briefs are
+      2 dispatch blocks, `review.md.j2:187` and `:909`) whose core lens briefs are
       byte-identical to `lens_briefs_baseline.json` and to the Claude-rendered ones.
-- [x] The structural gate has been observed failing on an injected `Task(` regression **and**
-      on a forced-empty scan surface.
-- [x] `INTEGRATION=1` live e2e run once, green, and recorded — asserting spawn events, lens
-      result files, and `blocks_approval: false`.
+- [x] The structural gate has been observed failing on an injected regression for **every**
+      `_CLAUDE_ONLY` entry (the payload set is derived from that tuple, so a new entry with no
+      payload fails the test rather than shipping unexercised) **and** on a forced-empty scan
+      surface.
+- [x] `INTEGRATION=1` live e2e run and green **after the final edit to it** — asserting the
+      runtime's own `collab_tool_call`/`spawn_agent` record and the sub-agent's reply.
+      **It does NOT assert lens result files or `blocks_approval`** — ADR-005 scoped that half
+      out, and the D.5 gap above says so; an earlier version of this line claimed both and
+      contradicted its own document.
 - [x] Full suite green.
 - [x] Every rendered dispatch on either target originates from the dispatch macro, and the
       macro fails loudly when `is_codex` is not passed.

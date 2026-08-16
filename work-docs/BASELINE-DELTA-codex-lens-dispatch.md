@@ -30,12 +30,15 @@ renders **only** on the Codex arm. That is the mitigation for a real, measured r
 `spawn_agent` schemas exist in Codex CLI 0.147.0 (`agent_type`/`message` from the live
 `codex exec` probe, `task_name`/`fork_turns` in the shipped `multi_agents_v2` handlers), only
 one is verified, and a hardcoded literal that drifts fails **silently** — which is the failure
-this whole task exists to remove. The Claude arm pays +213 for the macro's line-shape changes and nothing for the **Codex**
-intent sentence; `dispatch_intro` does emit a one-line Claude sentence ("Dispatch each item
+this whole task exists to remove. The Claude arm pays **+205 for the macro's line-shape changes and +8 for the round-3 Pass-1
+rewording** (`review.md.j2:270-271`, 46→54 chars — which is why both arms move by the same 8),
+and nothing for the **Codex** intent sentence; `dispatch_intro` does emit a one-line Claude sentence ("Dispatch each item
 below with the `Task` tool."), which is part of that +213.
 
-**Review rounds 1 and 3 raised the Codex figure from +1 635 to +4 182**, and the extra ~2.5k is one
-paragraph: the **join contract**. `spawn_agent` returns when an agent *starts*, not when it
+**Review round 1 raised the Codex figure from +1 635 to +4 174, and round 3 added the last +8.**
+Round 1's ~2.5k is one paragraph — the **join contract**; round 3's +8 is the Pass-1 rewording,
+not the join. (The figures were re-measured after each round and the surrounding attribution was
+not, which is the same defect this document records twice above.) `spawn_agent` returns when an agent *starts*, not when it
 answers — collection is a separate step. The stage prose then declares "a dispatch that returns
 nothing produces no file; that absence is the signal", so on the runtime where this fan-out has
 never actually run, a still-in-flight agent would have been read as a dead lens — reproducing

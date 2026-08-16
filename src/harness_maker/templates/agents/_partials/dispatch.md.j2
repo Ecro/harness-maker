@@ -6,7 +6,8 @@
   (`agent_type` / `message`, live-probed against Codex CLI 0.147.0), and the agent roles it
   resolves against are the `[agents.<name>]` entries `.codex/config.toml` already declares from
   the same `agents` dict. Emitting `Task(` into a Codex skill ships an instruction the runtime
-  cannot execute: measured 36 `Task(` across 9 rendered Codex files, and a Codex `/hm:review`
+  cannot execute: measured 18 `Task(` across 9 rendered Codex files per preset (36 across the
+  two rendered presets), and a Codex `/hm:review`
   that wrote zero lens result files and was therefore permanently unapprovable.
 
   `is_codex` is an EXPLICIT REQUIRED PARAMETER, never read from context. Jinja's `{% import %}`
