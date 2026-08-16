@@ -122,9 +122,13 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     #       being prose (ADR-008), and prose has no executable surface to test. It was three
     #       chained verbs over one rewritten file until 2026-08-16; folding them into one
     #       stateless call took this row 35 -> 33 and removed the write-back defect class.
+    #   +2  Phase 5's churn measurement: two endpoint pins (pre-fix, post-fix) and one
+    #       `hm review_churn measure` per repair round. The measure shares a line with the
+    #       post pin, so the round costs two counted calls, not three. They run only inside
+    #       the auto-fix loop — a review that approves at round 1 pays none of them.
     # The ADR-011 rule counts each `Task(` individually even though all seven leave in one
     # message, so the dispatch half of this is a cost in the metric, not in turns.
-    "review": 33,
+    "review": 35,
     "spec": 6,
     "uninstall": 3,
     "verify": 13,

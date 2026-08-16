@@ -141,3 +141,27 @@ The counts differ by variant (+17 vs +13) because the counting rule does: `^!` l
 `Bash(` call sites for codex, and the template branches on `is_codex`. They are separate keys for
 that reason — folding them onto one would let a real drift in one variant hide behind the other's
 number.
+
+## Phase 5 — churn measurement (2026-08-16)
+
+| Dimension | Was | Now | Δ |
+|---|---|---|---|
+| `chars` (aggregate) | 11,185 (claude) | **11,227** (codex) | +42 |
+| `commands.review` | 8,821 | **9,816** | +995 |
+| `round_trips.review` | 11 | **13** | +2 |
+| `round_trips.hm-review` | 13 | **15** | +2 |
+
+Three calls per repair round: two endpoint pins (`hm review_churn pin --label r{N}-pre|post`)
+and one `hm review_churn measure`. The measure shares its line with the post pin, so the
+counting rule sees **two** calls per variant, not three.
+
+The pins are what the characters buy. A round's fixes are uncommitted — `/hm:review` never
+commits, wrapup does — so `HEAD..HEAD` would report 0.0 for every round no matter what the
+round changed, and the Phase 6 gate reading that would skip every re-review. The prose that
+funds them is the two-sentence boundary note ("record only", null-ratio ≠ no-churn), which
+exists because the reverse reading — treating a binary-only round as zero churn — is the same
+silent-skip in a different disguise.
+
+`chars` is now pinned to the **codex** figure (11,227), not the claude one (11,185). The codex
+variant renders the same three calls inside `Bash("…")` wrappers, so it grows more; funding the
+smaller of the two would have gone red on a target nobody was reading.

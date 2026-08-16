@@ -89,28 +89,37 @@ def resolve_review_base(base: Path, base_branch: str | None = None) -> str:
     return EMPTY_TREE
 
 
+def snapshot_working_tree(base: Path) -> str:
+    """Write the current working state — tracked and untracked — to a tree, index untouched.
+
+    Sole owner of this technique; `review_churn` pins its per-round endpoints the same way,
+    and a second hand-rolled copy would be the place the ignored-file subtlety below is lost.
+
+    Seed from HEAD before adding. An EMPTY index makes `add -A` treat a file that is
+    tracked-but-`.gitignore`-matched as ignored, so it is silently omitted and the reader
+    sees it as DELETED — the snapshot is then not the working tree, which is the one
+    property that makes it usable. Reproduced against a probe repo with a tracked, ignored
+    file. Seeding first also means `add -A` records genuine deletions rather than starting
+    from nothing.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        env = {**os.environ, "GIT_INDEX_FILE": str(Path(tmp) / "index")}
+        _git(base, "read-tree", "HEAD", env=env)
+        _git(base, "add", "-A", env=env)
+        return _git(base, "write-tree", env=env)
+
+
 def create_freeze_commit(base: Path, slug: str, pass_id: str, review_base: str) -> str:
     """Commit the current working state — tracked and untracked — without touching the index.
 
     The fixes a confirmation pass must examine are uncommitted at the moment the gate would
     approve (commits happen at wrapup), so a ref naming HEAD would freeze the artifact WITHOUT
-    the content the pass exists to look at. A temporary index gives a faithful tree while
-    leaving the user's staged state alone.
+    the content the pass exists to look at.
 
     Parented on `review_base` so the pass's diff spans the whole review rather than the last
     round's fixes.
     """
-    with tempfile.TemporaryDirectory() as tmp:
-        env = {**os.environ, "GIT_INDEX_FILE": str(Path(tmp) / "index")}
-        # Seed from HEAD before adding. An EMPTY index makes `add -A` treat a file that is
-        # tracked-but-`.gitignore`-matched as ignored, so it is silently omitted and the
-        # confirmation pass sees it as DELETED relative to review_base — the frozen tree is
-        # then not the working tree, which is the one property AC-004 asserts. Reproduced
-        # against a probe repo with a tracked, ignored file. Seeding first also means
-        # `add -A` records genuine deletions rather than starting from nothing.
-        _git(base, "read-tree", "HEAD", env=env)
-        _git(base, "add", "-A", env=env)
-        tree = _git(base, "write-tree", env=env)
+    tree = snapshot_working_tree(base)
 
     parents = [] if review_base == EMPTY_TREE else ["-p", review_base]
     commit = _git(base, "commit-tree", tree, *parents, "-m", f"hm freeze: {slug} {pass_id}")

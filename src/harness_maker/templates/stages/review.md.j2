@@ -756,6 +756,14 @@ Per iteration:
    - Tag = `consensus-passed`.
    - Has a concrete `suggestion` with replacement code (skip vague advice).
 
+3b. **Pin the pre-fix endpoint** — before this round's first `Edit`, never after:
+
+{% if is_codex %}```bash
+Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_churn pin --slug {slug} --label r{N}-pre")
+```{% else %}```bash
+!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_churn pin --slug {slug} --label r{N}-pre
+```{% endif %}
+
 4. **Apply** in priority order (P0 → P1 → P2):
 
    > **Run the tests, never edit one to make a finding go away.** You **must not edit a test file
@@ -778,6 +786,19 @@ Per iteration:
 
    On failure: identify the last fix that touched the failing file → **revert** it (restore original snippet) and log `Fix #{N} reverted — caused build failure`. Continue with remaining fixes (do not abort the round).
 
+5b. **Measure this round's churn** — after Step 5's reverts, so a reverted fix does not count:
+
+{% if is_codex %}```bash
+Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_churn pin --slug {slug} --label r{N}-post && uv run --with {{ harness_maker_src_path }} hm review_churn measure --pre refs/hm-churn/v1/{slug}-r{N}-pre --post refs/hm-churn/v1/{slug}-r{N}-post")
+```{% else %}```bash
+!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_churn pin --slug {slug} --label r{N}-post && uv run --with {{ harness_maker_src_path }} hm review_churn measure --pre refs/hm-churn/v1/{slug}-r{N}-pre --post refs/hm-churn/v1/{slug}-r{N}-post
+```{% endif %}
+
+   **Record only — nothing branches on the ratio in this version.** Carry the four
+   `churn_*` keys verbatim into the iteration record and the telemetry row. A null
+   `churn_ratio` beside `churn_measured_n: 0` means no file was measurable (all
+   binary/deleted), which is a different fact from a round that changed nothing.
+
 6. **Re-review (selective)** — re-spawn ONLY reviewers whose scope was touched by applied fixes. Launch all required re-reviewers in parallel in one Task batch when their scopes are independent. Reviewers that approved untouched files are NOT re-run. Multi-instance code-reviewer consensus (when configured) still uses the configured number of instances on modified files. **`unreviewed_fix_count` = applied fixes whose file no re-spawned reviewer covers.**
 
 7. **Recompute grade** using the current voting set (Step 4 again, clusters rebuilt per the round-state contract).
@@ -795,6 +816,7 @@ Per iteration:
    | 2 | P1 | ... | ... | Skipped — overlap · caused_by=none |
 
    Remaining: {count} | New issues introduced: {count}
+   Churn: {churn_ratio or "not measurable"} (max: {churn_max_path}, measured {churn_measured_n}, excluded {churn_excluded_n})
    ```
 
 9. Return to the Grade Gate with the updated grade and incremented `iteration_count`.

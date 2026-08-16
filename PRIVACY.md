@@ -107,9 +107,13 @@ Measure C (PLAN-review-round-inflation). These four are `null` rather than `0` w
 | `unreviewed_fix_count` | int \| null | Fixes applied in the terminal round, which the loop never re-reviewed |
 | `regression_attributed_n` | int \| null | Distinct findings attributed to a previous round's fix |
 | `attribution_unknown_n` | int \| null | Distinct findings whose origin could not be attributed either way |
-| `lenses_exercised` | list[str] \| null | Which of the five mandatory review lenses delivered a result this round. Lens **ids** only (`correctness`, `failure`, `concurrency`, `security`, `tests`) — never finding text. `[]` means every dispatch failed; `null` means a harness version that predates the field |
+| `lenses_exercised` | list[str] \| null | Which mandatory review lenses delivered a result this round. Lens **ids** only (`design`, `functionality`, `robustness`, `consistency`, `security`, `concurrency`, `tests`) — never finding text. `[]` means every dispatch failed; `null` means a harness version that predates the field |
 | `confirm_pass_ran` | bool \| null | Whether a confirmation pass ran over the frozen diff |
 | `confirm_pass_new_severe_n` | int \| null | Count of new severe findings the confirmation pass surfaced. Present only when `confirm_pass_ran` is true |
+| `churn_ratio` | float \| null | How much of the most-churned file this repair round rewrote, 0–1. `null` = no file was measurable (all binary/deleted), or a harness version that predates the field |
+| `churn_max_path` | str \| null | Repo-**relative** path of the file that ratio came from — a path, never file content. Stays on disk with the rest of the row |
+| `churn_measured_n` | int \| null | How many touched files contributed to the ratio |
+| `churn_excluded_n` | int \| null | How many were excluded (binary, deleted, empty post-tree) |
 
 <!-- @hm:/privacy:review-telemetry-measure-c -->
 

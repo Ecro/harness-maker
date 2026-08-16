@@ -99,6 +99,16 @@ class ReviewTelemetryRecord(BaseModel):
     confirm_pass_ran: bool | None = None
     confirm_pass_new_severe_n: int | None = Field(default=None, ge=0)
 
+    # ── churn measurement (SPEC AC-013, record-only) ─────────────────────────
+    # Null across all three = this harness version never measured. The counts are
+    # the version discriminator, not the ratio: a round whose whole diff was binary
+    # measures nothing and writes `churn_ratio: null` with `churn_measured_n: 0`,
+    # which a nullable ratio alone could not tell apart from a legacy row.
+    churn_ratio: float | None = Field(default=None, ge=0.0, le=1.0)
+    churn_max_path: str | None = Field(default=None, max_length=400)
+    churn_measured_n: int | None = Field(default=None, ge=0)
+    churn_excluded_n: int | None = Field(default=None, ge=0)
+
     @field_validator("lenses_exercised")
     @classmethod
     def _lenses_are_known(cls, value: list[str] | None) -> list[str] | None:
@@ -134,6 +144,36 @@ class ReviewTelemetryRecord(BaseModel):
             raise ValueError(msg)
         if self.confirm_pass_ran is not True and self.confirm_pass_new_severe_n is not None:
             msg = "confirm_pass_new_severe_n must be null unless confirm_pass_ran is true"
+            raise ValueError(msg)
+        return self
+
+    @model_validator(mode="after")
+    def _churn_record_is_readable(self) -> ReviewTelemetryRecord:
+        """The counts are one observation; the ratio is conditional on them.
+
+        A ratio beside absent counts has no denominator to interpret it against,
+        and a positive `churn_measured_n` with a null ratio contradicts itself —
+        a measured file always yields a number. These rows are append-only.
+        """
+        if (self.churn_measured_n is None) != (self.churn_excluded_n is None):
+            msg = (
+                "churn_measured_n and churn_excluded_n are both-or-neither: "
+                f"got measured={self.churn_measured_n!r}, excluded={self.churn_excluded_n!r}"
+            )
+            raise ValueError(msg)
+        if self.churn_measured_n is None:
+            if self.churn_ratio is not None or self.churn_max_path is not None:
+                msg = "churn_ratio/churn_max_path require the churn counts"
+                raise ValueError(msg)
+            return self
+        if self.churn_measured_n > 0 and self.churn_ratio is None:
+            msg = f"churn_measured_n={self.churn_measured_n} but churn_ratio is null"
+            raise ValueError(msg)
+        if self.churn_measured_n == 0 and self.churn_ratio is not None:
+            msg = "churn_ratio must be null when no file was measurable"
+            raise ValueError(msg)
+        if (self.churn_ratio is None) != (self.churn_max_path is None):
+            msg = "churn_ratio and churn_max_path are both-or-neither"
             raise ValueError(msg)
         return self
 

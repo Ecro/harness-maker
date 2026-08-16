@@ -10,13 +10,13 @@ interview_rounds: 23
 adrs: 10
 validator_outcome: MAJOR_REVISION_RESOLVED
 surface_allowance:
-  chars: 10218
+  chars: 11227
   commands:
-    review: 8821
+    review: 9816
   round_trips:
-    review: 11
-    hm-review: 13
-  reason: "Phase 1's two uncuttable brief clauses (732), plus Phases 2-4: nine lens dispatches instead of five at BOTH sites, Step C2 rendering its own dispatch list because six lenses now share one agent and are told apart only by their brief line, and Step 4 calling hm review_consensus instead of describing the arithmetic (ADR-008)."
+    review: 13
+    hm-review: 15
+  reason: "Phase 1's two uncuttable brief clauses (732), plus Phases 2-4: nine lens dispatches instead of five at BOTH sites, Step C2 rendering its own dispatch list because six lenses now share one agent and are told apart only by their brief line, and Step 4 calling hm review_consensus instead of describing the arithmetic (ADR-008). Phase 5 adds two churn-endpoint pins and one measure call per repair round, at both sites."
   delta_doc: BASELINE-DELTA-review-loop-empirics.md
 summary: "Adopt the six-category axis, give each lens a vote, gate re-review on churn."
 ---
@@ -582,6 +582,7 @@ ADR-007 and it is not backward compatible with a harness that expected `manual-o
 - **Rollback:** Phase 3 (and Phase 3 must not ship without this).
 
 ### Phase 5 — Churn measurement (record only)
+- **Status:** DONE (2026-08-16). `review_churn.{FileChurn,measure,collect,pin}`, the four `churn_*` telemetry fields, and the two endpoint pins plus one measure call in the auto-fix loop. No gate — that is Phase 6.
 - **depends_on:** `[1]` · **parallel_group:** `serial-review-tpl` · **merge_hazards:** `review.md.j2` iteration record (shared with Phase 4)
 - **Scope.** In: `review_churn.py` — pinned pre/post endpoints, per-file ratio, **max across files**,
   created/deleted/binary/renamed handling — plus iteration-record and telemetry fields. Out: any gate.

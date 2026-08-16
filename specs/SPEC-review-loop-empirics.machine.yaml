@@ -302,7 +302,7 @@ ac:
       counted: true
       human_review_needed: true
     edge: false
-    note: 'AC-SHAPED but never verified. AC-999 parses exactly like AC-004.'
+    note: AC-SHAPED but never verified. AC-999 parses exactly like AC-004.
   - input:
       severity: P0
       disposition: rejected
@@ -517,7 +517,8 @@ ac:
 - id: AC-013
   title: The churn ratio is well-defined over pinned endpoints and degenerate files
   type: parametric
-  test_ids: []
+  test_ids:
+  - tests/unit/test_review_churn_measure.py::test_churn_ratio_endpoints_and_degenerate_files
   executable_predicate: null
   golden_table:
   - input:
@@ -577,7 +578,7 @@ ac:
     note: ''
   rubric_id: null
   note: ''
-  pending_test: true
+  pending_test: false
   oracle_source: golden
   oracle_evidence: Each expected value is computed by hand from S12's rules; the max-across-files
     row exists specifically because aggregate averaging masked it, which is the defect

@@ -1,8 +1,16 @@
-"""Per-round fix churn: config resolution today, measurement in a later phase."""
+"""Per-round fix churn: config resolution plus measurement over pinned endpoints."""
 
 from __future__ import annotations
 
+import argparse
+import json
+import subprocess
+import sys
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
+
+from harness_maker import command_registry, freeze
 
 DEFAULT_CHURN_RATIO = 0.20
 """Fraction of a touched file's LOC above which a repair round re-reviews.
@@ -63,3 +71,288 @@ def churn_gate_enabled(reviewers: dict[str, Any]) -> bool:
     if not isinstance(raw, bool):
         raise ChurnConfigError(f"{_GATE_KEY} must be a bool, got {raw!r}")
     return raw
+
+
+# ── measurement (Phase 5 — record only; the gate is Phase 6) ────────────────
+
+BINARY = "binary"
+DELETED = "deleted"
+CREATED = "created"
+MODIFIED = "modified"
+RENAMED = "renamed"
+
+EXCLUDED_BINARY = "binary"
+EXCLUDED_DELETED = "deleted"
+EXCLUDED_EMPTY_POST = "empty-post-tree"
+
+
+class ChurnMeasurementError(ValueError):
+    """A file record the ratio has no reading over.
+
+    Distinct from `ChurnConfigError`: that one is a user's typo, this one is the
+    adapter handing the pure layer something it cannot have produced.
+    """
+
+
+@dataclass(frozen=True)
+class FileChurn:
+    """One touched file at the pinned endpoints.
+
+    `post_loc` is the line count in the **post** tree, which is what makes
+    "a small file rewritten whole" and "a small edit to a large file" separable;
+    a pre-tree denominator would rank a whole-file deletion-and-rewrite by its
+    old size instead.
+    """
+
+    path: str
+    kind: str
+    added: int | None
+    deleted: int | None
+    post_loc: int | None
+
+
+@dataclass(frozen=True)
+class ChurnMeasurement:
+    """The aggregate plus the audit trail of what did not count toward it.
+
+    `excluded` is carried, not dropped: a round whose whole diff was binary
+    reports `ratio=None` with a reason, which a bare `0.0` would have made
+    indistinguishable from a round that genuinely changed nothing.
+    """
+
+    ratio: float | None
+    max_path: str | None
+    measured: tuple[tuple[str, float], ...]
+    excluded: tuple[tuple[str, str], ...]
+
+    def as_record(self) -> dict[str, Any]:
+        """The telemetry subset — exactly the four `ReviewTelemetryRecord` churn keys.
+
+        Deliberately excludes the per-file detail: the telemetry row forbids extra
+        keys and is capped at PIPE_BUF, so a caller splatting the detail into it
+        would fail validation on a large diff and nowhere else.
+        """
+        return {
+            "churn_ratio": self.ratio,
+            "churn_max_path": self.max_path,
+            "churn_measured_n": len(self.measured),
+            "churn_excluded_n": len(self.excluded),
+        }
+
+    def as_detail(self) -> dict[str, Any]:
+        """The full audit shape for the REVIEW iteration record."""
+        return {
+            **self.as_record(),
+            "measured": [{"path": p, "ratio": r} for p, r in self.measured],
+            "excluded": [{"path": p, "reason": r} for p, r in self.excluded],
+        }
+
+
+def file_ratio(entry: FileChurn) -> tuple[float | None, str | None]:
+    """`(ratio, exclusion_reason)` — exactly one of the two is set.
+
+    Returning the reason alongside the value is what keeps an exclusion
+    *recorded* rather than silently folded into "no churn" (AC-013).
+    """
+    if entry.kind == BINARY:
+        return None, EXCLUDED_BINARY
+    if entry.kind == DELETED:
+        return None, EXCLUDED_DELETED
+    if entry.added is None or entry.deleted is None:
+        raise ChurnMeasurementError(
+            f"{entry.path}: kind={entry.kind!r} needs numeric added/deleted "
+            f"(got {entry.added!r}/{entry.deleted!r}); only {BINARY!r} may omit them"
+        )
+    if entry.post_loc is None or entry.post_loc <= 0:
+        return None, EXCLUDED_EMPTY_POST
+
+    # Clamped at 1.0: a file whose every line was replaced has churned wholly, and
+    # `(added + deleted) / post_loc` exceeds 1 for that case. Leaving it unclamped
+    # would let one rewritten 30-line file outrank another purely by edit style.
+    return min(1.0, (entry.added + entry.deleted) / entry.post_loc), None
+
+
+def measure(files: list[FileChurn]) -> ChurnMeasurement:
+    """Aggregate by **maximum**, not mean.
+
+    S12's rule: averaging let a one-line edit to a 5000-line file mask a 30-line
+    file rewritten whole, which is the case the gate exists to catch.
+    """
+    measured: list[tuple[str, float]] = []
+    excluded: list[tuple[str, str]] = []
+    for entry in files:
+        ratio, reason = file_ratio(entry)
+        if ratio is None:
+            excluded.append((entry.path, reason or EXCLUDED_EMPTY_POST))
+        else:
+            measured.append((entry.path, ratio))
+
+    if not measured:
+        return ChurnMeasurement(None, None, (), tuple(excluded))
+
+    # `max` keeps the first maximum, so pre-sorting by path breaks ties on path —
+    # two runs over the same diff then name the same file.
+    top = max(sorted(measured), key=lambda pair: pair[1])
+    return ChurnMeasurement(top[1], top[0], tuple(measured), tuple(excluded))
+
+
+def _git(root: Path, *args: str) -> str:
+    proc = subprocess.run(  # noqa: S603 — fixed argv, shell=False
+        ["git", "-C", str(root), *args],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    return proc.stdout
+
+
+def _parse_name_status(raw: str) -> dict[str, str]:
+    """post-path -> kind, from `--name-status -z -M` records."""
+    fields = [f for f in raw.split("\0") if f != ""]
+    kinds: dict[str, str] = {}
+    i = 0
+    while i < len(fields):
+        status = fields[i]
+        if status[0] in {"R", "C"}:  # status, old-path, new-path
+            if i + 2 >= len(fields):
+                break
+            kinds[fields[i + 2]] = RENAMED
+            i += 3
+            continue
+        if i + 1 >= len(fields):
+            break
+        path = fields[i + 1]
+        kinds[path] = {"A": CREATED, "D": DELETED}.get(status[0], MODIFIED)
+        i += 2
+    return kinds
+
+
+def _parse_numstat(raw: str) -> list[tuple[str, int | None, int | None]]:
+    """(post-path, added, deleted) — `None` counts mark git's binary `-`."""
+    fields = [f for f in raw.split("\0") if f != ""]
+    out: list[tuple[str, int | None, int | None]] = []
+    i = 0
+    while i < len(fields):
+        head = fields[i]
+        parts = head.split("\t")
+        if len(parts) < 2:
+            i += 1
+            continue
+        added = None if parts[0] == "-" else int(parts[0])
+        deleted = None if parts[1] == "-" else int(parts[1])
+        if len(parts) >= 3 and parts[2] != "":
+            out.append((parts[2], added, deleted))
+            i += 1
+            continue
+        # Rename: the trailing tab is empty and old/new paths follow as records.
+        if i + 2 >= len(fields):
+            break
+        out.append((fields[i + 2], added, deleted))
+        i += 3
+    return out
+
+
+def _post_loc(root: Path, post_ref: str, path: str) -> int | None:
+    """Line count in the pinned post tree; `None` when the blob is absent."""
+    try:
+        blob = subprocess.run(  # noqa: S603 — fixed argv, shell=False
+            ["git", "-C", str(root), "show", f"{post_ref}:{path}"],
+            check=True,
+            capture_output=True,
+            timeout=60,
+        ).stdout
+    except subprocess.CalledProcessError:
+        return None
+    if not blob:
+        return 0
+    return blob.count(b"\n") + (0 if blob.endswith(b"\n") else 1)
+
+
+def collect(root: Path, pre_ref: str, post_ref: str) -> list[FileChurn]:
+    """Read the two **pinned** endpoints — never the working tree.
+
+    The endpoints are refs on purpose (S12): measuring the cumulative working
+    diff would attribute an earlier round's edits to this one, so the ratio
+    would grow monotonically and the gate would stop skipping anything.
+    """
+    kinds = _parse_name_status(_git(root, "diff", "--name-status", "-z", "-M", pre_ref, post_ref))
+    entries: list[FileChurn] = []
+    for path, added, deleted in _parse_numstat(
+        _git(root, "diff", "--numstat", "-z", "-M", pre_ref, post_ref)
+    ):
+        kind = kinds.get(path, MODIFIED)
+        if added is None or deleted is None:
+            kind = BINARY
+        post = None if kind == DELETED else _post_loc(root, post_ref, path)
+        entries.append(FileChurn(path=path, kind=kind, added=added, deleted=deleted, post_loc=post))
+    return entries
+
+
+def measure_refs(root: Path, pre_ref: str, post_ref: str) -> ChurnMeasurement:
+    return measure(collect(root, pre_ref, post_ref))
+
+
+def pin_ref(slug: str, label: str) -> str:
+    if not label or "/" in label or label.startswith("-"):
+        raise ChurnMeasurementError(f"pin label must be a bare name, got {label!r}")
+    return f"refs/hm-churn/v1/{slug}-{label}"
+
+
+def pin(root: Path, slug: str, label: str) -> str:
+    """Snapshot the working tree into a ref and return its commit.
+
+    The fixes a round makes are uncommitted (wrapup owns commits), so `HEAD` is the
+    wrong endpoint — it would measure zero churn no matter what the round changed.
+    Parentless on purpose: these are measurement endpoints, not history.
+    """
+    ref = pin_ref(slug, label)
+    tree = freeze.snapshot_working_tree(root)
+    commit = _git(root, "commit-tree", tree, "-m", f"hm churn pin: {slug} {label}").strip()
+    _git(root, "update-ref", ref, commit)
+    return commit
+
+
+_USAGE = (
+    "usage: hm review_churn measure --pre <ref> --post <ref> [--root <dir>]\n"
+    "       hm review_churn pin --slug <slug> --label <name> [--root <dir>]\n"
+)
+
+
+def main(argv: list[str] | None = None) -> int:
+    guard = command_registry.guard_or_none("review_churn", argv)
+    if guard is not None:
+        return guard
+    parser = argparse.ArgumentParser(prog="hm review_churn", add_help=True)
+    parser.add_argument("verb", choices=["measure", "pin"])
+    parser.add_argument("--pre")
+    parser.add_argument("--post")
+    parser.add_argument("--slug")
+    parser.add_argument("--label")
+    parser.add_argument("--root", default=".")
+    try:
+        opts = parser.parse_args(argv if argv is not None else sys.argv[1:])
+    except SystemExit:
+        sys.stderr.write(_USAGE)
+        raise
+
+    try:
+        if opts.verb == "pin":
+            if not opts.slug or not opts.label:
+                sys.stderr.write(_USAGE)
+                return 2
+            sys.stdout.write(pin(Path(opts.root), opts.slug, opts.label) + "\n")
+            return 0
+        if not opts.pre or not opts.post:
+            sys.stderr.write(_USAGE)
+            return 2
+        result = measure_refs(Path(opts.root), opts.pre, opts.post)
+    except (subprocess.CalledProcessError, ChurnMeasurementError) as e:
+        sys.stderr.write(f"[churn] measurement failed: {e}\n")
+        return 1
+    sys.stdout.write(json.dumps(result.as_detail(), sort_keys=True) + "\n")
+    return 0
+
+
+if __name__ == "__main__":  # pragma: no cover
+    raise SystemExit(main())

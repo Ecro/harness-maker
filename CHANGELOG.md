@@ -2,6 +2,28 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Per-round fix churn is measured (PLAN-review-loop-empirics Phase 5, record only).**
+  `hm review_churn measure --pre <ref> --post <ref>` reports, for one repair round, the
+  fraction of the most-churned file that round rewrote. Three properties decide whether the
+  number means anything, and each was a way to get it wrong:
+  - **Endpoints are pinned trees, not `HEAD`.** `/hm:review` never commits (wrapup does), so
+    `HEAD..HEAD` would read 0.0 for every round however much it changed. `hm review_churn pin`
+    snapshots the working tree — tracked and untracked — into `refs/hm-churn/v1/<slug>-<label>`
+    without touching the index, sharing `freeze.snapshot_working_tree` so the tracked-but-
+    gitignored-file subtlety has one owner.
+  - **Aggregation is the maximum across files, not the mean.** A mean lets a one-line edit to a
+    5000-line file mask a 30-line file rewritten whole — the case the Phase 6 gate exists to catch.
+  - **Degenerate files are excluded and the exclusion is recorded.** A created file contributes
+    1.0, a deleted file leaves the denominator, a binary file is excluded by name. A round whose
+    whole diff was binary reports `churn_ratio: null` beside `churn_measured_n: 0`, which is a
+    different fact from a round that changed nothing.
+  Carried on the telemetry row as four `churn_*` fields whose validator rejects every
+  self-contradicting combination; these rows are append-only, so an unreadable one is permanent.
+  Nothing branches on the ratio yet — the gate, the single-reviewer repair round and
+  `/hm:health`'s `not_applicable` are Phase 6.
+
 ### Fixed
 
 - **Review round 2 (the repair's own review) — three P0s the round-1 repair introduced.**

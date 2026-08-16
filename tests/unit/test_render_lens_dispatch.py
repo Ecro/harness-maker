@@ -585,7 +585,13 @@ def test_the_telemetry_emit_field_list_carries_the_new_fields(
 #: Every `hm` module whose paths are worktree-relative, so an invocation of it that runs at the
 #: base repo operates on the wrong tree. Membership is the point of the test below; a module added
 #: here with no prefix in the template fails immediately.
-_WORKTREE_RELATIVE_MODULES = ("freeze", "lens_coverage", "review_consensus", "stage_agent_ledger")
+_WORKTREE_RELATIVE_MODULES = (
+    "freeze",
+    "lens_coverage",
+    "review_churn",
+    "review_consensus",
+    "stage_agent_ledger",
+)
 
 
 def _render_both_variants(tmp_path_factory: pytest.TempPathFactory) -> dict[str, str]:
@@ -709,3 +715,44 @@ def test_finalize_is_invoked_exactly_once_per_site(
     for variant, body in bodies.items():
         calls = [ln for ln in body.splitlines() if "hm review_consensus finalize " in ln]
         assert len(calls) == 1, f"{variant}: expected one finalize invocation, got {len(calls)}"
+
+
+def test_the_rendered_stage_pins_both_churn_endpoints_and_measures_between_them(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> None:
+    """Measurement that is never invoked measures nothing (Phase 5).
+
+    Both pins are asserted, not just the `measure`: with only the post pin the `--pre` ref
+    would resolve to a stale endpoint from an earlier round — the ratio would still be a
+    number, and a call-count assertion would still pass. The `--pre`/`--post` refs are
+    asserted to name the SAME round as the pins for the same reason: a measure spanning
+    r1-pre..r2-post is well-formed, wrong, and silent.
+    """
+    bodies = _render_both_variants(tmp_path_factory)
+    for variant, body in bodies.items():
+        assert "hm review_churn pin --slug {slug} --label r{N}-pre" in body, (
+            f"{variant}: the pre-fix endpoint is never pinned"
+        )
+        assert "hm review_churn pin --slug {slug} --label r{N}-post" in body, (
+            f"{variant}: the post-fix endpoint is never pinned"
+        )
+        measures = [ln for ln in body.splitlines() if "hm review_churn measure " in ln]
+        assert len(measures) == 1, f"{variant}: expected one measure call, got {len(measures)}"
+        assert "--pre refs/hm-churn/v1/{slug}-r{N}-pre" in measures[0], measures[0]
+        assert "--post refs/hm-churn/v1/{slug}-r{N}-post" in measures[0], measures[0]
+
+
+def test_the_churn_measurement_does_not_gate_anything_yet(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> None:
+    """Phase 5 is record-only; the skip branch is Phase 6.
+
+    Shipping the gate a phase early would remove a review that happens today with no
+    calibration data behind the threshold — the one irreversible move in this PLAN.
+    """
+    bodies = _render_both_variants(tmp_path_factory)
+    for variant, body in bodies.items():
+        assert "Record only" in body, f"{variant}: the record-only boundary is not stated"
+        assert "rereview_churn_gate" not in body, (
+            f"{variant}: the stage reads the gate key before Phase 6 ships it"
+        )
