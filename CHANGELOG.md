@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.52.3] - 2026-08-16
+
 ### Fixed
 
 - **`make --dry-run` reported dozens of unchanged files as NEW.** The preview decided
