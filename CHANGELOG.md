@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.52.0] - 2026-08-16
+
 ### Added
 
 - **Per-round fix churn is measured (PLAN-review-loop-empirics Phase 5, record only).**
