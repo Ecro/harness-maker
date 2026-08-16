@@ -1,7 +1,7 @@
 ---
 type: plan
 task_slug: review-loop-empirics
-status: planning
+status: complete
 created: 2026-08-15
 tags: [harness-maker, plan, review-loop, lens-coverage, churn, disposition]
 spec: "[[SPEC-review-loop-empirics]]"
@@ -9,15 +9,11 @@ research_doc: "[[RESEARCH-review-loop-empirics]]"
 interview_rounds: 23
 adrs: 10
 validator_outcome: MAJOR_REVISION_RESOLVED
-surface_allowance:
-  chars: 13395
-  commands:
-    review: 11970
-  round_trips:
-    review: 15
-    hm-review: 17
-  reason: "Phase 1's two uncuttable brief clauses (732), plus Phases 2-4: nine lens dispatches instead of five at BOTH sites, Step C2 rendering its own dispatch list because six lenses now share one agent and are told apart only by their brief line, and Step 4 calling hm review_consensus instead of describing the arithmetic (ADR-008). Phase 5 adds two churn-endpoint pins and one measure call per repair round, at both sites."
-  delta_doc: BASELINE-DELTA-review-loop-empirics.md
+# surface_allowance: RETIRED 2026-08-16 — Phases 1-7 landed and the growth it funded is
+# now the baseline (tests/structural/surface_baseline.json @ c9a8a1bf). The block is
+# deleted rather than zeroed: an allowance that outlives its PLAN is a standing exemption,
+# which is what the ratchet exists to prevent. Every number it carried is attributed in
+# work-docs/BASELINE-DELTA-review-loop-empirics.md.
 summary: "Adopt the six-category axis, give each lens a vote, gate re-review on churn."
 ---
 

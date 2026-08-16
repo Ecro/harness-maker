@@ -191,3 +191,38 @@ The gate branch is **render-time**, not runtime: `rereview_churn_gate: false` re
 pre-Phase-6 text verbatim, so the escape hatch documented in `harness.yaml` is a real rollback
 and not a runtime flag the prose merely mentions. It also means the off-render pays none of
 these characters — the numbers above are the on-render, which is the default.
+
+## Final re-baseline — the allowance is retired (2026-08-16, `c9a8a1bf`)
+
+Phases 1–7 are landed, so the growth the per-PLAN `surface_allowance` funded is now the
+committed baseline and the allowance block is **deleted** from the PLAN. Deleted, not zeroed:
+an allowance that outlives its PLAN is a standing exemption, which is the thing the ratchet
+exists to prevent.
+
+| Key | Was | Now | Δ |
+|---|---|---|---|
+| `aggregate_chars.claude` | 398 138 | **411 452** | +13 314 |
+| `aggregate_chars.codex` | 326 030 | **339 400** | +13 370 |
+| `review` (claude) `chars` | 67 876 | **81 190** | +13 314 |
+| `review` (claude) `round_trips` | 22 | **37** | +15 |
+| `hm-review` (codex) `chars` | 61 758 | **75 128** | +13 370 |
+| `hm-review` (codex) `round_trips` | 16 | **33** | +17 |
+
+Every character and every call is in one command — `review` / `hm-review`. Nothing else in
+the shipped surface moved.
+
+**Direction: the shipped surface is LARGER, and this was a cost-reduction PLAN.** That is the
+finding a reader is most likely to skip past, so it is stated here rather than left to be
+inferred from a table. The PLAN spends context to buy back reviewer *dispatches* and repair
+*rounds*: seven lenses instead of five at two sites, a confirmation pass that renders its own
+dispatch list, four executable seams where there was prose, and a churn gate whose third
+branch is a paragraph. Whether that trade paid is not decidable from this document — it is
+what the per-round churn rows and the round-trip counts were built to answer, and neither has
+a live corpus yet.
+
+**Why only this document may move these numbers (ADR-010).** The ratchet's subject is the
+prompt surface, and the failure mode is `ratchet-rebaselined-by-its-own-subject`: the task
+that grows the surface is also the task holding the pen, so "regenerate the baseline" is
+always the cheapest way to go green and it erases the evidence in the same stroke. The
+attribution row is the price of the regeneration, and this test file fails the commit that
+skips it.

@@ -374,7 +374,24 @@ _ATOMIC_RATCHET: dict[str, int] = {
     #   • the frozen refs are released at the terminal state, because `prune_stale`'s sweep
     #     needs a live task slug and the Side preset never has one.
     # Attributed in work-docs/BASELINE-DELTA-ai-review-exit-criteria.md.
-    "review": 47652,
+    #
+    # 47652 → 60550 (+12898, PLAN-review-loop-empirics Phases 1–7). The largest single ratchet
+    # move in this table, made deliberately and with the pre-change figure recorded here
+    # because risk R11 of that PLAN predicted this line would be the thing that blocked it.
+    # Every character is in ONE command; nothing else in the shipped surface moved.
+    #   • the axis: seven lenses dispatched at round 1 and again by the confirmation pass,
+    #     which must render its OWN brief list — six of the seven share `code-reviewer` and are
+    #     told apart only by the brief line, so a back-reference is not runnable;
+    #   • four executable seams that were prose: `review_consensus finalize`, `plan`, the
+    #     churn pins/measure, and the oscillation scan. Prose has no surface a test can bind
+    #     to, and this PLAN's round-1 P0 was exactly that — arithmetic nothing called;
+    #   • the churn gate's third branch (a null ratio re-reviews as if the gate were off),
+    #     which is a paragraph and is the branch that keeps the gate from silently skipping
+    #     every round it could not measure.
+    # This PLAN spends context to buy back reviewer DISPATCHES and repair ROUNDS. Whether that
+    # trade paid is not yet decidable — the churn rows and round-trip counts exist to answer it
+    # and have no live corpus. Attributed in work-docs/BASELINE-DELTA-review-loop-empirics.md.
+    "review": 60550,
     # 30537 → 32114 (PLAN-plan-interview-comprehension): the same partial, invoked with
     # `stage='spec'`. Raw +1778, compacted to +1577. The brief's SUBJECT differs by stage
     # (ADR-007) because `/hm:spec` has no architecture draft to disclose — identical text
