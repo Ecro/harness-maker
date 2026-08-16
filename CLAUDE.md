@@ -84,7 +84,7 @@ harness-maker 는 **triple plugin** — 세 marketplace 모두에 등록 가능:
 - `.claude/skills/<name>/SKILL.md` — skill (양쪽 표준 호환)
 - `.claude/commands/hm/<name>.md` — `/hm:` 슬래시 명령
 - `.claude/settings.json` — permissions + preset + **`hooks`** (Claude Code 가 프로젝트 hook 을 읽는 **유일한** 위치. harness-owned 이지만 deep-merge — 사용자 hook 보존)
-- `.claude/hooks/hooks.json` — ⚠️ **Claude Code 가 읽지 않음** (2026-07-17 실험으로 확정). 아직 렌더되지만 dead weight — 은퇴는 후속 phase. 새 hook 은 여기 추가하지 말 것.
+- ~~`.claude/hooks/hooks.json`~~ — **더 이상 렌더되지 않음** (0.52.0 기준). Claude Code 가 읽지 않는다는 게 2026-07-17 실험으로 확정된 뒤 ADR-005 (PLAN-permission-deny-and-hooks-wiring) 가 렌더를 제거했다. 디스크에 남은 pristine 사본은 `cli._retire_stale_hooks_json` 이 은퇴시키고 (정확히 일치할 때만), 사용자가 손댄 사본은 `reconcile._SWEEP_NEVER_DELETE` 가 지킨다. 새 hook 은 `settings.json` 의 `hooks` 키로.
 - `.claude/lib/`, `.claude/observability/`
 - `.worktrees/` (gitignored)
 
@@ -98,7 +98,7 @@ harness-maker 는 **triple plugin** — 세 marketplace 모두에 등록 가능:
 - `.codex/hooks.json` — Codex hooks (PascalCase + PermissionRequest 이벤트)
 - `.codex/agents/<name>.toml` — 에이전트 TOML (developer_instructions = agent body)
 - `AGENTS.md` — 프로젝트 루트 instructions (block-merge markers 포함)
-- `.agents/skills/<name>/SKILL.md` — 기존 11개 skill 의 Codex 경로 dual-render
+- `.agents/skills/<name>/SKILL.md` — 기존 skill 의 Codex 경로 dual-render (개수는 `templates/skills/` 가 소스; 고정 숫자를 여기 적으면 skill 하나 추가할 때마다 이 줄이 조용히 틀려진다)
 - `.agents/skills/hm-<stage>/SKILL.md` — 7개 atomic stage 용 stage-trigger skill
 
 **Worktree 공유**: `.worktrees/` 단일 디렉토리. Cursor 의 `/worktree` 자체 관리와 같은 위치. cleanup 은 prefix 매치로 자기 것만 (`execute-*`, `plan-*`, `phase-*`, `autoloop-*`).

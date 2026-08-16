@@ -371,7 +371,11 @@ harness-maker make . --promote NAME    # ad-hoc 자산을 하네스로 승격
 
 ### 🛡️ 신뢰 — *등급 게이트된 작업*
 
-- **등급 기반 auto-fix 루프.** `/hm:review`는 보고만 하지 않음. Consensus-passed fix 적용 → 재리뷰 (selective, 스코프 닿은 reviewer만 재spawn) → 재채점, 등급 ≥ threshold (기본 A) 또는 `max_review_rounds` 소진까지. Weak-consensus와 manual-only는 절대 auto-apply 안 됨.
+- **7개 렌즈 축, 그리고 렌즈 하나면 finding 이 성립.** 라운드 1이 `design`·`functionality`·`robustness`·`consistency`·`security`·`concurrency`·`tests` 를 디스패치. 9개에서 실측 중복도 기준으로 합쳤음 (`consistency` 는 자기 finding 의 80% 를 다른 렌즈도 제기했고, `security`·`concurrency`·`tests` 는 0%). Production 은 7개 전부 mandatory, Side 는 core 4개만 mandatory 하고 domain 3개는 라우팅 — 단 **양쪽 다 7개를 디스패치**한다. 라우터는 디스패치된 것만 걸러낼 수 있기 때문. 렌즈 하나가 단독으로 제기해도 `consensus-passed`: 두 렌즈의 동의는 보강이지, 그걸 요구하면 전문 렌즈 하나만 볼 수 있었던 것을 통째로 버리게 된다. K=2 는 cross-model 투표자와 같은 렌즈의 반복 발언에만 남는다.
+- **등급 기반 auto-fix 루프, 종료 경로는 3개.** Consensus-passed fix 적용 → 재리뷰 → 재채점. 종료 조건은 (a) 등급이 threshold 도달 **후 frozen artifact 에 대한 confirmation pass 가 새 것을 못 찾음**, (b) 한 라운드에 lifecycle 전이가 0 (`no-progress`), (c) `max_review_rounds` 소진 — 세 종료를 서로 다른 것으로 보고한다. Weak-consensus 와 manual-only 는 절대 auto-apply 안 됨.
+- **repair 라운드는 자신이 얼마나 고쳐 썼는지로 게이팅.** fix 는 거의 1:1 로 결함을 만들기 때문에, 라운드마다 pin 된 pre/post 트리 기준으로 churn 을 잰다 — 파일별 최대값이라 5000줄 파일의 1줄 수정이 30줄 파일 전면 재작성을 가리지 못한다. `reviewers.rereview_churn_ratio` 미만이면 재리뷰를 건너뛰고 비교식을 기록, 이상이면 **정확히 1명**의 구조화된 리뷰어. 측정 자체가 불가능했던 라운드는 그냥 재리뷰한다. `rereview_churn_gate: false` 로 이전 동작 그대로 복원.
+- **한 라운드가 지운 hunk 를 나중 라운드가 되돌리면 결함이 아니라 SPEC 공백.** `manual-only` P1 `spec_gap` 으로 보고하고 **등급은 건드리지 않는다** — 유일한 문제가 "어떤 동작을 원하는지 아무도 안 적었다" 인 리뷰도 A 에 도달할 수 있어야 한다.
+- **테스트 실행은 머신과 러너에 맞춘다.** `hm test_runners plan` 이 프로젝트의 러너, 그 러너가 실제로 가진 3개 레버(병렬 / 변경 기반 선택 / 실패만 재실행), 그리고 가시 코어의 절반 수준으로 제한된 워커 수를 알려준다. `-n auto` 는 이식 가능한 조언이 아니다: `cargo`·`go`·`vitest`·`jest`·`flutter` 는 이미 병렬이라 워커 플래그가 가속이 아니라 상한/중첩이 되고, `pytest` 만 기본 직렬이다.
 - **LLM 토큰 전에 mechanical pre-check.** Lint clean + tests green이 reviewer가 spawn 되기 **전에** 강제. 첫 non-zero exit이 `## MECHANICAL_BLOCK: <cmd> exit=<N>`을 emit하고 halt. `--no-auto-fix`가 이 게이트를 우회하지 않음.
 - **Conditional reviewer routing.** `.env` 변경 → security-reviewer. `/perf/` → performance-reviewer. `.tsx` → ux-reviewer. async/locking → concurrency-reviewer. 모든 diff에 모든 reviewer fan-out 보다 10× 저렴.
 - **2-pass redaction (+47pp 정밀도).** Pass 1이 PR 메타데이터를 제거하여 finding이 author/title에 anchor되지 못하게. Pass 2가 전체 컨텍스트 복원 — reviewer가 각 Pass 1 finding을 validate 또는 drop. Anchoring 취약 diff에 대한 ablation 측정된 정밀도 증가.

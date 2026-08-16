@@ -84,7 +84,7 @@ Three design commitments shape every decision below:
         │                          worktree-isolator, ...     │
         │  agents/            ◀── M12 reviewer/executor       │
         │                          privilege separation       │
-        │  hooks/hooks.json   ◀── telemetry                    │
+        │  settings.json      ◀── permissions + HOOKS         │
         │  .worktrees/        ◀── M9 git worktree isolation   │
         │  observability/                                     │
         │    dashboard.md                                     │
@@ -344,11 +344,34 @@ harness-maker renders the same workflow model for Claude Code, Cursor IDE, and O
 - `.claude/skills/<name>/SKILL.md`
 - `.claude/commands/hm/<name>.md` (verified empirically against kairos 0.5.7 in 0.6.2 — see `tests/cursor-compat/results-2026-05-08.md`; the previously-reserved `_is_cursor_command` dispatch in `render.py` is now annotated as dead code)
 
-**Per-IDE assets** (different content per IDE — both files emitted when `cursor` ∈ targets):
-- `.claude/hooks/hooks.json` — Claude Code schema: PascalCase event keys (`PreToolUse`, `PostToolUse`, `Stop`, `PreCompact`) + nested `{matcher, hooks:[{type, command}]}` shape.
-- `.cursor/hooks.json` — Cursor-native schema: lowercase camelCase event keys (`preToolUse`, `stop`, `preCompact`) + flat `{matcher, command}` shape + `version: 1`.
+**Per-IDE hooks** — each IDE reads its own location, and they are NOT interchangeable:
+- `.claude/settings.json` → its `hooks` key. **This is the only place Claude Code reads project
+  hooks from.** PascalCase event keys (`PreToolUse`, `PostToolUse`, `Stop`, `PreCompact`) +
+  nested `{matcher, hooks:[{type, command}]}`. Harness-owned but deep-merged, so a user's own
+  hooks survive a re-render.
+- `.cursor/hooks.json` — Cursor-native schema: lowercase camelCase event keys (`preToolUse`,
+  `stop`, `preCompact`) + flat `{matcher, command}` shape + `version: 1`.
+- `.codex/hooks.json` — Codex's own file and schema.
 
-**The hooks divergence is by design**, not a bug. The 0.6.2 forensic on the kairos repo (private, harness-maker 0.5.7) traced 4 entries in `metrics.jsonl` — all with `event: "stop"` (lowercase) and Cursor-only `status` / `loop_count` payload fields per `telemetry.py:11` — to the lowercase template, proving Cursor reads its dedicated file with its own schema. Both `templates/cursor/hooks.json.j2` and `templates/hooks/hooks.json.j2` carry Jinja header comments and unit tests (`test_cursor_hooks_uses_lowercase_native_schema`) that fail loudly if a future change attempts to converge them. CLAUDE.md §Plugin structure also documents the divergence authoritatively.
+> **Corrected 2026-07-17; the correction is the interesting part.** This section used to name
+> `.claude/hooks/hooks.json` as "the Claude Code schema", and **that was false** — Claude Code
+> loads project hooks only from settings files, and `hooks/hooks.json` is a *plugin-bundle*
+> path. Every hook harness-maker rendered there was dead in Claude Code for as long as the
+> claim stood; Cursor and Codex were unaffected because they really do read their own files.
+>
+> The claim came from the 2026-05-08 kairos forensic cited below, which asked only *"does
+> Cursor read `.cursor/hooks.json`?"* (yes, proven) and never tested the Claude half. **The
+> untested half of a verified experiment became an assertion**, and it survived two years of
+> readers because the verified half made the whole paragraph feel measured. Refuted by a
+> controlled experiment; `.claude/hooks/hooks.json` is no longer rendered at all (ADR-005 of
+> PLAN-permission-deny-and-hooks-wiring), and a pristine leftover copy is retired by
+> `cli._retire_stale_hooks_json` — user-merged content is never deleted.
+
+**The Cursor/Codex divergence is still by design.** The 0.6.2 forensic on the kairos repo
+(private, harness-maker 0.5.7) traced 4 entries in `metrics.jsonl` — all with `event: "stop"`
+(lowercase) and Cursor-only `status` / `loop_count` payload fields per `telemetry.py:11` — to the
+lowercase template, proving Cursor reads its dedicated file with its own schema. Do not try to
+collapse the per-IDE files: Cursor silently stops firing hooks.
 
 **Cursor-only assets** (emitted only when `cursor` ∈ targets):
 - `.cursor/rules/harness.mdc` — always-on workflow rules rendered via `_render_cursor_mdc()`, which limits frontmatter to keys Cursor accepts (`description`, `globs`, `alwaysApply`). Our `content_hash` metadata is omitted from the frontmatter to avoid strict-reject. The `.mdc` line budget is a Cursor authoring guideline (≤500 lines; split recommended past ~200 per CLAUDE.md), **not** enforced by `context_lint.py` — its per-preset `THRESHOLDS` table covers only `CLAUDE.md`/`AGENTS.md`/`agent`/`skill`/`workflow`. Current rendered output is ~133 lines.

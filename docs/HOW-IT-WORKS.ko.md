@@ -144,7 +144,7 @@ harness-maker 는 **Claude Code 와 Cursor 양쪽 IDE** 에서 동작하는 듀�
 │   ├── commands/hm/          ← 슬래시 명령 파일들
 │   ├── skills/               ← 스킬 SKILL.md 파일들
 │   ├── agents/               ← 에이전트 정의 파일들
-│   ├── hooks/hooks.json      ← 훅 이벤트 정의
+│   ├── settings.json         ← 권한 + 훅 이벤트 정의
 │   ├── memory/               ← wiki.md / failures.md / session/
 │   └── observability/        ← metrics.jsonl / security/ / refresh/
 │       └── adaptive/         ← overrides.jsonl (0.12.0+: M18 yaml-override 텔레메트리)
@@ -603,35 +603,64 @@ uv run python -m harness_maker.worktree finalize <WT> fail
 
 #### 실행 절차
 
-**Step 1 — 2-pass 리댁션 (diff 전처리)**
+**Step 1 — 2-pass 리댁션 (diff 가 아니라 메타데이터)**
 
-원본 diff 에서 노이즈를 제거하는 두 단계:
+> **정정.** 이 절은 Pass 1 을 "로그·잠금 파일 제거", Pass 2 를 "diff 의미 리댁션"으로 적고
+> 있었다. 실제 동작이 아니며, 측정치의 귀속도 틀렸다 — +47%p 는 **메타데이터**를 가려서 나온
+> 수치지 diff 를 다듬어서 나온 게 아니다. diff 는 절대 리댁션하지 않는다 (리뷰어는 diff 를
+> 통째로 봐야 한다). 같은 문서 **§11.7 이 처음부터 옳게 적고 있었고**, 두 서술이 한 파일 안에서
+> 모순돼 있었다.
 
-Pass 1 — 구조적 리댁션 (결정적 규칙):
-- 로그/타임스탬프/자동생성 주석 제거
-- 이진 파일/잠금 파일/마이그레이션 diff 제거
-- 불변 줄 (공백/공행만 변경) 제거
+앵커링의 출처는 PR 제목·설명·작성자·커밋 메시지다. "작은 리팩터, 동작 변경 없음"을 읽은 리뷰어는
+그 주장을 기준으로 diff 를 채점한다.
 
-Pass 2 — 의미 리댁션 (LLM 판단):
-- Pass 1 이후 남은 diff 를 LLM 이 읽어 "앵커링 위험" 부분 추가 제거
-- 리뷰어가 실제 변경 의도에 집중할 수 있게 함
-- 이 2-pass 시스템으로 앵커링 감수성 대비 **+47%p precision 향상**
+- **Pass 1 — 루브릭만.** `hm two_pass_review redact --file <path>` 가 그 4개 필드를
+  `[REDACTED]` 로 치환하고, 리뷰어는 루브릭만으로 코드를 판단한다. **+47%p** 는 여기서 나왔다.
+- **Pass 2 — 맥락 판정.** 같은 리뷰어가 메타데이터를 복원한 상태로 다시 돌면서, 맥락이
+  반증하는 finding 을 버리고 severity 를 조정한다. Pass 2 가 authoritative — Pass 2 에 없는
+  Pass 1 finding 은 버려진다.
+- `hm two_pass_review merge --file <path>` 가 병합한다. **두 명령 모두 파일 경로를 받고
+  `echo '<json>' |` 를 쓰지 않는다** — 입력이 diff 자체와 그에 대한 리뷰어 산문이라, 바뀐 줄의
+  아포스트로피 하나가 셸 인용을 끝내고 나머지를 실행시켰다.
 
-**Step 2 — Conditional Router 로 리뷰어 선택**
+두 패스 사이에 verifier 는 없다. 41개 리뷰에서 261건 중 5건(1.9%)만 걸러내면서 매 리뷰마다
+직렬 에이전트 왕복 1회를 통째로 먹어서 제거했다.
 
-`conditional-router` 스킬이 diff 경로 패턴을 분석하여 리뷰어를 선택:
+**Step 2 — 렌즈 축(무엇이 도는가) 그리고 라우팅(무엇이 필수인가)**
 
-| 파일 패턴 | 추가 리뷰어 |
-|----------|-----------|
-| `.env`, `/auth/`, `/secret` | security-reviewer |
-| `/perf/`, `benchmark`, `hot` | performance-reviewer |
-| `.tsx`, `.jsx`, `/ui/` | ux-reviewer |
-| `thread`, `isr`, `worker`, `async` | concurrency-reviewer |
-| **항상** | code-reviewer (무조건 포함) |
+라운드 1이 **7개 렌즈**를 디스패치한다 (양 preset 공통):
+
+| 렌즈 | 묻는 것 |
+|---|---|
+| `design` | 구조가 맞는가 — 경계, 결합도, 불필요한 복잡도 |
+| `functionality` | 주장하는 대로 동작하는가, 경계 입력 포함 |
+| `robustness` | 입력이나 환경이 어긋나면 무슨 일이 벌어지는가 |
+| `consistency` | 이미 있는 관례·명명과 맞는가 |
+| `security` | 비밀값, 인젝션, 인가, 위험한 권한 부여 |
+| `concurrency` | 경쟁 상태, 교착, ISR 안전성, async 정확성 |
+| `tests` | 테스트가 판별력이 있는가, 틀린 구현도 통과시키지 않는가 |
+
+교과서적 6개 범주를 **실측 중복도**로 4개 core 까지 합쳤다 — 한 렌즈의 finding 중 다른 렌즈도
+제기한 비율: `consistency` 80%, `design` 50%, `complexity` 40%, `robustness` 40%,
+`functionality` 33%, `naming` 14%, 그리고 `security`·`concurrency`·`tests` 는 전부 **0%**.
+`complexity` 는 `design` 으로, `naming` 은 `consistency` 로 접었고, 중복 0% 인 domain 렌즈 3개는
+바로 그 이유로 남겼다 — 다른 무엇도 그것들이 보는 걸 보지 못한다.
+
+Conditional router 는 어떤 렌즈가 **필수인지**를 정하지, 무엇이 도는지를 정하지 않는다.
+Production 은 7개 전부 필수, Side 는 core 4개 필수 + domain 3개를 경로 패턴으로 라우팅
+(`.env`·`/auth/` → `security`, `thread`·`async` → `concurrency`, …). **양쪽 다 7개를
+디스패치한다** — 라우터는 디스패치된 것만 걸러낼 수 있고, 아예 안 돈 렌즈는 다시 넣을 수 없다.
+
+`hm lens_coverage check` 가 실제로 결과를 낸 렌즈를 계산한다. 결과 파일은
+`<slug>/<run-id>/<round>/` 로 키잉되고, 파일 부재가 디스패치 실패의 신호다. 승인 게이트가 읽는
+것은 실행 모델의 자기 보고가 아니라 이 coverage 판정이다.
 
 **Step 3 — 병렬 리뷰 실행**
 
-선택된 리뷰어들이 동시에 독립적으로 실행된다. 각 리뷰어는 **read-only** 에이전트 — 코드를 수정하지 않고 findings 만 반환.
+렌즈들이 한 메시지 안에서 동시에 독립적으로 실행된다. 각 리뷰어는 **read-only** 에이전트 —
+코드를 수정하지 않고 findings 만 반환하며, 각 finding 에는 제기한 렌즈와
+`hm codex_adapter stamp-ids` 가 계산한 안정적 `id` 가 찍힌다 (모델이 만든 id 는 매 실행 달라져
+라운드 간 병합이 깨진다).
 
 각 finding 구조:
 ```json
@@ -652,8 +681,13 @@ P0/P1 에는 4-step reasoning 필수 (Observe → Trace → Infer → Conclude).
 `consensus-arbiter` 에이전트가 여러 리뷰어의 findings 를 통합:
 
 **Surface Match** (같은 파일 + 줄±5 + 같은 severity tier):
-- 2개 이상 리뷰어가 같은 위치 발견 → **consensus-passed**
-- 1개만 발견 → **weak-consensus** 또는 **manual-only**
+- **리뷰어-렌즈 목소리 하나면 충분** → `consensus-passed`. 두 렌즈의 동의는 보강이지 입증
+  기준이 아니다. 그걸 요구하면 전문 렌즈 하나만 볼 수 있었던 finding 을 정확히 그 이유로
+  버리게 되고, domain 렌즈 3개는 다른 무엇과도 중복이 0%다.
+- K=2 는 두 번째 목소리가 진짜 독립 증거일 때만 남는다: **cross-model** 투표자, 그리고 같은
+  렌즈가 두 번 이상 말한 경우.
+- 목소리가 하나도 없으면 → `manual-only`. 태그 표는 목소리 수에 대해 단조다 — 목소리가 늘어서
+  등급이 약해지는 일은 없다.
 
 **Reasoning Alignment** (OBSERVE→INFER→CONCLUDE 단계별 정렬):
 - 같은 위치라도 reasoning 이 다르면 약한 합의
@@ -678,12 +712,25 @@ P0/P1 개수 기반 등급:
 등급이 `grade_threshold` (기본 A) 미달 시 자동 수정 루프 진입:
 
 ```
-리뷰 → 수정 → 재리뷰 → 수정 → ... (max_review_rounds 까지)
+리뷰 → 수정 → churn 측정 → (조건부) 재리뷰 → 재채점 → …
 ```
 
-- `executor` 에이전트가 P0/P1 findings 를 순서대로 수정
-- 수정 후 리뷰 재실행
-- 등급 달성 또는 `max_review_rounds` 도달 시 루프 종료
+- executor 가 P0/P1 findings 를 순서대로 수정하고, 빌드를 깨는 수정은 되돌린다.
+- **재리뷰는 churn 으로 게이팅된다.** 라운드마다 pin 된 두 트리 — 그 라운드 자신의 수정 전/후
+  상태 — 사이에서 측정한다. **`HEAD` 가 아니다**: `/hm:review` 는 커밋하지 않으므로
+  `HEAD..HEAD` 는 무엇을 고쳤든 항상 0.0 을 보고한다. 집계는 **파일별 최대값**이라 5000줄
+  파일의 1줄 수정이 30줄 파일 전면 재작성을 가리지 못한다. `reviewers.rereview_churn_ratio`
+  (기본 0.20) 미만이면 재리뷰를 건너뛰고 비교식을 기록, 이상이면 **정확히 1명**의 구조화된
+  리뷰어가 돈다. churn 을 측정할 수 없었던 라운드(전부 이진 파일)는 그냥 재리뷰한다 — 측정
+  불가는 "임계값 미만"이 아니다. `rereview_churn_gate: false` 로 이전 동작 복원.
+- **종료 경로가 3개이고, 서로 다른 것으로 보고한다:** 등급이 threshold 에 도달하고 **frozen
+  artifact 에 대한 confirmation pass 가 새 것을 못 찾음**(`converged`), 한 라운드에 lifecycle
+  전이가 0(`no-progress`), 라운드 소진(`cap-exhausted`). no-progress 정지를 cap 으로 보고하면
+  루프가 작동하지 않고 있다는 사실이 가려진다.
+- **oscillation 은 보고하되 채점하지 않는다.** 한 라운드가 지우고 나중 라운드가 되돌린 hunk —
+  (경로, 정규화된 내용, 감싸는 심볼) 로 키잉 — 는 `manual-only` P1 `spec_gap` 이다. 두 라운드가
+  같은 코드를 두고 이견을 낸 것이므로 diff 의 결함이 아니라 SPEC 의 공백이고, 그것 때문에 A
+  등급이 도달 불가가 되면 안 된다.
 
 **Step 7 — REVIEW 문서 저장**
 
@@ -1534,7 +1581,9 @@ Code 는 그런 블록을 있어도 조용히 무시한다 — 진짜 경계는 
 
 ## 9. 훅 상세
 
-훅은 특정 이벤트가 발생할 때 자동으로 실행되는 Python 모듈이다. `.claude/hooks/hooks.json` 에 정의되며, harness-maker 가 관리한다.
+훅은 특정 이벤트가 발생할 때 자동으로 실행되는 Python 모듈이다. Claude Code 의 경우 **`.claude/settings.json`** 의 `hooks` 키에 정의된다 — Claude Code 가 프로젝트 훅을 읽는 **유일한** 위치다. harness-maker 가 관리하되 deep-merge 하므로 사용자가 직접 추가한 훅은 재렌더에도 보존된다. Cursor 와 Codex 는 각자의 파일(`.cursor/hooks.json`, `.codex/hooks.json`)을 자기 스키마로 읽는다.
+
+> `.claude/hooks/hooks.json` 은 그 위치가 **아니며** 더 이상 렌더되지 않는다. 이 경로는 *플러그인 번들* 용이라, 옛 버전이 거기 쓴 훅은 Claude Code 에서 동작하지 않았다. 그 주장을 반증한 실험은 `docs/ARCHITECTURE.md` 참조.
 
 ### 훅 정의 구조 (hooks.json)
 

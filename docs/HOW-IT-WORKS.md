@@ -143,7 +143,7 @@ harness-maker is a multi-target harness generator for **Claude Code, Cursor IDE,
 │   ├── commands/hm/          ← Slash command files
 │   ├── skills/               ← Skill SKILL.md files
 │   ├── agents/               ← Agent definition files
-│   ├── hooks/hooks.json      ← Hook event definitions
+│   ├── settings.json         ← permissions + hook event definitions
 │   ├── memory/               ← wiki.md / failures.md / session/
 │   └── observability/        ← metrics.jsonl / security/ / refresh/
 │       └── adaptive/         ← overrides.jsonl (0.12.0+: M18 yaml-override telemetry)
@@ -449,8 +449,32 @@ End interview when user selects "sufficient — end" or all high-impact ambiguit
 After the interview ends, pass the completed PLAN draft to the `plan-validator` agent:
 
 - `APPROVED` → Save PLAN as-is
-- `NEEDS_REVISION` (warnings only) → One additional interview round per warning, then save
-- `MAJOR_REVISION` (serious issues) → Additional interview then re-validate once. If second result is also MAJOR_REVISION, escalate to user
+- `NEEDS_REVISION` / `MAJOR_REVISION` → **the follow-up rounds are planned by CLI, not one per
+  critique.** `hm plan_rounds plan` returns the critiques that earn a round and, for every one
+  that does not, the reason. Then re-validate **once** (the cap is two passes); if the second
+  pass is still `MAJOR_REVISION`, escalate to the user.
+
+Two rules do the cutting, and both are transfers from `/hm:review`'s loop:
+
+- **The progress invariant.** A critique the previous pass raised and this pass raises again is
+  `unresolved`, not `pending` again — the revision did not answer it, and asking a second time
+  is the round that produced nothing. Ids are computed from (section, title) rather than asked
+  of the model: an LLM-minted id changes every run, which turns merge-by-id into "everything is
+  new" and the invariant can then never fire.
+- **Churn, INVERTED.** In `/hm:review` a *low* churn ratio skips the re-review. Copying that
+  shape here would say "small edit, skip re-validation" — and this stage's own measurement
+  refutes exactly that: twelve recorded `plan-validator` episodes, **none ever clean**, and one
+  PLAN whose pass-2 criticals were *created by the pass-1 fixes*. What transfers is the other
+  direction: once a revision has rewritten more than half the PLAN, the critiques still queued
+  were raised against a document that no longer exists, so they go `stale` and cost no round.
+  Nothing is lost — Step 4.5's terminal pass re-derives whichever still hold. An **unmeasured**
+  ratio runs every round.
+
+The lens axis does **not** transfer: `plan-validator` is a single agent, not a fan-out.
+
+`hm plan_rounds outcome` then records `no-progress` separately from `cap-exhausted`. A bare
+two-pass limit reports the same ending for both, hiding the one that means the revision step is
+not working on this document at all.
 
 **Step 5 — Write PLAN Document**
 
@@ -632,35 +656,66 @@ uv run python -m harness_maker.worktree finalize <WT> fail
 
 #### Execution Procedure
 
-**Step 1 — 2-Pass Redaction (diff preprocessing)**
+**Step 1 — 2-Pass Redaction (METADATA, not diff noise)**
 
-Two steps to remove noise from the original diff:
+> **Corrected.** This section previously described Pass 1 as structural removal of logs and
+> lock files and Pass 2 as "semantic redaction" of the diff. That is not what the two passes
+> do, and it mis-attributed the measured result: the +47 pp came from hiding **metadata**, not
+> from trimming the diff. The diff is never redacted — reviewers need it whole.
 
-Pass 1 — Structural redaction (deterministic rules):
-- Remove logs/timestamps/auto-generated comments
-- Remove binary files/lock files/migration diffs
-- Remove invariant lines (only whitespace/blank line changes)
+The anchoring source is the PR title, description, author and commit message: a reviewer that
+reads "small refactor, no behaviour change" grades the diff against that claim.
 
-Pass 2 — Semantic redaction (LLM judgment):
-- LLM reads the diff remaining after Pass 1 to additionally remove "anchoring risk" portions
-- Allows reviewers to focus on the actual intent of changes
-- This 2-pass system produces **+47 percentage-point precision improvement** over anchoring sensitivity
+- **Pass 1 — rubric only.** `hm two_pass_review redact --file <path>` replaces those four
+  fields with `[REDACTED]`; reviewers judge the code against the rubric alone. This is where
+  the **+47 percentage-point precision gain** on anchoring-prone diffs was measured.
+- **Pass 2 — contextual verdict.** The same reviewers run again with metadata restored and the
+  raw Pass-1 findings, dropping any the context proves spurious and adjusting severity.
+  Pass 2 is authoritative: a Pass-1 finding absent from Pass 2 is dropped.
+- `hm two_pass_review merge --file <path>` merges them. **Both commands take a file path, never
+  `echo '<json>' |`** — their inputs are the diff itself and reviewer prose about it, so one
+  apostrophe in a changed line used to end the shell quoting and run the rest.
 
-**Step 2 — Reviewer Selection via Conditional Router**
+There is no verifier between the passes; that dispatch was removed after it dropped 5 of 261
+findings (1.9 %) while costing a full serialized agent round-trip on every review.
 
-The `conditional-router` skill analyzes diff path patterns to select reviewers:
+**Step 2 — the lens axis (what runs), then routing (what is mandatory)**
 
-| File Pattern | Additional Reviewer |
-|--------------|---------------------|
-| `.env`, `/auth/`, `/secret` | security-reviewer |
-| `/perf/`, `benchmark`, `hot` | performance-reviewer |
-| `.tsx`, `.jsx`, `/ui/` | ux-reviewer |
-| `thread`, `isr`, `worker`, `async` | concurrency-reviewer |
-| **Always** | code-reviewer (always included) |
+Round 1 dispatches **seven lenses**, on both presets:
+
+| Lens | Asks |
+|---|---|
+| `design` | Is the structure right — boundaries, coupling, needless complexity? |
+| `functionality` | Does it do what it claims, including on the edges? |
+| `robustness` | What happens when the inputs or the environment misbehave? |
+| `consistency` | Does it match the conventions and the naming already here? |
+| `security` | Secrets, injection, authz, unsafe permission grants |
+| `concurrency` | Races, deadlocks, ISR safety, async correctness |
+| `tests` | Do the tests discriminate, or would they pass a wrong implementation? |
+
+Six textbook categories were merged to four core ones on **measured** redundancy — the share of
+a lens's findings that another lens also raised: `consistency` 80 %, `design` 50 %,
+`complexity` 40 %, `robustness` 40 %, `functionality` 33 %, `naming` 14 %, and `security`,
+`concurrency`, `tests` all **0 %**. `complexity` folded into `design` and `naming` into
+`consistency`; the three zero-overlap domain lenses were kept exactly because nothing else
+sees what they see.
+
+The conditional router decides which lenses are **mandatory**, not which are dispatched:
+Production requires all seven, Side requires the four core ones and routes the three domain
+lenses by path pattern (`.env` / `/auth/` → `security`, `thread` / `async` → `concurrency`, …).
+**Both dispatch all seven** — a router can only drop what was dispatched, and a lens that never
+ran cannot be routed back in.
+
+`hm lens_coverage check` computes which lenses actually delivered, from result files keyed by
+`<slug>/<run-id>/<round>/`. A missing file is the signal that a dispatch died; the coverage
+verdict, not the executing model's self-report, is what the approval gate reads.
 
 **Step 3 — Parallel Review Execution**
 
-Selected reviewers run simultaneously and independently. Each reviewer is a **read-only** agent — they return findings without modifying code.
+Lenses run simultaneously and independently in one message. Each reviewer is a **read-only**
+agent — they return findings without modifying code, and each finding is stamped with the lens
+that raised it plus a stable `id` computed by `hm codex_adapter stamp-ids` (a model-minted id
+changes every round, which breaks the round-to-round merge).
 
 Each finding structure:
 ```json
@@ -681,8 +736,13 @@ P0/P1 require 4-step reasoning (Observe → Trace → Infer → Conclude).
 The `consensus-arbiter` agent integrates findings from multiple reviewers:
 
 **Surface Match** (same file + line±5 + same severity tier):
-- 2 or more reviewers found the same location → **consensus-passed**
-- Only 1 reviewer found it → **weak-consensus** or **manual-only**
+- **One reviewer-lens voice is enough** → `consensus-passed`. Two lenses agreeing is
+  corroboration, not the evidentiary bar: requiring it discarded precisely the findings only
+  one specialist could have seen, and the three domain lenses have 0 % overlap with anything.
+- K=2 still applies where a second voice is genuinely independent evidence: **cross-model**
+  voters, and the same lens speaking more than once.
+- No voice at all → `manual-only`. The tag table is monotonic in voices — adding a voice can
+  never weaken a finding's tag.
 
 **Reasoning Alignment** (step-by-step alignment of OBSERVE→INFER→CONCLUDE):
 - Even at the same location, different reasoning means weak consensus
@@ -704,15 +764,29 @@ Grade based on P0/P1 count:
 
 **Step 6 — Automatic Fix Loop**
 
-If grade falls below `grade_threshold` (default A), enter automatic fix loop:
+If grade falls below `grade_threshold` (default A), enter the automatic fix loop:
 
 ```
-review → fix → re-review → fix → ... (up to max_review_rounds)
+review → fix → measure churn → (maybe) re-review → regrade → …
 ```
 
-- `executor` agent fixes P0/P1 findings in order
-- Re-run review after fixes
-- Loop ends when grade is achieved or `max_review_rounds` is reached
+- The executor applies P0/P1 findings in order; a fix that breaks the build is reverted.
+- **The re-review is gated on churn.** Each round's churn is measured between two pinned
+  trees — the round's own pre-fix and post-fix state, never `HEAD`, because `/hm:review` does
+  not commit and `HEAD..HEAD` would read 0.0 for every round. It aggregates as the **maximum
+  across touched files**, so a one-line edit to a 5000-line file cannot mask a 30-line file
+  rewritten whole. Below `reviewers.rereview_churn_ratio` (default 0.20) the re-review is
+  skipped and the comparison recorded; at or above it, exactly **one** structured reviewer runs.
+  A round whose churn could not be measured (all-binary diff) re-reviews anyway — unmeasured is
+  not "below the threshold". `rereview_churn_gate: false` restores the pre-gate behaviour.
+- **Three endings, reported as three different things:** the grade meets the threshold *and* a
+  confirmation pass over a frozen artifact finds nothing new (`converged`); no lifecycle
+  transition happened in a round (`no-progress`); or the rounds ran out (`cap-exhausted`).
+  Reporting the cap for a no-progress stop hides the one that says the loop is not working.
+- **Oscillation is reported, never graded.** A hunk one round removes and a later round
+  restores — keyed on (path, normalized content, enclosing symbol) — is a `manual-only` P1
+  `spec_gap`: two rounds disagreed about the same code, which is a gap in the SPEC rather than
+  a defect in the diff, and it must not make grade A unreachable.
 
 **Step 7 — Save REVIEW Document**
 
@@ -1280,13 +1354,29 @@ High-severity findings → block wrapup/verify
 ### 7.10 targeted-test-selection
 
 **Role**: Owns the select-then-run recipe for a verify step that would otherwise run the
-whole suite. Computes the changed set as the NUL-delimited union of `git diff -z
---name-only HEAD` and `git ls-files -z --others --exclude-standard`, feeds it to
-`hm test_dep_map` **inside the stage's own worktree**, then runs either the returned
-`node_ids` (`mode: targeted`) or the full suite (`mode: full`, echoing `reason`). An empty
-changed set still invokes the selector with zero `--changed-file` arguments — skipping the
-call would run no tests and report success. `ruff check` and `mypy --strict` stay
-unconditional: repo-wide, cheap, no selection concept.
+whole suite — **and, since 0.52.0, the run-it-well half for any language**.
+
+§0 asks `hm test_runners plan --root .`, which names the project's runner, a worker count
+already capped for the machine (about half the visible cores, floored at 1, never above
+`cores - 1`), and which of the three levers that runner actually has: parallel, change-based
+selection, re-run-only-failures. The distinction that makes this a table rather than a
+sentence is `parallel_is_default`: `cargo`, `go`, `vitest`, `jest` and `flutter` are already
+parallel, where a worker flag caps (`cargo --test-threads` *lowers* concurrency) or nests a
+pool inside a pool, and `pytest` is the one common runner that is serial by default. A runner
+the table does not know is answered with "use the project's own command" — **not an error**,
+because for a table of ten runners that is the normal case and failing there would make the
+stage skip the step that runs tests.
+
+§1–§3 are the **Python** dep-map, and are skipped when the runner has none. They compute the
+changed set as the NUL-delimited union of `git diff -z --name-only HEAD` and `git ls-files -z
+--others --exclude-standard`, feed it to `hm test_dep_map` **inside the stage's own worktree**,
+then run either the returned `node_ids` (`mode: targeted`) or the full suite (`mode: full`,
+echoing `reason`). An empty changed set still invokes the selector with zero `--changed-file`
+arguments — skipping the call would run no tests and report success. Before this, the skill
+said only "for Rust or Node there is no dep-map, run the normal suite", which left every
+non-Python harness with neither selection nor parallelism.
+
+Lint and type checks stay unconditional: repo-wide, cheap, no selection concept.
 
 **Called from**:
 - The `/hm:review` auto-fix loop's **verify build** step (replacing an unconditional
@@ -1674,9 +1764,11 @@ routed to a field that does not exist.
 
 ## 9. Hook Details
 
-Hooks are Python modules that run automatically when specific events occur. They are defined in `.claude/hooks/hooks.json` and managed by harness-maker.
+Hooks are Python modules that run automatically when specific events occur. For Claude Code they are defined in the `hooks` key of **`.claude/settings.json`** — the only place Claude Code reads project hooks from — and managed by harness-maker, which deep-merges so your own hooks survive a re-render. Cursor and Codex read their own files (`.cursor/hooks.json`, `.codex/hooks.json`) with their own schemas.
 
-### Hook Definition Structure (hooks.json)
+> `.claude/hooks/hooks.json` is **not** that location and is no longer rendered. It is a *plugin-bundle* path; anything placed there by an older version was inert in Claude Code. See `docs/ARCHITECTURE.md` for the experiment that refuted the older claim.
+
+### Hook Definition Structure (the `hooks` key in settings.json)
 
 ```json
 {
