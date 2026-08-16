@@ -223,9 +223,11 @@ an earlier round can never vouch for a lens that did not run in this one.
 Then compute coverage. The CLI is the **sole producer** of the verdict — do not substitute your
 own judgement about which lenses ran:
 
-```bash
+{% if is_codex %}```bash
+Bash("uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round <round> --run-id <run-id> --preset {{ config.preset }}")
+```{% else %}```bash
 !{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round <round> --run-id <run-id> --preset {{ config.preset }}
-```
+```{% endif %}
 
 It prints `{"exercised": [...], "missing": [...], "blocks_approval": <bool>}`. Carry all three
 into the Grade Gate.
@@ -474,11 +476,17 @@ or `weak-consensus` at P0/P1 are surfaced by the Grade Gate's
 model name>", "kind": "lens"|"cross-model"}` — plus `reasoning_diverges: true` when Step 4b found
 matching OBSERVE with diverging CONCLUDE. Write the array to a temp path, then:
 
-```bash
+{% if is_codex %}```bash
+Bash("uv run --with {{ harness_maker_src_path }} hm review_consensus tag --file <the literal temp path>")
+```{% else %}```bash
 !{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_consensus tag --file <the literal temp path>
-```
+```{% endif %}
 
-It returns each finding with a `tag`. **Use its answer**; do not re-derive one.
+It rewrites the file **in place** with a `tag` on each finding, and prints the same payload.
+**Use its answer**; do not re-derive one, and do not hand-merge its stdout — the in-place write
+is what lets `record` and `grade` read this file next. (All three used to print to stdout only
+while being handed the same path, so `grade` re-read an untagged array and returned grade `A`
+over any number of P0s. Measured 2026-08-16.)
 
 | Tag | Condition | Auto-fix eligible? |
 |-----|-----------|--------------------|
@@ -521,12 +529,15 @@ step and an `auto_fix`-disabled run. Give each finding a `disposition` and, when
 | `duplicate` | Same defect as another `id` this round | — |
 | `unresolved` | Cannot adjudicate; no contract to judge against | `no-contract` |
 
-```bash
+{% if is_codex %}```bash
+Bash("uv run --with {{ harness_maker_src_path }} hm review_consensus record --file <the literal temp path>")
+```{% else %}```bash
 !{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_consensus record --file <the literal temp path>
-```
+```{% endif %}
 
-Exit 1 lists the findings it had to downgrade — a missing or unrecordable disposition becomes
-`unresolved` / `no-contract`, which counts toward the grade and raises `human_review_needed`.
+It rewrites the file in place, as `tag` does. Exit 1 lists the findings it had to downgrade — a
+missing or unrecordable disposition becomes `unresolved` / `no-contract`, which counts toward the
+grade and raises `human_review_needed`.
 Fix the listed entries rather than proceeding on the downgrade: it is the fail-safe, not the
 intent.
 
@@ -594,12 +605,19 @@ Sections:
 
 The same CLI computes it, from the tagged and dispositioned findings:
 
-```bash
-!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_consensus grade --file <the literal temp path>
-```
+{% if is_codex %}```bash
+Bash("uv run --with {{ harness_maker_src_path }} hm review_consensus grade --file <the literal temp path> --spec {{ config.spec.dir }}SPEC-{slug}.machine.yaml")
+```{% else %}```bash
+!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_consensus grade --file <the literal temp path> --spec {{ config.spec.dir }}SPEC-{slug}.machine.yaml
+```{% endif %}
 
-It prints `{"grade": "<letter>", "counts": {...}, "human_review_needed": <bool>}`. The rule it
-applies — stated here so a mismatch is visible, not so you can compute it yourself:
+It prints `{"grade": …, "counts": …, "human_review_needed": …, "errors": [...]}` and **exits 1
+whenever `errors` is non-empty** — an untagged finding, or a rejection citing an AC id the machine
+SPEC does not declare. Both mean the letter is not trustworthy: fix the listed entries and re-run
+rather than carrying the number forward. `--spec` is what makes an AC citation *verified*; without
+it no AC-cited rejection clears the grade, because `AC-999` parses exactly like `AC-004`.
+
+The rule it applies — stated here so a mismatch is visible, not so you can compute it yourself:
 
 - `P0_count` / `P1_count` = **`consensus-passed`** findings at that severity **whose disposition
   counts** (everything except `duplicate` and an AC-cited `rejected`).
@@ -700,9 +718,11 @@ Then re-run the check **passing `--round` once per round of this review so far**
 coverage is cumulative over a review rather than per round: the auto-fix loop re-spawns only
 the reviewers a fix touched, so this round's directory legitimately holds one or two files.
 
-```bash
-!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round 1 --round 2 --round <this round> --run-id <run-id> --preset {{ config.preset }}
-```
+{% if is_codex %}```bash
+Bash("uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round 1 --round 2 <one --round per further round so far> --round <this round> --run-id <run-id> --preset {{ config.preset }}")
+```{% else %}```bash
+!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round 1 --round 2 <one --round per further round so far> --round <this round> --run-id <run-id> --preset {{ config.preset }}
+```{% endif %}
 
 > The union is computed by the CLI, not by you. Round 2 of this change's own review rejected
 > the earlier wording, which told you to take the union yourself: the Grade Gate branches on
@@ -824,9 +844,11 @@ The dispatch list is the round-1 list, unchanged — same agents, same lens line
 {% for d in lenses %}Task(subagent_type="{{ d.agent }}", description="lens {{ d.lens }}: {slug}", prompt="<brief>\n\nYour lens: {{ d.brief }}")
 {% endfor %}```
 
-```bash
+{% if is_codex %}```bash
+Bash("uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round <pass-id> --run-id <run-id> --preset {{ config.preset }}")
+```{% else %}```bash
 !{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round <pass-id> --run-id <run-id> --preset {{ config.preset }}
-```
+```{% endif %}
 
 **Apply no fixes in this pass.** It is an observation, and a pass that edits what it is measuring
 has measured nothing.

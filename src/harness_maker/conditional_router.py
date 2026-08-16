@@ -20,21 +20,45 @@ from pathlib import Path
 
 from harness_maker.llm_judge import JudgeClient
 
-#: The discovery axis, adopted verbatim from the source experiment's structured arm
-#: (PLAN-review-loop-empirics ADR-001). Textbook code-review order; the measured fan-out gain
-#: concentrated in `robustness` and `naming`, which the old axis had no owner for.
+#: The discovery axis: the source experiment's six textbook categories, MERGED to four.
+#:
+#: The six were adopted verbatim by ADR-001 and the merge deviates from that deliberately, on
+#: measured redundancy rather than on taste. From the 2026-08-16 nine-lens run over the Phases
+#: 2-4 diff, counting each lens's findings that ANOTHER lens also raised:
+#:
+#:     consistency  80% redundant (4 of 5)   design       50% (4 of 8)
+#:     complexity   40% (2 of 5)             robustness   40% (2 of 5)
+#:     functionality 33% (3 of 9)            naming       14% (1 of 7)
+#:     security / concurrency / tests   0% — every finding exclusive
+#:
+#: Two merges follow from that, and only two:
+#:
+#: - **`complexity` folded into `design`.** Both of its overlaps were with `design`, and its
+#:   exclusive findings were all shape questions — a decision function with no caller, dataclasses
+#:   nothing crosses a boundary with, three CLI round trips where one would do. "Is this the right
+#:   shape" and "is this more shape than the problem needs" are one question asked twice.
+#: - **`naming` folded into `consistency`.** `consistency` was the most redundant lens in the run
+#:   and its single exclusive finding was a constant duplicated in two modules — which is what the
+#:   merged lens is for. Both read two places and compare: a name against its value, a docstring
+#:   against its code, a module against the conventions around it. `naming`'s own yield was almost
+#:   entirely exclusive, so the merged brief keeps its question first and in full.
+#:
+#: Untouched: the three zero-redundancy lenses, plus `robustness` (sole voice on the P0 at P0, and
+#: on the codex target rendering every mandated call inert) and `functionality`.
 #:
 #: The prior five (`correctness`, `failure`, `concurrency`, `security`, `tests`) are NOT carried
 #: alongside these: `correctness` and `failure` are RETIRED, replaced by `functionality` and
 #: `robustness`. The Phase 0 pilot measured `correctness` at zero exclusive finding-groups across
-#: three diffs — every finding it produced, `functionality` produced too — so the substitution is
-#: evidenced rather than assumed. The mandatory set is nine, never eleven.
+#: three diffs — every finding it produced, `functionality` produced too.
+#:
+#: **Caveat, stated because the numbers above look more solid than they are:** one diff, one run
+#: per lens. The source experiment measured median Jaccard 0.36 between two runs of ONE reviewer,
+#: so a re-run would redraw some of these groups. `consistency` at 80% is 4 findings out of 5.
+#: The mandatory set is seven on Production and these four on Side — never nine, never eleven.
 CORE_LENSES: tuple[str, ...] = (
     "design",
     "functionality",
-    "complexity",
     "robustness",
-    "naming",
     "consistency",
 )
 
@@ -48,10 +72,18 @@ DOMAIN_LENSES: tuple[str, ...] = ("security", "concurrency", "tests")
 #: presets differ in which lenses are *mandatory*, never in which exist.
 ALL_LENSES: tuple[str, ...] = CORE_LENSES + DOMAIN_LENSES
 
-#: Production's mandatory set, and the name every existing consumer imports. Kept as an alias so
-#: `review_telemetry`'s known-lens validation accepts the full vocabulary regardless of preset —
-#: a Side harness that routes in `security` still emits a legitimate `security` result.
-MANDATORY_LENSES: tuple[str, ...] = ALL_LENSES
+#: Every lens name a result file or a telemetry row may legitimately carry, on any preset. This
+#: is a VOCABULARY, not a requirement: `mandatory_lenses(preset)` answers "what must be exercised
+#: to approve", and the two are different sets on Side.
+KNOWN_LENSES: tuple[str, ...] = ALL_LENSES
+
+#: Deprecated alias for `KNOWN_LENSES`. The name asserts preset-scoped mandatoriness that its
+#: value never had — it is the full vocabulary — and a reader who "fixed" the constant to be
+#: genuinely mandatory-scoped would make `review_telemetry.emit` reject a legitimate Side row
+#: carrying a router-selected `security`, losing that append-only row. New code uses
+#: `KNOWN_LENSES` or `mandatory_lenses(preset)`; this exists so an out-of-tree import keeps
+#: working.
+MANDATORY_LENSES: tuple[str, ...] = KNOWN_LENSES
 
 
 def mandatory_lenses(preset: str = "Production") -> tuple[str, ...]:
@@ -72,27 +104,24 @@ def mandatory_lenses(preset: str = "Production") -> tuple[str, ...]:
 LENS_DISPATCH: dict[str, tuple[str, str]] = {
     "design": (
         "code-reviewer",
-        "design — boundaries, coupling, whether this is the right shape for the problem.",
+        "design — boundaries, coupling, whether this is the right shape for the problem; and "
+        "complexity: could it be simpler? Unnecessary indirection, dead generality, a knob or a "
+        "function with no caller on any path a user reaches.",
     ),
     "functionality": (
         "code-reviewer",
         "functionality — does it do what the SPEC and the invariants say, on every path?",
     ),
-    "complexity": (
-        "code-reviewer",
-        "complexity — could this be simpler? Unnecessary indirection, dead generality.",
-    ),
     "robustness": (
         "code-reviewer",
         "robustness — edge cases, partial writes, restart, resource exhaustion, recovery.",
     ),
-    "naming": (
-        "code-reviewer",
-        "naming — do the names say what the things are? Misleading names are defects.",
-    ),
     "consistency": (
         "code-reviewer",
-        "consistency — does this match the conventions of the code around it?",
+        "consistency — do the names, docstrings and declarations say what the code actually "
+        "does, and does this match the conventions around it? A name or a docstring that makes a "
+        "reader believe something FALSE about behaviour is a defect, not a nit; so is a second "
+        "source of truth for something that already had one.",
     ),
     "security": (
         "security-reviewer",
@@ -116,9 +145,18 @@ def lens_dispatch(preset: str = "Production") -> list[dict[str, str]]:
     drift apart. Parity is not a convention here: a confirmation pass missing a lens the coverage
     CLI requires makes every review permanently unapprovable (SPEC AC-015).
     """
+    # mandatory + routable, NOT mandatory alone. The Side split is "the router decides", and a
+    # router can only DROP what was dispatched — with the mandatory set alone, `security`,
+    # `concurrency` and `tests` were absent from every Side render, so a Side harness could never
+    # run them at all while the rendered prose said the router "may drop" them. Opt-out, not
+    # opt-in, is what ADR-001 specified. `mandatory_lenses` is unchanged: these three are
+    # dispatched on Side but not REQUIRED for approval, which is exactly the preset difference.
+    dispatched = list(mandatory_lenses(preset)) + [
+        lens for lens in routable_lenses(preset) if lens not in mandatory_lenses(preset)
+    ]
     return [
         {"lens": lens, "agent": LENS_DISPATCH[lens][0], "brief": LENS_DISPATCH[lens][1]}
-        for lens in mandatory_lenses(preset)
+        for lens in dispatched
     ]
 
 

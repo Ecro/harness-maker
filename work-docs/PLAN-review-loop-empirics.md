@@ -10,12 +10,12 @@ interview_rounds: 23
 adrs: 10
 validator_outcome: MAJOR_REVISION_RESOLVED
 surface_allowance:
-  chars: 9074
+  chars: 9940
   commands:
-    review: 7189
+    review: 8055
   round_trips:
-    review: 17
-    hm-review: 13
+    review: 13
+    hm-review: 15
   reason: "Phase 1's two uncuttable brief clauses (732), plus Phases 2-4: nine lens dispatches instead of five at BOTH sites, Step C2 rendering its own dispatch list because six lenses now share one agent and are told apart only by their brief line, and Step 4 calling hm review_consensus instead of describing the arithmetic (ADR-008)."
   delta_doc: BASELINE-DELTA-review-loop-empirics.md
 summary: "Adopt the six-category axis, give each lens a vote, gate re-review on churn."
@@ -156,7 +156,28 @@ extras.
   this harness renders for firmware and auth-bearing repositories.
 - Keep the old five and append the missing categories — approximates an axis that was measured as a
   whole, and leaves `design`/`consistency` unowned.
-**Source:** Interview #2, #7, #12, #20; validator critical C-02
+**Amendment (2026-08-16, interview #24 — after the first live run of the axis):** the six
+categories are **merged to four**, so the mandatory set is **seven on Production and four on
+Side**. `complexity` folds into `design`; `naming` folds into `consistency`. This deviates from
+"adopt the six verbatim" deliberately, on redundancy measured by the nine-lens run over this
+PLAN's own Phases 2–4 diff — counting each lens's findings that another lens also raised:
+`consistency` 80 % (4/5), `design` 50 % (4/8), `complexity` 40 % (2/5), `robustness` 40 % (2/5),
+`functionality` 33 % (3/9), `naming` 14 % (1/7), and `security` / `concurrency` / `tests` **0 %**.
+Both of `complexity`'s overlaps were with `design`, and its exclusive findings were all shape
+questions (a decision function with no caller, dataclasses crossing no boundary, three CLI round
+trips where one would do). `consistency` was the single most redundant lens and its one exclusive
+finding was a constant duplicated across two modules — which is what the merged lens is for; both
+it and `naming` read two places and compare. The four zero-or-near-zero-redundancy lenses are
+untouched, as are `robustness` (sole voice calling the P0 a P0, and sole finder of the codex
+target rendering every mandated call inert) and `functionality`.
+**Caveat:** one diff, one run per lens. The source experiment measured median Jaccard 0.36 between
+two runs of ONE reviewer, so a re-run would redraw some groups; `consistency` at 80 % is 4 of 5.
+Under-merging is the recoverable direction — a lens can be split again, but a category with no
+owner produces nothing to notice its absence from.
+**Cost:** Production round 1 and the confirmation pass go 9 → 7; the rendered `review` command
+drops 4 mandated calls (39 → 35).
+
+**Source:** Interview #2, #7, #12, #20, #24; validator critical C-02
 
 ### ADR-007: A single reviewer lens carries a full vote; K=2 is retained for same-lens repeats and for cross-model voters
 **Status:** Accepted (2026-08-15, via /hm:plan interview)

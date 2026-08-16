@@ -23,12 +23,17 @@ def _write_result(d: Path, lens: str, *, body: object | None = None, run_id: str
     (d / f"{lens}.json").write_text(json.dumps(payload), encoding="utf-8")
 
 
-def test_ac001_nine_mandatory_lenses_on_production() -> None:
-    """Nine, not eleven — `correctness` and `failure` are retired, not carried alongside."""
-    assert len(MANDATORY_LENSES) == 9
-    assert len(set(MANDATORY_LENSES)) == 9
-    assert "correctness" not in MANDATORY_LENSES
-    assert "failure" not in MANDATORY_LENSES
+def test_the_known_lens_vocabulary_is_seven_and_holds_no_retired_name() -> None:
+    """Seven, not nine and never eleven.
+
+    `correctness`/`failure` were retired by the axis change; `complexity`/`naming` were then
+    merged into `design`/`consistency` on measured redundancy (2026-08-16 run). A retired name
+    reappearing means two axes are live at once, which is how the set drifts to eleven.
+    """
+    assert len(MANDATORY_LENSES) == 7
+    assert len(set(MANDATORY_LENSES)) == 7
+    for retired in ("correctness", "failure", "complexity", "naming"):
+        assert retired not in MANDATORY_LENSES
 
 
 def test_every_mandatory_lens_present_does_not_block(tmp_path: Path) -> None:

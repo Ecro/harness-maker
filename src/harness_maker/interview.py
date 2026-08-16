@@ -130,6 +130,10 @@ _PROD_ENABLED_REVIEWERS: list[str] = [
     "performance-reviewer",
     "ux-reviewer",
     "concurrency-reviewer",
+    # `tests` is a MANDATORY lens on Production and `test-reviewer` carries it, so omitting it
+    # here left the coverage gate demanding a result from an agent the config never enabled —
+    # `blocks_approval: true` on every Production review, forever.
+    "test-reviewer",
 ]
 _PROD_ENABLED_SKILLS: list[str] = list(_ALL_SKILLS)
 

@@ -27,7 +27,7 @@ from pydantic import (
 )
 
 from harness_maker import command_registry
-from harness_maker.conditional_router import MANDATORY_LENSES
+from harness_maker.conditional_router import KNOWN_LENSES
 
 # Default location relative to project root — overridable via parameter.
 DEFAULT_OBSERVABILITY_DIR = Path(".claude/observability")
@@ -105,7 +105,7 @@ class ReviewTelemetryRecord(BaseModel):
         """An unrecognised lens name has no reading — this field is the approval gate's input."""
         if value is None:
             return value
-        unknown = [lens for lens in value if lens not in MANDATORY_LENSES]
+        unknown = [lens for lens in value if lens not in KNOWN_LENSES]
         if unknown:
             msg = f"lenses_exercised contains unknown lens name(s): {unknown}"
             raise ValueError(msg)

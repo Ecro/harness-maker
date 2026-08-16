@@ -64,11 +64,28 @@ def test_a_plan_without_the_block_grants_nothing(tmp_path: Path) -> None:
     assert aggregate_headroom(tmp_path) == 0
 
 
-def test_headroom_sums_across_concurrent_plans(tmp_path: Path) -> None:
+def test_two_concurrent_allowances_are_refused_not_summed(tmp_path: Path) -> None:
+    """Headroom has no ownership key, so summing makes the ratchet fail OPEN.
+
+    The gates pass only the repo root. With two in-flight PLANs the sum funds a change that
+    declared nothing from a PLAN that declared something, and the assertion message reports only
+    the total — so nothing says whose budget was spent. This repo runs concurrent sessions by
+    default, which makes that the ordinary case rather than the exotic one.
+    """
     _plan(tmp_path, "alpha", status="planning", block=_VALID)
     _plan(tmp_path, "beta", status="planning", block=_VALID)
-    assert aggregate_headroom(tmp_path) == 1464
-    assert command_headroom(tmp_path, "review") == 1400
+    with pytest.raises(AllowanceError, match="not attributable across PLANs"):
+        aggregate_headroom(tmp_path)
+
+
+def test_a_blocked_plan_keeps_its_headroom(tmp_path: Path) -> None:
+    """`blocked` is maximally in-flight — plan.md.j2 writes it on the ADR halt path.
+
+    Expiring there fails the ratchet with a message telling the author to regenerate
+    surface_baseline.json, which is the destructive act the allowance exists to remove.
+    """
+    _plan(tmp_path, "demo", status="blocked", block=_VALID)
+    assert aggregate_headroom(tmp_path) == 732
 
 
 def test_an_absent_work_docs_dir_is_not_an_error(tmp_path: Path) -> None:

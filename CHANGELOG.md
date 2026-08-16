@@ -2,7 +2,60 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **`hm review_consensus grade` failed OPEN — three consensus-passed P0 findings graded `A`.**
+  Found by the first live run of the nine-lens axis, dispatched against the commit that
+  introduced it, and reproduced by execution. `tag` and `record` printed to stdout only while
+  `review.md.j2` handed all three verbs one temp path and never said to write anything back, so
+  `grade` re-read an untagged array; `grade_from_findings` read `raw.get("tag")` and skipped
+  anything that was not `consensus-passed`, which made an ABSENT tag indistinguishable from
+  `manual-only`. Three repairs, because one was not enough: `tag`/`record` now rewrite the file
+  in place, an unrecognised tag is counted at its own severity and reported, and `grade` exits 1
+  whenever `errors` is non-empty.
+- **A rejection citing an AC id that exists in no SPEC cleared a P0 from the grade.**
+  `_authority_kind` checked the citation's *shape*, so `AC-999` parsed exactly like `AC-004` —
+  and ADR-002's whole claim is that clearing a P0 requires an **independent** contract. `grade`
+  takes `--spec` and verifies ids against the machine SPEC's `ac` list; without `--spec` no
+  AC-cited rejection clears, because an unverifiable citation is not a verified one.
+- **A Side harness could never dispatch `security`, `concurrency` or `tests`.** `lens_dispatch`
+  iterated the mandatory set, so the routable lenses were absent from every Side render while the
+  same command's routing bullet said the router "may drop" them — subtraction from a set the
+  renderer never produced. Dispatch is now mandatory ∪ routable: a router can only drop what was
+  dispatched, and `mandatory_lenses` is unchanged, which is exactly the preset difference.
+- **`test-reviewer` was missing from the Production enabled set** while `tests` is a mandatory
+  Production lens, so the coverage gate demanded a result from an agent the config never enabled
+  — `blocks_approval: true` forever.
+- **On the codex target every new mandated call rendered as an inert `!` line**, leaving the
+  coverage verdict, the tag, the disposition and the grade prose-only there. All six calls are
+  now `is_codex`-branched.
+- **`weak-consensus` was unreachable through the CLI**: the `tag` verb dropped the
+  `reasoning_diverges` field the template tells the model to supply.
+- **One voice-less finding aborted the whole `tag` batch** with exit 2 and no output — and the
+  stage produces voice-less findings by design. Empty voices now tag `manual-only`, which is what
+  the gate skill already specifies for that class.
+- **`aggregate_headroom` summed across every in-flight PLAN.** Headroom has no ownership key and
+  the gates pass only the repo root, so a change that earned none passed on another PLAN's
+  budget — failing open in the multi-session case this repo runs by default. It now refuses to
+  sum: more than one active allowance is a loud error naming the PLANs.
+- **`_ACTIVE_STATUSES` did not include `blocked`**, the status `plan.md.j2`'s ADR-halt path
+  writes — expiring the allowance at the moment the PLAN is most in-flight, and steering the
+  author toward regenerating `surface_baseline.json`, which is the destructive act the allowance
+  exists to remove.
+- `_load` silently dropped non-mapping findings (a dropped finding satisfies AC-006's
+  completeness invariant by not existing); `MANDATORY_LENSES` is renamed `KNOWN_LENSES` (it is a
+  vocabulary, not any preset's requirement) with a documented deprecated alias.
+
 ### Changed
+
+- **The lens axis is seven, not nine.** The source experiment's six categories are merged to
+  four — `complexity` into `design`, `naming` into `consistency` — on redundancy measured by the
+  nine-lens run over this change's own diff: `consistency` 80 % of its findings also raised by
+  another lens, `design` 50 %, `complexity` 40 %, against **0 %** for `security`, `concurrency`
+  and `tests`, which are untouched. Both of `complexity`'s overlaps were with `design` and its
+  exclusive findings were all shape questions; `consistency` and `naming` both work by reading
+  two places and comparing. Production round 1 and the confirmation pass go 9 → 7 dispatches.
+  Caveat recorded in ADR-001's amendment: one diff, one run per lens.
 
 - **The review discovery axis is replaced (BREAKING for review behaviour — Phases 2–4 of
   PLAN-review-loop-empirics).** The five incidental lenses give way to the six categories the

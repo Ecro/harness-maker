@@ -42,7 +42,7 @@ def _model(name: str) -> dict[str, str]:
 
 AC004_ROWS = [
     ([_lens("robustness")], "consensus-passed"),
-    ([_lens("naming"), _lens("design")], "consensus-passed"),
+    ([_lens("consistency"), _lens("design")], "consensus-passed"),
     ([_model("codex")], "manual-only"),
     ([_model("codex"), _model("antigravity")], "consensus-passed"),
     ([_model("codex"), _lens("security")], "consensus-passed"),
@@ -84,19 +84,31 @@ def test_the_table_is_monotonic_in_voices() -> None:
     for diverges in (False, True):
         solo = ranks[tag_finding([_lens("robustness")], reasoning_diverges=diverges)]
         pair = ranks[
-            tag_finding([_lens("robustness"), _lens("naming")], reasoning_diverges=diverges)
+            tag_finding([_lens("robustness"), _lens("consistency")], reasoning_diverges=diverges)
         ]
         assert pair >= solo, f"a second lens voice made it worse (diverges={diverges})"
 
 
 @pytest.mark.parametrize(
     "voices",
-    [[], [{"source": "", "kind": "lens"}], [{"source": "x", "kind": "reviewer"}], ["naming"]],
+    [[{"source": "", "kind": "lens"}], [{"source": "x", "kind": "reviewer"}], ["naming"]],
 )
 def test_a_malformed_voice_is_loud(voices: list[object]) -> None:
     """Never a silent drop: a dropped voice moves a grade with no diagnostic."""
     with pytest.raises(ConsensusError):
         tag_finding(voices)
+
+
+def test_a_voice_less_finding_is_manual_only_not_an_error() -> None:
+    """The stage PRODUCES these, so raising took the whole batch down with them.
+
+    Step 4d tells the model to leave an `unresolved` cross-model finding's voices out of the
+    array while Step 4e requires every finding to carry a disposition — so it stays in the file
+    with no voices. Raising made one such entry abort `tag` with exit 2 and no output, which then
+    fed an untagged file into `grade`. `manual-only` is the tag the skill already specifies for
+    that class.
+    """
+    assert tag_finding([]) == "manual-only"
 
 
 # ── AC-004 provenance: `lens` is metadata, never part of the merge key ───────
@@ -105,10 +117,15 @@ def test_a_malformed_voice_is_loud(voices: list[object]) -> None:
 def test_finding_carries_lens_provenance() -> None:
     """The tag rule is undecidable without it — six lenses share one agent name."""
     findings = [
-        {"lens": "naming", "severity": "P2", "tag": "consensus-passed", "disposition": "accepted"},
+        {
+            "lens": "consistency",
+            "severity": "P2",
+            "tag": "consensus-passed",
+            "disposition": "accepted",
+        },
         {"lens": "design", "severity": "P2", "tag": "consensus-passed", "disposition": "accepted"},
     ]
-    assert {f["lens"] for f in findings} == {"naming", "design"}
+    assert {f["lens"] for f in findings} == {"consistency", "design"}
     # Two different lenses, one agent: `source` alone would collapse them.
     assert tag_finding([_lens(f["lens"]) for f in findings]) == "consensus-passed"
 
@@ -371,3 +388,199 @@ def test_the_plan_verb_reports_the_comparison(tmp_path: Path) -> None:
     payload = json.loads(proc.stdout)
     assert payload["dispatches"] == []
     assert "0.05 < 0.20" in payload["reason"]
+
+
+# ── The seam, end to end: the defect cluster that reached main on 2026-08-16 ──
+#
+# Every test above this line calls the LIBRARY. The P0 lived in the gap between the library and
+# the three-verb chain the rendered stage prescribes — so these drive the CLI over one temp path,
+# exactly as the template says to, and assert on what comes out.
+
+
+@pytest.fixture
+def chain(tmp_path: Path):  # type: ignore[no-untyped-def]
+    """Write findings, then run tag → record → grade over ONE path, as the stage does."""
+    path = tmp_path / "findings.json"
+
+    def run(findings: list[dict[str, object]], *, spec: str | None = None) -> dict[str, object]:
+        path.write_text(json.dumps(findings), encoding="utf-8")
+        _hm("tag", "--file", str(path))
+        _hm("record", "--file", str(path))
+        args = ["grade", "--file", str(path)]
+        if spec:
+            args += ["--spec", spec]
+        proc = _hm(*args)
+        payload = json.loads(proc.stdout)
+        payload["_exit"] = proc.returncode
+        return payload
+
+    return run
+
+
+def test_the_chain_grades_p0s_it_was_given(chain) -> None:  # type: ignore[no-untyped-def]
+    """The P0, as a test. Three consensus-passed P0s graded `A` before this.
+
+    `tag` and `record` printed to stdout only while all three verbs were handed the same path, so
+    `grade` re-read the untagged array, skipped every finding, and returned zero counts. The
+    letter said the review could exit.
+    """
+    out = chain(
+        [
+            {"id": fid, "severity": "P0", "voices": [_lens(ln)], "disposition": "accepted"}
+            for fid, ln in (("a", "robustness"), ("b", "security"), ("c", "design"))
+        ]
+    )
+    assert out["grade"] == "F"
+    assert out["counts"]["P0"] == 3
+
+
+def test_grade_fails_closed_on_an_untagged_file() -> None:
+    """The direction matters more than the letter: unknown input must never read as clean."""
+    out = grade_from_findings([{"id": "a", "severity": "P0", "disposition": "accepted"}])
+    assert out["grade"] != "A"
+    assert out["human_review_needed"] is True
+    assert out["errors"]
+
+
+def test_an_unverifiable_ac_citation_cannot_clear_a_p0(tmp_path: Path) -> None:
+    """`AC-999` parses exactly like `AC-004`; only the SPEC can tell them apart.
+
+    Without this, clearing a P0 from the grade needed a well-formed string rather than an
+    independent contract — which is the grade laundering ADR-002 exists to forbid.
+    """
+    spec = tmp_path / "s.machine.yaml"
+    spec.write_text("ac:\n  - id: AC-004\n    title: t\n", encoding="utf-8")
+    f = tmp_path / "f.json"
+
+    def grade_with(authority: str) -> dict[str, object]:
+        f.write_text(
+            json.dumps(
+                [
+                    {
+                        "id": "a",
+                        "severity": "P0",
+                        "tag": "consensus-passed",
+                        "disposition": "rejected",
+                        "authority": authority,
+                    }
+                ]
+            ),
+            encoding="utf-8",
+        )
+        proc = _hm("grade", "--file", str(f), "--spec", str(spec))
+        out = json.loads(proc.stdout)
+        out["_exit"] = proc.returncode
+        return out
+
+    phantom = grade_with("AC-999")
+    assert phantom["grade"] == "D"
+    assert phantom["_exit"] == 1
+
+    real = grade_with("AC-004")
+    assert real["grade"] == "A"
+    assert real["_exit"] == 0
+
+
+def test_without_a_spec_no_ac_citation_clears_the_grade(tmp_path: Path) -> None:
+    """Fail-closed on the absent case: an unverifiable citation is not a verified one."""
+    f = tmp_path / "f.json"
+    f.write_text(
+        json.dumps(
+            [
+                {
+                    "id": "a",
+                    "severity": "P0",
+                    "tag": "consensus-passed",
+                    "disposition": "rejected",
+                    "authority": "AC-004",
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+    out = json.loads(_hm("grade", "--file", str(f)).stdout)
+    assert out["grade"] == "D"
+
+
+def test_a_voice_less_finding_does_not_abort_the_batch(tmp_path: Path) -> None:
+    """One entry used to take the whole round's tag column down with it, via exit 2."""
+    f = tmp_path / "f.json"
+    f.write_text(
+        json.dumps(
+            [
+                {"id": "a", "severity": "P1", "voices": []},
+                {"id": "b", "severity": "P0", "voices": [_lens("consistency")]},
+            ]
+        ),
+        encoding="utf-8",
+    )
+    proc = _hm("tag", "--file", str(f))
+    assert proc.returncode == 0
+    assert [x["tag"] for x in json.loads(proc.stdout)["findings"]] == [
+        "manual-only",
+        "consensus-passed",
+    ]
+
+
+def test_the_tag_verb_honours_reasoning_diverges(tmp_path: Path) -> None:
+    """`weak-consensus` was unreachable through the CLI the template calls the sole decider."""
+    f = tmp_path / "f.json"
+    f.write_text(
+        json.dumps(
+            [
+                {
+                    "id": "a",
+                    "severity": "P1",
+                    "reasoning_diverges": True,
+                    "voices": [_model("codex"), _model("antigravity")],
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+    assert json.loads(_hm("tag", "--file", str(f)).stdout)["findings"][0]["tag"] == (
+        "weak-consensus"
+    )
+
+
+def test_tag_and_record_write_back_in_place(tmp_path: Path) -> None:
+    """The in-place write IS the chain; without it each verb re-reads the original array."""
+    f = tmp_path / "f.json"
+    f.write_text(
+        json.dumps([{"id": "a", "severity": "P2", "voices": [_lens("consistency")]}]),
+        encoding="utf-8",
+    )
+    _hm("tag", "--file", str(f))
+    assert json.loads(f.read_text())[0]["tag"] == "consensus-passed"
+    _hm("record", "--file", str(f))
+    assert json.loads(f.read_text())[0]["disposition"] in DISPOSITIONS
+
+
+def test_a_non_mapping_finding_is_loud_not_dropped(tmp_path: Path) -> None:
+    """A dropped finding satisfies AC-006's completeness invariant by not existing."""
+    f = tmp_path / "f.json"
+    f.write_text(json.dumps([{"id": "a", "severity": "P0"}, "not-a-finding"]), encoding="utf-8")
+    assert _hm("record", "--file", str(f)).returncode == 2
+
+
+def test_build_round_record_preserves_a_valid_disposition() -> None:
+    """The one-sided oracle the tests lens caught: only the fail-safe direction was pinned.
+
+    A mutant stamping every finding `unresolved`/`no-contract` passed the whole file, which would
+    have killed AC-008's AC-cited escape on the only path the stage uses.
+    """
+    record = build_round_record(
+        [
+            {
+                "id": "a",
+                "severity": "P0",
+                "tag": "consensus-passed",
+                "disposition": "rejected",
+                "authority": "AC-004",
+            }
+        ]
+    )
+    assert record.errors == []
+    assert record.findings[0]["disposition"] == "rejected"
+    assert record.findings[0]["authority"] == "AC-004"
+    assert grade_from_findings(record.findings)["grade"] == "A"

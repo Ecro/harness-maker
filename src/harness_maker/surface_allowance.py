@@ -13,7 +13,13 @@ _FRONTMATTER = re.compile(r"\A---\r?\n(.*?)\r?\n---\r?\n", re.DOTALL)
 #: A PLAN only holds headroom while it is in flight. On completion the growth is folded
 #: into the baseline once, with its BASELINE-DELTA attribution — that is the legitimate
 #: re-freeze moment, and it is what stops allowances accumulating into no ratchet at all.
-_ACTIVE_STATUSES = frozenset({"planning"})
+#:
+#: `blocked` counts as in-flight. `plan.md.j2`'s halt path writes it when an iteration hits a
+#: decision needing an ADR — the PLAN is then maximally mid-work, and expiring its headroom there
+#: fails the ratchet gate with a message telling the author to regenerate `surface_baseline.json`,
+#: which is precisely the destructive act the allowance exists to remove. Only `wrapup` writes the
+#: terminal `complete`.
+_ACTIVE_STATUSES = frozenset({"planning", "blocked"})
 
 
 class AllowanceError(ValueError):
@@ -124,14 +130,39 @@ def load_active_allowances(root: Path) -> list[Allowance]:
     return found
 
 
+def _sole_active(root: Path) -> list[Allowance]:
+    """The active allowances, refusing to SUM across two in-flight PLANs.
+
+    Headroom has no ownership key: the gates pass only the repo root, so summing means every
+    in-flight PLAN's declared growth funds every other's. Session B, whose change earned zero
+    headroom, would pass the ratchet on session A's budget — and the failure message reports only
+    the total, so nothing says whose. This repo runs N concurrent sessions by default, which is
+    the case that makes it fail OPEN rather than the exotic one.
+
+    Refusing is the honest control: a real second concurrent allowance is rare, and when it
+    happens the author must fold the completed PLAN's growth into the baseline (the legitimate
+    re-freeze) rather than silently borrowing.
+    """
+    active = load_active_allowances(root)
+    if len(active) > 1:
+        slugs = ", ".join(a.slug for a in active)
+        raise AllowanceError(
+            f"{len(active)} in-flight PLANs declare a surface_allowance ({slugs}). Headroom is "
+            "not attributable across PLANs — one PLAN's growth would be funded by another's "
+            "budget. Fold the completed PLAN's growth into surface_baseline.json with its "
+            "delta doc, or set its status away from planning/blocked."
+        )
+    return active
+
+
 def aggregate_headroom(root: Path) -> int:
     """Total characters the aggregate ratchet may exceed its frozen baseline by."""
-    return sum(a.chars for a in load_active_allowances(root))
+    return sum(a.chars for a in _sole_active(root))
 
 
 def command_headroom(root: Path, command: str) -> int:
     """Characters a single rendered command may exceed its per-command ceiling by."""
-    return sum(a.commands.get(command, 0) for a in load_active_allowances(root))
+    return sum(a.commands.get(command, 0) for a in _sole_active(root))
 
 
 def round_trip_headroom(root: Path, command: str) -> int:
@@ -150,4 +181,4 @@ def round_trip_headroom(root: Path, command: str) -> int:
     so one edit legitimately adds a different number of calls to each. Folding them onto one key
     would let a real drift in one variant hide behind the other's declaration.
     """
-    return sum(a.round_trips.get(command, 0) for a in load_active_allowances(root))
+    return sum(a.round_trips.get(command, 0) for a in _sole_active(root))

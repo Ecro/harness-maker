@@ -22,8 +22,14 @@ from pathlib import Path
 from typing import Any, Literal
 
 from harness_maker import command_registry
+from harness_maker.io_utils import atomic_write
 
 Tag = Literal["consensus-passed", "weak-consensus", "manual-only"]
+
+#: The closed tag vocabulary. `grade_from_findings` checks membership rather than testing for
+#: one value, so an ABSENT tag is distinguishable from `manual-only` — the distinction the
+#: fail-open defect turned on.
+_TAGS: frozenset[str] = frozenset({"consensus-passed", "weak-consensus", "manual-only"})
 Disposition = Literal["accepted", "rejected", "duplicate", "unresolved"]
 
 #: The four PIDA values. Shared with the cross-model gate so the rejection rate cannot silently
@@ -101,7 +107,14 @@ def tag_finding(voices: list[object], *, reasoning_diverges: bool = False) -> Ta
     """
     parsed = [_as_voice(v) for v in voices]
     if not parsed:
-        raise ConsensusError("a finding with no voices cannot be tagged")
+        # `manual-only`, not a raise. The stage PRODUCES voice-less findings by design: Step 4d
+        # tells the model to leave an `unresolved` cross-model finding's voices out of the array,
+        # while Step 4e requires every finding to carry a disposition — so it must stay in the
+        # file. Raising made one such entry abort the whole batch with exit 2 and no output,
+        # which then fed an untagged file straight into `grade`. `manual-only` is also the tag
+        # the skill already specifies for that class, so this is the documented outcome rather
+        # than a new leniency.
+        return "manual-only"
     lens_sources = {v.source for v in parsed if v.kind == "lens"}
     model_sources = {v.source for v in parsed if v.kind == "cross-model"}
 
@@ -240,12 +253,33 @@ def grade_from_findings(findings: list[dict[str, Any]]) -> dict[str, Any]:
     A finding is graded when it is `consensus-passed` **and** its disposition counts. Two
     independent filters, in that order: the tag decides whether it is corroborated, the
     disposition decides whether a contract excused it.
+
+    **An untagged finding is an ERROR, never a skip.** This used to `continue` past a finding
+    whose `tag` key was absent, which made the whole function fail OPEN: the stage runs `tag`,
+    `record` and `grade` against one temp path, the first two print to stdout, and if their
+    output is not merged back then `grade` sees an array with no `tag` on anything — every
+    finding skipped, counts all zero, grade `A`, `human_review_needed` false. Measured on
+    2026-08-16: three consensus-passed P0s graded `A`. That is the exact defect this module was
+    written to make impossible, reintroduced one layer up, so the absent case is now reported
+    and the caller is expected to exit non-zero on it.
     """
     counts = {"P0": 0, "P1": 0, "P2": 0, "P3": 0}
     human_review_needed = False
-    for raw in findings:
+    errors: list[str] = []
+    for i, raw in enumerate(findings):
         severity = str(raw.get("severity", ""))
         tag = raw.get("tag")
+        if tag not in _TAGS:
+            # Fail CLOSED: an unknown tag counts at its own severity and raises the flag, so a
+            # lost tag column can only ever make the grade worse than the truth.
+            errors.append(
+                f"{raw.get('id', i)}: tag is {tag!r}, not one of {sorted(_TAGS)} — counted as "
+                "severe. Did the `tag` verb's output get written back to this file?"
+            )
+            if severity in counts:
+                counts[severity] += 1
+            human_review_needed = True
+            continue
         effect = grade_effect(severity, raw.get("disposition"), raw.get("authority"))
         if effect["human_review_needed"] and tag == "consensus-passed":
             human_review_needed = True
@@ -261,7 +295,12 @@ def grade_from_findings(findings: list[dict[str, Any]]) -> dict[str, Any]:
         p2_count=counts["P2"],
         p3_count=counts["P3"],
     )
-    return {"grade": grade, "counts": counts, "human_review_needed": human_review_needed}
+    return {
+        "grade": grade,
+        "counts": counts,
+        "human_review_needed": human_review_needed,
+        "errors": errors,
+    }
 
 
 # ── Re-review decision (ADR-004/005; wired by Phase 6) ───────────────────────
@@ -305,11 +344,72 @@ def rereview_plan(churn_ratio: float, threshold: float) -> list[Dispatch]:
 
 _USAGE = (
     "usage: hm review_consensus <tag|grade|plan|record> …\n"
-    "  tag     --file <findings.json>   stamp a `tag` on each finding from its `voices`\n"
-    "  grade   --file <findings.json>   grade + counts + human_review_needed\n"
+    "  tag     --file <f> [--out <f>]  stamp a `tag` on each finding from its `voices`\n"
+    "  record  --file <f> [--out <f>]  assign the disposition column; exit 1 on any gap\n"
+    "  grade   --file <f> [--spec <machine.yaml>]  grade + counts + human_review_needed\n"
     "  plan    --churn-ratio <r> --threshold <t>\n"
-    "  record  --file <findings.json>   assign the disposition column; exit 1 on any gap\n"
+    "\n"
+    "  --out defaults to --file: `tag` and `record` rewrite the file IN PLACE, so the three\n"
+    "  verbs chain over one path without the caller having to merge stdout back by hand.\n"
+    "  --spec turns AC-cited rejections into VERIFIED ones; without it none can clear the grade.\n"
 )
+
+
+def _known_ac_ids(spec_path: str | None) -> frozenset[str] | None:
+    """AC ids the machine SPEC actually declares, or None when no SPEC was supplied.
+
+    Only an AC-cited rejection clears a finding from the grade, and `_authority_kind` can only
+    check the SHAPE of the citation — `AC-999` parses exactly like `AC-004`. Measured
+    2026-08-16: a P0 rejected against `AC-999`, an id in no SPEC, came back
+    `{counted: false, human_review_needed: false}`. Citing a contract that does not exist is
+    typing a string, not citing a contract, and ADR-002's whole claim is that clearing a P0
+    requires an INDEPENDENT one.
+    """
+    if not spec_path:
+        return None
+    import yaml
+
+    raw = yaml.safe_load(Path(spec_path).read_text(encoding="utf-8"))
+    if not isinstance(raw, dict):
+        raise ConsensusError(f"{spec_path}: machine SPEC must be a mapping")
+    acs = raw.get("ac")
+    if not isinstance(acs, list):
+        raise ConsensusError(f"{spec_path}: machine SPEC has no `ac` list")
+    return frozenset(
+        str(a["id"]) for a in acs if isinstance(a, dict) and isinstance(a.get("id"), str)
+    )
+
+
+def _verify_ac_citations(findings: list[dict[str, Any]], known: frozenset[str] | None) -> list[str]:
+    """Downgrade any rejection whose AC id cannot be verified, IN PLACE, and report it.
+
+    Fail-closed in both directions. With no SPEC (`known is None`) nothing can be verified, so no
+    AC-cited rejection clears — a task-driven harness has no AC ids anyway, which ADR-002 records
+    as the accepted cost. With a SPEC, an id outside it is downgraded to `unresolved`, which
+    counts toward the grade and raises the human-review flag.
+    """
+    errors: list[str] = []
+    for i, f in enumerate(findings):
+        if f.get("disposition") != "rejected":
+            continue
+        authority = f.get("authority")
+        if _authority_kind(authority) != "ac":
+            continue
+        ident = str(authority).split()[0].upper()
+        if known is None:
+            errors.append(
+                f"{f.get('id', i)}: rejected against {ident} but no --spec was given, so the "
+                "citation cannot be verified — recorded unresolved"
+            )
+        elif ident not in known:
+            errors.append(
+                f"{f.get('id', i)}: rejected against {ident}, which the machine SPEC does not "
+                "declare — recorded unresolved"
+            )
+        else:
+            continue
+        f["disposition"], f["authority"] = "unresolved", NO_CONTRACT
+    return errors
 
 
 def _load(path: str) -> list[dict[str, Any]]:
@@ -318,7 +418,23 @@ def _load(path: str) -> list[dict[str, Any]]:
         data = data.get("findings", [])
     if not isinstance(data, list):
         raise ConsensusError("expected a findings array, or an object with a `findings` key")
-    return [x for x in data if isinstance(x, dict)]
+    for i, x in enumerate(data):
+        # Loud, not lenient — matching `build_round_record`. Dropping a malformed entry made a
+        # finding vanish before the disposition column was assigned, which satisfies AC-006's
+        # completeness invariant trivially by not existing.
+        if not isinstance(x, dict):
+            raise ConsensusError(f"finding {i} must be a mapping, got {type(x).__name__}")
+    return list(data)
+
+
+def _write_findings(path: str, findings: list[dict[str, Any]]) -> None:
+    """Persist the enriched column so the NEXT verb can read it.
+
+    `tag` and `record` used to print to stdout only, while the rendered stage passed one temp
+    path to all three verbs — so `grade` re-read the original array and saw no `tag` on anything.
+    Writing in place is what makes the documented `tag → record → grade` chain actually chain.
+    """
+    atomic_write(Path(path), json.dumps(findings, indent=2, sort_keys=True, default=str) + "\n")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -337,6 +453,14 @@ def main(argv: list[str] | None = None) -> int:
     # invisible to it — the registry would then claim four verbs the scan cannot corroborate.
     parser.add_argument("verb", choices=["tag", "grade", "plan", "record"])
     parser.add_argument("--file")
+    parser.add_argument(
+        "--out",
+        help="where to write the enriched findings; defaults to --file (in-place)",
+    )
+    parser.add_argument(
+        "--spec",
+        help="machine SPEC whose `ac` ids an AC-cited rejection must name to clear the grade",
+    )
     parser.add_argument("--churn-ratio", type=float, dest="churn_ratio")
     parser.add_argument("--threshold", type=float)
     try:
@@ -361,22 +485,36 @@ def main(argv: list[str] | None = None) -> int:
                 return 2
             findings = _load(opts.file)
             if verb == "tag":
-                payload = {
-                    "findings": [
-                        {**f, "tag": tag_finding(list(f.get("voices", [])))} for f in findings
-                    ]
-                }
+                tagged = [
+                    {
+                        **f,
+                        "tag": tag_finding(
+                            list(f.get("voices", [])),
+                            reasoning_diverges=bool(f.get("reasoning_diverges", False)),
+                        ),
+                    }
+                    for f in findings
+                ]
+                payload = {"findings": tagged}
+                _write_findings(opts.out or opts.file, tagged)
             elif verb == "grade":
+                errors = _verify_ac_citations(findings, _known_ac_ids(opts.spec))
                 payload = grade_from_findings(findings)
+                payload["errors"] = errors + list(payload.get("errors", []))
             else:
                 record = build_round_record(findings)
                 payload = {"findings": record.findings, "errors": record.errors}
+                _write_findings(opts.out or opts.file, record.findings)
     except (ConsensusError, OSError, ValueError) as exc:
         sys.stderr.write(f"review_consensus: {exc}\n")
         return 2
 
     sys.stdout.write(json.dumps(payload, sort_keys=True, default=str) + "\n")
-    if verb == "record" and payload.get("errors"):
+    if verb in {"record", "grade"} and payload.get("errors"):
+        # `grade` exits 1 on any error too, because its errors are exactly the cases where the
+        # printed letter is not trustworthy — a lost tag column, or a rejection citing an AC that
+        # cannot be verified. A silent zero exit next to a cheerful "A" is the shape of the
+        # defect this whole change is repairing.
         return 1
     return 0
 
