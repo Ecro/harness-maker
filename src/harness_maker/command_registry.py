@@ -140,7 +140,7 @@ MODULES: dict[str, ModuleSpec] = {
     "second_opinion_oracle": ModuleSpec("flagonly"),
     "review_telemetry": ModuleSpec("manual-dispatch", _s("emit")),
     "lens_coverage": ModuleSpec("manual-dispatch", _s("check")),
-    "review_consensus": ModuleSpec("manual-dispatch", _s("tag", "grade", "plan", "record")),
+    "review_consensus": ModuleSpec("manual-dispatch", _s("finalize", "plan")),
     "verifier_discrimination": ModuleSpec("manual-dispatch", _s("report", "rounds", "agents")),
     "freeze": ModuleSpec("manual-dispatch", _s("resolve-base", "commit", "read-base", "reap")),
     "spec_quality": ModuleSpec("manual-dispatch", _s("eval")),

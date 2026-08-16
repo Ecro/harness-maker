@@ -118,11 +118,13 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     #       does". Under the old axis that back-reference was adequate because each lens had a
     #       self-describing agent; six of the nine now share `code-reviewer` and are told apart
     #       ONLY by their brief line, so a pass that never states the briefs cannot be run.
-    #   +4  `hm review_consensus {tag,record,grade}` and the disposition ledger write — Step 4
-    #       stopped being prose (ADR-008), and prose has no executable surface to test.
+    #   +2  `hm review_consensus finalize` and the disposition ledger write — Step 4 stopped
+    #       being prose (ADR-008), and prose has no executable surface to test. It was three
+    #       chained verbs over one rewritten file until 2026-08-16; folding them into one
+    #       stateless call took this row 35 -> 33 and removed the write-back defect class.
     # The ADR-011 rule counts each `Task(` individually even though all seven leave in one
     # message, so the dispatch half of this is a cost in the metric, not in turns.
-    "review": 35,
+    "review": 33,
     "spec": 6,
     "uninstall": 3,
     "verify": 13,

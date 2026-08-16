@@ -248,7 +248,19 @@ This is the second independent observation of that mechanism.
 input and a fifth row was added: an AC-*shaped* citation that was never verified no longer clears
 the grade. `AC-999` parses exactly like `AC-004`; only the SPEC can tell them apart.
 
-## What was NOT done, and why it matters
+## The collapse (done after round 2, at the operator's direction)
+
+`tag` / `record` / `grade` are now one verb, `finalize`: one read, the same three rules, one
+payload, no write. Every defect in the list below that stemmed from the write-back is now
+**unreachable rather than guarded** — file destruction, envelope loss, missing containment,
+non-idempotency, order dependence. The rules did not change; the statefulness did. Round trips
+for the rendered `review` command go 35 → 33, and a render guard fails if any retired verb
+reappears.
+
+The section below is kept as the record of what the narrow-repair path left open **before** the
+collapse, because the reasoning is what produced it.
+
+## What was NOT done at the time, and why it mattered
 
 The alternative on the table was **collapsing `tag`/`record`/`grade` into one stateless verb**.
 The in-place write is what generated most of round 2's findings — file destruction, envelope loss,
@@ -256,8 +268,8 @@ missing containment, non-idempotency, order-dependence — and a single read-and
 that class rather than guarding each instance. Narrow repair was chosen instead, so the class
 remains and these stay open:
 
-- `_write_findings` applies **no containment check** on a model-substituted path, unlike every
-  sibling writer in this repo (`stage_agent_ledger`, `lens_coverage`, `review_telemetry`).
+- ~~`_write_findings` applies **no containment check** on a model-substituted path~~ — **closed
+  by the collapse**: there is no write path any more.
 - `two_pass_review merge` still inlines model-authored findings into a shell-quoted `echo`, one
   step before the change that exists to stop exactly that — command injection from a hostile diff.
 - `--out` has no rendered caller; the `plan` verb and `rereview_plan` are still callerless.

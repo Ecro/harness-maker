@@ -84,6 +84,18 @@
 
 ### Changed
 
+- **`hm review_consensus` is one stateless verb.** `tag` / `record` / `grade` chained by rewriting
+  the findings file so each could see the previous one's column; `finalize` reads once, applies
+  the same three rules, and prints one payload. The chaining was the defect generator, not an
+  incidental cost — two review rounds found, in it: `tag --file <any JSON object>` silently
+  destroying that file, the envelope dropped on write-back, no containment check on a
+  model-substituted path (unlike every sibling writer here), `record` going green on a blind
+  retry, and an order dependence the template could only express as prose naming one path three
+  times. None of those are reachable from a function that reads and returns. The rules are
+  unchanged: same tag table, same disposition column, same grade, same AC verification — what is
+  removed is the statefulness, not a check. The rendered stage makes one call instead of three
+  (round trips 35 → 33), and a render guard fails if any of the retired verbs reappears.
+
 - **The lens axis is seven, not nine.** The source experiment's six categories are merged to
   four — `complexity` into `design`, `naming` into `consistency` — on redundancy measured by the
   nine-lens run over this change's own diff: `consistency` 80 % of its findings also raised by

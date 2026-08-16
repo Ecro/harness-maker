@@ -472,21 +472,30 @@ or `weak-consensus` at P0/P1 are surfaced by the Grade Gate's
 
 #### Step 4d — Tag every finding
 
-**The CLI decides the tag; you supply the voices.** Give each finding a `voices` array — one entry per source that raised it, `{"source": "<lens or
-model name>", "kind": "lens"|"cross-model"}` — plus `reasoning_diverges: true` when Step 4b found
-matching OBSERVE with diverging CONCLUDE. Write the array to a temp path, then:
+**One call decides tag, disposition and grade together — Steps 4d, 4e and the Grade Computation
+below are its three rules, not three commands.** Give each finding a `voices` array — one entry
+per source that raised it, `{"source": "<lens or model name>", "kind": "lens"|"cross-model"}` —
+plus `reasoning_diverges: true` when Step 4b found matching OBSERVE with diverging CONCLUDE, and
+the `disposition`/`authority` that Step 4e describes. Write the array to a temp path, then:
 
 {% if is_codex %}```bash
-Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_consensus tag --file <the literal temp path>")
+Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_consensus finalize --file <the literal temp path>{% if config.dev_mode == 'spec-driven' %} --spec {{ config.spec.dir }}SPEC-{slug}.machine.yaml{% endif %}")
 ```{% else %}```bash
-!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_consensus tag --file <the literal temp path>
+!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_consensus finalize --file <the literal temp path>{% if config.dev_mode == 'spec-driven' %} --spec {{ config.spec.dir }}SPEC-{slug}.machine.yaml{% endif %}
 ```{% endif %}
 
-It rewrites the file **in place** with a `tag` on each finding, and prints the same payload.
-**Use its answer**; do not re-derive one, and do not hand-merge its stdout — the in-place write
-is what lets `record` and `grade` read this file next. (All three used to print to stdout only
-while being handed the same path, so `grade` re-read an untagged array and returned grade `A`
-over any number of P0s. Measured 2026-08-16.)
+It **reads only** and prints one payload: `{"findings": [...with `tag`...], "grade": …,
+"counts": …, "human_review_needed": …, "errors": [...]}`. **Use its answer**; do not re-derive
+one. Exit 1 means `errors` is non-empty — an untagged or off-vocabulary finding, a missing
+disposition, or a rejection citing an AC id the machine SPEC does not declare — and the letter is
+not trustworthy until those are fixed at the source and the call repeated.
+
+> This was three chained verbs that rewrote the findings file so each could see the last one's
+> column. That chaining was the defect generator: `tag --file <any JSON object>` silently
+> destroyed that file, the envelope was dropped on write-back, the write had no containment
+> check, `record` went green on a blind retry, and the order dependence could only be expressed
+> as prose naming one path three times. A function that reads once and returns a value has none
+> of those. The rules are unchanged — same tag table, same disposition column, same grade.
 
 | Tag | Condition | Auto-fix eligible? |
 |-----|-----------|--------------------|
@@ -529,14 +538,9 @@ step and an `auto_fix`-disabled run. Give each finding a `disposition` and, when
 | `duplicate` | Same defect as another `id` this round | — |
 | `unresolved` | Cannot adjudicate; no contract to judge against | `no-contract` |
 
-{% if is_codex %}```bash
-Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_consensus record --file <the literal temp path>{% if config.dev_mode == 'spec-driven' %} --spec {{ config.spec.dir }}SPEC-{slug}.machine.yaml{% endif %}")
-```{% else %}```bash
-!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_consensus record --file <the literal temp path>{% if config.dev_mode == 'spec-driven' %} --spec {{ config.spec.dir }}SPEC-{slug}.machine.yaml{% endif %}
-```{% endif %}
 
-It rewrites the file in place, as `tag` does. Exit 1 lists the findings it had to downgrade — a
-missing or unrecordable disposition becomes `unresolved` / `no-contract`, which counts toward the
+
+The `finalize` call above reports these. A missing or unrecordable disposition becomes `unresolved` / `no-contract`, which counts toward the
 grade and raises `human_review_needed`.
 Fix the listed entries rather than proceeding on the downgrade: it is the fail-safe, not the
 intent.
@@ -603,13 +607,10 @@ Sections:
 
 ## Grade Computation (after every round)
 
-The same CLI computes it, from the tagged and dispositioned findings:
+`finalize` already returned it — read `grade`, `counts` and `human_review_needed` off that
+payload rather than calling anything again:
 
-{% if is_codex %}```bash
-Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_consensus grade --file <the literal temp path>")
-```{% else %}```bash
-!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_consensus grade --file <the literal temp path>
-```{% endif %}
+
 
 It prints `{"grade": …, "counts": …, "human_review_needed": …, "errors": [...]}` and **exits 1
 whenever `errors` is non-empty** — an untagged finding, or a rejection citing an AC id the machine

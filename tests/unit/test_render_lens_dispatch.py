@@ -662,9 +662,8 @@ def test_the_codex_variant_is_actually_scanned(
 # ── The seam that let round 1's P0 ship green: nothing bound the CLI to the render ──
 
 
-@pytest.mark.parametrize("verb", ["tag", "record", "grade"])
-def test_the_rendered_stage_invokes_each_review_consensus_verb(
-    tmp_path_factory: pytest.TempPathFactory, verb: str
+def test_the_rendered_stage_invokes_review_consensus(
+    tmp_path_factory: pytest.TempPathFactory,
 ) -> None:
     """`review_consensus` exists to be CALLED by the stage; nothing asserted that it is.
 
@@ -676,23 +675,37 @@ def test_the_rendered_stage_invokes_each_review_consensus_verb(
     """
     bodies = _render_both_variants(tmp_path_factory)
     for variant, body in bodies.items():
-        calls = [ln for ln in body.splitlines() if f"hm review_consensus {verb} " in ln]
-        assert calls, f"{variant}: the rendered stage never invokes `review_consensus {verb}`"
-        assert all("--file " in ln for ln in calls), f"{variant}: {verb} invoked without --file"
+        calls = [ln for ln in body.splitlines() if "hm review_consensus finalize " in ln]
+        assert calls, f"{variant}: the rendered stage never invokes `review_consensus finalize`"
+        assert all("--file " in ln for ln in calls), f"{variant}: finalize invoked without --file"
 
 
-def test_only_record_carries_the_spec_flag(
+def test_the_retired_chained_verbs_are_not_invoked(
     tmp_path_factory: pytest.TempPathFactory,
 ) -> None:
-    """`--spec` verifies AC citations, and verification is recorded by the disposition owner.
+    """`tag`/`record`/`grade` were folded into one stateless verb; a caller of them is a revert.
 
-    It sat on `grade` first, which recomputed the verdict and then discarded it — the file, the
-    ledger and the REVIEW report all kept saying `rejected` while the letter disagreed, and the
-    documented "fix and re-run" loop could not terminate. `record` owns the disposition column and
-    already persists, so the flag belongs there and `grade` stays read-only.
+    They chained by rewriting the findings file so each could see the previous one's column, and
+    that write was the defect generator — file destruction, envelope loss, no containment on a
+    model-substituted path, a `record` that went green on a blind retry. A rendered call to any of
+    the three means the statefulness came back.
     """
     bodies = _render_both_variants(tmp_path_factory)
+    offenders = [
+        f"{variant}: {ln.strip()}"
+        for variant, body in bodies.items()
+        for ln in body.splitlines()
+        for verb in ("tag", "record", "grade")
+        if f"hm review_consensus {verb} " in ln
+    ]
+    assert not offenders, offenders
+
+
+def test_finalize_is_invoked_exactly_once_per_site(
+    tmp_path_factory: pytest.TempPathFactory,
+) -> None:
+    """One call, not three. Two calls over one path is the chaining coming back by another name."""
+    bodies = _render_both_variants(tmp_path_factory)
     for variant, body in bodies.items():
-        for ln in body.splitlines():
-            if "hm review_consensus grade " in ln:
-                assert "--spec" not in ln, f"{variant}: grade must not take --spec: {ln.strip()}"
+        calls = [ln for ln in body.splitlines() if "hm review_consensus finalize " in ln]
+        assert len(calls) == 1, f"{variant}: expected one finalize invocation, got {len(calls)}"

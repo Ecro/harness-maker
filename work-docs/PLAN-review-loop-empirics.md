@@ -10,12 +10,12 @@ interview_rounds: 23
 adrs: 10
 validator_outcome: MAJOR_REVISION_RESOLVED
 surface_allowance:
-  chars: 9940
+  chars: 10218
   commands:
-    review: 8298
+    review: 8821
   round_trips:
-    review: 13
-    hm-review: 15
+    review: 11
+    hm-review: 13
   reason: "Phase 1's two uncuttable brief clauses (732), plus Phases 2-4: nine lens dispatches instead of five at BOTH sites, Step C2 rendering its own dispatch list because six lenses now share one agent and are told apart only by their brief line, and Step 4 calling hm review_consensus instead of describing the arithmetic (ADR-008)."
   delta_doc: BASELINE-DELTA-review-loop-empirics.md
 summary: "Adopt the six-category axis, give each lens a vote, gate re-review on churn."

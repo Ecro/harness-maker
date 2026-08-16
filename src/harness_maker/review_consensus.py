@@ -23,7 +23,6 @@ from typing import Any, Literal
 
 from harness_maker import command_registry
 from harness_maker.codex_ledger import DISPOSITION_VALUES
-from harness_maker.io_utils import atomic_write
 
 Tag = Literal["consensus-passed", "weak-consensus", "manual-only"]
 
@@ -390,17 +389,15 @@ def rereview_plan(churn_ratio: float, threshold: float) -> list[Dispatch]:
 # ── CLI ──────────────────────────────────────────────────────────────────────
 
 _USAGE = (
-    "usage: hm review_consensus <tag|grade|plan|record> …\n"
-    "  tag     --file <f> [--out <f>]  stamp a `tag` on each finding from its `voices`\n"
-    "  record  --file <f> [--out <f>] [--spec <machine.yaml>]  disposition column + AC\n"
-    "                                   citation verification; exit 1 on any gap\n"
-    "  grade   --file <f>              grade + counts + human_review_needed (read-only)\n"
-    "  plan    --churn-ratio <r> --threshold <t>\n"
+    "usage: hm review_consensus <finalize|plan> …\n"
+    "  finalize --file <f> [--spec <machine.yaml>]\n"
+    "           tag + disposition + AC-citation verification + grade, in ONE read.\n"
+    "           Reads only; prints the whole payload. Exit 1 when `errors` is non-empty.\n"
+    "  plan     --churn-ratio <r> --threshold <t>\n"
     "\n"
-    "  --out defaults to --file: `tag` and `record` rewrite the file IN PLACE, so the three\n"
-    "  verbs chain over one path without the caller having to merge stdout back by hand.\n"
-    "  --spec turns AC-cited rejections into VERIFIED ones, stamping `authority_verified` so the\n"
-    "  verdict survives into the file `grade` reads; without it none can clear the grade.\n"
+    "  `--spec` verifies AC citations against the machine SPEC's `ac` list. Without it none can\n"
+    "  clear the grade — an unverifiable citation is not a verified one, and `AC-999` parses\n"
+    "  exactly like `AC-004`.\n"
 )
 
 
@@ -485,29 +482,21 @@ def _verify_ac_citations(findings: list[dict[str, Any]], known: frozenset[str] |
     return errors
 
 
-def _load(path: str) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
-    """The findings list, plus the envelope it arrived in (None for a bare array).
+def _load(path: str) -> list[dict[str, Any]]:
+    """The findings list. Read-only — nothing in this module writes any more.
 
-    Returning the envelope is not a convenience: `_write_findings` rewrites this same path, so
-    dropping the sibling keys of a `{"findings": [...], "round": 2, "run_id": "x"}` payload would
-    destroy them on the first `tag`.
-
-    A dict **without** a `findings` key raises. It used to `.get("findings", [])` — which, once
-    the write-back landed, meant `tag --file <any JSON object>` silently replaced that file's
-    contents with `[]` at exit 0, and a subsequent `grade` returned `A` over the wreckage.
-    Measured 2026-08-16 against a settings-shaped file. `codex_adapter.stamp_ids` already refuses
-    exactly this ("a bare record, not an empty batch"); this is the same refusal, and the path is
-    model-substituted out of template prose, so leniency here is destruction.
+    A dict **without** a `findings` key still raises, even though there is no longer a write to
+    destroy it with: an empty batch grades `A`, so treating a bare record as one would report a
+    clean review of a file that was never a review. `codex_adapter.stamp_ids` refuses this for the
+    same reason ("a bare record, not an empty batch").
     """
     data = json.loads(Path(path).read_text(encoding="utf-8"))
-    envelope: dict[str, Any] | None = None
     if isinstance(data, dict):
         if "findings" not in data:
             raise ConsensusError(
-                f"{path}: JSON object has no `findings` key — refusing to treat it as an empty "
-                "batch, because this verb rewrites the file it reads"
+                f"{path}: JSON object has no `findings` key — refusing to treat it as an "
+                "empty batch, which would grade as a clean review"
             )
-        envelope = {k: v for k, v in data.items() if k != "findings"}
         data = data["findings"]
     if not isinstance(data, list):
         raise ConsensusError("expected a findings array, or an object with a `findings` key")
@@ -517,20 +506,45 @@ def _load(path: str) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
         # completeness invariant trivially by not existing.
         if not isinstance(x, dict):
             raise ConsensusError(f"finding {i} must be a mapping, got {type(x).__name__}")
-    return list(data), envelope
+    return list(data)
 
 
-def _write_findings(
-    path: str, findings: list[dict[str, Any]], envelope: dict[str, Any] | None = None
-) -> None:
-    """Persist the enriched column so the NEXT verb can read it.
+def finalize(findings: list[dict[str, Any]], known: frozenset[str] | None = None) -> dict[str, Any]:
+    """Tag, dispose, verify and grade in one pass over one list. Pure; writes nothing.
 
-    `tag` and `record` used to print to stdout only, while the rendered stage passed one temp
-    path to all three verbs — so `grade` re-read the original array and saw no `tag` on anything.
-    Writing in place is what makes the documented `tag → record → grade` chain actually chain.
+    This replaced three chained verbs (`tag` → `record` → `grade`) that rewrote the findings file
+    in place so each could see the previous one's column. That chaining was the defect generator,
+    not an incidental cost: reviews of it found a lenient read plus a write turning
+    `tag --file <any JSON object>` into silent destruction of that file; the envelope
+    (`round`, `run_id`) dropped on write-back; no containment check on a model-substituted path,
+    unlike every sibling writer in this repo; `record` non-idempotent in the direction that hid
+    its own diagnostic; and an order dependence the template could only express as prose naming
+    one path three times.
+
+    None of those are reachable from a function that reads once and returns a value. The rules
+    themselves are unchanged — this is the same tag table, the same disposition column, the same
+    grade — so what is removed is the statefulness, not a check.
     """
-    payload: object = findings if envelope is None else {**envelope, "findings": findings}
-    atomic_write(Path(path), json.dumps(payload, indent=2, sort_keys=True, default=str) + "\n")
+    tagged = [
+        {
+            **f,
+            "tag": tag_finding(
+                list(f.get("voices", [])),
+                reasoning_diverges=bool(f.get("reasoning_diverges", False)),
+            ),
+        }
+        for f in findings
+    ]
+    record = build_round_record(tagged)
+    ac_errors = _verify_ac_citations(record.findings, known)
+    graded = grade_from_findings(record.findings)
+    return {
+        "findings": record.findings,
+        "grade": graded["grade"],
+        "counts": graded["counts"],
+        "human_review_needed": graded["human_review_needed"],
+        "errors": record.errors + ac_errors + list(graded["errors"]),
+    }
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -547,12 +561,8 @@ def main(argv: list[str] | None = None) -> int:
     # `choices` rather than a membership test against a set literal: the command-surface gate
     # extracts the shipped subcommand set from THIS source by AST, and a `not in {...}` guard is
     # invisible to it — the registry would then claim four verbs the scan cannot corroborate.
-    parser.add_argument("verb", choices=["tag", "grade", "plan", "record"])
+    parser.add_argument("verb", choices=["finalize", "plan"])
     parser.add_argument("--file")
-    parser.add_argument(
-        "--out",
-        help="where to write the enriched findings; defaults to --file (in-place)",
-    )
     parser.add_argument(
         "--spec",
         help="machine SPEC whose `ac` ids an AC-cited rejection must name to clear the grade",
@@ -579,37 +589,15 @@ def main(argv: list[str] | None = None) -> int:
             if not opts.file:
                 sys.stderr.write(f"{verb} needs --file\n")
                 return 2
-            findings, envelope = _load(opts.file)
-            if verb == "tag":
-                tagged = [
-                    {
-                        **f,
-                        "tag": tag_finding(
-                            list(f.get("voices", [])),
-                            reasoning_diverges=bool(f.get("reasoning_diverges", False)),
-                        ),
-                    }
-                    for f in findings
-                ]
-                payload = {"findings": tagged}
-                _write_findings(opts.out or opts.file, tagged, envelope)
-            elif verb == "grade":
-                payload = grade_from_findings(findings)
-            else:
-                known, spec_errors = _known_ac_ids(opts.spec)
-                record = build_round_record(findings)
-                ac_errors = _verify_ac_citations(record.findings, known)
-                payload = {
-                    "findings": record.findings,
-                    "errors": spec_errors + ac_errors + record.errors,
-                }
-                _write_findings(opts.out or opts.file, record.findings, envelope)
+            known, spec_errors = _known_ac_ids(opts.spec)
+            payload = finalize(_load(opts.file), known)
+            payload["errors"] = spec_errors + list(payload["errors"])
     except (ConsensusError, OSError, ValueError) as exc:
         sys.stderr.write(f"review_consensus: {exc}\n")
         return 2
 
     sys.stdout.write(json.dumps(payload, sort_keys=True, default=str) + "\n")
-    if verb in {"record", "grade"} and payload.get("errors"):
+    if verb == "finalize" and payload.get("errors"):
         # `grade` exits 1 on any error too, because its errors are exactly the cases where the
         # printed letter is not trustworthy — a lost tag column, or a rejection citing an AC that
         # cannot be verified. A silent zero exit next to a cheerful "A" is the shape of the

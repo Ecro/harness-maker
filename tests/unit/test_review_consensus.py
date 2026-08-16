@@ -386,18 +386,27 @@ def test_reachable_through_the_hm_dispatcher(tmp_path: Path) -> None:
     """An in-process test passes whether or not the template's command line runs."""
     f = tmp_path / "findings.json"
     f.write_text(
-        json.dumps([{"id": "a", "severity": "P0", "voices": [_lens("robustness")]}]),
+        json.dumps(
+            [
+                {
+                    "id": "a",
+                    "severity": "P0",
+                    "voices": [_lens("robustness")],
+                    "disposition": "accepted",
+                }
+            ]
+        ),
         encoding="utf-8",
     )
-    proc = _hm("tag", "--file", str(f))
+    proc = _hm("finalize", "--file", str(f))
     assert proc.returncode == 0, proc.stderr
     assert json.loads(proc.stdout)["findings"][0]["tag"] == "consensus-passed"
 
 
-def test_the_record_verb_exits_nonzero_on_a_gap(tmp_path: Path) -> None:
+def test_finalize_exits_nonzero_on_a_gap(tmp_path: Path) -> None:
     f = tmp_path / "findings.json"
     f.write_text(json.dumps([{"id": "a", "severity": "P0"}]), encoding="utf-8")
-    proc = _hm("record", "--file", str(f))
+    proc = _hm("finalize", "--file", str(f))
     assert proc.returncode == 1
     assert json.loads(proc.stdout)["errors"]
 
@@ -419,19 +428,18 @@ def test_the_plan_verb_reports_the_comparison(tmp_path: Path) -> None:
 
 @pytest.fixture
 def chain(tmp_path: Path):  # type: ignore[no-untyped-def]
-    """Write findings, then run tag → record → grade over ONE path, as the stage does."""
+    """Write findings, then run the single `finalize` call the stage makes."""
     path = tmp_path / "findings.json"
 
     def run(findings: list[dict[str, object]], *, spec: str | None = None) -> dict[str, object]:
         path.write_text(json.dumps(findings), encoding="utf-8")
-        _hm("tag", "--file", str(path))
-        _hm("record", "--file", str(path))
-        args = ["grade", "--file", str(path)]
+        args = ["finalize", "--file", str(path)]
         if spec:
             args += ["--spec", spec]
         proc = _hm(*args)
         payload = json.loads(proc.stdout)
         payload["_exit"] = proc.returncode
+        payload["_input_unchanged"] = path.read_text(encoding="utf-8") == json.dumps(findings)
         return payload
 
     return run
@@ -452,6 +460,9 @@ def test_the_chain_grades_p0s_it_was_given(chain) -> None:  # type: ignore[no-un
     )
     assert out["grade"] == "F"
     assert out["counts"]["P0"] == 3
+    assert out["errors"] == []
+    assert out["_exit"] == 0
+    assert out["_input_unchanged"], "finalize must not write to the file it reads"
 
 
 def test_grade_fails_closed_on_an_untagged_file() -> None:
@@ -479,7 +490,7 @@ def test_an_unverifiable_ac_citation_cannot_clear_a_p0(tmp_path: Path) -> None:
                     {
                         "id": "a",
                         "severity": "P0",
-                        "tag": "consensus-passed",
+                        "voices": [_lens("design")],
                         "disposition": "rejected",
                         "authority": authority,
                     }
@@ -487,10 +498,9 @@ def test_an_unverifiable_ac_citation_cannot_clear_a_p0(tmp_path: Path) -> None:
             ),
             encoding="utf-8",
         )
-        rec = _hm("record", "--file", str(f), "--spec", str(spec))
-        proc = _hm("grade", "--file", str(f))
+        proc = _hm("finalize", "--file", str(f), "--spec", str(spec))
         out = json.loads(proc.stdout)
-        out["_exit"] = rec.returncode
+        out["_exit"] = proc.returncode
         return out
 
     phantom = grade_with("AC-999")
@@ -511,7 +521,7 @@ def test_without_a_spec_no_ac_citation_clears_the_grade(tmp_path: Path) -> None:
                 {
                     "id": "a",
                     "severity": "P0",
-                    "tag": "consensus-passed",
+                    "voices": [_lens("design")],
                     "disposition": "rejected",
                     "authority": "AC-004",
                 }
@@ -519,7 +529,7 @@ def test_without_a_spec_no_ac_citation_clears_the_grade(tmp_path: Path) -> None:
         ),
         encoding="utf-8",
     )
-    out = json.loads(_hm("grade", "--file", str(f)).stdout)
+    out = json.loads(_hm("finalize", "--file", str(f)).stdout)
     assert out["grade"] == "D"
 
 
@@ -535,8 +545,9 @@ def test_a_voice_less_finding_does_not_abort_the_batch(tmp_path: Path) -> None:
         ),
         encoding="utf-8",
     )
-    proc = _hm("tag", "--file", str(f))
-    assert proc.returncode == 0
+    proc = _hm("finalize", "--file", str(f))
+
+    assert proc.stdout, "one voice-less entry took the whole batch's output with it"
     assert [x["tag"] for x in json.loads(proc.stdout)["findings"]] == [
         "manual-only",
         "consensus-passed",
@@ -559,29 +570,16 @@ def test_the_tag_verb_honours_reasoning_diverges(tmp_path: Path) -> None:
         ),
         encoding="utf-8",
     )
-    assert json.loads(_hm("tag", "--file", str(f)).stdout)["findings"][0]["tag"] == (
+    assert json.loads(_hm("finalize", "--file", str(f)).stdout)["findings"][0]["tag"] == (
         "weak-consensus"
     )
-
-
-def test_tag_and_record_write_back_in_place(tmp_path: Path) -> None:
-    """The in-place write IS the chain; without it each verb re-reads the original array."""
-    f = tmp_path / "f.json"
-    f.write_text(
-        json.dumps([{"id": "a", "severity": "P2", "voices": [_lens("consistency")]}]),
-        encoding="utf-8",
-    )
-    _hm("tag", "--file", str(f))
-    assert json.loads(f.read_text())[0]["tag"] == "consensus-passed"
-    _hm("record", "--file", str(f))
-    assert json.loads(f.read_text())[0]["disposition"] in DISPOSITIONS
 
 
 def test_a_non_mapping_finding_is_loud_not_dropped(tmp_path: Path) -> None:
     """A dropped finding satisfies AC-006's completeness invariant by not existing."""
     f = tmp_path / "f.json"
     f.write_text(json.dumps([{"id": "a", "severity": "P0"}, "not-a-finding"]), encoding="utf-8")
-    assert _hm("record", "--file", str(f)).returncode == 2
+    assert _hm("finalize", "--file", str(f)).returncode == 2
 
 
 def test_build_round_record_preserves_a_valid_disposition() -> None:
@@ -623,26 +621,11 @@ def test_a_json_object_without_findings_is_refused_not_emptied(tmp_path: Path) -
     original = json.dumps({"permissions": {"allow": ["Bash(uv:*)"]}}, indent=2)
     victim.write_text(original, encoding="utf-8")
 
-    proc = _hm("tag", "--file", str(victim))
+    proc = _hm("finalize", "--file", str(victim))
 
     assert proc.returncode == 2
     assert victim.read_text(encoding="utf-8") == original
     assert "no `findings` key" in proc.stderr
-
-
-def test_the_envelope_survives_the_write_back(tmp_path: Path) -> None:
-    """`{"findings": [...], "round": 2}` must not come back as a bare array."""
-    f = tmp_path / "f.json"
-    f.write_text(
-        json.dumps(
-            {"findings": [{"id": "a", "severity": "P2", "voices": [_lens("design")]}], "round": 2}
-        ),
-        encoding="utf-8",
-    )
-    _hm("tag", "--file", str(f))
-    reloaded = json.loads(f.read_text(encoding="utf-8"))
-    assert reloaded["round"] == 2
-    assert reloaded["findings"][0]["tag"] == "consensus-passed"
 
 
 @pytest.mark.parametrize("severity", ["critical", "p0", "P0 (blocker)", "", "high"])
@@ -698,7 +681,7 @@ def test_an_unusable_spec_degrades_rather_than_aborting_the_grade(
                 {
                     "id": "a",
                     "severity": "P0",
-                    "tag": "consensus-passed",
+                    "voices": [_lens("design")],
                     "disposition": "rejected",
                     "authority": "AC-004",
                 }
@@ -707,63 +690,74 @@ def test_an_unusable_spec_degrades_rather_than_aborting_the_grade(
         encoding="utf-8",
     )
 
-    rec = _hm("record", "--file", str(f), "--spec", str(spec))
-    assert rec.stdout, "record printed no payload at all"
-    assert json.loads(rec.stdout)["errors"], "an unusable SPEC must be reported, not swallowed"
-    assert rec.returncode == 1
+    proc = _hm("finalize", "--file", str(f), "--spec", str(spec))
 
-    proc = _hm("grade", "--file", str(f))
-    assert proc.stdout, "grade printed no payload at all"
-    assert json.loads(proc.stdout)["grade"] == "D", "an unverifiable citation must not clear"
+    assert proc.stdout, "finalize printed no payload at all"
+    out = json.loads(proc.stdout)
+    assert out["errors"], "an unusable SPEC must be reported, not swallowed"
+    assert out["grade"] == "D", "an unverifiable citation must not clear the P0"
+    assert proc.returncode == 1
 
 
 # ── Round 2 P1s: the repairs' own follow-ups ─────────────────────────────────
 
 
-def test_ac_verification_survives_into_the_file(tmp_path: Path) -> None:
-    """`grade` used to verify in memory and throw the verdict away.
+# ── The properties the collapse to one stateless verb bought ─────────────────
 
-    It downgraded an unverifiable `AC-999`, counted the finding, printed the error and exited —
-    while the file, the disposition ledger and the REVIEW report all still said `rejected`. The
-    documented remedy ("fix the listed entries and re-run") could not terminate, because nothing
-    the CLI did changed the file.
+
+def test_finalize_never_writes_to_the_file_it_reads(tmp_path: Path) -> None:
+    """The whole point, asserted directly.
+
+    Three chained verbs rewrote the findings file so each could see the previous one's column, and
+    that write was the defect generator: `tag --file <any JSON object>` destroyed that file, the
+    envelope was dropped on write-back, no containment check guarded a model-substituted path, and
+    `record` went green on a blind retry. One read-only verb makes all of that unreachable rather
+    than guarded one instance at a time.
+    """
+    f = tmp_path / "f.json"
+    original = json.dumps(
+        {
+            "findings": [{"id": "a", "severity": "P2", "voices": [_lens("design")]}],
+            "round": 2,
+            "run_id": "x",
+        }
+    )
+    f.write_text(original, encoding="utf-8")
+
+    payload = json.loads(_hm("finalize", "--file", str(f)).stdout)
+
+    assert f.read_text(encoding="utf-8") == original, "finalize wrote to its own input"
+    assert payload["findings"][0]["tag"] == "consensus-passed"
+
+
+def test_finalize_is_idempotent(tmp_path: Path) -> None:
+    """`record` used to write its downgrade and THEN exit 1, so a blind retry went green.
+
+    A non-zero exit is the standard cue to re-run; the retry read back the downgraded values,
+    found them valid, and reported nothing. With nothing persisted, every run sees the same input
+    and reports the same gap.
+    """
+    f = tmp_path / "f.json"
+    f.write_text(
+        json.dumps([{"id": "a", "severity": "P0", "voices": [_lens("design")]}]), encoding="utf-8"
+    )
+
+    first, second = _hm("finalize", "--file", str(f)), _hm("finalize", "--file", str(f))
+
+    assert first.stdout == second.stdout
+    assert first.returncode == second.returncode == 1
+    assert json.loads(second.stdout)["errors"]
+
+
+def test_a_hand_written_authority_verified_is_not_trusted(tmp_path: Path) -> None:
+    """The flag is a CONCLUSION, not an input.
+
+    The findings file is authored by the model, so a stamped `authority_verified: true` on a
+    citation no SPEC backs would be self-certification — the grade laundering the AC rule exists
+    to forbid. Verification recomputes and overwrites it on every run.
     """
     spec = tmp_path / "s.machine.yaml"
     spec.write_text("ac:\n  - id: AC-004\n    title: t\n", encoding="utf-8")
-    f = tmp_path / "f.json"
-
-    def run(authority: str) -> dict[str, object]:
-        f.write_text(
-            json.dumps(
-                [
-                    {
-                        "id": "a",
-                        "severity": "P0",
-                        "voices": [_lens("design")],
-                        "disposition": "rejected",
-                        "authority": authority,
-                    }
-                ]
-            ),
-            encoding="utf-8",
-        )
-        _hm("tag", "--file", str(f))
-        _hm("record", "--file", str(f), "--spec", str(spec))
-        on_disk = json.loads(f.read_text(encoding="utf-8"))[0]
-        return {"disk": on_disk, "grade": json.loads(_hm("grade", "--file", str(f)).stdout)}
-
-    real = run("AC-004")
-    assert real["disk"]["authority_verified"] is True  # type: ignore[index]
-    assert real["grade"]["grade"] == "A"  # type: ignore[index]
-
-    phantom = run("AC-999")
-    assert phantom["disk"]["disposition"] == "unresolved"  # type: ignore[index]
-    assert phantom["disk"]["authority_verified"] is False  # type: ignore[index]
-    assert phantom["grade"]["grade"] == "D"  # type: ignore[index]
-
-
-def test_grade_alone_cannot_honour_an_unverified_ac_citation(tmp_path: Path) -> None:
-    """Order-independence. Verification is a recorded fact, not a step you can skip past."""
     f = tmp_path / "f.json"
     f.write_text(
         json.dumps(
@@ -771,7 +765,33 @@ def test_grade_alone_cannot_honour_an_unverified_ac_citation(tmp_path: Path) -> 
                 {
                     "id": "a",
                     "severity": "P0",
-                    "tag": "consensus-passed",
+                    "voices": [_lens("design")],
+                    "disposition": "rejected",
+                    "authority": "AC-999",
+                    "authority_verified": True,
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    payload = json.loads(_hm("finalize", "--file", str(f), "--spec", str(spec)).stdout)
+
+    assert payload["findings"][0]["authority_verified"] is False
+    assert payload["grade"] == "D"
+
+
+def test_a_real_citation_still_clears_and_the_verdict_is_visible(tmp_path: Path) -> None:
+    spec = tmp_path / "s.machine.yaml"
+    spec.write_text("ac:\n  - id: AC-004\n    title: t\n", encoding="utf-8")
+    f = tmp_path / "f.json"
+    f.write_text(
+        json.dumps(
+            [
+                {
+                    "id": "a",
+                    "severity": "P0",
+                    "voices": [_lens("design")],
                     "disposition": "rejected",
                     "authority": "AC-004",
                 }
@@ -779,24 +799,9 @@ def test_grade_alone_cannot_honour_an_unverified_ac_citation(tmp_path: Path) -> 
         ),
         encoding="utf-8",
     )
-    assert json.loads(_hm("grade", "--file", str(f)).stdout)["grade"] == "D"
 
+    payload = json.loads(_hm("finalize", "--file", str(f), "--spec", str(spec)).stdout)
 
-def test_record_keeps_reporting_a_gap_it_already_papered_over(tmp_path: Path) -> None:
-    """`record` wrote the downgrade and THEN exited 1, so a blind re-run went green.
-
-    A non-zero exit is the standard cue to retry, and the retry read back
-    `unresolved`/`no-contract`, found it valid, and reported nothing — turning a hard, itemised
-    failure into a clean pass with the gap intact.
-    """
-    f = tmp_path / "f.json"
-    f.write_text(
-        json.dumps([{"id": "a", "severity": "P0", "tag": "manual-only"}]), encoding="utf-8"
-    )
-
-    first = _hm("record", "--file", str(f))
-    second = _hm("record", "--file", str(f))
-
-    assert first.returncode == 1
-    assert second.returncode == 1, "a blind re-run erased the diagnostic"
-    assert json.loads(second.stdout)["errors"]
+    assert payload["findings"][0]["authority_verified"] is True
+    assert payload["grade"] == "A"
+    assert payload["errors"] == []
