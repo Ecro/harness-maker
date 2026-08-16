@@ -41,6 +41,13 @@ DISPOSITIONS: frozenset[str] = frozenset({"accepted", "rejected", "duplicate", "
 #: valid on `unresolved` and invalid on `rejected`.
 NO_CONTRACT = "no-contract"
 
+#: The closed severity vocabulary. Checked by membership, so an off-vocabulary value ("critical",
+#: "p0", "P0 (blocker)") is DISTINGUISHABLE from a low one rather than falling through the count
+#: silently — measured 2026-08-16: three `consensus-passed` findings at `severity: "critical"`
+#: graded `A` with zero errors and exit 0, which is the same fail-open that the `tag` column had,
+#: one field over and on the field that actually moves the letter.
+_SEVERITIES: tuple[str, ...] = ("P0", "P1", "P2", "P3")
+
 #: Severities that can move the grade or raise the human-review flag. P2/P3 never do — that is
 #: the pre-change behaviour, and it is what makes a nine-lens fan-out affordable at all: the
 #: low-importance half of the new axis lands at P2 and is recorded rather than blocking.
@@ -269,15 +276,26 @@ def grade_from_findings(findings: list[dict[str, Any]]) -> dict[str, Any]:
     for i, raw in enumerate(findings):
         severity = str(raw.get("severity", ""))
         tag = raw.get("tag")
+        if severity not in _SEVERITIES:
+            # Fail CLOSED on the field that decides the letter. The previous `if severity in
+            # counts` guard incremented nothing for an off-vocabulary value, so the finding was
+            # graded as if it did not exist — while the untagged branch's message claimed it was
+            # "counted as severe".
+            errors.append(
+                f"{raw.get('id', i)}: severity is {severity!r}, not one of "
+                f"{list(_SEVERITIES)} — counted as P0"
+            )
+            counts["P0"] += 1
+            human_review_needed = True
+            continue
         if tag not in _TAGS:
             # Fail CLOSED: an unknown tag counts at its own severity and raises the flag, so a
             # lost tag column can only ever make the grade worse than the truth.
             errors.append(
                 f"{raw.get('id', i)}: tag is {tag!r}, not one of {sorted(_TAGS)} — counted as "
-                "severe. Did the `tag` verb's output get written back to this file?"
+                f"{severity}. Did the `tag` verb's output get written back to this file?"
             )
-            if severity in counts:
-                counts[severity] += 1
+            counts[severity] += 1
             human_review_needed = True
             continue
         effect = grade_effect(severity, raw.get("disposition"), raw.get("authority"))
@@ -287,8 +305,7 @@ def grade_from_findings(findings: list[dict[str, Any]]) -> dict[str, Any]:
             human_review_needed = True
         if tag != "consensus-passed" or not effect["counted"]:
             continue
-        if severity in counts:
-            counts[severity] += 1
+        counts[severity] += 1
     grade = compute_grade(
         p0_count=counts["P0"],
         p1_count=counts["P1"],
@@ -355,7 +372,7 @@ _USAGE = (
 )
 
 
-def _known_ac_ids(spec_path: str | None) -> frozenset[str] | None:
+def _known_ac_ids(spec_path: str | None) -> tuple[frozenset[str] | None, list[str]]:
     """AC ids the machine SPEC actually declares, or None when no SPEC was supplied.
 
     Only an AC-cited rejection clears a finding from the grade, and `_authority_kind` can only
@@ -366,17 +383,27 @@ def _known_ac_ids(spec_path: str | None) -> frozenset[str] | None:
     requires an INDEPENDENT one.
     """
     if not spec_path:
-        return None
+        return None, []
     import yaml
 
-    raw = yaml.safe_load(Path(spec_path).read_text(encoding="utf-8"))
-    if not isinstance(raw, dict):
-        raise ConsensusError(f"{spec_path}: machine SPEC must be a mapping")
-    acs = raw.get("ac")
-    if not isinstance(acs, list):
-        raise ConsensusError(f"{spec_path}: machine SPEC has no `ac` list")
-    return frozenset(
-        str(a["id"]) for a in acs if isinstance(a, dict) and isinstance(a.get("id"), str)
+    try:
+        raw = yaml.safe_load(Path(spec_path).read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError) as exc:
+        # DEGRADE, do not abort. Raising made the whole verb exit 2 with no payload on every
+        # harness that has no machine SPEC — a first-class `dev_mode` — so the review's sole
+        # grade producer was unrunnable there and the gate had no letter to branch on. Worse, the
+        # `known is None` branch below exists precisely for the absent case and was unreachable
+        # from the only call site that ships. `None` is already the fail-closed value: nothing
+        # can be verified, so no AC-cited rejection clears.
+        return None, [f"machine SPEC {spec_path!r} unreadable ({type(exc).__name__}): {exc}"]
+    if not isinstance(raw, dict) or not isinstance(raw.get("ac"), list):
+        return None, [f"machine SPEC {spec_path!r} has no `ac` list — no AC citation can clear"]
+    acs = raw["ac"]
+    return (
+        frozenset(
+            str(a["id"]) for a in acs if isinstance(a, dict) and isinstance(a.get("id"), str)
+        ),
+        [],
     )
 
 
@@ -412,10 +439,30 @@ def _verify_ac_citations(findings: list[dict[str, Any]], known: frozenset[str] |
     return errors
 
 
-def _load(path: str) -> list[dict[str, Any]]:
+def _load(path: str) -> tuple[list[dict[str, Any]], dict[str, Any] | None]:
+    """The findings list, plus the envelope it arrived in (None for a bare array).
+
+    Returning the envelope is not a convenience: `_write_findings` rewrites this same path, so
+    dropping the sibling keys of a `{"findings": [...], "round": 2, "run_id": "x"}` payload would
+    destroy them on the first `tag`.
+
+    A dict **without** a `findings` key raises. It used to `.get("findings", [])` — which, once
+    the write-back landed, meant `tag --file <any JSON object>` silently replaced that file's
+    contents with `[]` at exit 0, and a subsequent `grade` returned `A` over the wreckage.
+    Measured 2026-08-16 against a settings-shaped file. `codex_adapter.stamp_ids` already refuses
+    exactly this ("a bare record, not an empty batch"); this is the same refusal, and the path is
+    model-substituted out of template prose, so leniency here is destruction.
+    """
     data = json.loads(Path(path).read_text(encoding="utf-8"))
+    envelope: dict[str, Any] | None = None
     if isinstance(data, dict):
-        data = data.get("findings", [])
+        if "findings" not in data:
+            raise ConsensusError(
+                f"{path}: JSON object has no `findings` key — refusing to treat it as an empty "
+                "batch, because this verb rewrites the file it reads"
+            )
+        envelope = {k: v for k, v in data.items() if k != "findings"}
+        data = data["findings"]
     if not isinstance(data, list):
         raise ConsensusError("expected a findings array, or an object with a `findings` key")
     for i, x in enumerate(data):
@@ -424,17 +471,20 @@ def _load(path: str) -> list[dict[str, Any]]:
         # completeness invariant trivially by not existing.
         if not isinstance(x, dict):
             raise ConsensusError(f"finding {i} must be a mapping, got {type(x).__name__}")
-    return list(data)
+    return list(data), envelope
 
 
-def _write_findings(path: str, findings: list[dict[str, Any]]) -> None:
+def _write_findings(
+    path: str, findings: list[dict[str, Any]], envelope: dict[str, Any] | None = None
+) -> None:
     """Persist the enriched column so the NEXT verb can read it.
 
     `tag` and `record` used to print to stdout only, while the rendered stage passed one temp
     path to all three verbs — so `grade` re-read the original array and saw no `tag` on anything.
     Writing in place is what makes the documented `tag → record → grade` chain actually chain.
     """
-    atomic_write(Path(path), json.dumps(findings, indent=2, sort_keys=True, default=str) + "\n")
+    payload: object = findings if envelope is None else {**envelope, "findings": findings}
+    atomic_write(Path(path), json.dumps(payload, indent=2, sort_keys=True, default=str) + "\n")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -483,7 +533,7 @@ def main(argv: list[str] | None = None) -> int:
             if not opts.file:
                 sys.stderr.write(f"{verb} needs --file\n")
                 return 2
-            findings = _load(opts.file)
+            findings, envelope = _load(opts.file)
             if verb == "tag":
                 tagged = [
                     {
@@ -496,15 +546,16 @@ def main(argv: list[str] | None = None) -> int:
                     for f in findings
                 ]
                 payload = {"findings": tagged}
-                _write_findings(opts.out or opts.file, tagged)
+                _write_findings(opts.out or opts.file, tagged, envelope)
             elif verb == "grade":
-                errors = _verify_ac_citations(findings, _known_ac_ids(opts.spec))
+                known, spec_errors = _known_ac_ids(opts.spec)
+                errors = spec_errors + _verify_ac_citations(findings, known)
                 payload = grade_from_findings(findings)
                 payload["errors"] = errors + list(payload.get("errors", []))
             else:
                 record = build_round_record(findings)
                 payload = {"findings": record.findings, "errors": record.errors}
-                _write_findings(opts.out or opts.file, record.findings)
+                _write_findings(opts.out or opts.file, record.findings, envelope)
     except (ConsensusError, OSError, ValueError) as exc:
         sys.stderr.write(f"review_consensus: {exc}\n")
         return 2

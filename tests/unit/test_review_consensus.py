@@ -584,3 +584,111 @@ def test_build_round_record_preserves_a_valid_disposition() -> None:
     assert record.findings[0]["disposition"] == "rejected"
     assert record.findings[0]["authority"] == "AC-004"
     assert grade_from_findings(record.findings)["grade"] == "A"
+
+
+# ── Round 2: the three P0s the repair round itself introduced ────────────────
+
+
+def test_a_json_object_without_findings_is_refused_not_emptied(tmp_path: Path) -> None:
+    """The write-back turned a lenient read into destruction of the target file.
+
+    `_load` did `.get("findings", [])`, so `tag --file <any JSON object>` replaced that file's
+    contents with `[]` at exit 0, and a following `grade` returned `A` over the wreckage.
+    Measured 2026-08-16 against a settings-shaped file. The path is model-substituted out of
+    template prose, so leniency here is not tolerance — it is deletion.
+    """
+    victim = tmp_path / "settings.json"
+    original = json.dumps({"permissions": {"allow": ["Bash(uv:*)"]}}, indent=2)
+    victim.write_text(original, encoding="utf-8")
+
+    proc = _hm("tag", "--file", str(victim))
+
+    assert proc.returncode == 2
+    assert victim.read_text(encoding="utf-8") == original
+    assert "no `findings` key" in proc.stderr
+
+
+def test_the_envelope_survives_the_write_back(tmp_path: Path) -> None:
+    """`{"findings": [...], "round": 2}` must not come back as a bare array."""
+    f = tmp_path / "f.json"
+    f.write_text(
+        json.dumps(
+            {"findings": [{"id": "a", "severity": "P2", "voices": [_lens("design")]}], "round": 2}
+        ),
+        encoding="utf-8",
+    )
+    _hm("tag", "--file", str(f))
+    reloaded = json.loads(f.read_text(encoding="utf-8"))
+    assert reloaded["round"] == 2
+    assert reloaded["findings"][0]["tag"] == "consensus-passed"
+
+
+@pytest.mark.parametrize("severity", ["critical", "p0", "P0 (blocker)", "", "high"])
+def test_an_off_vocabulary_severity_cannot_grade_a(severity: str) -> None:
+    """The fail-open moved one field over, onto the field that decides the letter.
+
+    The tag column was closed; `severity` was still matched with `if severity in counts`, so
+    `critical` or lowercase `p0` incremented nothing — three `consensus-passed` findings graded
+    `A` with zero errors and exit 0. Same shape as the round-1 P0, one field along.
+    """
+    out = grade_from_findings(
+        [
+            {"id": i, "severity": severity, "tag": "consensus-passed", "disposition": "accepted"}
+            for i in "abc"
+        ]
+    )
+    assert out["grade"] == "F"
+    assert out["counts"]["P0"] == 3
+    assert out["human_review_needed"] is True
+    assert len(out["errors"]) == 3
+
+
+def test_a_legitimate_low_severity_still_grades_a() -> None:
+    """The other half: fail-closed must not swallow the vocabulary it is protecting."""
+    out = grade_from_findings(
+        [{"id": "a", "severity": "P2", "tag": "consensus-passed", "disposition": "accepted"}] * 5
+    )
+    assert out["grade"] == "A"
+    assert out["errors"] == []
+
+
+@pytest.mark.parametrize("spec_state", ["missing", "malformed", "no-ac-list"])
+def test_an_unusable_spec_degrades_rather_than_aborting_the_grade(
+    tmp_path: Path, spec_state: str
+) -> None:
+    """`grade` used to exit 2 with NO payload for every harness without a machine SPEC.
+
+    That is a first-class `dev_mode`, so the review's sole grade producer was unrunnable there and
+    the gate had no letter to branch on — and `_verify_ac_citations`'s `known is None` branch,
+    written for exactly this case, was unreachable from the only call site that ships. `None` is
+    already the fail-closed value: nothing can be verified, so no AC-cited rejection clears.
+    """
+    spec = tmp_path / "s.machine.yaml"
+    if spec_state == "malformed":
+        spec.write_text("ac: [unclosed\n", encoding="utf-8")
+    elif spec_state == "no-ac-list":
+        spec.write_text("spec_slug: x\n", encoding="utf-8")
+
+    f = tmp_path / "f.json"
+    f.write_text(
+        json.dumps(
+            [
+                {
+                    "id": "a",
+                    "severity": "P0",
+                    "tag": "consensus-passed",
+                    "disposition": "rejected",
+                    "authority": "AC-004",
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    proc = _hm("grade", "--file", str(f), "--spec", str(spec))
+
+    assert proc.stdout, "grade printed no payload at all"
+    out = json.loads(proc.stdout)
+    assert out["grade"] == "D", "an unverifiable AC citation must not clear the P0"
+    assert out["errors"]
+    assert proc.returncode == 1

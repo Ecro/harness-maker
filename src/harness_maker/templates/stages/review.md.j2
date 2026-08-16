@@ -606,9 +606,9 @@ Sections:
 The same CLI computes it, from the tagged and dispositioned findings:
 
 {% if is_codex %}```bash
-Bash("uv run --with {{ harness_maker_src_path }} hm review_consensus grade --file <the literal temp path> --spec {{ config.spec.dir }}SPEC-{slug}.machine.yaml")
+Bash("uv run --with {{ harness_maker_src_path }} hm review_consensus grade --file <the literal temp path>{% if config.dev_mode == 'spec-driven' %} --spec {{ config.spec.dir }}SPEC-{slug}.machine.yaml{% endif %}")
 ```{% else %}```bash
-!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_consensus grade --file <the literal temp path> --spec {{ config.spec.dir }}SPEC-{slug}.machine.yaml
+!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_consensus grade --file <the literal temp path>{% if config.dev_mode == 'spec-driven' %} --spec {{ config.spec.dir }}SPEC-{slug}.machine.yaml{% endif %}
 ```{% endif %}
 
 It prints `{"grade": …, "counts": …, "human_review_needed": …, "errors": [...]}` and **exits 1
@@ -616,6 +616,13 @@ whenever `errors` is non-empty** — an untagged finding, or a rejection citing 
 SPEC does not declare. Both mean the letter is not trustworthy: fix the listed entries and re-run
 rather than carrying the number forward. `--spec` is what makes an AC citation *verified*; without
 it no AC-cited rejection clears the grade, because `AC-999` parses exactly like `AC-004`.
+{% if config.dev_mode == 'spec-driven' %}
+> **Drop the `--spec` argument if `{{ config.spec.dir }}SPEC-{slug}.machine.yaml` does not exist**
+> — a slug whose SPEC stage recorded `none` has no machine SPEC, and the grade is then computed
+> with no AC citation able to clear it, which is the intended fail-closed outcome. The CLI already
+> degrades that way on its own; omitting the flag just keeps a routine run from reporting an error
+> every round, which is what would teach a reader to ignore the exit code the other checks rely on.
+{%- endif %}
 
 The rule it applies — stated here so a mismatch is visible, not so you can compute it yourself:
 
