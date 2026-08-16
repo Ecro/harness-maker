@@ -44,14 +44,25 @@ def _plan(*priorities: str) -> ImprovementPlan:
 def test_dry_run_summary_includes_keep_merge(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
+    """KEEP/MERGE are surfaced, and are now derived from PATHS rather than free counts.
+
+    The old signature took bare integers, so this test could — and did — assert `keep_count=2,
+    merge_count=1` against a two-file blueprint: three decisions over two files. Passing the
+    reconcile paths makes that unrepresentable, and it is what lets the summary subtract them
+    from REPLACE instead of double-counting.
+
+    The `"2" in out` / `"1" in out` assertions were also substring matches against the whole
+    block, which a `Total: 2` line satisfies on its own; they are anchored to their labels now.
+    """
     cli._emit_dry_run_summary(
-        _bp("commands/hm/x.md", "agents/a.md"), tmp_path, keep_count=2, merge_count=1
+        _bp("commands/hm/x.md", "agents/a.md"),
+        tmp_path,
+        keep_paths=frozenset({Path("commands/hm/x.md")}),
+        merge_paths=frozenset({Path("agents/a.md")}),
     )
     out = capsys.readouterr().out
-    assert "KEEP:" in out
-    assert "2" in out
-    assert "MERGE:" in out
-    assert "1" in out
+    assert "KEEP:    1" in out
+    assert "MERGE:   1" in out
 
 
 # ── severity-aware fresh-install health (ADR-005) ─────────────────────────

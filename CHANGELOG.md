@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **`make --dry-run` reported dozens of unchanged files as NEW.** The preview decided
+  existence by walking `.claude/` and matching blueprint keys against it — but `.cursor/`,
+  `.codex/`, `.agents/`, `AGENTS.md` and the root `CLAUDE.md` are written OUTSIDE `.claude/`,
+  so none of them could ever match and every one was announced as new on every re-render.
+  Measured on this repo's own harness (claude-code + cursor + codex, nothing changed): the
+  preview said `NEW: 43` where the truth was `0`. Existence now goes through
+  `render.resolve_output_path`, the resolver `render` and `reconcile` already share, so the
+  three cannot disagree about where a file lives.
+  Separately, KEEP and MERGE are reconcile decisions about files that **exist**, so each was
+  also counted under REPLACE — reported once honestly and once as an overwrite that will not
+  happen. The four buckets now partition the blueprint and sum to `Total`.
+  This mattered because a preview exists so someone can decide whether to proceed: "43 new
+  files" invites a Cancel on a re-render that changes nothing. Only users with `cursor` or
+  `codex` in `targets` saw it, which is why it survived — a claude-code-only harness has no
+  files outside `.claude/` and its preview was correct all along.
+
 ## [0.52.2] - 2026-08-16
 
 ### Fixed

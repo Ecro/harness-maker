@@ -39,7 +39,12 @@ from harness_maker.modular_edit import add as modular_add
 from harness_maker.modular_edit import remove as modular_remove
 from harness_maker.profile import profile
 from harness_maker.reconcile import OrphanSweepReport, backup, reconcile, sweep_orphans
-from harness_maker.render import DEFAULT_FREEZE_TIME, render, render_stale_hooks_json_bytes
+from harness_maker.render import (
+    DEFAULT_FREEZE_TIME,
+    render,
+    render_stale_hooks_json_bytes,
+    resolve_output_path,
+)
 from harness_maker.synthesize import synthesize
 from harness_maker.telemetry import (
     compute_yaml_diff,
@@ -503,18 +508,19 @@ def make(
     target_dotclaude = target / ".claude"
 
     if dry_run:
-        keep_n = merge_n = 0
+        keep_set: frozenset[Path] = frozenset()
+        merge_set: frozenset[Path] = frozenset()
         if target_dotclaude.exists() and any(target_dotclaude.iterdir()):
             from harness_maker.models import ReconcileDecision
 
             conflicts = reconcile(target_dotclaude, bp)
-            keep_n = sum(1 for c in conflicts if c.decision == ReconcileDecision.KEEP)
-            merge_n = sum(
-                1
+            keep_set = frozenset(c.path for c in conflicts if c.decision == ReconcileDecision.KEEP)
+            merge_set = frozenset(
+                c.path
                 for c in conflicts
                 if c.decision in (ReconcileDecision.MERGE_BLOCK, ReconcileDecision.MERGE_JSON)
             )
-        _emit_dry_run_summary(bp, target_dotclaude, keep_count=keep_n, merge_count=merge_n)
+        _emit_dry_run_summary(bp, target_dotclaude, keep_paths=keep_set, merge_paths=merge_set)
         raise typer.Exit(0)
 
     merge_paths: set[Path] = set()
@@ -909,25 +915,39 @@ def _emit_dry_run_summary(
     bp: Blueprint,
     target_dotclaude: Path,
     *,
-    keep_count: int = 0,
-    merge_count: int = 0,
+    keep_paths: frozenset[Path] = frozenset(),
+    merge_paths: frozenset[Path] = frozenset(),
 ) -> None:
     """Print what make() would install without writing any files.
 
-    ``keep_count`` / ``merge_count`` come from a read-only reconcile pass when
+    ``keep_paths`` / ``merge_paths`` come from a read-only reconcile pass when
     re-rendering over an existing harness, so the preview shows what the user's
     own edits will preserve (KEEP) or block-merge (MERGE) before they confirm.
+
+    Two things this got wrong, both of which made the preview overstate the change:
+
+    1. **Existence was decided against ``.claude/`` alone.** It walked
+       ``target_dotclaude.rglob`` and compared ``fe.path`` against those keys — but
+       ``.cursor/``, ``.codex/``, ``.agents/``, ``AGENTS.md`` and the root ``CLAUDE.md``
+       are written OUTSIDE ``.claude/``, so every one of them missed the set and was
+       reported NEW on every single re-render. On a claude-code+cursor+codex harness that
+       is 40-plus files announced as new when nothing about them had changed. Existence
+       now goes through ``resolve_output_path`` — the same resolver ``render`` and
+       ``reconcile`` use, so the three cannot disagree about where a file lives.
+    2. **KEEP and MERGE were also counted as REPLACE.** They are reconcile decisions
+       ABOUT files that exist, so every kept or merged file was double-reported: once
+       honestly, once as an overwrite that will not happen. The four buckets now
+       partition the blueprint, and ``Total`` is their sum.
     """
-    existing = set()
-    if target_dotclaude.exists():
-        for p in target_dotclaude.rglob("*"):
-            if p.is_file():
-                existing.add(p.relative_to(target_dotclaude))
+    keep_n = sum(1 for fe in bp.files if fe.path in keep_paths)
+    merge_n = sum(1 for fe in bp.files if fe.path in merge_paths)
 
     new_count = 0
     replace_count = 0
     for fe in bp.files:
-        if fe.path in existing:
+        if fe.path in keep_paths or fe.path in merge_paths:
+            continue
+        if resolve_output_path(target_dotclaude, fe.path).exists():
             replace_count += 1
         else:
             new_count += 1
@@ -937,8 +957,8 @@ def _emit_dry_run_summary(
     typer.echo("─" * 50)
     typer.echo(f"  NEW:     {new_count}")
     typer.echo(f"  REPLACE: {replace_count}")
-    typer.echo(f"  KEEP:    {keep_count}   (your edits preserved)")
-    typer.echo(f"  MERGE:   {merge_count}   (block-merged into your edits)")
+    typer.echo(f"  KEEP:    {keep_n}   (your edits preserved)")
+    typer.echo(f"  MERGE:   {merge_n}   (block-merged into your edits)")
     typer.echo(f"  Total:   {len(bp.files)} files")
     typer.echo("─" * 50)
 
