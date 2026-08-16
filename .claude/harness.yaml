@@ -1,10 +1,10 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.51.1
+harness_maker_version: 0.51.3
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: harness-yaml/Production.yaml.j2
 provenance: official
-content_hash: b0e6dfe1eab303306ba63b04eb1d1d6daf370caacb062abbfb4914b0817d6b7f
+content_hash: 834f490896b2a8bac17ca2c8b2f0e66f23299df94308d41d9e0ac8d07bc6a263
 ---
 preset: Production
 locale: ko
@@ -28,6 +28,11 @@ interview:
       llm_inference_enabled: true
   main_loop:
     max_rounds: null
+  comprehension:
+    # PLAN-plan-interview-comprehension: minimal | standard | deep.
+    # `.get()` not bare attribute access — a hand-built `interview` dict (several tests
+    # construct one) has no `comprehension` key and bare access raises UndefinedError.
+    depth: standard
 project:
   domains: [python]
 spec:
@@ -70,11 +75,20 @@ toolchains:
       types: "uv run mypy {path}"
 
 reviewers:
+  # Routing narrows the OPTIONAL reviewers (ux-reviewer, performance-reviewer) only.
+  # The mandatory lenses — design, functionality, robustness, consistency, security, concurrency, tests —
+  # are exercised every round regardless of `routing`; incomplete coverage blocks
+  # approval, so a routed-away mandatory lens would make every review unapprovable.
   consensus: cross-check
   verbosity: standard
   auto_fix: true
   grade_threshold: A
   max_review_rounds: 3
+  # Repair-round re-review gate: below this fraction of a touched file's LOC the
+  # round skips its re-review and records the measured ratio as the reason.
+  # Set the gate false to restore the pre-gate behaviour in one line.
+  rereview_churn_gate: true
+  rereview_churn_ratio: 0.2
 
   installed:
     - code-reviewer
