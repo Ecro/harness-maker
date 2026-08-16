@@ -377,7 +377,15 @@ def test_stage_skill_renders_stage_body_without_double_rendering() -> None:
     env = _make_env()
     tpl = env.get_template("codex/stage_skill.md.j2")
     jinja_fragment = "Use {{ config.work_docs.dir }} for your plan files."
-    rendered = tpl.render(stage="execute", stage_body=jinja_fragment)
+    # `config` is required by the included step_manifest partial — pass it as the real render
+    # does. Note this also makes the assertion sharper: `config` is now genuinely defined, so
+    # a double-render would resolve `{{ config.work_docs.dir }}` instead of raising.
+    rendered = tpl.render(
+        stage="execute",
+        stage_body=jinja_fragment,
+        config=HarnessConfig().model_dump(mode="json"),
+        harness_maker_src_path="/fake/src/path",
+    )
     assert jinja_fragment in rendered, (
         "stage_skill.md.j2 double-rendered stage_body — {{ fragments }} must appear literally"
     )

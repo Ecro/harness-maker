@@ -168,12 +168,40 @@ def test_autoarm_replaces_a_stale_peer_marker(
 
 def test_session_id_from_stdin_rejects_a_non_string(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("sys.stdin", io.StringIO(json.dumps({"session_id": 17})))
-    assert autopilot_autoarm._session_id_from_stdin() is None
+    assert autopilot_autoarm._session_id(autopilot_autoarm._payload_from_stdin()) is None
 
 
 def test_session_id_from_stdin_survives_garbage(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("sys.stdin", io.StringIO("not json at all"))
-    assert autopilot_autoarm._session_id_from_stdin() is None
+    assert autopilot_autoarm._payload_from_stdin() == {}
+
+
+# --- the root the hook arms in (Cursor `sessionStart` wiring, 2026-08-16) --------
+#
+# `Path.cwd()` was the sole source while Claude Code was the only caller. Cursor's
+# sessionStart working directory is NOT verified by this repo, and guessing wrong is
+# silent: a root with no `.claude/harness.yaml` takes `arm_if_persistent`'s fail-safe
+# `return False`, so a persistent harness just never arms and nothing says why.
+
+
+def test_root_prefers_the_payload_over_the_process_cwd(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", "/env/root")
+    assert autopilot_autoarm._project_root({"cwd": "/payload/root"}) == Path("/payload/root")
+
+
+def test_root_falls_back_to_the_project_dir_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The Cursor path: its hook command exports CLAUDE_PROJECT_DIR, payload shape unknown."""
+    monkeypatch.setenv("CLAUDE_PROJECT_DIR", "/env/root")
+    assert autopilot_autoarm._project_root({}) == Path("/env/root")
+
+
+def test_root_falls_back_to_cwd_when_nothing_else_is_available(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.delenv("CLAUDE_PROJECT_DIR", raising=False)
+    monkeypatch.delenv("CURSOR_PROJECT_DIR", raising=False)
+    monkeypatch.chdir(tmp_path)
+    assert autopilot_autoarm._project_root({}) == Path(tmp_path)
 
 
 # --- round-1 P1: the task_slug allowlist, on BOTH sinks -------------------------

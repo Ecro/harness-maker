@@ -202,7 +202,12 @@ def test_only_the_configured_stage_gets_a_dispatch(tmp_path: Path) -> None:
 # value `blocked`, and the boundary command lost its bracketed placeholder in favour of an
 # append instruction. wrapup owns no judgment gate, so it inlines only the `{% else %}`
 # side; the +1 is the shared restructure.
-@pytest.mark.parametrize(("preset", "expected"), [("Side", 675), ("Production", 708)])
+# 675 → 674 / 708 → 707 (-1, 2026-08-16): the autopilot picker's gate in the shared
+# `step_manifest.md.j2` lost its runtime half (`not is_codex` — arming is a marker-file write
+# and works in every runtime; only auto-advance needs the Claude-only `Skill` tool), and the
+# rationale moved into a `{#- … -#}` comment whose whitespace control absorbs one blank line.
+# The prose is unchanged; this is purely the gate line. DOWN is the allowed direction.
+@pytest.mark.parametrize(("preset", "expected"), [("Side", 674), ("Production", 707)])
 def test_the_default_render_costs_existing_users_nothing(
     tmp_path: Path, preset: str, expected: int
 ) -> None:

@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -111,29 +112,58 @@ def arm_if_persistent(
     return True
 
 
-def _session_id_from_stdin() -> str | None:
-    """Sanitized ``session_id`` off the SessionStart payload; None on anything unusable.
-
-    Mirrors `sessionid_envfile.run`'s read — the payload is this hook's only source for the
-    id, since the env var that sibling publishes lands in later Bash, not here.
-    """
+def _payload_from_stdin() -> dict[str, object]:
+    """The SessionStart payload, or ``{}`` on anything unusable."""
     try:
         raw_text = sys.stdin.read() if not sys.stdin.isatty() else ""
         data = json.loads(raw_text) if raw_text.strip() else {}
     except Exception:
-        return None
-    if not isinstance(data, dict):
-        return None
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _session_id(data: dict[str, object]) -> str | None:
+    """Sanitized ``session_id`` off the SessionStart payload; None on anything unusable.
+
+    Mirrors `sessionid_envfile.run`'s read — the payload is this hook's only source for the
+    id, since the env var that sibling publishes lands in later Bash, not here. Cursor has no
+    such sibling at all (it defines no ``CLAUDE_ENV_FILE``), so there the id-less degraded
+    marker is the NORMAL outcome rather than a failure.
+    """
     raw = data.get("session_id")
     if not isinstance(raw, str):
         return None
     return sanitize_session_id(raw) or None
 
 
+def _project_root(data: dict[str, object]) -> Path:
+    """Resolve the project root payload-first, mirroring `loop_gate._project_root`.
+
+    ``Path.cwd()`` alone was fine while Claude Code was the only caller — it starts a
+    SessionStart hook at the project root. It is not a safe sole source now that this hook
+    also renders into Cursor's ``sessionStart``, whose working directory this repo has NOT
+    verified. Getting it wrong is silent: a root without ``.claude/harness.yaml`` takes the
+    fail-safe `return False` path, so a persistent harness would simply never auto-arm and
+    nothing would say why.
+    """
+    raw_workspace = data.get("workspace")
+    workspace = raw_workspace if isinstance(raw_workspace, dict) else {}
+    cwd_val = data.get("cwd")
+    candidate = (
+        (workspace.get("current_dir") if isinstance(workspace, dict) else None)
+        or (cwd_val if isinstance(cwd_val, str) else None)
+        or os.environ.get("CLAUDE_PROJECT_DIR")
+        or os.environ.get("CURSOR_PROJECT_DIR")
+        or os.getcwd()
+    )
+    return Path(str(candidate))
+
+
 def main() -> int:
     """SessionStart entrypoint — always exit 0 (a hook must never block session start)."""
     try:
-        arm_if_persistent(Path.cwd(), claude_session_id=_session_id_from_stdin())
+        payload = _payload_from_stdin()
+        arm_if_persistent(_project_root(payload), claude_session_id=_session_id(payload))
     except Exception:
         logger.warning(".hm-autopilot autoarm: unexpected error — ignored (fail-safe).")
     return 0

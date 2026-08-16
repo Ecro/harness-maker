@@ -54,6 +54,26 @@
         "command": "CLAUDE_PROJECT_DIR=\"${CLAUDE_PROJECT_DIR:-${CURSOR_PROJECT_DIR:-$PWD}}\" PATH=\"$HOME/.local/bin:$PATH\" uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.telemetry"
       }
     ],
+    {#- `sessionStart` is a REAL Cursor event, not a guess: the extension host's hook-event
+        enum lists it beside the four events already rendered here, and Cursor ships an
+        explicit Claude->Cursor mapping table `{PreToolUse: preToolUse, ..., SessionStart:
+        sessionStart, ...}` (probed against the installed 2.x bundle, 2026-08-16). Until then
+        Cursor rendered NO session event at all, so a `autopilot_persistent: true` harness
+        never auto-armed there.
+
+        Claude Code and Codex run TWO hooks on this event. Cursor gets only one, on purpose:
+        `sessionid_envfile` writes `HM_SESSION_ID` into `$CLAUDE_ENV_FILE`, and that variable
+        does not exist in Cursor (zero occurrences in the same bundle) — its `main()` would
+        take the `env_file is None` early return every single time. Rendering it would ship a
+        hook that provably cannot do anything, which is the `.claude/hooks/hooks.json` mistake
+        over again. Cursor sessions therefore stay id-less by design and share the degraded
+        autopilot marker; that is documented as NORMAL in the stage picker, not as a fault.
+    -#}
+    "sessionStart": [
+      {
+        "command": "CLAUDE_PROJECT_DIR=\"${CLAUDE_PROJECT_DIR:-${CURSOR_PROJECT_DIR:-$PWD}}\" PATH=\"$HOME/.local/bin:$PATH\" uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.hooks.autopilot_autoarm"
+      }
+    ],
     "preCompact": [
       {
         "command": "CLAUDE_PROJECT_DIR=\"${CLAUDE_PROJECT_DIR:-${CURSOR_PROJECT_DIR:-$PWD}}\" PATH=\"$HOME/.local/bin:$PATH\" uv run --with \"{{ harness_maker_src_path }}\" python -m harness_maker.hooks.flush_session",

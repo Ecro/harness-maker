@@ -830,6 +830,30 @@ def _codex_skill_files() -> list[FileSpec]:
     ]
 
 
+_CODEX_OUTPUT_ROOTS = (".codex", ".agents")
+_CODEX_OUTPUT_FILES = ("AGENTS.md",)
+
+
+def _is_codex_output(out_path: str) -> bool:
+    """Is this rendered file destined for Codex? Derived from the path, never hand-listed.
+
+    The old context builder hard-coded ``False`` on the grounds that Codex bodies are
+    pre-rendered by `_codex_stage_skills`. Only half true: the STAGE BODY is pre-rendered
+    with ``is_codex=True``, but the WRAPPER around it (`codex/stage_skill.md.j2` and the
+    partials it includes) is rendered here — and so received ``False`` for every Codex file
+    on disk. Any `is_codex` branch in a wrapper-level partial therefore took the Claude arm
+    while looking, in the template source, like it was Codex-aware.
+
+    Derived rather than enumerated because a hand-list is the failure mode this project keeps
+    re-learning: a new Codex output would silently miss the flag and nothing would say so.
+    An explicit `is_codex` in a FileSpec's own context still wins.
+    """
+    parts = Path(out_path).parts
+    return (parts[0] in _CODEX_OUTPUT_ROOTS if parts else False) or (
+        out_path in _CODEX_OUTPUT_FILES
+    )
+
+
 def _codex_stage_skills(*, config_dump: dict[str, object] | None = None) -> list[FileSpec]:
     """Seven stage-trigger SKILL.md files with embedded procedure bodies (is_codex=True)."""
     from harness_maker.render import _make_env  # local import: avoid cycle
@@ -1028,9 +1052,7 @@ def synthesize(
                 "lifecycle": profile.lifecycle,
                 "harness_maker_src_path": install_ref,
                 "feedback_enabled": feedback_enabled,
-                # is_codex gates Codex-specific branches; always False here since
-                # Codex skill bodies are pre-rendered in _codex_stage_skills().
-                "is_codex": ctx.get("is_codex", False),
+                "is_codex": ctx.get("is_codex", _is_codex_output(out_path)),
             },
             frontmatter=_command_frontmatter(out_path),
         )

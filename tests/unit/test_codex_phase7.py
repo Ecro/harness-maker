@@ -30,9 +30,24 @@ _STAGES = _ATOMIC_STAGES  # ["research", "spec", "plan", "execute", "review", "w
 
 
 def _render_stage_skill(stage: str) -> str:
+    """`config` is required, exactly as the real render supplies it.
+
+    The wrapper includes `step_manifest.md.j2`, whose autopilot picker reads
+    `config.autonomy.level`. That used to be reachable only behind an `is_codex is defined`
+    guard, so a context without `config` happened to render — an accident of short-circuit
+    order, not a supported call. The gate is deliberately NOT weakened to `config is defined`:
+    under StrictUndefined a production path that forgot `config` should fail loudly, not drop
+    the picker in silence.
+    """
+    from harness_maker.models import HarnessConfig
+
     env = _make_env()
     tpl = env.get_template("codex/stage_skill.md.j2")
-    return tpl.render(stage=stage)
+    return tpl.render(
+        stage=stage,
+        config=HarnessConfig().model_dump(mode="json"),
+        harness_maker_src_path="/fake/src/path",
+    )
 
 
 # ── stage_skill.md.j2 ─────────────────────────────────────────────────────────

@@ -25,7 +25,12 @@
 > Present them as **intended, conditional** steps — skip heuristics, early-exit /
 > early-FAIL rules, and any stage's own `STOP — do not proceed` boundary override
 > this plan; never treat the banner as a commitment to run past a STOP.
-{% if is_codex is defined and not is_codex and config.autonomy.level != "gated" %}
+{#- Gated on the CONFIG only. The `not is_codex` half that used to be here was wrong twice
+    over: it never fired (every Codex file reached this partial with is_codex=False until
+    `_is_codex_output` was derived, 2026-08-16), and had it fired it would have suppressed
+    the picker on Codex — where arming demonstrably works, since it is a marker-file write.
+    Only end-of-stage auto-advance is Claude-Code-only, and the block below says so itself. -#}
+{% if config.autonomy.level != "gated" %}
 
 <!-- @hm:autopilot-picker -->
 > **Autopilot session start.** This harness is configured for autonomy (`autonomy.level: {{ config.autonomy.level }}`).

@@ -70,6 +70,19 @@ harness-maker 는 **triple plugin** — 세 marketplace 모두에 등록 가능:
 - `commands/<name>.md` — 슬래시 명령, 양쪽 공유
 - `hooks/hooks.json` (at the **plugin root**) — the plugin bundle's own hooks. This is a real, documented Claude Code hook location and it is why `sessionstart_drift` works. Do NOT confuse it with the rendered `.claude/hooks/hooks.json` (see below).
 - **Hook schema diverges by design**: Cursor IDE reads `.cursor/hooks.json` (lowercase camelCase + `version: 1`); Codex reads `.codex/hooks.json`. Each IDE owns its own file with its own native schema. Verified empirically via kairos 0.5.7 metrics forensic 2026-05-08 (`tests/cursor-compat/results-2026-05-08.md`). Do NOT collapse to single source — Cursor 2.4+ hooks-compat docs apply to CLI only, IDE reads the dedicated `.cursor/` location.
+  > **Cursor `sessionStart` (2026-08-16).** Cursor renders **one** hook on this event —
+  > `autopilot_autoarm` — where Claude Code and Codex render two. The event is real, not
+  > assumed: Cursor's extension host carries the hook-event enum (`sessionStart` sits beside
+  > the four events already rendered) and an explicit Claude→Cursor mapping table
+  > (`{PreToolUse: preToolUse, …, SessionStart: sessionStart, …}`). Before this, Cursor
+  > rendered **no** session event at all, so `autopilot_persistent: true` armed on two
+  > runtimes out of three and nothing reported the difference.
+  > **`sessionid_envfile` is excluded on purpose** — it writes to `$CLAUDE_ENV_FILE`, which
+  > does not exist in Cursor (zero occurrences in the same bundle), so its `main()` would take
+  > the `env_file is None` early return every time. Adding it "for parity" ships a hook that
+  > provably cannot act — the `.claude/hooks/hooks.json` mistake again. Cursor sessions are
+  > therefore id-less **by design** and share `.hm-autopilot-degraded`. Gate:
+  > `tests/unit/test_render_cursor_session_start.py`.
   > **⚠️ Corrected 2026-07-17.** This line used to say "**Claude Code reads `.claude/hooks/hooks.json`** (PascalCase + nested)". **False.** Claude Code reads project hooks **only** from settings files (`hooks.md`'s location table); `hooks/hooks.json` is a *plugin-bundle* path. Every hook harness-maker rendered to `.claude/hooks/hooks.json` was dead **in Claude Code** — Cursor and Codex were unaffected. The claim came from the 2026-05-08 forensic, which asked only "does Cursor read `.cursor/hooks.json`?" (yes) and never checked the Claude half; the untested half became this assertion. Refuted by controlled experiment on 2026-07-17 — see `[wiki:architecture] hooks-load-from-settings-not-hooksjson`. Claude hooks now render into `.claude/settings.json`'s `hooks` key (PLAN-permission-deny-and-hooks-wiring).
 - `rules/<name>.mdc` — Cursor 전용 (Claude Code 미사용)
 - `mcp.json` — MCP server 정의, 양쪽 공유
@@ -391,6 +404,23 @@ Integration test 는 `tests/integration/` 에 두고 `pytest.mark.skipif(not os.
 - orphan-branch sweep + **landed-marker** (PLAN-worktree-deliverable-blocks-create ADR-003/004): finalize 성공 시 `refs/hm-landed/v1/<branch>` 에 worktree 브랜치 tip SHA 를 기록한다 (`_write_landed_marker`, cleanup 직전·clean/dirty base 양쪽). `prune_stale` 의 브랜치 sweep 은 marker SHA == 현재 tip 이면 (worktree dir 부재 시) **content 재비교 없이** 삭제 — 후속 HEAD 편집에도 안전하고, 이름 충돌로 재생성된 동명 브랜치는 tip 이 달라 marker 불일치 → preserve-biased content-gate 로 빠진다. marker 없는 legacy 브랜치는 기존 `_branch_content_in_head` fallback. **모든 삭제 경로(marker-sweep, content-gate, `--force`)가 같은 op 에서 marker ref 도 삭제**하고, branch 없는 orphan `refs/hm-landed/v1/*` 는 prune 시 reap → ref 누적 0. create 시 preserved-branch 경고 벽은 **1줄 요약**으로 collapse (`_print_prune_warnings`).
 - `prune-branches [--force]` CLI (ADR-004): 누적된 legacy `execute-*` 브랜치 backlog 를 정리. flag 없으면 `prune_stale` 와 동일 gate (marker/content 검증된 것만 sweep, 나머지는 `git log -p <branch>` 힌트와 함께 preserve). `--force` 는 markerless/diverged 브랜치까지 삭제하되 삭제 전 per-branch recovery 힌트를 출력 (reflog `wip(execute)` 커밋은 gc 윈도우까지 생존). `--force` 는 명시 파싱 (substring 검사 아님).
 - **Cursor 와 공유 시 주의**: prefix 매치로 자기 것만 cleanup (`execute-*`, `plan-*`, `phase-*`, `autoloop-*`). Cursor 가 만든 worktree (다른 prefix) 는 건드리지 않음.
+
+### 렌더 컨텍스트 플래그는 **출력 경로에서 파생**시킬 것 (`is_codex`, 2026-08-16)
+
+`synthesize` 의 컨텍스트 빌더가 모든 파일에 `is_codex: False` 를 하드코딩하고 있었다. 근거는
+"Codex 본문은 `_codex_stage_skills()` 가 미리 렌더한다" 였고, 절반만 맞았다 — 미리 렌더되는 건
+**stage body** 뿐이고 그걸 감싸는 **wrapper** (`codex/stage_skill.md.j2` + 그것이 include 하는
+partial) 는 빌더가 렌더한다. 그래서 **디스크의 Codex 파일 전부가 `is_codex=False` 로 생성**됐고,
+wrapper-level partial 의 `{% if is_codex %}` 는 템플릿 소스만 보면 Codex 를 인식하는 것처럼 읽히면서
+실제로는 항상 Claude 가지를 탔다. 실측 결과: autopilot picker 의 `not is_codex` 게이트는 한 번도
+발화한 적이 없고, `stage_end_summary` 의 auto-advance 억제 게이트도 마찬가지여서 Codex stage skill 이
+실행할 수 없는 `Skill` 자동 전환 블록을 싣고 나갔다.
+
+교훈은 두 가지다. (a) **런타임 플래그는 손목록이 아니라 출력 경로에서 파생**시킨다
+(`_is_codex_output` — `.codex/` · `.agents/` · `AGENTS.md`). 새 Codex 출력이 플래그를 조용히
+놓치는 경로가 없어진다. (b) **이 결함은 render-grep 으로 절대 안 잡힌다** — 템플릿도 산출물도 모두
+"정상"으로 읽히고, 틀린 건 컨텍스트뿐이다. 게이트는 blueprint 의 `FileEntry.context` 를 직접 보는
+`tests/structural/test_is_codex_matches_output_path.py` 다.
 
 ### Snapshot test 결정성
 Renderer 의 `freeze_time` 인자 적극 활용. snapshot 비교 시 `generated_at` 필드 마스크:

@@ -104,3 +104,20 @@ def test_auto_advance_stays_claude_code_only(bodies: dict[str, str]) -> None:
     claude = bodies["claude"]
     assert "@hm:autopilot-advance" in claude
     assert "Claude" in claude
+
+
+def test_codex_gets_the_picker_but_not_the_auto_advance_block(bodies: dict[str, str]) -> None:
+    """The two halves separate at RENDER time too, not only in the prose.
+
+    This pairing is the whole point: Codex can arm (marker file write) and cannot chain
+    (no `Skill` tool). Until `_is_codex_output` was derived on 2026-08-16 the split did not
+    exist — every Codex file rendered with `is_codex=False`, so the `not is_codex` gate on
+    `stage_end_summary.md.j2` never fired and Codex stage skills shipped an auto-advance
+    block they had no way to execute.
+    """
+    codex = bodies["codex"]
+    assert "@hm:autopilot-picker" in codex, "Codex lost the picker — it CAN arm"
+    assert "@hm:autopilot-advance" not in codex, (
+        "Codex renders the auto-advance block, which invokes the next stage through the "
+        "`Skill` tool that Codex does not have — it will wait for a chain that cannot happen"
+    )

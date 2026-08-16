@@ -2,6 +2,59 @@
 
 ## [Unreleased]
 
+## [0.52.2] - 2026-08-16
+
+### Fixed
+
+- **Cursor now runs a `sessionStart` hook, so `autopilot_persistent: true` arms there too.**
+  Cursor previously rendered no session event at all — the option worked on Claude Code and
+  Codex, silently did nothing on Cursor, and nothing reported the gap. The event was assumed
+  absent rather than checked; it is not. Probed against the installed Cursor bundle:
+  `sessionStart` sits in the extension host's hook-event enum beside the four events already
+  rendered, and Cursor ships an explicit Claude→Cursor mapping table
+  (`{PreToolUse: preToolUse, …, SessionStart: sessionStart, …}`).
+  **`sessionid_envfile` is deliberately NOT rendered there.** It writes to `$CLAUDE_ENV_FILE`,
+  which does not exist in Cursor (zero occurrences in that same bundle), so it could only ever
+  take its `env_file is None` early return. Shipping it "for parity" would be a hook that
+  provably cannot act — the `.claude/hooks/hooks.json` mistake over again — so a test asserts
+  its **absence**, with the reason, to stop a future contributor from "fixing" the asymmetry.
+  Cursor sessions stay id-less by design and share the degraded autopilot marker.
+  `autopilot_autoarm` also stopped rooting solely on `Path.cwd()`: it now resolves the project
+  root payload-first (`cwd` → `CLAUDE_PROJECT_DIR` → `CURSOR_PROJECT_DIR` → cwd), because a
+  wrong root takes the fail-safe "no harness.yaml" path and simply never arms, saying nothing.
+
+- **Every Codex-destined file was rendered with `is_codex=False`.** The context builder
+  hard-coded it, reasoning that Codex bodies are pre-rendered by `_codex_stage_skills()`. Half
+  true, and the wrong half was invisible: the stage **body** is pre-rendered with
+  `is_codex=True`, but the **wrapper** around it (`codex/stage_skill.md.j2` and the partials
+  it includes) is rendered by the builder. So every wrapper-level `{% if is_codex %}` read as
+  Codex-aware in its own source and always took the Claude arm. Two gates were inert as a
+  result: the autopilot picker's `not is_codex` (harmless — 0.52.1 had already made that text
+  true in both runtimes) and `stage_end_summary`'s auto-advance suppression, which shipped
+  Codex stage skills a `Skill`-tool auto-invoke block Codex has no way to execute. The flag is
+  now **derived from the output path** (`.codex/`, `.agents/`, `AGENTS.md`) rather than
+  enumerated, so a new Codex output cannot silently miss it, and the picker's gate drops the
+  runtime half entirely — arming works everywhere; only auto-advance does not. Codex now
+  renders the picker and **not** the advance block; Claude renders both.
+  No render-grep could have caught this: template and output both read as correct, and only
+  the context was wrong — so the gate asserts on the blueprint's `FileEntry.context`.
+
+### Added
+
+- **A gate against teaching a retired path.** Every existing doc gate checks that something
+  the docs *say exists* does exist; nothing checked the reverse, and that is the direction the
+  expensive errors ran — `.claude/hooks/hooks.json` was taught as "the Claude Code hooks
+  schema" in four docs plus this project's own CLAUDE.md, months after a controlled experiment
+  refuted it and the render was removed. The new test pins a retired→replacement mapping and
+  asserts three different things: the retired path is genuinely not rendered, the replacement
+  **is** rendered (so the forward pointer docs give a reader stays live), and no shipped doc
+  names the retired path without also naming the replacement. Deliberately wording-agnostic —
+  matching disclaimer prose ("no longer", "deprecated") is the sort of heuristic that passes
+  on a sentence which then says the opposite. **Scope is stated in the test itself**: it
+  catches retired *paths*, not wrong claims about behaviour; three of the four corrections
+  made on 2026-08-15 were prose semantics with no mechanical referent and would still slip
+  through.
+
 ## [0.52.1] - 2026-08-16
 
 ### Fixed

@@ -192,3 +192,7 @@ tests/_env_isolation_probe_*/
 # `paths_to_mutate` before committing.
 .coverage
 *.py.bak
+
+# Scratch render output — `render(..., Path("out"))` probes land here when run from the
+# repo root. Never a deliverable; it reached a tagged commit once via `git add -A`.
+out/

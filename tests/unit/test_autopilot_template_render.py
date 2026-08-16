@@ -12,6 +12,7 @@ bare/partial renders (e.g. the codex stage_skill unit render) where `is_codex` i
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -88,9 +89,11 @@ def test_picker_absent_when_level_is_pinned_gated(tmp_path: Path) -> None:
 
 
 def test_codex_exclusion_is_structural() -> None:
-    # ADR-004: the auto-branch is wrapped in `is_codex is defined and not is_codex` (so the
-    # Codex render never emits a Skill auto-invoke branch) AND `autopilot_advance_enabled`
-    # (REVIEW P1-3: fused renders pass False so the block is not embedded per fragment).
+    # ADR-004: the AUTO-ADVANCE branch is wrapped in `is_codex is defined and not is_codex`
+    # (so the Codex render never emits a Skill auto-invoke branch) AND
+    # `autopilot_advance_enabled` (REVIEW P1-3: fused renders pass False so the block is not
+    # embedded per fragment). Auto-advance is genuinely Claude-Code-only — it calls the next
+    # stage through the `Skill` tool, which Cursor and Codex do not have.
     partial = (_TEMPLATES / "agents" / "_partials" / "stage_end_summary.md.j2").read_text()
     manifest = (_TEMPLATES / "agents" / "_partials" / "step_manifest.md.j2").read_text()
     assert (
@@ -98,9 +101,19 @@ def test_codex_exclusion_is_structural() -> None:
         "and (autopilot_advance_enabled | default(true)) %}" in partial
     )
     assert "@hm:autopilot-advance" in partial
-    assert (
-        '{% if is_codex is defined and not is_codex and config.autonomy.level != "gated" %}'
-        in manifest
+    # The PICKER, by contrast, is gated on the config ALONE (2026-08-16). Arming is a marker
+    # file write, so it works in every runtime; suppressing the picker on Codex would leave a
+    # Codex session with no in-band way to turn autopilot on. The `not is_codex` half that
+    # used to be here was inert anyway — until `_is_codex_output` was derived, every Codex
+    # file reached this partial with `is_codex=False`.
+    assert '{% if config.autonomy.level != "gated" %}' in manifest
+    # Scan the Jinja STATEMENTS only. A plain substring search also matches the comment that
+    # explains why the runtime half was removed, which would make this fail on its own
+    # rationale — the first version of this assertion did exactly that.
+    statements = re.findall(r"\{%.*?%\}", manifest, re.S)
+    assert not [s for s in statements if "is_codex" in s], (
+        f"the picker is gated on the runtime again ({statements}) — arming is runtime-"
+        "independent; only auto-advance (stage_end_summary, above) needs the Skill tool"
     )
 
 

@@ -580,10 +580,16 @@ required, and stops at the ones where it is.
   stage actually started), so a chain that announces a stage and then stalls leaves a
   visible gap rather than a clean record. Gate-stops and cap-halts are recorded too, and
   `/hm:health` surfaces an "armed but never fired" degradation signal.
-- **Claude Code only** today — the auto-advance branch is excluded from the **Codex**
-  render entirely, and is a runtime **no-op under Cursor** (it needs the Claude-only `Skill`
-  tool + a per-session autopilot marker — a Cursor session has no `session_id`, so it lands on
-  the shared `.claude/.hm-autopilot-degraded` file and just falls through to the STOP).
+- **Arming works in every runtime; auto-advance is Claude Code only.** These are two
+  capabilities, and collapsing them into one "Claude Code only" label is what made a Codex
+  session read its own skill and stand down from a feature that worked. *Arming* writes a
+  marker file — `harness-maker autopilot on` (or the picker at the first stage) does it from
+  Claude Code, Cursor and Codex alike, and `autopilot_persistent: true` re-arms on SessionStart
+  in all three. *Auto-advance* invokes the next stage through the Claude-only `Skill` tool, so
+  it is excluded from the Codex render and is a runtime no-op under Cursor; there, an armed
+  marker changes nothing by itself and each stage still starts by hand.
+  Cursor and Codex sessions have no `session_id` — that is the design, not a fault — so they
+  share `.claude/.hm-autopilot-degraded` rather than a per-session marker.
 
 ---
 
