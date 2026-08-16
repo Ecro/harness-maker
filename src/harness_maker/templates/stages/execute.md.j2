@@ -1,3 +1,4 @@
+{% import "agents/_partials/dispatch.md.j2" as dsp -%}
 # Stage: execute
 
 > Atomic stage. TDD machine driven by PLAN. Phase A → A.4 → A.5 → B → C → D, with worktree isolation and **NO commits** (wrapup owns commits).
@@ -278,10 +279,12 @@ per_scenario entry for that scenario with quality FAIL and the duplication named
 blocks, because PASS requires every per_scenario.quality to be PASS. Only a genuine nice-to-have is
 dropped.\n\nReturn ONLY the JSON output as specified in your instructions.`
 
+{{ dsp.dispatch_intro(is_codex) }}
+
 ```
-Task(subagent_type="test-reviewer", description="A.5 red-correctness: {slug}", prompt="<brief>\n\nYour lens: red-correctness — does each test fail, and for the intended reason?")
-Task(subagent_type="test-reviewer", description="A.5 discrimination: {slug}", prompt="<brief>\n\nYour lens: discrimination — would this assertion also pass against a plausibly WRONG implementation?")
-Task(subagent_type="test-reviewer", description="A.5 coverage: {slug}", prompt="<brief>\n\nYour lens: coverage — does the set cover the criterion, with no missing scenario and no duplicate?")
+{{ dsp.dispatch(is_codex, "test-reviewer", "A.5 red-correctness: {slug}", "<brief>\\n\\nYour lens: red-correctness — does each test fail, and for the intended reason?") }}
+{{ dsp.dispatch(is_codex, "test-reviewer", "A.5 discrimination: {slug}", "<brief>\\n\\nYour lens: discrimination — would this assertion also pass against a plausibly WRONG implementation?") }}
+{{ dsp.dispatch(is_codex, "test-reviewer", "A.5 coverage: {slug}", "<brief>\\n\\nYour lens: coverage — does the set cover the criterion, with no missing scenario and no duplicate?") }}
 ```
 
 **Merge all three before judging** — a lens passing its own rubric does not end the round:

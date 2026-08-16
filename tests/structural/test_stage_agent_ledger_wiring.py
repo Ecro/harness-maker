@@ -6,7 +6,8 @@ validator pass never changed a verdict" from an empty file. R3 in the PLAN names
 the medium-likelihood, high-impact risk of this phase.
 
 **Exit criterion 3 is the subtle one.** The expected dispatch count is derived from the
-rendered *dispatch sites* — the `Task(subagent_type=...)` blocks — and never from the emit
+rendered *dispatch sites* — `Task(subagent_type=…)` on Claude, `spawn_agent(agent_type=…)`
+on Codex — and never from the emit
 lines or the ledger. A count taken from the emit lines would say "every emit line has an
 emit line", which is true of a template with none of either.
 """
@@ -31,8 +32,11 @@ _PERSIST = re.compile(r"hm stage_agent_ledger persist-payload\b")
 
 #: INDEPENDENT source for the expected count (exit 3): the agent-dispatch sites themselves.
 _DISPATCH_SITE = {
-    "plan-validator": re.compile(r'subagent_type="plan-validator"'),
-    "test-reviewer": re.compile(r'subagent_type="test-reviewer"'),
+    # `(?:sub)?agent_type` — Claude dispatches with `Task(subagent_type=…)`, Codex with
+    # `spawn_agent(agent_type=…)`. A pattern naming only the Claude spelling finds zero sites in
+    # every Codex skill and reports the ledger as unwired where it is merely spelled otherwise.
+    "plan-validator": re.compile(r'(?:sub)?agent_type="plan-validator"'),
+    "test-reviewer": re.compile(r'(?:sub)?agent_type="test-reviewer"'),
 }
 
 _STAGE_MARKERS = {

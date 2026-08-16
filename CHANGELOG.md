@@ -2,6 +2,47 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Codex-target output named tools the Codex runtime does not have.** Every rendered Codex
+  stage skill carried Claude Code's `Task(subagent_type=…)` dispatch syntax verbatim — 18
+  occurrences per preset across 9 files, `hm-review` alone 14. Codex has no `Task` tool, so
+  every sub-agent dispatch on that target was an instruction the runtime could not execute,
+  and it failed **silently**: the model improvised. Observed in a real harness as a Codex
+  `/hm:review` that wrote zero lens result files, leaving `hm lens_coverage check` reporting
+  every mandatory lens missing and the review permanently unapprovable.
+
+  Dispatch now goes through one macro (`agents/_partials/dispatch.md.j2`) that renders each
+  runtime's own vocabulary — `spawn_agent(agent_type=…, message=…)` on Codex — with `is_codex`
+  as an explicit required parameter so an omission raises `UndefinedError` instead of silently
+  taking the Claude arm. The autopilot picker names `request_user_input` on Codex, and the
+  stage-end `Next:` banner names the mention form (`@hm-execute`), because Codex has no slash
+  command for a stage and **no skill-running tool at all** (live-probed, Codex CLI 0.147.0 —
+  see `tests/manual/CODEX_SPAWN_AGENT_PROBE.md`).
+
+  The Codex fan-out also gained an explicit **join** contract: `spawn_agent` returns when an
+  agent starts, not when it answers, and the stage prose treats a missing result file as a dead
+  lens — so without it an in-flight agent would have reproduced the original symptom with seven
+  sub-agents genuinely running.
+
+### Added
+
+- `tests/structural/test_no_claude_tool_calls_in_codex_output.py` — blueprint-derived gate over
+  a preset × targets × dev_mode × `second_opinion.models` × `reviewers.enabled` matrix, with a
+  non-empty precondition and a positive dispatch-count control. Each of the last two axes was
+  added after it was measured to hide a live leak.
+- `tests/integration/test_codex_spawn_agent_live.py` (`INTEGRATION=1`) — asserts the runtime's
+  own `collab_tool_call`/`spawn_agent` record and the sub-agent's reply, so a model narrating a
+  dispatch cannot satisfy it.
+
+### Changed
+
+- `count_round_trips` now counts each variant's own dispatch call-site form. It counted `Task(`
+  for both arms, which was harmless only while Codex output still carried `Task(`; left alone it
+  would have scored `hm-review`'s fourteen-dispatch fan-out at zero from this change onward.
+- `tests/unit/test_invocation_render_gate.py` rendered Codex assets outside the tree it walked,
+  so it had never scanned them despite its docstring. Re-rooted; it now covers 37 Codex files.
+
 ## [0.52.3] - 2026-08-16
 
 ### Fixed

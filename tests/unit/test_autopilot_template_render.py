@@ -12,7 +12,6 @@ bare/partial renders (e.g. the codex stage_skill unit render) where `is_codex` i
 
 from __future__ import annotations
 
-import re
 from pathlib import Path
 
 import pytest
@@ -107,13 +106,34 @@ def test_codex_exclusion_is_structural() -> None:
     # used to be here was inert anyway — until `_is_codex_output` was derived, every Codex
     # file reached this partial with `is_codex=False`.
     assert '{% if config.autonomy.level != "gated" %}' in manifest
-    # Scan the Jinja STATEMENTS only. A plain substring search also matches the comment that
-    # explains why the runtime half was removed, which would make this fail on its own
-    # rationale — the first version of this assertion did exactly that.
-    statements = re.findall(r"\{%.*?%\}", manifest, re.S)
-    assert not [s for s in statements if "is_codex" in s], (
-        f"the picker is gated on the runtime again ({statements}) — arming is runtime-"
-        "independent; only auto-advance (stage_end_summary, above) needs the Skill tool"
+    # The property is that the picker is not SUPPRESSED on Codex — measure that directly by
+    # rendering it both ways, rather than through the proxy "no `is_codex` statement appears".
+    # That proxy was too broad: it also forbids naming the runtime's own question tool inside
+    # the picker (`request_user_input` on Codex, `AskUserQuestion` on Claude), which suppresses
+    # nothing and is the correction that a Codex session cannot act on the Claude spelling.
+    for is_codex in (True, False):
+        rendered = _render_manifest(is_codex)
+        assert "hm autopilot on" in rendered, (
+            f"the picker vanished at is_codex={is_codex} — arming is runtime-independent; "
+            "only auto-advance (stage_end_summary, above) needs the Skill tool"
+        )
+    assert "request_user_input" in _render_manifest(True)
+    assert "AskUserQuestion" in _render_manifest(False)
+
+
+def _render_manifest(is_codex: bool) -> str:
+    """Render the picker partial alone, so suppression is measured rather than grepped for."""
+    from harness_maker.models import HarnessConfig
+    from harness_maker.render import _make_env
+
+    return (
+        _make_env()
+        .get_template("agents/_partials/step_manifest.md.j2")
+        .render(
+            config=HarnessConfig().model_dump(mode="json"),
+            is_codex=is_codex,
+            harness_maker_src_path="/cache/harness-maker/0.0.0",
+        )
     )
 
 

@@ -1,0 +1,418 @@
+{
+  "Side::.agents/skills/autoloop-driver/SKILL.md": [
+    "`AskUserQuestion` in Claude Code, `request_user_input` in Codex)."
+  ],
+  "Side::.agents/skills/hm-execute/SKILL.md": [
+    ">   `AskUserQuestion` for the `research → spec → plan → execute → review → verify → wrapup` pipeline:",
+    "> - anything else → offer ONCE via `AskUserQuestion`: \"Run the",
+    "Task(subagent_type=\"test-reviewer\", description=\"A.5 red-correctness: {slug}\", prompt=\"<brief>\\n\\nYour lens: red-correctness — does each test fail, and for the intended reason?\")",
+    "Task(subagent_type=\"test-reviewer\", description=\"A.5 discrimination: {slug}\", prompt=\"<brief>\\n\\nYour lens: discrimination — would this assertion also pass against a plausibly WRONG implementation?\")",
+    "Task(subagent_type=\"test-reviewer\", description=\"A.5 coverage: {slug}\", prompt=\"<brief>\\n\\nYour lens: coverage — does the set cover the criterion, with no missing scenario and no duplicate?\")"
+  ],
+  "Side::.agents/skills/hm-plan/SKILL.md": [
+    ">   `AskUserQuestion` for the `research → spec → plan → execute → review → verify → wrapup` pipeline:",
+    "> - anything else → offer ONCE via `AskUserQuestion`: \"Run the"
+  ],
+  "Side::.agents/skills/hm-research/SKILL.md": [
+    ">   `AskUserQuestion` for the `research → spec → plan → execute → review → verify → wrapup` pipeline:",
+    "> - anything else → offer ONCE via `AskUserQuestion`: \"Run the"
+  ],
+  "Side::.agents/skills/hm-review/SKILL.md": [
+    ">   `AskUserQuestion` for the `research → spec → plan → execute → review → verify → wrapup` pipeline:",
+    "> - anything else → offer ONCE via `AskUserQuestion`: \"Run the",
+    "Task(subagent_type=\"code-reviewer\", description=\"lens design: {slug}\", prompt=\"<brief>\\n\\nYour lens: design — boundaries, coupling, whether this is the right shape for the problem; and complexity: could it be simpler? Unnecessary indirection, dead generality, a knob or a function with no caller on any path a user reaches.\")",
+    "Task(subagent_type=\"code-reviewer\", description=\"lens functionality: {slug}\", prompt=\"<brief>\\n\\nYour lens: functionality — does it do what the SPEC and the invariants say, on every path?\")",
+    "Task(subagent_type=\"code-reviewer\", description=\"lens robustness: {slug}\", prompt=\"<brief>\\n\\nYour lens: robustness — edge cases, partial writes, restart, resource exhaustion, recovery.\")",
+    "Task(subagent_type=\"code-reviewer\", description=\"lens consistency: {slug}\", prompt=\"<brief>\\n\\nYour lens: consistency — do the names, docstrings and declarations say what the code actually does, and does this match the conventions around it? A name or a docstring that makes a reader believe something FALSE about behaviour is a defect, not a nit; so is a second source of truth for something that already had one.\")",
+    "Task(subagent_type=\"security-reviewer\", description=\"lens security: {slug}\", prompt=\"<brief>\\n\\nYour lens: security — external input, authz, secrets, injection.\")",
+    "Task(subagent_type=\"concurrency-reviewer\", description=\"lens concurrency: {slug}\", prompt=\"<brief>\\n\\nYour lens: concurrency — races, deadlock, resource lifetime, cancellation.\")",
+    "Task(subagent_type=\"test-reviewer\", description=\"lens tests: {slug}\", prompt=\"<brief>\\n\\nYour lens: tests — oracle strength, discrimination, would these tests pass a wrong implementation?\")",
+    "Task(subagent_type=\"code-reviewer\", description=\"lens design: {slug}\", prompt=\"<brief>\\n\\nYour lens: design — boundaries, coupling, whether this is the right shape for the problem; and complexity: could it be simpler? Unnecessary indirection, dead generality, a knob or a function with no caller on any path a user reaches.\")",
+    "Task(subagent_type=\"code-reviewer\", description=\"lens functionality: {slug}\", prompt=\"<brief>\\n\\nYour lens: functionality — does it do what the SPEC and the invariants say, on every path?\")",
+    "Task(subagent_type=\"code-reviewer\", description=\"lens robustness: {slug}\", prompt=\"<brief>\\n\\nYour lens: robustness — edge cases, partial writes, restart, resource exhaustion, recovery.\")",
+    "Task(subagent_type=\"code-reviewer\", description=\"lens consistency: {slug}\", prompt=\"<brief>\\n\\nYour lens: consistency — do the names, docstrings and declarations say what the code actually does, and does this match the conventions around it? A name or a docstring that makes a reader believe something FALSE about behaviour is a defect, not a nit; so is a second source of truth for something that already had one.\")",
+    "Task(subagent_type=\"security-reviewer\", description=\"lens security: {slug}\", prompt=\"<brief>\\n\\nYour lens: security — external input, authz, secrets, injection.\")",
+    "Task(subagent_type=\"concurrency-reviewer\", description=\"lens concurrency: {slug}\", prompt=\"<brief>\\n\\nYour lens: concurrency — races, deadlock, resource lifetime, cancellation.\")",
+    "Task(subagent_type=\"test-reviewer\", description=\"lens tests: {slug}\", prompt=\"<brief>\\n\\nYour lens: tests — oracle strength, discrimination, would these tests pass a wrong implementation?\")"
+  ],
+  "Side::.agents/skills/hm-spec/SKILL.md": [
+    ">   `AskUserQuestion` for the `research → spec → plan → execute → review → verify → wrapup` pipeline:",
+    "> - anything else → offer ONCE via `AskUserQuestion`: \"Run the"
+  ],
+  "Side::.agents/skills/hm-verify/SKILL.md": [
+    ">   `AskUserQuestion` for the `research → spec → plan → execute → review → verify → wrapup` pipeline:",
+    "> - anything else → offer ONCE via `AskUserQuestion`: \"Run the"
+  ],
+  "Side::.agents/skills/hm-wrapup/SKILL.md": [
+    ">   `AskUserQuestion` for the `research → spec → plan → execute → review → verify → wrapup` pipeline:",
+    "> - anything else → offer ONCE via `AskUserQuestion`: \"Run the"
+  ],
+  "Side::.agents/skills/second-opinion-gate/SKILL.md": [
+    "Task(subagent_type=\"code-verifier\", description=\"Mode B PIDA: <slug>\","
+  ],
+  "Side::.claude/commands/hm/configure.md": [
+    "show current settings, then drive targeted changes via the structured question tool (`AskQuestion` in Cursor, `AskUserQuestion` in Claude Code).",
+    "Use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code): \"What would you like to change?\" This is a",
+    "For each selected dimension, show a structured question (`AskQuestion` / `AskUserQuestion`) with the current value,"
+  ],
+  "Side::.claude/commands/hm/execute.md": [
+    ">   `AskUserQuestion` for the `research → spec → plan → execute → review → verify → wrapup` pipeline:",
+    "> - anything else → offer ONCE via `AskUserQuestion`: \"Run the",
+    "Task(subagent_type=\"test-reviewer\", description=\"A.5 red-correctness: {slug}\", prompt=\"<brief>\\n\\nYour lens: red-correctness — does each test fail, and for the intended reason?\")",
+    "Task(subagent_type=\"test-reviewer\", description=\"A.5 discrimination: {slug}\", prompt=\"<brief>\\n\\nYour lens: discrimination — would this assertion also pass against a plausibly WRONG implementation?\")",
+    "Task(subagent_type=\"test-reviewer\", description=\"A.5 coverage: {slug}\", prompt=\"<brief>\\n\\nYour lens: coverage — does the set cover the criterion, with no missing scenario and no duplicate?\")",
+    "- `proceed: true` → **auto-advance**: invoke `Skill(hm:<next_stage from the JSON>)` with"
+  ],
+  "Side::.claude/commands/hm/health.md": [
+    "Use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code) per item with three options:"
+  ],
+  "Side::.claude/commands/hm/loop.md": [
+    "Use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code) — single call, two independent questions:",
+    "For each unresolved dimension, ask via `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code). Present what you",
+    "Batch up to two related dimensions per `AskQuestion` / `AskUserQuestion` call when they are",
+    "2. Ask via `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code): \"Add to exit checklist? {proposed label}\"",
+    "not a fixed script) and ask via `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code). Continue until actionable.",
+    "slice of 3–10 features. Use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code) to accept / edit / retype.",
+    "Use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code) to add AC for each feature (batch 3–5 per call).",
+    "Use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code) only if the stopping_criteria answer didn't make",
+    "Show the user: saved paths + one-line summary, then use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code)",
+    "| \"operator decision to pause\" / \"user wants fresh context\" | The loop body **cannot** use `AskUserQuestion` (autoloop autonomous-decision protocol). Any \"operator decision\" emitted from inside the loop body is a hallucination. |",
+    "loop-context file. If the count reaches 3, ask via `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code):",
+    "Escalate via `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code).",
+    "ask via `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code):"
+  ],
+  "Side::.claude/commands/hm/make.md": [
+    "(`AskUserQuestion` in Claude Code, `AskQuestion` in Cursor) — **Proceed** /",
+    "it asks locale first, then drives the structured question tool (`AskQuestion` in Cursor, `AskUserQuestion` in Claude Code) for preset, dev_mode, targets, and"
+  ],
+  "Side::.claude/commands/hm/plan.md": [
+    ">   `AskUserQuestion` for the `research → spec → plan → execute → review → verify → wrapup` pipeline:",
+    "> - anything else → offer ONCE via `AskUserQuestion`: \"Run the",
+    "- **Exit 0 (`active`)** → loop-mode: some `.claude/.hm-loop-*` marker's content header matches YOUR `session_id` (or a legacy global `.hm-loop-active` exists — degraded fallback). Do NOT engage the deep interview (loop body cannot block on `AskUserQuestion`). Scope the plan to the next master-PLAN phase only.",
+    "> ⚠️ **LOOP-MODE ADR CONSTRAINT (CRITICAL)** — If implementation during this iteration reveals a decision that genuinely requires an ADR (component boundary change, new contract, precedent-setting choice, rejection of viable alternative), **HALT the loop immediately**. Do NOT defer the ADR. Do NOT document it as a local per-iter decision. The autoloop has no `AskUserQuestion` channel; new ADRs must be added to the master PLAN through standalone `/hm:plan {slug}` (which engages the deep interview).",
+    "Use `AskUserQuestion` to present:",
+    "- **Claude Code:** invoke `Skill(hm:spec <target>)` (the Skill tool is available in Claude Code).",
+    "When SPEC is fully approved, the only remaining `/hm:plan` question is: **\"Given this SPEC, are you ready for phase decomposition, or is there a how-question (architecture / phasing / library choice) you want to lock down first?\"** Use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code) to present structured options to the user. Options:",
+    "- **Live interview** → conduct in `en` (en→English, ko→Korean, ja→Japanese, others→English fallback). Round preamble, \"decisions so far\", open ambiguity explanations, `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code) prompts and option labels — all in `en`.",
+    "#### Step B — `AskQuestion` / `AskUserQuestion` (in `en`)",
+    "*before* anything else: Two predicates, and the flag value separates them. (1) If the validator returned MAJOR_REVISION on its SECOND pass and the Step 4 A/B question is UNANSWERED, or the user chose B (abort), pass --judgment-gate blocked. No level clears it, auto_full included: a plan the validator twice called critically flawed must not be accepted as risk with NO HUMAN PRESENT. If the user chose A (proceed with the critiques as accepted risk) the threshold IS resolved — that is recorded as validator_outcome: MAJOR_REVISION_RESOLVED, a human WAS present, and the verdict is clear. Keying blocked on the bare historical fact would make the halt permanent and its remedy impossible. (2) Else, any unresolved architectural AskUserQuestion round → --judgment-gate pending: that is the judgment half, and at auto_full it is answered with the recommended option, which you MUST write into the PLAN's Interview Transcript before advancing. (3) Neither → clear.",
+    "- `proceed: true` → **auto-advance**: invoke `Skill(hm:<next_stage from the JSON>)` with"
+  ],
+  "Side::.claude/commands/hm/research.md": [
+    ">   `AskUserQuestion` for the `research → spec → plan → execute → review → verify → wrapup` pipeline:",
+    "> - anything else → offer ONCE via `AskUserQuestion`: \"Run the",
+    "When `--deep` is set, use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code) in `en` with 3-5 questions drawn from this rubric. Use the configured locale for the live interview: the round preamble, ambiguity explanation, question text and option labels, and any validation prompt must be in `en` (en→English, ko→Korean, ja→Japanese, others→English fallback). The persisted RESEARCH document remains English unless project policy says otherwise.",
+    "- `Task(subagent_type=\"Explore\", …)` — **codebase**: classes 1, 7 below.",
+    "- `Task(subagent_type=\"Explore\", …)` — **internal record**: classes 2, 3 below.",
+    "- `Task(subagent_type=\"Explore\", …)` — **external**: classes 4, 5, 6 below.",
+    "- `proceed: true` → **auto-advance**: invoke `Skill(hm:<next_stage from the JSON>)` with"
+  ],
+  "Side::.claude/commands/hm/review.md": [
+    ">   `AskUserQuestion` for the `research → spec → plan → execute → review → verify → wrapup` pipeline:",
+    "> - anything else → offer ONCE via `AskUserQuestion`: \"Run the",
+    "Task(subagent_type=\"code-reviewer\", description=\"lens design: {slug}\", prompt=\"<brief>\\n\\nYour lens: design — boundaries, coupling, whether this is the right shape for the problem; and complexity: could it be simpler? Unnecessary indirection, dead generality, a knob or a function with no caller on any path a user reaches.\")",
+    "Task(subagent_type=\"code-reviewer\", description=\"lens functionality: {slug}\", prompt=\"<brief>\\n\\nYour lens: functionality — does it do what the SPEC and the invariants say, on every path?\")",
+    "Task(subagent_type=\"code-reviewer\", description=\"lens robustness: {slug}\", prompt=\"<brief>\\n\\nYour lens: robustness — edge cases, partial writes, restart, resource exhaustion, recovery.\")",
+    "Task(subagent_type=\"code-reviewer\", description=\"lens consistency: {slug}\", prompt=\"<brief>\\n\\nYour lens: consistency — do the names, docstrings and declarations say what the code actually does, and does this match the conventions around it? A name or a docstring that makes a reader believe something FALSE about behaviour is a defect, not a nit; so is a second source of truth for something that already had one.\")",
+    "Task(subagent_type=\"security-reviewer\", description=\"lens security: {slug}\", prompt=\"<brief>\\n\\nYour lens: security — external input, authz, secrets, injection.\")",
+    "Task(subagent_type=\"concurrency-reviewer\", description=\"lens concurrency: {slug}\", prompt=\"<brief>\\n\\nYour lens: concurrency — races, deadlock, resource lifetime, cancellation.\")",
+    "Task(subagent_type=\"test-reviewer\", description=\"lens tests: {slug}\", prompt=\"<brief>\\n\\nYour lens: tests — oracle strength, discrimination, would these tests pass a wrong implementation?\")",
+    "Task(subagent_type=\"code-reviewer\", description=\"lens design: {slug}\", prompt=\"<brief>\\n\\nYour lens: design — boundaries, coupling, whether this is the right shape for the problem; and complexity: could it be simpler? Unnecessary indirection, dead generality, a knob or a function with no caller on any path a user reaches.\")",
+    "Task(subagent_type=\"code-reviewer\", description=\"lens functionality: {slug}\", prompt=\"<brief>\\n\\nYour lens: functionality — does it do what the SPEC and the invariants say, on every path?\")",
+    "Task(subagent_type=\"code-reviewer\", description=\"lens robustness: {slug}\", prompt=\"<brief>\\n\\nYour lens: robustness — edge cases, partial writes, restart, resource exhaustion, recovery.\")",
+    "Task(subagent_type=\"code-reviewer\", description=\"lens consistency: {slug}\", prompt=\"<brief>\\n\\nYour lens: consistency — do the names, docstrings and declarations say what the code actually does, and does this match the conventions around it? A name or a docstring that makes a reader believe something FALSE about behaviour is a defect, not a nit; so is a second source of truth for something that already had one.\")",
+    "Task(subagent_type=\"security-reviewer\", description=\"lens security: {slug}\", prompt=\"<brief>\\n\\nYour lens: security — external input, authz, secrets, injection.\")",
+    "Task(subagent_type=\"concurrency-reviewer\", description=\"lens concurrency: {slug}\", prompt=\"<brief>\\n\\nYour lens: concurrency — races, deadlock, resource lifetime, cancellation.\")",
+    "Task(subagent_type=\"test-reviewer\", description=\"lens tests: {slug}\", prompt=\"<brief>\\n\\nYour lens: tests — oracle strength, discrimination, would these tests pass a wrong implementation?\")",
+    "- `proceed: true` → **auto-advance**: invoke `Skill(hm:<next_stage from the JSON>)` with"
+  ],
+  "Side::.claude/commands/hm/spec.md": [
+    ">   `AskUserQuestion` for the `research → spec → plan → execute → review → verify → wrapup` pipeline:",
+    "> - anything else → offer ONCE via `AskUserQuestion`: \"Run the",
+    "- Use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code). **Batch independent questions** per round (independence test: would Q2's options change based on Q1's answer? if yes → separate rounds).",
+    "- `proceed: true` → **auto-advance**: invoke `Skill(hm:<next_stage from the JSON>)` with"
+  ],
+  "Side::.claude/commands/hm/uninstall.md": [
+    "Use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code):"
+  ],
+  "Side::.claude/commands/hm/verify.md": [
+    ">   `AskUserQuestion` for the `research → spec → plan → execute → review → verify → wrapup` pipeline:",
+    "> - anything else → offer ONCE via `AskUserQuestion`: \"Run the",
+    "- `--force` — proceed even when one or more checks FAIL. **Logged with the override reason.** Use only when the user has consciously chosen to bypass (emergency hotfix, intentional debt). Without `--reason=<text>`, `--force` requires confirmation via `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code) in `en`.",
+    "- `proceed: true` → **auto-advance**: invoke `Skill(hm:<next_stage from the JSON>)` with"
+  ],
+  "Side::.claude/commands/hm/wrapup.md": [
+    ">   `AskUserQuestion` for the `research → spec → plan → execute → review → verify → wrapup` pipeline:",
+    "> - anything else → offer ONCE via `AskUserQuestion`: \"Run the",
+    "You **MAY** call `AskUserQuestion` (autoloop exception) **ONLY IF** the literal substring `[finalize] stash-pop conflict` OR `[finalize] untracked-file collision` appears in stderr. Any other non-zero exit: surface verbatim and halt, do NOT ask.",
+    "- `proceed: true` → **auto-advance**: invoke `Skill(hm:<next_stage from the JSON>)` with"
+  ],
+  "Side::.claude/skills/autoloop-driver/SKILL.md": [
+    "`AskUserQuestion` in Claude Code, `request_user_input` in Codex)."
+  ],
+  "Side::.claude/skills/second-opinion-gate/SKILL.md": [
+    "Task(subagent_type=\"code-verifier\", description=\"Mode B PIDA: <slug>\","
+  ],
+  "Side::.claude/stages/execute.md": [
+    "Task(subagent_type=\"test-reviewer\", description=\"A.5 red-correctness: {slug}\", prompt=\"<brief>\\n\\nYour lens: red-correctness — does each test fail, and for the intended reason?\")",
+    "Task(subagent_type=\"test-reviewer\", description=\"A.5 discrimination: {slug}\", prompt=\"<brief>\\n\\nYour lens: discrimination — would this assertion also pass against a plausibly WRONG implementation?\")",
+    "Task(subagent_type=\"test-reviewer\", description=\"A.5 coverage: {slug}\", prompt=\"<brief>\\n\\nYour lens: coverage — does the set cover the criterion, with no missing scenario and no duplicate?\")",
+    "- `proceed: true` → **auto-advance**: invoke `Skill(hm:<next_stage from the JSON>)` with"
+  ],
+  "Side::.claude/stages/plan.md": [
+    "- **Exit 0 (`active`)** → loop-mode: some `.claude/.hm-loop-*` marker's content header matches YOUR `session_id` (or a legacy global `.hm-loop-active` exists — degraded fallback). Do NOT engage the deep interview (loop body cannot block on `AskUserQuestion`). Scope the plan to the next master-PLAN phase only.",
+    "> ⚠️ **LOOP-MODE ADR CONSTRAINT (CRITICAL)** — If implementation during this iteration reveals a decision that genuinely requires an ADR (component boundary change, new contract, precedent-setting choice, rejection of viable alternative), **HALT the loop immediately**. Do NOT defer the ADR. Do NOT document it as a local per-iter decision. The autoloop has no `AskUserQuestion` channel; new ADRs must be added to the master PLAN through standalone `/hm:plan {slug}` (which engages the deep interview).",
+    "Use `AskUserQuestion` to present:",
+    "- **Claude Code:** invoke `Skill(hm:spec <target>)` (the Skill tool is available in Claude Code).",
+    "When SPEC is fully approved, the only remaining `/hm:plan` question is: **\"Given this SPEC, are you ready for phase decomposition, or is there a how-question (architecture / phasing / library choice) you want to lock down first?\"** Use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code) to present structured options to the user. Options:",
+    "- **Live interview** → conduct in `en` (en→English, ko→Korean, ja→Japanese, others→English fallback). Round preamble, \"decisions so far\", open ambiguity explanations, `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code) prompts and option labels — all in `en`.",
+    "#### Step B — `AskQuestion` / `AskUserQuestion` (in `en`)",
+    "*before* anything else: Two predicates, and the flag value separates them. (1) If the validator returned MAJOR_REVISION on its SECOND pass and the Step 4 A/B question is UNANSWERED, or the user chose B (abort), pass --judgment-gate blocked. No level clears it, auto_full included: a plan the validator twice called critically flawed must not be accepted as risk with NO HUMAN PRESENT. If the user chose A (proceed with the critiques as accepted risk) the threshold IS resolved — that is recorded as validator_outcome: MAJOR_REVISION_RESOLVED, a human WAS present, and the verdict is clear. Keying blocked on the bare historical fact would make the halt permanent and its remedy impossible. (2) Else, any unresolved architectural AskUserQuestion round → --judgment-gate pending: that is the judgment half, and at auto_full it is answered with the recommended option, which you MUST write into the PLAN's Interview Transcript before advancing. (3) Neither → clear.",
+    "- `proceed: true` → **auto-advance**: invoke `Skill(hm:<next_stage from the JSON>)` with"
+  ],
+  "Side::.claude/stages/research.md": [
+    "When `--deep` is set, use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code) in `en` with 3-5 questions drawn from this rubric. Use the configured locale for the live interview: the round preamble, ambiguity explanation, question text and option labels, and any validation prompt must be in `en` (en→English, ko→Korean, ja→Japanese, others→English fallback). The persisted RESEARCH document remains English unless project policy says otherwise.",
+    "- `Task(subagent_type=\"Explore\", …)` — **codebase**: classes 1, 7 below.",
+    "- `Task(subagent_type=\"Explore\", …)` — **internal record**: classes 2, 3 below.",
+    "- `Task(subagent_type=\"Explore\", …)` — **external**: classes 4, 5, 6 below.",
+    "- `proceed: true` → **auto-advance**: invoke `Skill(hm:<next_stage from the JSON>)` with"
+  ],
+  "Side::.claude/stages/review.md": [
+    "Task(subagent_type=\"code-reviewer\", description=\"lens design: {slug}\", prompt=\"<brief>\\n\\nYour lens: design — boundaries, coupling, whether this is the right shape for the problem; and complexity: could it be simpler? Unnecessary indirection, dead generality, a knob or a function with no caller on any path a user reaches.\")",
+    "Task(subagent_type=\"code-reviewer\", description=\"lens functionality: {slug}\", prompt=\"<brief>\\n\\nYour lens: functionality — does it do what the SPEC and the invariants say, on every path?\")",
+    "Task(subagent_type=\"code-reviewer\", description=\"lens robustness: {slug}\", prompt=\"<brief>\\n\\nYour lens: robustness — edge cases, partial writes, restart, resource exhaustion, recovery.\")",
+    "Task(subagent_type=\"code-reviewer\", description=\"lens consistency: {slug}\", prompt=\"<brief>\\n\\nYour lens: consistency — do the names, docstrings and declarations say what the code actually does, and does this match the conventions around it? A name or a docstring that makes a reader believe something FALSE about behaviour is a defect, not a nit; so is a second source of truth for something that already had one.\")",
+    "Task(subagent_type=\"security-reviewer\", description=\"lens security: {slug}\", prompt=\"<brief>\\n\\nYour lens: security — external input, authz, secrets, injection.\")",
+    "Task(subagent_type=\"concurrency-reviewer\", description=\"lens concurrency: {slug}\", prompt=\"<brief>\\n\\nYour lens: concurrency — races, deadlock, resource lifetime, cancellation.\")",
+    "Task(subagent_type=\"test-reviewer\", description=\"lens tests: {slug}\", prompt=\"<brief>\\n\\nYour lens: tests — oracle strength, discrimination, would these tests pass a wrong implementation?\")",
+    "Task(subagent_type=\"code-reviewer\", description=\"lens design: {slug}\", prompt=\"<brief>\\n\\nYour lens: design — boundaries, coupling, whether this is the right shape for the problem; and complexity: could it be simpler? Unnecessary indirection, dead generality, a knob or a function with no caller on any path a user reaches.\")",
+    "Task(subagent_type=\"code-reviewer\", description=\"lens functionality: {slug}\", prompt=\"<brief>\\n\\nYour lens: functionality — does it do what the SPEC and the invariants say, on every path?\")",
+    "Task(subagent_type=\"code-reviewer\", description=\"lens robustness: {slug}\", prompt=\"<brief>\\n\\nYour lens: robustness — edge cases, partial writes, restart, resource exhaustion, recovery.\")",
+    "Task(subagent_type=\"code-reviewer\", description=\"lens consistency: {slug}\", prompt=\"<brief>\\n\\nYour lens: consistency — do the names, docstrings and declarations say what the code actually does, and does this match the conventions around it? A name or a docstring that makes a reader believe something FALSE about behaviour is a defect, not a nit; so is a second source of truth for something that already had one.\")",
+    "Task(subagent_type=\"security-reviewer\", description=\"lens security: {slug}\", prompt=\"<brief>\\n\\nYour lens: security — external input, authz, secrets, injection.\")",
+    "Task(subagent_type=\"concurrency-reviewer\", description=\"lens concurrency: {slug}\", prompt=\"<brief>\\n\\nYour lens: concurrency — races, deadlock, resource lifetime, cancellation.\")",
+    "Task(subagent_type=\"test-reviewer\", description=\"lens tests: {slug}\", prompt=\"<brief>\\n\\nYour lens: tests — oracle strength, discrimination, would these tests pass a wrong implementation?\")",
+    "- `proceed: true` → **auto-advance**: invoke `Skill(hm:<next_stage from the JSON>)` with"
+  ],
+  "Side::.claude/stages/spec.md": [
+    "- Use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code). **Batch independent questions** per round (independence test: would Q2's options change based on Q1's answer? if yes → separate rounds).",
+    "- `proceed: true` → **auto-advance**: invoke `Skill(hm:<next_stage from the JSON>)` with"
+  ],
+  "Side::.claude/stages/verify.md": [
+    "- `--force` — proceed even when one or more checks FAIL. **Logged with the override reason.** Use only when the user has consciously chosen to bypass (emergency hotfix, intentional debt). Without `--reason=<text>`, `--force` requires confirmation via `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code) in `en`.",
+    "- `proceed: true` → **auto-advance**: invoke `Skill(hm:<next_stage from the JSON>)` with"
+  ],
+  "Side::.claude/stages/wrapup.md": [
+    "You **MAY** call `AskUserQuestion` (autoloop exception) **ONLY IF** the literal substring `[finalize] stash-pop conflict` OR `[finalize] untracked-file collision` appears in stderr. Any other non-zero exit: surface verbatim and halt, do NOT ask.",
+    "- `proceed: true` → **auto-advance**: invoke `Skill(hm:<next_stage from the JSON>)` with"
+  ],
+  "Production::.agents/skills/autoloop-driver/SKILL.md": [
+    "`AskUserQuestion` in Claude Code, `request_user_input` in Codex)."
+  ],
+  "Production::.agents/skills/hm-execute/SKILL.md": [
+    ">   `AskUserQuestion` for the `research → spec → plan → execute → review → verify → wrapup` pipeline:",
+    "> - anything else → offer ONCE via `AskUserQuestion`: \"Run the",
+    "Task(subagent_type=\"test-reviewer\", description=\"A.5 red-correctness: {slug}\", prompt=\"<brief>\\n\\nYour lens: red-correctness — does each test fail, and for the intended reason?\")",
+    "Task(subagent_type=\"test-reviewer\", description=\"A.5 discrimination: {slug}\", prompt=\"<brief>\\n\\nYour lens: discrimination — would this assertion also pass against a plausibly WRONG implementation?\")",
+    "Task(subagent_type=\"test-reviewer\", description=\"A.5 coverage: {slug}\", prompt=\"<brief>\\n\\nYour lens: coverage — does the set cover the criterion, with no missing scenario and no duplicate?\")"
+  ],
+  "Production::.agents/skills/hm-plan/SKILL.md": [
+    ">   `AskUserQuestion` for the `research → spec → plan → execute → review → verify → wrapup` pipeline:",
+    "> - anything else → offer ONCE via `AskUserQuestion`: \"Run the"
+  ],
+  "Production::.agents/skills/hm-research/SKILL.md": [
+    ">   `AskUserQuestion` for the `research → spec → plan → execute → review → verify → wrapup` pipeline:",
+    "> - anything else → offer ONCE via `AskUserQuestion`: \"Run the"
+  ],
+  "Production::.agents/skills/hm-review/SKILL.md": [
+    ">   `AskUserQuestion` for the `research → spec → plan → execute → review → verify → wrapup` pipeline:",
+    "> - anything else → offer ONCE via `AskUserQuestion`: \"Run the",
+    "Task(subagent_type=\"code-reviewer\", description=\"lens design: {slug}\", prompt=\"<brief>\\n\\nYour lens: design — boundaries, coupling, whether this is the right shape for the problem; and complexity: could it be simpler? Unnecessary indirection, dead generality, a knob or a function with no caller on any path a user reaches.\")",
+    "Task(subagent_type=\"code-reviewer\", description=\"lens functionality: {slug}\", prompt=\"<brief>\\n\\nYour lens: functionality — does it do what the SPEC and the invariants say, on every path?\")",
+    "Task(subagent_type=\"code-reviewer\", description=\"lens robustness: {slug}\", prompt=\"<brief>\\n\\nYour lens: robustness — edge cases, partial writes, restart, resource exhaustion, recovery.\")",
+    "Task(subagent_type=\"code-reviewer\", description=\"lens consistency: {slug}\", prompt=\"<brief>\\n\\nYour lens: consistency — do the names, docstrings and declarations say what the code actually does, and does this match the conventions around it? A name or a docstring that makes a reader believe something FALSE about behaviour is a defect, not a nit; so is a second source of truth for something that already had one.\")",
+    "Task(subagent_type=\"security-reviewer\", description=\"lens security: {slug}\", prompt=\"<brief>\\n\\nYour lens: security — external input, authz, secrets, injection.\")",
+    "Task(subagent_type=\"concurrency-reviewer\", description=\"lens concurrency: {slug}\", prompt=\"<brief>\\n\\nYour lens: concurrency — races, deadlock, resource lifetime, cancellation.\")",
+    "Task(subagent_type=\"test-reviewer\", description=\"lens tests: {slug}\", prompt=\"<brief>\\n\\nYour lens: tests — oracle strength, discrimination, would these tests pass a wrong implementation?\")",
+    "Task(subagent_type=\"code-reviewer\", description=\"lens design: {slug}\", prompt=\"<brief>\\n\\nYour lens: design — boundaries, coupling, whether this is the right shape for the problem; and complexity: could it be simpler? Unnecessary indirection, dead generality, a knob or a function with no caller on any path a user reaches.\")",
+    "Task(subagent_type=\"code-reviewer\", description=\"lens functionality: {slug}\", prompt=\"<brief>\\n\\nYour lens: functionality — does it do what the SPEC and the invariants say, on every path?\")",
+    "Task(subagent_type=\"code-reviewer\", description=\"lens robustness: {slug}\", prompt=\"<brief>\\n\\nYour lens: robustness — edge cases, partial writes, restart, resource exhaustion, recovery.\")",
+    "Task(subagent_type=\"code-reviewer\", description=\"lens consistency: {slug}\", prompt=\"<brief>\\n\\nYour lens: consistency — do the names, docstrings and declarations say what the code actually does, and does this match the conventions around it? A name or a docstring that makes a reader believe something FALSE about behaviour is a defect, not a nit; so is a second source of truth for something that already had one.\")",
+    "Task(subagent_type=\"security-reviewer\", description=\"lens security: {slug}\", prompt=\"<brief>\\n\\nYour lens: security — external input, authz, secrets, injection.\")",
+    "Task(subagent_type=\"concurrency-reviewer\", description=\"lens concurrency: {slug}\", prompt=\"<brief>\\n\\nYour lens: concurrency — races, deadlock, resource lifetime, cancellation.\")",
+    "Task(subagent_type=\"test-reviewer\", description=\"lens tests: {slug}\", prompt=\"<brief>\\n\\nYour lens: tests — oracle strength, discrimination, would these tests pass a wrong implementation?\")"
+  ],
+  "Production::.agents/skills/hm-spec/SKILL.md": [
+    ">   `AskUserQuestion` for the `research → spec → plan → execute → review → verify → wrapup` pipeline:",
+    "> - anything else → offer ONCE via `AskUserQuestion`: \"Run the"
+  ],
+  "Production::.agents/skills/hm-verify/SKILL.md": [
+    ">   `AskUserQuestion` for the `research → spec → plan → execute → review → verify → wrapup` pipeline:",
+    "> - anything else → offer ONCE via `AskUserQuestion`: \"Run the"
+  ],
+  "Production::.agents/skills/hm-wrapup/SKILL.md": [
+    ">   `AskUserQuestion` for the `research → spec → plan → execute → review → verify → wrapup` pipeline:",
+    "> - anything else → offer ONCE via `AskUserQuestion`: \"Run the"
+  ],
+  "Production::.agents/skills/second-opinion-gate/SKILL.md": [
+    "Task(subagent_type=\"code-verifier\", description=\"Mode B PIDA: <slug>\","
+  ],
+  "Production::.claude/commands/hm/configure.md": [
+    "show current settings, then drive targeted changes via the structured question tool (`AskQuestion` in Cursor, `AskUserQuestion` in Claude Code).",
+    "Use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code): \"What would you like to change?\" This is a",
+    "For each selected dimension, show a structured question (`AskQuestion` / `AskUserQuestion`) with the current value,"
+  ],
+  "Production::.claude/commands/hm/execute.md": [
+    ">   `AskUserQuestion` for the `research → spec → plan → execute → review → verify → wrapup` pipeline:",
+    "> - anything else → offer ONCE via `AskUserQuestion`: \"Run the",
+    "Task(subagent_type=\"test-reviewer\", description=\"A.5 red-correctness: {slug}\", prompt=\"<brief>\\n\\nYour lens: red-correctness — does each test fail, and for the intended reason?\")",
+    "Task(subagent_type=\"test-reviewer\", description=\"A.5 discrimination: {slug}\", prompt=\"<brief>\\n\\nYour lens: discrimination — would this assertion also pass against a plausibly WRONG implementation?\")",
+    "Task(subagent_type=\"test-reviewer\", description=\"A.5 coverage: {slug}\", prompt=\"<brief>\\n\\nYour lens: coverage — does the set cover the criterion, with no missing scenario and no duplicate?\")",
+    "You **MAY** call `AskUserQuestion` (autoloop exception) **ONLY IF** `[finalize] stash-pop conflict` OR `[finalize] untracked-file collision` appears in finalize's stderr. Any other failure: halt with the stderr message, do NOT ask.",
+    "- `proceed: true` → **auto-advance**: invoke `Skill(hm:<next_stage from the JSON>)` with"
+  ],
+  "Production::.claude/commands/hm/health.md": [
+    "Use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code) per item with three options:"
+  ],
+  "Production::.claude/commands/hm/loop.md": [
+    "Use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code) — single call, two independent questions:",
+    "For each unresolved dimension, ask via `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code). Present what you",
+    "Batch up to two related dimensions per `AskQuestion` / `AskUserQuestion` call when they are",
+    "2. Ask via `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code): \"Add to exit checklist? {proposed label}\"",
+    "not a fixed script) and ask via `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code). Continue until actionable.",
+    "slice of 3–10 features. Use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code) to accept / edit / retype.",
+    "Use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code) to add AC for each feature (batch 3–5 per call).",
+    "Use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code) only if the stopping_criteria answer didn't make",
+    "Show the user: saved paths + one-line summary, then use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code)",
+    "| \"operator decision to pause\" / \"user wants fresh context\" | The loop body **cannot** use `AskUserQuestion` (autoloop autonomous-decision protocol). Any \"operator decision\" emitted from inside the loop body is a hallucination. |",
+    "loop-context file. If the count reaches 3, ask via `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code):",
+    "Escalate via `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code).",
+    "ask via `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code):"
+  ],
+  "Production::.claude/commands/hm/make.md": [
+    "(`AskUserQuestion` in Claude Code, `AskQuestion` in Cursor) — **Proceed** /",
+    "it asks locale first, then drives the structured question tool (`AskQuestion` in Cursor, `AskUserQuestion` in Claude Code) for preset, dev_mode, targets, and"
+  ],
+  "Production::.claude/commands/hm/plan.md": [
+    ">   `AskUserQuestion` for the `research → spec → plan → execute → review → verify → wrapup` pipeline:",
+    "> - anything else → offer ONCE via `AskUserQuestion`: \"Run the",
+    "- **Exit 0 (`active`)** → loop-mode: some `.claude/.hm-loop-*` marker's content header matches YOUR `session_id` (or a legacy global `.hm-loop-active` exists — degraded fallback). Do NOT engage the deep interview (loop body cannot block on `AskUserQuestion`). Scope the plan to the next master-PLAN phase only.",
+    "> ⚠️ **LOOP-MODE ADR CONSTRAINT (CRITICAL)** — If implementation during this iteration reveals a decision that genuinely requires an ADR (component boundary change, new contract, precedent-setting choice, rejection of viable alternative), **HALT the loop immediately**. Do NOT defer the ADR. Do NOT document it as a local per-iter decision. The autoloop has no `AskUserQuestion` channel; new ADRs must be added to the master PLAN through standalone `/hm:plan {slug}` (which engages the deep interview).",
+    "Use `AskUserQuestion` to present:",
+    "- **Claude Code:** invoke `Skill(hm:spec <target>)` (the Skill tool is available in Claude Code).",
+    "When SPEC is fully approved, the only remaining `/hm:plan` question is: **\"Given this SPEC, are you ready for phase decomposition, or is there a how-question (architecture / phasing / library choice) you want to lock down first?\"** Use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code) to present structured options to the user. Options:",
+    "- **Live interview** → conduct in `en` (en→English, ko→Korean, ja→Japanese, others→English fallback). Round preamble, \"decisions so far\", open ambiguity explanations, `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code) prompts and option labels — all in `en`.",
+    "#### Step B — `AskQuestion` / `AskUserQuestion` (in `en`)",
+    "*before* anything else: Two predicates, and the flag value separates them. (1) If the validator returned MAJOR_REVISION on its SECOND pass and the Step 4 A/B question is UNANSWERED, or the user chose B (abort), pass --judgment-gate blocked. No level clears it, auto_full included: a plan the validator twice called critically flawed must not be accepted as risk with NO HUMAN PRESENT. If the user chose A (proceed with the critiques as accepted risk) the threshold IS resolved — that is recorded as validator_outcome: MAJOR_REVISION_RESOLVED, a human WAS present, and the verdict is clear. Keying blocked on the bare historical fact would make the halt permanent and its remedy impossible. (2) Else, any unresolved architectural AskUserQuestion round → --judgment-gate pending: that is the judgment half, and at auto_full it is answered with the recommended option, which you MUST write into the PLAN's Interview Transcript before advancing. (3) Neither → clear.",
+    "- `proceed: true` → **auto-advance**: invoke `Skill(hm:<next_stage from the JSON>)` with"
+  ],
+  "Production::.claude/commands/hm/research.md": [
+    ">   `AskUserQuestion` for the `research → spec → plan → execute → review → verify → wrapup` pipeline:",
+    "> - anything else → offer ONCE via `AskUserQuestion`: \"Run the",
+    "When `--deep` is set, use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code) in `en` with 3-5 questions drawn from this rubric. Use the configured locale for the live interview: the round preamble, ambiguity explanation, question text and option labels, and any validation prompt must be in `en` (en→English, ko→Korean, ja→Japanese, others→English fallback). The persisted RESEARCH document remains English unless project policy says otherwise.",
+    "- `Task(subagent_type=\"Explore\", …)` — **codebase**: classes 1, 7 below.",
+    "- `Task(subagent_type=\"Explore\", …)` — **internal record**: classes 2, 3 below.",
+    "- `Task(subagent_type=\"Explore\", …)` — **external**: classes 4, 5, 6 below.",
+    "- `proceed: true` → **auto-advance**: invoke `Skill(hm:<next_stage from the JSON>)` with"
+  ],
+  "Production::.claude/commands/hm/review.md": [
+    ">   `AskUserQuestion` for the `research → spec → plan → execute → review → verify → wrapup` pipeline:",
+    "> - anything else → offer ONCE via `AskUserQuestion`: \"Run the",
+    "Task(subagent_type=\"code-reviewer\", description=\"lens design: {slug}\", prompt=\"<brief>\\n\\nYour lens: design — boundaries, coupling, whether this is the right shape for the problem; and complexity: could it be simpler? Unnecessary indirection, dead generality, a knob or a function with no caller on any path a user reaches.\")",
+    "Task(subagent_type=\"code-reviewer\", description=\"lens functionality: {slug}\", prompt=\"<brief>\\n\\nYour lens: functionality — does it do what the SPEC and the invariants say, on every path?\")",
+    "Task(subagent_type=\"code-reviewer\", description=\"lens robustness: {slug}\", prompt=\"<brief>\\n\\nYour lens: robustness — edge cases, partial writes, restart, resource exhaustion, recovery.\")",
+    "Task(subagent_type=\"code-reviewer\", description=\"lens consistency: {slug}\", prompt=\"<brief>\\n\\nYour lens: consistency — do the names, docstrings and declarations say what the code actually does, and does this match the conventions around it? A name or a docstring that makes a reader believe something FALSE about behaviour is a defect, not a nit; so is a second source of truth for something that already had one.\")",
+    "Task(subagent_type=\"security-reviewer\", description=\"lens security: {slug}\", prompt=\"<brief>\\n\\nYour lens: security — external input, authz, secrets, injection.\")",
+    "Task(subagent_type=\"concurrency-reviewer\", description=\"lens concurrency: {slug}\", prompt=\"<brief>\\n\\nYour lens: concurrency — races, deadlock, resource lifetime, cancellation.\")",
+    "Task(subagent_type=\"test-reviewer\", description=\"lens tests: {slug}\", prompt=\"<brief>\\n\\nYour lens: tests — oracle strength, discrimination, would these tests pass a wrong implementation?\")",
+    "Task(subagent_type=\"code-reviewer\", description=\"lens design: {slug}\", prompt=\"<brief>\\n\\nYour lens: design — boundaries, coupling, whether this is the right shape for the problem; and complexity: could it be simpler? Unnecessary indirection, dead generality, a knob or a function with no caller on any path a user reaches.\")",
+    "Task(subagent_type=\"code-reviewer\", description=\"lens functionality: {slug}\", prompt=\"<brief>\\n\\nYour lens: functionality — does it do what the SPEC and the invariants say, on every path?\")",
+    "Task(subagent_type=\"code-reviewer\", description=\"lens robustness: {slug}\", prompt=\"<brief>\\n\\nYour lens: robustness — edge cases, partial writes, restart, resource exhaustion, recovery.\")",
+    "Task(subagent_type=\"code-reviewer\", description=\"lens consistency: {slug}\", prompt=\"<brief>\\n\\nYour lens: consistency — do the names, docstrings and declarations say what the code actually does, and does this match the conventions around it? A name or a docstring that makes a reader believe something FALSE about behaviour is a defect, not a nit; so is a second source of truth for something that already had one.\")",
+    "Task(subagent_type=\"security-reviewer\", description=\"lens security: {slug}\", prompt=\"<brief>\\n\\nYour lens: security — external input, authz, secrets, injection.\")",
+    "Task(subagent_type=\"concurrency-reviewer\", description=\"lens concurrency: {slug}\", prompt=\"<brief>\\n\\nYour lens: concurrency — races, deadlock, resource lifetime, cancellation.\")",
+    "Task(subagent_type=\"test-reviewer\", description=\"lens tests: {slug}\", prompt=\"<brief>\\n\\nYour lens: tests — oracle strength, discrimination, would these tests pass a wrong implementation?\")",
+    "- `proceed: true` → **auto-advance**: invoke `Skill(hm:<next_stage from the JSON>)` with"
+  ],
+  "Production::.claude/commands/hm/spec.md": [
+    ">   `AskUserQuestion` for the `research → spec → plan → execute → review → verify → wrapup` pipeline:",
+    "> - anything else → offer ONCE via `AskUserQuestion`: \"Run the",
+    "- Use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code). **Batch independent questions** per round (independence test: would Q2's options change based on Q1's answer? if yes → separate rounds).",
+    "- `proceed: true` → **auto-advance**: invoke `Skill(hm:<next_stage from the JSON>)` with"
+  ],
+  "Production::.claude/commands/hm/uninstall.md": [
+    "Use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code):"
+  ],
+  "Production::.claude/commands/hm/verify.md": [
+    ">   `AskUserQuestion` for the `research → spec → plan → execute → review → verify → wrapup` pipeline:",
+    "> - anything else → offer ONCE via `AskUserQuestion`: \"Run the",
+    "- `--force` — proceed even when one or more checks FAIL. **Logged with the override reason.** Use only when the user has consciously chosen to bypass (emergency hotfix, intentional debt). Without `--reason=<text>`, `--force` requires confirmation via `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code) in `en`.",
+    "- `proceed: true` → **auto-advance**: invoke `Skill(hm:<next_stage from the JSON>)` with"
+  ],
+  "Production::.claude/commands/hm/wrapup.md": [
+    ">   `AskUserQuestion` for the `research → spec → plan → execute → review → verify → wrapup` pipeline:",
+    "> - anything else → offer ONCE via `AskUserQuestion`: \"Run the",
+    "You **MAY** call `AskUserQuestion` (autoloop exception) **ONLY IF** the literal substring `[finalize] stash-pop conflict` OR `[finalize] untracked-file collision` appears in stderr. Any other non-zero exit: surface verbatim and halt, do NOT ask.",
+    "- `proceed: true` → **auto-advance**: invoke `Skill(hm:<next_stage from the JSON>)` with"
+  ],
+  "Production::.claude/skills/autoloop-driver/SKILL.md": [
+    "`AskUserQuestion` in Claude Code, `request_user_input` in Codex)."
+  ],
+  "Production::.claude/skills/second-opinion-gate/SKILL.md": [
+    "Task(subagent_type=\"code-verifier\", description=\"Mode B PIDA: <slug>\","
+  ],
+  "Production::.claude/stages/execute.md": [
+    "Task(subagent_type=\"test-reviewer\", description=\"A.5 red-correctness: {slug}\", prompt=\"<brief>\\n\\nYour lens: red-correctness — does each test fail, and for the intended reason?\")",
+    "Task(subagent_type=\"test-reviewer\", description=\"A.5 discrimination: {slug}\", prompt=\"<brief>\\n\\nYour lens: discrimination — would this assertion also pass against a plausibly WRONG implementation?\")",
+    "Task(subagent_type=\"test-reviewer\", description=\"A.5 coverage: {slug}\", prompt=\"<brief>\\n\\nYour lens: coverage — does the set cover the criterion, with no missing scenario and no duplicate?\")",
+    "You **MAY** call `AskUserQuestion` (autoloop exception) **ONLY IF** `[finalize] stash-pop conflict` OR `[finalize] untracked-file collision` appears in finalize's stderr. Any other failure: halt with the stderr message, do NOT ask.",
+    "- `proceed: true` → **auto-advance**: invoke `Skill(hm:<next_stage from the JSON>)` with"
+  ],
+  "Production::.claude/stages/plan.md": [
+    "- **Exit 0 (`active`)** → loop-mode: some `.claude/.hm-loop-*` marker's content header matches YOUR `session_id` (or a legacy global `.hm-loop-active` exists — degraded fallback). Do NOT engage the deep interview (loop body cannot block on `AskUserQuestion`). Scope the plan to the next master-PLAN phase only.",
+    "> ⚠️ **LOOP-MODE ADR CONSTRAINT (CRITICAL)** — If implementation during this iteration reveals a decision that genuinely requires an ADR (component boundary change, new contract, precedent-setting choice, rejection of viable alternative), **HALT the loop immediately**. Do NOT defer the ADR. Do NOT document it as a local per-iter decision. The autoloop has no `AskUserQuestion` channel; new ADRs must be added to the master PLAN through standalone `/hm:plan {slug}` (which engages the deep interview).",
+    "Use `AskUserQuestion` to present:",
+    "- **Claude Code:** invoke `Skill(hm:spec <target>)` (the Skill tool is available in Claude Code).",
+    "When SPEC is fully approved, the only remaining `/hm:plan` question is: **\"Given this SPEC, are you ready for phase decomposition, or is there a how-question (architecture / phasing / library choice) you want to lock down first?\"** Use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code) to present structured options to the user. Options:",
+    "- **Live interview** → conduct in `en` (en→English, ko→Korean, ja→Japanese, others→English fallback). Round preamble, \"decisions so far\", open ambiguity explanations, `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code) prompts and option labels — all in `en`.",
+    "#### Step B — `AskQuestion` / `AskUserQuestion` (in `en`)",
+    "*before* anything else: Two predicates, and the flag value separates them. (1) If the validator returned MAJOR_REVISION on its SECOND pass and the Step 4 A/B question is UNANSWERED, or the user chose B (abort), pass --judgment-gate blocked. No level clears it, auto_full included: a plan the validator twice called critically flawed must not be accepted as risk with NO HUMAN PRESENT. If the user chose A (proceed with the critiques as accepted risk) the threshold IS resolved — that is recorded as validator_outcome: MAJOR_REVISION_RESOLVED, a human WAS present, and the verdict is clear. Keying blocked on the bare historical fact would make the halt permanent and its remedy impossible. (2) Else, any unresolved architectural AskUserQuestion round → --judgment-gate pending: that is the judgment half, and at auto_full it is answered with the recommended option, which you MUST write into the PLAN's Interview Transcript before advancing. (3) Neither → clear.",
+    "- `proceed: true` → **auto-advance**: invoke `Skill(hm:<next_stage from the JSON>)` with"
+  ],
+  "Production::.claude/stages/research.md": [
+    "When `--deep` is set, use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code) in `en` with 3-5 questions drawn from this rubric. Use the configured locale for the live interview: the round preamble, ambiguity explanation, question text and option labels, and any validation prompt must be in `en` (en→English, ko→Korean, ja→Japanese, others→English fallback). The persisted RESEARCH document remains English unless project policy says otherwise.",
+    "- `Task(subagent_type=\"Explore\", …)` — **codebase**: classes 1, 7 below.",
+    "- `Task(subagent_type=\"Explore\", …)` — **internal record**: classes 2, 3 below.",
+    "- `Task(subagent_type=\"Explore\", …)` — **external**: classes 4, 5, 6 below.",
+    "- `proceed: true` → **auto-advance**: invoke `Skill(hm:<next_stage from the JSON>)` with"
+  ],
+  "Production::.claude/stages/review.md": [
+    "Task(subagent_type=\"code-reviewer\", description=\"lens design: {slug}\", prompt=\"<brief>\\n\\nYour lens: design — boundaries, coupling, whether this is the right shape for the problem; and complexity: could it be simpler? Unnecessary indirection, dead generality, a knob or a function with no caller on any path a user reaches.\")",
+    "Task(subagent_type=\"code-reviewer\", description=\"lens functionality: {slug}\", prompt=\"<brief>\\n\\nYour lens: functionality — does it do what the SPEC and the invariants say, on every path?\")",
+    "Task(subagent_type=\"code-reviewer\", description=\"lens robustness: {slug}\", prompt=\"<brief>\\n\\nYour lens: robustness — edge cases, partial writes, restart, resource exhaustion, recovery.\")",
+    "Task(subagent_type=\"code-reviewer\", description=\"lens consistency: {slug}\", prompt=\"<brief>\\n\\nYour lens: consistency — do the names, docstrings and declarations say what the code actually does, and does this match the conventions around it? A name or a docstring that makes a reader believe something FALSE about behaviour is a defect, not a nit; so is a second source of truth for something that already had one.\")",
+    "Task(subagent_type=\"security-reviewer\", description=\"lens security: {slug}\", prompt=\"<brief>\\n\\nYour lens: security — external input, authz, secrets, injection.\")",
+    "Task(subagent_type=\"concurrency-reviewer\", description=\"lens concurrency: {slug}\", prompt=\"<brief>\\n\\nYour lens: concurrency — races, deadlock, resource lifetime, cancellation.\")",
+    "Task(subagent_type=\"test-reviewer\", description=\"lens tests: {slug}\", prompt=\"<brief>\\n\\nYour lens: tests — oracle strength, discrimination, would these tests pass a wrong implementation?\")",
+    "Task(subagent_type=\"code-reviewer\", description=\"lens design: {slug}\", prompt=\"<brief>\\n\\nYour lens: design — boundaries, coupling, whether this is the right shape for the problem; and complexity: could it be simpler? Unnecessary indirection, dead generality, a knob or a function with no caller on any path a user reaches.\")",
+    "Task(subagent_type=\"code-reviewer\", description=\"lens functionality: {slug}\", prompt=\"<brief>\\n\\nYour lens: functionality — does it do what the SPEC and the invariants say, on every path?\")",
+    "Task(subagent_type=\"code-reviewer\", description=\"lens robustness: {slug}\", prompt=\"<brief>\\n\\nYour lens: robustness — edge cases, partial writes, restart, resource exhaustion, recovery.\")",
+    "Task(subagent_type=\"code-reviewer\", description=\"lens consistency: {slug}\", prompt=\"<brief>\\n\\nYour lens: consistency — do the names, docstrings and declarations say what the code actually does, and does this match the conventions around it? A name or a docstring that makes a reader believe something FALSE about behaviour is a defect, not a nit; so is a second source of truth for something that already had one.\")",
+    "Task(subagent_type=\"security-reviewer\", description=\"lens security: {slug}\", prompt=\"<brief>\\n\\nYour lens: security — external input, authz, secrets, injection.\")",
+    "Task(subagent_type=\"concurrency-reviewer\", description=\"lens concurrency: {slug}\", prompt=\"<brief>\\n\\nYour lens: concurrency — races, deadlock, resource lifetime, cancellation.\")",
+    "Task(subagent_type=\"test-reviewer\", description=\"lens tests: {slug}\", prompt=\"<brief>\\n\\nYour lens: tests — oracle strength, discrimination, would these tests pass a wrong implementation?\")",
+    "- `proceed: true` → **auto-advance**: invoke `Skill(hm:<next_stage from the JSON>)` with"
+  ],
+  "Production::.claude/stages/spec.md": [
+    "- Use `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code). **Batch independent questions** per round (independence test: would Q2's options change based on Q1's answer? if yes → separate rounds).",
+    "- `proceed: true` → **auto-advance**: invoke `Skill(hm:<next_stage from the JSON>)` with"
+  ],
+  "Production::.claude/stages/verify.md": [
+    "- `--force` — proceed even when one or more checks FAIL. **Logged with the override reason.** Use only when the user has consciously chosen to bypass (emergency hotfix, intentional debt). Without `--reason=<text>`, `--force` requires confirmation via `AskQuestion` (Cursor) or `AskUserQuestion` (Claude Code) in `en`.",
+    "- `proceed: true` → **auto-advance**: invoke `Skill(hm:<next_stage from the JSON>)` with"
+  ],
+  "Production::.claude/stages/wrapup.md": [
+    "You **MAY** call `AskUserQuestion` (autoloop exception) **ONLY IF** the literal substring `[finalize] stash-pop conflict` OR `[finalize] untracked-file collision` appears in stderr. Any other non-zero exit: surface verbatim and halt, do NOT ask.",
+    "- `proceed: true` → **auto-advance**: invoke `Skill(hm:<next_stage from the JSON>)` with"
+  ]
+}

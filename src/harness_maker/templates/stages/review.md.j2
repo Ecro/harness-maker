@@ -1,5 +1,6 @@
 {% set wt_on = config.worktree is defined and config.worktree.get('enabled') %}{% set WTR = '<WT>' if wt_on else '.' -%}
 {% set lenses = lens_dispatch(config.preset) %}{% set lens_names = mandatory_lenses(config.preset) -%}
+{% import "agents/_partials/dispatch.md.j2" as dsp -%}
 # Stage: review
 
 > Atomic stage. Multi-perspective review with **surface-match + reasoning-alignment** consensus, grade gate, and auto-fix loop.
@@ -179,12 +180,14 @@ When no drift is detected, emit `result: clean` with empty lists. This record is
 
 ### Step 3 — Parallel reviewer invocation (2-pass redaction)
 
-**Dispatch the {{ lenses | length }} lenses in ONE message, in round 1** — one `Task(`
+**Dispatch the {{ lenses | length }} lenses in ONE message, in round 1** — one dispatch
 per lens, same message, so they run concurrently. The core lenses share `code-reviewer` and are
 distinguished only by the lens line, so send that line verbatim.
 
+{{ dsp.dispatch_intro(is_codex) }}
+
 ```
-{% for d in lenses %}Task(subagent_type="{{ d.agent }}", description="lens {{ d.lens }}: {slug}", prompt="<brief>\n\nYour lens: {{ d.brief }}")
+{% for d in lenses %}{{ dsp.dispatch(is_codex, d.agent, "lens " + d.lens + ": {slug}", "<brief>\\n\\nYour lens: " + d.brief) }}
 {% endfor %}```
 
 **Put in `<brief>`, so it reaches every lens: the public contract is fixed and out of scope** — no
@@ -264,8 +267,8 @@ anchoring-prone diffs):
    ```
    The CLI returns a JSON object with the same fields but anchoring values
    replaced by `[REDACTED]`.
-2. Run all selected reviewers in a **single message with multiple Task tool
-   uses** for parallel execution, passing `pass1_context`. Each reviewer:
+2. Run all selected reviewers in a **single message, one sub-agent dispatch per
+   reviewer** for parallel execution, passing `pass1_context`. Each reviewer:
    - Reads the diff, bounded by the read budget below.
    - Walks the runtime path the diff touches — what runs first, what state
      mutates, what can fail.
@@ -325,7 +328,7 @@ extras at runtime bringing total > 1, re-enable Pass 1 manually.
 3. Re-run the same reviewer set with the **full** context (metadata
    restored) and the **raw Pass 1 findings** list — unfiltered, since no verifier
    step runs between the passes (ADR-001). Launch these reviewer
-   calls in parallel, using one Task call per reviewer (or per reviewer × file
+   calls in parallel, using one sub-agent dispatch per reviewer (or per reviewer × file
    cluster when safe). Each reviewer validates each finding against the
    metadata, drops any that the context proves spurious, and adjusts severity
    if context changes risk.
@@ -828,7 +831,7 @@ Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_pat
    It prints `{"dispatches": [...], "reason": "churn <r> <op> <t>"}`. An empty `dispatches` IS
    the skip — do not second-guess it by re-spawning the old set. To restore the pre-gate
    behaviour, set `reviewers.rereview_churn_gate: false` and re-render.
-{% else %}6. **Re-review (selective)** — re-spawn ONLY reviewers whose scope was touched by applied fixes. Launch all required re-reviewers in parallel in one Task batch when their scopes are independent. Reviewers that approved untouched files are NOT re-run. Multi-instance code-reviewer consensus (when configured) still uses the configured number of instances on modified files.
+{% else %}6. **Re-review (selective)** — re-spawn ONLY reviewers whose scope was touched by applied fixes. Launch all required re-reviewers in parallel in one message when their scopes are independent. Reviewers that approved untouched files are NOT re-run. Multi-instance code-reviewer consensus (when configured) still uses the configured number of instances on modified files.
 {% endif %}
    **`unreviewed_fix_count` = applied fixes whose file no re-spawned reviewer covers.** A skipped
    re-review re-spawns nobody, so every fix in that round counts — the skip is a deliberate
@@ -903,8 +906,10 @@ that failed during the pass be counted as exercised from that round's stale file
 
 The dispatch list is the round-1 list, unchanged — same agents, same lens lines:
 
+{{ dsp.dispatch_intro(is_codex) }}
+
 ```
-{% for d in lenses %}Task(subagent_type="{{ d.agent }}", description="lens {{ d.lens }}: {slug}", prompt="<brief>\n\nYour lens: {{ d.brief }}")
+{% for d in lenses %}{{ dsp.dispatch(is_codex, d.agent, "lens " + d.lens + ": {slug}", "<brief>\\n\\nYour lens: " + d.brief) }}
 {% endfor %}```
 
 {% if is_codex %}```bash

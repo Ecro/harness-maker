@@ -27,6 +27,16 @@ from ._surface_baseline import CLAUDE_VARIANT, CODEX_VARIANT, count_round_trips,
 # counted individually by the ADR-011 rule even though they leave in one message — see
 # the note in `test_the_fan_out_is_counted_as_three_though_it_costs_one_turn`.
 _CLAUDE_ROUND_TRIPS: dict[str, int] = {
+    # loop 12→10, plan 18→15, review 37→36, total 165→159 (2026-08-16,
+    # PLAN-codex-lens-dispatch). **No mandated call was removed and none was added** — the
+    # COUNTING RULE was corrected. `count_round_trips` used a bare `text.count("Task(")` for
+    # both variants, which charged backticked PROSE as a round trip (a paragraph reading
+    # "retry the `Task(...)` call" cost one) and named the CLAUDE tool for both arms. The
+    # second half was harmless only while Codex output still carried `Task(` — and this task
+    # is what stops it carrying it. Left alone, the rule would have scored `hm-review`'s
+    # fourteen lens dispatches at ZERO from this commit on. Both arms now count their own
+    # call-site form. The Claude drop is prose leaving the count plus `plan`'s multi-line
+    # `Task(` collapsing into one macro call.
     # +1 on every review-bearing command (2026-07-30, PLAN-second-opinion-acceptance-gate):
     # Step 3.4 gained ONE mandated call, `hm codex_adapter stamp-ids`. It exists because the
     # step previously told an LLM to compute `sha256(...)[:16]` itself — which it cannot do, so
@@ -69,7 +79,7 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     "execute": 18,
     "health": 7,
     "help": 0,
-    "loop": 12,
+    "loop": 10,
     "loop-p5-batch": 2,
     "make": 1,
     "metrics": 7,
@@ -87,7 +97,7 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     #   +2  the two `hm review_churn pin` lines (the measure shares the post pin's line) that
     #       feed the stale rule. OPTIONAL: an unmeasured ratio runs every round, so a stage
     #       that skips them behaves exactly as it did before this change.
-    "plan": 18,
+    "plan": 15,
     "research": 8,
     # 9 → 8 (same phase): `stage_agent_ledger persist-payload`, same axis.
     #
@@ -141,7 +151,7 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     #   +2  Phase 6 + 7: `hm review_consensus plan` decides the repair round's re-review
     #       (gate-on render only), and one `hm review_churn oscillation` scan runs at the
     #       terminal state. The gate-off render pays neither and keeps the old dispatch.
-    "review": 37,
+    "review": 36,
     "spec": 6,
     "uninstall": 3,
     "verify": 13,

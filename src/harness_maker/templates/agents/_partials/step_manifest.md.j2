@@ -53,12 +53,12 @@
 >   Arm either way — unset expands to `""` and arms the shared degraded marker.
 {%- if config.autonomy.level == "ask" %}
 > - `reason: "ask-pending"` → the normal path here (`level: ask`). Offer three options via
->   `AskUserQuestion` for the `{{ config.autonomy.pipeline | join(' → ') }}` pipeline:
+>   {% if is_codex is defined and is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %} for the `{{ config.autonomy.pipeline | join(' → ') }}` pipeline:
 >   **`auto_safe`** (stops at the plan interview), **`auto_full`** (answers it, and an
 >   APPROVED review's `human_review_needed`), or **gated**. A CHANGES_REQUESTED review and
 >   the wrapup land stop at every level. Arm with the PICKED level:
 {%- endif %}
-> - anything else → offer ONCE via `AskUserQuestion`: "Run the
+> - anything else → offer ONCE via {% if is_codex is defined and is_codex %}`request_user_input`{% else %}`AskUserQuestion`{% endif %}: "Run the
 >   `{{ config.autonomy.pipeline | join(' → ') }}` pipeline on autopilot this session
 >   (stages auto-advance when no mandatory gate is pending), or stay gated?" On **yes**:
 >   `uv run --with {{ harness_maker_src_path }} hm autopilot on --level {% if config.autonomy.level == "ask" %}<the level the user picked>{% else %}{{ config.autonomy.level }}{% endif %} --pipeline {{ config.autonomy.pipeline | join(',') }} --session-id "$HM_SESSION_ID"`

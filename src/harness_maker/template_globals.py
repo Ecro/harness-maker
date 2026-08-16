@@ -14,12 +14,31 @@ thing that was wrong.
 
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING
 
 from harness_maker import conditional_router, review_churn
 
 if TYPE_CHECKING:  # pragma: no cover - import cycle only matters at type-check time
     from jinja2 import Environment
+
+_HM_SLASH_COMMAND = re.compile(r"/hm:([a-z0-9][a-z0-9-]*)")
+
+
+def stage_invocation(text: str, is_codex: bool) -> str:
+    """Rewrite `/hm:<stage>` into the calling runtime's own invocation form.
+
+    Codex has no slash command for a stage. A stage there is a skill under `.agents/skills/`,
+    and the only way to start one is to mention it — `@hm-execute` (live-probed against Codex
+    CLI 0.147.0: *"SKILL-running tools: none … invoked by mentioning its skill name"*). So a
+    `➡️ Next: /hm:execute` banner on that target names a call the runtime cannot make. Same
+    defect class as rendering `Task(` into a Codex skill: an instruction that reads fine and
+    cannot be followed.
+    """
+    if not is_codex:
+        return text
+    return _HM_SLASH_COMMAND.sub(r"@hm-\1", text)
+
 
 #: Exported as a callable rather than baked into each template as a literal list. The rendered
 #: dispatch list and `hm lens_coverage check` must agree on the mandatory lens set; a literal
@@ -33,6 +52,8 @@ TEMPLATE_GLOBALS: dict[str, object] = {
     # must agree on what "absent key" means. A literal `0.20` in the template would let the
     # prose promise one threshold while the CLI applied another.
     "default_churn_ratio": review_churn.default_churn_ratio,
+    # Rendered vocabulary, not content: `/hm:execute` is uncallable on Codex.
+    "stage_invocation": stage_invocation,
 }
 
 

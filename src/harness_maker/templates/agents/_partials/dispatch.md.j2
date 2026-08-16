@@ -1,0 +1,52 @@
+{#-
+  Sub-agent dispatch, rendered in the calling runtime's own vocabulary.
+
+  ONE owner for every dispatch call site (ADR-003 of PLAN-codex-lens-dispatch). Claude Code
+  dispatches with the `Task` tool; Codex has no such tool — it exposes `spawn_agent`
+  (`agent_type` / `message`, live-probed against Codex CLI 0.147.0), and the agent roles it
+  resolves against are the `[agents.<name>]` entries `.codex/config.toml` already declares from
+  the same `agents` dict. Emitting `Task(` into a Codex skill ships an instruction the runtime
+  cannot execute: measured 36 `Task(` across 9 rendered Codex files, and a Codex `/hm:review`
+  that wrote zero lens result files and was therefore permanently unapprovable.
+
+  `is_codex` is an EXPLICIT REQUIRED PARAMETER, never read from context. Jinja's `{% import %}`
+  does not pass caller context unless imported `with context`, so a macro reading the flag
+  internally would silently take the Claude arm in every production render while an isolated
+  unit test passed — which is verbatim the `is_codex`-hardcoded-`False` defect this repo already
+  shipped (see CLAUDE.md, "렌더 컨텍스트 플래그는 출력 경로에서 파생시킬 것"). Under
+  `StrictUndefined` an omitted argument raises `UndefinedError` at render time instead.
+
+  ADR-002 orders INTENT before LITERAL so a parameter-name drift degrades to "the model reads
+  the intent and adapts" rather than a silent no-op: the binary also carries a `multi_agents_v2`
+  handler set spelling these `task_name` / `fork_turns`, and only the `codex exec` schema is
+  verified. The intent lives in `dispatch_intro()` rather than inside `dispatch()` because the
+  call sites are loops — seven lens dispatches would otherwise repeat the paragraph seven times.
+  Emit `dispatch_intro()` immediately above the block, `dispatch()` per call.
+-#}
+
+{%- macro dispatch_intro(is_codex) -%}
+{%- if is_codex -%}
+This skill explicitly authorises sub-agent delegation: hand each item below to the named agent
+using your session's sub-agent tool, passing its message verbatim. The concrete form is
+`spawn_agent(agent_type=…, message=…)`; if your session exposes that tool under a different
+parameter spelling, follow the tool's live schema — the delegation is what matters, not the
+spelling. The agent names resolve against the `[agents.*]` roles in `.codex/config.toml`.
+
+**Spawn them all, then WAIT for every one of them before acting on the results.** `spawn_agent`
+returns as soon as the agent starts, not when it answers — collection is a separate step
+(`wait`, or whatever your session exposes). An agent that has not answered yet is **not** an
+agent that returned nothing, and any step below that treats a missing result as a dead agent
+would misread the whole fan-out as failed. Do not begin the next step until every spawned agent
+has either replied or genuinely failed.
+{%- else -%}
+Dispatch each item below with the `Task` tool.
+{%- endif -%}
+{%- endmacro -%}
+
+{%- macro dispatch(is_codex, agent, description, brief) -%}
+{%- if is_codex -%}
+spawn_agent(agent_type="{{ agent }}", message="{{ brief }}")
+{%- else -%}
+Task(subagent_type="{{ agent }}", description="{{ description }}", prompt="{{ brief }}")
+{%- endif -%}
+{%- endmacro -%}

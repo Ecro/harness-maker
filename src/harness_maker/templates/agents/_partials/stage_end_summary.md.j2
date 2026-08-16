@@ -11,7 +11,9 @@
     loud under StrictUndefined — absent-case guard, ADR-002. Renders in config.locale
     via the output_language directive. Self-skips under an active autoloop. The banner
     fires once per stage, so a fused (concatenated) workflow emits one per stage; the
-    Codex workflow_skill delegates and carries none. is_codex-agnostic prose.
+    Codex workflow_skill delegates and carries none. The `Next:` line is rewritten per
+    runtime by `stage_invocation` (an `@hm-<stage>` mention on Codex, which has no slash
+    command and no skill-running tool); the rest of the banner is is_codex-agnostic.
 
     P6 (PLAN-human-bottleneck-auto-advance): an autopilot auto-advance block is emitted
     before the STOP banner for non-Codex renders. Callers MUST set `summary_stage` (this
@@ -110,4 +112,4 @@ Otherwise emit it as your final output, in the configured output language:
 <!-- @hm:banner:end -->
 > ✅ **Done:** {{ summary_done }}
 > 📁 **Artifacts:** {{ summary_artifact }}
-> ➡️ **Next:** {{ summary_next }}
+> ➡️ **Next:** {{ stage_invocation(summary_next, is_codex is defined and is_codex) }}

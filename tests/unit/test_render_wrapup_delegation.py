@@ -207,7 +207,10 @@ def test_only_the_configured_stage_gets_a_dispatch(tmp_path: Path) -> None:
 # and works in every runtime; only auto-advance needs the Claude-only `Skill` tool), and the
 # rationale moved into a `{#- … -#}` comment whose whitespace control absorbs one blank line.
 # The prose is unchanged; this is purely the gate line. DOWN is the allowed direction.
-@pytest.mark.parametrize(("preset", "expected"), [("Side", 674), ("Production", 707)])
+# 674 → 672 / 707 → 705 (-2, 2026-08-16, PLAN-codex-lens-dispatch): the judgment-reviewer
+# dispatch moved to the shared dispatch macro, collapsing a four-line `Task(` call into one
+# line plus a one-line intent sentence. No step was removed; the call is the same call.
+@pytest.mark.parametrize(("preset", "expected"), [("Side", 672), ("Production", 705)])
 def test_the_default_render_costs_existing_users_nothing(
     tmp_path: Path, preset: str, expected: int
 ) -> None:

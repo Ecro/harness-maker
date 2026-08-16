@@ -1,0 +1,9 @@
+{
+  "design": "design — boundaries, coupling, whether this is the right shape for the problem; and complexity: could it be simpler? Unnecessary indirection, dead generality, a knob or a function with no caller on any path a user reaches.",
+  "functionality": "functionality — does it do what the SPEC and the invariants say, on every path?",
+  "robustness": "robustness — edge cases, partial writes, restart, resource exhaustion, recovery.",
+  "consistency": "consistency — do the names, docstrings and declarations say what the code actually does, and does this match the conventions around it? A name or a docstring that makes a reader believe something FALSE about behaviour is a defect, not a nit; so is a second source of truth for something that already had one.",
+  "security": "security — external input, authz, secrets, injection.",
+  "concurrency": "concurrency — races, deadlock, resource lifetime, cancellation.",
+  "tests": "tests — oracle strength, discrimination, would these tests pass a wrong implementation?"
+}

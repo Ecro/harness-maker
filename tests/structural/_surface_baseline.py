@@ -8,13 +8,19 @@ have frozen a baseline against whatever happened to be lying around. The render 
 produced **in-process** from the repo's committed `.claude/harness.yaml`, which makes it
 fresh by construction and pins it to a commit rather than to a working directory.
 
-**Counting rule (ADR-011, verbatim).** Count `^!`-prefixed lines in the Claude render,
-`Bash(` call sites in the Codex render, and *all* `Task(` occurrences, fences included.
-This is a **consistent proxy, not a semantic count** — the rule deliberately counts
-examples too. There is no implementable "outside a fenced block" discriminator: real
-commands live inside ```bash fences throughout the shipped templates
-(`wrapup.md.j2:569`, `plan.md.j2:548`, `execute.md.j2:384`), so a fence-aware counter
-would return 0 and assert nothing. A ratchet needs consistency, not precision.
+**Counting rule (ADR-011).** Count `^!`-prefixed lines in the Claude render, `Bash(` call
+sites in the Codex render, plus **that variant's own dispatch call-site form** —
+`Task(subagent_type=` on Claude, `spawn_agent(agent_type="` on Codex. Fenced examples are
+counted; backticked prose is not. This is a **consistent proxy, not a semantic count**.
+There is no implementable "outside a fenced block" discriminator: real commands live inside
+```bash fences throughout the shipped templates, so a fence-aware counter would return 0 and
+assert nothing. A ratchet needs consistency, not precision.
+
+The dispatch term was a variant-independent `Task(` count until 2026-08-16
+(PLAN-codex-lens-dispatch). That was harmless only while Codex output still carried `Task(`;
+once it dispatches with `spawn_agent`, the old rule scores its fan-out at zero — a budget
+going blind exactly when the thing it measures changes spelling. It also charged prose: a
+sentence reading "retry the `Task(...)` call" cost a round trip nobody makes.
 
 **Two target variants, not three.** `.cursor/commands/` is dead code in the renderer
 (`render.py:571-582` — no template feeds it), so Cursor reads the Claude render and
@@ -54,8 +60,9 @@ BASE_BRANCH = "main"
 
 COUNTING_RULE = (
     "ADR-011: round_trips = count of ^! lines (claude variant) or 'Bash(' call sites "
-    "(codex variant), plus all 'Task(' occurrences; fenced examples included. "
-    "A consistent proxy, not a semantic count."
+    "(codex variant), plus that variant's DISPATCH call-site form — 'Task(subagent_type=' "
+    "on claude, 'spawn_agent(agent_type=\"' on codex; fenced examples included, "
+    "backticked prose excluded. A consistent proxy, not a semantic count."
 )
 
 _GENERATED_BY = "tests/structural/_surface_baseline.py"
@@ -136,14 +143,27 @@ def render_surface(depth_override: str | None = None) -> dict[str, dict[str, str
 
 
 def count_round_trips(text: str, variant: str) -> int:
-    """ADR-011's counting rule. `variant` selects the call-site form, never the Task rule."""
+    """ADR-011's counting rule. `variant` selects the call-site form for shell AND dispatch.
+
+    The dispatch term used to be a bare `text.count("Task(")` applied to both variants, which
+    was wrong in two ways. It counted backticked PROSE — a paragraph saying "retry the
+    `Task(...)` call" added a round trip nobody makes. And it named the CLAUDE tool for both
+    arms: that was harmless only while Codex output still carried `Task(`, and
+    PLAN-codex-lens-dispatch is precisely the change that stops it carrying it. Left alone,
+    the rule would have scored `hm-review`'s fourteen lens dispatches at **zero** from that
+    commit onward — a budget going blind at the moment the thing it measures changed spelling.
+    Both arms now count their own CALL-SITE form, so prose is excluded on both and neither
+    runtime's dispatches are invisible.
+    """
     if variant == CLAUDE_VARIANT:
         calls = len(_BANG_LINE.findall(text))
+        dispatches = text.count("Task(subagent_type=")
     elif variant == CODEX_VARIANT:
         calls = text.count("Bash(")
+        dispatches = text.count('spawn_agent(agent_type="')
     else:
         raise ValueError(f"unknown target variant: {variant!r}")
-    return calls + text.count("Task(")
+    return calls + dispatches
 
 
 def measure_surface() -> dict[str, dict[str, dict[str, int]]]:

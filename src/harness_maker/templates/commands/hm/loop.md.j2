@@ -486,7 +486,7 @@ Bash("uv run --with {{ harness_maker_src_path }} hm worktree verify <WT>")
 > ⚠️ **Never batch worktree-dependent operations in one parallel tool-call
 > turn.** `create` → `verify` → `.current-iter` marker must run **serially**,
 > each confirmed before the next. If you fire the marker write, receipt writes,
-> and stage `Task(...)` dispatches as parallel calls in a single turn and the
+> and stage sub-agent dispatches as parallel calls in a single turn and the
 > path is wrong, one `cd <WT>` error cancels the entire batch (every sibling
 > shows `Cancelled: parallel tool call … errored`). Serialize the
 > create→verify→marker prelude; only parallelize work already inside a
@@ -805,7 +805,7 @@ For each iter (until convergence or any safety rail fires):
 
    > ⚠️ **Serial, not batched (same rule as Step 5's gate).** Emit this marker
    > write as its **own** turn and confirm exit 0 before Step 4 dispatches any
-   > stage. Do NOT batch the marker write + receipt writes + stage `Task(...)`
+   > stage. Do NOT batch the marker write + receipt writes + stage sub-agent
    > calls into one parallel tool-call turn: if {{ WTP }} is wrong, one `cd`
    > error cancels the entire batch (`Cancelled: parallel tool call … errored`).
    > A non-zero exit here (`root … is not an existing directory`) means {{ WTP }}

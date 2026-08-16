@@ -21,3 +21,4 @@
 {"deletes": "src/harness_maker/template_globals.py:37", "gate": "tests/structural/test_template_globals_installed.py::test_the_installer_actually_binds_every_declared_global", "slug": null, "ts": "2026-08-15T17:47:53Z"}
 {"deletes": "src/harness_maker/synthesize.py:1055", "gate": "tests/structural/test_is_codex_matches_output_path.py::test_every_codex_destined_file_is_flagged_as_codex", "slug": null, "ts": "2026-08-16T11:32:02Z"}
 {"deletes": "src/harness_maker/synthesize.py:667", "gate": "tests/structural/test_retired_paths_not_taught.py::test_the_replacement_is_rendered", "slug": null, "ts": "2026-08-16T11:32:02Z"}
+{"deletes": "src/harness_maker/templates/agents/_partials/dispatch.md.j2:42", "gate": "tests/structural/test_no_claude_tool_calls_in_codex_output.py::test_no_claude_only_tool_reaches_codex_output", "slug": "codex-lens-dispatch", "ts": "2026-08-16T15:50:19Z"}

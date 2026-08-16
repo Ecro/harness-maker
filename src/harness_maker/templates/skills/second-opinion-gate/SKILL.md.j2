@@ -1,3 +1,4 @@
+{% import "agents/_partials/dispatch.md.j2" as dsp -%}
 ---
 name: {{ name }}
 description: Procedure /hm:review follows for the auto-fix loop's round-state contract (finding identity, monotonic progress, per-round voter state) in EVERY harness, and additionally for the cross-model second-opinion acceptance gate (oracle gathering, PIDA dispositions, the frozen finding set) when harness.yaml second_opinion.models is non-empty.
@@ -115,18 +116,12 @@ here — that escape belongs only to the model-invoker calls.
 ## 2b. The mode-B call
 
 One call with **every** enabled model's findings together, so cross-model duplicates can be
-marked. Claude Code / Cursor:
+marked.
+
+{{ dsp.dispatch_intro(is_codex) }}
 
 ```
-Task(subagent_type="code-verifier", description="Mode B PIDA: <slug>",
-  prompt="MODE: B (cross-model PIDA)\n\nsecond_opinion_findings: <adapted JSON, all models, ids verbatim>\nfull_context: <Pass 2 non-redacted diff>\noracle_blocks: <labelled, budgeted, credential-filtered per §2>\n\nReturn ONLY the mode-B JSON.")
-```
-
-Codex:
-
-```
-@code-verifier MODE: B (cross-model PIDA)
-second_opinion_findings / full_context (Pass 2, non-redacted) / oracle_blocks
+{{ dsp.dispatch(is_codex, "code-verifier", "Mode B PIDA: <slug>", "MODE: B (cross-model PIDA)\\n\\nsecond_opinion_findings: <adapted JSON, all models, ids verbatim>\\nfull_context: <Pass 2 non-redacted diff>\\noracle_blocks: <labelled, budgeted, credential-filtered per §2>\\n\\nReturn ONLY the mode-B JSON.") }}
 ```
 
 ## 3. Applying the dispositions

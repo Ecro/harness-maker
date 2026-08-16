@@ -120,6 +120,14 @@ def _render_single_component(
             "stack": [],
             "scale": "small",
             "lifecycle": "dormant",
+            # This builder bypasses `synthesize`, which derives `is_codex` for every FileEntry
+            # (`synthesize.py` `_is_codex_output`). Without it here the templates rendered by
+            # this path — `skills/<name>/SKILL.md.j2`, which includes a dispatch call site —
+            # would see an undefined flag. `False` is correct: this path writes to `.claude/`
+            # only. Supplying it is what lets every call site pass `is_codex` BARE, so an
+            # omission raises `UndefinedError` under StrictUndefined instead of silently
+            # rendering the Claude arm — the guarantee ADR-003 is built on.
+            "is_codex": False,
         },
         frontmatter={},
     )

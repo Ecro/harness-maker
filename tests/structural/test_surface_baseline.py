@@ -301,13 +301,13 @@ def test_the_generator_is_deterministic_in_process(
 # ── the recorded counting rule is the rule that was applied ────────────────────
 
 
-def test_the_recorded_counting_rule_names_its_three_tokens(frozen: dict[str, object]) -> None:
+def test_the_recorded_counting_rule_names_its_four_tokens(frozen: dict[str, object]) -> None:
     """ADR-011 states the rule concretely; a non-empty string describing a *different*
     rule is exactly the drift that makes the Phase 0 and Phase 6 sides incomparable."""
     rule = frozen["counting_rule"]
     assert isinstance(rule, str)
     assert rule == COUNTING_RULE, "the frozen rule drifted from the module constant"
-    for token in ("^!", "Bash(", "Task("):
+    for token in ("^!", "Bash(", "Task(subagent_type=", 'spawn_agent(agent_type="'):
         assert token in rule, f"counting rule does not name {token!r}"
 
 
@@ -325,8 +325,13 @@ def test_the_counter_implements_the_rule_it_records() -> None:
             "  !third --indented",
             "Bash(x) and Bash(y)",
             "Task(subagent_type='x')",
+            'spawn_agent(agent_type="x", message="m")',
+            "prose mentioning `Task(...)` and `spawn_agent(agent_type=…)` — neither is a call",
         ]
     )
+    # Each variant counts ITS OWN dispatch form and ignores the other's, so a Codex render is
+    # not scored as zero-dispatch and a Claude render is not charged for a `spawn_agent` example.
+    # The prose line counts on neither: `Task(...)` and the ellipsis form are not call sites.
     assert count_round_trips(text, CLAUDE_VARIANT) == 3 + 1
     assert count_round_trips(text, CODEX_VARIANT) == 2 + 1
     with pytest.raises(ValueError, match="unknown target variant"):

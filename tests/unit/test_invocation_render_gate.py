@@ -61,6 +61,14 @@ def _executable_broken_lines(text: str) -> list[str]:
                 in_fence = False
                 fence_is_bash = False
             continue
+        # A `#`-comment line is not executable, in any of the asset languages this walks:
+        # TOML comments, shell comments inside a bash fence, and markdown headings all start
+        # this way and none of them runs. This became load-bearing when the Codex `.toml`
+        # tree entered scope — `.codex/agents/*.toml` carry block-marker comments that mention
+        # `harness-maker make` in prose, and the old docstring's premise ("no template has a
+        # legitimate use of the console form") was only true while those files were invisible.
+        if stripped.startswith("#"):
+            continue
         if _CONSOLE.search(line):
             out.append(stripped)
             continue
@@ -109,12 +117,19 @@ def rendered_cursor_codex(tmp_path_factory: pytest.TempPathFactory) -> Path:
     """The migration touched dual-rendered partials, so the gate must also cover the
     Cursor (`.mdc`) and Codex (`.toml`/`.md`) asset trees, not just claude-code `.md`
     (REVIEW P2: code-reviewer + codex)."""
+    # `render()`'s target_dir is the `.claude` DIRECTORY; Codex outputs (`.codex/`, `.agents/`,
+    # `AGENTS.md`) are written to its PARENT. Passing the scan root itself as target_dir put the
+    # entire Codex tree in pytest's basetemp — OUTSIDE the tree this test then walks — so the
+    # docstring's claim to cover the Codex asset tree was never true and any broken launcher
+    # living only in a Codex body passed. Root the render one level down and walk the parent.
+    # (Found by the security lens while reviewing PLAN-codex-lens-dispatch, which fixes the
+    # identical mistake two files over.)
     out = tmp_path_factory.mktemp("rendered-invocation-gate-multi")
     blueprint = synthesize(
         ProjectProfile(stack=["python"]),
         InterviewAnswers(targets=[Target.CLAUDE_CODE, Target.CURSOR, Target.CODEX]),
     )
-    render(blueprint, out, freeze_time=DEFAULT_FREEZE_TIME)
+    render(blueprint, out / ".claude", freeze_time=DEFAULT_FREEZE_TIME)
     return out
 
 

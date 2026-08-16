@@ -1,4 +1,5 @@
 {% set wt_on = config.worktree is defined and config.worktree.get('enabled') %}{% set WTR = '<WT>' if wt_on else '.' -%}
+{% import "agents/_partials/dispatch.md.j2" as dsp -%}
 # Stage: plan
 
 > Atomic stage. Implementation planning via deep interactive interview, ADR promotion, and validator-checked phase decomposition.
@@ -535,7 +536,7 @@ The **main loop** (this stage prompt) runs each enabled second-opinion model —
 `plan-validator` agent is tool-restricted (`Read, Grep, Glob`, no Bash) and cannot. For every
 model in `second_opinion.models` ({{ config.second_opinion.models | join(', ') }}) the main loop
 runs the CLI, decides invoked-vs-skipped + the skip reason, adapts the findings, and **injects**
-them into the `plan-validator` Task() prompt below. The agent then *reconciles* the pre-injected
+them into the `plan-validator` dispatch below. The agent then *reconciles* the pre-injected
 findings and echoes the main-loop-supplied per-model status — it never runs any CLI itself.
 
 **Mandatory gate (ADR-003 matrix — applies uniformly to EVERY enabled model):**
@@ -558,19 +559,18 @@ findings and echoes the main-loop-supplied per-model status — it never runs an
 
 | Owner | Responsibility |
 |-------|----------------|
-| Main loop (this prompt) | Run each enabled model's CLI; decide invoked/skipped/failed + skip reason per model; adapt findings; inject findings + a per-model `second_opinion_results` entry into the validator Task() prompt. |
+| Main loop (this prompt) | Run each enabled model's CLI; decide invoked/skipped/failed + skip reason per model; adapt findings; inject findings + a per-model `second_opinion_results` entry into the validator dispatch. |
 | `plan-validator` agent | Reconcile the **pre-injected** findings (no Bash, no CLI); emit `second_opinion_results` (echo the main-loop per-model status) in its JSON. |
 | On skip/fail | Injected findings empty for that model → its `second_opinion_results` entry carries `status: skipped` (or `failed`) with an empty `reconciliation`. |
 
 Exactly one `second_opinion_results` entry per enabled model — success, skip, and failure paths
 all produce one entry (never zero, never duplicated).
 {% endif %}
+{% set pv_prompt %}<full draft PLAN body + Interview Transcript + ADRs>{% if config.second_opinion.models %}\n\nCross-model second opinion (main-loop supplied — one entry per model in [{{ config.second_opinion.models | join(', ') }}], each with status invoked|skipped|failed + skip reason):\n<adapted findings JSON per model from the Step 4 (pre) adapter, or [] on skip/fail>\n\nReconcile every injected finding (disposition + reason); echo the supplied per-model status in your output.{% endif %}\n\nReturn JSON: {overall: APPROVED|NEEDS_REVISION|MAJOR_REVISION, critiques: [...]{% if config.second_opinion.models %}, second_opinion_results: [{model, status: invoked|skipped|failed, reconciliation: [...]}, ...]{% endif %}}{% endset -%}
+{{ dsp.dispatch_intro(is_codex) }}
+
 ```
-Task(
-  subagent_type="plan-validator",
-  description="Plan validator: {slug}",
-  prompt="<full draft PLAN body + Interview Transcript + ADRs>{% if config.second_opinion.models %}\n\nCross-model second opinion (main-loop supplied — one entry per model in [{{ config.second_opinion.models | join(', ') }}], each with status invoked|skipped|failed + skip reason):\n<adapted findings JSON per model from the Step 4 (pre) adapter, or [] on skip/fail>\n\nReconcile every injected finding (disposition + reason); echo the supplied per-model status in your output.{% endif %}\n\nReturn JSON: {overall: APPROVED|NEEDS_REVISION|MAJOR_REVISION, critiques: [...]{% if config.second_opinion.models %}, second_opinion_results: [{model, status: invoked|skipped|failed, reconciliation: [...]}, ...]{% endif %}}"
-)
+{{ dsp.dispatch(is_codex, "plan-validator", "Plan validator: {slug}", pv_prompt) }}
 ```
 
 Resolution:
@@ -616,7 +616,7 @@ Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_pat
 Use the ratio for `work-docs/PLAN-{slug}.md` from `measured`, not the aggregate — the aggregate
 is the maximum across every touched file, and a revision round may legitimately touch others.
 
-> **If the validator agent itself fails to launch** (0 tool uses, model/launch error): retry the `Task(...)` call once with `model: "opus"` explicitly set (subagent frontmatter may be stale across a model upgrade). When you surface such a failure to the user, name the **tier** (`opus`/`sonnet`) — never a pinned concrete id like `claude-4-7-opus[1m]`; a pinned id in the message is itself the bug class this guidance exists to avoid. If it still cannot launch, self-review the PLAN in the validator's place and say so plainly.
+> **If the validator agent itself fails to launch** (0 tool uses, model/launch error): retry the dispatch once with `model: "opus"` explicitly set (subagent frontmatter may be stale across a model upgrade). When you surface such a failure to the user, name the **tier** (`opus`/`sonnet`) — never a pinned concrete id like `claude-4-7-opus[1m]`; a pinned id in the message is itself the bug class this guidance exists to avoid. If it still cannot launch, self-review the PLAN in the validator's place and say so plainly.
 
 ### Step 4.5 — Terminal re-validation of the whole PLAN
 

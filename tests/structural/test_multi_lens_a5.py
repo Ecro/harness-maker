@@ -33,7 +33,12 @@ _A5 = "#### Phase A.5"
 _PHASE_B = "#### Phase B"
 _RESOLUTION = "\nResolution:"
 
-_DISPATCH = re.compile(r'Task\(subagent_type="test-reviewer"')
+#: Runtime-agnostic on purpose. The property is "three dispatch sites", not "three `Task(`
+#: calls": Claude Code dispatches with `Task(subagent_type=…)` and Codex with
+#: `spawn_agent(agent_type=…)`, and a pattern naming only the first counted ZERO on every Codex
+#: skill — reporting a missing fan-out where the fan-out was simply spelled in the other
+#: runtime's vocabulary.
+_DISPATCH = re.compile(r'(?:Task\(subagent_type|spawn_agent\(agent_type)="test-reviewer"')
 _LENSES = ("red-correctness", "discrimination", "coverage")
 
 #: The forbidden thing is CONDITIONING A REWRITE DECISION on `passing_tests`, so the left-hand
@@ -143,7 +148,7 @@ def test_three_lens_dispatches_precede_the_resolution(name: str) -> None:
     between = [
         ln
         for ln in lines[idx[0] : idx[-1]]
-        if ln.strip() and not ln.lstrip().startswith(("Task(", ")", "#", '"', "'"))
+        if ln.strip() and not ln.lstrip().startswith(("Task(", "spawn_agent(", ")", "#", '"', "'"))
     ]
     assert not between, (
         f"{name}: prose sits between the dispatch lines ({between[:2]!r}) — text like 'await the "
@@ -161,7 +166,9 @@ def test_each_lens_owns_exactly_one_dispatch(name: str) -> None:
     `count(lens) == 1` fails on a correct template — it did, on the first draft of this test.
     """
     region = _a5_region(_bodies()[name])
-    block = region[region.index('Task(subagent_type="test-reviewer"') : region.index(_RESOLUTION)]
+    first = _DISPATCH.search(region)
+    assert first is not None, f"{name}: no dispatch site found in the A.5 region"
+    block = region[first.start() : region.index(_RESOLUTION)]
     lines = [ln for ln in block.splitlines() if _DISPATCH.search(ln)]
     assert len(lines) == 3, f"{name}: {len(lines)} dispatch line(s), expected 3"
     # Scope the count to the two SEGMENTS that name the lens, not to the whole line. Whole-line
@@ -176,9 +183,17 @@ def test_each_lens_owns_exactly_one_dispatch(name: str) -> None:
         label = head.partition("description=")[2]
         segments.append((label, tail.partition("—")[0]))
 
+    # `spawn_agent` has no `description` parameter, so on the Codex arm the lens is named ONCE,
+    # in the message. The label/body disagreement this check exists to catch is then not merely
+    # undetected but structurally impossible — there is one source of truth, not two. Fall back
+    # to the body there rather than reporting "0 dispatches labelled", which is what a
+    # description-only count says about a correct Codex render.
+    has_label = any(label.strip() for label, _ in segments)
     for lens in _LENSES:
-        labelled = [i for i, (label, _) in enumerate(segments) if lens in label]
         asked = [i for i, (_, body) in enumerate(segments) if lens in body]
+        labelled = (
+            [i for i, (label, _) in enumerate(segments) if lens in label] if has_label else asked
+        )
         assert len(labelled) == 1, (
             f"{name}: lens {lens!r} labels {len(labelled)} dispatch(es), expected 1 — "
             "two dispatches carrying the same lens is a fan-out that reviews one thing thrice"
