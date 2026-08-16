@@ -91,16 +91,23 @@ def coverage_verdict(
     }
 
 
-def round_dir(results_dir: Path, slug: str, round_id: str) -> Path:
-    """Results live under <results-dir>/<slug>/<round-id>/.
+def round_dir(results_dir: Path, slug: str, round_id: str, run_id: str) -> Path:
+    """Results live under <results-dir>/<slug>/<run-id>/<round-id>/.
 
     ``round_id`` is a round number for a round and a pass id (``confirm-1`` / ``confirm-2``)
     for a confirmation pass. They share a namespace deliberately so that a pass can never
     inherit a round's files: reusing a round's directory would let a lens that failed during
     the pass be counted as exercised from the stale file, yielding ``blocks_approval: false``
     — a silent false approval produced by the coverage mechanism itself.
+
+    ``run_id`` is in the PATH, not only in the file content, and the difference is the whole
+    point. The content check (`exercised_lenses`) closes F2 only while the writer stamps the
+    id correctly — and the writer is the model. Keying the directory makes the isolation
+    structural: a second `/hm:review` on the same slug cannot see the first invocation's files
+    at all, whatever it wrote inside them. Both checks stay; this one does not depend on
+    anything a model chose to put in a file.
     """
-    candidate = (results_dir / slug / round_id).resolve()
+    candidate = (results_dir / slug / run_id / round_id).resolve()
     root = results_dir.resolve()
     if not candidate.is_relative_to(root):
         # `--slug ../../tmp/fake` pointed the checker at an arbitrary directory. The security
@@ -108,7 +115,7 @@ def round_dir(results_dir: Path, slug: str, round_id: str) -> Path:
         # argument also writes the result files) and the cross-model reviewer called it P1;
         # the disagreement is recorded in the REVIEW. Containment is two lines and removes the
         # question, which is cheaper than being right about it.
-        msg = f"results path escapes {root}: slug={slug!r} round={round_id!r}"
+        msg = f"results path escapes {root}: slug={slug!r} run={run_id!r} round={round_id!r}"
         raise ValueError(msg)
     return candidate
 
@@ -167,7 +174,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     try:
-        dirs = [round_dir(opts.results_dir, opts.slug, r) for r in opts.round_ids]
+        dirs = [round_dir(opts.results_dir, opts.slug, r, opts.run_id) for r in opts.round_ids]
     except ValueError as exc:
         # The containment check raises. Escaping as a traceback left the caller with no JSON
         # at all, while the template calls this the sole producer of the verdict.

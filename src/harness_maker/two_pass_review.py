@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import logging
+from pathlib import Path
 from typing import Any, Protocol
 
 from harness_maker import command_registry
@@ -437,17 +438,38 @@ def main() -> int:
     import sys
 
     if len(sys.argv) < 2:
-        sys.stderr.write("usage: python -m harness_maker.two_pass_review {redact|merge}\n")
+        sys.stderr.write(
+            "usage: hm two_pass_review {redact|merge} --file <path>   (or JSON on stdin)\n"
+        )
         return 2
     sub = sys.argv[1]
-    raw = sys.stdin.read()
+
+    # `--file` exists because the ONLY two inputs this command has are attacker-reachable: the
+    # diff under review (`redact`) and the reviewers' findings about it (`merge`). Both used to
+    # reach the shell inside `echo '<json>' | …`, where one apostrophe in a diff line ends the
+    # quoting and the rest of that line is a command. A path argument carries no content, so
+    # there is nothing for a diff to escape out of. stdin stays supported for pipelines that
+    # already build the JSON in-process.
+    rest = sys.argv[2:]
+    raw = ""
+    if rest and rest[0] == "--file":
+        if len(rest) < 2:
+            sys.stderr.write(f"{sub}: --file needs a path\n")
+            return 2
+        try:
+            raw = Path(rest[1]).read_text(encoding="utf-8")
+        except OSError as exc:
+            sys.stderr.write(f"{sub}: cannot read {rest[1]}: {exc}\n")
+            return 1
+    else:
+        raw = sys.stdin.read()
     if not raw.strip():
-        sys.stderr.write(f"{sub}: stdin is empty / invalid\n")
+        sys.stderr.write(f"{sub}: input is empty / invalid\n")
         return 1
     try:
         data = json.loads(raw)
     except (json.JSONDecodeError, ValueError):
-        sys.stderr.write("two_pass_review: stdin is not valid JSON\n")
+        sys.stderr.write("two_pass_review: input is not valid JSON\n")
         return 1
     if sub == "redact":
         if not isinstance(data, dict):

@@ -151,6 +151,24 @@ def _migrate_legacy_ledger(base_dir: Path) -> None:
     new_path = base_dir / LEDGER_FILENAME
     if new_path.exists() or not legacy_path.exists():
         return
+
+    # CLAIM the migration before reading, with an O_EXCL create that only one process can win.
+    # The `exists()` check above is necessary but not sufficient: `/hm:review` and `/hm:plan`
+    # can both invoke the second-opinion path at once (they are separate sessions sharing one
+    # repo, which this harness treats as the normal case), both see the file missing, and both
+    # append the whole legacy history — permanently doubling every rate this ledger computes,
+    # in an append-only file. The loser of the race returns having done nothing, which is
+    # correct: the winner is copying the same bytes.
+    new_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        os.close(os.open(str(new_path), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644))
+    except FileExistsError:
+        return
+    except OSError:
+        # Best-effort by contract (this function never raises); a claim we cannot make means
+        # a migration we do not perform, and `emit` still appends the caller's own row.
+        return
+
     lines: list[str] = []
     for raw_line in legacy_path.read_text(encoding="utf-8").splitlines():
         if not raw_line.strip():
@@ -171,8 +189,10 @@ def _migrate_legacy_ledger(base_dir: Path) -> None:
             continue
         lines.append(json.dumps(record.model_dump(), ensure_ascii=False, sort_keys=True))
     if not lines:
+        # The claim file stays, zero bytes. A legacy file whose every row is unusable has
+        # nothing to migrate, and leaving the claim in place stops the next process re-parsing
+        # it forever; `emit` appends to it exactly as it would to a migrated one.
         return
-    new_path.parent.mkdir(parents=True, exist_ok=True)
     for line in lines:
         _append_atomic_line(new_path, line)
 

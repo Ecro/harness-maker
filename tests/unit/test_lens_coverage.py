@@ -97,20 +97,23 @@ def test_a_confirmation_pass_never_inherits_a_round_directory(tmp_path: Path) ->
     """
     results = tmp_path / "results"
     for lens in MANDATORY_LENSES:
-        _write_result(round_dir(results, "slug", "3"), lens)
+        _write_result(round_dir(results, "slug", "3", RUN), lens)
 
     for lens in MANDATORY_LENSES:
         if lens != "robustness":
-            _write_result(round_dir(results, "slug", "confirm-1"), lens)
+            _write_result(round_dir(results, "slug", "confirm-1", RUN), lens)
 
-    assert coverage_verdict(round_dir(results, "slug", "3"), RUN)["blocks_approval"] is False
-    assert coverage_verdict(round_dir(results, "slug", "confirm-1"), RUN)["blocks_approval"] is True
+    assert coverage_verdict(round_dir(results, "slug", "3", RUN), RUN)["blocks_approval"] is False
+    assert (
+        coverage_verdict(round_dir(results, "slug", "confirm-1", RUN), RUN)["blocks_approval"]
+        is True
+    )
 
 
 def test_cli_prints_the_verdict(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     for lens in MANDATORY_LENSES:
         if lens != "security":
-            _write_result(round_dir(tmp_path, "slug", "confirm-2"), lens)
+            _write_result(round_dir(tmp_path, "slug", "confirm-2", RUN), lens)
     rc = main(
         [
             "check",
@@ -137,7 +140,7 @@ def test_reachable_through_the_hm_dispatcher(tmp_path: Path) -> None:
     reachable — which is the whole failure mode this phase's exit criterion names.
     """
     for lens in MANDATORY_LENSES:
-        _write_result(round_dir(tmp_path, "slug", "1"), lens)
+        _write_result(round_dir(tmp_path, "slug", "1", RUN), lens)
     proc = subprocess.run(
         [
             sys.executable,
@@ -216,10 +219,10 @@ def test_the_results_path_cannot_escape_its_root(tmp_path: Path) -> None:
     which is cheaper than continuing to be right about it.
     """
     with pytest.raises(ValueError, match="escapes"):
-        round_dir(tmp_path, "../../etc", "1")
+        round_dir(tmp_path, "../../etc", "1", RUN)
     with pytest.raises(ValueError, match="escapes"):
-        round_dir(tmp_path, "/etc", "1")
-    assert round_dir(tmp_path, "ok-slug", "1") == (tmp_path / "ok-slug" / "1").resolve()
+        round_dir(tmp_path, "/etc", "1", RUN)
+    assert round_dir(tmp_path, "ok-slug", "1", RUN) == (tmp_path / "ok-slug" / RUN / "1").resolve()
 
 
 def test_coverage_is_the_union_across_the_review_s_rounds(tmp_path: Path) -> None:
@@ -233,8 +236,8 @@ def test_coverage_is_the_union_across_the_review_s_rounds(tmp_path: Path) -> Non
     was worse than the defect: the gate branches on the CLI's `blocks_approval`, and the same
     template forbids substituting the model's judgement for it. The union is computed here.
     """
-    r1 = round_dir(tmp_path, "s", "1")
-    r2 = round_dir(tmp_path, "s", "2")
+    r1 = round_dir(tmp_path, "s", "1", RUN)
+    r2 = round_dir(tmp_path, "s", "2", RUN)
     for lens in MANDATORY_LENSES:
         if lens != "security":
             _write_result(r1, lens)
@@ -251,7 +254,7 @@ def test_coverage_is_the_union_across_the_review_s_rounds(tmp_path: Path) -> Non
 def test_the_cli_takes_round_repeatably(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     for lens in MANDATORY_LENSES:
         target = "1" if lens != "tests" else "2"
-        _write_result(round_dir(tmp_path, "s", target), lens)
+        _write_result(round_dir(tmp_path, "s", target, RUN), lens)
     rc = main(
         [
             "check",

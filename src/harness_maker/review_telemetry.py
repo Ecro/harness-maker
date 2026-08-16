@@ -314,19 +314,35 @@ def main(argv: list[str] | None = None) -> int:
         return _guard
     args = list(sys.argv[1:]) if argv is None else list(argv)
     if not args or args[0] != "emit":
-        sys.stderr.write("usage: python -m harness_maker.review_telemetry emit\n")
+        sys.stderr.write("usage: hm review_telemetry emit --file <path>   (or JSON on stdin)\n")
         return 2
-    raw = sys.stdin.read()
+
+    # `--file` for the same reason as `two_pass_review`: this record is assembled by a model
+    # and one of its fields is now a PATH OUT OF THE DIFF (`churn_max_path`). A repository
+    # containing a file named `x'; rm -rf ~; echo '.py` would, under `echo '<record_json>' |`,
+    # put that name through the shell. A path argument carries no content to escape from.
+    rest = args[1:]
+    if rest and rest[0] == "--file":
+        if len(rest) < 2:
+            sys.stderr.write("emit: --file needs a path\n")
+            return 2
+        try:
+            raw = Path(rest[1]).read_text(encoding="utf-8")
+        except OSError as exc:
+            sys.stderr.write(f"emit: cannot read {rest[1]}: {exc}\n")
+            return 1
+    else:
+        raw = sys.stdin.read()
     if not raw.strip():
-        sys.stderr.write("emit: stdin is empty / invalid\n")
+        sys.stderr.write("emit: input is empty / invalid\n")
         return 1
     try:
         data = json.loads(raw)
     except (json.JSONDecodeError, ValueError) as exc:
-        sys.stderr.write(f"emit: stdin is not valid JSON: {exc}\n")
+        sys.stderr.write(f"emit: input is not valid JSON: {exc}\n")
         return 1
     if not isinstance(data, dict):
-        sys.stderr.write("emit: stdin must decode to a JSON object\n")
+        sys.stderr.write("emit: input must decode to a JSON object\n")
         return 1
     try:
         record = record_from_dict(data)

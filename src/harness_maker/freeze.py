@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -141,7 +142,7 @@ def freeze_ref(slug: str, pass_id: str) -> str:
             f"pass_id must be one of {sorted(VALID_PASS_IDS)}, got {pass_id!r}. "
             "`base` in particular would collide with the review_base store."
         )
-    return f"refs/hm-freeze/v1/{slug}-{pass_id}"
+    return f"refs/hm-freeze/v1/{validate_slug(slug)}-{pass_id}"
 
 
 def review_base_ref(slug: str) -> str:
@@ -150,7 +151,7 @@ def review_base_ref(slug: str) -> str:
     A value that must survive across rounds and a repair round, with no named store, is a free
     variable each pass would re-resolve — drifting as new commits land.
     """
-    return f"refs/hm-freeze/v1/{slug}-base"
+    return f"refs/hm-freeze/v1/{validate_slug(slug)}-base"
 
 
 #: Where the review_base WRITE time is recorded. The ref itself cannot carry it: it points at
@@ -161,8 +162,31 @@ def review_base_ref(slug: str) -> str:
 FREEZE_STAMP_DIR = Path(".claude/observability/.hm-freeze")
 
 
+#: A slug reaches here from the stage prompt, where it is a task name the user typed. It is
+#: interpolated into BOTH a git ref and a filesystem path, and the two fail differently: git
+#: rejects `..` in a refname on its own, but `review_base_stamp` would happily write
+#: `<base>/.claude/observability/.hm-freeze/../../../x.stamp`. A leading `-` is the other half —
+#: it turns the ref argument into an option for whichever git plumbing command receives it.
+_SAFE_SLUG = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+
+
+def validate_slug(slug: str) -> str:
+    """The one place a slug becomes a path or a ref. Rejects rather than sanitises.
+
+    Sanitising (stripping `../`) would silently map two different slugs onto one namespace,
+    which is worse here than refusing: these refs and stamps are how a confirmation pass finds
+    the artifact it froze, and a collision hands it someone else's.
+    """
+    if not _SAFE_SLUG.match(slug):
+        raise ValueError(
+            f"slug must match {_SAFE_SLUG.pattern} (no path separators, no leading '-'), "
+            f"got {slug!r}"
+        )
+    return slug
+
+
 def review_base_stamp(base: Path, slug: str) -> Path:
-    return base / FREEZE_STAMP_DIR / f"{slug}.stamp"
+    return base / FREEZE_STAMP_DIR / f"{validate_slug(slug)}.stamp"
 
 
 def store_review_base(base: Path, slug: str, commit: str) -> None:
@@ -214,6 +238,15 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     base = Path(opts.root).resolve()
+
+    try:
+        validate_slug(opts.slug)
+    except ValueError as exc:
+        # Surface it as a diagnosed exit, not a traceback: every caller is a rendered stage
+        # step whose next instruction reads this command's stdout, and a traceback there
+        # produces no JSON at all.
+        sys.stderr.write(f"freeze: {exc}\n")
+        return 2
 
     if args[0] == "read-base":
         stored = load_review_base(base, opts.slug)
