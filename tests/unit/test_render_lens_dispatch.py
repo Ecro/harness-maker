@@ -409,13 +409,20 @@ def test_the_coverage_call_carries_its_full_flag_set(review_body: str, flag: str
 
 
 def test_the_result_path_is_per_slug_and_per_round(dispatch_block: str) -> None:
-    """The round segment is what makes the directory unreusable; asserting the segment is
-    verifiable, whereas asserting the sentence "never reused" is not."""
-    assert f"{RESULTS_ROOT}/<slug>/<round>/" in dispatch_block, (
-        "the write instruction does not name the full per-round path. Round 5: asserting "
-        f"{RESULTS_ROOT!r} and '<slug>/<round>/' as two independent whole-document substrings "
-        "passed a template whose write instruction omitted the round segment while a separate "
-        "rationale sentence quoted it — and the directory is then reusable across rounds"
+    """Both segments, as ONE substring — each makes the directory unreusable along a different
+    axis, and asserting the sentence "never reused" is not verifiable.
+
+    `<round>` separates a round from a later round. `<run-id>` separates one `/hm:review` from
+    the next on the same slug, which round keying does not: F2 (measured 2026-08-15) is five
+    files from invocation 1 vouching for four lenses that died in invocation 2. The id is also
+    checked inside each file, but the writer of that content is a model — the path segment is
+    the half that holds whatever the model wrote.
+    """
+    assert f"{RESULTS_ROOT}/<slug>/<run-id>/<round>/" in dispatch_block, (
+        "the write instruction does not name the full per-run, per-round path. Round 5: "
+        f"asserting {RESULTS_ROOT!r} and '<slug>/<round>/' as two independent whole-document "
+        "substrings passed a template whose write instruction omitted the round segment while "
+        "a separate rationale sentence quoted it — and the directory is then reusable"
     )
 
 

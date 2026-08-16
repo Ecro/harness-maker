@@ -77,7 +77,17 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # now behind the `instrumentation` axis, which defaults OFF for a fresh install. This
     # repo's own harness has it ON, so the call still renders here — what dropped is the
     # count measured from the DEFAULT fixture. No instruction was deleted.
-    "plan": 14,
+    # 14 → 18 (2026-08-16, review-loop transfer to the plan stage). Four calls, none removed:
+    #   +1  `hm plan_rounds plan` decides WHICH critiques earn a follow-up round. It replaces
+    #       "one round per critical critique", which was the stage's only unbounded cost — the
+    #       validator passes are capped at two and that cap holds.
+    #   +1  `hm plan_rounds outcome` records `no-progress` vs `progress` at the terminal pass.
+    #       A bare two-pass cap reports the same ending for both, hiding the one that means
+    #       the revision step is not working on this document.
+    #   +2  the two `hm review_churn pin` lines (the measure shares the post pin's line) that
+    #       feed the stale rule. OPTIONAL: an unmeasured ratio runs every round, so a stage
+    #       that skips them behaves exactly as it did before this change.
+    "plan": 18,
     "research": 8,
     # 9 → 8 (same phase): `stage_agent_ledger persist-payload`, same axis.
     #

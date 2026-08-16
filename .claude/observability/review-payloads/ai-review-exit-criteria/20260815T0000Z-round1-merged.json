@@ -1,0 +1,19 @@
+[
+ {"id":"cr-1","severity":"P0","file":"src/harness_maker/templates/stages/review.md.j2","line":683,"source":"code-reviewer","summary":"freeze/coverage calls omit the cd <WT> prefix; the confirmation pass freezes the base repo","tag":"manual-only"},
+ {"id":"cr-2","severity":"P1","file":"src/harness_maker/templates/stages/review.md.j2","line":613,"source":"code-reviewer","summary":"per-round results directory makes coverage unsatisfiable from round 2","tag":"manual-only"},
+ {"id":"cr-3","severity":"P1","file":"src/harness_maker/spec_mutation.py","line":738,"source":"code-reviewer","summary":"mutmut-absent skip is a substring test against arbitrary subprocess output","tag":"manual-only"},
+ {"id":"cr-4","severity":"P1","file":"src/harness_maker/verifier_discrimination.py","line":178,"source":"code-reviewer","summary":"episode key drops stage, merging independent episodes","tag":"manual-only"},
+ {"id":"cr-5","severity":"P1","file":"src/harness_maker/verifier_discrimination.py","line":195,"source":"code-reviewer","summary":"dispatch sentinels counted as bound_by_the_cap","tag":"manual-only"},
+ {"id":"cr-6","severity":"P1","file":"src/harness_maker/worktree.py","line":2547,"source":"code-reviewer","summary":"reaper deletes a live review's review_base","tag":"consensus-passed"},
+ {"id":"cr-7","severity":"P2","file":"src/harness_maker/spec_mutation.py","line":325,"source":"code-reviewer","summary":"emoji counters override worded counters against stated precedence","tag":"manual-only"},
+ {"id":"cr-8","severity":"P2","file":"src/harness_maker/verifier_discrimination.py","line":226,"source":"code-reviewer","summary":"EXCLUSIONS_FILE honoured by agents only","tag":"manual-only"},
+ {"id":"sr-1","severity":"P1","file":"src/harness_maker/spec_mutation.py","line":241,"source":"security-reviewer","summary":"mutation_runner from repo YAML executed by mutmut, unvalidated","tag":"manual-only"},
+ {"id":"sr-2","severity":"P1","file":"src/harness_maker/worktree.py","line":2547,"source":"security-reviewer","summary":"reaper deletes freeze refs of a live review in two shipped configurations","tag":"consensus-passed"},
+ {"id":"sr-3","severity":"P2","file":"src/harness_maker/freeze.py","line":86,"source":"security-reviewer","summary":"freeze commit sweeps untracked non-ignored files into a persistent ref","tag":"manual-only"},
+ {"id":"sr-4","severity":"P2","file":"src/harness_maker/verifier_discrimination.py","line":366,"source":"security-reviewer","summary":"model-authored ledger strings echoed into a session","tag":"manual-only"},
+ {"id":"co-1","severity":"P1","file":"src/harness_maker/lens_coverage.py","line":79,"source":"codex","summary":"results path escapes its root; coverage satisfiable by placeholder files","tag":"manual-only"},
+ {"id":"co-2","severity":"P1","file":"src/harness_maker/freeze.py","line":165,"source":"codex","summary":"--pass base overwrites the review_base store ref","tag":"manual-only"},
+ {"id":"co-3","severity":"P1","file":"src/harness_maker/freeze.py","line":84,"source":"codex","summary":"empty temp index omits tracked-but-gitignored files from the freeze tree","tag":"manual-only"},
+ {"id":"co-4","severity":"P1","file":"src/harness_maker/freeze.py","line":41,"source":"codex","summary":"base resolution uses a local branch rather than the remote-tracking ref","tag":"manual-only"},
+ {"id":"co-5","severity":"P2","file":"src/harness_maker/verifier_discrimination.py","line":182,"source":"codex","summary":"duplicate ledger rows rewrite a recorded verdict","tag":"manual-only"}
+]

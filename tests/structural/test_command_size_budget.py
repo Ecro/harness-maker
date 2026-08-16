@@ -325,7 +325,13 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # and the executing model treats it as optional; that is the failure mode this repo records
     # for costly mandatory steps. Attributed in
     # work-docs/BASELINE-DELTA-ai-review-exit-criteria.md.
-    "plan": 51130,
+    # 51130 → 53564 (+2434, 2026-08-16). The review loop's two transferable mechanisms, and
+    # the paragraph that says WHY the churn half is inverted here: in `/hm:review` a LOW ratio
+    # skips work, and copying that shape would mean "small edit, skip re-validation" — the
+    # reading this stage's own measurement refutes (12 validator episodes, none ever clean;
+    # one PLAN whose pass-2 criticals were created by the pass-1 fixes). Attributed in
+    # work-docs/BASELINE-DELTA-plan-validator-transfer.md.
+    "plan": 53564,
     "research": 26673,
     # 34760 → 35828 (review round 4): the `CHANGES_REQUESTED` resolution bullet gained an
     # autopilot carve-out, and the APPROVED+human_review_needed bullet was split so the
@@ -399,7 +405,13 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # preamble is SUBSUMED rather than stacked, so the round-state half is close to a swap.
     # Attributed in work-docs/BASELINE-DELTA-plan-interview-comprehension.md.
     "spec": 32114,
-    "verify": 23796,
+    # 23796 → 24935 (+1139, 2026-08-16, cross-runtime test-execution recipe). One paragraph,
+    # in the stage that owns the whole-suite pass, saying: ask `hm test_runners plan` for THIS
+    # runner rather than pasting a parallel flag. The flag is not portable advice — `cargo`,
+    # `go`, `vitest`, `jest` and `flutter` are ALREADY parallel and a worker flag there caps or
+    # nests instead of accelerating, while `pytest` is the one common runner that is serial by
+    # default. Attributed in work-docs/BASELINE-DELTA-plan-validator-transfer.md.
+    "verify": 24935,
     # 41345 → 42452 (PLAN-workflow-time-token-savings B3/B4): the shared
     # `stage_end_summary` partial gained the judgment-gate discriminator and
     # `step_manifest` gained the `ask-pending` picker branch, both of which every stage

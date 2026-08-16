@@ -2,6 +2,69 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`hm test_runners plan` — how to run a project's tests fast, without assuming Python.**
+  `-n auto` is not portable advice, which is the whole reason this is a table rather than a
+  sentence: `cargo`, `go`, `vitest`, `jest` and `flutter` are **already parallel**, and a
+  worker flag there caps (`cargo --test-threads` *lowers* concurrency) or nests a pool inside
+  a pool. `pytest` is the one common runner that is serial by default. For each of ten runners
+  the recipe reports the three levers separately — parallel, change-based selection,
+  re-run-only-failures — or `null` where the runner has none, and an unrecognised toolchain is
+  answered with "use the project's own command", never an error.
+  **The worker count is capped at about half the visible cores**, floored at 1 and never above
+  `cores - 1`. More is not faster: a suite whose tests shell out to `git` runs roughly twice
+  the processes the core count suggests, the session waiting for the suite needs a core, and
+  several runners are parallel internally already. Cores come from `sched_getaffinity`, not
+  `os.cpu_count()`, so a container limited to two of the host's cores is not handed sixteen.
+  A fraction above 0.7 is **refused, not clamped** — a silent clamp makes the knob read as
+  accepted while doing nothing. Wired into the `targeted-test-selection` skill (whose §1–§3
+  Python dep-map now sits behind a language-neutral §0), `/hm:verify`, `/hm:wrapup` and
+  `/hm:review`'s auto-fix loop. Measured on this repo: 873s serial → 384s at 8 of 14 workers.
+
+- **`hm plan_rounds` — the review loop's mechanisms, transferred to `/hm:plan`.**
+  The stage's cost is not its validator passes (capped at two, and the cap holds) but the
+  follow-up interview rounds, spent one-per-critique with no bound. Two mechanisms transfer:
+  - **the progress invariant**, as-is — a critique the previous pass raised and this pass
+    raises again is `unresolved`, not `pending` again, so the round that produced nothing is
+    not bought twice. Merge is by an id computed from (section, title), never asked of the
+    model, and the lattice is monotonic.
+  - **churn, INVERTED.** In `/hm:review` a LOW ratio skips the re-review; copying that shape
+    would mean "small edit, skip re-validation", which is the reading `plan.md.j2`'s own
+    measurement refutes — 12 validator episodes, none ever clean, one PLAN whose pass-2
+    criticals were created by the pass-1 fixes. What transfers is the other direction: past
+    50% rewritten, the queued critiques were raised against a document that no longer exists,
+    so they are `stale` and cost no round. Nothing is lost — the terminal pass re-derives
+    whichever still hold. An **unmeasured** ratio runs every round.
+  The lens axis does not transfer: `plan-validator` is one agent, not a fan-out.
+  `/hm:plan` also now records `no-progress` separately from `cap-exhausted`; a bare two-pass
+  limit reports the same ending for both and hides the one that means the revision step is not
+  working on this document.
+
+### Fixed
+
+- **Model-authored JSON no longer reaches a shell (command injection).** `hm two_pass_review
+  redact|merge` and `hm review_telemetry emit` take `--file <path>`; the rendered stage writes
+  the JSON and passes the path. They were invoked as `echo '<json>' | …`, where one apostrophe
+  in a diff line ends the quoting and the rest of that line runs — and both inputs are
+  attacker-reachable: `redact`'s is the diff itself, `merge`'s is reviewer prose about it.
+  The churn measurement shipped earlier this release had just made it concrete by putting a
+  **filename out of the diff** (`churn_max_path`) into the telemetry record.
+- **A task slug can no longer traverse out of the freeze store.** `freeze.validate_slug` guards
+  the ref builders and the stamp path. git rejects `..` in a refname on its own, so the refs
+  looked safe in isolation — but `review_base_stamp` is a plain filesystem join and would have
+  written outside `.claude/observability/.hm-freeze/`. A leading `-` is the other half: it
+  turns the ref into an option for the git plumbing command that receives it.
+- **The one-time second-opinion ledger migration is claimed, not merely checked.**
+  `_migrate_legacy_ledger` took an `O_EXCL` claim before copying. Two sessions over one repo is
+  the normal case for this harness, both could pass the `exists()` check before either wrote,
+  and the file is append-only — a doubled migration permanently doubles every rate computed
+  from it. Reproduced with two real processes: 6 rows instead of 3.
+- **A previous `/hm:review` can no longer vouch for a lens that died in this one.** The lens
+  results directory is keyed by `<run-id>` as well as `<round>`. The run id was already checked
+  inside each file, but the writer of that content is a model; the path segment holds whatever
+  the model wrote.
+
 ## [0.52.0] - 2026-08-16
 
 ### Added

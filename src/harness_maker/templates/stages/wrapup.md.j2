@@ -164,7 +164,7 @@ Catch regressions wrapup-stage edits could introduce:
 
 {% if is_codex %}
 ```
-# Pick the toolchain that matches the project. Examples:
+# Pick the toolchain that matches the project (`hm test_runners plan --root .` names it, its capped worker count, and whether it is ALREADY parallel — do not guess a flag). Examples:
 Bash("uv run pytest -x")                      # Python tests
 Bash("uv run ruff check src/ tests/")          # lint
 Bash("uv run ruff format --check src/ tests/") # format — REQUIRED (lint alone misses format violations; [fail:lint] ruff-format-not-in-local-verify-pass count:2 if skipped)
@@ -174,7 +174,7 @@ Bash("uv run mypy --strict src/")              # type
 ```
 {% else %}
 ```bash
-# Pick the toolchain that matches the project. Examples:
+# Pick the toolchain that matches the project (`hm test_runners plan --root .` names it, its capped worker count, and whether it is ALREADY parallel — do not guess a flag). Examples:
 !uv run pytest -x                      # Python tests
 !uv run ruff check src/ tests/          # lint
 !uv run ruff format --check src/ tests/ # format — REQUIRED (lint alone misses format violations; [fail:lint] ruff-format-not-in-local-verify-pass count:2 if skipped)

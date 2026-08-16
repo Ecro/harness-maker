@@ -1,0 +1,94 @@
+{
+  "findings": [
+    {
+      "severity": "P0",
+      "file": "src/harness_maker/render.py",
+      "line": 1108,
+      "source": "code-reviewer",
+      "summary": "Mixed-group preservation freezes a stale `uv run --with <path>` and deletes the fresh template copy; re-render no longer self-heals",
+      "suggestion": "Rewrite the preserved user hook's `--with` ref to the current install ref (reuse the `<HM>:` match span) before suppressing, or suppress only when the preserved command's raw text equals the template's.",
+      "id": "1733864e8c6b2bff"
+    },
+    {
+      "severity": "P1",
+      "file": "src/harness_maker/render.py",
+      "line": 1254,
+      "source": "code-reviewer",
+      "summary": "user_scoped is event-global, so scoping one matcher deletes the command from an untouched sibling template entry (PreCompact auto/manual)",
+      "suggestion": "Key suppression by (normalized_command, matcher) per PLAN Phase 2's stated multi-matcher rule: build dict[command, set[matcher]] from the template and only drop from the entry whose matcher the user actually re-scoped.",
+      "id": "0f1fa143b4395384"
+    },
+    {
+      "severity": "P1",
+      "file": "src/harness_maker/render.py",
+      "line": 1242,
+      "source": "code-reviewer",
+      "summary": "Flat (Cursor) suppression IS the matcher-difference rule ADR-003 rejected as unsound \u2014 one command per entry means mixed-group evidence is structurally unavailable",
+      "suggestion": "Gate the flat branch on positive provenance, or restrict it to entries whose raw command byte-matches a shipped one; otherwise emit both and accept the duplicate until provenance lands.",
+      "id": "eead20acb79501d4"
+    },
+    {
+      "severity": "P1",
+      "file": "src/harness_maker/render.py",
+      "line": 1255,
+      "source": "security-reviewer",
+      "summary": "The template's own blocking gate is dropped with zero diagnostic output; ADR-003 explicitly relies on a render warning that was never implemented",
+      "suggestion": "Emit typer.echo(..., err=True) beside the drop naming the suppressed commands, the event and the user matcher now carrying them \u2014 matching render.py:1173.",
+      "id": "0ef2bb7208c8777a"
+    },
+    {
+      "severity": "P1",
+      "file": "src/harness_maker/render.py",
+      "line": 1253,
+      "source": "security-reviewer",
+      "summary": "Phase 1 validates the TEMPLATE's install ref, then ADR-004 suppresses that validated entry in favour of a user entry whose `--with` ref the render never inspects",
+      "suggestion": "Before adding a command to user_scoped, compare its literal `--with` ref to the template's; if they differ, keep shipping the template entry or warn naming both refs.",
+      "id": "bc4af07871238250"
+    },
+    {
+      "severity": "P1",
+      "file": "src/harness_maker/synthesize.py",
+      "line": 116,
+      "source": "codex",
+      "summary": "`_pinned_distribution_ref` pins any non-empty version, including local/pre-release versions absent from the index, leaving every rendered blocking hook unresolvable",
+      "suggestion": "Reject a local/dev version (PEP 440 local segment or a pre-release with no index presence) and drop to the bare name, or verify resolvability before pinning.",
+      "id": "91a86a3d53cf1cef"
+    },
+    {
+      "severity": "P2",
+      "file": "src/harness_maker/synthesize.py",
+      "line": 192,
+      "source": "code-reviewer",
+      "summary": "A working wheel/sdist `file://` install ref is rewritten to a version pin that may not exist on the index",
+      "suggestion": "Accept the ref when it is a file uv can install (.whl/.tar.gz); or prefer `_portablize_ref(_HARNESS_MAKER_PKG_ROOT)` when that root is itself a resolvable project before falling back to a PyPI pin.",
+      "id": "f221afdc443668fd"
+    },
+    {
+      "severity": "P2",
+      "file": "src/harness_maker/synthesize.py",
+      "line": 183,
+      "source": "code-reviewer",
+      "summary": "Warnings use `print(file=sys.stderr)`; ADR-001 specifies typer.echo(err=True) and CLAUDE.md forbids print for control flow",
+      "suggestion": "Replace both print calls with typer.echo(..., err=True) and drop the new `sys` import.",
+      "id": "f33952126fd7684b"
+    },
+    {
+      "severity": "P2",
+      "file": "tests/unit/test_render_settings_hooks.py",
+      "line": 542,
+      "source": "code-reviewer",
+      "summary": "No test ships one command under two template matchers, nor re-merges the output, hiding the event-global suppression defect",
+      "suggestion": "Add a PreCompact-shaped case (same command under 'auto' and 'manual', user mixes into 'auto') asserting 'manual' still ships both commands, plus an idempotency assertion.",
+      "id": "a535692f35a36b53"
+    },
+    {
+      "severity": "P2",
+      "file": "src/harness_maker/render.py",
+      "line": 1259,
+      "source": "codex",
+      "summary": "Command-global suppression removes valid registrations under unrelated template matchers",
+      "suggestion": "Add a matcher dimension to the suppression set.",
+      "id": "7d3343e3bb4be974"
+    }
+  ]
+}

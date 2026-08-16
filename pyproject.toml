@@ -55,6 +55,11 @@ Issues = "https://github.com/Ecro/harness-maker/issues"
 dev = [
     "pytest>=8",
     "pytest-asyncio",
+    # Parallel runs are opt-in on the command line (`-n <workers> --dist loadfile`),
+    # never in `addopts`: a suite only ever run in parallel hides the order- and
+    # isolation-dependent failures a serial run would surface. `hm test_runners plan`
+    # prints the worker count already capped for the machine.
+    "pytest-xdist",
     "ruff>=0.6",
     "mypy>=1.11",
     "types-PyYAML",
