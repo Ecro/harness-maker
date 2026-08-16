@@ -742,17 +742,22 @@ def test_the_rendered_stage_pins_both_churn_endpoints_and_measures_between_them(
         assert "--post refs/hm-churn/v1/{slug}-r{N}-post" in measures[0], measures[0]
 
 
-def test_the_churn_measurement_does_not_gate_anything_yet(
+def test_the_churn_gate_is_a_render_time_branch_with_a_working_off_switch(
     tmp_path_factory: pytest.TempPathFactory,
 ) -> None:
-    """Phase 5 is record-only; the skip branch is Phase 6.
+    """Phase 5 asserted the stage did NOT read the gate key; Phase 6 ships the read.
 
-    Shipping the gate a phase early would remove a review that happens today with no
-    calibration data behind the threshold — the one irreversible move in this PLAN.
+    That guard was a phase boundary, and this is what it becomes — retired in the phase
+    that legitimately crosses it rather than left to fail as noise. The invariant that
+    survives is the one worth keeping: the gate is resolved at RENDER time, so
+    `rereview_churn_gate: false` produces the pre-gate text rather than a runtime flag the
+    prose merely mentions. `tests/unit/test_review_churn_gate.py` asserts the off-render
+    directly; here we only require the on-render to carry the branch.
     """
     bodies = _render_both_variants(tmp_path_factory)
     for variant, body in bodies.items():
-        assert "Record only" in body, f"{variant}: the record-only boundary is not stated"
-        assert "rereview_churn_gate" not in body, (
-            f"{variant}: the stage reads the gate key before Phase 6 ships it"
+        assert "Re-review (gated" in body, f"{variant}: the gate branch is not rendered"
+        assert "as if the gate were off" in body, (
+            f"{variant}: the null-ratio case is not stated, so an unmeasurable round "
+            "reads as below-threshold and is silently skipped"
         )

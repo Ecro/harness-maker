@@ -21,8 +21,26 @@
     different fact from a round that changed nothing.
   Carried on the telemetry row as four `churn_*` fields whose validator rejects every
   self-contradicting combination; these rows are append-only, so an unreadable one is permanent.
-  Nothing branches on the ratio yet — the gate, the single-reviewer repair round and
-  `/hm:health`'s `not_applicable` are Phase 6.
+  **The gate now reads it (Phase 6).** Below `reviewers.rereview_churn_ratio` a repair round
+  skips its re-review and records the comparison verbatim; at or above it, exactly ONE
+  structured reviewer runs over the changed hunks — one, because a single lens now carries a
+  full vote (ADR-007), so the K=2 argument that used to force a pair no longer applies. A round
+  whose ratio is **null** re-reviews as if the gate were off: unmeasured is not "below the
+  threshold", and treating it as below would silently skip every round the measurement could
+  not see. `reviewers.rereview_churn_gate: false` renders the pre-gate text verbatim — the
+  branch is render-time, so the documented rollback is a real one. `/hm:health` reports a
+  disabled gate as `not_applicable` with no penalty, and a malformed threshold as a failure
+  rather than defaulting it: that value decides whether reviews happen at all.
+
+- **An oscillating hunk is reported as a `manual-only` P1 `spec_gap` (Phase 7).** A hunk one
+  round removed and a later round put back means two rounds disagreed about the same code —
+  a gap in the SPEC, not a defect in the diff. It is keyed on (path, normalized hunk content,
+  enclosing symbol from git's own `@@` header): identical text in two functions is two hunks,
+  and without the symbol a removal in one plus an addition in the other reads as a restoration.
+  Scanned from the endpoint refs Phase 5 already pins, so there is no second store to fall out
+  of step with the first, and a review that crashed mid-loop can still be scanned afterwards.
+  **It never moves the grade** — a review whose only real problem is that nobody wrote down
+  which behaviour was wanted must still be able to reach A.
 
 ### Fixed
 

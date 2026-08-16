@@ -128,7 +128,10 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     #       the auto-fix loop — a review that approves at round 1 pays none of them.
     # The ADR-011 rule counts each `Task(` individually even though all seven leave in one
     # message, so the dispatch half of this is a cost in the metric, not in turns.
-    "review": 35,
+    #   +2  Phase 6 + 7: `hm review_consensus plan` decides the repair round's re-review
+    #       (gate-on render only), and one `hm review_churn oscillation` scan runs at the
+    #       terminal state. The gate-off render pays neither and keeps the old dispatch.
+    "review": 37,
     "spec": 6,
     "uninstall": 3,
     "verify": 13,

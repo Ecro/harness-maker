@@ -384,7 +384,8 @@ ac:
 - id: AC-010
   title: Below-threshold churn skips the re-review, with the reason recorded
   type: parametric
-  test_ids: []
+  test_ids:
+  - tests/unit/test_review_churn_gate.py::test_below_threshold_churn_skips_rereview
   executable_predicate: null
   golden_table:
   - input:
@@ -421,7 +422,7 @@ ac:
     note: ''
   rubric_id: null
   note: ''
-  pending_test: true
+  pending_test: false
   oracle_source: golden
   oracle_evidence: Boundary rows (equal-to-threshold inclusive) come from the threshold
     semantics fixed in interview round 3, not from the implementation's comparison
@@ -441,13 +442,14 @@ ac:
 - id: AC-011
   title: At or above threshold, exactly one structured reviewer is dispatched
   type: mechanical
-  test_ids: []
+  test_ids:
+  - tests/unit/test_review_churn_gate.py::test_above_threshold_dispatches_one_structured_reviewer
   executable_predicate: len(review_consensus.rereview_plan(churn_ratio=0.35, threshold=0.20))
     == 1
   golden_table: []
   rubric_id: null
   note: ''
-  pending_test: true
+  pending_test: false
   oracle_source: golden
   oracle_evidence: 'The count 1 follows from AC-004: a single lens now carries a full
     vote, so the K=2 argument that forced two dispatches no longer applies. Fixed
@@ -598,13 +600,14 @@ ac:
 - id: AC-014
   title: A stalled loop records the churn ratio on no-progress
   type: mechanical
-  test_ids: []
+  test_ids:
+  - tests/unit/test_review_churn_gate.py::test_no_progress_records_churn_ratio
   executable_predicate: exit_record(transitions=0, churn_ratio=0.0)['exit_reason']
     == 'no-progress'
   golden_table: []
   rubric_id: null
   note: ''
-  pending_test: true
+  pending_test: false
   oracle_source: differential
   oracle_evidence: 'Compared against the pre-change exit assignment for the same input:
     the value and its precedence must be unchanged, so any new exit reason or reordering
@@ -651,12 +654,13 @@ ac:
 - id: AC-016
   title: An oscillating hunk raises a manual-only P1 spec_gap
   type: mechanical
-  test_ids: []
+  test_ids:
+  - tests/unit/test_review_oscillation.py::test_oscillating_hunk_emits_manual_only_spec_gap
   executable_predicate: detect_oscillation(three_round_fixture())[0].tag == 'manual-only'
   golden_table: []
   rubric_id: null
   note: ''
-  pending_test: true
+  pending_test: false
   oracle_source: golden
   oracle_evidence: The fixture reproduces the documented R3-removes / R4-restores
     sequence with the oscillating hunk chosen by hand; the manual-only tag is required
@@ -727,12 +731,13 @@ ac:
 - id: AC-019
   title: hm health treats a disabled gate as not_applicable
   type: mechanical
-  test_ids: []
+  test_ids:
+  - tests/unit/test_review_churn_gate.py::test_health_reports_gate_off_as_not_applicable
   executable_predicate: churn_gate_signal(enabled=False).not_applicable is True
   golden_table: []
   rubric_id: null
   note: ''
-  pending_test: true
+  pending_test: false
   oracle_source: differential
   oracle_evidence: Compared against the shipped permissions.deny_dangerous opt-out
     signal, which already encodes the not_applicable / passed=True / no-penalty shape;

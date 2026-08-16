@@ -141,7 +141,7 @@ MODULES: dict[str, ModuleSpec] = {
     "review_telemetry": ModuleSpec("manual-dispatch", _s("emit")),
     "lens_coverage": ModuleSpec("manual-dispatch", _s("check")),
     "review_consensus": ModuleSpec("manual-dispatch", _s("finalize", "plan")),
-    "review_churn": ModuleSpec("manual-dispatch", _s("measure", "pin")),
+    "review_churn": ModuleSpec("manual-dispatch", _s("measure", "pin", "oscillation")),
     "verifier_discrimination": ModuleSpec("manual-dispatch", _s("report", "rounds", "agents")),
     "freeze": ModuleSpec("manual-dispatch", _s("resolve-base", "commit", "read-base", "reap")),
     "spec_quality": ModuleSpec("manual-dispatch", _s("eval")),

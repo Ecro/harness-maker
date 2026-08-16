@@ -21,6 +21,11 @@ from pydantic import BaseModel, ConfigDict, ValidationError
 from harness_maker._metrics_io import _candidate_files
 from harness_maker.context_lint import _count_body_lines
 from harness_maker.models import Preset
+from harness_maker.review_churn import (
+    ChurnConfigError,
+    churn_gate_enabled,
+    resolve_churn_threshold,
+)
 
 # Layer-1 dimension weights (sum to 1.0 per preset).
 # model_routing is weight 0 (advisory per ADR-010) — surfaces signals/actions
@@ -136,6 +141,12 @@ class Signal(BaseModel):
     # dimension score to 0 regardless of additive weight — for invariants that must
     # fail health even when the dimension's passed-weights already cap at 100.
     hard_gate: bool = False
+    # A deliberate config opt-out, not a guardrail that is merely passing. Both read
+    # `passed=True`, and a reader deciding whether to ACT on the row needs them apart:
+    # "you turned the churn gate off" is not the same news as "the churn gate is healthy".
+    # Scoring ignores this field — a not-applicable signal carries weight 0, so the
+    # no-penalty half is structural rather than a rule someone has to remember.
+    not_applicable: bool = False
 
 
 class DimensionScore(BaseModel):
@@ -209,6 +220,7 @@ def _signal(
     action: str | None,
     *,
     hard_gate: bool = False,
+    not_applicable: bool = False,
 ) -> Signal:
     return Signal(
         id=sig_id,
@@ -217,6 +229,57 @@ def _signal(
         evidence=evidence,
         action=action,
         hard_gate=hard_gate,
+        not_applicable=not_applicable,
+    )
+
+
+def churn_gate_signal(*, enabled: bool, reviewers: dict[str, Any] | None = None) -> Signal:
+    """The re-review churn gate's health, or its documented absence.
+
+    Weight 0 in both directions and that is deliberate: the gate is a config choice, so a
+    harness that turns it off must not lose points, and one that leaves it on must not gain
+    any either — a signal worth points in one direction is a nudge toward a setting the
+    project may have decided against. What it buys is visibility of the failure that is
+    otherwise silent: a malformed `rereview_churn_ratio` decides whether re-reviews happen
+    at all, and `resolve_churn_threshold` raises on it at load time rather than defaulting,
+    so without this signal the first sign of a typo is a review that never re-reviewed.
+    """
+    cfg = reviewers or {}
+    try:
+        # Both keys are validated here, and the gate key FIRST. `enabled` is what the caller
+        # resolved from this same dict, so on a well-formed config the two always agree; on a
+        # malformed one (`rereview_churn_gate: "yes"`) the caller has no bool to pass, and a
+        # signal that only ever checked the ratio would report a healthy gate for a harness
+        # whose gate setting does not parse.
+        if reviewers is not None:
+            enabled = churn_gate_enabled(cfg)
+        threshold = resolve_churn_threshold(cfg) if enabled else None
+    except ChurnConfigError as e:
+        return _signal(
+            "rereview_churn_gate",
+            False,
+            0,
+            f"re-review churn gate config is unreadable: {e}",
+            "Fix reviewers.rereview_churn_gate / rereview_churn_ratio in harness.yaml "
+            "(a bool and a number in [0, 1])",
+        )
+
+    if not enabled:
+        return _signal(
+            "rereview_churn_gate",
+            True,
+            0,
+            "re-review churn gate intentionally off (harness.yaml reviewers."
+            "rereview_churn_gate=false) — every repair round re-reviews, as before",
+            None,
+            not_applicable=True,
+        )
+    return _signal(
+        "rereview_churn_gate",
+        True,
+        0,
+        f"re-review churn gate on at threshold {threshold:.2f}",
+        None,
     )
 
 
@@ -1164,6 +1227,26 @@ def _dim_guardrails(project_dir: Path, *, session_id: str | None = None) -> Dime
             None if cov_ok else "Block rm -rf, curl|sh, writes to /etc and ~/.ssh",
         )
     )
+
+    # Read the reviewers block once for the churn gate. Both a missing harness.yaml and an
+    # unreadable one degrade to "gate on with defaults", matching `churn_gate_enabled`'s own
+    # absent-key rule — the signal reports a MALFORMED threshold, not a missing file, which
+    # `harness_yaml_present` already owns.
+    _churn_reviewers: dict[str, Any] = {}
+    _churn_hy = claude / "harness.yaml"
+    if _churn_hy.is_file():
+        try:
+            from harness_maker.io_utils import load_harness_yaml as _lhy_churn
+
+            _churn_cfg = _lhy_churn(_churn_hy)
+            _raw_reviewers = _churn_cfg.get("reviewers") if isinstance(_churn_cfg, dict) else None
+            if isinstance(_raw_reviewers, dict):
+                _churn_reviewers = _raw_reviewers
+        except Exception:  # noqa: BLE001 — degrade, never crash readiness
+            _churn_reviewers = {}
+    # `enabled` is re-derived inside from the same dict; it is passed so the AC-019 contract
+    # (`churn_gate_signal(enabled=False)`) works with no config at all.
+    signals.append(churn_gate_signal(enabled=True, reviewers=_churn_reviewers))
 
     sec_dir = claude / "observability" / "security"
     high_count = 0

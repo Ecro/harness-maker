@@ -165,3 +165,29 @@ silent-skip in a different disguise.
 `chars` is now pinned to the **codex** figure (11,227), not the claude one (11,185). The codex
 variant renders the same three calls inside `Bash("…")` wrappers, so it grows more; funding the
 smaller of the two would have gone red on a target nobody was reading.
+
+## Phases 6 + 7 — the gate and the oscillation report (2026-08-16)
+
+| Dimension | Was | Now | Δ |
+|---|---|---|---|
+| `chars` (aggregate) | 11,227 | **13,395** | +2,168 |
+| `commands.review` | 9,816 | **11,970** | +2,154 |
+| `round_trips.review` | 13 | **15** | +2 |
+| `round_trips.hm-review` | 15 | **17** | +2 |
+
+Two calls, both at seams that used to be prose: `hm review_consensus plan` decides the repair
+round's re-review, and `hm review_churn oscillation` scans the round pins once at the terminal
+state. Neither replaces a cheaper call — the first replaces a judgement the executing model
+used to make about its own re-review, and the second replaces nothing at all.
+
+The characters are mostly the gate's **third** branch. Two branches (below / at-or-above) are
+four lines; the third — a null ratio re-reviews as if the gate were off — costs a paragraph
+and is the one that matters. Without it the natural reading of "below the threshold" swallows
+`null`, and the gate skips every round it could not measure. That is the absent-case failure
+this repo has recorded eight times, and it would have shipped inside the one phase that removes
+a review that happens today.
+
+The gate branch is **render-time**, not runtime: `rereview_churn_gate: false` renders the
+pre-Phase-6 text verbatim, so the escape hatch documented in `harness.yaml` is a real rollback
+and not a runtime flag the prose merely mentions. It also means the off-render pays none of
+these characters — the numbers above are the on-render, which is the default.

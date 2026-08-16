@@ -10,12 +10,12 @@ interview_rounds: 23
 adrs: 10
 validator_outcome: MAJOR_REVISION_RESOLVED
 surface_allowance:
-  chars: 11227
+  chars: 13395
   commands:
-    review: 9816
+    review: 11970
   round_trips:
-    review: 13
-    hm-review: 15
+    review: 15
+    hm-review: 17
   reason: "Phase 1's two uncuttable brief clauses (732), plus Phases 2-4: nine lens dispatches instead of five at BOTH sites, Step C2 rendering its own dispatch list because six lenses now share one agent and are told apart only by their brief line, and Step 4 calling hm review_consensus instead of describing the arithmetic (ADR-008). Phase 5 adds two churn-endpoint pins and one measure call per repair round, at both sites."
   delta_doc: BASELINE-DELTA-review-loop-empirics.md
 summary: "Adopt the six-category axis, give each lens a vote, gate re-review on churn."
@@ -591,6 +591,7 @@ ADR-007 and it is not backward compatible with a harness that expected `manual-o
 - **Rollback:** Phase 4.
 
 ### Phase 6 — Churn gate, one-reviewer repair round, ratio on `no-progress`
+- **Status:** DONE (2026-08-16). The gate branch in `review.md.j2` (render-time, so `rereview_churn_gate: false` restores the old dispatch verbatim), `review_consensus plan` wired at the seam, `exit_record` attaching the ratio to `no-progress`, and `readiness.churn_gate_signal` with `Signal.not_applicable`.
 - **depends_on:** `[4, 5]` · **parallel_group:** `serial-review-tpl` · **merge_hazards:** `review.md.j2`, `second-opinion-gate` §5 (shared with Phase 4)
 - **Scope.** In: `rereview_churn_gate`, the skip/dispatch branch, the single-reviewer dispatch, the
   ratio on `no-progress`, `readiness.py` `not_applicable`. Out: oscillation.
@@ -599,6 +600,7 @@ ADR-007 and it is not backward compatible with a harness that expected `manual-o
 - **Rollback:** Phase 5, or `rereview_churn_gate: false`.
 
 ### Phase 7 — Oscillation report
+- **Status:** DONE (2026-08-16). `parse_hunks` / `detect_oscillation` / `record_oscillations` keyed on (path, normalized hunk hash, enclosing symbol from git's own `@@` header), scanned from Phase 5's endpoint refs by `hm review_churn oscillation` at the terminal state. `manual-only` P1 `spec_gap`, never in the voting set.
 - **depends_on:** `[4, 5]` · **parallel_group:** `serial-review-tpl` · **merge_hazards:** `review.md.j2`, `review_churn.py` (shared with Phase 5)
 - **Scope.** In: hunk records keyed by (path, normalized content hash, enclosing symbol), restoration
   detection, `manual-only` P1 `spec_gap`, `review-oscillation-{slug}.jsonl`. Out: suspension.

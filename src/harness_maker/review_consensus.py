@@ -386,6 +386,53 @@ def rereview_plan(churn_ratio: float, threshold: float) -> list[Dispatch]:
     return [Dispatch(agent="code-reviewer", lens="functionality", reason=reason)]
 
 
+#: Exit reasons in PRECEDENCE order — the first whose rule holds is the one reported.
+#: The order is the shipped assignment, not a new one, and two of the four positions are
+#: load-bearing: `auto-fix-disabled` sits above `no-progress` because a run with fixing
+#: switched off makes no transitions BY CONSTRUCTION, and `cap-exhausted` sits below it
+#: because a stop the progress invariant made is never a budget stop, however many rounds
+#: happened to have run.
+EXIT_REASONS: tuple[str, ...] = ("converged", "auto-fix-disabled", "no-progress", "cap-exhausted")
+
+
+def exit_record(
+    *,
+    transitions: int,
+    churn_ratio: float | None,
+    approved: bool = False,
+    auto_fix: bool = True,
+    rounds_used: int = 1,
+    max_rounds: int = 3,
+) -> dict[str, Any]:
+    """The loop's terminal record, with the measured churn attached.
+
+    `churn_ratio` is a REQUIRED argument and the key is always present, including when it
+    is `None`. A caller that stalls without measuring writes the absence explicitly rather
+    than leaving the field off, because "the loop stalled and nobody looked at the churn"
+    and "the loop stalled after churning nothing" are opposite diagnoses and an absent key
+    reads as the second.
+    """
+    if approved:
+        reason = "converged"
+    elif not auto_fix:
+        reason = "auto-fix-disabled"
+    elif transitions == 0:
+        reason = "no-progress"
+    elif rounds_used >= max_rounds:
+        reason = "cap-exhausted"
+    else:
+        raise ValueError(
+            f"no exit rule holds for transitions={transitions}, rounds_used={rounds_used}, "
+            f"max_rounds={max_rounds}: the loop has not stopped, so it has no exit reason"
+        )
+    return {
+        "exit_reason": reason,
+        "churn_ratio": churn_ratio,
+        "transitions": transitions,
+        "rounds_used": rounds_used,
+    }
+
+
 # ── CLI ──────────────────────────────────────────────────────────────────────
 
 _USAGE = (

@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import os
+import re
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -20,6 +23,16 @@ module in another codebase — hence the config key. It is a starting point to b
 recalibrated from the ratios the loop records, not a measured property of this
 project (PLAN risk R3).
 """
+
+
+def default_churn_ratio() -> float:
+    """Callable, not the bare float: Jinja globals are callables by contract here.
+
+    The gate branch renders the threshold it promises, and `resolve_churn_threshold` applies
+    the one it resolves. Both read this, so a template literal cannot drift from the CLI.
+    """
+    return DEFAULT_CHURN_RATIO
+
 
 _RATIO_KEY = "rereview_churn_ratio"
 _GATE_KEY = "rereview_churn_gate"
@@ -313,9 +326,217 @@ def pin(root: Path, slug: str, label: str) -> str:
     return commit
 
 
+# ── oscillation (Phase 7 — report only; it can never block a grade) ─────────
+
+_HUNK_HEADER = re.compile(r"^@@ -\d+(?:,\d+)? \+\d+(?:,\d+)? @@ ?(.*)$")
+
+
+@dataclass(frozen=True)
+class HunkRecord:
+    """One changed hunk as of one round.
+
+    Keyed on `(path, content_hash, symbol)` — the symbol is not decoration. Identical text
+    in two functions is two hunks; without the symbol, a removal in one and an addition of
+    the same line in the other reads as a restoration and raises a spec_gap against code
+    that never oscillated.
+    """
+
+    round: int
+    path: str
+    content_hash: str
+    symbol: str
+    present: bool
+
+
+@dataclass(frozen=True)
+class Oscillation:
+    """A hunk one round removed and a later round put back.
+
+    `tag` is fixed at `manual-only` and is not a parameter. Two rounds disagreeing about the
+    same code is a gap in the SPEC, not a defect in the diff; if it could join the voting set
+    it would make grade A unreachable for a review whose only real problem is that nobody
+    wrote down which behaviour was wanted.
+    """
+
+    path: str
+    symbol: str
+    content_hash: str
+    rounds: tuple[int, ...]
+    tag: str = "manual-only"
+    category: str = "spec_gap"
+    severity: str = "P1"
+
+    def as_row(self) -> dict[str, Any]:
+        return {
+            "path": self.path,
+            "symbol": self.symbol,
+            "content_hash": self.content_hash,
+            "rounds": list(self.rounds),
+            "tag": self.tag,
+            "category": self.category,
+            "severity": self.severity,
+        }
+
+
+def normalize_hunk_body(lines: list[str]) -> str:
+    """Changed lines only, sign- and indentation-blind.
+
+    Sign-blind because a removal and its later restoration must hash the SAME — that identity
+    is what makes the pair detectable. Indentation-blind because a restoration that lands at a
+    different nesting level is still the same decision being reversed, and hashing raw text
+    would let a re-indent hide it.
+    """
+    parts = [ln[1:].strip() for ln in lines if ln[:1] in {"+", "-"}]
+    return "\n".join(p for p in parts if p)
+
+
+def parse_hunks(diff_text: str, round_no: int) -> list[HunkRecord]:
+    """Read hunks from a unified diff, taking the enclosing symbol from git's own header.
+
+    Git already prints the enclosing function on the `@@` line, so no language parser is
+    needed and none is added — a wrong symbol from a hand-rolled parser would silently
+    re-key hunks and lose the very pairs this looks for.
+    """
+    records: list[HunkRecord] = []
+    path = ""
+    symbol = ""
+    body: list[str] = []
+    started = False
+
+    def flush() -> None:
+        if not started:
+            return
+        content = normalize_hunk_body(body)
+        if not content:
+            return
+        added = sum(1 for ln in body if ln.startswith("+"))
+        removed = sum(1 for ln in body if ln.startswith("-"))
+        records.append(
+            HunkRecord(
+                round=round_no,
+                path=path,
+                content_hash=hashlib.sha256(content.encode("utf-8")).hexdigest()[:16],
+                symbol=symbol,
+                present=added >= removed,
+            )
+        )
+
+    for line in diff_text.splitlines():
+        if line.startswith("+++ "):
+            flush()
+            started = False
+            body = []
+            path = line[4:].strip()
+            path = path[2:] if path.startswith(("a/", "b/")) else path
+            continue
+        header = _HUNK_HEADER.match(line)
+        if header:
+            flush()
+            started = True
+            body = []
+            symbol = header.group(1).strip()
+            continue
+        if started and line[:1] in {"+", "-", " "} and not line.startswith(("+++", "---")):
+            body.append(line)
+    flush()
+    return records
+
+
+def detect_oscillation(records: list[HunkRecord]) -> list[Oscillation]:
+    """A hunk one round REMOVED that a later round put back — a removal followed by a return.
+
+    Only the removal→return pair, in that order. Three near-misses this deliberately excludes:
+    "touched in two rounds" matches every ordinary repair round, so the report would be noise
+    from its first run; a removal left removed is a fix; and an addition that is only ever
+    added is ordinary forward work. A leading presence is NOT required — the common real shape
+    is a guard removed in round 2 and restored in round 3, which never appears before its own
+    removal.
+    """
+    grouped: dict[tuple[str, str, str], list[HunkRecord]] = {}
+    for rec in records:
+        grouped.setdefault((rec.path, rec.content_hash, rec.symbol), []).append(rec)
+
+    found: list[Oscillation] = []
+    for (path, content_hash, symbol), group in grouped.items():
+        ordered = sorted(group, key=lambda r: r.round)
+        seen_removal = False
+        oscillates = False
+        for rec in ordered:
+            if not rec.present:
+                seen_removal = True
+            elif seen_removal:
+                oscillates = True
+                break
+        if oscillates:
+            found.append(
+                Oscillation(
+                    path=path,
+                    symbol=symbol,
+                    content_hash=content_hash,
+                    rounds=tuple(r.round for r in ordered),
+                )
+            )
+    return sorted(found, key=lambda o: (o.path, o.symbol, o.content_hash))
+
+
+def scan_rounds(root: Path, slug: str, rounds: list[int]) -> list[HunkRecord]:
+    """Re-read every repair round from the endpoint refs Phase 5 already pinned.
+
+    No per-round accumulation file: the pins ARE the record, so a review that crashed
+    mid-loop can still be scanned afterwards, and there is no second store to fall out of
+    step with the first.
+    """
+    records: list[HunkRecord] = []
+    for round_no in sorted(set(rounds)):
+        try:
+            diff = _git(
+                root,
+                "diff",
+                pin_ref(slug, f"r{round_no}-pre"),
+                pin_ref(slug, f"r{round_no}-post"),
+            )
+        except subprocess.CalledProcessError:
+            # A round whose pins are missing is skipped, not fatal: the report is advisory
+            # and a partial scan is worth more than no scan. It is also visible — the
+            # round simply contributes no hunks, so it cannot fake a restoration.
+            continue
+        records.extend(parse_hunks(diff, round_no))
+    return records
+
+
+def oscillation_path(root: Path, slug: str) -> Path:
+    return root / ".claude" / "observability" / f"review-oscillation-{slug}.jsonl"
+
+
+def record_oscillations(root: Path, slug: str, findings: list[Oscillation]) -> Path:
+    """Append one row per oscillation; write NOTHING when there are none.
+
+    An empty file would read, later, as "the report ran and found nothing" for a review
+    where it never ran at all.
+    """
+    path = oscillation_path(root, slug)
+    if not findings:
+        return path
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = "".join(json.dumps(f.as_row(), sort_keys=True) + "\n" for f in findings)
+    fd = os.open(str(path), os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o644)
+    try:
+        view = memoryview(payload.encode("utf-8"))
+        written = 0
+        while written < len(view):
+            n = os.write(fd, view[written:])
+            if n == 0:
+                raise OSError("os.write returned 0 appending the oscillation report")
+            written += n
+    finally:
+        os.close(fd)
+    return path
+
+
 _USAGE = (
     "usage: hm review_churn measure --pre <ref> --post <ref> [--root <dir>]\n"
     "       hm review_churn pin --slug <slug> --label <name> [--root <dir>]\n"
+    "       hm review_churn oscillation --slug <slug> --rounds 2,3,4 [--root <dir>]\n"
 )
 
 
@@ -324,11 +545,12 @@ def main(argv: list[str] | None = None) -> int:
     if guard is not None:
         return guard
     parser = argparse.ArgumentParser(prog="hm review_churn", add_help=True)
-    parser.add_argument("verb", choices=["measure", "pin"])
+    parser.add_argument("verb", choices=["measure", "pin", "oscillation"])
     parser.add_argument("--pre")
     parser.add_argument("--post")
     parser.add_argument("--slug")
     parser.add_argument("--label")
+    parser.add_argument("--rounds")
     parser.add_argument("--root", default=".")
     try:
         opts = parser.parse_args(argv if argv is not None else sys.argv[1:])
@@ -342,6 +564,20 @@ def main(argv: list[str] | None = None) -> int:
                 sys.stderr.write(_USAGE)
                 return 2
             sys.stdout.write(pin(Path(opts.root), opts.slug, opts.label) + "\n")
+            return 0
+        if opts.verb == "oscillation":
+            if not opts.slug or not opts.rounds:
+                sys.stderr.write(_USAGE)
+                return 2
+            try:
+                rounds = [int(part) for part in opts.rounds.split(",") if part.strip()]
+            except ValueError:
+                sys.stderr.write("--rounds takes comma-separated integers, e.g. 2,3,4\n")
+                return 2
+            root = Path(opts.root)
+            findings = detect_oscillation(scan_rounds(root, opts.slug, rounds))
+            record_oscillations(root, opts.slug, findings)
+            sys.stdout.write(json.dumps([f.as_row() for f in findings], sort_keys=True) + "\n")
             return 0
         if not opts.pre or not opts.post:
             sys.stderr.write(_USAGE)

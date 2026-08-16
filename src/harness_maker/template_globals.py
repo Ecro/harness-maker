@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from harness_maker import conditional_router
+from harness_maker import conditional_router, review_churn
 
 if TYPE_CHECKING:  # pragma: no cover - import cycle only matters at type-check time
     from jinja2 import Environment
@@ -29,6 +29,10 @@ TEMPLATE_GLOBALS: dict[str, object] = {
     "lens_dispatch": conditional_router.lens_dispatch,
     "mandatory_lenses": conditional_router.mandatory_lenses,
     "routable_lenses": conditional_router.routable_lenses,
+    # Same reason, different axis: the rendered gate branch and `resolve_churn_threshold`
+    # must agree on what "absent key" means. A literal `0.20` in the template would let the
+    # prose promise one threshold while the CLI applied another.
+    "default_churn_ratio": review_churn.default_churn_ratio,
 }
 
 

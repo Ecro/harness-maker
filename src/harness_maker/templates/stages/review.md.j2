@@ -794,16 +794,43 @@ Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_pat
 !{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_churn pin --slug {slug} --label r{N}-post && uv run --with {{ harness_maker_src_path }} hm review_churn measure --pre refs/hm-churn/v1/{slug}-r{N}-pre --post refs/hm-churn/v1/{slug}-r{N}-post
 ```{% endif %}
 
-   **Record only — nothing branches on the ratio in this version.** Carry the four
-   `churn_*` keys verbatim into the iteration record and the telemetry row. A null
-   `churn_ratio` beside `churn_measured_n: 0` means no file was measurable (all
-   binary/deleted), which is a different fact from a round that changed nothing.
+   Carry the four `churn_*` keys verbatim into the iteration record and the telemetry row.
+   A null `churn_ratio` beside `churn_measured_n: 0` means no file was measurable (all
+   binary/deleted), which is a different fact from a round that changed nothing — and Step 6
+   treats the two differently.{% if not config.reviewers.get("rereview_churn_gate", True) %}
+   **Record only here — `reviewers.rereview_churn_gate` is off, so nothing branches on the
+   ratio.** The rows still accrue, which is what a later recalibration reads.{% endif %}
 
-6. **Re-review (selective)** — re-spawn ONLY reviewers whose scope was touched by applied fixes. Launch all required re-reviewers in parallel in one Task batch when their scopes are independent. Reviewers that approved untouched files are NOT re-run. Multi-instance code-reviewer consensus (when configured) still uses the configured number of instances on modified files. **`unreviewed_fix_count` = applied fixes whose file no re-spawned reviewer covers.**
+{% if config.reviewers.get("rereview_churn_gate", True) %}6. **Re-review (gated on Step 5b's ratio).** Three branches, and the third is the one that matters:
+
+   - **`churn_ratio` is null** (nothing measurable — the whole diff was binary or deleted) →
+     re-review as if the gate were off. Unmeasured is not "below the threshold"; treating it as
+     below would silently skip every round the measurement could not see.
+   - **`churn_ratio` < `{{ config.reviewers.get("rereview_churn_ratio", default_churn_ratio()) }}`** → **dispatch nobody.**
+     Record `rereview: skipped — {reason}` in the iteration record, with `{reason}` copied
+     verbatim from the CLI below so the skip is auditable without re-running anything.
+   - **at or above** → run exactly the dispatch the CLI names — **one** structured reviewer over
+     the changed hunks, not the scope-selected set. One is sufficient because a single lens now
+     carries a full vote (ADR-007).
+
+{% if is_codex %}```bash
+Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_consensus plan --churn-ratio <the measured ratio> --threshold {{ config.reviewers.get("rereview_churn_ratio", default_churn_ratio()) }}")
+```{% else %}```bash
+!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_consensus plan --churn-ratio <the measured ratio> --threshold {{ config.reviewers.get("rereview_churn_ratio", default_churn_ratio()) }}
+```{% endif %}
+
+   It prints `{"dispatches": [...], "reason": "churn <r> <op> <t>"}`. An empty `dispatches` IS
+   the skip — do not second-guess it by re-spawning the old set. To restore the pre-gate
+   behaviour, set `reviewers.rereview_churn_gate: false` and re-render.
+{% else %}6. **Re-review (selective)** — re-spawn ONLY reviewers whose scope was touched by applied fixes. Launch all required re-reviewers in parallel in one Task batch when their scopes are independent. Reviewers that approved untouched files are NOT re-run. Multi-instance code-reviewer consensus (when configured) still uses the configured number of instances on modified files.
+{% endif %}
+   **`unreviewed_fix_count` = applied fixes whose file no re-spawned reviewer covers.** A skipped
+   re-review re-spawns nobody, so every fix in that round counts — the skip is a deliberate
+   trade, and hiding its cost from the terminal measure would make the trade unmeasurable.
 
 7. **Recompute grade** using the current voting set (Step 4 again, clusters rebuilt per the round-state contract).
 
-7b. **Evaluate the progress invariant.** No lifecycle transition this round → stop now with `CHANGES_REQUESTED` and exit reason `no-progress`.
+7b. **Evaluate the progress invariant.** No lifecycle transition this round → stop now with `CHANGES_REQUESTED` and exit reason `no-progress`, **attaching Step 5b's `churn_ratio`** (null when nothing was measurable — record the null, do not omit the field). A stall that churned a lot and a stall that churned nothing are opposite diagnoses; the exit reason alone cannot tell them apart, which is why the gate's threshold is recalibrated from these rows.
 
 8. **Append iteration record** to the REVIEW report:
 
@@ -957,6 +984,22 @@ opposite responses. This cap deserves the same treatment rather than a guess.
 {% endif %}
 
 ## Final Summary (always)
+
+**First, scan the repair rounds for oscillation** — a hunk one round removed and a later round
+put back. `<rounds>` is the comma-separated repair rounds that ran (`2,3` after two of them);
+skip the call when none did:
+
+{% if is_codex %}```bash
+Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_churn oscillation --slug {slug} --rounds <rounds>")
+```{% else %}```bash
+!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_churn oscillation --slug {slug} --rounds <rounds>
+```{% endif %}
+
+Each row is a `manual-only` P1 `spec_gap`: two rounds disagreed about the same code, which is
+a gap in the SPEC rather than a defect in the diff. **It never moves the grade** and never
+joins the voting set — a review whose only real problem is that nobody wrote down which
+behaviour was wanted must still be able to reach A. Report the rows under a `## 🔁 Oscillation` heading
+with the question each one raises for the human; an empty list writes nothing at all.
 
 Append to the REVIEW report:
 
