@@ -4,7 +4,7 @@ harness_maker_version: 0.52.4
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: harness-yaml/Production.yaml.j2
 provenance: official
-content_hash: 834f490896b2a8bac17ca2c8b2f0e66f23299df94308d41d9e0ac8d07bc6a263
+content_hash: 5d3da2f675c99bc4c92dfc22bdc20b0bccc1a3232856123eaf3b0433ebcf5172
 ---
 preset: Production
 locale: ko
