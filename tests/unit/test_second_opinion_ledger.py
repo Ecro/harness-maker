@@ -7,13 +7,19 @@ from pathlib import Path
 
 import pytest
 
+from harness_maker import codex_ledger
 from harness_maker.codex_ledger import (
     _LEGACY_LEDGER_FILENAME,
     LEDGER_FILENAME,
     SecondOpinionRecord,
-    emit,
     record_from_dict,
 )
+
+# `emit` is called through the MODULE, never from-imported. A from-import binds the real
+# function into this module's globals at import time, so the root conftest's autouse
+# redirect — a `monkeypatch.setattr(codex_ledger, "emit", ...)` — cannot reach it, and any
+# future call here that forgets `project_root=` would append to the live ledger with every
+# isolation gate green. Two reviewer lenses found this module as the standing precedent.
 
 
 def _obs_dir(tmp_path: Path) -> Path:
@@ -56,7 +62,7 @@ def test_status_enum_accepts_failed() -> None:
 
 def test_emit_writes_new_filename(tmp_path: Path) -> None:
     obs = _obs_dir(tmp_path)
-    path = emit(_record(), project_root=tmp_path, observability_dir=obs)
+    path = codex_ledger.emit(_record(), project_root=tmp_path, observability_dir=obs)
     assert path.name == LEDGER_FILENAME
     rows = path.read_text(encoding="utf-8").strip().splitlines()
     assert len(rows) == 1
@@ -82,7 +88,7 @@ def _legacy_row(**over: object) -> str:
 def test_forward_copy_tags_legacy_rows_codex(tmp_path: Path) -> None:
     obs = _obs_dir(tmp_path)
     (obs / _LEGACY_LEDGER_FILENAME).write_text(_legacy_row() + "\n", encoding="utf-8")
-    emit(_record(), project_root=tmp_path, observability_dir=obs)
+    codex_ledger.emit(_record(), project_root=tmp_path, observability_dir=obs)
     rows = (obs / LEDGER_FILENAME).read_text(encoding="utf-8").strip().splitlines()
     # 1 forward-copied legacy row + 1 fresh emit
     assert len(rows) == 2
@@ -95,8 +101,8 @@ def test_forward_copy_tags_legacy_rows_codex(tmp_path: Path) -> None:
 def test_forward_copy_is_one_time_not_repeated(tmp_path: Path) -> None:
     obs = _obs_dir(tmp_path)
     (obs / _LEGACY_LEDGER_FILENAME).write_text(_legacy_row() + "\n", encoding="utf-8")
-    emit(_record(), project_root=tmp_path, observability_dir=obs)
-    emit(_record(finding_ref="f2"), project_root=tmp_path, observability_dir=obs)
+    codex_ledger.emit(_record(), project_root=tmp_path, observability_dir=obs)
+    codex_ledger.emit(_record(finding_ref="f2"), project_root=tmp_path, observability_dir=obs)
     rows = (obs / LEDGER_FILENAME).read_text(encoding="utf-8").strip().splitlines()
     # 1 legacy + 2 fresh — the legacy migration must NOT re-run on the second emit
     assert len(rows) == 3
@@ -107,7 +113,7 @@ def test_forward_copy_skips_when_new_file_exists(tmp_path: Path) -> None:
     obs = _obs_dir(tmp_path)
     (obs / _LEGACY_LEDGER_FILENAME).write_text(_legacy_row() + "\n", encoding="utf-8")
     (obs / LEDGER_FILENAME).write_text(json.dumps(_record().model_dump()) + "\n", encoding="utf-8")
-    emit(_record(finding_ref="f2"), project_root=tmp_path, observability_dir=obs)
+    codex_ledger.emit(_record(finding_ref="f2"), project_root=tmp_path, observability_dir=obs)
     rows = (obs / LEDGER_FILENAME).read_text(encoding="utf-8").strip().splitlines()
     # new file pre-existed -> legacy migration is a no-op; only the 2 new rows present
     assert all(json.loads(r)["slug"] != "old" for r in rows)
@@ -117,7 +123,7 @@ def test_forward_copy_skips_malformed_legacy_rows(tmp_path: Path) -> None:
     obs = _obs_dir(tmp_path)
     content = "not json\n" + _legacy_row() + "\n" + '{"partial":\n'
     (obs / _LEGACY_LEDGER_FILENAME).write_text(content, encoding="utf-8")
-    emit(_record(), project_root=tmp_path, observability_dir=obs)
+    codex_ledger.emit(_record(), project_root=tmp_path, observability_dir=obs)
     rows = (obs / LEDGER_FILENAME).read_text(encoding="utf-8").strip().splitlines()
     # 1 valid legacy row survives + 1 fresh; the 2 malformed lines are dropped
     assert len(rows) == 2
@@ -125,7 +131,7 @@ def test_forward_copy_skips_malformed_legacy_rows(tmp_path: Path) -> None:
 
 def test_new_only_no_legacy(tmp_path: Path) -> None:
     obs = _obs_dir(tmp_path)
-    emit(_record(), project_root=tmp_path, observability_dir=obs)
+    codex_ledger.emit(_record(), project_root=tmp_path, observability_dir=obs)
     rows = (obs / LEDGER_FILENAME).read_text(encoding="utf-8").strip().splitlines()
     assert len(rows) == 1
 

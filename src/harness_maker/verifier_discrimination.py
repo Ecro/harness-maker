@@ -42,23 +42,24 @@ import argparse
 import json
 import sys
 from collections import Counter
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from harness_maker import command_registry
+from harness_maker import command_registry, ledger_exclusions
 from harness_maker.stage_agent_ledger import DISPATCH_SENTINELS
 
 DEFAULT_LEDGER = Path(".claude/observability/second-opinion.jsonl")
 DEFAULT_REVIEW_GLOB = "review-*.jsonl"
 DEFAULT_AGENT_GLOB = "stage-agents*.jsonl"
 
-#: Project-local list of run ids whose rows must not enter any aggregate, as
-#: ``{"<run-id>": "<why>"}``. These ledgers are append-only with **no retract verb**, so a row
-#: written in error is permanent; without a reader-side exclusion one mistake silently biases
-#: every future number. This repository has one: `aiexit-exec-p2b` records a `PASS` emitted
-#: BEFORE the round it claims to describe was dispatched.
-EXCLUSIONS_FILE = ".ledger-exclusions.json"
+#: The exclusions filename and its schema live in ``ledger_exclusions`` — this module used to
+#: declare its own copy alongside a comment documenting the RETIRED ``{"<run-id>": "<why>"}``
+#: map as authoritative, while SPEC and PLAN both pointed readers here as "the only exclusion
+#: reader". Someone routed here would have written the map form, which the second-opinion
+#: ledger's rows (no ``run_id`` field at all) can never match — silently. Two names for one
+#: file, one of them describing a schema that no longer holds, is worse than no comment.
 
 #: Below this many episodes a 0% release rate is small-sample noise, not a property of the gate.
 _DEGENERATE_MIN_EPISODES = 5
@@ -144,23 +145,15 @@ def read_rows(path: Path) -> list[dict[str, Any]]:
     return rows
 
 
-def load_exclusions(observability_dir: Path) -> dict[str, str]:
-    """Run ids to drop, with reasons. Absent file → nothing excluded (the common case)."""
-    path = observability_dir / EXCLUSIONS_FILE
-    if not path.is_file():
-        return {}
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError) as exc:
-        # Loud, not silent. A trailing comma re-admits the rows this file exists to drop, into
-        # every aggregate, with no diagnostic — the same silent-no-op shape as the skip-rate
-        # contamination this repository already records.
-        sys.stderr.write(f"[ledger] {path} unreadable ({exc}) — NO rows excluded\n")
-        return {}
-    if not isinstance(payload, dict):
-        sys.stderr.write(f"[ledger] {path} is not an object — NO rows excluded\n")
-        return {}
-    return {str(k): str(v) for k, v in payload.items()}
+def load_exclusions(observability_dir: Path) -> list[ledger_exclusions.Exclusion]:
+    """Delegates to the ONE reader (ADR-007). Kept as a name so call sites read the same.
+
+    The body used to live here and returned a run-id map, which the second-opinion ledger
+    could not use at all — its rows have no `run_id` field. Loudness and the deliberate
+    fail-open are documented at `ledger_exclusions.load`, which owns them; this must stay a
+    delegation, not a copy, or the two ledgers drift apart one branch at a time.
+    """
+    return ledger_exclusions.load(observability_dir)
 
 
 def agent_rounds(observability_dir: Path) -> dict[str, Any]:
@@ -180,7 +173,7 @@ def agent_rounds(observability_dir: Path) -> dict[str, Any]:
     for path in sorted(observability_dir.glob(DEFAULT_AGENT_GLOB)):
         for row in read_rows(path):
             run_id = str(row.get("run_id"))
-            if run_id in exclusions:
+            if ledger_exclusions.is_excluded(row, exclusions):
                 continue
             # All FOUR fields. `stage_agent_ledger.check_run_coherence` states the rule and
             # the reason: `run_id` is chosen by the model and nothing enforces uniqueness, so
@@ -252,7 +245,12 @@ def agent_rounds(observability_dir: Path) -> dict[str, Any]:
         "agents": out,
         "conflicting_rows": conflicts,
         "degenerate_gates": degenerate,
-        "excluded_run_ids": exclusions,
+        # Kept under its historical name and shape for compatibility with its one reader.
+        # It is LOSSY by construction: a slug entry and a stage entry sharing a value
+        # collapse to one line, and the `key` that distinguished them is gone. `exclusions`
+        # below is the honest record — this field is the compatible one.
+        "excluded_run_ids": {e.value: e.reason for e in exclusions},
+        "exclusions": [{"key": e.key, "value": e.value, "reason": e.reason} for e in exclusions],
         "note": (
             "`bound_by_the_cap` counts episodes whose final pass was still unclean. A "
             "release_rate of 0 is NOT by itself evidence about the verifier: it is equally "
@@ -285,9 +283,26 @@ def analyse(rows: list[dict[str, Any]]) -> dict[str, ModelStats]:
     return out
 
 
-def to_payload(stats: dict[str, ModelStats]) -> dict[str, Any]:
-    """JSON view. `false_acceptance_rate` is absent by design — see the module docstring."""
+def to_payload(
+    stats: dict[str, ModelStats],
+    exclusions: Sequence[ledger_exclusions.Exclusion] = (),
+    *,
+    dropped_n: int = 0,
+) -> dict[str, Any]:
+    """JSON view. `false_acceptance_rate` is absent by design — see the module docstring.
+
+    ``exclusions``/``dropped_n`` are published because this report started filtering rows for
+    the first time. Before ADR-007 the filter keyed on ``run_id``, which second-opinion rows
+    do not have, so it was a guaranteed no-op; now one line in a gitignored file can remove a
+    whole stage from the denominator and the payload would still read clean. A suppression
+    control whose output does not say what it suppressed is the same silent bias the
+    exclusions mechanism exists to remove, one function away.
+    """
     return {
+        "exclusions": {
+            "applied": [{"key": e.key, "value": e.value, "reason": e.reason} for e in exclusions],
+            "rows_dropped": dropped_n,
+        },
         "models": {
             name: {
                 "calls": s.calls,
@@ -332,7 +347,7 @@ def marginal_gain(observability_dir: Path) -> dict[str, Any]:
     per_slug: dict[str, dict[int, int]] = {}
     for path in sorted(observability_dir.glob(DEFAULT_REVIEW_GLOB)):
         for row in read_rows(path):
-            if str(row.get("run_id")) in exclusions:
+            if ledger_exclusions.is_excluded(row, exclusions):
                 continue
             slug = str(row.get("slug"))
             rnd = row.get("round")
@@ -440,15 +455,29 @@ def main(argv: list[str] | None = None) -> int:
     # The exclusions file says these rows "must not enter ANY aggregate"; honouring it only in
     # `agents` made that false for `report`, which is where the loss-rate lives.
     exclusions = load_exclusions(opts.ledger.parent)
+    total = len(rows)
     if exclusions:
-        rows = [r for r in rows if str(r.get("run_id")) not in exclusions]
+        rows = [r for r in rows if not ledger_exclusions.is_excluded(r, exclusions)]
+    dropped = total - len(rows)
     if not rows:
-        sys.stderr.write(
-            f"verifier_discrimination: no rows at {opts.ledger} — nothing to report. "
-            "This is not a clean bill of health; it is an absence of evidence.\n"
-        )
+        if total:
+            # An intact, full ledger emptied by an over-broad predicate is a CONFIGURATION
+            # problem, and the absence-of-evidence line points the operator at the wrong
+            # file. Naming the exclusions file is the difference between a five-minute fix
+            # and an investigation of a ledger that turns out to be fine.
+            sys.stderr.write(
+                f"verifier_discrimination: all {total} row(s) at {opts.ledger} were excluded "
+                f"by {ledger_exclusions.EXCLUSIONS_FILE} — nothing left to report. The ledger "
+                "is intact; the exclusion set is too broad.\n"
+            )
+        else:
+            sys.stderr.write(
+                f"verifier_discrimination: no rows at {opts.ledger} — nothing to report. "
+                "This is not a clean bill of health; it is an absence of evidence.\n"
+            )
         return 1
-    sys.stdout.write(json.dumps(to_payload(analyse(rows)), indent=2, sort_keys=True) + "\n")
+    payload = to_payload(analyse(rows), exclusions, dropped_n=dropped)
+    sys.stdout.write(json.dumps(payload, indent=2, sort_keys=True) + "\n")
     return 0
 
 

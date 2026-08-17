@@ -47,7 +47,8 @@ mechanism, the loop should be required to escalate to "is this mechanism constru
 rather than schedule round 4 — here the answer was no (no liveness signal outlives the CLI:
 [[fail:design claim-record-used-as-access-control-list]]), and one round spent asking would have
 been cheaper than two spent patching.
-**Triggered by:** [fail:test] fix-introduced-defect-passes-all-gates (count: 9 as of 2026-08-17; this proposal was written at count: 3)
+**Triggered by:** [fail:test] fix-introduced-defect-passes-all-gates (count: 10 as of 2026-08-17; this proposal was written at count: 3)
+**Instance 10 (2026-08-17, lens-and-review-fix-verification) supplies the first evidence of what actually stops the compounding, and it is cheaper than a re-review dispatch.** Six consecutive rounds (Phase A.5 3->4, plan-validator 1->2, review 2->3) each introduced ~1 new defect. Round 3 of review was the first to introduce **zero**, and it was also the first whose repairs each added a test that goes RED when the repair is reverted. The two facts are the same fact: the defect-introducing rounds shipped fixes whose only evidence was a green suite — a signal that was green before the fix too — while the clean round shipped fixes whose evidence was a revert. Sharpened mechanism: before round N+1 recomputes a grade, require per-fix revert evidence (name the test, show it dies without the fix). That is mechanically checkable and does not need a second reviewer dispatch, so it can gate rounds the budget cannot afford to re-review.
 **Rate, finally measured (2026-08-15, ai-review-exit-criteria):** round 1 produced 15 findings; the repairs for them produced 8 in round 2, and **all eight were created by those repairs** — not one was a pre-existing defect round 1 had missed. That is the first clean numerator/denominator this entry has: 8/15. It also sharpens what a mechanism must catch, because two of the 15 repairs did not close their own finding (a grace window keyed on the wrong timestamp; a coverage fix that handled only the branch the loop never takes). So a re-review of the fix delta is necessary but not sufficient — the obligation has to include *re-deriving the finding's failure scenario against the repaired code*, which is what caught both.
  — the seventh instance (multi-lens-review-round) extends the proposal's SCOPE, not just its count: five of that unit's six compounding rounds happened during **planning**, where there is no fix delta and no suite to re-review — each PLAN revision introduced the next round's P0 at the same rate the code rounds did. A mechanism aimed only at the review auto-fix loop therefore addresses at most half of this entry's mass; the plan-validator loop needs the mirror obligation (when a PLAN revision is itself a repair, re-derive the truth table of any condition it adds, and re-read the whole rule rather than the edited sentence). The fourth instance is PLAN-harness-diet Phases 2-6: 14 findings over four rounds, 11 of them introduced by this task's own fixes, seven while fixing the other four. It also sharpens the proposal: three of the eleven were a single class-default flip re-fixed four times, so the receipt should demand an ENUMERATION (the grep and its full result set) whenever a fix changes a shared default or a shared allowlist, not just a re-review of the diff.
 **Proposed mechanism:** make the review stage's auto-fix loop re-review the FIX DELTA, not
@@ -204,7 +205,17 @@ positives against the tree BEFORE building the gate, and drop it if the ratio re
 ---
 
 ## Proposal: a whole-file substring assertion may not stand in for a per-item claim (2026-08-08)
-**Triggered by:** [fail:test] assertion-invariant-over-named-dimension (count: 12 as of 2026-08-15 — instance 12 moved the class from the ASSERTION to the FIXTURE: the assertion named the age dimension correctly, but the helper could only build refs pointing at a just-created HEAD, so no input it produced was old and the assertion held for the broken implementation too. A mechanism that inspects assertions in isolation cannot see this; it has to ask whether the fixture can express the production shape. Original entry: count: 11 as of
+**Triggered by:** [fail:test] assertion-invariant-over-named-dimension (count: 13 as of 2026-08-17.
+Instance 13 (lens-and-review-fix-verification) adds the **mirror direction**, which every
+formulation of this proposal so far has excluded by construction: a delegation test injected an
+exclusion for a field the fixture hardcodes to a different value, so the assertion was
+UNSATISFIABLE by any correct implementation — it went red for a reason unrelated to the defect it
+named. Alongside it, the ordinary direction: an isolation canary asserted a resolved-root
+INEQUALITY that held precisely while the resolver was still returning the real repository,
+certifying a live leak as safe. A mechanism phrased as "can this assertion fail in the broken
+world?" catches the second and is silent on the first. Phrase it symmetrically instead: **the
+assertion must be shown to fail against the named wrong implementation AND to pass against the
+intended one**, both demonstrated, which is one revert and one green run. Prior text: count: 12 as of 2026-08-15 — instance 12 moved the class from the ASSERTION to the FIXTURE: the assertion named the age dimension correctly, but the helper could only build refs pointing at a just-created HEAD, so no input it produced was old and the assertion held for the broken implementation too. A mechanism that inspects assertions in isolation cannot see this; it has to ask whether the fixture can express the production shape. Original entry: count: 11 as of
 2026-08-13; this proposal was written at count: 10, when it was the highest-count entry with
 no proposal of any kind). The eleventh instance (plan-interview-comprehension) is NOT the
 containment shape this proposal targets, and that is the useful part: all three of its
@@ -333,7 +344,15 @@ the grade and needs its own PLAN. Do not do them in a review round.
 
 ## Proposal: forbid a bare `cd` prefix in stage-rendered Bash (2026-08-10)
 
-**Triggered by:** [fail:runtime] cwd-inherited-from-worktree-into-main-commands (count: 3)
+**Triggered by:** [fail:runtime] cwd-inherited-from-worktree-into-main-commands (count: 4 as of
+2026-08-17; this proposal was written at count: 3) — the fourth instance (lens-and-review-fix-verification)
+breaks the "the misfire only misreads" assumption this proposal was written under: a `cat >>` heredoc
+ran with cwd back at the BASE repo and **appended a 50-line fixture there**, into a tree another
+session was live in. Detector (2) below (`echo pwd` beside the rc) would not have caught it, because
+there is no rc — the write succeeded. Widen the mechanism: the render-grep in (1) must cover
+output-redirecting Bash (`>`, `>>`, `tee`) as well as verdict-bearing commands, and the authoring
+rule should prefer the Write/Edit tool with an absolute path for any append, since those tools
+cannot inherit a stale cwd at all.
 
 **Proposed mechanism:** a structural render-grep over the rendered `.claude/commands/hm/*.md`
 plus a stage-prompt authoring rule.

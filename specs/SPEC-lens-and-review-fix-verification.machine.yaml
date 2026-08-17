@@ -1,0 +1,347 @@
+schema_version: 2
+spec_slug: lens-and-review-fix-verification
+parent_spec: null
+verification_tier: 2
+mutation_threshold: 70
+mutation_threshold_rationale: Mixed Python + Jinja work. The Python surface (lens_coverage,
+  the exclusion filter, the two config resolvers) is small and directly assertable,
+  but three ACs land in templates where mutation testing has no purchase, so the 85
+  bar would be measured against a shrinking denominator and read as stronger than
+  it is.
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/lens_coverage.py
+- src/harness_maker/verifier_discrimination.py
+- src/harness_maker/second_opinion_invoke.py
+- src/harness_maker/interview.py
+- src/harness_maker/models.py
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: The unit suite writes no rows into the base repo's second-opinion ledger
+  type: property
+  test_ids:
+  - tests/unit/test_ledger_isolation.py::test_the_ledger_redirect_fixture_is_autouse_and_actually_patches
+  - tests/unit/test_ledger_isolation.py::test_leaking_invoker_call_lands_in_tmp_path
+  - tests/unit/test_ledger_isolation.py::test_no_test_module_bypasses_the_ledger_redirect
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: 'Invariant over the whole suite, not a site list: running any test
+    must leave the enclosing repository''s ledger byte-identical. It holds regardless
+    of how the invoker is implemented, so an implementation that satisfies it cannot
+    have been derived from reading the invoker.'
+  oracle_independence_waiver: null
+  input_domain: every test in tests/unit collected from the repo root
+  transformation: run the test, then re-read the base repo's second-opinion.jsonl
+  expected_relation: row count and byte length are unchanged from before the run
+  preconditions:
+  - cwd is inside the harness-maker git repository
+  - the ledger file exists before the run
+  observable_output: byte length and line count of .claude/observability/second-opinion.jsonl
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: Recorded synthetic rows are excluded at read time
+  type: mechanical
+  test_ids:
+  - tests/unit/test_ledger_exclusions_call_sites.py::test_excluded_slug_absent_from_second_opinion_aggregate
+  executable_predicate: excluded_slug not in aggregate_second_opinion(ledger_path).slugs
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: A fixture ledger authored by hand with a known row split (3 real,
+    2 excluded) fixes the expected aggregate before any code reads it; the expected
+    numbers come from the fixture's construction, not from running the aggregator.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: The routing paragraph names only agents the dispatch can produce
+  type: mechanical
+  test_ids:
+  - tests/structural/test_routing_prose_matches_dispatch.py::test_routing_prose_names_only_dispatched_agents
+  executable_predicate: agents_named_in_routing_prose(preset) <= {d["agent"] for d
+    in lens_dispatch(preset)}
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: differential
+  oracle_evidence: The reference is conditional_router.lens_dispatch — an independent
+    producer of the same fact the prose asserts. Neither was written from the other,
+    which is precisely why they disagreed and shipped that way.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: Unstamped findings are reported without blocking approval
+  type: mechanical
+  test_ids:
+  - tests/unit/test_lens_coverage.py::test_lens_coverage_reports_unstamped_without_blocking
+  executable_predicate: verdict["unstamped"] == ["security"] and verdict["blocks_approval"]
+    is False
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: Two hand-built result directories — one fully stamped, one with
+    a single lens unstamped — fix both expected values before the check runs. The
+    live neuroTerm run (19/19 unstamped, blocks_approval false) supplies the real-world
+    shape the fixtures imitate.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-005
+  title: An absent instrumentation key resolves to off
+  type: mechanical
+  test_ids:
+  - tests/unit/test_instrumentation_absent_key.py::test_absent_instrumentation_key_resolves_false
+  executable_predicate: parse_instrumentation({}).stage_agent_ledger is False
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The expected value is the operator's Round-2 decision, recorded
+    in the SPEC before any code changed. It is not read off the resolver — the resolver
+    currently returns the opposite.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-006
+  title: reviewers.review_doc selects how much REVIEW prose is written
+  type: parametric
+  test_ids:
+  - tests/render/test_review_doc_modes.py::test_review_doc_modes_render_expected_sections
+  executable_predicate: null
+  golden_table:
+  - input:
+      review_doc: full
+    expected: frontmatter=1 loop_state=1 findings_lists=1 narrative=1
+    edge: false
+    note: ''
+  - input:
+      review_doc: lean
+    expected: frontmatter=1 loop_state=1 findings_lists=1 narrative=0
+    edge: false
+    note: ''
+  - input:
+      review_doc: frontmatter-only
+    expected: frontmatter=1 loop_state=1 findings_lists=0 narrative=0
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The table is the operator's Round-3/4 decision, fixed in the SPEC
+    before implementation. The loop_state column is true in every row on purpose —
+    it is the constraint that made frontmatter-only safe, not an outcome of the render.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-007
+  title: frontmatter-only is the default on both the new-render and absent-key paths
+  type: mechanical
+  test_ids:
+  - tests/unit/test_review_doc_default.py::test_review_doc_default_is_frontmatter_only_on_both_paths
+  executable_predicate: ReviewersConfig().review_doc == "frontmatter-only" and parse_reviewers({}).review_doc
+    == "frontmatter-only"
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: The operator was shown the four-way choice (new=lean/existing=full,
+    both lean, both full, new=frontmatter-only) and picked both-frontmatter-only.
+    The expected value predates the code.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-008
+  title: Antigravity's empty-response failure is a distinguishable class
+  type: mechanical
+  test_ids:
+  - tests/unit/test_second_opinion_agy_envelope.py::test_agy_empty_response_has_distinct_skip_reason
+  executable_predicate: row["skip_reason"].startswith("agy-empty-response") and row["status"]
+    == "failed"
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: differential
+  oracle_evidence: Three fabricated agy envelopes — SUCCESS+empty, SUCCESS+valid structured_output,
+    and a non-SUCCESS status — must produce three distinguishable rows. The discriminating
+    power is checked across the set, so a token that collapses two classes fails even
+    though each row alone looks correct.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-009
+  title: Every observability artifact has a named consumer or is listed as orphaned
+  type: mechanical
+  test_ids:
+  - tests/structural/test_observability_audit_complete.py::test_every_observability_path_appears_in_the_audit
+  executable_predicate: observability_paths_written_by_modules() <= audit_table_paths()
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: property
+  oracle_evidence: Set containment over paths discovered from the module graph, not
+    from a hand list. A new writer added later fails the check by construction — which
+    is the property that makes the audit outlive the day it was written.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-010
+  title: Orphan writers are removed
+  type: mechanical
+  test_ids:
+  - tests/structural/test_observability_audit_complete.py::test_no_module_writes_an_orphan_observability_path
+  executable_predicate: orphan_paths_from_audit() & observability_paths_written_by_modules()
+    == set()
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: differential
+  oracle_evidence: The audit table (AC-009) and the module graph are two independent
+    producers of the same path set; the criterion is their intersection being empty.
+    Neither is derived from the other.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-011
+  title: The lens axis is exercised live in harness-maker and spoton
+  type: parametric
+  test_ids: []
+  executable_predicate: null
+  golden_table:
+  - input:
+      project: harness-maker
+    expected: missing=[] exercised=7 lenses_exercised_non_empty=1
+    edge: false
+    note: ''
+  - input:
+      project: spoton
+    expected: missing=[] exercised=7 lenses_exercised_non_empty=1
+    edge: false
+    note: ''
+  rubric_id: null
+  note: ''
+  pending_test: true
+  oracle_source: golden
+  oracle_evidence: 'The oracle is `hm lens_coverage check`''s own JSON — `missing:
+    []` with all seven lenses in `exercised` — plus a telemetry row carrying a non-empty
+    `lenses_exercised`. Both are produced by machinery independent of the review prose
+    being verified, which is why the neuroTerm run could be trusted as evidence in
+    RESEARCH.'
+  oracle_independence_waiver: 'task-driven: this AC is a live manual run in two external
+    projects, so it has no pytest binding. The recorded CLI JSON and telemetry row
+    are the durable evidence.'
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null

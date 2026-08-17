@@ -825,6 +825,8 @@ All observability is 100% local — nothing is transmitted externally.
 | `.claude/observability/security/findings-*.jsonl` | 7-gate security scan findings |
 | `.claude/observability/adaptive/overrides.jsonl` | `harness_yaml_override` events with `schema_version: 1`, dual capture sites (`/hm:configure` exit primary + SessionStart secondary), dedup-keyed |
 | `.claude/observability/adaptive/last-audit.txt` | Last personalization-audit run timestamp (that layer now runs inside `/hm:health`) |
+| `.claude/observability/second-opinion.jsonl` | One row per cross-model second-opinion call (`finding_ref: "n/a"`) plus one row per finding disposition (`finding_ref` set). Both carry `status: "invoked"`, so `finding_ref` is the only discriminator — aggregate the loss rate as `(skipped + failed) / total`, **per model**, excluding `stage: "health"` rows |
+| `.claude/observability/.ledger-exclusions.json` | Optional. A list of `{key, value, reason}` predicates (`key` is `run_id`, `slug` or `stage`) naming rows the aggregates must ignore — synthetic rows from a past leak, a known-bad run. Read by `harness_maker.ledger_exclusions`, the single reader for both the second-opinion ledger and the verifier-discrimination aggregates. A malformed file **fails open with a loud stderr line**: excluding nothing loudly beats a silently empty aggregate, which is indistinguishable from having nothing to exclude. Filtered reports publish `exclusions: {applied, rows_dropped}` so a filtered number cannot be mistaken for an unfiltered one |
 
 Run `/hm:health` to regenerate the dashboard on demand.
 

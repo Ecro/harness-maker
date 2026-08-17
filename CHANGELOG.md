@@ -78,6 +78,38 @@
   assertion passes on zero recorded calls must fail loudly if the module under test stops
   importing what it patches. `tag_finding` takes `Sequence[object]` rather than `list[object]`
   so callers need not widen their own fixtures to satisfy list invariance.
+- **The unit suite was writing into the real second-opinion ledger, so the health metric
+  CLAUDE.md prescribes was fiction.** Roughly 150 synthetic rows had been appended to
+  `.claude/observability/second-opinion.jsonl` by tests calling the invoker without a
+  `base_root`; measured against the real 332-row ledger, the codex loss rate those rows
+  produced was **64.9%** where the true rate is **1.3%** (228 -> 78 calls). A new autouse
+  fixture in `tests/conftest.py` redirects `codex_ledger.emit` to the test's own `tmp_path`
+  unless the test carries the new `live_ledger` marker. The redirect is on `emit`, **not** on
+  `resolve_base_root`: the resolver-level version broke `mutation_receipt._base_root` (a
+  call-time import that must read a committed ledger) and collapsed `test_dep_map`'s targeted
+  selection. Three tests hold the line — a canary that calls the invoker the way the leak did,
+  an AST scan proving no test module bypasses the fixture, and an assertion that the fixture is
+  in fact autouse and in fact patches.
+
+### Added
+
+- **One read-time exclusion helper shared by both ledgers** — `harness_maker.ledger_exclusions`,
+  the single reader of `.claude/observability/.ledger-exclusions.json`. The schema moved from a
+  `{"<run-id>": "<why>"}` map to a list of `{key, value, reason}` predicates where `key` is
+  `run_id | slug | stage`; the old map could not express a second-opinion exclusion at all,
+  because those rows carry no `run_id`. `verifier_discrimination.py` delegates both the loading
+  **and the predicate** at all three filter sites, so a row whose `stage` collides with an
+  excluded `slug` value is still counted, and it now publishes
+  `exclusions: {applied: [...], rows_dropped: N}` so a filtered aggregate can no longer be read
+  as an unfiltered one. A malformed exclusions file **fails OPEN with a loud stderr line** — a
+  fail-closed reader empties the aggregate, and at that point "excluding nothing" and "having
+  nothing to exclude" are indistinguishable, which is the exact defect this work removes.
+  Antigravity's loss rate is unchanged at 47.1% across the same filter, which is the evidence
+  that it is targeted rather than blanket.
+
+  Scope note: this is **Phase 1 only** of `PLAN-lens-and-review-fix-verification`. Phases 2-5
+  (routing prose, the two config axes, antigravity empty-response classification, the
+  observability audit) were not started; that PLAN is recorded `status: partial`.
 
 ## [0.52.4] - 2026-08-17
 

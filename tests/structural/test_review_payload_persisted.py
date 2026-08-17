@@ -68,6 +68,24 @@ _KNOWN_MISSING: dict[tuple[str, int], str] = {
         "recovery is possible while a later-round one is not, which is an argument for "
         "persisting at merge time rather than as a numbered step the round can skip."
     ),
+    ("lens-and-review-fix-verification", 3): (
+        "round 1 persisted (ea8087ff-20260817T0757Z-round1-merged.json) because the "
+        "orchestrator ran Step 3.4 there; rounds 2 and 3 did not, and the round-3 merged "
+        "voter state existed only in the orchestrator's context. `consensus.json` in the "
+        "session scratchpad is round 1's payload, byte-identical to the persisted file; the "
+        "only round-3 artifact that survives is `review_consensus finalize`'s 568-byte grade "
+        "output, which is a verdict and not a findings payload. Building one now would be "
+        "the manufactured non-capture the entry above rejects, and the precedent there is "
+        "explicit that re-running a converged review to produce a file is a round run for "
+        "the gate rather than for the code. Recorded as missing instead. Two adjacent gaps "
+        "this gate structurally cannot see, both from the same run and both worth more than "
+        "this waiver: round 2 emitted NO telemetry row at all (the gate only inspects rounds "
+        "that appear in the ledger, so a round that never reported is invisible to it), and "
+        "BOTH emitted rows carry `terminal: true` though only round 3 was terminal. With the "
+        "four `churn_*` keys absent from every row in this repository and three others, that "
+        "is four independent defects in one LLM-assembled record — the argument for moving "
+        "the producer from prose into the CLI, not for a better-worded instruction."
+    ),
     ("second-opinion-oracle-polyglot", 1): (
         "the orchestrator ran Pass 1, the cross-model voters and the consensus filter but "
         "skipped Step 3.4 entirely — neither `codex_adapter stamp-ids` nor persist-payload. "

@@ -101,5 +101,6 @@ addopts = "-q"
 markers = [
     "advisory: ADVISORY test — per PLAN-install-cmd-cifence ADR-002, run as a separate CI step with `continue-on-error: true` so unrelated external-tool drift (codex CLI behavior, npm registry availability) cannot block CI. Use `-m advisory` to select; `-m \"not advisory\"` to exclude.",
     "slow: long-running test (e.g. delivery-metrics 2000-commit perf gate) — BLOCKING in CI; deselect locally with `-m \"not slow\"` when iterating.",
-    "live_env: opt OUT of the root conftest's Claude-session env pin (CLAUDECODE / CLAUDE_ENV_FILE / HM_SESSION_ID). Only for tests whose subject IS the ambient environment; everything else must stay deterministic regardless of whether pytest runs inside a Claude Code session.",
+    "live_env: opt OUT of the root conftest's Claude-session env pin (CLAUDECODE / CLAUDE_ENV_FILE / HM_SESSION_ID). Only for tests whose subject IS the ambient environment; everything else must stay deterministic regardless of whether pytest runs inside a Claude Code session. It does NOT affect the ledger redirect — see live_ledger.",
+    "live_ledger: opt OUT of the root conftest's second-opinion ledger redirect, allowing this test to append to the REAL .claude/observability/second-opinion.jsonl. Almost nothing should want this: the suite once wrote 150 synthetic rows into that file and made a model look like 64.9% loss where the truth was 1.3%. Separate from live_env on purpose — one decorator must not disable two orthogonal invariants.",
 ]
