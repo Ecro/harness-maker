@@ -145,6 +145,7 @@ _HARNESS_CHURN_FILES: tuple[str, ...] = (
 _HARNESS_CHURN_GLOBS: tuple[str, ...] = (
     ".claude/.hm-spec-need-*",
     ".claude/.hm-autopilot*",
+    ".claude/.hm-review-run-*",
     _TASK_MARKER_GITIGNORE_PATTERN,
 )
 # Patterns appended to the user's .gitignore (ADR-002) — dirs + exact files + globs.
@@ -608,6 +609,12 @@ _HARNESS_ARTIFACT_PREFIXES = (
     # an exact-match churn-file entry. Registered here so a present marker does
     # NOT trip the dirty-base guard or get stashed at finalize.
     ".claude/.hm-spec-need-",
+    # PLAN-self-induced-regression-gate ADR-003. Slug-keyed, so a prefix and not an exact-file
+    # entry. Registered HERE as well as in the gitignore globs because the finalize dirt-filter
+    # reads this tuple and never the globs — a glob-only registration makes every live
+    # run-state file user dirt that `worktree finalize` sweeps into the stash, releasing every
+    # slug's open run. Same failure the autopilot marker shipped once.
+    ".claude/.hm-review-run-",
     # PLAN-multisession-marker-scoping ADR-011. The FINALIZE filter reads this tuple and
     # NEVER the globs, so without this entry every live per-session autopilot marker is
     # user dirt that `worktree finalize` sweeps into the finalize stash — silently

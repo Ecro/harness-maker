@@ -65,7 +65,17 @@ def test_a_dispatched_module_actually_runs_through_the_console_script() -> None:
     `test_dep_map` is chosen because it succeeds with no repo state and prints parseable
     JSON, so a real dispatch is distinguishable from a no-op exit 0.
     """
-    proc = _uv_run("hm", "test_dep_map", "--root", str(_REPO_ROOT), "--changed-file", "uv.lock")
+    proc = _uv_run(
+        "hm",
+        "test_dep_map",
+        "--root",
+        str(_REPO_ROOT),
+        # A source module no test maps to. The lockfile used to stand here; ADR-006 of
+        # PLAN-self-induced-regression-gate moved the packaging shapes to `CLASS_CONFIG`, so
+        # they select a bounded set instead of forcing FULL and no longer exercise this arm.
+        "--changed-file",
+        "src/harness_maker/deleted_module.py",
+    )
     assert proc.returncode == 0, proc.stderr[-2000:]
     assert '"mode": "full"' in proc.stdout, proc.stdout[:400]
 

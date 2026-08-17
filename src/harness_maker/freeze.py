@@ -12,6 +12,8 @@ import tempfile
 from pathlib import Path
 
 from harness_maker import command_registry
+from harness_maker.io_utils import atomic_write
+from harness_maker.second_opinion_invoke import resolve_base_root
 
 _TIMEOUT = 30
 
@@ -189,11 +191,26 @@ def review_base_stamp(base: Path, slug: str) -> Path:
     return base / FREEZE_STAMP_DIR / f"{validate_slug(slug)}.stamp"
 
 
+def stamp_root(base: Path) -> Path:
+    """Where the stamp lives — the BASE repo root, even when `base` is a worktree.
+
+    The git ref is shared across worktrees, but the stamp is an ordinary file, and its only
+    consumer (`worktree._freeze_ref_age_seconds`) reads it at the base root. A stage runs with
+    `cd <WT>`, so a worktree-relative stamp is written where nothing looks for it: the age stays
+    `None` forever and the ref is presumed live. Fail-safe, but it means the stamp did nothing.
+
+    Only the STAMP is re-rooted, never `base` itself — `resolve_review_base` computes a
+    merge-base against the CURRENT branch, and rooting that at the base repo would silently
+    answer for the wrong branch.
+    """
+    return resolve_base_root(base)
+
+
 def store_review_base(base: Path, slug: str, commit: str) -> None:
     _git(base, "update-ref", review_base_ref(slug), commit)
-    stamp = review_base_stamp(base, slug)
+    stamp = review_base_stamp(stamp_root(base), slug)
     stamp.parent.mkdir(parents=True, exist_ok=True)
-    stamp.write_text(commit + "\n", encoding="utf-8")
+    atomic_write(stamp, commit + "\n")
 
 
 def load_review_base(base: Path, slug: str) -> str | None:
@@ -279,7 +296,7 @@ def main(argv: list[str] | None = None) -> int:
                 continue
             _git(base, "update-ref", "-d", ref)
             removed.append(ref)
-        review_base_stamp(base, opts.slug).unlink(missing_ok=True)
+        review_base_stamp(stamp_root(base), opts.slug).unlink(missing_ok=True)
         sys.stdout.write(json.dumps({"removed": removed}) + "\n")
         return 0
 
@@ -308,6 +325,32 @@ def main(argv: list[str] | None = None) -> int:
                 }
             )
             + "\n"
+        )
+        return 0
+
+    # Idempotent (ADR-004 of PLAN-self-induced-regression-gate). The prose already forbade
+    # re-resolving, and `read-base` already failed loudly on a missing ref — but this path
+    # resolved and stored unconditionally, so a second round 1 silently re-based a review in
+    # flight. There is deliberately NO override flag: an escape hatch reinstates exactly the
+    # drift this removes, one flag away, with no ADR recording when it is legitimate.
+    stored = load_review_base(base, opts.slug)
+    if stored is not None:
+        # Repair the stamp rather than returning on the ref alone. `FREEZE_STAMP_DIR` lives
+        # under `.claude/observability/` — per-worktree, gitignored — while refs are shared
+        # across worktrees, so ref-present / stamp-absent is reachable, and the stamp is the
+        # only record of the WRITE time (the ref points at a merge-base months older).
+        stamp = review_base_stamp(stamp_root(base), opts.slug)
+        if not stamp.is_file():
+            stamp.parent.mkdir(parents=True, exist_ok=True)
+            atomic_write(stamp, stored + "\n")
+            sys.stderr.write(f"freeze: repaired missing stamp {stamp}\n")
+        sys.stderr.write(
+            f"freeze: review_base for {opts.slug!r} is already stored at "
+            f"{review_base_ref(opts.slug)} ({stored}); reusing it. Re-resolving would make the "
+            "base a free variable that drifts as commits land during the review.\n"
+        )
+        sys.stdout.write(
+            json.dumps({"review_base": stored, "ref": review_base_ref(opts.slug)}) + "\n"
         )
         return 0
 

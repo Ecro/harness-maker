@@ -103,6 +103,32 @@ If a command exits non-zero:
 {% set hm_stage = "review" %}{% include "agents/_partials/worktree_preflight.md.j2" %}
 {%- endif %}
 
+### Step 0 — Open the run
+
+Every cap in this stage — `max_review_rounds`, the no-progress invariant, the two-pass
+confirmation bound — is state inside ONE run. Nothing used to record that a run was still open,
+so a second `/hm:review` started a parallel one and reset all of them. On 2026-08-17 a single
+session created six runs for one slug that way.
+
+{% if is_codex %}
+```
+Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_run open --slug <slug>")
+```
+{% else %}
+```bash
+!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_run open --slug <slug>
+```
+{% endif %}
+
+**Read it from `open`, never mint one:** the `id` this prints is the run identity every
+`<run-id>` below stands for — the join key for the lens-results directory and every check or
+record keyed on it.
+
+**A non-zero exit means the slug already has an open run**, and the payload names it. **Resume
+that run** — do not start another. Recovery from a genuinely abandoned run is
+`open --force`, which reports the run it displaced; there is no expiry, because a long review
+and an abandoned one are indistinguishable from elapsed time alone.
+
 ### Step 1 — Reviewer set selection
 
 **The discovery axis** — {% for l in lens_names %}`{{ l }}`{{ ", " if not loop.last }}{% endfor %} —
@@ -206,7 +232,7 @@ carries it and every coverage call is given it.
 
 **You write the result files; the lens agents do not.** For each dispatch that **returns**, write
 its findings JSON to the per-round results directory, adding a `"lens"` key naming the lens and
-the `"run_id"` you minted — **and stamp the same `"lens"` value on every finding inside it**.
+the `"run_id"` Step 0's `open` printed — **and stamp the same `"lens"` value on every finding inside it**.
 
 > The per-finding stamp is what makes ADR-007's rule decidable. The core lenses all dispatch to
 > `code-reviewer`, so `reviewer`/`source` collapses them to one voter name; without a per-finding
@@ -385,9 +411,8 @@ Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_pat
 ```
 {% endif %}
 
-> **`<run-id>` must be a real value you choose, not the literal text.** Use a fresh UTC
-> stamp at the start of THIS `/hm:review` invocation (e.g. `20260805T2210Z`) and keep it
-> **stable across every round** of this review — the round number is already a separate
+> **`<run-id>` is the id Step 0's `open` printed** — read it from `open`, and keep it
+> **stable across every round** of this review; the round number is already a separate
 > part of the filename. Leaving `<run-id>` un-substituted is not a cosmetic slip: it
 > sanitises to a constant, so every review of this slug writes the same filename and
 > **silently destroys the previous review's payload**, quietly emptying the corpus this
@@ -700,14 +725,17 @@ IF grade ≥ grade_threshold AND blocks_approval == false:
 IF auto_fix disabled (config OR --no-auto-fix):
   → STOP. Report grade + remaining findings. Status = CHANGES_REQUESTED.
   → Set human_review_needed=true if grade < threshold OR unverified_severe.
+  → Close the run: `hm review_run close --slug <slug> --run-id <run-id> --outcome CHANGES_REQUESTED`.
 
 IF iteration_count ≥ max_review_rounds AND blocks_approval == true:
   → STOP. Status = CHANGES_REQUESTED. Emit the coverage blocker (below), not a finding.
   → Set human_review_needed=true.
+  → Close the run: `hm review_run close --slug <slug> --run-id <run-id> --outcome CHANGES_REQUESTED`.
 
 IF iteration_count ≥ max_review_rounds:
   → STOP. Best grade + remaining. Status = CHANGES_REQUESTED.
   → Set human_review_needed=true.
+  → Close the run: `hm review_run close --slug <slug> --run-id <run-id> --outcome CHANGES_REQUESTED`.
 
 ELSE:
   → Enter the auto-fix loop below.
@@ -839,7 +867,9 @@ Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_pat
 
 7. **Recompute grade** using the current voting set (Step 4 again, clusters rebuilt per the round-state contract).
 
-7b. **Evaluate the progress invariant.** No lifecycle transition this round → stop now with `CHANGES_REQUESTED` and exit reason `no-progress`, **attaching Step 5b's `churn_ratio`** (null when nothing was measurable — record the null, do not omit the field). A stall that churned a lot and a stall that churned nothing are opposite diagnoses; the exit reason alone cannot tell them apart, which is why the gate's threshold is recalibrated from these rows.
+7b. **Evaluate the progress invariant.** No lifecycle transition this round → stop now with
+   `CHANGES_REQUESTED` and exit reason `no-progress`. No-progress is stage-terminal, so close the
+   run: `hm review_run close --slug <slug> --run-id <run-id> --outcome CHANGES_REQUESTED`, **attaching Step 5b's `churn_ratio`** (null when nothing was measurable — record the null, do not omit the field). A stall that churned a lot and a stall that churned nothing are opposite diagnoses; the exit reason alone cannot tell them apart, which is why the gate's threshold is recalibrated from these rows.
 
 8. **Append iteration record** to the REVIEW report:
 
@@ -926,6 +956,19 @@ has measured nothing.
 second invocation here would give them a second vote on the same review.
 {% endif %}
 ### Step C3 — Outcome
+
+**Four of the five arms below are stage-terminal; close the run on each of those**, with
+`hm review_run close --slug <slug> --run-id <run-id> --outcome <APPROVED|CHANGES_REQUESTED>`.
+**The `confirm-1` arm is NOT terminal and must NOT close** — it enters a repair round and
+dispatches confirm-2, so closing there releases the slug *mid-pass* while `<run-id>` is still the
+join key for the lens-results tree, the ledger rows below and the freeze refs. That is the arm
+where releasing does the most damage, because reaching it means the review is still dirty.
+
+> **The Grade Gate's APPROVE-side exits are NOT terminal and must NOT close.** This pass runs
+> only when the gate would approve, so those exits flow into C1–C3 — closing there releases
+> the slug while the freeze refs and ledger rows still use the id, and lets the next
+> invocation mint a fresh id mid-review. (`close` is idempotent, so a second close is a no-op —
+> not one of the harms.)
 
 A **new finding** is one whose `id` is absent from the union of every prior round's
 `consensus-passed` set in this `/hm:review`. Mechanical, from the REVIEW report's per-round

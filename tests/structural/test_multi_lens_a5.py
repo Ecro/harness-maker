@@ -1,6 +1,8 @@
-"""Phase A.5 fans out to three lenses in one message, and the round is merged before judging.
+"""Phase A.5 dispatches ONE test-reviewer carrying all three lens questions.
 
-PLAN-multi-lens-review-round, Phase 2 + Phase 3 exit criteria.
+PLAN-multi-lens-review-round shipped the three-way fan-out; ADR-010 of
+PLAN-self-induced-regression-gate collapsed it to one dispatch, keeping the questions and
+dropping the contexts. The order and merge properties below are unchanged.
 
 **Every assertion here pins a relation — count, order, or locus — never the presence of a
 token.** That rule is not stylistic. The parent task (`opus5-selfreview-vs-harness-gates`)
@@ -116,92 +118,36 @@ def _a5_region(text: str) -> str:
 
 
 @pytest.mark.parametrize("name", sorted(_bodies()))
-def test_three_lens_dispatches_precede_the_resolution(name: str) -> None:
-    """Count AND order. Three is the point; before the merge is what makes them one round."""
-    region = _a5_region(_bodies()[name])
-    hits = [m.start() for m in _DISPATCH.finditer(region)]
-    assert len(hits) == 3, f"{name}: {len(hits)} test-reviewer dispatch site(s), expected 3"
-    resolution = region.index(_RESOLUTION)
-    assert max(hits) < resolution, (
-        f"{name}: a dispatch site appears after the Resolution — the round cannot be merged "
-        "before it is judged if a lens is dispatched afterwards"
-    )
+def test_one_dispatch_carries_every_lens_and_precedes_the_resolution(name: str) -> None:
+    """Count, order and content — the contract ADR-010 of PLAN-self-induced-regression-gate put
+    in place of the three-way fan-out these two tests used to pin.
 
-    # CONTIGUITY is the property "in one message" actually means, and count+order do not imply
-    # it: three dispatches split into three fenced blocks with "dispatch, await the verdict,
-    # then the next" between them satisfy both and restore the serial gate this change exists
-    # to replace — the +2 round-trip re-baseline was paid FOR the concurrency.
-    # The property is ONE MESSAGE, i.e. one fenced block with nothing between the calls that
-    # could serialise them. Requiring three CONSECUTIVE physical lines is stricter than that and
-    # freezes formatting: a correct rewrite using multi-line `Task(...)` calls, or a comment
-    # between them, is still one message and must stay green. So: same fence, and no prose line
-    # between the first and last dispatch.
-    lines = region.splitlines()
-    idx = [i for i, ln in enumerate(lines) if _DISPATCH.search(ln)]
-    fences = [i for i, ln in enumerate(lines) if ln.startswith("```")]
-    assert [f for f in fences if f < idx[0]], f"{name}: no fence opens before the dispatch lines"
-    assert [f for f in fences if f > idx[-1]], f"{name}: no fence closes after the dispatch lines"
-    assert not [f for f in fences if idx[0] < f < idx[-1]], (
-        f"{name}: a fence boundary sits between the dispatch lines — they are not one message, "
-        "and separate blocks are how a fan-out silently becomes a serial retry"
-    )
-    between = [
-        ln
-        for ln in lines[idx[0] : idx[-1]]
-        if ln.strip() and not ln.lstrip().startswith(("Task(", "spawn_agent(", ")", "#", '"', "'"))
-    ]
-    assert not between, (
-        f"{name}: prose sits between the dispatch lines ({between[:2]!r}) — text like 'await the "
-        "verdict, then dispatch the next' turns the fan-out back into the serial gate this "
-        "change replaced, while count and order still pass"
-    )
-
-
-@pytest.mark.parametrize("name", sorted(_bodies()))
-def test_each_lens_owns_exactly_one_dispatch(name: str) -> None:
-    """Three dispatches that all carry the same lens would satisfy a bare count of three.
-
-    The unit is the dispatch LINE, not the block: a lens legitimately appears twice within its
-    own line (once in `description=`, once in the prompt's `Your lens:`), so a block-wide
-    `count(lens) == 1` fails on a correct template — it did, on the first draft of this test.
+    The fan-out's premise was that one reviewer retried SERIALLY surfaces one category per round.
+    A single call asking all three questions is not that shape, so the premise does not reach it.
+    What the collapse must not do is drop the questions along with the contexts, and that is what
+    the second half here pins. Measured trade, recorded in ADR-010: on the round that produced
+    the change, all six blocking issues were solo finds — the independent contexts, not the lens
+    text, produced that spread.
     """
     region = _a5_region(_bodies()[name])
-    first = _DISPATCH.search(region)
-    assert first is not None, f"{name}: no dispatch site found in the A.5 region"
-    block = region[first.start() : region.index(_RESOLUTION)]
-    lines = [ln for ln in block.splitlines() if _DISPATCH.search(ln)]
-    assert len(lines) == 3, f"{name}: {len(lines)} dispatch line(s), expected 3"
-    # Scope the count to the two SEGMENTS that name the lens, not to the whole line. Whole-line
-    # membership pins vocabulary uniqueness: it breaks the moment a correct rewrite inlines the
-    # shared brief (which contains "coverage holes" and "duplication") into all three prompts,
-    # and it cannot see the real degenerate case — three distinct `description=` labels with one
-    # prompt body copied to all three, reviewing one thing thrice under three names.
-    segments = []
-    for ln in lines:
-        head, sep, tail = ln.partition("Your lens:")
-        assert sep, f"{name}: a dispatch line has no `Your lens:` segment: {ln[:80]!r}"
-        label = head.partition("description=")[2]
-        segments.append((label, tail.partition("—")[0]))
+    hits = [m.start() for m in _DISPATCH.finditer(region)]
+    assert len(hits) == 1, f"{name}: {len(hits)} test-reviewer dispatch site(s), expected 1"
 
-    # `spawn_agent` has no `description` parameter, so on the Codex arm the lens is named ONCE,
-    # in the message. The label/body disagreement this check exists to catch is then not merely
-    # undetected but structurally impossible — there is one source of truth, not two. Fall back
-    # to the body there rather than reporting "0 dispatches labelled", which is what a
-    # description-only count says about a correct Codex render.
-    has_label = any(label.strip() for label, _ in segments)
+    resolution = region.index(_RESOLUTION)
+    assert hits[0] < resolution, (
+        f"{name}: the dispatch appears after the Resolution — the round cannot be judged before "
+        "the reviewer has been asked"
+    )
+
+    # The lens words must sit in the DISPATCH LINE, not merely in the A.5 region. The region
+    # carries retry-scope prose naming every lens independently of any dispatch, so a
+    # region-scoped assertion stayed green through a collapse that dropped all three — measured
+    # while this change was being made.
+    line = next(ln for ln in region.splitlines() if _DISPATCH.search(ln)).lower()
     for lens in _LENSES:
-        asked = [i for i, (_, body) in enumerate(segments) if lens in body]
-        labelled = (
-            [i for i, (label, _) in enumerate(segments) if lens in label] if has_label else asked
-        )
-        assert len(labelled) == 1, (
-            f"{name}: lens {lens!r} labels {len(labelled)} dispatch(es), expected 1 — "
-            "two dispatches carrying the same lens is a fan-out that reviews one thing thrice"
-        )
-        assert labelled == asked, (
-            f"{name}: {lens!r} is labelled on dispatch {labelled} but asked for on {asked} — "
-            "the label and the prompt disagree, so this dispatch reviews something other than "
-            "what it is named"
+        assert lens in line, (
+            f"{name}: the single dispatch does not ask about {lens!r} — collapsing the fan-out "
+            "removes the three contexts, never the three questions"
         )
 
 

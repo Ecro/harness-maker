@@ -503,13 +503,14 @@ def _normalize_hints(affected: list[Path], project_root: Path) -> list[str]:
     return [r for r in rels if not any(r.startswith(d + "/") for d in dirs)]
 
 
-# ── four-way selection (PLAN-workflow-step-audit ADR-008) ──────────────────────
+# ── class-based selection (PLAN-workflow-step-audit ADR-008) ──────────────────
 #
 # `build_test_hints` above skips every non-`.py` file, so the interview's locked rule
 # ("a changed file with no hint → FULL") degenerates to always-FULL in this repo, where
 # most changes are `.j2` templates, markdown and config. The classifier below keeps what
 # that rule protects — a source file no test maps to must never be silently untested —
-# and gives the other three shapes a bounded answer.
+# and gives every other shape a bounded answer. (It started four-way; `CLASS_CONFIG` made it
+# five, so this comment no longer counts them — a count here goes stale on the next class.)
 #
 # That was only HALF the cause, and naming one cause is what kept the other unexamined
 # for so long. The second half was in `find_importers`: its `ImportFrom` branch read
@@ -532,6 +533,12 @@ CLASS_SOURCE_WITHOUT_HINTS = "source-without-hints"
 CLASS_RENDER_AFFECTING = "render-affecting"
 CLASS_DOC_WITH_CONSUMERS = "doc-with-consumers"
 CLASS_INERT = "inert"
+#: Packaging and CI configuration. Added by PLAN-self-induced-regression-gate ADR-006 — these
+#: paths used to reach the loud-FULL default arm above, and because `select_tests` returns FULL
+#: when ANY changed file is forcing, one of them discarded every other file's targeted hints.
+#: This repository's release procedure edits `pyproject.toml` on a five-file version sync, so
+#: that arm fired on routine work.
+CLASS_CONFIG = "config"
 
 #: The bounded set a template / fixture change selects instead of FULL. Curated, so
 #: `test_every_directory_under_tests_is_classified_by_the_constant` exists to fail when
@@ -561,6 +568,63 @@ _RENDER_AFFECTING_PREFIXES = (
     "tests/snapshot/",
     "tests/e2e/sandbox/",
     "tests/e2e/sandbox-plugin-test/",
+    # This repo's own harness input: it drives every render, so the render suites are what
+    # would catch a regression in it. A different answer from the packaging files below, which
+    # is why ADR-006 routes it here rather than folding all four config shapes into one class.
+    ".claude/harness.yaml",
+)
+
+#: Exact paths and prefixes that make a change `CLASS_CONFIG`.
+_CONFIG_FILES = ("pyproject.toml", "uv.lock")
+_CONFIG_PREFIXES = (".github/workflows/",)
+
+#: What a config change selects instead of FULL. Curated, so it can be wrong in the
+#: sometimes-too-narrow direction — the risk ADR-006 accepts and `TESTS_NOT_CONFIG_AFFECTING`
+#: plus the coverage gate in `tests/unit/test_test_dep_map_config_class.py` police.
+#:
+#: Deliberately broad on `tests/structural` (ADR-006 names it) and deliberately NARROW on
+#: `tests/unit`: naming that directory would restore the always-FULL cost under a `targeted`
+#: label, which is what the gate's breadth bound rejects.
+#:
+#: Excluded on purpose, with the reason, because an unexplained omission is the failure mode
+#: this list exists to prevent: `tests/e2e` and `tests/integration` are excluded as a whole —
+#: their matches write synthetic `pyproject.toml` files into sandboxes or use one as an
+#: upward-walk marker, so they read the repo's own config in no case; the individual files are
+#: enumerated in `TESTS_NOT_CONFIG_AFFECTING` rather than waved off by directory.
+#:
+#: `tests/unit/test_readiness.py` is excluded even though ADR-006 names the readiness suite:
+#: it builds synthetic roots and never reads THIS repository's own config, so a change to
+#: `pyproject.toml` cannot affect it. It is absent from `TESTS_NOT_CONFIG_AFFECTING` too,
+#: because the coverage gate's detector never flags it (no `REPO_ROOT` / `Path(__file__)`
+#: anchor to match) — and an exclusion the gate cannot see is exactly the kind this comment
+#: block exists to state out loud.
+CONFIG_SUITES: tuple[str, ...] = (
+    # Runs `profile()` on the real repo root and branches its `ci_provider` assertion on
+    # whether `.github/workflows/` holds yml/yaml files.
+    "tests/unit/test_profile.py",
+    # Reads the real `pyproject.toml` through `REPO_ROOT` for the five-file version sync.
+    "tests/unit/test_version_sync.py",
+    # Asserts on the presence and role of `.github/workflows/` among other structural facts.
+    "tests/structural",
+)
+
+#: Suites the detector flags as touching a routed path but which do NOT read this repository's
+#: own copy of it. Entries are **files, never directories** — the detector yields file paths, so
+#: a directory entry would dispose of every suite beneath it, now and in future, which is how
+#: this kind of opt-out list goes silently inert. Enforced by the coverage gate.
+TESTS_NOT_CONFIG_AFFECTING: tuple[str, ...] = (
+    # Writes a synthetic pyproject.toml into a sandbox copy.
+    "tests/e2e/test_hook_consumption_canary.py",
+    # Mentions ci_provider only to tolerate it being empty in a worktree.
+    "tests/e2e/test_personalization_dogfood.py",
+    # Reads the plugin SANDBOX's pyproject.toml, not the repo's.
+    "tests/e2e/test_plugin_entry.py",
+    # Writes a synthetic pyproject.toml for the live plugin fixture.
+    "tests/e2e/test_plugin_live.py",
+    # Uses pyproject.toml only as an upward-walk marker for the repo root.
+    "tests/integration/test_readme_install_commands.py",
+    # Asserts pyproject.toml merely EXISTS, as a sanity check on the resolved root.
+    "tests/unit/test_ledger_isolation.py",
 )
 
 #: Markdown is inert only in these locations. A blanket "`.md` is inert" would make
@@ -616,7 +680,9 @@ def doc_consumers(rel_path: str) -> tuple[str, ...]:
 
 
 def classify_path(rel_path: str, project_root: Path) -> str:
-    """Total function: every input lands in exactly one of the four classes.
+    """Total function: every input lands in exactly one class — the constants above are
+    the complete set. (Deliberately uncounted: it was four, `CLASS_CONFIG` made it five, and a
+    number written here goes stale on the next class.)
 
     Classification is by PATH ONLY, never by `Path.exists()` — a deleted or renamed
     file is gone from disk, and a classifier that stats it would misroute exactly the
@@ -633,6 +699,8 @@ def classify_path(rel_path: str, project_root: Path) -> str:
         return CLASS_DOC_WITH_CONSUMERS
     if norm in _INERT_ROOT_FILES or any(norm.startswith(p) for p in _INERT_PREFIXES):
         return CLASS_INERT
+    if norm in _CONFIG_FILES or any(norm.startswith(p) for p in _CONFIG_PREFIXES):
+        return CLASS_CONFIG
     if norm.endswith(".py"):
         src = project_root / norm
         hints = build_test_hints([src], project_root)
@@ -685,6 +753,12 @@ def select_tests(changed: list[str], project_root: Path) -> dict[str, Any]:
     for rel, cls in classified.items():
         if cls == CLASS_RENDER_AFFECTING:
             node_ids.extend(RENDER_AFFECTING_SUITES)
+        elif cls == CLASS_CONFIG:
+            # Classification alone contributes nothing: this loop is where a class becomes node
+            # ids. A new class routed in `classify_path` with no arm here reports `targeted`
+            # with the OTHER files' hints and zero suites of its own — a clean-looking run that
+            # never selected what the class exists to select.
+            node_ids.extend(CONFIG_SUITES)
         elif cls == CLASS_DOC_WITH_CONSUMERS:
             node_ids.extend(doc_consumers(rel))
         elif cls == CLASS_SOURCE_WITH_HINTS:

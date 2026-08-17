@@ -84,7 +84,14 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # Step 4 GREEN read an unqualified "Dispatch each item below" imperative and could have spent
     # the call on a stage that never blocked. Attributed in
     # work-docs/BASELINE-DELTA-stuck-dispatch.md.
-    "execute": 19,
+    # 19 -> 17 (2026-08-17, PLAN-self-induced-regression-gate). Net -2: ADR-010 collapses Phase
+    # A.5's three `test-reviewer` dispatches into ONE carrying all three lens questions.
+    # It was briefly 18 — ADR-008 added a `verification_cache check` to Phase D (+1) — and
+    # review withdrew that read: the producer half was already cut (`is_fresh` never compares
+    # check sets, so a marker written after a TARGETED run would let the next verify/wrapup skip
+    # the whole suite), which left a consumer that can never hit, because this stage changes
+    # files before it reaches the read.
+    "execute": 17,
     "health": 7,
     "help": 0,
     "loop": 10,
@@ -159,7 +166,13 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     #   +2  Phase 6 + 7: `hm review_consensus plan` decides the repair round's re-review
     #       (gate-on render only), and one `hm review_churn oscillation` scan runs at the
     #       terminal state. The gate-off render pays neither and keeps the old dispatch.
-    "review": 36,
+    #   +1  ADR-003 of PLAN-self-induced-regression-gate (2026-08-17): Step 0's
+    #       `hm review_run open`, which mints the run identity every `<run-id>` below stands
+    #       for. `close` is prose on each terminal branch rather than a mandated call line, so
+    #       it is not charged here. (An auto-fix-loop cache read was also added and then
+    #       withdrawn in review — see the `execute` note above. It was inline prose either way,
+    #       so this count never moved for it.)
+    "review": 37,
     "spec": 6,
     "uninstall": 3,
     "verify": 13,

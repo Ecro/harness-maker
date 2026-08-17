@@ -55,6 +55,7 @@ _DISPATCHABLE: frozenset[str] = frozenset(
         "observability.verification_cache",
         "plan_rounds",
         "review_churn",
+        "review_run",
         "review_consensus",
         "review_telemetry",
         "run_classify",

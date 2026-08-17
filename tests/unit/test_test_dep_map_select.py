@@ -9,11 +9,16 @@ always: machinery added, cost preserved.
 ADR-008 keeps what the locked rule protects (a source file with no known test must never
 be silently untested) and sharpens the predicate into four classes. The property that
 matters most here is that the classifier is **total**: the validator caught a first
-version that defaulted only *out-of-root* paths, leaving in-root non-matches
-(`pyproject.toml`, `uv.lock`, `.github/workflows/*.yml`, `.claude/harness.yaml`)
-selecting **zero** tests — trading an always-FULL bug for a sometimes-NONE bug, which is
-strictly weaker than today. Every test below that names a concrete path is aimed at that
-arm.
+version that defaulted only *out-of-root* paths, leaving in-root non-matches selecting
+**zero** tests — trading an always-FULL bug for a sometimes-NONE bug, which is strictly
+weaker than today. Every test below that names a concrete path is aimed at that arm.
+
+**The four config shapes moved out of that arm** (PLAN-self-induced-regression-gate
+ADR-006): `pyproject.toml`, `uv.lock` and `.github/workflows/` are now `CLASS_CONFIG`, and
+`.claude/harness.yaml` is render-affecting. They are asserted in
+`test_test_dep_map_config_class.py`; what remains here guards the default arm with paths
+that genuinely have no mapped tests. The forcing RULE is unchanged — one hintless source
+file still takes the whole selection to FULL.
 """
 
 from __future__ import annotations
@@ -23,6 +28,7 @@ from pathlib import Path
 import pytest
 
 from harness_maker.test_dep_map import (
+    CLASS_CONFIG,
     CLASS_DOC_WITH_CONSUMERS,
     CLASS_INERT,
     CLASS_RENDER_AFFECTING,
@@ -124,21 +130,20 @@ def test_a_markdown_only_change_selects_neither_tests_nor_full() -> None:
 @pytest.mark.parametrize(
     "rel",
     [
-        "pyproject.toml",
-        "uv.lock",
-        ".github/workflows/ci.yml",
         "tests/fixtures/stop_payload_wsl2.json",
-        ".claude/harness.yaml",
         "../outside-the-root/thing.py",
         "Makefile",
         "src/harness_maker/py.typed",
     ],
 )
 def test_an_unmatched_path_falls_to_full_not_to_zero_tests(rel: str) -> None:
-    """`.claude/harness.yaml` is the sharpest of these: it drives every render, so
-    classifying it inert because it is not `.py` would skip the render suites on a
-    config change. A lockfile bump selecting zero tests would be strictly weaker than
-    today's always-run-everything."""
+    """The default arm's whole job: a path nothing maps to selects everything rather than
+    nothing. Selecting zero would be indistinguishable from "checked and clean", which is
+    strictly weaker than today's always-run-everything.
+
+    The four config shapes that used to sit in this list are now routed by ADR-006 and are
+    asserted in `test_test_dep_map_config_class.py`. What is left has no mapped tests by any
+    rule: a fixture payload, an out-of-root path, a Makefile, and a marker file."""
     assert _classify(rel) == CLASS_SOURCE_WITHOUT_HINTS
     sel = select_tests([rel], _REPO_ROOT)
     assert sel["mode"] == "full", sel
@@ -162,6 +167,7 @@ def test_the_classifier_is_total_over_a_hostile_sample() -> None:
         CLASS_SOURCE_WITHOUT_HINTS,
         CLASS_RENDER_AFFECTING,
         CLASS_INERT,
+        CLASS_CONFIG,
     }
     for rel in hostile:
         assert _classify(rel) in classes, rel
@@ -185,12 +191,19 @@ def test_a_deleted_or_renamed_path_classifies_by_its_pre_change_path() -> None:
 
 
 def test_one_hintless_source_file_forces_full_for_the_whole_phase() -> None:
+    """ADR-007 of PLAN-self-induced-regression-gate keeps this rule. The forcing path used to
+    be `uv.lock`; ADR-006 moved that to `CLASS_CONFIG`, so the case is now carried by a source
+    module no test maps to — which is what the rule was always about."""
     sel = select_tests(
-        ["work-docs/PLAN-x.md", "src/harness_maker/templates/stages/verify.md.j2", "uv.lock"],
+        [
+            "work-docs/PLAN-x.md",
+            "src/harness_maker/templates/stages/verify.md.j2",
+            "src/harness_maker/deleted_module.py",
+        ],
         _REPO_ROOT,
     )
     assert sel["mode"] == "full", sel
-    assert "uv.lock" in sel["reason"]
+    assert "src/harness_maker/deleted_module.py" in sel["reason"]
 
 
 def test_render_and_hinted_sources_union_without_forcing_full() -> None:
@@ -241,11 +254,11 @@ def test_the_cli_emits_json_and_exits_zero(capsys: pytest.CaptureFixture[str]) -
 
     from harness_maker.test_dep_map import main
 
-    rc = main(["--root", str(_REPO_ROOT), "--changed-file", "uv.lock"])
+    rc = main(["--root", str(_REPO_ROOT), "--changed-file", "src/harness_maker/deleted_module.py"])
     assert rc == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["mode"] == "full"
-    assert "uv.lock" in payload["reason"]
+    assert "src/harness_maker/deleted_module.py" in payload["reason"]
 
 
 def test_the_cli_with_no_changed_files_is_explicit_not_silent(

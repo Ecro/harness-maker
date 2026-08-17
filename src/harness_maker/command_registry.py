@@ -144,6 +144,7 @@ MODULES: dict[str, ModuleSpec] = {
     "plan_rounds": ModuleSpec("manual-dispatch", _s("plan", "outcome")),
     "test_runners": ModuleSpec("manual-dispatch", _s("plan", "list")),
     "review_churn": ModuleSpec("manual-dispatch", _s("measure", "pin", "oscillation")),
+    "review_run": ModuleSpec("manual-dispatch", _s("open", "status", "close")),
     "verifier_discrimination": ModuleSpec("manual-dispatch", _s("report", "rounds", "agents")),
     "freeze": ModuleSpec("manual-dispatch", _s("resolve-base", "commit", "read-base", "reap")),
     "spec_quality": ModuleSpec("manual-dispatch", _s("eval")),

@@ -113,6 +113,13 @@ work-docs/*
 # ignored file is recomputed by whoever regenerates it next.
 !work-docs/BASELINE-*.md
 !work-docs/RECEIPT-*.md
+# Same durability argument, for the one work-docs artifact that is a script rather than a
+# document: `probe-*.py` is the falsifiability probe ADR-011 of
+# PLAN-self-induced-regression-gate names as the COMPENSATING CONTROL for suspending Phase A.5
+# on a prose deliverable. A compensating control that is gitignored does not survive
+# `task-land`, so the control would exist only in the session that wrote it — which is the
+# same "worthless if the next person regenerates it" failure the lines above guard against.
+!work-docs/probe-*.py
 # Same durability argument as BASELINE-*: a pre-registered measurement and a coverage
 # matrix are worthless if the next person regenerates them. ABLATION-* carries the
 # pre-registration block that makes the un-gated honesty waiver survivable (ADR-007) —
