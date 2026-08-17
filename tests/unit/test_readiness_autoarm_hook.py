@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from harness_maker.readiness import _dim_guardrails
+from harness_maker.readiness import Signal, _dim_guardrails
 
 _SIG = "autopilot_autoarm_registered"
 
@@ -41,7 +41,7 @@ def _write(project_dir: Path, *, persistent: bool, autoarm: bool) -> None:
     )
 
 
-def _find(signals: list, sig_id: str):  # type: ignore[no-untyped-def]
+def _find(signals: list[Signal], sig_id: str) -> Signal | None:
     return next((s for s in signals if s.id == sig_id), None)
 
 

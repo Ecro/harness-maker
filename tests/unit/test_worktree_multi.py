@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import subprocess
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -222,7 +223,7 @@ def test_finalize_primary_ok_sibling_fail(
 
     original_merge = worktree.merge
 
-    def fail_on_sibling(wt: Path, **kwargs: object) -> None:
+    def fail_on_sibling(wt: Path, **kwargs: Any) -> None:
         if wt.is_relative_to(sibling):
             raise RuntimeError("simulated sibling merge conflict")
         original_merge(wt, **kwargs)
@@ -252,7 +253,7 @@ def test_finalize_rerun_after_partial(
     original_merge = worktree.merge
     calls: list[Path] = []
 
-    def fail_second_call(wt: Path, **kwargs: object) -> None:
+    def fail_second_call(wt: Path, **kwargs: Any) -> None:
         calls.append(wt)
         if len(calls) == 2:
             raise RuntimeError("simulated sibling fail")

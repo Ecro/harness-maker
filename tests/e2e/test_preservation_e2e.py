@@ -25,7 +25,7 @@ from pathlib import Path
 import pytest
 
 from harness_maker.interview import interview
-from harness_maker.models import ProjectProfile, Target
+from harness_maker.models import InterviewAnswers, ProjectProfile, Target
 from harness_maker.reconcile import backup, reconcile
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
@@ -36,7 +36,7 @@ INTEGRATION_GATE = pytest.mark.skipif(
 )
 
 
-def _build_targets(targets: list[Target]) -> tuple[object, object]:
+def _build_targets(targets: list[Target]) -> tuple[ProjectProfile, InterviewAnswers]:
     """Build a (profile, answers) pair with the requested target list."""
     profile = ProjectProfile(stack=["python"], scale="small", lifecycle="dormant")
     answers = interview(profile, autoloop_mode=True).model_copy(

@@ -30,12 +30,13 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+from typing import Any
 
 import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from harness_maker.economics import PRICE_TABLE, main, resolve_model_family
+from harness_maker.economics import PRICE_TABLE, ModelPrice, main, resolve_model_family
 from harness_maker.economics_source import encode_project_dir, load_turns
 
 # Hypothesis profile contract (spec-tetrad ADR-002): `ci` = reproducible gate,
@@ -75,7 +76,7 @@ def _materialise(tmp_path: Path, fixture: str) -> tuple[Path, Path]:
     return project, store
 
 
-def _price():
+def _price() -> ModelPrice:
     # Stated, not defaulted: an `or "opus"` fallback would keep pricing this test at opus
     # rates while `price_turn` took its own fallback path, and the two would agree by
     # coincidence rather than because the model resolved.
@@ -228,7 +229,9 @@ def test_boundaries_are_preserved_because_groups_never_disagree_on_attribution(
     assert [b.uuid for b in find_boundaries(turns)] == []
 
 
-def _write_group(session_dir: Path, name: str, project: Path, n: int, usage: dict) -> None:
+def _write_group(
+    session_dir: Path, name: str, project: Path, n: int, usage: dict[str, Any]
+) -> None:
     """N assistant records sharing one `message.id`, with byte-identical usage.
 
     Identical usage is the shape 5,756 of 5,757 real groups have; varying `output_tokens`

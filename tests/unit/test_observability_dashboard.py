@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 from harness_maker.observability.dashboard import (
     parse_dashboard,
@@ -20,7 +21,7 @@ from harness_maker.observability.dashboard import (
 # ─── render_dashboard_markdown ──────────────────────────────────────────────
 
 
-def _sample_inputs() -> tuple[dict, dict]:
+def _sample_inputs() -> tuple[dict[str, Any], dict[str, Any]]:
     structural = {
         "score": 72,
         "signals_failed": ["context_quality:has_stack", "agent_quality:has_charter"],

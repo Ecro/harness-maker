@@ -10,12 +10,12 @@ directory the caller happened to be in.
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
 
-from harness_maker import tool_detect
 from harness_maker.cli import app
 
 runner = CliRunner()
@@ -37,7 +37,7 @@ def test_the_command_is_registered_under_the_name_the_slash_command_types() -> N
 
 
 def test_stdout_is_exactly_one_json_object(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(tool_detect.shutil, "which", _fake_which({"codex"}))
+    monkeypatch.setattr(shutil, "which", _fake_which({"codex"}))
     result = runner.invoke(app, ["detect-tools", "--json"])
     assert result.exit_code == 0, result.output
 
@@ -59,7 +59,7 @@ def test_the_json_payload_survives_a_diagnostic_on_stderr(
     Mixing the two is how a consumer that does `json.loads(stdout)` starts failing for a
     reason that has nothing to do with detection.
     """
-    monkeypatch.setattr(tool_detect.shutil, "which", _fake_which(set()))
+    monkeypatch.setattr(shutil, "which", _fake_which(set()))
     result = runner.invoke(app, ["detect-tools", "--json"], catch_exceptions=False)
     assert result.exit_code == 0, result.output
     json.loads(result.stdout.strip())
@@ -68,7 +68,7 @@ def test_the_json_payload_survives_a_diagnostic_on_stderr(
 def test_the_result_does_not_depend_on_the_working_directory(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    monkeypatch.setattr(tool_detect.shutil, "which", _fake_which({"agy"}))
+    monkeypatch.setattr(shutil, "which", _fake_which({"agy"}))
     first = runner.invoke(app, ["detect-tools", "--json"])
 
     other = tmp_path / "elsewhere"
@@ -89,7 +89,7 @@ def test_the_human_readable_form_names_both_the_key_and_the_binary(
     It must also never claim the tool is usable — `shutil.which` says the binary exists,
     not that `codex login` / `agy` auth has been done (PLAN ADR-001, §detect-tools contract).
     """
-    monkeypatch.setattr(tool_detect.shutil, "which", _fake_which({"agy"}))
+    monkeypatch.setattr(shutil, "which", _fake_which({"agy"}))
     result = runner.invoke(app, ["detect-tools"])
     assert result.exit_code == 0, result.output
     out = result.stdout

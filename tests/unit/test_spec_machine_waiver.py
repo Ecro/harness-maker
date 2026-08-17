@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
+import pytest
 import yaml
 
 from harness_maker.spec_machine import (
@@ -50,7 +52,7 @@ def test_weak_threshold_is_40() -> None:
 # --- CLI helpers ------------------------------------------------------------
 
 
-def _write_yaml(tmp_path: Path, slug: str, acs: list[dict]) -> Path:
+def _write_yaml(tmp_path: Path, slug: str, acs: list[dict[str, Any]]) -> Path:
     p = tmp_path / f"SPEC-{slug}.machine.yaml"
     p.write_text(
         yaml.safe_dump({"schema_version": 2, "spec_slug": slug, "verification_tier": 1, "ac": acs}),
@@ -59,7 +61,9 @@ def _write_yaml(tmp_path: Path, slug: str, acs: list[dict]) -> Path:
     return p
 
 
-def _run(tmp_path: Path, yaml_path: Path, mode: str, capsys) -> tuple[int, dict]:
+def _run(
+    tmp_path: Path, yaml_path: Path, mode: str, capsys: pytest.CaptureFixture[str]
+) -> tuple[int, dict[str, Any]]:
     rc = main(
         ["waiver-check", "--yaml", str(yaml_path), "--dev-mode", mode, "--root", str(tmp_path)]
     )
@@ -76,7 +80,9 @@ def _receipt(tmp_path: Path, slug: str) -> Path:
 # --- tri-state CLI ----------------------------------------------------------
 
 
-def test_waiver_check_flags_weak_unwaived_task_driven(tmp_path: Path, capsys) -> None:
+def test_waiver_check_flags_weak_unwaived_task_driven(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     y = _write_yaml(
         tmp_path,
         "flag",
@@ -88,7 +94,9 @@ def test_waiver_check_flags_weak_unwaived_task_driven(tmp_path: Path, capsys) ->
     assert "AC-001" in status["flagged_acs"]
 
 
-def test_waiver_check_waived_not_flagged(tmp_path: Path, capsys) -> None:
+def test_waiver_check_waived_not_flagged(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     y = _write_yaml(
         tmp_path,
         "waived",
@@ -108,7 +116,9 @@ def test_waiver_check_waived_not_flagged(tmp_path: Path, capsys) -> None:
     assert status["flagged_acs"] == []
 
 
-def test_waiver_check_spec_driven_is_ok_noop(tmp_path: Path, capsys) -> None:
+def test_waiver_check_spec_driven_is_ok_noop(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     y = _write_yaml(
         tmp_path,
         "spec",
@@ -119,7 +129,9 @@ def test_waiver_check_spec_driven_is_ok_noop(tmp_path: Path, capsys) -> None:
     assert status["status"] == "ok"  # spec-driven already blocks at authoring
 
 
-def test_waiver_check_malformed_yaml_is_check_error(tmp_path: Path, capsys) -> None:
+def test_waiver_check_malformed_yaml_is_check_error(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     bad = tmp_path / "SPEC-bad.machine.yaml"
     bad.write_text(":bad: : yaml :", encoding="utf-8")
     rc, status = _run(tmp_path, bad, "task-driven", capsys)
@@ -127,7 +139,9 @@ def test_waiver_check_malformed_yaml_is_check_error(tmp_path: Path, capsys) -> N
     assert status["status"] == "check_error"  # NOT a clean pass
 
 
-def test_waiver_check_non_list_ac_is_check_error(tmp_path: Path, capsys) -> None:
+def test_waiver_check_non_list_ac_is_check_error(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     p = tmp_path / "SPEC-nonlist.machine.yaml"
     p.write_text(yaml.safe_dump({"schema_version": 2, "spec_slug": "x", "ac": "oops"}), "utf-8")
     rc, status = _run(tmp_path, p, "task-driven", capsys)
@@ -135,13 +149,17 @@ def test_waiver_check_non_list_ac_is_check_error(tmp_path: Path, capsys) -> None
     assert status["status"] == "check_error"
 
 
-def test_waiver_check_missing_file_is_check_error(tmp_path: Path, capsys) -> None:
+def test_waiver_check_missing_file_is_check_error(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     rc, status = _run(tmp_path, tmp_path / "nope.yaml", "task-driven", capsys)
     assert rc == 0
     assert status["status"] == "check_error"
 
 
-def test_waiver_check_writes_receipt_under_root(tmp_path: Path, capsys) -> None:
+def test_waiver_check_writes_receipt_under_root(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     y = _write_yaml(
         tmp_path,
         "rcpt",
@@ -159,7 +177,9 @@ def test_waiver_check_writes_receipt_under_root(tmp_path: Path, capsys) -> None:
 # --- robustness: never-raises / exit-0 contract (REVIEW consensus) ----------
 
 
-def test_non_str_oracle_evidence_is_check_error(tmp_path: Path, capsys) -> None:
+def test_non_str_oracle_evidence_is_check_error(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     y = _write_yaml(
         tmp_path,
         "nonstr",
@@ -170,7 +190,7 @@ def test_non_str_oracle_evidence_is_check_error(tmp_path: Path, capsys) -> None:
     assert status["status"] == "check_error"  # NOT a crash, NOT a clean ok
 
 
-def test_non_str_waiver_is_check_error(tmp_path: Path, capsys) -> None:
+def test_non_str_waiver_is_check_error(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     y = _write_yaml(
         tmp_path,
         "nonstrw",
@@ -188,7 +208,9 @@ def test_non_str_waiver_is_check_error(tmp_path: Path, capsys) -> None:
     assert status["status"] == "check_error"
 
 
-def test_non_dict_ac_entry_is_check_error(tmp_path: Path, capsys) -> None:
+def test_non_dict_ac_entry_is_check_error(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     p = tmp_path / "SPEC-nondict.machine.yaml"
     p.write_text(yaml.safe_dump({"schema_version": 2, "spec_slug": "x", "ac": [123]}), "utf-8")
     rc, status = _run(tmp_path, p, "task-driven", capsys)
@@ -196,7 +218,7 @@ def test_non_dict_ac_entry_is_check_error(tmp_path: Path, capsys) -> None:
     assert status["status"] == "check_error"  # not silently "ok"
 
 
-def test_non_utf8_file_is_check_error(tmp_path: Path, capsys) -> None:
+def test_non_utf8_file_is_check_error(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     bad = tmp_path / "SPEC-binary.machine.yaml"
     bad.write_bytes(b"\xff\xfe\x00bad")
     rc, status = _run(tmp_path, bad, "task-driven", capsys)
@@ -204,7 +226,9 @@ def test_non_utf8_file_is_check_error(tmp_path: Path, capsys) -> None:
     assert status["status"] == "check_error"
 
 
-def test_receipt_write_failure_still_exits_zero(tmp_path: Path, capsys) -> None:
+def test_receipt_write_failure_still_exits_zero(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     y = _write_yaml(
         tmp_path,
         "rcptfail",
@@ -222,7 +246,9 @@ def test_receipt_write_failure_still_exits_zero(tmp_path: Path, capsys) -> None:
     assert '"flagged"' in out
 
 
-def test_large_flagged_list_receipt_is_truncated(tmp_path: Path, capsys) -> None:
+def test_large_flagged_list_receipt_is_truncated(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     acs = [
         {"id": f"AC-{i:04d}", "title": "t", "oracle_source": "golden", "oracle_evidence": ""}
         for i in range(500)

@@ -13,6 +13,9 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
+
+import pytest
 
 from harness_maker import autopilot, autopilot_caps, autopilot_ledger
 from harness_maker.models import AutonomyConfig
@@ -23,7 +26,7 @@ _PIPELINE = list(AutonomyConfig().pipeline)
 _STAGES = [s.value for s in _PIPELINE]
 
 
-def _boundary(root: Path, current: str, capsys) -> dict:  # noqa: ANN001
+def _boundary(root: Path, current: str, capsys: pytest.CaptureFixture[str]) -> dict[str, Any]:
     rc = autopilot_caps.main(
         [
             "boundary",
@@ -44,10 +47,13 @@ def _boundary(root: Path, current: str, capsys) -> dict:  # noqa: ANN001
         ]
     )
     assert rc == 0
-    return json.loads(capsys.readouterr().out)
+    value: dict[str, Any] = json.loads(capsys.readouterr().out)
+    return value
 
 
-def test_full_pipeline_chain_advances_then_stops_before_wrapup(tmp_path: Path, capsys) -> None:  # noqa: ANN001
+def test_full_pipeline_chain_advances_then_stops_before_wrapup(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     # Arm a fresh autopilot session over the full default pipeline (…review, verify, wrapup).
     autopilot.write(
         tmp_path, level="auto_safe", pipeline=_PIPELINE, now=datetime.now(UTC).isoformat()
@@ -83,7 +89,7 @@ def test_full_pipeline_chain_advances_then_stops_before_wrapup(tmp_path: Path, c
     assert autopilot.load(tmp_path, session_id=None) is None
 
 
-def test_chain_halts_at_step_cap(tmp_path: Path, capsys) -> None:  # noqa: ANN001
+def test_chain_halts_at_step_cap(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     # A low step cap stops the chain mid-pipeline with a halted_cap receipt (runaway guard).
     # Deterministic on the live clock: a generous time cap (600 min) guarantees the STEP cap
     # fires first (evaluate_boundary order: kill_switch → step_cap → time_cap), so the

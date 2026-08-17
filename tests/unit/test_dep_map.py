@@ -802,9 +802,9 @@ def test_asts_are_parsed_once_across_separate_build_test_hints_calls(
 
     def counting_parse(*args: object, **kwargs: object) -> ast.Module:
         calls[0] += 1
-        return real_parse(*args, **kwargs)  # type: ignore[arg-type,return-value]
+        return real_parse(*args, **kwargs)  # type: ignore[call-overload, no-any-return]
 
-    monkeypatch.setattr(dep_map.ast, "parse", counting_parse)
+    monkeypatch.setattr(ast, "parse", counting_parse)
 
     build_test_hints([root / "src" / "pkg" / "a.py"], root)
     first = calls[0]

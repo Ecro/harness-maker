@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -38,7 +39,7 @@ _VALID_MODEL_LINE = re.compile(r"^model:\s+[a-zA-Z0-9_.:-]+\s*$", re.MULTILINE)
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-def _write_harness_yaml(tmp_path: Path, body: dict) -> Path:
+def _write_harness_yaml(tmp_path: Path, body: dict[str, Any]) -> Path:
     """Helper: write a minimal harness.yaml with provenance frontmatter prefix
     so io_utils.load_harness_yaml can parse the multi-document stream."""
     frontmatter = (
@@ -75,6 +76,7 @@ def test_mv1_default_model_yaml_injection_rejected_by_loader(tmp_path: Path) -> 
         },
     )
     answers = answers_from_harness_yaml(yaml_path)
+    assert answers is not None
     # Exact MV-1 Then-clause: the injected payload must NOT survive into
     # answers.default_model. We do not assume what the fallback value IS —
     # only that it is NOT the malicious payload, and that no YAML-significant
@@ -107,6 +109,7 @@ def test_mv2_recommended_model_migration_yaml_injection_rejected(tmp_path: Path)
         },
     )
     answers = answers_from_harness_yaml(yaml_path)
+    assert answers is not None
     # Same shape as MV-1, applied to the schema-v1 migration branch.
     assert answers.default_model != payload
     assert "\n" not in answers.default_model

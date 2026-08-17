@@ -91,7 +91,7 @@ def regen_one(fixture_name: str, mode_label: str, mode: DevMode) -> None:
                 {"path": str(f.path), "template": f.template, "body_sha256": f.body_sha256}
                 for f in filtered
             ],
-            key=lambda x: x["path"],
+            key=lambda x: x["path"] or "",
         ),
     }
     out = Path("tests/snapshot") / f"{fixture_name}-{mode_label}.expected.yaml"
@@ -122,7 +122,7 @@ if __name__ == "__main__":
     # snapshots are home-free and match production render (where _portablize_ref
     # rewrites the home-prefixed cache path to $HOME/...), and so the render-time
     # leak-check assert passes. Mirrors tests/unit/conftest.py's pin.
-    _synth._compute_install_ref = lambda: "$HOME/harness-maker"  # type: ignore[assignment]
+    _synth._compute_install_ref = lambda: "$HOME/harness-maker"
     with tempfile.TemporaryDirectory() as fake_home:
         os.environ["HOME"] = fake_home
         with patch.object(Path, "home", lambda: Path(fake_home)):

@@ -88,6 +88,13 @@ select = ["E", "F", "W", "I", "N", "UP", "B", "A", "C4", "RET", "SIM", "PT"]
 strict = true
 python_version = "3.12"
 
+# `tests/snapshot/regenerate.py` is imported as a top-level `regenerate` module by two tests
+# that sys.path-insert its directory. `mypy_path` is NOT the fix — it makes mypy find the same
+# file under two module names and abort. The module is checked on its own path already.
+[[tool.mypy.overrides]]
+module = "regenerate"
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"

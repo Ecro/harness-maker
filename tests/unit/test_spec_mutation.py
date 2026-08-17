@@ -177,7 +177,6 @@ def test_measure_baseline_mutmut_missing(tmp_path: Path, monkeypatch: pytest.Mon
     Now we deterministically replace subprocess.run with a FileNotFoundError
     raiser and assert the documented empty-state contract.
     """
-    import harness_maker.spec_mutation as sm
 
     def _raise_fnf(*_a: Any, **_kw: Any) -> None:
         raise FileNotFoundError("mutmut: not installed (mocked)")
@@ -185,7 +184,7 @@ def test_measure_baseline_mutmut_missing(tmp_path: Path, monkeypatch: pytest.Mon
     # A fully-absent mutmut raises FNF on BOTH the `--version` precheck and the
     # `mutmut run` call (same missing binary) — the realistic model. The precheck
     # catches FNF and falls through, so the existing absent contract is preserved.
-    monkeypatch.setattr(sm.subprocess, "run", _raise_fnf)
+    monkeypatch.setattr(subprocess, "run", _raise_fnf)
 
     rep = measure_baseline(
         ["src/harness_maker/render.py"],
@@ -201,7 +200,10 @@ def test_measure_baseline_mutmut_missing(tmp_path: Path, monkeypatch: pytest.Mon
 
 
 def _fake_run_factory(
-    version_out: str, *, on_run: Callable[..., Any], version_rc: int = 0
+    version_out: str,
+    *,
+    on_run: Callable[..., subprocess.CompletedProcess[str]],
+    version_rc: int = 0,
 ) -> Callable[..., subprocess.CompletedProcess[str]]:
     """Command-discriminating ``subprocess.run`` replacement (PLAN-mutmut-3x-pin).
 
@@ -229,7 +231,6 @@ def test_measure_baseline_timeout_preserves_partial_output(
     0% score after timeout — spuriously failing the gate. The version precheck
     succeeds (2.x) so only the run call times out, isolating this behavior.
     """
-    import harness_maker.spec_mutation as sm
 
     def _run_timeout(_cmd: list[str], *_a: Any, **_kw: Any) -> subprocess.CompletedProcess[str]:
         raise subprocess.TimeoutExpired(
@@ -239,9 +240,7 @@ def test_measure_baseline_timeout_preserves_partial_output(
             stderr=b"",
         )
 
-    monkeypatch.setattr(
-        sm.subprocess, "run", _fake_run_factory("mutmut 2.5.1", on_run=_run_timeout)
-    )
+    monkeypatch.setattr(subprocess, "run", _fake_run_factory("mutmut 2.5.1", on_run=_run_timeout))
 
     rep = measure_baseline(["src/x.py"], cwd=tmp_path, timeout_seconds=10)
     # Partial output must be parsed — not zeroed.
@@ -264,7 +263,7 @@ def test_measure_baseline_mutmut_3x_unsupported(
         raise AssertionError(f"mutmut run must not be invoked when 3.x is detected: {cmd}")
 
     monkeypatch.setattr(
-        sm.subprocess, "run", _fake_run_factory("mutmut 3.0.0", on_run=_run_must_not_run)
+        subprocess, "run", _fake_run_factory("mutmut 3.0.0", on_run=_run_must_not_run)
     )
 
     rep = measure_baseline(["src/x.py"], cwd=tmp_path, timeout_seconds=5)
@@ -288,7 +287,7 @@ def test_measure_baseline_unparsable_version_proceeds_as_supported(
         return subprocess.CompletedProcess(_cmd, 0, stdout="killed: 7\nsurvived: 3\n", stderr="")
 
     monkeypatch.setattr(
-        sm.subprocess, "run", _fake_run_factory("garbage with no version", on_run=_run_counts)
+        subprocess, "run", _fake_run_factory("garbage with no version", on_run=_run_counts)
     )
 
     rep = measure_baseline(["src/x.py"], cwd=tmp_path, timeout_seconds=5)
@@ -311,7 +310,7 @@ def test_measure_baseline_version_nonzero_exit_proceeds_as_supported(
         return subprocess.CompletedProcess(_cmd, 0, stdout="killed: 5\nsurvived: 1\n", stderr="")
 
     monkeypatch.setattr(
-        sm.subprocess,
+        subprocess,
         "run",
         _fake_run_factory("Traceback ... mutmut 3.0.0", on_run=_run_counts, version_rc=1),
     )
@@ -331,7 +330,7 @@ def test_measure_baseline_2x_minor_not_unsupported(
         return subprocess.CompletedProcess(_cmd, 0, stdout="killed: 9\nsurvived: 1\n", stderr="")
 
     monkeypatch.setattr(
-        sm.subprocess, "run", _fake_run_factory("mutmut version 2.10.3", on_run=_run_counts)
+        subprocess, "run", _fake_run_factory("mutmut version 2.10.3", on_run=_run_counts)
     )
 
     rep = measure_baseline(["src/x.py"], cwd=tmp_path, timeout_seconds=5)
@@ -349,7 +348,7 @@ def test_measure_baseline_future_major_unsupported(
         raise AssertionError(f"mutmut run must not be invoked for an unsupported major: {cmd}")
 
     monkeypatch.setattr(
-        sm.subprocess, "run", _fake_run_factory("mutmut 4.0.0", on_run=_run_must_not_run)
+        subprocess, "run", _fake_run_factory("mutmut 4.0.0", on_run=_run_must_not_run)
     )
 
     rep = measure_baseline(["src/x.py"], cwd=tmp_path, timeout_seconds=5)
@@ -479,7 +478,7 @@ def test_cli_gate_absent_when_version_precheck_fnf(
     def _raise_fnf(*_a: Any, **_kw: Any) -> None:
         raise FileNotFoundError("mutmut: not installed (mocked)")
 
-    monkeypatch.setattr(sm.subprocess, "run", _raise_fnf)
+    monkeypatch.setattr(subprocess, "run", _raise_fnf)
     yp = _write_machine(tmp_path, paths=["src/x.py"])
     rc = sm.main(["gate", "--yaml", str(yp), "--tier", "1"])
     err = capsys.readouterr().err

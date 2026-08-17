@@ -22,6 +22,7 @@ import re
 from functools import cache
 from pathlib import Path
 from tempfile import mkdtemp
+from typing import Literal
 
 import pytest
 
@@ -39,7 +40,7 @@ _FIXTURES = Path(__file__).parents[1] / "fixtures"
 # the empty set in every possible world — the exact vacuity validator-3 H3 caught in the
 # sibling `validator_invocation_points` conjunct. `test_the_invariance_guards_are_not_vacuous`
 # is the standing check that it stays non-empty.
-_SECOND_OPINION_MODELS = ["codex", "antigravity"]
+_SECOND_OPINION_MODELS: list[Literal["codex", "antigravity"]] = ["codex", "antigravity"]
 
 
 def _profile(preset: Preset) -> ProjectProfile:
@@ -232,7 +233,9 @@ _NEGATORS = ("never escalate", "do not escalate", "off-limits", "do not emit")
 def has_bounded_read_default(site: str) -> bool:
     flat = _normalized(site)
     m = re.search(r"up to \*\*(\d+)\*\* lines", flat)
-    return bool(m) and int(m.group(1)) >= _MIN_BUDGET_LINES and "not a ceiling" in flat
+    if m is None:
+        return False
+    return int(m.group(1)) >= _MIN_BUDGET_LINES and "not a ceiling" in flat
 
 
 def has_escalation_clause(site: str) -> bool:

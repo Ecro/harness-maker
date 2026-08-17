@@ -27,7 +27,9 @@ from harness_maker.plan_rounds import (
 )
 
 
-def _c(title: str, section: str = "Phase 2", severity: str = "critical", **kw: Any) -> dict:
+def _c(
+    title: str, section: str = "Phase 2", severity: str = "critical", **kw: Any
+) -> dict[str, Any]:
     return {"title": title, "section": section, "severity": severity, **kw}
 
 

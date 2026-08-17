@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import yaml
 
 from harness_maker.observability.spec_drift import scan
 
 
-def _seed(specs_dir: Path, slug: str, ac: dict) -> None:
+def _seed(specs_dir: Path, slug: str, ac: dict[str, Any]) -> None:
     specs_dir.mkdir(parents=True, exist_ok=True)
     (specs_dir / f"SPEC-{slug}.machine.yaml").write_text(
         yaml.safe_dump({"spec_slug": slug, "verification_tier": 1, "ac": [ac]}),

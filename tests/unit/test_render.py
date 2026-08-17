@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
+from harness_maker.block_merge import MergeReport
 from harness_maker.interview import interview
-from harness_maker.models import Blueprint, ProjectProfile
+from harness_maker.models import Blueprint, FileEntry, ProjectProfile
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
 
@@ -215,7 +217,6 @@ def test_render_with_merge_paths_preserves_user_blocks(tmp_path: Path) -> None:
     """Round-trip: render → user edits a user:<id> block → re-render with
     merge_paths → user content survives, hash reflects merged body.
     """
-    from harness_maker.block_merge import MergeReport
 
     p = _profile()
     a = interview(p, autoloop_mode=True)
@@ -1013,10 +1014,8 @@ def test_resolve_output_path_claude_unchanged() -> None:
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-def _fe(path: str) -> Blueprint:
+def _fe(path: str) -> FileEntry:
     """Minimal FileEntry helper for predicate testing."""
-    from harness_maker.models import FileEntry
-
     return FileEntry(path=Path(path), template="hooks/hooks.json.j2", context={})
 
 
@@ -1190,7 +1189,7 @@ def test_render_agents_md_block_merge_preserves_user_blocks(tmp_path: Path) -> N
     )
     (tmp_path / "AGENTS.md").write_text(existing)
 
-    merge_reports: dict = {}
+    merge_reports: dict[Path, MergeReport] = {}
     fe = FileEntry(path=Path("AGENTS.md"), template="agents.md.j2", context={})
     out = _render_agents_md(
         fe,
@@ -1229,7 +1228,7 @@ def test_render_agents_md_block_merge_fallback_on_missing_file(tmp_path: Path) -
     )
     target_dir = tmp_path / ".claude"
     target_dir.mkdir()
-    merge_reports: dict = {}
+    merge_reports: dict[Path, MergeReport] = {}
     fe = FileEntry(path=Path("AGENTS.md"), template="agents.md.j2", context={})
     out = _render_agents_md(
         fe,
@@ -1578,8 +1577,8 @@ def _hm_cmd(path: str, invocation: str = "harness_maker.gates.permission_gate") 
     return f"uv run --with {path} python -m {invocation}"
 
 
-def _nested_entry(command: str, matcher: str | None = None) -> dict:
-    e: dict = {"hooks": [{"type": "command", "command": command}]}
+def _nested_entry(command: str, matcher: str | None = None) -> dict[str, Any]:
+    e: dict[str, Any] = {"hooks": [{"type": "command", "command": command}]}
     if matcher is not None:
         e["matcher"] = matcher
     return e

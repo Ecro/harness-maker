@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import pytest
 from pydantic import ValidationError
@@ -486,7 +487,7 @@ def test_one_bad_row_does_not_hide_a_real_defect_in_another_run() -> None:
     Rows come from a shared file that concurrent sessions append to, so a single torn line
     used to convert the checker from "reports problems" to "reports nothing".
     """
-    rows = [
+    rows: list[dict[str, Any]] = [
         {"agent": "a", "stage": "s", "slug": "x", "run_id": "bad", "pass_or_attempt": None},
         {**_BASE, "run_id": "real", "pass_or_attempt": 1, "terminal": True},
         {**_BASE, "run_id": "real", "pass_or_attempt": 2, "terminal": True},

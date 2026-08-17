@@ -53,12 +53,14 @@ def test_extract_plain_json_object() -> None:
 def test_extract_fenced_json() -> None:
     raw = '```json\n{"findings": [], "summary": "ok", "confidence": null}\n```'
     payload = extract_antigravity_payload(raw)
+    assert isinstance(payload, dict)
     assert payload["summary"] == "ok"
 
 
 def test_extract_prose_wrapped_single_object() -> None:
     raw = 'Here is my review:\n{"findings": [], "summary": "ok", "confidence": 0.5}\nThanks!'
     payload = extract_antigravity_payload(raw)
+    assert isinstance(payload, dict)
     assert payload["summary"] == "ok"
 
 
@@ -95,6 +97,7 @@ def test_extract_prose_prefixed_clean_json_still_accepted() -> None:
     # the anchor rule must NOT reject a legitimate prose-prefixed single payload
     raw = 'Here is my review:\n{"findings": [], "summary": "ok", "confidence": 0.5}'
     payload = extract_antigravity_payload(raw)
+    assert isinstance(payload, dict)
     assert payload["summary"] == "ok"
 
 

@@ -14,6 +14,7 @@ GREEN after Phase 6:
 from __future__ import annotations
 
 import tomllib
+from typing import Any
 
 import pytest
 
@@ -37,7 +38,7 @@ _BASE_CONFIG = {
 }
 
 
-def _render_agent_toml(name: str) -> dict:
+def _render_agent_toml(name: str) -> dict[str, Any]:
     """Render a Codex agent TOML using production context from _codex_agent_files()."""
     specs = _codex_agent_files()
     agent_ctx = next((ctx for _, out, ctx in specs if out == f".codex/agents/{name}.toml"), {})

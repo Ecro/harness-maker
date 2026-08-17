@@ -55,7 +55,10 @@ def test_dry_run_summary_includes_keep_merge(
     block, which a `Total: 2` line satisfies on its own; they are anchored to their labels now.
     """
     cli._emit_dry_run_summary(
-        _bp("commands/hm/x.md", "agents/a.md"),
+        # Duck-typed stand-in: `_emit_dry_run_summary` reads only `.files[].path`. The ignore is
+        # localised HERE rather than widened into `_bp`'s return type, so a signature change on
+        # the function under test still surfaces statically.
+        _bp("commands/hm/x.md", "agents/a.md"),  # type: ignore[arg-type]
         tmp_path,
         keep_paths=frozenset({Path("commands/hm/x.md")}),
         merge_paths=frozenset({Path("agents/a.md")}),

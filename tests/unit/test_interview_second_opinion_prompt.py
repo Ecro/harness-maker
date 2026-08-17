@@ -16,6 +16,8 @@ removed — which is exactly what this phase does to every other test in this di
 
 from __future__ import annotations
 
+import shutil
+
 import pytest
 
 from harness_maker.interview import interview
@@ -33,14 +35,13 @@ def _answering(
     installed: set[str] = frozenset(),  # type: ignore[assignment]
 ) -> list[str]:
     """Drive the interview by prompt substring; return every prompt+printed line seen."""
-    from harness_maker import tool_detect
 
     seen: list[str] = []
 
     def _which(cmd: str) -> str | None:
         return f"/usr/bin/{cmd}" if cmd in installed else None
 
-    monkeypatch.setattr(tool_detect.shutil, "which", _which)
+    monkeypatch.setattr(shutil, "which", _which)
     monkeypatch.setattr("harness_maker.interview._fetch_agy_models", lambda: [])
 
     def _input(prompt: str) -> str:
@@ -121,9 +122,7 @@ def test_an_unrecognised_answer_is_re_asked_not_silently_dropped(
     replies = iter(["antigravty", "codex"])  # typo, then a correction
     seen: list[str] = []
 
-    from harness_maker import tool_detect
-
-    monkeypatch.setattr(tool_detect.shutil, "which", lambda _c: None)
+    monkeypatch.setattr(shutil, "which", lambda _c: None)
     monkeypatch.setattr("harness_maker.interview._fetch_agy_models", lambda: [])
 
     def _input(prompt: str) -> str:
@@ -144,9 +143,8 @@ def test_a_persistently_bad_answer_terminates_instead_of_looping(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Re-prompting must be bounded — an unattended stdin must not spin forever."""
-    from harness_maker import tool_detect
 
-    monkeypatch.setattr(tool_detect.shutil, "which", lambda _c: None)
+    monkeypatch.setattr(shutil, "which", lambda _c: None)
     monkeypatch.setattr("harness_maker.interview._fetch_agy_models", lambda: [])
     asked: list[str] = []
 

@@ -37,7 +37,8 @@ def _boundary(root: Path, current: str, *extra: str) -> dict[str, object]:
     with contextlib.redirect_stdout(buf):
         rc = autopilot_caps.main(["boundary", "--root", str(root), "--current", current, *extra])
     assert rc == 0
-    return json.loads(buf.getvalue().strip())
+    value: dict[str, object] = json.loads(buf.getvalue().strip())
+    return value
 
 
 def _events(root: Path) -> list[tuple[str, object]]:

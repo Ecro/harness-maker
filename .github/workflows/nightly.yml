@@ -39,7 +39,7 @@ jobs:
       - name: Ruff format check
         run: uv run ruff format --check .
       - name: Mypy strict
-        run: uv run mypy --strict src
+        run: uv run mypy --strict src tests
       - name: Pytest
         run: uv run pytest -x --tb=short
       - name: Integration test — fresh install readiness

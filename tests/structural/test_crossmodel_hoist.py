@@ -19,6 +19,7 @@ import re
 from functools import cache
 from pathlib import Path
 from tempfile import mkdtemp
+from typing import Literal
 
 import pytest
 
@@ -43,7 +44,7 @@ def _offset(pattern: re.Pattern[str], text: str) -> int | None:
     return None if m is None else m.start()
 
 
-def _render(*, models: list[str]) -> Path:
+def _render(*, models: list[Literal["codex", "antigravity"]]) -> Path:
     profile = ProjectProfile(stack=["python"], scale="medium", lifecycle="active")
     answers = interview(profile, autoloop_mode=True)
     answers.targets = [Target.CLAUDE_CODE, Target.CURSOR, Target.CODEX]

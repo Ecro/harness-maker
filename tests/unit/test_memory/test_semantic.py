@@ -81,8 +81,9 @@ def test_write_many_single_lock_acquisition(
     import contextlib
 
     import harness_maker.memory.semantic as semantic_module
+    from harness_maker.memory._locking import exclusive_lock
 
-    real_lock = semantic_module.exclusive_lock
+    real_lock = exclusive_lock
     acquire_count = 0
 
     @contextlib.contextmanager

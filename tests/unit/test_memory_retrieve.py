@@ -7,6 +7,9 @@ this module handles the markdown wiki/failures files surfaced to research/plan/s
 from __future__ import annotations
 
 import sys
+from pathlib import Path
+
+from harness_maker.memory_retrieve import MemoryEntry
 
 
 def test_module_does_not_import_anthropic() -> None:
@@ -193,7 +196,7 @@ class TestScoreEntry:
         body: str = "alpha bravo charlie",
         category: str = "pattern",
         tier: str = "wiki",
-    ):
+    ) -> MemoryEntry:
         from harness_maker.memory_retrieve import MemoryEntry
 
         return MemoryEntry(
@@ -248,7 +251,7 @@ class TestTopCandidatesOrdering:
         date: str,
         body: str,
         category: str = "pattern",
-    ):
+    ) -> MemoryEntry:
         from harness_maker.memory_retrieve import MemoryEntry
 
         return MemoryEntry(
@@ -316,7 +319,7 @@ class TestTopCandidatesOrdering:
 
 
 class TestByteCap:
-    def _make_entry_with_body(self, slug: str, body_size: int):
+    def _make_entry_with_body(self, slug: str, body_size: int) -> MemoryEntry:
         from harness_maker.memory_retrieve import MemoryEntry
 
         return MemoryEntry(
@@ -442,7 +445,7 @@ class TestByteCap:
 
 
 class TestRenderSchema:
-    def _make_entry(self):
+    def _make_entry(self) -> MemoryEntry:
         from harness_maker.memory_retrieve import MemoryEntry
 
         return MemoryEntry(
@@ -561,14 +564,14 @@ class TestTopicTokens:
 
 
 class TestParseFiles:
-    def test_parse_files_handles_missing_files_gracefully(self, tmp_path) -> None:
+    def test_parse_files_handles_missing_files_gracefully(self, tmp_path: Path) -> None:
         from harness_maker.memory_retrieve import load_memory_dir
 
         # Non-existent dir
         entries = load_memory_dir(tmp_path / "nonexistent")
         assert entries == []
 
-    def test_parse_files_loads_both_tiers(self, tmp_path) -> None:
+    def test_parse_files_loads_both_tiers(self, tmp_path: Path) -> None:
         from harness_maker.memory_retrieve import load_memory_dir
 
         memdir = tmp_path / "memory"

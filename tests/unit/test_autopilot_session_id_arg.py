@@ -187,7 +187,7 @@ def test_set_task_slug_persists_only_when_wired(tmp_path: Path) -> None:
 def test_effective_level_honours_the_marker_only_when_wired(tmp_path: Path) -> None:
     """An id-less resolve silently downgrades a `full`/`auto_safe` session to the
     committed yaml default — a precedence inversion with no diagnostic."""
-    autopilot.write(tmp_path, level="full", pipeline=_PIPELINE, claude_session_id=_SID)
+    autopilot.write(tmp_path, level="full", pipeline=_PIPELINE, claude_session_id=_SID)  # type: ignore[arg-type]  # legacy level, normalized on write
 
     assert autopilot.effective_level(tmp_path, yaml_level="gated") == "gated"
     assert autopilot.effective_level(tmp_path, yaml_level="gated", session_id=_SID) == "auto_safe"

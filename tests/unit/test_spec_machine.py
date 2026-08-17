@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
+from typing import Any
 
 import pytest
 import yaml
@@ -21,7 +23,7 @@ from harness_maker.spec_machine import (
 )
 
 
-def _minimal_yaml(tmp_path: Path, **overrides) -> Path:
+def _minimal_yaml(tmp_path: Path, **overrides: Any) -> Path:
     """Write a minimal valid SpecMachine yaml; return path."""
     data = {
         "schema_version": SCHEMA_VERSION,
@@ -217,9 +219,9 @@ def _write_md_yaml_pair(
     tmp_path: Path,
     *,
     slug: str = "render",
-    md_frontmatter: dict | None = None,
-    md_acs: list[dict] | None = None,
-    yaml_overrides: dict | None = None,
+    md_frontmatter: dict[str, Any] | None = None,
+    md_acs: list[dict[str, Any]] | None = None,
+    yaml_overrides: dict[str, Any] | None = None,
 ) -> tuple[Path, Path]:
     md_frontmatter = (
         md_frontmatter if md_frontmatter is not None else {"type": "spec", "tier": 1, "slug": slug}
@@ -709,7 +711,7 @@ def test_check_pytest_collect_drops_option_like_test_id(monkeypatch: pytest.Monk
         captured["args"] = args
         return _Result()
 
-    monkeypatch.setattr(sm.subprocess, "run", _fake_run)
+    monkeypatch.setattr(subprocess, "run", _fake_run)
     unresolved = sm._check_pytest_collect(["-pevil::x", "tests/ok.py::test_y"], cwd=Path("."))
     assert "-pevil" not in captured["args"]  # never spliced as an option
     assert "-pevil::x" not in captured["args"]

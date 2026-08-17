@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from harness_maker.readiness import _dim_guardrails
+from harness_maker.readiness import Signal, _dim_guardrails
 
 _SIG = "wrapup_oracle_waiver_dev_mode_match"
 
@@ -23,7 +23,7 @@ def _project(tmp_path: Path, dev_mode: str, wrapup_body: str | None) -> Path:
     return tmp_path
 
 
-def _signal(project: Path):
+def _signal(project: Path) -> Signal | None:
     dim = _dim_guardrails(project)
     return next((s for s in dim.signals if s.id == _SIG), None)
 
@@ -31,7 +31,8 @@ def _signal(project: Path):
 def _passed(project: Path) -> bool:
     sig = _signal(project)
     assert sig is not None
-    return sig.passed
+    value: bool = sig.passed
+    return value
 
 
 def test_task_driven_with_advisory_passes(tmp_path: Path) -> None:

@@ -18,6 +18,7 @@ prose has since been generalized (rename mapping) from single-vendor "Codex" wor
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
 
 from harness_maker.models import (
     InterviewAnswers,
@@ -112,7 +113,9 @@ def test_non_codex_agent_has_no_reconcile_block(tmp_path: Path) -> None:
     assert "second_opinion_results" not in body
 
 
-def _render_models(tmp_path: Path, *, models: list[str]) -> dict[str, str]:
+def _render_models(
+    tmp_path: Path, *, models: list[Literal["codex", "antigravity"]]
+) -> dict[str, str]:
     blueprint = synthesize(
         ProjectProfile(),
         InterviewAnswers(

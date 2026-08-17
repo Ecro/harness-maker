@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 import yaml
@@ -60,7 +61,7 @@ def _pair(
 
 def _run(
     tmp_path: Path, yaml_path: Path, md_path: Path, mode: str = "task-driven"
-) -> tuple[int, dict]:
+) -> tuple[int, dict[str, Any]]:
     import contextlib
     import io
 

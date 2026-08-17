@@ -150,7 +150,10 @@ def golden_churn_repo(root: Path) -> DMRepo:
     ⇒ churned_loc=4, added_loc=10.
     """
     r = DMRepo(root)
-    write = lambda lines: {"base.py": "\n".join(lines) + "\n"}  # noqa: E731
+
+    def write(lines: list[str]) -> dict[str, str]:
+        return {"base.py": "\n".join(lines) + "\n"}
+
     r.commit("chore: initial", days_ago=40, files=write(_BASE_LINES))
     r.commit("feat: alpha block", days_ago=20, files=write(_BASE_LINES + _A_LINES))
 

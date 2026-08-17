@@ -116,6 +116,7 @@ def render_surface(depth_override: str | None = None) -> dict[str, dict[str, str
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
         answers = answers_from_harness_yaml(HARNESS_YAML)
+        assert answers is not None, f"{HARNESS_YAML} did not parse into answers"
         if depth_override is not None:
             interview = dict(answers.interview)
             comprehension = dict(interview.get("comprehension", {}))

@@ -115,7 +115,7 @@ def test_render_never_shells_out_to_agy(monkeypatch: pytest.MonkeyPatch, tmp_pat
         argv = args[0] if args else kwargs.get("args")
         if isinstance(argv, (list, tuple)) and argv and argv[0] == "agy":
             calls.append(list(argv))
-        return real_run(*args, **kwargs)  # type: ignore[arg-type]
+        return real_run(*args, **kwargs)  # type: ignore[call-overload]
 
     monkeypatch.setattr(subprocess, "run", _spy)
     _render(["antigravity"], tmp_path)

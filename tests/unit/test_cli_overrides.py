@@ -7,10 +7,10 @@ import typer
 
 from harness_maker.cli import _apply_dimension_overrides
 from harness_maker.interview import _build_answers
-from harness_maker.models import DevMode, Preset, Target
+from harness_maker.models import DevMode, InterviewAnswers, Preset, Target
 
 
-def _baseline_side() -> object:
+def _baseline_side() -> InterviewAnswers:
     return _build_answers(
         locale="en",
         targets=[Target.CLAUDE_CODE],

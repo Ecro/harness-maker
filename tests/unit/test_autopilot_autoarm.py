@@ -99,7 +99,7 @@ def test_write_failure_is_fail_safe(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     def _boom(*_a: object, **_k: object) -> None:
         raise OSError("disk full")
 
-    monkeypatch.setattr(autopilot_autoarm.autopilot, "write", _boom)
+    monkeypatch.setattr(autopilot, "write", _boom)
     # Must NOT raise — a hook that blocks SessionStart is worse than a degraded fallback.
     assert autopilot_autoarm.arm_if_persistent(tmp_path, now=_FROZEN) is False
 

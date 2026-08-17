@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -207,7 +208,7 @@ def test_the_migration_claim_wins_the_race_not_the_existence_check(tmp_path: Pat
     )
     procs = [
         subprocess.Popen(  # noqa: S603 — fixed argv, shell=False
-            [os.sys.executable, "-c", script, str(obs), str(tmp_path / f"barrier-{i}")],
+            [sys.executable, "-c", script, str(obs), str(tmp_path / f"barrier-{i}")],
             cwd=str(Path(__file__).parents[2]),
         )
         for i in range(2)

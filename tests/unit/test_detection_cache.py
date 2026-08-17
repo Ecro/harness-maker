@@ -6,11 +6,11 @@ import json
 import logging
 import os
 import threading
+import time
 from pathlib import Path
 
 import pytest
 
-from harness_maker import detection_cache
 from harness_maker.detection_cache import _repo_hash, load_or_run, write
 from harness_maker.models import ProjectProfile
 
@@ -80,7 +80,7 @@ def test_load_returns_none_after_24h_ceiling(
     real_mtime = cache_file.stat().st_mtime
     # Pretend "now" is 25h after the cache was written.
     fake_now = real_mtime + 25 * 60 * 60
-    monkeypatch.setattr(detection_cache.time, "time", lambda: fake_now)
+    monkeypatch.setattr(time, "time", lambda: fake_now)
 
     assert load_or_run(repo, cache_dir=cache_dir) is None
 

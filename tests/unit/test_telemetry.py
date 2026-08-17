@@ -5,6 +5,7 @@ from __future__ import annotations
 import io
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -16,7 +17,7 @@ def _run_main_with_stdin(monkeypatch: pytest.MonkeyPatch, stdin: str) -> int:
     return telemetry.main()
 
 
-def _read_today_entries(tmp_path: Path) -> list[dict]:
+def _read_today_entries(tmp_path: Path) -> list[dict[str, Any]]:
     """Read all entries telemetry wrote today (handles 0.7.1 dated filenames)."""
     obs_dir = tmp_path / ".claude" / "observability"
     if not obs_dir.is_dir():

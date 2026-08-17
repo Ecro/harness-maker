@@ -37,7 +37,8 @@ def _signal(project: Path):  # type: ignore[no-untyped-def]
 def _passed(project: Path) -> bool:
     sig = _signal(project)
     assert sig is not None
-    return sig.passed
+    value: bool = sig.passed
+    return value
 
 
 def test_spec_driven_with_gating_passes(tmp_path: Path) -> None:

@@ -131,7 +131,11 @@ def test_preflight_runs_no_mutating_git(tmp_path: Path, monkeypatch) -> None:  #
             seen.append(args)
         return real_run(args, *a, **kw)
 
-    monkeypatch.setattr(worktree.subprocess, "run", _spy)
+    # String target, not `setattr(subprocess, ...)`: this is a SPY whose assertion can pass
+    # vacuously (zero recorded calls satisfies it). Patching the bare stdlib module still
+    # works if `worktree` stopped importing it, so the spy would record nothing and the test
+    # would go green on a module it no longer observes. The dotted form raises instead.
+    monkeypatch.setattr("harness_maker.worktree.subprocess.run", _spy)
     worktree.enablement_preflight(repo)
     mutating = {
         "commit",

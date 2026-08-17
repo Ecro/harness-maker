@@ -13,12 +13,12 @@ ONBOARDING_ACCEPTANCE.md` owns those, and this file's docstring is the pointer t
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
 
-from harness_maker import tool_detect
 from harness_maker.cli import app
 from harness_maker.io_utils import load_harness_yaml
 
@@ -59,7 +59,7 @@ def test_detect_tools_reports_absence_rather_than_failing(
     If this ever exits non-zero, the fresh-install flow acquires a failure mode in the one
     place a first-time user is least equipped to diagnose.
     """
-    monkeypatch.setattr(tool_detect.shutil, "which", _fake_which(set()))
+    monkeypatch.setattr(shutil, "which", _fake_which(set()))
     result = runner.invoke(app, ["detect-tools", "--json"])
     assert result.exit_code == 0, result.output
     payload = json.loads(result.stdout.strip())
@@ -137,5 +137,7 @@ def test_per_model_sub_blocks_survive_a_models_list_change(tmp_path: Path) -> No
     before = _config(root)["second_opinion"]
     _make(root, "--second-opinion-models", "codex")
     after = _config(root)["second_opinion"]
-    assert after["codex"] == before["codex"]  # type: ignore[index,call-overload]
-    assert after["antigravity"] == before["antigravity"]  # type: ignore[index,call-overload]
+    assert isinstance(after, dict)
+    assert isinstance(before, dict)
+    assert after["codex"] == before["codex"]
+    assert after["antigravity"] == before["antigravity"]

@@ -12,6 +12,8 @@ Verifies that:
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 from harness_maker.models import DELEGATABLE_STAGES, HarnessConfig
@@ -23,7 +25,7 @@ from harness_maker.synthesize import (
 )
 
 
-def _make_default_config() -> dict:
+def _make_default_config() -> dict[str, Any]:
     return HarnessConfig().model_dump(mode="json")
 
 

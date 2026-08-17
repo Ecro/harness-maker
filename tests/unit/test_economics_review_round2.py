@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -123,7 +124,7 @@ def _project_with_transcripts(tmp_path: Path, *, harness_yaml: str) -> tuple[Pat
 
     store = tmp_path / "projects"
     (store / encode_project_dir(root)).mkdir(parents=True)
-    lines = [
+    lines: list[dict[str, Any]] = [
         # attributed anchor, then two unattributed turns 1 and 30 minutes later
         {"skill": "hm:execute", "minute": 0},
         {"skill": None, "minute": 1},
@@ -151,7 +152,7 @@ def _report(capsys: pytest.CaptureFixture[str], root: Path, store: Path) -> dict
     assert code == 0
     payload = json.loads(capsys.readouterr().out)
     assert isinstance(payload["report"], dict)
-    return payload["report"]  # type: ignore[return-value]
+    return payload["report"]
 
 
 def test_adjacency_estimate_knob_reaches_the_report(

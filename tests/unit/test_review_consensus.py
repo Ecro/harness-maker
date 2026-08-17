@@ -40,7 +40,7 @@ def _model(name: str) -> dict[str, str]:
 
 # ── AC-004: the golden table, verbatim from the machine SPEC ─────────────────
 
-AC004_ROWS = [
+AC004_ROWS: list[tuple[list[dict[str, str]], str]] = [
     ([_lens("robustness")], "consensus-passed"),
     ([_lens("consistency"), _lens("design")], "consensus-passed"),
     ([_model("codex")], "manual-only"),
@@ -437,7 +437,7 @@ def chain(tmp_path: Path):  # type: ignore[no-untyped-def]
         if spec:
             args += ["--spec", spec]
         proc = _hm(*args)
-        payload = json.loads(proc.stdout)
+        payload: dict[str, object] = json.loads(proc.stdout)
         payload["_exit"] = proc.returncode
         payload["_input_unchanged"] = path.read_text(encoding="utf-8") == json.dumps(findings)
         return payload
@@ -499,7 +499,7 @@ def test_an_unverifiable_ac_citation_cannot_clear_a_p0(tmp_path: Path) -> None:
             encoding="utf-8",
         )
         proc = _hm("finalize", "--file", str(f), "--spec", str(spec))
-        out = json.loads(proc.stdout)
+        out: dict[str, object] = json.loads(proc.stdout)
         out["_exit"] = proc.returncode
         return out
 

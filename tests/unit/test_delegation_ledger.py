@@ -365,7 +365,9 @@ def test_a_row_too_large_for_pipe_buf_is_shrunk_rather_than_dropped(tmp_path: Pa
     dl.append(base, stage="wrapup", slug="s", kind="brief", status="degraded", reason="한" * 8000)
     rows = _rows(base)
     assert len(rows) == 1
-    assert rows[0]["reason"].endswith("…[truncated]")
+    reason = rows[0]["reason"]
+    assert isinstance(reason, str)
+    assert reason.endswith("…[truncated]")
     raw = dl.ledger_path(base).read_bytes()
     assert len(raw) <= 4096, f"row is {len(raw)} bytes — above PIPE_BUF, so no longer atomic"
 

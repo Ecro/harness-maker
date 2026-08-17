@@ -12,6 +12,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any, Literal
 
 import pytest
 import yaml
@@ -28,7 +29,12 @@ from harness_maker.spec_machine import (
 # ---------------------------------------------------------------------------
 
 
-def _ac(ac_id: str, ac_type: str, *, pending: bool = False) -> AcceptanceCriterion:
+def _ac(
+    ac_id: str,
+    ac_type: Literal["mechanical", "parametric", "judgment", "property"],
+    *,
+    pending: bool = False,
+) -> AcceptanceCriterion:
     """Construct a minimal AC of a given type (model construction does not gate
     per-type fields — that is `validate()`; the selector keys on `type` only)."""
     return AcceptanceCriterion(id=ac_id, title=f"{ac_type} ac", type=ac_type, pending_test=pending)
@@ -121,7 +127,7 @@ def test_mark_tested_binds_property_ac(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _parametric_yaml(tmp_path: Path, golden: list[dict] | None = None) -> Path:
+def _parametric_yaml(tmp_path: Path, golden: list[dict[str, Any]] | None = None) -> Path:
     data = {
         "schema_version": 2,
         "spec_slug": "demo",

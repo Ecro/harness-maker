@@ -40,7 +40,9 @@ def _write_yaml(root: Path, *, level: str, persistent: bool) -> None:
 
 
 def test_legacy_full_demotes_to_auto_safe() -> None:
-    assert AutonomyConfig(level="full").level == "auto_safe"
+    # "full" is the LEGACY input this migration test feeds in; the Literal covers only the
+    # post-migration values, so the static error is the subject, not a defect.
+    assert AutonomyConfig(level="full").level == "auto_safe"  # type: ignore[arg-type]
 
 
 def test_a_marker_written_by_an_older_version_still_loads(tmp_path: Path) -> None:

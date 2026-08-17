@@ -12,6 +12,7 @@ import json
 import subprocess
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -544,7 +545,7 @@ def _seed_store(tmp_path: Path) -> Path:
         "cwd": str(tmp_path.resolve()),
         "message": {"role": "user", "content": "actually, also check the parser"},
     }
-    lines: list[dict[str, object]] = [
+    lines: list[dict[str, Any]] = [
         _assistant("t0", 1, "hm:plan"),
         user,
         _assistant("t1", 2, None),

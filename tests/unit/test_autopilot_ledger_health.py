@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -13,7 +14,7 @@ from harness_maker.iter_receipts import Verdict
 from harness_maker.models import AtomicStage
 
 
-def _ledger_lines(root: Path) -> list[dict]:
+def _ledger_lines(root: Path) -> list[dict[str, Any]]:
     path = root / ".claude" / "observability" / "auto-advance.jsonl"
     if not path.is_file():
         return []
@@ -90,7 +91,7 @@ def test_smoke_not_degraded_when_entries_exist(tmp_path: Path) -> None:
     assert result["entry_count"] == 1
 
 
-def test_smoke_cli_emits_json(tmp_path: Path, capsys) -> None:  # noqa: ANN001
+def test_smoke_cli_emits_json(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     rc = autopilot_ledger.main(["smoke", "--root", str(tmp_path), "--level", "auto_safe"])
     assert rc == 0
     out = json.loads(capsys.readouterr().out)
@@ -106,11 +107,11 @@ def test_ledger_never_writes_a_verdict_literal_in_event(tmp_path: Path) -> None:
     # Write every legal event; assert NO emitted `event` field is an iter_receipts.Verdict
     # literal (the two enums are disjoint by construction — this guards the on-disk bytes).
     for ev in ("advanced", "gate_blocked", "halted_cap"):
-        autopilot_ledger.append_event(tmp_path, event=ev)  # type: ignore[arg-type]
+        autopilot_ledger.append_event(tmp_path, event=ev)
     verdicts = set(Verdict.__args__)  # type: ignore[attr-defined]
     events_on_disk = {ln["event"] for ln in _ledger_lines(tmp_path)}
     assert events_on_disk.isdisjoint(verdicts)
     # and the forbidden literals are still rejected at the write boundary.
     for forbidden in verdicts:
         with pytest.raises(ValueError, match="ADR-009"):
-            autopilot_ledger.append_event(tmp_path, event=forbidden)  # type: ignore[arg-type]
+            autopilot_ledger.append_event(tmp_path, event=forbidden)

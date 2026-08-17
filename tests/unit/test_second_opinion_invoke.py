@@ -15,11 +15,13 @@ from __future__ import annotations
 
 import json
 import subprocess
+import tempfile
 from pathlib import Path
 from typing import Any
 
 import pytest
 
+from harness_maker import codex_adapter, codex_ledger
 from harness_maker import second_opinion_invoke as soi
 
 # ── fixtures ─────────────────────────────────────────────────────────────────
@@ -123,7 +125,7 @@ def _run_with(monkeypatch: pytest.MonkeyPatch, fake: Any) -> None:
             return _REAL_RUN(argv, **kwargs)
         return fake(argv, **kwargs)
 
-    monkeypatch.setattr(soi.subprocess, "run", dispatch)
+    monkeypatch.setattr(subprocess, "run", dispatch)
 
 
 # ── base-root resolution (5 cases, against REAL git) ─────────────────────────
@@ -623,7 +625,7 @@ def test_missing_git_degrades_instead_of_raising(
             raise FileNotFoundError(2, "No such file or directory", "git")
         return _FakeCompleted(0, stdout=json.dumps(_valid_payload()))
 
-    monkeypatch.setattr(soi.subprocess, "run", no_git)
+    monkeypatch.setattr(subprocess, "run", no_git)
     monkeypatch.chdir(tmp_path)
 
     r = soi.invoke(model="antigravity", prompt="p", slug="s", stage="review")
@@ -646,7 +648,7 @@ def test_invoker_error_before_the_cli_call_still_returns_json(
     def boom(*a: Any, **kw: Any) -> None:
         raise OSError(28, "No space left on device")
 
-    monkeypatch.setattr(soi.tempfile, "mkstemp", boom)
+    monkeypatch.setattr(tempfile, "mkstemp", boom)
 
     r = soi.invoke(model="codex", prompt="p", slug="s", stage="review", base_root=repo)
 
@@ -660,13 +662,13 @@ def test_temp_files_are_removed_on_every_branch(
 ) -> None:
     # One leaked file per codex call, plus one more per call whenever the packaged
     # schema is materialised. Both hold review content and accumulate silently.
-    before = set(Path(soi.tempfile.gettempdir()).glob("hm-so-*"))
+    before = set(Path(tempfile.gettempdir()).glob("hm-so-*"))
     _run_with(monkeypatch, lambda argv, **kw: _FakeCompleted(0))  # empty out-file → failed
 
     r = soi.invoke(model="codex", prompt="p", slug="s", stage="review", base_root=repo)
 
     assert r["status"] == "failed"
-    assert set(Path(soi.tempfile.gettempdir()).glob("hm-so-*")) == before
+    assert set(Path(tempfile.gettempdir()).glob("hm-so-*")) == before
 
 
 def test_failed_reason_carries_what_the_cli_actually_said(
@@ -823,7 +825,7 @@ def test_ledger_write_failure_does_not_change_the_returned_status(
     _run_with(
         monkeypatch, lambda argv, **kw: _FakeCompleted(0, stdout=json.dumps(_valid_payload()))
     )
-    monkeypatch.setattr(soi.codex_ledger, "emit", boom)
+    monkeypatch.setattr(codex_ledger, "emit", boom)
 
     r = soi.invoke(model="antigravity", prompt="p", slug="s", stage="review", base_root=repo)
 
@@ -979,7 +981,7 @@ def test_a_user_schema_living_in_the_temp_dir_survives_the_call(
     recorded at creation rather than re-derived from where the file happens to live.
     """
     schema = _write_schema(repo)
-    monkeypatch.setattr(soi.tempfile, "tempdir", str(schema.parent))
+    monkeypatch.setattr(tempfile, "tempdir", str(schema.parent))
 
     def fake_run(argv: list[str], **kwargs: Any) -> _FakeCompleted:
         Path(argv[argv.index("--output-last-message") + 1]).write_text(
@@ -1004,7 +1006,7 @@ def test_oversized_codex_output_fails_closed_naming_the_cap(
     the assertion that separates the two.
     """
     _write_schema(repo)
-    monkeypatch.setattr(soi.codex_adapter, "_MAX_ANTIGRAVITY_BYTES", 64)
+    monkeypatch.setattr(codex_adapter, "_MAX_ANTIGRAVITY_BYTES", 64)
 
     def fake_run(argv: list[str], **kwargs: Any) -> _FakeCompleted:
         Path(argv[argv.index("--output-last-message") + 1]).write_text(
@@ -1027,7 +1029,7 @@ def test_the_cap_counts_bytes_not_characters(repo: Path, monkeypatch: pytest.Mon
     `invoked`. This is the only case that distinguishes the two units.
     """
     _write_schema(repo)
-    monkeypatch.setattr(soi.codex_adapter, "_MAX_ANTIGRAVITY_BYTES", 400)
+    monkeypatch.setattr(codex_adapter, "_MAX_ANTIGRAVITY_BYTES", 400)
 
     payload = _valid_payload()
     payload["findings"][0]["message"] = "가" * 120  # 120 chars, 360 bytes

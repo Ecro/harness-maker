@@ -53,7 +53,7 @@ def _write_installed_plugins_json(target: Path, version: str = "0.20.0") -> Path
 
 
 @pytest.fixture
-def patched_installed_plugins_json(monkeypatch, tmp_path: Path) -> Path:
+def patched_installed_plugins_json(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
     """Redirect the lazy default-path lookup to a tmp fixture file."""
     fixture = _write_installed_plugins_json(tmp_path)
     import harness_maker.locate as locate_mod
@@ -85,7 +85,7 @@ def test_locate_default_prints_json(patched_installed_plugins_json: Path) -> Non
     assert payload["gitCommitSha"] == "deadbeef"
 
 
-def test_locate_exit_3_when_no_plugin(monkeypatch, tmp_path: Path) -> None:
+def test_locate_exit_3_when_no_plugin(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Exit 3 (NOT 1, NOT 2) when no installed plugin entry found."""
     import harness_maker.locate as locate_mod
 

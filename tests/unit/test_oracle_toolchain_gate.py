@@ -66,7 +66,7 @@ def rec(monkeypatch: pytest.MonkeyPatch) -> _Recorder:
     # it would also intercept `resolve_base_root`'s git shell-out and make it return "ok" as
     # the repo root. Every test that uses this fixture therefore pins `_resolve_config_root`
     # explicitly rather than letting it resolve through the patched boundary.
-    monkeypatch.setattr(soo.subprocess, "run", r)
+    monkeypatch.setattr(subprocess, "run", r)
     return r
 
 
@@ -455,7 +455,7 @@ def test_repo_wide_commands_are_charged_against_the_budget(
     300 s subprocess per repo-wide template whose output was then discarded."""
     _set_changed(*[f"f{i}.ts" for i in range(80)])
     big = _Recorder(stdout="x" * 4000)
-    monkeypatch.setattr(soo.subprocess, "run", big)
+    monkeypatch.setattr(subprocess, "run", big)
     _with_toolchains(monkeypatch, _NODE_TC)
     soo.gather([_finding(f"f-{i}", f"f{i}.ts") for i in range(80)], repo)
     assert not any(a[-1] == "tsc" for a in big.argvs), (
@@ -505,7 +505,7 @@ def test_python_path_output_unchanged_from_baseline(
     monkeypatch.setattr(baseline, "_changed_files", lambda _r: changed)
     expected = baseline.gather(findings, tmp_path)
 
-    monkeypatch.setattr(soo.subprocess, "run", _run)
+    monkeypatch.setattr(subprocess, "run", _run)
     monkeypatch.setattr(soo, "_changed_files", lambda _r: changed)
     monkeypatch.setattr(soo, "_load_toolchains", lambda _r: [])
     actual = soo.gather(findings, tmp_path)

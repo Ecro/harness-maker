@@ -11,6 +11,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from harness_maker import autopilot
 from harness_maker.models import AtomicStage
 from harness_maker.worktree import _HARNESS_CHURN_FILES, _current_session_uuid
@@ -50,7 +52,7 @@ def test_write_then_load_roundtrips(tmp_path: Path) -> None:
 
 
 def test_clear_removes_marker_idempotently(tmp_path: Path) -> None:
-    autopilot.write(tmp_path, level="full", pipeline=DEFAULT_PIPELINE)
+    autopilot.write(tmp_path, level="full", pipeline=DEFAULT_PIPELINE)  # type: ignore[arg-type]  # legacy level, normalized on write
     autopilot.clear(tmp_path, session_id=None)
     assert autopilot.load(tmp_path, session_id=None) is None
     autopilot.clear(tmp_path, session_id=None)  # second clear must not raise
@@ -83,7 +85,9 @@ def test_active_marker_matches_current_session(tmp_path: Path) -> None:
     assert m.level == "auto_safe"
 
 
-def test_active_marker_foreign_uuid_returns_none(tmp_path: Path, monkeypatch) -> None:  # noqa: ANN001
+def test_active_marker_foreign_uuid_returns_none(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     # A marker stamped by a different session must be ignored (fail-safe → gated).
     # Pin the current-session uuid so the mismatch is deterministic, not probabilistic.
     monkeypatch.setattr(autopilot, "_current_session_uuid", lambda _root: "aaaaaaaaaaaa")
@@ -116,7 +120,9 @@ def test_effective_level_falls_back_to_yaml_when_no_marker(tmp_path: Path) -> No
     assert autopilot.effective_level(tmp_path, yaml_level="full") == "auto_safe"
 
 
-def test_effective_level_foreign_marker_falls_back_to_yaml(tmp_path: Path, monkeypatch) -> None:  # noqa: ANN001
+def test_effective_level_foreign_marker_falls_back_to_yaml(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setattr(autopilot, "_current_session_uuid", lambda _root: "aaaaaaaaaaaa")
     _raw_write(
         tmp_path,

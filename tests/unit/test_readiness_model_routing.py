@@ -12,6 +12,7 @@ Multi-target test (W-6 fix) verifies all 3 sub-checks fire independently.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 from harness_maker.readiness import _dim_model_routing
 
@@ -19,7 +20,7 @@ from harness_maker.readiness import _dim_model_routing
 def _write_harness_yaml(
     project_dir: Path,
     targets: list[str],
-    agent_models: dict | None = None,
+    agent_models: dict[str, Any] | None = None,
 ) -> None:
     """Helper: write a minimal v2 harness.yaml at .claude/harness.yaml."""
     claude = project_dir / ".claude"

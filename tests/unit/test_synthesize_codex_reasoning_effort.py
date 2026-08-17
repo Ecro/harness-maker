@@ -7,6 +7,8 @@ precedent). Render [profiles.cheap] + [profiles.deep] in .codex/config.toml.
 
 from __future__ import annotations
 
+from typing import Any
+
 from harness_maker.models import (
     AgentModelSpec,
     CodexAgentSpec,
@@ -15,7 +17,7 @@ from harness_maker.models import (
 from harness_maker.synthesize import _codex_agent_files
 
 
-def _ctx_for(name: str, file_specs: list[tuple[str, str, dict]]) -> dict:
+def _ctx_for(name: str, file_specs: list[tuple[str, str, dict[str, Any]]]) -> dict[str, Any]:
     for _tmpl, dst, ctx in file_specs:
         if dst == f".codex/agents/{name}.toml":
             return ctx

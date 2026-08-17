@@ -9,6 +9,7 @@ A regression here means a rename was missed and would ship a broken reference.
 from __future__ import annotations
 
 import re
+from collections.abc import Iterator
 from pathlib import Path
 
 _REPO = Path(__file__).resolve().parents[2]
@@ -39,7 +40,7 @@ _ALLOWLIST = {
 _SCAN_ROOTS = ["src/harness_maker", "commands", "CLAUDE.md"]
 
 
-def _iter_files():  # type: ignore[no-untyped-def]
+def _iter_files() -> Iterator[Path]:
     for root in _SCAN_ROOTS:
         p = _REPO / root
         if p.is_file():

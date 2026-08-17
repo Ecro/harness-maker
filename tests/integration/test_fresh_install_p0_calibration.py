@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import os
 import re
+from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
@@ -30,7 +31,7 @@ pytestmark = pytest.mark.skipif(
 _runner = CliRunner()
 
 
-def _invoke_make(project_dir, preset: str = "Production") -> str:
+def _invoke_make(project_dir: Path, preset: str = "Production") -> str:
     """Run ``harness-maker make`` and return combined stdout."""
     from harness_maker.cli import app
 
@@ -53,7 +54,7 @@ def _invoke_make(project_dir, preset: str = "Production") -> str:
     return result.output
 
 
-def _seed_fresh_python_project(project_dir) -> None:
+def _seed_fresh_python_project(project_dir: Path) -> None:
     """Minimal Python project — no observability/, no docs/adr/, no .github/workflows/."""
     (project_dir / "pyproject.toml").write_text(
         '[project]\nname = "fresh-fixture"\nversion = "0.0.0"\n',
@@ -65,7 +66,7 @@ def _seed_fresh_python_project(project_dir) -> None:
     )
 
 
-def test_fresh_install_no_p0_for_intended_signals(tmp_path) -> None:
+def test_fresh_install_no_p0_for_intended_signals(tmp_path: Path) -> None:
     """No [P0] line in stdout mentions telemetry / ADRs / CONTRIBUTING / CI workflow."""
     _seed_fresh_python_project(tmp_path)
     output = _invoke_make(tmp_path, preset="Production")
@@ -83,7 +84,7 @@ def test_fresh_install_no_p0_for_intended_signals(tmp_path) -> None:
     )
 
 
-def test_fresh_install_footer_present(tmp_path) -> None:
+def test_fresh_install_footer_present(tmp_path: Path) -> None:
     """Deferral footer must appear when telemetry/governance items are deferred/demoted."""
     _seed_fresh_python_project(tmp_path)
     output = _invoke_make(tmp_path, preset="Production")
@@ -93,7 +94,7 @@ def test_fresh_install_footer_present(tmp_path) -> None:
     assert "/hm:health" in output
 
 
-def test_fresh_install_adr_demoted_not_hidden(tmp_path) -> None:
+def test_fresh_install_adr_demoted_not_hidden(tmp_path: Path) -> None:
     """ADRs must appear as P2 (demoted), not hidden entirely (ADR-003 contract)."""
     _seed_fresh_python_project(tmp_path)
     output = _invoke_make(tmp_path, preset="Production")

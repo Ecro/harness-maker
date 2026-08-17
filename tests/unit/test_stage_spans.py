@@ -240,9 +240,12 @@ def _real_worktree(tmp_path: Path) -> tuple[Path, Path]:
     """
     base = tmp_path / "repo"
     base.mkdir()
-    run = lambda *a: subprocess.run(  # noqa: E731
-        ["git", *a], cwd=base, check=True, capture_output=True, text=True, timeout=30
-    )
+
+    def run(*a: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            ["git", *a], cwd=base, check=True, capture_output=True, text=True, timeout=30
+        )
+
     run("init", "-q", "-b", "main")
     run("config", "user.email", "t@example.com")
     run("config", "user.name", "t")

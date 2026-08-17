@@ -68,7 +68,7 @@ def _run_with_stdout(
         seen.append(argv)
         return subprocess.CompletedProcess(argv, returncode, stdout=stdout, stderr="")
 
-    monkeypatch.setattr(soi.subprocess, "run", _fake)
+    monkeypatch.setattr(subprocess, "run", _fake)
     return seen
 
 
@@ -122,7 +122,9 @@ def test_argv_omits_both_flags_when_no_schema(tmp_path: Path) -> None:
 # ── the six paths ────────────────────────────────────────────────────────────
 
 
-def test_case_1_unparseable_stdout_is_failed(agy_repo: Path, monkeypatch) -> None:
+def test_case_1_unparseable_stdout_is_failed(
+    agy_repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     _run_with_stdout(monkeypatch, "not json at all")
     result = _invoke(agy_repo)
     assert result["status"] == "failed"
@@ -135,7 +137,9 @@ def test_case_1_unparseable_stdout_is_failed(agy_repo: Path, monkeypatch) -> Non
     assert "JSON payload" in reason
 
 
-def test_case_2_non_success_status_is_skipped_with_agy_message(agy_repo: Path, monkeypatch) -> None:
+def test_case_2_non_success_status_is_skipped_with_agy_message(
+    agy_repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """An agy-side error inside a well-formed envelope is agy's failure, not a parse bug.
 
     Reporting it as `failed` would recreate the misattribution the invoker's excerpt
@@ -148,7 +152,9 @@ def test_case_2_non_success_status_is_skipped_with_agy_message(agy_repo: Path, m
     assert "ERROR" in (result["reason"] or "")
 
 
-def test_case_3a_valid_structured_output_is_used(agy_repo: Path, monkeypatch) -> None:
+def test_case_3a_valid_structured_output_is_used(
+    agy_repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     _run_with_stdout(monkeypatch, _envelope(structured_output=_VALID_PAYLOAD))
     result = _invoke(agy_repo)
     assert result["status"] == "invoked"
@@ -156,7 +162,9 @@ def test_case_3a_valid_structured_output_is_used(agy_repo: Path, monkeypatch) ->
     assert result["findings"][0]["severity"] == "P1"
 
 
-def test_case_3b_invalid_structured_output_fails_closed(agy_repo: Path, monkeypatch) -> None:
+def test_case_3b_invalid_structured_output_fails_closed(
+    agy_repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """A schema-violating `structured_output` must NOT fall back to `response`.
 
     Interview #6 locked fail-closed: tolerating it would hide a broken schema contract,
@@ -176,7 +184,7 @@ def test_case_3b_invalid_structured_output_fails_closed(agy_repo: Path, monkeypa
 
 
 def test_case_4a_absent_structured_output_falls_back_to_response(
-    agy_repo: Path, monkeypatch
+    agy_repo: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """The absent case is REAL, not defensive — observed on a `status: SUCCESS` reply."""
     _run_with_stdout(monkeypatch, _envelope(response=json.dumps(_VALID_PAYLOAD)))
@@ -185,14 +193,18 @@ def test_case_4a_absent_structured_output_falls_back_to_response(
     assert len(result["findings"]) == 1
 
 
-def test_case_4a_tolerates_prose_around_the_json(agy_repo: Path, monkeypatch) -> None:
+def test_case_4a_tolerates_prose_around_the_json(
+    agy_repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """`response` is model prose; the tolerant extractor is why case 4 can work at all."""
     _run_with_stdout(monkeypatch, _envelope(response=f"```json\n{json.dumps(_VALID_PAYLOAD)}\n```"))
     result = _invoke(agy_repo)
     assert result["status"] == "invoked"
 
 
-def test_case_4b_missing_response_is_failed(agy_repo: Path, monkeypatch) -> None:
+def test_case_4b_missing_response_is_failed(
+    agy_repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     _run_with_stdout(monkeypatch, _envelope(response=None))
     result = _invoke(agy_repo)
     assert result["status"] == "failed"
@@ -201,7 +213,9 @@ def test_case_4b_missing_response_is_failed(agy_repo: Path, monkeypatch) -> None
     assert "neither a dict" in (result["reason"] or "")
 
 
-def test_case_4b_non_string_response_is_failed(agy_repo: Path, monkeypatch) -> None:
+def test_case_4b_non_string_response_is_failed(
+    agy_repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     _run_with_stdout(monkeypatch, _envelope(response={"not": "a string"}))
     result = _invoke(agy_repo)
     assert result["status"] == "failed"
@@ -213,7 +227,9 @@ def test_case_4b_non_string_response_is_failed(agy_repo: Path, monkeypatch) -> N
 # ── size cap ─────────────────────────────────────────────────────────────────
 
 
-def test_oversized_envelope_is_capped_before_parsing(agy_repo: Path, monkeypatch) -> None:
+def test_oversized_envelope_is_capped_before_parsing(
+    agy_repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """The cap must be re-applied to stdout itself.
 
     It used to live only inside `extract_antigravity_payload`, which under the envelope
@@ -232,7 +248,9 @@ def test_oversized_envelope_is_capped_before_parsing(agy_repo: Path, monkeypatch
 # ── temp-schema lifecycle ────────────────────────────────────────────────────
 
 
-def test_packaged_schema_temp_file_is_cleaned_up(agy_repo: Path, monkeypatch) -> None:
+def test_packaged_schema_temp_file_is_cleaned_up(
+    agy_repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """The schema is materialised per call; not deleting it leaks a file every review."""
     created: list[Path] = []
     real = soi._packaged_schema
@@ -251,7 +269,9 @@ def test_packaged_schema_temp_file_is_cleaned_up(agy_repo: Path, monkeypatch) ->
         assert not path.exists(), f"leaked temp schema: {path}"
 
 
-def test_schema_resolution_failure_still_invokes(agy_repo: Path, monkeypatch) -> None:
+def test_schema_resolution_failure_still_invokes(
+    agy_repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """A broken packaged asset degrades to the no-schema argv and the call PROCEEDS.
 
     Reusing the codex resolver here would instead raise `SecondOpinionSkipError` on a
@@ -270,7 +290,9 @@ def test_schema_resolution_failure_still_invokes(agy_repo: Path, monkeypatch) ->
     assert "--json-schema" not in seen[0]
 
 
-def test_antigravity_does_not_read_the_codex_schema_path(agy_repo: Path, monkeypatch) -> None:
+def test_antigravity_does_not_read_the_codex_schema_path(
+    agy_repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """`second_opinion.codex.output_schema_path` is codex-specific (CLAUDE.md).
 
     Sharing it would let a user's custom codex schema silently redefine antigravity's
@@ -290,7 +312,9 @@ def test_antigravity_does_not_read_the_codex_schema_path(agy_repo: Path, monkeyp
     assert result["status"] == "invoked", result["reason"]
 
 
-def test_bare_payload_in_schema_mode_is_still_used(agy_repo: Path, monkeypatch) -> None:
+def test_bare_payload_in_schema_mode_is_still_used(
+    agy_repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Shape decides whether stdout is an envelope — not the flag we passed.
 
     Asking for `--output-format json` does not entitle the invoker to ASSUME the reply
@@ -305,7 +329,9 @@ def test_bare_payload_in_schema_mode_is_still_used(agy_repo: Path, monkeypatch) 
     assert len(result["findings"]) == 1
 
 
-def test_empty_response_says_agy_produced_nothing(agy_repo: Path, monkeypatch) -> None:
+def test_empty_response_says_agy_produced_nothing(
+    agy_repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """`SUCCESS` + empty `response` + no `structured_output` is a REAL observed state.
 
     Live 2026-08-08, 47KB prompt: agy answered SUCCESS in 6s having produced nothing —
@@ -324,7 +350,9 @@ def test_empty_response_says_agy_produced_nothing(agy_repo: Path, monkeypatch) -
     assert "JSON payload" not in reason, "must not blame the parser for agy's silence"
 
 
-def test_status_absent_but_structured_output_present_is_used(agy_repo: Path, monkeypatch) -> None:
+def test_status_absent_but_structured_output_present_is_used(
+    agy_repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """A payload-bearing reply with no `status` key must NOT be skipped.
 
     The bare-payload guard needs BOTH envelope keys absent, so this reply reaches the
@@ -338,7 +366,9 @@ def test_status_absent_but_structured_output_present_is_used(agy_repo: Path, mon
     assert len(result["findings"]) == 1
 
 
-def test_case_2_excerpt_is_fenced_and_control_chars_stripped(agy_repo: Path, monkeypatch) -> None:
+def test_case_2_excerpt_is_fenced_and_control_chars_stripped(
+    agy_repo: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Model text on the skip path gets the same fence + strip as the failure path.
 
     `_clip` only collapses whitespace, and ESC/BEL/NUL are not whitespace — an unfenced

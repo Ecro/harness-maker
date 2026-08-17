@@ -14,9 +14,10 @@ prose determinism via a golden block (validator W2).
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 from harness_maker import synthesize as _synth
-from harness_maker.models import InterviewAnswers, Preset, ProjectProfile, Target
+from harness_maker.models import Blueprint, InterviewAnswers, Preset, ProjectProfile, Target
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 
 WIRED_STAGES = ("execute", "plan", "review", "wrapup", "verify", "research", "spec")
@@ -31,7 +32,7 @@ def _render(tmp_path: Path, *, flag_on: bool) -> dict[str, str]:
     }
 
 
-def synthesize_blueprint(worktree: dict[str, object]) -> object:
+def synthesize_blueprint(worktree: dict[str, Any]) -> Blueprint:
     from harness_maker.synthesize import synthesize
 
     return synthesize(

@@ -33,7 +33,7 @@ def _row(**overrides: Any) -> dict[str, Any]:
     return base
 
 
-def _rejected_by_a_rule(**row: Any) -> list[dict[str, Any]]:
+def _rejected_by_a_rule(**row: Any) -> list[Any]:
     with pytest.raises(ValidationError) as excinfo:
         ReviewTelemetryRecord(**row)
     errors = [e for e in excinfo.value.errors() if e["type"] != "extra_forbidden"]

@@ -270,7 +270,12 @@ def test_drain_does_not_run_when_the_pop_failed(
 ) -> None:
     drained: list[Any] = []
     monkeypatch.setattr(wt, "_cli_post_commit_pop", lambda _a: 1)
-    monkeypatch.setattr(wt, "_cli_drain", lambda a: drained.append(a) or 0)
+
+    def _drain(a: object) -> int:
+        drained.append(a)
+        return 0
+
+    monkeypatch.setattr(wt, "_cli_drain", _drain)
     (task_worktree / "a.md").write_text("a\n", encoding="utf-8")
     rc, receipt = wrapup_land.run(_args(task_worktree, repo, message, optional=["a.md"]))
     assert rc == wrapup_land.EXIT_FAILED

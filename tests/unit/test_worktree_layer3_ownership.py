@@ -13,6 +13,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from harness_maker.worktree import (
     _cli_owned_crumb_add,
     _cli_owned_crumb_clear,
@@ -31,13 +33,13 @@ _EXEC2 = "execute-444455556666-20260621T0001Z"
 # ── wt-uuid CLI ──────────────────────────────────────────────────────────────
 
 
-def test_wt_uuid_parses_execute_name(capsys) -> None:
+def test_wt_uuid_parses_execute_name(capsys: pytest.CaptureFixture[str]) -> None:
     rc = _cli_wt_uuid([f"/a/b/.worktrees/{_EXEC}"])
     assert rc == 0
     assert capsys.readouterr().out.strip() == "deadbeef1234"
 
 
-def test_wt_uuid_slug_name_empty_with_stderr_warn(capsys) -> None:
+def test_wt_uuid_slug_name_empty_with_stderr_warn(capsys: pytest.CaptureFixture[str]) -> None:
     """A flag-on `.worktrees/<slug>` task path has no uuid → empty stdout + warn."""
     rc = _cli_wt_uuid(["/a/b/.worktrees/myslug"])
     out = capsys.readouterr()
@@ -46,13 +48,13 @@ def test_wt_uuid_slug_name_empty_with_stderr_warn(capsys) -> None:
     assert "myslug" in out.err or "no uuid" in out.err.lower()
 
 
-def test_wt_uuid_multi_csv(capsys) -> None:
+def test_wt_uuid_multi_csv(capsys: pytest.CaptureFixture[str]) -> None:
     rc = _cli_wt_uuid([_EXEC, _EXEC2])
     assert rc == 0
     assert capsys.readouterr().out.strip() == "deadbeef1234,444455556666"
 
 
-def test_wt_uuid_nonexistent_path_ok(capsys) -> None:
+def test_wt_uuid_nonexistent_path_ok(capsys: pytest.CaptureFixture[str]) -> None:
     """Pure string parse — the path need not exist on disk (wrapup post-cleanup)."""
     rc = _cli_wt_uuid([f"/gone/.worktrees/{_EXEC}"])
     assert rc == 0
@@ -70,7 +72,7 @@ def test_owned_crumb_roundtrip_and_dedup(tmp_path: Path) -> None:
     assert _owned_crumb_read(tmp_path, "myslug") == ["444455556666", "deadbeef1234"]
 
 
-def test_owned_crumb_read_absent_empty(tmp_path: Path, capsys) -> None:
+def test_owned_crumb_read_absent_empty(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     (tmp_path / ".claude").mkdir()
     assert _cli_owned_crumb_read([str(tmp_path), "absent"]) == 0
     assert capsys.readouterr().out.strip() == ""

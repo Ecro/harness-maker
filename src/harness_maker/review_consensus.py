@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
@@ -92,7 +93,7 @@ def _as_voice(raw: object) -> Voice:
     return Voice(source=source, kind=kind)
 
 
-def tag_finding(voices: list[object], *, reasoning_diverges: bool = False) -> Tag:
+def tag_finding(voices: Sequence[object], *, reasoning_diverges: bool = False) -> Tag:
     """Apply ADR-007's tag table.
 
     One reviewer-lens voice is sovereign: the fan-out gain consists *by definition* of findings

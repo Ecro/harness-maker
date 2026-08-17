@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Literal
 
 import pytest
 from pydantic import ValidationError
@@ -30,7 +31,12 @@ from harness_maker.synthesize import synthesize
 _PIPELINE = list(AutonomyConfig().pipeline)
 
 
-def _arm(root: Path, *, created: datetime, level: str = "auto_safe") -> None:
+def _arm(
+    root: Path,
+    *,
+    created: datetime,
+    level: Literal["gated", "auto_safe", "auto_full"] = "auto_safe",
+) -> None:
     autopilot.write(root, level=level, pipeline=_PIPELINE, now=created.isoformat())
 
 

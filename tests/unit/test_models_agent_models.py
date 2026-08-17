@@ -29,12 +29,12 @@ def test_codex_agent_spec_reasoning_effort_enum_accepts_valid() -> None:
 
 def test_codex_agent_spec_reasoning_effort_rejects_invalid() -> None:
     with pytest.raises(ValidationError):
-        CodexAgentSpec(reasoning_effort="extreme")  # not in Literal
+        CodexAgentSpec(reasoning_effort="extreme")  # type: ignore[arg-type]  # not in Literal
 
 
 def test_codex_agent_spec_strict_rejects_extra_fields() -> None:
     with pytest.raises(ValidationError):
-        CodexAgentSpec(reasoning_effort="medium", verbosity="high")  # unknown key
+        CodexAgentSpec(reasoning_effort="medium", verbosity="high")  # type: ignore[call-arg]  # unknown key
 
 
 def test_agent_model_spec_all_fields_optional() -> None:
@@ -59,7 +59,7 @@ def test_agent_model_spec_nested_codex_round_trip() -> None:
 
 def test_agent_model_spec_strict_rejects_extra_fields() -> None:
     with pytest.raises(ValidationError):
-        AgentModelSpec(claude="opus", verbosity="high")  # unknown key
+        AgentModelSpec(claude="opus", verbosity="high")  # type: ignore[call-arg]  # unknown key
 
 
 def test_agent_model_spec_partial_fields() -> None:

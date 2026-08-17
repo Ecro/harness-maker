@@ -14,6 +14,7 @@ import json
 import re
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 from harness_maker.feedback.telemetry_grep import (
     TELEMETRY_GREP_MAX_BYTES,
@@ -28,7 +29,7 @@ def _today_metrics_file(obs_dir: Path) -> Path:
     return obs_dir / f"metrics-{today}.jsonl"
 
 
-def _write_jsonl(path: Path, rows: list[dict]) -> None:
+def _write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("\n".join(json.dumps(r) for r in rows) + "\n", encoding="utf-8")
 
@@ -94,7 +95,7 @@ def test_last_stop_with_trace_respects_byte_cap(tmp_path: Path) -> None:
     obs = tmp_path / ".claude/observability"
     f = _today_metrics_file(obs)
     huge_args = "x" * 4000
-    rows: list[dict] = [
+    rows: list[dict[str, Any]] = [
         {"event": "post_tool_use", "trace_id": "T", "tool_input": huge_args, "i": i}
         for i in range(50)
     ]

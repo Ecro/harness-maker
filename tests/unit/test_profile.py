@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -717,7 +718,7 @@ def test_lifecycle_active_for_ten_or_more_commits(
         # 12 commits worth of oneline output
         return subprocess.CompletedProcess(args=[], returncode=0, stdout="x\n" * 12, stderr="")
 
-    monkeypatch.setattr(profile_mod.subprocess, "run", fake_run)
+    monkeypatch.setattr(subprocess, "run", fake_run)
     assert profile_mod._detect_lifecycle(tmp_path) == "active"
 
 
@@ -734,7 +735,7 @@ def test_lifecycle_maintenance_for_partial_commits(
     def fake_run(*_args: object, **_kwargs: object) -> subprocess.CompletedProcess[str]:
         return subprocess.CompletedProcess(args=[], returncode=0, stdout="x\n" * 5, stderr="")
 
-    monkeypatch.setattr(profile_mod.subprocess, "run", fake_run)
+    monkeypatch.setattr(subprocess, "run", fake_run)
     assert profile_mod._detect_lifecycle(tmp_path) == "maintenance"
 
 
@@ -751,7 +752,7 @@ def test_lifecycle_dormant_for_zero_commits(
     def fake_run(*_args: object, **_kwargs: object) -> subprocess.CompletedProcess[str]:
         return subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
 
-    monkeypatch.setattr(profile_mod.subprocess, "run", fake_run)
+    monkeypatch.setattr(subprocess, "run", fake_run)
     assert profile_mod._detect_lifecycle(tmp_path) == "dormant"
 
 
@@ -768,7 +769,7 @@ def test_lifecycle_subprocess_failure_returns_dormant(
     def fake_run(*_args: object, **_kwargs: object) -> subprocess.CompletedProcess[str]:
         raise subprocess.SubprocessError("git timed out")
 
-    monkeypatch.setattr(profile_mod.subprocess, "run", fake_run)
+    monkeypatch.setattr(subprocess, "run", fake_run)
     assert profile_mod._detect_lifecycle(tmp_path) == "dormant"
 
 

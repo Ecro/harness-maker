@@ -9,6 +9,7 @@ would report a CLI installed five minutes ago as absent, silently, for up to a d
 
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 
 import pytest
@@ -26,7 +27,7 @@ def _fake_which(present: set[str]) -> object:
 def test_every_tool_reports_installed_when_its_binary_is_on_path(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(tool_detect.shutil, "which", _fake_which({"codex", "agy", "cursor"}))
+    monkeypatch.setattr(shutil, "which", _fake_which({"codex", "agy", "cursor"}))
     result = tool_detect.detect_tools()
     assert result == {
         "codex": {"installed": True},
@@ -38,7 +39,7 @@ def test_every_tool_reports_installed_when_its_binary_is_on_path(
 def test_every_tool_reports_absent_when_nothing_is_on_path(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setattr(tool_detect.shutil, "which", _fake_which(set()))
+    monkeypatch.setattr(shutil, "which", _fake_which(set()))
     result = tool_detect.detect_tools()
     assert result == {
         "codex": {"installed": False},
@@ -55,14 +56,14 @@ def test_the_antigravity_key_is_driven_by_the_agy_binary(
     A test asserting only "some tool was detected" would pass with the mapping inverted,
     and the inversion is invisible until a user with `agy` installed is never offered it.
     """
-    monkeypatch.setattr(tool_detect.shutil, "which", _fake_which({"agy"}))
+    monkeypatch.setattr(shutil, "which", _fake_which({"agy"}))
     result = tool_detect.detect_tools()
     assert result["antigravity"] == {"installed": True}
     assert result["codex"] == {"installed": False}
     assert result["cursor"] == {"installed": False}
 
     # And the reverse: a binary literally named `antigravity` is NOT what we look for.
-    monkeypatch.setattr(tool_detect.shutil, "which", _fake_which({"antigravity"}))
+    monkeypatch.setattr(shutil, "which", _fake_which({"antigravity"}))
     assert tool_detect.detect_tools()["antigravity"] == {"installed": False}
 
 
@@ -94,7 +95,7 @@ def test_detection_never_touches_the_detection_cache(
 
     monkeypatch.setattr(detection_cache, "load_or_run", _boom)
     monkeypatch.setattr(detection_cache, "write", _boom)
-    monkeypatch.setattr(tool_detect.shutil, "which", _fake_which({"codex"}))
+    monkeypatch.setattr(shutil, "which", _fake_which({"codex"}))
 
     cache_dir = tmp_path / "cache"
     cache_dir.mkdir()
@@ -112,8 +113,8 @@ def test_repeated_calls_reflect_a_binary_that_appears_between_them(
     A memoised implementation passes every test above and fails this one — which is the
     exact failure mode ADR-001 rejects (a CLI installed mid-session reading as absent).
     """
-    monkeypatch.setattr(tool_detect.shutil, "which", _fake_which(set()))
+    monkeypatch.setattr(shutil, "which", _fake_which(set()))
     assert tool_detect.detect_tools()["codex"] == {"installed": False}
 
-    monkeypatch.setattr(tool_detect.shutil, "which", _fake_which({"codex"}))
+    monkeypatch.setattr(shutil, "which", _fake_which({"codex"}))
     assert tool_detect.detect_tools()["codex"] == {"installed": True}

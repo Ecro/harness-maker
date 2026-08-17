@@ -8,6 +8,8 @@ import sys
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from harness_maker.hooks.sessionstart_drift import _format_context, run
 
 # Pin both the imported __version__ AND latest_installed_version to a stable
@@ -40,14 +42,16 @@ def _write_harness_yaml(project_dir: Path, stamped_version: str) -> None:
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-def test_run_silent_when_no_harness_yaml(tmp_path: Path, capsys) -> None:
+def test_run_silent_when_no_harness_yaml(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     rc = run(cwd=tmp_path)
     assert rc == 0
     captured = capsys.readouterr()
     assert captured.out == ""
 
 
-def test_run_silent_when_versions_match(tmp_path: Path, capsys) -> None:
+def test_run_silent_when_versions_match(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     _write_harness_yaml(tmp_path, _TEST_CURRENT)
     with patch(
         "harness_maker.hooks.sessionstart_drift.latest_installed_version",
@@ -59,7 +63,9 @@ def test_run_silent_when_versions_match(tmp_path: Path, capsys) -> None:
     assert captured.out == ""
 
 
-def test_run_silent_when_harness_yaml_has_no_frontmatter(tmp_path: Path, capsys) -> None:
+def test_run_silent_when_harness_yaml_has_no_frontmatter(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     claude = tmp_path / ".claude"
     claude.mkdir()
     # disable_telemetry isolates this drift-silence assertion from the Phase 11
@@ -79,7 +85,9 @@ def test_run_silent_when_harness_yaml_has_no_frontmatter(tmp_path: Path, capsys)
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-def test_run_emits_additional_context_on_upgrade(tmp_path: Path, capsys) -> None:
+def test_run_emits_additional_context_on_upgrade(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     _write_harness_yaml(tmp_path, "0.0.1")
     with patch(
         "harness_maker.hooks.sessionstart_drift.latest_installed_version",
@@ -97,7 +105,7 @@ def test_run_emits_additional_context_on_upgrade(tmp_path: Path, capsys) -> None
     assert "/harness-maker:make" in ctx
 
 
-def test_run_emits_downgrade_warning(tmp_path: Path, capsys) -> None:
+def test_run_emits_downgrade_warning(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     _write_harness_yaml(tmp_path, "999.0.0")
     with patch(
         "harness_maker.hooks.sessionstart_drift.latest_installed_version",
@@ -109,7 +117,9 @@ def test_run_emits_downgrade_warning(tmp_path: Path, capsys) -> None:
     assert "downgrade" in ctx.lower()
 
 
-def test_run_does_not_emit_system_message(tmp_path: Path, capsys) -> None:
+def test_run_does_not_emit_system_message(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     """systemMessage is NOT emitted (0.11.5).
 
     Per official Claude Code docs (2026-05-13), SessionStart hooks have no
@@ -137,7 +147,9 @@ def test_run_does_not_emit_system_message(tmp_path: Path, capsys) -> None:
     assert "systemMessage" not in payload
 
 
-def test_additional_context_is_imperative(tmp_path: Path, capsys) -> None:
+def test_additional_context_is_imperative(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     """additionalContext must instruct Claude to surface drift to the user.
 
     Descriptive phrasing ("drift detected: ...") is too easy to ignore.
@@ -282,7 +294,7 @@ def _write_last_audit(project_dir: Path, days_ago: float) -> None:
     path.write_text(ts, encoding="utf-8")
 
 
-def test_no_hint_when_under_thresholds(tmp_path: Path, capsys) -> None:
+def test_no_hint_when_under_thresholds(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """5 overrides + 7 days since audit → neither threshold tripped → silent."""
     _write_phase11_harness_yaml(tmp_path)
     _write_overrides(tmp_path, 5)
@@ -296,7 +308,9 @@ def test_no_hint_when_under_thresholds(tmp_path: Path, capsys) -> None:
     assert capsys.readouterr().out == ""
 
 
-def test_hint_when_override_count_exceeds_threshold(tmp_path: Path, capsys) -> None:
+def test_hint_when_override_count_exceeds_threshold(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     """35 overrides since the last audit ≥ default 30 → hint includes the count."""
     _write_phase11_harness_yaml(tmp_path)
     _write_last_audit(tmp_path, 1.0)  # well under the days threshold
@@ -318,7 +332,9 @@ def test_hint_when_override_count_exceeds_threshold(tmp_path: Path, capsys) -> N
     assert "35 personalization axis overrides" in payload["systemMessage"]
 
 
-def test_overrides_before_last_audit_do_not_count(tmp_path: Path, capsys) -> None:
+def test_overrides_before_last_audit_do_not_count(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     """Regression (F66): the count is 'since last audit', not lifetime. 40
     overrides all recorded BEFORE a recent audit must not trip the count
     threshold — the audit already processed them."""
@@ -335,7 +351,9 @@ def test_overrides_before_last_audit_do_not_count(tmp_path: Path, capsys) -> Non
     assert capsys.readouterr().out == ""
 
 
-def test_hint_when_days_since_audit_exceeds_threshold(tmp_path: Path, capsys) -> None:
+def test_hint_when_days_since_audit_exceeds_threshold(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     """15 days since audit ≥ default 14 → hint fires even with no overrides."""
     _write_phase11_harness_yaml(tmp_path)
     _write_overrides(tmp_path, 3)
@@ -352,7 +370,9 @@ def test_hint_when_days_since_audit_exceeds_threshold(tmp_path: Path, capsys) ->
     assert "/hm:health" in payload["systemMessage"]
 
 
-def test_no_hint_when_telemetry_disabled(tmp_path: Path, capsys) -> None:
+def test_no_hint_when_telemetry_disabled(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     """ADR-005 opt-out: telemetry off suppresses the hint even with 100
     overrides + never-audited."""
     _write_phase11_harness_yaml(tmp_path, disable_telemetry=True)
@@ -367,7 +387,9 @@ def test_no_hint_when_telemetry_disabled(tmp_path: Path, capsys) -> None:
     assert capsys.readouterr().out == ""
 
 
-def test_systemMessage_and_additionalContext_both_present(tmp_path: Path, capsys) -> None:  # noqa: N802
+def test_systemMessage_and_additionalContext_both_present(  # noqa: N802
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     """Wiki [[sessionstart-systemmessage-required]] — banner needs both
     fields populated. Guard against one being dropped in a future refactor.
 
@@ -395,7 +417,9 @@ def test_systemMessage_and_additionalContext_both_present(tmp_path: Path, capsys
     assert "systemMessage" not in hook_out
 
 
-def test_missing_last_audit_treated_as_infinity(tmp_path: Path, capsys) -> None:
+def test_missing_last_audit_treated_as_infinity(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     """last-audit.txt absent → days_since = +inf → hint fires by the days branch."""
     _write_phase11_harness_yaml(tmp_path)
     _write_overrides(tmp_path, 2)

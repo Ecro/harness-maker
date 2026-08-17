@@ -24,6 +24,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from harness_maker.second_opinion_oracle import (
     BUDGET_PER_COMMAND,
     BUDGET_TOTAL,
@@ -153,7 +155,7 @@ def test_budgets_are_ordered_sanely() -> None:
 
 
 def test_cli_emits_labelled_blocks_and_drops_unsafe_paths(
-    tmp_path: Path, monkeypatch, capsys
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """End-to-end: a findings payload in, labelled blocks out, with the option-shaped path
     gone and its finding recorded as having no oracle."""
@@ -187,7 +189,9 @@ def test_cli_emits_labelled_blocks_and_drops_unsafe_paths(
     assert "ccc3" in out, "findings without an oracle must still be listed"
 
 
-def test_two_findings_on_one_path_produce_one_block(tmp_path: Path, monkeypatch, capsys) -> None:
+def test_two_findings_on_one_path_produce_one_block(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
     """The performance fix, made non-revertible.
 
     `gather` groups by path, not by finding: N findings over M files issue 3·M subprocesses
@@ -200,10 +204,15 @@ def test_two_findings_on_one_path_produce_one_block(tmp_path: Path, monkeypatch,
     calls: list[str] = []
     monkeypatch.setattr(mod, "_changed_files", lambda _root: {"src/a.py"})
     monkeypatch.setattr(mod, "_load_toolchains", lambda _root: [])
+
     # Seam moved from `_run_checks` (removed with the hardcoded triple) to `_run_argv`. The
     # property this pins is unchanged: ONE block per path, naming BOTH ids. Counting argv
     # calls would count 3 (one per role), so count the distinct paths they carry.
-    monkeypatch.setattr(mod, "_run_argv", lambda argv, root: calls.append(argv[-1]) or "checked")
+    def _run_argv(argv: list[str], root: object) -> str:
+        calls.append(argv[-1])
+        return "checked"
+
+    monkeypatch.setattr(mod, "_run_argv", _run_argv)
 
     payload = tmp_path / "f.json"
     payload.write_text(
@@ -221,7 +230,9 @@ def test_two_findings_on_one_path_produce_one_block(tmp_path: Path, monkeypatch,
     assert "two" in out
 
 
-def test_cli_degrades_gracefully_on_a_bad_payload(tmp_path: Path, capsys) -> None:
+def test_cli_degrades_gracefully_on_a_bad_payload(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     from harness_maker import second_opinion_oracle as mod
 
     bad = tmp_path / "bad.json"

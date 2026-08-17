@@ -8,6 +8,8 @@ exactly ONE module (no silent drift re-introduction).
 
 from __future__ import annotations
 
+from typing import Any
+
 import yaml
 
 from harness_maker import spec_quality
@@ -19,7 +21,7 @@ _SPEC_TEXT = (
 )
 
 
-def _dim(ac: dict, dev_mode: str = "task-driven") -> int:
+def _dim(ac: dict[str, Any], dev_mode: str = "task-driven") -> int:
     m = yaml.safe_dump(
         {
             "schema_version": 2,
@@ -98,4 +100,7 @@ def test_markers_and_threshold_live_in_exactly_one_module() -> None:
     assert not hasattr(spec_quality, "ORACLE_EVIDENCE_SPECIFICITY_MARKERS")
     assert not hasattr(spec_quality, "ORACLE_EVIDENCE_WEAK_THRESHOLD")
     # And the shared scorer is imported (not redefined locally).
-    assert spec_quality.score_ac_oracle_evidence.__module__ == "harness_maker.spec_machine"
+    # Read through the module dict, not the attribute: the re-export IS the subject here, and
+    # mypy --strict (no_implicit_reexport) rejects naming an attribute a module does not export.
+    # `getattr` with a literal is not an option — ruff rewrites it back to attribute access.
+    assert vars(spec_quality)["score_ac_oracle_evidence"].__module__ == "harness_maker.spec_machine"

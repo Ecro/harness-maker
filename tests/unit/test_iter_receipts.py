@@ -42,7 +42,13 @@ def test_schema_rejects_extra_field() -> None:
 
 def test_schema_rejects_invalid_verdict() -> None:
     with pytest.raises(ValidationError):
-        IterReceipt(iter=1, stage="execute", verdict="ok", written_at="2026-05-23T05:00:00Z")
+        # "ok" is the REJECTION under test, so the static type error is the point.
+        IterReceipt(
+            iter=1,
+            stage="execute",
+            verdict="ok",  # type: ignore[arg-type]
+            written_at="2026-05-23T05:00:00Z",
+        )
 
 
 def test_schema_rejects_zero_iter() -> None:

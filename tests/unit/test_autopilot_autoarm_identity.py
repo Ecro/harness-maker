@@ -20,6 +20,7 @@ import io
 import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -46,7 +47,8 @@ def _raw(root: Path, session_id: str | None = None) -> dict[str, object]:
     # test that arms with an explicit id must read back with the SAME id. `None` keeps the
     # env-fallback behavior the `HM_SESSION_ID`-setting tests below rely on.
     path = autopilot.marker_path(root, session_id=session_id)
-    return json.loads(path.read_text(encoding="utf-8"))
+    value: dict[str, object] = json.loads(path.read_text(encoding="utf-8"))
+    return value
 
 
 def _plant_foreign(root: Path, *, at: str | None, owner: str, created_at: str) -> bytes:
@@ -413,12 +415,16 @@ def test_heartbeat_is_refreshed_by_the_owner_and_surfaced(
     )
     marker = autopilot.load(tmp_path, session_id=None)
     assert marker is not None
-    assert autopilot.idle_minutes(marker) > 170  # falls back to created_at
+    idle = autopilot.idle_minutes(marker)
+    assert idle is not None
+    assert idle > 170  # falls back to created_at
 
     assert autopilot.touch(tmp_path) is True
     refreshed = autopilot.load(tmp_path, session_id=None)
     assert refreshed is not None
-    assert autopilot.idle_minutes(refreshed) < 1
+    refreshed_idle = autopilot.idle_minutes(refreshed)
+    assert refreshed_idle is not None
+    assert refreshed_idle < 1
 
 
 def test_a_peer_cannot_refresh_someone_elses_heartbeat(
@@ -572,7 +578,7 @@ def test_touch_refuses_when_the_marker_changed_underneath(
     real = autopilot.active_marker
     calls = {"n": 0}
 
-    def _takeover_after_first_read(root, **kw):  # noqa: ANN001, ANN202
+    def _takeover_after_first_read(root: Path, **kw: Any) -> Any:
         out = real(root, **kw)
         calls["n"] += 1
         if calls["n"] == 1:

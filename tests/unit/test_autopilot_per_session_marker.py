@@ -21,6 +21,7 @@ from pathlib import Path
 import pytest
 
 from harness_maker import autopilot, worktree
+from harness_maker.io_utils import atomic_write
 from harness_maker.models import AtomicStage
 
 PIPE = [AtomicStage.RESEARCH, AtomicStage.SPEC, AtomicStage.PLAN]
@@ -150,7 +151,7 @@ def test_legacy_takeover_does_not_delete_a_marker_that_changed(
     """CAS: a replacement landing between the read and the unlink must survive."""
     root = _project(tmp_path)
     _legacy(root).write_text(json.dumps(_payload(root, claude_session_id=SESS_A)), encoding="utf-8")
-    real = autopilot.atomic_write
+    real = atomic_write
 
     def _mutating(path: Path, content: str) -> None:
         real(path, content)
@@ -165,7 +166,7 @@ def test_legacy_takeover_does_not_delete_a_marker_that_changed(
 
 def test_legacy_takeover_never_clobbers_an_existing_per_session_marker(tmp_path: Path) -> None:
     root = _project(tmp_path)
-    autopilot.write(root, level="full", pipeline=PIPE, claude_session_id=SESS_A)
+    autopilot.write(root, level="full", pipeline=PIPE, claude_session_id=SESS_A)  # type: ignore[arg-type]  # legacy level, normalized on write
     _legacy(root).write_text(
         json.dumps(_payload(root, claude_session_id=SESS_A, level="gated")), encoding="utf-8"
     )

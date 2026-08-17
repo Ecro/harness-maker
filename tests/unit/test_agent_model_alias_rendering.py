@@ -85,10 +85,10 @@ def test_foreign_config_renders_concrete_model(ftype: str) -> None:
     """
     from harness_maker.foreign_config import (
         AxisMapping,
-        Confidence,
         ForeignConfig,
         _build_render_context,
     )
+    from harness_maker.models import Confidence
 
     fc = ForeignConfig(path=".aider.conf.yml", type=ftype, size=10, confidence=Confidence.HIGH)
     cfg = HarnessConfig(default_model="opus")

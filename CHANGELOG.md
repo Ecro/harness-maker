@@ -49,6 +49,36 @@
   `work-docs/BASELINE-DELTA-stuck-dispatch.md`, which also records that the ratchet's previous
   base was already stale by 237 chars.
 
+- **`harness_maker` now ships a `py.typed` marker.** The package is `mypy --strict` clean and
+  has been since 0.1.0, but without the marker PEP 561 tells every downstream checker to treat
+  it as untyped: `mypy --strict` on any file importing it emitted `Skipping analyzing
+  "harness_maker.X": module is installed, but missing library stubs or py.typed marker`, one
+  error per import, and every symbol it exports degraded to `Any` at the call site. CI never saw
+  it because it checks `src` only, where the imports are internal. The marker is in the wheel
+  (verified in `harness_maker-*.whl`), so consumers of the published package get the annotations
+  too.
+
+  **Downstream note:** a consumer whose own config carried
+  `[[tool.mypy.overrides]] module = "harness_maker.*"` with `ignore_missing_imports` was
+  silently treating this package as untyped; that override is now a no-op and their build may
+  surface real errors it had been masking.
+
+### Changed
+
+- **`mypy --strict` now covers `tests/` in CI, and the test tree was made clean for it**
+  (616 errors → 0 across ~143 files). CI, nightly and release all ran `mypy --strict src`, so
+  nothing ever type-checked the tests — the 0-error state would have rotted with the first
+  unannotated helper. The sweep is annotation-only apart from four deliberate corrections found
+  in review: the `Confidence.HIGH == "high"` assertion was restored (with a
+  `comparison-overlap` ignore) because `.value == "high"` holds for a plain `Enum` and no longer
+  tested the str mixin the test is named for; `_bp()`'s truthful `SimpleNamespace` return type
+  was restored with the exception localised to its call site; two `readiness` `_find` helpers
+  got the concrete `Signal | None` signature their three siblings already had; and three
+  `monkeypatch` **spy** sites went back to the dotted-string target, because a spy whose
+  assertion passes on zero recorded calls must fail loudly if the module under test stops
+  importing what it patches. `tag_finding` takes `Sequence[object]` rather than `list[object]`
+  so callers need not widen their own fixtures to satisfy list invariance.
+
 ## [0.52.4] - 2026-08-17
 
 ### Fixed

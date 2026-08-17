@@ -31,7 +31,7 @@ def test_anthropic_judge_sends_cache_control() -> None:
     """AnthropicJudgeClient must set cache_control ephemeral on system block."""
     recorder = _RecordingClient()
     client = AnthropicJudgeClient.__new__(AnthropicJudgeClient)
-    client._client = recorder  # type: ignore[attr-defined]
+    client._client = recorder  # type: ignore[assignment]
 
     client.judge("test system prompt", "test user prompt", "claude-sonnet-4-6")
 

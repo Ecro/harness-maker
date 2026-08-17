@@ -636,7 +636,7 @@ def test_s4_loop_intensity_valid_values() -> None:
             priority="high",
             test_reliability="good",
             stopping_criteria="done when green",
-            loop_intensity=value,  # type: ignore[arg-type]
+            loop_intensity=value,
         )
         assert ctx.loop_intensity == value
 

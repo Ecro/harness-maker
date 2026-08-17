@@ -4,10 +4,12 @@ import os
 import subprocess
 import time
 from pathlib import Path
+from typing import Any
 
 import pytest
 
 from harness_maker import worktree
+from harness_maker.io_utils import atomic_write
 
 
 def _git(args: list[str], cwd: Path) -> str:
@@ -151,7 +153,7 @@ def test_fresh_reservation_protects_in_flight_dir(tmp_path: Path) -> None:
     (repo / ".claude").mkdir()
     wt = _owned_dir_with_git(repo, "execute-inflight012-20260621T0000Z")
     # a peer's create() wrote a FRESH reservation before its `git worktree add`
-    worktree.atomic_write(worktree._reservation_path(repo, wt.name), "peer-uuid\n")
+    atomic_write(worktree._reservation_path(repo, wt.name), "peer-uuid\n")
     report = worktree.prune_stale(repo)
     assert wt not in report.removed_worktrees
     assert wt.exists()  # in-flight peer dir survives
@@ -162,7 +164,7 @@ def test_aged_reservation_does_not_protect_and_is_removed(tmp_path: Path) -> Non
     (repo / ".claude").mkdir()
     wt = _owned_dir_with_git(repo, "execute-stalecreate-20260621T0000Z")
     reservation = worktree._reservation_path(repo, wt.name)
-    worktree.atomic_write(reservation, "dead-uuid\n")
+    atomic_write(reservation, "dead-uuid\n")
     old = time.time() - worktree._PRUNE_GRACE_SECONDS - 60
     os.utime(reservation, (old, old))
     report = worktree.prune_stale(repo)
@@ -203,7 +205,7 @@ def test_create_removes_reservation_on_add_failure(
     repo = _repo(tmp_path)
     real_run = worktree._run
 
-    def boom(args: list[str], cwd: Path, **kw: object) -> subprocess.CompletedProcess[str]:
+    def boom(args: list[str], cwd: Path, **kw: Any) -> subprocess.CompletedProcess[str]:
         if args[:3] == ["git", "worktree", "add"]:
             raise RuntimeError("simulated git worktree add failure")
         return real_run(args, cwd=cwd, **kw)
@@ -350,7 +352,7 @@ def test_prune_stale_reaps_aged_leaked_reservation(tmp_path: Path) -> None:
     claude = repo / ".claude"
     claude.mkdir()
     reservation = worktree._reservation_path(repo, "execute-leaked12345-20260621T0000Z")
-    worktree.atomic_write(reservation, "killed\n")
+    atomic_write(reservation, "killed\n")
     old = time.time() - worktree._PRUNE_GRACE_SECONDS - 60
     os.utime(reservation, (old, old))
 
@@ -363,7 +365,7 @@ def test_prune_stale_keeps_fresh_reservation(tmp_path: Path) -> None:
     claude = repo / ".claude"
     claude.mkdir()
     reservation = worktree._reservation_path(repo, "execute-livecreate1-20260621T0000Z")
-    worktree.atomic_write(reservation, "creating\n")  # fresh
+    atomic_write(reservation, "creating\n")  # fresh
 
     worktree.prune_stale(repo)
     assert reservation.exists()  # a live create's reservation is never reaped

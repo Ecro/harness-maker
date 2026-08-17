@@ -8,9 +8,10 @@ from pathlib import Path
 import pytest
 
 from harness_maker import interview
+from harness_maker.models import InterviewAnswers
 
 
-def _answers_from_yaml(text: str, tmp_path: Path) -> interview.InterviewAnswers | None:
+def _answers_from_yaml(text: str, tmp_path: Path) -> InterviewAnswers | None:
     p = tmp_path / "harness.yaml"
     p.write_text(textwrap.dedent(text), encoding="utf-8")
     return interview.answers_from_harness_yaml(p)

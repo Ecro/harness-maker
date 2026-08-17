@@ -259,4 +259,6 @@ def test_a_routed_in_domain_lens_is_reported_as_exercised_on_side(tmp_path: Path
     _write_results(tmp_path, [*CORE_LENSES, "security"])
     verdict = coverage_verdict(tmp_path, "run-a", "Side")
     assert verdict["blocks_approval"] is False
-    assert "security" in verdict["exercised"]
+    exercised = verdict["exercised"]
+    assert isinstance(exercised, list)
+    assert "security" in exercised

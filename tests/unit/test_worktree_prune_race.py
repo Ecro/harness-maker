@@ -15,6 +15,7 @@ import time
 from pathlib import Path
 
 from harness_maker import worktree
+from harness_maker.io_utils import atomic_write
 
 
 def _git(args: list[str], cwd: Path) -> str:
@@ -46,7 +47,7 @@ def test_reserved_dir_survives_concurrent_prune_hammer(tmp_path: Path) -> None:
     wt = repo / ".worktrees" / name
     wt.mkdir(parents=True)
     (wt / ".git").write_text("gitdir: /gone\n")
-    worktree.atomic_write(worktree._reservation_path(repo, name), "peer\n")
+    atomic_write(worktree._reservation_path(repo, name), "peer\n")
 
     stop = threading.Event()
     removed: list[Path] = []

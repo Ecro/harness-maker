@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 from harness_maker.secscan.hook_injection import scan
 
 
-def _write_hooks(path: Path, hooks: dict) -> Path:
+def _write_hooks(path: Path, hooks: dict[str, Any]) -> Path:
     p = path / "hooks.json"
     p.write_text(json.dumps(hooks), encoding="utf-8")
     return p

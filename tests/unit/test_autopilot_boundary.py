@@ -6,6 +6,8 @@ import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import pytest
+
 from harness_maker import autopilot, autopilot_caps, autopilot_ledger
 from harness_maker.models import AutonomyConfig
 
@@ -60,7 +62,9 @@ def test_count_events_filters_by_type_and_since(tmp_path: Path) -> None:
 # ── boundary CLI ────────────────────────────────────────────────────────────
 
 
-def test_boundary_proceeds_and_records_advance(tmp_path: Path, capsys) -> None:  # noqa: ANN001
+def test_boundary_proceeds_and_records_advance(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     # Fresh marker (live clock — the CLI reads real time; a fixed past created_at would
     # trip the time cap once the session runs long enough — determinism, checkpoint 7).
     _arm(tmp_path, created=datetime.now(UTC))
@@ -93,7 +97,7 @@ def test_boundary_proceeds_and_records_advance(tmp_path: Path, capsys) -> None: 
     assert json.loads(ledger.splitlines()[-1])["to"] == "spec"
 
 
-def test_boundary_step_cap_halt(tmp_path: Path, capsys) -> None:  # noqa: ANN001
+def test_boundary_step_cap_halt(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     # The boundary CLI checks the marker against the LIVE clock (18h TTL), so the
     # marker + its ledger events must be NOW, not a fixed past date — a hardcoded
     # 2026-06-20 marker rotted to stale→kill_switch after 18h (same live-clock fix
@@ -125,7 +129,7 @@ def test_boundary_step_cap_halt(tmp_path: Path, capsys) -> None:  # noqa: ANN001
     assert autopilot_ledger.count_events(tmp_path, "advanced") == 3
 
 
-def test_boundary_time_cap_halt(tmp_path: Path, capsys) -> None:  # noqa: ANN001
+def test_boundary_time_cap_halt(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     created = datetime(2026, 6, 20, 12, 0, tzinfo=UTC)
     _arm(tmp_path, created=created)
     # CLI uses the live clock; an old marker (created 90min ago, within 18h TTL) trips
@@ -152,7 +156,7 @@ def test_boundary_time_cap_halt(tmp_path: Path, capsys) -> None:  # noqa: ANN001
     assert out["halt_kind"] == "time_cap"
 
 
-def test_boundary_kill_switch_no_marker(tmp_path: Path, capsys) -> None:  # noqa: ANN001
+def test_boundary_kill_switch_no_marker(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     rc = autopilot_caps.main(
         [
             "boundary",
@@ -172,7 +176,9 @@ def test_boundary_kill_switch_no_marker(tmp_path: Path, capsys) -> None:  # noqa
     assert out["halt_kind"] == "kill_switch"
 
 
-def test_boundary_unknown_current_preserves_marker(tmp_path: Path, capsys) -> None:  # noqa: ANN001
+def test_boundary_unknown_current_preserves_marker(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     # An unknown --current (typo / stage outside the pipeline) must NOT be treated as
     # completion: marker preserved, distinct halt_kind (REVIEW P2).
     _arm(tmp_path, created=datetime.now(UTC))
@@ -197,7 +203,9 @@ def test_boundary_unknown_current_preserves_marker(tmp_path: Path, capsys) -> No
     assert autopilot.load(tmp_path, session_id=None) is not None  # marker NOT cleared
 
 
-def test_boundary_stops_before_wrapup_merge_gate(tmp_path: Path, capsys) -> None:  # noqa: ANN001
+def test_boundary_stops_before_wrapup_merge_gate(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     # P1-1: the chain must NEVER auto-enter wrapup (its Step 7.7 squash-land is a one-way
     # door). At the verify→wrapup boundary it stops with halt_kind=merge_gate, records a
     # gate_blocked event, clears the marker (Stop-hook stands down → human takes over), and
@@ -221,7 +229,9 @@ def test_boundary_stops_before_wrapup_merge_gate(tmp_path: Path, capsys) -> None
     assert autopilot_ledger.count_events(tmp_path, "advanced") == 0
 
 
-def test_boundary_step_cap_clears_marker(tmp_path: Path, capsys) -> None:  # noqa: ANN001
+def test_boundary_step_cap_clears_marker(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     # P2-6 / P3: a cap halt is TERMINAL → the marker is cleared so a later boundary call
     # cannot re-fire a duplicate halted_cap (and the Stop-hook stands down).
     now = datetime.now(UTC)
@@ -257,7 +267,9 @@ def test_count_events_includes_exact_since_boundary(tmp_path: Path) -> None:
     )
 
 
-def test_boundary_pipeline_complete_clears_marker(tmp_path: Path, capsys) -> None:  # noqa: ANN001
+def test_boundary_pipeline_complete_clears_marker(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     _arm(tmp_path, created=datetime.now(UTC))  # fresh marker (live-clock CLI — see above)
     rc = autopilot_caps.main(
         [

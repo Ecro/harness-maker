@@ -19,7 +19,7 @@ from pathlib import Path
 
 import yaml
 
-from harness_maker.models import HarnessConfig
+from harness_maker.models import HarnessConfig, PermissionsConfig
 from harness_maker.permission_syntax import is_matchable_rule
 from harness_maker.readiness import (
     _DANGEROUS_DENY_PATTERNS,
@@ -32,7 +32,9 @@ SETTINGS_TEMPLATES = ("settings/Side.json.j2", "settings/Production.json.j2")
 
 
 def _render_deny(template: str, deny_dangerous: bool) -> list[str]:
-    cfg = HarnessConfig(permissions={"deny_dangerous": deny_dangerous}).model_dump(mode="json")
+    cfg = HarnessConfig(permissions=PermissionsConfig(deny_dangerous=deny_dangerous)).model_dump(
+        mode="json"
+    )
     out = (
         _make_env()
         .get_template(template)

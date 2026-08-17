@@ -15,13 +15,14 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 from pydantic import ValidationError
 
 from harness_maker.review_telemetry import ReviewTelemetryRecord, emit, record_from_dict
 
-_BASE = {
+_BASE: dict[str, Any] = {
     "ts": "2026-08-05T00:00:00Z",
     "slug": "workflow-loop-efficiency",
     "round": 1,

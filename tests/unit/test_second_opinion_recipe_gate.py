@@ -18,8 +18,8 @@ from pathlib import Path
 
 import pytest
 
-from harness_maker.interview import InterviewAnswers
 from harness_maker.models import (
+    InterviewAnswers,
     Preset,
     ProjectProfile,
     SecondOpinionConfig,

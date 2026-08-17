@@ -6,13 +6,15 @@ from __future__ import annotations
 import importlib
 import json
 import sys
+from collections.abc import Iterator
 from pathlib import Path
+from types import ModuleType
 
 import pytest
 
 
 @pytest.fixture
-def baseline_module():
+def baseline_module() -> Iterator[ModuleType]:
     """Import the baseline script as a module."""
     scripts_dir = Path(__file__).resolve().parent.parent.parent / "scripts"
     sys.path.insert(0, str(scripts_dir))
@@ -25,7 +27,7 @@ def baseline_module():
 
 
 def test_baseline_collects_all_axes(
-    baseline_module, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    baseline_module: ModuleType, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """All required axes must be present in the baseline output."""
     commands_dir = tmp_path / ".claude" / "commands" / "hm"
@@ -37,7 +39,7 @@ def test_baseline_collects_all_axes(
         encoding="utf-8",
     )
 
-    def mock_time_command(cmd, cwd=None):
+    def mock_time_command(cmd: object, cwd: object = None) -> tuple[float, int]:
         return (1.23, 0)
 
     monkeypatch.setattr(baseline_module, "_time_command", mock_time_command)
@@ -56,7 +58,7 @@ def test_baseline_collects_all_axes(
     assert "python" in data["machine"]
 
 
-def test_baseline_drift_count(baseline_module, tmp_path: Path) -> None:
+def test_baseline_drift_count(baseline_module: ModuleType, tmp_path: Path) -> None:
     """Drift gate counting must find the correct number of mentions."""
     commands_dir = tmp_path / ".claude" / "commands" / "hm"
     commands_dir.mkdir(parents=True)
@@ -80,7 +82,7 @@ def test_baseline_drift_count(baseline_module, tmp_path: Path) -> None:
     assert "execute" not in counts
 
 
-def test_baseline_save_and_load(baseline_module, tmp_path: Path) -> None:
+def test_baseline_save_and_load(baseline_module: ModuleType, tmp_path: Path) -> None:
     """Baseline JSON must round-trip through save/load."""
     data = {"measured_at": "2026-01-01T00:00:00+00:00", "pytest_seconds": 42.0}
     out_path = tmp_path / "baseline.json"
@@ -94,7 +96,7 @@ def test_baseline_save_and_load(baseline_module, tmp_path: Path) -> None:
 
 
 def test_baseline_cache_dir_env_override(
-    baseline_module, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    baseline_module: ModuleType, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     """HARNESS_MAKER_CACHE_DIR must override the default cache path."""
     custom = tmp_path / "custom-cache"
@@ -103,7 +105,7 @@ def test_baseline_cache_dir_env_override(
     assert result == custom
 
 
-def test_baseline_compare(baseline_module, tmp_path: Path) -> None:
+def test_baseline_compare(baseline_module: ModuleType, tmp_path: Path) -> None:
     """Compare must produce a markdown delta table."""
     prior = {
         "pytest_seconds": 10.0,

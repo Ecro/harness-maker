@@ -19,11 +19,11 @@ from __future__ import annotations
 import pytest
 
 from harness_maker.interview import interview
-from harness_maker.models import Preset, ProjectProfile
+from harness_maker.models import InterviewAnswers, Preset, ProjectProfile
 from harness_maker.synthesize import ROUND_STATE_SKILL, synthesize
 
 
-def _answers_without_the_skill():
+def _answers_without_the_skill() -> tuple[ProjectProfile, InterviewAnswers]:
     profile = ProjectProfile(stack=["python"], scale="medium", lifecycle="active")
     answers = interview(profile, autoloop_mode=True)
     answers.skills["enabled"] = [s for s in answers.skills["enabled"] if s != ROUND_STATE_SKILL]

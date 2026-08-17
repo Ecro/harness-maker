@@ -112,7 +112,9 @@ def instruction_set(text: str) -> dict[str, list[str]]:
 
 
 def _render_atomic(dev_mode: DevMode) -> dict[str, str]:
-    answers = answers_from_harness_yaml(HARNESS_YAML).model_copy(update={"dev_mode": dev_mode})
+    parsed = answers_from_harness_yaml(HARNESS_YAML)
+    assert parsed is not None, f"{HARNESS_YAML} did not parse into answers"
+    answers = parsed.model_copy(update={"dev_mode": dev_mode})
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
         with pinned_install_ref():

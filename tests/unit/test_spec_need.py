@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 import yaml
@@ -36,11 +37,11 @@ from harness_maker.spec_need import (
 # ---------------------------------------------------------------------------
 
 
-def _write_machine_yaml(  # type: ignore[type-arg]
-    path: Path, *, slug: str, paths_to_mutate: list[str], acs: list[dict]
+def _write_machine_yaml(
+    path: Path, *, slug: str, paths_to_mutate: list[str], acs: list[dict[str, Any]]
 ) -> None:
     """Write a valid SPEC-*.machine.yaml to `path`."""
-    data: dict = {
+    data: dict[str, Any] = {
         "schema_version": 1,
         "spec_slug": slug,
         "verification_tier": 2,
@@ -58,7 +59,7 @@ def _write_machine_yaml_v2_judgment(
     judgment_subject_paths: list[str],
 ) -> None:
     """Write a v2 judgment AC machine.yaml."""
-    data: dict = {
+    data: dict[str, Any] = {
         "schema_version": 2,
         "spec_slug": slug,
         "verification_tier": 1,

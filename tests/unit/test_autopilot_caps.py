@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -104,7 +105,7 @@ def test_kill_switch_wins_over_step_cap(tmp_path: Path) -> None:
 # ── ledger: halted_cap event (ADR-009) ──────────────────────────────────────
 
 
-def _ledger_lines(root: Path) -> list[dict]:
+def _ledger_lines(root: Path) -> list[dict[str, Any]]:
     path = root / ".claude" / "observability" / "auto-advance.jsonl"
     if not path.is_file():
         return []
@@ -138,7 +139,7 @@ def test_ledger_rejects_iter_receipts_verdict_literals(tmp_path: Path) -> None:
 
 def test_ledger_accepts_the_three_events(tmp_path: Path) -> None:
     for ev in ("advanced", "gate_blocked", "halted_cap"):
-        autopilot_ledger.append_event(tmp_path, event=ev, fields={"stage": "review"})  # type: ignore[arg-type]
+        autopilot_ledger.append_event(tmp_path, event=ev, fields={"stage": "review"})
     lines = _ledger_lines(tmp_path)
     assert [ln["event"] for ln in lines] == ["advanced", "gate_blocked", "halted_cap"]
 

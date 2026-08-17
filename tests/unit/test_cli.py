@@ -4,16 +4,18 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 from typer.testing import CliRunner
 
 from harness_maker.cli import app
+from harness_maker.models import Blueprint, InterviewAnswers
 
 runner = CliRunner()
 
 
-def _minimal_answers():
+def _minimal_answers() -> InterviewAnswers:
     from harness_maker.interview import _build_answers
     from harness_maker.models import DevMode, Preset, Target
 
@@ -34,10 +36,12 @@ def _write_harness_yaml(project: Path) -> None:
     )
 
 
-def _all_patches(*, interview_spy: MagicMock | None = None, answers=None):
+def _all_patches(
+    *, interview_spy: MagicMock | None = None, answers: InterviewAnswers | None = None
+) -> list[Any]:
     """Return a list of patches that silence all downstream effects of make()."""
     _answers = answers if answers is not None else _minimal_answers()
-    patches = [
+    patches: list[Any] = [
         patch("harness_maker.cli.profile", return_value=MagicMock()),
         patch("harness_maker.cli.synthesize", return_value=MagicMock(files=[])),
         patch("harness_maker.cli.render"),
@@ -225,9 +229,9 @@ def test_grade_threshold_flag(tmp_path: Path) -> None:
     """--grade-threshold=B overrides the default grade_threshold in answers."""
     _write_harness_yaml(tmp_path)
     answers = _minimal_answers()
-    captured_bp = {}
+    captured_bp: dict[str, Any] = {}
 
-    def _capture_synthesize(p, a, **kw):
+    def _capture_synthesize(p: object, a: InterviewAnswers, **kw: object) -> Blueprint:
         from harness_maker.models import Blueprint, HarnessConfig
 
         captured_bp["grade_threshold"] = a.grade_threshold
@@ -256,9 +260,9 @@ def test_domains_flag(tmp_path: Path) -> None:
     """--domains=python,react sets answers.domains."""
     _write_harness_yaml(tmp_path)
     answers = _minimal_answers()
-    captured_bp = {}
+    captured_bp: dict[str, Any] = {}
 
-    def _capture_synthesize(p, a, **kw):
+    def _capture_synthesize(p: object, a: InterviewAnswers, **kw: object) -> Blueprint:
         from harness_maker.models import Blueprint, HarnessConfig
 
         captured_bp["domains"] = list(a.domains)
@@ -287,9 +291,9 @@ def test_mechanical_checks_flag(tmp_path: Path) -> None:
     """--mechanical-checks passes semicolon-separated commands."""
     _write_harness_yaml(tmp_path)
     answers = _minimal_answers()
-    captured_bp = {}
+    captured_bp: dict[str, Any] = {}
 
-    def _capture_synthesize(p, a, **kw):
+    def _capture_synthesize(p: object, a: InterviewAnswers, **kw: object) -> Blueprint:
         from harness_maker.models import Blueprint, HarnessConfig
 
         captured_bp["mechanical_checks"] = list(a.mechanical_checks)
@@ -320,9 +324,9 @@ def test_focus_flag_adds_reviewers(tmp_path: Path) -> None:
     """--focus=security adds security-reviewer + security-auditor to Side preset."""
     _write_harness_yaml(tmp_path)
     answers = _minimal_answers()
-    captured_bp = {}
+    captured_bp: dict[str, Any] = {}
 
-    def _capture_synthesize(p, a, **kw):
+    def _capture_synthesize(p: object, a: InterviewAnswers, **kw: object) -> Blueprint:
         from harness_maker.models import Blueprint, HarnessConfig
 
         captured_bp["reviewers_enabled"] = list(a.reviewers["enabled"])
@@ -353,9 +357,9 @@ def test_preset_plus_extended_flags(tmp_path: Path) -> None:
     """Combo: --preset=Production --grade-threshold=A --domains=python all survive."""
     _write_harness_yaml(tmp_path)
     answers = _minimal_answers()
-    captured_bp = {}
+    captured_bp: dict[str, Any] = {}
 
-    def _capture_synthesize(p, a, **kw):
+    def _capture_synthesize(p: object, a: InterviewAnswers, **kw: object) -> Blueprint:
         from harness_maker.models import Blueprint, HarnessConfig
 
         captured_bp["grade_threshold"] = a.grade_threshold
@@ -486,9 +490,9 @@ def test_partial_override_preserves_unchanged_fields(tmp_path: Path) -> None:
     answers = _minimal_answers().model_copy(
         update={"domains": ["python", "react"], "mechanical_checks": ["ruff check ."]}
     )
-    captured_bp = {}
+    captured_bp: dict[str, Any] = {}
 
-    def _capture_synthesize(p, a, **kw):
+    def _capture_synthesize(p: object, a: InterviewAnswers, **kw: object) -> Blueprint:
         from harness_maker.models import Blueprint, HarnessConfig
 
         captured_bp["domains"] = list(a.domains)
@@ -528,7 +532,7 @@ def test_wrapup_docs_flag(tmp_path: Path) -> None:
     _write_harness_yaml(tmp_path)
     captured: dict[str, object] = {}
 
-    def _capture(p, a, **kw):
+    def _capture(p: object, a: InterviewAnswers, **kw: object) -> Blueprint:
         from harness_maker.models import Blueprint, HarnessConfig
 
         captured["wrapup_docs"] = list(a.wrapup_docs)

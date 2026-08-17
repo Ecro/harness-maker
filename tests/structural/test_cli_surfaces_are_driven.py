@@ -164,8 +164,8 @@ def _driven_names() -> set[str]:
                     driven.add(main_alias[func.id])
                 # the module object handed to a same-file runner
                 for i in runners.get(func.id, ()):
-                    if i < len(node.args) and isinstance(node.args[i], ast.Name):
-                        local = node.args[i].id
+                    if i < len(node.args) and isinstance(arg := node.args[i], ast.Name):
+                        local = arg.id
                         if local in alias:
                             driven.add(alias[local])
             # argv positions: only STRING CONSTANTS that are arguments of a call, and only

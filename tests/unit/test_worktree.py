@@ -10,6 +10,7 @@ from __future__ import annotations
 import contextlib
 import subprocess
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -1009,9 +1010,9 @@ def test_finalize_fence_boundary_ordering(repo: Path, monkeypatch: pytest.Monkey
         events.append("snapshot")
         return real_snapshot(b)
 
-    def rec_refwrite(*a: object, **k: object) -> None:
+    def rec_refwrite(*a: Any, **k: Any) -> None:
         events.append("ref-write")
-        return real_refwrite(*a, **k)  # type: ignore[arg-type]
+        real_refwrite(*a, **k)
 
     def rec_cleanup(*a: object, **k: object) -> None:
         events.append("cleanup")
@@ -1111,14 +1112,18 @@ def test_ensure_gitignore_batches_check_ignore(repo: Path, monkeypatch: pytest.M
         ".claude/\nwork-docs/loop-context/\nwork-docs/p5-batch-state.yaml\n"
     )
     check_ignore_calls: list[list[str]] = []
-    real_run = worktree.subprocess.run
+    real_run = subprocess.run
 
     def counting_run(args: object, *a: object, **k: object) -> object:
         if isinstance(args, (list, tuple)) and "check-ignore" in args:
             check_ignore_calls.append(list(args))
-        return real_run(args, *a, **k)  # type: ignore[arg-type]
+        return real_run(args, *a, **k)  # type: ignore[call-overload]
 
-    monkeypatch.setattr(worktree.subprocess, "run", counting_run)
+    # String target, not `setattr(subprocess, ...)`: this is a SPY whose assertion can pass
+    # vacuously (zero recorded calls satisfies it). Patching the bare stdlib module still
+    # works if `worktree` stopped importing it, so the spy would record nothing and the test
+    # would go green on a module it no longer observes. The dotted form raises instead.
+    monkeypatch.setattr("harness_maker.worktree.subprocess.run", counting_run)
     worktree._ensure_harness_gitignore(repo)
     # RED-now lands at 8 (the 10 churn patterns minus the 2 work-docs lines this
     # fixture seeds as exact matches → short-circuited before check-ignore). The
@@ -1140,14 +1145,18 @@ def test_ensure_gitignore_absent_creates_file_and_batches(
     gi = repo / ".gitignore"
     gi.unlink(missing_ok=True)  # the `repo` fixture pre-creates one — exercise the absent branch
     check_ignore_calls: list[list[str]] = []
-    real_run = worktree.subprocess.run
+    real_run = subprocess.run
 
     def counting_run(args: object, *a: object, **k: object) -> object:
         if isinstance(args, (list, tuple)) and "check-ignore" in args:
             check_ignore_calls.append(list(args))
-        return real_run(args, *a, **k)  # type: ignore[arg-type]
+        return real_run(args, *a, **k)  # type: ignore[call-overload]
 
-    monkeypatch.setattr(worktree.subprocess, "run", counting_run)
+    # String target, not `setattr(subprocess, ...)`: this is a SPY whose assertion can pass
+    # vacuously (zero recorded calls satisfies it). Patching the bare stdlib module still
+    # works if `worktree` stopped importing it, so the spy would record nothing and the test
+    # would go green on a module it no longer observes. The dotted form raises instead.
+    monkeypatch.setattr("harness_maker.worktree.subprocess.run", counting_run)
     worktree._ensure_harness_gitignore(repo)
     assert gi.is_file(), ".gitignore must be created when absent"
     content = gi.read_text()

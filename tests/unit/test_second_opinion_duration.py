@@ -34,7 +34,8 @@ _SCHEMA = (
 
 
 def _schema() -> dict[str, Any]:
-    return json.loads(_SCHEMA.read_text(encoding="utf-8"))
+    schema: dict[str, Any] = json.loads(_SCHEMA.read_text(encoding="utf-8"))
+    return schema
 
 
 # ── the dual surface ─────────────────────────────────────────────────────────
@@ -57,7 +58,7 @@ def test_duration_is_not_required_so_legacy_rows_stay_valid() -> None:
 
 
 def test_legacy_row_without_the_field_still_parses() -> None:
-    legacy = {
+    legacy: dict[str, Any] = {
         "ts": "2026-07-15T12:46:44Z",
         "slug": "spec-optional-task-driven",
         "stage": "plan",
@@ -84,7 +85,7 @@ def test_duration_type_contract_under_strict_mode() -> None:
     type, but the row-deleting risk it was credited with belongs to this other input
     class, so that is what gets asserted.
     """
-    base = {
+    base: dict[str, Any] = {
         "ts": "2026-08-08T00:00:00Z",
         "slug": "s",
         "stage": "review",
@@ -101,7 +102,8 @@ def test_duration_type_contract_under_strict_mode() -> None:
     # not re-derive it from the same wrong premise.
     assert codex_ledger.SecondOpinionRecord(**base, duration_s=27).duration_s == 27.0
     with pytest.raises(ValidationError):
-        codex_ledger.SecondOpinionRecord(**base, duration_s="27.4")
+        # A str is the REJECTION this assertion is about, so the type error is the point.
+        codex_ledger.SecondOpinionRecord(**base, duration_s="27.4")  # type: ignore[arg-type]
 
 
 # ── the producer ─────────────────────────────────────────────────────────────
@@ -156,7 +158,7 @@ def test_every_status_branch_writes_a_row_carrying_duration(
             raise exc
         return subprocess.CompletedProcess(argv, returncode, stdout=stdout, stderr="err")
 
-    monkeypatch.setattr(soi.subprocess, "run", _fake)
+    monkeypatch.setattr(subprocess, "run", _fake)
     result = soi.invoke(
         model="antigravity", prompt="p", slug="s", stage="review", base_root=agy_repo
     )

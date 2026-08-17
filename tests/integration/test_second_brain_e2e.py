@@ -19,6 +19,7 @@ import pytest
 from harness_maker.interview import _build_answers
 from harness_maker.models import (
     DevMode,
+    InterviewAnswers,
     Preset,
     SecondBrainConfig,
     SecondBrainFolder,
@@ -36,7 +37,7 @@ from harness_maker.second_brain import (
 from harness_maker.synthesize import synthesize
 
 
-def _baseline_answers(vault_path: Path, project_id: str = "harness-maker"):  # noqa: ANN202
+def _baseline_answers(vault_path: Path, project_id: str = "harness-maker") -> InterviewAnswers:
     """Minimal answers with Second Brain enabled + one writable folder."""
     return _build_answers(
         locale="en",
@@ -58,7 +59,7 @@ def _baseline_answers(vault_path: Path, project_id: str = "harness-maker"):  # n
     )
 
 
-def _render_harness(target_root: Path, answers) -> Path:  # noqa: ANN001
+def _render_harness(target_root: Path, answers: InterviewAnswers) -> Path:
     """Run profile → synthesize → render against ``target_root/.claude``; return .claude dir."""
     project_profile = profile(target_root)
     blueprint = synthesize(project_profile, answers)

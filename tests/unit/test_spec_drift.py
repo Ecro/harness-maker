@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import shutil
 from datetime import date, timedelta
 from pathlib import Path
+from typing import Any
 
+import pytest
 import yaml
 
 from harness_maker.observability.spec_drift import (
@@ -34,7 +37,7 @@ def _seed_spec(
     slug: str,
     *,
     tier: int = 1,
-    ac: list[dict] | None = None,
+    ac: list[dict[str, Any]] | None = None,
     last_mutation_run: str | None = None,
     oqs: int = 0,
 ) -> None:
@@ -168,7 +171,7 @@ def test_is_stale_invalid_date_returns_false() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_scan_flags_resolved_but_pending(tmp_path, monkeypatch) -> None:
+def test_scan_flags_resolved_but_pending(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """A pending AC whose test_ids all resolve = wrapup write-back never ran."""
     import harness_maker.observability.spec_drift as sd
 
@@ -193,7 +196,9 @@ def test_scan_flags_resolved_but_pending(tmp_path, monkeypatch) -> None:
     assert report.has_findings
 
 
-def test_scan_pending_with_unresolved_test_not_flagged(tmp_path, monkeypatch) -> None:
+def test_scan_pending_with_unresolved_test_not_flagged(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Genuinely-pending AC (test_ids do not resolve yet) is NOT a write-back miss."""
     import harness_maker.observability.spec_drift as sd
 
@@ -217,13 +222,15 @@ def test_scan_pending_with_unresolved_test_not_flagged(tmp_path, monkeypatch) ->
     assert report.resolved_but_pending == []
 
 
-def test_scan_pending_without_test_ids_skips_collect(tmp_path, monkeypatch) -> None:
+def test_scan_pending_without_test_ids_skips_collect(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """Pending AC with empty test_ids is not a candidate — no pytest collect runs."""
     import harness_maker.observability.spec_drift as sd
 
     called = {"n": 0}
 
-    def _spy(ids, cwd):
+    def _spy(ids: object, cwd: object) -> list[Any]:
         called["n"] += 1
         return []
 
@@ -248,9 +255,10 @@ def test_scan_pending_without_test_ids_skips_collect(tmp_path, monkeypatch) -> N
     assert called["n"] == 0  # no candidates → no collect
 
 
-def test_scan_resolved_but_pending_skipped_when_pytest_absent(tmp_path, monkeypatch) -> None:
+def test_scan_resolved_but_pending_skipped_when_pytest_absent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """C-P2a: with pytest unavailable, do NOT false-flag every pending-with-ids AC."""
-    import harness_maker.observability.spec_drift as sd
 
     specs = tmp_path / "specs"
     _seed_spec(
@@ -267,7 +275,7 @@ def test_scan_resolved_but_pending_skipped_when_pytest_absent(tmp_path, monkeypa
             }
         ],
     )
-    monkeypatch.setattr(sd.shutil, "which", lambda name: None)  # pytest "absent"
+    monkeypatch.setattr(shutil, "which", lambda name: None)  # pytest "absent"
     # If the guard were missing, unresolved_test_ids would degrade to [] and flag this AC.
     report = scan(specs, dev_mode="spec-driven")
     assert report.resolved_but_pending == []

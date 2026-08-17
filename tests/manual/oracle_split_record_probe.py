@@ -4,6 +4,7 @@ import collections
 import json
 import os
 from pathlib import Path
+from typing import Any
 
 from harness_maker.economics_source import (
     _transcript_files,
@@ -16,12 +17,12 @@ proj = Path("/home/noel/harness-maker")
 dirs = discover_transcript_dirs(
     proj, transcript_root=Path(os.environ.get("HM_TR", str(default_transcript_root())))
 )
-per_id = collections.Counter()
-usage_same = collections.Counter()
-sample = []
+per_id: collections.Counter[str] = collections.Counter()
+usage_same: collections.Counter[str] = collections.Counter()
+sample: list[Any] = []
 for d in dirs:
     for f in _transcript_files(d):
-        seen = {}
+        seen: dict[str, Any] = {}
         for line in f.read_text(encoding="utf-8", errors="replace").splitlines():
             if not line.strip():
                 continue

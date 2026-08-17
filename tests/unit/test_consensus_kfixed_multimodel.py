@@ -9,10 +9,14 @@ This is the regression guard for ADR-006's "no Python change needed" claim: the 
 
 from __future__ import annotations
 
+from typing import Any
+
 from harness_maker.conditional_router import scope_aware_consensus
 
 
-def _finding(reviewer: str, *, file: str = "a.py", line: int = 10, sev: str = "P0") -> dict:
+def _finding(
+    reviewer: str, *, file: str = "a.py", line: int = 10, sev: str = "P0"
+) -> dict[str, Any]:
     return {
         "reviewer": reviewer,
         "file": file,
@@ -23,7 +27,7 @@ def _finding(reviewer: str, *, file: str = "a.py", line: int = 10, sev: str = "P
     }
 
 
-def _tag_for(findings: list[dict], *, file: str = "a.py", line: int = 10) -> str:
+def _tag_for(findings: list[dict[str, Any]], *, file: str = "a.py", line: int = 10) -> str:
     out = scope_aware_consensus(findings)
     for f in out:
         if f.get("file") == file and f.get("line") == line:
@@ -33,7 +37,7 @@ def _tag_for(findings: list[dict], *, file: str = "a.py", line: int = 10) -> str
 
 def test_two_voices_pass_at_n3() -> None:
     # pool of 3 voices (2 claude reviewers + codex), 2 agree on the same location
-    findings = [
+    findings: list[dict[str, Any]] = [
         _finding("code-reviewer"),
         _finding("codex"),
         _finding("security-reviewer", file="b.py", line=99, sev="P1"),
@@ -82,7 +86,7 @@ def test_null_location_relaxation_is_a_render_concern_not_math() -> None:
     # own bucket. The symbol/message-similarity relaxation is applied by the LLM per the
     # rendered prose BEFORE this function — so two null-location voices with the SAME
     # (None,None,sev) bucket still count as 2 distinct reviewers here.
-    findings = [
+    findings: list[dict[str, Any]] = [
         {
             "reviewer": "codex",
             "file": None,

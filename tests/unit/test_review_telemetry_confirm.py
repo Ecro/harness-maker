@@ -29,7 +29,7 @@ def _row(**overrides: Any) -> dict[str, Any]:
     return base
 
 
-def _rejected_by_a_rule(**row: Any) -> list[dict[str, Any]]:
+def _rejected_by_a_rule(**row: Any) -> list[Any]:
     """Assert the row is rejected, and that a RULE rejected it — not the extra-key guard.
 
     The model sets ``extra="forbid"``, so before the three fields exist EVERY row carrying

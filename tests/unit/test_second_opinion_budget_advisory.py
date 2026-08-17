@@ -13,6 +13,10 @@ the shape that shipped four silent-skip bugs in this exact subsystem.
 
 from __future__ import annotations
 
+import subprocess
+from pathlib import Path
+from typing import Any
+
 import pytest
 
 from harness_maker import second_opinion_invoke as soi
@@ -64,7 +68,9 @@ def test_advisory_message_names_both_numbers_and_the_remedy() -> None:
     assert "model" in text.lower(), "an operator needs to know WHICH knob to turn"
 
 
-def test_invoke_returns_duration_so_it_crosses_the_process_boundary(tmp_path, monkeypatch) -> None:
+def test_invoke_returns_duration_so_it_crosses_the_process_boundary(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """`duration_s` must be in the RESULT, not only in the ledger row.
 
     The health smoke runs the invoker as a subprocess and reads its one JSON line. A
@@ -73,7 +79,6 @@ def test_invoke_returns_duration_so_it_crosses_the_process_boundary(tmp_path, mo
     """
     import json
     import subprocess
-    from typing import Any
 
     (tmp_path / ".claude").mkdir(parents=True)
     (tmp_path / ".claude" / "harness.yaml").write_text(
@@ -85,7 +90,7 @@ def test_invoke_returns_duration_so_it_crosses_the_process_boundary(tmp_path, mo
         payload = {"findings": [], "summary": "s", "confidence": 1.0}
         return subprocess.CompletedProcess(argv, 0, stdout=json.dumps(payload), stderr="")
 
-    monkeypatch.setattr(soi.subprocess, "run", _fake)
+    monkeypatch.setattr(subprocess, "run", _fake)
     result = soi.invoke(
         model="antigravity", prompt="p", slug="s", stage="health", base_root=tmp_path
     )
@@ -116,14 +121,15 @@ def test_message_wording_is_stage_dependent() -> None:
         assert "second_opinion.antigravity.model" in text
 
 
-def test_invoke_never_raises_when_root_resolution_fails(tmp_path, monkeypatch) -> None:
+def test_invoke_never_raises_when_root_resolution_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """`Path.resolve()` sat outside the terminal guard — a raise escaped `invoke()`.
 
     That broke the never-raise contract AND wrote zero ledger rows, in the one function
     whose docstring promises neither can happen.
     """
     import json
-    from typing import Any
 
     (tmp_path / ".claude").mkdir(parents=True)
     (tmp_path / ".claude" / "harness.yaml").write_text(
@@ -133,7 +139,7 @@ def test_invoke_never_raises_when_root_resolution_fails(tmp_path, monkeypatch) -
     def _boom(_self: Any) -> Any:
         raise OSError("ELOOP: too many levels of symbolic links")
 
-    monkeypatch.setattr(soi.Path, "resolve", _boom)
+    monkeypatch.setattr(Path, "resolve", _boom)
 
     def _fake_run(argv: list[str], **_kw: Any) -> Any:
         import subprocess
@@ -141,7 +147,7 @@ def test_invoke_never_raises_when_root_resolution_fails(tmp_path, monkeypatch) -
         payload = {"findings": [], "summary": "s", "confidence": 1.0}
         return subprocess.CompletedProcess(argv, 0, stdout=json.dumps(payload), stderr="")
 
-    monkeypatch.setattr(soi.subprocess, "run", _fake_run)
+    monkeypatch.setattr(subprocess, "run", _fake_run)
 
     result = soi.invoke(
         model="antigravity", prompt="p", slug="s", stage="review", base_root=tmp_path
@@ -150,7 +156,9 @@ def test_invoke_never_raises_when_root_resolution_fails(tmp_path, monkeypatch) -
     assert result["status"] in {"invoked", "skipped", "failed"}
 
 
-def test_unreadable_prompt_file_emits_a_ledger_row_and_duration(tmp_path, monkeypatch) -> None:
+def test_unreadable_prompt_file_emits_a_ledger_row_and_duration(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """The `main()` early-return used to bypass `_result` entirely.
 
     Two consequences it is worth pinning: skip-rate telemetry omitted this failure class
@@ -188,7 +196,9 @@ def test_unreadable_prompt_file_emits_a_ledger_row_and_duration(tmp_path, monkey
     assert isinstance(rows[0]["duration_s"], float)
 
 
-def test_packaged_schema_does_not_leak_when_the_write_fails(monkeypatch, tmp_path) -> None:
+def test_packaged_schema_does_not_leak_when_the_write_fails(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     """The unlink-on-raising-write had no discriminating test; this is it.
 
     `_packaged_schema` returns the path, so a raise between `mkstemp` and `return` leaves
@@ -199,7 +209,7 @@ def test_packaged_schema_does_not_leak_when_the_write_fails(monkeypatch, tmp_pat
     monkeypatch.setattr(tempfile, "tempdir", str(tmp_path))
     real_open = open
 
-    def _boom(*args, **kwargs):
+    def _boom(*args: Any, **kwargs: Any) -> Any:
         if args and isinstance(args[0], int):
             raise OSError("ENOSPC: no space left on device")
         return real_open(*args, **kwargs)

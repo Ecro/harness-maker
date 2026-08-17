@@ -32,7 +32,7 @@ import pytest
 from harness_maker import codex_ledger, second_opinion_invoke
 from harness_maker.codex_ledger import LEDGER_FILENAME, ORACLE_RESULT_MAX, cap_oracle_result
 
-_DISPOSITIONS = [
+_DISPOSITIONS: list[dict[str, object]] = [
     {
         "id": "abc123def4567890",
         "model": "codex",

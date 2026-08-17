@@ -17,12 +17,12 @@ from pathlib import Path
 
 from harness_maker.context_lint import THRESHOLDS, lint
 from harness_maker.interview import interview
-from harness_maker.models import Preset, Target
+from harness_maker.models import InterviewAnswers, Preset, Target
 from harness_maker.profile import profile
 from harness_maker.synthesize import synthesize
 
 
-def _make_answers(fix_dir: Path, targets: list[str]):
+def _make_answers(fix_dir: Path, targets: list[str]) -> InterviewAnswers:
     """Build InterviewAnswers with given targets using autoloop mode."""
     p = profile(fix_dir)
     a = interview(p, autoloop_mode=True)

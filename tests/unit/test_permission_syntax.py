@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import json
 
-from harness_maker.models import HarnessConfig
+from harness_maker.models import HarnessConfig, PermissionsConfig
 from harness_maker.permission_syntax import (
     BASH_SEPARATORS,
     UNMATCHED_PATH_TOOLS,
@@ -33,7 +33,9 @@ SETTINGS_TEMPLATES = ("settings/Side.json.j2", "settings/Production.json.j2")
 
 
 def _render_permissions(template: str, deny_dangerous: bool) -> dict[str, list[str]]:
-    cfg = HarnessConfig(permissions={"deny_dangerous": deny_dangerous}).model_dump(mode="json")
+    cfg = HarnessConfig(permissions=PermissionsConfig(deny_dangerous=deny_dangerous)).model_dump(
+        mode="json"
+    )
     out = (
         _make_env()
         .get_template(template)

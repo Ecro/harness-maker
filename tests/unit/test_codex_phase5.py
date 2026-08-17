@@ -15,6 +15,7 @@ GREEN after Phase 5:
 from __future__ import annotations
 
 import json
+from typing import Any
 
 from harness_maker.render import _make_env
 from harness_maker.synthesize import _codex_target_files
@@ -132,7 +133,7 @@ def test_codex_hooks_json_has_pretooluse_permission_gate() -> None:
 # ── permission_gate PermissionRequest branch ──────────────────────────────────
 
 
-def _run_main_with_stdin(payload: dict) -> tuple[int, str]:
+def _run_main_with_stdin(payload: dict[str, Any]) -> tuple[int, str]:
     """Run permission_gate.main() with JSON payload as stdin, return (exit_code, stdout)."""
     import sys
     from io import StringIO

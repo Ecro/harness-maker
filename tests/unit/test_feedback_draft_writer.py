@@ -5,6 +5,9 @@ PLAN-auto-feedback-2026-05 Phase 3 exit criterion (a)-(f).
 
 from __future__ import annotations
 
+from pathlib import Path
+from typing import Any
+
 import pytest
 from pydantic import ValidationError
 
@@ -16,8 +19,8 @@ from harness_maker.feedback.draft_writer import (
 )
 
 
-def _make_draft(**overrides) -> FeedbackDraft:
-    base = {
+def _make_draft(**overrides: Any) -> FeedbackDraft:
+    base: dict[str, Any] = {
         "harness_maker_version": "0.23.7",
         "ide": "claude-code",
         "os": "Linux 6.6.0",
@@ -150,7 +153,7 @@ def test_file_paths_empty_list_default() -> None:
 # ── (e) dedup: same (trigger_id, slug, date) → one file ──────────────────────
 
 
-def test_write_dedup_returns_existing_path_silent(tmp_path) -> None:
+def test_write_dedup_returns_existing_path_silent(tmp_path: Path) -> None:
     d = _make_draft()
     p1 = write(d, base_dir=tmp_path, date="2026-05-23")
     # Modify a different field to prove dedup is by (trigger_id, slug, date), not body hash.
@@ -161,7 +164,7 @@ def test_write_dedup_returns_existing_path_silent(tmp_path) -> None:
     assert "different error this time" not in p1.read_text()
 
 
-def test_write_different_date_produces_separate_file(tmp_path) -> None:
+def test_write_different_date_produces_separate_file(tmp_path: Path) -> None:
     d = _make_draft()
     p1 = write(d, base_dir=tmp_path, date="2026-05-23")
     p2 = write(d, base_dir=tmp_path, date="2026-05-24")
@@ -170,7 +173,7 @@ def test_write_different_date_produces_separate_file(tmp_path) -> None:
     assert p2.is_file()
 
 
-def test_write_different_trigger_id_produces_separate_file(tmp_path) -> None:
+def test_write_different_trigger_id_produces_separate_file(tmp_path: Path) -> None:
     d_a = _make_draft(trigger_signal=TriggerSignal(id="hook-error", count=1))
     d_b = _make_draft(trigger_signal=TriggerSignal(id="silent-intent-miss", count=1))
     p_a = write(d_a, base_dir=tmp_path, date="2026-05-23")
@@ -195,7 +198,7 @@ def test_dedup_hash_varies_with_inputs() -> None:
 # ── (f) body structure ─────────────────────────────────────────────────────
 
 
-def test_write_body_contains_all_5_whitelisted_fields(tmp_path) -> None:
+def test_write_body_contains_all_5_whitelisted_fields(tmp_path: Path) -> None:
     d = _make_draft(error_message="boom", file_paths=[".claude/foo.md"])
     p = write(d, base_dir=tmp_path, date="2026-05-23")
     body = p.read_text()
@@ -210,7 +213,7 @@ def test_write_body_contains_all_5_whitelisted_fields(tmp_path) -> None:
     assert ".claude/foo.md" in body
 
 
-def test_write_body_excludes_user_repo_strings(tmp_path) -> None:
+def test_write_body_excludes_user_repo_strings(tmp_path: Path) -> None:
     """The PLAN's privacy invariant — body must not contain any path not declared in whitelist."""
     d = _make_draft()
     p = write(d, base_dir=tmp_path, date="2026-05-23")

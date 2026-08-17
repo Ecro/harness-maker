@@ -179,7 +179,8 @@ def test_harness_config_recommended_model_default() -> None:
 
 
 def test_harness_config_recommended_model_override() -> None:
-    cfg = HarnessConfig(recommended_model="claude-sonnet-4-6")
+    # Legacy validation alias for `default_model` — runtime-valid, invisible to mypy.
+    cfg = HarnessConfig(recommended_model="claude-sonnet-4-6")  # type: ignore[call-arg]
     assert cfg.recommended_model == "claude-sonnet-4-6"
 
 
@@ -476,7 +477,9 @@ def test_confidence_value_strings() -> None:
 def test_confidence_is_str_enum() -> None:
     """str-Enum so it round-trips through YAML/JSON dumps cleanly."""
     assert isinstance(Confidence.HIGH, str)
-    assert Confidence.HIGH == "high"
+    # The bare-string comparison IS the subject: `.value == "high"` holds for a plain Enum
+    # too, so it would not distinguish the str mixin this test is named for.
+    assert Confidence.HIGH == "high"  # type: ignore[comparison-overlap]
 
 
 # ──────────────────────────────────────────────────────────────────────────────

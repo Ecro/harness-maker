@@ -189,7 +189,7 @@ def test_codex_executes_the_shipped_dispatch_instruction() -> None:
     replies = [
         str(state.get("message") or "")
         for call_item in calls
-        for state in (call_item.get("agents_states") or {}).values()  # type: ignore[union-attr]
+        for state in (call_item.get("agents_states") or {}).values()  # type: ignore[attr-defined]
         if isinstance(state, dict)
     ]
     assert any(_SENTINEL in reply for reply in replies), (

@@ -9,6 +9,8 @@ dependency: pure-Python, single-signal normalized overlap (PLAN ADR-001/002/003)
 
 from __future__ import annotations
 
+from harness_maker.memory_retrieve import MemoryEntry
+
 
 def _make_entry(
     *,
@@ -17,7 +19,7 @@ def _make_entry(
     date: str = "2026-05-20",
     tier: str = "fail",
     category: str = "lint",
-):
+) -> MemoryEntry:
     from harness_maker.memory_retrieve import MemoryEntry
 
     return MemoryEntry(
@@ -182,11 +184,11 @@ class TestRecallStemBridge:
         # --- raw baseline (stemming OFF, mirrors the pre-change formula) ---
         topic_raw = {t.lower() for t in WORD_RE.findall(topic)}
 
-        def _raw_tokens(e) -> set[str]:
+        def _raw_tokens(e: MemoryEntry) -> set[str]:
             text = " ".join([e.tier, e.category, e.slug, e.date, e.body]).lower()
             return set(WORD_RE.findall(text))
 
-        def _raw_score(e) -> float:
+        def _raw_score(e: MemoryEntry) -> float:
             return len(topic_raw & _raw_tokens(e)) / len(topic_raw)
 
         assert _raw_score(entry_a) > 0.0  # A shares "snapshots" raw

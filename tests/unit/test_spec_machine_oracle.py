@@ -8,6 +8,7 @@ required), never inherit the bumped SCHEMA_VERSION constant.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -22,13 +23,13 @@ from harness_maker.spec_machine import (
 )
 
 
-def _write(tmp_path: Path, data: dict) -> Path:
+def _write(tmp_path: Path, data: dict[str, Any]) -> Path:
     p = tmp_path / "SPEC-x.machine.yaml"
     p.write_text(yaml.safe_dump(data), encoding="utf-8")
     return p
 
 
-def _v2_base(**ac_overrides) -> dict:
+def _v2_base(**ac_overrides: Any) -> dict[str, Any]:
     """A minimal explicit-v2 machine dict with one mechanical AC."""
     ac = {
         "id": "AC-001",

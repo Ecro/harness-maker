@@ -357,7 +357,9 @@ def _build_harness_config() -> HarnessConfig:
         preset=Preset.PRODUCTION,
         dev_mode=DevMode.SPEC_DRIVEN,
         targets=[Target.CLAUDE_CODE, Target.CURSOR],
-        recommended_model="claude-opus-4-7",
+        # Legacy validation alias for `default_model` (AliasChoices) — valid at runtime,
+        # invisible to mypy, which only sees the canonical field name.
+        recommended_model="claude-opus-4-7",  # type: ignore[call-arg]
     )
 
 

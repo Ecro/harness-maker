@@ -24,6 +24,7 @@ import re
 from functools import cache
 from pathlib import Path
 from tempfile import mkdtemp
+from typing import Literal
 
 from harness_maker.interview import interview
 from harness_maker.models import Preset, ProjectProfile, SecondOpinionConfig
@@ -34,7 +35,7 @@ _MODELS = ("codex", "antigravity")
 
 
 @cache
-def _render_root(models: tuple[str, ...]) -> Path:
+def _render_root(models: tuple[Literal["codex", "antigravity"], ...]) -> Path:
     """Render once per model-set for the whole module — a full render is not cheap."""
     profile = ProjectProfile(stack=["python"], scale="medium", lifecycle="active")
     answers = interview(profile, autoloop_mode=True)

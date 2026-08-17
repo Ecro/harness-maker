@@ -82,7 +82,9 @@ def test_brief_cli_emits_an_absolute_worktree_root(
 
     assert rc == 0
     assert payload["status"] == "ok", payload["verdict"]
-    root = payload["brief"]["worktree_root"]
+    brief = payload["brief"]
+    assert isinstance(brief, dict)
+    root = brief["worktree_root"]
     assert Path(root).is_absolute(), f"relative worktree_root {root!r} breaks the reconciler"
     assert Path(root).resolve() == wt.resolve()
 

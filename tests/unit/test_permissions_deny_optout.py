@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from harness_maker.models import HarnessConfig
+from harness_maker.models import HarnessConfig, PermissionsConfig
 from harness_maker.readiness import _dim_guardrails
 from harness_maker.render import _make_env
 
@@ -20,7 +20,9 @@ SETTINGS_TEMPLATES = ("settings/Side.json.j2", "settings/Production.json.j2")
 
 
 def _render_deny(template: str, deny_dangerous: bool) -> list[str]:
-    cfg = HarnessConfig(permissions={"deny_dangerous": deny_dangerous}).model_dump(mode="json")
+    cfg = HarnessConfig(permissions=PermissionsConfig(deny_dangerous=deny_dangerous)).model_dump(
+        mode="json"
+    )
     # `harness_maker_src_path` became required when the settings templates gained
     # the `hooks` key (PLAN-permission-deny-and-hooks-wiring Phase 1) — the env
     # uses StrictUndefined, so omitting it raises rather than rendering empty.

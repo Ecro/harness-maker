@@ -71,7 +71,7 @@ def test_snapshot_matches(
             {"path": str(f.path), "template": f.template, "body_sha256": f.body_sha256}
             for f in filtered
         ],
-        key=lambda x: x["path"],
+        key=lambda x: x["path"] or "",
     )
     assert actual == expected["files"]
 

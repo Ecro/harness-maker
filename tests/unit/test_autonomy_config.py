@@ -112,6 +112,7 @@ def test_autonomy_partial_config_fills_defaults() -> None:
     cfg = AutonomyConfig(level="auto_safe")
     assert cfg.level == "auto_safe"
     assert cfg.pipeline == DEFAULT_PIPELINE
+    assert cfg.step_cap is not None
     assert cfg.step_cap > 0
 
 

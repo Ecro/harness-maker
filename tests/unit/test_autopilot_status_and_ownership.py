@@ -15,8 +15,10 @@ peer.
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -31,9 +33,10 @@ def _iso(delta_hours: float = 0.0) -> str:
 
 
 def _read_raw(root: Path, session_id: str | None = None) -> dict[str, object]:
-    return json.loads(
+    raw: dict[str, object] = json.loads(
         autopilot.marker_path(root, session_id=session_id).read_text(encoding="utf-8")
     )
+    return raw
 
 
 def _write_raw(root: Path, payload: dict[str, object], session_id: str | None = None) -> None:
@@ -242,11 +245,11 @@ def test_gc_preserves_a_replacement_written_after_the_judgement(
     original = {"read_text": Path.read_text, "read_bytes": Path.read_bytes}
     state = {"swapped": False, "reads": 0}
 
-    def _make(name: str):  # noqa: ANN202 — local factory
+    def _make(name: str) -> Callable[..., Any]:  # local factory
         real = original[name]
 
-        def _hooked(self: Path, *a: object, **kw: object):  # noqa: ANN202
-            out = real(self, *a, **kw)  # type: ignore[arg-type]
+        def _hooked(self: Path, *a: object, **kw: object) -> Any:
+            out = real(self, *a, **kw)  # type: ignore[operator]
             if self == marker:
                 state["reads"] += 1
                 if not state["swapped"]:
@@ -296,7 +299,8 @@ def test_write_overwrites_own_and_stale_markers_without_force(
 ) -> None:
     monkeypatch.setenv("HM_SESSION_ID", "sess-A")
     autopilot.write(tmp_path, level="auto_safe", pipeline=DEFAULT_PIPELINE)
-    autopilot.write(tmp_path, level="full", pipeline=DEFAULT_PIPELINE)  # own → allowed
+    # Legacy level, normalized on write — see test_autonomy_level_matrix.
+    autopilot.write(tmp_path, level="full", pipeline=DEFAULT_PIPELINE)  # type: ignore[arg-type]
     # The marker records the NORMALIZED level, so an older writer's `full` and a current
     # `auto_safe` are the same on disk — which is what makes the legacy marker loadable.
     assert _read_raw(tmp_path)["level"] == "auto_safe"
@@ -355,7 +359,8 @@ def _status(root: Path) -> dict[str, object]:
     with contextlib.redirect_stdout(buf):
         rc = autopilot.main(["status", "--root", str(root)])
     assert rc == 0, "status must always exit 0"
-    return json.loads(buf.getvalue().strip())
+    parsed: dict[str, object] = json.loads(buf.getvalue().strip())
+    return parsed
 
 
 def test_status_absent(tmp_path: Path) -> None:

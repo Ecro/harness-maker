@@ -72,7 +72,9 @@ def test_agy_accepts_the_schema_flags_and_returns_a_usable_payload(tmp_path: Pat
 
 
 @pytest.mark.skipif(not _agy_available(), reason="agy not on PATH")
-def test_invoke_succeeds_from_a_worktree_cwd(tmp_path: Path, monkeypatch) -> None:
+def test_invoke_succeeds_from_a_worktree_cwd(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """The packaged schema is materialised into a temp file, so cwd cannot break it.
 
     Probed 2026-08-08 by hand from `.worktrees/<slug>/` with an absolute base-root path:

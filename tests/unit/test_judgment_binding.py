@@ -13,6 +13,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 import pytest
 import yaml
@@ -180,7 +181,7 @@ def test_subject_hash_symlink_escape_rejected(tmp_path: Path) -> None:
 
 def _judgment_yaml(tmp_path: Path, **over: object) -> Path:
     (tmp_path / "subject.py").write_text("def f():\n    return 1\n")
-    ac = {
+    ac: dict[str, Any] = {
         "id": "AC-001",
         "title": "subject is correct",
         "type": "judgment",

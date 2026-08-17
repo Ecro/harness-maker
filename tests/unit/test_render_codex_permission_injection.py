@@ -114,7 +114,7 @@ _INVOKER_SUFFIX = " hm second_opinion_invoke:*)"
 
 def _invoker_rules(settings: dict[str, object]) -> list[str]:
     allow = settings["permissions"]["allow"]  # type: ignore[index]
-    return [r for r in allow if _INVOKER_SUFFIX in r]  # type: ignore[union-attr]
+    return [r for r in allow if _INVOKER_SUFFIX in r]
 
 
 def test_scoped_invoker_allow_rule_ships_whenever_any_model_is_enabled(tmp_path: Path) -> None:

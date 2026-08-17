@@ -6,8 +6,9 @@ import collections
 import json
 import os
 from pathlib import Path
+from typing import Any
 
-from harness_maker.economics import PRICE_TABLE, resolve_model_family  # type: ignore[attr-defined]
+from harness_maker.economics import PRICE_TABLE, ModelPrice, resolve_model_family
 from harness_maker.economics_source import (
     _transcript_files,
     default_transcript_root,
@@ -22,7 +23,7 @@ dirs = discover_transcript_dirs(
 )
 
 
-def price(model):
+def price(model: str | None) -> ModelPrice:
     fam = resolve_model_family(model or "")
     return PRICE_TABLE.get(fam or "opus") or PRICE_TABLE["opus"]
 
@@ -30,27 +31,31 @@ def price(model):
 STAGES = ("hm:research", "hm:spec", "hm:plan", "hm:execute", "hm:review", "hm:verify", "hm:wrapup")
 
 
-def cost(u, p):
-    return (
+def cost(u: dict[str, Any], p: ModelPrice) -> float:
+    total: float = (
         u.get("input_tokens", 0) * p.input
         + u.get("output_tokens", 0) * p.output
         + u.get("cache_read_input_tokens", 0) * p.cache_read
         + u.get("cache_creation_input_tokens", 0) * p.cache_write_5m
     ) / 1e6
+    return total
 
 
-def carry(u, p):
-    return u.get("cache_read_input_tokens", 0) * p.cache_read / 1e6
+def carry(u: dict[str, Any], p: ModelPrice) -> float:
+    total: float = u.get("cache_read_input_tokens", 0) * p.cache_read / 1e6
+    return total
 
 
 for mode in ("raw", "deduped"):
     tot = carr = 0.0
     n = 0
-    per_stage = collections.defaultdict(lambda: [0, 0.0, 0.0, 0])  # turns, usd, carry, ctx
+    per_stage: dict[str, list[float]] = collections.defaultdict(
+        lambda: [0, 0.0, 0.0, 0]
+    )  # turns, usd, carry, ctx
     for d in dirs:
         for f in _transcript_files(d):
-            best = {}
-            order = []
+            best: dict[str, tuple[dict[str, Any], str | None, str | None]] = {}
+            order: list[str] = []
             cur = None
             for line in f.read_text(encoding="utf-8", errors="replace").splitlines():
                 if not line.strip():

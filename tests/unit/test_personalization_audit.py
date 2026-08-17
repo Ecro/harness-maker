@@ -263,7 +263,7 @@ def _seed_harness_yaml(
     """Minimal valid harness.yaml fixture for the audit reader."""
     path = tmp_path / ".claude" / "harness.yaml"
     path.parent.mkdir(parents=True, exist_ok=True)
-    body = {
+    body: dict[str, Any] = {
         "preset": "Side",
         "dev_mode": "spec-driven",
         "targets": ["claude-code"],

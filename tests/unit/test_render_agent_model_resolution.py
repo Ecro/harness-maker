@@ -7,6 +7,8 @@ Validator C-2 fix: Tier-3 user-authored agent must not KeyError.
 
 from __future__ import annotations
 
+from typing import Any
+
 from harness_maker.models import (
     AgentModelSpec,
     CodexAgentSpec,
@@ -17,7 +19,7 @@ from harness_maker.presets import CURSOR_MODEL_IDS, resolve_agent_spec
 from harness_maker.synthesize import _agent_files
 
 
-def _spec_for(name: str, file_specs: list[tuple[str, str, dict]]) -> dict:
+def _spec_for(name: str, file_specs: list[tuple[str, str, dict[str, Any]]]) -> dict[str, Any]:
     for _tmpl, dst, ctx in file_specs:
         if dst == f"agents/{name}.md":
             return ctx

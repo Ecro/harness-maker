@@ -16,6 +16,7 @@ import sys
 import threading
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 import pytest
 from pydantic import ValidationError
@@ -27,7 +28,7 @@ from harness_maker.review_telemetry import (
     record_from_dict,
 )
 
-_BASE_FIELDS = {
+_BASE_FIELDS: dict[str, Any] = {
     "ts": "2026-05-11T12:00:00Z",
     "slug": "llm-code-review-2026",
     "round": 1,

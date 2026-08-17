@@ -12,6 +12,8 @@ import os
 import subprocess
 from pathlib import Path
 
+import pytest
+
 from harness_maker import worktree
 
 
@@ -38,7 +40,9 @@ def _reg(repo: Path, task: str, branch: str, wt: str, uuid: str) -> None:
 # ── flag helper ──────────────────────────────────────────────────────────────
 
 
-def test_flag_absent_returns_false_and_warns_once(tmp_path: Path, capsys) -> None:
+def test_flag_absent_returns_false_and_warns_once(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     repo = _repo(tmp_path)
     # No key of ANY generation — the only shape that reaches the absent-case warning.
     # (`scope: [execute]` is no longer "absent": it is a legacy rung the reader honors,
@@ -53,7 +57,9 @@ def test_flag_absent_returns_false_and_warns_once(tmp_path: Path, capsys) -> Non
     assert warnings.count("no worktree.enabled key") == 1  # warned exactly once
 
 
-def test_legacy_scope_is_honoured_not_treated_as_absent(tmp_path: Path, capsys) -> None:
+def test_legacy_scope_is_honoured_not_treated_as_absent(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     """An un-re-rendered harness keeps working: `scope: [execute]` meant isolation was
     on for execute, so the reader resolves True rather than warning about an absent key."""
     repo = _repo(tmp_path)
@@ -119,7 +125,9 @@ def test_register_idempotent_by_uuid_replaces_in_place(tmp_path: Path) -> None:
     assert rows[0].branch == "hm/new"
 
 
-def test_reclaim_preserves_row_under_pid_reuse(tmp_path: Path, monkeypatch) -> None:
+def test_reclaim_preserves_row_under_pid_reuse(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """pid reuse (a recorded pid now owned by an unrelated process) must NOT drop a
     row whose worktree is still present — preserve-biased, never a false drop."""
     repo = _repo(tmp_path)
