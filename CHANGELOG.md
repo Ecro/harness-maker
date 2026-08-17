@@ -2,7 +2,73 @@
 
 ## [Unreleased]
 
+## [0.52.5] - 2026-08-17
+
+### Added
+
+- **`hm review_run open|status|close` — at most one open `/hm:review` run per slug (ADR-003).**
+  `review.md.j2` told the model to mint `<run-id>` itself, and `iteration_count`,
+  `max_review_rounds` and the confirmation-pass bound are all state inside one run with nothing
+  recording that a run is still open. On 2026-08-17 one session created **six** runs for one
+  slug, each resetting every cap. The state file lives at the **base repo root** (a
+  worktree-relative path is lost at `task-land`) and is registered in
+  `worktree._HARNESS_ARTIFACT_PREFIXES` — the tuple the finalize dirt-filter actually reads —
+  as well as in the gitignore set; a gitignore-only registration would make every live run-state
+  file user dirt that `worktree finalize` sweeps into the stash.
+
+  The record is written to a temp file and published with `os.link`, **not** created with
+  `os.open(O_CREAT|O_EXCL)`. `O_EXCL` alone creates the directory entry and writes a moment
+  later, and in that window a peer sees a zero-byte file that its corrupt-file recovery cannot
+  distinguish from a truncated one — so the recovery overwrites a live record and both runs
+  proceed as owner, reopening the race the exclusive create existed to close. That matters
+  because `freeze_ref` keys on slug + pass_id with **no run id**, so two runs on one slug share
+  freeze refs and the loser can clobber the tree the winner froze.
+
+- **A falsifiability probe for the render assertions** (`work-docs/probe-phase3-falsifiability.py`,
+  ADR-011). 21 mutants in three classes: contract (must go RED), everything-else and
+  correct-implementation (must stay GREEN). RED requires pytest `rc == 1` specifically — any
+  other non-zero code is reported as a harness error, and every node runs unmutated first and
+  must pass, or the probe aborts. Both guards exist because a `SyntaxError` in the test module
+  once made all 21 mutants report "RED (falsifiable)" while nothing was being tested.
+
+### Changed
+
+- **Config files no longer force the FULL test suite** (ADR-006). `test_dep_map` gains
+  `CLASS_CONFIG`, so `pyproject.toml`, `uv.lock`, `.github/workflows/*` and `.claude/harness.yaml`
+  select bounded suites instead of falling to the loud-FULL default arm. A version bump stops
+  making every repair in that phase run everything.
+- **Phase A.5 dispatches ONE `test-reviewer`, not three** (ADR-010). The single dispatch carries
+  all three lens questions. `execute`'s round-trip count drops 19 → 17.
+- **`/hm:execute` declares three things before a repair** (ADR-002): the root-cause hypothesis,
+  the scope it will touch, and its non-goals. Declarations, not lookups — a task-driven PLAN has
+  no SPEC and `--no-tdd` has no Phase A, so a step that told you to go read them would have had
+  no referent most of the time.
+- **`hm freeze resolve-base` is idempotent** (ADR-004): it returns the stored commit and repairs
+  a missing stamp rather than re-resolving. The stamp is written at the **base repo root**, where
+  its only consumer reads it — a stage runs with `cd <WT>`, so the stamp had been landing where
+  nothing looks and the ref age stayed unknown forever.
+
 ### Fixed
+
+- **A `verification_cache check` shipped in `/hm:execute` and `/hm:review` that could never hit,
+  and has been withdrawn.** Its producer half was cut during planning because `is_fresh` never
+  compares check sets, so a `mark-pass` after a *targeted* run would stamp the marker a FULL run
+  would and let the next `verify`/`wrapup` skip the whole suite. What shipped was the consumer
+  alone — and both stages change files before reaching the read, so the fingerprint had always
+  moved and `check` returned 1 on essentially every call. `verify`, `wrapup` and the
+  `verify-before-completion` skill keep the cache; they hold both halves.
+- **Four of five `review_run close` recipes rendered without `--slug`/`--run-id`**, both
+  required, so the command exited 2 and the run never closed — on the three Grade-Gate
+  `CHANGES_REQUESTED` exits and the no-progress stop, i.e. the *ordinary* non-approving endings
+  of a review. The render gate could not see it: it matched the bare token `review_run close` and
+  never inspected the arguments.
+- **Step C3 instructed a close on an arm that is not terminal.** "Every arm below is
+  stage-terminal" covered the `confirm-1` arm, which enters a repair round and dispatches
+  confirm-2 — closing there releases the slug mid-pass while `<run-id>` is still the join key for
+  the lens-results tree, the ledger rows and the freeze refs.
+
+  Surface: claude +4309 characters, codex +4396, declared in `surface_allowance` and attributed
+  in `work-docs/BASELINE-DELTA-self-induced-regression-gate.md`.
 
 - **`/hm:execute` blocked with a symptom and no unblock path — the `stuck` agent was installed
   but never dispatched.** `stuck` names its own triggers in its body ("`/hm:execute` Phase A.5
