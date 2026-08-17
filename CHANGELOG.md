@@ -2,6 +2,53 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **`/hm:execute` blocked with a symptom and no unblock path — the `stuck` agent was installed
+  but never dispatched.** `stuck` names its own triggers in its body ("`/hm:execute` Phase A.5
+  retry exhaust", Phase D unfixable, ADR conflict) and every preset installs it, yet
+  `grep -r stuck templates/stages/` returned **zero**: no stage template ever dispatched it. So
+  the terminal halt at `execute.md.j2`'s blocker path surfaced the failure output alone, and the
+  agent written to name the binding constraint behind that output never ran. Observed 2026-08-17
+  on a Codex `/hm:execute` that exhausted the two-round Phase A.5 budget, reported two test
+  blockers, and stopped — leaving the user a defect list that a lens-level rewrite had already
+  failed twice to fix.
+
+  The blocker path is now four numbered steps that run **on the blocked path only**: document
+  the blocker, dispatch `stuck` (through the runtime-neutral macro, so both `Task(` and
+  `spawn_agent(` render), surface the failure output together with `stuck`'s returned note, and
+  neither change scope nor act on the recommendation — `stuck` is advisory and the user picks
+  the unblock path. If `stuck` errors or returns nothing, the failure output is surfaced alone
+  prefixed `[stuck] unavailable`; it is never withheld waiting on the escalation. The A.5
+  exhaustion sentence routes into that path instead of terminating on the merged lens verdict,
+  and says a blocked gate means Phase C is not entered.
+
+  Two review rounds found six defects in the first draft of that path, all now fixed and
+  all worth naming because each was invisible to the tests: (1) the brief ordered `stuck` to
+  **Write** the note and return its path, but its `tools:` grant is `Read, Grep, Glob` — on
+  Claude Code the write cannot execute, so the stage would have surfaced a path to a file that
+  was never created (`stuck_body.md.j2`'s own Step 5 had the same dead instruction, and nothing
+  in this repo has ever read `.claude/memory/escalations/`); (2) the dispatch block rendered
+  **outside** the conditional, so a run that exited Step 4 GREEN read an unqualified "Dispatch
+  each item below" imperative; (3) the only degrade clause was "Skip only if it dies", which on
+  Codex contradicts the join contract's own rule that a silent agent is not a failed one, so a
+  blocked run could wait indefinitely while holding back the output the user needs; (4) the
+  brief interpolates verbatim repo-controlled text (test stderr, ADR bodies) into a sub-agent
+  prompt with none of the untrusted-data framing every sibling dispatch uses; (5) the scope
+  qualifier pointed at `### Step 4`, which also spans the GREEN exit items; (6) `docs/HOW-IT-WORKS`
+  (both locales) still documented the removed file write, tree node included.
+
+  Gate: `tests/structural/test_stuck_dispatched_on_blocker.py` — the dispatch **site** inside
+  the blocker region and ahead of the surface step, across the three rendered documents that
+  carry that path. The order assertion reads on the dispatch site's own offset: its first draft
+  compared the *bullet* that promises a dispatch, and was green on a template whose fenced call
+  sat six lines below the surface instruction — the exact arrangement the gate exists to reject.
+  Two mutation receipts are filed and were run, not asserted (delete the dispatch line; move it
+  below the surface step). Baseline movement — `execute` **+1 741** chars and +1 round-trip,
+  aggregate +1 741 claude / +2 624 codex — is attributed in
+  `work-docs/BASELINE-DELTA-stuck-dispatch.md`, which also records that the ratchet's previous
+  base was already stale by 237 chars.
+
 ## [0.52.4] - 2026-08-17
 
 ### Fixed

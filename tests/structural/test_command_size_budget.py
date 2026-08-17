@@ -295,7 +295,30 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # not infer the counts": the round-5 brief in this very task stated `24 failed, 3 passed`
     # against a true 25/2 read off a progress string, and sent all three lenses hunting a test
     # that did not exist. Attributed in work-docs/BASELINE-DELTA-ai-review-exit-criteria.md.
-    "execute": 41222,
+    # 41459 → 43200 (stuck-dispatch, 2026-08-17). +1741.
+    # **The previous entry's 41222 was STALE by 237 chars** — measured, not inferred: stashing only
+    # this task's template edit and re-running the `flag_on` fixture renders 41459. That drift
+    # predates this change and is NOT attributed to it; folding it in would have reported +1737 for
+    # a +1516 insertion, which is the `attribution-doc-reports-the-wrong-movement` class this repo
+    # has already paid for twice. The band (`measured*1.02`) is wide enough that a stale base passes
+    # silently, so it can only be caught by measuring both endpoints — do that when you re-baseline.
+    #
+    # What the +1516 buys: the `stuck` agent has shipped in every preset since 0.1.0 naming
+    # `/hm:execute` Phase A.5 / Phase D / ADR conflict as its OWN triggers, while no stage template
+    # dispatched it — the blocker path halted with the failure output and the agent written to
+    # explain it never ran.
+    # Compaction FIRST, per the bar the entries above set: the first draft was +1630 of prose, cut
+    # to +1136 by moving the rationale into the delta document. The +605 above that is what two
+    # review rounds added back, and none of it is prose: the four-step ordering that makes
+    # the dispatch unreachable from the GREEN exit (it rendered unconditionally, so a clean run
+    # read an unqualified "dispatch" imperative), the `[stuck] unavailable` degrade — including
+    # its has-not-answered arm, since the Codex join contract forbids reading a missing reply as
+    # a failure, so the other conditions never fire on a hang — the untrusted-DATA clause on the
+    # verbatim stderr the brief interpolates, and the `no Write tool` correction — `stuck` has
+    # `tools: Read, Grep, Glob`, so the original brief ordered a file write that cannot execute and
+    # the stage surfaced a path to a file that was never created.
+    # Attributed in work-docs/BASELINE-DELTA-stuck-dispatch.md.
+    "execute": 43200,
     # 46008 → 47503 (validator-pass-cap-telemetry + its review round): the pass cap, the
     # corrected per-(agent,stage,slug,run-id) terminal invariant, the `coherence` pointer,
     # and the shell-quoting rules for the free-text `--reason`. Attributed in

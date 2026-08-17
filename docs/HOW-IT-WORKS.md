@@ -1695,7 +1695,7 @@ list (Write/Edit/Bash are granted without path restriction). See §11.16.
 2. Identify **single binding constraint** (not symptoms, but the root architectural/contract/time constraint)
 3. Propose 2–3 concrete resolution paths (each with trade-offs + related ADR/Interview number)
 4. Recommend the path most consistent with current decision context
-5. Save escalation note to `.claude/memory/escalations/escalation-{slug}-{date}.md`
+5. Return the escalation note as the agent's reply — `stuck` has no Write tool
 
 **Characteristic**: Does not fix problems directly — read-only advisor.
 **Model**: opus (complex reasoning required)
@@ -1973,10 +1973,8 @@ second_brain:
 ├── failures.md       ← Failure cases and solutions ([fail:] tags)
 ├── session/
 │   └── <date>.md     ← Compaction checkpoints (checkpoint:compaction entries)
-├── archive/
-│   └── failures-<YYYY>.md  ← evicted stale count:1 entries (0.47.0+; archived, never deleted)
-└── escalations/
-    └── escalation-{slug}-{date}.md  ← stuck agent escalation notes
+└── archive/
+    └── failures-<YYYY>.md  ← evicted stale count:1 entries (0.47.0+; archived, never deleted)
 ```
 
 - **wiki.md**: Patterns to reference in future similar tasks. Auto-appended by wrapup.
@@ -2700,7 +2698,7 @@ The `stuck` agent reads the full PLAN + SPEC + REVIEW + latest 3 reviewer output
 1. **Separate symptoms from root constraints** — not "tests are failing" but rather "ADR-002 prohibits this API format but SPEC S3 requires it" type of root constraint
 2. **Propose 2–3 resolution paths** — each with trade-offs and related ADR/Interview numbers
 3. **Recommend the preferred path** — the path most consistent with current decision context
-4. **Save escalation note** — `.claude/memory/escalations/escalation-{slug}-{date}.md`
+4. **Return the escalation note** — as the agent's reply; the stage surfaces it verbatim
 
 `stuck` is a **read-only advisor** — it does not directly modify code. The decision returns to the user.
 

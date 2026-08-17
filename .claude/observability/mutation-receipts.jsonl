@@ -22,3 +22,6 @@
 {"deletes": "src/harness_maker/synthesize.py:1055", "gate": "tests/structural/test_is_codex_matches_output_path.py::test_every_codex_destined_file_is_flagged_as_codex", "slug": null, "ts": "2026-08-16T11:32:02Z"}
 {"deletes": "src/harness_maker/synthesize.py:667", "gate": "tests/structural/test_retired_paths_not_taught.py::test_the_replacement_is_rendered", "slug": null, "ts": "2026-08-16T11:32:02Z"}
 {"deletes": "src/harness_maker/templates/agents/_partials/dispatch.md.j2:42", "gate": "tests/structural/test_no_claude_tool_calls_in_codex_output.py::test_no_claude_only_tool_reaches_codex_output", "slug": "codex-lens-dispatch", "ts": "2026-08-16T15:50:19Z"}
+{"deletes": "src/harness_maker/templates/stages/execute.md.j2:498", "gate": "tests/structural/test_stuck_dispatched_on_blocker.py::test_the_blocker_path_dispatches_stuck", "slug": "stuck-dispatch", "ts": "2026-08-17T05:57:24Z"}
+{"deletes": "src/harness_maker/templates/stages/execute.md.j2:495", "gate": "tests/structural/test_stuck_dispatched_on_blocker.py::test_stuck_is_dispatched_before_the_stage_surfaces", "slug": "stuck-dispatch", "ts": "2026-08-17T06:51:16Z"}
+{"deletes": "src/harness_maker/templates/stages/execute.md.j2:499", "gate": "tests/structural/test_stuck_dispatched_on_blocker.py::test_the_blocker_path_dispatches_stuck", "slug": "stuck-dispatch", "ts": "2026-08-17T06:51:16Z"}

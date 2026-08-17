@@ -1516,7 +1516,7 @@ Code 는 그런 블록을 있어도 조용히 무시한다 — 진짜 경계는 
 2. **단일 구속 제약** 식별 (증상이 아닌 근본 아키텍처/계약/시간 제약)
 3. 2-3개 구체적 해결 경로 제안 (각각 trade-off + 관련 ADR/Interview 번호)
 4. 우선 결정과 가장 일관된 경로 권장
-5. 에스컬레이션 노트를 `.claude/memory/escalations/escalation-{slug}-{date}.md` 에 저장
+5. 에스컬레이션 노트를 에이전트 응답으로 반환 — `stuck` 에는 Write 도구가 없음
 
 **특징**: 문제를 직접 고치지 않음 — 읽기 전용 조언자.
 **모델**: opus (복잡한 추론 필요)
@@ -1764,10 +1764,8 @@ ref_folders:
 .claude/memory/
 ├── wiki.md           ← 재사용 가능한 패턴, 관례, 교훈
 ├── failures.md       ← 실패 사례와 해결책 ([fail:] 태그)
-├── session/
-│   └── <date>.md     ← compaction 체크포인트 (checkpoint:compaction 항목)
-└── escalations/
-    └── escalation-{slug}-{date}.md  ← stuck 에이전트 에스컬레이션 노트
+└── session/
+    └── <date>.md     ← compaction 체크포인트 (checkpoint:compaction 항목)
 ```
 
 - **wiki.md**: 나중에 비슷한 작업 시 참조할 패턴. wrapup 이 자동 추가.
@@ -2440,7 +2438,7 @@ PLAN 저장 전, "Accept?", "OK?", "Verify?", "Should we?" 같은 표현을 스�
 1. **증상 vs 근본 제약 분리** — "테스트가 실패한다" 가 아니라 "ADR-002 가 이 API 형식을 금지하는데 SPEC S3 이 그 형식을 요구한다" 같은 근본 제약을 찾는다
 2. **2-3개 해결 경로 제안** — 각각의 trade-off 와 관련 ADR/Interview 번호 포함
 3. **우선 경로 권장** — 현재 결정 맥락과 가장 일관된 경로를 권장
-4. **에스컬레이션 노트 저장** — `.claude/memory/escalations/escalation-{slug}-{date}.md`
+4. **에스컬레이션 노트 반환** — 에이전트 응답으로; 스테이지가 그대로 surface
 
 `stuck` 은 **읽기 전용 조언자** — 직접 코드를 수정하지 않는다. 결정은 사용자에게 돌아간다.
 

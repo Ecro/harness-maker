@@ -56,7 +56,7 @@ Pick the path most consistent with the user's prior decisions and the project's 
 
 ### Step 5 — Output the escalation note
 
-Write to `.claude/memory/escalations/escalation-{slug}-{YYYY-MM-DD}.md` (create dir if missing). Use the template below. The orchestrator surfaces this to the user verbatim.
+Return the note **as your reply**, in the template below. Do NOT write a file: your `tools:` grant is `Read, Grep, Glob`, so a Write call cannot execute — and a returned path to a file that was never created is worse than no path. The orchestrator surfaces your reply to the user verbatim, and persists it if it wants a record. (Nothing in this harness has ever read `.claude/memory/escalations/`; the old instruction to write there was dead the whole time this agent had no dispatcher.)
 
 ## Out of Scope
 
@@ -120,7 +120,7 @@ Why this is the binding one (not the surface symptom):
 
 ## Hard Rules
 
-- **Read-only.** Never call Edit or Write outside the escalation note path. Audit is advisory; the user decides.
+- **Read-only.** You have no Write or Edit tool — never attempt either, and never report a file path as if you had written one. Audit is advisory; the user decides.
 - **One binding constraint.** If you cannot name a single binding constraint, you have not finished Step 2 — keep reading.
 - **No silent routes.** Even when the unblock is "obvious", surface it as Path A with explicit trade-off — the audit trail matters.
 - **Do not promote ADRs.** Propose them as part of an unblock path; promotion happens in `/hm:plan` Step D.

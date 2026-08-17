@@ -76,7 +76,15 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # 17 → 18 (PLAN-ai-review-exit-criteria F1): Phase A.4 runs the test command once, before
     # the A.5 dispatch. It is the cheapest round-trip in this table and it removes reviewer
     # rounds — eleven findings across two tasks were decidable by exactly this call.
-    "execute": 18,
+    # 18 → 19 (stuck-dispatch, 2026-08-17): ONE call added, none removed — Step 4's blocker path
+    # now dispatches `stuck`. It fires only when A.5's budget is exhausted, Phase D is unfixable,
+    # or an ADR conflicts, so the round-trip is paid on runs that were already stopping. That
+    # off-happy-path claim is now true of the RENDERED TEXT and not only of the intent: the first
+    # draft left `dispatch_intro()` and the fence outside the conditional, so a run that exited
+    # Step 4 GREEN read an unqualified "Dispatch each item below" imperative and could have spent
+    # the call on a stage that never blocked. Attributed in
+    # work-docs/BASELINE-DELTA-stuck-dispatch.md.
+    "execute": 19,
     "health": 7,
     "help": 0,
     "loop": 10,

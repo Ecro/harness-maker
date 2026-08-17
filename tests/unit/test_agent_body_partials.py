@@ -156,7 +156,16 @@ _EXPECTED_SHA256: dict[str, str] = {
     # heuristic also silently changed meaning: three outputs are now ONE round, not three, so the
     # brief says to read across rounds when history is needed. Found by review, out of the diff.
     # Body change outside the codex conditional. Pre-bump hash in git history.
-    "stuck": "8b215345161581a4eb138a48ae5604d9381e50bad4c40504e57b4e7a3cfe2864",
+    # stuck re-pinned 2026-08-17 (stuck-dispatch). Step 5 told this agent to WRITE the escalation
+    # note to `.claude/memory/escalations/…` and its Hard Rules referenced "the escalation note
+    # path" — but its `tools:` grant is `Read, Grep, Glob`, so the write could never execute on
+    # Claude Code, and nothing in this repo has ever read that directory. The instruction was
+    # inert for as long as no stage dispatched this agent; wiring `/hm:execute`'s blocker path to
+    # it made the contradiction load-bearing, because the stage was then told to surface a note
+    # PATH that could not exist. Step 5 now returns the note inline. Found by four review lenses
+    # independently, none of which was looking at this file. Body change outside the codex
+    # conditional. Pre-bump hash in git history.
+    "stuck": "2ed15a8cdadeb5b8d6d61b84ba0855b314d786c352618228a4f63984d0c1a4b7",
     # test-reviewer re-pinned 2026-08-10 (PLAN-multi-lens-review-round, review round 2). Two
     # rules changed, both because Phase A.5 now runs three lens-scoped instances of this agent:
     # (a) `passing_tests[]` was declared FROZEN, which conflicted with the caller's merge rule —
