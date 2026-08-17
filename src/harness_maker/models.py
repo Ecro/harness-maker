@@ -1359,9 +1359,9 @@ class InterviewAnswers(BaseModel):
     max_review_rounds: int = 3
     # Repair-round re-review gate (PLAN-review-loop-empirics ADR-004). Absent key in an
     # older harness.yaml resolves to these same defaults via review_churn — the gate is
-    # on and the threshold is 0.20 — so a re-render never silently disables it.
+    # on and the threshold is 0.30 — so a re-render never silently disables it.
     rereview_churn_gate: bool = True
-    rereview_churn_ratio: float = 0.20
+    rereview_churn_ratio: float = 0.30
     caching: str = "agent-aware"
     # Shell commands run as mechanical pre-check in /hm:review before LLM reviewers.
     # User adds to harness.yaml manually (no interview question). Empty list = feature off.

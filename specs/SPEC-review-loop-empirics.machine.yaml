@@ -474,9 +474,9 @@ ac:
   golden_table:
   - input:
       config: absent
-    expected: 0.2
+    expected: 0.3
     edge: false
-    note: ''
+    note: 'default raised 0.20 -> 0.30 on 2026-08-17; see DEFAULT_CHURN_RATIO'
   - input:
       config: '0.35'
     expected: 0.35

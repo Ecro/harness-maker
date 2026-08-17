@@ -88,7 +88,7 @@ reviewers:
   # round skips its re-review and records the measured ratio as the reason.
   # Set the gate false to restore the pre-gate behaviour in one line.
   rereview_churn_gate: true
-  rereview_churn_ratio: 0.2
+  rereview_churn_ratio: 0.3
 
   installed:
     - code-reviewer

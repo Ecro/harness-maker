@@ -15,13 +15,19 @@ from typing import Any
 
 from harness_maker import command_registry, freeze
 
-DEFAULT_CHURN_RATIO = 0.20
+DEFAULT_CHURN_RATIO = 0.30
 """Fraction of a touched file's LOC above which a repair round re-reviews.
 
-0.20 comes from the source experiment, whose subject was a 156-line Python
-module in another codebase — hence the config key. It is a starting point to be
-recalibrated from the ratios the loop records, not a measured property of this
-project (PLAN risk R3).
+Was 0.20, from the source experiment on a 156-line Python module in another
+codebase. That value was always meant to be recalibrated from the ratios the
+loop records — and on 2026-08-17 an audit of four repositories found the loop
+records **none**: `churn_ratio` is a declared `ReviewTelemetryRecord` field that
+only a prose instruction ever populated, and all 123 rows have it absent. So
+0.30 is NOT the recalibration this docstring asked for; it is a second estimate,
+raised because the yield data that *does* exist argues for fewer repair rounds —
+of 22 multi-round slugs, 16 (73%) got zero consensus findings out of every round
+after the first. Wiring the four `churn_*` keys to a producer that cannot skip
+them is the prerequisite for ever setting this number from evidence.
 """
 
 

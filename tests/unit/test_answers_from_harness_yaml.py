@@ -570,7 +570,7 @@ def test_legacy_yaml_without_churn_keys_uses_defaults(tmp_path: Path) -> None:
     answers = answers_from_harness_yaml(target)
     assert answers is not None
     assert answers.rereview_churn_gate is True
-    assert answers.rereview_churn_ratio == 0.20
+    assert answers.rereview_churn_ratio == 0.30
 
 
 def test_malformed_churn_values_warn_and_fall_back_rather_than_dropping_silently(
@@ -594,7 +594,7 @@ def test_malformed_churn_values_warn_and_fall_back_rather_than_dropping_silently
         answers = answers_from_harness_yaml(target)
     assert answers is not None
     assert answers.rereview_churn_gate is True
-    assert answers.rereview_churn_ratio == 0.20
+    assert answers.rereview_churn_ratio == 0.30
     warnings = " ".join(r.getMessage() for r in caplog.records)
     assert "rereview_churn_gate" in warnings
     assert "rereview_churn_ratio" in warnings
