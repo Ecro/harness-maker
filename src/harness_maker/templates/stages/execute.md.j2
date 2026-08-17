@@ -12,7 +12,7 @@
 
 ## Purpose
 
-Apply the PLAN's phases to the codebase. When `tdd_active`, tests are written from SPEC's In-Scope Scenarios first, the implementation follows, and each PLAN phase exits only when its exit-criterion command is GREEN. Use `test_dep_map.build_test_hints()` to identify which tests are affected by each changed file — run only those tests during Phase D instead of the full suite on every edit.
+Apply the PLAN's phases to the codebase. When `tdd_active`, tests are written from SPEC's In-Scope Scenarios first, the implementation follows, and each PLAN phase exits only when its exit-criterion command is GREEN. Phase D selects tests per changed file rather than running the whole suite on every edit.
 
 ## Usage
 
@@ -394,7 +394,11 @@ Type-check once per FILE, when you finish that file — not after each edit. Inc
 
 #### Phase D — Post-GREEN verification
 
-Select what to run, then run it as ONE call. `mode: full` → run everything and echo `reason` verbatim (fires when no test maps to a changed file, and for `pyproject.toml` / `uv.lock` / CI workflows / `harness.yaml` — selecting zero tests there would be weaker than today); `mode: targeted` → pass `node_ids`. `&&` short-circuits, so one call still surfaces the first failure:
+Select what to run, then run it as ONE call. `mode: full` → run everything, echo `reason`
+verbatim (no test maps to a changed file, or `pyproject.toml` / `uv.lock` / CI workflows /
+`harness.yaml`, where selecting zero would be weaker); `mode: targeted` → pass `node_ids`.
+`&&` short-circuits, so one call surfaces the first failure. **A repair re-runs targeted on
+the files IT touched; `full` once, at phase exit** — the triggers read the *phase's* set.
 
 {% if is_codex %}
 ```
