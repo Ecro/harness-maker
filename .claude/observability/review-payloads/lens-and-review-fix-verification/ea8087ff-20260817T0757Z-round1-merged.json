@@ -1,0 +1,302 @@
+{
+ "findings": [
+  {
+   "id": "F1",
+   "severity": "P1",
+   "file": "tests/conftest.py",
+   "line": 96,
+   "summary": "Redirect compares an UNRESOLVED project_root, so a relative or symlinked root escapes to the real ledger. invoke()'s documented except path sets root=Path('.') and emit resolves it to cwd.",
+   "voices": [
+    {
+     "source": "robustness",
+     "kind": "lens"
+    },
+    {
+     "source": "functionality",
+     "kind": "lens"
+    },
+    {
+     "source": "concurrency",
+     "kind": "lens"
+    },
+    {
+     "source": "security",
+     "kind": "lens"
+    },
+    {
+     "source": "codex",
+     "kind": "cross-model"
+    },
+    {
+     "source": "antigravity",
+     "kind": "cross-model"
+    }
+   ],
+   "disposition": "accepted"
+  },
+  {
+   "id": "F2",
+   "severity": "P1",
+   "file": "tests/conftest.py",
+   "line": 83,
+   "summary": "live_env silently doubles as an AC-001 opt-out; pyproject registers it as an env-pin opt-out only, and the bypass scan cannot see markers.",
+   "voices": [
+    {
+     "source": "consistency",
+     "kind": "lens"
+    },
+    {
+     "source": "design",
+     "kind": "lens"
+    },
+    {
+     "source": "concurrency",
+     "kind": "lens"
+    },
+    {
+     "source": "tests",
+     "kind": "lens"
+    }
+   ],
+   "disposition": "accepted"
+  },
+  {
+   "id": "F3",
+   "severity": "P1",
+   "file": "tests/conftest.py",
+   "line": 101,
+   "summary": "from harness_maker.codex_ledger import emit binds the real function at import time and is immune to the module-attribute patch; test_second_opinion_ledger.py already uses that idiom.",
+   "voices": [
+    {
+     "source": "functionality",
+     "kind": "lens"
+    },
+    {
+     "source": "concurrency",
+     "kind": "lens"
+    }
+   ],
+   "disposition": "accepted"
+  },
+  {
+   "id": "F4",
+   "severity": "P1",
+   "file": ".claude/observability/.ledger-exclusions.json",
+   "line": 0,
+   "summary": "The mechanism ships unconfigured: the base file is still the legacy map, so 144 slug:'s' + 6 canary rows still enter every aggregate. Phase 1 exit conjunct 2 is unmet on disk.",
+   "voices": [
+    {
+     "source": "design",
+     "kind": "lens"
+    },
+    {
+     "source": "functionality",
+     "kind": "lens"
+    }
+   ],
+   "disposition": "accepted"
+  },
+  {
+   "id": "F5",
+   "severity": "P1",
+   "file": "src/harness_maker/verifier_discrimination.py",
+   "line": 56,
+   "summary": "Dead duplicate EXCLUSIONS_FILE whose comment still documents the retired run-id-map schema, and SPEC + PLAN both route readers to it as the only exclusion reader.",
+   "voices": [
+    {
+     "source": "consistency",
+     "kind": "lens"
+    },
+    {
+     "source": "design",
+     "kind": "lens"
+    }
+   ],
+   "disposition": "accepted"
+  },
+  {
+   "id": "F6",
+   "severity": "P1",
+   "file": "src/harness_maker/verifier_discrimination.py",
+   "line": 439,
+   "summary": "report now filters rows for the first time on this ledger and discloses nothing in its payload; an over-broad entry empties it and is reported as 'no rows \u2014 absence of evidence'.",
+   "voices": [
+    {
+     "source": "security",
+     "kind": "lens"
+    },
+    {
+     "source": "robustness",
+     "kind": "lens"
+    },
+    {
+     "source": "concurrency",
+     "kind": "lens"
+    }
+   ],
+   "disposition": "accepted"
+  },
+  {
+   "id": "F7",
+   "severity": "P1",
+   "file": "src/harness_maker/ledger_exclusions.py",
+   "line": 78,
+   "summary": "load accepts an entry with no value: missing becomes '' and null becomes the literal 'None', producing an inert predicate with no warning while the neighbouring key check shouts.",
+   "voices": [
+    {
+     "source": "functionality",
+     "kind": "lens"
+    },
+    {
+     "source": "robustness",
+     "kind": "lens"
+    },
+    {
+     "source": "codex",
+     "kind": "cross-model"
+    },
+    {
+     "source": "antigravity",
+     "kind": "cross-model"
+    }
+   ],
+   "disposition": "accepted"
+  },
+  {
+   "id": "F8",
+   "severity": "P1",
+   "file": "src/harness_maker/verifier_discrimination.py",
+   "line": 252,
+   "summary": "excluded_run_ids drops the key and collapses same-value entries, so the sole published audit trail under-reports both the breadth and the count of what was suppressed.",
+   "voices": [
+    {
+     "source": "security",
+     "kind": "lens"
+    },
+    {
+     "source": "consistency",
+     "kind": "lens"
+    },
+    {
+     "source": "codex",
+     "kind": "cross-model"
+    },
+    {
+     "source": "antigravity",
+     "kind": "cross-model"
+    }
+   ],
+   "disposition": "accepted"
+  },
+  {
+   "id": "F9",
+   "severity": "P1",
+   "file": "tests/unit/test_ledger_exclusions_call_sites.py",
+   "line": 269,
+   "summary": "Predicate delegation is asserted at 2 of 3 call sites; marginal_gain can keep a private predicate and pass the whole set.",
+   "voices": [
+    {
+     "source": "tests",
+     "kind": "lens"
+    }
+   ],
+   "disposition": "accepted"
+  },
+  {
+   "id": "F10",
+   "severity": "P1",
+   "file": "tests/unit/test_ledger_isolation.py",
+   "line": 118,
+   "summary": "The invoke canary's status assertion depends on the base repo's harness.yaml, which no fixture pins \u2014 an unrelated config edit turns it red.",
+   "voices": [
+    {
+     "source": "tests",
+     "kind": "lens"
+    }
+   ],
+   "disposition": "accepted"
+  },
+  {
+   "id": "F11",
+   "severity": "P2",
+   "file": "tests/unit/test_ledger_isolation.py",
+   "line": 270,
+   "summary": "_restores_the_real_emit has no positive control; assert not offenders is true both when nothing bypasses and when the detector is dead.",
+   "voices": [
+    {
+     "source": "tests",
+     "kind": "lens"
+    }
+   ],
+   "disposition": "accepted"
+  },
+  {
+   "id": "F12",
+   "severity": "P2",
+   "file": "tests/unit/test_ledger_exclusions.py",
+   "line": 49,
+   "summary": "load treats every JSON object as a legacy map, so a new-schema file written as one object is silently mis-read; untested.",
+   "voices": [
+    {
+     "source": "tests",
+     "kind": "lens"
+    }
+   ],
+   "disposition": "accepted"
+  },
+  {
+   "id": "F13",
+   "severity": "P2",
+   "file": "tests/conftest.py",
+   "line": 91,
+   "summary": "The redirect forwards **kw untouched, so an absolute observability_dir with a substituted project_root trips emit's containment guard inside an autouse fixture.",
+   "voices": [
+    {
+     "source": "design",
+     "kind": "lens"
+    },
+    {
+     "source": "codex",
+     "kind": "cross-model"
+    },
+    {
+     "source": "antigravity",
+     "kind": "cross-model"
+    }
+   ],
+   "disposition": "accepted"
+  },
+  {
+   "id": "F14",
+   "severity": "P2",
+   "file": "tests/conftest.py",
+   "line": 33,
+   "summary": "The _TESTS_ROOT comment states an 'only when' predicate that omits the None arm, and says 'lands inside this checkout' where the code means 'contains the tests tree'.",
+   "voices": [
+    {
+     "source": "consistency",
+     "kind": "lens"
+    },
+    {
+     "source": "tests",
+     "kind": "lens"
+    }
+   ],
+   "disposition": "accepted"
+  },
+  {
+   "id": "F15",
+   "severity": "P2",
+   "file": "tests/unit/test_ledger_exclusions.py",
+   "line": 139,
+   "summary": "The loud branches of load (non-dict entry, top-level scalar) have no test.",
+   "voices": [
+    {
+     "source": "functionality",
+     "kind": "lens"
+    }
+   ],
+   "disposition": "accepted"
+  }
+ ]
+}
