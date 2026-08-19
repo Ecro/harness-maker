@@ -22,7 +22,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 
-from harness_maker import command_registry
+from harness_maker import command_registry, round_record
 from harness_maker.codex_ledger import DISPOSITION_VALUES
 
 Tag = Literal["consensus-passed", "weak-consensus", "manual-only"]
@@ -350,6 +350,35 @@ def grade_from_findings(findings: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def disposition_counts(findings: list[dict[str, Any]]) -> dict[str, int]:
+    """Step 4e's four counts, for the telemetry row — the gate's only trace on disk.
+
+    Computed here rather than tallied by the caller for the reason `finalize` exists at all:
+    a number the model transcribes is a number the model can get wrong, and this one is the
+    input to the rejection rate ADR-002 is judged by. `counts` beside it is SEVERITY, so a
+    caller reaching for "the counts" would silently emit P0..P3 under a disposition key.
+
+    **Counted AFTER normalisation and AC verification, which is the only honest point.** These
+    are the dispositions the grade was computed from, not the ones the model proposed: an absent
+    or unrecordable disposition is already `unresolved`/`no-contract` by then, and so is a
+    `rejected` whose AC citation no machine SPEC could verify. The consequence is load-bearing
+    for anyone reading a rate off these rows — **on a harness with no machine SPEC no rejection
+    survives, so the rejected count is ~0 by construction, not by behaviour.** That is the
+    documented cost of the solo-lens vote in the SPEC-less case. Segment by harness before
+    comparing, or the two populations average into a number describing neither.
+
+    Off-vocabulary values are counted **nowhere** and are not an error here: `build_round_record`
+    already reports a missing or unrecordable disposition, and `ReviewTelemetryRecord` rejects an
+    unknown key outright. Silently folding one into `unresolved` would launder it into the rate.
+    """
+    counts = dict.fromkeys(sorted(DISPOSITIONS), 0)
+    for raw in findings:
+        disposition = raw.get("disposition")
+        if isinstance(disposition, str) and disposition in counts:
+            counts[disposition] += 1
+    return counts
+
+
 # ── Re-review decision (ADR-004/005; wired by Phase 6) ───────────────────────
 
 
@@ -590,6 +619,7 @@ def finalize(findings: list[dict[str, Any]], known: frozenset[str] | None = None
         "findings": record.findings,
         "grade": graded["grade"],
         "counts": graded["counts"],
+        "disposition_counts": disposition_counts(record.findings),
         "human_review_needed": graded["human_review_needed"],
         "errors": record.errors + ac_errors + list(graded["errors"]),
     }
@@ -617,6 +647,12 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--churn-ratio", type=float, dest="churn_ratio")
     parser.add_argument("--threshold", type=float)
+    # The producer half of `round_record`: given both, `finalize` records its own counts where
+    # `review_telemetry emit` will read them, so the number never passes through the model.
+    # Optional so every existing caller keeps working — the template supplies them, and `emit`
+    # says loudly which producer never ran when they are missing.
+    parser.add_argument("--slug")
+    parser.add_argument("--round", type=int, dest="round_n")
     try:
         opts = parser.parse_args([verb, *rest])
     except SystemExit:
@@ -640,6 +676,19 @@ def main(argv: list[str] | None = None) -> int:
             known, spec_errors = _known_ac_ids(opts.spec)
             payload = finalize(_load(opts.file), known)
             payload["errors"] = spec_errors + list(payload["errors"])
+            if opts.slug and opts.round_n:
+                # Best effort, and deliberately not fatal: a scratch file that cannot be
+                # written must not fail a review whose grade is already computed. `emit`
+                # reports the resulting absence.
+                try:
+                    round_record.merge(
+                        Path("."),
+                        opts.slug,
+                        opts.round_n,
+                        {"disposition_counts": payload["disposition_counts"]},
+                    )
+                except (OSError, ValueError) as exc:
+                    sys.stderr.write(f"[consensus] round record not written: {exc}\n")
     except (ConsensusError, OSError, ValueError) as exc:
         sys.stderr.write(f"review_consensus: {exc}\n")
         return 2

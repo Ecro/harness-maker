@@ -24,8 +24,14 @@ harness-maker writes four kinds of JSONL files under your project's `.claude/obs
         ├── adaptive/
         │   └── overrides.jsonl
         ├── review-2026-05-19.jsonl
+        ├── .hm-round/<slug>-r<N>.json     # scratch; measured values awaiting the row below
         └── silent-intent-miss-<slug>.jsonl
 ```
+
+`.hm-round/` holds one small scratch file per review round so a measured value reaches the
+`review-*.jsonl` row from the command that computed it rather than from the model retyping it.
+It carries **only** the `ReviewTelemetryRecord` fields documented below — the same counts and
+the one repo-relative path, never finding text — and it is overwritten by the next round.
 
 All paths are inside your project root (or `CLAUDE_PROJECT_DIR` / `CURSOR_PROJECT_DIR` if set). The telemetry hook resolves the project directory via an env-var-first chain documented in [`telemetry.py`](src/harness_maker/telemetry.py) lines 194–204 and explicitly rejects the bare stdin `cwd` field (which was a path-traversal primitive prior to 0.7.1).
 
@@ -114,6 +120,7 @@ Measure C (PLAN-review-round-inflation). These four are `null` rather than `0` w
 | `churn_max_path` | str \| null | Repo-**relative** path of the file that ratio came from — a path, never file content. Stays on disk with the rest of the row |
 | `churn_measured_n` | int \| null | How many touched files contributed to the ratio |
 | `churn_excluded_n` | int \| null | How many were excluded (binary, deleted, empty post-tree) |
+| `disposition_counts` | dict[str, int] \| null | How many findings this round landed on each of the four dispositions (`accepted`, `rejected`, `duplicate`, `unresolved`). **Counts keyed by a closed vocabulary — never a finding, a file path, a summary or an authority citation.** `{}` = a round with no findings; `null` = a harness version that predates the field |
 
 <!-- @hm:/privacy:review-telemetry-measure-c -->
 

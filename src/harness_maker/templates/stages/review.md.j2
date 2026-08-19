@@ -513,9 +513,9 @@ plus `reasoning_diverges: true` when Step 4b found matching OBSERVE with divergi
 the `disposition`/`authority` that Step 4e describes. Write the array to a temp path, then:
 
 {% if is_codex %}```bash
-Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_consensus finalize --file <the literal temp path>{% if config.dev_mode == 'spec-driven' %} --spec {{ config.spec.dir }}SPEC-{slug}.machine.yaml{% endif %}")
+Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_consensus finalize --file <the literal temp path> --slug {slug} --round <N>{% if config.dev_mode == 'spec-driven' %} --spec {{ config.spec.dir }}SPEC-{slug}.machine.yaml{% endif %}")
 ```{% else %}```bash
-!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_consensus finalize --file <the literal temp path>{% if config.dev_mode == 'spec-driven' %} --spec {{ config.spec.dir }}SPEC-{slug}.machine.yaml{% endif %}
+!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_consensus finalize --file <the literal temp path> --slug {slug} --round <N>{% if config.dev_mode == 'spec-driven' %} --spec {{ config.spec.dir }}SPEC-{slug}.machine.yaml{% endif %}
 ```{% endif %}
 
 It **reads only** and prints one payload: `{"findings": [...with `tag`...], "grade": …,
@@ -789,9 +789,16 @@ Per iteration:
 2. **Group.** On a §5 trigger fire, emit its per-group block and make ONE consolidated edit.
 
 3. **Select fixable findings** — only:
-   - Severity P0, P1, or P2 (skip P3 unless current grade is D or F).
+   - Severity **P0 or P1**. P2 and P3 only when the current grade is D or F.
    - Tag = `consensus-passed`.
    - Has a concrete `suggestion` with replacement code (skip vague advice).
+
+   > **P2 was in this queue and bought nothing the gate can read.** P2/P3 cannot move the
+   > grade, so every P2 fixed was churn against a blind gate — and an adjudicated set of this
+   > shape ran 31% real against 69% naming, comments and structure: accurate, mostly not worth
+   > a round trip. The `consistency` lens is what made that volume reachable. They are **not
+   > dropped** — Step 4e dispositions every finding on every path, so a skipped P2 sits in the
+   > report for a human sweep. D/F keeps the old breadth, where it earns the round trip.
 
 3b. **Pin the pre-fix endpoint** — before this round's first `Edit`, never after:
 
@@ -823,15 +830,26 @@ Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_pat
 
    On failure: identify the last fix that touched the failing file → **revert** it (restore original snippet) and log `Fix #{N} reverted — caused build failure`. Continue with remaining fixes (do not abort the round).
 
+   > **First read the failing assertion's setup and ask whether production can reach that
+   > state** — is the call it skips unconditional upstream, is the init it re-runs once-only.
+   > **Revert either way**; the answer changes the record, not the action. If the state is
+   > unreachable the fix broke no behaviour, so `caused build failure` is a false diagnosis of
+   > a test that over-specifies: log `reverted — test pins unreachable state: <upstream fact>`
+   > and carry one `manual-only` P1 `spec_gap`, as an oscillation is carried. Never grade-
+   > lowering, never authority to edit the test. Measured: four runs broke the same four
+   > tests, "AI fixes cause regressions, 4/4 reproduced" was one step from publication, and
+   > the code was never broken — the finding behind it was later adjudicated a false positive.
+
 5b. **Measure this round's churn** — after Step 5's reverts, so a reverted fix does not count:
 
 {% if is_codex %}```bash
-Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_churn pin --slug {slug} --label r{N}-post && uv run --with {{ harness_maker_src_path }} hm review_churn measure --pre refs/hm-churn/v1/{slug}-r{N}-pre --post refs/hm-churn/v1/{slug}-r{N}-post")
+Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_churn pin --slug {slug} --label r{N}-post && uv run --with {{ harness_maker_src_path }} hm review_churn measure --slug {slug} --round {N} --pre refs/hm-churn/v1/{slug}-r{N}-pre --post refs/hm-churn/v1/{slug}-r{N}-post")
 ```{% else %}```bash
-!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_churn pin --slug {slug} --label r{N}-post && uv run --with {{ harness_maker_src_path }} hm review_churn measure --pre refs/hm-churn/v1/{slug}-r{N}-pre --post refs/hm-churn/v1/{slug}-r{N}-post
+!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_churn pin --slug {slug} --label r{N}-post && uv run --with {{ harness_maker_src_path }} hm review_churn measure --slug {slug} --round {N} --pre refs/hm-churn/v1/{slug}-r{N}-pre --post refs/hm-churn/v1/{slug}-r{N}-post
 ```{% endif %}
 
-   Carry the four `churn_*` keys verbatim into the iteration record and the telemetry row.
+   `--slug`/`--round` file the four `churn_*` keys where the emit reads them, so carry them
+   into the **iteration record** only, never into the row.
    A null `churn_ratio` beside `churn_measured_n: 0` means no file was measurable (all
    binary/deleted), which is a different fact from a round that changed nothing — and Step 6
    treats the two differently.{% if not config.reviewers.get("rereview_churn_gate", True) %}
@@ -1118,7 +1136,12 @@ uv run --with {{ harness_maker_src_path }} hm review_telemetry emit --file <the 
 
 Record fields:
 `{ts, slug, round, pass1_n, verifier_kept_n, verifier_dropped_n, verifier_false_drop_n, verifier_false_keep_n, fixture_label, pass2_kept_n, consensus_passed_n, wall_time_ms, build_break_count, auto_fix_reverted_n, fallback, terminal, unreviewed_fix_count, regression_attributed_n, attribution_unknown_n, lenses_exercised,
-confirm_pass_ran, confirm_pass_new_severe_n}`.
+confirm_pass_ran, confirm_pass_new_severe_n, disposition_counts}`.
+
+**Leave `disposition_counts` and every `churn_*` key OUT of the row you write.** They come from
+the producers keyed by the `--slug`/`--round` you already passed Step 4d's `finalize` and Step
+5b's `measure`; a value you supply is discarded with a warning. If `emit` reports no producer
+record, one of those two ran without its flags — fix that, never fill the numbers in by hand.
 
 `lenses_exercised` is the coverage CLI's `exercised` array for this round — `[]` when every
 dispatch failed, never null (null means a pre-change row). `confirm_pass_ran` is required

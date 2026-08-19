@@ -26,7 +26,8 @@ from pydantic import (
     model_validator,
 )
 
-from harness_maker import command_registry
+from harness_maker import command_registry, round_record
+from harness_maker.codex_ledger import DISPOSITION_VALUES
 from harness_maker.conditional_router import KNOWN_LENSES
 
 # Default location relative to project root — overridable via parameter.
@@ -108,6 +109,41 @@ class ReviewTelemetryRecord(BaseModel):
     churn_max_path: str | None = Field(default=None, max_length=400)
     churn_measured_n: int | None = Field(default=None, ge=0)
     churn_excluded_n: int | None = Field(default=None, ge=0)
+
+    # ── disposition record (Step 4e's only machine-readable trace) ───────────
+    # `finalize` returns dispositions on stdout and writes nothing; the ledger's
+    # per-finding disposition rows are a closed enum of second-opinion vendors, so
+    # a reviewer-lens disposition had no value that would name it and its only
+    # record was REVIEW prose. That made the rejection rate — the number ADR-002
+    # exists to move — unanswerable from disk. This is the counts, not the findings:
+    # the per-finding record stays the round record.
+    #
+    # Null is the version discriminator, `{}` is a measured empty. A round that
+    # produced no findings writes `{}`; a row from before this field writes null.
+    # Defaulting to `{}` would erase that distinction into an append-only row.
+    disposition_counts: dict[str, int] | None = None
+
+    @field_validator("disposition_counts")
+    @classmethod
+    def _dispositions_are_known(cls, value: dict[str, int] | None) -> dict[str, int] | None:
+        """Off-vocabulary keys are what this field exists to make countable.
+
+        The disposition enum already shipped once with `fixed` / `accepted-not-fixed` /
+        `deferred` / `out-of-scope` reaching disk, and nothing rejected them. A rate computed
+        over a mixed vocabulary is not a rate. Reuses `codex_ledger.DISPOSITION_VALUES` rather
+        than restating the four values — a second list is how the two drift apart.
+        """
+        if value is None:
+            return value
+        unknown = sorted(k for k in value if k not in DISPOSITION_VALUES)
+        if unknown:
+            msg = f"disposition_counts contains unknown disposition(s): {unknown}"
+            raise ValueError(msg)
+        negative = sorted(k for k, n in value.items() if n < 0)
+        if negative:
+            msg = f"disposition_counts has negative count(s): {negative}"
+            raise ValueError(msg)
+        return value
 
     @field_validator("lenses_exercised")
     @classmethod
@@ -303,6 +339,43 @@ def record_from_dict(
 # ── CLI ──────────────────────────────────────────────────────────────────────
 
 
+def _take_measured_from_producers(data: dict[str, Any], *, root: Path) -> dict[str, Any]:
+    """Measured fields come from the round record and from nowhere else.
+
+    Stripping rather than defaulting is the point. A model-supplied value is DISCARDED even
+    when the record has nothing, because the alternative — accept it when the record is empty
+    — is exactly the arrangement that produced 0/69 populated rows: the field stays optional
+    to whoever assembles the row, and an optional field does not get written. Here its
+    presence or absence is decided by whether the producer ran.
+
+    Both anomalies are reported to stderr and neither is fatal: a review must not fail over
+    telemetry, and a row with a null measure is honest. `slug`/`round` are required fields, so
+    a row missing them is already a schema error and is left for the validator to report.
+    """
+    slug, round_n = data.get("slug"), data.get("round")
+    if not isinstance(slug, str) or not isinstance(round_n, int) or isinstance(round_n, bool):
+        return data
+
+    out = {k: v for k, v in data.items() if k not in round_record.MEASURED_KEYS}
+    supplied = {k: v for k, v in data.items() if k in round_record.MEASURED_KEYS}
+    measured = round_record.read(root, slug, round_n)
+    out.update(measured)
+
+    drifted = sorted(k for k, v in supplied.items() if measured.get(k) != v)
+    if drifted:
+        sys.stderr.write(
+            f"[telemetry] discarded transcribed value(s) {drifted} — the producer's own "
+            "record is authoritative\n"
+        )
+    if not measured:
+        sys.stderr.write(
+            f"[telemetry] round {round_n} of {slug!r} has no producer record: every measured "
+            f"field is null. Expected `review_consensus finalize` (and, from round 2, "
+            f"`review_churn measure`) to have run with --slug/--round.\n"
+        )
+    return out
+
+
 def main(argv: list[str] | None = None) -> int:
     """CLI entry: ``python -m harness_maker.review_telemetry emit``.
 
@@ -344,6 +417,7 @@ def main(argv: list[str] | None = None) -> int:
     if not isinstance(data, dict):
         sys.stderr.write("emit: input must decode to a JSON object\n")
         return 1
+    data = _take_measured_from_producers(data, root=Path.cwd())
     try:
         record = record_from_dict(data)
     except ValidationError as exc:

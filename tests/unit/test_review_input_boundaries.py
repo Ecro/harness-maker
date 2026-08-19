@@ -9,14 +9,20 @@ the boundary to exist at all.
 from __future__ import annotations
 
 import json
-import os
 import subprocess
 import sys
 from pathlib import Path
 
 import pytest
 
-from harness_maker import codex_ledger, freeze, lens_coverage, review_telemetry, two_pass_review
+from harness_maker import (
+    codex_ledger,
+    freeze,
+    lens_coverage,
+    review_telemetry,
+    round_record,
+    two_pass_review,
+)
 
 # ── the injection: model-authored JSON must never reach a shell ──────────────
 
@@ -63,14 +69,64 @@ def test_redact_reads_a_file_because_its_input_is_the_diff_itself(
     assert json.loads(capsys.readouterr().out)["pr_title"] == "[REDACTED]"
 
 
-def test_telemetry_emit_reads_a_file_because_churn_max_path_comes_from_the_diff(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+def test_a_hostile_filename_round_trips_through_the_producer_record(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """A repository may contain a file whose NAME is a shell payload.
 
-    `churn_max_path` is a path taken straight out of the measured diff, so the telemetry
-    record became attacker-influenced the moment churn measurement shipped.
+    `churn_max_path` is a path taken straight out of the measured diff, so the telemetry record
+    became attacker-influenced the moment churn measurement shipped. Two properties, unchanged
+    in substance by the producer-record rework and both asserted here: no stage of this path
+    builds a shell command out of that name, and the name is recorded VERBATIM — a sanitiser
+    here would corrupt the very field an operator uses to find the file.
+
+    What did change is where the value enters. `emit` now takes the measured keys only from the
+    round record `review_churn measure` wrote, so this exercises the hostile name along the path
+    it actually travels; the model cannot put a `churn_max_path` in the row at all.
     """
+    hostile = "src/x'; touch /tmp/nope; echo '.py"
+    monkeypatch.chdir(tmp_path)
+    round_record.merge(
+        tmp_path,
+        "s",
+        1,
+        {
+            "churn_ratio": 0.5,
+            "churn_max_path": hostile,
+            "churn_measured_n": 1,
+            "churn_excluded_n": 0,
+        },
+    )
+    record = {
+        "ts": "2026-08-16T00:00:00Z",
+        "slug": "s",
+        "round": 1,
+        "pass1_n": 0,
+        "pass2_kept_n": 0,
+        "consensus_passed_n": 0,
+        "wall_time_ms": 1,
+        "build_break_count": 0,
+        "auto_fix_reverted_n": 0,
+    }
+    src = tmp_path / "row.json"
+    src.write_text(json.dumps(record), encoding="utf-8")
+
+    assert review_telemetry.main(["emit", "--file", str(src)]) == 0
+    written = Path(capsys.readouterr().out.strip())
+    row = json.loads(written.read_text(encoding="utf-8").strip())
+    assert row["churn_max_path"] == hostile
+    assert not Path("/tmp/nope").exists()
+
+
+def test_a_transcribed_churn_path_never_reaches_the_row(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The narrower boundary the rework added: the model is no longer an input here at all.
+
+    Asserted separately from the round-trip above because they fail for different reasons — a
+    regression that re-admits the model's value would leave that test green.
+    """
+    monkeypatch.chdir(tmp_path)
     record = {
         "ts": "2026-08-16T00:00:00Z",
         "slug": "s",
@@ -89,15 +145,11 @@ def test_telemetry_emit_reads_a_file_because_churn_max_path_comes_from_the_diff(
     src = tmp_path / "row.json"
     src.write_text(json.dumps(record), encoding="utf-8")
 
-    cwd = os.getcwd()
-    os.chdir(tmp_path)
-    try:
-        assert review_telemetry.main(["emit", "--file", str(src)]) == 0
-    finally:
-        os.chdir(cwd)
+    assert review_telemetry.main(["emit", "--file", str(src)]) == 0
     written = Path(capsys.readouterr().out.strip())
     row = json.loads(written.read_text(encoding="utf-8").strip())
-    assert row["churn_max_path"] == record["churn_max_path"]
+    assert row["churn_max_path"] is None
+    assert row["churn_ratio"] is None
 
 
 def test_the_file_arg_reports_a_missing_path_instead_of_reading_stdin(
