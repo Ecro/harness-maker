@@ -2,6 +2,40 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`/hm:plan` output gains a required `## 🚧 Contract Boundaries` section, and `/hm:execute`
+  reads it.** `/hm:review` already *detects* the contract hole — behaviour that oscillates across
+  rounds surfaces as `spec_gap` — but nothing ever wrote the hole down, so the next round
+  rediscovered it. The section holds one list, `### Do not change`: the surfaces the
+  implementation must leave alone. It sits between **📝 Implementation Plan** and **🧪 Testing
+  Strategy** (section 7 of 11) and an empty list is written as an explicit `none`; a missing
+  section fails `/hm:plan` Step 6, an empty one is repaired rather than stopped. Entries follow a
+  single closed grammar (ADR-008) — a path, a glob, or an `Advisory:` line — so a reader never has
+  to guess whether a line is a rule or a comment.
+
+  `/hm:execute` is the only consumer and touches it in three places: it **loads** the list at
+  **Step 1**, so a pure new-feature task is covered rather than only a repair; it **cites** it at
+  **Phase C.0**; and at the **GREEN stage exit** it compares the implementer's enumerated
+  changed-path set against it and reports any crossing. The comparison is **report-only and never
+  gates** — the list is authored prose, not a derived contract, so a gate over it fails on the
+  author's typo rather than on the defect. An absent section emits one line and proceeds
+  (ADR-009). A crossing is defined at exactly **one** site (`execute.md.j2` Step 4) as an exact
+  match or a `/`-boundary descendant; every other mention defers to it and states no rule of its
+  own. That structure is the round-5 repair, not decoration: the rule had been written in four
+  places, a round-4 fix changed one of them, and three of the next round's eight P1s were the
+  other three still asserting the refuted semantics.
+
+  `review.md.j2` and `review_consensus.py` are **unchanged** — review-side consumption was cut
+  during validation (ADR-004) — and the originally-planned second sub-list, `Deliberately
+  unspecified`, was cut by ADR-011 for having no automated consumer. New gates:
+  `tests/structural/test_plan_contract_boundaries_section.py` and
+  `tests/structural/test_execute_contract_boundaries.py`, both asserting the `claude` and `codex`
+  variants; the report-not-gate invariant is guarded by a regex predicate with a mutation fixture
+  after a token list proved unable to catch either wrong implementation its own comment named.
+  Surface: `surface_allowance` 4086 chars, with the per-command split recorded in
+  `work-docs/BASELINE-DELTA-ai-work-boundaries.md`.
+
 ## [0.52.5] - 2026-08-17
 
 ### Added

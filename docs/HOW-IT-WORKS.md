@@ -478,26 +478,27 @@ not working on this document at all.
 
 **Step 5 — Write PLAN Document**
 
-`work-docs/PLAN-{slug}.md` with 10 required sections:
+`work-docs/PLAN-{slug}.md` with 11 required sections:
 1. 🎯 Executive Summary
 2. 📚 Prior Work
 3. 🎙️ Interview Transcript
 4. 📐 Architecture Decision Records
 5. 🏗️ Technical Design
 6. 📝 Implementation Plan (each stage: scope / exit criterion / risk / rollback point)
-7. 🧪 Testing Strategy
-8. ⚠️ Risks & Mitigation
-9. ✅ Success Criteria
-10. 🔍 Plan Validation
+7. 🚧 Contract Boundaries (one `### Do not change` list; an empty list is written as an explicit `none`)
+8. 🧪 Testing Strategy
+9. ⚠️ Risks & Mitigation
+10. ✅ Success Criteria
+11. 🔍 Plan Validation
 
 Each implementation stage has **4 required fields**: scope, exit criterion (executable command), risk level (`low|medium|high`), rollback point.
 
 **Step 6 — Post-Save Validation**
 
-Read the file and verify: frontmatter present, Interview Transcript section exists, ADR count matches, all 4 fields present.
+Read the file and verify: frontmatter present, Interview Transcript section exists, ADR count matches, all 4 fields present, and `## 🚧 Contract Boundaries` sits between 📝 Implementation Plan and 🧪 Testing Strategy with a non-empty `### Do not change` list.
 
 #### Outputs
-- `work-docs/PLAN-{slug}.md` (frontmatter + 10 sections)
+- `work-docs/PLAN-{slug}.md` (frontmatter + 11 sections)
 - ADR set (ADR-001, ADR-002, …)
 
 ---

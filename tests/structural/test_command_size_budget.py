@@ -328,7 +328,16 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # only for as long as the allowance stays in flight. Retiring the allowance without this
     # entry turns the gate red on landed, reviewed, released work.
     # Attributed in work-docs/BASELINE-DELTA-self-induced-regression-gate.md.
-    "execute": 45169,
+    # 45169 → 47718 (ai-work-boundaries, folded 2026-08-19 at close-out). +2549, matching that
+    # PLAN's declared `surface_allowance.commands.execute`. Buys the Step 1 load clause for the
+    # PLAN's `Do not change` list, Phase C.0's citation, and the GREEN-exit comparison — which is
+    # ALSO the sole site defining what a crossing is, after five review rounds found the rule
+    # stated in four places and three of the four now defer to it. Attributed in
+    # work-docs/BASELINE-DELTA-ai-work-boundaries.md.
+    # BOTH ratchets are folded in this same commit. That PLAN's ADR-010 exists because
+    # 43234d0e folded `surface_baseline.json` and not this dict; folding one and not the other
+    # is invisible until the allowance retires, which is exactly when it is hardest to diagnose.
+    "execute": 47718,
     # 46008 → 47503 (validator-pass-cap-telemetry + its review round): the pass cap, the
     # corrected per-(agent,stage,slug,run-id) terminal invariant, the `coherence` pointer,
     # and the shell-quoting rules for the free-text `--reason`. Attributed in
@@ -364,7 +373,14 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # reading this stage's own measurement refutes (12 validator episodes, none ever clean;
     # one PLAN whose pass-2 criticals were created by the pass-1 fixes). Attributed in
     # work-docs/BASELINE-DELTA-plan-validator-transfer.md.
-    "plan": 53564,
+    # 53564 → 55322 (ai-work-boundaries, folded 2026-08-19 at close-out). +1758, matching that
+    # PLAN's declared `surface_allowance.commands.plan`. Buys required section #7
+    # `## 🚧 Contract Boundaries` (one list, `### Do not change`, a closed three-form grammar
+    # that names globs among its exclusions), the renumbering of 7-10 → 8-11, and two Step 6
+    # verification bullets. An intermediate round measured 4212 against a 4,200 ceiling and
+    # ~126 chars were CUT rather than the ceiling raised. Attributed in
+    # work-docs/BASELINE-DELTA-ai-work-boundaries.md.
+    "plan": 55322,
     # 26673 -> 27248 (+575, 0.52.1). The autopilot picker renders into EVERY stage, so a
     # four-word correction there costs a little on all of them. It is the fix that
     # unblocks autopilot on Codex entirely: the block was headed "(Claude Code only)",

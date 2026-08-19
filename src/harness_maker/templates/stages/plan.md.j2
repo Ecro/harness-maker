@@ -765,10 +765,13 @@ spec_need_target: <slug>  # the task slug or SPEC slug for change/delete{% endif
    - Exit criterion (a runnable command or check that proves the phase is done)
    - Risk: `low` | `medium` | `high`
    - Rollback point reference (which prior phase to revert to on failure)
-7. **🧪 Testing Strategy** — unit / integration / manual steps
-8. **⚠️ Risks & Mitigation** — risk register table
-9. **✅ Success Criteria** — checklist mirroring SPEC verification criteria when SPEC exists
-10. **🔍 Plan Validation** — append validator outcome (APPROVED / consensus critiques table / resolution links to interview rounds)
+7. **🚧 Contract Boundaries** — one list, `### Do not change`: surfaces the implementation must leave alone. The only behaviour that moves across a long review is the one the contract never fixed, so an unwritten hole is the defect this section closes.
+   - **Exactly three admitted forms**, one per `- ` bullet: (a) a **repo-relative** path in backticks — `` - `src/pkg/mod.py` `` or a directory prefix `` - `src/pkg/` `` — optionally ` — {why}`; (b) `- Advisory: {intent no path expresses}`; (c) `- none — this task has no contract boundaries`, valid **only as the sole bullet**. No absolute paths, `..` or globs.
+   - An empty list is **written, never omitted** — form (c). "Nobody was asked" and "the author said there are none" are different facts.
+8. **🧪 Testing Strategy** — unit / integration / manual steps
+9. **⚠️ Risks & Mitigation** — risk register table
+10. **✅ Success Criteria** — checklist mirroring SPEC verification criteria when SPEC exists
+11. **🔍 Plan Validation** — append validator outcome (APPROVED / consensus critiques table / resolution links to interview rounds)
 
 ### Step 6 — Verify write
 
@@ -777,6 +780,8 @@ After writing, Read the file back and assert:
 - Contains `## 🎙️ Interview Transcript` with ≥1 entry (or skip-justification line).
 - ADR count in frontmatter matches `## 📐 Architecture Decision Records` heading count.
 - Every phase has all required fields (depends_on / parallel_group / merge_hazards / scope / exit / risk / rollback).
+- `## 🚧 Contract Boundaries` is present, sits between **📝 Implementation Plan** and **🧪 Testing Strategy**, and its `### Do not change` list is non-empty — an explicit `none` line satisfies this, an absent section does not; an empty one is repaired below, never a stop.
+- Every `### Do not change` bullet is one of the three admitted forms, **and a form-(c) bullet is the only bullet**. Anything else — an empty list included, repaired by writing the entries, **never** by fabricating `none` — is **self-repaired inline** — rewrite and continue; this never triggers the retry-once-then-stop rule below, because a consumer cannot act on an undecidable entry and will silently drop it. A `none` bullet coexisting with others: **delete the `none`**, never a path or `Advisory:` bullet.
 {% if config.dev_mode == 'spec-driven' %}- **SPEC-need frontmatter assertion (spec-driven):** the frontmatter MUST contain `spec_need_verdict` (present and set to a valid value from Step 1.7 — one of `add`, `change`, `delete`, `none`, or `not-evaluated`). If this key is absent, the write is incomplete — retry once, then surface the path + error and stop. A missing `spec_need_verdict` closes the absent-case fail-open that defeats Check 6.{% endif %}
 
 If verification fails, retry write **once**. If still failing, surface the path + error and stop — do NOT proceed to a downstream stage.
@@ -792,7 +797,7 @@ If verification fails, retry write **once**. If still failing, surface the path 
 > Never write artifacts under `work_docs/` (underscore) — that path is a
 > known LLM footgun.
 
-- `{{ config.work_docs.dir }}PLAN-{slug}.md` (frontmatter + 10 sections above)
+- `{{ config.work_docs.dir }}PLAN-{slug}.md` (frontmatter + 11 sections above)
 - Interview Transcript as the single source of truth for user decisions
 - ADR set bound to this PLAN (numbered ADR-001…)
 - `validator_outcome` recorded in frontmatter

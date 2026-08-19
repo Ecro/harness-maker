@@ -205,7 +205,19 @@ positives against the tree BEFORE building the gate, and drop it if the ratio re
 ---
 
 ## Proposal: a whole-file substring assertion may not stand in for a per-item claim (2026-08-08)
-**Triggered by:** [fail:test] assertion-invariant-over-named-dimension (count: 13 as of 2026-08-17.
+**Triggered by:** [fail:test] assertion-invariant-over-named-dimension (count: 14 as of 2026-08-19.
+Instance 14 (ai-work-boundaries) is the **negative-over-prose** direction, which is invariant in
+BOTH directions at once and so is not covered by any "can this assertion fail in the broken world"
+phrasing that assumes a single failing case exists: a gate asserted a token list is ABSENT from a
+prose block, and its own comment named the two wrong implementations it existed to reject —
+neither was catchable, because `"exits 1"` does not contain `"exit 1"` and `"blocker"` does not
+contain `"BLOCKED"`. A negative over prose is green when the rule holds and green when the
+predicate is broken, and nothing in a passing suite distinguishes them. Concrete addition to the
+mechanism: **a negative assertion must be accompanied by a MUTATION FIXTURE** — a stored piece of
+text exhibiting the forbidden shape, over which the same predicate is asserted to fire. Presence
+of a red case is the only evidence a negative can offer. That is what the round-5 repair shipped
+(regex predicate + fixture) after a token list had already survived one repair round. Prior
+trigger text follows, count: 13 as of 2026-08-17.
 Instance 13 (lens-and-review-fix-verification) adds the **mirror direction**, which every
 formulation of this proposal so far has excluded by construction: a delegation test injected an
 exclusion for a field the fixture hardcodes to a different value, so the assertion was
@@ -377,7 +389,15 @@ step echo `pwd` beside the rc, so an rc is never recorded without the tree it gr
 
 ## Proposal: a fix must be tested in the position where it does not obviously apply (2026-08-13)
 
-**Triggered by:** [fail:design] fix-introduces-the-defect-class-it-closes (count: 3)
+**Triggered by:** [fail:design] fix-introduces-the-defect-class-it-closes (count: 4 as of
+2026-08-19. Instance 4 (ai-work-boundaries) is the cheapest possible illustration and suggests a
+narrower, checkable sub-rule: the fix narrowed a MATCH PREDICATE. An over-match — a lexical-prefix
+crossing rule matching `mod.py.bak` against a `mod.py` entry — was repaired by requiring entries
+to be `/`-terminated, which shipped a silent under-match: a directory entry written without a
+trailing slash matched nothing, and the report read clean. **Sub-rule: when a fix narrows a
+predicate, the test population must include an input the OLD predicate handled correctly**, not
+only the input that motivated the narrowing — over-match and under-match are one defect class and
+a narrowing walks between them. Prior trigger text follows, count: 3.)
 
 **Proposed mechanism:** an authoring rule in the review auto-fix loop + a receipt field.
 

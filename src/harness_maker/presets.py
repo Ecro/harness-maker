@@ -63,19 +63,38 @@ def _spec(claude_alias: str, effort: _Effort) -> AgentModelSpec:
     )
 
 
-# Production: reasoning agents get opus + high effort; reviewers get sonnet +
-# medium. (REVIEW Phase 5 CP-1: trajectory-monitor removed — agent is dormant,
-# not in `synthesize._ALL_AGENTS` / `_ALL_SKILLS` / `_COMMUNICATION_VARIANT`.
-# Reactivate by adding to those tables AND restoring the entry here.)
+# Production. **The axis is CALL VOLUME, not "reasoning vs structured"** — that older
+# description did not survive reading the map beside it. `plan-validator` (opus) and
+# `code-reviewer` (sonnet) both critique a draft; only the name differs. What actually predicts
+# a row is how often the agent runs: the eleven reviewers fire 7-at-a-time, twice per review
+# round, several rounds per task, so they dominate spend and sit on sonnet; the rest run once
+# per stage or less and can afford opus.
+#
+# Two rows are deliberate exceptions to the volume rule, each for a stated reason:
+#   * `stage-delegate` — the most PROCEDURAL agent here (frontmatter edit, checkbox
+#     substitution, a handful of CLI calls, return a receipt). Volume is low, but a checklist
+#     does not need opus, and the receipt is reconciled against disk before anything commits.
+#   * `code-verifier` — low volume, but its mode-B disposition decides whether a cross-model
+#     finding gets a VOTE. A wrong call there deletes a finding silently, and nothing
+#     downstream can tell. It is the one place a cheap judgment is unrecoverable.
+#
+# `stuck` keeps opus because it is near-zero volume and fires only after everything else has
+# already failed — not because escalation is "reasoning-heavy".
+#
+# (REVIEW Phase 5 CP-1: trajectory-monitor removed — agent is dormant, not in
+# `synthesize._ALL_AGENTS` / `_ALL_SKILLS` / `_COMMUNICATION_VARIANT`. Reactivate by adding to
+# those tables AND restoring the entry here.)
 _PRODUCTION_MAP: dict[str, AgentModelSpec] = {
-    # Reasoning-heavy
+    # Low volume — opus is affordable here
     "autoloop-coder": _spec("opus", "high"),
     "plan-validator": _spec("opus", "high"),
-    "stage-delegate": _spec("opus", "high"),
     "stuck": _spec("opus", "high"),
-    # Reviewer / structured agents
+    # Low volume, but PROCEDURAL — see the exception note above
+    "stage-delegate": _spec("sonnet", "medium"),
+    # Low volume, and the one cheap judgment that is unrecoverable — see the note above
+    "code-verifier": _spec("opus", "high"),
+    # High volume — 7 lenses x 2 passes x N rounds
     "code-reviewer": _spec("sonnet", "medium"),
-    "code-verifier": _spec("sonnet", "medium"),
     "concurrency-reviewer": _spec("sonnet", "medium"),
     "consensus-arbiter": _spec("sonnet", "medium"),
     "executor": _spec("sonnet", "medium"),
