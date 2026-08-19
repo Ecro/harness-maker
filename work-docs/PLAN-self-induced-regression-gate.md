@@ -1,7 +1,8 @@
 ---
 type: plan
 task_slug: self-induced-regression-gate
-status: planning
+status: complete
+status_reason: "Landed in 43234d0e and released as 0.52.5; re-render at f4218a64. Review reached grade B against a threshold of A — not for unfinished work (no P0 or P1 open, full suite green, ruff/mypy clean, reviewer called it landable) but because every repair round in a task about self-induced churn produced self-induced churn. Closed 2026-08-19: the only act outstanding was this status flip. The surface growth was already folded into tests/structural/surface_baseline.json in 43234d0e with its BASELINE-DELTA attribution, so completion here RETIRES the 4396-char allowance rather than spending it — left in flight, it was pure unattributed headroom on an already-folded baseline."
 created: 2026-08-17
 tags: [harness-maker, plan, python, jinja2, review-loop, test-selection, churn]
 interview_rounds: 6

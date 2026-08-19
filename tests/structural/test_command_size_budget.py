@@ -318,7 +318,17 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # `tools: Read, Grep, Glob`, so the original brief ordered a file write that cannot execute and
     # the stage surfaced a path to a file that was never created.
     # Attributed in work-docs/BASELINE-DELTA-stuck-dispatch.md.
-    "execute": 43200,
+    # 43200 → 45169 (self-induced-regression-gate, folded 2026-08-19 at close-out). +1969, of
+    # which 864 is the standing 2% slack and 1105 was charged to that PLAN's declared
+    # `surface_allowance.commands.execute: 2008`. The growth itself landed in 43234d0e (Phase C.0's
+    # pre-repair declaration and the `targeted-test-selection` pointer) and was attributed then;
+    # what was missed is that the commit re-froze `surface_baseline.json` and NOT this dict.
+    # There are two ratchets on different counters — that file measures the rendered command's
+    # chars, this one measures `len(flag_on[name])` — so folding one leaves the other passing
+    # only for as long as the allowance stays in flight. Retiring the allowance without this
+    # entry turns the gate red on landed, reviewed, released work.
+    # Attributed in work-docs/BASELINE-DELTA-self-induced-regression-gate.md.
+    "execute": 45169,
     # 46008 → 47503 (validator-pass-cap-telemetry + its review round): the pass cap, the
     # corrected per-(agent,stage,slug,run-id) terminal invariant, the `coherence` pointer,
     # and the shell-quoting rules for the free-text `--reason`. Attributed in
@@ -426,7 +436,13 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # This PLAN spends context to buy back reviewer DISPATCHES and repair ROUNDS. Whether that
     # trade paid is not yet decidable — the churn rows and round-trip counts exist to answer it
     # and have no live corpus. Attributed in work-docs/BASELINE-DELTA-review-loop-empirics.md.
-    "review": 60550,
+    # 60550 → 63924 (self-induced-regression-gate, folded 2026-08-19 at close-out). +3374, of
+    # which 1211 is the standing 2% slack and 2163 was charged to that PLAN's declared
+    # `surface_allowance.commands.review: 2301` — 138 characters of the declaration went unspent.
+    # Growth: Step 0's run-open block, the id-source sentence and the five `close` instructions
+    # (43234d0e). Same half-done fold as the `execute` entry above; see it for why this dict was
+    # missed. Attributed in work-docs/BASELINE-DELTA-self-induced-regression-gate.md.
+    "review": 63924,
     # 30537 → 32114 (PLAN-plan-interview-comprehension): the same partial, invoked with
     # `stage='spec'`. Raw +1778, compacted to +1577. The brief's SUBJECT differs by stage
     # (ADR-007) because `/hm:spec` has no architecture draft to disclose — identical text

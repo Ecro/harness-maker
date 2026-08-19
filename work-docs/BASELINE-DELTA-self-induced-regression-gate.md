@@ -144,3 +144,35 @@ movement is *declared in advance* — the `surface_allowance` block names the ch
 commands before the edits, and `test_roundtrip_budget.py`'s own message directs a deliberate
 change to re-baseline in the same commit and name the calls. The unattributed case is the one
 the rule forbids, and this section is the attribution.
+
+## Allowance retired — 2026-08-19, and the fold was only half done
+
+`PLAN-self-induced-regression-gate` moved to `status: complete`, which expires this allowance.
+Retiring it exposed a defect in this task's own close-out that no gate reported while the
+allowance stayed in flight.
+
+**There are two ratchets on two different counters, and 43234d0e re-froze one of them.**
+
+| ratchet | counter | re-frozen in 43234d0e? |
+|---|---|---|
+| `tests/structural/surface_baseline.json` | rendered command chars, per variant | **yes** — §"Surface baseline movement" above |
+| `_ATOMIC_RATCHET` in `tests/structural/test_command_size_budget.py` | `len(flag_on[name])` | **no** |
+
+The second one is the sole consumer of `surface_allowance.commands`, so it kept passing on the
+declared headroom alone. With the allowance expired it went red on landed, reviewed, released
+work:
+
+| command | rendered | old ceiling (ratchet × 1.02) | over by | charged against declared |
+|---|---:|---:|---:|---:|
+| `execute` | 45169 | 44064 | 1105 | 2008 |
+| `review` | 63924 | 61761 | 2163 | 2301 |
+
+Folded at close-out: `execute` 43200 → 45169, `review` 60550 → 63924, each with its attribution
+comment in the dict. **Both came in under their declaration** (899 and 138 characters unspent),
+which is the number this record exists to make checkable.
+
+The generalisable lesson is not "we forgot a file". It is that a fold performed in the growth's
+own commit is performed while the allowance still masks any half of it that gets missed — the
+error is undetectable exactly when it is made, and surfaces only at the close-out that removes
+the mask. A close-out is therefore not a formality: it is the first moment either ratchet is
+measured honestly.
