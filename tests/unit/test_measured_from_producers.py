@@ -57,7 +57,9 @@ def _write(name: str, payload: dict[str, Any]) -> str:
 def _emitted(tmp_path: Path) -> dict[str, Any]:
     written = list((tmp_path / ".claude" / "observability").glob("review-*.jsonl"))
     assert len(written) == 1, f"expected one ledger file, got {written}"
-    return json.loads(written[0].read_text(encoding="utf-8").strip())
+    row = json.loads(written[0].read_text(encoding="utf-8").strip())
+    assert isinstance(row, dict), f"ledger row is not an object: {row!r}"
+    return row
 
 
 @pytest.fixture
