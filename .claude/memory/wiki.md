@@ -946,4 +946,54 @@ Two ledgers (`.claude/observability/second-opinion.jsonl` and the verifier-discr
 **The durable lesson is not the feature, it is what five review rounds cost.** Three of the last round's eight P1s existed for one reason: the definition of "a changed path crosses a boundary entry" was written in **four places** — `execute.md.j2` Step 1, Step 4, ADR-008, and risk row R2 — and a round-4 repair changed **one** of them. The other three kept asserting the refuted semantics, individually readable as correct, and no gate compares two prose statements of the same rule, so nothing went red. The repair that actually worked was structural rather than textual: make **`execute.md.j2` Step 4 the SOLE site that defines a crossing**, and turn every other mention into a deferral that points at it and carries no rule of its own. The test is mechanical and worth applying before writing the sentence: *if this sentence were deleted, would any information be lost that the normative site does not already carry?* If not, it is a copy, and a copy of a rule is a future contradiction with no detector. The same round produced the corollary defects this pattern generates — a negative assertion over prose (`"exit 1" not in text`) that is green both when the rule holds and when its own predicate is broken (`"exits 1"` does not contain `"exit 1"`), and an over-match repair (lexical prefix matched `mod.py.bak`) that shipped a silent under-match (a `/`-terminated-only rule matches nothing for a slash-less directory entry). The final rule is equals-or-`/`-boundary, and the report-not-gate invariant is now guarded by a regex predicate with a mutation fixture rather than a token list.
 
 Full record: `work-docs/PLAN-ai-work-boundaries.md` (11 ADRs), `work-docs/REVIEW-ai-work-boundaries-2026-08-19.md` (5 rounds), `work-docs/BASELINE-DELTA-ai-work-boundaries.md` (the surface_allowance re-measurements — an intermediate round-5 measurement hit 4212 against a 4,200 ceiling and ~126 chars were CUT rather than the ceiling raised). Gates: `tests/structural/test_plan_contract_boundaries_section.py`, `tests/structural/test_execute_contract_boundaries.py`.
+## [wiki:architecture] review-oracles-untestable-dims | 2026-08-20
+Every severe finding across both /hm:review rounds on this branch landed in a dimension the
+existing test suite structurally could not express — never in hard code. (1) **cwd**: a
+round-record store was written from `<WT>` and read from base; a fixture that shares one
+`tmp_path` for writer and reader cannot represent two roots, so the P0 was invisible to
+every unit test and only a real `git worktree add` regression test catches it. (2) **shell
+semantics**: `--spec` rendered after `| tee <file>`, so the shell handed it to `tee`, which
+rejected the unknown long option and exited 1. Every existing gate read the rendered TEXT;
+the snapshot fixtures compare body HASHES, and regenerating them after the change blessed
+the broken line as the new expected value. The fix is `bash -n` on the substituted line plus
+a structural check on what follows the pipe plus a `pipefail` assertion, mutation-receipted
+against the exact template line. (3) **half of a stamp contract**: `review_churn`'s
+`--slug`/`--round` stamping had no CLI-level test — only `finalize`'s side was proven — so a
+regression on the untested half would go silent; the fix drives the real CLI against a real
+repo, not a hand-built fixture dict.
+
+The generalisable rule: when a review finds a severe defect that no test caught, do not
+conclude "we need more tests of the same kind" — ask what DIMENSION the passing tests were
+blind to (which root a path resolves against, what a shell does to a rendered line before
+your code ever sees it, which half of a two-sided contract only one side proved) and write
+one oracle that pins exactly that dimension. A test that exercises the Python API is not
+evidence about the shell/cwd/consumer boundary the user's invocation actually crosses — see
+`[fail:test] shipped-entry-point-not-exercised` for the general form of (2).
+## [wiki:pattern] reduce-guarding-device-not-repair | 2026-08-20
+A shared mutable store keyed by (slug, round) has to answer three questions a plain file
+path does not: which root it lives under, how two writers coordinate, and how two runs stay
+apart. On `round_record.py` each answer was added only after a review round found the
+previous one broken — base-root anchoring (round 1's P0) made two worktrees share one file
+(confirm-1's P1×2: lost update, chimera row), and the `flock` + run-id stamp added to fix
+THAT had its own TOCTOU, no timeout, and no oracle (confirm-2's P1×5). Three consecutive
+rounds produced severe findings only in the machinery guarding the feature, never in the
+feature itself.
+
+Per CLAUDE.md 제1목표 (bias to simple over complex when a device costs more than it buys),
+the store was deleted rather than repaired a third time: producers now `tee` their own
+payload to an absolute temp path and the reader takes `--measured <path>` directly — no
+shared root, no lock, no run coordination, because there is no shared mutable state to
+coordinate. Deleting it removed five surviving P1s and six P2s WITHOUT fixing any of
+them — they simply had no subject left. The one hazard a file path still introduces (a
+stale payload from an earlier run) is decidable, unlike the store's three questions, so it
+is decided: the payload is stamped with slug/round and the reader refuses a mismatch.
+
+The transferable signal: if review round N's severe findings are concentrated in the
+machinery ADDED to fix round N-1's severe findings — not in the feature the machinery
+protects — that is the moment to ask whether the machinery should exist at all, before
+attempting a round-N+1 repair. The honest cost of this specific trade: prompt surface grew
++182 chars while Python shrank 228 lines (explaining `tee`/`--measured` in prose across
+four template arms costs more text than describing a store did), and the reduction itself
+then drew its own P0 (a `tee`/pipe-ordering shell bug) and further P1s on its first review —
+a reduction is still new code with a new-code defect rate, not a proof of correctness.
 <!-- @hm:/user:entries -->

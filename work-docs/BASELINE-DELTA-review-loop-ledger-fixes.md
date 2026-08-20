@@ -8,14 +8,34 @@ Measured with `tests/structural/_surface_baseline.py` after the trim described b
 
 | Key | Was | Now | Δ |
 |---|---|---|---|
-| `review` (claude) `chars` | 84 690 | **86 786** | +2 096 |
-| `hm-review` (codex) `chars` | 80 002 | **82 098** | +2 096 |
-| `aggregate_chars.claude` | 427 300 | **429 396** | +2 096 |
-| `aggregate_chars.codex` | 360 211 | **362 307** | +2 096 |
-| `review` / `hm-review` `round_trips` | 37 / 33 | **37 / 33** | **0** |
+| `review` (claude) `chars` | 84 690 | **87 262** | +2 572 |
+| `hm-review` (codex) `chars` | 80 002 | **82 573** | +2 571 |
+| `aggregate_chars.claude` | 427 300 | **429 872** | +2 572 |
+| `aggregate_chars.codex` | 360 211 | **362 782** | +2 571 |
+| `review` `round_trips` | 37 | **38** | **+1** |
+| `hm-review` `round_trips` | 33 | **33** | 0 |
+| `_ATOMIC_RATCHET["review"]` | 63 924 | **65 198** | +1 274 |
 
-`round_trips` is flat on purpose: all three changes are rules applied inside steps that already
-run. Nothing here adds a mandated call, so the axis that has no ratchet direction does not move.
+`payload_digest` and `render_sha` moved too. Both are mechanical consequences of regenerating the
+baseline — the digest is a hash over the measured surface and the sha pins the commit it was frozen
+at (`0f3b286b`, the wrapup commit, reachable from the base branch as `assert_sha_is_durable`
+requires). Neither carries an attribution of its own; they are named here because the gate that
+reads this document treats an unmentioned changed key as an unexplained one, which is the correct
+default.
+
+**Direction: LARGER.** Measured after the work landed on the base branch, not declared before it.
+Every figure above is the regenerated baseline at `0f3b286b`, folded there because a completed
+PLAN's `surface_allowance` expires the moment its status flips — `surface_allowance._sole_active`
+documents that handoff, and `assert_sha_is_durable` refuses to freeze against a task-branch SHA,
+so the fold can only happen here. The atomic ratchet is folded in the same commit and carries its
+own inline attribution.
+
+`round_trips` moved once, and not for a new call: the Telemetry Emit step's Claude arm was the
+only CLI line in this command rendered without the `!` auto-exec marker, so the metric never
+charged for a step the operator was expected to run by reading prose — and that step is the one
+that writes this whole change's deliverable. A review round found it unmarked. The count rises
+because the command became honest, not longer. Re-baselined in `test_roundtrip_budget.py` with
+that reason beside it.
 
 The per-command atomic ceiling (`test_command_size_budget`, flag-on render) needs **818**; the
 aggregate needs **2 096**. Both are declared in `PLAN-review-loop-ledger-fixes.md`.

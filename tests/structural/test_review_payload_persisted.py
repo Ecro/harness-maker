@@ -49,6 +49,22 @@ _STEP_LANDED = "2026-08-05"
 #: (slug, round) pairs that ran on or after the cutoff WITHOUT persisting. Each needs a
 #: reason. Adding an entry is the visible cost of skipping the step; removing one is free.
 _KNOWN_MISSING: dict[tuple[str, int], str] = {
+    ("review-loop-ledger-fixes", 3): (
+        "There was no round 3 to capture. This slug's first /hm:review ran two rounds and "
+        "then two CONFIRMATION passes, and the confirmation pass writes its lens results "
+        "under a `confirm-1`/`confirm-2` pass-id directory, not a round number — Step 3.4's "
+        "persist-payload is a per-ROUND line in the auto-fix loop and never fires for a pass. "
+        "The `round: 3` the gate sees comes from the terminal telemetry row, which numbers "
+        "the confirm-2 state so the ledger has one row per review; the two numbering schemes "
+        "meet only there. Reconstructing a payload would fabricate a round that never "
+        "dispatched, which is the non-capture this corpus exists to exclude. The confirm-2 "
+        "findings, their dispositions and the five surviving P1s are in "
+        "REVIEW-review-loop-ledger-fixes-2026-08-20.md; rounds 1 and 2 of that review, and "
+        "round 1 of the second review, did persist. What this entry actually records is that "
+        "the telemetry row's round axis and the payload corpus's round axis disagree for any "
+        "review that reaches a confirmation pass — a gate-visible seam, not an orchestrator "
+        "lapse, and the third distinct cause on this list."
+    ),
     ("plan-interview-comprehension", 2): (
         "round 1 of this slug WAS re-captured rather than waived: the original /hm:review "
         "skipped Step 3.4 entirely, and when this gate surfaced it at wrapup the operator "

@@ -1,7 +1,7 @@
 ---
 type: plan
 task_slug: review-loop-ledger-fixes
-status: planning
+status: complete
 created: 2026-08-19
 tags: [harness-maker, plan, review-stage, telemetry, auto-fix-loop]
 summary: "Give the disposition gate a measurement surface; stop diagnosing over-specified tests as regressions; take P2 out of the fixer's queue."

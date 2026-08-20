@@ -458,7 +458,23 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # Growth: Step 0's run-open block, the id-source sentence and the five `close` instructions
     # (43234d0e). Same half-done fold as the `execute` entry above; see it for why this dict was
     # missed. Attributed in work-docs/BASELINE-DELTA-self-induced-regression-gate.md.
-    "review": 63924,
+    # 63924 → 65198 (review-loop-ledger-fixes, 2026-08-20). +1274, the permanent home for the
+    # growth that PLAN-review-loop-ledger-fixes carried in `surface_allowance` while it was in
+    # flight. That allowance expires the moment the PLAN's status flips to `complete`
+    # (`surface_allowance._sole_active` documents the handoff), so the fold has to land here or
+    # the next run of this gate reads the growth as unattributed. Attributed in
+    # work-docs/BASELINE-DELTA-review-loop-ledger-fixes.md; the figure is measured, not declared.
+    #
+    # What it bought, in the order it was paid: a `disposition_counts` field so the disposition
+    # gate leaves a machine-readable trace at all (its rejection rate was previously unreadable
+    # from disk); a reachability question before the auto-fix loop calls a failing test a
+    # regression; P2 out of the auto-fix queue. Then two review rounds found a P0 each and the
+    # mechanism was reduced twice — the second reduction deleted a 228-line shared store and paid
+    # +182 prompt characters for the `tee` / `--measured` plumbing that replaced it, and the
+    # repairs for that reduction's own P0 (`--spec` rendered onto `tee` instead of the producer)
+    # added `set -o pipefail` on four template arms, an absolute-path rule, and the `!` auto-exec
+    # marker the telemetry step never had. The last of those also moved round_trips 37 → 38.
+    "review": 65198,
     # 30537 → 32114 (PLAN-plan-interview-comprehension): the same partial, invoked with
     # `stage='spec'`. Raw +1778, compacted to +1577. The brief's SUBJECT differs by stage
     # (ADR-007) because `/hm:spec` has no architecture draft to disclose — identical text
