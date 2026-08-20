@@ -133,6 +133,12 @@ work-docs/*
 # it — and a rule amended after seeing data is the failure `stage_agent_ledger`'s docstring
 # already had to disclose once.
 !work-docs/EXPERIMENT-*.md
+# DELTA-* is evidence MAINTENANCE for an already-committed RESEARCH: an experiment that lands
+# after the audit was written and changes the basis of a gap rather than adding one. It has to be
+# committed for the same reason the RESEARCH is — the RESEARCH now cites it by name for a retired
+# claim, and an ignored citation is indistinguishable from a fabricated one. (`BASELINE-DELTA-*`
+# was already covered by the `BASELINE-*` line above; a bare `DELTA-*` was not.)
+!work-docs/DELTA-*.md
 !work-docs/plans/
 
 # Cache

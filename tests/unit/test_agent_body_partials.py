@@ -89,6 +89,14 @@ def _render_body(name: str) -> str:
 # 5 reviewer entries below are the post-Phase-C hashes; the remaining 7
 # agents keep their pre-refactor hashes.
 _EXPECTED_SHA256: dict[str, str] = {
+    # Re-pinned 2026-08-20 (review-scope-and-oracle). FIVE entries — exactly the agents that
+    # include `_partials/hard_rules.md.j2`, whose `Diff scope` rule was rewritten from location
+    # ("outside the changed lines") to causation ("does the change make it reachable"), and lost
+    # the `out_of_diff: true` marker. That marker had no consumer anywhere in `src/`, `tests/` or
+    # any rendered harness — the reviewers were told to emit it into a void. The rewrite also
+    # ends a contradiction inside these same bodies: twelve lines above the rule they are told to
+    # "walk the runtime path the changed code triggers … Logic bugs hide where the patch doesn't
+    # touch", which the old rule then forbade them to report on. Pre-bump hashes in git history.
     # Re-pinned 2026-07-30 (PLAN-second-opinion-acceptance-gate). SIX entries moved for TWO
     # reasons, both intended: the five reviewers because `_partials/finding_schema.md.j2` gained
     # the note that `id` is harness-assigned and must NOT be emitted by a reviewer (an
@@ -120,8 +128,8 @@ _EXPECTED_SHA256: dict[str, str] = {
     # pre-0.28.5 hashes. The codex-ENABLED tools:Bash path is asserted in
     # test_render_codex_permission_injection.py. Pre-bump hashes in git history.
     "autoloop-coder": "093210f0b4da3e0d0431c7fa4a0833f19f320d04ee349989fd8b5b5882483932",
-    "code-reviewer": "74b2b0bff2a42b417f7db8acc4cb9bb62ff75e687fbeffe40f48cd30be677cce",
-    "concurrency-reviewer": "290c9dd2c57c4a11015b1ac5cf65176b1b6a85586717e663980a818b4965d39a",
+    "code-reviewer": "d09023357e53929d9eee5059ecb624a0f502115da3f1dda7b00c4252de2e5169",
+    "concurrency-reviewer": "ffc8b5f6bcc43dd33fc6353e87797216a5c8eb39494e8b762beaab50f31ff359",
     # consensus-arbiter + plan-validator: hashes bumped 2026-05-24 per
     # PLAN-codex-second-llm-integration ADR-007 + review security fix.
     # Both agents previously had NO frontmatter permissions block; Phase 2
@@ -145,10 +153,10 @@ _EXPECTED_SHA256: dict[str, str] = {
     # enforced — see CLAUDE.md §보안/권한). Reworded to "by convention, prompt-
     # level guidance, not runtime-enforced". Pre-bump hash in git history.
     "executor": "0a4a5e34f5b7d985eab1b0b8b2ee79d898d3d95ddd4d68eea051536939e96874",
-    "performance-reviewer": "9b9f42a5f726d56df9ae1688ace1979b0eaa768cacc24b48c052659aec635e0c",
+    "performance-reviewer": "869fa3131ffa6cae4be84232deca0174df7d9cd973cc203499f13f75977771e6",
     "plan-validator": "2116a5ce4fb8053c0a8c921f2a1e2c022ea5099f488e8bc315a6a87b097ec36b",
     "security-auditor": "51a11902b9f56b9ebb0e0103e0d2047a64d1a218898d6cedc229a1a43fed2f53",
-    "security-reviewer": "b5ea840e5af70d27ce283bca2513c12c2abc3ddfbf55a722a92dad4a48ed57f4",
+    "security-reviewer": "aadcaf6606ce6b7483f4994f190c919cfba8e9a32d987a4a046e2d9491d19c0e",
     # stuck re-pinned 2026-08-10 (PLAN-multi-lens-review-round, review round 4). `stuck` is the
     # agent A.5 escalates to, and its incoming brief still described the budget as "2 attempts"
     # after the stage renamed the unit to rounds — three lens dispatches now share one round, so
@@ -178,7 +186,7 @@ _EXPECTED_SHA256: dict[str, str] = {
     # the closest banned pattern). Body change outside the codex conditional. Pre-bump hash in
     # git history.
     "test-reviewer": "e998c3dbb245e32155dcbf114a494f4a628e45e628e2511206ea0f19ffffd19b",
-    "ux-reviewer": "7ce5bd89c61c7669ffeee85a0b6b528aa3ff9a52e77912bd646eb3a542754e42",
+    "ux-reviewer": "b6e31a5a45013208a80f0c17eca4e720add647f6d9a386027ae1a57b5d347ebc",
 }
 
 

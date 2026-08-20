@@ -337,7 +337,15 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # BOTH ratchets are folded in this same commit. That PLAN's ADR-010 exists because
     # 43234d0e folded `surface_baseline.json` and not this dict; folding one and not the other
     # is invisible until the allowance retires, which is exactly when it is hardest to diagnose.
-    "execute": 47718,
+    # 47718 → 48199 (review-scope-and-oracle, 2026-08-20). +481, and it was NOT tripping — the
+    # render fit under the standing 2% slack. Recorded anyway: leaving it there is exactly how
+    # the `review` entry below accumulated 1298 characters nobody could attribute. Phase D gains
+    # a pointer to `targeted-test-selection` §4.5's three-way classification of a RED run, which
+    # execute had no counterpart to: D.5 asks what a repair newly made REACHABLE, and nothing
+    # asked whether the red light was about something reachable at all. `grep -in 'unreachable'`
+    # over this template returned zero before this. The rule itself is in the skill, which
+    # neither ratchet measures; what is charged here is the pointer and the D.5 relation.
+    "execute": 48199,
     # 46008 → 47503 (validator-pass-cap-telemetry + its review round): the pass cap, the
     # corrected per-(agent,stage,slug,run-id) terminal invariant, the `coherence` pointer,
     # and the shell-quoting rules for the free-text `--reason`. Attributed in
@@ -474,7 +482,35 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # repairs for that reduction's own P0 (`--spec` rendered onto `tee` instead of the producer)
     # added `set -o pipefail` on four template arms, an absolute-path rule, and the `!` auto-exec
     # marker the telemetry step never had. The last of those also moved round_trips 37 → 38.
-    "review": 65198,
+    # 65198 → 67008 (review-scope-and-oracle, 2026-08-20). Two numbers, and they are not the
+    # same number. **This change costs +512** — measured by rendering the fixture with and
+    # without the template edits (66 496 → 67 008). The other **+1298 is drift that was already
+    # there**: the previous fold recorded 65 198 while the render was 66 496, and the standing
+    # 2% slack (ceiling 66 501) hid the gap by five characters. It is the half-done fold the
+    # `execute` entry above describes — the figure was taken before that task's last repair
+    # commit landed. Folding it silently into a "+1810 bought X" claim would attribute another
+    # task's growth to this one, so it is separated here and in the delta doc.
+    #
+    # The first draft of this change cost +900 and the residue is +512, because the oracle-scope
+    # rule MOVED rather than shrank: it lives in `targeted-test-selection` §4.5, which neither
+    # ratchet measures, and this command keeps a pointer plus the two things that are review's
+    # own — revert-either-way, and the per-cause log vocabulary. Two sources of truth for one
+    # rule is what the `consistency` lens is told to flag; the pointer form also gives the same
+    # rule to `/hm:execute` Phase D for one line there.
+    #
+    # What the +512 buys: the three-way classification of a RED verify run reaches this loop at
+    # all. Both rules in this change answer one defect class, found running this harness against
+    # a firmware experiment — three real defects were TRIGGERED inside the changed file but
+    # CAUSED in files the diff never touched, and the reviewers' `Diff scope` hard rule read as
+    # permission to read there but not to report there. Widening reporting alone is a half fix:
+    # once findings point outside the diff, FIXES follow them there, and `targeted-test-selection`
+    # derives targets from the CHANGED files — so a correct fix against a real upstream symbol is
+    # checked by a target that does not contain it and fails to link. Externally observed:
+    # `undefined reference to 'power_sampling_active'` on a function that exists, in a fix that
+    # was right. The reporting half costs nothing here — it lives in the shared `hard_rules`
+    # partial, which this dict does not measure.
+    # Attributed in work-docs/BASELINE-DELTA-review-scope-and-oracle.md.
+    "review": 67008,
     # 30537 → 32114 (PLAN-plan-interview-comprehension): the same partial, invoked with
     # `stage='spec'`. Raw +1778, compacted to +1577. The brief's SUBJECT differs by stage
     # (ADR-007) because `/hm:spec` has no architecture draft to disclose — identical text

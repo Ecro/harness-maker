@@ -1,5 +1,51 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **Reviewers report by causation, not by location.** The shared `hard_rules` partial told every
+  reviewer *"do not flag pre-existing issues outside the changed lines unless the change reveals
+  them"* — twelve lines after the same agent body instructs them to *"walk the runtime path the
+  changed code triggers … Logic bugs hide where the patch doesn't touch."* Reading outside the diff
+  was open; reporting from there read as closed. The rule now turns on whether the change makes the
+  defect reachable: an out-of-diff **cause** is in scope when the diff **triggers** it, the finding
+  carries the cause's `file`/`line` (that is where the fix goes) and names the diff-side trigger,
+  and only defects unrelated to the change are suppressed. The dead `out_of_diff: true` marker is
+  removed — nothing in `src/`, `tests/` or any rendered harness ever read it.
+- **`/hm:review`'s auto-fix loop widens the test target to match the fix before judging it.**
+  `targeted-test-selection` derives targets from the *changed files*, so a fix that reaches a symbol
+  the file did not previously depend on is verified by a target missing that dependency and breaks
+  the build on a missing symbol rather than on anything wrong with the fix — the direct consequence
+  of the scope change above, since fixes now follow findings out of the diff. Step 5 adds the new
+  dependency's module and re-runs once before concluding, then records `reverted — build/link
+  error: <missing symbol or unit>` separately from `caused build failure`; collapsing the two logged
+  a scope problem as a bad fix and let the next round re-derive the same finding. The rule itself
+  lives in `targeted-test-selection` **§4.5** (three-way: production reaches the pinned state / it
+  cannot / the target is too narrow), which neither surface ratchet measures; `/hm:review` Step 5
+  and `/hm:execute` Phase D each carry a pointer plus only what is genuinely theirs.
+  `/hm:execute` had **no** inverse of Phase D.5 before this — D.5 asks what a repair newly made
+  reachable, and `grep -in 'unreachable'` over that template returned zero.
+  Attributed in `work-docs/BASELINE-DELTA-review-scope-and-oracle.md` (+512 review / +481 execute
+  per variant; the review ratchet also absorbs 1298 chars of pre-existing unattributed drift,
+  separated there).
+
+### Fixed
+
+- **`.claude/agents/*.md` user blocks never merged — 13 of 15 agents froze permanently and
+  silently on the user's first edit.** `reconcile._decide_user_modified` probed `has_markers()`
+  against `agents/<name>.md.j2`, a ten-line frontmatter shim, while the `@hm:user:extensions`
+  markers live in `agents/<name>_body.md.j2` reached by `{% include %}`. The probe answered False
+  for every split template, so the decision fell through to `KEEP, "hash-mismatch-user-modified"`:
+  the file kept the user's text and stopped receiving every future template improvement, with no
+  warning. `.codex/agents/*.toml` merged correctly on the same runs because their template is
+  single-file — that control group is what identified the split structure as the variable.
+  `_template_has_markers()` now follows literal `{% include %}` targets (no Jinja evaluation, no
+  context), and is used on the hash-comment path too, where the same shape would lose user data
+  via `REPLACE` rather than freeze it. Reported by the spoton project with a reproduction; regression
+  asserted on the **decision**, not on rendered bytes — the rendered file does carry the markers, so
+  every output-reading test passed while the bug was live, which is why it survived.
+
 ## [0.52.6] - 2026-08-20
 
 ### Added

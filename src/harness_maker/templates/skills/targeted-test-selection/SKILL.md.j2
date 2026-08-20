@@ -125,6 +125,30 @@ uv run ruff check      # example: this project. Substitute the project's linter.
 uv run mypy --strict
 ```
 
+## 4.5 When the targeted run is RED — classify before concluding
+
+Three causes, three actions. Deciding by reflex that the code is wrong is how a loop spends
+rounds on a change nothing was wrong with.
+
+- **(a) The test pins a state production reaches** → fix the code. The ordinary case, and the
+  only one where the red light means what it appears to mean.
+- **(b) It pins a state production cannot reach** → the code broke no behaviour, so "this change
+  caused a regression" is false. A (b) claim **must name the caller-side fact** that makes the
+  state unreachable — the call that is unconditional upstream, the init that runs once. That fact
+  does not live in the file under test, so (b) argued from the test file alone is not evidence.
+  Record the gap; **never authority to edit the test.**
+- **(c) The target is too narrow for the fix** → §1 derives the selection from the **changed
+  files**, so a fix reaching a symbol the file did not depend on before is checked by a target
+  without that dependency. In a linked language it fails as a missing symbol, not a failed
+  assertion — observed as `undefined reference to 'power_sampling_active'` against a function that
+  exists, in a fix that was correct. Add the dependency's module to the target, re-run once.
+
+A build or link error is **not a test failure** and must not be logged as one. Its failure count
+is often zero — nothing ran — so an oracle reading only failure counts sees neither green nor red.
+
+> (c) grew reachable rather than being longstanding: reviewers now report defects caused outside
+> the diff, so fixes follow them there, and a changed-files target lags by construction.
+
 ## 5. What the selection does and does not promise
 
 - It resolves imports by **fully qualified module name**, so `from pkg import a, b` binds

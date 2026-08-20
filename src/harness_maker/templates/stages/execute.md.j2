@@ -439,7 +439,12 @@ worker count, and whether that runner is parallel by default. Three rules from i
 while iterating on a failure run `rerun_failed` first, then the targeted set, and only then the
 full suite — one full pass per edit dominates any flag you could add; the full suite still runs
 at least once before the work is called done; and the parallel flag belongs on the command line,
-never in the project's persistent config.
+never in the project's persistent config. And when the targeted run comes back RED, its **§4.5**
+owns the three-way classification before you conclude the code is wrong — production reaches the
+pinned state (fix the code) / it cannot (say which caller-side fact makes it unreachable; never
+edit the test) / the target is too narrow for the fix (widen it and re-run once). Phase D.5 asks
+what a repair newly made reachable; §4.5 is the question that comes first — whether this red light
+is about something reachable at all.
 
 Select what to run, then run it as ONE call. `mode: full` → run everything and echo `reason`
 verbatim; `mode: targeted` → pass `node_ids`. `&&` short-circuits, so one call surfaces the

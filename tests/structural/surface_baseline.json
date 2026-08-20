@@ -1,12 +1,12 @@
 {
   "aggregate_chars": {
-    "claude": 429872,
-    "codex": 362782
+    "claude": 430865,
+    "codex": 363775
   },
   "counting_rule": "ADR-011: round_trips = count of ^! lines (claude variant) or 'Bash(' call sites (codex variant), plus that variant's DISPATCH call-site form \u2014 'Task(subagent_type=' on claude, 'spawn_agent(agent_type=\"' on codex; fenced examples included, backticked prose excluded. A consistent proxy, not a semantic count.",
   "generated_by": "tests/structural/_surface_baseline.py",
-  "payload_digest": "d36379e2f7f63937304f879d2f55ef4165980b5e0007b43b32c8810bf2c1bce8",
-  "render_sha": "0f3b286b102946559e0c1e95e2738b6ee0cade4b",
+  "payload_digest": "fcd2d2b929a5bcf03ef04efc9f85c7c75e13534fc5bca7b8fbe818d8241053c1",
+  "render_sha": "a5030534fe49d1e87a7fa17de591dd4167a90439",
   "schema_version": 1,
   "surface": {
     "claude": {
@@ -15,7 +15,7 @@
         "round_trips": 4
       },
       "execute": {
-        "chars": 48962,
+        "chars": 49443,
         "round_trips": 17
       },
       "health": {
@@ -51,7 +51,7 @@
         "round_trips": 8
       },
       "review": {
-        "chars": 87262,
+        "chars": 87774,
         "round_trips": 38
       },
       "spec": {
@@ -73,7 +73,7 @@
     },
     "codex": {
       "hm-execute": {
-        "chars": 47829,
+        "chars": 48310,
         "round_trips": 16
       },
       "hm-help": {
@@ -97,7 +97,7 @@
         "round_trips": 7
       },
       "hm-review": {
-        "chars": 82573,
+        "chars": 83085,
         "round_trips": 33
       },
       "hm-spec": {

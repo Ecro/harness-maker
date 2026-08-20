@@ -22,6 +22,7 @@ from tempfile import mkdtemp
 
 import pytest
 
+from harness_maker.context_lint import THRESHOLDS
 from harness_maker.interview import interview
 from harness_maker.models import Preset, ProjectProfile
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
@@ -137,6 +138,16 @@ def test_the_operative_predicates_discriminate() -> None:
 
 
 def test_the_rendered_skill_is_within_the_context_lint_cap() -> None:
-    """Production caps SKILL.md at 150 lines; the renderer only warns, so assert it."""
+    """The context-lint cap, read from the lint's own table; the renderer only warns.
+
+    This used to hardcode 150 and say in its docstring that 150 was what Production caps a
+    SKILL.md at. That stopped being true in 0.45.0, when `THRESHOLDS` moved both skill rows to
+    300 because the acceptance-gate work put normative contracts into assets a role
+    description's budget cannot hold. The literal here was never updated, so the test enforced a
+    number no longer in force while asserting it WAS the cap — a second source of truth for a
+    value that already had one, which is what the `consistency` lens is told to flag. Read the
+    table instead: this can no longer drift from the lint the harness actually runs.
+    """
+    cap = THRESHOLDS[("skill", Preset.PRODUCTION.value)]
     lines = _skill_body(Preset.PRODUCTION).splitlines()
-    assert len(lines) <= 150, f"{_SKILL} SKILL.md is {len(lines)} lines (cap 150)"
+    assert len(lines) <= cap, f"{_SKILL} SKILL.md is {len(lines)} lines (cap {cap})"

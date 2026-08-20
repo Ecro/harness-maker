@@ -830,15 +830,22 @@ Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_pat
 
    On failure: identify the last fix that touched the failing file → **revert** it (restore original snippet) and log `Fix #{N} reverted — caused build failure`. Continue with remaining fixes (do not abort the round).
 
-   > **First read the failing assertion's setup and ask whether production can reach that
-   > state** — is the call it skips unconditional upstream, is the init it re-runs once-only.
-   > **Revert either way**; the answer changes the record, not the action. If the state is
-   > unreachable the fix broke no behaviour, so `caused build failure` is a false diagnosis of
-   > a test that over-specifies: log `reverted — test pins unreachable state: <upstream fact>`
-   > and carry one `manual-only` P1 `spec_gap`, as an oscillation is carried. Never grade-
-   > lowering, never authority to edit the test. Measured: four runs broke the same four
-   > tests, "AI fixes cause regressions, 4/4 reproduced" was one step from publication, and
-   > the code was never broken — the finding behind it was later adjudicated a false positive.
+   > **Classify the failure first — `targeted-test-selection` §4.5 owns the three-way split**
+   > (production reaches the state / it does not / the target is too narrow for the fix). Two
+   > things are review's own. **Revert either way**: the classification changes the record, not
+   > the action. And the record is per-cause, never one line for all three —
+   > `reverted — build/link error: <missing symbol or unit>` when nothing compiled or linked,
+   > `reverted — test pins unreachable state: <upstream fact>` for the unreachable case, and
+   > `caused build failure` **only** for a fix that built and failed an assertion. Collapsing
+   > them records a scope problem as a bad fix, and the next round re-derives the finding
+   > because nothing said the fix itself was sound.
+
+   > On §4.5's unreachable case, carry one `manual-only` P1 `spec_gap`, as an oscillation is
+   > carried — never grade-lowering, never authority to edit the test. Measured, and since
+   > superseded: four runs broke the same four tests and the finding driving those fixes was
+   > adjudicated a false positive, but re-running the loop with the reviewer able to read the
+   > repository produced those breaks **0 times in 10 rounds**. Ask the question anyway — the
+   > usual cause is a reviewer that could not see the caller, not a test that over-specifies.
 
 5b. **Measure this round's churn** — after Step 5's reverts, so a reverted fix does not count:
 
