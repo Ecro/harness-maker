@@ -42,11 +42,11 @@ jobs:
         run: uv run ruff format --check .
       - name: Mypy strict
         run: uv run mypy --strict src tests
-      # Parallel here, SERIAL in nightly.yml — both on purpose. `hm test_runners plan` calls
-      # pytest "the only common runner that is SERIAL by default, the one place `-n` is the
-      # whole win rather than a tweak", and warns that a suite only ever run in parallel hides
-      # order- and isolation-dependent failures. The nightly job is that serial run; do not
-      # parallelise it to match this one.
+      # `hm test_runners plan` calls pytest "the only common runner that is SERIAL by default,
+      # the one place `-n` is the whole win rather than a tweak". It also warns that a suite
+      # only ever run in parallel hides order- and isolation-dependent failures; the job that
+      # answers that warning is now `release.yml:quality-gate`, the last serial full-suite run
+      # in CI. Nightly is parallel too — its comment explains the trade.
       #
       # Why this changed: run 32377369255 hit the 15m cap. It was not a step-change — the six
       # successful runs before it took 812/837/850/814/884/846s against a 900s cap, so the
@@ -55,8 +55,8 @@ jobs:
       #
       # `--dist loadfile` is load-bearing, not tuning: tests here touch cwd, temp paths and git
       # refs, and `--dist load` would spread one file's tests across workers and let them race.
-      # `-n` stays on the command line rather than in `addopts` for the same reason the serial
-      # nightly exists — a local serial run must stay possible without editing config.
+      # `-n` stays on the command line rather than in `addopts`: `uv run pytest` with no flags
+      # must stay a genuine serial run, both locally and in release.yml, which passes no flags.
       #
       # Measured (14-core WSL2, so read the RATIO, not the seconds): serial did not finish
       # inside 1800s; `-n 4 --dist loadfile -m "not advisory"` finished in 331s with zero

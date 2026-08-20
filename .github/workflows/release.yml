@@ -50,6 +50,12 @@ jobs:
         run: uv run ruff format --check .
       - name: Mypy strict
         run: uv run mypy --strict src tests
+      # SERIAL on purpose, and now the ONLY serial full-suite run in CI — ci.yml and nightly.yml
+      # both moved to `-n auto --dist loadfile`. `hm test_runners plan` warns that a suite only
+      # ever run in parallel hides order- and isolation-dependent failures; this job is what
+      # answers that warning, and a failure it catches blocks a release rather than reaching
+      # one. Do NOT add `-n` here. ~14 min against the 20-minute cap above: if that gets tight,
+      # add a second job rather than parallelising this step.
       - name: Pytest
         run: uv run pytest -x --tb=short
       - name: Integration test — fresh install readiness

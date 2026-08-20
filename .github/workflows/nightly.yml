@@ -40,12 +40,27 @@ jobs:
         run: uv run ruff format --check .
       - name: Mypy strict
         run: uv run mypy --strict src tests
-      # SERIAL on purpose — ci.yml's quality-gate runs `-n auto --dist loadfile`, and this is
-      # the run that would catch what parallelism hides (order- and isolation-dependent
-      # failures). `hm test_runners plan` states that contract; keep this job unparallelised
-      # even if it becomes the slower one.
+      # Parallel, matching ci.yml. `hm test_runners plan` warns that a suite only ever run in
+      # parallel hides order- and isolation-dependent failures, and this job was where that
+      # warning was being honoured — for one day.
+      #
+      # The serial run did not disappear; it moved. `release.yml:quality-gate` still runs
+      # `uv run pytest -x --tb=short` with no `-n` (~14 min against a 20-minute cap), so a
+      # failure that only appears in a serial ordering now surfaces at TAG time. That is a
+      # later signal, and arguably the better place for it: such a failure blocks a release
+      # instead of reaching one. It is also the last serial run in CI — parallelising that job
+      # too would remove the oracle outright, so do not, and if its cap ever gets tight, add a
+      # separate serial job rather than adding `-n` there.
+      #
+      # `--dist loadfile` keeps each file's tests on one worker, so within-file ordering — where
+      # this suite's cwd, temp-path and git-ref coupling actually lives — is preserved either
+      # way; only cross-file ordering is given up. `addopts` still has no `-n` so a bare
+      # `uv run pytest` stays serial for local runs.
+      #
+      # What this bought is machine time, not a person's: nightly has a 30-minute cap, finished
+      # serially in 810s, and nobody waits on it.
       - name: Pytest
-        run: uv run pytest -x --tb=short
+        run: uv run pytest -x --tb=short -n auto --dist loadfile
       - name: Integration test — fresh install readiness
         env:
           INTEGRATION: "1"
