@@ -6,11 +6,13 @@ created: 2026-08-19
 tags: [harness-maker, plan, review-stage, telemetry, auto-fix-loop]
 summary: "Give the disposition gate a measurement surface; stop diagnosing over-specified tests as regressions; take P2 out of the fixer's queue."
 surface_allowance:
-  chars: 2096
-  reason: "MEASURED after the reduction, not before. round_trips 37/33 unchanged — every rule lands in a step that already runs. The number moved four times and each move is attributable: 2516 first draft -> 1861 after cutting all three blocks to the facts that change a reader decision -> 1975 when finalize gained the counts and the record list gained copy-it-never-tally-it -> 1908 after a rationale cut -> 1914 when a confirm-1 repair fixed two self-contradicting prose spots -> 2096 now. The last move is the ONLY one that is a net addition rather than a repair, and it is the price of Option A: deleting round_record.py (228 lines) means the producers tee their payload and emit takes --measured, which costs +182 prompt characters across four template arms. That trade removed five P1 findings and six P2s, all of them in the store machinery and none in the feature. The per-command atomic ceiling needs 818 of it; the rest is aggregate."
+  chars: 2572
+  reason: "MEASURED after the reduction, not before. round_trips 37/33 unchanged — every rule lands in a step that already runs. The number moved four times and each move is attributable: 2516 first draft -> 1861 after cutting all three blocks to the facts that change a reader decision -> 1975 when finalize gained the counts and the record list gained copy-it-never-tally-it -> 1908 after a rationale cut -> 1914 when a confirm-1 repair fixed two self-contradicting prose spots -> 2096 now. The last move is the ONLY one that is a net addition rather than a repair, and it is the price of Option A: deleting round_record.py (228 lines) means the producers tee their payload and emit takes --measured, which costs +182 prompt characters across four template arms. That trade removed five P1 findings and six P2s, all of them in the store machinery and none in the feature. A second review of the reduction then found a P0 and six P1s and the repairs took it to 2572: `set -o pipefail` on two producer pipelines (four template arms), an absolute-path rule for the tee'd payload paths, the `!` auto-exec marker the emit step never had, and moving `--spec` back in front of the pipe. round_trips 37 -> 38 for the `!`, re-baselined in test_roundtrip_budget.py with its reason. The per-command atomic ceiling needs 1294 of it; the rest is aggregate."
   delta_doc: BASELINE-DELTA-review-loop-ledger-fixes.md
+  round_trips:
+    review: 1
   commands:
-    review: 818
+    review: 1294
 ---
 
 # PLAN — three fixes the re-audit left standing

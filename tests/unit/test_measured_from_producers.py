@@ -21,6 +21,7 @@ needed proving about locks and run identity has no subject any more.
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 from typing import Any
 
@@ -283,3 +284,101 @@ def test_an_off_vocabulary_disposition_is_rejected() -> None:
     for shipped_by_accident in ("fixed", "accepted-not-fixed", "deferred", "out-of-scope"):
         with pytest.raises(ValueError, match=shipped_by_accident):
             ReviewTelemetryRecord(**_row(disposition_counts={shipped_by_accident: 1}))
+
+
+# ── carried back from the suite this file replaced ───────────────────────────
+# The store's tests went with the store. These three did not test the store at
+# all — schema validation, the single-source enum, and finalize's tally under AC
+# verification — and deleting them was a silent coverage loss, not a
+# simplification the reduction's rationale covers.
+
+
+def test_a_negative_count_is_rejected() -> None:
+    with pytest.raises(ValueError, match="negative"):
+        ReviewTelemetryRecord(**_row(disposition_counts={"accepted": -1}))
+
+
+def test_the_disposition_vocabulary_is_not_restated_in_the_model() -> None:
+    """One source for the enum. A second list is how the two drift apart."""
+    source = Path(review_telemetry.__file__).read_text(encoding="utf-8")
+    assert "DISPOSITION_VALUES" in source
+    assert '"duplicate"' not in source, "the enum is restated instead of imported"
+
+
+def test_the_counts_are_taken_after_ac_verification_not_before() -> None:
+    """A `rejected` no machine SPEC can verify is `unresolved` by the time the grade is set.
+
+    Counting the proposed value instead would report a rejection the gate did not honour — and
+    on a SPEC-less harness that is EVERY rejection.
+    """
+    out = review_consensus.finalize(
+        [
+            {
+                "id": "b",
+                "severity": "P2",
+                "disposition": "rejected",
+                "authority": "AC-004",
+                "voices": [_LENS],
+            }
+        ]
+    )
+    assert out["disposition_counts"] == {
+        "accepted": 0,
+        "duplicate": 0,
+        "rejected": 0,
+        "unresolved": 1,
+    }
+
+
+# ── the churn side of the stamp contract, driven through its own CLI ─────────
+
+
+def test_measure_stamps_slug_and_round_through_its_cli(at: Path, capsys: Any) -> None:
+    """The consensus side had a CLI test; the churn side was asserted only by a hand-built dict.
+
+    If `review_churn`'s stamping line broke, every round-2+ churn payload would arrive unstamped
+    — and `_measured_from` ACCEPTS an unstamped payload, so the refusal guarantee would silently
+    stop applying to churn with no test failing.
+    """
+    subprocess.run(["git", "init", "-q", "-b", "main", "."], check=True, capture_output=True)
+    subprocess.run(["git", "config", "user.email", "t@example.com"], check=True)
+    subprocess.run(["git", "config", "user.name", "t"], check=True)
+    Path("a.py").write_text("x = 1\n", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-qm", "one"], check=True, capture_output=True)
+    assert review_churn.main(["pin", "--slug", "demo", "--label", "pre", "--root", "."]) == 0
+    Path("a.py").write_text("x = 2\ny = 3\n", encoding="utf-8")
+    subprocess.run(["git", "add", "-A"], check=True, capture_output=True)
+    subprocess.run(["git", "commit", "-qm", "two"], check=True, capture_output=True)
+    assert review_churn.main(["pin", "--slug", "demo", "--label", "post", "--root", "."]) == 0
+    capsys.readouterr()
+
+    rc = review_churn.main(
+        [
+            "measure",
+            "--slug",
+            "demo",
+            "--round",
+            "2",
+            "--root",
+            ".",
+            "--pre",
+            "refs/hm-churn/v1/demo-pre",
+            "--post",
+            "refs/hm-churn/v1/demo-post",
+        ]
+    )
+    assert rc == 0
+    payload = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
+    assert payload["slug"] == "demo"
+    assert payload["round"] == 2
+    assert set(MEASURED_KEYS) & set(payload), "no measured key on the churn payload"
+
+
+def test_two_producer_files_carrying_one_key_are_last_wins(at: Path) -> None:
+    """Undocumented before; pinned here so a change to the order is a decision, not a drift."""
+    first = _write("a.json", {"slug": "demo", "round": 1, "disposition_counts": {"accepted": 1}})
+    second = _write("b.json", {"slug": "demo", "round": 1, "disposition_counts": {"accepted": 2}})
+    args = ["emit", "--file", _write("row.json", _row()), "--measured", first]
+    assert review_telemetry.main([*args, "--measured", second]) == 0
+    assert _emitted(at)["disposition_counts"] == {"accepted": 2}

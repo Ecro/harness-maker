@@ -104,7 +104,7 @@ both writes live in the CLI layer, which already did IO.
 **Larger**, and it is a trade, not a correction. The first draft measured **+2 516** per variant;
 compressing all three blocks to the facts that change a reader's decision brought it to +1 861;
 moving the counts onto `finalize`'s payload then added the `copy it, never tally it yourself`
-rule and took it to +1 975, and a further rationale cut landed it at **+1 908**. Both cuts
+rule and took it to +1 975, and a further rationale cut landed it at **+1 909**. Both cuts
 happened before this number was taken — per this repo's own rule that prose is cut
 back before a ceiling is raised.
 
@@ -135,7 +135,7 @@ reach it. The branch now has a test that actually enters it. And a docstring her
 sentence that does not exist** in `stage_agent_ledger`; a fabricated citation is not a P2 to
 defer, so it is gone.
 
-The +5 characters are two template one-liners: Step 4d's payload enumeration gained the
+1 909 + 5 = 1 914. The +5 characters are two template one-liners: Step 4d's payload enumeration gained the
 `disposition_counts` key it has always returned, and the telemetry field list lost the key the
 next sentence tells the model to omit.
 

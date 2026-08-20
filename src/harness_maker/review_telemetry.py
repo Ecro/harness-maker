@@ -370,10 +370,16 @@ def _measured_from(
     is ignored, so a producer growing a new key cannot leak it into an append-only row.
 
     **A file whose `slug`/`round` disagree with the row is refused**, not merged. Those two keys
-    are stamped by the producers when they are given `--slug`/`--round`, which makes a stale file
-    from an earlier round a decidable error rather than a silent wrong number — the one hazard
-    passing paths introduces over a shared store. A file that carries neither is accepted: it
-    predates the stamp.
+    are stamped by the producers when they are given `--slug`/`--round`, so a payload left over
+    from a DIFFERENT round or slug is a decidable error rather than a silent wrong number. A file
+    carrying neither is accepted: it predates the stamp.
+
+    **The stamp does not separate two runs of the SAME slug and round.** `review_run`'s
+    single-open guard makes that rare and `open --force` makes it possible, and a payload from the
+    displaced run passes both checks. The store this replaced did not close that case either — it
+    answered it with a run-id stamp that then produced a TOCTOU and an un-timed lock. What is
+    claimed here is narrower than "two runs stay apart": a stale file from another round or slug
+    cannot become a wrong number. Same round, same slug, two runs, still can.
 
     This replaced a shared scratch store keyed by (slug, round). The store had to answer three
     questions a file path does not: which root it lives under (producers run with `cd <WT> &&`
@@ -499,7 +505,14 @@ def main(argv: list[str] | None = None) -> int:
     except ValidationError as exc:
         sys.stderr.write(f"emit: schema validation failed: {exc}\n")
         return 1
-    path = emit(record, project_root=Path.cwd())
+    try:
+        path = emit(record, project_root=Path.cwd())
+    except (OSError, ValueError) as exc:
+        # `_append_atomic_line` refuses a row past PIPE_BUF rather than interleaving it. Now that
+        # `churn_max_path` and `disposition_counts` routinely populate, rows are larger than when
+        # that ceiling was set — an operator should see the reason, not a traceback.
+        sys.stderr.write(f"emit: row not appended: {exc}\n")
+        return 1
     sys.stdout.write(str(path) + "\n")
     return 0
 

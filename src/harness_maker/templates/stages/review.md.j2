@@ -513,9 +513,9 @@ plus `reasoning_diverges: true` when Step 4b found matching OBSERVE with divergi
 the `disposition`/`authority` that Step 4e describes. Write the array to a temp path, then:
 
 {% if is_codex %}```bash
-Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_consensus finalize --file <the literal temp path> --slug {slug} --round <N> | tee <FINALIZE-r{N}>{% if config.dev_mode == 'spec-driven' %} --spec {{ config.spec.dir }}SPEC-{slug}.machine.yaml{% endif %}")
+Bash("{{ 'cd <WT> && ' if wt_on else '' }}set -o pipefail; uv run --with {{ harness_maker_src_path }} hm review_consensus finalize --file <the literal temp path> --slug {slug} --round <N>{% if config.dev_mode == 'spec-driven' %} --spec {{ config.spec.dir }}SPEC-{slug}.machine.yaml{% endif %} | tee <FINALIZE-r{N}>")
 ```{% else %}```bash
-!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_consensus finalize --file <the literal temp path> --slug {slug} --round <N> | tee <FINALIZE-r{N}>{% if config.dev_mode == 'spec-driven' %} --spec {{ config.spec.dir }}SPEC-{slug}.machine.yaml{% endif %}
+!{{ 'cd <WT> && ' if wt_on else '' }}set -o pipefail; uv run --with {{ harness_maker_src_path }} hm review_consensus finalize --file <the literal temp path> --slug {slug} --round <N>{% if config.dev_mode == 'spec-driven' %} --spec {{ config.spec.dir }}SPEC-{slug}.machine.yaml{% endif %} | tee <FINALIZE-r{N}>
 ```{% endif %}
 
 It **reads only** and prints one payload: `{"findings": [...with `tag`...], "grade": …,
@@ -843,9 +843,9 @@ Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_pat
 5b. **Measure this round's churn** — after Step 5's reverts, so a reverted fix does not count:
 
 {% if is_codex %}```bash
-Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_churn pin --slug {slug} --label r{N}-post && uv run --with {{ harness_maker_src_path }} hm review_churn measure --slug {slug} --round {N} --pre refs/hm-churn/v1/{slug}-r{N}-pre --post refs/hm-churn/v1/{slug}-r{N}-post | tee <CHURN-r{N}>")
+Bash("{{ 'cd <WT> && ' if wt_on else '' }}set -o pipefail; uv run --with {{ harness_maker_src_path }} hm review_churn pin --slug {slug} --label r{N}-post && uv run --with {{ harness_maker_src_path }} hm review_churn measure --slug {slug} --round {N} --pre refs/hm-churn/v1/{slug}-r{N}-pre --post refs/hm-churn/v1/{slug}-r{N}-post | tee <CHURN-r{N}>")
 ```{% else %}```bash
-!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_churn pin --slug {slug} --label r{N}-post && uv run --with {{ harness_maker_src_path }} hm review_churn measure --slug {slug} --round {N} --pre refs/hm-churn/v1/{slug}-r{N}-pre --post refs/hm-churn/v1/{slug}-r{N}-post | tee <CHURN-r{N}>
+!{{ 'cd <WT> && ' if wt_on else '' }}set -o pipefail; uv run --with {{ harness_maker_src_path }} hm review_churn pin --slug {slug} --label r{N}-post && uv run --with {{ harness_maker_src_path }} hm review_churn measure --slug {slug} --round {N} --pre refs/hm-churn/v1/{slug}-r{N}-pre --post refs/hm-churn/v1/{slug}-r{N}-post | tee <CHURN-r{N}>
 ```{% endif %}
 
    `tee` keeps this payload for the Telemetry Emit step, which reads the four `churn_*` keys
@@ -1130,7 +1130,7 @@ Bash("uv run --with {{ harness_maker_src_path }} hm review_telemetry emit --file
 ```
 {% else %}
 ```bash
-uv run --with {{ harness_maker_src_path }} hm review_telemetry emit --file <the literal temp path> --measured <FINALIZE-r{N}> <plus --measured <CHURN-r{N}> from round 2>
+!uv run --with {{ harness_maker_src_path }} hm review_telemetry emit --file <the literal temp path> --measured <FINALIZE-r{N}> <plus --measured <CHURN-r{N}> from round 2>
 ```
 {% endif %}
 
@@ -1139,7 +1139,14 @@ Record fields:
 confirm_pass_ran, confirm_pass_new_severe_n}`.
 
 **Leave `disposition_counts` and every `churn_*` key OUT of the row you write.** `--measured`
-reads them from the payloads you `tee`'d at Step 4d and Step 5b. A value you supply is discarded
+reads them from the payloads you `tee`'d at Step 4d and Step 5b.
+
+> **`<FINALIZE-r{N}>` and `<CHURN-r{N}>` must be ABSOLUTE paths** — take them from `mktemp`, never
+> a bare filename.{% if wt_on %} The producers run from the task worktree and this command does
+> not, so a relative path is written in one directory and looked for in another. That is the same
+> producer/consumer split that made every measured field null before, arriving by a shorter
+> route;{% else %} A later step may run from a different directory than the producers did;{% endif %}
+> `emit` reports the miss but the row still goes out empty. A value you supply is discarded
 with a warning, and a payload whose stamped `slug`/`round` disagree with the row is refused, so a
 stale file cannot become a wrong number. "No producer output" means you did not pass
 `--measured` — fix that, never type the numbers in.

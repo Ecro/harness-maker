@@ -171,7 +171,7 @@ model — that property is unchanged and is the entire purpose of the change.
 | P1 #2 flock has no timeout | no subject |
 | P1 #3 flock has no oracle | no subject |
 | P1 #4 `_base_root`'s `RuntimeError` claim | no subject — the function is gone |
-| P1 #5 BASELINE-DELTA arithmetic | rewritten for the reduced design |
+| P1 #5 BASELINE-DELTA arithmetic | **still live when this table was written** — the claim of a rewrite was wrong. The stale figure was `1 908` (the pre-1 909 measurement), not the `+5`; corrected in the round-2 repair. |
 | P2 `--force` discards a round · janitor · duplicated parser · lock containment · double base-root resolution · `_base_root` as the lone wrapper | all no subject |
 | P2/P3 test findings about the store, `_open_run`, the fail-open mock | suite replaced (15 tests, new subject) |
 
@@ -195,3 +195,70 @@ accepted so nothing predating the stamp regresses.
 **Verification of the reduced tree:** `ruff check` / `ruff format --check` / `mypy --strict`
 (141 source files) / full `pytest` — all green, `rc=0`, zero failures. That is a test result,
 not a review.
+
+---
+
+# REVIEW round 2 — the reduction itself
+
+Run `c5970332fbe3`, base `7da81847`, unreviewed slice `5c0dfe8c..HEAD`. Seven lenses plus
+`codex` (which recovered from its quota window; `antigravity` skipped again on `CANCELED`).
+
+**Status: CHANGES_REQUESTED.** The P0 and five of the P1s were repaired and verified; the review
+was then stopped by decision rather than by the stage running out of rounds. No confirmation pass
+ran, so **the repairs below have not themselves been reviewed** — the same condition that
+preceded every previous round's severe findings. Recorded, not implied.
+
+## What it found — all of it real
+
+| Sev | Finding | Sources | Repaired |
+|---|---|---|---|
+| **P0** | `--spec` rendered *after* `\| tee <file>`, so the shell handed it to `tee`, which rejects an unrecognised long option and exits 1. On a spec-driven harness Step 4d produced no payload and `finalize` never received the flag that makes AC-cited rejections verifiable. | design, robustness, codex | ✅ moved before the pipe |
+| P1 | `a \| tee f` reports `tee`'s status. `review_churn measure` writes nothing to stdout on failure, so a real measurement failure produced an empty file → `emit` reported it unreadable → churn fields null, **indistinguishable on disk from a version that never measured** — the one distinction the schema's null design exists to preserve. | robustness, codex | ✅ `set -o pipefail` on both pipelines |
+| P1 | "Absolute temp paths, so the P0 cannot re-form" was asserted in a docstring and in BASELINE-DELTA. The template never said *absolute* or *mktemp*. Producers run from the worktree, `emit` from base; a relative path reproduces the original null-field defect by a shorter route. | consistency | ✅ rule stated, gated on `wt_on` |
+| P1 | The Telemetry Emit step's Claude arm had no `!` auto-exec marker — the only CLI line in the command without one, on the step that writes this whole change's deliverable. | functionality | ✅ added; round-trip table re-baselined 37 → 38 with its reason |
+| P1 | BASELINE-DELTA's arithmetic was still wrong, **and this document's own post-review table claimed it had been rewritten.** An unfixed finding recorded as fixed. | consistency | ✅ figure corrected; the false claim struck |
+| P1 | The stamp does not separate two runs of the *same* slug and round, while the docstring implied a stale payload could never become a wrong number. | codex | ✅ claim narrowed to what it actually holds |
+| P1 | `review_churn`'s stamping had no CLI-level test — only `finalize`'s side was proven, and `_measured_from` *accepts* an unstamped payload, so a regression there would go silent. | tests | ✅ test drives the real CLI against a real repo |
+| P2 | The replacement suite silently dropped three arms that had nothing to do with the store: negative-count rejection, the enum-not-restated check, and the counts-after-AC-verification tally. | tests | ✅ carried back |
+| P2 | `emit()` was unwrapped in `main()`; an oversize row would traceback rather than diagnose. | concurrency | ✅ wrapped |
+| P2 | Two `--measured` files carrying one key was undocumented last-wins. | codex, robustness, tests | ✅ pinned by test |
+
+## Deliberately not repaired
+
+- `--measured <path>` has no containment or symlink guard, and an unstamped payload is accepted.
+  Both bounded by the `MEASURED_KEYS` filter plus strict pydantic validation before the append.
+  *(security, P2)*
+- `review_churn`'s pin refs are `refs/hm-churn/v1/{slug}-{label}` — no run id, and custom refs are
+  shared across worktrees, so two runs on one slug clobber each other's churn measurement.
+  **Pre-existing, out of this diff.** *(concurrency, P1)*
+- `emit` parses `--measured` by hand rather than argparse, diverging from the two producers
+  touched in the same commit. *(design, P2)*
+- The template's prose rules still have no presence tripwire. *(tests, P3)*
+- `"No producer output"` is also printed for an unreadable, malformed, mismatched or key-less
+  payload, so the diagnosis over-narrows. *(codex, P3)*
+
+## The gates this review added, and why they are the only thing that shortens the next one
+
+Every severe finding across both reviews landed in a dimension the suite could not express — not
+in hard code. The existing tests were correct about what they measured:
+
+| Dimension | Why nothing caught it | Now |
+|---|---|---|
+| cwd | writer and reader shared one `tmp_path`, so a root mismatch was unrepresentable | a real `git worktree add` regression test |
+| shell semantics | every gate read the rendered TEXT; the snapshots compare body hashes, and regenerating them after the change **blessed the broken line** | `bash -n` on the substituted line, a structural check on what follows the pipe, and a `pipefail` assertion — mutation-receipted against `review.md.j2:518` |
+| the churn half of the stamp contract | asserted by a hand-built fixture dict | driven through `review_churn.main` |
+
+That is the transferable result. The three items this change shipped do not reduce review rounds;
+moving a defect class from "found by the next round's reviewer" to "found by pytest in seconds"
+does.
+
+## Why this stopped here
+
+The stage terminated correctly both times — confirm-2 dirty in review 1, grade D in review 2.
+Neither loop ran away. What was unbounded was the decision to re-enter after each repair, which
+nothing in the harness budgets and nothing should: it is a judgment, and it was exercised here.
+
+The residual is not a defect count, it is the ordinary one: a repair is new code, and new code has
+a defect rate. The source experiment measured new findings as a function of revision churn
+(r = 0.837), not of convergence. Expecting a review round to return nothing is expecting that rate
+to be zero.

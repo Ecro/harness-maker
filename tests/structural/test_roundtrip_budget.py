@@ -172,7 +172,14 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     #       it is not charged here. (An auto-fix-loop cache read was also added and then
     #       withdrawn in review — see the `execute` note above. It was inline prose either way,
     #       so this count never moved for it.)
-    "review": 37,
+    #   +1  The Telemetry Emit step's Claude arm gained the `!` auto-exec marker
+    #       (2026-08-20). It is not a new call — the step always existed and always had to
+    #       run — but it was the ONLY CLI line in this command rendered without `!`, so the
+    #       metric never charged for a step the operator was expected to run by reading prose.
+    #       That step is the one that writes `disposition_counts` and the four `churn_*` keys,
+    #       i.e. the entire deliverable of PLAN-review-loop-ledger-fixes; a review round found
+    #       it unmarked. The count rises because the command became honest, not longer.
+    "review": 38,
     "spec": 6,
     "uninstall": 3,
     "verify": 13,
