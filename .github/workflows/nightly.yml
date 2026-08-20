@@ -40,6 +40,10 @@ jobs:
         run: uv run ruff format --check .
       - name: Mypy strict
         run: uv run mypy --strict src tests
+      # SERIAL on purpose — ci.yml's quality-gate runs `-n auto --dist loadfile`, and this is
+      # the run that would catch what parallelism hides (order- and isolation-dependent
+      # failures). `hm test_runners plan` states that contract; keep this job unparallelised
+      # even if it becomes the slower one.
       - name: Pytest
         run: uv run pytest -x --tb=short
       - name: Integration test — fresh install readiness

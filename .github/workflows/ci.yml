@@ -42,8 +42,29 @@ jobs:
         run: uv run ruff format --check .
       - name: Mypy strict
         run: uv run mypy --strict src tests
+      # Parallel here, SERIAL in nightly.yml — both on purpose. `hm test_runners plan` calls
+      # pytest "the only common runner that is SERIAL by default, the one place `-n` is the
+      # whole win rather than a tweak", and warns that a suite only ever run in parallel hides
+      # order- and isolation-dependent failures. The nightly job is that serial run; do not
+      # parallelise it to match this one.
+      #
+      # Why this changed: run 32377369255 hit the 15m cap. It was not a step-change — the six
+      # successful runs before it took 812/837/850/814/884/846s against a 900s cap, so the
+      # remaining headroom (16-88s) had been smaller than the run-to-run spread (72s) for weeks.
+      # Raising `timeout-minutes` buys time until the next commit; this attacks the cause.
+      #
+      # `--dist loadfile` is load-bearing, not tuning: tests here touch cwd, temp paths and git
+      # refs, and `--dist load` would spread one file's tests across workers and let them race.
+      # `-n` stays on the command line rather than in `addopts` for the same reason the serial
+      # nightly exists — a local serial run must stay possible without editing config.
+      #
+      # Measured (14-core WSL2, so read the RATIO, not the seconds): serial did not finish
+      # inside 1800s; `-n 4 --dist loadfile -m "not advisory"` finished in 331s with zero
+      # failures; `-n auto` at 14 workers took 333s. Equal times at 4 and 14 workers means the
+      # suite is bound by subprocess and filesystem waiting, not cores — which is why a 4-vCPU
+      # runner is expected to see the same kind of win.
       - name: Pytest
-        run: uv run pytest -x --tb=short
+        run: uv run pytest -x --tb=short -n auto --dist loadfile
 
   dependency-review:
     # Runs only on PRs — blocks introduction of vulnerable transitive deps.
