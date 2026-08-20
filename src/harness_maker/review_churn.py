@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from harness_maker import command_registry, freeze, round_record
+from harness_maker import command_registry, freeze
 
 DEFAULT_CHURN_RATIO = 0.30
 """Fraction of a touched file's LOC above which a repair round re-reviews.
@@ -557,8 +557,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--slug")
     parser.add_argument("--label")
     parser.add_argument("--rounds")
-    # The producer half of `round_record` for `measure`. `--slug` already exists for the other
-    # two verbs; `--round` is what keys the record `review_telemetry emit` reads.
+    # `--slug` already exists for the other two verbs. Given with `--round`, `measure` stamps
+    # both onto its own payload so `review_telemetry emit` can refuse a stale file.
     parser.add_argument("--round", type=int, dest="round_n")
     parser.add_argument("--root", default=".")
     try:
@@ -595,14 +595,10 @@ def main(argv: list[str] | None = None) -> int:
     except (subprocess.CalledProcessError, ChurnMeasurementError) as e:
         sys.stderr.write(f"[churn] measurement failed: {e}\n")
         return 1
-    if opts.slug and opts.round_n:
-        # Best effort: a scratch file that cannot be written must not fail a repair round whose
-        # measurement already succeeded. `emit` reports the resulting absence.
-        try:
-            round_record.merge(Path(opts.root), opts.slug, opts.round_n, result.as_record())
-        except (OSError, ValueError) as exc:
-            sys.stderr.write(f"[churn] round record not written: {exc}\n")
-    sys.stdout.write(json.dumps(result.as_detail(), sort_keys=True) + "\n")
+    detail = result.as_detail()
+    if opts.slug and opts.round_n is not None:
+        detail["slug"], detail["round"] = opts.slug, opts.round_n
+    sys.stdout.write(json.dumps(detail, sort_keys=True) + "\n")
     return 0
 
 

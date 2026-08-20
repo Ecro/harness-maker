@@ -2,10 +2,11 @@
 
 PLAN-llm-code-review-2026 ADR-006 specifies a per-session JSONL line keyed
 to `.claude/observability/review-{YYYY-MM-DD}.jsonl`. Append uses POSIX
-`O_APPEND` so writes ≤ PIPE_BUF (4096 bytes) are kernel-atomic — sufficient
-for the 19-field record. Concurrent reviewers (autoloop + Cursor sharing
-``.worktrees/``) thereby serialize at the kernel level without explicit
-locking.
+`O_APPEND` so writes ≤ PIPE_BUF (4096 bytes) are kernel-atomic. `_append_atomic_line`
+enforces that ceiling at write time and raises rather than truncating, which is the
+load-bearing guarantee — not any particular field count. Concurrent reviewers
+(autoloop + Cursor sharing ``.worktrees/``) thereby serialize at the kernel level
+without explicit locking.
 """
 
 from __future__ import annotations
@@ -26,12 +27,31 @@ from pydantic import (
     model_validator,
 )
 
-from harness_maker import command_registry, round_record
+from harness_maker import command_registry
 from harness_maker.codex_ledger import DISPOSITION_VALUES
 from harness_maker.conditional_router import KNOWN_LENSES
 
 # Default location relative to project root — overridable via parameter.
 DEFAULT_OBSERVABILITY_DIR = Path(".claude/observability")
+
+#: The fields a PRODUCER owns. `emit` takes these from the producer's own output and from
+#: nowhere else, so a number never passes through the model.
+#:
+#: Every one of them is nullable, and that is the whole failure this exists to end: measured on
+#: this repository's ledger, 69 rows carried `churn_ratio` 0/69, `churn_measured_n` 0/69,
+#: `lenses_exercised` 0/69, `confirm_pass_ran` 0/69 — while all nine REQUIRED fields were present
+#: in every row. A schema optional is a prompt optional, and "always, per round" in prose does not
+#: survive it. `review_churn.DEFAULT_CHURN_RATIO` records the cost: a live gate threshold set from
+#: an estimate because the recalibration data never arrived across four repositories, 123 rows.
+#:
+#: Adding a measured field means adding it here AND having its producer print it.
+MEASURED_KEYS: tuple[str, ...] = (
+    "disposition_counts",
+    "churn_ratio",
+    "churn_max_path",
+    "churn_measured_n",
+    "churn_excluded_n",
+)
 
 
 class ReviewTelemetryRecord(BaseModel):
@@ -111,7 +131,8 @@ class ReviewTelemetryRecord(BaseModel):
     churn_excluded_n: int | None = Field(default=None, ge=0)
 
     # ── disposition record (Step 4e's only machine-readable trace) ───────────
-    # `finalize` returns dispositions on stdout and writes nothing; the ledger's
+    # The pure `finalize()` writes nothing (the CLI verb writes the round record when
+    # `--slug`/`--round` are given, and `emit` reads that output); the ledger's
     # per-finding disposition rows are a closed enum of second-opinion vendors, so
     # a reviewer-lens disposition had no value that would name it and its only
     # record was REVIEW prose. That made the rejection rate — the number ADR-002
@@ -339,39 +360,84 @@ def record_from_dict(
 # ── CLI ──────────────────────────────────────────────────────────────────────
 
 
-def _take_measured_from_producers(data: dict[str, Any], *, root: Path) -> dict[str, Any]:
-    """Measured fields come from the round record and from nowhere else.
+def _measured_from(
+    paths: list[str], *, slug: str, round_n: int
+) -> tuple[dict[str, Any], list[str]]:
+    """Collect the measured keys from the producers' own output files.
 
-    Stripping rather than defaulting is the point. A model-supplied value is DISCARDED even
-    when the record has nothing, because the alternative — accept it when the record is empty
-    — is exactly the arrangement that produced 0/69 populated rows: the field stays optional
-    to whoever assembles the row, and an optional field does not get written. Here its
-    presence or absence is decided by whether the producer ran.
+    Each path is one producer's stdout, verbatim — `review_consensus finalize`'s payload or
+    `review_churn measure`'s. Only `MEASURED_KEYS` are taken; everything else in those payloads
+    is ignored, so a producer growing a new key cannot leak it into an append-only row.
 
-    Both anomalies are reported to stderr and neither is fatal: a review must not fail over
-    telemetry, and a row with a null measure is honest. `slug`/`round` are required fields, so
-    a row missing them is already a schema error and is left for the validator to report.
+    **A file whose `slug`/`round` disagree with the row is refused**, not merged. Those two keys
+    are stamped by the producers when they are given `--slug`/`--round`, which makes a stale file
+    from an earlier round a decidable error rather than a silent wrong number — the one hazard
+    passing paths introduces over a shared store. A file that carries neither is accepted: it
+    predates the stamp.
+
+    This replaced a shared scratch store keyed by (slug, round). The store had to answer three
+    questions a file path does not: which root it lives under (producers run with `cd <WT> &&`
+    and `emit` does not — that mismatch was a P0), how two writers coordinate (a lock), and how
+    two runs stay apart (a run-id stamp). Those three answers produced five P1 findings across
+    two review rounds, none of them in the feature. Absolute temp paths make all three questions
+    disappear rather than answering them.
+    """
+    measured: dict[str, Any] = {}
+    errors: list[str] = []
+    for path in paths:
+        try:
+            payload = json.loads(Path(path).read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError, ValueError) as exc:
+            errors.append(f"{path}: unreadable producer output ({exc})")
+            continue
+        if not isinstance(payload, dict):
+            errors.append(f"{path}: producer output is not a JSON object")
+            continue
+        stamped_slug, stamped_round = payload.get("slug"), payload.get("round")
+        if stamped_slug is not None and stamped_slug != slug:
+            errors.append(f"{path}: slug {stamped_slug!r} does not match the row's {slug!r}")
+            continue
+        if stamped_round is not None and stamped_round != round_n:
+            errors.append(f"{path}: round {stamped_round!r} does not match the row's {round_n}")
+            continue
+        measured.update({k: v for k, v in payload.items() if k in MEASURED_KEYS})
+    return measured, errors
+
+
+def _apply_measured(data: dict[str, Any], paths: list[str]) -> dict[str, Any]:
+    """Measured fields come from the producers and from nowhere else.
+
+    Stripping rather than defaulting is the point. A model-supplied value is DISCARDED even when
+    no producer file was given, because the alternative — accept it when there is nothing to
+    compare against — is exactly the arrangement that produced 0/69 populated rows: the field
+    stays optional to whoever assembles the row, and an optional field does not get written.
+
+    Every anomaly goes to stderr and none is fatal: a review must not fail over telemetry, and a
+    row with a null measure is honest. `slug`/`round` are required fields, so a row missing them
+    is already a schema error and is left for the validator to report.
     """
     slug, round_n = data.get("slug"), data.get("round")
     if not isinstance(slug, str) or not isinstance(round_n, int) or isinstance(round_n, bool):
         return data
 
-    out = {k: v for k, v in data.items() if k not in round_record.MEASURED_KEYS}
-    supplied = {k: v for k, v in data.items() if k in round_record.MEASURED_KEYS}
-    measured = round_record.read(root, slug, round_n)
+    out = {k: v for k, v in data.items() if k not in MEASURED_KEYS}
+    supplied = {k: v for k, v in data.items() if k in MEASURED_KEYS}
+    measured, errors = _measured_from(paths, slug=slug, round_n=round_n)
     out.update(measured)
 
+    for message in errors:
+        sys.stderr.write(f"[telemetry] {message}\n")
     drifted = sorted(k for k, v in supplied.items() if measured.get(k) != v)
     if drifted:
         sys.stderr.write(
             f"[telemetry] discarded transcribed value(s) {drifted} — the producer's own "
-            "record is authoritative\n"
+            "output is authoritative\n"
         )
     if not measured:
         sys.stderr.write(
-            f"[telemetry] round {round_n} of {slug!r} has no producer record: every measured "
-            f"field is null. Expected `review_consensus finalize` (and, from round 2, "
-            f"`review_churn measure`) to have run with --slug/--round.\n"
+            f"[telemetry] round {round_n} of {slug!r} has no producer output: every measured "
+            "field is null. Pass --measured <path> for `review_consensus finalize`'s payload "
+            "(and, from round 2, `review_churn measure`'s).\n"
         )
     return out
 
@@ -387,7 +453,9 @@ def main(argv: list[str] | None = None) -> int:
         return _guard
     args = list(sys.argv[1:]) if argv is None else list(argv)
     if not args or args[0] != "emit":
-        sys.stderr.write("usage: hm review_telemetry emit --file <path>   (or JSON on stdin)\n")
+        sys.stderr.write(
+            "usage: hm review_telemetry emit --file <path> [--measured <producer-output> ...]\n"
+        )
         return 2
 
     # `--file` for the same reason as `two_pass_review`: this record is assembled by a model
@@ -395,6 +463,14 @@ def main(argv: list[str] | None = None) -> int:
     # containing a file named `x'; rm -rf ~; echo '.py` would, under `echo '<record_json>' |`,
     # put that name through the shell. A path argument carries no content to escape from.
     rest = args[1:]
+    measured_paths: list[str] = []
+    while "--measured" in rest:
+        i = rest.index("--measured")
+        if i + 1 >= len(rest):
+            sys.stderr.write("emit: --measured needs a path\n")
+            return 2
+        measured_paths.append(rest[i + 1])
+        rest = rest[:i] + rest[i + 2 :]
     if rest and rest[0] == "--file":
         if len(rest) < 2:
             sys.stderr.write("emit: --file needs a path\n")
@@ -417,7 +493,7 @@ def main(argv: list[str] | None = None) -> int:
     if not isinstance(data, dict):
         sys.stderr.write("emit: input must decode to a JSON object\n")
         return 1
-    data = _take_measured_from_producers(data, root=Path.cwd())
+    data = _apply_measured(data, measured_paths)
     try:
         record = record_from_dict(data)
     except ValidationError as exc:

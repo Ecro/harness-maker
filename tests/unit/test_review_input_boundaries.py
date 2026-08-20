@@ -20,7 +20,6 @@ from harness_maker import (
     freeze,
     lens_coverage,
     review_telemetry,
-    round_record,
     two_pass_review,
 )
 
@@ -69,7 +68,7 @@ def test_redact_reads_a_file_because_its_input_is_the_diff_itself(
     assert json.loads(capsys.readouterr().out)["pr_title"] == "[REDACTED]"
 
 
-def test_a_hostile_filename_round_trips_through_the_producer_record(
+def test_a_hostile_filename_round_trips_through_the_producer_output(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """A repository may contain a file whose NAME is a shell payload.
@@ -80,22 +79,25 @@ def test_a_hostile_filename_round_trips_through_the_producer_record(
     builds a shell command out of that name, and the name is recorded VERBATIM — a sanitiser
     here would corrupt the very field an operator uses to find the file.
 
-    What did change is where the value enters. `emit` now takes the measured keys only from the
-    round record `review_churn measure` wrote, so this exercises the hostile name along the path
+    What did change is where the value enters. `emit` now takes the measured keys only from
+    `review_churn measure`'s own output file, so this exercises the hostile name along the path
     it actually travels; the model cannot put a `churn_max_path` in the row at all.
     """
     hostile = "src/x'; touch /tmp/nope; echo '.py"
     monkeypatch.chdir(tmp_path)
-    round_record.merge(
-        tmp_path,
-        "s",
-        1,
-        {
-            "churn_ratio": 0.5,
-            "churn_max_path": hostile,
-            "churn_measured_n": 1,
-            "churn_excluded_n": 0,
-        },
+    producer = tmp_path / "churn.json"
+    producer.write_text(
+        json.dumps(
+            {
+                "slug": "s",
+                "round": 1,
+                "churn_ratio": 0.5,
+                "churn_max_path": hostile,
+                "churn_measured_n": 1,
+                "churn_excluded_n": 0,
+            }
+        ),
+        encoding="utf-8",
     )
     record = {
         "ts": "2026-08-16T00:00:00Z",
@@ -111,7 +113,7 @@ def test_a_hostile_filename_round_trips_through_the_producer_record(
     src = tmp_path / "row.json"
     src.write_text(json.dumps(record), encoding="utf-8")
 
-    assert review_telemetry.main(["emit", "--file", str(src)]) == 0
+    assert review_telemetry.main(["emit", "--file", str(src), "--measured", str(producer)]) == 0
     written = Path(capsys.readouterr().out.strip())
     row = json.loads(written.read_text(encoding="utf-8").strip())
     assert row["churn_max_path"] == hostile

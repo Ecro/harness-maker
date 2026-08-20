@@ -6,11 +6,11 @@ created: 2026-08-19
 tags: [harness-maker, plan, review-stage, telemetry, auto-fix-loop]
 summary: "Give the disposition gate a measurement surface; stop diagnosing over-specified tests as regressions; take P2 out of the fixer's queue."
 surface_allowance:
-  chars: 1909
-  reason: "MEASURED after the trim, not before. Three rules added to steps that already run — hence round_trips 37/33 unchanged. The first draft measured 2516/variant; compressing all three blocks to the facts that change a reader's decision brought it to 1861, and that cut preceded this number, per the repo rule that prose is cut before a ceiling is raised. It then rose to 1975 when Step 4e's counts were moved onto finalize's payload and the record list gained 'copy it, never tally it yourself' — a rule that exists because 'counts' beside it is severity — and a further ~67 of rationale was cut back to land at 1908. A fourth change (the round record) then replaced the model's transcription instructions with producer flags — NET +1 after its own trim, because the prose it deletes nearly pays for the flags it adds. Split: ~500 disposition_counts on the telemetry record list, ~690 the reachability question before the revert diagnosis, ~720 the P2 selection change and its rationale. The per-command atomic ceiling needs 631 of it; the rest is aggregate. Attribution in BASELINE-DELTA-review-loop-ledger-fixes.md."
+  chars: 2096
+  reason: "MEASURED after the reduction, not before. round_trips 37/33 unchanged — every rule lands in a step that already runs. The number moved four times and each move is attributable: 2516 first draft -> 1861 after cutting all three blocks to the facts that change a reader decision -> 1975 when finalize gained the counts and the record list gained copy-it-never-tally-it -> 1908 after a rationale cut -> 1914 when a confirm-1 repair fixed two self-contradicting prose spots -> 2096 now. The last move is the ONLY one that is a net addition rather than a repair, and it is the price of Option A: deleting round_record.py (228 lines) means the producers tee their payload and emit takes --measured, which costs +182 prompt characters across four template arms. That trade removed five P1 findings and six P2s, all of them in the store machinery and none in the feature. The per-command atomic ceiling needs 818 of it; the rest is aggregate."
   delta_doc: BASELINE-DELTA-review-loop-ledger-fixes.md
   commands:
-    review: 631
+    review: 818
 ---
 
 # PLAN — three fixes the re-audit left standing
@@ -34,13 +34,14 @@ Three independent changes to `/hm:review`, none of which adds a round trip:
 4. **Measured fields stop passing through the model.** Found while checking whether item 1 would
    actually populate: it would not have. Every nullable measured field on the telemetry row is
    0/69 on this repo's own ledger while all nine required fields are 69/69 — a schema optional is
-   a prompt optional. Producers now write a per-round record and `emit` reads it.
+   a prompt optional. The producers `tee` their own payload; `emit --measured <path>` reads the
+   numbers out of it and strips them from the model's row.
 
 ## 📐 Scope
 
-**In:** `review_telemetry.py` (one nullable field, one validator, producer-sourced measures),
-`review_consensus.py` (one pure counter on `finalize`'s payload + `--slug`/`--round`),
-`review_churn.py` (`--slug`/`--round` on `measure`), `round_record.py` (new),
+**In:** `review_telemetry.py` (one nullable field, one validator, `MEASURED_KEYS`, and the
+`--measured` reader), `review_consensus.py` (one pure counter on `finalize`'s payload +
+`--slug`/`--round` stamping), `review_churn.py` (the same stamping on `measure`),
 `stages/review.md.j2`, `PRIVACY.md`, two unit test modules.
 
 **Out:** any new persisted artifact; the `review-payloads/` store; the disposition enum itself;
@@ -74,6 +75,12 @@ in `failed`. Not fixed here; noted so the rate is not read as quality.
   measure its own reviewer false-positive rate, which is what a local replication of the source
   experiment's repo-access result would need.
 - Size trend: `FileChurn.post_loc` is computed and discarded into a ratio denominator.
+- **A harness change cannot be verified through its own rendered stage.** The rendered command
+  runs `uv run --with $HOME/harness-maker`, which resolves to the BASE checkout — so a stage
+  running inside `.worktrees/<slug>/` executes `main`'s Python, not the branch under review.
+  Measured: this change's own terminal `emit` wrote a row with no `disposition_counts` key,
+  because the code that produces it is not on `main` yet. Pre-existing, out of this diff's scope,
+  and the single largest obstacle to ever measuring a harness change end to end.
 - `lenses_exercised` and `confirm_pass_ran` are still prose-populated and still 0/69. They have no
   producer command to hang a `--slug`/`--round` on, so they are the next candidates rather than a
   drop-in extension of item 4.
@@ -85,6 +92,33 @@ in `failed`. Not fixed here; noted so the rate is not read as quality.
 - The grade gate rests entirely on reviewer-declared severity, whose self-assessment measured
   ~50% accurate in the source. No prescription yet.
 
+## 🔻 What Option A removed, and why the shape changed twice
+
+The first implementation carried the numbers in a shared scratch store keyed by (slug, round).
+A store has to answer three questions a file path does not — which root it lives under, how two
+writers coordinate, how two runs stay apart — and each answer was added only after a review round
+found the previous one broken:
+
+| Round | Finding | Answer added |
+|---|---|---|
+| 1 | **P0** producers wrote inside `<WT>`, `emit` read the base | base-root anchoring |
+| confirm-1 | **P1 ×2** that anchoring made two worktrees share one file: lost update, chimera row | `flock`, `RUN_KEY` |
+| confirm-2 | **P1 ×5** in the lock and the stamp: TOCTOU, no timeout, no oracle, two doc claims | — |
+
+Three consecutive rounds produced severe findings **only** in the machinery guarding the feature,
+never in the feature. Per 제1목표 the device was reduced rather than repaired again: `round_record.py`
+(228 lines) is deleted, and with it all five surviving P1s and six P2s — not fixed, but left
+without a subject. The P0's own recurrence path goes too, since absolute temp paths are
+cwd-independent by construction.
+
+**The honest cost:** the prompt surface grew +182 characters (1914 → 2096). Python shrank by 228
+lines; the prose explaining `tee` and `--measured` is larger than the prose describing the store.
+
+**The one hazard passing paths introduces is a stale file**, and unlike the store's three
+questions it is decidable: the producers stamp `slug`/`round` onto their payload and `emit`
+refuses a file whose stamp disagrees with the row. An unstamped payload is accepted, so nothing
+that predates the stamp regresses.
+
 ## ✅ Exit criteria
 
 - `tests/unit/test_review_telemetry_disposition.py` passes, including the arm asserting the enum
@@ -93,5 +127,7 @@ in `failed`. Not fixed here; noted so the rate is not read as quality.
 - `round_trips` for `review` / `hm-review` unchanged at 37 / 33.
 - A telemetry row whose model-supplied JSON omits every measured key still carries the producers'
   numbers (`test_a_row_that_omits_everything_still_gets_the_numbers` — the 0/69 case, reproduced).
+- A producer payload stamped with a different slug or round is refused, not merged.
+- Nothing imports `round_record`; no shared mutable store remains on this path.
 - Full `pytest` green with the declared allowance and **without** regenerating
   `surface_baseline.json`.

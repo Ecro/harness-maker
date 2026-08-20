@@ -22,7 +22,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 
-from harness_maker import command_registry, round_record
+from harness_maker import command_registry
 from harness_maker.codex_ledger import DISPOSITION_VALUES
 
 Tag = Literal["consensus-passed", "weak-consensus", "manual-only"]
@@ -647,10 +647,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--churn-ratio", type=float, dest="churn_ratio")
     parser.add_argument("--threshold", type=float)
-    # The producer half of `round_record`: given both, `finalize` records its own counts where
-    # `review_telemetry emit` will read them, so the number never passes through the model.
-    # Optional so every existing caller keeps working — the template supplies them, and `emit`
-    # says loudly which producer never ran when they are missing.
+    # Given both, `finalize` stamps them onto its own payload so `review_telemetry emit`, which
+    # reads that payload, can refuse a file from a different slug or round. Optional: every
+    # pre-existing caller keeps working, and `emit` says loudly when no producer output arrived.
     parser.add_argument("--slug")
     parser.add_argument("--round", type=int, dest="round_n")
     try:
@@ -676,19 +675,8 @@ def main(argv: list[str] | None = None) -> int:
             known, spec_errors = _known_ac_ids(opts.spec)
             payload = finalize(_load(opts.file), known)
             payload["errors"] = spec_errors + list(payload["errors"])
-            if opts.slug and opts.round_n:
-                # Best effort, and deliberately not fatal: a scratch file that cannot be
-                # written must not fail a review whose grade is already computed. `emit`
-                # reports the resulting absence.
-                try:
-                    round_record.merge(
-                        Path("."),
-                        opts.slug,
-                        opts.round_n,
-                        {"disposition_counts": payload["disposition_counts"]},
-                    )
-                except (OSError, ValueError) as exc:
-                    sys.stderr.write(f"[consensus] round record not written: {exc}\n")
+            if opts.slug and opts.round_n is not None:
+                payload["slug"], payload["round"] = opts.slug, opts.round_n
     except (ConsensusError, OSError, ValueError) as exc:
         sys.stderr.write(f"review_consensus: {exc}\n")
         return 2

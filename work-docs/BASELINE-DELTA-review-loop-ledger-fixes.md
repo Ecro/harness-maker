@@ -8,17 +8,17 @@ Measured with `tests/structural/_surface_baseline.py` after the trim described b
 
 | Key | Was | Now | Δ |
 |---|---|---|---|
-| `review` (claude) `chars` | 84 690 | **86 599** | +1 909 |
-| `hm-review` (codex) `chars` | 80 002 | **81 911** | +1 909 |
-| `aggregate_chars.claude` | 427 300 | **429 209** | +1 909 |
-| `aggregate_chars.codex` | 360 211 | **362 120** | +1 909 |
+| `review` (claude) `chars` | 84 690 | **86 786** | +2 096 |
+| `hm-review` (codex) `chars` | 80 002 | **82 098** | +2 096 |
+| `aggregate_chars.claude` | 427 300 | **429 396** | +2 096 |
+| `aggregate_chars.codex` | 360 211 | **362 307** | +2 096 |
 | `review` / `hm-review` `round_trips` | 37 / 33 | **37 / 33** | **0** |
 
 `round_trips` is flat on purpose: all three changes are rules applied inside steps that already
 run. Nothing here adds a mandated call, so the axis that has no ratchet direction does not move.
 
-The per-command atomic ceiling (`test_command_size_budget`, flag-on render) needs **631**; the
-aggregate needs **1 909**. Both are declared in `PLAN-review-loop-ledger-fixes.md`.
+The per-command atomic ceiling (`test_command_size_budget`, flag-on render) needs **818**; the
+aggregate needs **2 096**. Both are declared in `PLAN-review-loop-ledger-fixes.md`.
 
 ## The four rows
 
@@ -112,6 +112,60 @@ Whether the trade pays is measurable for row 1 in a way it is not for rows 2 and
 because of row 4. Before it, `disposition_counts` would have joined the 0/69 club; the honest
 prediction now is that the next review's row carries it, and that is checkable on the first run. Rows 2 and 3 change what a round
 *reports* and what it *skips*; the evidence for both is a re-audit, not a counter.
+
+## The confirmation pass, and what it cost (+5)
+
+The pass was not a formality. Round 1 found the producer/consumer root mismatch (four lenses,
+confirmed by measurement: the record sat in `<WT>` and the base had no such directory). The
+repair for it — anchoring on the base root — then **created** two hazards that were structurally
+unreachable before, and confirm-1's concurrency lens found both: two worktrees reviewing one slug
+now share one file, so an unlocked read-modify-write can lose an update, and a file holding one
+run's dispositions beside another run's churn is schema-valid while describing neither review.
+
+`merge` now takes an `flock` across the whole read-modify-write, and stamps the open run's id —
+read from `review_run`'s own base-anchored state, NOT taken as a new flag, because the same value
+in two places is what drifts. A `merge` whose run id differs from the stored one replaces rather
+than merges. With no readable run state the stamp is skipped and the old behaviour stands.
+
+Also repaired: `_base_root`'s except tuple gained `RuntimeError`. Three lenses disagreed about
+that line — one said the tuple was right, one said it was dead code, one said `RuntimeError` was
+missing — and a three-line probe settled it: CPython 3.12 raises `RuntimeError` on a symlink loop
+from `Path.resolve()`, so the docstring's fail-open promise was false for the only case that can
+reach it. The branch now has a test that actually enters it. And a docstring here **quoted a
+sentence that does not exist** in `stage_agent_ledger`; a fabricated citation is not a P2 to
+defer, so it is gone.
+
+The +5 characters are two template one-liners: Step 4d's payload enumeration gained the
+`disposition_counts` key it has always returned, and the telemetry field list lost the key the
+next sentence tells the model to omit.
+
+## The reduction, and its price (+182)
+
+Confirm-2 returned five P1s. All five were in the `flock` and run-identity machinery the
+confirm-1 repair had added, which existed because base-root anchoring — the round-1 P0's repair —
+had made two worktrees share one file. None of the three rounds produced a severe finding in the
+feature itself; every one landed in the device guarding it. 제1목표 says a device contributing more
+to complexity than to quality should be reduced, so it was.
+
+`round_record.py` is **deleted** (228 lines). The producers now `tee` their own payload and
+`review_telemetry emit --measured <path>` reads `MEASURED_KEYS` out of it. The numbers still never
+pass through the model — that property is unchanged and is what the whole change is for.
+
+What went away with the store, none of it fixed, all of it left without a subject: the run-id
+TOCTOU, the un-timed blocking `flock`, the lock's absent oracle, the `_base_root` exception-tuple
+dispute (four verdicts across three rounds, two of them factually wrong), the `--force` recovery
+that discarded a round's data, the missing janitor, the duplicated parser, the lock-path
+containment gap. **And the P0's own recurrence path**: absolute temp paths are cwd-independent, so
+the producer/consumer split that started all of this cannot re-form.
+
+**This is a trade, not a free win.** The prompt surface grew **+182** (1 914 → 2 096) while Python
+shrank by 228 lines: explaining `tee` and `--measured` across four template arms costs more prose
+than describing a store did. The ratchet moves the wrong way here and it is recorded as such.
+
+The one hazard file paths introduce that a store did not have is a **stale payload**. Unlike the
+store's three questions it is decidable, so it is decided: the producers stamp `slug`/`round` and
+`emit` refuses a mismatch. An unstamped payload is accepted, so nothing predating the stamp
+regresses.
 
 ## Why only this document may move these numbers (ADR-010)
 

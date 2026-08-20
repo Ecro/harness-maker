@@ -513,13 +513,13 @@ plus `reasoning_diverges: true` when Step 4b found matching OBSERVE with divergi
 the `disposition`/`authority` that Step 4e describes. Write the array to a temp path, then:
 
 {% if is_codex %}```bash
-Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_consensus finalize --file <the literal temp path> --slug {slug} --round <N>{% if config.dev_mode == 'spec-driven' %} --spec {{ config.spec.dir }}SPEC-{slug}.machine.yaml{% endif %}")
+Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_consensus finalize --file <the literal temp path> --slug {slug} --round <N> | tee <FINALIZE-r{N}>{% if config.dev_mode == 'spec-driven' %} --spec {{ config.spec.dir }}SPEC-{slug}.machine.yaml{% endif %}")
 ```{% else %}```bash
-!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_consensus finalize --file <the literal temp path> --slug {slug} --round <N>{% if config.dev_mode == 'spec-driven' %} --spec {{ config.spec.dir }}SPEC-{slug}.machine.yaml{% endif %}
+!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_consensus finalize --file <the literal temp path> --slug {slug} --round <N> | tee <FINALIZE-r{N}>{% if config.dev_mode == 'spec-driven' %} --spec {{ config.spec.dir }}SPEC-{slug}.machine.yaml{% endif %}
 ```{% endif %}
 
 It **reads only** and prints one payload: `{"findings": [...with `tag`...], "grade": …,
-"counts": …, "human_review_needed": …, "errors": [...]}`. **Use its answer**; do not re-derive
+"counts": …, "disposition_counts": …, "human_review_needed": …, "errors": [...]}`. **Use its answer**; do not re-derive
 one. Exit 1 means `errors` is non-empty — an untagged or off-vocabulary finding, a missing
 disposition, or a rejection citing an AC id the machine SPEC does not declare — and the letter is
 not trustworthy until those are fixed at the source and the call repeated.
@@ -843,13 +843,13 @@ Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_pat
 5b. **Measure this round's churn** — after Step 5's reverts, so a reverted fix does not count:
 
 {% if is_codex %}```bash
-Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_churn pin --slug {slug} --label r{N}-post && uv run --with {{ harness_maker_src_path }} hm review_churn measure --slug {slug} --round {N} --pre refs/hm-churn/v1/{slug}-r{N}-pre --post refs/hm-churn/v1/{slug}-r{N}-post")
+Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_churn pin --slug {slug} --label r{N}-post && uv run --with {{ harness_maker_src_path }} hm review_churn measure --slug {slug} --round {N} --pre refs/hm-churn/v1/{slug}-r{N}-pre --post refs/hm-churn/v1/{slug}-r{N}-post | tee <CHURN-r{N}>")
 ```{% else %}```bash
-!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_churn pin --slug {slug} --label r{N}-post && uv run --with {{ harness_maker_src_path }} hm review_churn measure --slug {slug} --round {N} --pre refs/hm-churn/v1/{slug}-r{N}-pre --post refs/hm-churn/v1/{slug}-r{N}-post
+!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_churn pin --slug {slug} --label r{N}-post && uv run --with {{ harness_maker_src_path }} hm review_churn measure --slug {slug} --round {N} --pre refs/hm-churn/v1/{slug}-r{N}-pre --post refs/hm-churn/v1/{slug}-r{N}-post | tee <CHURN-r{N}>
 ```{% endif %}
 
-   `--slug`/`--round` file the four `churn_*` keys where the emit reads them, so carry them
-   into the **iteration record** only, never into the row.
+   `tee` keeps this payload for the Telemetry Emit step, which reads the four `churn_*` keys
+   out of it. Carry them into the **iteration record** only, never into the row.
    A null `churn_ratio` beside `churn_measured_n: 0` means no file was measurable (all
    binary/deleted), which is a different fact from a round that changed nothing — and Step 6
    treats the two differently.{% if not config.reviewers.get("rereview_churn_gate", True) %}
@@ -1126,22 +1126,23 @@ leakage — see `test_telemetry_no_leak`).
 
 {% if is_codex %}
 ```bash
-Bash("uv run --with {{ harness_maker_src_path }} hm review_telemetry emit --file <the literal temp path>")
+Bash("uv run --with {{ harness_maker_src_path }} hm review_telemetry emit --file <the literal temp path> --measured <FINALIZE-r{N}> <plus --measured <CHURN-r{N}> from round 2>")
 ```
 {% else %}
 ```bash
-uv run --with {{ harness_maker_src_path }} hm review_telemetry emit --file <the literal temp path>
+uv run --with {{ harness_maker_src_path }} hm review_telemetry emit --file <the literal temp path> --measured <FINALIZE-r{N}> <plus --measured <CHURN-r{N}> from round 2>
 ```
 {% endif %}
 
 Record fields:
 `{ts, slug, round, pass1_n, verifier_kept_n, verifier_dropped_n, verifier_false_drop_n, verifier_false_keep_n, fixture_label, pass2_kept_n, consensus_passed_n, wall_time_ms, build_break_count, auto_fix_reverted_n, fallback, terminal, unreviewed_fix_count, regression_attributed_n, attribution_unknown_n, lenses_exercised,
-confirm_pass_ran, confirm_pass_new_severe_n, disposition_counts}`.
+confirm_pass_ran, confirm_pass_new_severe_n}`.
 
-**Leave `disposition_counts` and every `churn_*` key OUT of the row you write.** They come from
-the producers keyed by the `--slug`/`--round` you already passed Step 4d's `finalize` and Step
-5b's `measure`; a value you supply is discarded with a warning. If `emit` reports no producer
-record, one of those two ran without its flags — fix that, never fill the numbers in by hand.
+**Leave `disposition_counts` and every `churn_*` key OUT of the row you write.** `--measured`
+reads them from the payloads you `tee`'d at Step 4d and Step 5b. A value you supply is discarded
+with a warning, and a payload whose stamped `slug`/`round` disagree with the row is refused, so a
+stale file cannot become a wrong number. "No producer output" means you did not pass
+`--measured` — fix that, never type the numbers in.
 
 `lenses_exercised` is the coverage CLI's `exercised` array for this round — `[]` when every
 dispatch failed, never null (null means a pre-change row). `confirm_pass_ran` is required
