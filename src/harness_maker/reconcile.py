@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import shutil
 import sys
 from datetime import UTC, date, datetime
@@ -48,6 +49,43 @@ from harness_maker.render import RENDER_MANIFEST_NAME, _is_schemas_json, resolve
 # Templates ship inside the package; reconcile peeks at the source to know
 # whether a fresh render will produce markers without re-rendering.
 _TEMPLATE_DIR = Path(__file__).resolve().parent / "templates"
+
+#: Literal `{% include "…" %}` targets. Deliberately literal-only: the two dynamic forms in this
+#: tree (`"agents/" + name + "_body.md.j2"`, `"agents/_standards/" + d + ".md.j2"`) cannot be
+#: resolved without a render context, and neither reaches a marker-bearing file today — the
+#: dynamic-include TOML template carries its markers inline, and no `_standards`/`_partials` file
+#: has a marker at all. An unresolvable include degrades to today's answer for that file rather
+#: than guessing.
+_INCLUDE_RE = re.compile(r'\{%-?\s*include\s+"([^"]+)"')
+
+
+def _template_has_markers(
+    template_name: str,
+    style: MarkerStyle = MarkerStyle.HTML_COMMENT,
+    _seen: frozenset[str] = frozenset(),
+) -> bool:
+    """`has_markers()` over a template AND its literal includes.
+
+    Agent templates are SPLIT: `agents/<name>.md.j2` is a ten-line frontmatter shim whose whole
+    body is `{% include "agents/<name>_body.md.j2" %}`, and the `@hm:user:extensions` markers live
+    in the body. Probing only the outer file answered False for 13 of 15 agents, so
+    `_decide_user_modified` fell through to `KEEP, "hash-mismatch-user-modified"` and every one of
+    them froze permanently and silently on the user's first edit — the exact outcome the
+    block-merge feature exists to prevent. The `.codex/agents/*.toml` control group merged
+    correctly on the same runs because their template is single-file, which is what identified the
+    split structure as the variable.
+    """
+    if template_name in _seen:
+        return False
+    try:
+        src = (_TEMPLATE_DIR / template_name).read_text(encoding="utf-8")
+    except OSError:
+        return False
+    if has_markers(src, style):
+        return True
+    seen = _seen | {template_name}
+    return any(_template_has_markers(inc, style, seen) for inc in _INCLUDE_RE.findall(src))
+
 
 # Top-level locations the renderer ever writes. Used to bound the orphan-sweep
 # walk so user-owned dirs (src/, tests/, docs/, ...) are never inspected.
@@ -345,7 +383,11 @@ def _decide_hash_comment_branch(
     """
     template_path = _TEMPLATE_DIR / template_name
     try:
-        template_src = template_path.read_text(encoding="utf-8")
+        # Read for the side effect only. `_template_has_markers` answers False on OSError, which
+        # would collapse "template unreadable" into "template has no markers" and lose the
+        # distinct reason string below — the one that tells an operator the install is broken
+        # rather than that their file is unmergeable.
+        template_path.read_text(encoding="utf-8")
     except OSError:
         # Template unreadable → conservative REPLACE preserves prior behaviour.
         return ReconcileDecision.REPLACE, "hashcomment-template-unreadable"
@@ -353,7 +395,7 @@ def _decide_hash_comment_branch(
         existing_src = existing_path.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
         return ReconcileDecision.REPLACE, "hashcomment-existing-unreadable"
-    if has_markers(template_src, MarkerStyle.HASH_COMMENT) and has_markers(
+    if _template_has_markers(template_name, MarkerStyle.HASH_COMMENT) and has_markers(
         existing_src,
         MarkerStyle.HASH_COMMENT,
     ):
@@ -373,14 +415,18 @@ def _decide_user_modified(template_name: str, old_body: bytes) -> tuple[Reconcil
     """
     template_path = _TEMPLATE_DIR / template_name
     try:
-        template_src = template_path.read_text(encoding="utf-8")
+        # Read for the side effect only. `_template_has_markers` answers False on OSError, which
+        # would collapse "template unreadable" into "template has no markers" and lose the
+        # distinct reason string below — the one that tells an operator the install is broken
+        # rather than that their file is unmergeable.
+        template_path.read_text(encoding="utf-8")
     except OSError:
         return ReconcileDecision.KEEP, "hash-mismatch-template-unreadable"
     try:
         old_text = old_body.decode("utf-8")
     except UnicodeDecodeError:
         return ReconcileDecision.KEEP, "hash-mismatch-binary-old"
-    if has_markers(template_src) and has_markers(old_text):
+    if _template_has_markers(template_name) and has_markers(old_text):
         # Validate OLD parses cleanly. A user who broke marker syntax (typo,
         # deleted close, etc.) should NOT silently lose their edits via
         # REPLACE-on-parse-failure; KEEP the malformed file and surface why.

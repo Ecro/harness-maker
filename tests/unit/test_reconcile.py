@@ -5,8 +5,19 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
+from harness_maker.block_merge import has_markers
 from harness_maker.models import Blueprint, FileEntry, ReconcileDecision
-from harness_maker.reconcile import backup, compute_body_hash, parse_frontmatter, reconcile
+from harness_maker.reconcile import (
+    _TEMPLATE_DIR,
+    _decide_user_modified,
+    _template_has_markers,
+    backup,
+    compute_body_hash,
+    parse_frontmatter,
+    reconcile,
+)
 
 
 def _bp(rel_paths: list[str]) -> Blueprint:
@@ -697,3 +708,61 @@ def test_sweep_never_deletes_hooks_json_with_user_hook(tmp_path: Path) -> None:
     assert hooks_json.exists(), "user-authored hooks.json must survive the sweep"
     assert "MY-USER-HOOK" in hooks_json.read_text(encoding="utf-8")
     assert Path(".claude/hooks/hooks.json") not in report.deleted
+
+
+def _edited_agent_body(marker: str = "extensions") -> bytes:
+    """A rendered agent body as it looks after the user writes in their block.
+
+    Only the marker pair and the user's text matter here — `_decide_user_modified` reads the
+    TEMPLATE side off disk itself, which is where this test's fidelity lives.
+    """
+    return (
+        "# code-reviewer\n\nTemplate-owned prose.\n\n"
+        f"<!-- @hm:user:{marker} -->\n"
+        "Project rule: never flag the generated parser.\n"
+        f"<!-- @hm:/user:{marker} -->\n"
+    ).encode()
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["code-reviewer", "concurrency-reviewer", "performance-reviewer", "executor"],
+)
+def test_split_agent_template_merges_rather_than_freezing(name: str) -> None:
+    """Regression: 13 of 15 agents froze permanently on the user's first edit.
+
+    `_decide_user_modified` probed `agents/<name>.md.j2` — a ten-line frontmatter shim — while
+    the `@hm:user:extensions` markers live in `agents/<name>_body.md.j2`, reached by
+    `{% include %}`. `has_markers()` does not follow includes, so the probe answered False and
+    the decision fell through to `KEEP, "hash-mismatch-user-modified"`: the file kept the user's
+    text and stopped receiving every future template improvement, silently. The
+    `.codex/agents/*.toml` control group merged correctly on the same runs because its template
+    is single-file, which is what identified the split structure as the variable.
+
+    Asserted on the DECISION, not on rendered bytes. The rendered file DOES carry the markers, so
+    every test that reads output passes while the bug is live — that is why it survived.
+    """
+    decision, reason = _decide_user_modified(f"agents/{name}.md.j2", _edited_agent_body())
+    assert decision is ReconcileDecision.MERGE_BLOCK, (name, reason)
+
+
+def test_the_marker_probe_follows_every_agent_template_that_gets_split() -> None:
+    """Companion guard: catches the NEXT template someone splits.
+
+    Walks every outer agent template. Whenever its literal include target carries markers, the
+    probe reconcile actually calls must report True — otherwise that agent has silently joined
+    the frozen set.
+    """
+    agents = _TEMPLATE_DIR / "agents"
+    frozen = []
+    for outer in sorted(agents.glob("*.md.j2")):
+        if outer.name.endswith("_body.md.j2"):
+            continue
+        body = agents / f"{outer.name.removesuffix('.md.j2')}_body.md.j2"
+        if not body.exists() or not has_markers(body.read_text(encoding="utf-8")):
+            continue
+        if not _template_has_markers(f"agents/{outer.name}"):
+            frozen.append(outer.name)
+    assert not frozen, (
+        f"markers unreachable from the outer template — these agents freeze: {frozen}"
+    )
