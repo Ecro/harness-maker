@@ -4,6 +4,33 @@
 
 ### Added
 
+- **`/hm:review`'s telemetry row gets a `disposition_counts` measurement surface, and its four
+  nullable "measured" fields (`churn_ratio`, `churn_measured_n`, `lenses_exercised`,
+  `confirm_pass_ran`) stop passing through the model.** `finalize` and `review_churn measure` now
+  `tee` their own payload to an absolute temp path; `review_telemetry emit --measured <path>`
+  reads `MEASURED_KEYS` out of it and strips those keys from the model's row, so the numbers the
+  disposition gate reads are written by code, never transcribed by prose. (Measured on this repo's
+  own ledger before the fix: all four fields were 0/69 populated while every required field was
+  69/69.) A first implementation carried the numbers through a shared `round_record.py` store
+  keyed by `(slug, round)`; three review rounds found severe defects only in that store's cwd
+  anchoring, locking, and run-identity machinery, never in the feature, so the store (228 lines)
+  was deleted rather than repaired again — see `work-docs/REVIEW-review-loop-ledger-fixes-2026-08-20.md`.
+- The auto-fix loop asks whether production can reach the state a failing assertion pins **before**
+  diagnosing a reverted fix as a regression (reverts either way; the answer changes the record, not
+  the action).
+- P2/P3 findings leave the auto-fix queue except when the review grade is D/F — they cannot move
+  the grade, so fixing them was churn against a gate that could not read them.
+
+### Fixed
+
+- `stages/review.md.j2`: a producer pipeline rendered `--spec <file>` **after** `| tee <file>`, so
+  the shell handed `--spec` to `tee`, which rejects the unrecognised long option and exits 1 — on a
+  spec-driven harness this silently dropped the AC-verification payload. Fixed by moving `--spec`
+  back before the pipe and gating both producer pipelines with `set -o pipefail` (a `tee` failure
+  used to report the pipe's exit status, not its own). A new structural test parses the substituted
+  pipeline with `bash -n` and asserts the shape, so a future template edit that reorders the flag
+  cannot regress silently again.
+
 - **`/hm:plan` output gains a required `## 🚧 Contract Boundaries` section, and `/hm:execute`
   reads it.** `/hm:review` already *detects* the contract hole — behaviour that oscillates across
   rounds surfaces as `spec_gap` — but nothing ever wrote the hole down, so the next round
