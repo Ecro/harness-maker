@@ -805,3 +805,63 @@ def test_a_real_citation_still_clears_and_the_verdict_is_visible(tmp_path: Path)
     assert payload["findings"][0]["authority_verified"] is True
     assert payload["grade"] == "A"
     assert payload["errors"] == []
+
+
+# ── PLAN-bench-study-adoption ADR-006: the `oracle-blocked` authority ────────
+
+# Phase A.4: of the six node ids below, four pass before the implementation. The three
+# `False` rows of `ORACLE_BLOCKED_ROWS` and `test_oracle_blocked_does_not_change_the_grade_effect
+# _of_unresolved` are negative invariants — vacuously true while `oracle-blocked` is not in the
+# vocabulary at all. Their RED positive siblings sit in the same block: the `unresolved`/True row
+# forces the authority into `_authority_kind`, and that is the edit where someone might also
+# reach for `grade_effect` or for a new `DISPOSITIONS` member. The negatives are what make those
+# two wrong fixes fail instead of shipping.
+
+ORACLE_BLOCKED_ROWS = [
+    ("unresolved", "oracle-blocked", True),
+    ("accepted", "oracle-blocked", False),
+    ("rejected", "oracle-blocked", False),
+    ("duplicate", "oracle-blocked", False),
+]
+
+
+@pytest.mark.parametrize(("disposition", "authority", "valid"), ORACLE_BLOCKED_ROWS)
+def test_oracle_blocked_pairs_only_with_unresolved(
+    disposition: str, authority: str, valid: bool
+) -> None:
+    """A fix the auto-fixer refused because passing would require editing a test.
+
+    It pairs exactly like `no-contract`: the authority records why the finding could not be
+    adjudicated, and the only honest disposition for "could not be adjudicated" is
+    `unresolved`. Admitting it on `rejected` would let the fixer's own refusal stand as the
+    contract that excuses the finding — self-grading, the thing ADR-002 exists to forbid.
+    """
+    assert validate_disposition(disposition, authority) is valid
+
+
+def test_oracle_blocked_is_a_distinct_authority_not_an_unknown_string() -> None:
+    """Rejects "it already works" — it does not, and the failure mode is silent-ish.
+
+    Before this change `oracle-blocked` is simply not in the vocabulary, so `_authority_kind`
+    returns `unknown` and `validate_disposition` is False for EVERY disposition including
+    `unresolved`. That is indistinguishable from a typo, which is the point: the refusal has
+    to be a first-class recorded reason, not a free-text string that fails validation and gets
+    downgraded to a missing disposition by the caller's fail-safe.
+    """
+    assert validate_disposition("unresolved", "oracle-blocked") is True
+    assert validate_disposition("unresolved", "oracle-blocke") is False
+    assert validate_disposition("unresolved", "oracle blocked") is False
+
+
+def test_oracle_blocked_does_not_change_the_grade_effect_of_unresolved() -> None:
+    """The authority carries the reason; the grade comes from the tag, not from here.
+
+    ADR-004's amendment makes the refusal retag the finding `manual-only`, which is what keeps
+    it out of `P0_count`/`P1_count`. `grade_effect` must therefore be IDENTICAL for
+    `oracle-blocked` and `no-contract` — if it were not, the authority would be a second,
+    hidden grade lever and Contract Boundaries' "grade_effect is untouched" would be false.
+    """
+    for severity in ("P0", "P1", "P2"):
+        assert grade_effect(severity, "unresolved", "oracle-blocked") == grade_effect(
+            severity, "unresolved", "no-contract"
+        )

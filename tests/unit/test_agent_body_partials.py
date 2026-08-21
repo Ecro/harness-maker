@@ -128,8 +128,13 @@ _EXPECTED_SHA256: dict[str, str] = {
     # pre-0.28.5 hashes. The codex-ENABLED tools:Bash path is asserted in
     # test_render_codex_permission_injection.py. Pre-bump hashes in git history.
     "autoloop-coder": "093210f0b4da3e0d0431c7fa4a0833f19f320d04ee349989fd8b5b5882483932",
-    "code-reviewer": "d09023357e53929d9eee5059ecb624a0f502115da3f1dda7b00c4252de2e5169",
-    "concurrency-reviewer": "ffc8b5f6bcc43dd33fc6353e87797216a5c8eb39494e8b762beaab50f31ff359",
+    # PLAN-bench-study-adoption Phase 4: these four moved because each gained
+    # `{% include "agents/_partials/return_envelope.md.j2" %}` — the top-level `repo_probe`
+    # contract. EXACTLY four: they are the agents `conditional_router.LENS_DISPATCH` names as
+    # backing the seven lenses. `performance-reviewer`, `ux-reviewer` and `code-verifier` are
+    # correctly absent from this list — they were not edited, and their pins did not move.
+    "code-reviewer": "e557100ff79e1378097a28963e8e3a9d4b45a053958a37896173371b6f24f2d6",
+    "concurrency-reviewer": "7ad51b6e9fbfe1e8f64621d07e574fe67677b54d4ff0511d37856432201a0a9d",
     # consensus-arbiter + plan-validator: hashes bumped 2026-05-24 per
     # PLAN-codex-second-llm-integration ADR-007 + review security fix.
     # Both agents previously had NO frontmatter permissions block; Phase 2
@@ -156,7 +161,7 @@ _EXPECTED_SHA256: dict[str, str] = {
     "performance-reviewer": "869fa3131ffa6cae4be84232deca0174df7d9cd973cc203499f13f75977771e6",
     "plan-validator": "2116a5ce4fb8053c0a8c921f2a1e2c022ea5099f488e8bc315a6a87b097ec36b",
     "security-auditor": "51a11902b9f56b9ebb0e0103e0d2047a64d1a218898d6cedc229a1a43fed2f53",
-    "security-reviewer": "aadcaf6606ce6b7483f4994f190c919cfba8e9a32d987a4a046e2d9491d19c0e",
+    "security-reviewer": "49d4264775796508dadec9145478db887f751d158b116d6f6250863fee89b8d3",
     # stuck re-pinned 2026-08-10 (PLAN-multi-lens-review-round, review round 4). `stuck` is the
     # agent A.5 escalates to, and its incoming brief still described the budget as "2 attempts"
     # after the stage renamed the unit to rounds — three lens dispatches now share one round, so
@@ -185,7 +190,7 @@ _EXPECTED_SHA256: dict[str, str] = {
     # now routes to a field the schema has (scenarios_missing / per_scenario.quality=FAIL /
     # the closest banned pattern). Body change outside the codex conditional. Pre-bump hash in
     # git history.
-    "test-reviewer": "e998c3dbb245e32155dcbf114a494f4a628e45e628e2511206ea0f19ffffd19b",
+    "test-reviewer": "eda52bbfe968c640fc431e2997908c3ba428455e19a9e2ecdd0a9b85b474fbcf",
     "ux-reviewer": "b6e31a5a45013208a80f0c17eca4e720add647f6d9a386027ae1a57b5d347ebc",
 }
 

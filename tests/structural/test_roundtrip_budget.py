@@ -179,7 +179,12 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     #       That step is the one that writes `disposition_counts` and the four `churn_*` keys,
     #       i.e. the entire deliverable of PLAN-review-loop-ledger-fixes; a review round found
     #       it unmarked. The count rises because the command became honest, not longer.
-    "review": 38,
+    # 38 -> 39: PLAN-bench-study-adoption Phase 3 adds Step 5c, the `hm review_churn complexity`
+    # measurement, as its OWN call rather than chaining it onto 5b's churn line. Chaining would
+    # have cost no round trip, and that is exactly why it was rejected: a record-only telemetry
+    # failure must not be able to take the churn measurement down with it. The call is
+    # Production-gated, so a Side render is unchanged.
+    "review": 39,
     "spec": 6,
     "uninstall": 3,
     "verify": 13,

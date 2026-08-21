@@ -1,5 +1,5 @@
 {% set wt_on = config.worktree is defined and config.worktree.get('enabled') %}{% set WTR = '<WT>' if wt_on else '.' -%}
-{% set lenses = lens_dispatch(config.preset) %}{% set lens_names = mandatory_lenses(config.preset) -%}
+{% set probe_flags = " --diff-files <the literal path printed by the mktemp above> --rev <review_base>" if config.preset == "Production" else "" %}{% set lenses = lens_dispatch(config.preset) %}{% set lens_names = mandatory_lenses(config.preset) -%}
 {% import "agents/_partials/dispatch.md.j2" as dsp -%}
 # Stage: review
 
@@ -234,6 +234,18 @@ carries it and every coverage call is given it.
 its findings JSON to the per-round results directory, adding a `"lens"` key naming the lens and
 the `"run_id"` Step 0's `open` printed — **and stamp the same `"lens"` value on every finding inside it**.
 
+{% if config.preset == "Production" %}
+**Carry each lens's `repo_probe` into the file you write for it, verbatim.** The agent returns
+it at the top level beside its findings; you are the one who writes the result file, so a probe
+you do not transcribe exists only in a transcript nothing reads — and the lens is then recorded
+exactly as a dispatch that never returned.
+
+The check needs two values you already have. Write the diff's changed paths, one per line, to a
+`mktemp` file and pass that path as `--diff-files`; pass Step 1's frozen `review_base` as
+`--rev`. Both are **required** — an absent `--diff-files` is an error rather than an empty list,
+because an empty list makes "not in the diff" true of every path and the check silently stops
+checking. `--preset Side` is how a harness says *do not check*.
+{% endif %}
 > The per-finding stamp is what makes ADR-007's rule decidable. The core lenses all dispatch to
 > `code-reviewer`, so `reviewer`/`source` collapses them to one voter name; without a per-finding
 > `lens`, Step 4 cannot tell one lens speaking once from one lens speaking several times, and the
@@ -255,9 +267,9 @@ Then compute coverage. The CLI is the **sole producer** of the verdict — do no
 own judgement about which lenses ran:
 
 {% if is_codex %}```bash
-Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round <round> --run-id <run-id> --preset {{ config.preset }}")
+Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round <round> --run-id <run-id> --preset {{ config.preset }}{{ probe_flags }}")
 ```{% else %}```bash
-!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round <round> --run-id <run-id> --preset {{ config.preset }}
+!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round <round> --run-id <run-id> --preset {{ config.preset }}{{ probe_flags }}
 ```{% endif %}
 
 It prints `{"exercised": [...], "missing": [...], "blocks_approval": <bool>}`. Carry all three
@@ -571,6 +583,7 @@ step and an `auto_fix`-disabled run. Give each finding a `disposition` and, when
 | `rejected` | Not a defect | **required**: a SPEC AC id (`AC-004`) or `docstring:<path>:<symbol>` |
 | `duplicate` | Same defect as another `id` this round | — |
 | `unresolved` | Cannot adjudicate; no contract to judge against | `no-contract` |
+| `unresolved` | The fixer read the covering test and refused (Step 4) | `oracle-blocked` |
 
 
 
@@ -764,9 +777,9 @@ coverage is cumulative over a review rather than per round: the auto-fix loop re
 the reviewers a fix touched, so this round's directory legitimately holds one or two files.
 
 {% if is_codex %}```bash
-Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round 1 --round 2 <one --round per further round so far> --round <this round> --run-id <run-id> --preset {{ config.preset }}")
+Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round 1 --round 2 <one --round per further round so far> --round <this round> --run-id <run-id> --preset {{ config.preset }}{{ probe_flags }}")
 ```{% else %}```bash
-!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round 1 --round 2 <one --round per further round so far> --round <this round> --run-id <run-id> --preset {{ config.preset }}
+!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round 1 --round 2 <one --round per further round so far> --round <this round> --run-id <run-id> --preset {{ config.preset }}{{ probe_flags }}
 ```{% endif %}
 
 > The union is computed by the CLI, not by you. Round 2 of this change's own review rejected
@@ -816,6 +829,15 @@ Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_pat
    > findings repairable only by writing a test, so an unqualified ban leaves them `pending` → one
    > non-progressing round → an unapprovable review.
 
+<!-- @hm:oracle-blocked -->
+   > **Read the covering test before this file's first `Edit`, and be willing to refuse.**
+   > `targeted-test-selection` §6 owns the rule and the three outcomes; do not restate it here.
+   > A refusal is recorded twice: retag the finding **`manual-only`**, and set
+   > `disposition: unresolved` / `authority: oracle-blocked`. The retag is what excludes it from
+   > the next round's selection above and from the grade — no second filter exists. "No covering
+   > test found" is a refusal, not permission.
+<!-- @hm:/oracle-blocked -->
+
    - Read the file at `{file}:{line}`.
    - Verify current code still matches the finding's `evidence` snippet (prior fixes may have shifted lines).
    - Apply the suggested fix via `Edit`.
@@ -854,6 +876,23 @@ Bash("{{ 'cd <WT> && ' if wt_on else '' }}set -o pipefail; uv run --with {{ harn
 ```{% else %}```bash
 !{{ 'cd <WT> && ' if wt_on else '' }}set -o pipefail; uv run --with {{ harness_maker_src_path }} hm review_churn pin --slug {slug} --label r{N}-post && uv run --with {{ harness_maker_src_path }} hm review_churn measure --slug {slug} --round {N} --pre refs/hm-churn/v1/{slug}-r{N}-pre --post refs/hm-churn/v1/{slug}-r{N}-post | tee <CHURN-r{N}>
 ```{% endif %}
+
+{% if config.preset == "Production" %}
+5c. **Measure what the round did to the code**, not only how much it edited. Churn counts edits;
+   this counts what the edits left behind. Its own call on purpose — a telemetry failure must
+   never take 5b's churn measurement down with it, and this feature records rather than gates.
+
+{% if is_codex %}```bash
+Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_churn complexity --slug {slug} --round {N} --pre refs/hm-churn/v1/{slug}-r{N}-pre --post refs/hm-churn/v1/{slug}-r{N}-post")
+```{% else %}```bash
+!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm review_churn complexity --slug {slug} --round {N} --pre refs/hm-churn/v1/{slug}-r{N}-pre --post refs/hm-churn/v1/{slug}-r{N}-post
+```{% endif %}
+
+   It reuses 5b's endpoints, so it measures the round AFTER reverts — a reverted fix leaves no
+   complexity behind either. `complexity_status` is three-valued: `not-python` is ADR-001's
+   accepted cost made visible, `unparseable` is a transient state, and a `measured` file always
+   scores at least 1 — so a null never has to be guessed at.
+{% endif %}
 
    `tee` keeps this payload for the Telemetry Emit step, which reads the four `churn_*` keys
    out of it. Carry them into the **iteration record** only, never into the row.
@@ -968,10 +1007,18 @@ The dispatch list is the round-1 list, unchanged — same agents, same lens line
 {% endfor %}```
 
 {% if is_codex %}```bash
-Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round <pass-id> --run-id <run-id> --preset {{ config.preset }}")
+Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round <pass-id> --run-id <run-id> --preset {{ config.preset }}{{ probe_flags }}")
 ```{% else %}```bash
-!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round <pass-id> --run-id <run-id> --preset {{ config.preset }}
+!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round <pass-id> --run-id <run-id> --preset {{ config.preset }}{{ probe_flags }}
 ```{% endif %}
+{% if config.preset == "Production" %}
+> **Re-derive `--diff-files` HERE, into a fresh `mktemp` — do not reuse Step 3's.** This pass
+> redefines the diff as `review_base..<freeze commit>`, the whole review including every
+> auto-fix round's edits, and the probe's in-diff boundary has to be that same set. Round 1's
+> list predates every repair, so a lens quoting a file the fixer edited in round 2 would pass
+> as out-of-diff evidence — on any review that needed one repair round, which is the common
+> path. Write `git diff --name-only <review_base> <freeze commit>` to the new file and pass it.
+{% endif %}
 
 **Apply no fixes in this pass.** It is an observation, and a pass that edits what it is measuring
 has measured nothing.
@@ -1092,7 +1139,21 @@ Append to the REVIEW report:
 
 Final grade: {final}
 Iterations used: {N} / {max_review_rounds}
-Exit reason: converged | no-progress | cap-exhausted | auto-fix-disabled
+Exit reason: converged | no-progress | cap-exhausted | auto-fix-disabled{% if config.preset == "Production" %}
+
+## 📏 Size & Complexity
+
+| File | LOC | Cyclomatic | Max nesting | Status |
+|------|-----|------------|-------------|--------|
+| {path} | {pre_loc} → {post_loc} | {pre} → {post} | {pre} → {post} | {complexity_status} |
+
+Read it from 5c's rows — do not re-derive the numbers. **Report only; there is no threshold and
+no gate.** A study measuring ten arms over 47 rounds found the compliance verdict identical
+(19/19) while complexity split −17% against +58%, which is the case for recording it; it supplies
+no threshold, and inventing one here would be a device that costs more than it protects.
+
+Write `null` as `null`, never `0`: a non-Python file and a perfectly simple one are different
+facts, and `complexity_status` says which you are looking at.{% endif %}
 Status: APPROVED | CHANGES_REQUESTED
 human_review_needed: {true|false}
 Counters (see §5): unreviewed {u} · prior-fix {r} · unattributed {a}

@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Four prescriptions from `Ecro/harness-bench` (`docs/STUDY-ko.md`) adopted.** The auto-fixer now
+  reads the covering test before its first edit on a file and refuses (`oracle-blocked`) rather than
+  widening a fix past what the test can verify — the refusal records `unresolved`/`oracle-blocked`
+  and is retagged `manual-only`. `hm review_churn complexity` emits per-file LOC and AST-node deltas
+  beside the compliance verdict (Production-gated "Size and Complexity" report section), `null` (not
+  `0`) for a file it cannot diff. A `repo_probe` canary was added to the reviewer contract so a lens
+  that reads outside the diff can say so — **this one did not land working**: a live 7-lens
+  `/hm:review` on the re-rendered harness returned zero `repo_probe` fields, because reviewer output
+  is narrative prose with no envelope for a field to sit "beside"; see REVIEW-bench-study-adoption
+  R1 (`human_review_needed: true`) — deferred, not fixed. Reviewer fan-out's language-conditional
+  payoff (Python +52% recall, C firmware no gain per the STUDY) is recorded in `wiki.md` and
+  `CLAUDE.md`, deliberately without a routing change (no data on which lenses overlap in which
+  language).
+
 ### Changed
 
 - **Reviewers report by causation, not by location.** The shared `hard_rules` partial told every

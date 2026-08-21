@@ -13,7 +13,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from harness_maker import command_registry, freeze
+from harness_maker import command_registry, freeze, review_complexity
+from harness_maker.review_complexity import record_row
 
 DEFAULT_CHURN_RATIO = 0.30
 """Fraction of a touched file's LOC above which a repair round re-reviews.
@@ -539,10 +540,85 @@ def record_oscillations(root: Path, slug: str, findings: list[Oscillation]) -> P
     return path
 
 
+def _blob(root: Path, ref: str, path: str) -> bytes | None:
+    """A file's contents at one endpoint as BYTES, or None when it did not exist there.
+
+    An absent endpoint is an ABSENCE, not a failure and not an empty file — a created file has
+    no pre side and a deleted one has no post side, and recording either as `b""` would report
+    a real zero where there is no measurement at all.
+
+    **Bytes, not text, and this is the whole point.** The shared `_git` helper passes
+    `text=True`, so a binary blob raises `UnicodeDecodeError` — which is not a
+    `CalledProcessError` and so escapes both this except and `main`'s. One PNG in a diff then
+    killed the entire complexity command, destroying the round's telemetry for every other
+    file, in a feature whose own stage prose promises it can only record and never gate.
+    `_post_loc` twelve lines above already avoids `text=True` for exactly this reason; the
+    first draft reused the text-mode helper instead of following the byte-mode sibling written
+    for the case. Decoding is `review_complexity`'s decision, made once, where the meaning of
+    "this did not decode" is defined.
+    """
+    try:
+        return subprocess.run(  # noqa: S603 — fixed argv, shell=False
+            ["git", "-C", str(root), "show", f"{ref}:{path}"],
+            check=True,
+            capture_output=True,
+            timeout=60,
+        ).stdout
+    except subprocess.CalledProcessError:
+        return None
+
+
+def _parse_renames(raw: str) -> dict[str, str]:
+    """post-path -> pre-path, for `R`/`C` records only.
+
+    `_parse_name_status` keys renames by their POST path and drops the old one, which is right
+    for churn (it asks how much a path changed) and wrong for a two-endpoint measurement: the
+    pre side must be read at the name the file had THEN. Without this, moving a file reports a
+    null pre endpoint beside `complexity_status: measured` — "complexity appeared from
+    nothing" for a file that only changed name.
+    """
+    fields = [f for f in raw.split("\0") if f != ""]
+    renames: dict[str, str] = {}
+    i = 0
+    while i < len(fields):
+        if fields[i][0] in {"R", "C"}:
+            if i + 2 >= len(fields):
+                break
+            renames[fields[i + 2]] = fields[i + 1]
+            i += 3
+            continue
+        if i + 1 >= len(fields):
+            break
+        i += 2
+    return renames
+
+
+def collect_complexity(root: Path, pre_ref: str, post_ref: str) -> list[dict[str, Any]]:
+    """Every touched file's endpoints, in path order.
+
+    Sorted because these rows are compared across weeks — git's traversal order is not a
+    contract, and an order-dependent row makes every comparison noise.
+
+    This is the PRE-side plumbing ADR-001 had to add: `FileChurn` carries `post_loc` only, and
+    the pre side exists there as numstat added/deleted, which is not a line count.
+    """
+    raw = _git(root, "diff", "--name-status", "-z", "-M", pre_ref, post_ref)
+    renames = _parse_renames(raw)
+    return [
+        review_complexity.complexity_row(
+            path,
+            _blob(root, pre_ref, renames.get(path, path)),
+            _blob(root, post_ref, path),
+        )
+        for path in sorted(_parse_name_status(raw))
+    ]
+
+
 _USAGE = (
     "usage: hm review_churn measure --pre <ref> --post <ref> [--root <dir>]\n"
     "       hm review_churn pin --slug <slug> --label <name> [--root <dir>]\n"
     "       hm review_churn oscillation --slug <slug> --rounds 2,3,4 [--root <dir>]\n"
+    "       hm review_churn complexity --pre <ref> --post <ref> --slug <slug> --round <n>\n"
 )
 
 
@@ -551,7 +627,7 @@ def main(argv: list[str] | None = None) -> int:
     if guard is not None:
         return guard
     parser = argparse.ArgumentParser(prog="hm review_churn", add_help=True)
-    parser.add_argument("verb", choices=["measure", "pin", "oscillation"])
+    parser.add_argument("verb", choices=["measure", "pin", "oscillation", "complexity"])
     parser.add_argument("--pre")
     parser.add_argument("--post")
     parser.add_argument("--slug")
@@ -591,6 +667,20 @@ def main(argv: list[str] | None = None) -> int:
         if not opts.pre or not opts.post:
             sys.stderr.write(_USAGE)
             return 2
+        if opts.verb == "complexity":
+            if not opts.slug or opts.round_n is None:
+                sys.stderr.write(_USAGE)
+                return 2
+            root = Path(opts.root)
+            files = collect_complexity(root, opts.pre, opts.post)
+            record_row(root, slug=opts.slug, round_n=opts.round_n, files=files)
+            sys.stdout.write(
+                json.dumps(
+                    {"slug": opts.slug, "round": opts.round_n, "files": files}, sort_keys=True
+                )
+                + "\n"
+            )
+            return 0
         result = measure_refs(Path(opts.root), opts.pre, opts.post)
     except (subprocess.CalledProcessError, ChurnMeasurementError) as e:
         sys.stderr.write(f"[churn] measurement failed: {e}\n")

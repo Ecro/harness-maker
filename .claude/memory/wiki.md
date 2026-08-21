@@ -996,4 +996,31 @@ attempting a round-N+1 repair. The honest cost of this specific trade: prompt su
 four template arms costs more text than describing a store did), and the reduction itself
 then drew its own P0 (a `tee`/pipe-ordering shell bug) and further P1s on its first review —
 a reduction is still new code with a new-code defect rate, not a proof of correctness.
+
+## [wiki:convention] reviewer-fanout-is-language-conditional | 2026-08-21
+`/hm:review` 의 7렌즈 팬아웃은 Production 에서 **언어와 무관하게** 강제된다. `Ecro/harness-bench`
+의 `docs/STUDY-ko.md` 는 같은 토큰 예산에서 팬아웃이 **Python 코드베이스 재현율 +52%**, **C 펌웨어
+에서는 이득 없음**(43% vs 단일 리뷰어 50%)을 관측했다. 렌즈가 서로 겹치면 예산만 소비한다.
+
+**의도적으로 바꾸지 않았다.** 언어별 렌즈 축소에는 "어느 렌즈가 어느 언어에서 겹치는가"의 데이터가
+필요하고 우리에겐 없다. 근거 없는 라우팅은 `lens_coverage` 의 `blocks_approval` 구조와 충돌한다 —
+mandatory 렌즈는 라우팅으로 뺄 수 없고, 빼면 그 리뷰는 영구 승인 불가가 된다 (conditional router 가
+`ux-reviewer`/`performance-reviewer` 만 드롭할 수 있는 이유가 정확히 이것).
+
+이 엔트리의 존재 이유는 **침묵과 보류를 구분하는 것**이다. 기록이 없으면 다음 독자가 이걸 미검토
+구멍으로 읽고 재검토 비용을 다시 치른다. 소비 프로젝트가 C/펌웨어 위주라면 `reviewers.enabled` 를
+직접 줄이는 선택지가 사용자에게 열려 있다 — 하네스가 대신 결정하지 않을 뿐이다.
+
+같은 논증 계열: STUDY 의 처방 ③(합의 필터 끄기)도 기각됐다. 그 근거 수치는 **파일-스코프** 조건에서
+나왔고 문서 자신이 "리포를 열면 상관이 뒤집힌다"고 적는데, 우리 리뷰어는 `tools: Read, Grep, Glob`
+로 리포를 읽는다. 헤드라인만 보고 채택하면 조건이 반대인 데이터로 결정하게 된다.
+
+## [wiki:architecture] narrative-output-needs-explicit-envelope | 2026-08-21
+A contract that asks an LLM agent for "a top-level field beside your findings array" assumes an envelope the agent does not emit. Phase 4 of PLAN-bench-study-adoption added `repo_probe` — one verbatim line from a file outside the diff — as proof that a reviewer's repository access is live, and wired it through `lens_coverage` as a validity condition. The render was correct: all four backing agents carried the contract three times each, and all three `hm lens_coverage check` sites carried `--diff-files`/`--rev`, verified on disk after `make --update`. A live `/hm:review` then returned **zero probes from seven lenses**, and the coverage gate reported every mandatory lens `missing`.
+
+The cause was not delivery. Reviewers return **narrative prose**, sometimes with embedded JSON fragments; there is no findings array for a sibling field to sit beside, because the main loop is what assembles the result file (`review.md.j2` Step 3's own contract). Every automated test passed because every fixture wrote the envelope by hand — the shape was never observed, only assumed.
+
+Two things make this worth keeping. First, the reviewers **did** read outside the diff — they cited `io_utils.py`, `review_telemetry.py`, `common_ground.py` — so a detector reported absence where the thing it detects was present: a false negative, the worse direction for a canary. Second, the failure was invisible to every layer that could have been asked cheaply: render-greps passed, unit tests passed, the SHA pins moved exactly as predicted. Only running the thing showed it.
+
+The rule: when a contract depends on an agent's OUTPUT SHAPE rather than on its behaviour, one real dispatch is the only evidence that counts, and it belongs before the contract is wired into a gate — not after. Fixture-shaped output proves the validator, never the producer.
 <!-- @hm:/user:entries -->

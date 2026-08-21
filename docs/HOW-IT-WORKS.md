@@ -771,7 +771,13 @@ If grade falls below `grade_threshold` (default A), enter the automatic fix loop
 review → fix → measure churn → (maybe) re-review → regrade → …
 ```
 
-- The executor applies P0/P1 findings in order; a fix that breaks the build is reverted.
+- The executor applies P0/P1 findings in order; a fix that breaks the build is reverted. Before
+  its first edit on a file it reads the covering test for the finding — if the fix would widen
+  past what that test can verify, it refuses with `oracle-blocked` rather than guessing at a
+  wider fix, and the refusal records `unresolved`/`oracle-blocked` (retagged `manual-only`).
+- **`hm review_churn complexity`** reports per-file LOC and AST-node deltas beside the round's
+  compliance verdict (Production-only "Size and Complexity" report section) — `null`, not `0`,
+  for a file it cannot diff (e.g. binary, or absent at one revision).
 - **The re-review is gated on churn.** Each round's churn is measured between two pinned
   trees — the round's own pre-fix and post-fix state, never `HEAD`, because `/hm:review` does
   not commit and `HEAD..HEAD` would read 0.0 for every round. It aggregates as the **maximum

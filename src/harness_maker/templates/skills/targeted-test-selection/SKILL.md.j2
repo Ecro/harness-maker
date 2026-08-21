@@ -161,3 +161,42 @@ is often zero — nothing ran — so an oracle reading only failure counts sees 
   monkeypatch targets) are invisible to an AST scan, and two-hop breakage is out of scope
   by design. A file the selector cannot map forces FULL rather than being skipped, so the
   failure direction is extra tests, never missing ones.
+
+## 6. Before the first edit — read the test, then be willing to refuse
+
+§4.5 classifies a targeted run that already went RED. This is the question that comes **first**,
+and it is cheaper: a fix that cannot pass without rewriting a test is one you can decline before
+you write it.
+
+**Read the test(s) covering a file before your first `Edit` on it.** Running a test is not
+reading it — running tells you the current colour, reading tells you what the file is allowed to
+do. Then apply one of three outcomes:
+
+1. **Apply.** The fix passes the covering test as written. The normal case.
+2. **Refuse.** Passing would require changing a test **that is not this finding's own target**.
+   Do not widen the fix and do not touch the test. Record it (below) and move to the next finding.
+3. **Apply — the test IS the target.** A finding whose own target is the test may be fixed by
+   editing that test. This is a **non-trigger**, not an exception you argue for: `tests` is a
+   mandatory lens and raises findings repairable only by writing a test, so a refusal that fired
+   here would leave every such finding unfixable and the review unapprovable.
+
+**No covering test located is outcome 2, not outcome 1.** "I could not find one" is not
+permission — record it with the reason `no covering test located`. A rule that activates on a
+condition and silently no-ops when the condition is unknown never fires for the cases that
+motivated it.
+
+**The record**, and both halves are load-bearing:
+
+- retag the finding **`manual-only`**, and
+- record `disposition: unresolved` with `authority: oracle-blocked`.
+
+The retag is the mechanism. It keeps the finding out of `P0_count`/`P1_count` and out of the
+next round's fixable-finding selection, which already filters on `consensus-passed` — so the
+refusal costs no extra machinery and cannot be re-litigated round after round. The authority
+carries **why**, which is what separates this from an ordinary single-voice `manual-only` and
+makes the set of refusals a free audit of where the spec and the tests disagree.
+
+**Why `manual-only` and not a grade penalty.** The same fact discovered one step later — a fix
+applied, run RED, classified unreachable and reverted — is already recorded `manual-only`,
+never grade-lowering. If refusing early were harsher, the cheapest way to protect the grade
+would be to skip the read, which is precisely the behaviour this section exists to replace.

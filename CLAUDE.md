@@ -228,6 +228,18 @@ Cursor / Codex 의 plugin marketplace 가 GitHub 에서 직접 fetch.
 - `.cursor/rules/*.mdc` ≤ 500행 (Cursor 권장. 분할 권장 임계 200행)
 - 초과 시 renderer 가 warn
 
+## 리뷰어 팬아웃은 언어 조건부다 — 기록만, 라우팅은 안 한다
+
+`/hm:review` 의 7렌즈는 Production 에서 언어와 무관하게 강제된다. `Ecro/harness-bench` 의
+`docs/STUDY-ko.md` 는 같은 예산 대비 **Python 코드베이스에서 재현율 +52%**, **C 펌웨어에서는
+이득 없음** (팬아웃 43% vs 단일 리뷰어 50%) 을 관측했다. 겹치는 렌즈는 예산만 쓴다.
+
+**그래서 바꾸지 않았다.** 언어별로 렌즈를 줄이려면 어느 렌즈가 어느 언어에서 겹치는지에 대한
+데이터가 필요한데 우리에겐 없고, 근거 없는 라우팅은 mandatory-lens 가 승인을 막는 구조와 정면
+충돌한다 (`lens_coverage` 의 `blocks_approval`). 침묵이 "검토 안 한 구멍" 으로 읽히는 걸 막으려고
+적어둔다 — 이건 미검토가 아니라 **의도적 보류**다. 소비 프로젝트가 C/펌웨어 위주라면
+`reviewers.enabled` 를 직접 줄이는 것이 사용자 선택으로 열려 있다.
+
 ## Workflow (autoloop CODER 가 알아야 할 점)
 - **Atomic stage**: 7개 (research/spec/plan/execute/review/wrapup/verify)
 - **Stage 연결** = `/hm:loop --per-iter-stages` 또는 autopilot. 융합 명령 축은 0.47.0 에서 제거됨 (PLAN-harness-diet ADR-001/002).

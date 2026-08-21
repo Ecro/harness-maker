@@ -44,6 +44,16 @@ DISPOSITIONS: frozenset[str] = DISPOSITION_VALUES
 #: valid on `unresolved` and invalid on `rejected`.
 NO_CONTRACT = "no-contract"
 
+#: The auto-fixer read the covering test and refused: passing would require editing a test that
+#: is not this finding's own target. Like `no-contract` it is the recorded reason a finding could
+#: not be adjudicated, so it pairs with `unresolved` and nothing else — a refusal is not a
+#: contract, and letting it justify `rejected` would make the fixer's own reluctance sufficient
+#: to clear a P0. The grade is NOT decided here: the refusal also retags the finding
+#: `manual-only`, which is what keeps it out of `P0_count`/`P1_count` and out of the fixable-
+#: finding selection. This value carries only the WHY, distinguishing it from an ordinary
+#: single-voice `manual-only`.
+ORACLE_BLOCKED = "oracle-blocked"
+
 #: The closed severity vocabulary. Checked by membership, so an off-vocabulary value ("critical",
 #: "p0", "P0 (blocker)") is DISTINGUISHABLE from a low one rather than falling through the count
 #: silently — measured 2026-08-16: three `consensus-passed` findings at `severity: "critical"`
@@ -139,7 +149,7 @@ def tag_finding(voices: Sequence[object], *, reasoning_diverges: bool = False) -
 
 
 def _authority_kind(authority: object) -> str:
-    """`ac` | `docstring` | `no-contract` | `none` | `unknown`."""
+    """`ac` | `docstring` | `no-contract` | `oracle-blocked` | `none` | `unknown`."""
     if authority is None:
         return "none"
     if not isinstance(authority, str) or not authority.strip():
@@ -147,6 +157,8 @@ def _authority_kind(authority: object) -> str:
     text = authority.strip()
     if text == NO_CONTRACT:
         return NO_CONTRACT
+    if text == ORACLE_BLOCKED:
+        return ORACLE_BLOCKED
     if text.startswith("docstring:"):
         return "docstring"
     head = text.split()[0].upper()
@@ -163,6 +175,12 @@ def validate_disposition(disposition: object, authority: object = None) -> bool:
     docstring has nothing to reject against, and the honest record of that is `unresolved`, which
     still counts toward the grade. Letting `no-contract` justify a rejection would turn
     self-grading into grade laundering, which is the exact thing ADR-002 exists to prevent.
+
+    `oracle-blocked` is the second value in that family and pairs the same way: the auto-fixer
+    refusing to widen a fix is a reason, not a contract. The disposition vocabulary is untouched
+    — it is `codex_ledger.DISPOSITION_VALUES` by alias, shared with the cross-model ledger and
+    with `review_telemetry`, and adding a member would put a permanently-zero key in
+    `disposition_counts`. The authority axis already exists to carry exactly this.
     """
     if disposition not in DISPOSITIONS:
         return False
@@ -171,7 +189,7 @@ def validate_disposition(disposition: object, authority: object = None) -> bool:
         return False
     if disposition == "rejected":
         return kind in {"ac", "docstring"}
-    if kind == NO_CONTRACT:
+    if kind in {NO_CONTRACT, ORACLE_BLOCKED}:
         return disposition == "unresolved"
     return True
 
