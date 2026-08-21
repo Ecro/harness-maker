@@ -82,3 +82,24 @@ estimate exists because a reviewer or the plan validator named its absence as a 
 cutting one to protect a declaration would trade a real finding for a tidy figure. The rule this
 repo applies — cut before raising — is about prose that stopped earning its place; none of this
 has.
+
+## The fold — every baseline key that moved, and why
+
+Run from the base repo **after** `task-land`, at squash commit `15669b4e`. Regenerating from a
+task-branch commit is refused by `assert_sha_is_durable`, which is why this is the last step of
+the task rather than part of the work.
+
+| Key | Before → After | Why |
+|---|---|---|
+| `surface.claude.review.chars` | 87774 → 91584 | The four prescriptions' prose, plus the seven round-1 review repairs. `review.md.j2` is the only stage template this task edited, and `review` is the only claude command that moved. |
+| `surface.claude.review.round_trips` | 38 → 39 | Step 5c, the complexity measurement. Its own call rather than a chain onto 5b's churn line, so a record-only telemetry failure cannot take the churn measurement down with it. |
+| `surface.codex.hm-review.chars` | 83085 → 86902 | The same blocks through the `is_codex` fence, in the `hm-review` skill; +3817 against claude's +3810. |
+| `surface.codex.hm-review.round_trips` | 33 → 34 | The same Step 5c, on the Codex arm — `hm-review` again, counted as `Bash(` call sites rather than `^!` lines. |
+| `aggregate_chars.claude` | 430865 → 434675 | The sum. No other command moved. |
+| `aggregate_chars.codex` | 363775 → 367592 | The sum. No other skill moved. |
+| `payload_digest` | `fcd2d2b9…` → `28c7e1cf…` | A hash **of** the surface payload above. It moves whenever any measured value does; it carries no independent claim and is listed so a reader is not left wondering whether it was an unexplained edit. |
+| `render_sha` | `a5030534` → `15669b4e` | The commit the render was taken at — this task's squash. Pins the numbers to a base-reachable commit rather than to a working directory. |
+
+`_ATOMIC_RATCHET["review"]` moved 67008 → 70818 in the same fold, for the same reason as the
+`chars` row above. **Nothing else in that table moved**, which is the check worth making: this
+task edited one stage template, so a second command drifting would be a finding, not rounding.

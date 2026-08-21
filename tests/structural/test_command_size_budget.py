@@ -510,7 +510,11 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # was right. The reporting half costs nothing here — it lives in the shared `hard_rules`
     # partial, which this dict does not measure.
     # Attributed in work-docs/BASELINE-DELTA-review-scope-and-oracle.md.
-    "review": 67008,
+    # 67008 -> 70818: PLAN-bench-study-adoption's end-of-task fold, taken from the base repo
+    # at squash commit 15669b4e with `work-docs/BASELINE-DELTA-bench-study-adoption.md` as the
+    # attribution. The growth is the four prescriptions' prose plus the seven repairs its own
+    # live review found. `execute` did not move; this task edited one stage template.
+    "review": 70818,
     # 30537 → 32114 (PLAN-plan-interview-comprehension): the same partial, invoked with
     # `stage='spec'`. Raw +1778, compacted to +1577. The brief's SUBJECT differs by stage
     # (ADR-007) because `/hm:spec` has no architecture draft to disclose — identical text
