@@ -21,9 +21,14 @@ Three design facts the tests below pin, each because its absence was a finding i
   that: with `[]` every path satisfies "not in the diff" and the check silently becomes a
   no-op, which is the absent-case black hole arriving through the parameter list.
 
-* **A failed probe makes that lens `missing`.** It reuses the one blocking reason that already
-  exists; `missing` already blocks approval and the Auto-Fix Loop already re-dispatches. A
-  second independent gate would create a state needing both satisfied, for no more detection.
+* **A failed probe is REPORTED, not blocking.** It was designed to make the lens `missing`,
+  reusing the one blocking reason that already existed. A live `/hm:review` then failed all
+  seven lenses while they demonstrably HAD read outside the diff — the contract asks for a
+  top-level field beside a findings array and reviewers return prose, so there is no array for
+  it to sit beside. Blocking on that makes every consuming Production harness's review
+  permanently unapprovable, so the check records and reports via `probe_failures`.
+  `exercised_lenses` no longer consults it at all; these tests therefore assert on
+  `probe_failures`, and the two `coverage_verdict` tests at the end assert the SEPARATION.
 """
 
 from __future__ import annotations
@@ -33,7 +38,12 @@ from pathlib import Path
 
 import pytest
 
-from harness_maker.lens_coverage import ProbeCheck, coverage_verdict, exercised_lenses
+from harness_maker.lens_coverage import (
+    ProbeCheck,
+    coverage_verdict,
+    exercised_lenses,
+    probe_failures,
+)
 
 _RUN = "run-1"
 _CAUSE = "src/pkg/cause.py"
@@ -77,25 +87,25 @@ def test_a_verbatim_out_of_diff_quote_counts_the_lens_as_exercised(tmp_path: Pat
 def test_an_absent_probe_field_drops_the_lens(tmp_path: Path) -> None:
     """Mode 1, and the most likely: a reviewer that never had access cannot produce one."""
     _write(tmp_path, "design", None)
-    assert exercised_lenses(tmp_path, _RUN, probe=_check()) == set()
+    assert probe_failures(tmp_path, _RUN, probe=_check()) == {"design"}
 
 
 def test_quoting_a_file_inside_the_diff_drops_the_lens(tmp_path: Path) -> None:
     """Mode 2. The diff is already in the brief — quoting it proves nothing about access."""
     _write(tmp_path, "design", {"path": "src/pkg/touched.py", "line": 1, "text": "x"})
-    assert exercised_lenses(tmp_path, _RUN, probe=_check()) == set()
+    assert probe_failures(tmp_path, _RUN, probe=_check()) == {"design"}
 
 
 def test_quoting_an_untracked_path_drops_the_lens(tmp_path: Path) -> None:
     """Mode 3. A path git does not know is a path the reviewer did not read."""
     _write(tmp_path, "design", {"path": "src/pkg/invented.py", "line": 1, "text": "x"})
-    assert exercised_lenses(tmp_path, _RUN, probe=_check()) == set()
+    assert probe_failures(tmp_path, _RUN, probe=_check()) == {"design"}
 
 
 def test_text_that_does_not_match_the_line_drops_the_lens(tmp_path: Path) -> None:
     """Mode 4 — the one that separates reading from guessing a plausible line."""
     _write(tmp_path, "design", {"path": _CAUSE, "line": 4, "text": "def reach(flag, extra):"})
-    assert exercised_lenses(tmp_path, _RUN, probe=_check()) == set()
+    assert probe_failures(tmp_path, _RUN, probe=_check()) == {"design"}
 
 
 @pytest.mark.parametrize("bad", ["../../etc/passwd", "/etc/passwd", "src/../../escape.py"])
@@ -116,7 +126,7 @@ def test_a_path_escaping_the_repository_drops_the_lens(tmp_path: Path, bad: str)
         tracked=frozenset({"src/pkg/touched.py", _CAUSE, bad}),
         read_blob=lambda path: "secret\n" if path == bad else None,
     )
-    assert exercised_lenses(tmp_path, _RUN, probe=hostile) == set()
+    assert probe_failures(tmp_path, _RUN, probe=hostile) == {"design"}
 
 
 # ── the escape, and its verification ────────────────────────────────────────
@@ -132,7 +142,7 @@ def test_the_no_out_of_diff_escape_is_accepted_only_when_it_is_true(tmp_path: Pa
 def test_the_escape_is_rejected_when_out_of_diff_files_do_exist(tmp_path: Path) -> None:
     """Never taken on the reviewer's word — otherwise it is a one-line opt-out of the canary."""
     _write(tmp_path, "design", {"status": "no-out-of-diff-file"})
-    assert exercised_lenses(tmp_path, _RUN, probe=_check()) == set()
+    assert probe_failures(tmp_path, _RUN, probe=_check()) == {"design"}
 
 
 # ── malformed shapes ────────────────────────────────────────────────────────
@@ -154,7 +164,7 @@ def test_the_escape_is_rejected_when_out_of_diff_files_do_exist(tmp_path: Path) 
 def test_a_malformed_probe_drops_the_lens(tmp_path: Path, probe: object) -> None:
     """Fail-closed on shape. "Cannot tell" must never resolve to "exercised"."""
     _write(tmp_path, "design", probe)
-    assert exercised_lenses(tmp_path, _RUN, probe=_check()) == set()
+    assert probe_failures(tmp_path, _RUN, probe=_check()) == {"design"}
 
 
 # ── Side: the third state ───────────────────────────────────────────────────
@@ -202,16 +212,33 @@ def test_coverage_verdict_threads_the_probe_context(tmp_path: Path) -> None:
     _write(tmp_path, "security", {"path": _CAUSE, "line": 4, "text": "WRONG"})
     v = coverage_verdict(tmp_path, _RUN, preset="Production", probe=_check())
     assert "design" in v["exercised"]  # type: ignore[operator]
-    assert "security" in v["missing"]  # type: ignore[operator]
-    assert v["blocks_approval"] is True
+    assert "security" in v["exercised"]  # type: ignore[operator]  # advisory, still delivered
+    assert v["probe_failed"] == ["security"]
 
 
-def test_a_failed_probe_produces_missing_and_not_a_new_blocking_reason(tmp_path: Path) -> None:
-    """Contract Boundary: `blocks_approval` keeps exactly one meaning.
+def test_a_failed_probe_is_reported_beside_the_verdict_and_does_not_change_it(
+    tmp_path: Path,
+) -> None:
+    """Contract Boundary: `blocks_approval` keeps exactly one meaning — a lens did not deliver.
 
-    Phase 4 widens what "usable result" means; it does not add a second reason. A verdict key
-    naming the probe separately would be that second reason.
+    A probe failure is not yet evidence of that: seven of seven lenses failed the probe in a
+    live review while having read outside the diff. So the verdict carries `probe_failed` as a
+    REPORT and `blocks_approval` is unmoved by it. The assertion is the separation, both ways —
+    the lens still counts as exercised, and the failure is still named.
     """
     _write(tmp_path, "design", {"path": _CAUSE, "line": 4, "text": "WRONG"})
     v = coverage_verdict(tmp_path, _RUN, preset="Production", probe=_check())
-    assert set(v) == {"exercised", "missing", "blocks_approval", "preset"}
+    assert "design" in v["exercised"]  # type: ignore[operator]
+    assert v["probe_failed"] == ["design"]
+    assert "design" not in v["missing"]  # type: ignore[operator]
+
+
+def test_a_lens_that_never_delivered_still_blocks(tmp_path: Path) -> None:
+    """Discrimination. Without it, "never block on anything" would satisfy the test above.
+
+    The probe went advisory; the delivery gate did not. An absent result file is still the
+    failure `lens_coverage` was built for.
+    """
+    v = coverage_verdict(tmp_path, _RUN, preset="Production", probe=_check())
+    assert v["blocks_approval"] is True
+    assert "design" in v["missing"]  # type: ignore[operator]

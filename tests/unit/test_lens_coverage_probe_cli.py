@@ -102,10 +102,15 @@ def _run(root: Path, results: Path, rev: str, *extra: str) -> subprocess.Complet
     return subprocess.CompletedProcess(argv, rc, "", "")
 
 
-def test_one_valid_and_one_invalid_probe_blocks_and_names_the_invalid_lens(
+def test_one_valid_and_one_invalid_probe_names_the_invalid_lens(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """The scenario the Testing Strategy names, through the entry point the stage calls."""
+    """The scenario the Testing Strategy names, through the entry point the stage calls.
+
+    Renamed from `..._blocks_and_names_...`: the probe went advisory after a live review showed
+    it fails on reviewers that HAVE read the repository. It still has to NAME the lens — a
+    detector that reports nothing is not advisory, it is absent.
+    """
     rev = _repo(tmp_path)
     good = {"path": _CAUSE, "line": 4, "text": "def reach(flag):"}
     bad = {"path": _CAUSE, "line": 4, "text": "def reach(flag, extra):"}
@@ -114,10 +119,12 @@ def test_one_valid_and_one_invalid_probe_blocks_and_names_the_invalid_lens(
     _run(tmp_path, results, rev)
     verdict = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
 
-    assert verdict["blocks_approval"] is True
-    assert verdict["missing"] == ["security"]
+    # ADVISORY: the probe failure is reported, the verdict is unmoved. Blocking on it made
+    # every Production harness's review permanently unapprovable once it re-rendered.
+    assert verdict["probe_failed"] == ["security"]
+    assert verdict["blocks_approval"] is False
     assert "design" in verdict["exercised"]
-    assert "security" not in verdict["exercised"]
+    assert "security" in verdict["exercised"]
 
 
 def test_all_valid_probes_do_not_block(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -131,6 +138,7 @@ def test_all_valid_probes_do_not_block(tmp_path: Path, capsys: pytest.CaptureFix
 
     assert verdict["blocks_approval"] is False
     assert verdict["missing"] == []
+    assert verdict["probe_failed"] == [], "a valid probe must not be reported as failed"
 
 
 def test_absent_flags_skip_the_check_loudly_instead_of_failing(
@@ -310,8 +318,7 @@ def test_a_probe_right_on_disk_and_wrong_at_rev_is_rejected(
     _run(tmp_path, results, rev)
     verdict = json.loads(capsys.readouterr().out.strip().splitlines()[-1])
 
-    assert sorted(verdict["missing"]) == sorted(_MANDATORY), (
-        "a probe matching only the post-review working tree was accepted — the validator is "
+    assert sorted(verdict["probe_failed"]) == sorted(_MANDATORY), (
+        "a probe matching only the post-review working tree verified — the validator is "
         "reading the tree, so the quoted 'evidence' never had to exist at the reviewed revision"
     )
-    assert verdict["blocks_approval"] is True

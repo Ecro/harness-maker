@@ -103,3 +103,27 @@ the task rather than part of the work.
 `_ATOMIC_RATCHET["review"]` moved 67008 → 70818 in the same fold, for the same reason as the
 `chars` row above. **Nothing else in that table moved**, which is the check worth making: this
 task edited one stage template, so a second command drifting would be a finding, not rounding.
+
+## Second fold — the probe went advisory
+
+A follow-up on the same task, after CI was green and before release. The live gate had shown the
+canary failing all seven lenses that HAD read the repository, and blocking on that would make
+every consuming Production harness's `/hm:review` permanently unapprovable the moment it
+re-rendered — `blocks_approval: true`, `CHANGES_REQUESTED` at the round cap, forever. Shipping
+that to PyPI, which is immutable, is what this fold pays for avoiding.
+
+| Key | Before → After | Why |
+|---|---|---|
+| `surface.claude.review.chars` | 91584 → 91909 | One paragraph in `review` saying the check is advisory and its reported lenses are not missing. |
+| `surface.codex.hm-review.chars` | 86902 → 87227 | The same paragraph in `hm-review`; +325 on both variants, so this block has no `is_codex` branch. |
+| `aggregate_chars.claude` | 434675 → 435000 | The sum. |
+| `aggregate_chars.codex` | 367592 → 367917 | The sum. |
+| `payload_digest` | `28c7e1cf…` → `bc668726…` | Moves with any measured value; no independent claim. |
+| `render_sha` | `15669b4e` → `774b73e4` | The first fold's commit, which is now the base-reachable one. |
+
+`round_trips` did **not** move on either variant, which is the check worth naming: making a gate
+advisory removes a branch, not a call, so a round-trip change here would have meant something
+else had shifted. `_ATOMIC_RATCHET["review"]` follows its chars row, 70818 → 71143.
+
+The `return_envelope` partial also changed, and reviewer bodies are not in either surface count —
+only the four agent `body_sha256` snapshots moved for it.

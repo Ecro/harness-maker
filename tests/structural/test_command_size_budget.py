@@ -514,7 +514,10 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # at squash commit 15669b4e with `work-docs/BASELINE-DELTA-bench-study-adoption.md` as the
     # attribution. The growth is the four prescriptions' prose plus the seven repairs its own
     # live review found. `execute` did not move; this task edited one stage template.
-    "review": 70818,
+    # 70818 -> 71143: the probe check went advisory before release (+325, one paragraph).
+    # Blocking on a canary that fails lenses which HAVE read the repository would have made
+    # every consuming Production harness's review permanently unapprovable.
+    "review": 71143,
     # 30537 → 32114 (PLAN-plan-interview-comprehension): the same partial, invoked with
     # `stage='spec'`. Raw +1778, compacted to +1577. The brief's SUBJECT differs by stage
     # (ADR-007) because `/hm:spec` has no architecture draft to disclose — identical text

@@ -240,6 +240,11 @@ it at the top level beside its findings; you are the one who writes the result f
 you do not transcribe exists only in a transcript nothing reads — and the lens is then recorded
 exactly as a dispatch that never returned.
 
+The check is **advisory** — it reports `probe_failed` beside the verdict and moves nothing.
+Blocking on it made every Production review unapprovable, because reviewers return prose and the
+contract asks for a field beside a findings array that prose does not have. Surface the reported
+lenses; do not treat them as missing.
+
 The check needs two values you already have. Write the diff's changed paths, one per line, to a
 `mktemp` file and pass that path as `--diff-files`; pass Step 1's frozen `review_base` as
 `--rev`. Both are **required** — an absent `--diff-files` is an error rather than an empty list,

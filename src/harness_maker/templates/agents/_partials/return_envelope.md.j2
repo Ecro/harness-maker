@@ -33,6 +33,9 @@ outside the diff, that is itself worth noticing before you answer.
 then, return `{"status": "no-out-of-diff-file"}`. The claim is verified against the repository,
 so it is not available as a shortcut.
 
-A missing, unverifiable or in-diff probe means your lens did not deliver a usable result, and it
-is recorded the same way a dispatch that never returned would be.
+A missing or unverifiable probe is **recorded, not held against you** — it appears as
+`probe_failed` beside the coverage verdict and changes no outcome. That is deliberate: the first
+version made it mean "this lens did not deliver", and a live review then failed all seven lenses
+that had demonstrably read the repository. Answer it honestly rather than defensively; a probe
+you cannot give truthfully is more useful absent than invented.
 {%- endif %}

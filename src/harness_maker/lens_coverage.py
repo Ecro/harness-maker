@@ -132,13 +132,47 @@ def exercised_lenses(round_dir: Path, run_id: str, *, probe: ProbeCheck | None) 
             continue
         if payload.get("run_id") != run_id:
             continue
-        if probe is not None and not _probe_ok(payload.get("repo_probe"), probe):
-            # A lens that cannot show it read the repository did not deliver a usable result.
-            # It becomes `missing`, which already blocks approval and already triggers a
-            # re-dispatch — no second blocking reason is introduced.
-            continue
+        # NOTE: the probe is deliberately NOT consulted here. It was a `continue` — a failed
+        # probe meant "this lens did not deliver" — until a live review showed that blocks every
+        # Production harness forever. `probe_failures` reports it instead; see its docstring.
         found.add(stem)
     return found
+
+
+def probe_failures(round_dir: Path, run_id: str, *, probe: ProbeCheck | None) -> set[str]:
+    """Lenses whose `repo_probe` did not verify. **Reported, never blocking.**
+
+    The canary was designed to make a failed probe mean "this lens did not deliver", reusing
+    `missing` so no second blocking reason existed. A live `/hm:review` then showed the design
+    rests on a shape that does not exist: the contract asks for a top-level field beside a
+    findings array, and reviewers return narrative prose with no array for it to sit beside.
+    Seven of seven lenses failed while demonstrably HAVING read outside the diff — a false
+    negative from a detector, which is the worse direction.
+
+    Blocking on that would make every consuming Production harness's `/hm:review` permanently
+    unapprovable the moment it re-renders: all seven lenses `missing`, `blocks_approval: true`,
+    `CHANGES_REQUESTED` at the round cap, forever. So the check runs, records and reports, and
+    does not gate.
+
+    **What it would take to restore blocking**: an output shape reviewers actually produce.
+    Until one dispatch demonstrates that, a passing probe is evidence and a failing one is not.
+    """
+    result: set[str] = set()
+    if probe is None or not round_dir.is_dir():
+        return result
+    known = set(ALL_LENSES)
+    for path in sorted(round_dir.glob("*.json")):
+        if path.stem not in known:
+            continue
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if not isinstance(payload, dict) or payload.get("run_id") != run_id:
+            continue
+        if not _probe_ok(payload.get("repo_probe"), probe):
+            result.add(path.stem)
+    return result
 
 
 def coverage_verdict(
@@ -167,9 +201,16 @@ def coverage_verdict(
     for d in dirs:
         exercised |= exercised_lenses(d, run_id, probe=probe)
     missing = [lens for lens in required if lens not in exercised]
+    probe_failed: set[str] = set()
+    for d in dirs:
+        probe_failed |= probe_failures(d, run_id, probe=probe)
     return {
         "exercised": [lens for lens in ALL_LENSES if lens in exercised],
         "missing": missing,
+        # Reported beside the verdict, deliberately NOT folded into it. `blocks_approval` keeps
+        # exactly one meaning — a lens did not deliver a result — and a probe failure is not
+        # yet evidence of that (see `probe_failures`).
+        "probe_failed": [lens for lens in ALL_LENSES if lens in probe_failed],
         "blocks_approval": bool(missing),
         "preset": str(preset),
     }
