@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.53.0] - 2026-08-22
 
 ### Added
 
@@ -17,6 +17,18 @@
   payoff (Python +52% recall, C firmware no gain per the STUDY) is recorded in `wiki.md` and
   `CLAUDE.md`, deliberately without a routing change (no data on which lenses overlap in which
   language).
+
+  **The `repo_probe` check ships ADVISORY, and that is deliberate.** It runs, validates and
+  reports `probe_failed` beside the coverage verdict; it does **not** move `blocks_approval`.
+  Blocking was the original design and was removed before release for a reason worth stating: a
+  Production harness that updates and re-renders gets the flags in its review command and the
+  contract in its reviewer bodies, all seven lenses then report `missing`, and the grade gate
+  returns `CHANGES_REQUESTED` at the round cap on **every** review, permanently. Nothing is lost
+  by the demotion — a detector producing only false negatives detected nothing — and the
+  validator, the contract, the object-store read (a tracked symlink cannot steer it out of the
+  repo) and the five invalidity modes are all in place and tested. Restoring the gate is one
+  `continue`, once an output shape reviewers actually produce exists; the condition is written
+  into `lens_coverage.probe_failures`' docstring.
 
 ### Changed
 
