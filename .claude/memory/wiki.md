@@ -1052,4 +1052,50 @@ until the diff has been taken. Related: `[fail:test] existing-tests-found-the-si
 what it replaced" shape) and `[fail:design] gate-enumeration-was-not-exhaustive` (enumeration
 completeness by recall vs. by mechanical derivation — the same recall-vs-mechanism split, applied
 here to code deletion instead of gate lists).
+
+## [wiki:architecture] reconciling-qualifier-must-be-copied-to-every-enforcing-reader | 2026-08-23
+`[wiki:architecture] one-rule-one-normative-site-others-defer` (2026-08-19) says a rule should
+live in exactly one place and every other mention should defer to it. That is right when every
+consumer of the rule can READ the normative site. It is wrong, and produces a live block, when
+one consumer is an LLM agent dispatched with its own bounded prompt and no access to the file
+that carries the reconciling clause.
+
+`a5-duplicate-coverage-block` hit exactly that shape. Phase A.5's `test-reviewer` agent's rubric
+permitted "at least one dedicated test function" per SPEC scenario, while its own Hard Rules
+routing bullet blocked on "a scenario covered twice" — an internal contradiction inside one
+agent's prompt. The reconciling qualifier that resolves it (duplication means duplication of one
+OBSERVABLE, not of a scenario ID) already existed, correctly, at `execute.md.j2:222` — the Phase
+A authoring rule the ORCHESTRATOR reads. `test-reviewer` is dispatched with its own prompt and
+never sees that file. Two rounds of Phase A.5 blocked on a live consuming project before this was
+diagnosed, because the fix that would satisfy "one normative site" (point Phase A.5 at
+`execute.md.j2:222`) is not available to a sub-agent call.
+
+The rule this entry adds, alongside the 2026-08-19 one rather than replacing it: **before applying
+"one normative site, others defer," check whether every consumer can actually read that site.**
+If a consumer is a separately-dispatched agent (its own `Task()`/`spawn_agent` call with a bounded
+prompt, not a template `{% include %}` the orchestrator composes), the rule must be COPIED into
+that agent's own prompt, not deferred — and the copy is now a second normative site with the
+duplication-drift risk that implies (a future edit to one copy and not the other reproduces this
+exact defect). `test-reviewer_body.md.j2` and `execute.md.j2` now both state "for the same
+observable" verbatim; `tests/structural/test_duplicate_trigger_observable_parity.py` pins both
+rendered copies so they cannot silently diverge. Full record: `work-docs/PLAN-a5-duplicate-coverage-block.md` (ADR-004), `work-docs/REVIEW-a5-duplicate-coverage-block-2026-08-23.md`.
+
+## [wiki:convention] resolution-window-exclusion-over-syntactic-splitter | 2026-08-23
+When an ADR locks WHERE a qualifier must semantically attach (e.g. "the trailing phrase modifies
+the duplication predicate, not the whole sentence") but prescribes no separator, arm order, or
+clause shape, a mechanical test trying to decide "which arm does this phrase attach to" from
+punctuation alone is under-determined — and inventing a marker/anchor to make it decidable is
+circular, because the oracle then only certifies a subject shaped exactly like the oracle's own
+invention. `a5-duplicate-coverage-block`'s `test_duplicate_trigger_observable_parity.py` went
+through three such inventions across six review rounds (an aggregate count instead of a locus
+check; an invented `_DUPLICATION_MARKER` literal; a second invented literal plus a non-unique
+keyword anchor) before landing on the fix that actually generalizes: instead of parsing which
+clause a phrase is grammatically attached to, assert a **window exclusion** — the qualifier text
+must not appear in the character span between the mismatch-locator and the next routing target.
+Every literal the assertion reads (`"for the same observable"`, the locator, the next target) is
+one that already exists in the templates, so the test cannot be satisfied by an implementation
+shaped to please the test. Prevention: when a locked ADR constrains semantic placement without
+constraining syntax, look for a window/exclusion-region predicate before reaching for a splitter
+or an invented anchor — the splitter approach has a hidden assumption (a stable separator exists
+and is unique) that the ADR never actually promised.
 <!-- @hm:/user:entries -->

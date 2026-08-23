@@ -193,7 +193,25 @@ _EXPECTED_SHA256: dict[str, str] = {
     # the closest banned pattern). Body change outside the codex conditional. Pre-bump hash in
     # git history.
     # `return_envelope` include removed — see the code-reviewer note above.
-    "test-reviewer": "c61a73e05cd2507595b0d8bb83285ef0b397a4d970fc8671ed078c2de6d12ba8",
+    # test-reviewer re-pinned 2026-08-23 (PLAN-a5-duplicate-coverage-block). ONE rule changed:
+    # the banned-patterns Hard Rule routed "a scenario covered twice" to a blocking
+    # `per_scenario` FAIL, which contradicted this same body's rubric section 1 ("at least one
+    # dedicated test function"). The qualifier that reconciles them — duplication is duplication
+    # of one OBSERVABLE — lived only in `execute.md.j2`'s Phase A authoring rule, which this agent
+    # never reads, so N tests asserting N different observables under one scenario ID blocked
+    # Phase A.5. Observed live at 0.54.0 on a consuming project: five tests, five observables, two
+    # rounds blocked. The bullet now splits into two predicates — same-observable duplication
+    # FAILs, and a test aimed at a different scenario FAILs "regardless of observable" (banned
+    # pattern 5 is a naming defect, not a duplication one), so narrowing opens no loophole.
+    # Section 1 is unchanged and load-bearing. Body change outside the codex conditional.
+    # Pre-bump hash in git history.
+    # Re-pinned again in review round 2 of the same task: cross-model review found the new
+    # clause said such tests "must PASS" unconditionally, which targets the same
+    # `per_scenario.quality` field the banned-patterns rule forces to FAIL — two rules with
+    # opposite verdicts over a tautological test that happens to assert a different
+    # observable. It now says they may not FAIL *for that reason* and are still judged
+    # against the banned patterns, which the clause never overrides.
+    "test-reviewer": "0a3978bcd2cb69680a67bdba70d6ce91b07fe86c3ef17e6df6bf6b7cf3f994df",
     "ux-reviewer": "b6e31a5a45013208a80f0c17eca4e720add647f6d9a386027ae1a57b5d347ebc",
 }
 

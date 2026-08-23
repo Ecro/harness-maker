@@ -21,6 +21,9 @@ from pathlib import Path
 
 import pytest
 
+from harness_maker.interview import answers_from_harness_yaml
+from harness_maker.models import DEFAULT_COMPREHENSION_DEPTH
+
 from ._comprehension_golden import (
     GOLDEN_PATH,
     TRACKED_COMMANDS,
@@ -28,7 +31,7 @@ from ._comprehension_golden import (
     digest,
     load_golden,
 )
-from ._surface_baseline import _git, assert_sha_is_durable, render_surface
+from ._surface_baseline import HARNESS_YAML, _git, assert_sha_is_durable, render_surface
 
 _SHA_LEN = 64
 
@@ -140,6 +143,17 @@ def test_render_surface_supplies_both_variants_for_both_commands() -> None:
             assert name in surface[variant], f"{variant}/{name} absent from the render"
 
 
+def _configured_depth() -> str:
+    """This repo's own `interview.comprehension.depth`, or the default when unset.
+
+    Read rather than assumed, so the lever test can pick a contrast depth the config is not at.
+    """
+    answers = answers_from_harness_yaml(HARNESS_YAML)
+    assert answers is not None, f"{HARNESS_YAML} did not parse into answers"
+    comprehension = dict(answers.interview or {}).get("comprehension") or {}
+    return str(comprehension.get("depth", DEFAULT_COMPREHENSION_DEPTH))
+
+
 def test_the_depth_override_lever_actually_moves_the_render() -> None:
     """The golden's comparability rests entirely on this parameter working.
 
@@ -165,15 +179,22 @@ def test_the_depth_override_lever_actually_moves_the_render() -> None:
     if not partial.exists():
         pytest.skip("Phase 2 has not landed — no rendered command reads depth yet")
     plain = render_surface()
-    deep = render_surface(depth_override="deep")
+    # The contrast depth is DERIVED from the repo's own configured depth, never hardcoded. An
+    # earlier version pinned "deep", which held only while this repo's harness.yaml sat at
+    # "standard"; the moment the config moved to "deep" the two renders became the same call and
+    # this guard fired against a lever that was working perfectly. The property under test is
+    # "the override moves the render", so the probe has to be a depth the config is NOT at.
+    configured = _configured_depth()
+    contrast = "minimal" if configured != "minimal" else "deep"
+    overridden = render_surface(depth_override=contrast)
     differing = [
         (variant, name)
         for variant, names in TRACKED_COMMANDS.items()
         for name in names
-        if plain[variant][name] != deep[variant][name]
+        if plain[variant][name] != overridden[variant][name]
     ]
     assert differing, (
-        "render_surface(depth_override='deep') produced byte-identical output to an "
+        f"render_surface(depth_override={contrast!r}) produced byte-identical output to an "
         "un-overridden render for every tracked command — the override is a no-op, so "
         "AC-003's comparison would be a render against itself."
     )

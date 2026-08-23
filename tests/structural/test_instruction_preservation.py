@@ -133,8 +133,10 @@ _STEP5_SCOPED_HEADING = ["### Step 5 — Worktree finalize"]
 #: and both are conditional on `interview.comprehension.depth`: at `minimal` the original
 #: text renders unchanged (that is what AC-003's byte-identity asserts), and at
 #: `standard`/`deep` the depth branch swaps it. The baseline renders this repo's own
-#: harness.yaml, which carries no `comprehension` key and therefore resolves to `standard`
-#: (ADR-006's accepted retrofit), so the baseline sees the replaced form.
+#: harness.yaml, which now carries `interview.comprehension.depth: deep` (it previously carried
+#: no `comprehension` key and resolved to `standard` via ADR-006's retrofit — the note said so and
+#: went stale when the key was set). Either value takes the same branch, so the baseline still
+#: sees the replaced form and these entries still hold; only the premise was corrected.
 #:
 #: ADR-008 — `plan.md.j2` Step A said "visualization OPTIONAL" while the round-state block
 #: says required-when-changed. Two contradicting instructions in one command leave the
@@ -145,7 +147,21 @@ _STEP5_SCOPED_HEADING = ["### Step 5 — Worktree finalize"]
 _COMPREHENSION_PLAN_HEADING = ("#### Step A — Render current plan state (visualization OPTIONAL)",)
 _COMPREHENSION_SPEC_HEADING = ("## SPEC Interview Round {N}",)
 
+#: NOT a template phase — a CONFIG change. `harness.yaml second_opinion.models` dropped
+#: `antigravity`, so its per-model recipe stops rendering in `plan` and `review`. The baseline
+#: renders this repo's own harness.yaml and its projection deliberately includes every feature
+#: toggle (`_instruction_baseline.py` docstring), so a toggle flip is a real removal and must be
+#: declared here rather than re-baselined away. The `codex` recipe is untouched; if BOTH models
+#: are ever disabled the whole cross-model section goes and that is a different, larger entry.
+_ANTIGRAVITY_RECIPE_HEADING = ["#### Second opinion — model: `antigravity`"]
+
 _ALLOWED_REMOVALS: dict[str, dict[str, list[str]]] = {
+    "config-second-opinion-antigravity-off": {
+        "plan@task-driven": list(_ANTIGRAVITY_RECIPE_HEADING),
+        "plan@spec-driven": list(_ANTIGRAVITY_RECIPE_HEADING),
+        "review@task-driven": list(_ANTIGRAVITY_RECIPE_HEADING),
+        "review@spec-driven": list(_ANTIGRAVITY_RECIPE_HEADING),
+    },
     "plan-interview-comprehension": {
         "plan@task-driven": list(_COMPREHENSION_PLAN_HEADING),
         "plan@spec-driven": list(_COMPREHENSION_PLAN_HEADING),

@@ -92,7 +92,11 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # the whole suite), which left a consumer that can never hit, because this stage changes
     # files before it reaches the read.
     "execute": 17,
-    "health": 7,
+    # 7 -> 6 on 2026-08-23 (PLAN-a5-duplicate-coverage-block, config half): `harness.yaml
+    # second_opinion.models` dropped `antigravity`, and `/hm:health` runs ONE per-model
+    # positive smoke-test per enabled model, so its `second_opinion_invoke` smoke call for that
+    # model stops rendering. Re-enabling the model restores the call and this row.
+    "health": 6,
     "help": 0,
     "loop": 10,
     "loop-p5-batch": 2,

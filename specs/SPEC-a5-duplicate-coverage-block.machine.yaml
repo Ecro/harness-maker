@@ -1,0 +1,155 @@
+schema_version: 2
+spec_slug: a5-duplicate-coverage-block
+parent_spec: null
+verification_tier: 2
+mutation_threshold: null
+mutation_threshold_rationale: Tier 2. The change is rendered prose in two Jinja templates;
+  mutation adequacy has no subject. The single new Python file is a structural assertion
+  test, not production logic. ADR-009's 3-layer default applies instead of a numeric
+  gate.
+last_mutation_run: null
+paths_to_mutate: []
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: reviewer Hard Rule states the trigger per observable
+  type: mechanical
+  test_ids:
+  - tests/structural/test_duplicate_trigger_observable_parity.py::test_ac_001_reviewer_hard_rule_is_observable_qualified
+  executable_predicate: bare_scenario_cardinality_triggers(render_all_targets()['test-reviewer'])
+    == 0
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The qualifier's provenance is execute.md.j2:222 ("both an AC test
+    and a scenario test for the same observable"), which predates this change and
+    was written for the Phase A authoring rule, not for the reviewer clause under
+    test. The expected value is therefore read from a site the change does not touch,
+    not from the file being asserted.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: all four A.5 duplication sites carry the same qualifier
+  type: property
+  test_ids:
+  - tests/structural/test_duplicate_trigger_observable_parity.py::test_ac_002_execute_body_carries_the_qualifier_at_every_trigger_site
+  - tests/structural/test_duplicate_trigger_observable_parity.py::test_ac_002_no_cardinality_phrasing_survives_in_the_a5_region
+  - tests/structural/test_duplicate_trigger_observable_parity.py::test_ac_002_brief_keeps_the_mismatch_arm_unqualified
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: Cross-template parity, the same shape as tests/structural/test_gate_base_root_parity.py.
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: The relation is agreement between two independently-edited templates,
+    so it holds regardless of which wording is chosen for the qualifier — an implementation
+    cannot satisfy it by copying one site, only by making every site agree. This is
+    the seam RESEARCH identified as undetectable by single-file render-grep.
+  oracle_independence_waiver: null
+  input_domain: the set of sites expressing the Phase A.5 duplication trigger — the
+    Hard Rule in the rendered test-reviewer body, and the coverage-lens table row,
+    the <brief> routing sentence and the dispatch string in the rendered execute stage
+    body, read across every render target (Claude and Codex arms)
+  transformation: render every target, then extract each anchor site's duplication-trigger
+    sentence from the rendered body
+  expected_relation: every extracted sentence's duplication arm contains the observable-level
+    qualifier, its scenario-ID-mismatch arm does not, none states the trigger as a
+    count of tests sharing a scenario ID, and the literal occurs exactly five times
+    in total
+  preconditions:
+  - every render target produces a body
+  - the anchor tuple holds exactly 4 edited trigger sites (drift protection is known-site
+    only)
+  observable_output: a per-site boolean, all true
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: rubric section 1 keeps "at least one dedicated test function"
+  type: mechanical
+  test_ids:
+  - tests/structural/test_duplicate_trigger_observable_parity.py::test_ac_003_rubric_keeps_at_least_one_dedicated_test
+  executable_predicate: '''at least one dedicated test function'' in render_all_targets()[''test-reviewer'']'
+  golden_table: []
+  rubric_id: null
+  note: Regression guard against drifting to "exactly one", the rejected arm of interview
+    Q2.
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The expected string is the pre-change text of test-reviewer_body.md.j2:21,
+    captured before any edit in this task; it is a pin on prior state, not a value
+    derived from the post-change file.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: rendered reviewer prompt is internally non-contradictory
+  type: judgment
+  test_ids: []
+  executable_predicate: null
+  golden_table: []
+  rubric_id: agent_prompt
+  note: Covers the residual RESEARCH claim that this defect class reads as correct
+    in every single file and only shows at the seam; a mechanical check cannot judge
+    "contradiction".
+  pending_test: true
+  oracle_source: rubric
+  oracle_evidence: Judged by judgment-reviewer against the shipped agent_prompt rubric
+    (templates/rubrics/agent_prompt.yaml.j2), which is authored for prompt quality
+    generally and predates this task — the rubric is not written around the change
+    it scores. Subject is the template source, not .claude/agents/test-reviewer.md
+    — that path does not exist in this repo, so its hash could never be re-derived
+    and the staleness trigger would be dead.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: pass
+  judged_at: '2026-08-23'
+  judgment_evidence: 'judgment-reviewer against the agent_prompt rubric, 6 criteria,
+    all pass. Section 1''s "at least one dedicated test function" and the narrowed
+    routing bullet no longer conflict: the bullet states that N tests under one scenario
+    ID asserting N different observables is NOT duplication and must PASS, which is
+    what section 1 always permitted. Banned pattern 5 is preserved as a defect "regardless
+    of observable", so narrowing the duplication trigger opens no loophole for a mislabelled
+    test that happens to assert a different observable. The reason-field instruction
+    ("naming the duplicated observable and which tests carry it") plus the body''s
+    existing "observable Outcome from SPEC" anchor give an LLM reviewer enough grounding
+    to act. Subject: the body rendered from the hashed template. RE-JUDGED in review
+    round 2 after the subject changed: the first clause said such tests "must PASS"
+    unconditionally, colliding with Section 2 over the same per_scenario.quality field;
+    the revision scopes the immunity to "for that reason" and states it never overrides
+    the banned patterns. All six criteria pass on the new subject; the four-routes-in-one-sentence
+    density is noted as readability, not a contradiction.'
+  judgment_subject_paths:
+  - src/harness_maker/templates/agents/test-reviewer_body.md.j2
+  judgment_subject_hash: cc93dd65c8a22fc8349f6789a8bbe045e1f954b295051e2a8410b59e6163ff0c

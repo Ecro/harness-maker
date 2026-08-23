@@ -272,7 +272,7 @@ which is why this was ever a fan-out — but a single call asking all three is n
 |---|---|
 | `red-correctness` | Does each test fail, and for the intended reason? |
 | `discrimination` | Would this assertion also pass against a plausibly WRONG implementation? |
-| `coverage` | Does the set cover the criterion — no missing scenario, no duplicate? |
+| `coverage` | Does the set cover the criterion — no missing scenario, and no duplicate for the same observable? |
 
 > **Measured cost of the fan-out it replaces:** ≈330k subagent tokens and ≈2 minutes per round.
 > **Measured cost of collapsing it:** on the round that produced this change, all six blocking
@@ -291,15 +291,19 @@ it must still be reported — never dropped — but it has to travel in a field 
 has, because there is no suggestions field and your Hard Rules forbid inventing a category. Route
 it: a test that would also pass a WRONG implementation is a banned pattern (category 1 tautology,
 6 magic values, or 8 private state) and goes in blocking_issues; a scenario with no test goes in
-scenarios_missing; a scenario covered twice, or covered by a test aimed at another scenario, is a
-per_scenario entry for that scenario with quality FAIL and the duplication named in reason — which
-blocks, because PASS requires every per_scenario.quality to be PASS. Only a genuine nice-to-have is
+scenarios_missing; a scenario covered twice for the same observable is a per_scenario entry for
+that scenario with quality FAIL, naming the duplicated observable and which tests carry it — N
+tests under one scenario ID asserting N different observables is not duplication, so none of them
+may FAIL for that reason, and each is still judged on its own against the banned patterns, which
+this clause never overrides; a
+test aimed at another scenario is the same per_scenario FAIL, which holds regardless of observable
+— which blocks, because PASS requires every per_scenario.quality to be PASS. Only a genuine nice-to-have is
 dropped.\n\nReturn ONLY the JSON output as specified in your instructions.`
 
 {{ dsp.dispatch_intro(is_codex) }}
 
 ```
-{{ dsp.dispatch(is_codex, "test-reviewer", "A.5: {slug}", "<brief>\\n\\nYou are ACCOUNTABLE for all three lenses. red-correctness — does each test fail, and for the intended reason? discrimination — would this assertion also pass against a plausibly WRONG implementation? coverage — does the set cover the criterion, with no missing scenario and no duplicate?") }}
+{{ dsp.dispatch(is_codex, "test-reviewer", "A.5: {slug}", "<brief>\\n\\nYou are ACCOUNTABLE for all three lenses. red-correctness — does each test fail, and for the intended reason? discrimination — would this assertion also pass against a plausibly WRONG implementation? coverage — does the set cover the criterion, with no missing scenario and no duplicate for the same observable?") }}
 ```
 
 **The merge rules below still apply**, and are deliberately kept: a retry re-dispatch folds into
