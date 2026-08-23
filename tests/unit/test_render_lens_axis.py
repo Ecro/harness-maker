@@ -214,7 +214,7 @@ def test_missing_new_mandatory_lens_blocks_approval(tmp_path: Path, missing: str
     expectation authored alongside this change.
     """
     _write_results(tmp_path, [x for x in ALL_LENSES if x != missing])
-    verdict = coverage_verdict(tmp_path, "run-a", probe=None)
+    verdict = coverage_verdict(tmp_path, "run-a")
     assert verdict["blocks_approval"] is True
     assert verdict["missing"] == [missing]
 
@@ -226,8 +226,8 @@ def test_a_side_review_is_not_blocked_by_an_unrouted_domain_lens(tmp_path: Path)
     review permanently unapprovable, which is the failure the preset argument exists to prevent.
     """
     _write_results(tmp_path, CORE_LENSES)
-    assert coverage_verdict(tmp_path, "run-a", "Side", probe=None)["blocks_approval"] is False
-    assert coverage_verdict(tmp_path, "run-a", "Production", probe=None)["blocks_approval"] is True
+    assert coverage_verdict(tmp_path, "run-a", "Side")["blocks_approval"] is False
+    assert coverage_verdict(tmp_path, "run-a", "Production")["blocks_approval"] is True
 
 
 # ── AC-017: the two brief clauses survive the axis rewrite ────────────────────
@@ -257,7 +257,7 @@ def test_a_routed_in_domain_lens_is_reported_as_exercised_on_side(tmp_path: Path
     `review_telemetry.lenses_exercised` would lose a lens that actually ran.
     """
     _write_results(tmp_path, [*CORE_LENSES, "security"])
-    verdict = coverage_verdict(tmp_path, "run-a", "Side", probe=None)
+    verdict = coverage_verdict(tmp_path, "run-a", "Side")
     assert verdict["blocks_approval"] is False
     exercised = verdict["exercised"]
     assert isinstance(exercised, list)

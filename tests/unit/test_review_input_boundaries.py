@@ -317,7 +317,7 @@ def test_a_previous_invocation_cannot_be_seen_at_all_by_the_next(tmp_path: Path)
     run2 = lens_coverage.round_dir(tmp_path, "s", "1", "run-2")
     _write_result(run2, "design", "run-2")
 
-    verdict = lens_coverage.coverage_verdict([run2], "run-2", "Side", probe=None)
+    verdict = lens_coverage.coverage_verdict([run2], "run-2", "Side")
     assert verdict["exercised"] == ["design"]
     assert verdict["blocks_approval"] is True
 
@@ -326,7 +326,7 @@ def test_a_mis_stamped_file_in_the_right_directory_is_still_rejected(tmp_path: P
     """Both checks stay. The path keying does not license dropping the content one."""
     d = lens_coverage.round_dir(tmp_path, "s", "1", "run-2")
     _write_result(d, "design", "run-1")  # right directory, wrong id inside
-    assert lens_coverage.exercised_lenses(d, "run-2", probe=None) == set()
+    assert lens_coverage.exercised_lenses(d, "run-2") == set()
 
 
 def test_a_traversing_run_id_is_contained(tmp_path: Path) -> None:

@@ -58,7 +58,6 @@ def _ledger() -> Path:
 #: never grow — a new gate is exactly what this test exists to stop.
 _UNRECEIPTED_DEBT: frozenset[str] = frozenset(
     {
-        "test_agent_frontmatter_merges.py",
         "test_autopilot_advance_render_gate.py",
         "test_autopilot_marker_api_session_key.py",
         "test_baseline_delta_attribution.py",

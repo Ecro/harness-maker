@@ -1,5 +1,43 @@
 # Changelog
 
+## [0.54.0] - 2026-08-22
+
+### Removed
+
+- **The `repo_probe` canary is retired.** It asked each reviewer agent for a verbatim line from a
+  file outside the diff, as proof its repository access was live. Shipped in 0.53.0 and demoted to
+  advisory in the same release: a live `/hm:review` failed 7 of 7 lenses that had demonstrably read
+  outside the diff, because the contract asked for "one top-level field beside your findings array"
+  and reviewers return narrative prose with no array for it to sit beside. Advisory, it reported
+  every lens as failed on every Production review — a detector pinned at a 100% noise floor, which
+  trains a reader to skip the line that would report a real break. Gone: `ProbeCheck`, `_probe_ok`,
+  `probe_failures`, `build_probe_check`, the `probe` parameter of `exercised_lenses` /
+  `coverage_verdict`, the `probe_failed` verdict key, the `return_envelope` agent partial, and the
+  `probe_flags` wiring in `review.md.j2`. **Accepted coverage gap**: nothing now detects a tool that
+  is declared but unusable at run time. That is not a regression — the canary could not see it
+  either, and produced a false negative on the one live run it saw.
+
+### Changed
+
+- **`lens_coverage check` accepts `--diff-files` / `--rev` and ignores them**, with one stderr line
+  naming the remedy. A harness rendered by 0.53.0 keeps passing them until its owner re-renders, and
+  `argparse` exits 2 on an unknown argument — that exit would land at `/hm:review` Step 3 and lose
+  the review. The absorption expires at 0.55.0, enforced by a test comparing parsed version tuples
+  rather than strings (`"0.100.0" < "0.55.0"` is True lexicographically).
+- **`coverage_verdict` no longer returns `probe_failed`**, and `exercised_lenses` /
+  `coverage_verdict` no longer take a keyword-only `probe`. Both are consumer-visible, which is why
+  this is a minor rather than a patch.
+- **The agent tool-boundary gate now derives its population instead of listing it.**
+  `tests/structural/test_agent_frontmatter_merges.py` guarded `_READ_ONLY_AGENTS` — a list of the
+  names to CHECK, which is fail-open: an agent absent from it, a new one most likely, was checked
+  for nothing beyond a non-empty `tools:`, and so were the four agents that legitimately hold write
+  tools. The population is now the blueprint's emitted agent entries and the only enumerated list is
+  `_WRITE_PRIVILEGED`, the four exceptions with their exact permitted sets. No currently-rendered
+  agent changes guard status; what changes is the default for the next one. Read+Grep is asserted
+  only over `lens_dispatch("Production")`'s agents, where a contract requires them.
+- `_ATOMIC_RATCHET["review"]` lowered 71143 → 70153, the post-removal measurement.
+  `tests/structural/test_new_gates_file_a_mutation_receipt.py`'s debt list is one entry shorter.
+
 ## [0.53.0] - 2026-08-22
 
 ### Added

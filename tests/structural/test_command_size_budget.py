@@ -517,7 +517,12 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # 70818 -> 71143: the probe check went advisory before release (+325, one paragraph).
     # Blocking on a canary that fails lenses which HAVE read the repository would have made
     # every consuming Production harness's review permanently unapprovable.
-    "review": 71143,
+    # 71143 -> 70153 (PLAN-probe-envelope-contract Phase 3, -990): the canary was retired
+    # outright, taking the +325 above plus the Step-3 carry paragraph and the confirmation
+    # pass's re-derive note. Lowered rather than left as slack: a net-negative change that
+    # keeps its old ceiling hands the next task ~1k of headroom no BASELINE-DELTA row
+    # explains, which is the silent absorption SPEC-workflow-loop-efficiency.md:126 forbids.
+    "review": 70153,
     # 30537 → 32114 (PLAN-plan-interview-comprehension): the same partial, invoked with
     # `stage='spec'`. Raw +1778, compacted to +1577. The brief's SUBJECT differs by stage
     # (ADR-007) because `/hm:spec` has no architecture draft to disclose — identical text

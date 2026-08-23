@@ -39,7 +39,7 @@ def test_the_known_lens_vocabulary_is_seven_and_holds_no_retired_name() -> None:
 def test_every_mandatory_lens_present_does_not_block(tmp_path: Path) -> None:
     for lens in MANDATORY_LENSES:
         _write_result(tmp_path, lens)
-    verdict = coverage_verdict(tmp_path, RUN, probe=None)
+    verdict = coverage_verdict(tmp_path, RUN)
     assert verdict["blocks_approval"] is False
     assert verdict["missing"] == []
 
@@ -49,7 +49,7 @@ def test_any_absent_lens_blocks(tmp_path: Path, dropped: str) -> None:
     for lens in MANDATORY_LENSES:
         if lens != dropped:
             _write_result(tmp_path, lens)
-    verdict = coverage_verdict(tmp_path, RUN, probe=None)
+    verdict = coverage_verdict(tmp_path, RUN)
     assert verdict["blocks_approval"] is True
     assert verdict["missing"] == [dropped]
 
@@ -58,7 +58,7 @@ def test_unparseable_file_is_not_exercised(tmp_path: Path) -> None:
     for lens in MANDATORY_LENSES:
         _write_result(tmp_path, lens)
     (tmp_path / "security.json").write_text("{not json", encoding="utf-8")
-    assert coverage_verdict(tmp_path, RUN, probe=None)["missing"] == ["security"]
+    assert coverage_verdict(tmp_path, RUN)["missing"] == ["security"]
 
 
 def test_mislabelled_file_is_not_exercised(tmp_path: Path) -> None:
@@ -66,7 +66,7 @@ def test_mislabelled_file_is_not_exercised(tmp_path: Path) -> None:
     for lens in MANDATORY_LENSES:
         _write_result(tmp_path, lens)
     _write_result(tmp_path, "tests", body={"lens": "robustness", "findings": []})
-    assert coverage_verdict(tmp_path, RUN, probe=None)["missing"] == ["tests"]
+    assert coverage_verdict(tmp_path, RUN)["missing"] == ["tests"]
 
 
 def test_unknown_lens_file_cannot_pad_coverage(tmp_path: Path) -> None:
@@ -74,17 +74,17 @@ def test_unknown_lens_file_cannot_pad_coverage(tmp_path: Path) -> None:
         if lens != "robustness":
             _write_result(tmp_path, lens)
     _write_result(tmp_path, "performance")
-    assert coverage_verdict(tmp_path, RUN, probe=None)["missing"] == ["robustness"]
+    assert coverage_verdict(tmp_path, RUN)["missing"] == ["robustness"]
 
 
 def test_empty_directory_blocks(tmp_path: Path) -> None:
-    verdict = coverage_verdict(tmp_path, RUN, probe=None)
+    verdict = coverage_verdict(tmp_path, RUN)
     assert verdict["blocks_approval"] is True
     assert verdict["exercised"] == []
 
 
 def test_absent_directory_blocks(tmp_path: Path) -> None:
-    assert coverage_verdict(tmp_path / "never-created", RUN, probe=None)["blocks_approval"] is True
+    assert coverage_verdict(tmp_path / "never-created", RUN)["blocks_approval"] is True
 
 
 def test_a_confirmation_pass_never_inherits_a_round_directory(tmp_path: Path) -> None:
@@ -103,14 +103,9 @@ def test_a_confirmation_pass_never_inherits_a_round_directory(tmp_path: Path) ->
         if lens != "robustness":
             _write_result(round_dir(results, "slug", "confirm-1", RUN), lens)
 
+    assert coverage_verdict(round_dir(results, "slug", "3", RUN), RUN)["blocks_approval"] is False
     assert (
-        coverage_verdict(round_dir(results, "slug", "3", RUN), RUN, probe=None)["blocks_approval"]
-        is False
-    )
-    assert (
-        coverage_verdict(round_dir(results, "slug", "confirm-1", RUN), RUN, probe=None)[
-            "blocks_approval"
-        ]
+        coverage_verdict(round_dir(results, "slug", "confirm-1", RUN), RUN)["blocks_approval"]
         is True
     )
 
@@ -190,7 +185,7 @@ def test_f2_a_prior_invocation_cannot_vouch_for_a_dead_lens(tmp_path: Path) -> N
     # Invocation 2: one lens returns; the other four files are last time's.
     _write_result(tmp_path, "robustness", run_id="invocation-2")
 
-    verdict = coverage_verdict(tmp_path, "invocation-2", probe=None)
+    verdict = coverage_verdict(tmp_path, "invocation-2")
     assert verdict["exercised"] == ["robustness"]
     assert verdict["missing"] == [lens for lens in MANDATORY_LENSES if lens != "robustness"]
     assert verdict["blocks_approval"] is True
@@ -204,13 +199,13 @@ def test_f2_a_result_without_a_run_id_is_not_counted(tmp_path: Path) -> None:
     inputs that predate the fix — the absent-case black hole this repo records at count:8.
     """
     _write_result(tmp_path, "security", body={"lens": "security", "findings": []})
-    assert exercised_lenses(tmp_path, RUN, probe=None) == set()
+    assert exercised_lenses(tmp_path, RUN) == set()
 
 
 def test_f2_the_run_id_does_not_weaken_the_existing_checks(tmp_path: Path) -> None:
     """A matching run_id must not rescue a file that fails the lens-identity check."""
     _write_result(tmp_path, "security", body={"lens": "correctness", "run_id": RUN, "findings": []})
-    assert exercised_lenses(tmp_path, RUN, probe=None) == set(), (
+    assert exercised_lenses(tmp_path, RUN) == set(), (
         "a mislabelled file was accepted because its run_id matched"
     )
 
@@ -248,10 +243,10 @@ def test_coverage_is_the_union_across_the_review_s_rounds(tmp_path: Path) -> Non
             _write_result(r1, lens)
     _write_result(r2, "security")
 
-    assert coverage_verdict(r1, RUN, probe=None)["blocks_approval"] is True
-    assert coverage_verdict(r2, RUN, probe=None)["blocks_approval"] is True
+    assert coverage_verdict(r1, RUN)["blocks_approval"] is True
+    assert coverage_verdict(r2, RUN)["blocks_approval"] is True
 
-    union = coverage_verdict([r1, r2], RUN, probe=None)
+    union = coverage_verdict([r1, r2], RUN)
     assert union["missing"] == []
     assert union["blocks_approval"] is False
 

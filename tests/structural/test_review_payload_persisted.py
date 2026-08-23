@@ -49,6 +49,21 @@ _STEP_LANDED = "2026-08-05"
 #: (slug, round) pairs that ran on or after the cutoff WITHOUT persisting. Each needs a
 #: reason. Adding an entry is the visible cost of skipping the step; removing one is free.
 _KNOWN_MISSING: dict[tuple[str, int], str] = {
+    ("probe-envelope-contract", 2): (
+        "Round 2 dispatched no reviewers, so there was no merged payload to capture. The "
+        "auto-fix loop's churn gate skipped the re-review (`review_consensus plan` returned an "
+        "empty `dispatches` with reason `churn 0.07 < 0.30`), and Step 3.4's persist-payload "
+        "line sits after a merge that never happened. The round is visible to this gate only "
+        "because the TERMINAL telemetry row numbers it — the same round-axis disagreement the "
+        "`review-loop-ledger-fixes` entry above records for a confirmation pass, reached by a "
+        "second route. Round 1 DID dispatch all seven lenses and its per-lens captures are on "
+        "disk under `.claude/observability/.hm-lens-results/probe-envelope-contract/"
+        "c488271901e1/1/`; its merged payload was NOT persisted, and this gate cannot see that "
+        "because no round-1 telemetry row was emitted either — the gate's population is the "
+        "telemetry rows, so a skipped row hides a skipped payload. That hole is the honest "
+        "finding here and is recorded in `[fail:design] per-round-step-runs-only-in-round-1` "
+        "(count 2). Nothing was reconstructed to clear this."
+    ),
     ("review-loop-ledger-fixes", 3): (
         "There was no round 3 to capture. This slug's first /hm:review ran two rounds and "
         "then two CONFIRMATION passes, and the confirmation pass writes its lens results "

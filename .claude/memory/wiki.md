@@ -1,6 +1,6 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.52.6
+harness_maker_version: 0.53.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: memory/wiki.ko.md.j2
 provenance: official
@@ -1023,4 +1023,33 @@ The cause was not delivery. Reviewers return **narrative prose**, sometimes with
 Two things make this worth keeping. First, the reviewers **did** read outside the diff — they cited `io_utils.py`, `review_telemetry.py`, `common_ground.py` — so a detector reported absence where the thing it detects was present: a false negative, the worse direction for a canary. Second, the failure was invisible to every layer that could have been asked cheaply: render-greps passed, unit tests passed, the SHA pins moved exactly as predicted. Only running the thing showed it.
 
 The rule: when a contract depends on an agent's OUTPUT SHAPE rather than on its behaviour, one real dispatch is the only evidence that counts, and it belongs before the contract is wired into a gate — not after. Fixture-shaped output proves the validator, never the producer.
+## [wiki:convention] deletion-diff-is-the-reviewable-artifact | 2026-08-23
+When a change DELETES code, the thing a reviewer can actually check is the mechanical before/after
+set of what existed — not a narrative argument about what "should" have been removed. Instance
+(`probe-envelope-contract`): a Python string-replacement meant to cut one target from a comment to
+end-of-file also deleted `test_every_agent_declares_a_non_empty_tools_list`, which sat past the
+intended cut point. The effect was concrete — an agent declaring `tools: ""` would pass silently,
+and `tools:` absent would raise `AssertionError: unhandled tools: shape NoneType` instead of the
+security-explaining message this repo's *only* enforced agent boundary depends on.
+
+Two rounds of `/hm:execute` A.5 and both human reviewers missed it. The tests-lens was asked, in
+so many words, whether the new test set was a strict superset of the deleted one, and answered "by
+construction, yes" — a true statement about the dangerous-grant check (which IS a superset of the
+old one), applied to a DIFFERENT property (whether every original `def test_` name still exists).
+A construction argument about property A does not certify property B, even when both are about the
+same file. The cross-model voter (codex) caught it alone, and not by reasoning — by comparing the
+two `def test_` name sets.
+
+The general rule: a reviewer reasoning in prose about a deletion is answering "does what remains
+make sense", which is a different, weaker question than "what disappeared". The second question is
+answerable in one command — `comm -23 <(before) <(after)` over the defined names, or an equivalent
+before/after set diff — and it would have caught this in under a minute. When a diff includes a
+deletion of >0 code (not just a net-negative line count — a `sed`/string-replace cut, a rewritten
+function, a collapsed block), the review pass for that file should run the mechanical diff BEFORE
+any prose reasoning about intent, and treat "I reasoned it through and it looks fine" as unverified
+until the diff has been taken. Related: `[fail:test] existing-tests-found-the-silent-half-the-new-matrix-missed`
+(new-test-set coverage gaps caught by the OLD suite, same "the new artifact wasn't checked against
+what it replaced" shape) and `[fail:design] gate-enumeration-was-not-exhaustive` (enumeration
+completeness by recall vs. by mechanical derivation — the same recall-vs-mechanism split, applied
+here to code deletion instead of gate lists).
 <!-- @hm:/user:entries -->

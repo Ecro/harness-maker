@@ -1,16 +1,16 @@
 ---
 generated_by: harness-maker
-harness_maker_version: 0.52.6
+harness_maker_version: 0.53.0
 generated_at: '2026-01-01T00:00:00+00:00'
 source_template: harness-yaml/Production.yaml.j2
 provenance: official
-content_hash: 5d3da2f675c99bc4c92dfc22bdc20b0bccc1a3232856123eaf3b0433ebcf5172
+content_hash: b904d026b5111c5aeb31d2c12d3e0f2aefeb73abc11850a834dce0439574c07f
 ---
 preset: Production
 locale: ko
 targets: [claude-code, cursor, codex]
 default_model: opus
-dev_mode: task-driven
+dev_mode: spec-driven
 caching: agent-aware
 schema_version: 1
 interview:

@@ -1,5 +1,5 @@
 {% set wt_on = config.worktree is defined and config.worktree.get('enabled') %}{% set WTR = '<WT>' if wt_on else '.' -%}
-{% set probe_flags = " --diff-files <the literal path printed by the mktemp above> --rev <review_base>" if config.preset == "Production" else "" %}{% set lenses = lens_dispatch(config.preset) %}{% set lens_names = mandatory_lenses(config.preset) -%}
+{% set lenses = lens_dispatch(config.preset) %}{% set lens_names = mandatory_lenses(config.preset) -%}
 {% import "agents/_partials/dispatch.md.j2" as dsp -%}
 # Stage: review
 
@@ -234,23 +234,6 @@ carries it and every coverage call is given it.
 its findings JSON to the per-round results directory, adding a `"lens"` key naming the lens and
 the `"run_id"` Step 0's `open` printed — **and stamp the same `"lens"` value on every finding inside it**.
 
-{% if config.preset == "Production" %}
-**Carry each lens's `repo_probe` into the file you write for it, verbatim.** The agent returns
-it at the top level beside its findings; you are the one who writes the result file, so a probe
-you do not transcribe exists only in a transcript nothing reads — and the lens is then recorded
-exactly as a dispatch that never returned.
-
-The check is **advisory** — it reports `probe_failed` beside the verdict and moves nothing.
-Blocking on it made every Production review unapprovable, because reviewers return prose and the
-contract asks for a field beside a findings array that prose does not have. Surface the reported
-lenses; do not treat them as missing.
-
-The check needs two values you already have. Write the diff's changed paths, one per line, to a
-`mktemp` file and pass that path as `--diff-files`; pass Step 1's frozen `review_base` as
-`--rev`. Both are **required** — an absent `--diff-files` is an error rather than an empty list,
-because an empty list makes "not in the diff" true of every path and the check silently stops
-checking. `--preset Side` is how a harness says *do not check*.
-{% endif %}
 > The per-finding stamp is what makes ADR-007's rule decidable. The core lenses all dispatch to
 > `code-reviewer`, so `reviewer`/`source` collapses them to one voter name; without a per-finding
 > `lens`, Step 4 cannot tell one lens speaking once from one lens speaking several times, and the
@@ -272,9 +255,9 @@ Then compute coverage. The CLI is the **sole producer** of the verdict — do no
 own judgement about which lenses ran:
 
 {% if is_codex %}```bash
-Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round <round> --run-id <run-id> --preset {{ config.preset }}{{ probe_flags }}")
+Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round <round> --run-id <run-id> --preset {{ config.preset }}")
 ```{% else %}```bash
-!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round <round> --run-id <run-id> --preset {{ config.preset }}{{ probe_flags }}
+!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round <round> --run-id <run-id> --preset {{ config.preset }}
 ```{% endif %}
 
 It prints `{"exercised": [...], "missing": [...], "blocks_approval": <bool>}`. Carry all three
@@ -782,9 +765,9 @@ coverage is cumulative over a review rather than per round: the auto-fix loop re
 the reviewers a fix touched, so this round's directory legitimately holds one or two files.
 
 {% if is_codex %}```bash
-Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round 1 --round 2 <one --round per further round so far> --round <this round> --run-id <run-id> --preset {{ config.preset }}{{ probe_flags }}")
+Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round 1 --round 2 <one --round per further round so far> --round <this round> --run-id <run-id> --preset {{ config.preset }}")
 ```{% else %}```bash
-!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round 1 --round 2 <one --round per further round so far> --round <this round> --run-id <run-id> --preset {{ config.preset }}{{ probe_flags }}
+!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round 1 --round 2 <one --round per further round so far> --round <this round> --run-id <run-id> --preset {{ config.preset }}
 ```{% endif %}
 
 > The union is computed by the CLI, not by you. Round 2 of this change's own review rejected
@@ -1012,18 +995,10 @@ The dispatch list is the round-1 list, unchanged — same agents, same lens line
 {% endfor %}```
 
 {% if is_codex %}```bash
-Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round <pass-id> --run-id <run-id> --preset {{ config.preset }}{{ probe_flags }}")
+Bash("{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round <pass-id> --run-id <run-id> --preset {{ config.preset }}")
 ```{% else %}```bash
-!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round <pass-id> --run-id <run-id> --preset {{ config.preset }}{{ probe_flags }}
+!{{ 'cd <WT> && ' if wt_on else '' }}uv run --with {{ harness_maker_src_path }} hm lens_coverage check --results-dir .claude/observability/.hm-lens-results --slug <slug> --round <pass-id> --run-id <run-id> --preset {{ config.preset }}
 ```{% endif %}
-{% if config.preset == "Production" %}
-> **Re-derive `--diff-files` HERE, into a fresh `mktemp` — do not reuse Step 3's.** This pass
-> redefines the diff as `review_base..<freeze commit>`, the whole review including every
-> auto-fix round's edits, and the probe's in-diff boundary has to be that same set. Round 1's
-> list predates every repair, so a lens quoting a file the fixer edited in round 2 would pass
-> as out-of-diff evidence — on any review that needed one repair round, which is the common
-> path. Write `git diff --name-only <review_base> <freeze commit>` to the new file and pass it.
-{% endif %}
 
 **Apply no fixes in this pass.** It is an observation, and a pass that edits what it is measuring
 has measured nothing.
