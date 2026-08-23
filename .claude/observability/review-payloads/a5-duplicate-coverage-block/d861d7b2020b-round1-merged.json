@@ -1,0 +1,216 @@
+[
+ {
+  "id": "r1-spec-md-stale-testnames",
+  "severity": "P1",
+  "file": "specs/SPEC-a5-duplicate-coverage-block.md",
+  "line": 103,
+  "summary": "SPEC Verification-Criteria table names two tests that do not exist",
+  "voices": [
+   {
+    "source": "tests",
+    "kind": "lens"
+   }
+  ],
+  "disposition": "accepted",
+  "suggestion": "Replace with the real function names; AC-002 has three."
+ },
+ {
+  "id": "r1-machine-stale-testids",
+  "severity": "P1",
+  "file": "specs/SPEC-a5-duplicate-coverage-block.machine.yaml",
+  "line": 47,
+  "summary": "machine SPEC test_ids name nonexistent nodes; pending_test:true masked Rule 3's pytest --collect-only",
+  "voices": [
+   {
+    "source": "consistency",
+    "kind": "lens"
+   }
+  ],
+  "disposition": "accepted",
+  "suggestion": "Fix the ids and flip pending_test:false for AC-001/002/003 so Rule 3 runs."
+ },
+ {
+  "id": "r1-site4-no-locus",
+  "severity": "P1",
+  "file": "tests/structural/test_duplicate_trigger_observable_parity.py",
+  "line": 318,
+  "summary": "Occurrence count stands in for a locus check the fourth site (execute.md.j2:222) never gets",
+  "voices": [
+   {
+    "source": "tests",
+    "kind": "lens"
+   }
+  ],
+  "disposition": "accepted",
+  "suggestion": "Add a fourth locus assertion for the Phase A authoring rule."
+ },
+ {
+  "id": "r1-negation-blind",
+  "severity": "P1",
+  "file": "tests/structural/test_duplicate_trigger_observable_parity.py",
+  "line": 176,
+  "summary": "QUALIFIER-in-window is substring containment with no negation-awareness",
+  "voices": [
+   {
+    "source": "tests",
+    "kind": "lens"
+   }
+  ],
+  "disposition": "accepted",
+  "suggestion": "No full fix for NL; disclose the blind spot beside the other named residual."
+ },
+ {
+  "id": "1e33584dee639958",
+  "severity": "P1",
+  "file": "src/harness_maker/templates/agents/test-reviewer_body.md.j2",
+  "line": 105,
+  "summary": "Unconditional 'must PASS' targets per_scenario.quality, the same field the banned-patterns rule forces to FAIL",
+  "voices": [
+   {
+    "source": "codex",
+    "kind": "cross-model"
+   }
+  ],
+  "disposition": "accepted",
+  "suggestion": "Bound it: 'must not FAIL merely for duplication', and mirror in the execute brief."
+ },
+ {
+  "id": "r1-irreducible-overclaim",
+  "severity": "P2",
+  "file": "tests/structural/test_duplicate_trigger_observable_parity.py",
+  "line": 219,
+  "summary": "'Positionally irreducible' shown against one alternative boundary only",
+  "voices": [
+   {
+    "source": "tests",
+    "kind": "lens"
+   }
+  ],
+  "disposition": "accepted",
+  "suggestion": "Soften to 'not solved by the boundaries tried so far', or record why a clause-terminator boundary was rejected."
+ },
+ {
+  "id": "r1-qualifier-duplicated",
+  "severity": "P2",
+  "file": "src/harness_maker/templates/stages/execute.md.j2",
+  "line": 222,
+  "summary": "Qualifier hand-copied to 5 sites instead of one Jinja definition",
+  "voices": [
+   {
+    "source": "design",
+    "kind": "lens"
+   }
+  ],
+  "disposition": "accepted",
+  "suggestion": "Define once via {% set %} or a shared partial so drift is a template error."
+ },
+ {
+  "id": "r1-overloaded-bullet",
+  "severity": "P2",
+  "file": "src/harness_maker/templates/agents/test-reviewer_body.md.j2",
+  "line": 105,
+  "summary": "Hard Rules bullet packs four routing decisions into one run-on sentence",
+  "voices": [
+   {
+    "source": "design",
+    "kind": "lens"
+   }
+  ],
+  "disposition": "accepted",
+  "suggestion": "Split into a sub-list, one clause per arm."
+ },
+ {
+  "id": "r1-mkdtemp-leak",
+  "severity": "P2",
+  "file": "tests/structural/test_duplicate_trigger_observable_parity.py",
+  "line": 131,
+  "summary": "mkdtemp render root never cleaned up",
+  "voices": [
+   {
+    "source": "concurrency",
+    "kind": "lens"
+   },
+   {
+    "source": "robustness",
+    "kind": "lens"
+   }
+  ],
+  "disposition": "accepted",
+  "suggestion": "Session fixture rmtree, but fix the sibling test_multi_lens_a5.py in the same change."
+ },
+ {
+  "id": "r1-routing-bullet-eof",
+  "severity": "P2",
+  "file": "tests/structural/test_duplicate_trigger_observable_parity.py",
+  "line": 255,
+  "summary": "_routing_bullet's end boundary falls through to EOF on the last bullet",
+  "voices": [
+   {
+    "source": "robustness",
+    "kind": "lens"
+   }
+  ],
+  "disposition": "accepted",
+  "suggestion": "Bound the -1 branch explicitly or comment the coincidence."
+ },
+ {
+  "id": "r1-config-drift-adr",
+  "severity": "P2",
+  "file": ".claude/harness.yaml",
+  "line": 149,
+  "summary": "antigravity removal is an undeclared-in-PLAN reviewer-pool change riding in this worktree",
+  "voices": [
+   {
+    "source": "security",
+    "kind": "lens"
+   }
+  ],
+  "disposition": "accepted",
+  "suggestion": "Split it out, or add an ADR note so a future re-render cannot silently restore it."
+ },
+ {
+  "id": "r1-gate-judgment-erosion",
+  "severity": "P2",
+  "file": "src/harness_maker/templates/stages/execute.md.j2",
+  "line": 294,
+  "summary": "Deterministic count becomes an LLM judgment call \u2014 accepted in ADR-001, flagged for erosion watch",
+  "voices": [
+   {
+    "source": "security",
+    "kind": "lens"
+   }
+  ],
+  "disposition": "accepted",
+  "suggestion": "No action now; watch that the mismatch-arm wording never moves inside the qualifier's scope."
+ },
+ {
+  "id": "r1-plan-checkboxes",
+  "severity": "P2",
+  "file": "work-docs/PLAN-a5-duplicate-coverage-block.md",
+  "line": 466,
+  "summary": "Success Criteria checkboxes unchecked while the phase bodies declare DONE",
+  "voices": [
+   {
+    "source": "consistency",
+    "kind": "lens"
+   }
+  ],
+  "disposition": "accepted",
+  "suggestion": "Check off the completed items."
+ },
+ {
+  "id": "af9f6c69874a303e",
+  "severity": "P2",
+  "file": ".claude/harness.yaml",
+  "line": 35,
+  "summary": "depth: deep applied to base only; the committed worktree copy is standard, and a new comment claims otherwise",
+  "voices": [
+   {
+    "source": "codex",
+    "kind": "cross-model"
+   }
+  ],
+  "disposition": "accepted",
+  "suggestion": "Set depth: deep in the worktree copy, then the comment becomes true; re-baseline what moves."
+ }
+]

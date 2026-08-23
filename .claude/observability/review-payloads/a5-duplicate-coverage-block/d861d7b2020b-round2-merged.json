@@ -1,0 +1,81 @@
+[
+ {
+  "id": "r1-qualifier-duplicated",
+  "severity": "P2",
+  "file": "src/harness_maker/templates/stages/execute.md.j2",
+  "line": 222,
+  "summary": "Qualifier hand-copied to 5 sites instead of one Jinja definition \u2014 DEFERRED, outside Phase 1 scope",
+  "voices": [
+   {
+    "source": "design",
+    "kind": "lens"
+   }
+  ],
+  "disposition": "accepted",
+  "suggestion": "Follow-up task: define once via {% set %} or a shared partial."
+ },
+ {
+  "id": "r1-overloaded-bullet",
+  "severity": "P2",
+  "file": "src/harness_maker/templates/agents/test-reviewer_body.md.j2",
+  "line": 105,
+  "summary": "Hard Rules bullet packs four routing decisions into one sentence \u2014 DEFERRED, and AC-004 re-judged it non-ambiguous",
+  "voices": [
+   {
+    "source": "design",
+    "kind": "lens"
+   }
+  ],
+  "disposition": "accepted",
+  "suggestion": "Follow-up task: split into a sub-list."
+ },
+ {
+  "id": "r1-mkdtemp-leak",
+  "severity": "P2",
+  "file": "tests/structural/test_duplicate_trigger_observable_parity.py",
+  "line": 131,
+  "summary": "mkdtemp render root never cleaned up \u2014 DEFERRED, fixing it here alone would leave the sibling leaking",
+  "voices": [
+   {
+    "source": "concurrency",
+    "kind": "lens"
+   },
+   {
+    "source": "robustness",
+    "kind": "lens"
+   }
+  ],
+  "disposition": "accepted",
+  "suggestion": "Follow-up task: fix this file and tests/structural/test_multi_lens_a5.py together."
+ },
+ {
+  "id": "r1-config-drift-adr",
+  "severity": "P2",
+  "file": ".claude/harness.yaml",
+  "line": 149,
+  "summary": "Config changes ride in this worktree without a PLAN/ADR entry \u2014 surfaced in the boundary report and the BASELINE-DELTA",
+  "voices": [
+   {
+    "source": "security",
+    "kind": "lens"
+   }
+  ],
+  "disposition": "accepted",
+  "suggestion": "wrapup decides whether to split the commit."
+ },
+ {
+  "id": "r1-gate-judgment-erosion",
+  "severity": "P2",
+  "file": "src/harness_maker/templates/stages/execute.md.j2",
+  "line": 294,
+  "summary": "Deterministic count became an LLM judgment call \u2014 accepted in ADR-001, recorded for erosion watch",
+  "voices": [
+   {
+    "source": "security",
+    "kind": "lens"
+   }
+  ],
+  "disposition": "accepted",
+  "suggestion": "No action."
+ }
+]
