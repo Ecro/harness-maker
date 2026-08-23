@@ -1,6 +1,6 @@
 {
   "name": "harness-maker",
-  "version": "0.54.0",
+  "version": "0.54.1",
   "description": "Per-project AI coding harness for Claude Code · Cursor · Codex. Native `codex plugin add` installs the plugin, but the Python engine still comes from PyPI (`uv tool install harness-maker`) — see README.",
   "author": {
     "name": "noel"

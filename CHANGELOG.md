@@ -1,6 +1,6 @@
 # Changelog
 
-## [Unreleased]
+## [0.54.1] - 2026-08-23
 
 ### Fixed
 
@@ -28,25 +28,6 @@
   `interview.comprehension.depth` is `deep`. Both on user request, both unrelated to the fix
   above; every baseline key they moved is attributed in
   `work-docs/BASELINE-DELTA-a5-duplicate-coverage-block.md`.
-
-## [Unreleased]
-
-### Fixed
-
-- **`/hm:execute` Phase A.5's `test-reviewer` agent could block on a scenario that was
-  legitimately covered by several tests asserting DIFFERENT observables.** Its rubric
-  ("at least one dedicated test function" per SPEC scenario) and its Hard Rules routing
-  bullet ("a scenario covered twice" blocks) could not both hold, because the reconciling
-  qualifier — duplication means duplication of one OBSERVABLE, not of a scenario ID — lived
-  only in `execute.md.j2:222`, the Phase A authoring rule, which `test-reviewer` never reads.
-  Observed live on a consuming project at 0.54.0: five tests asserting five different
-  observables under one scenario ID blocked Phase A.5 for two rounds before escalating to
-  `stuck`. Fixed by writing "for the same observable" into all four sites that state the
-  duplication rule and splitting the compound Hard Rules clause so the qualifier attaches
-  only to the duplication predicate — a scenario-ID mismatch with no duplication stays a
-  defect "regardless of observable" (banned pattern 5, a naming defect, is unaffected).
-  `tests/structural/test_duplicate_trigger_observable_parity.py` pins this over the RENDERED
-  agent body for every target.
 
 ## [0.54.0] - 2026-08-22
 
