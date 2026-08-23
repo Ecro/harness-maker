@@ -112,7 +112,14 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     #   +2  the two `hm review_churn pin` lines (the measure shares the post pin's line) that
     #       feed the stale rule. OPTIONAL: an unmeasured ratio runs every round, so a stage
     #       that skips them behaves exactly as it did before this change.
-    "plan": 15,
+    # 15 → 26 (2026-08-23, the `dev_mode: task-driven → spec-driven` correction). NOT this
+    # repo's feature work: the repo has 186 SPECs and 185 machine SPECs and had been rendering
+    # with the spec gate OFF, so flipping the config turned the spec-need gate on. The six new
+    # `!` lines are `spec_need marker-read`, `marker-fresh`, `prefilter`, `record`,
+    # `waiver-set`, and the `git diff --name-only $(git merge-base HEAD <base>)` that feeds
+    # them; the rest of the rise is the same gate's fenced call sites, which ADR-011's rule
+    # counts. Re-baselined here rather than absorbed, per this file's own instruction.
+    "plan": 26,
     "research": 8,
     # 9 → 8 (same phase): `stage_agent_ledger persist-payload`, same axis.
     #
@@ -187,8 +194,13 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     "review": 39,
     "spec": 6,
     "uninstall": 3,
-    "verify": 13,
-    "wrapup": 29,
+    # 13 → 15 (same dev_mode correction): `spec_need op-check` and `spec_need waiver-check`.
+    "verify": 15,
+    # 29 → 28 (same dev_mode correction, and the only DROP): `spec_machine waiver-check
+    # --dev-mode task-driven` is the task-driven oracle-waiver advisory, which spec-driven does
+    # not render. A config flip that adds a gate in two commands and removes an advisory in a
+    # third is the shape to expect here, not a uniform rise.
+    "wrapup": 28,
 }
 
 
