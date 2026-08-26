@@ -625,6 +625,10 @@ TESTS_NOT_CONFIG_AFFECTING: tuple[str, ...] = (
     "tests/integration/test_readme_install_commands.py",
     # Asserts pyproject.toml merely EXISTS, as a sanity check on the resolved root.
     "tests/unit/test_ledger_isolation.py",
+    # Writes a synthetic pyproject.toml carrying `addopts = "-q"` into a sandbox repo, to
+    # reproduce the verbosity composition that made the find-unbound gate inert. The trap
+    # is built, never inherited, so THIS repo's addopts cannot change the outcome.
+    "tests/unit/test_nonmechanical_binding.py",
 )
 
 #: Markdown is inert only in these locations. A blanket "`.md` is inert" would make

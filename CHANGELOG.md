@@ -4,6 +4,20 @@
 
 ### Fixed
 
+- **The Production `find-unbound` gate can now fail.** It never had. `--collect-only`
+  prints node ids at exactly verbosity -1, and `_pytest_collect_nodeids` passed its own
+  `-q` on top of this repo's `addopts = "-q"` — landing on -2, where pytest prints
+  per-file counts (`tests/e2e/foo.py: 2`) instead. Nothing in that form contains `"::"`,
+  so the parse always yielded nothing, every AC looked un-collectable, and `find-unbound`
+  reported OK over genuinely unbound work. The helper now resets `addopts` to pin the
+  verbosity it parses, and treats rc 0 with zero parsed node ids as could-not-adjudicate
+  rather than as an empty suite — pytest signals a real empty suite with rc 5, so rc 0
+  with unreadable stdout is our own read failure. That second half is independent of the
+  first and holds for any future output-format change. Every existing collect test built
+  a sandbox with no `pyproject.toml`, so none of them could reproduce the composition
+  that killed the gate; the new one builds a repo that carries it, and asserts as a
+  precondition that the naive parse still finds nothing there.
+
 - **`CLAUDE.md`'s second-opinion loss-rate guidance now names the shipped reader**
   (`hm verifier_discrimination report` + `.claude/observability/.ledger-exclusions.json`)
   instead of prescribing a hand formula. A hand calculation over the raw ledger reported

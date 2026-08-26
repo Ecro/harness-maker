@@ -769,15 +769,29 @@ class BindingGateUnavailableError(Exception):
 def _pytest_collect_nodeids(cwd: Path) -> tuple[list[str], bool]:
     """Return ``(collected_nodeids, ran_cleanly)`` from a repo-wide ``--collect-only``.
 
-    ``ran_cleanly`` is False when pytest is unavailable/timed out OR exited with a
+    ``ran_cleanly`` is False when pytest is unavailable/timed out, exited with a
     collection error (rc not in {0, 5} — 5 is pytest's "no tests collected", a
-    legitimately-empty clean run). A collection error (e.g. an import error in a
-    test file) must NOT pass as "no collectable test" — that broken-test AC would
-    be mis-classified as future work (false PASS). The caller fails closed on False.
+    legitimately-empty clean run), OR ran clean over a non-empty suite whose output
+    yielded no parseable node id. All three are "could not adjudicate"; the caller
+    fails closed on False.
+
+    ``-o addopts=`` is load-bearing, not tidiness. ``--collect-only`` prints node
+    ids at exactly verbosity -1; the project's own ``addopts`` composes with the
+    ``-q`` below, so an ``addopts = "-q"`` (this repo's own, and a common default)
+    lands on -2, where pytest prints PER-FILE COUNTS instead —
+    ``tests/e2e/foo.py: 2``, not one ``file::test`` per line. Nothing in that form
+    contains ``"::"``, so the parse silently yielded [] and the Production
+    ``find-unbound`` gate reported OK for every AC it was ever asked about. It had
+    never once fired. Resetting addopts pins the verbosity this parse assumes.
+
+    Accepted cost: a project whose addopts carries a collection-affecting flag
+    (``--import-mode``, a required ``-p``) loses it here and may collect-error.
+    That surfaces as rc != 0 → fail-closed → a LOUD gate failure, which is the
+    safe direction; the silent one is what this replaces.
     """
     try:
         result = subprocess.run(
-            ["pytest", "--collect-only", "-q", "--no-header"],
+            ["pytest", "-o", "addopts=", "--collect-only", "-q", "--no-header"],
             cwd=str(cwd),
             capture_output=True,
             text=True,
@@ -789,6 +803,11 @@ def _pytest_collect_nodeids(cwd: Path) -> tuple[list[str], bool]:
     if result.returncode not in (0, 5):  # 5 = no-tests-collected (clean empty)
         return [], False
     nodeids = [ln.strip() for ln in result.stdout.splitlines() if "::" in ln]
+    # rc 0 means pytest collected SOMETHING (rc 5 is the empty-suite code), so an
+    # empty parse here is OUR failure to read the output, never a true empty suite.
+    # Calling that "no collectable test" is precisely the false PASS above.
+    if result.returncode == 0 and not nodeids:
+        return [], False
     return nodeids, True
 
 

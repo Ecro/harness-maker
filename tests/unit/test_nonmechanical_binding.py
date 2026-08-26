@@ -394,3 +394,108 @@ def test_integration_parametric_loop(tmp_path: Path) -> None:
     assert errors == [], errors
     assert load(y).ac[0].pending_test is False
     assert find_unbound_closed_type_acs(y, tmp_path) == [], "bound AC is no longer a miss"
+
+
+# ---------------------------------------------------------------------------
+# The gate that never fired — verbosity arithmetic + the empty-parse false PASS
+# ---------------------------------------------------------------------------
+
+
+def test_find_unbound_sees_nodeids_under_project_addopts_q(tmp_path: Path) -> None:
+    """The gate must still fire in a repo whose own `addopts` already carries `-q`.
+
+    This is the shape that made the Production gate inert for its whole life, and
+    it is invisible to a monkeypatched test BY CONSTRUCTION: the helper composes
+    the project's ini `addopts` with its own `-q`, so a repo with
+    `addopts = "-q"` (this one; a common default) reaches verbosity -2, where
+    `--collect-only` prints per-file COUNTS — `tests/foo.py: 2` — instead of node
+    ids. The `"::"` parse then yields nothing, every AC looks un-collectable, and
+    `find-unbound` reports OK over genuinely unbound work.
+
+    So this test builds a repo that HAS that addopts. Every other collect test in
+    this file writes no pyproject at all, which is why they all passed while the
+    real gate was dead. Reverting either half of the fix kills this: without
+    `-o addopts=` the parse is empty (→ fail-closed raise), and without the
+    empty-parse guard it silently returns [].
+    """
+    from harness_maker.spec_machine import find_unbound_closed_type_acs
+
+    (tmp_path / "pyproject.toml").write_text(
+        '[tool.pytest.ini_options]\ntestpaths = ["tests"]\naddopts = "-q"\n'
+    )
+    tests_dir = tmp_path / "tests"
+    tests_dir.mkdir()
+    (tests_dir / "test_ac_001_thing.py").write_text("def test_ac_001_thing():\n    assert True\n")
+
+    specs = tmp_path / "specs"
+    specs.mkdir()
+    y = specs / "SPEC-demo.machine.yaml"
+    y.write_text(
+        yaml.safe_dump(
+            {
+                "schema_version": 2,
+                "spec_slug": "demo",
+                "verification_tier": 1,
+                "ac": [
+                    {
+                        "id": "AC-001",
+                        "title": "thing",
+                        "type": "mechanical",
+                        "executable_predicate": "True",
+                        "pending_test": True,
+                    }
+                ],
+            }
+        )
+    )
+
+    # Pre-condition: the addopts really do collapse the default parse to nothing,
+    # so the assertion below is about the fix and not about an easy repo.
+    naive = subprocess.run(
+        [sys.executable, "-m", "pytest", "--collect-only", "-q", "--no-header"],
+        cwd=str(tmp_path),
+        capture_output=True,
+        text=True,
+        timeout=120,
+        check=False,
+    )
+    assert [ln for ln in naive.stdout.splitlines() if "::" in ln] == [], (
+        "fixture no longer reproduces the trap — the naive parse found node ids:\n" + naive.stdout
+    )
+
+    assert find_unbound_closed_type_acs(y, tmp_path) == ["AC-001"], (
+        "a pending AC whose convention-named test collects is a miss, and the "
+        "project's own -q must not hide it"
+    )
+
+
+def test_collect_helper_fails_closed_when_output_yields_no_nodeid(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """rc 0 with an unparseable stdout is "could not adjudicate", never "no tests".
+
+    pytest signals a genuinely empty suite with rc 5, so rc 0 means it collected
+    something we failed to read. Returning `ran=True` there is the false PASS: the
+    caller sees an empty collectable set, subtracts nothing from `pending`, and
+    reports OK. This is the fail-closed half, independent of the addopts half —
+    it holds for any future output-format change too.
+    """
+    from harness_maker import spec_machine
+
+    class _Result:
+        returncode = 0
+        stdout = "tests/e2e/test_a.py: 2\ntests/unit/test_b.py: 41\n\n43 tests collected\n"
+        stderr = ""
+
+    monkeypatch.setattr(spec_machine.subprocess, "run", lambda *a, **k: _Result())
+    nodeids, ran = spec_machine._pytest_collect_nodeids(tmp_path)
+    assert nodeids == []
+    assert ran is False, "unparseable collect output must fail closed, not read as an empty suite"
+
+    # rc 5 IS a real empty suite and must stay a clean, non-raising run.
+    class _Empty(_Result):
+        returncode = 5
+        stdout = "no tests ran\n"
+
+    monkeypatch.setattr(spec_machine.subprocess, "run", lambda *a, **k: _Empty())
+    assert spec_machine._pytest_collect_nodeids(tmp_path) == ([], True)
