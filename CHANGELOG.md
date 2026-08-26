@@ -1,5 +1,36 @@
 # Changelog
 
+## [Unreleased]
+
+### Fixed
+
+- **`CLAUDE.md`'s second-opinion loss-rate guidance now names the shipped reader**
+  (`hm verifier_discrimination report` + `.claude/observability/.ledger-exclusions.json`)
+  instead of prescribing a hand formula. A hand calculation over the raw ledger reported
+  codex at 61.3% where the reader reports 2.15% — a 30x error, because 147 of 375 rows were
+  pytest fixture writes the exclusions file already names. A differential test runs the
+  documented command as a subprocess over a fixture ledger and compares its per-model
+  `loss_rate` to the shipped reader's own output.
+- **`worktree._cli_span_end` now copies `git_branch`/`task_slug` from the span's own start**
+  when the caller has a session id. Every one of the 109 `end` rows in the live ledger had
+  nulled both fields, so a slug-keyed join over `stage-spans.jsonl` always returned zero spans.
+- **`wrapup_receipt._confined` accepts an absolute path iff it resolves inside the repo root**,
+  instead of rejecting every absolute path outright (it was firing on truthful delegate
+  receipts reporting documents written from inside a `.worktrees/<slug>/` checkout).
+  `WrapupReceipt` gained two fields observed in production delegate receipts, and the
+  stage-delegate template now states the exact key set and path form expected in return.
+- `tests/unit/test_run_classify.py`'s fixture no longer hardcodes an absolute date. The old
+  fixture pinned timestamps to 2026-07-26 while `_cmd_boundaries` falls back to a 30-day
+  window, so on 2026-08-26 every turn fell outside the window and all seven tests failed —
+  a time-bomb that was green on the day it was written and silently failed a month later.
+
+### Changed
+
+- `CLAUDE.md` shrunk from 624 to 392 lines (Production ceiling is 500) by relocating two
+  procedural blocks verbatim into `docs/reference/implementation-patterns.md` and
+  `docs/reference/pre-change-checklist.md`, with a resolving pointer left in their place.
+  Nothing was compressed or reworded.
+
 ## [0.54.1] - 2026-08-23
 
 ### Fixed

@@ -1,0 +1,180 @@
+schema_version: 2
+spec_slug: render-observability-audit
+parent_spec: null
+verification_tier: 2
+mutation_threshold: 70
+mutation_threshold_rationale: 'Mixed Python + Jinja + Markdown. Only two ACs land
+  on assertable Python: AC-003 (span-end emission) and AC-004''s consumer half (`_confined`,
+  schema widening). AC-001/002 are documentation predicates, and AC-004''s producer
+  half is a Jinja template edit where mutation testing has no purchase — its verification
+  is ADR-002''s observation window, not a mutant. Holding the 85 bar would measure
+  a shrinking denominator and read as stronger evidence than it is.'
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/worktree.py
+- src/harness_maker/wrapup_receipt.py
+mutation_runner: null
+spec_quality_score: null
+spec_quality_score_at: null
+ac:
+- id: AC-001
+  title: CLAUDE.md prescribes the shipped second-opinion reader
+  type: mechanical
+  test_ids:
+  - tests/unit/test_claude_md_second_opinion_guidance.py::test_claude_md_prescribes_shipped_second_opinion_reader
+  executable_predicate: '''verifier_discrimination report'' in claude_md_second_opinion_guidance()'
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: The reference implementation is the shipped reader `hm verifier_discrimination
+    report`, which applies `.ledger-exclusions.json` and is independently gated by
+    tests/unit/test_ledger_exclusions_call_sites.py. The test compares the documented
+    procedure's result against that reader's output on the same ledger, so it cannot
+    be satisfied by rewording the doc alone.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-002
+  title: CLAUDE.md is within the Production line ceiling
+  type: mechanical
+  test_ids:
+  - tests/unit/test_claude_md_second_opinion_guidance.py::test_claude_md_within_production_line_ceiling
+  executable_predicate: claude_md_line_count() <= 500
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The 500 bound is not chosen by this SPEC. It is harness-maker's
+    own Production context-lint threshold, asserted independently by readiness.py's
+    context_quality:claude_md_within_limit signal and stated in CLAUDE.md's Context
+    Lint section. The expected value predates and is external to the change under
+    test.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-003
+  title: A closed span's end row carries its start's task and branch
+  type: property
+  test_ids:
+  - tests/unit/test_stage_span_end_fields.py::test_span_end_preserves_start_task_and_branch
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: 'Round-trip invariance, not a fixture: whatever slug and branch
+    the start carried, the end must carry. The relation holds for every (slug, branch)
+    pair regardless of how span-end resolves them internally, so an implementation
+    cannot satisfy it by echoing a hardcoded value the test also knows. Observed violation:
+    all 109 end rows in the live ledger null both fields while their starts carry
+    them.'
+  oracle_independence_waiver: null
+  input_domain: any (task_slug, git_branch) pair emitted by task-preflight, including
+    non-ASCII and hyphenated slugs
+  transformation: emit a start event for (slug, branch), then close it via `worktree
+    span-end`
+  expected_relation: end.task_slug == start.task_slug and end.git_branch == start.git_branch
+  preconditions:
+  - the span is the caller's own (session_id matches, or both are session-less)
+  - no intervening start from the same session
+  observable_output: the appended SpanEvent row in stage-spans.jsonl
+  generator_hint: vary slug charset and branch prefix; include the session-less degraded
+    path
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null
+- id: AC-004
+  title: The delegate stops producing deterministically-invalid receipts
+  type: parametric
+  test_ids:
+  - tests/unit/test_wrapup_receipt_deterministic_kinds.py::test_deterministic_receipt_mismatch_kinds_absent
+  executable_predicate: null
+  golden_table:
+  - input:
+      kind: receipt-unparseable
+      receipt: a receipt whose steps_skipped and drift_verdict use the shapes the
+        delegate actually emits
+    expected: []
+    edge: false
+    note: 'Observed 2026-08 run hm-receipt.vvv0sGJy: pydantic extra_forbidden on steps_skipped
+      (list) and drift_verdict (dict).'
+  - input:
+      kind: document-escapes-root
+      receipt: a receipt listing documents the delegate wrote from inside .worktrees/<slug>/
+    expected: []
+    edge: false
+    note: 'Observed 7 occurrences in one run: absolute worktree paths rejected as
+      escaping the repository root.'
+  - input:
+      kind: promotion-arithmetic
+      receipt: a receipt whose candidates equal promoted + skipped
+    expected: []
+    edge: false
+    note: 'Observed twice: ''4 candidates but 3 promoted + 0 skipped = 3'' and ''6
+      candidates but 4 promoted + 0 skipped = 4''.'
+  - input:
+      kind: wiki-missing
+      receipt: a receipt claiming a wiki.md heading that was never written
+    expected:
+    - wiki-missing
+    edge: false
+    note: Claim-based kind — must REMAIN reportable and distinct. Guards against fixing
+      the rate by silencing the check.
+  - input:
+      kind: failure-missing
+      receipt: a receipt claiming a failures.md heading that was never written
+    expected:
+    - failure-missing
+    edge: false
+    note: Claim-based kind — must remain distinct from wiki-missing.
+  - input:
+      kind: promotion-missing
+      receipt: a receipt claiming a Second Brain promotion absent from the vault
+    expected:
+    - promotion-missing
+    edge: false
+    note: Claim-based kind — must remain distinct.
+  rubric_id: null
+  note: ''
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Every expected value is transcribed from the 15 mismatch rows recorded
+    in .claude/observability/delegation.jsonl between 2026-08-01 and 2026-08-23, before
+    any fix existed. The provenance is production telemetry, not a value derived from
+    the implementation under test.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  judgment_verdict: null
+  judged_at: null
+  judgment_evidence: null
+  judgment_subject_paths: []
+  judgment_subject_hash: null

@@ -1098,4 +1098,6 @@ shaped to please the test. Prevention: when a locked ADR constrains semantic pla
 constraining syntax, look for a window/exclusion-region predicate before reaching for a splitter
 or an invented anchor — the splitter approach has a hidden assumption (a stable separator exists
 and is unique) that the ADR never actually promised.
+## [wiki:tooling] verifier-discrim-report-is-loss-reader | 2026-08-26
+`harness_maker.observability.verifier_discrimination`의 `report` 서브커맨드는 second-opinion ledger에서 모델별 loss_rate를 계산할 때 `.claude/observability/.ledger-exclusions.json`을 적용한다. 이 파일은 프로덕션 ledger에 흘러든, 어떤 집계에도 포함되면 안 되는 행(예: 테스트 스위트가 쓴 fixture 행)을 이름으로 지목한다. `(skipped+failed)/total`을 손으로 계산하면 이 제외 목록을 놓쳐 조용히 크게 틀린 값을 낸다 — 2026-08-26 실측으로 codex 손계산 61.3% vs 리더 2.15% (30배 차이, 375행 중 147행이 2026-08-08~17 테스트 fixture 행). CLAUDE.md는 이제 손 공식 대신 `hm verifier_discrimination report` 실행을 지시한다.
 <!-- @hm:/user:entries -->

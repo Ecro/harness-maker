@@ -64,6 +64,20 @@ _KNOWN_MISSING: dict[tuple[str, int], str] = {
         "finding here and is recorded in `[fail:design] per-round-step-runs-only-in-round-1` "
         "(count 2). Nothing was reconstructed to clear this."
     ),
+    ("render-observability-audit", 2): (
+        "Operator error, not a structural impossibility — and unlike the two entries below, "
+        "this round DID dispatch. The churn gate measured 1.00 and `review_consensus plan` "
+        "returned a real dispatch (`code-reviewer`/`functionality`), which ran and returned "
+        "findings. Step 3.4's persist-payload line simply was never invoked, and the merged "
+        "findings temp file was not retained afterwards, so no capture exists to write. "
+        "Reconstructing one now would fabricate a capture, which is the non-capture this "
+        "corpus exists to exclude, so nothing was reconstructed. Round 1 is invisible to this "
+        "gate for the reason the `probe-envelope-contract` entry already records: the gate's "
+        "population is the telemetry rows, and only ONE terminal row was emitted for this "
+        "review instead of one per round, so a skipped row hid a skipped payload. That makes "
+        "this instance 3 of `[fail:design] per-round-step-runs-only-in-round-1` — the same "
+        "class, reached by neither of the two routes already documented here."
+    ),
     ("review-loop-ledger-fixes", 3): (
         "There was no round 3 to capture. This slug's first /hm:review ran two rounds and "
         "then two CONFIRMATION passes, and the confirmation pass writes its lens results "

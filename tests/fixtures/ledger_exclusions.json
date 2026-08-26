@@ -1,0 +1,7 @@
+[
+  {
+    "key": "slug",
+    "value": "synthetic-suite-rows",
+    "reason": "Fixture analogue of the real 2026-08-17 leak: rows a test suite wrote into the production ledger before the isolation gate existed."
+  }
+]

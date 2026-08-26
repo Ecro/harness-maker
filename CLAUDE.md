@@ -46,7 +46,13 @@ harness-maker 는 Claude Code + Cursor 양쪽 IDE 의 플러그인으로, **LLM 
     - **graceful degrade** (ADR-011; 분기 정의는 PLAN-second-opinion-invocation-and-slug-cap ADR-008 이 supersede): CLI 미설치 / login 만료 / rate-limit·구독 초과 / timeout / 파싱 불가 — 전부 warn-and-proceed. **`exit 127` 은 더 이상 CLI 미설치의 신호가 아니다** — invoker 는 `shell=False` 로 돌기 때문에 127 을 만들어주던 쉘이 없고, 미설치는 `FileNotFoundError`, timeout 은 `TimeoutExpired`, 실행권한 없음은 `PermissionError` 로 **예외로 온다**. 7분기 매트릭스(예외 3 + non-zero exit + payload 획득 실패 + validate 실패 + 성공)가 이걸 전부 흡수하며, `resolve_base_root`/`load_config` 의 shell-out 도 같은 보호를 받는다 (git 부재 시 cwd fallback 후 **진행** — skip 아님). agy 는 hang 가능 → agy native `--print-timeout 240s` 를 계속 쓰고, process-level `AGY_TIMEOUT_S=300` 은 그보다 **위**에 있는 바깥 backstop 이다 (native 가 먼저 발화해 agy 자신의 진단이 남도록). 옛 "external `timeout` 래퍼 금지" 규칙의 근거는 allow-rule prefix 매칭이었고 ADR-001 이후 그 근거는 사라졌다 — `subprocess.run(timeout=)` 은 금지 대상이 아니다. Codex 는 `--output-schema` 로 JSON 강제; **antigravity 도 CLI-레벨 강제가 있다 — 플래그 이름이 다를 뿐이다** (`--output-format json --json-schema <path>`, 2026-08-08 probe. 옛 "CLI-레벨 강제 없음" 서술은 `--output-schema` 라는 철자만 찾아본 결과였고, 그 오기가 여섯 곳에 복제돼 파싱 실패 9건의 원인이 됐다 — PLAN-antigravity-second-opinion-timeout ADR-002/006). 단 **강제는 best-effort** 다: `status: SUCCESS` 응답에서도 `structured_output` 키가 없는 경우가 관측됐으므로 `codex_adapter.extract_antigravity_payload` fail-closed 경로는 **폐기가 아니라 필수 fallback** 으로 남는다 (4-case 표: 파싱불가→failed / status≠SUCCESS→skipped / structured_output dict→그대로 쓰되 validate 실패는 fail-closed / 부재→`response` 를 tolerant 추출). plan-validator 는 **PIDA** (KEEP/REFUTE → oracle 없으면 `unresolved` surface, never-block).
     - **output contract** (ADR-008): plan stage 는 `second_opinion_results: [{model, status: invoked|skipped|failed, reconciliation: [...]}]` 배열 (모델당 정확히 1 entry). 옛 scalar `codex_status`/`codex_reconciliation` 대체. review stage 는 persistent status field 없음 (findings 를 `source: "<model>"` 태그로 Step 4 에 fold).
     - **PIDA 수용 게이트 + vote freeze** (PLAN-second-opinion-acceptance-gate): review 경로에도 반박 게이트가 생겼다. `/hm:review` Step 3.4 가 **모든** finding (Claude 것 포함) 에 `codex_adapter.finding_id` 로 불변 `id` 를 찍고 (리뷰어는 `id` 를 내보내지 않는다 — LLM 이 만들면 매 실행 달라져 안정성이 깨짐), Step 3.6 이 분쟁 finding 이 지목한 경로에 targeted `pytest`/`ruff`/`mypy` 를 돌려 **예산 4000자 / 명령당 1500자 + 가시 절단마커 + `id` 연결 + 자격증명 라인 필터** 를 걸어 주입하고, Step 3.7 이 `code-verifier` **mode B** 로 ledger enum (`accepted`/`rejected`/`duplicate`/`unresolved`) 을 **직접** 판정한다 (KEEP/REFUTE 중간 어휘 없음 — 번역 단계가 있으면 그 매핑 실패로 행이 조용히 사라진다). `accepted` 만 Step 4 투표권을 얻고, `unresolved` 는 `manual-only` + `unverified_severe` 스캔의 **유일한 provenance 예외** (ADR-004 — 가시성 회귀를 수용한 의도된 선택). **Phase 0 mechanical checks 를 oracle 로 재사용하지 말 것** — `reviewers.mechanical_checks` 로 가드되어 이 repo 에선 렌더 자체가 안 되고, 렌더돼도 Round 1 위에서 1회만 돌며 stop-on-first-failure 라 살아남은 라운드에선 항상 all-green 이다. 모델은 `/hm:review` 당 **정확히 1회** 호출되고 rounds 2..N 은 REVIEW 의 `## 🧊 Cross-model findings (frozen @ round 1)` 섹션을 다시 읽는다. Auto-Fix Loop 은 **단조 격자**(`pending`→`resolved`/`stale` 만 progress; `→ pending` 은 절대 아님)와 **1회 무진전 라운드 종료**(단 **round ≥ 2** 에서만 평가 — round 1 은 fix 단계가 없어 progress 전이가 원리적으로 0이라 무조건 규칙이면 auto-fix 가 아예 안 돈다)를 갖고, 라운드별 voter state 는 **`id` 기준 merge** 다 (wholesale replacement 금지 — 리뷰어 비결정성만으로 corroborating voice 가 사라져 코드 변경 없이 등급이 움직인다). `resolved` 는 **verification 성공 후에만** — revert/skip 된 fix 는 `pending` 유지.
-    - ledger `.claude/observability/second-opinion.jsonl` 는 **두 종류의 행**이 공존한다: `finding_ref == "n/a"` = **호출당 1행** (skip-rate 분모), `finding_ref != "n/a"` = **finding 당 disposition 1행** (accept-rate, `oracle_result` 에 capped PIDA 근거). **둘 다 `status: "invoked"` 이므로 `finding_ref` 가 유일한 판별자** — 필터 없이 집계하면 finding 마다 호출 1건으로 세어 skip-rate 가 조용히 오염된다. disposition 행은 `hm second_opinion_invoke --record-disposition --disposition-file <path>` 로만 쓴다 (argv JSON 금지 — quoting + `ARG_MAX`; `codex_ledger emit` 은 `Path.cwd()` 에 써서 worktree row-loss 재발). 실패는 exit 0 + `[second-opinion] disposition rows NOT recorded:` stderr 1행 (조용한 no-op 금지). `oracle_result` 는 `max_length=200` 이고 invoker 의 row emission 이 예외를 삼키므로 `codex_ledger.cap_oracle_result` 로 **검증 전에** 자른다 — 안 자르면 행 전체가 소실된다. invoker 가 **base repo root** 기준으로 쓴다 — 옛 `codex_ledger.main()` 의 `project_root=Path.cwd()` 는 worktree 안 gitignored 경로에 기록해 `task-land` 시 소실됐다. 행이 skip 전용에서 호출 전체로 바뀌었으므로 **분모가 바뀌었다**: **`(skipped + failed) / total` 을 모델별로** 계산하고 `stage: "health"` 행은 제외할 것 (smoke 는 base cwd + 사소한 프롬프트라 구조적으로 `invoked` 편향). **`failed` 를 빼거나 모델을 합치면 안 된다** — `failed` 는 CLI 가 돌았지만 Step 4 가 못 먹는 payload 라 그 모델 목소리가 없는 건 skip 과 동일하고, 건강한 모델이 고장난 모델을 희석한다. 2026-08-06 실측: 옛 `skipped/total` 이 10.3% 를 보고할 때 실제는 20.7% 였고 한 모델 손실 전량이 `failed` 행에 있었다 (집계 20.7% vs 모델별 2.4% / 37.8%). `stage` 는 `review|plan|health` (Python `Literal` 과 출하 JSON enum 양쪽 확장 — 이름만 비교하던 parity 테스트가 enum 값에 대해 불변이었다).
+    - ledger `.claude/observability/second-opinion.jsonl` 는 **두 종류의 행**이 공존한다: `finding_ref == "n/a"` = **호출당 1행** (skip-rate 분모), `finding_ref != "n/a"` = **finding 당 disposition 1행** (accept-rate, `oracle_result` 에 capped PIDA 근거). **둘 다 `status: "invoked"` 이므로 `finding_ref` 가 유일한 판별자** — 필터 없이 집계하면 finding 마다 호출 1건으로 세어 skip-rate 가 조용히 오염된다. disposition 행은 `hm second_opinion_invoke --record-disposition --disposition-file <path>` 로만 쓴다 (argv JSON 금지 — quoting + `ARG_MAX`; `codex_ledger emit` 은 `Path.cwd()` 에 써서 worktree row-loss 재발). 실패는 exit 0 + `[second-opinion] disposition rows NOT recorded:` stderr 1행 (조용한 no-op 금지). `oracle_result` 는 `max_length=200` 이고 invoker 의 row emission 이 예외를 삼키므로 `codex_ledger.cap_oracle_result` 로 **검증 전에** 자른다 — 안 자르면 행 전체가 소실된다. invoker 가 **base repo root** 기준으로 쓴다 — 옛 `codex_ledger.main()` 의 `project_root=Path.cwd()` 는 worktree 안 gitignored 경로에 기록해 `task-land` 시 소실됐다. 행이 skip 전용에서 호출 전체로 바뀌었으므로 **분모가 바뀌었다**. **이 수치는 손으로 계산하지 말 것 — 출하된 리더를 쓴다:**
+
+```
+hm verifier_discrimination report --ledger .claude/observability/second-opinion.jsonl
+```
+
+모델별 `loss_rate` 가 그 답이고, 이 리더는 `.claude/observability/.ledger-exclusions.json` 을 적용한다 — 그 파일은 테스트 스위트가 프로덕션 ledger 에 흘린 행처럼 **어떤 집계에도 들어가면 안 되는 행**을 이름으로 지목한다 (`ledger_exclusions.py` → `verifier_discrimination.py`, 호출 지점은 `tests/unit/test_ledger_exclusions_call_sites.py` 가 강제). 개념적으로는 여전히 `(skipped + failed) / total` 을 모델별로 계산하고 `stage: "health"` 행을 제외하는 것이지만 (smoke 는 base cwd + 사소한 프롬프트라 구조적으로 `invoked` 편향), **제외 목록을 빼먹은 손계산은 조용히 크게 틀린다**: 2026-08-26 실측으로 raw 파일에 대한 손계산이 codex **61.3%** 를 보고할 때 리더는 **2.15%** 를 보고했다 — 30배. 375행 중 147행이 2026-08-08~17 에 테스트가 쓴 행이었고, 생산자는 `tests/unit/test_ledger_isolation.py` 가 막았지만 **기존 행은 남아 있다**. 같은 오독이 세 번 반복됐다 (exclusions 파일의 `reason` 필드가 앞의 두 번을 기록). **`failed` 를 빼거나 모델을 합치면 안 된다** — `failed` 는 CLI 가 돌았지만 Step 4 가 못 먹는 payload 라 그 모델 목소리가 없는 건 skip 과 동일하고, 건강한 모델이 고장난 모델을 희석한다. 2026-08-06 실측: 옛 `skipped/total` 이 10.3% 를 보고할 때 실제는 20.7% 였고 한 모델 손실 전량이 `failed` 행에 있었다 (집계 20.7% vs 모델별 2.4% / 37.8%). `stage` 는 `review|plan|health` (Python `Literal` 과 출하 JSON enum 양쪽 확장 — 이름만 비교하던 parity 테스트가 enum 값에 대해 불변이었다).
     - `/hm:health` 가 per-model positive smoke-test 로 silent-degradation 을 잡되, **base 에서만 돈다** (worktree preflight 없음). 초록 = "공유 호출 경로가 base 에서 동작". worktree 분기(base-root/config 해석)는 유닛 테스트와 수동 검증이 담당 — 초록 `/hm:health` 를 Production 경로의 증거로 읽지 말 것. 그 추론이 H1 을 수명 내내 가렸다.
     - antigravity sandbox 안전성 (`tests/manual/ANTIGRAVITY_SANDBOX_PROBE.md`, ADR-012): project-less `agy --sandbox --print` 는 file 도구 미노출 → working-tree mutation 불가. **2026-07-25 재검증 완료:** 옛 probe 는 `agy --print --sandbox …` 형태로 돌아 `--sandbox` 가 프롬프트 값으로 소비됐다 — 즉 sandbox 가 적용되지 **않은** 명령을 관찰하면서 "sandbox 가 안전하다"를 주장하고 있었다. 교정된 `agy --sandbox --print "<prompt>"` 로 `INTEGRATION=1 pytest tests/integration/test_antigravity_sandbox_probe.py` 재실행 → 통과 (명시적 파일 수정 지시에도 대상 파일 불변). 결론은 그대로지만, 이제 근거가 실제로 그 명령을 검증한다. loop 는 stage-level 이라 자동 상속.
 
@@ -359,259 +365,21 @@ Cursor / Codex 의 plugin marketplace 가 GitHub 에서 직접 fetch.
 
 ## 구현 패턴 (CODER 가 따라야 할 코드 관례)
 
-### Atomic file write (디스크 corrupt 방지)
-모든 파일 write 는 atomic 패턴 강제:
-```python
-import os, tempfile
-from pathlib import Path
-
-def atomic_write(path: Path, content: str) -> None:
-    """tempfile + os.rename — 인터럽트 시 corrupt 0."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp = tempfile.mkstemp(
-        dir=str(path.parent),
-        prefix=f".{path.name}.",
-        suffix=".tmp",
-    )
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            f.write(content)
-        os.replace(tmp, path)  # atomic on POSIX + Windows
-    except Exception:
-        Path(tmp).unlink(missing_ok=True)
-        raise
-```
-plain `open(path, "w")` 사용 금지 (단, 명백히 임시 디렉토리 안에서만 OK).
-
-### LLM mock 패턴 (테스트 결정성)
-사용자 정책: 실제 호출은 Claude Code subscription 통해 가능하지만, **단위 테스트는 mock 우선** (속도·결정성).
-
-```python
-# tests/unit/conftest.py
-import pytest
-from anthropic.types import Message, TextBlock, Usage
-
-@pytest.fixture
-def mock_anthropic_client(monkeypatch):
-    """Claude SDK 호출을 deterministic mock 으로 대체."""
-    class _MockClient:
-        def __init__(self, *_a, **_kw): ...
-        @property
-        def messages(self):
-            return self
-        def create(self, *_a, **_kw):
-            return Message(
-                id="msg_test",
-                type="message",
-                role="assistant",
-                model="claude-opus-4-7",
-                content=[TextBlock(type="text", text='{"applicability_score": 0.85, "risk": "low"}')],
-                stop_reason="end_turn",
-                stop_sequence=None,
-                usage=Usage(input_tokens=10, output_tokens=20),
-            )
-    monkeypatch.setattr("anthropic.Anthropic", _MockClient)
-    return _MockClient
-```
-Integration test 는 `tests/integration/` 에 두고 `pytest.mark.skipif(not os.getenv("INTEGRATION"))` 가드.
-
-### Worktree cleanup 정책
-- 정상 종료: cleanup 은 **설정이 아니라 finalize 의 status 인자**가 결정한다. `cleanup(wt, on_success=True)` 는 force 제거(작업 복사본 무조건 삭제), `on_success=False` 는 non-force 제거(dirty 면 git 이 거부 — 의도된 안전망). **`harness.yaml.worktree.cleanup` 이라는 키는 존재하지 않는다** — 어떤 preset 템플릿도 렌더한 적 없고 어떤 코드도 읽지 않는다. 이 문서가 `(default on_success)` 라고 적어 설정 가능한 것처럼 읽히게 했던 것이 오류다 (PLAN-worktree-side-defaults 에서 확인).
-- **autoloop iter / phase blocker 발생 시 강제 cleanup**: `worktree.cleanup_all(force=True)` 호출 → halt 전 모든 `.worktrees/*` 제거 (디스크 누적 방지). 단, `--debug-worktree` 플래그 시 보존.
-- stale-artifact janitor: `prune_stale(base)` 가 **`worktree create` 시점에만** 실행된다 (`_cli_create`, `--debug-worktree` 시 skip). orphan `.hm-loop-*` 마커, dangling `.worktrees/*`, 그리고 finalize-stash ref 를 정리한다. ref drain 정책: stash object 가 이미 사라진(gc/drop) ref 는 즉시 제거(복원할 내용 없음), 살아있지만 내용이 HEAD 에 없는 ref 는 preserve+warn (PLAN-worktree-base-artifact-pollution ADR-005). **24h/주기 기반 hook 은 없다** — 예전 문서의 "weekly `/hm:health` cleanup" 주장은 코드에 존재한 적 없는 오류였다.
-- orphan-branch sweep + **landed-marker** (PLAN-worktree-deliverable-blocks-create ADR-003/004): finalize 성공 시 `refs/hm-landed/v1/<branch>` 에 worktree 브랜치 tip SHA 를 기록한다 (`_write_landed_marker`, cleanup 직전·clean/dirty base 양쪽). `prune_stale` 의 브랜치 sweep 은 marker SHA == 현재 tip 이면 (worktree dir 부재 시) **content 재비교 없이** 삭제 — 후속 HEAD 편집에도 안전하고, 이름 충돌로 재생성된 동명 브랜치는 tip 이 달라 marker 불일치 → preserve-biased content-gate 로 빠진다. marker 없는 legacy 브랜치는 기존 `_branch_content_in_head` fallback. **모든 삭제 경로(marker-sweep, content-gate, `--force`)가 같은 op 에서 marker ref 도 삭제**하고, branch 없는 orphan `refs/hm-landed/v1/*` 는 prune 시 reap → ref 누적 0. create 시 preserved-branch 경고 벽은 **1줄 요약**으로 collapse (`_print_prune_warnings`).
-- `prune-branches [--force]` CLI (ADR-004): 누적된 legacy `execute-*` 브랜치 backlog 를 정리. flag 없으면 `prune_stale` 와 동일 gate (marker/content 검증된 것만 sweep, 나머지는 `git log -p <branch>` 힌트와 함께 preserve). `--force` 는 markerless/diverged 브랜치까지 삭제하되 삭제 전 per-branch recovery 힌트를 출력 (reflog `wip(execute)` 커밋은 gc 윈도우까지 생존). `--force` 는 명시 파싱 (substring 검사 아님).
-- **Cursor 와 공유 시 주의**: prefix 매치로 자기 것만 cleanup (`execute-*`, `plan-*`, `phase-*`, `autoloop-*`). Cursor 가 만든 worktree (다른 prefix) 는 건드리지 않음.
-
-### 렌더 컨텍스트 플래그는 **출력 경로에서 파생**시킬 것 (`is_codex`, 2026-08-16)
-
-`synthesize` 의 컨텍스트 빌더가 모든 파일에 `is_codex: False` 를 하드코딩하고 있었다. 근거는
-"Codex 본문은 `_codex_stage_skills()` 가 미리 렌더한다" 였고, 절반만 맞았다 — 미리 렌더되는 건
-**stage body** 뿐이고 그걸 감싸는 **wrapper** (`codex/stage_skill.md.j2` + 그것이 include 하는
-partial) 는 빌더가 렌더한다. 그래서 **디스크의 Codex 파일 전부가 `is_codex=False` 로 생성**됐고,
-wrapper-level partial 의 `{% if is_codex %}` 는 템플릿 소스만 보면 Codex 를 인식하는 것처럼 읽히면서
-실제로는 항상 Claude 가지를 탔다. 실측 결과: autopilot picker 의 `not is_codex` 게이트는 한 번도
-발화한 적이 없고, `stage_end_summary` 의 auto-advance 억제 게이트도 마찬가지여서 Codex stage skill 이
-실행할 수 없는 `Skill` 자동 전환 블록을 싣고 나갔다.
-
-교훈은 두 가지다. (a) **런타임 플래그는 손목록이 아니라 출력 경로에서 파생**시킨다
-(`_is_codex_output` — `.codex/` · `.agents/` · `AGENTS.md`). 새 Codex 출력이 플래그를 조용히
-놓치는 경로가 없어진다. (b) **이 결함은 render-grep 으로 절대 안 잡힌다** — 템플릿도 산출물도 모두
-"정상"으로 읽히고, 틀린 건 컨텍스트뿐이다. 게이트는 blueprint 의 `FileEntry.context` 를 직접 보는
-`tests/structural/test_is_codex_matches_output_path.py` 다.
-
-### Snapshot test 결정성
-Renderer 의 `freeze_time` 인자 적극 활용. snapshot 비교 시 `generated_at` 필드 마스크:
-```python
-def normalize_for_snapshot(text: str) -> str:
-    """frontmatter 의 generated_at 만 마스크 (다른 필드는 결정적)."""
-    return re.sub(r'^generated_at:.*$', 'generated_at: <FROZEN>', text, flags=re.M)
-```
-
-### 외부 명령 호출
-- `subprocess.run(..., check=True, capture_output=True, text=True, timeout=N)` — timeout 필수
-- shell=True 금지 (security_scanner 의 hook injection 검사가 자기 코드도 잡으면 안 됨)
-- 외부 명령 실패 시 graceful fallback (예: GitHub API rate limit → empty result + 경고 로그)
-
-### Communication variant policy (PLAN-antisycophancy-2026-05)
-
-- 새 agent dispatcher template 추가 시 source frontmatter 에 `communication_variant: full|reframe|soft` **필수**. 누락 시 render 시 Jinja `UndefinedError` + `/hm:health` Layer 1 `communication_protocol` sub-check 가 actionable item 으로 surface (silent-miss = R4 canonical failure mode).
-- 분류:
-  - **FULL** — 일반 executor 형 (autoloop-coder, executor, stuck, trajectory-monitor — JSON output, REFRAME inapplicable).
-  - **REFRAME** — reviewer / evaluator 형 (10 reviewer agents). FULL + "Input Processing" 섹션 (confirmation bias 완화).
-  - **SOFT** — idea / brainstorm 형. 현재 consumer 없음 (dormant ship).
-- Output frontmatter / TOML metadata 에는 키 노출 X — body 안 HTML comment 마커 `<!-- @hm:communication_variant: X -->` 로만 식별. Cursor `.mdc` / Codex TOML strict parser 호환 (ADR-004).
-- Skill 도 동일 패턴, **4 LLM-judgment skill 만 적용** — agent-quality-rubric, ai-readiness-rubric, security-scanner, refdocs-search (ADR-005, reduced from 5 in 0.22.3 per ADR-0007). 7 procedural skill 제외.
-- Render path: `render._extract_source_communication_variant` 가 pre-render 단계에서 source frontmatter 에서 regex 로 추출 (yaml.safe_load 는 `{{ name }}` 같은 Jinja expression 에 fail). Codex 는 dispatcher source 우회하므로 `synthesize._COMMUNICATION_VARIANT` table 명시.
-- 변경 후 `/hm:health` 실행하여 silent-miss + source ↔ output drift 확인.
+**→ [`docs/reference/implementation-patterns.md`](docs/reference/implementation-patterns.md)**
+에 전문이 있다. 담긴 것: atomic file write 강제 패턴 (`plain open(path,"w")` 금지),
+LLM mock 픽스처 규약, worktree cleanup 정책 (`harness.yaml.worktree.cleanup` 은 존재하지 않는
+키다), 렌더 컨텍스트 플래그를 출력 경로에서 파생시키는 규칙 (`is_codex`), snapshot 결정성,
+외부 명령 호출 규약 (`shell=True` 금지 · timeout 필수), communication variant 정책.
+**구현을 시작하기 전에 읽을 것** — 여기 요약은 목차이지 규칙이 아니다.
 
 ## 무언가를 고치거나 개선하기 전에 — 필수 체크리스트
 
-> **이 섹션은 다음 fix/feature 시작 전에 반드시 읽고 통과시킬 것.**
-> 0.1.0 → 0.3.5 patch 5번을 거치며 같은 패턴의 실수가 반복됨. 매번
-> 회귀 테스트가 잡아주는 게 아니라 **구현 전에 8개 체크포인트를
-> 통과**해야 다음에 같은 함정 안 밟음.
-
-각 체크포인트는 "현실에서 한 번 깨졌던 사례 + 그래서 다음엔 어떻게
-미리 잡을지" 형태. 새 PR 의 description 에 **각 항목 OK/N-A 표기 권장**.
-
-### 1. 사용자 상태 보존 계약을 먼저 그려라
-사용자 디스크에 쓸 때마다 묻는다: **"이 write 가 사용자가 손댄 무엇을
-지울 수 있나?"** 답이 "있다" 면 보존 정책 설계 필수.
-- 0.3.0: block-merge marker (`@hm:user:*` 안의 사용자 추가가 템플릿
-  업그레이드를 견디게)
-- 0.3.1: `settings.json` shallow merge (Claude Code 가 쓴 `enabledPlugins`
-  보존)
-- 0.3.2: `answers_from_harness_yaml` (재렌더 시 인터뷰 답변 silent 재사용)
-패턴: **policy flag (default = preserve user) + slash 명령에서
-`AskUserQuestion` 으로 의도 묻기**.
-
-### 2. 외부 소비자 정합성 확인 — 전처리 + parser
-우리가 렌더하는 파일은 우리가 아니라 **다른 도구가 읽음**. 그 도구의
-parser 가 받아들이는 형식을 따라야 하고, **parser 앞단에서 내용을 바꾸는
-전처리기가 있는지도** 확인해야 한다.
-
-> **두 층은 탐지 방법이 다르다.** parser 문제는 파일을 읽으면 잡힌다
-> (`settings.json` 에 frontmatter 가 박혀 있다 — 보면 안다). **전처리 문제는
-> 파일을 읽어서는 절대 안 잡힌다** — 디스크의 내용은 옳고, 실행되는 내용만
-> 다르다. render-grep 테스트는 전부 통과한다. **실제 호출의 결과값을
-> 대조해야만** 보인다.
-- `settings.json` → Claude Code 가 pure JSON 으로 기대 (YAML frontmatter
-  prefix 박으면 permissions 무시됨, 0.3.1 fix)
-- `hooks/hooks.json` → jq-parseable pure JSON
-- `lib/*.sh` → bash 가 `---` 를 명령으로 해석, frontmatter 금지
-  (`_render_pure_text`)
-- `.cursor/rules/*.mdc` → Cursor 가 frontmatter 로 `description`, `globs`,
-  `alwaysApply` 만 인식. 우리 `content_hash` 등 추가 필드를 strict-reject
-  하는지는 Phase 1 검증 결과 따름. reject 시 `_render_cursor_mdc()`
-  분기에서 우리 메타는 별도 sidecar (`.hm-meta.yaml`) 로 분리 고려.
-- `.cursor/mcp.json` → Cursor pure JSON, frontmatter 금지
-- `.cursor-plugin/plugin.json` / `.claude-plugin/plugin.json` → 두
-  marketplace 가 schema 검증. 알 수 없는 필드는 일반적으로 무시되나
-  manifest 표준 외 키 추가 금지.
-- `.claude/harness.yaml` → 렌더러가 **provenance YAML frontmatter** 를
-  prefix 로 박는다 (`generated_by`, `content_hash`, …). 결과 파일은
-  multi-document YAML stream 이므로 단일 `yaml.safe_load` 는 거부한다.
-  새 reader 는 `harness_maker.io_utils.load_harness_yaml()` 헬퍼를 쓰거나,
-  `safe_load_all` 의 마지막 non-empty mapping 을 사용해야 한다.
-  Reverse mapper: `interview.answers_from_harness_yaml`.
-
-- **슬래시 명령 본문** (렌더된 `.claude/commands/hm/*.md` **와** 플러그인 자신의
-  `commands/*.md` 양쪽) → Claude Code 가 모델에게 넘기기 **전에** 인자를 치환한다.
-  `$0`–`$9` 는 인자로 대체되므로 셸/awk 의 위치 매개변수를 쓸 수 없다
-  (`$ARGUMENTS` 가 지원되는 방식). **2026-07-26 실측**: `/hm:make --update` 에서
-  디스크의 `awk '{print $NF, $0}'` 가 호출 시 `awk '{print $NF, --update}'` 가 되어
-  `HM=-8` → `uv run --with "-8"` 실패 → **하드코딩된 구버전 pin 으로 fallback**.
-  그 줄의 존재 이유가 정확히 그 stale-pin 함정을 피하는 것이었다. 같은 함정이
-  `/hm:review`·`/hm:plan` 의 `awk '{s+=$1}'` 에도 있었고, 그 값은
-  `high_diff classify --added-lines` 로 가서 **second-opinion 발동 여부**를
-  결정한다. 그리고 플러그인 자신의 `commands/make.md` — **신규 설치의 진입점** —
-  에도 같은 줄이 있었는데, 렌더된 명령만 스캔하던 첫 게이트가 놓쳤다.
-  게이트: `tests/structural/test_no_positional_params_in_commands.py`
-  (렌더 산출물 + 플러그인 자체 표면 양쪽).
-
-새 파일 종류 추가 시 두 가지를 확인한다:
-1. **누가 읽는지** + 그 reader 가 frontmatter 를 허용하는지. 안 되면
-   `_is_pure_text` / `_is_hooks_json` 같은 디스패치 분기 추가.
-2. **그 소비자가 읽기 전에 내용을 바꾸는지.** 바꾼다면 디스크의 파일을 검사하는
-   테스트로는 절대 잡을 수 없다 — 실제 호출을 한 번 돌려 결과값을 대조하는
-   테스트가 있어야 한다. 게이트를 만들 때는 **자기가 고치던 산출물에만 범위를
-   맞추지 말 것** — 같은 결함이 자기 수정을 피해 살아남는다 (위 `commands/make.md`).
-
-### 3. 설정 precedence 의식
-Claude Code 는 `~/.claude/settings.json` (user) → `<project>/.claude/settings.json`
-(project) → `<project>/.claude/settings.local.json` 순으로 우선 적용. **하위
-레벨에 키를 쓰면 상위가 가려짐**.
-- 같은 패턴: `permissions`, `env` 도 project 가 user-global 을 가림
-- Cursor 도 동일 패턴: enterprise → team → project (`<root>/.cursor/`) → user (`~/.cursor/`)
-
-새 키 쓰기 전에 상위 레벨에 같은 키 있는지 확인. 있으면 keep / combine /
-overwrite 분기 줄지 결정.
-
-### 4. CLI 와 slash 명령의 책임 분리
-- **CLI** (`harness_maker.cli`) = flag-driven, no stdin/AskUserQuestion.
-  테스트 가능, CI 안전, 슬래시 명령에서 호출 가능
-- **Slash 명령** (`commands/*.md`, `templates/commands/hm/*.md.j2`) = 사용자
-  intent 수집 (`AskUserQuestion`) → CLI 에 적절한 flag 조합으로 dispatch
-
-CLI 에 `input()` / `AskUserQuestion` 박지 말 것 — 슬래시 명령 컨텍스트에는
-stdin 이 안 통해 hang. 0.3.2 의 non-tty fallback 도 같은 원리.
-
-### 5. 자동-업그레이드 vs 보존 분기 (fingerprint 기반)
-사용자 파일에 박힌 값을 만질 때: **이게 우리가 박은 거냐 사용자가 박은
-거냐** 를 fingerprint 로 판정.
-- `content_hash` 비교: frontmatter hash 가 일치하면 "ours" → 자동 업그레이드.
-  다르면 "theirs" → KEEP.
-- explicit policy 가 있으면 자동-업그레이드 무시 + policy 우선.
-
-같은 fingerprint 패턴이 필요할 만한 곳: 사용자 hooks.json, 사용자 추가
-agent/skill 파일. 그 위치에 우리 출력 박을 때 fingerprint set 만들어두면
-나중에 업그레이드 깔끔.
-
-### 6. 양방향 매퍼 (write 한 건 read 도 가능해야)
-디스크에 persist 하는 모든 포맷은 **reverse mapper** 가 있어야 추후
-재사용 가능.
-- `synthesize.py` → `harness.yaml` 쓰기
-- `interview.answers_from_harness_yaml` → `harness.yaml` 읽어서 InterviewAnswers
-  복원 (0.3.2)
-- `render.py` → frontmatter 에 `content_hash`
-- `reconcile.py` → 같은 hash 로 KEEP/REPLACE 결정
-
-새 persist 포맷 도입 시 "이걸 다음 번에 누가 읽을까?" 답이 있어야 함.
-Schema gap (옛 버전 파일에 새 키 없음) 은 default fallback 으로 처리.
-예: `targets` 키 없는 옛 harness.yaml → `[claude-code]` silent fallback +
-경고 로그.
-
-### 7. 테스트 결정성 + 환경 격리
-사용자 환경 (HOME, env vars, 시계) 을 읽는 코드는 **테스트에서 격리** 필수.
-안 그러면 개발자 머신 의존 + CI 비결정적.
-- `freeze_time` (0.1.x): `generated_at` 결정적
-- `Path.home()` mocking (0.3.5): test 가 개발자의 `~/.claude/settings.json`
-  에 의존하지 않게
-- `regenerate.py` 도 HOME pin: snapshot 결정성
-- LLM mock: `mock_anthropic_client` fixture
-- 외부 API: `INTEGRATION=1` 가드
-
-새 코드가 환경 변수 / HOME / 외부 API / 시계 읽으면 **autouse fixture 또는
-명시 monkeypatch** 추가가 PR 의 일부.
-
-### 8. Integration 경계 한 줄 테스트
-unit test 다 통과해도 **integration 경계** (CLI 실행, 외부 도구 호출,
-파일 시스템 효과) 가 깨질 수 있음.
-- 예: 모듈 import 는 통과해도 `uv run` 으로 다른 cwd 에서 실행하면 실패.
-  unit 으론 못 잡음 → `tests/e2e/test_plugin_live.py` 로 실제 claude 바이너리
-  호출해서 검증.
-- **Cursor target 추가 시**: 사용자는 Cursor IDE 사용 (CLI 사용 X). e2e
-  자동화는 IDE 기반이라 어렵고 **manual 검증이 default**. CI 에서는
-  unit + snapshot test 로 디스크 산출물 (frontmatter 형식, parser 정합성,
-  render 결정성) 을 최대한 잡음. IDE 인식 여부 (slash 명령 표시,
-  agent dispatch, hook fire, skill auto-load) 는 manual 체크리스트로
-  README 또는 `tests/cursor-compat/MANUAL_CHECKLIST.md` 에 명시.
-
-새 사용자-경계 코드 (CLI 명령, 슬래시 명령, hook) 는 **bash 또는
-subprocess 로 실제 실행하는 e2e 한 케이스** 라도 추가.
-
----
+**→ [`docs/reference/pre-change-checklist.md`](docs/reference/pre-change-checklist.md)**
+에 8개 체크포인트 전문이 있다. 각각 "현실에서 한 번 깨졌던 사례 + 다음엔 어떻게 미리 잡을지"
+형태: (1) 사용자 상태 보존 계약, (2) 외부 소비자 정합성 — parser 와 **전처리기** 양쪽,
+(3) 설정 precedence, (4) CLI 와 slash 명령의 책임 분리, (5) fingerprint 기반 자동-업그레이드
+분기, (6) 양방향 매퍼, (7) 테스트 결정성 + 환경 격리, (8) integration 경계 테스트.
+**다음 fix/feature 시작 전에 반드시 읽고 통과시킬 것.**
 
 ## 사용자 voice
 - 직접적 (no preamble, no flattery)

@@ -514,6 +514,18 @@ def _seed_store(tmp_path: Path) -> Path:
 
     Built through the encoded-project-dir contract the loader actually uses, so this
     exercises the same discovery + cwd filter the real command does.
+
+    **Timestamps are relative to now, not literals — do not pin them back.** They were
+    `2026-07-26T09:0X:00Z`, which passed when written and began failing silently 31 days
+    later: `_cmd_boundaries` falls back to `EconomicsConfig.window_days` (30) when
+    `--days` is absent and `--root` has no harness.yaml, so `load_turns` dropped all
+    three turns as `outside_window` and every assertion about a derived boundary saw an
+    empty list. Nothing about the code changed — the fixture aged out of the window.
+    `run_classify`'s `boundaries` command has no `--now` (economics does), so anchoring
+    the data to the clock is the isolation available here; CLAUDE.md's pre-change
+    checkpoint 7 asks for exactly that for any test whose subject reads the clock.
+    The relative SHAPE is what the assertions depend on — t0 at +1m, the user turn at
+    +1m30s between t0 and t1, t1 at +2m, t2 at +3m — and it is preserved exactly.
     """
     from harness_maker.economics_source import encode_project_dir
 
@@ -521,12 +533,21 @@ def _seed_store(tmp_path: Path) -> Path:
     directory = root / encode_project_dir(tmp_path.resolve())
     directory.mkdir(parents=True)
 
+    # One day old: comfortably inside any window a caller might configure, and far
+    # enough from `now` that a slow suite cannot drift a turn into the future.
+    base = (datetime.now(UTC) - timedelta(days=1)).replace(
+        hour=9, minute=0, second=0, microsecond=0
+    )
+
+    def _stamp(**delta: int) -> str:
+        return (base + timedelta(**delta)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
     def _assistant(uuid: str, minute: int, skill: str | None) -> dict[str, object]:
         line: dict[str, object] = {
             "type": "assistant",
             "uuid": uuid,
             "sessionId": "sess-A",
-            "timestamp": f"2026-07-26T09:0{minute}:00Z",
+            "timestamp": _stamp(minutes=minute),
             "cwd": str(tmp_path.resolve()),
             "message": {
                 "model": "claude-opus-4-7",
@@ -541,7 +562,7 @@ def _seed_store(tmp_path: Path) -> Path:
     user = {
         "type": "user",
         "sessionId": "sess-A",
-        "timestamp": "2026-07-26T09:01:30Z",
+        "timestamp": _stamp(minutes=1, seconds=30),
         "cwd": str(tmp_path.resolve()),
         "message": {"role": "user", "content": "actually, also check the parser"},
     }

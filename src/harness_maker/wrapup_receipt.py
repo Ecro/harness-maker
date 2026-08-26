@@ -18,7 +18,7 @@ import re
 import sys
 from collections.abc import Sequence
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, field_validator
 
@@ -77,6 +77,18 @@ class WrapupReceipt(BaseModel):
     promoted_slugs: tuple[str, ...] = ()
     promotion_skips: tuple[PromotionSkip, ...] = ()
     documents_updated: tuple[str, ...] = ()
+    # Observed on run hm-receipt.vvv0sGJy: the delegate emits these two, and `extra="forbid"`
+    # rejected the WHOLE receipt for them (`receipt-unparseable`). Named fields, never
+    # `extra="allow"` — an unenumerated widening would swallow a genuinely malformed reply.
+    # Neither is reconciled: they are diagnostics the delegate reports about its own run.
+    steps_skipped: tuple[str, ...] = ()
+    # `Any`: the delegate reports this as a free-form diagnostic object about its own
+    # run and its shape is NOT contractual — nothing reconciles it, so pinning a schema
+    # here would assert a contract no producer or consumer has agreed to. If a consumer
+    # is ever wired in, model it as a closed type then; note that the REVIEW report's
+    # frontmatter carries a DIFFERENT, load-bearing `drift_verdict` that wrapup and
+    # verify do read — same name, different producer, do not conflate them.
+    drift_verdict: dict[str, Any] | None = None
 
 
 class Mismatch(BaseModel):
@@ -230,10 +242,16 @@ def _confined(base: Path, rel: str) -> Path | None:
     `SecondBrainFolder._reject_absolute_or_empty_path`.
     """
     candidate = Path(rel)
-    if not rel.strip() or candidate.is_absolute() or ".." in candidate.parts:
+    if not rel.strip() or ".." in candidate.parts:
         return None
     try:
-        resolved = (base / candidate).resolve()
+        # ADR-003: an ABSOLUTE path is accepted iff it resolves inside `base`. The delegate
+        # legitimately reports paths inside its own worktree in absolute form, so rejecting
+        # absoluteness fired the control on truthful receipts. The containment test below was
+        # always the load-bearing half — `Path("/base") / "/etc/hostname"` is `/etc/hostname`,
+        # whose `resolve()` is NOT under `base`, so F-04 is closed by `is_relative_to`, not by
+        # this branch. Joining is still correct for a relative path.
+        resolved = (candidate if candidate.is_absolute() else base / candidate).resolve()
         # `resolve()` before `is_relative_to` is the load-bearing half: it is the only
         # thing that catches a SYMLINK escape, which is neither absolute nor `..`-bearing
         # and so passes every string check above.

@@ -427,7 +427,7 @@ def test_a_receipt_from_a_future_schema_version_is_rejected() -> None:
 # ------------------------------------------------- review round 2 (F-04, M-05, M-11)
 
 
-def test_an_absolute_claimed_path_is_rejected_rather_than_probed(tmp_path: Path) -> None:
+def test_an_escaping_absolute_claimed_path_is_rejected(tmp_path: Path) -> None:
     """F-04. `Path("/base") / "/etc/hostname"` is `/etc/hostname`, so an unvalidated
     join let a delegate satisfy reconciliation with any existing file on the machine —
     after which the verify template adopts the receipt's verdict."""
@@ -607,11 +607,17 @@ def test_a_brace_inside_a_string_does_not_split_the_payload() -> None:
 
 
 def test_a_symlink_escape_is_rejected(tmp_path: Path) -> None:
-    """R2-03. The two F-04 tests supply `/etc/hostname` and `../outside.md` — BOTH
-    return at the pure-string guard, so `resolve()` + `is_relative_to` (the only
-    defence against a symlink, which is neither absolute nor `..`-bearing) was never
-    executed by any test. A refactor deleting them as "redundant with the string
-    checks" would have left the suite fully green while reopening F-04.
+    """R2-03. `resolve()` + `is_relative_to` is the only defence against a symlink escape,
+    which is neither absolute nor `..`-bearing, and no test executed it before this one: the
+    two F-04 tests supplied `/etc/hostname` and `../outside.md`, and BOTH returned at the
+    pure-string guard. A refactor deleting them as "redundant with the string checks" would
+    have left the suite fully green while reopening F-04.
+
+    **Half of that is now history.** ADR-003 of PLAN-render-observability-audit removed the
+    absoluteness short-circuit, so `/etc/hostname` now falls through to the containment check
+    and this test is no longer its only exercise — `../outside.md` still returns at the
+    pure-string guard. The point of the widening was precisely that containment, not
+    absoluteness, was always doing the work; this test is what proves it was there to inherit.
     """
     base = tmp_path / "repo"
     _memory(base)

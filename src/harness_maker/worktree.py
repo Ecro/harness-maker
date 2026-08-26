@@ -5780,7 +5780,28 @@ def _cli_span_end(args: list[str]) -> int:
             ours = [e for e in events if e.session_id is None]
         if not ours or ours[-1].event == "end":
             return 0  # nothing of ours is open — see docstring
-        emit_event("end", stage=stage or ours[-1].stage, cwd=base, session_id=mine)
+        # Carry the pair the START recorded (AC-003). `ours[-1]` is already the record this
+        # line reads `stage` from, so no new lookup is introduced — and a `task_slug`-keyed
+        # join over the ledger silently returned ZERO spans while these were nulled, which is
+        # `[fail:design] observability-field-with-no-consumer`.
+        #
+        # ONLY on the attributable path. When `mine` is falsy, `ours` is the shared
+        # session-less bucket, so `ours[-1]` may be a CONCURRENT PEER's still-open `start`
+        # (the KNOWN LIMIT above) — and copying its pair would stamp this row with another
+        # task's slug and branch. A null is excluded by the slug-keyed join this AC exists to
+        # enable; a well-formed WRONG slug is silently accepted by that same join and
+        # attributed to the wrong task, which is strictly worse than the nulls we came from.
+        # `stage` has always been read from `ours[-1]` and keeps that pre-existing behaviour:
+        # narrowing it is a separate change with its own consumers.
+        attributable = bool(mine)
+        emit_event(
+            "end",
+            stage=stage or ours[-1].stage,
+            cwd=base,
+            session_id=mine,
+            git_branch=ours[-1].git_branch if attributable else None,
+            task_slug=ours[-1].task_slug if attributable else None,
+        )
     except Exception as exc:  # pragma: no cover - defensive
         print(f"[span] end emission failed (non-fatal): {exc}", file=sys.stderr)
     return 0
