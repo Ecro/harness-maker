@@ -36,6 +36,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
@@ -112,7 +113,9 @@ def _rows(base: Path) -> list[dict[str, object]]:
 
 
 @given(slug=_SLUGS, branch=_BRANCHES)
-def test_span_end_preserves_start_task_and_branch(tmp_path_factory, slug, branch) -> None:
+def test_span_end_preserves_start_task_and_branch(
+    tmp_path_factory: pytest.TempPathFactory, slug: str, branch: str
+) -> None:
     """expected_relation: end.task_slug == start.task_slug
     and end.git_branch == start.git_branch.
     """

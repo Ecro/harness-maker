@@ -58,8 +58,14 @@ from pathlib import Path
 
 import pytest
 
-from harness_maker.spec_machine import load_golden_table
-from harness_maker.wrapup_receipt import WrapupReceipt, _confined, parse_receipt, reconcile
+from harness_maker.spec_machine import GoldenRow, load_golden_table
+from harness_maker.wrapup_receipt import (
+    ReconcileResult,
+    WrapupReceipt,
+    _confined,
+    parse_receipt,
+    reconcile,
+)
 
 _REPO = Path(__file__).resolve().parents[2]
 _SPEC = _REPO / "specs" / "SPEC-render-observability-audit.machine.yaml"
@@ -86,11 +92,11 @@ _DELEGATE_RAW_JSON = json.dumps(
 )
 
 
-def _kinds(result) -> list[str]:
+def _kinds(result: ReconcileResult) -> list[str]:
     return [m.kind for m in result.mismatches]
 
 
-def _row_id(row) -> str:
+def _row_id(row: GoldenRow) -> str:
     return str(row.input.get("kind", "row"))
 
 
@@ -98,7 +104,7 @@ def _row_id(row) -> str:
 
 
 @pytest.mark.parametrize("row", _ROWS, ids=[_row_id(r) for r in _ROWS])
-def test_deterministic_receipt_mismatch_kinds_absent(row, tmp_path: Path) -> None:
+def test_deterministic_receipt_mismatch_kinds_absent(row: GoldenRow, tmp_path: Path) -> None:
     """Each row's `expected` is the kind list a CORRECT delegate run must produce.
 
     Two oracle bodies, because the two kinds live on different code paths — `load_golden_table`

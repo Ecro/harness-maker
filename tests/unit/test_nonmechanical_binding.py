@@ -487,7 +487,7 @@ def test_collect_helper_fails_closed_when_output_yields_no_nodeid(
         stdout = "tests/e2e/test_a.py: 2\ntests/unit/test_b.py: 41\n\n43 tests collected\n"
         stderr = ""
 
-    monkeypatch.setattr(spec_machine.subprocess, "run", lambda *a, **k: _Result())
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: _Result())
     nodeids, ran = spec_machine._pytest_collect_nodeids(tmp_path)
     assert nodeids == []
     assert ran is False, "unparseable collect output must fail closed, not read as an empty suite"
@@ -497,5 +497,5 @@ def test_collect_helper_fails_closed_when_output_yields_no_nodeid(
         returncode = 5
         stdout = "no tests ran\n"
 
-    monkeypatch.setattr(spec_machine.subprocess, "run", lambda *a, **k: _Empty())
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: _Empty())
     assert spec_machine._pytest_collect_nodeids(tmp_path) == ([], True)
