@@ -69,6 +69,7 @@ _DISPATCHABLE: frozenset[str] = frozenset(
         "spec_quality",
         "test_dep_map",
         "test_runners",
+        "verification_plan",
         "two_pass_review",
         "worktree",
         "wrapup_brief",

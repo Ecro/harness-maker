@@ -210,7 +210,16 @@ def test_only_the_configured_stage_gets_a_dispatch(tmp_path: Path) -> None:
 # 674 → 672 / 707 → 705 (-2, 2026-08-16, PLAN-codex-lens-dispatch): the judgment-reviewer
 # dispatch moved to the shared dispatch macro, collapsing a four-line `Task(` call into one
 # line plus a one-line intent sentence. No step was removed; the call is the same call.
-@pytest.mark.parametrize(("preset", "expected"), [("Side", 672), ("Production", 705)])
+# 672 → 673 / 705 → 706 (+1, SPEC-ci-derived-verification-plan): Step 2's four EXAMPLE gate
+# commands are replaced by one `verification_plan commands` call plus the degraded-fallback
+# branch a derived plan needs and a hardcoded list does not. Uniform +1 across both presets,
+# as expected — the block sits outside every preset gate, so a change reaching only one arm
+# would mean something else moved with it. The four removed `!` lines are declared in
+# `test_instruction_preservation._ALLOWED_REMOVALS`, and the char cost is attributed in
+# work-docs/BASELINE-DELTA-ci-derived-verification-plan.md. UP is the disallowed direction by
+# default, so it is bought deliberately: without the fallback branch a project whose CI cannot
+# be read has no instruction at all, which is worse than the guess this replaces.
+@pytest.mark.parametrize(("preset", "expected"), [("Side", 673), ("Production", 706)])
 def test_the_default_render_costs_existing_users_nothing(
     tmp_path: Path, preset: str, expected: int
 ) -> None:

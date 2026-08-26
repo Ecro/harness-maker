@@ -46,6 +46,7 @@ def _s(*names: str) -> frozenset[str]:
 MODULES: dict[str, ModuleSpec] = {
     # ── argparse-subparser (guarded) ──
     "autopilot_caps": ModuleSpec("subparser", _s("boundary", "gate-blocked")),
+    "verification_plan": ModuleSpec("subparser", _s("show", "commands")),
     "autopilot_ledger": ModuleSpec("subparser", _s("smoke")),
     "codex_ledger": ModuleSpec("subparser", _s("emit")),
     "delegation_ledger": ModuleSpec("subparser", _s("record")),

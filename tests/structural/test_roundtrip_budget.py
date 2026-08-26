@@ -199,12 +199,24 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     "spec": 6,
     "uninstall": 3,
     # 13 → 15 (same dev_mode correction): `spec_need op-check` and `spec_need waiver-check`.
-    "verify": 15,
+    # 15 → 12: SPEC-ci-derived-verification-plan replaces the four EXAMPLE gate commands
+    # (`pytest -q`, `ruff check`, `ruff format --check`, `mypy --strict src/`) with ONE
+    # `verification_plan commands` call that reads the project's CI. Net -3, not -4: the
+    # examples were four charged lines, the derivation is one. The stage still runs four
+    # gates — it now runs the four CI runs, which is the point. A DROP here is the expected
+    # shape for this change; a rise would mean the examples survived alongside the call.
+    "verify": 12,
     # 29 → 28 (same dev_mode correction, and the only DROP): `spec_machine waiver-check
     # --dev-mode task-driven` is the task-driven oracle-waiver advisory, which spec-driven does
     # not render. A config flip that adds a gate in two commands and removes an advisory in a
     # third is the shape to expect here, not a uniform rise.
-    "wrapup": 28,
+    # 28 → 25: SPEC-ci-derived-verification-plan, same four-examples-to-one-call swap as
+    # `verify` above and the same net -3. Wrapup's own full-suite run is NOT lost — it is
+    # now whatever the project's CI test gate is, with `uv run pytest -x` kept as the
+    # degraded fallback, which is also what keeps
+    # `test_review_verify_uses_dep_map::test_the_out_of_scope_wrapup_full_run_survives`
+    # pointed at a real witness.
+    "wrapup": 25,
 }
 
 

@@ -117,6 +117,31 @@ _PHASE_5_SPAN_SESSIONID = {
     for mode in AXES
 }
 
+#: The four EXAMPLE gate commands verify and wrapup used to ship, replaced by one
+#: `verification_plan commands` call that derives them from the project's own CI.
+#:
+#: They are removals, not losses: the stage still runs a lint, format, type and test
+#: gate — it now runs the ones CI runs instead of these guesses. The guesses were
+#: NARROWER than this repo's own CI (`mypy --strict src/` vs `mypy --strict src tests`),
+#: which is how two consecutive commits shipped a red CI through a green local pass.
+#:
+#: `pytest -q` / `pytest -x` differ between the two stages, so each arm lists its own
+#: spelling — an entry that matched both by accident would let a real removal hide.
+_CI_DERIVED_VERIFY_EXAMPLES = [
+    "!uv run pytest -q",
+    "!uv run ruff check src/ tests/",
+    "!uv run ruff format --check src/ tests/",
+    "!uv run mypy --strict src/",
+]
+
+_CI_DERIVED_WRAPUP_EXAMPLES = [
+    "!uv run pytest -x                      # Python tests",
+    "!uv run ruff check src/ tests/          # lint",
+    "!uv run ruff format --check src/ tests/ # format — REQUIRED (lint alone misses format "
+    "violations; [fail:lint] ruff-format-not-in-local-verify-pass count:2 if skipped)",
+    "!uv run mypy --strict src/              # type",
+]
+
 _PHASE_1_PASS15_HEADINGS = [
     "#### Pass 1.5 — verifier (active, ADR-008)",
 ]
@@ -208,6 +233,16 @@ _ALLOWED_REMOVALS: dict[str, dict[str, list[str]]] = {
     "phase-1-workflow-loop-efficiency-pass15": {
         "review@task-driven": list(_PHASE_1_PASS15_HEADINGS),
         "review@spec-driven": list(_PHASE_1_PASS15_HEADINGS),
+    },
+    # SPEC-ci-derived-verification-plan: the shipped example gate commands are replaced by
+    # `hm verification_plan commands --root .`, which reads the project's CI. Listed against
+    # BOTH arms because neither block sat behind a `dev_mode` gate — a cut reaching only one
+    # arm would be the bug this key shape exposes.
+    "ci-derived-verification-plan": {
+        "verify@task-driven": list(_CI_DERIVED_VERIFY_EXAMPLES),
+        "verify@spec-driven": list(_CI_DERIVED_VERIFY_EXAMPLES),
+        "wrapup@task-driven": list(_CI_DERIVED_WRAPUP_EXAMPLES),
+        "wrapup@spec-driven": list(_CI_DERIVED_WRAPUP_EXAMPLES),
     },
 }
 

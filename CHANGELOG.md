@@ -2,6 +2,22 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`hm verification_plan {show,commands}` — the gate commands are now DERIVED from the
+  project's CI, not guessed.** `/hm:verify` and `/hm:wrapup` used to ship EXAMPLE commands
+  (`mypy --strict src/`, `ruff check src/ tests/`), which are a guess about someone else's
+  repository; the dangerous direction of that guess is NARROWING, because a local pass that
+  checks a subset produces exactly the same green output as one that checks everything. This
+  harness's own stages checked `src/` while its CI checked `src tests`, so every type error
+  in test code was structurally unreachable locally — two consecutive commits shipped a red
+  CI through the gap. The reader keeps `push`/`pull_request` workflows, reports one blocking
+  command per gate kind, carries `continue-on-error` through so an advisory CI step never
+  becomes a blocking local gate, lists both the commands it did not select and the ones it
+  could not classify, and degrades EXPLICITLY with a reason so an empty plan cannot read as
+  "this project has no gates". GitHub Actions only; anything else falls back to the previous
+  examples, which is the status quo rather than a regression.
+
 ### Fixed
 
 - **The Production `find-unbound` gate can now fail.** It never had. `--collect-only`

@@ -170,7 +170,23 @@ def test_work_docs_footgun_probe(tmp_path: Path) -> None:
 
 
 def test_verify_marker_covers_wrapup_python_checks(tmp_path: Path) -> None:
-    """A verify marker must not let wrapup skip checks verify did not run."""
+    """A verify marker must not let wrapup skip checks verify did not run.
+
+    The first assertion used to be `"uv run ruff format --check src/ tests/" in
+    verify_stage` — a LITERAL standing in for "verify really does run a format gate".
+    It is replaced rather than restored, and the replacement is stricter, so this is
+    not `[fail:test] assertion-amended-to-match-the-fix`:
+
+    The literal never established the invariant in the docstring. Under it, verify ran
+    `pytest -q` while wrapup ran `pytest -x` — DIFFERENT commands — and the marker
+    recorded a single `pytest` for both, which is exactly the "wrapup skips a check
+    verify did not run" this test names. The literal passed the whole time.
+
+    What actually enforces it is both stages resolving their gates from ONE source.
+    SPEC-ci-derived-verification-plan makes that source the project's CI, so the
+    assertion is now that both stages derive, and derive identically — a property the
+    old spelling could not have while the two hardcoded lists differed.
+    """
     p = _profile()
     a = interview(p, autoloop_mode=True)
     bp = synthesize(p, a)
@@ -179,7 +195,9 @@ def test_verify_marker_covers_wrapup_python_checks(tmp_path: Path) -> None:
     verify_stage = (tmp_path / "stages" / "verify.md").read_text(encoding="utf-8")
     wrapup_stage = (tmp_path / "stages" / "wrapup.md").read_text(encoding="utf-8")
 
-    assert "uv run ruff format --check src/ tests/" in verify_stage
+    derive = "hm verification_plan commands --root ."
+    assert derive in verify_stage, "verify no longer derives its gates from the project's CI"
+    assert derive in wrapup_stage, "wrapup no longer derives its gates from the project's CI"
     assert "--checks lint,format,mypy,pytest" in verify_stage
     assert "--checks lint,format,mypy,pytest" in wrapup_stage
 

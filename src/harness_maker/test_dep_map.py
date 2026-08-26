@@ -606,6 +606,11 @@ CONFIG_SUITES: tuple[str, ...] = (
     "tests/unit/test_version_sync.py",
     # Asserts on the presence and role of `.github/workflows/` among other structural facts.
     "tests/structural",
+    # Reads THIS repo's `.github/workflows/ci.yml` and asserts the derived gate commands equal
+    # what its quality-gate job runs. Unlike the sandbox-building suites in the opt-out list
+    # below, changing this repo's CI genuinely changes this suite's expected result — that
+    # coupling IS the test, so a CI edit must select it.
+    "tests/unit/test_verification_plan.py",
 )
 
 #: Suites the detector flags as touching a routed path but which do NOT read this repository's

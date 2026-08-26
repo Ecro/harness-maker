@@ -76,38 +76,26 @@ If this exits `0`, print `PASS (cached)` and skip to Check 3. If it exits
 `1`, run the suite below. Do not write a passing marker until every suite
 command has passed.
 
-Run the project's full check suite. Pick the toolchain that matches the project:
-
-> **Ask for the runner's own recipe first — do not guess the parallel flag.** `hm test_runners
-> plan --root .` names this project's runner, a worker count already capped for the machine
-> (about half its cores, never all of them), and whether the runner is ALREADY parallel — for
-> `cargo`, `go`, `vitest`, `jest` and `flutter` it is, and adding a worker flag there caps or
-> nests instead of accelerating. `pytest` is the one common runner that is serial by default.
-> Run the FULL suite here regardless: this is the stage that owns the whole-suite pass, and a
-> suite only ever run in parallel hides order-dependent failures, so keep the flag on the
-> command line and out of the project's persistent config.
+**Ask the project's CI what the gates are — never guess them.** A guessed command that is
+NARROWER than CI passes locally and fails on push, saying nothing about what it skipped.
 
 {% if is_codex %}
 ```
-# Python:
-Bash("uv run pytest -q")
-Bash("uv run ruff check src/ tests/")
-Bash("uv run ruff format --check src/ tests/")
-Bash("uv run mypy --strict src/")
-# Rust: Bash("cargo test && cargo check")
-# Node: Bash("pnpm test && pnpm build")
+Bash("uv run --with {{ harness_maker_src_path }} hm verification_plan commands --root .")
 ```
 {% else %}
 ```bash
-# Python:
-!uv run pytest -q
-!uv run ruff check src/ tests/
-!uv run ruff format --check src/ tests/
-!uv run mypy --strict src/
-# Rust: cargo test && cargo check
-# Node: pnpm test && pnpm build
+!uv run --with {{ harness_maker_src_path }} hm verification_plan commands --root .
 ```
 {% endif %}
+
+Run each printed command verbatim. **Exit 1 = degraded** (no CI, unreadable, nothing
+recognised — stderr says which): only then fall back to the project's toolchain
+(`pytest -q` / `ruff check .` / `ruff format --check .` / `mypy --strict`; `cargo test`;
+`pnpm test`) and say the gates were guessed. `show` prints the full plan — blocking CI
+commands NOT selected, plus what it could not classify — read it when a gate looks missing.
+Parallel flags stay with `hm test_runners plan --root .`: `pytest` is serial by default,
+`cargo`/`go`/`vitest`/`jest` are already parallel and a worker flag there nests.
 
 If the harness has its own `.claude-verify.sh phase_<N>` script, prefer it over the generic toolchain commands.
 

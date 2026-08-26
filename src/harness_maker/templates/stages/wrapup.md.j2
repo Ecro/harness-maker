@@ -160,30 +160,25 @@ If this exits `0`, print `PASS (verification marker fresh)` and skip to Step
 3. If it exits `1`, run the suite below once. Do not write a passing marker
 until every suite command has passed.
 
-Run the project's full check suite only when the marker is absent or stale.
-Catch regressions wrapup-stage edits could introduce:
+Run the project's full check suite only when the marker is absent or stale, and take the
+commands from the project's CI rather than an example — an example that is narrower than CI
+passes locally and fails on push, saying nothing about what it skipped:
 
 {% if is_codex %}
 ```
-# Pick the toolchain that matches the project (`hm test_runners plan --root .` names it, its capped worker count, and whether it is ALREADY parallel — do not guess a flag). Examples:
-Bash("uv run pytest -x")                      # Python tests
-Bash("uv run ruff check src/ tests/")          # lint
-Bash("uv run ruff format --check src/ tests/") # format — REQUIRED (lint alone misses format violations; [fail:lint] ruff-format-not-in-local-verify-pass count:2 if skipped)
-Bash("uv run mypy --strict src/")              # type
-# Rust: Bash("cargo test && cargo check")
-# Node: Bash("pnpm test && pnpm build")
+Bash("uv run --with {{ harness_maker_src_path }} hm verification_plan commands --root .")
 ```
 {% else %}
 ```bash
-# Pick the toolchain that matches the project (`hm test_runners plan --root .` names it, its capped worker count, and whether it is ALREADY parallel — do not guess a flag). Examples:
-!uv run pytest -x                      # Python tests
-!uv run ruff check src/ tests/          # lint
-!uv run ruff format --check src/ tests/ # format — REQUIRED (lint alone misses format violations; [fail:lint] ruff-format-not-in-local-verify-pass count:2 if skipped)
-!uv run mypy --strict src/              # type
-# Rust: cargo test && cargo check
-# Node: pnpm test && pnpm build
+!uv run --with {{ harness_maker_src_path }} hm verification_plan commands --root .
 ```
 {% endif %}
+
+Run each printed command verbatim. **Exit 1 = degraded** (no CI, unreadable, or nothing
+recognised — stderr says which): only then fall back to the project's toolchain
+(`uv run pytest -x` / `ruff check .` / `ruff format --check .` / `mypy --strict`), say the
+gates were guessed. Never drop the format check: lint alone misses format violations
+(`[fail:lint] ruff-format-not-in-local-verify-pass` count:2).
 
 If any fail: STOP, surface the failure, do NOT proceed. Reverting an executed-merge is more painful than diagnosing here.
 
