@@ -2,6 +2,37 @@
 
 ## [Unreleased]
 
+## [0.55.0] - 2026-08-26
+
+This release removes places where the harness reported success while checking
+nothing. Three of its four changes are the same shape: a gate or a metric that
+produced a green, confident answer without the input it claimed to be reading.
+Nothing here is a new capability — `verification_plan` is the only addition, and
+even it makes verification CONSISTENT rather than stronger: it aligns the local
+gates to CI, and a project whose CI is weak now reproduces that weakness
+faithfully.
+
+Known and deliberately not fixed in this release: `ci.yml`'s Pytest step carries
+no `-m "not advisory"` filter while the measurement comment above it does, so
+advisory tests run as blocking; `test_runners plan`'s advice still names the
+filter that step does not use; the 147 historically polluted ledger rows remain
+on disk, neutralised by the exclusions file rather than purged; and
+`verification_plan` reads GitHub Actions only, degrading elsewhere to the
+example commands that were the status quo.
+
+### Removed
+
+- **BREAKING for a harness not re-rendered since 0.53.0: `lens_coverage check` no
+  longer accepts `--diff-files` / `--rev`.** ADR-004 of PLAN-probe-envelope-contract
+  set 0.55.0 as the sunset when it absorbed them, and this is that release — the
+  expiry is enforced by the suite rather than by anyone remembering, so cutting this
+  version is what removed them. The flags were dead on arrival: the repo-access probe
+  they fed was deleted, and they were kept only so an older rendered `review.md` would
+  not hit an `argparse` exit 2 at `/hm:review` Step 3 and lose the review. Rendered
+  commands stopped passing them when the probe went, so a harness re-rendered at any
+  point since is unaffected. One that has not been re-rendered since 0.53.0 will now
+  see that exit 2 — run `/harness-maker:make --update`.
+
 ### Added
 
 - **`hm verification_plan {show,commands}` — the gate commands are now DERIVED from the

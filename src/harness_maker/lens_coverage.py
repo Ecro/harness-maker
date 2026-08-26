@@ -170,24 +170,15 @@ def main(argv: list[str] | None = None) -> int:
             "`--round` also accepts a confirmation-pass id (confirm-1 / confirm-2)."
         ),
     )
-    # RETIRED, still accepted (ADR-004). A harness rendered by 0.53.0 keeps passing these
-    # until its owner re-renders, and argparse exits 2 on an unknown argument — which would
-    # land at /hm:review Step 3 and lose the review. Suppressed from --help so they are not
-    # advertised, absorbed so they do not break, and warned about so "absorbed" is not silent.
-    # `tests/unit/test_lens_coverage_retired_flags.py` removes them at 0.55.0.
-    parser.add_argument("--diff-files", type=Path, help=argparse.SUPPRESS)
-    parser.add_argument("--rev", help=argparse.SUPPRESS)
+    # `--diff-files` / `--rev` were absorbed here from 0.53.0 so a harness rendered before
+    # the repo-access probe was removed would not hit an argparse exit 2 at /hm:review
+    # Step 3 and lose its review. ADR-004 set 0.55.0 as the sunset and this is it: they are
+    # gone. A harness still rendered by <=0.53.0 must re-render (/harness-maker:make
+    # --update) — the rendered command has not passed these since the probe was removed.
     try:
         opts = parser.parse_args(args[1:])
     except SystemExit:
         return 2
-
-    if opts.diff_files or opts.rev:
-        sys.stderr.write(
-            "lens_coverage: --diff-files/--rev are retired and ignored — the repo-access "
-            "probe was removed. Re-render the harness (/harness-maker:make --update) so the "
-            "rendered command stops passing them.\n"
-        )
 
     try:
         dirs = [round_dir(opts.results_dir, opts.slug, r, opts.run_id) for r in opts.round_ids]
