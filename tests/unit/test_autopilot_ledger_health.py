@@ -97,7 +97,13 @@ def test_smoke_cli_emits_json(tmp_path: Path, capsys: pytest.CaptureFixture[str]
     out = json.loads(capsys.readouterr().out)
     assert out["degraded"] is True
     assert out["level"] == "auto_safe"
-    assert set(out) == {"degraded", "level", "entry_count", "reason"}  # full surface locked
+    # full surface locked. `applicable` was added by AC-003 of
+    # PLAN-token-efficiency-autopilot-ux-speed: a harness whose `targets` omit `claude-code` cannot
+    # auto-advance at all, so "configured yet never fired" is a permanent false alarm there. This
+    # lock is why that addition had to be deliberate rather than silent.
+    assert set(out) == {"degraded", "applicable", "level", "entry_count", "reason"}
+    # absent `targets` is the pre-existing call path and must keep today's behaviour
+    assert out["applicable"] is True
 
 
 # ── ADR-009 collision regression (runtime, not just the type-level disjoint check) ──

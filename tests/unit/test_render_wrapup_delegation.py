@@ -219,7 +219,16 @@ def test_only_the_configured_stage_gets_a_dispatch(tmp_path: Path) -> None:
 # work-docs/BASELINE-DELTA-ci-derived-verification-plan.md. UP is the disallowed direction by
 # default, so it is bought deliberately: without the fallback branch a project whose CI cannot
 # be read has no instruction at all, which is worse than the guess this replaces.
-@pytest.mark.parametrize(("preset", "expected"), [("Side", 673), ("Production", 706)])
+# 673 → 683 / 706 → 716 (+10, PLAN-token-efficiency-autopilot-ux-speed review fix P1-4): Step 7.7
+# now PRODUCES `work-docs/BASELINE-ledger-rollup.md` before the `wrapup_land` manifest stages it.
+# The manifest already named the path as `--optional` and nothing wrote it — grep for
+# `autopilot_ledger` across every template returned only `health.md.j2`'s `smoke` verb — so
+# `wrapup_land` recorded `absent-optional` on every harness and ADR-002's "the aggregate survives a
+# fresh clone" was unreachable. +10 = 3 lines of prose, 1 blank, and the two fenced invocation
+# branches (codex / non-codex) at 3 lines each. This equality pin is the FOURTH normative site for
+# the wrapup body size, alongside `_ATOMIC_RATCHET`, `surface_baseline.json` and this task's
+# `surface_allowance`; a change to that command moves all four, which is worth stating once here.
+@pytest.mark.parametrize(("preset", "expected"), [("Side", 683), ("Production", 716)])
 def test_the_default_render_costs_existing_users_nothing(
     tmp_path: Path, preset: str, expected: int
 ) -> None:

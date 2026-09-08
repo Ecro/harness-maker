@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -11,6 +12,7 @@ from unittest.mock import patch
 import pytest
 
 from harness_maker.hooks.sessionstart_drift import _format_context, run
+from harness_maker.spec_machine import GoldenRow, load_golden_table
 
 # Pin both the imported __version__ AND latest_installed_version to a stable
 # value so this test suite is deterministic regardless of what's actually in
@@ -349,6 +351,77 @@ def test_overrides_before_last_audit_do_not_count(
     assert rc == 0
     # Neither threshold tripped (0 fresh overrides, 1 day < days threshold).
     assert capsys.readouterr().out == ""
+
+
+_AC009_SPEC = (
+    Path(__file__).parents[2] / "specs" / "SPEC-token-efficiency-autopilot-ux-speed.machine.yaml"
+)
+
+
+@pytest.mark.parametrize(
+    "row",
+    load_golden_table(_AC009_SPEC, "AC-009"),
+    ids=lambda r: f"{r.input['overrides']}ov/{r.input['days_since_audit']}d",
+)
+def test_ac_009_the_emitted_banner_names_only_the_threshold_that_fired(
+    row: GoldenRow, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """AC-009's OBSERVABLE arm — the banner a user actually sees, from the real hook.
+
+    Lives here rather than in `tests/unit/test_doc_truth.py` because the three fixtures are
+    already here. A.5 round 1 rejected the first attempt at this AC's wiring guard, an
+    `inspect.getsource` grep for the composer's name in `_personalization_hint`: that is
+    satisfied by a comment, by a dead branch, and by a call whose return value is discarded, so
+    the shipped banner could still print `threshold 30` on a days-only trip. The justification
+    offered for not executing the hook — that a config file, an overrides ledger and an audit
+    stamp were unavailable — was refuted by this very module, which builds all three.
+
+    Threshold membership is asserted with a WORD-BOUNDED pattern, not `str(n) in text`: the
+    golden's inputs (45 / 2 / 0 / 20) happen not to contain "30" or "14" as substrings, so plain
+    containment is sound today **by luck of the numbers**. A future row with 130 overrides or
+    14.5 days would flip both flags silently.
+    """
+    session_threshold, days_threshold = 30, 14
+    n_overrides = int(row.input["overrides"])
+    days_since = float(row.input["days_since_audit"])
+
+    _write_phase11_harness_yaml(
+        tmp_path,
+        audit_session_threshold=session_threshold,
+        audit_days_threshold=days_threshold,
+    )
+    _write_last_audit(tmp_path, days_since)
+    if n_overrides:
+        # stamped after the audit so they count "since last audit"
+        _write_overrides(tmp_path, n_overrides, days_ago=days_since / 2)
+    else:
+        # the fixed 2026-05-01 stamp predates the audit, so these filter out to zero
+        _write_overrides(tmp_path, 3)
+
+    with patch(
+        "harness_maker.hooks.sessionstart_drift.latest_installed_version",
+        return_value=_TEST_CURRENT,
+    ):
+        rc = run(cwd=tmp_path)
+
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert out, f"no hint fired for {n_overrides} overrides / {days_since} days"
+    additional = json.loads(out)["hookSpecificOutput"]["additionalContext"]
+
+    expect_count = row.expected in ("session", "both")
+    expect_days = row.expected in ("days", "both")
+    count_named = re.search(rf"\b{session_threshold}\b", additional) is not None
+    days_named = re.search(rf"\b{days_threshold}\b", additional) is not None
+
+    assert count_named is expect_count, (
+        f"the banner {'omits' if expect_count else 'cites'} the override threshold "
+        f"({session_threshold}) on the {row.expected} branch: {additional!r}"
+    )
+    assert days_named is expect_days, (
+        f"the banner {'omits' if expect_days else 'cites'} the days threshold "
+        f"({days_threshold}) on the {row.expected} branch: {additional!r}"
+    )
 
 
 def test_hint_when_days_since_audit_exceeds_threshold(

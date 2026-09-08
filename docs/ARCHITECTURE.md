@@ -176,7 +176,7 @@ There are exactly **7 atomic stages**: `research`, `spec`, `plan`, `execute`, `r
 
 The `research` fragment includes a discovery-lens calibration step so broad trend or roadmap prompts inspect user workflows and adjacent artifacts before narrowing into academic, benchmark, or implementation-only sources.
 
-**Fused workflows were retired in 0.47.0** (`PLAN-harness-diet` ADR-001/002). Until then, user-named stage sequences under `harness.yaml.workflows` were concatenated by `workflow_fuse.py` into a single `/hm:<workflow>` command; that module, the `workflows` / `default_workflow` keys and the five rendered fused commands are all gone. They were 58.6% of the shipped Claude command surface with zero recorded invocations.
+**Fused workflows were retired in 0.47.0** (`PLAN-harness-diet` ADR-001/002). Until then, user-named stage sequences under `harness.yaml.workflows` were concatenated by `workflow_fuse.py` into a single `/hm:<workflow>` command; that module, the `workflows` / `default_workflow` keys and the five rendered fused commands are all gone. They were 58.6% of the shipped Claude command surface with zero recorded invocations. <!-- @hm:axis-removed -->
 
 Stages are chained instead by `/hm:loop --per-iter-stages execute,review` or by autopilot's `autonomy.pipeline`. `io_utils.load_harness_yaml` strips the two retired keys at LOAD time (one advisory per project), so an old config keeps working without a re-render.
 

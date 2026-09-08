@@ -413,6 +413,71 @@ def _read_last_audit_iso(cwd: Path) -> datetime | None:
     return ts
 
 
+AuditReason = Literal["session", "days", "both"]
+
+
+def compose_audit_advisory(
+    *, n_overrides: int, days_since: float, config: AdaptiveConfig
+) -> tuple[AuditReason, str, str] | None:
+    """Name the threshold that actually fired (PLAN-token-efficiency-autopilot-ux-speed AC-009).
+
+    Both thresholds can trip independently, and the message used to cite
+    ``audit_session_threshold`` unconditionally — so a session opened 20 days after the last audit
+    with zero overrides read ``0 axis overrides recorded since last audit (threshold 30)``, which
+    names the branch that did **not** fire and tells the user their override count is the problem
+    when it is not. Classification and wording are one function so they cannot drift: a caller
+    cannot pick a branch and then format the other one's number.
+
+    ``days_since`` is ``math.inf`` when no audit was ever recorded; that formats as a stated
+    absence rather than ``inf days``.
+    """
+    over_count = n_overrides >= config.audit_session_threshold
+    over_days = days_since >= config.audit_days_threshold
+    if not (over_count or over_days):
+        return None
+
+    reason: AuditReason = (
+        "both" if over_count and over_days else ("session" if over_count else "days")
+    )
+    tail = "Run /hm:health (Step 3 Personalization) to review."
+    count_clause = (
+        f"{n_overrides} axis overrides recorded since last audit "
+        f"(threshold {config.audit_session_threshold})"
+    )
+    days_clause = (
+        f"no previous audit recorded (threshold {config.audit_days_threshold} days)"
+        if not math.isfinite(days_since)
+        else (
+            f"{days_since:.0f} days since the last audit "
+            f"(threshold {config.audit_days_threshold} days)"
+        )
+    )
+
+    if reason == "session":
+        body = count_clause
+        system_body = f"{n_overrides} personalization axis overrides queued"
+    elif reason == "days":
+        body = days_clause
+        system_body = "personalization audit is overdue"
+    else:
+        # With no audit ever recorded, `n_overrides` is the LIFETIME count (the filter above only
+        # runs in the `last_audit is not None` branch), so "since last audit" is doubly false — the
+        # same sentence then says both "since last audit" and "no previous audit recorded" (review
+        # finding P2-2).
+        lifetime_clause = (
+            f"{n_overrides} axis overrides recorded (threshold {config.audit_session_threshold})"
+        )
+        counted = count_clause if math.isfinite(days_since) else lifetime_clause
+        body = f"{counted} and {days_clause}"
+        system_body = f"{n_overrides} personalization axis overrides queued, audit overdue"
+
+    return (
+        reason,
+        f"personalization-audit recommended: {body}. {tail}",
+        f"harness-maker: {system_body}. {tail}",
+    )
+
+
 def _personalization_hint(cwd: Path) -> tuple[str, str] | None:
     """Compute (additionalContext, systemMessage) when an audit is due.
 
@@ -447,20 +512,12 @@ def _personalization_hint(cwd: Path) -> tuple[str, str] | None:
             if ts > last_audit:
                 kept.append(r)
         overrides = kept
-    n_overrides = len(overrides)
-    over_count = n_overrides >= config.audit_session_threshold
-    over_days = days_since >= config.audit_days_threshold
-    if not (over_count or over_days):
+    composed = compose_audit_advisory(
+        n_overrides=len(overrides), days_since=days_since, config=config
+    )
+    if composed is None:
         return None
-    additional = (
-        f"personalization-audit recommended: {n_overrides} axis overrides recorded "
-        f"since last audit (threshold {config.audit_session_threshold}). "
-        "Run /hm:health (Step 3 Personalization) to review."
-    )
-    system = (
-        f"harness-maker: {n_overrides} personalization axis overrides queued. "
-        "Run /hm:health (Step 3 Personalization) to review."
-    )
+    _reason, additional, system = composed
     return additional, system
 
 

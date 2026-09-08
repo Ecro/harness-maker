@@ -21,7 +21,7 @@
     StrictUndefined, so a stage can never pass `--current ""` (which the CLI would treat as
     an unknown stage and clear the marker). `summary_autopilot_gate` (the stage's
     mandatory-gate predicate prose) defaults STOP-biased. -#}
-{% if is_codex is defined and not is_codex and (autopilot_advance_enabled | default(true)) %}
+{% if is_codex is defined and not is_codex and config.autonomy.level != "gated" %}
 <!-- @hm:autopilot-advance -->
 ## Auto-advance check (autopilot — Claude Code only)
 

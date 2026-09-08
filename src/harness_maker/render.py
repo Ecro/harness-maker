@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import re
 import tomllib
@@ -37,11 +38,13 @@ from typing import Any, Literal
 import yaml
 from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
-from harness_maker import __version__, template_globals
+from harness_maker import __version__, context_lint, template_globals
 from harness_maker.block_merge import MergeReport
 from harness_maker.block_merge import merge as block_merge
 from harness_maker.io_utils import RETIRED_TOP_LEVEL_KEYS, atomic_append, atomic_write
-from harness_maker.models import Blueprint, FileEntry
+from harness_maker.models import Blueprint, FileEntry, Preset
+
+logger = logging.getLogger(__name__)
 
 # Module constants — templates ship inside the harness_maker package so they're
 # present in both editable installs (src/harness_maker/templates/) and wheel
@@ -2043,6 +2046,75 @@ def compact_render_manifest(
     return True
 
 
+def _context_lint_asset_type(rel: Path) -> str:
+    """Map a rendered path to the `context_lint` asset class, or `"other"` for no-limit.
+
+    Kept as a pure function of the path rather than of the `FileEntry` because the linter's
+    thresholds are keyed by asset class and every class is decidable from where the file lands —
+    `docs/reference/implementation-patterns.md`'s rule about deriving render-context flags from the
+    output path, applied to the same kind of question.
+    """
+    name = rel.name
+    if name in ("CLAUDE.md", "AGENTS.md"):
+        return name
+    parts = rel.parts
+    # `.agents/skills/**` is Codex's MIRROR of assets that already get linted under `.claude/`, and
+    # the `hm-<stage>` entries are whole stage-command bodies whose size is governed by
+    # `_ATOMIC_RATCHET`, not by the skill band (measured: hm-review 1120 lines, hm-loop 1049).
+    # Classifying them as `skill` would emit 8 duplicate warnings on every codex render for content
+    # no one can shorten from here. `other` = no band, deliberately (review finding P1-5).
+    if ".agents" in parts:
+        return "other"
+    if len(parts) >= 2 and parts[-2] == "agents" and rel.suffix == ".md":
+        return "agent"
+    if name == "SKILL.md":
+        return "skill"
+    return "other"
+
+
+def _warn_context_lint(written: list[Path], target_dir: Path, preset: Preset) -> None:
+    """Apply the context linter to what was just rendered (AC-014 of PLAN-token-efficiency…).
+
+    `context_lint.lint` had **no production caller**: the thresholds were configured in
+    `harness.yaml`, documented in CLAUDE.md's Context Lint section and applied to nothing, so an
+    over-long agent prompt shipped silently and the "renderer warns" contract in the docs was a
+    claim about behaviour that did not exist.
+
+    **Warn, never fail.** A render that aborted on an over-threshold asset would turn every
+    `--update` on an existing harness into a hard failure with no migration path, which is
+    CLAUDE.md checkpoint #1. `context_lint.THRESHOLDS`' unit stays lines (ADR-004).
+
+    Thresholds live in `context_lint.THRESHOLDS`, keyed by `(asset_type, preset)` — **not** in
+    `harness.yaml`, which carries no `context_lint` key today (no `harness-yaml/*.j2` emits one and
+    `answers_from_harness_yaml` has no reverse mapper). An earlier revision of this docstring said
+    "configured in `harness.yaml`", which would have sent a reader looking for a knob that is not
+    there (review finding P2-1). `interview.py` DOES set `context_lint: {"enabled": False}` for the
+    Side preset, and that opt-out is honoured by the caller below.
+    """
+    for path in written:
+        # TWO roots, because `resolve_output_path` has two: `.cursor/`, `.codex/`, `.agents/` and
+        # `AGENTS.md` land at `target_dir.parent`. A single `relative_to(target_dir)` with a
+        # `continue` dropped all of them — 22 assets on a codex render, including `AGENTS.md`,
+        # whose threshold rows exist in `context_lint.THRESHOLDS` and were therefore unreachable
+        # from the only production caller (review finding P1-5). A structural test asserting
+        # `_context_lint_asset_type(Path("AGENTS.md")) == "AGENTS.md"` was green the whole time,
+        # because it called the classifier directly with an input the caller could never produce.
+        rel: Path | None = None
+        for root in (target_dir, target_dir.parent):
+            try:
+                rel = path.relative_to(root)
+                break
+            except ValueError:
+                continue
+        if rel is None:
+            continue
+        asset_type = _context_lint_asset_type(rel)
+        if asset_type == "other" or not path.is_file():
+            continue
+        for warning in context_lint.lint(path, asset_type, preset):
+            logger.warning("[context-lint] %s: %s", rel, warning)
+
+
 def render(
     blueprint: Blueprint,
     target_dir: Path,
@@ -2194,4 +2266,9 @@ def render(
                 fe.body_sha256,
                 freeze_time=freeze_time,
             )
+    # `context_lint.enabled: false` is a real user choice (`interview.py` sets it for Side), so the
+    # linter respects it rather than overriding it silently. Absent key = on, because the linter is
+    # warn-only and a missing block should not silence a guard (review finding P2-1).
+    if not dry_run and (blueprint.config.context_lint or {}).get("enabled", True):
+        _warn_context_lint(written, target_dir, blueprint.config.preset)
     return written

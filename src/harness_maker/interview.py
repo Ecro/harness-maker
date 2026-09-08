@@ -88,6 +88,25 @@ _ALL_REVIEWERS: list[str] = [
     "consensus-arbiter",
     "executor",
     "autoloop-coder",
+    # `test-reviewer` carries the MANDATORY `tests` lens and is in `_PROD_ENABLED_REVIEWERS`, but
+    # was missing here — so the rendered `installed` list under-reported what the harness ships.
+    # AC-010 of PLAN-token-efficiency-autopilot-ux-speed.
+    #
+    # CORRECTED (review finding P2-3): an earlier version of this comment said "no consumer
+    # validates against `installed`". **False** — `templates/stages/review.md.j2:74` tells the model
+    # that `--with-reviewers=<csv>` entries "must exist in `reviewers.installed`". So this line does
+    # more than fix a display list: it makes `test-reviewer` ad-hoc addable. Writing a comment that
+    # the shipped prose contradicts is the exact defect class the unit that added this line exists
+    # to remove, so the correction is recorded rather than quietly swapped.
+    #
+    # This list is deliberately NOT derived from `synthesize._ALL_AGENTS`. Five agents are shipped
+    # and absent here — `code-verifier`, `judgment-reviewer`, `plan-validator`, `stage-delegate`,
+    # `stuck` — and deriving would make all five `--with-reviewers` addable, which is wrong for
+    # `stage-delegate` and `stuck` (not reviewers, and dispatched by their own stages). That
+    # `judgment-reviewer` is an installed reviewer agent yet un-addable is a real gap; widening the
+    # ad-hoc reviewer set is a review-flow decision, not a bookkeeping fix, so it is left as a
+    # named follow-up rather than smuggled in here.
+    "test-reviewer",
 ]
 _ALL_SKILLS: list[str] = [
     "verify-before-completion",

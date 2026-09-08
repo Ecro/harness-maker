@@ -352,8 +352,11 @@ the harness. They map to `--second-opinion-models` and `--autonomy-level`.
 14. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **Autopilot** — "Auto-advance
    the stage pipeline this session (stages advance past two-way-door boundaries but always
    stop at the plan interview, a CHANGES_REQUESTED review, and the wrapup merge)?" Options:
-   `gated` (off) / `auto_safe` (**the default a fresh install renders**) / `full`; ask whether to persist across
-   sessions. Maps to `--autonomy-level` and `--autonomy-persistent` / `--no-autonomy-persistent`.
+   `gated` (off) / `ask` (**the default a fresh install renders** — the session picker decides,
+   which is why arming is a per-session question rather than a config value) / `auto_safe` /
+   `auto_full`; ask whether to persist across sessions (`autopilot_persistent` defaults to
+   **`true`**). Maps to `--autonomy-level` and `--autonomy-persistent` /
+   `--no-autonomy-persistent`.
 
 #### 4.5 Preview structured question
 
@@ -560,7 +563,8 @@ in turn, then dispatch with all collected flags:
    unauthenticated/rate-limited CLI. `shutil.which` each selected CLI (`codex` / `agy`) and
    warn (non-blocking) if absent. Maps to `--second-opinion-models` (comma-separated).
 14. `AskQuestion` (Cursor) / `AskUserQuestion` (Claude Code): **Autopilot** — `gated` (off) /
-   `auto_safe` / `full`; if enabled, ask whether to persist across sessions. Maps to
+   `ask` (default) / `auto_safe` / `auto_full`; if enabled, ask whether to persist across
+   sessions. Maps to
    `--autonomy-level` and `--autonomy-persistent` / `--no-autonomy-persistent`.
 
 Then dispatch with the collected values:

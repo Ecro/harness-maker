@@ -1,0 +1,471 @@
+schema_version: 2
+spec_slug: token-efficiency-autopilot-ux-speed
+parent_spec: null
+verification_tier: 2
+mutation_threshold: 70
+mutation_threshold_rationale: tier 2 — the changed Python is aggregation arithmetic over
+  ledger rows (bucket by model, bucket by stage, exclude a stage, apply an exclusions
+  file), which is exactly where a wrong aggregation key survives a shape-only assertion.
+  CLAUDE.md records this class as having already shipped a 30x mis-measurement on this
+  very ledger family (a hand aggregation reported 61.3% where the shipped reader reported
+  2.15%). Not tier 1 — none of this sits on /hm:execute's hot path. 70 rather than 85
+  because the same modules also hold path resolution and file I/O that these tests cannot
+  reach.
+last_mutation_run: null
+paths_to_mutate:
+- src/harness_maker/autopilot_ledger.py
+- src/harness_maker/readiness.py
+- src/harness_maker/context_lint.py
+spec_quality_score: 90
+spec_quality_score_at: '2026-09-08'
+ac:
+- id: AC-001
+  title: the roll-up carries hand-checkable counts and survives a clone
+  type: mechanical
+  test_ids:
+  - tests/unit/test_autopilot_ledger_rollup.py::test_ac_001_rollup_counts_are_hand_checkable
+  - tests/unit/test_autopilot_ledger_rollup.py::test_ac_001_each_misaggregation_changes_the_answer
+  - tests/unit/test_autopilot_ledger_rollup.py::test_ac_001_the_rollup_path_is_the_named_deliverable
+  - tests/unit/test_autopilot_ledger_rollup.py::test_ac_001_the_document_is_a_function_of_every_aggregate_axis
+  - tests/unit/test_autopilot_ledger_rollup.py::test_the_rollup_path_is_named_in_wrapup_lands_manifest
+  - tests/unit/test_ledger_exclusions_call_sites.py::test_the_rollup_seam_applies_exclusions
+  executable_predicate: rollup(fixture_ledger).by_model["codex"]["invoked"] == 4 and rollup(fixture_ledger).total
+    == 6 and "work-docs/BASELINE-ledger-rollup.md" in committed_paths_at_head()
+  golden_table: []
+  rubric_id: null
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The fixture is hand-authored so that FOUR distinct mis-aggregations each
+    produce a different number — merging models, dropping failed rows, counting disposition
+    rows as invocations, and skipping the exclusions file — so every expected value is
+    computed by hand from the file and never by a second call to the aggregator. Three of
+    the four are mistakes CLAUDE.md records as having shipped on this ledger family.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  note: The total == 6 arm is the disposition discriminator — finding_ref is the only thing
+    separating per-invocation rows from per-finding rows and both carry status invoked, so a
+    naive aggregator reports more than 6. The third conjunct proves COMMITTING, not staging —
+    git clone transfers commits and never index state, so the check is git ls-tree at HEAD
+    plus git check-ignore --no-index, and the roll-up must be named in wrapup_land's typed
+    manifest because the worktree-sweep that would otherwise catch it records
+    skipped-not-isolated when the worktree IS the base (risk R3).
+- id: AC-002
+  title: a dangling authorization is reported
+  type: mechanical
+  test_ids:
+  - tests/unit/test_autopilot_ledger_rollup.py::test_ac_002_a_dangling_authorization_is_reported
+  - tests/unit/test_autopilot_ledger_rollup.py::test_ac_002_a_fully_confirmed_ledger_reports_nothing
+  executable_predicate: len(dangling_authorizations(fixture_authorized_not_entered)) ==
+    1
+  golden_table: []
+  rubric_id: null
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The fixture is hand-authored to hold exactly one advance_authorized
+    row with no matching advance_entered, so the expected count comes from the file's
+    construction. find_unconfirmed_authorization already computes this and today has
+    exactly one caller, so a report that returns nothing on this fixture is the current
+    shipped behaviour — the AC discriminates the reader, not the computation.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+- id: AC-003
+  title: the smoke check is not-applicable when the runtime cannot advance
+  type: parametric
+  test_ids:
+    - tests/unit/test_health_evidence_surface.py::test_ac_003_smoke_is_not_applicable_when_the_runtime_cannot_advance
+    - tests/unit/test_health_evidence_surface.py::test_ac_003_a_claude_code_harness_with_entries_is_neither
+    - tests/unit/test_health_evidence_surface.py::test_ac_003_a_non_claude_harness_with_entries_is_still_not_applicable
+  executable_predicate: null
+  golden_table:
+  - input: {targets: [claude-code]}
+    expected: degraded
+  - input: {targets: [cursor]}
+    expected: not-applicable
+  - input: {targets: [codex]}
+    expected: not-applicable
+  - input: {targets: [claude-code, cursor]}
+    expected: degraded
+  - input: {targets: [cursor, codex]}
+    expected: not-applicable
+  rubric_id: null
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Each expected value is derived from the documented capability rule —
+    end-of-stage auto-advance requires Claude Code's Skill tool, which Cursor and Codex do
+    not have — and not from the function's own output. The rule is already stated verbatim
+    in the rendered picker prose, so the table has a source outside the implementation.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  note: Today smoke_check reads only yaml_level with zero targets references, so a
+    Cursor-only harness reports "configured yet never fired" forever — a permanent false
+    alarm that trains the user to ignore the one real degradation signal.
+- id: AC-004
+  title: absence of evidence is never reported as health
+  type: property
+  test_ids:
+    - tests/unit/test_health_evidence_surface.py::test_ac_004_absence_is_never_reported_as_health
+    - tests/unit/test_health_evidence_surface.py::test_ac_004_the_reader_enumeration_is_complete
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: A metamorphic relation over any reader — it holds regardless of how a
+    given reader is implemented, so it cannot be satisfied by reading the implementation.
+    The relation is already honoured by one reader (verifier_discrimination answers "this
+    is not a clean bill of health; it is an absence of evidence"), which proves the shape
+    is achievable and makes the other readers the discriminating cases.
+  oracle_independence_waiver: null
+  input_domain: any ledger reader in the harness_maker ledger family, paired with an empty
+    ledger file and with a healthy non-empty one
+  transformation: produce a report from the empty ledger and a report from the healthy
+    non-empty ledger
+  expected_relation: report(empty) != report(healthy) and not is_passing(report(empty))
+  preconditions:
+  - the reader produces a report in both cases rather than raising
+  - 'CORRECTED by Phase 2 A.5: an earlier draft required "the reader exits 0 in both cases
+    (absence is not an error)". That excluded the very reader the oracle_evidence above holds
+    up as the reference — verifier_discrimination''s report verb writes the absence sentence to
+    stderr and exits 1. A non-zero exit carrying an explicit absence statement is the STRONGEST
+    form of the compliance this property asks for, not a violation of it, so the precondition
+    was wrong and is replaced. The relation is about the report''s verdict, never its exit code.'
+  observable_output: the reader's report payload
+  generator_hint: null
+- id: AC-005
+  title: a gated harness renders no auto-advance surface
+  type: mechanical
+  test_ids:
+    - tests/structural/test_autopilot_gate_render.py::test_ac_005_a_gated_harness_renders_no_boundary_invocation
+    - tests/structural/test_autopilot_gate_render.py::test_ac_005_the_advance_block_is_present_in_the_armed_arm
+    - tests/structural/test_autopilot_gate_render.py::test_ac_005_the_gated_delta_is_exactly_the_advance_blocks
+    - tests/structural/test_autopilot_gate_render.py::test_ac_005_the_dead_guard_name_appears_nowhere
+    - tests/structural/test_autopilot_gate_render.py::test_ac_005_the_non_gated_arms_are_byte_identical_to_the_pre_change_golden
+    - tests/structural/test_autopilot_gate_render.py::test_ac_005_the_picker_block_is_untouched
+  executable_predicate: render(level="gated")["review.md"].count("autopilot_caps boundary")
+    == 0 and "autopilot_advance_enabled" not in all_source_text()
+  golden_table: []
+  rubric_id: null
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: The reference is a second render of the same answers with
+    autonomy.level=auto_safe, so the expected delta is produced by a configuration rather
+    than asserted as a literal. A character pin (24,884 measured today) would break on any
+    unrelated edit and would also pass if the block were replaced by equally-sized dead
+    prose.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  note: Removals must be listed in _ALLOWED_REMOVALS keyed to this phase and to the exact
+    <command>@<dev_mode>; the character floor at measured*0.80 cannot see a single deleted
+    instruction (risk R1).
+- id: AC-006
+  title: the cross-model call is in flight before the fan-out completes
+  type: mechanical
+  test_ids:
+    - tests/unit/test_second_opinion_backgrounding.py::test_ac_006_the_review_render_backgrounds_the_invoker
+    - tests/unit/test_second_opinion_backgrounding.py::test_ac_006_the_plan_render_refuses_to_background
+    - tests/unit/test_second_opinion_backgrounding.py::test_ac_006_the_wiring_sits_inside_the_models_gate
+    - tests/unit/test_second_opinion_backgrounding.py::test_ac_006_a_live_review_overlaps_the_fan_out
+  executable_predicate: second_opinion_span(live_review).start_ts < pass1_fanout_span(live_review).end_ts
+  golden_table: []
+  rubric_id: null
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: Differential against the sequential baseline the same run produces
+    without the wiring. A render-grep for run_in_background is a PRECONDITION only — per
+    [wiki:architecture] narrative-output-needs-explicit-envelope, fixture-shaped output
+    proves the validator and never the producer, and this is the exact class where render
+    greps, unit tests and SHA pins all passed while the behaviour was absent. One real
+    dispatch is the only evidence that counts.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  note: Non-deterministic and costs a real cross-model call (risk R2). Whether this runs
+    under INTEGRATION=1 or in the PR gate is open question 2.
+- id: AC-007
+  title: no disclosed default survives inversion of its producing object
+  type: property
+  test_ids:
+    - tests/unit/test_doc_truth.py::test_ac_007_the_guard_is_green_before_the_inversion
+    - tests/unit/test_doc_truth.py::test_ac_007_inverting_a_disclosed_default_fails_the_guard
+    - tests/unit/test_doc_truth.py::test_ac_007_every_disclosure_is_value_bound
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: A metamorphic relation over the guard itself, satisfiable only by
+    binding the claim to the producing object. This is precisely the remedy recorded in
+    [wiki:convention] wrong-transparency-table-worse-than-none, where a presence-only
+    regex (re.search(r"autonomy|autopilot", summary)) passed on inverted content and the
+    replacement arm reads AutonomyConfig() and was verified to fail on a revert.
+  oracle_independence_waiver: null
+  input_domain: any document assertion of the form "the default is X" whose X is produced
+    by a class attribute or a config default
+  transformation: invert X in the class that produces it, leaving the document unchanged
+  expected_relation: the assertion guarding that document fails
+  preconditions:
+  - the assertion is green before the inversion
+  observable_output: the guarding test's pass/fail verdict
+  generator_hint: null
+  note: Scoped to DISCLOSED DEFAULTS — a claim of the form "the default is X" — not to any
+    mention of a config name, to bound risk R5. Which document set the property ranges
+    over is open question 1.
+- id: AC-008
+  title: README's worktree claim holds on both arms
+  type: parametric
+  test_ids:
+    - tests/unit/test_doc_truth.py::test_ac_008_the_readme_worktree_claim_holds_on_both_arms
+  executable_predicate: null
+  golden_table:
+  - input: {worktree_enabled: true}
+    expected: "the claim must state a persistent per-task worktree on branch hm/<slug>"
+  - input: {worktree_enabled: false}
+    expected: "the claim must state that no worktree is created and stages run in the current tree"
+  rubric_id: null
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The truth value for each arm comes from worktree_enabled(base), the
+    single documented reader whose singleton status is itself structurally guarded by
+    tests/unit/test_worktree_reader_singleton.py — not from the README sentence. Today's
+    sentence asserts a fresh worktree per /hm:execute, which is false at false and
+    imprecise at true.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+- id: AC-009
+  title: the advisory names the threshold that fired
+  type: parametric
+  test_ids:
+    - tests/unit/test_doc_truth.py::test_ac_009_the_advisory_names_the_threshold_that_fired
+    - tests/unit/test_sessionstart_drift.py::test_ac_009_the_emitted_banner_names_only_the_threshold_that_fired
+  executable_predicate: null
+  golden_table:
+  - input: {overrides: 45, days_since_audit: 2}
+    expected: session
+  - input: {overrides: 0, days_since_audit: 20}
+    expected: days
+  - input: {overrides: 45, days_since_audit: 20}
+    expected: both
+  rubric_id: null
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: Each expected citation is derived from which branch the inputs trip,
+    computed directly from audit_session_threshold=30 and audit_days_threshold=14
+    (models.py:394-395), independently of the message builder. The production message
+    observed on 2026-09-08 — "0 axis overrides recorded since last audit (threshold 30)" —
+    is self-refuting evidence for the second row, since 0 < 30 cannot trip the count
+    branch.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+- id: AC-010
+  title: every enabled name resolves to a real asset
+  type: property
+  test_ids:
+    - tests/unit/test_enabled_names_resolve.py::test_ac_010_every_enabled_name_resolves_to_a_real_asset
+    - tests/unit/test_enabled_names_resolve.py::test_ac_010_a_phantom_name_is_caught
+    - tests/unit/test_enabled_names_resolve.py::test_ac_010_a_phantom_reviewer_is_caught
+    - tests/unit/test_enabled_names_resolve.py::test_ac_010_enabled_is_contained_in_installed
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: The referent is the ACTUAL inventory on disk, not the sibling installed
+    list. synthesize.py:3-5 installs the full inventory unconditionally, so installed is
+    descriptive and a containment check against it is satisfiable by ADDING a phantom name
+    to installed — where the phantom still resolves to no template. Resolution against the
+    inventory is independent of both harness.yaml lists, generalizes to a future phantom,
+    and exercises the reviewer half that a containment check would report green with zero
+    work.
+  oracle_independence_waiver: null
+  input_domain: every name in skills.enabled and reviewers.enabled of any rendered
+    harness.yaml
+  transformation: resolve each name against the inventory — templates/skills/<name>/ for
+    skills, the rendered .claude/agents/<name>.md for reviewers
+  expected_relation: every enabled name resolves to an existing asset
+  preconditions:
+  - the render completed
+  observable_output: the list of unresolvable names, which must be empty
+  generator_hint: null
+  note: >-
+    CORRECTED 2026-09-08 (Phase 6, A.5 round 1). This note asserted "Today's two phantoms are
+    relevance-filter and research-crawler" — REFUTED. Both were removed in 0.22.3 (ADR-0007)
+    and survive only in comments (communication_audit.py:25,46; synthesize.py:825), so no
+    producer-emitted skills.enabled contains either and the resolution invariant is already
+    green — a regression guard, not a repair. It also said the reviewer-side defect is
+    "test-reviewer dispatched while appearing in neither list" and attributed it to AC-015 —
+    wrong on both counts. test-reviewer IS in _PROD_ENABLED_REVIEWERS; the real defect was its
+    absence from _ALL_REVIEWERS, so the rendered installed list under-reported what ships.
+    That belongs to AC-010, is fixed here, and is asserted over the producer constants AND the
+    rendered artifact.
+- id: AC-011
+  title: no shipped section survives whose body refutes its heading
+  type: mechanical
+  test_ids:
+    - tests/unit/test_doc_truth.py::test_ac_011_no_shipped_section_refutes_its_own_heading
+    - tests/structural/test_no_fused_workflow_axis.py::test_no_repo_doc_advertises_a_fused_workflow
+  executable_predicate: '"Fusion Commands" not in read_text("docs/HOW-IT-WORKS.md")'
+  golden_table: []
+  rubric_id: null
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: A golden absence check against a concretely named stale section whose
+    body already states that no fusion command exists. Independent of the doc's own prose
+    because the fused-command axis was deleted in 0.47.0 and workflow_fuse.py is confirmed
+    absent from src/ — the section's subject provably does not exist.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  note: The table-of-contents entry at :22 and the section at :938 must both go; deleting
+    only the body leaves a TOC link to nothing.
+- id: AC-012
+  title: an unreachable vault is a standing health condition
+  type: mechanical
+  test_ids:
+    - tests/unit/test_health_evidence_surface.py::test_ac_012_an_unreachable_vault_is_a_standing_condition
+    - tests/unit/test_health_evidence_surface.py::test_ac_012_a_reachable_vault_passes_without_the_optout_flag
+    - tests/unit/test_health_evidence_surface.py::test_ac_012_a_disabled_second_brain_is_an_optout_not_a_failure
+    - tests/unit/test_health_evidence_surface.py::test_ac_012_an_empty_vault_path_is_unreachable_not_the_cwd
+  executable_predicate: '"second_brain_vault_unreachable" in health_conditions(config_with_unreachable_vault())'
+  golden_table: []
+  rubric_id: null
+  pending_test: false
+  oracle_source: golden
+  oracle_evidence: The precondition is constructed rather than observed — an enabled
+    second_brain pointed at a path that does not resolve — so the expected condition name
+    is fixed by the test's own setup. Today the failure surfaces only when a second_brain
+    subcommand is invoked, so a wrapup that never reaches Step 5.6 shows nothing, which is
+    the discriminating case.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+- id: AC-013
+  title: the per-command ratchet sees second-opinion surface
+  type: mechanical
+  test_ids:
+    - tests/structural/test_command_size_budget.py::test_ac_013_the_ratchet_render_carries_second_opinion
+    - tests/structural/test_command_size_budget.py::test_ac_013_the_models_delta_is_produced_by_configuration
+  executable_predicate: atomic_ratchet_render_kwargs()["second_opinion"] is not None and
+    rendered_size("review", models_on=True) <= ratchet_ceiling("review")
+  golden_table: []
+  rubric_id: null
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: Differential between a models-off and a models-on render of the same
+    answers, so the expected delta is produced by a second configuration rather than
+    asserted as a literal. _render() passes no second_opinion today, so review's ~10.6 kB of
+    second-opinion surface never reaches _ATOMIC_RATCHET and only the aggregate arm — which
+    cannot attribute growth to a command — can see it.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  note: The gate-measures-the-shipped-file half is RETRACTED, not deferred. .gitignore:26
+    excludes .claude/*, so there is no shipped render in a fresh worktree and a stale one in
+    base, and _surface_baseline.py:5-9 records measuring it as a deliberately rejected
+    design. The 435,437-vs-442,446 gap is a stale untracked local render, not a gate defect;
+    RESEARCH A-10 was mis-framed. Satisfying this AC re-derives the review and plan ratchet
+    constants, which is a measurement-SUBJECT change and needs the ADR-011 carve-out — the
+    no-raised-ceiling prohibition otherwise forbids the only fix.
+- id: AC-015
+  title: no rendered command instructs from a list its own dispatch ignores
+  type: mechanical
+  test_ids:
+    - tests/unit/test_doc_truth.py::test_ac_015_no_rendered_command_instructs_from_an_ignored_list
+  executable_predicate: not (instructs_to_start_from(rendered("review.md"), "reviewers.enabled")
+    and dispatch_table_ignores(rendered("review.md"), "reviewers.enabled"))
+  golden_table: []
+  rubric_id: null
+  pending_test: false
+  oracle_source: differential
+  oracle_evidence: Both halves are read from the SAME rendered artifact — the prose
+    instruction originating at review.md.j2:139 and the lens-dispatch table generated from
+    lens_dispatch(preset) — so the contradiction is decidable from the file alone, with no
+    reference to either producer's intent. That independence is what makes it a differential
+    rather than a golden.
+  oracle_independence_waiver: null
+  input_domain: null
+  transformation: null
+  expected_relation: null
+  preconditions: []
+  observable_output: null
+  generator_hint: null
+  note: The fifteenth parity gap, found by plan validation rather than by the research fan-out
+    — in the largest rendered command (87,438 chars). It is the other half of the contract
+    ADR-003 addresses — retracting only the CLAUDE.md half would leave a shipped command
+    instructing the model from a list its own generated table composes without.
+- id: AC-014
+  title: every unwired component is wired or gated as intentional
+  type: property
+  test_ids:
+    - tests/structural/test_unwired_components.py::test_ac_014_every_unwired_agent_is_declared
+    - tests/structural/test_unwired_components.py::test_ac_014_context_lint_has_a_production_caller
+    - tests/structural/test_unwired_components.py::test_ac_014_the_linter_sees_every_asset_class
+    - tests/structural/test_unwired_components.py::test_ac_014_the_linter_emits_on_an_over_threshold_asset
+    - tests/structural/test_unwired_components.py::test_ac_014_verify_delegation_is_config_gated
+  executable_predicate: null
+  golden_table: []
+  rubric_id: null
+  pending_test: false
+  oracle_source: property
+  oracle_evidence: A property over the component set rather than over today's three
+    members, so it holds for a component that becomes unwired later and cannot be
+    satisfied by inspecting any single current case. The relation is decidable from the
+    import graph plus the test corpus, neither of which is the component under test.
+  oracle_independence_waiver: null
+  input_domain: any harness_maker component with no production call site — today
+    context_lint.lint, the consensus-arbiter dispatch path, and verify-stage delegation
+  transformation: scan the source tree for a production call site, then scan the test
+    corpus for a gate asserting the absence is intentional
+  expected_relation: has_production_caller(c) or has_intent_gate(c)
+  preconditions:
+  - the component is reachable in the rendered harness or shipped in src/
+  observable_output: the per-component pair of booleans
+  generator_hint: null
+  note: Deliberately NOT a judgment AC — the four available rubrics (agent_prompt,
+    claude_md, repair_guard_force, skill) do not cover this, and inventing a rubric file to
+    satisfy cross-validate rule 4 would add surface for one AC.

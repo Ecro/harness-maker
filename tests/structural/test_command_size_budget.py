@@ -22,10 +22,13 @@ Three criteria, three different jobs:
   autoloop driver see three stages missing on every iteration.
 
 * **AC-007** is the no-loss check, and it is an **equality**, not a subset. The
-  differential between an atomic render and the fused render is measured to be exactly
-  one heading and two executable lines — the autopilot auto-advance block, which
-  `workflow_fuse.fuse()` deliberately omits (`autopilot_advance_enabled=False`, see the
-  REVIEW P1-3 rationale there). Asserting equality against that named exemption means
+  differential between an atomic render and the fused render was measured to be exactly
+  one heading and two executable lines — the autopilot auto-advance block, which the fused
+  render deliberately omitted. **Historical**: the fused-command axis was deleted in 0.47.0
+  and `workflow_fuse.py` no longer exists, so neither that function nor the flag it passed
+  (a name AC-005 of PLAN-token-efficiency-autopilot-ux-speed has since removed, because it
+  had no producers left) can be cited as live behaviour. Asserting equality against that
+  named exemption means
   any *other* instruction the fused render drops fails immediately; a subset-with-
   exemptions would have silently absorbed it.
 """
@@ -388,7 +391,16 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # verification bullets. An intermediate round measured 4212 against a 4,200 ceiling and
     # ~126 chars were CUT rather than the ceiling raised. Attributed in
     # work-docs/BASELINE-DELTA-ai-work-boundaries.md.
-    "plan": 55322,
+    # RE-DERIVED 2026-09-08 (PLAN-token-efficiency-autopilot-ux-speed ADR-011, AC-013).
+    # The ratchet fixtures were models-OFF, so both ceilings were set for a document without
+    # the second-opinion dispatch recipes — prose that this repo's own harness renders, and
+    # that no band had ever seen. `_render` now passes `_RATCHET_MODELS`; measured through the
+    # same pinned fixture, only these two entries moved outside their bands (the other five
+    # atomic commands do not include the partial and are byte-identical), which is exactly the
+    # carve-out ADR-011 authorises. This is the SINGLE re-derivation that decision permits:
+    # re-deriving again to absorb a later edit is `ratchet-rebaselined-by-its-own-subject`.
+    #   plan: 55322 -> 62703 (+7381, models-on)
+    "plan": 62703,
     # 26673 -> 27248 (+575, 0.52.1). The autopilot picker renders into EVERY stage, so a
     # four-word correction there costs a little on all of them. It is the fix that
     # unblocks autopilot on Codex entirely: the block was headed "(Claude Code only)",
@@ -522,7 +534,16 @@ _ATOMIC_RATCHET: dict[str, int] = {
     # pass's re-derive note. Lowered rather than left as slack: a net-negative change that
     # keeps its old ceiling hands the next task ~1k of headroom no BASELINE-DELTA row
     # explains, which is the silent absorption SPEC-workflow-loop-efficiency.md:126 forbids.
-    "review": 70153,
+    # RE-DERIVED 2026-09-08 (PLAN-token-efficiency-autopilot-ux-speed ADR-011, AC-013).
+    # The ratchet fixtures were models-OFF, so both ceilings were set for a document without
+    # the second-opinion dispatch recipes — prose that this repo's own harness renders, and
+    # that no band had ever seen. `_render` now passes `_RATCHET_MODELS`; measured through the
+    # same pinned fixture, only these two entries moved outside their bands (the other five
+    # atomic commands do not include the partial and are byte-identical), which is exactly the
+    # carve-out ADR-011 authorises. This is the SINGLE re-derivation that decision permits:
+    # re-deriving again to absorb a later edit is `ratchet-rebaselined-by-its-own-subject`.
+    #   review: 70153 -> 80586 (+10433, models-on)
+    "review": 80586,
     # 30537 → 32114 (PLAN-plan-interview-comprehension): the same partial, invoked with
     # `stage='spec'`. Raw +1778, compacted to +1577. The brief's SUBJECT differs by stage
     # (ADR-007) because `/hm:spec` has no architecture draft to disclose — identical text
@@ -581,7 +602,31 @@ _HEADING = re.compile(r"^#{2,6} .*$", re.M)
 _EXEC_LINE = re.compile(r"^\s*!.*$", re.M)
 
 
-def _render(*, feature_branch_workflow: bool, tmp: Path) -> dict[str, str]:
+#: What the ratchet's own fixtures enable (AC-013 of PLAN-token-efficiency-autopilot-ux-speed).
+#: The second-opinion dispatch partial renders BYTE-ZERO while `models` is empty, so a ratchet
+#: derived from a models-off render sets ceilings for a document this repo's own harness does not
+#: have: `review` +10,433 and `plan` +7,381 of prose live behind that flag, and every future edit to
+#: it would have been measured against a band that never saw it.
+#:
+#: Those two numbers are the ONLY correct pair, and they agree with the per-entry comments in
+#: `_ATOMIC_RATCHET` below and with `work-docs/BASELINE-DELTA-…`. An earlier revision of this
+#: docstring said +11,607 / +7,454 — an unpinned ad-hoc render that skipped `pin_install_ref`,
+#: whose `uv run --with <path>` strings differ in length per command. A.5 round 1 caught the two
+#: records disagreeing; a derivation recorded three times in three different values is
+#: `wrong-transparency-table-worse-than-none`, and ADR-011's carve-out is conditioned on the
+#: derivation being written down, so a self-contradicting record fails that condition outright.
+#:
+#: Known scope limit: `["codex"]` is ONE model, so `second_opinion_dispatch.md.j2`'s
+#: `{% if _models | length >= 2 %}` concurrency block and the antigravity transport partial are
+#: still outside every per-command band. AC-013 asks for `second_opinion` set, which this
+#: satisfies; the multi-model branch is the same "a band that never saw it" argument one level in,
+#: recorded rather than left silent (A.5 round 1, ADVISORY-2).
+_RATCHET_MODELS: list[str] = ["codex"]
+
+
+def _render(
+    *, feature_branch_workflow: bool, tmp: Path, second_opinion_models: list[str] | None = None
+) -> dict[str, str]:
     """`fused_workflows` is passed explicitly: its model default is a single 3-stage
     workflow, so an implicit render would not contain the commands this gate measures
     and every assertion below would KeyError rather than assert.
@@ -589,6 +634,12 @@ def _render(*, feature_branch_workflow: bool, tmp: Path) -> dict[str, str]:
     The install-ref pin is applied HERE rather than left to the conftest autouse fixture:
     these render fixtures are module-scoped and are therefore set up before any
     function-scoped autouse fixture runs.
+
+    `second_opinion_models` DEFAULTS TO OFF on purpose. The ratchet fixtures below pass
+    `_RATCHET_MODELS`; `tests/structural/test_autopilot_gate_render.py` imports this helper for a
+    byte-identity golden about the autopilot advance block, which is orthogonal to second-opinion
+    surface, and flipping the shared default would have re-based that golden a third time for a
+    fixture change rather than a template change.
     """
     with pytest.MonkeyPatch.context() as mp:
         pin_install_ref(mp)
@@ -599,6 +650,9 @@ def _render(*, feature_branch_workflow: bool, tmp: Path) -> dict[str, str]:
                     preset=Preset.PRODUCTION,
                     targets=[Target.CLAUDE_CODE],
                     worktree={"feature_branch_workflow": feature_branch_workflow},
+                    second_opinion=(
+                        {"models": list(second_opinion_models)} if second_opinion_models else {}
+                    ),
                 ),
             ),
             tmp,
@@ -610,12 +664,20 @@ def _render(*, feature_branch_workflow: bool, tmp: Path) -> dict[str, str]:
 
 @pytest.fixture(scope="module")
 def flag_on(tmp_path_factory: pytest.TempPathFactory) -> dict[str, str]:
-    return _render(feature_branch_workflow=True, tmp=tmp_path_factory.mktemp("on"))
+    return _render(
+        feature_branch_workflow=True,
+        tmp=tmp_path_factory.mktemp("on"),
+        second_opinion_models=_RATCHET_MODELS,
+    )
 
 
 @pytest.fixture(scope="module")
 def flag_off(tmp_path_factory: pytest.TempPathFactory) -> dict[str, str]:
-    return _render(feature_branch_workflow=False, tmp=tmp_path_factory.mktemp("off"))
+    return _render(
+        feature_branch_workflow=False,
+        tmp=tmp_path_factory.mktemp("off"),
+        second_opinion_models=_RATCHET_MODELS,
+    )
 
 
 def headings(text: str) -> set[str]:
@@ -697,6 +759,53 @@ def test_atomic_commands_within_budget(flag_on: dict[str, str], name: str) -> No
     size = len(flag_on[name])
     extra = f" (+{headroom} allowance)" if headroom else ""
     assert floor <= size <= ceiling, f"{name}: {size} outside [{floor}, {ceiling}]{extra}"
+
+
+def test_ac_013_the_ratchet_render_carries_second_opinion(flag_on: dict[str, str]) -> None:
+    """AC-013: the fixture the ratchet measures must contain the second-opinion surface.
+
+    Bound to a construct that renders ONLY when `models` is non-empty — the invoker entrypoint the
+    dispatch recipes call — rather than to a character count, so the assertion cannot be satisfied
+    by a render that merely happens to be the right size.
+    """
+    assert _RATCHET_MODELS, "the ratchet is back to a models-off render; the ceilings do not apply"
+
+    for name in ("review", "plan"):
+        assert "second_opinion_invoke" in flag_on[name], (
+            f"the ratchet's {name} fixture has no second-opinion dispatch, so its ceiling was "
+            "derived against a document this repo's harness does not render"
+        )
+
+
+def test_ac_013_the_models_delta_is_produced_by_configuration(
+    flag_on: dict[str, str], tmp_path: Path
+) -> None:
+    """The differential half: the delta comes from a second CONFIGURATION, not from a literal.
+
+    Same answers, `models` off, and the two stages that include the shared partial must shrink while
+    the other five stay byte-identical. That is what makes ADR-011's carve-out ("only `review` and
+    `plan`") a measurement rather than an assumption — and it fails loudly if the partial ever gets
+    included somewhere else, which is precisely when the other five ceilings would go stale.
+    """
+    off = _render(feature_branch_workflow=True, tmp=tmp_path, second_opinion_models=None)
+
+    assert set(off) == set(flag_on), "the two configurations rendered different command sets"
+
+    for name in ("review", "plan"):
+        assert len(off[name]) < len(flag_on[name]), (
+            f"{name} did not grow when second-opinion models were enabled, so the flag renders "
+            "nothing and the re-derivation had no subject"
+        )
+        assert "second_opinion_invoke" not in off[name], (
+            f"{name} names the invoker with models off — the partial is not byte-zero when disabled"
+        )
+
+    unchanged = sorted(set(_ATOMIC_RATCHET) - {"review", "plan"})
+    moved = [n for n in unchanged if off[n] != flag_on[n]]
+    assert moved == [], (
+        f"enabling second-opinion models moved {moved}, whose ceilings were NOT re-derived — "
+        "ADR-011's carve-out names only review and plan"
+    )
 
 
 def test_the_atomic_table_covers_every_atomic_command(flag_on: dict[str, str]) -> None:

@@ -8,9 +8,15 @@ is not a hypothetical wrong implementation — it is a restatement of the shippe
 which the second-opinion `report` path already called for exclusions and excluded nothing
 because it keyed on a field those rows do not have.
 
-So these tests drive the real seams: the `report` CLI over a second-opinion ledger, and
-`agent_rounds` over a stage-agents ledger. Both are exercised through their public entry
-points rather than through the helper.
+So these tests drive the real seams: the `report` CLI over a second-opinion ledger,
+`agent_rounds` over a stage-agents ledger, and `autopilot_ledger.rollup` over the same
+second-opinion ledger. All are exercised through their public entry points rather than through
+the helper.
+
+**Adding an aggregator means adding a seam here.** `rollup` is the third one and it is why this
+is a registry rather than a pair: it is a second consumer of the same ledger family, so it could
+have filtered nothing while every test in `test_ledger_exclusions.py` and both tests below stayed
+green — this file's own stated defect, one aggregator later.
 """
 
 from __future__ import annotations
@@ -99,6 +105,43 @@ def test_excluded_slug_absent_from_second_opinion_aggregate(
     assert codex["skipped"] == 0, "the excluded rows are still in the NUMERATOR"
     assert codex["loss_rate"] == 0.0
     assert ledger.read_bytes() == before, "reading the ledger must not rewrite it"
+
+
+def test_the_rollup_seam_applies_exclusions(tmp_path: Path) -> None:
+    """Third seam — `autopilot_ledger.rollup`, with its counterexample inline.
+
+    Both arms read the same ledger; only the exclusions file differs. Without the counterexample
+    the first assertions could be satisfied by an aggregate that drops those rows for some
+    unrelated reason — the trap the two tests above split across a pair.
+    """
+    from harness_maker import autopilot_ledger
+
+    rows = "\n".join(
+        [
+            _call_row("codex", "invoked", "real-a"),
+            _call_row("codex", "skipped", "s"),
+            _call_row("codex", "invoked", "real-b"),
+        ]
+    )
+    filtered_dir = tmp_path / "filtered"
+    unfiltered_dir = tmp_path / "unfiltered"
+    for obs in (filtered_dir, unfiltered_dir):
+        obs.mkdir()
+        (obs / "second-opinion.jsonl").write_text(rows + "\n", encoding="utf-8")
+    (filtered_dir / ".ledger-exclusions.json").write_text(
+        json.dumps([{"key": "slug", "value": "s", "reason": "unit-suite synthetic"}]),
+        encoding="utf-8",
+    )
+
+    filtered = autopilot_ledger.rollup(tmp_path, observability_dir=filtered_dir)
+    unfiltered = autopilot_ledger.rollup(tmp_path, observability_dir=unfiltered_dir)
+
+    assert filtered.by_model["codex"]["calls"] == 2, "excluded row still in the DENOMINATOR"
+    assert filtered.by_model["codex"]["skipped"] == 0, "excluded row still in the NUMERATOR"
+    assert filtered.exclusions["rows_dropped"] == 1
+    # counterexample: the same ledger with no exclusions file must NOT agree
+    assert unfiltered.by_model["codex"]["calls"] == 3
+    assert unfiltered.by_model["codex"]["skipped"] == 1
 
 
 def test_an_unexcluded_synthetic_row_still_corrupts_the_rate(

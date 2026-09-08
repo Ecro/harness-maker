@@ -877,9 +877,16 @@ class AutonomyConfig(BaseModel):
     """Pipeline auto-advance policy (PLAN-human-bottleneck-auto-advance).
 
     ADR-002: ``level`` decides how far the workflow auto-advances past inter-stage
-    STOP boundaries. PLAN-harness-diet ADR-010 promoted the class default from ``gated``
-    to ``auto_safe`` (and ``autopilot_persistent`` to ``True``), so a NEWLY rendered
-    harness auto-arms. **That flip does not reach an existing project by loading**:
+    STOP boundaries. **The class default is ``ask``** — see the comment on the field itself.
+    PLAN-harness-diet ADR-010 first promoted it from ``gated`` to ``auto_safe`` (and
+    ``autopilot_persistent`` to ``True``, which still holds), and the 2026-08-09 user decision
+    then moved ``level`` to ``ask`` so the choice lands per session rather than being answered
+    once in config. This docstring claimed ``auto_safe`` for a month after that; corrected
+    2026-09-08 (PLAN-token-efficiency-autopilot-ux-speed AC-007), because a class docstring that
+    contradicts its own field is read by every maintainer and enforced by nothing. So a NEWLY
+    rendered harness *offers* to arm; it does not silently auto-arm at ``auto_safe``.
+
+    **That promotion does not reach an existing project by loading**:
     ADR-013 pins ``interview._parse_autonomy``'s absent and malformed branches, the
     interview's explicit-decline branch, and ``cli._build_autonomy_override``'s absent
     base to ``gated`` / ``False``. A config error, a missing block, or a user's "no" must

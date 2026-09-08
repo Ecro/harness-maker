@@ -19,7 +19,7 @@
    - 3.5 [/hm:review — Code Review](#35-hmreview--code-review)
    - 3.6 [/hm:verify — Completion Verification](#36-hmverify--completion-verification)
    - 3.7 [/hm:wrapup — Commit Finalization](#37-hmwrapup--commit-finalization)
-4. [Fusion Commands](#4-fusion-commands)
+4. [Chaining the Stages](#4-chaining-the-stages)
 5. [/hm:loop — Automated Iteration Loop](#5-hmloop--automated-iteration-loop)
 6. [Special Commands](#6-special-commands)
    - 6.1 [/hm:health — structural layer](#61-hmhealth--structural-layer)
@@ -66,9 +66,9 @@ harness-maker is a multi-target harness generator for **Claude Code, Cursor IDE,
 
 | Category | Content |
 |----------|---------|
-| **Commands** | 14 `/hm:` prefix slash commands (7 atomic + 4 fusion + 2 special + 1 loop) |
+| **Commands** | 15 `/hm:` slash commands (7 atomic stages + 2 loop drivers + 6 utility: `configure` `health` `help` `make` `metrics` `uninstall`) |
 | **Skills** | 11 reusable capability modules invoked by commands |
-| **Agents** | 12 sub-agents with specific roles |
+| **Agents** | 15 sub-agents with specific roles |
 | **Hooks** | 5 event handler types that run automatically before/after tool calls |
 
 ### Design principles
@@ -935,11 +935,23 @@ Commit types: `feat | fix | chore | ci | test | docs | refactor`
 
 ---
 
-## 4. Fusion Commands
+## 4. Chaining the Stages
 
-There is no fusion command. The seven atomic stages are chained by `/hm:loop` <!-- @hm:axis-removed -->
-(`--per-iter-stages`, default `execute,review`) or by autopilot's `autonomy.pipeline`.
-The fused-workflow axis was removed in 0.47.0 — see PLAN-harness-diet ADR-001/002/014. <!-- @hm:axis-removed -->
+The seven atomic stages are separate commands on purpose — each one is a place you can stop,
+read what it produced, and change direction. Two mechanisms chain them when you do not want to
+stop:
+
+| Mechanism | What it does | Where it stops |
+|---|---|---|
+| **autopilot** (`autonomy.level`) | at the end of a stage, advances to the next entry in `autonomy.pipeline` | the plan architecture interview, a CHANGES_REQUESTED review, and the wrapup land — at **every** level |
+| **`/hm:loop`** | re-runs a chosen subset (`--per-iter-stages`, default `execute,review`) until a goal or a cap is reached | iteration / time caps, and any stage that reports a blocking gate |
+
+The default is neither: a fresh harness renders `autonomy.level: ask`, so the first eligible
+stage of each session offers the choice and nothing advances until you take it. §5 covers
+`/hm:loop` in full; the autopilot picker is described in §6.
+
+There is **no single fused command** that runs several stages as one unit. That axis existed
+until 0.47.0 and was removed — see PLAN-harness-diet ADR-001/002/014. <!-- @hm:axis-removed -->
 
 ---
 

@@ -136,7 +136,6 @@ is exercised every round. These are review categories, not agent names; the core
 told apart only by the lens line in their brief. Distinct categories find distinct defects: that is
 why one lens's finding stands on its own (Step 4).
 
-- Start from `harness.yaml.reviewers.enabled`.
 - `routing: always-all` → invoke every enabled reviewer in parallel.
 - `routing: conditional` → use Conditional Router (M6) on the changed-file paths. It may drop **only** `ux-reviewer` / `performance-reviewer`{% if routable_lenses(config.preset) %} and, on this Side harness, the domain lenses {% for l in routable_lenses(config.preset) %}`{{ l }}`{{ ", " if not loop.last }}{% endfor %} — which are mandatory on Production and routable here{% endif %}; a mandatory lens is never routed away, because incomplete coverage blocks approval and a routed-away lens would make every conditional review permanently unapprovable.
 - Add any extras from `--with-reviewers=<csv>`.

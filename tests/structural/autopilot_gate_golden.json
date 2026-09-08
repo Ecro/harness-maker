@@ -1,0 +1,93 @@
+{
+  "arms": {
+    "ask@flag_off": {
+      "configure": "e0e723e1f6fb99a68fad442b5a24fe0f7c3ce4c761b7ee10b4051aeff6a75a89",
+      "execute": "1d9f139b773e096e1a002a6378b7efa0c98cb84125dec52b6d0eed73fc6291d2",
+      "health": "d71a799ccade3db54cd9094841aced9693a9cd0572b94c8cb32bae2ff7c337a0",
+      "help": "8d75b00e2c1464f6b6639f0eb5c76577f4b0f04317b07d5ddc341cd7b69157fa",
+      "loop": "2dae22aa4e8f48c7589b236d0f52ebee6b4f16f072c49386b6344b93195b92d6",
+      "loop-p5-batch": "0316cb859e528af163eb3955761ed1eff9fce06c89b3cc69259dbb8bc71db059",
+      "make": "9cd0198584689b099e551458cac36a7a68ee5f65adabbeb2ae76ec6f76298ae9",
+      "metrics": "3bf935b8814009e3e304902e6dd9638fa1fd6c778e23a655da0964785e5a8528",
+      "plan": "ac4644f74265d20c0fa66242020ff342de183f17c4c771bcfb5fcac6ab7c5619",
+      "research": "3eb8654327857211c293037cb14248b2968b3c38c21cfed87fd74e422ee4c650",
+      "review": "3ada361123431a069b9baa12df4fec12aedbab1f9a151a1415f351ef7f04b79e",
+      "spec": "baec526d3a8a6cb734f762d73f74fa15e8e34d15165213f4ddc2e06abbcf831b",
+      "uninstall": "ecb587f4a8f0b4fc41d613b879c006e293f931e763e210e584849d7e24c6d345",
+      "verify": "2722795bf4138b424ee8958ed25f8a4630ef20d4353d139859d256906c3f3199",
+      "wrapup": "87bbd3ec8d0128d7c505167b43a1ed545d56448c5ec84fc03fe4e9982bd216c6"
+    },
+    "ask@flag_on": {
+      "configure": "e0e723e1f6fb99a68fad442b5a24fe0f7c3ce4c761b7ee10b4051aeff6a75a89",
+      "execute": "4b5395fa85f1798b47c2a75415d3c13cc5e81c041c7d76c28fbc1ff9e604877b",
+      "health": "d71a799ccade3db54cd9094841aced9693a9cd0572b94c8cb32bae2ff7c337a0",
+      "help": "8d75b00e2c1464f6b6639f0eb5c76577f4b0f04317b07d5ddc341cd7b69157fa",
+      "loop": "92deab01c175a96d9ac5932c6903d6166a9acdb2e080efae176c3c5392bd092b",
+      "loop-p5-batch": "0edc470528debb41543a1558645ff3fe68110974b9616ea3f4564828a2129844",
+      "make": "9cd0198584689b099e551458cac36a7a68ee5f65adabbeb2ae76ec6f76298ae9",
+      "metrics": "3bf935b8814009e3e304902e6dd9638fa1fd6c778e23a655da0964785e5a8528",
+      "plan": "4275ebee966bd884d1d998d9ff2f8e08735752744fad6aadc4a1b22c6367a023",
+      "research": "643f6bb323d56b46978827be7d8178a74596aafd11bb06b33870804ef548b344",
+      "review": "f4aeb118d0c8a61b32767546a87cb02b4c584d3e897c4d5c9e0cb628ff66667b",
+      "spec": "a8f986714475f98fa0c282f754f4721e941466c97b6d0341e3a3f6098f0a347e",
+      "uninstall": "ecb587f4a8f0b4fc41d613b879c006e293f931e763e210e584849d7e24c6d345",
+      "verify": "7b4a783992a69c303a69ad425347821d1014a3cb12799fe85d8d539f63bb14d9",
+      "wrapup": "2c8269f612dd83342a9cea11144b6a0f6b8eb17a822682c78b1de07a7847b211"
+    },
+    "auto_safe@spec-driven": {
+      "configure": "e0e723e1f6fb99a68fad442b5a24fe0f7c3ce4c761b7ee10b4051aeff6a75a89",
+      "execute": "41d1decf6ceb0b98301e71d58ee10f0cb407860e65806330866a582207ffa507",
+      "health": "e08e0cefeebaa92d6c77ace36faa5c384bc82ee79d313dc5da7f7bf70ff646cf",
+      "help": "53ffbc8c8122cc39116782a2c7e66711cb60f50ae7eb4f7c780ef96d61e5c439",
+      "loop": "9d2d6150e60bf37b941c25379265e598e7a6e2622717b5196e3adb7ad17b2c92",
+      "loop-p5-batch": "0edc470528debb41543a1558645ff3fe68110974b9616ea3f4564828a2129844",
+      "make": "9cd0198584689b099e551458cac36a7a68ee5f65adabbeb2ae76ec6f76298ae9",
+      "metrics": "3bf935b8814009e3e304902e6dd9638fa1fd6c778e23a655da0964785e5a8528",
+      "plan": "60b2b6fed3a259b6a1f83bff3bdd25eddd98dd15e23481f648c110659a645c49",
+      "research": "d009bc84e4c948969900936eff4dc9a628e938924cc1674c8b1787710fa5fa0d",
+      "review": "0408c8c2e5697c3748907b7090b3163a58f6cd57c92038c43e64668a652b9f2c",
+      "spec": "222859c6b62070a4436dcab135e8ff2c00fafe1eb3a23de1186be795956d5785",
+      "uninstall": "ecb587f4a8f0b4fc41d613b879c006e293f931e763e210e584849d7e24c6d345",
+      "verify": "df5e035f174debb342fcbc712e68401316741e2ec91498c379f330bcbba4efaa",
+      "wrapup": "8bf2dae202f73d377d9aee43b4a51061815876fd967261c605a65dab03147c48"
+    },
+    "auto_safe@task-driven": {
+      "configure": "e0e723e1f6fb99a68fad442b5a24fe0f7c3ce4c761b7ee10b4051aeff6a75a89",
+      "execute": "41d1decf6ceb0b98301e71d58ee10f0cb407860e65806330866a582207ffa507",
+      "health": "e08e0cefeebaa92d6c77ace36faa5c384bc82ee79d313dc5da7f7bf70ff646cf",
+      "help": "53ffbc8c8122cc39116782a2c7e66711cb60f50ae7eb4f7c780ef96d61e5c439",
+      "loop": "9d2d6150e60bf37b941c25379265e598e7a6e2622717b5196e3adb7ad17b2c92",
+      "loop-p5-batch": "0edc470528debb41543a1558645ff3fe68110974b9616ea3f4564828a2129844",
+      "make": "9cd0198584689b099e551458cac36a7a68ee5f65adabbeb2ae76ec6f76298ae9",
+      "metrics": "3bf935b8814009e3e304902e6dd9638fa1fd6c778e23a655da0964785e5a8528",
+      "plan": "dcd376a6ac7f7f8d4c76092da134f19d50b2146db519096e9af9a1b28f5fd41b",
+      "research": "d009bc84e4c948969900936eff4dc9a628e938924cc1674c8b1787710fa5fa0d",
+      "review": "c54f8d27298627e70778126e7d32478030159d01d30df0fbadb55b32568415d0",
+      "spec": "c0482cc176379aac8c00816b055403c7951f387a9c33e568bd5208694055cef8",
+      "uninstall": "ecb587f4a8f0b4fc41d613b879c006e293f931e763e210e584849d7e24c6d345",
+      "verify": "e63e6ddb4d5a6457a33a0c185e6829f2fea4925c2df6e16a4734b619d7674afe",
+      "wrapup": "560fa72524e8329e480e5950510730a7ad7e1f77de3b8fc78b3df95d6857de04"
+    }
+  },
+  "note": "PRE-CHANGE byte identity for the NON-GATED autonomy arms. Originally captured before Phase 3 of PLAN-token-efficiency-autopilot-ux-speed edited any template, and Phase 3's edit was verified byte-neutral against that capture \u2014 a historical fact this file no longer holds the bytes for. A re-base is allowed ONLY for a change that is separately attributed: add a row to `rebases` naming the phase and the delta doc. Re-basing to make a red test green, with no such row, is the failure this file exists to catch.",
+  "rebases": [
+    {
+      "aggregate_delta_chars": 1456,
+      "attributed_in": "work-docs/BASELINE-DELTA-token-efficiency-autopilot-ux-speed.md",
+      "phase": 4,
+      "reason": "Phase 4 adds the stage-guarded backgrounding blocks to the shared second-opinion dispatch partial, which this repo renders because second_opinion.models is non-empty. Phase 3's byte-neutrality was verified against the pre-Phase-3 capture first."
+    },
+    {
+      "aggregate_delta_chars": -54,
+      "attributed_in": "work-docs/BASELINE-DELTA-token-efficiency-autopilot-ux-speed.md",
+      "phase": 5,
+      "reason": "Phase 5 SHRINKS the rendered surface by 54 chars, in two attributed edits: review.md.j2 drops the `- Start from `harness.yaml.reviewers.enabled`.` bullet (-47, AC-015 \u2014 the list is not an input to lens_dispatch, so the instruction was a lever that does not exist), and step_manifest.md.j2's disclosed default for autopilot_persistent goes `false` -> `true` (-1 x 7 commands, AC-007 \u2014 the class default is True). No autopilot advance or picker block moved; the Phase 3 byte-neutrality claim is unaffected because both edits are outside the advance block."
+    },
+    {
+      "aggregate_delta_chars": 416,
+      "attributed_in": "work-docs/BASELINE-DELTA-token-efficiency-autopilot-ux-speed.md",
+      "phase": "review-fixes",
+      "reason": "/hm:review returned two P1s whose fix was an ADDED rendered instruction: wrapup.md.j2 gains the roll-up producer (the manifest staged a path nothing wrote, so ADR-002's survives-a-clone guarantee was unreachable), and health.md.j2 passes --targets (smoke_check's applicability parameter had no production caller, so the cursor-only false alarm shipped unchanged). Only wrapup moves in these arms; the autopilot advance and picker blocks are untouched, so Phase 3's byte-neutrality claim for them still holds."
+    }
+  ]
+}

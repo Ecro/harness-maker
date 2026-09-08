@@ -254,9 +254,20 @@ def test_a_retired_key_is_not_re_injected_on_re_render(tmp_path: Path) -> None:
 # "coupling between stages is handled by fusion commands" through the entire removal, and the
 # Korean file kept a whole section 4 documenting the four deleted commands, while this gate
 # stayed green. Ban both spellings in both languages.
+# Round-3 hardening (PLAN-token-efficiency-autopilot-ux-speed AC-011). The ban was
+# case-SENSITIVE and matched only the singular noun phrase, so `docs/HOW-IT-WORKS.md` kept
+# `## 4. Fusion Commands` (capital + plural), its anchor `#4-fusion-commands` (hyphen, not
+# space), and a `7 atomic + 4 fusion + 2 special` count row — three unmarked assertions about
+# the deleted axis, in the very file whose Korean sibling this gate was written to catch. The
+# same shape a third time: each round fixed the spelling it had just been shown and left the
+# next one open. So the tokens are now BARE and case-insensitive in both languages — any
+# mention of the axis at all must carry the marker, which is the rule the exemption already
+# states ("a line may name the axis ONLY to say it is gone"). `workflow_fuse` is in the ban
+# because the module is deleted, and `docs/CONTRIBUTING.md` still drew it in a directory tree.
 _PROSE_BAN = re.compile(
-    r"fused workflow|fused-workflow|융합 워크플로|fusion command|퓨전 명령"
-    r"|@hm-exec-rev|/hm:exec-rev|`exec-rev|`plan-exec-rev|`res-spec-plan"
+    r"fused workflow|fused-workflow|fusion|퓨전|융합|workflow_fuse"
+    r"|@hm-exec-rev|/hm:exec-rev|`exec-rev|`plan-exec-rev|`res-spec-plan",
+    re.IGNORECASE,
 )
 _AXIS_REMOVED_MARKER = "<!-- @hm:axis-removed -->"
 

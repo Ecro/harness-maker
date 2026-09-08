@@ -74,6 +74,14 @@ _CALL_ROW = "n/a"
 
 DISPOSITIONS = ("accepted", "rejected", "duplicate", "unresolved")
 
+#: The family's absence answer, shared by every reader that has one.
+#:
+#: **No trailing punctuation.** The two producers continue differently — this module ends the
+#: sentence with a period, `autopilot_ledger.render_rollup` continues it with an em dash — so the
+#: constant is the substring they have in common. Including punctuation would make one of them
+#: unable to use it, and a re-typed copy is what lets a reword silently break a test that pins it.
+ABSENCE_NOTICE = "This is not a clean bill of health; it is an absence of evidence"
+
 
 @dataclass(frozen=True)
 class ModelStats:
@@ -473,7 +481,7 @@ def main(argv: list[str] | None = None) -> int:
         else:
             sys.stderr.write(
                 f"verifier_discrimination: no rows at {opts.ledger} — nothing to report. "
-                "This is not a clean bill of health; it is an absence of evidence.\n"
+                f"{ABSENCE_NOTICE}.\n"
             )
         return 1
     payload = to_payload(analyse(rows), exclusions, dropped_n=dropped)

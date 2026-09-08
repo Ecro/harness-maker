@@ -593,13 +593,27 @@ Step 7.7 below is deliberately NOT in it: it is the only step that can lose work
 keeps its own invocation and its own operator decision point (ADR-006).
 {% endif -%}
 
+**First, produce the ledger roll-up** — the manifest below stages it, and nothing else writes it.
+It reads the rows from the **base** repo (that is where every writer files them) and writes the
+document into the tree this wrapup will commit, so the aggregate survives a fresh clone:
+
 {% if is_codex %}
 ```
-Bash("uv run --with {{ harness_maker_src_path }} hm wrapup_land --worktree {{ '<WT>' if wt_on else '"$(pwd)"' }} --base {{ '<BASE>' if wt_on else '"$(pwd)"' }} --slug <slug> --message-file <msg-tmpfile> --required {{ config.work_docs.dir }}PLAN-{slug}.md --optional .claude/memory/ --optional {{ config.work_docs.dir }}REVIEW-{slug}-*.md --optional {{ config.work_docs.dir }}RESEARCH-{slug}.md --optional {{ config.spec.dir }}SPEC-{slug}.md --optional {{ config.spec.dir }}SPEC-{slug}.machine.yaml")
+Bash("uv run --with {{ harness_maker_src_path }} hm autopilot_ledger rollup --root {{ '<WT>' if wt_on else '"$(pwd)"' }} --write")
 ```
 {% else %}
 ```bash
-!uv run --with {{ harness_maker_src_path }} hm wrapup_land --worktree {{ '<WT>' if wt_on else '"$(pwd)"' }} --base {{ '<BASE>' if wt_on else '"$(pwd)"' }} --slug <slug> --message-file <msg-tmpfile> --required {{ config.work_docs.dir }}PLAN-{slug}.md --optional .claude/memory/ --optional {{ config.work_docs.dir }}REVIEW-{slug}-*.md --optional {{ config.work_docs.dir }}RESEARCH-{slug}.md --optional {{ config.spec.dir }}SPEC-{slug}.md --optional {{ config.spec.dir }}SPEC-{slug}.machine.yaml
+!uv run --with {{ harness_maker_src_path }} hm autopilot_ledger rollup --root {{ '<WT>' if wt_on else '"$(pwd)"' }} --write
+```
+{% endif %}
+
+{% if is_codex %}
+```
+Bash("uv run --with {{ harness_maker_src_path }} hm wrapup_land --worktree {{ '<WT>' if wt_on else '"$(pwd)"' }} --base {{ '<BASE>' if wt_on else '"$(pwd)"' }} --slug <slug> --message-file <msg-tmpfile> --required {{ config.work_docs.dir }}PLAN-{slug}.md --optional .claude/memory/ --optional {{ config.work_docs.dir }}REVIEW-{slug}-*.md --optional {{ config.work_docs.dir }}RESEARCH-{slug}.md --optional {{ config.spec.dir }}SPEC-{slug}.md --optional {{ config.spec.dir }}SPEC-{slug}.machine.yaml --optional work-docs/BASELINE-ledger-rollup.md")
+```
+{% else %}
+```bash
+!uv run --with {{ harness_maker_src_path }} hm wrapup_land --worktree {{ '<WT>' if wt_on else '"$(pwd)"' }} --base {{ '<BASE>' if wt_on else '"$(pwd)"' }} --slug <slug> --message-file <msg-tmpfile> --required {{ config.work_docs.dir }}PLAN-{slug}.md --optional .claude/memory/ --optional {{ config.work_docs.dir }}REVIEW-{slug}-*.md --optional {{ config.work_docs.dir }}RESEARCH-{slug}.md --optional {{ config.spec.dir }}SPEC-{slug}.md --optional {{ config.spec.dir }}SPEC-{slug}.machine.yaml --optional work-docs/BASELINE-ledger-rollup.md
 ```
 {% endif %}
 

@@ -144,7 +144,7 @@ autopilot (a broken boundary CLI, a marker that never gets written, a chain that
 kill-switches) looks identical to "the user just never turned it on". Run the degradation probe:
 
 ```bash
-!uv run --with {{ harness_maker_src_path }} hm autopilot_ledger smoke --root . --level {{ config.autonomy.level }}
+!uv run --with {{ harness_maker_src_path }} hm autopilot_ledger smoke --root . --level {{ config.autonomy.level }} --targets {{ config.targets | join(',') }}
 ```
 
 Report the JSON as a Layer 1 ActionItem:

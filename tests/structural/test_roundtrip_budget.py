@@ -216,7 +216,20 @@ _CLAUDE_ROUND_TRIPS: dict[str, int] = {
     # degraded fallback, which is also what keeps
     # `test_review_verify_uses_dep_map::test_the_out_of_scope_wrapup_full_run_survives`
     # pointed at a real witness.
-    "wrapup": 25,
+    # 25 → 26: PLAN-token-efficiency-autopilot-ux-speed, review fix P1-4. The added call is
+    # `hm autopilot_ledger rollup --root <WT> --write`, immediately before the `wrapup_land`
+    # manifest that already staged `work-docs/BASELINE-ledger-rollup.md` as `--optional` and that
+    # nothing wrote — so ADR-002's "the aggregate survives a fresh clone" was unreachable on any
+    # harness where an operator did not type the CLI by hand. Named here, and attributed in
+    # `work-docs/BASELINE-DELTA-token-efficiency-autopilot-ux-speed.md` together with the matching
+    # `surface_allowance.round_trips` entries for `wrapup` and `hm-wrapup`.
+    #
+    # Worth knowing: round-trip counts now have THREE normative sites — this table,
+    # `surface_baseline.json`'s per-command `round_trips`, and an in-flight PLAN's
+    # `surface_allowance.round_trips`. The first two are frozen descriptions and the third is the
+    # declared delta between them, so they are not three copies of one rule; but a change here has
+    # to move all three, which is worth saying out loud rather than rediscovering.
+    "wrapup": 26,
 }
 
 

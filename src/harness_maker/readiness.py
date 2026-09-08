@@ -1603,6 +1603,83 @@ def _dim_observability_setup(project_dir: Path) -> DimensionScore:
         )
     )
 
+    # `second_brain.enabled: true` with a vault that is not there. Today that surfaces ONLY when a
+    # `second_brain` subcommand runs, so a wrapup that never reaches Step 5.6 shows nothing and the
+    # promotion pipeline is silently dead. `weight=0`: this dimension's weights sum to 100, and
+    # AC-012 asks for the condition to be REPORTED, not scored — an environment/config fact rather
+    # than a harness-quality defect. Reachability is `is_dir()`, deliberately NOT `second_brain`'s
+    # stricter "parent carries .obsidian/" rule: re-implementing that here would put the same rule
+    # in two places, and a standing condition only needs to know the path is not there.
+    _sb_enabled = False
+    _sb_vault: str | None = None
+    _sb_hy = project_dir / ".claude" / "harness.yaml"
+    if _sb_hy.is_file():
+        try:
+            from harness_maker.io_utils import load_harness_yaml as _lhy_sb
+
+            _sb_cfg = _lhy_sb(_sb_hy)
+            _sb_block = _sb_cfg.get("second_brain") if isinstance(_sb_cfg, dict) else None
+            if isinstance(_sb_block, dict):
+                _sb_enabled = _sb_block.get("enabled") is True
+                _raw_vault = _sb_block.get("vault_path")
+                _sb_vault = str(_raw_vault) if _raw_vault else None
+        except Exception:  # noqa: BLE001 — degrade to N-A, never crash readiness
+            _sb_enabled = False
+    # Truthiness first, and `if _sb_vault else False` rather than `bool(...) and ...` because the
+    # former narrows for mypy AND rejects `""`, which `Path("")` would turn into `.` — a directory
+    # that always exists, so an empty vault_path would read as reachable.
+    #
+    # Resolution goes through `second_brain._vault_root`, the SAME resolver the promotion path uses
+    # (review finding, P2). A bare `Path(_sb_vault)` diverged from it twice over: no `expanduser()`,
+    # so a perfectly working `vault_path: ~/Documents/vault` was reported as unresolvable with an
+    # action telling the user to fix a correct config; and relative paths resolved against the
+    # process cwd instead of the harness root, so inside `.worktrees/<slug>/` the signal could read
+    # **reachable** while promotion wrote nothing — a false green on the exact silent-dead-pipeline
+    # condition this signal exists to catch. The looser `is_dir()` check (vs. the `.obsidian/`
+    # parent rule) is still deliberate per the note above; only the PATH resolution is shared.
+    #
+    # `OSError` is caught because `Path.is_dir()` swallows only ENOENT/ENOTDIR/EBADF/ELOOP and
+    # PROPAGATES EACCES and ENAMETOOLONG. This is the first probe in this dimension to stat an
+    # arbitrary user string, so an over-long path or a vault under a directory the user cannot
+    # traverse (a root-owned mount, a macOS TCC-protected iCloud path — a common Obsidian location)
+    # would have killed the whole `/hm:health` run for one weight-0 signal.
+    _vault_reachable = False
+    if _sb_vault:
+        try:
+            from harness_maker.models import SecondBrainConfig
+            from harness_maker.second_brain import _vault_root as _sb_vault_root
+
+            _vault_reachable = _sb_vault_root(
+                project_dir, SecondBrainConfig(enabled=True, vault_path=_sb_vault)
+            ).is_dir()
+        except OSError:
+            _vault_reachable = False
+        except Exception:  # noqa: BLE001 — degrade to "unreachable", never crash readiness
+            _vault_reachable = False
+    signals.append(
+        _signal(
+            "second_brain_vault_reachable",
+            passed=(not _sb_enabled) or _vault_reachable,
+            weight=0,
+            evidence=(
+                "second_brain disabled — promotion not expected"
+                if not _sb_enabled
+                else (
+                    f"vault reachable at {_sb_vault}"
+                    if _vault_reachable
+                    else f"second_brain.enabled but vault_path does not resolve: {_sb_vault!r}"
+                )
+            ),
+            action=(
+                None
+                if (not _sb_enabled) or _vault_reachable
+                else "Fix second_brain.vault_path in .claude/harness.yaml, or set enabled: false — "
+                "wrapup Step 5.6 promotion cannot run against an absent vault"
+            ),
+            not_applicable=not _sb_enabled,
+        )
+    )
+
     sample_size = 0
     for path in metrics_files:
         try:

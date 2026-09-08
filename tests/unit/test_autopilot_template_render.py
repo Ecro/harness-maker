@@ -89,15 +89,23 @@ def test_picker_absent_when_level_is_pinned_gated(tmp_path: Path) -> None:
 
 def test_codex_exclusion_is_structural() -> None:
     # ADR-004: the AUTO-ADVANCE branch is wrapped in `is_codex is defined and not is_codex`
-    # (so the Codex render never emits a Skill auto-invoke branch) AND
-    # `autopilot_advance_enabled` (REVIEW P1-3: fused renders pass False so the block is not
-    # embedded per fragment). Auto-advance is genuinely Claude-Code-only — it calls the next
+    # (so the Codex render never emits a Skill auto-invoke branch) AND a second condition.
+    # That second condition used to be a `| default(true)` flag whose only producer was the
+    # since-deleted fused-workflow module; AC-005 of PLAN-token-efficiency-autopilot-ux-speed
+    # replaced it with `config.autonomy.level != "gated"`, the axis that actually decides whether
+    # auto-advance can do anything. Auto-advance is genuinely Claude-Code-only — it calls the next
     # stage through the `Skill` tool, which Cursor and Codex do not have.
     partial = (_TEMPLATES / "agents" / "_partials" / "stage_end_summary.md.j2").read_text()
     manifest = (_TEMPLATES / "agents" / "_partials" / "step_manifest.md.j2").read_text()
+    # The guard used to be a `| default(true)` flag whose only producer was `workflow_fuse.py`;
+    # once that module was deleted the flag had ZERO producers, so the block shipped into every
+    # non-Codex harness — including `gated` ones, where its only possible output is `kill_switch`.
+    # AC-005 of PLAN-token-efficiency-autopilot-ux-speed replaced it in place with the real axis.
+    # The old name is deliberately not spelled here: a structural scan asserts it appears nowhere
+    # in `src/` or `tests/`, and a mention in a comment is indistinguishable from a live reference.
     assert (
         "{% if is_codex is defined and not is_codex "
-        "and (autopilot_advance_enabled | default(true)) %}" in partial
+        'and config.autonomy.level != "gated" %}' in partial
     )
     assert "@hm:autopilot-advance" in partial
     # The PICKER, by contrast, is gated on the config ALONE (2026-08-16). Arming is a marker
@@ -137,7 +145,7 @@ def _render_manifest(is_codex: bool) -> str:
     )
 
 
-def _render_partial(is_codex: bool, *, advance_enabled: bool | None = None) -> str:
+def _render_partial(is_codex: bool) -> str:
     from harness_maker.models import HarnessConfig
     from harness_maker.render import _make_env
 
@@ -154,8 +162,6 @@ def _render_partial(is_codex: bool, *, advance_enabled: bool | None = None) -> s
         # which the full render injects; supply it here for the isolated partial render.
         "harness_maker_src_path": "/cache/harness-maker/0.0.0",
     }
-    if advance_enabled is not None:
-        ctx["autopilot_advance_enabled"] = advance_enabled
     return env.get_template("agents/_partials/stage_end_summary.md.j2").render(**ctx)
 
 

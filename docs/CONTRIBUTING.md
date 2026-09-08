@@ -15,7 +15,6 @@ harness-maker/
 │   ├── reconcile.py          # M2: brownfield conflict resolution
 │   ├── verify.py             # M8: verify-before-completion gate
 │   ├── modular_edit.py       # --add / --remove / --promote
-│   ├── workflow_fuse.py      # M3: atomic stage fusion
 │   ├── conditional_router.py # M6: file-area → reviewer routing
 │   ├── autoloop_driver.py    # M7: time/iter-bounded loop
 │   ├── worktree.py           # M9: git worktree isolation
@@ -41,7 +40,7 @@ harness-maker/
 │   ├── commands/hm/          # /hm:<stage> + /hm:loop / ai-readiness / refresh
 │   ├── skills/<name>/SKILL.md.j2
 │   ├── agents/<name>.md.j2
-│   ├── stages/<stage>.md.j2  # atomic stage fragments for workflow fusion
+│   ├── stages/<stage>.md.j2  # per-stage fragments composed into /hm: commands
 │   ├── harness-yaml/<Preset>.yaml.j2
 │   ├── settings/<Preset>.json.j2
 │   ├── cursor/               # M14: Cursor-only assets (rules/*.mdc, mcp.json)

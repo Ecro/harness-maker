@@ -19,7 +19,7 @@
    - 3.5 [/hm:review — 코드 리뷰](#35-hmreview--코드-리뷰)
    - 3.6 [/hm:verify — 완료 검증](#36-hmverify--완료-검증)
    - 3.7 [/hm:wrapup — 커밋 마무리](#37-hmwrapup--커밋-마무리)
-4. [퓨전 명령](#4-퓨전-명령) <!-- @hm:axis-removed -->
+4. [단계 연결](#4-단계-연결)
 5. [/hm:loop — 자동 반복 루프](#5-hmloop--자동-반복-루프)
 6. [특수 명령](#6-특수-명령)
    - 6.1 [/hm:health — structural 레이어](#61-hmhealth--structural-레이어)
@@ -67,9 +67,9 @@ harness-maker 는 **Claude Code 와 Cursor 양쪽 IDE** 에서 동작하는 듀�
 
 | 범주 | 내용 |
 |------|------|
-| **명령(Commands)** | `/hm:` 접두어 슬래시 명령 14개 (원자 7 + 퓨전 4 + 특수 2 + 루프 1) |
+| **명령(Commands)** | `/hm:` 슬래시 명령 15개 (원자 단계 7 + 루프 드라이버 2 + 유틸리티 6: `configure` `health` `help` `make` `metrics` `uninstall`) |
 | **스킬(Skills)** | 명령에서 호출하는 재사용 능력 모듈 11개 |
-| **에이전트(Agents)** | 특정 역할의 서브-에이전트 12개 |
+| **에이전트(Agents)** | 특정 역할의 서브-에이전트 15개 |
 | **훅(Hooks)** | 도구 호출 전후에 자동 실행되는 이벤트 핸들러 5종 |
 
 ### 설계 원칙
@@ -872,11 +872,22 @@ EOF
 
 ---
 
-## 4. 퓨전 명령 <!-- @hm:axis-removed -->
+## 4. 단계 연결
 
-퓨전 명령은 없습니다. 7개 원자 단계는 `/hm:loop` (`--per-iter-stages`, 기본 <!-- @hm:axis-removed -->
-`execute,review`) 또는 autopilot 의 `autonomy.pipeline` 으로 연결합니다.
-융합 워크플로 축은 0.47.0 에서 제거됐습니다 — PLAN-harness-diet ADR-001/002/014 참조. <!-- @hm:axis-removed -->
+7개 원자 단계가 별도 명령인 것은 의도입니다 — 각 지점이 멈춰서 산출물을 읽고 방향을 바꿀 수 있는
+자리입니다. 멈추고 싶지 않을 때 단계를 이어주는 장치는 둘입니다:
+
+| 장치 | 하는 일 | 멈추는 곳 |
+|---|---|---|
+| **autopilot** (`autonomy.level`) | 스테이지 종료 시 `autonomy.pipeline` 의 다음 항목으로 진행 | plan 아키텍처 인터뷰, CHANGES_REQUESTED 리뷰, wrapup land — **모든 레벨**에서 |
+| **`/hm:loop`** | 선택한 부분집합(`--per-iter-stages`, 기본 `execute,review`)을 목표 달성 또는 상한까지 재실행 | 반복/시간 상한, 그리고 blocking gate 를 보고하는 스테이지 |
+
+기본값은 둘 다 아닙니다: 새로 렌더된 하네스는 `autonomy.level: ask` 이므로, 세션의 첫 적격
+스테이지가 선택지를 제시하고 그것을 고르기 전까지는 아무것도 자동 진행하지 않습니다. `/hm:loop`
+전문은 §5, autopilot 픽커는 §6 에 있습니다.
+
+여러 스테이지를 한 단위로 실행하는 **단일 결합 명령은 없습니다.** 그 축은 0.47.0 까지
+존재했고 제거됐습니다 — PLAN-harness-diet ADR-001/002/014 참조. <!-- @hm:axis-removed -->
 
 ---
 
