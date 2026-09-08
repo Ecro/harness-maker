@@ -430,11 +430,19 @@ _FUSED_AXIS_GATE = _ROOT / "tests" / "structural" / "test_no_fused_workflow_axis
 
 #: Lines that shipped in `docs/HOW-IT-WORKS{,.ko}.md` and `docs/CONTRIBUTING.md` while the
 #: repo-wide gate stayed green. Each must be caught by the gate's own pattern.
+#: The LEADING ordinals are stripped on purpose. `test_no_dead_string_pins` forbids pinning a step
+#: number in a test literal — an ordinal is prose and breaks on a correct renumber — and it is
+#: right: what escaped the ban was the SPELLING (capital, plural, hyphenated anchor), not the digit.
+#: trailing `#4-` inside an anchor stays because that is the literal text that escaped.
+#:
+#: Worth knowing: that gate enumerates via `git ls-files`, so it could not see this file while it
+#: was untracked. The violation surfaced only after `task-land` committed it — a new test file's
+#: structural violations are invisible until the commit that adds it.
 _ESCAPED_LINES = (
     "## 4. Fusion Commands",
-    "4. [Fusion Commands](#4-fusion-commands)",
+    "[Fusion Commands](#4-fusion-commands)",
     "| **Commands** | 14 `/hm:` prefix slash commands (7 atomic + 4 fusion + 2 special + 1 loop) |",
-    "4. [퓨전 명령](#4-퓨전-명령)",
+    "[퓨전 명령](#4-퓨전-명령)",
     "| **명령(Commands)** | `/hm:` 접두어 슬래시 명령 14개 (원자 7 + 퓨전 4 + 특수 2 + 루프 1) |",
     "│   ├── workflow_fuse.py      # M3: atomic stage fusion",
 )
