@@ -2,6 +2,35 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Observability rows no longer vanish at `task-land`.** `review_telemetry emit` filed its
+  row at `Path.cwd()` and `spec_need record` at the stage's `--root` — both the worktree —
+  while a worktree's `.claude/observability/` is gitignored and deleted when the task lands.
+  Measured: neuroTerm's base `review-*.jsonl` stopped on 2026-05-26 while one worktree held a
+  complete 2026-08-17 review round (384 rows); spoton had spec-need rows stranded in four
+  worktrees. Both writers now resolve the base repo root through `resolve_base_root`, the
+  same resolver `stage_agent_ledger` and `second_opinion_invoke` already use. Markers and
+  waivers stay worktree-local: they are gate state read back where they are written.
+- **`work-docs/BASELINE-ledger-rollup.md` regenerated from the base ledger.** The committed
+  copy reported 1 codex call at loss 1.0; the base held 196 rows (codex 2.1%, antigravity
+  51.5%). It was produced inside the worktree by a pre-fix run and never regenerated,
+  because the rendered `/hm:wrapup` pins the released plugin (0.55.0), which has no
+  `rollup` subcommand. The wrapup step now names that failure and skips visibly instead of
+  inviting a hand-written document.
+- **The `verify-<date>.jsonl` prose ledger is retired.** `/hm:verify` told the model to
+  hand-append a JSON record; nothing read it and three projects produced 3 rows in four
+  months. Stage entry/exit is already in `stage-spans.jsonl` and `auto-advance.jsonl`. The
+  `hm cli verify` CI wrapper keeps its own writer.
+
+### Added
+
+- **`/hm:health` signal `observability_tracked_but_ignored`.** A project whose
+  `.gitignore` excludes `.claude/observability/` but still tracks files under it is
+  committing a frozen snapshot that reads as the ledger (neuroTerm: six files from May 2026;
+  spoton: `dashboard.md` from June). The signal lists the paths and the exact
+  `git rm -r --cached` remediation; harness-maker never untracks on the user's behalf.
+
 ## [0.55.0] - 2026-08-26
 
 This release removes places where the harness reported success while checking

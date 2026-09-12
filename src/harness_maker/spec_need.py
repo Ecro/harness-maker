@@ -141,7 +141,12 @@ def record_spec_need(
     """Append a SpecNeedEvent to the verdict ledger (no-raise contract).
 
     Mirrors observability/intent_miss.record_intent_miss.
-    Writes to root/.claude/observability/spec-need-{target}.jsonl.
+    Writes to <base>/.claude/observability/spec-need-{target}.jsonl, where <base> is the
+    main worktree resolved from ``root``. ``root`` is the stage's `<WT>`, and a worktree's
+    `.claude/observability/` is gitignored and deleted at `task-land` — spoton had four
+    worktrees each holding spec-need rows that never reached base. Markers and waivers
+    keep ``root`` on purpose: they are per-worktree gate state read back from the same
+    place they are written, not observability.
     """
     try:
         _validate_slug(target)
@@ -152,8 +157,10 @@ def record_spec_need(
             detected_at=_now_iso(),
             changed_files_hash=changed_files_hash,
         )
+        from harness_maker.second_opinion_invoke import resolve_base_root  # noqa: PLC0415
+
         effective_path = audit_path or (
-            root / ".claude" / "observability" / f"spec-need-{target}.jsonl"
+            resolve_base_root(root) / ".claude" / "observability" / f"spec-need-{target}.jsonl"
         )
         line = json.dumps(event.to_dict(), ensure_ascii=False) + "\n"
         atomic_append(effective_path, line)

@@ -228,7 +228,7 @@ def test_only_the_configured_stage_gets_a_dispatch(tmp_path: Path) -> None:
 # branches (codex / non-codex) at 3 lines each. This equality pin is the FOURTH normative site for
 # the wrapup body size, alongside `_ATOMIC_RATCHET`, `surface_baseline.json` and this task's
 # `surface_allowance`; a change to that command moves all four, which is worth stating once here.
-@pytest.mark.parametrize(("preset", "expected"), [("Side", 683), ("Production", 716)])
+@pytest.mark.parametrize(("preset", "expected"), [("Side", 684), ("Production", 717)])
 def test_the_default_render_costs_existing_users_nothing(
     tmp_path: Path, preset: str, expected: int
 ) -> None:
@@ -250,7 +250,14 @@ def test_the_default_render_costs_existing_users_nothing(
     and a bad slug now HALTS, so a model copying the shipped line would stop the chain at
     every stage) and added the `bad_slug` recovery clause. Wrapup's own body is
     untouched: it is human-gated (`_HUMAN_GATED_STAGES`), so the chain never auto-enters it
-    and its terminal STOP needed no exception clause."""
+    and its terminal STOP needed no exception clause.
+
+    Re-measured 2026-09-12 (was 683 / 716): +1. The roll-up step now says what to do when
+    `hm autopilot_ledger rollup` fails with `invalid choice: 'rollup'` — the rendered command
+    pins the released plugin, and the subcommand shipped after 0.55.0, so on every harness
+    rendered before the next release the step errored and a hand-made document was the
+    tempting (and wrong) recovery. Attributed in
+    `work-docs/BASELINE-DELTA-observability-rows-at-base.md`."""
     assert _count_body_lines(_wrapup(tmp_path, preset=preset)) == expected
 
 

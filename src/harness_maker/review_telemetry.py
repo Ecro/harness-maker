@@ -308,8 +308,12 @@ def emit(
     """Append one record. Returns the path written.
 
     ``project_root`` is prepended to ``observability_dir`` when both are
-    relative; pass ``project_root=Path.cwd()`` from CLI sites. ``observability_dir``
-    defaults to ``DEFAULT_OBSERVABILITY_DIR``.
+    relative. CLI sites pass the **base** repo root (``resolve_base_root(Path.cwd())``),
+    never ``Path.cwd()``: `/hm:review` runs inside `.worktrees/<slug>/`, whose
+    `.claude/observability/` is gitignored and deleted at `task-land`, so a cwd-rooted row
+    was written and then lost — neuroTerm's base `review-*.jsonl` stopped on 2026-05-26
+    while a worktree held a whole 2026-08-17 round. ``observability_dir`` defaults to
+    ``DEFAULT_OBSERVABILITY_DIR``.
 
     ``project_root`` is resolved before joining so traversal segments like
     ``..`` collapse into a concrete absolute path; callers that pass a
@@ -506,7 +510,11 @@ def main(argv: list[str] | None = None) -> int:
         sys.stderr.write(f"emit: schema validation failed: {exc}\n")
         return 1
     try:
-        path = emit(record, project_root=Path.cwd())
+        # Deferred import: `second_opinion_invoke` is the shipped base-root resolver
+        # (worktree-aware, `--separate-git-dir`-aware, git-less fallback = cwd).
+        from harness_maker.second_opinion_invoke import resolve_base_root  # noqa: PLC0415
+
+        path = emit(record, project_root=resolve_base_root(Path.cwd()))
     except (OSError, ValueError) as exc:
         # `_append_atomic_line` refuses a row past PIPE_BUF rather than interleaving it. Now that
         # `churn_max_path` and `disposition_counts` routinely populate, rows are larger than when

@@ -528,6 +528,26 @@ def _dim_context_quality(project_dir: Path, preset: Preset) -> DimensionScore:
     return DimensionScore(name="context_quality", score=_score_signals(signals), signals=signals)
 
 
+def tracked_but_ignored_observability(project_dir: Path) -> list[str] | None:
+    """Paths under `.claude/observability/` that git both tracks AND would ignore.
+
+    `None` = not a git checkout (or no usable git) — the caller marks the signal N-A rather
+    than green, because "could not look" must never read as "looked and found nothing".
+    Paths are repo-relative, sorted, so the remediation command is stable across runs.
+    """
+    from harness_maker.second_opinion_invoke import _git_stdout  # noqa: PLC0415
+
+    if _git_stdout(["rev-parse", "--show-toplevel"], project_dir) is None:
+        return None
+    out = _git_stdout(
+        ["ls-files", "-z", "-ci", "--exclude-standard", "--", ".claude/observability"],
+        project_dir,
+    )
+    if out is None:
+        return None
+    return sorted(p for p in out.split("\0") if p)
+
+
 def _dim_guardrails(project_dir: Path, *, session_id: str | None = None) -> DimensionScore:
     """Hooks defined + permissions deny list density.
 
@@ -1286,6 +1306,45 @@ def _dim_guardrails(project_dir: Path, *, session_id: str | None = None) -> Dime
             sec_action,
         )
     )
+
+    # Tracked-but-ignored observability files (2026-09-12). `_ensure_harness_gitignore`
+    # excludes `.claude/observability/` wholesale, but gitignore never untracks: a project
+    # that committed ledger files BEFORE the rule keeps them tracked forever, frozen at that
+    # commit, while the live rows land in ignored siblings. neuroTerm carried six such files
+    # from May 2026 (a review ledger that "stopped" on 2026-05-26 was this snapshot); spoton
+    # a June `dashboard.md`. The snapshot reads as the ledger to anyone who trusts `git`.
+    # harness-maker never runs `git rm --cached` on the user's behalf (CLAUDE.md git policy),
+    # so this signal names the paths and the exact command. N-A outside a git checkout.
+    stale = tracked_but_ignored_observability(project_dir)
+    if stale is None:
+        signals.append(
+            _signal(
+                "observability_tracked_but_ignored",
+                True,
+                5,
+                "not a git checkout — tracked-snapshot probe not applicable",
+                None,
+                not_applicable=True,
+            )
+        )
+    else:
+        signals.append(
+            _signal(
+                "observability_tracked_but_ignored",
+                not stale,
+                5,
+                "no tracked files under an ignored .claude/observability/"
+                if not stale
+                else f"{len(stale)} tracked file(s) under the ignored .claude/observability/ "
+                f"— a frozen snapshot reads as the ledger: {', '.join(stale[:5])}"
+                + (" …" if len(stale) > 5 else ""),
+                None
+                if not stale
+                else "Untrack the snapshot (the live rows are in ignored siblings): "
+                f"git rm -r --cached {' '.join(stale)} && git commit -m "
+                '"chore(observability): untrack the pre-gitignore ledger snapshot"',
+            )
+        )
 
     return DimensionScore(name="guardrails", score=_score_signals(signals), signals=signals)
 

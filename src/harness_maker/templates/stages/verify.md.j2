@@ -119,7 +119,7 @@ Read the prior `structural` score from `.claude/observability/dashboard.md` — 
 
 Recompute current structural score (or invoke `/hm:health` Step 1 if a fresh score is needed). Compare ONLY structural values.
 
-**No-baseline PASS rule (ADR-004):** when `dashboard.md` is absent OR exists but does NOT begin with `---\ngenerated_by: harness-maker\n` (pre-0.13.0 single-`Health:` scalar schema) OR is missing the `## Structural` section / `score:` line, emit a **PASS** for this check with a `reason` string `"no-baseline: <cause>"` (e.g. `"no-baseline: dashboard.md missing"`, `"no-baseline: pre-0.13.0 schema"`). Record both `prior: null` and `current: <value-or-null>` in the JSONL.
+**No-baseline PASS rule (ADR-004):** when `dashboard.md` is absent OR exists but does NOT begin with `---\ngenerated_by: harness-maker\n` (pre-0.13.0 single-`Health:` scalar schema) OR is missing the `## Structural` section / `score:` line, emit a **PASS** for this check with a `reason` string `"no-baseline: <cause>"` (e.g. `"no-baseline: dashboard.md missing"`, `"no-baseline: pre-0.13.0 schema"`). Report both `prior` (null) and `current` (value or null) in the text summary.
 
 FAIL when: a parseable prior baseline exists AND `current_structural - prior_structural < -5` (structural score dropped more than 5 points). Mid-work-unit dips are normal; a 5+ point drop signals quality regression.
 
@@ -220,8 +220,6 @@ exit 0
 
 ## Output
 
-Write **both** formats:
-
 ### Text (stdout, for humans)
 
 {% if config.dev_mode == 'spec-driven' %}
@@ -240,7 +238,7 @@ Write **both** formats:
 [6/6] (skipped — stopped at first FAIL)
 
 RESULT: FAIL — 1 of 6 checks failed.
-Override: --force --reason="<text>"  (logs to verify-<date>.jsonl with the reason)
+Override: --force --reason="<text>"
 ```
 {% else %}
 ```
@@ -257,54 +255,9 @@ Override: --force --reason="<text>"  (logs to verify-<date>.jsonl with the reaso
 [5/5] (skipped — stopped at first FAIL)
 
 RESULT: FAIL — 1 of 5 checks failed.
-Override: --force --reason="<text>"  (logs to verify-<date>.jsonl with the reason)
+Override: --force --reason="<text>"
 ```
 {% endif %}
-
-### JSON (`.claude/observability/verify-<YYYY-MM-DD>.jsonl`, append one record)
-
-{% if config.dev_mode == 'spec-driven' %}
-```json
-{
-  "timestamp": "2026-05-17T14:23:01Z",
-  "stage": "verify",
-  "result": "FAIL",
-  "checks": [
-    {"id": 1, "name": "plan_spec_satisfaction", "result": "PASS"},
-    {"id": 2, "name": "regression_smoke", "result": "PASS"},
-    {"id": 3, "name": "structural_delta", "result": "PASS", "delta": 2, "prior": 87, "current": 89, "reason": null},
-    {"id": 4, "name": "security_high", "result": "FAIL", "blocking_items": 1, "items": ["CVE-2026-12345"], "reason": null},
-    {"id": 5, "name": "worktree_merge", "result": "SKIPPED"},
-    {"id": 6, "name": "spec_requirement", "result": "SKIPPED"}
-  ],
-  "force_override": false,
-  "override_reason": null
-}
-```
-{% else %}
-```json
-{
-  "timestamp": "2026-05-17T14:23:01Z",
-  "stage": "verify",
-  "result": "FAIL",
-  "checks": [
-    {"id": 1, "name": "plan_spec_satisfaction", "result": "PASS"},
-    {"id": 2, "name": "regression_smoke", "result": "PASS"},
-    {"id": 3, "name": "structural_delta", "result": "PASS", "delta": 2, "prior": 87, "current": 89, "reason": null},
-    {"id": 4, "name": "security_high", "result": "FAIL", "blocking_items": 1, "items": ["CVE-2026-12345"], "reason": null},
-    {"id": 5, "name": "worktree_merge", "result": "SKIPPED"}
-  ],
-  "force_override": false,
-  "override_reason": null
-}
-```
-{% endif %}
-
-For no-baseline PASS, the corresponding check record carries `"result": "PASS"` and a populated `"reason"` string (e.g. `"no-baseline: dashboard.md missing"` / `"no-baseline: pre-0.13.0 schema"`); `prior` / `current` may be `null`. Verify never emits `result: "PASS"` for Check 3 silently — a populated `reason` is mandatory whenever the baseline was missing or unparseable.
-
-> **Personalization field is informational only.** The JSONL record never contains a `personalization` check entry. Verify reads structural only; the `## Personalization` section of dashboard.md is for `/hm:health` reporting and is ignored by this stage. ADR-002 (amended by ADR-007).
-
-When `--force` is set, append the same record with `"force_override": true, "override_reason": "<text>"`.
 
 ## Procedure
 {%- if config.worktree is defined and config.worktree.get('enabled') %}
@@ -389,21 +342,19 @@ Run the checks yourself, below, **only** when Step 0.5 sent you here.
 2. Run Check 1. If PASS, continue. If FAIL: emit text + JSON record + STOP (unless `--force`).
 3. Repeat for Checks 2-{% if config.dev_mode == 'spec-driven' %}6{% else %}5{% endif %}.
 4. Emit final RESULT line + JSON record.
-5. When `--force` is set with FAILing checks: emit text + JSON record with override flag + reason, then return PASS exit code (let the workflow proceed). Wrapup will surface the override in the commit body footer.
+5. When `--force` is set with FAILing checks: emit the text summary with the override flag + reason, then return PASS exit code (let the workflow proceed). Wrapup will surface the override in the commit body footer.
 6. **Stage terminal**: Emit the RESULT line and **STOP**. Do not proceed to `/hm:wrapup` or any other stage without an explicit user command — unless this stage was dispatched by `/hm:loop`, which owns the transition to the next stage. Exception: an auto-advance check below returning `proceed: true` supersedes this.
 
 ## Outputs
 
-- Text summary on stdout (human-facing).
-- One JSON record appended to `.claude/observability/verify-<YYYY-MM-DD>.jsonl`.
+- Text summary on stdout (human-facing). No JSONL ledger: the former `verify-<date>.jsonl` record was hand-written prose nothing read (3 rows across three projects in four months); stage entry/exit is already recorded by `stage-spans.jsonl` and `auto-advance.jsonl`.
 - Exit code: `0` for PASS or `--force` override; non-zero for FAIL without override.
 
 ## Quality Bar
 
 - The gate is **non-negotiable**; bypassing requires `--force --reason=<text>`.
 - A failed check produces actionable evidence (which scenario / which test / which finding) — not just a red line.
-- The JSON record is parseable by the autoloop driver to make stop/continue decisions without re-parsing stdout.
-- `--force` is recorded in the JSONL with the reason — auditable later.
+- `--force` is recorded in the RESULT line with the reason, and `/hm:wrapup` surfaces it in the commit body footer — auditable later.
 - No check produces false PASS by missing inputs (e.g., a missing `findings-*.jsonl` is a soft skip, not a silent PASS).
 
 {% set summary_done = "Full check suite run — tests + lint + type" -%}

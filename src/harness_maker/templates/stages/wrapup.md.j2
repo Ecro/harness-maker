@@ -593,9 +593,10 @@ Step 7.7 below is deliberately NOT in it: it is the only step that can lose work
 keeps its own invocation and its own operator decision point (ADR-006).
 {% endif -%}
 
-**First, produce the ledger roll-up** — the manifest below stages it, and nothing else writes it.
-It reads the rows from the **base** repo (that is where every writer files them) and writes the
-document into the tree this wrapup will commit, so the aggregate survives a fresh clone:
+**First, produce the ledger roll-up** — the manifest stages it; nothing else writes it. Rows come
+from the **base** repo; the document lands where this wrapup commits. On `invalid choice:
+'rollup'` the pinned plugin predates the subcommand: note it, continue (the file is optional),
+never hand-write it:
 
 {% if is_codex %}
 ```
