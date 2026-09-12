@@ -2,6 +2,29 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **`mypy --strict src tests` is clean repo-wide again.** Nine strict errors in five test files
+  had kept CI's `quality-gate` red since `a6e8cc8a` (2026-09-08) through four nightlies, because
+  each phase of this PLAN checked only the sources it touched, never the whole tree. Eight of
+  nine were dict literals passed to `InterviewAnswers`'s typed model fields
+  (`second_opinion`/`delegation`/`autonomy`) — pydantic coerces them at runtime, mypy strict does
+  not; repaired by constructing the typed models directly rather than loosening any field type.
+  The ninth (`test_enabled_names_resolve.py`) was unrelated: a `sorted()` call inline inside
+  `@pytest.mark.parametrize` let its `Iterable[object]` drive mypy's inference so the sort key's
+  argument typed as `object`.
+- **`test_render_roundtrip_collapse.py`'s wrapup call-count golden re-based on the call
+  sequence, not a bare count.** `test_the_wrapup_git_tail_is_three_calls` asserted `== 3` while
+  Phase 1 had legitimately added a 4th `!` call (`autopilot_ledger rollup`), funded by
+  `surface_allowance.round_trips.wrapup: 1` — the assertion lived outside the allowance
+  mechanism and had been red since the same commit. Renamed and rewritten to compare the
+  expected call sequence; the underlying helper was also narrowed to refuse shapes it cannot
+  parse, after three review lenses found it silently under-reporting.
+- **AC-006 re-gated onto ADR-009's `INTEGRATION=1` lane**, and its blocker re-diagnosed: not
+  "no second-opinion CLI installed" (both were present) but that no producer durably records
+  when Pass 1's reviewer fan-out completes. Recorded as an explicit waiver in the PLAN's
+  `## ❓ Open Questions` (S2 / AC-006), pending that producer landing as its own unit.
+
 ### Added
 
 - **Step-sensitivity registry answers "which `/hm:` steps should shrink as models/hosts

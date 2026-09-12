@@ -7,7 +7,8 @@ ADR-011 of the review work hoisted the cross-model call to run "concurrently wit
 **Three of the four tests here are PRECONDITIONS, not the oracle.** AC-006's oracle is one real
 `/hm:review` dispatch, and this AC's own text disqualifies a render-grep as proof: *fixture-shaped
 output proves the validator and never the producer*. The oracle is the live test at the bottom of
-this file, `skipif`'d on CLI absence — without `codex` or `agy` it **skips**, which is not a pass.
+this file, `skipif`'d on `INTEGRATION=1` **and** CLI presence (ADR-009) — outside that lane it
+**skips**, which is not a pass.
 The SPEC records the resulting status as MECHANISM LANDED, ORACLE UNVERIFIED rather than green.
 
 **The stage guard is the load-bearing half.** `/hm:plan` must inject the adapted findings into
@@ -19,8 +20,10 @@ review-stage test went green.
 
 from __future__ import annotations
 
+import os
 import shutil
 from pathlib import Path
+from typing import Literal
 
 import pytest
 
@@ -28,6 +31,7 @@ from harness_maker.models import (
     InterviewAnswers,
     Preset,
     ProjectProfile,
+    SecondOpinionConfig,
     Target,
 )
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
@@ -37,14 +41,14 @@ _BACKGROUND = "run_in_background: true"
 _REFUSAL = "Do NOT background the invoker at this stage"
 
 
-def _render_commands(tmp: Path, *, models: list[str]) -> dict[str, str]:
+def _render_commands(tmp: Path, *, models: list[Literal["codex", "antigravity"]]) -> dict[str, str]:
     render(
         synthesize(
             ProjectProfile(),
             InterviewAnswers(
                 preset=Preset.PRODUCTION,
                 targets=[Target.CLAUDE_CODE],
-                second_opinion={"models": models},
+                second_opinion=SecondOpinionConfig(models=models),
             ),
         ),
         tmp,
@@ -124,12 +128,22 @@ def test_ac_006_the_wiring_sits_inside_the_models_gate(models_off: dict[str, str
 
 
 @pytest.mark.skipif(
+    os.environ.get("INTEGRATION") != "1",
+    reason=(
+        "ADR-009: the live cross-model dispatch runs under INTEGRATION=1, not the PR gate. "
+        "Re-gated 2026-09-12 — the previous guard keyed on CLI presence ALONE, so this test "
+        "unskipped and failed on every ordinary suite run in any developer environment that "
+        "happened to have `codex` or `agy` installed. That is the PR gate by another route, "
+        "which is the thing ADR-009 decided against."
+    ),
+)
+@pytest.mark.skipif(
     shutil.which("codex") is None and shutil.which("agy") is None,
     reason=(
         "AC-006's oracle needs one REAL cross-model dispatch and no second-opinion CLI is "
         "installed. This test SKIPS rather than passes: the SPEC records AC-006 as "
         "MECHANISM LANDED, ORACLE UNVERIFIED, and a render-grep is disqualified as proof by the "
-        "AC's own text. Install `codex` or `agy`, then run with INTEGRATION=1."
+        "AC's own text."
     ),
 )
 def test_ac_006_a_live_review_overlaps_the_fan_out() -> None:
@@ -141,12 +155,39 @@ def test_ac_006_a_live_review_overlaps_the_fan_out() -> None:
     a test that cannot run here and says why, so the gap is visible to the next reader instead of
     being papered over.
 
-    What it must assert when a CLI exists: in one real `/hm:review` on a non-empty diff with
-    `second_opinion.models` non-empty, the invoker's start timestamp precedes the completion of
-    Pass 1's reviewer fan-out — read from `.claude/observability/second-opinion.jsonl` and the
-    stage-agent ledger, differentially against a run with the backgrounding removed.
+    What it must assert: in one real `/hm:review` on a non-empty diff with `second_opinion.models`
+    non-empty, the invoker's start timestamp precedes the completion of Pass 1's reviewer fan-out.
+
+    **What blocks writing it is not the CLI — that was the original guess, and it is wrong.**
+    Both CLIs were present on 2026-09-12 and the oracle still could not be written, because
+    *nothing durably records when the fan-out completed*:
+
+    * the invoker's start IS derivable — `second-opinion.jsonl` carries `ts` plus `duration_s`;
+    * the fan-out's completion is NOT. `.hm-lens-results/<slug>/<run>/<round>/*.json` is written
+      inside the task worktree under a gitignored path, so `task-land` destroys it; and
+      `stage-agents.jsonl` carries no per-lens dispatch row (two full review runs that day left
+      `confirmation-pass` rows and nothing else).
+
+    So closing AC-006 needs a *producer* first — the review stage emitting a per-lens row — and
+    that is a template change to the one stage `/hm:loop` pays for five times, against an
+    `_ATOMIC_RATCHET["review"]` ceiling whose single ADR-011 carve-out is already spent. It is
+    therefore its own unit of work, not a line in this file.
+
+    **This alarm is developer-manual-only, and no CI lane fires it.** `ci.yml` never sets
+    `INTEGRATION`; `nightly.yml` and `release.yml` set it only around
+    `tests/integration/test_fresh_install_readiness.py`, so nothing collects this file with the
+    variable set. Setting the variable would not help either: no lane that could run this file
+    has a second-opinion CLI, so the second guard below would skip it. (Not "the runners have no
+    CLI" — `ci.yml`'s `install-cmd-regression` job installs a pinned `codex` for its own advisory
+    test. That job is not this one.) Before the re-gate, any developer with
+    a CLI hit this failure on an ordinary suite run; now it takes a CLI *and* `INTEGRATION=1`.
+    That is a weaker alarm, accepted because the stronger one was failing ordinary suite runs in
+    every such environment, which is what ADR-009 decided against. The durable record of the gap
+    is this docstring and the PLAN entry, not a gate — so do not read a green suite as evidence
+    that AC-006 is closed.
     """
     pytest.fail(
-        "AC-006's oracle is not implemented. A CLI is installed, so this test is no longer "
-        "skipped and must be written before AC-006 can be called green."
+        "AC-006's oracle is not implemented. INTEGRATION=1 and a CLI are both present, so the "
+        "environment can host a live dispatch — but the fan-out completion signal it must "
+        "compare against still has no durable producer (see this test's docstring)."
     )

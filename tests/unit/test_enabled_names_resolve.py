@@ -41,6 +41,11 @@ _PRESET_LISTS: dict[Preset, tuple[list[str], list[str]]] = {
     Preset.SIDE: (iv._SIDE_ENABLED_SKILLS, iv._SIDE_ENABLED_REVIEWERS),
 }
 
+#: Bound to a name so the element type is pinned to `Preset`. Inline in the decorator,
+#: `parametrize`'s `Iterable[object]` parameter drove mypy's inference of `sorted`, typing the
+#: key lambda's argument as `object` — `p.value` then had nothing to resolve against.
+_SORTED_PRESETS: list[Preset] = sorted(_PRESET_LISTS, key=lambda p: p.value)
+
 
 def _render_for(
     preset: Preset,
@@ -115,7 +120,7 @@ def _unresolved(out: Path) -> dict[str, list[str]]:
     }
 
 
-@pytest.mark.parametrize("preset", sorted(_PRESET_LISTS, key=lambda p: p.value))
+@pytest.mark.parametrize("preset", _SORTED_PRESETS)
 def test_ac_010_every_enabled_name_resolves_to_a_real_asset(preset: Preset, tmp_path: Path) -> None:
     """Both presets, because `_SIDE_ENABLED_SKILLS` is a different list and could drift alone."""
     out = _render_for(preset, tmp_path)

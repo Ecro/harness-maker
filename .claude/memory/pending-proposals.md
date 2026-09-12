@@ -324,6 +324,8 @@ should write the proposal from that instance rather than from this line.
 | `[fail:test] test-pins-retired-implementation-name` | 4 | no proposal |
 | `[fail:test] shipped-entry-point-not-exercised` | 4 | no proposal (the RESOLVED table's `test_cli_surfaces_are_driven.py` covers CLI surfaces only, not the general class) |
 | `[fail:test] snapshot-regen-inside-worktree` | 13 | no proposal — added 2026-08-10. Highest count in the file and it was missing from this table entirely, which is its own signal. No first-hand instance this round, so no mechanism is proposed here; the obvious candidate (refuse `regenerate.py` when cwd is under `.worktrees/`) should be written by whoever next trips it |
+| `[fail:process] targeted-phase-d-subset-missed-the-snapshot-test` | 3 | no proposal — added 2026-09-13. No first-hand instance this round (this wrapup did not touch a targeted-subset test selection). Obvious candidate: any change under `templates/` or a `synthesize`/`render`-importing module must always run `tests/unit/test_synthesize_snapshot.py` plus whole-repo `ruff check .`/`ruff format --check .`, not a symbol-derived subset — should be written by whoever next trips it |
+| `[fail:design] green-module-dead-prose-wiring` | 7 | no proposal — added 2026-09-13. No first-hand instance this round. Obvious candidate: a "the stage LLM runs `python -m harness_maker.X`" recipe needs a seam-focused review pass proving the rendered flags exercise the module's real branches, not just an isolated-module review — should be written by whoever next trips it |
 
 > Table cleared 2026-08-10 (multi-lens-review-round) for the two entries that reached count 3
 > this round with first-hand evidence — proposals for them follow below.

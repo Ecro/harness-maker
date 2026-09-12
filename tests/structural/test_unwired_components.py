@@ -31,7 +31,13 @@ from pathlib import Path
 import pytest
 
 from harness_maker import interview as iv
-from harness_maker.models import InterviewAnswers, Preset, ProjectProfile, Target
+from harness_maker.models import (
+    DelegationConfig,
+    InterviewAnswers,
+    Preset,
+    ProjectProfile,
+    Target,
+)
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
 
@@ -355,7 +361,7 @@ def test_ac_014_verify_delegation_is_config_gated(tmp_path: Path) -> None:
                 InterviewAnswers(
                     preset=Preset.PRODUCTION,
                     targets=[Target.CLAUDE_CODE],
-                    delegation={"stages": stages},
+                    delegation=DelegationConfig(stages=stages),
                 ),
             ),
             out,

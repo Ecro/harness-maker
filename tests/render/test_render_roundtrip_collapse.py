@@ -29,7 +29,46 @@ from harness_maker.synthesize import synthesize
 
 from .conftest import pin_install_ref
 
-_BANG = re.compile(r"^!", re.M)
+_BANG_LINE = re.compile(r"^!(.*)", re.M)
+
+
+def _hm_call_sequence(block: str) -> tuple[str, ...]:
+    """The `hm` verb each `!` auto-exec line in `block` invokes, in render order.
+
+    **Deliberately narrow, and loud about it.** The block this serves is the wrapup git tail:
+    four harness-authored lines, one `hm` call each, no continuation and no quoting near the
+    verb. Two rounds of this review tried to generalise instead — first to two calls on one line
+    and backslash continuations, and reviewers immediately found a bare `hm` inside a quoted
+    argument, a CRLF continuation, and a join that reached outside `!` lines. That is what a
+    general shell parser costs when the input is four fixed lines, so the generality was removed
+    rather than extended again.
+
+    Anything outside the supported shape raises instead of returning a shorter answer. A refusal
+    is the right outcome for a golden: it means the block changed shape, which is the event this
+    test exists to notice, and it is the one report a silent under-count can never produce.
+
+    Only the verb is kept — the `uv run --with <ref>` prefix carries an install ref that moves
+    every release and the arguments carry `<WT>`/`<BASE>` placeholders, so pinning either would
+    make this a byte golden of things it is not about. A second word joins the verb only when it
+    is not flag-shaped; that rule is positional, and the equality assertion below is what fails
+    if an `hm` call ever takes a bare positional argument.
+    """
+    out: list[str] = []
+    for line in _BANG_LINE.findall(block.replace("\r\n", "\n")):
+        assert not line.rstrip().endswith("\\"), f"continued `!` line is unsupported: {line!r}"
+        words = line.split()
+        positions = [i for i, word in enumerate(words) if word == "hm"]
+        if not positions:
+            continue
+        assert len(positions) == 1, f"more than one `hm` token on one `!` line: {line!r}"
+        rest = words[positions[0] + 1 :]
+        if not rest:
+            continue
+        verb = rest[0]
+        if len(rest) > 1 and not rest[1].startswith("-"):
+            verb = f"{verb} {rest[1]}"
+        out.append(verb)
+    return tuple(out)
 
 
 @cache
@@ -230,16 +269,57 @@ def test_wrapup_keeps_task_land_as_its_own_visible_call() -> None:
     assert "hm worktree commit-base-memory" in body
 
 
-def test_the_wrapup_git_tail_is_three_calls() -> None:
-    """`wrapup_land` + `task-land` + `commit-base-memory`, and nothing else in between.
+def test_hm_call_sequence_refuses_the_shapes_it_does_not_support() -> None:
+    """The refusal arms — the whole reason the helper stayed narrow.
+
+    Both shapes are real: `execute.md.j2` puts an inner `$( … hm … )` and an outer `hm` on one
+    `!` line, and `configure.md.j2` continues `hm cli \\` onto the next line. Neither is in the
+    wrapup tail. An earlier version of this helper parsed both and was then found to
+    under-report on a bare `hm` inside a quoted argument and on CRLF — so it now refuses, and
+    these are the assertions that prove the refusal is reachable rather than decorative.
+    """
+    two_calls = (
+        '!HM_OWNED="$(uv run --with X hm worktree owned-crumb-read "$(pwd)" s)" '
+        'uv run --with X hm worktree post-commit-pop "$(pwd)"\n'
+    )
+    with pytest.raises(AssertionError, match="more than one `hm` token"):
+        _hm_call_sequence(two_calls)
+
+    continued = '!uv run --with X hm cli \\\n  configure-second-brain "$(pwd)" --check\n'
+    with pytest.raises(AssertionError, match="continued `!` line is unsupported"):
+        _hm_call_sequence(continued)
+
+
+def test_hm_call_sequence_skips_a_bang_line_that_invokes_no_hm_verb() -> None:
+    """Step 8's `!git push` is the concrete case a widened slice would include."""
+    assert _hm_call_sequence("!git push\n!uv run --with X hm wrapup_land --worktree W\n") == (
+        "wrapup_land",
+    )
+
+
+def test_the_wrapup_git_tail_is_the_expected_call_sequence() -> None:
+    """The roll-up, then `wrapup_land` + `task-land` + `commit-base-memory`, in that order.
 
     Sliced to Steps 6 → 7.7 exactly. Slicing "to the end of the file" would sweep in Step
     8's push, the Gate-0 receipt guard and the two autopilot calls — shared blocks present
     in every stage command, outside this PLAN's scope and not part of the git tail.
+
+    **Re-based from a bare `== 3`, and renamed with it** (PLAN-token-efficiency-autopilot-ux-speed
+    Phase 1, which added the `autopilot_ledger rollup` call and declared it as
+    `surface_allowance.round_trips.wrapup: 1` — the movement is funded, it was simply never
+    folded back into this golden). A count is the weakest form this assertion can take: it stays
+    green through a substitution or a re-ordering, which is most of what could actually go wrong
+    here. The sequence is compared instead, so the allowance's one added call has to be *that*
+    call, in that position.
     """
     body = _commands(_CLAUDE_ONLY)["wrapup"]
     tail = body[body.index("### Steps 6 → 7.6") : body.index("### Step 8")]
-    assert len(_BANG.findall(tail)) == 3, _BANG.findall(tail)
+    assert _hm_call_sequence(tail) == (
+        "autopilot_ledger rollup",
+        "wrapup_land",
+        "worktree task-land",
+        "worktree commit-base-memory",
+    )
 
 
 def test_wrapup_carries_the_stash_preview_obligation_into_the_prose() -> None:

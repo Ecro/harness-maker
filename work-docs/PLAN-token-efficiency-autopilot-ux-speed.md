@@ -1,7 +1,7 @@
 ---
 type: plan
 task_slug: token-efficiency-autopilot-ux-speed
-status: planning
+status: complete
 created: 2026-09-08
 tags: [harness-maker, plan, python, observability, parity, autopilot, token-economy]
 spec: "[[SPEC-token-efficiency-autopilot-ux-speed]]"
@@ -764,6 +764,38 @@ should. All template files were restored byte-for-byte and re-verified green aft
 - **Rollback point:** Phase 3.
 - Delivers AC-006.
 - **Status: MECHANISM LANDED, ORACLE UNVERIFIED — by explicit user decision.** Wiring green (`structural` + `snapshot` + `render` + the phase's own tests, `pytest_exit=0`); AC-006 is **not** called green.
+- **2026-09-12 — the blocker was re-diagnosed, and the test re-gated to ADR-009's lane.** The
+  original record blamed CLI absence. Both `codex` and `agy` were present on 2026-09-12 and the
+  oracle still could not be written, so that was the wrong diagnosis. The real blocker: **nothing
+  durably records when Pass 1's fan-out completed.** The invoker's start *is* derivable
+  (`second-opinion.jsonl` carries `ts` + `duration_s`), but the completion side is not — the lens
+  result files live under a gitignored path inside the task worktree and are destroyed by
+  `task-land`, and `stage-agents.jsonl` carries no per-lens dispatch row (two full review runs
+  that day left `confirmation-pass` rows and nothing else). Closing AC-006 therefore needs a
+  **producer** first — the review stage emitting a per-lens row — which is a template change to
+  the one stage `/hm:loop` pays for five times, against an `_ATOMIC_RATCHET["review"]` ceiling
+  whose single ADR-011 carve-out is already spent. That is its own unit of work.
+  Separately, the test's `skipif` keyed on **CLI presence alone**, so it unskipped and failed on
+  every ordinary suite run in any environment that happened to have a CLI — the PR gate by
+  another route, which is what ADR-009 decided against. It is now gated on `INTEGRATION=1`
+  **and** CLI presence.
+
+  **What that costs, stated rather than implied.** The re-gate was proposed as "the alarm is
+  preserved, just moved to ADR-009's lane". The review's `tests` lens read all three workflows
+  and showed that claim is too generous: `ci.yml` never sets `INTEGRATION`, and `nightly.yml`
+  and `release.yml` set it only around `tests/integration/test_fresh_install_readiness.py`, so
+  **no CI lane collects this file under `INTEGRATION=1`** and the alarm now has no automated
+  firing surface at all. Nor can one simply be added by setting the variable: **no lane that
+  could run this file has a second-opinion CLI**, so the second guard would skip it anyway.
+  (Stated that way on purpose — a blanket "the runners have no CLI" would be false:
+  `ci.yml`'s `install-cmd-regression` job does `npm install -g @openai/codex@<pinned>` for its
+  own advisory negative test. `agy` appears in no workflow at all. The point is that neither the
+  `quality-gate` job nor the two narrow `INTEGRATION=1` steps is that job.) The honest description is
+  therefore **developer-manual-only** — it fires for someone who has a second-opinion CLI *and*
+  types `INTEGRATION=1`. That is weaker than the pre-change behaviour, where any developer with
+  a CLI hit it on an ordinary suite run; it is accepted because the pre-change behaviour was
+  breaking ordinary suite runs in every such environment, which ADR-009 decided against. The
+  durable record of the gap is this PLAN entry and the test's own docstring, not a gate.
 
 ##### The oracle cannot be produced here, and that is recorded rather than worked around
 
@@ -975,6 +1007,50 @@ since a machine half contradicting the prose half is exactly this unit's thesis.
 `_RATCHET_MODELS = ["codex"]` is one model, so the `≥2 models` concurrency block and the antigravity
 transport are still outside every per-command band.
 
+### Post-phase repair (2026-09-12) — two defects the per-phase exits could not see
+
+Phases 1–6 each recorded `mypy --strict` clean and a green targeted run, and both records were
+accurate **about what they measured**. Two defects survived anyway, because neither was inside any
+one phase's measurement window. They are recorded here rather than inside a phase, since attributing
+them to one would be false.
+
+1. **`mypy --strict` was never run over `src tests` as a whole.** Each phase type-checked the
+   sources it changed; CI checks the tree. Nine errors in five test files this unit authored.
+   CI's `quality-gate` had been red on exactly these since 2026-09-08 (`a6e8cc8a`), through four
+   nightlies, and the next task's push inherited the red.
+
+   **They are not all one defect, and the first draft of this paragraph said they were.** The
+   split below is the `mypy --strict src tests` output itself, not a count derived from reading
+   the diff: `test_doc_truth.py:219` emits **five** errors from one `AutonomyConfig(**{...})`
+   call (one per keyword mypy resolves through the unpacking), and
+   `test_second_opinion_backgrounding.py:47`, `test_unwired_components.py:358` and
+   `test_command_size_budget.py:654` emit one each. Eight
+   of the nine, across four files, are therefore the dict-literal shape: `InterviewAnswers`'s
+   `second_opinion` / `delegation` / `autonomy` fields are typed models, the tests passed dict
+   literals, and pydantic coerces at runtime where mypy strict refuses. Repaired by constructing
+   the typed models, never by loosening the field types — the contract is the thing the tests are
+   checking. `test_doc_truth` gained `_level_of`, a lookup that re-derives the `AutonomyLevel`
+   member from its own string, chosen over a `cast` so a rename of that Literal fails loudly here
+   instead of being narrowed by assertion.
+
+   The ninth, in `test_enabled_names_resolve.py`, has an unrelated cause: `sorted(...)` sat
+   inline inside `@pytest.mark.parametrize`, whose `Iterable[object]` parameter drove mypy's
+   inference of the call, typing the key lambda's argument as `object` so `p.value` resolved
+   against nothing. Repaired by binding the sorted list to an annotated name. Folding it under
+   the dict-literal cause would send the next reader looking for a model mismatch that file does
+   not contain — the review's `consistency` lens caught exactly that in the first draft.
+2. **Phase 1's added `!` call was funded but never folded into the golden it moved.**
+   `surface_allowance.round_trips.wrapup: 1` admits the `autopilot_ledger rollup` call, so every
+   ratchet stayed green — but `test_render_roundtrip_collapse.py`'s `== 3` is a plain golden,
+   outside the allowance mechanism, and it had been red since the same commit. Re-based to the
+   observed call **sequence** rather than a re-bumped count: a count survives a substitution or a
+   re-ordering, which is most of what could actually go wrong in this block.
+
+**What this says about the per-phase exit criterion.** "Green on the files I touched" and "green"
+differ by exactly the set a phase did not look at, and a repo-wide gate lives in that gap. The
+phases were not wrong to scope their runs — a full sweep per phase is not affordable — but the
+*unit* needed one full sweep before it could be called done, and it never had one.
+
 ## 🔎 Review round 1 (2026-09-08)
 
 Full record in `work-docs/REVIEW-token-efficiency-autopilot-ux-speed-round1.md`. Two reviewers over
@@ -1066,25 +1142,68 @@ shape-only assertion.
 | R8 | Phases 5 and 6 both edit `CLAUDE.md`. | low | Declared as a merge hazard on both; `depends_on: [5]` forces serial. |
 | R9 | This unit could be read as promising a token or wall-clock saving. | medium | Success Criteria states no measured saving is claimed; the enabling work and the saving are deliberately separate units. |
 
+## ❓ Open Questions
+
+### S2 / AC-006 — the differential oracle is waived, with an unblock condition (resolved 2026-09-13)
+
+**Question.** SPEC S2 declares its verification as `integration / differential (live run vs
+sequential baseline)`. That oracle is not implemented, and AC-006's own text disqualifies a
+render-grep as a substitute — so does the scenario ship uncovered, or does something stand in?
+
+**Resolution: waived, deliberately, twice.** The user was offered wire-and-record / defer
+Phases 4+6 / install a CLI first, and chose **wire-and-record** (Phase 4's record); on
+2026-09-13 the same decision was re-affirmed when the blocker was re-diagnosed and the test
+re-gated onto ADR-009's `INTEGRATION=1` lane. This entry exists because the decision was
+recorded only in Phase 4's status line and the test's docstring, and `/hm:verify` check 1b
+reads waivers from **this** section — so the gate saw an uncovered scenario where a settled
+decision existed. That is a placement defect in the record, not a new judgement.
+
+**What actually covers S2 today.** The three render-level tests bound to AC-006
+(`…_the_review_render_backgrounds_the_invoker`, `…_the_plan_render_refuses_to_background`,
+`…_the_wiring_sits_inside_the_models_gate`) prove the **mechanism is wired and stage-gated** —
+that `run_in_background` reaches the review arm, that the plan arm refuses it, and that both
+sit inside the models gate. They do not prove **overlap**, which is what S2's `Then` clause
+asserts. The gap is therefore narrow and named: wired, not observed.
+
+**Why the oracle cannot be written yet** (the 2026-09-13 re-diagnosis — the original "no CLI
+installed" answer was wrong; both CLIs were present and it still could not be written): the
+invoker's start time *is* derivable (`second-opinion.jsonl` carries `ts` + `duration_s`), but
+**no producer durably records when Pass 1's reviewer fan-out completed**. The per-lens result
+files live under a gitignored path inside the task worktree and `task-land` destroys them, and
+`stage-agents.jsonl` carries no per-lens dispatch row — two full review runs on 2026-09-12 left
+`confirmation-pass` rows and nothing else.
+
+**Unblock condition.** Closing AC-006 needs that producer first — the review stage emitting a
+per-lens row — which is a template change to the one stage `/hm:loop` pays for five times,
+against an `_ATOMIC_RATCHET["review"]` ceiling whose single ADR-011 carve-out is already spent.
+That is its own unit of work. When it lands, the differential test becomes writable and this
+waiver should be removed rather than renewed.
+
+**Known cost of the waiver.** The alarm is **developer-manual-only**: it fires for someone who
+has a second-opinion CLI *and* types `INTEGRATION=1`. No CI lane collects this file with the
+variable set, and setting it would not help because no lane that could run this file has a CLI.
+So a green suite is not evidence that AC-006 is closed — this entry and the test's docstring
+are the only durable record of the gap.
+
 ## ✅ Success Criteria
 
 Mirrors `SPEC-token-efficiency-autopilot-ux-speed`'s fifteen acceptance criteria.
 
-- [ ] AC-001 — the roll-up carries hand-checkable counts and survives a clone
-- [ ] AC-002 — a dangling authorization is reported
-- [ ] AC-003 — the smoke check is not-applicable when the runtime cannot advance
-- [ ] AC-004 — absence of evidence is never reported as health
-- [ ] AC-005 — a gated harness renders no auto-advance surface
-- [ ] AC-006 — the cross-model call is in flight before the fan-out completes
-- [ ] AC-007 — no disclosed default survives inversion of its producing object
-- [ ] AC-008 — README's worktree claim holds on both arms
-- [ ] AC-009 — the advisory names the threshold that fired
-- [ ] AC-010 — every enabled name resolves to a real asset
-- [ ] AC-011 — no shipped section survives whose body refutes its heading
-- [ ] AC-012 — an unreachable vault is a standing health condition
-- [ ] AC-013 — the per-command ratchet sees second-opinion surface
-- [ ] AC-014 — every unwired component is wired or gated as intentional
-- [ ] AC-015 — no rendered command instructs from a list its own dispatch ignores
+- [x] AC-001 — the roll-up carries hand-checkable counts and survives a clone
+- [x] AC-002 — a dangling authorization is reported
+- [x] AC-003 — the smoke check is not-applicable when the runtime cannot advance
+- [x] AC-004 — absence of evidence is never reported as health
+- [x] AC-005 — a gated harness renders no auto-advance surface
+- [x] AC-006 — the cross-model call is in flight before the fan-out completes — WAIVED (oracle unimplemented; see Open Questions → S2 / AC-006)
+- [x] AC-007 — no disclosed default survives inversion of its producing object
+- [x] AC-008 — README's worktree claim holds on both arms
+- [x] AC-009 — the advisory names the threshold that fired
+- [x] AC-010 — every enabled name resolves to a real asset
+- [x] AC-011 — no shipped section survives whose body refutes its heading
+- [x] AC-012 — an unreachable vault is a standing health condition
+- [x] AC-013 — the per-command ratchet sees second-opinion surface
+- [x] AC-014 — every unwired component is wired or gated as intentional
+- [x] AC-015 — no rendered command instructs from a list its own dispatch ignores
 
 **Not a success criterion, deliberately.** No measured token or wall-clock reduction. This
 unit removes dead surface and restores the instrument; a saving claim requires a

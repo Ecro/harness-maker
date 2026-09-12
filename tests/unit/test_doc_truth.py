@@ -57,6 +57,7 @@ import importlib.util
 import re
 from dataclasses import dataclass
 from pathlib import Path
+from typing import get_args
 
 import pytest
 import yaml
@@ -108,10 +109,45 @@ def _produced(cfg: AutonomyConfig) -> dict[str, str]:
 
 #: Every value a disclosed default could be inverted to. Sourced from the producing types so a
 #: new `AutonomyLevel` member widens the inversion sweep without a second hand-list.
+_LEVELS: tuple[AutonomyLevel, ...] = get_args(AutonomyLevel)
+
 _DOMAINS: dict[str, tuple[str, ...]] = {
-    "level": tuple(AutonomyLevel.__args__),  # type: ignore[attr-defined]
+    "level": _LEVELS,
     "persistent": ("true", "false"),
 }
+
+
+def _level_of(value: str) -> AutonomyLevel:
+    """Re-derive the Literal member from its own string, instead of casting it.
+
+    The inversion sweep walks `_DOMAINS` as plain strings (the `persistent` arm is not a
+    Literal), so the value reaching `AutonomyConfig` has to be narrowed back. A `cast` would
+    narrow it by assertion and stay green if `AutonomyLevel` were renamed out from under this
+    file; the lookup fails loudly instead, which is the property this test is about.
+    """
+    for level in _LEVELS:
+        if level == value:
+            return level
+    raise AssertionError(f"not an AutonomyLevel member: {value!r}")
+
+
+def test_level_of_rejects_a_string_that_is_not_an_autonomy_level() -> None:
+    """The branch the inversion sweep itself never reaches, and the reason it exists.
+
+    Every value `_level_of` sees in a passing run comes from `AutonomyLevel` already, so its
+    raise arm is unreachable from the sweep — which is exactly the shape of a guard that quietly
+    stops guarding. This enters that window directly: rename a member and the lookup fails here
+    with the offending string, instead of a `cast` narrowing it through.
+    """
+    with pytest.raises(AssertionError, match="not an AutonomyLevel member"):
+        _level_of("auto_unsafe")
+
+
+def test_level_of_round_trips_every_declared_level() -> None:
+    """The positive arm — otherwise the test above passes against a `_level_of` that raises on
+    everything, which would fail the sweep rather than guard it."""
+    for level in _LEVELS:
+        assert _level_of(level) == level
 
 
 @dataclass(frozen=True)
@@ -216,14 +252,12 @@ def test_ac_007_inverting_a_disclosed_default_fails_the_guard(disclosure: _Discl
             if alternative == baseline[key]:
                 continue
             inverted = AutonomyConfig(
-                **{
-                    "level": alternative if key == "level" else baseline["level"],
-                    "autopilot_persistent": (
-                        alternative == "true"
-                        if key == "persistent"
-                        else baseline["persistent"] == "true"
-                    ),
-                }
+                level=_level_of(alternative if key == "level" else baseline["level"]),
+                autopilot_persistent=(
+                    alternative == "true"
+                    if key == "persistent"
+                    else baseline["persistent"] == "true"
+                ),
             )
             inversions += 1
             assert not _guard_verdict(disclosure, _produced(inverted)), (

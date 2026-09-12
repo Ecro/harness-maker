@@ -37,10 +37,17 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
+from typing import Literal
 
 import pytest
 
-from harness_maker.models import InterviewAnswers, Preset, ProjectProfile, Target
+from harness_maker.models import (
+    InterviewAnswers,
+    Preset,
+    ProjectProfile,
+    SecondOpinionConfig,
+    Target,
+)
 from harness_maker.render import DEFAULT_FREEZE_TIME, render
 from harness_maker.synthesize import synthesize
 
@@ -621,11 +628,14 @@ _EXEC_LINE = re.compile(r"^\s*!.*$", re.M)
 #: still outside every per-command band. AC-013 asks for `second_opinion` set, which this
 #: satisfies; the multi-model branch is the same "a band that never saw it" argument one level in,
 #: recorded rather than left silent (A.5 round 1, ADVISORY-2).
-_RATCHET_MODELS: list[str] = ["codex"]
+_RATCHET_MODELS: list[Literal["codex", "antigravity"]] = ["codex"]
 
 
 def _render(
-    *, feature_branch_workflow: bool, tmp: Path, second_opinion_models: list[str] | None = None
+    *,
+    feature_branch_workflow: bool,
+    tmp: Path,
+    second_opinion_models: list[Literal["codex", "antigravity"]] | None = None,
 ) -> dict[str, str]:
     """`fused_workflows` is passed explicitly: its model default is a single 3-stage
     workflow, so an implicit render would not contain the commands this gate measures
@@ -650,8 +660,8 @@ def _render(
                     preset=Preset.PRODUCTION,
                     targets=[Target.CLAUDE_CODE],
                     worktree={"feature_branch_workflow": feature_branch_workflow},
-                    second_opinion=(
-                        {"models": list(second_opinion_models)} if second_opinion_models else {}
+                    second_opinion=SecondOpinionConfig(
+                        models=list(second_opinion_models) if second_opinion_models else []
                     ),
                 ),
             ),
